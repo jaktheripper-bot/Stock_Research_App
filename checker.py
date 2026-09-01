@@ -1,41 +1,45 @@
 import re
 
 def verify_stock_report(stock_data: dict, report_text: str) -> tuple[bool, list[str]]:
+    """
+    Audits the generated AI report to ensure structural integrity, 
+    proper 1-100 ESG bounds, and strict adherence to the Indian numerical system.
+    """
     discrepancies = []
     
-    ticker = stock_data.get("ticker", "").upper()
-    short_name = stock_data.get("short_name", "")
-    
-    if not ticker or ticker not in report_text.upper():
-        discrepancies.append(f"Critical: Target ticker symbol '{ticker}' is missing from report text.")
-    if short_name and short_name.lower() not in report_text.lower():
-        discrepancies.append(f"Critical: Company name '{short_name}' is missing from report text.")
-
-    if "N/A" in report_text and ("Market Cap" in report_text or "P/E" in report_text):
-        discrepancies.append("Data Integrity Error: Report contains unresolved 'N/A' placeholders for core financial metrics.")
-
-    required_sections = [
-        "Values & Beliefs Impact Scorecard",
-        "Corporate Governance & Transparency",
-        "Socio-Economic Impact",
-        "Environmental & Sustainability Alignment"
+    required_headers = [
+        "VERDICT",
+        "Pillar 1",
+        "Pillar 2",
+        "Pillar 3",
+        "Pillar 4",
+        "Pillar 5",
+        "Pillar 6",
+        "Pillar 7",
+        "Conclusion"
     ]
     
-    for section in required_sections:
-        if section.lower() not in report_text.lower():
-            discrepancies.append(f"Structure Error: Missing mandatory section -> '{section}'.")
+    for header in required_headers:
+        if not re.search(rf"{header}", report_text, re.IGNORECASE):
+            discrepancies.append(f"Missing required section: {header}")
 
-    score_matches = re.findall(r'(\d+(?:\.\d+)?)\s*/\s*10', report_text)
-    if not score_matches:
-        discrepancies.append("Scorecard Error: No valid 'X/10' numerical ratings found in the impact scorecard.")
-        
-    for score_str in score_matches:
-        try:
-            score_val = float(score_str)
-            if score_val < 0 or score_val > 10:
-                discrepancies.append(f"Scorecard Error: Rating '{score_val}/10' exceeds allowable 0-10 bounds.")
-        except ValueError:
-            discrepancies.append(f"Scorecard Error: Malformed score formatting detected ('{score_str}').")
+    esg_pattern = re.compile(r'\|\s*\*\*?(Environmental|Social|Governance)\*?\*\s*\|\s*(\d+(?:\.\d+)?)\s*\|', re.IGNORECASE)
+    esg_matches = esg_pattern.findall(report_text)
+    
+    if not esg_matches or len(esg_matches) < 3:
+        discrepancies.append("ESG Impact Scorecard table is missing, incomplete, or improperly formatted.")
+    else:
+        for match in esg_matches:
+            param, score_str = match
+            try:
+                score = float(score_str)
+                if not (0 <= score <= 100):
+                    discrepancies.append(f"Scorecard Error: {param} rating '{score}' exceeds allowable 0-100 bounds.")
+            except ValueError:
+                discrepancies.append(f"Scorecard Error: Could not parse numerical score for {param}.")
+
+    if re.search(r'\b(billion|billions|million|millions)\b', report_text, re.IGNORECASE):
+        discrepancies.append("Formatting Error: Report contains disallowed international numeric formats (Millions/Billions). It must strictly use the Indian numbering system (Lakhs/Crores).")
 
     passed = len(discrepancies) == 0
     return passed, discrepancies

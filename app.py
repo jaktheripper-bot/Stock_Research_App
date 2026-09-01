@@ -5,7 +5,45 @@ from db import get_archived_reports
 from markdown_pdf import MarkdownPdf, Section
 
 st.set_page_config(page_title="Equity Research AI", layout="wide", page_icon="📈")
-st.title("Equity Research Analysis Platform")
+
+st.markdown("""
+    <style>
+        /* Increase body copy font size by 3 points (~19px) while keeping headers untouched */
+        div[data-testid="stMarkdownContainer"] p, 
+        .stTextInput label, 
+        .stSelectbox label, 
+        .stMarkdown li,
+        .stCaptionContainer p {
+            font-size: 19px !important;
+        }
+    </style>
+""", unsafe_allow_html=True)
+
+def format_inr(number):
+    if number is None or not isinstance(number, (int, float)):
+        return "N/A"
+    
+    def group_inr(val):
+        parts = f"{val:.2f}".split(".")
+        int_p, dec_p = parts[0], parts[1]
+        if len(int_p) <= 3:
+            return f"{int_p}.{dec_p}"
+        last_three = int_p[-3:]
+        rest = int_p[:-3]
+        groups = []
+        while len(rest) > 2:
+            groups.append(rest[-2:])
+            rest = rest[:-2]
+        if rest:
+            groups.append(rest)
+        groups.reverse()
+        return f"{','.join(groups)},{last_three}.{dec_p}"
+
+    if number >= 1e7:
+        return f"₹{group_inr(number / 1e7)} Cr"
+    elif number >= 1e5:
+        return f"₹{group_inr(number / 1e5)} Lakh"
+    return f"₹{group_inr(number)}"
 
 def convert_md_to_pdf_bytes(markdown_text: str) -> bytes:
     pdf = MarkdownPdf(toc_level=0)
@@ -18,14 +56,7 @@ def convert_md_to_pdf_bytes(markdown_text: str) -> bytes:
     return pdf_bytes
 
 with st.sidebar:
-    st.header("Controls & History")
-    if st.button("Clear Application Cache", use_container_width=True):
-        st.cache_data.clear()
-        st.success("Cache cleared.")
-        st.rerun()
-        
-    st.markdown("---")
-    st.subheader("Archived Reports")
+    st.header("Archived Reports")
     try:
         archives = get_archived_reports()
         if archives:
@@ -44,19 +75,40 @@ with st.sidebar:
                     st.rerun()
         else:
             st.info("No archives found.")
-    except Exception as e:
+    except Exception:
         st.caption("Archive history unavailable.")
 
-query = st.text_input("Enter Company Name or Ticker (e.g., Tata Motors, SBILIFE, RELIANCE):", "")
+ticker_display = st.session_state.get("last_fundamentals", {}).get("short_name", "")
+if ticker_display:
+    st.title(f"Equity Research Analysis Platform [{ticker_display}]")
+else:
+    st.title("Equity Research Analysis Platform")
 
-if st.button("Generate Research Report", type="primary") and query:
+st.markdown('<p style="font-size: 19px; color: #888888;">To aid stock discovery and simplify their fundamentals.</p>', unsafe_allow_html=True)
+
+with st.form("search_form", clear_on_submit=False):
+    query = st.text_input("Enter Company Name or Ticker:", value="")
+    st.caption("Press enter to start learning")
+    
+    selected_language = st.selectbox(
+        "Select Report Language:", 
+        ["English (India)", "Hindi", "Marathi", "Gujarati", "Tamil", "Telugu", "Bengali"]
+    )
+    
+    if selected_language != "English (India)":
+        st.caption("⚠️ Translations are AI-generated for accessibility; refer to the original English report for audited financial figures.")
+        
+    submitted = st.form_submit_button("Generate Research Report", type="primary")
+
+if submitted and query:
     try:
         with st.spinner(f"Analyzing {query} and running validation audit..."):
             stock_data = get_stock_fundamentals(query)
-            report_text = generate_stock_report(query)
+            report_text = generate_stock_report(query, language=selected_language)
             st.session_state["last_report"] = report_text
             st.session_state["last_ticker"] = query
             st.session_state["last_fundamentals"] = stock_data
+            st.rerun()
     except ValueError as ve:
         st.error(f"Data Retrieval Error: {str(ve)}")
     except Exception as e:
@@ -66,12 +118,11 @@ if "last_report" in st.session_state:
     fund = st.session_state.get("last_fundamentals", {})
     ticker_disp = st.session_state.get("last_ticker", "STOCK")
     
-    st.markdown(f"### Executive Summary: {fund.get('short_name', ticker_disp)}")
-    
     col1, col2, col3, col4 = st.columns(4)
     mcap = fund.get("market_cap", 0)
-    if isinstance(mcap, (int, float)) and mcap > 0:
-        mcap_str = f"₹{mcap / 10000000:.2f} Cr"
+    
+    if isinstance(mcap, (int, float)):
+        mcap_str = format_inr(mcap)
     else:
         mcap_str = str(mcap)
         
