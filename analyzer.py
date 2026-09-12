@@ -1,7 +1,7 @@
 import os
+import re
 import time
 import requests
-import yfinance as yf
 import streamlit as st
 from google import genai
 from normalizer import normalize_stock_data
@@ -9,155 +9,100 @@ from db import save_report_to_archive
 from checker import verify_stock_report
 from screener import pass_pre_screening_gates
 from bsedata.bse import BSE
+from bse_master import resolve_bse_scrip_code
 
-def correct_ticker_with_ai(query: str) -> str:
-    """Fallback fuzzy corrector for misspelled company names using Gemini."""
-    api_key = st.secrets.get("GEMINI_API_KEY") or os.environ.get("GEMINI_API_KEY") or st.secrets.get("GOOGLE_API_KEY") or os.environ.get("GOOGLE_API_KEY")
-    if not api_key:
-        raise ValueError(f"Could not identify a valid stock ticker for '{query}'.")
+def fetch_pe_from_google(ticker: str) -> str:
+    """Fetches trailing P/E ratio from Google Finance with NSE/BOM fallback."""
+    clean = ticker.strip().upper().replace(".NS", "").replace(".BO", "")
+    headers = {"User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64)"}
     
-    try:
-        client = genai.Client(api_key=api_key)
-        prompt = f"Identify the official NSE ticker symbol for '{query}'. Return ONLY the ticker symbol ending in .NS or .BO (e.g., TATAMOTORS.NS). If unknown, reply 'UNKNOWN'."
-        res = client.models.generate_content(model="gemini-3.5-flash", contents=prompt)
-        
-        text_content = ""
-        if hasattr(res, "text") and res.text:
-            text_content = res.text
-        elif hasattr(res, "candidates") and res.candidates:
-            for candidate in res.candidates:
-                if hasattr(candidate, "content") and candidate.content and hasattr(candidate.content, "parts"):
-                    for part in candidate.content.parts:
-                        if hasattr(part, "text") and part.text:
-                            text_content += part.text
-                            
-        text_content = text_content.strip().upper()
-        if "UNKNOWN" in text_content or not text_content:
-            raise ValueError(f"Could not identify a valid stock ticker for '{query}'. Please check the spelling.")
-            
-        return text_content if text_content.endswith((".NS", ".BO")) else f"{text_content}.NS"
-    except Exception as e:
-        raise ValueError(f"Could not identify a valid stock ticker for '{query}': {e}")
+    for exchange in ["NSE", "BOM"]:
+        url = f"https://www.google.com/finance/quote/{clean}:{exchange}"
+        try:
+            res = requests.get(url, headers=headers, timeout=3)
+            if res.status_code == 200:
+                match = re.search(r'P/E ratio</div>.*?<div[^>]*>([0-9\.,]+)</div>', res.text, re.DOTALL)
+                if match:
+                    return match.group(1).strip()
+        except Exception:
+            continue
+    return "N/A"
 
-def resolve_ticker(query: str) -> str:
-    clean = query.strip()
-    if clean.upper().endswith((".NS", ".BO")):
-        return clean.upper()
-        
-    headers = {"User-Agent": "Mozilla/5.0"}
-    search_url = f"https://query2.finance.yahoo.com/v1/finance/search?q={requests.utils.quote(clean)}&quotesCount=10"
-    
-    try:
-        res = requests.get(search_url, headers=headers, timeout=5).json()
-        quotes = res.get("quotes", [])
-        for q in quotes:
-            sym = q.get("symbol", "")
-            if sym.endswith((".NS", ".BO")):
-                return sym
-        if quotes:
-            sym = quotes[0].get("symbol", "")
-            if sym.endswith((".NS", ".BO")):
-                return sym
-    except Exception as e:
-        print(f"Ticker resolution fallback: {e}")
-        
-    return correct_ticker_with_ai(clean)
+def fetch_bse_exchange_data(query: str) -> dict:
+    """Pulls real-time fundamentals directly from the BSE exchange via scrip lookup."""
+    scrip = resolve_bse_scrip_code(query)
+    if not scrip:
+        raise ValueError(f"Could not resolve an official BSE scrip code for '{query}'.")
 
-def fetch_fundamentals_with_fallback(query: str, ticker_symbol: str) -> dict:
-    # 1. Attempt primary scrape with browser-agent session
-    try:
-        session = requests.Session()
-        session.headers.update({"User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64)"})
-        stock = yf.Ticker(ticker_symbol, session=session)
-        info = stock.info
-        if info and len(info) >= 5 and (info.get("regularMarketPrice") is not None or info.get("currentPrice") is not None or info.get("marketCap") is not None):
-            return info
-    except Exception as e:
-        print(f"Primary source (yfinance) failed: {e}. Trying secondary fallback...")
+    b = BSE()
+    q = b.getQuote(scrip)
+    if not q or "currentValue" not in q:
+        raise ValueError(f"BSE exchange did not return active quote data for scrip {scrip}.")
 
-    # 2. Attempt secondary numeric BSE lookup
+    mcap_raw = q.get("marketCapFull") or q.get("marketCapFreeFloat") or "0"
+    mcap_clean = mcap_raw.replace(" Cr.", "").replace(",", "").strip()
     try:
-        b = BSE()
-        clean_code = ticker_symbol.split(".")[0].upper()
-        bse_code_map = {
-            "TATAMOTORS": "500570",
-            "RELIANCE": "500325",
-            "TCS": "532540",
-            "INFY": "500209",
-            "SBIN": "500112"
-        }
-        target_code = bse_code_map.get(clean_code, clean_code)
-        if target_code.isdigit():
-            q = b.getQuote(target_code)
-            if q and "currentValue" in q:
-                market_cap_val = 0
-                try:
-                    market_cap_val = float(q.get("mCap", "0").replace(",", "")) * 10000000
-                except Exception:
-                    pass
-                return {
-                    "longName": q.get("companyName", clean_code),
-                    "sector": "General Industry",
-                    "industry": "General Industry",
-                    "marketCap": market_cap_val,
-                    "trailingPE": "N/A"
-                }
-    except Exception as e:
-        print(f"Secondary source (bsedata) failed: {e}")
+        mcap_crores = float(mcap_clean)
+        mcap_inr = int(mcap_crores * 10000000)
+    except ValueError:
+        mcap_inr = 0
 
-    # 3. Soft Graceful Degradation: synthesize clean baseline data rather than crashing
-    clean_ticker = ticker_symbol.split(".")[0].upper()
+    clean_ticker = query.strip().upper().replace(".NS", "").replace(".BO", "")
+    pe_val = fetch_pe_from_google(clean_ticker)
+
     return {
-        "longName": query.strip().title(),
-        "sector": "Diversified / Core Industry",
-        "industry": "General Corporate",
-        "marketCap": 10000000000,
-        "trailingPE": "N/A",
-        "is_fallback": True
+        "ticker": clean_ticker,
+        "short_name": q.get("companyName", clean_ticker),
+        "scrip_code": scrip,
+        "current_price": q.get("currentValue", "0.00"),
+        "market_cap": mcap_inr,
+        "pe_ratio": pe_val,
+        "industry": q.get("industry", "Core Industry"),
+        "sector": q.get("industry", "Core Industry"),
+        "52w_high": q.get("52weekHigh", "N/A"),
+        "52w_low": q.get("52weekLow", "N/A"),
+        "description": f"BSE Listed Equity under group {q.get('group', 'General')}.",
+        "is_fallback": False
     }
 
-@st.cache_data(ttl=3600)
-def get_stock_fundamentals(query: str):
-    ticker_symbol = resolve_ticker(query)
-    info = fetch_fundamentals_with_fallback(query, ticker_symbol)
+def get_stock_fundamentals(query: str) -> dict:
+    """Primary entry point: Fetches verified exchange data or initiates graceful fallback."""
+    try:
+        raw_data = fetch_bse_exchange_data(query)
+    except Exception as e:
+        print(f"BSE Direct fetch failed: {e}. Initiating graceful synthesis fallback.")
+        clean = query.strip().upper().replace(".NS", "").replace(".BO", "")
+        raw_data = {
+            "ticker": clean,
+            "short_name": query.strip().title(),
+            "sector": "Diversified / Core Industry",
+            "industry": "General Corporate",
+            "market_cap": 10000000000,
+            "pe_ratio": "N/A",
+            "description": f"Live exchange gateway unavailable for {clean}. Synthesized by AI.",
+            "is_fallback": True
+        }
 
-    market_cap_raw = info.get("marketCap") or info.get("mCap") or 0
-    pe_ratio_raw = info.get("trailingPE") or info.get("forwardPE") or "N/A"
-    clean_ticker = ticker_symbol.split(".")[0]
-    
-    profile_res = {
-        "name": info.get("longName", clean_ticker),
-        "sector": info.get("sector", "Financial Services"),
-        "industry": info.get("industry", "General Industry"),
-        "market_capitalization": market_cap_raw,
-        "description": info.get("businessSummary", f"Equity asset profile for {clean_ticker}.")
-    }
-    stats_res = {
-        "statistics": {
-            "valuations_metrics": {
-                "trailing_pe": pe_ratio_raw
+    if not raw_data.get("is_fallback"):
+        profile_res = {
+            "name": raw_data["short_name"],
+            "sector": raw_data["sector"],
+            "industry": raw_data["industry"],
+            "market_capitalization": raw_data["market_cap"],
+            "description": raw_data["description"]
+        }
+        stats_res = {
+            "statistics": {
+                "valuations_metrics": {
+                    "trailing_pe": raw_data["pe_ratio"]
+                }
             }
         }
-    }
-    
-    # Bypass screening rejection if soft fallback is triggered
-    if not info.get("is_fallback"):
         passed_gate, gate_reason = pass_pre_screening_gates(stats_res, profile_res)
         if not passed_gate:
             raise ValueError(f"Stock Pre-Screening Rejected: {gate_reason}")
-    
-    raw_data = {
-        "ticker": clean_ticker,
-        "short_name": profile_res["name"],
-        "sector": profile_res["sector"],
-        "industry": profile_res["industry"],
-        "market_cap": market_cap_raw,
-        "pe_ratio": pe_ratio_raw,
-        "description": profile_res["description"],
-        "is_fallback": info.get("is_fallback", False)
-    }
-    
-    return normalize_stock_data(raw_data, exchange="NSE" if ticker_symbol.endswith(".NS") else "BSE")
+
+    return normalize_stock_data(raw_data, exchange="BSE")
 
 def get_system_prompt(ticker: str, language: str) -> str:
     lang_rule = "The report must be entirely in English (India). Strictly use British/Indian spelling (e.g., analyse, capitalisation, labour)." if language == "English (India)" else f"The report must be fully translated into {language}, including all section headers, analysis, and verdicts without omitting technical detail."
@@ -234,7 +179,7 @@ def extract_response_text(response) -> str:
     return text_content
 
 def call_genai_with_fallback(client, prompt: str, system_prompt: str) -> str:
-    models_to_try = ["gemini-3.6-flash", "gemini-3.5-flash"]
+    models_to_try = ["gemini-flash-latest", "gemini-2.5-flash-lite"]
     last_error = None
     
     for model_name in models_to_try:
@@ -251,10 +196,12 @@ def call_genai_with_fallback(client, prompt: str, system_prompt: str) -> str:
             except Exception as e:
                 last_error = e
                 err_str = str(e)
-                if any(code in err_str for code in ["429", "RESOURCE_EXHAUSTED", "404", "503", "UNAVAILABLE"]):
+                if "404" in err_str or "NOT_FOUND" in err_str:
+                    break
+                if any(code in err_str for code in ["429", "RESOURCE_EXHAUSTED", "503", "UNAVAILABLE"]):
                     time.sleep(2 ** attempt)
                     continue
-                raise e
+                break
             
     raise ValueError(f"API Limit Reached or Model Unavailable. Details: {last_error}")
 
