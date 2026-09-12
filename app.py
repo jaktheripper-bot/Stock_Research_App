@@ -100,19 +100,30 @@ with st.form("search_form", clear_on_submit=False):
         
     submitted = st.form_submit_button("Generate Research Report", type="primary")
 
+def sanitize_ticker_input(q: str) -> str:
+    import re
+    if not q or not isinstance(q, str):
+        return ""
+    cleaned = re.sub(r"[^\w\s\.-]", "", q).strip()
+    return cleaned[:40]
+
 if submitted and query:
-    try:
-        with st.spinner(f"Analyzing {query} and running validation audit..."):
-            stock_data = get_stock_fundamentals(query)
-            report_text = generate_stock_report(query, language=selected_language)
-            st.session_state["last_report"] = report_text
-            st.session_state["last_ticker"] = query
-            st.session_state["last_fundamentals"] = stock_data
-            st.rerun()
-    except ValueError as ve:
-        st.error(f"Data Retrieval Error: {str(ve)}")
-    except Exception as e:
-        st.error(f"Application Error: {str(e)}")
+    clean_query = sanitize_ticker_input(query)
+    if not clean_query or len(clean_query) < 2:
+        st.error("Please enter a valid company name or stock ticker (minimum 2 characters).")
+    else:
+        try:
+            with st.spinner(f"Analyzing {clean_query} and running validation audit..."): 
+                stock_data = get_stock_fundamentals(clean_query)
+                report_text = generate_stock_report(clean_query, language=selected_language)
+                st.session_state["last_report"] = report_text
+                st.session_state["last_ticker"] = clean_query
+                st.session_state["last_fundamentals"] = stock_data
+                st.rerun()
+        except ValueError as ve:
+            st.error(f"Data Retrieval Error: {str(ve)}")
+        except Exception as e:
+            st.error(f"Application Error: {str(e)}")
 
 if "last_report" in st.session_state:
     fund = st.session_state.get("last_fundamentals", {})
