@@ -78,11 +78,7 @@ with st.sidebar:
     except Exception:
         st.caption("Archive history unavailable.")
 
-ticker_display = st.session_state.get("last_fundamentals", {}).get("short_name", "")
-if ticker_display:
-    st.title(f"Equity Research Analysis Platform [{ticker_display}]")
-else:
-    st.title("Equity Research Analysis Platform")
+st.title("Equity Research Analysis Platform")
 
 st.markdown('<p style="font-size: 19px; color: #888888;">To aid stock discovery and simplify their fundamentals.</p>', unsafe_allow_html=True)
 
@@ -143,9 +139,15 @@ if "last_report" in st.session_state:
     col4.metric("Exchange Status", "Active / Verified")
     
     st.markdown("---")
+    company_name = fund.get("short_name", "").strip()
+    clean_ticker = ticker_disp.strip().upper()
+    header_label = f"{company_name} ({clean_ticker})" if company_name and company_name.upper() != clean_ticker else clean_ticker
+    
+    st.header(f"Equity Research Report: {header_label}")
     st.markdown(st.session_state["last_report"])
     
-    pdf_data = convert_md_to_pdf_bytes(st.session_state["last_report"])
+    full_report_md = f"# Equity Research Report: {header_label}\n\n" + st.session_state["last_report"]
+    pdf_data = convert_md_to_pdf_bytes(full_report_md)
     st.download_button(
         label="Download Research Report (.pdf)",
         data=pdf_data,
