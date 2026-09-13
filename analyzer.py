@@ -1,3 +1,74 @@
+
+import requests
+from datetime import datetime, timezone
+
+def fetch_latest_bse_announcement(scrip_code: str) -> str:
+    """Fetches the latest official corporate filing headline from BSE India."""
+    if not scrip_code or not str(scrip_code).isdigit():
+        return ""
+    try:
+        url = f"https://api.bseindia.com/BseIndiaAPI/api/AnnSubCategoryGetData/w?pageno=1&strCat=-1&strPrevDate=&strScrip={scrip_code}&strSearch=P&strToDate=&strType=C"
+        headers = {
+            "User-Agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
+            "Referer": "https://www.bseindia.com/",
+            "Accept": "application/json, text/plain, */*"
+        }
+        res = requests.get(url, headers=headers, timeout=5)
+        if res.status_code == 200:
+            data = res.json()
+            table = data.get("Table", [])
+            if table and len(table) > 0:
+                headline = table[0].get("NEWSSUB", "") or table[0].get("HEADLINE", "")
+                return headline.strip()
+    except Exception:
+        pass
+    return ""
+
+def evaluate_material_change(cached: dict, live_fund: dict, scrip_code: str) -> tuple:
+    """
+    Evaluates whether material changes require report regeneration.
+    Returns (should_regenerate: bool, reason: str, latest_announcement: str).
+    """
+    if not cached:
+        return True, "Initial analysis", ""
+
+    # 1. Check age (> 14 days)
+    raw_ts = cached.get("raw_timestamp")
+    if raw_ts:
+        try:
+            ts = raw_ts if isinstance(raw_ts, datetime) else datetime.fromisoformat(str(raw_ts).replace("Z", "+00:00"))
+            now = datetime.now(timezone.utc)
+            if ts.tzinfo is None:
+                ts = ts.replace(tzinfo=timezone.utc)
+            days_old = (now - ts).total_seconds() / 86400.0
+            if days_old > 14:
+                return True, f"Report is {int(days_old)} days old (> 14-day cycle)", ""
+        except Exception:
+            pass
+
+    # 2. Check Corporate Filings on BSE
+    latest_ann = fetch_latest_bse_announcement(scrip_code)
+    cached_ann = cached.get("latest_announcement", "")
+    if latest_ann and cached_ann and latest_ann != cached_ann:
+        return True, f"New BSE Corporate Announcement: '{latest_ann[:50]}...'", latest_ann
+
+    # 3. Check Price Volatility (>= 5% move)
+    cached_price = cached.get("baseline_price")
+    live_price = live_fund.get("current_price") or live_fund.get("currentValue")
+    try:
+        c_p = float(str(cached_price).replace(",", "").strip())
+        l_p = float(str(live_price).replace(",", "").strip())
+        if c_p > 0:
+            pct_change = abs(l_p - c_p) / c_p
+            if pct_change >= 0.05:
+                direction = "+" if l_p > c_p else "-"
+                return True, f"Price shifted {direction}{pct_change*100:.1f}% since last report", latest_ann
+    except Exception:
+        pass
+
+    # No material events detected
+    return False, "No material price or regulatory changes detected", latest_ann
+
 import os
 import re
 import time
@@ -67,11 +138,16 @@ def fetch_bse_exchange_data(query: str) -> dict:
 
 def get_stock_fundamentals(query: str) -> dict:
     """Primary entry point: Fetches verified exchange data or initiates graceful fallback."""
+    # Step A: Validate resolution explicitly
+    clean = query.strip().upper().replace(".NS", "").replace(".BO", "")
+    scrip = resolve_bse_scrip_code(query)
+    if not scrip:
+        raise ValueError(f"Could not find BSE scrip code for '{query}'. Please enter the exact ticker symbol or 6-digit BSE code (e.g., 543940 for Jio Financial).")
+
     try:
         raw_data = fetch_bse_exchange_data(query)
     except Exception as e:
-        print(f"BSE Direct fetch failed: {e}. Initiating graceful synthesis fallback.")
-        clean = query.strip().upper().replace(".NS", "").replace(".BO", "")
+        print(f"BSE Network quote fetch failed: {e}. Initiating graceful synthesis fallback.")
         raw_data = {
             "ticker": clean,
             "short_name": query.strip().title(),
@@ -79,7 +155,7 @@ def get_stock_fundamentals(query: str) -> dict:
             "industry": "General Corporate",
             "market_cap": 10000000000,
             "pe_ratio": "N/A",
-            "description": f"Live exchange gateway unavailable for {clean}. Synthesized by AI.",
+            "description": f"Live exchange quote unavailable for {clean}. Synthesized by AI.",
             "is_fallback": True
         }
 
@@ -179,7 +255,7 @@ def extract_response_text(response) -> str:
     return text_content
 
 def call_genai_with_fallback(client, prompt: str, system_prompt: str) -> str:
-    models_to_try = ["gemini-flash-latest", "gemini-2.5-flash-lite"]
+    models_to_try = ["gemini-3.6-flash", "gemini-flash-latest"]
     last_error = None
     
     for model_name in models_to_try:
@@ -189,7 +265,10 @@ def call_genai_with_fallback(client, prompt: str, system_prompt: str) -> str:
                     model=model_name,
                     contents=prompt,
                     config=genai.types.GenerateContentConfig(
-                        system_instruction=system_prompt
+                        system_instruction=system_prompt + """
+- Actively verify company developments using Google Search. Ground all qualitative pillars (TAM, competitive moat, governance, ESG) in recent earnings disclosures, quarterly concall commentary, management guidance changes, and regulatory filings from the past 90 to 180 days.
+""",
+                        tools=[{"google_search": {}}],
                     ),
                 )
                 return extract_response_text(response)

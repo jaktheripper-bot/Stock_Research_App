@@ -7,6 +7,9 @@ BSE_CSV_PATH = "bse_equity_master.csv"
 
 # Pre-compiled high-frequency scrip map for immediate fallback
 PRIMARY_BSE_MAP = {
+    "JIOFIN": "543940",
+    "JIO FINANCIAL": "543940",
+    "JIO FINANCIAL SERVICES": "543940",
     "RELIANCE": "500325",
     "TCS": "532540",
     "HDFCBANK": "500180",
