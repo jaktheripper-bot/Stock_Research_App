@@ -1,12 +1,26 @@
 import os
-import csv
-import io
+import json
+import re
 import requests
 
-BSE_CSV_PATH = "bse_equity_master.csv"
+CACHE_FILE = "bse_scrips_cache.json"
 
-# Pre-compiled high-frequency scrip map for immediate fallback
+# Fast-path cache for immediate O(1) resolution without disk/network overhead
 PRIMARY_BSE_MAP = {
+    # Brand to Corporate Entity Aliases
+    "ZOMATO": "543320",
+    "ETERNAL": "543320",
+    "PAYTM": "543396",
+    "ONE97": "543396",
+    "ONE97 COMMUNICATIONS": "543396",
+    "NYKAA": "543384",
+    "FSN E-COMMERCE": "543384",
+    "DMART": "540376",
+    "AVENUE SUPERMARTS": "540376",
+    "POLICYBAZAAR": "543390",
+    "PB FINTECH": "543390",
+    "DELHIVERY": "543529",
+
     "JIOFIN": "543940",
     "JIO FINANCIAL": "543940",
     "JIO FINANCIAL SERVICES": "543940",
@@ -33,57 +47,120 @@ PRIMARY_BSE_MAP = {
     "CDSL": "543265"
 }
 
-def update_bse_master_csv() -> bool:
-    """Fetches the official BSE Equity master list and saves it locally."""
-    url = "https://www.bseindia.com/corporates/List_Scrips.aspx"
+_MASTER_CACHE = None
+
+def sync_bse_master_list() -> dict:
+    """Fetches all 5,000+ active equities directly from BSE India and compiles a lookup dictionary."""
+    url = "https://api.bseindia.com/BseIndiaAPI/api/ListofScripData/w?Group=&Scrip_code=&industry=&segment=Equity&status=Active"
     headers = {
-        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36",
-        "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8"
+        "User-Agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
+        "Accept": "application/json, text/plain, */*",
+        "Referer": "https://www.bseindia.com/"
     }
+    
+    cache_payload = {
+        "symbols": {},  # Strict ticker symbols: e.g. "ABB": "500002", "TRENT": "500251"
+        "names": {}     # Company descriptions: e.g. "ABB INDIA LTD": "500002"
+    }
+
     try:
-        # BSE endpoint serving the active equity CSV
-        download_url = "https://api.bseindia.com/BseIndiaAPI/api/ListofScripData/w?Group=&Scrip_code=&industry=&segment=Equity&status=Active"
-        res = requests.get(download_url, headers=headers, timeout=10)
-        if res.status_code == 200 and len(res.content) > 1000:
-            with open(BSE_CSV_PATH, "wb") as f:
-                f.write(res.content)
-            return True
+        res = requests.get(url, headers=headers, timeout=12)
+        if res.status_code == 200:
+            records = res.json()
+            if isinstance(records, list):
+                for item in records:
+                    code = str(item.get("SCRIP_CD", "")).strip()
+                    if not (code.isdigit() and len(code) == 6):
+                        continue
+
+                    # Exact exchange ticker symbol
+                    symbol = str(item.get("scrip_id") or "").strip().upper()
+                    if symbol:
+                        cache_payload["symbols"][symbol] = code
+
+                    # Common display name
+                    scrip_name = str(item.get("Scrip_Name") or "").strip().upper()
+                    if scrip_name:
+                        cache_payload["names"][scrip_name] = code
+
+                    # Full legal issuer name
+                    issuer_name = str(item.get("Issuer_Name") or "").strip().upper()
+                    if issuer_name and issuer_name != scrip_name:
+                        cache_payload["names"][issuer_name] = code
+
+            if cache_payload["symbols"]:
+                with open(CACHE_FILE, "w", encoding="utf-8") as f:
+                    json.dump(cache_payload, f)
+                return cache_payload
     except Exception as e:
-        print(f"Warning: Online BSE master fetch failed ({e}). Using local lookup.")
-    return False
+        print(f"Warning: Online BSE master sync failed ({e}).")
+
+    return cache_payload
+
+def _load_master_data() -> dict:
+    global _MASTER_CACHE
+    if _MASTER_CACHE is not None:
+        return _MASTER_CACHE
+
+    if os.path.exists(CACHE_FILE):
+        try:
+            with open(CACHE_FILE, "r", encoding="utf-8") as f:
+                _MASTER_CACHE = json.load(f)
+                return _MASTER_CACHE
+        except Exception:
+            pass
+
+    _MASTER_CACHE = sync_bse_master_list()
+    return _MASTER_CACHE
 
 def resolve_bse_scrip_code(query: str) -> str:
     """
-    Resolves a ticker symbol or company name into a valid 6-digit BSE scrip code.
-    Returns the code as a string, or None if unresolved.
+    Resolves a query (ticker, company name, or 6-digit code) to an official BSE scrip code.
+    Evaluates in order: Direct Code -> Static Map -> Exact Symbol -> Exact Name -> Substring.
     """
+    if not query:
+        return None
+
     clean = query.strip().upper().replace(".NS", "").replace(".BO", "")
-    
-    # Direct numeric code check
+
+    # 1. Direct 6-digit scrip code
     if clean.isdigit() and len(clean) == 6:
         return clean
-        
-    # Check static fast cache
+
+    # 2. Fast-path static memory map
     if clean in PRIMARY_BSE_MAP:
         return PRIMARY_BSE_MAP[clean]
-        
-    # Check local CSV if present
-    if os.path.exists(BSE_CSV_PATH):
-        try:
-            with open(BSE_CSV_PATH, "r", encoding="utf-8", errors="ignore") as f:
-                reader = csv.DictReader(f)
-                for row in reader:
-                    symbol = row.get("Scrip Id", "").strip().upper()
-                    name = row.get("Scrip Name", "").strip().upper()
-                    code = row.get("Scrip Code", "").strip()
-                    if clean == symbol or clean in name:
-                        return code
-        except Exception:
-            pass
-            
+
+    data = _load_master_data()
+    symbols = data.get("symbols", {})
+    names = data.get("names", {})
+
+    # 3. Exact ticker symbol match (e.g., "ABB", "TRENT", "ZOMATO")
+    if clean in symbols:
+        return symbols[clean]
+
+    # 4. Exact company name match
+    if clean in names:
+        return names[clean]
+
+    # 5. Word-boundary or substring search across company names
+    for comp_name, code in names.items():
+        if clean in comp_name:
+            return code
+
     return None
 
 if __name__ == "__main__":
-    test_queries = ["TATAMOTORS", "500325", "INFY", "CDSL", "INVALID_STOCK"]
+    print("Testing bse_master.py resolver...")
+    test_queries = [
+        "ABB", 
+        "TRENT", 
+        "ZOMATO", 
+        "Hindustan Aeronautics", 
+        "HAL", 
+        "JIOFIN", 
+        "500180", 
+        "INVALID_XYZ"
+    ]
     for q in test_queries:
-        print(f"Query: {q} -> Scrip Code: {resolve_bse_scrip_code(q)}")
+        print(f"'{q}' -> Scrip: {resolve_bse_scrip_code(q)}")
