@@ -1,59 +1,4 @@
 
-def fetch_google_finance_data(ticker: str) -> dict:
-    """Secondary cloud-resilient fallback: Fetches verified exchange data via Google Finance."""
-    import re
-    import requests
-    
-    clean = ticker.strip().upper().replace(".NS", "").replace(".BO", "")
-    headers = {
-        "User-Agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"
-    }
-
-    for exchange in ["BOM", "NSE"]:
-        url = f"https://www.google.com/finance/quote/{clean}:{exchange}"
-        try:
-            res = requests.get(url, headers=headers, timeout=6)
-            if res.status_code == 200:
-                price_match = re.search(r'class="YMlKec fxKbKc">₹?([0-9,.]+)<', res.text)
-                if not price_match:
-                    continue
-
-                name_match = re.search(r'class="zzDege">([^<]+)<', res.text)
-                pe_match = re.search(r'>P/E ratio</div><div[^>]*class="P6K39c">([0-9,.-]+)<', res.text)
-                mcap_match = re.search(r'>Market cap</div><div[^>]*class="P6K39c">([^<]+)<', res.text)
-                high_match = re.search(r'>52-wk high</div><div[^>]*class="P6K39c">₹?([0-9,.]+)<', res.text)
-                low_match = re.search(r'>52-wk low</div><div[^>]*class="P6K39c">₹?([0-9,.]+)<', res.text)
-
-                price = price_match.group(1).replace(",", "")
-                mcap_str = mcap_match.group(1) if mcap_match else "0"
-                
-                # Normalize Market Cap to integer INR
-                mcap_num = 0
-                if "T" in mcap_str:
-                    mcap_num = int(float(re.sub(r"[^\d.]", "", mcap_str)) * 1_000_000_000_000)
-                elif "LCr" in mcap_str or "Lakh Cr" in mcap_str:
-                    mcap_num = int(float(re.sub(r"[^\d.]", "", mcap_str)) * 100_000_000_000)
-                elif "Cr" in mcap_str:
-                    mcap_num = int(float(re.sub(r"[^\d.]", "", mcap_str)) * 10_000_000)
-
-                return {
-                    "ticker": clean,
-                    "short_name": name_match.group(1) if name_match else clean,
-                    "scrip_code": clean,
-                    "current_price": price,
-                    "market_cap": mcap_num,
-                    "pe_ratio": pe_match.group(1) if pe_match else "N/A",
-                    "industry": "Publicly Traded Equity",
-                    "sector": "Core Market Index",
-                    "52w_high": high_match.group(1) if high_match else "N/A",
-                    "52w_low": low_match.group(1) if low_match else "N/A",
-                    "description": f"Verified equity data secured via Google Finance ({exchange}).",
-                    "is_fallback": False
-                }
-        except Exception:
-            continue
-
-    return None
 
 
 class PipelineError(Exception):
@@ -218,21 +163,16 @@ def fetch_bse_exchange_data(query: str) -> dict:
     }
 
 def get_stock_fundamentals(query: str) -> dict:
-    """Fetches exchange data. Raises PipelineError on failure with zero synthetic fallbacks."""
+    """Fetches verified exchange data. Raises PipelineError on failure with zero synthetic fallbacks."""
     clean = query.strip().upper().replace(".NS", "").replace(".BO", "")
     scrip = resolve_bse_scrip_code(query)
     if not scrip:
         raise TickerResolutionError(query)
 
-    # Tier 1: Direct BSE Ingestion
     try:
         raw_data = fetch_bse_exchange_data(query)
     except Exception as bse_err:
-        print(f"Tier 1 (BSE Direct) failed: {bse_err}. Initiating Tier 2 (Google Finance Cloud)...")
-        # Tier 2: Google Finance Ingestion (Cloud IP & Geo-block immunity)
-        raw_data = fetch_google_finance_data(clean)
-        if not raw_data:
-            raise ExchangeDataFetchError(scrip, f"BSE Direct error: {bse_err}. Google Finance fallback also returned no active quote.")
+        raise ExchangeDataFetchError(scrip, str(bse_err))
 
     profile_res = {
         "name": raw_data["short_name"],
@@ -253,6 +193,8 @@ def get_stock_fundamentals(query: str) -> dict:
         raise PipelineError("Pre-Screening Gate", f"Stock rejected: {gate_reason}")
 
     return normalize_stock_data(raw_data, exchange="BSE")
+
+
 def get_system_prompt(ticker: str, language: str) -> str:
     lang_rule = "The report must be entirely in English (India). Strictly use British/Indian spelling (e.g., analyse, capitalisation, labour)." if language == "English (India)" else f"The report must be fully translated into {language}, including all section headers, analysis, and verdicts without omitting technical detail."
 
