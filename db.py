@@ -59,3 +59,32 @@ def save_report_to_archive(stock_data: dict, report_text: str):
     conn.commit()
     cursor.close()
     conn.close()
+
+def get_archived_reports() -> list:
+    """Retrieves all stored reports ordered by most recent, formatted as dicts."""
+    init_db()
+    conn = get_db_connection()
+    cursor = conn.cursor()
+    
+    results = []
+    try:
+        cursor.execute('''
+            SELECT ticker, short_name, report_text, timestamp 
+            FROM reports 
+            ORDER BY timestamp DESC
+        ''')
+        rows = cursor.fetchall()
+        for row in rows:
+            results.append({
+                "ticker": row[0],
+                "short_name": row[1],
+                "report_text": row[2],
+                "timestamp": str(row[3]) if row[3] else ""
+            })
+    except Exception as e:
+        print(f"Database query error in get_archived_reports: {e}")
+    finally:
+        cursor.close()
+        conn.close()
+        
+    return results
