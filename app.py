@@ -1,7 +1,11 @@
+import json
+import traceback
+import platform
+from datetime import datetime, timezone
 import tempfile
 import streamlit as st
-from analyzer import generate_stock_report, get_stock_fundamentals
-from db import get_archived_reports
+from analyzer import generate_stock_report, get_stock_fundamentals, evaluate_material_change
+from db import get_archived_reports, get_report_by_ticker
 from markdown_pdf import MarkdownPdf, Section
 
 st.set_page_config(page_title="Equity Research AI", layout="wide", page_icon="📈")
@@ -109,17 +113,57 @@ if submitted and query:
         st.error("Please enter a valid company name or stock ticker (minimum 2 characters).")
     else:
         try:
-            with st.spinner(f"Analyzing {clean_query} and running validation audit..."): 
+            with st.spinner(f"Auditing market data & filings for {clean_query}..."):
                 stock_data = get_stock_fundamentals(clean_query)
-                report_text = generate_stock_report(clean_query, language=selected_language)
-                st.session_state["last_report"] = report_text
-                st.session_state["last_ticker"] = clean_query
-                st.session_state["last_fundamentals"] = stock_data
-                st.rerun()
-        except ValueError as ve:
-            st.error(f"Data Retrieval Error: {str(ve)}")
-        except Exception as e:
-            st.error(f"Application Error: {str(e)}")
+                resolved_ticker = stock_data.get("ticker", clean_query)
+                scrip = stock_data.get("scrip_code", "")
+                cached = get_report_by_ticker(resolved_ticker)
+                
+                should_regen, reason, latest_ann = evaluate_material_change(cached, stock_data, scrip)
+                
+                if not should_regen and selected_language == "English (India)":
+                    st.session_state["last_report"] = cached["report_text"]
+                    st.session_state["last_ticker"] = resolved_ticker
+                    st.session_state["last_fundamentals"] = stock_data
+                    st.session_state["report_source"] = f"Cached ({cached['formatted_date']})"
+                    st.session_state["gate_reason"] = reason
+                    st.session_state["cached_record"] = cached
+                    st.rerun()
+                else:
+                    with st.spinner(f"Updating analysis: {reason}..."):
+                        report_text = generate_stock_report(clean_query, language=selected_language)
+                        st.session_state["last_report"] = report_text
+                        st.session_state["last_ticker"] = resolved_ticker
+                        st.session_state["last_fundamentals"] = stock_data
+                        st.session_state["report_source"] = "Freshly Generated"
+                        st.session_state["gate_reason"] = reason
+                        st.session_state.pop("cached_record", None)
+                        st.rerun()
+        except Exception as err:
+            st.session_state["last_report"] = None
+            stage = getattr(err, "stage", "Pipeline Engine")
+            tech_details = getattr(err, "technical_details", "")
+            
+            diag_payload = {
+                "timestamp_utc": datetime.now(timezone.utc).isoformat(),
+                "query_entered": clean_query,
+                "error_stage": stage,
+                "error_type": type(err).__name__,
+                "error_message": str(err),
+                "technical_details": tech_details,
+                "system": {
+                    "python": platform.python_version(),
+                    "os": platform.system()
+                },
+                "traceback_tail": traceback.format_exc().splitlines()[-4:]
+            }
+            
+            st.error(f"### ❌ Data Pipeline Stopped at: {stage}")
+            st.markdown(f"**Error:** {err}")
+            st.caption("🛡️ **Zero-Hallucination Policy:** Synthetic estimation disabled. Reports require direct exchange quotes.")
+            
+            with st.expander("📋 Copy Diagnostic Report (Share to Fix)", expanded=True):
+                st.code(json.dumps(diag_payload, indent=2), language="json")
 
 if "last_report" in st.session_state:
     fund = st.session_state.get("last_fundamentals", {})

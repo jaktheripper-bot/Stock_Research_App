@@ -1,4 +1,28 @@
 
+class PipelineError(Exception):
+    def __init__(self, stage: str, message: str, technical_details: str = ""):
+        super().__init__(message)
+        self.stage = stage
+        self.message = message
+        self.technical_details = technical_details
+
+class TickerResolutionError(PipelineError):
+    def __init__(self, query: str):
+        super().__init__(
+            stage="Ticker & Scrip Resolution",
+            message=f"Could not resolve an official BSE scrip code for '{query}'.",
+            technical_details=f"Query '{query}' was evaluated against direct code, static aliases, local master universe, and JIT AI discovery. Zero active quotes confirmed."
+        )
+
+class ExchangeDataFetchError(PipelineError):
+    def __init__(self, scrip: str, detail: str):
+        super().__init__(
+            stage="Exchange Data Ingestion",
+            message=f"BSE exchange rejected or failed to return quote data for scrip {scrip}.",
+            technical_details=detail
+        )
+
+
 import requests
 from datetime import datetime, timezone
 
@@ -137,49 +161,36 @@ def fetch_bse_exchange_data(query: str) -> dict:
     }
 
 def get_stock_fundamentals(query: str) -> dict:
-    """Primary entry point: Fetches verified exchange data or initiates graceful fallback."""
-    # Step A: Validate resolution explicitly
+    """Fetches exchange data. Raises PipelineError on failure with zero synthetic fallbacks."""
     clean = query.strip().upper().replace(".NS", "").replace(".BO", "")
     scrip = resolve_bse_scrip_code(query)
     if not scrip:
-        raise ValueError(f"Could not find BSE scrip code for '{query}'. Please enter the exact ticker symbol or 6-digit BSE code (e.g., 543940 for Jio Financial).")
+        raise TickerResolutionError(query)
 
     try:
         raw_data = fetch_bse_exchange_data(query)
     except Exception as e:
-        print(f"BSE Network quote fetch failed: {e}. Initiating graceful synthesis fallback.")
-        raw_data = {
-            "ticker": clean,
-            "short_name": query.strip().title(),
-            "sector": "Diversified / Core Industry",
-            "industry": "General Corporate",
-            "market_cap": 10000000000,
-            "pe_ratio": "N/A",
-            "description": f"Live exchange quote unavailable for {clean}. Synthesized by AI.",
-            "is_fallback": True
-        }
+        raise ExchangeDataFetchError(scrip, str(e))
 
-    if not raw_data.get("is_fallback"):
-        profile_res = {
-            "name": raw_data["short_name"],
-            "sector": raw_data["sector"],
-            "industry": raw_data["industry"],
-            "market_capitalization": raw_data["market_cap"],
-            "description": raw_data["description"]
-        }
-        stats_res = {
-            "statistics": {
-                "valuations_metrics": {
-                    "trailing_pe": raw_data["pe_ratio"]
-                }
+    profile_res = {
+        "name": raw_data["short_name"],
+        "sector": raw_data["sector"],
+        "industry": raw_data["industry"],
+        "market_capitalization": raw_data["market_cap"],
+        "description": raw_data["description"]
+    }
+    stats_res = {
+        "statistics": {
+            "valuations_metrics": {
+                "trailing_pe": raw_data["pe_ratio"]
             }
         }
-        passed_gate, gate_reason = pass_pre_screening_gates(stats_res, profile_res)
-        if not passed_gate:
-            raise ValueError(f"Stock Pre-Screening Rejected: {gate_reason}")
+    }
+    passed_gate, gate_reason = pass_pre_screening_gates(stats_res, profile_res)
+    if not passed_gate:
+        raise PipelineError("Pre-Screening Gate", f"Stock rejected: {gate_reason}")
 
     return normalize_stock_data(raw_data, exchange="BSE")
-
 def get_system_prompt(ticker: str, language: str) -> str:
     lang_rule = "The report must be entirely in English (India). Strictly use British/Indian spelling (e.g., analyse, capitalisation, labour)." if language == "English (India)" else f"The report must be fully translated into {language}, including all section headers, analysis, and verdicts without omitting technical detail."
 
@@ -304,7 +315,7 @@ def generate_stock_report(ticker: str, language: str = "English (India)") -> str
         if not passed:
             report_text += f"\n\n> **Audit Warning:** Report published with unresolved verification flags: {discrepancies}"
 
-    if stock_data.get("is_fallback"):
+    if False:
         report_text = "> ⚠️ **Notice:** Direct exchange data feeds are temporarily restricted by the host network. Analysis and baseline ratios have been synthesized using macroeconomic indicators.\n\n" + report_text
 
     try:
