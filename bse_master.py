@@ -71,11 +71,18 @@ def save_dynamic_alias(query: str, scrip_code: str):
 def discover_scrip_with_ai(query: str) -> str:
     """Uses Gemini Grounding to locate renamed or unmapped BSE scrip codes, verified against BSE."""
     try:
-        secrets_path = ".streamlit/secrets.toml"
-        if not os.path.exists(secrets_path):
-            return None
-        secrets = toml.load(secrets_path)
-        api_key = secrets.get("GEMINI_API_KEY")
+        api_key = os.environ.get("GEMINI_API_KEY")
+        if not api_key:
+            try:
+                import streamlit as st
+                api_key = st.secrets.get("GEMINI_API_KEY")
+            except Exception:
+                pass
+        if not api_key and os.path.exists(".streamlit/secrets.toml"):
+            try:
+                api_key = toml.load(".streamlit/secrets.toml").get("GEMINI_API_KEY")
+            except Exception:
+                pass
         if not api_key:
             return None
 
