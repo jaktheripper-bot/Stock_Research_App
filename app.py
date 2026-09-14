@@ -193,9 +193,28 @@ if ("last_report" in st.session_state and st.session_state["last_report"] is not
     if st.session_state.get("stream_pending"):
         st.session_state["stream_pending"] = False
         lang = st.session_state.get("stream_language", "English (India)")
+        
         try:
-            stream_gen = stream_stock_report(clean_ticker, language=lang, stock_data=fund)
-            streamed_text = st.write_stream(stream_gen)
+            with st.status("Auditing market data & generating report...", expanded=True) as status:
+                st.write("🔍 Connecting to Gemini API...")
+                st.write("📡 Running Google Search to audit recent corporate filings (This takes 4-6 seconds)...")
+                
+                stream_gen = stream_stock_report(clean_ticker, language=lang, stock_data=fund)
+                
+                # Force the heavy AFC search delay to execute while status box is open
+                try:
+                    first_chunk = next(stream_gen)
+                    status.update(label="Audit complete. Streaming report...", state="complete", expanded=False)
+                except StopIteration:
+                    first_chunk = ""
+                    status.update(label="Stream ended unexpectedly.", state="error", expanded=False)
+            
+            def combined_stream():
+                if first_chunk:
+                    yield first_chunk
+                yield from stream_gen
+                
+            streamed_text = st.write_stream(combined_stream)
             st.session_state["last_report"] = streamed_text
         except Exception as stream_err:
             st.error(f"### ❌ Live Streaming Halted: {stream_err}")
