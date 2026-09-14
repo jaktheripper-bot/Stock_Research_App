@@ -222,7 +222,7 @@ if ("last_report" in st.session_state and st.session_state["last_report"] is not
     elif st.session_state.get("last_report"):
         st.markdown(st.session_state["last_report"])
     
-    full_report_md = f"# Equity Research Report: {header_label}\n\n" + st.session_state["last_report"]
+    full_report_md = f"# Equity Research Report: {header_label}\n\n" + str(st.session_state.get("last_report") or "")
     pdf_data = convert_md_to_pdf_bytes(full_report_md)
     st.download_button(
         label="Download Research Report (.pdf)",

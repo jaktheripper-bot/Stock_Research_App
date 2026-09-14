@@ -270,7 +270,7 @@ def extract_response_text(response) -> str:
     return text_content
 
 def call_genai_with_fallback(client, prompt: str, system_prompt: str) -> str:
-    models_to_try = ["gemini-3.5-flash", "gemini-1.5-flash"]
+    models_to_try = ["gemini-1.5-pro", "gemini-1.5-flash"]
     last_error = None
     
     for model_name in models_to_try:
@@ -334,7 +334,7 @@ def stream_genai_with_fallback(client, prompt: str, system_prompt: str):
     Streams Gemini response chunks using client.chats.create to properly handle
     Automatic Function Calling (AFC) with Google Search grounding and transient 503 spikes.
     """
-    models_to_try = ["gemini-3.6-flash", "gemini-2.5-flash", "gemini-flash-latest"]
+    models_to_try = ["gemini-1.5-pro", "gemini-1.5-flash"]
     last_error = None
 
     for model_name in models_to_try:
