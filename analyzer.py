@@ -391,6 +391,48 @@ def stream_genai_with_fallback(client, prompt: str, system_prompt: str):
     raise ValueError(f"API Limit Reached or Model Unavailable during stream. Details: {last_error}")
 
 
+
+def stream_perplexity_fallback(prompt: str, system_prompt: str):
+    import os
+    try:
+        from openai import OpenAI
+    except ImportError:
+        raise ValueError("OpenAI package missing. Run `pip install openai`.")
+        
+    api_key = os.environ.get("PERPLEXITY_API_KEY")
+    if not api_key:
+        try:
+            import streamlit as st
+            api_key = st.secrets.get("PERPLEXITY_API_KEY")
+        except Exception:
+            pass
+    if not api_key and os.path.exists(".streamlit/secrets.toml"):
+        try:
+            import toml
+            api_key = toml.load(".streamlit/secrets.toml").get("PERPLEXITY_API_KEY")
+        except Exception:
+            pass
+            
+    if not api_key:
+        raise ValueError("PERPLEXITY_API_KEY not found in secrets or environment.")
+        
+    client = OpenAI(api_key=api_key, base_url="https://api.perplexity.ai")
+    
+    messages = [
+        {"role": "system", "content": system_prompt + "\n- Actively verify company developments using live web search. Ground all qualitative pillars (TAM, competitive moat, governance, ESG) in recent earnings disclosures, quarterly concall commentary, management guidance changes, and regulatory filings from the past 90 to 180 days."},
+        {"role": "user", "content": prompt}
+    ]
+    
+    response_stream = client.chat.completions.create(
+        model="sonar-pro",
+        messages=messages,
+        stream=True
+    )
+    
+    for chunk in response_stream:
+        if chunk.choices[0].delta.content:
+            yield chunk.choices[0].delta.content
+
 def stream_stock_report(ticker: str, language: str = "English (India)", stock_data: dict = None):
     """
     Generator that yields Markdown tokens live.
@@ -419,9 +461,24 @@ def stream_stock_report(ticker: str, language: str = "English (India)", stock_da
 Data: {stock_data}"""
 
     report_accumulator = []
-    for chunk in stream_genai_with_fallback(client, user_prompt, system_prompt):
-        report_accumulator.append(chunk)
-        yield chunk
+    try:
+        for chunk in stream_genai_with_fallback(client, user_prompt, system_prompt):
+            report_accumulator.append(chunk)
+            yield chunk
+    except Exception as gemini_err:
+        fallback_notice = "\n\n> ⚠️ **Gemini Outage Detected.**\n> 🔄 **Rerouting to Perplexity Sonar...**\n\n"
+        report_accumulator.append(fallback_notice)
+        yield fallback_notice
+        
+        try:
+            for chunk in stream_perplexity_fallback(user_prompt, system_prompt):
+                report_accumulator.append(chunk)
+                yield chunk
+        except Exception as perp_err:
+            final_err = f"\n\n> ❌ **Fatal Fallback Error:** Perplexity API failed or is missing the PERPLEXITY_API_KEY.\n> Details: {perp_err}"
+            report_accumulator.append(final_err)
+            yield final_err
+            return
 
     complete_text = "".join(report_accumulator)
 
