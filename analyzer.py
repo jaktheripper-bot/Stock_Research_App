@@ -328,3 +328,114 @@ def generate_stock_report(ticker: str, language: str = "English (India)") -> str
         print(f"Warning: Failed to save to archive: {e}")
         
     return report_text
+
+def stream_genai_with_fallback(client, prompt: str, system_prompt: str):
+    """
+    Streams Gemini response chunks using client.chats.create to properly handle
+    Automatic Function Calling (AFC) with Google Search grounding and transient 503 spikes.
+    """
+    models_to_try = ["gemini-3.6-flash", "gemini-2.5-flash", "gemini-flash-latest"]
+    last_error = None
+
+    for model_name in models_to_try:
+        for attempt in range(4):
+            try:
+                chat = client.chats.create(
+                    model=model_name,
+                    config=genai.types.GenerateContentConfig(
+                        system_instruction=system_prompt + """
+- Actively verify company developments using Google Search. Ground all qualitative pillars (TAM, competitive moat, governance, ESG) in recent earnings disclosures, quarterly concall commentary, management guidance changes, and regulatory filings from the past 90 to 180 days.
+""",
+                        tools=[{"google_search": {}}],
+                    )
+                )
+
+                response_stream = chat.send_message_stream(prompt)
+
+                yielded_any = False
+                for chunk in response_stream:
+                    text_part = None
+                    try:
+                        text_part = chunk.text
+                    except Exception:
+                        pass
+
+                    if not text_part and hasattr(chunk, "candidates") and chunk.candidates:
+                        for candidate in chunk.candidates:
+                            content = getattr(candidate, "content", None)
+                            if content and hasattr(content, "parts"):
+                                for part in content.parts:
+                                    t = getattr(part, "text", None)
+                                    if t:
+                                        text_part = t
+                                        break
+
+                    if text_part:
+                        yielded_any = True
+                        yield text_part
+
+                if yielded_any:
+                    return
+            except Exception as e:
+                last_error = e
+                err_str = str(e)
+                if "404" in err_str or "NOT_FOUND" in err_str:
+                    break
+                if any(code in err_str for code in ["429", "RESOURCE_EXHAUSTED", "503", "UNAVAILABLE"]):
+                    sleep_time = (2 ** attempt) + 1
+                    print(f"[{model_name}] Transient error ({err_str[:40]}...). Retrying in {sleep_time}s...")
+                    time.sleep(sleep_time)
+                    continue
+                break
+
+    raise ValueError(f"API Limit Reached or Model Unavailable during stream. Details: {last_error}")
+
+
+def stream_stock_report(ticker: str, language: str = "English (India)", stock_data: dict = None):
+    """
+    Generator that yields Markdown tokens live.
+    Executes post-stream audit and commits to database archive upon stream completion.
+    """
+    if stock_data is None:
+        stock_data = get_stock_fundamentals(ticker)
+
+    api_key = os.environ.get("GEMINI_API_KEY")
+    if not api_key:
+        try:
+            import streamlit as st
+            api_key = st.secrets.get("GEMINI_API_KEY")
+        except Exception:
+            pass
+    if not api_key and os.path.exists(".streamlit/secrets.toml"):
+        try:
+            import toml
+            api_key = toml.load(".streamlit/secrets.toml").get("GEMINI_API_KEY")
+        except Exception:
+            pass
+
+    client = genai.Client(api_key=api_key)
+    system_prompt = get_system_prompt(ticker, language)
+    user_prompt = f"""Generate the research report for: {stock_data.get('short_name')} ({stock_data.get('ticker')})
+Data: {stock_data}"""
+
+    report_accumulator = []
+    for chunk in stream_genai_with_fallback(client, user_prompt, system_prompt):
+        report_accumulator.append(chunk)
+        yield chunk
+
+    complete_text = "".join(report_accumulator)
+
+    try:
+        passed, discrepancies = verify_stock_report(stock_data, complete_text)
+        if not passed:
+            audit_note = f"""\n\n> ⚠️ **Post-Stream Verification Note:** Minor metric discrepancies identified: {discrepancies}"""
+            complete_text += audit_note
+            yield audit_note
+    except Exception as audit_err:
+        print(f"Verification audit warning: {audit_err}")
+
+    try:
+        save_report_to_archive(stock_data, complete_text)
+    except Exception as db_err:
+        print(f"Warning: Failed to save streamed report to archive: {db_err}")
+

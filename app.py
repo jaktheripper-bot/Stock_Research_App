@@ -4,7 +4,7 @@ import platform
 from datetime import datetime, timezone
 import tempfile
 import streamlit as st
-from analyzer import generate_stock_report, get_stock_fundamentals, evaluate_material_change
+from analyzer import generate_stock_report, stream_stock_report, get_stock_fundamentals, evaluate_material_change
 from db import get_archived_reports, get_report_by_ticker
 from markdown_pdf import MarkdownPdf, Section
 
@@ -130,15 +130,16 @@ if submitted and query:
                     st.session_state["cached_record"] = cached
                     st.rerun()
                 else:
-                    with st.spinner(f"Updating analysis: {reason}..."):
-                        report_text = generate_stock_report(clean_query, language=selected_language)
-                        st.session_state["last_report"] = report_text
-                        st.session_state["last_ticker"] = resolved_ticker
-                        st.session_state["last_fundamentals"] = stock_data
-                        st.session_state["report_source"] = "Freshly Generated"
-                        st.session_state["gate_reason"] = reason
-                        st.session_state.pop("cached_record", None)
-                        st.rerun()
+                    # Trigger two-phase render: render metrics instantly, stream prose below
+                    st.session_state["last_report"] = None
+                    st.session_state["last_ticker"] = resolved_ticker
+                    st.session_state["last_fundamentals"] = stock_data
+                    st.session_state["report_source"] = "Freshly Generated"
+                    st.session_state["gate_reason"] = reason
+                    st.session_state["stream_pending"] = True
+                    st.session_state["stream_language"] = selected_language
+                    st.session_state.pop("cached_record", None)
+                    st.rerun()
         except Exception as err:
             st.session_state["last_report"] = None
             stage = getattr(err, "stage", "Pipeline Engine")
@@ -165,7 +166,7 @@ if submitted and query:
             with st.expander("📋 Copy Diagnostic Report (Share to Fix)", expanded=True):
                 st.code(json.dumps(diag_payload, indent=2), language="json")
 
-if "last_report" in st.session_state:
+if ("last_report" in st.session_state and st.session_state["last_report"] is not None) or st.session_state.get("stream_pending"):
     fund = st.session_state.get("last_fundamentals", {})
     ticker_disp = st.session_state.get("last_ticker", "STOCK")
     
@@ -188,7 +189,19 @@ if "last_report" in st.session_state:
     header_label = f"{company_name} ({clean_ticker})" if company_name and company_name.upper() != clean_ticker else clean_ticker
     
     st.header(f"Equity Research Report: {header_label}")
-    st.markdown(st.session_state["last_report"])
+    
+    if st.session_state.get("stream_pending"):
+        st.session_state["stream_pending"] = False
+        lang = st.session_state.get("stream_language", "English (India)")
+        try:
+            stream_gen = stream_stock_report(clean_ticker, language=lang, stock_data=fund)
+            streamed_text = st.write_stream(stream_gen)
+            st.session_state["last_report"] = streamed_text
+        except Exception as stream_err:
+            st.error(f"### ❌ Live Streaming Halted: {stream_err}")
+            st.session_state["last_report"] = None
+    elif st.session_state.get("last_report"):
+        st.markdown(st.session_state["last_report"])
     
     full_report_md = f"# Equity Research Report: {header_label}\n\n" + st.session_state["last_report"]
     pdf_data = convert_md_to_pdf_bytes(full_report_md)
