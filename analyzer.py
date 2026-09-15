@@ -270,7 +270,7 @@ def extract_response_text(response) -> str:
     return text_content
 
 def call_genai_with_fallback(client, prompt: str, system_prompt: str) -> str:
-    models_to_try = ["gemini-1.5-pro", "gemini-1.5-flash"]
+    models_to_try = get_latest_flash_models(client)
     last_error = None
     
     for model_name in models_to_try:
@@ -329,12 +329,64 @@ def generate_stock_report(ticker: str, language: str = "English (India)") -> str
         
     return report_text
 
+_DISCOVERED_MODELS_CACHE = {"models": [], "timestamp": 0}
+
+def get_latest_flash_models(client, ttl_seconds: int = 86400) -> list:
+    """
+    Dynamically resolves the latest general-purpose Gemini Flash models.
+    Filters out specialized variants that fail on Google Search grounding,
+    sorts by version descending, and caches the list.
+    """
+    import time
+    import re
+
+    now = time.time()
+    if _DISCOVERED_MODELS_CACHE["models"] and (now - _DISCOVERED_MODELS_CACHE["timestamp"]) < ttl_seconds:
+        return _DISCOVERED_MODELS_CACHE["models"]
+
+    fallback_models = ["gemini-3.8-flash", "gemini-3.5-flash-lite", "gemini-3.1-pro-preview"]
+    try:
+        discovered = []
+        for m in client.models.list():
+            model_id = m.name.replace("models/", "") if hasattr(m, "name") else ""
+            actions = getattr(m, "supported_actions", []) or getattr(m, "supported_generation_methods", [])
+            if actions and "generateContent" not in actions:
+                continue
+
+            if "gemini" not in model_id or "flash" not in model_id:
+                continue
+            if any(k in model_id for k in ["image", "tts", "live", "transcribe", "embedding", "audio", "native-audio"]):
+                continue
+
+            match = re.search(r"gemini-(\d+(?:\.\d+)?)", model_id)
+            if match:
+                version_num = float(match.group(1))
+                discovered.append((version_num, model_id))
+
+        if discovered:
+            discovered.sort(key=lambda x: x[0], reverse=True)
+            seen = set()
+            ordered = []
+            for _, mod_id in discovered:
+                if mod_id not in seen:
+                    seen.add(mod_id)
+                    ordered.append(mod_id)
+
+            _DISCOVERED_MODELS_CACHE["models"] = ordered
+            _DISCOVERED_MODELS_CACHE["timestamp"] = now
+            return ordered
+    except Exception as e:
+        print(f"Warning: Dynamic model discovery failed ({e}). Using fallback cascade.")
+
+    return fallback_models
+
+
 def stream_genai_with_fallback(client, prompt: str, system_prompt: str):
     """
     Streams Gemini response chunks using client.chats.create to properly handle
     Automatic Function Calling (AFC) with Google Search grounding and transient 503 spikes.
     """
-    models_to_try = ["gemini-1.5-pro", "gemini-1.5-flash"]
+    models_to_try = get_latest_flash_models(client)
     last_error = None
 
     for model_name in models_to_try:
