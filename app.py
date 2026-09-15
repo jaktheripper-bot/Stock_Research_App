@@ -196,15 +196,17 @@ if ("last_report" in st.session_state and st.session_state["last_report"] is not
         
         try:
             with st.status("Auditing market data & generating report...", expanded=True) as status:
-                st.write("🔍 Connecting to Gemini API...")
-                st.write("📡 Running Google Search to audit recent corporate filings (This takes 4-6 seconds)...")
+                st.write(f"📊 Verified Quote: **₹{fund.get('current_price', 'N/A')}** | Mcap: **{fund.get('market_cap', 'N/A')}**")
                 
-                stream_gen = stream_stock_report(clean_ticker, language=lang, stock_data=fund)
+                def live_status_hook(msg):
+                    st.write(msg)
                 
-                # Force the heavy AFC search delay to execute while status box is open
+                stream_gen = stream_stock_report(clean_ticker, language=lang, stock_data=fund, on_status=live_status_hook)
+                
+                # Await initial grounded response while streaming live telemetry inside the status card
                 try:
                     first_chunk = next(stream_gen)
-                    status.update(label="Audit complete. Streaming report...", state="complete", expanded=False)
+                    status.update(label="✅ Audit complete. Streaming live research...", state="complete", expanded=False)
                 except StopIteration:
                     first_chunk = ""
                     status.update(label="Stream ended unexpectedly.", state="error", expanded=False)

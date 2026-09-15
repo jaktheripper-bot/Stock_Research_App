@@ -381,26 +381,32 @@ def get_latest_flash_models(client, ttl_seconds: int = 86400) -> list:
     return fallback_models
 
 
-def stream_genai_with_fallback(client, prompt: str, system_prompt: str):
+def stream_genai_with_fallback(client, prompt: str, system_prompt: str, on_status=None):
     """
-    Streams Gemini response chunks using client.chats.create to properly handle
-    Automatic Function Calling (AFC) with Google Search grounding and transient 503 spikes.
+    Streams Gemini chunks with fast-fail 1-attempt model failover and live status telemetry.
     """
-    models_to_try = get_latest_flash_models(client)
+    discovered_models = get_latest_flash_models(client)
+    # Target top 2 production flash endpoints to avoid cycling through deprecated versions
+    models_to_try = [m for m in discovered_models if "preview" not in m][:2] or ["gemini-2.5-flash", "gemini-2.0-flash"]
     last_error = None
 
     for model_name in models_to_try:
-        for attempt in range(4):
+        if on_status:
+            on_status(f"⚡ Connecting to model node `{model_name}`...")
+        for attempt in range(2):  # Cap at 1 retry max (2 attempts total)
             try:
                 chat = client.chats.create(
                     model=model_name,
                     config=genai.types.GenerateContentConfig(
                         system_instruction=system_prompt + """
-- Actively verify company developments using Google Search. Ground all qualitative pillars (TAM, competitive moat, governance, ESG) in recent earnings disclosures, quarterly concall commentary, management guidance changes, and regulatory filings from the past 90 to 180 days.
+- Verify recent quarterly earnings results, management guidance, and official BSE filings from the past 90-180 days using targeted Google Search.
 """,
                         tools=[{"google_search": {}}],
                     )
                 )
+
+                if on_status:
+                    on_status("🔍 Running Google Search grounding on filings & disclosures...")
 
                 response_stream = chat.send_message_stream(prompt)
 
@@ -434,14 +440,15 @@ def stream_genai_with_fallback(client, prompt: str, system_prompt: str):
                 if "404" in err_str or "NOT_FOUND" in err_str:
                     break
                 if any(code in err_str for code in ["429", "RESOURCE_EXHAUSTED", "503", "UNAVAILABLE"]):
-                    sleep_time = (2 ** attempt) + 1
-                    print(f"[{model_name}] Transient error ({err_str[:40]}...). Retrying in {sleep_time}s...")
-                    time.sleep(sleep_time)
-                    continue
+                    if attempt == 0:
+                        if on_status:
+                            on_status(f"⚠️ Model `{model_name}` busy. Retrying once (1s)...")
+                        import time
+                        time.sleep(1)
+                        continue
                 break
 
     raise ValueError(f"API Limit Reached or Model Unavailable during stream. Details: {last_error}")
-
 
 
 def stream_perplexity_fallback(prompt: str, system_prompt: str):
@@ -485,7 +492,7 @@ def stream_perplexity_fallback(prompt: str, system_prompt: str):
         if chunk.choices[0].delta.content:
             yield chunk.choices[0].delta.content
 
-def stream_stock_report(ticker: str, language: str = "English (India)", stock_data: dict = None):
+def stream_stock_report(ticker: str, language: str = "English (India)", stock_data: dict = None, on_status=None):
     """
     Generator that yields Markdown tokens live.
     Executes post-stream audit and commits to database archive upon stream completion.
@@ -514,7 +521,7 @@ Data: {stock_data}"""
 
     report_accumulator = []
     try:
-        for chunk in stream_genai_with_fallback(client, user_prompt, system_prompt):
+        for chunk in stream_genai_with_fallback(client, user_prompt, system_prompt, on_status=on_status):
             report_accumulator.append(chunk)
             yield chunk
     except Exception as gemini_err:
