@@ -1,10 +1,13 @@
 def extract_health_matrix(report_text: str) -> dict:
     """
     Parses the 7-Pillar Health Matrix from report text.
-    Uses structured regex first, falling back to keyword heuristics for legacy reports.
+    Resilient to non-breaking spaces, bullets, brackets, and casing.
     """
     if not report_text or not isinstance(report_text, str):
         return {}
+
+    # Normalize Unicode spaces, hyphens, and bullets
+    clean = report_text.replace("\xa0", " ").replace("–", "-").replace("—", "-").replace("•", "-")
 
     matrix = {
         "Macro": "Neutral",
@@ -13,48 +16,49 @@ def extract_health_matrix(report_text: str) -> dict:
         "Diagnostic": "N/A",
         "Valuation": "Fair",
         "BalanceSheet": "Resilient",
-        "Verdict": "WATCHLIST"
+        "Verdict": "Watchlist"
     }
 
-    # Primary: Structured metadata scan
     patterns = {
-        "Macro": r"-\s*Macro:\s*\[?(Stable|Headwinds|Neutral)\]?",
-        "Moat": r"-\s*Moat:\s*\[?(Wide|Moderate|Narrow)\]?",
-        "Governance": r"-\s*Governance:\s*\[?(Clean|Caution|High Risk)\]?",
-        "Diagnostic": r"-\s*Diagnostic:\s*\[?(Temporary|Structural|Neutral|N/A)\]?",
-        "Valuation": r"-\s*Valuation:\s*\[?(Undervalued|Fair|Stretched|Loss-Making)\]?",
-        "BalanceSheet": r"-\s*Balance Sheet:\s*\[?(Debt-Free|Moderate Debt|High Debt|Resilient)\]?",
-        "Verdict": r"-\s*Verdict:\s*\[?(BUY|WATCHLIST|AVOID)\]?"
+        "Macro": r"Macro\s*:\s*\[?\s*(Stable|Headwinds|Neutral)\s*\]?",
+        "Moat": r"Moat\s*:\s*\[?\s*(Wide|Moderate|Narrow)\s*\]?",
+        "Governance": r"Governance\s*:\s*\[?\s*(Clean|Caution|High Risk)\s*\]?",
+        "Diagnostic": r"Diagnostic\s*:\s*\[?\s*(Temporary|Structural|Neutral|N/A)\s*\]?",
+        "Valuation": r"Valuation\s*:\s*\[?\s*(Undervalued|Fair|Stretched|Loss-Making)\s*\]?",
+        "BalanceSheet": r"Balance\s*Sheet\s*:\s*\[?\s*(Debt-Free|Moderate Debt|High Debt|Resilient)\s*\]?",
+        "Verdict": r"Verdict\s*:\s*\[?\s*(BUY|WATCHLIST|AVOID|Buy|Watchlist|Avoid)\s*\]?"
     }
 
     found_any = False
     for key, pat in patterns.items():
-        match = re.search(pat, report_text, re.IGNORECASE)
+        match = re.search(pat, clean, re.IGNORECASE)
         if match:
-            matrix[key] = match.group(1).title()
+            matrix[key] = match.group(1).strip().title()
             found_any = True
 
-    # Secondary Heuristic Fallback (for older cached reports without the metadata block)
     if not found_any:
-        # Verdict fallback
-        v_match = re.search(r"#+\s*VERDICT:\s*(BUY|WATCHLIST|AVOID)", report_text, re.IGNORECASE)
+        v_match = re.search(r"#+\s*VERDICT:\s*\[?\s*(BUY|WATCHLIST|AVOID)\s*\]?", clean, re.IGNORECASE)
         if v_match:
-            matrix["Verdict"] = v_match.group(1).upper()
-        # Diagnostic fallback
-        if "temporary" in report_text.lower() and "drop" in report_text.lower():
-            matrix["Diagnostic"] = "Temporary"
-        elif "structural" in report_text.lower():
-            matrix["Diagnostic"] = "Structural"
-        # Moat fallback
-        if "wide moat" in report_text.lower():
-            matrix["Moat"] = "Wide"
-        elif "narrow moat" in report_text.lower():
-            matrix["Moat"] = "Narrow"
+            matrix["Verdict"] = v_match.group(1).strip().title()
 
     return matrix
 
-
-
+import os
+import re
+import sys
+import json
+import time
+import random
+import contextlib
+import requests
+from datetime import datetime, timezone
+from google import genai
+from normalizer import normalize_stock_data
+from db import save_report_to_archive
+from checker import verify_stock_report
+from screener import pass_pre_screening_gates
+from bsedata.bse import BSE
+from bse_master import resolve_bse_scrip_code
 
 class PipelineError(Exception):
     def __init__(self, stage: str, message: str, technical_details: str = ""):
@@ -66,9 +70,9 @@ class PipelineError(Exception):
 class TickerResolutionError(PipelineError):
     def __init__(self, query: str):
         super().__init__(
-            stage="Ticker & Scrip Resolution",
+            stage="Ticker Resolution",
             message=f"Could not resolve an official BSE scrip code for '{query}'.",
-            technical_details=f"Query '{query}' was evaluated against direct code, static aliases, local master universe, and JIT AI discovery. Zero active quotes confirmed."
+            technical_details="Evaluated static map, master universe, and JIT AI discovery. Zero active quotes confirmed."
         )
 
 class ExchangeDataFetchError(PipelineError):
@@ -79,41 +83,64 @@ class ExchangeDataFetchError(PipelineError):
             technical_details=detail
         )
 
+def resolve_pe_with_failsafes(ticker: str, scrip: str = "") -> str:
+    clean = ticker.strip().upper().replace(".NS", "").replace(".BO", "").replace(" ", "")
+    # Tier 1: Consolidated yfinance
+    try:
+        import yfinance as yf
+        symbols = [f"{clean}.NS", f"{clean}.BO"]
+        if scrip and str(scrip).isdigit():
+            symbols.append(f"{scrip}.BO")
+        with open(os.devnull, "w") as devnull:
+            with contextlib.redirect_stderr(devnull):
+                for s in symbols:
+                    try:
+                        tk = yf.Ticker(s)
+                        info = tk.info or {}
+                        trailing_eps = info.get("trailingEps")
+                        trailing_pe = info.get("trailingPE")
+                        if trailing_eps is not None and float(trailing_eps) <= 0:
+                            return "N/A (Loss-Making)"
+                        if trailing_pe and float(trailing_pe) > 0:
+                            return f"{float(trailing_pe):.2f}"
+                    except Exception:
+                        continue
+    except Exception:
+        pass
 
-import requests
-from datetime import datetime, timezone
+    # Tier 2: BSE ComHeader Direct
+    if scrip and str(scrip).isdigit():
+        try:
+            url = f"https://api.bseindia.com/BseIndiaAPI/api/ComHeader/w?quotetype=EQ&scripcode={scrip}&seriesid="
+            headers = {"User-Agent": "Mozilla/5.0", "Referer": "https://www.bseindia.com/"}
+            res = requests.get(url, headers=headers, timeout=3)
+            if res.status_code == 200:
+                raw_pe = res.json().get("PE")
+                if raw_pe and str(raw_pe).strip() not in ["", "-", "None", "0", "0.00"]:
+                    val = float(str(raw_pe).replace(",", "").strip())
+                    return f"{val:.2f}" if val > 0 else "N/A (Loss-Making)"
+        except Exception:
+            pass
+    return "N/A"
 
 def fetch_latest_bse_announcement(scrip_code: str) -> str:
-    """Fetches the latest official corporate filing headline from BSE India."""
     if not scrip_code or not str(scrip_code).isdigit():
         return ""
     try:
         url = f"https://api.bseindia.com/BseIndiaAPI/api/AnnSubCategoryGetData/w?pageno=1&strCat=-1&strPrevDate=&strScrip={scrip_code}&strSearch=P&strToDate=&strType=C"
-        headers = {
-            "User-Agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
-            "Referer": "https://www.bseindia.com/",
-            "Accept": "application/json, text/plain, */*"
-        }
+        headers = {"User-Agent": "Mozilla/5.0", "Referer": "https://www.bseindia.com/"}
         res = requests.get(url, headers=headers, timeout=5)
         if res.status_code == 200:
-            data = res.json()
-            table = data.get("Table", [])
-            if table and len(table) > 0:
-                headline = table[0].get("NEWSSUB", "") or table[0].get("HEADLINE", "")
-                return headline.strip()
+            table = res.json().get("Table", [])
+            if table:
+                return (table[0].get("NEWSSUB") or table[0].get("HEADLINE") or "").strip()
     except Exception:
         pass
     return ""
 
 def evaluate_material_change(cached: dict, live_fund: dict, scrip_code: str) -> tuple:
-    """
-    Evaluates whether material changes require report regeneration.
-    Returns (should_regenerate: bool, reason: str, latest_announcement: str).
-    """
     if not cached:
         return True, "Initial analysis", ""
-
-    # 1. Check age (> 14 days)
     raw_ts = cached.get("raw_timestamp")
     if raw_ts:
         try:
@@ -121,67 +148,29 @@ def evaluate_material_change(cached: dict, live_fund: dict, scrip_code: str) -> 
             now = datetime.now(timezone.utc)
             if ts.tzinfo is None:
                 ts = ts.replace(tzinfo=timezone.utc)
-            days_old = (now - ts).total_seconds() / 86400.0
-            if days_old > 14:
-                return True, f"Report is {int(days_old)} days old (> 14-day cycle)", ""
+            if (now - ts).total_seconds() / 86400.0 > 14:
+                return True, "Report is > 14 days old", ""
         except Exception:
             pass
 
-    # 2. Check Corporate Filings on BSE
     latest_ann = fetch_latest_bse_announcement(scrip_code)
     cached_ann = cached.get("latest_announcement", "")
     if latest_ann and cached_ann and latest_ann != cached_ann:
-        return True, f"New BSE Corporate Announcement: '{latest_ann[:50]}...'", latest_ann
+        return True, f"New BSE Filing: {latest_ann[:40]}...", latest_ann
 
-    # 3. Check Price Volatility (>= 5% move)
     cached_price = cached.get("baseline_price")
     live_price = live_fund.get("current_price") or live_fund.get("currentValue")
     try:
         c_p = float(str(cached_price).replace(",", "").strip())
         l_p = float(str(live_price).replace(",", "").strip())
-        if c_p > 0:
-            pct_change = abs(l_p - c_p) / c_p
-            if pct_change >= 0.05:
-                direction = "+" if l_p > c_p else "-"
-                return True, f"Price shifted {direction}{pct_change*100:.1f}% since last report", latest_ann
+        if c_p > 0 and (abs(l_p - c_p) / c_p) >= 0.05:
+            d = "+" if l_p > c_p else "-"
+            return True, f"Price shifted {d}{(abs(l_p - c_p) / c_p)*100:.1f}%", latest_ann
     except Exception:
         pass
-
-    # No material events detected
-    return False, "No material price or regulatory changes detected", latest_ann
-
-import os
-import re
-import time
-import requests
-import streamlit as st
-from google import genai
-from normalizer import normalize_stock_data
-from db import save_report_to_archive
-from checker import verify_stock_report
-from screener import pass_pre_screening_gates
-from bsedata.bse import BSE
-from bse_master import resolve_bse_scrip_code
-
-def fetch_pe_from_google(ticker: str) -> str:
-    """Fetches trailing P/E ratio from Google Finance with NSE/BOM fallback."""
-    clean = ticker.strip().upper().replace(".NS", "").replace(".BO", "")
-    headers = {"User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64)"}
-    
-    for exchange in ["NSE", "BOM"]:
-        url = f"https://www.google.com/finance/quote/{clean}:{exchange}"
-        try:
-            res = requests.get(url, headers=headers, timeout=3)
-            if res.status_code == 200:
-                match = re.search(r'P/E ratio</div>.*?<div[^>]*>([0-9\.,]+)</div>', res.text, re.DOTALL)
-                if match:
-                    return match.group(1).strip()
-        except Exception:
-            continue
-    return "N/A"
+    return False, "No material price or regulatory change", latest_ann
 
 def fetch_bse_exchange_data(query: str) -> dict:
-    """Pulls real-time fundamentals directly from the BSE exchange via scrip lookup."""
     scrip = resolve_bse_scrip_code(query)
     if not scrip:
         raise ValueError(f"Could not resolve an official BSE scrip code for '{query}'.")
@@ -189,18 +178,17 @@ def fetch_bse_exchange_data(query: str) -> dict:
     b = BSE()
     q = b.getQuote(scrip)
     if not q or "currentValue" not in q:
-        raise ValueError(f"BSE exchange did not return active quote data for scrip {scrip}.")
+        raise ValueError(f"BSE exchange did not return quote data for scrip {scrip}.")
 
     mcap_raw = q.get("marketCapFull") or q.get("marketCapFreeFloat") or "0"
     mcap_clean = mcap_raw.replace(" Cr.", "").replace(",", "").strip()
     try:
-        mcap_crores = float(mcap_clean)
-        mcap_inr = int(mcap_crores * 10000000)
-    except ValueError:
+        mcap_inr = int(float(mcap_clean) * 10_000_000)
+    except Exception:
         mcap_inr = 0
 
     clean_ticker = query.strip().upper().replace(".NS", "").replace(".BO", "")
-    pe_val = fetch_pe_from_google(clean_ticker)
+    resolved_pe = resolve_pe_with_failsafes(q.get("scrip_id") or clean_ticker, scrip)
 
     return {
         "ticker": clean_ticker,
@@ -208,7 +196,7 @@ def fetch_bse_exchange_data(query: str) -> dict:
         "scrip_code": scrip,
         "current_price": q.get("currentValue", "0.00"),
         "market_cap": mcap_inr,
-        "pe_ratio": pe_val,
+        "pe_ratio": resolved_pe,
         "industry": q.get("industry", "Core Industry"),
         "sector": q.get("industry", "Core Industry"),
         "52w_high": q.get("52weekHigh", "N/A"),
@@ -218,304 +206,126 @@ def fetch_bse_exchange_data(query: str) -> dict:
     }
 
 def get_stock_fundamentals(query: str) -> dict:
-    """Fetches verified exchange data. Raises PipelineError on failure with zero synthetic fallbacks."""
     clean = query.strip().upper().replace(".NS", "").replace(".BO", "")
     scrip = resolve_bse_scrip_code(query)
     if not scrip:
         raise TickerResolutionError(query)
-
     try:
         raw_data = fetch_bse_exchange_data(query)
     except Exception as bse_err:
         raise ExchangeDataFetchError(scrip, str(bse_err))
 
     profile_res = {
-        "name": raw_data["short_name"],
-        "sector": raw_data["sector"],
-        "industry": raw_data["industry"],
-        "market_capitalization": raw_data["market_cap"],
+        "name": raw_data["short_name"], "sector": raw_data["sector"],
+        "industry": raw_data["industry"], "market_capitalization": raw_data["market_cap"],
         "description": raw_data["description"]
     }
-    stats_res = {
-        "statistics": {
-            "valuations_metrics": {
-                "trailing_pe": raw_data["pe_ratio"]
-            }
-        }
-    }
-    passed_gate, gate_reason = pass_pre_screening_gates(stats_res, profile_res)
-    if not passed_gate:
-        raise PipelineError("Pre-Screening Gate", f"Stock rejected: {gate_reason}")
-
+    stats_res = {"statistics": {"valuations_metrics": {"trailing_pe": raw_data["pe_ratio"]}}}
+    passed, reason = pass_pre_screening_gates(stats_res, profile_res)
+    if not passed:
+        raise PipelineError("Pre-Screening Gate", f"Stock rejected: {reason}")
     return normalize_stock_data(raw_data, exchange="BSE")
 
-
 def get_system_prompt(ticker: str, language: str) -> str:
-    lang_rule = "The report must be entirely in English (India). Strictly use British/Indian spelling (e.g., analyse, capitalisation, labour)." if language == "English (India)" else f"The report must be fully translated into {language}, including all section headers, analysis, and verdicts without omitting technical detail."
-
-    return f"""You are an expert equity research analyst. Write a comprehensive report for {ticker}.
+    lang_rule = "The report must be entirely in English (India) using British/Indian spelling." if language == "English (India)" else f"The report must be fully translated into {language} without omitting technical rigor."
+    return f"""You are an institutional equity research analyst. Write a comprehensive research report for {ticker}.
 {lang_rule}
+
+### Health Matrix
+- Macro: [Stable | Headwinds | Neutral]
+- Moat: [Wide | Moderate | Narrow]
+- Governance: [Clean | Caution | High Risk]
+- Diagnostic: [Temporary | Structural | Neutral | N/A]
+- Valuation: [Undervalued | Fair | Stretched | Loss-Making]
+- Balance Sheet: [Debt-Free | Moderate Debt | High Debt]
+- Verdict: [BUY | WATCHLIST | AVOID]
 
 CRITICAL LINGUISTIC RULES:
 1. Write at an 8th-grade reading level. Keep sentences short and simple.
-2. For any unavoidable financial terminology, include a brief inline definition in parentheses immediately following the term.
-3. NEVER use en-dashes or em-dashes in the text. Use colons, commas, or parentheses instead.
-4. All financial figures provided are in Indian Rupees (INR) unless explicitly stated otherwise. Express market values in Crores (Cr). Do not use Millions or Billions.
+2. For financial terms, provide a brief definition in parentheses.
+3. Express all Indian corporate metrics in Crores (Cr) and Indian Rupees (INR).
 
-# VERDICT: [BUY / HOLD / SELL]
-**Summary:** One concise sentence summarizing the current operational and market standing of the stock.
+# VERDICT: [BUY / WATCHLIST / AVOID]
+**Summary:** One concise sentence summarizing the operational standing.
 
 ---
-
 ## Pillar 1: Macro-Economic, Geopolitical & Environmental Overlays
-* Geopolitics & Supply Chain: Cross-border exposure, trade friction, and sovereign risks.
-* Environmental / ESG Factors: Climate vulnerabilities, raw material dependencies, and regulatory compliance.
-* Interest Rate & Inflation Cycle: Capital cost sensitivity and pricing power.
-
 ## Pillar 2: Industry Dynamics & Competitive Positioning
-* Total Addressable Market (TAM): Secular growth horizon and industry expansion rates.
-* Porter's Five Forces: Barriers to entry, supplier/buyer power, and competitive intensity.
-* Market Share: Dominant sector leader vs. marginal player.
-
 ## Pillar 3: Promoter Quality & Fundamental Health
-* Profitability Metrics: ROE and ROCE trends.
-* Balance Sheet Strength: Debt-to-Equity, cash runway, and dilution risk.
-* Revenue Stickiness: High-margin recurring streams vs. lumpy cyclical sales.
-* Promoter Governance: Pledging, shareholding trajectory, and alignment with minority holders.
-
 ## Pillar 4: The "Structural vs. Temporary" Drop Diagnostic
-* Evaluate whether recent price drawdowns are Temporary (accumulation opportunity) or Structural (fundamental thesis damage).
-
 ## Pillar 5: Valuation & Margin of Safety
-* Multiples: Trailing/Forward P/E, P/B, and EV/EBITDA compared to historic medians and peers.
-* Margin of Safety: Estimated discount to intrinsic valuation.
-
 ## Pillar 6: Technical & Momentum Overlay
-* Moving Averages: 50-day and 200-day DMA positioning.
-* Momentum: MACD signals and institutional delivery volume trends.
-
 ## Pillar 7: ESG Impact Scorecard
 Tabulate the ESG analysis strictly using the following Markdown table format:
-
 | Parameter | Score (0-100) | Evaluation & Key Drivers |
 | :--- | :--- | :--- |
-| **Environmental** | [Score] | [Key factors, carbon footprint, compliance] |
-| **Social** | [Score] | [Labor relations, human capital, community impact] |
-| **Governance** | [Score] | [Board independence, transparency, minority rights] |
+| **Environmental** | [Score] | [Key factors] |
+| **Social** | [Score] | [Labor, community impact] |
+| **Governance** | [Score] | [Board independence, transparency] |
 
 ---
-
 ## Conclusion & Actionable Guidance
-1. **Verdict:** [BUY / HOLD / SELL] with comprehensive rationale based on the 7 pillars.
-2. **Strategy:** Specific, step-by-step portfolio execution roadmap for the investor."""
-
-def extract_response_text(response) -> str:
-    text_content = ""
-    try:
-        if hasattr(response, "candidates") and response.candidates:
-            for candidate in response.candidates:
-                if hasattr(candidate, "content") and candidate.content and hasattr(candidate.content, "parts"):
-                    for part in candidate.content.parts:
-                        if hasattr(part, "text") and part.text:
-                            text_content += part.text
-    except Exception:
-        pass
-    if not text_content and hasattr(response, "text"):
-        text_content = response.text or ""
-    return text_content
-
-def call_genai_with_fallback(client, prompt: str, system_prompt: str) -> str:
-    models_to_try = get_latest_flash_models(client)
-    last_error = None
-    
-    for model_name in models_to_try:
-        for attempt in range(3):
-            try:
-                response = client.models.generate_content(
-                    model=model_name,
-                    contents=prompt,
-                    config=genai.types.GenerateContentConfig(
-                        system_instruction=system_prompt + """
-- Actively verify company developments using Google Search. Ground all qualitative pillars (TAM, competitive moat, governance, ESG) in recent earnings disclosures, quarterly concall commentary, management guidance changes, and regulatory filings from the past 90 to 180 days.
-""",
-                        tools=[{"google_search": {}}],
-                    ),
-                )
-                return extract_response_text(response)
-            except Exception as e:
-                last_error = e
-                err_str = str(e)
-                if "404" in err_str or "NOT_FOUND" in err_str:
-                    break
-                if any(code in err_str for code in ["429", "RESOURCE_EXHAUSTED", "503", "UNAVAILABLE"]):
-                    time.sleep(2 ** attempt)
-                    continue
-                break
-            
-    raise ValueError(f"API Limit Reached or Model Unavailable. Details: {last_error}")
-
-@st.cache_data(ttl=3600)
-def generate_stock_report(ticker: str, language: str = "English (India)") -> str:
-    stock_data = get_stock_fundamentals(ticker)
-    
-    api_key = st.secrets.get("GEMINI_API_KEY") or os.environ.get("GEMINI_API_KEY") or st.secrets.get("GOOGLE_API_KEY") or os.environ.get("GOOGLE_API_KEY")
-    client = genai.Client(api_key=api_key)
-    
-    system_prompt = get_system_prompt(ticker, language)
-    user_prompt = f"Generate the research report for: {stock_data.get('short_name')} ({stock_data.get('ticker')})\nData: {stock_data}"
-    
-    report_text = call_genai_with_fallback(client, user_prompt, system_prompt)
-    passed, discrepancies = verify_stock_report(stock_data, report_text)
-    
-    if not passed:
-        correction_prompt = f"{user_prompt}\n\nPREVIOUS DRAFT FAILED AUDIT. Fix these exact discrepancies: {discrepancies}"
-        report_text = call_genai_with_fallback(client, correction_prompt, system_prompt)
-        passed, discrepancies = verify_stock_report(stock_data, report_text)
-        if not passed:
-            report_text += f"\n\n> **Audit Warning:** Report published with unresolved verification flags: {discrepancies}"
-
-    if False:
-        report_text = "> ⚠️ **Notice:** Direct exchange data feeds are temporarily restricted by the host network. Analysis and baseline ratios have been synthesized using macroeconomic indicators.\n\n" + report_text
-
-    try:
-        save_report_to_archive(stock_data, report_text)
-    except Exception as e:
-        print(f"Warning: Failed to save to archive: {e}")
-        
-    return report_text
+1. **Verdict:** [BUY / WATCHLIST / AVOID]
+2. **Strategy:** Portfolio execution roadmap."""
 
 _DISCOVERED_MODELS_CACHE = {"models": [], "timestamp": 0}
 
-def get_latest_flash_models(client, ttl_seconds: int = 86400) -> list:
-    """
-    Dynamically resolves the latest general-purpose Gemini Flash models.
-    Filters out specialized variants that fail on Google Search grounding,
-    sorts by version descending, and caches the list.
-    """
-    import time
-    import re
-
+def get_latest_flash_models(client) -> list:
     now = time.time()
-    if _DISCOVERED_MODELS_CACHE["models"] and (now - _DISCOVERED_MODELS_CACHE["timestamp"]) < ttl_seconds:
+    if _DISCOVERED_MODELS_CACHE["models"] and (now - _DISCOVERED_MODELS_CACHE["timestamp"]) < 86400:
         return _DISCOVERED_MODELS_CACHE["models"]
-
-    fallback_models = ["gemini-3.8-flash", "gemini-3.5-flash-lite", "gemini-3.1-pro-preview"]
+    fallback = ["gemini-2.5-flash", "gemini-2.0-flash"]
     try:
         discovered = []
         for m in client.models.list():
             model_id = m.name.replace("models/", "") if hasattr(m, "name") else ""
-            actions = getattr(m, "supported_actions", []) or getattr(m, "supported_generation_methods", [])
-            if actions and "generateContent" not in actions:
-                continue
-
-            if "gemini" not in model_id or "flash" not in model_id:
-                continue
-            if any(k in model_id for k in ["image", "tts", "live", "transcribe", "embedding", "audio", "native-audio"]):
-                continue
-
-            match = re.search(r"gemini-(\d+(?:\.\d+)?)", model_id)
-            if match:
-                version_num = float(match.group(1))
-                discovered.append((version_num, model_id))
-
+            if "gemini" in model_id and "flash" in model_id and "preview" not in model_id:
+                if not any(k in model_id for k in ["image", "tts", "audio", "embed"]):
+                    match = re.search(r"gemini-(\d+(?:\.\d+)?)", model_id)
+                    if match:
+                        discovered.append((float(match.group(1)), model_id))
         if discovered:
             discovered.sort(key=lambda x: x[0], reverse=True)
-            seen = set()
-            ordered = []
-            for _, mod_id in discovered:
-                if mod_id not in seen:
-                    seen.add(mod_id)
-                    ordered.append(mod_id)
-
+            ordered = [x[1] for x in discovered]
             _DISCOVERED_MODELS_CACHE["models"] = ordered
             _DISCOVERED_MODELS_CACHE["timestamp"] = now
             return ordered
-    except Exception as e:
-        print(f"Warning: Dynamic model discovery failed ({e}). Using fallback cascade.")
-
-    return fallback_models
-
+    except Exception:
+        pass
+    return fallback
 
 def stream_genai_with_fallback(client, prompt: str, system_prompt: str, on_status=None):
-    """
-    Streams Gemini chunks with fast-fail 1-attempt model failover and live status telemetry.
-    """
-    discovered_models = get_latest_flash_models(client)
-    # Target top 2 production flash endpoints to avoid cycling through deprecated versions
-    models_to_try = [m for m in discovered_models if "preview" not in m][:2] or ["gemini-2.5-flash", "gemini-2.0-flash"]
+    models_to_try = get_latest_flash_models(client)[:2]
     last_error = None
-
     for model_name in models_to_try:
         if on_status:
-            on_status(f"⚡ Connecting to model node `{model_name}`...")
-        for attempt in range(2):  # Cap at 1 retry max (2 attempts total)
+            on_status(f"⚡ Connected to model `{model_name}`...")
+        for attempt in range(2):
             try:
                 chat = client.chats.create(
                     model=model_name,
                     config=genai.types.GenerateContentConfig(
-                        system_instruction=system_prompt + """
-- Verify recent quarterly earnings results, management guidance, and official BSE filings from the past 90-180 days using targeted Google Search.
-""",
+                        system_instruction=system_prompt + "\n- Search recent BSE/NSE disclosures and concalls from the past 90-180 days.",
                         tools=[{"google_search": {}}],
                     )
                 )
-
                 if on_status:
-                    on_status("🔍 Running Google Search grounding on filings & disclosures...")
-
-                response_stream = chat.send_message_stream(prompt)
-
-                yielded_any = False
-                for chunk in response_stream:
-                    text_part = None
-                    try:
-                        text_part = chunk.text
-                    except Exception:
-                        pass
-
-                    if not text_part and hasattr(chunk, "candidates") and chunk.candidates:
-                        for candidate in chunk.candidates:
-                            content = getattr(candidate, "content", None)
-                            if content and hasattr(content, "parts"):
-                                for part in content.parts:
-                                    t = getattr(part, "text", None)
-                                    if t:
-                                        text_part = t
-                                        break
-
-                    if text_part:
-                        yielded_any = True
-                        yield text_part
-
-                if yielded_any:
-                    return
+                    on_status("🔍 Grounding against official filings...")
+                for chunk in chat.send_message_stream(prompt):
+                    t = getattr(chunk, "text", None)
+                    if t:
+                        yield t
+                return
             except Exception as e:
                 last_error = e
                 err_str = str(e)
-                if "404" in err_str or "NOT_FOUND" in err_str:
-                    break
                 if any(code in err_str for code in ["429", "RESOURCE_EXHAUSTED", "503", "UNAVAILABLE"]):
-                    if attempt == 0:
-                        if on_status:
-                            on_status(f"⚠️ Model `{model_name}` busy. Retrying once (1s)...")
-                        import time
-                        time.sleep(1)
-                        continue
+                    time.sleep(1.0 + random.uniform(0.2, 1.0))
+                    continue
                 break
-
-    raise ValueError(f"API Limit Reached or Model Unavailable during stream. Details: {last_error}")
-
+    raise ValueError(f"Gemini grounded search exhausted: {last_error}")
 
 def stream_perplexity_fallback(prompt: str, system_prompt: str):
-    """
-    Fallback generator: streams institutional research from Perplexity Agent API
-    (/v1/responses) using preset 'low' with explicit UTF-8 decoding to protect currency symbols.
-    """
-    import os
-    import json
-    import requests
-
-    # 1. Resolve API Key across Streamlit secrets and environment
     api_key = os.environ.get("PERPLEXITY_API_KEY")
     if not api_key:
         try:
@@ -523,34 +333,17 @@ def stream_perplexity_fallback(prompt: str, system_prompt: str):
             api_key = st.secrets.get("PERPLEXITY_API_KEY")
         except Exception:
             pass
-    if not api_key and os.path.exists(".streamlit/secrets.toml"):
-        try:
-            import toml
-            api_key = toml.load(".streamlit/secrets.toml").get("PERPLEXITY_API_KEY")
-        except Exception:
-            pass
-
     if not api_key:
-        raise ValueError("PERPLEXITY_API_KEY is missing from environment and .streamlit/secrets.toml")
+        raise ValueError("PERPLEXITY_API_KEY missing from secrets/environment.")
 
     url = "https://api.perplexity.ai/v1/responses"
-    headers = {
-        "Authorization": f"Bearer {api_key}",
-        "Content-Type": "application/json",
-        "Accept": "text/event-stream"
-    }
-    payload = {
-        "preset": "low",
-        "input": prompt,
-        "instructions": system_prompt,
-        "stream": True
-    }
+    headers = {"Authorization": f"Bearer {api_key}", "Content-Type": "application/json", "Accept": "text/event-stream"}
+    payload = {"preset": "low", "input": prompt, "instructions": system_prompt, "stream": True}
 
     res = requests.post(url, headers=headers, json=payload, stream=True, timeout=20)
     if res.status_code != 200:
-        raise RuntimeError(f"Perplexity Agent API returned HTTP {res.status_code}: {res.text}")
+        raise RuntimeError(f"Perplexity Agent API HTTP {res.status_code}: {res.text}")
 
-    # Explicitly decode raw byte chunks to prevent UTF-8 mojibake (e.g. Rupee symbols)
     for raw_line in res.iter_lines(decode_unicode=False):
         if not raw_line:
             continue
@@ -567,12 +360,18 @@ def stream_perplexity_fallback(prompt: str, system_prompt: str):
             except Exception:
                 continue
 
+def stream_gemini_ungrounded_bypass(client, prompt: str, system_prompt: str):
+    model_name = get_latest_flash_models(client)[0]
+    chat = client.chats.create(
+        model=model_name,
+        config=genai.types.GenerateContentConfig(system_instruction=system_prompt, temperature=0.2)
+    )
+    for chunk in chat.send_message_stream(prompt):
+        t = getattr(chunk, "text", None)
+        if t:
+            yield t
 
 def stream_stock_report(ticker: str, language: str = "English (India)", stock_data: dict = None, on_status=None):
-    """
-    Generator that yields Markdown tokens live.
-    Executes post-stream audit and commits to database archive upon stream completion.
-    """
     if stock_data is None:
         stock_data = get_stock_fundamentals(ticker)
 
@@ -583,51 +382,53 @@ def stream_stock_report(ticker: str, language: str = "English (India)", stock_da
             api_key = st.secrets.get("GEMINI_API_KEY")
         except Exception:
             pass
-    if not api_key and os.path.exists(".streamlit/secrets.toml"):
-        try:
-            import toml
-            api_key = toml.load(".streamlit/secrets.toml").get("GEMINI_API_KEY")
-        except Exception:
-            pass
-
     client = genai.Client(api_key=api_key)
     system_prompt = get_system_prompt(ticker, language)
-    user_prompt = f"""Generate the research report for: {stock_data.get('short_name')} ({stock_data.get('ticker')})
-Data: {stock_data}"""
+    user_prompt = f"Generate research report for: {stock_data.get('short_name')} ({stock_data.get('ticker')})\nData: {stock_data}"
 
     report_accumulator = []
     try:
         for chunk in stream_genai_with_fallback(client, user_prompt, system_prompt, on_status=on_status):
             report_accumulator.append(chunk)
             yield chunk
-    except Exception as gemini_err:
-        fallback_notice = "\n\n> ⚠️ **Gemini Outage Detected.**\n> 🔄 **Rerouting to Perplexity Sonar...**\n\n"
-        report_accumulator.append(fallback_notice)
-        yield fallback_notice
-        
+    except Exception:
+        notice_p = "\n\n> ⚠️ **Gemini Grounding Unavailable. Rerouting to Perplexity Agent API...**\n\n"
+        report_accumulator.append(notice_p)
+        yield notice_p
         try:
             for chunk in stream_perplexity_fallback(user_prompt, system_prompt):
                 report_accumulator.append(chunk)
                 yield chunk
-        except Exception as perp_err:
-            final_err = f"\n\n> ❌ **Fatal Fallback Error:** Perplexity API failed or is missing the PERPLEXITY_API_KEY.\n> Details: {perp_err}"
-            report_accumulator.append(final_err)
-            yield final_err
-            return
+        except Exception:
+            notice_u = (
+                "\n\n> ⚠️ **Notice: Live Web Grounding Offline.**\n"
+                "> Synthesizing thesis from core parametric intelligence.\n"
+                "> *Note:* Exchange metrics are verified, but recent disclosures may be omitted.\n\n"
+            )
+            report_accumulator.append(notice_u)
+            yield notice_u
+            try:
+                for chunk in stream_gemini_ungrounded_bypass(client, user_prompt, system_prompt):
+                    report_accumulator.append(chunk)
+                    yield chunk
+            except Exception as final_err:
+                err_msg = f"\n\n> ❌ **Live Synthesis Failed:** {final_err}"
+                report_accumulator.append(err_msg)
+                yield err_msg
 
     complete_text = "".join(report_accumulator)
-
     try:
-        passed, discrepancies = verify_stock_report(stock_data, complete_text)
+        passed, disc = verify_stock_report(stock_data, complete_text)
         if not passed:
-            audit_note = f"""\n\n> ⚠️ **Post-Stream Verification Note:** Minor metric discrepancies identified: {discrepancies}"""
-            complete_text += audit_note
-            yield audit_note
-    except Exception as audit_err:
-        print(f"Verification audit warning: {audit_err}")
+            note = f"\n\n> ⚠️ **Verification Audit Note:** {disc}"
+            complete_text += note
+            yield note
+    except Exception:
+        pass
 
     try:
-        save_report_to_archive(stock_data, complete_text)
-    except Exception as db_err:
-        print(f"Warning: Failed to save streamed report to archive: {db_err}")
-
+        scrip = stock_data.get("scrip_code", "")
+        ann = fetch_latest_bse_announcement(scrip)
+        save_report_to_archive(stock_data, complete_text, announcement=ann)
+    except Exception:
+        pass
