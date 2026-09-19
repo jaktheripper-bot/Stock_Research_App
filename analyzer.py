@@ -452,12 +452,15 @@ def stream_genai_with_fallback(client, prompt: str, system_prompt: str, on_statu
 
 
 def stream_perplexity_fallback(prompt: str, system_prompt: str):
+    """
+    Fallback generator: streams institutional research from Perplexity Agent API
+    (/v1/responses) using preset 'low' with explicit UTF-8 decoding to protect currency symbols.
+    """
     import os
-    try:
-        from openai import OpenAI
-    except ImportError:
-        raise ValueError("OpenAI package missing. Run `pip install openai`.")
-        
+    import json
+    import requests
+
+    # 1. Resolve API Key across Streamlit secrets and environment
     api_key = os.environ.get("PERPLEXITY_API_KEY")
     if not api_key:
         try:
@@ -471,26 +474,44 @@ def stream_perplexity_fallback(prompt: str, system_prompt: str):
             api_key = toml.load(".streamlit/secrets.toml").get("PERPLEXITY_API_KEY")
         except Exception:
             pass
-            
+
     if not api_key:
-        raise ValueError("PERPLEXITY_API_KEY not found in secrets or environment.")
-        
-    client = OpenAI(api_key=api_key, base_url="https://api.perplexity.ai")
-    
-    messages = [
-        {"role": "system", "content": system_prompt + "\n- Actively verify company developments using live web search. Ground all qualitative pillars (TAM, competitive moat, governance, ESG) in recent earnings disclosures, quarterly concall commentary, management guidance changes, and regulatory filings from the past 90 to 180 days."},
-        {"role": "user", "content": prompt}
-    ]
-    
-    response_stream = client.chat.completions.create(
-        model="sonar-pro",
-        messages=messages,
-        stream=True
-    )
-    
-    for chunk in response_stream:
-        if chunk.choices[0].delta.content:
-            yield chunk.choices[0].delta.content
+        raise ValueError("PERPLEXITY_API_KEY is missing from environment and .streamlit/secrets.toml")
+
+    url = "https://api.perplexity.ai/v1/responses"
+    headers = {
+        "Authorization": f"Bearer {api_key}",
+        "Content-Type": "application/json",
+        "Accept": "text/event-stream"
+    }
+    payload = {
+        "preset": "low",
+        "input": prompt,
+        "instructions": system_prompt,
+        "stream": True
+    }
+
+    res = requests.post(url, headers=headers, json=payload, stream=True, timeout=20)
+    if res.status_code != 200:
+        raise RuntimeError(f"Perplexity Agent API returned HTTP {res.status_code}: {res.text}")
+
+    # Explicitly decode raw byte chunks to prevent UTF-8 mojibake (e.g. Rupee symbols)
+    for raw_line in res.iter_lines(decode_unicode=False):
+        if not raw_line:
+            continue
+        line = raw_line.decode("utf-8", errors="replace")
+        if line.startswith("data: "):
+            data_str = line[6:].strip()
+            if data_str == "[DONE]":
+                break
+            try:
+                event = json.loads(data_str)
+                delta = event.get("delta") or (event.get("type") == "response.output_text.delta" and event.get("delta"))
+                if delta:
+                    yield delta
+            except Exception:
+                continue
+
 
 def stream_stock_report(ticker: str, language: str = "English (India)", stock_data: dict = None, on_status=None):
     """
