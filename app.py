@@ -1,10 +1,49 @@
+def render_health_card_ui(report_text: str):
+    matrix = extract_health_matrix(report_text)
+    if not matrix:
+        return
+
+    color_map = {
+        # Positive (Green)
+        "Buy": "#1b5e20", "Wide": "#1b5e20", "Clean": "#1b5e20",
+        "Debt-Free": "#1b5e20", "Undervalued": "#1b5e20", "Temporary": "#1b5e20", "Stable": "#1b5e20",
+        # Neutral (Amber/Yellow)
+        "Watchlist": "#b26a00", "Moderate": "#b26a00", "Fair": "#b26a00",
+        "Neutral": "#b26a00", "Moderate Debt": "#b26a00", "Resilient": "#b26a00", "N/A": "#555555",
+        # Negative (Red)
+        "Avoid": "#b71c1c", "Narrow": "#b71c1c", "Caution": "#b71c1c", "High Risk": "#b71c1c",
+        "Structural": "#b71c1c", "Stretched": "#b71c1c", "Loss-Making": "#b71c1c", "High Debt": "#b71c1c"
+    }
+
+    pills_html = '<div style="display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 20px;">'
+    labels = [
+        ("Verdict", matrix.get("Verdict", "WATCHLIST")),
+        ("Macro", matrix.get("Macro", "Neutral")),
+        ("Moat", matrix.get("Moat", "Moderate")),
+        ("Gov", matrix.get("Governance", "Clean")),
+        ("Diagnostic", matrix.get("Diagnostic", "N/A")),
+        ("Valuation", matrix.get("Valuation", "Fair")),
+        ("Balance Sheet", matrix.get("BalanceSheet", "Resilient")),
+    ]
+
+    for title, val in labels:
+        bg = color_map.get(val, "#333333")
+        pills_html += f"""
+        <div style="background-color: {bg}; color: #ffffff; padding: 6px 12px; border-radius: 6px; font-size: 13px; font-weight: 600; display: inline-flex; align-items: center; gap: 6px;">
+            <span style="opacity: 0.8; font-weight: 400; text-transform: uppercase; font-size: 11px;">{title}:</span>
+            <span>{val}</span>
+        </div>
+        """
+    pills_html += '</div>'
+    st.markdown(pills_html, unsafe_allow_html=True)
+
 import json
 import traceback
 import platform
 from datetime import datetime, timezone
 import tempfile
 import streamlit as st
-from analyzer import generate_stock_report, stream_stock_report, get_stock_fundamentals, evaluate_material_change
+from analyzer import generate_stock_report, extract_health_matrix, stream_stock_report, get_stock_fundamentals, evaluate_material_change
 from db import get_archived_reports, get_report_by_ticker
 from markdown_pdf import MarkdownPdf, Section
 
@@ -179,15 +218,33 @@ if ("last_report" in st.session_state and st.session_state["last_report"] is not
         mcap_str = str(mcap)
         
     col1.metric("Market Capitalization", mcap_str)
-    col2.metric("P/E Ratio", str(fund.get("pe_ratio", "N/A")))
+    pe_val = str(fund.get("pe_ratio", "N/A"))
+    if "Loss-Making" in pe_val or "Negative" in pe_val:
+        col2.metric("P/E Ratio", "Loss-Making", delta="- Negative EPS", delta_color="inverse")
+    else:
+        col2.metric("P/E Ratio", pe_val)
     col3.metric("Sector", str(fund.get("sector", "N/A")))
     col4.metric("Exchange Status", "Active / Verified")
     
+    # Explicit valuation alert for loss-making equities
+    pe_raw = str(fund.get("pe_ratio", "N/A"))
+    if "Loss-Making" in pe_raw or "Negative" in pe_raw:
+        st.error(
+            f"❌ **Valuation Multiple Error: P/E Undefined.** "
+            f"{ticker_disp} operates at a trailing net loss (Negative TTM EPS). "
+            f"Under BSE, NSE, and institutional reporting standards, Price-to-Earnings cannot be calculated for unprofitable firms."
+        )
+    elif pe_raw == "N/A":
+        st.warning(
+            f"⚠️ **Valuation Notice:** Trailing P/E multiple is currently unavailable from exchange feeds for {ticker_disp}."
+        )
     st.markdown("---")
     company_name = fund.get("short_name", "").strip()
     clean_ticker = ticker_disp.strip().upper()
     header_label = f"{company_name} ({clean_ticker})" if company_name and company_name.upper() != clean_ticker else clean_ticker
     
+    if st.session_state.get("last_report"):
+        render_health_card_ui(st.session_state["last_report"])
     st.header(f"Equity Research Report: {header_label}")
     
     if st.session_state.get("stream_pending"):

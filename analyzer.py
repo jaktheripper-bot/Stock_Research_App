@@ -1,3 +1,58 @@
+def extract_health_matrix(report_text: str) -> dict:
+    """
+    Parses the 7-Pillar Health Matrix from report text.
+    Uses structured regex first, falling back to keyword heuristics for legacy reports.
+    """
+    if not report_text or not isinstance(report_text, str):
+        return {}
+
+    matrix = {
+        "Macro": "Neutral",
+        "Moat": "Moderate",
+        "Governance": "Clean",
+        "Diagnostic": "N/A",
+        "Valuation": "Fair",
+        "BalanceSheet": "Resilient",
+        "Verdict": "WATCHLIST"
+    }
+
+    # Primary: Structured metadata scan
+    patterns = {
+        "Macro": r"-\s*Macro:\s*\[?(Stable|Headwinds|Neutral)\]?",
+        "Moat": r"-\s*Moat:\s*\[?(Wide|Moderate|Narrow)\]?",
+        "Governance": r"-\s*Governance:\s*\[?(Clean|Caution|High Risk)\]?",
+        "Diagnostic": r"-\s*Diagnostic:\s*\[?(Temporary|Structural|Neutral|N/A)\]?",
+        "Valuation": r"-\s*Valuation:\s*\[?(Undervalued|Fair|Stretched|Loss-Making)\]?",
+        "BalanceSheet": r"-\s*Balance Sheet:\s*\[?(Debt-Free|Moderate Debt|High Debt|Resilient)\]?",
+        "Verdict": r"-\s*Verdict:\s*\[?(BUY|WATCHLIST|AVOID)\]?"
+    }
+
+    found_any = False
+    for key, pat in patterns.items():
+        match = re.search(pat, report_text, re.IGNORECASE)
+        if match:
+            matrix[key] = match.group(1).title()
+            found_any = True
+
+    # Secondary Heuristic Fallback (for older cached reports without the metadata block)
+    if not found_any:
+        # Verdict fallback
+        v_match = re.search(r"#+\s*VERDICT:\s*(BUY|WATCHLIST|AVOID)", report_text, re.IGNORECASE)
+        if v_match:
+            matrix["Verdict"] = v_match.group(1).upper()
+        # Diagnostic fallback
+        if "temporary" in report_text.lower() and "drop" in report_text.lower():
+            matrix["Diagnostic"] = "Temporary"
+        elif "structural" in report_text.lower():
+            matrix["Diagnostic"] = "Structural"
+        # Moat fallback
+        if "wide moat" in report_text.lower():
+            matrix["Moat"] = "Wide"
+        elif "narrow moat" in report_text.lower():
+            matrix["Moat"] = "Narrow"
+
+    return matrix
+
 
 
 
