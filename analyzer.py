@@ -1,32 +1,44 @@
+import os
+import re
+import sys
+import json
+import time
+import random
+import contextlib
+import requests
+from datetime import datetime, timezone
+import streamlit as st
+from google import genai
+from normalizer import normalize_stock_data
+from db import save_report_to_archive
+from checker import verify_stock_report
+from screener import pass_pre_screening_gates
+from bsedata.bse import BSE
+from bse_master import resolve_bse_scrip_code
+
 def extract_health_matrix(report_text: str) -> dict:
     """
     Parses the 7-Pillar Health Matrix from report text.
-    Resilient to non-breaking spaces, bullets, brackets, and casing.
+    Resilient to asterisks (*), hyphens (-), brackets, and casing.
     """
     if not report_text or not isinstance(report_text, str):
         return {}
 
-    # Normalize Unicode spaces, hyphens, and bullets
-    clean = report_text.replace("\xa0", " ").replace("–", "-").replace("—", "-").replace("•", "-")
+    clean = report_text.replace("\xa0", " ").replace("–", "-").replace("—", "-")
 
     matrix = {
-        "Macro": "Neutral",
-        "Moat": "Moderate",
-        "Governance": "Clean",
-        "Diagnostic": "N/A",
-        "Valuation": "Fair",
-        "BalanceSheet": "Resilient",
-        "Verdict": "Watchlist"
+        "Macro": "Neutral", "Moat": "Moderate", "Governance": "Clean",
+        "Diagnostic": "N/A", "Valuation": "Fair", "BalanceSheet": "Resilient", "Verdict": "Watchlist"
     }
 
     patterns = {
-        "Macro": r"Macro\s*:\s*\[?\s*(Stable|Headwinds|Neutral)\s*\]?",
-        "Moat": r"Moat\s*:\s*\[?\s*(Wide|Moderate|Narrow)\s*\]?",
-        "Governance": r"Governance\s*:\s*\[?\s*(Clean|Caution|High Risk)\s*\]?",
-        "Diagnostic": r"Diagnostic\s*:\s*\[?\s*(Temporary|Structural|Neutral|N/A)\s*\]?",
-        "Valuation": r"Valuation\s*:\s*\[?\s*(Undervalued|Fair|Stretched|Loss-Making)\s*\]?",
-        "BalanceSheet": r"Balance\s*Sheet\s*:\s*\[?\s*(Debt-Free|Moderate Debt|High Debt|Resilient)\s*\]?",
-        "Verdict": r"Verdict\s*:\s*\[?\s*(BUY|WATCHLIST|AVOID|Buy|Watchlist|Avoid)\s*\]?"
+        "Macro": r"(?:[-*•]|\d+\.)?\s*Macro\s*:\s*\[?\s*(Stable\vert{}Headwinds\vert{}Neutral)\s*\]?",
+        "Moat": r"(?:[-*•]|\d+\.)?\s*Moat\s*:\s*\[?\s*(Wide\vert{}Moderate\vert{}Narrow)\s*\]?",
+        "Governance": r"(?:[-*•]|\d+\.)?\s*Governance\s*:\s*\[?\s*(Clean\vert{}Caution\vert{}High Risk)\s*\]?",
+        "Diagnostic": r"(?:[-*•]|\d+\.)?\s*Diagnostic\s*:\s*\[?\s*(Temporary\vert{}Structural\vert{}Neutral\vert{}N/A)\s*\]?",
+        "Valuation": r"(?:[-*•]|\d+\.)?\s*Valuation\s*:\s*\[?\s*(Undervalued\vert{}Fair\vert{}Stretched\vert{}Loss-Making)\s*\]?",
+        "BalanceSheet": r"(?:[-*•]|\d+\.)?\s*Balance\s*Sheet\s*:\s*\[?\s*(Debt-Free\vert{}Moderate Debt\vert{}High Debt\vert{}Resilient)\s*\]?",
+        "Verdict": r"(?:[-*•]|\d+\.)?\s*Verdict\s*:\s*\[?\s*(BUY\vert{}WATCHLIST\vert{}AVOID\vert{}Buy\vert{}Watchlist\vert{}Avoid)\s*\]?"
     }
 
     found_any = False
@@ -37,28 +49,22 @@ def extract_health_matrix(report_text: str) -> dict:
             found_any = True
 
     if not found_any:
-        v_match = re.search(r"#+\s*VERDICT:\s*\[?\s*(BUY|WATCHLIST|AVOID)\s*\]?", clean, re.IGNORECASE)
+        v_match = re.search(r"#+\s*VERDICT:\s*\[?\s*(BUY\vert{}WATCHLIST\vert{}AVOID)\s*\]?", clean, re.IGNORECASE)
         if v_match:
             matrix["Verdict"] = v_match.group(1).strip().title()
 
     return matrix
 
-import os
-import re
-import sys
-import json
-import time
-import random
-import contextlib
-import requests
-from datetime import datetime, timezone
-from google import genai
-from normalizer import normalize_stock_data
-from db import save_report_to_archive
-from checker import verify_stock_report
-from screener import pass_pre_screening_gates
-from bsedata.bse import BSE
-from bse_master import resolve_bse_scrip_code
+def remove_health_matrix_text(text: str) -> str:
+    """Removes redundant markdown Health Matrix bullet blocks from presentation."""
+    if not text or not isinstance(text, str):
+        return ""
+    cleaned = re.sub(
+        r'(?i)#*\s*Health Matrix\s*\n+(?:[ \t]*[-*•\d\.]+\s+[^\n]+\n*)+',
+        '',
+        text
+    )
+    return cleaned.strip()
 
 class PipelineError(Exception):
     def __init__(self, stage: str, message: str, technical_details: str = ""):
@@ -72,7 +78,7 @@ class TickerResolutionError(PipelineError):
         super().__init__(
             stage="Ticker Resolution",
             message=f"Could not resolve an official BSE scrip code for '{query}'.",
-            technical_details="Evaluated static map, master universe, and JIT AI discovery. Zero active quotes confirmed."
+            technical_details="Evaluated static map, Supabase master universe, and JIT AI discovery. Zero active quotes confirmed."
         )
 
 class ExchangeDataFetchError(PipelineError):
@@ -274,7 +280,7 @@ def get_latest_flash_models(client) -> list:
     now = time.time()
     if _DISCOVERED_MODELS_CACHE["models"] and (now - _DISCOVERED_MODELS_CACHE["timestamp"]) < 86400:
         return _DISCOVERED_MODELS_CACHE["models"]
-    fallback = ["gemini-2.5-flash", "gemini-2.0-flash"]
+    fallback = ["gemini-3.6-flash", "gemini-2.0-flash"]
     try:
         discovered = []
         for m in client.models.list():
@@ -312,9 +318,23 @@ def stream_genai_with_fallback(client, prompt: str, system_prompt: str, on_statu
                 if on_status:
                     on_status("🔍 Grounding against official filings...")
                 for chunk in chat.send_message_stream(prompt):
-                    t = getattr(chunk, "text", None)
-                    if t:
-                        yield t
+                    extracted_text = None
+                    if hasattr(chunk, "candidates") and chunk.candidates:
+                        for cand in chunk.candidates:
+                            content_obj = getattr(cand, "content", None)
+                            if content_obj and hasattr(content_obj, "parts"):
+                                for part in content_obj.parts:
+                                    t = getattr(part, "text", None)
+                                    if t:
+                                        extracted_text = t
+                                        break
+                    if not extracted_text:
+                        try:
+                            extracted_text = chunk.text
+                        except Exception:
+                            pass
+                    if extracted_text:
+                        yield extracted_text
                 return
             except Exception as e:
                 last_error = e
@@ -432,3 +452,9 @@ def stream_stock_report(ticker: str, language: str = "English (India)", stock_da
         save_report_to_archive(stock_data, complete_text, announcement=ann)
     except Exception:
         pass
+
+def generate_stock_report(ticker: str, language: str = "English (India)") -> str:
+    chunks = []
+    for c in stream_stock_report(ticker, language):
+        chunks.append(c)
+    return "".join(chunks)
