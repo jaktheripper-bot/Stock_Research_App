@@ -61,7 +61,7 @@ def render_health_card_ui(report_text: str):
     }
 
     labels = [
-        ("Verdict", matrix.get("Verdict", "WATCHLIST")),
+        ("Capital Allocation", matrix.get("CapitalAllocation", "Disciplined")),
         ("Macro", matrix.get("Macro", "Neutral")),
         ("Moat", matrix.get("Moat", "Moderate")),
         ("Gov", matrix.get("Governance", "Clean")),

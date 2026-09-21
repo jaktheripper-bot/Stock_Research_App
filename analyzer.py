@@ -1,3 +1,36 @@
+def enrich_fundamentals(ticker: str, data: dict) -> dict:
+    """Secondary enrichment: uses yfinance strictly to backfill trailing P/E, Market Cap, and Sector."""
+    try:
+        import yfinance as yf
+        clean_sym = str(ticker).strip().upper().replace(".NS", "").replace(".BO", "")
+        yf_ticker = f"{clean_sym}.BO" if clean_sym.isdigit() else f"{clean_sym}.NS"
+        info = yf.Ticker(yf_ticker).info or {}
+
+        # Trailing P/E
+        if data.get("pe_ratio") in [None, "N/A", "-", "", 0, "0"]:
+            pe = info.get("trailingPE")
+            if pe is not None and isinstance(pe, (int, float)):
+                data["pe_ratio"] = round(pe, 2) if pe > 0 else "N/A (Loss-Making)"
+
+        # Market Cap
+        if data.get("market_cap") in [None, "N/A", 0, "-", "", "0"]:
+            mcap = info.get("marketCap")
+            if mcap and isinstance(mcap, (int, float)):
+                data["market_cap"] = int(mcap)
+
+        # Sector & Industry
+        if data.get("sector") in [None, "N/A", "-", "", "Core Industry", "Diversified / Core Industry"]:
+            sec = info.get("sector")
+            if sec:
+                data["sector"] = sec
+        if data.get("industry") in [None, "N/A", "-", "", "General Corporate"]:
+            ind = info.get("industry")
+            if ind:
+                data["industry"] = ind
+    except Exception as e:
+        print(f"Background fundamental enrichment notice: {e}")
+    return data
+
 import os
 import re
 import sys
@@ -19,7 +52,7 @@ from bse_master import resolve_bse_scrip_code
 def extract_health_matrix(report_text: str) -> dict:
     """
     Parses the 7-Pillar Health Matrix from report text.
-    Resilient to asterisks (*), hyphens (-), brackets, and casing.
+    Case-insensitive, agnostic to bullet markers (*, -, •), numbered lists, colons, and hyphens.
     """
     if not report_text or not isinstance(report_text, str):
         return {}
@@ -28,30 +61,28 @@ def extract_health_matrix(report_text: str) -> dict:
 
     matrix = {
         "Macro": "Neutral", "Moat": "Moderate", "Governance": "Clean",
-        "Diagnostic": "N/A", "Valuation": "Fair", "BalanceSheet": "Resilient", "Verdict": "Watchlist"
+        "Diagnostic": "N/A", "Valuation": "Fair", "BalanceSheet": "Resilient", "CapitalAllocation": "Disciplined"
     }
 
     patterns = {
-        "Macro": r"(?:[-*•]|\d+\.)?\s*Macro\s*:\s*\[?\s*(Stable\vert{}Headwinds\vert{}Neutral)\s*\]?",
-        "Moat": r"(?:[-*•]|\d+\.)?\s*Moat\s*:\s*\[?\s*(Wide\vert{}Moderate\vert{}Narrow)\s*\]?",
-        "Governance": r"(?:[-*•]|\d+\.)?\s*Governance\s*:\s*\[?\s*(Clean\vert{}Caution\vert{}High Risk)\s*\]?",
-        "Diagnostic": r"(?:[-*•]|\d+\.)?\s*Diagnostic\s*:\s*\[?\s*(Temporary\vert{}Structural\vert{}Neutral\vert{}N/A)\s*\]?",
-        "Valuation": r"(?:[-*•]|\d+\.)?\s*Valuation\s*:\s*\[?\s*(Undervalued\vert{}Fair\vert{}Stretched\vert{}Loss-Making)\s*\]?",
-        "BalanceSheet": r"(?:[-*•]|\d+\.)?\s*Balance\s*Sheet\s*:\s*\[?\s*(Debt-Free\vert{}Moderate Debt\vert{}High Debt\vert{}Resilient)\s*\]?",
-        "Verdict": r"(?:[-*•]|\d+\.)?\s*Verdict\s*:\s*\[?\s*(BUY\vert{}WATCHLIST\vert{}AVOID\vert{}Buy\vert{}Watchlist\vert{}Avoid)\s*\]?"
+        "Macro": r"(?i)(?:[-*•]|\d+\.)?\s*Macro\s*[:\-]?\s*\[?\s*(Stable|Headwinds|Neutral)\s*\]?",
+        "Moat": r"(?i)(?:[-*•]|\d+\.)?\s*Moat\s*[:\-]?\s*\[?\s*(Wide|Moderate|Narrow)\s*\]?",
+        "Governance": r"(?i)(?:[-*•]|\d+\.)?\s*Governance\s*[:\-]?\s*\[?\s*(Clean|Caution|High Risk)\s*\]?",
+        "Diagnostic": r"(?i)(?:[-*•]|\d+\.)?\s*Diagnostic\s*[:\-]?\s*\[?\s*(Temporary|Structural|Neutral|N/A)\s*\]?",
+        "Valuation": r"(?i)(?:[-*•]|\d+\.)?\s*Valuation\s*[:\-]?\s*\[?\s*(Undervalued|Fair|Stretched|Loss-Making)\s*\]?",
+        "BalanceSheet": r"(?i)(?:[-*•]|\d+\.)?\s*Balance\s*Sheet\s*[:\-]?\s*\[?\s*(Debt-Free|Moderate Debt|High Debt|Resilient)\s*\]?",
+        "CapitalAllocation": r"(?i)(?:[-*•]|\d+\.)?\s*Capital\s*Allocation\s*[:\-]?\s*\[?\s*(Disciplined|Moderate|Strained)\s*\]?"
     }
 
-    found_any = False
     for key, pat in patterns.items():
-        match = re.search(pat, clean, re.IGNORECASE)
+        match = re.search(pat, clean)
         if match:
             matrix[key] = match.group(1).strip().title()
-            found_any = True
 
-    if not found_any:
-        v_match = re.search(r"#+\s*VERDICT:\s*\[?\s*(BUY\vert{}WATCHLIST\vert{}AVOID)\s*\]?", clean, re.IGNORECASE)
-        if v_match:
-            matrix["Verdict"] = v_match.group(1).strip().title()
+    if matrix.get("CapitalAllocation") == "Disciplined":
+        ca_match = re.search(r"(?i)Capital\s*Allocation\s*[:\-]?\s*\[?\s*(Disciplined|Moderate|Strained)\s*\]?", clean)
+        if ca_match:
+            matrix["CapitalAllocation"] = ca_match.group(1).strip().title()
 
     return matrix
 
@@ -218,6 +249,7 @@ def get_stock_fundamentals(query: str) -> dict:
         raise TickerResolutionError(query)
     try:
         raw_data = fetch_bse_exchange_data(query)
+        raw_data = enrich_fundamentals(clean, raw_data)
     except Exception as bse_err:
         raise ExchangeDataFetchError(scrip, str(bse_err))
 
@@ -244,14 +276,14 @@ def get_system_prompt(ticker: str, language: str) -> str:
 - Diagnostic: [Temporary | Structural | Neutral | N/A]
 - Valuation: [Undervalued | Fair | Stretched | Loss-Making]
 - Balance Sheet: [Debt-Free | Moderate Debt | High Debt]
-- Verdict: [BUY | WATCHLIST | AVOID]
+- Capital Allocation: [Disciplined | Moderate | Strained]
 
 CRITICAL LINGUISTIC RULES:
 1. Write at an 8th-grade reading level. Keep sentences short and simple.
 2. For financial terms, provide a brief definition in parentheses.
 3. Express all Indian corporate metrics in Crores (Cr) and Indian Rupees (INR).
 
-# VERDICT: [BUY / WATCHLIST / AVOID]
+# DIAGNOSTIC SUMMARY & KEY TAKEAWAYS
 **Summary:** One concise sentence summarizing the operational standing.
 
 ---
@@ -271,7 +303,7 @@ Tabulate the ESG analysis strictly using the following Markdown table format:
 
 ---
 ## Conclusion & Actionable Guidance
-1. **Verdict:** [BUY / WATCHLIST / AVOID]
+1. **Diagnostic Summary & Key Takeaways:** Synthesize algorithmic strengths, balance sheet discipline, capital allocation efficiency, and critical operational risks. Do NOT provide prescriptive Buy/Sell/Hold advice, target prices, or trade execution signals.
 2. **Strategy:** Portfolio execution roadmap."""
 
 _DISCOVERED_MODELS_CACHE = {"models": [], "timestamp": 0}
