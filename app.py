@@ -46,18 +46,19 @@ def format_inr(number):
         return f"₹{group_inr(number / 1e5)} Lakh"
     return f"₹{group_inr(number)}"
 
-def render_health_card_ui(report_text: str):
+def render_health_card_ui(report_text: str, target_container=None):
     matrix = extract_health_matrix(report_text)
     if not matrix:
         return
 
     color_map = {
-        "Buy": "#1b5e20", "Wide": "#1b5e20", "Clean": "#1b5e20",
+        "Disciplined": "#1b5e20", "Buy": "#1b5e20", "Wide": "#1b5e20", "Clean": "#1b5e20",
         "Debt-Free": "#1b5e20", "Undervalued": "#1b5e20", "Temporary": "#1b5e20", "Stable": "#1b5e20",
         "Watchlist": "#b26a00", "Moderate": "#b26a00", "Fair": "#b26a00",
         "Neutral": "#b26a00", "Moderate Debt": "#b26a00", "Resilient": "#b26a00", "N/A": "#555555",
-        "Avoid": "#b71c1c", "Narrow": "#b71c1c", "Caution": "#b71c1c", "High Risk": "#b71c1c",
-        "Structural": "#b71c1c", "Stretched": "#b71c1c", "Loss-Making": "#b71c1c", "High Debt": "#b71c1c"
+        "Strained": "#b71c1c", "Avoid": "#b71c1c", "Narrow": "#b71c1c", "Caution": "#b71c1c", 
+        "High Risk": "#b71c1c", "Structural": "#b71c1c", "Stretched": "#b71c1c", 
+        "Loss-Making": "#b71c1c", "High Debt": "#b71c1c", "Headwinds": "#b71c1c"
     }
 
     labels = [
@@ -80,7 +81,9 @@ def render_health_card_ui(report_text: str):
             f'<span>{val}</span></div>'
         )
     pills_html.append('</div>')
-    st.markdown("".join(pills_html), unsafe_allow_html=True)
+    
+    renderer = target_container if target_container is not None else st
+    renderer.markdown("".join(pills_html), unsafe_allow_html=True)
 
 with st.sidebar:
     st.header("Archived Reports")
@@ -184,8 +187,9 @@ if ("last_report" in st.session_state and st.session_state["last_report"] is not
         st.warning(f"⚠️ **Valuation Notice:** Trailing P/E multiple is unavailable from exchange feeds for {ticker_disp}.")
 
     st.markdown("---")
+    badge_container = st.empty()
     if st.session_state.get("last_report"):
-        render_health_card_ui(st.session_state["last_report"])
+        render_health_card_ui(st.session_state["last_report"], target_container=badge_container)
     st.header(f"Equity Research Report: {header_label}")
 
     if st.session_state.get("stream_pending"):
@@ -207,6 +211,7 @@ if ("last_report" in st.session_state and st.session_state["last_report"] is not
                 yield from stream_gen
 
             streamed_text = st.write_stream(combined_stream)
+            render_health_card_ui(streamed_text, target_container=badge_container)
             if "Live Synthesis Failed" in streamed_text:
                 cached_rec = get_report_by_ticker(clean_ticker)
                 if cached_rec and cached_rec.get("report_text"):
