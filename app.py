@@ -13,6 +13,110 @@ from db import get_archived_reports, get_report_by_ticker
 from markdown_pdf import MarkdownPdf, Section
 
 st.set_page_config(page_title="Equity Research AI", layout="wide", page_icon="📈")
+# Streamlit 1.63 Responsive Viewport & Flex Constraints
+st.markdown(
+    """
+    <style>
+    /* 1. Prevent global page blowout */
+    html, body, .stApp, [data-testid="stAppViewContainer"] {
+        max-width: 100vw !important;
+        overflow-x: hidden !important;
+        box-sizing: border-box !important;
+    }
+
+    /* 2. Target Modern Streamlit Main Block Container */
+    [data-testid="stMainBlockContainer"],
+    [data-testid="block-container"] {
+        max-width: 880px !important;
+        width: 100% !important;
+        margin: 0 auto !important;
+        padding-top: 1.5rem !important;
+        padding-bottom: 4rem !important;
+        padding-left: 1rem !important;
+        padding-right: 1rem !important;
+        box-sizing: border-box !important;
+        overflow-x: hidden !important;
+    }
+
+    /* 3. Allow st.columns to wrap on zoom/small screens instead of blowing out width */
+    [data-testid="stHorizontalBlock"] {
+        flex-wrap: wrap !important;
+        gap: 12px !important;
+    }
+    [data-testid="stHorizontalBlock"] > div {
+        min-width: 180px !important;
+        flex: 1 1 180px !important;
+    }
+
+    /* 4. Enforce word wrapping across all markdown and streaming containers */
+    [data-testid="stMarkdownContainer"],
+    [data-testid="stMarkdownContainer"] p,
+    [data-testid="stMarkdownContainer"] div,
+    [data-testid="stMarkdownContainer"] span {
+        white-space: normal !important;
+        word-break: break-word !important;
+        overflow-wrap: anywhere !important;
+    }
+
+    /* 5. Preformatted code blocks word-wrapping */
+    pre, code {
+        white-space: pre-wrap !important;
+        word-break: break-word !important;
+        max-width: 100% !important;
+    }
+
+    /* 6. Contain Markdown Tables within the 880px measure */
+    [data-testid="stMarkdownContainer"] table {
+        display: block !important;
+        overflow-x: auto !important;
+        max-width: 100% !important;
+    }
+    </style>
+    """,
+    unsafe_allow_html=True
+)
+
+
+# Responsive Typography & Container Constraints
+st.markdown(
+    """
+    <style>
+    /* Constrain main block to optimal reading measure */
+    .main .block-container {
+        max-width: 920px !important;
+        padding-top: 2rem !important;
+        padding-bottom: 4rem !important;
+        padding-left: 1.5rem !important;
+        padding-right: 1.5rem !important;
+        margin: 0 auto !important;
+    }
+
+    /* Force responsive word wrapping on all generated text */
+    .stMarkdown, .stMarkdown p, .stMarkdown div, .stMarkdown span {
+        white-space: normal !important;
+        word-wrap: break-word !important;
+        overflow-wrap: break-word !important;
+    }
+
+    /* Prevent pre/code blocks from blowing out page width */
+    pre, code {
+        white-space: pre-wrap !important;
+        word-break: break-word !important;
+        max-width: 100% !important;
+    }
+
+    /* Enable smooth horizontal scrolling on wide markdown tables without breaking page layout */
+    .stMarkdown table {
+        display: block !important;
+        overflow-x: auto !important;
+        white-space: nowrap !important;
+        max-width: 100% !important;
+    }
+    </style>
+    """,
+    unsafe_allow_html=True
+)
+
 
 st.markdown("""
     <style>

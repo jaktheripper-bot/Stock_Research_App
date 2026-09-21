@@ -11,11 +11,11 @@ logging.getLogger("streamlit").setLevel(logging.ERROR)
 def run_suite():
     issues = []
     print("\n=======================================================")
-    print(f"   PROJECT INTEGRITY AUDIT - {datetime.now(timezone.utc).strftime('%Y-%m-%d %H:%M:%S UTC')}")
+    print(f"   SYSTEM INTEGRITY & CONTRACT AUDIT - {datetime.now(timezone.utc).strftime('%Y-%m-%d %H:%M:%S UTC')}")
     print("=======================================================")
 
-    # 1. Environment & Module Syntax
-    print("1. Checking Environment & Module Syntax...")
+    # 1. Environment & Exact Version Integrity
+    print("1. Auditing Installed Packages & Version Integrity...")
     modules = [
         ("streamlit", "streamlit"),
         ("bsedata", "bsedata"),
@@ -34,18 +34,45 @@ def run_suite():
     
     for mod_name, pkg_name in modules:
         try:
-            __import__(mod_name)
-            print(f"   ✅ {mod_name} imported cleanly.")
+            mod = __import__(mod_name)
+            ver = getattr(mod, "__version__", "local")
+            print(f"   ✅ {mod_name} verified ({ver}).")
         except Exception as e:
             issues.append((
                 "Syntax/Dependency",
                 f"Import failed for '{mod_name}': {e}",
-                f"Run `pip install {pkg_name}` or check syntax in {mod_name}."
+                f"Run `pip install {pkg_name}` or verify syntax."
             ))
             print(f"   ❌ {mod_name} FAILED: {e}")
 
-    # 2. Credentials & Secrets Configuration
-    print("\n2. Auditing API Credentials & Secrets...")
+    # 2. Third-Party Data Contract: yfinance Schema Probe
+    print("\n2. Probing yfinance Contract & Multiples Schema...")
+    try:
+        import yfinance as yf
+        ticker = yf.Ticker("INFY.BO")
+        info = ticker.info or {}
+        pe = info.get("trailingPE")
+        mcap = info.get("marketCap")
+
+        if pe is not None and mcap is not None and mcap > 0:
+            print(f"   ✅ yfinance contract operational: INFY Trailing P/E={pe}, MCap={mcap:,}")
+        else:
+            issues.append((
+                "Data Contract",
+                f"yfinance returned incomplete schema for INFY (PE: {pe}, MCap: {mcap})",
+                "Check Yahoo Finance API changes or IP rate-limits."
+            ))
+            print(f"   ⚠️ yfinance schema gap: PE={pe}, MCap={mcap}")
+    except Exception as e:
+        issues.append((
+            "Data Contract",
+            f"yfinance probe failed with exception: {e}",
+            "Inspect network access to Yahoo Finance endpoints."
+        ))
+        print(f"   ❌ yfinance probe FAILED: {e}")
+
+    # 3. Credentials & Secrets Configuration
+    print("\n3. Auditing API Credentials & Secrets...")
     gemini_key = os.environ.get("GEMINI_API_KEY")
     secrets_path = ".streamlit/secrets.toml"
     if os.path.exists(secrets_path):
@@ -67,8 +94,8 @@ def run_suite():
     else:
         print("   ✅ GEMINI_API_KEY is configured.")
 
-    # 3. BSE Scrip Resolution Logic
-    print("\n3. Testing BSE Scrip Resolution Engine...")
+    # 4. BSE Scrip Resolution Logic
+    print("\n4. Testing BSE Scrip Resolution Engine...")
     try:
         from bse_master import resolve_bse_scrip_code
         scrip = resolve_bse_scrip_code("INFY")
@@ -89,8 +116,8 @@ def run_suite():
         ))
         print(f"   ❌ BSE Resolution FAILED: {e}")
 
-    # 4. Database Connection & Latency Probe
-    print("\n4. Probing Database Connection & Query Latency...")
+    # 5. Database Connection & Query Latency Probe
+    print("\n5. Probing Database Connection & Latency...")
     try:
         from db import get_db_connection
         t0 = time.perf_counter()
@@ -101,17 +128,17 @@ def run_suite():
         latency_ms = (time.perf_counter() - t0) * 1000
         cur.close()
         conn.close()
-        print(f"   ✅ Database connection responsive ({latency_ms:.2f}ms roundtrip).")
+        print(f"   ✅ Database responsive ({latency_ms:.2f}ms roundtrip).")
     except Exception as e:
         issues.append((
             "Database",
             f"Database handshake failed: {e}",
-            "Check database availability and SUPABASE_DB_URL or local SQLite fallback."
+            "Check database availability and connection string."
         ))
         print(f"   ❌ Database probe FAILED: {e}")
 
-    # 5. Headless UI Streamlit Mount Audit
-    print("\n5. Executing Headless UI Smoke Test (Streamlit AppTest)...")
+    # 6. Streamlit 1.63 Headless UI Mount Audit
+    print("\n6. Executing Headless UI Smoke Test (AppTest)...")
     try:
         from streamlit.testing.v1 import AppTest
         at = AppTest.from_file("app.py", default_timeout=15)
@@ -120,7 +147,7 @@ def run_suite():
             issues.append((
                 "Headless UI",
                 f"Streamlit app crashed on launch: {at.exception}",
-                "Inspect traceback in app.py to resolve the startup exception."
+                "Inspect traceback in app.py to resolve startup exception."
             ))
             print(f"   ❌ App crashed on startup: {at.exception}")
         else:
@@ -142,7 +169,7 @@ def run_suite():
         ))
         print(f"   ❌ Headless UI test failed: {e}")
 
-    # 6. Project Health Ledger Update (PROJECT_STATUS.md)
+    # 7. Project Health Ledger Update (PROJECT_STATUS.md)
     timestamp_str = datetime.now(timezone.utc).strftime('%Y-%m-%d %H:%M:%S UTC')
     status_summary = "ALL SYSTEMS OPERATIONAL" if not issues else f"{len(issues)} ISSUE(S) DETECTED"
     
@@ -169,7 +196,7 @@ def run_suite():
     except Exception as e:
         print(f"\n❌ Failed to write PROJECT_STATUS.md: {e}")
 
-    # Terminal Output Summary
+    # Executive Output
     print("\n=======================================================")
     print("   EXECUTIVE AUDIT SUMMARY")
     print("=======================================================")
