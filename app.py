@@ -24,18 +24,17 @@ st.set_page_config(page_title="Equity Research AI", layout="centered", page_icon
 # Responsive Typography & Container Constraints
 
 def format_inr(number):
-    if number is None or str(number).strip() in ["", "0", "N/A"]:
+    if number is None or str(number).strip() in ["", "0", "N/A", "None"]:
         return "N/A"
     try:
         clean_num = str(number).replace(",", "").strip()
-        number = float(clean_num)
+        val = float(clean_num)
     except (ValueError, TypeError):
         return str(number)
 
-    def group_inr(val):
-        parts = f"{val:.2f}".split(".")
-        int_p = parts[0]
-        dec_p = parts[1]
+    def group_inr(num):
+        parts = f"{num:.2f}".split(".")
+        int_p, dec_p = parts[0], parts[1]
         if len(int_p) <= 3:
             return f"{int_p}.{dec_p}"
         last_three = int_p[-3:]
@@ -47,11 +46,11 @@ def format_inr(number):
         groups.reverse()
         return f"{','.join(groups)},{last_three}.{dec_p}"
 
-    if number >= 1e7:
-        return f"₹{group_inr(number / 1e7)} Cr"
-    elif number >= 1e5:
-        return f"₹{group_inr(number / 1e5)} Lakh"
-    return f"₹{group_inr(number)}"
+    if val >= 1e7:
+        return f"₹{group_inr(val / 1e7)} Cr"
+    elif val >= 1e5:
+        return f"₹{group_inr(val / 1e5)} Lakh"
+    return f"₹{group_inr(val)}"
 
 def render_health_card_ui(report_text: str, target_container=None):
     matrix = extract_health_matrix(report_text)
