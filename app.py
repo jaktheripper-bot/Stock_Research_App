@@ -12,135 +12,38 @@ from analyzer import (
 from db import get_archived_reports, get_report_by_ticker
 from markdown_pdf import MarkdownPdf, Section
 
-st.set_page_config(page_title="Equity Research AI", layout="wide", page_icon="📈")
+st.set_page_config(page_title="Equity Research AI", layout="centered", page_icon="📈")
+# Typography Styling (Zero Layout/Container Overrides)
+
+# Unified Responsive Typography & Layout Constraints
+
+# Responsive Typography & Column Wrapping
+
 # Streamlit 1.63 Responsive Viewport & Flex Constraints
-st.markdown(
-    """
-    <style>
-    /* 1. Prevent global page blowout */
-    html, body, .stApp, [data-testid="stAppViewContainer"] {
-        max-width: 100vw !important;
-        overflow-x: hidden !important;
-        box-sizing: border-box !important;
-    }
-
-    /* 2. Target Modern Streamlit Main Block Container */
-    [data-testid="stMainBlockContainer"],
-    [data-testid="block-container"] {
-        max-width: 880px !important;
-        width: 100% !important;
-        margin: 0 auto !important;
-        padding-top: 1.5rem !important;
-        padding-bottom: 4rem !important;
-        padding-left: 1rem !important;
-        padding-right: 1rem !important;
-        box-sizing: border-box !important;
-        overflow-x: hidden !important;
-    }
-
-    /* 3. Allow st.columns to wrap on zoom/small screens instead of blowing out width */
-    [data-testid="stHorizontalBlock"] {
-        flex-wrap: wrap !important;
-        gap: 12px !important;
-    }
-    [data-testid="stHorizontalBlock"] > div {
-        min-width: 180px !important;
-        flex: 1 1 180px !important;
-    }
-
-    /* 4. Enforce word wrapping across all markdown and streaming containers */
-    [data-testid="stMarkdownContainer"],
-    [data-testid="stMarkdownContainer"] p,
-    [data-testid="stMarkdownContainer"] div,
-    [data-testid="stMarkdownContainer"] span {
-        white-space: normal !important;
-        word-break: break-word !important;
-        overflow-wrap: anywhere !important;
-    }
-
-    /* 5. Preformatted code blocks word-wrapping */
-    pre, code {
-        white-space: pre-wrap !important;
-        word-break: break-word !important;
-        max-width: 100% !important;
-    }
-
-    /* 6. Contain Markdown Tables within the 880px measure */
-    [data-testid="stMarkdownContainer"] table {
-        display: block !important;
-        overflow-x: auto !important;
-        max-width: 100% !important;
-    }
-    </style>
-    """,
-    unsafe_allow_html=True
-)
-
 
 # Responsive Typography & Container Constraints
-st.markdown(
-    """
-    <style>
-    /* Constrain main block to optimal reading measure */
-    .main .block-container {
-        max-width: 920px !important;
-        padding-top: 2rem !important;
-        padding-bottom: 4rem !important;
-        padding-left: 1.5rem !important;
-        padding-right: 1.5rem !important;
-        margin: 0 auto !important;
-    }
-
-    /* Force responsive word wrapping on all generated text */
-    .stMarkdown, .stMarkdown p, .stMarkdown div, .stMarkdown span {
-        white-space: normal !important;
-        word-wrap: break-word !important;
-        overflow-wrap: break-word !important;
-    }
-
-    /* Prevent pre/code blocks from blowing out page width */
-    pre, code {
-        white-space: pre-wrap !important;
-        word-break: break-word !important;
-        max-width: 100% !important;
-    }
-
-    /* Enable smooth horizontal scrolling on wide markdown tables without breaking page layout */
-    .stMarkdown table {
-        display: block !important;
-        overflow-x: auto !important;
-        white-space: nowrap !important;
-        max-width: 100% !important;
-    }
-    </style>
-    """,
-    unsafe_allow_html=True
-)
-
-
-st.markdown("""
-    <style>
-        div[data-testid="stMarkdownContainer"] p, 
-        .stTextInput label, .stSelectbox label, 
-        .stMarkdown li, .stCaptionContainer p { font-size: 19px !important; }
-    </style>
-""", unsafe_allow_html=True)
 
 def format_inr(number):
-    if number is None or not isinstance(number, (int, float)):
+    if number is None or str(number).strip() in ["", "0", "N/A"]:
         return "N/A"
+    try:
+        clean_num = str(number).replace(",", "").strip()
+        number = float(clean_num)
+    except (ValueError, TypeError):
+        return str(number)
+
     def group_inr(val):
         parts = f"{val:.2f}".split(".")
-        int_p, dec_p = parts[0], parts[1]
+        int_p = parts[0]
+        dec_p = parts[1]
         if len(int_p) <= 3:
             return f"{int_p}.{dec_p}"
-        last_three, rest = int_p[-3:], int_p[:-3]
+        last_three = int_p[-3:]
+        remaining = int_p[:-3]
         groups = []
-        while len(rest) > 2:
-            groups.append(rest[-2:])
-            rest = rest[:-2]
-        if rest:
-            groups.append(rest)
+        while remaining:
+            groups.append(remaining[-2:])
+            remaining = remaining[:-2]
         groups.reverse()
         return f"{','.join(groups)},{last_three}.{dec_p}"
 
@@ -274,7 +177,7 @@ if ("last_report" in st.session_state and st.session_state["last_report"] is not
 
     col1, col2, col3, col4 = st.columns(4)
     mcap = fund.get("market_cap", 0)
-    col1.metric("Market Capitalization", format_inr(mcap) if isinstance(mcap, (int, float)) else str(mcap))
+    col1.metric("Market Capitalization", format_inr(mcap))
 
     pe_val = str(fund.get("pe_ratio", "N/A"))
     if "Loss-Making" in pe_val or "Negative" in pe_val:
