@@ -320,7 +320,7 @@ def get_system_prompt(ticker: str, language: str) -> str:
 
 CRITICAL LINGUISTIC RULES:
 1. Write at an 8th-grade reading level. Keep sentences short and simple.
-2. For financial terms, provide a brief definition in parentheses.
+2. ABBREVIATION MANDATE: On first mention of any abbreviation or acronym (e.g., P/E, ROCE, ROE, EPS, CAGR, DCF, EBITDA, CAPEX, TAM, 50-DMA), immediately provide its full form in brackets [e.g., P/E [Price-to-Earnings Ratio], ROCE [Return on Capital Employed], CAGR [Compound Annual Growth Rate]]. Subsequent mentions should use the acronym alone. Do NOT expand abbreviations inside the `### Health Matrix` block or Markdown table cells/headers.
 3. Express all Indian corporate metrics in Crores (Cr) and Indian Rupees (INR).
 
 # DIAGNOSTIC SUMMARY & KEY TAKEAWAYS
@@ -583,3 +583,61 @@ def get_stock_price_history(query: str, period: str = "6mo") -> pd.DataFrame:
     except Exception as e:
         print(f"Warning: Failed to fetch price history for {query}: {e}")
         return pd.DataFrame()
+
+def get_historical_prices(ticker: str, period: str = "6mo"):
+    """
+    Fetches trailing daily historical prices via yfinance, attempting BSE (.BO)
+    first with NSE (.NS) fallback. Computes 50-day Simple Moving Average (50-DMA).
+    Auto-resolves 6-digit BSE scrip codes to alphanumeric ticker symbols.
+    """
+    import os
+    import json
+    import pandas as pd
+    import yfinance as yf
+
+    if not ticker or not isinstance(ticker, str):
+        return None
+
+    clean = ticker.strip().upper().replace(".BO", "").replace(".NS", "")
+
+    # Reverse-lookup numeric scrip code to ticker symbol for yfinance
+    if clean.isdigit():
+        try:
+            from bse_master import PRIMARY_BSE_MAP
+            rev_map = {str(v).strip(): k for k, v in PRIMARY_BSE_MAP.items()}
+            if clean in rev_map:
+                clean = rev_map[clean]
+        except Exception:
+            pass
+
+    df = pd.DataFrame()
+    for suffix in [".BO", ".NS"]:
+        try:
+            sym = f"{clean}{suffix}"
+            t = yf.Ticker(sym)
+            hist = t.history(period=period)
+            if hist is not None and not hist.empty and len(hist) > 5:
+                df = hist
+                break
+        except Exception:
+            continue
+
+    if df.empty:
+        return None
+
+    df = df.reset_index()
+    if "Date" not in df.columns or "Close" not in df.columns:
+        return None
+
+    df["Date"] = pd.to_datetime(df["Date"]).dt.tz_localize(None)
+    df["Close"] = pd.to_numeric(df["Close"], errors="coerce")
+    df["Volume"] = pd.to_numeric(df.get("Volume", 0), errors="coerce").fillna(0)
+    df = df.dropna(subset=["Close"])
+
+    if len(df) < 5:
+        return None
+
+    window = min(50, len(df))
+    df["SMA50"] = df["Close"].rolling(window=window, min_periods=5).mean()
+
+    return df[["Date", "Close", "SMA50", "Volume"]]

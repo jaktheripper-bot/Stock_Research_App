@@ -1,28 +1,59 @@
-import altair as alt
-import json
-import traceback
 import platform
-import tempfile
+import json
+import os
+import sys
+import time
 from datetime import datetime, timezone
 import streamlit as st
 from analyzer import (
     remove_health_matrix_text,
-    extract_health_matrix, stream_stock_report, 
-    get_stock_fundamentals, evaluate_material_change
+    extract_health_matrix,
+    stream_stock_report,
+    get_stock_fundamentals,
+    evaluate_material_change,
+    get_historical_prices,
 )
 from db import get_archived_reports, get_report_by_ticker
 from markdown_pdf import MarkdownPdf, Section
 
 st.set_page_config(page_title="Equity Research AI", layout="wide", page_icon="📈")
-# Typography Styling (Zero Layout/Container Overrides)
 
-# Unified Responsive Typography & Layout Constraints
+# Production UI Stylesheet (Metric Unclip & Reading Bounds)
+st.markdown(
+    """
+    <style>
+    /* 1. Prevent st.metric from cutting off text with ellipses */
+    [data-testid="stMetricValue"] > div {
+        font-size: clamp(1.1rem, 1.35vw, 1.45rem) !important;
+        white-space: normal !important;
+        overflow: visible !important;
+        text-overflow: unset !important;
+        line-height: 1.25 !important;
+    }
+    [data-testid="stMetricLabel"] > div {
+        font-size: 0.95rem !important;
+        white-space: normal !important;
+        overflow: visible !important;
+        text-overflow: unset !important;
+    }
 
-# Responsive Typography & Column Wrapping
+    /* 2. Constrain reading measure strictly on report prose */
+    [data-testid="stMarkdownContainer"] p,
+    [data-testid="stMarkdownContainer"] li {
+        max-width: 860px !important;
+        line-height: 1.65 !important;
+        font-size: 18px !important;
+    }
 
-# Streamlit 1.63 Responsive Viewport & Flex Constraints
-
-# Responsive Typography & Container Constraints
+    /* 3. Wrap metric cards gracefully on zoom */
+    [data-testid="stHorizontalBlock"] {
+        flex-wrap: wrap !important;
+        gap: 12px !important;
+    }
+    </style>
+    """,
+    unsafe_allow_html=True
+)
 
 def render_material_badge(reason: str, is_regenerated: bool):
     """Renders a responsive status badge detailing cache vs regeneration triggers."""
@@ -42,45 +73,105 @@ def render_material_badge(reason: str, is_regenerated: bool):
         unsafe_allow_html=True,
     )
 
-
 def render_momentum_chart(df, ticker: str):
-    """Renders a responsive 6-month price momentum and 50-day moving average chart with volume bars."""
-    if df is None or df.empty or "Date" not in df.columns or "Close" not in df.columns:
+    """Renders a responsive 6-month price momentum chart with on-the-fly fallback and dynamic inference explainer."""
+    import altair as alt
+    import pandas as pd
+
+    # Fallback fetch if viewing an archived report
+    if (df is None or not hasattr(df, "empty") or df.empty) and ticker:
+        with st.spinner(f"Loading price momentum for {ticker}..."):
+            df = get_historical_prices(ticker)
+            if df is not None and not df.empty:
+                st.session_state["last_history"] = df
+
+    if df is None or not hasattr(df, "empty") or df.empty or "Date" not in df.columns or "Close" not in df.columns:
+        if ticker:
+            st.caption(f"ℹ️ Trailing 6-month price momentum chart unavailable for {ticker} (exchange feed unlisted).")
         return
 
     base = alt.Chart(df).encode(
-        x=alt.X("Date:T", title="", axis=alt.Axis(format="%b %Y", labelColor="#9ca3af", grid=False))
+        x=alt.X("Date:T", title="Date", axis=alt.Axis(format="%b %Y", labelAngle=0, grid=False))
     )
 
-    vol_bar = base.mark_bar(opacity=0.25, color="#6b7280").encode(
-        y=alt.Y("Volume:Q", axis=None)
-    )
-
-    price_line = base.mark_line(color="#3b82f6", strokeWidth=2).encode(
-        y=alt.Y("Close:Q", title="Price (₹)", scale=alt.Scale(zero=False), axis=alt.Axis(labelColor="#9ca3af", titleColor="#9ca3af")),
+    price_line = base.mark_line(color="#2563eb", strokeWidth=2).encode(
+        y=alt.Y("Close:Q", scale=alt.Scale(zero=False), title="Price (₹ INR)"),
         tooltip=[
-            alt.Tooltip("Date:T", format="%d %b %Y"),
-            alt.Tooltip("Close:Q", format=".2f", title="Close (₹)"),
-            alt.Tooltip("SMA50:Q", format=".2f", title="50-DMA (₹)"),
-            alt.Tooltip("Volume:Q", format=",.0f", title="Volume")
+            alt.Tooltip("Date:T", format="%Y-%m-%d", title="Date"),
+            alt.Tooltip("Close:Q", format=".2f", title="Close Price (₹ INR)"),
+            alt.Tooltip("SMA50:Q", format=".2f", title="50-DMA [50-Day Moving Average] (₹ INR)")
         ]
     )
 
     sma_line = base.mark_line(color="#f59e0b", strokeWidth=1.5, strokeDash=[4, 4]).encode(
-        y=alt.Y("SMA50:Q")
+        y=alt.Y("SMA50:Q", scale=alt.Scale(zero=False)),
+        tooltip=[
+            alt.Tooltip("Date:T", format="%Y-%m-%d", title="Date"),
+            alt.Tooltip("SMA50:Q", format=".2f", title="50-DMA [50-Day Moving Average] (₹ INR)")
+        ]
     )
 
-    layered = alt.layer(vol_bar, price_line, sma_line).resolve_scale(
-        y="independent"
-    ).properties(
+    vol_max = df["Volume"].max() if "Volume" in df.columns and df["Volume"].max() > 0 else 1
+    vol_bars = base.mark_bar(opacity=0.18, color="#64748b").encode(
+        y=alt.Y("Volume:Q", axis=None, scale=alt.Scale(domain=[0, vol_max * 4]))
+    )
+
+    chart = alt.layer(vol_bars, price_line, sma_line).properties(
+        title=f"6-Month Price Momentum & 50-DMA [50-Day Moving Average] ({ticker})",
         height=260
-    ).configure_view(
-        strokeWidth=0
-    )
+    ).resolve_scale(y="independent")
 
-    st.markdown("<p style='font-size:14px; font-weight:600; color:#9ca3af; margin-bottom:4px; margin-top:16px;'>6-MONTH PRICE MOMENTUM & 50-DAY MOVING AVERAGE</p>", unsafe_allow_html=True)
-    st.altair_chart(layered, use_container_width=True)
+    st.altair_chart(chart, use_container_width=True)
 
+    # Dynamic Technical Inference Explainer
+    valid_sma = df.dropna(subset=["SMA50", "Close"])
+    if not valid_sma.empty:
+        latest_row = valid_sma.iloc[-1]
+        c_price = float(latest_row["Close"])
+        sma_val = float(latest_row["SMA50"])
+        diff_pct = ((c_price - sma_val) / sma_val) * 100.0
+
+        if diff_pct >= 1.5:
+            posture = "Bullish Intermediate Momentum"
+            color_border = "#10b981"
+            bg_color = "rgba(16, 185, 129, 0.08)"
+            inference = (
+                f"Trading <strong>{abs(diff_pct):.1f}% above</strong> its 50-DMA "
+                f"(50-Day Moving Average). The price is sustaining upward momentum, with the 50-DMA line functioning "
+                f"as dynamic intermediate support (price floor)."
+            )
+        elif diff_pct <= -1.5:
+            posture = "Corrective / Consolidation Posture"
+            color_border = "#f59e0b"
+            bg_color = "rgba(245, 158, 11, 0.08)"
+            inference = (
+                f"Trading <strong>{abs(diff_pct):.1f}% below</strong> its 50-DMA "
+                f"(50-Day Moving Average). The price faces intermediate overhead resistance, indicating "
+                f"cooling demand or consolidation before a trend reversal."
+            )
+        else:
+            posture = "Inflection / Mean-Reversion Zone"
+            color_border = "#3b82f6"
+            bg_color = "rgba(59, 130, 246, 0.08)"
+            inference = (
+                f"Trading within <strong>{abs(diff_pct):.1f}% of its 50-DMA</strong> "
+                f"(50-Day Moving Average). The stock is consolidating directly along its 10-week intermediate mean."
+            )
+
+        st.markdown(
+            f"""
+            <div style="border-left: 3px solid {color_border}; background-color: {bg_color}; 
+                        padding: 10px 14px; border-radius: 0 6px 6px 0; margin-top: -6px; margin-bottom: 16px;">
+                <div style="font-size: 13px; font-weight: 700; color: #f8fafc; margin-bottom: 4px;">
+                    Technical Posture: {posture}
+                </div>
+                <div style="font-size: 13px; color: #cbd5e1; line-height: 1.5;">
+                    Current Close: <strong>₹{c_price:,.2f}</strong> vs 50-DMA: <strong>₹{sma_val:,.2f}</strong>. {inference}
+                </div>
+            </div>
+            """,
+            unsafe_allow_html=True
+        )
 
 def format_inr(number):
     if number is None or str(number).strip() in ["", "0", "N/A", "None"]:
@@ -112,6 +203,7 @@ def format_inr(number):
     return f"₹{group_inr(val)}"
 
 def render_health_card_ui(report_text: str, target_container=None):
+    render_momentum_chart(st.session_state.get('last_history'), st.session_state.get('last_ticker', ''))
     render_material_badge(st.session_state.get('material_reason', ''), st.session_state.get('is_regenerated', False))
     matrix = extract_health_matrix(report_text)
     if not matrix:
@@ -195,6 +287,7 @@ if submitted and query:
         try:
             with st.spinner(f"Auditing market data & filings for {clean_query}..."):
                 stock_data = get_stock_fundamentals(clean_query)
+                st.session_state["last_history"] = get_historical_prices(stock_data.get("ticker", clean_query))
                 resolved_ticker = stock_data.get("ticker", clean_query)
                 scrip = stock_data.get("scrip_code", "")
                 cached = get_report_by_ticker(resolved_ticker)
