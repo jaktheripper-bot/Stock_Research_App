@@ -1,3 +1,4 @@
+import altair as alt
 import json
 import traceback
 import platform
@@ -12,7 +13,7 @@ from analyzer import (
 from db import get_archived_reports, get_report_by_ticker
 from markdown_pdf import MarkdownPdf, Section
 
-st.set_page_config(page_title="Equity Research AI", layout="centered", page_icon="📈")
+st.set_page_config(page_title="Equity Research AI", layout="wide", page_icon="📈")
 # Typography Styling (Zero Layout/Container Overrides)
 
 # Unified Responsive Typography & Layout Constraints
@@ -22,6 +23,64 @@ st.set_page_config(page_title="Equity Research AI", layout="centered", page_icon
 # Streamlit 1.63 Responsive Viewport & Flex Constraints
 
 # Responsive Typography & Container Constraints
+
+def render_material_badge(reason: str, is_regenerated: bool):
+    """Renders a responsive status badge detailing cache vs regeneration triggers."""
+    if not reason:
+        return
+    bg = "#fef3c7" if is_regenerated else "#ecfdf5"
+    border = "#fde68a" if is_regenerated else "#a7f3d0"
+    text_color = "#92400e" if is_regenerated else "#065f46"
+    st.markdown(
+        f"""
+        <div style="display: inline-flex; align-items: center; background-color: {bg}; color: {text_color};
+                    padding: 5px 12px; border-radius: 6px; font-size: 13px; font-weight: 600;
+                    margin-bottom: 12px; border: 1px solid {border};">
+            {reason}
+        </div>
+        """,
+        unsafe_allow_html=True,
+    )
+
+
+def render_momentum_chart(df, ticker: str):
+    """Renders a responsive 6-month price momentum and 50-day moving average chart with volume bars."""
+    if df is None or df.empty or "Date" not in df.columns or "Close" not in df.columns:
+        return
+
+    base = alt.Chart(df).encode(
+        x=alt.X("Date:T", title="", axis=alt.Axis(format="%b %Y", labelColor="#9ca3af", grid=False))
+    )
+
+    vol_bar = base.mark_bar(opacity=0.25, color="#6b7280").encode(
+        y=alt.Y("Volume:Q", axis=None)
+    )
+
+    price_line = base.mark_line(color="#3b82f6", strokeWidth=2).encode(
+        y=alt.Y("Close:Q", title="Price (₹)", scale=alt.Scale(zero=False), axis=alt.Axis(labelColor="#9ca3af", titleColor="#9ca3af")),
+        tooltip=[
+            alt.Tooltip("Date:T", format="%d %b %Y"),
+            alt.Tooltip("Close:Q", format=".2f", title="Close (₹)"),
+            alt.Tooltip("SMA50:Q", format=".2f", title="50-DMA (₹)"),
+            alt.Tooltip("Volume:Q", format=",.0f", title="Volume")
+        ]
+    )
+
+    sma_line = base.mark_line(color="#f59e0b", strokeWidth=1.5, strokeDash=[4, 4]).encode(
+        y=alt.Y("SMA50:Q")
+    )
+
+    layered = alt.layer(vol_bar, price_line, sma_line).resolve_scale(
+        y="independent"
+    ).properties(
+        height=260
+    ).configure_view(
+        strokeWidth=0
+    )
+
+    st.markdown("<p style='font-size:14px; font-weight:600; color:#9ca3af; margin-bottom:4px; margin-top:16px;'>6-MONTH PRICE MOMENTUM & 50-DAY MOVING AVERAGE</p>", unsafe_allow_html=True)
+    st.altair_chart(layered, use_container_width=True)
+
 
 def format_inr(number):
     if number is None or str(number).strip() in ["", "0", "N/A", "None"]:
@@ -53,6 +112,7 @@ def format_inr(number):
     return f"₹{group_inr(val)}"
 
 def render_health_card_ui(report_text: str, target_container=None):
+    render_material_badge(st.session_state.get('material_reason', ''), st.session_state.get('is_regenerated', False))
     matrix = extract_health_matrix(report_text)
     if not matrix:
         return
@@ -139,6 +199,8 @@ if submitted and query:
                 scrip = stock_data.get("scrip_code", "")
                 cached = get_report_by_ticker(resolved_ticker)
                 should_regen, reason, latest_ann = evaluate_material_change(cached, stock_data, scrip)
+                st.session_state["material_reason"] = reason
+                st.session_state["is_regenerated"] = should_regen
 
                 if not should_regen and selected_language == "English (India)":
                     st.session_state["last_report"] = cached["report_text"]
