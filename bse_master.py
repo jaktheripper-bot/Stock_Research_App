@@ -1,3 +1,29 @@
+
+def find_fuzzy_scrip_match(query: str, cutoff: float = 0.72) -> str:
+    """Matches typographical errors against known scrips and aliases using Levenshtein similarity."""
+    clean_q = query.strip().upper()
+    
+    # Check similarity against PRIMARY_BSE_MAP keys
+    candidates = list(PRIMARY_BSE_MAP.keys())
+    matches = difflib.get_close_matches(clean_q, candidates, n=1, cutoff=cutoff)
+    if matches:
+        return PRIMARY_BSE_MAP[matches[0]]
+        
+    # Check similarity against dynamic aliases if file exists
+    try:
+        import json, os
+        if os.path.exists("dynamic_aliases.json"):
+            with open("dynamic_aliases.json", "r") as f:
+                dyn = json.load(f)
+                dyn_matches = difflib.get_close_matches(clean_q, list(dyn.keys()), n=1, cutoff=cutoff)
+                if dyn_matches:
+                    return dyn[dyn_matches[0]]
+    except Exception:
+        pass
+        
+    return None
+
+import difflib
 import os
 import re
 import json
