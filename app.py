@@ -327,6 +327,38 @@ p, li { font-size: 9.5pt; line-height: 1.45; }
             os.unlink(chart_filename)
 
 
+def render_dual_speed_report(markdown_text: str, expand_all: bool = False):
+    """
+    Renders report in a mobile-optimized dual-speed layout:
+    - Diagnostic Summary & Takeaways: open above the fold
+    - Analytical Pillars 1 to 7: nested inside st.expander containers
+    - Conclusion & Key Monitorables: open at the base
+    """
+    import re
+    cleaned = remove_health_matrix_text(markdown_text)
+    # Multiline flag (?m) matches line starts without requiring escape newlines
+    sections = re.split(r"(?m)(?=^##?\s+)", cleaned)
+    sections = [s.strip() for s in sections if s.strip()]
+
+    if len(sections) <= 2:
+        st.markdown(cleaned)
+        return
+
+    for sec in sections:
+        lines = sec.splitlines()
+        first_line = lines[0].strip()
+        title = re.sub(r"^#+\s*", "", first_line).strip()
+        body_content = chr(10).join(lines[1:]).strip() if len(lines) > 1 else sec
+
+        # Nest Pillars 1 through 7 into accordions
+        if re.search(r"(?i)Pillar\s*\d+", title):
+            with st.expander(f"📁 {title}", expanded=expand_all):
+                st.markdown(body_content)
+        else:
+            # Diagnostic Summary, Conclusion, or unclassified headers remain open
+            st.markdown(sec)
+
+
 def render_health_card_ui(report_text: str, target_container=None):
     render_momentum_chart(st.session_state.get('last_history'), st.session_state.get('last_ticker', ''))
     render_material_badge(st.session_state.get('material_reason', ''), st.session_state.get('is_regenerated', False))
@@ -528,7 +560,8 @@ if ("last_report" in st.session_state and st.session_state["last_report"] is not
             st.error(f"### ❌ Live Streaming Halted: {stream_err}")
             st.session_state["last_report"] = None
     elif st.session_state.get("last_report"):
-        st.markdown(remove_health_matrix_text(st.session_state["last_report"]))
+        expand_all = st.toggle("📖 Expand all analytical pillars", value=False)
+        render_dual_speed_report(st.session_state["last_report"], expand_all=expand_all)
 
     # Primary Red Download Button Rendered at the Bottom of the Report
     if st.session_state.get("last_report"):
