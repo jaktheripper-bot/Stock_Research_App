@@ -487,34 +487,6 @@ if ("last_report" in st.session_state and st.session_state["last_report"] is not
         render_health_card_ui(st.session_state["last_report"], target_container=badge_container)
     st.header(f"Equity Research Report: {header_label}")
 
-    # Top Primary Download Button (Rendered directly under header in red)
-    if st.session_state.get("last_report"):
-        rep_content = st.session_state["last_report"]
-        pdf_cache_id = f"{clean_ticker}_{hash(rep_content)}"
-        
-        if st.session_state.get("pdf_cache_id") != pdf_cache_id or "cached_pdf_bytes" not in st.session_state:
-            try:
-                st.session_state["cached_pdf_bytes"] = build_pdf_dossier(
-                    rep_content,
-                    clean_ticker,
-                    header_label,
-                    st.session_state.get("last_history")
-                )
-                st.session_state["pdf_cache_id"] = pdf_cache_id
-            except Exception as pdf_err:
-                st.session_state["cached_pdf_bytes"] = None
-                st.caption(f"PDF export notice: {pdf_err}")
-                
-        if st.session_state.get("cached_pdf_bytes"):
-            st.download_button(
-                label="Download PDF Report",
-                data=st.session_state["cached_pdf_bytes"],
-                file_name=f"{clean_ticker}_Research_Report.pdf",
-                mime="application/pdf",
-                type="primary",
-                use_container_width=False
-            )
-
     if st.session_state.get("stream_pending"):
         st.session_state["stream_pending"] = False
         lang = st.session_state.get("stream_language", "English (India)")
@@ -557,3 +529,32 @@ if ("last_report" in st.session_state and st.session_state["last_report"] is not
             st.session_state["last_report"] = None
     elif st.session_state.get("last_report"):
         st.markdown(remove_health_matrix_text(st.session_state["last_report"]))
+
+    # Primary Red Download Button Rendered at the Bottom of the Report
+    if st.session_state.get("last_report"):
+        st.markdown("---")
+        rep_content = st.session_state["last_report"]
+        pdf_cache_id = f"{clean_ticker}_{hash(rep_content)}"
+        
+        if st.session_state.get("pdf_cache_id") != pdf_cache_id or "cached_pdf_bytes" not in st.session_state:
+            try:
+                st.session_state["cached_pdf_bytes"] = build_pdf_dossier(
+                    rep_content,
+                    clean_ticker,
+                    header_label,
+                    st.session_state.get("last_history")
+                )
+                st.session_state["pdf_cache_id"] = pdf_cache_id
+            except Exception as pdf_err:
+                st.session_state["cached_pdf_bytes"] = None
+                st.caption(f"PDF export notice: {pdf_err}")
+                
+        if st.session_state.get("cached_pdf_bytes"):
+            st.download_button(
+                label="📄 Download Research Report (PDF)",
+                data=st.session_state["cached_pdf_bytes"],
+                file_name=f"{clean_ticker}_Research_Report.pdf",
+                mime="application/pdf",
+                type="primary",
+                use_container_width=True
+            )
