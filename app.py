@@ -23,9 +23,20 @@ st.set_page_config(page_title="Equity Research AI", layout="wide", page_icon="ðŸ
 st.markdown(
     """
     <style>
-    /* 1. Prevent st.metric from cutting off text with ellipses */
+    /* 1. Constrain canvas width on zoom-out while staying fluid on mobile / zoom-in */
+    .main .block-container {
+        max-width: min(1280px, 95vw) !important;
+        padding-top: 2rem !important;
+        padding-bottom: 3rem !important;
+        margin: 0 auto !important;
+    }
+
+    /* 2. Prevent st.metric from cutting off text with ellipses and wrap gracefully */
+    [data-testid="stMetric"] {
+        min-width: 180px !important;
+    }
     [data-testid="stMetricValue"] > div {
-        font-size: clamp(1.1rem, 1.35vw, 1.45rem) !important;
+        font-size: clamp(1.15rem, 1.4vw, 1.5rem) !important;
         white-space: normal !important;
         overflow: visible !important;
         text-overflow: unset !important;
@@ -38,18 +49,22 @@ st.markdown(
         text-overflow: unset !important;
     }
 
-    /* 2. Constrain reading measure strictly on report prose */
+    /* 3. Constrain reading measure strictly on report prose */
     [data-testid="stMarkdownContainer"] p,
     [data-testid="stMarkdownContainer"] li {
         max-width: 860px !important;
         line-height: 1.65 !important;
-        font-size: 18px !important;
+        font-size: 17px !important;
     }
 
-    /* 3. Wrap metric cards gracefully on zoom */
+    /* 4. Responsive horizontal column wrapping for zoom-in */
     [data-testid="stHorizontalBlock"] {
         flex-wrap: wrap !important;
-        gap: 12px !important;
+        gap: 16px !important;
+    }
+    [data-testid="stHorizontalBlock"] > div {
+        flex: 1 1 200px !important;
+        min-width: 180px !important;
     }
     </style>
     """,
@@ -166,7 +181,7 @@ def render_momentum_chart(df, ticker: str):
 
     chart = alt.layer(vol_bars, price_line, sma_line).properties(
         title=f"6-Month Price Momentum & 50-DMA [50-Day Moving Average] ({ticker})",
-        height=260
+        height=300
     ).resolve_scale(y="independent")
 
     st.altair_chart(chart, use_container_width=True)
@@ -472,6 +487,34 @@ if ("last_report" in st.session_state and st.session_state["last_report"] is not
         render_health_card_ui(st.session_state["last_report"], target_container=badge_container)
     st.header(f"Equity Research Report: {header_label}")
 
+    # Top Primary Download Button (Rendered directly under header in red)
+    if st.session_state.get("last_report"):
+        rep_content = st.session_state["last_report"]
+        pdf_cache_id = f"{clean_ticker}_{hash(rep_content)}"
+        
+        if st.session_state.get("pdf_cache_id") != pdf_cache_id or "cached_pdf_bytes" not in st.session_state:
+            try:
+                st.session_state["cached_pdf_bytes"] = build_pdf_dossier(
+                    rep_content,
+                    clean_ticker,
+                    header_label,
+                    st.session_state.get("last_history")
+                )
+                st.session_state["pdf_cache_id"] = pdf_cache_id
+            except Exception as pdf_err:
+                st.session_state["cached_pdf_bytes"] = None
+                st.caption(f"PDF export notice: {pdf_err}")
+                
+        if st.session_state.get("cached_pdf_bytes"):
+            st.download_button(
+                label="Download PDF Report",
+                data=st.session_state["cached_pdf_bytes"],
+                file_name=f"{clean_ticker}_Research_Report.pdf",
+                mime="application/pdf",
+                type="primary",
+                use_container_width=False
+            )
+
     if st.session_state.get("stream_pending"):
         st.session_state["stream_pending"] = False
         lang = st.session_state.get("stream_language", "English (India)")
@@ -514,29 +557,3 @@ if ("last_report" in st.session_state and st.session_state["last_report"] is not
             st.session_state["last_report"] = None
     elif st.session_state.get("last_report"):
         st.markdown(remove_health_matrix_text(st.session_state["last_report"]))
-
-    if st.session_state.get("last_report"):
-        rep_content = st.session_state["last_report"]
-        pdf_cache_id = f"{clean_ticker}_{hash(rep_content)}"
-        
-        if st.session_state.get("pdf_cache_id") != pdf_cache_id or "cached_pdf_bytes" not in st.session_state:
-            try:
-                st.session_state["cached_pdf_bytes"] = build_pdf_dossier(
-                    rep_content,
-                    clean_ticker,
-                    header_label,
-                    st.session_state.get("last_history")
-                )
-                st.session_state["pdf_cache_id"] = pdf_cache_id
-            except Exception as pdf_err:
-                st.session_state["cached_pdf_bytes"] = None
-                st.caption(f"PDF export notice: {pdf_err}")
-                
-        if st.session_state.get("cached_pdf_bytes"):
-            st.download_button(
-                label="ðŸ“„ Download Research Report (PDF)",
-                data=st.session_state["cached_pdf_bytes"],
-                file_name=f"{clean_ticker}_Research_Report.pdf",
-                mime="application/pdf",
-                use_container_width=True
-            )
