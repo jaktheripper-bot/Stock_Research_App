@@ -342,9 +342,11 @@ Tabulate the ESG analysis strictly using the following Markdown table format:
 | **Governance** | [Score] | [Board independence, transparency] |
 
 ---
-## Conclusion & Actionable Guidance
-1. **Diagnostic Summary & Key Takeaways:** Synthesize algorithmic strengths, balance sheet discipline, capital allocation efficiency, and critical operational risks. Do NOT provide prescriptive Buy/Sell/Hold advice, target prices, or trade execution signals.
-2. **Strategy:** Portfolio execution roadmap."""
+## Conclusion & Key Monitorables
+1. **Diagnostic Synthesis:** Synthesize algorithmic business model resilience, balance sheet leverage, capital allocation efficiency, and critical operational risks.
+2. **Key Fundamental Monitorables:** Enumerate 3 to 4 specific operating metrics, balance sheet covenants, or regulatory disclosures that an independent investor should independently track in subsequent filings.
+
+CRITICAL COMPLIANCE DIRECTIVE: Strictly avoid providing any Buy/Sell/Hold verdicts, investment recommendations, portfolio allocation advice, target prices, trade execution signals, or portfolio roadmaps. The analysis must remain purely descriptive, factual, and diagnostic."""
 
 _DISCOVERED_MODELS_CACHE = {"models": [], "timestamp": 0}
 

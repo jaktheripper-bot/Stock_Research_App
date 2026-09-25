@@ -29,6 +29,9 @@ import re
 import json
 
 PRIMARY_BSE_MAP = {
+    "ONIDA": "500279",
+    "MIRC": "500279",
+    "MIRC ELECTRONICS": "500279",
     "ZOMATO": "543320", "ETERNAL": "543320", "PAYTM": "543396", "ONE97": "543396",
     "NYKAA": "543384", "DMART": "540376", "POLICYBAZAAR": "543390", "DELHIVERY": "543529",
     "JIOFIN": "543940", "RELIANCE": "500325", "TCS": "532540", "HDFCBANK": "500180",
@@ -97,3 +100,23 @@ def resolve_bse_scrip_code(query: str) -> str:
             pass
 
     return None
+
+
+def get_ticker_suggestions(query: str, n: int = 3) -> list:
+    """Finds closest matching ticker symbols or company names using fuzzy string matching."""
+    import difflib
+    import os
+    if not query:
+        return []
+    clean = query.strip().upper()
+    candidates = list(PRIMARY_BSE_MAP.keys())
+    try:
+        import json
+        if os.path.exists("bse_scrips_cache.json"):
+            with open("bse_scrips_cache.json", "r", encoding="utf-8") as f:
+                cached = json.load(f)
+                candidates.extend([k.upper() for k in cached.keys()])
+    except Exception:
+        pass
+    matches = difflib.get_close_matches(clean, list(set(candidates)), n=n, cutoff=0.5)
+    return matches

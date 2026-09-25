@@ -7,3 +7,4 @@ requests==2.34.2
 toml==0.10.2
 beautifulsoup4==4.15.0
 yfinance==1.7.0
+matplotlib>=3.8.0
