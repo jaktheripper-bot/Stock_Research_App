@@ -478,7 +478,7 @@ if ("last_report" in st.session_state and st.session_state["last_report"] is not
         try:
             with st.status("🔍 Auditing exchange filings & synthesizing research...", expanded=True) as status:
                 st.caption("ℹ️ *Institutional Due Diligence: Research grounded in public BSE filings and exchange feeds via AI synthesis under SEBI educational safe-harbor standards.*")
-                st.write(f"✓ **Exchange Quote Verified:** ₹{fund.get('current_price', 'N/A')} (Scrip: {scrip or clean_ticker})")
+                st.write(f"✓ **Exchange Quote Verified:** ₹{fund.get('current_price', 'N/A')} (Scrip: {fund.get('scrip_code', clean_ticker)})")
                 st.write(f"✓ **Fundamental Valuation Metrics:** Market Cap ₹{format_inr(fund.get('market_cap', 0))} | Trailing P/E: {fund.get('pe_ratio', 'N/A')}")
                 if st.session_state.get("last_history") is not None and not st.session_state["last_history"].empty:
                     st.write("✓ **Technical Momentum Aggregated:** 6-month OHLCV data & rolling 50-DMA calculated.")
