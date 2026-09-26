@@ -1,3 +1,4 @@
+import re
 from datetime import datetime
 import traceback
 import platform
@@ -584,8 +585,18 @@ if ("last_report" in st.session_state and st.session_state["last_report"] is not
                 st.caption(f"PDF export notice: {pdf_err}")
                 
         if st.session_state.get("cached_pdf_bytes"):
+            canonical_clean = re.sub(r'[^A-Za-z0-9]', '', str(fund.get('ticker', clean_ticker)).split('.')[0]).upper()
+            date_stamp = datetime.now().strftime('%d-%m-%Y')
+            target_filename = f"{canonical_clean}_{date_stamp}_Research_Report.pdf"
+            
             st.download_button(
                 label="Download Research Report (PDF)",
+                data=st.session_state["cached_pdf_bytes"],
+                file_name=target_filename,
+                mime="application/pdf",
+                type="primary",
+                use_container_width=True
+            )",
                 data=st.session_state["cached_pdf_bytes"],
                 file_name=f"{re.sub(r'[^A-Za-z0-9]', '', fund.get('ticker', clean_ticker).split('.')[0]).upper()}_{datetime.now().strftime('%d-%m-%Y')}_Research_Report.pdf",
                 mime="application/pdf",
