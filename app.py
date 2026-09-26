@@ -584,9 +584,9 @@ if ("last_report" in st.session_state and st.session_state["last_report"] is not
                 
         if st.session_state.get("cached_pdf_bytes"):
             st.download_button(
-                label="📄 Download Research Report (PDF)",
+                label="Download Research Report (PDF)",
                 data=st.session_state["cached_pdf_bytes"],
-                file_name=f"{clean_ticker}_Research_Report.pdf",
+                file_name=f"{re.sub(r'[^A-Za-z0-9]', '', fund.get('ticker', clean_ticker).split('.')[0]).upper()}_{datetime.now().strftime('%d-%m-%Y')}_Research_Report.pdf",
                 mime="application/pdf",
                 type="primary",
                 use_container_width=True
