@@ -88,14 +88,14 @@ def resolve_scrip_via_gemini_jit(query: str) -> str:
             f"What is the official 6-digit BSE (Bombay Stock Exchange) security/scrip code for '{query}'? "
             "Reply strictly with only the 6-digit number. If not found, reply N/A."
         )
-        response = client.models.generate_content(
-            model="gemini-2.0-flash",
-            contents=prompt,
+        chat = client.chats.create(
+            model="gemini-3.8-flash",
             config=genai.types.GenerateContentConfig(
                 tools=[{"google_search": {}}],
                 temperature=0.0
             )
         )
+        response = chat.send_message(prompt)
         text = response.text if hasattr(response, "text") and response.text else ""
         match = re.search(r"\b(5\d{5})\b", text)
         if match:

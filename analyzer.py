@@ -360,10 +360,12 @@ def fetch_bse_exchange_data(query: str) -> dict:
         mcap_inr = 0
 
     clean_ticker = query.strip().upper().replace(".NS", "").replace(".BO", "")
-    resolved_pe = resolve_pe_with_failsafes(q.get("scrip_id") or clean_ticker, scrip)
+    sec_id = str(q.get("securityID") or q.get("scrip_id") or "").strip().upper()
+    canonical_ticker = sec_id if (sec_id and " " not in sec_id) else (clean_ticker if " " not in clean_ticker else (sec_id or clean_ticker.replace(" ", "")))
+    resolved_pe = resolve_pe_with_failsafes(canonical_ticker, scrip)
 
     return {
-        "ticker": clean_ticker,
+        "ticker": canonical_ticker,
         "short_name": q.get("companyName", clean_ticker),
         "scrip_code": scrip,
         "current_price": q.get("currentValue", "0.00"),
@@ -689,6 +691,7 @@ def generate_stock_report(ticker: str, language: str = "English (India)") -> str
 
 
 
+@st.cache_data(ttl="15m", max_entries=50)
 def get_historical_prices(ticker: str, period: str = "6mo"):
     """
     Fetches trailing daily historical prices via yfinance, attempting BSE (.BO)
@@ -704,6 +707,23 @@ def get_historical_prices(ticker: str, period: str = "6mo"):
         return None
 
     clean = ticker.strip().upper().replace(".BO", "").replace(".NS", "")
+
+    # Sanitize multi-word queries with spaces to their canonical security ID
+    if " " in clean:
+        scrip = resolve_bse_scrip_code(clean)
+        if scrip:
+            try:
+                b = BSE()
+                q = b.getQuote(scrip)
+                sec_id = str(q.get("securityID") or "").strip().upper()
+                if sec_id and " " not in sec_id:
+                    clean = sec_id
+                else:
+                    clean = clean.replace(" ", "")
+            except Exception:
+                clean = clean.replace(" ", "")
+        else:
+            clean = clean.replace(" ", "")
 
     # Reverse-lookup numeric scrip code to ticker symbol for yfinance
     if clean.isdigit():

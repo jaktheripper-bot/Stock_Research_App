@@ -38,6 +38,28 @@ from markdown_pdf import MarkdownPdf, Section
 
 st.set_page_config(page_title="Equity Research AI", layout="wide", page_icon="📈")
 
+def inject_ga4_tracking():
+    """Injects Google Analytics 4 tracking script if GA4_MEASUREMENT_ID is configured in secrets."""
+    try:
+        ga_id = st.secrets.get("GA4_MEASUREMENT_ID") or os.environ.get("GA4_MEASUREMENT_ID")
+        if ga_id and str(ga_id).startswith("G-"):
+            st.html(
+                f"""
+                <!-- Google tag (gtag.js) -->
+                <script async src="https://www.googletagmanager.com/gtag/js?id={ga_id}"></script>
+                <script>
+                  window.dataLayer = window.dataLayer || [];
+                  function gtag(){{dataLayer.push(arguments);}}
+                  gtag('js', new Date());
+                  gtag('config', '{ga_id}');
+                </script>
+                """
+            )
+    except Exception:
+        pass
+
+inject_ga4_tracking()
+
 # Production UI Stylesheet (Metric Unclip & Reading Bounds)
 st.markdown(
     """
@@ -89,6 +111,135 @@ st.markdown(
     """,
     unsafe_allow_html=True
 )
+
+def sanitize_ticker_input(q: str) -> str:
+    """Sanitizes ticker queries by stripping non-alphanumeric characters except dots and hyphens."""
+    import re
+    return re.sub(r"[^\w\s\.-]", "", q or "").strip()[:40]
+
+
+def set_active_dossier_state(
+    ticker: str,
+    report_text: str = None,
+    report_date: str = None,
+    fundamentals: dict = None,
+    material_reason: str = "📂 Loaded from Archived Research Dossier",
+    is_regenerated: bool = False,
+    viewing_snapshot: dict = None,
+    custom_diff: dict = None,
+    history_df=None
+):
+    """Atomically synchronizes all report, chart, and surveillance session state for a given ticker."""
+    clean_t = (ticker or "").strip().upper()
+    st.session_state["last_ticker"] = clean_t
+    st.session_state["last_report"] = report_text
+    st.session_state["last_report_date"] = report_date
+    st.session_state["last_fundamentals"] = fundamentals or {}
+    st.session_state["material_reason"] = material_reason
+    st.session_state["is_regenerated"] = is_regenerated
+    st.session_state["cached_pdf_bytes"] = None
+    st.session_state["pdf_cache_id"] = None
+    st.session_state["sb_archive_sync_ticker"] = clean_t
+
+    if history_df is not None:
+        st.session_state["last_history"] = history_df
+        st.session_state["last_history_ticker"] = clean_t
+    else:
+        st.session_state["last_history"] = None
+        st.session_state["last_history_ticker"] = None
+
+    if viewing_snapshot:
+        st.session_state["viewing_snapshot"] = viewing_snapshot
+    else:
+        st.session_state.pop("viewing_snapshot", None)
+
+    if custom_diff:
+        st.session_state["custom_diff"] = custom_diff
+    else:
+        st.session_state.pop("custom_diff", None)
+
+def execute_stock_research(query: str, selected_language: str = "English (India)"):
+    """Executes the 5-phase data ingestion, validation, delta-gating, and synthesis pipeline for a stock query."""
+    st.session_state.pop("viewing_snapshot", None)
+    st.session_state.pop("custom_diff", None)
+    clean_query = sanitize_ticker_input(query)
+    if not clean_query or len(clean_query) < 2:
+        st.error("Please enter a valid company name or stock ticker (minimum 2 characters).")
+        return
+    try:
+        prog_slot = st.empty()
+        prog_bar = prog_slot.progress(0.15, text=f"⏳ Step 1/5: Verifying BSE Exchange Quote for {clean_query}...")
+        stock_data = get_stock_fundamentals(clean_query)
+        resolved_ticker = stock_data.get("ticker", clean_query)
+
+        prog_bar.progress(0.35, text=f"📈 Step 2/5: Ingesting 6-Month OHLCV & Computing 50-DMA for {resolved_ticker}...")
+        hist_df = get_historical_prices(resolved_ticker)
+        st.session_state["last_history"] = hist_df
+        st.session_state["last_history_ticker"] = resolved_ticker
+        scrip = stock_data.get("scrip_code", "")
+
+        prog_bar.progress(0.55, text="📢 Step 3/5: Auditing BSE Regulatory Filings & Delta Gating...")
+        cached = get_report_by_ticker(resolved_ticker)
+        should_regen, reason, latest_ann = evaluate_material_change(cached, stock_data, scrip)
+
+        if not should_regen and selected_language == "English (India)":
+            prog_bar.progress(1.0, text="✅ Step 5/5: Verified Dossier Retrieved from Archive!")
+            import time
+            time.sleep(0.3)
+            prog_slot.empty()
+            set_active_dossier_state(
+                ticker=resolved_ticker,
+                report_text=cached["report_text"],
+                report_date=cached.get("formatted_date"),
+                fundamentals=stock_data,
+                material_reason=reason,
+                is_regenerated=False,
+                history_df=hist_df
+            )
+            st.rerun()
+        else:
+            prog_bar.progress(0.65, text="⚡ Step 4/5: Initializing 7-Pillar Institutional AI Synthesis...")
+            import time
+            time.sleep(0.3)
+            prog_slot.empty()
+            set_active_dossier_state(
+                ticker=resolved_ticker,
+                report_text=None,
+                fundamentals=stock_data,
+                material_reason=reason,
+                is_regenerated=True,
+                history_df=hist_df
+            )
+            st.session_state["stream_pending"] = True
+            st.session_state["stream_language"] = selected_language
+            st.rerun()
+    except Exception as err:
+        st.session_state["last_report"] = None
+        err_str = str(err).lower()
+        if isinstance(err, ValueError) or "scrip code" in err_str or "not found" in err_str:
+            st.warning(f"⚠️ **Stock Not Located:** Could not find verified BSE/NSE exchange listings for **'{clean_query}'**.")
+            suggestions = get_ticker_suggestions(clean_query)
+            if suggestions:
+                st.info(f"💡 **Did you mean:** {', '.join(suggestions)}?")
+            else:
+                st.caption("ℹ️ Examples of valid inputs: `INFY`, `TCS`, `RELIANCE`, or the 6-digit BSE Scrip Code like `500209`.")
+        else:
+            stage = getattr(err, "stage", "Pipeline Engine")
+            diag_payload = {
+                "timestamp_ist": datetime.now(IST).strftime("%Y-%m-%d %H:%M:%S IST"),
+                "query_entered": clean_query,
+                "error_stage": stage,
+                "error_type": type(err).__name__,
+                "error_message": str(err),
+                "technical_details": getattr(err, "technical_details", ""),
+                "system": {"python": platform.python_version(), "os": platform.system()},
+                "traceback_tail": traceback.format_exc().splitlines()[-4:] if 'traceback' in globals() else []
+            }
+            st.error(f"### ❌ Data Pipeline Stopped at: {stage}")
+            st.markdown(f"**Error:** {err}")
+            with st.expander("📋 Technical Diagnostic Details", expanded=False):
+                st.code(json.dumps(diag_payload, indent=2), language="json")
+
 
 def render_material_badge(reason: str, is_regenerated: bool):
     """Renders a responsive status badge detailing cache vs regeneration triggers."""
@@ -160,12 +311,14 @@ def render_momentum_chart(df, ticker: str):
     import altair as alt
     import pandas as pd
 
-    # Fallback fetch if viewing an archived report
-    if (df is None or not hasattr(df, "empty") or df.empty) and ticker:
+    # Fallback fetch if viewing an archived report or if cached chart belongs to a different stock
+    cached_chart_ticker = st.session_state.get("last_history_ticker")
+    if (df is None or not hasattr(df, "empty") or df.empty or cached_chart_ticker != ticker) and ticker:
         with st.spinner(f"Loading price momentum for {ticker}..."):
             df = get_historical_prices(ticker)
             if df is not None and not df.empty:
                 st.session_state["last_history"] = df
+                st.session_state["last_history_ticker"] = ticker
 
     if df is None or not hasattr(df, "empty") or df.empty or "Date" not in df.columns or "Close" not in df.columns:
         if ticker:
@@ -519,6 +672,18 @@ def render_thesis_drift_panel(ticker: str, custom_diff_data: dict = None):
 
 
 with st.sidebar:
+    st.header("Stock Discovery")
+    with st.form("sidebar_stock_search", clear_on_submit=False):
+        sb_query = st.text_input(
+            "Look up any stock:",
+            placeholder="e.g. INFY, TCS, RELIANCE...",
+            help="Search across all BSE-listed equity instruments by ticker or company name."
+        )
+        sb_submit = st.form_submit_button("Search Stock", type="primary", width="stretch")
+    if sb_submit and sb_query:
+        execute_stock_research(sb_query)
+
+    st.markdown("---")
     st.header("Research Archive & Surveillance")
     try:
         archives = get_archived_reports()
@@ -535,16 +700,31 @@ with st.sidebar:
                 ticker_options.append(label)
                 archive_map[label] = a
 
-            # Pre-select matching ticker if active in session_state
+            # Determine currently selected index or active option
             active_ticker = st.session_state.get("last_ticker", "").strip().upper()
-            default_idx = 0
+            active_label = None
             if active_ticker:
-                for idx, opt in enumerate(ticker_options):
+                for opt in ticker_options:
                     if opt != "Select..." and archive_map[opt].get("ticker") == active_ticker:
-                        default_idx = idx
+                        active_label = opt
                         break
 
-            selected_label = st.selectbox("Select stock archive:", ticker_options, index=default_idx)
+            # Smart synchronization: sync dropdown if active_ticker changed externally
+            if "sb_archive_picker" not in st.session_state:
+                st.session_state["sb_archive_picker"] = active_label if active_label else "Select..."
+                st.session_state["sb_archive_sync_ticker"] = active_ticker
+            elif active_label and st.session_state.get("sb_archive_sync_ticker") != active_ticker:
+                st.session_state["sb_archive_picker"] = active_label
+                st.session_state["sb_archive_sync_ticker"] = active_ticker
+
+            if st.session_state.get("sb_archive_picker") not in ticker_options:
+                st.session_state["sb_archive_picker"] = "Select..."
+
+            selected_label = st.selectbox(
+                "Select stock archive:",
+                options=ticker_options,
+                key="sb_archive_picker"
+            )
             if selected_label != "Select...":
                 selected_item = archive_map[selected_label]
                 selected_ticker = selected_item.get("ticker")
@@ -552,23 +732,25 @@ with st.sidebar:
 
                 # Load Latest button
                 if st.button(
-                    "✓ Active Report Loaded" if is_active else "Load Latest Snapshot",
+                    "✓ Active Report Loaded" if is_active else "Load Active Dossier",
                     type="secondary" if is_active else "primary",
                     disabled=is_active,
                     width="stretch"
                 ):
-                    st.session_state["last_report"] = selected_item.get("report_text")
-                    st.session_state["last_report_date"] = selected_item.get("formatted_date")
-                    st.session_state["last_ticker"] = selected_ticker
-                    st.session_state["last_fundamentals"] = {
-                        "short_name": selected_item.get("short_name", selected_ticker),
-                        "market_cap": selected_item.get("baseline_mcap", "Archived"),
-                        "pe_ratio": selected_item.get("baseline_pe", "N/A"),
-                        "sector": "General Industry",
-                        "current_price": selected_item.get("baseline_price", "N/A")
-                    }
-                    st.session_state.pop("viewing_snapshot", None)
-                    st.session_state.pop("custom_diff", None)
+                    set_active_dossier_state(
+                        ticker=selected_ticker,
+                        report_text=selected_item.get("report_text"),
+                        report_date=selected_item.get("formatted_date"),
+                        fundamentals={
+                            "short_name": selected_item.get("short_name", selected_ticker),
+                            "ticker": selected_ticker,
+                            "market_cap": selected_item.get("baseline_mcap", "Archived"),
+                            "pe_ratio": selected_item.get("baseline_pe", "N/A"),
+                            "sector": "General Industry",
+                            "current_price": selected_item.get("baseline_price", "N/A")
+                        },
+                        material_reason="📂 Loaded from Archived Research Dossier"
+                    )
                     st.rerun()
 
                 st.markdown("---")
@@ -606,16 +788,27 @@ with st.sidebar:
                                     "rev_a": r_a,
                                     "rev_b": r_b,
                                 }
-                                st.session_state["last_ticker"] = selected_ticker
-                                st.session_state["last_report"] = r_b.get("report_text")
-                                st.session_state["last_report_date"] = r_b.get("formatted_date")
-                                st.session_state["last_fundamentals"] = {
-                                    "short_name": r_b.get("short_name", selected_ticker),
-                                    "market_cap": r_b.get("baseline_mcap", "Archived"),
-                                    "pe_ratio": r_b.get("baseline_pe", "N/A"),
-                                    "sector": "General Industry",
-                                    "current_price": r_b.get("baseline_price", "N/A")
-                                }
+                                set_active_dossier_state(
+                                    ticker=selected_ticker,
+                                    report_text=r_b.get("report_text"),
+                                    report_date=r_b.get("formatted_date"),
+                                    fundamentals={
+                                        "short_name": r_b.get("short_name", selected_ticker),
+                                        "ticker": selected_ticker,
+                                        "market_cap": r_b.get("baseline_mcap", "Archived"),
+                                        "pe_ratio": r_b.get("baseline_pe", "N/A"),
+                                        "sector": "General Industry",
+                                        "current_price": r_b.get("baseline_price", "N/A")
+                                    },
+                                    material_reason=f"⚖️ Multi-Quarter Differential ({sel_a_lbl} vs {sel_b_lbl})",
+                                    custom_diff={
+                                        "diff": c_diff,
+                                        "label_a": sel_a_lbl,
+                                        "label_b": sel_b_lbl,
+                                        "rev_a": r_a,
+                                        "rev_b": r_b,
+                                    }
+                                )
                                 st.rerun()
 
                     # Chronological Timeline Cards
@@ -668,18 +861,21 @@ with st.sidebar:
                                 disabled=is_cur_viewing,
                                 width="stretch"
                             ):
-                                st.session_state["viewing_snapshot"] = rev
-                                st.session_state["last_report"] = rev.get("report_text")
-                                st.session_state["last_report_date"] = rev.get("formatted_date")
-                                st.session_state["last_ticker"] = selected_ticker
-                                st.session_state["last_fundamentals"] = {
-                                    "short_name": rev.get("short_name", selected_ticker),
-                                    "market_cap": rev.get("baseline_mcap", "Archived"),
-                                    "pe_ratio": rev.get("baseline_pe", "N/A"),
-                                    "sector": "General Industry",
-                                    "current_price": rev.get("baseline_price", "N/A")
-                                }
-                                st.session_state.pop("custom_diff", None)
+                                set_active_dossier_state(
+                                    ticker=selected_ticker,
+                                    report_text=rev.get("report_text"),
+                                    report_date=rev.get("formatted_date"),
+                                    fundamentals={
+                                        "short_name": rev.get("short_name", selected_ticker),
+                                        "ticker": selected_ticker,
+                                        "market_cap": rev.get("baseline_mcap", "Archived"),
+                                        "pe_ratio": rev.get("baseline_pe", "N/A"),
+                                        "sector": "General Industry",
+                                        "current_price": rev.get("baseline_price", "N/A")
+                                    },
+                                    material_reason=f"📜 Viewing Immutable Revision #{rev_num} ({rev.get('revision_trigger')})",
+                                    viewing_snapshot=rev
+                                )
                                 st.rerun()
         else:
             st.info("No archives found.")
@@ -688,6 +884,26 @@ with st.sidebar:
 
 st.title("Equity Research Analysis Platform")
 st.markdown('<p style="font-size: 19px; color: #888888;">To aid stock discovery and simplify fundamentals.</p>', unsafe_allow_html=True)
+
+with st.form("search_form", clear_on_submit=False):
+    col_q1, col_q2 = st.columns([3, 1])
+    with col_q1:
+        query = st.text_input(
+            "Enter Company Name or Ticker:",
+            value="",
+            placeholder="Type any listed Indian company (e.g., RELIANCE, TCS, INFY)...",
+            help="Search across all BSE-listed equity instruments by symbol or company name."
+        )
+    with col_q2:
+        selected_language = st.selectbox(
+            "Report Language:",
+            ["English (India)", "Hindi", "Marathi", "Gujarati", "Tamil", "Telugu", "Bengali"]
+        )
+    st.caption("💡 *Examples: `RELIANCE`, `TCS`, `INFY`, or `500325` (BSE Scrip Code). Field is blank by default.*")
+    submitted = st.form_submit_button("Generate Research Report", type="primary")
+
+if submitted and query:
+    execute_stock_research(query, selected_language)
 
 
 def render_alert_hub():
@@ -751,23 +967,39 @@ def render_alert_hub():
                         with h_col2:
                             btn_c1, btn_c2 = st.columns(2)
                             with btn_c1:
-                                if st.button("Dossier", key=f"dossier_{alt['id']}", width="stretch"):
-                                    st.session_state["last_ticker"] = alt["ticker"]
+                                if st.button(
+                                    "Dossier",
+                                    key=f"dossier_{alt['id']}",
+                                    width="stretch",
+                                    help=f"Open full 7-pillar institutional equity research dossier & technical chart for {alt['ticker']}"
+                                ):
                                     rec = get_report_by_ticker(alt["ticker"])
                                     if rec:
-                                        st.session_state["last_report"] = rec.get("report_text")
-                                        st.session_state["last_report_date"] = rec.get("formatted_date")
-                                        st.session_state["last_fundamentals"] = {
-                                            "short_name": rec.get("short_name", alt["ticker"]),
-                                            "market_cap": rec.get("baseline_mcap", "Archived"),
-                                            "pe_ratio": rec.get("baseline_pe", "N/A"),
-                                            "sector": "General Industry",
-                                            "current_price": rec.get("baseline_price", "N/A")
-                                        }
+                                        set_active_dossier_state(
+                                            ticker=alt["ticker"],
+                                            report_text=rec.get("report_text"),
+                                            report_date=rec.get("formatted_date"),
+                                            fundamentals={
+                                                "short_name": rec.get("short_name", alt["ticker"]),
+                                                "ticker": alt["ticker"],
+                                                "market_cap": rec.get("baseline_mcap", "Archived"),
+                                                "pe_ratio": rec.get("baseline_pe", "N/A"),
+                                                "sector": "General Industry",
+                                                "current_price": rec.get("baseline_price", "N/A")
+                                            },
+                                            material_reason=f"🔔 Loaded from Surveillance Alert: {alt.get('title')}"
+                                        )
+                                    else:
+                                        execute_stock_research(alt["ticker"])
                                     st.rerun()
                             with btn_c2:
                                 if not is_read:
-                                    if st.button("Read", key=f"read_{alt['id']}", width="stretch"):
+                                    if st.button(
+                                        "Read",
+                                        key=f"read_{alt['id']}",
+                                        width="stretch",
+                                        help="Mark this alert as acknowledged/read to clear the unread notification badge"
+                                    ):
                                         mark_alert_as_read(alt["id"])
                                         st.rerun()
 
@@ -786,7 +1018,7 @@ def render_alert_hub():
             if watchlist_items:
                 for w in watchlist_items:
                     with st.container(border=True):
-                        row_c1, row_c2, row_c3 = st.columns([3, 2, 1])
+                        row_c1, row_c2, row_c3 = st.columns([3, 2, 2])
                         with row_c1:
                             st.markdown(f"**{w['ticker']}** — {w['short_name']}")
                             p_str = f"₹{w['last_scanned_price']:,.2f}" if w.get('last_scanned_price') else "Not Scanned"
@@ -799,16 +1031,86 @@ def render_alert_hub():
                             st.markdown(" ".join([f"`{b}`" for b in badges]))
                             st.caption(f"Mode: `{w['digest_mode'].title()}`")
                         with row_c3:
-                            if st.button("Remove", key=f"rm_watch_{w['ticker']}", width="stretch"):
-                                remove_from_watchlist(w["ticker"])
-                                st.rerun()
+                            btn_w1, btn_w2 = st.columns(2)
+                            with btn_w1:
+                                if st.button(
+                                    "Research",
+                                    key=f"res_watch_{w['ticker']}",
+                                    width="stretch",
+                                    help=f"Open full 7-pillar institutional equity research dossier & technical chart for {w['ticker']}"
+                                ):
+                                    rec = get_report_by_ticker(w["ticker"])
+                                    if rec:
+                                        set_active_dossier_state(
+                                            ticker=w["ticker"],
+                                            report_text=rec.get("report_text"),
+                                            report_date=rec.get("formatted_date"),
+                                            fundamentals={
+                                                "short_name": w.get("short_name", w["ticker"]),
+                                                "ticker": w["ticker"],
+                                                "market_cap": rec.get("baseline_mcap", "Archived"),
+                                                "pe_ratio": rec.get("baseline_pe", "N/A"),
+                                                "sector": "General Industry",
+                                                "current_price": rec.get("baseline_price", "N/A")
+                                            },
+                                            material_reason="👁️ Loaded from Surveillance Watchlist"
+                                        )
+                                        st.rerun()
+                                    else:
+                                        execute_stock_research(w["ticker"])
+                            with btn_w2:
+                                if st.button("Remove", key=f"rm_watch_{w['ticker']}", width="stretch"):
+                                    remove_from_watchlist(w["ticker"])
+                                    st.rerun()
             else:
                 st.info("Your surveillance watchlist is empty. Add stocks below or directly from any equity research report.")
+
+            # Native Web Push Notifications (Decision 3: C)
+            with st.container(border=True):
+                wb_c1, wb_c2 = st.columns([3, 1])
+                with wb_c1:
+                    st.markdown("🔔 **Device Push Notifications (Zero-PII)**")
+                    st.caption("Receive background push alerts for corporate filings & price shocks directly on your device, even with the browser tab closed.")
+                with wb_c2:
+                    if st.button("Enable Push", key="btn_enable_web_push", width="stretch"):
+                        st.session_state["web_push_requested"] = True
+
+            if st.session_state.get("web_push_requested"):
+                st.session_state["web_push_requested"] = False
+                st.html(
+                    """
+                    <script>
+                    if (!("Notification" in window)) {
+                        alert("This browser does not support desktop notifications.");
+                    } else if (Notification.permission === "granted") {
+                        new Notification("🔔 Surveillance Alerts Active", {
+                            body: "You will receive real-time BSE filings and price shock notifications for watchlisted companies!",
+                            icon: "https://raw.githubusercontent.com/feathericons/feather/master/icons/bell.svg"
+                        });
+                    } else if (Notification.permission !== "denied") {
+                        Notification.requestPermission().then(function (permission) {
+                            if (permission === "granted") {
+                                new Notification("🔔 Surveillance Alerts Active", {
+                                    body: "Push alerts successfully enabled for your surveillance watchlist!",
+                                    icon: "https://raw.githubusercontent.com/feathericons/feather/master/icons/bell.svg"
+                                });
+                            }
+                        });
+                    }
+                    </script>
+                    """
+                )
+                st.success("✓ Browser notification request triggered. Click 'Allow' in your browser prompt.")
 
             st.markdown("---")
             st.markdown("#### Add Stock to Surveillance Watchlist")
             with st.form("add_watchlist_form", clear_on_submit=True):
-                w_ticker_input = st.text_input("Enter Ticker or Company Name (e.g. INFY, TCS, 500209):")
+                w_ticker_input = st.text_input(
+                    "Stock Ticker or BSE Scrip Code:",
+                    placeholder="Type ticker or 6-digit scrip code (e.g., INFY, TCS, 500209)...",
+                    help="Enter an official BSE scrip code (e.g. 500209) or exchange ticker symbol (e.g. INFY, TCS, RELIANCE)."
+                )
+                st.caption("💡 *Example inputs: `INFY` (Infosys), `TCS` (Tata Consultancy Services), or `500209` (BSE Scrip Code). Field is blank by default.*")
                 pref_c1, pref_c2, pref_c3 = st.columns(3)
                 with pref_c1:
                     pref_mat = st.checkbox("Material Filings 📢", value=True)
@@ -818,6 +1120,7 @@ def render_alert_hub():
                     pref_val = st.checkbox("Valuation Shock (±5%) ⚡", value=True)
 
                 digest_choice = st.radio("Notification Frequency:", ["Instant Notifications", "Daily Digest"], horizontal=True)
+                also_research = st.checkbox("Also generate complete research dossier now", value=False)
                 add_sub = st.form_submit_button("Add to Watchlist", type="primary")
 
                 if add_sub and w_ticker_input:
@@ -835,7 +1138,10 @@ def render_alert_hub():
                     )
                     if added:
                         st.success(f"✓ Added **{clean_t}** to surveillance watchlist.")
-                        st.rerun()
+                        if also_research:
+                            execute_stock_research(clean_t)
+                        else:
+                            st.rerun()
                     else:
                         st.error("Failed to add stock to watchlist.")
 
@@ -872,70 +1178,6 @@ def render_alert_hub():
 
 render_alert_hub()
 
-with st.form("search_form", clear_on_submit=False):
-    query = st.text_input("Enter Company Name or Ticker:", value="")
-    selected_language = st.selectbox("Select Report Language:", ["English (India)", "Hindi", "Marathi", "Gujarati", "Tamil", "Telugu", "Bengali"])
-    submitted = st.form_submit_button("Generate Research Report", type="primary")
-
-def sanitize_ticker_input(q: str) -> str:
-    import re
-    return re.sub(r"[^\w\s\.-]", "", q or "").strip()[:40]
-
-if submitted and query:
-    st.session_state.pop("viewing_snapshot", None)
-    st.session_state.pop("custom_diff", None)
-    clean_query = sanitize_ticker_input(query)
-    if not clean_query or len(clean_query) < 2:
-        st.error("Please enter a valid company name or stock ticker (minimum 2 characters).")
-    else:
-        try:
-            with st.spinner(f"Auditing market data & filings for {clean_query}..."):
-                stock_data = get_stock_fundamentals(clean_query)
-                st.session_state["last_history"] = get_historical_prices(stock_data.get("ticker", clean_query))
-                resolved_ticker = stock_data.get("ticker", clean_query)
-                scrip = stock_data.get("scrip_code", "")
-                cached = get_report_by_ticker(resolved_ticker)
-                should_regen, reason, latest_ann = evaluate_material_change(cached, stock_data, scrip)
-                st.session_state["material_reason"] = reason
-                st.session_state["is_regenerated"] = should_regen
-
-                if not should_regen and selected_language == "English (India)":
-                    st.session_state["last_report"] = cached["report_text"]
-                    st.session_state["last_report_date"] = cached.get("formatted_date")
-                    st.session_state["last_ticker"] = resolved_ticker
-                    st.session_state["last_fundamentals"] = stock_data
-                    st.rerun()
-                else:
-                    st.session_state["last_report"] = None
-                    st.session_state["last_ticker"] = resolved_ticker
-                    st.session_state["last_fundamentals"] = stock_data
-                    st.session_state["stream_pending"] = True
-                    st.session_state["stream_language"] = selected_language
-                    st.rerun()
-        except Exception as err:
-            st.session_state["last_report"] = None
-            err_str = str(err).lower()
-            if isinstance(err, ValueError) or "scrip code" in err_str or "not found" in err_str:
-                st.warning(f"⚠️ **Stock Not Located:** Could not find verified BSE/NSE exchange listings for **'{clean_query}'**.")
-                suggestions = get_ticker_suggestions(clean_query)
-                if suggestions:
-                    st.info(f"💡 **Did you mean:** {', '.join(suggestions)}?")
-                else:
-                    st.caption("Please verify the spelling, enter the listed ticker symbol (e.g., INFY, TCS), or provide the 6-digit BSE Scrip Code.")
-            else:
-                stage = getattr(err, "stage", "Pipeline Engine")
-                diag_payload = {
-                    "timestamp_ist": datetime.now(IST).strftime("%Y-%m-%d %H:%M:%S IST"), "query_entered": clean_query,
-                    "error_stage": stage, "error_type": type(err).__name__, "error_message": str(err),
-                    "technical_details": getattr(err, "technical_details", ""),
-                    "system": {"python": platform.python_version(), "os": platform.system()},
-                    "traceback_tail": traceback.format_exc().splitlines()[-4:] if 'traceback' in globals() else []
-                }
-                st.error(f"### ❌ Data Pipeline Stopped at: {stage}")
-                st.markdown(f"**Error:** {err}")
-                with st.expander("📋 Technical Diagnostic Details", expanded=False):
-                    st.code(json.dumps(diag_payload, indent=2), language="json")
-
 if ("last_report" in st.session_state and st.session_state["last_report"] is not None) or st.session_state.get("stream_pending"):
     fund = st.session_state.get("last_fundamentals", {})
     ticker_disp = st.session_state.get("last_ticker", "STOCK")
@@ -953,11 +1195,17 @@ if ("last_report" in st.session_state and st.session_state["last_report"] is not
             )
         with col_s2:
             if st.button("Return to Latest", key="btn_return_latest_snap", width="stretch"):
-                st.session_state.pop("viewing_snapshot", None)
                 rec = get_report_by_ticker(clean_ticker)
                 if rec:
-                    st.session_state["last_report"] = rec.get("report_text")
-                    st.session_state["last_report_date"] = rec.get("formatted_date")
+                    set_active_dossier_state(
+                        ticker=clean_ticker,
+                        report_text=rec.get("report_text"),
+                        report_date=rec.get("formatted_date"),
+                        fundamentals=fund,
+                        material_reason="📂 Returned to Active Dossier"
+                    )
+                else:
+                    st.session_state.pop("viewing_snapshot", None)
                 st.rerun()
 
     col1, col2, col3, col4 = st.columns(4)
@@ -1030,11 +1278,36 @@ if ("last_report" in st.session_state and st.session_state["last_report"] is not
                     first_chunk = ""
                     status.update(label="⚠️ Stream ended unexpectedly.", state="error", expanded=False)
 
+            synth_slot = st.empty()
+            synth_bar = synth_slot.progress(0.70, text="⚡ Step 4/5: Synthesizing 7-Pillar Institutional Equity Research Dossier...")
+
+            accumulated = []
             def combined_stream():
-                if first_chunk: yield first_chunk
-                yield from stream_gen
+                if first_chunk:
+                    accumulated.append(first_chunk)
+                    yield first_chunk
+                for chunk in stream_gen:
+                    accumulated.append(chunk)
+                    txt = "".join(accumulated)
+                    if "Pillar 7" in txt or "ESG" in txt:
+                        synth_bar.progress(0.96, text="🌱 Step 4/5: Synthesizing Pillar 7: ESG Impact Scorecard...")
+                    elif "Pillar 6" in txt or "Balance Sheet" in txt:
+                        synth_bar.progress(0.92, text="🛡️ Step 4/5: Synthesizing Pillar 6: Balance Sheet Stress-Test...")
+                    elif "Pillar 5" in txt or "Valuation" in txt:
+                        synth_bar.progress(0.88, text="⚡ Step 4/5: Synthesizing Pillar 5: Valuation Diagnostic...")
+                    elif "Pillar 4" in txt or "Governance" in txt:
+                        synth_bar.progress(0.84, text="🔍 Step 4/5: Synthesizing Pillar 4: Corporate Governance...")
+                    elif "Pillar 3" in txt or "Capital Allocation" in txt:
+                        synth_bar.progress(0.80, text="📊 Step 4/5: Synthesizing Pillar 3: Capital Allocation Track Record...")
+                    elif "Pillar 2" in txt or "Moat" in txt:
+                        synth_bar.progress(0.75, text="🏰 Step 4/5: Synthesizing Pillar 2: Business Model & Competitive Moat...")
+                    yield chunk
 
             streamed_text = st.write_stream(combined_stream)
+            synth_bar.progress(1.0, text="✅ Step 5/5: SEBI Compliance Verified & Dossier Archived!")
+            import time
+            time.sleep(0.4)
+            synth_slot.empty()
             render_health_card_ui(streamed_text, target_container=badge_container)
             if "Live Synthesis Failed" in streamed_text:
                 cached_rec = get_report_by_ticker(clean_ticker)

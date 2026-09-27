@@ -238,6 +238,10 @@ def save_report_to_archive(stock_data: dict, report_text: str, announcement: str
         ))
 
         conn.commit()
+        try:
+            st.cache_data.clear()
+        except Exception:
+            pass
     finally:
         cursor.close()
         conn.close()
@@ -261,6 +265,7 @@ def _format_timestamp(raw_ts) -> str:
     except Exception:
         return f"{str(raw_ts)[:16]} IST"
 
+@st.cache_data(ttl="5m", max_entries=5)
 def get_archived_reports() -> list:
     init_db()
     conn = get_db_connection()
@@ -294,6 +299,7 @@ def get_archived_reports() -> list:
         conn.close()
     return results
 
+@st.cache_data(ttl="5m", max_entries=50)
 def get_report_by_ticker(ticker: str) -> dict:
     init_db()
     conn = get_db_connection()
@@ -329,6 +335,7 @@ def get_report_by_ticker(ticker: str) -> dict:
         conn.close()
     return record
 
+@st.cache_data(ttl="5m", max_entries=50)
 def get_report_revisions(ticker: str) -> list:
     """Retrieves immutable revision history for a stock to power the differential engine."""
     init_db()
@@ -447,6 +454,7 @@ def get_revision_by_id(rev_id: int) -> dict:
 # GRANULAR ALERTING & WATCHLIST SUBSYSTEM
 # ==========================================
 
+@st.cache_data(ttl="60s")
 def get_watchlist() -> list:
     """Retrieves all tracked stocks in the surveillance watchlist."""
     init_db()
@@ -531,6 +539,10 @@ def add_to_watchlist(ticker: str, short_name: str = "", scrip_code: str = "",
             initial_price
         ))
         conn.commit()
+        try:
+            st.cache_data.clear()
+        except Exception:
+            pass
         success = True
     except Exception as e:
         print(f"Database error in add_to_watchlist: {e}")
@@ -551,6 +563,10 @@ def remove_from_watchlist(ticker: str) -> bool:
     try:
         cursor.execute(f"DELETE FROM watchlist WHERE ticker = {placeholder}", (clean,))
         conn.commit()
+        try:
+            st.cache_data.clear()
+        except Exception:
+            pass
         success = True
     except Exception as e:
         print(f"Database error in remove_from_watchlist: {e}")
@@ -632,6 +648,7 @@ def record_alert_event(ticker: str, category: str, severity: str, title: str, de
         conn.close()
     return new_id
 
+@st.cache_data(ttl="30s")
 def get_alert_events(ticker: str = None, category: str = None, unread_only: bool = False, limit: int = 50) -> list:
     """Retrieves recorded alert events with optional filters."""
     init_db()
@@ -692,6 +709,10 @@ def mark_alert_as_read(alert_id: int):
         val = "TRUE" if supabase_url else "1"
         cursor.execute(f"UPDATE alert_events SET is_read = {val} WHERE id = {placeholder}", (alert_id,))
         conn.commit()
+        try:
+            st.cache_data.clear()
+        except Exception:
+            pass
     except Exception as e:
         print(f"Error in mark_alert_as_read: {e}")
     finally:
@@ -713,12 +734,17 @@ def mark_all_alerts_as_read(ticker: str = None):
         else:
             cursor.execute(f"UPDATE alert_events SET is_read = {val}")
         conn.commit()
+        try:
+            st.cache_data.clear()
+        except Exception:
+            pass
     except Exception as e:
         print(f"Error in mark_all_alerts_as_read: {e}")
     finally:
         cursor.close()
         conn.close()
 
+@st.cache_data(ttl="30s")
 def get_unread_alert_count(ticker: str = None) -> int:
     """Returns the total number of unread alerts."""
     init_db()
