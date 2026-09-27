@@ -31,6 +31,8 @@ from db import (
     get_unread_alert_count,
     mark_alert_as_read,
     mark_all_alerts_as_read,
+    dismiss_alert,
+    dismiss_all_alerts,
 )
 from alerts import run_surveillance_scan
 from bse_master import get_ticker_suggestions
@@ -914,7 +916,10 @@ def render_alert_hub():
         unread_c = 0
 
     hub_title = f"🔔 Surveillance & Regulatory Alert Hub ({unread_c} Unread)" if unread_c > 0 else "🔔 Surveillance & Regulatory Alert Hub"
-    with st.expander(hub_title, expanded=(unread_c > 0)):
+    # Auto-collapse expander when a dossier is active or user requested collapse
+    user_has_active_dossier = bool(st.session_state.get("last_report") or st.session_state.get("stream_pending"))
+    default_expanded = (unread_c > 0) and not user_has_active_dossier and not st.session_state.get("collapse_alert_hub", False)
+    with st.expander(hub_title, expanded=default_expanded):
         tab_feed, tab_watchlist, tab_scan = st.tabs([
             f"📥 Alert Feed ({unread_c})",
             "👁️ Surveillance Watchlist",
@@ -922,7 +927,7 @@ def render_alert_hub():
         ])
 
         with tab_feed:
-            c_filter1, c_filter2, c_filter3 = st.columns([2, 1, 1])
+            c_filter1, c_filter2 = st.columns([3, 2])
             with c_filter1:
                 sel_cat = st.segmented_control(
                     "Filter Category:",
@@ -930,21 +935,37 @@ def render_alert_hub():
                     default="All"
                 )
             with c_filter2:
-                show_unread = st.checkbox("Unread only", value=False)
-            with c_filter3:
-                if st.button("Mark All Read", key="btn_mark_all_read", width="stretch"):
+                feed_view = st.segmented_control(
+                    "Feed View:",
+                    options=["📥 Unread Inbox", "📜 All History"],
+                    default="📥 Unread Inbox"
+                )
+
+            act_col1, act_col2 = st.columns(2)
+            with act_col1:
+                if st.button("✓ Mark All as Read", key="btn_mark_all_read", width="stretch", help="Mark all unread alerts as read"):
                     mark_all_alerts_as_read()
+                    st.toast("All notifications marked as read.", icon="✓")
+                    st.rerun()
+            with act_col2:
+                if st.button("🗑️ Dismiss All Unread", key="btn_dismiss_all_unread", width="stretch", help="Permanently clear all unread alerts"):
+                    dismiss_all_alerts(unread_only=True)
+                    st.toast("Unread notifications dismissed.", icon="🗑️")
                     st.rerun()
 
             cat_map = {"All": None, "Material 📢": "material", "Fundamental 📊": "fundamental", "Valuation ⚡": "valuation"}
             raw_cat = cat_map.get(sel_cat)
+            is_unread_only = (feed_view == "📥 Unread Inbox")
             try:
-                alerts = get_alert_events(category=raw_cat, unread_only=show_unread, limit=30)
+                alerts = get_alert_events(category=raw_cat, unread_only=is_unread_only, limit=30)
             except Exception:
                 alerts = []
 
             if not alerts:
-                st.info("No alert events found matching the selected filters.")
+                if is_unread_only:
+                    st.success("🎉 All caught up! No unread notifications in your inbox.")
+                else:
+                    st.info("No alert events found matching the selected filters.")
             else:
                 for alt in alerts:
                     cat = alt.get("category", "material")
@@ -965,12 +986,13 @@ def render_alert_hub():
                             st.markdown(f"**{unread_ind}{icon} {alt['title']}**")
                             st.caption(f"🕒 {alt['timestamp']} | Source: {alt.get('source', 'BSE Surveillance')} | Tier: `{sev.upper()}`")
                         with h_col2:
-                            btn_c1, btn_c2 = st.columns(2)
+                            btn_c1, btn_c2 = st.columns([1, 1])
                             with btn_c1:
                                 if st.button(
                                     "Dossier",
                                     key=f"dossier_{alt['id']}",
                                     width="stretch",
+                                    type="primary",
                                     help=f"Open full 7-pillar institutional equity research dossier & technical chart for {alt['ticker']}"
                                 ):
                                     rec = get_report_by_ticker(alt["ticker"])
@@ -991,6 +1013,9 @@ def render_alert_hub():
                                         )
                                     else:
                                         execute_stock_research(alt["ticker"])
+                                    st.session_state["scroll_to_dossier"] = True
+                                    st.session_state["collapse_alert_hub"] = True
+                                    st.session_state["toast_message"] = f"📄 Loaded dossier for {alt['ticker']}!"
                                     st.rerun()
                             with btn_c2:
                                 if not is_read:
@@ -998,9 +1023,18 @@ def render_alert_hub():
                                         "Read",
                                         key=f"read_{alt['id']}",
                                         width="stretch",
-                                        help="Mark this alert as acknowledged/read to clear the unread notification badge"
+                                        help="Mark as read (dismisses from Unread Inbox)"
                                     ):
                                         mark_alert_as_read(alt["id"])
+                                        st.rerun()
+                                else:
+                                    if st.button(
+                                        "Dismiss",
+                                        key=f"dism_{alt['id']}",
+                                        width="stretch",
+                                        help="Permanently delete this alert from history"
+                                    ):
+                                        dismiss_alert(alt["id"])
                                         st.rerun()
 
                         if alt.get("details"):
@@ -1055,9 +1089,12 @@ def render_alert_hub():
                                             },
                                             material_reason="👁️ Loaded from Surveillance Watchlist"
                                         )
-                                        st.rerun()
                                     else:
                                         execute_stock_research(w["ticker"])
+                                    st.session_state["scroll_to_dossier"] = True
+                                    st.session_state["collapse_alert_hub"] = True
+                                    st.session_state["toast_message"] = f"📄 Loaded dossier for {w['ticker']}!"
+                                    st.rerun()
                             with btn_w2:
                                 if st.button("Remove", key=f"rm_watch_{w['ticker']}", width="stretch"):
                                     remove_from_watchlist(w["ticker"])
@@ -1065,15 +1102,46 @@ def render_alert_hub():
             else:
                 st.info("Your surveillance watchlist is empty. Add stocks below or directly from any equity research report.")
 
-            # Native Web Push Notifications (Decision 3: C)
+            # Comprehensive Notification & Push Preferences Card (Opt-in & Opt-out)
             with st.container(border=True):
-                wb_c1, wb_c2 = st.columns([3, 1])
-                with wb_c1:
-                    st.markdown("🔔 **Device Push Notifications (Zero-PII)**")
-                    st.caption("Receive background push alerts for corporate filings & price shocks directly on your device, even with the browser tab closed.")
-                with wb_c2:
-                    if st.button("Enable Push", key="btn_enable_web_push", width="stretch"):
-                        st.session_state["web_push_requested"] = True
+                st.markdown("#### 🔔 Notification & Push Preferences")
+
+                is_opted_out = st.session_state.get("notifications_opted_out", False)
+                notif_c1, notif_c2 = st.columns([3, 1])
+                with notif_c1:
+                    if is_opted_out:
+                        st.markdown("🔕 **Surveillance Alerts: OPTED OUT (Muted)**")
+                        st.caption("All event notifications and unread badge alerts are silenced. Market data is still polled.")
+                    else:
+                        st.markdown("🔔 **Surveillance Alerts: ACTIVE (Opted In)**")
+                        st.caption("Receiving event alerts for public BSE corporate filings, fundamental shifts, and valuation shocks.")
+                with notif_c2:
+                    if is_opted_out:
+                        if st.button("🔔 Re-Enable Alerts", key="btn_enable_global_notifs", width="stretch", type="primary"):
+                            st.session_state["notifications_opted_out"] = False
+                            st.toast("Surveillance alerts re-enabled.", icon="🔔")
+                            st.rerun()
+                    else:
+                        if st.button("🔕 Opt Out of Alerts", key="btn_opt_out_global_notifs", width="stretch"):
+                            st.session_state["notifications_opted_out"] = True
+                            st.toast("You have opted out of surveillance alerts.", icon="🔕")
+                            st.rerun()
+
+                st.markdown("---")
+                push_c1, push_c2 = st.columns([3, 2])
+                with push_c1:
+                    st.markdown("📲 **Device Desktop Push Notifications (Zero-PII)**")
+                    st.caption("Receive background OS push alerts for BSE disclosures directly on your device.")
+                with push_c2:
+                    p_btn1, p_btn2 = st.columns(2)
+                    with p_btn1:
+                        if st.button("Enable Push", key="btn_enable_web_push", width="stretch", help="Request browser permission for background OS push notifications"):
+                            st.session_state["web_push_requested"] = True
+                    with p_btn2:
+                        if st.button("Disable Push", key="btn_disable_web_push", width="stretch", help="Opt out and disable device push notifications"):
+                            st.session_state["web_push_disabled"] = True
+                            st.toast("Push notifications disabled.", icon="🔕")
+                            st.rerun()
 
             if st.session_state.get("web_push_requested"):
                 st.session_state["web_push_requested"] = False
@@ -1101,6 +1169,10 @@ def render_alert_hub():
                     """
                 )
                 st.success("✓ Browser notification request triggered. Click 'Allow' in your browser prompt.")
+
+            if st.session_state.get("web_push_disabled"):
+                st.session_state["web_push_disabled"] = False
+                st.info("🔕 Device push notifications have been disabled. You have opted out of browser alerts.")
 
             st.markdown("---")
             st.markdown("#### Add Stock to Surveillance Watchlist")
@@ -1149,6 +1221,9 @@ def render_alert_hub():
             st.markdown("#### On-Demand Regulatory & Exchange Sweep")
             st.caption("Polls official BSE Corporate Disclosures, board meeting intimations, and live exchange quotes for all watchlisted companies.")
 
+            if st.session_state.get("notifications_opted_out", False):
+                st.info("🔕 **Surveillance Alerts Muted:** You are opted out of notifications. Sweeps update live quotes and disclosure archives without generating new alert events.")
+
             try:
                 w_list = get_watchlist()
             except Exception:
@@ -1179,6 +1254,30 @@ def render_alert_hub():
 render_alert_hub()
 
 if ("last_report" in st.session_state and st.session_state["last_report"] is not None) or st.session_state.get("stream_pending"):
+    # Anchor for smooth auto-scrolling
+    st.html('<div id="active-dossier-anchor" style="scroll-margin-top: 30px;"></div>')
+
+    # Handle toast message if requested
+    if st.session_state.get("toast_message"):
+        msg = st.session_state.pop("toast_message")
+        st.toast(msg, icon="📄")
+
+    # Handle smooth auto-scroll to dossier
+    if st.session_state.get("scroll_to_dossier"):
+        st.session_state["scroll_to_dossier"] = False
+        st.html(
+            """
+            <script>
+            setTimeout(function() {
+                var el = document.getElementById("active-dossier-anchor");
+                if (el) {
+                    el.scrollIntoView({behavior: "smooth", block: "start"});
+                }
+            }, 150);
+            </script>
+            """
+        )
+
     fund = st.session_state.get("last_fundamentals", {})
     ticker_disp = st.session_state.get("last_ticker", "STOCK")
     company_name = fund.get("short_name", "").strip()

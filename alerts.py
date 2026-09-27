@@ -229,6 +229,12 @@ def poll_single_stock(item: dict, live_fund: dict = None) -> list:
         announcement=latest_seen_headline if latest_seen_headline else last_ann
     )
 
+    try:
+        if st.session_state.get("notifications_opted_out", False):
+            return []
+    except Exception:
+        pass
+
     return new_alerts
 
 def run_surveillance_scan(progress_callback=None) -> dict:

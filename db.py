@@ -648,7 +648,6 @@ def record_alert_event(ticker: str, category: str, severity: str, title: str, de
         conn.close()
     return new_id
 
-@st.cache_data(ttl="30s")
 def get_alert_events(ticker: str = None, category: str = None, unread_only: bool = False, limit: int = 50) -> list:
     """Retrieves recorded alert events with optional filters."""
     init_db()
@@ -744,7 +743,55 @@ def mark_all_alerts_as_read(ticker: str = None):
         cursor.close()
         conn.close()
 
-@st.cache_data(ttl="30s")
+def dismiss_alert(alert_id: int) -> bool:
+    """Permanently dismisses and deletes an alert event from the database."""
+    init_db()
+    conn = get_db_connection()
+    cursor = conn.cursor()
+    supabase_url = st.secrets.get("SUPABASE_DB_URL") or os.environ.get("SUPABASE_DB_URL")
+    placeholder = "%s" if supabase_url else "?"
+    success = False
+    try:
+        cursor.execute(f"DELETE FROM alert_events WHERE id = {placeholder}", (alert_id,))
+        conn.commit()
+        try:
+            st.cache_data.clear()
+        except Exception:
+            pass
+        success = True
+    except Exception as e:
+        print(f"Error in dismiss_alert: {e}")
+    finally:
+        cursor.close()
+        conn.close()
+    return success
+
+def dismiss_all_alerts(unread_only: bool = False) -> bool:
+    """Permanently dismisses and deletes alerts."""
+    init_db()
+    conn = get_db_connection()
+    cursor = conn.cursor()
+    supabase_url = st.secrets.get("SUPABASE_DB_URL") or os.environ.get("SUPABASE_DB_URL")
+    success = False
+    try:
+        if unread_only:
+            unread_cond = "is_read = FALSE" if supabase_url else "is_read = 0"
+            cursor.execute(f"DELETE FROM alert_events WHERE {unread_cond}")
+        else:
+            cursor.execute("DELETE FROM alert_events")
+        conn.commit()
+        try:
+            st.cache_data.clear()
+        except Exception:
+            pass
+        success = True
+    except Exception as e:
+        print(f"Error in dismiss_all_alerts: {e}")
+    finally:
+        cursor.close()
+        conn.close()
+    return success
+
 def get_unread_alert_count(ticker: str = None) -> int:
     """Returns the total number of unread alerts."""
     init_db()
