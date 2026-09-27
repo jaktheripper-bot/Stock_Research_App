@@ -1,4 +1,22 @@
+import os
+import re
+import sys
+import json
+import time
+import random
+import contextlib
+import requests
+from datetime import datetime, timezone
 import pandas as pd
+import streamlit as st
+from google import genai
+from normalizer import normalize_stock_data
+from db import save_report_to_archive
+from checker import verify_stock_report
+from screener import pass_pre_screening_gates
+from bsedata.bse import BSE
+from bse_master import resolve_bse_scrip_code
+
 def enrich_fundamentals(ticker: str, data: dict) -> dict:
     """Secondary enrichment: uses yfinance strictly to backfill trailing P/E, Market Cap, and Sector."""
     try:
@@ -31,24 +49,6 @@ def enrich_fundamentals(ticker: str, data: dict) -> dict:
     except Exception as e:
         print(f"Background fundamental enrichment notice: {e}")
     return data
-
-import os
-import re
-import sys
-import json
-import time
-import random
-import contextlib
-import requests
-from datetime import datetime, timezone
-import streamlit as st
-from google import genai
-from normalizer import normalize_stock_data
-from db import save_report_to_archive
-from checker import verify_stock_report
-from screener import pass_pre_screening_gates
-from bsedata.bse import BSE
-from bse_master import resolve_bse_scrip_code
 
 def extract_health_matrix(report_text: str) -> dict:
     """
@@ -97,6 +97,134 @@ def remove_health_matrix_text(text: str) -> str:
         text
     )
     return cleaned.strip()
+
+def strip_conclusion_sections(text: str) -> str:
+    """
+    Strips conclusion, monitorables, recommendations, and actionable guidance sections
+    for strict SEBI Safe Harbor compliance.
+    """
+    if not text or not isinstance(text, str):
+        return ""
+    conclusion_pattern = r'(?im)^\s*#*\s*(?:\d+[\.:\)]\s*)?(?:Conclusion|Key Monitorables|Actionable Guidance|Diagnostic Synthesis|Recommendation|Target Price|Investment Summary\b|Outlook & Recommendation|Strategic Portfolio Roadmap|निष्कर्ष|कार्रवाई योग्य मार्गदर्शन)'
+    parts = re.split(conclusion_pattern, text)
+    cleaned = parts[0] if len(parts) > 1 else text
+    cleaned = re.sub(r'(?im)^\s*(?:#+|\*\*|__)?\s*VERDICT\s*:\s*(?:BUY|HOLD|SELL|AVOID)\b[^\n]*\n*', '', cleaned)
+    cleaned = re.sub(r'(?im)^[ \t]*[-*•]\s*(?:Verdict|Rating|Recommendation)\s*:\s*(?:BUY|HOLD|SELL|AVOID)\b[^\n]*\n*', '', cleaned)
+    cleaned = re.sub(r'\n*---\s*$', '', cleaned.rstrip())
+    return cleaned.strip()
+
+
+def compare_revisions(rev_a: dict, rev_b: dict) -> dict:
+    """
+    Standalone differential engine: compares two discrete report states (State A vs State B).
+    State A is the older revision, State B is the newer revision.
+    Returns a structured diff dict with pillar migrations, metric deltas,
+    value trap detection, and trigger provenance — all purely descriptive diagnostics.
+
+    Designed to be decoupled: accepts any two revision dicts, enabling
+    "Current vs Previous", "Current vs 1 Year Ago", or "Current vs Pre-COVID" comparisons.
+    """
+    matrix_a = extract_health_matrix(rev_a.get("report_text", ""))
+    matrix_b = extract_health_matrix(rev_b.get("report_text", ""))
+
+    # Pillar quality rankings: index 0 = strongest, higher index = weaker
+    PILLAR_RANKS = {
+        "Macro": ["Stable", "Neutral", "Headwinds"],
+        "Moat": ["Wide", "Moderate", "Narrow"],
+        "Governance": ["Clean", "Caution", "High Risk"],
+        "Diagnostic": ["Temporary", "Neutral", "Structural", "N/A"],
+        "Valuation": ["Undervalued", "Fair", "Stretched", "Loss-Making"],
+        "BalanceSheet": ["Debt-Free", "Resilient", "Moderate Debt", "High Debt"],
+        "CapitalAllocation": ["Disciplined", "Moderate", "Strained"],
+    }
+
+    PILLAR_LABELS = {
+        "Macro": "Macro Environment",
+        "Moat": "Competitive Moat",
+        "Governance": "Governance & Promoters",
+        "Diagnostic": "Drop Diagnostic",
+        "Valuation": "Valuation Multiple",
+        "BalanceSheet": "Balance Sheet Leverage",
+        "CapitalAllocation": "Capital Allocation",
+    }
+
+    pillar_migrations = []
+    downgrade_count = 0
+    upgrade_count = 0
+
+    for pillar, ranks in PILLAR_RANKS.items():
+        val_a = matrix_a.get(pillar, "N/A")
+        val_b = matrix_b.get(pillar, "N/A")
+        if val_a == val_b:
+            continue
+
+        rank_a = ranks.index(val_a) if val_a in ranks else -1
+        rank_b = ranks.index(val_b) if val_b in ranks else -1
+
+        if rank_a == -1 or rank_b == -1:
+            direction = "changed"
+        elif rank_b > rank_a:
+            direction = "downgrade"
+            downgrade_count += 1
+        else:
+            direction = "upgrade"
+            upgrade_count += 1
+
+        pillar_migrations.append({
+            "pillar": pillar,
+            "label": PILLAR_LABELS.get(pillar, pillar),
+            "from": val_a,
+            "to": val_b,
+            "direction": direction,
+        })
+
+    # Quantitative metric deltas
+    metric_deltas = {}
+    for key, label in [("baseline_price", "Price (₹)"), ("baseline_pe", "Trailing P/E"), ("baseline_mcap", "Market Cap")]:
+        raw_a = rev_a.get(key)
+        raw_b = rev_b.get(key)
+        try:
+            num_a = float(str(raw_a).replace(",", "").replace("N/A", "0").replace("Loss-Making", "0").strip() or "0")
+            num_b = float(str(raw_b).replace(",", "").replace("N/A", "0").replace("Loss-Making", "0").strip() or "0")
+        except (ValueError, TypeError):
+            num_a, num_b = 0.0, 0.0
+
+        pct_change = ((num_b - num_a) / num_a * 100.0) if num_a > 0 else 0.0
+        metric_deltas[key] = {
+            "label": label,
+            "state_a": raw_a,
+            "state_b": raw_b,
+            "num_a": num_a,
+            "num_b": num_b,
+            "pct_change": round(pct_change, 1),
+        }
+
+    # Value Trap Detection: qualitative downgrade + valuation expansion (price or P/E rise)
+    price_delta = metric_deltas.get("baseline_price", {}).get("pct_change", 0.0)
+    pe_delta = metric_deltas.get("baseline_pe", {}).get("pct_change", 0.0)
+    value_trap_detected = downgrade_count > 0 and (price_delta > 5.0 or pe_delta > 10.0)
+
+    # Trigger provenance
+    trigger_b = rev_b.get("revision_trigger", "Unknown")
+
+    return {
+        "state_a_date": rev_a.get("formatted_date", "Unknown"),
+        "state_b_date": rev_b.get("formatted_date", "Unknown"),
+        "pillar_migrations": pillar_migrations,
+        "migration_count": len(pillar_migrations),
+        "upgrades": upgrade_count,
+        "downgrades": downgrade_count,
+        "metric_deltas": metric_deltas,
+        "value_trap_detected": value_trap_detected,
+        "value_trap_detail": (
+            f"{downgrade_count} qualitative downgrade(s) alongside "
+            f"{'+' if price_delta > 0 else ''}{price_delta:.1f}% price shift"
+        ) if value_trap_detected else "",
+        "revision_trigger": trigger_b,
+        "matrix_a": matrix_a,
+        "matrix_b": matrix_b,
+    }
+
 
 class PipelineError(Exception):
     def __init__(self, stage: str, message: str, technical_details: str = ""):
@@ -165,8 +293,14 @@ def fetch_latest_bse_announcement(scrip_code: str) -> str:
     if not scrip_code or not str(scrip_code).isdigit():
         return ""
     try:
-        url = f"https://api.bseindia.com/BseIndiaAPI/api/AnnSubCategoryGetData/w?pageno=1&strCat=-1&strPrevDate=&strScrip={scrip_code}&strSearch=P&strToDate=&strType=C"
-        headers = {"User-Agent": "Mozilla/5.0", "Referer": "https://www.bseindia.com/"}
+        now_dt = datetime.now()
+        str_to_date = now_dt.strftime("%Y%m%d")
+        str_prev_date = (now_dt - timedelta(days=60)).strftime("%Y%m%d")
+        url = f"https://api.bseindia.com/BseIndiaAPI/api/AnnSubCategoryGetData/w?pageno=1&strCat=-1&strPrevDate={str_prev_date}&strScrip={scrip_code}&strSearch=P&strToDate={str_to_date}&strType=C"
+        headers = {
+            "User-Agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
+            "Referer": "https://www.bseindia.com/"
+        }
         res = requests.get(url, headers=headers, timeout=5)
         if res.status_code == 200:
             table = res.json().get("Table", [])
@@ -295,8 +429,8 @@ def get_stock_fundamentals(query: str) -> dict:
                     "52w_high": getattr(fast, "year_high", None) or info.get("fiftyTwoWeekHigh") or "N/A",
                     "52w_low": getattr(fast, "year_low", None) or info.get("fiftyTwoWeekLow") or "N/A",
                     "description": info.get("longBusinessSummary") or f"Exchange data synthesized for {clean}.",
-                    "exchange_status": "Active / Verified (NSE/BSE Fallback)",
-                    "is_fallback": False
+                    "exchange_status": "Active / Secondary (yfinance Fallback)",
+                    "is_fallback": True
                 }
     except Exception as yf_err:
         print(f"[WARN] yfinance fallback also failed for {query}: {yf_err}")
@@ -341,12 +475,8 @@ Tabulate the ESG analysis strictly using the following Markdown table format:
 | **Social** | [Score] | [Labor, community impact] |
 | **Governance** | [Score] | [Board independence, transparency] |
 
----
-## Conclusion & Key Monitorables
-1. **Diagnostic Synthesis:** Synthesize algorithmic business model resilience, balance sheet leverage, capital allocation efficiency, and critical operational risks.
-2. **Key Fundamental Monitorables:** Enumerate 3 to 4 specific operating metrics, balance sheet covenants, or regulatory disclosures that an independent investor should independently track in subsequent filings.
 
-CRITICAL COMPLIANCE DIRECTIVE: Strictly avoid providing any Buy/Sell/Hold verdicts, investment recommendations, portfolio allocation advice, target prices, trade execution signals, or portfolio roadmaps. The analysis must remain purely descriptive, factual, and diagnostic."""
+CRITICAL COMPLIANCE DIRECTIVE: Strictly avoid providing any conclusions, forward-looking advice, actionable investment guidance, Buy/Sell/Hold verdicts, investment recommendations, portfolio allocation advice, target prices, trade execution signals, or portfolio roadmaps. The research report concludes strictly after Pillar 7. All analysis must remain purely descriptive, factual, and diagnostic under SEBI Safe Harbor principles."""
 
 _DISCOVERED_MODELS_CACHE = {"models": [], "timestamp": 0}
 
@@ -430,13 +560,25 @@ def stream_perplexity_fallback(prompt: str, system_prompt: str):
     if not api_key:
         raise ValueError("PERPLEXITY_API_KEY missing from secrets/environment.")
 
-    url = "https://api.perplexity.ai/v1/responses"
-    headers = {"Authorization": f"Bearer {api_key}", "Content-Type": "application/json", "Accept": "text/event-stream"}
-    payload = {"preset": "low", "input": prompt, "instructions": system_prompt, "stream": True}
+    url = "https://api.perplexity.ai/chat/completions"
+    headers = {
+        "Authorization": f"Bearer {api_key}",
+        "Content-Type": "application/json",
+        "Accept": "text/event-stream"
+    }
+    payload = {
+        "model": "sonar-pro",
+        "messages": [
+            {"role": "system", "content": system_prompt},
+            {"role": "user", "content": prompt}
+        ],
+        "stream": True,
+        "temperature": 0.2
+    }
 
-    res = requests.post(url, headers=headers, json=payload, stream=True, timeout=20)
+    res = requests.post(url, headers=headers, json=payload, stream=True, timeout=30)
     if res.status_code != 200:
-        raise RuntimeError(f"Perplexity Agent API HTTP {res.status_code}: {res.text}")
+        raise RuntimeError(f"Perplexity sonar-pro API HTTP {res.status_code}: {res.text}")
 
     for raw_line in res.iter_lines(decode_unicode=False):
         if not raw_line:
@@ -448,9 +590,17 @@ def stream_perplexity_fallback(prompt: str, system_prompt: str):
                 break
             try:
                 event = json.loads(data_str)
-                delta = event.get("delta") or (event.get("type") == "response.output_text.delta" and event.get("delta"))
-                if delta:
-                    yield delta
+                choices = event.get("choices", [])
+                if choices:
+                    delta = choices[0].get("delta", {})
+                    content = delta.get("content", "") if isinstance(delta, dict) else str(delta)
+                    if content:
+                        yield content
+                elif "delta" in event:
+                    delta_val = event.get("delta")
+                    text = delta_val.get("content", "") if isinstance(delta_val, dict) else str(delta_val)
+                    if text:
+                        yield text
             except Exception:
                 continue
 
@@ -465,7 +615,7 @@ def stream_gemini_ungrounded_bypass(client, prompt: str, system_prompt: str):
         if t:
             yield t
 
-def stream_stock_report(ticker: str, language: str = "English (India)", stock_data: dict = None, on_status=None):
+def stream_stock_report(ticker: str, language: str = "English (India)", stock_data: dict = None, on_status=None, revision_trigger: str = ""):
     if stock_data is None:
         stock_data = get_stock_fundamentals(ticker)
 
@@ -486,10 +636,12 @@ def stream_stock_report(ticker: str, language: str = "English (India)", stock_da
             report_accumulator.append(chunk)
             yield chunk
     except Exception:
-        notice_p = "\n\n> ⚠️ **Gemini Grounding Unavailable. Rerouting to Perplexity Agent API...**\n\n"
+        notice_p = "\n\n> ⚠️ **Gemini Grounding Unavailable. Rerouting to Perplexity sonar-pro...**\n\n"
         report_accumulator.append(notice_p)
         yield notice_p
         try:
+            if on_status:
+                on_status("🔄 Failover: Querying Perplexity sonar-pro with search grounding...")
             for chunk in stream_perplexity_fallback(user_prompt, system_prompt):
                 report_accumulator.append(chunk)
                 yield chunk
@@ -514,7 +666,8 @@ def stream_stock_report(ticker: str, language: str = "English (India)", stock_da
     try:
         passed, disc = verify_stock_report(stock_data, complete_text)
         if not passed:
-            note = f"\n\n> ⚠️ **Verification Audit Note:** {disc}"
+            formatted_disc = "; ".join(disc) if isinstance(disc, list) else str(disc)
+            note = f"\n\n> ⚠️ **Verification Audit Note:** {formatted_disc}"
             complete_text += note
             yield note
     except Exception:
@@ -523,7 +676,7 @@ def stream_stock_report(ticker: str, language: str = "English (India)", stock_da
     try:
         scrip = stock_data.get("scrip_code", "")
         ann = fetch_latest_bse_announcement(scrip)
-        save_report_to_archive(stock_data, complete_text, announcement=ann)
+        save_report_to_archive(stock_data, complete_text, announcement=ann, revision_trigger=revision_trigger)
     except Exception:
         pass
 
@@ -534,57 +687,7 @@ def generate_stock_report(ticker: str, language: str = "English (India)") -> str
     return "".join(chunks)
 
 
-def get_stock_price_history(query: str, period: str = "6mo") -> pd.DataFrame:
-    """
-    Fetches historical OHLCV data using yfinance for 6-month price and volume momentum.
-    Prioritizes {clean}.NS (NSE) for liquidity, then {clean}.BO and {scrip}.BO.
-    Includes explicit error logging on candidate failures.
-    """
-    import yfinance as yf
-    import pandas as pd
 
-    try:
-        clean = query.strip().upper().replace(".NS", "").replace(".BO", "")
-        scrip = None
-        try:
-            from bse_master import resolve_bse_scrip_code
-            scrip = resolve_bse_scrip_code(query)
-        except Exception:
-            pass
-
-        candidates = [f"{clean}.NS", f"{clean}.BO"]
-        if scrip:
-            candidates.append(f"{scrip}.BO")
-
-        df = None
-        for sym in candidates:
-            try:
-                t = yf.Ticker(sym)
-                h = t.history(period=period)
-                if h is not None and not h.empty and len(h) >= 5:
-                    df = h
-                    break
-                else:
-                    print(f"[DEBUG] {sym} returned empty history.")
-            except Exception as e:
-                print(f"[DEBUG] Failed fetching {sym}: {type(e).__name__} - {e}")
-                continue
-
-        if df is None or df.empty:
-            return pd.DataFrame()
-
-        df = df.reset_index()
-        if "Date" in df.columns:
-            df["Date"] = pd.to_datetime(df["Date"].dt.date)
-
-        if "Close" in df.columns:
-            df["SMA50"] = df["Close"].rolling(window=50, min_periods=5).mean()
-
-        required_cols = [c for c in ["Date", "Close", "SMA50", "Volume"] if c in df.columns]
-        return df[required_cols]
-    except Exception as e:
-        print(f"Warning: Failed to fetch price history for {query}: {e}")
-        return pd.DataFrame()
 
 def get_historical_prices(ticker: str, period: str = "6mo"):
     """

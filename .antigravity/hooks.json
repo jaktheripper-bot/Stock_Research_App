@@ -1,0 +1,18 @@
+{
+  "agent_directives": [
+    {
+      "trigger": "file_edit",
+      "target_files": ["analyzer.py", "bse_master.py"],
+      "enforcement_rule": "ZERO_HALLUCINATION_STRICT",
+      "instruction": "Never write fallback logic that synthesizes or estimates numerical financial metrics (P/E, Market Cap, Price). If a direct BSE or verified API fetch fails, the function must return 'N/A' or raise a clean exception rather than fabricating data. Ensure compliance with ARCHITECTURE.md.",
+      "action": "block_and_warn_if_violated"
+    },
+    {
+      "trigger": "text_generation",
+      "target_files": ["app.py", "analyzer.py"],
+      "enforcement_rule": "SEBI_SAFE_HARBOR",
+      "instruction": "Do not implement UI badges or LLM prompts that result in 'BUY', 'SELL', or 'HOLD' labels. Restrict all qualitative ratings to descriptive classifications (e.g., 'Watchlist', 'Clean', 'Wide'). Ensure compliance with COMPLIANCE.md.",
+      "action": "block_and_warn_if_violated"
+    }
+  ]
+}

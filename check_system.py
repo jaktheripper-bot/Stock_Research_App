@@ -2,7 +2,9 @@ import os
 import sys
 import time
 import logging
-from datetime import datetime, timezone
+from datetime import datetime, timezone, timedelta
+
+IST = timezone(timedelta(hours=5, minutes=30))
 
 # Suppress bare-mode Streamlit log noise
 os.environ["STREAMLIT_LOG_LEVEL"] = "error"
@@ -11,7 +13,7 @@ logging.getLogger("streamlit").setLevel(logging.ERROR)
 def run_suite():
     issues = []
     print("\n=======================================================")
-    print(f"   SYSTEM INTEGRITY & CONTRACT AUDIT - {datetime.now(timezone.utc).strftime('%Y-%m-%d %H:%M:%S UTC')}")
+    print(f"   SYSTEM INTEGRITY & CONTRACT AUDIT - {datetime.now(IST).strftime('%Y-%m-%d %H:%M:%S IST')}")
     print("=======================================================")
 
     # 1. Environment & Exact Version Integrity
@@ -170,7 +172,7 @@ def run_suite():
         print(f"   ❌ Headless UI test failed: {e}")
 
     # 7. Project Health Ledger Update (PROJECT_STATUS.md)
-    timestamp_str = datetime.now(timezone.utc).strftime('%Y-%m-%d %H:%M:%S UTC')
+    timestamp_str = datetime.now(IST).strftime('%Y-%m-%d %H:%M:%S IST')
     status_summary = "ALL SYSTEMS OPERATIONAL" if not issues else f"{len(issues)} ISSUE(S) DETECTED"
     
     ledger_content = f"""# Project Health Ledger

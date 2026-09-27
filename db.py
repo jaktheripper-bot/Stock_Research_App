@@ -1,6 +1,10 @@
 import os
-from datetime import datetime
+from datetime import datetime, timezone, timedelta
 import streamlit as st
+
+IST = timezone(timedelta(hours=5, minutes=30))
+
+_DB_INITIALIZED = False
 
 def get_db_connection():
     supabase_url = st.secrets.get("SUPABASE_DB_URL") or os.environ.get("SUPABASE_DB_URL")
@@ -9,63 +13,175 @@ def get_db_connection():
         return psycopg2.connect(supabase_url)
     
     import sqlite3
-    return sqlite3.connect("reports.db")
+    conn = sqlite3.connect("reports.db", timeout=30.0, check_same_thread=False)
+    try:
+        conn.execute("PRAGMA journal_mode=WAL;")
+        conn.execute("PRAGMA busy_timeout=30000;")
+    except Exception:
+        pass
+    return conn
 
-def init_db():
+def init_db(force: bool = False):
+    global _DB_INITIALIZED
+    if _DB_INITIALIZED and not force:
+        return
+
     conn = get_db_connection()
     cursor = conn.cursor()
     supabase_url = st.secrets.get("SUPABASE_DB_URL") or os.environ.get("SUPABASE_DB_URL")
     
-    if supabase_url:
-        cursor.execute('''
-            CREATE TABLE IF NOT EXISTS reports (
-                ticker TEXT PRIMARY KEY,
-                short_name TEXT,
-                report_text TEXT,
-                timestamp TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
-                baseline_price NUMERIC,
-                baseline_pe TEXT,
-                baseline_mcap NUMERIC,
-                latest_announcement TEXT
-            )
-        ''')
-        # Add columns if migrating an existing table
-        for col, col_type in [("baseline_price", "NUMERIC"), ("baseline_pe", "TEXT"), ("baseline_mcap", "NUMERIC"), ("latest_announcement", "TEXT")]:
-            cursor.execute(f"ALTER TABLE reports ADD COLUMN IF NOT EXISTS {col} {col_type};")
-    else:
-        cursor.execute('''
-            CREATE TABLE IF NOT EXISTS reports (
-                ticker TEXT PRIMARY KEY,
-                short_name TEXT,
-                report_text TEXT,
-                timestamp DATETIME DEFAULT CURRENT_TIMESTAMP,
-                baseline_price REAL,
-                baseline_pe TEXT,
-                baseline_mcap REAL,
-                latest_announcement TEXT
-            )
-        ''')
-        # SQLite migration
-        cursor.execute("PRAGMA table_info(reports);")
-        existing_cols = [c[1] for c in cursor.fetchall()]
-        for col, col_type in [("baseline_price", "REAL"), ("baseline_pe", "TEXT"), ("baseline_mcap", "REAL"), ("latest_announcement", "TEXT")]:
-            if col not in existing_cols:
-                try:
-                    cursor.execute(f"ALTER TABLE reports ADD COLUMN {col} {col_type};")
-                except Exception:
-                    pass
+    try:
+        if supabase_url:
+            cursor.execute('''
+                CREATE TABLE IF NOT EXISTS reports (
+                    ticker TEXT PRIMARY KEY,
+                    short_name TEXT,
+                    report_text TEXT,
+                    timestamp TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
+                    baseline_price NUMERIC,
+                    baseline_pe TEXT,
+                    baseline_mcap NUMERIC,
+                    latest_announcement TEXT
+                );
+            ''')
+            # Add columns if migrating an existing table
+            for col, col_type in [("baseline_price", "NUMERIC"), ("baseline_pe", "TEXT"), ("baseline_mcap", "NUMERIC"), ("latest_announcement", "TEXT")]:
+                cursor.execute(f"ALTER TABLE reports ADD COLUMN IF NOT EXISTS {col} {col_type};")
 
-    conn.commit()
-    cursor.close()
-    conn.close()
+            # Differential Engine: Append-Only revisions table
+            cursor.execute('''
+                CREATE TABLE IF NOT EXISTS report_revisions (
+                    id SERIAL PRIMARY KEY,
+                    ticker TEXT NOT NULL,
+                    short_name TEXT,
+                    report_text TEXT NOT NULL,
+                    timestamp TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
+                    baseline_price NUMERIC,
+                    baseline_pe TEXT,
+                    baseline_mcap NUMERIC,
+                    latest_announcement TEXT,
+                    revision_trigger TEXT
+                );
+            ''')
+            # Granular Alerting Engine: Watchlist & Alert Events tables
+            cursor.execute('''
+                CREATE TABLE IF NOT EXISTS watchlist (
+                    id SERIAL PRIMARY KEY,
+                    ticker TEXT UNIQUE NOT NULL,
+                    short_name TEXT,
+                    scrip_code TEXT,
+                    added_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
+                    alert_material BOOLEAN DEFAULT TRUE,
+                    alert_fundamental BOOLEAN DEFAULT TRUE,
+                    alert_valuation BOOLEAN DEFAULT TRUE,
+                    digest_mode TEXT DEFAULT 'instant',
+                    last_scanned_price NUMERIC,
+                    last_scanned_announcement TEXT,
+                    last_scanned_at TIMESTAMPTZ
+                );
+            ''')
+            cursor.execute('''
+                CREATE TABLE IF NOT EXISTS alert_events (
+                    id SERIAL PRIMARY KEY,
+                    ticker TEXT NOT NULL,
+                    category TEXT NOT NULL,
+                    severity TEXT DEFAULT 'medium',
+                    title TEXT NOT NULL,
+                    details TEXT,
+                    timestamp TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
+                    is_read BOOLEAN DEFAULT FALSE,
+                    source TEXT DEFAULT 'BSE Polling Engine'
+                );
+            ''')
+            cursor.execute('CREATE INDEX IF NOT EXISTS idx_alert_events_ticker ON alert_events (ticker, timestamp DESC);')
+            cursor.execute('CREATE INDEX IF NOT EXISTS idx_alert_events_unread ON alert_events (is_read, timestamp DESC);')
+        else:
+            cursor.execute('''
+                CREATE TABLE IF NOT EXISTS reports (
+                    ticker TEXT PRIMARY KEY,
+                    short_name TEXT,
+                    report_text TEXT,
+                    timestamp DATETIME DEFAULT CURRENT_TIMESTAMP,
+                    baseline_price REAL,
+                    baseline_pe TEXT,
+                    baseline_mcap REAL,
+                    latest_announcement TEXT
+                );
+            ''')
+            # SQLite migration for reports table
+            cursor.execute("PRAGMA table_info(reports);")
+            existing_cols = [c[1] for c in cursor.fetchall()]
+            for col, col_type in [("baseline_price", "REAL"), ("baseline_pe", "TEXT"), ("baseline_mcap", "REAL"), ("latest_announcement", "TEXT")]:
+                if col not in existing_cols:
+                    try:
+                        cursor.execute(f"ALTER TABLE reports ADD COLUMN {col} {col_type};")
+                    except Exception:
+                        pass
 
-def save_report_to_archive(stock_data: dict, report_text: str, announcement: str = ""):
+            # Differential Engine: Append-Only revisions table in SQLite
+            cursor.execute('''
+                CREATE TABLE IF NOT EXISTS report_revisions (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    ticker TEXT NOT NULL,
+                    short_name TEXT,
+                    report_text TEXT NOT NULL,
+                    timestamp DATETIME DEFAULT CURRENT_TIMESTAMP,
+                    baseline_price REAL,
+                    baseline_pe TEXT,
+                    baseline_mcap REAL,
+                    latest_announcement TEXT,
+                    revision_trigger TEXT
+                );
+            ''')
+            # Granular Alerting Engine: Watchlist & Alert Events tables in SQLite
+            cursor.execute('''
+                CREATE TABLE IF NOT EXISTS watchlist (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    ticker TEXT UNIQUE NOT NULL,
+                    short_name TEXT,
+                    scrip_code TEXT,
+                    added_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+                    alert_material INTEGER DEFAULT 1,
+                    alert_fundamental INTEGER DEFAULT 1,
+                    alert_valuation INTEGER DEFAULT 1,
+                    digest_mode TEXT DEFAULT 'instant',
+                    last_scanned_price REAL,
+                    last_scanned_announcement TEXT,
+                    last_scanned_at DATETIME
+                );
+            ''')
+            cursor.execute('''
+                CREATE TABLE IF NOT EXISTS alert_events (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    ticker TEXT NOT NULL,
+                    category TEXT NOT NULL,
+                    severity TEXT DEFAULT 'medium',
+                    title TEXT NOT NULL,
+                    details TEXT,
+                    timestamp DATETIME DEFAULT CURRENT_TIMESTAMP,
+                    is_read INTEGER DEFAULT 0,
+                    source TEXT DEFAULT 'BSE Polling Engine'
+                );
+            ''')
+            cursor.execute('CREATE INDEX IF NOT EXISTS idx_alert_events_ticker ON alert_events (ticker, timestamp DESC);')
+            cursor.execute('CREATE INDEX IF NOT EXISTS idx_alert_events_unread ON alert_events (is_read, timestamp DESC);')
+
+        conn.commit()
+        _DB_INITIALIZED = True
+    finally:
+        cursor.close()
+        conn.close()
+
+def save_report_to_archive(stock_data: dict, report_text: str, announcement: str = "", revision_trigger: str = ""):
     init_db()
     conn = get_db_connection()
     cursor = conn.cursor()
     supabase_url = st.secrets.get("SUPABASE_DB_URL") or os.environ.get("SUPABASE_DB_URL")
     placeholder = "%s" if supabase_url else "?"
     
+    clean_ticker = str(stock_data.get("ticker", "")).strip().upper().replace(".NS", "").replace(".BO", "")
+    short_name = stock_data.get("short_name") or clean_ticker
+
     curr_price = stock_data.get("current_price") or stock_data.get("currentValue") or 0.0
     try:
         curr_price = float(str(curr_price).replace(",", "").strip())
@@ -80,42 +196,70 @@ def save_report_to_archive(stock_data: dict, report_text: str, announcement: str
 
     pe = str(stock_data.get("pe_ratio", "N/A"))
 
-    query = f'''
-        INSERT INTO reports (ticker, short_name, report_text, baseline_price, baseline_pe, baseline_mcap, latest_announcement)
-        VALUES ({placeholder}, {placeholder}, {placeholder}, {placeholder}, {placeholder}, {placeholder}, {placeholder})
-        ON CONFLICT (ticker) 
-        DO UPDATE SET 
-            short_name = EXCLUDED.short_name,
-            report_text = EXCLUDED.report_text,
-            timestamp = CURRENT_TIMESTAMP,
-            baseline_price = EXCLUDED.baseline_price,
-            baseline_pe = EXCLUDED.baseline_pe,
-            baseline_mcap = EXCLUDED.baseline_mcap,
-            latest_announcement = EXCLUDED.latest_announcement
-    '''
-    cursor.execute(query, (
-        stock_data.get("ticker"), 
-        stock_data.get("short_name"), 
-        report_text,
-        curr_price,
-        pe,
-        mcap,
-        announcement
-    ))
-    conn.commit()
-    cursor.close()
-    conn.close()
+    try:
+        # 1. Update/Upsert the current snapshot in 'reports'
+        query_snapshot = f'''
+            INSERT INTO reports (ticker, short_name, report_text, baseline_price, baseline_pe, baseline_mcap, latest_announcement)
+            VALUES ({placeholder}, {placeholder}, {placeholder}, {placeholder}, {placeholder}, {placeholder}, {placeholder})
+            ON CONFLICT (ticker) 
+            DO UPDATE SET 
+                short_name = EXCLUDED.short_name,
+                report_text = EXCLUDED.report_text,
+                timestamp = CURRENT_TIMESTAMP,
+                baseline_price = EXCLUDED.baseline_price,
+                baseline_pe = EXCLUDED.baseline_pe,
+                baseline_mcap = EXCLUDED.baseline_mcap,
+                latest_announcement = EXCLUDED.latest_announcement
+        '''
+        cursor.execute(query_snapshot, (
+            clean_ticker, 
+            short_name, 
+            report_text,
+            curr_price,
+            pe,
+            mcap,
+            announcement
+        ))
+
+        # 2. Append-Only Historical Archiving for Differential Tracking Engine
+        query_revision = f'''
+            INSERT INTO report_revisions (ticker, short_name, report_text, baseline_price, baseline_pe, baseline_mcap, latest_announcement, revision_trigger)
+            VALUES ({placeholder}, {placeholder}, {placeholder}, {placeholder}, {placeholder}, {placeholder}, {placeholder}, {placeholder})
+        '''
+        cursor.execute(query_revision, (
+            clean_ticker,
+            short_name,
+            report_text,
+            curr_price,
+            pe,
+            mcap,
+            announcement,
+            revision_trigger or "Material Update"
+        ))
+
+        conn.commit()
+    finally:
+        cursor.close()
+        conn.close()
 
 def _format_timestamp(raw_ts) -> str:
     if not raw_ts:
         return "Unknown Date"
-    if isinstance(raw_ts, datetime):
-        return raw_ts.strftime("%d-%b-%Y %H:%M")
     try:
-        parsed = datetime.fromisoformat(str(raw_ts).replace("Z", "+00:00").split("+")[0])
-        return parsed.strftime("%d-%b-%Y %H:%M")
+        if isinstance(raw_ts, datetime):
+            dt = raw_ts
+        else:
+            s = str(raw_ts).strip()
+            if s.endswith("Z"):
+                s = s[:-1] + "+00:00"
+            dt = datetime.fromisoformat(s)
+
+        if dt.tzinfo is None:
+            # Default database timestamps without explicit tz to UTC
+            dt = dt.replace(tzinfo=timezone.utc)
+        return dt.astimezone(IST).strftime("%d-%b-%Y %H:%M IST")
     except Exception:
-        return str(raw_ts)[:16]
+        return f"{str(raw_ts)[:16]} IST"
 
 def get_archived_reports() -> list:
     init_db()
@@ -124,9 +268,10 @@ def get_archived_reports() -> list:
     results = []
     try:
         cursor.execute('''
-            SELECT ticker, short_name, report_text, timestamp, baseline_price, baseline_pe, baseline_mcap, latest_announcement
-            FROM reports 
-            ORDER BY timestamp DESC
+            SELECT r.ticker, r.short_name, r.report_text, r.timestamp, r.baseline_price, r.baseline_pe, r.baseline_mcap, r.latest_announcement,
+                   (SELECT COUNT(*) FROM report_revisions rev WHERE rev.ticker = r.ticker) AS rev_count
+            FROM reports r 
+            ORDER BY r.timestamp DESC
         ''')
         rows = cursor.fetchall()
         for row in rows:
@@ -139,7 +284,8 @@ def get_archived_reports() -> list:
                 "baseline_price": row[4],
                 "baseline_pe": row[5],
                 "baseline_mcap": row[6],
-                "latest_announcement": row[7] or ""
+                "latest_announcement": row[7] or "",
+                "revision_count": int(row[8]) if len(row) > 8 and row[8] is not None else 0
             })
     except Exception as e:
         print(f"Database query error in get_archived_reports: {e}")
@@ -182,3 +328,418 @@ def get_report_by_ticker(ticker: str) -> dict:
         cursor.close()
         conn.close()
     return record
+
+def get_report_revisions(ticker: str) -> list:
+    """Retrieves immutable revision history for a stock to power the differential engine."""
+    init_db()
+    conn = get_db_connection()
+    cursor = conn.cursor()
+    clean = ticker.strip().upper().replace(".NS", "").replace(".BO", "")
+    supabase_url = st.secrets.get("SUPABASE_DB_URL") or os.environ.get("SUPABASE_DB_URL")
+    placeholder = "%s" if supabase_url else "?"
+    revisions = []
+    try:
+        cursor.execute(f'''
+            SELECT id, ticker, short_name, report_text, timestamp, baseline_price, baseline_pe, baseline_mcap, latest_announcement, revision_trigger
+            FROM report_revisions
+            WHERE ticker = {placeholder}
+            ORDER BY timestamp DESC
+        ''', (clean,))
+        rows = cursor.fetchall()
+        for row in rows:
+            revisions.append({
+                "id": row[0],
+                "ticker": row[1],
+                "short_name": row[2] or row[1],
+                "report_text": row[3],
+                "raw_timestamp": row[4],
+                "formatted_date": _format_timestamp(row[4]),
+                "baseline_price": row[5],
+                "baseline_pe": row[6],
+                "baseline_mcap": row[7],
+                "latest_announcement": row[8] or "",
+                "revision_trigger": row[9] or "Initial Baseline"
+            })
+
+        # Self-healing: Seed initial baseline revision if reports table has a snapshot but revisions table is empty
+        if not revisions:
+            cursor.execute(f'''
+                SELECT ticker, short_name, report_text, timestamp, baseline_price, baseline_pe, baseline_mcap, latest_announcement
+                FROM reports
+                WHERE ticker = {placeholder}
+            ''', (clean,))
+            rep_row = cursor.fetchone()
+            if rep_row:
+                cursor.execute(f'''
+                    INSERT INTO report_revisions (ticker, short_name, report_text, timestamp, baseline_price, baseline_pe, baseline_mcap, latest_announcement, revision_trigger)
+                    VALUES ({placeholder}, {placeholder}, {placeholder}, {placeholder}, {placeholder}, {placeholder}, {placeholder}, {placeholder}, {placeholder})
+                ''', (
+                    rep_row[0], rep_row[1], rep_row[2], rep_row[3],
+                    rep_row[4], rep_row[5], rep_row[6], rep_row[7],
+                    "Archived Baseline"
+                ))
+                conn.commit()
+                cursor.execute(f'''
+                    SELECT id, ticker, short_name, report_text, timestamp, baseline_price, baseline_pe, baseline_mcap, latest_announcement, revision_trigger
+                    FROM report_revisions
+                    WHERE ticker = {placeholder}
+                    ORDER BY timestamp DESC
+                ''', (clean,))
+                for s_row in cursor.fetchall():
+                    revisions.append({
+                        "id": s_row[0],
+                        "ticker": s_row[1],
+                        "short_name": s_row[2] or s_row[1],
+                        "report_text": s_row[3],
+                        "raw_timestamp": s_row[4],
+                        "formatted_date": _format_timestamp(s_row[4]),
+                        "baseline_price": s_row[5],
+                        "baseline_pe": s_row[6],
+                        "baseline_mcap": s_row[7],
+                        "latest_announcement": s_row[8] or "",
+                        "revision_trigger": s_row[9] or "Archived Baseline"
+                    })
+    except Exception as e:
+        print(f"Database query error in get_report_revisions: {e}")
+    finally:
+        cursor.close()
+        conn.close()
+    return revisions
+
+def get_revision_by_id(rev_id: int) -> dict:
+    """Retrieves a single immutable revision snapshot by ID."""
+    init_db()
+    conn = get_db_connection()
+    cursor = conn.cursor()
+    supabase_url = st.secrets.get("SUPABASE_DB_URL") or os.environ.get("SUPABASE_DB_URL")
+    placeholder = "%s" if supabase_url else "?"
+    record = None
+    try:
+        cursor.execute(f'''
+            SELECT id, ticker, short_name, report_text, timestamp, baseline_price, baseline_pe, baseline_mcap, latest_announcement, revision_trigger
+            FROM report_revisions
+            WHERE id = {placeholder}
+        ''', (rev_id,))
+        row = cursor.fetchone()
+        if row:
+            record = {
+                "id": row[0],
+                "ticker": row[1],
+                "short_name": row[2] or row[1],
+                "report_text": row[3],
+                "raw_timestamp": row[4],
+                "formatted_date": _format_timestamp(row[4]),
+                "baseline_price": row[5],
+                "baseline_pe": row[6],
+                "baseline_mcap": row[7],
+                "latest_announcement": row[8] or "",
+                "revision_trigger": row[9] or "Initial"
+            }
+    except Exception as e:
+        print(f"Database query error in get_revision_by_id: {e}")
+    finally:
+        cursor.close()
+        conn.close()
+    return record
+
+
+# ==========================================
+# GRANULAR ALERTING & WATCHLIST SUBSYSTEM
+# ==========================================
+
+def get_watchlist() -> list:
+    """Retrieves all tracked stocks in the surveillance watchlist."""
+    init_db()
+    conn = get_db_connection()
+    cursor = conn.cursor()
+    items = []
+    try:
+        cursor.execute('''
+            SELECT id, ticker, short_name, scrip_code, added_at,
+                   alert_material, alert_fundamental, alert_valuation,
+                   digest_mode, last_scanned_price, last_scanned_announcement, last_scanned_at
+            FROM watchlist
+            ORDER BY ticker ASC
+        ''')
+        for row in cursor.fetchall():
+            items.append({
+                "id": row[0],
+                "ticker": row[1],
+                "short_name": row[2] or row[1],
+                "scrip_code": row[3] or "",
+                "added_at": _format_timestamp(row[4]),
+                "alert_material": bool(row[5]),
+                "alert_fundamental": bool(row[6]),
+                "alert_valuation": bool(row[7]),
+                "digest_mode": row[8] or "instant",
+                "last_scanned_price": float(row[9]) if row[9] is not None else None,
+                "last_scanned_announcement": row[10] or "",
+                "last_scanned_at": _format_timestamp(row[11]) if row[11] else "Not yet scanned"
+            })
+    except Exception as e:
+        print(f"Database query error in get_watchlist: {e}")
+    finally:
+        cursor.close()
+        conn.close()
+    return items
+
+def add_to_watchlist(ticker: str, short_name: str = "", scrip_code: str = "",
+                     alert_material: bool = True, alert_fundamental: bool = True,
+                     alert_valuation: bool = True, digest_mode: str = "instant",
+                     initial_price: float = None) -> bool:
+    """Adds a stock to the surveillance watchlist or updates its subscription preferences."""
+    init_db()
+    conn = get_db_connection()
+    cursor = conn.cursor()
+    clean = ticker.strip().upper().replace(".NS", "").replace(".BO", "")
+    supabase_url = st.secrets.get("SUPABASE_DB_URL") or os.environ.get("SUPABASE_DB_URL")
+    placeholder = "%s" if supabase_url else "?"
+    success = False
+    try:
+        if supabase_url:
+            query = f'''
+                INSERT INTO watchlist (ticker, short_name, scrip_code, alert_material, alert_fundamental, alert_valuation, digest_mode, last_scanned_price)
+                VALUES ({placeholder}, {placeholder}, {placeholder}, {placeholder}, {placeholder}, {placeholder}, {placeholder}, {placeholder})
+                ON CONFLICT (ticker) DO UPDATE SET
+                    short_name = COALESCE(EXCLUDED.short_name, watchlist.short_name),
+                    scrip_code = COALESCE(EXCLUDED.scrip_code, watchlist.scrip_code),
+                    alert_material = EXCLUDED.alert_material,
+                    alert_fundamental = EXCLUDED.alert_fundamental,
+                    alert_valuation = EXCLUDED.alert_valuation,
+                    digest_mode = EXCLUDED.digest_mode
+            '''
+        else:
+            query = f'''
+                INSERT INTO watchlist (ticker, short_name, scrip_code, alert_material, alert_fundamental, alert_valuation, digest_mode, last_scanned_price)
+                VALUES ({placeholder}, {placeholder}, {placeholder}, {placeholder}, {placeholder}, {placeholder}, {placeholder}, {placeholder})
+                ON CONFLICT (ticker) DO UPDATE SET
+                    short_name = COALESCE(excluded.short_name, watchlist.short_name),
+                    scrip_code = COALESCE(excluded.scrip_code, watchlist.scrip_code),
+                    alert_material = excluded.alert_material,
+                    alert_fundamental = excluded.alert_fundamental,
+                    alert_valuation = excluded.alert_valuation,
+                    digest_mode = excluded.digest_mode
+            '''
+        cursor.execute(query, (
+            clean,
+            short_name or clean,
+            scrip_code,
+            alert_material,
+            alert_fundamental,
+            alert_valuation,
+            digest_mode,
+            initial_price
+        ))
+        conn.commit()
+        success = True
+    except Exception as e:
+        print(f"Database error in add_to_watchlist: {e}")
+    finally:
+        cursor.close()
+        conn.close()
+    return success
+
+def remove_from_watchlist(ticker: str) -> bool:
+    """Removes a stock from the surveillance watchlist."""
+    init_db()
+    conn = get_db_connection()
+    cursor = conn.cursor()
+    clean = ticker.strip().upper().replace(".NS", "").replace(".BO", "")
+    supabase_url = st.secrets.get("SUPABASE_DB_URL") or os.environ.get("SUPABASE_DB_URL")
+    placeholder = "%s" if supabase_url else "?"
+    success = False
+    try:
+        cursor.execute(f"DELETE FROM watchlist WHERE ticker = {placeholder}", (clean,))
+        conn.commit()
+        success = True
+    except Exception as e:
+        print(f"Database error in remove_from_watchlist: {e}")
+    finally:
+        cursor.close()
+        conn.close()
+    return success
+
+def is_ticker_in_watchlist(ticker: str) -> bool:
+    """Checks whether a ticker is currently active on the surveillance watchlist."""
+    init_db()
+    conn = get_db_connection()
+    cursor = conn.cursor()
+    clean = ticker.strip().upper().replace(".NS", "").replace(".BO", "")
+    supabase_url = st.secrets.get("SUPABASE_DB_URL") or os.environ.get("SUPABASE_DB_URL")
+    placeholder = "%s" if supabase_url else "?"
+    in_watch = False
+    try:
+        cursor.execute(f"SELECT 1 FROM watchlist WHERE ticker = {placeholder}", (clean,))
+        in_watch = cursor.fetchone() is not None
+    except Exception:
+        pass
+    finally:
+        cursor.close()
+        conn.close()
+    return in_watch
+
+def update_watchlist_scan_state(ticker: str, price: float = None, announcement: str = None):
+    """Updates the last scanned price and announcement for a watchlisted stock."""
+    init_db()
+    conn = get_db_connection()
+    cursor = conn.cursor()
+    clean = ticker.strip().upper().replace(".NS", "").replace(".BO", "")
+    supabase_url = st.secrets.get("SUPABASE_DB_URL") or os.environ.get("SUPABASE_DB_URL")
+    placeholder = "%s" if supabase_url else "?"
+    try:
+        cursor.execute(f'''
+            UPDATE watchlist
+            SET last_scanned_price = COALESCE({placeholder}, last_scanned_price),
+                last_scanned_announcement = COALESCE({placeholder}, last_scanned_announcement),
+                last_scanned_at = CURRENT_TIMESTAMP
+            WHERE ticker = {placeholder}
+        ''', (price, announcement, clean))
+        conn.commit()
+    except Exception as e:
+        print(f"Error in update_watchlist_scan_state: {e}")
+    finally:
+        cursor.close()
+        conn.close()
+
+def record_alert_event(ticker: str, category: str, severity: str, title: str, details: str = "", source: str = "BSE Surveillance") -> int:
+    """Records an immutable alert event for a stock."""
+    init_db()
+    conn = get_db_connection()
+    cursor = conn.cursor()
+    clean = ticker.strip().upper().replace(".NS", "").replace(".BO", "")
+    supabase_url = st.secrets.get("SUPABASE_DB_URL") or os.environ.get("SUPABASE_DB_URL")
+    placeholder = "%s" if supabase_url else "?"
+    new_id = None
+    try:
+        query = f'''
+            INSERT INTO alert_events (ticker, category, severity, title, details, source)
+            VALUES ({placeholder}, {placeholder}, {placeholder}, {placeholder}, {placeholder}, {placeholder})
+        '''
+        if supabase_url:
+            query += " RETURNING id"
+            cursor.execute(query, (clean, category, severity, title, details, source))
+            row = cursor.fetchone()
+            if row:
+                new_id = row[0]
+        else:
+            cursor.execute(query, (clean, category, severity, title, details, source))
+            new_id = cursor.lastrowid
+        conn.commit()
+    except Exception as e:
+        print(f"Error in record_alert_event: {e}")
+    finally:
+        cursor.close()
+        conn.close()
+    return new_id
+
+def get_alert_events(ticker: str = None, category: str = None, unread_only: bool = False, limit: int = 50) -> list:
+    """Retrieves recorded alert events with optional filters."""
+    init_db()
+    conn = get_db_connection()
+    cursor = conn.cursor()
+    supabase_url = st.secrets.get("SUPABASE_DB_URL") or os.environ.get("SUPABASE_DB_URL")
+    placeholder = "%s" if supabase_url else "?"
+    alerts = []
+    try:
+        conditions = []
+        params = []
+        if ticker:
+            clean = ticker.strip().upper().replace(".NS", "").replace(".BO", "")
+            conditions.append(f"ticker = {placeholder}")
+            params.append(clean)
+        if category and category.lower() != "all":
+            conditions.append(f"category = {placeholder}")
+            params.append(category.lower())
+        if unread_only:
+            conditions.append("is_read = FALSE" if supabase_url else "is_read = 0")
+        
+        where_clause = " WHERE " + " AND ".join(conditions) if conditions else ""
+        query = f'''
+            SELECT id, ticker, category, severity, title, details, timestamp, is_read, source
+            FROM alert_events
+            {where_clause}
+            ORDER BY timestamp DESC
+            LIMIT {limit}
+        '''
+        cursor.execute(query, tuple(params))
+        for row in cursor.fetchall():
+            alerts.append({
+                "id": row[0],
+                "ticker": row[1],
+                "category": row[2],
+                "severity": row[3] or "medium",
+                "title": row[4],
+                "details": row[5] or "",
+                "timestamp": _format_timestamp(row[6]),
+                "is_read": bool(row[7]),
+                "source": row[8] or "BSE Surveillance"
+            })
+    except Exception as e:
+        print(f"Error in get_alert_events: {e}")
+    finally:
+        cursor.close()
+        conn.close()
+    return alerts
+
+def mark_alert_as_read(alert_id: int):
+    """Marks a single alert event as read."""
+    init_db()
+    conn = get_db_connection()
+    cursor = conn.cursor()
+    supabase_url = st.secrets.get("SUPABASE_DB_URL") or os.environ.get("SUPABASE_DB_URL")
+    placeholder = "%s" if supabase_url else "?"
+    try:
+        val = "TRUE" if supabase_url else "1"
+        cursor.execute(f"UPDATE alert_events SET is_read = {val} WHERE id = {placeholder}", (alert_id,))
+        conn.commit()
+    except Exception as e:
+        print(f"Error in mark_alert_as_read: {e}")
+    finally:
+        cursor.close()
+        conn.close()
+
+def mark_all_alerts_as_read(ticker: str = None):
+    """Marks all alerts (optionally filtered by ticker) as read."""
+    init_db()
+    conn = get_db_connection()
+    cursor = conn.cursor()
+    supabase_url = st.secrets.get("SUPABASE_DB_URL") or os.environ.get("SUPABASE_DB_URL")
+    placeholder = "%s" if supabase_url else "?"
+    try:
+        val = "TRUE" if supabase_url else "1"
+        if ticker:
+            clean = ticker.strip().upper().replace(".NS", "").replace(".BO", "")
+            cursor.execute(f"UPDATE alert_events SET is_read = {val} WHERE ticker = {placeholder}", (clean,))
+        else:
+            cursor.execute(f"UPDATE alert_events SET is_read = {val}")
+        conn.commit()
+    except Exception as e:
+        print(f"Error in mark_all_alerts_as_read: {e}")
+    finally:
+        cursor.close()
+        conn.close()
+
+def get_unread_alert_count(ticker: str = None) -> int:
+    """Returns the total number of unread alerts."""
+    init_db()
+    conn = get_db_connection()
+    cursor = conn.cursor()
+    supabase_url = st.secrets.get("SUPABASE_DB_URL") or os.environ.get("SUPABASE_DB_URL")
+    placeholder = "%s" if supabase_url else "?"
+    count = 0
+    try:
+        unread_cond = "is_read = FALSE" if supabase_url else "is_read = 0"
+        if ticker:
+            clean = ticker.strip().upper().replace(".NS", "").replace(".BO", "")
+            cursor.execute(f"SELECT COUNT(*) FROM alert_events WHERE {unread_cond} AND ticker = {placeholder}", (clean,))
+        else:
+            cursor.execute(f"SELECT COUNT(*) FROM alert_events WHERE {unread_cond}")
+        row = cursor.fetchone()
+        if row:
+            count = row[0]
+    except Exception:
+        pass
+    finally:
+        cursor.close()
+        conn.close()
+    return count
