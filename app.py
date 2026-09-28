@@ -62,6 +62,12 @@ from ui.scorecard import (
 )
 from ui.comparison import render_peer_comparison_view
 from ui.analytics_hub import render_site_analytics_view
+from telemetry import (
+    track_user_action,
+    init_session_telemetry,
+    check_url_admin_auth,
+    is_admin_authenticated,
+)
 
 st.set_page_config(page_title="Equity Research AI", layout="wide", page_icon="📈")
 
@@ -86,6 +92,8 @@ def inject_ga4_tracking():
         pass
 
 inject_ga4_tracking()
+check_url_admin_auth()
+init_session_telemetry()
 
 # Production UI Stylesheet (Metric Unclip & Reading Bounds)
 st.markdown(
@@ -269,7 +277,7 @@ def execute_stock_research(query: str, selected_language: str = "English (India)
 
         # Instant silent pull if verified report exists and no material change detected
         if not should_regen and selected_language == "English (India)" and cached and cached.get("report_text"):
-            record_usage_event("CACHE_HIT", resolved_ticker, cost_saved_usd=0.036, details={"reason": reason})
+            track_user_action("CACHE_HIT", resolved_ticker, cost_saved_usd=0.036, details={"reason": reason})
             set_active_dossier_state(
                 ticker=resolved_ticker,
                 report_text=cached["report_text"],
@@ -284,7 +292,7 @@ def execute_stock_research(query: str, selected_language: str = "English (India)
             # Price shifted >= 5%, but business fundamentals, moat, and governance remain unchanged.
             # Silently mount verified dossier immediately for zero wait time,
             # and stage a smart notification banner offering surgical update.
-            record_usage_event("CACHE_HIT", resolved_ticker, cost_saved_usd=0.036, details={"reason": reason, "delta": True})
+            track_user_action("CACHE_HIT", resolved_ticker, cost_saved_usd=0.036, details={"reason": reason, "delta": True})
             st.session_state["pending_price_delta"] = {
                 "reason": reason,
                 "stock_data": stock_data,
@@ -304,7 +312,7 @@ def execute_stock_research(query: str, selected_language: str = "English (India)
             )
             st.rerun(scope="app")
         else:
-            record_usage_event("FULL_SYNTHESIS", resolved_ticker, details={"reason": reason})
+            track_user_action("FULL_SYNTHESIS", resolved_ticker, details={"reason": reason})
             prog_slot = st.empty()
             prog_bar = prog_slot.progress(0.80, text=f"⚡ {reason}. Initializing 7-Pillar Institutional AI Synthesis...")
             set_active_dossier_state(
@@ -359,6 +367,7 @@ with st.sidebar:
         )
         sb_submit = st.form_submit_button("Search Stock", type="primary", width="stretch")
     if sb_submit and sb_query:
+        track_user_action("SEARCH_QUERY", sb_query)
         execute_stock_research(sb_query)
 
     st.markdown("---")
@@ -415,6 +424,7 @@ with st.sidebar:
                     disabled=is_active,
                     width="stretch"
                 ):
+                    track_user_action("ARCHIVE_LOAD", selected_ticker)
                     rep_text = selected_item.get("report_text")
                     if not rep_text:
                         full_rec = get_report_by_ticker(selected_ticker)
@@ -567,30 +577,51 @@ with st.sidebar:
 st.title("Equity Research Analysis Platform")
 st.markdown('<p style="font-size: 19px; color: #888888;">To aid stock discovery and simplify fundamentals.</p>', unsafe_allow_html=True)
 
-# Navigation Controls
-nav_c1, nav_c2, nav_c3 = st.columns(3)
+# Public Navigation Controls
 cur_view = st.session_state.get("active_view", "dossier")
-with nav_c1:
-    if st.button("🔍 Institutional Dossier", key="btn_nav_dossier", type="primary" if cur_view == "dossier" else "secondary", width="stretch"):
-        st.session_state["active_view"] = "dossier"
-        st.rerun()
-with nav_c2:
-    if st.button("⚖️ Peer Comparison", key="btn_nav_compare", type="primary" if cur_view == "compare" else "secondary", width="stretch"):
-        st.session_state["active_view"] = "compare"
-        st.rerun()
-with nav_c3:
-    if st.button("📊 Site Usage & Analytics", key="btn_nav_analytics", type="primary" if cur_view == "analytics" else "secondary", width="stretch"):
-        st.session_state["active_view"] = "analytics"
-        st.rerun()
+is_admin = is_admin_authenticated()
+
+if is_admin:
+    nav_c1, nav_c2, nav_c3 = st.columns([1, 1, 1])
+    with nav_c1:
+        if st.button("🔍 Institutional Dossier", key="btn_nav_dossier", type="primary" if cur_view == "dossier" else "secondary", width="stretch"):
+            st.session_state["active_view"] = "dossier"
+            track_user_action("PAGE_VIEW", details={"page": "dossier"})
+            st.rerun()
+    with nav_c2:
+        if st.button("⚖️ Peer Comparison", key="btn_nav_compare", type="primary" if cur_view == "compare" else "secondary", width="stretch"):
+            st.session_state["active_view"] = "compare"
+            track_user_action("PAGE_VIEW", details={"page": "compare"})
+            st.rerun()
+    with nav_c3:
+        if st.button("📊 Private Admin Analytics 🔐", key="btn_nav_admin_analytics", type="primary" if cur_view == "analytics" else "secondary", width="stretch"):
+            st.session_state["active_view"] = "analytics"
+            track_user_action("PAGE_VIEW", details={"page": "analytics"})
+            st.rerun()
+else:
+    nav_c1, nav_c2 = st.columns(2)
+    with nav_c1:
+        if st.button("🔍 Institutional Dossier", key="btn_nav_dossier", type="primary" if cur_view == "dossier" else "secondary", width="stretch"):
+            st.session_state["active_view"] = "dossier"
+            track_user_action("PAGE_VIEW", details={"page": "dossier"})
+            st.rerun()
+    with nav_c2:
+        if st.button("⚖️ Peer Comparison", key="btn_nav_compare", type="primary" if cur_view == "compare" else "secondary", width="stretch"):
+            st.session_state["active_view"] = "compare"
+            track_user_action("PAGE_VIEW", details={"page": "compare"})
+            st.rerun()
 
 st.markdown("<div style='height: 10px;'></div>", unsafe_allow_html=True)
 
 if cur_view == "compare":
     render_peer_comparison_view()
     st.stop()
-elif cur_view == "analytics":
+elif cur_view == "analytics" and is_admin:
     render_site_analytics_view()
     st.stop()
+elif cur_view == "analytics" and not is_admin:
+    st.session_state["active_view"] = "dossier"
+    st.rerun()
 
 with st.form("search_form", clear_on_submit=False):
     col_q1, col_q2 = st.columns([3, 1])
@@ -610,6 +641,7 @@ with st.form("search_form", clear_on_submit=False):
     submitted = st.form_submit_button("Generate Research Report", type="primary")
 
 if submitted and query:
+    track_user_action("SEARCH_QUERY", query, details={"language": selected_language})
     execute_stock_research(query, selected_language)
 
 # Quick Lookup Chips: Recently Researched Stocks
@@ -676,11 +708,13 @@ def render_alert_hub():
             act_col1, act_col2 = st.columns(2)
             with act_col1:
                 if st.button("✓ Mark All as Read", key="btn_mark_all_read", width="stretch", help="Mark all unread alerts as read"):
+                    track_user_action("ALERTS_MARK_READ")
                     mark_all_alerts_as_read()
                     st.toast("All notifications marked as read.", icon="✅")
                     st.rerun()
             with act_col2:
                 if st.button("🗑️ Dismiss All Unread", key="btn_dismiss_all_unread", width="stretch", help="Permanently clear all unread alerts"):
+                    track_user_action("ALERTS_DISMISS")
                     dismiss_all_alerts(unread_only=True)
                     st.toast("Unread notifications dismissed.", icon="🗑️")
                     st.rerun()
@@ -1038,7 +1072,7 @@ if ("last_report" in st.session_state and st.session_state["last_report"] is not
                         )
                         st.session_state["last_report"] = updated_report
                         st.session_state["last_report_date"] = datetime.now(IST).strftime("%d-%b-%Y %H:%M IST")
-                        record_usage_event("SURGICAL_REFRESH", clean_ticker, cost_saved_usd=0.035, details={"reason": p_delta.get("reason")})
+                        track_user_action("SURGICAL_REFRESH", clean_ticker, cost_saved_usd=0.035, details={"reason": p_delta.get("reason")})
                         st.session_state.pop("pending_price_delta", None)
                         st.toast("Valuation & Technicals surgically updated!", icon="⚡")
                         st.rerun(scope="app")
@@ -1219,7 +1253,7 @@ if ("last_report" in st.session_state and st.session_state["last_report"] is not
                     st.session_state.get("last_history")
                 )
                 st.session_state["pdf_cache_id"] = pdf_cache_id
-                record_usage_event("PDF_DOWNLOAD", clean_ticker)
+                track_user_action("PDF_DOWNLOAD", clean_ticker, details={"file_bytes": len(st.session_state["cached_pdf_bytes"]) if st.session_state.get("cached_pdf_bytes") else 0})
             except Exception as pdf_err:
                 st.session_state["cached_pdf_bytes"] = None
                 st.caption(f"PDF export notice: {pdf_err}")

@@ -56,6 +56,10 @@ case "$COMMAND" in
         echo "--> Starting Streamlit Dev Server on http://localhost:8501..."
         "$STREAMLIT" run app.py
         ;;
+    admin)
+        echo "--> Starting Private Admin Portal on http://localhost:8502..."
+        "$STREAMLIT" run admin.py --server.port 8502
+        ;;
     checkpoint)
         shift
         echo "--> [1/1] Managing Release Checkpoint Creation..."

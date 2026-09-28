@@ -9,7 +9,8 @@ Evaluates companies side-by-side with heuristic checks across:
 import streamlit as st
 import pandas as pd
 from analyzer import compare_two_companies
-from db import MANDATORY_SEBI_DISCLAIMER, record_usage_event
+from db import MANDATORY_SEBI_DISCLAIMER
+from telemetry import track_user_action
 from ui.formatters import format_inr
 
 
@@ -51,11 +52,17 @@ def render_peer_comparison_view():
             with st.spinner(f"Auditing exchange data and running disparity check for {clean_a} vs {clean_b}..."):
                 try:
                     res = compare_two_companies(clean_a, clean_b)
-                    record_usage_event(
-                        "COMPARE_STOCKS",
+                    track_user_action(
+                        "PEER_COMPARISON",
                         ticker=f"{res['ticker_a']}_{res['ticker_b']}",
-                        details={"ticker_a": res["ticker_a"], "ticker_b": res["ticker_b"]}
+                        details={"ticker_a": res["ticker_a"], "ticker_b": res["ticker_b"], "is_disparate": res["disparity"]["is_disparate"]}
                     )
+                    if res["disparity"]["is_disparate"]:
+                        track_user_action(
+                            "DISPARITY_WARNING",
+                            ticker=f"{res['ticker_a']}_{res['ticker_b']}",
+                            details={"warnings": res["disparity"]["warnings"]}
+                        )
                     st.session_state["last_comparison"] = res
                 except Exception as err:
                     st.error(f"### ❌ Comparison Failed: {err}")
