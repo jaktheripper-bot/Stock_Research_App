@@ -36,7 +36,6 @@ from db import (
 )
 from alerts import run_surveillance_scan
 from bse_master import get_ticker_suggestions
-from markdown_pdf import MarkdownPdf, Section
 
 st.set_page_config(page_title="Equity Research AI", layout="wide", page_icon="📈")
 
@@ -170,24 +169,29 @@ def execute_stock_research(query: str, selected_language: str = "English (India)
         return
     try:
         prog_slot = st.empty()
-        prog_bar = prog_slot.progress(0.15, text=f"⏳ Step 1/5: Verifying BSE Exchange Quote for {clean_query}...")
+        prog_bar = prog_slot.progress(0.20, text=f"⏳ Step 1/4: Verifying BSE Exchange Quote for {clean_query}...")
         stock_data = get_stock_fundamentals(clean_query)
         resolved_ticker = stock_data.get("ticker", clean_query)
-
-        prog_bar.progress(0.35, text=f"📈 Step 2/5: Ingesting 6-Month OHLCV & Computing 50-DMA for {resolved_ticker}...")
-        hist_df = get_historical_prices(resolved_ticker)
-        st.session_state["last_history"] = hist_df
-        st.session_state["last_history_ticker"] = resolved_ticker
         scrip = stock_data.get("scrip_code", "")
 
-        prog_bar.progress(0.55, text="📢 Step 3/5: Auditing BSE Regulatory Filings & Delta Gating...")
-        cached = get_report_by_ticker(resolved_ticker)
-        should_regen, reason, latest_ann = evaluate_material_change(cached, stock_data, scrip)
+        prog_bar.progress(0.50, text=f"⚡ Step 2/4: Concurrently Ingesting Technicals & BSE Disclosures for {resolved_ticker}...")
+        import concurrent.futures
+        with concurrent.futures.ThreadPoolExecutor(max_workers=2) as executor:
+            future_hist = executor.submit(get_historical_prices, resolved_ticker)
+            def _fetch_delta_and_cache():
+                c = get_report_by_ticker(resolved_ticker)
+                s_regen, r_reason, l_ann = evaluate_material_change(c, stock_data, scrip)
+                return c, s_regen, r_reason, l_ann
+            future_disclosures = executor.submit(_fetch_delta_and_cache)
+
+            hist_df = future_hist.result()
+            cached, should_regen, reason, latest_ann = future_disclosures.result()
+
+        st.session_state["last_history"] = hist_df
+        st.session_state["last_history_ticker"] = resolved_ticker
 
         if not should_regen and selected_language == "English (India)":
-            prog_bar.progress(1.0, text="✅ Step 5/5: Verified Dossier Retrieved from Archive!")
-            import time
-            time.sleep(0.3)
+            prog_bar.progress(1.0, text="✅ Step 4/4: Verified Dossier Retrieved from Archive!")
             prog_slot.empty()
             set_active_dossier_state(
                 ticker=resolved_ticker,
@@ -198,11 +202,9 @@ def execute_stock_research(query: str, selected_language: str = "English (India)
                 is_regenerated=False,
                 history_df=hist_df
             )
-            st.rerun()
+            st.rerun(scope="app")
         else:
-            prog_bar.progress(0.65, text="⚡ Step 4/5: Initializing 7-Pillar Institutional AI Synthesis...")
-            import time
-            time.sleep(0.3)
+            prog_bar.progress(0.80, text="⚡ Step 3/4: Initializing 7-Pillar Institutional AI Synthesis...")
             prog_slot.empty()
             set_active_dossier_state(
                 ticker=resolved_ticker,
@@ -214,7 +216,7 @@ def execute_stock_research(query: str, selected_language: str = "English (India)
             )
             st.session_state["stream_pending"] = True
             st.session_state["stream_language"] = selected_language
-            st.rerun()
+            st.rerun(scope="app")
     except Exception as err:
         st.session_state["last_report"] = None
         err_str = str(err).lower()
@@ -739,9 +741,13 @@ with st.sidebar:
                     disabled=is_active,
                     width="stretch"
                 ):
+                    rep_text = selected_item.get("report_text")
+                    if not rep_text:
+                        full_rec = get_report_by_ticker(selected_ticker)
+                        rep_text = full_rec.get("report_text") if full_rec else ""
                     set_active_dossier_state(
                         ticker=selected_ticker,
-                        report_text=selected_item.get("report_text"),
+                        report_text=rep_text,
                         report_date=selected_item.get("formatted_date"),
                         fundamentals={
                             "short_name": selected_item.get("short_name", selected_ticker),
@@ -908,6 +914,7 @@ if submitted and query:
     execute_stock_research(query, selected_language)
 
 
+@st.fragment
 def render_alert_hub():
     """Renders the Granular Event Alerting Engine Hub with Feed, Watchlist, and Exchange Polling."""
     try:
@@ -945,7 +952,7 @@ def render_alert_hub():
             with act_col1:
                 if st.button("✓ Mark All as Read", key="btn_mark_all_read", width="stretch", help="Mark all unread alerts as read"):
                     mark_all_alerts_as_read()
-                    st.toast("All notifications marked as read.", icon="✓")
+                    st.toast("All notifications marked as read.", icon="✅")
                     st.rerun()
             with act_col2:
                 if st.button("🗑️ Dismiss All Unread", key="btn_dismiss_all_unread", width="stretch", help="Permanently clear all unread alerts"):
@@ -1016,7 +1023,7 @@ def render_alert_hub():
                                     st.session_state["scroll_to_dossier"] = True
                                     st.session_state["collapse_alert_hub"] = True
                                     st.session_state["toast_message"] = f"📄 Loaded dossier for {alt['ticker']}!"
-                                    st.rerun()
+                                    st.rerun(scope="app")
                             with btn_c2:
                                 if not is_read:
                                     if st.button(
@@ -1094,7 +1101,7 @@ def render_alert_hub():
                                     st.session_state["scroll_to_dossier"] = True
                                     st.session_state["collapse_alert_hub"] = True
                                     st.session_state["toast_message"] = f"📄 Loaded dossier for {w['ticker']}!"
-                                    st.rerun()
+                                    st.rerun(scope="app")
                             with btn_w2:
                                 if st.button("Remove", key=f"rm_watch_{w['ticker']}", width="stretch"):
                                     remove_from_watchlist(w["ticker"])

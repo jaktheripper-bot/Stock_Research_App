@@ -1,4 +1,5 @@
 import os
+import threading
 from datetime import datetime, timezone, timedelta
 import streamlit as st
 
@@ -6,11 +7,78 @@ IST = timezone(timedelta(hours=5, minutes=30))
 
 _DB_INITIALIZED = False
 
+class _PooledConnectionProxy:
+    """Proxy wrapper around a psycopg2 connection checked out from ThreadedConnectionPool.
+    Calling .close() returns the connection to the pool rather than terminating the TCP/SSL socket."""
+    def __init__(self, pool, conn):
+        self._pool = pool
+        self._conn = conn
+        self._returned = False
+
+    def __getattr__(self, name):
+        return getattr(self._conn, name)
+
+    def close(self):
+        if not self._returned:
+            self._returned = True
+            try:
+                if not self._conn.closed:
+                    self._conn.rollback()
+            except Exception:
+                pass
+            try:
+                self._pool.putconn(self._conn)
+            except Exception:
+                try:
+                    self._conn.close()
+                except Exception:
+                    pass
+
+    def __enter__(self):
+        return self
+
+    def __exit__(self, exc_type, exc_val, exc_tb):
+        self.close()
+
+@st.cache_resource
+def _get_pg_pool(dsn: str):
+    import psycopg2.pool
+    return psycopg2.pool.ThreadedConnectionPool(minconn=1, maxconn=10, dsn=dsn)
+
+def _acquire_connection_from_pool(pool):
+    conn = pool.getconn()
+    is_bad = False
+    try:
+        if conn.closed != 0:
+            is_bad = True
+        else:
+            conn.poll()
+            if conn.status == 2:  # STATUS_IN_TRANSACTION
+                conn.rollback()
+    except Exception:
+        is_bad = True
+
+    if is_bad:
+        try:
+            pool.putconn(conn, close=True)
+        except Exception:
+            pass
+        conn = pool.getconn()
+    return conn
+
 def get_db_connection():
     supabase_url = st.secrets.get("SUPABASE_DB_URL") or os.environ.get("SUPABASE_DB_URL")
     if supabase_url:
-        import psycopg2
-        return psycopg2.connect(supabase_url)
+        try:
+            pool = _get_pg_pool(supabase_url)
+            raw_conn = _acquire_connection_from_pool(pool)
+            return _PooledConnectionProxy(pool, raw_conn)
+        except Exception:
+            try:
+                import psycopg2
+                return psycopg2.connect(supabase_url)
+            except Exception:
+                pass
     
     import sqlite3
     conn = sqlite3.connect("reports.db", timeout=30.0, check_same_thread=False)
@@ -95,6 +163,7 @@ def init_db(force: bool = False):
             ''')
             cursor.execute('CREATE INDEX IF NOT EXISTS idx_alert_events_ticker ON alert_events (ticker, timestamp DESC);')
             cursor.execute('CREATE INDEX IF NOT EXISTS idx_alert_events_unread ON alert_events (is_read, timestamp DESC);')
+            cursor.execute('CREATE INDEX IF NOT EXISTS idx_report_revisions_ticker ON report_revisions (ticker);')
         else:
             cursor.execute('''
                 CREATE TABLE IF NOT EXISTS reports (
@@ -165,6 +234,7 @@ def init_db(force: bool = False):
             ''')
             cursor.execute('CREATE INDEX IF NOT EXISTS idx_alert_events_ticker ON alert_events (ticker, timestamp DESC);')
             cursor.execute('CREATE INDEX IF NOT EXISTS idx_alert_events_unread ON alert_events (is_read, timestamp DESC);')
+            cursor.execute('CREATE INDEX IF NOT EXISTS idx_report_revisions_ticker ON report_revisions (ticker);')
 
         conn.commit()
         _DB_INITIALIZED = True
@@ -266,18 +336,28 @@ def _format_timestamp(raw_ts) -> str:
         return f"{str(raw_ts)[:16]} IST"
 
 @st.cache_data(ttl="5m", max_entries=5)
-def get_archived_reports() -> list:
+def get_archived_reports(include_text: bool = False) -> list:
     init_db()
     conn = get_db_connection()
     cursor = conn.cursor()
     results = []
     try:
-        cursor.execute('''
-            SELECT r.ticker, r.short_name, r.report_text, r.timestamp, r.baseline_price, r.baseline_pe, r.baseline_mcap, r.latest_announcement,
-                   (SELECT COUNT(*) FROM report_revisions rev WHERE rev.ticker = r.ticker) AS rev_count
-            FROM reports r 
-            ORDER BY r.timestamp DESC
-        ''')
+        if include_text:
+            cursor.execute('''
+                SELECT r.ticker, r.short_name, r.report_text, r.timestamp, r.baseline_price, r.baseline_pe, r.baseline_mcap, r.latest_announcement,
+                       COALESCE(rc.rev_count, 0) AS rev_count
+                FROM reports r 
+                LEFT JOIN (SELECT ticker, COUNT(*) AS rev_count FROM report_revisions GROUP BY ticker) rc ON rc.ticker = r.ticker
+                ORDER BY r.timestamp DESC
+            ''')
+        else:
+            cursor.execute('''
+                SELECT r.ticker, r.short_name, '' AS report_text, r.timestamp, r.baseline_price, r.baseline_pe, r.baseline_mcap, r.latest_announcement,
+                       COALESCE(rc.rev_count, 0) AS rev_count
+                FROM reports r 
+                LEFT JOIN (SELECT ticker, COUNT(*) AS rev_count FROM report_revisions GROUP BY ticker) rc ON rc.ticker = r.ticker
+                ORDER BY r.timestamp DESC
+            ''')
         rows = cursor.fetchall()
         for row in rows:
             results.append({
