@@ -43,23 +43,46 @@ def test_interactive_app_suite():
 
     # 3. Sidebar Stock Archive Selection & Active Dossier Loading Simulation
     print("\n3. Simulating Sidebar Archive Selection & Dossier Loading...")
-    if at.selectbox:
-        picker = at.selectbox[0]
-        if len(picker.options) > 1:
-            chosen = picker.options[1]
-            print(f"   • Selecting archive option: '{chosen}'...")
-            picker.select(chosen).run()
-            assert not at.exception, f"Selecting archive option '{chosen}' threw exception: {at.exception}"
-            print("   ✅ Archive picker synchronized.")
+    archive_picker = None
+    for sb in at.selectbox:
+        if any("•" in opt or "rev" in opt for opt in sb.options):
+            archive_picker = sb
+            break
 
-            load_btns = [b for b in at.button if "Load Active Dossier" in b.label or "Active Report Loaded" in b.label]
-            if load_btns and not load_btns[0].disabled:
-                print("   • Clicking 'Load Active Dossier'...")
-                load_btns[0].click().run()
-                assert not at.exception, f"Clicking 'Load Active Dossier' threw exception: {at.exception}"
-                print("   ✅ Active dossier loaded into view state cleanly.")
-        else:
-            print("   ℹ️ No archive stocks available to select (empty archive).")
+    if archive_picker and len(archive_picker.options) > 1:
+        chosen = archive_picker.options[1]
+        print(f"   • Selecting archive option: '{chosen}'...")
+        archive_picker.select(chosen).run()
+        assert not at.exception, f"Selecting archive option '{chosen}' threw exception: {at.exception}"
+        print("   ✅ Archive picker synchronized.")
+
+        load_btns = [b for b in at.button if "Load Active Dossier" in b.label or "Active Report Loaded" in b.label]
+        if load_btns and not load_btns[0].disabled:
+            print("   • Clicking 'Load Active Dossier'...")
+            load_btns[0].click().run()
+            assert not at.exception, f"Clicking 'Load Active Dossier' threw exception: {at.exception}"
+            print("   ✅ Active dossier loaded into view state cleanly.")
+
+            # 4. Testing 'Expand all analytical pillars' Mobile Switch
+            print("\n4. Simulating 'Expand All Analytical Pillars' Mobile Switch...")
+            toggles = [t for t in at.toggle if "Expand all analytical pillars" in t.label]
+            if toggles:
+                # Default: collapsed (False)
+                pillar_exps = [e for e in at.expander if "Pillar" in e.label]
+                assert len(pillar_exps) == 7, f"Expected 7 pillar expanders, found {len(pillar_exps)}"
+                assert all(not e.proto.expanded for e in pillar_exps), "Pillars should default to collapsed"
+                print(f"   ✅ Initial collapsed state verified (7/7 pillars collapsed for mobile).")
+
+                # Toggle to True: expanded
+                toggles[0].set_value(True).run()
+                assert not at.exception, f"Toggling expand_all threw exception: {at.exception}"
+                pillar_exps_expanded = [e for e in at.expander if "Pillar" in e.label]
+                assert all(e.proto.expanded for e in pillar_exps_expanded), "All pillars should be expanded when switch is active"
+                print(f"   ✅ Active expanded state verified (7/7 pillars expanded).")
+            else:
+                print("   ℹ️ Toggle 'Expand all analytical pillars' not found on loaded report.")
+    else:
+        print("   ℹ️ No archive stocks available to select (empty archive).")
 
     print("\n🎉 All interactive UI simulation tests passed with 0 errors.\n")
 

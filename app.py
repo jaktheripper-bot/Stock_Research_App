@@ -1055,7 +1055,7 @@ if ("last_report" in st.session_state and st.session_state["last_report"] is not
             st.error(f"### ❌ Live Streaming Halted: {stream_err}")
             st.session_state["last_report"] = None
     elif st.session_state.get("last_report"):
-        expand_all = st.toggle("📖 Expand all analytical pillars", value=False)
+        expand_all = st.toggle("📖 Expand all analytical pillars", value=False, key="toggle_expand_pillars")
         render_dual_speed_report(st.session_state["last_report"], expand_all=expand_all)
         render_thesis_drift_panel(clean_ticker, custom_diff_data=st.session_state.get("custom_diff"))
 

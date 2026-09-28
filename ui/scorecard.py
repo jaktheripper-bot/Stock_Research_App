@@ -173,7 +173,7 @@ def render_dual_speed_report(markdown_text: str, expand_all: bool = False):
     - Analytical Pillars 1 to 7: nested inside st.expander containers
     """
     cleaned = strip_conclusion_sections(remove_health_matrix_text(markdown_text))
-    sections = re.split(r"(?m)(?=^##?\s+)", cleaned)
+    sections = re.split(r"(?m)(?=^#{1,4}\s+)", cleaned)
     sections = [s.strip() for s in sections if s.strip()]
 
     if len(sections) <= 2:
@@ -191,7 +191,7 @@ def render_dual_speed_report(markdown_text: str, expand_all: bool = False):
             continue
 
         # Nest Pillars 1 through 7 into accordions
-        if re.search(r"(?i) Pillar\s*\d+", title):
+        if re.search(r"(?i)\bPillars?\s*\d+", title):
             with st.expander(f"📁 {title}", expanded=expand_all):
                 st.markdown(body_content)
         else:
