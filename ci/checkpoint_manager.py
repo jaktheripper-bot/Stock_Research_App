@@ -66,7 +66,13 @@ def get_git_info():
     """Retrieve current commit SHA, branch, and status."""
     sha = run_cmd(["git", "rev-parse", "HEAD"]).stdout.strip()
     branch = run_cmd(["git", "rev-parse", "--abbrev-ref", "HEAD"]).stdout.strip()
-    status = run_cmd(["git", "status", "--porcelain"]).stdout.strip()
+    raw_status = run_cmd(["git", "status", "--porcelain"]).stdout.strip()
+    # Filter out auto-generated status/ledger files and checkpoint files
+    status_lines = [
+        line for line in raw_status.splitlines()
+        if not any(f in line for f in ("PROJECT_STATUS.md", "CHECKPOINTS.md", ".checkpoints"))
+    ]
+    status = "\n".join(status_lines)
     return sha, branch, status
 
 
@@ -215,20 +221,7 @@ def create_checkpoint(label: str = "", skip_checks: bool = False, push_remote: b
     else:
         print("   ℹ️ No local reports.db found. Proceeding with code-only checkpoint.")
 
-    print(f"\n🏷️ Step 3/4: Creating Annotated Git Release Tag '{tag_name}'...")
-    tag_msg = f"Verified Checkpoint: {label or 'Stable Release'} | SHA: {sha[:7]} | IST: {ts_str}"
-    run_cmd(["git", "tag", "-a", tag_name, "-m", tag_msg])
-    print(f"   ✅ Git tag '{tag_name}' created on commit {sha[:7]}.")
-
-    if push_remote:
-        print(f"\n🚀 Step 4/4: Synchronizing Tag with Remote Repository (origin)...")
-        try:
-            run_cmd(["git", "push", "origin", tag_name])
-            print(f"   ✅ Tag '{tag_name}' safely pushed to GitHub origin.")
-        except Exception as e:
-            print(f"   ⚠️ Could not push tag to origin (check network/credentials): {e}")
-
-    # Record in ledger
+    # Record in ledger and auto-commit status updates before tagging
     checkpoints = load_ledger()
     record = {
         "tag": tag_name,
@@ -241,6 +234,27 @@ def create_checkpoint(label: str = "", skip_checks: bool = False, push_remote: b
     }
     checkpoints.append(record)
     save_ledger(checkpoints)
+
+    raw_status = run_cmd(["git", "status", "--porcelain"]).stdout.strip()
+    if any(f in raw_status for f in ("PROJECT_STATUS.md", "CHECKPOINTS.md")):
+        run_cmd(["git", "add", "PROJECT_STATUS.md", "CHECKPOINTS.md"], check=False)
+        run_cmd(["git", "commit", "-m", f"docs: sync release checkpoint ledger ({tag_name})"], check=False)
+        sha, branch, _ = get_git_info()
+        record["commit_sha"] = sha
+        save_ledger(checkpoints)
+
+    print(f"\n🏷️ Step 3/4: Creating Annotated Git Release Tag '{tag_name}'...")
+    tag_msg = f"Verified Checkpoint: {label or 'Stable Release'} | SHA: {sha[:7]} | IST: {ts_str}"
+    run_cmd(["git", "tag", "-a", tag_name, "-m", tag_msg])
+    print(f"   ✅ Git tag '{tag_name}' created on commit {sha[:7]}.")
+
+    if push_remote:
+        print(f"\n🚀 Step 4/4: Synchronizing Tag with Remote Repository (origin)...")
+        try:
+            run_cmd(["git", "push", "origin", tag_name])
+            print(f"   ✅ Tag '{tag_name}' safely pushed to GitHub origin.")
+        except Exception as e:
+            print(f"   ⚠️ Could not push tag to origin (check network/credentials): {e}")
 
     print("\n" + "=" * 65)
     print("🎉 RELEASE CHECKPOINT CREATED SUCCESSFULLY!")
