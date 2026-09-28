@@ -176,12 +176,50 @@ def set_active_dossier_state(
     else:
         st.session_state.pop("custom_diff", None)
 
+    # Sync URL query parameters for deep-linking and browser reload persistence
+    try:
+        if clean_t:
+            st.query_params["ticker"] = clean_t
+        else:
+            st.query_params.pop("ticker", None)
+    except Exception:
+        pass
+
     # Institutional UX: Track recently researched stocks for quick 1-click lookup
     if clean_t:
         existing_recents = st.session_state.get("recent_searches", [])
         updated = [t for t in existing_recents if t != clean_t]
         updated.insert(0, clean_t)
         st.session_state["recent_searches"] = updated[:6]
+
+
+# Browser Refresh & Deep Linking Persistence:
+# If user refreshed the browser with an active ticker in URL, silently restore dossier from archive
+if not st.session_state.get("last_report") and "ticker" in st.query_params:
+    try:
+        init_url_ticker = sanitize_ticker_input(st.query_params.get("ticker", "")).upper()
+        if init_url_ticker:
+            c_init = get_report_by_ticker(init_url_ticker)
+            if c_init and c_init.get("report_text"):
+                c_fund = {
+                    "ticker": c_init.get("ticker", init_url_ticker),
+                    "short_name": c_init.get("short_name", init_url_ticker),
+                    "current_price": str(c_init.get("baseline_price") or "N/A"),
+                    "pe_ratio": str(c_init.get("baseline_pe") or "N/A"),
+                    "market_cap": c_init.get("baseline_mcap") or 0,
+                    "is_fallback": False
+                }
+                set_active_dossier_state(
+                    ticker=init_url_ticker,
+                    report_text=c_init["report_text"],
+                    report_date=c_init.get("formatted_date"),
+                    fundamentals=c_fund,
+                    material_reason=f"Archived Snapshot ({c_init.get('formatted_date', 'Prior Date')})",
+                    is_regenerated=False,
+                    history_df=get_historical_prices(init_url_ticker)
+                )
+    except Exception:
+        pass
 
 def execute_stock_research(query: str, selected_language: str = "English (India)"):
     """Executes the 5-phase data ingestion, validation, delta-gating, and synthesis pipeline for a stock query."""
@@ -192,13 +230,10 @@ def execute_stock_research(query: str, selected_language: str = "English (India)
         st.error("Please enter a valid company name or stock ticker (minimum 2 characters).")
         return
     try:
-        prog_slot = st.empty()
-        prog_bar = prog_slot.progress(0.20, text=f"⏳ Step 1/4: Verifying BSE Exchange Quote for {clean_query}...")
         stock_data = get_stock_fundamentals(clean_query)
         resolved_ticker = stock_data.get("ticker", clean_query)
         scrip = stock_data.get("scrip_code", "")
 
-        prog_bar.progress(0.50, text=f"⚡ Step 2/4: Concurrently Ingesting Technicals & BSE Disclosures for {resolved_ticker}...")
         import concurrent.futures
         with concurrent.futures.ThreadPoolExecutor(max_workers=2) as executor:
             future_hist = executor.submit(get_historical_prices, resolved_ticker)
@@ -214,9 +249,8 @@ def execute_stock_research(query: str, selected_language: str = "English (India)
         st.session_state["last_history"] = hist_df
         st.session_state["last_history_ticker"] = resolved_ticker
 
-        if not should_regen and selected_language == "English (India)":
-            prog_bar.progress(1.0, text="✅ Step 4/4: Verified Dossier Retrieved from Archive!")
-            prog_slot.empty()
+        # Instant silent pull if verified report exists and no material change detected
+        if not should_regen and selected_language == "English (India)" and cached and cached.get("report_text"):
             set_active_dossier_state(
                 ticker=resolved_ticker,
                 report_text=cached["report_text"],
@@ -228,8 +262,8 @@ def execute_stock_research(query: str, selected_language: str = "English (India)
             )
             st.rerun(scope="app")
         else:
-            prog_bar.progress(0.80, text="⚡ Step 3/4: Initializing 7-Pillar Institutional AI Synthesis...")
-            prog_slot.empty()
+            prog_slot = st.empty()
+            prog_bar = prog_slot.progress(0.80, text=f"⚡ {reason}. Initializing 7-Pillar Institutional AI Synthesis...")
             set_active_dossier_state(
                 ticker=resolved_ticker,
                 report_text=None,
