@@ -56,10 +56,7 @@ def render_admin_login_gate():
                     st.session_state["active_view"] = "dossier"
                     st.rerun()
 
-            st.caption(
-                "💡 *Tip: You can bookmark your private direct URL with `?admin=YOUR_PASSCODE` "
-                "for instant zero-click authorization.*"
-            )
+            st.caption("🔒 Strict password authentication enforced. Access is restricted to certified administrators.")
 
 
 def render_site_analytics_view():

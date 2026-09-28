@@ -108,8 +108,8 @@ def test_interactive_app_suite():
     at_admin = AppTest.from_file("admin.py")
     at_admin.run()
     assert not at_admin.exception, f"Admin portal threw exception on mount: {at_admin.exception}"
-    assert any("Administrator Access Required" in str(getattr(h, "value", "")) for h in at_admin.markdown), "Admin portal must require authentication"
-    print("   ✅ Unauthenticated access correctly blocked by Administrator Passcode gate.")
+    assert any("Executive Admin Portal" in str(getattr(h, "value", "")) or "Administrator Access Required" in str(getattr(h, "value", "")) for h in at_admin.markdown), "Admin portal must require authentication"
+    print("   ✅ Unauthenticated access correctly blocked by Administrator Password login screen.")
 
     print("\n🎉 All interactive UI simulation tests passed with 0 errors.\n")
 

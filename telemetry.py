@@ -58,14 +58,8 @@ def set_admin_authenticated(status: bool = True):
     st.session_state["is_admin_authenticated"] = bool(status)
 
 def check_url_admin_auth():
-    """Auto-authenticate admin if valid query parameter is passed in URL."""
-    try:
-        if hasattr(st, "query_params") and st.query_params:
-            candidate = st.query_params.get("admin") or st.query_params.get("key")
-            if candidate and verify_admin_passcode(candidate):
-                set_admin_authenticated(True)
-    except Exception:
-        pass
+    """Disabled: Strict password authentication required on login screen (no URL bypass)."""
+    pass
 
 def get_session_id() -> str:
     """Retrieve or initialize an anonymous session identifier."""
