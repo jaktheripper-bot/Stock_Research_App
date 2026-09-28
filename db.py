@@ -1,4 +1,5 @@
 import hashlib
+import json
 import logging
 import os
 import threading
@@ -331,6 +332,43 @@ def init_db(force: bool = False):
                 ''')
                 cursor.execute('CREATE INDEX IF NOT EXISTS idx_compliance_audit_ticker ON compliance_audit_log (ticker, timestamp DESC);')
                 cursor.execute("INSERT OR IGNORE INTO schema_migrations (version) VALUES ('v002_compliance_audit_log');")
+            conn.commit()
+
+        # Migration v003: Backend Site Usage Measurements & Telemetry Analytics
+        if "v003_site_usage_analytics" not in applied:
+            logger.info("Applying schema migration: v003_site_usage_analytics...")
+            if supabase_url:
+                cursor.execute('''
+                    CREATE TABLE IF NOT EXISTS site_usage_events (
+                        id SERIAL PRIMARY KEY,
+                        event_type VARCHAR(50) NOT NULL,
+                        ticker VARCHAR(20),
+                        latency_ms REAL DEFAULT 0.0,
+                        cost_saved_usd REAL DEFAULT 0.0,
+                        details TEXT,
+                        timestamp TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP
+                    );
+                ''')
+                cursor.execute('CREATE INDEX IF NOT EXISTS idx_site_usage_event_type ON site_usage_events (event_type, timestamp DESC);')
+                cursor.execute('CREATE INDEX IF NOT EXISTS idx_site_usage_ticker ON site_usage_events (ticker, timestamp DESC);')
+                cursor.execute('CREATE INDEX IF NOT EXISTS idx_site_usage_timestamp ON site_usage_events (timestamp DESC);')
+                cursor.execute("INSERT INTO schema_migrations (version) VALUES ('v003_site_usage_analytics') ON CONFLICT DO NOTHING;")
+            else:
+                cursor.execute('''
+                    CREATE TABLE IF NOT EXISTS site_usage_events (
+                        id INTEGER PRIMARY KEY AUTOINCREMENT,
+                        event_type TEXT NOT NULL,
+                        ticker TEXT,
+                        latency_ms REAL DEFAULT 0.0,
+                        cost_saved_usd REAL DEFAULT 0.0,
+                        details TEXT,
+                        timestamp DATETIME DEFAULT CURRENT_TIMESTAMP
+                    );
+                ''')
+                cursor.execute('CREATE INDEX IF NOT EXISTS idx_site_usage_event_type ON site_usage_events (event_type, timestamp DESC);')
+                cursor.execute('CREATE INDEX IF NOT EXISTS idx_site_usage_ticker ON site_usage_events (ticker, timestamp DESC);')
+                cursor.execute('CREATE INDEX IF NOT EXISTS idx_site_usage_timestamp ON site_usage_events (timestamp DESC);')
+                cursor.execute("INSERT OR IGNORE INTO schema_migrations (version) VALUES ('v003_site_usage_analytics');")
             conn.commit()
 
         _DB_INITIALIZED = True
@@ -1093,3 +1131,118 @@ def get_unread_alert_count(ticker: str = None) -> int:
         cursor.close()
         conn.close()
     return count
+
+def record_usage_event(event_type: str, ticker: str = "", latency_ms: float = 0.0, cost_saved_usd: float = 0.0, details: dict = None):
+    """
+    Records a telemetry event for backend site usage measurement.
+    Non-blocking: catches exceptions gracefully so app operations never fail if telemetry is unavailable.
+    """
+    try:
+        init_db()
+        conn = get_db_connection()
+        cursor = conn.cursor()
+        placeholder = get_placeholder()
+        clean_t = clean_ticker(ticker) if ticker else ""
+        details_json = json.dumps(details or {})
+        query = f'''
+            INSERT INTO site_usage_events (event_type, ticker, latency_ms, cost_saved_usd, details)
+            VALUES ({placeholder}, {placeholder}, {placeholder}, {placeholder}, {placeholder})
+        '''
+        cursor.execute(query, (event_type, clean_t, latency_ms, cost_saved_usd, details_json))
+        conn.commit()
+    except Exception as e:
+        logger.debug(f"Telemetry recording notice: {e}")
+    finally:
+        try:
+            cursor.close()
+            conn.close()
+        except Exception:
+            pass
+
+def get_site_usage_summary(days: int = 30) -> dict:
+    """Aggregates backend usage analytics, cache efficiency, and estimated credit savings."""
+    init_db()
+    conn = get_db_connection()
+    cursor = conn.cursor()
+    supabase_url = get_supabase_url()
+    
+    summary = {
+        "total_queries": 0,
+        "cache_hits": 0,
+        "surgical_refreshes": 0,
+        "full_syntheses": 0,
+        "cache_efficiency_pct": 0.0,
+        "total_cost_saved_usd": 0.0,
+        "pdf_downloads": 0,
+        "comparisons": 0,
+        "watchlist_actions": 0,
+        "top_searched_tickers": [],
+        "recent_events": [],
+    }
+    try:
+        if supabase_url:
+            time_filter = f"timestamp >= NOW() - INTERVAL '{days} days'"
+        else:
+            time_filter = f"timestamp >= datetime('now', '-{days} days')"
+
+        cursor.execute(f'''
+            SELECT event_type, COUNT(*), COALESCE(SUM(cost_saved_usd), 0.0)
+            FROM site_usage_events
+            WHERE {time_filter}
+            GROUP BY event_type
+        ''')
+        for row in cursor.fetchall():
+            ev, count, saved = row[0], int(row[1]), float(row[2])
+            summary["total_cost_saved_usd"] += saved
+            if ev in ["SEARCH", "QUERY"]:
+                summary["total_queries"] += count
+            elif ev == "CACHE_HIT":
+                summary["cache_hits"] += count
+            elif ev == "SURGICAL_REFRESH":
+                summary["surgical_refreshes"] += count
+            elif ev == "FULL_SYNTHESIS":
+                summary["full_syntheses"] += count
+            elif ev == "PDF_DOWNLOAD":
+                summary["pdf_downloads"] += count
+            elif ev in ["COMPARE", "COMPARE_STOCKS"]:
+                summary["comparisons"] += count
+            elif ev in ["WATCHLIST_ADD", "WATCHLIST"]:
+                summary["watchlist_actions"] += count
+
+        effective_searches = max(summary["total_queries"], summary["cache_hits"] + summary["full_syntheses"] + summary["surgical_refreshes"])
+        summary["total_queries"] = effective_searches
+        if effective_searches > 0:
+            free_served = summary["cache_hits"] + summary["surgical_refreshes"]
+            summary["cache_efficiency_pct"] = round((free_served / effective_searches) * 100.0, 1)
+
+        cursor.execute(f'''
+            SELECT ticker, COUNT(*) as cnt
+            FROM site_usage_events
+            WHERE {time_filter} AND ticker IS NOT NULL AND ticker != ''
+            GROUP BY ticker
+            ORDER BY cnt DESC
+            LIMIT 8
+        ''')
+        summary["top_searched_tickers"] = [{"ticker": row[0], "count": int(row[1])} for row in cursor.fetchall()]
+
+        cursor.execute(f'''
+            SELECT event_type, ticker, latency_ms, cost_saved_usd, timestamp
+            FROM site_usage_events
+            ORDER BY timestamp DESC
+            LIMIT 12
+        ''')
+        for row in cursor.fetchall():
+            summary["recent_events"].append({
+                "event_type": row[0],
+                "ticker": row[1] or "-",
+                "latency_ms": round(float(row[2] or 0), 1),
+                "cost_saved_usd": round(float(row[3] or 0), 3),
+                "formatted_time": _format_timestamp(row[4])
+            })
+    except Exception as e:
+        logger.error(f"Error fetching site usage summary: {e}")
+    finally:
+        cursor.close()
+        conn.close()
+    return summary
+

@@ -86,7 +86,33 @@ def test_interactive_app_suite():
     else:
         print("   ℹ️ No archive stocks available to select (empty archive).")
 
+    # 5. Peer Comparison & Telemetry Analytics View Navigation Simulation
+    print("\n5. Simulating Peer Comparison & Telemetry Analytics View Navigation...")
+    btn_compare = [b for b in at.button if b.key == "btn_nav_compare"]
+    if btn_compare:
+        print("   • Navigating to '⚖️ Peer Comparison' view...")
+        btn_compare[0].click().run()
+        assert not at.exception, f"Navigating to Peer Comparison threw exception: {at.exception}"
+        assert any("Peer Comparison" in str(getattr(h, "value", "")) for h in at.markdown), "Peer Comparison header should be visible"
+        print("   ✅ Peer Comparison view mounted and verified cleanly.")
+
+    btn_analytics = [b for b in at.button if b.key == "btn_nav_analytics"]
+    if btn_analytics:
+        print("   • Navigating to '📊 Site Usage & Analytics' view...")
+        btn_analytics[0].click().run()
+        assert not at.exception, f"Navigating to Site Analytics threw exception: {at.exception}"
+        assert any("Site Usage" in str(getattr(h, "value", "")) for h in at.markdown), "Site Usage header should be visible"
+        print("   ✅ Site Usage & Telemetry Analytics view mounted and verified cleanly.")
+
+    btn_dossier = [b for b in at.button if b.key == "btn_nav_dossier"]
+    if btn_dossier:
+        print("   • Returning to '🔍 Institutional Research Dossier' view...")
+        btn_dossier[0].click().run()
+        assert not at.exception, f"Returning to Dossier threw exception: {at.exception}"
+        print("   ✅ Institutional Research Dossier view restored cleanly.")
+
     print("\n🎉 All interactive UI simulation tests passed with 0 errors.\n")
 
 if __name__ == "__main__":
     test_interactive_app_suite()
+

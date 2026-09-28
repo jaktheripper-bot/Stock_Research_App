@@ -27,6 +27,8 @@ from analyzer import (
     get_historical_prices,
     execute_surgical_pillar_update,
     splice_report_pillars,
+    evaluate_company_disparity,
+    compare_two_companies,
 )
 from db import (
     IST,
@@ -44,6 +46,8 @@ from db import (
     mark_all_alerts_as_read,
     dismiss_alert,
     dismiss_all_alerts,
+    record_usage_event,
+    get_site_usage_summary,
 )
 from alerts import run_surveillance_scan
 from bse_master import get_ticker_suggestions
@@ -56,6 +60,8 @@ from ui.scorecard import (
     render_thesis_drift_panel,
     render_dual_speed_report,
 )
+from ui.comparison import render_peer_comparison_view
+from ui.analytics_hub import render_site_analytics_view
 
 st.set_page_config(page_title="Equity Research AI", layout="wide", page_icon="📈")
 
@@ -239,6 +245,7 @@ def execute_stock_research(query: str, selected_language: str = "English (India)
         stock_data = get_stock_fundamentals(clean_query)
         resolved_ticker = stock_data.get("ticker", clean_query)
         scrip = stock_data.get("scrip_code", "")
+        record_usage_event("SEARCH", resolved_ticker)
 
         import concurrent.futures
         with concurrent.futures.ThreadPoolExecutor(max_workers=2) as executor:
@@ -262,6 +269,7 @@ def execute_stock_research(query: str, selected_language: str = "English (India)
 
         # Instant silent pull if verified report exists and no material change detected
         if not should_regen and selected_language == "English (India)" and cached and cached.get("report_text"):
+            record_usage_event("CACHE_HIT", resolved_ticker, cost_saved_usd=0.036, details={"reason": reason})
             set_active_dossier_state(
                 ticker=resolved_ticker,
                 report_text=cached["report_text"],
@@ -276,6 +284,7 @@ def execute_stock_research(query: str, selected_language: str = "English (India)
             # Price shifted >= 5%, but business fundamentals, moat, and governance remain unchanged.
             # Silently mount verified dossier immediately for zero wait time,
             # and stage a smart notification banner offering surgical update.
+            record_usage_event("CACHE_HIT", resolved_ticker, cost_saved_usd=0.036, details={"reason": reason, "delta": True})
             st.session_state["pending_price_delta"] = {
                 "reason": reason,
                 "stock_data": stock_data,
@@ -295,6 +304,7 @@ def execute_stock_research(query: str, selected_language: str = "English (India)
             )
             st.rerun(scope="app")
         else:
+            record_usage_event("FULL_SYNTHESIS", resolved_ticker, details={"reason": reason})
             prog_slot = st.empty()
             prog_bar = prog_slot.progress(0.80, text=f"⚡ {reason}. Initializing 7-Pillar Institutional AI Synthesis...")
             set_active_dossier_state(
@@ -556,6 +566,31 @@ with st.sidebar:
 
 st.title("Equity Research Analysis Platform")
 st.markdown('<p style="font-size: 19px; color: #888888;">To aid stock discovery and simplify fundamentals.</p>', unsafe_allow_html=True)
+
+# Navigation Controls
+nav_c1, nav_c2, nav_c3 = st.columns(3)
+cur_view = st.session_state.get("active_view", "dossier")
+with nav_c1:
+    if st.button("🔍 Institutional Dossier", key="btn_nav_dossier", type="primary" if cur_view == "dossier" else "secondary", width="stretch"):
+        st.session_state["active_view"] = "dossier"
+        st.rerun()
+with nav_c2:
+    if st.button("⚖️ Peer Comparison", key="btn_nav_compare", type="primary" if cur_view == "compare" else "secondary", width="stretch"):
+        st.session_state["active_view"] = "compare"
+        st.rerun()
+with nav_c3:
+    if st.button("📊 Site Usage & Analytics", key="btn_nav_analytics", type="primary" if cur_view == "analytics" else "secondary", width="stretch"):
+        st.session_state["active_view"] = "analytics"
+        st.rerun()
+
+st.markdown("<div style='height: 10px;'></div>", unsafe_allow_html=True)
+
+if cur_view == "compare":
+    render_peer_comparison_view()
+    st.stop()
+elif cur_view == "analytics":
+    render_site_analytics_view()
+    st.stop()
 
 with st.form("search_form", clear_on_submit=False):
     col_q1, col_q2 = st.columns([3, 1])
@@ -1003,6 +1038,7 @@ if ("last_report" in st.session_state and st.session_state["last_report"] is not
                         )
                         st.session_state["last_report"] = updated_report
                         st.session_state["last_report_date"] = datetime.now(IST).strftime("%d-%b-%Y %H:%M IST")
+                        record_usage_event("SURGICAL_REFRESH", clean_ticker, cost_saved_usd=0.035, details={"reason": p_delta.get("reason")})
                         st.session_state.pop("pending_price_delta", None)
                         st.toast("Valuation & Technicals surgically updated!", icon="⚡")
                         st.rerun(scope="app")
@@ -1183,6 +1219,7 @@ if ("last_report" in st.session_state and st.session_state["last_report"] is not
                     st.session_state.get("last_history")
                 )
                 st.session_state["pdf_cache_id"] = pdf_cache_id
+                record_usage_event("PDF_DOWNLOAD", clean_ticker)
             except Exception as pdf_err:
                 st.session_state["cached_pdf_bytes"] = None
                 st.caption(f"PDF export notice: {pdf_err}")
