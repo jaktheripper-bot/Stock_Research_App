@@ -1,0 +1,63 @@
+#!/usr/bin/env bash
+# ==============================================================================
+# Unified CLI Task Runner for Stock Research App
+# Automatically resolves .venv/bin/python and executes standardized workflows
+# ==============================================================================
+
+set -e
+
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+cd "$SCRIPT_DIR"
+
+# Resolve virtual environment Python
+if [ -f "$SCRIPT_DIR/.venv/bin/python" ]; then
+    PYTHON="$SCRIPT_DIR/.venv/bin/python"
+    STREAMLIT="$SCRIPT_DIR/.venv/bin/streamlit"
+elif [ -f "$SCRIPT_DIR/venv/bin/python" ]; then
+    PYTHON="$SCRIPT_DIR/venv/bin/python"
+    STREAMLIT="$SCRIPT_DIR/venv/bin/streamlit"
+else
+    PYTHON="python3"
+    STREAMLIT="streamlit"
+fi
+
+COMMAND="${1:-test}"
+
+case "$COMMAND" in
+    lint)
+        echo "--> [1/1] Running Streamlit Static Linter & Guardrails..."
+        "$PYTHON" lint_streamlit.py
+        ;;
+    test)
+        echo "--> [1/3] Running Streamlit Static Linter..."
+        "$PYTHON" lint_streamlit.py
+        echo "--> [2/3] Running System Integrity & Contract Audit..."
+        "$PYTHON" check_system.py
+        echo "--> [3/3] Running Interactive UI Simulation Suite..."
+        "$PYTHON" test_ui_headless.py
+        echo "✅ All tests passed successfully."
+        ;;
+    bench)
+        echo "--> Running Performance Benchmark..."
+        "$PYTHON" benchmark.py
+        ;;
+    preflight)
+        echo "--> [1/4] Running Streamlit Static Linter..."
+        "$PYTHON" lint_streamlit.py
+        echo "--> [2/4] Running System Integrity Audit..."
+        "$PYTHON" check_system.py
+        echo "--> [3/4] Running Interactive UI Action Simulation..."
+        "$PYTHON" test_ui_headless.py
+        echo "--> [4/4] Enforcing Latency & Performance Budget..."
+        "$PYTHON" benchmark.py
+        echo "🎉 PRE-FLIGHT VALIDATION COMPLETE. Ready for deployment."
+        ;;
+    start)
+        echo "--> Starting Streamlit Dev Server on http://localhost:8501..."
+        "$STREAMLIT" run app.py
+        ;;
+    *)
+        echo "Usage: ./run.sh [lint | test | bench | preflight | start]"
+        exit 1
+        ;;
+esac
