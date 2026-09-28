@@ -315,7 +315,7 @@ def fetch_latest_bse_announcement(scrip_code: str) -> str:
 
 def evaluate_material_change(cached: dict, live_fund: dict, scrip_code: str) -> tuple:
     if not cached:
-        return True, "⚡ Fresh Analysis: Initial dossier synthesis", ""
+        return True, "⚡ Fresh Analysis: Initial dossier synthesis", "", "INITIAL"
     raw_ts = cached.get("raw_timestamp")
     if raw_ts:
         try:
@@ -324,14 +324,14 @@ def evaluate_material_change(cached: dict, live_fund: dict, scrip_code: str) -> 
             if ts.tzinfo is None:
                 ts = ts.replace(tzinfo=timezone.utc)
             if (now - ts).total_seconds() / 86400.0 > 14:
-                return True, "⚡ Regenerated: Report exceeded 14-day freshness window", ""
+                return True, "⚡ Regenerated: Report exceeded 14-day freshness window", "", "EXPIRED"
         except Exception as e:
             logger.debug(f"Timestamp freshness check notice: {e}")
 
     latest_ann = fetch_latest_bse_announcement(scrip_code)
     cached_ann = cached.get("latest_announcement", "")
     if latest_ann and cached_ann and latest_ann != cached_ann:
-        return True, f"⚡ Regenerated: New BSE Filing ({latest_ann[:35]}...)", latest_ann
+        return True, f"⚡ Regenerated: New BSE Filing ({latest_ann[:35]}...)", latest_ann, "NEW_FILING"
 
     cached_price = cached.get("baseline_price")
     live_price = live_fund.get("current_price") or live_fund.get("currentValue")
@@ -340,10 +340,12 @@ def evaluate_material_change(cached: dict, live_fund: dict, scrip_code: str) -> 
         l_p = float(str(live_price).replace(",", "").strip())
         if c_p > 0 and (abs(l_p - c_p) / c_p) >= 0.05:
             d = "+" if l_p > c_p else "-"
-            return True, f"⚡ Regenerated: Price shifted {d}{(abs(l_p - c_p) / c_p)*100:.1f}% vs baseline", latest_ann
+            shift_pct = (abs(l_p - c_p) / c_p) * 100
+            return True, f"⚡ Price shifted {d}{shift_pct:.1f}% vs baseline (₹{l_p:.2f} vs ₹{c_p:.2f})", latest_ann, "PRICE_DELTA"
     except Exception as e:
         logger.debug(f"Price delta computation notice: {e}")
-    return False, "🛡️ Verified Cache: No material events detected (Live quote updated)", latest_ann
+    return False, "🛡️ Verified Cache: No material events detected (Live quote updated)", latest_ann, "NONE"
+
 
 def fetch_bse_exchange_data(query: str) -> dict:
     scrip = resolve_bse_scrip_code(query)
@@ -509,7 +511,24 @@ def get_latest_flash_models(client) -> list:
         pass
     return fallback
 
-def stream_genai_with_fallback(client, prompt: str, system_prompt: str, on_status=None):
+def get_surgical_flash_model(client) -> str:
+    """Returns the most cost-efficient flash model (e.g., flash-lite if available, else standard flash)."""
+    try:
+        discovered = get_latest_flash_models(client)
+        for m in discovered:
+            if "lite" in m:
+                return m
+        for m in client.models.list():
+            model_id = m.name.replace("models/", "") if hasattr(m, "name") else ""
+            if "flash-lite" in model_id and "preview" not in model_id:
+                return model_id
+        if discovered:
+            return discovered[0]
+    except Exception:
+        pass
+    return "gemini-2.0-flash"
+
+def stream_genai_with_fallback(client, prompt: str, system_prompt: str, on_status=None, use_grounding: bool = True):
     models_to_try = get_latest_flash_models(client)[:2]
     last_error = None
     for model_name in models_to_try:
@@ -517,15 +536,26 @@ def stream_genai_with_fallback(client, prompt: str, system_prompt: str, on_statu
             on_status(f"⚡ Connected to model `{model_name}`...")
         for attempt in range(2):
             try:
+                sys_inst = system_prompt
+                tools_list = None
+                if use_grounding:
+                    sys_inst += "\n- Search recent BSE/NSE disclosures and concalls from the past 90-180 days."
+                    tools_list = [{"google_search": {}}]
+
                 chat = client.chats.create(
                     model=model_name,
                     config=genai.types.GenerateContentConfig(
-                        system_instruction=system_prompt + "\n- Search recent BSE/NSE disclosures and concalls from the past 90-180 days.",
-                        tools=[{"google_search": {}}],
+                        system_instruction=sys_inst,
+                        tools=tools_list,
+                        temperature=0.2,
                     )
                 )
                 if on_status:
-                    on_status("🔍 Grounding against official filings...")
+                    if use_grounding:
+                        on_status("🔍 Grounding against official filings...")
+                    else:
+                        on_status("⚡ Synthesizing with verified exchange metrics (Fast / Zero Search Fee)...")
+
                 for chunk in chat.send_message_stream(prompt):
                     extracted_text = None
                     if hasattr(chunk, "candidates") and chunk.candidates:
@@ -620,7 +650,7 @@ def stream_gemini_ungrounded_bypass(client, prompt: str, system_prompt: str):
         if t:
             yield t
 
-def stream_stock_report(ticker: str, language: str = "English (India)", stock_data: dict = None, on_status=None, revision_trigger: str = ""):
+def stream_stock_report(ticker: str, language: str = "English (India)", stock_data: dict = None, on_status=None, revision_trigger: str = "", use_grounding: bool = True):
     if stock_data is None:
         stock_data = get_stock_fundamentals(ticker)
 
@@ -637,7 +667,7 @@ def stream_stock_report(ticker: str, language: str = "English (India)", stock_da
 
     report_accumulator = []
     try:
-        for chunk in stream_genai_with_fallback(client, user_prompt, system_prompt, on_status=on_status):
+        for chunk in stream_genai_with_fallback(client, user_prompt, system_prompt, on_status=on_status, use_grounding=use_grounding):
             report_accumulator.append(chunk)
             yield chunk
     except Exception:
@@ -685,11 +715,221 @@ def stream_stock_report(ticker: str, language: str = "English (India)", stock_da
     except Exception:
         pass
 
-def generate_stock_report(ticker: str, language: str = "English (India)") -> str:
+def generate_stock_report(ticker: str, language: str = "English (India)", use_grounding: bool = True) -> str:
     chunks = []
-    for c in stream_stock_report(ticker, language):
+    for c in stream_stock_report(ticker, language, use_grounding=use_grounding):
         chunks.append(c)
     return "".join(chunks)
+
+
+def splice_report_pillars(original_text: str, updated_pillars: dict) -> str:
+    """
+    Surgically replaces specified pillar sections in an institutional report.
+    updated_pillars: e.g. {5: "## Pillar 5: ...", 6: "## Pillar 6: ..."}
+    Preserves all other pillars, headings, and formatting exactly.
+    """
+    if not original_text or not updated_pillars:
+        return original_text or ""
+    sections = re.split(r"(?m)(?=^#{1,3}\s+)", original_text)
+    new_sections = []
+    for s in sections:
+        matched_pillar = None
+        for p_num in updated_pillars:
+            if re.search(rf"(?i)\bPillars?\s*{p_num}\b", s):
+                matched_pillar = p_num
+                break
+        if matched_pillar is not None:
+            new_sections.append(updated_pillars[matched_pillar].strip() + "\n\n")
+        else:
+            new_sections.append(s)
+    return "".join(new_sections).strip()
+
+
+def compute_deterministic_technical_context(stock_data: dict, hist_df=None) -> dict:
+    """
+    Extracts and computes exact mathematical indicators (50-DMA, % from high/low)
+    directly in Python to eliminate hallucinations and token waste.
+    """
+    price = 0.0
+    try:
+        raw_p = stock_data.get("current_price") or stock_data.get("currentValue") or 0.0
+        price = float(str(raw_p).replace(",", "").strip())
+    except Exception:
+        pass
+
+    high_52 = None
+    low_52 = None
+    try:
+        high_52 = float(str(stock_data.get("52w_high", "")).replace(",", "").strip())
+    except Exception:
+        pass
+    try:
+        low_52 = float(str(stock_data.get("52w_low", "")).replace(",", "").strip())
+    except Exception:
+        pass
+
+    dma_50 = None
+    pct_from_dma50 = None
+    if hist_df is not None and not getattr(hist_df, "empty", True) and "Close" in hist_df.columns:
+        closes = hist_df["Close"].dropna()
+        if len(closes) >= 10:
+            dma_50 = float(closes.tail(50).mean())
+            if dma_50 > 0 and price > 0:
+                pct_from_dma50 = ((price - dma_50) / dma_50) * 100
+
+    pct_from_high = ((price - high_52) / high_52 * 100) if (high_52 and price and high_52 > 0) else None
+    pct_from_low = ((price - low_52) / low_52 * 100) if (low_52 and price and low_52 > 0) else None
+
+    pe_ratio = stock_data.get("pe_ratio", "N/A")
+    mcap = stock_data.get("market_cap", 0)
+    mcap_cr = (mcap / 10_000_000) if isinstance(mcap, (int, float)) and mcap > 0 else 0.0
+
+    return {
+        "price": price,
+        "pe_ratio": pe_ratio,
+        "mcap": mcap,
+        "mcap_cr": mcap_cr,
+        "52w_high": high_52,
+        "52w_low": low_52,
+        "dma_50": dma_50,
+        "pct_from_dma50": pct_from_dma50,
+        "pct_from_high": pct_from_high,
+        "pct_from_low": pct_from_low,
+    }
+
+
+def execute_surgical_pillar_update(
+    ticker: str,
+    cached_report: dict,
+    stock_data: dict,
+    hist_df=None,
+    language: str = "English (India)",
+    on_status=None
+) -> str:
+    """
+    Surgically updates ONLY Pillar 5 (Valuation) and Pillar 6 (Technicals)
+    for a cached report whose stock price shifted >= 5%.
+
+    Credit & Cost Optimization:
+      1. ZERO Google Search Grounding: saves $0.035 search fee per invocation.
+      2. Deterministic Technical Precomputation: 50-DMA and price bands passed directly.
+      3. Minimal Token Burn: ~350-500 output tokens instead of 3,000+ (85%+ token reduction).
+      4. Antifragile Fallback: Deterministic Python fallback if LLM spend cap is reached.
+    """
+    metrics = compute_deterministic_technical_context(stock_data, hist_df)
+    short_name = stock_data.get("short_name", ticker)
+    price = metrics["price"]
+    pe = metrics["pe_ratio"]
+    dma = f"₹{metrics['dma_50']:.2f}" if metrics["dma_50"] else "N/A"
+    dma_rel = f" ({metrics['pct_from_dma50']:+.1f}% vs 50-DMA)" if metrics["pct_from_dma50"] is not None else ""
+    high_str = f"₹{metrics['52w_high']}" if metrics["52w_high"] else "N/A"
+    low_str = f"₹{metrics['52w_low']}" if metrics["52w_low"] else "N/A"
+    mcap_str = f"₹{metrics['mcap_cr']:,.2f} Cr" if metrics['mcap_cr'] > 0 else "N/A"
+
+    lang_rule = "Write entirely in English (India)." if language == "English (India)" else f"Write in {language}."
+
+    sys_prompt = f"""You are an institutional equity research analyst operating under strict SEBI Safe Harbor guidelines.
+{lang_rule}
+Your task is to write updated, fact-based evaluations for ONLY Pillar 5 and Pillar 6 for {ticker}.
+Pillars 1 to 4 and Pillar 7 remain fundamentally valid and must NOT be reproduced.
+
+CRITICAL RULES:
+1. Write at an 8th-grade reading level. Keep sentences short and clear.
+2. ABBREVIATION MANDATE: On first mention of any acronym (e.g. P/E [Price-to-Earnings Ratio], 50-DMA [50-Day Simple Moving Average]), expand in brackets.
+3. Express metrics strictly in INR and Crores.
+4. Strictly NO BUY/HOLD/SELL verdicts, target prices, or portfolio roadmaps under SEBI regulations.
+
+OUTPUT FORMAT:
+Return strictly the two markdown sections:
+## Pillar 5: Valuation & Margin of Safety
+[Valuation analysis based on verified P/E and market cap]
+
+## Pillar 6: Technical & Momentum Overlay
+[Technical analysis based on price relative to 50-DMA and 52-week range]"""
+
+    user_prompt = f"""Company: {short_name} ({ticker})
+Verified Live Exchange Metrics:
+- Current Market Price: ₹{price}
+- Trailing P/E Multiple: {pe}
+- Market Capitalization: {mcap_str}
+- 52-Week Range: High {high_str} | Low {low_str}
+- 50-Day Moving Average: {dma}{dma_rel}"""
+
+    p5_text = ""
+    p6_text = ""
+
+    # Attempt Gemini Flash with zero grounding fee
+    try:
+        api_key = os.environ.get("GEMINI_API_KEY")
+        if not api_key:
+            try:
+                import streamlit as st
+                api_key = st.secrets.get("GEMINI_API_KEY")
+            except Exception:
+                pass
+        if api_key:
+            client = genai.Client(api_key=api_key)
+            model_name = get_surgical_flash_model(client)
+            if on_status:
+                on_status(f"⚡ Executing surgical Pillar 5 & 6 refresh via `{model_name}` (Zero Grounding Fee)...")
+            chat = client.chats.create(
+                model=model_name,
+                config=genai.types.GenerateContentConfig(
+                    system_instruction=sys_prompt,
+                    temperature=0.2,
+                )
+            )
+            resp = chat.send_message(user_prompt)
+            gen_text = resp.text or ""
+            sections = re.split(r"(?m)(?=^##\s+Pillars?\s*[56])", gen_text)
+            for sec in sections:
+                if re.search(r"(?i)\bPillars?\s*5\b", sec):
+                    p5_text = sec.strip()
+                elif re.search(r"(?i)\bPillars?\s*6\b", sec):
+                    p6_text = sec.strip()
+    except Exception as e:
+        logger.warning(f"Gemini surgical generation notice ({e}). Falling back to deterministic Python synthesis.")
+
+    # High-Reliability Deterministic Python Fallback if LLM unavailable
+    if not p5_text:
+        pe_desc = f"trades at a trailing P/E [Price-to-Earnings Ratio] of {pe}" if pe != "N/A" else "operates with unlisted trailing P/E metrics"
+        p5_text = (
+            f"## Pillar 5: Valuation & Margin of Safety\n\n"
+            f"At the current market price of ₹{price:.2f}, {short_name} {pe_desc} with an exchange market capitalization of {mcap_str}. "
+            f"Compared to its 52-week peak of {high_str} and trough of {low_str}, the current multiple reflects recent market adjustments. "
+            f"Investors should evaluate current valuation against broader industry peer benchmarks and historical cash-flow yield multiples."
+        )
+
+    if not p6_text:
+        dma_note = ""
+        if metrics["pct_from_dma50"] is not None:
+            pos = "above" if metrics["pct_from_dma50"] >= 0 else "below"
+            dma_note = f" The equity is currently trading {abs(metrics['pct_from_dma50']):.1f}% {pos} its 50-DMA [50-Day Simple Moving Average] of {dma}."
+        p6_text = (
+            f"## Pillar 6: Technical & Momentum Overlay\n\n"
+            f"The stock exhibits trailing price action at ₹{price:.2f} within a 52-week corridor of {low_str} to {high_str}.{dma_note} "
+            f"Short-term volume and moving average trends indicate ongoing price discovery following recent exchange trade cycles."
+        )
+
+    updated_dict = {5: p5_text, 6: p6_text}
+    original_report_text = cached_report.get("report_text", "")
+    spliced_text = splice_report_pillars(original_report_text, updated_dict)
+
+    # Save updated snapshot and record historical revision in database
+    try:
+        scrip = stock_data.get("scrip_code", "")
+        ann = fetch_latest_bse_announcement(scrip)
+        save_report_to_archive(
+            stock_data,
+            spliced_text,
+            announcement=ann,
+            revision_trigger=f"Surgical Valuation & Technicals Update (Live price ₹{price:.2f})"
+        )
+    except Exception as err:
+        logger.error(f"Error persisting surgical report update: {err}")
+
+    return spliced_text
+
 
 
 

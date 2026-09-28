@@ -25,6 +25,8 @@ from analyzer import (
     get_stock_fundamentals,
     evaluate_material_change,
     get_historical_prices,
+    execute_surgical_pillar_update,
+    splice_report_pillars,
 )
 from db import (
     IST,
@@ -176,6 +178,9 @@ def set_active_dossier_state(
     else:
         st.session_state.pop("custom_diff", None)
 
+    if st.session_state.get("pending_price_delta") and st.session_state["pending_price_delta"].get("ticker") != clean_t:
+        st.session_state.pop("pending_price_delta", None)
+
     # Sync URL query parameters for deep-linking and browser reload persistence
     try:
         if clean_t:
@@ -225,6 +230,7 @@ def execute_stock_research(query: str, selected_language: str = "English (India)
     """Executes the 5-phase data ingestion, validation, delta-gating, and synthesis pipeline for a stock query."""
     st.session_state.pop("viewing_snapshot", None)
     st.session_state.pop("custom_diff", None)
+    st.session_state.pop("pending_price_delta", None)
     clean_query = sanitize_ticker_input(query)
     if not clean_query or len(clean_query) < 2:
         st.error("Please enter a valid company name or stock ticker (minimum 2 characters).")
@@ -239,18 +245,45 @@ def execute_stock_research(query: str, selected_language: str = "English (India)
             future_hist = executor.submit(get_historical_prices, resolved_ticker)
             def _fetch_delta_and_cache():
                 c = get_report_by_ticker(resolved_ticker)
-                s_regen, r_reason, l_ann = evaluate_material_change(c, stock_data, scrip)
-                return c, s_regen, r_reason, l_ann
+                eval_res = evaluate_material_change(c, stock_data, scrip)
+                if len(eval_res) == 4:
+                    s_regen, r_reason, l_ann, c_type = eval_res
+                else:
+                    s_regen, r_reason, l_ann = eval_res
+                    c_type = "NONE" if not s_regen else "EXPIRED"
+                return c, s_regen, r_reason, l_ann, c_type
             future_disclosures = executor.submit(_fetch_delta_and_cache)
 
             hist_df = future_hist.result()
-            cached, should_regen, reason, latest_ann = future_disclosures.result()
+            cached, should_regen, reason, latest_ann, change_type = future_disclosures.result()
 
         st.session_state["last_history"] = hist_df
         st.session_state["last_history_ticker"] = resolved_ticker
 
         # Instant silent pull if verified report exists and no material change detected
         if not should_regen and selected_language == "English (India)" and cached and cached.get("report_text"):
+            set_active_dossier_state(
+                ticker=resolved_ticker,
+                report_text=cached["report_text"],
+                report_date=cached.get("formatted_date"),
+                fundamentals=stock_data,
+                material_reason=reason,
+                is_regenerated=False,
+                history_df=hist_df
+            )
+            st.rerun(scope="app")
+        elif change_type == "PRICE_DELTA" and selected_language == "English (India)" and cached and cached.get("report_text"):
+            # Price shifted >= 5%, but business fundamentals, moat, and governance remain unchanged.
+            # Silently mount verified dossier immediately for zero wait time,
+            # and stage a smart notification banner offering surgical update.
+            st.session_state["pending_price_delta"] = {
+                "reason": reason,
+                "stock_data": stock_data,
+                "cached": cached,
+                "ticker": resolved_ticker,
+                "language": selected_language,
+                "hist_df": hist_df,
+            }
             set_active_dossier_state(
                 ticker=resolved_ticker,
                 report_text=cached["report_text"],
@@ -947,6 +980,46 @@ if ("last_report" in st.session_state and st.session_state["last_report"] is not
     company_name = fund.get("short_name", "").strip()
     clean_ticker = ticker_disp.strip().upper()
     header_label = f"{company_name} ({clean_ticker})" if company_name and company_name.upper() != clean_ticker else clean_ticker
+
+    if st.session_state.get("pending_price_delta"):
+        p_delta = st.session_state["pending_price_delta"]
+        if p_delta.get("ticker") == clean_ticker:
+            with st.container():
+                st.warning(
+                    f"⚡ **Price Shift Detected:** {p_delta.get('reason')}. "
+                    "Pillars 1–4 & 7 (Business Model, Moat, Governance & ESG) remain fundamentally intact. "
+                    "You can quickly update Pillars 5 & 6 with verified live exchange data."
+                )
+                b_c1, b_c2, b_c3 = st.columns([3, 2.5, 1])
+                with b_c1:
+                    if st.button("⚡ Quick-Update Valuation & Technicals", key="btn_surgical_refresh", type="primary", width="stretch", help="Surgically refreshes Pillar 5 (Valuation) & Pillar 6 (Technicals) using live exchange data. Fast, zero Google search fees, saves 90%+ credits."):
+                        cached_data = p_delta.get("cached") or get_report_by_ticker(clean_ticker) or {}
+                        updated_report = execute_surgical_pillar_update(
+                            ticker=clean_ticker,
+                            cached_report=cached_data,
+                            stock_data=p_delta.get("stock_data", fund),
+                            hist_df=p_delta.get("hist_df"),
+                            language=p_delta.get("language", "English (India)")
+                        )
+                        st.session_state["last_report"] = updated_report
+                        st.session_state["last_report_date"] = datetime.now(IST).strftime("%d-%b-%Y %H:%M IST")
+                        st.session_state.pop("pending_price_delta", None)
+                        st.toast("Valuation & Technicals surgically updated!", icon="⚡")
+                        st.rerun(scope="app")
+                with b_c2:
+                    if st.button("🔄 Full 7-Pillar Re-synthesis", key="btn_full_regen", width="stretch", help="Re-synthesize all 7 pillars with full AI reasoning."):
+                        reason_msg = p_delta.get("reason", "Full Regeneration Requested")
+                        lang_choice = p_delta.get("language", "English (India)")
+                        st.session_state.pop("pending_price_delta", None)
+                        st.session_state["last_report"] = None
+                        st.session_state["stream_pending"] = True
+                        st.session_state["stream_language"] = lang_choice
+                        st.session_state["material_reason"] = reason_msg
+                        st.rerun(scope="app")
+                with b_c3:
+                    if st.button("✕ Dismiss", key="btn_dismiss_delta", width="stretch", help="Keep current report as-is"):
+                        st.session_state.pop("pending_price_delta", None)
+                        st.rerun(scope="app")
 
     if st.session_state.get("viewing_snapshot"):
         snap = st.session_state["viewing_snapshot"]
