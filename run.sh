@@ -56,8 +56,23 @@ case "$COMMAND" in
         echo "--> Starting Streamlit Dev Server on http://localhost:8501..."
         "$STREAMLIT" run app.py
         ;;
+    checkpoint)
+        shift
+        echo "--> [1/1] Managing Release Checkpoint Creation..."
+        "$PYTHON" ci/checkpoint_manager.py create "$@"
+        ;;
+    rollback)
+        shift
+        echo "--> [1/1] Initiating Production Disaster Recovery Rollback..."
+        "$PYTHON" ci/checkpoint_manager.py rollback "$@"
+        ;;
+    checkpoints|list-checkpoints)
+        shift
+        "$PYTHON" ci/checkpoint_manager.py list "$@"
+        ;;
     *)
-        echo "Usage: ./run.sh [lint | test | bench | preflight | start]"
+        echo "Usage: ./run.sh [lint | test | bench | preflight | start | checkpoint | rollback | checkpoints]"
         exit 1
         ;;
 esac
+
