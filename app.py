@@ -1,4 +1,5 @@
 import re
+import logging
 from datetime import datetime, timezone, timedelta
 import traceback
 import platform
@@ -7,6 +8,12 @@ import os
 import sys
 import time
 import streamlit as st
+
+logging.basicConfig(
+    level=logging.INFO,
+    format="%(asctime)s [%(levelname)s] [%(name)s]: %(message)s"
+)
+logger = logging.getLogger("equity_research.app")
 
 IST = timezone(timedelta(hours=5, minutes=30))
 from analyzer import (
@@ -167,6 +174,13 @@ def set_active_dossier_state(
         st.session_state["custom_diff"] = custom_diff
     else:
         st.session_state.pop("custom_diff", None)
+
+    # Institutional UX: Track recently researched stocks for quick 1-click lookup
+    if clean_t:
+        existing_recents = st.session_state.get("recent_searches", [])
+        updated = [t for t in existing_recents if t != clean_t]
+        updated.insert(0, clean_t)
+        st.session_state["recent_searches"] = updated[:6]
 
 def execute_stock_research(query: str, selected_language: str = "English (India)"):
     """Executes the 5-phase data ingestion, validation, delta-gating, and synthesis pipeline for a stock query."""
@@ -494,6 +508,32 @@ with st.form("search_form", clear_on_submit=False):
 
 if submitted and query:
     execute_stock_research(query, selected_language)
+
+# Quick Lookup Chips: Recently Researched Stocks
+recent_tickers = st.session_state.get("recent_searches")
+if recent_tickers is None:
+    try:
+        recent_tickers = [r["ticker"] for r in get_archived_reports()[:5] if r.get("ticker")]
+    except Exception:
+        recent_tickers = []
+    st.session_state["recent_searches"] = recent_tickers
+
+if recent_tickers:
+    st.markdown(
+        """
+        <div style="display: flex; align-items: center; gap: 8px; margin-top: 4px; margin-bottom: 8px;">
+            <span style="font-size: 12px; font-weight: 600; color: #94a3b8; text-transform: uppercase; letter-spacing: 0.05em;">
+                ⚡ Quick Lookup:
+            </span>
+        </div>
+        """,
+        unsafe_allow_html=True
+    )
+    chip_cols = st.columns(len(recent_tickers) + 1)
+    for idx, r_ticker in enumerate(recent_tickers):
+        with chip_cols[idx]:
+            if st.button(r_ticker, key=f"quick_lookup_chip_{r_ticker}_{idx}", width="stretch", help=f"Instant dossier lookup for {r_ticker}"):
+                execute_stock_research(r_ticker, selected_language)
 
 
 @st.fragment

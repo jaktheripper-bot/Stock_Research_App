@@ -93,10 +93,16 @@ def render_momentum_chart(df, ticker: str):
         y=alt.Y("Volume:Q", axis=None, scale=alt.Scale(domain=[0, vol_max * 4]))
     )
 
-    chart = alt.layer(vol_bars, price_line, sma_line).properties(
-        title=f"6-Month Price Momentum & 50-DMA [50-Day Moving Average] ({ticker})",
-        height=300
-    ).resolve_scale(y="independent")
+    chart = (
+        alt.layer(vol_bars, price_line, sma_line)
+        .properties(
+            title=f"6-Month Price Momentum & 50-DMA [50-Day Moving Average] ({ticker})",
+            height=300
+        )
+        .resolve_scale(y="independent")
+        .configure(background="transparent")
+        .configure_view(strokeOpacity=0)
+    )
 
     st.altair_chart(chart, width="stretch")
 

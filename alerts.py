@@ -1,8 +1,11 @@
 import os
 import re
+import logging
 from datetime import datetime, timezone, timedelta
 import requests
 import streamlit as st
+
+logger = logging.getLogger("equity_research.alerts")
 
 from db import (
     get_watchlist,
@@ -68,7 +71,7 @@ def fetch_bse_announcements(scrip_code: str, days: int = 45) -> list:
                     })
             return results
     except Exception as e:
-        print(f"BSE announcements fetch error for scrip {scrip_code}: {e}")
+        logger.error(f"BSE announcements fetch error for scrip {scrip_code}: {e}")
     return []
 
 def classify_announcement(item: dict) -> tuple:
@@ -266,7 +269,7 @@ def run_surveillance_scan(progress_callback=None) -> dict:
             alerts = poll_single_stock(item, live_fund=fund)
             all_new_alerts.extend(alerts)
         except Exception as e:
-            print(f"Error scanning {ticker}: {e}")
+            logger.error(f"Error scanning {ticker}: {e}")
 
     return {
         "stocks_scanned": total,

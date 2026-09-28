@@ -1,9 +1,23 @@
+import hashlib
+import logging
 import os
 import threading
 from datetime import datetime, timezone, timedelta
 import streamlit as st
 
 IST = timezone(timedelta(hours=5, minutes=30))
+logger = logging.getLogger("equity_research.db")
+
+MANDATORY_SEBI_DISCLAIMER = (
+    "SEBI Safe Harbor & Statutory Compliance: Antigravity Equity Research Engine is a diagnostic "
+    "algorithmic analytics and financial research tool developed strictly for informational, educational, "
+    "and analytical purposes. It does NOT provide, and should NEVER be construed as providing, investment advice, "
+    "recommendations, endorsements, or financial solicitations of any kind. Antigravity is not a SEBI-registered "
+    "Research Analyst (RA) or Investment Adviser (IA). Indian securities markets are subject to high market risks; "
+    "past performance, algorithmic valuations, fair values, and technical support/resistance bands are historical "
+    "and model-based estimates that do not guarantee future returns. Users must consult a qualified, SEBI-registered "
+    "financial adviser before executing any investment decisions."
+)
 
 _DB_INITIALIZED = False
 
@@ -99,145 +113,202 @@ def init_db(force: bool = False):
     supabase_url = st.secrets.get("SUPABASE_DB_URL") or os.environ.get("SUPABASE_DB_URL")
     
     try:
+        # Schema Migration Engine: Ensure migrations table exists
         if supabase_url:
             cursor.execute('''
-                CREATE TABLE IF NOT EXISTS reports (
-                    ticker TEXT PRIMARY KEY,
-                    short_name TEXT,
-                    report_text TEXT,
-                    timestamp TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
-                    baseline_price NUMERIC,
-                    baseline_pe TEXT,
-                    baseline_mcap NUMERIC,
-                    latest_announcement TEXT
+                CREATE TABLE IF NOT EXISTS schema_migrations (
+                    version TEXT PRIMARY KEY,
+                    applied_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP
                 );
             ''')
-            # Add columns if migrating an existing table
-            for col, col_type in [("baseline_price", "NUMERIC"), ("baseline_pe", "TEXT"), ("baseline_mcap", "NUMERIC"), ("latest_announcement", "TEXT")]:
-                cursor.execute(f"ALTER TABLE reports ADD COLUMN IF NOT EXISTS {col} {col_type};")
-
-            # Differential Engine: Append-Only revisions table
-            cursor.execute('''
-                CREATE TABLE IF NOT EXISTS report_revisions (
-                    id SERIAL PRIMARY KEY,
-                    ticker TEXT NOT NULL,
-                    short_name TEXT,
-                    report_text TEXT NOT NULL,
-                    timestamp TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
-                    baseline_price NUMERIC,
-                    baseline_pe TEXT,
-                    baseline_mcap NUMERIC,
-                    latest_announcement TEXT,
-                    revision_trigger TEXT
-                );
-            ''')
-            # Granular Alerting Engine: Watchlist & Alert Events tables
-            cursor.execute('''
-                CREATE TABLE IF NOT EXISTS watchlist (
-                    id SERIAL PRIMARY KEY,
-                    ticker TEXT UNIQUE NOT NULL,
-                    short_name TEXT,
-                    scrip_code TEXT,
-                    added_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
-                    alert_material BOOLEAN DEFAULT TRUE,
-                    alert_fundamental BOOLEAN DEFAULT TRUE,
-                    alert_valuation BOOLEAN DEFAULT TRUE,
-                    digest_mode TEXT DEFAULT 'instant',
-                    last_scanned_price NUMERIC,
-                    last_scanned_announcement TEXT,
-                    last_scanned_at TIMESTAMPTZ
-                );
-            ''')
-            cursor.execute('''
-                CREATE TABLE IF NOT EXISTS alert_events (
-                    id SERIAL PRIMARY KEY,
-                    ticker TEXT NOT NULL,
-                    category TEXT NOT NULL,
-                    severity TEXT DEFAULT 'medium',
-                    title TEXT NOT NULL,
-                    details TEXT,
-                    timestamp TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
-                    is_read BOOLEAN DEFAULT FALSE,
-                    source TEXT DEFAULT 'BSE Polling Engine'
-                );
-            ''')
-            cursor.execute('CREATE INDEX IF NOT EXISTS idx_alert_events_ticker ON alert_events (ticker, timestamp DESC);')
-            cursor.execute('CREATE INDEX IF NOT EXISTS idx_alert_events_unread ON alert_events (is_read, timestamp DESC);')
-            cursor.execute('CREATE INDEX IF NOT EXISTS idx_report_revisions_ticker ON report_revisions (ticker);')
         else:
             cursor.execute('''
-                CREATE TABLE IF NOT EXISTS reports (
-                    ticker TEXT PRIMARY KEY,
-                    short_name TEXT,
-                    report_text TEXT,
-                    timestamp DATETIME DEFAULT CURRENT_TIMESTAMP,
-                    baseline_price REAL,
-                    baseline_pe TEXT,
-                    baseline_mcap REAL,
-                    latest_announcement TEXT
+                CREATE TABLE IF NOT EXISTS schema_migrations (
+                    version TEXT PRIMARY KEY,
+                    applied_at DATETIME DEFAULT CURRENT_TIMESTAMP
                 );
             ''')
-            # SQLite migration for reports table
-            cursor.execute("PRAGMA table_info(reports);")
-            existing_cols = [c[1] for c in cursor.fetchall()]
-            for col, col_type in [("baseline_price", "REAL"), ("baseline_pe", "TEXT"), ("baseline_mcap", "REAL"), ("latest_announcement", "TEXT")]:
-                if col not in existing_cols:
-                    try:
-                        cursor.execute(f"ALTER TABLE reports ADD COLUMN {col} {col_type};")
-                    except Exception:
-                        pass
-
-            # Differential Engine: Append-Only revisions table in SQLite
-            cursor.execute('''
-                CREATE TABLE IF NOT EXISTS report_revisions (
-                    id INTEGER PRIMARY KEY AUTOINCREMENT,
-                    ticker TEXT NOT NULL,
-                    short_name TEXT,
-                    report_text TEXT NOT NULL,
-                    timestamp DATETIME DEFAULT CURRENT_TIMESTAMP,
-                    baseline_price REAL,
-                    baseline_pe TEXT,
-                    baseline_mcap REAL,
-                    latest_announcement TEXT,
-                    revision_trigger TEXT
-                );
-            ''')
-            # Granular Alerting Engine: Watchlist & Alert Events tables in SQLite
-            cursor.execute('''
-                CREATE TABLE IF NOT EXISTS watchlist (
-                    id INTEGER PRIMARY KEY AUTOINCREMENT,
-                    ticker TEXT UNIQUE NOT NULL,
-                    short_name TEXT,
-                    scrip_code TEXT,
-                    added_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-                    alert_material INTEGER DEFAULT 1,
-                    alert_fundamental INTEGER DEFAULT 1,
-                    alert_valuation INTEGER DEFAULT 1,
-                    digest_mode TEXT DEFAULT 'instant',
-                    last_scanned_price REAL,
-                    last_scanned_announcement TEXT,
-                    last_scanned_at DATETIME
-                );
-            ''')
-            cursor.execute('''
-                CREATE TABLE IF NOT EXISTS alert_events (
-                    id INTEGER PRIMARY KEY AUTOINCREMENT,
-                    ticker TEXT NOT NULL,
-                    category TEXT NOT NULL,
-                    severity TEXT DEFAULT 'medium',
-                    title TEXT NOT NULL,
-                    details TEXT,
-                    timestamp DATETIME DEFAULT CURRENT_TIMESTAMP,
-                    is_read INTEGER DEFAULT 0,
-                    source TEXT DEFAULT 'BSE Polling Engine'
-                );
-            ''')
-            cursor.execute('CREATE INDEX IF NOT EXISTS idx_alert_events_ticker ON alert_events (ticker, timestamp DESC);')
-            cursor.execute('CREATE INDEX IF NOT EXISTS idx_alert_events_unread ON alert_events (is_read, timestamp DESC);')
-            cursor.execute('CREATE INDEX IF NOT EXISTS idx_report_revisions_ticker ON report_revisions (ticker);')
-
         conn.commit()
+
+        cursor.execute("SELECT version FROM schema_migrations;")
+        applied = {row[0] for row in cursor.fetchall()}
+
+        # Migration v001: Core institutional schema
+        if "v001_core_schema" not in applied:
+            logger.info("Applying schema migration: v001_core_schema...")
+            if supabase_url:
+                cursor.execute('''
+                    CREATE TABLE IF NOT EXISTS reports (
+                        ticker TEXT PRIMARY KEY,
+                        short_name TEXT,
+                        report_text TEXT,
+                        timestamp TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
+                        baseline_price NUMERIC,
+                        baseline_pe TEXT,
+                        baseline_mcap NUMERIC,
+                        latest_announcement TEXT
+                    );
+                ''')
+                # Add columns if migrating an existing table
+                for col, col_type in [("baseline_price", "NUMERIC"), ("baseline_pe", "TEXT"), ("baseline_mcap", "NUMERIC"), ("latest_announcement", "TEXT")]:
+                    cursor.execute(f"ALTER TABLE reports ADD COLUMN IF NOT EXISTS {col} {col_type};")
+
+                # Differential Engine: Append-Only revisions table
+                cursor.execute('''
+                    CREATE TABLE IF NOT EXISTS report_revisions (
+                        id SERIAL PRIMARY KEY,
+                        ticker TEXT NOT NULL,
+                        short_name TEXT,
+                        report_text TEXT NOT NULL,
+                        timestamp TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
+                        baseline_price NUMERIC,
+                        baseline_pe TEXT,
+                        baseline_mcap NUMERIC,
+                        latest_announcement TEXT,
+                        revision_trigger TEXT
+                    );
+                ''')
+                # Granular Alerting Engine: Watchlist & Alert Events tables
+                cursor.execute('''
+                    CREATE TABLE IF NOT EXISTS watchlist (
+                        id SERIAL PRIMARY KEY,
+                        ticker TEXT UNIQUE NOT NULL,
+                        short_name TEXT,
+                        scrip_code TEXT,
+                        added_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
+                        alert_material BOOLEAN DEFAULT TRUE,
+                        alert_fundamental BOOLEAN DEFAULT TRUE,
+                        alert_valuation BOOLEAN DEFAULT TRUE,
+                        digest_mode TEXT DEFAULT 'instant',
+                        last_scanned_price NUMERIC,
+                        last_scanned_announcement TEXT,
+                        last_scanned_at TIMESTAMPTZ
+                    );
+                ''')
+                cursor.execute('''
+                    CREATE TABLE IF NOT EXISTS alert_events (
+                        id SERIAL PRIMARY KEY,
+                        ticker TEXT NOT NULL,
+                        category TEXT NOT NULL,
+                        severity TEXT DEFAULT 'medium',
+                        title TEXT NOT NULL,
+                        details TEXT,
+                        timestamp TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
+                        is_read BOOLEAN DEFAULT FALSE,
+                        source TEXT DEFAULT 'BSE Polling Engine'
+                    );
+                ''')
+                cursor.execute('CREATE INDEX IF NOT EXISTS idx_alert_events_ticker ON alert_events (ticker, timestamp DESC);')
+                cursor.execute('CREATE INDEX IF NOT EXISTS idx_alert_events_unread ON alert_events (is_read, timestamp DESC);')
+                cursor.execute('CREATE INDEX IF NOT EXISTS idx_report_revisions_ticker ON report_revisions (ticker);')
+                cursor.execute("INSERT INTO schema_migrations (version) VALUES ('v001_core_schema') ON CONFLICT DO NOTHING;")
+            else:
+                cursor.execute('''
+                    CREATE TABLE IF NOT EXISTS reports (
+                        ticker TEXT PRIMARY KEY,
+                        short_name TEXT,
+                        report_text TEXT,
+                        timestamp DATETIME DEFAULT CURRENT_TIMESTAMP,
+                        baseline_price REAL,
+                        baseline_pe TEXT,
+                        baseline_mcap REAL,
+                        latest_announcement TEXT
+                    );
+                ''')
+                # SQLite migration for reports table
+                cursor.execute("PRAGMA table_info(reports);")
+                existing_cols = [c[1] for c in cursor.fetchall()]
+                for col, col_type in [("baseline_price", "REAL"), ("baseline_pe", "TEXT"), ("baseline_mcap", "REAL"), ("latest_announcement", "TEXT")]:
+                    if col not in existing_cols:
+                        try:
+                            cursor.execute(f"ALTER TABLE reports ADD COLUMN {col} {col_type};")
+                        except Exception:
+                            pass
+
+                # Differential Engine: Append-Only revisions table in SQLite
+                cursor.execute('''
+                    CREATE TABLE IF NOT EXISTS report_revisions (
+                        id INTEGER PRIMARY KEY AUTOINCREMENT,
+                        ticker TEXT NOT NULL,
+                        short_name TEXT,
+                        report_text TEXT NOT NULL,
+                        timestamp DATETIME DEFAULT CURRENT_TIMESTAMP,
+                        baseline_price REAL,
+                        baseline_pe TEXT,
+                        baseline_mcap REAL,
+                        latest_announcement TEXT,
+                        revision_trigger TEXT
+                    );
+                ''')
+                # Granular Alerting Engine: Watchlist & Alert Events tables in SQLite
+                cursor.execute('''
+                    CREATE TABLE IF NOT EXISTS watchlist (
+                        id INTEGER PRIMARY KEY AUTOINCREMENT,
+                        ticker TEXT UNIQUE NOT NULL,
+                        short_name TEXT,
+                        scrip_code TEXT,
+                        added_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+                        alert_material INTEGER DEFAULT 1,
+                        alert_fundamental INTEGER DEFAULT 1,
+                        alert_valuation INTEGER DEFAULT 1,
+                        digest_mode TEXT DEFAULT 'instant',
+                        last_scanned_price REAL,
+                        last_scanned_announcement TEXT,
+                        last_scanned_at DATETIME
+                    );
+                ''')
+                cursor.execute('''
+                    CREATE TABLE IF NOT EXISTS alert_events (
+                        id INTEGER PRIMARY KEY AUTOINCREMENT,
+                        ticker TEXT NOT NULL,
+                        category TEXT NOT NULL,
+                        severity TEXT DEFAULT 'medium',
+                        title TEXT NOT NULL,
+                        details TEXT,
+                        timestamp DATETIME DEFAULT CURRENT_TIMESTAMP,
+                        is_read INTEGER DEFAULT 0,
+                        source TEXT DEFAULT 'BSE Polling Engine'
+                    );
+                ''')
+                cursor.execute('CREATE INDEX IF NOT EXISTS idx_alert_events_ticker ON alert_events (ticker, timestamp DESC);')
+                cursor.execute('CREATE INDEX IF NOT EXISTS idx_alert_events_unread ON alert_events (is_read, timestamp DESC);')
+                cursor.execute('CREATE INDEX IF NOT EXISTS idx_report_revisions_ticker ON report_revisions (ticker);')
+                cursor.execute("INSERT OR IGNORE INTO schema_migrations (version) VALUES ('v001_core_schema');")
+            conn.commit()
+
+        # Migration v002: SEBI Compliance & Retention Audit Trail
+        if "v002_compliance_audit_log" not in applied:
+            logger.info("Applying schema migration: v002_compliance_audit_log...")
+            if supabase_url:
+                cursor.execute('''
+                    CREATE TABLE IF NOT EXISTS compliance_audit_log (
+                        id SERIAL PRIMARY KEY,
+                        ticker TEXT NOT NULL,
+                        disclaimer_version TEXT NOT NULL,
+                        disclaimer_hash TEXT NOT NULL,
+                        timestamp TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP
+                    );
+                ''')
+                cursor.execute('CREATE INDEX IF NOT EXISTS idx_compliance_audit_ticker ON compliance_audit_log (ticker, timestamp DESC);')
+                cursor.execute("INSERT INTO schema_migrations (version) VALUES ('v002_compliance_audit_log') ON CONFLICT DO NOTHING;")
+            else:
+                cursor.execute('''
+                    CREATE TABLE IF NOT EXISTS compliance_audit_log (
+                        id INTEGER PRIMARY KEY AUTOINCREMENT,
+                        ticker TEXT NOT NULL,
+                        disclaimer_version TEXT NOT NULL,
+                        disclaimer_hash TEXT NOT NULL,
+                        timestamp DATETIME DEFAULT CURRENT_TIMESTAMP
+                    );
+                ''')
+                cursor.execute('CREATE INDEX IF NOT EXISTS idx_compliance_audit_ticker ON compliance_audit_log (ticker, timestamp DESC);')
+                cursor.execute("INSERT OR IGNORE INTO schema_migrations (version) VALUES ('v002_compliance_audit_log');")
+            conn.commit()
+
         _DB_INITIALIZED = True
+    except Exception as e:
+        logger.error(f"Error during init_db migrations: {e}")
+        raise
     finally:
         cursor.close()
         conn.close()
@@ -312,6 +383,96 @@ def save_report_to_archive(stock_data: dict, report_text: str, announcement: str
             st.cache_data.clear()
         except Exception:
             pass
+        # SEBI Compliance: Record statutory Safe Harbor disclaimer audit event
+        try:
+            log_compliance_event(clean_ticker)
+        except Exception as ce:
+            logger.error(f"Failed to record SEBI compliance event during archive: {ce}")
+    finally:
+        cursor.close()
+        conn.close()
+
+def log_compliance_event(ticker: str, disclaimer_text: str = None) -> bool:
+    """Records a SEBI Safe Harbor disclaimer attachment event in the immutable audit log."""
+    init_db()
+    conn = get_db_connection()
+    cursor = conn.cursor()
+    supabase_url = st.secrets.get("SUPABASE_DB_URL") or os.environ.get("SUPABASE_DB_URL")
+    placeholder = "%s" if supabase_url else "?"
+
+    clean_ticker = str(ticker).strip().upper().replace(".NS", "").replace(".BO", "")
+    target_disclaimer = disclaimer_text or MANDATORY_SEBI_DISCLAIMER
+    disclaimer_hash = hashlib.sha256(target_disclaimer.encode("utf-8")).hexdigest()
+    disclaimer_version = "SEBI-RA-2024-V1"
+
+    try:
+        query = f'''
+            INSERT INTO compliance_audit_log (ticker, disclaimer_version, disclaimer_hash)
+            VALUES ({placeholder}, {placeholder}, {placeholder})
+        '''
+        cursor.execute(query, (clean_ticker, disclaimer_version, disclaimer_hash))
+        conn.commit()
+        logger.info(f"Recorded SEBI compliance audit event for {clean_ticker} (hash={disclaimer_hash[:8]}...)")
+        return True
+    except Exception as e:
+        logger.error(f"Error logging compliance event for {clean_ticker}: {e}")
+        return False
+    finally:
+        cursor.close()
+        conn.close()
+
+def get_compliance_audit_logs(ticker: str = None, limit: int = 50) -> list:
+    """Retrieves immutable SEBI Safe Harbor compliance audit events."""
+    init_db()
+    conn = get_db_connection()
+    cursor = conn.cursor()
+    supabase_url = st.secrets.get("SUPABASE_DB_URL") or os.environ.get("SUPABASE_DB_URL")
+    placeholder = "%s" if supabase_url else "?"
+
+    try:
+        if ticker:
+            clean_ticker = str(ticker).strip().upper().replace(".NS", "").replace(".BO", "")
+            query = f'''
+                SELECT id, ticker, disclaimer_version, disclaimer_hash, timestamp
+                FROM compliance_audit_log
+                WHERE ticker = {placeholder}
+                ORDER BY timestamp DESC
+                LIMIT {placeholder}
+            '''
+            cursor.execute(query, (clean_ticker, limit))
+        else:
+            query = f'''
+                SELECT id, ticker, disclaimer_version, disclaimer_hash, timestamp
+                FROM compliance_audit_log
+                ORDER BY timestamp DESC
+                LIMIT {placeholder}
+            '''
+            cursor.execute(query, (limit,))
+
+        rows = cursor.fetchall()
+        logs = []
+        for row in rows:
+            ts = row[4]
+            if isinstance(ts, str):
+                try:
+                    ts = datetime.fromisoformat(ts.replace("Z", "+00:00"))
+                except Exception:
+                    pass
+            if hasattr(ts, "astimezone"):
+                ts = ts.astimezone(IST)
+            formatted_date = ts.strftime("%d-%m-%Y %H:%M IST") if hasattr(ts, "strftime") else str(ts)
+            logs.append({
+                "id": row[0],
+                "ticker": row[1],
+                "disclaimer_version": row[2],
+                "disclaimer_hash": row[3],
+                "timestamp": ts,
+                "formatted_date": formatted_date
+            })
+        return logs
+    except Exception as e:
+        logger.error(f"Error fetching compliance audit logs: {e}")
+        return []
     finally:
         cursor.close()
         conn.close()
@@ -373,7 +534,7 @@ def get_archived_reports(include_text: bool = False) -> list:
                 "revision_count": int(row[8]) if len(row) > 8 and row[8] is not None else 0
             })
     except Exception as e:
-        print(f"Database query error in get_archived_reports: {e}")
+        logger.error(f"Database query error in get_archived_reports: {e}")
     finally:
         cursor.close()
         conn.close()
@@ -409,7 +570,7 @@ def get_report_by_ticker(ticker: str) -> dict:
                 "latest_announcement": row[7] or ""
             }
     except Exception as e:
-        print(f"Database query error in get_report_by_ticker: {e}")
+        logger.error(f"Database query error in get_report_by_ticker: {e}")
     finally:
         cursor.close()
         conn.close()
@@ -487,7 +648,7 @@ def get_report_revisions(ticker: str) -> list:
                         "revision_trigger": s_row[9] or "Archived Baseline"
                     })
     except Exception as e:
-        print(f"Database query error in get_report_revisions: {e}")
+        logger.error(f"Database query error in get_report_revisions: {e}")
     finally:
         cursor.close()
         conn.close()
@@ -523,7 +684,7 @@ def get_revision_by_id(rev_id: int) -> dict:
                 "revision_trigger": row[9] or "Initial"
             }
     except Exception as e:
-        print(f"Database query error in get_revision_by_id: {e}")
+        logger.error(f"Database query error in get_revision_by_id: {e}")
     finally:
         cursor.close()
         conn.close()
@@ -565,7 +726,7 @@ def get_watchlist() -> list:
                 "last_scanned_at": _format_timestamp(row[11]) if row[11] else "Not yet scanned"
             })
     except Exception as e:
-        print(f"Database query error in get_watchlist: {e}")
+        logger.error(f"Database query error in get_watchlist: {e}")
     finally:
         cursor.close()
         conn.close()
@@ -625,7 +786,7 @@ def add_to_watchlist(ticker: str, short_name: str = "", scrip_code: str = "",
             pass
         success = True
     except Exception as e:
-        print(f"Database error in add_to_watchlist: {e}")
+        logger.error(f"Database error in add_to_watchlist: {e}")
     finally:
         cursor.close()
         conn.close()
@@ -649,7 +810,7 @@ def remove_from_watchlist(ticker: str) -> bool:
             pass
         success = True
     except Exception as e:
-        print(f"Database error in remove_from_watchlist: {e}")
+        logger.error(f"Database error in remove_from_watchlist: {e}")
     finally:
         cursor.close()
         conn.close()
@@ -692,7 +853,7 @@ def update_watchlist_scan_state(ticker: str, price: float = None, announcement: 
         ''', (price, announcement, clean))
         conn.commit()
     except Exception as e:
-        print(f"Error in update_watchlist_scan_state: {e}")
+        logger.error(f"Error in update_watchlist_scan_state: {e}")
     finally:
         cursor.close()
         conn.close()
@@ -722,7 +883,7 @@ def record_alert_event(ticker: str, category: str, severity: str, title: str, de
             new_id = cursor.lastrowid
         conn.commit()
     except Exception as e:
-        print(f"Error in record_alert_event: {e}")
+        logger.error(f"Error in record_alert_event: {e}")
     finally:
         cursor.close()
         conn.close()
@@ -771,7 +932,7 @@ def get_alert_events(ticker: str = None, category: str = None, unread_only: bool
                 "source": row[8] or "BSE Surveillance"
             })
     except Exception as e:
-        print(f"Error in get_alert_events: {e}")
+        logger.error(f"Error in get_alert_events: {e}")
     finally:
         cursor.close()
         conn.close()
@@ -793,7 +954,7 @@ def mark_alert_as_read(alert_id: int):
         except Exception:
             pass
     except Exception as e:
-        print(f"Error in mark_alert_as_read: {e}")
+        logger.error(f"Error in mark_alert_as_read: {e}")
     finally:
         cursor.close()
         conn.close()
@@ -818,7 +979,7 @@ def mark_all_alerts_as_read(ticker: str = None):
         except Exception:
             pass
     except Exception as e:
-        print(f"Error in mark_all_alerts_as_read: {e}")
+        logger.error(f"Error in mark_all_alerts_as_read: {e}")
     finally:
         cursor.close()
         conn.close()
@@ -840,7 +1001,7 @@ def dismiss_alert(alert_id: int) -> bool:
             pass
         success = True
     except Exception as e:
-        print(f"Error in dismiss_alert: {e}")
+        logger.error(f"Error in dismiss_alert: {e}")
     finally:
         cursor.close()
         conn.close()
@@ -866,7 +1027,7 @@ def dismiss_all_alerts(unread_only: bool = False) -> bool:
             pass
         success = True
     except Exception as e:
-        print(f"Error in dismiss_all_alerts: {e}")
+        logger.error(f"Error in dismiss_all_alerts: {e}")
     finally:
         cursor.close()
         conn.close()

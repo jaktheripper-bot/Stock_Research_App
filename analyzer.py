@@ -5,6 +5,7 @@ import json
 import time
 import random
 import contextlib
+import logging
 import requests
 from datetime import datetime, timezone
 import pandas as pd
@@ -16,6 +17,8 @@ from checker import verify_stock_report
 from screener import pass_pre_screening_gates
 from bsedata.bse import BSE
 from bse_master import resolve_bse_scrip_code
+
+logger = logging.getLogger("equity_research.analyzer")
 
 def enrich_fundamentals(ticker: str, data: dict) -> dict:
     """Secondary enrichment: uses yfinance strictly to backfill trailing P/E, Market Cap, and Sector."""
@@ -47,7 +50,7 @@ def enrich_fundamentals(ticker: str, data: dict) -> dict:
             if ind:
                 data["industry"] = ind
     except Exception as e:
-        print(f"Background fundamental enrichment notice: {e}")
+        logger.warning(f"Background fundamental enrichment notice: {e}")
     return data
 
 def extract_health_matrix(report_text: str) -> dict:
@@ -393,7 +396,7 @@ def get_stock_fundamentals(query: str) -> dict:
         if raw_data and not raw_data.get("is_fallback", False):
             return raw_data
     except Exception as bse_err:
-        print(f"[WARN] BSE direct quote failed for {query} ({bse_err}). Attempting yfinance fallback...")
+        logger.warning(f"BSE direct quote failed for {query} ({bse_err}). Attempting yfinance fallback...")
 
     # Secondary Resilience Fallback via yfinance
     try:
@@ -435,7 +438,7 @@ def get_stock_fundamentals(query: str) -> dict:
                     "is_fallback": True
                 }
     except Exception as yf_err:
-        print(f"[WARN] yfinance fallback also failed for {query}: {yf_err}")
+        logger.error(f"yfinance fallback also failed for {query}: {yf_err}")
 
     # If both fail, raise clean error
     raise ExchangeDataFetchError(clean, "Both primary BSE and secondary market gateways failed to return live quotes.")
