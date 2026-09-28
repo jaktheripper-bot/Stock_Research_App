@@ -7,11 +7,12 @@ import random
 import contextlib
 import logging
 import requests
-from datetime import datetime, timezone
+from datetime import datetime, timezone, timedelta
 import pandas as pd
 import streamlit as st
+import yfinance as yf
 from google import genai
-from normalizer import normalize_stock_data
+from normalizer import normalize_stock_data, clean_ticker
 from db import save_report_to_archive
 from checker import verify_stock_report
 from screener import pass_pre_screening_gates
@@ -23,8 +24,7 @@ logger = logging.getLogger("equity_research.analyzer")
 def enrich_fundamentals(ticker: str, data: dict) -> dict:
     """Secondary enrichment: uses yfinance strictly to backfill trailing P/E, Market Cap, and Sector."""
     try:
-        import yfinance as yf
-        clean_sym = str(ticker).strip().upper().replace(".NS", "").replace(".BO", "")
+        clean_sym = clean_ticker(ticker)
         yf_ticker = f"{clean_sym}.BO" if clean_sym.isdigit() else f"{clean_sym}.NS"
         info = yf.Ticker(yf_ticker).info or {}
 
@@ -253,10 +253,9 @@ class ExchangeDataFetchError(PipelineError):
         )
 
 def resolve_pe_with_failsafes(ticker: str, scrip: str = "") -> str:
-    clean = ticker.strip().upper().replace(".NS", "").replace(".BO", "").replace(" ", "")
+    clean = clean_ticker(ticker).replace(" ", "")
     # Tier 1: Consolidated yfinance
     try:
-        import yfinance as yf
         symbols = [f"{clean}.NS", f"{clean}.BO"]
         if scrip and str(scrip).isdigit():
             symbols.append(f"{scrip}.BO")
@@ -272,10 +271,11 @@ def resolve_pe_with_failsafes(ticker: str, scrip: str = "") -> str:
                             return "N/A (Loss-Making)"
                         if trailing_pe and float(trailing_pe) > 0:
                             return f"{float(trailing_pe):.2f}"
-                    except Exception:
+                    except Exception as err:
+                        logger.debug(f"yfinance Ticker probe notice for {s}: {err}")
                         continue
-    except Exception:
-        pass
+    except Exception as e:
+        logger.debug(f"P/E resolution via yfinance failed: {e}")
 
     # Tier 2: BSE ComHeader Direct
     if scrip and str(scrip).isdigit():
@@ -288,8 +288,8 @@ def resolve_pe_with_failsafes(ticker: str, scrip: str = "") -> str:
                 if raw_pe and str(raw_pe).strip() not in ["", "-", "None", "0", "0.00"]:
                     val = float(str(raw_pe).replace(",", "").strip())
                     return f"{val:.2f}" if val > 0 else "N/A (Loss-Making)"
-        except Exception:
-            pass
+        except Exception as e:
+            logger.debug(f"BSE ComHeader direct P/E fetch notice: {e}")
     return "N/A"
 
 def fetch_latest_bse_announcement(scrip_code: str) -> str:
@@ -309,8 +309,8 @@ def fetch_latest_bse_announcement(scrip_code: str) -> str:
             table = res.json().get("Table", [])
             if table:
                 return (table[0].get("NEWSSUB") or table[0].get("HEADLINE") or "").strip()
-    except Exception:
-        pass
+    except Exception as e:
+        logger.debug(f"BSE announcement fetch notice for scrip {scrip_code}: {e}")
     return ""
 
 def evaluate_material_change(cached: dict, live_fund: dict, scrip_code: str) -> tuple:
@@ -325,8 +325,8 @@ def evaluate_material_change(cached: dict, live_fund: dict, scrip_code: str) -> 
                 ts = ts.replace(tzinfo=timezone.utc)
             if (now - ts).total_seconds() / 86400.0 > 14:
                 return True, "⚡ Regenerated: Report exceeded 14-day freshness window", ""
-        except Exception:
-            pass
+        except Exception as e:
+            logger.debug(f"Timestamp freshness check notice: {e}")
 
     latest_ann = fetch_latest_bse_announcement(scrip_code)
     cached_ann = cached.get("latest_announcement", "")
@@ -341,8 +341,8 @@ def evaluate_material_change(cached: dict, live_fund: dict, scrip_code: str) -> 
         if c_p > 0 and (abs(l_p - c_p) / c_p) >= 0.05:
             d = "+" if l_p > c_p else "-"
             return True, f"⚡ Regenerated: Price shifted {d}{(abs(l_p - c_p) / c_p)*100:.1f}% vs baseline", latest_ann
-    except Exception:
-        pass
+    except Exception as e:
+        logger.debug(f"Price delta computation notice: {e}")
     return False, "🛡️ Verified Cache: No material events detected (Live quote updated)", latest_ann
 
 def fetch_bse_exchange_data(query: str) -> dict:
@@ -356,20 +356,21 @@ def fetch_bse_exchange_data(query: str) -> dict:
         raise ValueError(f"BSE exchange did not return quote data for scrip {scrip}.")
 
     mcap_raw = q.get("marketCapFull") or q.get("marketCapFreeFloat") or "0"
-    mcap_clean = mcap_raw.replace(" Cr.", "").replace(",", "").strip()
+    mcap_clean = str(mcap_raw).replace(" Cr.", "").replace(",", "").strip()
     try:
         mcap_inr = int(float(mcap_clean) * 10_000_000)
-    except Exception:
+    except Exception as e:
+        logger.debug(f"BSE MCap parsing note: {e}")
         mcap_inr = 0
 
-    clean_ticker = query.strip().upper().replace(".NS", "").replace(".BO", "")
+    clean_ticker_val = clean_ticker(query)
     sec_id = str(q.get("securityID") or q.get("scrip_id") or "").strip().upper()
-    canonical_ticker = sec_id if (sec_id and " " not in sec_id) else (clean_ticker if " " not in clean_ticker else (sec_id or clean_ticker.replace(" ", "")))
+    canonical_ticker = sec_id if (sec_id and " " not in sec_id) else (clean_ticker_val if " " not in clean_ticker_val else (sec_id or clean_ticker_val.replace(" ", "")))
     resolved_pe = resolve_pe_with_failsafes(canonical_ticker, scrip)
 
     return {
         "ticker": canonical_ticker,
-        "short_name": q.get("companyName", clean_ticker),
+        "short_name": q.get("companyName", clean_ticker_val),
         "scrip_code": scrip,
         "current_price": q.get("currentValue", "0.00"),
         "market_cap": mcap_inr,
@@ -387,8 +388,7 @@ def get_stock_fundamentals(query: str) -> dict:
     Primary entry point: Fetches verified exchange data from BSE.
     If BSE direct fails or reports inactive, falls back gracefully to Yahoo Finance.
     """
-    import yfinance as yf
-    clean = query.strip().upper().replace(".NS", "").replace(".BO", "")
+    clean = clean_ticker(query)
     
     # Try primary BSE ingestion
     try:
@@ -406,8 +406,8 @@ def get_stock_fundamentals(query: str) -> dict:
             info = {}
             try:
                 info = t.info or {}
-            except Exception:
-                pass
+            except Exception as err:
+                logger.debug(f"yfinance info notice for {sym}: {err}")
 
             price = None
             if fast and hasattr(fast, "last_price") and fast.last_price:
@@ -701,15 +701,10 @@ def get_historical_prices(ticker: str, period: str = "6mo"):
     first with NSE (.NS) fallback. Computes 50-day Simple Moving Average (50-DMA).
     Auto-resolves 6-digit BSE scrip codes to alphanumeric ticker symbols.
     """
-    import os
-    import json
-    import pandas as pd
-    import yfinance as yf
-
     if not ticker or not isinstance(ticker, str):
         return None
 
-    clean = ticker.strip().upper().replace(".BO", "").replace(".NS", "")
+    clean = clean_ticker(ticker)
 
     # Sanitize multi-word queries with spaces to their canonical security ID
     if " " in clean:
@@ -723,7 +718,8 @@ def get_historical_prices(ticker: str, period: str = "6mo"):
                     clean = sec_id
                 else:
                     clean = clean.replace(" ", "")
-            except Exception:
+            except Exception as e:
+                logger.debug(f"BSE quote lookup notice for {scrip}: {e}")
                 clean = clean.replace(" ", "")
         else:
             clean = clean.replace(" ", "")
@@ -735,8 +731,8 @@ def get_historical_prices(ticker: str, period: str = "6mo"):
             rev_map = {str(v).strip(): k for k, v in PRIMARY_BSE_MAP.items()}
             if clean in rev_map:
                 clean = rev_map[clean]
-        except Exception:
-            pass
+        except Exception as e:
+            logger.debug(f"Reverse lookup notice for scrip {clean}: {e}")
 
     df = pd.DataFrame()
     for suffix in [".BO", ".NS"]:

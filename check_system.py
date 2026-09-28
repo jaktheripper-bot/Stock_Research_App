@@ -2,9 +2,8 @@ import os
 import sys
 import time
 import logging
-from datetime import datetime, timezone, timedelta
-
-IST = timezone(timedelta(hours=5, minutes=30))
+from datetime import datetime
+from db import IST, MANDATORY_SEBI_DISCLAIMER
 
 # Suppress bare-mode Streamlit log noise
 os.environ["STREAMLIT_LOG_LEVEL"] = "error"
@@ -34,7 +33,13 @@ def run_suite():
         ("bse_master", "bse_master.py"),
         ("checker", "checker.py"),
         ("db", "db.py"),
-        ("screener", "screener.py")
+        ("screener", "screener.py"),
+        ("normalizer", "normalizer.py"),
+        ("alerts", "alerts.py"),
+        ("ui.charts", "ui/charts.py"),
+        ("ui.pdf", "ui/pdf.py"),
+        ("ui.scorecard", "ui/scorecard.py"),
+        ("ui.formatters", "ui/formatters.py"),
     ]
     
     for mod_name, pkg_name in modules:
@@ -99,8 +104,8 @@ def run_suite():
     else:
         print("   ✅ GEMINI_API_KEY is configured.")
 
-    # 4. BSE Scrip Resolution Logic
-    print("\n4. Testing BSE Scrip Resolution Engine...")
+    # 4. BSE Scrip Resolution Logic & Announcement Delta Engine
+    print("\n4. Testing BSE Scrip Resolution & Announcement Ingestion...")
     try:
         from bse_master import resolve_bse_scrip_code
         scrip = resolve_bse_scrip_code("INFY")
@@ -120,6 +125,18 @@ def run_suite():
             "Verify bse_master.py implementation."
         ))
         print(f"   ❌ BSE Resolution FAILED: {e}")
+
+    try:
+        from analyzer import fetch_latest_bse_announcement
+        ann = fetch_latest_bse_announcement("500209")
+        print(f"   ✅ BSE Announcement Feed operational (INFY: '{ann[:45]}...' if ann else 'clean').")
+    except Exception as e:
+        issues.append((
+            "Surveillance Engine",
+            f"fetch_latest_bse_announcement raised an exception: {e}",
+            "Verify analyzer.py announcement fetching and timedelta import."
+        ))
+        print(f"   ❌ BSE Announcement Fetch FAILED: {e}")
 
     # 5. Database Connection & Query Latency Probe
     print("\n5. Probing Database Connection & Latency...")

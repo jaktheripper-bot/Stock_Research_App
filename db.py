@@ -5,6 +5,8 @@ import threading
 from datetime import datetime, timezone, timedelta
 import streamlit as st
 
+from normalizer import clean_ticker
+
 IST = timezone(timedelta(hours=5, minutes=30))
 logger = logging.getLogger("equity_research.db")
 
@@ -20,6 +22,28 @@ MANDATORY_SEBI_DISCLAIMER = (
 )
 
 _DB_INITIALIZED = False
+_DB_INIT_LOCK = threading.Lock()
+
+_CACHED_SUPABASE_URL = None
+_SUPABASE_URL_RESOLVED = False
+
+def get_supabase_url() -> str | None:
+    """Returns configured Supabase DB URL, cached in memory after first resolution."""
+    global _CACHED_SUPABASE_URL, _SUPABASE_URL_RESOLVED
+    if not _SUPABASE_URL_RESOLVED:
+        url = os.environ.get("SUPABASE_DB_URL")
+        if not url:
+            try:
+                url = st.secrets.get("SUPABASE_DB_URL")
+            except Exception:
+                pass
+        _CACHED_SUPABASE_URL = url
+        _SUPABASE_URL_RESOLVED = True
+    return _CACHED_SUPABASE_URL
+
+def get_placeholder() -> str:
+    """Returns '%s' for PostgreSQL/Supabase or '?' for SQLite."""
+    return "%s" if get_supabase_url() else "?"
 
 class _PooledConnectionProxy:
     """Proxy wrapper around a psycopg2 connection checked out from ThreadedConnectionPool.
@@ -81,7 +105,7 @@ def _acquire_connection_from_pool(pool):
     return conn
 
 def get_db_connection():
-    supabase_url = st.secrets.get("SUPABASE_DB_URL") or os.environ.get("SUPABASE_DB_URL")
+    supabase_url = get_supabase_url()
     if supabase_url:
         try:
             pool = _get_pg_pool(supabase_url)
@@ -108,9 +132,13 @@ def init_db(force: bool = False):
     if _DB_INITIALIZED and not force:
         return
 
-    conn = get_db_connection()
-    cursor = conn.cursor()
-    supabase_url = st.secrets.get("SUPABASE_DB_URL") or os.environ.get("SUPABASE_DB_URL")
+    with _DB_INIT_LOCK:
+        if _DB_INITIALIZED and not force:
+            return
+
+        conn = get_db_connection()
+        cursor = conn.cursor()
+        supabase_url = get_supabase_url()
     
     try:
         # Schema Migration Engine: Ensure migrations table exists
@@ -317,11 +345,11 @@ def save_report_to_archive(stock_data: dict, report_text: str, announcement: str
     init_db()
     conn = get_db_connection()
     cursor = conn.cursor()
-    supabase_url = st.secrets.get("SUPABASE_DB_URL") or os.environ.get("SUPABASE_DB_URL")
-    placeholder = "%s" if supabase_url else "?"
+    supabase_url = get_supabase_url()
+    placeholder = get_placeholder()
     
-    clean_ticker = str(stock_data.get("ticker", "")).strip().upper().replace(".NS", "").replace(".BO", "")
-    short_name = stock_data.get("short_name") or clean_ticker
+    clean_sym = clean_ticker(stock_data.get("ticker", ""))
+    short_name = stock_data.get("short_name") or clean_sym
 
     curr_price = stock_data.get("current_price") or stock_data.get("currentValue") or 0.0
     try:
@@ -353,7 +381,7 @@ def save_report_to_archive(stock_data: dict, report_text: str, announcement: str
                 latest_announcement = EXCLUDED.latest_announcement
         '''
         cursor.execute(query_snapshot, (
-            clean_ticker, 
+            clean_sym, 
             short_name, 
             report_text,
             curr_price,
@@ -368,7 +396,7 @@ def save_report_to_archive(stock_data: dict, report_text: str, announcement: str
             VALUES ({placeholder}, {placeholder}, {placeholder}, {placeholder}, {placeholder}, {placeholder}, {placeholder}, {placeholder})
         '''
         cursor.execute(query_revision, (
-            clean_ticker,
+            clean_sym,
             short_name,
             report_text,
             curr_price,
@@ -385,9 +413,16 @@ def save_report_to_archive(stock_data: dict, report_text: str, announcement: str
             pass
         # SEBI Compliance: Record statutory Safe Harbor disclaimer audit event
         try:
-            log_compliance_event(clean_ticker)
+            log_compliance_event(clean_sym)
         except Exception as ce:
             logger.error(f"Failed to record SEBI compliance event during archive: {ce}")
+    except Exception as e:
+        try:
+            conn.rollback()
+        except Exception:
+            pass
+        logger.error(f"Failed to save report to archive for {clean_sym}: {e}")
+        raise
     finally:
         cursor.close()
         conn.close()
@@ -397,10 +432,10 @@ def log_compliance_event(ticker: str, disclaimer_text: str = None) -> bool:
     init_db()
     conn = get_db_connection()
     cursor = conn.cursor()
-    supabase_url = st.secrets.get("SUPABASE_DB_URL") or os.environ.get("SUPABASE_DB_URL")
-    placeholder = "%s" if supabase_url else "?"
+    supabase_url = get_supabase_url()
+    placeholder = get_placeholder()
 
-    clean_ticker = str(ticker).strip().upper().replace(".NS", "").replace(".BO", "")
+    clean_sym = clean_ticker(ticker)
     target_disclaimer = disclaimer_text or MANDATORY_SEBI_DISCLAIMER
     disclaimer_hash = hashlib.sha256(target_disclaimer.encode("utf-8")).hexdigest()
     disclaimer_version = "SEBI-RA-2024-V1"
@@ -410,12 +445,12 @@ def log_compliance_event(ticker: str, disclaimer_text: str = None) -> bool:
             INSERT INTO compliance_audit_log (ticker, disclaimer_version, disclaimer_hash)
             VALUES ({placeholder}, {placeholder}, {placeholder})
         '''
-        cursor.execute(query, (clean_ticker, disclaimer_version, disclaimer_hash))
+        cursor.execute(query, (clean_sym, disclaimer_version, disclaimer_hash))
         conn.commit()
-        logger.info(f"Recorded SEBI compliance audit event for {clean_ticker} (hash={disclaimer_hash[:8]}...)")
+        logger.info(f"Recorded SEBI compliance audit event for {clean_sym} (hash={disclaimer_hash[:8]}...)")
         return True
     except Exception as e:
-        logger.error(f"Error logging compliance event for {clean_ticker}: {e}")
+        logger.error(f"Error logging compliance event for {clean_sym}: {e}")
         return False
     finally:
         cursor.close()
@@ -426,12 +461,12 @@ def get_compliance_audit_logs(ticker: str = None, limit: int = 50) -> list:
     init_db()
     conn = get_db_connection()
     cursor = conn.cursor()
-    supabase_url = st.secrets.get("SUPABASE_DB_URL") or os.environ.get("SUPABASE_DB_URL")
-    placeholder = "%s" if supabase_url else "?"
+    supabase_url = get_supabase_url()
+    placeholder = get_placeholder()
 
     try:
         if ticker:
-            clean_ticker = str(ticker).strip().upper().replace(".NS", "").replace(".BO", "")
+            clean_sym = clean_ticker(ticker)
             query = f'''
                 SELECT id, ticker, disclaimer_version, disclaimer_hash, timestamp
                 FROM compliance_audit_log
@@ -439,7 +474,7 @@ def get_compliance_audit_logs(ticker: str = None, limit: int = 50) -> list:
                 ORDER BY timestamp DESC
                 LIMIT {placeholder}
             '''
-            cursor.execute(query, (clean_ticker, limit))
+            cursor.execute(query, (clean_sym, limit))
         else:
             query = f'''
                 SELECT id, ticker, disclaimer_version, disclaimer_hash, timestamp
@@ -545,9 +580,9 @@ def get_report_by_ticker(ticker: str) -> dict:
     init_db()
     conn = get_db_connection()
     cursor = conn.cursor()
-    clean = ticker.strip().upper().replace(".NS", "").replace(".BO", "")
-    supabase_url = st.secrets.get("SUPABASE_DB_URL") or os.environ.get("SUPABASE_DB_URL")
-    placeholder = "%s" if supabase_url else "?"
+    clean = clean_ticker(ticker)
+    supabase_url = get_supabase_url()
+    placeholder = get_placeholder()
     
     record = None
     try:
@@ -582,9 +617,9 @@ def get_report_revisions(ticker: str) -> list:
     init_db()
     conn = get_db_connection()
     cursor = conn.cursor()
-    clean = ticker.strip().upper().replace(".NS", "").replace(".BO", "")
-    supabase_url = st.secrets.get("SUPABASE_DB_URL") or os.environ.get("SUPABASE_DB_URL")
-    placeholder = "%s" if supabase_url else "?"
+    clean = clean_ticker(ticker)
+    supabase_url = get_supabase_url()
+    placeholder = get_placeholder()
     revisions = []
     try:
         cursor.execute(f'''
@@ -659,8 +694,8 @@ def get_revision_by_id(rev_id: int) -> dict:
     init_db()
     conn = get_db_connection()
     cursor = conn.cursor()
-    supabase_url = st.secrets.get("SUPABASE_DB_URL") or os.environ.get("SUPABASE_DB_URL")
-    placeholder = "%s" if supabase_url else "?"
+    supabase_url = get_supabase_url()
+    placeholder = get_placeholder()
     record = None
     try:
         cursor.execute(f'''
@@ -740,9 +775,9 @@ def add_to_watchlist(ticker: str, short_name: str = "", scrip_code: str = "",
     init_db()
     conn = get_db_connection()
     cursor = conn.cursor()
-    clean = ticker.strip().upper().replace(".NS", "").replace(".BO", "")
-    supabase_url = st.secrets.get("SUPABASE_DB_URL") or os.environ.get("SUPABASE_DB_URL")
-    placeholder = "%s" if supabase_url else "?"
+    clean = clean_ticker(ticker)
+    supabase_url = get_supabase_url()
+    placeholder = get_placeholder()
     success = False
     try:
         if supabase_url:
@@ -797,9 +832,9 @@ def remove_from_watchlist(ticker: str) -> bool:
     init_db()
     conn = get_db_connection()
     cursor = conn.cursor()
-    clean = ticker.strip().upper().replace(".NS", "").replace(".BO", "")
-    supabase_url = st.secrets.get("SUPABASE_DB_URL") or os.environ.get("SUPABASE_DB_URL")
-    placeholder = "%s" if supabase_url else "?"
+    clean = clean_ticker(ticker)
+    supabase_url = get_supabase_url()
+    placeholder = get_placeholder()
     success = False
     try:
         cursor.execute(f"DELETE FROM watchlist WHERE ticker = {placeholder}", (clean,))
@@ -821,9 +856,9 @@ def is_ticker_in_watchlist(ticker: str) -> bool:
     init_db()
     conn = get_db_connection()
     cursor = conn.cursor()
-    clean = ticker.strip().upper().replace(".NS", "").replace(".BO", "")
-    supabase_url = st.secrets.get("SUPABASE_DB_URL") or os.environ.get("SUPABASE_DB_URL")
-    placeholder = "%s" if supabase_url else "?"
+    clean = clean_ticker(ticker)
+    supabase_url = get_supabase_url()
+    placeholder = get_placeholder()
     in_watch = False
     try:
         cursor.execute(f"SELECT 1 FROM watchlist WHERE ticker = {placeholder}", (clean,))
@@ -840,9 +875,9 @@ def update_watchlist_scan_state(ticker: str, price: float = None, announcement: 
     init_db()
     conn = get_db_connection()
     cursor = conn.cursor()
-    clean = ticker.strip().upper().replace(".NS", "").replace(".BO", "")
-    supabase_url = st.secrets.get("SUPABASE_DB_URL") or os.environ.get("SUPABASE_DB_URL")
-    placeholder = "%s" if supabase_url else "?"
+    clean = clean_ticker(ticker)
+    supabase_url = get_supabase_url()
+    placeholder = get_placeholder()
     try:
         cursor.execute(f'''
             UPDATE watchlist
@@ -863,9 +898,9 @@ def record_alert_event(ticker: str, category: str, severity: str, title: str, de
     init_db()
     conn = get_db_connection()
     cursor = conn.cursor()
-    clean = ticker.strip().upper().replace(".NS", "").replace(".BO", "")
-    supabase_url = st.secrets.get("SUPABASE_DB_URL") or os.environ.get("SUPABASE_DB_URL")
-    placeholder = "%s" if supabase_url else "?"
+    clean = clean_ticker(ticker)
+    supabase_url = get_supabase_url()
+    placeholder = get_placeholder()
     new_id = None
     try:
         query = f'''
@@ -894,14 +929,14 @@ def get_alert_events(ticker: str = None, category: str = None, unread_only: bool
     init_db()
     conn = get_db_connection()
     cursor = conn.cursor()
-    supabase_url = st.secrets.get("SUPABASE_DB_URL") or os.environ.get("SUPABASE_DB_URL")
-    placeholder = "%s" if supabase_url else "?"
+    supabase_url = get_supabase_url()
+    placeholder = get_placeholder()
     alerts = []
     try:
         conditions = []
         params = []
         if ticker:
-            clean = ticker.strip().upper().replace(".NS", "").replace(".BO", "")
+            clean = clean_ticker(ticker)
             conditions.append(f"ticker = {placeholder}")
             params.append(clean)
         if category and category.lower() != "all":
@@ -916,8 +951,9 @@ def get_alert_events(ticker: str = None, category: str = None, unread_only: bool
             FROM alert_events
             {where_clause}
             ORDER BY timestamp DESC
-            LIMIT {limit}
+            LIMIT {placeholder}
         '''
+        params.append(int(limit))
         cursor.execute(query, tuple(params))
         for row in cursor.fetchall():
             alerts.append({
@@ -943,8 +979,8 @@ def mark_alert_as_read(alert_id: int):
     init_db()
     conn = get_db_connection()
     cursor = conn.cursor()
-    supabase_url = st.secrets.get("SUPABASE_DB_URL") or os.environ.get("SUPABASE_DB_URL")
-    placeholder = "%s" if supabase_url else "?"
+    supabase_url = get_supabase_url()
+    placeholder = get_placeholder()
     try:
         val = "TRUE" if supabase_url else "1"
         cursor.execute(f"UPDATE alert_events SET is_read = {val} WHERE id = {placeholder}", (alert_id,))
@@ -964,12 +1000,12 @@ def mark_all_alerts_as_read(ticker: str = None):
     init_db()
     conn = get_db_connection()
     cursor = conn.cursor()
-    supabase_url = st.secrets.get("SUPABASE_DB_URL") or os.environ.get("SUPABASE_DB_URL")
-    placeholder = "%s" if supabase_url else "?"
+    supabase_url = get_supabase_url()
+    placeholder = get_placeholder()
     try:
         val = "TRUE" if supabase_url else "1"
         if ticker:
-            clean = ticker.strip().upper().replace(".NS", "").replace(".BO", "")
+            clean = clean_ticker(ticker)
             cursor.execute(f"UPDATE alert_events SET is_read = {val} WHERE ticker = {placeholder}", (clean,))
         else:
             cursor.execute(f"UPDATE alert_events SET is_read = {val}")
@@ -989,8 +1025,8 @@ def dismiss_alert(alert_id: int) -> bool:
     init_db()
     conn = get_db_connection()
     cursor = conn.cursor()
-    supabase_url = st.secrets.get("SUPABASE_DB_URL") or os.environ.get("SUPABASE_DB_URL")
-    placeholder = "%s" if supabase_url else "?"
+    supabase_url = get_supabase_url()
+    placeholder = get_placeholder()
     success = False
     try:
         cursor.execute(f"DELETE FROM alert_events WHERE id = {placeholder}", (alert_id,))
@@ -1012,7 +1048,7 @@ def dismiss_all_alerts(unread_only: bool = False) -> bool:
     init_db()
     conn = get_db_connection()
     cursor = conn.cursor()
-    supabase_url = st.secrets.get("SUPABASE_DB_URL") or os.environ.get("SUPABASE_DB_URL")
+    supabase_url = get_supabase_url()
     success = False
     try:
         if unread_only:
@@ -1038,13 +1074,13 @@ def get_unread_alert_count(ticker: str = None) -> int:
     init_db()
     conn = get_db_connection()
     cursor = conn.cursor()
-    supabase_url = st.secrets.get("SUPABASE_DB_URL") or os.environ.get("SUPABASE_DB_URL")
-    placeholder = "%s" if supabase_url else "?"
+    supabase_url = get_supabase_url()
+    placeholder = get_placeholder()
     count = 0
     try:
         unread_cond = "is_read = FALSE" if supabase_url else "is_read = 0"
         if ticker:
-            clean = ticker.strip().upper().replace(".NS", "").replace(".BO", "")
+            clean = clean_ticker(ticker)
             cursor.execute(f"SELECT COUNT(*) FROM alert_events WHERE {unread_cond} AND ticker = {placeholder}", (clean,))
         else:
             cursor.execute(f"SELECT COUNT(*) FROM alert_events WHERE {unread_cond}")

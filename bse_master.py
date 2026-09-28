@@ -2,6 +2,7 @@ import os
 import re
 import json
 import difflib
+from normalizer import clean_ticker
 
 PRIMARY_BSE_MAP = {
     "ONIDA": "500279",
@@ -14,11 +15,48 @@ PRIMARY_BSE_MAP = {
     "TATAMOTORS": "500570", "OLAELEC": "544225", "ATHERENERGY": "544397"
 }
 
+_ALIASES_CACHE = {"data": None, "mtime": 0}
+_SCRIPS_CACHE = {"data": None, "mtime": 0}
+
+def get_dynamic_aliases() -> dict:
+    """Loads and caches dynamic_aliases.json in-memory with file mtime validation."""
+    path = "dynamic_aliases.json"
+    if not os.path.exists(path):
+        return {}
+    try:
+        mtime = os.path.getmtime(path)
+        if _ALIASES_CACHE["data"] is not None and _ALIASES_CACHE["mtime"] == mtime:
+            return _ALIASES_CACHE["data"]
+        with open(path, "r", encoding="utf-8") as f:
+            data = json.load(f)
+            _ALIASES_CACHE["data"] = data
+            _ALIASES_CACHE["mtime"] = mtime
+            return data
+    except Exception:
+        return _ALIASES_CACHE["data"] or {}
+
+def get_bse_scrips_cache() -> dict:
+    """Loads and caches bse_scrips_cache.json in-memory with file mtime validation."""
+    path = "bse_scrips_cache.json"
+    if not os.path.exists(path):
+        return {}
+    try:
+        mtime = os.path.getmtime(path)
+        if _SCRIPS_CACHE["data"] is not None and _SCRIPS_CACHE["mtime"] == mtime:
+            return _SCRIPS_CACHE["data"]
+        with open(path, "r", encoding="utf-8") as f:
+            data = json.load(f)
+            _SCRIPS_CACHE["data"] = data
+            _SCRIPS_CACHE["mtime"] = mtime
+            return data
+    except Exception:
+        return _SCRIPS_CACHE["data"] or {}
+
 def find_fuzzy_scrip_match(query: str, cutoff: float = 0.72) -> str:
     """Matches typographical errors against known scrips and aliases using Levenshtein similarity."""
     if not query:
         return None
-    clean_q = query.strip().upper()
+    clean_q = clean_ticker(query)
     
     # Check similarity against PRIMARY_BSE_MAP keys
     candidates = list(PRIMARY_BSE_MAP.keys())
@@ -26,16 +64,12 @@ def find_fuzzy_scrip_match(query: str, cutoff: float = 0.72) -> str:
     if matches:
         return PRIMARY_BSE_MAP[matches[0]]
         
-    # Check similarity against dynamic aliases if file exists
-    if os.path.exists("dynamic_aliases.json"):
-        try:
-            with open("dynamic_aliases.json", "r", encoding="utf-8") as f:
-                dyn = json.load(f)
-                dyn_matches = difflib.get_close_matches(clean_q, list(dyn.keys()), n=1, cutoff=cutoff)
-                if dyn_matches:
-                    return dyn[dyn_matches[0]]
-        except Exception:
-            pass
+    # Check similarity against dynamic aliases
+    dyn = get_dynamic_aliases()
+    if dyn:
+        dyn_matches = difflib.get_close_matches(clean_q, list(dyn.keys()), n=1, cutoff=cutoff)
+        if dyn_matches:
+            return dyn[dyn_matches[0]]
         
     return None
 
@@ -66,6 +100,17 @@ def resolve_scrip_from_supabase(query: str) -> str:
                 pass
     return None
 
+def _get_active_flash_model(client) -> str:
+    """Discovers active Gemini Flash model with graceful fallback."""
+    try:
+        from analyzer import get_latest_flash_models
+        models = get_latest_flash_models(client)
+        if models:
+            return models[0]
+    except Exception:
+        pass
+    return "gemini-2.5-flash"
+
 def resolve_scrip_via_gemini_jit(query: str) -> str:
     """
     Tier 5: Just-In-Time Gemini Grounded Search.
@@ -88,8 +133,9 @@ def resolve_scrip_via_gemini_jit(query: str) -> str:
             f"What is the official 6-digit BSE (Bombay Stock Exchange) security/scrip code for '{query}'? "
             "Reply strictly with only the 6-digit number. If not found, reply N/A."
         )
+        model_name = _get_active_flash_model(client)
         chat = client.chats.create(
-            model="gemini-3.8-flash",
+            model=model_name,
             config=genai.types.GenerateContentConfig(
                 tools=[{"google_search": {}}],
                 temperature=0.0
@@ -106,9 +152,10 @@ def resolve_scrip_via_gemini_jit(query: str) -> str:
                 if os.path.exists("dynamic_aliases.json"):
                     with open("dynamic_aliases.json", "r", encoding="utf-8") as f:
                         aliases = json.load(f)
-                aliases[query.strip().upper()] = code
+                aliases[clean_ticker(query)] = code
                 with open("dynamic_aliases.json", "w", encoding="utf-8") as f:
                     json.dump(aliases, f, indent=2)
+                _ALIASES_CACHE["mtime"] = 0
             except Exception:
                 pass
             return code
@@ -128,21 +175,16 @@ def resolve_bse_scrip_code(query: str) -> str:
     if not query:
         return None
 
-    clean = query.strip().upper().replace(".NS", "").replace(".BO", "")
+    clean = clean_ticker(query)
 
     # 1. Direct 6-digit code
     if clean.isdigit() and len(clean) == 6:
         return clean
 
     # 2. Dynamic aliases
-    if os.path.exists("dynamic_aliases.json"):
-        try:
-            with open("dynamic_aliases.json", "r", encoding="utf-8") as f:
-                dyn = json.load(f)
-                if clean in dyn:
-                    return str(dyn[clean]).strip()
-        except Exception:
-            pass
+    dyn = get_dynamic_aliases()
+    if clean in dyn:
+        return str(dyn[clean]).strip()
 
     # 3. In-memory fast path
     if clean in PRIMARY_BSE_MAP:
@@ -154,22 +196,18 @@ def resolve_bse_scrip_code(query: str) -> str:
         return scrip_from_db
 
     # 4. Local master cache fallback (offline universe)
-    if os.path.exists("bse_scrips_cache.json"):
-        try:
-            with open("bse_scrips_cache.json", "r", encoding="utf-8") as f:
-                data = json.load(f)
-                symbols = data.get("symbols", {})
-                names = data.get("names", {})
-                if clean in symbols:
-                    return symbols[clean]
-                if clean in names:
-                    return names[clean]
-                pattern = re.compile(rf"\b{re.escape(clean)}\b", re.IGNORECASE)
-                for comp_name, code in names.items():
-                    if pattern.search(comp_name):
-                        return code
-        except Exception:
-            pass
+    cached = get_bse_scrips_cache()
+    if cached:
+        symbols = cached.get("symbols", {})
+        names = cached.get("names", {})
+        if clean in symbols:
+            return symbols[clean]
+        if clean in names:
+            return names[clean]
+        pattern = re.compile(rf"\b{re.escape(clean)}\b", re.IGNORECASE)
+        for comp_name, code in names.items():
+            if pattern.search(comp_name):
+                return code
 
     # 5. Just-In-Time Gemini Grounded Search
     jit_code = resolve_scrip_via_gemini_jit(clean)
@@ -182,27 +220,19 @@ def get_ticker_suggestions(query: str, n: int = 3) -> list:
     """Finds closest matching ticker symbols or company names using fuzzy string matching."""
     if not query:
         return []
-    clean = query.strip().upper()
+    clean = clean_ticker(query)
     candidates = list(PRIMARY_BSE_MAP.keys())
 
-    if os.path.exists("dynamic_aliases.json"):
-        try:
-            with open("dynamic_aliases.json", "r", encoding="utf-8") as f:
-                dyn = json.load(f)
-                candidates.extend(list(dyn.keys()))
-        except Exception:
-            pass
+    dyn = get_dynamic_aliases()
+    if dyn:
+        candidates.extend(list(dyn.keys()))
 
-    if os.path.exists("bse_scrips_cache.json"):
-        try:
-            with open("bse_scrips_cache.json", "r", encoding="utf-8") as f:
-                cached = json.load(f)
-                symbols = cached.get("symbols", {})
-                names = cached.get("names", {})
-                candidates.extend(list(symbols.keys()))
-                candidates.extend(list(names.keys()))
-        except Exception:
-            pass
+    cached = get_bse_scrips_cache()
+    if cached:
+        symbols = cached.get("symbols", {})
+        names = cached.get("names", {})
+        candidates.extend(list(symbols.keys()))
+        candidates.extend(list(names.keys()))
 
     matches = difflib.get_close_matches(clean, list(set(candidates)), n=n, cutoff=0.5)
     return matches

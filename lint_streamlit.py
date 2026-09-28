@@ -43,7 +43,7 @@ def lint_file(filepath: str) -> list[str]:
                                 errors.append(
                                     f"{filepath}:{node.lineno}: Invalid st.toast icon '{icon_val}'. "
                                     f"Must be a single valid Unicode emoji or Material icon. Error: {err}"
-                                )
+                                    )
 
             # 2. Check for deprecated use_container_width
             for kw in node.keywords:
@@ -53,15 +53,27 @@ def lint_file(filepath: str) -> list[str]:
                         f"Use width='stretch' or width='content' instead."
                     )
 
+        # 3. Check for bare except: clauses (PEP 8 E722)
+        if isinstance(node, ast.ExceptHandler) and node.type is None:
+            errors.append(
+                f"{filepath}:{node.lineno}: Bare 'except:' clause detected. "
+                f"Catch specific exceptions or 'except Exception:' instead."
+            )
+
     return errors
 
 def run_linter(directory: str = ".") -> int:
     print("🔍 Running Streamlit Static Linter & Guardrail Scan...")
     total_errors = []
-    py_files = [
-        f for f in os.listdir(directory)
-        if f.endswith(".py") and not f.startswith("test_") and not f.startswith("check_")
-    ]
+    py_files = []
+    exclude_dirs = {".venv", "venv", "__pycache__", ".git", ".antigravity", "scratch"}
+    for root, dirs, files in os.walk(directory):
+        dirs[:] = [d for d in dirs if d not in exclude_dirs]
+        for f in files:
+            if f.endswith(".py") and not f.startswith("test_") and not f.startswith("check_"):
+                py_files.append(os.path.relpath(os.path.join(root, f), directory))
+
+    py_files.sort()
     for py_file in py_files:
         errs = lint_file(os.path.join(directory, py_file))
         total_errors.extend(errs)
@@ -72,7 +84,7 @@ def run_linter(directory: str = ".") -> int:
             print(f"   • {err}")
         return 1
     else:
-        print(f"✅ All {len(py_files)} Python files passed Streamlit guardrail scan.")
+        print(f"✅ All {len(py_files)} Python files (including ui/ components) passed Streamlit guardrail scan.")
         return 0
 
 if __name__ == "__main__":

@@ -1,17 +1,14 @@
-def format_indian_currency(val) -> str:
-    try:
-        num = float(val)
-    except (ValueError, TypeError):
-        return "N/A"
+from ui.formatters import format_inr
 
-    if num >= 10_000_000:
-        crores = num / 10_000_000
-        return f"₹{crores:,.2f} Cr"
-    elif num >= 100_000:
-        lakhs = num / 100_000
-        return f"₹{lakhs:,.2f} Lakh"
-    else:
-        return f"₹{num:,.2f}"
+def clean_ticker(raw: str) -> str:
+    """Normalize stock ticker by stripping whitespace, uppercase, and removing exchange suffixes (.NS, .BO)."""
+    if not raw:
+        return ""
+    return str(raw).strip().upper().replace(".NS", "").replace(".BO", "")
+
+def format_indian_currency(val) -> str:
+    """Formats numeric INR values using standard Indian numbering system (Lakhs / Crores)."""
+    return format_inr(val)
 
 def normalize_stock_data(raw_data: dict, exchange: str = "NSE") -> dict:
     normalized = raw_data.copy()

@@ -1,8 +1,7 @@
 import os
 import logging
-from datetime import datetime, timezone, timedelta
-
-IST = timezone(timedelta(hours=5, minutes=30))
+from datetime import datetime
+from db import IST
 
 # Suppress Streamlit bare-mode log spam
 os.environ["STREAMLIT_LOG_LEVEL"] = "error"

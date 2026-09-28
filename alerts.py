@@ -8,6 +8,7 @@ import streamlit as st
 logger = logging.getLogger("equity_research.alerts")
 
 from db import (
+    IST,
     get_watchlist,
     update_watchlist_scan_state,
     record_alert_event,
@@ -20,8 +21,6 @@ from db import (
     is_ticker_in_watchlist
 )
 from bse_master import resolve_bse_scrip_code
-
-IST = timezone(timedelta(hours=5, minutes=30))
 
 # Regulatory & Educational Notice:
 # All alerts generated are descriptive diagnostic notices of publicly disseminated exchange data.
