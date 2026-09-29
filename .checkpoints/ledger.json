@@ -94,5 +94,53 @@
       "revision_count": 0
     },
     "preflight_passed": true
+  },
+  {
+    "tag": "checkpoint_20260929_224818_gemini_spend_cap_lifted_and_perplexity_agent_api_failover",
+    "timestamp": "2026-09-29 22:48:18 IST",
+    "commit_sha": "154e153708f6f2a8c34432a699837a36ebbb2447",
+    "branch": "dev",
+    "description": "gemini_spend_cap_lifted_and_perplexity_agent_api_failover",
+    "database": {
+      "exists": true,
+      "filename": "reports_checkpoint_20260929_224818_gemini_spend_cap_lifted_and_perplexity_agent_api_failover.db",
+      "path": ".checkpoints/reports_checkpoint_20260929_224818_gemini_spend_cap_lifted_and_perplexity_agent_api_failover.db",
+      "size_bytes": 65536,
+      "report_count": 0,
+      "revision_count": 0
+    },
+    "preflight_passed": true
+  },
+  {
+    "tag": "checkpoint_20260929_232646_prevent_cache_poisoning_and_add_resynthesize_action",
+    "timestamp": "2026-09-29 23:26:46 IST",
+    "commit_sha": "d61e9d5935d751f3f18e98def7cc1ca9acc2a5aa",
+    "branch": "dev",
+    "description": "prevent_cache_poisoning_and_add_resynthesize_action",
+    "database": {
+      "exists": true,
+      "filename": "reports_checkpoint_20260929_232646_prevent_cache_poisoning_and_add_resynthesize_action.db",
+      "path": ".checkpoints/reports_checkpoint_20260929_232646_prevent_cache_poisoning_and_add_resynthesize_action.db",
+      "size_bytes": 65536,
+      "report_count": 0,
+      "revision_count": 0
+    },
+    "preflight_passed": true
+  },
+  {
+    "tag": "checkpoint_20260929_233930_peer_comparison_progress_loading_bar",
+    "timestamp": "2026-09-29 23:39:30 IST",
+    "commit_sha": "e9709980e888ba9762b508f94cc93d3a0418b507",
+    "branch": "dev",
+    "description": "peer_comparison_progress_loading_bar",
+    "database": {
+      "exists": true,
+      "filename": "reports_checkpoint_20260929_233930_peer_comparison_progress_loading_bar.db",
+      "path": ".checkpoints/reports_checkpoint_20260929_233930_peer_comparison_progress_loading_bar.db",
+      "size_bytes": 65536,
+      "report_count": 0,
+      "revision_count": 0
+    },
+    "preflight_passed": true
   }
 ]
