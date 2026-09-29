@@ -10,7 +10,7 @@
 
 | Checkpoint Tag | IST Timestamp | Commit | DB Reports | Description |
 |:---|:---|:---|:---|:---|
-| `checkpoint_20260929_224818_gemini_spend_cap_lifted_and_perplexity_agent_api_failover` | 2026-09-29 22:48:18 IST | `4b84d91` | 0 rep / 0 rev | gemini_spend_cap_lifted_and_perplexity_agent_api_failover |
+| `checkpoint_20260929_224818_gemini_spend_cap_lifted_and_perplexity_agent_api_failover` | 2026-09-29 22:48:18 IST | `154e153` | 0 rep / 0 rev | gemini_spend_cap_lifted_and_perplexity_agent_api_failover |
 | `checkpoint_20260929_004627_strict_password_protected_admin_portal` | 2026-09-29 00:46:27 IST | `05fee44` | 0 rep / 0 rev | strict_password_protected_admin_portal |
 | `checkpoint_20260929_004151_isolated_admin_portal_and_visitor_analytics` | 2026-09-29 00:41:51 IST | `97c1996` | 0 rep / 0 rev | isolated_admin_portal_and_visitor_analytics |
 | `checkpoint_20260929_002414_peer_comparison_and_usage_analytics` | 2026-09-29 00:24:14 IST | `1afde10` | 0 rep / 0 rev | peer_comparison_and_usage_analytics |
