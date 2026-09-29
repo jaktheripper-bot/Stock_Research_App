@@ -24,6 +24,7 @@ from telemetry import (
     is_admin_authenticated,
     set_admin_authenticated,
     verify_admin_passcode,
+    update_admin_passcode,
 )
 from ui.analytics_hub import render_site_analytics_view
 
@@ -32,7 +33,7 @@ st.set_page_config(
     page_title="Executive Telemetry & Site Usage Admin Portal",
     page_icon="🔐",
     layout="wide",
-    initial_sidebar_state="collapsed"
+    initial_sidebar_state="auto"
 )
 
 # Custom Admin Portal Styling
@@ -92,8 +93,37 @@ def render_login_screen():
 
             st.caption("🔒 All access attempts and telemetry queries are strictly isolated to authenticated administrators.")
 
+def render_admin_toolbar():
+    with st.sidebar:
+        st.markdown("### 🔐 Admin Controls")
+        st.caption("Status: **Authenticated Administrator**")
+        st.markdown("<div style='height: 4px;'></div>", unsafe_allow_html=True)
+        with st.expander("🔑 Change Password", expanded=False):
+            with st.form("admin_change_pw_form", clear_on_submit=True):
+                old_pw = st.text_input("Current Password", type="password")
+                new_pw = st.text_input("New Password", type="password")
+                confirm_pw = st.text_input("Confirm New Password", type="password")
+                save_pw = st.form_submit_button("Update Password", type="primary", width="stretch")
+                if save_pw:
+                    if not new_pw or new_pw != confirm_pw:
+                        st.error("❌ Passwords do not match or are blank.")
+                    else:
+                        ok, msg = update_admin_passcode(old_pw, new_pw)
+                        if ok:
+                            st.success("✅ Password successfully updated!")
+                            st.toast("Admin password updated.", icon="🔒")
+                        else:
+                            st.error(f"❌ {msg}")
+
+        st.markdown("<div style='height: 8px;'></div>", unsafe_allow_html=True)
+        if st.button("🚪 Log Out", width="stretch"):
+            set_admin_authenticated(False)
+            st.toast("Logged out.", icon="🔒")
+            st.rerun()
+
 # Dispatcher
 if not is_admin_authenticated():
     render_login_screen()
 else:
+    render_admin_toolbar()
     render_site_analytics_view()

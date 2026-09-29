@@ -409,6 +409,29 @@ def init_db(force: bool = False):
                 cursor.execute("INSERT OR IGNORE INTO schema_migrations (version) VALUES ('v004_traffic_attribution_and_session_tracking');")
             conn.commit()
 
+        # Migration v005: System Settings & Dynamic Configuration
+        if "v005_system_settings" not in applied:
+            logger.info("Applying schema migration: v005_system_settings...")
+            if supabase_url:
+                cursor.execute('''
+                    CREATE TABLE IF NOT EXISTS system_settings (
+                        key VARCHAR(64) PRIMARY KEY,
+                        value TEXT NOT NULL,
+                        updated_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP
+                    );
+                ''')
+                cursor.execute("INSERT INTO schema_migrations (version) VALUES ('v005_system_settings') ON CONFLICT DO NOTHING;")
+            else:
+                cursor.execute('''
+                    CREATE TABLE IF NOT EXISTS system_settings (
+                        key TEXT PRIMARY KEY,
+                        value TEXT NOT NULL,
+                        updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
+                    );
+                ''')
+                cursor.execute("INSERT OR IGNORE INTO schema_migrations (version) VALUES ('v005_system_settings');")
+            conn.commit()
+
         _DB_INITIALIZED = True
     except Exception as e:
         logger.error(f"Error during init_db migrations: {e}")
@@ -1518,4 +1541,62 @@ def get_session_journeys(days: int = None, start_date = None, end_date = None, l
         cursor.close()
         conn.close()
     return journeys
+
+def get_system_setting(key: str, default: str | None = None) -> str | None:
+    """Retrieve a persisted system setting from PostgreSQL/SQLite."""
+    init_db()
+    conn = get_db_connection()
+    cursor = conn.cursor()
+    placeholder = get_placeholder()
+    try:
+        cursor.execute(f"SELECT value FROM system_settings WHERE key = {placeholder};", (key,))
+        row = cursor.fetchone()
+        if row and row[0] is not None:
+            return str(row[0])
+        return default
+    except Exception as e:
+        logger.error(f"Error fetching system setting '{key}': {e}")
+        return default
+    finally:
+        cursor.close()
+        conn.close()
+
+def set_system_setting(key: str, value: str) -> bool:
+    """Upsert a persisted system setting in PostgreSQL/SQLite."""
+    init_db()
+    conn = get_db_connection()
+    cursor = conn.cursor()
+    supabase_url = get_supabase_url()
+    placeholder = get_placeholder()
+    try:
+        if supabase_url:
+            cursor.execute(
+                f"""
+                INSERT INTO system_settings (key, value, updated_at)
+                VALUES ({placeholder}, {placeholder}, CURRENT_TIMESTAMP)
+                ON CONFLICT (key) DO UPDATE SET value = EXCLUDED.value, updated_at = CURRENT_TIMESTAMP;
+                """,
+                (key, value)
+            )
+        else:
+            cursor.execute(
+                f"""
+                INSERT INTO system_settings (key, value, updated_at)
+                VALUES ({placeholder}, {placeholder}, CURRENT_TIMESTAMP)
+                ON CONFLICT (key) DO UPDATE SET value = excluded.value, updated_at = CURRENT_TIMESTAMP;
+                """,
+                (key, value)
+            )
+        conn.commit()
+        return True
+    except Exception as e:
+        logger.error(f"Error persisting system setting '{key}': {e}")
+        try:
+            conn.rollback()
+        except Exception:
+            pass
+        return False
+    finally:
+        cursor.close()
+        conn.close()
 

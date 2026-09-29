@@ -28,7 +28,15 @@ logger = logging.getLogger("equity_research.telemetry")
 DEFAULT_ADMIN_PASSCODE = "admin2026"
 
 def get_admin_passcode() -> str:
-    """Retrieve configured administrator passcode from secrets or environment."""
+    """Retrieve configured administrator passcode from database, secrets or environment."""
+    try:
+        from db import get_system_setting
+        db_pass = get_system_setting("admin_passcode")
+        if db_pass:
+            return db_pass.strip()
+    except Exception:
+        pass
+
     try:
         if hasattr(st, "secrets") and st.secrets.get("ADMIN_PASSCODE"):
             return str(st.secrets["ADMIN_PASSCODE"]).strip()
@@ -48,6 +56,48 @@ def verify_admin_passcode(candidate: str) -> bool:
         return hmac.compare_digest(str(candidate).strip(), expected)
     except Exception:
         return str(candidate).strip() == expected
+
+def update_admin_passcode(current_passcode: str, new_passcode: str) -> tuple[bool, str]:
+    """Verify current passcode and persist new administrator passcode to DB and local secrets."""
+    if not verify_admin_passcode(current_passcode):
+        return False, "Current administrator password is incorrect."
+    
+    cleaned_new = (new_passcode or "").strip()
+    if len(cleaned_new) < 6:
+        return False, "New password must be at least 6 characters long."
+    
+    # Persist to database (dual-binding PostgreSQL / SQLite)
+    try:
+        from db import set_system_setting
+        db_ok = set_system_setting("admin_passcode", cleaned_new)
+        if not db_ok:
+            logger.warning("Failed to persist admin password to database.")
+    except Exception as e:
+        logger.error(f"Error persisting admin password to DB: {e}")
+
+    # Also sync local .streamlit/secrets.toml if accessible
+    try:
+        base_dir = os.path.dirname(os.path.abspath(__file__))
+        secrets_path = os.path.join(base_dir, ".streamlit", "secrets.toml")
+        if os.path.exists(secrets_path):
+            with open(secrets_path, "r", encoding="utf-8") as f:
+                lines = f.readlines()
+            new_lines = []
+            replaced = False
+            for line in lines:
+                if line.strip().startswith("ADMIN_PASSCODE"):
+                    new_lines.append(f'ADMIN_PASSCODE = "{cleaned_new}"\n')
+                    replaced = True
+                else:
+                    new_lines.append(line)
+            if not replaced:
+                new_lines.append(f'ADMIN_PASSCODE = "{cleaned_new}"\n')
+            with open(secrets_path, "w", encoding="utf-8") as f:
+                f.writelines(new_lines)
+    except Exception as e:
+        logger.warning(f"Could not update local secrets.toml: {e}")
+
+    return True, "Password successfully updated."
 
 def is_admin_authenticated() -> bool:
     """Check if the current session has valid administrator authorization."""

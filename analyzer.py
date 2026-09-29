@@ -491,7 +491,7 @@ def get_latest_flash_models(client) -> list:
     now = time.time()
     if _DISCOVERED_MODELS_CACHE["models"] and (now - _DISCOVERED_MODELS_CACHE["timestamp"]) < 86400:
         return _DISCOVERED_MODELS_CACHE["models"]
-    fallback = ["gemini-3.6-flash", "gemini-2.0-flash"]
+    fallback = ["gemini-3.8-flash", "gemini-3.7-flash"]
     try:
         discovered = []
         for m in client.models.list():
@@ -526,7 +526,7 @@ def get_surgical_flash_model(client) -> str:
             return discovered[0]
     except Exception:
         pass
-    return "gemini-2.0-flash"
+    return "gemini-3.8-flash"
 
 def stream_genai_with_fallback(client, prompt: str, system_prompt: str, on_status=None, use_grounding: bool = True):
     models_to_try = get_latest_flash_models(client)[:2]
@@ -595,49 +595,62 @@ def stream_perplexity_fallback(prompt: str, system_prompt: str):
     if not api_key:
         raise ValueError("PERPLEXITY_API_KEY missing from secrets/environment.")
 
-    url = "https://api.perplexity.ai/chat/completions"
+    url = "https://api.perplexity.ai/v1/responses"
     headers = {
         "Authorization": f"Bearer {api_key}",
         "Content-Type": "application/json",
         "Accept": "text/event-stream"
     }
     payload = {
-        "model": "sonar-pro",
-        "messages": [
-            {"role": "system", "content": system_prompt},
-            {"role": "user", "content": prompt}
-        ],
-        "stream": True,
-        "temperature": 0.2
+        "input": prompt,
+        "instructions": system_prompt,
+        "preset": "fast",
+        "stream": True
     }
 
-    res = requests.post(url, headers=headers, json=payload, stream=True, timeout=30)
+    res = requests.post(url, headers=headers, json=payload, stream=True, timeout=60)
     if res.status_code != 200:
-        raise RuntimeError(f"Perplexity sonar-pro API HTTP {res.status_code}: {res.text}")
+        raise RuntimeError(f"Perplexity Agent API HTTP {res.status_code}: {res.text}")
 
+    current_event = None
+    yielded = False
     for raw_line in res.iter_lines(decode_unicode=False):
         if not raw_line:
             continue
         line = raw_line.decode("utf-8", errors="replace")
-        if line.startswith("data: "):
+        if line.startswith("event: "):
+            current_event = line[7:].strip()
+        elif line.startswith("data: "):
             data_str = line[6:].strip()
             if data_str == "[DONE]":
                 break
             try:
-                event = json.loads(data_str)
-                choices = event.get("choices", [])
-                if choices:
-                    delta = choices[0].get("delta", {})
-                    content = delta.get("content", "") if isinstance(delta, dict) else str(delta)
-                    if content:
-                        yield content
-                elif "delta" in event:
-                    delta_val = event.get("delta")
-                    text = delta_val.get("content", "") if isinstance(delta_val, dict) else str(delta_val)
-                    if text:
-                        yield text
+                data = json.loads(data_str)
+                if current_event == "response.output_text.delta" or "delta" in data:
+                    delta = data.get("delta")
+                    if isinstance(delta, str) and delta:
+                        yielded = True
+                        yield delta
             except Exception:
                 continue
+
+    if not yielded:
+        # Non-streaming fallback if SSE streaming yielded no tokens
+        r2 = requests.post(
+            url,
+            headers={"Authorization": f"Bearer {api_key}", "Content-Type": "application/json"},
+            json={"input": prompt, "instructions": system_prompt, "preset": "fast"},
+            timeout=60
+        )
+        if r2.status_code == 200:
+            d2 = r2.json()
+            for item in d2.get("output", []):
+                if isinstance(item, dict) and item.get("type") == "message":
+                    for c in item.get("content", []):
+                        if c.get("type") == "output_text":
+                            txt = c.get("text", "")
+                            if txt:
+                                yield txt
 
 def stream_gemini_ungrounded_bypass(client, prompt: str, system_prompt: str):
     model_name = get_latest_flash_models(client)[0]
@@ -670,32 +683,43 @@ def stream_stock_report(ticker: str, language: str = "English (India)", stock_da
         for chunk in stream_genai_with_fallback(client, user_prompt, system_prompt, on_status=on_status, use_grounding=use_grounding):
             report_accumulator.append(chunk)
             yield chunk
-    except Exception:
-        notice_p = "\n\n> ⚠️ **Gemini Grounding Unavailable. Rerouting to Perplexity sonar-pro...**\n\n"
+    except Exception as gemini_err:
+        notice_p = "\n\n> ⚠️ **Gemini Grounding Unavailable. Rerouting to Perplexity Agent API...**\n\n"
         report_accumulator.append(notice_p)
         yield notice_p
         try:
             if on_status:
-                on_status("🔄 Failover: Querying Perplexity sonar-pro with search grounding...")
+                on_status("🔄 Failover: Querying Perplexity Agent API with search grounding...")
             for chunk in stream_perplexity_fallback(user_prompt, system_prompt):
                 report_accumulator.append(chunk)
                 yield chunk
-        except Exception:
-            notice_u = (
-                "\n\n> ⚠️ **Notice: Live Web Grounding Offline.**\n"
-                "> Synthesizing thesis from core parametric intelligence.\n"
-                "> *Note:* Exchange metrics are verified, but recent disclosures may be omitted.\n\n"
-            )
-            report_accumulator.append(notice_u)
-            yield notice_u
-            try:
-                for chunk in stream_gemini_ungrounded_bypass(client, user_prompt, system_prompt):
-                    report_accumulator.append(chunk)
-                    yield chunk
-            except Exception as final_err:
-                err_msg = f"\n\n> ❌ **Live Synthesis Failed:** {final_err}"
+        except Exception as p_err:
+            gem_err_msg = str(gemini_err)
+            is_spend_cap = any(phrase in gem_err_msg for phrase in ["Spend cap breached", "PERMISSION_DENIED", "403", "quota"])
+            if is_spend_cap:
+                err_msg = (
+                    f"\n\n> ❌ **Live Synthesis Failed:** Both primary and failover providers encountered errors.\n"
+                    f"> • **Gemini (Primary):** Google Cloud spend cap breached or permission denied.\n"
+                    f"> • **Perplexity (Failover):** {p_err}\n"
+                )
                 report_accumulator.append(err_msg)
                 yield err_msg
+            else:
+                notice_u = (
+                    "\n\n> ⚠️ **Notice: Live Web Grounding Offline.**\n"
+                    "> Synthesizing thesis from core parametric intelligence.\n"
+                    "> *Note:* Exchange metrics are verified, but recent disclosures may be omitted.\n\n"
+                )
+                report_accumulator.append(notice_u)
+                yield notice_u
+                try:
+                    for chunk in stream_gemini_ungrounded_bypass(client, user_prompt, system_prompt):
+                        report_accumulator.append(chunk)
+                        yield chunk
+                except Exception as final_err:
+                    err_msg = f"\n\n> ❌ **Live Synthesis Failed:** {final_err}"
+                    report_accumulator.append(err_msg)
+                    yield err_msg
 
     complete_text = "".join(report_accumulator)
     try:
