@@ -1,6 +1,6 @@
+import io
 import os
 import re
-import sys
 import json
 import time
 import random
@@ -12,7 +12,7 @@ import pandas as pd
 import streamlit as st
 import yfinance as yf
 from google import genai
-from normalizer import normalize_stock_data, clean_ticker
+from normalizer import clean_ticker
 from db import save_report_to_archive, get_report_by_ticker
 from checker import verify_stock_report
 from screener import pass_pre_screening_gates
@@ -259,21 +259,20 @@ def resolve_pe_with_failsafes(ticker: str, scrip: str = "") -> str:
         symbols = [f"{clean}.NS", f"{clean}.BO"]
         if scrip and str(scrip).isdigit():
             symbols.append(f"{scrip}.BO")
-        with open(os.devnull, "w") as devnull:
-            with contextlib.redirect_stderr(devnull):
-                for s in symbols:
-                    try:
-                        tk = yf.Ticker(s)
-                        info = tk.info or {}
-                        trailing_eps = info.get("trailingEps")
-                        trailing_pe = info.get("trailingPE")
-                        if trailing_eps is not None and float(trailing_eps) <= 0:
-                            return "N/A (Loss-Making)"
-                        if trailing_pe and float(trailing_pe) > 0:
-                            return f"{float(trailing_pe):.2f}"
-                    except Exception as err:
-                        logger.debug(f"yfinance Ticker probe notice for {s}: {err}")
-                        continue
+        with contextlib.redirect_stderr(io.StringIO()):
+            for s in symbols:
+                try:
+                    tk = yf.Ticker(s)
+                    info = tk.info or {}
+                    trailing_eps = info.get("trailingEps")
+                    trailing_pe = info.get("trailingPE")
+                    if trailing_eps is not None and float(trailing_eps) <= 0:
+                        return "N/A (Loss-Making)"
+                    if trailing_pe and float(trailing_pe) > 0:
+                        return f"{float(trailing_pe):.2f}"
+                except Exception as err:
+                    logger.debug(f"yfinance Ticker probe notice for {s}: {err}")
+                    continue
     except Exception as e:
         logger.debug(f"P/E resolution via yfinance failed: {e}")
 
@@ -292,6 +291,7 @@ def resolve_pe_with_failsafes(ticker: str, scrip: str = "") -> str:
             logger.debug(f"BSE ComHeader direct P/E fetch notice: {e}")
     return "N/A"
 
+@st.cache_data(ttl=300, show_spinner=False)
 def fetch_latest_bse_announcement(scrip_code: str) -> str:
     if not scrip_code or not str(scrip_code).isdigit():
         return ""
@@ -685,6 +685,10 @@ def stream_gemini_ungrounded_bypass(client, prompt: str, system_prompt: str):
 def stream_stock_report(ticker: str, language: str = "English (India)", stock_data: dict = None, on_status=None, revision_trigger: str = "", use_grounding: bool = True):
     if stock_data is None:
         stock_data = get_stock_fundamentals(ticker)
+
+    passed, gate_msg = pass_pre_screening_gates(stock_data, stock_data)
+    if not passed:
+        raise PipelineError(stage="Pre-Screening Gate", message=gate_msg)
 
     api_key = os.environ.get("GEMINI_API_KEY")
     if not api_key:

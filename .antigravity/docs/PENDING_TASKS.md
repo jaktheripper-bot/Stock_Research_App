@@ -7,22 +7,22 @@
 ## 🛠️ Tier 1: Immediate Script Optimization & Code Cleanliness (From Script Audit)
 *Goal: Prune leftover code, eliminate memory/descriptor leaks, and optimize request latency.*
 
-- [ ] **Purge Dead / Unused Imports**
-  - [`alerts.py`](file:///Users/lyndonpinto/Documents/Stock_Research_App/alerts.py): Remove unused imports (`os`, `re`, `timezone`, unused `db` functions).
-  - [`analyzer.py`](file:///Users/lyndonpinto/Documents/Stock_Research_App/analyzer.py): Remove unused imports (`sys`, `normalize_stock_data`, `pass_pre_screening_gates`).
-  - [`app.py`](file:///Users/lyndonpinto/Documents/Stock_Research_App/app.py): Clean up unused imports at lines 1–65 (e.g. `concurrent.futures`, `sys`, `timezone`, modularized chart/formatter helpers).
-  - [`check_system.py`](file:///Users/lyndonpinto/Documents/Stock_Research_App/check_system.py), [`ci/checkpoint_manager.py`](file:///Users/lyndonpinto/Documents/Stock_Research_App/ci/checkpoint_manager.py), [`test_ui_headless.py`](file:///Users/lyndonpinto/Documents/Stock_Research_App/test_ui_headless.py).
-- [ ] **Prune Dead Functions**
-  - [`bse_master.py`](file:///Users/lyndonpinto/Documents/Stock_Research_App/bse_master.py#L55-L74): Remove `find_fuzzy_scrip_match()` (unreferenced dead function).
-  - [`screener.py`](file:///Users/lyndonpinto/Documents/Stock_Research_App/screener.py): Either connect `pass_pre_screening_gates()` to enforce real liquidity/market cap gating, or prune it to eliminate vestigial code.
-- [ ] **External BSE Announcement Exchange Caching**
-  - In [`analyzer.py`](file:///Users/lyndonpinto/Documents/Stock_Research_App/analyzer.py) and [`alerts.py`](file:///Users/lyndonpinto/Documents/Stock_Research_App/alerts.py): Decorate `fetch_latest_bse_announcement()` and `fetch_bse_announcements()` with `@st.cache_data(ttl=300)` to eliminate duplicate 200–600ms HTTP requests during report rendering and alert sweeps.
-- [ ] **Fix Process Descriptor Leak in P/E Resolver**
-  - [`analyzer.py:262`](file:///Users/lyndonpinto/Documents/Stock_Research_App/analyzer.py#L262): Replace `open(os.devnull, "w")` file handle allocation with in-memory `contextlib.redirect_stderr(io.StringIO())`.
-- [ ] **In-Memory Ticker Suggestion Cache**
-  - [`bse_master.py:237`](file:///Users/lyndonpinto/Documents/Stock_Research_App/bse_master.py#L237): Cache the deduplicated search candidate list in memory rather than reconstructing sets across thousands of records on every keystroke.
-- [ ] **SEBI Disclaimer Standardization**
-  - Update [`ui/pdf.py`](file:///Users/lyndonpinto/Documents/Stock_Research_App/ui/pdf.py) and in-page footer in [`app.py`](file:///Users/lyndonpinto/Documents/Stock_Research_App/app.py) to use the canonical [`MANDATORY_SEBI_DISCLAIMER`](file:///Users/lyndonpinto/Documents/Stock_Research_App/db.py#L14-L23) across all export surfaces.
+- [x] **Purge Dead / Unused Imports**
+  - [`alerts.py`](file:///Users/lyndonpinto/Documents/Stock_Research_App/alerts.py): Removed unused imports (`os`, `re`, `timezone`, unused `db` functions).
+  - [`analyzer.py`](file:///Users/lyndonpinto/Documents/Stock_Research_App/analyzer.py): Removed unused imports (`sys`, `normalize_stock_data`).
+  - [`app.py`](file:///Users/lyndonpinto/Documents/Stock_Research_App/app.py): Cleaned up unused imports (`sys`, `timezone`, `timedelta`, modularized chart/formatter helpers, inline redundant imports).
+  - [`check_system.py`](file:///Users/lyndonpinto/Documents/Stock_Research_App/check_system.py), [`test_ui_headless.py`](file:///Users/lyndonpinto/Documents/Stock_Research_App/test_ui_headless.py): Cleaned up unused imports.
+- [x] **Prune Dead Functions**
+  - [`bse_master.py`](file:///Users/lyndonpinto/Documents/Stock_Research_App/bse_master.py#L55-L74): Removed `find_fuzzy_scrip_match()` (unreferenced dead function).
+  - [`screener.py`](file:///Users/lyndonpinto/Documents/Stock_Research_App/screener.py): Wired `pass_pre_screening_gates()` into [`analyzer.py:stream_stock_report()`](file:///Users/lyndonpinto/Documents/Stock_Research_App/analyzer.py#L685-L690) to enforce real trading/liquidity gating and reject inactive/suspended securities.
+- [x] **External BSE Announcement Exchange Caching**
+  - In [`analyzer.py`](file:///Users/lyndonpinto/Documents/Stock_Research_App/analyzer.py#L294) and [`alerts.py`](file:///Users/lyndonpinto/Documents/Stock_Research_App/alerts.py#L20): Decorated `fetch_latest_bse_announcement()` and `fetch_bse_announcements()` with `@st.cache_data(ttl=300)` to eliminate duplicate 200–600ms HTTP requests during report rendering and alert sweeps.
+- [x] **Fix Process Descriptor Leak in P/E Resolver**
+  - [`analyzer.py:262`](file:///Users/lyndonpinto/Documents/Stock_Research_App/analyzer.py#L262): Replaced `open(os.devnull, "w")` file handle allocation with in-memory `contextlib.redirect_stderr(io.StringIO())`.
+- [x] **In-Memory Ticker Suggestion Cache**
+  - [`bse_master.py:237`](file:///Users/lyndonpinto/Documents/Stock_Research_App/bse_master.py#L237): Implemented `_get_cached_candidates()` to cache the deduplicated search candidate list in memory rather than reconstructing sets across thousands of records on every keystroke.
+- [x] **SEBI Disclaimer Standardization**
+  - Verified and synchronized canonical [`MANDATORY_SEBI_DISCLAIMER`](file:///Users/lyndonpinto/Documents/Stock_Research_App/db.py#L14-L23) across [`ui/pdf.py`](file:///Users/lyndonpinto/Documents/Stock_Research_App/ui/pdf.py#L13) and [`app.py`](file:///Users/lyndonpinto/Documents/Stock_Research_App/app.py#L1244).
 - [x] **Peer Comparison Progress Loading Bar**
   - In [`ui/comparison.py`](file:///Users/lyndonpinto/Documents/Stock_Research_App/ui/comparison.py#L52): Replaced static `st.spinner()` with structured multi-phase `st.progress` loading bar and `progress_callback` in [`analyzer.py:compare_two_companies()`](file:///Users/lyndonpinto/Documents/Stock_Research_App/analyzer.py#L1135-L1170) reporting quote resolution for Company A & B, disparity evaluation, and 7-pillar matrix alignment.
 
@@ -44,6 +44,14 @@
 *Source: [`.antigravity/docs/BEHAVIORAL_RESEARCH_STUDY.md`](file:///Users/lyndonpinto/Documents/Stock_Research_App/.antigravity/docs/BEHAVIORAL_RESEARCH_STUDY.md)*
 
 - [x] **P1: Normalized Cross-Stock Comparator** *(Completed: ⚖️ Peer Comparison tab with 3-tier Disparity Gates)*.
+- [ ] **P1.1: Institutional Peer Comparison Information Expansion (Analyst Deep-Dive)**
+  *Evaluation of essential diagnostic dimensions to elevate comparison beyond basic multiples:*
+  - **Capital Efficiency & Profitability Card**: Side-by-side ROCE %, ROE %, Operating Margin %, and OCF/EBITDA cash conversion.
+  - **Valuation Band & Multiple Disparity**: EV/EBITDA, P/B, Dividend Yield, and historical 5-year P/E percentile comparison.
+  - **Balance Sheet & Solvency Matrix**: Debt/Equity ratio, Interest Coverage, and Net Debt/EBITDA.
+  - **Shareholding & Promoter Alignment**: Promoter Holding %, Promoter Pledge % (critical Indian risk metric), and FII/DII institutional trend.
+  - **Head-to-Head Comparative Radar Chart**: Interactive spider/radar chart comparing Company A vs Company B across the 7 institutional pillars and return ratios.
+  - **Qualitative Moat & Divergence Diagnostic**: Side-by-side narrative contrasting competitive advantages, pricing power, and primary operational risks.
 - [ ] **P2: The "Inversion Engine" / Charlie Munger Pre-Mortem**
   - Integrate a mandatory counter-thesis section modeling the Top 3 Failure Modes (Customer Concentration, Regulatory/Policy Vulnerability, Balance Sheet Sensitivity) to prevent narrative seduction.
 - [ ] **P3: Sunk-Cost & Thesis Drift Prompter**

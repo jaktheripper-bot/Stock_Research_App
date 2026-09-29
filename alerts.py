@@ -1,7 +1,5 @@
-import os
-import re
 import logging
-from datetime import datetime, timezone, timedelta
+from datetime import datetime, timedelta
 import requests
 import streamlit as st
 
@@ -12,13 +10,6 @@ from db import (
     get_watchlist,
     update_watchlist_scan_state,
     record_alert_event,
-    get_alert_events,
-    get_unread_alert_count,
-    mark_alert_as_read,
-    mark_all_alerts_as_read,
-    add_to_watchlist,
-    remove_from_watchlist,
-    is_ticker_in_watchlist
 )
 from bse_master import resolve_bse_scrip_code
 
@@ -26,6 +17,7 @@ from bse_master import resolve_bse_scrip_code
 # All alerts generated are descriptive diagnostic notices of publicly disseminated exchange data.
 # They do not constitute investment advice or buy/sell recommendations per SEBI safe harbor standards.
 
+@st.cache_data(ttl=300, show_spinner=False)
 def fetch_bse_announcements(scrip_code: str, days: int = 45) -> list:
     """
     Fetches official BSE corporate announcements for a given scrip code over a date range.

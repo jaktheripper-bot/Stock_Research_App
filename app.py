@@ -1,11 +1,10 @@
 import re
 import logging
-from datetime import datetime, timezone, timedelta
+from datetime import datetime
 import traceback
 import platform
 import json
 import os
-import sys
 import time
 import streamlit as st
 
@@ -18,7 +17,6 @@ logger = logging.getLogger("equity_research.app")
 from normalizer import clean_ticker
 from analyzer import (
     remove_health_matrix_text,
-    strip_conclusion_sections,
     extract_health_matrix,
     compare_revisions,
     stream_stock_report,
@@ -26,9 +24,6 @@ from analyzer import (
     evaluate_material_change,
     get_historical_prices,
     execute_surgical_pillar_update,
-    splice_report_pillars,
-    evaluate_company_disparity,
-    compare_two_companies,
 )
 from db import (
     IST,
@@ -47,15 +42,13 @@ from db import (
     dismiss_alert,
     dismiss_all_alerts,
     record_usage_event,
-    get_site_usage_summary,
 )
 from alerts import run_surveillance_scan
 from bse_master import get_ticker_suggestions
-from ui.charts import render_momentum_chart, generate_pdf_chart_image
-from ui.formatters import format_inr, group_inr
+from ui.charts import render_momentum_chart
+from ui.formatters import format_inr
 from ui.pdf import build_pdf_dossier
 from ui.scorecard import (
-    render_material_badge,
     render_health_card_ui,
     render_thesis_drift_panel,
     render_dual_speed_report,
@@ -1221,7 +1214,6 @@ if ("last_report" in st.session_state and st.session_state["last_report"] is not
 
             streamed_text = st.write_stream(combined_stream)
             synth_bar.progress(1.0, text="✅ Step 5/5: SEBI Compliance Verified & Dossier Archived!")
-            import time
             time.sleep(0.4)
             synth_slot.empty()
             render_health_card_ui(streamed_text, target_container=badge_container)

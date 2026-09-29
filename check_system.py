@@ -3,7 +3,7 @@ import sys
 import time
 import logging
 from datetime import datetime
-from db import IST, MANDATORY_SEBI_DISCLAIMER
+from db import IST
 
 # Suppress bare-mode Streamlit log noise
 os.environ["STREAMLIT_LOG_LEVEL"] = "error"

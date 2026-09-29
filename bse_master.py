@@ -17,6 +17,7 @@ PRIMARY_BSE_MAP = {
 
 _ALIASES_CACHE = {"data": None, "mtime": 0}
 _SCRIPS_CACHE = {"data": None, "mtime": 0}
+_SUGGESTION_CANDIDATES = {"list": [], "scrips_mtime": -1, "alias_mtime": -1}
 
 def get_dynamic_aliases() -> dict:
     """Loads and caches dynamic_aliases.json in-memory with file mtime validation."""
@@ -52,26 +53,6 @@ def get_bse_scrips_cache() -> dict:
     except Exception:
         return _SCRIPS_CACHE["data"] or {}
 
-def find_fuzzy_scrip_match(query: str, cutoff: float = 0.72) -> str:
-    """Matches typographical errors against known scrips and aliases using Levenshtein similarity."""
-    if not query:
-        return None
-    clean_q = clean_ticker(query)
-    
-    # Check similarity against PRIMARY_BSE_MAP keys
-    candidates = list(PRIMARY_BSE_MAP.keys())
-    matches = difflib.get_close_matches(clean_q, candidates, n=1, cutoff=cutoff)
-    if matches:
-        return PRIMARY_BSE_MAP[matches[0]]
-        
-    # Check similarity against dynamic aliases
-    dyn = get_dynamic_aliases()
-    if dyn:
-        dyn_matches = difflib.get_close_matches(clean_q, list(dyn.keys()), n=1, cutoff=cutoff)
-        if dyn_matches:
-            return dyn[dyn_matches[0]]
-        
-    return None
 
 def resolve_scrip_from_supabase(query: str) -> str:
     """Queries Supabase bse_scrip_master via resolve_scrip() stored procedure."""
@@ -216,23 +197,38 @@ def resolve_bse_scrip_code(query: str) -> str:
 
     return None
 
-def get_ticker_suggestions(query: str, n: int = 3) -> list:
-    """Finds closest matching ticker symbols or company names using fuzzy string matching."""
-    if not query:
-        return []
-    clean = clean_ticker(query)
-    candidates = list(PRIMARY_BSE_MAP.keys())
+def _get_cached_candidates() -> list:
+    scrips_mtime = _SCRIPS_CACHE.get("mtime", 0)
+    alias_mtime = _ALIASES_CACHE.get("mtime", 0)
+    if (
+        _SUGGESTION_CANDIDATES["list"]
+        and _SUGGESTION_CANDIDATES["scrips_mtime"] == scrips_mtime
+        and _SUGGESTION_CANDIDATES["alias_mtime"] == alias_mtime
+    ):
+        return _SUGGESTION_CANDIDATES["list"]
 
+    candidates = set(PRIMARY_BSE_MAP.keys())
     dyn = get_dynamic_aliases()
     if dyn:
-        candidates.extend(list(dyn.keys()))
+        candidates.update(dyn.keys())
 
     cached = get_bse_scrips_cache()
     if cached:
         symbols = cached.get("symbols", {})
         names = cached.get("names", {})
-        candidates.extend(list(symbols.keys()))
-        candidates.extend(list(names.keys()))
+        candidates.update(symbols.keys())
+        candidates.update(names.keys())
 
-    matches = difflib.get_close_matches(clean, list(set(candidates)), n=n, cutoff=0.5)
-    return matches
+    cand_list = list(candidates)
+    _SUGGESTION_CANDIDATES["list"] = cand_list
+    _SUGGESTION_CANDIDATES["scrips_mtime"] = _SCRIPS_CACHE.get("mtime", 0)
+    _SUGGESTION_CANDIDATES["alias_mtime"] = _ALIASES_CACHE.get("mtime", 0)
+    return cand_list
+
+def get_ticker_suggestions(query: str, n: int = 3) -> list:
+    """Finds closest matching ticker symbols or company names using fuzzy string matching."""
+    if not query:
+        return []
+    clean = clean_ticker(query)
+    candidates = _get_cached_candidates()
+    return difflib.get_close_matches(clean, candidates, n=n, cutoff=0.5)
