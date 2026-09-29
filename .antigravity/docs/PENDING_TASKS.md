@@ -23,6 +23,8 @@
   - [`bse_master.py:237`](file:///Users/lyndonpinto/Documents/Stock_Research_App/bse_master.py#L237): Cache the deduplicated search candidate list in memory rather than reconstructing sets across thousands of records on every keystroke.
 - [ ] **SEBI Disclaimer Standardization**
   - Update [`ui/pdf.py`](file:///Users/lyndonpinto/Documents/Stock_Research_App/ui/pdf.py) and in-page footer in [`app.py`](file:///Users/lyndonpinto/Documents/Stock_Research_App/app.py) to use the canonical [`MANDATORY_SEBI_DISCLAIMER`](file:///Users/lyndonpinto/Documents/Stock_Research_App/db.py#L14-L23) across all export surfaces.
+- [x] **Peer Comparison Progress Loading Bar**
+  - In [`ui/comparison.py`](file:///Users/lyndonpinto/Documents/Stock_Research_App/ui/comparison.py#L52): Replaced static `st.spinner()` with structured multi-phase `st.progress` loading bar and `progress_callback` in [`analyzer.py:compare_two_companies()`](file:///Users/lyndonpinto/Documents/Stock_Research_App/analyzer.py#L1135-L1170) reporting quote resolution for Company A & B, disparity evaluation, and 7-pillar matrix alignment.
 
 ---
 

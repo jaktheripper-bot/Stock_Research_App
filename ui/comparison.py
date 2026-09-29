@@ -49,9 +49,14 @@ def render_peer_comparison_view():
         else:
             st.session_state["comp_input_a"] = clean_a
             st.session_state["comp_input_b"] = clean_b
-            with st.spinner(f"Auditing exchange data and running disparity check for {clean_a} vs {clean_b}..."):
+            prog_slot = st.empty()
+            with prog_slot.container():
+                prog_bar = st.progress(0.10, text=f"⚡ Initializing peer comparison for {clean_a} vs {clean_b}...")
+                def on_comp_progress(pct: float, msg: str):
+                    prog_bar.progress(pct, text=f"⚡ {msg}")
                 try:
-                    res = compare_two_companies(clean_a, clean_b)
+                    res = compare_two_companies(clean_a, clean_b, progress_callback=on_comp_progress)
+                    prog_bar.progress(1.0, text="✅ Comparison complete!")
                     track_user_action(
                         "PEER_COMPARISON",
                         ticker=f"{res['ticker_a']}_{res['ticker_b']}",
@@ -66,6 +71,8 @@ def render_peer_comparison_view():
                     st.session_state["last_comparison"] = res
                 except Exception as err:
                     st.error(f"### ❌ Comparison Failed: {err}")
+                finally:
+                    prog_slot.empty()
 
     # Render comparison results
     if st.session_state.get("last_comparison"):

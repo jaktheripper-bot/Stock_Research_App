@@ -1133,7 +1133,7 @@ def evaluate_company_disparity(fund_a: dict, fund_b: dict) -> dict:
     }
 
 
-def compare_two_companies(ticker_a: str, ticker_b: str) -> dict:
+def compare_two_companies(ticker_a: str, ticker_b: str, progress_callback=None) -> dict:
     """
     Executes cross-company peer comparison with 3-tier disparity evaluation,
     extracting side-by-side fundamentals, 7-pillar health matrices, and normalized indicators.
@@ -1141,19 +1141,31 @@ def compare_two_companies(ticker_a: str, ticker_b: str) -> dict:
     clean_a = clean_ticker(ticker_a)
     clean_b = clean_ticker(ticker_b)
     
+    if progress_callback:
+        progress_callback(0.20, f"Auditing verified BSE quotes & fundamentals for {clean_a}...")
     fund_a = get_stock_fundamentals(clean_a)
+
+    if progress_callback:
+        progress_callback(0.50, f"Auditing verified BSE quotes & fundamentals for {clean_b}...")
     fund_b = get_stock_fundamentals(clean_b)
     
     resolved_a = fund_a.get("ticker", clean_a)
     resolved_b = fund_b.get("ticker", clean_b)
     
+    if progress_callback:
+        progress_callback(0.70, "Loading verified 7-pillar health dossiers...")
     rep_a = get_report_by_ticker(resolved_a)
     rep_b = get_report_by_ticker(resolved_b)
     
     matrix_a = extract_health_matrix(rep_a.get("report_text", "") if rep_a else "")
     matrix_b = extract_health_matrix(rep_b.get("report_text", "") if rep_b else "")
     
+    if progress_callback:
+        progress_callback(0.85, "Evaluating 3-tier heuristic disparity (Sector, Lifecycle, Scale)...")
     disparity = evaluate_company_disparity(fund_a, fund_b)
+
+    if progress_callback:
+        progress_callback(1.0, "Synthesizing normalized side-by-side comparison matrix...")
     
     return {
         "ticker_a": resolved_a,
