@@ -240,7 +240,7 @@ if not st.session_state.get("last_report") and "ticker" in st.query_params:
     except Exception:
         pass
 
-def execute_stock_research(query: str, selected_language: str = "English (India)"):
+def execute_stock_research(query: str, selected_language: str = "English (India)", force_refresh: bool = False):
     """Executes the 5-phase data ingestion, validation, delta-gating, and synthesis pipeline for a stock query."""
     st.session_state.pop("viewing_snapshot", None)
     st.session_state.pop("custom_diff", None)
@@ -271,6 +271,11 @@ def execute_stock_research(query: str, selected_language: str = "English (India)
 
             hist_df = future_hist.result()
             cached, should_regen, reason, latest_ann, change_type = future_disclosures.result()
+
+        if force_refresh:
+            should_regen = True
+            reason = "⚡ User Requested Fresh Live Synthesis"
+            change_type = "FORCE_REFRESH"
 
         st.session_state["last_history"] = hist_df
         st.session_state["last_history_ticker"] = resolved_ticker
@@ -1137,30 +1142,35 @@ if ("last_report" in st.session_state and st.session_state["last_report"] is not
     if st.session_state.get("last_report"):
         render_health_card_ui(st.session_state["last_report"], target_container=badge_container)
 
-    # Report Header & Watchlist Quick Action
-    hdr_c1, hdr_c2 = st.columns([3, 1])
+    # Report Header & Watchlist / Re-synthesis Actions
+    hdr_c1, hdr_c2 = st.columns([2.6, 1.4])
     with hdr_c1:
         st.header(f"Equity Research Report: {header_label}")
         rep_date = st.session_state.get("last_report_date") or datetime.now(IST).strftime("%d-%b-%Y %H:%M IST")
         st.caption(f"🕒 **Report Timing:** {rep_date} | **Feed:** BSE Verified Exchange Data")
     with hdr_c2:
-        try:
-            in_w = is_ticker_in_watchlist(clean_ticker)
-        except Exception:
-            in_w = False
-        if in_w:
-            if st.button("✓ Tracking on Watchlist", key="btn_watch_toggle", width="stretch", help="Click to untrack from surveillance"):
-                remove_from_watchlist(clean_ticker)
-                st.rerun()
-        else:
-            if st.button("⭐ Track on Watchlist", key="btn_watch_toggle", type="secondary", width="stretch", help="Add to surveillance watchlist for material filings & price shock alerts"):
-                add_to_watchlist(
-                    ticker=clean_ticker,
-                    short_name=company_name or clean_ticker,
-                    scrip_code=str(fund.get("scrip_code", "")),
-                    initial_price=fund.get("current_price")
-                )
-                st.rerun()
+        btn_w_col, btn_regen_col = st.columns(2)
+        with btn_w_col:
+            try:
+                in_w = is_ticker_in_watchlist(clean_ticker)
+            except Exception:
+                in_w = False
+            if in_w:
+                if st.button("✓ Tracking", key="btn_watch_toggle", width="stretch", help="Click to untrack from surveillance"):
+                    remove_from_watchlist(clean_ticker)
+                    st.rerun()
+            else:
+                if st.button("⭐ Watchlist", key="btn_watch_toggle", type="secondary", width="stretch", help="Add to surveillance watchlist for material filings & price shock alerts"):
+                    add_to_watchlist(
+                        ticker=clean_ticker,
+                        short_name=company_name or clean_ticker,
+                        scrip_code=str(fund.get("scrip_code", "")),
+                        initial_price=fund.get("current_price")
+                    )
+                    st.rerun()
+        with btn_regen_col:
+            if st.button("🔄 Re-synthesize", key="btn_force_resynthesize_dossier", width="stretch", help="Force a fresh live AI synthesis grounded in latest BSE filings, bypassing cache"):
+                execute_stock_research(clean_ticker, selected_language=st.session_state.get("last_language", "English (India)"), force_refresh=True)
 
     if st.session_state.get("stream_pending"):
         st.session_state["stream_pending"] = False

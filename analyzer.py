@@ -316,6 +316,25 @@ def fetch_latest_bse_announcement(scrip_code: str) -> str:
 def evaluate_material_change(cached: dict, live_fund: dict, scrip_code: str) -> tuple:
     if not cached:
         return True, "⚡ Fresh Analysis: Initial dossier synthesis", "", "INITIAL"
+
+    # Self-Healing Cache Gate: Invalidate and force re-synthesis if cached text was poisoned by an error or is incomplete
+    cached_text = str(cached.get("report_text") or "").strip()
+    poison_signatures = [
+        "Live Synthesis Failed",
+        "Spend cap breached",
+        "PERMISSION_DENIED",
+        "403 PERMISSION_DENIED",
+        "chat_completions_not_available",
+        "Verification Audit Note: Missing required section",
+    ]
+    if (
+        not cached_text
+        or len(cached_text) < 800
+        or any(sig in cached_text for sig in poison_signatures)
+        or ("Pillar 1" not in cached_text and "DIAGNOSTIC SUMMARY" not in cached_text)
+    ):
+        return True, "⚡ Self-Healing Recovery: Cached report contained failed synthesis error or incomplete data", "", "POISONED_CACHE"
+
     raw_ts = cached.get("raw_timestamp")
     if raw_ts:
         try:
@@ -722,6 +741,7 @@ def stream_stock_report(ticker: str, language: str = "English (India)", stock_da
                     yield err_msg
 
     complete_text = "".join(report_accumulator)
+    passed = False
     try:
         passed, disc = verify_stock_report(stock_data, complete_text)
         if not passed:
@@ -730,14 +750,32 @@ def stream_stock_report(ticker: str, language: str = "English (India)", stock_da
             complete_text += note
             yield note
     except Exception:
-        pass
+        passed = False
 
-    try:
-        scrip = stock_data.get("scrip_code", "")
-        ann = fetch_latest_bse_announcement(scrip)
-        save_report_to_archive(stock_data, complete_text, announcement=ann, revision_trigger=revision_trigger)
-    except Exception:
-        pass
+    # Check for failure indicators
+    error_signatures = [
+        "Live Synthesis Failed",
+        "Spend cap breached",
+        "PERMISSION_DENIED",
+        "403 PERMISSION_DENIED",
+        "chat_completions_not_available",
+    ]
+    has_error_signature = any(err in complete_text for err in error_signatures)
+    is_structurally_valid = len(complete_text.strip()) >= 800 and ("Pillar 1" in complete_text or "DIAGNOSTIC SUMMARY" in complete_text)
+
+    # STRICT INTEGRITY GATE: Never archive failed or poisoned syntheses
+    if has_error_signature or not is_structurally_valid:
+        logger.warning(
+            f"Report synthesis failed or incomplete for {stock_data.get('ticker')}. "
+            "Skipping save_report_to_archive to prevent database cache poisoning."
+        )
+    else:
+        try:
+            scrip = stock_data.get("scrip_code", "")
+            ann = fetch_latest_bse_announcement(scrip)
+            save_report_to_archive(stock_data, complete_text, announcement=ann, revision_trigger=revision_trigger)
+        except Exception as e:
+            logger.error(f"Error archiving report for {stock_data.get('ticker')}: {e}")
 
 def generate_stock_report(ticker: str, language: str = "English (India)", use_grounding: bool = True) -> str:
     chunks = []
