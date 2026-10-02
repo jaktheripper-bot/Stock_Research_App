@@ -93,10 +93,25 @@ def render_dossier_view():
         # Handle toast message if requested
         if st.session_state.get("toast_message"):
             msg = st.session_state.pop("toast_message")
-            st.toast(msg, icon="📄")
+            icon = st.session_state.pop("toast_icon", "📄")
+            st.toast(msg, icon=icon)
 
-        # Handle smooth auto-scroll to dossier
-        if st.session_state.get("scroll_to_dossier"):
+        # Handle smooth auto-scroll to differential panel or dossier
+        if st.session_state.get("scroll_to_diff"):
+            st.session_state["scroll_to_diff"] = False
+            st.html(
+                """
+                <script>
+                setTimeout(function() {
+                    var el = document.getElementById("thesis-drift-anchor");
+                    if (el) {
+                        el.scrollIntoView({behavior: "smooth", block: "start"});
+                    }
+                }, 150);
+                </script>
+                """
+            )
+        elif st.session_state.get("scroll_to_dossier"):
             st.session_state["scroll_to_dossier"] = False
             st.html(
                 """
@@ -200,6 +215,12 @@ def render_dossier_view():
             st.warning(f"⚠️ **Valuation Notice:** Trailing P/E multiple is unavailable from exchange feeds for {ticker_disp}.")
 
         st.markdown("---")
+
+        # Hoisted Differential Analysis / Thesis Drift Surveillance Anchor & Card
+        st.html('<div id="thesis-drift-anchor" style="scroll-margin-top: 30px;"></div>')
+        if not st.session_state.get("stream_pending") and st.session_state.get("last_report"):
+            render_thesis_drift_panel(clean_t, custom_diff_data=st.session_state.get("custom_diff"))
+
         badge_container = st.empty()
         if st.session_state.get("last_report"):
             render_health_card_ui(st.session_state["last_report"], target_container=badge_container)
@@ -305,7 +326,6 @@ def render_dossier_view():
         elif st.session_state.get("last_report"):
             expand_all = st.toggle("📖 Expand all analytical pillars", value=False, key="toggle_expand_pillars")
             render_dual_speed_report(st.session_state["last_report"], expand_all=expand_all)
-            render_thesis_drift_panel(clean_t, custom_diff_data=st.session_state.get("custom_diff"))
 
         # Primary Download Button & Mandatory Immutable SEBI Disclaimer
         if st.session_state.get("last_report"):

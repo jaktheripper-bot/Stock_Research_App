@@ -9,7 +9,7 @@ from analyzer import (
     compare_revisions,
 )
 from normalizer import extract_citations_from_report
-from db import get_report_revisions
+from db import get_report_revisions, get_report_by_ticker
 from ui.charts import render_momentum_chart
 from ui.formatters import format_inr
 
@@ -111,8 +111,25 @@ def render_thesis_drift_panel(ticker: str, custom_diff_data: dict = None):
         with c1:
             st.info(f"⚖️ **Custom Differential Surveillance:** Comparing **{custom_diff_data.get('label_a', 'State A')}** vs **{custom_diff_data.get('label_b', 'State B')}**.")
         with c2:
-            if st.button("Reset to Default Drift", key="btn_reset_drift", width="stretch"):
+            if st.button("✕ Close Differential", key="btn_reset_drift", width="stretch", help="Return to latest active dossier view"):
                 st.session_state.pop("custom_diff", None)
+                rec = get_report_by_ticker(ticker)
+                if rec:
+                    from ui.views.state import set_active_dossier_state
+                    set_active_dossier_state(
+                        ticker=ticker,
+                        report_text=rec.get("report_text"),
+                        report_date=rec.get("formatted_date"),
+                        fundamentals={
+                            "short_name": rec.get("short_name", ticker),
+                            "ticker": ticker,
+                            "market_cap": rec.get("baseline_mcap", "Archived"),
+                            "pe_ratio": rec.get("baseline_pe", "N/A"),
+                            "sector": "General Industry",
+                            "current_price": rec.get("baseline_price", "N/A")
+                        },
+                        material_reason="📂 Returned to Active Dossier"
+                    )
                 st.rerun()
 
     # Value Trap Alert Banner
@@ -156,6 +173,8 @@ def render_thesis_drift_panel(ticker: str, custom_diff_data: dict = None):
                 )
             pills.append('</div>')
             st.markdown("".join(pills), unsafe_allow_html=True)
+        elif is_custom:
+            st.info("✓ **Zero Qualitative Pillar Migrations Detected:** The core investment thesis classifications across all 7 pillars remain identical between these two revisions.")
 
         # Quantitative metric delta table
         st.markdown("**Quantitative Baseline Shift**")

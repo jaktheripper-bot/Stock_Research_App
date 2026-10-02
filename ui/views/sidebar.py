@@ -146,7 +146,17 @@ def render_sidebar():
                                             "rev_b": r_b,
                                         }
                                     )
+                                    st.session_state["toast_message"] = f"⚖️ Differential comparison active: {sel_a_lbl} vs {sel_b_lbl}"
+                                    st.session_state["toast_icon"] = "📊"
+                                    st.session_state["scroll_to_diff"] = True
                                     st.rerun()
+                        elif len(revisions) == 1:
+                            st.caption("ℹ️ _Revision diffing activates upon the next quarterly filing or material price shift._")
+                            with st.expander("⚖️ Compare Any 2 Revisions", expanded=False):
+                                st.info(
+                                    "ℹ️ **Single Baseline Snapshot Archived:** Differential analysis and thesis drift tracking "
+                                    "activate automatically upon subsequent quarterly earnings filings or material price shifts (≥5%)."
+                                )
 
                         # Chronological Timeline Cards
                         st.markdown("**Timeline of Revisions**")

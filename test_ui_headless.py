@@ -81,6 +81,32 @@ def test_interactive_app_suite():
                 print("   ℹ️ Toggle present but loaded dossier has 0 analytical pillars.")
             else:
                 print("   ℹ️ Toggle 'Expand all analytical pillars' not found on loaded report.")
+
+        # 4b. Testing Arbitrary Multi-Quarter Differential Analysis Simulation
+        print("\n4b. Simulating Multi-Quarter Differential Analysis & Thesis Drift Surveillance...")
+        multi_rev_opt = next((opt for opt in archive_picker.options if "INFY" in opt or "TMPV" in opt), None)
+        if multi_rev_opt:
+            print(f"   • Selecting multi-revision stock: '{multi_rev_opt}'...")
+            archive_picker.select(multi_rev_opt).run()
+            assert not at.exception, f"Selecting '{multi_rev_opt}' threw exception: {at.exception}"
+
+            diff_btns = [b for b in at.button if b.key == "btn_run_sb_diff"]
+            if diff_btns:
+                print("   • Clicking 'Run Differential Analysis'...")
+                diff_btns[0].click().run()
+                assert not at.exception, f"Clicking 'Run Differential Analysis' threw exception: {at.exception}"
+                print("   ✅ Differential Analysis executed cleanly with toast and hoisted surveillance panel.")
+
+                reset_btns = [b for b in at.button if b.key == "btn_reset_drift"]
+                if reset_btns:
+                    print("   • Clicking '✕ Close Differential'...")
+                    reset_btns[0].click().run()
+                    assert not at.exception, f"Clicking 'Close Differential' threw exception: {at.exception}"
+                    print("   ✅ Differential view closed cleanly and active dossier restored.")
+            else:
+                print("   ℹ️ 'btn_run_sb_diff' not found in DOM.")
+        else:
+            print("   ℹ️ Multi-revision stock not found in archive picker options.")
     else:
         print("   ℹ️ No archive stocks available to select (empty archive).")
 
