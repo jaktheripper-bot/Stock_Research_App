@@ -60,7 +60,7 @@
 
         <div class="nav-actions">
           <a href="/pricing" class="btn btn-secondary btn-sm">⚡ View Pricing</a>
-          <a href="/pricing" class="btn btn-primary btn-sm">Claim 2 Free Credits</a>
+          <button id="navSignInBtn" class="btn btn-primary btn-sm" onclick="openSignInModal()">Sign In / Claim 2 Credits</button>
         </div>
       </div>
     </div>
@@ -109,6 +109,41 @@
 
       <div style="text-align: center; margin-top: 14px; font-size: 11px; color: var(--text-muted);">
         🔒 256-bit encrypted checkout via Razorpay • Instant electronic receipt
+      </div>
+    </div>
+  </div>
+
+  <!-- Global Sign-In / Welcome Credits Modal -->
+  <div id="authModal" class="modal-backdrop">
+    <div class="modal-dialog" style="max-width: 440px;">
+      <div class="modal-header">
+        <h3 style="font-weight: 800; font-size: 20px;">Sign In to Stock Research AI</h3>
+        <button id="closeAuthModalBtn" class="modal-close-btn">&times;</button>
+      </div>
+
+      <div style="background: rgba(16, 185, 129, 0.1); border-left: 3px solid var(--accent-emerald); padding: 12px; border-radius: 6px; margin-bottom: 20px; font-size: 13px; color: var(--accent-emerald);">
+        🎁 <strong>Welcome Bonus:</strong> 2 Free Research Credits granted instantly upon sign-in.
+      </div>
+
+      <form id="authForm" onsubmit="handleSignInSubmit(event)">
+        <div style="margin-bottom: 16px;">
+          <label style="display: block; font-size: 13px; color: var(--text-secondary); margin-bottom: 6px;">Your Work or Personal Email:</label>
+          <input 
+            type="email" 
+            id="authEmailInput" 
+            required 
+            placeholder="investor@example.com"
+            style="width: 100%; padding: 12px 14px; background: rgba(15, 23, 42, 0.8); border: 1px solid var(--border-color); border-radius: 8px; color: var(--text-primary); font-size: 14px; box-sizing: border-box;"
+          >
+        </div>
+
+        <button type="submit" id="authSubmitBtn" class="btn btn-primary" style="width: 100%; padding: 14px; font-size: 15px;">
+          Continue with Email & Claim 2 Credits →
+        </button>
+      </form>
+
+      <div style="text-align: center; margin-top: 16px; font-size: 11px; color: var(--text-muted);">
+        🔒 Safe-Harbor Privacy: No personal financial or bank credentials collected.
       </div>
     </div>
   </div>

@@ -51,8 +51,7 @@ def render_auth_sidebar_chip():
                 unsafe_allow_html=True
             )
             if st.button("Sign In / Register", key="btn_sidebar_signin", type="primary", width="stretch"):
-                st.session_state["show_login_dialog"] = True
-                st.rerun()
+                render_login_dialog()
     else:
         # Authenticated State
         credits_bal = user.get("credits_balance", 0.0)
@@ -92,18 +91,31 @@ def render_auth_sidebar_chip():
             c_top, c_led, c_out = st.columns([1.2, 1.2, 0.8])
             with c_top:
                 if st.button("💳 Top Up", key="btn_user_topup", width="stretch", help="Purchase on-demand packs or Pro subscription"):
-                    st.session_state["show_top_up_dialog"] = True
-                    st.rerun()
+                    from ui.billing_modal import render_top_up_dialog
+                    render_top_up_dialog()
             with c_led:
                 if st.button("📜 Ledger", key="btn_user_ledger", width="stretch", help="View consumption history and tax invoices"):
-                    st.session_state["show_ledger_dialog"] = True
-                    st.rerun()
+                    render_ledger_dialog()
             with c_out:
                 if st.button("🚪", key="btn_user_signout", width="stretch", help="Sign out of account"):
                     sign_out_user()
                     track_user_action("SIGN_OUT", details={"email": user.get("email")})
                     st.toast("Signed out successfully.", icon="👋")
                     st.rerun()
+
+
+def check_and_render_auth_dialogs():
+    """Renders active modal dialogs (login, top-up, ledger) if flagged in session state."""
+    if st.session_state.get("show_login_dialog"):
+        st.session_state.pop("show_login_dialog", None)
+        render_login_dialog()
+    if st.session_state.get("show_top_up_dialog"):
+        st.session_state.pop("show_top_up_dialog", None)
+        from ui.billing_modal import render_top_up_dialog
+        render_top_up_dialog()
+    if st.session_state.get("show_ledger_dialog"):
+        st.session_state.pop("show_ledger_dialog", None)
+        render_ledger_dialog()
 
 
 @st.dialog("Sign In to Research Platform", width="small")

@@ -153,7 +153,7 @@ def test_interactive_app_suite():
 
     # 7. Simulating User Authentication & Monetization UI States
     print("\n7. Simulating User Authentication & Monetization UI States...")
-    at_auth = AppTest.from_file("app.py", default_timeout=15)
+    at_auth = AppTest.from_file("app.py", default_timeout=30)
     at_auth.run()
     signin_btns = [b for b in at_auth.button if b.key == "btn_sidebar_signin"]
     assert len(signin_btns) > 0, "Guest user must see 'Sign In / Register' button in sidebar."

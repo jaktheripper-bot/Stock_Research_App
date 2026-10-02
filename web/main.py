@@ -28,6 +28,9 @@ from core.db import (
     get_archived_reports,
     get_report_by_ticker,
     get_report_revisions,
+    get_or_create_user,
+    get_user_by_id,
+    get_user_by_email,
     IST,
 )
 from core.analysis import get_stock_fundamentals
@@ -285,6 +288,37 @@ async def api_suggest(q: str = ""):
     if not q or len(q.strip()) < 2:
         return {"suggestions": []}
     return {"suggestions": get_ticker_suggestions(q.strip())}
+
+
+class SignInRequest(BaseModel):
+    email: str
+    full_name: Optional[str] = None
+
+
+@app.post("/api/auth/signin")
+async def api_signin(payload: SignInRequest):
+    """
+    Direct user sign-in or auto-registration.
+    Grants 2 welcome credits to new accounts and returns user profile.
+    """
+    clean_email = (payload.email or "").strip().lower()
+    if not clean_email or "@" not in clean_email or "." not in clean_email.split("@")[-1]:
+        raise HTTPException(status_code=400, detail="Please provide a valid email address.")
+
+    user_id = f"usr_{clean_email.replace('@', '_at_').replace('.', '_')}"
+    user = get_or_create_user(
+        user_id=user_id,
+        email=clean_email,
+        full_name=payload.full_name or clean_email.split("@")[0].capitalize()
+    )
+    if not user:
+        raise HTTPException(status_code=500, detail="Could not initialize user profile.")
+
+    return {
+        "success": True,
+        "message": f"Welcome {user.get('full_name')}! You have received 2 free research credits.",
+        "user": user
+    }
 
 
 class OrderRequest(BaseModel):

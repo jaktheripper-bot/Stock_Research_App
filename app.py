@@ -22,7 +22,11 @@ from ui.views import (
 )
 from ui.comparison import render_peer_comparison_view
 from ui.analytics_hub import render_site_analytics_view
-from ui.auth_ui import render_login_dialog, render_ledger_dialog
+from ui.auth_ui import (
+    render_login_dialog,
+    render_ledger_dialog,
+    check_and_render_auth_dialogs,
+)
 from ui.billing_modal import render_top_up_dialog
 from core.auth import handle_auth_callback
 from telemetry import (
@@ -189,12 +193,17 @@ else:
 
 st.markdown("<div style='height: 10px;'></div>", unsafe_allow_html=True)
 
+# Render active auth & billing modals if requested in session state
+check_and_render_auth_dialogs()
+
 # 8. View Routing Dispatch
 if cur_view == "compare":
     render_peer_comparison_view()
+    check_and_render_auth_dialogs()
     st.stop()
 elif cur_view == "analytics" and is_admin:
     render_site_analytics_view()
+    check_and_render_auth_dialogs()
     st.stop()
 elif cur_view == "analytics" and not is_admin:
     st.session_state["active_view"] = "dossier"
@@ -202,3 +211,4 @@ elif cur_view == "analytics" and not is_admin:
 
 # Default View: Institutional Research Dossier
 render_dossier_view()
+check_and_render_auth_dialogs()
