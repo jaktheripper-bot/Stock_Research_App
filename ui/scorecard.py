@@ -8,32 +8,46 @@ from analyzer import (
     strip_conclusion_sections,
     compare_revisions,
 )
+from normalizer import extract_citations_from_report
 from db import get_report_revisions
 from ui.charts import render_momentum_chart
 from ui.formatters import format_inr
 
-def render_material_badge(reason: str, is_regenerated: bool):
-    """Renders a responsive status badge detailing cache vs regeneration triggers."""
-    if not reason:
+def render_material_badge(reason: str, is_regenerated: bool, citations_count: int = 0, target_container=None):
+    """Renders responsive status badges detailing cache vs regeneration triggers and source attribution."""
+    if not reason and not citations_count:
         return
-    bg = "#fef3c7" if is_regenerated else "#ecfdf5"
-    border = "#fde68a" if is_regenerated else "#a7f3d0"
-    text_color = "#92400e" if is_regenerated else "#065f46"
-    st.markdown(
-        f"""
-        <div style="display: inline-flex; align-items: center; background-color: {bg}; color: {text_color};
-                    padding: 5px 12px; border-radius: 6px; font-size: 13px; font-weight: 600;
-                    margin-bottom: 12px; border: 1px solid {border};">
-            {reason}
-        </div>
-        """,
-        unsafe_allow_html=True,
-    )
+    badges_html = ['<div style="display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 12px; align-items: center;">']
+    if reason:
+        bg = "#fef3c7" if is_regenerated else "#ecfdf5"
+        border = "#fde68a" if is_regenerated else "#a7f3d0"
+        text_color = "#92400e" if is_regenerated else "#065f46"
+        badges_html.append(
+            f'<div style="background-color: {bg}; color: {text_color}; padding: 5px 12px; '
+            f'border-radius: 6px; font-size: 13px; font-weight: 600; border: 1px solid {border};">'
+            f'{reason}</div>'
+        )
+    if citations_count > 0:
+        badges_html.append(
+            f'<div style="background-color: rgba(37, 99, 235, 0.08); color: #2563eb; padding: 5px 12px; '
+            f'border-radius: 6px; font-size: 13px; font-weight: 600; border: 1px solid rgba(37, 99, 235, 0.25); '
+            f'display: inline-flex; align-items: center; gap: 6px;">'
+            f'📎 <span><b>{citations_count}</b> Verified Primary Sources Grounded</span></div>'
+        )
+    badges_html.append('</div>')
+    renderer = target_container if target_container is not None else st
+    renderer.markdown("".join(badges_html), unsafe_allow_html=True)
 
 def render_health_card_ui(report_text: str, target_container=None):
-    """Renders the top executive summary health matrix badges."""
+    """Renders the top executive summary health matrix badges and source attribution."""
     render_momentum_chart(st.session_state.get('last_history'), st.session_state.get('last_ticker', ''))
-    render_material_badge(st.session_state.get('material_reason', ''), st.session_state.get('is_regenerated', False))
+    citations = extract_citations_from_report(report_text) if report_text else []
+    render_material_badge(
+        st.session_state.get('material_reason', ''),
+        st.session_state.get('is_regenerated', False),
+        citations_count=len(citations),
+        target_container=target_container
+    )
     matrix = extract_health_matrix(report_text)
     if not matrix:
         return
@@ -193,6 +207,9 @@ def render_dual_speed_report(markdown_text: str, expand_all: bool = False):
         # Nest Pillars 1 through 7 into accordions
         if re.search(r"(?i)\bPillars?\s*\d+", title):
             with st.expander(f"📁 {title}", expanded=expand_all):
+                st.markdown(body_content)
+        elif re.search(r"(?i)\b(?:Sources|Footnote|Citations|Regulatory Filings)\b", title):
+            with st.expander(f"📚 {title}", expanded=True):
                 st.markdown(body_content)
         else:
             # Diagnostic Summary or unclassified factual headers remain open

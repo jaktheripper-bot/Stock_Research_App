@@ -58,11 +58,13 @@
   - 3-year variance table comparing Operating Cash Flow vs Net Profit to detect working-capital traps and aggressive revenue recognition.
 - [ ] **P5: Promoter & Insider SAST Disparity Tracker**
   - Ingest BSE SAST insider trading and block deal feeds to track management skin-in-the-game.
-- [ ] **P6: Visual Source Attribution & Footnote Citations Engine**
+- [x] **P6: Visual Source Attribution & Footnote Citations Engine** *(Completed: Grounding chunks extraction from Gemini & Perplexity, DB migration v006_report_citations with JSON dual-persistence, header source badge pill, mobile-responsive footnotes expander, and Sell-Side hyperlinked PDF appendix)*
   - Extract `grounding_chunks` (titles + URLs) from Gemini `google-genai` streams and `citations` array from Perplexity `sonar-pro` fallback.
-  - Attach deduplicated source citations list to report records in `reports` and `report_revisions` tables.
-  - Header Reference Pill: Render `📎 N Verified Primary Sources Grounded` badge and clickable disclosures drawer in the research dossier.
-  - Executive PDF Footnote Appendix: Render hyperlinked regulatory sources and filing citations in [`ui/pdf.py`](file:///Users/lyndonpinto/Documents/Stock_Research_App/ui/pdf.py) before the mandatory SEBI disclaimer.
+  - Ingest official BSE corporate announcements and disclosures into the citations ledger.
+  - Dual-persistence in `reports` and `report_revisions` tables (`citations_json` column via migration `v006_report_citations`).
+  - Header Reference Pill: Render `📎 N Verified Primary Sources Grounded` badge in the executive dossier header alongside the material reason badge.
+  - Interactive Citations Expander: Render `📚 Verified Regulatory Sources & Footnote Citations` expander with hyperlinked sources, domain classification, and SEBI safe-harbor compliance annotations.
+  - Executive PDF Footnote Appendix: Render hyperlinked regulatory sources and filing citations in [`ui/pdf.py`](file:///Users/lyndonpinto/Documents/Stock_Research_App/ui/pdf.py) styled cleanly before the mandatory SEBI disclaimer.
 
 ---
 

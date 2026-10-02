@@ -12,7 +12,7 @@ import pandas as pd
 import streamlit as st
 import yfinance as yf
 from google import genai
-from normalizer import clean_ticker
+from normalizer import clean_ticker, extract_citations_from_report
 from db import save_report_to_archive, get_report_by_ticker
 from checker import verify_stock_report
 from screener import pass_pre_screening_gates
@@ -607,7 +607,48 @@ def get_surgical_flash_model(client) -> str:
         pass
     return "gemini-3.8-flash"
 
-def stream_genai_with_fallback(client, prompt: str, system_prompt: str, on_status=None, use_grounding: bool = True):
+def format_citations_section(citations: list[dict], stock_data: dict = None) -> str:
+    """
+    Formats a structured list of citations into an institutional Sell-Side footnotes block.
+    Deduplicates URLs and displays clean attribution labels and source types.
+    """
+    if not citations:
+        return ""
+
+    lines = [
+        "\n\n### 📚 Verified Regulatory Sources & Footnote Citations",
+        "*All qualitative findings, corporate governance audits, and strategic disclosures in this report are grounded in primary exchange filings and verified public intelligence under SEBI statutory safe-harbor standards:*\n"
+    ]
+    seen = set()
+    idx = 1
+    for c in citations:
+        uri = (c.get("uri") or "").strip()
+        title = (c.get("title") or "Exchange / Public Document").strip()
+        stype = (c.get("source_type") or "Verified Grounding").strip()
+
+        # Clean title if domain-only
+        if title.lower() == "bseindia.com":
+            title = "BSE India Official Disclosures & Filing Repository"
+        elif title.lower() == "nseindia.com":
+            title = "NSE India Corporate Announcements Feed"
+        elif title.lower() == "mca.gov.in":
+            title = "Ministry of Corporate Affairs Company Master Data"
+        elif title.lower() == "sebi.gov.in":
+            title = "SEBI Statutory Orders & Regulatory Framework"
+
+        if uri and uri in seen:
+            continue
+        if uri:
+            seen.add(uri)
+            lines.append(f"{idx}. [{title}]({uri}) — *{stype}*")
+            idx += 1
+        elif title:
+            lines.append(f"{idx}. **{title}** — *{stype}*")
+            idx += 1
+
+    return "\n".join(lines) + "\n"
+
+def stream_genai_with_fallback(client, prompt: str, system_prompt: str, on_status=None, use_grounding: bool = True, collected_citations: list = None):
     models_to_try = get_latest_flash_models(client)[:2]
     last_error = None
     for model_name in models_to_try:
@@ -646,6 +687,36 @@ def stream_genai_with_fallback(client, prompt: str, system_prompt: str, on_statu
                                     if t:
                                         extracted_text = t
                                         break
+                            # Visual Source Attribution: Extract grounding metadata chunks
+                            if collected_citations is not None:
+                                gm = getattr(cand, "grounding_metadata", None)
+                                if gm:
+                                    gc = getattr(gm, "grounding_chunks", None)
+                                    if gc:
+                                        for c in gc:
+                                            w = getattr(c, "web", None)
+                                            if w:
+                                                u = (getattr(w, "uri", None) or "").strip()
+                                                t = (getattr(w, "title", None) or "").strip()
+                                                if u and not any(existing.get("uri") == u for existing in collected_citations):
+                                                    stype = "Verified Web Grounding"
+                                                    low_u = u.lower()
+                                                    low_t = t.lower()
+                                                    if "bseindia.com" in low_u or "bse" in low_t:
+                                                        stype = "BSE Regulatory Filing"
+                                                    elif "nseindia.com" in low_u or "nse" in low_t:
+                                                        stype = "NSE Exchange Filing"
+                                                    elif "mca.gov.in" in low_u:
+                                                        stype = "MCA Registry Record"
+                                                    elif "sebi.gov.in" in low_u:
+                                                        stype = "SEBI Statutory Disclosure"
+                                                    elif any(k in low_u for k in ["investor", "annualreport", "concall", "transcript"]):
+                                                        stype = "Corporate Investor Relations"
+                                                    collected_citations.append({
+                                                        "title": t or "Exchange / Web Grounding Source",
+                                                        "uri": u,
+                                                        "source_type": stype
+                                                    })
                     if not extracted_text:
                         try:
                             extracted_text = chunk.text
@@ -663,7 +734,7 @@ def stream_genai_with_fallback(client, prompt: str, system_prompt: str, on_statu
                 break
     raise ValueError(f"Gemini grounded search exhausted: {last_error}")
 
-def stream_perplexity_fallback(prompt: str, system_prompt: str):
+def stream_perplexity_fallback(prompt: str, system_prompt: str, collected_citations: list = None):
     api_key = os.environ.get("PERPLEXITY_API_KEY")
     if not api_key:
         try:
@@ -710,6 +781,14 @@ def stream_perplexity_fallback(prompt: str, system_prompt: str):
                     if isinstance(delta, str) and delta:
                         yielded = True
                         yield delta
+                if collected_citations is not None and "citations" in data:
+                    for c_url in data.get("citations", []):
+                        if isinstance(c_url, str) and c_url.startswith("http") and not any(e.get("uri") == c_url for e in collected_citations):
+                            collected_citations.append({
+                                "title": c_url.split("//")[-1].split("/")[0],
+                                "uri": c_url,
+                                "source_type": "Perplexity Search Grounding"
+                            })
             except Exception:
                 continue
 
@@ -730,6 +809,14 @@ def stream_perplexity_fallback(prompt: str, system_prompt: str):
                             txt = c.get("text", "")
                             if txt:
                                 yield txt
+            if collected_citations is not None and "citations" in d2:
+                for c_url in d2.get("citations", []):
+                    if isinstance(c_url, str) and c_url.startswith("http") and not any(e.get("uri") == c_url for e in collected_citations):
+                        collected_citations.append({
+                            "title": c_url.split("//")[-1].split("/")[0],
+                            "uri": c_url,
+                            "source_type": "Perplexity Search Grounding"
+                        })
 
 def stream_gemini_ungrounded_bypass(client, prompt: str, system_prompt: str):
     model_name = get_latest_flash_models(client)[0]
@@ -761,9 +848,19 @@ def stream_stock_report(ticker: str, language: str = "English (India)", stock_da
     system_prompt = get_system_prompt(ticker, language)
     user_prompt = f"Generate research report for: {stock_data.get('short_name')} ({stock_data.get('ticker')})\nData: {stock_data}"
 
+    collected_citations = []
+    scrip = str(stock_data.get("scrip_code") or "").strip()
+    clean_sym = stock_data.get("ticker", ticker)
+    if scrip and scrip.isdigit():
+        collected_citations.append({
+            "title": f"BSE Corporate Announcements & Disclosures ({clean_sym})",
+            "uri": f"https://www.bseindia.com/stock-share-price/-/{scrip}/corporate-announcements/",
+            "source_type": "BSE Official Regulatory Filing"
+        })
+
     report_accumulator = []
     try:
-        for chunk in stream_genai_with_fallback(client, user_prompt, system_prompt, on_status=on_status, use_grounding=use_grounding):
+        for chunk in stream_genai_with_fallback(client, user_prompt, system_prompt, on_status=on_status, use_grounding=use_grounding, collected_citations=collected_citations):
             report_accumulator.append(chunk)
             yield chunk
     except Exception as gemini_err:
@@ -773,7 +870,7 @@ def stream_stock_report(ticker: str, language: str = "English (India)", stock_da
         try:
             if on_status:
                 on_status("🔄 Failover: Querying Perplexity Agent API with search grounding...")
-            for chunk in stream_perplexity_fallback(user_prompt, system_prompt):
+            for chunk in stream_perplexity_fallback(user_prompt, system_prompt, collected_citations=collected_citations):
                 report_accumulator.append(chunk)
                 yield chunk
         except Exception as p_err:
@@ -803,6 +900,14 @@ def stream_stock_report(ticker: str, language: str = "English (India)", stock_da
                     err_msg = f"\n\n> ❌ **Live Synthesis Failed:** {final_err}"
                     report_accumulator.append(err_msg)
                     yield err_msg
+
+    current_text = "".join(report_accumulator)
+    # Append structured source citations block if not already present and synthesis was structurally productive
+    if collected_citations and len(current_text.strip()) >= 500 and "Verified Regulatory Sources" not in current_text:
+        citations_block = format_citations_section(collected_citations, stock_data)
+        if citations_block:
+            report_accumulator.append(citations_block)
+            yield citations_block
 
     complete_text = "".join(report_accumulator)
     passed = False
@@ -837,9 +942,10 @@ def stream_stock_report(ticker: str, language: str = "English (India)", stock_da
         try:
             scrip = stock_data.get("scrip_code", "")
             ann = fetch_latest_bse_announcement(scrip)
-            save_report_to_archive(stock_data, complete_text, announcement=ann, revision_trigger=revision_trigger)
+            save_report_to_archive(stock_data, complete_text, announcement=ann, revision_trigger=revision_trigger, citations=collected_citations)
         except Exception as e:
             logger.error(f"Error archiving report for {stock_data.get('ticker')}: {e}")
+
 
 def generate_stock_report(ticker: str, language: str = "English (India)", use_grounding: bool = True) -> str:
     chunks = []

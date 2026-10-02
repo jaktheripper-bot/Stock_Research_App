@@ -6,7 +6,7 @@ import threading
 from datetime import datetime, timezone, timedelta
 import streamlit as st
 
-from normalizer import clean_ticker
+from normalizer import clean_ticker, extract_citations_from_report
 
 IST = timezone(timedelta(hours=5, minutes=30))
 logger = logging.getLogger("equity_research.db")
@@ -432,6 +432,31 @@ def init_db(force: bool = False):
                 cursor.execute("INSERT OR IGNORE INTO schema_migrations (version) VALUES ('v005_system_settings');")
             conn.commit()
 
+        # Migration v006: Visual Source Attribution & Footnote Citations Engine
+        if "v006_report_citations" not in applied:
+            logger.info("Applying schema migration: v006_report_citations...")
+            if supabase_url:
+                cursor.execute("ALTER TABLE reports ADD COLUMN IF NOT EXISTS citations_json TEXT;")
+                cursor.execute("ALTER TABLE report_revisions ADD COLUMN IF NOT EXISTS citations_json TEXT;")
+                cursor.execute("INSERT INTO schema_migrations (version) VALUES ('v006_report_citations') ON CONFLICT DO NOTHING;")
+            else:
+                cursor.execute("PRAGMA table_info(reports);")
+                existing_rep_cols = [c[1] for c in cursor.fetchall()]
+                if "citations_json" not in existing_rep_cols:
+                    try:
+                        cursor.execute("ALTER TABLE reports ADD COLUMN citations_json TEXT;")
+                    except Exception:
+                        pass
+                cursor.execute("PRAGMA table_info(report_revisions);")
+                existing_rev_cols = [c[1] for c in cursor.fetchall()]
+                if "citations_json" not in existing_rev_cols:
+                    try:
+                        cursor.execute("ALTER TABLE report_revisions ADD COLUMN citations_json TEXT;")
+                    except Exception:
+                        pass
+                cursor.execute("INSERT OR IGNORE INTO schema_migrations (version) VALUES ('v006_report_citations');")
+            conn.commit()
+
         _DB_INITIALIZED = True
     except Exception as e:
         logger.error(f"Error during init_db migrations: {e}")
@@ -440,7 +465,7 @@ def init_db(force: bool = False):
         cursor.close()
         conn.close()
 
-def save_report_to_archive(stock_data: dict, report_text: str, announcement: str = "", revision_trigger: str = ""):
+def save_report_to_archive(stock_data: dict, report_text: str, announcement: str = "", revision_trigger: str = "", citations: list = None):
     init_db()
     conn = get_db_connection()
     cursor = conn.cursor()
@@ -464,11 +489,15 @@ def save_report_to_archive(stock_data: dict, report_text: str, announcement: str
 
     pe = str(stock_data.get("pe_ratio", "N/A"))
 
+    if citations is None:
+        citations = extract_citations_from_report(report_text)
+    citations_json = json.dumps(citations) if citations else None
+
     try:
         # 1. Update/Upsert the current snapshot in 'reports'
         query_snapshot = f'''
-            INSERT INTO reports (ticker, short_name, report_text, baseline_price, baseline_pe, baseline_mcap, latest_announcement)
-            VALUES ({placeholder}, {placeholder}, {placeholder}, {placeholder}, {placeholder}, {placeholder}, {placeholder})
+            INSERT INTO reports (ticker, short_name, report_text, baseline_price, baseline_pe, baseline_mcap, latest_announcement, citations_json)
+            VALUES ({placeholder}, {placeholder}, {placeholder}, {placeholder}, {placeholder}, {placeholder}, {placeholder}, {placeholder})
             ON CONFLICT (ticker) 
             DO UPDATE SET 
                 short_name = EXCLUDED.short_name,
@@ -477,7 +506,8 @@ def save_report_to_archive(stock_data: dict, report_text: str, announcement: str
                 baseline_price = EXCLUDED.baseline_price,
                 baseline_pe = EXCLUDED.baseline_pe,
                 baseline_mcap = EXCLUDED.baseline_mcap,
-                latest_announcement = EXCLUDED.latest_announcement
+                latest_announcement = EXCLUDED.latest_announcement,
+                citations_json = EXCLUDED.citations_json
         '''
         cursor.execute(query_snapshot, (
             clean_sym, 
@@ -486,13 +516,14 @@ def save_report_to_archive(stock_data: dict, report_text: str, announcement: str
             curr_price,
             pe,
             mcap,
-            announcement
+            announcement,
+            citations_json
         ))
 
         # 2. Append-Only Historical Archiving for Differential Tracking Engine
         query_revision = f'''
-            INSERT INTO report_revisions (ticker, short_name, report_text, baseline_price, baseline_pe, baseline_mcap, latest_announcement, revision_trigger)
-            VALUES ({placeholder}, {placeholder}, {placeholder}, {placeholder}, {placeholder}, {placeholder}, {placeholder}, {placeholder})
+            INSERT INTO report_revisions (ticker, short_name, report_text, baseline_price, baseline_pe, baseline_mcap, latest_announcement, revision_trigger, citations_json)
+            VALUES ({placeholder}, {placeholder}, {placeholder}, {placeholder}, {placeholder}, {placeholder}, {placeholder}, {placeholder}, {placeholder})
         '''
         cursor.execute(query_revision, (
             clean_sym,
@@ -502,7 +533,8 @@ def save_report_to_archive(stock_data: dict, report_text: str, announcement: str
             pe,
             mcap,
             announcement,
-            revision_trigger or "Material Update"
+            revision_trigger or "Material Update",
+            citations_json
         ))
 
         conn.commit()
@@ -686,22 +718,32 @@ def get_report_by_ticker(ticker: str) -> dict:
     record = None
     try:
         cursor.execute(f'''
-            SELECT ticker, short_name, report_text, timestamp, baseline_price, baseline_pe, baseline_mcap, latest_announcement
+            SELECT ticker, short_name, report_text, timestamp, baseline_price, baseline_pe, baseline_mcap, latest_announcement, citations_json
             FROM reports 
             WHERE ticker = {placeholder}
         ''', (clean,))
         row = cursor.fetchone()
         if row:
+            rep_text = row[2]
+            cit_data = []
+            if len(row) > 8 and row[8]:
+                try:
+                    cit_data = json.loads(row[8])
+                except Exception:
+                    cit_data = []
+            if not cit_data and rep_text:
+                cit_data = extract_citations_from_report(rep_text)
             record = {
                 "ticker": row[0],
                 "short_name": row[1] or row[0],
-                "report_text": row[2],
+                "report_text": rep_text,
                 "raw_timestamp": row[3],
                 "formatted_date": _format_timestamp(row[3]),
                 "baseline_price": row[4],
                 "baseline_pe": row[5],
                 "baseline_mcap": row[6],
-                "latest_announcement": row[7] or ""
+                "latest_announcement": row[7] or "",
+                "citations": cit_data
             }
     except Exception as e:
         logger.error(f"Database query error in get_report_by_ticker: {e}")
@@ -722,64 +764,86 @@ def get_report_revisions(ticker: str) -> list:
     revisions = []
     try:
         cursor.execute(f'''
-            SELECT id, ticker, short_name, report_text, timestamp, baseline_price, baseline_pe, baseline_mcap, latest_announcement, revision_trigger
+            SELECT id, ticker, short_name, report_text, timestamp, baseline_price, baseline_pe, baseline_mcap, latest_announcement, revision_trigger, citations_json
             FROM report_revisions
             WHERE ticker = {placeholder}
             ORDER BY timestamp DESC
         ''', (clean,))
         rows = cursor.fetchall()
         for row in rows:
+            rep_text = row[3]
+            cit_data = []
+            if len(row) > 10 and row[10]:
+                try:
+                    cit_data = json.loads(row[10])
+                except Exception:
+                    cit_data = []
+            if not cit_data and rep_text:
+                cit_data = extract_citations_from_report(rep_text)
             revisions.append({
                 "id": row[0],
                 "ticker": row[1],
                 "short_name": row[2] or row[1],
-                "report_text": row[3],
+                "report_text": rep_text,
                 "raw_timestamp": row[4],
                 "formatted_date": _format_timestamp(row[4]),
                 "baseline_price": row[5],
                 "baseline_pe": row[6],
                 "baseline_mcap": row[7],
                 "latest_announcement": row[8] or "",
-                "revision_trigger": row[9] or "Initial Baseline"
+                "revision_trigger": row[9] or "Initial Baseline",
+                "citations": cit_data
             })
 
         # Self-healing: Seed initial baseline revision if reports table has a snapshot but revisions table is empty
         if not revisions:
             cursor.execute(f'''
-                SELECT ticker, short_name, report_text, timestamp, baseline_price, baseline_pe, baseline_mcap, latest_announcement
+                SELECT ticker, short_name, report_text, timestamp, baseline_price, baseline_pe, baseline_mcap, latest_announcement, citations_json
                 FROM reports
                 WHERE ticker = {placeholder}
             ''', (clean,))
             rep_row = cursor.fetchone()
             if rep_row:
+                rep_cits = rep_row[8] if len(rep_row) > 8 else None
                 cursor.execute(f'''
-                    INSERT INTO report_revisions (ticker, short_name, report_text, timestamp, baseline_price, baseline_pe, baseline_mcap, latest_announcement, revision_trigger)
-                    VALUES ({placeholder}, {placeholder}, {placeholder}, {placeholder}, {placeholder}, {placeholder}, {placeholder}, {placeholder}, {placeholder})
+                    INSERT INTO report_revisions (ticker, short_name, report_text, timestamp, baseline_price, baseline_pe, baseline_mcap, latest_announcement, revision_trigger, citations_json)
+                    VALUES ({placeholder}, {placeholder}, {placeholder}, {placeholder}, {placeholder}, {placeholder}, {placeholder}, {placeholder}, {placeholder}, {placeholder})
                 ''', (
                     rep_row[0], rep_row[1], rep_row[2], rep_row[3],
                     rep_row[4], rep_row[5], rep_row[6], rep_row[7],
-                    "Archived Baseline"
+                    "Archived Baseline",
+                    rep_cits
                 ))
                 conn.commit()
                 cursor.execute(f'''
-                    SELECT id, ticker, short_name, report_text, timestamp, baseline_price, baseline_pe, baseline_mcap, latest_announcement, revision_trigger
+                    SELECT id, ticker, short_name, report_text, timestamp, baseline_price, baseline_pe, baseline_mcap, latest_announcement, revision_trigger, citations_json
                     FROM report_revisions
                     WHERE ticker = {placeholder}
                     ORDER BY timestamp DESC
                 ''', (clean,))
                 for s_row in cursor.fetchall():
+                    s_text = s_row[3]
+                    s_cit = []
+                    if len(s_row) > 10 and s_row[10]:
+                        try:
+                            s_cit = json.loads(s_row[10])
+                        except Exception:
+                            s_cit = []
+                    if not s_cit and s_text:
+                        s_cit = extract_citations_from_report(s_text)
                     revisions.append({
                         "id": s_row[0],
                         "ticker": s_row[1],
                         "short_name": s_row[2] or s_row[1],
-                        "report_text": s_row[3],
+                        "report_text": s_text,
                         "raw_timestamp": s_row[4],
                         "formatted_date": _format_timestamp(s_row[4]),
                         "baseline_price": s_row[5],
                         "baseline_pe": s_row[6],
                         "baseline_mcap": s_row[7],
                         "latest_announcement": s_row[8] or "",
-                        "revision_trigger": s_row[9] or "Archived Baseline"
+                        "revision_trigger": s_row[9] or "Archived Baseline",
+                        "citations": s_cit
                     })
     except Exception as e:
         logger.error(f"Database query error in get_report_revisions: {e}")

@@ -34,6 +34,9 @@ h2 { color: #1e293b; font-size: 12pt; margin-top: 14px; border-bottom: 1px solid
 h3 { color: #334155; font-size: 10.5pt; margin-top: 10px; }
 img { max-width: 100%; height: auto; margin: 6px 0; }
 p, li { font-size: 9.5pt; line-height: 1.45; }
+a { color: #1d4ed8; text-decoration: underline; }
+ol { margin-top: 6px; padding-left: 20px; }
+ol li { margin-bottom: 4px; font-size: 8.5pt; color: #334155; line-height: 1.4; }
 </style>
 """
     scorecard_md = f"""### Institutional 7-Pillar Health Scorecard
