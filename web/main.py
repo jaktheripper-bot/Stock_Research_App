@@ -41,7 +41,12 @@ from core.billing import (
     RazorpayAPIError,
 )
 from normalizer import clean_ticker
-from bse_master import get_ticker_suggestions
+from bse_master import (
+    get_ticker_suggestions,
+    resolve_canonical_symbol,
+    resolve_bse_scrip_code,
+    get_bse_scrips_cache,
+)
 from ui.formatters import format_inr
 from web.legal_content import POLICIES
 
@@ -125,7 +130,8 @@ async def search_redirect(q: str = ""):
     clean_q = clean_ticker(q)
     if not clean_q:
         return RedirectResponse(url="/")
-    return RedirectResponse(url=f"/dossier/{clean_q}")
+    canonical = resolve_canonical_symbol(clean_q) or clean_q
+    return RedirectResponse(url=f"/dossier/{canonical}", status_code=302)
 
 
 @app.get("/dossier/{ticker}", response_class=HTMLResponse)
@@ -133,18 +139,40 @@ async def dossier_page(request: Request, ticker: str):
     """
     Canonical stock research dossier page.
     Renders 7-pillar qualitative matrix, valuation multiples, and exchange citations.
+    If uncompiled, serves the pending compilation queue template instead of a raw 404 JSON.
     """
     clean_t = clean_ticker(ticker)
     if not clean_t:
-        raise HTTPException(status_code=400, detail="Invalid ticker symbol.")
+        return RedirectResponse(url="/")
 
-    rep = get_report_by_ticker(clean_t)
+    # Canonicalize ticker symbol (e.g. 'MANALI PETROCHEM' or '500268' -> 'MANALIPETC')
+    canonical = resolve_canonical_symbol(clean_t) or clean_t
+    if canonical != clean_t:
+        return RedirectResponse(url=f"/dossier/{canonical}", status_code=302)
+
+    rep = get_report_by_ticker(canonical)
     if not rep or not rep.get("report_text"):
-        # If report not yet archived, try fundamental resolution or suggest similar
-        suggestions = get_ticker_suggestions(clean_t)
-        raise HTTPException(
-            status_code=404,
-            detail=f"Dossier for {clean_t} is currently being compiled. Suggestions: {', '.join(suggestions[:4]) if suggestions else 'None'}"
+        # Resolve company details for the pending template
+        scrip = resolve_bse_scrip_code(canonical) or "BSE Listed"
+        cached = get_bse_scrips_cache()
+        company_name = canonical
+        if cached:
+            for c_name, c_code in cached.get("names", {}).items():
+                if str(c_code) == str(scrip):
+                    company_name = c_name.title()
+                    break
+
+        suggestions = get_ticker_suggestions(clean_t, n=4)
+        return templates.TemplateResponse(
+            request=request,
+            name="dossier_pending.html",
+            context={
+                "display_ticker": canonical,
+                "company_name": company_name,
+                "scrip_code": scrip,
+                "suggestions": suggestions,
+                "active_page": "dossier"
+            }
         )
 
     # Convert report markdown into semantic HTML

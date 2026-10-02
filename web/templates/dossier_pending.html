@@ -1,0 +1,130 @@
+{% extends "base.html" %}
+
+{% block title %}{{ display_ticker }} ({{ company_name }}) — Institutional Dossier Status | Stock Research AI{% endblock %}
+{% block meta_desc %}Real-time status and compilation queue for {{ display_ticker }} ({{ company_name }}). Ingested from verified BSE exchange disclosures.{% endblock %}
+
+{% block content %}
+<div class="container" style="max-width: 960px; margin: 40px auto;">
+  
+  <!-- Header Card -->
+  <div style="background: rgba(30, 41, 59, 0.7); border: 1px solid var(--border-color); border-radius: var(--radius-lg); padding: 32px; backdrop-filter: blur(12px); margin-bottom: 30px;">
+    <div style="display: flex; justify-content: space-between; align-items: flex-start; flex-wrap: wrap; gap: 16px;">
+      <div>
+        <div style="display: inline-flex; align-items: center; gap: 8px; background: rgba(245, 158, 11, 0.15); border: 1px solid rgba(245, 158, 11, 0.4); padding: 4px 12px; border-radius: 20px; font-size: 12px; font-weight: 700; color: #fbbf24; margin-bottom: 12px;">
+          <span>⏳ PENDING INSTITUTIONAL COMPILATION</span>
+        </div>
+        <h1 style="font-size: 32px; font-weight: 800; color: var(--text-primary); margin-bottom: 8px;">
+          {{ display_ticker }} <span style="font-size: 20px; font-weight: 500; color: var(--text-secondary);">({{ company_name }})</span>
+        </h1>
+        <div style="font-size: 13px; color: var(--text-muted); display: flex; gap: 12px; flex-wrap: wrap;">
+          <span>Exchange: <strong>BSE Listed</strong></span>
+          <span>•</span>
+          <span>Scrip Code: <strong class="tnum">{{ scrip_code }}</strong></span>
+          <span>•</span>
+          <span>Grounding: <strong>Verified Exchange Master</strong></span>
+        </div>
+      </div>
+
+      <div style="display: flex; gap: 10px;">
+        <a href="/pricing" class="btn btn-primary btn-sm">
+          ⚡ Synthesize Dossier (1 Credit)
+        </a>
+      </div>
+    </div>
+  </div>
+
+  <!-- Explanation & Call to Action -->
+  <div style="display: grid; grid-template-columns: 3fr 2fr; gap: 24px; margin-bottom: 40px;">
+    <div style="background: rgba(15, 23, 42, 0.6); border: 1px solid var(--border-color); border-radius: var(--radius-md); padding: 24px;">
+      <h3 style="font-size: 18px; font-weight: 700; margin-bottom: 14px; color: var(--text-primary); display: flex; align-items: center; gap: 8px;">
+        <span>🔍</span> Why is this dossier pending?
+      </h3>
+      <p style="color: var(--text-secondary); line-height: 1.6; font-size: 14px; margin-bottom: 16px;">
+        Our repository maintains zero-hallucination standards. Rather than serving synthetic AI estimates, each 7-pillar institutional thesis requires live ingestion of verified BSE financial statements, corporate governance filings, and multi-scenario valuation models.
+      </p>
+      <div style="background: rgba(14, 165, 233, 0.08); border-left: 3px solid var(--accent-cyan); padding: 12px 16px; border-radius: 6px; font-size: 13px; color: var(--text-secondary);">
+        <strong>Available on-demand:</strong> Sign in with Supabase Auth or claim your <strong>2 Free Welcome Credits</strong> to execute a fresh 7-pillar synthesis for <strong>{{ display_ticker }}</strong>.
+      </div>
+    </div>
+
+    <div style="background: rgba(15, 23, 42, 0.6); border: 1px solid var(--border-color); border-radius: var(--radius-md); padding: 24px; display: flex; flex-direction: column; justify-content: space-between;">
+      <div>
+        <h4 style="font-size: 15px; font-weight: 700; color: var(--text-primary); margin-bottom: 8px;">
+          Claim Research Pass
+        </h4>
+        <p style="font-size: 13px; color: var(--text-muted); line-height: 1.5; margin-bottom: 16px;">
+          Includes institutional PDF report export, exchange footnote citations, and multi-scenario DCF valuation.
+        </p>
+      </div>
+      <a href="/pricing" class="btn btn-primary" style="text-align: center; width: 100%;">
+        View Plans & Pricing →
+      </a>
+    </div>
+  </div>
+
+  <!-- Fuzzy Suggestions (if user typed partial or alternative name) -->
+  {% if suggestions %}
+  <div style="margin-bottom: 40px;">
+    <h3 style="font-size: 16px; font-weight: 700; color: var(--text-secondary); margin-bottom: 14px; text-transform: uppercase; letter-spacing: 0.05em;">
+      Closest Matching Equities in Universe:
+    </h3>
+    <div style="display: flex; gap: 10px; flex-wrap: wrap;">
+      {% for s in suggestions %}
+      <a href="/dossier/{{ s }}" style="background: rgba(30, 41, 59, 0.6); border: 1px solid var(--border-color); padding: 8px 16px; border-radius: 20px; font-size: 13px; font-weight: 600; color: var(--accent-cyan); text-decoration: none; transition: all 0.2s;" onmouseover="this.style.borderColor='var(--accent-cyan)'" onmouseout="this.style.borderColor='var(--border-color)'">
+        {{ s }} →
+      </a>
+      {% endfor %}
+    </div>
+  </div>
+  {% endif %}
+
+  <!-- Pre-compiled Featured Dossiers -->
+  <div style="margin-top: 50px;">
+    <div style="display: flex; justify-content: space-between; align-items: baseline; margin-bottom: 20px;">
+      <h3 style="font-size: 18px; font-weight: 700; color: var(--text-primary);">
+        Verified Archived Dossiers Ready for Immediate Exploration
+      </h3>
+      <a href="/" style="font-size: 13px; color: var(--accent-cyan); text-decoration: none;">View All 80+ Stocks →</a>
+    </div>
+
+    <div style="display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: 16px;">
+      <a href="/dossier/INFY" class="report-card" style="text-decoration: none; color: inherit;">
+        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;">
+          <strong style="font-size: 18px; color: var(--text-primary);">INFY</strong>
+          <span class="badge badge-emerald">Verified</span>
+        </div>
+        <div style="font-size: 13px; color: var(--text-secondary); margin-bottom: 12px;">Infosys Ltd</div>
+        <div style="font-size: 11px; color: var(--accent-cyan);">Read 7-Pillar Thesis →</div>
+      </a>
+
+      <a href="/dossier/TCS" class="report-card" style="text-decoration: none; color: inherit;">
+        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;">
+          <strong style="font-size: 18px; color: var(--text-primary);">TCS</strong>
+          <span class="badge badge-emerald">Verified</span>
+        </div>
+        <div style="font-size: 13px; color: var(--text-secondary); margin-bottom: 12px;">Tata Consultancy Services Ltd</div>
+        <div style="font-size: 11px; color: var(--accent-cyan);">Read 7-Pillar Thesis →</div>
+      </a>
+
+      <a href="/dossier/RELIANCE" class="report-card" style="text-decoration: none; color: inherit;">
+        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;">
+          <strong style="font-size: 18px; color: var(--text-primary);">RELIANCE</strong>
+          <span class="badge badge-emerald">Verified</span>
+        </div>
+        <div style="font-size: 13px; color: var(--text-secondary); margin-bottom: 12px;">Reliance Industries Ltd</div>
+        <div style="font-size: 11px; color: var(--accent-cyan);">Read 7-Pillar Thesis →</div>
+      </a>
+
+      <a href="/dossier/HDFCBANK" class="report-card" style="text-decoration: none; color: inherit;">
+        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;">
+          <strong style="font-size: 18px; color: var(--text-primary);">HDFCBANK</strong>
+          <span class="badge badge-emerald">Verified</span>
+        </div>
+        <div style="font-size: 13px; color: var(--text-secondary); margin-bottom: 12px;">HDFC Bank Ltd</div>
+        <div style="font-size: 11px; color: var(--accent-cyan);">Read 7-Pillar Thesis →</div>
+      </a>
+    </div>
+  </div>
+
+</div>
+{% endblock %}
