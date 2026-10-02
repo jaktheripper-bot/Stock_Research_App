@@ -20,6 +20,7 @@ from fastapi import FastAPI, Request, HTTPException, Form
 from fastapi.responses import HTMLResponse, RedirectResponse, Response, JSONResponse
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
+from starlette.middleware.base import BaseHTTPMiddleware
 from pydantic import BaseModel
 
 from core.db import (
@@ -52,6 +53,21 @@ app = FastAPI(
     description="Institutional-Grade 7-Pillar Equity Research Engine Grounded in Public Filings",
     version="2.0.0"
 )
+
+class HeadMethodMiddleware(BaseHTTPMiddleware):
+    """Transparently handles HEAD requests for uptime monitors and link crawlers."""
+    async def dispatch(self, request: Request, call_next):
+        if request.method == "HEAD":
+            request.scope["method"] = "GET"
+            response = await call_next(request)
+            return Response(
+                status_code=response.status_code,
+                headers=dict(response.headers),
+                background=response.background,
+            )
+        return await call_next(request)
+
+app.add_middleware(HeadMethodMiddleware)
 
 # Static files & Jinja2 templates
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
