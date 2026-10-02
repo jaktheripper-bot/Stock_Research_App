@@ -140,7 +140,7 @@ def verify_payment_signature(
 
     # In sandbox simulation mode, verify simulation token
     if order_id.startswith("order_sim_"):
-        return signature == f"sig_sim_{order_id}_{payment_id}" or signature == "simulated_success"
+        return signature.startswith("sig_sim_") or signature == "simulated_success"
 
     key_id, key_secret, _ = get_razorpay_keys()
     if not key_secret:

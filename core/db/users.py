@@ -282,10 +282,13 @@ def add_user_credits(
         return False, 0.0
 
     init_db()
+    clean_id = str(user_id).strip()
+    if not get_user_by_id(clean_id):
+        get_or_create_user(clean_id, f"{clean_id}@stockresearch.ai", "Guest Investor")
+
     conn = get_db_connection()
     cursor = conn.cursor()
     p = get_placeholder()
-    clean_id = str(user_id).strip()
 
     try:
         cursor.execute(f"SELECT credits_balance, subscription_tier FROM user_accounts WHERE id = {p};", (clean_id,))

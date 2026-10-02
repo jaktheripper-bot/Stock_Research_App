@@ -118,13 +118,14 @@ window.openCheckout = function(planId, planName, amountInr, credits) {
 
         if (orderData.is_simulated) {
           // Instant simulation fulfillment
+          const simPayId = 'pay_sim_' + Date.now();
           const verifyResp = await fetch('/api/verify-payment', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
               order_id: orderData.id,
-              payment_id: 'pay_sim_' + Date.now(),
-              signature: 'sig_sim_' + orderData.id + '_pay_sim_' + Date.now(),
+              payment_id: simPayId,
+              signature: 'sig_sim_' + orderData.id + '_' + simPayId,
               plan_id: planId
             })
           });
