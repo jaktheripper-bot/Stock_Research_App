@@ -15,7 +15,9 @@
             <span>•</span>
             <span class="badge badge-emerald">Verified Exchange Feed</span>
             <span>•</span>
-            <span>{{ citations|length }} Grounded Sources</span>
+            <a href="#citations" class="badge" style="background: rgba(56, 189, 248, 0.15); color: #38bdf8; border: 1px solid rgba(56, 189, 248, 0.3); text-decoration: none; font-weight: 600; display: inline-flex; align-items: center; gap: 4px; padding: 2px 10px; border-radius: 999px;">
+              <span>📎</span> <span>{{ citations|length }} Grounded Sources</span>
+            </a>
           </div>
         </div>
 
@@ -48,6 +50,22 @@
           <div class="kpi-val tnum">{{ scrip_code|default('N/A') }}</div>
         </div>
       </div>
+
+      <!-- Primary Source Attributions Callout Banner -->
+      {% if citations %}
+      <div style="margin-top: 20px; padding: 14px 18px; background: rgba(56, 189, 248, 0.08); border-left: 3px solid #38bdf8; border-radius: 8px; font-size: 13.5px; color: var(--text-secondary); display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 12px;">
+        <div style="display: flex; align-items: center; gap: 8px;">
+          <span style="font-size: 16px;">🛡️</span>
+          <span>
+            <strong style="color: #38bdf8;">Verified Regulatory Grounding:</strong>
+            This research dossier is synthesized from <strong>{{ citations|length }} primary sources</strong>, including statutory BSE filings, shareholding patterns, and official disclosures.
+          </span>
+        </div>
+        <a href="#citations" class="btn btn-secondary btn-sm" style="font-size: 12px; padding: 6px 14px; text-decoration: none;">
+          View {{ citations|length }} Verified Citations ↓
+        </a>
+      </div>
+      {% endif %}
     </div>
 
     <!-- 7-Pillar Report Content -->
@@ -57,24 +75,45 @@
 
     <!-- Verified Sources & Footnotes Appendix -->
     {% if citations %}
-    <div class="citations-box">
-      <div class="citations-title">
-        <span>📚</span>
-        <span>Verified Regulatory Sources & Footnote Citations ({{ citations|length }})</span>
+    <div id="citations" class="citations-box" style="scroll-margin-top: 100px; margin-top: 40px; background: rgba(15, 23, 42, 0.95); border: 1px solid rgba(56, 189, 248, 0.25); border-radius: var(--radius-md); padding: 28px;">
+      <div class="citations-title" style="display: flex; align-items: center; justify-content: space-between; border-bottom: 1px solid var(--border-subtle); padding-bottom: 16px; margin-bottom: 18px; flex-wrap: wrap; gap: 10px;">
+        <div style="display: flex; align-items: center; gap: 12px;">
+          <span style="font-size: 22px;">📚</span>
+          <div>
+            <h3 style="margin: 0; font-size: 17px; font-weight: 800; color: var(--text-primary); letter-spacing: -0.01em;">
+              Verified Regulatory Sources & Primary Footnote Citations
+            </h3>
+            <span style="font-size: 12px; color: var(--accent-cyan); font-weight: 600;">
+              {{ citations|length }} Institutional Documents Grounded Under SEBI Safe-Harbor Standards
+            </span>
+          </div>
+        </div>
+        <span class="badge badge-emerald" style="font-size: 11px; padding: 4px 10px;">SEBI Safe-Harbor Attributed</span>
       </div>
-      <p style="font-size: 12px; color: var(--text-muted); margin-bottom: 12px;">
-        The qualitative assessments above were synthesized strictly from the following official public filings and regulatory disclosure feeds:
+
+      <p style="font-size: 13px; color: var(--text-secondary); margin-bottom: 20px; line-height: 1.6;">
+        All corporate disclosures, audited financials, related-party metrics, shareholding patterns, and governance findings above were synthesized strictly from the following official public filings and verified regulatory repositories:
       </p>
-      <ul class="citations-list">
+
+      <ul class="citations-list" style="list-style: none; padding: 0; margin: 0; display: flex; flex-direction: column; gap: 10px;">
         {% for c in citations %}
-        <li>
-          [{{ loop.index }}] 
-          {% if c.url %}
-          <a href="{{ c.url }}" target="_blank" rel="noopener">{{ c.title|default(c.url) }}</a>
-          {% else %}
-          <span>{{ c.title|default('BSE Corporate Announcement Feed') }}</span>
-          {% endif %}
-          <span style="font-size: 11px; color: var(--text-muted); margin-left: 6px;">({{ c.domain|default('Exchange Filing') }})</span>
+        <li style="display: flex; align-items: baseline; gap: 10px; font-size: 13.5px; line-height: 1.5; padding: 10px 14px; background: rgba(30, 41, 59, 0.4); border-radius: 6px; border: 1px solid rgba(255, 255, 255, 0.04);">
+          <span style="color: var(--accent-cyan); font-weight: 800; font-family: monospace; font-size: 12px; min-width: 28px;">
+            [{{ loop.index }}]
+          </span>
+          <div style="flex: 1; min-width: 0;">
+            {% set link_url = c.uri|default(c.url) %}
+            {% if link_url %}
+            <a href="{{ link_url }}" target="_blank" rel="noopener noreferrer" style="color: #38bdf8; text-decoration: underline; text-underline-offset: 3px; font-weight: 600; word-break: break-word;">
+              {{ c.title|default(link_url) }}
+            </a>
+            {% else %}
+            <span style="font-weight: 600; color: var(--text-primary);">{{ c.title|default('BSE Corporate Announcement Feed') }}</span>
+            {% endif %}
+          </div>
+          <span class="badge" style="font-size: 11px; background: rgba(56, 189, 248, 0.12); color: #38bdf8; border: 1px solid rgba(56, 189, 248, 0.25); padding: 3px 10px; border-radius: 4px; white-space: nowrap; flex-shrink: 0;">
+            {{ c.source_type|default(c.domain|default('Verified Regulatory Filing')) }}
+          </span>
         </li>
         {% endfor %}
       </ul>

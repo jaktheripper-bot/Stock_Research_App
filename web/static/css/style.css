@@ -695,9 +695,13 @@ article.dossier-article {
   font-weight: 700;
 }
 
+html {
+  scroll-behavior: smooth;
+}
+
 /* Citations & Disclosures Box */
 .citations-box {
-  background: rgba(15, 23, 42, 0.85);
+  background: rgba(15, 23, 42, 0.95);
   border: 1px solid var(--border-subtle);
   border-radius: var(--radius-md);
   padding: 24px;
@@ -722,6 +726,16 @@ article.dossier-article {
 
 .citations-list li {
   margin-bottom: 8px;
+  transition: transform 0.15s ease, background 0.15s ease;
+}
+
+.citations-list li:hover {
+  background: rgba(30, 41, 59, 0.7) !important;
+}
+
+.citations-list a:hover {
+  color: #7dd3fc !important;
+  text-decoration: underline !important;
 }
 
 /* ==============================================================================

@@ -430,10 +430,12 @@ def render_dual_speed_report(markdown_text: str, expand_all: bool = False):
 
         # Nest Pillars 1 through 7 into accordions
         if re.search(r"(?i)\bPillars?\s*\d+", title):
-            with st.expander(f"📁 {title}", expanded=expand_all):
+            clean_title = re.sub(r"^[📁📚\s]+", "", title)
+            with st.expander(f"📁 {clean_title}", expanded=expand_all):
                 st.markdown(body_content)
         elif re.search(r"(?i)\b(?:Sources|Footnote|Citations|Regulatory Filings)\b", title):
-            with st.expander(f"📚 {title}", expanded=True):
+            clean_title = re.sub(r"^[📁📚\s]+", "", title)
+            with st.expander(f"📚 {clean_title}", expanded=True):
                 st.markdown(body_content)
         else:
             # Diagnostic Summary or unclassified factual headers remain open

@@ -10,6 +10,7 @@ Provides:
 """
 
 import os
+import re
 import json
 import logging
 import markdown
@@ -43,7 +44,7 @@ from core.billing import (
     RazorpayAuthError,
     RazorpayAPIError,
 )
-from normalizer import clean_ticker
+from normalizer import clean_ticker, extract_citations_from_report
 from bse_master import (
     get_ticker_suggestions,
     resolve_canonical_symbol,
@@ -178,21 +179,29 @@ async def dossier_page(request: Request, ticker: str):
             }
         )
 
-    # Convert report markdown into semantic HTML
-    raw_md = rep.get("report_text", "")
-    html_content = markdown.markdown(
-        raw_md,
-        extensions=["tables", "fenced_code", "nl2br"]
-    )
-
     # Ingest verified citations footnotes
-    citations = []
-    cit_json = rep.get("citations_json")
-    if cit_json:
+    raw_md = rep.get("report_text", "")
+    citations = rep.get("citations") or []
+    if not citations and rep.get("citations_json"):
         try:
-            citations = json.loads(cit_json)
+            citations = json.loads(rep.get("citations_json"))
         except Exception:
             citations = []
+    if not citations and raw_md:
+        citations = extract_citations_from_report(raw_md)
+
+    # Separate narrative prose from footnotes so they don't appear duplicated as unstyled markdown
+    prose_md = raw_md
+    if citations:
+        parts = re.split(r"(?im)^\s*#+\s*.*(?:Verified Regulatory Sources|Footnote Citations)", raw_md)
+        if len(parts) > 1 and len(parts[0].strip()) > 300:
+            prose_md = parts[0].rstrip()
+
+    # Convert report markdown into semantic HTML
+    html_content = markdown.markdown(
+        prose_md,
+        extensions=["tables", "fenced_code", "nl2br"]
+    )
 
     mcap = rep.get("baseline_mcap")
     mcap_formatted = f"₹{format_inr(mcap)}" if mcap else "N/A"
