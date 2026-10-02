@@ -89,3 +89,10 @@ ol li { margin-bottom: 4px; font-size: 8.5pt; color: #334155; line-height: 1.4; 
                 os.unlink(chart_filename)
             except OSError:
                 pass
+
+
+def generate_report_pdf(ticker: str, rep_text: str, header_label: str = None) -> bytes:
+    """Convenience wrapper for headless / web report PDF export."""
+    label = header_label or f"{ticker} Institutional Research Dossier"
+    return build_pdf_dossier(rep_text, ticker, label, hist_df=None)
+
