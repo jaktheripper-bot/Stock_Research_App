@@ -32,3 +32,11 @@
   * `core/analysis/delta.py`: 4-gate material change evaluation, self-healing cache checks, pillar markdown splicing, and zero-grounding-fee surgical valuation/technicals refresh.
   * `core/analysis/comparator.py`: Cross-company institutional peer comparison, side-by-side metric alignment, and 3-axis disparity diagnostics (Sector, Lifecycle, Scale).
 * **Zero-Breaking-Change Root Facade (`analyzer.py`):** The root `analyzer.py` exposes a 43-line facade re-exporting all symbols from `core.analysis`, ensuring zero import breakage across UI views, tests, and CLI task runners.
+
+## 6. Modular Presentation & View Controller Architecture
+* **Modular `ui/views/` Package:** The public user interface is cleanly separated into focused view controllers:
+  * `ui/views/state.py`: Session state synchronization, deep linking URL persistence, and 5-phase research pipeline execution.
+  * `ui/views/sidebar.py`: Stock lookup search, archive selectbox, multi-quarter revision diffing, and revision timelines.
+  * `ui/views/alerts_view.py`: Granular event alerting hub, unread badge counters, triage actions, and watchlist management.
+  * `ui/views/dossier_view.py`: Search input, language selection, active dossier metrics, streaming synthesis progress, scorecard, and PDF export.
+* **Lean Top-Level Application Orchestrator (`app.py`):** Reduced from 1,276 lines to 170 lines, coordinating page configuration, GA4 telemetry, CSS styling, sidebar rendering, and clean route dispatch.

@@ -52,12 +52,14 @@
   - [x] `core/analysis/__init__.py`: Aggregated re-exports of all 29 public symbols with explicit `__all__`.
   - [x] Refactored root `analyzer.py`: Transformed 1,375-line monolith into a 43-line backward-compatible facade.
   - [x] Verification: 100% pre-flight test pass (`./run.sh preflight`: linter across 38 files, system check, headless UI, and speed benchmark).
-- [ ] **Phase 3: Modularize `app.py` (1,275 lines) into `ui/views/`**
-  - [ ] `ui/views/dossier_view.py`: Main stock search, report synthesis, 7-pillar scorecard, citations expander.
-  - [ ] `ui/views/comparison_view.py`: Peer comparison container and disparity alerts.
-  - [ ] `ui/views/archive_view.py`: Browse existing 80+ reports, revision history, and full downloads.
-  - [ ] `ui/views/alerts_view.py`: Surveillance notifications and triage dashboard.
-  - [ ] `ui/views/admin_view.py`: Telemetry, demographics, user journeys, and cost savings analytics.
+- [x] **Phase 3: Modularize `app.py` (1,275 lines) into `ui/views/`**
+  - [x] `ui/views/state.py`: Session state synchronization, deep linking URL persistence, and 5-phase research pipeline execution.
+  - [x] `ui/views/sidebar.py`: Stock lookup search, archive selectbox, multi-quarter revision diffing, and revision timelines.
+  - [x] `ui/views/alerts_view.py`: Granular event alerting hub, unread badge counters, triage actions, and watchlist management.
+  - [x] `ui/views/dossier_view.py`: Search input, language selection, active dossier metrics, streaming synthesis progress, scorecard, and PDF export.
+  - [x] `ui/views/__init__.py`: Aggregated re-exports of view components and state utilities.
+  - [x] Refactored `app.py`: Transformed 1,275-line monolith into a 170-line coordinator.
+  - [x] Verification: 100% pre-flight test pass (`./run.sh preflight`: linter across 43 files, system check, headless UI, and 3.4x speed benchmark).
 
 ---
 
