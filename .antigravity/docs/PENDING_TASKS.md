@@ -74,3 +74,20 @@
   - Corporate bonds, Sovereign Gold Bonds (SGB), NCDs, and fixed deposit real-return diagnostics.
 - [ ] **Capstone: Unified Qualitative Portfolio Audit**
   - Aggregation engine combining Equities + Mutual Funds + Fixed Income into an institutional-grade risk concentration and diversification audit.
+
+---
+
+## 🌐 Tier 5: Discovery Architecture: SEO, GEO (Generative Engine Optimization) & Public Dossier Distribution
+*Goal: Transform internal database research reports into indexable, high-authority public knowledge assets for traditional search engines (Google, Bing) and AI answer engines (Perplexity, ChatGPT Search, Gemini).*
+
+- [ ] **Static Site Generation (SSG) & Headless Dossier Mirror**
+  - Automatically export lightweight, pre-rendered semantic HTML snapshots of verified equity dossiers (`/dossier/<canonical_ticker>.html`).
+  - Semantic HTML5 structure (`<h1>`, `<h2>`, `<article>`), `<meta>` tags, and OpenGraph/Twitter Card previews showcasing the 7-Pillar Health Matrix.
+  - Embed `Schema.org` JSON-LD structured data (`Article`, `FinancialProduct`) for instant rich snippets and factual indexing by search crawlers.
+- [ ] **Automated Dynamic Sitemap (`sitemap.xml`) & Disclosures Ingestion Feed**
+  - Expose an automated XML sitemap listing canonical ticker URLs with accurate `<lastmod>` timestamps derived from `report_revisions`.
+  - Provide an RSS/Atom corporate filing evaluation feed to notify search bots and AI aggregators within hours of material BSE disclosures.
+- [ ] **Deep-Linking & Shareable Direct Dossier Routing**
+  - Support direct query routing (e.g., `?ticker=TCS` or `?ticker=TATASTEEL`) so external search results link directly to active institutional dossiers.
+- [ ] **SEBI Safe Harbor Static Compliance Enforcer**
+  - Guarantee that all crawler-facing HTML mirrors append the immutable [`MANDATORY_SEBI_DISCLAIMER`](file:///Users/lyndonpinto/Documents/Stock_Research_App/db.py#L14-L23), enforce strictly diagnostic terminology, and omit any personalized or speculative investment targets.

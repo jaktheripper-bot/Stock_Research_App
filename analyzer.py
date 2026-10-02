@@ -17,7 +17,7 @@ from db import save_report_to_archive, get_report_by_ticker
 from checker import verify_stock_report
 from screener import pass_pre_screening_gates
 from bsedata.bse import BSE
-from bse_master import resolve_bse_scrip_code
+from bse_master import resolve_bse_scrip_code, resolve_canonical_symbol
 
 logger = logging.getLogger("equity_research.analyzer")
 
@@ -410,18 +410,22 @@ def get_stock_fundamentals(query: str) -> dict:
     If BSE direct fails or reports inactive, falls back gracefully to Yahoo Finance.
     """
     clean = clean_ticker(query)
+    canonical = resolve_canonical_symbol(query) or clean
     
     # Try primary BSE ingestion
     try:
-        raw_data = fetch_bse_exchange_data(query)
+        raw_data = fetch_bse_exchange_data(canonical)
         if raw_data and not raw_data.get("is_fallback", False):
             return raw_data
     except Exception as bse_err:
-        logger.warning(f"BSE direct quote failed for {query} ({bse_err}). Attempting yfinance fallback...")
+        logger.warning(f"BSE direct quote failed for {query}/{canonical} ({bse_err}). Attempting yfinance fallback...")
 
     # Secondary Resilience Fallback via yfinance
     try:
-        for sym in [f"{clean}.NS", f"{clean}.BO"]:
+        candidate_symbols = [f"{canonical}.NS", f"{canonical}.BO"]
+        if clean != canonical:
+            candidate_symbols.extend([f"{clean}.NS", f"{clean}.BO"])
+        for sym in candidate_symbols:
             t = yf.Ticker(sym)
             fast = getattr(t, "fast_info", None)
             info = {}
@@ -445,8 +449,8 @@ def get_stock_fundamentals(query: str) -> dict:
                     pe = "N/A"
 
                 return {
-                    "ticker": clean,
-                    "short_name": info.get("shortName") or info.get("longName") or clean,
+                    "ticker": canonical or clean,
+                    "short_name": info.get("shortName") or info.get("longName") or canonical or clean,
                     "sector": info.get("sector") or "General Industry",
                     "industry": info.get("industry") or "Diversified",
                     "market_cap": mcap,
@@ -1086,8 +1090,29 @@ def evaluate_company_disparity(fund_a: dict, fund_b: dict) -> dict:
     sec_a = str(fund_a.get("sector") or "").strip()
     sec_b = str(fund_b.get("sector") or "").strip()
     generic = {"N/A", "General Industry", "Core Industry", "Diversified / Core Industry", ""}
+    
+    def norm_sec(s: str) -> str:
+        sl = s.lower().strip()
+        if any(k in sl for k in ["tech", "software", "it -", "computers", "information technology"]):
+            return "technology"
+        if any(k in sl for k in ["bank", "financial", "nbfc", "lending", "insurance"]):
+            return "financial_services"
+        if any(k in sl for k in ["auto", "motor", "vehicle"]):
+            return "automotive"
+        if any(k in sl for k in ["pharma", "health", "biotech", "drug", "hospital"]):
+            return "healthcare"
+        if any(k in sl for k in ["steel", "metal", "mining", "aluminium", "copper"]):
+            return "metals_mining"
+        if any(k in sl for k in ["telecom", "communication"]):
+            return "telecommunications"
+        if any(k in sl for k in ["power", "energy", "oil", "gas", "petro", "utility"]):
+            return "energy_utilities"
+        if any(k in sl for k in ["fmcg", "consumer", "retail", "beverage", "food"]):
+            return "consumer"
+        return sl
+
     sector_mismatch = False
-    if sec_a and sec_b and sec_a not in generic and sec_b not in generic and sec_a.lower() != sec_b.lower():
+    if sec_a and sec_b and sec_a not in generic and sec_b not in generic and norm_sec(sec_a) != norm_sec(sec_b):
         sector_mismatch = True
         warnings.append(
             f"Sector Disparity ({sec_a} vs. {sec_b}): These companies operate in fundamentally different sectors. "

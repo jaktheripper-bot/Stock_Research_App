@@ -12,7 +12,11 @@ PRIMARY_BSE_MAP = {
     "NYKAA": "543384", "DMART": "540376", "POLICYBAZAAR": "543390", "DELHIVERY": "543529",
     "JIOFIN": "543940", "RELIANCE": "500325", "TCS": "532540", "HDFCBANK": "500180",
     "INFY": "500209", "ICICIBANK": "532174", "ITC": "500875", "SBIN": "500112",
-    "TATAMOTORS": "500570", "OLAELEC": "544225", "ATHERENERGY": "544397"
+    "TATAMOTORS": "500570", "OLAELEC": "544225", "ATHERENERGY": "544397",
+    "WIPRO": "507685", "HCL": "532281", "HCLTECH": "532281", "HCL TECHNOLOGIES": "532281",
+    "BHARTIARTL": "532454", "AIRTEL": "532454", "LT": "500510", "LARSEN": "500510",
+    "KOTAKBANK": "500247", "KOTAK": "500247", "AXISBANK": "532215", "MARUTI": "532500",
+    "TITAN": "500114", "SUNPHARMA": "524715", "TATASTEEL": "500470"
 }
 
 _ALIASES_CACHE = {"data": None, "mtime": 0}
@@ -196,6 +200,22 @@ def resolve_bse_scrip_code(query: str) -> str:
         return jit_code
 
     return None
+
+def resolve_canonical_symbol(query: str) -> str:
+    """Resolves an alias or scrip code to its canonical exchange ticker symbol (e.g. 'HCL' or '532281' -> 'HCLTECH')."""
+    if not query:
+        return ""
+    clean = clean_ticker(query)
+    scrip = resolve_bse_scrip_code(clean)
+    if not scrip:
+        return clean
+    cached = get_bse_scrips_cache()
+    if cached:
+        symbols = cached.get("symbols", {})
+        for sym, code in symbols.items():
+            if str(code).strip() == str(scrip).strip():
+                return sym
+    return clean
 
 def _get_cached_candidates() -> list:
     scrips_mtime = _SCRIPS_CACHE.get("mtime", 0)
