@@ -42,12 +42,16 @@
   - [x] Created `core/db/__init__.py`: Aggregated re-exports of all 38 public symbols with explicit `__all__`.
   - [x] Refactored root `db.py`: Transformed 1,666-line monolith into a 56-line backward-compatible facade.
   - [x] Verification: 100% pre-flight test pass (`./run.sh preflight`: linter, system check, headless UI, and 2.4x speed benchmark).
-- [ ] **Phase 2: Modularize `analyzer.py` (1,375 lines) into `core/analysis/`**
-  - [ ] `core/analysis/fundamentals.py`: Direct BSE scrip resolution, quotes, valuation ratios, and balance sheet metrics.
-  - [ ] `core/analysis/engine.py`: Flash cascade failover, Perplexity `sonar-pro` router, prompt templates, structured output parsing.
-  - [ ] `core/analysis/delta.py`: 2-tier caching, delta gating (>=5% price move, filings, >14 days), surgical refreshes.
-  - [ ] `core/analysis/comparator.py`: Side-by-side peer comparison, disparity detection, 7-pillar alignment.
-  - [ ] Root `analyzer.py` facade maintaining existing signatures.
+- [x] **Phase 2: Modularize `analyzer.py` (1,375 lines) into `core/analysis/`**
+  - [x] `core/analysis/exceptions.py`: Robust pipeline exception taxonomy (`PipelineError`, `TickerResolutionError`, `ExchangeDataFetchError`).
+  - [x] `core/analysis/parser.py`: 7-pillar health matrix extraction, regulatory sanitization, citations footnotes formatting, and differential comparison.
+  - [x] `core/analysis/fundamentals.py`: Direct BSE scrip resolution, quotes, valuation ratios, 50-DMA precomputation, and corporate announcements feed.
+  - [x] `core/analysis/engine.py`: Flash cascade failover, Perplexity `sonar-pro` router, prompt templates, and streaming citations ingestion.
+  - [x] `core/analysis/delta.py`: 4-gate material change evaluation, self-healing cache checks, pillar splicing, and zero-grounding surgical refresh.
+  - [x] `core/analysis/comparator.py`: Side-by-side peer comparison, disparity detection, 7-pillar alignment.
+  - [x] `core/analysis/__init__.py`: Aggregated re-exports of all 29 public symbols with explicit `__all__`.
+  - [x] Refactored root `analyzer.py`: Transformed 1,375-line monolith into a 43-line backward-compatible facade.
+  - [x] Verification: 100% pre-flight test pass (`./run.sh preflight`: linter across 38 files, system check, headless UI, and speed benchmark).
 - [ ] **Phase 3: Modularize `app.py` (1,275 lines) into `ui/views/`**
   - [ ] `ui/views/dossier_view.py`: Main stock search, report synthesis, 7-pillar scorecard, citations expander.
   - [ ] `ui/views/comparison_view.py`: Peer comparison container and disparity alerts.

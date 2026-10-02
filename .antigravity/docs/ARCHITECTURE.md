@@ -22,3 +22,13 @@
   * `core/db/telemetry.py`: Privacy-preserving user action journeys, geographic/device demographics, and API credit cost savings.
   * `core/db/settings.py`: Dynamic system configuration key-value storage.
 * **Zero-Breaking-Change Root Facade (`db.py`):** The root `db.py` exposes a 100% backwards-compatible facade re-exporting all symbols from `core.db`, ensuring existing scripts, test suites, and preflight checks operate with zero import breakage.
+
+## 5. Modular Analysis & AI Pipeline Architecture
+* **Modular `core/analysis/` Package:** Institutional research synthesis, fundamental ingestion, delta triggers, and peer comparisons are decomposed into specialized submodules:
+  * `core/analysis/exceptions.py`: Robust pipeline exception taxonomy (`PipelineError`, `TickerResolutionError`, `ExchangeDataFetchError`).
+  * `core/analysis/parser.py`: 7-pillar health matrix extraction, regulatory sanitization, citations footnote formatting, and time-series qualitative drift differential comparisons.
+  * `core/analysis/fundamentals.py`: Primary BSE exchange quote resolution, consolidated `yfinance` ratio fallback, 50-DMA/technical precomputation, and corporate announcements feed.
+  * `core/analysis/engine.py`: Dynamic Flash model discovery cascade, Perplexity `sonar-pro` failover, SSE stream parsing, and visual citations attribution ingestion.
+  * `core/analysis/delta.py`: 4-gate material change evaluation, self-healing cache checks, pillar markdown splicing, and zero-grounding-fee surgical valuation/technicals refresh.
+  * `core/analysis/comparator.py`: Cross-company institutional peer comparison, side-by-side metric alignment, and 3-axis disparity diagnostics (Sector, Lifecycle, Scale).
+* **Zero-Breaking-Change Root Facade (`analyzer.py`):** The root `analyzer.py` exposes a 43-line facade re-exporting all symbols from `core.analysis`, ensuring zero import breakage across UI views, tests, and CLI task runners.

@@ -1,0 +1,391 @@
+"""Fundamental data ingestion, verified exchange quote resolution, and technical indicator computation."""
+
+import io
+import contextlib
+import logging
+import requests
+from datetime import datetime, timedelta
+import pandas as pd
+import streamlit as st
+import yfinance as yf
+from bsedata.bse import BSE
+from normalizer import clean_ticker
+from bse_master import resolve_bse_scrip_code, resolve_canonical_symbol
+from core.analysis.exceptions import ExchangeDataFetchError
+
+logger = logging.getLogger("equity_research.core.analysis.fundamentals")
+
+def enrich_fundamentals(ticker: str, data: dict) -> dict:
+    """Secondary enrichment: uses yfinance strictly to backfill trailing P/E, Market Cap, and Sector."""
+    try:
+        clean_sym = clean_ticker(ticker)
+        yf_ticker = f"{clean_sym}.BO" if clean_sym.isdigit() else f"{clean_sym}.NS"
+        info = yf.Ticker(yf_ticker).info or {}
+
+        # Trailing P/E
+        if data.get("pe_ratio") in [None, "N/A", "-", "", 0, "0"]:
+            pe = info.get("trailingPE")
+            if pe is not None and isinstance(pe, (int, float)):
+                data["pe_ratio"] = round(pe, 2) if pe > 0 else "N/A (Loss-Making)"
+
+        # Market Cap
+        if data.get("market_cap") in [None, "N/A", 0, "-", "", "0"]:
+            mcap = info.get("marketCap")
+            if mcap and isinstance(mcap, (int, float)):
+                data["market_cap"] = int(mcap)
+
+        # Sector & Industry
+        if data.get("sector") in [None, "N/A", "-", "", "Core Industry", "Diversified / Core Industry"]:
+            sec = info.get("sector")
+            if sec:
+                data["sector"] = sec
+        if data.get("industry") in [None, "N/A", "-", "", "General Corporate"]:
+            ind = info.get("industry")
+            if ind:
+                data["industry"] = ind
+
+        # Institutional Financial Ratios Enrichment
+        fpe = info.get("forwardPE")
+        if fpe and isinstance(fpe, (int, float)) and fpe > 0:
+            data["forward_pe"] = f"{float(fpe):.2f}"
+        else:
+            data["forward_pe"] = data.get("forward_pe", "N/A")
+
+        pb = info.get("priceToBook")
+        if pb and isinstance(pb, (int, float)) and pb > 0:
+            data["price_to_book"] = f"{float(pb):.2f}"
+        else:
+            data["price_to_book"] = data.get("price_to_book", "N/A")
+
+        eve = info.get("enterpriseToEbitda")
+        if eve and isinstance(eve, (int, float)) and 0 < eve < 500:
+            data["ev_to_ebitda"] = f"{float(eve):.2f}"
+        else:
+            data["ev_to_ebitda"] = data.get("ev_to_ebitda", "N/A")
+
+        roe = info.get("returnOnEquity")
+        if roe is not None and isinstance(roe, (int, float)):
+            data["roe"] = f"{float(roe * 100):.1f}%"
+        else:
+            data["roe"] = data.get("roe", "N/A")
+
+        opm = info.get("operatingMargins")
+        if opm is not None and isinstance(opm, (int, float)):
+            data["opm"] = f"{float(opm * 100):.1f}%"
+        else:
+            data["opm"] = data.get("opm", "N/A")
+
+        npm = info.get("profitMargins")
+        if npm is not None and isinstance(npm, (int, float)):
+            data["npm"] = f"{float(npm * 100):.1f}%"
+        else:
+            data["npm"] = data.get("npm", "N/A")
+
+        de = info.get("debtToEquity")
+        if de is not None and isinstance(de, (int, float)):
+            data["debt_to_equity"] = f"{float(de):.2f}"
+        else:
+            data["debt_to_equity"] = data.get("debt_to_equity", "N/A")
+
+        dy = info.get("dividendYield")
+        if dy is not None and isinstance(dy, (int, float)):
+            val = dy if dy > 1 else dy * 100
+            data["dividend_yield"] = f"{float(val):.2f}%"
+        else:
+            data["dividend_yield"] = data.get("dividend_yield", "N/A")
+
+        cr = info.get("currentRatio")
+        if cr is not None and isinstance(cr, (int, float)):
+            data["current_ratio"] = f"{float(cr):.2f}"
+        else:
+            data["current_ratio"] = data.get("current_ratio", "N/A")
+    except Exception as e:
+        logger.warning(f"Background fundamental enrichment notice: {e}")
+    return data
+
+def resolve_pe_with_failsafes(ticker: str, scrip: str = "") -> str:
+    clean = clean_ticker(ticker).replace(" ", "")
+    # Tier 1: Consolidated yfinance
+    try:
+        symbols = [f"{clean}.NS", f"{clean}.BO"]
+        if scrip and str(scrip).isdigit():
+            symbols.append(f"{scrip}.BO")
+        with contextlib.redirect_stderr(io.StringIO()):
+            for s in symbols:
+                try:
+                    tk = yf.Ticker(s)
+                    info = tk.info or {}
+                    trailing_eps = info.get("trailingEps")
+                    trailing_pe = info.get("trailingPE")
+                    if trailing_eps is not None and float(trailing_eps) <= 0:
+                        return "N/A (Loss-Making)"
+                    if trailing_pe and float(trailing_pe) > 0:
+                        return f"{float(trailing_pe):.2f}"
+                except Exception as err:
+                    logger.debug(f"yfinance Ticker probe notice for {s}: {err}")
+                    continue
+    except Exception as e:
+        logger.debug(f"P/E resolution via yfinance failed: {e}")
+
+    # Tier 2: BSE ComHeader Direct
+    if scrip and str(scrip).isdigit():
+        try:
+            url = f"https://api.bseindia.com/BseIndiaAPI/api/ComHeader/w?quotetype=EQ&scripcode={scrip}&seriesid="
+            headers = {"User-Agent": "Mozilla/5.0", "Referer": "https://www.bseindia.com/"}
+            res = requests.get(url, headers=headers, timeout=3)
+            if res.status_code == 200:
+                raw_pe = res.json().get("PE")
+                if raw_pe and str(raw_pe).strip() not in ["", "-", "None", "0", "0.00"]:
+                    val = float(str(raw_pe).replace(",", "").strip())
+                    return f"{val:.2f}" if val > 0 else "N/A (Loss-Making)"
+        except Exception as e:
+            logger.debug(f"BSE ComHeader direct P/E fetch notice: {e}")
+    return "N/A"
+
+@st.cache_data(ttl=300, show_spinner=False)
+def fetch_latest_bse_announcement(scrip_code: str) -> str:
+    if not scrip_code or not str(scrip_code).isdigit():
+        return ""
+    try:
+        now_dt = datetime.now()
+        str_to_date = now_dt.strftime("%Y%m%d")
+        str_prev_date = (now_dt - timedelta(days=60)).strftime("%Y%m%d")
+        url = f"https://api.bseindia.com/BseIndiaAPI/api/AnnSubCategoryGetData/w?pageno=1&strCat=-1&strPrevDate={str_prev_date}&strScrip={scrip_code}&strSearch=P&strToDate={str_to_date}&strType=C"
+        headers = {
+            "User-Agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
+            "Referer": "https://www.bseindia.com/"
+        }
+        res = requests.get(url, headers=headers, timeout=5)
+        if res.status_code == 200:
+            table = res.json().get("Table", [])
+            if table:
+                return (table[0].get("NEWSSUB") or table[0].get("HEADLINE") or "").strip()
+    except Exception as e:
+        logger.debug(f"BSE announcement fetch notice for scrip {scrip_code}: {e}")
+    return ""
+
+def fetch_bse_exchange_data(query: str) -> dict:
+    scrip = resolve_bse_scrip_code(query)
+    if not scrip:
+        raise ValueError(f"Could not resolve an official BSE scrip code for '{query}'.")
+
+    b = BSE()
+    q = b.getQuote(scrip)
+    if not q or "currentValue" not in q:
+        raise ValueError(f"BSE exchange did not return quote data for scrip {scrip}.")
+
+    mcap_raw = q.get("marketCapFull") or q.get("marketCapFreeFloat") or "0"
+    mcap_clean = str(mcap_raw).replace(" Cr.", "").replace(",", "").strip()
+    try:
+        mcap_inr = int(float(mcap_clean) * 10_000_000)
+    except Exception as e:
+        logger.debug(f"BSE MCap parsing note: {e}")
+        mcap_inr = 0
+
+    clean_ticker_val = clean_ticker(query)
+    sec_id = str(q.get("securityID") or q.get("scrip_id") or "").strip().upper()
+    canonical_ticker = sec_id if (sec_id and " " not in sec_id) else (clean_ticker_val if " " not in clean_ticker_val else (sec_id or clean_ticker_val.replace(" ", "")))
+    resolved_pe = resolve_pe_with_failsafes(canonical_ticker, scrip)
+
+    return {
+        "ticker": canonical_ticker,
+        "short_name": q.get("companyName", clean_ticker_val),
+        "scrip_code": scrip,
+        "current_price": q.get("currentValue", "0.00"),
+        "market_cap": mcap_inr,
+        "pe_ratio": resolved_pe,
+        "industry": q.get("industry", "Core Industry"),
+        "sector": q.get("industry", "Core Industry"),
+        "52w_high": q.get("52weekHigh", "N/A"),
+        "52w_low": q.get("52weekLow", "N/A"),
+        "description": f"BSE Listed Equity under group {q.get('group', 'General')}.",
+        "is_fallback": False
+    }
+
+def get_stock_fundamentals(query: str) -> dict:
+    """
+    Primary entry point: Fetches verified exchange data from BSE.
+    If BSE direct fails or reports inactive, falls back gracefully to Yahoo Finance.
+    """
+    clean = clean_ticker(query)
+    canonical = resolve_canonical_symbol(query) or clean
+    
+    # Try primary BSE ingestion
+    try:
+        raw_data = fetch_bse_exchange_data(canonical)
+        if raw_data and not raw_data.get("is_fallback", False):
+            return raw_data
+    except Exception as bse_err:
+        logger.warning(f"BSE direct quote failed for {query}/{canonical} ({bse_err}). Attempting yfinance fallback...")
+
+    # Secondary Resilience Fallback via yfinance
+    try:
+        candidate_symbols = [f"{canonical}.NS", f"{canonical}.BO"]
+        if clean != canonical:
+            candidate_symbols.extend([f"{clean}.NS", f"{clean}.BO"])
+        for sym in candidate_symbols:
+            t = yf.Ticker(sym)
+            fast = getattr(t, "fast_info", None)
+            info = {}
+            try:
+                info = t.info or {}
+            except Exception as err:
+                logger.debug(f"yfinance info notice for {sym}: {err}")
+
+            price = None
+            if fast and hasattr(fast, "last_price") and fast.last_price:
+                price = fast.last_price
+            elif info.get("currentPrice"):
+                price = info.get("currentPrice")
+            elif info.get("regularMarketPrice"):
+                price = info.get("regularMarketPrice")
+
+            if price:
+                mcap = getattr(fast, "market_cap", None) or info.get("marketCap") or "N/A"
+                pe = info.get("trailingPE") or info.get("forwardPE") or "N/A"
+                if isinstance(pe, (int, float)) and pe <= 0:
+                    pe = "N/A"
+
+                return {
+                    "ticker": canonical or clean,
+                    "short_name": info.get("shortName") or info.get("longName") or canonical or clean,
+                    "sector": info.get("sector") or "General Industry",
+                    "industry": info.get("industry") or "Diversified",
+                    "market_cap": mcap,
+                    "pe_ratio": f"{pe:.2f}" if isinstance(pe, (int, float)) else str(pe),
+                    "current_price": round(price, 2),
+                    "52w_high": getattr(fast, "year_high", None) or info.get("fiftyTwoWeekHigh") or "N/A",
+                    "52w_low": getattr(fast, "year_low", None) or info.get("fiftyTwoWeekLow") or "N/A",
+                    "description": info.get("longBusinessSummary") or f"Exchange data synthesized for {clean}.",
+                    "exchange_status": "Active / Secondary (yfinance Fallback)",
+                    "is_fallback": True
+                }
+    except Exception as yf_err:
+        logger.error(f"yfinance fallback also failed for {query}: {yf_err}")
+
+    # If both fail, raise clean error
+    raise ExchangeDataFetchError(clean, "Both primary BSE and secondary market gateways failed to return live quotes.")
+
+@st.cache_data(ttl="15m", max_entries=50)
+def get_historical_prices(ticker: str, period: str = "6mo"):
+    """
+    Fetches trailing daily historical prices via yfinance, attempting BSE (.BO)
+    first with NSE (.NS) fallback. Computes 50-day Simple Moving Average (50-DMA).
+    Auto-resolves 6-digit BSE scrip codes to alphanumeric ticker symbols.
+    """
+    if not ticker or not isinstance(ticker, str):
+        return None
+
+    clean = clean_ticker(ticker)
+
+    # Sanitize multi-word queries with spaces to their canonical security ID
+    if " " in clean:
+        scrip = resolve_bse_scrip_code(clean)
+        if scrip:
+            try:
+                b = BSE()
+                q = b.getQuote(scrip)
+                sec_id = str(q.get("securityID") or "").strip().upper()
+                if sec_id and " " not in sec_id:
+                    clean = sec_id
+                else:
+                    clean = clean.replace(" ", "")
+            except Exception as e:
+                logger.debug(f"BSE quote lookup notice for {scrip}: {e}")
+                clean = clean.replace(" ", "")
+        else:
+            clean = clean.replace(" ", "")
+
+    # Reverse-lookup numeric scrip code to ticker symbol for yfinance
+    if clean.isdigit():
+        try:
+            from bse_master import PRIMARY_BSE_MAP
+            rev_map = {str(v).strip(): k for k, v in PRIMARY_BSE_MAP.items()}
+            if clean in rev_map:
+                clean = rev_map[clean]
+        except Exception as e:
+            logger.debug(f"Reverse lookup notice for scrip {clean}: {e}")
+
+    df = pd.DataFrame()
+    for suffix in [".BO", ".NS"]:
+        try:
+            sym = f"{clean}{suffix}"
+            t = yf.Ticker(sym)
+            hist = t.history(period=period)
+            if hist is not None and not hist.empty and len(hist) > 5:
+                df = hist
+                break
+        except Exception:
+            continue
+
+    if df.empty:
+        return None
+
+    df = df.reset_index()
+    if "Date" not in df.columns or "Close" not in df.columns:
+        return None
+
+    df["Date"] = pd.to_datetime(df["Date"]).dt.tz_localize(None)
+    df["Close"] = pd.to_numeric(df["Close"], errors="coerce")
+    df["Volume"] = pd.to_numeric(df.get("Volume", 0), errors="coerce").fillna(0)
+    df = df.dropna(subset=["Close"])
+
+    if len(df) < 5:
+        return None
+
+    window = min(50, len(df))
+    df["SMA50"] = df["Close"].rolling(window=window, min_periods=5).mean()
+
+    return df[["Date", "Close", "SMA50", "Volume"]]
+
+def compute_deterministic_technical_context(stock_data: dict, hist_df=None) -> dict:
+    """
+    Extracts and computes exact mathematical indicators (50-DMA, % from high/low)
+    directly in Python to eliminate hallucinations and token waste.
+    """
+    price = 0.0
+    try:
+        raw_p = stock_data.get("current_price") or stock_data.get("currentValue") or 0.0
+        price = float(str(raw_p).replace(",", "").strip())
+    except Exception:
+        pass
+
+    high_52 = None
+    low_52 = None
+    try:
+        high_52 = float(str(stock_data.get("52w_high", "")).replace(",", "").strip())
+    except Exception:
+        pass
+    try:
+        low_52 = float(str(stock_data.get("52w_low", "")).replace(",", "").strip())
+    except Exception:
+        pass
+
+    dma_50 = None
+    pct_from_dma50 = None
+    if hist_df is not None and not getattr(hist_df, "empty", True) and "Close" in hist_df.columns:
+        closes = hist_df["Close"].dropna()
+        if len(closes) >= 10:
+            dma_50 = float(closes.tail(50).mean())
+            if dma_50 > 0 and price > 0:
+                pct_from_dma50 = ((price - dma_50) / dma_50) * 100
+
+    pct_from_high = ((price - high_52) / high_52 * 100) if (high_52 and price and high_52 > 0) else None
+    pct_from_low = ((price - low_52) / low_52 * 100) if (low_52 and price and low_52 > 0) else None
+
+    pe_ratio = stock_data.get("pe_ratio", "N/A")
+    mcap = stock_data.get("market_cap", 0)
+    mcap_cr = (mcap / 10_000_000) if isinstance(mcap, (int, float)) and mcap > 0 else 0.0
+
+    return {
+        "price": price,
+        "pe_ratio": pe_ratio,
+        "mcap": mcap,
+        "mcap_cr": mcap_cr,
+        "52w_high": high_52,
+        "52w_low": low_52,
+        "dma_50": dma_50,
+        "pct_from_dma50": pct_from_dma50,
+        "pct_from_high": pct_from_high,
+        "pct_from_low": pct_from_low,
+    }
