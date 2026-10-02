@@ -49,6 +49,62 @@ def enrich_fundamentals(ticker: str, data: dict) -> dict:
             ind = info.get("industry")
             if ind:
                 data["industry"] = ind
+
+        # Institutional Financial Ratios Enrichment
+        fpe = info.get("forwardPE")
+        if fpe and isinstance(fpe, (int, float)) and fpe > 0:
+            data["forward_pe"] = f"{float(fpe):.2f}"
+        else:
+            data["forward_pe"] = data.get("forward_pe", "N/A")
+
+        pb = info.get("priceToBook")
+        if pb and isinstance(pb, (int, float)) and pb > 0:
+            data["price_to_book"] = f"{float(pb):.2f}"
+        else:
+            data["price_to_book"] = data.get("price_to_book", "N/A")
+
+        eve = info.get("enterpriseToEbitda")
+        if eve and isinstance(eve, (int, float)) and 0 < eve < 500:
+            data["ev_to_ebitda"] = f"{float(eve):.2f}"
+        else:
+            data["ev_to_ebitda"] = data.get("ev_to_ebitda", "N/A")
+
+        roe = info.get("returnOnEquity")
+        if roe is not None and isinstance(roe, (int, float)):
+            data["roe"] = f"{float(roe * 100):.1f}%"
+        else:
+            data["roe"] = data.get("roe", "N/A")
+
+        opm = info.get("operatingMargins")
+        if opm is not None and isinstance(opm, (int, float)):
+            data["opm"] = f"{float(opm * 100):.1f}%"
+        else:
+            data["opm"] = data.get("opm", "N/A")
+
+        npm = info.get("profitMargins")
+        if npm is not None and isinstance(npm, (int, float)):
+            data["npm"] = f"{float(npm * 100):.1f}%"
+        else:
+            data["npm"] = data.get("npm", "N/A")
+
+        de = info.get("debtToEquity")
+        if de is not None and isinstance(de, (int, float)):
+            data["debt_to_equity"] = f"{float(de):.2f}"
+        else:
+            data["debt_to_equity"] = data.get("debt_to_equity", "N/A")
+
+        dy = info.get("dividendYield")
+        if dy is not None and isinstance(dy, (int, float)):
+            val = dy if dy > 1 else dy * 100
+            data["dividend_yield"] = f"{float(val):.2f}%"
+        else:
+            data["dividend_yield"] = data.get("dividend_yield", "N/A")
+
+        cr = info.get("currentRatio")
+        if cr is not None and isinstance(cr, (int, float)):
+            data["current_ratio"] = f"{float(cr):.2f}"
+        else:
+            data["current_ratio"] = data.get("current_ratio", "N/A")
     except Exception as e:
         logger.warning(f"Background fundamental enrichment notice: {e}")
     return data
@@ -1180,6 +1236,9 @@ def compare_two_companies(ticker_a: str, ticker_b: str, progress_callback=None) 
     
     resolved_a = fund_a.get("ticker", clean_a)
     resolved_b = fund_b.get("ticker", clean_b)
+    
+    fund_a = enrich_fundamentals(resolved_a, fund_a)
+    fund_b = enrich_fundamentals(resolved_b, fund_b)
     
     if progress_callback:
         progress_callback(0.70, "Loading verified 7-pillar health dossiers...")

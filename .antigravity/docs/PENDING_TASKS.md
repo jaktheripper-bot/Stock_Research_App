@@ -44,14 +44,12 @@
 *Source: [`.antigravity/docs/BEHAVIORAL_RESEARCH_STUDY.md`](file:///Users/lyndonpinto/Documents/Stock_Research_App/.antigravity/docs/BEHAVIORAL_RESEARCH_STUDY.md)*
 
 - [x] **P1: Normalized Cross-Stock Comparator** *(Completed: ⚖️ Peer Comparison tab with 3-tier Disparity Gates)*.
-- [ ] **P1.1: Institutional Peer Comparison Information Expansion (Analyst Deep-Dive)**
-  *Evaluation of essential diagnostic dimensions to elevate comparison beyond basic multiples:*
-  - **Capital Efficiency & Profitability Card**: Side-by-side ROCE %, ROE %, Operating Margin %, and OCF/EBITDA cash conversion.
-  - **Valuation Band & Multiple Disparity**: EV/EBITDA, P/B, Dividend Yield, and historical 5-year P/E percentile comparison.
-  - **Balance Sheet & Solvency Matrix**: Debt/Equity ratio, Interest Coverage, and Net Debt/EBITDA.
-  - **Shareholding & Promoter Alignment**: Promoter Holding %, Promoter Pledge % (critical Indian risk metric), and FII/DII institutional trend.
-  - **Head-to-Head Comparative Radar Chart**: Interactive spider/radar chart comparing Company A vs Company B across the 7 institutional pillars and return ratios.
-  - **Qualitative Moat & Divergence Diagnostic**: Side-by-side narrative contrasting competitive advantages, pricing power, and primary operational risks.
+- [x] **P1.1: Institutional Peer Comparison Information Expansion (Analyst Deep-Dive)** *(Completed: Implemented 3-tab institutional layout in [`ui/comparison.py`](file:///Users/lyndonpinto/Documents/Stock_Research_App/ui/comparison.py) with 13 side-by-side financial/efficiency multiples, 7-pillar qualitative matrix with deep-dive expanders, and 3-axis disparity diagnostics)*
+  - **Capital Efficiency & Profitability Card**: Side-by-side ROCE %, ROE %, Operating Margin (OPM), and Net Profit Margin (NPM).
+  - **Valuation Band & Multiple Disparity**: Trailing P/E, Forward P/E, P/B, EV/EBITDA, Dividend Yield %, and 52-Week Range.
+  - **Balance Sheet & Solvency Matrix**: Debt/Equity ratio and Current Ratio liquidity buffer.
+  - **Qualitative Moat & 7-Pillar Health Scorecard**: 7-pillar side-by-side posture ratings with interactive methodology drilldowns.
+  - **3-Tier Disparity Gate Diagnostic**: Automated cards auditing Sector Mismatch, Lifecycle Divergence, and Scale Divergence (≥100×).
 - [ ] **P2: The "Inversion Engine" / Charlie Munger Pre-Mortem**
   - Integrate a mandatory counter-thesis section modeling the Top 3 Failure Modes (Customer Concentration, Regulatory/Policy Vulnerability, Balance Sheet Sensitivity) to prevent narrative seduction.
 - [ ] **P3: Sunk-Cost & Thesis Drift Prompter**
