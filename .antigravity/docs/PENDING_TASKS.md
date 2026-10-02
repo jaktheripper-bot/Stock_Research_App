@@ -87,8 +87,14 @@
   - **3-Tier Disparity Gate Diagnostic**: Automated cards auditing Sector Mismatch, Lifecycle Divergence, and Scale Divergence (≥100×).
 - [ ] **P2: The "Inversion Engine" / Charlie Munger Pre-Mortem**
   - Integrate a mandatory counter-thesis section modeling the Top 3 Failure Modes (Customer Concentration, Regulatory/Policy Vulnerability, Balance Sheet Sensitivity) to prevent narrative seduction.
-- [ ] **P3: Sunk-Cost & Thesis Drift Prompter**
-  - Automated alert comparing the current quarter against historical baseline snapshots in `report_revisions` to prompt: *"Your baseline thesis was [High Moat / Low Debt]. Current metrics show [Moat Compression]. Would you buy at today's price?"*
+- [ ] **P3: Differential Analysis & Thesis Drift Surveillance UX Overhaul**
+  - *Context:* The differential analysis engine (`compare_revisions`) compares discrete historical snapshots to track qualitative 7-pillar drift and detect value traps. However, the analysis is currently rendered at the bottom of the page (below Pillar 7), creating the impression that it didn't load after clicking "Run Differential Analysis" in the sidebar.
+  - **Action Items:**
+    - [ ] **Above-the-Fold Prominence:** Hoist the Differential Surveillance Card directly below the dossier header (above Pillar 1) whenever a comparison is triggered, rather than burying it below Pillar 7.
+    - [ ] **Visual Loading Confirmation:** Trigger an instant toast (`st.toast("⚖️ Differential Analysis loaded between Rev A & Rev B", icon="📊")`) and auto-scroll anchor directly to the differential comparison card.
+    - [ ] **Dedicated Top-Level View / Tab:** Expose a direct "⚖️ Multi-Quarter Differential" mode in the main UI navigation or a prominent button in the dossier header so users don't have to hunt in the sidebar dropdown.
+    - [ ] **Empty/Single-Revision Guidance:** When a stock has only 1 revision snapshot, render a helpful placeholder card explaining: *"Differential analysis activates once a stock has at least 2 historical snapshots across earnings quarters or material price/filing triggers."*
+    - [ ] **Interactive Visual Diff Cards:** Show side-by-side diff chips for each of the 7 pillars (e.g., `Moat: Wide ➔ Moderate [🔻 Downgrade]`) alongside quantitative shifts (Price, P/E, MCap) with value trap detection banners.
 - [ ] **P4: Forensic Cash Flow Quality Card**
   - 3-year variance table comparing Operating Cash Flow vs Net Profit to detect working-capital traps and aggressive revenue recognition.
 - [ ] **P5: Promoter & Insider SAST Disparity Tracker**
