@@ -20,6 +20,8 @@ from core.billing.razorpay import (
     verify_payment_signature,
     process_successful_payment,
     generate_invoice_html,
+    RazorpayAuthError,
+    RazorpayAPIError,
 )
 
 __all__ = [
@@ -37,4 +39,6 @@ __all__ = [
     "verify_payment_signature",
     "process_successful_payment",
     "generate_invoice_html",
+    "RazorpayAuthError",
+    "RazorpayAPIError",
 ]

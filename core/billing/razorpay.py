@@ -14,8 +14,21 @@ import hashlib
 import time
 import logging
 import requests
-import streamlit as st
 from typing import Dict, Any, Tuple, Optional
+
+# Load environment variables from .env
+try:
+    from dotenv import load_dotenv
+    load_dotenv()
+except Exception:
+    pass
+
+try:
+    import razorpay
+except ImportError:
+    razorpay = None
+
+import streamlit as st
 
 from core.billing.pricing import (
     get_plan_by_id,
@@ -28,9 +41,19 @@ from core.db import add_user_credits, get_user_by_id
 logger = logging.getLogger("equity_research.core.billing")
 
 
+class RazorpayAuthError(Exception):
+    """Raised when Razorpay returns authentication 401 failure."""
+    pass
+
+
+class RazorpayAPIError(Exception):
+    """Raised when Razorpay returns 5xx or bad gateway error."""
+    pass
+
+
 def get_razorpay_keys() -> Tuple[str, str, bool]:
     """
-    Retrieves Razorpay API credentials from secrets or environment.
+    Retrieves Razorpay API credentials from environment or secrets.
     Returns (key_id, key_secret, is_live).
     """
     key_id = os.environ.get("RAZORPAY_KEY_ID")
@@ -43,10 +66,22 @@ def get_razorpay_keys() -> Tuple[str, str, bool]:
         except Exception:
             pass
 
-    key_id = key_id or ""
-    key_secret = key_secret or ""
+    key_id = (key_id or "").strip()
+    key_secret = (key_secret or "").strip()
     is_live = bool(key_id and key_secret and not key_id.startswith("rzp_test_"))
     return key_id, key_secret, is_live
+
+
+def get_razorpay_client() -> Optional[Any]:
+    """Returns an authenticated razorpay.Client instance if SDK is available and keys exist."""
+    key_id, key_secret, _ = get_razorpay_keys()
+    if razorpay and key_id and key_secret:
+        try:
+            return razorpay.Client(auth=(key_id, key_secret))
+        except Exception as e:
+            logger.error(f"Failed to initialize Razorpay client: {e}")
+            return None
+    return None
 
 
 def is_razorpay_configured() -> bool:
@@ -56,72 +91,111 @@ def is_razorpay_configured() -> bool:
 
 
 def create_razorpay_order(
-    plan_id: str,
-    user_id: str,
-    user_email: str
+    plan_id: Optional[str] = None,
+    amount_paise: Optional[int] = None,
+    currency: str = "INR",
+    receipt: Optional[str] = None,
+    user_id: str = "guest_web_user",
+    user_email: str = "investor@example.com"
 ) -> Dict[str, Any]:
     """
-    Creates an order via Razorpay Orders API, or returns a simulated sandbox order
-    if credentials are in development/sandbox mode.
+    Creates an order via Razorpay Orders API / SDK.
+    Supports either plan_id or explicit amount_paise (minimum 100 paise).
     """
-    plan = get_plan_by_id(plan_id)
-    if not plan:
-        raise ValueError(f"Invalid plan ID: {plan_id}")
+    plan = None
+    if plan_id:
+        plan = get_plan_by_id(plan_id)
+        if not plan:
+            raise ValueError(f"Invalid plan ID: {plan_id}")
+        amount_paise = int(plan["amount_inr"] * 100)
+    elif amount_paise is not None:
+        amount_paise = int(amount_paise)
+    else:
+        raise ValueError("Either plan_id or amount_paise must be provided.")
 
-    amount_inr = plan["amount_inr"]
-    amount_paise = int(amount_inr * 100)
+    if amount_paise < 100:
+        raise ValueError("Minimum amount is 100 paise (₹1.00)")
+
     key_id, key_secret, is_live = get_razorpay_keys()
+    receipt_id = receipt or f"rcpt_{int(time.time())}_{user_id[:8]}"
 
-    # Live or Test API Call
+    # Live or Test API Call via Official Razorpay SDK / REST
     if key_id and key_secret:
+        notes = {
+            "user_id": user_id,
+            "user_email": user_email,
+            "plan_id": plan_id or "custom",
+            "service": INVOICE_SERVICE_DESCRIPTION
+        }
+        if plan:
+            notes["credits"] = str(plan["credits"])
+
+        # Try official SDK first
+        client = get_razorpay_client()
+        if client:
+            try:
+                order_data = client.order.create({
+                    "amount": amount_paise,
+                    "currency": currency,
+                    "receipt": receipt_id,
+                    "notes": notes
+                })
+                order_data["order_id"] = order_data["id"]
+                order_data["key_id"] = key_id
+                order_data["is_simulated"] = False
+                order_data["plan"] = plan
+                return order_data
+            except Exception as e:
+                err_str = str(e)
+                logger.error(f"Razorpay SDK order.create error: {err_str}")
+                if "401" in err_str or "auth" in err_str.lower():
+                    raise RazorpayAuthError("Razorpay authentication failed. Invalid API credentials.")
+                raise RazorpayAPIError(f"Razorpay API Error: {err_str}")
+
+        # Fallback to direct REST API
         try:
             url = "https://api.razorpay.com/v1/orders"
-            receipt_id = f"rcpt_{int(time.time())}_{user_id[:8]}"
             payload = {
                 "amount": amount_paise,
-                "currency": "INR",
+                "currency": currency,
                 "receipt": receipt_id,
-                "notes": {
-                    "user_id": user_id,
-                    "user_email": user_email,
-                    "plan_id": plan_id,
-                    "credits": str(plan["credits"]),
-                    "service": INVOICE_SERVICE_DESCRIPTION
-                }
+                "notes": notes
             }
-            resp = requests.post(
-                url,
-                json=payload,
-                auth=(key_id, key_secret),
-                timeout=10
-            )
+            resp = requests.post(url, json=payload, auth=(key_id, key_secret), timeout=10)
             if resp.status_code == 200:
                 data = resp.json()
+                data["order_id"] = data["id"]
                 data["key_id"] = key_id
                 data["is_simulated"] = False
                 data["plan"] = plan
                 return data
+            elif resp.status_code == 401:
+                raise RazorpayAuthError("Razorpay authentication failed. Invalid API credentials.")
             else:
-                logger.error(f"Razorpay API Error {resp.status_code}: {resp.text}")
+                raise RazorpayAPIError(f"Razorpay API Error {resp.status_code}: {resp.text}")
+        except RazorpayAuthError:
+            raise
         except Exception as e:
-            logger.error(f"Failed to call Razorpay API: {e}")
+            logger.error(f"Failed to call Razorpay REST API: {e}")
+            raise RazorpayAPIError(f"Razorpay order dispatch failed: {e}")
 
-    # Seamless Sandbox Simulation Order for Dev & Immediate Testing
+    # Fallback Seamless Sandbox Simulation Order for Dev & Offline Testing
     simulated_order_id = f"order_sim_{int(time.time())}_{user_id[:6]}"
     return {
         "id": simulated_order_id,
+        "order_id": simulated_order_id,
         "amount": amount_paise,
-        "amount_inr": amount_inr,
-        "currency": "INR",
+        "amount_inr": amount_paise / 100.0,
+        "currency": currency,
         "key_id": key_id or "rzp_test_simulated_key",
-        "receipt": f"rcpt_sim_{int(time.time())}",
+        "receipt": receipt_id,
         "status": "created",
         "is_simulated": True,
         "plan": plan,
         "notes": {
             "user_id": user_id,
             "user_email": user_email,
-            "plan_id": plan_id,
+            "plan_id": plan_id or "custom",
         }
     }
 
@@ -132,10 +206,10 @@ def verify_payment_signature(
     signature: str
 ) -> bool:
     """
-    Verifies the HMAC-SHA256 signature generated by Razorpay.
+    Verifies HMAC-SHA256 signature using Razorpay SDK utility or cryptographic compare.
     Formula: HMAC-SHA256(order_id + "|" + payment_id, secret) == signature
     """
-    if not order_id or not payment_id:
+    if not order_id or not payment_id or not signature:
         return False
 
     # In sandbox simulation mode, verify simulation token
@@ -146,6 +220,21 @@ def verify_payment_signature(
     if not key_secret:
         return False
 
+    # 1. Try Razorpay SDK verify_payment_signature
+    client = get_razorpay_client()
+    if client:
+        try:
+            client.utility.verify_payment_signature({
+                "razorpay_order_id": order_id,
+                "razorpay_payment_id": payment_id,
+                "razorpay_signature": signature
+            })
+            return True
+        except Exception:
+            # Fall through to raw HMAC compare
+            pass
+
+    # 2. Raw HMAC-SHA256 cryptographic verification
     try:
         msg = f"{order_id}|{payment_id}".encode("utf-8")
         expected_sig = hmac.new(key_secret.encode("utf-8"), msg, hashlib.sha256).hexdigest()

@@ -106,7 +106,7 @@ window.openCheckout = function(planId, planName, amountInr, credits) {
   if (confirmBtn) {
     confirmBtn.onclick = async () => {
       confirmBtn.disabled = true;
-      confirmBtn.innerText = 'Verifying with Razorpay...';
+      confirmBtn.innerText = 'Initializing Razorpay Checkout...';
 
       try {
         const resp = await fetch('/api/create-order', {
@@ -114,62 +114,100 @@ window.openCheckout = function(planId, planName, amountInr, credits) {
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ plan_id: planId })
         });
+        
+        if (!resp.ok) {
+          const errData = await resp.json().catch(() => ({}));
+          throw new Error(errData.detail || errData.message || 'Failed to initialize Razorpay order');
+        }
+
         const orderData = await resp.json();
 
         if (orderData.is_simulated) {
-          // Instant simulation fulfillment
+          // Instant simulation fulfillment for dev/offline testing
           const simPayId = 'pay_sim_' + Date.now();
           const verifyResp = await fetch('/api/verify-payment', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
-              order_id: orderData.id,
+              order_id: orderData.order_id || orderData.id,
               payment_id: simPayId,
-              signature: 'sig_sim_' + orderData.id + '_' + simPayId,
+              signature: 'sig_sim_' + (orderData.order_id || orderData.id) + '_' + simPayId,
               plan_id: planId
             })
           });
           const verifyResult = await verifyResp.json();
-          if (verifyResult.success) {
+          if (verifyResp.ok && verifyResult.success) {
             alert('🎉 Payment verified successfully! Added ' + credits + ' credits to your account. Invoice: ' + verifyResult.invoice_number);
             modal.classList.remove('active');
             window.location.reload();
           } else {
-            alert('Payment error: ' + verifyResult.message);
+            alert('Payment verification failed: ' + (verifyResult.detail || verifyResult.message || 'Verification error'));
           }
         } else {
-          // Live Razorpay window
+          // Official Razorpay Standard Web Checkout
           const options = {
             key: orderData.key_id,
             amount: orderData.amount,
-            currency: 'INR',
+            currency: orderData.currency || 'INR',
             name: 'Stock Research AI',
-            description: planName + ' - Computational Research Credits',
-            order_id: orderData.id,
+            description: planName + ' — Computational Research Credits',
+            order_id: orderData.order_id || orderData.id,
+            prefill: {
+              name: 'Guest Investor',
+              email: 'investor@stockresearch.ai'
+            },
+            theme: {
+              color: '#0ea5e9'
+            },
             handler: async function (response) {
-              const verifyResp = await fetch('/api/verify-payment', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({
-                  order_id: response.razorpay_order_id,
-                  payment_id: response.razorpay_payment_id,
-                  signature: response.razorpay_signature,
-                  plan_id: planId
-                })
-              });
-              const verifyResult = await verifyResp.json();
-              if (verifyResult.success) {
-                alert('Payment captured! Invoice: ' + verifyResult.invoice_number);
-                window.location.reload();
+              confirmBtn.innerText = 'Verifying Signature...';
+              try {
+                const verifyResp = await fetch('/api/verify-payment', {
+                  method: 'POST',
+                  headers: { 'Content-Type': 'application/json' },
+                  body: JSON.stringify({
+                    order_id: response.razorpay_order_id,
+                    payment_id: response.razorpay_payment_id,
+                    signature: response.razorpay_signature,
+                    plan_id: planId
+                  })
+                });
+                const verifyResult = await verifyResp.json();
+                if (verifyResp.ok && verifyResult.success) {
+                  alert('🎉 Payment Confirmed! ' + credits + ' Credits added. Invoice: ' + verifyResult.invoice_number);
+                  modal.classList.remove('active');
+                  window.location.reload();
+                } else {
+                  alert('Payment verification failed: ' + (verifyResult.detail || verifyResult.message || 'Signature mismatch'));
+                }
+              } catch (verifyErr) {
+                alert('Verification Error: ' + verifyErr.message);
+              } finally {
+                confirmBtn.disabled = false;
+                confirmBtn.innerText = 'Pay via UPI / Card (Instant Confirmation)';
+              }
+            },
+            modal: {
+              ondismiss: function () {
+                console.log('Razorpay modal dismissed by user');
+                confirmBtn.disabled = false;
+                confirmBtn.innerText = 'Pay via UPI / Card (Instant Confirmation)';
               }
             }
           };
-          const rzp1 = new Razorpay(options);
-          rzp1.open();
+
+          const rzpInstance = new Razorpay(options);
+          rzpInstance.on('payment.failed', function (failResp) {
+            console.error('Razorpay payment failed:', failResp.error);
+            const errDesc = failResp.error ? (failResp.error.description || failResp.error.reason) : 'Payment cancelled or failed';
+            alert('Payment Failed: ' + errDesc);
+            confirmBtn.disabled = false;
+            confirmBtn.innerText = 'Pay via UPI / Card (Instant Confirmation)';
+          });
+          rzpInstance.open();
         }
       } catch (err) {
         alert('Checkout error: ' + err.message);
-      } finally {
         confirmBtn.disabled = false;
         confirmBtn.innerText = 'Pay via UPI / Card (Instant Confirmation)';
       }
