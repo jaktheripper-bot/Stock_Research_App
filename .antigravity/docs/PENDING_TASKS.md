@@ -28,6 +28,35 @@
 
 ---
 
+## 🏗️ Architectural Modularization Roadmap (Separation of Concerns)
+*Goal: Decompose oversized scripts (>1,000 lines) into cohesive, single-responsibility modules with zero-breaking-change facades.*
+
+- [x] **Phase 1: Modularize `db.py` (1,666 lines) into `core/db/`**
+  - [x] Created `core/db/connection.py`: Connection pooling, dual-engine PostgreSQL/SQLite migrations (`v001_initial_schema` to `v006_report_citations`).
+  - [x] Created `core/db/compliance.py`: `MANDATORY_SEBI_DISCLAIMER`, audit logging, compliance history queries.
+  - [x] Created `core/db/reports.py`: Snapshot archiving, time-series differential revisions, full dossier retrieval.
+  - [x] Created `core/db/watchlist.py`: Watched scrips, automated surveillance scan timestamps, tracking state.
+  - [x] Created `core/db/alerts.py`: Surveillance event ledger, unread counts, user dismissals.
+  - [x] Created `core/db/telemetry.py`: User actions, session journeys, demographics, API credit cost savings.
+  - [x] Created `core/db/settings.py`: Dynamic system configuration key-value storage.
+  - [x] Created `core/db/__init__.py`: Aggregated re-exports of all 38 public symbols with explicit `__all__`.
+  - [x] Refactored root `db.py`: Transformed 1,666-line monolith into a 56-line backward-compatible facade.
+  - [x] Verification: 100% pre-flight test pass (`./run.sh preflight`: linter, system check, headless UI, and 2.4x speed benchmark).
+- [ ] **Phase 2: Modularize `analyzer.py` (1,375 lines) into `core/analysis/`**
+  - [ ] `core/analysis/fundamentals.py`: Direct BSE scrip resolution, quotes, valuation ratios, and balance sheet metrics.
+  - [ ] `core/analysis/engine.py`: Flash cascade failover, Perplexity `sonar-pro` router, prompt templates, structured output parsing.
+  - [ ] `core/analysis/delta.py`: 2-tier caching, delta gating (>=5% price move, filings, >14 days), surgical refreshes.
+  - [ ] `core/analysis/comparator.py`: Side-by-side peer comparison, disparity detection, 7-pillar alignment.
+  - [ ] Root `analyzer.py` facade maintaining existing signatures.
+- [ ] **Phase 3: Modularize `app.py` (1,275 lines) into `ui/views/`**
+  - [ ] `ui/views/dossier_view.py`: Main stock search, report synthesis, 7-pillar scorecard, citations expander.
+  - [ ] `ui/views/comparison_view.py`: Peer comparison container and disparity alerts.
+  - [ ] `ui/views/archive_view.py`: Browse existing 80+ reports, revision history, and full downloads.
+  - [ ] `ui/views/alerts_view.py`: Surveillance notifications and triage dashboard.
+  - [ ] `ui/views/admin_view.py`: Telemetry, demographics, user journeys, and cost savings analytics.
+
+---
+
 ## 🔌 Tier 2: Commercial Fundamental REST Integration (FMP / TwelveData)
 *Goal: Harden fundamental metrics against `yfinance` throttling and foreign IP blocks.*
 
