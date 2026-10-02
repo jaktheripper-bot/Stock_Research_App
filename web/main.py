@@ -1,0 +1,349 @@
+"""
+Stock Research AI - FastAPI Web Application.
+
+High-performance Server-Side Rendered (SSR) institutional equity research portal.
+Provides:
+- Razorpay-compliant public landing page & mandatory legal policies
+- Zero-latency crawlable dossier URLs for Google SEO & GEO answer engines
+- Interactive UPI and card checkout endpoints
+- Instant PDF report export downloads
+"""
+
+import os
+import json
+import logging
+import markdown
+from datetime import datetime, timezone, timedelta
+from typing import Optional
+
+from fastapi import FastAPI, Request, HTTPException, Form
+from fastapi.responses import HTMLResponse, RedirectResponse, Response, JSONResponse
+from fastapi.staticfiles import StaticFiles
+from fastapi.templating import Jinja2Templates
+from pydantic import BaseModel
+
+from core.db import (
+    init_db,
+    get_archived_reports,
+    get_report_by_ticker,
+    get_report_revisions,
+    IST,
+)
+from core.analysis import get_stock_fundamentals
+from core.billing import (
+    PRICING_PACKS,
+    B2B_PACKS,
+    get_plan_by_id,
+    create_razorpay_order,
+    process_successful_payment,
+)
+from normalizer import clean_ticker
+from bse_master import get_ticker_suggestions
+from ui.formatters import format_inr
+from web.legal_content import POLICIES
+
+logger = logging.getLogger("equity_research.web")
+
+# Initialize DB migrations on startup
+init_db()
+
+app = FastAPI(
+    title="Stock Research AI",
+    description="Institutional-Grade 7-Pillar Equity Research Engine Grounded in Public Filings",
+    version="2.0.0"
+)
+
+# Static files & Jinja2 templates
+BASE_DIR = os.path.dirname(os.path.abspath(__file__))
+app.mount("/static", StaticFiles(directory=os.path.join(BASE_DIR, "static")), name="static")
+templates = Jinja2Templates(directory=os.path.join(BASE_DIR, "templates"))
+
+
+# ==============================================================================
+# Page Routes (SSR)
+# ==============================================================================
+
+@app.get("/", response_class=HTMLResponse)
+async def home_page(request: Request):
+    """Public home & landing page with live stock search and featured dossiers."""
+    try:
+        archives = get_archived_reports()
+    except Exception as e:
+        logger.error(f"Error fetching archives: {e}")
+        archives = []
+
+    featured = archives[:9] if archives else []
+    total_count = len(archives) if archives else 81
+
+    return templates.TemplateResponse(
+        request=request,
+        name="index.html",
+        context={
+            "active_page": "home",
+            "featured_reports": featured,
+            "total_reports": total_count,
+            "pricing_packs": PRICING_PACKS,
+        }
+    )
+
+
+@app.get("/pricing", response_class=HTMLResponse)
+async def pricing_page(request: Request):
+    """Dedicated pricing and computational research credit pack selection."""
+    return templates.TemplateResponse(
+        request=request,
+        name="pricing.html",
+        context={
+            "active_page": "pricing",
+            "pricing_packs": PRICING_PACKS,
+            "b2b_packs": B2B_PACKS,
+        }
+    )
+
+
+@app.get("/search")
+async def search_redirect(q: str = ""):
+    """Redirects search queries to the canonical ticker dossier URL."""
+    clean_q = clean_ticker(q)
+    if not clean_q:
+        return RedirectResponse(url="/")
+    return RedirectResponse(url=f"/dossier/{clean_q}")
+
+
+@app.get("/dossier/{ticker}", response_class=HTMLResponse)
+async def dossier_page(request: Request, ticker: str):
+    """
+    Canonical stock research dossier page.
+    Renders 7-pillar qualitative matrix, valuation multiples, and exchange citations.
+    """
+    clean_t = clean_ticker(ticker)
+    if not clean_t:
+        raise HTTPException(status_code=400, detail="Invalid ticker symbol.")
+
+    rep = get_report_by_ticker(clean_t)
+    if not rep or not rep.get("report_text"):
+        # If report not yet archived, try fundamental resolution or suggest similar
+        suggestions = get_ticker_suggestions(clean_t)
+        raise HTTPException(
+            status_code=404,
+            detail=f"Dossier for {clean_t} is currently being compiled. Suggestions: {', '.join(suggestions[:4]) if suggestions else 'None'}"
+        )
+
+    # Convert report markdown into semantic HTML
+    raw_md = rep.get("report_text", "")
+    html_content = markdown.markdown(
+        raw_md,
+        extensions=["tables", "fenced_code", "nl2br"]
+    )
+
+    # Ingest verified citations footnotes
+    citations = []
+    cit_json = rep.get("citations_json")
+    if cit_json:
+        try:
+            citations = json.loads(cit_json)
+        except Exception:
+            citations = []
+
+    mcap = rep.get("baseline_mcap")
+    mcap_formatted = f"₹{format_inr(mcap)}" if mcap else "N/A"
+
+    return templates.TemplateResponse(
+        request=request,
+        name="dossier.html",
+        context={
+            "ticker": clean_t,
+            "short_name": rep.get("short_name", clean_t),
+            "current_price": str(rep.get("baseline_price") or "N/A"),
+            "pe_ratio": str(rep.get("baseline_pe") or "N/A"),
+            "market_cap_str": mcap_formatted,
+            "scrip_code": rep.get("scrip_code", "BSE Listed"),
+            "formatted_date": rep.get("formatted_date", "Archived"),
+            "report_html": html_content,
+            "citations": citations,
+        }
+    )
+
+
+# ==============================================================================
+# Mandatory Razorpay Legal & Compliance Policy Routes
+# ==============================================================================
+
+@app.get("/terms", response_class=HTMLResponse)
+async def terms_page(request: Request):
+    """Terms and Conditions page."""
+    return templates.TemplateResponse(
+        request=request,
+        name="policy.html",
+        context={"policy": POLICIES["terms"], "active_page": "terms"}
+    )
+
+
+@app.get("/privacy", response_class=HTMLResponse)
+async def privacy_page(request: Request):
+    """Privacy Policy page."""
+    return templates.TemplateResponse(
+        request=request,
+        name="policy.html",
+        context={"policy": POLICIES["privacy"], "active_page": "privacy"}
+    )
+
+
+@app.get("/refund-policy", response_class=HTMLResponse)
+async def refund_policy_page(request: Request):
+    """Cancellation and Refund Policy page."""
+    return templates.TemplateResponse(
+        request=request,
+        name="policy.html",
+        context={"policy": POLICIES["refund-policy"], "active_page": "refund"}
+    )
+
+
+@app.get("/contact", response_class=HTMLResponse)
+async def contact_page(request: Request):
+    """Contact Us & Support page."""
+    return templates.TemplateResponse(
+        request=request,
+        name="policy.html",
+        context={"policy": POLICIES["contact"], "active_page": "contact"}
+    )
+
+
+@app.get("/shipping-policy", response_class=HTMLResponse)
+async def shipping_policy_page(request: Request):
+    """Shipping & Instant Digital Delivery Policy page."""
+    return templates.TemplateResponse(
+        request=request,
+        name="policy.html",
+        context={"policy": POLICIES["shipping-policy"], "active_page": "shipping"}
+    )
+
+
+@app.get("/disclaimer", response_class=HTMLResponse)
+async def disclaimer_page(request: Request):
+    """Mandatory SEBI Safe-Harbor Disclaimer page."""
+    return templates.TemplateResponse(
+        request=request,
+        name="policy.html",
+        context={"policy": POLICIES["disclaimer"], "active_page": "disclaimer"}
+    )
+
+
+# ==============================================================================
+# API Endpoints
+# ==============================================================================
+
+@app.get("/api/suggest")
+async def api_suggest(q: str = ""):
+    """Returns ticker autocomplete suggestions."""
+    if not q or len(q.strip()) < 2:
+        return {"suggestions": []}
+    return {"suggestions": get_ticker_suggestions(q.strip())}
+
+
+class OrderRequest(BaseModel):
+    plan_id: str
+    user_id: Optional[str] = "guest_web_user"
+    email: Optional[str] = "investor@example.com"
+
+
+@app.post("/api/create-order")
+async def api_create_order(payload: OrderRequest):
+    """Creates a Razorpay order or returns simulated checkout data."""
+    try:
+        order = create_razorpay_order(
+            plan_id=payload.plan_id,
+            user_id=payload.user_id,
+            user_email=payload.email
+        )
+        return order
+    except Exception as e:
+        logger.error(f"Error creating order: {e}")
+        raise HTTPException(status_code=400, detail=str(e))
+
+
+class VerifyPaymentRequest(BaseModel):
+    order_id: str
+    payment_id: str
+    signature: str
+    plan_id: str
+    user_id: Optional[str] = "guest_web_user"
+
+
+@app.post("/api/verify-payment")
+async def api_verify_payment(payload: VerifyPaymentRequest):
+    """Verifies payment signature, credits account, and returns invoice number."""
+    try:
+        ok, new_bal, inv_num, msg = process_successful_payment(
+            user_id=payload.user_id,
+            plan_id=payload.plan_id,
+            order_id=payload.order_id,
+            payment_id=payload.payment_id,
+            signature=payload.signature
+        )
+        return {
+            "success": ok,
+            "new_balance": new_bal,
+            "invoice_number": inv_num,
+            "message": msg
+        }
+    except Exception as e:
+        logger.error(f"Error verifying payment: {e}")
+        raise HTTPException(status_code=400, detail=str(e))
+
+
+@app.get("/api/pdf/{ticker}")
+async def api_download_pdf(ticker: str):
+    """Generates and serves the official downloadable PDF report."""
+    clean_t = clean_ticker(ticker)
+    rep = get_report_by_ticker(clean_t)
+    if not rep or not rep.get("report_text"):
+        raise HTTPException(status_code=404, detail="Report not found.")
+
+    from ui.pdf import generate_report_pdf
+    pdf_bytes = generate_report_pdf(clean_t, rep.get("report_text", ""))
+    
+    date_slug = datetime.now(IST).strftime("%d-%m-%Y")
+    filename = f"{clean_t}_{date_slug}_Research_Report.pdf"
+
+    return Response(
+        content=pdf_bytes,
+        media_type="application/pdf",
+        headers={"Content-Disposition": f'attachment; filename="{filename}"'}
+    )
+
+
+@app.get("/sitemap.xml", response_class=Response)
+async def sitemap_xml():
+    """Generates automated XML sitemap for Google/Perplexity/Bing search crawlers."""
+    archives = get_archived_reports()
+    now_iso = datetime.now(timezone.utc).strftime("%Y-%m-%d")
+
+    xml_lines = [
+        '<?xml version="1.0" encoding="UTF-8"?>',
+        '<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">',
+        f'  <url><loc>https://stockresearch.app/</loc><lastmod>{now_iso}</lastmod><changefreq>daily</changefreq><priority>1.0</priority></url>',
+        f'  <url><loc>https://stockresearch.app/pricing</loc><lastmod>{now_iso}</lastmod><changefreq>weekly</changefreq><priority>0.8</priority></url>',
+        f'  <url><loc>https://stockresearch.app/terms</loc><lastmod>{now_iso}</lastmod><priority>0.5</priority></url>',
+        f'  <url><loc>https://stockresearch.app/privacy</loc><lastmod>{now_iso}</lastmod><priority>0.5</priority></url>',
+        f'  <url><loc>https://stockresearch.app/refund-policy</loc><lastmod>{now_iso}</lastmod><priority>0.5</priority></url>',
+        f'  <url><loc>https://stockresearch.app/contact</loc><lastmod>{now_iso}</lastmod><priority>0.5</priority></url>',
+        f'  <url><loc>https://stockresearch.app/shipping-policy</loc><lastmod>{now_iso}</lastmod><priority>0.5</priority></url>',
+        f'  <url><loc>https://stockresearch.app/disclaimer</loc><lastmod>{now_iso}</lastmod><priority>0.5</priority></url>',
+    ]
+
+    for a in archives:
+        t = a.get("ticker")
+        if t:
+            xml_lines.append(
+                f'  <url><loc>https://stockresearch.app/dossier/{t}</loc><lastmod>{now_iso}</lastmod><changefreq>weekly</changefreq><priority>0.9</priority></url>'
+            )
+
+    xml_lines.append('</urlset>')
+    return Response(content="\n".join(xml_lines), media_type="application/xml")
+
+
+@app.get("/healthz")
+async def healthz():
+    """Health check endpoint for cloud container orchestrators."""
+    return {"status": "healthy", "service": "Stock Research AI Web Server", "timestamp": datetime.now(IST).isoformat()}

@@ -71,6 +71,17 @@ from core.db.settings import (
     set_system_setting,
 )
 
+from core.db.users import (
+    get_or_create_user,
+    get_user_by_id,
+    get_user_by_email,
+    get_user_credits_balance,
+    deduct_user_credits,
+    add_user_credits,
+    get_user_transactions,
+    get_user_usage_history,
+)
+
 __all__ = [
     # connection
     "IST",
@@ -117,4 +128,13 @@ __all__ = [
     # settings
     "get_system_setting",
     "set_system_setting",
+    # users & monetization
+    "get_or_create_user",
+    "get_user_by_id",
+    "get_user_by_email",
+    "get_user_credits_balance",
+    "deduct_user_credits",
+    "add_user_credits",
+    "get_user_transactions",
+    "get_user_usage_history",
 ]

@@ -80,13 +80,12 @@ def backfill_all_citations():
         if not existing_cits and report_text:
             existing_cits = extract_citations_from_report(report_text)
 
-        if existing_cits:
+        if existing_cits and "Verified Regulatory Sources" in report_text:
             rep_skipped += 1
             continue
 
-        # Generate verified citations
         scrip = resolve_bse_scrip_code(ticker)
-        citations = generate_regulatory_citations(ticker, short_name, scrip, announcement)
+        citations = existing_cits if existing_cits else generate_regulatory_citations(ticker, short_name, scrip, announcement)
         cit_block = format_citations_section(citations, {"ticker": ticker, "short_name": short_name, "scrip_code": scrip})
         new_text = report_text.rstrip() + cit_block
         cit_json_str = json.dumps(citations)
@@ -127,12 +126,12 @@ def backfill_all_citations():
         if not existing_cits and report_text:
             existing_cits = extract_citations_from_report(report_text)
 
-        if existing_cits:
+        if existing_cits and "Verified Regulatory Sources" in report_text:
             rev_skipped += 1
             continue
 
         scrip = resolve_bse_scrip_code(ticker)
-        citations = generate_regulatory_citations(ticker, short_name, scrip, announcement)
+        citations = existing_cits if existing_cits else generate_regulatory_citations(ticker, short_name, scrip, announcement)
         cit_block = format_citations_section(citations, {"ticker": ticker, "short_name": short_name, "scrip_code": scrip})
         new_text = report_text.rstrip() + cit_block
         cit_json_str = json.dumps(citations)

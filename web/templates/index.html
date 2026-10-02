@@ -1,0 +1,247 @@
+{% extends "base.html" %}
+
+{% block title %}Stock Research AI | Institutional Equity Thesis & Drift Surveillance{% endblock %}
+
+{% block content %}
+<section class="hero">
+  <div class="container">
+    <div class="hero-badge">
+      <span>⚡ ZERO-HALLUCINATION DATA INTEGRITY</span>
+      <span>•</span>
+      <span>SEBI NON-ADVISORY SAFE HARBOR</span>
+    </div>
+
+    <h1 class="hero-title">
+      Institutional Equity Research Engine<br>
+      <span class="gradient">Grounded in Public Exchange Filings</span>
+    </h1>
+
+    <p class="hero-sub">
+      Automated 7-pillar qualitative thesis synthesis, multi-scenario valuations, and quarterly drift surveillance for Indian equities. Built for discerning long-term investors and analysts.
+    </p>
+
+    <!-- Interactive Stock Search -->
+    <div class="search-container">
+      <form id="mainSearchForm" action="/search" method="GET">
+        <div class="search-input-wrap">
+          <span class="search-icon">🔍</span>
+          <input 
+            type="text" 
+            id="mainSearchInput" 
+            name="q" 
+            class="search-input" 
+            placeholder="Search any BSE/NSE stock (e.g. INFY, TCS, RELIANCE)..." 
+            autocomplete="off"
+            required
+          >
+          <button type="submit" class="btn btn-primary btn-sm">Research Stock</button>
+        </div>
+      </form>
+      <div id="searchSuggestions" class="search-suggestions" style="display: none;"></div>
+
+      <div class="quick-chips">
+        <span>Trending Dossiers:</span>
+        <a href="/dossier/INFY" class="chip">INFY</a>
+        <a href="/dossier/TCS" class="chip">TCS</a>
+        <a href="/dossier/RELIANCE" class="chip">RELIANCE</a>
+        <a href="/dossier/RAILTEL" class="chip">RAILTEL</a>
+        <a href="/dossier/HDFCBANK" class="chip">HDFCBANK</a>
+        <a href="/dossier/TATASTEEL" class="chip">TATASTEEL</a>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- Trust Metrics Strip -->
+<section class="stats-strip">
+  <div class="container">
+    <div class="stats-grid">
+      <div class="stat-card">
+        <div class="stat-num tnum">{{ total_reports|default(81) }}+</div>
+        <div class="stat-label">Verified Institutional Dossiers</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-num tnum">100%</div>
+        <div class="stat-label">Zero-Hallucination Exchange Quotes</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-num">7 Pillars</div>
+        <div class="stat-label">Qualitative Moat & Governance Matrix</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-num tnum">₹0.00</div>
+        <div class="stat-label">Free Archival Reads & Exchange Quotes</div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- 7-Pillar Architecture Section -->
+<section class="pillars-section">
+  <div class="container">
+    <div class="section-head">
+      <div class="section-tag">Analytical Framework</div>
+      <h2 class="section-title">The 7-Pillar Institutional Health Matrix</h2>
+      <p class="section-sub">
+        Every equity dossier is synthesized across 7 rigorous strategic pillars grounded directly in verified BSE regulatory filings and financial disclosures.
+      </p>
+    </div>
+
+    <div class="pillars-grid">
+      <div class="pillar-card">
+        <div class="pillar-icon">🏰</div>
+        <h3 class="pillar-title">1. Business Model & Moat</h3>
+        <p class="pillar-desc">Evaluates pricing power, switching costs, network effects, and durability against low-cost disruptors.</p>
+      </div>
+      <div class="pillar-card">
+        <div class="pillar-icon">⚖️</div>
+        <h3 class="pillar-title">2. Capital Allocation</h3>
+        <p class="pillar-desc">Audits ROCE, ROE, reinvestment rates, dividend policy, and management stewardship of shareholder funds.</p>
+      </div>
+      <div class="pillar-card">
+        <div class="pillar-icon">📊</div>
+        <h3 class="pillar-title">3. Financial Health & Solvency</h3>
+        <p class="pillar-desc">Debt-to-equity ratios, interest coverage cushions, operating cash flow quality, and working capital traps.</p>
+      </div>
+      <div class="pillar-card">
+        <div class="pillar-icon">🌱</div>
+        <h3 class="pillar-title">4. Growth Drivers & Industry</h3>
+        <p class="pillar-desc">Total addressable market (TAM), sectoral tailwinds, regulatory barriers to entry, and volume visibility.</p>
+      </div>
+      <div class="pillar-card">
+        <div class="pillar-icon">🏷️</div>
+        <h3 class="pillar-title">5. Valuation & Margin of Safety</h3>
+        <p class="pillar-desc">Trailing & Forward P/E multiples, EV/EBITDA bands, multi-scenario DCF estimates, and historical quartiles.</p>
+      </div>
+      <div class="pillar-card">
+        <div class="pillar-icon">📈</div>
+        <h3 class="pillar-title">6. Technicals & Momentum</h3>
+        <p class="pillar-desc">52-week price range percentiles, 50-DMA trend lines, relative volume expansion, and moving averages.</p>
+      </div>
+      <div class="pillar-card">
+        <div class="pillar-icon">🛡️</div>
+        <h3 class="pillar-title">7. Governance & Forensic Cleanliness</h3>
+        <p class="pillar-desc">Related party transactions, promoter share pledging, auditor qualification records, and insider SAST filings.</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- Featured Archived Reports Section -->
+<section style="padding: 60px 0; background: rgba(15, 23, 42, 0.4);">
+  <div class="container">
+    <div class="section-head">
+      <div class="section-tag">Public Research Repository</div>
+      <h2 class="section-title">Explore Verified Equities</h2>
+      <p class="section-sub">100% free and open access to existing archived institutional dossiers. Read, inspect 7-pillar scorecards, and download official PDF reports.</p>
+    </div>
+
+    <div style="display: grid; grid-template-columns: repeat(auto-fill, minmax(300px, 1fr)); gap: 20px;">
+      {% for rep in featured_reports %}
+      <div class="stat-card" style="display: flex; flex-direction: column; justify-content: space-between;">
+        <div>
+          <div style="display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 8px;">
+            <span style="font-weight: 800; font-size: 18px; color: var(--text-primary);">{{ rep.ticker }}</span>
+            <span class="badge badge-cyan">{{ rep.revision_count|default(1) }} revs</span>
+          </div>
+          <div style="font-size: 13px; color: var(--text-secondary); margin-bottom: 12px;">{{ rep.short_name|default(rep.ticker) }}</div>
+          <div style="font-size: 12px; color: var(--text-muted); margin-bottom: 16px;">Last Evaluated: {{ rep.formatted_date|default('Recent') }}</div>
+        </div>
+        <a href="/dossier/{{ rep.ticker }}" class="btn btn-secondary btn-sm" style="width: 100%;">
+          View Full Dossier →
+        </a>
+      </div>
+      {% endfor %}
+    </div>
+  </div>
+</section>
+
+<!-- Pricing Section -->
+<section class="pricing-section">
+  <div class="container">
+    <div class="section-head">
+      <div class="section-tag">Transparent Monetization</div>
+      <h2 class="section-title">Research Credits & Subscriptions</h2>
+      <p class="section-sub">
+        On-demand compute credits power live AI syntheses grounded in real-time BSE filings. 
+        All existing archives, quotes, and PDF downloads remain 100% free.
+      </p>
+    </div>
+
+    <div class="pricing-grid">
+      <!-- Single Pass -->
+      <div class="plan-card">
+        <span class="plan-name">Single Research Pass</span>
+        <div class="plan-price">₹299</div>
+        <div class="plan-credits">🪙 1 Full Research Credit</div>
+        <p class="plan-desc">Deep-dive into any single BSE/NSE equity with full AI reasoning.</p>
+        <ul class="plan-features">
+          <li>1 Full 7-Pillar AI Synthesis</li>
+          <li>Multi-Scenario DCF Valuation</li>
+          <li>Institutional PDF Report Export</li>
+          <li>Regulatory Exchange Citations</li>
+          <li>Never expires</li>
+        </ul>
+        <button onclick="openCheckout('single_pass', 'Single Research Pass', 299, 1.0)" class="btn btn-secondary" style="width: 100%;">
+          Purchase Single Pass
+        </button>
+      </div>
+
+      <!-- Analyst 3-Pack -->
+      <div class="plan-card popular">
+        <span class="plan-badge">Most Popular</span>
+        <span class="plan-name">Analyst 3-Pack</span>
+        <div class="plan-price">₹699</div>
+        <div class="plan-credits">🪙 3 Research Credits (₹233/stock)</div>
+        <p class="plan-desc">Ideal for evaluating peer contenders and comparing top 3 industry leaders.</p>
+        <ul class="plan-features">
+          <li>3 Full 7-Pillar Syntheses</li>
+          <li>Surgical Price & Announcement Refreshes</li>
+          <li>Multi-Quarter Thesis Drift Surveillance</li>
+          <li>Unlimited PDF Downloads</li>
+          <li>Never expires</li>
+        </ul>
+        <button onclick="openCheckout('analyst_3pack', 'Analyst 3-Pack', 699, 3.0)" class="btn btn-primary" style="width: 100%;">
+          Purchase Analyst 3-Pack
+        </button>
+      </div>
+
+      <!-- Portfolio 10-Pack -->
+      <div class="plan-card">
+        <span class="plan-name">Portfolio 10-Pack</span>
+        <div class="plan-price">₹1,799</div>
+        <div class="plan-credits">🪙 10 Research Credits (₹180/stock)</div>
+        <p class="plan-desc">Comprehensive institutional audit for an entire equity portfolio.</p>
+        <ul class="plan-features">
+          <li>10 Full 7-Pillar Syntheses</li>
+          <li>10 Watched Tickers in Surveillance</li>
+          <li>Priority AI Processing Pipeline</li>
+          <li>Differential Analysis Audits</li>
+          <li>Never expires</li>
+        </ul>
+        <button onclick="openCheckout('portfolio_10pack', 'Portfolio 10-Pack', 1799, 10.0)" class="btn btn-secondary" style="width: 100%;">
+          Purchase 10-Pack
+        </button>
+      </div>
+
+      <!-- Pro Monthly -->
+      <div class="plan-card">
+        <span class="plan-name">Pro Desk (Monthly)</span>
+        <div class="plan-price">₹999 <span class="cycle">/month</span></div>
+        <div class="plan-credits">⭐ 40 Syntheses / mo</div>
+        <p class="plan-desc">Continuous surveillance engine for full-time investors and advisors.</p>
+        <ul class="plan-features">
+          <li>40 Fresh Syntheses / month</li>
+          <li>Unlimited Surgical Updates (0 credits)</li>
+          <li>50 Watched Equities in Surveillance</li>
+          <li>Unlimited PDF Exports</li>
+          <li>Cancel anytime</li>
+        </ul>
+        <button onclick="openCheckout('pro_monthly', 'Pro Desk (Monthly)', 999, 40.0)" class="btn btn-secondary" style="width: 100%;">
+          Subscribe Monthly
+        </button>
+      </div>
+    </div>
+  </div>
+</section>
+{% endblock %}

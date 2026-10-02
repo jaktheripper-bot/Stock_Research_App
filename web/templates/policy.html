@@ -1,0 +1,31 @@
+{% extends "base.html" %}
+
+{% block title %}{{ policy.title }} | Stock Research AI{% endblock %}
+{% block meta_desc %}{{ policy.description }}{% endblock %}
+
+{% block content %}
+<div class="container">
+  <div class="policy-wrap">
+    <div class="policy-head">
+      <div style="font-size: 12px; font-weight: 800; text-transform: uppercase; color: var(--accent-cyan); letter-spacing: 0.1em; margin-bottom: 6px;">
+        Regulatory & Operational Policy
+      </div>
+      <h1 class="policy-title">{{ policy.title }}</h1>
+      <div class="policy-meta">
+        <span>Effective / Last Updated: {{ policy.last_updated }}</span>
+        <span>•</span>
+        <span>Governing Jurisdiction: India</span>
+      </div>
+    </div>
+
+    <div class="policy-body">
+      {{ policy.content_html|safe }}
+    </div>
+
+    <div style="margin-top: 48px; padding-top: 24px; border-top: 1px solid var(--border-subtle); display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 16px;">
+      <a href="/" class="btn btn-secondary btn-sm">← Back to Research Platform</a>
+      <a href="/contact" class="btn btn-primary btn-sm">Need Help? Contact Support</a>
+    </div>
+  </div>
+</div>
+{% endblock %}

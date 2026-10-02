@@ -1,0 +1,184 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>{% block title %}Stock Research AI | Institutional Equity Thesis & Drift Surveillance{% endblock %}</title>
+  <meta name="description" content="{% block meta_desc %}Automated institutional-grade 7-pillar equity research engine for BSE & NSE equities. Multi-scenario valuation, thesis drift surveillance, and zero-hallucination regulatory grounding.{% endblock %}">
+  
+  <!-- OpenGraph / Social Meta Tags -->
+  <meta property="og:type" content="website">
+  <meta property="og:site_name" content="Stock Research AI">
+  <meta property="og:title" content="{% block og_title %}Stock Research AI — Institutional Equity Thesis & Drift Surveillance{% endblock %}">
+  <meta property="og:description" content="{% block og_desc %}Automated 7-pillar equity research dossiers, multi-scenario valuations, and BSE exchange audit surveillance.{% endblock %}">
+  <meta name="twitter:card" content="summary_large_image">
+  
+  <!-- Favicon & Stylesheet -->
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>📈</text></svg>">
+  <link rel="stylesheet" href="/static/css/style.css">
+
+  <!-- Schema.org Structured Data -->
+  <script type="application/ld+json">
+  {
+    "@context": "https://schema.org",
+    "@type": "SoftwareApplication",
+    "name": "Stock Research AI",
+    "applicationCategory": "BusinessApplication",
+    "operatingSystem": "Web",
+    "offers": {
+      "@type": "Offer",
+      "price": "299",
+      "priceCurrency": "INR"
+    },
+    "description": "Institutional-grade 7-pillar financial research synthesis software utility grounded in public exchange disclosures."
+  }
+  </script>
+
+  <!-- Razorpay Checkout SDK -->
+  <script src="https://checkout.razorpay.com/v1/checkout.js"></script>
+</head>
+<body>
+
+  <!-- Sticky Header Navigation -->
+  <header class="site-header">
+    <div class="container">
+      <div class="nav-wrap">
+        <a href="/" class="brand-link">
+          <div class="brand-logo">📈</div>
+          <div>
+            <span class="brand-text">STOCK RESEARCH <span style="color: var(--accent-cyan);">AI</span></span>
+            <span class="brand-sub">Institutional Equity Engine</span>
+          </div>
+        </a>
+
+        <nav class="main-nav">
+          <a href="/" class="nav-link {% if active_page == 'home' %}active{% endif %}">Explore Equities</a>
+          <a href="/pricing" class="nav-link {% if active_page == 'pricing' %}active{% endif %}">Research Credits & Pricing</a>
+          <a href="/dossier/INFY" class="nav-link">Sample Dossier (INFY)</a>
+          <a href="/disclaimer" class="nav-link">SEBI Safe Harbor</a>
+        </nav>
+
+        <div class="nav-actions">
+          <a href="/pricing" class="btn btn-secondary btn-sm">⚡ View Pricing</a>
+          <a href="/pricing" class="btn btn-primary btn-sm">Claim 2 Free Credits</a>
+        </div>
+      </div>
+    </div>
+  </header>
+
+  <!-- Main Content Body -->
+  <main>
+    {% block content %}{% endblock %}
+  </main>
+
+  <!-- Global Checkout Modal -->
+  <div id="checkoutModal" class="modal-backdrop">
+    <div class="modal-dialog">
+      <div class="modal-header">
+        <h3 id="modalPlanName" style="font-weight: 800; font-size: 20px;">Research Plan</h3>
+        <button id="closeModalBtn" class="modal-close-btn">&times;</button>
+      </div>
+      
+      <div style="background: rgba(14, 165, 233, 0.08); border-left: 3px solid var(--accent-cyan); padding: 12px; border-radius: 6px; margin-bottom: 20px; font-size: 13px;">
+        <strong>Computational Research Credits:</strong> Server compute units for live 7-pillar AI syntheses and valuation models. SAC 998314.
+      </div>
+
+      <div style="display: flex; justify-content: space-between; align-items: baseline; margin-bottom: 12px;">
+        <span style="font-size: 14px; color: var(--text-secondary);">Total Payable (Inclusive of 18% GST):</span>
+        <span id="modalPlanPrice" style="font-size: 28px; font-weight: 800; color: var(--text-primary);">₹0</span>
+      </div>
+
+      <div style="background: rgba(30, 41, 59, 0.4); border-radius: 8px; padding: 12px 16px; margin-bottom: 20px; font-size: 12px;">
+        <div style="display: flex; justify-content: space-between; margin-bottom: 4px;">
+          <span style="color: var(--text-muted);">Credits Allocated:</span>
+          <strong id="modalPlanCredits" style="color: var(--accent-emerald);">0 Credits</strong>
+        </div>
+        <div style="display: flex; justify-content: space-between; margin-bottom: 4px;">
+          <span style="color: var(--text-muted);">Base Amount:</span>
+          <span id="modalBasePrice" class="tnum">₹0.00</span>
+        </div>
+        <div style="display: flex; justify-content: space-between;">
+          <span style="color: var(--text-muted);">GST (18% SAC 998314):</span>
+          <span id="modalGstPrice" class="tnum">₹0.00</span>
+        </div>
+      </div>
+
+      <button id="modalConfirmBtn" class="btn btn-primary" style="width: 100%; padding: 14px; font-size: 15px;">
+        Pay via UPI / Card (Instant Confirmation)
+      </button>
+
+      <div style="text-align: center; margin-top: 14px; font-size: 11px; color: var(--text-muted);">
+        🔒 256-bit encrypted checkout via Razorpay • Instant electronic receipt
+      </div>
+    </div>
+  </div>
+
+  <!-- Mandatory Razorpay Compliance Footer -->
+  <footer class="site-footer">
+    <div class="container">
+      <div class="footer-disclaimer-box">
+        <strong>Mandatory SEBI Safe-Harbor Disclosure:</strong> The Stock Research App is an automated, computational financial research synthesis software utility (SAC Code 998314). We are NOT registered as a Research Analyst or Investment Adviser under SEBI regulations. All analytical outputs, 7-pillar scorecards, and syntheses are algorithmically compiled from public exchange disclosures for educational and research purposes only. Past performance does not guarantee future results. Consult an independent SEBI-registered advisor before investing.
+      </div>
+
+      <div class="footer-grid">
+        <div class="footer-brand">
+          <div style="display: flex; align-items: center; gap: 8px; margin-bottom: 12px;">
+            <span style="font-size: 22px;">📈</span>
+            <span style="font-weight: 800; font-size: 16px; color: var(--text-primary);">Stock Research AI</span>
+          </div>
+          <p style="color: var(--text-secondary); line-height: 1.6; margin-bottom: 16px;">
+            Empowering retail investors and institutional analysts with zero-hallucination fundamental synthesis and multi-quarter thesis drift surveillance.
+          </p>
+          <div style="color: var(--text-muted); font-size: 11px;">
+            Entity: Stock Research App<br>
+            SAC Code: 998314 (IT Software Services)
+          </div>
+        </div>
+
+        <div>
+          <div class="footer-col-title">Platform</div>
+          <ul class="footer-links">
+            <li><a href="/">Explore Stock Dossiers</a></li>
+            <li><a href="/pricing">Pricing & Credit Packs</a></li>
+            <li><a href="/dossier/INFY">Sample Report: INFY</a></li>
+            <li><a href="/dossier/TCS">Sample Report: TCS</a></li>
+          </ul>
+        </div>
+
+        <div>
+          <div class="footer-col-title">Legal & Policies</div>
+          <ul class="footer-links">
+            <li><a href="/terms">Terms & Conditions</a></li>
+            <li><a href="/privacy">Privacy Policy</a></li>
+            <li><a href="/refund-policy">Cancellation & Refund Policy</a></li>
+            <li><a href="/shipping-policy">Shipping & Delivery Policy</a></li>
+            <li><a href="/disclaimer">SEBI Regulatory Disclaimer</a></li>
+          </ul>
+        </div>
+
+        <div>
+          <div class="footer-col-title">Support & Trust</div>
+          <ul class="footer-links">
+            <li><a href="/contact">Contact Us</a></li>
+            <li><a href="mailto:support@stockresearch.app">support@stockresearch.app</a></li>
+            <li><span style="color: var(--text-muted);">Mon–Fri, 9:30 AM–6:30 PM IST</span></li>
+            <li><span style="color: var(--text-muted);">Bengaluru, Karnataka, India</span></li>
+          </ul>
+        </div>
+      </div>
+
+      <div class="footer-bottom">
+        <div>&copy; 2026 Stock Research App. All rights reserved.</div>
+        <div style="display: flex; gap: 20px;">
+          <a href="/privacy">Privacy</a>
+          <a href="/terms">Terms</a>
+          <a href="/refund-policy">Refunds</a>
+          <a href="/contact">Support</a>
+        </div>
+      </div>
+    </div>
+  </footer>
+
+  <script src="/static/js/main.js"></script>
+</body>
+</html>

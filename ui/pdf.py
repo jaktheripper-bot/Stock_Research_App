@@ -9,6 +9,7 @@ from analyzer import (
     extract_health_matrix,
     remove_health_matrix_text,
     strip_conclusion_sections,
+    calculate_overall_health_score,
 )
 from db import IST, MANDATORY_SEBI_DISCLAIMER
 from ui.charts import generate_pdf_chart_image
@@ -39,7 +40,11 @@ ol { margin-top: 6px; padding-left: 20px; }
 ol li { margin-bottom: 4px; font-size: 8.5pt; color: #334155; line-height: 1.4; }
 </style>
 """
+    health = calculate_overall_health_score(matrix)
+    posture_line = f"> **Aggregate Thesis Health:** **{health['status']}** ({health['total_score']}/21 pts • {health['percentage']}% quality alignment)\n" if health.get("total_score") else ""
+
     scorecard_md = f"""### Institutional 7-Pillar Health Scorecard
+{posture_line}
 | Analytical Pillar | Rating / Posture | Evaluated Dimension |
 | :--- | :--- | :--- |
 | **Capital Allocation** | {matrix.get('CapitalAllocation', 'Disciplined')} | Reinvestment discipline & cash returns |

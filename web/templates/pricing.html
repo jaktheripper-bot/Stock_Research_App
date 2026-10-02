@@ -1,0 +1,137 @@
+{% extends "base.html" %}
+
+{% block title %}Research Credits & Institutional Pricing | Stock Research AI{% endblock %}
+{% block meta_desc %}Transparent on-demand research credit packs and Pro subscriptions for automated Indian equity research. Instant delivery via UPI and Card.{% endblock %}
+
+{% block content %}
+<div class="container" style="padding-top: 48px; padding-bottom: 72px;">
+  <div class="section-head">
+    <div class="hero-badge">TRANSPARENT MONETIZATION</div>
+    <h1 class="section-title">Research Credits & Subscriptions</h1>
+    <p class="section-sub">
+      Choose the computational power you need. On-demand packs never expire. Pro subscriptions unlock unlimited surveillance and surgical refreshes.
+    </p>
+  </div>
+
+  <div class="pricing-grid">
+    <!-- Single Pass -->
+    <div class="plan-card">
+      <span class="plan-name">Single Research Pass</span>
+      <div class="plan-price">₹299</div>
+      <div class="plan-credits">🪙 1 Full Research Credit</div>
+      <p class="plan-desc">Deep-dive into any single BSE/NSE equity with full AI reasoning.</p>
+      <ul class="plan-features">
+        <li>1 Full 7-Pillar AI Synthesis</li>
+        <li>Multi-Scenario DCF Valuation</li>
+        <li>Institutional PDF Report Export</li>
+        <li>Regulatory Exchange Citations</li>
+        <li>Never expires</li>
+      </ul>
+      <button onclick="openCheckout('single_pass', 'Single Research Pass', 299, 1.0)" class="btn btn-secondary" style="width: 100%;">
+        Purchase Single Pass
+      </button>
+    </div>
+
+    <!-- Analyst 3-Pack -->
+    <div class="plan-card popular">
+      <span class="plan-badge">Most Popular</span>
+      <span class="plan-name">Analyst 3-Pack</span>
+      <div class="plan-price">₹699</div>
+      <div class="plan-credits">🪙 3 Research Credits (₹233/stock)</div>
+      <p class="plan-desc">Ideal for evaluating peer contenders and comparing top 3 industry leaders.</p>
+      <ul class="plan-features">
+        <li>3 Full 7-Pillar Syntheses</li>
+        <li>Surgical Price & Announcement Refreshes</li>
+        <li>Multi-Quarter Thesis Drift Surveillance</li>
+        <li>Unlimited PDF Downloads</li>
+        <li>Never expires</li>
+      </ul>
+      <button onclick="openCheckout('analyst_3pack', 'Analyst 3-Pack', 699, 3.0)" class="btn btn-primary" style="width: 100%;">
+        Purchase Analyst 3-Pack
+      </button>
+    </div>
+
+    <!-- Portfolio 10-Pack -->
+    <div class="plan-card">
+      <span class="plan-name">Portfolio 10-Pack</span>
+      <div class="plan-price">₹1,799</div>
+      <div class="plan-credits">🪙 10 Research Credits (₹180/stock)</div>
+      <p class="plan-desc">Comprehensive institutional audit for an entire equity portfolio.</p>
+      <ul class="plan-features">
+        <li>10 Full 7-Pillar Syntheses</li>
+        <li>10 Watched Tickers in Surveillance</li>
+        <li>Priority AI Processing Pipeline</li>
+        <li>Differential Analysis Audits</li>
+        <li>Never expires</li>
+      </ul>
+      <button onclick="openCheckout('portfolio_10pack', 'Portfolio 10-Pack', 1799, 10.0)" class="btn btn-secondary" style="width: 100%;">
+        Purchase 10-Pack
+      </button>
+    </div>
+
+    <!-- Pro Monthly -->
+    <div class="plan-card">
+      <span class="plan-name">Pro Desk (Monthly)</span>
+      <div class="plan-price">₹999 <span class="cycle">/month</span></div>
+      <div class="plan-credits">⭐ 40 Syntheses / mo</div>
+      <p class="plan-desc">Continuous surveillance engine for full-time investors and advisors.</p>
+      <ul class="plan-features">
+        <li>40 Fresh Syntheses / month</li>
+        <li>Unlimited Surgical Updates (0 credits)</li>
+        <li>50 Watched Equities in Surveillance</li>
+        <li>Unlimited PDF Exports</li>
+        <li>Cancel anytime</li>
+      </ul>
+      <button onclick="openCheckout('pro_monthly', 'Pro Desk (Monthly)', 999, 40.0)" class="btn btn-secondary" style="width: 100%;">
+        Subscribe Monthly
+      </button>
+    </div>
+  </div>
+
+  <!-- Enterprise / Bulk Packs -->
+  <div style="margin-top: 60px; padding: 40px; background: var(--bg-card); border: 1px solid var(--border-subtle); border-radius: var(--radius-lg);">
+    <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 20px;">
+      <div>
+        <h3 style="font-size: 22px; font-weight: 800; margin-bottom: 6px;">🏢 Corporate & Advisory Bulk Packs</h3>
+        <p style="color: var(--text-secondary); font-size: 14px; max-width: 600px;">
+          High-volume computational packs for family offices, wealth managers, and boutique equity research desks.
+        </p>
+      </div>
+      <div style="display: flex; gap: 14px;">
+        <button onclick="openCheckout('b2b_50', 'Corporate 50-Pack', 5999, 50.0)" class="btn btn-secondary">
+          Corporate 50-Pack (₹5,999)
+        </button>
+        <button onclick="openCheckout('b2b_150', 'Enterprise 150-Pack', 16999, 150.0)" class="btn btn-primary">
+          Enterprise 150-Pack (₹16,999)
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- FAQ Section -->
+  <div style="max-width: 800px; margin: 60px auto 0;">
+    <h3 style="font-size: 22px; font-weight: 800; text-align: center; margin-bottom: 32px;">Frequently Asked Questions</h3>
+    
+    <div style="margin-bottom: 20px;">
+      <h4 style="font-size: 16px; font-weight: 700; color: var(--text-primary); margin-bottom: 6px;">What are Research Credits?</h4>
+      <p style="font-size: 14px; color: var(--text-secondary); line-height: 1.6;">
+        Research credits are computational processing tokens. 1 research credit powers 1 fresh live 7-pillar AI synthesis grounded in real-time BSE regulatory filings. Reading existing archived dossiers and checking quotes is always 100% free.
+      </p>
+    </div>
+
+    <div style="margin-bottom: 20px;">
+      <h4 style="font-size: 16px; font-weight: 700; color: var(--text-primary); margin-bottom: 6px;">How does payment and delivery work?</h4>
+      <p style="font-size: 14px; color: var(--text-secondary); line-height: 1.6;">
+        Payments are processed securely via UPI (Google Pay, PhonePe, Paytm), NetBanking, or Cards through Razorpay. Credits are delivered to your online account instantly within 2 seconds upon payment confirmation. An official GST tax invoice is generated automatically.
+      </p>
+    </div>
+
+    <div>
+      <h4 style="font-size: 16px; font-weight: 700; color: var(--text-primary); margin-bottom: 6px;">Can I get a refund if I don't use my credits?</h4>
+      <p style="font-size: 14px; color: var(--text-secondary); line-height: 1.6;">
+        Yes. Under our 7-Day Refund Policy, if you purchased an on-demand credit pack and have not consumed any of the credits, you are eligible for a 100% refund. Once a credit is consumed to generate a report, that specific compute unit is non-refundable.
+      </p>
+    </div>
+  </div>
+</div>
+{% endblock %}

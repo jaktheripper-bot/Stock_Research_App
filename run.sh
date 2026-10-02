@@ -56,6 +56,10 @@ case "$COMMAND" in
         echo "--> Starting Streamlit Dev Server on http://localhost:8501..."
         "$STREAMLIT" run app.py
         ;;
+    web)
+        echo "--> Starting High-Performance FastAPI SSR Web Server on http://localhost:8000..."
+        "$PYTHON" -m uvicorn web.main:app --host 0.0.0.0 --port 8000 --reload
+        ;;
     admin)
         echo "--> Starting Private Admin Portal on http://localhost:8502..."
         "$STREAMLIT" run admin.py --server.port 8502

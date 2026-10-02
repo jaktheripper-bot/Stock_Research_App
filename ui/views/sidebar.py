@@ -6,10 +6,13 @@ from core.analysis import compare_revisions
 from ui.formatters import format_inr
 from telemetry import track_user_action
 from ui.views.state import execute_stock_research, set_active_dossier_state
+from ui.auth_ui import render_auth_sidebar_chip
 
 def render_sidebar():
     """Renders the persistent sidebar with search, archived dossier picker, and revision history."""
     with st.sidebar:
+        render_auth_sidebar_chip()
+        st.markdown("---")
         st.header("Stock Discovery")
         with st.form("sidebar_stock_search", clear_on_submit=False):
             sb_query = st.text_input(

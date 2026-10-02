@@ -22,6 +22,9 @@ from ui.views import (
 )
 from ui.comparison import render_peer_comparison_view
 from ui.analytics_hub import render_site_analytics_view
+from ui.auth_ui import render_login_dialog, render_ledger_dialog
+from ui.billing_modal import render_top_up_dialog
+from core.auth import handle_auth_callback
 from telemetry import (
     track_user_action,
     init_session_telemetry,
@@ -56,6 +59,7 @@ def inject_ga4_tracking():
 inject_ga4_tracking()
 check_url_admin_auth()
 init_session_telemetry()
+handle_auth_callback()
 
 # 3. Production CSS Stylesheet (Metric Unclip, Reading Measure, & Responsive Wrapping)
 st.markdown(
@@ -104,6 +108,23 @@ st.markdown(
         flex: 1 1 200px !important;
         min-width: 180px !important;
     }
+
+    /* 5. Cognitive Ergonomics: Tabular lining numerals for vertical alignment & magnitude scanning */
+    [data-testid="stMetricValue"],
+    [data-testid="stMetricDelta"],
+    table, th, td,
+    .stDataFrame,
+    [data-testid="stTable"] {
+        font-variant-numeric: tabular-nums !important;
+        font-feature-settings: "tnum" 1 !important;
+    }
+
+    /* 6. WCAG 2.2 AA Minimum Interactive Target Sizing (24x24 px) */
+    button,
+    [data-baseweb="select"],
+    [data-testid="stExpander"] summary {
+        min-height: 24px !important;
+    }
     </style>
     """,
     unsafe_allow_html=True
@@ -111,6 +132,19 @@ st.markdown(
 
 # 4. Silent Deep-Linking URL State Restoration
 restore_dossier_from_url()
+
+# 4b. Modal Dialog Triggers (Authentication, Top-Up Packs, Ledger)
+if st.session_state.get("show_login_dialog"):
+    st.session_state["show_login_dialog"] = False
+    render_login_dialog()
+
+if st.session_state.get("show_top_up_dialog"):
+    st.session_state["show_top_up_dialog"] = False
+    render_top_up_dialog()
+
+if st.session_state.get("show_ledger_dialog"):
+    st.session_state["show_ledger_dialog"] = False
+    render_ledger_dialog()
 
 # 5. Persistent Sidebar Rendering (Search, Archive Selectbox, & Revision Timeline)
 render_sidebar()

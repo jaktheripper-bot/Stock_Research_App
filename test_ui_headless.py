@@ -82,6 +82,22 @@ def test_interactive_app_suite():
             else:
                 print("   ℹ️ Toggle 'Expand all analytical pillars' not found on loaded report.")
 
+        # 4a. Testing Behavioral Controls & Pre-Mortem Decision Ledger Simulation
+        print("\n4a. Simulating Behavioral Ergonomics (WCAG Palette & Pre-Mortem)...")
+        cb_toggles = [t for t in at.toggle if t.key == "cb_palette_toggle"]
+        if cb_toggles:
+            print("   • Toggling 'Accessible Palette'...")
+            cb_toggles[0].set_value(True).run()
+            assert not at.exception, f"Toggling accessible palette threw exception: {at.exception}"
+            print("   ✅ Accessible Palette toggle verified.")
+
+        premortem_btns = [b for b in at.button if b.key == "btn_commit_premortem"]
+        if premortem_btns:
+            print("   • Clicking '🔒 Commit Pre-Mortem'...")
+            premortem_btns[0].click().run()
+            assert not at.exception, f"Clicking 'Commit Pre-Mortem' threw exception: {at.exception}"
+            print("   ✅ Pre-Mortem Decision Ledger commit verified.")
+
         # 4b. Testing Arbitrary Multi-Quarter Differential Analysis Simulation
         print("\n4b. Simulating Multi-Quarter Differential Analysis & Thesis Drift Surveillance...")
         multi_rev_opt = next((opt for opt in archive_picker.options if "INFY" in opt or "TMPV" in opt), None)
@@ -134,6 +150,34 @@ def test_interactive_app_suite():
     assert not at_admin.exception, f"Admin portal threw exception on mount: {at_admin.exception}"
     assert any("Executive Admin Portal" in str(getattr(h, "value", "")) or "Administrator Access Required" in str(getattr(h, "value", "")) for h in at_admin.markdown), "Admin portal must require authentication"
     print("   ✅ Unauthenticated access correctly blocked by Administrator Password login screen.")
+
+    # 7. Simulating User Authentication & Monetization UI States
+    print("\n7. Simulating User Authentication & Monetization UI States...")
+    at_auth = AppTest.from_file("app.py", default_timeout=15)
+    at_auth.run()
+    signin_btns = [b for b in at_auth.button if b.key == "btn_sidebar_signin"]
+    assert len(signin_btns) > 0, "Guest user must see 'Sign In / Register' button in sidebar."
+    print("   • Clicking 'Sign In / Register' in sidebar...")
+    signin_btns[0].click().run()
+    assert not at_auth.exception, f"Clicking Sign In threw exception: {at_auth.exception}"
+    print("   ✅ Login trigger executed cleanly.")
+
+    at_auth.session_state["user_session"] = {
+        "id": "usr_headless_test",
+        "email": "analyst@test.in",
+        "full_name": "Test Analyst",
+        "credits_balance": 2.0,
+        "subscription_tier": "free",
+        "is_pro": False
+    }
+    at_auth.run()
+    assert not at_auth.exception, f"Rendering authenticated user threw exception: {at_auth.exception}"
+    topup_btns = [b for b in at_auth.button if b.key == "btn_user_topup"]
+    assert len(topup_btns) > 0, "Authenticated user must see '💳 Top Up' button."
+    print("   • Clicking '💳 Top Up' button...")
+    topup_btns[0].click().run()
+    assert not at_auth.exception, f"Clicking Top Up threw exception: {at_auth.exception}"
+    print("   ✅ Top Up trigger executed cleanly.")
 
     print("\n🎉 All interactive UI simulation tests passed with 0 errors.\n")
 

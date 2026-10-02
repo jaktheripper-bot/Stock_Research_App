@@ -191,6 +191,25 @@ def execute_stock_research(query: str, selected_language: str = "English (India)
             )
             st.rerun(scope="app")
         else:
+            # Gate fresh live AI synthesis by user authentication & credit balance
+            from core.auth import get_current_user, refresh_current_user
+            from core.db import deduct_user_credits
+
+            user = get_current_user()
+            if not user:
+                st.warning("🔒 **Authentication Required:** Please sign in to run a fresh 7-pillar institutional AI synthesis. New accounts receive **2 Free Welcome Credits** immediately!")
+                st.session_state["show_login_dialog"] = True
+                return
+
+            can_proceed, new_bal, gate_msg = deduct_user_credits(user["id"], resolved_ticker, "LIVE_SYNTHESIS", 1.0)
+            if not can_proceed:
+                st.warning(f"🪙 **Insufficient Research Credits:** {gate_msg}")
+                st.session_state["show_top_up_dialog"] = True
+                return
+
+            refresh_current_user()
+            st.toast(f"1.0 Research Credit consumed. Remaining: {new_bal:.1f}", icon="🪙")
+
             track_user_action("FULL_SYNTHESIS", resolved_ticker, details={"reason": reason})
             prog_slot = st.empty()
             prog_slot.progress(0.80, text=f"⚡ {reason}. Initializing 7-Pillar Institutional AI Synthesis...")

@@ -25,6 +25,8 @@ from core.analysis.parser import (
 )
 
 from core.analysis.fundamentals import (
+    get_eodhd_api_key,
+    fetch_eodhd_stock_data,
     enrich_fundamentals,
     resolve_pe_with_failsafes,
     fetch_latest_bse_announcement,
@@ -57,6 +59,14 @@ from core.analysis.comparator import (
     compare_two_companies,
 )
 
+from core.analysis.metrics import (
+    calculate_52w_percentile,
+    calculate_pe_percentile,
+    get_valuation_quartile,
+    quantify_pillar_health,
+    calculate_overall_health_score,
+)
+
 __all__ = [
     # exceptions
     "PipelineError",
@@ -69,6 +79,8 @@ __all__ = [
     "format_citations_section",
     "compare_revisions",
     # fundamentals
+    "get_eodhd_api_key",
+    "fetch_eodhd_stock_data",
     "enrich_fundamentals",
     "resolve_pe_with_failsafes",
     "fetch_latest_bse_announcement",
@@ -93,4 +105,10 @@ __all__ = [
     # comparator
     "evaluate_company_disparity",
     "compare_two_companies",
+    # metrics
+    "calculate_52w_percentile",
+    "calculate_pe_percentile",
+    "get_valuation_quartile",
+    "quantify_pillar_health",
+    "calculate_overall_health_score",
 ]

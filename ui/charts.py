@@ -155,3 +155,113 @@ def render_momentum_chart(df, ticker: str):
             """,
             unsafe_allow_html=True
         )
+
+
+def render_pillar_drift_sparkline(ticker: str, revisions: list = None):
+    """
+    Renders a longitudinal qualitative 7-pillar drift sparkline across historical revisions.
+    Visualizes thesis trajectory over time to combat Confirmation Bias and the Disposition Effect.
+    """
+    import altair as alt
+    import pandas as pd
+    from db import get_report_revisions
+    from analyzer import extract_health_matrix, calculate_overall_health_score
+
+    if revisions is None:
+        revisions = get_report_revisions(ticker)
+
+    if not revisions:
+        return
+
+    if len(revisions) < 2:
+        st.markdown(
+            """
+            <div style="display: inline-flex; align-items: center; gap: 8px; padding: 6px 14px; 
+                        background: rgba(148, 163, 184, 0.08); border: 1px dashed rgba(148, 163, 184, 0.25); 
+                        border-radius: 6px; font-size: 12px; color: #94a3b8; margin-bottom: 12px;">
+                <span>📍 <b>Baseline Qualitative Thesis Established</b> (Snapshot 1/1). Longitudinal drift sparkline activates automatically upon second revision.</span>
+            </div>
+            """,
+            unsafe_allow_html=True
+        )
+        return
+
+    # Chronological order (oldest to newest)
+    ordered_revs = list(reversed(revisions))
+    records = []
+    for i, r in enumerate(ordered_revs):
+        rep_text = r.get("report_text", "")
+        matrix = extract_health_matrix(rep_text)
+        health = calculate_overall_health_score(matrix)
+        date_lbl = r.get("formatted_date") or f"Rev {i+1}"
+        records.append({
+            "Revision": f"#{i+1}",
+            "Date": date_lbl,
+            "QualityScore": health["total_score"],
+            "Percentage": health["percentage"],
+            "Trigger": r.get("revision_trigger", "Archive"),
+            "Moat": matrix.get("Moat", "N/A"),
+            "Governance": matrix.get("Governance", "N/A"),
+            "CapitalAllocation": matrix.get("CapitalAllocation", "N/A"),
+            "Valuation": matrix.get("Valuation", "N/A"),
+            "Diagnostic": matrix.get("Diagnostic", "N/A"),
+        })
+
+    if not records:
+        return
+
+    df_drift = pd.DataFrame(records)
+    first_score = df_drift.iloc[0]["QualityScore"]
+    latest_score = df_drift.iloc[-1]["QualityScore"]
+    delta_score = latest_score - first_score
+
+    if delta_score > 0:
+        line_color = "#10b981"
+        traj_badge = f'<span style="color: #10b981; font-weight: 700;">📈 Strengthening (+{delta_score} pts)</span>'
+    elif delta_score < 0:
+        line_color = "#ef4444"
+        traj_badge = f'<span style="color: #ef4444; font-weight: 700;">⚠️ Deteriorating ({delta_score} pts)</span>'
+    else:
+        line_color = "#3b82f6"
+        traj_badge = '<span style="color: #3b82f6; font-weight: 700;">➡️ Stable (0 pts)</span>'
+
+    c_base = alt.Chart(df_drift).encode(
+        x=alt.X("Date:N", sort=None, title="", axis=alt.Axis(labels=True, labelAngle=-15, labelFontSize=10, grid=False))
+    )
+
+    line = c_base.mark_line(color=line_color, strokeWidth=2.2, point=alt.OverlayMarkDef(filled=True, fill=line_color, size=50)).encode(
+        y=alt.Y("QualityScore:Q", scale=alt.Scale(domain=[max(0, df_drift["QualityScore"].min() - 2), 21]), title="Pillar Score (/21)"),
+        tooltip=[
+            alt.Tooltip("Revision:N", title="Revision"),
+            alt.Tooltip("Date:N", title="Snapshot Date"),
+            alt.Tooltip("QualityScore:Q", title="Pillar Quality (/21)"),
+            alt.Tooltip("Percentage:Q", title="Quality %", format=".1f"),
+            alt.Tooltip("Trigger:N", title="Trigger"),
+            alt.Tooltip("Moat:N", title="Moat"),
+            alt.Tooltip("Governance:N", title="Governance"),
+            alt.Tooltip("CapitalAllocation:N", title="Capital Allocation"),
+            alt.Tooltip("Valuation:N", title="Valuation"),
+        ]
+    )
+
+    chart = line.properties(
+        title=alt.TitleParams(
+            text=f"7-Pillar Thesis Longitudinal Drift Trajectory ({ticker})",
+            fontSize=11,
+            fontWeight="bold",
+            color="#94a3b8"
+        ),
+        height=95
+    ).configure_view(strokeOpacity=0).configure(background="transparent")
+
+    st.markdown(
+        f"""
+        <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 6px; padding: 6px 10px; background: rgba(30, 41, 59, 0.4); border-radius: 6px; font-size: 12px; border: 1px solid rgba(148, 163, 184, 0.15);">
+            <span>🛡️ <b>Longitudinal Thesis Surveillance:</b> {len(df_drift)} historical snapshots audited.</span>
+            <span>Trajectory: {traj_badge} | Latest Quality: <b>{latest_score}/21</b> ({df_drift.iloc[-1]['Percentage']}%)</span>
+        </div>
+        """,
+        unsafe_allow_html=True
+    )
+    st.altair_chart(chart, width="stretch")
+

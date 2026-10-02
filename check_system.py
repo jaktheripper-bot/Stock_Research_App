@@ -40,6 +40,10 @@ def run_suite():
         ("ui.pdf", "ui/pdf.py"),
         ("ui.scorecard", "ui/scorecard.py"),
         ("ui.formatters", "ui/formatters.py"),
+        ("core.auth", "core/auth"),
+        ("core.billing", "core/billing"),
+        ("ui.auth_ui", "ui/auth_ui.py"),
+        ("ui.billing_modal", "ui/billing_modal.py"),
     ]
     
     for mod_name, pkg_name in modules:
@@ -158,6 +162,33 @@ def run_suite():
             "Check database availability and connection string."
         ))
         print(f"   ❌ Database probe FAILED: {e}")
+
+    # 5b. Auditing Monetization & User Accounts Schema (v007)
+    print("\n5b. Auditing Monetization & User Accounts Schema (v007)...")
+    try:
+        from core.billing import PRICING_PACKS, B2B_PACKS
+        assert len(PRICING_PACKS) >= 5, "Missing core pricing tiers."
+        assert PRICING_PACKS["single_pass"]["amount_inr"] == 299, "Single pass must be ₹299."
+        assert PRICING_PACKS["analyst_3pack"]["amount_inr"] == 699, "Analyst 3-pack must be ₹699."
+        assert PRICING_PACKS["portfolio_10pack"]["amount_inr"] == 1799, "Portfolio 10-pack must be ₹1,799."
+        assert PRICING_PACKS["pro_monthly"]["amount_inr"] == 999, "Pro Monthly must be ₹999."
+        assert PRICING_PACKS["pro_annual"]["amount_inr"] == 8999, "Pro Annual must be ₹8,999."
+
+        conn = get_db_connection()
+        cur = conn.cursor()
+        cur.execute("SELECT version FROM schema_migrations WHERE version = 'v007_user_accounts_and_credits';")
+        mig_row = cur.fetchone()
+        cur.close()
+        conn.close()
+        assert mig_row is not None, "Migration v007_user_accounts_and_credits not found in schema_migrations."
+        print("   ✅ Monetization tiers & schema migration v007 verified.")
+    except Exception as e:
+        issues.append((
+            "Monetization/Auth",
+            f"Monetization schema audit failed: {e}",
+            "Verify v007 migration and pricing configuration."
+        ))
+        print(f"   ❌ Monetization audit FAILED: {e}")
 
     # 6. Streamlit 1.63 Headless UI Mount Audit
     print("\n6. Executing Headless UI Smoke Test (AppTest)...")

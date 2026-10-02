@@ -143,7 +143,23 @@ def render_dossier_view():
                     )
                     b_c1, b_c2, b_c3 = st.columns([3, 2.5, 1])
                     with b_c1:
-                        if st.button("⚡ Quick-Update Valuation & Technicals", key="btn_surgical_refresh", type="primary", width="stretch", help="Surgically refreshes Pillar 5 (Valuation) & Pillar 6 (Technicals) using live exchange data. Fast, zero Google search fees, saves 90%+ credits."):
+                        if st.button("⚡ Quick-Update Valuation & Technicals", key="btn_surgical_refresh", type="primary", width="stretch", help="Surgically refreshes Pillar 5 (Valuation) & Pillar 6 (Technicals) using live exchange data. Consumes 0.25 credits (0 credits for Pro)."):
+                            from core.auth import get_current_user, refresh_current_user
+                            from core.db import deduct_user_credits
+
+                            user = get_current_user()
+                            if not user:
+                                st.warning("Please sign in to update. New accounts receive 2 Free Welcome Credits!")
+                                st.session_state["show_login_dialog"] = True
+                                st.rerun(scope="app")
+
+                            can_proceed, new_bal, msg = deduct_user_credits(user["id"], clean_t, "SURGICAL_REFRESH", 0.25)
+                            if not can_proceed:
+                                st.warning(f"🪙 Insufficient research credits: {msg}")
+                                st.session_state["show_top_up_dialog"] = True
+                                st.rerun(scope="app")
+
+                            refresh_current_user()
                             cached_data = p_delta.get("cached") or get_report_by_ticker(clean_t) or {}
                             updated_report = execute_surgical_pillar_update(
                                 ticker=clean_t,
@@ -156,10 +172,27 @@ def render_dossier_view():
                             st.session_state["last_report_date"] = datetime.now(IST).strftime("%d-%b-%Y %H:%M IST")
                             track_user_action("SURGICAL_REFRESH", clean_t, cost_saved_usd=0.035, details={"reason": p_delta.get("reason")})
                             st.session_state.pop("pending_price_delta", None)
-                            st.toast("Valuation & Technicals surgically updated!", icon="⚡")
+                            st.toast(f"Valuation & Technicals surgically updated! (Remaining: {new_bal:.1f} credits)", icon="⚡")
                             st.rerun(scope="app")
                     with b_c2:
-                        if st.button("🔄 Full 7-Pillar Re-synthesis", key="btn_full_regen", width="stretch", help="Re-synthesize all 7 pillars with full AI reasoning."):
+                        if st.button("🔄 Full 7-Pillar Re-synthesis", key="btn_full_regen", width="stretch", help="Re-synthesize all 7 pillars with full AI reasoning (1.0 credit)."):
+                            from core.auth import get_current_user, refresh_current_user
+                            from core.db import deduct_user_credits
+
+                            user = get_current_user()
+                            if not user:
+                                st.warning("Please sign in to re-synthesize. New accounts receive 2 Free Welcome Credits!")
+                                st.session_state["show_login_dialog"] = True
+                                st.rerun(scope="app")
+
+                            can_proceed, new_bal, msg = deduct_user_credits(user["id"], clean_t, "LIVE_SYNTHESIS", 1.0)
+                            if not can_proceed:
+                                st.warning(f"🪙 Insufficient research credits: {msg}")
+                                st.session_state["show_top_up_dialog"] = True
+                                st.rerun(scope="app")
+
+                            refresh_current_user()
+                            st.toast(f"1.0 Research Credit consumed. Remaining: {new_bal:.1f}", icon="🪙")
                             reason_msg = p_delta.get("reason", "Full Regeneration Requested")
                             lang_choice = p_delta.get("language", "English (India)")
                             st.session_state.pop("pending_price_delta", None)

@@ -16,6 +16,8 @@ from core.analysis import (
     strip_conclusion_sections,
     format_citations_section,
     compare_revisions,
+    get_eodhd_api_key,
+    fetch_eodhd_stock_data,
     enrich_fundamentals,
     resolve_pe_with_failsafes,
     fetch_latest_bse_announcement,
@@ -37,6 +39,11 @@ from core.analysis import (
     execute_surgical_pillar_update,
     evaluate_company_disparity,
     compare_two_companies,
+    calculate_52w_percentile,
+    calculate_pe_percentile,
+    get_valuation_quartile,
+    quantify_pillar_health,
+    calculate_overall_health_score,
     __all__ as _core_analysis_all,
 )
 

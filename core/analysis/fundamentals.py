@@ -1,5 +1,6 @@
 """Fundamental data ingestion, verified exchange quote resolution, and technical indicator computation."""
 
+import os
 import io
 import contextlib
 import logging
@@ -15,8 +16,187 @@ from core.analysis.exceptions import ExchangeDataFetchError
 
 logger = logging.getLogger("equity_research.core.analysis.fundamentals")
 
+def get_eodhd_api_key() -> str:
+    """Safely retrieves EODHD API token from Streamlit secrets or environment."""
+    for key_name in ["EODHD_API_KEY", "EOHD_API_KEY"]:
+        try:
+            if hasattr(st, "secrets") and key_name in st.secrets:
+                key = st.secrets[key_name]
+                if key and str(key).strip() and not str(key).strip().startswith("your_"):
+                    return str(key).strip()
+        except Exception:
+            pass
+        env_key = os.environ.get(key_name, "").strip()
+        if env_key and not env_key.startswith("your_"):
+            return env_key
+    return ""
+
+def fetch_eodhd_stock_data(query: str, scrip_code: str = "") -> dict:
+    """
+    Fetches real-time quotes and fundamental metrics from European vendor EODHD (https://eodhd.com).
+    Supports .NSE and .BSE exchange suffixes for broad Indian market coverage.
+    Returns normalized stock data dictionary or None if key is absent or fetch fails.
+    """
+    token = get_eodhd_api_key()
+    if not token:
+        return None
+
+    clean = clean_ticker(query).upper()
+    candidates = []
+    if "." in query:
+        candidates.append(query.upper())
+    if scrip_code and str(scrip_code).isdigit():
+        candidates.append(f"{scrip_code}.XBSE")
+        candidates.append(f"{scrip_code}.BSE")
+    if not clean.isdigit():
+        candidates.append(f"{clean}.XNSE")
+        candidates.append(f"{clean}.NSE")
+        candidates.append(f"{clean}.XBSE")
+        candidates.append(f"{clean}.BSE")
+        candidates.append(f"{clean}.US")
+    elif scrip_code != clean:
+        candidates.append(f"{clean}.XBSE")
+        candidates.append(f"{clean}.BSE")
+
+    for symbol in candidates:
+        try:
+            # 1. Fetch Real-Time Quote
+            quote_url = f"https://eodhd.com/api/real-time/{symbol}?api_token={token}&fmt=json"
+            q_res = requests.get(quote_url, timeout=5)
+            if q_res.status_code != 200:
+                continue
+            q_json = q_res.json()
+            if not isinstance(q_json, dict) or not q_json.get("close"):
+                continue
+
+            price = float(q_json.get("close", 0))
+            if price <= 0:
+                continue
+
+            # 2. Fetch Fundamentals (filtered to General, Highlights, Valuation, Technicals)
+            fund_url = f"https://eodhd.com/api/v1.1/fundamentals/{symbol}?api_token={token}&filter=General,Highlights,Valuation,Technicals&fmt=json"
+            f_res = requests.get(fund_url, timeout=6)
+            f_json = f_res.json() if f_res.status_code == 200 and isinstance(f_res.json(), dict) else {}
+
+            gen = f_json.get("General") or {}
+            hl = f_json.get("Highlights") or {}
+            val = f_json.get("Valuation") or {}
+
+            # Parse MCap
+            mcap = hl.get("MarketCapitalization") or "N/A"
+            if mcap and str(mcap).replace(".", "").isdigit():
+                mcap = int(float(mcap))
+
+            # Parse PE
+            pe = hl.get("PERatio") or val.get("TrailingPE") or "N/A"
+            if isinstance(pe, (int, float)):
+                pe = f"{float(pe):.2f}" if float(pe) > 0 else "N/A (Loss-Making)"
+
+            high_52 = q_json.get("high") or "N/A"
+            low_52 = q_json.get("low") or "N/A"
+
+            return {
+                "ticker": clean,
+                "short_name": gen.get("Name") or clean,
+                "scrip_code": scrip_code or (clean if clean.isdigit() else ""),
+                "current_price": round(price, 2),
+                "market_cap": mcap,
+                "pe_ratio": pe,
+                "sector": gen.get("Sector") or "Core Industry",
+                "industry": gen.get("Industry") or "General Corporate",
+                "52w_high": high_52,
+                "52w_low": low_52,
+                "description": gen.get("Description") or f"EODHD verified exchange quote for {clean}.",
+                "exchange_status": "Active / Verified (EODHD REST)",
+                "is_fallback": False
+            }
+        except Exception as e:
+            logger.debug(f"EODHD probe notice for {symbol}: {e}")
+            continue
+
+    return None
+
 def enrich_fundamentals(ticker: str, data: dict) -> dict:
-    """Secondary enrichment: uses yfinance strictly to backfill trailing P/E, Market Cap, and Sector."""
+    """Enriches stock fundamentals with institutional ratios (EODHD if token present, fallback to yfinance)."""
+    # 1. Primary EODHD Fundamental Enrichment (if configured)
+    token = get_eodhd_api_key()
+    if token:
+        try:
+            clean_sym = clean_ticker(ticker).upper()
+            candidates = [f"{clean_sym}.XNSE", f"{clean_sym}.NSE", f"{clean_sym}.XBSE", f"{clean_sym}.BSE", f"{clean_sym}.US"] if not clean_sym.isdigit() else [f"{clean_sym}.XBSE", f"{clean_sym}.BSE"]
+            for sym in candidates:
+                url = f"https://eodhd.com/api/v1.1/fundamentals/{sym}?api_token={token}&filter=General,Highlights,Valuation,Technicals&fmt=json"
+                res = requests.get(url, timeout=5)
+                if res.status_code == 200 and isinstance(res.json(), dict):
+                    f_json = res.json()
+                    gen = f_json.get("General") or {}
+                    hl = f_json.get("Highlights") or {}
+                    val = f_json.get("Valuation") or {}
+
+                    # Trailing P/E
+                    if data.get("pe_ratio") in [None, "N/A", "-", "", 0, "0"]:
+                        pe = hl.get("PERatio") or val.get("TrailingPE")
+                        if pe is not None and isinstance(pe, (int, float)):
+                            data["pe_ratio"] = round(pe, 2) if pe > 0 else "N/A (Loss-Making)"
+
+                    # Market Cap
+                    if data.get("market_cap") in [None, "N/A", 0, "-", "", "0"]:
+                        mcap = hl.get("MarketCapitalization")
+                        if mcap and isinstance(mcap, (int, float)):
+                            data["market_cap"] = int(mcap)
+
+                    # Sector & Industry
+                    if data.get("sector") in [None, "N/A", "-", "", "Core Industry", "Diversified / Core Industry"]:
+                        sec = gen.get("Sector")
+                        if sec:
+                            data["sector"] = sec
+                    if data.get("industry") in [None, "N/A", "-", "", "General Corporate"]:
+                        ind = gen.get("Industry")
+                        if ind:
+                            data["industry"] = ind
+
+                    # Forward P/E
+                    if not data.get("forward_pe") or data.get("forward_pe") == "N/A":
+                        fpe = val.get("ForwardPE")
+                        if fpe and isinstance(fpe, (int, float)) and fpe > 0:
+                            data["forward_pe"] = f"{float(fpe):.2f}"
+
+                    # Price to Book
+                    if not data.get("price_to_book") or data.get("price_to_book") == "N/A":
+                        pb = val.get("PriceBookMRQ")
+                        if pb and isinstance(pb, (int, float)) and pb > 0:
+                            data["price_to_book"] = f"{float(pb):.2f}"
+
+                    # EV to EBITDA
+                    if not data.get("ev_to_ebitda") or data.get("ev_to_ebitda") == "N/A":
+                        eve = val.get("EnterpriseValueEbitda")
+                        if eve and isinstance(eve, (int, float)) and 0 < eve < 500:
+                            data["ev_to_ebitda"] = f"{float(eve):.2f}"
+
+                    # ROE
+                    if not data.get("roe") or data.get("roe") == "N/A":
+                        roe = hl.get("ReturnOnEquityTTM")
+                        if roe is not None and isinstance(roe, (int, float)):
+                            data["roe"] = f"{float(roe * 100):.1f}%"
+
+                    # OPM
+                    if not data.get("opm") or data.get("opm") == "N/A":
+                        opm = hl.get("OperatingMarginTTM")
+                        if opm is not None and isinstance(opm, (int, float)):
+                            data["opm"] = f"{float(opm * 100):.1f}%"
+
+                    # Dividend Yield
+                    if not data.get("dividend_yield") or data.get("dividend_yield") == "N/A":
+                        dy = hl.get("DividendYield")
+                        if dy is not None and isinstance(dy, (int, float)):
+                            val_dy = dy if dy > 1 else dy * 100
+                            data["dividend_yield"] = f"{float(val_dy):.2f}%"
+
+                    break
+        except Exception as e:
+            logger.debug(f"EODHD fundamental enrichment notice: {e}")
+
+    # 2. Secondary enrichment: yfinance backfill
     try:
         clean_sym = clean_ticker(ticker)
         yf_ticker = f"{clean_sym}.BO" if clean_sym.isdigit() else f"{clean_sym}.NS"
@@ -209,16 +389,26 @@ def get_stock_fundamentals(query: str) -> dict:
     """
     clean = clean_ticker(query)
     canonical = resolve_canonical_symbol(query) or clean
+    scrip = resolve_bse_scrip_code(query) or resolve_bse_scrip_code(canonical)
     
-    # Try primary BSE ingestion
+    # 1. Primary BSE Ingestion
     try:
         raw_data = fetch_bse_exchange_data(canonical)
         if raw_data and not raw_data.get("is_fallback", False):
             return raw_data
     except Exception as bse_err:
-        logger.warning(f"BSE direct quote failed for {query}/{canonical} ({bse_err}). Attempting yfinance fallback...")
+        logger.warning(f"BSE direct quote failed for {query}/{canonical} ({bse_err}). Attempting secondary gateways...")
 
-    # Secondary Resilience Fallback via yfinance
+    # 2. Secondary Resilience: EODHD REST Gateway (European vendor, comprehensive BSE/NSE)
+    try:
+        eodhd_data = fetch_eodhd_stock_data(canonical, scrip)
+        if eodhd_data:
+            logger.info(f"Resolved verified quote for {canonical} via EODHD REST API.")
+            return eodhd_data
+    except Exception as eodhd_err:
+        logger.debug(f"EODHD REST gateway notice for {canonical}: {eodhd_err}")
+
+    # 3. Tertiary Resilience Fallback via yfinance
     try:
         candidate_symbols = [f"{canonical}.NS", f"{canonical}.BO"]
         if clean != canonical:

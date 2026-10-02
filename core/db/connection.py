@@ -117,7 +117,7 @@ def get_db_connection():
     return conn
 
 def init_db(force: bool = False):
-    """Initializes tables and executes incremental schema migrations (v001 - v006)."""
+    """Initializes tables and executes incremental schema migrations (v001 - v007)."""
     global _DB_INITIALIZED
     if _DB_INITIALIZED and not force:
         return
@@ -438,6 +438,105 @@ def init_db(force: bool = False):
                         except Exception:
                             pass
                     cursor.execute("INSERT OR IGNORE INTO schema_migrations (version) VALUES ('v006_report_citations');")
+                conn.commit()
+
+            # Migration v007: User Accounts, Credits, Transactions & Usage Ledger
+            if "v007_user_accounts_and_credits" not in applied:
+                logger.info("Applying schema migration: v007_user_accounts_and_credits...")
+                if supabase_url:
+                    cursor.execute('''
+                        CREATE TABLE IF NOT EXISTS user_accounts (
+                            id TEXT PRIMARY KEY,
+                            email TEXT UNIQUE NOT NULL,
+                            full_name TEXT,
+                            avatar_url TEXT,
+                            credits_balance NUMERIC DEFAULT 2.0,
+                            subscription_tier TEXT DEFAULT 'free',
+                            subscription_expires_at TIMESTAMPTZ,
+                            created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
+                            last_login_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP
+                        );
+                    ''')
+                    cursor.execute('CREATE INDEX IF NOT EXISTS idx_user_accounts_email ON user_accounts (email);')
+
+                    cursor.execute('''
+                        CREATE TABLE IF NOT EXISTS credit_transactions (
+                            id TEXT PRIMARY KEY,
+                            user_id TEXT NOT NULL,
+                            amount_inr NUMERIC NOT NULL,
+                            credits_added NUMERIC NOT NULL,
+                            payment_gateway TEXT DEFAULT 'razorpay',
+                            gateway_order_id TEXT,
+                            gateway_payment_id TEXT,
+                            status TEXT DEFAULT 'success',
+                            pack_type TEXT NOT NULL,
+                            invoice_number TEXT,
+                            created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP
+                        );
+                    ''')
+                    cursor.execute('CREATE INDEX IF NOT EXISTS idx_credit_transactions_user ON credit_transactions (user_id, created_at DESC);')
+
+                    cursor.execute('''
+                        CREATE TABLE IF NOT EXISTS credit_usage_ledger (
+                            id SERIAL PRIMARY KEY,
+                            user_id TEXT NOT NULL,
+                            ticker TEXT NOT NULL,
+                            action_type TEXT NOT NULL,
+                            credits_consumed NUMERIC NOT NULL,
+                            balance_after NUMERIC NOT NULL,
+                            created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP
+                        );
+                    ''')
+                    cursor.execute('CREATE INDEX IF NOT EXISTS idx_credit_usage_user ON credit_usage_ledger (user_id, created_at DESC);')
+                    cursor.execute('CREATE INDEX IF NOT EXISTS idx_credit_usage_ticker ON credit_usage_ledger (ticker, created_at DESC);')
+                    cursor.execute("INSERT INTO schema_migrations (version) VALUES ('v007_user_accounts_and_credits') ON CONFLICT DO NOTHING;")
+                else:
+                    cursor.execute('''
+                        CREATE TABLE IF NOT EXISTS user_accounts (
+                            id TEXT PRIMARY KEY,
+                            email TEXT UNIQUE NOT NULL,
+                            full_name TEXT,
+                            avatar_url TEXT,
+                            credits_balance REAL DEFAULT 2.0,
+                            subscription_tier TEXT DEFAULT 'free',
+                            subscription_expires_at DATETIME,
+                            created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+                            last_login_at DATETIME DEFAULT CURRENT_TIMESTAMP
+                        );
+                    ''')
+                    cursor.execute('CREATE INDEX IF NOT EXISTS idx_user_accounts_email ON user_accounts (email);')
+
+                    cursor.execute('''
+                        CREATE TABLE IF NOT EXISTS credit_transactions (
+                            id TEXT PRIMARY KEY,
+                            user_id TEXT NOT NULL,
+                            amount_inr REAL NOT NULL,
+                            credits_added REAL NOT NULL,
+                            payment_gateway TEXT DEFAULT 'razorpay',
+                            gateway_order_id TEXT,
+                            gateway_payment_id TEXT,
+                            status TEXT DEFAULT 'success',
+                            pack_type TEXT NOT NULL,
+                            invoice_number TEXT,
+                            created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+                        );
+                    ''')
+                    cursor.execute('CREATE INDEX IF NOT EXISTS idx_credit_transactions_user ON credit_transactions (user_id, created_at DESC);')
+
+                    cursor.execute('''
+                        CREATE TABLE IF NOT EXISTS credit_usage_ledger (
+                            id INTEGER PRIMARY KEY AUTOINCREMENT,
+                            user_id TEXT NOT NULL,
+                            ticker TEXT NOT NULL,
+                            action_type TEXT NOT NULL,
+                            credits_consumed REAL NOT NULL,
+                            balance_after REAL NOT NULL,
+                            created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+                        );
+                    ''')
+                    cursor.execute('CREATE INDEX IF NOT EXISTS idx_credit_usage_user ON credit_usage_ledger (user_id, created_at DESC);')
+                    cursor.execute('CREATE INDEX IF NOT EXISTS idx_credit_usage_ticker ON credit_usage_ledger (ticker, created_at DESC);')
+                    cursor.execute("INSERT OR IGNORE INTO schema_migrations (version) VALUES ('v007_user_accounts_and_credits');")
                 conn.commit()
 
             _DB_INITIALIZED = True
