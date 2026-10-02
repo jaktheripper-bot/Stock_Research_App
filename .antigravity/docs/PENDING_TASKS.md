@@ -58,20 +58,31 @@
   - 3-year variance table comparing Operating Cash Flow vs Net Profit to detect working-capital traps and aggressive revenue recognition.
 - [ ] **P5: Promoter & Insider SAST Disparity Tracker**
   - Ingest BSE SAST insider trading and block deal feeds to track management skin-in-the-game.
+- [ ] **P6: Visual Source Attribution & Footnote Citations Engine**
+  - Extract `grounding_chunks` (titles + URLs) from Gemini `google-genai` streams and `citations` array from Perplexity `sonar-pro` fallback.
+  - Attach deduplicated source citations list to report records in `reports` and `report_revisions` tables.
+  - Header Reference Pill: Render `📎 N Verified Primary Sources Grounded` badge and clickable disclosures drawer in the research dossier.
+  - Executive PDF Footnote Appendix: Render hyperlinked regulatory sources and filing citations in [`ui/pdf.py`](file:///Users/lyndonpinto/Documents/Stock_Research_App/ui/pdf.py) before the mandatory SEBI disclaimer.
 
 ---
 
-## 📈 Tier 4: Strategic Multi-Asset Expansion
-*Source: [`.antigravity/docs/STRATEGY.md`](file:///Users/lyndonpinto/Documents/Stock_Research_App/.antigravity/docs/STRATEGY.md)*
+## 💳 Tier 4: Monetization Architecture & Payment Gateway Integration (Razorpay + Supabase Auth)
+*Goal: Implement payment structure and credit gates prior to public discovery, supporting platform development with a hybrid model tailored to Indian payment behavior.*
 
-- [ ] **Tier 2: Mutual Fund Look-Through Engine**
-  - Ingest mutual fund monthly portfolio disclosures (SEBI CAS / AMFI feeds).
-  - Calculate weighted look-through scores for mutual funds based on the 7-pillar qualitative moat scores of their underlying equity holdings.
-  - Track Mutual Fund Style Drift (detecting when large-cap funds chase mid-cap momentum or dilute quality).
-- [ ] **Tier 3: Fixed Income & Yield Curve Engine**
-  - Corporate bonds, Sovereign Gold Bonds (SGB), NCDs, and fixed deposit real-return diagnostics.
-- [ ] **Capstone: Unified Qualitative Portfolio Audit**
-  - Aggregation engine combining Equities + Mutual Funds + Fixed Income into an institutional-grade risk concentration and diversification audit.
+- [ ] **Hybrid Monetization Architecture (Freemium + On-Demand Credits + Pro Membership)**
+  - Free Tier: Public access to existing archived dossiers, live exchange quotes, and basic 2-stock comparison.
+  - On-Demand Credit Packs (Micropayments via UPI): ₹199 for 1 fresh live AI synthesis + PDF export (or ₹499 for 3) via frictionless UPI QR / GPay / PhonePe checkout.
+  - Pro Institutional Membership: ₹799 / month or ₹5,999 / year for unlimited report syntheses, full peer comparison engine, live watchlist surveillance alerts, and custom PDF export branding.
+- [ ] **Supabase User Accounts & Credit Ledger**
+  - Implement Supabase Auth (Google OAuth & Magic Link login) in Streamlit.
+  - Create `user_accounts` table: `id`, `email`, `credits_remaining`, `subscription_tier` (`free`, `pro_monthly`, `pro_annual`), `expires_at`.
+- [ ] **Razorpay Payment Gateway Integration**
+  - Integrate Razorpay Python SDK server-side order generation (`orders.create`).
+  - Streamlit checkout modal via `components.v1.html` or Razorpay hosted payment links.
+  - Webhook listener to handle `payment.captured` and automatically credit user balances in real time.
+- [ ] **Gated Execution & Safe Harbor Billing Compliance**
+  - Gate "⚡ Synthesize Report" and "📄 Download Executive PDF" actions behind active credits or Pro subscription.
+  - SEBI Safe Harbor Compliance: Invoice line-items and checkout screens bill strictly for *"Financial Research Synthesis Software Utility"*, retaining the mandatory non-advisory disclaimer.
 
 ---
 
@@ -89,3 +100,18 @@
   - Support direct query routing (e.g., `?ticker=TCS` or `?ticker=TATASTEEL`) so external search results link directly to active institutional dossiers.
 - [ ] **SEBI Safe Harbor Static Compliance Enforcer**
   - Guarantee that all crawler-facing HTML mirrors append the immutable [`MANDATORY_SEBI_DISCLAIMER`](file:///Users/lyndonpinto/Documents/Stock_Research_App/db.py#L14-L23), enforce strictly diagnostic terminology, and omit any personalized or speculative investment targets.
+
+---
+
+## 📈 Tier 6: Strategic Multi-Asset Expansion
+*Source: [`.antigravity/docs/STRATEGY.md`](file:///Users/lyndonpinto/Documents/Stock_Research_App/.antigravity/docs/STRATEGY.md)*
+
+- [ ] **Tier 2: Mutual Fund Look-Through Engine**
+  - Ingest mutual fund monthly portfolio disclosures (SEBI CAS / AMFI feeds).
+  - Calculate weighted look-through scores for mutual funds based on the 7-pillar qualitative moat scores of their underlying equity holdings.
+  - Track Mutual Fund Style Drift (detecting when large-cap funds chase mid-cap momentum or dilute quality).
+- [ ] **Tier 3: Fixed Income & Yield Curve Engine**
+  - Corporate bonds, Sovereign Gold Bonds (SGB), NCDs, and fixed deposit real-return diagnostics.
+- [ ] **Capstone: Unified Qualitative Portfolio Audit**
+  - Aggregation engine combining Equities + Mutual Funds + Fixed Income into an institutional-grade risk concentration and diversification audit.
+
