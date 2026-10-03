@@ -17,6 +17,7 @@ from ui.views.state import (
 from ui.views.alerts_view import render_alert_hub
 from ui.views.sidebar import render_sidebar
 from ui.views.dossier_view import render_dossier_view
+from ui.views.policies_view import render_policies_view
 
 __all__ = [
     "sanitize_ticker_input",
@@ -26,4 +27,5 @@ __all__ = [
     "render_alert_hub",
     "render_sidebar",
     "render_dossier_view",
+    "render_policies_view",
 ]

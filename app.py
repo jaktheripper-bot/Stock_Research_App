@@ -19,6 +19,7 @@ from ui.views import (
     render_sidebar,
     render_dossier_view,
     restore_dossier_from_url,
+    render_policies_view,
 )
 from ui.comparison import render_peer_comparison_view
 from ui.analytics_hub import render_site_analytics_view
@@ -134,8 +135,12 @@ st.markdown(
     unsafe_allow_html=True
 )
 
-# 4. Silent Deep-Linking URL State Restoration
+# 4. Silent Deep-Linking URL State Restoration & Policy Routing
 restore_dossier_from_url()
+
+query_page = st.query_params.get("page") or st.query_params.get("policy")
+if query_page and query_page.lower() in ["terms", "privacy", "refund-policy", "shipping-policy", "contact", "disclaimer", "pricing", "policies"]:
+    st.session_state["active_view"] = "policies"
 
 # 4b. Modal Dialog Triggers (Authentication, Top-Up Packs, Ledger)
 if st.session_state.get("show_login_dialog"):
@@ -157,38 +162,53 @@ render_sidebar()
 st.title("Equity Research Analysis Platform")
 st.markdown('<p style="font-size: 19px; color: #888888;">To aid stock discovery and simplify fundamentals.</p>', unsafe_allow_html=True)
 
-# 7. Navigation Bar (Institutional Dossier, Peer Comparison, Private Analytics)
+# 7. Navigation Bar (Institutional Dossier, Peer Comparison, Legal Policies, Private Analytics)
 cur_view = st.session_state.get("active_view", "dossier")
 is_admin = is_admin_authenticated()
 
 if is_admin:
+    nav_c1, nav_c2, nav_c3, nav_c4 = st.columns([1, 1, 1, 1])
+    with nav_c1:
+        if st.button("🔍 Institutional Dossier", key="btn_nav_dossier", type="primary" if cur_view == "dossier" else "secondary", width="stretch"):
+            st.session_state["active_view"] = "dossier"
+            st.query_params.clear()
+            track_user_action("PAGE_VIEW", details={"page": "dossier"})
+            st.rerun()
+    with nav_c2:
+        if st.button("⚖️ Peer Comparison", key="btn_nav_compare", type="primary" if cur_view == "compare" else "secondary", width="stretch"):
+            st.session_state["active_view"] = "compare"
+            st.query_params.clear()
+            track_user_action("PAGE_VIEW", details={"page": "compare"})
+            st.rerun()
+    with nav_c3:
+        if st.button("📜 Legal & Policies", key="btn_nav_policies", type="primary" if cur_view == "policies" else "secondary", width="stretch"):
+            st.session_state["active_view"] = "policies"
+            track_user_action("PAGE_VIEW", details={"page": "policies"})
+            st.rerun()
+    with nav_c4:
+        if st.button("📊 Private Admin Analytics 🔐", key="btn_nav_admin_analytics", type="primary" if cur_view == "analytics" else "secondary", width="stretch"):
+            st.session_state["active_view"] = "analytics"
+            st.query_params.clear()
+            track_user_action("PAGE_VIEW", details={"page": "analytics"})
+            st.rerun()
+else:
     nav_c1, nav_c2, nav_c3 = st.columns([1, 1, 1])
     with nav_c1:
         if st.button("🔍 Institutional Dossier", key="btn_nav_dossier", type="primary" if cur_view == "dossier" else "secondary", width="stretch"):
             st.session_state["active_view"] = "dossier"
+            st.query_params.clear()
             track_user_action("PAGE_VIEW", details={"page": "dossier"})
             st.rerun()
     with nav_c2:
         if st.button("⚖️ Peer Comparison", key="btn_nav_compare", type="primary" if cur_view == "compare" else "secondary", width="stretch"):
             st.session_state["active_view"] = "compare"
+            st.query_params.clear()
             track_user_action("PAGE_VIEW", details={"page": "compare"})
             st.rerun()
     with nav_c3:
-        if st.button("📊 Private Admin Analytics 🔐", key="btn_nav_admin_analytics", type="primary" if cur_view == "analytics" else "secondary", width="stretch"):
-            st.session_state["active_view"] = "analytics"
-            track_user_action("PAGE_VIEW", details={"page": "analytics"})
-            st.rerun()
-else:
-    nav_c1, nav_c2 = st.columns(2)
-    with nav_c1:
-        if st.button("🔍 Institutional Dossier", key="btn_nav_dossier", type="primary" if cur_view == "dossier" else "secondary", width="stretch"):
-            st.session_state["active_view"] = "dossier"
-            track_user_action("PAGE_VIEW", details={"page": "dossier"})
-            st.rerun()
-    with nav_c2:
-        if st.button("⚖️ Peer Comparison", key="btn_nav_compare", type="primary" if cur_view == "compare" else "secondary", width="stretch"):
-            st.session_state["active_view"] = "compare"
-            track_user_action("PAGE_VIEW", details={"page": "compare"})
+        if st.button("📜 Legal & Policies", key="btn_nav_policies", type="primary" if cur_view == "policies" else "secondary", width="stretch"):
+            st.session_state["active_view"] = "policies"
+            track_user_action("PAGE_VIEW", details={"page": "policies"})
             st.rerun()
 
 st.markdown("<div style='height: 10px;'></div>", unsafe_allow_html=True)
@@ -200,15 +220,37 @@ check_and_render_auth_dialogs()
 if cur_view == "compare":
     render_peer_comparison_view()
     check_and_render_auth_dialogs()
-    st.stop()
+elif cur_view == "policies":
+    render_policies_view()
+    check_and_render_auth_dialogs()
 elif cur_view == "analytics" and is_admin:
     render_site_analytics_view()
     check_and_render_auth_dialogs()
-    st.stop()
 elif cur_view == "analytics" and not is_admin:
     st.session_state["active_view"] = "dossier"
     st.rerun()
+else:
+    # Default View: Institutional Research Dossier
+    render_dossier_view()
+    check_and_render_auth_dialogs()
 
-# Default View: Institutional Research Dossier
-render_dossier_view()
-check_and_render_auth_dialogs()
+# 9. Statutory Footer & Direct Policy Links
+st.markdown("---")
+f_c1, f_c2 = st.columns([3, 2])
+with f_c1:
+    st.caption("📈 **Stock Research App** • Automated 7-Pillar Institutional Equity Research Engine Grounded in Public BSE Disclosures.")
+    st.caption("⚖️ **SEBI Safe Harbor:** Non-advisory computational research synthesis software utility (SAC Code 998314). Not an investment advisor or research analyst.")
+with f_c2:
+    st.markdown(
+        """
+        <div style="font-size: 12px; color: #888888; text-align: right; line-height: 1.8;">
+            <a href="?page=terms" target="_self" style="color: #0ea5e9; text-decoration: none;">Terms & Conditions</a> • 
+            <a href="?page=privacy" target="_self" style="color: #0ea5e9; text-decoration: none;">Privacy Policy</a> • 
+            <a href="?page=refund-policy" target="_self" style="color: #0ea5e9; text-decoration: none;">Refund Policy</a><br>
+            <a href="?page=shipping-policy" target="_self" style="color: #0ea5e9; text-decoration: none;">Delivery Policy</a> • 
+            <a href="?page=contact" target="_self" style="color: #0ea5e9; text-decoration: none;">Contact Us</a> • 
+            <a href="?page=disclaimer" target="_self" style="color: #0ea5e9; text-decoration: none;">Disclaimer</a>
+        </div>
+        """,
+        unsafe_allow_html=True
+    )
