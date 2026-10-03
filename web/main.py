@@ -32,7 +32,9 @@ from core.db import (
     get_or_create_user,
     get_user_by_id,
     get_user_by_email,
+    get_user_credits_balance,
     deduct_user_credits,
+    add_user_credits,
     IST,
 )
 from core.analysis import get_stock_fundamentals
@@ -491,6 +493,7 @@ async def sitemap_xml():
 class SynthesizeRequest(BaseModel):
     ticker: str
     user_id: str
+    force_refresh: Optional[bool] = False
 
 
 @app.post("/api/synthesize")
@@ -498,6 +501,7 @@ async def api_synthesize(payload: SynthesizeRequest):
     """
     Deducts 1 credit from user balance and triggers a full 7-pillar AI synthesis.
     Returns the generated dossier URL on success.
+    Automatically refunds the consumed credit if synthesis or archiving fails.
     """
     clean_t = clean_ticker(payload.ticker)
     if not clean_t:
@@ -508,14 +512,15 @@ async def api_synthesize(payload: SynthesizeRequest):
     if not clean_uid:
         raise HTTPException(status_code=401, detail="Sign in required to generate reports.")
 
-    # Check if a dossier already exists and is fresh (< 14 days old)
+    # Check if a dossier already exists and is fresh (< 14 days old) unless force_refresh is requested
     existing = get_report_by_ticker(canonical)
-    if existing and existing.get("report_text"):
+    if existing and existing.get("report_text") and not payload.force_refresh:
         return {
             "success": True,
             "already_exists": True,
             "ticker": canonical,
             "dossier_url": f"/dossier/{canonical}",
+            "new_balance": get_user_credits_balance(clean_uid),
             "message": f"An existing dossier for {canonical} is already available. No credits were deducted."
         }
 
@@ -534,9 +539,23 @@ async def api_synthesize(payload: SynthesizeRequest):
         report_text = generate_stock_report(canonical)
     except Exception as e:
         logger.error(f"Synthesis failed for {canonical}: {e}")
+        # Automatic refund on failure
+        add_user_credits(clean_uid, 0.0, 1.0, pack_type="REFUND_FAILED_SYNTHESIS")
+        refunded_bal = get_user_credits_balance(clean_uid)
         raise HTTPException(
             status_code=500,
-            detail=f"Report generation failed for {canonical}. Your credit has been consumed. Error: {e}"
+            detail=f"Report generation encountered an error for {canonical}. Your research credit has been automatically refunded (balance: {refunded_bal:.1f} credits). Error: {e}"
+        )
+
+    # Verify that the report was archived and contains content
+    rep = get_report_by_ticker(canonical)
+    if not rep or not rep.get("report_text"):
+        # Automatic refund on verification failure
+        add_user_credits(clean_uid, 0.0, 1.0, pack_type="REFUND_FAILED_SYNTHESIS")
+        refunded_bal = get_user_credits_balance(clean_uid)
+        raise HTTPException(
+            status_code=500,
+            detail=f"Synthesis could not verify report archiving for {canonical}. Your credit has been automatically refunded (balance: {refunded_bal:.1f} credits)."
         )
 
     return {
@@ -545,7 +564,7 @@ async def api_synthesize(payload: SynthesizeRequest):
         "ticker": canonical,
         "dossier_url": f"/dossier/{canonical}",
         "new_balance": new_balance,
-        "message": f"Dossier for {canonical} synthesized successfully. 1 credit deducted."
+        "message": f"Dossier for {canonical} synthesized successfully! 1 credit deducted."
     }
 
 

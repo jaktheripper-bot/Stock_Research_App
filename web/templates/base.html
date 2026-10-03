@@ -59,8 +59,9 @@
         </nav>
 
         <div class="nav-actions">
+          <button id="navGenerateBtn" class="btn btn-primary btn-sm" onclick="openGenerateModal()">⚡ Generate Report</button>
           <a href="/pricing" class="btn btn-secondary btn-sm">⚡ View Pricing</a>
-          <button id="navSignInBtn" class="btn btn-primary btn-sm" onclick="openSignInModal()">Sign In / Claim 2 Credits</button>
+          <button id="navSignInBtn" class="btn btn-secondary btn-sm" onclick="openSignInModal()">Sign In / Claim 2 Credits</button>
         </div>
       </div>
     </div>
@@ -144,6 +145,67 @@
 
       <div style="text-align: center; margin-top: 16px; font-size: 11px; color: var(--text-muted);">
         🔒 Safe-Harbor Privacy: No personal financial or bank credentials collected.
+      </div>
+    </div>
+  </div>
+
+  <!-- Global Generate Report Modal -->
+  <div id="generateModal" class="modal-backdrop">
+    <div class="modal-dialog" style="max-width: 480px;">
+      <div class="modal-header">
+        <h3 style="font-weight: 800; font-size: 20px;">⚡ Generate Institutional Dossier</h3>
+        <button id="closeGenerateModalBtn" class="modal-close-btn">&times;</button>
+      </div>
+
+      <div style="background: rgba(14, 165, 233, 0.08); border-left: 3px solid var(--accent-cyan); padding: 12px; border-radius: 6px; margin-bottom: 20px; font-size: 13px; color: var(--text-secondary);">
+        <strong>Computational Research Engine:</strong> Ingests live BSE exchange disclosures and synthesizes a full 7-pillar qualitative thesis, multi-scenario valuation models, and forensic governance audits.
+      </div>
+
+      <div id="generateModalBalanceBox" style="background: rgba(30, 41, 59, 0.5); border: 1px solid var(--border-color); border-radius: 8px; padding: 10px 16px; margin-bottom: 16px; display: flex; justify-content: space-between; align-items: center; font-size: 13px;">
+        <span style="color: var(--text-muted);">Your Research Balance:</span>
+        <strong id="generateModalCreditsText" style="color: var(--accent-emerald); font-size: 14px;">2 Credits Available</strong>
+      </div>
+
+      <form id="generateReportForm" onsubmit="handleGenerateModalSubmit(event)">
+        <div style="margin-bottom: 16px; position: relative;">
+          <label style="display: block; font-size: 13px; color: var(--text-secondary); margin-bottom: 6px;">
+            Enter Stock Symbol or Company Name:
+          </label>
+          <input 
+            type="text" 
+            id="generateModalTickerInput" 
+            required 
+            placeholder="e.g. RELIANCE, TCS, INFY, TATAMOTORS..."
+            autocomplete="off"
+            style="width: 100%; padding: 12px 14px; background: rgba(15, 23, 42, 0.8); border: 1px solid var(--border-color); border-radius: 8px; color: var(--text-primary); font-size: 14px; box-sizing: border-box;"
+          >
+          <div id="generateModalSuggestions" class="search-suggestions" style="display: none; position: absolute; left: 0; right: 0; z-index: 1000; max-height: 200px; overflow-y: auto;"></div>
+        </div>
+
+        <button type="submit" id="generateModalSubmitBtn" class="btn btn-primary" style="width: 100%; padding: 14px; font-size: 15px; font-weight: 700;">
+          ⚡ Synthesize 7-Pillar Dossier (1 Credit)
+        </button>
+      </form>
+
+      <div style="display: flex; justify-content: space-between; align-items: center; margin-top: 16px; font-size: 12px;">
+        <span style="color: var(--text-muted);">Consumes 1 compute credit</span>
+        <a href="/pricing" style="color: var(--accent-cyan); text-decoration: none; font-weight: 600;">Get More Credits →</a>
+      </div>
+    </div>
+  </div>
+
+  <!-- Global Synthesizing Progress Overlay -->
+  <div id="synthesizingOverlay" class="modal-backdrop">
+    <div class="modal-dialog" style="max-width: 480px; text-align: center; padding: 40px 32px;">
+      <div style="font-size: 48px; margin-bottom: 20px; display: inline-block; animation: spin 2s linear infinite;">⚙️</div>
+      <h3 id="overlayTickerTitle" style="font-weight: 800; font-size: 22px; margin-bottom: 12px; color: var(--text-primary);">
+        Synthesizing Institutional Dossier
+      </h3>
+      <p id="overlayStatusMsg" style="font-size: 14px; color: var(--text-secondary); line-height: 1.6; margin-bottom: 20px;">
+        Ingesting live BSE exchange filings, executing 7-pillar qualitative matrix analysis, computing multi-scenario DCF valuations, and auditing governance footnotes...
+      </p>
+      <div style="background: rgba(14, 165, 233, 0.1); border-radius: 8px; padding: 10px 14px; font-size: 12px; color: var(--accent-cyan);">
+        ⏳ Average compilation time: ~20-30 seconds. Please keep this tab open.
       </div>
     </div>
   </div>

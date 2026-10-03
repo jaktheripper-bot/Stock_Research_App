@@ -1,15 +1,18 @@
 /**
  * Stock Research App - Main Client-Side Logic
- * Autocomplete, Instant Lookup, and Razorpay Checkout Modal
+ * Autocomplete, Instant Lookup, Razorpay Checkout Modal, and Report Synthesis
  */
 
 document.addEventListener('DOMContentLoaded', () => {
   initSearchAutocomplete();
   initCheckoutModals();
+  initGenerateModal();
   initAuthModal();
 });
 
-// Search and Autocomplete
+// ==============================================================================
+// 1. Search and Autocomplete (Homepage)
+// ==============================================================================
 function initSearchAutocomplete() {
   const searchInput = document.getElementById('mainSearchInput');
   const suggestionsBox = document.getElementById('searchSuggestions');
@@ -71,7 +74,124 @@ function initSearchAutocomplete() {
   });
 }
 
-// Checkout Modal
+// ==============================================================================
+// 2. Global Generate Report Modal & Autocomplete
+// ==============================================================================
+function initGenerateModal() {
+  const modal = document.getElementById('generateModal');
+  const closeBtn = document.getElementById('closeGenerateModalBtn');
+  const tickerInput = document.getElementById('generateModalTickerInput');
+  const suggestionsBox = document.getElementById('generateModalSuggestions');
+
+  if (closeBtn && modal) {
+    closeBtn.addEventListener('click', () => {
+      modal.classList.remove('active');
+    });
+    modal.addEventListener('click', (e) => {
+      if (e.target === modal) {
+        modal.classList.remove('active');
+      }
+    });
+  }
+
+  if (tickerInput && suggestionsBox) {
+    let debounceTimer;
+    tickerInput.addEventListener('input', (e) => {
+      clearTimeout(debounceTimer);
+      const q = e.target.value.trim();
+      if (q.length < 2) {
+        suggestionsBox.style.display = 'none';
+        return;
+      }
+
+      debounceTimer = setTimeout(async () => {
+        try {
+          const resp = await fetch(`/api/suggest?q=${encodeURIComponent(q)}`);
+          if (resp.ok) {
+            const data = await resp.json();
+            const items = data.suggestions || [];
+            if (items.length === 0) {
+              suggestionsBox.style.display = 'none';
+              return;
+            }
+            suggestionsBox.innerHTML = items.map(ticker => `
+              <div class="suggestion-item" style="padding: 10px 14px; cursor: pointer; display: flex; justify-content: space-between; border-bottom: 1px solid var(--border-color); background: var(--bg-card);" onclick="selectGenerateTicker('${ticker}')">
+                <span class="ticker-badge" style="font-weight: 700; color: var(--accent-cyan);">${ticker}</span>
+                <span style="font-size: 12px; color: var(--text-muted);">Select</span>
+              </div>
+            `).join('');
+            suggestionsBox.style.display = 'block';
+          }
+        } catch (err) {
+          console.error('Failed to fetch modal suggestions:', err);
+        }
+      }, 250);
+    });
+
+    document.addEventListener('click', (e) => {
+      if (suggestionsBox && !tickerInput.contains(e.target) && !suggestionsBox.contains(e.target)) {
+        suggestionsBox.style.display = 'none';
+      }
+    });
+  }
+}
+
+window.selectGenerateTicker = function(ticker) {
+  const tickerInput = document.getElementById('generateModalTickerInput');
+  const suggestionsBox = document.getElementById('generateModalSuggestions');
+  if (tickerInput) tickerInput.value = ticker;
+  if (suggestionsBox) suggestionsBox.style.display = 'none';
+};
+
+window.openGenerateModal = function() {
+  const user = getStoredUser();
+  if (!user) {
+    alert('Please sign in first to generate institutional dossiers. You will receive 2 free research credits.');
+    openSignInModal();
+    return;
+  }
+
+  const balanceText = document.getElementById('generateModalCreditsText');
+  if (balanceText) {
+    const bal = user.credits_balance !== undefined ? user.credits_balance : 0;
+    balanceText.innerText = `${bal} Credits Available`;
+    if (bal < 1) {
+      balanceText.style.color = '#ef4444';
+      balanceText.innerText = `${bal} Credits (Top-up required)`;
+    } else {
+      balanceText.style.color = 'var(--accent-emerald)';
+    }
+  }
+
+  const modal = document.getElementById('generateModal');
+  if (modal) {
+    modal.classList.add('active');
+    const input = document.getElementById('generateModalTickerInput');
+    if (input) {
+      input.value = '';
+      setTimeout(() => input.focus(), 150);
+    }
+  }
+};
+
+window.handleGenerateModalSubmit = async function(e) {
+  if (e) e.preventDefault();
+  const input = document.getElementById('generateModalTickerInput');
+  if (!input || !input.value.trim()) {
+    alert('Please enter a BSE/NSE stock symbol or company name.');
+    return;
+  }
+
+  const ticker = input.value.trim().toUpperCase();
+  const modal = document.getElementById('generateModal');
+  if (modal) modal.classList.remove('active');
+
+  await synthesizeReport(ticker);
+};
+
+// ==============================================================================
+// 3. Razorpay Checkout Modal & Payment Processing
+// ==============================================================================
 function initCheckoutModals() {
   const modal = document.getElementById('checkoutModal');
   const closeBtn = document.getElementById('closeModalBtn');
@@ -129,7 +249,7 @@ window.openCheckout = function(planId, planName, amountInr, credits) {
         const orderData = await resp.json();
 
         if (orderData.is_simulated) {
-          // Instant simulation fulfillment for dev/offline testing
+          // Simulation fulfillment for dev/offline testing
           const simPayId = 'pay_sim_' + Date.now();
           const verifyResp = await fetch('/api/verify-payment', {
             method: 'POST',
@@ -144,9 +264,14 @@ window.openCheckout = function(planId, planName, amountInr, credits) {
           });
           const verifyResult = await verifyResp.json();
           if (verifyResp.ok && verifyResult.success) {
-            // Update localStorage with new balance from server
-            await refreshUserBalance(storedUser);
-            alert('🎉 Payment verified successfully! Added ' + credits + ' credits to your account. Invoice: ' + verifyResult.invoice_number);
+            let user = getStoredUser();
+            if (user) {
+              user.credits_balance = verifyResult.new_balance !== undefined ? verifyResult.new_balance : ((parseFloat(user.credits_balance) || 0) + parseFloat(credits));
+              localStorage.setItem('sr_user', JSON.stringify(user));
+              syncUserSession();
+            }
+            await refreshUserBalance(user);
+            alert(`🎉 Payment verified successfully! Added ${credits} credits to your account.\nNew Balance: ${verifyResult.new_balance !== undefined ? verifyResult.new_balance : (user ? user.credits_balance : credits)} Credits\nInvoice: ${verifyResult.invoice_number}`);
             modal.classList.remove('active');
             window.location.reload();
           } else {
@@ -184,9 +309,14 @@ window.openCheckout = function(planId, planName, amountInr, credits) {
                 });
                 const verifyResult = await verifyResp.json();
                 if (verifyResp.ok && verifyResult.success) {
-                  // Update localStorage with new balance from server
-                  await refreshUserBalance(storedUser);
-                  alert('🎉 Payment Confirmed! ' + credits + ' Credits added. Invoice: ' + verifyResult.invoice_number);
+                  let user = getStoredUser();
+                  if (user) {
+                    user.credits_balance = verifyResult.new_balance !== undefined ? verifyResult.new_balance : ((parseFloat(user.credits_balance) || 0) + parseFloat(credits));
+                    localStorage.setItem('sr_user', JSON.stringify(user));
+                    syncUserSession();
+                  }
+                  await refreshUserBalance(user);
+                  alert(`🎉 Payment Confirmed! Added ${credits} credits to your account.\nNew Balance: ${verifyResult.new_balance !== undefined ? verifyResult.new_balance : (user ? user.credits_balance : credits)} Credits\nInvoice: ${verifyResult.invoice_number}`);
                   modal.classList.remove('active');
                   window.location.reload();
                 } else {
@@ -230,35 +360,38 @@ window.openCheckout = function(planId, planName, amountInr, credits) {
 };
 
 // ==============================================================================
-// Report Synthesis — Triggers /api/synthesize with credit deduction
+// 4. Report Synthesis — Triggers /api/synthesize with credit deduction & UI feedback
 // ==============================================================================
 
-window.synthesizeReport = async function(ticker) {
+window.synthesizeReport = async function(ticker, forceRefresh = false) {
   const user = getStoredUser();
   if (!user) {
-    alert('Please sign in first to generate reports. You will receive 2 free research credits.');
+    alert('Please sign in first to generate institutional dossiers. You will receive 2 free research credits.');
     openSignInModal();
     return;
   }
 
-  if ((user.credits_balance || 0) < 1) {
-    if (confirm('You need at least 1 research credit to generate a new dossier.\n\nCurrent balance: ' + (user.credits_balance || 0) + ' credits.\n\nWould you like to purchase credits?')) {
+  const balance = parseFloat(user.credits_balance) || 0;
+  if (balance < 1) {
+    if (confirm(`You need at least 1 research credit to generate a new dossier.\n\nCurrent balance: ${balance} credits.\n\nWould you like to visit the Pricing page to top up credits?`)) {
       window.location.href = '/pricing';
     }
     return;
   }
 
-  if (!confirm(`Generate a full 7-pillar institutional dossier for ${ticker}?\n\nThis will consume 1 research credit.\nCurrent balance: ${user.credits_balance} credits.`)) {
+  const actionDesc = forceRefresh ? `Refresh and re-synthesize the 7-pillar institutional dossier for ${ticker}?` : `Generate a fresh 7-pillar institutional dossier for ${ticker}?`;
+  if (!confirm(`${actionDesc}\n\nThis will consume 1 research credit.\nCurrent balance: ${balance} credits.`)) {
     return;
   }
 
-  // Find the button that triggered this and show progress
-  const btn = event && event.target ? event.target.closest('button') || event.target : null;
-  const originalText = btn ? btn.innerText : '';
-  if (btn) {
-    btn.disabled = true;
-    btn.innerText = '⏳ Synthesizing 7-Pillar Thesis...';
-    btn.style.opacity = '0.7';
+  // Show the institutional synthesis overlay
+  const overlay = document.getElementById('synthesizingOverlay');
+  const overlayTitle = document.getElementById('overlayTickerTitle');
+  if (overlayTitle) {
+    overlayTitle.innerText = `Synthesizing Dossier: ${ticker}`;
+  }
+  if (overlay) {
+    overlay.classList.add('active');
   }
 
   try {
@@ -267,19 +400,22 @@ window.synthesizeReport = async function(ticker) {
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
         ticker: ticker,
-        user_id: user.id
+        user_id: user.id,
+        force_refresh: !!forceRefresh
       })
     });
 
     const data = await resp.json();
 
     if (resp.ok && data.success) {
-      // Update local credits
+      // Update local credits atomically
       if (data.new_balance !== undefined) {
         user.credits_balance = data.new_balance;
         localStorage.setItem('sr_user', JSON.stringify(user));
         syncUserSession();
       }
+
+      if (overlay) overlay.classList.remove('active');
 
       if (data.already_exists) {
         alert('✅ ' + data.message);
@@ -287,12 +423,13 @@ window.synthesizeReport = async function(ticker) {
         alert('🎉 ' + data.message);
       }
 
-      // Navigate to the dossier
+      // Navigate directly to the newly generated dossier
       window.location.href = data.dossier_url;
     } else {
+      if (overlay) overlay.classList.remove('active');
+
       const detail = data.detail || data.message || 'Synthesis failed.';
       if (resp.status === 402) {
-        // Insufficient credits
         if (confirm(detail + '\n\nWould you like to purchase more credits?')) {
           window.location.href = '/pricing';
         }
@@ -302,20 +439,19 @@ window.synthesizeReport = async function(ticker) {
       } else {
         alert('❌ ' + detail);
       }
+
+      // Refresh balance in background in case of refund
+      await refreshUserBalance(user);
     }
   } catch (err) {
-    alert('Synthesis Error: ' + err.message);
-  } finally {
-    if (btn) {
-      btn.disabled = false;
-      btn.innerText = originalText;
-      btn.style.opacity = '1';
-    }
+    if (overlay) overlay.classList.remove('active');
+    alert('Synthesis Request Error: ' + err.message);
+    await refreshUserBalance(user);
   }
 };
 
 // ==============================================================================
-// Authentication & User Session Management
+// 5. Authentication & User Session Management
 // ==============================================================================
 
 function initAuthModal() {
@@ -334,6 +470,12 @@ function initAuthModal() {
   }
 
   syncUserSession();
+
+  // Background balance sync on every page load
+  const user = getStoredUser();
+  if (user && user.id) {
+    refreshUserBalance(user);
+  }
 }
 
 window.openSignInModal = function() {
@@ -394,7 +536,7 @@ function getStoredUser() {
 
 /**
  * Fetches the latest user profile/balance from the server and updates localStorage.
- * Called after successful payments to ensure credit balance is always in sync.
+ * Called on page load and after payments/syntheses to ensure credits are always accurate.
  */
 async function refreshUserBalance(user) {
   if (!user || !user.id) return;
@@ -416,8 +558,15 @@ function syncUserSession() {
   const user = getStoredUser();
   const navBtn = document.getElementById('navSignInBtn');
   if (navBtn && user) {
-    navBtn.innerText = `👤 ${user.full_name || 'Account'} (${user.credits_balance} Credits)`;
+    const bal = user.credits_balance !== undefined ? user.credits_balance : 0;
+    navBtn.innerText = `👤 ${user.full_name || 'Account'} (${bal} Credits)`;
     navBtn.classList.remove('btn-primary');
     navBtn.classList.add('btn-secondary');
+  }
+
+  const modalBal = document.getElementById('generateModalCreditsText');
+  if (modalBal && user) {
+    const bal = user.credits_balance !== undefined ? user.credits_balance : 0;
+    modalBal.innerText = `${bal} Credits Available`;
   }
 }
