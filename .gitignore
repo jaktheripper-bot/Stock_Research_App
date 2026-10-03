@@ -1,14 +1,9 @@
-.streamlit/
-.streamlit/
 __pycache__/
+*.pyc
 .streamlit/secrets.toml
 .env
 reports.db
-.streamlit/secrets.toml
 *.db
-reports.db
-__pycache__/
-*.pyc
 .DS_Store
 
 .agents/

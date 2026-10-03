@@ -227,5 +227,138 @@ def _render_checkout_step(user: dict, order: dict):
                         st.error(f"Payment processing error: {msg}")
             else:
                 # Live Razorpay Modal Trigger
-                st.caption("Click to open the secure Razorpay payment window.")
-                st.button(f"Proceed to Pay ₹{amount_inr:,}", type="primary", width="stretch")
+                import streamlit.components.v1 as components
+                st.caption("🔒 Secure 256-bit encrypted checkout via UPI (GPay/PhonePe), Card, or NetBanking.")
+                
+                order_key_id = order.get("key_id", "")
+                order_amt_paise = order.get("amount", int(amount_inr * 100))
+                order_id_val = order.get("id") or order.get("order_id", "")
+                plan_name_val = plan.get("name", "Research Credits")
+                plan_credits_val = plan.get("credits", 1)
+                plan_id_val = plan.get("id", "single_pass")
+                user_name_val = user.get("full_name") or "Investor"
+                user_email_val = user.get("email") or ""
+
+                checkout_html = f"""
+                <!DOCTYPE html>
+                <html>
+                <head>
+                  <meta charset="utf-8">
+                  <script src="https://checkout.razorpay.com/v1/checkout.js"></script>
+                  <style>
+                    body {{ margin: 0; padding: 0; background: transparent; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; }}
+                    .rzp-btn {{
+                      background: linear-gradient(135deg, #0ea5e9 0%, #0284c7 100%);
+                      color: white;
+                      border: none;
+                      padding: 14px 20px;
+                      font-size: 15px;
+                      font-weight: 700;
+                      border-radius: 8px;
+                      cursor: pointer;
+                      width: 100%;
+                      box-sizing: border-box;
+                      box-shadow: 0 4px 14px rgba(14, 165, 233, 0.4);
+                      transition: all 0.2s ease;
+                      display: flex;
+                      align-items: center;
+                      justify-content: center;
+                      gap: 8px;
+                    }}
+                    .rzp-btn:hover {{
+                      transform: translateY(-1px);
+                      box-shadow: 0 6px 20px rgba(14, 165, 233, 0.5);
+                    }}
+                  </style>
+                </head>
+                <body>
+                  <button id="rzp-btn" class="rzp-btn">
+                    ⚡ Pay ₹{amount_inr:,} via Razorpay (UPI / Card)
+                  </button>
+                  <script>
+                    var options = {{
+                      "key": "{order_key_id}",
+                      "amount": "{order_amt_paise}",
+                      "currency": "INR",
+                      "name": "Stock Research App",
+                      "description": "{plan_name_val} — {plan_credits_val} Research Credits",
+                      "order_id": "{order_id_val}",
+                      "prefill": {{
+                        "name": "{user_name_val}",
+                        "email": "{user_email_val}"
+                      }},
+                      "theme": {{
+                        "color": "#0ea5e9"
+                      }},
+                      "handler": function (response) {{
+                        var base = window.parent.location.origin + window.parent.location.pathname;
+                        var redirectUrl = base + 
+                          "?payment_success=1" + 
+                          "&order_id=" + encodeURIComponent(response.razorpay_order_id) + 
+                          "&payment_id=" + encodeURIComponent(response.razorpay_payment_id) + 
+                          "&signature=" + encodeURIComponent(response.razorpay_signature) + 
+                          "&plan_id=" + encodeURIComponent("{plan_id_val}");
+                        window.parent.location.href = redirectUrl;
+                      }}
+                    }};
+                    var rzpInstance = new Razorpay(options);
+                    document.getElementById('rzp-btn').onclick = function(e) {{
+                      rzpInstance.open();
+                      e.preventDefault();
+                    }};
+                    // Auto open
+                    setTimeout(function() {{
+                      try {{ rzpInstance.open(); }} catch(e) {{}}
+                    }}, 400);
+                  </script>
+                </body>
+                </html>
+                """
+                components.html(checkout_html, height=75)
+
+
+def handle_payment_callback():
+    """Checks and processes Razorpay payment redirect callback from query params."""
+    try:
+        params = st.query_params
+        if params.get("payment_success"):
+            order_id = params.get("order_id")
+            payment_id = params.get("payment_id")
+            signature = params.get("signature")
+            plan_id = params.get("plan_id", "single_pass")
+
+            user = get_current_user()
+            user_id = user["id"] if user else "guest_web_user"
+
+            if order_id and payment_id and signature:
+                ok, new_bal, inv_num, msg = process_successful_payment(
+                    user_id=user_id,
+                    plan_id=plan_id,
+                    order_id=order_id,
+                    payment_id=payment_id,
+                    signature=signature
+                )
+                if ok:
+                    refresh_current_user()
+                    plan = get_plan_by_id(plan_id) or {}
+                    credits_added = plan.get("credits", 1.0)
+                    st.session_state["last_invoice_number"] = inv_num
+                    st.session_state["last_payment_success"] = {
+                        "invoice_number": inv_num,
+                        "plan_name": plan.get("name", "Research Credits"),
+                        "amount_inr": plan.get("amount_inr", 0),
+                        "credits_added": credits_added,
+                        "payment_id": payment_id,
+                        "date": time.strftime("%d-%b-%Y %H:%M IST")
+                    }
+                    st.toast(f"🎉 Payment Confirmed! Added {credits_added} credits (Balance: {new_bal:.1f}). Invoice: {inv_num}", icon="✅")
+                    track_user_action("PAYMENT_SUCCESS", details={"plan_id": plan_id, "invoice": inv_num})
+                else:
+                    st.error(f"Payment confirmation error: {msg}")
+
+            # Clear payment query params so it doesn't trigger again on reload
+            st.query_params.clear()
+            st.rerun()
+    except Exception as e:
+        logger.error(f"Error handling payment callback: {e}")
+

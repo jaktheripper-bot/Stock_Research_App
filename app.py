@@ -28,7 +28,7 @@ from ui.auth_ui import (
     render_ledger_dialog,
     check_and_render_auth_dialogs,
 )
-from ui.billing_modal import render_top_up_dialog
+from ui.billing_modal import render_top_up_dialog, handle_payment_callback
 from core.auth import handle_auth_callback
 from telemetry import (
     track_user_action,
@@ -65,6 +65,7 @@ inject_ga4_tracking()
 check_url_admin_auth()
 init_session_telemetry()
 handle_auth_callback()
+handle_payment_callback()
 
 # 3. Production CSS Stylesheet (Metric Unclip, Reading Measure, & Responsive Wrapping)
 st.markdown(
