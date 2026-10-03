@@ -1,37 +1,12 @@
-# Stock Research App — Production Release Ledger & Engineering Backlog
+# Stock Research App — Engineering Backlog & Production Release Ledger
 
-This document tracks all changes deployed to production and active engineering roadmap items.
-
----
-
-## Part 1: Production Deployment Ledger (Live Features)
-
-| Release Date | Git Commit | Scope / Feature | Production Route(s) | Status |
-| :--- | :--- | :--- | :--- | :--- |
-| **03-Oct-2026** | `ca979ac` | **The Morning Discovery Reel (Option B: Full Grounded Synthesis)**<br>• Nightly screening of 10–15 under-the-radar equities across diverse sectors<br>• Rigorous financial health gates (ROCE >= 15%, D/E <= 0.6, Micro/Small-Cap)<br>• Option B full institutional-grade 7-pillar grounded report generation with historical filings<br>• Dedicated discovery hub with interactive sector filtering (`/discovery`)<br>• Homepage highlights reel integration & BSE filing catalyst links<br>• Database migration `v008_discovery_reel` (PostgreSQL / SQLite dual-bound)<br>• Automated batch worker (`scripts/run_discovery_worker.py`) & admin trigger API | `/discovery`<br>`/`<br>`/api/admin/run-discovery` | **LIVE** |
-| **03-Oct-2026** | `35e15f8` | **Dossier Ergonomics & Technical Chart Restoration**<br>• Stripped redundant markdown Health Matrix bullet list<br>• Restored interactive 6-month Price Momentum & 50-DMA trendline chart<br>• Automated trend inference and Chart.js integration<br>• Permanent FastAPI Web Portal test suite (`test_fastapi_web.py`) | `/dossier/{ticker}` | **LIVE** |
-| **03-Oct-2026** | `ad6dbd8` | **Modern Web Portal & Complete Feature Port**<br>• Institutional Peer Comparator & 3-Tier Disparity Gates<br>• Charlie Munger Pre-Mortem Inversion Module<br>• Multi-Quarter Thesis Drift Surveillance & Value Trap Banner<br>• Anchoring Bias Guardrail & 7-Pillar Scorecard Strip<br>• Razorpay Live Checkout with Guaranteed Account Crediting<br>• Statutory Compliance & Policy Disclosures | `/`<br>`/compare`<br>`/dossier/{ticker}`<br>`/pricing`<br>`/terms`, `/privacy`, `/refund-policy` | **LIVE** |
-| **03-Oct-2026** | `6629ddc` | **Monetization & Credit Gating Engine**<br>• User accounts & 2.0 welcome credit allocation<br>• Credit-gated live synthesis with auto-refund on failure<br>• Dual-bound PostgreSQL/SQLite user schema (`v007`) | `/api/auth/signin`<br>`/api/synthesize`<br>`/api/user/{id}` | **LIVE** |
-| **02-Oct-2026** | `9b3a0c2` | **Verified Citations & Footnote Engine**<br>• Primary BSE filing & regulatory source grounding<br>• Footnote citations persistence (`v006`)<br>• Institutional PDF generation with hyperlinked appendix | `/dossier/{ticker}`<br>`/api/pdf/{ticker}` | **LIVE** |
-| **01-Oct-2026** | `5b497f1` | **Behavioral Ergonomics & Disparity Diagnostics**<br>• 13 side-by-side financial multiples & ratios<br>• Sector, Lifecycle, and Scale Disparity Gates (>=100x)<br>• Tabular lining typography (`tabular-nums`) | Core Analysis Engine | **LIVE** |
-| **30-Sep-2026** | `4a18f2d` | **Three-Phase Architectural Modularization**<br>• `core/db/`: connection pooling, migrations, queries<br>• `core/analysis/`: fundamentals, engine, delta, parser<br>• `ui/views/`: modular views and state coordinator | Internal Core Architecture | **LIVE** |
-| **29-Sep-2026** | `1c890e4` | **Foundation: 7-Pillar Synthesis & Exchange Ingestion**<br>• BSE scrip master resolution (5,000+ equities)<br>• Zero-hallucination exchange metrics ingestion<br>• Dual PostgreSQL/SQLite persistence (`v001`–`v005`) | Core Analysis Engine | **LIVE** |
-
-### Verified Live Capabilities (Current Production Environment)
-1. **Public Web Portal (`web/`):** Full Server-Side Rendered (SSR) portal running on FastAPI with sub-50ms TTFB.
-2. **Peer Comparison Engine (`/compare`):** Side-by-side analysis of any two BSE/NSE stocks with 3 automated disparity gates (Sector, Lifecycle, Scale >= 100x) and 13 financial multiples.
-3. **Behavioral Inversion Module (`/dossier/{ticker}`):** Charlie Munger Pre-Mortem counter-thesis capture committing to an immutable audit decision ledger.
-4. **Drift Surveillance (`/dossier/{ticker}`):** Multi-quarter differential tracking detecting pillar migrations and flagging potential value traps.
-5. **Anchoring Bias Guardrail (`/dossier/{ticker}`):** 52-week position percentile and historical P/E valuation quartiles (Q1–Q4).
-6. **Regulatory Footnotes & Citations:** Primary source attributions hyperlinked and rendered across web dossiers and PDF report exports.
-7. **Razorpay Payments & Credit Allocation (`/pricing`):** Seamless checkout supporting UPI (GPay, PhonePe), Cards, and NetBanking with authenticated account linking and automated tax receipts (SAC 998314).
-8. **Statutory Safe-Harbor Disclosures:** Dedicated legal policy suite (`/terms`, `/privacy`, `/refund-policy`, `/shipping-policy`, `/contact`, `/disclaimer`).
+This document tracks all active engineering tasks (surfaced at the top) followed by historical completed milestones and production deployments.
 
 ---
 
-## Part 2: Engineering Roadmap & Pending Backlog (Queued)
+## Part 1: Engineering Roadmap & Pending Tasks (Queued Backlog)
 
-Tasks below represent planned feature expansions and architectural optimizations. Each task is classified by priority, target phase, and functional scope.
+Tasks below represent active, queued roadmap items classified by priority, target phase, and functional scope.
 
 ### Priority 1: Architectural Unification (Non-Urgent)
 *Target: Complete transition away from dual-runtime to a single FastAPI stack.*
@@ -39,23 +14,11 @@ Tasks below represent planned feature expansions and architectural optimizations
 * [ ] **Phase 4: Full Platform Unification onto FastAPI (Retire Streamlit)**
   * **Operator Control Room Port (`/admin`):** Build a secure, password-protected `/admin` route in `web/main.py` (authenticated via `ADMIN_PASSCODE`) supporting database migration inspection, Gemini quota/spend monitoring, batch runs, and credit ledger audits.
   * **Core Caching Decoupling:** Replace `@st.cache_data` in `core/analysis/fundamentals.py`, `alerts.py`, and `bse_master.py` with standard Python in-memory TTL caching (e.g. `cachetools.TTLCache`), eliminating `MemoryCacheStorageManager` runtime warnings.
-  * **Test Suite Modernization:** Replace Streamlit `test_ui_headless.py` (`AppTest`) with an automated FastAPI `TestClient` suite covering all SSR routes, APIs, and billing transactions.
-  * **Dependency Purge:** Remove `streamlit` and transitive packages (`tornado`, `pydeck`, `protobuf`, `altair`) from `requirements.txt`, archive `app.py` and `admin.py`, and reduce Docker container size from ~1.3 GB to ~350 MB.
+  * **Streamlit Dependency Purge:** Remove `streamlit` and transitive packages (`tornado`, `pydeck`, `protobuf`, `altair`) from `requirements.txt`, archive legacy `app.py` and `admin.py`, reducing Docker container size from ~1.3 GB to ~350 MB.
 
 ---
 
-### Priority 2: Ingestion & Commercial Data Hardening
-*Target: Increase resilience against exchange throttling and upstream rate limits.*
-
-* [ ] **Tier 2: Commercial Fundamental REST Integration (EODHD)**
-  * Implement structured fallback in `core/analysis/fundamentals.py`:  
-    `BSE Direct API` ➔ `EODHD REST API` ➔ `yfinance` ➔ `'N/A'`.
-  * Protect fundamental metrics against foreign IP blocks and rate limits.
-  * Wire optional `EODHD_API_KEY` configuration.
-
----
-
-### Priority 3: Forensic & Behavioral Analytical Depth
+### Priority 2: Forensic & Behavioral Analytical Depth
 *Target: Advanced accounting fraud detection and cognitive bias mitigation.*
 
 * [ ] **P3.1: Post-Earnings Announcement Drift (PEAD) & SUE Anomaly Tracker**
@@ -71,7 +34,7 @@ Tasks below represent planned feature expansions and architectural optimizations
 
 ---
 
-### Priority 4: Search Discovery & Headless Distribution
+### Priority 3: Search Discovery & Headless Distribution
 *Target: Indexability across traditional search (Google, Bing) and AI answer engines (Perplexity, ChatGPT).*
 
 * [ ] **Static Site Generation (SSG) & Headless Mirror**
@@ -83,7 +46,7 @@ Tasks below represent planned feature expansions and architectural optimizations
 
 ---
 
-### Priority 5: Strategic Multi-Asset Expansion
+### Priority 4: Strategic Multi-Asset Expansion
 *Target: Extend 7-pillar methodology across investment classes.*
 
 * [ ] **Tier 2: Mutual Fund Look-Through Engine**
@@ -94,3 +57,42 @@ Tasks below represent planned feature expansions and architectural optimizations
   * Real-return diagnostics for Corporate Bonds, Sovereign Gold Bonds (SGB), NCDs, and fixed deposits.
 * [ ] **Capstone: Unified Qualitative Portfolio Audit**
   * Comprehensive risk concentration audit aggregating Equities + Mutual Funds + Fixed Income into an institutional-grade governance report.
+
+---
+
+### Completed Roadmap Milestones (Archived from Backlog)
+
+* [x] **The Morning Discovery Reel (Option B: Full Grounded Synthesis):** Nightly screening of 10–15 under-the-radar equities across 10 sectors, full grounded 7-pillar synthesis with BSE filings, dedicated hub (`/discovery`), homepage highlights reel (`/`), schema migration `v008_discovery_reel`, and batch worker script (`scripts/run_discovery_worker.py`).
+* [x] **Dossier Ergonomics & Momentum Chart Restoration:** Stripped redundant markdown Health Matrix bullet lists, restored interactive dark-mode 6-Month Price Momentum & 50-DMA trendline chart (`/dossier/{ticker}`).
+* [x] **FastAPI Automated Test Suite Modernization:** Comprehensive test suite (`tests/test_fastapi_web.py`) covering all SSR routes, peer comparison, pricing, policies, and discovery APIs.
+* [x] **Commercial Fundamental REST Integration (EODHD Fallback):** European vendor fallback (`fetch_eodhd_stock_data`) wired into ingestion hierarchy.
+* [x] **Monetization & Credit Gating Engine:** User accounts, Razorpay UPI/cards, 2.0 welcome credit allocation, dual-bound schema (`v007`).
+* [x] **Institutional Peer Comparator & Disparity Diagnostics:** Side-by-side analysis of two stocks with 3 automated disparity gates and 13 financial multiples (`/compare`).
+* [x] **SEBI Statutory Policy Disclosures Suite:** Dedicated legal policy suite (`/terms`, `/privacy`, `/refund-policy`, `/shipping-policy`, `/contact`, `/disclaimer`).
+
+---
+
+## Part 2: Production Deployment Ledger (Live Features)
+
+| Release Date | Git Commit | Scope / Feature | Production Route(s) | Status |
+| :--- | :--- | :--- | :--- | :--- |
+| **03-Oct-2026** | `ca979ac` | **The Morning Discovery Reel (Option B: Full Grounded Synthesis)**<br>• Nightly screening of 10–15 under-the-radar equities across diverse sectors<br>• Rigorous financial health gates (ROCE >= 15%, D/E <= 0.6, Micro/Small-Cap)<br>• Option B full institutional-grade 7-pillar grounded report generation with historical filings<br>• Dedicated discovery hub with interactive sector filtering (`/discovery`)<br>• Homepage highlights reel integration & BSE filing catalyst links<br>• Database migration `v008_discovery_reel` (PostgreSQL / SQLite dual-bound)<br>• Automated batch worker (`scripts/run_discovery_worker.py`) & admin trigger API | `/discovery`<br>`/`<br>`/api/admin/run-discovery` | **LIVE** |
+| **03-Oct-2026** | `35e15f8` | **Dossier Ergonomics & Technical Chart Restoration**<br>• Stripped redundant markdown Health Matrix bullet list<br>• Restored interactive 6-month Price Momentum & 50-DMA trendline chart<br>• Automated trend inference and Chart.js integration<br>• Permanent FastAPI Web Portal test suite (`test_fastapi_web.py`) | `/dossier/{ticker}` | **LIVE** |
+| **03-Oct-2026** | `ad6dbd8` | **Modern Web Portal & Complete Feature Port**<br>• Institutional Peer Comparator & 3-Tier Disparity Gates<br>• Charlie Munger Pre-Mortem Inversion Module<br>• Multi-Quarter Thesis Drift Surveillance & Value Trap Banner<br>• Anchoring Bias Guardrail & 7-Pillar Scorecard Strip<br>• Razorpay Live Checkout with Guaranteed Account Crediting<br>• Statutory Compliance & Policy Disclosures | `/`<br>`/compare`<br>`/dossier/{ticker}`<br>`/pricing`<br>`/terms`, `/privacy`, `/refund-policy` | **LIVE** |
+| **03-Oct-2026** | `6629ddc` | **Monetization & Credit Gating Engine**<br>• User accounts & 2.0 welcome credit allocation<br>• Credit-gated live synthesis with auto-refund on failure<br>• Dual-bound PostgreSQL/SQLite user schema (`v007`) | `/api/auth/signin`<br>`/api/synthesize`<br>`/api/user/{id}` | **LIVE** |
+| **02-Oct-2026** | `9b3a0c2` | **Verified Citations & Footnote Engine**<br>• Primary BSE filing & regulatory source grounding<br>• Footnote citations persistence (`v006`)<br>• Institutional PDF generation with hyperlinked appendix | `/dossier/{ticker}`<br>`/api/pdf/{ticker}` | **LIVE** |
+| **01-Oct-2026** | `5b497f1` | **Behavioral Ergonomics & Disparity Diagnostics**<br>• 13 side-by-side financial multiples & ratios<br>• Sector, Lifecycle, and Scale Disparity Gates (>=100x)<br>• Tabular lining typography (`tabular-nums`) | Core Analysis Engine | **LIVE** |
+| **30-Sep-2026** | `4a18f2d` | **Three-Phase Architectural Modularization**<br>• `core/db/`: connection pooling, migrations, queries<br>• `core/analysis/`: fundamentals, engine, delta, parser<br>• `ui/views/`: modular views and state coordinator | Internal Core Architecture | **LIVE** |
+| **29-Sep-2026** | `1c890e4` | **Foundation: 7-Pillar Synthesis & Exchange Ingestion**<br>• BSE scrip master resolution (5,000+ equities)<br>• Zero-hallucination exchange metrics ingestion<br>• Dual PostgreSQL/SQLite persistence (`v001`–`v005`) | Core Analysis Engine | **LIVE** |
+
+### Verified Live Capabilities (Current Production Environment)
+1. **The Morning Discovery Reel (`/discovery`):** Nightly curated highlights of 10–15 high-ROCE, low-leverage companies with interactive sector filtering and 1-click dossier navigation.
+2. **Public Web Portal (`web/`):** Full Server-Side Rendered (SSR) portal running on FastAPI with sub-50ms TTFB.
+3. **Peer Comparison Engine (`/compare`):** Side-by-side analysis of any two BSE/NSE stocks with 3 automated disparity gates (Sector, Lifecycle, Scale >= 100x) and 13 financial multiples.
+4. **Behavioral Inversion Module (`/dossier/{ticker}`):** Charlie Munger Pre-Mortem counter-thesis capture committing to an immutable audit decision ledger.
+5. **Drift Surveillance (`/dossier/{ticker}`):** Multi-quarter differential tracking detecting pillar migrations and flagging potential value traps.
+6. **Anchoring Bias Guardrail (`/dossier/{ticker}`):** 52-week position percentile and historical P/E valuation quartiles (Q1–Q4).
+7. **Interactive Price Momentum Visualizer (`/dossier/{ticker}`):** 6-Month daily price & 50-DMA trendline chart with trend inference banner.
+8. **Regulatory Footnotes & Citations:** Primary source attributions hyperlinked and rendered across web dossiers and PDF report exports.
+9. **Razorpay Payments & Credit Allocation (`/pricing`):** Seamless checkout supporting UPI (GPay, PhonePe), Cards, and NetBanking with authenticated account linking and automated tax receipts (SAC 998314).
+10. **Statutory Safe-Harbor Disclosures:** Dedicated legal policy suite (`/terms`, `/privacy`, `/refund-policy`, `/shipping-policy`, `/contact`, `/disclaimer`).
