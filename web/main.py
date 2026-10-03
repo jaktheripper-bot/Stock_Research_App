@@ -55,10 +55,10 @@ from core.db import (
     IST,
 )
 from core.db.telemetry import record_usage_event
-from core.analysis import get_stock_fundamentals
+from core.analysis import get_stock_fundamentals, get_historical_prices
 from core.analysis.engine import generate_stock_report
 from core.analysis.comparator import compare_two_companies
-from core.analysis.parser import extract_health_matrix, compare_revisions
+from core.analysis.parser import extract_health_matrix, compare_revisions, remove_health_matrix_text
 from core.analysis.metrics import calculate_52w_percentile, calculate_pe_percentile, get_valuation_quartile
 from core.billing import (
     PRICING_PACKS,
@@ -222,6 +222,9 @@ async def dossier_page(request: Request, ticker: str):
         if len(parts) > 1 and len(parts[0].strip()) > 300:
             prose_md = parts[0].rstrip()
 
+    # Strip redundant Health Matrix markdown list so only top colored badge pills appear
+    prose_md = remove_health_matrix_text(prose_md)
+
     # Convert report markdown into semantic HTML
     html_content = markdown.markdown(
         prose_md,
@@ -259,6 +262,55 @@ async def dossier_page(request: Request, ticker: str):
     pct_pe = calculate_pe_percentile(pe_val, revisions)
     pe_quartile = get_valuation_quartile(pct_pe)
 
+    # Ingest 6-Month Price Momentum & 50-DMA Trend History
+    chart_data = None
+    chart_json = "{}"
+    try:
+        df_hist = get_historical_prices(canonical, period="6mo")
+        if df_hist is not None and not df_hist.empty and "Close" in df_hist.columns and "Date" in df_hist.columns:
+            import pandas as pd
+            dates = []
+            closes = []
+            sma50 = []
+            for _, row in df_hist.iterrows():
+                d_val = row["Date"]
+                d_str = d_val.strftime("%d %b") if hasattr(d_val, "strftime") else str(d_val)[:10]
+                dates.append(d_str)
+                c_val = row.get("Close")
+                closes.append(round(float(c_val), 2) if c_val is not None and pd.notna(c_val) else None)
+                s_val = row.get("SMA50")
+                sma50.append(round(float(s_val), 2) if s_val is not None and pd.notna(s_val) else None)
+
+            latest_close = closes[-1] if closes else None
+            latest_sma = next((s for s in reversed(sma50) if s is not None), None)
+            trend_badge = None
+            trend_status = "neutral"
+            trend_inference = None
+            if latest_close and latest_sma:
+                diff_pct = ((latest_close - latest_sma) / latest_sma) * 100
+                if diff_pct >= 0:
+                    trend_badge = f"+{diff_pct:.1f}% vs 50-DMA"
+                    trend_status = "bullish"
+                    trend_inference = f"Trading {trend_badge}. Momentum remains constructive above the 50-day institutional accumulation trendline."
+                else:
+                    trend_badge = f"{diff_pct:.1f}% vs 50-DMA"
+                    trend_status = "bearish"
+                    trend_inference = f"Trading {trend_badge}. Consolidation below 50-DMA indicates valuation compression or intermediate mean-reversion."
+
+            chart_data = {
+                "dates": dates,
+                "closes": closes,
+                "sma50": sma50,
+                "latest_close": latest_close,
+                "latest_sma": latest_sma,
+                "trend_badge": trend_badge,
+                "trend_status": trend_status,
+                "trend_inference": trend_inference
+            }
+            chart_json = json.dumps(chart_data)
+    except Exception as e:
+        logger.debug(f"Momentum chart generation notice for {canonical}: {e}")
+
     return templates.TemplateResponse(
         request=request,
         name="dossier.html",
@@ -280,6 +332,8 @@ async def dossier_page(request: Request, ticker: str):
             "high_52": high_52,
             "pct_pe": pct_pe,
             "pe_quartile": pe_quartile,
+            "chart_data": chart_data,
+            "chart_json": chart_json,
         }
     )
 
