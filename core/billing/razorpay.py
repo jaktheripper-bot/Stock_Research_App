@@ -60,9 +60,22 @@ def get_razorpay_keys() -> Tuple[str, str, bool]:
     key_secret = os.environ.get("RAZORPAY_KEY_SECRET")
 
     if not key_id or not key_secret:
+        # Check Streamlit secrets first if available
         try:
             key_id = st.secrets.get("RAZORPAY_KEY_ID", key_id)
             key_secret = st.secrets.get("RAZORPAY_KEY_SECRET", key_secret)
+        except Exception:
+            pass
+
+    if not key_id or not key_secret:
+        # Check local .streamlit/secrets.toml directly (for FastAPI / Uvicorn runtimes)
+        try:
+            import toml
+            p = os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))), ".streamlit", "secrets.toml")
+            if os.path.exists(p):
+                sec = toml.load(p)
+                key_id = sec.get("RAZORPAY_KEY_ID", key_id)
+                key_secret = sec.get("RAZORPAY_KEY_SECRET", key_secret)
         except Exception:
             pass
 

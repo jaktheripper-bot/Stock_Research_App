@@ -211,6 +211,14 @@ function initCheckoutModals() {
 
 // Global checkout trigger
 window.openCheckout = function(planId, planName, amountInr, credits) {
+  const storedUser = getStoredUser();
+  if (!storedUser) {
+    window._pendingCheckout = { planId: planId, planName: planName, amountInr: amountInr, credits: credits };
+    alert('Please enter your email to sign in or create your account first. You will receive 2 free welcome credits and your purchased credits will be credited directly to your account.');
+    openSignInModal();
+    return;
+  }
+
   const modal = document.getElementById('checkoutModal');
   if (!modal) return;
 
@@ -230,14 +238,14 @@ window.openCheckout = function(planId, planName, amountInr, credits) {
       confirmBtn.innerText = 'Initializing Razorpay Checkout...';
 
       try {
-        const storedUser = getStoredUser();
+        const currentUser = getStoredUser();
         const resp = await fetch('/api/create-order', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
             plan_id: planId,
-            user_id: storedUser ? storedUser.id : 'guest_web_user',
-            email: storedUser ? storedUser.email : 'investor@example.com'
+            user_id: currentUser ? currentUser.id : 'guest_web_user',
+            email: currentUser ? currentUser.email : 'investor@example.com'
           })
         });
         
@@ -509,10 +517,19 @@ window.handleSignInSubmit = async function(e) {
     const data = await resp.json();
     if (resp.ok && data.success) {
       localStorage.setItem('sr_user', JSON.stringify(data.user));
-      alert(`🎉 Welcome ${data.user.full_name}! 2 Free Research Credits have been allocated to your account.`);
       const modal = document.getElementById('authModal');
       if (modal) modal.classList.remove('active');
       syncUserSession();
+
+      if (window._pendingCheckout) {
+        const p = window._pendingCheckout;
+        window._pendingCheckout = null;
+        alert(`🎉 Welcome ${data.user.full_name}! 2 Free Welcome Credits have been claimed.\nOpening checkout for ${p.planName}...`);
+        openCheckout(p.planId, p.planName, p.amountInr, p.credits);
+        return;
+      }
+
+      alert(`🎉 Welcome ${data.user.full_name}! 2 Free Research Credits have been allocated to your account.`);
       window.location.reload();
     } else {
       alert('Sign-In Error: ' + (data.detail || data.message || 'Could not complete sign in.'));
@@ -522,6 +539,50 @@ window.handleSignInSubmit = async function(e) {
   } finally {
     submitBtn.disabled = false;
     submitBtn.innerText = 'Continue with Email & Claim 2 Credits →';
+  }
+};
+
+window.handlePreMortemSubmit = async function(e, ticker) {
+  if (e) e.preventDefault();
+  const vector = document.getElementById('premortemVector')?.value || '';
+  const notes = document.getElementById('premortemNotes')?.value || '';
+  const statusEl = document.getElementById('premortemStatus');
+  const btn = document.getElementById('btnCommitPremortem');
+
+  if (btn) {
+    btn.disabled = true;
+    btn.innerText = 'Anchoring Anti-Thesis...';
+  }
+
+  try {
+    const user = getStoredUser();
+    const resp = await fetch('/api/premortem', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        ticker: ticker,
+        failure_vector: vector,
+        anti_thesis_notes: notes,
+        user_id: user ? user.id : 'guest_web_user'
+      })
+    });
+    const data = await resp.json();
+    if (resp.ok && data.success) {
+      if (statusEl) {
+        statusEl.innerText = '✅ Committed to Decision Ledger!';
+        statusEl.style.color = 'var(--accent-emerald)';
+      }
+      alert(`🔒 ${data.message}`);
+    } else {
+      alert('Error: ' + (data.detail || data.message || 'Could not record.'));
+    }
+  } catch (err) {
+    alert('Error recording pre-mortem: ' + err.message);
+  } finally {
+    if (btn) {
+      btn.disabled = false;
+      btn.innerText = '🔒 Commit Pre-Mortem to Audit Ledger';
+    }
   }
 };
 

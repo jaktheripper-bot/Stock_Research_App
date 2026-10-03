@@ -48,15 +48,34 @@ def get_or_create_user(
         # Check if user exists by ID or email
         cursor.execute(f"SELECT id, email, full_name, avatar_url, credits_balance, subscription_tier, subscription_expires_at, created_at, last_login_at FROM user_accounts WHERE id = {p} OR email = {p} LIMIT 1;", (clean_id, clean_email))
         row = cursor.fetchone()
-
         if row:
             db_id = row[0]
-            # Update last_login_at and metadata if provided
-            cursor.execute(
-                f"UPDATE user_accounts SET last_login_at = CURRENT_TIMESTAMP, full_name = COALESCE(NULLIF({p}, ''), full_name), avatar_url = COALESCE(NULLIF({p}, ''), avatar_url) WHERE id = {p};",
-                (full_name, avatar_url, db_id)
-            )
-            conn.commit()
+            # Check if this user ever received welcome credits
+            cursor.execute(f"SELECT COUNT(*) FROM credit_transactions WHERE user_id = {p} AND pack_type = 'WELCOME_GRANT';", (db_id,))
+            grant_row = cursor.fetchone()
+            grant_count = grant_row[0] if grant_row else 0
+            current_bal = float(row[4] or 0.0)
+
+            if grant_count == 0 and current_bal < 2.0:
+                # First-time welcome grant
+                initial_credits = 2.0
+                cursor.execute(f"UPDATE user_accounts SET credits_balance = credits_balance + {p} WHERE id = {p};", (initial_credits, db_id))
+                tx_id = f"tx_welcome_{db_id[:12]}_{int(time.time())}"
+                cursor.execute(
+                    f"""
+                    INSERT INTO credit_transactions (id, user_id, amount_inr, credits_added, payment_gateway, status, pack_type, invoice_number)
+                    VALUES ({p}, {p}, 0.0, {p}, 'system_grant', 'success', 'WELCOME_GRANT', {p});
+                    """,
+                    (tx_id, db_id, initial_credits, f"INV-WELCOME-{int(time.time())}")
+                )
+                cursor.execute(
+                    f"""
+                    INSERT INTO credit_usage_ledger (user_id, ticker, action_type, credits_consumed, balance_after)
+                    VALUES ({p}, 'PLATFORM', 'WELCOME_GRANT', 0.0, {p});
+                    """,
+                    (db_id, current_bal + initial_credits)
+                )
+                conn.commit()
 
             # Refresh updated row
             cursor.execute(f"SELECT id, email, full_name, avatar_url, credits_balance, subscription_tier, subscription_expires_at, created_at, last_login_at FROM user_accounts WHERE id = {p};", (db_id,))

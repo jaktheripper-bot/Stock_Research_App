@@ -22,6 +22,23 @@ from fastapi.responses import HTMLResponse, RedirectResponse, Response, JSONResp
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 from starlette.middleware.base import BaseHTTPMiddleware
+try:
+    from dotenv import load_dotenv
+    load_dotenv()
+except Exception:
+    pass
+
+try:
+    import toml
+    _sec_path = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), ".streamlit", "secrets.toml")
+    if os.path.exists(_sec_path):
+        _sec = toml.load(_sec_path)
+        for _k, _v in _sec.items():
+            if isinstance(_v, str) and _k not in os.environ:
+                os.environ[_k] = _v
+except Exception:
+    pass
+
 from pydantic import BaseModel
 
 from core.db import (
@@ -37,8 +54,12 @@ from core.db import (
     add_user_credits,
     IST,
 )
+from core.db.telemetry import record_usage_event
 from core.analysis import get_stock_fundamentals
 from core.analysis.engine import generate_stock_report
+from core.analysis.comparator import compare_two_companies
+from core.analysis.parser import extract_health_matrix, compare_revisions
+from core.analysis.metrics import calculate_52w_percentile, calculate_pe_percentile, get_valuation_quartile
 from core.billing import (
     PRICING_PACKS,
     B2B_PACKS,
@@ -210,6 +231,34 @@ async def dossier_page(request: Request, ticker: str):
     mcap = rep.get("baseline_mcap")
     mcap_formatted = f"₹{format_inr(mcap)}" if mcap else "N/A"
 
+    # 7-Pillar Health Matrix
+    matrix = extract_health_matrix(raw_md)
+
+    # Multi-Quarter Revisions & Thesis Drift Surveillance
+    revisions = get_report_revisions(canonical) or []
+    diff_data = None
+    if len(revisions) >= 2:
+        try:
+            diff_data = compare_revisions(revisions[1], revisions[0])
+        except Exception as e:
+            logger.debug(f"Differential revision comparison notice: {e}")
+
+    # Anchoring Bias Guardrail: Valuation & 52-Week Percentiles
+    fund = {}
+    try:
+        fund = get_stock_fundamentals(canonical) or {}
+    except Exception:
+        pass
+
+    price_val = rep.get("baseline_price") or fund.get("current_price")
+    low_52 = fund.get("fifty_two_week_low") or fund.get("52w_low")
+    high_52 = fund.get("fifty_two_week_high") or fund.get("52w_high")
+    pe_val = rep.get("baseline_pe") or fund.get("pe_ratio")
+
+    pct_52w = calculate_52w_percentile(price_val, low_52, high_52)
+    pct_pe = calculate_pe_percentile(pe_val, revisions)
+    pe_quartile = get_valuation_quartile(pct_pe)
+
     return templates.TemplateResponse(
         request=request,
         name="dossier.html",
@@ -223,8 +272,94 @@ async def dossier_page(request: Request, ticker: str):
             "formatted_date": rep.get("formatted_date", "Archived"),
             "report_html": html_content,
             "citations": citations,
+            "matrix": matrix,
+            "diff": diff_data,
+            "revisions_count": len(revisions),
+            "pct_52w": pct_52w,
+            "low_52": low_52,
+            "high_52": high_52,
+            "pct_pe": pct_pe,
+            "pe_quartile": pe_quartile,
         }
     )
+
+
+@app.get("/compare", response_class=HTMLResponse)
+async def compare_page(
+    request: Request,
+    a: Optional[str] = "INFY",
+    b: Optional[str] = "TCS"
+):
+    """Cross-company institutional peer comparison and 3-tier disparity diagnostic."""
+    clean_a = clean_ticker(a or "INFY")
+    clean_b = clean_ticker(b or "TCS")
+    canonical_a = resolve_canonical_symbol(clean_a) or clean_a
+    canonical_b = resolve_canonical_symbol(clean_b) or clean_b
+
+    try:
+        comp_data = compare_two_companies(canonical_a, canonical_b)
+    except Exception as e:
+        logger.error(f"Error comparing companies {canonical_a} vs {canonical_b}: {e}")
+        comp_data = {
+            "ticker_a": canonical_a,
+            "ticker_b": canonical_b,
+            "fund_a": {},
+            "fund_b": {},
+            "matrix_a": {},
+            "matrix_b": {},
+            "disparity": {"is_disparate": False, "warnings": []}
+        }
+
+    # Format Market Caps
+    for f_key in ["fund_a", "fund_b"]:
+        m = comp_data.get(f_key, {}).get("market_cap")
+        if m:
+            comp_data[f_key]["market_cap_str"] = f"₹{format_inr(m)}"
+
+    return templates.TemplateResponse(
+        request=request,
+        name="compare.html",
+        context={
+            "active_page": "compare",
+            "ticker_a": canonical_a,
+            "ticker_b": canonical_b,
+            "compared": True,
+            "fund_a": comp_data.get("fund_a", {}),
+            "fund_b": comp_data.get("fund_b", {}),
+            "matrix_a": comp_data.get("matrix_a", {}),
+            "matrix_b": comp_data.get("matrix_b", {}),
+            "disparity": comp_data.get("disparity", {"is_disparate": False, "warnings": []}),
+        }
+    )
+
+
+class PreMortemRequest(BaseModel):
+    ticker: str
+    failure_vector: str
+    anti_thesis_notes: str
+    user_id: Optional[str] = "guest_web_user"
+
+
+@app.post("/api/premortem")
+async def api_premortem(payload: PreMortemRequest):
+    """Commits a Charlie Munger Pre-Mortem counter-thesis to the audit ledger."""
+    clean_t = clean_ticker(payload.ticker)
+    if not clean_t:
+        raise HTTPException(status_code=400, detail="Invalid ticker symbol.")
+
+    record_usage_event(
+        event_type="PREMORTEM",
+        ticker=clean_t,
+        details={
+            "failure_vector": payload.failure_vector,
+            "anti_thesis_notes": payload.anti_thesis_notes,
+            "user_id": payload.user_id,
+        }
+    )
+    return {
+        "success": True,
+        "message": f"🔒 Pre-Mortem counter-thesis committed to decision ledger for {clean_t}!"
+    }
 
 
 # ==============================================================================

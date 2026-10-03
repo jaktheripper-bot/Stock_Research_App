@@ -1,0 +1,258 @@
+{% extends "base.html" %}
+
+{% block title %}Peer Comparison: {{ ticker_a }} vs {{ ticker_b }} | Stock Research AI{% endblock %}
+{% block meta_desc %}Side-by-side institutional peer comparison and 3-tier disparity diagnostic between {{ ticker_a }} and {{ ticker_b }}. Grounded in verified BSE filings.{% endblock %}
+
+{% block content %}
+<div class="container" style="max-width: 1100px; margin: 30px auto;">
+  
+  <!-- Header Title -->
+  <div style="margin-bottom: 28px;">
+    <div style="display: inline-flex; align-items: center; gap: 8px; background: rgba(14, 165, 233, 0.12); border: 1px solid rgba(14, 165, 233, 0.3); padding: 4px 14px; border-radius: 999px; font-size: 12px; font-weight: 700; color: var(--accent-cyan); margin-bottom: 12px;">
+      <span>⚖️ INSTITUTIONAL PEER COMPARISON</span>
+    </div>
+    <h1 style="font-size: 32px; font-weight: 800; color: var(--text-primary); margin-bottom: 8px; letter-spacing: -0.02em;">
+      Cross-Company Peer Comparator & Disparity Diagnostic
+    </h1>
+    <p style="font-size: 14px; color: var(--text-secondary); max-width: 800px; line-height: 1.6;">
+      Benchmark capital efficiency, valuation multiples, balance sheet liquidity, and 7-pillar qualitative moats across any two BSE/NSE listed equities with automated disparity gating.
+    </p>
+  </div>
+
+  <!-- Search & Selection Form -->
+  <div style="background: rgba(15, 23, 42, 0.7); border: 1px solid var(--border-color); border-radius: var(--radius-lg); padding: 24px; backdrop-filter: blur(12px); margin-bottom: 30px;">
+    <form method="GET" action="/compare" style="display: grid; grid-template-columns: 1fr 1fr auto; gap: 16px; align-items: flex-end;">
+      <div>
+        <label style="display: block; font-size: 13px; font-weight: 600; color: var(--text-secondary); margin-bottom: 6px;">
+          Company A (Primary Stock):
+        </label>
+        <input 
+          type="text" 
+          name="a" 
+          value="{{ ticker_a|default('INFY') }}" 
+          required 
+          placeholder="e.g. INFY, RELIANCE, TCS..."
+          style="width: 100%; padding: 12px 14px; background: rgba(30, 41, 59, 0.6); border: 1px solid var(--border-color); border-radius: 8px; color: var(--text-primary); font-size: 14px; font-weight: 700; box-sizing: border-box;"
+        >
+      </div>
+
+      <div>
+        <label style="display: block; font-size: 13px; font-weight: 600; color: var(--text-secondary); margin-bottom: 6px;">
+          Company B (Peer / Competitor):
+        </label>
+        <input 
+          type="text" 
+          name="b" 
+          value="{{ ticker_b|default('TCS') }}" 
+          required 
+          placeholder="e.g. TCS, WIPRO, HDFCBANK..."
+          style="width: 100%; padding: 12px 14px; background: rgba(30, 41, 59, 0.6); border: 1px solid var(--border-color); border-radius: 8px; color: var(--text-primary); font-size: 14px; font-weight: 700; box-sizing: border-box;"
+        >
+      </div>
+
+      <div>
+        <button type="submit" class="btn btn-primary" style="padding: 12px 24px; font-size: 14px; font-weight: 700; white-space: nowrap;">
+          ⚖️ Compare Peers
+        </button>
+      </div>
+    </form>
+  </div>
+
+  {% if compared %}
+  <!-- Comparison Result Header -->
+  <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; flex-wrap: wrap; gap: 12px;">
+    <div style="display: flex; align-items: baseline; gap: 12px;">
+      <h2 style="font-size: 24px; font-weight: 800; color: var(--text-primary);">
+        <span style="color: var(--accent-cyan);">{{ ticker_a }}</span>
+        <span style="font-size: 16px; font-weight: 400; color: var(--text-muted);">({{ fund_a.short_name|default(ticker_a) }})</span>
+        <span style="color: var(--text-muted); margin: 0 6px;">vs</span>
+        <span style="color: var(--accent-emerald);">{{ ticker_b }}</span>
+        <span style="font-size: 16px; font-weight: 400; color: var(--text-muted);">({{ fund_b.short_name|default(ticker_b) }})</span>
+      </h2>
+    </div>
+
+    <div style="display: flex; gap: 10px;">
+      <a href="/dossier/{{ ticker_a }}" class="btn btn-secondary btn-sm" style="font-size: 12px;">
+        View {{ ticker_a }} Dossier →
+      </a>
+      <a href="/dossier/{{ ticker_b }}" class="btn btn-secondary btn-sm" style="font-size: 12px;">
+        View {{ ticker_b }} Dossier →
+      </a>
+    </div>
+  </div>
+
+  <!-- 3-Tier Disparity Gate Banner -->
+  {% if disparity.is_disparate %}
+  <div style="background: rgba(244, 63, 94, 0.08); border-left: 4px solid var(--accent-rose); border-radius: var(--radius-sm); padding: 18px 20px; margin-bottom: 24px;">
+    <div style="display: flex; align-items: center; gap: 8px; font-weight: 800; color: var(--accent-rose); font-size: 14px; margin-bottom: 8px;">
+      <span>⚠️</span>
+      <span>Institutional Disparity Gate Warning (False Equivalence Detected)</span>
+    </div>
+    <ul style="margin: 0; padding-left: 20px; font-size: 13.5px; color: var(--text-secondary); line-height: 1.6;">
+      {% for w in disparity.warnings %}
+      <li>{{ w }}</li>
+      {% endfor %}
+    </ul>
+    <div style="margin-top: 10px; font-size: 12px; color: var(--text-muted);">
+      <em>Rule: Do not compare multiples 1:1 across disparate business models, early lifecycles, or extreme capital structures.</em>
+    </div>
+  </div>
+  {% else %}
+  <div style="background: rgba(16, 185, 129, 0.08); border-left: 4px solid var(--accent-emerald); border-radius: var(--radius-sm); padding: 14px 18px; margin-bottom: 24px; font-size: 13.5px; color: var(--accent-emerald); display: flex; align-items: center; gap: 8px;">
+    <span>✅</span>
+    <span><strong>Peer Alignment Verified:</strong> Both assets operate within aligned business domains and capital structure bounds. Direct comparative synthesis is valid.</span>
+  </div>
+  {% endif %}
+
+  <!-- Financial Multiples & Ratios Table -->
+  <div style="background: rgba(15, 23, 42, 0.7); border: 1px solid var(--border-color); border-radius: var(--radius-lg); overflow: hidden; margin-bottom: 30px;">
+    <div style="padding: 18px 24px; border-bottom: 1px solid var(--border-color); background: rgba(30, 41, 59, 0.4); display: flex; justify-content: space-between; align-items: center;">
+      <h3 style="font-size: 16px; font-weight: 800; color: var(--text-primary); margin: 0;">
+        📊 Valuation Multiples, Capital Efficiency & Solvency
+      </h3>
+      <span class="badge badge-emerald" style="font-size: 11px;">Verified Exchange Fundamentals</span>
+    </div>
+
+    <table style="width: 100%; border-collapse: collapse; text-align: left; font-size: 13.5px;">
+      <thead>
+        <tr style="border-bottom: 1px solid var(--border-color); background: rgba(15, 23, 42, 0.9);">
+          <th style="padding: 14px 24px; color: var(--text-muted); font-weight: 600; width: 34%;">Financial Metric</th>
+          <th style="padding: 14px 24px; color: var(--accent-cyan); font-weight: 700; width: 33%;">
+            {{ ticker_a }} (Primary)
+          </th>
+          <th style="padding: 14px 24px; color: var(--accent-emerald); font-weight: 700; width: 33%;">
+            {{ ticker_b }} (Peer)
+          </th>
+        </tr>
+      </thead>
+      <tbody>
+        <!-- Current Quote -->
+        <tr style="border-bottom: 1px solid rgba(255,255,255,0.04);">
+          <td style="padding: 12px 24px; color: var(--text-secondary); font-weight: 500;">Live Quote Price</td>
+          <td class="tnum" style="padding: 12px 24px; font-weight: 700; color: var(--text-primary);">₹{{ fund_a.current_price|default('N/A') }}</td>
+          <td class="tnum" style="padding: 12px 24px; font-weight: 700; color: var(--text-primary);">₹{{ fund_b.current_price|default('N/A') }}</td>
+        </tr>
+        <!-- Market Cap -->
+        <tr style="border-bottom: 1px solid rgba(255,255,255,0.04); background: rgba(30, 41, 59, 0.2);">
+          <td style="padding: 12px 24px; color: var(--text-secondary); font-weight: 500;">Market Capitalization</td>
+          <td class="tnum" style="padding: 12px 24px; color: var(--text-primary);">{{ fund_a.market_cap_str|default(fund_a.market_cap|default('N/A')) }}</td>
+          <td class="tnum" style="padding: 12px 24px; color: var(--text-primary);">{{ fund_b.market_cap_str|default(fund_b.market_cap|default('N/A')) }}</td>
+        </tr>
+        <!-- Trailing P/E -->
+        <tr style="border-bottom: 1px solid rgba(255,255,255,0.04);">
+          <td style="padding: 12px 24px; color: var(--text-secondary); font-weight: 500;">Trailing P/E Ratio</td>
+          <td class="tnum" style="padding: 12px 24px; font-weight: 700; color: var(--accent-cyan);">{{ fund_a.pe_ratio|default('N/A') }}</td>
+          <td class="tnum" style="padding: 12px 24px; font-weight: 700; color: var(--accent-emerald);">{{ fund_b.pe_ratio|default('N/A') }}</td>
+        </tr>
+        <!-- Forward P/E -->
+        <tr style="border-bottom: 1px solid rgba(255,255,255,0.04); background: rgba(30, 41, 59, 0.2);">
+          <td style="padding: 12px 24px; color: var(--text-secondary); font-weight: 500;">Forward P/E Ratio</td>
+          <td class="tnum" style="padding: 12px 24px; color: var(--text-primary);">{{ fund_a.forward_pe|default('N/A') }}</td>
+          <td class="tnum" style="padding: 12px 24px; color: var(--text-primary);">{{ fund_b.forward_pe|default('N/A') }}</td>
+        </tr>
+        <!-- Price to Book -->
+        <tr style="border-bottom: 1px solid rgba(255,255,255,0.04);">
+          <td style="padding: 12px 24px; color: var(--text-secondary); font-weight: 500;">Price to Book (P/B)</td>
+          <td class="tnum" style="padding: 12px 24px; color: var(--text-primary);">{{ fund_a.pb_ratio|default('N/A') }}</td>
+          <td class="tnum" style="padding: 12px 24px; color: var(--text-primary);">{{ fund_b.pb_ratio|default('N/A') }}</td>
+        </tr>
+        <!-- EV / EBITDA -->
+        <tr style="border-bottom: 1px solid rgba(255,255,255,0.04); background: rgba(30, 41, 59, 0.2);">
+          <td style="padding: 12px 24px; color: var(--text-secondary); font-weight: 500;">EV / EBITDA Multiple</td>
+          <td class="tnum" style="padding: 12px 24px; color: var(--text-primary);">{{ fund_a.ev_ebitda|default('N/A') }}</td>
+          <td class="tnum" style="padding: 12px 24px; color: var(--text-primary);">{{ fund_b.ev_ebitda|default('N/A') }}</td>
+        </tr>
+        <!-- ROCE % -->
+        <tr style="border-bottom: 1px solid rgba(255,255,255,0.04);">
+          <td style="padding: 12px 24px; color: var(--text-secondary); font-weight: 500;">ROCE (Return on Capital Employed)</td>
+          <td class="tnum" style="padding: 12px 24px; font-weight: 700; color: var(--text-primary);">{{ fund_a.roce|default('N/A') }}{% if fund_a.roce and fund_a.roce != 'N/A' %}%{% endif %}</td>
+          <td class="tnum" style="padding: 12px 24px; font-weight: 700; color: var(--text-primary);">{{ fund_b.roce|default('N/A') }}{% if fund_b.roce and fund_b.roce != 'N/A' %}%{% endif %}</td>
+        </tr>
+        <!-- ROE % -->
+        <tr style="border-bottom: 1px solid rgba(255,255,255,0.04); background: rgba(30, 41, 59, 0.2);">
+          <td style="padding: 12px 24px; color: var(--text-secondary); font-weight: 500;">ROE (Return on Equity)</td>
+          <td class="tnum" style="padding: 12px 24px; color: var(--text-primary);">{{ fund_a.roe|default('N/A') }}{% if fund_a.roe and fund_a.roe != 'N/A' %}%{% endif %}</td>
+          <td class="tnum" style="padding: 12px 24px; color: var(--text-primary);">{{ fund_b.roe|default('N/A') }}{% if fund_b.roe and fund_b.roe != 'N/A' %}%{% endif %}</td>
+        </tr>
+        <!-- Operating Margin % -->
+        <tr style="border-bottom: 1px solid rgba(255,255,255,0.04);">
+          <td style="padding: 12px 24px; color: var(--text-secondary); font-weight: 500;">Operating Margin (OPM)</td>
+          <td class="tnum" style="padding: 12px 24px; color: var(--text-primary);">{{ fund_a.operating_margin|default('N/A') }}{% if fund_a.operating_margin and fund_a.operating_margin != 'N/A' %}%{% endif %}</td>
+          <td class="tnum" style="padding: 12px 24px; color: var(--text-primary);">{{ fund_b.operating_margin|default('N/A') }}{% if fund_b.operating_margin and fund_b.operating_margin != 'N/A' %}%{% endif %}</td>
+        </tr>
+        <!-- Debt to Equity -->
+        <tr style="border-bottom: 1px solid rgba(255,255,255,0.04); background: rgba(30, 41, 59, 0.2);">
+          <td style="padding: 12px 24px; color: var(--text-secondary); font-weight: 500;">Debt-to-Equity Ratio</td>
+          <td class="tnum" style="padding: 12px 24px; color: var(--text-primary);">{{ fund_a.debt_to_equity|default('N/A') }}</td>
+          <td class="tnum" style="padding: 12px 24px; color: var(--text-primary);">{{ fund_b.debt_to_equity|default('N/A') }}</td>
+        </tr>
+        <!-- 52-Week Range -->
+        <tr style="border-bottom: 1px solid rgba(255,255,255,0.04);">
+          <td style="padding: 12px 24px; color: var(--text-secondary); font-weight: 500;">52-Week Range (Low – High)</td>
+          <td class="tnum" style="padding: 12px 24px; color: var(--text-primary);">₹{{ fund_a.fifty_two_week_low|default('N/A') }} – ₹{{ fund_a.fifty_two_week_high|default('N/A') }}</td>
+          <td class="tnum" style="padding: 12px 24px; color: var(--text-primary);">₹{{ fund_b.fifty_two_week_low|default('N/A') }} – ₹{{ fund_b.fifty_two_week_high|default('N/A') }}</td>
+        </tr>
+      </tbody>
+    </table>
+  </div>
+
+  <!-- 7-Pillar Qualitative Health Matrix Comparison -->
+  <div style="background: rgba(15, 23, 42, 0.7); border: 1px solid var(--border-color); border-radius: var(--radius-lg); overflow: hidden; margin-bottom: 40px;">
+    <div style="padding: 18px 24px; border-bottom: 1px solid var(--border-color); background: rgba(30, 41, 59, 0.4); display: flex; justify-content: space-between; align-items: center;">
+      <h3 style="font-size: 16px; font-weight: 800; color: var(--text-primary); margin: 0;">
+        🛡️ 7-Pillar Qualitative Health Posture Alignment
+      </h3>
+      <span class="badge" style="background: rgba(14, 165, 233, 0.15); color: var(--accent-cyan); font-size: 11px;">Qualitative Matrix</span>
+    </div>
+
+    <table style="width: 100%; border-collapse: collapse; text-align: left; font-size: 13.5px;">
+      <thead>
+        <tr style="border-bottom: 1px solid var(--border-color); background: rgba(15, 23, 42, 0.9);">
+          <th style="padding: 14px 24px; color: var(--text-muted); font-weight: 600; width: 34%;">Strategic Pillar</th>
+          <th style="padding: 14px 24px; color: var(--accent-cyan); font-weight: 700; width: 33%;">{{ ticker_a }} Posture</th>
+          <th style="padding: 14px 24px; color: var(--accent-emerald); font-weight: 700; width: 33%;">{{ ticker_b }} Posture</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td style="padding: 14px 24px; font-weight: 600; color: var(--text-secondary);">1. Competitive Moat & Advantage</td>
+          <td style="padding: 14px 24px;"><span class="badge badge-cyan">{{ matrix_a.Moat|default('Moderate') }}</span></td>
+          <td style="padding: 14px 24px;"><span class="badge badge-emerald">{{ matrix_b.Moat|default('Moderate') }}</span></td>
+        </tr>
+        <tr style="background: rgba(30, 41, 59, 0.2);">
+          <td style="padding: 14px 24px; font-weight: 600; color: var(--text-secondary);">2. Capital Allocation & Reinvestment</td>
+          <td style="padding: 14px 24px;"><span class="badge badge-cyan">{{ matrix_a.CapitalAllocation|default('Disciplined') }}</span></td>
+          <td style="padding: 14px 24px;"><span class="badge badge-emerald">{{ matrix_b.CapitalAllocation|default('Disciplined') }}</span></td>
+        </tr>
+        <tr>
+          <td style="padding: 14px 24px; font-weight: 600; color: var(--text-secondary);">3. Valuation Multiple & Margin of Safety</td>
+          <td style="padding: 14px 24px;"><span class="badge badge-cyan">{{ matrix_a.Valuation|default('Fair') }}</span></td>
+          <td style="padding: 14px 24px;"><span class="badge badge-emerald">{{ matrix_b.Valuation|default('Fair') }}</span></td>
+        </tr>
+        <tr style="background: rgba(30, 41, 59, 0.2);">
+          <td style="padding: 14px 24px; font-weight: 600; color: var(--text-secondary);">4. Balance Sheet Leverage & Solvency</td>
+          <td style="padding: 14px 24px;"><span class="badge badge-cyan">{{ matrix_a.BalanceSheet|default('Resilient') }}</span></td>
+          <td style="padding: 14px 24px;"><span class="badge badge-emerald">{{ matrix_b.BalanceSheet|default('Resilient') }}</span></td>
+        </tr>
+        <tr>
+          <td style="padding: 14px 24px; font-weight: 600; color: var(--text-secondary);">5. Management Quality & Governance</td>
+          <td style="padding: 14px 24px;"><span class="badge badge-cyan">{{ matrix_a.Governance|default('Clean') }}</span></td>
+          <td style="padding: 14px 24px;"><span class="badge badge-emerald">{{ matrix_b.Governance|default('Clean') }}</span></td>
+        </tr>
+        <tr style="background: rgba(30, 41, 59, 0.2);">
+          <td style="padding: 14px 24px; font-weight: 600; color: var(--text-secondary);">6. Macro & Industry Headwinds</td>
+          <td style="padding: 14px 24px;"><span class="badge badge-cyan">{{ matrix_a.Macro|default('Neutral') }}</span></td>
+          <td style="padding: 14px 24px;"><span class="badge badge-emerald">{{ matrix_b.Macro|default('Neutral') }}</span></td>
+        </tr>
+        <tr>
+          <td style="padding: 14px 24px; font-weight: 600; color: var(--text-secondary);">7. Drop Diagnostic & Catalysts</td>
+          <td style="padding: 14px 24px;"><span class="badge badge-cyan">{{ matrix_a.Diagnostic|default('Neutral') }}</span></td>
+          <td style="padding: 14px 24px;"><span class="badge badge-emerald">{{ matrix_b.Diagnostic|default('Neutral') }}</span></td>
+        </tr>
+      </tbody>
+    </table>
+  </div>
+  {% endif %}
+
+</div>
+{% endblock %}

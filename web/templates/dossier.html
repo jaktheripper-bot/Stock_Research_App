@@ -51,14 +51,52 @@
         </div>
       </div>
 
+      <!-- Anchoring Bias Guardrail -->
+      {% if pct_52w is not none or pct_pe is not none %}
+      <div style="background: rgba(15, 23, 42, 0.6); border-left: 3px solid #3b82f6; padding: 10px 16px; border-radius: 0 8px 8px 0; margin-top: 16px; font-size: 13px; color: #cbd5e1; display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 10px;" title="Anchoring Bias Guardrail: Decouples absolute price swings from distribution percentiles and intrinsic value.">
+        <div style="display: flex; align-items: center; gap: 8px;">
+          <span>⚓</span>
+          <span style="font-weight: 700; color: #93c5fd;">Anchoring Bias Guardrail:</span>
+          <span>
+            {% if pct_52w is not none %}
+            <b>52-Wk Range Position:</b> <span class="tnum">{{ pct_52w }}%</span> (₹{{ low_52|default('N/A') }} – ₹{{ high_52|default('N/A') }})
+            {% endif %}
+            {% if pct_52w is not none and pct_pe is not none %} • {% endif %}
+            {% if pct_pe is not none %}
+            <b>P/E Valuation Band:</b> <span class="tnum">{{ pct_pe }}%-ile</span> ({{ pe_quartile.label|default('Historical') }})
+            {% endif %}
+          </span>
+        </div>
+        <span class="badge" style="background: rgba(59, 130, 246, 0.15); color: #93c5fd; font-size: 11px;">Behavioral Guardrail</span>
+      </div>
+      {% endif %}
+
+      <!-- 7-Pillar Qualitative Posture Strip -->
+      {% if matrix %}
+      <div style="margin-top: 18px; background: rgba(30, 41, 59, 0.35); border: 1px solid var(--border-color); border-radius: var(--radius-sm); padding: 14px 18px;">
+        <div style="font-size: 12px; font-weight: 700; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.05em; margin-bottom: 10px;">
+          7-Pillar Qualitative Health Matrix:
+        </div>
+        <div style="display: flex; gap: 10px; flex-wrap: wrap;">
+          <span class="badge badge-cyan" title="Competitive Moat">Moat: <strong>{{ matrix.Moat|default('Moderate') }}</strong></span>
+          <span class="badge badge-emerald" title="Capital Allocation">Capital: <strong>{{ matrix.CapitalAllocation|default('Disciplined') }}</strong></span>
+          <span class="badge" style="background: rgba(245, 158, 11, 0.15); color: #fbbf24; border: 1px solid rgba(245, 158, 11, 0.3);" title="Valuation Multiple">Valuation: <strong>{{ matrix.Valuation|default('Fair') }}</strong></span>
+          <span class="badge badge-emerald" title="Balance Sheet">Solvency: <strong>{{ matrix.BalanceSheet|default('Resilient') }}</strong></span>
+          <span class="badge badge-emerald" title="Management Governance">Governance: <strong>{{ matrix.Governance|default('Clean') }}</strong></span>
+          <span class="badge badge-cyan" title="Macro Environment">Macro: <strong>{{ matrix.Macro|default('Neutral') }}</strong></span>
+          <span class="badge" style="background: rgba(148, 163, 184, 0.15); color: var(--text-secondary); border: 1px solid rgba(148, 163, 184, 0.25);" title="Drop Diagnostic">Diagnostic: <strong>{{ matrix.Diagnostic|default('Neutral') }}</strong></span>
+        </div>
+      </div>
+      {% endif %}
+
       <!-- Primary Source Attributions Callout Banner -->
       {% if citations %}
-      <div style="margin-top: 20px; padding: 14px 18px; background: rgba(56, 189, 248, 0.08); border-left: 3px solid #38bdf8; border-radius: 8px; font-size: 13.5px; color: var(--text-secondary); display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 12px;">
+      <div style="margin-top: 18px; padding: 14px 18px; background: rgba(56, 189, 248, 0.08); border-left: 3px solid #38bdf8; border-radius: 8px; font-size: 13.5px; color: var(--text-secondary); display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 12px;">
         <div style="display: flex; align-items: center; gap: 8px;">
           <span style="font-size: 16px;">🛡️</span>
           <span>
             <strong style="color: #38bdf8;">Verified Regulatory Grounding:</strong>
-            This research dossier is synthesized from <strong>{{ citations|length }} primary sources</strong>, including statutory BSE filings, shareholding patterns, and official disclosures.
+            Synthesized from <strong>{{ citations|length }} primary sources</strong>, including statutory BSE filings, shareholding patterns, and official disclosures.
           </span>
         </div>
         <a href="#citations" class="btn btn-secondary btn-sm" style="font-size: 12px; padding: 6px 14px; text-decoration: none;">
@@ -68,9 +106,107 @@
       {% endif %}
     </div>
 
+    <!-- Multi-Quarter Thesis Drift Surveillance Card (Hoisted Above Report) -->
+    {% if diff %}
+    <div style="margin-bottom: 30px; background: rgba(15, 23, 42, 0.9); border: 1px solid rgba(14, 165, 233, 0.35); border-radius: var(--radius-md); padding: 22px;">
+      <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 14px; flex-wrap: wrap; gap: 10px;">
+        <div style="display: flex; align-items: center; gap: 10px;">
+          <span style="font-size: 20px;">📈</span>
+          <h3 style="margin: 0; font-size: 17px; font-weight: 800; color: var(--text-primary);">
+            Multi-Quarter Thesis Drift Surveillance
+          </h3>
+          <span class="badge" style="background: rgba(14, 165, 233, 0.2); color: var(--accent-cyan); font-size: 11px;">
+            State A ({{ diff.state_a_date }}) ➔ State B ({{ diff.state_b_date }})
+          </span>
+        </div>
+        <span class="badge badge-emerald" style="font-size: 11px;">Surveillance Active</span>
+      </div>
+
+      <!-- Value Trap Warning Banner -->
+      {% if diff.value_trap_detected %}
+      <div style="background: rgba(244, 63, 94, 0.12); border-left: 4px solid var(--accent-rose); border-radius: 6px; padding: 12px 16px; margin-bottom: 16px; font-size: 13.5px; color: #fecdd3;">
+        <strong>⚠️ Value Trap Warning Detected:</strong> Multiple qualitative pillars downgraded while valuation/price expanded. High risk of multiple compression.
+      </div>
+      {% endif %}
+
+      <!-- Pillar Migration Chips -->
+      {% if diff.pillar_migrations %}
+      <div style="margin-bottom: 16px;">
+        <div style="font-size: 12px; font-weight: 700; color: var(--text-muted); margin-bottom: 8px;">Pillar Migrations Detected:</div>
+        <div style="display: flex; gap: 8px; flex-wrap: wrap;">
+          {% for m in diff.pillar_migrations %}
+          <span class="badge" style="background: rgba(30, 41, 59, 0.7); border: 1px solid var(--border-color); font-size: 12px; padding: 6px 12px;">
+            <strong>{{ m.label }}:</strong> {{ m.from }} ➔ {{ m.to }} 
+            {% if m.direction == 'downgrade' %}<span style="color: var(--accent-rose);">[🔻 Downgrade]</span>
+            {% elif m.direction == 'upgrade' %}<span style="color: var(--accent-emerald);">[🔺 Upgrade]</span>
+            {% else %}<span style="color: var(--accent-cyan);">[Shift]</span>{% endif %}
+          </span>
+          {% endfor %}
+        </div>
+      </div>
+      {% else %}
+      <div style="font-size: 13px; color: var(--text-secondary); margin-bottom: 12px;">
+        ✅ <strong>Zero Qualitative Pillar Drift:</strong> Core qualitative health matrix posture remained stable between snapshots.
+      </div>
+      {% endif %}
+    </div>
+    {% elif revisions_count == 1 %}
+    <div style="margin-bottom: 24px; padding: 12px 16px; background: rgba(30, 41, 59, 0.35); border-radius: 8px; border: 1px solid var(--border-color); font-size: 12.5px; color: var(--text-muted); display: flex; align-items: center; justify-content: space-between;">
+      <span>ℹ️ <strong>Surveillance Active:</strong> Differential revision tracking will automatically highlight thesis drift upon subsequent quarterly earnings filings or material price shifts (≥5%).</span>
+      <span class="badge" style="background: rgba(14, 165, 233, 0.15); color: var(--accent-cyan); font-size: 11px;">1 Snapshot Archived</span>
+    </div>
+    {% endif %}
+
     <!-- 7-Pillar Report Content -->
     <div class="dossier-prose">
       {{ report_html|safe }}
+    </div>
+
+    <!-- Charlie Munger Pre-Mortem Inversion Engine (Anti-Thesis Module) -->
+    <div id="premortem" style="margin-top: 40px; background: rgba(15, 23, 42, 0.95); border: 1px solid rgba(245, 158, 11, 0.3); border-radius: var(--radius-md); padding: 24px;">
+      <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px; flex-wrap: wrap; gap: 8px;">
+        <div style="display: flex; align-items: center; gap: 10px;">
+          <span style="font-size: 22px;">⚡</span>
+          <h3 style="margin: 0; font-size: 17px; font-weight: 800; color: var(--text-primary);">
+            Pre-Mortem Inversion Engine (Charlie Munger Anti-Thesis)
+          </h3>
+        </div>
+        <span class="badge" style="background: rgba(245, 158, 11, 0.15); color: #fbbf24; font-size: 11px;">Behavioral De-Biasing</span>
+      </div>
+
+      <p style="font-size: 13px; color: var(--text-secondary); line-height: 1.5; margin-bottom: 16px;">
+        <strong>Force backward reasoning from a state of guaranteed failure:</strong> Identify what existential shock could invalidate this company's moat before cementing conviction to combat Narrative Seduction and Confirmation Bias.
+      </p>
+
+      <form id="premortemForm" onsubmit="handlePreMortemSubmit(event, '{{ ticker }}')">
+        <div style="margin-bottom: 14px;">
+          <label style="display: block; font-size: 13px; font-weight: 600; color: var(--text-secondary); margin-bottom: 6px;">
+            Primary Hypothetical Failure Vector:
+          </label>
+          <select id="premortemVector" style="width: 100%; padding: 10px 14px; background: rgba(30, 41, 59, 0.8); border: 1px solid var(--border-color); border-radius: 6px; color: var(--text-primary); font-size: 13.5px;">
+            <option>Customer / Geographic Concentration Risk (e.g. Top 3 clients >35% revenue)</option>
+            <option>Regulatory / Policy Vulnerability (e.g. import tariffs, export duties, PLI scheme expiration)</option>
+            <option>Operating Margin Squeeze / Raw Material Inflation (e.g. >200 bps margin contraction)</option>
+            <option>Capital Misallocation / Debt-Fueled Acquisition</option>
+            <option>Technological Obsolescence / Moat Decay</option>
+            <option>Custom Operational Vulnerability...</option>
+          </select>
+        </div>
+
+        <div style="margin-bottom: 16px;">
+          <label style="display: block; font-size: 13px; font-weight: 600; color: var(--text-secondary); margin-bottom: 6px;">
+            Analyst Anti-Thesis Rationale:
+          </label>
+          <textarea id="premortemNotes" rows="2" placeholder="Articulate specific operational failure scenarios (e.g., loss of principal client, margin compression)..." style="width: 100%; padding: 10px 14px; background: rgba(30, 41, 59, 0.8); border: 1px solid var(--border-color); border-radius: 6px; color: var(--text-primary); font-size: 13.5px; box-sizing: border-box;"></textarea>
+        </div>
+
+        <div style="display: flex; justify-content: space-between; align-items: center;">
+          <span id="premortemStatus" style="font-size: 12px; color: var(--accent-emerald);"></span>
+          <button type="submit" id="btnCommitPremortem" class="btn btn-secondary btn-sm" style="font-weight: 700;">
+            🔒 Commit Pre-Mortem to Audit Ledger
+          </button>
+        </div>
+      </form>
     </div>
 
     <!-- Verified Sources & Footnotes Appendix -->
