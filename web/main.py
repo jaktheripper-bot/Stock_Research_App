@@ -17,7 +17,7 @@ import markdown
 from datetime import datetime, timezone, timedelta
 from typing import Optional
 
-from fastapi import FastAPI, Request, HTTPException, Form
+from fastapi import FastAPI, Request, HTTPException, Form, Header, BackgroundTasks, Query
 from fastapi.responses import HTMLResponse, RedirectResponse, Response, JSONResponse
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
@@ -52,6 +52,9 @@ from core.db import (
     get_user_credits_balance,
     deduct_user_credits,
     add_user_credits,
+    get_active_discovery_reel,
+    get_available_discovery_editions,
+    save_discovery_reel,
     IST,
 )
 from core.db.telemetry import record_usage_event
@@ -117,12 +120,18 @@ templates = Jinja2Templates(directory=os.path.join(BASE_DIR, "templates"))
 
 @app.get("/", response_class=HTMLResponse)
 async def home_page(request: Request):
-    """Public home & landing page with live stock search and featured dossiers."""
+    """Public home & landing page with live stock search, discovery reel, and featured dossiers."""
     try:
         archives = get_archived_reports()
     except Exception as e:
         logger.error(f"Error fetching archives: {e}")
         archives = []
+
+    try:
+        discovery_stocks = get_active_discovery_reel()
+    except Exception as e:
+        logger.error(f"Error fetching discovery reel for home: {e}")
+        discovery_stocks = []
 
     featured = archives[:9] if archives else []
     total_count = len(archives) if archives else 81
@@ -133,8 +142,34 @@ async def home_page(request: Request):
         context={
             "active_page": "home",
             "featured_reports": featured,
+            "discovery_stocks": discovery_stocks,
             "total_reports": total_count,
             "pricing_packs": PRICING_PACKS,
+        }
+    )
+
+
+@app.get("/discovery", response_class=HTMLResponse)
+async def discovery_page(request: Request, edition: Optional[str] = Query(None)):
+    """The Morning Discovery Reel: nightly screening of under-the-radar equities for RIAs."""
+    try:
+        discovery_stocks = get_active_discovery_reel(edition_date=edition)
+        available_editions = get_available_discovery_editions()
+    except Exception as e:
+        logger.error(f"Error fetching discovery reel: {e}")
+        discovery_stocks = []
+        available_editions = []
+
+    current_ed = edition or (discovery_stocks[0]["edition_date"] if discovery_stocks else datetime.now(IST).strftime("%Y-%m-%d"))
+
+    return templates.TemplateResponse(
+        request=request,
+        name="discovery.html",
+        context={
+            "active_page": "discovery",
+            "discovery_stocks": discovery_stocks,
+            "available_editions": available_editions,
+            "current_edition": current_ed,
         }
     )
 
@@ -771,3 +806,23 @@ async def api_get_user(user_id: str):
 async def healthz():
     """Health check endpoint for cloud container orchestrators."""
     return {"status": "healthy", "service": "Stock Research AI Web Server", "timestamp": datetime.now(IST).isoformat()}
+
+
+@app.post("/api/admin/run-discovery")
+async def api_run_discovery(
+    background_tasks: BackgroundTasks,
+    x_admin_key: Optional[str] = Header(None),
+    count: int = 12,
+    force: bool = False
+):
+    """Triggers the Morning Discovery Reel screening and dossier synthesis worker."""
+    admin_secret = os.environ.get("ADMIN_API_KEY", "")
+    if admin_secret and x_admin_key != admin_secret:
+        raise HTTPException(status_code=403, detail="Unauthorized admin access.")
+
+    from scripts.run_discovery_worker import run_discovery_pipeline
+    background_tasks.add_task(run_discovery_pipeline, target_count=count, force_synthesis=force)
+    return {
+        "status": "initiated",
+        "message": f"Morning Discovery Reel worker dispatched for {count} equities (force={force})."
+    }

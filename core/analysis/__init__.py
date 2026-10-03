@@ -67,6 +67,12 @@ from core.analysis.metrics import (
     calculate_overall_health_score,
 )
 
+from core.analysis.discovery import (
+    CANDIDATE_UNIVERSE,
+    evaluate_under_the_radar_candidate,
+    curate_morning_discovery_cohort,
+)
+
 __all__ = [
     # exceptions
     "PipelineError",
@@ -111,4 +117,8 @@ __all__ = [
     "get_valuation_quartile",
     "quantify_pillar_health",
     "calculate_overall_health_score",
+    # discovery
+    "CANDIDATE_UNIVERSE",
+    "evaluate_under_the_radar_candidate",
+    "curate_morning_discovery_cohort",
 ]

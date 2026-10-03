@@ -539,6 +539,59 @@ def init_db(force: bool = False):
                     cursor.execute("INSERT OR IGNORE INTO schema_migrations (version) VALUES ('v007_user_accounts_and_credits');")
                 conn.commit()
 
+            # Migration v008: Morning Discovery Reel & Under-the-Radar Cohort
+            if "v008_discovery_reel" not in applied:
+                logger.info("Applying schema migration: v008_discovery_reel...")
+                if supabase_url:
+                    cursor.execute('''
+                        CREATE TABLE IF NOT EXISTS discovery_reel (
+                            id SERIAL PRIMARY KEY,
+                            edition_date DATE NOT NULL,
+                            ticker TEXT NOT NULL,
+                            company_name TEXT NOT NULL,
+                            sector TEXT NOT NULL,
+                            market_cap_tier TEXT DEFAULT 'Small-Cap',
+                            current_price NUMERIC,
+                            pe_ratio TEXT,
+                            roce_pct NUMERIC,
+                            debt_to_equity NUMERIC,
+                            sales_growth_3y NUMERIC,
+                            ria_thesis TEXT NOT NULL,
+                            catalyst_headline TEXT,
+                            key_metrics_json TEXT,
+                            is_active BOOLEAN DEFAULT TRUE,
+                            created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP
+                        );
+                    ''')
+                    cursor.execute('CREATE INDEX IF NOT EXISTS idx_discovery_reel_edition ON discovery_reel (edition_date, is_active);')
+                    cursor.execute('CREATE INDEX IF NOT EXISTS idx_discovery_reel_ticker ON discovery_reel (ticker);')
+                    cursor.execute("INSERT INTO schema_migrations (version) VALUES ('v008_discovery_reel') ON CONFLICT DO NOTHING;")
+                else:
+                    cursor.execute('''
+                        CREATE TABLE IF NOT EXISTS discovery_reel (
+                            id INTEGER PRIMARY KEY AUTOINCREMENT,
+                            edition_date TEXT NOT NULL,
+                            ticker TEXT NOT NULL,
+                            company_name TEXT NOT NULL,
+                            sector TEXT NOT NULL,
+                            market_cap_tier TEXT DEFAULT 'Small-Cap',
+                            current_price REAL,
+                            pe_ratio TEXT,
+                            roce_pct REAL,
+                            debt_to_equity REAL,
+                            sales_growth_3y REAL,
+                            ria_thesis TEXT NOT NULL,
+                            catalyst_headline TEXT,
+                            key_metrics_json TEXT,
+                            is_active INTEGER DEFAULT 1,
+                            created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+                        );
+                    ''')
+                    cursor.execute('CREATE INDEX IF NOT EXISTS idx_discovery_reel_edition ON discovery_reel (edition_date, is_active);')
+                    cursor.execute('CREATE INDEX IF NOT EXISTS idx_discovery_reel_ticker ON discovery_reel (ticker);')
+                    cursor.execute("INSERT OR IGNORE INTO schema_migrations (version) VALUES ('v008_discovery_reel');")
+                conn.commit()
+
             _DB_INITIALIZED = True
         except Exception as e:
             logger.error(f"Error during init_db migrations: {e}")

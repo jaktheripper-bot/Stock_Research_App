@@ -82,6 +82,12 @@ from core.db.users import (
     get_user_usage_history,
 )
 
+from core.db.discovery import (
+    save_discovery_reel,
+    get_active_discovery_reel,
+    get_available_discovery_editions,
+)
+
 __all__ = [
     # connection
     "IST",
@@ -137,4 +143,8 @@ __all__ = [
     "add_user_credits",
     "get_user_transactions",
     "get_user_usage_history",
+    # discovery reel
+    "save_discovery_reel",
+    "get_active_discovery_reel",
+    "get_available_discovery_editions",
 ]

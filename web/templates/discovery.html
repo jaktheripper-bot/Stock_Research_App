@@ -1,0 +1,213 @@
+{% extends "base.html" %}
+
+{% block title %}Morning Discovery Reel | Under-the-Radar Indian Equities | Stock Research AI{% endblock %}
+
+{% block content %}
+<div class="container" style="padding-top: 40px; padding-bottom: 80px;">
+
+  <!-- Hero Header -->
+  <div style="margin-bottom: 36px;">
+    <div style="display: flex; flex-wrap: wrap; justify-content: space-between; align-items: flex-start; gap: 16px;">
+      <div>
+        <div class="hero-badge" style="margin-bottom: 12px; display: inline-flex;">
+          <span>🌅 NIGHTLY EXCHANGE DISCOVERY</span>
+          <span>•</span>
+          <span>RIAs & PMS SURVEILLANCE</span>
+        </div>
+        <h1 style="font-size: 32px; font-weight: 800; color: var(--text-primary); margin-bottom: 8px; letter-spacing: -0.02em;">
+          The Morning Discovery Reel
+        </h1>
+        <p style="font-size: 15px; color: var(--text-secondary); max-width: 720px; line-height: 1.6; margin: 0;">
+          Curated nightly from official BSE regulatory disclosures and audited filings. 
+          10–15 under-the-radar Indian companies across diverse sectors commanding high return on capital (ROCE &ge; 15%), conservative solvency (D/E &le; 0.6), and negligible institutional sell-side coverage.
+        </p>
+      </div>
+
+      <!-- Edition Selector -->
+      {% if available_editions %}
+      <div style="background: rgba(30, 41, 59, 0.6); padding: 12px 16px; border-radius: 12px; border: 1px solid var(--border-color); display: flex; align-items: center; gap: 12px;">
+        <span style="font-size: 13px; color: var(--text-muted); font-weight: 600;">Edition Date:</span>
+        <select id="editionSelect" onchange="switchEdition(this.value)" style="background: var(--bg-surface); color: var(--text-primary); border: 1px solid var(--border-color); border-radius: 6px; padding: 6px 12px; font-size: 13px; font-weight: 600; cursor: pointer; outline: none;">
+          {% for ed in available_editions %}
+          <option value="{{ ed }}" {% if ed == current_edition %}selected{% endif %}>{{ ed }}</option>
+          {% endfor %}
+        </select>
+      </div>
+      {% endif %}
+    </div>
+  </div>
+
+  <!-- Sector Filter Navigation Tabs -->
+  <div style="display: flex; gap: 8px; overflow-x: auto; padding-bottom: 12px; margin-bottom: 30px; scrollbar-width: none;">
+    <button class="sector-tab active" onclick="filterSector('ALL', this)">All Sectors ({{ discovery_stocks|length }})</button>
+    {% set seen_sectors = [] %}
+    {% for s in discovery_stocks %}
+      {% if s.sector not in seen_sectors %}
+        {% set _ = seen_sectors.append(s.sector) %}
+        <button class="sector-tab" onclick="filterSector('{{ s.sector }}', this)">{{ s.sector }}</button>
+      {% endif %}
+    {% endfor %}
+  </div>
+
+  <!-- Empty State if no stocks available -->
+  {% if not discovery_stocks %}
+  <div style="background: rgba(30, 41, 59, 0.4); border: 1px dashed var(--border-color); border-radius: 16px; padding: 60px 20px; text-align: center;">
+    <div style="font-size: 40px; margin-bottom: 16px;">🌅</div>
+    <h3 style="font-size: 20px; font-weight: 700; color: var(--text-primary); margin-bottom: 8px;">Discovery Reel Generating...</h3>
+    <p style="font-size: 14px; color: var(--text-muted); max-width: 500px; margin: 0 auto 24px auto;">
+      Today's cohort is being screened across live exchange disclosures. Check back shortly or explore our existing public research repository.
+    </p>
+    <a href="/" class="btn btn-primary btn-sm">Explore Existing Dossiers</a>
+  </div>
+  {% else %}
+
+  <!-- Discovery Grid -->
+  <div id="discoveryGrid" style="display: grid; grid-template-columns: repeat(auto-fill, minmax(360px, 1fr)); gap: 24px;">
+    {% for item in discovery_stocks %}
+    <div class="discovery-card" data-sector="{{ item.sector }}" style="background: rgba(30, 41, 59, 0.6); backdrop-filter: blur(12px); border: 1px solid var(--border-color); border-radius: 16px; padding: 24px; display: flex; flex-direction: column; justify-content: space-between; transition: all 0.25s ease;">
+      
+      <div>
+        <!-- Top Tags Strip -->
+        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 14px;">
+          <span class="badge badge-cyan" style="font-size: 11px; text-transform: uppercase; letter-spacing: 0.05em; font-weight: 700;">
+            {{ item.sector }}
+          </span>
+          <span style="font-size: 11px; font-weight: 600; padding: 3px 8px; border-radius: 6px; background: rgba(245, 158, 11, 0.12); color: #fbbf24; border: 1px solid rgba(245, 158, 11, 0.3);">
+            {{ item.market_cap_tier }}
+          </span>
+        </div>
+
+        <!-- Ticker & Company Name -->
+        <div style="margin-bottom: 16px;">
+          <div style="display: flex; justify-content: space-between; align-items: baseline;">
+            <a href="/dossier/{{ item.ticker }}" style="font-size: 22px; font-weight: 800; color: var(--text-primary); text-decoration: none;">
+              {{ item.ticker }}
+            </a>
+            <div style="text-align: right;">
+              <span class="tnum" style="font-size: 20px; font-weight: 800; color: var(--accent-emerald);">
+                ₹{{ "{:,.2f}".format(item.current_price) }}
+              </span>
+            </div>
+          </div>
+          <div style="font-size: 13px; color: var(--text-secondary); margin-top: 2px;">
+            {{ item.company_name }}
+          </div>
+        </div>
+
+        <!-- Key Financial Metrics Bar -->
+        <div style="display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; background: rgba(15, 23, 42, 0.5); border: 1px solid rgba(255, 255, 255, 0.05); border-radius: 10px; padding: 10px; margin-bottom: 18px; text-align: center;">
+          <div>
+            <div style="font-size: 11px; color: var(--text-muted); font-weight: 600;">ROCE</div>
+            <div class="tnum" style="font-size: 14px; font-weight: 800; color: var(--accent-cyan);">{{ item.roce_pct }}%</div>
+          </div>
+          <div>
+            <div style="font-size: 11px; color: var(--text-muted); font-weight: 600;">D/E</div>
+            <div class="tnum" style="font-size: 14px; font-weight: 800; color: #a5b4fc;">{{ item.debt_to_equity }}x</div>
+          </div>
+          <div>
+            <div style="font-size: 11px; color: var(--text-muted); font-weight: 600;">P/E</div>
+            <div class="tnum" style="font-size: 14px; font-weight: 800; color: var(--text-primary);">{{ item.pe_ratio }}</div>
+          </div>
+          <div>
+            <div style="font-size: 11px; color: var(--text-muted); font-weight: 600;">3Y Sales</div>
+            <div class="tnum" style="font-size: 14px; font-weight: 800; color: var(--accent-emerald);">+{{ item.sales_growth_3y }}%</div>
+          </div>
+        </div>
+
+        <!-- RIA Compounding Thesis -->
+        <div style="background: rgba(14, 165, 233, 0.06); border-left: 3px solid var(--accent-cyan); border-radius: 6px; padding: 12px 14px; margin-bottom: 14px;">
+          <div style="font-size: 11px; font-weight: 700; color: var(--accent-cyan); text-transform: uppercase; margin-bottom: 4px; letter-spacing: 0.05em;">
+            🎯 RIA Thesis Undercurrent
+          </div>
+          <div style="font-size: 13px; color: var(--text-secondary); line-height: 1.5;">
+            {{ item.ria_thesis }}
+          </div>
+        </div>
+
+        <!-- Corporate Catalyst & Exchange Filing -->
+        {% if item.catalyst_headline %}
+        <div style="background: rgba(15, 23, 42, 0.4); border-radius: 6px; padding: 10px 12px; margin-bottom: 20px; display: flex; gap: 8px; align-items: flex-start;">
+          <span style="font-size: 13px; line-height: 1;">📢</span>
+          <div style="font-size: 12px; color: var(--text-muted); line-height: 1.4;">
+            <strong style="color: var(--text-secondary);">Latest Exchange Disclosure:</strong> {{ item.catalyst_headline }}
+          </div>
+        </div>
+        {% endif %}
+      </div>
+
+      <!-- Action Button -->
+      <div>
+        <a href="/dossier/{{ item.ticker }}" class="btn btn-secondary btn-sm" style="width: 100%; display: flex; justify-content: center; align-items: center; gap: 6px; font-weight: 600;">
+          <span>Open Full Research Dossier</span>
+          <span>→</span>
+        </a>
+      </div>
+
+    </div>
+    {% endfor %}
+  </div>
+  {% endif %}
+
+  <!-- SEBI Safe Harbor Mandatory Disclosure -->
+  <div style="margin-top: 60px; padding: 20px; background: rgba(15, 23, 42, 0.6); border: 1px solid rgba(255, 255, 255, 0.06); border-radius: 12px; font-size: 12px; color: var(--text-muted); line-height: 1.6;">
+    <strong style="color: var(--text-secondary);">SEBI Non-Advisory Safe Harbor Compliance:</strong>
+    The Morning Discovery Reel is a non-personalized algorithmic diagnostic screener based solely on publicly reported historical financial filings, audited balance sheets, and official corporate announcements from the Bombay Stock Exchange (BSE) and National Stock Exchange of India (NSE). 
+    In strict compliance with SEBI (Research Analysts) Regulations, 2014, the inclusions herein do not constitute investment advice, solicitations, or recommendations to buy, hold, or sell any security. 
+    Metrics such as ROCE, Debt-to-Equity, and P/E ratios are historical. Past performance does not guarantee future results.
+  </div>
+
+</div>
+
+<!-- Filter Tabs CSS & JS -->
+<style>
+  .sector-tab {
+    background: rgba(30, 41, 59, 0.6);
+    color: var(--text-secondary);
+    border: 1px solid var(--border-color);
+    padding: 8px 16px;
+    border-radius: 20px;
+    font-size: 13px;
+    font-weight: 600;
+    cursor: pointer;
+    white-space: nowrap;
+    transition: all 0.2s ease;
+  }
+  .sector-tab:hover {
+    background: rgba(51, 65, 85, 0.8);
+    color: var(--text-primary);
+  }
+  .sector-tab.active {
+    background: var(--accent-cyan);
+    color: #0b1120;
+    border-color: var(--accent-cyan);
+    font-weight: 700;
+  }
+  .discovery-card:hover {
+    border-color: rgba(14, 165, 233, 0.4) !important;
+    transform: translateY(-3px);
+    box-shadow: 0 12px 24px -10px rgba(0, 0, 0, 0.5);
+  }
+</style>
+
+<script>
+  function switchEdition(dateStr) {
+    if (!dateStr) return;
+    window.location.href = '/discovery?edition=' + encodeURIComponent(dateStr);
+  }
+
+  function filterSector(sector, btnElement) {
+    document.querySelectorAll('.sector-tab').forEach(t => t.classList.remove('active'));
+    btnElement.classList.add('active');
+
+    const cards = document.querySelectorAll('.discovery-card');
+    cards.forEach(card => {
+      const cardSec = card.getAttribute('data-sector');
+      if (sector === 'ALL' || cardSec === sector) {
+        card.style.display = 'flex';
+      } else {
+        card.style.display = 'none';
+      }
+    });
+  }
+</script>
+{% endblock %}
