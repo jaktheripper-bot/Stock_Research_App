@@ -60,6 +60,20 @@
   - [x] `ui/views/__init__.py`: Aggregated re-exports of view components and state utilities.
   - [x] Refactored `app.py`: Transformed 1,275-line monolith into a 170-line coordinator.
   - [x] Verification: 100% pre-flight test pass (`./run.sh preflight`: linter across 43 files, system check, headless UI, and 3.4x speed benchmark).
+- [ ] **Phase 4: Full Platform Unification onto FastAPI (Retire Streamlit & Eliminate Dual-Stack)**
+  - *Goal: Eliminate dual-runtime maintenance, reduce Docker image size from 1.3 GB to ~350 MB, and eradicate Streamlit runtime cache warnings.*
+  - [ ] **Port Operator Control Room to FastAPI (`/admin`):**
+    - Create `web/templates/admin.html` and secure `/admin` route in `web/main.py` protected by session/cookie authentication with `ADMIN_PASSCODE`.
+    - Support DB migration checks, quota/spend monitoring, batch runs, and user credit ledger audits directly from the web interface.
+  - [ ] **Decouple Core Caching from Streamlit (`@st.cache_data`):**
+    - Replace `@st.cache_data` in [`core/analysis/fundamentals.py`](file:///Users/lyndonpinto/Documents/Stock_Research_App/core/analysis/fundamentals.py), [`alerts.py`](file:///Users/lyndonpinto/Documents/Stock_Research_App/alerts.py), and [`bse_master.py`](file:///Users/lyndonpinto/Documents/Stock_Research_App/bse_master.py) with standard Python in-memory TTL caching (e.g. `cachetools.TTLCache` or custom lightweight decorator).
+    - Eliminate `No runtime found, using MemoryCacheStorageManager` warnings completely.
+  - [ ] **Migrate Pre-Flight Test Suite to FastAPI TestClient:**
+    - Replace Streamlit `test_ui_headless.py` (`streamlit.testing.v1.AppTest`) with comprehensive `TestClient` suite covering all SSR routes, APIs, and billing flows.
+  - [ ] **Purge Streamlit Dependency & Artifacts:**
+    - Remove `streamlit` from [`requirements.txt`](file:///Users/lyndonpinto/Documents/Stock_Research_App/requirements.txt).
+    - Archive legacy `app.py` and `admin.py`.
+    - Cut container cold-start and deployment latency by ~70%.
 
 ---
 
