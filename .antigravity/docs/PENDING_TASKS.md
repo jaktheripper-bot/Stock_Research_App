@@ -21,6 +21,11 @@ Tasks below represent active, queued roadmap items classified by priority, targe
 ### Priority 2: Forensic & Behavioral Analytical Depth
 *Target: Advanced accounting fraud detection and cognitive bias mitigation.*
 
+* [ ] **EODHD Institutional Deep-Data Enrichment Pipeline**
+  * **Single-Trip Filter Expansion:** Expand EODHD fundamental query filter in `core/analysis/fundamentals.py` (`SharesStats,Earnings,Financials::Cash_Flow::yearly`) to ingest audited multi-year Operating Cash Flow (OCF), Net Income, Capex, and Institutional Shareholding in a single sub-second call.
+  * **Forensic Cash Flow Quality Card (OCF vs. Net Profit):** Compute 3-year cumulative variance $\frac{\text{Operating Cash Flow}}{\text{Net Profit}}$ and Free Cash Flow Yield ($FCF = OCF - \text{Capex}$) to flag aggressive revenue recognition and working capital traps in `/dossier/{ticker}` and `/compare`.
+  * **Earnings Surprise & Consensus Tracker:** Extract 4-quarter EPS surprises (`epsActual` vs `epsEstimate`) to compute Standardized Unexpected Earnings (SUE) deviations.
+  * **Smart Money & Ownership Cushion:** Ingest institutional and insider holding percentages into the Morning Discovery Reel (`/discovery`) and 7-pillar dossiers.
 * [ ] **P3.1: Post-Earnings Announcement Drift (PEAD) & SUE Anomaly Tracker**
   * Calculate Standardized Unexpected Earnings (SUE) on quarterly earnings releases.
   * Visualize 60-day post-earnings empirical drift bands to combat loss aversion and disposition effect.
