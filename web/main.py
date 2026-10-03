@@ -32,9 +32,11 @@ from core.db import (
     get_or_create_user,
     get_user_by_id,
     get_user_by_email,
+    deduct_user_credits,
     IST,
 )
 from core.analysis import get_stock_fundamentals
+from core.analysis.engine import generate_stock_report
 from core.billing import (
     PRICING_PACKS,
     B2B_PACKS,
@@ -484,6 +486,77 @@ async def sitemap_xml():
 
     xml_lines.append('</urlset>')
     return Response(content="\n".join(xml_lines), media_type="application/xml")
+
+
+class SynthesizeRequest(BaseModel):
+    ticker: str
+    user_id: str
+
+
+@app.post("/api/synthesize")
+async def api_synthesize(payload: SynthesizeRequest):
+    """
+    Deducts 1 credit from user balance and triggers a full 7-pillar AI synthesis.
+    Returns the generated dossier URL on success.
+    """
+    clean_t = clean_ticker(payload.ticker)
+    if not clean_t:
+        raise HTTPException(status_code=400, detail="Invalid ticker symbol.")
+
+    canonical = resolve_canonical_symbol(clean_t) or clean_t
+    clean_uid = str(payload.user_id).strip()
+    if not clean_uid:
+        raise HTTPException(status_code=401, detail="Sign in required to generate reports.")
+
+    # Check if a dossier already exists and is fresh (< 14 days old)
+    existing = get_report_by_ticker(canonical)
+    if existing and existing.get("report_text"):
+        return {
+            "success": True,
+            "already_exists": True,
+            "ticker": canonical,
+            "dossier_url": f"/dossier/{canonical}",
+            "message": f"An existing dossier for {canonical} is already available. No credits were deducted."
+        }
+
+    # Deduct 1 credit atomically
+    ok, new_balance, msg = deduct_user_credits(
+        user_id=clean_uid,
+        ticker=canonical,
+        action_type="FULL_SYNTHESIS",
+        amount=1.0
+    )
+    if not ok:
+        raise HTTPException(status_code=402, detail=msg)
+
+    # Trigger synchronous report generation
+    try:
+        report_text = generate_stock_report(canonical)
+    except Exception as e:
+        logger.error(f"Synthesis failed for {canonical}: {e}")
+        raise HTTPException(
+            status_code=500,
+            detail=f"Report generation failed for {canonical}. Your credit has been consumed. Error: {e}"
+        )
+
+    return {
+        "success": True,
+        "already_exists": False,
+        "ticker": canonical,
+        "dossier_url": f"/dossier/{canonical}",
+        "new_balance": new_balance,
+        "message": f"Dossier for {canonical} synthesized successfully. 1 credit deducted."
+    }
+
+
+@app.get("/api/user/{user_id}")
+async def api_get_user(user_id: str):
+    """Returns current user profile and credit balance from the database."""
+    clean_uid = str(user_id).strip()
+    user = get_user_by_id(clean_uid)
+    if not user:
+        raise HTTPException(status_code=404, detail="User not found.")
+    return {"success": True, "user": user}
 
 
 @app.get("/healthz")

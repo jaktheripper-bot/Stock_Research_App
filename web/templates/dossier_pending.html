@@ -26,9 +26,9 @@
       </div>
 
       <div style="display: flex; gap: 10px;">
-        <a href="/pricing" class="btn btn-primary btn-sm">
+        <button onclick="synthesizeReport('{{ display_ticker }}')" class="btn btn-primary btn-sm">
           ⚡ Synthesize Dossier (1 Credit)
-        </a>
+        </button>
       </div>
     </div>
   </div>
@@ -50,13 +50,16 @@
     <div style="background: rgba(15, 23, 42, 0.6); border: 1px solid var(--border-color); border-radius: var(--radius-md); padding: 24px; display: flex; flex-direction: column; justify-content: space-between;">
       <div>
         <h4 style="font-size: 15px; font-weight: 700; color: var(--text-primary); margin-bottom: 8px;">
-          Claim Research Pass
+          Generate This Dossier
         </h4>
         <p style="font-size: 13px; color: var(--text-muted); line-height: 1.5; margin-bottom: 16px;">
           Includes institutional PDF report export, exchange footnote citations, and multi-scenario DCF valuation.
         </p>
       </div>
-      <a href="/pricing" class="btn btn-primary" style="text-align: center; width: 100%;">
+      <button onclick="synthesizeReport('{{ display_ticker }}')" class="btn btn-primary" style="text-align: center; width: 100%;">
+        ⚡ Synthesize Dossier (1 Credit)
+      </button>
+      <a href="/pricing" class="btn btn-secondary" style="text-align: center; width: 100%; margin-top: 10px; text-decoration: none;">
         View Plans & Pricing →
       </a>
     </div>

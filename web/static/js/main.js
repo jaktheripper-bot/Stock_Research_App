@@ -144,6 +144,8 @@ window.openCheckout = function(planId, planName, amountInr, credits) {
           });
           const verifyResult = await verifyResp.json();
           if (verifyResp.ok && verifyResult.success) {
+            // Update localStorage with new balance from server
+            await refreshUserBalance(storedUser);
             alert('🎉 Payment verified successfully! Added ' + credits + ' credits to your account. Invoice: ' + verifyResult.invoice_number);
             modal.classList.remove('active');
             window.location.reload();
@@ -182,6 +184,8 @@ window.openCheckout = function(planId, planName, amountInr, credits) {
                 });
                 const verifyResult = await verifyResp.json();
                 if (verifyResp.ok && verifyResult.success) {
+                  // Update localStorage with new balance from server
+                  await refreshUserBalance(storedUser);
                   alert('🎉 Payment Confirmed! ' + credits + ' Credits added. Invoice: ' + verifyResult.invoice_number);
                   modal.classList.remove('active');
                   window.location.reload();
@@ -223,6 +227,91 @@ window.openCheckout = function(planId, planName, amountInr, credits) {
   }
 
   modal.classList.add('active');
+};
+
+// ==============================================================================
+// Report Synthesis — Triggers /api/synthesize with credit deduction
+// ==============================================================================
+
+window.synthesizeReport = async function(ticker) {
+  const user = getStoredUser();
+  if (!user) {
+    alert('Please sign in first to generate reports. You will receive 2 free research credits.');
+    openSignInModal();
+    return;
+  }
+
+  if ((user.credits_balance || 0) < 1) {
+    if (confirm('You need at least 1 research credit to generate a new dossier.\n\nCurrent balance: ' + (user.credits_balance || 0) + ' credits.\n\nWould you like to purchase credits?')) {
+      window.location.href = '/pricing';
+    }
+    return;
+  }
+
+  if (!confirm(`Generate a full 7-pillar institutional dossier for ${ticker}?\n\nThis will consume 1 research credit.\nCurrent balance: ${user.credits_balance} credits.`)) {
+    return;
+  }
+
+  // Find the button that triggered this and show progress
+  const btn = event && event.target ? event.target.closest('button') || event.target : null;
+  const originalText = btn ? btn.innerText : '';
+  if (btn) {
+    btn.disabled = true;
+    btn.innerText = '⏳ Synthesizing 7-Pillar Thesis...';
+    btn.style.opacity = '0.7';
+  }
+
+  try {
+    const resp = await fetch('/api/synthesize', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        ticker: ticker,
+        user_id: user.id
+      })
+    });
+
+    const data = await resp.json();
+
+    if (resp.ok && data.success) {
+      // Update local credits
+      if (data.new_balance !== undefined) {
+        user.credits_balance = data.new_balance;
+        localStorage.setItem('sr_user', JSON.stringify(user));
+        syncUserSession();
+      }
+
+      if (data.already_exists) {
+        alert('✅ ' + data.message);
+      } else {
+        alert('🎉 ' + data.message);
+      }
+
+      // Navigate to the dossier
+      window.location.href = data.dossier_url;
+    } else {
+      const detail = data.detail || data.message || 'Synthesis failed.';
+      if (resp.status === 402) {
+        // Insufficient credits
+        if (confirm(detail + '\n\nWould you like to purchase more credits?')) {
+          window.location.href = '/pricing';
+        }
+      } else if (resp.status === 401) {
+        alert(detail);
+        openSignInModal();
+      } else {
+        alert('❌ ' + detail);
+      }
+    }
+  } catch (err) {
+    alert('Synthesis Error: ' + err.message);
+  } finally {
+    if (btn) {
+      btn.disabled = false;
+      btn.innerText = originalText;
+      btn.style.opacity = '1';
+    }
+  }
 };
 
 // ==============================================================================
@@ -300,6 +389,26 @@ function getStoredUser() {
     return raw ? JSON.parse(raw) : null;
   } catch {
     return null;
+  }
+}
+
+/**
+ * Fetches the latest user profile/balance from the server and updates localStorage.
+ * Called after successful payments to ensure credit balance is always in sync.
+ */
+async function refreshUserBalance(user) {
+  if (!user || !user.id) return;
+  try {
+    const resp = await fetch(`/api/user/${encodeURIComponent(user.id)}`);
+    if (resp.ok) {
+      const data = await resp.json();
+      if (data.success && data.user) {
+        localStorage.setItem('sr_user', JSON.stringify(data.user));
+        syncUserSession();
+      }
+    }
+  } catch (err) {
+    console.error('Failed to refresh user balance:', err);
   }
 }
 
