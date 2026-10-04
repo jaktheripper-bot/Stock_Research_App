@@ -126,16 +126,29 @@ async def run_daily_discovery_scheduler():
             logger.error(f"🌅 [Discovery Scheduler] Error in daily discovery scheduler: {e}")
             await asyncio.sleep(60)
 
+from apscheduler.schedulers.asyncio import AsyncIOScheduler
+from core.msme.scheduler import register_jobs
+
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     # Initialize DB migrations on startup
+    # Include MSME router
+    from core.msme.router import router as msme_router
+    app.include_router(msme_router, prefix="/api/msme")
     init_db()
     # Warm‑up task to prime async resources
     await warmup_task()
+    # Start APScheduler for MSME background jobs
+    scheduler = AsyncIOScheduler()
+    register_jobs(scheduler)
+    scheduler.start()
     # Start automated daily discovery background scheduler
-    task = asyncio.create_task(run_daily_discovery_scheduler())
-    yield
-    task.cancel()
+    discovery_task = asyncio.create_task(run_daily_discovery_scheduler())
+    try:
+        yield
+    finally:
+        discovery_task.cancel()
+        scheduler.shutdown()
 
 app = FastAPI(
     title="Stock Research AI",
@@ -1039,10 +1052,10 @@ async def api_run_discovery(
 
     from scripts.run_discovery_worker import run_discovery_pipeline
     background_tasks.add_task(run_discovery_pipeline, target_count=count, force_synthesis=force)
-    return {
+    return json_response_with_cache({
         "status": "initiated",
         "message": f"Morning Discovery Reel worker dispatched for {count} equities (force={force})."
-    }
+    })
 
 
 # ==============================================================================

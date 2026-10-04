@@ -697,6 +697,47 @@ def init_db(force: bool = False):
                         pass
                     cursor.execute("INSERT OR IGNORE INTO schema_migrations (version) VALUES ('v010_user_usage_and_billables_audit');")
                 conn.commit()
+                # Migration v011: MSME Firms table
+                if "v011_msme_firms" not in applied:
+                    logger.info("Applying schema migration: v011_msme_firms...")
+                    if supabase_url:
+                        cursor.execute("""
+                            CREATE TABLE IF NOT EXISTS msme_firms (
+                                uin VARCHAR PRIMARY KEY,
+                                name TEXT NOT NULL,
+                                sector_code VARCHAR,
+                                sector_name TEXT,
+                                city TEXT,
+                                state TEXT,
+                                annual_turnover NUMERIC,
+                                employee_count INTEGER,
+                                registration_date DATE,
+                                source VARCHAR NOT NULL,
+                                last_updated TIMESTAMPTZ DEFAULT now()
+                            );
+                            CREATE INDEX IF NOT EXISTS idx_msme_sector ON msme_firms(sector_name);
+                            CREATE INDEX IF NOT EXISTS idx_msme_state ON msme_firms(state);
+                        """)
+                    else:
+                        cursor.execute("""
+                            CREATE TABLE IF NOT EXISTS msme_firms (
+                                uin TEXT PRIMARY KEY,
+                                name TEXT NOT NULL,
+                                sector_code TEXT,
+                                sector_name TEXT,
+                                city TEXT,
+                                state TEXT,
+                                annual_turnover REAL,
+                                employee_count INTEGER,
+                                registration_date TEXT,
+                                source TEXT NOT NULL,
+                                last_updated TEXT DEFAULT (datetime('now'))
+                            );
+                        """)
+                        cursor.execute("CREATE INDEX IF NOT EXISTS idx_msme_sector ON msme_firms(sector_name);")
+                        cursor.execute("CREATE INDEX IF NOT EXISTS idx_msme_state ON msme_firms(state);")
+                    cursor.execute("INSERT OR IGNORE INTO schema_migrations (version) VALUES ('v011_msme_firms');")
+                    conn.commit()
 
             _DB_INITIALIZED = True
         except Exception as e:
