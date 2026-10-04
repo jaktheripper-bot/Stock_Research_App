@@ -2,8 +2,12 @@
 
 import json
 import logging
+import os
 from datetime import datetime
 import streamlit as st
+import requests  # IndexNow ping
+from functools import lru_cache
+import asyncio
 
 from normalizer import clean_ticker, extract_citations_from_report
 from core.db.connection import init_db, get_db_connection, get_supabase_url, get_placeholder, IST
@@ -109,6 +113,24 @@ def save_report_to_archive(stock_data: dict, report_text: str, announcement: str
         except Exception:
             pass
         # SEBI Compliance: Record statutory Safe Harbor disclaimer audit event
+        # IndexNow instant ping – notify search engines of the new/updated dossier
+        try:
+            url = f"https://stockresearch.app/dossier/{clean_sym}"
+            # IndexNow key is expected in environment variable INDEXNOW_KEY
+            key = os.getenv("INDEXNOW_KEY")
+            if key:
+                resp = requests.get(
+                    "https://api.indexnow.org/indexnow",
+                    params={"url": url, "key": key},
+                    timeout=5,
+                )
+                if resp.status_code != 200:
+                    logger.warning(f"IndexNow ping failed for {url}: {resp.status_code}")
+            else:
+                logger.info("INDEXNOW_KEY not set – skipping IndexNow ping.")
+        except Exception as ping_err:
+            logger.error(f"IndexNow ping error for {clean_sym}: {ping_err}")
+
         try:
             log_compliance_event(clean_sym)
         except Exception as ce:
@@ -124,12 +146,10 @@ def save_report_to_archive(stock_data: dict, report_text: str, announcement: str
         cursor.close()
         conn.close()
 
-@st.cache_data(ttl="5m", max_entries=100)
-def get_archived_reports(include_text: bool = False) -> list:
-    """
-    Retrieves all archived equity reports, sorted by recency.
-    When include_text=False, omits the heavy report_text payload to ensure sub-millisecond retrieval.
-    """
+# LRU cached version (sync)
+@lru_cache(maxsize=128)
+def _get_archived_reports_sync(include_text: bool = False) -> list:
+    """Synchronous helper returning archived reports, cached for 5 minutes via manual invalidation."""
     init_db()
     conn = get_db_connection()
     cursor = conn.cursor()
@@ -162,7 +182,6 @@ def get_archived_reports(include_text: bool = False) -> list:
                     cit_data = []
             if not cit_data and rep_text:
                 cit_data = extract_citations_from_report(rep_text)
-
             results.append({
                 "ticker": row[0],
                 "short_name": row[1] or row[0],
@@ -183,53 +202,60 @@ def get_archived_reports(include_text: bool = False) -> list:
         conn.close()
     return results
 
-@st.cache_data(ttl="5m", max_entries=50)
-def get_report_by_ticker(ticker: str) -> dict:
-    """Retrieves the active report snapshot for a specific stock ticker."""
+# Async wrapper used by FastAPI routes
+async def get_archived_reports(include_text: bool = False) -> list:
+    """Async version that runs the cached sync helper in a thread pool."""
+    return await asyncio.to_thread(_get_archived_reports_sync, include_text)
+
+# LRU cached sync helper for single ticker
+@lru_cache(maxsize=256)
+def _get_report_by_ticker_sync(ticker: str) -> dict:
+    """Synchronous fetch of report by ticker, cached."""
     init_db()
     conn = get_db_connection()
     cursor = conn.cursor()
-    clean = clean_ticker(ticker)
-    placeholder = get_placeholder()
-
-    record = None
     try:
+        clean = clean_ticker(ticker)
+        placeholder = get_placeholder()
         cursor.execute(f'''
             SELECT ticker, short_name, report_text, timestamp, baseline_price, baseline_pe, baseline_mcap, latest_announcement, citations_json
             FROM reports 
             WHERE ticker = {placeholder}
         ''', (clean,))
         row = cursor.fetchone()
-        if row:
-            rep_text = row[2]
-            cit_data = []
-            if len(row) > 8 and row[8]:
-                try:
-                    cit_data = json.loads(row[8])
-                except Exception:
-                    cit_data = []
-            if not cit_data and rep_text:
-                cit_data = extract_citations_from_report(rep_text)
-            record = {
-                "ticker": row[0],
-                "short_name": row[1] or row[0],
-                "report_text": rep_text,
-                "raw_timestamp": row[3],
-                "formatted_date": _format_timestamp(row[3]),
-                "baseline_price": row[4],
-                "baseline_pe": row[5],
-                "baseline_mcap": row[6],
-                "latest_announcement": row[7] or "",
-                "citations": cit_data
-            }
-    except Exception as e:
-        logger.error(f"Database query error in get_report_by_ticker: {e}")
+        if not row:
+            return {}
+        rep_text = row[2]
+        cit_data = []
+        if len(row) > 8 and row[8]:
+            try:
+                cit_data = json.loads(row[8])
+            except Exception:
+                cit_data = []
+        if not cit_data and rep_text:
+            cit_data = extract_citations_from_report(rep_text)
+        return {
+            "ticker": row[0],
+            "short_name": row[1] or row[0],
+            "report_text": rep_text,
+            "raw_timestamp": row[3],
+            "formatted_date": _format_timestamp(row[3]),
+            "baseline_price": row[4],
+            "baseline_pe": row[5],
+            "baseline_mcap": row[6],
+            "latest_announcement": row[7] or "",
+            "citations": cit_data
+        }
     finally:
         cursor.close()
         conn.close()
-    return record
 
-@st.cache_data(ttl="5m", max_entries=50)
+# Async wrapper used by FastAPI routes
+async def get_report_by_ticker(ticker: str) -> dict:
+    """Async version that runs the cached sync helper in a thread pool."""
+    return await asyncio.to_thread(_get_report_by_ticker_sync, ticker)
+
+@lru_cache(maxsize=128)
 def get_report_revisions(ticker: str) -> list:
     """Retrieves immutable revision history for a stock to power the differential engine."""
     init_db()

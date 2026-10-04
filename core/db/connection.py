@@ -69,7 +69,16 @@ class _PooledConnectionProxy:
 @st.cache_resource
 def _get_pg_pool(dsn: str):
     import psycopg2.pool
-    return psycopg2.pool.ThreadedConnectionPool(minconn=1, maxconn=10, dsn=dsn)
+    # Enable TCP keepalive to improve connection reliability
+    return psycopg2.pool.ThreadedConnectionPool(
+        minconn=1,
+        maxconn=300,
+        dsn=dsn,
+        keepalives=1,
+        keepalives_idle=30,
+        keepalives_interval=10,
+        keepalives_count=5,
+    )
 
 def _acquire_connection_from_pool(pool):
     for attempt in range(5):

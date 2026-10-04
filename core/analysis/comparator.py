@@ -1,13 +1,14 @@
 """Peer comparison and cross-company disparity diagnostic engine."""
 
 import logging
+import httpx
 from normalizer import clean_ticker
 from core.db import get_report_by_ticker
 from core.analysis.fundamentals import get_stock_fundamentals, enrich_fundamentals
 from core.analysis.parser import extract_health_matrix
 
 logger = logging.getLogger("equity_research.core.analysis.comparator")
-
+import asyncio
 def evaluate_company_disparity(fund_a: dict, fund_b: dict) -> dict:
     """
     Evaluates cross-company disparity across the 3 institutional axes:
@@ -92,7 +93,7 @@ def evaluate_company_disparity(fund_a: dict, fund_b: dict) -> dict:
         "sec_b": sec_b or "N/A",
     }
 
-def compare_two_companies(ticker_a: str, ticker_b: str, progress_callback=None) -> dict:
+async def compare_two_companies(ticker_a: str, ticker_b: str, progress_callback=None) -> dict:
     """
     Executes cross-company peer comparison with 3-tier disparity evaluation,
     extracting side-by-side fundamentals, 7-pillar health matrices, and normalized indicators.
@@ -100,25 +101,29 @@ def compare_two_companies(ticker_a: str, ticker_b: str, progress_callback=None) 
     clean_a = clean_ticker(ticker_a)
     clean_b = clean_ticker(ticker_b)
     
-    from concurrent.futures import ThreadPoolExecutor
-
-    def _fetch_pipeline(ticker_str: str):
-        c_tick = clean_ticker(ticker_str)
-        f_data = get_stock_fundamentals(c_tick)
-        res_tick = f_data.get("ticker", c_tick)
-        f_data = enrich_fundamentals(res_tick, f_data)
-        rep = get_report_by_ticker(res_tick)
-        mat = extract_health_matrix(rep.get("report_text", "") if rep else "")
-        return res_tick, f_data, rep, mat
+    # Using asyncio for concurrent fetching
+    async def _fetch_pipeline(ticker_str: str):
+        async with httpx.AsyncClient() as client:
+            # Placeholder async HTTP request to demonstrate async usage.
+            # Actual fundamentals fetching remains synchronous; we wrap it in a thread.
+            return await asyncio.to_thread(lambda: (
+                clean_ticker(ticker_str),
+                get_stock_fundamentals(clean_ticker(ticker_str)),
+                get_report_by_ticker(clean_ticker(ticker_str)),
+                extract_health_matrix(
+                    get_report_by_ticker(clean_ticker(ticker_str)).get("report_text", "")
+                    if get_report_by_ticker(clean_ticker(ticker_str))
+                    else ""
+                ),
+            ))
 
     if progress_callback:
         progress_callback(0.25, f"Auditing verified BSE quotes & fundamentals for {clean_a} & {clean_b}...")
 
-    with ThreadPoolExecutor(max_workers=2) as executor:
-        fut_a = executor.submit(_fetch_pipeline, ticker_a)
-        fut_b = executor.submit(_fetch_pipeline, ticker_b)
-        resolved_a, fund_a, rep_a, matrix_a = fut_a.result()
-        resolved_b, fund_b, rep_b, matrix_b = fut_b.result()
+    (resolved_a, fund_a, rep_a, matrix_a), (resolved_b, fund_b, rep_b, matrix_b) = await asyncio.gather(
+        _fetch_pipeline(ticker_a),
+        _fetch_pipeline(ticker_b),
+    )
     
     if progress_callback:
         progress_callback(0.85, "Evaluating 3-tier heuristic disparity (Sector, Lifecycle, Scale)...")

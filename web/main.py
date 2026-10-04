@@ -23,6 +23,7 @@ from fastapi.responses import HTMLResponse, RedirectResponse, Response, JSONResp
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 from starlette.middleware.base import BaseHTTPMiddleware
+from brotli_asgi import BrotliMiddleware
 try:
     from dotenv import load_dotenv
     load_dotenv()
@@ -129,6 +130,8 @@ async def run_daily_discovery_scheduler():
 async def lifespan(app: FastAPI):
     # Initialize DB migrations on startup
     init_db()
+    # Warm‑up task to prime async resources
+    await warmup_task()
     # Start automated daily discovery background scheduler
     task = asyncio.create_task(run_daily_discovery_scheduler())
     yield
@@ -141,7 +144,28 @@ app = FastAPI(
     lifespan=lifespan
 )
 
+# Cache-Control / ETag helper for cheap JSON endpoints
+def json_response_with_cache(data: dict, max_age: int = 3600) -> JSONResponse:
+    import json, hashlib
+    content_str = json.dumps(data, sort_keys=True)
+    etag = f'"{hashlib.md5(content_str.encode()).hexdigest()}"'
+    return JSONResponse(content=data, media_type="application/json", headers={
+        "Cache-Control": f"public, max-age={max_age}",
+        "ETag": etag,
+    })
+
+# Warm‑up task to prime async resources on startup
+async def warmup_task():
+    logger.info("🚀 Starting warm‑up task: preloading resources...")
+    try:
+        # Simple warm‑up using compare_two_companies to load HTTP client pool and DB connections
+        await compare_two_companies("INFY", "TCS")
+        logger.info("🚀 Warm‑up task completed: compare_two_companies preloaded.")
+    except Exception as e:
+        logger.exception(f"Warm‑up task failed: {e}")
+
 app.add_middleware(GZipMiddleware, minimum_size=500)
+app.add_middleware(BrotliMiddleware, minimum_size=500)
 
 class HeadMethodMiddleware(BaseHTTPMiddleware):
     """Transparently handles HEAD requests for uptime monitors and link crawlers."""
@@ -427,7 +451,7 @@ def dossier_page(request: Request, ticker: str):
 
 
 @app.get("/compare", response_class=HTMLResponse)
-def compare_page(
+async def compare_page(
     request: Request,
     a: Optional[str] = "INFY",
     b: Optional[str] = "TCS"
@@ -439,7 +463,7 @@ def compare_page(
     canonical_b = resolve_canonical_symbol(clean_b) or clean_b
 
     try:
-        comp_data = compare_two_companies(canonical_a, canonical_b)
+        comp_data = await compare_two_companies(canonical_a, canonical_b)
     except Exception as e:
         logger.error(f"Error comparing companies {canonical_a} vs {canonical_b}: {e}")
         comp_data = {
@@ -499,10 +523,10 @@ async def api_premortem(payload: PreMortemRequest):
         },
         user_id=payload.user_id
     )
-    return {
+    return json_response_with_cache({
         "success": True,
         "message": f"🔒 Pre-Mortem counter-thesis committed to decision ledger for {clean_t}!"
-    }
+    })
 
 
 class TelemetryEventRequest(BaseModel):
@@ -530,7 +554,7 @@ async def api_record_telemetry_event(payload: TelemetryEventRequest, request: Re
         user_id=payload.user_id,
         user_email=payload.user_email
     )
-    return {"status": "ok"}
+    return json_response_with_cache({"status": "ok"})
 
 
 # ==============================================================================
@@ -679,10 +703,10 @@ async def disclaimer_page(request: Request):
 
 @app.get("/api/suggest")
 async def api_suggest(q: str = ""):
-    """Returns ticker autocomplete suggestions."""
+    """Returns ticker autocomplete suggestions with caching headers."""
     if not q or len(q.strip()) < 2:
-        return {"suggestions": []}
-    return {"suggestions": get_ticker_suggestions(q.strip())}
+        return json_response_with_cache({"suggestions": []})
+    return json_response_with_cache({"suggestions": get_ticker_suggestions(q.strip())})
 
 
 class SignInRequest(BaseModel):
@@ -716,11 +740,11 @@ async def api_signin(payload: SignInRequest):
         details={"name": user.get("full_name"), "tier": user.get("subscription_tier")}
     )
 
-    return {
+    return json_response_with_cache({
         "success": True,
         "message": f"Welcome {user.get('full_name')}! You have received 2 free research credits.",
         "user": user
-    }
+    })
 
 
 class OrderRequest(BaseModel):
@@ -747,17 +771,17 @@ async def api_create_order(payload: OrderRequest):
             user_id=payload.user_id or "guest_web_user",
             user_email=payload.email or "investor@example.com"
         )
-        return {
-            "order_id": order.get("order_id") or order.get("id"),
-            "id": order.get("id") or order.get("order_id"),
-            "amount": order.get("amount"),
-            "currency": order.get("currency", "INR"),
-            "key_id": order.get("key_id"),
-            "receipt": order.get("receipt"),
-            "status": order.get("status", "created"),
-            "is_simulated": order.get("is_simulated", False),
-            "plan": order.get("plan")
-        }
+    return json_response_with_cache({
+        "order_id": order.get("order_id") or order.get("id"),
+        "id": order.get("id") or order.get("order_id"),
+        "amount": order.get("amount"),
+        "currency": order.get("currency", "INR"),
+        "key_id": order.get("key_id"),
+        "receipt": order.get("receipt"),
+        "status": order.get("status", "created"),
+        "is_simulated": order.get("is_simulated", False),
+        "plan": order.get("plan")
+    })
     except RazorpayAuthError as e:
         logger.error(f"Razorpay auth failure: {e}")
         raise HTTPException(status_code=401, detail="Razorpay authentication failed. Verify API credentials.")
@@ -819,14 +843,14 @@ async def api_verify_payment(payload: VerifyPaymentRequest):
             details={"plan_id": payload.plan_id, "payment_id": eff_payment_id, "invoice": inv_num}
         )
 
-        return {
-            "success": True,
-            "message": "Payment verified successfully",
-            "order_id": eff_order_id,
-            "payment_id": eff_payment_id,
-            "new_balance": new_bal,
-            "invoice_number": inv_num
-        }
+    return json_response_with_cache({
+        "success": True,
+        "message": "Payment verified successfully",
+        "order_id": eff_order_id,
+        "payment_id": eff_payment_id,
+        "new_balance": new_bal,
+        "invoice_number": inv_num
+    })
     except HTTPException:
         raise
     except Exception as e:
@@ -865,6 +889,7 @@ async def api_download_pdf(ticker: str):
 async def sitemap_xml():
     """Generates automated XML sitemap for Google/Perplexity/Bing search crawlers."""
     archives = get_archived_reports()
+    # Use current date for static pages
     now_iso = datetime.now(timezone.utc).strftime("%Y-%m-%d")
 
     xml_lines = [
@@ -883,8 +908,22 @@ async def sitemap_xml():
     for a in archives:
         t = a.get("ticker")
         if t:
+            # Use the report's raw_timestamp for lastmod if available, fallback to now_iso
+            raw_ts = a.get("raw_timestamp")
+            if raw_ts:
+                try:
+                    # Ensure datetime object; if string, parse ISO
+                    if isinstance(raw_ts, str):
+                        dt = datetime.fromisoformat(raw_ts.replace('Z', '+00:00'))
+                    else:
+                        dt = raw_ts
+                    lastmod_date = dt.astimezone(timezone.utc).strftime("%Y-%m-%d")
+                except Exception:
+                    lastmod_date = now_iso
+            else:
+                lastmod_date = now_iso
             xml_lines.append(
-                f'  <url><loc>https://stockresearch.app/dossier/{t}</loc><lastmod>{now_iso}</lastmod><changefreq>weekly</changefreq><priority>0.9</priority></url>'
+                f'  <url><loc>https://stockresearch.app/dossier/{t}</loc><lastmod>{lastmod_date}</lastmod><changefreq>weekly</changefreq><priority>0.9</priority></url>'
             )
 
     xml_lines.append('</urlset>')
@@ -916,14 +955,14 @@ async def api_synthesize(payload: SynthesizeRequest):
     # Check if a dossier already exists and is fresh (< 14 days old) unless force_refresh is requested
     existing = get_report_by_ticker(canonical)
     if existing and existing.get("report_text") and not payload.force_refresh:
-        return {
+        return json_response_with_cache({
             "success": True,
             "already_exists": True,
             "ticker": canonical,
             "dossier_url": f"/dossier/{canonical}",
             "new_balance": get_user_credits_balance(clean_uid),
             "message": f"An existing dossier for {canonical} is already available. No credits were deducted."
-        }
+        })
 
     # Deduct 1 credit atomically
     ok, new_balance, msg = deduct_user_credits(
@@ -959,30 +998,31 @@ async def api_synthesize(payload: SynthesizeRequest):
             detail=f"Synthesis could not verify report archiving for {canonical}. Your credit has been automatically refunded (balance: {refunded_bal:.1f} credits)."
         )
 
-    return {
+    return json_response_with_cache({
         "success": True,
         "already_exists": False,
         "ticker": canonical,
         "dossier_url": f"/dossier/{canonical}",
         "new_balance": new_balance,
         "message": f"Dossier for {canonical} synthesized successfully! 1 credit deducted."
-    }
+    })
 
 
 @app.get("/api/user/{user_id}")
 async def api_get_user(user_id: str):
-    """Returns current user profile and credit balance from the database."""
+    """Returns current user profile and credit balance with caching headers."""
     clean_uid = str(user_id).strip()
     user = get_user_by_id(clean_uid)
     if not user:
         raise HTTPException(status_code=404, detail="User not found.")
-    return {"success": True, "user": user}
+    return json_response_with_cache({"success": True, "user": user})
 
 
 @app.get("/healthz")
 async def healthz():
-    """Health check endpoint for cloud container orchestrators."""
-    return {"status": "healthy", "service": "Stock Research AI Web Server", "timestamp": datetime.now(IST).isoformat()}
+    """Health check endpoint with caching (short‑lived)."""
+    data = {"status": "healthy", "service": "Stock Research AI Web Server", "timestamp": datetime.now(IST).isoformat()}
+    return json_response_with_cache(data, max_age=30)
 
 
 @app.post("/api/admin/run-discovery")

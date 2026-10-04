@@ -101,3 +101,4 @@ Tasks below represent active, queued roadmap items classified by priority, targe
 8. **Regulatory Footnotes & Citations:** Primary source attributions hyperlinked and rendered across web dossiers and PDF report exports.
 9. **Razorpay Payments & Credit Allocation (`/pricing`):** Seamless checkout supporting UPI (GPay, PhonePe), Cards, and NetBanking with authenticated account linking and automated tax receipts (SAC 998314).
 10. **Statutory Safe-Harbor Disclosures:** Dedicated legal policy suite (`/terms`, `/privacy`, `/refund-policy`, `/shipping-policy`, `/contact`, `/disclaimer`).
+
