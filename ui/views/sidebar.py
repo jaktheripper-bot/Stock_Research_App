@@ -1,7 +1,7 @@
 """Sidebar component: stock discovery search, archive picker, and revision timeline."""
 
 import streamlit as st
-from core.db import get_archived_reports, get_report_by_ticker, get_report_revisions
+from core.db import get_archived_reports_sync, get_report_by_ticker_sync, get_report_revisions
 from core.analysis import compare_revisions
 from ui.formatters import format_inr
 from telemetry import track_user_action
@@ -28,7 +28,7 @@ def render_sidebar():
         st.markdown("---")
         st.header("Research Archive & Surveillance")
         try:
-            archives = get_archived_reports()
+            archives = get_archived_reports_sync()
             if archives:
                 # Format ticker labels with company name and revision counts
                 ticker_options = ["Select..."]
@@ -82,7 +82,7 @@ def render_sidebar():
                         track_user_action("ARCHIVE_LOAD", selected_ticker)
                         rep_text = selected_item.get("report_text")
                         if not rep_text:
-                            full_rec = get_report_by_ticker(selected_ticker)
+                            full_rec = get_report_by_ticker_sync(selected_ticker)
                             rep_text = full_rec.get("report_text") if full_rec else ""
                         set_active_dossier_state(
                             ticker=selected_ticker,

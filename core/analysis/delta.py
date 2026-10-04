@@ -34,13 +34,13 @@ def evaluate_material_change(cached: dict, live_fund: dict, scrip_code: str) -> 
         "chat_completions_not_available",
         "Verification Audit Note: Missing required section",
     ]
-    if (
-        not cached_text
-        or len(cached_text) < 800
-        or any(sig in cached_text for sig in poison_signatures)
-        or ("Pillar 1" not in cached_text and "DIAGNOSTIC SUMMARY" not in cached_text)
-    ):
-        return True, "⚡ Self-Healing Recovery: Cached report contained failed synthesis error or incomplete data", "", "POISONED_CACHE"
+    if cached_text:
+        if (
+            len(cached_text) < 800
+            or any(sig in cached_text for sig in poison_signatures)
+            or ("Pillar 1" not in cached_text and "DIAGNOSTIC SUMMARY" not in cached_text)
+        ):
+            return True, "⚡ Self-Healing Recovery: Cached report contained failed synthesis error or incomplete data", "", "POISONED_CACHE"
 
     raw_ts = cached.get("raw_timestamp")
     if raw_ts:

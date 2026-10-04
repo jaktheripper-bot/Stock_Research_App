@@ -27,6 +27,8 @@ from core.db import (
     save_report_to_archive,
     get_archived_reports,
     get_report_by_ticker,
+    get_archived_reports_sync,
+    get_report_by_ticker_sync,
     get_report_revisions,
     get_revision_by_id,
     get_watchlist,

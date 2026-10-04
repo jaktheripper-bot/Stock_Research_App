@@ -51,8 +51,8 @@ from pydantic import BaseModel
 
 from core.db import (
     init_db,
-    get_archived_reports,
-    get_report_by_ticker,
+    get_archived_reports_sync,
+    get_report_by_ticker_sync,
     get_report_revisions,
     get_or_create_user,
     get_user_by_id,
@@ -102,7 +102,6 @@ from web.legal_content import POLICIES
 logger = logging.getLogger("equity_research.web")
 
 from contextlib import asynccontextmanager
-from starlette.middleware.gzip import GZipMiddleware
 
 async def run_daily_discovery_scheduler():
     """
@@ -182,8 +181,6 @@ async def warmup_task():
         logger.info("🚀 Warm‑up task completed: compare_two_companies preloaded.")
     except Exception as e:
         logger.exception(f"Warm‑up task failed: {e}")
-
-app.add_middleware(GZipMiddleware, minimum_size=500)
 app.add_middleware(BrotliMiddleware, minimum_size=500)
 # Security headers middleware for CSP, HSTS, etc.
 app.add_middleware(SecurityHeadersMiddleware)
@@ -230,7 +227,7 @@ templates.env.globals["MANDATORY_SEBI_DISCLAIMER"] = MANDATORY_SEBI_DISCLAIMER
 def home_page(request: Request):
     """Public home & landing page with live stock search, discovery reel, and featured dossiers."""
     try:
-        archives = get_archived_reports()
+        archives = get_archived_reports_sync()
     except Exception as e:
         logger.error(f"Error fetching archives: {e}")
         archives = []
@@ -322,7 +319,7 @@ def dossier_page(request: Request, ticker: str):
     if canonical != clean_t:
         return RedirectResponse(url=f"/dossier/{canonical}", status_code=302)
 
-    rep = get_report_by_ticker(canonical)
+    rep = get_report_by_ticker_sync(canonical)
     if not rep or not rep.get("report_text"):
         # Resolve company details for the pending template
         scrip = resolve_bse_scrip_code(canonical) or "BSE Listed"
@@ -895,7 +892,7 @@ async def api_verify_payment(payload: VerifyPaymentRequest):
 async def api_download_pdf(ticker: str):
     """Generates and serves the official downloadable PDF report."""
     clean_t = clean_ticker(ticker)
-    rep = get_report_by_ticker(clean_t)
+    rep = get_report_by_ticker_sync(clean_t)
     if not rep or not rep.get("report_text"):
         raise HTTPException(status_code=404, detail="Report not found.")
 
@@ -921,7 +918,7 @@ async def api_download_pdf(ticker: str):
 @app.get("/sitemap.xml", response_class=Response)
 async def sitemap_xml():
     """Generates automated XML sitemap for Google/Perplexity/Bing search crawlers."""
-    archives = get_archived_reports()
+    archives = get_archived_reports_sync()
     # Use current date for static pages
     now_iso = datetime.now(timezone.utc).strftime("%Y-%m-%d")
 
@@ -986,7 +983,7 @@ async def api_synthesize(payload: SynthesizeRequest):
         raise HTTPException(status_code=401, detail="Sign in required to generate reports.")
 
     # Check if a dossier already exists and is fresh (< 14 days old) unless force_refresh is requested
-    existing = get_report_by_ticker(canonical)
+    existing = get_report_by_ticker_sync(canonical)
     if existing and existing.get("report_text") and not payload.force_refresh:
         return json_response_with_cache({
             "success": True,
@@ -1021,7 +1018,7 @@ async def api_synthesize(payload: SynthesizeRequest):
         )
 
     # Verify that the report was archived and contains content
-    rep = get_report_by_ticker(canonical)
+    rep = get_report_by_ticker_sync(canonical)
     if not rep or not rep.get("report_text"):
         # Automatic refund on verification failure
         add_user_credits(clean_uid, 0.0, 1.0, pack_type="REFUND_FAILED_SYNTHESIS")
@@ -1099,7 +1096,7 @@ async def robots_txt():
 async def sitemap_xml():
     """Generates an XML sitemap of all public routes and canonical stock dossiers."""
     try:
-        archives = get_archived_reports()
+        archives = get_archived_reports_sync()
     except Exception:
         archives = []
 

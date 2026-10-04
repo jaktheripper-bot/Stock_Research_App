@@ -39,6 +39,8 @@ from core.db.reports import (
     get_report_by_ticker,
     get_report_revisions,
     get_revision_by_id,
+    _get_report_by_ticker_sync as get_report_by_ticker_sync,
+    _get_archived_reports_sync as get_archived_reports_sync,
 )
 
 from core.db.watchlist import (
@@ -121,6 +123,8 @@ __all__ = [
     "save_report_to_archive",
     "get_archived_reports",
     "get_report_by_ticker",
+    "get_archived_reports_sync",
+    "get_report_by_ticker_sync",
     "get_report_revisions",
     "get_revision_by_id",
     # watchlist

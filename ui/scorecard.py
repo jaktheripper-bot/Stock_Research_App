@@ -15,7 +15,7 @@ from analyzer import (
 )
 from telemetry import track_user_action
 from normalizer import extract_citations_from_report
-from db import get_report_revisions, get_report_by_ticker
+from db import get_report_revisions, get_report_by_ticker_sync
 from ui.charts import render_momentum_chart, render_pillar_drift_sparkline
 from ui.formatters import format_inr
 
@@ -318,7 +318,7 @@ def render_thesis_drift_panel(ticker: str, custom_diff_data: dict = None):
         with c2:
             if st.button("✕ Close Differential", key="btn_reset_drift", width="stretch", help="Return to latest active dossier view"):
                 st.session_state.pop("custom_diff", None)
-                rec = get_report_by_ticker(ticker)
+                rec = get_report_by_ticker_sync(ticker)
                 if rec:
                     from ui.views.state import set_active_dossier_state
                     set_active_dossier_state(

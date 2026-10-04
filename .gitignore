@@ -8,6 +8,9 @@ reports.db
 
 .agents/
 .github/
+
 .vscode/
 *.csv
 rzp-key.csv
+backups/
+*.tar.gz

@@ -86,7 +86,7 @@ def evaluate_under_the_radar_candidate(candidate: Dict[str, Any]) -> Optional[Di
     scrip_code = candidate.get("scrip_code") or resolve_bse_scrip_code(canonical) or ""
 
     from bsedata.bse import BSE
-    from core.db import get_report_by_ticker
+    from core.db import get_report_by_ticker_sync
 
     p_float = 0.0
     pe_str = "Fair"
@@ -94,7 +94,7 @@ def evaluate_under_the_radar_candidate(candidate: Dict[str, Any]) -> Optional[Di
 
     # 1. Fast Path: Read existing verified DB snapshot (1ms)
     try:
-        rep = get_report_by_ticker(canonical)
+        rep = get_report_by_ticker_sync(canonical)
         if rep and rep.get("baseline_price"):
             p_float = float(str(rep.get("baseline_price")).replace(",", "").strip())
             pe_str = str(rep.get("baseline_pe") or "Fair")

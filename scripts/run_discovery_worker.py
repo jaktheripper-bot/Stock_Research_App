@@ -20,7 +20,7 @@ if ROOT_DIR not in sys.path:
     sys.path.insert(0, ROOT_DIR)
 
 from core.db.connection import init_db, IST
-from core.db.reports import get_report_by_ticker
+from core.db.reports import get_report_by_ticker_sync
 from core.db.discovery import save_discovery_reel, get_active_discovery_reel
 from core.analysis.discovery import curate_morning_discovery_cohort
 from core.analysis.engine import generate_stock_report
@@ -74,7 +74,7 @@ def run_discovery_pipeline(
     for item in cohort:
         ticker = item["ticker"]
         try:
-            existing = get_report_by_ticker(ticker)
+            existing = get_report_by_ticker_sync(ticker)
             needs_synthesis = force_synthesis or not existing or not existing.get("report_text")
 
             # Check staleness if existing

@@ -11,7 +11,7 @@ from core.db import (
     get_watchlist,
     add_to_watchlist,
     remove_from_watchlist,
-    get_report_by_ticker,
+    get_report_by_ticker_sync,
 )
 from alerts import run_surveillance_scan
 from bse_master import resolve_bse_scrip_code
@@ -108,7 +108,7 @@ def render_alert_hub():
                                     type="primary",
                                     help=f"Open full 7-pillar institutional equity research dossier & technical chart for {alt['ticker']}"
                                 ):
-                                    rec = get_report_by_ticker(alt["ticker"])
+                                    rec = get_report_by_ticker_sync(alt["ticker"])
                                     if rec:
                                         set_active_dossier_state(
                                             ticker=alt["ticker"],
@@ -186,7 +186,7 @@ def render_alert_hub():
                                     width="stretch",
                                     help=f"Open full 7-pillar institutional equity research dossier & technical chart for {w['ticker']}"
                                 ):
-                                    rec = get_report_by_ticker(w["ticker"])
+                                    rec = get_report_by_ticker_sync(w["ticker"])
                                     if rec:
                                         set_active_dossier_state(
                                             ticker=w["ticker"],

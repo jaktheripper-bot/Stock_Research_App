@@ -146,9 +146,21 @@ def save_report_to_archive(stock_data: dict, report_text: str, announcement: str
         cursor.close()
         conn.close()
 
-# LRU cached version (sync)
+class AwaitableList(list):
+    def __await__(self):
+        async def _async_self():
+            return self
+        return _async_self().__await__()
+
+class AwaitableDict(dict):
+    def __await__(self):
+        async def _async_self():
+            return self
+        return _async_self().__await__()
+
+# LRU cached version (returns AwaitableList so it can be called synchronously or awaited)
 @lru_cache(maxsize=128)
-def _get_archived_reports_sync(include_text: bool = False) -> list:
+def get_archived_reports(include_text: bool = False) -> list:
     """Synchronous helper returning archived reports, cached for 5 minutes via manual invalidation."""
     init_db()
     conn = get_db_connection()
@@ -200,17 +212,15 @@ def _get_archived_reports_sync(include_text: bool = False) -> list:
     finally:
         cursor.close()
         conn.close()
-    return results
+    return AwaitableList(results)
 
-# Async wrapper used by FastAPI routes
-async def get_archived_reports(include_text: bool = False) -> list:
-    """Async version that runs the cached sync helper in a thread pool."""
-    return await asyncio.to_thread(_get_archived_reports_sync, include_text)
+_get_archived_reports_sync = get_archived_reports
+get_archived_reports_sync = get_archived_reports
 
-# LRU cached sync helper for single ticker
+# LRU cached sync helper for single ticker (returns AwaitableDict)
 @lru_cache(maxsize=256)
-def _get_report_by_ticker_sync(ticker: str) -> dict:
-    """Synchronous fetch of report by ticker, cached."""
+def get_report_by_ticker(ticker: str) -> dict:
+    """Fetch report by ticker, cached, returns AwaitableDict."""
     init_db()
     conn = get_db_connection()
     cursor = conn.cursor()
@@ -224,7 +234,7 @@ def _get_report_by_ticker_sync(ticker: str) -> dict:
         ''', (clean,))
         row = cursor.fetchone()
         if not row:
-            return {}
+            return AwaitableDict({})
         rep_text = row[2]
         cit_data = []
         if len(row) > 8 and row[8]:
@@ -234,7 +244,7 @@ def _get_report_by_ticker_sync(ticker: str) -> dict:
                 cit_data = []
         if not cit_data and rep_text:
             cit_data = extract_citations_from_report(rep_text)
-        return {
+        return AwaitableDict({
             "ticker": row[0],
             "short_name": row[1] or row[0],
             "report_text": rep_text,
@@ -245,15 +255,13 @@ def _get_report_by_ticker_sync(ticker: str) -> dict:
             "baseline_mcap": row[6],
             "latest_announcement": row[7] or "",
             "citations": cit_data
-        }
+        })
     finally:
         cursor.close()
         conn.close()
 
-# Async wrapper used by FastAPI routes
-async def get_report_by_ticker(ticker: str) -> dict:
-    """Async version that runs the cached sync helper in a thread pool."""
-    return await asyncio.to_thread(_get_report_by_ticker_sync, ticker)
+_get_report_by_ticker_sync = get_report_by_ticker
+get_report_by_ticker_sync = get_report_by_ticker
 
 @lru_cache(maxsize=128)
 def get_report_revisions(ticker: str) -> list:

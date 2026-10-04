@@ -3,7 +3,7 @@
 import logging
 import httpx
 from normalizer import clean_ticker
-from core.db import get_report_by_ticker
+from core.db import get_report_by_ticker_sync
 from core.analysis.fundamentals import get_stock_fundamentals, enrich_fundamentals
 from core.analysis.parser import extract_health_matrix
 
@@ -103,19 +103,14 @@ async def compare_two_companies(ticker_a: str, ticker_b: str, progress_callback=
     
     # Using asyncio for concurrent fetching
     async def _fetch_pipeline(ticker_str: str):
-        async with httpx.AsyncClient() as client:
-            # Placeholder async HTTP request to demonstrate async usage.
-            # Actual fundamentals fetching remains synchronous; we wrap it in a thread.
-            return await asyncio.to_thread(lambda: (
-                clean_ticker(ticker_str),
-                get_stock_fundamentals(clean_ticker(ticker_str)),
-                get_report_by_ticker(clean_ticker(ticker_str)),
-                extract_health_matrix(
-                    get_report_by_ticker(clean_ticker(ticker_str)).get("report_text", "")
-                    if get_report_by_ticker(clean_ticker(ticker_str))
-                    else ""
-                ),
-            ))
+        clean = clean_ticker(ticker_str)
+        # Fetch the report asynchronously
+        report = get_report_by_ticker_sync(clean)
+        # Fetch fundamentals synchronously
+        fundamentals = get_stock_fundamentals(clean)
+        # Extract health matrix from report text if available
+        matrix = extract_health_matrix(report.get("report_text", "")) if report else ""
+        return (clean, fundamentals, report, matrix)
 
     if progress_callback:
         progress_callback(0.25, f"Auditing verified BSE quotes & fundamentals for {clean_a} & {clean_b}...")

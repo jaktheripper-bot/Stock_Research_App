@@ -8,8 +8,8 @@ import streamlit as st
 from core.db import (
     IST,
     MANDATORY_SEBI_DISCLAIMER,
-    get_archived_reports,
-    get_report_by_ticker,
+    get_archived_reports_sync,
+    get_report_by_ticker_sync,
     is_ticker_in_watchlist,
     add_to_watchlist,
     remove_from_watchlist,
@@ -60,7 +60,7 @@ def render_dossier_view():
     recent_tickers = st.session_state.get("recent_searches")
     if recent_tickers is None:
         try:
-            recent_tickers = [r["ticker"] for r in get_archived_reports()[:5] if r.get("ticker")]
+            recent_tickers = [r["ticker"] for r in get_archived_reports_sync()[:5] if r.get("ticker")]
         except Exception:
             recent_tickers = []
         st.session_state["recent_searches"] = recent_tickers
@@ -160,7 +160,7 @@ def render_dossier_view():
                                 st.rerun(scope="app")
 
                             refresh_current_user()
-                            cached_data = p_delta.get("cached") or get_report_by_ticker(clean_t) or {}
+                            cached_data = p_delta.get("cached") or get_report_by_ticker_sync(clean_t) or {}
                             updated_report = execute_surgical_pillar_update(
                                 ticker=clean_t,
                                 cached_report=cached_data,
@@ -216,7 +216,7 @@ def render_dossier_view():
                 )
             with col_s2:
                 if st.button("Return to Latest", key="btn_return_latest_snap", width="stretch"):
-                    rec = get_report_by_ticker(clean_t)
+                    rec = get_report_by_ticker_sync(clean_t)
                     if rec:
                         set_active_dossier_state(
                             ticker=clean_t,
@@ -341,7 +341,7 @@ def render_dossier_view():
                 synth_slot.empty()
                 render_health_card_ui(streamed_text, target_container=badge_container)
                 if "Live Synthesis Failed" in streamed_text:
-                    cached_rec = get_report_by_ticker(clean_t)
+                    cached_rec = get_report_by_ticker_sync(clean_t)
                     if cached_rec and cached_rec.get("report_text"):
                         st.warning(f"⚠️ Live generation failed. Displaying archive from {cached_rec.get('formatted_date')}.")
                         st.session_state["last_report"] = cached_rec["report_text"]

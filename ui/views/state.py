@@ -10,7 +10,7 @@ import streamlit as st
 
 from core.db import (
     IST,
-    get_report_by_ticker,
+    get_report_by_ticker_sync,
     record_usage_event,
 )
 from core.analysis import (
@@ -92,7 +92,7 @@ def restore_dossier_from_url():
         try:
             init_url_ticker = sanitize_ticker_input(st.query_params.get("ticker", "")).upper()
             if init_url_ticker:
-                c_init = get_report_by_ticker(init_url_ticker)
+                c_init = get_report_by_ticker_sync(init_url_ticker)
                 if c_init and c_init.get("report_text"):
                     c_fund = {
                         "ticker": c_init.get("ticker", init_url_ticker),
@@ -133,7 +133,7 @@ def execute_stock_research(query: str, selected_language: str = "English (India)
         with concurrent.futures.ThreadPoolExecutor(max_workers=2) as executor:
             future_hist = executor.submit(get_historical_prices, resolved_ticker)
             def _fetch_delta_and_cache():
-                c = get_report_by_ticker(resolved_ticker)
+                c = get_report_by_ticker_sync(resolved_ticker)
                 eval_res = evaluate_material_change(c, stock_data, scrip)
                 if len(eval_res) == 4:
                     s_regen, r_reason, l_ann, c_type = eval_res
