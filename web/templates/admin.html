@@ -1,0 +1,923 @@
+{% extends "base.html" %}
+
+{% block title %}Executive Telemetry & Site Usage Admin Console | Stock Research AI{% endblock %}
+
+{% block content %}
+<style>
+.admin-container {
+  max-width: 1440px;
+  margin: 0 auto;
+  padding: 24px 20px 60px;
+}
+.admin-card {
+  background: var(--bg-card, #131722);
+  border: 1px solid var(--border-subtle, #1e293b);
+  border-radius: 12px;
+  padding: 24px;
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.25);
+  margin-bottom: 24px;
+}
+.admin-login-box {
+  max-width: 480px;
+  margin: 60px auto;
+  background: var(--bg-card, #131722);
+  border: 1px solid rgba(14, 165, 233, 0.3);
+  border-radius: 16px;
+  padding: 36px 32px;
+  box-shadow: 0 10px 40px rgba(0, 0, 0, 0.5), 0 0 30px rgba(14, 165, 233, 0.1);
+  text-align: center;
+}
+.admin-header-bar {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 16px;
+  margin-bottom: 24px;
+  padding-bottom: 20px;
+  border-bottom: 1px solid var(--border-subtle, #1e293b);
+}
+.admin-title-group h1 {
+  font-size: 24px;
+  font-weight: 800;
+  margin: 0 0 6px;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+.admin-title-group p {
+  color: var(--text-secondary, #94a3b8);
+  font-size: 13px;
+  margin: 0;
+}
+.admin-controls-group {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+.kpi-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  gap: 16px;
+  margin-bottom: 24px;
+}
+.kpi-card {
+  background: var(--bg-card, #131722);
+  border: 1px solid var(--border-subtle, #1e293b);
+  border-radius: 10px;
+  padding: 18px 20px;
+  position: relative;
+  overflow: hidden;
+  transition: transform 0.2s ease, border-color 0.2s ease;
+}
+.kpi-card:hover {
+  transform: translateY(-2px);
+  border-color: rgba(14, 165, 233, 0.4);
+}
+.kpi-label {
+  font-size: 12px;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--text-secondary, #94a3b8);
+  margin-bottom: 8px;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+.kpi-value {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 28px;
+  font-weight: 800;
+  color: var(--text-primary, #f8fafc);
+  margin-bottom: 4px;
+}
+.kpi-delta {
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--accent-cyan, #0ea5e9);
+}
+.kpi-delta.success { color: #10b981; }
+.kpi-delta.warning { color: #f59e0b; }
+.kpi-delta.danger { color: #ef4444; }
+
+/* Admin Tabs Styling */
+.admin-tabs {
+  display: flex;
+  gap: 8px;
+  overflow-x: auto;
+  border-bottom: 1px solid var(--border-subtle, #1e293b);
+  margin-bottom: 24px;
+  padding-bottom: 4px;
+}
+.admin-tab-btn {
+  background: transparent;
+  border: none;
+  color: var(--text-secondary, #94a3b8);
+  font-size: 14px;
+  font-weight: 600;
+  padding: 10px 18px;
+  border-radius: 8px;
+  cursor: pointer;
+  white-space: nowrap;
+  transition: all 0.2s ease;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.admin-tab-btn:hover {
+  color: var(--text-primary, #f8fafc);
+  background: rgba(255, 255, 255, 0.04);
+}
+.admin-tab-btn.active {
+  color: #fff;
+  background: rgba(14, 165, 233, 0.15);
+  border: 1px solid rgba(14, 165, 233, 0.3);
+}
+.admin-tab-badge {
+  background: #ef4444;
+  color: white;
+  font-size: 11px;
+  padding: 2px 7px;
+  border-radius: 12px;
+  font-weight: 700;
+}
+.admin-tab-pane {
+  display: none;
+}
+.admin-tab-pane.active {
+  display: block;
+}
+
+/* Data Tables */
+.admin-table-wrap {
+  overflow-x: auto;
+  border-radius: 8px;
+  border: 1px solid var(--border-subtle, #1e293b);
+}
+.admin-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 13px;
+  text-align: left;
+}
+.admin-table th {
+  background: rgba(15, 23, 42, 0.8);
+  padding: 12px 16px;
+  font-weight: 700;
+  color: var(--text-secondary, #94a3b8);
+  border-bottom: 1px solid var(--border-subtle, #1e293b);
+  white-space: nowrap;
+}
+.admin-table td {
+  padding: 12px 16px;
+  border-bottom: 1px solid rgba(30, 41, 59, 0.6);
+  color: var(--text-primary, #f8fafc);
+}
+.admin-table tr:hover {
+  background: rgba(255, 255, 255, 0.02);
+}
+.mono {
+  font-family: 'JetBrains Mono', monospace;
+}
+.status-pill {
+  display: inline-block;
+  padding: 3px 8px;
+  border-radius: 4px;
+  font-size: 11px;
+  font-weight: 700;
+  text-transform: uppercase;
+}
+.status-pill.success { background: rgba(16, 185, 129, 0.15); color: #10b981; border: 1px solid rgba(16, 185, 129, 0.3); }
+.status-pill.open { background: rgba(239, 68, 68, 0.15); color: #ef4444; border: 1px solid rgba(239, 68, 68, 0.3); }
+.status-pill.in_progress { background: rgba(245, 158, 11, 0.15); color: #f59e0b; border: 1px solid rgba(245, 158, 11, 0.3); }
+.status-pill.resolved { background: rgba(16, 185, 129, 0.15); color: #10b981; border: 1px solid rgba(16, 185, 129, 0.3); }
+.status-pill.closed { background: rgba(148, 163, 184, 0.15); color: #94a3b8; border: 1px solid rgba(148, 163, 184, 0.3); }
+
+/* Form Controls */
+.admin-select, .admin-input {
+  background: rgba(15, 23, 42, 0.8);
+  border: 1px solid var(--border-subtle, #1e293b);
+  border-radius: 6px;
+  color: var(--text-primary, #f8fafc);
+  padding: 8px 12px;
+  font-size: 13px;
+}
+.admin-select:focus, .admin-input:focus {
+  outline: none;
+  border-color: var(--accent-cyan, #0ea5e9);
+}
+.grid-2col {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 20px;
+}
+@media (max-width: 900px) {
+  .grid-2col { grid-template-columns: 1fr; }
+}
+</style>
+
+<div class="admin-container">
+
+{% if not authenticated %}
+  <!-- Admin Authentication Lockbox -->
+  <div class="admin-login-box">
+    <div style="font-size: 42px; margin-bottom: 12px;">🔐</div>
+    <h2 style="font-size: 22px; font-weight: 800; margin-bottom: 8px;">Executive Administrator Portal</h2>
+    <p style="color: var(--text-secondary, #94a3b8); font-size: 13px; margin-bottom: 24px;">
+      Restricted access: Real-time telemetry, visitor attribution, institutional billables, and support grievance redressal.
+    </p>
+
+    {% if error %}
+    <div style="background: rgba(239, 68, 68, 0.15); border: 1px solid rgba(239, 68, 68, 0.3); color: #fca5a5; padding: 12px; border-radius: 8px; font-size: 13px; margin-bottom: 20px;">
+      ❌ {{ error }}
+    </div>
+    {% endif %}
+
+    <form method="POST" action="/admin/login">
+      <div style="text-align: left; margin-bottom: 16px;">
+        <label for="password" style="display: block; font-size: 12px; font-weight: 600; color: var(--text-secondary, #94a3b8); margin-bottom: 6px;">
+          Administrator Passcode:
+        </label>
+        <input 
+          type="password" 
+          id="password" 
+          name="password" 
+          class="admin-input" 
+          style="width: 100%; box-sizing: border-box; padding: 12px; font-size: 14px;" 
+          placeholder="Enter passcode..." 
+          required 
+          autofocus
+        >
+      </div>
+      <button type="submit" class="btn btn-primary" style="width: 100%; padding: 12px; font-size: 14px; font-weight: 700;">
+        🔓 Authenticate Admin Session
+      </button>
+    </form>
+    <div style="margin-top: 20px; font-size: 11px; color: #64748b;">
+      🔒 Dual-authenticated via HMAC cryptographic verification. Access restricted to certified deployment administrators.
+    </div>
+  </div>
+
+{% else %}
+  <!-- Authenticated Admin Dashboard -->
+
+  <!-- Top Header Bar -->
+  <div class="admin-header-bar">
+    <div class="admin-title-group">
+      <h1>📊 Executive Telemetry & Site Usage Hub</h1>
+      <p>Live visitor acquisition, user behavior paths, cache efficiency, institutional billing, and support complaints.</p>
+    </div>
+
+    <div class="admin-controls-group">
+      <!-- Time Window Filter Form -->
+      <form method="GET" action="/admin" id="windowForm" style="display: flex; align-items: center; gap: 8px;">
+        <label for="windowSelect" style="font-size: 12px; color: var(--text-secondary, #94a3b8);">Window:</label>
+        <select name="window" id="windowSelect" class="admin-select" onchange="document.getElementById('windowForm').submit()">
+          <option value="24h" {% if window == '24h' %}selected{% endif %}>Last 24 Hours</option>
+          <option value="7d" {% if window == '7d' %}selected{% endif %}>Last 7 Days</option>
+          <option value="30d" {% if window == '30d' or not window %}selected{% endif %}>Last 30 Days (Default)</option>
+          <option value="90d" {% if window == '90d' %}selected{% endif %}>Last 90 Days</option>
+          <option value="mtd" {% if window == 'mtd' %}selected{% endif %}>Month to Date</option>
+        </select>
+        {% if active_tab %}
+        <input type="hidden" name="tab" value="{{ active_tab }}">
+        {% endif %}
+      </form>
+
+      <!-- Password Change Trigger -->
+      <button class="btn btn-secondary btn-sm" onclick="document.getElementById('changePwModal').style.display='flex'">
+        🔑 Change Password
+      </button>
+
+      <!-- Logout Form -->
+      <a href="/admin/logout" class="btn btn-secondary btn-sm" style="color: #fca5a5; border-color: rgba(239, 68, 68, 0.3);">
+        🚪 Log Out
+      </a>
+    </div>
+  </div>
+
+  {% if notification %}
+  <div style="background: rgba(16, 185, 129, 0.15); border: 1px solid rgba(16, 185, 129, 0.3); color: #6ee7b7; padding: 12px 16px; border-radius: 8px; font-size: 13px; margin-bottom: 20px;">
+    ✅ {{ notification }}
+  </div>
+  {% endif %}
+
+  <!-- 5 Top Executive KPI Cards -->
+  <div class="kpi-grid">
+    <div class="kpi-card">
+      <div class="kpi-label">Unique Sessions <span>🌐</span></div>
+      <div class="kpi-value">{{ summary.unique_sessions }}</div>
+      <div class="kpi-delta">Distinct Visitor Footprints</div>
+    </div>
+    <div class="kpi-card">
+      <div class="kpi-label">Total Actions <span>⚡</span></div>
+      <div class="kpi-value">{{ summary.total_actions }}</div>
+      <div class="kpi-delta">Queries, Dockets & Exports</div>
+    </div>
+    <div class="kpi-card">
+      <div class="kpi-label">Cache Efficiency <span>🛡️</span></div>
+      <div class="kpi-value">{{ summary.cache_efficiency_pct }}%</div>
+      <div class="kpi-delta success">Zero-Cost Instant Serve</div>
+    </div>
+    <div class="kpi-card">
+      <div class="kpi-label">Est. API Cost Saved <span>💰</span></div>
+      <div class="kpi-value">${{ "%.2f"|format(summary.total_cost_saved_usd) }}</div>
+      <div class="kpi-delta success">Grounding Fee Bypass</div>
+    </div>
+    <div class="kpi-card">
+      <div class="kpi-label">PDFs Exported <span>📄</span></div>
+      <div class="kpi-value">{{ summary.pdf_downloads }}</div>
+      <div class="kpi-delta">Institutional Research Reports</div>
+    </div>
+  </div>
+
+  <!-- Navigation Tabs -->
+  <div class="admin-tabs">
+    <button class="admin-tab-btn {% if not active_tab or active_tab == 'billables' %}active{% endif %}" onclick="showTab('billables')">
+      💳 Live Billables & Invoices
+    </button>
+    <button class="admin-tab-btn {% if active_tab == 'users' %}active{% endif %}" onclick="showTab('users')">
+      👤 User Accounts & Usage
+    </button>
+    <button class="admin-tab-btn {% if active_tab == 'tickets' %}active{% endif %}" onclick="showTab('tickets')">
+      📩 Support Grievances
+      {% if open_tickets_count > 0 %}
+      <span class="admin-tab-badge">{{ open_tickets_count }}</span>
+      {% endif %}
+    </button>
+    <button class="admin-tab-btn {% if active_tab == 'traffic' %}active{% endif %}" onclick="showTab('traffic')">
+      🌐 Traffic Origins
+    </button>
+    <button class="admin-tab-btn {% if active_tab == 'actions' %}active{% endif %}" onclick="showTab('actions')">
+      🎯 User Actions
+    </button>
+    <button class="admin-tab-btn {% if active_tab == 'journeys' %}active{% endif %}" onclick="showTab('journeys')">
+      🧭 Session Journeys
+    </button>
+    <button class="admin-tab-btn {% if active_tab == 'telemetry' %}active{% endif %}" onclick="showTab('telemetry')">
+      📜 Live Audit Stream
+    </button>
+  </div>
+
+  <!-- TAB 1: Live Billables & Invoices -->
+  <div id="tab-billables" class="admin-tab-pane {% if not active_tab or active_tab == 'billables' %}active{% endif %}">
+    <!-- Financial Overview Sub-Grid -->
+    <div class="kpi-grid" style="grid-template-columns: repeat(auto-fit, minmax(190px, 1fr));">
+      <div class="kpi-card">
+        <div class="kpi-label">Gross Revenue</div>
+        <div class="kpi-value">₹{{ "{:,.2f}".format(rev_summary.gross_revenue_inr) }}</div>
+        <div class="kpi-delta">{{ rev_summary.paid_orders_count }} paid transactions</div>
+      </div>
+      <div class="kpi-card">
+        <div class="kpi-label">GST 18% (SAC 998314)</div>
+        <div class="kpi-value">₹{{ "{:,.2f}".format(rev_summary.tax_gst_collected_inr) }}</div>
+        <div class="kpi-delta">Statutory Tax Payable</div>
+      </div>
+      <div class="kpi-card">
+        <div class="kpi-label">Net Software Rev</div>
+        <div class="kpi-value">₹{{ "{:,.2f}".format(rev_summary.net_revenue_inr) }}</div>
+        <div class="kpi-delta success">Net of GST & Returns</div>
+      </div>
+      <div class="kpi-card">
+        <div class="kpi-label">Total Refunds</div>
+        <div class="kpi-value">₹{{ "{:,.2f}".format(rev_summary.refunded_amount_inr) }}</div>
+        <div class="kpi-delta warning">{{ rev_summary.refunded_orders_count }} reversal(s)</div>
+      </div>
+      <div class="kpi-card">
+        <div class="kpi-label">Circulating Credits</div>
+        <div class="kpi-value">{{ "{:,.1f}".format(rev_summary.credits_in_circulation) }}</div>
+        <div class="kpi-delta">{{ rev_summary.active_subscribers_count }} active accounts</div>
+      </div>
+    </div>
+
+    <!-- Actions & Table -->
+    <div class="admin-card">
+      <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px; flex-wrap: wrap; gap: 12px;">
+        <h3 style="margin: 0; font-size: 16px; font-weight: 700;">💳 Transaction & Tax Invoices Ledger</h3>
+        <div style="display: flex; gap: 10px;">
+          <a href="/admin/export/tax-register" class="btn btn-secondary btn-sm" download>
+            📥 Export GSTR-1 Tax Register (CSV)
+          </a>
+          <button class="btn btn-primary btn-sm" onclick="document.getElementById('refundModal').style.display='flex'">
+            ↩️ Process Refund
+          </button>
+        </div>
+      </div>
+
+      <div class="admin-table-wrap">
+        <table class="admin-table">
+          <thead>
+            <tr>
+              <th>Invoice #</th>
+              <th>Date</th>
+              <th>Customer</th>
+              <th>Pack</th>
+              <th>Total INR</th>
+              <th>Base Value</th>
+              <th>GST (18%)</th>
+              <th>Status</th>
+              <th>Order / Ref</th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for b in billables %}
+            <tr>
+              <td class="mono" style="font-weight: 600; color: var(--accent-cyan, #0ea5e9);">{{ b.invoice_number }}</td>
+              <td class="mono" style="font-size: 12px;">{{ b.date }}</td>
+              <td>
+                <div style="font-weight: 600;">{{ b.customer_name }}</div>
+                <div style="font-size: 11px; color: var(--text-secondary, #94a3b8);">{{ b.customer_email }}</div>
+              </td>
+              <td><span class="status-pill closed">{{ b.pack_type }}</span></td>
+              <td class="mono" style="font-weight: 700;">₹{{ "{:,.2f}".format(b.amount_inr) }}</td>
+              <td class="mono">₹{{ "{:,.2f}".format(b.base_amount_inr) }}</td>
+              <td class="mono">₹{{ "{:,.2f}".format(b.tax_gst_inr) }}</td>
+              <td>
+                <span class="status-pill {% if b.status == 'success' or b.status == 'paid' %}success{% elif b.status == 'refunded' %}open{% else %}closed{% endif %}">
+                  {{ b.status }}
+                </span>
+              </td>
+              <td class="mono" style="font-size: 11px; color: #64748b;">
+                {{ b.gateway_order_id or b.gateway_payment_id or '-' }}
+              </td>
+            </tr>
+            {% else %}
+            <tr>
+              <td colspan="9" style="text-align: center; color: var(--text-secondary, #94a3b8); padding: 30px;">
+                No billing transactions recorded in this period.
+              </td>
+            </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+
+  <!-- TAB 2: User Accounts & Usage -->
+  <div id="tab-users" class="admin-tab-pane {% if active_tab == 'users' %}active{% endif %}">
+    <div class="kpi-grid">
+      <div class="kpi-card">
+        <div class="kpi-label">Registered Accounts</div>
+        <div class="kpi-value">{{ user_analytics.total_registered_users }}</div>
+        <div class="kpi-delta">{{ user_analytics.pro_subscribers_count }} Pro Subscribers</div>
+      </div>
+      <div class="kpi-card">
+        <div class="kpi-label">Active in Period</div>
+        <div class="kpi-value">{{ user_analytics.active_users_in_period }}</div>
+        <div class="kpi-delta">Engaged Researchers</div>
+      </div>
+      <div class="kpi-card">
+        <div class="kpi-label">Signed-in Actions</div>
+        <div class="kpi-value">{{ user_analytics.signed_in_actions_count }}</div>
+        <div class="kpi-delta">Authenticated Activity</div>
+      </div>
+      <div class="kpi-card">
+        <div class="kpi-label">Guest Actions</div>
+        <div class="kpi-value">{{ user_analytics.guest_actions_count }}</div>
+        <div class="kpi-delta">Anonymous Visitors</div>
+      </div>
+    </div>
+
+    <div class="admin-card">
+      <h3 style="margin-top: 0; font-size: 16px; font-weight: 700; margin-bottom: 16px;">Top Active Users in Period</h3>
+      <div class="admin-table-wrap">
+        <table class="admin-table">
+          <thead>
+            <tr>
+              <th>User Email</th>
+              <th>User ID</th>
+              <th>Total Events</th>
+              <th>Distinct Tickers</th>
+              <th>PDFs Exported</th>
+              <th>Comparisons</th>
+              <th>Last Seen</th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for u in user_analytics.top_users %}
+            <tr>
+              <td style="font-weight: 600;">{{ u.email }}</td>
+              <td class="mono" style="font-size: 11px; color: #64748b;">{{ u.user_id }}</td>
+              <td class="mono" style="font-weight: 700;">{{ u.total_events }}</td>
+              <td class="mono">{{ u.distinct_tickers }}</td>
+              <td class="mono">{{ u.pdf_exports }}</td>
+              <td class="mono">{{ u.comparisons }}</td>
+              <td class="mono" style="font-size: 11px;">{{ u.last_seen }}</td>
+            </tr>
+            {% else %}
+            <tr>
+              <td colspan="7" style="text-align: center; color: var(--text-secondary, #94a3b8); padding: 30px;">
+                No user telemetry records found in the selected window.
+              </td>
+            </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+
+  <!-- TAB 3: Support Grievances & Tickets -->
+  <div id="tab-tickets" class="admin-tab-pane {% if active_tab == 'tickets' %}active{% endif %}">
+    <div class="admin-card">
+      <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px;">
+        <h3 style="margin: 0; font-size: 16px; font-weight: 700;">📩 Grievance Redressal & Support Tickets</h3>
+        <span class="status-pill {% if open_tickets_count > 0 %}open{% else %}success{% endif %}">
+          {{ open_tickets_count }} Unresolved Tickets
+        </span>
+      </div>
+
+      <div class="admin-table-wrap">
+        <table class="admin-table">
+          <thead>
+            <tr>
+              <th>Ticket ID</th>
+              <th>Created</th>
+              <th>User</th>
+              <th>Category</th>
+              <th>Subject & Message</th>
+              <th>Status</th>
+              <th>Action</th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for t in support_tickets %}
+            <tr>
+              <td class="mono" style="font-weight: 700; color: var(--accent-cyan, #0ea5e9);">{{ t.ticket_id }}</td>
+              <td class="mono" style="font-size: 11px;">{{ t.created_at }}</td>
+              <td>
+                <div style="font-weight: 600;">{{ t.user_name or 'User' }}</div>
+                <div style="font-size: 11px; color: var(--text-secondary, #94a3b8);">{{ t.user_email }}</div>
+              </td>
+              <td><span class="status-pill closed">{{ t.category }}</span></td>
+              <td style="max-width: 320px;">
+                <div style="font-weight: 600; margin-bottom: 4px;">{{ t.subject }}</div>
+                <div style="font-size: 12px; color: var(--text-secondary, #94a3b8); white-space: pre-wrap;">{{ t.message }}</div>
+                {% if t.admin_notes %}
+                <div style="margin-top: 6px; font-size: 11px; color: #a5b4fc; background: rgba(99, 102, 241, 0.1); padding: 4px 8px; border-radius: 4px;">
+                  Note: {{ t.admin_notes }}
+                </div>
+                {% endif %}
+              </td>
+              <td>
+                <span class="status-pill {{ t.status }}">{{ t.status }}</span>
+              </td>
+              <td>
+                <form method="POST" action="/admin/tickets/{{ t.ticket_id }}/status" style="display: flex; gap: 6px; align-items: center;">
+                  <select name="status" class="admin-select" style="padding: 4px 8px; font-size: 12px;">
+                    <option value="open" {% if t.status == 'open' %}selected{% endif %}>Open</option>
+                    <option value="in_progress" {% if t.status == 'in_progress' %}selected{% endif %}>In Progress</option>
+                    <option value="resolved" {% if t.status == 'resolved' %}selected{% endif %}>Resolved</option>
+                    <option value="closed" {% if t.status == 'closed' %}selected{% endif %}>Closed</option>
+                  </select>
+                  <button type="submit" class="btn btn-secondary btn-sm" style="padding: 4px 8px; font-size: 11px;">
+                    Update
+                  </button>
+                </form>
+              </td>
+            </tr>
+            {% else %}
+            <tr>
+              <td colspan="7" style="text-align: center; color: var(--text-secondary, #94a3b8); padding: 30px;">
+                No support tickets found. All investor grievances resolved!
+              </td>
+            </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+
+  <!-- TAB 4: Traffic Origins -->
+  <div id="tab-traffic" class="admin-tab-pane {% if active_tab == 'traffic' %}active{% endif %}">
+    <div class="grid-2col">
+      <div class="admin-card">
+        <h3 style="margin-top: 0; font-size: 16px; font-weight: 700; margin-bottom: 16px;">Traffic Channels</h3>
+        <div class="admin-table-wrap">
+          <table class="admin-table">
+            <thead>
+              <tr>
+                <th>Channel</th>
+                <th>Sessions</th>
+                <th>Share</th>
+              </tr>
+            </thead>
+            <tbody>
+              {% for ts in summary.traffic_sources %}
+              <tr>
+                <td style="font-weight: 600;">{{ ts.source }}</td>
+                <td class="mono">{{ ts.count }}</td>
+                <td class="mono" style="color: var(--accent-cyan, #0ea5e9);">{{ ts.percentage }}%</td>
+              </tr>
+              {% else %}
+              <tr>
+                <td colspan="3" style="text-align: center; color: var(--text-secondary, #94a3b8); padding: 20px;">
+                  No traffic channel data in period.
+                </td>
+              </tr>
+              {% endfor %}
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+      <div class="admin-card">
+        <h3 style="margin-top: 0; font-size: 16px; font-weight: 700; margin-bottom: 16px;">Top Referring Websites</h3>
+        <div class="admin-table-wrap">
+          <table class="admin-table">
+            <thead>
+              <tr>
+                <th>Referring Domain / URL</th>
+                <th>Visits</th>
+              </tr>
+            </thead>
+            <tbody>
+              {% for ref in summary.top_referrers %}
+              <tr>
+                <td class="mono" style="font-size: 12px;">{{ ref.referrer }}</td>
+                <td class="mono">{{ ref.count }}</td>
+              </tr>
+              {% else %}
+              <tr>
+                <td colspan="2" style="text-align: center; color: var(--text-secondary, #94a3b8); padding: 20px;">
+                  No referring websites logged yet.
+                </td>
+              </tr>
+              {% endfor %}
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+
+    <!-- Demographics Grid -->
+    <div class="kpi-grid" style="grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));">
+      <div class="admin-card" style="margin-bottom: 0;">
+        <h4 style="margin-top: 0; font-size: 14px; font-weight: 700;">Geographic Distribution</h4>
+        <ul style="list-style: none; padding: 0; margin: 0; font-size: 13px;">
+          {% for g in summary.geographic_distribution %}
+          <li style="display: flex; justify-content: space-between; padding: 6px 0; border-bottom: 1px solid rgba(255,255,255,0.05);">
+            <span>{{ g.flag }} {{ g.country }}</span>
+            <span class="mono" style="font-weight: 700;">{{ g.count }}</span>
+          </li>
+          {% else %}
+          <li style="color: #64748b; padding: 10px 0;">No geo data in period.</li>
+          {% endfor %}
+        </ul>
+      </div>
+
+      <div class="admin-card" style="margin-bottom: 0;">
+        <h4 style="margin-top: 0; font-size: 14px; font-weight: 700;">Device Categories</h4>
+        <ul style="list-style: none; padding: 0; margin: 0; font-size: 13px;">
+          {% for d in summary.device_breakdown %}
+          <li style="display: flex; justify-content: space-between; padding: 6px 0; border-bottom: 1px solid rgba(255,255,255,0.05);">
+            <span>📱 {{ d.device }}</span>
+            <span class="mono" style="font-weight: 700;">{{ d.count }}</span>
+          </li>
+          {% else %}
+          <li style="color: #64748b; padding: 10px 0;">No device data in period.</li>
+          {% endfor %}
+        </ul>
+      </div>
+
+      <div class="admin-card" style="margin-bottom: 0;">
+        <h4 style="margin-top: 0; font-size: 14px; font-weight: 700;">Browser & OS</h4>
+        <ul style="list-style: none; padding: 0; margin: 0; font-size: 13px;">
+          {% for b in summary.browser_breakdown %}
+          <li style="display: flex; justify-content: space-between; padding: 6px 0; border-bottom: 1px solid rgba(255,255,255,0.05);">
+            <span>🌐 {{ b.browser }}</span>
+            <span class="mono" style="font-weight: 700;">{{ b.count }}</span>
+          </li>
+          {% else %}
+          <li style="color: #64748b; padding: 10px 0;">No browser data in period.</li>
+          {% endfor %}
+        </ul>
+      </div>
+    </div>
+  </div>
+
+  <!-- TAB 5: User Actions -->
+  <div id="tab-actions" class="admin-tab-pane {% if active_tab == 'actions' %}active{% endif %}">
+    <div class="grid-2col">
+      <div class="admin-card">
+        <h3 style="margin-top: 0; font-size: 16px; font-weight: 700; margin-bottom: 16px;">Action Breakdown</h3>
+        <div class="admin-table-wrap">
+          <table class="admin-table">
+            <thead>
+              <tr>
+                <th>Event Type</th>
+                <th>Volume</th>
+              </tr>
+            </thead>
+            <tbody>
+              {% for ev, cnt in summary.action_breakdown.items() %}
+              <tr>
+                <td style="font-weight: 600;">{{ ev }}</td>
+                <td class="mono" style="font-weight: 700; color: var(--accent-cyan, #0ea5e9);">{{ cnt }}</td>
+              </tr>
+              {% else %}
+              <tr>
+                <td colspan="2" style="text-align: center; color: var(--text-secondary, #94a3b8); padding: 20px;">
+                  No user action logs in this period.
+                </td>
+              </tr>
+              {% endfor %}
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+      <div class="admin-card">
+        <h3 style="margin-top: 0; font-size: 16px; font-weight: 700; margin-bottom: 16px;">Top Researched Tickers</h3>
+        <div class="admin-table-wrap">
+          <table class="admin-table">
+            <thead>
+              <tr>
+                <th>Ticker Symbol</th>
+                <th>Inquiry Count</th>
+              </tr>
+            </thead>
+            <tbody>
+              {% for t in summary.top_searched_tickers %}
+              <tr>
+                <td>
+                  <a href="/dossier/{{ t.ticker }}" target="_blank" style="color: var(--accent-cyan, #0ea5e9); font-weight: 700; text-decoration: none;">
+                    {{ t.ticker }} ↗
+                  </a>
+                </td>
+                <td class="mono" style="font-weight: 700;">{{ t.count }}</td>
+              </tr>
+              {% else %}
+              <tr>
+                <td colspan="2" style="text-align: center; color: var(--text-secondary, #94a3b8); padding: 20px;">
+                  No stock queries recorded in period.
+                </td>
+              </tr>
+              {% endfor %}
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- TAB 6: Session Journeys -->
+  <div id="tab-journeys" class="admin-tab-pane {% if active_tab == 'journeys' %}active{% endif %}">
+    <div class="admin-card">
+      <h3 style="margin-top: 0; font-size: 16px; font-weight: 700; margin-bottom: 16px;">Recent Visitor Session Journeys</h3>
+      <p style="color: var(--text-secondary, #94a3b8); font-size: 13px; margin-bottom: 20px;">
+        Chronological step-by-step visitor breadcrumbs across the platform.
+      </p>
+
+      {% for j in session_journeys %}
+      <div style="background: rgba(15, 23, 42, 0.6); border: 1px solid var(--border-subtle, #1e293b); border-radius: 8px; padding: 14px 18px; margin-bottom: 14px;">
+        <div style="display: flex; justify-content: space-between; align-items: baseline; flex-wrap: wrap; gap: 8px; margin-bottom: 8px;">
+          <div style="font-weight: 700; font-size: 13px; display: flex; align-items: center; gap: 8px;">
+            <span class="mono" style="color: var(--accent-cyan, #0ea5e9);">{{ j.session_id }}</span>
+            <span style="font-size: 11px; color: #94a3b8;">via {{ j.traffic_source }}</span>
+            {% if j.country %}<span style="font-size: 11px;">🌍 {{ j.country }}</span>{% endif %}
+            {% if j.device_type %}<span style="font-size: 11px;">📱 {{ j.device_type }}</span>{% endif %}
+          </div>
+          <div class="mono" style="font-size: 11px; color: #64748b;">
+            Duration: {{ j.duration_seconds }}s | Started: {{ j.started_at }}
+          </div>
+        </div>
+
+        <div style="display: flex; flex-wrap: wrap; gap: 8px; align-items: center; font-size: 12px;">
+          {% for step in j.steps %}
+          <div style="background: rgba(30, 41, 59, 0.8); border: 1px solid rgba(255,255,255,0.06); padding: 4px 10px; border-radius: 4px; display: flex; align-items: center; gap: 6px;">
+            <span style="font-weight: 600;">{{ step.event_type }}</span>
+            {% if step.ticker %}<span class="mono" style="color: var(--accent-cyan, #0ea5e9);">({{ step.ticker }})</span>{% endif %}
+            <span class="mono" style="font-size: 10px; color: #64748b;">+{{ step.delta_sec }}s</span>
+          </div>
+          {% if not loop.last %}<span style="color: #475569;">➔</span>{% endif %}
+          {% endfor %}
+        </div>
+      </div>
+      {% else %}
+      <div style="text-align: center; color: var(--text-secondary, #94a3b8); padding: 40px;">
+        No session journeys recorded in this period.
+      </div>
+      {% endfor %}
+    </div>
+  </div>
+
+  <!-- TAB 7: Live Telemetry Audit Stream -->
+  <div id="tab-telemetry" class="admin-tab-pane {% if active_tab == 'telemetry' %}active{% endif %}">
+    <div class="admin-card">
+      <h3 style="margin-top: 0; font-size: 16px; font-weight: 700; margin-bottom: 16px;">Live Platform Events Stream (Latest 50)</h3>
+      <div class="admin-table-wrap">
+        <table class="admin-table">
+          <thead>
+            <tr>
+              <th>Timestamp</th>
+              <th>Event</th>
+              <th>Ticker</th>
+              <th>Session ID</th>
+              <th>Latency</th>
+              <th>Cost Saved</th>
+              <th>Source / Ref</th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for ev in summary.recent_events %}
+            <tr>
+              <td class="mono" style="font-size: 11px;">{{ ev.timestamp }}</td>
+              <td><span class="status-pill closed">{{ ev.event_type }}</span></td>
+              <td class="mono" style="font-weight: 700; color: var(--accent-cyan, #0ea5e9);">{{ ev.ticker or '-' }}</td>
+              <td class="mono" style="font-size: 11px; color: #64748b;">{{ ev.session_id or '-' }}</td>
+              <td class="mono">{{ ev.latency_ms }}ms</td>
+              <td class="mono" style="color: #10b981;">${{ "%.4f"|format(ev.cost_saved_usd or 0.0) }}</td>
+              <td style="font-size: 11px; color: #94a3b8;">{{ ev.traffic_source or ev.referrer or '-' }}</td>
+            </tr>
+            {% else %}
+            <tr>
+              <td colspan="7" style="text-align: center; color: var(--text-secondary, #94a3b8); padding: 30px;">
+                No telemetry stream events captured yet.
+              </td>
+            </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+
+  <!-- Password Change Modal -->
+  <div id="changePwModal" class="modal-backdrop" style="display: none; align-items: center; justify-content: center;">
+    <div class="modal-dialog" style="max-width: 440px; background: var(--bg-card, #131722); border-radius: 12px; padding: 24px;">
+      <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px;">
+        <h3 style="margin: 0; font-size: 18px; font-weight: 800;">🔑 Update Administrator Password</h3>
+        <button onclick="document.getElementById('changePwModal').style.display='none'" style="background: none; border: none; color: #fff; font-size: 20px; cursor: pointer;">&times;</button>
+      </div>
+
+      <form method="POST" action="/admin/change-password">
+        <div style="margin-bottom: 12px;">
+          <label style="display: block; font-size: 12px; margin-bottom: 4px; color: #94a3b8;">Current Password</label>
+          <input type="password" name="current_password" class="admin-input" style="width: 100%; box-sizing: border-box;" required>
+        </div>
+        <div style="margin-bottom: 12px;">
+          <label style="display: block; font-size: 12px; margin-bottom: 4px; color: #94a3b8;">New Password (min 6 chars)</label>
+          <input type="password" name="new_password" class="admin-input" style="width: 100%; box-sizing: border-box;" required minlength="6">
+        </div>
+        <div style="margin-bottom: 18px;">
+          <label style="display: block; font-size: 12px; margin-bottom: 4px; color: #94a3b8;">Confirm New Password</label>
+          <input type="password" name="confirm_password" class="admin-input" style="width: 100%; box-sizing: border-box;" required minlength="6">
+        </div>
+        <button type="submit" class="btn btn-primary" style="width: 100%; padding: 10px;">Update Password</button>
+      </form>
+    </div>
+  </div>
+
+  <!-- Refund Modal -->
+  <div id="refundModal" class="modal-backdrop" style="display: none; align-items: center; justify-content: center;">
+    <div class="modal-dialog" style="max-width: 440px; background: var(--bg-card, #131722); border-radius: 12px; padding: 24px;">
+      <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px;">
+        <h3 style="margin: 0; font-size: 18px; font-weight: 800;">↩️ Process Order Refund</h3>
+        <button onclick="document.getElementById('refundModal').style.display='none'" style="background: none; border: none; color: #fff; font-size: 20px; cursor: pointer;">&times;</button>
+      </div>
+
+      <form method="POST" action="/admin/refund">
+        <div style="margin-bottom: 12px;">
+          <label style="display: block; font-size: 12px; margin-bottom: 4px; color: #94a3b8;">Gateway Order ID or Payment ID</label>
+          <input type="text" name="order_id" class="admin-input" style="width: 100%; box-sizing: border-box;" required placeholder="order_xxx or pay_xxx">
+        </div>
+        <div style="margin-bottom: 12px;">
+          <label style="display: block; font-size: 12px; margin-bottom: 4px; color: #94a3b8;">Customer Email (for credit deduction)</label>
+          <input type="email" name="user_email" class="admin-input" style="width: 100%; box-sizing: border-box;" required placeholder="investor@example.com">
+        </div>
+        <div style="margin-bottom: 18px;">
+          <label style="display: block; font-size: 12px; margin-bottom: 4px; color: #94a3b8;">Reason for Refund</label>
+          <input type="text" name="reason" class="admin-input" style="width: 100%; box-sizing: border-box;" placeholder="Customer cancellation / dissatisfaction">
+        </div>
+        <button type="submit" class="btn btn-primary" style="width: 100%; padding: 10px; background: #ef4444; border-color: #ef4444;">
+          Confirm & Issue Refund
+        </button>
+      </form>
+    </div>
+  </div>
+
+  <script>
+  function showTab(tabName) {
+    document.querySelectorAll('.admin-tab-pane').forEach(el => el.classList.remove('active'));
+    document.querySelectorAll('.admin-tab-btn').forEach(el => el.classList.remove('active'));
+    const target = document.getElementById('tab-' + tabName);
+    if (target) {
+      target.classList.add('active');
+    }
+    // Highlight button
+    event.currentTarget.classList.add('active');
+    // Update window query parameter smoothly
+    const url = new URL(window.location);
+    url.searchParams.set('tab', tabName);
+    window.history.replaceState({}, '', url);
+  }
+  </script>
+
+{% endif %}
+
+</div>
+{% endblock %}

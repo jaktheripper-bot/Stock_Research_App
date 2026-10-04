@@ -1,7 +1,6 @@
 """Alert events, unread notifications, and user dismissals repository."""
 
 import logging
-import streamlit as st
 from normalizer import clean_ticker
 from core.db.connection import init_db, get_db_connection, get_supabase_url, get_placeholder
 from core.db.reports import _format_timestamp
@@ -100,10 +99,6 @@ def mark_alert_as_read(alert_id: int):
         val = "TRUE" if supabase_url else "1"
         cursor.execute(f"UPDATE alert_events SET is_read = {val} WHERE id = {placeholder}", (alert_id,))
         conn.commit()
-        try:
-            st.cache_data.clear()
-        except Exception:
-            pass
     except Exception as e:
         logger.error(f"Error in mark_alert_as_read: {e}")
     finally:
@@ -125,10 +120,6 @@ def mark_all_alerts_as_read(ticker: str = None):
         else:
             cursor.execute(f"UPDATE alert_events SET is_read = {val}")
         conn.commit()
-        try:
-            st.cache_data.clear()
-        except Exception:
-            pass
     except Exception as e:
         logger.error(f"Error in mark_all_alerts_as_read: {e}")
     finally:
@@ -145,10 +136,6 @@ def dismiss_alert(alert_id: int) -> bool:
     try:
         cursor.execute(f"DELETE FROM alert_events WHERE id = {placeholder}", (alert_id,))
         conn.commit()
-        try:
-            st.cache_data.clear()
-        except Exception:
-            pass
         success = True
     except Exception as e:
         logger.error(f"Error in dismiss_alert: {e}")
@@ -171,10 +158,6 @@ def dismiss_all_alerts(unread_only: bool = False) -> bool:
         else:
             cursor.execute("DELETE FROM alert_events")
         conn.commit()
-        try:
-            st.cache_data.clear()
-        except Exception:
-            pass
         success = True
     except Exception as e:
         logger.error(f"Error in dismiss_all_alerts: {e}")

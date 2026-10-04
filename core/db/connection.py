@@ -4,7 +4,7 @@ import logging
 import os
 import threading
 from datetime import timezone, timedelta
-import streamlit as st
+from core.config import get_secret
 
 IST = timezone(timedelta(hours=5, minutes=30))
 logger = logging.getLogger("equity_research.core.db.connection")
@@ -19,12 +19,7 @@ def get_supabase_url() -> str | None:
     """Returns configured Supabase DB URL, cached in memory after first resolution."""
     global _CACHED_SUPABASE_URL, _SUPABASE_URL_RESOLVED
     if not _SUPABASE_URL_RESOLVED:
-        url = os.environ.get("SUPABASE_DB_URL")
-        if not url:
-            try:
-                url = st.secrets.get("SUPABASE_DB_URL")
-            except Exception:
-                pass
+        url = get_secret("SUPABASE_DB_URL")
         _CACHED_SUPABASE_URL = url
         _SUPABASE_URL_RESOLVED = True
     return _CACHED_SUPABASE_URL
@@ -66,19 +61,27 @@ class _PooledConnectionProxy:
     def __exit__(self, exc_type, exc_val, exc_tb):
         self.close()
 
-@st.cache_resource
+_PG_POOLS = {}
+_PG_POOL_LOCK = threading.Lock()
+
 def _get_pg_pool(dsn: str):
-    import psycopg2.pool
-    # Enable TCP keepalive to improve connection reliability
-    return psycopg2.pool.ThreadedConnectionPool(
-        minconn=1,
-        maxconn=300,
-        dsn=dsn,
-        keepalives=1,
-        keepalives_idle=30,
-        keepalives_interval=10,
-        keepalives_count=5,
-    )
+    """Thread-safe singleton ThreadedConnectionPool without Streamlit runtime dependency."""
+    global _PG_POOLS
+    if dsn not in _PG_POOLS:
+        with _PG_POOL_LOCK:
+            if dsn not in _PG_POOLS:
+                import psycopg2.pool
+                # Enable TCP keepalive to improve connection reliability
+                _PG_POOLS[dsn] = psycopg2.pool.ThreadedConnectionPool(
+                    minconn=1,
+                    maxconn=300,
+                    dsn=dsn,
+                    keepalives=1,
+                    keepalives_idle=30,
+                    keepalives_interval=10,
+                    keepalives_count=5,
+                )
+    return _PG_POOLS[dsn]
 
 def _acquire_connection_from_pool(pool):
     for attempt in range(5):

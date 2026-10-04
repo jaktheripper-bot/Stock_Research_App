@@ -15,6 +15,10 @@ import json
 import asyncio
 import logging
 import markdown
+import csv
+import io
+import hmac
+import hashlib
 from datetime import datetime, timezone, timedelta
 from typing import Optional
 
@@ -65,8 +69,23 @@ from core.db import (
     save_discovery_reel,
     create_support_ticket,
     get_support_tickets,
+    get_open_tickets_count,
+    update_ticket_status,
+    get_all_billables,
+    get_revenue_analytics_summary,
+    process_refund,
+    get_site_usage_summary,
+    get_session_journeys,
+    get_user_usage_analytics,
+    get_system_setting,
+    set_system_setting,
     MANDATORY_SEBI_DISCLAIMER,
     IST,
+)
+from telemetry import (
+    verify_admin_passcode,
+    update_admin_passcode,
+    get_admin_passcode,
 )
 from core.db.telemetry import record_usage_event
 from core.notify import dispatch_support_ticket_alert
@@ -1073,6 +1092,290 @@ async def api_run_discovery(
         "status": "initiated",
         "message": f"Morning Discovery Reel worker dispatched for {count} equities (force={force})."
     })
+
+
+# ==============================================================================
+# Executive Administrator Portal & Site Usage Analytics Hub
+# ==============================================================================
+
+ADMIN_COOKIE_NAME = "admin_session"
+
+def _generate_admin_token() -> str:
+    secret = get_admin_passcode().encode("utf-8")
+    now_ts = int(datetime.now(timezone.utc).timestamp())
+    payload = f"admin_authenticated:{now_ts}".encode("utf-8")
+    sig = hmac.new(secret, payload, hashlib.sha256).hexdigest()
+    return f"{payload.decode('utf-8')}.{sig}"
+
+def _validate_admin_token(token: Optional[str]) -> bool:
+    if not token or "." not in token:
+        return False
+    try:
+        payload_str, sig = token.rsplit(".", 1)
+        secret = get_admin_passcode().encode("utf-8")
+        expected_sig = hmac.new(secret, payload_str.encode("utf-8"), hashlib.sha256).hexdigest()
+        if not hmac.compare_digest(sig, expected_sig):
+            return False
+        parts = payload_str.split(":")
+        if len(parts) == 2 and parts[0] == "admin_authenticated":
+            ts = int(parts[1])
+            # Valid for 7 days
+            if datetime.now(timezone.utc).timestamp() - ts < 604800:
+                return True
+        return False
+    except Exception:
+        return False
+
+def _is_admin_authenticated(request: Request) -> bool:
+    token = request.cookies.get(ADMIN_COOKIE_NAME)
+    return _validate_admin_token(token)
+
+@app.get("/admin", response_class=HTMLResponse)
+async def admin_dashboard(
+    request: Request,
+    window: str = "30d",
+    tab: Optional[str] = "billables",
+    msg: Optional[str] = None,
+    err: Optional[str] = None
+):
+    if not _is_admin_authenticated(request):
+        return templates.TemplateResponse(
+            request=request,
+            name="admin.html",
+            context={
+                "authenticated": False,
+                "error": err,
+                "active_page": "admin"
+            }
+        )
+
+    # Compute date ranges
+    today = datetime.now(IST).date()
+    start_date = None
+    end_date = None
+    selected_days = 30
+
+    if window == "24h":
+        selected_days = 1
+    elif window == "7d":
+        selected_days = 7
+    elif window == "30d":
+        selected_days = 30
+    elif window == "90d":
+        selected_days = 90
+    elif window == "mtd":
+        start_date = today.replace(day=1)
+        end_date = today
+        selected_days = None
+
+    try:
+        summary = get_site_usage_summary(days=selected_days, start_date=start_date, end_date=end_date)
+    except Exception as e:
+        logger.error(f"Error fetching site usage summary: {e}")
+        summary = {
+            "unique_sessions": 0, "total_actions": 0, "cache_efficiency_pct": 0.0,
+            "total_cost_saved_usd": 0.0, "pdf_downloads": 0, "action_breakdown": {},
+            "top_searched_tickers": [], "traffic_sources": [], "top_referrers": [],
+            "geographic_distribution": [], "device_breakdown": [], "browser_breakdown": [],
+            "os_breakdown": [], "recent_events": []
+        }
+
+    try:
+        rev_summary = get_revenue_analytics_summary(days=selected_days, start_date=start_date, end_date=end_date)
+    except Exception as e:
+        logger.error(f"Error fetching rev summary: {e}")
+        rev_summary = {
+            "gross_revenue_inr": 0.0, "net_revenue_inr": 0.0, "tax_gst_collected_inr": 0.0,
+            "refunded_amount_inr": 0.0, "paid_orders_count": 0, "refunded_orders_count": 0,
+            "credits_in_circulation": 0.0, "active_subscribers_count": 0
+        }
+
+    try:
+        billables = get_all_billables(limit=100)
+    except Exception:
+        billables = []
+
+    try:
+        user_analytics = get_user_usage_analytics(days=selected_days, start_date=start_date, end_date=end_date, limit=50)
+    except Exception:
+        user_analytics = {
+            "total_registered_users": 0, "active_users_in_period": 0,
+            "signed_in_actions_count": 0, "guest_actions_count": 0,
+            "pro_subscribers_count": 0, "top_users": []
+        }
+
+    try:
+        support_tickets = get_support_tickets(limit=50)
+    except Exception:
+        support_tickets = []
+
+    try:
+        open_tickets_count = get_open_tickets_count()
+    except Exception:
+        open_tickets_count = 0
+
+    try:
+        session_journeys = get_session_journeys(days=selected_days, start_date=start_date, end_date=end_date, limit=25)
+    except Exception:
+        session_journeys = []
+
+    return templates.TemplateResponse(
+        request=request,
+        name="admin.html",
+        context={
+            "authenticated": True,
+            "active_tab": tab,
+            "window": window,
+            "notification": msg,
+            "error": err,
+            "summary": summary,
+            "rev_summary": rev_summary,
+            "billables": billables,
+            "user_analytics": user_analytics,
+            "support_tickets": support_tickets,
+            "open_tickets_count": open_tickets_count,
+            "session_journeys": session_journeys,
+            "active_page": "admin"
+        }
+    )
+
+@app.post("/admin/login")
+async def admin_login(request: Request, password: str = Form(...)):
+    if verify_admin_passcode(password):
+        token = _generate_admin_token()
+        response = RedirectResponse(url="/admin", status_code=303)
+        response.set_cookie(
+            key=ADMIN_COOKIE_NAME,
+            value=token,
+            httponly=True,
+            samesite="lax",
+            max_age=86400 * 7
+        )
+        return response
+    return templates.TemplateResponse(
+        request=request,
+        name="admin.html",
+        context={
+            "authenticated": False,
+            "error": "Access Denied: Incorrect administrator password. Please try again.",
+            "active_page": "admin"
+        },
+        status_code=401
+    )
+
+@app.get("/admin/logout")
+@app.post("/admin/logout")
+async def admin_logout():
+    response = RedirectResponse(url="/admin", status_code=303)
+    response.delete_cookie(key=ADMIN_COOKIE_NAME)
+    return response
+
+@app.post("/admin/change-password")
+async def admin_change_password(
+    request: Request,
+    current_password: str = Form(...),
+    new_password: str = Form(...),
+    confirm_password: str = Form(...)
+):
+    if not _is_admin_authenticated(request):
+        raise HTTPException(status_code=403, detail="Admin authorization required.")
+
+    if new_password != confirm_password:
+        return RedirectResponse(url="/admin?err=New+passwords+do+not+match", status_code=303)
+
+    if len(new_password) < 6:
+        return RedirectResponse(url="/admin?err=Password+must+be+at+least+6+characters", status_code=303)
+
+    ok, msg = update_admin_passcode(current_password, new_password)
+    if ok:
+        token = _generate_admin_token()
+        resp = RedirectResponse(url="/admin?msg=Administrator+password+updated+successfully", status_code=303)
+        resp.set_cookie(
+            key=ADMIN_COOKIE_NAME,
+            value=token,
+            httponly=True,
+            samesite="lax",
+            max_age=86400 * 7
+        )
+        return resp
+    return RedirectResponse(url=f"/admin?err={msg}", status_code=303)
+
+@app.post("/admin/tickets/{ticket_id}/status")
+async def admin_update_ticket(
+    ticket_id: str,
+    request: Request,
+    status: str = Form(...),
+    admin_notes: Optional[str] = Form(None)
+):
+    if not _is_admin_authenticated(request):
+        raise HTTPException(status_code=403, detail="Admin authorization required.")
+
+    ok = update_ticket_status(ticket_id, status, admin_notes)
+    msg = f"Ticket+{ticket_id}+status+updated+to+{status}" if ok else "Failed+to+update+ticket"
+    return RedirectResponse(url=f"/admin?tab=tickets&msg={msg}", status_code=303)
+
+@app.post("/admin/refund")
+async def admin_process_refund(
+    request: Request,
+    order_id: str = Form(...),
+    user_email: str = Form(...),
+    reason: Optional[str] = Form("Customer request")
+):
+    if not _is_admin_authenticated(request):
+        raise HTTPException(status_code=403, detail="Admin authorization required.")
+
+    res = process_refund(gateway_order_id=order_id, user_email=user_email, reason=reason)
+    if res.get("success"):
+        msg = f"Refund+of+Rs+{res.get('refund_amount', 0)}+processed+successfully+for+{order_id}"
+    else:
+        msg = f"Refund+failed:+{res.get('error', 'Unknown error')}"
+    return RedirectResponse(url=f"/admin?tab=billables&msg={msg}", status_code=303)
+
+@app.get("/admin/export/tax-register")
+async def admin_export_tax_register(request: Request):
+    if not _is_admin_authenticated(request):
+        raise HTTPException(status_code=403, detail="Admin authorization required.")
+
+    billables = get_all_billables(status="success", limit=1000)
+    output = io.StringIO()
+    writer = csv.writer(output)
+    writer.writerow([
+        "Invoice Number", "Date", "Customer Email", "Customer Name",
+        "Pack Type", "SAC Code", "Taxable Value (INR)", "CGST 9% (INR)",
+        "SGST 9% (INR)", "IGST 18% (INR)", "Total Invoice Value (INR)",
+        "Status", "Gateway Order ID", "Gateway Payment ID"
+    ])
+    for b in billables:
+        base = b.get("base_amount_inr", 0.0)
+        gst = b.get("tax_gst_inr", 0.0)
+        half_gst = round(gst / 2, 2)
+        total = b.get("amount_inr", 0.0)
+        writer.writerow([
+            b.get("invoice_number"),
+            b.get("date"),
+            b.get("customer_email"),
+            b.get("customer_name"),
+            b.get("pack_type"),
+            b.get("sac_code", "998314"),
+            f"{base:.2f}",
+            f"{half_gst:.2f}",
+            f"{half_gst:.2f}",
+            "0.00",
+            f"{total:.2f}",
+            b.get("status"),
+            b.get("gateway_order_id"),
+            b.get("gateway_payment_id")
+        ])
+
+    csv_data = output.getvalue()
+    today_str = datetime.now(IST).strftime("%Y%m%d")
+    return Response(
+        content=csv_data,
+        media_type="text/csv",
+        headers={
+            "Content-Disposition": f"attachment; filename=GSTR1_Tax_Register_{today_str}.csv"
+        }
+    )
 
 
 # ==============================================================================

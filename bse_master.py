@@ -103,13 +103,8 @@ def resolve_scrip_via_gemini_jit(query: str) -> str:
     """
     try:
         from google import genai
-        api_key = os.environ.get("GEMINI_API_KEY")
-        if not api_key:
-            try:
-                import streamlit as st
-                api_key = st.secrets.get("GEMINI_API_KEY")
-            except Exception:
-                pass
+        from core.config import get_secret
+        api_key = get_secret("GEMINI_API_KEY")
         if not api_key:
             return None
 

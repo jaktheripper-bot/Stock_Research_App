@@ -129,6 +129,80 @@ class TestFastAPIWebPortal(unittest.TestCase):
         self.assertIn("<urlset", res_sitemap.text)
         self.assertIn("/dossier/INFY", res_sitemap.text)
 
+    def test_admin_unauthenticated_shows_login(self):
+        res = self.client.get("/admin")
+        self.assertEqual(res.status_code, 200)
+        self.assertIn("Executive Administrator Portal", res.text)
+        self.assertIn("Administrator Passcode:", res.text)
+        self.assertIn("Authenticate Admin Session", res.text)
+
+    def test_admin_login_invalid_password(self):
+        res = self.client.post("/admin/login", data={"password": "wrong_password_xyz"})
+        self.assertEqual(res.status_code, 401)
+        self.assertIn("Access Denied", res.text)
+
+    def test_admin_login_success_and_dashboard_access(self):
+        from telemetry import get_admin_passcode
+        client = TestClient(app)
+        passcode = get_admin_passcode()
+        res_login = client.post("/admin/login", data={"password": passcode}, follow_redirects=False)
+        self.assertEqual(res_login.status_code, 303)
+        self.assertIn("admin_session", res_login.cookies)
+
+        client.cookies.set("admin_session", res_login.cookies["admin_session"])
+        res_dash = client.get("/admin")
+        self.assertEqual(res_dash.status_code, 200)
+        self.assertIn("Executive Telemetry & Site Usage Hub", res_dash.text)
+        self.assertIn("Live Billables & Invoices", res_dash.text)
+        self.assertIn("Unique Sessions", res_dash.text)
+        self.assertIn("Est. API Cost Saved", res_dash.text)
+        self.assertIn("Export GSTR-1 Tax Register (CSV)", res_dash.text)
+
+    def test_admin_update_ticket_status(self):
+        from telemetry import get_admin_passcode
+        from core.db.support import create_support_ticket, get_support_tickets
+        client = TestClient(app)
+        passcode = get_admin_passcode()
+        res_login = client.post("/admin/login", data={"password": passcode}, follow_redirects=False)
+        client.cookies.set("admin_session", res_login.cookies["admin_session"])
+
+        # Create ticket
+        t = create_support_ticket("test_admin@example.com", "Test Subject", "Test message", user_name="Admin Tester")
+        ticket_id = t["ticket_id"]
+
+        # Update status
+        res_update = client.post(
+            f"/admin/tickets/{ticket_id}/status",
+            data={"status": "resolved", "admin_notes": "Tested resolution note."},
+            follow_redirects=True
+        )
+        self.assertEqual(res_update.status_code, 200)
+        self.assertIn("Ticket", res_update.text)
+        self.assertIn("status updated", res_update.text)
+
+    def test_admin_tax_register_csv_export(self):
+        from telemetry import get_admin_passcode
+        client = TestClient(app)
+        passcode = get_admin_passcode()
+        res_login = client.post("/admin/login", data={"password": passcode}, follow_redirects=False)
+        client.cookies.set("admin_session", res_login.cookies["admin_session"])
+
+        res_csv = client.get("/admin/export/tax-register")
+        self.assertEqual(res_csv.status_code, 200)
+        self.assertIn("text/csv", res_csv.headers["content-type"])
+        self.assertIn("Invoice Number,Date,Customer Email,Customer Name", res_csv.text)
+        self.assertIn("GSTR1_Tax_Register", res_csv.headers.get("content-disposition", ""))
+
+    def test_admin_logout(self):
+        from telemetry import get_admin_passcode
+        client = TestClient(app)
+        passcode = get_admin_passcode()
+        res_login = client.post("/admin/login", data={"password": passcode}, follow_redirects=False)
+        client.cookies.set("admin_session", res_login.cookies["admin_session"])
+
+        res_logout = client.get("/admin/logout", follow_redirects=False)
+        self.assertEqual(res_logout.status_code, 303)
+
 
 if __name__ == "__main__":
     unittest.main()

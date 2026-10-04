@@ -4,7 +4,6 @@ import os
 import re
 import logging
 from datetime import datetime, timezone
-import streamlit as st
 from google import genai
 
 from core.db import save_report_to_archive
@@ -156,13 +155,8 @@ Verified Live Exchange Metrics:
 
     # Attempt Gemini Flash with zero grounding fee
     try:
-        api_key = os.environ.get("GEMINI_API_KEY")
-        if not api_key:
-            try:
-                import streamlit as st
-                api_key = st.secrets.get("GEMINI_API_KEY")
-            except Exception:
-                pass
+        from core.config import get_secret
+        api_key = get_secret("GEMINI_API_KEY")
         if api_key:
             client = genai.Client(api_key=api_key)
             model_name = get_surgical_flash_model(client)

@@ -28,8 +28,7 @@ try:
 except ImportError:
     razorpay = None
 
-import streamlit as st
-
+from core.config import get_secret
 from core.billing.pricing import (
     get_plan_by_id,
     INVOICE_SERVICE_DESCRIPTION,
@@ -56,28 +55,8 @@ def get_razorpay_keys() -> Tuple[str, str, bool]:
     Retrieves Razorpay API credentials from environment or secrets.
     Returns (key_id, key_secret, is_live).
     """
-    key_id = os.environ.get("RAZORPAY_KEY_ID")
-    key_secret = os.environ.get("RAZORPAY_KEY_SECRET")
-
-    if not key_id or not key_secret:
-        # Check Streamlit secrets first if available
-        try:
-            key_id = st.secrets.get("RAZORPAY_KEY_ID", key_id)
-            key_secret = st.secrets.get("RAZORPAY_KEY_SECRET", key_secret)
-        except Exception:
-            pass
-
-    if not key_id or not key_secret:
-        # Check local .streamlit/secrets.toml directly (for FastAPI / Uvicorn runtimes)
-        try:
-            import toml
-            p = os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))), ".streamlit", "secrets.toml")
-            if os.path.exists(p):
-                sec = toml.load(p)
-                key_id = sec.get("RAZORPAY_KEY_ID", key_id)
-                key_secret = sec.get("RAZORPAY_KEY_SECRET", key_secret)
-        except Exception:
-            pass
+    key_id = get_secret("RAZORPAY_KEY_ID")
+    key_secret = get_secret("RAZORPAY_KEY_SECRET")
 
     key_id = (key_id or "").strip()
     key_secret = (key_secret or "").strip()

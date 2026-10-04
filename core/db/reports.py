@@ -4,7 +4,6 @@ import json
 import logging
 import os
 from datetime import datetime
-import streamlit as st
 import requests  # IndexNow ping
 from functools import lru_cache
 import asyncio
@@ -109,7 +108,8 @@ def save_report_to_archive(stock_data: dict, report_text: str, announcement: str
 
         conn.commit()
         try:
-            st.cache_data.clear()
+            get_archived_reports.cache_clear()
+            get_report_by_ticker.cache_clear()
         except Exception:
             pass
         # SEBI Compliance: Record statutory Safe Harbor disclaimer audit event

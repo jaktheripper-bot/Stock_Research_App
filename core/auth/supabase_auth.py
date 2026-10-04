@@ -12,7 +12,6 @@ import os
 import re
 import logging
 import requests
-import streamlit as st
 from typing import Optional, Dict, Any, Tuple
 
 from core.db import (
@@ -21,21 +20,26 @@ from core.db import (
     get_user_by_email,
     get_supabase_url,
 )
+from core.config import get_secret
 
 logger = logging.getLogger("equity_research.core.auth")
 
+_BARE_USER_SESSION = None
+_BARE_AUTH_TOKEN = None
+
+def _is_streamlit_running() -> bool:
+    try:
+        from streamlit.runtime import exists
+        return bool(exists())
+    except Exception:
+        return False
 
 def get_supabase_auth_config() -> Dict[str, str]:
     """
     Resolves Supabase Project REST URL and Public Anon Key from secrets or environment.
     If direct SUPABASE_URL is not set, derives it from the PostgreSQL host ref.
     """
-    supabase_url = os.environ.get("SUPABASE_URL")
-    if not supabase_url:
-        try:
-            supabase_url = st.secrets.get("SUPABASE_URL")
-        except Exception:
-            pass
+    supabase_url = get_secret("SUPABASE_URL")
 
     # Fallback: Extract from SUPABASE_DB_URL
     if not supabase_url:
@@ -47,12 +51,7 @@ def get_supabase_auth_config() -> Dict[str, str]:
             project_ref = match.group(1)
             supabase_url = f"https://{project_ref}.supabase.co"
 
-    anon_key = os.environ.get("SUPABASE_ANON_KEY")
-    if not anon_key:
-        try:
-            anon_key = st.secrets.get("SUPABASE_ANON_KEY")
-        except Exception:
-            pass
+    anon_key = get_secret("SUPABASE_ANON_KEY")
 
     return {
         "url": (supabase_url or "").rstrip("/"),
@@ -136,26 +135,33 @@ def _complete_direct_signin(clean_email: str) -> Tuple[bool, str]:
 
 
 def set_session_user(user_record: Dict[str, Any], auth_token: Optional[str] = None):
-    """Stores active user session record into Streamlit session state."""
-    try:
-        if "user_session" not in st.session_state:
-            st.session_state.user_session = {}
-        st.session_state.user_session = user_record
-        if auth_token:
-            st.session_state.auth_token = auth_token
-        logger.info(f"Active session set for: {user_record.get('email')} (Credits: {user_record.get('credits_balance')})")
-    except Exception as e:
-        logger.warning(f"Could not write to st.session_state (bare mode): {e}")
+    """Stores active user session record into Streamlit session state or bare storage."""
+    global _BARE_USER_SESSION, _BARE_AUTH_TOKEN
+    _BARE_USER_SESSION = user_record
+    _BARE_AUTH_TOKEN = auth_token
+    if _is_streamlit_running():
+        try:
+            import streamlit as st
+            if "user_session" not in st.session_state:
+                st.session_state.user_session = {}
+            st.session_state.user_session = user_record
+            if auth_token:
+                st.session_state.auth_token = auth_token
+            logger.info(f"Active session set for: {user_record.get('email')} (Credits: {user_record.get('credits_balance')})")
+        except Exception as e:
+            logger.warning(f"Could not write to st.session_state (bare mode): {e}")
 
 
 def get_current_user() -> Optional[Dict[str, Any]]:
     """Returns the currently authenticated user dictionary or None if unauthenticated."""
-    try:
-        if "user_session" in st.session_state and st.session_state.user_session:
-            return st.session_state.user_session
-    except Exception:
-        pass
-    return None
+    if _is_streamlit_running():
+        try:
+            import streamlit as st
+            if "user_session" in st.session_state and st.session_state.user_session:
+                return st.session_state.user_session
+        except Exception:
+            pass
+    return _BARE_USER_SESSION
 
 
 def is_authenticated() -> bool:
@@ -166,13 +172,18 @@ def is_authenticated() -> bool:
 
 def sign_out_user():
     """Clears active user session from session state."""
-    try:
-        if "user_session" in st.session_state:
-            st.session_state.user_session = None
-        if "auth_token" in st.session_state:
-            st.session_state.auth_token = None
-    except Exception:
-        pass
+    global _BARE_USER_SESSION, _BARE_AUTH_TOKEN
+    _BARE_USER_SESSION = None
+    _BARE_AUTH_TOKEN = None
+    if _is_streamlit_running():
+        try:
+            import streamlit as st
+            if "user_session" in st.session_state:
+                st.session_state.user_session = None
+            if "auth_token" in st.session_state:
+                st.session_state.auth_token = None
+        except Exception:
+            pass
 
 
 def refresh_current_user() -> Optional[Dict[str, Any]]:
@@ -193,7 +204,10 @@ def handle_auth_callback() -> Optional[Dict[str, Any]]:
     If an OAuth / Magic Link redirect arrives, extracts access token, fetches user identity,
     and initializes the session state.
     """
+    if not _is_streamlit_running():
+        return None
     try:
+        import streamlit as st
         params = st.query_params
         # Handle access token or code
         token = params.get("access_token")

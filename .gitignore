@@ -14,3 +14,4 @@ reports.db
 rzp-key.csv
 backups/
 *.tar.gz
+scratch/

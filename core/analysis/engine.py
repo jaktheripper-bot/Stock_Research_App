@@ -188,13 +188,8 @@ def stream_genai_with_fallback(client, prompt: str, system_prompt: str, on_statu
     raise ValueError(f"Gemini grounded search exhausted: {last_error}")
 
 def stream_perplexity_fallback(prompt: str, system_prompt: str, collected_citations: list = None):
-    api_key = os.environ.get("PERPLEXITY_API_KEY")
-    if not api_key:
-        try:
-            import streamlit as st
-            api_key = st.secrets.get("PERPLEXITY_API_KEY")
-        except Exception:
-            pass
+    from core.config import get_secret
+    api_key = get_secret("PERPLEXITY_API_KEY")
     if not api_key:
         raise ValueError("PERPLEXITY_API_KEY missing from secrets/environment.")
 
@@ -290,13 +285,8 @@ def stream_stock_report(ticker: str, language: str = "English (India)", stock_da
     if not passed:
         raise PipelineError(stage="Pre-Screening Gate", message=gate_msg)
 
-    api_key = os.environ.get("GEMINI_API_KEY")
-    if not api_key:
-        try:
-            import streamlit as st
-            api_key = st.secrets.get("GEMINI_API_KEY")
-        except Exception:
-            pass
+    from core.config import get_secret
+    api_key = get_secret("GEMINI_API_KEY")
     client = genai.Client(api_key=api_key)
     system_prompt = get_system_prompt(ticker, language)
     user_prompt = f"Generate research report for: {stock_data.get('short_name')} ({stock_data.get('ticker')})\nData: {stock_data}"

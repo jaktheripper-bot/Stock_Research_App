@@ -3,33 +3,61 @@
 import os
 import io
 import time
+import threading
 import contextlib
 import logging
+from functools import wraps
 import requests
 from datetime import datetime, timedelta
 import pandas as pd
-import streamlit as st
 import yfinance as yf
 from bsedata.bse import BSE
 from normalizer import clean_ticker
 from bse_master import resolve_bse_scrip_code, resolve_canonical_symbol
 from core.analysis.exceptions import ExchangeDataFetchError
+from core.config import get_secret
 
 logger = logging.getLogger("equity_research.core.analysis.fundamentals")
 
+def ttl_cache(ttl_seconds: int = 300, maxsize: int = 128):
+    """Thread-safe in-memory TTL and LRU cache for external market data requests."""
+    def decorator(fn):
+        cache = {}
+        lock = threading.Lock()
+        @wraps(fn)
+        def wrapped(*args, **kwargs):
+            key = (args, tuple(sorted(kwargs.items())))
+            now = time.time()
+            with lock:
+                if key in cache:
+                    val, exp = cache[key]
+                    if now < exp:
+                        return val
+                    del cache[key]
+            res = fn(*args, **kwargs)
+            with lock:
+                if len(cache) >= maxsize:
+                    try:
+                        oldest = min(cache.keys(), key=lambda k: cache[k][1])
+                        cache.pop(oldest, None)
+                    except Exception:
+                        cache.clear()
+                cache[key] = (res, now + ttl_seconds)
+            return res
+        def cache_clear():
+            with lock:
+                cache.clear()
+        wrapped.cache_clear = cache_clear
+        wrapped.clear = cache_clear
+        return wrapped
+    return decorator
+
 def get_eodhd_api_key() -> str:
-    """Safely retrieves EODHD API token from Streamlit secrets or environment."""
+    """Safely retrieves EODHD API token from environment or secrets."""
     for key_name in ["EODHD_API_KEY", "EOHD_API_KEY"]:
-        try:
-            if hasattr(st, "secrets") and key_name in st.secrets:
-                key = st.secrets[key_name]
-                if key and str(key).strip() and not str(key).strip().startswith("your_"):
-                    return str(key).strip()
-        except Exception:
-            pass
-        env_key = os.environ.get(key_name, "").strip()
-        if env_key and not env_key.startswith("your_"):
-            return env_key
+        key = get_secret(key_name)
+        if key and str(key).strip() and not str(key).strip().startswith("your_"):
+            return str(key).strip()
     return ""
 
 _EODHD_SUPPORTED = {"NSE": False, "BSE": False, "tested": False}
@@ -334,7 +362,7 @@ def resolve_pe_with_failsafes(ticker: str, scrip: str = "") -> str:
             logger.debug(f"BSE ComHeader direct P/E fetch notice: {e}")
     return "N/A"
 
-@st.cache_data(ttl=300, show_spinner=False)
+@ttl_cache(ttl_seconds=300, maxsize=256)
 def fetch_latest_bse_announcement(scrip_code: str) -> str:
     if not scrip_code or not str(scrip_code).isdigit():
         return ""
@@ -482,7 +510,7 @@ def get_stock_fundamentals(query: str) -> dict:
     # If both fail, raise clean error
     raise ExchangeDataFetchError(clean, "Both primary BSE and secondary market gateways failed to return live quotes.")
 
-@st.cache_data(ttl="15m", max_entries=50)
+@ttl_cache(ttl_seconds=900, maxsize=128)
 def get_historical_prices(ticker: str, period: str = "6mo"):
     """
     Fetches trailing daily historical prices via yfinance, attempting BSE (.BO)

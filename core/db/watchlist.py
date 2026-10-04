@@ -1,14 +1,14 @@
 """Stock surveillance watchlist repository and state management."""
 
 import logging
-import streamlit as st
+from functools import lru_cache
 from normalizer import clean_ticker
 from core.db.connection import init_db, get_db_connection, get_supabase_url, get_placeholder
 from core.db.reports import _format_timestamp
 
 logger = logging.getLogger("equity_research.core.db.watchlist")
 
-@st.cache_data(ttl="60s")
+@lru_cache(maxsize=128)
 def get_watchlist() -> list:
     """Retrieves all tracked stocks in the surveillance watchlist."""
     init_db()
@@ -44,6 +44,8 @@ def get_watchlist() -> list:
         cursor.close()
         conn.close()
     return items
+
+get_watchlist.clear = get_watchlist.cache_clear
 
 def add_to_watchlist(ticker: str, short_name: str = "", scrip_code: str = "",
                      alert_material: bool = True, alert_fundamental: bool = True,
@@ -94,7 +96,7 @@ def add_to_watchlist(ticker: str, short_name: str = "", scrip_code: str = "",
         ))
         conn.commit()
         try:
-            st.cache_data.clear()
+            get_watchlist.cache_clear()
         except Exception:
             pass
         success = True
@@ -117,7 +119,7 @@ def remove_from_watchlist(ticker: str) -> bool:
         cursor.execute(f"DELETE FROM watchlist WHERE ticker = {placeholder}", (clean,))
         conn.commit()
         try:
-            st.cache_data.clear()
+            get_watchlist.cache_clear()
         except Exception:
             pass
         success = True
