@@ -295,8 +295,9 @@ window.openCheckout = function(planId, planName, amountInr, credits) {
             description: planName + ' — Computational Research Credits',
             order_id: orderData.order_id || orderData.id,
             prefill: {
-              name: storedUser ? storedUser.full_name : 'Guest Investor',
-              email: storedUser ? storedUser.email : 'investor@stockresearch.ai'
+              name: (storedUser && storedUser.full_name) ? storedUser.full_name : 'Test Investor',
+              email: (storedUser && storedUser.email) ? storedUser.email : 'investor@stockresearch.ai',
+              contact: (storedUser && storedUser.phone) ? storedUser.phone : '9820098200'
             },
             theme: {
               color: '#0ea5e9'
