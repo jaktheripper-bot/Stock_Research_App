@@ -407,17 +407,22 @@ def fetch_bse_exchange_data(query: str) -> dict:
     canonical_ticker = sec_id if (sec_id and " " not in sec_id) else (clean_ticker_val if " " not in clean_ticker_val else (sec_id or clean_ticker_val.replace(" ", "")))
     resolved_pe = resolve_pe_with_failsafes(canonical_ticker, scrip)
 
+    try:
+        curr_p = float(str(q.get("currentValue", "0.00")).replace(",", "").strip())
+    except Exception:
+        curr_p = 0.0
+
     return {
         "ticker": canonical_ticker,
-        "short_name": q.get("companyName", clean_ticker_val),
+        "short_name": str(q.get("companyName", clean_ticker_val)),
         "scrip_code": scrip,
-        "current_price": q.get("currentValue", "0.00"),
+        "current_price": curr_p,
         "market_cap": mcap_inr,
         "pe_ratio": resolved_pe,
-        "industry": q.get("industry", "Core Industry"),
-        "sector": q.get("industry", "Core Industry"),
-        "52w_high": q.get("52weekHigh", "N/A"),
-        "52w_low": q.get("52weekLow", "N/A"),
+        "industry": str(q.get("industry", "Core Industry")),
+        "sector": str(q.get("industry", "Core Industry")),
+        "52w_high": str(q.get("52weekHigh", "N/A")),
+        "52w_low": str(q.get("52weekLow", "N/A")),
         "description": f"BSE Listed Equity under group {q.get('group', 'General')}.",
         "is_fallback": False
     }

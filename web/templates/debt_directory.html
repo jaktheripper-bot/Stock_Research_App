@@ -1,0 +1,117 @@
+{% extends "base.html" %}
+
+{% block title %}Democratized Corporate Debt & SDI Directory | Institutional Equity & Fixed Income{% endblock %}
+{% block meta_description %}Institutional directory of listed corporate bonds, NCDs, and Securitized Debt Instruments (SDIs) under SEBI's ₹10,000 face value framework, scored via the 5-Pillar Credit & Solvency Matrix.{% endblock %}
+
+{% block content %}
+<div class="container py-8">
+  <!-- Hero Section -->
+  <div style="background: linear-gradient(135deg, rgba(30, 41, 59, 0.7) 0%, rgba(15, 23, 42, 0.9) 100%); border: 1px solid rgba(255, 255, 255, 0.1); border-radius: 16px; padding: 32px; margin-bottom: 32px; position: relative; overflow: hidden;">
+    <div style="position: absolute; top: -50px; right: -50px; width: 200px; height: 200px; background: radial-gradient(circle, rgba(14, 165, 233, 0.15) 0%, transparent 70%); pointer-events: none;"></div>
+    
+    <div style="display: inline-flex; align-items: center; gap: 8px; background: rgba(14, 165, 233, 0.15); border: 1px solid rgba(14, 165, 233, 0.3); border-radius: 9999px; padding: 4px 12px; margin-bottom: 16px;">
+      <span style="width: 8px; height: 8px; border-radius: 50%; background: #0ea5e9;"></span>
+      <span style="font-size: 12px; font-weight: 700; color: #38bdf8; text-transform: uppercase; letter-spacing: 0.05em;">SEBI ₹10,000 Face Value Democratization Framework</span>
+    </div>
+
+    <h1 style="font-size: 32px; font-weight: 800; color: #f8fafc; margin-bottom: 12px; letter-spacing: -0.02em;">
+      Corporate Bonds & Securitized Debt Directory
+    </h1>
+    <p style="font-size: 15px; color: #94a3b8; max-width: 800px; line-height: 1.6; margin-bottom: 24px;">
+      Direct retail access to exchange-listed, demat-credited fixed-income instruments. Every issue is subjected to our 
+      <strong>5-Pillar Credit & Solvency Matrix</strong>—auditing rating drift, capital hierarchy seniority, cash flow coverage, duration risk, and recovery reality.
+    </p>
+
+    <!-- Top KPI Grid -->
+    <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 16px;">
+      <div style="background: rgba(15, 23, 42, 0.6); border: 1px solid rgba(255, 255, 255, 0.08); border-radius: 12px; padding: 16px;">
+        <div style="font-size: 12px; color: #64748b; text-transform: uppercase; font-weight: 600; margin-bottom: 4px;">Tracked Securities</div>
+        <div style="font-size: 24px; font-weight: 800; color: #f8fafc;">{{ securities|length }} Issues</div>
+      </div>
+      <div style="background: rgba(15, 23, 42, 0.6); border: 1px solid rgba(255, 255, 255, 0.08); border-radius: 12px; padding: 16px;">
+        <div style="font-size: 12px; color: #64748b; text-transform: uppercase; font-weight: 600; margin-bottom: 4px;">Average YTM</div>
+        <div style="font-size: 24px; font-weight: 800; color: #10b981;">{{ avg_ytm }}%</div>
+      </div>
+      <div style="background: rgba(15, 23, 42, 0.6); border: 1px solid rgba(255, 255, 255, 0.08); border-radius: 12px; padding: 16px;">
+        <div style="font-size: 12px; color: #64748b; text-transform: uppercase; font-weight: 600; margin-bottom: 4px;">Benchmark 10Y G-Sec</div>
+        <div style="font-size: 24px; font-weight: 800; color: #38bdf8;">7.10%</div>
+      </div>
+      <div style="background: rgba(15, 23, 42, 0.6); border: 1px solid rgba(255, 255, 255, 0.08); border-radius: 12px; padding: 16px;">
+        <div style="font-size: 12px; color: #64748b; text-transform: uppercase; font-weight: 600; margin-bottom: 4px;">Settlement Platform</div>
+        <div style="font-size: 24px; font-weight: 800; color: #f8fafc;">BSE / NSE RFQ</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Filter Navigation Tabs -->
+  <div style="display: flex; gap: 8px; overflow-x: auto; padding-bottom: 12px; margin-bottom: 24px;">
+    <a href="/debt" class="btn btn-sm {% if not current_filter %}btn-primary{% else %}btn-secondary{% endif %}" style="border-radius: 9999px;">All Issues ({{ securities|length }})</a>
+    <a href="/debt?seniority=SENIOR_SECURED" class="btn btn-sm {% if current_filter == 'SENIOR_SECURED' %}btn-primary{% else %}btn-secondary{% endif %}" style="border-radius: 9999px;">🛡️ Senior Secured</a>
+    <a href="/debt?is_sdi=true" class="btn btn-sm {% if current_filter == 'is_sdi' %}btn-primary{% else %}btn-secondary{% endif %}" style="border-radius: 9999px;">📦 Securitized Debt (SDIs)</a>
+    <a href="/debt?seniority=SUBORDINATED_TIER_2" class="btn btn-sm {% if current_filter == 'SUBORDINATED_TIER_2' %}btn-primary{% else %}btn-secondary{% endif %}" style="border-radius: 9999px;">🏛️ Tier-II Subordinated</a>
+    <a href="/debt?seniority=PERPETUAL_AT1" class="btn btn-sm {% if current_filter == 'PERPETUAL_AT1' %}btn-primary{% else %}btn-secondary{% endif %}" style="border-radius: 9999px;">⚠️ Perpetual AT1</a>
+  </div>
+
+  <!-- Securities Grid -->
+  <div style="display: grid; grid-template-columns: repeat(auto-fill, minmax(340px, 1fr)); gap: 20px;">
+    {% for s in securities %}
+    <div style="background: rgba(30, 41, 59, 0.5); border: 1px solid rgba(255, 255, 255, 0.1); border-radius: 14px; padding: 20px; display: flex; flex-direction: column; justify-content: space-between; transition: transform 0.2s, border-color 0.2s;" onmouseover="this.style.borderColor='rgba(14, 165, 233, 0.4)'; this.style.transform='translateY(-2px)';" onmouseout="this.style.borderColor='rgba(255, 255, 255, 0.1)'; this.style.transform='translateY(0)';">
+      <div>
+        <!-- Card Header Badges -->
+        <div style="display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 12px;">
+          <div>
+            <span style="font-size: 18px; font-weight: 800; color: #f8fafc; margin-right: 8px;">{{ s.ticker }}</span>
+            <span style="font-size: 11px; padding: 2px 8px; border-radius: 4px; background: rgba(255, 255, 255, 0.08); color: #94a3b8; font-family: monospace;">{{ s.series }}</span>
+          </div>
+          <span style="font-size: 11px; font-weight: 700; padding: 4px 10px; border-radius: 9999px; background: rgba(16, 185, 129, 0.15); color: #10b981; border: 1px solid rgba(16, 185, 129, 0.3);">
+            {{ s.credit_rating }}
+          </span>
+        </div>
+
+        <h3 style="font-size: 14px; font-weight: 600; color: #cbd5e1; line-height: 1.4; margin-bottom: 16px; min-height: 40px;">
+          {{ s.instrument_name }}
+        </h3>
+
+        <!-- Core Financial Metrics Table -->
+        <div style="background: rgba(15, 23, 42, 0.5); border-radius: 8px; padding: 12px; margin-bottom: 16px; font-size: 12px;">
+          <div style="display: flex; justify-content: space-between; margin-bottom: 6px;">
+            <span style="color: #64748b;">Coupon / Freq:</span>
+            <span style="font-weight: 700; color: #f8fafc;">{{ s.coupon_rate_pct }}% ({{ s.coupon_frequency.title() }})</span>
+          </div>
+          <div style="display: flex; justify-content: space-between; margin-bottom: 6px;">
+            <span style="color: #64748b;">Yield to Maturity (YTM):</span>
+            <span style="font-weight: 800; color: #10b981;">{{ s.ytm_pct }}%</span>
+          </div>
+          <div style="display: flex; justify-content: space-between; margin-bottom: 6px;">
+            <span style="color: #64748b;">Macaulay Duration:</span>
+            <span style="font-weight: 600; color: #cbd5e1;">{{ s.macaulay_duration_years }} yrs</span>
+          </div>
+          <div style="display: flex; justify-content: space-between; margin-bottom: 6px;">
+            <span style="color: #64748b;">Face Value (Min Entry):</span>
+            <span style="font-weight: 600; color: #f8fafc;">₹{{ "{:,.0f}".format(s.face_value) }}</span>
+          </div>
+          <div style="display: flex; justify-content: space-between;">
+            <span style="color: #64748b;">Seniority Waterfall:</span>
+            <span style="font-weight: 600; color: {% if s.seniority_tier == 'SENIOR_SECURED' %}#10b981{% elif s.seniority_tier == 'PERPETUAL_AT1' %}#ef4444{% else %}#f59e0b{% endif %};">
+              {{ s.seniority_tier.replace('_', ' ') }}
+            </span>
+          </div>
+        </div>
+      </div>
+
+      <!-- Action Button -->
+      <div>
+        <a href="/debt/{{ s.isin }}" class="btn btn-secondary" style="width: 100%; text-align: center; padding: 10px; font-size: 13px; font-weight: 600; border-radius: 8px;">
+          Analyze 5-Pillar Credit Dossier &rarr;
+        </a>
+      </div>
+    </div>
+    {% endfor %}
+  </div>
+
+  <!-- Mandatory SEBI Safe-Harbor Disclosure Footer -->
+  <div style="margin-top: 48px; padding: 20px; background: rgba(15, 23, 42, 0.4); border: 1px solid rgba(255, 255, 255, 0.05); border-radius: 12px; font-size: 12px; color: #64748b; line-height: 1.6;">
+    <strong>Mandatory Regulatory Disclosure:</strong> Fixed-income analytics and credit posture scores are computational risk evaluations derived from publicly listed exchange filings (BSE/NSE) and Credit Rating Agency circulars under the SEBI (Issue and Listing of Non-Convertible Securities) Regulations. Yields-to-Maturity (YTM) are contractual mathematical calculations based on current market traded prices and do not constitute an explicit or implied guarantee of issuer solvency. Investment in debt securities carries market, credit, and liquidity risk.
+  </div>
+</div>
+{% endblock %}

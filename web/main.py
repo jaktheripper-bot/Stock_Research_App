@@ -117,6 +117,15 @@ from bse_master import (
 )
 from ui.formatters import format_inr
 from web.legal_content import POLICIES
+from core.db.debt import (
+    get_active_debt_securities,
+    get_debt_security_by_isin,
+    get_debt_securities_by_ticker,
+    get_recent_rating_actions,
+    get_rating_history,
+    seed_default_debt_securities,
+)
+from core.analysis.debt_engine import evaluate_5_pillar_credit_posture
 
 logger = logging.getLogger("equity_research.web")
 
@@ -160,19 +169,28 @@ async def lifespan(app: FastAPI):
     from core.msme.router import router as msme_router
     app.include_router(msme_router, prefix="/api/msme")
     init_db()
-    # Warm‑up task to prime async resources
-    await warmup_task()
-    # Start APScheduler for MSME background jobs
-    scheduler = AsyncIOScheduler()
-    register_jobs(scheduler)
-    scheduler.start()
-    # Start automated daily discovery background scheduler
-    discovery_task = asyncio.create_task(run_daily_discovery_scheduler())
+
+    is_testing = os.environ.get("TESTING") == "1" or "pytest" in sys.modules
+    scheduler = None
+    discovery_task = None
+
+    if not is_testing:
+        # Warm‑up task to prime async resources
+        await warmup_task()
+        # Start APScheduler for MSME background jobs
+        scheduler = AsyncIOScheduler()
+        register_jobs(scheduler)
+        scheduler.start()
+        # Start automated daily discovery background scheduler
+        discovery_task = asyncio.create_task(run_daily_discovery_scheduler())
+
     try:
         yield
     finally:
-        discovery_task.cancel()
-        scheduler.shutdown()
+        if discovery_task:
+            discovery_task.cancel()
+        if scheduler:
+            scheduler.shutdown()
 
 app = FastAPI(
     title="Stock Research AI",
@@ -193,6 +211,9 @@ def json_response_with_cache(data: dict, max_age: int = 3600) -> JSONResponse:
 
 # Warm‑up task to prime async resources on startup
 async def warmup_task():
+    if os.environ.get("TESTING") == "1" or "pytest" in sys.modules:
+        logger.info("🧪 Test environment detected: skipping live network warm-up task.")
+        return
     logger.info("🚀 Starting warm‑up task: preloading resources...")
     try:
         # Simple warm‑up using compare_two_companies to load HTTP client pool and DB connections
@@ -546,6 +567,158 @@ async def compare_page(
             "disparity": comp_data.get("disparity", {"is_disparate": False, "warnings": []}),
         }
     )
+
+
+# ==============================================================================
+# Corporate Debt & SDIs Routes (SEBI ₹10,000 Framework)
+# ==============================================================================
+
+@app.get("/debt", response_class=HTMLResponse)
+def debt_directory_page(
+    request: Request,
+    seniority: Optional[str] = None,
+    is_sdi: Optional[str] = None
+):
+    """Public corporate debt and SDI screener under SEBI's ₹10,000 face value framework."""
+    init_db()
+    sdi_bool = True if is_sdi == "true" else None
+    securities = get_active_debt_securities(
+        seniority=seniority,
+        is_sdi=sdi_bool
+    )
+    if not securities:
+        seed_default_debt_securities()
+        securities = get_active_debt_securities(
+            seniority=seniority,
+            is_sdi=sdi_bool
+        )
+
+    # Compute average YTM
+    ytm_vals = [s.get("ytm_pct", 0.0) for s in securities if s.get("ytm_pct")]
+    avg_ytm = round(sum(ytm_vals) / len(ytm_vals), 2) if ytm_vals else 8.50
+
+    current_filter = seniority or ("is_sdi" if is_sdi == "true" else None)
+
+    return templates.TemplateResponse(
+        request=request,
+        name="debt_directory.html",
+        context={
+            "active_page": "debt",
+            "securities": securities,
+            "avg_ytm": avg_ytm,
+            "current_filter": current_filter,
+        }
+    )
+
+
+@app.get("/debt/{isin}", response_class=HTMLResponse)
+def debt_dossier_page(request: Request, isin: str):
+    """Institutional 5-Pillar Credit & Solvency Dossier for a specific ISIN."""
+    init_db()
+    clean_isin = isin.strip().upper()
+    sec = get_debt_security_by_isin(clean_isin)
+    if not sec:
+        raise HTTPException(status_code=404, detail=f"Debt security with ISIN '{clean_isin}' not found.")
+
+    rating_history = get_rating_history(clean_isin)
+    posture = evaluate_5_pillar_credit_posture(sec, rating_history=rating_history)
+
+    return templates.TemplateResponse(
+        request=request,
+        name="debt_dossier.html",
+        context={
+            "active_page": "debt",
+            "security": sec,
+            "posture": posture,
+            "rating_history": rating_history,
+        }
+    )
+
+
+@app.get("/api/debt/securities")
+def api_get_debt_securities(
+    seniority: Optional[str] = None,
+    instrument_type: Optional[str] = None,
+    min_rating: Optional[str] = None,
+    is_sdi: Optional[bool] = None
+):
+    """Public API: List active corporate debt and SDIs with 5-pillar composite evaluation."""
+    init_db()
+    secs = get_active_debt_securities(
+        seniority=seniority,
+        instrument_type=instrument_type,
+        min_rating=min_rating,
+        is_sdi=is_sdi
+    )
+    if not secs:
+        seed_default_debt_securities()
+        secs = get_active_debt_securities(
+            seniority=seniority,
+            instrument_type=instrument_type,
+            min_rating=min_rating,
+            is_sdi=is_sdi
+        )
+
+    results = []
+    for s in secs:
+        eval_summary = evaluate_5_pillar_credit_posture(s)
+        results.append({
+            "isin": s["isin"],
+            "ticker": s["ticker"],
+            "instrument_name": s["instrument_name"],
+            "instrument_type": s["instrument_type"],
+            "seniority_tier": s["seniority_tier"],
+            "face_value": s["face_value"],
+            "coupon_rate_pct": s["coupon_rate_pct"],
+            "coupon_frequency": s["coupon_frequency"],
+            "maturity_date": str(s["maturity_date"]),
+            "credit_rating": s["credit_rating"],
+            "ytm_pct": s.get("ytm_pct"),
+            "macaulay_duration_years": s.get("macaulay_duration_years"),
+            "composite_score": eval_summary["composite_score"],
+            "posture": eval_summary["posture"],
+            "posture_badge": eval_summary["posture_badge"],
+            "warnings_count": len(eval_summary["warnings"])
+        })
+
+    return json_response_with_cache({"status": "success", "count": len(results), "securities": results})
+
+
+@app.get("/api/debt/security/{isin}")
+def api_get_debt_security_detail(isin: str):
+    """Public API: Detailed 5-Pillar Credit & Solvency evaluation for a specific ISIN."""
+    init_db()
+    clean_isin = isin.strip().upper()
+    sec = get_debt_security_by_isin(clean_isin)
+    if not sec:
+        raise HTTPException(status_code=404, detail="Debt security not found.")
+
+    rating_history = get_rating_history(clean_isin)
+    posture = evaluate_5_pillar_credit_posture(sec, rating_history=rating_history)
+
+    return json_response_with_cache({
+        "status": "success",
+        "security": sec,
+        "posture": posture,
+        "rating_history": rating_history
+    })
+
+
+@app.get("/api/debt/ticker/{ticker}")
+def api_get_debt_by_ticker(ticker: str):
+    """Public API: All listed corporate debt securities issued by a given company."""
+    init_db()
+    clean_t = clean_ticker(ticker)
+    secs = get_debt_securities_by_ticker(clean_t)
+    return json_response_with_cache({"status": "success", "ticker": clean_t, "count": len(secs), "securities": secs})
+
+
+@app.get("/api/debt/ratings/actions")
+def api_get_recent_rating_actions(limit: int = 50):
+    """Public API: Recent Credit Rating Agency actions (upgrades, downgrades, watches)."""
+    init_db()
+    actions = get_recent_rating_actions(limit=limit)
+    return json_response_with_cache({"status": "success", "count": len(actions), "actions": actions})
 
 
 class PreMortemRequest(BaseModel):

@@ -700,47 +700,163 @@ def init_db(force: bool = False):
                         pass
                     cursor.execute("INSERT OR IGNORE INTO schema_migrations (version) VALUES ('v010_user_usage_and_billables_audit');")
                 conn.commit()
-                # Migration v011: MSME Firms table
-                if "v011_msme_firms" not in applied:
-                    logger.info("Applying schema migration: v011_msme_firms...")
-                    if supabase_url:
-                        cursor.execute("""
-                            CREATE TABLE IF NOT EXISTS msme_firms (
-                                uin VARCHAR PRIMARY KEY,
-                                name TEXT NOT NULL,
-                                sector_code VARCHAR,
-                                sector_name TEXT,
-                                city TEXT,
-                                state TEXT,
-                                annual_turnover NUMERIC,
-                                employee_count INTEGER,
-                                registration_date DATE,
-                                source VARCHAR NOT NULL,
-                                last_updated TIMESTAMPTZ DEFAULT now()
-                            );
-                            CREATE INDEX IF NOT EXISTS idx_msme_sector ON msme_firms(sector_name);
-                            CREATE INDEX IF NOT EXISTS idx_msme_state ON msme_firms(state);
-                        """)
-                    else:
-                        cursor.execute("""
-                            CREATE TABLE IF NOT EXISTS msme_firms (
-                                uin TEXT PRIMARY KEY,
-                                name TEXT NOT NULL,
-                                sector_code TEXT,
-                                sector_name TEXT,
-                                city TEXT,
-                                state TEXT,
-                                annual_turnover REAL,
-                                employee_count INTEGER,
-                                registration_date TEXT,
-                                source TEXT NOT NULL,
-                                last_updated TEXT DEFAULT (datetime('now'))
-                            );
-                        """)
-                        cursor.execute("CREATE INDEX IF NOT EXISTS idx_msme_sector ON msme_firms(sector_name);")
-                        cursor.execute("CREATE INDEX IF NOT EXISTS idx_msme_state ON msme_firms(state);")
+
+            # Migration v011: MSME Firms table
+            if "v011_msme_firms" not in applied:
+                logger.info("Applying schema migration: v011_msme_firms...")
+                if supabase_url:
+                    cursor.execute("""
+                        CREATE TABLE IF NOT EXISTS msme_firms (
+                            uin VARCHAR PRIMARY KEY,
+                            name TEXT NOT NULL,
+                            sector_code VARCHAR,
+                            sector_name TEXT,
+                            city TEXT,
+                            state TEXT,
+                            annual_turnover NUMERIC,
+                            employee_count INTEGER,
+                            registration_date DATE,
+                            source VARCHAR NOT NULL,
+                            last_updated TIMESTAMPTZ DEFAULT now()
+                        );
+                        CREATE INDEX IF NOT EXISTS idx_msme_sector ON msme_firms(sector_name);
+                        CREATE INDEX IF NOT EXISTS idx_msme_state ON msme_firms(state);
+                        INSERT INTO schema_migrations (version) VALUES ('v011_msme_firms') ON CONFLICT DO NOTHING;
+                    """)
+                else:
+                    cursor.execute("""
+                        CREATE TABLE IF NOT EXISTS msme_firms (
+                            uin TEXT PRIMARY KEY,
+                            name TEXT NOT NULL,
+                            sector_code TEXT,
+                            sector_name TEXT,
+                            city TEXT,
+                            state TEXT,
+                            annual_turnover REAL,
+                            employee_count INTEGER,
+                            registration_date TEXT,
+                            source TEXT NOT NULL,
+                            last_updated TEXT DEFAULT (datetime('now'))
+                        );
+                    """)
+                    cursor.execute("CREATE INDEX IF NOT EXISTS idx_msme_sector ON msme_firms(sector_name);")
+                    cursor.execute("CREATE INDEX IF NOT EXISTS idx_msme_state ON msme_firms(state);")
                     cursor.execute("INSERT OR IGNORE INTO schema_migrations (version) VALUES ('v011_msme_firms');")
-                    conn.commit()
+                conn.commit()
+
+            # Migration v012: Corporate Debt Securities and Credit Rating Events
+            if "v012_corporate_debt_and_credit_ratings" not in applied:
+                logger.info("Applying schema migration: v012_corporate_debt_and_credit_ratings...")
+                if supabase_url:
+                    cursor.execute("""
+                        CREATE TABLE IF NOT EXISTS corporate_debt_securities (
+                            isin VARCHAR(20) PRIMARY KEY,
+                            ticker VARCHAR(50) NOT NULL,
+                            scrip_code VARCHAR(20),
+                            series VARCHAR(20),
+                            instrument_name TEXT NOT NULL,
+                            instrument_type VARCHAR(50) NOT NULL,
+                            seniority_tier VARCHAR(50) NOT NULL,
+                            face_value NUMERIC NOT NULL DEFAULT 10000.0,
+                            coupon_rate_pct NUMERIC NOT NULL,
+                            coupon_frequency VARCHAR(20) NOT NULL DEFAULT 'ANNUAL',
+                            issue_date DATE,
+                            maturity_date DATE NOT NULL,
+                            credit_rating VARCHAR(50) NOT NULL,
+                            credit_rating_agency VARCHAR(50) NOT NULL,
+                            asset_cover_ratio NUMERIC DEFAULT 1.0,
+                            is_listed BOOLEAN DEFAULT TRUE,
+                            exchange VARCHAR(20) DEFAULT 'BSE',
+                            is_sdi BOOLEAN DEFAULT FALSE,
+                            originator TEXT,
+                            fldg_pct NUMERIC DEFAULT 0.0,
+                            last_traded_price NUMERIC,
+                            ytm_pct NUMERIC,
+                            macaulay_duration_years NUMERIC,
+                            modified_duration_years NUMERIC,
+                            metadata_json TEXT DEFAULT '{}',
+                            created_at TIMESTAMPTZ DEFAULT now(),
+                            last_updated TIMESTAMPTZ DEFAULT now()
+                        );
+                        CREATE INDEX IF NOT EXISTS idx_debt_ticker ON corporate_debt_securities(ticker);
+                        CREATE INDEX IF NOT EXISTS idx_debt_type ON corporate_debt_securities(instrument_type);
+                        CREATE INDEX IF NOT EXISTS idx_debt_seniority ON corporate_debt_securities(seniority_tier);
+                        CREATE INDEX IF NOT EXISTS idx_debt_rating ON corporate_debt_securities(credit_rating);
+
+                        CREATE TABLE IF NOT EXISTS credit_rating_events (
+                            id SERIAL PRIMARY KEY,
+                            isin VARCHAR(20) NOT NULL,
+                            ticker VARCHAR(50) NOT NULL,
+                            rating_agency VARCHAR(50) NOT NULL,
+                            rating_symbol VARCHAR(20) NOT NULL,
+                            outlook VARCHAR(30) DEFAULT 'STABLE',
+                            action_type VARCHAR(30) NOT NULL,
+                            event_date DATE NOT NULL,
+                            action_rationale TEXT,
+                            created_at TIMESTAMPTZ DEFAULT now()
+                        );
+                        CREATE INDEX IF NOT EXISTS idx_rating_isin ON credit_rating_events(isin);
+                        CREATE INDEX IF NOT EXISTS idx_rating_ticker ON credit_rating_events(ticker);
+                        CREATE INDEX IF NOT EXISTS idx_rating_date ON credit_rating_events(event_date);
+
+                        INSERT INTO schema_migrations (version) VALUES ('v012_corporate_debt_and_credit_ratings') ON CONFLICT DO NOTHING;
+                    """)
+                else:
+                    cursor.execute("""
+                        CREATE TABLE IF NOT EXISTS corporate_debt_securities (
+                            isin TEXT PRIMARY KEY,
+                            ticker TEXT NOT NULL,
+                            scrip_code TEXT,
+                            series TEXT,
+                            instrument_name TEXT NOT NULL,
+                            instrument_type TEXT NOT NULL,
+                            seniority_tier TEXT NOT NULL,
+                            face_value REAL NOT NULL DEFAULT 10000.0,
+                            coupon_rate_pct REAL NOT NULL,
+                            coupon_frequency TEXT NOT NULL DEFAULT 'ANNUAL',
+                            issue_date TEXT,
+                            maturity_date TEXT NOT NULL,
+                            credit_rating TEXT NOT NULL,
+                            credit_rating_agency TEXT NOT NULL,
+                            asset_cover_ratio REAL DEFAULT 1.0,
+                            is_listed INTEGER DEFAULT 1,
+                            exchange TEXT DEFAULT 'BSE',
+                            is_sdi INTEGER DEFAULT 0,
+                            originator TEXT,
+                            fldg_pct REAL DEFAULT 0.0,
+                            last_traded_price REAL,
+                            ytm_pct REAL,
+                            macaulay_duration_years REAL,
+                            modified_duration_years REAL,
+                            metadata_json TEXT DEFAULT '{}',
+                            created_at TEXT DEFAULT (datetime('now')),
+                            last_updated TEXT DEFAULT (datetime('now'))
+                        );
+                    """)
+                    cursor.execute("CREATE INDEX IF NOT EXISTS idx_debt_ticker ON corporate_debt_securities(ticker);")
+                    cursor.execute("CREATE INDEX IF NOT EXISTS idx_debt_type ON corporate_debt_securities(instrument_type);")
+                    cursor.execute("CREATE INDEX IF NOT EXISTS idx_debt_seniority ON corporate_debt_securities(seniority_tier);")
+                    cursor.execute("CREATE INDEX IF NOT EXISTS idx_debt_rating ON corporate_debt_securities(credit_rating);")
+
+                    cursor.execute("""
+                        CREATE TABLE IF NOT EXISTS credit_rating_events (
+                            id INTEGER PRIMARY KEY AUTOINCREMENT,
+                            isin TEXT NOT NULL,
+                            ticker TEXT NOT NULL,
+                            rating_agency TEXT NOT NULL,
+                            rating_symbol TEXT NOT NULL,
+                            outlook TEXT DEFAULT 'STABLE',
+                            action_type TEXT NOT NULL,
+                            event_date TEXT NOT NULL,
+                            action_rationale TEXT,
+                            created_at TEXT DEFAULT (datetime('now'))
+                        );
+                    """)
+                    cursor.execute("CREATE INDEX IF NOT EXISTS idx_rating_isin ON credit_rating_events(isin);")
+                    cursor.execute("CREATE INDEX IF NOT EXISTS idx_rating_ticker ON credit_rating_events(ticker);")
+                    cursor.execute("CREATE INDEX IF NOT EXISTS idx_rating_date ON credit_rating_events(event_date);")
+                    cursor.execute("INSERT OR IGNORE INTO schema_migrations (version) VALUES ('v012_corporate_debt_and_credit_ratings');")
+                conn.commit()
 
             _DB_INITIALIZED = True
         except Exception as e:

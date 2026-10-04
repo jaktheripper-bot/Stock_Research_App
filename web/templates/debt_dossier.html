@@ -1,0 +1,196 @@
+{% extends "base.html" %}
+
+{% block title %}{{ posture.ticker }} - {{ posture.instrument_name }} | 5-Pillar Credit Dossier{% endblock %}
+{% block meta_description %}Institutional 5-Pillar credit analysis, YTM, duration risk, seniority waterfall, and rate shock sensitivity for {{ posture.instrument_name }} ({{ posture.isin }}).{% endblock %}
+
+{% block content %}
+<div class="container py-8">
+  <!-- Breadcrumb -->
+  <div style="font-size: 13px; color: #64748b; margin-bottom: 20px;">
+    <a href="/debt" style="color: #38bdf8; text-decoration: none;">&larr; Corporate Debt Directory</a> /
+    <span>{{ posture.ticker }}</span> /
+    <span style="color: #94a3b8; font-family: monospace;">{{ posture.isin }}</span>
+  </div>
+
+  <!-- Header Banner -->
+  <div style="background: linear-gradient(135deg, rgba(30, 41, 59, 0.7) 0%, rgba(15, 23, 42, 0.9) 100%); border: 1px solid rgba(255, 255, 255, 0.1); border-radius: 16px; padding: 28px; margin-bottom: 28px;">
+    <div style="display: flex; flex-wrap: wrap; justify-content: space-between; align-items: flex-start; gap: 16px; margin-bottom: 20px;">
+      <div>
+        <div style="display: flex; align-items: center; gap: 10px; margin-bottom: 8px;">
+          <h1 style="font-size: 28px; font-weight: 800; color: #f8fafc; margin: 0;">{{ posture.ticker }}</h1>
+          <span style="font-size: 12px; padding: 3px 10px; border-radius: 6px; background: rgba(255, 255, 255, 0.08); color: #cbd5e1; font-family: monospace;">{{ posture.isin }}</span>
+          <span style="font-size: 12px; padding: 3px 10px; border-radius: 6px; background: rgba(14, 165, 233, 0.15); color: #38bdf8;">{{ security.exchange }} Listed</span>
+        </div>
+        <div style="font-size: 16px; color: #94a3b8; font-weight: 500;">
+          {{ posture.instrument_name }}
+        </div>
+      </div>
+
+      <!-- Composite Posture Badge -->
+      <div style="text-align: right;">
+        <div style="display: inline-block; font-size: 13px; font-weight: 700; padding: 6px 14px; border-radius: 9999px; background: rgba({{ posture.badge_color }}, 0.15); color: {{ posture.badge_color }}; border: 1px solid {{ posture.badge_color }}; margin-bottom: 6px;">
+          ● {{ posture.posture_badge }}
+        </div>
+        <div style="font-size: 12px; color: #64748b;">
+          5-Pillar Score: <strong style="color: #f8fafc; font-size: 14px;">{{ posture.composite_score }} / 100</strong>
+        </div>
+      </div>
+    </div>
+
+    <!-- Highlight Metrics Strip -->
+    <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 12px; background: rgba(15, 23, 42, 0.6); border-radius: 12px; padding: 16px; border: 1px solid rgba(255, 255, 255, 0.06);">
+      <div>
+        <div style="font-size: 11px; color: #64748b; text-transform: uppercase;">Yield to Maturity</div>
+        <div style="font-size: 22px; font-weight: 800; color: #10b981;">{{ posture.ytm_pct }}%</div>
+      </div>
+      <div>
+        <div style="font-size: 11px; color: #64748b; text-transform: uppercase;">Coupon / Frequency</div>
+        <div style="font-size: 20px; font-weight: 700; color: #f8fafc;">{{ posture.coupon_rate_pct }}% <span style="font-size: 12px; color: #94a3b8;">{{ posture.coupon_frequency.title() }}</span></div>
+      </div>
+      <div>
+        <div style="font-size: 11px; color: #64748b; text-transform: uppercase;">Credit Rating</div>
+        <div style="font-size: 20px; font-weight: 700; color: #38bdf8;">{{ posture.credit_rating }}</div>
+      </div>
+      <div>
+        <div style="font-size: 11px; color: #64748b; text-transform: uppercase;">Macaulay Duration</div>
+        <div style="font-size: 20px; font-weight: 700; color: #f8fafc;">{{ posture.macaulay_duration_years }} yrs</div>
+      </div>
+      <div>
+        <div style="font-size: 11px; color: #64748b; text-transform: uppercase;">Maturity Date</div>
+        <div style="font-size: 16px; font-weight: 700; color: #cbd5e1; margin-top: 4px;">{{ security.maturity_date }}</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Critical Regulatory Warning Banners (if any) -->
+  {% if posture.warnings %}
+  <div style="margin-bottom: 24px;">
+    {% for w in posture.warnings %}
+    <div style="background: rgba(239, 68, 68, 0.1); border-left: 4px solid #ef4444; border-radius: 8px; padding: 14px 18px; margin-bottom: 10px; font-size: 13px; color: #fca5a5; line-height: 1.5;">
+      <strong>⚠️ Warning Alert:</strong> {{ w }}
+    </div>
+    {% endfor %}
+  </div>
+  {% endif %}
+
+  <!-- 5-Pillar Credit & Solvency Deep-Dive Cards -->
+  <h2 style="font-size: 20px; font-weight: 800; color: #f8fafc; margin-bottom: 16px; letter-spacing: -0.01em;">
+    5-Pillar Credit & Solvency Matrix
+  </h2>
+
+  <div style="display: flex; flex-direction: column; gap: 16px; margin-bottom: 32px;">
+    <!-- Pillar 1 -->
+    <div style="background: rgba(30, 41, 59, 0.5); border: 1px solid rgba(255, 255, 255, 0.08); border-radius: 12px; padding: 20px;">
+      <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px;">
+        <h3 style="font-size: 16px; font-weight: 700; color: #f8fafc; margin: 0;">Pillar 1: Credit Quality & Rating Drift</h3>
+        <span style="font-size: 13px; font-weight: 700; color: #38bdf8;">Score: {{ posture.pillars.p1_credit_quality.score }} / 100</span>
+      </div>
+      <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 12px; font-size: 13px; color: #cbd5e1;">
+        <div>Agency Rating: <strong>{{ posture.pillars.p1_credit_quality.credit_rating }}</strong></div>
+        <div>Rating Trajectory: <strong>{{ posture.pillars.p1_credit_quality.drift_status }}</strong></div>
+        <div>G-Sec Spread: <strong>{{ posture.pillars.p1_credit_quality.credit_spread_bps }} bps</strong> over 10Y Benchmark ({{ posture.pillars.p1_credit_quality.benchmark_10y_gsec }}%)</div>
+      </div>
+      {% if posture.pillars.p1_credit_quality.warning %}
+      <div style="margin-top: 10px; font-size: 12px; color: #f59e0b;">{{ posture.pillars.p1_credit_quality.warning }}</div>
+      {% endif %}
+    </div>
+
+    <!-- Pillar 2 -->
+    <div style="background: rgba(30, 41, 59, 0.5); border: 1px solid rgba(255, 255, 255, 0.08); border-radius: 12px; padding: 20px;">
+      <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px;">
+        <h3 style="font-size: 16px; font-weight: 700; color: #f8fafc; margin: 0;">Pillar 2: Capital Hierarchy & Seniority Cover</h3>
+        <span style="font-size: 13px; font-weight: 700; color: #38bdf8;">Score: {{ posture.pillars.p2_capital_hierarchy.score }} / 100</span>
+      </div>
+      <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 12px; font-size: 13px; color: #cbd5e1;">
+        <div>Hierarchy Rank: <strong>{{ posture.pillars.p2_capital_hierarchy.hierarchy_label }}</strong></div>
+        <div>Asset Cover Ratio: <strong>{{ posture.pillars.p2_capital_hierarchy.asset_cover_ratio }}x</strong></div>
+        <div>Covenant Status: <strong>{{ posture.pillars.p2_capital_hierarchy.acr_status }}</strong></div>
+      </div>
+    </div>
+
+    <!-- Pillar 3 -->
+    <div style="background: rgba(30, 41, 59, 0.5); border: 1px solid rgba(255, 255, 255, 0.08); border-radius: 12px; padding: 20px;">
+      <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px;">
+        <h3 style="font-size: 16px; font-weight: 700; color: #f8fafc; margin: 0;">Pillar 3: Cash Flow Solvency & Coverage</h3>
+        <span style="font-size: 13px; font-weight: 700; color: #38bdf8;">Score: {{ posture.pillars.p3_solvency.score }} / 100</span>
+      </div>
+      <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 12px; font-size: 13px; color: #cbd5e1;">
+        <div>Interest Coverage (ICR): <strong>{{ posture.pillars.p3_solvency.interest_coverage_ratio or "Industry Standard" }}</strong></div>
+        <div>Debt Service Coverage (DSCR): <strong>{{ posture.pillars.p3_solvency.debt_service_coverage_ratio or "Compliant" }}</strong></div>
+        <div>Net Debt / EBITDA: <strong>{{ posture.pillars.p3_solvency.net_debt_to_ebitda or "Adequate" }}</strong></div>
+      </div>
+    </div>
+
+    <!-- Pillar 4 -->
+    <div style="background: rgba(30, 41, 59, 0.5); border: 1px solid rgba(255, 255, 255, 0.08); border-radius: 12px; padding: 20px;">
+      <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px;">
+        <h3 style="font-size: 16px; font-weight: 700; color: #f8fafc; margin: 0;">Pillar 4: Duration & Interest Rate Sensitivity</h3>
+        <span style="font-size: 13px; font-weight: 700; color: #38bdf8;">Score: {{ posture.pillars.p4_duration.score }} / 100</span>
+      </div>
+      <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 12px; font-size: 13px; color: #cbd5e1; margin-bottom: 8px;">
+        <div>Macaulay Duration: <strong>{{ posture.pillars.p4_duration.macaulay_duration_years }} yrs</strong></div>
+        <div>Modified Duration: <strong>{{ posture.pillars.p4_duration.modified_duration_years }} yrs</strong></div>
+        <div>Duration Posture: <strong>{{ posture.pillars.p4_duration.duration_posture }}</strong></div>
+      </div>
+      <div style="font-size: 12px; color: #94a3b8;">{{ posture.pillars.p4_duration.description }}</div>
+    </div>
+
+    <!-- Pillar 5 -->
+    <div style="background: rgba(30, 41, 59, 0.5); border: 1px solid rgba(255, 255, 255, 0.08); border-radius: 12px; padding: 20px;">
+      <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px;">
+        <h3 style="font-size: 16px; font-weight: 700; color: #f8fafc; margin: 0;">Pillar 5: Recovery Reality & Securitization Quality</h3>
+        <span style="font-size: 13px; font-weight: 700; color: #38bdf8;">Score: {{ posture.pillars.p5_recovery.score }} / 100</span>
+      </div>
+      {% if posture.pillars.p5_recovery.is_sdi %}
+      <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 12px; font-size: 13px; color: #cbd5e1;">
+        <div>Originator: <strong>{{ posture.pillars.p5_recovery.details.originator }}</strong></div>
+        <div>First Loss Default Guarantee (FLDG): <strong>{{ posture.pillars.p5_recovery.details.fldg_pct }}%</strong></div>
+        <div>Bankruptcy Remoteness: <strong>{{ posture.pillars.p5_recovery.details.bankruptcy_remoteness }}</strong></div>
+      </div>
+      {% else %}
+      <div style="font-size: 13px; color: #cbd5e1;">
+        {{ posture.pillars.p5_recovery.details.recovery_expectation }} Traded via {{ posture.pillars.p5_recovery.details.trading_mechanism }}.
+      </div>
+      {% endif %}
+    </div>
+  </div>
+
+  <!-- Interest Rate Shock Sensitivity Scenario Table -->
+  <h2 style="font-size: 20px; font-weight: 800; color: #f8fafc; margin-bottom: 16px; letter-spacing: -0.01em;">
+    RBI Repo Rate Shock Sensitivity Model
+  </h2>
+  <div style="background: rgba(30, 41, 59, 0.5); border: 1px solid rgba(255, 255, 255, 0.08); border-radius: 12px; overflow-x: auto; margin-bottom: 32px;">
+    <table style="width: 100%; border-collapse: collapse; font-size: 13px; text-align: left;">
+      <thead>
+        <tr style="border-bottom: 1px solid rgba(255, 255, 255, 0.1); background: rgba(15, 23, 42, 0.5);">
+          <th style="padding: 12px 16px; color: #94a3b8;">Rate Scenario</th>
+          <th style="padding: 12px 16px; color: #94a3b8;">Yield Shift</th>
+          <th style="padding: 12px 16px; color: #94a3b8;">Estimated % Price Change</th>
+          <th style="padding: 12px 16px; color: #94a3b8;">Estimated Clean Price</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for s in posture.rate_shock_scenarios %}
+        <tr style="border-bottom: 1px solid rgba(255, 255, 255, 0.04);">
+          <td style="padding: 12px 16px; font-weight: 600; color: #f8fafc;">
+            {% if s.rate_shift_bps < 0 %}Rate Cut {{ s.rate_shift_label }}{% elif s.rate_shift_bps > 0 %}Rate Hike {{ s.rate_shift_label }}{% else %}Current Yield Curve (Par){% endif %}
+          </td>
+          <td style="padding: 12px 16px; font-family: monospace; color: #cbd5e1;">{{ s.rate_shift_bps }} bps</td>
+          <td style="padding: 12px 16px; font-weight: 700; color: {% if s.pct_price_change > 0 %}#10b981{% elif s.pct_price_change < 0 %}#ef4444{% else %}#f8fafc{% endif %}; font-family: monospace;">
+            {{ s.pct_price_change }}%
+          </td>
+          <td style="padding: 12px 16px; font-family: monospace; font-weight: 600; color: #f8fafc;">
+            ₹{{ "{:,.2f}".format(s.estimated_price) }}
+          </td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+
+  <!-- Mandatory Regulatory Disclaimer -->
+  <div style="padding: 20px; background: rgba(15, 23, 42, 0.4); border: 1px solid rgba(255, 255, 255, 0.05); border-radius: 12px; font-size: 12px; color: #64748b; line-height: 1.6;">
+    <strong>Mandatory Regulatory Disclosure:</strong> Fixed-income analysis, credit ratings, duration metrics, and rate shock sensitivity models are computational risk evaluations grounded in public exchange filings and Credit Rating Agency press releases. Calculations adhere to standard financial market methodologies and do not constitute an explicit or implied guarantee of capital safety. Past ratings and yields are not indicative of future solvency.
+  </div>
+</div>
+{% endblock %}

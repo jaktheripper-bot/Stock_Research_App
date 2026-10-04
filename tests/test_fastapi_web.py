@@ -1,6 +1,10 @@
 """Test suite for FastAPI web portal routes, dossier rendering, and momentum charting."""
 
+import os
+os.environ["TESTING"] = "1"
+
 import unittest
+from unittest.mock import patch
 from fastapi.testclient import TestClient
 from web.main import app
 
@@ -21,14 +25,41 @@ class TestFastAPIWebPortal(unittest.TestCase):
         self.assertIn("Single Research Pass", res.text)
         self.assertIn("₹299", res.text)
 
-    def test_peer_comparison_page(self):
+    @patch("web.main.compare_two_companies")
+    def test_peer_comparison_page(self, mock_compare):
+        async def fake_compare(a, b):
+            return {
+                "ticker_a": a,
+                "ticker_b": b,
+                "fund_a": {"current_price": 1500.0, "market_cap": 6000000000000.0, "pe_ratio": 24.5, "sector": "Technology"},
+                "fund_b": {"current_price": 3800.0, "market_cap": 14000000000000.0, "pe_ratio": 28.1, "sector": "Technology"},
+                "matrix_a": {"moat": "Strong", "management": "Stable"},
+                "matrix_b": {"moat": "Strong", "management": "Stable"},
+                "disparity": {"is_disparate": False, "warnings": []}
+            }
+        mock_compare.side_effect = fake_compare
         res = self.client.get("/compare?a=INFY&b=TCS")
         self.assertEqual(res.status_code, 200)
         self.assertIn("Cross-Company Peer Comparator", res.text)
         self.assertIn("INFY", res.text)
         self.assertIn("TCS", res.text)
 
-    def test_dossier_infy_rendering_and_chart(self):
+    @patch("web.main.get_stock_fundamentals")
+    @patch("web.main.get_historical_prices")
+    def test_dossier_infy_rendering_and_chart(self, mock_hist, mock_fund):
+        import pandas as pd
+        mock_fund.return_value = {
+            "current_price": 1520.0,
+            "fifty_two_week_low": 1300.0,
+            "fifty_two_week_high": 1900.0,
+            "pe_ratio": 25.0
+        }
+        dates = pd.date_range(end=pd.Timestamp.now(), periods=30)
+        mock_hist.return_value = pd.DataFrame({
+            "Date": dates,
+            "Close": [1500.0 + i for i in range(30)],
+            "SMA_50": [1480.0] * 30
+        })
         res = self.client.get("/dossier/INFY")
         self.assertEqual(res.status_code, 200)
         html = res.text
@@ -202,6 +233,48 @@ class TestFastAPIWebPortal(unittest.TestCase):
 
         res_logout = client.get("/admin/logout", follow_redirects=False)
         self.assertEqual(res_logout.status_code, 303)
+
+    def test_debt_directory_page(self):
+        res = self.client.get("/debt")
+        self.assertEqual(res.status_code, 200)
+        self.assertIn("Corporate Bonds & Securitized Debt Directory", res.text)
+        self.assertIn("SEBI ₹10,000 Face Value", res.text)
+        self.assertIn("RELIANCE", res.text)
+        self.assertIn("5-Pillar Credit & Solvency Matrix", res.text)
+
+    def test_debt_dossier_page(self):
+        res = self.client.get("/debt/INE002A08012")
+        self.assertEqual(res.status_code, 200)
+        self.assertIn("RELIANCE", res.text)
+        self.assertIn("Pillar 1: Credit Quality & Rating Drift", res.text)
+        self.assertIn("Pillar 2: Capital Hierarchy & Seniority Cover", res.text)
+        self.assertIn("RBI Repo Rate Shock Sensitivity Model", res.text)
+
+    def test_debt_api_endpoints(self):
+        # 1. /api/debt/securities
+        res_list = self.client.get("/api/debt/securities")
+        self.assertEqual(res_list.status_code, 200)
+        data = res_list.json()
+        self.assertEqual(data.get("status"), "success")
+        self.assertGreater(data.get("count", 0), 0)
+
+        # 2. /api/debt/security/{isin}
+        res_sec = self.client.get("/api/debt/security/INE002A08012")
+        self.assertEqual(res_sec.status_code, 200)
+        sec_data = res_sec.json()
+        self.assertEqual(sec_data.get("status"), "success")
+        self.assertIn("posture", sec_data)
+        self.assertEqual(sec_data["posture"]["posture"], "INSTITUTIONAL_PRIME")
+
+        # 3. /api/debt/ticker/{ticker}
+        res_ticker = self.client.get("/api/debt/ticker/RELIANCE")
+        self.assertEqual(res_ticker.status_code, 200)
+        self.assertEqual(res_ticker.json().get("status"), "success")
+
+        # 4. /api/debt/ratings/actions
+        res_act = self.client.get("/api/debt/ratings/actions")
+        self.assertEqual(res_act.status_code, 200)
+        self.assertEqual(res_act.json().get("status"), "success")
 
 
 if __name__ == "__main__":
