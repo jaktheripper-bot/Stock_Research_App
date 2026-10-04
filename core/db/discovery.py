@@ -125,8 +125,14 @@ def get_active_discovery_reel(edition_date: Optional[str] = None) -> List[Dict[s
         else:
             rows = []
 
+        now_ist = datetime.now(IST)
+        today_str = now_ist.strftime("%Y-%m-%d")
+        is_past_9am = now_ist.hour >= 9
+
         # Fallback to latest available edition if requested edition yielded no rows
         if not rows:
+            # If before 9 AM IST, select the latest edition strictly prior to today
+            date_filter = f"AND edition_date <= '{today_str}'" if is_past_9am else f"AND edition_date < '{today_str}'"
             query = f"""
                 SELECT id, edition_date, ticker, company_name, sector, market_cap_tier,
                        current_price, pe_ratio, roce_pct, debt_to_equity, sales_growth_3y,
@@ -134,12 +140,28 @@ def get_active_discovery_reel(edition_date: Optional[str] = None) -> List[Dict[s
                 FROM discovery_reel
                 WHERE {active_clause}
                   AND edition_date = (
-                      SELECT MAX(edition_date) FROM discovery_reel WHERE {active_clause}
+                      SELECT MAX(edition_date) FROM discovery_reel WHERE {active_clause} {date_filter}
                   )
                 ORDER BY id ASC;
             """
             cursor.execute(query)
             rows = cursor.fetchall()
+
+            # Safety fallback: if no prior edition exists, select absolute max
+            if not rows:
+                query = f"""
+                    SELECT id, edition_date, ticker, company_name, sector, market_cap_tier,
+                           current_price, pe_ratio, roce_pct, debt_to_equity, sales_growth_3y,
+                           ria_thesis, catalyst_headline, key_metrics_json, created_at
+                    FROM discovery_reel
+                    WHERE {active_clause}
+                      AND edition_date = (
+                          SELECT MAX(edition_date) FROM discovery_reel WHERE {active_clause}
+                      )
+                    ORDER BY id ASC;
+                """
+                cursor.execute(query)
+                rows = cursor.fetchall()
 
         results = []
         for r in rows:
@@ -188,7 +210,20 @@ def get_available_discovery_editions() -> List[str]:
         active_clause = "is_active = TRUE" if is_pg else "is_active = 1"
         cursor.execute(f"SELECT DISTINCT edition_date FROM discovery_reel WHERE {active_clause} ORDER BY edition_date DESC LIMIT 30;")
         rows = cursor.fetchall()
-        return [str(r[0]) for r in rows]
+        now_ist = datetime.now(IST)
+        today_str = now_ist.strftime("%Y-%m-%d")
+        is_past_9am = now_ist.hour >= 9
+
+        editions = []
+        for r in rows:
+            ed_str = str(r[0])
+            # If before 9AM IST, hide today's unreleased edition
+            if not is_past_9am and ed_str >= today_str:
+                continue
+            editions.append(ed_str)
+
+        # If all were filtered out, fallback to unfiltered
+        return editions if editions else [str(r[0]) for r in rows]
     except Exception as e:
         logger.error(f"Error fetching available discovery editions: {e}")
         return []

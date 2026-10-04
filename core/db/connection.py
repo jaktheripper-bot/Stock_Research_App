@@ -72,24 +72,28 @@ def _get_pg_pool(dsn: str):
     return psycopg2.pool.ThreadedConnectionPool(minconn=1, maxconn=10, dsn=dsn)
 
 def _acquire_connection_from_pool(pool):
-    conn = pool.getconn()
-    is_bad = False
-    try:
-        if conn.closed != 0:
-            is_bad = True
-        else:
+    for attempt in range(5):
+        conn = None
+        try:
+            conn = pool.getconn()
+            if conn.closed != 0:
+                try:
+                    pool.putconn(conn, close=True)
+                except Exception:
+                    pass
+                continue
             with conn.cursor() as cur:
                 cur.execute("SELECT 1;")
-    except Exception:
-        is_bad = True
-
-    if is_bad:
-        try:
-            pool.putconn(conn, close=True)
+            return conn
         except Exception:
-            pass
-        conn = pool.getconn()
-    return conn
+            if conn:
+                try:
+                    pool.putconn(conn, close=True)
+                except Exception:
+                    pass
+    import psycopg2
+    supabase_url = get_supabase_url()
+    return psycopg2.connect(supabase_url)
 
 def get_db_connection():
     """Returns a pooled PostgreSQL connection or WAL-mode SQLite fallback connection."""

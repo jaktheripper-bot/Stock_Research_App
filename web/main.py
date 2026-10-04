@@ -12,6 +12,7 @@ Provides:
 import os
 import re
 import json
+import asyncio
 import logging
 import markdown
 from datetime import datetime, timezone, timedelta
@@ -65,7 +66,12 @@ from core.notify import dispatch_support_ticket_alert
 from core.analysis import get_stock_fundamentals, get_historical_prices
 from core.analysis.engine import generate_stock_report
 from core.analysis.comparator import compare_two_companies
-from core.analysis.parser import extract_health_matrix, compare_revisions, remove_health_matrix_text
+from core.analysis.parser import (
+    extract_health_matrix,
+    compare_revisions,
+    remove_health_matrix_text,
+    wrap_html_with_collapsible_pillars
+)
 from core.analysis.metrics import calculate_52w_percentile, calculate_pe_percentile, get_valuation_quartile
 from core.billing import (
     PRICING_PACKS,
@@ -88,14 +94,54 @@ from web.legal_content import POLICIES
 
 logger = logging.getLogger("equity_research.web")
 
-# Initialize DB migrations on startup
-init_db()
+from contextlib import asynccontextmanager
+from starlette.middleware.gzip import GZipMiddleware
+
+async def run_daily_discovery_scheduler():
+    """
+    Automated background BSE surveillance and screening scheduler:
+    Initiates automatic crawling & screening of BSE listed companies at 09:00 AM IST daily.
+    """
+    logger.info("🌅 [Discovery Scheduler] Background BSE surveillance crawler initiated.")
+    while True:
+        try:
+            now = datetime.now(IST)
+            target = now.replace(hour=9, minute=0, second=0, microsecond=0)
+            if now >= target:
+                target += timedelta(days=1)
+            wait_seconds = (target - now).total_seconds()
+            logger.info(f"🌅 [Discovery Scheduler] Next daily BSE screening scheduled in {wait_seconds/3600:.2f} hours (at {target.strftime('%Y-%m-%d 09:00:00 IST')}).")
+            await asyncio.sleep(wait_seconds)
+            
+            logger.info("🌅 [Discovery Scheduler] 09:00 AM IST reached. Executing automated BSE discovery pipeline...")
+            from scripts.run_discovery_worker import run_discovery_pipeline
+            loop = asyncio.get_running_loop()
+            await loop.run_in_executor(None, run_discovery_pipeline, 12, None, False, False)
+            logger.info("🌅 [Discovery Scheduler] Automated 9:00 AM BSE discovery edition published successfully.")
+        except asyncio.CancelledError:
+            logger.info("🌅 [Discovery Scheduler] Background scheduler cancelled.")
+            break
+        except Exception as e:
+            logger.error(f"🌅 [Discovery Scheduler] Error in daily discovery scheduler: {e}")
+            await asyncio.sleep(60)
+
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    # Initialize DB migrations on startup
+    init_db()
+    # Start automated daily discovery background scheduler
+    task = asyncio.create_task(run_daily_discovery_scheduler())
+    yield
+    task.cancel()
 
 app = FastAPI(
     title="Stock Research AI",
     description="Institutional-Grade 7-Pillar Equity Research Engine Grounded in Public Filings",
-    version="2.0.0"
+    version="2.0.0",
+    lifespan=lifespan
 )
+
+app.add_middleware(GZipMiddleware, minimum_size=500)
 
 class HeadMethodMiddleware(BaseHTTPMiddleware):
     """Transparently handles HEAD requests for uptime monitors and link crawlers."""
@@ -124,7 +170,7 @@ templates.env.globals["MANDATORY_SEBI_DISCLAIMER"] = MANDATORY_SEBI_DISCLAIMER
 # ==============================================================================
 
 @app.get("/", response_class=HTMLResponse)
-async def home_page(request: Request):
+def home_page(request: Request):
     """Public home & landing page with live stock search, discovery reel, and featured dossiers."""
     try:
         archives = get_archived_reports()
@@ -155,7 +201,7 @@ async def home_page(request: Request):
 
 
 @app.get("/discovery", response_class=HTMLResponse)
-async def discovery_page(request: Request, edition: Optional[str] = Query(None)):
+def discovery_page(request: Request, edition: Optional[str] = Query(None)):
     """The Morning Discovery Reel: nightly screening of under-the-radar equities."""
     try:
         discovery_stocks = get_active_discovery_reel(edition_date=edition)
@@ -180,7 +226,7 @@ async def discovery_page(request: Request, edition: Optional[str] = Query(None))
 
 
 @app.get("/pricing", response_class=HTMLResponse)
-async def pricing_page(request: Request):
+def pricing_page(request: Request):
     """Dedicated pricing and computational research credit pack selection."""
     return templates.TemplateResponse(
         request=request,
@@ -204,7 +250,7 @@ async def search_redirect(q: str = ""):
 
 
 @app.get("/dossier/{ticker}", response_class=HTMLResponse)
-async def dossier_page(request: Request, ticker: str):
+def dossier_page(request: Request, ticker: str):
     """
     Canonical stock research dossier page.
     Renders 7-pillar qualitative matrix, valuation multiples, and exchange citations.
@@ -270,6 +316,8 @@ async def dossier_page(request: Request, ticker: str):
         prose_md,
         extensions=["tables", "fenced_code", "nl2br"]
     )
+    scrip_code = rep.get("scrip_code") or resolve_bse_scrip_code(canonical) or ""
+    html_content = wrap_html_with_collapsible_pillars(html_content, scrip_code)
 
     mcap = rep.get("baseline_mcap")
     mcap_formatted = f"₹{format_inr(mcap)}" if mcap else "N/A"
@@ -379,7 +427,7 @@ async def dossier_page(request: Request, ticker: str):
 
 
 @app.get("/compare", response_class=HTMLResponse)
-async def compare_page(
+def compare_page(
     request: Request,
     a: Optional[str] = "INFY",
     b: Optional[str] = "TCS"

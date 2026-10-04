@@ -48,25 +48,29 @@
       <div class="nav-wrap">
         <a href="/" class="brand-link">
           <div class="brand-logo">📈</div>
-          <div>
+          <div class="brand-text-block">
             <span class="brand-text">STOCK RESEARCH <span style="color: var(--accent-cyan);">AI</span></span>
             <span class="brand-sub">Institutional Equity Engine</span>
           </div>
         </a>
 
-        <nav class="main-nav">
+        <nav id="mainNav" class="main-nav">
           <a href="/" class="nav-link {% if active_page == 'home' %}active{% endif %}">Explore Equities</a>
-          <a href="/discovery" class="nav-link {% if active_page == 'discovery' %}active{% endif %}">🌅 Discovery Reel</a>
+          <a href="/discovery" class="nav-link {% if active_page == 'discovery' %}active{% endif %}">Stock Discovery @9AM</a>
           <a href="/compare" class="nav-link {% if active_page == 'compare' %}active{% endif %}">⚖️ Peer Comparison</a>
-          <a href="/pricing" class="nav-link {% if active_page == 'pricing' %}active{% endif %}">Research Credits & Pricing</a>
+          <a href="/pricing" class="nav-link {% if active_page == 'pricing' %}active{% endif %}">Pricing & Credits</a>
           <a href="/contact" class="nav-link {% if active_page == 'contact' %}active{% endif %}">Support & Complaints</a>
           <a href="/disclaimer" class="nav-link">SEBI Safe Harbor</a>
         </nav>
 
         <div class="nav-actions">
           <button id="navGenerateBtn" class="btn btn-primary btn-sm" onclick="openGenerateModal()">⚡ Generate Report</button>
-          <a href="/pricing" class="btn btn-secondary btn-sm">⚡ View Pricing</a>
-          <button id="navSignInBtn" class="btn btn-secondary btn-sm" onclick="openSignInModal()">Sign In / Claim 2 Credits</button>
+          <button id="navSignInBtn" class="btn btn-secondary btn-sm" onclick="openSignInModal()">Sign In / 2 Credits</button>
+          <button id="mobileMenuBtn" class="mobile-menu-btn" onclick="toggleMobileMenu()" aria-label="Toggle navigation menu">
+            <span class="bar"></span>
+            <span class="bar"></span>
+            <span class="bar"></span>
+          </button>
         </div>
       </div>
     </div>

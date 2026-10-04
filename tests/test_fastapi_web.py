@@ -45,10 +45,15 @@ class TestFastAPIWebPortal(unittest.TestCase):
         self.assertIn("chart.umd.min.js", html)
         self.assertIn("6-Month Price Momentum & 50-DMA Trendline", html)
 
+        # 4. Collapsible 7-pillar accordion structure with exact BSE citations
+        self.assertIn("details class=\"pillar-accordion\"", html)
+        self.assertIn("Exact Page Grounding:", html)
+        self.assertIn("bseindia.com", html)
+
     def test_discovery_page(self):
         res = self.client.get("/discovery")
         self.assertEqual(res.status_code, 200)
-        self.assertIn("The Morning Discovery Reel", res.text)
+        self.assertIn("Stock Discovery @9AM", res.text)
         self.assertIn("INSTITUTIONAL QUALITY SURVEILLANCE", res.text)
         self.assertIn("Mandatory SEBI Safe-Harbor Disclosure", res.text)
 

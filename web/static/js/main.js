@@ -632,3 +632,76 @@ function syncUserSession() {
     modalBal.innerText = `${bal} Credits Available`;
   }
 }
+
+// ==============================================================================
+// 7. Responsive Navigation & Mobile Drawer
+// ==============================================================================
+function toggleMobileMenu() {
+  const nav = document.getElementById('mainNav');
+  const btn = document.getElementById('mobileMenuBtn');
+  if (!nav) return;
+  const isOpen = nav.classList.toggle('mobile-open');
+  if (btn) btn.classList.toggle('active', isOpen);
+}
+
+// Close mobile menu on click outside or on nav link
+document.addEventListener('click', (e) => {
+  const nav = document.getElementById('mainNav');
+  const btn = document.getElementById('mobileMenuBtn');
+  if (nav && nav.classList.contains('mobile-open')) {
+    if (!nav.contains(e.target) && (!btn || !btn.contains(e.target))) {
+      nav.classList.remove('mobile-open');
+      if (btn) btn.classList.remove('active');
+    }
+  }
+});
+
+// ==============================================================================
+// 8. 7-Pillar Accordion Minimise / Maximise Controls
+// ==============================================================================
+function toggleAllPillars(expand) {
+  const accordions = document.querySelectorAll('details.pillar-accordion');
+  accordions.forEach(el => {
+    el.open = expand;
+  });
+  const expandBtn = document.getElementById('btnExpandAllPillars');
+  const collapseBtn = document.getElementById('btnCollapseAllPillars');
+  if (expandBtn && collapseBtn) {
+    if (expand) {
+      expandBtn.classList.add('active');
+      collapseBtn.classList.remove('active');
+    } else {
+      collapseBtn.classList.add('active');
+      expandBtn.classList.remove('active');
+    }
+  }
+}
+
+// ==============================================================================
+// 9. Instant Hover Prefetching for Fluid Navigation
+// ==============================================================================
+(function initLinkPrefetching() {
+  const prefetched = new Set();
+  function prefetchUrl(url) {
+    if (!url || prefetched.has(url) || url.startsWith('http') || url.includes('#') || url.includes('/api/')) return;
+    prefetched.add(url);
+    const link = document.createElement('link');
+    link.rel = 'prefetch';
+    link.href = url;
+    document.head.appendChild(link);
+  }
+
+  document.addEventListener('mouseover', (e) => {
+    const a = e.target.closest('a');
+    if (a && a.getAttribute('href') && a.getAttribute('href').startsWith('/')) {
+      prefetchUrl(a.getAttribute('href'));
+    }
+  }, { passive: true });
+
+  document.addEventListener('touchstart', (e) => {
+    const a = e.target.closest('a');
+    if (a && a.getAttribute('href') && a.getAttribute('href').startsWith('/')) {
+      prefetchUrl(a.getAttribute('href'));
+    }
+  }, { passive: true });
+})();

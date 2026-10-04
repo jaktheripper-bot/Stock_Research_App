@@ -100,27 +100,25 @@ def compare_two_companies(ticker_a: str, ticker_b: str, progress_callback=None) 
     clean_a = clean_ticker(ticker_a)
     clean_b = clean_ticker(ticker_b)
     
-    if progress_callback:
-        progress_callback(0.20, f"Auditing verified BSE quotes & fundamentals for {clean_a}...")
-    fund_a = get_stock_fundamentals(clean_a)
+    from concurrent.futures import ThreadPoolExecutor
+
+    def _fetch_pipeline(ticker_str: str):
+        c_tick = clean_ticker(ticker_str)
+        f_data = get_stock_fundamentals(c_tick)
+        res_tick = f_data.get("ticker", c_tick)
+        f_data = enrich_fundamentals(res_tick, f_data)
+        rep = get_report_by_ticker(res_tick)
+        mat = extract_health_matrix(rep.get("report_text", "") if rep else "")
+        return res_tick, f_data, rep, mat
 
     if progress_callback:
-        progress_callback(0.50, f"Auditing verified BSE quotes & fundamentals for {clean_b}...")
-    fund_b = get_stock_fundamentals(clean_b)
-    
-    resolved_a = fund_a.get("ticker", clean_a)
-    resolved_b = fund_b.get("ticker", clean_b)
-    
-    fund_a = enrich_fundamentals(resolved_a, fund_a)
-    fund_b = enrich_fundamentals(resolved_b, fund_b)
-    
-    if progress_callback:
-        progress_callback(0.70, "Loading verified 7-pillar health dossiers...")
-    rep_a = get_report_by_ticker(resolved_a)
-    rep_b = get_report_by_ticker(resolved_b)
-    
-    matrix_a = extract_health_matrix(rep_a.get("report_text", "") if rep_a else "")
-    matrix_b = extract_health_matrix(rep_b.get("report_text", "") if rep_b else "")
+        progress_callback(0.25, f"Auditing verified BSE quotes & fundamentals for {clean_a} & {clean_b}...")
+
+    with ThreadPoolExecutor(max_workers=2) as executor:
+        fut_a = executor.submit(_fetch_pipeline, ticker_a)
+        fut_b = executor.submit(_fetch_pipeline, ticker_b)
+        resolved_a, fund_a, rep_a, matrix_a = fut_a.result()
+        resolved_b, fund_b, rep_b, matrix_b = fut_b.result()
     
     if progress_callback:
         progress_callback(0.85, "Evaluating 3-tier heuristic disparity (Sector, Lifecycle, Scale)...")

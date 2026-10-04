@@ -2,6 +2,7 @@
 
 import os
 import io
+import time
 import contextlib
 import logging
 import requests
@@ -31,6 +32,8 @@ def get_eodhd_api_key() -> str:
             return env_key
     return ""
 
+_EODHD_SUPPORTED = {"NSE": False, "BSE": False, "tested": False}
+
 def fetch_eodhd_stock_data(query: str, scrip_code: str = "") -> dict:
     """
     Fetches real-time quotes and fundamental metrics from European vendor EODHD (https://eodhd.com).
@@ -41,28 +44,31 @@ def fetch_eodhd_stock_data(query: str, scrip_code: str = "") -> dict:
     if not token:
         return None
 
+    global _EODHD_SUPPORTED
+    if _EODHD_SUPPORTED["tested"] and not _EODHD_SUPPORTED["NSE"] and not _EODHD_SUPPORTED["BSE"]:
+        # Indian exchange coverage not active on this EODHD plan
+        return None
+
     clean = clean_ticker(query).upper()
     candidates = []
     if "." in query:
         candidates.append(query.upper())
     if scrip_code and str(scrip_code).isdigit():
-        candidates.append(f"{scrip_code}.XBSE")
         candidates.append(f"{scrip_code}.BSE")
     if not clean.isdigit():
-        candidates.append(f"{clean}.XNSE")
         candidates.append(f"{clean}.NSE")
-        candidates.append(f"{clean}.XBSE")
-        candidates.append(f"{clean}.BSE")
-        candidates.append(f"{clean}.US")
-    elif scrip_code != clean:
-        candidates.append(f"{clean}.XBSE")
         candidates.append(f"{clean}.BSE")
 
     for symbol in candidates:
         try:
-            # 1. Fetch Real-Time Quote
+            # 1. Fetch Real-Time Quote with rapid 1.5s timeout
             quote_url = f"https://eodhd.com/api/real-time/{symbol}?api_token={token}&fmt=json"
-            q_res = requests.get(quote_url, timeout=5)
+            q_res = requests.get(quote_url, timeout=1.5)
+            if q_res.status_code in (403, 404):
+                _EODHD_SUPPORTED["tested"] = True
+                _EODHD_SUPPORTED["NSE"] = False
+                _EODHD_SUPPORTED["BSE"] = False
+                return None
             if q_res.status_code != 200:
                 continue
             q_json = q_res.json()
@@ -118,15 +124,21 @@ def fetch_eodhd_stock_data(query: str, scrip_code: str = "") -> dict:
 
 def enrich_fundamentals(ticker: str, data: dict) -> dict:
     """Enriches stock fundamentals with institutional ratios (EODHD if token present, fallback to yfinance)."""
-    # 1. Primary EODHD Fundamental Enrichment (if configured)
+    # 1. Primary EODHD Fundamental Enrichment (if configured and supported)
     token = get_eodhd_api_key()
-    if token:
+    global _EODHD_SUPPORTED
+    if token and not (_EODHD_SUPPORTED["tested"] and not _EODHD_SUPPORTED["NSE"]):
         try:
             clean_sym = clean_ticker(ticker).upper()
-            candidates = [f"{clean_sym}.XNSE", f"{clean_sym}.NSE", f"{clean_sym}.XBSE", f"{clean_sym}.BSE", f"{clean_sym}.US"] if not clean_sym.isdigit() else [f"{clean_sym}.XBSE", f"{clean_sym}.BSE"]
+            candidates = [f"{clean_sym}.NSE", f"{clean_sym}.BSE"] if not clean_sym.isdigit() else [f"{clean_sym}.BSE"]
             for sym in candidates:
                 url = f"https://eodhd.com/api/v1.1/fundamentals/{sym}?api_token={token}&filter=General,Highlights,Valuation,Technicals&fmt=json"
-                res = requests.get(url, timeout=5)
+                res = requests.get(url, timeout=1.5)
+                if res.status_code in (403, 404):
+                    _EODHD_SUPPORTED["tested"] = True
+                    _EODHD_SUPPORTED["NSE"] = False
+                    _EODHD_SUPPORTED["BSE"] = False
+                    break
                 if res.status_code == 200 and isinstance(res.json(), dict):
                     f_json = res.json()
                     gen = f_json.get("General") or {}
@@ -382,12 +394,21 @@ def fetch_bse_exchange_data(query: str) -> dict:
         "is_fallback": False
     }
 
+_FUNDAMENTALS_CACHE = {}
+
 def get_stock_fundamentals(query: str) -> dict:
     """
     Primary entry point: Fetches verified exchange data from BSE.
     If BSE direct fails or reports inactive, falls back gracefully to Yahoo Finance.
+    Maintains a 5-minute in-memory cache to guarantee instant sub-second responses.
     """
     clean = clean_ticker(query)
+    now = time.time()
+    if clean in _FUNDAMENTALS_CACHE:
+        ts, cached_val = _FUNDAMENTALS_CACHE[clean]
+        if (now - ts) < 300:  # 5 min TTL
+            return dict(cached_val)
+
     canonical = resolve_canonical_symbol(query) or clean
     scrip = resolve_bse_scrip_code(query) or resolve_bse_scrip_code(canonical)
     
@@ -395,6 +416,8 @@ def get_stock_fundamentals(query: str) -> dict:
     try:
         raw_data = fetch_bse_exchange_data(canonical)
         if raw_data and not raw_data.get("is_fallback", False):
+            _FUNDAMENTALS_CACHE[clean] = (now, raw_data)
+            _FUNDAMENTALS_CACHE[canonical] = (now, raw_data)
             return raw_data
     except Exception as bse_err:
         logger.warning(f"BSE direct quote failed for {query}/{canonical} ({bse_err}). Attempting secondary gateways...")
@@ -436,7 +459,7 @@ def get_stock_fundamentals(query: str) -> dict:
                 if isinstance(pe, (int, float)) and pe <= 0:
                     pe = "N/A"
 
-                return {
+                res_dict = {
                     "ticker": canonical or clean,
                     "short_name": info.get("shortName") or info.get("longName") or canonical or clean,
                     "sector": info.get("sector") or "General Industry",
@@ -450,6 +473,9 @@ def get_stock_fundamentals(query: str) -> dict:
                     "exchange_status": "Active / Secondary (yfinance Fallback)",
                     "is_fallback": True
                 }
+                _FUNDAMENTALS_CACHE[clean] = (now, res_dict)
+                _FUNDAMENTALS_CACHE[canonical] = (now, res_dict)
+                return res_dict
     except Exception as yf_err:
         logger.error(f"yfinance fallback also failed for {query}: {yf_err}")
 

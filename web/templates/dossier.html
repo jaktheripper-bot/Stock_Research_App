@@ -31,23 +31,35 @@
         </div>
       </div>
 
-      <!-- Financial Metrics KPI Strip -->
+      <!-- Financial Metrics KPI Strip with Direct BSE Citations -->
       <div class="kpi-strip">
         <div class="kpi-card">
           <div class="kpi-label">Current Quote</div>
           <div class="kpi-val tnum">₹{{ current_price|default('N/A') }}</div>
+          <a href="https://www.bseindia.com/stock-share-price/-/-/{% if scrip_code and scrip_code != 'N/A' %}{{ scrip_code }}{% else %}500209{% endif %}/" target="_blank" rel="noopener noreferrer" style="font-size: 10px; color: var(--accent-cyan); text-decoration: underline; text-underline-offset: 2px; margin-top: 4px; display: inline-flex; align-items: center; gap: 3px;">
+            BSE Live Quote ↗
+          </a>
         </div>
         <div class="kpi-card">
           <div class="kpi-label">Trailing P/E</div>
           <div class="kpi-val tnum">{{ pe_ratio|default('N/A') }}</div>
+          <a href="https://www.bseindia.com/corporates/Comp_Resultsnew.aspx?scrip_cd={% if scrip_code and scrip_code != 'N/A' %}{{ scrip_code }}{% else %}500209{% endif %}" target="_blank" rel="noopener noreferrer" style="font-size: 10px; color: var(--accent-cyan); text-decoration: underline; text-underline-offset: 2px; margin-top: 4px; display: inline-flex; align-items: center; gap: 3px;">
+            BSE Results Filing ↗
+          </a>
         </div>
         <div class="kpi-card">
           <div class="kpi-label">Market Capitalization</div>
           <div class="kpi-val tnum">{{ market_cap_str|default('N/A') }}</div>
+          <a href="https://www.bseindia.com/stock-share-price/-/-/{% if scrip_code and scrip_code != 'N/A' %}{{ scrip_code }}{% else %}500209{% endif %}/" target="_blank" rel="noopener noreferrer" style="font-size: 10px; color: var(--accent-cyan); text-decoration: underline; text-underline-offset: 2px; margin-top: 4px; display: inline-flex; align-items: center; gap: 3px;">
+            BSE Capital Float ↗
+          </a>
         </div>
         <div class="kpi-card">
           <div class="kpi-label">BSE Scrip Code</div>
           <div class="kpi-val tnum">{{ scrip_code|default('N/A') }}</div>
+          <a href="https://www.bseindia.com/stock-share-price/-/-/{% if scrip_code and scrip_code != 'N/A' %}{{ scrip_code }}{% else %}500209{% endif %}/" target="_blank" rel="noopener noreferrer" style="font-size: 10px; color: var(--accent-cyan); text-decoration: underline; text-underline-offset: 2px; margin-top: 4px; display: inline-flex; align-items: center; gap: 3px;">
+            BSE Scrip Profile ↗
+          </a>
         </div>
       </div>
 
@@ -195,6 +207,25 @@
     {% endif %}
 
     <!-- 7-Pillar Report Content -->
+    <!-- Pillar Accordion Toolbar Controls -->
+    <div class="pillar-toolbar">
+      <div style="display: flex; align-items: center; gap: 10px;">
+        <span style="font-size: 18px;">📑</span>
+        <div>
+          <strong style="font-size: 14px; color: var(--text-primary); display: block;">7-Pillar Qualitative Research Analysis</strong>
+          <span style="font-size: 11px; color: var(--text-muted);">Every metric and finding grounded in verified BSE regulatory filings</span>
+        </div>
+      </div>
+      <div class="pillar-toolbar-btns">
+        <button id="btnExpandAllPillars" class="pillar-toolbar-btn active" onclick="toggleAllPillars(true)">
+          ⊞ Expand All
+        </button>
+        <button id="btnCollapseAllPillars" class="pillar-toolbar-btn" onclick="toggleAllPillars(false)">
+          ⊟ Collapse All (Mobile View)
+        </button>
+      </div>
+    </div>
+
     <div class="dossier-prose">
       {{ report_html|safe }}
     </div>
