@@ -24,6 +24,12 @@ from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 from starlette.middleware.base import BaseHTTPMiddleware
 from brotli_asgi import BrotliMiddleware
+from fastapi.middleware.cors import CORSMiddleware
+from web.middleware.security_headers import SecurityHeadersMiddleware
+from slowapi import Limiter
+from slowapi.util import get_remote_address
+from slowapi.errors import RateLimitExceeded
+from fastapi import Request, Response
 try:
     from dotenv import load_dotenv
     load_dotenv()
@@ -179,6 +185,20 @@ async def warmup_task():
 
 app.add_middleware(GZipMiddleware, minimum_size=500)
 app.add_middleware(BrotliMiddleware, minimum_size=500)
+# Security headers middleware for CSP, HSTS, etc.
+app.add_middleware(SecurityHeadersMiddleware)
+# CORS configuration – allow all origins for now (adjust in production)
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
+# Rate limiting using SlowAPI – 100 requests per minute per IP
+limiter = Limiter(key_func=get_remote_address, default_limits=["100/minute"])
+app.state.limiter = limiter
+app.add_exception_handler(RateLimitExceeded, lambda request, exc: Response(content="Rate limit exceeded", status_code=429))
 
 class HeadMethodMiddleware(BaseHTTPMiddleware):
     """Transparently handles HEAD requests for uptime monitors and link crawlers."""
