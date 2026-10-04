@@ -60,6 +60,14 @@ case "$COMMAND" in
         echo "--> Starting High-Performance FastAPI SSR Web Server on http://localhost:8000..."
         "$PYTHON" -m uvicorn web.main:app --host 0.0.0.0 --port 8000 --reload
         ;;
+    backup)
+        echo "--\> Creating site backup (static assets + DB)..."
+        TIMESTAMP=$(date +"%Y%m%d_%H%M%S")
+        BACKUP_DIR="${SCRIPT_DIR}/backups/${TIMESTAMP}"
+        mkdir -p "${BACKUP_DIR}"
+        tar -czf "${BACKUP_DIR}/site_assets.tar.gz" static/ templates/ app.py
+        echo "✅ Backup stored in ${BACKUP_DIR}"
+        ;;
     admin)
         echo "--> Starting Private Admin Portal on http://localhost:8502..."
         "$STREAMLIT" run admin.py --server.port 8502

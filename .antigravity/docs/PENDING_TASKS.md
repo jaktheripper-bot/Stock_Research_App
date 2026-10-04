@@ -1,1 +1,10 @@
 - [ ] Build a public API endpoint for report access so external developers can consume reports programmatically.
+- [ ] Add PDF export styling with embedded SEBI safe‑harbor disclaimer.
+- [ ] Implement archived report differential tracker (immutable report_revisions history).
+- [ ] Implement granular event alert system with material event categories and digest options.
+- [ ] Implement cross-company comparison with disparity warning and override workflow.
+- [ ] Add unit and integration tests for alerting and comparison features.
+- [ ] Build Tier 2 mutual‑fund look‑through engine to propagate holdings through the 7‑pillar engine.
+- [ ] Add a way for the reports to be customised under the pro-desk & corporate & advisory bulk packs.
+- [ ] Add research to be done on API ingestion for MSME analysis.
+- [ ] Keep backup step synchronized with future deployment changes.

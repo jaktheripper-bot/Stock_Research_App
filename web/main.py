@@ -804,7 +804,7 @@ async def api_create_order(payload: OrderRequest):
             user_id=payload.user_id or "guest_web_user",
             user_email=payload.email or "investor@example.com"
         )
-    return json_response_with_cache({
+        return json_response_with_cache({
         "order_id": order.get("order_id") or order.get("id"),
         "id": order.get("id") or order.get("order_id"),
         "amount": order.get("amount"),
