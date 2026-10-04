@@ -64,6 +64,10 @@ case "$COMMAND" in
         echo "--> Starting Private Admin Portal on http://localhost:8502..."
         "$STREAMLIT" run admin.py --server.port 8502
         ;;
+    live-audit|live_audit|audit-live)
+        echo "--> [1/1] Executing Real Browser Interaction Audit on Live Deployment..."
+        "$PYTHON" test_live_ui.py
+        ;;
     checkpoint)
         shift
         echo "--> [1/1] Managing Release Checkpoint Creation..."
@@ -79,7 +83,7 @@ case "$COMMAND" in
         "$PYTHON" ci/checkpoint_manager.py list "$@"
         ;;
     *)
-        echo "Usage: ./run.sh [lint | test | bench | preflight | start | checkpoint | rollback | checkpoints]"
+        echo "Usage: ./run.sh [lint | test | bench | preflight | live-audit | start | web | admin | checkpoint | rollback | checkpoints]"
         exit 1
         ;;
 esac
