@@ -637,7 +637,56 @@ def init_db(force: bool = False):
                     ''')
                     cursor.execute('CREATE INDEX IF NOT EXISTS idx_support_tickets_status ON support_tickets (status, created_at DESC);')
                     cursor.execute('CREATE INDEX IF NOT EXISTS idx_support_tickets_email ON support_tickets (user_email);')
-                    cursor.execute("INSERT OR IGNORE INTO schema_migrations (version) VALUES ('v009_support_tickets_and_feedback');")
+            # Migration v010: User Usage Attribution & Billables Audit Ledger
+            if "v010_user_usage_and_billables_audit" not in applied:
+                logger.info("Applying schema migration: v010_user_usage_and_billables_audit...")
+                if supabase_url:
+                    cursor.execute('''
+                        ALTER TABLE site_usage_events ADD COLUMN IF NOT EXISTS user_id VARCHAR(64);
+                        ALTER TABLE site_usage_events ADD COLUMN IF NOT EXISTS user_email VARCHAR(255);
+                        CREATE INDEX IF NOT EXISTS idx_site_usage_user ON site_usage_events (user_id, timestamp DESC);
+                        CREATE INDEX IF NOT EXISTS idx_site_usage_email ON site_usage_events (user_email, timestamp DESC);
+
+                        ALTER TABLE credit_transactions ADD COLUMN IF NOT EXISTS customer_email TEXT;
+                        ALTER TABLE credit_transactions ADD COLUMN IF NOT EXISTS customer_name TEXT;
+                        ALTER TABLE credit_transactions ADD COLUMN IF NOT EXISTS base_amount_inr NUMERIC DEFAULT 0.0;
+                        ALTER TABLE credit_transactions ADD COLUMN IF NOT EXISTS tax_gst_inr NUMERIC DEFAULT 0.0;
+                        ALTER TABLE credit_transactions ADD COLUMN IF NOT EXISTS sac_code TEXT DEFAULT '998314';
+                        ALTER TABLE credit_transactions ADD COLUMN IF NOT EXISTS refund_amount_inr NUMERIC DEFAULT 0.0;
+                        ALTER TABLE credit_transactions ADD COLUMN IF NOT EXISTS refund_reason TEXT;
+                        ALTER TABLE credit_transactions ADD COLUMN IF NOT EXISTS gateway_refund_id TEXT;
+                        ALTER TABLE credit_transactions ADD COLUMN IF NOT EXISTS refunded_at TIMESTAMPTZ;
+                        CREATE INDEX IF NOT EXISTS idx_credit_transactions_status ON credit_transactions (status, created_at DESC);
+                        CREATE INDEX IF NOT EXISTS idx_credit_transactions_invoice ON credit_transactions (invoice_number);
+                        INSERT INTO schema_migrations (version) VALUES ('v010_user_usage_and_billables_audit') ON CONFLICT DO NOTHING;
+                    ''')
+                else:
+                    # SQLite alter table columns wrapped safely
+                    for col_def in [
+                        ("site_usage_events", "user_id TEXT"),
+                        ("site_usage_events", "user_email TEXT"),
+                        ("credit_transactions", "customer_email TEXT"),
+                        ("credit_transactions", "customer_name TEXT"),
+                        ("credit_transactions", "base_amount_inr REAL DEFAULT 0.0"),
+                        ("credit_transactions", "tax_gst_inr REAL DEFAULT 0.0"),
+                        ("credit_transactions", "sac_code TEXT DEFAULT '998314'"),
+                        ("credit_transactions", "refund_amount_inr REAL DEFAULT 0.0"),
+                        ("credit_transactions", "refund_reason TEXT"),
+                        ("credit_transactions", "gateway_refund_id TEXT"),
+                        ("credit_transactions", "refunded_at DATETIME"),
+                    ]:
+                        try:
+                            cursor.execute(f"ALTER TABLE {col_def[0]} ADD COLUMN {col_def[1]};")
+                        except Exception:
+                            pass
+                    try:
+                        cursor.execute("CREATE INDEX IF NOT EXISTS idx_site_usage_user ON site_usage_events (user_id, timestamp DESC);")
+                        cursor.execute("CREATE INDEX IF NOT EXISTS idx_site_usage_email ON site_usage_events (user_email, timestamp DESC);")
+                        cursor.execute("CREATE INDEX IF NOT EXISTS idx_credit_transactions_status ON credit_transactions (status, created_at DESC);")
+                        cursor.execute("CREATE INDEX IF NOT EXISTS idx_credit_transactions_invoice ON credit_transactions (invoice_number);")
+                    except Exception:
+                        pass
+                    cursor.execute("INSERT OR IGNORE INTO schema_migrations (version) VALUES ('v010_user_usage_and_billables_audit');")
                 conn.commit()
 
             _DB_INITIALIZED = True

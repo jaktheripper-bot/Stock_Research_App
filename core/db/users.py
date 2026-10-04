@@ -321,14 +321,43 @@ def add_user_credits(
         tx_id = f"tx_{int(time.time())}_{clean_id[:8]}"
         inv_num = invoice_number or f"INV-{int(time.time())}"
 
-        # Insert Transaction
-        cursor.execute(
-            f"""
-            INSERT INTO credit_transactions (id, user_id, amount_inr, credits_added, payment_gateway, gateway_order_id, gateway_payment_id, status, pack_type, invoice_number)
-            VALUES ({p}, {p}, {p}, {p}, 'razorpay', {p}, {p}, {p}, {p}, {p});
-            """,
-            (tx_id, clean_id, amount_inr, credits_to_add, gateway_order_id, gateway_payment_id, status, pack_type, inv_num)
-        )
+        # Fetch user profile to enrich invoice
+        cursor.execute(f"SELECT email, full_name FROM user_accounts WHERE id = {p};", (clean_id,))
+        acc_info = cursor.fetchone()
+        cust_email = acc_info[0] if acc_info else f"{clean_id}@stockresearch.ai"
+        cust_name = acc_info[1] if acc_info else "Investor"
+
+        # Compute GST breakdown (Inclusive of 18% GST, SAC 998314)
+        amt = float(amount_inr)
+        if amt > 0:
+            base_amt = round(amt / 1.18, 2)
+            gst_amt = round(amt - base_amt, 2)
+        else:
+            base_amt = 0.0
+            gst_amt = 0.0
+
+        # Insert Transaction with complete tax & customer audit trail
+        try:
+            cursor.execute(
+                f"""
+                INSERT INTO credit_transactions (
+                    id, user_id, amount_inr, credits_added, payment_gateway,
+                    gateway_order_id, gateway_payment_id, status, pack_type, invoice_number,
+                    customer_email, customer_name, base_amount_inr, tax_gst_inr, sac_code
+                )
+                VALUES ({p}, {p}, {p}, {p}, 'razorpay', {p}, {p}, {p}, {p}, {p}, {p}, {p}, {p}, {p}, '998314');
+                """,
+                (tx_id, clean_id, amt, credits_to_add, gateway_order_id, gateway_payment_id, status, pack_type, inv_num, cust_email, cust_name, base_amt, gst_amt)
+            )
+        except Exception:
+            # Fallback for earlier schema if columns not yet committed
+            cursor.execute(
+                f"""
+                INSERT INTO credit_transactions (id, user_id, amount_inr, credits_added, payment_gateway, gateway_order_id, gateway_payment_id, status, pack_type, invoice_number)
+                VALUES ({p}, {p}, {p}, {p}, 'razorpay', {p}, {p}, {p}, {p}, {p});
+                """,
+                (tx_id, clean_id, amt, credits_to_add, gateway_order_id, gateway_payment_id, status, pack_type, inv_num)
+            )
 
         # Handle Subscriptions (Pro Monthly / Annual)
         normalized_pack = pack_type.upper()
@@ -361,7 +390,7 @@ def add_user_credits(
         )
 
         conn.commit()
-        logger.info(f"Added {credits_to_add} credits to user {clean_id} (Pack: {pack_type}, INR: ₹{amount_inr}). New balance: {new_balance}")
+        logger.info(f"Added {credits_to_add} credits to user {clean_id} (Pack: {pack_type}, INR: ₹{amt}). New balance: {new_balance}")
         return True, new_balance
     except Exception as e:
         logger.error(f"Error adding credits to user {user_id}: {e}")
@@ -373,6 +402,241 @@ def add_user_credits(
     finally:
         cursor.close()
         conn.close()
+
+
+def get_all_billables(status: Optional[str] = None, limit: int = 100, offset: int = 0) -> List[Dict[str, Any]]:
+    """
+    Retrieves all purchases, invoices, and returns for administrative billing audit.
+    Includes tax breakdown (Base + GST 18%), SAC code, and gateway IDs.
+    """
+    init_db()
+    conn = get_db_connection()
+    cursor = conn.cursor()
+    p = get_placeholder()
+    try:
+        where_clause = ""
+        params = []
+        if status:
+            where_clause = f"WHERE t.status = {p}"
+            params.append(status.lower())
+
+        query = f"""
+            SELECT 
+                t.id, t.user_id, t.amount_inr, t.credits_added, t.payment_gateway,
+                t.gateway_order_id, t.gateway_payment_id, t.status, t.pack_type, t.invoice_number,
+                t.created_at,
+                COALESCE(t.customer_email, u.email, t.user_id) as email,
+                COALESCE(t.customer_name, u.full_name, 'Investor') as name,
+                COALESCE(t.base_amount_inr, 0.0),
+                COALESCE(t.tax_gst_inr, 0.0),
+                COALESCE(t.sac_code, '998314'),
+                COALESCE(t.refund_amount_inr, 0.0),
+                t.refund_reason,
+                t.gateway_refund_id,
+                t.refunded_at
+            FROM credit_transactions t
+            LEFT JOIN user_accounts u ON t.user_id = u.id
+            {where_clause}
+            ORDER BY t.created_at DESC
+            LIMIT {limit} OFFSET {offset};
+        """
+        cursor.execute(query, tuple(params))
+        rows = cursor.fetchall()
+        billables = []
+        for r in rows:
+            amt = float(r[2] or 0.0)
+            base = float(r[13] or 0.0)
+            gst = float(r[14] or 0.0)
+            if amt > 0 and base == 0.0 and gst == 0.0:
+                base = round(amt / 1.18, 2)
+                gst = round(amt - base, 2)
+
+            billables.append({
+                "id": r[0],
+                "user_id": r[1],
+                "amount_inr": amt,
+                "credits_added": float(r[3] or 0.0),
+                "gateway": r[4] or "razorpay",
+                "gateway_order_id": r[5] or "",
+                "gateway_payment_id": r[6] or "",
+                "status": (r[7] or "success").lower(),
+                "pack_type": r[8],
+                "invoice_number": r[9] or f"INV-{r[0]}",
+                "date": _format_timestamp(r[10]),
+                "customer_email": r[11],
+                "customer_name": r[12],
+                "base_amount_inr": base,
+                "tax_gst_inr": gst,
+                "sac_code": r[15] or "998314",
+                "refund_amount_inr": float(r[16] or 0.0),
+                "refund_reason": r[17] or "",
+                "gateway_refund_id": r[18] or "",
+                "refunded_at": _format_timestamp(r[19]) if r[19] else None
+            })
+        return billables
+    except Exception as e:
+        logger.error(f"Error fetching all billables: {e}")
+        return []
+    finally:
+        cursor.close()
+        conn.close()
+
+
+def get_revenue_analytics_summary(days: int = None, start_date = None, end_date = None) -> Dict[str, Any]:
+    """
+    Computes institutional revenue summary, GST collected, returns/refunds,
+    and circulating credit liabilities across a selectable time window.
+    """
+    init_db()
+    conn = get_db_connection()
+    cursor = conn.cursor()
+    from core.db.telemetry import _build_telemetry_time_filter, get_supabase_url
+    supabase_url = get_supabase_url()
+
+    summary = {
+        "gross_revenue_inr": 0.0,
+        "net_revenue_inr": 0.0,
+        "tax_gst_collected_inr": 0.0,
+        "refunded_amount_inr": 0.0,
+        "paid_orders_count": 0,
+        "refunded_orders_count": 0,
+        "welcome_grants_count": 0,
+        "credits_in_circulation": 0.0,
+        "active_subscribers_count": 0
+    }
+
+    try:
+        time_filter = _build_telemetry_time_filter(supabase_url, days=days, start_date=start_date, end_date=end_date)
+        time_filter_tx = time_filter.replace("timestamp", "created_at")
+
+        # 1. Total paid revenue, GST, and order count
+        cursor.execute(f"""
+            SELECT 
+                COUNT(CASE WHEN amount_inr > 0 AND status = 'success' THEN 1 END) as paid_orders,
+                SUM(CASE WHEN amount_inr > 0 AND status = 'success' THEN amount_inr ELSE 0 END) as gross_rev,
+                COUNT(CASE WHEN status IN ('refunded', 'reversed') THEN 1 END) as refund_count,
+                SUM(COALESCE(refund_amount_inr, 0.0)) as refund_sum,
+                COUNT(CASE WHEN pack_type = 'WELCOME_GRANT' THEN 1 END) as welcome_grants
+            FROM credit_transactions
+            WHERE {time_filter_tx};
+        """)
+        row = cursor.fetchone()
+        if row:
+            gross = float(row[1] or 0.0)
+            refund_sum = float(row[3] or 0.0)
+            summary["gross_revenue_inr"] = gross
+            summary["paid_orders_count"] = int(row[0] or 0)
+            summary["refunded_orders_count"] = int(row[2] or 0)
+            summary["refunded_amount_inr"] = refund_sum
+            summary["welcome_grants_count"] = int(row[4] or 0)
+
+            # 18% GST calculation (Price inclusive of GST)
+            if gross > 0:
+                summary["net_revenue_inr"] = round((gross - refund_sum) / 1.18, 2)
+                summary["tax_gst_collected_inr"] = round((gross - refund_sum) - summary["net_revenue_inr"], 2)
+
+        # 2. Credits in circulation across all users (unearned revenue liability)
+        try:
+            cursor.execute("SELECT SUM(credits_balance), COUNT(CASE WHEN subscription_tier IN ('pro_monthly', 'pro_annual') THEN 1 END) FROM user_accounts;")
+            c_row = cursor.fetchone()
+            if c_row:
+                summary["credits_in_circulation"] = float(c_row[0] or 0.0)
+                summary["active_subscribers_count"] = int(c_row[1] or 0)
+        except Exception:
+            pass
+
+    except Exception as e:
+        logger.error(f"Error computing revenue analytics summary: {e}")
+    finally:
+        cursor.close()
+        conn.close()
+
+    return summary
+
+
+def process_refund(
+    transaction_id: str,
+    refund_amount: Optional[float] = None,
+    reason: str = "Customer requested return within policy",
+    admin_notes: str = ""
+) -> Tuple[bool, str]:
+    """
+    Processes a return / refund for an existing purchase transaction.
+    - Sets transaction status to 'refunded' with immutable audit fields
+    - Deducts the equivalent credits from the user's credit balance
+    - Logs a reversal ledger entry for SEBI / accounting audit trail
+    """
+    if not transaction_id:
+        return False, "Transaction ID required."
+
+    init_db()
+    conn = get_db_connection()
+    cursor = conn.cursor()
+    p = get_placeholder()
+    tx_clean = str(transaction_id).strip()
+
+    try:
+        cursor.execute(
+            f"SELECT id, user_id, amount_inr, credits_added, status, invoice_number FROM credit_transactions WHERE id = {p};",
+            (tx_clean,)
+        )
+        tx = cursor.fetchone()
+        if not tx:
+            return False, f"Transaction {tx_clean} not found."
+
+        if tx[4] == "refunded":
+            return False, f"Transaction {tx_clean} is already marked as refunded."
+
+        user_id = tx[1]
+        orig_amount = float(tx[2] or 0.0)
+        credits_to_reverse = float(tx[3] or 0.0)
+        actual_refund_amt = float(refund_amount) if refund_amount is not None else orig_amount
+
+        # Update credit_transactions
+        now_val = "CURRENT_TIMESTAMP"
+        cursor.execute(
+            f"""
+            UPDATE credit_transactions
+            SET status = 'refunded',
+                refund_amount_inr = {p},
+                refund_reason = {p},
+                refunded_at = CURRENT_TIMESTAMP
+            WHERE id = {p};
+            """,
+            (actual_refund_amt, f"{reason} | Notes: {admin_notes}", tx_clean)
+        )
+
+        # Adjust user balance
+        cursor.execute(f"SELECT credits_balance FROM user_accounts WHERE id = {p};", (user_id,))
+        u_row = cursor.fetchone()
+        current_bal = float(u_row[0] or 0.0) if u_row else 0.0
+        new_bal = max(0.0, round(current_bal - credits_to_reverse, 2))
+
+        cursor.execute(f"UPDATE user_accounts SET credits_balance = {p} WHERE id = {p};", (new_bal, user_id))
+
+        # Log reversal entry in credit_usage_ledger
+        cursor.execute(
+            f"""
+            INSERT INTO credit_usage_ledger (user_id, ticker, action_type, credits_consumed, balance_after)
+            VALUES ({p}, 'BILLING', 'REFUND_REVERSAL', {p}, {p});
+            """,
+            (user_id, credits_to_reverse, new_bal)
+        )
+
+        conn.commit()
+        logger.info(f"Processed refund for tx {tx_clean} (User: {user_id}, Amount: ₹{actual_refund_amt}). Adjusted balance: {new_bal}")
+        return True, f"Successfully processed refund of ₹{actual_refund_amt:.2f} for Invoice {tx[5]}. Reversal ledger committed."
+    except Exception as e:
+        logger.error(f"Error processing refund for {transaction_id}: {e}")
+        try:
+            conn.rollback()
+        except Exception:
+            pass
+        return False, f"Database error during refund: {e}"
+    finally:
+        cursor.close()
+        conn.close()
+
 
 
 def get_user_transactions(user_id: str, limit: int = 20) -> List[Dict[str, Any]]:

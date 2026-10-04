@@ -496,12 +496,41 @@ async def api_premortem(payload: PreMortemRequest):
             "failure_vector": payload.failure_vector,
             "anti_thesis_notes": payload.anti_thesis_notes,
             "user_id": payload.user_id,
-        }
+        },
+        user_id=payload.user_id
     )
     return {
         "success": True,
         "message": f"🔒 Pre-Mortem counter-thesis committed to decision ledger for {clean_t}!"
     }
+
+
+class TelemetryEventRequest(BaseModel):
+    event_type: str
+    ticker: Optional[str] = ""
+    user_id: Optional[str] = None
+    user_email: Optional[str] = None
+    details: Optional[dict] = None
+
+
+@app.post("/api/telemetry/event")
+async def api_record_telemetry_event(payload: TelemetryEventRequest, request: Request):
+    """Client-side telemetry event capture for user-level journey and interaction tracking."""
+    user_agent = request.headers.get("user-agent", "")
+    referer = request.headers.get("referer", "")
+    device = "Mobile" if any(m in user_agent.lower() for m in ["mobile", "android", "iphone"]) else "Desktop"
+
+    record_usage_event(
+        event_type=payload.event_type,
+        ticker=payload.ticker or "",
+        details=payload.details or {},
+        referrer=referer,
+        device_type=device,
+        browser=user_agent[:60],
+        user_id=payload.user_id,
+        user_email=payload.user_email
+    )
+    return {"status": "ok"}
 
 
 # ==============================================================================
@@ -680,6 +709,13 @@ async def api_signin(payload: SignInRequest):
     if not user:
         raise HTTPException(status_code=500, detail="Could not initialize user profile.")
 
+    record_usage_event(
+        event_type="user_signin",
+        user_id=user_id,
+        user_email=clean_email,
+        details={"name": user.get("full_name"), "tier": user.get("subscription_tier")}
+    )
+
     return {
         "success": True,
         "message": f"Welcome {user.get('full_name')}! You have received 2 free research credits.",
@@ -777,6 +813,12 @@ async def api_verify_payment(payload: VerifyPaymentRequest):
                 detail=msg or "Payment signature verification failed. Transaction was not confirmed."
             )
 
+        record_usage_event(
+            event_type="purchase_success",
+            user_id=payload.user_id,
+            details={"plan_id": payload.plan_id, "payment_id": eff_payment_id, "invoice": inv_num}
+        )
+
         return {
             "success": True,
             "message": "Payment verified successfully",
@@ -799,6 +841,12 @@ async def api_download_pdf(ticker: str):
     rep = get_report_by_ticker(clean_t)
     if not rep or not rep.get("report_text"):
         raise HTTPException(status_code=404, detail="Report not found.")
+
+    record_usage_event(
+        event_type="pdf_download",
+        ticker=clean_t,
+        details={"action": "export_pdf"}
+    )
 
     from ui.pdf import generate_report_pdf
     pdf_bytes = generate_report_pdf(clean_t, rep.get("report_text", ""))

@@ -64,6 +64,7 @@ from core.db.telemetry import (
     _build_telemetry_time_filter,
     get_site_usage_summary,
     get_session_journeys,
+    get_user_usage_analytics,
 )
 
 from core.db.settings import (
@@ -80,6 +81,9 @@ from core.db.users import (
     add_user_credits,
     get_user_transactions,
     get_user_usage_history,
+    get_all_billables,
+    get_revenue_analytics_summary,
+    process_refund,
 )
 
 from core.db.discovery import (

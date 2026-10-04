@@ -20,7 +20,9 @@ def record_usage_event(
     country: str = None,
     device_type: str = None,
     browser: str = None,
-    os: str = None
+    os: str = None,
+    user_id: str = None,
+    user_email: str = None
 ):
     """
     Records a telemetry event for backend site usage measurement.
@@ -37,22 +39,39 @@ def record_usage_event(
             query = f'''
                 INSERT INTO site_usage_events (
                     event_type, ticker, latency_ms, cost_saved_usd, details,
-                    session_id, traffic_source, referrer, country, device_type, browser, os
+                    session_id, traffic_source, referrer, country, device_type, browser, os,
+                    user_id, user_email
                 )
                 VALUES ({placeholder}, {placeholder}, {placeholder}, {placeholder}, {placeholder},
-                        {placeholder}, {placeholder}, {placeholder}, {placeholder}, {placeholder}, {placeholder}, {placeholder})
+                        {placeholder}, {placeholder}, {placeholder}, {placeholder}, {placeholder}, {placeholder}, {placeholder},
+                        {placeholder}, {placeholder})
             '''
             cursor.execute(query, (
                 event_type, clean_t, latency_ms, cost_saved_usd, details_json,
-                session_id, traffic_source, referrer, country, device_type, browser, os
+                session_id, traffic_source, referrer, country, device_type, browser, os,
+                user_id, user_email
             ))
         except Exception:
-            # Fallback for earlier schema if columns not yet committed
-            query_fallback = f'''
-                INSERT INTO site_usage_events (event_type, ticker, latency_ms, cost_saved_usd, details)
-                VALUES ({placeholder}, {placeholder}, {placeholder}, {placeholder}, {placeholder})
-            '''
-            cursor.execute(query_fallback, (event_type, clean_t, latency_ms, cost_saved_usd, details_json))
+            try:
+                # Fallback for earlier schema if user columns not yet committed
+                query_fallback_session = f'''
+                    INSERT INTO site_usage_events (
+                        event_type, ticker, latency_ms, cost_saved_usd, details,
+                        session_id, traffic_source, referrer, country, device_type, browser, os
+                    )
+                    VALUES ({placeholder}, {placeholder}, {placeholder}, {placeholder}, {placeholder},
+                            {placeholder}, {placeholder}, {placeholder}, {placeholder}, {placeholder}, {placeholder}, {placeholder})
+                '''
+                cursor.execute(query_fallback_session, (
+                    event_type, clean_t, latency_ms, cost_saved_usd, details_json,
+                    session_id, traffic_source, referrer, country, device_type, browser, os
+                ))
+            except Exception:
+                query_fallback = f'''
+                    INSERT INTO site_usage_events (event_type, ticker, latency_ms, cost_saved_usd, details)
+                    VALUES ({placeholder}, {placeholder}, {placeholder}, {placeholder}, {placeholder})
+                '''
+                cursor.execute(query_fallback, (event_type, clean_t, latency_ms, cost_saved_usd, details_json))
         conn.commit()
     except Exception as e:
         logger.debug(f"Telemetry recording notice: {e}")
@@ -356,3 +375,123 @@ def get_session_journeys(days: int = None, start_date = None, end_date = None, l
         cursor.close()
         conn.close()
     return journeys
+
+
+def get_user_usage_analytics(days: int = None, start_date = None, end_date = None, limit: int = 50) -> dict:
+    """
+    Aggregates user-level telemetry and usage attribution:
+    - Registered user accounts vs active in period
+    - Top active users by queries, dossier generations, and export volume
+    - Per-user credit balance and subscription tier correlation
+    """
+    init_db()
+    conn = get_db_connection()
+    cursor = conn.cursor()
+    supabase_url = get_supabase_url()
+    p = get_placeholder()
+
+    result = {
+        "total_registered_users": 0,
+        "active_users_in_period": 0,
+        "signed_in_actions_count": 0,
+        "guest_actions_count": 0,
+        "top_users": [],
+        "pro_subscribers_count": 0
+    }
+
+    try:
+        time_filter = _build_telemetry_time_filter(supabase_url, days=days, start_date=start_date, end_date=end_date)
+
+        # 1. Total registered users & Pro counts
+        try:
+            cursor.execute("SELECT COUNT(*), COUNT(CASE WHEN subscription_tier IN ('pro_monthly', 'pro_annual') THEN 1 END) FROM user_accounts;")
+            u_row = cursor.fetchone()
+            if u_row:
+                result["total_registered_users"] = int(u_row[0] or 0)
+                result["pro_subscribers_count"] = int(u_row[1] or 0)
+        except Exception as ue:
+            logger.debug(f"User accounts count probe: {ue}")
+
+        # 2. Signed-in vs guest action count in period
+        try:
+            cursor.execute(f"""
+                SELECT 
+                    COUNT(CASE WHEN user_email IS NOT NULL AND user_email != '' THEN 1 END) as signed_in,
+                    COUNT(CASE WHEN user_email IS NULL OR user_email = '' THEN 1 END) as guest,
+                    COUNT(DISTINCT CASE WHEN user_email IS NOT NULL AND user_email != '' THEN user_email END) as active_users
+                FROM site_usage_events
+                WHERE {time_filter};
+            """)
+            counts_row = cursor.fetchone()
+            if counts_row:
+                result["signed_in_actions_count"] = int(counts_row[0] or 0)
+                result["guest_actions_count"] = int(counts_row[1] or 0)
+                result["active_users_in_period"] = int(counts_row[2] or 0)
+        except Exception as ce:
+            logger.debug(f"Signed-in action counts probe: {ce}")
+
+        # 3. Top active users in period
+        try:
+            cursor.execute(f"""
+                SELECT 
+                    e.user_email,
+                    COALESCE(MAX(e.user_id), 'unknown') as uid,
+                    COUNT(*) as total_events,
+                    COUNT(DISTINCT e.ticker) as distinct_tickers,
+                    COUNT(CASE WHEN e.event_type = 'pdf_download' THEN 1 END) as pdf_exports,
+                    COUNT(CASE WHEN e.event_type = 'peer_comparison' THEN 1 END) as comparisons,
+                    MAX(e.timestamp) as last_seen
+                FROM site_usage_events e
+                WHERE {time_filter} AND e.user_email IS NOT NULL AND e.user_email != ''
+                GROUP BY e.user_email
+                ORDER BY total_events DESC
+                LIMIT {limit};
+            """)
+            top_rows = cursor.fetchall()
+            user_list = []
+            for r in top_rows:
+                email = r[0]
+                uid = r[1]
+                events_cnt = int(r[2] or 0)
+                tickers_cnt = int(r[3] or 0)
+                pdf_cnt = int(r[4] or 0)
+                comp_cnt = int(r[5] or 0)
+                last_active = _format_timestamp(r[6])
+
+                # Get user profile metadata
+                credits = 0.0
+                tier = "free"
+                name = email.split("@")[0]
+                try:
+                    cursor.execute(f"SELECT full_name, credits_balance, subscription_tier FROM user_accounts WHERE email = {p} OR id = {p} LIMIT 1;", (email, uid))
+                    acc = cursor.fetchone()
+                    if acc:
+                        name = acc[0] or name
+                        credits = float(acc[1] or 0.0)
+                        tier = (acc[2] or "free").lower()
+                except Exception:
+                    pass
+
+                user_list.append({
+                    "email": email,
+                    "name": name,
+                    "user_id": uid,
+                    "total_actions": events_cnt,
+                    "distinct_tickers": tickers_cnt,
+                    "pdf_exports": pdf_cnt,
+                    "comparisons": comp_cnt,
+                    "credits_balance": credits,
+                    "subscription_tier": tier,
+                    "last_active": last_active
+                })
+            result["top_users"] = user_list
+        except Exception as te:
+            logger.debug(f"Top users aggregation error: {te}")
+
+    except Exception as e:
+        logger.error(f"Error compiling user usage analytics: {e}")
+    finally:
+        cursor.close()
+        conn.close()
+
+    return result

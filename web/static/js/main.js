@@ -596,6 +596,42 @@ function getStoredUser() {
   }
 }
 
+window.trackUserEvent = function(eventType, ticker, details) {
+  try {
+    const user = getStoredUser();
+    const payload = {
+      event_type: eventType,
+      ticker: ticker || '',
+      user_id: user ? user.id : null,
+      user_email: user ? user.email : null,
+      details: details || {}
+    };
+    fetch('/api/telemetry/event', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload)
+    }).catch(() => {});
+  } catch {}
+};
+
+// Track initial page view with logged-in user attribution
+(function initUserTelemetry() {
+  const path = window.location.pathname;
+  let pageEvent = 'page_view';
+  let currentTicker = '';
+  if (path.startsWith('/dossier/')) {
+    pageEvent = 'dossier_view';
+    currentTicker = path.split('/')[2];
+  } else if (path === '/compare') {
+    pageEvent = 'compare_view';
+  } else if (path === '/discovery') {
+    pageEvent = 'discovery_view';
+  } else if (path === '/pricing') {
+    pageEvent = 'pricing_view';
+  }
+  setTimeout(() => window.trackUserEvent(pageEvent, currentTicker, { path }), 300);
+})();
+
 /**
  * Fetches the latest user profile/balance from the server and updates localStorage.
  * Called on page load and after payments/syntheses to ensure credits are always accurate.
