@@ -49,7 +49,7 @@ class TestFastAPIWebPortal(unittest.TestCase):
         res = self.client.get("/discovery")
         self.assertEqual(res.status_code, 200)
         self.assertIn("The Morning Discovery Reel", res.text)
-        self.assertIn("RIAs & PMS SURVEILLANCE", res.text)
+        self.assertIn("INSTITUTIONAL QUALITY SURVEILLANCE", res.text)
         self.assertIn("SEBI Non-Advisory Safe Harbor Compliance", res.text)
 
     def test_discovery_db_repository(self):

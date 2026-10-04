@@ -175,7 +175,7 @@ POLICIES = {
             <li><strong>No Individual Financial Profiling:</strong> We do not assess your personal risk tolerance, financial goals, or asset allocation.</li>
             <li><strong>No Performance Guarantees:</strong> Past financial metrics or historical valuation multiples do not guarantee future stock performance.</li>
             <li><strong>Algorithmic & AI Ingestion:</strong> Qualitative health matrix assessments are synthesized using computational reasoning from public filings. Users must independently verify all filings on <a href="https://www.bseindia.com" target="_blank" rel="noopener">bseindia.com</a>.</li>
-            <li><strong>Consult a Professional:</strong> Always consult an independent SEBI-registered investment advisor (RIA) before committing capital to Indian equity markets.</li>
+            <li><strong>Consult a Professional:</strong> Always consult an independent SEBI-registered investment advisor or licensed financial professional before committing capital to Indian equity markets.</li>
         </ul>
         """
     }

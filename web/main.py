@@ -151,7 +151,7 @@ async def home_page(request: Request):
 
 @app.get("/discovery", response_class=HTMLResponse)
 async def discovery_page(request: Request, edition: Optional[str] = Query(None)):
-    """The Morning Discovery Reel: nightly screening of under-the-radar equities for RIAs."""
+    """The Morning Discovery Reel: nightly screening of under-the-radar equities."""
     try:
         discovery_stocks = get_active_discovery_reel(edition_date=edition)
         available_editions = get_available_discovery_editions()

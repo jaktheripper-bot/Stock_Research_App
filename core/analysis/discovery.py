@@ -2,7 +2,7 @@
 Morning Discovery Reel: Screening & Selection Engine for Under-the-Radar Equities.
 
 Identifies, filters, and curates 10-15 high-quality, overlooked Indian equities across
-varied sectors for RIAs, PMS managers, and research analysts.
+varied sectors for investors and research analysts.
 Enforces:
 1. Strict exclusion of Nifty 100 mega-caps (low/zero broker coverage focus)
 2. High capital compounding quality: ROCE >= 15% or ROE >= 15%
