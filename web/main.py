@@ -876,7 +876,7 @@ async def api_verify_payment(payload: VerifyPaymentRequest):
             details={"plan_id": payload.plan_id, "payment_id": eff_payment_id, "invoice": inv_num}
         )
 
-    return json_response_with_cache({
+        return json_response_with_cache({
         "success": True,
         "message": "Payment verified successfully",
         "order_id": eff_order_id,
