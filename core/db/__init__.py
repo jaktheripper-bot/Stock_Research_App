@@ -88,6 +88,13 @@ from core.db.discovery import (
     get_available_discovery_editions,
 )
 
+from core.db.support import (
+    create_support_ticket,
+    get_support_tickets,
+    update_ticket_status,
+    get_open_tickets_count,
+)
+
 __all__ = [
     # connection
     "IST",
@@ -147,4 +154,9 @@ __all__ = [
     "save_discovery_reel",
     "get_active_discovery_reel",
     "get_available_discovery_editions",
+    # support & grievances
+    "create_support_ticket",
+    "get_support_tickets",
+    "update_ticket_status",
+    "get_open_tickets_count",
 ]

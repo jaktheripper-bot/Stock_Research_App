@@ -55,10 +55,13 @@ from core.db import (
     get_active_discovery_reel,
     get_available_discovery_editions,
     save_discovery_reel,
+    create_support_ticket,
+    get_support_tickets,
     MANDATORY_SEBI_DISCLAIMER,
     IST,
 )
 from core.db.telemetry import record_usage_event
+from core.notify import dispatch_support_ticket_alert
 from core.analysis import get_stock_fundamentals, get_historical_prices
 from core.analysis.engine import generate_stock_report
 from core.analysis.comparator import compare_two_companies
@@ -489,11 +492,87 @@ async def refund_policy_page(request: Request):
 
 @app.get("/contact", response_class=HTMLResponse)
 async def contact_page(request: Request):
-    """Contact Us & Support page."""
+    """Interactive Support Desk, Complaints, and Statutory Grievance Redressal page."""
     return templates.TemplateResponse(
         request=request,
-        name="policy.html",
-        context={"policy": POLICIES["contact"], "active_page": "contact"}
+        name="contact.html",
+        context={"active_page": "contact"}
+    )
+
+
+@app.post("/contact", response_class=HTMLResponse)
+async def submit_contact_ticket(
+    request: Request,
+    background_tasks: BackgroundTasks,
+    user_email: str = Form(...),
+    subject: str = Form(...),
+    message: str = Form(...),
+    user_name: Optional[str] = Form(""),
+    category: Optional[str] = Form("general")
+):
+    """Processes user complaint/support ticket, logs to audit ledger, and alerts admin."""
+    clean_email = str(user_email).strip().lower()
+    clean_subj = str(subject).strip()
+    clean_msg = str(message).strip()
+    clean_name = str(user_name or "").strip()
+    clean_cat = str(category or "general").strip().lower()
+
+    if not clean_email or "@" not in clean_email or not clean_subj or not clean_msg:
+        return templates.TemplateResponse(
+            request=request,
+            name="contact.html",
+            context={
+                "active_page": "contact",
+                "error_msg": "Please provide a valid email address, subject, and detailed message.",
+                "form_name": clean_name,
+                "form_email": clean_email,
+                "form_subj": clean_subj,
+                "form_msg": clean_msg,
+                "form_cat": clean_cat,
+            }
+        )
+
+    # 1. Create ticket in database
+    res = create_support_ticket(
+        user_email=clean_email,
+        subject=clean_subj,
+        message=clean_msg,
+        user_name=clean_name,
+        category=clean_cat,
+        source="web_contact_form"
+    )
+
+    if not res.get("success"):
+        return templates.TemplateResponse(
+            request=request,
+            name="contact.html",
+            context={
+                "active_page": "contact",
+                "error_msg": f"Failed to submit ticket: {res.get('error', 'Database error')}",
+                "form_name": clean_name,
+                "form_email": clean_email,
+                "form_subj": clean_subj,
+                "form_msg": clean_msg,
+                "form_cat": clean_cat,
+            }
+        )
+
+    # 2. Dispatch background alert to admin console and admin email
+    background_tasks.add_task(dispatch_support_ticket_alert, res)
+
+    # 3. Record telemetry event
+    record_usage_event(
+        event_type="SUPPORT_TICKET_SUBMITTED",
+        details={"ticket_id": res.get("ticket_id"), "category": clean_cat, "email": clean_email}
+    )
+
+    return templates.TemplateResponse(
+        request=request,
+        name="contact.html",
+        context={
+            "active_page": "contact",
+            "success_ticket": res,
+        }
     )
 
 
@@ -828,3 +907,61 @@ async def api_run_discovery(
         "status": "initiated",
         "message": f"Morning Discovery Reel worker dispatched for {count} equities (force={force})."
     }
+
+
+# ==============================================================================
+# SEO & Standard Web Best Practice Endpoints
+# ==============================================================================
+
+@app.get("/robots.txt", response_class=Response)
+async def robots_txt():
+    """Provides search engine crawler directives and XML sitemap index pointer."""
+    content = (
+        "User-agent: *\n"
+        "Allow: /\n"
+        "Disallow: /api/\n"
+        "Disallow: /admin\n\n"
+        "Sitemap: https://stock-research-app-2ljm.onrender.com/sitemap.xml\n"
+    )
+    return Response(content=content, media_type="text/plain")
+
+
+@app.get("/sitemap.xml", response_class=Response)
+async def sitemap_xml():
+    """Generates an XML sitemap of all public routes and canonical stock dossiers."""
+    try:
+        archives = get_archived_reports()
+    except Exception:
+        archives = []
+
+    base_url = "https://stock-research-app-2ljm.onrender.com"
+    today_str = datetime.now(timezone.utc).strftime("%Y-%m-%d")
+
+    urls = [
+        f"<url><loc>{base_url}/</loc><lastmod>{today_str}</lastmod><changefreq>hourly</changefreq><priority>1.0</priority></url>",
+        f"<url><loc>{base_url}/discovery</loc><lastmod>{today_str}</lastmod><changefreq>daily</changefreq><priority>0.9</priority></url>",
+        f"<url><loc>{base_url}/compare</loc><lastmod>{today_str}</lastmod><changefreq>weekly</changefreq><priority>0.8</priority></url>",
+        f"<url><loc>{base_url}/pricing</loc><lastmod>{today_str}</lastmod><changefreq>monthly</changefreq><priority>0.8</priority></url>",
+        f"<url><loc>{base_url}/contact</loc><lastmod>{today_str}</lastmod><changefreq>monthly</changefreq><priority>0.7</priority></url>",
+        f"<url><loc>{base_url}/disclaimer</loc><lastmod>{today_str}</lastmod><changefreq>monthly</changefreq><priority>0.6</priority></url>",
+        f"<url><loc>{base_url}/terms</loc><lastmod>{today_str}</lastmod><changefreq>monthly</changefreq><priority>0.5</priority></url>",
+        f"<url><loc>{base_url}/privacy</loc><lastmod>{today_str}</lastmod><changefreq>monthly</changefreq><priority>0.5</priority></url>",
+        f"<url><loc>{base_url}/refund-policy</loc><lastmod>{today_str}</lastmod><changefreq>monthly</changefreq><priority>0.5</priority></url>",
+        f"<url><loc>{base_url}/shipping-policy</loc><lastmod>{today_str}</lastmod><changefreq>monthly</changefreq><priority>0.5</priority></url>",
+    ]
+
+    for a in archives:
+        t = a.get("ticker")
+        if t:
+            urls.append(
+                f"<url><loc>{base_url}/dossier/{t}</loc><lastmod>{today_str}</lastmod><changefreq>daily</changefreq><priority>0.9</priority></url>"
+            )
+
+    xml_content = (
+        '<?xml version="1.0" encoding="UTF-8"?>\n'
+        '<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">\n'
+        + "\n".join(urls)
+        + "\n</urlset>"
+    )
+    return Response(content=xml_content, media_type="application/xml")
+

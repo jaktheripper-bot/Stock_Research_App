@@ -93,6 +93,37 @@ class TestFastAPIWebPortal(unittest.TestCase):
             data = res.json()
             self.assertEqual(data.get("status"), "initiated")
 
+    def test_contact_page_get_and_post(self):
+        # 1. GET /contact returns interactive form
+        res_get = self.client.get("/contact")
+        self.assertEqual(res_get.status_code, 200)
+        self.assertIn("Submit an Inquiry or Complaint", res_get.text)
+        self.assertIn("Grievance Redressal", res_get.text)
+
+        # 2. POST /contact creates ticket and dispatches alert
+        post_data = {
+            "user_name": "Test Investor",
+            "user_email": "investor@example.com",
+            "category": "billing",
+            "subject": "Payment credit verification query",
+            "message": "Testing automated support ticket dispatch and admin alerting."
+        }
+        res_post = self.client.post("/contact", data=post_data)
+        self.assertEqual(res_post.status_code, 200)
+        self.assertIn("Ticket Registered Successfully", res_post.text)
+        self.assertIn("TKT-", res_post.text)
+
+    def test_seo_robots_and_sitemap(self):
+        res_robots = self.client.get("/robots.txt")
+        self.assertEqual(res_robots.status_code, 200)
+        self.assertIn("User-agent: *", res_robots.text)
+        self.assertIn("Sitemap:", res_robots.text)
+
+        res_sitemap = self.client.get("/sitemap.xml")
+        self.assertEqual(res_sitemap.status_code, 200)
+        self.assertIn("<urlset", res_sitemap.text)
+        self.assertIn("/dossier/INFY", res_sitemap.text)
+
 
 if __name__ == "__main__":
     unittest.main()

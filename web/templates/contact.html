@@ -1,0 +1,152 @@
+{% extends "base.html" %}
+
+{% block title %}Contact Support & Grievance Redressal | Stock Research AI{% endblock %}
+{% block meta_desc %}Need assistance with research credits, account billing, technical inquiries, or regulatory compliance? Contact our support desk or file a complaint.{% endblock %}
+
+{% block content %}
+<div class="container" style="max-width: 960px; margin: 40px auto 80px;">
+  
+  <div style="text-align: center; margin-bottom: 40px;">
+    <div style="display: inline-flex; align-items: center; gap: 8px; background: rgba(14, 165, 233, 0.1); border: 1px solid rgba(14, 165, 233, 0.25); padding: 4px 14px; border-radius: 20px; font-size: 12px; font-weight: 700; color: var(--accent-cyan); margin-bottom: 12px;">
+      <span>🎧 HELP & REDRESSAL DESK</span>
+    </div>
+    <h1 style="font-size: clamp(2rem, 4vw, 2.75rem); font-weight: 800; color: var(--text-primary); margin-bottom: 12px;">
+      We're Here to Help
+    </h1>
+    <p style="font-size: 16px; color: var(--text-secondary); max-width: 600px; margin: 0 auto; line-height: 1.6;">
+      Have a question regarding research credits, payment reconciliation, platform bugs, or regulatory governance? Submit a ticket below.
+    </p>
+  </div>
+
+  <div style="display: grid; grid-template-columns: 3fr 2fr; gap: 32px; align-items: flex-start;">
+    
+    <!-- Contact & Complaint Submission Form -->
+    <div style="background: rgba(30, 41, 59, 0.7); border: 1px solid var(--border-color); border-radius: var(--radius-lg); padding: 32px; backdrop-filter: blur(12px);">
+      <h3 style="font-size: 20px; font-weight: 700; color: var(--text-primary); margin-bottom: 8px; display: flex; align-items: center; gap: 8px;">
+        <span>📝</span> Submit an Inquiry or Complaint
+      </h3>
+      <p style="font-size: 13px; color: var(--text-muted); margin-bottom: 24px; line-height: 1.5;">
+        Every inquiry is registered into our audit ledger with an immutable tracking ID and immediately alerted to our engineering and compliance leads.
+      </p>
+
+      {% if success_ticket %}
+      <div style="background: rgba(16, 185, 129, 0.12); border: 1px solid var(--accent-emerald); border-radius: 8px; padding: 20px; margin-bottom: 24px;">
+        <div style="display: flex; align-items: center; gap: 8px; font-weight: 800; color: var(--accent-emerald); font-size: 16px; margin-bottom: 6px;">
+          <span>✅</span> Ticket Registered Successfully!
+        </div>
+        <div style="font-size: 14px; color: var(--text-primary); margin-bottom: 10px;">
+          Reference ID: <strong class="tnum" style="background: rgba(15, 23, 42, 0.6); padding: 2px 8px; border-radius: 4px; color: var(--accent-cyan);">{{ success_ticket.ticket_id }}</strong>
+        </div>
+        <p style="font-size: 13px; color: var(--text-secondary); line-height: 1.5; margin: 0;">
+          A notification has been dispatched to our operations team. A confirmation has been logged for <strong>{{ success_ticket.user_email }}</strong>. We will review and respond within 24 hours.
+        </p>
+      </div>
+      {% endif %}
+
+      {% if error_msg %}
+      <div style="background: rgba(239, 68, 68, 0.12); border: 1px solid #ef4444; border-radius: 8px; padding: 14px; margin-bottom: 20px; font-size: 13px; color: #fca5a5;">
+        ❌ {{ error_msg }}
+      </div>
+      {% endif %}
+
+      <form action="/contact" method="POST">
+        <div style="margin-bottom: 18px;">
+          <label style="display: block; font-size: 13px; font-weight: 600; color: var(--text-secondary); margin-bottom: 6px;">
+            Your Name (Optional)
+          </label>
+          <input type="text" name="user_name" placeholder="e.g., Lyndon Pinto" style="width: 100%; padding: 12px 14px; background: rgba(15, 23, 42, 0.6); border: 1px solid var(--border-color); border-radius: 6px; color: var(--text-primary); font-size: 14px;" value="{{ form_name|default('') }}">
+        </div>
+
+        <div style="margin-bottom: 18px;">
+          <label style="display: block; font-size: 13px; font-weight: 600; color: var(--text-secondary); margin-bottom: 6px;">
+            Email Address <span style="color: #ef4444;">*</span>
+          </label>
+          <input type="email" name="user_email" required placeholder="you@domain.com" style="width: 100%; padding: 12px 14px; background: rgba(15, 23, 42, 0.6); border: 1px solid var(--border-color); border-radius: 6px; color: var(--text-primary); font-size: 14px;" value="{{ form_email|default('') }}">
+        </div>
+
+        <div style="margin-bottom: 18px;">
+          <label style="display: block; font-size: 13px; font-weight: 600; color: var(--text-secondary); margin-bottom: 6px;">
+            Category <span style="color: #ef4444;">*</span>
+          </label>
+          <select name="category" style="width: 100%; padding: 12px 14px; background: #0f172a; border: 1px solid var(--border-color); border-radius: 6px; color: var(--text-primary); font-size: 14px;">
+            <option value="billing" {% if form_cat == 'billing' %}selected{% endif %}>💳 Billing / Payment Dispute / Refund</option>
+            <option value="synthesis" {% if form_cat == 'synthesis' %}selected{% endif %}>⚡ Synthesis Failure / Ingestion Issue</option>
+            <option value="bug" {% if form_cat == 'bug' %}selected{% endif %}>🐛 Bug Report / Platform Technical Issue</option>
+            <option value="grievance" {% if form_cat == 'grievance' %}selected{% endif %}>⚖️ Statutory Grievance / Compliance</option>
+            <option value="general" {% if not form_cat or form_cat == 'general' %}selected{% endif %}>💬 General Inquiry / Feedback</option>
+          </select>
+        </div>
+
+        <div style="margin-bottom: 18px;">
+          <label style="display: block; font-size: 13px; font-weight: 600; color: var(--text-secondary); margin-bottom: 6px;">
+            Subject <span style="color: #ef4444;">*</span>
+          </label>
+          <input type="text" name="subject" required placeholder="Brief summary of your inquiry..." style="width: 100%; padding: 12px 14px; background: rgba(15, 23, 42, 0.6); border: 1px solid var(--border-color); border-radius: 6px; color: var(--text-primary); font-size: 14px;" value="{{ form_subj|default('') }}">
+        </div>
+
+        <div style="margin-bottom: 24px;">
+          <label style="display: block; font-size: 13px; font-weight: 600; color: var(--text-secondary); margin-bottom: 6px;">
+            Detailed Message / Complaint <span style="color: #ef4444;">*</span>
+          </label>
+          <textarea name="message" required rows="5" placeholder="Please describe the issue in detail, including order ID, ticker symbol, or timestamps if applicable..." style="width: 100%; padding: 12px 14px; background: rgba(15, 23, 42, 0.6); border: 1px solid var(--border-color); border-radius: 6px; color: var(--text-primary); font-size: 14px; resize: vertical; line-height: 1.5;">{{ form_msg|default('') }}</textarea>
+        </div>
+
+        <button type="submit" class="btn btn-primary" style="width: 100%; padding: 14px; font-size: 15px; font-weight: 700; display: flex; justify-content: center; align-items: center; gap: 8px;">
+          <span>📨 Send Support Ticket</span>
+        </button>
+      </form>
+    </div>
+
+    <!-- Official Contact & Grievance Officer Channels -->
+    <div>
+      <div style="background: rgba(15, 23, 42, 0.6); border: 1px solid var(--border-color); border-radius: var(--radius-md); padding: 24px; margin-bottom: 24px;">
+        <h4 style="font-size: 16px; font-weight: 700; color: var(--text-primary); margin-bottom: 14px; display: flex; align-items: center; gap: 8px;">
+          <span>🏢</span> Registered Operating Entity
+        </h4>
+        <div style="font-size: 13px; color: var(--text-secondary); line-height: 1.8;">
+          <div><strong>Entity:</strong> Stock Research App / Equity Research AI</div>
+          <div><strong>Service Code:</strong> SAC 998314 (IT Software Services)</div>
+          <div><strong>Operational Office:</strong> Indiranagar, 100 Feet Road, Bengaluru, Karnataka 560038, India</div>
+          <div><strong>Direct Email:</strong> <a href="mailto:support@stockresearch.app">support@stockresearch.app</a></div>
+          <div><strong>Business Hours:</strong> Monday – Friday, 9:30 AM – 6:30 PM IST</div>
+        </div>
+      </div>
+
+      <div style="background: rgba(15, 23, 42, 0.6); border: 1px solid var(--border-color); border-radius: var(--radius-md); padding: 24px; margin-bottom: 24px;">
+        <h4 style="font-size: 16px; font-weight: 700; color: var(--accent-cyan); margin-bottom: 12px; display: flex; align-items: center; gap: 8px;">
+          <span>⚖️</span> Statutory Grievance Redressal
+        </h4>
+        <p style="font-size: 12px; color: var(--text-secondary); line-height: 1.6; margin-bottom: 12px;">
+          Under the Information Technology (Intermediary Guidelines) Rules, 2021 and Consumer Protection (E-Commerce) Rules, 2020:
+        </p>
+        <div style="font-size: 12px; color: var(--text-muted); line-height: 1.7; background: rgba(30, 41, 59, 0.4); padding: 12px; border-radius: 6px;">
+          <div><strong>Grievance Officer:</strong> Operations & Compliance Desk</div>
+          <div><strong>Email:</strong> <code>grievance@stockresearch.app</code></div>
+          <div><strong>Acknowledgment:</strong> Within 24 hours of receipt</div>
+          <div><strong>Resolution Target:</strong> Maximum 15 business days</div>
+        </div>
+      </div>
+
+      <div style="background: rgba(15, 23, 42, 0.6); border: 1px solid var(--border-color); border-radius: var(--radius-md); padding: 20px;">
+        <h5 style="font-size: 14px; font-weight: 700; color: var(--text-primary); margin-bottom: 8px;">⚡ Fast Payment Support</h5>
+        <p style="font-size: 12px; color: var(--text-secondary); line-height: 1.5; margin-bottom: 12px;">
+          For instant payment resolution, quote your 14-character Razorpay Payment ID (e.g. <code>pay_...</code>) or Order ID.
+        </p>
+        <a href="https://razorpay.me/@stockresearchapp" target="_blank" rel="noopener noreferrer" class="btn btn-secondary btn-sm" style="display: flex; justify-content: center; align-items: center; gap: 6px; width: 100%;">
+          <span>Open Direct Razorpay UPI Portal ↗</span>
+        </a>
+      </div>
+    </div>
+
+  </div>
+
+  <!-- Mandatory SEBI Safe-Harbor Disclosure -->
+  <div style="margin-top: 48px; padding: 20px; background: rgba(15, 23, 42, 0.6); border: 1px solid rgba(255, 255, 255, 0.08); border-radius: var(--radius-md); font-size: 13px; color: var(--text-secondary); line-height: 1.6;">
+    <strong style="color: var(--accent-cyan); display: flex; align-items: center; gap: 6px; margin-bottom: 6px;">
+      <span>🛡️</span> Mandatory SEBI Safe-Harbor Disclosure
+    </strong>
+    {{ MANDATORY_SEBI_DISCLAIMER }}
+  </div>
+
+</div>
+{% endblock %}

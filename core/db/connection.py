@@ -78,9 +78,8 @@ def _acquire_connection_from_pool(pool):
         if conn.closed != 0:
             is_bad = True
         else:
-            conn.poll()
-            if conn.status == 2:  # STATUS_IN_TRANSACTION
-                conn.rollback()
+            with conn.cursor() as cur:
+                cur.execute("SELECT 1;")
     except Exception:
         is_bad = True
 
@@ -590,6 +589,51 @@ def init_db(force: bool = False):
                     cursor.execute('CREATE INDEX IF NOT EXISTS idx_discovery_reel_edition ON discovery_reel (edition_date, is_active);')
                     cursor.execute('CREATE INDEX IF NOT EXISTS idx_discovery_reel_ticker ON discovery_reel (ticker);')
                     cursor.execute("INSERT OR IGNORE INTO schema_migrations (version) VALUES ('v008_discovery_reel');")
+                conn.commit()
+
+            # Migration v009: Support Tickets, User Grievances & Redressal Ledger
+            if "v009_support_tickets_and_feedback" not in applied:
+                logger.info("Applying schema migration: v009_support_tickets_and_feedback...")
+                if supabase_url:
+                    cursor.execute('''
+                        CREATE TABLE IF NOT EXISTS support_tickets (
+                            id SERIAL PRIMARY KEY,
+                            ticket_id TEXT UNIQUE NOT NULL,
+                            user_email TEXT NOT NULL,
+                            user_name TEXT,
+                            category TEXT NOT NULL DEFAULT 'general',
+                            subject TEXT NOT NULL,
+                            message TEXT NOT NULL,
+                            status TEXT NOT NULL DEFAULT 'open',
+                            admin_notes TEXT,
+                            source TEXT DEFAULT 'web_contact',
+                            created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
+                            updated_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP
+                        );
+                    ''')
+                    cursor.execute('CREATE INDEX IF NOT EXISTS idx_support_tickets_status ON support_tickets (status, created_at DESC);')
+                    cursor.execute('CREATE INDEX IF NOT EXISTS idx_support_tickets_email ON support_tickets (user_email);')
+                    cursor.execute("INSERT INTO schema_migrations (version) VALUES ('v009_support_tickets_and_feedback') ON CONFLICT DO NOTHING;")
+                else:
+                    cursor.execute('''
+                        CREATE TABLE IF NOT EXISTS support_tickets (
+                            id INTEGER PRIMARY KEY AUTOINCREMENT,
+                            ticket_id TEXT UNIQUE NOT NULL,
+                            user_email TEXT NOT NULL,
+                            user_name TEXT,
+                            category TEXT NOT NULL DEFAULT 'general',
+                            subject TEXT NOT NULL,
+                            message TEXT NOT NULL,
+                            status TEXT NOT NULL DEFAULT 'open',
+                            admin_notes TEXT,
+                            source TEXT DEFAULT 'web_contact',
+                            created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+                            updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
+                        );
+                    ''')
+                    cursor.execute('CREATE INDEX IF NOT EXISTS idx_support_tickets_status ON support_tickets (status, created_at DESC);')
+                    cursor.execute('CREATE INDEX IF NOT EXISTS idx_support_tickets_email ON support_tickets (user_email);')
+                    cursor.execute("INSERT OR IGNORE INTO schema_migrations (version) VALUES ('v009_support_tickets_and_feedback');")
                 conn.commit()
 
             _DB_INITIALIZED = True

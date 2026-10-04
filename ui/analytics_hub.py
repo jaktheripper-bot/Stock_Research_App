@@ -16,7 +16,14 @@ Renders restricted administrative telemetry:
 import streamlit as st
 import pandas as pd
 from datetime import datetime, timedelta, date
-from db import IST, get_site_usage_summary, get_session_journeys
+from db import (
+    IST,
+    get_site_usage_summary,
+    get_session_journeys,
+    get_support_tickets,
+    update_ticket_status,
+    get_open_tickets_count,
+)
 from telemetry import (
     is_admin_authenticated,
     set_admin_authenticated,
@@ -170,13 +177,81 @@ def render_site_analytics_view():
 
     st.markdown("<div style='height: 12px;'></div>", unsafe_allow_html=True)
 
+    try:
+        open_tickets = get_open_tickets_count()
+    except Exception:
+        open_tickets = 0
+
+    support_tab_title = f"📩 User Complaints & Tickets ({open_tickets} Open)" if open_tickets > 0 else "📩 User Complaints & Tickets"
+
     # 4. Tabbed Deep-Dive Workspaces
-    t_traffic, t_behavior, t_journeys, t_stream = st.tabs([
+    t_tickets, t_traffic, t_behavior, t_journeys, t_stream = st.tabs([
+        support_tab_title,
         "🌐 Traffic Origins (Where They Come From)",
         "🎯 User Actions (What Users Are Doing)",
         "🧭 Session Journeys (Step-by-Step Paths)",
         "📜 Live Telemetry Audit Stream"
     ])
+
+    # -------------------------------------------------------------------------
+    # TAB 0: User Complaints, Support Tickets & Grievance Redressal
+    # -------------------------------------------------------------------------
+    with t_tickets:
+        st.markdown("#### 📩 User Grievances, Inquiries & Redressal Desk")
+        st.write("Track and resolve complaints from users, payment issues, or statutory regulatory inquiries.")
+
+        c_status, c_refresh = st.columns([3, 1])
+        with c_status:
+            sel_status = st.segmented_control(
+                "Filter Ticket Status:",
+                options=["Open Only ⏳", "All Tickets 📜", "Resolved Only ✅"],
+                default="Open Only ⏳",
+                key="admin_ticket_status_filter"
+            )
+        with c_refresh:
+            if st.button("🔄 Refresh Tickets", key="btn_refresh_tickets", width="stretch"):
+                st.rerun()
+
+        filter_arg = "open" if sel_status == "Open Only ⏳" else ("resolved" if sel_status == "Resolved Only ✅" else "all")
+        tickets = get_support_tickets(status=filter_arg, limit=50)
+
+        if tickets:
+            for t in tickets:
+                status_color = "#ef4444" if t["status"] == "open" else "#10b981"
+                status_badge = "⏳ OPEN" if t["status"] == "open" else "✅ RESOLVED"
+                with st.expander(
+                    f"{status_badge} [{t['category'].upper()}] {t['ticket_id']} — {t['subject']} ({t['user_email']})",
+                    expanded=(t["status"] == "open")
+                ):
+                    st.caption(f"**Submitted At:** {t['created_at']} | **User Name:** {t['user_name'] or 'N/A'} | **Source:** `{t['source']}`")
+                    st.markdown("**Message / Complaint Content:**")
+                    st.info(t["message"])
+
+                    if t.get("admin_notes"):
+                        st.caption(f"**Admin Resolution Notes:** {t['admin_notes']}")
+
+                    col_act1, col_act2 = st.columns([2, 1])
+                    with col_act1:
+                        new_note = st.text_input(
+                            "Resolution / Follow-up Note:",
+                            value=t.get("admin_notes", ""),
+                            key=f"note_{t['ticket_id']}",
+                            placeholder="Add action taken, email response date, or refund reference..."
+                        )
+                    with col_act2:
+                        st.markdown("<div style='height: 28px;'></div>", unsafe_allow_html=True)
+                        if t["status"] == "open":
+                            if st.button("Mark Resolved ✅", key=f"res_{t['ticket_id']}", type="primary", width="stretch"):
+                                update_ticket_status(t["ticket_id"], "resolved", new_note)
+                                st.toast(f"Ticket {t['ticket_id']} marked as resolved!", icon="✅")
+                                st.rerun()
+                        else:
+                            if st.button("Re-open Ticket ⏳", key=f"reopen_{t['ticket_id']}", width="stretch"):
+                                update_ticket_status(t["ticket_id"], "open", new_note)
+                                st.toast(f"Ticket {t['ticket_id']} re-opened.", icon="⏳")
+                                st.rerun()
+        else:
+            st.success("🎉 No pending complaints or unresolved tickets in this view! All inquiries are resolved.")
 
     # -------------------------------------------------------------------------
     # TAB 1: Traffic Origins & Demographics

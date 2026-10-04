@@ -55,6 +55,10 @@ from core.db import (
     add_user_credits,
     get_user_transactions,
     get_user_usage_history,
+    create_support_ticket,
+    get_support_tickets,
+    update_ticket_status,
+    get_open_tickets_count,
     __all__ as _core_db_all,
 )
 
