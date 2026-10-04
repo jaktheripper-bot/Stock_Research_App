@@ -55,6 +55,7 @@ from core.db import (
     get_active_discovery_reel,
     get_available_discovery_editions,
     save_discovery_reel,
+    MANDATORY_SEBI_DISCLAIMER,
     IST,
 )
 from core.db.telemetry import record_usage_event
@@ -112,6 +113,7 @@ app.add_middleware(HeadMethodMiddleware)
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 app.mount("/static", StaticFiles(directory=os.path.join(BASE_DIR, "static")), name="static")
 templates = Jinja2Templates(directory=os.path.join(BASE_DIR, "templates"))
+templates.env.globals["MANDATORY_SEBI_DISCLAIMER"] = MANDATORY_SEBI_DISCLAIMER
 
 
 # ==============================================================================

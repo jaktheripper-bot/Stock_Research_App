@@ -132,14 +132,12 @@ B2B_PACKS: Dict[str, Dict[str, Any]] = {
     },
 }
 
+from core.db.compliance import MANDATORY_SEBI_DISCLAIMER
+
 # SEBI-Compliant Invoice Metadata
 INVOICE_SERVICE_DESCRIPTION = "Financial Research Synthesis Software Utility — Computational Research Credits"
 INVOICE_SAC_CODE = "998314"  # Information Technology Software Services
-INVOICE_DISCLAIMER = (
-    "Non-Advisory Disclosure: This invoice covers automated software compute and API research aggregation units. "
-    "This service does not constitute investment advice, research analyst recommendations under SEBI (Research Analysts) "
-    "Regulations 2014, or portfolio management services. Past performance does not guarantee future results."
-)
+INVOICE_DISCLAIMER = MANDATORY_SEBI_DISCLAIMER
 
 
 def get_plan_by_id(plan_id: str) -> Dict[str, Any]:

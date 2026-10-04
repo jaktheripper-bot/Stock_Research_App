@@ -50,7 +50,7 @@ class TestFastAPIWebPortal(unittest.TestCase):
         self.assertEqual(res.status_code, 200)
         self.assertIn("The Morning Discovery Reel", res.text)
         self.assertIn("INSTITUTIONAL QUALITY SURVEILLANCE", res.text)
-        self.assertIn("SEBI Non-Advisory Safe Harbor Compliance", res.text)
+        self.assertIn("Mandatory SEBI Safe-Harbor Disclosure", res.text)
 
     def test_discovery_db_repository(self):
         from core.db.discovery import save_discovery_reel, get_active_discovery_reel, get_available_discovery_editions

@@ -8,6 +8,8 @@ Complies with:
 - Goods and Services Tax (GST) SAC Code 998314 (Information Technology Software Services)
 """
 
+from core.db.compliance import MANDATORY_SEBI_DISCLAIMER
+
 POLICIES = {
     "terms": {
         "title": "Terms and Conditions",
@@ -161,12 +163,7 @@ POLICIES = {
         <div style="background: rgba(245, 158, 11, 0.1); border-left: 4px solid #f59e0b; padding: 16px; border-radius: 6px; margin: 20px 0;">
             <h4 style="margin: 0 0 10px 0; color: #b45309;">MANDATORY SEBI NON-ADVISORY SAFE HARBOR NOTICE</h4>
             <p style="margin: 0; font-size: 14px; line-height: 1.6; color: #78350f;">
-                This platform is an automated, computational financial research synthesis software utility. 
-                <strong>We are NOT a SEBI-registered Research Analyst or Investment Adviser.</strong> 
-                No content, scorecards, qualitative matrices, valuation estimates, or synthesized dossiers constitute personal financial advice, 
-                investment recommendations, or an endorsement to BUY, SELL, or HOLD any security. 
-                All research outputs are generated algorithmically using publicly available exchange filings from the Bombay Stock Exchange (BSE) 
-                and National Stock Exchange (NSE) for strictly educational and research purposes.
+                <strong>""" + MANDATORY_SEBI_DISCLAIMER + """</strong>
             </p>
         </div>
 
