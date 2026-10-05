@@ -1,0 +1,288 @@
+{% extends "base.html" %}
+
+{% block title %}{{ scheme.scheme_name }} | Institutional 6-Pillar Look-Through Dossier{% endblock %}
+{% block meta_description %}Deep institutional look-through analysis of {{ scheme.scheme_name }}. Constituent stock & bond decomposition, Active Share closet-indexing check, and 10-year Direct vs Regular fee drag analysis.{% endblock %}
+
+{% block content %}
+<div class="container py-8">
+  <!-- Breadcrumbs -->
+  <div style="font-size: 13px; color: #64748b; margin-bottom: 20px; display: flex; align-items: center; gap: 8px;">
+    <a href="/" style="color: #94a3b8; text-decoration: none;">Home</a>
+    <span>›</span>
+    <a href="/funds" style="color: #94a3b8; text-decoration: none;">Mutual Funds</a>
+    <span>›</span>
+    <span style="color: #f8fafc; font-weight: 600;">{{ scheme.scheme_code }}</span>
+  </div>
+
+  <!-- Header Banner -->
+  <div style="background: linear-gradient(135deg, rgba(30, 41, 59, 0.8) 0%, rgba(15, 23, 42, 0.95) 100%); border: 1px solid rgba(255, 255, 255, 0.1); border-radius: 16px; padding: 28px; margin-bottom: 24px;">
+    <div style="display: flex; justify-content: space-between; align-items: flex-start; flex-wrap: wrap; gap: 16px;">
+      <div>
+        <div style="display: inline-flex; align-items: center; gap: 8px; margin-bottom: 12px;">
+          <span style="font-size: 12px; font-weight: 700; color: #c084fc; background: rgba(168, 85, 247, 0.15); border: 1px solid rgba(168, 85, 247, 0.3); padding: 4px 10px; border-radius: 6px; text-transform: uppercase;">
+            {{ scheme.category }}
+          </span>
+          <span style="font-size: 12px; font-weight: 600; color: #94a3b8; background: rgba(255, 255, 255, 0.05); padding: 4px 10px; border-radius: 6px;">
+            SEBI Risk: {{ scheme.risk_grade }}
+          </span>
+          <span style="font-size: 12px; font-weight: 600; color: #38bdf8; background: rgba(14, 165, 233, 0.1); padding: 4px 10px; border-radius: 6px;">
+            AMC: {{ scheme.fund_house }}
+          </span>
+        </div>
+
+        <h1 style="font-size: 28px; font-weight: 800; color: #f8fafc; margin-bottom: 6px; letter-spacing: -0.01em;">
+          {{ scheme.scheme_name }}
+        </h1>
+        <div style="font-size: 14px; color: #94a3b8;">
+          Benchmark: <strong style="color: #f8fafc;">{{ scheme.benchmark_index }}</strong> • Manager: <strong style="color: #f8fafc;">{{ scheme.fund_manager }}</strong> • Portfolio Date: {{ scheme.last_portfolio_date }}
+        </div>
+      </div>
+
+      <!-- Health Score Gauge -->
+      <div style="text-align: right; background: rgba(15, 23, 42, 0.7); border: 1px solid rgba(255, 255, 255, 0.1); border-radius: 14px; padding: 16px 24px;">
+        <div style="font-size: 11px; color: #94a3b8; text-transform: uppercase; font-weight: 600; margin-bottom: 4px;">Composite Health Score</div>
+        <div style="font-size: 38px; font-weight: 900; line-height: 1; color: {% if lookthrough.composite_health_score >= 80 %}#10b981{% elif lookthrough.composite_health_score >= 65 %}#38bdf8{% elif lookthrough.composite_health_score >= 50 %}#f59e0b{% else %}#ef4444{% endif %};">
+          {{ lookthrough.composite_health_score }}<span style="font-size: 18px; color: #64748b;">/100</span>
+        </div>
+        <div style="font-size: 12px; font-weight: 700; margin-top: 4px; color: {% if lookthrough.composite_health_score >= 80 %}#10b981{% elif lookthrough.composite_health_score >= 65 %}#38bdf8{% else %}#ef4444{% endif %};">
+          {{ lookthrough.health_posture }}
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Fiduciary Warnings Banner (if any) -->
+  {% if lookthrough.warnings %}
+  <div style="background: rgba(239, 68, 68, 0.1); border: 1px solid rgba(239, 68, 68, 0.3); border-radius: 12px; padding: 16px 20px; margin-bottom: 24px;">
+    <div style="display: flex; align-items: center; gap: 8px; color: #ef4444; font-weight: 700; font-size: 14px; margin-bottom: 8px;">
+      <span>⚠️</span> Fiduciary Surveillance Alerts Triggered ({{ lookthrough.warnings|length }})
+    </div>
+    <ul style="margin: 0; padding-left: 20px; color: #fca5a5; font-size: 13px; line-height: 1.5;">
+      {% for w in lookthrough.warnings %}
+      <li>{{ w }}</li>
+      {% endfor %}
+    </ul>
+  </div>
+  {% endif %}
+
+  <!-- Core 6-Pillar Analytical Workspaces -->
+  <div style="display: grid; grid-template-columns: 1fr; gap: 24px;">
+
+    <!-- Workspace 1: Dual-Sleeve Asset Allocation & Look-Through Constituent Decomposition -->
+    <div style="background: rgba(30, 41, 59, 0.4); border: 1px solid rgba(255, 255, 255, 0.08); border-radius: 14px; padding: 24px;">
+      <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px; flex-wrap: wrap; gap: 12px;">
+        <div>
+          <h2 style="font-size: 18px; font-weight: 700; color: #f8fafc; margin: 0;">
+            Pillar 1: Dual-Sleeve Constituent Decomposition
+          </h2>
+          <div style="font-size: 13px; color: #64748b;">
+            Equity holdings evaluated via 7-Pillar Stock Engine; Debt/bonds evaluated via 5-Pillar Credit Engine.
+          </div>
+        </div>
+        <!-- Sleeve Weight Tags -->
+        <div style="display: flex; gap: 8px; font-size: 12px; font-weight: 600;">
+          <span style="background: rgba(14, 165, 233, 0.15); color: #38bdf8; padding: 4px 10px; border-radius: 6px;">
+            Equity: {{ lookthrough.sleeve_breakdown.equity_weight_pct }}% (Score: {{ lookthrough.sleeve_breakdown.equity_sleeve_score }})
+          </span>
+          <span style="background: rgba(168, 85, 247, 0.15); color: #c084fc; padding: 4px 10px; border-radius: 6px;">
+            Debt: {{ lookthrough.sleeve_breakdown.debt_weight_pct }}% (Score: {{ lookthrough.sleeve_breakdown.debt_sleeve_score }})
+          </span>
+          <span style="background: rgba(16, 185, 129, 0.15); color: #34d399; padding: 4px 10px; border-radius: 6px;">
+            Cash / TREPS: {{ lookthrough.sleeve_breakdown.cash_weight_pct }}%
+          </span>
+        </div>
+      </div>
+
+      <!-- Granular Holdings Table -->
+      <div style="overflow-x: auto; border: 1px solid rgba(255, 255, 255, 0.06); border-radius: 10px;">
+        <table style="width: 100%; border-collapse: collapse; text-align: left; font-size: 13px;">
+          <thead>
+            <tr style="background: rgba(15, 23, 42, 0.6); border-bottom: 1px solid rgba(255, 255, 255, 0.08);">
+              <th style="padding: 12px 16px; color: #94a3b8; font-weight: 600;">Identifier</th>
+              <th style="padding: 12px 16px; color: #94a3b8; font-weight: 600;">Security Name</th>
+              <th style="padding: 12px 16px; color: #94a3b8; font-weight: 600;">Type</th>
+              <th style="padding: 12px 16px; color: #94a3b8; font-weight: 600;">Weight</th>
+              <th style="padding: 12px 16px; color: #94a3b8; font-weight: 600;">Sector / Rating</th>
+              <th style="padding: 12px 16px; color: #94a3b8; font-weight: 600;">Engine Score</th>
+              <th style="padding: 12px 16px; color: #94a3b8; font-weight: 600;">Diagnostic Notes</th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for h in lookthrough.holdings %}
+            <tr style="border-bottom: 1px solid rgba(255, 255, 255, 0.04); transition: background 0.15s;" onmouseover="this.style.background='rgba(255, 255, 255, 0.03)';" onmouseout="this.style.background='transparent';">
+              <td style="padding: 12px 16px; font-weight: 700; color: #f8fafc;">
+                {% if h.holding_type in ['EQUITY', 'FOREIGN_EQUITY'] and h.identifier not in ['GOOGL', 'MSFT', 'META', 'AMZN'] %}
+                <a href="/dossier/{{ h.identifier }}" style="color: #38bdf8; text-decoration: none;">
+                  {{ h.identifier }} ↗
+                </a>
+                {% elif h.holding_type in ['DEBT', 'SDI'] %}
+                <a href="/debt/{{ h.identifier }}" style="color: #a855f7; text-decoration: none;">
+                  {{ h.identifier }} ↗
+                </a>
+                {% else %}
+                <span style="color: #94a3b8;">{{ h.identifier }}</span>
+                {% endif %}
+              </td>
+              <td style="padding: 12px 16px; color: #e2e8f0; font-weight: 500;">{{ h.name }}</td>
+              <td style="padding: 12px 16px;">
+                <span style="font-size: 11px; font-weight: 600; padding: 2px 8px; border-radius: 4px; background: rgba(255, 255, 255, 0.05); color: #94a3b8;">
+                  {{ h.holding_type }}
+                </span>
+              </td>
+              <td style="padding: 12px 16px; font-weight: 700; color: #f8fafc;">{{ h.weight_pct }}%</td>
+              <td style="padding: 12px 16px; color: #94a3b8;">{{ h.sector_or_rating }}</td>
+              <td style="padding: 12px 16px; font-weight: 800; color: {% if h.score >= 80 %}#10b981{% elif h.score >= 65 %}#38bdf8{% elif h.score >= 50 %}#f59e0b{% else %}#ef4444{% endif %};">
+                {{ h.score }}
+              </td>
+              <td style="padding: 12px 16px; color: #64748b; font-size: 12px;">{{ h.notes }}</td>
+            </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    </div>
+
+    <!-- Workspace 2 & 3 Grid: Active Share (Pillar 2) and Risk & Downside Capture (Pillar 3 & 4) -->
+    <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(340px, 1fr)); gap: 20px;">
+      
+      <!-- Pillar 2: Active Share & Closet Indexing -->
+      <div style="background: rgba(30, 41, 59, 0.4); border: 1px solid rgba(255, 255, 255, 0.08); border-radius: 14px; padding: 22px;">
+        <h2 style="font-size: 16px; font-weight: 700; color: #f8fafc; margin-bottom: 4px;">
+          Pillar 2: True Diversification & Active Share
+        </h2>
+        <div style="font-size: 12px; color: #64748b; margin-bottom: 16px;">
+          Exposing Closet Indexing: Active Share AS = 0.5 × ∑|w_fund - w_bench|
+        </div>
+
+        <div style="background: rgba(15, 23, 42, 0.6); border-radius: 10px; padding: 16px; margin-bottom: 16px; border: 1px solid rgba(255, 255, 255, 0.05); text-align: center;">
+          <div style="font-size: 11px; color: #94a3b8; text-transform: uppercase;">Active Share Score</div>
+          <div style="font-size: 36px; font-weight: 900; color: {% if active_share.active_share_pct >= 60.0 %}#10b981{% elif active_share.active_share_pct >= 40.0 %}#f59e0b{% else %}#ef4444{% endif %};">
+            {{ active_share.active_share_pct }}%
+          </div>
+          <div style="font-size: 12px; font-weight: 700; margin-top: 4px; color: {% if active_share.active_share_pct >= 60.0 %}#10b981{% elif active_share.active_share_pct >= 40.0 %}#f59e0b{% else %}#ef4444{% endif %};">
+            {{ active_share.posture }}
+          </div>
+        </div>
+
+        <p style="font-size: 13px; color: #94a3b8; line-height: 1.5; margin-bottom: 12px;">
+          {{ active_share.description }}
+        </p>
+
+        <div style="display: flex; justify-content: space-between; font-size: 13px; padding-top: 8px; border-top: 1px solid rgba(255, 255, 255, 0.05);">
+          <span style="color: #64748b;">Top 10 Holdings Concentration:</span>
+          <strong style="color: {% if lookthrough.top_10_weight_pct > 60 %}#ef4444{% else %}#f8fafc{% endif %};">
+            {{ lookthrough.top_10_weight_pct }}%
+          </strong>
+        </div>
+      </div>
+
+      <!-- Pillar 3 & 4: Risk-Adjusted Alpha & Asymmetrical Downside Resilience -->
+      <div style="background: rgba(30, 41, 59, 0.4); border: 1px solid rgba(255, 255, 255, 0.08); border-radius: 14px; padding: 22px;">
+        <h2 style="font-size: 16px; font-weight: 700; color: #f8fafc; margin-bottom: 4px;">
+          Pillars 3 & 4: Risk-Adjusted Alpha & Downside Capture
+        </h2>
+        <div style="font-size: 12px; color: #64748b; margin-bottom: 16px;">
+          Evaluating asymmetrical compounding: Downside Capture Ratio vs Upside Capture Ratio.
+        </div>
+
+        <div style="display: grid; grid-template-columns: repeat(2, 1fr); gap: 10px; margin-bottom: 16px;">
+          <div style="background: rgba(15, 23, 42, 0.6); border-radius: 8px; padding: 12px; border: 1px solid rgba(255, 255, 255, 0.05);">
+            <div style="font-size: 11px; color: #64748b;">Sortino Ratio</div>
+            <div style="font-size: 20px; font-weight: 800; color: #10b981;">
+              {{ risk_capture.sortino_ratio }}
+            </div>
+            <div style="font-size: 10px; color: #94a3b8;">Downside Risk Only</div>
+          </div>
+          <div style="background: rgba(15, 23, 42, 0.6); border-radius: 8px; padding: 12px; border: 1px solid rgba(255, 255, 255, 0.05);">
+            <div style="font-size: 11px; color: #64748b;">Downside Capture</div>
+            <div style="font-size: 20px; font-weight: 800; color: {% if risk_capture.is_downside_resilient %}#10b981{% else %}#ef4444{% endif %};">
+              {{ risk_capture.downside_capture_ratio }}%
+            </div>
+            <div style="font-size: 10px; color: #94a3b8;">Benchmark: ≤ 75%</div>
+          </div>
+          <div style="background: rgba(15, 23, 42, 0.6); border-radius: 8px; padding: 12px; border: 1px solid rgba(255, 255, 255, 0.05);">
+            <div style="font-size: 11px; color: #64748b;">Capture Spread</div>
+            <div style="font-size: 20px; font-weight: 800; color: #38bdf8;">
+              +{{ risk_capture.capture_spread }}%
+            </div>
+            <div style="font-size: 10px; color: #94a3b8;">UCR ({{ risk_capture.upside_capture_ratio }}%) - DCR</div>
+          </div>
+          <div style="background: rgba(15, 23, 42, 0.6); border-radius: 8px; padding: 12px; border: 1px solid rgba(255, 255, 255, 0.05);">
+            <div style="font-size: 11px; color: #64748b;">Hurst Exponent (H)</div>
+            <div style="font-size: 20px; font-weight: 800; color: #c084fc;">
+              {{ risk_capture.hurst_exponent }}
+            </div>
+            <div style="font-size: 10px; color: #94a3b8;">Persistent Momentum</div>
+          </div>
+        </div>
+
+        <div style="display: flex; justify-content: space-between; font-size: 13px; padding-top: 8px; border-top: 1px solid rgba(255, 255, 255, 0.05);">
+          <span style="color: #64748b;">3-Year Rolling Return Consistency:</span>
+          <strong style="color: #10b981;">{{ risk_capture.rolling_consistency_3y_pct }}% of windows</strong>
+        </div>
+      </div>
+    </div>
+
+    <!-- Workspace 4: Intermediary Fee Drag & Wealth Destruction (Pillar 5) -->
+    <div style="background: rgba(30, 41, 59, 0.4); border: 1px solid rgba(255, 255, 255, 0.08); border-radius: 14px; padding: 24px;">
+      <div style="display: flex; justify-content: space-between; align-items: flex-start; flex-wrap: wrap; gap: 12px; margin-bottom: 16px;">
+        <div>
+          <h2 style="font-size: 18px; font-weight: 700; color: #f8fafc; margin: 0;">
+            Pillar 5: Intermediary Fee Drag & Wealth Destruction
+          </h2>
+          <div style="font-size: 13px; color: #64748b;">
+            Direct Plan vs Regular Plan: Compounded wealth transfer to distributor commissions over time.
+          </div>
+        </div>
+        <div style="text-align: right;">
+          <div style="font-size: 11px; color: #64748b; text-transform: uppercase;">Annual Distributor Commission Drag</div>
+          <div style="font-size: 20px; font-weight: 800; color: #ef4444;">
+            {{ fee_drag.ter_spread_bps }} bps / yr ({{ scheme.ter_regular_pct }}% - {{ scheme.ter_direct_pct }}%)
+          </div>
+        </div>
+      </div>
+
+      <!-- Compounded Rupee Lost Schedule -->
+      <div style="overflow-x: auto; border: 1px solid rgba(255, 255, 255, 0.06); border-radius: 10px; margin-bottom: 16px;">
+        <table style="width: 100%; border-collapse: collapse; text-align: left; font-size: 13px;">
+          <thead>
+            <tr style="background: rgba(15, 23, 42, 0.6); border-bottom: 1px solid rgba(255, 255, 255, 0.08);">
+              <th style="padding: 12px 16px; color: #94a3b8; font-weight: 600;">Time Horizon</th>
+              <th style="padding: 12px 16px; color: #94a3b8; font-weight: 600;">Direct Plan Value (Net)</th>
+              <th style="padding: 12px 16px; color: #94a3b8; font-weight: 600;">Regular Plan Value (Net)</th>
+              <th style="padding: 12px 16px; color: #94a3b8; font-weight: 600;">Cumulative Wealth Lost</th>
+              <th style="padding: 12px 16px; color: #94a3b8; font-weight: 600;">Percentage Corpus Destroyed</th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for row in fee_drag.schedule %}
+            <tr style="border-bottom: 1px solid rgba(255, 255, 255, 0.04);">
+              <td style="padding: 12px 16px; font-weight: 700; color: #f8fafc;">{{ row.years }} Years</td>
+              <td style="padding: 12px 16px; color: #10b981; font-weight: 600;">₹{{ "{:,.0f}".format(row.direct_corpus) }}</td>
+              <td style="padding: 12px 16px; color: #94a3b8; font-weight: 600;">₹{{ "{:,.0f}".format(row.regular_corpus) }}</td>
+              <td style="padding: 12px 16px; color: #ef4444; font-weight: 800;">-₹{{ "{:,.0f}".format(row.wealth_lost_inr) }}</td>
+              <td style="padding: 12px 16px; color: #ef4444; font-weight: 700;">{{ row.wealth_lost_pct }}%</td>
+            </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+
+      <p style="font-size: 13px; color: #fca5a5; line-height: 1.5; margin: 0;">
+        💡 <strong>Fiduciary Takeaway:</strong> {{ fee_drag.summary }}
+      </p>
+    </div>
+
+    <!-- Quick Navigation Bottom Toolbar -->
+    <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 12px; margin-top: 8px;">
+      <a href="/funds" class="btn btn-secondary btn-sm" style="border-radius: 9999px;">
+        ← Back to Mutual Funds Screener
+      </a>
+      <a href="/funds/compare/overlap?scheme_a={{ scheme.scheme_code }}" class="btn btn-primary btn-sm" style="border-radius: 9999px;">
+        🔍 Check Overlap with Another Fund →
+      </a>
+    </div>
+
+  </div>
+</div>
+{% endblock %}

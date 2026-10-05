@@ -1,0 +1,138 @@
+{% extends "base.html" %}
+
+{% block title %}Mutual Fund Look-Through Screener & Fiduciary Engine | Institutional Research{% endblock %}
+{% block meta_description %}Institutional 6-Pillar Mutual Fund Look-Through Engine. Unbundle equity and debt sleeves, expose closet indexing via Active Share, analyze direct vs regular TER wealth destruction, and audit true portfolio overlap.{% endblock %}
+
+{% block content %}
+<div class="container py-8">
+  <!-- Hero Section -->
+  <div style="background: linear-gradient(135deg, rgba(30, 41, 59, 0.7) 0%, rgba(15, 23, 42, 0.9) 100%); border: 1px solid rgba(255, 255, 255, 0.1); border-radius: 16px; padding: 32px; margin-bottom: 32px; position: relative; overflow: hidden;">
+    <div style="position: absolute; top: -50px; right: -50px; width: 220px; height: 220px; background: radial-gradient(circle, rgba(168, 85, 247, 0.15) 0%, transparent 70%); pointer-events: none;"></div>
+    
+    <div style="display: inline-flex; align-items: center; gap: 8px; background: rgba(168, 85, 247, 0.15); border: 1px solid rgba(168, 85, 247, 0.3); border-radius: 9999px; padding: 4px 12px; margin-bottom: 16px;">
+      <span style="width: 8px; height: 8px; border-radius: 50%; background: #a855f7;"></span>
+      <span style="font-size: 12px; font-weight: 700; color: #c084fc; text-transform: uppercase; letter-spacing: 0.05em;">SEBI Mutual Funds Look-Through Framework</span>
+    </div>
+
+    <h1 style="font-size: 32px; font-weight: 800; color: #f8fafc; margin-bottom: 12px; letter-spacing: -0.02em;">
+      Mutual Fund Look-Through & Fiduciary Screener
+    </h1>
+    <p style="font-size: 15px; color: #94a3b8; max-width: 820px; line-height: 1.6; margin-bottom: 24px;">
+      Never evaluate mutual funds as opaque past-performance black boxes. Our <strong>6-Pillar Fiduciary Engine</strong> decomposes portfolios into granular equity (7-Pillar) and debt (5-Pillar) constituents, unmasks closet indexing via Active Share, quantifies 10-year Direct vs Regular commission loss, and alerts against AUM capacity traps.
+    </p>
+
+    <!-- Top KPI Grid -->
+    <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 16px;">
+      <div style="background: rgba(15, 23, 42, 0.6); border: 1px solid rgba(255, 255, 255, 0.08); border-radius: 12px; padding: 16px;">
+        <div style="font-size: 12px; color: #64748b; text-transform: uppercase; font-weight: 600; margin-bottom: 4px;">Audited Schemes</div>
+        <div style="font-size: 24px; font-weight: 800; color: #f8fafc;">{{ schemes|length }} Schemes</div>
+      </div>
+      <div style="background: rgba(15, 23, 42, 0.6); border: 1px solid rgba(255, 255, 255, 0.08); border-radius: 12px; padding: 16px;">
+        <div style="font-size: 12px; color: #64748b; text-transform: uppercase; font-weight: 600; margin-bottom: 4px;">Total Monitored AUM</div>
+        <div style="font-size: 24px; font-weight: 800; color: #a855f7;">₹{{ "{:,.0f}".format(total_aum) }} Cr</div>
+      </div>
+      <div style="background: rgba(15, 23, 42, 0.6); border: 1px solid rgba(255, 255, 255, 0.08); border-radius: 12px; padding: 16px;">
+        <div style="font-size: 12px; color: #64748b; text-transform: uppercase; font-weight: 600; margin-bottom: 4px;">Avg Direct vs Reg Drag</div>
+        <div style="font-size: 24px; font-weight: 800; color: #ef4444;">{{ avg_drag_bps }} bps/yr</div>
+      </div>
+      <div style="background: rgba(15, 23, 42, 0.6); border: 1px solid rgba(255, 255, 255, 0.08); border-radius: 12px; padding: 16px;">
+        <div style="font-size: 12px; color: #64748b; text-transform: uppercase; font-weight: 600; margin-bottom: 4px;">Active Share Benchmark</div>
+        <div style="font-size: 24px; font-weight: 800; color: #10b981;">≥ 60% True Active</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Actions Bar & Filter Navigation Tabs -->
+  <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 12px; margin-bottom: 24px;">
+    <div style="display: flex; gap: 8px; overflow-x: auto; padding-bottom: 4px;">
+      <a href="/funds" class="btn btn-sm {% if not current_category %}btn-primary{% else %}btn-secondary{% endif %}" style="border-radius: 9999px;">All Schemes ({{ schemes|length }})</a>
+      <a href="/funds?broad_category=EQUITY" class="btn btn-sm {% if current_category == 'EQUITY' %}btn-primary{% else %}btn-secondary{% endif %}" style="border-radius: 9999px;">📈 Equity Funds</a>
+      <a href="/funds?broad_category=HYBRID" class="btn btn-sm {% if current_category == 'HYBRID' %}btn-primary{% else %}btn-secondary{% endif %}" style="border-radius: 9999px;">⚖️ Balanced Advantage / Hybrid</a>
+      <a href="/funds?broad_category=DEBT" class="btn btn-sm {% if current_category == 'DEBT' %}btn-primary{% else %}btn-secondary{% endif %}" style="border-radius: 9999px;">🏛️ Corporate Bond & Debt</a>
+    </div>
+
+    <!-- Overlap Diagnostic CTA Button -->
+    <a href="/funds/compare/overlap" class="btn btn-sm btn-outline-primary" style="display: inline-flex; align-items: center; gap: 6px; border-radius: 9999px; font-weight: 600;">
+      <span>🔍</span> True Diversification & Overlap Tool →
+    </a>
+  </div>
+
+  <!-- Schemes Grid -->
+  <div style="display: grid; grid-template-columns: repeat(auto-fill, minmax(360px, 1fr)); gap: 20px;">
+    {% for s in schemes %}
+    <div style="background: rgba(30, 41, 59, 0.5); border: 1px solid rgba(255, 255, 255, 0.1); border-radius: 14px; padding: 22px; display: flex; flex-direction: column; justify-content: space-between; transition: transform 0.2s, border-color 0.2s;" onmouseover="this.style.borderColor='rgba(168, 85, 247, 0.5)'; this.style.transform='translateY(-2px)';" onmouseout="this.style.borderColor='rgba(255, 255, 255, 0.1)'; this.style.transform='translateY(0)';">
+      <div>
+        <!-- Badges Bar -->
+        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px;">
+          <span style="font-size: 11px; font-weight: 700; color: #a855f7; background: rgba(168, 85, 247, 0.12); padding: 3px 8px; border-radius: 6px; text-transform: uppercase;">
+            {{ s.category }}
+          </span>
+          <span style="font-size: 11px; font-weight: 600; color: #94a3b8; background: rgba(255, 255, 255, 0.05); padding: 3px 8px; border-radius: 6px;">
+            AUM: ₹{{ "{:,.0f}".format(s.aum_crores) }} Cr
+          </span>
+        </div>
+
+        <!-- Scheme Title -->
+        <h2 style="font-size: 18px; font-weight: 700; color: #f8fafc; margin-bottom: 4px; line-height: 1.3;">
+          <a href="/funds/{{ s.scheme_code }}" style="color: inherit; text-decoration: none;">
+            {{ s.scheme_name }}
+          </a>
+        </h2>
+        <div style="font-size: 13px; color: #64748b; margin-bottom: 16px;">
+          {{ s.fund_house }} • Benchmark: {{ s.benchmark_index }}
+        </div>
+
+        <!-- Key Metrics Strip -->
+        <div style="display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; background: rgba(15, 23, 42, 0.5); border-radius: 10px; padding: 12px; margin-bottom: 16px; border: 1px solid rgba(255, 255, 255, 0.05);">
+          <div>
+            <div style="font-size: 10px; color: #64748b; text-transform: uppercase;">Active Share</div>
+            <div style="font-size: 16px; font-weight: 800; color: {% if s.active_share_pct >= 60.0 %}#10b981{% elif s.active_share_pct >= 40.0 %}#f59e0b{% else %}#ef4444{% endif %};">
+              {{ s.active_share_pct }}%
+            </div>
+          </div>
+          <div>
+            <div style="font-size: 10px; color: #64748b; text-transform: uppercase;">Direct TER</div>
+            <div style="font-size: 16px; font-weight: 800; color: #38bdf8;">
+              {{ s.ter_direct_pct }}%
+            </div>
+          </div>
+          <div>
+            <div style="font-size: 10px; color: #64748b; text-transform: uppercase;">Regular TER</div>
+            <div style="font-size: 16px; font-weight: 800; color: #ef4444;">
+              {{ s.ter_regular_pct }}%
+            </div>
+          </div>
+        </div>
+
+        <!-- Qualitative Indicators -->
+        <div style="font-size: 12px; color: #94a3b8; display: flex; flex-direction: column; gap: 6px; margin-bottom: 16px;">
+          <div style="display: flex; justify-content: space-between;">
+            <span>Manager Churn (PTR):</span>
+            <strong style="color: {% if s.portfolio_turnover_ratio_pct > 100.0 %}#ef4444{% elif s.portfolio_turnover_ratio_pct > 50.0 %}#f59e0b{% else %}#10b981{% endif %};">
+              {{ s.portfolio_turnover_ratio_pct }}%
+            </strong>
+          </div>
+          <div style="display: flex; justify-content: space-between;">
+            <span>10-Yr Commission Drag:</span>
+            <strong style="color: #ef4444;">
+              -{{ "{:,.0f}".format((s.ter_regular_pct - s.ter_direct_pct) * 100) }} bps/yr
+            </strong>
+          </div>
+          <div style="display: flex; justify-content: space-between;">
+            <span>Fund Manager:</span>
+            <span style="color: #f8fafc; font-weight: 500;">{{ s.fund_manager }}</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- Action Button -->
+      <div>
+        <a href="/funds/{{ s.scheme_code }}" class="btn btn-secondary btn-sm" style="width: 100%; display: flex; justify-content: center; align-items: center; gap: 6px; font-weight: 600; border-radius: 8px;">
+          View 6-Pillar Look-Through Dossier →
+        </a>
+      </div>
+    </div>
+    {% endfor %}
+  </div>
+</div>
+{% endblock %}

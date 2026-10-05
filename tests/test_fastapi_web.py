@@ -11,7 +11,12 @@ from web.main import app
 class TestFastAPIWebPortal(unittest.TestCase):
     @classmethod
     def setUpClass(cls):
-        cls.client = TestClient(app)
+        cls._cm = TestClient(app)
+        cls.client = cls._cm.__enter__()
+
+    @classmethod
+    def tearDownClass(cls):
+        cls._cm.__exit__(None, None, None)
 
     def test_home_page(self):
         res = self.client.get("/")
@@ -275,6 +280,60 @@ class TestFastAPIWebPortal(unittest.TestCase):
         res_act = self.client.get("/api/debt/ratings/actions")
         self.assertEqual(res_act.status_code, 200)
         self.assertEqual(res_act.json().get("status"), "success")
+
+    def test_fund_directory_page(self):
+        res = self.client.get("/funds")
+        self.assertEqual(res.status_code, 200)
+        self.assertIn("Mutual Fund Look-Through & Fiduciary Screener", res.text)
+        self.assertIn("Parag Parikh Flexi Cap Fund", res.text)
+        self.assertIn("Active Share", res.text)
+
+    def test_fund_dossier_page(self):
+        res = self.client.get("/funds/PPFAS_FLEXICAP_DIR")
+        self.assertEqual(res.status_code, 200)
+        self.assertIn("Parag Parikh Flexi Cap Fund", res.text)
+        self.assertIn("Pillar 1: Dual-Sleeve Constituent Decomposition", res.text)
+        self.assertIn("Pillar 2: True Diversification & Active Share", res.text)
+        self.assertIn("Pillar 5: Intermediary Fee Drag & Wealth Destruction", res.text)
+
+    def test_fund_overlap_page(self):
+        res = self.client.get("/funds/compare/overlap?scheme_a=PPFAS_FLEXICAP_DIR&scheme_b=MIRAE_LARGECAP_DIR")
+        self.assertEqual(res.status_code, 200)
+        self.assertIn("Mutual Fund Portfolio Overlap & Duplication Diagnostic", res.text)
+        self.assertIn("Portfolio Overlap Score", res.text)
+        self.assertIn("Shared Constituent Holdings", res.text)
+
+    def test_fund_api_endpoints(self):
+        # 1. /api/funds/schemes
+        res_list = self.client.get("/api/funds/schemes")
+        self.assertEqual(res_list.status_code, 200)
+        data_list = res_list.json()
+        self.assertEqual(data_list.get("status"), "success")
+        self.assertGreaterEqual(len(data_list.get("schemes", [])), 6)
+
+        # 2. /api/funds/scheme/{scheme_code}
+        res_detail = self.client.get("/api/funds/scheme/PPFAS_FLEXICAP_DIR")
+        self.assertEqual(res_detail.status_code, 200)
+        data_detail = res_detail.json()
+        self.assertEqual(data_detail.get("status"), "success")
+        self.assertIn("dossier", data_detail)
+
+        # 3. /api/funds/scheme/{scheme_code}/lookthrough
+        res_lt = self.client.get("/api/funds/scheme/PPFAS_FLEXICAP_DIR/lookthrough")
+        self.assertEqual(res_lt.status_code, 200)
+        self.assertEqual(res_lt.json().get("status"), "success")
+
+        # 4. /api/funds/overlap
+        res_over = self.client.get("/api/funds/overlap?scheme_a=PPFAS_FLEXICAP_DIR&scheme_b=MIRAE_LARGECAP_DIR")
+        self.assertEqual(res_over.status_code, 200)
+        self.assertEqual(res_over.json().get("status"), "success")
+        self.assertGreater(res_over.json()["overlap"]["overlap_pct"], 20.0)
+
+        # 5. /api/funds/holding/{identifier}
+        res_hold = self.client.get("/api/funds/holding/HDFCBANK")
+        self.assertEqual(res_hold.status_code, 200)
+        self.assertEqual(res_hold.json().get("status"), "success")
+        self.assertGreaterEqual(res_hold.json().get("count", 0), 2)
 
 
 if __name__ == "__main__":

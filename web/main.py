@@ -127,6 +127,20 @@ from core.db.debt import (
     seed_default_debt_securities,
 )
 from core.analysis.debt_engine import evaluate_5_pillar_credit_posture
+from core.db.mutual_funds import (
+    get_active_mutual_funds,
+    get_mutual_fund_scheme,
+    get_scheme_holdings,
+    get_schemes_by_holding,
+    seed_default_mutual_funds,
+)
+from core.analysis.mutual_fund_engine import (
+    evaluate_mutual_fund_comprehensive,
+    evaluate_dual_sleeve_lookthrough,
+    calculate_portfolio_overlap,
+    calculate_active_share,
+    calculate_fee_drag,
+)
 
 logger = logging.getLogger("equity_research.web")
 
@@ -722,6 +736,216 @@ def api_get_recent_rating_actions(limit: int = 50):
     init_db()
     actions = get_recent_rating_actions(limit=limit)
     return json_response_with_cache({"status": "success", "count": len(actions), "actions": actions})
+
+
+@app.get("/funds", response_class=HTMLResponse)
+def fund_directory_page(
+    request: Request,
+    category: Optional[str] = None,
+    broad_category: Optional[str] = None
+):
+    """Public Mutual Fund Look-Through directory & screener under SEBI disclosure norms."""
+    init_db()
+    schemes = get_active_mutual_funds(category=category, broad_category=broad_category)
+    if not schemes:
+        seed_default_mutual_funds()
+        schemes = get_active_mutual_funds(category=category, broad_category=broad_category)
+
+    total_aum = sum(s.get("aum_crores", 0.0) for s in schemes)
+    drag_vals = [(s.get("ter_regular_pct", 1.5) - s.get("ter_direct_pct", 0.7)) * 100 for s in schemes]
+    avg_drag_bps = round(sum(drag_vals) / len(drag_vals), 0) if drag_vals else 75
+
+    return templates.TemplateResponse(
+        request=request,
+        name="fund_directory.html",
+        context={
+            "active_page": "funds",
+            "schemes": schemes,
+            "total_aum": total_aum,
+            "avg_drag_bps": int(avg_drag_bps),
+            "current_category": broad_category or category,
+        }
+    )
+
+
+@app.get("/funds/compare/overlap", response_class=HTMLResponse)
+def fund_overlap_page(
+    request: Request,
+    scheme_a: Optional[str] = None,
+    scheme_b: Optional[str] = None
+):
+    """True Diversification & Portfolio Overlap Diagnostic Tool."""
+    init_db()
+    all_funds = get_active_mutual_funds()
+    if not all_funds:
+        seed_default_mutual_funds()
+        all_funds = get_active_mutual_funds()
+
+    scheme_a_code = (scheme_a or "PPFAS_FLEXICAP_DIR").strip().upper()
+    scheme_b_code = (scheme_b or "MIRAE_LARGECAP_DIR").strip().upper()
+
+    overlap_res = None
+    if scheme_a_code and scheme_b_code:
+        h_a = get_scheme_holdings(scheme_a_code)
+        h_b = get_scheme_holdings(scheme_b_code)
+        s_a = get_mutual_fund_scheme(scheme_a_code) or {}
+        s_b = get_mutual_fund_scheme(scheme_b_code) or {}
+        name_a = s_a.get("scheme_name", scheme_a_code)
+        name_b = s_b.get("scheme_name", scheme_b_code)
+        overlap_res = calculate_portfolio_overlap(h_a, h_b, name_a=name_a, name_b=name_b)
+
+    return templates.TemplateResponse(
+        request=request,
+        name="fund_overlap.html",
+        context={
+            "active_page": "funds",
+            "all_funds": all_funds,
+            "scheme_a_code": scheme_a_code,
+            "scheme_b_code": scheme_b_code,
+            "overlap_res": overlap_res,
+        }
+    )
+
+
+@app.get("/funds/{scheme_code}", response_class=HTMLResponse)
+def fund_dossier_page(request: Request, scheme_code: str):
+    """Institutional 6-Pillar Mutual Fund Look-Through Dossier."""
+    init_db()
+    clean_code = scheme_code.strip().upper()
+    scheme = get_mutual_fund_scheme(clean_code)
+    if not scheme:
+        seed_default_mutual_funds()
+        scheme = get_mutual_fund_scheme(clean_code)
+
+    if not scheme:
+        raise HTTPException(status_code=404, detail=f"Mutual fund scheme with code '{clean_code}' not found.")
+
+    dossier = evaluate_mutual_fund_comprehensive(clean_code)
+    if not dossier:
+        raise HTTPException(status_code=500, detail="Failed to generate mutual fund look-through dossier.")
+
+    return templates.TemplateResponse(
+        request=request,
+        name="fund_dossier.html",
+        context={
+            "active_page": "funds",
+            "scheme": dossier["scheme"],
+            "lookthrough": dossier["lookthrough"],
+            "active_share": dossier["active_share"],
+            "fee_drag": dossier["fee_drag"],
+            "risk_capture": dossier["risk_capture"],
+        }
+    )
+
+
+@app.get("/api/funds/schemes")
+def api_get_mutual_fund_schemes(
+    category: Optional[str] = None,
+    broad_category: Optional[str] = None
+):
+    """Public API: List all tracked mutual fund schemes with look-through health scores."""
+    init_db()
+    schemes = get_active_mutual_funds(category=category, broad_category=broad_category)
+    if not schemes:
+        seed_default_mutual_funds()
+        schemes = get_active_mutual_funds(category=category, broad_category=broad_category)
+
+    results = []
+    for s in schemes:
+        h = get_scheme_holdings(s["scheme_code"])
+        lt = evaluate_dual_sleeve_lookthrough(s, h)
+        results.append({
+            "scheme_code": s["scheme_code"],
+            "scheme_name": s["scheme_name"],
+            "fund_house": s["fund_house"],
+            "category": s["category"],
+            "broad_category": s["broad_category"],
+            "benchmark_index": s["benchmark_index"],
+            "aum_crores": s["aum_crores"],
+            "nav": s["nav"],
+            "ter_direct_pct": s["ter_direct_pct"],
+            "ter_regular_pct": s["ter_regular_pct"],
+            "active_share_pct": s["active_share_pct"],
+            "portfolio_turnover_ratio_pct": s["portfolio_turnover_ratio_pct"],
+            "composite_health_score": lt["composite_health_score"],
+            "health_posture": lt["health_posture"],
+            "warnings_count": len(lt["warnings"])
+        })
+
+    return json_response_with_cache({"status": "success", "count": len(results), "schemes": results})
+
+
+@app.get("/api/funds/scheme/{scheme_code}")
+def api_get_mutual_fund_detail(scheme_code: str):
+    """Public API: Master 6-Pillar Look-Through evaluation for a specific scheme."""
+    init_db()
+    clean_code = scheme_code.strip().upper()
+    dossier = evaluate_mutual_fund_comprehensive(clean_code)
+    if not dossier:
+        seed_default_mutual_funds()
+        dossier = evaluate_mutual_fund_comprehensive(clean_code)
+
+    if not dossier:
+        raise HTTPException(status_code=404, detail=f"Scheme '{clean_code}' not found.")
+
+    return json_response_with_cache({"status": "success", "dossier": dossier})
+
+
+@app.get("/api/funds/scheme/{scheme_code}/lookthrough")
+def api_get_mutual_fund_lookthrough(scheme_code: str):
+    """Public API: Granular constituent holdings look-through table."""
+    init_db()
+    clean_code = scheme_code.strip().upper()
+    scheme = get_mutual_fund_scheme(clean_code)
+    if not scheme:
+        seed_default_mutual_funds()
+        scheme = get_mutual_fund_scheme(clean_code)
+    if not scheme:
+        raise HTTPException(status_code=404, detail=f"Scheme '{clean_code}' not found.")
+
+    holdings = get_scheme_holdings(clean_code)
+    lt = evaluate_dual_sleeve_lookthrough(scheme, holdings)
+    return json_response_with_cache({"status": "success", "scheme_code": clean_code, "lookthrough": lt})
+
+
+@app.get("/api/funds/overlap")
+def api_get_funds_overlap(scheme_a: str, scheme_b: str):
+    """Public API: Computes pairwise portfolio overlap between two mutual fund schemes."""
+    init_db()
+    code_a = scheme_a.strip().upper()
+    code_b = scheme_b.strip().upper()
+
+    h_a = get_scheme_holdings(code_a)
+    h_b = get_scheme_holdings(code_b)
+    s_a = get_mutual_fund_scheme(code_a) or {}
+    s_b = get_mutual_fund_scheme(code_b) or {}
+
+    if not h_a or not h_b:
+        seed_default_mutual_funds()
+        h_a = get_scheme_holdings(code_a)
+        h_b = get_scheme_holdings(code_b)
+        s_a = get_mutual_fund_scheme(code_a) or {}
+        s_b = get_mutual_fund_scheme(code_b) or {}
+
+    overlap_res = calculate_portfolio_overlap(
+        h_a, h_b,
+        name_a=s_a.get("scheme_name", code_a),
+        name_b=s_b.get("scheme_name", code_b)
+    )
+    return json_response_with_cache({"status": "success", "overlap": overlap_res})
+
+
+@app.get("/api/funds/holding/{identifier}")
+def api_get_funds_holding_security(identifier: str):
+    """Reverse Look-Through: Lists all mutual funds holding a specific stock ticker or bond ISIN."""
+    init_db()
+    clean_id = identifier.strip().upper()
+    schemes = get_schemes_by_holding(clean_id)
+    if not schemes:
+        seed_default_mutual_funds()
+        schemes = get_schemes_by_holding(clean_id)
+
+    return json_response_with_cache({"status": "success", "identifier": clean_id, "count": len(schemes), "funds": schemes})
 
 
 class PreMortemRequest(BaseModel):

@@ -858,6 +858,100 @@ def init_db(force: bool = False):
                     cursor.execute("INSERT OR IGNORE INTO schema_migrations (version) VALUES ('v012_corporate_debt_and_credit_ratings');")
                 conn.commit()
 
+            # Migration v013: Mutual Fund Schemes and Granular Holdings Portfolio
+            if "v013_mutual_fund_schemes_and_portfolios" not in applied:
+                logger.info("Applying schema migration: v013_mutual_fund_schemes_and_portfolios...")
+                if supabase_url:
+                    cursor.execute("""
+                        CREATE TABLE IF NOT EXISTS mutual_fund_schemes (
+                            scheme_code VARCHAR(50) PRIMARY KEY,
+                            scheme_name TEXT NOT NULL,
+                            fund_house VARCHAR(100) NOT NULL,
+                            category VARCHAR(100) NOT NULL,
+                            broad_category VARCHAR(50) NOT NULL,
+                            benchmark_index VARCHAR(150) NOT NULL,
+                            aum_crores NUMERIC DEFAULT 0.0,
+                            nav NUMERIC DEFAULT 0.0,
+                            ter_direct_pct NUMERIC DEFAULT 0.0,
+                            ter_regular_pct NUMERIC DEFAULT 0.0,
+                            portfolio_turnover_ratio_pct NUMERIC DEFAULT 0.0,
+                            active_share_pct NUMERIC DEFAULT 0.0,
+                            risk_grade VARCHAR(50) DEFAULT 'Very High',
+                            fund_manager VARCHAR(150),
+                            metadata_json TEXT DEFAULT '{}',
+                            last_portfolio_date DATE,
+                            created_at TIMESTAMPTZ DEFAULT now(),
+                            last_updated TIMESTAMPTZ DEFAULT now()
+                        );
+                        CREATE INDEX IF NOT EXISTS idx_mf_category ON mutual_fund_schemes(category);
+                        CREATE INDEX IF NOT EXISTS idx_mf_broad_category ON mutual_fund_schemes(broad_category);
+                        CREATE INDEX IF NOT EXISTS idx_mf_fund_house ON mutual_fund_schemes(fund_house);
+
+                        CREATE TABLE IF NOT EXISTS mutual_fund_holdings (
+                            id SERIAL PRIMARY KEY,
+                            scheme_code VARCHAR(50) NOT NULL,
+                            holding_type VARCHAR(50) NOT NULL,
+                            identifier VARCHAR(50) NOT NULL,
+                            holding_name TEXT NOT NULL,
+                            weight_pct NUMERIC NOT NULL,
+                            sector_or_rating VARCHAR(100),
+                            instrument_details TEXT DEFAULT '{}',
+                            portfolio_date DATE NOT NULL,
+                            created_at TIMESTAMPTZ DEFAULT now()
+                        );
+                        CREATE INDEX IF NOT EXISTS idx_mf_holdings_scheme ON mutual_fund_holdings(scheme_code);
+                        CREATE INDEX IF NOT EXISTS idx_mf_holdings_ident ON mutual_fund_holdings(identifier);
+                        CREATE INDEX IF NOT EXISTS idx_mf_holdings_type ON mutual_fund_holdings(holding_type);
+
+                        INSERT INTO schema_migrations (version) VALUES ('v013_mutual_fund_schemes_and_portfolios') ON CONFLICT DO NOTHING;
+                    """)
+                else:
+                    cursor.execute("""
+                        CREATE TABLE IF NOT EXISTS mutual_fund_schemes (
+                            scheme_code TEXT PRIMARY KEY,
+                            scheme_name TEXT NOT NULL,
+                            fund_house TEXT NOT NULL,
+                            category TEXT NOT NULL,
+                            broad_category TEXT NOT NULL,
+                            benchmark_index TEXT NOT NULL,
+                            aum_crores REAL DEFAULT 0.0,
+                            nav REAL DEFAULT 0.0,
+                            ter_direct_pct REAL DEFAULT 0.0,
+                            ter_regular_pct REAL DEFAULT 0.0,
+                            portfolio_turnover_ratio_pct REAL DEFAULT 0.0,
+                            active_share_pct REAL DEFAULT 0.0,
+                            risk_grade TEXT DEFAULT 'Very High',
+                            fund_manager TEXT,
+                            metadata_json TEXT DEFAULT '{}',
+                            last_portfolio_date TEXT,
+                            created_at TEXT DEFAULT (datetime('now')),
+                            last_updated TEXT DEFAULT (datetime('now'))
+                        );
+                    """)
+                    cursor.execute("CREATE INDEX IF NOT EXISTS idx_mf_category ON mutual_fund_schemes(category);")
+                    cursor.execute("CREATE INDEX IF NOT EXISTS idx_mf_broad_category ON mutual_fund_schemes(broad_category);")
+                    cursor.execute("CREATE INDEX IF NOT EXISTS idx_mf_fund_house ON mutual_fund_schemes(fund_house);")
+
+                    cursor.execute("""
+                        CREATE TABLE IF NOT EXISTS mutual_fund_holdings (
+                            id INTEGER PRIMARY KEY AUTOINCREMENT,
+                            scheme_code TEXT NOT NULL,
+                            holding_type TEXT NOT NULL,
+                            identifier TEXT NOT NULL,
+                            holding_name TEXT NOT NULL,
+                            weight_pct REAL NOT NULL,
+                            sector_or_rating TEXT,
+                            instrument_details TEXT DEFAULT '{}',
+                            portfolio_date TEXT NOT NULL,
+                            created_at TEXT DEFAULT (datetime('now'))
+                        );
+                    """)
+                    cursor.execute("CREATE INDEX IF NOT EXISTS idx_mf_holdings_scheme ON mutual_fund_holdings(scheme_code);")
+                    cursor.execute("CREATE INDEX IF NOT EXISTS idx_mf_holdings_ident ON mutual_fund_holdings(identifier);")
+                    cursor.execute("CREATE INDEX IF NOT EXISTS idx_mf_holdings_type ON mutual_fund_holdings(holding_type);")
+                    cursor.execute("INSERT OR IGNORE INTO schema_migrations (version) VALUES ('v013_mutual_fund_schemes_and_portfolios');")
+                conn.commit()
+
             _DB_INITIALIZED = True
         except Exception as e:
             logger.error(f"Error during init_db migrations: {e}")

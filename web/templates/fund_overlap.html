@@ -1,0 +1,132 @@
+{% extends "base.html" %}
+
+{% block title %}Mutual Fund True Diversification & Overlap Diagnostic | Institutional Research{% endblock %}
+{% block meta_description %}Institutional portfolio overlap tool. Compute pairwise holding duplication across mutual funds to expose illusory diversification and avoid double fees on identical stock/bond portfolios.{% endblock %}
+
+{% block content %}
+<div class="container py-8">
+  <!-- Breadcrumbs -->
+  <div style="font-size: 13px; color: #64748b; margin-bottom: 20px; display: flex; align-items: center; gap: 8px;">
+    <a href="/" style="color: #94a3b8; text-decoration: none;">Home</a>
+    <span>›</span>
+    <a href="/funds" style="color: #94a3b8; text-decoration: none;">Mutual Funds</a>
+    <span>›</span>
+    <span style="color: #f8fafc; font-weight: 600;">Portfolio Overlap Diagnostic</span>
+  </div>
+
+  <!-- Hero Header -->
+  <div style="background: linear-gradient(135deg, rgba(30, 41, 59, 0.7) 0%, rgba(15, 23, 42, 0.9) 100%); border: 1px solid rgba(255, 255, 255, 0.1); border-radius: 16px; padding: 28px; margin-bottom: 28px;">
+    <div style="display: inline-flex; align-items: center; gap: 8px; background: rgba(16, 185, 129, 0.15); border: 1px solid rgba(16, 185, 129, 0.3); border-radius: 9999px; padding: 4px 12px; margin-bottom: 12px;">
+      <span style="width: 8px; height: 8px; border-radius: 50%; background: #10b981;"></span>
+      <span style="font-size: 12px; font-weight: 700; color: #34d399; text-transform: uppercase; letter-spacing: 0.05em;">True Diversification Engine</span>
+    </div>
+
+    <h1 style="font-size: 28px; font-weight: 800; color: #f8fafc; margin-bottom: 8px; letter-spacing: -0.01em;">
+      Mutual Fund Portfolio Overlap & Duplication Diagnostic
+    </h1>
+    <p style="font-size: 14px; color: #94a3b8; max-width: 780px; line-height: 1.5; margin: 0;">
+      Holding multiple funds often creates <em>illusory diversification</em>: paying two different asset managers double expense fees to buy the exact same underlying Indian blue-chips.
+    </p>
+  </div>
+
+  <!-- Fund Selection Form -->
+  <div style="background: rgba(30, 41, 59, 0.4); border: 1px solid rgba(255, 255, 255, 0.08); border-radius: 14px; padding: 20px; margin-bottom: 28px;">
+    <form method="GET" action="/funds/compare/overlap" style="display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)) auto; gap: 16px; align-items: flex-end;">
+      <div>
+        <label for="scheme_a" style="display: block; font-size: 12px; font-weight: 600; color: #94a3b8; text-transform: uppercase; margin-bottom: 6px;">Select Scheme A</label>
+        <select id="scheme_a" name="scheme_a" style="width: 100%; background: rgba(15, 23, 42, 0.8); border: 1px solid rgba(255, 255, 255, 0.15); color: #f8fafc; padding: 10px 14px; border-radius: 8px; font-size: 14px;">
+          {% for f in all_funds %}
+          <option value="{{ f.scheme_code }}" {% if f.scheme_code == scheme_a_code %}selected{% endif %}>
+            {{ f.scheme_name }} ({{ f.category }})
+          </option>
+          {% endfor %}
+        </select>
+      </div>
+
+      <div>
+        <label for="scheme_b" style="display: block; font-size: 12px; font-weight: 600; color: #94a3b8; text-transform: uppercase; margin-bottom: 6px;">Select Scheme B</label>
+        <select id="scheme_b" name="scheme_b" style="width: 100%; background: rgba(15, 23, 42, 0.8); border: 1px solid rgba(255, 255, 255, 0.15); color: #f8fafc; padding: 10px 14px; border-radius: 8px; font-size: 14px;">
+          {% for f in all_funds %}
+          <option value="{{ f.scheme_code }}" {% if f.scheme_code == scheme_b_code %}selected{% endif %}>
+            {{ f.scheme_name }} ({{ f.category }})
+          </option>
+          {% endfor %}
+        </select>
+      </div>
+
+      <div>
+        <button type="submit" class="btn btn-primary" style="padding: 10px 24px; font-weight: 700; border-radius: 8px; height: 42px; display: inline-flex; align-items: center; gap: 6px;">
+          <span>🔍</span> Calculate Overlap
+        </button>
+      </div>
+    </form>
+  </div>
+
+  {% if overlap_res %}
+  <!-- Overlap Results Card -->
+  <div style="background: rgba(30, 41, 59, 0.6); border: 1px solid rgba(255, 255, 255, 0.1); border-radius: 16px; padding: 28px; margin-bottom: 28px;">
+    <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 20px; border-bottom: 1px solid rgba(255, 255, 255, 0.08); padding-bottom: 20px; margin-bottom: 20px;">
+      <div>
+        <div style="font-size: 12px; color: #64748b; text-transform: uppercase; margin-bottom: 4px;">Pairwise Portfolio Duplication</div>
+        <h2 style="font-size: 22px; font-weight: 800; color: #f8fafc; margin: 0;">
+          {{ overlap_res.fund_a_name }} <span style="color: #64748b;">vs</span> {{ overlap_res.fund_b_name }}
+        </h2>
+      </div>
+
+      <div style="text-align: right;">
+        <div style="font-size: 11px; color: #94a3b8; text-transform: uppercase; font-weight: 600;">Portfolio Overlap Score</div>
+        <div style="font-size: 38px; font-weight: 900; line-height: 1; color: {% if overlap_res.overlap_pct > 50 %}#ef4444{% elif overlap_res.overlap_pct >= 25 %}#f59e0b{% else %}#10b981{% endif %};">
+          {{ overlap_res.overlap_pct }}%
+        </div>
+        <div style="font-size: 12px; font-weight: 700; margin-top: 4px; color: {% if overlap_res.overlap_pct > 50 %}#ef4444{% elif overlap_res.overlap_pct >= 25 %}#f59e0b{% else %}#10b981{% endif %};">
+          {{ overlap_res.verdict }}
+        </div>
+      </div>
+    </div>
+
+    <!-- Diagnostic Verdict Notice -->
+    <div style="background: rgba(15, 23, 42, 0.6); border-radius: 10px; padding: 14px 18px; border: 1px solid rgba(255, 255, 255, 0.05); margin-bottom: 24px;">
+      <div style="font-size: 14px; color: #e2e8f0; line-height: 1.5;">
+        💡 <strong>Fiduciary Recommendation:</strong> {{ overlap_res.recommendation }}
+      </div>
+    </div>
+
+    <!-- Shared Holdings Breakdown Table -->
+    <h3 style="font-size: 16px; font-weight: 700; color: #f8fafc; margin-bottom: 12px;">
+      Shared Constituent Holdings ({{ overlap_res.shared_holdings_count }} Common Stocks/Bonds)
+    </h3>
+
+    {% if overlap_res.shared_holdings %}
+    <div style="overflow-x: auto; border: 1px solid rgba(255, 255, 255, 0.06); border-radius: 10px;">
+      <table style="width: 100%; border-collapse: collapse; text-align: left; font-size: 13px;">
+        <thead>
+          <tr style="background: rgba(15, 23, 42, 0.6); border-bottom: 1px solid rgba(255, 255, 255, 0.08);">
+            <th style="padding: 12px 16px; color: #94a3b8; font-weight: 600;">Holding Ticker / Name</th>
+            <th style="padding: 12px 16px; color: #38bdf8; font-weight: 600;">Weight in {{ scheme_a_code }}</th>
+            <th style="padding: 12px 16px; color: #c084fc; font-weight: 600;">Weight in {{ scheme_b_code }}</th>
+            <th style="padding: 12px 16px; color: #ef4444; font-weight: 600;">Overlapping Weight</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for h in overlap_res.shared_holdings %}
+          <tr style="border-bottom: 1px solid rgba(255, 255, 255, 0.04);">
+            <td style="padding: 12px 16px; font-weight: 600; color: #f8fafc;">
+              {{ h.name }} <span style="font-size: 11px; color: #64748b;">({{ h.identifier }})</span>
+            </td>
+            <td style="padding: 12px 16px; color: #38bdf8; font-weight: 700;">{{ h.weight_fund_a }}%</td>
+            <td style="padding: 12px 16px; color: #c084fc; font-weight: 700;">{{ h.weight_fund_b }}%</td>
+            <td style="padding: 12px 16px; color: #ef4444; font-weight: 800;">{{ h.overlap_weight }}%</td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+    {% else %}
+    <div style="padding: 24px; text-align: center; color: #64748b;">
+      No shared stock or bond holdings detected! These portfolios are 100% distinct.
+    </div>
+    {% endif %}
+  </div>
+  {% endif %}
+</div>
+{% endblock %}

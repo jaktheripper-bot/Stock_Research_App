@@ -18,13 +18,13 @@
 - [x] Tag Capital Hierarchy: Enforce seniority classification (Senior Secured vs. Unsecured vs. Subordinated vs. Perpetual AT1 write-down risk).
 
 ### Priority 2: Mutual Fund Portfolio Ingestion & Look-Through Engine
-- [ ] Develop AMFI Monthly Mutual Fund Portfolio Ingestion Pipeline: Ingest standardized monthly AMC portfolio disclosures across equity, debt, and hybrid schemes.
-- [ ] Implement Dual-Sleeve Mutual Fund Look-Through Engine:
+- [x] Develop AMFI Monthly Mutual Fund Portfolio Ingestion Pipeline: Ingest standardized monthly AMC portfolio disclosures across equity, debt, and hybrid schemes.
+- [x] Implement Dual-Sleeve Mutual Fund Look-Through Engine:
       - Equity sleeve routed through verified 7-Pillar Stock Engine.
       - Debt/Debenture sleeve routed through 5-Pillar Credit & Duration Engine.
-- [ ] Implement True Diversification & Overlap Diagnostic: Compute Active Share ($AS \ge 60\%$) to expose closet indexing, Top 10 concentration, and cross-scheme duplicate holdings.
-- [ ] Build Risk-Adjusted Alpha & Downside Capture Calculator: Compute Sortino Ratio, Rolling 3Y/5Y Consistency, Hurst Exponent ($H > 0.5$), and Downside Capture Ratio ($DCR \le 75\%$).
-- [ ] Build Intermediary Fee Drag & Churn Analyzer: Quantify 10-year compounded wealth loss in Direct vs. Regular TER, and track Portfolio Turnover Ratio (PTR).
+- [x] Implement True Diversification & Overlap Diagnostic: Compute Active Share ($AS \ge 60\%$) to expose closet indexing, Top 10 concentration, and cross-scheme duplicate holdings.
+- [x] Build Risk-Adjusted Alpha & Downside Capture Calculator: Compute Sortino Ratio, Rolling 3Y/5Y Consistency, Hurst Exponent ($H > 0.5$), and Downside Capture Ratio ($DCR \le 75\%$).
+- [x] Build Intermediary Fee Drag & Churn Analyzer: Quantify 10-year compounded wealth loss in Direct vs. Regular TER, and track Portfolio Turnover Ratio (PTR).
 
 ### Priority 3: Sovereign Curve & ETF Analytics
 - [ ] Ingest Sovereign Risk-Free Benchmarks: Ingest RBI/FBIL T-Bills (91/182/364-day), 10-Yr G-Sec, and SDL yield curves.
