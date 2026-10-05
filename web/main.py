@@ -203,9 +203,11 @@ app = FastAPI(
 # Cache-Control / ETag helper for cheap JSON endpoints
 def json_response_with_cache(data: dict, max_age: int = 3600) -> JSONResponse:
     import json, hashlib
-    content_str = json.dumps(data, sort_keys=True)
+    from fastapi.encoders import jsonable_encoder
+    safe_data = jsonable_encoder(data)
+    content_str = json.dumps(safe_data, sort_keys=True, default=str)
     etag = f'"{hashlib.md5(content_str.encode()).hexdigest()}"'
-    return JSONResponse(content=data, media_type="application/json", headers={
+    return JSONResponse(content=safe_data, media_type="application/json", headers={
         "Cache-Control": f"public, max-age={max_age}",
         "ETag": etag,
     })

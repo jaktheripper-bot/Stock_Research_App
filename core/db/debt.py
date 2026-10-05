@@ -6,6 +6,7 @@ Complies with SEBI (Issue and Listing of Non-Convertible Securities) Regulations
 
 import json
 import logging
+from decimal import Decimal
 from datetime import datetime, date, timezone
 from typing import Optional, List, Dict, Any
 
@@ -39,6 +40,13 @@ def clean_dict_row(cursor, row: Any) -> Dict[str, Any]:
         d = dict(zip(cols, row))
     else:
         d = dict(row)
+
+    for k, v in list(d.items()):
+        if isinstance(v, Decimal):
+            d[k] = float(v)
+        elif isinstance(v, (datetime, date)):
+            d[k] = str(v)
+
     if "metadata_json" in d and isinstance(d["metadata_json"], str):
         try:
             d["metadata"] = json.loads(d["metadata_json"])
