@@ -8,6 +8,7 @@ document.addEventListener('DOMContentLoaded', () => {
   initCheckoutModals();
   initGenerateModal();
   initAuthModal();
+  initNavigationDropdowns();
 });
 
 // ==============================================================================
@@ -724,8 +725,74 @@ function syncUserSession() {
 }
 
 // ==============================================================================
-// 7. Responsive Navigation & Mobile Drawer
+// 7. Responsive Navigation, Dropdown Sub-Tabs & Mobile Drawer
 // ==============================================================================
+function initNavigationDropdowns() {
+  const dropdownToggles = document.querySelectorAll('.nav-item.dropdown .dropdown-toggle');
+
+  dropdownToggles.forEach(btn => {
+    btn.addEventListener('click', (e) => {
+      e.stopPropagation();
+      const parent = btn.closest('.nav-item.dropdown');
+      if (!parent) return;
+
+      const isOpen = parent.classList.contains('open');
+
+      // Close all other dropdowns
+      document.querySelectorAll('.nav-item.dropdown.open').forEach(d => {
+        if (d !== parent) {
+          d.classList.remove('open');
+          const toggle = d.querySelector('.dropdown-toggle');
+          if (toggle) toggle.setAttribute('aria-expanded', 'false');
+        }
+      });
+
+      // Toggle current dropdown
+      if (isOpen) {
+        parent.classList.remove('open');
+        btn.setAttribute('aria-expanded', 'false');
+      } else {
+        parent.classList.add('open');
+        btn.setAttribute('aria-expanded', 'true');
+      }
+    });
+
+    // Keyboard support: Escape closes dropdown
+    btn.addEventListener('keydown', (e) => {
+      if (e.key === 'Escape') {
+        const parent = btn.closest('.nav-item.dropdown');
+        if (parent && parent.classList.contains('open')) {
+          parent.classList.remove('open');
+          btn.setAttribute('aria-expanded', 'false');
+          btn.focus();
+        }
+      }
+    });
+  });
+
+  // Close open dropdowns when clicking outside
+  document.addEventListener('click', (e) => {
+    if (!e.target.closest('.nav-item.dropdown')) {
+      document.querySelectorAll('.nav-item.dropdown.open').forEach(d => {
+        d.classList.remove('open');
+        const toggle = d.querySelector('.dropdown-toggle');
+        if (toggle) toggle.setAttribute('aria-expanded', 'false');
+      });
+    }
+  });
+
+  // Close dropdowns on global Escape key
+  document.addEventListener('keydown', (e) => {
+    if (e.key === 'Escape') {
+      document.querySelectorAll('.nav-item.dropdown.open').forEach(d => {
+        d.classList.remove('open');
+        const toggle = d.querySelector('.dropdown-toggle');
+        if (toggle) toggle.setAttribute('aria-expanded', 'false');
+      });
+    }
+  });
+}
+
 function toggleMobileMenu() {
   const nav = document.getElementById('mainNav');
   const btn = document.getElementById('mobileMenuBtn');
@@ -734,7 +801,7 @@ function toggleMobileMenu() {
   if (btn) btn.classList.toggle('active', isOpen);
 }
 
-// Close mobile menu on click outside or on nav link
+// Close mobile menu on click outside or on non-dropdown nav link
 document.addEventListener('click', (e) => {
   const nav = document.getElementById('mainNav');
   const btn = document.getElementById('mobileMenuBtn');

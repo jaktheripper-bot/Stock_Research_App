@@ -55,16 +55,131 @@
           </div>
         </a>
 
-        <nav id="mainNav" class="main-nav">
-          <a href="/search" class="nav-link {% if active_page == 'search' %}active{% endif %}">🔍 Search</a>
-          <a href="/" class="nav-link {% if active_page == 'home' %}active{% endif %}">Explore Equities</a>
-          <a href="/debt" class="nav-link {% if active_page == 'debt' %}active{% endif %}">🏦 Bonds & SDIs</a>
-          <a href="/funds" class="nav-link {% if active_page == 'funds' %}active{% endif %}">📊 Mutual Funds</a>
-          <a href="/discovery" class="nav-link {% if active_page == 'discovery' %}active{% endif %}">Stock Discovery @9AM</a>
-          <a href="/compare" class="nav-link {% if active_page == 'compare' %}active{% endif %}">⚖️ Peer Comparison</a>
-          <a href="/pricing" class="nav-link {% if active_page == 'pricing' %}active{% endif %}">Pricing & Credits</a>
-          <a href="/contact" class="nav-link {% if active_page == 'contact' %}active{% endif %}">Support & Complaints</a>
-          <a href="/disclaimer" class="nav-link">SEBI Safe Harbor</a>
+        <nav id="mainNav" class="main-nav" aria-label="Main Navigation">
+          <a href="/search" class="nav-link {% if active_page == 'search' %}active{% endif %}" id="navSearchLink">
+            <span class="nav-icon">🔍</span> Search
+          </a>
+
+          <!-- Markets & Multi-Asset Sub-Tabs -->
+          <div class="nav-item dropdown {% if active_page in ['home', 'debt', 'funds', 'dossier'] %}active-parent{% endif %}" id="navMarketsDropdown">
+            <button class="nav-link dropdown-toggle" aria-haspopup="true" aria-expanded="false" id="marketsDropdownBtn">
+              <span>Markets</span>
+              <svg class="dropdown-chevron" width="10" height="6" viewBox="0 0 10 6" fill="none" xmlns="http://www.w3.org/2000/svg">
+                <path d="M1 1L5 5L9 1" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/>
+              </svg>
+            </button>
+            <div class="dropdown-menu" role="menu" aria-labelledby="marketsDropdownBtn">
+              <a href="/" class="dropdown-item {% if active_page == 'home' %}active{% endif %}" role="menuitem">
+                <div class="dropdown-icon">📈</div>
+                <div class="dropdown-content">
+                  <div class="dropdown-title">Equities & Stocks</div>
+                  <div class="dropdown-desc">BSE & NSE 7-Pillar research, DCF & multi-scenario valuation</div>
+                </div>
+              </a>
+              <a href="/debt" class="dropdown-item {% if active_page == 'debt' %}active{% endif %}" role="menuitem">
+                <div class="dropdown-icon">🏦</div>
+                <div class="dropdown-content">
+                  <div class="dropdown-title">Bonds, NCDs & SDIs</div>
+                  <div class="dropdown-desc">SEBI ₹10K fixed income, senior secured yields & YTMs</div>
+                </div>
+              </a>
+              <a href="/funds" class="dropdown-item {% if active_page == 'funds' %}active{% endif %}" role="menuitem">
+                <div class="dropdown-icon">📊</div>
+                <div class="dropdown-content">
+                  <div class="dropdown-title">Mutual Funds & ETFs</div>
+                  <div class="dropdown-desc">Dual-sleeve look-through, active share & TER fee drag</div>
+                </div>
+              </a>
+              <div class="dropdown-divider"></div>
+              <div class="dropdown-item disabled-preview" title="Coming in Priority 3">
+                <div class="dropdown-icon">🏛️</div>
+                <div class="dropdown-content">
+                  <div class="dropdown-title">Sovereign Curve <span class="nav-pill-badge">Soon</span></div>
+                  <div class="dropdown-desc">RBI T-Bills, 10Y G-Sec & SDL auction benchmarks</div>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- Research Tools Sub-Tabs -->
+          <div class="nav-item dropdown {% if active_page in ['discovery', 'compare'] %}active-parent{% endif %}" id="navToolsDropdown">
+            <button class="nav-link dropdown-toggle" aria-haspopup="true" aria-expanded="false" id="toolsDropdownBtn">
+              <span>Research Tools</span>
+              <svg class="dropdown-chevron" width="10" height="6" viewBox="0 0 10 6" fill="none" xmlns="http://www.w3.org/2000/svg">
+                <path d="M1 1L5 5L9 1" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/>
+              </svg>
+            </button>
+            <div class="dropdown-menu" role="menu" aria-labelledby="toolsDropdownBtn">
+              <a href="/discovery" class="dropdown-item {% if active_page == 'discovery' %}active{% endif %}" role="menuitem">
+                <div class="dropdown-icon">🌅</div>
+                <div class="dropdown-content">
+                  <div class="dropdown-title">Morning Discovery @9AM</div>
+                  <div class="dropdown-desc">Daily screening of under-the-radar BSE equities</div>
+                </div>
+              </a>
+              <a href="/compare" class="dropdown-item {% if active_page == 'compare' %}active{% endif %}" role="menuitem">
+                <div class="dropdown-icon">⚖️</div>
+                <div class="dropdown-content">
+                  <div class="dropdown-title">Peer Comparison</div>
+                  <div class="dropdown-desc">Side-by-side financial metrics & valuation disparity</div>
+                </div>
+              </a>
+              <div class="dropdown-divider"></div>
+              <a href="javascript:void(0)" onclick="openGenerateModal()" class="dropdown-item" role="menuitem">
+                <div class="dropdown-icon">⚡</div>
+                <div class="dropdown-content">
+                  <div class="dropdown-title">Instant Dossier Generator</div>
+                  <div class="dropdown-desc">Synthesize live 7-pillar research report on demand</div>
+                </div>
+              </a>
+            </div>
+          </div>
+
+          <!-- Pricing Link -->
+          <a href="/pricing" class="nav-link {% if active_page == 'pricing' %}active{% endif %}" id="navPricingLink">
+            Pricing
+          </a>
+
+          <!-- Governance & Support Sub-Tabs -->
+          <div class="nav-item dropdown {% if active_page in ['contact', 'disclaimer', 'terms', 'privacy', 'refund'] %}active-parent{% endif %}" id="navGovDropdown">
+            <button class="nav-link dropdown-toggle" aria-haspopup="true" aria-expanded="false" id="govDropdownBtn">
+              <span>Governance</span>
+              <svg class="dropdown-chevron" width="10" height="6" viewBox="0 0 10 6" fill="none" xmlns="http://www.w3.org/2000/svg">
+                <path d="M1 1L5 5L9 1" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/>
+              </svg>
+            </button>
+            <div class="dropdown-menu dropdown-menu-right" role="menu" aria-labelledby="govDropdownBtn">
+              <a href="/contact" class="dropdown-item {% if active_page == 'contact' %}active{% endif %}" role="menuitem">
+                <div class="dropdown-icon">🎧</div>
+                <div class="dropdown-content">
+                  <div class="dropdown-title">Support & Grievances</div>
+                  <div class="dropdown-desc">Investor redressal, ticket desk & SEBI SCORES</div>
+                </div>
+              </a>
+              <a href="/disclaimer" class="dropdown-item {% if active_page == 'disclaimer' %}active{% endif %}" role="menuitem">
+                <div class="dropdown-icon">🛡️</div>
+                <div class="dropdown-content">
+                  <div class="dropdown-title">SEBI Safe Harbor</div>
+                  <div class="dropdown-desc">Non-advisory disclosures & statutory disclaimers</div>
+                </div>
+              </a>
+              <div class="dropdown-divider"></div>
+              <a href="/terms" class="dropdown-item {% if active_page == 'terms' %}active{% endif %}" role="menuitem">
+                <div class="dropdown-icon">📑</div>
+                <div class="dropdown-content">
+                  <div class="dropdown-title">Terms of Service</div>
+                  <div class="dropdown-desc">Computational credit rules & platform usage</div>
+                </div>
+              </a>
+              <a href="/privacy" class="dropdown-item {% if active_page == 'privacy' %}active{% endif %}" role="menuitem">
+                <div class="dropdown-icon">🔒</div>
+                <div class="dropdown-content">
+                  <div class="dropdown-title">Privacy Policy</div>
+                  <div class="dropdown-desc">256-bit encryption & zero data monetization</div>
+                </div>
+              </a>
+            </div>
+          </div>
         </nav>
 
         <div class="nav-actions">

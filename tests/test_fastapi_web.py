@@ -340,7 +340,42 @@ class TestFastAPIWebPortal(unittest.TestCase):
         self.assertEqual(res_hold.json().get("status"), "success")
         self.assertGreaterEqual(res_hold.json().get("count", 0), 2)
 
+    def test_simplified_taskbar_navigation(self):
+        """Verifies that the taskbar is organized into clean top-level categories and sub-tabs without horizontal overflow."""
+        res = self.client.get("/")
+        self.assertEqual(res.status_code, 200)
+        html = res.text
+
+        # Top-level category tabs
+        self.assertIn("Markets", html)
+        self.assertIn("Research Tools", html)
+        self.assertIn("Governance", html)
+        self.assertIn("Pricing", html)
+        self.assertIn("Search", html)
+
+        # Sub-tab dropdown items
+        self.assertIn("Equities & Stocks", html)
+        self.assertIn("Bonds, NCDs & SDIs", html)
+        self.assertIn("Mutual Funds & ETFs", html)
+        self.assertIn("Morning Discovery @9AM", html)
+        self.assertIn("Peer Comparison", html)
+        self.assertIn("Instant Dossier Generator", html)
+        self.assertIn("Support & Grievances", html)
+        self.assertIn("SEBI Safe Harbor", html)
+
+        # Accessibility semantics
+        self.assertIn('aria-haspopup="true"', html)
+        self.assertIn('aria-expanded="false"', html)
+        self.assertIn('role="menu"', html)
+        self.assertIn('role="menuitem"', html)
+
+        # Active state propagation
+        res_debt = self.client.get("/debt")
+        self.assertEqual(res_debt.status_code, 200)
+        self.assertIn('active-parent', res_debt.text)
+
 
 if __name__ == "__main__":
     unittest.main()
+
 

@@ -149,10 +149,11 @@ header.site-header {
   white-space: nowrap;
 }
 
+/* Navigation & Dropdown Architecture */
 nav.main-nav {
   display: flex;
   align-items: center;
-  gap: 22px;
+  gap: 20px;
   flex-shrink: 1;
 }
 
@@ -161,14 +162,192 @@ nav.main-nav {
   font-weight: 600;
   font-size: 13.5px;
   text-decoration: none;
-  transition: color 0.2s ease;
+  transition: all 0.2s ease;
   white-space: nowrap;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 8px 4px;
+  background: none;
+  border: none;
+  cursor: pointer;
+  font-family: inherit;
 }
 
 .nav-link:hover,
-.nav-link.active {
+.nav-link.active,
+.nav-item.dropdown:hover > .nav-link,
+.nav-item.dropdown.active-parent > .nav-link,
+.nav-item.dropdown.open > .nav-link {
   color: var(--text-primary);
   text-decoration: none;
+}
+
+.nav-item.dropdown.active-parent > .nav-link {
+  color: var(--accent-cyan);
+}
+
+.nav-item.dropdown {
+  position: relative;
+  display: flex;
+  align-items: center;
+}
+
+.dropdown-chevron {
+  transition: transform 0.25s cubic-bezier(0.16, 1, 0.3, 1), stroke 0.2s ease;
+  color: var(--text-muted);
+  flex-shrink: 0;
+}
+
+.nav-item.dropdown:hover .dropdown-chevron,
+.nav-item.dropdown.open .dropdown-chevron {
+  transform: rotate(180deg);
+  color: var(--accent-cyan);
+}
+
+/* Glassmorphic Floating Sub-Tab Menu */
+.dropdown-menu {
+  position: absolute;
+  top: calc(100% + 8px);
+  left: 0;
+  min-width: 310px;
+  max-width: 360px;
+  background: rgba(13, 20, 36, 0.97);
+  backdrop-filter: blur(24px);
+  -webkit-backdrop-filter: blur(24px);
+  border: 1px solid rgba(148, 163, 184, 0.16);
+  border-radius: 14px;
+  box-shadow: 0 20px 40px -10px rgba(0, 0, 0, 0.7), 0 0 1px 1px rgba(255, 255, 255, 0.08);
+  padding: 8px;
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  z-index: 1000;
+  opacity: 0;
+  visibility: hidden;
+  transform: translateY(-8px) scale(0.98);
+  transform-origin: top left;
+  transition: opacity 0.2s ease, transform 0.2s cubic-bezier(0.16, 1, 0.3, 1), visibility 0.2s;
+  pointer-events: none;
+}
+
+/* Invisible Bridge to prevent hover gap jitter */
+.dropdown-menu::before {
+  content: '';
+  position: absolute;
+  top: -12px;
+  left: 0;
+  right: 0;
+  height: 12px;
+}
+
+.dropdown-menu-right {
+  left: auto;
+  right: 0;
+  transform-origin: top right;
+}
+
+.nav-item.dropdown:hover .dropdown-menu,
+.nav-item.dropdown:focus-within .dropdown-menu,
+.nav-item.dropdown.open .dropdown-menu {
+  opacity: 1;
+  visibility: visible;
+  transform: translateY(0) scale(1);
+  pointer-events: auto;
+}
+
+/* Sub-Tab Items */
+.dropdown-item {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  padding: 10px 12px;
+  border-radius: 10px;
+  text-decoration: none;
+  transition: background 0.15s ease, transform 0.15s ease, border-color 0.15s ease;
+  border: 1px solid transparent;
+  cursor: pointer;
+}
+
+.dropdown-item:hover {
+  background: rgba(255, 255, 255, 0.05);
+  transform: translateX(2px);
+  text-decoration: none;
+}
+
+.dropdown-item.active {
+  background: rgba(14, 165, 233, 0.1);
+  border-color: rgba(14, 165, 233, 0.3);
+}
+
+.dropdown-icon {
+  width: 34px;
+  height: 34px;
+  border-radius: 8px;
+  background: rgba(30, 41, 59, 0.7);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 16px;
+  flex-shrink: 0;
+  border: 1px solid rgba(255, 255, 255, 0.06);
+  transition: transform 0.15s ease, background 0.15s ease, border-color 0.15s ease;
+}
+
+.dropdown-item:hover .dropdown-icon {
+  transform: scale(1.08);
+  background: rgba(14, 165, 233, 0.18);
+  border-color: rgba(14, 165, 233, 0.4);
+}
+
+.dropdown-content {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+
+.dropdown-title {
+  font-size: 13.5px;
+  font-weight: 700;
+  color: var(--text-primary);
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.dropdown-desc {
+  font-size: 11px;
+  color: var(--text-muted);
+  line-height: 1.35;
+  white-space: normal;
+}
+
+.dropdown-divider {
+  height: 1px;
+  background: rgba(255, 255, 255, 0.06);
+  margin: 4px 6px;
+}
+
+.nav-pill-badge {
+  font-size: 9.5px;
+  font-weight: 700;
+  padding: 1px 6px;
+  border-radius: 9999px;
+  background: rgba(14, 165, 233, 0.18);
+  color: var(--accent-cyan);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  border: 1px solid rgba(148, 163, 184, 0.2);
+}
+
+.dropdown-item.disabled-preview {
+  opacity: 0.6;
+  cursor: default;
+}
+.dropdown-item.disabled-preview:hover {
+  background: transparent;
+  transform: none;
 }
 
 .nav-actions {
@@ -1119,7 +1298,7 @@ details.pillar-accordion[open] .pillar-chevron {
    Mobile Responsiveness & Breakpoints
    ============================================================================== */
 
-@media (max-width: 1120px) {
+@media (max-width: 1024px) {
   .mobile-menu-btn {
     display: flex;
   }
@@ -1131,15 +1310,17 @@ details.pillar-accordion[open] .pillar-chevron {
     left: 0;
     right: 0;
     background: rgba(10, 15, 29, 0.98);
-    backdrop-filter: blur(20px);
-    -webkit-backdrop-filter: blur(20px);
+    backdrop-filter: blur(24px);
+    -webkit-backdrop-filter: blur(24px);
     border-bottom: 1px solid var(--border-color);
-    padding: 20px 24px;
+    padding: 16px 20px;
     flex-direction: column;
-    align-items: flex-start;
-    gap: 14px;
+    align-items: stretch;
+    gap: 4px;
     box-shadow: 0 20px 40px rgba(0, 0, 0, 0.7);
     z-index: 100;
+    max-height: 82vh;
+    overflow-y: auto;
   }
 
   nav.main-nav.mobile-open {
@@ -1148,9 +1329,56 @@ details.pillar-accordion[open] .pillar-chevron {
 
   .nav-link {
     font-size: 15px;
-    padding: 8px 0;
+    padding: 10px 8px;
     width: 100%;
     border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+    justify-content: flex-start;
+  }
+
+  .nav-item.dropdown {
+    width: 100%;
+    flex-direction: column;
+    align-items: stretch;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+  }
+
+  .dropdown-toggle {
+    width: 100%;
+    justify-content: space-between;
+    font-size: 15px;
+    padding: 11px 8px;
+  }
+
+  .dropdown-menu {
+    position: static;
+    opacity: 1;
+    visibility: visible;
+    transform: none;
+    box-shadow: none;
+    border: none;
+    background: rgba(15, 23, 42, 0.5);
+    border-radius: 10px;
+    padding: 6px 6px 8px 6px;
+    margin: 2px 0 8px 0;
+    display: none;
+    pointer-events: auto;
+    max-width: 100%;
+  }
+
+  .dropdown-menu::before {
+    display: none;
+  }
+
+  .nav-item.dropdown.open .dropdown-menu {
+    display: flex;
+  }
+
+  .dropdown-item {
+    padding: 8px 10px;
+  }
+
+  .dropdown-desc {
+    font-size: 11px;
   }
 }
 
