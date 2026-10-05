@@ -165,27 +165,44 @@ class TestFastAPIWebPortal(unittest.TestCase):
         self.assertIn("<urlset", res_sitemap.text)
         self.assertIn("/dossier/INFY", res_sitemap.text)
 
+    def _get_authenticated_admin_client(self):
+        from core.db.admin import get_admin_user
+        from core.auth.totp import get_totp_code
+        client = TestClient(app)
+        res_verify = client.post("/admin/auth/direct-verify", data={"email": "lyndnpnto@gmail.com"}, follow_redirects=False)
+        pending_cookie = res_verify.cookies["admin_2fa_pending"]
+        client.cookies.set("admin_2fa_pending", pending_cookie)
+
+        owner = get_admin_user("lyndnpnto@gmail.com")
+        secret = owner.get("totp_secret")
+        if not secret:
+            client.get("/admin/setup-2fa")
+            owner = get_admin_user("lyndnpnto@gmail.com")
+            secret = owner["totp_secret"]
+            code = get_totp_code(secret)
+            res_post = client.post("/admin/setup-2fa", data={"code": code}, follow_redirects=False)
+        else:
+            code = get_totp_code(secret)
+            endpoint = "/admin/verify-2fa" if owner.get("totp_enabled") else "/admin/setup-2fa"
+            res_post = client.post(endpoint, data={"code": code}, follow_redirects=False)
+
+        session_cookie = res_post.cookies["admin_session"]
+        client.cookies.set("admin_session", session_cookie)
+        return client
+
     def test_admin_unauthenticated_shows_login(self):
         res = self.client.get("/admin")
         self.assertEqual(res.status_code, 200)
         self.assertIn("Executive Administrator Portal", res.text)
-        self.assertIn("Administrator Passcode:", res.text)
-        self.assertIn("Authenticate Admin Session", res.text)
+        self.assertIn("Sign In with Google", res.text)
 
-    def test_admin_login_invalid_password(self):
-        res = self.client.post("/admin/login", data={"password": "wrong_password_xyz"})
-        self.assertEqual(res.status_code, 401)
-        self.assertIn("Access Denied", res.text)
+    def test_admin_login_invalid_user(self):
+        res = self.client.post("/admin/auth/direct-verify", data={"email": "unauthorized_user@example.com"}, follow_redirects=False)
+        self.assertEqual(res.status_code, 303)
+        self.assertIn("err=", res.headers.get("location", ""))
 
     def test_admin_login_success_and_dashboard_access(self):
-        from telemetry import get_admin_passcode
-        client = TestClient(app)
-        passcode = get_admin_passcode()
-        res_login = client.post("/admin/login", data={"password": passcode}, follow_redirects=False)
-        self.assertEqual(res_login.status_code, 303)
-        self.assertIn("admin_session", res_login.cookies)
-
-        client.cookies.set("admin_session", res_login.cookies["admin_session"])
+        client = self._get_authenticated_admin_client()
         res_dash = client.get("/admin")
         self.assertEqual(res_dash.status_code, 200)
         self.assertIn("Executive Telemetry & Site Usage Hub", res_dash.text)
@@ -193,14 +210,12 @@ class TestFastAPIWebPortal(unittest.TestCase):
         self.assertIn("Unique Sessions", res_dash.text)
         self.assertIn("Est. API Cost Saved", res_dash.text)
         self.assertIn("Export GSTR-1 Tax Register (CSV)", res_dash.text)
+        self.assertIn("Team & Access", res_dash.text)
+        self.assertIn("Admin Audit Trail", res_dash.text)
 
     def test_admin_update_ticket_status(self):
-        from telemetry import get_admin_passcode
-        from core.db.support import create_support_ticket, get_support_tickets
-        client = TestClient(app)
-        passcode = get_admin_passcode()
-        res_login = client.post("/admin/login", data={"password": passcode}, follow_redirects=False)
-        client.cookies.set("admin_session", res_login.cookies["admin_session"])
+        from core.db.support import create_support_ticket
+        client = self._get_authenticated_admin_client()
 
         # Create ticket
         t = create_support_ticket("test_admin@example.com", "Test Subject", "Test message", user_name="Admin Tester")
@@ -217,12 +232,7 @@ class TestFastAPIWebPortal(unittest.TestCase):
         self.assertIn("status updated", res_update.text)
 
     def test_admin_tax_register_csv_export(self):
-        from telemetry import get_admin_passcode
-        client = TestClient(app)
-        passcode = get_admin_passcode()
-        res_login = client.post("/admin/login", data={"password": passcode}, follow_redirects=False)
-        client.cookies.set("admin_session", res_login.cookies["admin_session"])
-
+        client = self._get_authenticated_admin_client()
         res_csv = client.get("/admin/export/tax-register")
         self.assertEqual(res_csv.status_code, 200)
         self.assertIn("text/csv", res_csv.headers["content-type"])
@@ -230,12 +240,7 @@ class TestFastAPIWebPortal(unittest.TestCase):
         self.assertIn("GSTR1_Tax_Register", res_csv.headers.get("content-disposition", ""))
 
     def test_admin_logout(self):
-        from telemetry import get_admin_passcode
-        client = TestClient(app)
-        passcode = get_admin_passcode()
-        res_login = client.post("/admin/login", data={"password": passcode}, follow_redirects=False)
-        client.cookies.set("admin_session", res_login.cookies["admin_session"])
-
+        client = self._get_authenticated_admin_client()
         res_logout = client.get("/admin/logout", follow_redirects=False)
         self.assertEqual(res_logout.status_code, 303)
 

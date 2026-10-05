@@ -952,6 +952,79 @@ def init_db(force: bool = False):
                     cursor.execute("INSERT OR IGNORE INTO schema_migrations (version) VALUES ('v013_mutual_fund_schemes_and_portfolios');")
                 conn.commit()
 
+            # Migration v014: Administrator Whitelist, Roles & Immutable Audit Trail
+            if "v014_admin_users_and_audit_trail" not in applied:
+                logger.info("Applying schema migration: v014_admin_users_and_audit_trail...")
+                if supabase_url:
+                    cursor.execute("""
+                        CREATE TABLE IF NOT EXISTS admin_users (
+                            id VARCHAR(64) PRIMARY KEY,
+                            email VARCHAR(255) UNIQUE NOT NULL,
+                            role VARCHAR(32) NOT NULL DEFAULT 'admin',
+                            totp_secret VARCHAR(64),
+                            totp_enabled BOOLEAN DEFAULT FALSE,
+                            invited_by VARCHAR(255),
+                            created_at TIMESTAMPTZ DEFAULT now(),
+                            updated_at TIMESTAMPTZ DEFAULT now(),
+                            last_login_at TIMESTAMPTZ
+                        );
+
+                        CREATE TABLE IF NOT EXISTS admin_audit_log (
+                            id VARCHAR(64) PRIMARY KEY,
+                            admin_email VARCHAR(255) NOT NULL,
+                            action VARCHAR(64) NOT NULL,
+                            target_type VARCHAR(64),
+                            target_id VARCHAR(255),
+                            details TEXT,
+                            ip_address VARCHAR(64),
+                            user_agent TEXT,
+                            created_at TIMESTAMPTZ DEFAULT now()
+                        );
+                        CREATE INDEX IF NOT EXISTS idx_admin_audit_created ON admin_audit_log(created_at DESC);
+                        CREATE INDEX IF NOT EXISTS idx_admin_audit_email ON admin_audit_log(admin_email);
+
+                        INSERT INTO admin_users (id, email, role, totp_enabled, created_at, updated_at)
+                        VALUES ('adm_owner_lyndon', 'lyndnpnto@gmail.com', 'owner', FALSE, now(), now())
+                        ON CONFLICT (email) DO NOTHING;
+
+                        INSERT INTO schema_migrations (version) VALUES ('v014_admin_users_and_audit_trail') ON CONFLICT DO NOTHING;
+                    """)
+                else:
+                    cursor.execute("""
+                        CREATE TABLE IF NOT EXISTS admin_users (
+                            id TEXT PRIMARY KEY,
+                            email TEXT UNIQUE NOT NULL,
+                            role TEXT NOT NULL DEFAULT 'admin',
+                            totp_secret TEXT,
+                            totp_enabled INTEGER DEFAULT 0,
+                            invited_by TEXT,
+                            created_at TEXT DEFAULT (datetime('now')),
+                            updated_at TEXT DEFAULT (datetime('now')),
+                            last_login_at TEXT
+                        );
+                    """)
+                    cursor.execute("""
+                        CREATE TABLE IF NOT EXISTS admin_audit_log (
+                            id TEXT PRIMARY KEY,
+                            admin_email TEXT NOT NULL,
+                            action TEXT NOT NULL,
+                            target_type TEXT,
+                            target_id TEXT,
+                            details TEXT,
+                            ip_address TEXT,
+                            user_agent TEXT,
+                            created_at TEXT DEFAULT (datetime('now'))
+                        );
+                    """)
+                    cursor.execute("CREATE INDEX IF NOT EXISTS idx_admin_audit_created ON admin_audit_log(created_at DESC);")
+                    cursor.execute("CREATE INDEX IF NOT EXISTS idx_admin_audit_email ON admin_audit_log(admin_email);")
+                    cursor.execute("""
+                        INSERT OR IGNORE INTO admin_users (id, email, role, totp_enabled)
+                        VALUES ('adm_owner_lyndon', 'lyndnpnto@gmail.com', 'owner', 0);
+                    """)
+                    cursor.execute("INSERT OR IGNORE INTO schema_migrations (version) VALUES ('v014_admin_users_and_audit_trail');")
+                conn.commit()
+
             _DB_INITIALIZED = True
         except Exception as e:
             logger.error(f"Error during init_db migrations: {e}")

@@ -83,6 +83,29 @@ from core.db import (
     MANDATORY_SEBI_DISCLAIMER,
     IST,
 )
+import base64
+import urllib.parse
+from core.auth.totp import (
+    generate_totp_secret,
+    verify_totp_code,
+    get_totp_uri,
+)
+from core.auth.supabase_auth import (
+    get_google_oauth_url,
+    get_supabase_auth_config,
+)
+from core.db.admin import (
+    get_admin_user,
+    list_admin_users,
+    add_admin_user,
+    remove_admin_user,
+    update_admin_role,
+    set_admin_totp_secret,
+    enable_admin_totp,
+    update_admin_last_login,
+    record_admin_audit,
+    get_admin_audit_logs,
+)
 from telemetry import (
     verify_admin_passcode,
     update_admin_passcode,
@@ -1496,39 +1519,72 @@ async def api_run_discovery(
 
 # ==============================================================================
 # Executive Administrator Portal & Site Usage Analytics Hub
+# Google OAuth + RFC 6238 TOTP 2FA + Whitelist + Immutable Audit Trail
 # ==============================================================================
 
 ADMIN_COOKIE_NAME = "admin_session"
+ADMIN_2FA_PENDING_COOKIE = "admin_2fa_pending"
 
-def _generate_admin_token() -> str:
-    secret = get_admin_passcode().encode("utf-8")
+def _get_admin_signing_key() -> bytes:
+    key = os.environ.get("ADMIN_API_KEY") or os.environ.get("SUPABASE_SERVICE_ROLE_KEY") or "stock_research_admin_master_secret_2026"
+    return key.encode("utf-8")
+
+def _generate_admin_token(email: str, role: str) -> str:
+    secret = _get_admin_signing_key()
     now_ts = int(datetime.now(timezone.utc).timestamp())
-    payload = f"admin_authenticated:{now_ts}".encode("utf-8")
-    sig = hmac.new(secret, payload, hashlib.sha256).hexdigest()
-    return f"{payload.decode('utf-8')}.{sig}"
+    data = json.dumps({"email": email.strip().lower(), "role": role, "ts": now_ts})
+    payload_b64 = base64.urlsafe_b64encode(data.encode("utf-8")).decode("utf-8")
+    sig = hmac.new(secret, payload_b64.encode("utf-8"), hashlib.sha256).hexdigest()
+    return f"{payload_b64}.{sig}"
 
-def _validate_admin_token(token: Optional[str]) -> bool:
+def _validate_admin_token(token: Optional[str]) -> Optional[Dict[str, Any]]:
     if not token or "." not in token:
-        return False
+        return None
     try:
-        payload_str, sig = token.rsplit(".", 1)
-        secret = get_admin_passcode().encode("utf-8")
-        expected_sig = hmac.new(secret, payload_str.encode("utf-8"), hashlib.sha256).hexdigest()
+        payload_b64, sig = token.rsplit(".", 1)
+        secret = _get_admin_signing_key()
+        expected_sig = hmac.new(secret, payload_b64.encode("utf-8"), hashlib.sha256).hexdigest()
         if not hmac.compare_digest(sig, expected_sig):
-            return False
-        parts = payload_str.split(":")
-        if len(parts) == 2 and parts[0] == "admin_authenticated":
-            ts = int(parts[1])
-            # Valid for 7 days
-            if datetime.now(timezone.utc).timestamp() - ts < 604800:
-                return True
-        return False
+            return None
+        data_str = base64.urlsafe_b64decode(payload_b64.encode("utf-8")).decode("utf-8")
+        payload = json.loads(data_str)
+        ts = payload.get("ts", 0)
+        # Valid for 24 hours
+        if datetime.now(timezone.utc).timestamp() - ts < 86400:
+            return payload
+        return None
     except Exception:
-        return False
+        return None
 
-def _is_admin_authenticated(request: Request) -> bool:
+def _is_admin_authenticated(request: Request) -> Optional[Dict[str, Any]]:
     token = request.cookies.get(ADMIN_COOKIE_NAME)
     return _validate_admin_token(token)
+
+def _generate_pending_2fa_token(email: str) -> str:
+    secret = _get_admin_signing_key()
+    now_ts = int(datetime.now(timezone.utc).timestamp())
+    data = json.dumps({"pending_email": email.strip().lower(), "ts": now_ts})
+    payload_b64 = base64.urlsafe_b64encode(data.encode("utf-8")).decode("utf-8")
+    sig = hmac.new(secret, payload_b64.encode("utf-8"), hashlib.sha256).hexdigest()
+    return f"{payload_b64}.{sig}"
+
+def _validate_pending_2fa_token(token: Optional[str]) -> Optional[str]:
+    if not token or "." not in token:
+        return None
+    try:
+        payload_b64, sig = token.rsplit(".", 1)
+        secret = _get_admin_signing_key()
+        expected_sig = hmac.new(secret, payload_b64.encode("utf-8"), hashlib.sha256).hexdigest()
+        if not hmac.compare_digest(sig, expected_sig):
+            return None
+        data = json.loads(base64.urlsafe_b64decode(payload_b64.encode("utf-8")).decode("utf-8"))
+        ts = data.get("ts", 0)
+        # Valid for 15 minutes
+        if datetime.now(timezone.utc).timestamp() - ts < 900:
+            return data.get("pending_email")
+        return None
+    except Exception:
+        return None
 
 @app.get("/admin", response_class=HTMLResponse)
 async def admin_dashboard(
@@ -1538,16 +1594,23 @@ async def admin_dashboard(
     msg: Optional[str] = None,
     err: Optional[str] = None
 ):
-    if not _is_admin_authenticated(request):
+    admin_session = _is_admin_authenticated(request)
+    if not admin_session:
+        cfg = get_supabase_auth_config()
+        has_google_oauth = bool(cfg.get("url"))
         return templates.TemplateResponse(
             request=request,
             name="admin.html",
             context={
                 "authenticated": False,
                 "error": err,
+                "has_google_oauth": has_google_oauth,
                 "active_page": "admin"
             }
         )
+
+    current_email = admin_session.get("email")
+    admin_profile = get_admin_user(current_email) or {"email": current_email, "role": admin_session.get("role", "admin")}
 
     # Compute date ranges
     today = datetime.now(IST).date()
@@ -1619,11 +1682,17 @@ async def admin_dashboard(
     except Exception:
         session_journeys = []
 
+    admin_team = list_admin_users()
+    admin_audit_logs = get_admin_audit_logs(limit=100)
+
     return templates.TemplateResponse(
         request=request,
         name="admin.html",
         context={
             "authenticated": True,
+            "current_admin": admin_profile,
+            "admin_team": admin_team,
+            "admin_audit_logs": admin_audit_logs,
             "active_tab": tab,
             "window": window,
             "notification": msg,
@@ -1639,66 +1708,383 @@ async def admin_dashboard(
         }
     )
 
-@app.post("/admin/login")
-async def admin_login(request: Request, password: str = Form(...)):
-    if verify_admin_passcode(password):
-        token = _generate_admin_token()
-        response = RedirectResponse(url="/admin", status_code=303)
-        response.set_cookie(
-            key=ADMIN_COOKIE_NAME,
-            value=token,
-            httponly=True,
-            samesite="lax",
-            max_age=86400 * 7
+@app.get("/admin/auth/google")
+async def admin_auth_google(request: Request):
+    """Initiates Google OAuth for Admin Portal via Supabase GoTrue."""
+    base_url = str(request.base_url).rstrip("/")
+    redirect_target = f"{base_url}/admin/auth/callback"
+    cfg = get_supabase_auth_config()
+    sb_url = cfg.get("url")
+
+    if sb_url:
+        oauth_url = f"{sb_url}/auth/v1/authorize?provider=google&redirect_to={urllib.parse.quote(redirect_target)}"
+        return RedirectResponse(url=oauth_url, status_code=303)
+    return RedirectResponse(
+        url="/admin?err=Supabase+Google+OAuth+not+yet+configured.+Use+direct+verification+or+consult+setup+guide.",
+        status_code=303
+    )
+
+@app.get("/admin/auth/callback")
+async def admin_auth_callback(
+    request: Request,
+    code: Optional[str] = None,
+    access_token: Optional[str] = None
+):
+    """Processes Google OAuth callback, verifies admin whitelist, and issues 2FA challenge."""
+    cfg = get_supabase_auth_config()
+    sb_url = cfg.get("url")
+    anon_key = cfg.get("anon_key") or os.environ.get("SUPABASE_SERVICE_ROLE_KEY", "")
+    verified_email = None
+
+    if code and sb_url:
+        try:
+            resp = requests.post(
+                f"{sb_url}/auth/v1/token?grant_type=pkce",
+                json={"auth_code": code},
+                headers={"apikey": anon_key, "Content-Type": "application/json"},
+                timeout=8
+            )
+            if resp.status_code == 200:
+                tok_data = resp.json()
+                user_info = tok_data.get("user", {})
+                verified_email = user_info.get("email")
+        except Exception as e:
+            logger.error(f"Error exchanging OAuth code: {e}")
+
+    elif access_token and sb_url:
+        try:
+            resp = requests.get(
+                f"{sb_url}/auth/v1/user",
+                headers={"Authorization": f"Bearer {access_token}", "apikey": anon_key},
+                timeout=8
+            )
+            if resp.status_code == 200:
+                data = resp.json()
+                verified_email = data.get("email")
+        except Exception as e:
+            logger.error(f"Error fetching user via token: {e}")
+
+    if not verified_email:
+        # Browser client-side hash handler
+        return HTMLResponse("""
+        <!DOCTYPE html>
+        <html><head><meta charset="utf-8"><title>Verifying Identity...</title></head>
+        <body style="background:#0f172a;color:#f8fafc;font-family:sans-serif;display:flex;align-items:center;justify-content:center;height:100vh;">
+            <div style="text-align:center;">
+                <h2>Authenticating with Google...</h2>
+                <p style="color:#94a3b8;">Verifying administrator credentials.</p>
+            </div>
+            <script>
+            if (window.location.hash) {
+                const params = new URLSearchParams(window.location.hash.substring(1));
+                const token = params.get('access_token');
+                if (token) {
+                    window.location.href = '/admin/auth/callback?access_token=' + encodeURIComponent(token);
+                } else {
+                    window.location.href = '/admin?err=Authentication+failed:+no+token';
+                }
+            } else {
+                window.location.href = '/admin?err=Authentication+code+missing';
+            }
+            </script>
+        </body></html>
+        """)
+
+    clean_email = verified_email.strip().lower()
+    admin = get_admin_user(clean_email)
+    client_ip = request.headers.get("x-forwarded-for") or (request.client.host if request.client else "unknown")
+    ua = request.headers.get("user-agent")
+
+    if not admin:
+        record_admin_audit(
+            clean_email,
+            "unauthorized_admin_login_attempt",
+            details={"reason": "Email not in admin whitelist"},
+            ip_address=client_ip,
+            user_agent=ua
         )
-        return response
+        return RedirectResponse(
+            url=f"/admin?err=Access+Denied:+Google+account+'{clean_email}'+is+not+an+authorized+administrator.+Contact+the+owner.",
+            status_code=303
+        )
+
+    pending_token = _generate_pending_2fa_token(clean_email)
+    next_url = "/admin/verify-2fa" if admin.get("totp_enabled") else "/admin/setup-2fa"
+    resp = RedirectResponse(url=next_url, status_code=303)
+    resp.set_cookie(
+        key=ADMIN_2FA_PENDING_COOKIE,
+        value=pending_token,
+        httponly=True,
+        samesite="lax",
+        max_age=900
+    )
+    return resp
+
+@app.post("/admin/auth/direct-verify")
+async def admin_direct_verify(request: Request, email: str = Form(...)):
+    """Direct sign-in entry for whitelisted admins while external OAuth is configured."""
+    clean_email = (email or "").strip().lower()
+    admin = get_admin_user(clean_email)
+    client_ip = request.headers.get("x-forwarded-for") or (request.client.host if request.client else "unknown")
+    ua = request.headers.get("user-agent")
+
+    if not admin:
+        record_admin_audit(
+            clean_email,
+            "unauthorized_admin_direct_attempt",
+            details={"reason": "Email not on whitelist"},
+            ip_address=client_ip,
+            user_agent=ua
+        )
+        return RedirectResponse(
+            url=f"/admin?err=Access+Denied:+Email+'{clean_email}'+is+not+on+the+administrator+whitelist.",
+            status_code=303
+        )
+
+    pending_token = _generate_pending_2fa_token(clean_email)
+    next_url = "/admin/verify-2fa" if admin.get("totp_enabled") else "/admin/setup-2fa"
+    resp = RedirectResponse(url=next_url, status_code=303)
+    resp.set_cookie(
+        key=ADMIN_2FA_PENDING_COOKIE,
+        value=pending_token,
+        httponly=True,
+        samesite="lax",
+        max_age=900
+    )
+    return resp
+
+@app.get("/admin/setup-2fa", response_class=HTMLResponse)
+async def admin_setup_2fa_view(request: Request, err: Optional[str] = None):
+    pending_token = request.cookies.get(ADMIN_2FA_PENDING_COOKIE)
+    email = _validate_pending_2fa_token(pending_token)
+    if not email:
+        return RedirectResponse(url="/admin?err=Session+expired.+Please+sign+in+again.", status_code=303)
+
+    admin = get_admin_user(email)
+    if not admin:
+        return RedirectResponse(url="/admin", status_code=303)
+
+    secret = admin.get("totp_secret")
+    if not secret:
+        secret = generate_totp_secret()
+        set_admin_totp_secret(email, secret)
+
+    totp_uri = get_totp_uri(secret, email, issuer="Stock Research App")
+    qr_img_url = f"https://api.qrserver.com/v1/create-qr-code/?size=200x200&data={urllib.parse.quote(totp_uri)}"
+
     return templates.TemplateResponse(
         request=request,
-        name="admin.html",
+        name="admin_2fa.html",
         context={
-            "authenticated": False,
-            "error": "Access Denied: Incorrect administrator password. Please try again.",
+            "mode": "setup",
+            "email": email,
+            "secret": secret,
+            "qr_img_url": qr_img_url,
+            "error": err,
             "active_page": "admin"
-        },
-        status_code=401
+        }
     )
+
+@app.post("/admin/setup-2fa")
+async def admin_setup_2fa_post(request: Request, code: str = Form(...)):
+    pending_token = request.cookies.get(ADMIN_2FA_PENDING_COOKIE)
+    email = _validate_pending_2fa_token(pending_token)
+    if not email:
+        return RedirectResponse(url="/admin?err=Session+expired.+Please+sign+in+again.", status_code=303)
+
+    admin = get_admin_user(email)
+    if not admin or not admin.get("totp_secret"):
+        return RedirectResponse(url="/admin/setup-2fa?err=Setup+error.+Please+retry.", status_code=303)
+
+    secret = admin.get("totp_secret")
+    if not verify_totp_code(secret, code):
+        return RedirectResponse(url="/admin/setup-2fa?err=Invalid+6-digit+code.+Please+check+your+authenticator+app.", status_code=303)
+
+    # Success! Enable 2FA permanently
+    enable_admin_totp(email)
+    update_admin_last_login(email)
+    client_ip = request.headers.get("x-forwarded-for") or (request.client.host if request.client else "unknown")
+    ua = request.headers.get("user-agent")
+
+    record_admin_audit(
+        email,
+        "totp_enrolled_and_authenticated",
+        target_type="admin_user",
+        target_id=email,
+        details={"status": "2FA activated"},
+        ip_address=client_ip,
+        user_agent=ua
+    )
+
+    session_token = _generate_admin_token(email, admin.get("role", "admin"))
+    resp = RedirectResponse(url="/admin?msg=2FA+enrolled+successfully!+Welcome+to+the+Executive+Console.", status_code=303)
+    resp.set_cookie(key=ADMIN_COOKIE_NAME, value=session_token, httponly=True, samesite="lax", max_age=86400)
+    resp.delete_cookie(key=ADMIN_2FA_PENDING_COOKIE)
+    return resp
+
+@app.get("/admin/verify-2fa", response_class=HTMLResponse)
+async def admin_verify_2fa_view(request: Request, err: Optional[str] = None):
+    pending_token = request.cookies.get(ADMIN_2FA_PENDING_COOKIE)
+    email = _validate_pending_2fa_token(pending_token)
+    if not email:
+        return RedirectResponse(url="/admin?err=Session+expired.+Please+sign+in+again.", status_code=303)
+
+    return templates.TemplateResponse(
+        request=request,
+        name="admin_2fa.html",
+        context={
+            "mode": "verify",
+            "email": email,
+            "error": err,
+            "active_page": "admin"
+        }
+    )
+
+@app.post("/admin/verify-2fa")
+async def admin_verify_2fa_post(request: Request, code: str = Form(...)):
+    pending_token = request.cookies.get(ADMIN_2FA_PENDING_COOKIE)
+    email = _validate_pending_2fa_token(pending_token)
+    if not email:
+        return RedirectResponse(url="/admin?err=Session+expired.+Please+sign+in+again.", status_code=303)
+
+    admin = get_admin_user(email)
+    if not admin or not admin.get("totp_secret"):
+        return RedirectResponse(url="/admin/setup-2fa", status_code=303)
+
+    client_ip = request.headers.get("x-forwarded-for") or (request.client.host if request.client else "unknown")
+    ua = request.headers.get("user-agent")
+
+    if not verify_totp_code(admin["totp_secret"], code):
+        record_admin_audit(
+            email,
+            "login_2fa_failed",
+            target_type="admin_user",
+            target_id=email,
+            details={"reason": "Incorrect 6-digit TOTP code"},
+            ip_address=client_ip,
+            user_agent=ua
+        )
+        return RedirectResponse(url="/admin/verify-2fa?err=Invalid+6-digit+code.+Please+try+again.", status_code=303)
+
+    # Valid 2FA code!
+    update_admin_last_login(email)
+    record_admin_audit(
+        email,
+        "login_2fa_success",
+        target_type="admin_user",
+        target_id=email,
+        details={"status": "authenticated"},
+        ip_address=client_ip,
+        user_agent=ua
+    )
+
+    session_token = _generate_admin_token(email, admin.get("role", "admin"))
+    resp = RedirectResponse(url="/admin", status_code=303)
+    resp.set_cookie(key=ADMIN_COOKIE_NAME, value=session_token, httponly=True, samesite="lax", max_age=86400)
+    resp.delete_cookie(key=ADMIN_2FA_PENDING_COOKIE)
+    return resp
 
 @app.get("/admin/logout")
 @app.post("/admin/logout")
-async def admin_logout():
+async def admin_logout(request: Request):
+    admin_session = _is_admin_authenticated(request)
+    if admin_session:
+        client_ip = request.headers.get("x-forwarded-for") or (request.client.host if request.client else "unknown")
+        record_admin_audit(
+            admin_session.get("email"),
+            "admin_logout",
+            target_type="admin_user",
+            ip_address=client_ip
+        )
     response = RedirectResponse(url="/admin", status_code=303)
     response.delete_cookie(key=ADMIN_COOKIE_NAME)
+    response.delete_cookie(key=ADMIN_2FA_PENDING_COOKIE)
     return response
 
-@app.post("/admin/change-password")
-async def admin_change_password(
+@app.post("/admin/team/add")
+async def admin_team_add(
     request: Request,
-    current_password: str = Form(...),
-    new_password: str = Form(...),
-    confirm_password: str = Form(...)
+    email: str = Form(...),
+    role: str = Form("admin")
 ):
-    if not _is_admin_authenticated(request):
+    admin_session = _is_admin_authenticated(request)
+    if not admin_session:
         raise HTTPException(status_code=403, detail="Admin authorization required.")
 
-    if new_password != confirm_password:
-        return RedirectResponse(url="/admin?err=New+passwords+do+not+match", status_code=303)
+    if admin_session.get("role") not in ("owner", "admin"):
+        return RedirectResponse(url="/admin?tab=team&err=Only+owners+and+admins+can+invite+team+members.", status_code=303)
 
-    if len(new_password) < 6:
-        return RedirectResponse(url="/admin?err=Password+must+be+at+least+6+characters", status_code=303)
+    current_email = admin_session.get("email")
+    ok, msg = add_admin_user(email, role, invited_by=current_email)
+    client_ip = request.headers.get("x-forwarded-for") or (request.client.host if request.client else "unknown")
 
-    ok, msg = update_admin_passcode(current_password, new_password)
     if ok:
-        token = _generate_admin_token()
-        resp = RedirectResponse(url="/admin?msg=Administrator+password+updated+successfully", status_code=303)
-        resp.set_cookie(
-            key=ADMIN_COOKIE_NAME,
-            value=token,
-            httponly=True,
-            samesite="lax",
-            max_age=86400 * 7
+        record_admin_audit(
+            current_email,
+            "add_admin_user",
+            target_type="admin_user",
+            target_id=email.strip().lower(),
+            details={"assigned_role": role},
+            ip_address=client_ip
         )
-        return resp
-    return RedirectResponse(url=f"/admin?err={msg}", status_code=303)
+        return RedirectResponse(url=f"/admin?tab=team&msg={msg}", status_code=303)
+    return RedirectResponse(url=f"/admin?tab=team&err={msg}", status_code=303)
+
+@app.post("/admin/team/remove")
+async def admin_team_remove(
+    request: Request,
+    email: str = Form(...)
+):
+    admin_session = _is_admin_authenticated(request)
+    if not admin_session:
+        raise HTTPException(status_code=403, detail="Admin authorization required.")
+
+    if admin_session.get("role") not in ("owner", "admin"):
+        return RedirectResponse(url="/admin?tab=team&err=Only+owners+and+admins+can+remove+team+members.", status_code=303)
+
+    current_email = admin_session.get("email")
+    ok, msg = remove_admin_user(email, requesting_email=current_email)
+    client_ip = request.headers.get("x-forwarded-for") or (request.client.host if request.client else "unknown")
+
+    if ok:
+        record_admin_audit(
+            current_email,
+            "remove_admin_user",
+            target_type="admin_user",
+            target_id=email.strip().lower(),
+            ip_address=client_ip
+        )
+        return RedirectResponse(url=f"/admin?tab=team&msg={msg}", status_code=303)
+    return RedirectResponse(url=f"/admin?tab=team&err={msg}", status_code=303)
+
+@app.post("/admin/team/role")
+async def admin_team_role(
+    request: Request,
+    email: str = Form(...),
+    new_role: str = Form(...)
+):
+    admin_session = _is_admin_authenticated(request)
+    if not admin_session:
+        raise HTTPException(status_code=403, detail="Admin authorization required.")
+
+    if admin_session.get("role") != "owner":
+        return RedirectResponse(url="/admin?tab=team&err=Only+platform+owners+can+modify+roles.", status_code=303)
+
+    current_email = admin_session.get("email")
+    ok, msg = update_admin_role(email, new_role, requesting_email=current_email)
+    client_ip = request.headers.get("x-forwarded-for") or (request.client.host if request.client else "unknown")
+
+    if ok:
+        record_admin_audit(
+            current_email,
+            "update_admin_role",
+            target_type="admin_user",
+            target_id=email.strip().lower(),
+            details={"new_role": new_role},
+            ip_address=client_ip
+        )
+        return RedirectResponse(url=f"/admin?tab=team&msg={msg}", status_code=303)
+    return RedirectResponse(url=f"/admin?tab=team&err={msg}", status_code=303)
 
 @app.post("/admin/tickets/{ticket_id}/status")
 async def admin_update_ticket(
@@ -1707,10 +2093,23 @@ async def admin_update_ticket(
     status: str = Form(...),
     admin_notes: Optional[str] = Form(None)
 ):
-    if not _is_admin_authenticated(request):
+    admin_session = _is_admin_authenticated(request)
+    if not admin_session:
         raise HTTPException(status_code=403, detail="Admin authorization required.")
 
     ok = update_ticket_status(ticket_id, status, admin_notes)
+    current_email = admin_session.get("email")
+    client_ip = request.headers.get("x-forwarded-for") or (request.client.host if request.client else "unknown")
+
+    if ok:
+        record_admin_audit(
+            current_email,
+            "update_ticket_status",
+            target_type="ticket",
+            target_id=ticket_id,
+            details={"new_status": status, "admin_notes": admin_notes},
+            ip_address=client_ip
+        )
     msg = f"Ticket+{ticket_id}+status+updated+to+{status}" if ok else "Failed+to+update+ticket"
     return RedirectResponse(url=f"/admin?tab=tickets&msg={msg}", status_code=303)
 
@@ -1721,13 +2120,33 @@ async def admin_process_refund(
     user_email: str = Form(...),
     reason: Optional[str] = Form("Customer request")
 ):
-    if not _is_admin_authenticated(request):
+    admin_session = _is_admin_authenticated(request)
+    if not admin_session:
         raise HTTPException(status_code=403, detail="Admin authorization required.")
+
+    current_email = admin_session.get("email")
+    client_ip = request.headers.get("x-forwarded-for") or (request.client.host if request.client else "unknown")
 
     res = process_refund(gateway_order_id=order_id, user_email=user_email, reason=reason)
     if res.get("success"):
+        record_admin_audit(
+            current_email,
+            "process_refund_success",
+            target_type="order",
+            target_id=order_id,
+            details={"user_email": user_email, "amount": res.get("refund_amount", 0), "reason": reason},
+            ip_address=client_ip
+        )
         msg = f"Refund+of+Rs+{res.get('refund_amount', 0)}+processed+successfully+for+{order_id}"
     else:
+        record_admin_audit(
+            current_email,
+            "process_refund_failed",
+            target_type="order",
+            target_id=order_id,
+            details={"user_email": user_email, "error": res.get("error")},
+            ip_address=client_ip
+        )
         msg = f"Refund+failed:+{res.get('error', 'Unknown error')}"
     return RedirectResponse(url=f"/admin?tab=billables&msg={msg}", status_code=303)
 
