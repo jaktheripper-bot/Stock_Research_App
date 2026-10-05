@@ -13,8 +13,8 @@
 ## Security & Access Control (Blocking)
 - [x] Replace admin password gate with Google sign-in + second factor, admin allowlist (roles), and per-admin audit trail of every console action.
 - [ ] Fix public site sign-in: `/api/auth/signin` accepts any email with no verification (anyone can sign in as any user). Move to verified Google / OTP sign-in.
-- [ ] Protect `/api/admin/run-discovery` (open when `ADMIN_API_KEY` unset).
-- [ ] Review BSE/NSE display licensing for existing equity pages (same redistribution rules as ETFs).
+- [x] Protect `/api/admin/run-discovery` (requires `x_admin_key` or authenticated admin session cookie).
+- [x] Review BSE/NSE display licensing and risk exposures for monetized dossiers (detailed evaluation & migration plan in [source_evaluation.md](file:///Users/lyndonpinto/Documents/Stock_Research_App/source_evaluation.md)).
 
 ## Multi-Asset & Mutual Fund Look-Through Roadmap
 

@@ -105,8 +105,6 @@ def run_discovery_pipeline(
         except Exception as synth_err:
             logger.error(f"Error during report synthesis for {ticker}: {synth_err}")
 
-    # 3. Persist cohort to discovery_reel repository
-    saved_count = save_discovery_reel(cohort, edition_date=edition_date)
     logger.info(
         f"🎉 Morning Discovery Reel edition {edition_date} complete! "
         f"Saved: {saved_count} equities. Dossiers Synthesized: {synthesized_count}, Reused: {reused_count}."

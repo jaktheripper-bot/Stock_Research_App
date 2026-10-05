@@ -97,16 +97,26 @@ def save_discovery_reel(items: List[Dict[str, Any]], edition_date: Optional[str]
         conn.close()
 
 
-def get_active_discovery_reel(edition_date: Optional[str] = None) -> List[Dict[str, Any]]:
+def get_active_discovery_reel(
+    edition_date: Optional[str] = None,
+    exclude_tests: Optional[bool] = None
+) -> List[Dict[str, Any]]:
     """
     Retrieves the active morning discovery reel for a given edition date.
     If edition_date is None or has no items, falls back to the most recent available active edition.
+    Excludes synthetic test records on public requests by default.
     """
     init_db()
     conn = get_db_connection()
     cursor = conn.cursor()
     placeholder = get_placeholder()
     is_pg = bool(get_supabase_url())
+
+    # Default exclude_tests to True for public requests where edition_date is None
+    if exclude_tests is None:
+        exclude_tests = (edition_date is None)
+
+    test_filter = "AND ticker NOT LIKE 'TEST%' AND ticker NOT LIKE 'UNITTEST%' AND ticker NOT LIKE 'SYNTHETIC%'" if exclude_tests else ""
 
     try:
         active_clause = "is_active = TRUE" if is_pg else "is_active = 1"
@@ -117,7 +127,7 @@ def get_active_discovery_reel(edition_date: Optional[str] = None) -> List[Dict[s
                        current_price, pe_ratio, roce_pct, debt_to_equity, sales_growth_3y,
                        ria_thesis, catalyst_headline, key_metrics_json, created_at
                 FROM discovery_reel
-                WHERE edition_date = {placeholder} AND {active_clause}
+                WHERE edition_date = {placeholder} AND {active_clause} {test_filter}
                 ORDER BY id ASC;
             """
             cursor.execute(query, (edition_date,))
@@ -138,25 +148,25 @@ def get_active_discovery_reel(edition_date: Optional[str] = None) -> List[Dict[s
                        current_price, pe_ratio, roce_pct, debt_to_equity, sales_growth_3y,
                        ria_thesis, catalyst_headline, key_metrics_json, created_at
                 FROM discovery_reel
-                WHERE {active_clause}
+                WHERE {active_clause} {test_filter}
                   AND edition_date = (
-                      SELECT MAX(edition_date) FROM discovery_reel WHERE {active_clause} {date_filter}
+                      SELECT MAX(edition_date) FROM discovery_reel WHERE {active_clause} {test_filter} {date_filter}
                   )
                 ORDER BY id ASC;
             """
             cursor.execute(query)
             rows = cursor.fetchall()
 
-            # Safety fallback: if no prior edition exists, select absolute max
+            # Safety fallback: if no prior edition exists, select absolute max available edition
             if not rows:
                 query = f"""
                     SELECT id, edition_date, ticker, company_name, sector, market_cap_tier,
                            current_price, pe_ratio, roce_pct, debt_to_equity, sales_growth_3y,
                            ria_thesis, catalyst_headline, key_metrics_json, created_at
                     FROM discovery_reel
-                    WHERE {active_clause}
+                    WHERE {active_clause} {test_filter}
                       AND edition_date = (
-                          SELECT MAX(edition_date) FROM discovery_reel WHERE {active_clause}
+                          SELECT MAX(edition_date) FROM discovery_reel WHERE {active_clause} {test_filter}
                       )
                     ORDER BY id ASC;
                 """
@@ -199,7 +209,7 @@ def get_active_discovery_reel(edition_date: Optional[str] = None) -> List[Dict[s
         conn.close()
 
 
-def get_available_discovery_editions() -> List[str]:
+def get_available_discovery_editions(exclude_tests: bool = False) -> List[str]:
     """Retrieves all distinct available discovery edition dates, sorted descending."""
     init_db()
     conn = get_db_connection()
@@ -208,7 +218,8 @@ def get_available_discovery_editions() -> List[str]:
 
     try:
         active_clause = "is_active = TRUE" if is_pg else "is_active = 1"
-        cursor.execute(f"SELECT DISTINCT edition_date FROM discovery_reel WHERE {active_clause} ORDER BY edition_date DESC LIMIT 30;")
+        test_filter = "AND ticker NOT LIKE 'TEST%' AND ticker NOT LIKE 'UNITTEST%' AND ticker NOT LIKE 'SYNTHETIC%'" if exclude_tests else ""
+        cursor.execute(f"SELECT DISTINCT edition_date FROM discovery_reel WHERE {active_clause} {test_filter} ORDER BY edition_date DESC LIMIT 30;")
         rows = cursor.fetchall()
         now_ist = datetime.now(IST)
         today_str = now_ist.strftime("%Y-%m-%d")
