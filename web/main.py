@@ -1640,17 +1640,28 @@ async def sitemap_xml():
     # Use current date for static pages
     now_iso = datetime.now(timezone.utc).strftime("%Y-%m-%d")
 
+    base_url = "https://stockresearch.app"
     xml_lines = [
         '<?xml version="1.0" encoding="UTF-8"?>',
         '<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">',
-        f'  <url><loc>https://stockresearch.app/</loc><lastmod>{now_iso}</lastmod><changefreq>daily</changefreq><priority>1.0</priority></url>',
-        f'  <url><loc>https://stockresearch.app/pricing</loc><lastmod>{now_iso}</lastmod><changefreq>weekly</changefreq><priority>0.8</priority></url>',
-        f'  <url><loc>https://stockresearch.app/terms</loc><lastmod>{now_iso}</lastmod><priority>0.5</priority></url>',
-        f'  <url><loc>https://stockresearch.app/privacy</loc><lastmod>{now_iso}</lastmod><priority>0.5</priority></url>',
-        f'  <url><loc>https://stockresearch.app/refund-policy</loc><lastmod>{now_iso}</lastmod><priority>0.5</priority></url>',
-        f'  <url><loc>https://stockresearch.app/contact</loc><lastmod>{now_iso}</lastmod><priority>0.5</priority></url>',
-        f'  <url><loc>https://stockresearch.app/shipping-policy</loc><lastmod>{now_iso}</lastmod><priority>0.5</priority></url>',
-        f'  <url><loc>https://stockresearch.app/disclaimer</loc><lastmod>{now_iso}</lastmod><priority>0.5</priority></url>',
+        f'  <url><loc>{base_url}/</loc><lastmod>{now_iso}</lastmod><changefreq>hourly</changefreq><priority>1.0</priority></url>',
+        f'  <url><loc>{base_url}/discovery</loc><lastmod>{now_iso}</lastmod><changefreq>daily</changefreq><priority>0.9</priority></url>',
+        f'  <url><loc>{base_url}/search</loc><lastmod>{now_iso}</lastmod><changefreq>daily</changefreq><priority>0.9</priority></url>',
+        f'  <url><loc>{base_url}/compare</loc><lastmod>{now_iso}</lastmod><changefreq>weekly</changefreq><priority>0.8</priority></url>',
+        f'  <url><loc>{base_url}/debt</loc><lastmod>{now_iso}</lastmod><changefreq>daily</changefreq><priority>0.8</priority></url>',
+        f'  <url><loc>{base_url}/funds</loc><lastmod>{now_iso}</lastmod><changefreq>daily</changefreq><priority>0.8</priority></url>',
+        f'  <url><loc>{base_url}/sovereign</loc><lastmod>{now_iso}</lastmod><changefreq>weekly</changefreq><priority>0.8</priority></url>',
+        f'  <url><loc>{base_url}/etfs</loc><lastmod>{now_iso}</lastmod><changefreq>daily</changefreq><priority>0.8</priority></url>',
+        f'  <url><loc>{base_url}/calculator/tax</loc><lastmod>{now_iso}</lastmod><changefreq>monthly</changefreq><priority>0.8</priority></url>',
+        f'  <url><loc>{base_url}/reits</loc><lastmod>{now_iso}</lastmod><changefreq>weekly</changefreq><priority>0.8</priority></url>',
+        f'  <url><loc>{base_url}/safety-radar</loc><lastmod>{now_iso}</lastmod><changefreq>weekly</changefreq><priority>0.8</priority></url>',
+        f'  <url><loc>{base_url}/pricing</loc><lastmod>{now_iso}</lastmod><changefreq>weekly</changefreq><priority>0.8</priority></url>',
+        f'  <url><loc>{base_url}/terms</loc><lastmod>{now_iso}</lastmod><priority>0.5</priority></url>',
+        f'  <url><loc>{base_url}/privacy</loc><lastmod>{now_iso}</lastmod><priority>0.5</priority></url>',
+        f'  <url><loc>{base_url}/refund-policy</loc><lastmod>{now_iso}</lastmod><priority>0.5</priority></url>',
+        f'  <url><loc>{base_url}/contact</loc><lastmod>{now_iso}</lastmod><priority>0.5</priority></url>',
+        f'  <url><loc>{base_url}/shipping-policy</loc><lastmod>{now_iso}</lastmod><priority>0.5</priority></url>',
+        f'  <url><loc>{base_url}/disclaimer</loc><lastmod>{now_iso}</lastmod><priority>0.5</priority></url>',
     ]
 
     for a in archives:
@@ -2633,44 +2644,4 @@ async def robots_txt():
         "Sitemap: https://stock-research-app-2ljm.onrender.com/sitemap.xml\n"
     )
     return Response(content=content, media_type="text/plain")
-
-
-@app.get("/sitemap.xml", response_class=Response)
-async def sitemap_xml():
-    """Generates an XML sitemap of all public routes and canonical stock dossiers."""
-    try:
-        archives = get_archived_reports_sync()
-    except Exception:
-        archives = []
-
-    base_url = "https://stock-research-app-2ljm.onrender.com"
-    today_str = datetime.now(timezone.utc).strftime("%Y-%m-%d")
-
-    urls = [
-        f"<url><loc>{base_url}/</loc><lastmod>{today_str}</lastmod><changefreq>hourly</changefreq><priority>1.0</priority></url>",
-        f"<url><loc>{base_url}/discovery</loc><lastmod>{today_str}</lastmod><changefreq>daily</changefreq><priority>0.9</priority></url>",
-        f"<url><loc>{base_url}/compare</loc><lastmod>{today_str}</lastmod><changefreq>weekly</changefreq><priority>0.8</priority></url>",
-        f"<url><loc>{base_url}/pricing</loc><lastmod>{today_str}</lastmod><changefreq>monthly</changefreq><priority>0.8</priority></url>",
-        f"<url><loc>{base_url}/contact</loc><lastmod>{today_str}</lastmod><changefreq>monthly</changefreq><priority>0.7</priority></url>",
-        f"<url><loc>{base_url}/disclaimer</loc><lastmod>{today_str}</lastmod><changefreq>monthly</changefreq><priority>0.6</priority></url>",
-        f"<url><loc>{base_url}/terms</loc><lastmod>{today_str}</lastmod><changefreq>monthly</changefreq><priority>0.5</priority></url>",
-        f"<url><loc>{base_url}/privacy</loc><lastmod>{today_str}</lastmod><changefreq>monthly</changefreq><priority>0.5</priority></url>",
-        f"<url><loc>{base_url}/refund-policy</loc><lastmod>{today_str}</lastmod><changefreq>monthly</changefreq><priority>0.5</priority></url>",
-        f"<url><loc>{base_url}/shipping-policy</loc><lastmod>{today_str}</lastmod><changefreq>monthly</changefreq><priority>0.5</priority></url>",
-    ]
-
-    for a in archives:
-        t = a.get("ticker")
-        if t:
-            urls.append(
-                f"<url><loc>{base_url}/dossier/{t}</loc><lastmod>{today_str}</lastmod><changefreq>daily</changefreq><priority>0.9</priority></url>"
-            )
-
-    xml_content = (
-        '<?xml version="1.0" encoding="UTF-8"?>\n'
-        '<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">\n'
-        + "\n".join(urls)
-        + "\n</urlset>"
-    )
-    return Response(content=xml_content, media_type="application/xml")
 
