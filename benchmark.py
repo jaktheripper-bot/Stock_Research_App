@@ -44,7 +44,10 @@ def run_benchmarks():
     t_conn = (time.perf_counter() - t0) * 1000
 
     # 2. Lean Archive Query (without report_text payload)
-    get_archived_reports.clear()
+    if hasattr(get_archived_reports, "cache_clear"):
+        get_archived_reports.cache_clear()
+    elif hasattr(get_archived_reports, "clear"):
+        get_archived_reports.clear()
     t0 = time.perf_counter()
     archives = get_archived_reports(include_text=False)
     t_arch = (time.perf_counter() - t0) * 1000
