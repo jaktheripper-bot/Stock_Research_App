@@ -18,6 +18,8 @@ tar --exclude="./.git" \
     --exclude="./__pycache__" \
     --exclude="./.pytest_cache" \
     --exclude="./backups" \
+    --exclude="./.tmp.driveupload" \
+    --exclude="*.tar.gz" \
     --exclude="./.streamlit/secrets.toml" \
     --exclude="./.env" \
     -czf "${ARCHIVE_PATH}" .
