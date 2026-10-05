@@ -319,6 +319,13 @@
         {% endif %}
       </div>
 
+      <!-- Purge Test Data Button (Top Header, All Tabs) -->
+      {% if current_admin.role in ['owner', 'admin'] %}
+      <button type="button" onclick="document.getElementById('purgeDataModal').style.display='flex'" class="btn btn-secondary btn-sm" style="color: #f87171; border-color: rgba(239, 68, 68, 0.45); background: rgba(239, 68, 68, 0.08); display: flex; align-items: center; gap: 6px; font-weight: 700; cursor: pointer;" title="Permanently delete synthetic test runs, dummy tickets, and test transactions">
+        🧹 Purge Test Data
+      </button>
+      {% endif %}
+
       <!-- Admin Identity & 2FA Badge -->
       <div style="display: flex; align-items: center; gap: 8px; background: rgba(15, 23, 42, 0.8); border: 1px solid var(--border-subtle, #1e293b); padding: 6px 12px; border-radius: 8px;">
         <span style="font-size: 12px; color: #f8fafc; font-weight: 600;">👤 {{ current_admin.email }}</span>
@@ -405,31 +412,36 @@
   <!-- TAB 1: Live Billables & Invoices -->
   <div id="tab-billables" class="admin-tab-pane {% if not active_tab or active_tab == 'billables' %}active{% endif %}">
     <!-- Financial Overview Sub-Grid -->
-    <div class="kpi-grid" style="grid-template-columns: repeat(auto-fit, minmax(190px, 1fr));">
-      <div class="kpi-card">
-        <div class="kpi-label">Gross Revenue</div>
-        <div class="kpi-value">₹{{ "{:,.2f}".format(rev_summary.gross_revenue_inr) }}</div>
-        <div class="kpi-delta">{{ rev_summary.paid_orders_count }} paid transactions</div>
+    <div class="kpi-grid" style="grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));">
+      <div class="kpi-card" style="border-left: 3px solid #10b981;">
+        <div class="kpi-label">Verified Cash Income <span>💵</span></div>
+        <div class="kpi-value" style="color: #34d399;">₹{{ "{:,.2f}".format(rev_summary.gross_revenue_inr) }}</div>
+        <div class="kpi-delta success">{{ rev_summary.paid_orders_count }} Verified Paid Order(s)</div>
       </div>
       <div class="kpi-card">
-        <div class="kpi-label">GST 18% (SAC 998314)</div>
-        <div class="kpi-value">₹{{ "{:,.2f}".format(rev_summary.tax_gst_collected_inr) }}</div>
-        <div class="kpi-delta">Statutory Tax Payable</div>
-      </div>
-      <div class="kpi-card">
-        <div class="kpi-label">Net Software Rev</div>
+        <div class="kpi-label">Net Software Rev <span>📈</span></div>
         <div class="kpi-value">₹{{ "{:,.2f}".format(rev_summary.net_revenue_inr) }}</div>
-        <div class="kpi-delta success">Net of GST & Returns</div>
+        <div class="kpi-delta">GST 18%: ₹{{ "{:,.2f}".format(rev_summary.tax_gst_collected_inr) }}</div>
+      </div>
+      <div class="kpi-card" style="border-left: 3px solid #38bdf8;">
+        <div class="kpi-label">Paid Tokens Issued <span>🪙</span></div>
+        <div class="kpi-value" style="color: #38bdf8;">{{ "{:,.1f}".format(rev_summary.paid_credits_issued) }}</div>
+        <div class="kpi-delta">Cash-Backed Credits</div>
+      </div>
+      <div class="kpi-card" style="border-left: 3px solid #c084fc;">
+        <div class="kpi-label">Free Trial Tokens (₹0) <span>🎁</span></div>
+        <div class="kpi-value" style="color: #c084fc;">{{ "{:,.1f}".format(rev_summary.free_credits_issued) }}</div>
+        <div class="kpi-delta">{{ rev_summary.welcome_grants_count }} Free Welcome Grants</div>
       </div>
       <div class="kpi-card">
-        <div class="kpi-label">Total Refunds</div>
+        <div class="kpi-label">Total Refunds <span>↩️</span></div>
         <div class="kpi-value">₹{{ "{:,.2f}".format(rev_summary.refunded_amount_inr) }}</div>
         <div class="kpi-delta warning">{{ rev_summary.refunded_orders_count }} reversal(s)</div>
       </div>
       <div class="kpi-card">
-        <div class="kpi-label">Circulating Credits</div>
+        <div class="kpi-label">Circulating Liability <span>⚖️</span></div>
         <div class="kpi-value">{{ "{:,.1f}".format(rev_summary.credits_in_circulation) }}</div>
-        <div class="kpi-delta">{{ rev_summary.active_subscribers_count }} active accounts</div>
+        <div class="kpi-delta">{{ rev_summary.active_subscribers_count }} accounts with balance</div>
       </div>
     </div>
 
@@ -437,7 +449,12 @@
     <div class="admin-card">
       <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px; flex-wrap: wrap; gap: 12px;">
         <h3 style="margin: 0; font-size: 16px; font-weight: 700;">💳 Transaction & Tax Invoices Ledger</h3>
-        <div style="display: flex; gap: 10px;">
+        <div style="display: flex; gap: 10px; flex-wrap: wrap;">
+          {% if current_admin.role in ['owner', 'admin'] %}
+          <button type="button" onclick="document.getElementById('purgeDataModal').style.display='flex'" class="btn btn-secondary btn-sm" style="color: #f87171; border-color: rgba(239, 68, 68, 0.45); background: rgba(239, 68, 68, 0.08); display: flex; align-items: center; gap: 6px; font-weight: 600; cursor: pointer;">
+            🧹 Purge Test Data
+          </button>
+          {% endif %}
           <a href="/admin/export/tax-register" class="btn btn-secondary btn-sm" download>
             📥 Export GSTR-1 Tax Register (CSV)
           </a>
@@ -454,7 +471,8 @@
               <th>Invoice #</th>
               <th>Date</th>
               <th>Customer</th>
-              <th>Pack</th>
+              <th>Nature</th>
+              <th>Pack & Credits</th>
               <th>Total INR</th>
               <th>Base Value</th>
               <th>GST (18%)</th>
@@ -471,7 +489,21 @@
                 <div style="font-weight: 600;">{{ b.customer_name }}</div>
                 <div style="font-size: 11px; color: var(--text-secondary, #94a3b8);">{{ b.customer_email }}</div>
               </td>
-              <td><span class="status-pill closed">{{ b.pack_type }}</span></td>
+              <td>
+                {% if b.nature == 'VERIFIED_PAID' %}
+                <span class="status-pill success" style="font-size: 11px;">💳 Real Paid</span>
+                {% elif b.nature == 'FREE_GRANT' %}
+                <span class="status-pill" style="background: rgba(147, 51, 234, 0.15); color: #c084fc; border: 1px solid rgba(147, 51, 234, 0.3); font-size: 11px;">🎁 Free Grant (₹0)</span>
+                {% elif b.nature == 'SIMULATION' %}
+                <span class="status-pill warning" style="font-size: 11px;">🧪 Simulation</span>
+                {% else %}
+                <span class="status-pill closed" style="font-size: 11px;">{{ b.nature_label or 'Standard' }}</span>
+                {% endif %}
+              </td>
+              <td>
+                <span class="status-pill closed">{{ b.pack_type }}</span>
+                <span style="font-size: 11px; color: var(--text-secondary, #94a3b8); margin-left: 4px;">(+{{ b.credits_added }})</span>
+              </td>
               <td class="mono" style="font-weight: 700;">₹{{ "{:,.2f}".format(b.amount_inr) }}</td>
               <td class="mono">₹{{ "{:,.2f}".format(b.base_amount_inr) }}</td>
               <td class="mono">₹{{ "{:,.2f}".format(b.tax_gst_inr) }}</td>
@@ -486,7 +518,7 @@
             </tr>
             {% else %}
             <tr>
-              <td colspan="9" style="text-align: center; color: var(--text-secondary, #94a3b8); padding: 30px;">
+              <td colspan="10" style="text-align: center; color: var(--text-secondary, #94a3b8); padding: 30px;">
                 No billing transactions recorded in this period.
               </td>
             </tr>
@@ -1136,6 +1168,7 @@
       </div>
 
       <form method="POST" action="/admin/telemetry/purge-test-data" style="display: flex; gap: 10px; justify-content: flex-end;">
+        <input type="hidden" name="tab" id="purgeModalTabInput" value="{{ active_tab or 'billables' }}">
         <button type="button" onclick="document.getElementById('purgeDataModal').style.display='none'" class="btn btn-secondary" style="padding: 8px 16px; font-size: 13px;">
           Cancel
         </button>
@@ -1164,6 +1197,10 @@
     const tabInput = document.getElementById('activeTabInput');
     if (tabInput) {
       tabInput.value = tabName;
+    }
+    const purgeTabInput = document.getElementById('purgeModalTabInput');
+    if (purgeTabInput) {
+      purgeTabInput.value = tabName;
     }
 
     // Update URL query parameter smoothly without page reload

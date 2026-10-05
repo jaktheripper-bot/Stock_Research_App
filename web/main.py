@@ -1799,6 +1799,16 @@ async def admin_purge_test_data(request: Request):
     if client_ip and "," in client_ip:
         client_ip = client_ip.split(",")[0].strip()
 
+    # Determine originating tab to preserve user context (default to telemetry)
+    return_tab = None
+    try:
+        form_data = await request.form()
+        return_tab = form_data.get("tab")
+    except Exception:
+        pass
+    if not return_tab:
+        return_tab = request.query_params.get("tab") or "telemetry"
+
     counts = purge_test_telemetry()
 
     record_admin_audit(
@@ -1809,8 +1819,8 @@ async def admin_purge_test_data(request: Request):
         ip_address=client_ip
     )
 
-    msg = f"Successfully+purged+{counts['events_purged']}+test+events,+{counts['tickets_purged']}+test+tickets,+and+{counts['transactions_purged']}+test+transactions.+Dashboard+is+now+clean."
-    return RedirectResponse(url=f"/admin?tab=telemetry&msg={msg}", status_code=303)
+    msg = f"Successfully+purged+{counts.get('events_purged', 0)}+test+events,+{counts.get('tickets_purged', 0)}+test+tickets,+and+{counts.get('transactions_purged', 0)}+test+orders.+Dashboard+is+now+clean."
+    return RedirectResponse(url=f"/admin?tab={return_tab}&msg={msg}", status_code=303)
 
 @app.get("/admin/auth/google")
 async def admin_auth_google(request: Request):

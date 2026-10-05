@@ -604,32 +604,52 @@ def purge_test_telemetry() -> dict:
         except Exception as te:
             logger.debug(f"Support tickets purge notice: {te}")
 
-        # 3. Purge test credit_transactions
+        # 3. Purge test credit_transactions (including simulation checkouts)
         try:
             cursor.execute("""
                 DELETE FROM credit_transactions
                 WHERE customer_email LIKE '%@example.com'
                    OR customer_email LIKE '%@test.com'
+                   OR customer_email LIKE '%@pytest.com'
                    OR user_id LIKE 'test_%'
-                   OR order_id LIKE 'order_test_%'
-                   OR order_id LIKE 'test_%';
+                   OR user_id IN ('guest_web_user', 'test_user', 'testclient', 'test_admin')
+                   OR gateway_order_id LIKE 'order_test_%'
+                   OR gateway_order_id LIKE 'order_sim_%'
+                   OR gateway_order_id LIKE 'test_%'
+                   OR gateway_payment_id LIKE 'pay_test_%'
+                   OR gateway_payment_id LIKE 'pay_sim_%'
+                   OR payment_gateway = 'simulation'
+                   OR id LIKE 'tx_test_%'
+                   OR id LIKE 'test_%';
             """)
             purged_counts["transactions_purged"] = cursor.rowcount if cursor.rowcount and cursor.rowcount > 0 else 0
         except Exception as cte:
-            logger.debug(f"Credit transactions purge notice: {cte}")
+            logger.warning(f"Credit transactions purge notice: {cte}")
 
-        # 4. Purge test user_accounts
+        # 4. Purge test user_accounts (primary key is id)
         try:
             cursor.execute("""
                 DELETE FROM user_accounts
                 WHERE email LIKE '%@example.com'
                    OR email LIKE '%@test.com'
-                   OR user_id LIKE 'test_%'
-                   OR user_id IN ('guest_web_user', 'test_user');
+                   OR email LIKE '%@pytest.com'
+                   OR id LIKE 'test_%'
+                   OR id IN ('guest_web_user', 'test_user', 'testclient', 'test_admin');
             """)
             purged_counts["users_purged"] = cursor.rowcount if cursor.rowcount and cursor.rowcount > 0 else 0
         except Exception as ue:
-            logger.debug(f"User accounts purge notice: {ue}")
+            logger.warning(f"User accounts purge notice: {ue}")
+
+        # 5. Purge test credit_usage_ledger
+        try:
+            cursor.execute("""
+                DELETE FROM credit_usage_ledger
+                WHERE user_id LIKE 'test_%'
+                   OR user_id IN ('guest_web_user', 'test_user', 'testclient', 'test_admin');
+            """)
+            purged_counts["ledger_purged"] = cursor.rowcount if cursor.rowcount and cursor.rowcount > 0 else 0
+        except Exception as le:
+            logger.warning(f"Credit usage ledger purge notice: {le}")
 
         conn.commit()
     except Exception as e:

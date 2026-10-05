@@ -336,6 +336,13 @@ def add_user_credits(
             base_amt = 0.0
             gst_amt = 0.0
 
+        # Determine gateway and simulation flag
+        is_simulation_order = bool(
+            (gateway_order_id and str(gateway_order_id).startswith(("order_sim_", "order_test_"))) or
+            (gateway_payment_id and str(gateway_payment_id).startswith(("pay_sim_", "pay_test_")))
+        )
+        effective_gateway = "simulation" if is_simulation_order else "razorpay"
+
         # Insert Transaction with complete tax & customer audit trail
         try:
             cursor.execute(
@@ -345,18 +352,18 @@ def add_user_credits(
                     gateway_order_id, gateway_payment_id, status, pack_type, invoice_number,
                     customer_email, customer_name, base_amount_inr, tax_gst_inr, sac_code
                 )
-                VALUES ({p}, {p}, {p}, {p}, 'razorpay', {p}, {p}, {p}, {p}, {p}, {p}, {p}, {p}, {p}, '998314');
+                VALUES ({p}, {p}, {p}, {p}, {p}, {p}, {p}, {p}, {p}, {p}, {p}, {p}, {p}, {p}, '998314');
                 """,
-                (tx_id, clean_id, amt, credits_to_add, gateway_order_id, gateway_payment_id, status, pack_type, inv_num, cust_email, cust_name, base_amt, gst_amt)
+                (tx_id, clean_id, amt, credits_to_add, effective_gateway, gateway_order_id, gateway_payment_id, status, pack_type, inv_num, cust_email, cust_name, base_amt, gst_amt)
             )
         except Exception:
             # Fallback for earlier schema if columns not yet committed
             cursor.execute(
                 f"""
                 INSERT INTO credit_transactions (id, user_id, amount_inr, credits_added, payment_gateway, gateway_order_id, gateway_payment_id, status, pack_type, invoice_number)
-                VALUES ({p}, {p}, {p}, {p}, 'razorpay', {p}, {p}, {p}, {p}, {p});
+                VALUES ({p}, {p}, {p}, {p}, {p}, {p}, {p}, {p}, {p}, {p});
                 """,
-                (tx_id, clean_id, amt, credits_to_add, gateway_order_id, gateway_payment_id, status, pack_type, inv_num)
+                (tx_id, clean_id, amt, credits_to_add, effective_gateway, gateway_order_id, gateway_payment_id, status, pack_type, inv_num)
             )
 
         # Handle Subscriptions (Pro Monthly / Annual)
@@ -421,9 +428,11 @@ def get_all_billables(status: Optional[str] = None, limit: int = 100, offset: in
             where_conditions.append(f"t.status = {p}")
             params.append(status.lower())
         if exclude_tests:
-            where_conditions.append("(t.customer_email IS NULL OR (t.customer_email NOT LIKE '%@example.com' AND t.customer_email NOT LIKE '%@test.com'))")
-            where_conditions.append("(t.user_id NOT LIKE 'test_%' AND t.user_id != 'guest_web_user')")
-            where_conditions.append("(t.gateway_order_id IS NULL OR t.gateway_order_id NOT LIKE 'order_test_%')")
+            where_conditions.append("(t.customer_email IS NULL OR (t.customer_email NOT LIKE '%@example.com' AND t.customer_email NOT LIKE '%@test.com' AND t.customer_email NOT LIKE '%@pytest.com'))")
+            where_conditions.append("(t.user_id NOT LIKE 'test_%' AND t.user_id NOT IN ('guest_web_user', 'testclient', 'test_admin', 'test_user'))")
+            where_conditions.append("(t.gateway_order_id IS NULL OR (t.gateway_order_id NOT LIKE 'order_test_%' AND t.gateway_order_id NOT LIKE 'order_sim_%'))")
+            where_conditions.append("(t.gateway_payment_id IS NULL OR (t.gateway_payment_id NOT LIKE 'pay_test_%' AND t.gateway_payment_id NOT LIKE 'pay_sim_%'))")
+            where_conditions.append("t.payment_gateway != 'simulation'")
 
         where_clause = f"WHERE {' AND '.join(where_conditions)}" if where_conditions else ""
 
@@ -458,6 +467,26 @@ def get_all_billables(status: Optional[str] = None, limit: int = 100, offset: in
                 base = round(amt / 1.18, 2)
                 gst = round(amt - base, 2)
 
+            # Classify transaction nature (Verified Cash vs Free Token Grant vs Simulation)
+            g_ord = (r[5] or "").lower()
+            g_pay = (r[6] or "").lower()
+            gw = (r[4] or "").lower()
+            pack = (r[8] or "").upper()
+            st = (r[7] or "success").lower()
+
+            if "sim" in g_ord or "sim" in g_pay or gw == "simulation" or "order_test" in g_ord:
+                nature = "SIMULATION"
+                nature_label = "🧪 Sandbox Test"
+            elif pack == "WELCOME_GRANT" or (amt == 0.0 and (gw == "system_grant" or "grant" in pack or "free" in pack)):
+                nature = "FREE_GRANT"
+                nature_label = "🎁 Free Grant (₹0)"
+            elif amt > 0 and st in ("success", "paid"):
+                nature = "VERIFIED_PAID"
+                nature_label = "💳 Paid Order"
+            else:
+                nature = "PROMO"
+                nature_label = "🎟️ Free Token"
+
             billables.append({
                 "id": r[0],
                 "user_id": r[1],
@@ -466,7 +495,7 @@ def get_all_billables(status: Optional[str] = None, limit: int = 100, offset: in
                 "gateway": r[4] or "razorpay",
                 "gateway_order_id": r[5] or "",
                 "gateway_payment_id": r[6] or "",
-                "status": (r[7] or "success").lower(),
+                "status": st,
                 "pack_type": r[8],
                 "invoice_number": r[9] or f"INV-{r[0]}",
                 "date": _format_timestamp(r[10]),
@@ -478,7 +507,9 @@ def get_all_billables(status: Optional[str] = None, limit: int = 100, offset: in
                 "refund_amount_inr": float(r[16] or 0.0),
                 "refund_reason": r[17] or "",
                 "gateway_refund_id": r[18] or "",
-                "refunded_at": _format_timestamp(r[19]) if r[19] else None
+                "refunded_at": _format_timestamp(r[19]) if r[19] else None,
+                "nature": nature,
+                "nature_label": nature_label,
             })
         return billables
     except Exception as e:
@@ -493,7 +524,8 @@ def get_revenue_analytics_summary(days: int = None, start_date = None, end_date 
     """
     Computes institutional revenue summary, GST collected, returns/refunds,
     and circulating credit liabilities across a selectable time window.
-    Filters out synthetic test transactions by default.
+    Strictly distinguishes genuine, bank-cleared revenue (Razorpay)
+    from promotional welcome grants, free test tokens, and sandbox checkout simulations.
     """
     init_db()
     conn = get_db_connection()
@@ -507,8 +539,10 @@ def get_revenue_analytics_summary(days: int = None, start_date = None, end_date 
         "tax_gst_collected_inr": 0.0,
         "refunded_amount_inr": 0.0,
         "paid_orders_count": 0,
+        "paid_credits_issued": 0.0,
         "refunded_orders_count": 0,
         "welcome_grants_count": 0,
+        "free_credits_issued": 0.0,
         "credits_in_circulation": 0.0,
         "active_subscribers_count": 0
     }
@@ -517,16 +551,34 @@ def get_revenue_analytics_summary(days: int = None, start_date = None, end_date 
         time_filter = _build_telemetry_time_filter(supabase_url, days=days, start_date=start_date, end_date=end_date, exclude_tests=False)
         time_filter_tx = time_filter.replace("timestamp", "created_at")
         if exclude_tests:
-            time_filter_tx += " AND (customer_email IS NULL OR (customer_email NOT LIKE '%@example.com' AND customer_email NOT LIKE '%@test.com')) AND (user_id IS NULL OR (user_id NOT LIKE 'test_%' AND user_id != 'guest_web_user')) AND (gateway_order_id IS NULL OR gateway_order_id NOT LIKE 'order_test_%')"
+            time_filter_tx += " AND (customer_email IS NULL OR (customer_email NOT LIKE '%@example.com' AND customer_email NOT LIKE '%@test.com' AND customer_email NOT LIKE '%@pytest.com')) AND (user_id IS NULL OR (user_id NOT LIKE 'test_%' AND user_id NOT IN ('guest_web_user', 'testclient', 'test_admin', 'test_user'))) AND (gateway_order_id IS NULL OR (gateway_order_id NOT LIKE 'order_test_%' AND gateway_order_id NOT LIKE 'order_sim_%')) AND (gateway_payment_id IS NULL OR (gateway_payment_id NOT LIKE 'pay_test_%' AND gateway_payment_id NOT LIKE 'pay_sim_%')) AND payment_gateway != 'simulation'"
 
-        # 1. Total paid revenue, GST, and order count
+        # 1. Total paid revenue, GST, order count, and separate paid vs free token accounting
         cursor.execute(f"""
             SELECT 
-                COUNT(CASE WHEN amount_inr > 0 AND status = 'success' THEN 1 END) as paid_orders,
-                SUM(CASE WHEN amount_inr > 0 AND status = 'success' THEN amount_inr ELSE 0 END) as gross_rev,
+                COUNT(CASE WHEN amount_inr > 0 AND status = 'success' 
+                           AND payment_gateway != 'simulation'
+                           AND (gateway_payment_id IS NULL OR (gateway_payment_id NOT LIKE 'pay_sim_%' AND gateway_payment_id NOT LIKE 'pay_test_%'))
+                           AND (gateway_order_id IS NULL OR (gateway_order_id NOT LIKE 'order_sim_%' AND gateway_order_id NOT LIKE 'order_test_%'))
+                           THEN 1 END) as paid_orders,
+                COALESCE(SUM(CASE WHEN amount_inr > 0 AND status = 'success' 
+                           AND payment_gateway != 'simulation'
+                           AND (gateway_payment_id IS NULL OR (gateway_payment_id NOT LIKE 'pay_sim_%' AND gateway_payment_id NOT LIKE 'pay_test_%'))
+                           AND (gateway_order_id IS NULL OR (gateway_order_id NOT LIKE 'order_sim_%' AND gateway_order_id NOT LIKE 'order_test_%'))
+                           THEN amount_inr ELSE 0 END), 0.0) as gross_rev,
                 COUNT(CASE WHEN status IN ('refunded', 'reversed') THEN 1 END) as refund_count,
-                SUM(COALESCE(refund_amount_inr, 0.0)) as refund_sum,
-                COUNT(CASE WHEN pack_type = 'WELCOME_GRANT' THEN 1 END) as welcome_grants
+                COALESCE(SUM(refund_amount_inr), 0.0) as refund_sum,
+                COUNT(CASE WHEN pack_type = 'WELCOME_GRANT' 
+                           OR (amount_inr = 0 AND (payment_gateway = 'system_grant' OR pack_type LIKE '%GRANT%' OR pack_type LIKE '%FREE%'))
+                           THEN 1 END) as welcome_grants,
+                COALESCE(SUM(CASE WHEN pack_type = 'WELCOME_GRANT' 
+                           OR (amount_inr = 0 AND (payment_gateway = 'system_grant' OR pack_type LIKE '%GRANT%' OR pack_type LIKE '%FREE%'))
+                           THEN credits_added ELSE 0 END), 0.0) as free_credits,
+                COALESCE(SUM(CASE WHEN amount_inr > 0 AND status = 'success' 
+                           AND payment_gateway != 'simulation'
+                           AND (gateway_payment_id IS NULL OR (gateway_payment_id NOT LIKE 'pay_sim_%' AND gateway_payment_id NOT LIKE 'pay_test_%'))
+                           AND (gateway_order_id IS NULL OR (gateway_order_id NOT LIKE 'order_sim_%' AND gateway_order_id NOT LIKE 'order_test_%'))
+                           THEN credits_added ELSE 0 END), 0.0) as paid_credits
             FROM credit_transactions
             WHERE {time_filter_tx};
         """)
@@ -534,11 +586,13 @@ def get_revenue_analytics_summary(days: int = None, start_date = None, end_date 
         if row:
             gross = float(row[1] or 0.0)
             refund_sum = float(row[3] or 0.0)
-            summary["gross_revenue_inr"] = gross
             summary["paid_orders_count"] = int(row[0] or 0)
+            summary["gross_revenue_inr"] = gross
             summary["refunded_orders_count"] = int(row[2] or 0)
             summary["refunded_amount_inr"] = refund_sum
             summary["welcome_grants_count"] = int(row[4] or 0)
+            summary["free_credits_issued"] = float(row[5] or 0.0)
+            summary["paid_credits_issued"] = float(row[6] or 0.0)
 
             # 18% GST calculation (Price inclusive of GST)
             if gross > 0:
