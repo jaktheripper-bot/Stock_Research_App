@@ -254,5 +254,21 @@
       "revision_count": 0
     },
     "preflight_passed": true
+  },
+  {
+    "tag": "checkpoint_20261005_235838_verified_revenue_isolation_and_admin_purge",
+    "timestamp": "2026-10-05 23:58:38 IST",
+    "commit_sha": "4e57bd83d04c2e140e740e1d525ccc280189502e",
+    "branch": "main",
+    "description": "verified_revenue_isolation_and_admin_purge",
+    "database": {
+      "exists": true,
+      "filename": "reports_checkpoint_20261005_235838_verified_revenue_isolation_and_admin_purge.db",
+      "path": ".checkpoints/reports_checkpoint_20261005_235838_verified_revenue_isolation_and_admin_purge.db",
+      "size_bytes": 638976,
+      "report_count": 1,
+      "revision_count": 36
+    },
+    "preflight_passed": true
   }
 ]
