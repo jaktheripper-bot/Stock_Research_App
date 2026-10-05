@@ -17,3 +17,4 @@ backups/
 scratch/
 .tmp.driveupload/
 *.code-workspace
+.cache/

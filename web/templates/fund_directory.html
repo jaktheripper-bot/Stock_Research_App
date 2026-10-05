@@ -42,10 +42,23 @@
     </div>
   </div>
 
+  <!-- Mutual Fund Search Bar -->
+  <div style="background: rgba(30, 41, 59, 0.4); border: 1px solid rgba(255, 255, 255, 0.1); border-radius: 12px; padding: 14px 18px; margin-bottom: 20px;">
+    <form action="/funds" method="GET" style="display: flex; gap: 10px; align-items: center; flex-wrap: wrap;">
+      <div style="flex: 1; min-width: 260px;">
+        <input type="text" name="q" value="{{ query or '' }}" placeholder="🔍 Search by Scheme Name, AMFI Code, AMC (e.g. Parag Parikh, Quant, 122639)..." class="form-control" style="background: rgba(15, 23, 42, 0.9); border: 1px solid rgba(255, 255, 255, 0.15); color: #fff; padding: 10px 16px; border-radius: 8px; width: 100%;">
+      </div>
+      <button type="submit" class="btn btn-primary btn-sm" style="padding: 10px 18px; font-weight: 700;">Search Schemes</button>
+      {% if query %}
+      <a href="/funds" class="btn btn-secondary btn-sm" style="padding: 10px 14px;">Clear Search</a>
+      {% endif %}
+    </form>
+  </div>
+
   <!-- Actions Bar & Filter Navigation Tabs -->
   <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 12px; margin-bottom: 24px;">
     <div style="display: flex; gap: 8px; overflow-x: auto; padding-bottom: 4px;">
-      <a href="/funds" class="btn btn-sm {% if not current_category %}btn-primary{% else %}btn-secondary{% endif %}" style="border-radius: 9999px;">All Schemes ({{ schemes|length }})</a>
+      <a href="/funds" class="btn btn-sm {% if not current_category and not query %}btn-primary{% else %}btn-secondary{% endif %}" style="border-radius: 9999px;">All Schemes ({{ schemes|length }})</a>
       <a href="/funds?broad_category=EQUITY" class="btn btn-sm {% if current_category == 'EQUITY' %}btn-primary{% else %}btn-secondary{% endif %}" style="border-radius: 9999px;">📈 Equity Funds</a>
       <a href="/funds?broad_category=HYBRID" class="btn btn-sm {% if current_category == 'HYBRID' %}btn-primary{% else %}btn-secondary{% endif %}" style="border-radius: 9999px;">⚖️ Balanced Advantage / Hybrid</a>
       <a href="/funds?broad_category=DEBT" class="btn btn-sm {% if current_category == 'DEBT' %}btn-primary{% else %}btn-secondary{% endif %}" style="border-radius: 9999px;">🏛️ Corporate Bond & Debt</a>

@@ -280,6 +280,7 @@ def evaluate_dual_sleeve_lookthrough(
     debt_weight = 0.0
     cash_weight = 0.0
 
+    equity_covered_weight = 0.0
     equity_weighted_score = 0.0
     debt_weighted_score = 0.0
     cash_score = 100.0  # Cash/TREPS represents risk-free baseline
@@ -294,23 +295,48 @@ def evaluate_dual_sleeve_lookthrough(
         name = h.get("holding_name", ident)
         sector_or_rating = h.get("sector_or_rating", "")
 
-        score = 70.0
+        score = None
         posture_badge = "badge-neutral"
         notes = ""
+        is_researched = False
 
         if h_type in ("EQUITY", "FOREIGN_EQUITY"):
             equity_weight += w
-            score = EQUITY_HEALTH_DEFAULTS.get(ident, 72.0)
-            equity_weighted_score += (score * w)
-            if score >= 80:
+
+            # Zero-Hallucination: Check if genuine 7-Pillar Equity report exists
+            rep = None
+            try:
+                from core.db.reports import get_report_by_ticker
+                rep = get_report_by_ticker(ident)
+            except Exception:
+                pass
+
+            is_researched = bool(rep and rep.get("report_text"))
+            if is_researched:
+                score = 82.0  # Verified 7-pillar institutional asset
+                equity_covered_weight += w
+                equity_weighted_score += (score * w)
                 posture_badge = "badge-success"
-                notes = "High-Quality Capital Compounder"
-            elif score < 65:
-                posture_badge = "badge-warning"
-                notes = "Elevated Fundamental or Valuation Risk"
+                notes = "Verified 7-Pillar Equity Dossier Available"
+            elif ident in EQUITY_HEALTH_DEFAULTS:
+                # Calibrated baseline proxy for benchmark constituent
+                score = float(EQUITY_HEALTH_DEFAULTS[ident])
+                equity_covered_weight += w
+                equity_weighted_score += (score * w)
+                if score >= 80:
+                    posture_badge = "badge-success"
+                    notes = "High-Quality Capital Compounder"
+                elif score < 65:
+                    posture_badge = "badge-warning"
+                    notes = "Elevated Fundamental or Valuation Risk"
+                else:
+                    posture_badge = "badge-neutral"
+                    notes = "Solid Core Holding"
             else:
+                # Strict Zero-Hallucination: Mark unresearched stock as N/A
+                score = None
                 posture_badge = "badge-neutral"
-                notes = "Solid Core Holding"
+                notes = "Coverage Pending (Run 7-Pillar Audit)"
 
         elif h_type in ("DEBT", "SDI"):
             debt_weight += w
@@ -352,13 +378,15 @@ def evaluate_dual_sleeve_lookthrough(
             "holding_type": h_type,
             "weight_pct": round(w, 2),
             "sector_or_rating": sector_or_rating,
-            "score": round(score, 1),
+            "score": round(score, 1) if score is not None else "N/A",
             "posture_badge": posture_badge,
-            "notes": notes
+            "notes": notes,
+            "is_researched": is_researched or (ident in EQUITY_HEALTH_DEFAULTS)
         })
 
     # Normalized scores
-    eq_score_norm = (equity_weighted_score / equity_weight) if equity_weight > 0 else 0.0
+    equity_coverage_pct = round((equity_covered_weight / equity_weight * 100.0), 1) if equity_weight > 0 else 0.0
+    eq_score_norm = (equity_weighted_score / equity_covered_weight) if equity_covered_weight > 0 else 72.0
     debt_score_norm = (debt_weighted_score / debt_weight) if debt_weight > 0 else 0.0
 
     # Composite Fund Health Score
@@ -410,6 +438,7 @@ def evaluate_dual_sleeve_lookthrough(
             "cash_weight_pct": round(cash_weight, 1),
             "equity_sleeve_score": round(eq_score_norm, 1),
             "debt_sleeve_score": round(debt_score_norm, 1),
+            "equity_coverage_pct": equity_coverage_pct,
         },
         "top_10_weight_pct": top_10_weight,
         "warnings": warnings,

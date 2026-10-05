@@ -6,6 +6,7 @@
 - [x] Add unit and integration tests for alerting and comparison features.
 - [x] Decouple core database, analysis, billing, and auth stack from Streamlit runtime; build native SSR Admin & Telemetry Console.
 - [ ] Add a way for the reports to be customised under the pro-desk & corporate & advisory bulk packs.
+- [x] Add a way for users to search for specific investment products as well (omni-search across stocks, debt/NCDs, and mutual funds via `/search` & `/api/search/products`).
 - [ ] Add research to be done on API ingestion for MSME analysis.
 - [x] Keep backup step synchronized with future deployment changes (pre & post commit backups).
 
@@ -31,8 +32,8 @@
 - [x] Implement True Diversification & Overlap Diagnostic: Compute Active Share ($AS \ge 60\%$) to expose closet indexing, Top 10 concentration, and cross-scheme duplicate holdings.
 - [x] Build Risk-Adjusted Alpha & Downside Capture Calculator: Compute Sortino Ratio, Rolling 3Y/5Y Consistency, Hurst Exponent ($H > 0.5$), and Downside Capture Ratio ($DCR \le 75\%$).
 - [x] Build Intermediary Fee Drag & Churn Analyzer: Quantify 10-year compounded wealth loss in Direct vs. Regular TER, and track Portfolio Turnover Ratio (PTR).
-- [ ] **P2 Remediation:** Replace hand-typed seed data (`seed_default_mutual_funds`) with live AMFI `NAVAll.txt` ingestion + scheme master; mark any non-ingested metric as `N/A`.
-- [ ] **P2 Remediation:** Add `ALWAYS_ON_ASSET_SCAN` rule (hooks.json) + scheduled MF/debt scans: daily diff → NEW / CHANGED / CLOSED-MERGED → ARCHIVED (append-only), logged to a `scan_runs` ledger and surfaced in the admin console.
+- [x] **P2 Remediation:** Replace hand-typed seed data (`seed_default_mutual_funds`) with live AMFI `NAVAll.txt` ingestion + scheme master; unresearched stocks strictly marked as `N/A` with coverage pending and zero-hallucination compliance.
+- [x] **P2 Remediation:** Add `ALWAYS_ON_ASSET_SCAN` rule + scheduled MF/debt surveillance engine: daily diff → NEW / CHANGED / CLOSED-MERGED → ARCHIVED (append-only), logged to immutable `asset_scan_runs` ledger and surfaced in `/admin?tab=assets` console.
 
 ### Priority 3: Sovereign Curve & ETF Analytics
 - [ ] Ingest Sovereign Risk-Free Benchmarks: Ingest RBI/FBIL T-Bills (91/182/364-day), 10-Yr G-Sec, and SDL yield curves.

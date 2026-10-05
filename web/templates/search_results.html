@@ -1,0 +1,187 @@
+{% extends "base.html" %}
+
+{% block title %}Omni-Product Investment Search | Equities, Mutual Funds & Debt{% endblock %}
+{% block meta_description %}Unified institutional search across Indian listed equities, AMFI mutual fund schemes, and BSE/NSE corporate debt securities.{% endblock %}
+
+{% block content %}
+<div class="container py-8">
+  <!-- Search Hero Header -->
+  <div style="background: linear-gradient(135deg, rgba(30, 41, 59, 0.7) 0%, rgba(15, 23, 42, 0.9) 100%); border: 1px solid rgba(255, 255, 255, 0.1); border-radius: 16px; padding: 32px; margin-bottom: 28px;">
+    <div style="display: inline-flex; align-items: center; gap: 8px; background: rgba(14, 165, 233, 0.15); border: 1px solid rgba(14, 165, 233, 0.3); border-radius: 9999px; padding: 4px 12px; margin-bottom: 16px;">
+      <span style="width: 8px; height: 8px; border-radius: 50%; background: #0ea5e9;"></span>
+      <span style="font-size: 12px; font-weight: 700; color: #38bdf8; text-transform: uppercase; letter-spacing: 0.05em;">Multi-Asset Omni Search</span>
+    </div>
+
+    <h1 style="font-size: 32px; font-weight: 800; color: #f8fafc; margin-bottom: 12px; letter-spacing: -0.02em;">
+      Search Investment Products
+    </h1>
+    <p style="font-size: 15px; color: #94a3b8; max-width: 780px; line-height: 1.6; margin-bottom: 24px;">
+      Instant discovery across <strong>Public Equities</strong>, <strong>AMFI Mutual Funds</strong>, and <strong>Listed Corporate Bonds & SDIs</strong>. Search by company name, ticker symbol, scheme code, or ISIN.
+    </p>
+
+    <!-- Search Form -->
+    <form action="/search" method="GET" style="display: flex; gap: 10px; max-width: 760px; flex-wrap: wrap;">
+      <div style="flex: 1; min-width: 280px; position: relative;">
+        <input type="text" name="q" id="omniSearchInput" value="{{ query or '' }}" placeholder="Search stocks, mutual funds, bonds (e.g. INFY, Parag Parikh, HDFC, INE002A)..." autofocus class="form-control" style="background: rgba(15, 23, 42, 0.9); border: 1px solid rgba(255, 255, 255, 0.2); color: #fff; padding: 12px 18px; border-radius: 10px; font-size: 15px; width: 100%;">
+      </div>
+      <input type="hidden" name="type" value="{{ selected_type or 'ALL' }}">
+      <button type="submit" class="btn btn-primary" style="padding: 12px 24px; font-size: 14px; font-weight: 700; border-radius: 10px;">
+        🔍 Search All
+      </button>
+    </form>
+  </div>
+
+  <!-- Category Filter Pills -->
+  {% if query %}
+  <div style="display: flex; gap: 8px; margin-bottom: 24px; overflow-x: auto; padding-bottom: 4px;">
+    <a href="/search?q={{ query }}&type=ALL" class="btn btn-sm {% if selected_type == 'ALL' or not selected_type %}btn-primary{% else %}btn-secondary{% endif %}" style="border-radius: 9999px;">
+      All Categories ({{ search_results.total_matches }})
+    </a>
+    <a href="/search?q={{ query }}&type=EQUITY" class="btn btn-sm {% if selected_type == 'EQUITY' %}btn-primary{% else %}btn-secondary{% endif %}" style="border-radius: 9999px;">
+      📈 Stocks ({{ search_results.categories.equities|length }})
+    </a>
+    <a href="/search?q={{ query }}&type=MUTUAL_FUND" class="btn btn-sm {% if selected_type == 'MUTUAL_FUND' %}btn-primary{% else %}btn-secondary{% endif %}" style="border-radius: 9999px;">
+      📊 Mutual Funds ({{ search_results.categories.mutual_funds|length }})
+    </a>
+    <a href="/search?q={{ query }}&type=DEBT" class="btn btn-sm {% if selected_type == 'DEBT' %}btn-primary{% else %}btn-secondary{% endif %}" style="border-radius: 9999px;">
+      🏛️ Corporate Debt & NCDs ({{ search_results.categories.corporate_debt|length }})
+    </a>
+  </div>
+
+  <!-- Search Results Sections -->
+  {% if search_results.total_matches == 0 %}
+  <div style="background: rgba(30, 41, 59, 0.4); border: 1px solid rgba(255, 255, 255, 0.08); border-radius: 12px; padding: 48px; text-align: center;">
+    <div style="font-size: 48px; margin-bottom: 16px;">🔍</div>
+    <h3 style="font-size: 18px; font-weight: 700; color: #f8fafc; margin-bottom: 8px;">No matching investment products found</h3>
+    <p style="font-size: 14px; color: #94a3b8; max-width: 500px; margin: 0 auto 20px;">
+      We couldn't find any equities, mutual fund schemes, or debt securities matching "<strong>{{ query }}</strong>". Try searching with a broader keyword, ticker symbol, or AMFI scheme code.
+    </p>
+    <a href="/funds" class="btn btn-secondary btn-sm" style="border-radius: 8px;">Browse Mutual Funds Directory</a>
+  </div>
+  {% else %}
+
+  <!-- 1. Equities Section -->
+  {% if search_results.categories.equities and (selected_type == 'ALL' or selected_type == 'EQUITY') %}
+  <div style="margin-bottom: 32px;">
+    <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 14px;">
+      <h2 style="font-size: 18px; font-weight: 700; color: #f8fafc; display: flex; align-items: center; gap: 8px;">
+        <span>📈</span> Listed Equities & Stocks ({{ search_results.categories.equities|length }})
+      </h2>
+    </div>
+    <div style="display: grid; grid-template-columns: repeat(auto-fill, minmax(320px, 1fr)); gap: 14px;">
+      {% for eq in search_results.categories.equities %}
+      <a href="{{ eq.url }}" style="text-decoration: none; color: inherit;">
+        <div style="background: rgba(30, 41, 59, 0.5); border: 1px solid rgba(255, 255, 255, 0.1); border-radius: 12px; padding: 18px; transition: all 0.2s;" onmouseover="this.style.borderColor='rgba(16, 185, 129, 0.5)'; this.style.transform='translateY(-2px)';" onmouseout="this.style.borderColor='rgba(255, 255, 255, 0.1)'; this.style.transform='translateY(0)';">
+          <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;">
+            <span class="mono" style="font-size: 14px; font-weight: 800; color: #34d399;">{{ eq.identifier }}</span>
+            <span style="font-size: 11px; font-weight: 700; background: rgba(16, 185, 129, 0.15); color: #34d399; padding: 2px 8px; border-radius: 6px;">STOCK</span>
+          </div>
+          <div style="font-size: 15px; font-weight: 700; color: #f8fafc; margin-bottom: 4px;">{{ eq.title }}</div>
+          <div style="font-size: 12px; color: #94a3b8;">{{ eq.subtitle }}</div>
+        </div>
+      </a>
+      {% endfor %}
+    </div>
+  </div>
+  {% endif %}
+
+  <!-- 2. Mutual Funds Section -->
+  {% if search_results.categories.mutual_funds and (selected_type == 'ALL' or selected_type == 'MUTUAL_FUND') %}
+  <div style="margin-bottom: 32px;">
+    <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 14px;">
+      <h2 style="font-size: 18px; font-weight: 700; color: #f8fafc; display: flex; align-items: center; gap: 8px;">
+        <span>📊</span> Mutual Fund Schemes ({{ search_results.categories.mutual_funds|length }})
+      </h2>
+    </div>
+    <div style="display: grid; grid-template-columns: repeat(auto-fill, minmax(340px, 1fr)); gap: 14px;">
+      {% for mf in search_results.categories.mutual_funds %}
+      <a href="{{ mf.url }}" style="text-decoration: none; color: inherit;">
+        <div style="background: rgba(30, 41, 59, 0.5); border: 1px solid rgba(255, 255, 255, 0.1); border-radius: 12px; padding: 18px; transition: all 0.2s;" onmouseover="this.style.borderColor='rgba(14, 165, 233, 0.5)'; this.style.transform='translateY(-2px)';" onmouseout="this.style.borderColor='rgba(255, 255, 255, 0.1)'; this.style.transform='translateY(0)';">
+          <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;">
+            <span class="mono" style="font-size: 12px; color: #38bdf8; font-weight: 700;">Code: {{ mf.identifier }}</span>
+            <span style="font-size: 11px; font-weight: 700; background: rgba(14, 165, 233, 0.15); color: #38bdf8; padding: 2px 8px; border-radius: 6px;">MUTUAL FUND</span>
+          </div>
+          <div style="font-size: 15px; font-weight: 700; color: #f8fafc; margin-bottom: 4px; line-height: 1.3;">{{ mf.title }}</div>
+          <div style="font-size: 12px; color: #94a3b8; margin-bottom: 10px;">{{ mf.subtitle }}</div>
+          {% if mf.details.nav %}
+          <div style="display: inline-block; font-size: 12px; font-weight: 700; color: #cbd5e1; background: rgba(255, 255, 255, 0.05); padding: 3px 8px; border-radius: 6px;">
+            NAV: {{ mf.details.nav }}
+          </div>
+          {% endif %}
+        </div>
+      </a>
+      {% endfor %}
+    </div>
+  </div>
+  {% endif %}
+
+  <!-- 3. Corporate Debt Section -->
+  {% if search_results.categories.corporate_debt and (selected_type == 'ALL' or selected_type == 'DEBT') %}
+  <div style="margin-bottom: 32px;">
+    <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 14px;">
+      <h2 style="font-size: 18px; font-weight: 700; color: #f8fafc; display: flex; align-items: center; gap: 8px;">
+        <span>🏛️</span> Corporate Debt Securities & NCDs ({{ search_results.categories.corporate_debt|length }})
+      </h2>
+    </div>
+    <div style="display: grid; grid-template-columns: repeat(auto-fill, minmax(340px, 1fr)); gap: 14px;">
+      {% for d in search_results.categories.corporate_debt %}
+      <a href="{{ d.url }}" style="text-decoration: none; color: inherit;">
+        <div style="background: rgba(30, 41, 59, 0.5); border: 1px solid rgba(255, 255, 255, 0.1); border-radius: 12px; padding: 18px; transition: all 0.2s;" onmouseover="this.style.borderColor='rgba(245, 158, 11, 0.5)'; this.style.transform='translateY(-2px)';" onmouseout="this.style.borderColor='rgba(255, 255, 255, 0.1)'; this.style.transform='translateY(0)';">
+          <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;">
+            <span class="mono" style="font-size: 12px; color: #fbbf24; font-weight: 700;">ISIN: {{ d.identifier }}</span>
+            <span style="font-size: 11px; font-weight: 700; background: rgba(245, 158, 11, 0.15); color: #fbbf24; padding: 2px 8px; border-radius: 6px;">NCD BOND</span>
+          </div>
+          <div style="font-size: 15px; font-weight: 700; color: #f8fafc; margin-bottom: 4px;">{{ d.title }}</div>
+          <div style="font-size: 12px; color: #94a3b8; margin-bottom: 8px;">{{ d.subtitle }}</div>
+        </div>
+      </a>
+      {% endfor %}
+    </div>
+  </div>
+  {% endif %}
+
+  {% endif %}
+  {% else %}
+  <!-- Initial Explore Prompt -->
+  <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 20px;">
+    <div style="background: rgba(30, 41, 59, 0.4); border: 1px solid rgba(255, 255, 255, 0.08); border-radius: 14px; padding: 24px;">
+      <div style="font-size: 28px; margin-bottom: 12px;">📈</div>
+      <h3 style="font-size: 17px; font-weight: 700; color: #f8fafc; margin-bottom: 8px;">Public Listed Equities</h3>
+      <p style="font-size: 13px; color: #94a3b8; line-height: 1.5; margin-bottom: 16px;">
+        7-Pillar zero-hallucination institutional research dossiers for NIFTY 50, NIFTY 500, and mid/small-cap companies.
+      </p>
+      <div style="display: flex; gap: 6px; flex-wrap: wrap;">
+        <a href="/search?q=INFY" class="btn btn-secondary btn-sm" style="font-size: 11px; padding: 4px 8px;">INFY</a>
+        <a href="/search?q=TCS" class="btn btn-secondary btn-sm" style="font-size: 11px; padding: 4px 8px;">TCS</a>
+        <a href="/search?q=RELIANCE" class="btn btn-secondary btn-sm" style="font-size: 11px; padding: 4px 8px;">RELIANCE</a>
+        <a href="/search?q=HDFCBANK" class="btn btn-secondary btn-sm" style="font-size: 11px; padding: 4px 8px;">HDFCBANK</a>
+      </div>
+    </div>
+
+    <div style="background: rgba(30, 41, 59, 0.4); border: 1px solid rgba(255, 255, 255, 0.08); border-radius: 14px; padding: 24px;">
+      <div style="font-size: 28px; margin-bottom: 12px;">📊</div>
+      <h3 style="font-size: 17px; font-weight: 700; color: #f8fafc; margin-bottom: 8px;">Mutual Fund Schemes</h3>
+      <p style="font-size: 13px; color: #94a3b8; line-height: 1.5; margin-bottom: 16px;">
+        AMFI daily NAV tracking, Active Share closet-indexing detection, and 10-year Direct vs Regular TER fee drag models.
+      </p>
+      <div style="display: flex; gap: 6px; flex-wrap: wrap;">
+        <a href="/search?q=Parag+Parikh" class="btn btn-secondary btn-sm" style="font-size: 11px; padding: 4px 8px;">Parag Parikh</a>
+        <a href="/search?q=Quant+Small+Cap" class="btn btn-secondary btn-sm" style="font-size: 11px; padding: 4px 8px;">Quant Small Cap</a>
+        <a href="/search?q=HDFC+Mid-Cap" class="btn btn-secondary btn-sm" style="font-size: 11px; padding: 4px 8px;">HDFC Mid-Cap</a>
+      </div>
+    </div>
+
+    <div style="background: rgba(30, 41, 59, 0.4); border: 1px solid rgba(255, 255, 255, 0.08); border-radius: 14px; padding: 24px;">
+      <div style="font-size: 28px; margin-bottom: 12px;">🏛️</div>
+      <h3 style="font-size: 17px; font-weight: 700; color: #f8fafc; margin-bottom: 8px;">Bonds & Debentures</h3>
+      <p style="font-size: 13px; color: #94a3b8; line-height: 1.5; margin-bottom: 16px;">
+        5-Pillar Credit & Duration Core for BSE/NSE listed NCDs, Senior Secured Debentures, and Securitized Debt Instruments.
+      </p>
+      <div style="display: flex; gap: 6px; flex-wrap: wrap;">
+        <a href="/debt" class="btn btn-secondary btn-sm" style="font-size: 11px; padding: 4px 8px;">Browse All Debt</a>
+      </div>
+    </div>
+  </div>
+  {% endif %}
+</div>
+{% endblock %}

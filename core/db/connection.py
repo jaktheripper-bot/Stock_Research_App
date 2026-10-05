@@ -1025,6 +1025,51 @@ def init_db(force: bool = False):
                     cursor.execute("INSERT OR IGNORE INTO schema_migrations (version) VALUES ('v014_admin_users_and_audit_trail');")
                 conn.commit()
 
+            # Migration v015: Always-On Asset Scan Runs & Multi-Asset Audit Ledger
+            if "v015_asset_scan_runs" not in applied:
+                logger.info("Applying schema migration: v015_asset_scan_runs...")
+                if supabase_url:
+                    cursor.execute("""
+                        CREATE TABLE IF NOT EXISTS asset_scan_runs (
+                            id SERIAL PRIMARY KEY,
+                            scan_id VARCHAR(64) UNIQUE NOT NULL,
+                            scan_type VARCHAR(50) NOT NULL,
+                            status VARCHAR(20) NOT NULL,
+                            items_scanned INTEGER DEFAULT 0,
+                            items_added INTEGER DEFAULT 0,
+                            items_updated INTEGER DEFAULT 0,
+                            items_archived INTEGER DEFAULT 0,
+                            details_json TEXT DEFAULT '{}',
+                            triggered_by VARCHAR(50) DEFAULT 'scheduled_cron',
+                            started_at TIMESTAMPTZ DEFAULT now(),
+                            completed_at TIMESTAMPTZ,
+                            error_message TEXT
+                        );
+                        CREATE INDEX IF NOT EXISTS idx_scan_runs_type ON asset_scan_runs(scan_type, started_at DESC);
+                        INSERT INTO schema_migrations (version) VALUES ('v015_asset_scan_runs') ON CONFLICT DO NOTHING;
+                    """)
+                else:
+                    cursor.execute("""
+                        CREATE TABLE IF NOT EXISTS asset_scan_runs (
+                            id INTEGER PRIMARY KEY AUTOINCREMENT,
+                            scan_id TEXT UNIQUE NOT NULL,
+                            scan_type TEXT NOT NULL,
+                            status TEXT NOT NULL,
+                            items_scanned INTEGER DEFAULT 0,
+                            items_added INTEGER DEFAULT 0,
+                            items_updated INTEGER DEFAULT 0,
+                            items_archived INTEGER DEFAULT 0,
+                            details_json TEXT DEFAULT '{}',
+                            triggered_by TEXT DEFAULT 'scheduled_cron',
+                            started_at TEXT DEFAULT (datetime('now')),
+                            completed_at TEXT,
+                            error_message TEXT
+                        );
+                    """)
+                    cursor.execute("CREATE INDEX IF NOT EXISTS idx_scan_runs_type ON asset_scan_runs(scan_type, started_at DESC);")
+                    cursor.execute("INSERT OR IGNORE INTO schema_migrations (version) VALUES ('v015_asset_scan_runs');")
+                conn.commit()
+
             _DB_INITIALIZED = True
         except Exception as e:
             logger.error(f"Error during init_db migrations: {e}")

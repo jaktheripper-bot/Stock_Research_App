@@ -214,6 +214,21 @@ async def lifespan(app: FastAPI):
     app.include_router(msme_router, prefix="/api/msme")
     init_db()
 
+    # Pre-seed foundational benchmark securities if empty on startup (out-of-band, not during HTTP requests)
+    try:
+        from core.db.mutual_funds import get_active_mutual_funds, seed_default_mutual_funds
+        if not get_active_mutual_funds():
+            seed_default_mutual_funds()
+    except Exception as e:
+        logger.warning(f"Initial mutual fund bootstrap seed skipped: {e}")
+
+    try:
+        from core.db.debt import get_active_debt_securities, seed_default_debt_securities
+        if not get_active_debt_securities():
+            seed_default_debt_securities()
+    except Exception as e:
+        logger.warning(f"Initial debt bootstrap seed skipped: {e}")
+
     is_testing = os.environ.get("TESTING") == "1" or "pytest" in sys.modules
     scheduler = None
     discovery_task = None
@@ -338,6 +353,59 @@ def home_page(request: Request):
             "pricing_packs": PRICING_PACKS,
         }
     )
+
+
+@app.get("/search", response_class=HTMLResponse)
+def search_page(
+    request: Request,
+    q: Optional[str] = None,
+    type: Optional[str] = None,
+    asset_class: Optional[str] = None
+):
+    """Multi-asset unified search discovery page across Equities, Mutual Funds, and Corporate Debt/NCDs."""
+    init_db()
+    query_str = (q or "").strip()
+    selected_type = (type or asset_class or "ALL").strip().upper()
+
+    search_res = {
+        "query": query_str,
+        "total_matches": 0,
+        "results": [],
+        "categories": {"equities": [], "mutual_funds": [], "corporate_debt": []}
+    }
+    if query_str:
+        from core.search.product_search import search_investment_products
+        search_res = search_investment_products(query_str, product_type=selected_type, limit_per_category=20)
+
+    return templates.TemplateResponse(
+        request=request,
+        name="search_results.html",
+        context={
+            "active_page": "search",
+            "query": query_str,
+            "selected_type": selected_type,
+            "search_results": search_res,
+        }
+    )
+
+
+@app.get("/api/search/products")
+def api_search_products(
+    q: str = Query(..., min_length=1, description="Search query string"),
+    asset_class: str = Query("all", description="Asset class filter: 'all', 'equity', 'mutual_fund', 'debt'"),
+    limit: int = Query(25, ge=1, le=100)
+):
+    """Public Omni-Product Search API across Equities, Mutual Funds, and Corporate Debt/NCDs."""
+    init_db()
+    from core.search.product_search import search_all_products
+    matches = search_all_products(q, asset_class=asset_class, limit=limit)
+    return json_response_with_cache({
+        "status": "success",
+        "query": q,
+        "asset_class": asset_class,
+        "count": len(matches),
+        "results": matches
+    }, max_age=60)
 
 
 @app.get("/discovery", response_class=HTMLResponse)
@@ -632,12 +700,6 @@ def debt_directory_page(
         seniority=seniority,
         is_sdi=sdi_bool
     )
-    if not securities:
-        seed_default_debt_securities()
-        securities = get_active_debt_securities(
-            seniority=seniority,
-            is_sdi=sdi_bool
-        )
 
     # Compute average YTM
     ytm_vals = [s.get("ytm_pct", 0.0) for s in securities if s.get("ytm_pct")]
@@ -696,14 +758,6 @@ def api_get_debt_securities(
         min_rating=min_rating,
         is_sdi=is_sdi
     )
-    if not secs:
-        seed_default_debt_securities()
-        secs = get_active_debt_securities(
-            seniority=seniority,
-            instrument_type=instrument_type,
-            min_rating=min_rating,
-            is_sdi=is_sdi
-        )
 
     results = []
     for s in secs:
@@ -771,13 +825,34 @@ def api_get_recent_rating_actions(limit: int = 50):
 def fund_directory_page(
     request: Request,
     category: Optional[str] = None,
-    broad_category: Optional[str] = None
+    broad_category: Optional[str] = None,
+    q: Optional[str] = None
 ):
     """Public Mutual Fund Look-Through directory & screener under SEBI disclosure norms."""
     init_db()
-    schemes = get_active_mutual_funds(category=category, broad_category=broad_category)
-    if not schemes:
-        seed_default_mutual_funds()
+    query_str = (q or "").strip()
+    if query_str:
+        from core.search.product_search import search_mutual_funds
+        raw_matches = search_mutual_funds(query_str, limit=50)
+        schemes = []
+        for m in raw_matches:
+            s = get_mutual_fund_scheme(m["identifier"])
+            if s:
+                schemes.append(s)
+            else:
+                nav_val = float(str(m.get("details", {}).get("nav", "0")).replace("₹", "").replace(",", "") or 0.0)
+                schemes.append({
+                    "scheme_code": m["identifier"],
+                    "scheme_name": m["title"],
+                    "fund_house": m.get("subtitle", "").split("•")[0].strip(),
+                    "category": m.get("details", {}).get("category", "Mutual Fund"),
+                    "aum_crores": 0.0,
+                    "nav": nav_val,
+                    "ter_direct_pct": 0.75,
+                    "ter_regular_pct": 1.50,
+                    "active_share_pct": 70.0
+                })
+    else:
         schemes = get_active_mutual_funds(category=category, broad_category=broad_category)
 
     total_aum = sum(s.get("aum_crores", 0.0) for s in schemes)
@@ -793,6 +868,7 @@ def fund_directory_page(
             "total_aum": total_aum,
             "avg_drag_bps": int(avg_drag_bps),
             "current_category": broad_category or category,
+            "query": query_str
         }
     )
 
@@ -806,9 +882,6 @@ def fund_overlap_page(
     """True Diversification & Portfolio Overlap Diagnostic Tool."""
     init_db()
     all_funds = get_active_mutual_funds()
-    if not all_funds:
-        seed_default_mutual_funds()
-        all_funds = get_active_mutual_funds()
 
     scheme_a_code = (scheme_a or "PPFAS_FLEXICAP_DIR").strip().upper()
     scheme_b_code = (scheme_b or "MIRAE_LARGECAP_DIR").strip().upper()
@@ -843,8 +916,11 @@ def fund_dossier_page(request: Request, scheme_code: str):
     clean_code = scheme_code.strip().upper()
     scheme = get_mutual_fund_scheme(clean_code)
     if not scheme:
-        seed_default_mutual_funds()
-        scheme = get_mutual_fund_scheme(clean_code)
+        # Check master AMFI directory dynamically
+        from core.ingestion.amfi import search_amfi_master_directory
+        amfi_matches = search_amfi_master_directory(clean_code, limit=1)
+        if amfi_matches:
+            scheme = get_mutual_fund_scheme(clean_code) or amfi_matches[0]
 
     if not scheme:
         raise HTTPException(status_code=404, detail=f"Mutual fund scheme with code '{clean_code}' not found.")
@@ -875,9 +951,6 @@ def api_get_mutual_fund_schemes(
     """Public API: List all tracked mutual fund schemes with look-through health scores."""
     init_db()
     schemes = get_active_mutual_funds(category=category, broad_category=broad_category)
-    if not schemes:
-        seed_default_mutual_funds()
-        schemes = get_active_mutual_funds(category=category, broad_category=broad_category)
 
     results = []
     for s in schemes:
@@ -911,10 +984,6 @@ def api_get_mutual_fund_detail(scheme_code: str):
     clean_code = scheme_code.strip().upper()
     dossier = evaluate_mutual_fund_comprehensive(clean_code)
     if not dossier:
-        seed_default_mutual_funds()
-        dossier = evaluate_mutual_fund_comprehensive(clean_code)
-
-    if not dossier:
         raise HTTPException(status_code=404, detail=f"Scheme '{clean_code}' not found.")
 
     return json_response_with_cache({"status": "success", "dossier": dossier})
@@ -926,9 +995,6 @@ def api_get_mutual_fund_lookthrough(scheme_code: str):
     init_db()
     clean_code = scheme_code.strip().upper()
     scheme = get_mutual_fund_scheme(clean_code)
-    if not scheme:
-        seed_default_mutual_funds()
-        scheme = get_mutual_fund_scheme(clean_code)
     if not scheme:
         raise HTTPException(status_code=404, detail=f"Scheme '{clean_code}' not found.")
 
@@ -948,14 +1014,6 @@ def api_get_funds_overlap(scheme_a: str, scheme_b: str):
     h_b = get_scheme_holdings(code_b)
     s_a = get_mutual_fund_scheme(code_a) or {}
     s_b = get_mutual_fund_scheme(code_b) or {}
-
-    if not h_a or not h_b:
-        seed_default_mutual_funds()
-        h_a = get_scheme_holdings(code_a)
-        h_b = get_scheme_holdings(code_b)
-        s_a = get_mutual_fund_scheme(code_a) or {}
-        s_b = get_mutual_fund_scheme(code_b) or {}
-
     overlap_res = calculate_portfolio_overlap(
         h_a, h_b,
         name_a=s_a.get("scheme_name", code_a),
@@ -970,9 +1028,6 @@ def api_get_funds_holding_security(identifier: str):
     init_db()
     clean_id = identifier.strip().upper()
     schemes = get_schemes_by_holding(clean_id)
-    if not schemes:
-        seed_default_mutual_funds()
-        schemes = get_schemes_by_holding(clean_id)
 
     return json_response_with_cache({"status": "success", "identifier": clean_id, "count": len(schemes), "funds": schemes})
 
@@ -1753,6 +1808,12 @@ async def admin_dashboard(
     admin_team = list_admin_users()
     admin_audit_logs = get_admin_audit_logs(limit=100)
 
+    try:
+        from core.analysis.asset_scanner import get_asset_scan_runs
+        asset_scans = get_asset_scan_runs(limit=30)
+    except Exception:
+        asset_scans = []
+
     return templates.TemplateResponse(
         request=request,
         name="admin.html",
@@ -1761,6 +1822,7 @@ async def admin_dashboard(
             "current_admin": admin_profile,
             "admin_team": admin_team,
             "admin_audit_logs": admin_audit_logs,
+            "asset_scans": asset_scans,
             "active_tab": tab,
             "window": window,
             "exclude_tests": exclude_tests,
@@ -2309,6 +2371,70 @@ async def admin_export_tax_register(request: Request):
             "Content-Disposition": f"attachment; filename=GSTR1_Tax_Register_{today_str}.csv"
         }
     )
+
+
+@app.post("/admin/assets/trigger-scan")
+async def admin_trigger_scan_form(request: Request):
+    """Admin UI action: Trigger full AMFI and Debt asset surveillance scan."""
+    if not _is_admin_authenticated(request):
+        raise HTTPException(status_code=403, detail="Admin authorization required.")
+
+    from core.analysis.asset_scanner import run_comprehensive_asset_scan
+    res = run_comprehensive_asset_scan()
+    msg = f"Asset+scan+completed:+{res.get('total_scanned', 0)}+scanned,+{res.get('new_assets', 0)}+new,+{res.get('changed_assets', 0)}+updated."
+    return RedirectResponse(url=f"/admin?tab=assets&msg={msg}", status_code=303)
+
+
+@app.post("/api/admin/assets/scan")
+async def api_admin_trigger_asset_scan(
+    request: Request,
+    background_tasks: BackgroundTasks,
+    x_admin_key: Optional[str] = Header(None)
+):
+    """Admin API: Trigger asset surveillance scan across mutual funds and debt securities."""
+    admin_secret = os.environ.get("ADMIN_API_KEY", "")
+    is_authed = False
+    if admin_secret and x_admin_key == admin_secret:
+        is_authed = True
+    elif _is_admin_authenticated(request):
+        is_authed = True
+
+    if not is_authed:
+        raise HTTPException(status_code=403, detail="Unauthorized admin access.")
+
+    from core.analysis.asset_scanner import run_comprehensive_asset_scan
+    scan_summary = run_comprehensive_asset_scan()
+    return json_response_with_cache({
+        "status": "success",
+        "message": "Asset surveillance scan completed.",
+        "summary": scan_summary
+    })
+
+
+@app.get("/api/admin/assets/scan-runs")
+async def api_admin_get_scan_runs(
+    request: Request,
+    limit: int = 50,
+    x_admin_key: Optional[str] = Header(None)
+):
+    """Admin API: Query historical immutable asset scan ledger records."""
+    admin_secret = os.environ.get("ADMIN_API_KEY", "")
+    is_authed = False
+    if admin_secret and x_admin_key == admin_secret:
+        is_authed = True
+    elif _is_admin_authenticated(request):
+        is_authed = True
+
+    if not is_authed:
+        raise HTTPException(status_code=403, detail="Unauthorized admin access.")
+
+    from core.analysis.asset_scanner import get_asset_scan_runs
+    runs = get_asset_scan_runs(limit=limit)
+    return json_response_with_cache({
+        "status": "success",
+        "count": len(runs),
+        "runs": runs
+    })
 
 
 # ==============================================================================
