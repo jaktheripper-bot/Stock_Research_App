@@ -111,7 +111,13 @@ from telemetry import (
     update_admin_passcode,
     get_admin_passcode,
 )
-from core.db.telemetry import record_usage_event
+from core.db.telemetry import (
+    record_usage_event,
+    parse_traffic_source,
+    parse_user_agent,
+    extract_geo,
+    purge_test_telemetry,
+)
 from core.notify import dispatch_support_ticket_alert
 from core.analysis import get_stock_fundamentals, get_historical_prices
 from core.analysis.engine import generate_stock_report
@@ -1006,23 +1012,65 @@ class TelemetryEventRequest(BaseModel):
     ticker: Optional[str] = ""
     user_id: Optional[str] = None
     user_email: Optional[str] = None
+    session_id: Optional[str] = None
+    referrer: Optional[str] = None
+    landing_url: Optional[str] = None
+    utm_source: Optional[str] = None
+    utm_medium: Optional[str] = None
+    utm_campaign: Optional[str] = None
+    ref: Optional[str] = None
     details: Optional[dict] = None
 
 
 @app.post("/api/telemetry/event")
 async def api_record_telemetry_event(payload: TelemetryEventRequest, request: Request):
-    """Client-side telemetry event capture for user-level journey and interaction tracking."""
+    """Client-side telemetry event capture for user-level journey and acquisition tracking."""
     user_agent = request.headers.get("user-agent", "")
-    referer = request.headers.get("referer", "")
-    device = "Mobile" if any(m in user_agent.lower() for m in ["mobile", "android", "iphone"]) else "Desktop"
+
+    # 1. Resolve traffic attribution from landing payload or headers
+    query_params = {}
+    if payload.utm_source:
+        query_params["utm_source"] = payload.utm_source
+    if payload.utm_medium:
+        query_params["utm_medium"] = payload.utm_medium
+    if payload.utm_campaign:
+        query_params["utm_campaign"] = payload.utm_campaign
+    if payload.ref:
+        query_params["ref"] = payload.ref
+
+    effective_referrer = (payload.referrer or "").strip()
+    if not effective_referrer:
+        hdr_ref = request.headers.get("referer", "")
+        base_host = request.base_url.netloc
+        if hdr_ref and base_host not in hdr_ref:
+            effective_referrer = hdr_ref
+
+    traffic_source, clean_ref = parse_traffic_source(effective_referrer, query_params)
+
+    # 2. Parse device, browser, and OS
+    client_env = parse_user_agent(user_agent)
+
+    # 3. Geo extraction from proxy headers
+    country = extract_geo(dict(request.headers))
+
+    # 4. Anonymous session ID resolution
+    client_ip = request.headers.get("x-forwarded-for") or (request.client.host if request.client else "")
+    if client_ip and "," in client_ip:
+        client_ip = client_ip.split(",")[0].strip()
+
+    sess_id = payload.session_id or f"sess_{hashlib.md5((client_ip + user_agent).encode()).hexdigest()[:10]}"
 
     record_usage_event(
         event_type=payload.event_type,
         ticker=payload.ticker or "",
         details=payload.details or {},
-        referrer=referer,
-        device_type=device,
-        browser=user_agent[:60],
+        session_id=sess_id,
+        traffic_source=traffic_source,
+        referrer=clean_ref,
+        country=country,
+        device_type=client_env.get("device", "Desktop"),
+        browser=client_env.get("browser", "Chrome"),
+        os=client_env.get("os", "macOS"),
         user_id=payload.user_id,
         user_email=payload.user_email
     )
@@ -1591,6 +1639,8 @@ async def admin_dashboard(
     request: Request,
     window: str = "30d",
     tab: Optional[str] = "billables",
+    start_date: Optional[str] = None,
+    end_date: Optional[str] = None,
     msg: Optional[str] = None,
     err: Optional[str] = None
 ):
@@ -1614,8 +1664,8 @@ async def admin_dashboard(
 
     # Compute date ranges
     today = datetime.now(IST).date()
-    start_date = None
-    end_date = None
+    parsed_start = None
+    parsed_end = None
     selected_days = 30
 
     if window == "24h":
@@ -1627,12 +1677,28 @@ async def admin_dashboard(
     elif window == "90d":
         selected_days = 90
     elif window == "mtd":
-        start_date = today.replace(day=1)
-        end_date = today
+        parsed_start = today.replace(day=1)
+        parsed_end = today
         selected_days = None
+    elif window == "custom" or (start_date and end_date):
+        window = "custom"
+        try:
+            if start_date:
+                parsed_start = datetime.strptime(start_date.strip(), "%Y-%m-%d").date()
+            if end_date:
+                parsed_end = datetime.strptime(end_date.strip(), "%Y-%m-%d").date()
+            if parsed_start and parsed_end:
+                selected_days = None
+            else:
+                selected_days = 30
+                window = "30d"
+        except Exception as de:
+            logger.warning(f"Error parsing custom date range: {de}")
+            selected_days = 30
+            window = "30d"
 
     try:
-        summary = get_site_usage_summary(days=selected_days, start_date=start_date, end_date=end_date)
+        summary = get_site_usage_summary(days=selected_days, start_date=parsed_start, end_date=parsed_end)
     except Exception as e:
         logger.error(f"Error fetching site usage summary: {e}")
         summary = {
@@ -1644,7 +1710,7 @@ async def admin_dashboard(
         }
 
     try:
-        rev_summary = get_revenue_analytics_summary(days=selected_days, start_date=start_date, end_date=end_date)
+        rev_summary = get_revenue_analytics_summary(days=selected_days, start_date=parsed_start, end_date=parsed_end)
     except Exception as e:
         logger.error(f"Error fetching rev summary: {e}")
         rev_summary = {
@@ -1659,7 +1725,7 @@ async def admin_dashboard(
         billables = []
 
     try:
-        user_analytics = get_user_usage_analytics(days=selected_days, start_date=start_date, end_date=end_date, limit=50)
+        user_analytics = get_user_usage_analytics(days=selected_days, start_date=parsed_start, end_date=parsed_end, limit=50)
     except Exception:
         user_analytics = {
             "total_registered_users": 0, "active_users_in_period": 0,
@@ -1678,7 +1744,7 @@ async def admin_dashboard(
         open_tickets_count = 0
 
     try:
-        session_journeys = get_session_journeys(days=selected_days, start_date=start_date, end_date=end_date, limit=25)
+        session_journeys = get_session_journeys(days=selected_days, start_date=parsed_start, end_date=parsed_end, limit=25)
     except Exception:
         session_journeys = []
 
@@ -1695,6 +1761,8 @@ async def admin_dashboard(
             "admin_audit_logs": admin_audit_logs,
             "active_tab": tab,
             "window": window,
+            "start_date_str": parsed_start.strftime("%Y-%m-%d") if parsed_start else "",
+            "end_date_str": parsed_end.strftime("%Y-%m-%d") if parsed_end else "",
             "notification": msg,
             "error": err,
             "summary": summary,
@@ -1707,6 +1775,38 @@ async def admin_dashboard(
             "active_page": "admin"
         }
     )
+
+
+@app.post("/admin/telemetry/purge-test-data")
+async def admin_purge_test_data(request: Request):
+    """
+    Purges synthetic test records across telemetry, tickets, and transactions.
+    Restricted to authorized 'owner' and 'admin' roles.
+    """
+    admin_session = _is_admin_authenticated(request)
+    if not admin_session:
+        raise HTTPException(status_code=401, detail="Unauthorized admin session.")
+
+    role = admin_session.get("role", "viewer")
+    if role not in ("owner", "admin"):
+        raise HTTPException(status_code=403, detail="Forbidden. Only owners and administrators can purge test data.")
+
+    client_ip = request.headers.get("x-forwarded-for") or (request.client.host if request.client else "unknown")
+    if client_ip and "," in client_ip:
+        client_ip = client_ip.split(",")[0].strip()
+
+    counts = purge_test_telemetry()
+
+    record_admin_audit(
+        admin_email=admin_session.get("email"),
+        action="PURGE_TEST_DATA",
+        target_type="telemetry_and_tickets",
+        details=counts,
+        ip_address=client_ip
+    )
+
+    msg = f"Successfully+purged+{counts['events_purged']}+test+events,+{counts['tickets_purged']}+test+tickets,+and+{counts['transactions_purged']}+test+transactions.+Dashboard+is+now+clean."
+    return RedirectResponse(url=f"/admin?tab=telemetry&msg={msg}", status_code=303)
 
 @app.get("/admin/auth/google")
 async def admin_auth_google(request: Request):

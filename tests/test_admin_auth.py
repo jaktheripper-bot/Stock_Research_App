@@ -151,3 +151,52 @@ def test_admin_web_flow(client):
     assert "lyndnpnto@gmail.com" in res_dash.text
     assert "OWNER" in res_dash.text
     assert "2FA ACTIVE" in res_dash.text
+
+
+def test_telemetry_attribution_and_custom_date_range(client):
+    """Verify UTM and referrer attribution, custom date range filtering, and test data purge."""
+    from web.main import _generate_admin_token
+
+    admin_cookie = _generate_admin_token("lyndnpnto@gmail.com", "owner")
+
+    # 1. Send client-side telemetry with UTM campaign and custom referrer
+    telemetry_payload = {
+        "event_type": "page_view",
+        "ticker": "INFY",
+        "session_id": "sess_test_12345",
+        "referrer": "https://twitter.com/i/web/status/123",
+        "utm_source": "twitter",
+        "utm_campaign": "q3_results",
+        "details": {"path": "/dossier/INFY"}
+    }
+    res_tel = client.post("/api/telemetry/event", json=telemetry_payload)
+    assert res_tel.status_code == 200
+    assert res_tel.json()["status"] == "ok"
+
+    # 2. Access admin console with custom date range
+    res_custom = client.get(
+        "/admin?window=custom&start_date=2026-09-01&end_date=2026-10-05&tab=traffic",
+        cookies={ADMIN_COOKIE_NAME: admin_cookie}
+    )
+    assert res_custom.status_code == 200
+    assert "2026-09-01" in res_custom.text
+    assert "2026-10-05" in res_custom.text
+    assert "Traffic Channels" in res_custom.text
+
+    # 3. Test data purge endpoint requires authentication
+    res_unauth = client.post("/admin/telemetry/purge-test-data")
+    assert res_unauth.status_code in (401, 303)
+
+    # 4. Trigger purge with authenticated owner
+    res_purge = client.post(
+        "/admin/telemetry/purge-test-data",
+        cookies={ADMIN_COOKIE_NAME: admin_cookie},
+        follow_redirects=False
+    )
+    assert res_purge.status_code == 303
+    assert "tab=telemetry" in res_purge.headers["location"]
+
+    # 5. Verify audit log entry was created
+    audit_logs = get_admin_audit_logs(limit=10)
+    assert any(log["action"] == "PURGE_TEST_DATA" for log in audit_logs)
+

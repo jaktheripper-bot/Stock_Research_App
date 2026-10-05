@@ -5,6 +5,7 @@ import logging
 from normalizer import clean_ticker
 from core.db.connection import init_db, get_db_connection, get_supabase_url, get_placeholder
 from core.db.reports import _format_timestamp
+from telemetry import parse_traffic_source, parse_user_agent, extract_geo
 
 logger = logging.getLogger("equity_research.core.db.telemetry")
 
@@ -435,15 +436,16 @@ def get_user_usage_analytics(days: int = None, start_date = None, end_date = Non
             cursor.execute(f"""
                 SELECT 
                     e.user_email,
-                    COALESCE(MAX(e.user_id), 'unknown') as uid,
+                    COALESCE(u.id, NULLIF(MAX(e.user_id), ''), 'Unassigned') as uid,
                     COUNT(*) as total_events,
                     COUNT(DISTINCT e.ticker) as distinct_tickers,
                     COUNT(CASE WHEN e.event_type = 'pdf_download' THEN 1 END) as pdf_exports,
                     COUNT(CASE WHEN e.event_type = 'peer_comparison' THEN 1 END) as comparisons,
                     MAX(e.timestamp) as last_seen
                 FROM site_usage_events e
+                LEFT JOIN user_accounts u ON LOWER(e.user_email) = LOWER(u.email)
                 WHERE {time_filter} AND e.user_email IS NOT NULL AND e.user_email != ''
-                GROUP BY e.user_email
+                GROUP BY e.user_email, u.id
                 ORDER BY total_events DESC
                 LIMIT {limit};
             """)
@@ -495,3 +497,93 @@ def get_user_usage_analytics(days: int = None, start_date = None, end_date = Non
         conn.close()
 
     return result
+
+
+def purge_test_telemetry() -> dict:
+    """
+    Purges synthetic testing and automated test runner records:
+    - site_usage_events: test email domains, test uids, test tickers, test browsers/IPs
+    - support_tickets: test emails, dummy test tickets
+    - credit_transactions: test emails, test user accounts
+    - user_accounts: test accounts
+    Preserves all real user accounts, legitimate customer transactions, and genuine visitor records.
+    Returns dictionary with counts of purged records.
+    """
+    init_db()
+    conn = get_db_connection()
+    cursor = conn.cursor()
+    purged_counts = {
+        "events_purged": 0,
+        "tickets_purged": 0,
+        "transactions_purged": 0,
+        "users_purged": 0
+    }
+    try:
+        # 1. Purge synthetic site_usage_events
+        cursor.execute("""
+            DELETE FROM site_usage_events
+            WHERE user_email LIKE '%@example.com'
+               OR user_email LIKE '%@test.com'
+               OR user_email LIKE 'test_%'
+               OR user_id IN ('guest_web_user', 'test_user', 'testclient', 'test_admin')
+               OR user_id LIKE 'test_%'
+               OR ticker IN ('TEST', 'APP', 'XYZ', 'SAMPLE')
+               OR browser LIKE '%testclient%'
+               OR browser LIKE '%pytest%';
+        """)
+        purged_counts["events_purged"] = cursor.rowcount if cursor.rowcount and cursor.rowcount > 0 else 0
+
+        # 2. Purge test support_tickets
+        try:
+            cursor.execute("""
+                DELETE FROM support_tickets
+                WHERE user_email LIKE '%@example.com'
+                   OR user_email LIKE '%@test.com'
+                   OR user_email LIKE 'test_%'
+                   OR ticket_id LIKE 'TKT-TEST-%'
+                   OR subject LIKE '%[TEST]%';
+            """)
+            purged_counts["tickets_purged"] = cursor.rowcount if cursor.rowcount and cursor.rowcount > 0 else 0
+        except Exception as te:
+            logger.debug(f"Support tickets purge notice: {te}")
+
+        # 3. Purge test credit_transactions
+        try:
+            cursor.execute("""
+                DELETE FROM credit_transactions
+                WHERE customer_email LIKE '%@example.com'
+                   OR customer_email LIKE '%@test.com'
+                   OR user_id LIKE 'test_%'
+                   OR order_id LIKE 'order_test_%'
+                   OR order_id LIKE 'test_%';
+            """)
+            purged_counts["transactions_purged"] = cursor.rowcount if cursor.rowcount and cursor.rowcount > 0 else 0
+        except Exception as cte:
+            logger.debug(f"Credit transactions purge notice: {cte}")
+
+        # 4. Purge test user_accounts
+        try:
+            cursor.execute("""
+                DELETE FROM user_accounts
+                WHERE email LIKE '%@example.com'
+                   OR email LIKE '%@test.com'
+                   OR user_id LIKE 'test_%'
+                   OR user_id IN ('guest_web_user', 'test_user');
+            """)
+            purged_counts["users_purged"] = cursor.rowcount if cursor.rowcount and cursor.rowcount > 0 else 0
+        except Exception as ue:
+            logger.debug(f"User accounts purge notice: {ue}")
+
+        conn.commit()
+    except Exception as e:
+        logger.error(f"Error executing test data purge: {e}")
+        try:
+            conn.rollback()
+        except Exception:
+            pass
+    finally:
+        cursor.close()
+        conn.close()
+
+    return purged_counts
+

@@ -596,14 +596,67 @@ function getStoredUser() {
   }
 }
 
+// Persistent Visitor Acquisition Attribution & Journey Tracking
+function getTelemetrySessionId() {
+  try {
+    let sid = sessionStorage.getItem('sr_session_id');
+    if (!sid) {
+      sid = 'sess_' + Math.random().toString(36).substring(2, 9) + Date.now().toString(36);
+      sessionStorage.setItem('sr_session_id', sid);
+    }
+    return sid;
+  } catch {
+    return 'sess_anonymous';
+  }
+}
+
+function getAcquisitionData() {
+  try {
+    let data = sessionStorage.getItem('sr_acquisition');
+    if (data) return JSON.parse(data);
+
+    // Initial landing capture
+    const params = new URLSearchParams(window.location.search);
+    const ref = document.referrer || '';
+    // Discard internal navigation from same origin
+    const isInternal = ref && ref.startsWith(window.location.origin);
+    const cleanRef = isInternal ? '' : ref;
+
+    const acquisition = {
+      referrer: cleanRef,
+      landing_url: window.location.href,
+      landing_path: window.location.pathname,
+      utm_source: params.get('utm_source') || '',
+      utm_medium: params.get('utm_medium') || '',
+      utm_campaign: params.get('utm_campaign') || '',
+      utm_term: params.get('utm_term') || '',
+      utm_content: params.get('utm_content') || '',
+      ref: params.get('ref') || params.get('source') || '',
+      captured_at: new Date().toISOString()
+    };
+    sessionStorage.setItem('sr_acquisition', JSON.stringify(acquisition));
+    return acquisition;
+  } catch {
+    return {};
+  }
+}
+
 window.trackUserEvent = function(eventType, ticker, details) {
   try {
     const user = getStoredUser();
+    const acq = getAcquisitionData();
     const payload = {
       event_type: eventType,
       ticker: ticker || '',
       user_id: user ? user.id : null,
       user_email: user ? user.email : null,
+      session_id: getTelemetrySessionId(),
+      referrer: acq.referrer || (document.referrer && !document.referrer.startsWith(window.location.origin) ? document.referrer : ''),
+      landing_url: acq.landing_url || window.location.href,
+      utm_source: acq.utm_source || '',
+      utm_medium: acq.utm_medium || '',
+      utm_campaign: acq.utm_campaign || '',
+      ref: acq.ref || '',
       details: details || {}
     };
     fetch('/api/telemetry/event', {
@@ -614,8 +667,9 @@ window.trackUserEvent = function(eventType, ticker, details) {
   } catch {}
 };
 
-// Track initial page view with logged-in user attribution
+// Track initial page view with logged-in user attribution and source retention
 (function initUserTelemetry() {
+  getAcquisitionData();
   const path = window.location.pathname;
   let pageEvent = 'page_view';
   let currentTicker = '';

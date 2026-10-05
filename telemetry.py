@@ -204,26 +204,58 @@ def parse_traffic_source(referrer: str, query_params: dict) -> tuple:
         return "Direct / Bookmark", "Direct"
 
     ref_lower = referrer.lower()
+    # Filter self-referential navigations (internal links within the app)
+    if any(self_host in ref_lower for self_host in ("stock-research-app", "onrender.com", "localhost", "127.0.0.1")):
+        return "Direct / Bookmark", "Direct"
+
     if "google." in ref_lower:
         return "Google Search", referrer
     elif "bing." in ref_lower:
         return "Bing Search", referrer
+    elif "yahoo." in ref_lower:
+        return "Yahoo Search", referrer
+    elif "duckduckgo." in ref_lower:
+        return "DuckDuckGo", referrer
     elif any(k in ref_lower for k in ["t.co", "twitter.com", "x.com"]):
         return "X / Twitter", referrer
-    elif "linkedin.com" in ref_lower:
+    elif any(k in ref_lower for k in ["linkedin.com", "lnkd.in"]):
         return "LinkedIn", referrer
-    elif any(k in ref_lower for k in ["whatsapp.com", "wa.me"]):
+    elif any(k in ref_lower for k in ["whatsapp.com", "wa.me", "api.whatsapp.com"]):
         return "WhatsApp", referrer
+    elif any(k in ref_lower for k in ["t.me", "telegram.me"]):
+        return "Telegram", referrer
     elif "bseindia.com" in ref_lower:
         return "BSE India", referrer
+    elif "nseindia.com" in ref_lower:
+        return "NSE India", referrer
+    elif "screener.in" in ref_lower:
+        return "Screener.in", referrer
+    elif "moneycontrol.com" in ref_lower:
+        return "Moneycontrol", referrer
+    elif "trendlyne.com" in ref_lower:
+        return "Trendlyne", referrer
+    elif "tradingview.com" in ref_lower:
+        return "TradingView", referrer
+    elif any(k in ref_lower for k in ["zerodha.com", "pulse.zerodha.com"]):
+        return "Zerodha Pulse", referrer
+    elif "valuepickr.com" in ref_lower:
+        return "ValuePickr Forum", referrer
     elif "reddit.com" in ref_lower:
         return "Reddit", referrer
-    elif "youtube.com" in ref_lower:
+    elif any(k in ref_lower for k in ["youtube.com", "youtu.be"]):
         return "YouTube", referrer
+    elif any(k in ref_lower for k in ["facebook.com", "fb.com"]):
+        return "Facebook", referrer
+    elif "instagram.com" in ref_lower:
+        return "Instagram", referrer
+    elif "threads.net" in ref_lower:
+        return "Threads", referrer
     else:
         try:
             parsed = urlparse(referrer)
-            domain = parsed.netloc
+            domain = parsed.netloc.lower()
+            if domain.startswith("www."):
+                domain = domain[4:]
             return domain if domain else "Referral", referrer
         except Exception:
             return "Referral", referrer

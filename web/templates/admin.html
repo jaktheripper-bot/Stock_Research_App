@@ -286,18 +286,25 @@
 
     <div class="admin-controls-group">
       <!-- Time Window Filter Form -->
-      <form method="GET" action="/admin" id="windowForm" style="display: flex; align-items: center; gap: 8px;">
+      <form method="GET" action="/admin" id="windowForm" style="display: flex; align-items: center; gap: 8px; flex-wrap: wrap;">
         <label for="windowSelect" style="font-size: 12px; color: var(--text-secondary, #94a3b8);">Window:</label>
-        <select name="window" id="windowSelect" class="admin-select" onchange="document.getElementById('windowForm').submit()">
+        <select name="window" id="windowSelect" class="admin-select">
           <option value="24h" {% if window == '24h' %}selected{% endif %}>Last 24 Hours</option>
           <option value="7d" {% if window == '7d' %}selected{% endif %}>Last 7 Days</option>
           <option value="30d" {% if window == '30d' or not window %}selected{% endif %}>Last 30 Days (Default)</option>
           <option value="90d" {% if window == '90d' %}selected{% endif %}>Last 90 Days</option>
           <option value="mtd" {% if window == 'mtd' %}selected{% endif %}>Month to Date</option>
+          <option value="custom" {% if window == 'custom' %}selected{% endif %}>📅 Custom Range...</option>
         </select>
-        {% if active_tab %}
-        <input type="hidden" name="tab" value="{{ active_tab }}">
-        {% endif %}
+        
+        <div id="customDateRange" style="display: {% if window == 'custom' %}inline-flex{% else %}none{% endif %}; align-items: center; gap: 6px;">
+          <input type="date" name="start_date" id="startDateInput" class="admin-input" value="{{ start_date_str or '' }}" style="padding: 6px 10px; font-size: 12px; width: 130px;">
+          <span style="color: var(--text-secondary, #94a3b8); font-size: 12px;">to</span>
+          <input type="date" name="end_date" id="endDateInput" class="admin-input" value="{{ end_date_str or '' }}" style="padding: 6px 10px; font-size: 12px; width: 130px;">
+          <button type="submit" class="btn btn-secondary btn-sm" style="padding: 6px 12px; font-size: 12px;">Apply</button>
+        </div>
+
+        <input type="hidden" name="tab" id="activeTabInput" value="{{ active_tab or 'billables' }}">
       </form>
 
       <!-- Admin Identity & 2FA Badge -->
@@ -351,34 +358,34 @@
 
   <!-- Navigation Tabs -->
   <div class="admin-tabs">
-    <button class="admin-tab-btn {% if not active_tab or active_tab == 'billables' %}active{% endif %}" onclick="showTab('billables')">
+    <button class="admin-tab-btn {% if not active_tab or active_tab == 'billables' %}active{% endif %}" data-tab="billables" onclick="showTab('billables')">
       💳 Live Billables & Invoices
     </button>
-    <button class="admin-tab-btn {% if active_tab == 'users' %}active{% endif %}" onclick="showTab('users')">
+    <button class="admin-tab-btn {% if active_tab == 'users' %}active{% endif %}" data-tab="users" onclick="showTab('users')">
       👤 User Accounts & Usage
     </button>
-    <button class="admin-tab-btn {% if active_tab == 'tickets' %}active{% endif %}" onclick="showTab('tickets')">
+    <button class="admin-tab-btn {% if active_tab == 'tickets' %}active{% endif %}" data-tab="tickets" onclick="showTab('tickets')">
       📩 Support Grievances
       {% if open_tickets_count > 0 %}
       <span class="admin-tab-badge">{{ open_tickets_count }}</span>
       {% endif %}
     </button>
-    <button class="admin-tab-btn {% if active_tab == 'traffic' %}active{% endif %}" onclick="showTab('traffic')">
+    <button class="admin-tab-btn {% if active_tab == 'traffic' %}active{% endif %}" data-tab="traffic" onclick="showTab('traffic')">
       🌐 Traffic Origins
     </button>
-    <button class="admin-tab-btn {% if active_tab == 'actions' %}active{% endif %}" onclick="showTab('actions')">
+    <button class="admin-tab-btn {% if active_tab == 'actions' %}active{% endif %}" data-tab="actions" onclick="showTab('actions')">
       🎯 User Actions
     </button>
-    <button class="admin-tab-btn {% if active_tab == 'journeys' %}active{% endif %}" onclick="showTab('journeys')">
+    <button class="admin-tab-btn {% if active_tab == 'journeys' %}active{% endif %}" data-tab="journeys" onclick="showTab('journeys')">
       🧭 Session Journeys
     </button>
-    <button class="admin-tab-btn {% if active_tab == 'telemetry' %}active{% endif %}" onclick="showTab('telemetry')">
+    <button class="admin-tab-btn {% if active_tab == 'telemetry' %}active{% endif %}" data-tab="telemetry" onclick="showTab('telemetry')">
       📜 Live Audit Stream
     </button>
-    <button class="admin-tab-btn {% if active_tab == 'team' %}active{% endif %}" onclick="showTab('team')">
+    <button class="admin-tab-btn {% if active_tab == 'team' %}active{% endif %}" data-tab="team" onclick="showTab('team')">
       👥 Team & Access
     </button>
-    <button class="admin-tab-btn {% if active_tab == 'audit' %}active{% endif %}" onclick="showTab('audit')">
+    <button class="admin-tab-btn {% if active_tab == 'audit' %}active{% endif %}" data-tab="audit" onclick="showTab('audit')">
       🛡️ Admin Audit Trail
     </button>
   </div>
@@ -831,7 +838,14 @@
   <!-- TAB 7: Live Telemetry Audit Stream -->
   <div id="tab-telemetry" class="admin-tab-pane {% if active_tab == 'telemetry' %}active{% endif %}">
     <div class="admin-card">
-      <h3 style="margin-top: 0; font-size: 16px; font-weight: 700; margin-bottom: 16px;">Live Platform Events Stream (Latest 50)</h3>
+      <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px; flex-wrap: wrap; gap: 10px;">
+        <h3 style="margin: 0; font-size: 16px; font-weight: 700;">Live Platform Events Stream (Latest 50)</h3>
+        {% if current_admin.role in ['owner', 'admin'] %}
+        <button onclick="document.getElementById('purgeDataModal').style.display='flex'" class="btn btn-secondary btn-sm" style="color: #f87171; border-color: rgba(239, 68, 68, 0.4); display: flex; align-items: center; gap: 6px;">
+          🧹 Purge Test Data
+        </button>
+        {% endif %}
+      </div>
       <div class="admin-table-wrap">
         <table class="admin-table">
           <thead>
@@ -1085,6 +1099,41 @@
     </div>
   </div>
 
+  <!-- Purge Test Data Confirmation Modal -->
+  <div id="purgeDataModal" class="modal-backdrop" style="display: none; align-items: center; justify-content: center;">
+    <div class="modal-dialog" style="max-width: 480px; background: var(--bg-card, #131722); border-radius: 12px; padding: 24px; border: 1px solid rgba(239, 68, 68, 0.4);">
+      <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px;">
+        <h3 style="margin: 0; font-size: 18px; font-weight: 800; color: #f87171;">🧹 Purge Synthetic Test Data</h3>
+        <button onclick="document.getElementById('purgeDataModal').style.display='none'" style="background: none; border: none; color: #fff; font-size: 20px; cursor: pointer;">&times;</button>
+      </div>
+
+      <p style="font-size: 13px; color: var(--text-secondary, #94a3b8); margin-bottom: 16px; line-height: 1.5;">
+        This action permanently removes all synthetic development records so that your dashboard reflects strictly authentic, live user traffic:
+      </p>
+
+      <ul style="font-size: 12px; color: #cbd5e1; margin-bottom: 20px; padding-left: 20px; line-height: 1.6;">
+        <li>Mock telemetry records with test emails (<code>*@example.com</code>, <code>test_*</code>)</li>
+        <li>Synthetic user IDs (<code>guest_web_user</code>, <code>test_user</code>, <code>testclient</code>)</li>
+        <li>Test ticker logs (<code>TEST</code>, <code>APP</code>, <code>XYZ</code>, <code>SAMPLE</code>)</li>
+        <li>Automated test support grievances (<code>TKT-TEST-*</code>)</li>
+        <li>Dummy credit transactions and simulated signups</li>
+      </ul>
+
+      <div style="background: rgba(239, 68, 68, 0.1); border: 1px solid rgba(239, 68, 68, 0.2); padding: 10px; border-radius: 6px; font-size: 12px; color: #fca5a5; margin-bottom: 20px;">
+        🔒 All legitimate investor accounts, genuine paying transactions, and real visitor telemetry are strictly preserved.
+      </div>
+
+      <form method="POST" action="/admin/telemetry/purge-test-data" style="display: flex; gap: 10px; justify-content: flex-end;">
+        <button type="button" onclick="document.getElementById('purgeDataModal').style.display='none'" class="btn btn-secondary" style="padding: 8px 16px; font-size: 13px;">
+          Cancel
+        </button>
+        <button type="submit" class="btn btn-primary" style="background: #ef4444; border-color: #ef4444; padding: 8px 16px; font-size: 13px; font-weight: 700;">
+          Confirm & Purge Test Data
+        </button>
+      </form>
+    </div>
+  </div>
+
   <script>
   function showTab(tabName) {
     document.querySelectorAll('.admin-tab-pane').forEach(el => el.classList.remove('active'));
@@ -1093,13 +1142,49 @@
     if (target) {
       target.classList.add('active');
     }
-    // Highlight button
-    event.currentTarget.classList.add('active');
-    // Update window query parameter smoothly
+    // Highlight button by data-tab attribute
+    const btn = document.querySelector(`.admin-tab-btn[data-tab="${tabName}"]`);
+    if (btn) {
+      btn.classList.add('active');
+    }
+
+    // CRITICAL: Synchronize hidden tab input in windowForm so changing the date range never loses the active tab!
+    const tabInput = document.getElementById('activeTabInput');
+    if (tabInput) {
+      tabInput.value = tabName;
+    }
+
+    // Update URL query parameter smoothly without page reload
     const url = new URL(window.location);
     url.searchParams.set('tab', tabName);
     window.history.replaceState({}, '', url);
   }
+
+  // Handle windowSelect changes and auto-restore tab state
+  document.addEventListener('DOMContentLoaded', () => {
+    const sel = document.getElementById('windowSelect');
+    const customDiv = document.getElementById('customDateRange');
+    if (sel && customDiv) {
+      sel.addEventListener('change', () => {
+        if (sel.value === 'custom') {
+          customDiv.style.display = 'inline-flex';
+        } else {
+          customDiv.style.display = 'none';
+          document.getElementById('windowForm').submit();
+        }
+      });
+    }
+
+    // Auto-restore tab from URL query if present
+    const urlParams = new URLSearchParams(window.location.search);
+    const initialTab = urlParams.get('tab');
+    if (initialTab) {
+      const pane = document.getElementById('tab-' + initialTab);
+      if (pane) {
+        showTab(initialTab);
+      }
+    }
+  });
   </script>
 
 {% endif %}
