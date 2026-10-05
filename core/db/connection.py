@@ -1070,6 +1070,203 @@ def init_db(force: bool = False):
                     cursor.execute("INSERT OR IGNORE INTO schema_migrations (version) VALUES ('v015_asset_scan_runs');")
                 conn.commit()
 
+            # Migration v016: Sovereign benchmarks and ETF matrix (Priority 3)
+            if "v016_sovereign_benchmarks_and_etfs" not in applied:
+                logger.info("Applying schema migration: v016_sovereign_benchmarks_and_etfs...")
+                if supabase_url:
+                    cursor.execute("""
+                        CREATE TABLE IF NOT EXISTS sovereign_benchmarks (
+                            id SERIAL PRIMARY KEY,
+                            tenor_label VARCHAR(64) UNIQUE NOT NULL,
+                            instrument_type VARCHAR(20) NOT NULL,
+                            maturity_years NUMERIC NOT NULL,
+                            cut_off_yield NUMERIC NOT NULL,
+                            auction_date VARCHAR(20) NOT NULL,
+                            source VARCHAR(64) DEFAULT 'RBI_AUCTION_CUTOFF',
+                            updated_at TIMESTAMPTZ DEFAULT now()
+                        );
+                        CREATE TABLE IF NOT EXISTS etf_matrix (
+                            id SERIAL PRIMARY KEY,
+                            symbol VARCHAR(64) UNIQUE NOT NULL,
+                            scheme_name VARCHAR(255) NOT NULL,
+                            category VARCHAR(50) NOT NULL,
+                            underlying_index VARCHAR(100) NOT NULL,
+                            last_price NUMERIC NOT NULL,
+                            nav NUMERIC NOT NULL,
+                            premium_discount_pct NUMERIC DEFAULT 0.0,
+                            tracking_error_1y NUMERIC DEFAULT 0.0,
+                            expense_ratio_pct NUMERIC DEFAULT 0.0,
+                            aum_crores NUMERIC DEFAULT 0.0,
+                            avg_daily_volume NUMERIC DEFAULT 0.0,
+                            avg_daily_turnover_cr NUMERIC DEFAULT 0.0,
+                            liquidity_tier VARCHAR(30) DEFAULT 'HIGH_LIQUIDITY',
+                            updated_at TIMESTAMPTZ DEFAULT now()
+                        );
+                        INSERT INTO schema_migrations (version) VALUES ('v016_sovereign_benchmarks_and_etfs') ON CONFLICT DO NOTHING;
+                    """)
+                else:
+                    cursor.execute("""
+                        CREATE TABLE IF NOT EXISTS sovereign_benchmarks (
+                            id INTEGER PRIMARY KEY AUTOINCREMENT,
+                            tenor_label TEXT UNIQUE NOT NULL,
+                            instrument_type TEXT NOT NULL,
+                            maturity_years REAL NOT NULL,
+                            cut_off_yield REAL NOT NULL,
+                            auction_date TEXT NOT NULL,
+                            source TEXT DEFAULT 'RBI_AUCTION_CUTOFF',
+                            updated_at TEXT DEFAULT (datetime('now'))
+                        );
+                    """)
+                    cursor.execute("""
+                        CREATE TABLE IF NOT EXISTS etf_matrix (
+                            id INTEGER PRIMARY KEY AUTOINCREMENT,
+                            symbol TEXT UNIQUE NOT NULL,
+                            scheme_name TEXT NOT NULL,
+                            category TEXT NOT NULL,
+                            underlying_index TEXT NOT NULL,
+                            last_price REAL NOT NULL,
+                            nav REAL NOT NULL,
+                            premium_discount_pct REAL DEFAULT 0.0,
+                            tracking_error_1y REAL DEFAULT 0.0,
+                            expense_ratio_pct REAL DEFAULT 0.0,
+                            aum_crores REAL DEFAULT 0.0,
+                            avg_daily_volume REAL DEFAULT 0.0,
+                            avg_daily_turnover_cr REAL DEFAULT 0.0,
+                            liquidity_tier TEXT DEFAULT 'HIGH_LIQUIDITY',
+                            updated_at TEXT DEFAULT (datetime('now'))
+                        );
+                    """)
+                    cursor.execute("INSERT OR IGNORE INTO schema_migrations (version) VALUES ('v016_sovereign_benchmarks_and_etfs');")
+                conn.commit()
+
+            # Migration v017: SM REITs, InvITs, and SGB tranches (Priority 4)
+            if "v017_sm_reits_invits_and_sgb" not in applied:
+                logger.info("Applying schema migration: v017_sm_reits_invits_and_sgb...")
+                if supabase_url:
+                    cursor.execute("""
+                        CREATE TABLE IF NOT EXISTS reits_and_invits (
+                            id SERIAL PRIMARY KEY,
+                            symbol VARCHAR(64) UNIQUE NOT NULL,
+                            name VARCHAR(255) NOT NULL,
+                            structure_type VARCHAR(50) NOT NULL,
+                            current_price NUMERIC NOT NULL,
+                            nav_per_unit NUMERIC NOT NULL,
+                            discount_to_nav_pct NUMERIC DEFAULT 0.0,
+                            distribution_yield_pct NUMERIC DEFAULT 0.0,
+                            occupancy_pct NUMERIC DEFAULT 0.0,
+                            ndcf_payout_purity_pct NUMERIC DEFAULT 100.0,
+                            ltv_ratio_pct NUMERIC DEFAULT 0.0,
+                            wale_years NUMERIC DEFAULT 0.0,
+                            sponsor_holding_pct NUMERIC DEFAULT 0.0,
+                            sebi_compliant BOOLEAN DEFAULT TRUE,
+                            details_json TEXT DEFAULT '{}',
+                            updated_at TIMESTAMPTZ DEFAULT now()
+                        );
+                        CREATE TABLE IF NOT EXISTS sgb_tranches (
+                            id SERIAL PRIMARY KEY,
+                            symbol VARCHAR(64) UNIQUE NOT NULL,
+                            series_name VARCHAR(255) NOT NULL,
+                            issue_price NUMERIC NOT NULL,
+                            market_price NUMERIC NOT NULL,
+                            spot_gold_price NUMERIC NOT NULL,
+                            discount_to_spot_pct NUMERIC DEFAULT 0.0,
+                            annual_coupon_rate NUMERIC DEFAULT 2.50,
+                            maturity_date VARCHAR(20) NOT NULL,
+                            ytm_annualized_pct NUMERIC DEFAULT 0.0,
+                            tax_treatment VARCHAR(100) DEFAULT '100% Tax-Free Capital Gains (Sec 47(viic))',
+                            etf_tax_adjusted_spread_pct NUMERIC DEFAULT 0.0,
+                            updated_at TIMESTAMPTZ DEFAULT now()
+                        );
+                        INSERT INTO schema_migrations (version) VALUES ('v017_sm_reits_invits_and_sgb') ON CONFLICT DO NOTHING;
+                    """)
+                else:
+                    cursor.execute("""
+                        CREATE TABLE IF NOT EXISTS reits_and_invits (
+                            id INTEGER PRIMARY KEY AUTOINCREMENT,
+                            symbol TEXT UNIQUE NOT NULL,
+                            name TEXT NOT NULL,
+                            structure_type TEXT NOT NULL,
+                            current_price REAL NOT NULL,
+                            nav_per_unit REAL NOT NULL,
+                            discount_to_nav_pct REAL DEFAULT 0.0,
+                            distribution_yield_pct REAL DEFAULT 0.0,
+                            occupancy_pct REAL DEFAULT 0.0,
+                            ndcf_payout_purity_pct REAL DEFAULT 100.0,
+                            ltv_ratio_pct REAL DEFAULT 0.0,
+                            wale_years REAL DEFAULT 0.0,
+                            sponsor_holding_pct REAL DEFAULT 0.0,
+                            sebi_compliant INTEGER DEFAULT 1,
+                            details_json TEXT DEFAULT '{}',
+                            updated_at TEXT DEFAULT (datetime('now'))
+                        );
+                    """)
+                    cursor.execute("""
+                        CREATE TABLE IF NOT EXISTS sgb_tranches (
+                            id INTEGER PRIMARY KEY AUTOINCREMENT,
+                            symbol TEXT UNIQUE NOT NULL,
+                            series_name TEXT NOT NULL,
+                            issue_price REAL NOT NULL,
+                            market_price REAL NOT NULL,
+                            spot_gold_price REAL NOT NULL,
+                            discount_to_spot_pct REAL DEFAULT 0.0,
+                            annual_coupon_rate REAL DEFAULT 2.50,
+                            maturity_date TEXT NOT NULL,
+                            ytm_annualized_pct REAL DEFAULT 0.0,
+                            tax_treatment TEXT DEFAULT '100% Tax-Free Capital Gains (Sec 47(viic))',
+                            etf_tax_adjusted_spread_pct REAL DEFAULT 0.0,
+                            updated_at TEXT DEFAULT (datetime('now'))
+                        );
+                    """)
+                    cursor.execute("INSERT OR IGNORE INTO schema_migrations (version) VALUES ('v017_sm_reits_invits_and_sgb');")
+                conn.commit()
+
+            # Migration v018: Retail alternative yield & shadow banking safety radar (Priority 5)
+            if "v018_retail_safety_radar" not in applied:
+                logger.info("Applying schema migration: v018_retail_safety_radar...")
+                if supabase_url:
+                    cursor.execute("""
+                        CREATE TABLE IF NOT EXISTS alternative_yield_products (
+                            id SERIAL PRIMARY KEY,
+                            product_id VARCHAR(64) UNIQUE NOT NULL,
+                            product_name VARCHAR(255) NOT NULL,
+                            category VARCHAR(50) NOT NULL,
+                            promoted_yield_pct NUMERIC NOT NULL,
+                            danger_score INTEGER NOT NULL DEFAULT 50,
+                            regulatory_status VARCHAR(50) NOT NULL,
+                            counterparty_risk_level VARCHAR(30) NOT NULL,
+                            principal_guarantee_validity BOOLEAN DEFAULT FALSE,
+                            rbi_warning_circular TEXT DEFAULT '',
+                            liquidity_lock_months INTEGER DEFAULT 0,
+                            precedent_losses_summary TEXT DEFAULT '',
+                            safe_alternative_recommendation TEXT DEFAULT '',
+                            audit_matrix_json TEXT DEFAULT '{}',
+                            updated_at TIMESTAMPTZ DEFAULT now()
+                        );
+                        INSERT INTO schema_migrations (version) VALUES ('v018_retail_safety_radar') ON CONFLICT DO NOTHING;
+                    """)
+                else:
+                    cursor.execute("""
+                        CREATE TABLE IF NOT EXISTS alternative_yield_products (
+                            id INTEGER PRIMARY KEY AUTOINCREMENT,
+                            product_id TEXT UNIQUE NOT NULL,
+                            product_name TEXT NOT NULL,
+                            category TEXT NOT NULL,
+                            promoted_yield_pct REAL NOT NULL,
+                            danger_score INTEGER NOT NULL DEFAULT 50,
+                            regulatory_status TEXT NOT NULL,
+                            counterparty_risk_level TEXT NOT NULL,
+                            principal_guarantee_validity INTEGER DEFAULT 0,
+                            rbi_warning_circular TEXT DEFAULT '',
+                            liquidity_lock_months INTEGER DEFAULT 0,
+                            precedent_losses_summary TEXT DEFAULT '',
+                            safe_alternative_recommendation TEXT DEFAULT '',
+                            audit_matrix_json TEXT DEFAULT '{}',
+                            updated_at TEXT DEFAULT (datetime('now'))
+                        );
+                    """)
+                    cursor.execute("INSERT OR IGNORE INTO schema_migrations (version) VALUES ('v018_retail_safety_radar');")
+                conn.commit()
+
             _DB_INITIALIZED = True
         except Exception as e:
             logger.error(f"Error during init_db migrations: {e}")

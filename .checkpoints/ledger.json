@@ -286,5 +286,37 @@
       "revision_count": 38
     },
     "preflight_passed": true
+  },
+  {
+    "tag": "checkpoint_20261006_005157_fix_discovery_and_source_evaluation",
+    "timestamp": "2026-10-06 00:51:57 IST",
+    "commit_sha": "5de148859215f899c3862969a5818cc0be777929",
+    "branch": "main",
+    "description": "fix_discovery_and_source_evaluation",
+    "database": {
+      "exists": true,
+      "filename": "reports_checkpoint_20261006_005157_fix_discovery_and_source_evaluation.db",
+      "path": ".checkpoints/reports_checkpoint_20261006_005157_fix_discovery_and_source_evaluation.db",
+      "size_bytes": 757760,
+      "report_count": 1,
+      "revision_count": 41
+    },
+    "preflight_passed": true
+  },
+  {
+    "tag": "checkpoint_20261006_005620_simplify_website_taskbar_subtabs",
+    "timestamp": "2026-10-06 00:56:20 IST",
+    "commit_sha": "3b314c53d2a5563035f34e9827b2936db173ef5b",
+    "branch": "main",
+    "description": "simplify_website_taskbar_subtabs",
+    "database": {
+      "exists": true,
+      "filename": "reports_checkpoint_20261006_005620_simplify_website_taskbar_subtabs.db",
+      "path": ".checkpoints/reports_checkpoint_20261006_005620_simplify_website_taskbar_subtabs.db",
+      "size_bytes": 811008,
+      "report_count": 1,
+      "revision_count": 44
+    },
+    "preflight_passed": true
   }
 ]

@@ -1,0 +1,123 @@
+{% extends "base.html" %}
+
+{% block title %}National ETF Matrix & Tracking Error Surveillance | Stock Research AI{% endblock %}
+{% block meta_desc %}Real-time Indian ETF matrix auditing exchange price vs NAV premium/discount, tracking error, expense ratio drag, and Amihud liquidity tiers for Index, Debt, and Commodity ETFs.{% endblock %}
+
+{% block content %}
+<div class="container py-8">
+  <!-- Header Banner -->
+  <div style="background: linear-gradient(135deg, rgba(30, 41, 59, 0.7) 0%, rgba(15, 23, 42, 0.95) 100%); border: 1px solid rgba(255, 255, 255, 0.1); border-radius: 16px; padding: 32px; margin-bottom: 32px; position: relative; overflow: hidden;">
+    <div style="display: inline-flex; align-items: center; gap: 8px; background: rgba(16, 185, 129, 0.15); border: 1px solid rgba(16, 185, 129, 0.3); border-radius: 9999px; padding: 4px 14px; margin-bottom: 16px;">
+      <span style="width: 8px; height: 8px; border-radius: 50%; background: #10b981;"></span>
+      <span style="font-size: 12px; font-weight: 700; color: #34d399; text-transform: uppercase; letter-spacing: 0.05em;">SEBI-Mandated Tracking Error & Liquidity Surveillance</span>
+    </div>
+
+    <h1 style="font-size: 32px; font-weight: 800; color: #f8fafc; margin-bottom: 12px; letter-spacing: -0.02em;">
+      National ETF Performance & Liquidity Matrix
+    </h1>
+    <p style="font-size: 15px; color: #94a3b8; max-width: 840px; line-height: 1.6; margin-bottom: 24px;">
+      Exchange Traded Funds (ETFs) trade like stocks but hold collective portfolios. Every ETF is evaluated against its 
+      <strong>True NAV Fair Value</strong>, tracking error deviation, total expense ratio (TER) fee drag, and secondary market liquidity depth.
+    </p>
+
+    <!-- Top KPI Grid -->
+    <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 16px;">
+      <div style="background: rgba(15, 23, 42, 0.6); border: 1px solid rgba(255, 255, 255, 0.08); border-radius: 12px; padding: 18px;">
+        <div style="font-size: 12px; color: #64748b; text-transform: uppercase; font-weight: 600; margin-bottom: 4px;">Tracked ETFs</div>
+        <div style="font-size: 26px; font-weight: 800; color: #f8fafc;" class="tnum">{{ data.total_tracked_etfs }} Schemes</div>
+      </div>
+      <div style="background: rgba(15, 23, 42, 0.6); border: 1px solid rgba(255, 255, 255, 0.08); border-radius: 12px; padding: 18px;">
+        <div style="font-size: 12px; color: #64748b; text-transform: uppercase; font-weight: 600; margin-bottom: 4px;">Total ETF AUM</div>
+        <div style="font-size: 26px; font-weight: 800; color: #38bdf8;" class="tnum">₹{{ data.total_aum_crores|round(0) }} Cr</div>
+      </div>
+      <div style="background: rgba(15, 23, 42, 0.6); border: 1px solid rgba(255, 255, 255, 0.08); border-radius: 12px; padding: 18px;">
+        <div style="font-size: 12px; color: #64748b; text-transform: uppercase; font-weight: 600; margin-bottom: 4px;">High-Liquidity Core</div>
+        <div style="font-size: 26px; font-weight: 800; color: #10b981;" class="tnum">{{ data.high_liquidity_count }} ETFs</div>
+      </div>
+      <div style="background: rgba(15, 23, 42, 0.6); border: 1px solid rgba(255, 255, 255, 0.08); border-radius: 12px; padding: 18px;">
+        <div style="font-size: 12px; color: #64748b; text-transform: uppercase; font-weight: 600; margin-bottom: 4px;">NAV Divergence Alerts</div>
+        <div style="font-size: 26px; font-weight: 800; color: #f59e0b;" class="tnum">{{ data.nav_divergence_alerts }} Issues</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Category Filter Pills -->
+  <div style="display: flex; gap: 8px; overflow-x: auto; padding-bottom: 12px; margin-bottom: 24px;">
+    <a href="/etfs" class="btn btn-sm {% if not current_category %}btn-primary{% else %}btn-secondary{% endif %}" style="border-radius: 9999px;">All ETFs ({{ data.total_tracked_etfs }})</a>
+    <a href="/etfs?category=EQUITY_INDEX" class="btn btn-sm {% if current_category == 'EQUITY_INDEX' %}btn-primary{% else %}btn-secondary{% endif %}" style="border-radius: 9999px;">📈 Equity Indices</a>
+    <a href="/etfs?category=COMMODITY_GOLD" class="btn btn-sm {% if current_category == 'COMMODITY_GOLD' %}btn-primary{% else %}btn-secondary{% endif %}" style="border-radius: 9999px;">🪙 Gold & Commodities</a>
+    <a href="/etfs?category=DEBT_TARGET_MATURITY" class="btn btn-sm {% if current_category == 'DEBT_TARGET_MATURITY' %}btn-primary{% else %}btn-secondary{% endif %}" style="border-radius: 9999px;">🛡️ Bharat Bond & Target Maturity</a>
+    <a href="/etfs?category=LIQUID" class="btn btn-sm {% if current_category == 'LIQUID' %}btn-primary{% else %}btn-secondary{% endif %}" style="border-radius: 9999px;">💧 Overnight & Liquid</a>
+  </div>
+
+  <!-- ETF Table -->
+  <div class="card" style="padding: 24px; margin-bottom: 32px;">
+    <div style="overflow-x: auto;">
+      <table style="width: 100%; border-collapse: collapse; font-size: 13.5px;">
+        <thead>
+          <tr style="border-bottom: 1px solid rgba(255, 255, 255, 0.1); text-align: left; color: #64748b; font-size: 11.5px; text-transform: uppercase;">
+            <th style="padding: 12px 14px;">Symbol / Scheme</th>
+            <th style="padding: 12px 14px;">Category</th>
+            <th style="padding: 12px 14px;">Market Price</th>
+            <th style="padding: 12px 14px;">NAV</th>
+            <th style="padding: 12px 14px;">Prem / Disc %</th>
+            <th style="padding: 12px 14px;">1Y Tracking Error</th>
+            <th style="padding: 12px 14px;">TER Fee</th>
+            <th style="padding: 12px 14px;">AUM</th>
+            <th style="padding: 12px 14px;">Liquidity Tier</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for etf in data.etfs %}
+          <tr style="border-bottom: 1px solid rgba(255, 255, 255, 0.05); transition: background 0.15s ease;">
+            <td style="padding: 12px 14px;">
+              <div style="font-weight: 800; color: #f8fafc;">{{ etf.symbol }}</div>
+              <div style="font-size: 11px; color: #94a3b8; max-width: 220px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">{{ etf.scheme_name }}</div>
+            </td>
+            <td style="padding: 12px 14px; font-size: 12px; color: #cbd5e1;">
+              {{ etf.category }}
+            </td>
+            <td style="padding: 12px 14px; font-weight: 700; color: #f8fafc;" class="tnum">
+              ₹{{ etf.last_price }}
+            </td>
+            <td style="padding: 12px 14px; color: #94a3b8;" class="tnum">
+              ₹{{ etf.nav }}
+            </td>
+            <td style="padding: 12px 14px; font-weight: 700;" class="tnum">
+              {% if etf.premium_discount_pct > 0.3 %}
+                <span style="color: #f59e0b;">+{{ etf.premium_discount_pct }}% (Prem)</span>
+              {% elif etf.premium_discount_pct < -0.3 %}
+                <span style="color: #10b981;">{{ etf.premium_discount_pct }}% (Disc)</span>
+              {% else %}
+                <span style="color: #94a3b8;">{{ etf.premium_discount_pct }}%</span>
+              {% endif %}
+            </td>
+            <td style="padding: 12px 14px; color: #38bdf8;" class="tnum">
+              {{ etf.tracking_error_1y }}%
+            </td>
+            <td style="padding: 12px 14px; color: #cbd5e1;" class="tnum">
+              {{ etf.expense_ratio_pct }}%
+            </td>
+            <td style="padding: 12px 14px; color: #94a3b8;" class="tnum">
+              ₹{{ etf.aum_crores|round(0) }} Cr
+            </td>
+            <td style="padding: 12px 14px;">
+              {% if etf.liquidity_tier == 'HIGH_LIQUIDITY' %}
+                <span style="background: rgba(16, 185, 129, 0.15); color: #34d399; padding: 2px 8px; border-radius: 4px; font-size: 11px; font-weight: 700;">High (₹{{ etf.avg_daily_turnover_cr }} Cr/d)</span>
+              {% else %}
+                <span style="background: rgba(245, 158, 11, 0.15); color: #fbbf24; padding: 2px 8px; border-radius: 4px; font-size: 11px; font-weight: 700;">Moderate</span>
+              {% endif %}
+            </td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+  <!-- Disclaimer Footer -->
+  <div style="font-size: 12px; color: #64748b; text-align: center; max-width: 800px; margin: 0 auto; line-height: 1.6;">
+    🔒 <strong>Data Sources:</strong> AMFI NAVAll.txt and Association of Mutual Funds in India statutory Tracking Error disclosures. Exchange prices represent delayed End-of-Day closing levels. For educational and analytical research under SEBI RA regulations.
+  </div>
+</div>
+{% endblock %}

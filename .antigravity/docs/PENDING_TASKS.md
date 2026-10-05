@@ -36,9 +36,9 @@
 - [x] **P2 Remediation:** Add `ALWAYS_ON_ASSET_SCAN` rule + scheduled MF/debt surveillance engine: daily diff → NEW / CHANGED / CLOSED-MERGED → ARCHIVED (append-only), logged to immutable `asset_scan_runs` ledger and surfaced in `/admin?tab=assets` console.
 
 ### Priority 3: Sovereign Curve & ETF Analytics
-- [ ] Ingest Sovereign Risk-Free Benchmarks: Ingest RBI/FBIL T-Bills (91/182/364-day), 10-Yr G-Sec, and SDL yield curves.
-- [ ] Build ETF Performance & Liquidity Matrix: Track Tracking Error, Impact Cost, and Exchange Liquidity spreads for Index, Debt (Bharat Bond), and Commodity ETFs.
-- [ ] Implement Net Real Post-Tax Return Calculator: Model net purchasing power across FDs, Sovereign Bonds, and Corporate Debt across marginal tax slabs.
+- [x] Ingest Sovereign Risk-Free Benchmarks: Ingest RBI/FBIL T-Bills (91/182/364-day), 10-Yr G-Sec, and SDL yield curves (`core/db/sovereign.py`, `core/analysis/sovereign_engine.py`, `/sovereign`, `/api/sovereign/curve`).
+- [x] Build ETF Performance & Liquidity Matrix: Track Tracking Error, Impact Cost, and Exchange Liquidity spreads for Index, Debt (Bharat Bond), and Commodity ETFs (`core/analysis/etf_engine.py`, `/etfs`, `/api/etfs/matrix`).
+- [x] Implement Net Real Post-Tax Return Calculator: Model net purchasing power across FDs, Sovereign Bonds, and Corporate Debt across marginal tax slabs using MOSPI CPI inflation deflator (`core/analysis/tax_calculator.py`, `/calculator/tax`, `/api/calculator/tax-return`).
 - Free sources (Tier A): AMFI NAVAll + Tracking Error disclosures, RBI auction press releases (T-Bill/G-Sec/SDL), RBI DBIE, MOSPI CPI API, SEBI NFO filings, FY-versioned tax rules.
 - Paid / licensed sources to evaluate (add value, required for public display):
   - [ ] NSE Data & Analytics licence: EOD / delayed display of ETF prices, volumes, index levels (delayed data ~₹1.4L/yr per medium; EOD on quote).
@@ -49,8 +49,8 @@
   - [ ] CRISIL / ICRA bond valuation feed: debt-ETF underlying bond pricing.
 
 ### Priority 4: Fractional Real Estate (SM REITs) & Sovereign Gold
-- [ ] Build SEBI SM REIT & InvIT Tracking Module: Monitor completed asset occupancy ($\ge 95\%$), NDCF distribution upstreaming purity, and leverage ratios ($LTV \le 49\%$).
-- [ ] Build SGB Secondary Market Discount & Yield Analyzer: Calculate annualized yields and tax-adjusted parity against Gold ETFs and physical gold.
+- [x] Build SEBI SM REIT & InvIT Tracking Module: Monitor completed asset occupancy ($\ge 95\%$), NDCF distribution upstreaming purity, and leverage ratios ($LTV \le 49\%$) under SEBI (REIT) (Amendment) Regulations 2024 (`core/db/reits.py`, `core/analysis/reit_engine.py`, `/reits`, `/api/reits/directory`).
+- [x] Build SGB Secondary Market Discount & Yield Analyzer: Calculate annualized yields and tax-adjusted parity against Gold ETFs and physical gold with Section 47(viic) capital gains tax exemption (`core/analysis/sgb_engine.py`, `/api/sgb/tranches`).
 
 ### Priority 5: Retail Safety & Shadow-Banking Diagnostic Radar
-- [ ] Build Alternative Yield Risk Scorecard: Diagnostic guardrail highlighting counterparty risks in unregulated gold leasing (Gullak Gold+) and RBI-restricted P2P lending.
+- [x] Build Alternative Yield Risk Scorecard: Diagnostic guardrail highlighting counterparty risks in unregulated gold leasing (Gullak Gold+), RBI-restricted P2P lending (12Club/LiquiLoans), and unrated NBFC deposits with 0-100 Danger Score (`core/db/safety_radar.py`, `core/analysis/safety_radar.py`, `/safety-radar`, `/api/safety-radar`).

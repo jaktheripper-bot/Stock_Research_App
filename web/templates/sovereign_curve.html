@@ -1,0 +1,126 @@
+{% extends "base.html" %}
+
+{% block title %}Sovereign Risk-Free Benchmarks & RBI Par Yield Curve | Stock Research AI{% endblock %}
+{% block meta_desc %}Real-time Indian sovereign yield curve across Treasury Bills (91D, 182D, 364D), Central G-Secs (2Y to 30Y), and 10Y State Development Loans (SDL) based on official RBI auction cut-offs.{% endblock %}
+
+{% block content %}
+<div class="container py-8">
+  <!-- Header Banner -->
+  <div style="background: linear-gradient(135deg, rgba(30, 41, 59, 0.7) 0%, rgba(15, 23, 42, 0.95) 100%); border: 1px solid rgba(255, 255, 255, 0.1); border-radius: 16px; padding: 32px; margin-bottom: 32px; position: relative; overflow: hidden;">
+    <div style="display: inline-flex; align-items: center; gap: 8px; background: rgba(14, 165, 233, 0.15); border: 1px solid rgba(14, 165, 233, 0.3); border-radius: 9999px; padding: 4px 14px; margin-bottom: 16px;">
+      <span style="width: 8px; height: 8px; border-radius: 50%; background: #0ea5e9;"></span>
+      <span style="font-size: 12px; font-weight: 700; color: #38bdf8; text-transform: uppercase; letter-spacing: 0.05em;">Official RBI Public Auction Cut-Off Benchmarks</span>
+    </div>
+
+    <h1 style="font-size: 32px; font-weight: 800; color: #f8fafc; margin-bottom: 12px; letter-spacing: -0.02em;">
+      Indian Sovereign Par Yield Curve
+    </h1>
+    <p style="font-size: 15px; color: #94a3b8; max-width: 840px; line-height: 1.6; margin-bottom: 24px;">
+      The definitive risk-free foundation for Indian capital markets. Synthesized directly from official 
+      <strong>Reserve Bank of India (RBI)</strong> weekly primary auction cut-offs across Treasury Bills, Central Government Securities (G-Sec), and State Development Loans (SDL).
+    </p>
+
+    <!-- Top KPI Grid -->
+    <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 16px;">
+      <div style="background: rgba(15, 23, 42, 0.6); border: 1px solid rgba(255, 255, 255, 0.08); border-radius: 12px; padding: 18px;">
+        <div style="font-size: 12px; color: #64748b; text-transform: uppercase; font-weight: 600; margin-bottom: 4px;">Benchmark 10Y G-Sec</div>
+        <div style="font-size: 26px; font-weight: 800; color: #38bdf8;" class="tnum">{{ analytics.benchmark_10y_gsec }}%</div>
+        <div style="font-size: 11px; color: #94a3b8; margin-top: 4px;">Primary Sovereign Anchor</div>
+      </div>
+      <div style="background: rgba(15, 23, 42, 0.6); border: 1px solid rgba(255, 255, 255, 0.08); border-radius: 12px; padding: 18px;">
+        <div style="font-size: 12px; color: #64748b; text-transform: uppercase; font-weight: 600; margin-bottom: 4px;">91-Day T-Bill Cut-Off</div>
+        <div style="font-size: 26px; font-weight: 800; color: #10b981;" class="tnum">{{ analytics.risk_free_short_tbill }}%</div>
+        <div style="font-size: 11px; color: #94a3b8; margin-top: 4px;">Ultra-Short Risk-Free Rate</div>
+      </div>
+      <div style="background: rgba(15, 23, 42, 0.6); border: 1px solid rgba(255, 255, 255, 0.08); border-radius: 12px; padding: 18px;">
+        <div style="font-size: 12px; color: #64748b; text-transform: uppercase; font-weight: 600; margin-bottom: 4px;">Term Spread (10Y - 91D)</div>
+        <div style="font-size: 26px; font-weight: 800; color: #f59e0b;" class="tnum">+{{ analytics.term_spread_bps }} bps</div>
+        <div style="font-size: 11px; color: #94a3b8; margin-top: 4px;">Curve Slope: {{ analytics.curve_shape }}</div>
+      </div>
+      <div style="background: rgba(15, 23, 42, 0.6); border: 1px solid rgba(255, 255, 255, 0.08); border-radius: 12px; padding: 18px;">
+        <div style="font-size: 12px; color: #64748b; text-transform: uppercase; font-weight: 600; margin-bottom: 4px;">10Y SDL State Spread</div>
+        <div style="font-size: 26px; font-weight: 800; color: #a855f7;" class="tnum">+{{ analytics.sdl_credit_spread_bps }} bps</div>
+        <div style="font-size: 11px; color: #94a3b8; margin-top: 4px;">Sub-Sovereign State Premium</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Curve Insights Strip -->
+  {% if analytics.macro_insights %}
+  <div style="background: rgba(14, 165, 233, 0.08); border-left: 4px solid var(--accent-cyan); padding: 16px 20px; border-radius: 8px; margin-bottom: 32px;">
+    <div style="font-weight: 700; color: #38bdf8; font-size: 14px; margin-bottom: 6px;">Macro Monetary Dynamics:</div>
+    <ul style="margin: 0; padding-left: 20px; color: #cbd5e1; font-size: 13.5px; line-height: 1.6;">
+      {% for ins in analytics.macro_insights %}
+      <li>{{ ins }}</li>
+      {% endfor %}
+    </ul>
+  </div>
+  {% endif %}
+
+  <!-- Sovereign Curve Table -->
+  <div class="card" style="padding: 24px; margin-bottom: 32px;">
+    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; flex-wrap: wrap; gap: 12px;">
+      <div>
+        <h2 style="font-size: 20px; font-weight: 800; color: #f8fafc; margin: 0 0 4px 0;">Primary Auction Cut-Off Term Structure</h2>
+        <p style="font-size: 13px; color: #94a3b8; margin: 0;">Immutable RBI primary market clearing yields by maturity tenor.</p>
+      </div>
+      <a href="/calculator/tax" class="btn btn-secondary btn-sm">🧮 Compute Net Real Post-Tax Return</a>
+    </div>
+
+    <div style="overflow-x: auto;">
+      <table style="width: 100%; border-collapse: collapse; font-size: 14px;">
+        <thead>
+          <tr style="border-bottom: 1px solid rgba(255, 255, 255, 0.1); text-align: left; color: #64748b; font-size: 12px; text-transform: uppercase;">
+            <th style="padding: 12px 16px;">Tenor</th>
+            <th style="padding: 12px 16px;">Instrument Type</th>
+            <th style="padding: 12px 16px;">Maturity</th>
+            <th style="padding: 12px 16px;">RBI Cut-Off Yield</th>
+            <th style="padding: 12px 16px;">Spread vs 91D T-Bill</th>
+            <th style="padding: 12px 16px;">Auction Date</th>
+            <th style="padding: 12px 16px;">Settlement Platform</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for pt in analytics.curve_points %}
+          <tr style="border-bottom: 1px solid rgba(255, 255, 255, 0.05); transition: background 0.15s ease;">
+            <td style="padding: 14px 16px; font-weight: 700; color: #f8fafc;">
+              {{ pt.tenor_label }}
+            </td>
+            <td style="padding: 14px 16px;">
+              {% if pt.instrument_type == 'TBILL' %}
+                <span style="background: rgba(16, 185, 129, 0.15); color: #34d399; padding: 2px 8px; border-radius: 4px; font-size: 12px; font-weight: 700;">T-Bill</span>
+              {% elif pt.instrument_type == 'GSEC' %}
+                <span style="background: rgba(14, 165, 233, 0.15); color: #38bdf8; padding: 2px 8px; border-radius: 4px; font-size: 12px; font-weight: 700;">Central G-Sec</span>
+              {% else %}
+                <span style="background: rgba(168, 85, 247, 0.15); color: #c084fc; padding: 2px 8px; border-radius: 4px; font-size: 12px; font-weight: 700;">State SDL</span>
+              {% endif %}
+            </td>
+            <td style="padding: 14px 16px; color: #94a3b8;">
+              {{ pt.maturity_years }} Years
+            </td>
+            <td style="padding: 14px 16px; font-weight: 800; color: #f8fafc;" class="tnum">
+              {{ pt.cut_off_yield }}%
+            </td>
+            <td style="padding: 14px 16px; color: #f59e0b;" class="tnum">
+              {% set spread = (pt.cut_off_yield - analytics.risk_free_short_tbill) * 100 %}
+              {% if spread >= 0 %}+{{ spread|round(1) }} bps{% else %}{{ spread|round(1) }} bps{% endif %}
+            </td>
+            <td style="padding: 14px 16px; color: #94a3b8;" class="tnum">
+              {{ pt.auction_date }}
+            </td>
+            <td style="padding: 14px 16px; color: #64748b; font-size: 12px;">
+              RBI E-Kuber / Retail Direct
+            </td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+  <!-- SEBI Regulatory Safe-Harbor Note -->
+  <div style="font-size: 12px; color: #64748b; text-align: center; max-width: 800px; margin: 0 auto; line-height: 1.6;">
+    🔒 <strong>Data Provenance:</strong> Sourced strictly from official Reserve Bank of India (RBI) Gazette Auction Releases. Yield figures reflect primary auction cut-offs and are published for educational and analytical benchmarking under Section 2(u) of SEBI (Research Analysts) Regulations, 2014.
+  </div>
+</div>
+{% endblock %}

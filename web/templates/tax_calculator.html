@@ -1,0 +1,123 @@
+{% extends "base.html" %}
+
+{% block title %}Net Real Post-Tax Return Calculator | Multi-Asset Purchasing Power Audit{% endblock %}
+{% block meta_desc %}Calculate net real post-tax returns across Bank FDs, Sovereign G-Secs, Corporate Bonds, Sovereign Gold Bonds (SGB), and Equity Mutual Funds adjusted for MOSPI CPI inflation.{% endblock %}
+
+{% block content %}
+<div class="container py-8">
+  <!-- Header Banner -->
+  <div style="background: linear-gradient(135deg, rgba(30, 41, 59, 0.7) 0%, rgba(15, 23, 42, 0.95) 100%); border: 1px solid rgba(255, 255, 255, 0.1); border-radius: 16px; padding: 32px; margin-bottom: 32px; position: relative; overflow: hidden;">
+    <div style="display: inline-flex; align-items: center; gap: 8px; background: rgba(56, 189, 248, 0.15); border: 1px solid rgba(56, 189, 248, 0.3); border-radius: 9999px; padding: 4px 14px; margin-bottom: 16px;">
+      <span style="width: 8px; height: 8px; border-radius: 50%; background: #38bdf8;"></span>
+      <span style="font-size: 12px; font-weight: 700; color: #38bdf8; text-transform: uppercase; letter-spacing: 0.05em;">Finance Act 2024 / FY 2025-26 Statutory Rules</span>
+    </div>
+
+    <h1 style="font-size: 32px; font-weight: 800; color: #f8fafc; margin-bottom: 12px; letter-spacing: -0.02em;">
+      Net Real Post-Tax Return Engine
+    </h1>
+    <p style="font-size: 15px; color: #94a3b8; max-width: 840px; line-height: 1.6; margin-bottom: 24px;">
+      Nominal returns are an illusion. What truly matters is <strong>purchasing power retention</strong> after deducting 
+      statutory taxes (Income Tax Slabs, Section 50AA Debt MF rules, Budget 2024 12.5% LTCG) and <strong>MOSPI Consumer Price Index (CPI) inflation</strong>.
+    </p>
+
+    <!-- Interactive Tax Slab Selector Form -->
+    <form method="GET" action="/calculator/tax" style="display: flex; gap: 16px; align-items: flex-end; flex-wrap: wrap; background: rgba(15, 23, 42, 0.6); padding: 20px; border-radius: 12px; border: 1px solid rgba(255, 255, 255, 0.08);">
+      <div>
+        <label style="display: block; font-size: 12px; color: #94a3b8; text-transform: uppercase; font-weight: 700; margin-bottom: 6px;">Your Marginal Tax Slab:</label>
+        <select name="tax_slab" style="background: rgba(30, 41, 59, 0.8); border: 1px solid rgba(255, 255, 255, 0.2); color: #f8fafc; padding: 10px 14px; border-radius: 8px; font-size: 14px; font-weight: 700;">
+          <option value="30.0" {% if current_slab == 30.0 %}selected{% endif %}>30% Slab (Income > ₹15 Lakhs)</option>
+          <option value="20.0" {% if current_slab == 20.0 %}selected{% endif %}>20% Slab (Income ₹12L - ₹15L)</option>
+          <option value="15.0" {% if current_slab == 15.0 %}selected{% endif %}>15% Slab (Income ₹9L - ₹12L)</option>
+          <option value="10.0" {% if current_slab == 10.0 %}selected{% endif %}>10% Slab (Income ₹6L - ₹9L)</option>
+          <option value="39.0" {% if current_slab == 39.0 %}selected{% endif %}>39% Surcharge Slab (HNI / Ultra-HNI)</option>
+          <option value="0.0" {% if current_slab == 0.0 %}selected{% endif %}>0% (Tax-Exempt / Senior Citizen Base)</option>
+        </select>
+      </div>
+
+      <div>
+        <label style="display: block; font-size: 12px; color: #94a3b8; text-transform: uppercase; font-weight: 700; margin-bottom: 6px;">MOSPI CPI Inflation Deflator (%):</label>
+        <input type="number" step="0.1" name="inflation" value="{{ current_inflation }}" style="width: 140px; background: rgba(30, 41, 59, 0.8); border: 1px solid rgba(255, 255, 255, 0.2); color: #f8fafc; padding: 10px 14px; border-radius: 8px; font-size: 14px; font-weight: 700;">
+      </div>
+
+      <button type="submit" class="btn btn-primary" style="padding: 10px 20px;">
+        Recalculate Real Returns
+      </button>
+    </form>
+  </div>
+
+  <!-- Asset Comparison Matrix Table -->
+  <div class="card" style="padding: 24px; margin-bottom: 32px;">
+    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; flex-wrap: wrap; gap: 12px;">
+      <div>
+        <h2 style="font-size: 20px; font-weight: 800; color: #f8fafc; margin: 0 0 4px 0;">Post-Tax Purchasing Power Matrix</h2>
+        <p style="font-size: 13px; color: #94a3b8; margin: 0;">Ranked from highest compounding purchasing power to highest wealth erosion.</p>
+      </div>
+      <div style="font-size: 13px; color: #38bdf8; font-weight: 700;">
+        Active Deflator: {{ current_inflation }}% Annual Inflation
+      </div>
+    </div>
+
+    <div style="overflow-x: auto;">
+      <table style="width: 100%; border-collapse: collapse; font-size: 14px;">
+        <thead>
+          <tr style="border-bottom: 1px solid rgba(255, 255, 255, 0.1); text-align: left; color: #64748b; font-size: 12px; text-transform: uppercase;">
+            <th style="padding: 12px 16px;">Rank</th>
+            <th style="padding: 12px 16px;">Asset Class</th>
+            <th style="padding: 12px 16px;">Nominal Yield</th>
+            <th style="padding: 12px 16px;">Effective Tax</th>
+            <th style="padding: 12px 16px;">Post-Tax Yield</th>
+            <th style="padding: 12px 16px;">Net Real Return</th>
+            <th style="padding: 12px 16px;">Verdict</th>
+            <th style="padding: 12px 16px;">Statutory Tax Basis</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for a in assets %}
+          <tr style="border-bottom: 1px solid rgba(255, 255, 255, 0.05); transition: background 0.15s ease;">
+            <td style="padding: 14px 16px; font-weight: 800; color: #94a3b8;">
+              #{{ a.rank }}
+            </td>
+            <td style="padding: 14px 16px; font-weight: 700; color: #f8fafc;">
+              {{ a.asset_name }}
+            </td>
+            <td style="padding: 14px 16px; color: #94a3b8;" class="tnum">
+              {{ a.nominal_yield_pct }}%
+            </td>
+            <td style="padding: 14px 16px; color: #f87171;" class="tnum">
+              -{{ a.effective_tax_rate_pct }}%
+            </td>
+            <td style="padding: 14px 16px; font-weight: 700; color: #cbd5e1;" class="tnum">
+              {{ a.post_tax_yield_pct }}%
+            </td>
+            <td style="padding: 14px 16px; font-weight: 800; font-size: 15px;" class="tnum">
+              {% if a.net_real_return_pct > 1.5 %}
+                <span style="color: #10b981;">+{{ a.net_real_return_pct }}%</span>
+              {% elif a.net_real_return_pct >= 0 %}
+                <span style="color: #38bdf8;">+{{ a.net_real_return_pct }}%</span>
+              {% else %}
+                <span style="color: #ef4444;">{{ a.net_real_return_pct }}%</span>
+              {% endif %}
+            </td>
+            <td style="padding: 14px 16px; font-size: 12.5px;">
+              {% if a.net_real_return_pct > 0 %}
+                <span style="background: rgba(16, 185, 129, 0.15); color: #34d399; padding: 3px 8px; border-radius: 4px; font-weight: 700;">Beat Inflation</span>
+              {% else %}
+                <span style="background: rgba(239, 68, 68, 0.15); color: #f87171; padding: 3px 8px; border-radius: 4px; font-weight: 700;">Purchasing Power Loss</span>
+              {% endif %}
+            </td>
+            <td style="padding: 14px 16px; font-size: 11.5px; color: #64748b; max-width: 240px; line-height: 1.4;">
+              {{ a.tax_statute_citation }}
+            </td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+  <!-- Educational Callout -->
+  <div style="background: rgba(30, 41, 59, 0.4); border: 1px solid rgba(255, 255, 255, 0.08); border-radius: 12px; padding: 20px; font-size: 13px; color: #94a3b8; line-height: 1.6; margin-bottom: 24px;">
+    💡 <strong>Why Sovereign Gold Bonds (SGB) Rank #1 for Wealth Compounding:</strong> Under Section 47(viic) of the Income Tax Act, sovereign gold redemption capital gains are 100% exempt from income tax. In contrast, Bank FDs and Debt MFs (post-Section 50AA) face a 30%+ tax drag, resulting in negative real returns against 5% CPI inflation.
+  </div>
+</div>
+{% endblock %}

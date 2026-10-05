@@ -61,7 +61,7 @@
           </a>
 
           <!-- Markets & Multi-Asset Sub-Tabs -->
-          <div class="nav-item dropdown {% if active_page in ['home', 'debt', 'funds', 'dossier'] %}active-parent{% endif %}" id="navMarketsDropdown">
+          <div class="nav-item dropdown {% if active_page in ['home', 'debt', 'funds', 'sovereign', 'etfs', 'reits', 'dossier'] %}active-parent{% endif %}" id="navMarketsDropdown">
             <button class="nav-link dropdown-toggle" aria-haspopup="true" aria-expanded="false" id="marketsDropdownBtn">
               <span>Markets</span>
               <svg class="dropdown-chevron" width="10" height="6" viewBox="0 0 10 6" fill="none" xmlns="http://www.w3.org/2000/svg">
@@ -87,22 +87,36 @@
                 <div class="dropdown-icon">📊</div>
                 <div class="dropdown-content">
                   <div class="dropdown-title">Mutual Funds & ETFs</div>
-                  <div class="dropdown-desc">Dual-sleeve look-through, active share & TER fee drag</div>
+                  <div class="dropdown-desc">Dual-sleeve look-through, active share & fee drag</div>
+                </div>
+              </a>
+              <a href="/etfs" class="dropdown-item {% if active_page == 'etfs' %}active{% endif %}" role="menuitem">
+                <div class="dropdown-icon">🌐</div>
+                <div class="dropdown-content">
+                  <div class="dropdown-title">National ETF Matrix</div>
+                  <div class="dropdown-desc">NAV premium/discount, tracking error & liquidity depth</div>
                 </div>
               </a>
               <div class="dropdown-divider"></div>
-              <div class="dropdown-item disabled-preview" title="Coming in Priority 3">
+              <a href="/sovereign" class="dropdown-item {% if active_page == 'sovereign' %}active{% endif %}" role="menuitem">
                 <div class="dropdown-icon">🏛️</div>
                 <div class="dropdown-content">
-                  <div class="dropdown-title">Sovereign Curve <span class="nav-pill-badge">Soon</span></div>
+                  <div class="dropdown-title">Sovereign Curve & T-Bills</div>
                   <div class="dropdown-desc">RBI T-Bills, 10Y G-Sec & SDL auction benchmarks</div>
                 </div>
-              </div>
+              </a>
+              <a href="/reits" class="dropdown-item {% if active_page == 'reits' %}active{% endif %}" role="menuitem">
+                <div class="dropdown-icon">🏢</div>
+                <div class="dropdown-content">
+                  <div class="dropdown-title">SM REITs, InvITs & SGBs</div>
+                  <div class="dropdown-desc">Fractional real estate, NDCF purity & gold parity</div>
+                </div>
+              </a>
             </div>
           </div>
 
           <!-- Research Tools Sub-Tabs -->
-          <div class="nav-item dropdown {% if active_page in ['discovery', 'compare'] %}active-parent{% endif %}" id="navToolsDropdown">
+          <div class="nav-item dropdown {% if active_page in ['discovery', 'compare', 'tax_calculator', 'safety_radar'] %}active-parent{% endif %}" id="navToolsDropdown">
             <button class="nav-link dropdown-toggle" aria-haspopup="true" aria-expanded="false" id="toolsDropdownBtn">
               <span>Research Tools</span>
               <svg class="dropdown-chevron" width="10" height="6" viewBox="0 0 10 6" fill="none" xmlns="http://www.w3.org/2000/svg">
@@ -122,6 +136,20 @@
                 <div class="dropdown-content">
                   <div class="dropdown-title">Peer Comparison</div>
                   <div class="dropdown-desc">Side-by-side financial metrics & valuation disparity</div>
+                </div>
+              </a>
+              <a href="/calculator/tax" class="dropdown-item {% if active_page == 'tax_calculator' %}active{% endif %}" role="menuitem">
+                <div class="dropdown-icon">🧮</div>
+                <div class="dropdown-content">
+                  <div class="dropdown-title">Net Real Tax Calculator</div>
+                  <div class="dropdown-desc">Post-tax returns deflated by MOSPI CPI inflation</div>
+                </div>
+              </a>
+              <a href="/safety-radar" class="dropdown-item {% if active_page == 'safety_radar' %}active{% endif %}" role="menuitem">
+                <div class="dropdown-icon">🚨</div>
+                <div class="dropdown-content">
+                  <div class="dropdown-title">Retail Safety Radar</div>
+                  <div class="dropdown-desc">Danger scorecard for gold leasing & P2P lending</div>
                 </div>
               </a>
               <div class="dropdown-divider"></div>

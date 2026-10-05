@@ -1048,6 +1048,163 @@ def api_get_funds_holding_security(identifier: str):
     return json_response_with_cache({"status": "success", "identifier": clean_id, "count": len(schemes), "funds": schemes})
 
 
+# ==============================================================================
+# Priority 3: Sovereign Risk-Free Benchmarks, ETF Matrix & Real Tax Calculator
+# ==============================================================================
+@app.get("/sovereign", response_class=HTMLResponse)
+def sovereign_page(request: Request):
+    """Sovereign Risk-Free Benchmarks & Par Yield Curve page."""
+    from core.analysis.sovereign_engine import evaluate_sovereign_curve
+    init_db()
+    curve_data = evaluate_sovereign_curve()
+    return templates.TemplateResponse(
+        request=request,
+        name="sovereign_curve.html",
+        context={
+            "active_page": "sovereign",
+            "analytics": curve_data
+        }
+    )
+
+
+@app.get("/api/sovereign/curve")
+def api_sovereign_curve():
+    """Public API: Indian Sovereign Yield Curve & Term Spreads."""
+    from core.analysis.sovereign_engine import evaluate_sovereign_curve
+    init_db()
+    return json_response_with_cache(evaluate_sovereign_curve(), max_age=300)
+
+
+@app.get("/etfs", response_class=HTMLResponse)
+def etfs_page(request: Request, category: Optional[str] = Query(None)):
+    """National ETF Matrix & Tracking Error Surveillance page."""
+    from core.analysis.etf_engine import evaluate_etf_matrix
+    init_db()
+    matrix_data = evaluate_etf_matrix(category=category)
+    return templates.TemplateResponse(
+        request=request,
+        name="etf_matrix.html",
+        context={
+            "active_page": "etfs",
+            "current_category": category,
+            "data": matrix_data
+        }
+    )
+
+
+@app.get("/api/etfs/matrix")
+def api_etfs_matrix(category: Optional[str] = None):
+    """Public API: National ETF Matrix with premium/discount and tracking errors."""
+    from core.analysis.etf_engine import evaluate_etf_matrix
+    init_db()
+    return json_response_with_cache(evaluate_etf_matrix(category=category), max_age=120)
+
+
+@app.get("/calculator/tax", response_class=HTMLResponse)
+def tax_calculator_page(
+    request: Request,
+    tax_slab: float = Query(30.0),
+    inflation: float = Query(5.0)
+):
+    """Net Real Post-Tax Return & Purchasing Power Calculator page."""
+    from core.analysis.tax_calculator import compare_asset_classes_post_tax
+    assets = compare_asset_classes_post_tax(
+        marginal_tax_slab_pct=tax_slab,
+        cpi_inflation_pct=inflation
+    )
+    return templates.TemplateResponse(
+        request=request,
+        name="tax_calculator.html",
+        context={
+            "active_page": "tax_calculator",
+            "current_slab": tax_slab,
+            "current_inflation": inflation,
+            "assets": assets
+        }
+    )
+
+
+@app.get("/api/calculator/tax-return")
+def api_tax_calculator(
+    nominal_return: float = Query(7.10),
+    tax_rate: float = Query(30.0),
+    cpi_inflation: float = Query(5.0)
+):
+    """Public API: Computes exact net post-tax nominal return, tax drag, and real purchasing power."""
+    from core.analysis.tax_calculator import calculate_net_real_return
+    return json_response_with_cache(
+        calculate_net_real_return(nominal_return, tax_rate, cpi_inflation),
+        max_age=3600
+    )
+
+
+# ==============================================================================
+# Priority 4: Fractional Real Estate (SM REITs, InvITs) & Sovereign Gold (SGB)
+# ==============================================================================
+@app.get("/reits", response_class=HTMLResponse)
+def reits_page(request: Request, structure: Optional[str] = Query(None)):
+    """SEBI SM REITs, Mainboard REITs, InvITs & SGB Secondary Parity directory."""
+    from core.analysis.reit_engine import audit_reit_portfolio
+    from core.analysis.sgb_engine import evaluate_sgb_market
+    init_db()
+    reit_audit = audit_reit_portfolio(structure_type=structure)
+    sgb_audit = evaluate_sgb_market()
+    return templates.TemplateResponse(
+        request=request,
+        name="reit_directory.html",
+        context={
+            "active_page": "reits",
+            "current_structure": structure,
+            "reit_audit": reit_audit,
+            "sgb_audit": sgb_audit
+        }
+    )
+
+
+@app.get("/api/reits/directory")
+def api_reits_directory(structure: Optional[str] = None):
+    """Public API: Audited REITs, SM REITs, and InvITs."""
+    from core.analysis.reit_engine import audit_reit_portfolio
+    init_db()
+    return json_response_with_cache(audit_reit_portfolio(structure_type=structure), max_age=300)
+
+
+@app.get("/api/sgb/tranches")
+def api_sgb_tranches():
+    """Public API: Sovereign Gold Bonds secondary market yields, discounts, and parity."""
+    from core.analysis.sgb_engine import evaluate_sgb_market
+    init_db()
+    return json_response_with_cache(evaluate_sgb_market(), max_age=300)
+
+
+# ==============================================================================
+# Priority 5: Retail Alternative Yield & Shadow-Banking Safety Radar
+# ==============================================================================
+@app.get("/safety-radar", response_class=HTMLResponse)
+def safety_radar_page(request: Request, category: Optional[str] = Query(None)):
+    """Retail Safety & Shadow-Banking Diagnostic Radar page."""
+    from core.analysis.safety_radar import audit_alternative_yield_radar
+    init_db()
+    radar_data = audit_alternative_yield_radar(category=category)
+    return templates.TemplateResponse(
+        request=request,
+        name="safety_radar.html",
+        context={
+            "active_page": "safety_radar",
+            "current_category": category,
+            "data": radar_data
+        }
+    )
+
+
+@app.get("/api/safety-radar")
+def api_safety_radar(category: Optional[str] = None):
+    """Public API: Danger scores and regulatory warnings for alternative yield schemes."""
+    from core.analysis.safety_radar import audit_alternative_yield_radar
+    init_db()
+    return json_response_with_cache(audit_alternative_yield_radar(category=category), max_age=300)
+
+
 class PreMortemRequest(BaseModel):
     ticker: str
     failure_vector: str
