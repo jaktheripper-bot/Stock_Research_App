@@ -257,6 +257,85 @@ class TestDebtEngineAndRepository(unittest.TestCase):
         self.assertEqual(history[0]["action_type"], "UPGRADE")
         self.assertEqual(history[0]["rating_symbol"], "AA+")
 
+    def test_institutional_narrative_and_primer_synthesis(self):
+        """Verifies that evaluate_5_pillar_credit_posture generates comprehensive narrative dossiers."""
+        sec = get_debt_security_by_isin("INE414G07GE7")  # Muthoot Finance
+        self.assertIsNotNone(sec)
+
+        posture = evaluate_5_pillar_credit_posture(sec)
+
+        # 1. Executive Primer
+        self.assertIn("primer", posture)
+        self.assertIn("What Am I Looking At?", posture["primer"]["title"])
+        self.assertIn("summary", posture["primer"])
+        self.assertIn("fd_comparison", posture["primer"])
+
+        # 2. Issuer Profile
+        self.assertIn("issuer_profile", posture)
+        self.assertEqual(posture["issuer_profile"]["ticker"], "MUTHOOTFIN")
+        self.assertIn("description", posture["issuer_profile"])
+        self.assertIn("gnpa_pct", posture["issuer_profile"])
+
+        # 3. Investment Thesis
+        self.assertIn("investment_thesis", posture)
+        self.assertGreaterEqual(len(posture["investment_thesis"]["the_good"]), 2)
+        self.assertGreaterEqual(len(posture["investment_thesis"]["the_bad"]), 2)
+        self.assertGreaterEqual(len(posture["investment_thesis"]["the_ugly"]), 1)
+
+        # 4. Tax Drag Schedule
+        self.assertIn("tax_drag_schedule", posture)
+        self.assertIn("benchmark_30pct_post_tax_yield", posture["tax_drag_schedule"])
+        self.assertIn("slab_breakdown", posture["tax_drag_schedule"])
+
+        # 5. Collation Sources
+        self.assertIn("collated_sources", posture)
+        source_names = [s["name"] for s in posture["collated_sources"]]
+        self.assertIn("Wint Wealth", source_names)
+        self.assertIn("BSE Debt Market", source_names)
+
+        # 6. Deep narrative inside each pillar
+        for p_key in ["p1_credit_quality", "p2_capital_hierarchy", "p3_solvency", "p4_duration", "p5_recovery"]:
+            p = posture["pillars"][p_key]
+            self.assertIn("educational_overview", p, f"{p_key} missing educational_overview")
+            self.assertIn("institutional_analysis", p, f"{p_key} missing institutional_analysis")
+            self.assertIn("plain_english_takeaway", p, f"{p_key} missing plain_english_takeaway")
+
+    def test_tax_drag_calculator_accuracy(self):
+        """Verifies tax drag calculations against known tax slabs."""
+        from core.analysis.debt_engine import calculate_tax_drag_and_real_return
+        res = calculate_tax_drag_and_real_return(ytm_pct=10.0, inflation_pct=5.5)
+        self.assertEqual(res["nominal_ytm_pct"], 10.0)
+
+        # 30% slab with 4% cess is 31.2% effective tax -> 10.0 * (1 - 0.312) = 6.88%
+        self.assertAlmostEqual(res["benchmark_30pct_post_tax_yield"], 6.88, delta=0.05)
+        # Real return = 6.88 - 5.5 = +1.38%
+        self.assertAlmostEqual(res["benchmark_30pct_real_return"], 1.38, delta=0.05)
+
+    def test_debt_crawler_collation_catalog(self):
+        """Verifies supported platform directory for Indian alternative fixed-income collation."""
+        from core.analysis.debt_crawler import get_collation_platform_catalog, normalize_debt_security_payload
+        catalog = get_collation_platform_catalog()
+        platforms = catalog["platforms"]
+        self.assertIn("WINT_WEALTH", platforms)
+        self.assertIn("GOLDEN_PI", platforms)
+        self.assertIn("BSE_DEBT", platforms)
+        self.assertIn("GRIP_INVEST", platforms)
+
+        raw = {
+            "isin": "INE123TEST99",
+            "ticker": "TESTCORP",
+            "coupon_rate_pct": 10.5,
+            "ytm_pct": 10.5,
+            "maturity_date": "2027-12-31",
+            "seniority_tier": "SENIOR_SECURED",
+            "credit_rating": "CRISIL AA"
+        }
+        normalized = normalize_debt_security_payload(raw)
+        self.assertEqual(normalized["isin"], "INE123TEST99")
+        self.assertEqual(normalized["ytm_pct"], 10.5)
+        self.assertGreater(normalized["macaulay_duration_years"], 0.0)
+
 
 if __name__ == "__main__":
     unittest.main()
+
