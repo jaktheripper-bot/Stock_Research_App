@@ -16,3 +16,4 @@ backups/
 *.tar.gz
 scratch/
 .tmp.driveupload/
+*.code-workspace
