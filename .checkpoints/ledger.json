@@ -270,5 +270,21 @@
       "revision_count": 36
     },
     "preflight_passed": true
+  },
+  {
+    "tag": "checkpoint_20261006_003117_priority_2_amfi_ingestion_and_omni_search",
+    "timestamp": "2026-10-06 00:31:17 IST",
+    "commit_sha": "17d7563d6cb22a4248fa7015396831b4052dcf3c",
+    "branch": "main",
+    "description": "priority_2_amfi_ingestion_and_omni_search",
+    "database": {
+      "exists": true,
+      "filename": "reports_checkpoint_20261006_003117_priority_2_amfi_ingestion_and_omni_search.db",
+      "path": ".checkpoints/reports_checkpoint_20261006_003117_priority_2_amfi_ingestion_and_omni_search.db",
+      "size_bytes": 684032,
+      "report_count": 1,
+      "revision_count": 38
+    },
+    "preflight_passed": true
   }
 ]
