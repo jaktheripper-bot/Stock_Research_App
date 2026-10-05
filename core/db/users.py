@@ -404,21 +404,28 @@ def add_user_credits(
         conn.close()
 
 
-def get_all_billables(status: Optional[str] = None, limit: int = 100, offset: int = 0) -> List[Dict[str, Any]]:
+def get_all_billables(status: Optional[str] = None, limit: int = 100, offset: int = 0, exclude_tests: bool = True) -> List[Dict[str, Any]]:
     """
     Retrieves all purchases, invoices, and returns for administrative billing audit.
     Includes tax breakdown (Base + GST 18%), SAC code, and gateway IDs.
+    Filters out synthetic test orders by default.
     """
     init_db()
     conn = get_db_connection()
     cursor = conn.cursor()
     p = get_placeholder()
     try:
-        where_clause = ""
+        where_conditions = []
         params = []
         if status:
-            where_clause = f"WHERE t.status = {p}"
+            where_conditions.append(f"t.status = {p}")
             params.append(status.lower())
+        if exclude_tests:
+            where_conditions.append("(t.customer_email IS NULL OR (t.customer_email NOT LIKE '%@example.com' AND t.customer_email NOT LIKE '%@test.com'))")
+            where_conditions.append("(t.user_id NOT LIKE 'test_%' AND t.user_id != 'guest_web_user')")
+            where_conditions.append("(t.gateway_order_id IS NULL OR t.gateway_order_id NOT LIKE 'order_test_%')")
+
+        where_clause = f"WHERE {' AND '.join(where_conditions)}" if where_conditions else ""
 
         query = f"""
             SELECT 
@@ -482,10 +489,11 @@ def get_all_billables(status: Optional[str] = None, limit: int = 100, offset: in
         conn.close()
 
 
-def get_revenue_analytics_summary(days: int = None, start_date = None, end_date = None) -> Dict[str, Any]:
+def get_revenue_analytics_summary(days: int = None, start_date = None, end_date = None, exclude_tests: bool = True) -> Dict[str, Any]:
     """
     Computes institutional revenue summary, GST collected, returns/refunds,
     and circulating credit liabilities across a selectable time window.
+    Filters out synthetic test transactions by default.
     """
     init_db()
     conn = get_db_connection()
@@ -506,8 +514,10 @@ def get_revenue_analytics_summary(days: int = None, start_date = None, end_date 
     }
 
     try:
-        time_filter = _build_telemetry_time_filter(supabase_url, days=days, start_date=start_date, end_date=end_date)
+        time_filter = _build_telemetry_time_filter(supabase_url, days=days, start_date=start_date, end_date=end_date, exclude_tests=False)
         time_filter_tx = time_filter.replace("timestamp", "created_at")
+        if exclude_tests:
+            time_filter_tx += " AND (customer_email IS NULL OR (customer_email NOT LIKE '%@example.com' AND customer_email NOT LIKE '%@test.com')) AND (user_id IS NULL OR (user_id NOT LIKE 'test_%' AND user_id != 'guest_web_user')) AND (gateway_order_id IS NULL OR gateway_order_id NOT LIKE 'order_test_%')"
 
         # 1. Total paid revenue, GST, and order count
         cursor.execute(f"""

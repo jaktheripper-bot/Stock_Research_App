@@ -9,6 +9,25 @@ from telemetry import parse_traffic_source, parse_user_agent, extract_geo
 
 logger = logging.getLogger("equity_research.core.db.telemetry")
 
+def is_synthetic_test_event(
+    event_type: str = "",
+    ticker: str = "",
+    browser: str = "",
+    user_id: str = "",
+    user_email: str = ""
+) -> bool:
+    """Detects whether an event originates from test runners or synthetic development runs."""
+    if user_email and any(dom in str(user_email).lower() for dom in ["@example.com", "@test.com", "test_"]):
+        return True
+    if user_id and (user_id in ("guest_web_user", "test_user", "testclient", "test_admin") or str(user_id).startswith("test_")):
+        return True
+    if ticker and str(ticker).upper() in ("TEST", "APP", "XYZ", "SAMPLE"):
+        return True
+    if browser and any(b in str(browser).lower() for b in ["testclient", "pytest"]):
+        return True
+    return False
+
+
 def record_usage_event(
     event_type: str,
     ticker: str = "",
@@ -23,12 +42,22 @@ def record_usage_event(
     browser: str = None,
     os: str = None,
     user_id: str = None,
-    user_email: str = None
+    user_email: str = None,
+    is_test_override: bool = False
 ):
     """
     Records a telemetry event for backend site usage measurement.
     Non-blocking: catches exceptions gracefully so app operations never fail if telemetry is unavailable.
+    Filters out synthetic automated test runs and testclient traffic unless explicitly overridden.
     """
+    if not is_test_override and is_synthetic_test_event(
+        event_type=event_type,
+        ticker=ticker,
+        browser=browser,
+        user_id=user_id,
+        user_email=user_email
+    ):
+        return
     try:
         init_db()
         conn = get_db_connection()
@@ -83,23 +112,39 @@ def record_usage_event(
         except Exception:
             pass
 
-def _build_telemetry_time_filter(supabase_url: str, days: int = None, start_date = None, end_date = None) -> str:
-    """Constructs dynamic SQL WHERE clause for relative days or exact start/end date ranges."""
+def _build_telemetry_time_filter(
+    supabase_url: str,
+    days: int = None,
+    start_date = None,
+    end_date = None,
+    exclude_tests: bool = True
+) -> str:
+    """Constructs dynamic SQL WHERE clause for relative days or exact start/end date ranges with automated test exclusion."""
     if start_date and end_date:
         s_str = start_date.strftime("%Y-%m-%d") if hasattr(start_date, "strftime") else str(start_date)[:10]
         e_str = end_date.strftime("%Y-%m-%d") if hasattr(end_date, "strftime") else str(end_date)[:10]
         if supabase_url:
-            return f"timestamp >= '{s_str} 00:00:00+05:30' AND timestamp <= '{e_str} 23:59:59+05:30'"
+            base_clause = f"timestamp >= '{s_str} 00:00:00+05:30' AND timestamp <= '{e_str} 23:59:59+05:30'"
         else:
-            return f"timestamp >= '{s_str} 00:00:00' AND timestamp <= '{e_str} 23:59:59'"
-    
-    num_days = days if days is not None else 30
-    if supabase_url:
-        return f"timestamp >= NOW() - INTERVAL '{num_days} days'"
+            base_clause = f"timestamp >= '{s_str} 00:00:00' AND timestamp <= '{e_str} 23:59:59'"
     else:
-        return f"timestamp >= datetime('now', '-{num_days} days')"
+        num_days = days if days is not None else 30
+        if supabase_url:
+            base_clause = f"timestamp >= NOW() - INTERVAL '{num_days} days'"
+        else:
+            base_clause = f"timestamp >= datetime('now', '-{num_days} days')"
 
-def get_site_usage_summary(days: int = None, start_date = None, end_date = None) -> dict:
+    if exclude_tests:
+        base_clause += (
+            " AND (user_email IS NULL OR (user_email NOT LIKE '%@example.com' AND user_email NOT LIKE '%@test.com' AND user_email NOT LIKE 'test_%'))"
+            " AND (user_id IS NULL OR (user_id NOT IN ('guest_web_user', 'test_user', 'testclient', 'test_admin') AND user_id NOT LIKE 'test_%'))"
+            " AND (ticker IS NULL OR ticker NOT IN ('TEST', 'APP', 'XYZ', 'SAMPLE'))"
+            " AND (browser IS NULL OR browser NOT LIKE '%testclient%')"
+        )
+
+    return base_clause
+
+def get_site_usage_summary(days: int = None, start_date = None, end_date = None, exclude_tests: bool = True) -> dict:
     """Aggregates backend usage analytics, visitor origins, demographics, and credit savings across a selectable date range."""
     init_db()
     conn = get_db_connection()
@@ -129,7 +174,9 @@ def get_site_usage_summary(days: int = None, start_date = None, end_date = None)
         "recent_events": [],
     }
     try:
-        time_filter = _build_telemetry_time_filter(supabase_url, days=days, start_date=start_date, end_date=end_date)
+        time_filter = _build_telemetry_time_filter(
+            supabase_url, days=days, start_date=start_date, end_date=end_date, exclude_tests=exclude_tests
+        )
 
         # 1. Total Events & Cost Savings by Event Type
         cursor.execute(f'''
@@ -316,7 +363,7 @@ def get_site_usage_summary(days: int = None, start_date = None, end_date = None)
         conn.close()
     return summary
 
-def get_session_journeys(days: int = None, start_date = None, end_date = None, limit: int = 25) -> list:
+def get_session_journeys(days: int = None, start_date = None, end_date = None, limit: int = 25, exclude_tests: bool = True) -> list:
     """Reconstructs chronological user journeys grouped by session ID across a selectable date range."""
     init_db()
     conn = get_db_connection()
@@ -324,7 +371,9 @@ def get_session_journeys(days: int = None, start_date = None, end_date = None, l
     supabase_url = get_supabase_url()
     journeys = []
     try:
-        time_filter = _build_telemetry_time_filter(supabase_url, days=days, start_date=start_date, end_date=end_date)
+        time_filter = _build_telemetry_time_filter(
+            supabase_url, days=days, start_date=start_date, end_date=end_date, exclude_tests=exclude_tests
+        )
 
         cursor.execute(f'''
             SELECT session_id,
@@ -378,7 +427,7 @@ def get_session_journeys(days: int = None, start_date = None, end_date = None, l
     return journeys
 
 
-def get_user_usage_analytics(days: int = None, start_date = None, end_date = None, limit: int = 50) -> dict:
+def get_user_usage_analytics(days: int = None, start_date = None, end_date = None, limit: int = 50, exclude_tests: bool = True) -> dict:
     """
     Aggregates user-level telemetry and usage attribution:
     - Registered user accounts vs active in period
@@ -401,11 +450,19 @@ def get_user_usage_analytics(days: int = None, start_date = None, end_date = Non
     }
 
     try:
-        time_filter = _build_telemetry_time_filter(supabase_url, days=days, start_date=start_date, end_date=end_date)
+        time_filter = _build_telemetry_time_filter(
+            supabase_url, days=days, start_date=start_date, end_date=end_date, exclude_tests=exclude_tests
+        )
 
         # 1. Total registered users & Pro counts
         try:
-            cursor.execute("SELECT COUNT(*), COUNT(CASE WHEN subscription_tier IN ('pro_monthly', 'pro_annual') THEN 1 END) FROM user_accounts;")
+            cursor.execute("""
+                SELECT 
+                    COUNT(*), 
+                    COUNT(CASE WHEN subscription_tier IN ('pro_monthly', 'pro_annual') THEN 1 END) 
+                FROM user_accounts
+                WHERE email NOT LIKE '%@example.com' AND email NOT LIKE '%@test.com' AND user_id NOT LIKE 'test_%';
+            """)
             u_row = cursor.fetchone()
             if u_row:
                 result["total_registered_users"] = int(u_row[0] or 0)

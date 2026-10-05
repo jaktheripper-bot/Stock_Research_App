@@ -244,8 +244,8 @@ window.openCheckout = function(planId, planName, amountInr, credits) {
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
             plan_id: planId,
-            user_id: currentUser ? currentUser.id : 'guest_web_user',
-            email: currentUser ? currentUser.email : 'investor@example.com'
+            user_id: currentUser ? currentUser.id : getTelemetrySessionId(),
+            email: currentUser ? currentUser.email : ''
           })
         });
         

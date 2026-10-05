@@ -64,20 +64,22 @@ def create_support_ticket(
         conn.close()
 
 
-def get_support_tickets(status: str = None, limit: int = 50) -> list:
-    """Retrieves support tickets filtered by status ('open', 'resolved', 'all')."""
+def get_support_tickets(status: str = None, limit: int = 50, exclude_tests: bool = True) -> list:
+    """Retrieves support tickets filtered by status ('open', 'resolved', 'all') with automatic test ticket exclusion."""
     init_db()
     conn = get_db_connection()
     cursor = conn.cursor()
     placeholder = get_placeholder()
     tickets = []
 
+    test_filter = "AND (user_email NOT LIKE '%@example.com' AND user_email NOT LIKE '%@test.com' AND ticket_id NOT LIKE 'TKT-TEST-%')" if exclude_tests else ""
+
     try:
         if status and status.lower() != "all":
             query = f'''
                 SELECT id, ticket_id, user_email, user_name, category, subject, message, status, admin_notes, source, created_at
                 FROM support_tickets
-                WHERE status = {placeholder}
+                WHERE status = {placeholder} {test_filter}
                 ORDER BY created_at DESC
                 LIMIT {placeholder}
             '''
@@ -86,6 +88,7 @@ def get_support_tickets(status: str = None, limit: int = 50) -> list:
             query = f'''
                 SELECT id, ticket_id, user_email, user_name, category, subject, message, status, admin_notes, source, created_at
                 FROM support_tickets
+                WHERE 1=1 {test_filter}
                 ORDER BY created_at DESC
                 LIMIT {placeholder}
             '''
@@ -153,13 +156,14 @@ def update_ticket_status(ticket_id: str, new_status: str, admin_notes: str = Non
         conn.close()
 
 
-def get_open_tickets_count() -> int:
-    """Returns the total number of unresolved open support tickets."""
+def get_open_tickets_count(exclude_tests: bool = True) -> int:
+    """Returns the total number of unresolved open support tickets (excluding test runs)."""
     init_db()
     conn = get_db_connection()
     cursor = conn.cursor()
+    test_filter = "AND user_email NOT LIKE '%@example.com' AND user_email NOT LIKE '%@test.com' AND ticket_id NOT LIKE 'TKT-TEST-%'" if exclude_tests else ""
     try:
-        cursor.execute("SELECT COUNT(*) FROM support_tickets WHERE status = 'open';")
+        cursor.execute(f"SELECT COUNT(*) FROM support_tickets WHERE status = 'open' {test_filter};")
         row = cursor.fetchone()
         return row[0] if row else 0
     except Exception:

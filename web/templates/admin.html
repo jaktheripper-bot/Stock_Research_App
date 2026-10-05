@@ -305,7 +305,19 @@
         </div>
 
         <input type="hidden" name="tab" id="activeTabInput" value="{{ active_tab or 'billables' }}">
+        <input type="hidden" name="include_tests" value="{{ include_tests or 0 }}">
       </form>
+
+      <!-- Real Data Filter Indicator -->
+      <div style="display: flex; align-items: center; gap: 6px; background: rgba(15, 23, 42, 0.8); border: 1px solid var(--border-subtle, #1e293b); padding: 6px 10px; border-radius: 8px;">
+        {% if exclude_tests %}
+        <span class="status-pill success" style="font-size: 10px; padding: 2px 6px;">🛡️ Clean Real Data</span>
+        <a href="/admin?window={{ window }}&tab={{ active_tab }}&include_tests=1" style="font-size: 11px; color: #64748b; text-decoration: none;" title="Include synthetic test runs">(Show Tests)</a>
+        {% else %}
+        <span class="status-pill warning" style="font-size: 10px; padding: 2px 6px;">⚠️ Incl. Test Data</span>
+        <a href="/admin?window={{ window }}&tab={{ active_tab }}&include_tests=0" style="font-size: 11px; color: #38bdf8; text-decoration: none;" title="Exclude synthetic test runs">(Clean Mode)</a>
+        {% endif %}
+      </div>
 
       <!-- Admin Identity & 2FA Badge -->
       <div style="display: flex; align-items: center; gap: 8px; background: rgba(15, 23, 42, 0.8); border: 1px solid var(--border-subtle, #1e293b); padding: 6px 12px; border-radius: 8px;">

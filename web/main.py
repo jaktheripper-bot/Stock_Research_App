@@ -1641,6 +1641,7 @@ async def admin_dashboard(
     tab: Optional[str] = "billables",
     start_date: Optional[str] = None,
     end_date: Optional[str] = None,
+    include_tests: int = 0,
     msg: Optional[str] = None,
     err: Optional[str] = None
 ):
@@ -1661,6 +1662,7 @@ async def admin_dashboard(
 
     current_email = admin_session.get("email")
     admin_profile = get_admin_user(current_email) or {"email": current_email, "role": admin_session.get("role", "admin")}
+    exclude_tests = not bool(include_tests)
 
     # Compute date ranges
     today = datetime.now(IST).date()
@@ -1698,7 +1700,7 @@ async def admin_dashboard(
             window = "30d"
 
     try:
-        summary = get_site_usage_summary(days=selected_days, start_date=parsed_start, end_date=parsed_end)
+        summary = get_site_usage_summary(days=selected_days, start_date=parsed_start, end_date=parsed_end, exclude_tests=exclude_tests)
     except Exception as e:
         logger.error(f"Error fetching site usage summary: {e}")
         summary = {
@@ -1710,7 +1712,7 @@ async def admin_dashboard(
         }
 
     try:
-        rev_summary = get_revenue_analytics_summary(days=selected_days, start_date=parsed_start, end_date=parsed_end)
+        rev_summary = get_revenue_analytics_summary(days=selected_days, start_date=parsed_start, end_date=parsed_end, exclude_tests=exclude_tests)
     except Exception as e:
         logger.error(f"Error fetching rev summary: {e}")
         rev_summary = {
@@ -1720,12 +1722,12 @@ async def admin_dashboard(
         }
 
     try:
-        billables = get_all_billables(limit=100)
+        billables = get_all_billables(limit=100, exclude_tests=exclude_tests)
     except Exception:
         billables = []
 
     try:
-        user_analytics = get_user_usage_analytics(days=selected_days, start_date=parsed_start, end_date=parsed_end, limit=50)
+        user_analytics = get_user_usage_analytics(days=selected_days, start_date=parsed_start, end_date=parsed_end, limit=50, exclude_tests=exclude_tests)
     except Exception:
         user_analytics = {
             "total_registered_users": 0, "active_users_in_period": 0,
@@ -1734,17 +1736,17 @@ async def admin_dashboard(
         }
 
     try:
-        support_tickets = get_support_tickets(limit=50)
+        support_tickets = get_support_tickets(limit=50, exclude_tests=exclude_tests)
     except Exception:
         support_tickets = []
 
     try:
-        open_tickets_count = get_open_tickets_count()
+        open_tickets_count = get_open_tickets_count(exclude_tests=exclude_tests)
     except Exception:
         open_tickets_count = 0
 
     try:
-        session_journeys = get_session_journeys(days=selected_days, start_date=parsed_start, end_date=parsed_end, limit=25)
+        session_journeys = get_session_journeys(days=selected_days, start_date=parsed_start, end_date=parsed_end, limit=25, exclude_tests=exclude_tests)
     except Exception:
         session_journeys = []
 
@@ -1761,6 +1763,8 @@ async def admin_dashboard(
             "admin_audit_logs": admin_audit_logs,
             "active_tab": tab,
             "window": window,
+            "exclude_tests": exclude_tests,
+            "include_tests": include_tests,
             "start_date_str": parsed_start.strftime("%Y-%m-%d") if parsed_start else "",
             "end_date_str": parsed_end.strftime("%Y-%m-%d") if parsed_end else "",
             "notification": msg,
