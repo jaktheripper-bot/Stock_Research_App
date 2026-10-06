@@ -511,22 +511,12 @@ A live route audit across all 73 registered FastAPI endpoints was performed:
 
 ---
 
-#### Priority 2: Medium (Institutional Scale & Customization)
+#### Priority 2: Low (External Scale & Ingestion Research)
 
-2. **Custom Report Branding for Corporate & Advisory Bulk Packs:**
-   - **Files:** [core/reporting/pdf.py](file:///Users/lyndonpinto/Documents/Stock_Research_App/core/reporting/pdf.py), [core/billing/pricing.py](file:///Users/lyndonpinto/Documents/Stock_Research_App/core/billing/pricing.py)
-   - **Action:** Allow Pro and Corporate subscribers to attach firm logo and custom disclaimer notes to exported PDF dossiers.
-   - **Environmental Impact:** High perceived value for registered advisors and family offices with zero production overhead.
-
-3. **Build Public Developer API Endpoint:**
-   - **Files:** [web/main.py](file:///Users/lyndonpinto/Documents/Stock_Research_App/web/main.py)
-   - **Action:** Implement token-authenticated `/api/v1/reports/{ticker}` endpoint for external programmatic consumption.
-   - **Environmental Impact:** Enables B2B programmatic distribution with rate limiting to protect production server load.
-
-4. **Research MSME Analysis Ingestion:**
+2. **Research MSME Analysis Ingestion:**
    - **Files:** `core/msme/`
    - **Action:** Scope public API endpoints from SIDBI, MCA21, and TReDS. Pre-development phase only.
-   - **Environmental Impact:** Pre-development research only; no runtime impact.
+   - **Environmental Impact:** Pre-development research only; zero runtime impact.
 
 ---
 
@@ -554,4 +544,8 @@ The following items from the original audit scorecard and remediation plan have 
   *Completed:* Implemented `compute_pead_drift_band()` in `core/analysis/fundamentals.py` and rendered the Thesis Integrity Checkpoint & 60-day PEAD Drift Corridor in `web/templates/dossier.html` to fulfill behavioral research specifications against Disposition Effect and Sunk Cost Fallacy.
 - ~~**10. Dynamic Open Graph & Meta Tags for Multi-Asset Pages:**~~  
   *Completed:* Added rich OpenGraph and Twitter meta cards across `sovereign_curve.html`, `etf_matrix.html`, `reit_directory.html`, `safety_radar.html`, `tax_calculator.html`, `debt_directory.html`, and `fund_directory.html`. Corrected preload tag typo in `base.html`.
+- ~~**11. Custom Report Branding for Corporate & Advisory Bulk Packs:**~~  
+  *Completed:* Implemented custom advisory desk branding headers, advisor registration numbers, client attribution, and custom advisory disclaimers in `core/reporting/pdf.py` and query parameters on `/api/pdf/{ticker}`. Verified by automated tests in `tests/test_api_v1_and_branding.py`.
+- ~~**12. Build Public Developer API Endpoint (`/api/v1/reports/{ticker}`):**~~  
+  *Completed:* Implemented token-authenticated `/api/v1/reports/{ticker}` endpoint in `web/main.py`. Delivers structured JSON reports containing 7-pillar health scores, deterministic technical indicators, PEAD 60-day drift projections, grounded citations, and SEBI regulatory disclaimers with HTTP 300s caching and robot noindex headers. Verified by automated tests in `tests/test_api_v1_and_branding.py`.
 

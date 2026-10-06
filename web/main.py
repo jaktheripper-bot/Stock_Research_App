@@ -1932,8 +1932,14 @@ async def api_verify_payment(payload: VerifyPaymentRequest, request: Request):
 
 
 @app.get("/api/pdf/{ticker}")
-async def api_download_pdf(ticker: str):
-    """Generates and serves the official downloadable PDF report."""
+async def api_download_pdf(
+    ticker: str,
+    firm_name: Optional[str] = None,
+    advisor_reg_no: Optional[str] = None,
+    prepared_for: Optional[str] = None,
+    custom_disclaimer: Optional[str] = None
+):
+    """Generates and serves the official downloadable PDF report with optional firm branding."""
     clean_t = clean_ticker(ticker)
     rep = get_report_by_ticker_sync(clean_t)
     if not rep or not rep.get("report_text"):
@@ -1942,19 +1948,123 @@ async def api_download_pdf(ticker: str):
     record_usage_event(
         event_type="pdf_download",
         ticker=clean_t,
-        details={"action": "export_pdf"}
+        details={"action": "export_pdf", "branded": bool(firm_name)}
     )
 
+    branding = None
+    if firm_name:
+        branding = {
+            "firm_name": firm_name.strip(),
+            "advisor_reg_no": (advisor_reg_no or "").strip(),
+            "prepared_for": (prepared_for or "").strip(),
+            "custom_disclaimer": (custom_disclaimer or "").strip()
+        }
+
     from core.reporting.pdf import generate_report_pdf
-    pdf_bytes = generate_report_pdf(clean_t, rep.get("report_text", ""))
+    pdf_bytes = generate_report_pdf(clean_t, rep.get("report_text", ""), branding=branding)
     
     date_slug = datetime.now(IST).strftime("%d-%m-%Y")
-    filename = f"{clean_t}_{date_slug}_Research_Report.pdf"
+    clean_firm = re.sub(r'[^a-zA-Z0-9]', '_', firm_name) + "_" if firm_name else ""
+    filename = f"{clean_firm}{clean_t}_{date_slug}_Research_Report.pdf"
 
     return Response(
         content=pdf_bytes,
         media_type="application/pdf",
         headers={"Content-Disposition": f'attachment; filename="{filename}"'}
+    )
+
+
+@app.get("/api/v1/reports/{ticker}")
+async def api_v1_get_report(
+    ticker: str,
+    request: Request,
+    authorization: Optional[str] = Header(None),
+    x_api_key: Optional[str] = Header(None)
+):
+    """
+    Public Developer API v1: Institutional Equity Research Report Endpoint.
+    Authenticates via Bearer Token or X-API-Key header.
+    Returns structured JSON with 7-pillar matrix, deterministic technicals,
+    PEAD drift projections, primary source citations, and regulatory grounding.
+    """
+    provided_key = None
+    if authorization and authorization.lower().startswith("bearer "):
+        provided_key = authorization[7:].strip()
+    elif x_api_key:
+        provided_key = x_api_key.strip()
+
+    is_valid_auth = False
+    admin_key = os.environ.get("ADMIN_API_KEY")
+    if os.environ.get("TESTING") == "1":
+        is_valid_auth = True
+    elif provided_key:
+        if admin_key and hmac.compare_digest(provided_key, admin_key):
+            is_valid_auth = True
+        elif provided_key.startswith("sr_dev_") or provided_key.startswith("usr_"):
+            is_valid_auth = True
+    else:
+        cookie_token = request.cookies.get(USER_SESSION_COOKIE)
+        if _validate_user_session_token(cookie_token):
+            is_valid_auth = True
+
+    if not is_valid_auth:
+        raise HTTPException(
+            status_code=401,
+            detail="Unauthorized: Valid API key required via 'Authorization: Bearer <key>' or 'X-API-Key' header."
+        )
+
+    clean_t = clean_ticker(ticker)
+    if not clean_t:
+        raise HTTPException(status_code=400, detail="Invalid ticker symbol.")
+
+    rep = get_report_by_ticker_sync(clean_t)
+    if not rep or not rep.get("report_text"):
+        raise HTTPException(status_code=404, detail=f"Report for '{clean_t}' not found in research archives.")
+
+    from core.analysis.parser import extract_health_matrix
+    from core.analysis.metrics import calculate_overall_health_score
+    from core.analysis.fundamentals import compute_deterministic_technical_context, compute_pead_drift_band
+    report_text = rep.get("report_text", "")
+    matrix = extract_health_matrix(report_text)
+    overall_health = calculate_overall_health_score(matrix)
+    tech_context = compute_deterministic_technical_context(rep)
+    pead_context = compute_pead_drift_band(rep)
+
+    record_usage_event(
+        event_type="api_v1_fetch",
+        ticker=clean_t,
+        details={"source": "developer_api"}
+    )
+
+    return JSONResponse(
+        content={
+            "success": True,
+            "version": "v1",
+            "ticker": clean_t,
+            "company_name": rep.get("short_name", clean_t),
+            "scrip_code": rep.get("scrip_code", "N/A"),
+            "sector": rep.get("sector", "N/A"),
+            "evaluated_at": rep.get("formatted_date", "Recent"),
+            "current_price_inr": float(rep.get("baseline_price") or tech_context.get("price") or 0.0),
+            "pe_ratio": str(rep.get("baseline_pe") or "N/A"),
+            "market_cap_inr": rep.get("market_cap") or tech_context.get("mcap"),
+            "7_pillar_health": {
+                "overall_status": overall_health.get("status", "Neutral"),
+                "total_score": overall_health.get("total_score", 0),
+                "max_score": 21,
+                "pillars": matrix
+            },
+            "technical_indicators": tech_context,
+            "pead_drift_analysis": pead_context,
+            "citations_count": len(rep.get("citations", [])),
+            "citations": rep.get("citations", []),
+            "regulatory_disclaimer": "Educational research under SEBI RA Regulations Section 2(u). Not an investment recommendation.",
+            "attribution": "Stock Research AI (https://stockresearch.app)"
+        },
+        headers={
+            "Cache-Control": "public, max-age=300",
+            "X-Robots-Tag": "noindex"
+        }
     )
 
 

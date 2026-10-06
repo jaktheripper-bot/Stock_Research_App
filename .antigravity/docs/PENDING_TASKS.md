@@ -1,11 +1,11 @@
-- [ ] Build a public API endpoint for report access so external developers can consume reports programmatically.
+- [x] Build a public API endpoint for report access so external developers can consume reports programmatically (`/api/v1/reports/{ticker}`).
 - [x] Add PDF export styling with embedded SEBI safe‑harbor disclaimer and document receipt tracking (`core/reporting/pdf.py`).
 - [x] Implement archived report differential tracker (immutable report_revisions history).
 - [x] Implement granular event alert system with material event categories and digest options.
 - [x] Implement cross-company comparison with disparity warning and override workflow.
 - [x] Add unit and integration tests for alerting and comparison features.
 - [x] Decouple core database, analysis, billing, and auth stack from Streamlit runtime; build native SSR Admin & Telemetry Console.
-- [ ] Add a way for the reports to be customised under the pro-desk & corporate & advisory bulk packs.
+- [x] Add a way for the reports to be customised under the pro-desk & corporate & advisory bulk packs (firm logo, advisory reg. no, client name, custom disclosures).
 - [x] Add a way for users to search for specific investment products as well (omni-search across stocks, debt/NCDs, and mutual funds via `/search` & `/api/search/products`).
 - [ ] Add research to be done on API ingestion for MSME analysis.
 - [x] Keep backup step synchronized with future deployment changes (pre & post commit backups).
