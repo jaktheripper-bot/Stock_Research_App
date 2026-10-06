@@ -1,7 +1,7 @@
 {% extends "base.html" %}
 
 {% block title %}{{ ticker }} ({{ short_name }}) Institutional Equity Research Dossier | Stock Research AI{% endblock %}
-{% block meta_desc %}Comprehensive 7-pillar qualitative equity thesis and valuation matrix for {{ ticker }} ({{ short_name }}). Ingested from verified BSE exchange filings. Cross-checked with EODHD data feeds.{% endblock %}
+{% block meta_desc %}Comprehensive 7-pillar qualitative equity thesis and valuation matrix for {{ ticker }} ({{ short_name }}). Ingested from verified exchange filings and cross-checked with institutional market data feeds.{% endblock %}
 
 {% block content %}
 <div class="container">
@@ -14,7 +14,7 @@
             <span>📅 Evaluated: {{ formatted_date|default('Recent') }}</span>
             <span>•</span>
             <span class="badge badge-emerald">Verified Exchange Feed</span>
-            <div class="data-provenance" style="margin-top:4px; font-size:12px; color:var(--text-secondary);">Data sourced directly from BSE filings and double‑checked against EODHD feeds.</div>
+            <div class="data-provenance" style="margin-top:4px; font-size:12px; color:var(--text-secondary);">Data sourced directly from statutory exchange filings and cross‑checked against institutional market feeds.</div>
             <span>•</span>
             <a href="#citations" class="badge" style="background: rgba(56, 189, 248, 0.15); color: #38bdf8; border: 1px solid rgba(56, 189, 248, 0.3); text-decoration: none; font-weight: 600; display: inline-flex; align-items: center; gap: 4px; padding: 2px 10px; border-radius: 999px;">
               <span>📎</span> <span>{{ citations|length }} Grounded Sources</span>

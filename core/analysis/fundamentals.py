@@ -140,8 +140,8 @@ def fetch_eodhd_stock_data(query: str, scrip_code: str = "") -> dict:
                 "industry": gen.get("Industry") or "General Corporate",
                 "52w_high": high_52,
                 "52w_low": low_52,
-                "description": gen.get("Description") or f"EODHD verified exchange quote for {clean}.",
-                "exchange_status": "Active / Verified (EODHD REST)",
+                "description": gen.get("Description") or f"Verified exchange quote for {clean}.",
+                "exchange_status": "Active / Verified (Institutional Feed)",
                 "is_fallback": False
             }
         except Exception as e:

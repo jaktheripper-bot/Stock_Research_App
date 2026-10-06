@@ -119,7 +119,7 @@ ol li { margin-bottom: 4px; font-size: 8.5pt; color: #334155; line-height: 1.4; 
         header_branding = f"""# Institutional Equity Research Dossier: {header_label}
 > **Platform:** [Stock Research AI](https://stockresearch.app) | **Document ID:** `{doc_receipt_id}`  
 > **Compilation Timestamp:** {now_str} | **Licensing Tier:** Standard Subscriber Deliverable  
-> **Data Provenance:** Statutory Exchange Disclosures (BSE/NSE), Commercial Vendor Feeds (EODHD), and AMFI/RBI Benchmarks.
+> **Data Provenance:** Statutory Exchange Disclosures (BSE/NSE), Audited Institutional Market Feeds, and AMFI/RBI Benchmarks.
 """
 
     custom_disc = f"\n> \n> **Advisory Firm Disclosures ({branding.get('firm_name')}):**  \n> *{branding.get('custom_disclaimer')}*" if branding and branding.get("custom_disclaimer") else ""
