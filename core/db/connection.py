@@ -10,6 +10,7 @@ IST = timezone(timedelta(hours=5, minutes=30))
 logger = logging.getLogger("equity_research.core.db.connection")
 
 _DB_INITIALIZED = False
+_INITIALIZED_DBS = set()
 _DB_INIT_LOCK = threading.Lock()
 
 _CACHED_SUPABASE_URL = None
@@ -107,8 +108,14 @@ def _acquire_connection_from_pool(pool):
     supabase_url = get_supabase_url()
     return psycopg2.connect(supabase_url)
 
-def get_db_connection():
-    """Returns a pooled PostgreSQL connection or WAL-mode SQLite fallback connection."""
+def get_db_path() -> str:
+    """Returns the SQLite database path based on environment."""
+    if os.environ.get("TESTING") == "1":
+        return os.environ.get("TEST_DB_PATH", "test_reports.db")
+    return os.environ.get("DB_PATH", "reports.db")
+
+def _get_raw_connection():
+    """Returns an unwrapped direct PostgreSQL or SQLite connection."""
     supabase_url = get_supabase_url()
     if supabase_url:
         try:
@@ -123,7 +130,8 @@ def get_db_connection():
                 pass
 
     import sqlite3
-    conn = sqlite3.connect("reports.db", timeout=30.0, check_same_thread=False)
+    db_path = get_db_path()
+    conn = sqlite3.connect(db_path, timeout=30.0, check_same_thread=False)
     try:
         conn.execute("PRAGMA journal_mode=WAL;")
         conn.execute("PRAGMA busy_timeout=30000;")
@@ -131,19 +139,31 @@ def get_db_connection():
         pass
     return conn
 
+def get_db_connection():
+    """Returns a pooled PostgreSQL connection or WAL-mode SQLite fallback connection."""
+    supabase_url = get_supabase_url()
+    target_key = supabase_url if supabase_url else get_db_path()
+
+    if target_key not in _INITIALIZED_DBS:
+        init_db()
+
+    return _get_raw_connection()
+
 def init_db(force: bool = False):
-    """Initializes tables and executes incremental schema migrations (v001 - v007)."""
-    global _DB_INITIALIZED
-    if _DB_INITIALIZED and not force:
+    """Initializes tables and executes incremental schema migrations (v001 - v019)."""
+    global _DB_INITIALIZED, _INITIALIZED_DBS
+    supabase_url = get_supabase_url()
+    target_key = supabase_url if supabase_url else get_db_path()
+
+    if (target_key in _INITIALIZED_DBS) and not force:
         return
 
     with _DB_INIT_LOCK:
-        if _DB_INITIALIZED and not force:
+        if (target_key in _INITIALIZED_DBS) and not force:
             return
 
-        conn = get_db_connection()
+        conn = _get_raw_connection()
         cursor = conn.cursor()
-        supabase_url = get_supabase_url()
 
         try:
             # Schema Migration Engine: Ensure migrations table exists
@@ -1267,7 +1287,35 @@ def init_db(force: bool = False):
                     cursor.execute("INSERT OR IGNORE INTO schema_migrations (version) VALUES ('v018_retail_safety_radar');")
                 conn.commit()
 
+            # Migration v019: Email OTP authentication
+            if "v019_auth_otps" not in applied:
+                logger.info("Applying schema migration: v019_auth_otps...")
+                if supabase_url:
+                    cursor.execute("""
+                        CREATE TABLE IF NOT EXISTS auth_otps (
+                            email TEXT PRIMARY KEY,
+                            otp_hash TEXT NOT NULL,
+                            expires_at TIMESTAMPTZ NOT NULL,
+                            attempts INTEGER DEFAULT 0,
+                            created_at TIMESTAMPTZ DEFAULT now()
+                        );
+                    """)
+                    cursor.execute("INSERT INTO schema_migrations (version) VALUES ('v019_auth_otps') ON CONFLICT DO NOTHING;")
+                else:
+                    cursor.execute("""
+                        CREATE TABLE IF NOT EXISTS auth_otps (
+                            email TEXT PRIMARY KEY,
+                            otp_hash TEXT NOT NULL,
+                            expires_at TEXT NOT NULL,
+                            attempts INTEGER DEFAULT 0,
+                            created_at TEXT DEFAULT (datetime('now'))
+                        );
+                    """)
+                    cursor.execute("INSERT OR IGNORE INTO schema_migrations (version) VALUES ('v019_auth_otps');")
+                conn.commit()
+
             _DB_INITIALIZED = True
+            _INITIALIZED_DBS.add(target_key)
         except Exception as e:
             logger.error(f"Error during init_db migrations: {e}")
             raise

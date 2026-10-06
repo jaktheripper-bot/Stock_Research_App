@@ -23,6 +23,7 @@ from core.db.connection import (
     get_supabase_url,
     get_placeholder,
     get_db_connection,
+    get_db_path,
     init_db,
 )
 
@@ -113,6 +114,7 @@ __all__ = [
     "get_supabase_url",
     "get_placeholder",
     "get_db_connection",
+    "get_db_path",
     "init_db",
     # compliance
     "MANDATORY_SEBI_DISCLAIMER",

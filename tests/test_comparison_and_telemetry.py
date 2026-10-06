@@ -144,6 +144,9 @@ class TestComparisonAndTelemetry(unittest.TestCase):
         p = get_placeholder()
 
         try:
+            cursor.execute("DELETE FROM credit_transactions;")
+            conn.commit()
+
             # 1. Insert Real Paid Order (Rs. 299)
             cursor.execute(
                 f"""

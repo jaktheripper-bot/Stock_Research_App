@@ -1,4 +1,4 @@
-from ui.formatters import format_inr
+from core.formatters import format_inr
 
 def clean_ticker(raw: str) -> str:
     """Normalize stock ticker by stripping whitespace, uppercase, and removing exchange suffixes (.NS, .BO)."""

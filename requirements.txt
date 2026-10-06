@@ -1,4 +1,6 @@
-streamlit==1.63.0
+fastapi==0.142.2
+uvicorn==0.52.4
+jinja2==3.1.6
 bsedata==0.6.0
 google-genai==2.23.0
 markdown-pdf==1.13.3
@@ -9,14 +11,9 @@ beautifulsoup4==4.15.0
 yfinance==1.7.0
 matplotlib==3.11.2
 pandas==3.0.5
-altair==6.2.2
-fastapi==0.142.2
-uvicorn==0.52.4
-jinja2==3.1.6
 markdown==3.11
 razorpay==2.0.1
 python-dotenv==1.2.4
-
 brotli-asgi==1.2.0
 apscheduler==3.10.4
 selenium==4.23.1

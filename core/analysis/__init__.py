@@ -34,6 +34,7 @@ from core.analysis.fundamentals import (
     get_stock_fundamentals,
     get_historical_prices,
     compute_deterministic_technical_context,
+    compute_pead_drift_band,
 )
 
 from core.analysis.engine import (

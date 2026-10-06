@@ -12,29 +12,24 @@ cd "$SCRIPT_DIR"
 # Resolve virtual environment Python
 if [ -f "$SCRIPT_DIR/.venv/bin/python" ]; then
     PYTHON="$SCRIPT_DIR/.venv/bin/python"
-    STREAMLIT="$SCRIPT_DIR/.venv/bin/streamlit"
 elif [ -f "$SCRIPT_DIR/venv/bin/python" ]; then
     PYTHON="$SCRIPT_DIR/venv/bin/python"
-    STREAMLIT="$SCRIPT_DIR/venv/bin/streamlit"
 else
     PYTHON="python3"
-    STREAMLIT="streamlit"
 fi
 
 COMMAND="${1:-test}"
 
 case "$COMMAND" in
     lint)
-        echo "--> [1/1] Running Streamlit Static Linter & Guardrails..."
-        "$PYTHON" lint_streamlit.py
+        echo "--> [1/1] Running System Contract & Integrity Audit..."
+        "$PYTHON" check_system.py
         ;;
     test)
-        echo "--> [1/3] Running Streamlit Static Linter..."
-        "$PYTHON" lint_streamlit.py
-        echo "--> [2/3] Running System Integrity & Contract Audit..."
+        echo "--> [1/2] Running System Integrity & Contract Audit..."
         "$PYTHON" check_system.py
-        echo "--> [3/3] Running Interactive UI Simulation Suite..."
-        "$PYTHON" test_ui_headless.py
+        echo "--> [2/2] Running Regression Test Suite..."
+        "$PYTHON" -m unittest discover -s tests
         echo "✅ All tests passed successfully."
         ;;
     bench)
@@ -42,35 +37,30 @@ case "$COMMAND" in
         "$PYTHON" benchmark.py
         ;;
     preflight)
-        echo "--> [1/4] Running Streamlit Static Linter..."
-        "$PYTHON" lint_streamlit.py
-        echo "--> [2/4] Running System Integrity Audit..."
+        echo "--> [1/3] Running System Integrity Audit..."
         "$PYTHON" check_system.py
-        echo "--> [3/4] Running Interactive UI Action Simulation..."
-        "$PYTHON" test_ui_headless.py
-        echo "--> [4/4] Enforcing Latency & Performance Budget..."
+        echo "--> [2/3] Running Regression Test Suite..."
+        "$PYTHON" -m unittest discover -s tests
+        echo "--> [3/3] Enforcing Latency & Performance Budget..."
         "$PYTHON" benchmark.py
         echo "🎉 PRE-FLIGHT VALIDATION COMPLETE. Ready for deployment."
         ;;
-    start)
-        echo "--> Starting Streamlit Dev Server on http://localhost:8501..."
-        "$STREAMLIT" run app.py
-        ;;
-    web)
+    start|web)
         echo "--> Starting High-Performance FastAPI SSR Web Server on http://localhost:8000..."
         "$PYTHON" -m uvicorn web.main:app --host 0.0.0.0 --port 8000 --reload
         ;;
     backup)
-        echo "--\> Creating site backup (static assets + DB)..."
+        echo "--> Creating site backup (web assets + DB)..."
         TIMESTAMP=$(date +"%Y%m%d_%H%M%S")
         BACKUP_DIR="${SCRIPT_DIR}/backups/${TIMESTAMP}"
         mkdir -p "${BACKUP_DIR}"
-        tar -czf "${BACKUP_DIR}/site_assets.tar.gz" static/ templates/ app.py
+        tar -czf "${BACKUP_DIR}/site_assets.tar.gz" web/ reports.db
         echo "✅ Backup stored in ${BACKUP_DIR}"
         ;;
     admin)
-        echo "--> Starting Private Admin Portal on http://localhost:8502..."
-        "$STREAMLIT" run admin.py --server.port 8502
+        echo "--> Admin console is native SSR in FastAPI. Access at http://localhost:8000/admin"
+        echo "--> Starting server..."
+        "$PYTHON" -m uvicorn web.main:app --host 0.0.0.0 --port 8000 --reload
         ;;
     live-audit|live_audit|audit-live)
         echo "--> [1/1] Executing Real Browser Interaction Audit on Live Deployment..."

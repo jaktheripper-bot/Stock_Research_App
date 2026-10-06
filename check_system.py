@@ -5,9 +5,10 @@ import logging
 from datetime import datetime
 from db import IST
 
-# Suppress bare-mode Streamlit log noise
-os.environ["STREAMLIT_LOG_LEVEL"] = "error"
-logging.getLogger("streamlit").setLevel(logging.ERROR)
+os.environ["TESTING"] = "1"
+
+# Suppress debug log noise
+logging.getLogger("uvicorn").setLevel(logging.WARNING)
 
 def run_suite():
     issues = []
@@ -18,16 +19,16 @@ def run_suite():
     # 1. Environment & Exact Version Integrity
     print("1. Auditing Installed Packages & Version Integrity...")
     modules = [
-        ("streamlit", "streamlit"),
+        ("fastapi", "fastapi"),
+        ("uvicorn", "uvicorn"),
+        ("jinja2", "jinja2"),
         ("bsedata", "bsedata"),
         ("google.genai", "google-genai"),
         ("markdown_pdf", "markdown-pdf"),
         ("psycopg2", "psycopg2-binary"),
         ("requests", "requests"),
-        ("toml", "toml"),
         ("yfinance", "yfinance"),
         ("pandas", "pandas"),
-        ("altair", "altair"),
         ("matplotlib", "matplotlib"),
         ("analyzer", "analyzer.py"),
         ("bse_master", "bse_master.py"),
@@ -36,14 +37,13 @@ def run_suite():
         ("screener", "screener.py"),
         ("normalizer", "normalizer.py"),
         ("alerts", "alerts.py"),
-        ("ui.charts", "ui/charts.py"),
-        ("ui.pdf", "ui/pdf.py"),
-        ("ui.scorecard", "ui/scorecard.py"),
-        ("ui.formatters", "ui/formatters.py"),
+        ("telemetry", "telemetry.py"),
+        ("core.formatters", "core/formatters.py"),
+        ("core.reporting.pdf", "core/reporting/pdf.py"),
         ("core.auth", "core/auth"),
         ("core.billing", "core/billing"),
-        ("ui.auth_ui", "ui/auth_ui.py"),
-        ("ui.billing_modal", "ui/billing_modal.py"),
+        ("core.db.connection", "core/db/connection.py"),
+        ("web.main", "web/main.py"),
     ]
     
     for mod_name, pkg_name in modules:
@@ -87,26 +87,18 @@ def run_suite():
 
     # 3. Credentials & Secrets Configuration
     print("\n3. Auditing API Credentials & Secrets...")
-    gemini_key = os.environ.get("GEMINI_API_KEY")
-    secrets_path = ".streamlit/secrets.toml"
-    if os.path.exists(secrets_path):
-        try:
-            import toml
-            secrets_dict = toml.load(secrets_path)
-            if not gemini_key:
-                gemini_key = secrets_dict.get("GEMINI_API_KEY")
-        except Exception as e:
-            issues.append(("Configuration", f"Failed to parse {secrets_path}: {e}", "Fix syntax in .streamlit/secrets.toml."))
+    from core.config import get_secret
+    gemini_key = get_secret("GEMINI_API_KEY")
 
     if not gemini_key:
         issues.append((
             "Credentials",
             "GEMINI_API_KEY missing",
-            "Add GEMINI_API_KEY to .streamlit/secrets.toml or export as an environment variable."
+            "Add GEMINI_API_KEY to .env or export as an environment variable."
         ))
         print("   ❌ GEMINI_API_KEY not found.")
     else:
-        print("   ✅ GEMINI_API_KEY is configured.")
+        print("   ✅ GEMINI_API_KEY verified.")
 
     # 4. BSE Scrip Resolution Logic & Announcement Delta Engine
     print("\n4. Testing BSE Scrip Resolution & Announcement Ingestion...")
@@ -190,37 +182,35 @@ def run_suite():
         ))
         print(f"   ❌ Monetization audit FAILED: {e}")
 
-    # 6. Streamlit 1.63 Headless UI Mount Audit
-    print("\n6. Executing Headless UI Smoke Test (AppTest)...")
+    # 6. FastAPI SSR Production Application Mount & Route Smoke Test
+    print("\n6. Executing FastAPI SSR Application Smoke Test (TestClient)...")
     try:
-        from streamlit.testing.v1 import AppTest
-        at = AppTest.from_file("app.py", default_timeout=15)
-        at.run()
-        if at.exception:
-            issues.append((
-                "Headless UI",
-                f"Streamlit app crashed on launch: {at.exception}",
-                "Inspect traceback in app.py to resolve startup exception."
-            ))
-            print(f"   ❌ App crashed on startup: {at.exception}")
-        else:
-            text_inputs = list(at.text_input)
-            if not text_inputs:
+        from fastapi.testclient import TestClient
+        from web.main import app
+        with TestClient(app) as client:
+            test_routes = ["/", "/discovery", "/pricing", "/search", "/api/suggest?q=inf"]
+            failed_routes = []
+            for route in test_routes:
+                res = client.get(route)
+                if res.status_code != 200:
+                    failed_routes.append(f"{route} (Status {res.status_code})")
+            
+            if failed_routes:
                 issues.append((
-                    "Headless UI",
-                    "No text_input widget found in app.py",
-                    "Verify search form widgets in app.py."
+                    "FastAPI SSR Routes",
+                    f"Route checks failed for: {', '.join(failed_routes)}",
+                    "Verify templates and route handlers in web/main.py."
                 ))
-                print("   ❌ Search input widget missing.")
+                print(f"   ❌ Route checks failed: {failed_routes}")
             else:
-                print(f"   ✅ App mounted cleanly with {len(text_inputs)} input field(s) verified.")
+                print(f"   ✅ FastAPI application mounted cleanly with {len(test_routes)} core routes returning HTTP 200 OK.")
     except Exception as e:
         issues.append((
-            "Headless UI",
-            f"Headless runner encountered an exception: {e}",
-            "Verify streamlit testing setup and dependencies."
+            "FastAPI SSR Mount",
+            f"TestClient encountered an exception: {e}",
+            "Verify FastAPI installation and web/main.py initialization."
         ))
-        print(f"   ❌ Headless UI test failed: {e}")
+        print(f"   ❌ FastAPI smoke test failed: {e}")
 
     # 7. Project Health Ledger Update (PROJECT_STATUS.md)
     timestamp_str = datetime.now(IST).strftime('%Y-%m-%d %H:%M:%S IST')

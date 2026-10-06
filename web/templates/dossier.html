@@ -170,6 +170,49 @@
     </div>
     {% endif %}
 
+    <!-- 60-Day Post-Earnings Announcement Drift (PEAD) Behavioral Band -->
+    {% if pead_data and pead_data.active and pead_data.current_price > 0 %}
+    <div style="margin-bottom: 30px; background: rgba(15, 23, 42, 0.88); border: 1px solid {% if pead_data.status == 'bullish' %}rgba(16, 185, 129, 0.35){% else %}rgba(244, 63, 94, 0.35){% endif %}; border-radius: var(--radius-md); padding: 22px;">
+      <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 14px; flex-wrap: wrap; gap: 10px;">
+        <div>
+          <div style="font-size: 11px; font-weight: 700; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.05em; margin-bottom: 4px;">
+            Behavioral Anomaly & De-Biasing Engine
+          </div>
+          <h3 style="margin: 0; font-size: 16.5px; font-weight: 800; color: var(--text-primary); display: flex; align-items: center; gap: 8px;">
+            <span>🎯</span> Thesis Integrity Checkpoint & 60-Day PEAD Drift Band
+          </h3>
+        </div>
+        <div style="display: flex; align-items: center; gap: 8px;">
+          <span class="badge" style="{% if pead_data.status == 'bullish' %}background: rgba(16, 185, 129, 0.15); color: #34d399; border: 1px solid rgba(16, 185, 129, 0.3);{% else %}background: rgba(244, 63, 94, 0.15); color: #fb7185; border: 1px solid rgba(244, 63, 94, 0.3);{% endif %} font-weight: 700; font-size: 12px; padding: 5px 12px;">
+            {{ pead_data.label }} ({{ pead_data.drift_direction }})
+          </span>
+          <span class="badge" style="background: rgba(56, 189, 248, 0.15); color: #38bdf8; font-size: 11px;">60-Day Horizon</span>
+        </div>
+      </div>
+
+      <!-- Drift Corridor Visual Band -->
+      <div style="background: rgba(30, 41, 59, 0.5); border-radius: 8px; padding: 16px; margin-bottom: 14px;">
+        <div style="display: flex; justify-content: space-between; align-items: center; font-size: 12px; color: var(--text-muted); margin-bottom: 8px;">
+          <span>Corridor Floor: <strong style="color: #cbd5e1;" class="tnum">₹{{ pead_data.lower_bound }}</strong></span>
+          <span>Current Base: <strong style="color: #38bdf8;" class="tnum">₹{{ pead_data.current_price }}</strong></span>
+          <span>Projected Drift Target: <strong style="{% if pead_data.status == 'bullish' %}color: #34d399;{% else %}color: #fb7185;{% endif %}" class="tnum">₹{{ pead_data.target_drift }}</strong></span>
+          <span>Corridor Ceiling: <strong style="color: #cbd5e1;" class="tnum">₹{{ pead_data.upper_bound }}</strong></span>
+        </div>
+        <!-- Progress / Corridor Bar -->
+        <div style="position: relative; height: 14px; background: rgba(51, 65, 85, 0.6); border-radius: 7px; overflow: hidden; display: flex;">
+          <div style="width: 25%; background: rgba(148, 163, 184, 0.25);" title="Lower Buffer"></div>
+          <div style="width: 50%; background: {% if pead_data.status == 'bullish' %}linear-gradient(90deg, rgba(56, 189, 248, 0.5), rgba(16, 185, 129, 0.8)){% else %}linear-gradient(90deg, rgba(244, 63, 94, 0.8), rgba(245, 158, 11, 0.5)){% endif %};" title="Empirical Drift Corridor"></div>
+          <div style="width: 25%; background: rgba(148, 163, 184, 0.25);" title="Upper Buffer"></div>
+        </div>
+      </div>
+
+      <!-- Behavioral Nudge Guidance -->
+      <div style="padding: 10px 14px; background: rgba(15, 23, 42, 0.7); border-radius: 6px; font-size: 12.5px; color: var(--text-secondary); line-height: 1.5;">
+        <span>🛡️ <strong>Behavioral Intervention:</strong> {{ pead_data.guidance }}</span>
+      </div>
+    </div>
+    {% endif %}
+
     <!-- 6-Month Price Momentum & 50-DMA Trend Chart -->
     {% if chart_data and chart_data.dates %}
     <div style="margin-bottom: 30px; background: rgba(15, 23, 42, 0.85); border: 1px solid var(--border-color); border-radius: var(--radius-md); padding: 22px;">

@@ -492,6 +492,7 @@ window.openSignInModal = function() {
   const user = getStoredUser();
   if (user) {
     if (confirm(`Logged in as ${user.full_name} (${user.email})\nCredits Balance: ${user.credits_balance} Credits\n\nWould you like to sign out?`)) {
+      fetch('/api/auth/signout', { method: 'POST' }).catch(() => {});
       localStorage.removeItem('sr_user');
       window.location.reload();
     }
@@ -501,48 +502,132 @@ window.openSignInModal = function() {
   if (modal) modal.classList.add('active');
 };
 
-window.handleSignInSubmit = async function(e) {
+let _authOtpRequested = false;
+
+window.handleAuthFormSubmit = async function(e) {
   e.preventDefault();
   const emailInput = document.getElementById('authEmailInput');
+  const otpGroup = document.getElementById('authOtpGroup');
+  const otpInput = document.getElementById('authOtpInput');
   const submitBtn = document.getElementById('authSubmitBtn');
-  if (!emailInput || !emailInput.value.trim()) return;
+  const noticeEl = document.getElementById('authOtpNotice');
 
-  submitBtn.disabled = true;
-  submitBtn.innerText = 'Signing In & Granting Credits...';
+  if (!emailInput || !emailInput.value.trim()) return;
+  const email = emailInput.value.trim().toLowerCase();
+
+  if (!_authOtpRequested) {
+    // Step 1: Request OTP
+    submitBtn.disabled = true;
+    submitBtn.innerText = 'Dispatching Verification Code...';
+
+    try {
+      const resp = await fetch('/api/auth/send-otp', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email: email })
+      });
+      const data = await resp.json();
+      if (resp.ok && data.success) {
+        _authOtpRequested = true;
+        if (otpGroup) otpGroup.style.display = 'block';
+        if (otpInput) {
+          otpInput.required = true;
+          otpInput.focus();
+          if (data.test_code) otpInput.value = data.test_code;
+        }
+        if (noticeEl) {
+          noticeEl.style.display = 'block';
+          noticeEl.innerText = data.test_code 
+            ? `✅ Test code: ${data.test_code} (auto-filled).` 
+            : `📬 Verification code sent to ${email}. Valid for 10 minutes.`;
+        }
+        submitBtn.innerText = 'Verify & Claim 2 Credits →';
+      } else {
+        alert('Authentication Error: ' + (data.detail || data.message || 'Could not send verification code.'));
+      }
+    } catch (err) {
+      alert('Authentication Error: ' + err.message);
+    } finally {
+      submitBtn.disabled = false;
+      if (!_authOtpRequested) submitBtn.innerText = 'Send Verification Code →';
+    }
+  } else {
+    // Step 2: Verify OTP
+    const code = (otpInput?.value || '').trim();
+    if (!code || code.length < 6) {
+      alert('Please enter the 6-digit verification code.');
+      if (otpInput) otpInput.focus();
+      return;
+    }
+
+    submitBtn.disabled = true;
+    submitBtn.innerText = 'Verifying Code & Authenticating...';
+
+    try {
+      const resp = await fetch('/api/auth/verify-otp', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email: email, code: code })
+      });
+      const data = await resp.json();
+      if (resp.ok && data.success) {
+        localStorage.setItem('sr_user', JSON.stringify(data.user));
+        const modal = document.getElementById('authModal');
+        if (modal) modal.classList.remove('active');
+        syncUserSession();
+
+        if (window._pendingCheckout) {
+          const p = window._pendingCheckout;
+          window._pendingCheckout = null;
+          alert(`🎉 Welcome ${data.user.full_name}! 2 Free Welcome Credits have been claimed.\nOpening checkout for ${p.planName}...`);
+          openCheckout(p.planId, p.planName, p.amountInr, p.credits);
+          return;
+        }
+
+        alert(`🎉 Welcome ${data.user.full_name}! You have received 2 free research credits.`);
+        window.location.reload();
+      } else {
+        alert('Verification Failed: ' + (data.detail || data.message || 'Invalid or expired code.'));
+      }
+    } catch (err) {
+      alert('Verification Failed: ' + err.message);
+    } finally {
+      submitBtn.disabled = false;
+      submitBtn.innerText = 'Verify & Claim 2 Credits →';
+    }
+  }
+};
+
+window.handleResendOtp = async function() {
+  const emailInput = document.getElementById('authEmailInput');
+  const noticeEl = document.getElementById('authOtpNotice');
+  const email = emailInput?.value?.trim()?.toLowerCase();
+  if (!email) return;
 
   try {
-    const resp = await fetch('/api/auth/signin', {
+    const resp = await fetch('/api/auth/send-otp', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ email: emailInput.value.trim() })
+      body: JSON.stringify({ email: email })
     });
     const data = await resp.json();
     if (resp.ok && data.success) {
-      localStorage.setItem('sr_user', JSON.stringify(data.user));
-      const modal = document.getElementById('authModal');
-      if (modal) modal.classList.remove('active');
-      syncUserSession();
-
-      if (window._pendingCheckout) {
-        const p = window._pendingCheckout;
-        window._pendingCheckout = null;
-        alert(`🎉 Welcome ${data.user.full_name}! 2 Free Welcome Credits have been claimed.\nOpening checkout for ${p.planName}...`);
-        openCheckout(p.planId, p.planName, p.amountInr, p.credits);
-        return;
+      if (noticeEl) {
+        noticeEl.style.display = 'block';
+        noticeEl.innerText = data.test_code 
+          ? `✅ New test code: ${data.test_code}` 
+          : `📬 Fresh code dispatched to ${email}.`;
       }
-
-      alert(`🎉 Welcome ${data.user.full_name}! 2 Free Research Credits have been allocated to your account.`);
-      window.location.reload();
+      alert('A fresh verification code has been dispatched.');
     } else {
-      alert('Sign-In Error: ' + (data.detail || data.message || 'Could not complete sign in.'));
+      alert('Notice: ' + (data.detail || data.message || 'Could not resend code.'));
     }
   } catch (err) {
-    alert('Sign-In Error: ' + err.message);
-  } finally {
-    submitBtn.disabled = false;
-    submitBtn.innerText = 'Continue with Email & Claim 2 Credits →';
+    alert('Resend Error: ' + err.message);
   }
 };
+
+window.handleSignInSubmit = window.handleAuthFormSubmit;
 
 window.handlePreMortemSubmit = async function(e, ticker) {
   if (e) e.preventDefault();

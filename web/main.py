@@ -28,7 +28,10 @@ from fastapi.responses import HTMLResponse, RedirectResponse, Response, JSONResp
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 from starlette.middleware.base import BaseHTTPMiddleware
-from brotli_asgi import BrotliMiddleware
+try:
+    from brotli_asgi import BrotliMiddleware
+except ImportError:
+    BrotliMiddleware = None
 from fastapi.middleware.cors import CORSMiddleware
 from web.middleware.security_headers import SecurityHeadersMiddleware
 from slowapi import Limiter
@@ -94,6 +97,10 @@ from core.auth.supabase_auth import (
     get_google_oauth_url,
     get_supabase_auth_config,
 )
+from core.auth.otp import (
+    create_email_otp,
+    verify_email_otp,
+)
 from core.db.admin import (
     get_admin_user,
     list_admin_users,
@@ -145,7 +152,7 @@ from bse_master import (
     resolve_bse_scrip_code,
     get_bse_scrips_cache,
 )
-from ui.formatters import format_inr
+from core.formatters import format_inr
 from web.legal_content import POLICIES
 from core.db.debt import (
     get_active_debt_securities,
@@ -308,7 +315,8 @@ async def warmup_task():
         logger.info("🚀 Warm‑up task completed: compare_two_companies preloaded.")
     except Exception as e:
         logger.exception(f"Warm‑up task failed: {e}")
-app.add_middleware(BrotliMiddleware, minimum_size=500)
+if BrotliMiddleware is not None:
+    app.add_middleware(BrotliMiddleware, minimum_size=500)
 # Security headers middleware for CSP, HSTS, etc.
 app.add_middleware(SecurityHeadersMiddleware)
 # CORS configuration – allow all origins for now (adjust in production)
@@ -577,8 +585,12 @@ def dossier_page(request: Request, ticker: str):
     # Ingest 6-Month Price Momentum & 50-DMA Trend History
     chart_data = None
     chart_json = "{}"
+    pead_data = None
     try:
         df_hist = get_historical_prices(canonical, period="6mo")
+        from core.analysis.fundamentals import compute_pead_drift_band
+        pead_data = compute_pead_drift_band(rep, df_hist)
+
         if df_hist is not None and not df_hist.empty and "Close" in df_hist.columns and "Date" in df_hist.columns:
             import pandas as pd
             dates = []
@@ -646,6 +658,7 @@ def dossier_page(request: Request, ticker: str):
             "pe_quartile": pe_quartile,
             "chart_data": chart_data,
             "chart_json": chart_json,
+            "pead_data": pead_data,
         }
     )
 
@@ -1213,8 +1226,11 @@ class PreMortemRequest(BaseModel):
 
 
 @app.post("/api/premortem")
-async def api_premortem(payload: PreMortemRequest):
+async def api_premortem(payload: PreMortemRequest, request: Request):
     """Commits a Charlie Munger Pre-Mortem counter-thesis to the audit ledger."""
+    if not _validate_request_origin(request):
+        raise HTTPException(status_code=403, detail="Cross-origin request rejected.")
+
     clean_t = clean_ticker(payload.ticker)
     if not clean_t:
         raise HTTPException(status_code=400, detail="Invalid ticker symbol.")
@@ -1457,20 +1473,113 @@ async def api_suggest(q: str = ""):
     return json_response_with_cache({"suggestions": get_ticker_suggestions(q.strip())})
 
 
-class SignInRequest(BaseModel):
+# ==============================================================================
+# Public User Authentication & Identity Management (Google OAuth + Email OTP)
+# ==============================================================================
+
+USER_SESSION_COOKIE = "user_session_token"
+ALLOWED_ORIGIN_HOSTS = {
+    "localhost",
+    "127.0.0.1",
+    "stockresearch.app",
+    "www.stockresearch.app",
+    "stock-research-app-2ljm.onrender.com",
+}
+
+def _get_user_signing_key() -> bytes:
+    key = os.environ.get("SECRET_KEY") or os.environ.get("ADMIN_API_KEY") or "stock_research_user_session_salt_2026"
+    return key.encode("utf-8")
+
+def _generate_user_session_token(user_id: str, email: str) -> str:
+    secret = _get_user_signing_key()
+    now_ts = int(datetime.now(timezone.utc).timestamp())
+    data = json.dumps({"user_id": user_id, "email": email.strip().lower(), "ts": now_ts})
+    payload_b64 = base64.urlsafe_b64encode(data.encode("utf-8")).decode("utf-8")
+    sig = hmac.new(secret, payload_b64.encode("utf-8"), hashlib.sha256).hexdigest()
+    return f"{payload_b64}.{sig}"
+
+def _validate_user_session_token(token: Optional[str]) -> Optional[Dict[str, Any]]:
+    if not token or "." not in token:
+        return None
+    try:
+        payload_b64, sig = token.rsplit(".", 1)
+        secret = _get_user_signing_key()
+        expected_sig = hmac.new(secret, payload_b64.encode("utf-8"), hashlib.sha256).hexdigest()
+        if not hmac.compare_digest(sig, expected_sig):
+            return None
+        data_str = base64.urlsafe_b64decode(payload_b64.encode("utf-8")).decode("utf-8")
+        payload = json.loads(data_str)
+        ts = payload.get("ts", 0)
+        # Valid for 30 days
+        if datetime.now(timezone.utc).timestamp() - ts < 2592000:
+            return payload
+        return None
+    except Exception:
+        return None
+
+def _get_current_web_user(request: Request) -> Optional[Dict[str, Any]]:
+    token = request.cookies.get(USER_SESSION_COOKIE)
+    if not token:
+        auth_header = request.headers.get("authorization", "")
+        if auth_header.lower().startswith("bearer "):
+            token = auth_header.split(" ", 1)[1].strip()
+    session = _validate_user_session_token(token)
+    if session and session.get("email"):
+        user = get_user_by_email(session["email"])
+        if user:
+            return user
+    return None
+
+def _validate_request_origin(request: Request) -> bool:
+    origin = request.headers.get("origin")
+    referer = request.headers.get("referer")
+    target = origin or referer
+    if not target:
+        return True
+    try:
+        parsed = urllib.parse.urlparse(target)
+        host = (parsed.hostname or "").lower()
+        return host in ALLOWED_ORIGIN_HOSTS or host.endswith(".onrender.com")
+    except Exception:
+        return False
+
+
+class SendOtpRequest(BaseModel):
     email: str
+
+
+@app.post("/api/auth/send-otp")
+async def api_send_otp(payload: SendOtpRequest):
+    """
+    Generates and dispatches a cryptographically secure 6-digit email OTP.
+    Enforces a 60-second cooldown rate-limit per email.
+    """
+    clean_email = (payload.email or "").strip().lower()
+    success, msg, code = create_email_otp(clean_email)
+    if not success:
+        raise HTTPException(status_code=400, detail=msg)
+
+    response_data = {"success": True, "message": msg}
+    if os.environ.get("TESTING") == "1":
+        response_data["test_code"] = code
+    return JSONResponse(content=response_data)
+
+
+class VerifyOtpRequest(BaseModel):
+    email: str
+    code: str
     full_name: Optional[str] = None
 
 
-@app.post("/api/auth/signin")
-async def api_signin(payload: SignInRequest):
+@app.post("/api/auth/verify-otp")
+async def api_verify_otp(payload: VerifyOtpRequest):
     """
-    Direct user sign-in or auto-registration.
-    Grants 2 welcome credits to new accounts and returns user profile.
+    Validates email OTP, registers/authenticates user, and issues a 30-day signed session cookie.
     """
     clean_email = (payload.email or "").strip().lower()
-    if not clean_email or "@" not in clean_email or "." not in clean_email.split("@")[-1]:
-        raise HTTPException(status_code=400, detail="Please provide a valid email address.")
+    valid, msg = verify_email_otp(clean_email, payload.code)
+    if not valid:
+        raise HTTPException(status_code=400, detail=msg)
 
     user_id = f"usr_{clean_email.replace('@', '_at_').replace('.', '_')}"
     user = get_or_create_user(
@@ -1485,14 +1594,224 @@ async def api_signin(payload: SignInRequest):
         event_type="user_signin",
         user_id=user_id,
         user_email=clean_email,
-        details={"name": user.get("full_name"), "tier": user.get("subscription_tier")}
+        details={"name": user.get("full_name"), "tier": user.get("subscription_tier"), "method": "email_otp"}
     )
 
-    return json_response_with_cache({
+    token = _generate_user_session_token(user_id, clean_email)
+    resp = JSONResponse(content={
         "success": True,
+        "token": token,
         "message": f"Welcome {user.get('full_name')}! You have received 2 free research credits.",
         "user": user
     })
+    resp.set_cookie(
+        key=USER_SESSION_COOKIE,
+        value=token,
+        httponly=True,
+        samesite="lax",
+        max_age=2592000
+    )
+    return resp
+
+
+class SignInRequest(BaseModel):
+    email: str
+    full_name: Optional[str] = None
+    otp_code: Optional[str] = None
+
+
+@app.post("/api/auth/signin")
+async def api_signin(payload: SignInRequest):
+    """
+    Hardened user sign-in endpoint.
+    Requires verified OTP code or testing bypass. Direct unverified email registration is blocked in production.
+    """
+    clean_email = (payload.email or "").strip().lower()
+    if not clean_email or "@" not in clean_email or "." not in clean_email.split("@")[-1]:
+        raise HTTPException(status_code=400, detail="Please provide a valid email address.")
+
+    # Security Gate: Require valid OTP code in production
+    if os.environ.get("TESTING") != "1":
+        if not payload.otp_code:
+            raise HTTPException(
+                status_code=403,
+                detail="Direct unverified sign-in is disabled. Please verify your email via OTP or Google OAuth."
+            )
+        valid, msg = verify_email_otp(clean_email, payload.otp_code)
+        if not valid:
+            raise HTTPException(status_code=400, detail=msg)
+
+    user_id = f"usr_{clean_email.replace('@', '_at_').replace('.', '_')}"
+    user = get_or_create_user(
+        user_id=user_id,
+        email=clean_email,
+        full_name=payload.full_name or clean_email.split("@")[0].capitalize()
+    )
+    if not user:
+        raise HTTPException(status_code=500, detail="Could not initialize user profile.")
+
+    record_usage_event(
+        event_type="user_signin",
+        user_id=user_id,
+        user_email=clean_email,
+        details={"name": user.get("full_name"), "tier": user.get("subscription_tier"), "method": "direct_verified"}
+    )
+
+    token = _generate_user_session_token(user_id, clean_email)
+    resp = JSONResponse(content={
+        "success": True,
+        "token": token,
+        "message": f"Welcome {user.get('full_name')}! You have received 2 free research credits.",
+        "user": user
+    })
+    resp.set_cookie(
+        key=USER_SESSION_COOKIE,
+        value=token,
+        httponly=True,
+        samesite="lax",
+        max_age=2592000
+    )
+    return resp
+
+
+@app.get("/auth/google")
+async def public_auth_google(request: Request, redirect: Optional[str] = "/"):
+    """Public Google OAuth initiation via Supabase GoTrue."""
+    base_url = str(request.base_url).rstrip("/")
+    redirect_target = f"{base_url}/auth/callback?next={urllib.parse.quote(redirect or '/')}"
+    cfg = get_supabase_auth_config()
+    sb_url = cfg.get("url")
+
+    if sb_url:
+        oauth_url = f"{sb_url}/auth/v1/authorize?provider=google&redirect_to={urllib.parse.quote(redirect_target)}"
+        return RedirectResponse(url=oauth_url, status_code=303)
+    return RedirectResponse(
+        url="/?err=Google+OAuth+not+yet+configured.+Please+use+Email+OTP+verification.",
+        status_code=303
+    )
+
+
+@app.get("/auth/callback")
+async def public_auth_callback(
+    request: Request,
+    code: Optional[str] = None,
+    access_token: Optional[str] = None,
+    next: Optional[str] = "/"
+):
+    """Processes Google OAuth callback for public users, sets session cookie and localStorage."""
+    cfg = get_supabase_auth_config()
+    sb_url = cfg.get("url")
+    anon_key = cfg.get("anon_key") or os.environ.get("SUPABASE_SERVICE_ROLE_KEY", "")
+    verified_email = None
+    user_name = None
+
+    if code and sb_url:
+        try:
+            resp = requests.post(
+                f"{sb_url}/auth/v1/token?grant_type=pkce",
+                json={"auth_code": code},
+                headers={"apikey": anon_key, "Content-Type": "application/json"},
+                timeout=8
+            )
+            if resp.status_code == 200:
+                tok_data = resp.json()
+                u_info = tok_data.get("user", {})
+                verified_email = u_info.get("email")
+                user_name = u_info.get("user_metadata", {}).get("full_name")
+        except Exception as e:
+            logger.error(f"Error exchanging public OAuth code: {e}")
+
+    elif access_token and sb_url:
+        try:
+            resp = requests.get(
+                f"{sb_url}/auth/v1/user",
+                headers={"Authorization": f"Bearer {access_token}", "apikey": anon_key},
+                timeout=8
+            )
+            if resp.status_code == 200:
+                data = resp.json()
+                verified_email = data.get("email")
+                user_name = data.get("user_metadata", {}).get("full_name")
+        except Exception as e:
+            logger.error(f"Error fetching public user via token: {e}")
+
+    if not verified_email:
+        # Browser client-side hash handler for implicit flow
+        return HTMLResponse(f"""
+        <!DOCTYPE html>
+        <html><head><meta charset="utf-8"><title>Verifying Identity...</title></head>
+        <body style="background:#0f172a;color:#f8fafc;font-family:sans-serif;display:flex;align-items:center;justify-content:center;height:100vh;">
+            <div style="text-align:center;">
+                <h2>Authenticating with Google...</h2>
+                <p style="color:#94a3b8;">Verifying your account credentials.</p>
+            </div>
+            <script>
+            if (window.location.hash) {{
+                const params = new URLSearchParams(window.location.hash.substring(1));
+                const token = params.get('access_token');
+                if (token) {{
+                    window.location.href = '/auth/callback?access_token=' + encodeURIComponent(token) + '&next=' + encodeURIComponent('{next or "/"}');
+                }} else {{
+                    window.location.href = '/?err=Authentication+failed';
+                }}
+            }} else {{
+                window.location.href = '/?err=Authentication+code+missing';
+            }}
+            </script>
+        </body></html>
+        """)
+
+    clean_email = verified_email.strip().lower()
+    full_name = user_name or clean_email.split("@")[0].capitalize()
+    user_id = f"usr_{clean_email.replace('@', '_at_').replace('.', '_')}"
+    user = get_or_create_user(user_id=user_id, email=clean_email, full_name=full_name)
+
+    token = _generate_user_session_token(user_id, clean_email)
+    dest_url = next or "/"
+    if not dest_url.startswith("/"):
+        dest_url = "/"
+
+    user_json = json.dumps(user)
+    html_content = f"""
+    <!DOCTYPE html>
+    <html><head><meta charset="utf-8"><title>Authentication Successful</title></head>
+    <body style="background:#0f172a;color:#f8fafc;font-family:sans-serif;display:flex;align-items:center;justify-content:center;height:100vh;">
+        <div style="text-align:center;">
+            <h2>🎉 Welcome, {full_name}!</h2>
+            <p style="color:#94a3b8;">Redirecting to your research terminal...</p>
+        </div>
+        <script>
+        localStorage.setItem('sr_user', JSON.stringify({user_json}));
+        window.location.href = '{dest_url}';
+        </script>
+    </body></html>
+    """
+    resp = HTMLResponse(content=html_content)
+    resp.set_cookie(
+        key=USER_SESSION_COOKIE,
+        value=token,
+        httponly=True,
+        samesite="lax",
+        max_age=2592000
+    )
+    return resp
+
+
+@app.get("/api/auth/me")
+async def api_auth_me(request: Request):
+    """Returns the currently authenticated user profile from session cookie or Authorization header."""
+    user = _get_current_web_user(request)
+    if not user:
+        raise HTTPException(status_code=401, detail="Not authenticated.")
+    return JSONResponse(content={"authenticated": True, "user": user})
+
+
+@app.post("/api/auth/signout")
+async def api_auth_signout():
+    """Clears the authenticated user session cookie."""
+    resp = JSONResponse(content={"success": True, "message": "Successfully signed out."})
+    resp.delete_cookie(key=USER_SESSION_COOKIE)
+    return resp
 
 
 class OrderRequest(BaseModel):
@@ -1505,11 +1824,14 @@ class OrderRequest(BaseModel):
 
 
 @app.post("/api/create-order")
-async def api_create_order(payload: OrderRequest):
+async def api_create_order(payload: OrderRequest, request: Request):
     """
     Creates an official Razorpay order or returns simulated checkout data.
     Validates amount >= 100 paise, handles 401 auth and 500 API errors.
     """
+    if not _validate_request_origin(request):
+        raise HTTPException(status_code=403, detail="Cross-origin request rejected.")
+
     try:
         order = create_razorpay_order(
             plan_id=payload.plan_id,
@@ -1556,11 +1878,14 @@ class VerifyPaymentRequest(BaseModel):
 
 
 @app.post("/api/verify-payment")
-async def api_verify_payment(payload: VerifyPaymentRequest):
+async def api_verify_payment(payload: VerifyPaymentRequest, request: Request):
     """
     Cryptographically verifies the HMAC-SHA256 signature generated by Razorpay.
     Returns 400 for signature mismatch or missing fields, and credits user on match.
     """
+    if not _validate_request_origin(request):
+        raise HTTPException(status_code=403, detail="Cross-origin request rejected.")
+
     eff_order_id = payload.order_id or payload.razorpay_order_id
     eff_payment_id = payload.payment_id or payload.razorpay_payment_id
     eff_signature = payload.signature or payload.razorpay_signature
@@ -1620,7 +1945,7 @@ async def api_download_pdf(ticker: str):
         details={"action": "export_pdf"}
     )
 
-    from ui.pdf import generate_report_pdf
+    from core.reporting.pdf import generate_report_pdf
     pdf_bytes = generate_report_pdf(clean_t, rep.get("report_text", ""))
     
     date_slug = datetime.now(IST).strftime("%d-%m-%Y")
@@ -2641,7 +2966,7 @@ async def robots_txt():
         "Allow: /\n"
         "Disallow: /api/\n"
         "Disallow: /admin\n\n"
-        "Sitemap: https://stock-research-app-2ljm.onrender.com/sitemap.xml\n"
+        "Sitemap: https://stockresearch.app/sitemap.xml\n"
     )
     return Response(content=content, media_type="text/plain")
 

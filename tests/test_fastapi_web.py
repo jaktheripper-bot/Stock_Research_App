@@ -11,6 +11,35 @@ from web.main import app
 class TestFastAPIWebPortal(unittest.TestCase):
     @classmethod
     def setUpClass(cls):
+        from core.db import save_report_to_archive
+        stock_data = {
+            "ticker": "INFY",
+            "short_name": "Infosys Ltd",
+            "current_price": 1520.0,
+            "pe_ratio": "25.0",
+            "market_cap": 6000000000000.0,
+        }
+        save_report_to_archive(
+            stock_data=stock_data,
+            report_text="""### 7-Pillar Qualitative Health Matrix:
+- Moat: Strong
+- Management: Stable
+- Capital Allocation: Clean
+
+## Pillar 1: Long-Term Competitive Moat
+Detailed competitive advantage breakdown.
+
+## Pillar 2: Financial Strength & Balance Sheet
+Zero long-term debt and high FCF conversion.
+
+## Pillar 3: Corporate Governance & Capital Allocation
+Clean historical capital allocation track record.
+
+### Key Fundamental Monitorables
+Detailed forensic analysis with exact page grounding to bseindia.com filings.
+""",
+            announcement="Q2 Earnings release filed with BSE."
+        )
         cls._cm = TestClient(app)
         cls.client = cls._cm.__enter__()
 

@@ -1,5 +1,5 @@
 # Project Health Ledger
-**Last Updated:** 2026-10-06 01:11:40 IST  
+**Last Updated:** 2026-10-06 18:20:11 IST  
 **Status:** 1 ISSUE(S) DETECTED
 
 ---
@@ -9,5 +9,5 @@
 ⚠️ **1 critical issue(s) require action:**
 
 ### 1. [Credentials] GEMINI_API_KEY missing
-- **Immediate Action Required:** `Add GEMINI_API_KEY to .streamlit/secrets.toml or export as an environment variable.`
+- **Immediate Action Required:** `Add GEMINI_API_KEY to .env or export as an environment variable.`
 

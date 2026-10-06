@@ -1,5 +1,5 @@
 - [ ] Build a public API endpoint for report access so external developers can consume reports programmatically.
-- [ ] Add PDF export styling with embedded SEBI safe‑harbor disclaimer.
+- [x] Add PDF export styling with embedded SEBI safe‑harbor disclaimer and document receipt tracking (`core/reporting/pdf.py`).
 - [x] Implement archived report differential tracker (immutable report_revisions history).
 - [x] Implement granular event alert system with material event categories and digest options.
 - [x] Implement cross-company comparison with disparity warning and override workflow.
@@ -12,7 +12,7 @@
 
 ## Security & Access Control (Blocking)
 - [x] Replace admin password gate with Google sign-in + second factor, admin allowlist (roles), and per-admin audit trail of every console action.
-- [ ] Fix public site sign-in: `/api/auth/signin` accepts any email with no verification (anyone can sign in as any user). Move to verified Google / OTP sign-in.
+- [x] Fix public site sign-in: `/api/auth/signin` accepts any email with no verification. Hardened with verified Google OAuth + 6-digit Email OTP (`core/auth/otp.py`, `/api/auth/send-otp`, `/api/auth/verify-otp`, signed session cookie).
 - [x] Protect `/api/admin/run-discovery` (requires `x_admin_key` or authenticated admin session cookie).
 - [x] Review BSE/NSE display licensing and risk exposures for monetized dossiers (detailed evaluation & migration plan in [source_evaluation.md](file:///Users/lyndonpinto/Documents/Stock_Research_App/source_evaluation.md)).
 

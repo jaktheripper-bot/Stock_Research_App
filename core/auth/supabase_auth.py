@@ -28,11 +28,7 @@ _BARE_USER_SESSION = None
 _BARE_AUTH_TOKEN = None
 
 def _is_streamlit_running() -> bool:
-    try:
-        from streamlit.runtime import exists
-        return bool(exists())
-    except Exception:
-        return False
+    return False
 
 def get_supabase_auth_config() -> Dict[str, str]:
     """
@@ -139,28 +135,11 @@ def set_session_user(user_record: Dict[str, Any], auth_token: Optional[str] = No
     global _BARE_USER_SESSION, _BARE_AUTH_TOKEN
     _BARE_USER_SESSION = user_record
     _BARE_AUTH_TOKEN = auth_token
-    if _is_streamlit_running():
-        try:
-            import streamlit as st
-            if "user_session" not in st.session_state:
-                st.session_state.user_session = {}
-            st.session_state.user_session = user_record
-            if auth_token:
-                st.session_state.auth_token = auth_token
-            logger.info(f"Active session set for: {user_record.get('email')} (Credits: {user_record.get('credits_balance')})")
-        except Exception as e:
-            logger.warning(f"Could not write to st.session_state (bare mode): {e}")
+    logger.info(f"Active session set for: {user_record.get('email')} (Credits: {user_record.get('credits_balance')})")
 
 
 def get_current_user() -> Optional[Dict[str, Any]]:
     """Returns the currently authenticated user dictionary or None if unauthenticated."""
-    if _is_streamlit_running():
-        try:
-            import streamlit as st
-            if "user_session" in st.session_state and st.session_state.user_session:
-                return st.session_state.user_session
-        except Exception:
-            pass
     return _BARE_USER_SESSION
 
 
@@ -171,19 +150,10 @@ def is_authenticated() -> bool:
 
 
 def sign_out_user():
-    """Clears active user session from session state."""
+    """Clears active user session."""
     global _BARE_USER_SESSION, _BARE_AUTH_TOKEN
     _BARE_USER_SESSION = None
     _BARE_AUTH_TOKEN = None
-    if _is_streamlit_running():
-        try:
-            import streamlit as st
-            if "user_session" in st.session_state:
-                st.session_state.user_session = None
-            if "auth_token" in st.session_state:
-                st.session_state.auth_token = None
-        except Exception:
-            pass
 
 
 def refresh_current_user() -> Optional[Dict[str, Any]]:
@@ -199,67 +169,5 @@ def refresh_current_user() -> Optional[Dict[str, Any]]:
 
 
 def handle_auth_callback() -> Optional[Dict[str, Any]]:
-    """
-    Inspects URL query parameters for Supabase authentication tokens or callback codes.
-    If an OAuth / Magic Link redirect arrives, extracts access token, fetches user identity,
-    and initializes the session state.
-    """
-    if not _is_streamlit_running():
-        return None
-    try:
-        import streamlit as st
-        params = st.query_params
-        # Handle access token or code
-        token = params.get("access_token")
-        code = params.get("code")
-
-        if token:
-            cfg = get_supabase_auth_config()
-            base_url = cfg["url"]
-            anon_key = cfg["anon_key"]
-            if base_url:
-                resp = requests.get(
-                    f"{base_url}/auth/v1/user",
-                    headers={"Authorization": f"Bearer {token}", "apikey": anon_key},
-                    timeout=5
-                )
-                if resp.status_code == 200:
-                    data = resp.json()
-                    user_id = data.get("id")
-                    email = data.get("email")
-                    metadata = data.get("user_metadata", {})
-                    full_name = metadata.get("full_name", metadata.get("name", ""))
-                    avatar_url = metadata.get("avatar_url", "")
-                    user = get_or_create_user(user_id, email, full_name, avatar_url)
-                    set_session_user(user, auth_token=token)
-                    # Clear query params
-                    st.query_params.clear()
-                    return user
-        elif code:
-            # Handle PKCE exchange if enabled
-            cfg = get_supabase_auth_config()
-            base_url = cfg["url"]
-            anon_key = cfg["anon_key"]
-            if base_url and anon_key:
-                resp = requests.post(
-                    f"{base_url}/auth/v1/token?grant_type=pkce",
-                    json={"auth_code": code},
-                    headers={"apikey": anon_key, "Content-Type": "application/json"},
-                    timeout=5
-                )
-                if resp.status_code == 200:
-                    tok_data = resp.json()
-                    access_token = tok_data.get("access_token")
-                    user_info = tok_data.get("user", {})
-                    user = get_or_create_user(
-                        user_info.get("id"),
-                        user_info.get("email"),
-                        user_info.get("user_metadata", {}).get("full_name", ""),
-                        user_info.get("user_metadata", {}).get("avatar_url", "")
-                    )
-                    set_session_user(user, auth_token=access_token)
-                    st.query_params.clear()
-                    return user
-    except Exception as e:
-        logger.warning(f"Error handling auth callback: {e}")
+    """Disabled: Auth handled directly via web routes."""
     return None

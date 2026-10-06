@@ -1,6 +1,6 @@
 import os
 import sqlite3
-import streamlit as st
+from core.config import get_secret
 from db import get_db_connection
 from analyzer import strip_conclusion_sections
 
@@ -21,7 +21,7 @@ def sanitize_database():
         total_count = len(rows)
         print(f"Auditing {total_count} records in primary database...")
 
-        is_pg = hasattr(cursor, "mogrify") or (st.secrets.get("SUPABASE_DB_URL") or os.environ.get("SUPABASE_DB_URL"))
+        is_pg = hasattr(cursor, "mogrify") or bool(get_secret("SUPABASE_DB_URL"))
         param_placeholder = "%s" if is_pg else "?"
 
         for ticker, original_text in rows:

@@ -12,17 +12,63 @@ from analyzer import (
     calculate_overall_health_score,
 )
 from db import IST, MANDATORY_SEBI_DISCLAIMER
-from ui.charts import generate_pdf_chart_image
 
-logger = logging.getLogger("equity_research.ui.pdf")
+logger = logging.getLogger("equity_research.core.reporting.pdf")
 
-def build_pdf_dossier(rep_text: str, ticker: str, header_label: str, hist_df) -> bytes:
+
+def generate_pdf_chart_image(df, ticker: str):
+    """Generates a high-resolution static PNG of the 6-month momentum and 50-DMA for PDF embedding."""
+    if df is None or not hasattr(df, "empty") or df.empty or "Date" not in df.columns or "Close" not in df.columns:
+        return None
+    try:
+        import matplotlib
+        matplotlib.use("Agg")
+        import matplotlib.pyplot as plt
+        import pandas as pd
+
+        plot_df = df.copy()
+        plot_df["Date"] = pd.to_datetime(plot_df["Date"])
+        plot_df = plot_df.sort_values("Date")
+
+        fig, (ax1, ax2) = plt.subplots(2, 1, figsize=(7.2, 3.6), gridspec_kw={'height_ratios': [3, 1]}, sharex=True)
+        fig.patch.set_facecolor('#ffffff')
+
+        # Price & 50-DMA
+        ax1.set_facecolor('#ffffff')
+        ax1.plot(plot_df["Date"], plot_df["Close"], color="#2563eb", linewidth=1.6, label="Close Price")
+        if "SMA50" in plot_df.columns and not plot_df["SMA50"].dropna().empty:
+            ax1.plot(plot_df["Date"], plot_df["SMA50"], color="#d97706", linewidth=1.3, linestyle="--", label="50-DMA")
+        
+        ax1.set_title(f"6-Month Price Momentum & 50-DMA ({ticker})", fontsize=10, fontweight="bold", pad=6)
+        ax1.set_ylabel("Price (INR)", fontsize=8)
+        ax1.legend(loc="upper left", frameon=True, fontsize=8)
+        ax1.grid(True, linestyle=":", alpha=0.5)
+
+        # Volume
+        ax2.set_facecolor('#ffffff')
+        if "Volume" in plot_df.columns:
+            ax2.bar(plot_df["Date"], plot_df["Volume"], color="#94a3b8", alpha=0.6, width=1.5)
+        ax2.set_ylabel("Vol", fontsize=7)
+        ax2.grid(True, linestyle=":", alpha=0.5)
+
+        plt.tight_layout()
+        clean_name = re_mod.sub(r'[^a-zA-Z0-9]', '_', ticker)
+        local_img_path = f"_pdf_chart_{clean_name}.png"
+        plt.savefig(local_img_path, dpi=180, bbox_inches="tight")
+        plt.close(fig)
+        return local_img_path
+    except Exception as e:
+        logger.warning(f"Could not generate PDF momentum chart for {ticker}: {e}")
+        return None
+
+
+def build_pdf_dossier(rep_text: str, ticker: str, header_label: str, hist_df=None) -> bytes:
     """Compiles the report, 7-pillar scorecard, and static chart into an executive PDF binary."""
     from markdown_pdf import MarkdownPdf, Section
     clean_name = re_mod.sub(r'[^a-zA-Z0-9]', '_', ticker)
     matrix = extract_health_matrix(rep_text)
     clean_body = strip_conclusion_sections(remove_health_matrix_text(rep_text))
-    chart_filename = generate_pdf_chart_image(hist_df, ticker)
+    chart_filename = generate_pdf_chart_image(hist_df, ticker) if hist_df is not None else None
     now_str = datetime.now(IST).strftime("%d %B %Y, %H:%M IST")
     
     embedded_style = """<style>
@@ -56,14 +102,22 @@ ol li { margin-bottom: 4px; font-size: 8.5pt; color: #334155; line-height: 1.4; 
 | **Balance Sheet Leverage** | {matrix.get('BalanceSheet', 'Resilient')} | Solvency & debt service capacity |
 """
     chart_md = f"\n### Trailing 6-Month Momentum & Technical Overlay\n![6-Month Price Momentum]({chart_filename})\n" if chart_filename and os.path.exists(chart_filename) else ""
-    header_branding = f"""# Equity Research Report: {header_label}
-> **Platform:** [Equity Research AI Platform](https://stock-research-app2.streamlit.app)  
-> **Generated:** {now_str} | **Exchange Status:** Verified Indian Equities Feed
+    doc_receipt_id = f"SR-DOC-{clean_name.upper()}-{int(datetime.now().timestamp())}"
+    header_branding = f"""# Institutional Equity Research Dossier: {header_label}
+> **Platform:** [Stock Research AI](https://stockresearch.app) | **Document ID:** `{doc_receipt_id}`  
+> **Compilation Timestamp:** {now_str} | **Licensing Tier:** Standard Subscriber Deliverable  
+> **Data Provenance:** Statutory Exchange Disclosures (BSE/NSE), Commercial Vendor Feeds (EODHD), and AMFI/RBI Benchmarks.
 """
     footer_disclaimer = f"""
 ---
-> **Statutory Safe Harbor & Regulatory Compliance Notice:**  
-> *{MANDATORY_SEBI_DISCLAIMER}*
+### Statutory Regulatory Disclaimers & Data Provenance Notice
+> **SEBI Safe-Harbor (Section 2(u) RA Regulations 2014):**  
+> *{MANDATORY_SEBI_DISCLAIMER}*  
+> 
+> **Data Grounding & Commercial Provenance:**  
+> Financial multiples, price series, and qualitative thesis assessments are synthesized algorithmically from public exchange filings and licensed commercial data feeds. Figures represent delayed or End-of-Day historical points and are not suitable for high-frequency or real-time trade execution. Past performance does not guarantee future outcomes. Independent verification with primary exchange filings is recommended.
+> 
+> *Generated by Stock Research App • SAC Code: 998314 • Document Tracking ID: {doc_receipt_id}*
 """
     full_md = f"{embedded_style}\n{header_branding}\n{scorecard_md}\n{chart_md}\n---\n\n{clean_body}\n{footer_disclaimer}"
     
@@ -95,4 +149,3 @@ def generate_report_pdf(ticker: str, rep_text: str, header_label: str = None) ->
     """Convenience wrapper for headless / web report PDF export."""
     label = header_label or f"{ticker} Institutional Research Dossier"
     return build_pdf_dossier(rep_text, ticker, label, hist_df=None)
-

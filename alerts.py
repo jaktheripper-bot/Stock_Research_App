@@ -1,7 +1,7 @@
 import logging
+import time
 from datetime import datetime, timedelta
 import requests
-import streamlit as st
 
 logger = logging.getLogger("equity_research.alerts")
 
@@ -17,7 +17,8 @@ from bse_master import resolve_bse_scrip_code
 # All alerts generated are descriptive diagnostic notices of publicly disseminated exchange data.
 # They do not constitute investment advice or buy/sell recommendations per SEBI safe harbor standards.
 
-@st.cache_data(ttl=300, show_spinner=False)
+_BSE_ANNOUNCEMENT_CACHE = {}
+
 def fetch_bse_announcements(scrip_code: str, days: int = 45) -> list:
     """
     Fetches official BSE corporate announcements for a given scrip code over a date range.
@@ -25,6 +26,13 @@ def fetch_bse_announcements(scrip_code: str, days: int = 45) -> list:
     """
     if not scrip_code or not str(scrip_code).isdigit():
         return []
+    
+    cache_key = f"{scrip_code}_{days}"
+    now_ts = time.time()
+    if cache_key in _BSE_ANNOUNCEMENT_CACHE:
+        cached_ts, cached_data = _BSE_ANNOUNCEMENT_CACHE[cache_key]
+        if now_ts - cached_ts < 300:
+            return cached_data
     
     try:
         now_dt = datetime.now()
@@ -222,12 +230,6 @@ def poll_single_stock(item: dict, live_fund: dict = None) -> list:
         price=current_price if current_price else last_price,
         announcement=latest_seen_headline if latest_seen_headline else last_ann
     )
-
-    try:
-        if st.session_state.get("notifications_opted_out", False):
-            return []
-    except Exception:
-        pass
 
     return new_alerts
 

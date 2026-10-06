@@ -63,10 +63,10 @@ def get_or_create_user(
                 tx_id = f"tx_welcome_{db_id[:12]}_{int(time.time())}"
                 cursor.execute(
                     f"""
-                    INSERT INTO credit_transactions (id, user_id, amount_inr, credits_added, payment_gateway, status, pack_type, invoice_number)
-                    VALUES ({p}, {p}, 0.0, {p}, 'system_grant', 'success', 'WELCOME_GRANT', {p});
+                    INSERT INTO credit_transactions (id, user_id, customer_email, amount_inr, credits_added, payment_gateway, status, pack_type, invoice_number)
+                    VALUES ({p}, {p}, {p}, 0.0, {p}, 'system_grant', 'success', 'WELCOME_GRANT', {p});
                     """,
-                    (tx_id, db_id, initial_credits, f"INV-WELCOME-{int(time.time())}")
+                    (tx_id, db_id, clean_email, initial_credits, f"INV-WELCOME-{int(time.time())}")
                 )
                 cursor.execute(
                     f"""
@@ -96,10 +96,10 @@ def get_or_create_user(
         tx_id = f"tx_welcome_{clean_id[:12]}_{int(time.time())}"
         cursor.execute(
             f"""
-            INSERT INTO credit_transactions (id, user_id, amount_inr, credits_added, payment_gateway, status, pack_type, invoice_number)
-            VALUES ({p}, {p}, 0.0, {p}, 'system_grant', 'success', 'WELCOME_GRANT', {p});
+            INSERT INTO credit_transactions (id, user_id, customer_email, amount_inr, credits_added, payment_gateway, status, pack_type, invoice_number)
+            VALUES ({p}, {p}, {p}, 0.0, {p}, 'system_grant', 'success', 'WELCOME_GRANT', {p});
             """,
-            (tx_id, clean_id, initial_credits, f"INV-WELCOME-{int(time.time())}")
+            (tx_id, clean_id, clean_email, initial_credits, f"INV-WELCOME-{int(time.time())}")
         )
 
         # Log initial ledger entry

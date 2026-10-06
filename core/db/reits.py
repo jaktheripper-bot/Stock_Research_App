@@ -212,8 +212,8 @@ def save_reit_or_invit(reit: Dict[str, Any]) -> bool:
     is_pg = bool(get_supabase_url())
 
     try:
-        cp = float(reit["current_price"])
-        nav = float(reit["nav_per_unit"])
+        cp = float(reit.get("current_price") or reit.get("cmp_inr") or 0.0)
+        nav = float(reit.get("nav_per_unit") or reit.get("nav_per_unit_inr") or cp or 1.0)
         disc = round(((cp - nav) / nav) * 100, 2) if nav > 0 else 0.0
 
         # SEBI Regulatory compliance test:
@@ -386,8 +386,8 @@ def save_sgb_tranche(sgb: Dict[str, Any]) -> bool:
     is_pg = bool(get_supabase_url())
 
     try:
-        mp = float(sgb["market_price"])
-        spot = float(sgb.get("spot_gold_price", 7450.0))
+        mp = float(sgb.get("market_price") or sgb.get("cmp_inr") or sgb.get("price") or 0.0)
+        spot = float(sgb.get("spot_gold_price") or sgb.get("spot_gold_per_gram") or 7450.0)
         disc = round(((mp - spot) / spot) * 100, 2) if spot > 0 else 0.0
 
         if is_pg:
@@ -435,12 +435,12 @@ def save_sgb_tranche(sgb: Dict[str, Any]) -> bool:
         params = (
             sgb["symbol"].upper(),
             sgb["series_name"],
-            float(sgb.get("issue_price", mp)),
+            float(sgb.get("issue_price") or sgb.get("issue_price_inr") or mp),
             mp,
             spot,
             disc,
-            float(sgb.get("annual_coupon_rate", 2.50)),
-            str(sgb["maturity_date"]),
+            float(sgb.get("annual_coupon_rate") or sgb.get("coupon_rate_pct") or 2.50),
+            str(sgb.get("maturity_date") or "2028-11-30"),
             float(sgb.get("ytm_annualized_pct", 9.0)),
             sgb.get("tax_treatment", "100% Tax-Free Capital Gains (Sec 47(viic))"),
             float(sgb.get("etf_tax_adjusted_spread_pct", 2.0)),

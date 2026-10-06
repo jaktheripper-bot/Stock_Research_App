@@ -21,7 +21,6 @@ import uuid
 import hmac
 import logging
 from urllib.parse import urlparse
-import streamlit as st
 
 logger = logging.getLogger("equity_research.telemetry")
 
@@ -101,30 +100,14 @@ def update_admin_passcode(current_passcode: str, new_passcode: str) -> tuple[boo
 _BARE_SESSION_STATE = {}
 
 def _is_streamlit_running() -> bool:
-    """Returns True only if running within an active Streamlit server runtime."""
-    try:
-        from streamlit.runtime import exists
-        return bool(exists())
-    except Exception:
-        return False
+    return False
 
 def is_admin_authenticated() -> bool:
     """Check if the current session has valid administrator authorization."""
-    if _is_streamlit_running():
-        try:
-            return bool(st.session_state.get("is_admin_authenticated", False))
-        except Exception:
-            pass
     return bool(_BARE_SESSION_STATE.get("is_admin_authenticated", False))
 
 def set_admin_authenticated(status: bool = True):
     """Set administrator authorization state for current session."""
-    if _is_streamlit_running():
-        try:
-            st.session_state["is_admin_authenticated"] = bool(status)
-            return
-        except Exception:
-            pass
     _BARE_SESSION_STATE["is_admin_authenticated"] = bool(status)
 
 def check_url_admin_auth():
@@ -133,13 +116,6 @@ def check_url_admin_auth():
 
 def get_session_id() -> str:
     """Retrieve or initialize an anonymous session identifier."""
-    if _is_streamlit_running():
-        try:
-            if "telemetry_session_id" not in st.session_state:
-                st.session_state["telemetry_session_id"] = f"sess_{uuid.uuid4().hex[:10]}"
-            return st.session_state["telemetry_session_id"]
-        except Exception:
-            pass
     if "telemetry_session_id" not in _BARE_SESSION_STATE:
         _BARE_SESSION_STATE["telemetry_session_id"] = f"sess_{uuid.uuid4().hex[:10]}"
     return _BARE_SESSION_STATE["telemetry_session_id"]
@@ -277,19 +253,6 @@ def get_visitor_context() -> dict:
     session_id = get_session_id()
     headers = {}
     query_params = {}
-    if _is_streamlit_running():
-        try:
-            if hasattr(st, "context") and hasattr(st.context, "headers") and st.context.headers:
-                headers = dict(st.context.headers)
-        except Exception:
-            pass
-
-        try:
-            if hasattr(st, "query_params") and st.query_params:
-                query_params = dict(st.query_params)
-        except Exception:
-            pass
-
     referrer = headers.get("referer") or headers.get("referrer", "")
     traffic_source, clean_ref = parse_traffic_source(referrer, query_params)
     ua_str = headers.get("user-agent", "")
@@ -338,23 +301,4 @@ def track_user_action(
 
 def init_session_telemetry():
     """Initializes session tracking once per browser session."""
-    if not _is_streamlit_running():
-        return
-    try:
-        if "session_telemetry_logged" in st.session_state:
-            return
-        st.session_state["session_telemetry_logged"] = True
-    except Exception:
-        pass
-        ctx = get_visitor_context()
-        utm_params = {}
-        try:
-            if hasattr(st, "query_params"):
-                utm_params = {k: v for k, v in dict(st.query_params).items() if k.startswith("utm_") or k in ("ref", "source")}
-        except Exception:
-            pass
-        track_user_action(
-            event_type="SESSION_START",
-            ticker="APP",
-            details={"utm_params": utm_params}
-        )
+    pass

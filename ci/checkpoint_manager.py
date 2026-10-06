@@ -170,9 +170,8 @@ def run_preflight_verification() -> bool:
     py_exec = sys.executable
 
     tiers = [
-        ("Streamlit Static Linter", [py_exec, "lint_streamlit.py"]),
         ("System Contract Audit", [py_exec, "check_system.py"]),
-        ("Interactive UI Action Simulation", [py_exec, "test_ui_headless.py"]),
+        ("Multi-Asset Regression Suite", [py_exec, "-m", "unittest", "discover", "-s", "tests"]),
         ("Latency Performance Benchmark", [py_exec, "benchmark.py"]),
     ]
 
@@ -185,7 +184,7 @@ def run_preflight_verification() -> bool:
             print(res.stderr[-1000:] if res.stderr else "")
             return False
 
-    print("   ✅ All 4 pre-flight tiers PASSED. Code is certified 100% operational.")
+    print("   ✅ All pre-flight tiers PASSED. Code is certified 100% operational.")
     return True
 
 

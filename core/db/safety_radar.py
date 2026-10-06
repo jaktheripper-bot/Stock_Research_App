@@ -144,6 +144,19 @@ def save_alternative_yield_product(prod: Dict[str, Any]) -> bool:
     is_pg = bool(get_supabase_url())
 
     try:
+        prod_id = str(prod.get("product_id") or prod.get("platform_name") or "UNKNOWN").upper().replace(" ", "_").replace("/", "_")
+        prod_name = prod.get("product_name") or prod.get("platform_name") or prod_id
+        cat = prod.get("category", "UNREGULATED_SHADOW")
+        prom_yield = float(prod.get("promoted_yield_pct") or prod.get("advertised_yield_pct") or 0.0)
+        danger_sc = int(prod.get("danger_score", 50))
+        reg_stat = prod.get("regulatory_status", "UNREGULATED")
+        cp_risk = prod.get("counterparty_risk_level") or ("EXTREME" if danger_sc >= 80 else "HIGH")
+        pg_val = bool(prod.get("principal_guarantee_validity", False))
+        rbi_circ = prod.get("rbi_warning_circular") or prod.get("rbi_warning_ref", "")
+        lock_m = int(prod.get("liquidity_lock_months", 0))
+        prec_loss = prod.get("precedent_losses_summary") or prod.get("safety_verdict", "")
+        safe_alt = prod.get("safe_alternative_recommendation", "")
+
         mat_json = prod.get("audit_matrix_json", "{}")
         if isinstance(mat_json, dict):
             mat_json = json.dumps(mat_json)
@@ -197,18 +210,18 @@ def save_alternative_yield_product(prod: Dict[str, Any]) -> bool:
                     updated_at = datetime('now');
             """
         params = (
-            prod["product_id"].upper(),
-            prod["product_name"],
-            prod["category"],
-            float(prod["promoted_yield_pct"]),
-            int(prod.get("danger_score", 50)),
-            prod["regulatory_status"],
-            prod["counterparty_risk_level"],
-            bool(prod.get("principal_guarantee_validity", False)),
-            prod.get("rbi_warning_circular", ""),
-            int(prod.get("liquidity_lock_months", 0)),
-            prod.get("precedent_losses_summary", ""),
-            prod.get("safe_alternative_recommendation", ""),
+            prod_id,
+            prod_name,
+            cat,
+            prom_yield,
+            danger_sc,
+            reg_stat,
+            cp_risk,
+            pg_val,
+            rbi_circ,
+            lock_m,
+            prec_loss,
+            safe_alt,
             mat_json,
         )
         cursor.execute(query, params)
