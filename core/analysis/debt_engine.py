@@ -793,18 +793,29 @@ def determine_retail_suitability(posture: Dict[str, Any], tax_drag: Dict[str, An
 
 EQUITY_TICKER_MAP = {
     "TATACAP": "TATAMOTORS",
+    "TATA": "TATAMOTORS",
     "HDFCBANK": "HDFCBANK",
     "RELIANCE": "RELIANCE",
     "L&T": "LT",
     "LT": "LT",
+    "LTFIN": "LT",
     "CHOLAFIN": "CHOLAFIN",
     "INDUSINDBK": "INDUSINDBK",
     "PIRAMAL": "PEL",
+    "PEL": "PEL",
     "MANAPPURAM": "MANAPPURAM",
     "SHRIRAMFIN": "SHRIRAMFIN",
     "MUTHOOT": "MUTHOOTFIN",
+    "MUTHOOTFIN": "MUTHOOTFIN",
     "BAJFINANCE": "BAJFINANCE",
-    "KOTAK": "KOTAKBANK"
+    "BAJAJFIN": "BAJFINANCE",
+    "KOTAK": "KOTAKBANK",
+    "KOTAKHOME": "KOTAKBANK",
+    "SBIN": "SBIN",
+    "IRFC": "IRFC",
+    "NTPC": "NTPC",
+    "PFC": "PFC",
+    "REC": "REC"
 }
 
 

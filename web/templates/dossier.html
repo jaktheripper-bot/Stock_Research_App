@@ -283,6 +283,80 @@
       {{ report_html|safe }}
     </div>
 
+    <!-- Phase 2: Capital Structure & Listed Corporate NCDs (Equity-to-Debt Contagion Bridge) -->
+    {% if linked_debt %}
+    <div id="capitalStructure" style="margin-top: 36px; background: linear-gradient(135deg, rgba(15, 23, 42, 0.9) 0%, rgba(30, 41, 59, 0.75) 100%); border: 1px solid rgba(14, 165, 233, 0.35); border-radius: var(--radius-md); padding: 24px; box-shadow: 0 10px 25px rgba(0, 0, 0, 0.3);">
+      <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px; flex-wrap: wrap; gap: 12px;">
+        <div style="display: flex; align-items: center; gap: 10px;">
+          <span style="font-size: 24px;">🏦</span>
+          <div>
+            <h3 style="margin: 0; font-size: 18px; font-weight: 800; color: #f8fafc;">
+              Capital Structure: Listed Corporate Debentures & NCDs ({{ linked_debt|length }} Tranches)
+            </h3>
+            <div style="font-size: 12.5px; color: #94a3b8; margin-top: 2px;">
+              Cross-asset linkage monitoring solvency buffer, recovery priority, and equity-to-debt contagion
+            </div>
+          </div>
+        </div>
+
+        {% if contagion_alert %}
+        <div style="display: inline-flex; align-items: center; gap: 6px; padding: 6px 14px; border-radius: 9999px; background: rgba(255, 255, 255, 0.05); border: 1px solid {{ contagion_alert.badge_color }};">
+          <span style="width: 8px; height: 8px; border-radius: 50%; background: {{ contagion_alert.badge_color }};"></span>
+          <span style="font-size: 12px; font-weight: 700; color: {{ contagion_alert.badge_color }};">📡 {{ contagion_alert.radar_label }}</span>
+        </div>
+        {% endif %}
+      </div>
+
+      {% if contagion_alert and contagion_alert.radar_status == 'ACTIVE_CONTAGION_ALERT' %}
+      <div style="background: rgba(239, 68, 68, 0.12); border-left: 4px solid #ef4444; border-radius: 6px; padding: 12px 16px; margin-bottom: 18px; font-size: 13px; color: #fca5a5; line-height: 1.5;">
+        <strong>⚠️ Active Equity-to-Debt Contagion Warning:</strong> {{ contagion_alert.radar_summary }}
+      </div>
+      {% elif contagion_alert and contagion_alert.radar_status == 'MONITORED_EQUITY_DRIFT' %}
+      <div style="background: rgba(245, 158, 11, 0.1); border-left: 4px solid #f59e0b; border-radius: 6px; padding: 12px 16px; margin-bottom: 18px; font-size: 13px; color: #fde68a; line-height: 1.5;">
+        <strong>⚠️ Monitored Equity Drift:</strong> {{ contagion_alert.radar_summary }}
+      </div>
+      {% endif %}
+
+      <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 14px;">
+        {% for d in linked_debt %}
+        <div style="background: rgba(15, 23, 42, 0.6); border: 1px solid rgba(255, 255, 255, 0.08); border-radius: 10px; padding: 16px; display: flex; flex-direction: column; justify-content: space-between;">
+          <div>
+            <div style="display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 6px;">
+              <span class="badge" style="background: rgba(14, 165, 233, 0.15); color: #38bdf8; font-weight: 700; font-size: 11px;">
+                {{ d.credit_rating|default('AAA') }}
+              </span>
+              <span style="font-size: 11.5px; color: #64748b; font-family: monospace;">
+                {{ d.isin }}
+              </span>
+            </div>
+            <div style="font-size: 14.5px; font-weight: 700; color: #f8fafc; margin-bottom: 4px; line-height: 1.3;">
+              {{ d.instrument_name|default('Corporate NCD') }}
+            </div>
+            <div style="font-size: 12px; color: #94a3b8; margin-bottom: 12px;">
+              Seniority: <strong style="color: #cbd5e1;">{{ d.seniority_tier|default('SENIOR_SECURED')|replace('_', ' ') }}</strong>
+            </div>
+
+            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 8px; background: rgba(30, 41, 59, 0.4); border-radius: 6px; padding: 8px 10px; margin-bottom: 12px; font-size: 12px;">
+              <div>
+                <span style="color: #64748b; display: block; font-size: 10.5px; text-transform: uppercase;">Coupon / YTM</span>
+                <strong style="color: #10b981; font-size: 13.5px;" class="tnum">{{ d.ytm_pct|default(d.coupon_rate_pct)|default('N/A') }}%</strong>
+              </div>
+              <div>
+                <span style="color: #64748b; display: block; font-size: 10.5px; text-transform: uppercase;">Maturity</span>
+                <strong style="color: #f8fafc; font-size: 13.5px;" class="tnum">{{ d.maturity_date|default('N/A') }}</strong>
+              </div>
+            </div>
+          </div>
+
+          <a href="/debt/{{ d.isin }}" class="btn btn-secondary btn-sm" style="width: 100%; text-align: center; font-size: 12px; font-weight: 600; padding: 7px;">
+            Open Fixed Income Dossier &rarr;
+          </a>
+        </div>
+        {% endfor %}
+      </div>
+    </div>
+    {% endif %}
+
     <!-- Charlie Munger Pre-Mortem Inversion Engine (Anti-Thesis Module) -->
     <div id="premortem" style="margin-top: 40px; background: rgba(15, 23, 42, 0.95); border: 1px solid rgba(245, 158, 11, 0.3); border-radius: var(--radius-md); padding: 24px;">
       <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px; flex-wrap: wrap; gap: 8px;">

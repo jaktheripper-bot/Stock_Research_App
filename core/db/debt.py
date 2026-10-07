@@ -231,6 +231,63 @@ def get_debt_securities_by_ticker(ticker: str) -> List[Dict[str, Any]]:
         cursor.close()
         conn.close()
 
+def get_debt_securities_for_equity(equity_ticker: str) -> List[Dict[str, Any]]:
+    """
+    Finds all corporate debt securities / NCDs issued by an equity ticker or its subsidiaries.
+    Supports bidirectional mapping between parent equity symbol and debt issuer tickers.
+    """
+    clean_sym = (equity_ticker or "").strip().upper()
+    if not clean_sym:
+        return []
+
+    debt_to_equity_map = {
+        "TATACAP": "TATAMOTORS",
+        "TATA": "TATAMOTORS",
+        "HDFCBANK": "HDFCBANK",
+        "RELIANCE": "RELIANCE",
+        "L&T": "LT",
+        "LT": "LT",
+        "LTFIN": "LT",
+        "CHOLAFIN": "CHOLAFIN",
+        "INDUSINDBK": "INDUSINDBK",
+        "PIRAMAL": "PEL",
+        "PEL": "PEL",
+        "MANAPPURAM": "MANAPPURAM",
+        "SHRIRAMFIN": "SHRIRAMFIN",
+        "MUTHOOT": "MUTHOOTFIN",
+        "MUTHOOTFIN": "MUTHOOTFIN",
+        "BAJFINANCE": "BAJFINANCE",
+        "BAJAJFIN": "BAJFINANCE",
+        "KOTAK": "KOTAKBANK",
+        "KOTAKHOME": "KOTAKBANK",
+        "SBIN": "SBIN",
+        "IRFC": "IRFC",
+        "NTPC": "NTPC",
+        "PFC": "PFC",
+        "REC": "REC"
+    }
+
+    matching_debt_tickers = {clean_sym}
+    for debt_sym, eq_sym in debt_to_equity_map.items():
+        if eq_sym.upper() == clean_sym or debt_sym.upper() == clean_sym:
+            matching_debt_tickers.add(debt_sym.upper())
+
+    conn = get_db_connection()
+    cursor = conn.cursor()
+    use_pg = is_supabase_enabled()
+    try:
+        placeholders = ", ".join(["%s" if use_pg else "?" for _ in matching_debt_tickers])
+        sql = f"SELECT * FROM corporate_debt_securities WHERE UPPER(ticker) IN ({placeholders}) ORDER BY maturity_date ASC"
+        cursor.execute(sql, tuple(matching_debt_tickers))
+        rows = cursor.fetchall()
+        return [clean_dict_row(cursor, r) for r in rows]
+    except Exception as e:
+        logger.error(f"Error querying debt securities for equity {clean_sym}: {e}")
+        return []
+    finally:
+        cursor.close()
+        conn.close()
+
 def get_active_debt_securities(
     seniority: Optional[str] = None,
     instrument_type: Optional[str] = None,

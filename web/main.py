@@ -777,6 +777,18 @@ def dossier_page(request: Request, ticker: str):
     except Exception as e:
         logger.debug(f"Momentum chart generation notice for {canonical}: {e}")
 
+    # Phase 2: Equity-to-Debt Contagion Bridge
+    linked_debt = []
+    contagion_alert = None
+    try:
+        from core.db.debt import get_debt_securities_for_equity
+        linked_debt = get_debt_securities_for_equity(canonical)
+        if linked_debt:
+            from core.analysis.debt_engine import evaluate_equity_cross_contagion
+            contagion_alert = evaluate_equity_cross_contagion(linked_debt[0])
+    except Exception as e:
+        logger.debug(f"Linked debt query notice for {canonical}: {e}")
+
     return templates.TemplateResponse(
         request=request,
         name="dossier.html",
@@ -801,6 +813,8 @@ def dossier_page(request: Request, ticker: str):
             "chart_data": chart_data,
             "chart_json": chart_json,
             "pead_data": pead_data,
+            "linked_debt": linked_debt,
+            "contagion_alert": contagion_alert,
         }
     )
 

@@ -235,12 +235,15 @@ To turn these competitive advantages into an unassailable market moat, we propos
 ---
 
 ### Phase 2: Equity-to-Debt Contagion Bridge (Cross-Asset Risk Detection)
+**Status:** **Completed & Verified.**  
 **Objective:** Protect conservative fixed-income investors by linking debt securities directly to corporate equity health.
-- **Tasks:**
-  1. Build an automated linkage between `debt_securities` and `reports.db` by matching parent company scrip codes and ISINs.
-  2. If an equity audit detects deteriorating governance, forensic accounting red flags, or severe promoter pledging, trigger an immediate **Debt Contagion Warning** on the company's listed NCDs.
-  3. Verify recovery seniority and true Asset Coverage Ratio (ACR) independent of credit agency ratings.
-- **User Facing Deliverable:** A "Credit Contagion Radar" badge on debt dossiers highlighting equity distress before rating agency downgrades.
+- **Tasks & Delivery:**
+  1. **Automated Linkage:** Built bidirectional parent-subsidiary mapping (`get_debt_securities_for_equity`) linking listed equities (`RELIANCE`, `TATAMOTORS`, `LT`, `BAJFINANCE`, `PEL`, `HDFCBANK`, etc.) directly to their listed NCDs.
+  2. **Contagion Spillover Detection:** Evaluates parent governance posture, promoter pledge ratio, and Piotroski F-score to compute the `Credit Contagion Radar` (`ACTIVE_CONTAGION_ALERT`, `MONITORED_EQUITY_DRIFT`, `INSULATED_EQUITY_MOAT`).
+  3. **Bi-Directional Dossier Integration:** 
+     - **Equity Dossiers:** Displays the new **Capital Structure & Listed Corporate NCDs** module showcasing active debenture tranches, seniority tier, YTM, and spillover warnings.
+     - **Debt Dossiers:** Displays the **Credit Contagion Radar** with an immediate 1-click drilldown to the parent equity forensic dossier.
+- **User Facing Deliverable:** Live "Credit Contagion Radar" badge on debt dossiers and "Capital Structure & Listed NCDs" card on equity dossiers.
 
 ---
 

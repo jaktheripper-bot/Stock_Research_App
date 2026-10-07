@@ -80,6 +80,17 @@ class TestCompetitiveEnhancements(unittest.TestCase):
                 self.assertEqual(radar["badge_color"], "#ef4444")
                 self.assertIn("Elevated equity distress", radar["radar_summary"])
 
+    def test_get_debt_securities_for_equity(self):
+        """Tests that equity tickers find matching debt securities and subsidiary debentures."""
+        from core.db.debt import get_debt_securities_for_equity
+        rel_debt = get_debt_securities_for_equity("RELIANCE")
+        self.assertGreater(len(rel_debt), 0)
+        self.assertTrue(any(d.get("isin") == "INE002A08012" for d in rel_debt))
+
+        tata_debt = get_debt_securities_for_equity("TATAMOTORS")
+        self.assertGreater(len(tata_debt), 0)
+        self.assertTrue(any("TATACAP" in d.get("ticker", "") for d in tata_debt))
+
     def test_multi_asset_copilot_mutual_fund(self):
         """Tests that Copilot correctly grounds context when querying a mutual fund scheme."""
         import asyncio
@@ -148,10 +159,11 @@ class TestCompetitiveEnhancements(unittest.TestCase):
         self.assertIn("Agent Radar", resp_home.text)
         self.assertIn("/admin/audit", resp_home.text)
 
-        # 2. Debt dossier contains Contagion Radar and Copilot trigger
+        # 2. Debt dossier contains Contagion Radar, Copilot trigger, and link to parent equity
         resp_debt = self.client.get("/debt/INE002A08012")
         self.assertEqual(resp_debt.status_code, 200)
         self.assertIn("Credit Contagion Radar", resp_debt.text)
+        self.assertIn("/dossier/RELIANCE", resp_debt.text)
         self.assertIn("Forensic Copilot", resp_debt.text)
         self.assertIn("Export PDF", resp_debt.text)
         self.assertIn("copilotModalBackdrop", resp_debt.text)
