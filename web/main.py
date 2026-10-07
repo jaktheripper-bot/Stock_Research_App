@@ -652,6 +652,19 @@ def dossier_page(request: Request, ticker: str):
                     break
 
         suggestions = get_ticker_suggestions(clean_t, n=4)
+
+        # Phase 2: Equity-to-Debt Contagion Bridge for pending equities
+        linked_debt = []
+        contagion_alert = None
+        try:
+            from core.db.debt import get_debt_securities_for_equity
+            linked_debt = get_debt_securities_for_equity(canonical)
+            if linked_debt:
+                from core.analysis.debt_engine import evaluate_equity_cross_contagion
+                contagion_alert = evaluate_equity_cross_contagion(linked_debt[0])
+        except Exception as e:
+            logger.debug(f"Linked debt query notice for pending {canonical}: {e}")
+
         return templates.TemplateResponse(
             request=request,
             name="dossier_pending.html",
@@ -660,7 +673,9 @@ def dossier_page(request: Request, ticker: str):
                 "company_name": company_name,
                 "scrip_code": scrip,
                 "suggestions": suggestions,
-                "active_page": "dossier"
+                "active_page": "dossier",
+                "linked_debt": linked_debt,
+                "contagion_alert": contagion_alert,
             }
         )
 

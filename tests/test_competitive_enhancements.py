@@ -91,6 +91,42 @@ class TestCompetitiveEnhancements(unittest.TestCase):
         self.assertGreater(len(tata_debt), 0)
         self.assertTrue(any("TATACAP" in d.get("ticker", "") for d in tata_debt))
 
+    def test_equity_dossier_pending_renders_linked_debt(self):
+        """Tests that uncompiled equity tickers with active debt display listed debt tranches."""
+        resp = self.client.get("/dossier/RELIANCE")
+        self.assertEqual(resp.status_code, 200)
+        self.assertIn("PENDING INSTITUTIONAL COMPILATION", resp.text)
+        self.assertIn("Capital Structure: Listed Corporate Debentures", resp.text)
+        self.assertIn("INE002A08012", resp.text)
+        self.assertIn("/debt/INE002A08012", resp.text)
+
+    def test_phase_3_opportunity_terminal_cross_asset_real_yield(self):
+        """Tests Phase 3 cross-asset aggregation, statutory tax waterfalls, and scenario filters."""
+        from core.analysis.opportunity_terminal import get_normalized_opportunity_universe, calculate_tax_waterfall
+
+        # 1. Verify multi-asset classes present
+        universe = get_normalized_opportunity_universe(tax_slab=30.0, cpi_inflation=4.5)
+        asset_classes = {x["asset_class"] for x in universe}
+        expected_classes = {"BOND", "REIT", "SGB", "SOVEREIGN", "MF", "EQUITY"}
+        for ec in expected_classes:
+            self.assertIn(ec, asset_classes)
+
+        # 2. Verify dynamic tax slab calculation (e.g. 10% New Tax Regime vs 30% Standard)
+        b_10 = calculate_tax_waterfall(10.0, "BOND", tax_slab=10.0)
+        b_30 = calculate_tax_waterfall(10.0, "BOND", tax_slab=30.0)
+        self.assertEqual(b_10["net_yield_pct"], 9.0)
+        self.assertEqual(b_30["net_yield_pct"], 7.0)
+
+        # 3. Verify scenario filters
+        pres = get_normalized_opportunity_universe(persona_filter="capital_preservation")
+        self.assertTrue(all(x.get("real_yield_pct", 0) >= 0 for x in pres))
+
+        cash = get_normalized_opportunity_universe(persona_filter="maximum_cashflow")
+        self.assertTrue(len(cash) > 0)
+
+        upside = get_normalized_opportunity_universe(persona_filter="asymmetric_upside")
+        self.assertTrue(len(upside) > 0)
+
     def test_multi_asset_copilot_mutual_fund(self):
         """Tests that Copilot correctly grounds context when querying a mutual fund scheme."""
         import asyncio

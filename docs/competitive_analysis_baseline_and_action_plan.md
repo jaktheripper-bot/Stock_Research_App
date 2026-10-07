@@ -248,12 +248,13 @@ To turn these competitive advantages into an unassailable market moat, we propos
 ---
 
 ### Phase 3: Opportunity Terminal Enhancement (Unified Real Returns)
+**Status:** **Completed & Verified.**  
 **Objective:** Provide investors with an unconflicted, cross-asset comparison terminal that factors in taxes and inflation.
-- **Tasks:**
-  1. Connect all 5 asset classes (Equities, Funds, Corporate NCDs, SM REITs/InvITs, SGBs, Sovereign G-Secs) into the `opportunity_terminal.py` engine.
-  2. Implement dynamic post-tax yield calculations adjusted for investor tax bracket (0%, 10%, 20%, 30%) and real yield over Indian CPI inflation.
-  3. Add interactive scenario filters: "Capital Preservation (Real Return > 0%)", "Maximum Cash Flow", "Asymmetric Upside".
-- **User Facing Deliverable:** An institutional Opportunity Matrix ranking every tracked instrument on an identical, uncompromised risk-adjusted scale.
+- **Tasks & Delivery:**
+  1. **All Asset Classes Connected:** Ingests and normalizes across 7 asset sleeves: Fundamental Equities (`reports.db`), Mutual Funds (`mutual_funds.py`), Corporate NCDs & SDIs (`debt.py`), SM REITs & InvITs (`reits.py`), Sovereign Gold Bonds (`reits.py`), Sovereign G-Secs/T-Bills (`sovereign.py`), and National ETFs (`sovereign.py`).
+  2. **Statutory Tax Waterfalls & Real Returns:** Dynamically calculates post-tax real yields net of MOSPI CPI inflation across tax brackets (0%, 10% New Tax Regime, 20%, 30%, 39% HNI Surcharge) citing precise statutes (Sec 47(viic) tax-free SGB capital gains, Sec 115UA hybrid REIT pass-through, Sec 112A 12.5% equity LTCG, Sec 50AA debt marginal rate).
+  3. **Multi-Modal Terminal & Scenario Filters:** Implements 4 distinct discovery views (Bento Cards, 2D Spread Heatmap Matrix, Risk-Return Scatter Frontier, Dense Table), persistent 4-item Arbitrage Docket with side-by-side comparison scorecard modal, and scenario filters: *"Capital Preservation (Real Return > 0%)"*, *"Maximum Cash Flow"*, *"HNI Real Assets"*, and *"Asymmetric Upside"*.
+- **User Facing Deliverable:** Live interactive Opportunity Terminal at `/opportunities` and APIs at `/api/opportunities/universe`, `/api/opportunities/heatmap`, and `/api/opportunities/arbitrage`.
 
 ---
 

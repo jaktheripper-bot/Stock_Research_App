@@ -316,10 +316,12 @@ def get_normalized_opportunity_universe(
     # ----------------------------------------------------
     try:
         sovereign_benchmarks = get_sovereign_yield_curve()
+        canonical_tenors = ("91D", "364D", "5Y", "10Y", "10Y_SGRB", "30Y")
         for b in sovereign_benchmarks:
-            # We select key canonical points: 91D, 364D, 5Y, 10Y, 30Y, and Sovereign Green Bond
             tenor = b.get("tenor_label", "")
-            if tenor in ("91D", "364D", "5Y", "10Y", "10Y SGrB", "30Y"):
+            # Match canonical benchmark points (e.g. 91D_TBILL, 10Y_GSEC, 30Y_GSEC)
+            is_canonical = (tenor in canonical_tenors) or any(tenor.startswith(f"{ct}_") or tenor == ct for ct in canonical_tenors)
+            if is_canonical:
                 yield_val = float(b.get("cut_off_yield", 7.0))
                 mat_years = float(b.get("maturity_years", 5.0))
                 tax_info = calculate_tax_waterfall(yield_val, "SOVEREIGN", tax_slab)
@@ -327,10 +329,11 @@ def get_normalized_opportunity_universe(
                 real_yield = round(net_yield - cpi_inflation, 2)
                 spread_bps = round((yield_val - BENCHMARK_10Y_GSEC_YIELD) * 100)
 
+                clean_label = tenor.replace("_", " ").title()
                 items.append({
-                    "id": f"GOI_{tenor.replace(' ', '_')}",
+                    "id": f"GOI_{tenor}",
                     "symbol": f"GOI-{tenor}",
-                    "name": f"Government of India {b.get('instrument_type', 'Benchmark')} ({tenor})",
+                    "name": f"Government of India {b.get('instrument_type', 'Benchmark')} ({clean_label})",
                     "asset_class": "SOVEREIGN",
                     "category_label": "Sovereign G-Sec / T-Bill",
                     "gross_yield_pct": yield_val,
@@ -360,8 +363,27 @@ def get_normalized_opportunity_universe(
     try:
         funds = get_active_mutual_funds(limit=20)
         for f in funds:
-            cagr = float(f.get("returns_3y_cagr") or f.get("returns_5y_cagr") or 14.5)
-            tax_info = calculate_tax_waterfall(cagr, "MF_EQUITY", tax_slab)
+            broad = (f.get("broad_category") or "EQUITY").upper()
+            cat_name = f.get("category") or ""
+            is_debt = (broad == "DEBT") or any(k in cat_name.lower() for k in ["debt", "liquid", "gilt", "overnight", "money market", "banking and psu", "corporate bond", "credit risk"])
+
+            if is_debt:
+                cagr = float(f.get("returns_3y_cagr") or f.get("returns_5y_cagr") or 7.2)
+                tax_info = calculate_tax_waterfall(cagr, "BOND", tax_slab)
+                seniority = "AAA_PSU" if ("gilt" in cat_name.lower() or "psu" in cat_name.lower()) else "SENIOR_SECURED"
+                personas = ["capital_preservation", "quarterly_cashflow"]
+                recourse = "Regulated Underlying Debt Portfolio (AMFI Liquidations / Accrual)"
+                failure = "Credit Rating Downgrade / RBI Repo Rate Shock"
+                dur = 2.5
+            else:
+                cagr = float(f.get("returns_3y_cagr") or f.get("returns_5y_cagr") or 14.5)
+                tax_info = calculate_tax_waterfall(cagr, "MF_EQUITY", tax_slab)
+                seniority = "EQUITY"
+                personas = ["compounding", "asymmetric_upside"]
+                recourse = "Diversified Underlying Equity Portfolio (AMFI NAV Liquidation)"
+                failure = "Market-Wide Equity Drawdown / Active Fund Underperformance"
+                dur = 5.0
+
             net_yield = tax_info["net_yield_pct"]
             real_yield = round(net_yield - cpi_inflation, 2)
             spread_bps = round((cagr - BENCHMARK_10Y_GSEC_YIELD) * 100)
@@ -371,24 +393,24 @@ def get_normalized_opportunity_universe(
                 "symbol": f.get("scheme_code"),
                 "name": f.get("scheme_name", "Mutual Fund Scheme"),
                 "asset_class": "MF",
-                "category_label": f.get("category", "Equity Mutual Fund"),
+                "category_label": cat_name or ("Debt Mutual Fund" if is_debt else "Equity Mutual Fund"),
                 "gross_yield_pct": cagr,
                 "net_yield_pct": net_yield,
                 "real_yield_pct": real_yield,
                 "spread_vs_10y_gsec_bps": spread_bps,
-                "seniority_tier": "EQUITY",
-                "seniority_rank": SENIORITY_RANKS["EQUITY"],
+                "seniority_tier": seniority,
+                "seniority_rank": SENIORITY_RANKS.get(seniority, 5),
                 "credit_rating": "SEBI Monitored Portfolio",
-                "macaulay_duration_years": 5.0,
-                "tenure_bucket": "3-5Y",
+                "macaulay_duration_years": dur,
+                "tenure_bucket": assign_tenure_bucket(dur),
                 "min_ticket_inr": 500.0,
                 "liquidity_tier": "INSTANT_T1",
                 "tax_statute": tax_info["tax_statute"],
                 "effective_tax_rate_pct": tax_info["effective_tax_rate_pct"],
-                "recovery_recourse": "Diversified Underlying Equity Portfolio (AMFI NAV Liquidation)",
-                "primary_failure_mode": "Market-Wide Equity Drawdown / Active Fund Underperformance",
+                "recovery_recourse": recourse,
+                "primary_failure_mode": failure,
                 "detail_url": f"/funds/{f.get('scheme_code')}",
-                "persona_tags": ["compounding"]
+                "persona_tags": personas
             })
     except Exception as e:
         logger.error(f"Error aggregating mutual funds for Opportunity Terminal: {e}")
