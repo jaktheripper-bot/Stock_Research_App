@@ -1600,6 +1600,27 @@ def init_db(force: bool = False):
                     cursor.execute("INSERT OR IGNORE INTO schema_migrations (version) VALUES ('v024_autonomous_event_ledger');")
                 conn.commit()
 
+            # Migration v025: Landing Pages & Route Telemetry
+            if "v025_landing_pages_telemetry" not in applied:
+                logger.info("Applying schema migration: v025_landing_pages_telemetry...")
+                if supabase_url:
+                    cursor.execute("""
+                        ALTER TABLE site_usage_events ADD COLUMN IF NOT EXISTS landing_page VARCHAR(255);
+                        CREATE INDEX IF NOT EXISTS idx_site_usage_landing ON site_usage_events (landing_page, timestamp DESC);
+                        INSERT INTO schema_migrations (version) VALUES ('v025_landing_pages_telemetry') ON CONFLICT DO NOTHING;
+                    """)
+                else:
+                    try:
+                        cursor.execute("ALTER TABLE site_usage_events ADD COLUMN landing_page TEXT;")
+                    except Exception:
+                        pass
+                    try:
+                        cursor.execute("CREATE INDEX IF NOT EXISTS idx_site_usage_landing ON site_usage_events (landing_page, timestamp DESC);")
+                    except Exception:
+                        pass
+                    cursor.execute("INSERT OR IGNORE INTO schema_migrations (version) VALUES ('v025_landing_pages_telemetry');")
+                conn.commit()
+
             _DB_INITIALIZED = True
             _INITIALIZED_DBS.add(target_key)
         except Exception as e:

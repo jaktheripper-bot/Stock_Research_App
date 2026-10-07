@@ -390,7 +390,7 @@
       {% endif %}
     </button>
     <button class="admin-tab-btn {% if active_tab == 'traffic' %}active{% endif %}" data-tab="traffic" onclick="showTab('traffic')">
-      🌐 Traffic Origins
+      🌐 Traffic & Landing Pages
     </button>
     <button class="admin-tab-btn {% if active_tab == 'actions' %}active{% endif %}" data-tab="actions" onclick="showTab('actions')">
       🎯 User Actions
@@ -671,8 +671,159 @@
     </div>
   </div>
 
-  <!-- TAB 4: Traffic Origins -->
+  <!-- TAB 4: Traffic & Landing Pages -->
   <div id="tab-traffic" class="admin-tab-pane {% if active_tab == 'traffic' %}active{% endif %}">
+    <!-- Landing & Inbound KPIs -->
+    <div class="kpi-grid" style="grid-template-columns: repeat(auto-fit, minmax(210px, 1fr)); margin-bottom: 24px;">
+      <div class="kpi-card" style="border-left: 3px solid #38bdf8;">
+        <div class="kpi-label">Primary Entry Route <span>📍</span></div>
+        <div class="kpi-value mono" style="font-size: 18px; color: #38bdf8; word-break: break-all;">
+          {{ summary.top_landing_pages[0].path if summary.top_landing_pages else '/' }}
+        </div>
+        <div class="kpi-delta success">
+          {{ summary.top_landing_pages[0].percentage if summary.top_landing_pages else 0 }}% of Total Inbound Sessions
+        </div>
+      </div>
+      <div class="kpi-card" style="border-left: 3px solid #10b981;">
+        <div class="kpi-label">Inbound Entry Sessions <span>🚪</span></div>
+        <div class="kpi-value mono" style="color: #34d399;">
+          {{ summary.unique_sessions }}
+        </div>
+        <div class="kpi-delta">Tracked Unique Visitors</div>
+      </div>
+      <div class="kpi-card" style="border-left: 3px solid #c084fc;">
+        <div class="kpi-label">Most Visited Route <span>🔥</span></div>
+        <div class="kpi-value mono" style="font-size: 18px; color: #c084fc; word-break: break-all;">
+          {{ summary.top_visited_pages[0].path if summary.top_visited_pages else '/' }}
+        </div>
+        <div class="kpi-delta">
+          {{ summary.top_visited_pages[0].views if summary.top_visited_pages else 0 }} Page Impressions
+        </div>
+      </div>
+      <div class="kpi-card" style="border-left: 3px solid #f59e0b;">
+        <div class="kpi-label">Top External Channel <span>🌐</span></div>
+        <div class="kpi-value" style="font-size: 16px; color: #fbbf24;">
+          {{ summary.traffic_sources[0].source if summary.traffic_sources else 'Direct / Bookmark' }}
+        </div>
+        <div class="kpi-delta">
+          {{ summary.traffic_sources[0].percentage if summary.traffic_sources else 100 }}% Channel Share
+        </div>
+      </div>
+    </div>
+
+    <!-- Top Landing Pages & Visited Routes Grid -->
+    <div class="grid-2col" style="margin-bottom: 24px;">
+      <div class="admin-card">
+        <div style="display: flex; justify-content: space-between; align-items: baseline; margin-bottom: 14px;">
+          <div>
+            <h3 style="margin: 0; font-size: 16px; font-weight: 700;">📍 Top Landing Pages & Entry Routes</h3>
+            <p style="margin: 4px 0 0; color: var(--text-secondary, #94a3b8); font-size: 12px;">
+              The exact touchpoint pages where visitors first arrived on the platform in each session.
+            </p>
+          </div>
+        </div>
+        <div class="admin-table-wrap">
+          <table class="admin-table">
+            <thead>
+              <tr>
+                <th>Landing URL / Route</th>
+                <th>Section</th>
+                <th>Sessions</th>
+                <th>Share</th>
+              </tr>
+            </thead>
+            <tbody>
+              {% for lp in summary.top_landing_pages %}
+              <tr>
+                <td>
+                  <a href="{{ lp.path }}" target="_blank" style="color: #38bdf8; text-decoration: none; font-weight: 600; font-family: monospace; font-size: 12px; display: inline-flex; align-items: center; gap: 4px;">
+                    {{ lp.path }} <span style="font-size: 10px; opacity: 0.7;">↗</span>
+                  </a>
+                </td>
+                <td>
+                  <span class="status-pill closed" style="font-size: 11px; white-space: nowrap;">
+                    {{ lp.icon }} {{ lp.category }}
+                  </span>
+                </td>
+                <td class="mono" style="font-weight: 700;">{{ lp.sessions }}</td>
+                <td style="min-width: 120px;">
+                  <div style="display: flex; align-items: center; gap: 8px;">
+                    <div style="flex: 1; height: 6px; background: rgba(255,255,255,0.08); border-radius: 3px; overflow: hidden;">
+                      <div style="width: {{ lp.percentage }}%; height: 100%; background: linear-gradient(90deg, #0ea5e9, #38bdf8); border-radius: 3px;"></div>
+                    </div>
+                    <span class="mono" style="font-size: 12px; color: var(--accent-cyan, #0ea5e9); min-width: 36px; text-align: right;">{{ lp.percentage }}%</span>
+                  </div>
+                </td>
+              </tr>
+              {% else %}
+              <tr>
+                <td colspan="4" style="text-align: center; color: var(--text-secondary, #94a3b8); padding: 25px;">
+                  No landing page telemetry recorded in period.
+                </td>
+              </tr>
+              {% endfor %}
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+      <div class="admin-card">
+        <div style="display: flex; justify-content: space-between; align-items: baseline; margin-bottom: 14px;">
+          <div>
+            <h3 style="margin: 0; font-size: 16px; font-weight: 700;">📄 Sitewide Most Visited Pages</h3>
+            <p style="margin: 4px 0 0; color: var(--text-secondary, #94a3b8); font-size: 12px;">
+              Aggregate volume of views and unique visitor reach across all internal navigation routes.
+            </p>
+          </div>
+        </div>
+        <div class="admin-table-wrap">
+          <table class="admin-table">
+            <thead>
+              <tr>
+                <th>Page Route</th>
+                <th>Section</th>
+                <th>Views</th>
+                <th>Visitors</th>
+                <th>Share</th>
+              </tr>
+            </thead>
+            <tbody>
+              {% for vp in summary.top_visited_pages %}
+              <tr>
+                <td>
+                  <a href="{{ vp.path }}" target="_blank" style="color: #c084fc; text-decoration: none; font-weight: 600; font-family: monospace; font-size: 12px; display: inline-flex; align-items: center; gap: 4px;">
+                    {{ vp.path }} <span style="font-size: 10px; opacity: 0.7;">↗</span>
+                  </a>
+                </td>
+                <td>
+                  <span class="status-pill closed" style="font-size: 11px; white-space: nowrap;">
+                    {{ vp.icon }} {{ vp.category }}
+                  </span>
+                </td>
+                <td class="mono" style="font-weight: 700; color: #34d399;">{{ vp.views }}</td>
+                <td class="mono">{{ vp.unique_sessions }}</td>
+                <td style="min-width: 100px;">
+                  <div style="display: flex; align-items: center; gap: 8px;">
+                    <div style="flex: 1; height: 6px; background: rgba(255,255,255,0.08); border-radius: 3px; overflow: hidden;">
+                      <div style="width: {{ vp.percentage }}%; height: 100%; background: linear-gradient(90deg, #a855f7, #c084fc); border-radius: 3px;"></div>
+                    </div>
+                    <span class="mono" style="font-size: 12px; color: #c084fc; min-width: 36px; text-align: right;">{{ vp.percentage }}%</span>
+                  </div>
+                </td>
+              </tr>
+              {% else %}
+              <tr>
+                <td colspan="5" style="text-align: center; color: var(--text-secondary, #94a3b8); padding: 25px;">
+                  No page impression data recorded in period.
+                </td>
+              </tr>
+              {% endfor %}
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+
     <div class="grid-2col">
       <div class="admin-card">
         <h3 style="margin-top: 0; font-size: 16px; font-weight: 700; margin-bottom: 16px;">Traffic Channels</h3>
@@ -855,8 +1006,11 @@
       {% for j in session_journeys %}
       <div style="background: rgba(15, 23, 42, 0.6); border: 1px solid var(--border-subtle, #1e293b); border-radius: 8px; padding: 14px 18px; margin-bottom: 14px;">
         <div style="display: flex; justify-content: space-between; align-items: baseline; flex-wrap: wrap; gap: 8px; margin-bottom: 8px;">
-          <div style="font-weight: 700; font-size: 13px; display: flex; align-items: center; gap: 8px;">
+          <div style="font-weight: 700; font-size: 13px; display: flex; align-items: center; gap: 8px; flex-wrap: wrap;">
             <span class="mono" style="color: var(--accent-cyan, #0ea5e9);">{{ j.session_id }}</span>
+            <span style="background: rgba(14, 165, 233, 0.12); color: #38bdf8; border: 1px solid rgba(14, 165, 233, 0.3); padding: 2px 8px; border-radius: 4px; font-size: 11px; font-weight: 600; display: inline-flex; align-items: center; gap: 4px;">
+              🏁 Landed: {{ j.landing_page or '/' }}
+            </span>
             <span style="font-size: 11px; color: #94a3b8;">via {{ j.traffic_source }}</span>
             {% if j.country %}<span style="font-size: 11px;">🌍 {{ j.country }}</span>{% endif %}
             {% if j.device_type %}<span style="font-size: 11px;">📱 {{ j.device_type }}</span>{% endif %}

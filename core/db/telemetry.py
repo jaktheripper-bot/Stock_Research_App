@@ -28,6 +28,53 @@ def is_synthetic_test_event(
     return False
 
 
+def classify_page_category(path: str) -> tuple[str, str]:
+    """
+    Returns (category_name, badge_emoji) for a platform page path.
+    """
+    clean_p = (path or "").strip()
+    if not clean_p or clean_p == "/":
+        return "Homepage / Terminal", "🏠"
+    if clean_p.startswith("/dossier/"):
+        tick = clean_p.split("/")[2] if len(clean_p.split("/")) > 2 else ""
+        return f"Equity Dossier ({tick})" if tick else "Equity Research Dossier", "📈"
+    if clean_p == "/dossier":
+        return "Equity Dossier Index", "📈"
+    if clean_p == "/funds":
+        return "Mutual Fund Directory", "🏦"
+    if clean_p.startswith("/funds/"):
+        return "Mutual Fund Forensic Dossier", "🏦"
+    if clean_p == "/debt":
+        return "Corporate Debt Directory", "📜"
+    if clean_p.startswith("/debt/"):
+        return "Corporate Debt Dossier", "📜"
+    if clean_p.startswith("/pricing"):
+        return "Pricing & Subscriptions", "💳"
+    if clean_p.startswith("/compare"):
+        return "Peer Head-to-Head Compare", "⚖️"
+    if clean_p.startswith("/discovery"):
+        return "Alpha Discovery Radar", "🧭"
+    if clean_p.startswith("/opportunities"):
+        return "Multi-Asset Terminal", "🎯"
+    if clean_p.startswith("/reits"):
+        return "REITs & InvITs Surveillance", "🏢"
+    if clean_p.startswith("/sovereign") or "curve" in clean_p:
+        return "Sovereign Yield Curve", "🏛️"
+    if clean_p.startswith("/safety-radar"):
+        return "Retail Safety Radar", "🛡️"
+    if clean_p.startswith("/calculator") or clean_p.startswith("/tax"):
+        return "Advance Tax Calculator", "🧮"
+    if clean_p.startswith("/etf"):
+        return "ETF Matrix & Benchmarks", "📊"
+    if clean_p.startswith("/admin"):
+        return "Executive Admin Console", "🔐"
+    if any(clean_p.startswith(x) for x in ["/terms", "/privacy", "/refund", "/disclaimer"]):
+        return "Legal & Policies", "📑"
+    if clean_p.startswith("/contact") or clean_p.startswith("/support"):
+        return "Investor Support Grievances", "📩"
+    return "Platform Page", "🌐"
+
+
 def record_usage_event(
     event_type: str,
     ticker: str = "",
@@ -43,7 +90,8 @@ def record_usage_event(
     os: str = None,
     user_id: str = None,
     user_email: str = None,
-    is_test_override: bool = False
+    is_test_override: bool = False,
+    landing_page: str = None
 ):
     """
     Records a telemetry event for backend site usage measurement.
@@ -64,44 +112,77 @@ def record_usage_event(
         cursor = conn.cursor()
         placeholder = get_placeholder()
         clean_t = clean_ticker(ticker) if ticker else ""
-        details_json = json.dumps(details or {})
+
+        details_dict = dict(details or {})
+        resolved_lp = landing_page or details_dict.get("landing_page") or details_dict.get("path") or details_dict.get("page") or ""
+        if not resolved_lp and ticker and ticker != "APP":
+            resolved_lp = f"/dossier/{clean_t}"
+        if resolved_lp:
+            if not resolved_lp.startswith("/"):
+                resolved_lp = "/" + resolved_lp
+            if len(resolved_lp) > 1 and resolved_lp.endswith("/"):
+                resolved_lp = resolved_lp.rstrip("/")
+        else:
+            resolved_lp = "/"
+        details_dict["landing_page"] = resolved_lp
+        details_json = json.dumps(details_dict)
+
         try:
+            # 1. Primary insert including landing_page column
             query = f'''
                 INSERT INTO site_usage_events (
                     event_type, ticker, latency_ms, cost_saved_usd, details,
                     session_id, traffic_source, referrer, country, device_type, browser, os,
-                    user_id, user_email
+                    user_id, user_email, landing_page
                 )
                 VALUES ({placeholder}, {placeholder}, {placeholder}, {placeholder}, {placeholder},
                         {placeholder}, {placeholder}, {placeholder}, {placeholder}, {placeholder}, {placeholder}, {placeholder},
-                        {placeholder}, {placeholder})
+                        {placeholder}, {placeholder}, {placeholder})
             '''
             cursor.execute(query, (
                 event_type, clean_t, latency_ms, cost_saved_usd, details_json,
                 session_id, traffic_source, referrer, country, device_type, browser, os,
-                user_id, user_email
+                user_id, user_email, resolved_lp
             ))
         except Exception:
             try:
-                # Fallback for earlier schema if user columns not yet committed
-                query_fallback_session = f'''
+                # Fallback without landing_page column
+                query_fallback_user = f'''
                     INSERT INTO site_usage_events (
                         event_type, ticker, latency_ms, cost_saved_usd, details,
-                        session_id, traffic_source, referrer, country, device_type, browser, os
+                        session_id, traffic_source, referrer, country, device_type, browser, os,
+                        user_id, user_email
                     )
                     VALUES ({placeholder}, {placeholder}, {placeholder}, {placeholder}, {placeholder},
-                            {placeholder}, {placeholder}, {placeholder}, {placeholder}, {placeholder}, {placeholder}, {placeholder})
+                            {placeholder}, {placeholder}, {placeholder}, {placeholder}, {placeholder}, {placeholder}, {placeholder},
+                            {placeholder}, {placeholder})
                 '''
-                cursor.execute(query_fallback_session, (
+                cursor.execute(query_fallback_user, (
                     event_type, clean_t, latency_ms, cost_saved_usd, details_json,
-                    session_id, traffic_source, referrer, country, device_type, browser, os
+                    session_id, traffic_source, referrer, country, device_type, browser, os,
+                    user_id, user_email
                 ))
             except Exception:
-                query_fallback = f'''
-                    INSERT INTO site_usage_events (event_type, ticker, latency_ms, cost_saved_usd, details)
-                    VALUES ({placeholder}, {placeholder}, {placeholder}, {placeholder}, {placeholder})
-                '''
-                cursor.execute(query_fallback, (event_type, clean_t, latency_ms, cost_saved_usd, details_json))
+                try:
+                    # Fallback for earlier schema if user columns not yet committed
+                    query_fallback_session = f'''
+                        INSERT INTO site_usage_events (
+                            event_type, ticker, latency_ms, cost_saved_usd, details,
+                            session_id, traffic_source, referrer, country, device_type, browser, os
+                        )
+                        VALUES ({placeholder}, {placeholder}, {placeholder}, {placeholder}, {placeholder},
+                                {placeholder}, {placeholder}, {placeholder}, {placeholder}, {placeholder}, {placeholder}, {placeholder})
+                    '''
+                    cursor.execute(query_fallback_session, (
+                        event_type, clean_t, latency_ms, cost_saved_usd, details_json,
+                        session_id, traffic_source, referrer, country, device_type, browser, os
+                    ))
+                except Exception:
+                    query_fallback = f'''
+                        INSERT INTO site_usage_events (event_type, ticker, latency_ms, cost_saved_usd, details)
+                        VALUES ({placeholder}, {placeholder}, {placeholder}, {placeholder}, {placeholder})
+                    '''
+                    cursor.execute(query_fallback, (event_type, clean_t, latency_ms, cost_saved_usd, details_json))
         conn.commit()
     except Exception as e:
         logger.debug(f"Telemetry recording notice: {e}")
@@ -167,6 +248,8 @@ def get_site_usage_summary(days: int = None, start_date = None, end_date = None,
         "top_searched_tickers": [],
         "traffic_sources": [],
         "top_referrers": [],
+        "top_landing_pages": [],
+        "top_visited_pages": [],
         "geographic_distribution": [],
         "device_breakdown": [],
         "browser_breakdown": [],
@@ -266,6 +349,96 @@ def get_site_usage_summary(days: int = None, start_date = None, end_date = None,
             summary["top_referrers"] = [{"referrer": row[0], "count": int(row[1])} for row in cursor.fetchall()]
         except Exception:
             summary["top_referrers"] = []
+
+        # 5b. Top Landing Pages (Entry Points) & Visited Routes
+        try:
+            try:
+                cursor.execute(f'''
+                    SELECT id, session_id, COALESCE(landing_page, ''), details, ticker, event_type, timestamp
+                    FROM site_usage_events
+                    WHERE {time_filter}
+                    ORDER BY timestamp ASC
+                ''')
+                all_events = cursor.fetchall()
+            except Exception:
+                cursor.execute(f'''
+                    SELECT id, session_id, '', details, ticker, event_type, timestamp
+                    FROM site_usage_events
+                    WHERE {time_filter}
+                    ORDER BY timestamp ASC
+                ''')
+                all_events = cursor.fetchall()
+
+            session_landing_map = {}
+            page_views_map = {}
+
+            for ev_row in all_events:
+                eid, sess_id, lp_col, det_raw, ev_tick, ev_type, _ = ev_row
+                effective_sess = str(sess_id).strip() if sess_id and str(sess_id).strip() else f"anon_{eid}"
+
+                p = str(lp_col).strip() if lp_col else ""
+                if not p and det_raw:
+                    try:
+                        d = json.loads(det_raw) if isinstance(det_raw, str) else det_raw
+                        p = d.get("landing_page") or d.get("path") or d.get("page") or ""
+                        if not p and d.get("landing_url"):
+                            from urllib.parse import urlparse
+                            p = urlparse(d["landing_url"]).path
+                    except Exception:
+                        pass
+                if not p and ev_tick and str(ev_tick).upper() != "APP":
+                    p = f"/dossier/{clean_ticker(ev_tick)}"
+                if not p:
+                    if "COMPARE" in (ev_type or ""): p = "/compare"
+                    elif "TICKET" in (ev_type or ""): p = "/contact"
+                    elif "PDF" in (ev_type or ""): p = f"/dossier/{clean_ticker(ev_tick)}" if ev_tick else "/dossier"
+                    else: p = "/"
+
+                if not p.startswith("/"):
+                    p = "/" + p
+                if len(p) > 1 and p.endswith("/"):
+                    p = p.rstrip("/")
+
+                if effective_sess not in session_landing_map:
+                    session_landing_map[effective_sess] = p
+
+                if p not in page_views_map:
+                    page_views_map[p] = {"views": 0, "sessions": set()}
+                page_views_map[p]["views"] += 1
+                page_views_map[p]["sessions"].add(effective_sess)
+
+            landing_counts = {}
+            for s_id, l_path in session_landing_map.items():
+                landing_counts[l_path] = landing_counts.get(l_path, 0) + 1
+
+            total_landing_sessions = max(1, sum(landing_counts.values()))
+            summary["top_landing_pages"] = []
+            for path_key, s_count in sorted(landing_counts.items(), key=lambda x: x[1], reverse=True)[:15]:
+                cat_name, cat_icon = classify_page_category(path_key)
+                summary["top_landing_pages"].append({
+                    "path": path_key,
+                    "category": cat_name,
+                    "icon": cat_icon,
+                    "sessions": s_count,
+                    "percentage": round((s_count / total_landing_sessions) * 100.0, 1)
+                })
+
+            total_all_views = max(1, sum(v["views"] for v in page_views_map.values()))
+            summary["top_visited_pages"] = []
+            for path_key, v_data in sorted(page_views_map.items(), key=lambda x: x[1]["views"], reverse=True)[:15]:
+                cat_name, cat_icon = classify_page_category(path_key)
+                summary["top_visited_pages"].append({
+                    "path": path_key,
+                    "category": cat_name,
+                    "icon": cat_icon,
+                    "views": v_data["views"],
+                    "unique_sessions": len(v_data["sessions"]),
+                    "percentage": round((v_data["views"] / total_all_views) * 100.0, 1)
+                })
+        except Exception as lp_err:
+            logger.warning(f"Error computing top landing pages: {lp_err}")
+            summary["top_landing_pages"] = []
+            summary["top_visited_pages"] = []
 
         # 6. Geographic Distribution (Countries)
         try:
@@ -394,15 +567,53 @@ def get_session_journeys(days: int = None, start_date = None, end_date = None, l
         placeholder = get_placeholder()
         for s in sessions:
             sess_id, start_ts, source, ref, country, device, browser, count = s
-            cursor.execute(f'''
-                SELECT event_type, ticker, timestamp
-                FROM site_usage_events
-                WHERE session_id = {placeholder}
-                ORDER BY timestamp ASC
-            ''', (sess_id,))
+            try:
+                cursor.execute(f'''
+                    SELECT event_type, ticker, timestamp, COALESCE(landing_page, ''), details
+                    FROM site_usage_events
+                    WHERE session_id = {placeholder}
+                    ORDER BY timestamp ASC
+                ''', (sess_id,))
+                sess_events = cursor.fetchall()
+            except Exception:
+                cursor.execute(f'''
+                    SELECT event_type, ticker, timestamp, '', details
+                    FROM site_usage_events
+                    WHERE session_id = {placeholder}
+                    ORDER BY timestamp ASC
+                ''', (sess_id,))
+                sess_events = cursor.fetchall()
+
             events = []
-            for ev in cursor.fetchall():
-                ev_type, ev_ticker, ev_ts = ev
+            session_landing_page = "/"
+            first_event = True
+            for ev in sess_events:
+                ev_type, ev_ticker, ev_ts, ev_lp, ev_det = ev
+                if first_event:
+                    first_event = False
+                    p = str(ev_lp).strip() if ev_lp else ""
+                    if not p and ev_det:
+                        try:
+                            d = json.loads(ev_det) if isinstance(ev_det, str) else ev_det
+                            p = d.get("landing_page") or d.get("path") or d.get("page") or ""
+                            if not p and d.get("landing_url"):
+                                from urllib.parse import urlparse
+                                p = urlparse(d["landing_url"]).path
+                        except Exception:
+                            pass
+                    if not p and ev_ticker and str(ev_ticker).upper() != "APP":
+                        p = f"/dossier/{clean_ticker(ev_ticker)}"
+                    if not p:
+                        if "COMPARE" in (ev_type or ""): p = "/compare"
+                        elif "TICKET" in (ev_type or ""): p = "/contact"
+                        elif "PDF" in (ev_type or ""): p = f"/dossier/{clean_ticker(ev_ticker)}" if ev_ticker else "/dossier"
+                        else: p = "/"
+                    if not p.startswith("/"):
+                        p = "/" + p
+                    if len(p) > 1 and p.endswith("/"):
+                        p = p.rstrip("/")
+                    session_landing_page = p
+
                 events.append({
                     "event_type": ev_type,
                     "ticker": ev_ticker or "",
@@ -417,6 +628,7 @@ def get_session_journeys(days: int = None, start_date = None, end_date = None, l
                 "device_type": device or "Desktop",
                 "browser": browser or "Unknown",
                 "action_count": count,
+                "landing_page": session_landing_page,
                 "events": events
             })
     except Exception as e:

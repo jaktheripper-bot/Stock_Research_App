@@ -1783,6 +1783,7 @@ class TelemetryEventRequest(BaseModel):
     session_id: Optional[str] = None
     referrer: Optional[str] = None
     landing_url: Optional[str] = None
+    landing_page: Optional[str] = None
     utm_source: Optional[str] = None
     utm_medium: Optional[str] = None
     utm_campaign: Optional[str] = None
@@ -1828,10 +1829,32 @@ async def api_record_telemetry_event(payload: TelemetryEventRequest, request: Re
 
     sess_id = payload.session_id or f"sess_{hashlib.md5((client_ip + user_agent).encode()).hexdigest()[:10]}"
 
+    # 5. Resolve landing page and visited path
+    evt_details = dict(payload.details or {})
+    resolved_lp = payload.landing_page or evt_details.get("landing_page") or ""
+    if not resolved_lp and payload.landing_url:
+        try:
+            from urllib.parse import urlparse
+            p = urlparse(payload.landing_url).path
+            if p:
+                resolved_lp = p
+        except Exception:
+            pass
+    if not resolved_lp:
+        resolved_lp = evt_details.get("path") or evt_details.get("page") or "/"
+    if not resolved_lp.startswith("/"):
+        resolved_lp = "/" + resolved_lp
+    if len(resolved_lp) > 1 and resolved_lp.endswith("/"):
+        resolved_lp = resolved_lp.rstrip("/")
+
+    evt_details["landing_page"] = resolved_lp
+    if payload.landing_url and "landing_url" not in evt_details:
+        evt_details["landing_url"] = payload.landing_url
+
     record_usage_event(
         event_type=payload.event_type,
         ticker=payload.ticker or "",
-        details=payload.details or {},
+        details=evt_details,
         session_id=sess_id,
         traffic_source=traffic_source,
         referrer=clean_ref,
@@ -1840,7 +1863,8 @@ async def api_record_telemetry_event(payload: TelemetryEventRequest, request: Re
         browser=client_env.get("browser", "Chrome"),
         os=client_env.get("os", "macOS"),
         user_id=payload.user_id,
-        user_email=payload.user_email
+        user_email=payload.user_email,
+        landing_page=resolved_lp
     )
     return json_response_with_cache({"status": "ok"})
 

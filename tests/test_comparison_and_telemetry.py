@@ -73,6 +73,8 @@ class TestComparisonAndTelemetry(unittest.TestCase):
         self.assertIsNotNone(summary_days)
         self.assertIn("total_queries", summary_days)
         self.assertIn("traffic_sources", summary_days)
+        self.assertIn("top_landing_pages", summary_days)
+        self.assertIn("top_visited_pages", summary_days)
         self.assertIn("geographic_distribution", summary_days)
 
         # 2. Summary by custom date range
@@ -80,10 +82,13 @@ class TestComparisonAndTelemetry(unittest.TestCase):
         start = today - timedelta(days=2)
         summary_range = get_site_usage_summary(start_date=start, end_date=today)
         self.assertIsNotNone(summary_range)
+        self.assertIn("top_landing_pages", summary_range)
 
         # 3. Session Journeys
         journeys = get_session_journeys(start_date=start, end_date=today, limit=10)
         self.assertIsInstance(journeys, list)
+        if len(journeys) > 0:
+            self.assertIn("landing_page", journeys[0])
 
         # Cleanup test records
         conn = get_db_connection()
@@ -222,5 +227,50 @@ class TestComparisonAndTelemetry(unittest.TestCase):
             cursor.close()
             conn.close()
 
+    def test_landing_pages_telemetry_and_classification(self):
+        from core.db.telemetry import classify_page_category
+
+        # 1. Test route classification
+        self.assertEqual(classify_page_category("/")[0], "Homepage / Terminal")
+        self.assertEqual(classify_page_category("/dossier/INFY")[0], "Equity Dossier (INFY)")
+        self.assertEqual(classify_page_category("/funds")[0], "Mutual Fund Directory")
+        self.assertEqual(classify_page_category("/funds/118989")[0], "Mutual Fund Forensic Dossier")
+        self.assertEqual(classify_page_category("/debt")[0], "Corporate Debt Directory")
+        self.assertEqual(classify_page_category("/pricing")[0], "Pricing & Subscriptions")
+        self.assertEqual(classify_page_category("/compare")[0], "Peer Head-to-Head Compare")
+        self.assertEqual(classify_page_category("/opportunities")[0], "Multi-Asset Terminal")
+
+        # 2. Test recording landing page event
+        sess_id = "sess_landing_test_999"
+        record_usage_event(
+            event_type="PAGE_VIEW",
+            ticker="TCS",
+            session_id=sess_id,
+            landing_page="/funds",
+            traffic_source="Google Search",
+            is_test_override=True
+        )
+
+        try:
+            summary = get_site_usage_summary(days=1, exclude_tests=False)
+            self.assertIn("top_landing_pages", summary)
+            self.assertIn("top_visited_pages", summary)
+            landing_paths = [lp["path"] for lp in summary["top_landing_pages"]]
+            self.assertIn("/funds", landing_paths)
+
+            # Check that journeys capture landing_page
+            journeys = get_session_journeys(days=1, limit=50, exclude_tests=False)
+            test_journey = next((j for j in journeys if j["session_id"] == sess_id), None)
+            self.assertIsNotNone(test_journey)
+            self.assertEqual(test_journey["landing_page"], "/funds")
+        finally:
+            conn = get_db_connection()
+            c = conn.cursor()
+            c.execute("DELETE FROM site_usage_events WHERE session_id = ?", (sess_id,))
+            conn.commit()
+            c.close()
+            conn.close()
+
 if __name__ == "__main__":
     unittest.main()
+

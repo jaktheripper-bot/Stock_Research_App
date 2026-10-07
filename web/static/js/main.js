@@ -798,6 +798,15 @@ window.trackUserEvent = function(eventType, ticker, details) {
   try {
     const user = getStoredUser();
     const acq = getAcquisitionData();
+    const currentPath = window.location.pathname;
+    const landingPath = acq.landing_path || currentPath;
+    const mergedDetails = Object.assign({
+      path: currentPath,
+      landing_page: landingPath,
+      landing_url: acq.landing_url || window.location.href,
+      title: document.title || ''
+    }, details || {});
+
     const payload = {
       event_type: eventType,
       ticker: ticker || '',
@@ -806,11 +815,12 @@ window.trackUserEvent = function(eventType, ticker, details) {
       session_id: getTelemetrySessionId(),
       referrer: acq.referrer || (document.referrer && !document.referrer.startsWith(window.location.origin) ? document.referrer : ''),
       landing_url: acq.landing_url || window.location.href,
+      landing_page: landingPath,
       utm_source: acq.utm_source || '',
       utm_medium: acq.utm_medium || '',
       utm_campaign: acq.utm_campaign || '',
       ref: acq.ref || '',
-      details: details || {}
+      details: mergedDetails
     };
     fetch('/api/telemetry/event', {
       method: 'POST',
@@ -822,21 +832,41 @@ window.trackUserEvent = function(eventType, ticker, details) {
 
 // Track initial page view with logged-in user attribution and source retention
 (function initUserTelemetry() {
-  getAcquisitionData();
+  const acq = getAcquisitionData();
   const path = window.location.pathname;
   let pageEvent = 'page_view';
   let currentTicker = '';
   if (path.startsWith('/dossier/')) {
     pageEvent = 'dossier_view';
     currentTicker = path.split('/')[2];
+  } else if (path.startsWith('/funds/')) {
+    pageEvent = 'fund_view';
+  } else if (path.startsWith('/debt/')) {
+    pageEvent = 'debt_view';
+  } else if (path === '/funds') {
+    pageEvent = 'funds_directory_view';
+  } else if (path === '/debt') {
+    pageEvent = 'debt_directory_view';
   } else if (path === '/compare') {
     pageEvent = 'compare_view';
   } else if (path === '/discovery') {
     pageEvent = 'discovery_view';
   } else if (path === '/pricing') {
     pageEvent = 'pricing_view';
+  } else if (path === '/opportunities') {
+    pageEvent = 'opportunities_view';
+  } else if (path === '/reits') {
+    pageEvent = 'reits_view';
+  } else if (path === '/sovereign' || path === '/sovereign-curve') {
+    pageEvent = 'sovereign_view';
+  } else if (path === '/safety-radar') {
+    pageEvent = 'safety_radar_view';
   }
-  setTimeout(() => window.trackUserEvent(pageEvent, currentTicker, { path }), 300);
+  setTimeout(() => window.trackUserEvent(pageEvent, currentTicker, {
+    path: path,
+    landing_page: acq.landing_path || path,
+    title: document.title || ''
+  }), 300);
 })();
 
 /**
