@@ -22,7 +22,13 @@
           </div>
         </div>
 
-        <div style="display: flex; gap: 10px;">
+        <div style="display: flex; gap: 10px; flex-wrap: wrap;">
+          <button onclick="openCopilot('{{ ticker }}')" class="btn btn-sm" style="background: rgba(14, 165, 233, 0.15); color: #38bdf8; border: 1px solid rgba(14, 165, 233, 0.4); font-weight: 700;">
+            🛡️ Forensic Copilot
+          </button>
+          <button id="btnOpenThesisTop" onclick="openThesisModal()" class="btn btn-secondary btn-sm" style="font-weight: 700; border-color: rgba(245, 158, 11, 0.4); color: #fbbf24; background: rgba(245, 158, 11, 0.1);">
+            ⚖️ Thesis Checkpoint
+          </button>
           <a href="/api/pdf/{{ ticker }}" class="btn btn-primary btn-sm" download>
             📄 Download Institutional PDF
           </a>
@@ -84,11 +90,11 @@
       </div>
       {% endif %}
 
-      <!-- 7-Pillar Qualitative Posture Strip -->
+      <!-- Qualitative Health Matrix Strip -->
       {% if matrix %}
       <div style="margin-top: 18px; background: rgba(30, 41, 59, 0.35); border: 1px solid var(--border-color); border-radius: var(--radius-sm); padding: 14px 18px;">
         <div style="font-size: 12px; font-weight: 700; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.05em; margin-bottom: 10px;">
-          7-Pillar Qualitative Health Matrix:
+          Qualitative Health Matrix (01–07):
         </div>
         <div style="display: flex; gap: 10px; flex-wrap: wrap;">
           <span class="badge badge-cyan" title="Competitive Moat">Moat: <strong>{{ matrix.Moat|default('Moderate') }}</strong></span>
@@ -138,14 +144,14 @@
       <!-- Value Trap Warning Banner -->
       {% if diff.value_trap_detected %}
       <div style="background: rgba(244, 63, 94, 0.12); border-left: 4px solid var(--accent-rose); border-radius: 6px; padding: 12px 16px; margin-bottom: 16px; font-size: 13.5px; color: #fecdd3;">
-        <strong>⚠️ Value Trap Warning Detected:</strong> Multiple qualitative pillars downgraded while valuation/price expanded. High risk of multiple compression.
+        <strong>⚠️ Value Trap Warning Detected:</strong> Multiple qualitative checks downgraded while valuation/price expanded. High risk of multiple compression.
       </div>
       {% endif %}
 
-      <!-- Pillar Migration Chips -->
+      <!-- Drift Migration Chips -->
       {% if diff.pillar_migrations %}
       <div style="margin-bottom: 16px;">
-        <div style="font-size: 12px; font-weight: 700; color: var(--text-muted); margin-bottom: 8px;">Pillar Migrations Detected:</div>
+        <div style="font-size: 12px; font-weight: 700; color: var(--text-muted); margin-bottom: 8px;">Matrix Migrations Detected:</div>
         <div style="display: flex; gap: 8px; flex-wrap: wrap;">
           {% for m in diff.pillar_migrations %}
           <span class="badge" style="background: rgba(30, 41, 59, 0.7); border: 1px solid var(--border-color); font-size: 12px; padding: 6px 12px;">
@@ -159,7 +165,7 @@
       </div>
       {% else %}
       <div style="font-size: 13px; color: var(--text-secondary); margin-bottom: 12px;">
-        ✅ <strong>Zero Qualitative Pillar Drift:</strong> Core qualitative health matrix posture remained stable between snapshots.
+        ✅ <strong>Zero Thesis Drift:</strong> Core qualitative health matrix posture remained stable between snapshots.
       </div>
       {% endif %}
     </div>
@@ -182,7 +188,10 @@
             <span>🎯</span> Thesis Integrity Checkpoint & 60-Day PEAD Drift Band
           </h3>
         </div>
-        <div style="display: flex; align-items: center; gap: 8px;">
+        <div style="display: flex; align-items: center; gap: 8px; flex-wrap: wrap;">
+          <button id="btnOpenThesisPead" class="btn btn-sm" onclick="openThesisModal()" style="font-size: 11.5px; font-weight: 700; padding: 4px 10px; background: rgba(245, 158, 11, 0.15); border: 1px solid rgba(245, 158, 11, 0.4); color: #fbbf24; cursor: pointer; border-radius: 6px; display: inline-flex; align-items: center; gap: 5px;">
+            <span>⚖️</span> "Would You Buy Today?" Checkpoint
+          </button>
           <span class="badge" style="{% if pead_data.status == 'bullish' %}background: rgba(16, 185, 129, 0.15); color: #34d399; border: 1px solid rgba(16, 185, 129, 0.3);{% else %}background: rgba(244, 63, 94, 0.15); color: #fb7185; border: 1px solid rgba(244, 63, 94, 0.3);{% endif %} font-weight: 700; font-size: 12px; padding: 5px 12px;">
             {{ pead_data.label }} ({{ pead_data.drift_direction }})
           </span>
@@ -251,21 +260,21 @@
     {% endif %}
 
     <!-- 7-Pillar Report Content -->
-    <!-- Pillar Accordion Toolbar Controls -->
+    <!-- Section Accordion Toolbar Controls -->
     <div class="pillar-toolbar">
       <div style="display: flex; align-items: center; gap: 10px;">
         <span style="font-size: 18px;">📑</span>
         <div>
-          <strong style="font-size: 14px; color: var(--text-primary); display: block;">7-Pillar Qualitative Research Analysis</strong>
+          <strong style="font-size: 14px; color: var(--text-primary); display: block;">Institutional Forensic Research (01–07)</strong>
           <span style="font-size: 11px; color: var(--text-muted);">Every metric and finding grounded in verified BSE regulatory filings</span>
         </div>
       </div>
       <div class="pillar-toolbar-btns">
         <button id="btnExpandAllPillars" class="pillar-toolbar-btn active" onclick="toggleAllPillars(true)">
-          ⊞ Expand All
+          ⊞ Expand All (01–07)
         </button>
         <button id="btnCollapseAllPillars" class="pillar-toolbar-btn" onclick="toggleAllPillars(false)">
-          ⊟ Collapse All (Mobile View)
+          ⊟ Collapse All
         </button>
       </div>
     </div>
@@ -374,8 +383,98 @@
         <span>🛡️</span> Mandatory SEBI Safe-Harbor Disclosure
       </strong>
       {{ MANDATORY_SEBI_DISCLAIMER }}
+      <div style="margin-top: 10px; font-size: 12px; color: var(--text-muted); border-top: 1px solid rgba(255, 255, 255, 0.08); padding-top: 8px;">
+        <strong>Data Grounding & Provenance:</strong> Valuation metrics, financial statements, and disclosure filings are sourced strictly from official exchange disclosures (BSE/NSE announcements), statutory AMFI feeds, and verified broker gateway APIs. Zero synthetic metrics.
+      </div>
     </div>
   </article>
+</div>
+
+<!-- Interactive Thesis Violation & Sunk Cost Intervention Modal -->
+<div id="thesisModalBackdrop" style="display: none; position: fixed; inset: 0; background: rgba(15, 23, 42, 0.85); backdrop-filter: blur(6px); z-index: 9999; align-items: center; justify-content: center; padding: 20px;">
+  <div id="thesisModal" style="background: #0f172a; border: 1px solid rgba(245, 158, 11, 0.4); border-radius: 12px; width: 100%; max-width: 560px; box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.7); overflow: hidden;">
+    <!-- Modal Header -->
+    <div style="background: rgba(30, 41, 59, 0.8); border-bottom: 1px solid rgba(245, 158, 11, 0.25); padding: 18px 24px; display: flex; align-items: center; justify-content: space-between;">
+      <div style="display: flex; align-items: center; gap: 10px;">
+        <span style="font-size: 22px;">⚖️</span>
+        <div>
+          <h3 style="margin: 0; font-size: 16.5px; font-weight: 800; color: #f8fafc;">
+            Thesis Integrity Checkpoint
+          </h3>
+          <span style="font-size: 11.5px; color: #fbbf24; font-weight: 600;">
+            De-Biasing Engine: Intercept Sunk Cost Fallacy & Disposition Effect
+          </span>
+        </div>
+      </div>
+      <button onclick="closeThesisModal()" style="background: none; border: none; color: #94a3b8; font-size: 20px; cursor: pointer; padding: 4px; line-height: 1;">✕</button>
+    </div>
+
+    <!-- Modal Body -->
+    <div style="padding: 24px;">
+      <div style="background: rgba(245, 158, 11, 0.08); border-left: 3px solid #f59e0b; padding: 12px 16px; border-radius: 4px; margin-bottom: 18px;">
+        <strong style="color: #f8fafc; font-size: 13.5px; display: block; margin-bottom: 4px;">
+          The Core Behavioral Question:
+        </strong>
+        <p style="margin: 0; font-size: 13px; color: #cbd5e1; line-height: 1.5;">
+          <em>"If you held <strong>zero shares</strong> of <strong>{{ ticker }}</strong> today, would you initiate this position at <strong class="tnum" style="color: #38bdf8;">₹{{ current_price|default('N/A') }}</strong> based strictly on current fundamentals and filings?"</em>
+        </p>
+      </div>
+
+      <form id="thesisCheckpointForm" onsubmit="handleThesisCheckpointSubmit(event, '{{ ticker }}')">
+        <input type="hidden" id="thesisCurrentPrice" value="{{ current_price|default(0) }}" />
+
+        <div style="margin-bottom: 16px;">
+          <label style="display: block; font-size: 12px; font-weight: 700; color: #94a3b8; margin-bottom: 8px; text-transform: uppercase; letter-spacing: 0.05em;">
+            Select Thesis Decision
+          </label>
+          <div style="display: flex; flex-direction: column; gap: 8px;">
+            <label style="display: flex; align-items: flex-start; gap: 10px; background: rgba(30, 41, 59, 0.5); padding: 10px 14px; border-radius: 8px; border: 1px solid var(--border-color); cursor: pointer;">
+              <input type="radio" name="thesisDecision" value="WOULD_BUY_TODAY" checked style="margin-top: 3px;" />
+              <div>
+                <strong style="color: #34d399; font-size: 13px; display: block;">✅ Yes — Thesis Intact</strong>
+                <span style="font-size: 12px; color: #94a3b8;">Fundamentals, moat, and governance remain sound; valuation reflects margin of safety.</span>
+              </div>
+            </label>
+
+            <label style="display: flex; align-items: flex-start; gap: 10px; background: rgba(30, 41, 59, 0.5); padding: 10px 14px; border-radius: 8px; border: 1px solid var(--border-color); cursor: pointer;">
+              <input type="radio" name="thesisDecision" value="THESIS_BREACHED" style="margin-top: 3px;" />
+              <div>
+                <strong style="color: #fb7185; font-size: 13px; display: block;">🚨 No — Thesis Breached (Capital Preservation)</strong>
+                <span style="font-size: 12px; color: #94a3b8;">Fundamental deterioration, governance red flag, or moat degradation requires reallocating capital.</span>
+              </div>
+            </label>
+
+            <label style="display: flex; align-items: flex-start; gap: 10px; background: rgba(30, 41, 59, 0.5); padding: 10px 14px; border-radius: 8px; border: 1px solid var(--border-color); cursor: pointer;">
+              <input type="radio" name="thesisDecision" value="UNDER_REVIEW" style="margin-top: 3px;" />
+              <div>
+                <strong style="color: #fbbf24; font-size: 13px; display: block;">⚠️ Caution — Under Review (Hold Gated)</strong>
+                <span style="font-size: 12px; color: #94a3b8;">Material regulatory or sector headwind; awaiting next quarterly disclosure before committing.</span>
+              </div>
+            </label>
+          </div>
+        </div>
+
+        <div style="margin-bottom: 20px;">
+          <label style="display: block; font-size: 12px; font-weight: 700; color: #94a3b8; margin-bottom: 6px; text-transform: uppercase; letter-spacing: 0.05em;">
+            Analyst Objective Rationale (Mandatory)
+          </label>
+          <textarea id="thesisRationale" required rows="3" placeholder="Articulate objective reasons devoid of purchase price anchoring (e.g. ROIC resilience, auditor report notes, capital expenditure cycle)..." style="width: 100%; padding: 10px 14px; background: rgba(30, 41, 59, 0.8); border: 1px solid var(--border-color); border-radius: 6px; color: var(--text-primary); font-size: 13px; box-sizing: border-box; line-height: 1.5;"></textarea>
+        </div>
+
+        <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 10px;">
+          <span id="thesisStatus" style="font-size: 12px; font-weight: 600;"></span>
+          <div style="display: flex; gap: 10px;">
+            <button type="button" onclick="closeThesisModal()" class="btn btn-secondary btn-sm" style="padding: 7px 16px;">
+              Cancel
+            </button>
+            <button type="submit" id="btnCommitThesis" class="btn btn-primary btn-sm" style="font-weight: 700; padding: 7px 18px; background: #f59e0b; border-color: #f59e0b; color: #0f172a;">
+              🔒 Commit to Ledger
+            </button>
+          </div>
+        </div>
+      </form>
+    </div>
+  </div>
 </div>
 
 {% if chart_data and chart_data.dates %}
@@ -476,4 +575,6 @@ document.addEventListener('DOMContentLoaded', function() {
 });
 </script>
 {% endif %}
+{% include "partials/copilot_modal.html" %}
+<script src="/static/js/copilot.js"></script>
 {% endblock %}

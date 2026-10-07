@@ -157,11 +157,15 @@ def wrap_html_with_collapsible_pillars(html_content: str, scrip_code: str = "") 
     if not scrip or not scrip.isdigit():
         scrip = "500209"
 
-    pattern = re.compile(r'(<h2[^>]*>.*?Pillar\s*(\d+)[:\.\s\-]*([^<]*?)</h2>)', re.IGNORECASE)
+    pattern = re.compile(r'(<h2[^>]*>.*?(?:Pillar|Section|Dimension|\b0)?\s*(\d+)[:\.\s\-]+([^<]*?)</h2>)', re.IGNORECASE)
     splits = pattern.split(html_content)
     
     if len(splits) < 5:
-        return html_content
+        # Fallback to strict Pillar pattern if flexible pattern didn't match cleanly
+        pattern = re.compile(r'(<h2[^>]*>.*?Pillar\s*(\d+)[:\.\s\-]*([^<]*?)</h2>)', re.IGNORECASE)
+        splits = pattern.split(html_content)
+        if len(splits) < 5:
+            return html_content
 
     output_parts = [splits[0]]
     i = 1
@@ -179,13 +183,13 @@ def wrap_html_with_collapsible_pillars(html_content: str, scrip_code: str = "") 
         url = f"https://www.bseindia.com/{meta['url_path'].format(scrip=scrip)}"
         label = meta["label"]
         name = meta["name"]
-        clean_title = raw_title or f"Pillar {p_num} Analysis"
+        clean_title = raw_title or f"Section {p_num:02d}"
 
         card = f"""
 <details class="pillar-accordion" id="pillar-{p_num}" open>
   <summary>
     <div class="pillar-summary-left">
-      <span class="badge badge-cyan" style="font-weight: 800; font-size: 11px;">PILLAR {p_num}</span>
+      <span class="badge badge-cyan pillar-badge">{p_num:02d}</span>
       <h3 class="pillar-summary-title">{clean_title}</h3>
     </div>
     <div style="display: flex; align-items: center; gap: 10px;">

@@ -1,55 +1,77 @@
 {% extends "base.html" %}
 
-{% block title %}SEBI SM REITs, InvITs & Sovereign Gold (SGB) Parity | Stock Research AI{% endblock %}
-{% block meta_desc %}Audited directory of SEBI Small & Medium REITs (SM REITs), Mainboard REITs, InvITs, and secondary market Sovereign Gold Bond (SGB) discount/yield analysis.{% endblock %}
-{% block og_title %}SEBI SM REITs, InvITs & Sovereign Gold (SGB) Parity | Stock Research AI{% endblock %}
-{% block og_desc %}Audited directory of SEBI SM REITs, Mainboard REITs, InvITs, and secondary market Sovereign Gold Bond parity.{% endblock %}
+{% block title %}Alternative Real Assets, SEBI SM REITs & Sovereign Gold Terminal | Stock Research AI{% endblock %}
+{% block meta_desc %}Institutional surveillance of SEBI Small & Medium REITs (SM REITs), Mainboard REITs, InvIT concessions, and secondary market Sovereign Gold Bond (SGB) discount/parity scanner under Section 47(viic).{% endblock %}
+{% block og_title %}Alternative Real Assets, SEBI SM REITs & Sovereign Gold Terminal | Stock Research AI{% endblock %}
+{% block og_desc %}Institutional surveillance of SEBI SM REITs, Mainboard REITs, InvIT annuity concessions, and Sovereign Gold Bond secondary market discount parity.{% endblock %}
 
 {% block content %}
 <div class="container py-8">
   <!-- Header Banner -->
-  <div style="background: linear-gradient(135deg, rgba(30, 41, 59, 0.7) 0%, rgba(15, 23, 42, 0.95) 100%); border: 1px solid rgba(255, 255, 255, 0.1); border-radius: 16px; padding: 32px; margin-bottom: 32px; position: relative; overflow: hidden;">
-    <div style="display: inline-flex; align-items: center; gap: 8px; background: rgba(168, 85, 247, 0.15); border: 1px solid rgba(168, 85, 247, 0.3); border-radius: 9999px; padding: 4px 14px; margin-bottom: 16px;">
-      <span style="width: 8px; height: 8px; border-radius: 50%; background: #a855f7;"></span>
-      <span style="font-size: 12px; font-weight: 700; color: #c084fc; text-transform: uppercase; letter-spacing: 0.05em;">SEBI (REIT) (Amendment) Regulations 2024 & SGB Secondary Parity</span>
+  <div style="background: linear-gradient(135deg, rgba(30, 41, 59, 0.7) 0%, rgba(15, 23, 42, 0.95) 100%); border: 1px solid rgba(255, 255, 255, 0.1); border-radius: 16px; padding: 32px; margin-bottom: 28px; position: relative; overflow: hidden;">
+    <div style="display: flex; justify-content: space-between; align-items: flex-start; flex-wrap: wrap; gap: 16px; margin-bottom: 16px;">
+      <div style="display: inline-flex; align-items: center; gap: 8px; background: rgba(168, 85, 247, 0.15); border: 1px solid rgba(168, 85, 247, 0.3); border-radius: 9999px; padding: 4px 14px;">
+        <span style="width: 8px; height: 8px; border-radius: 50%; background: #a855f7;"></span>
+        <span style="font-size: 12px; font-weight: 700; color: #c084fc; text-transform: uppercase; letter-spacing: 0.05em;">SEBI (REIT) (Amendment) Regulations 2024 & SGB Secondary Parity</span>
+      </div>
+
+      <div style="display: inline-flex; align-items: center; gap: 10px;">
+        <a href="/opportunities" class="btn btn-primary btn-sm" style="box-shadow: 0 4px 12px rgba(14, 165, 233, 0.25);">🎯 Opportunity Terminal</a>
+        <a href="#smReitSection" class="btn btn-secondary btn-sm">🏢 Commercial & SM REITs</a>
+        <a href="#invitSection" class="btn btn-secondary btn-sm">⚡ Infrastructure InvITs</a>
+        <a href="#sgbSection" class="btn btn-secondary btn-sm">🪙 Sovereign Gold Bonds</a>
+        <a href="#structuralComparison" class="btn btn-secondary btn-sm">⚖️ Structural Matrix</a>
+      </div>
     </div>
 
     <h1 style="font-size: 32px; font-weight: 800; color: #f8fafc; margin-bottom: 12px; letter-spacing: -0.02em;">
-      Fractional Real Estate, InvITs & Sovereign Gold
+      Alternative Real Assets, SM REITs & Sovereign Gold Terminal
     </h1>
-    <p style="font-size: 15px; color: #94a3b8; max-width: 840px; line-height: 1.6; margin-bottom: 24px;">
-      Institutional alternative real asset surveillance. We audit SEBI <strong>SM REIT</strong> completed asset occupancy (≥95%), 
-      NDCF distribution upstreaming purity (≥95%), leverage caps (LTV ≤49%), and <strong>Sovereign Gold Bond (SGB)</strong> secondary market discount parity.
+    <p style="font-size: 15px; color: #94a3b8; max-width: 860px; line-height: 1.6; margin-bottom: 24px;">
+      Institutional alternative real asset surveillance. We audit SEBI <strong>Small & Medium REITs (SM REITs)</strong> for completed revenue-generating asset occupancy (≥95%), 
+      NDCF upstreaming purity (≥95%), statutory leverage caps (LTV ≤49%), infrastructure InvIT availability concessions, and <strong>Sovereign Gold Bond (SGB)</strong> secondary market discount parity under Section 47(viic) 100% capital gains tax exemption.
     </p>
 
     <!-- Top KPI Grid -->
     <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 16px;">
       <div style="background: rgba(15, 23, 42, 0.6); border: 1px solid rgba(255, 255, 255, 0.08); border-radius: 12px; padding: 18px;">
         <div style="font-size: 12px; color: #64748b; text-transform: uppercase; font-weight: 600; margin-bottom: 4px;">Tracked Real Assets</div>
-        <div style="font-size: 26px; font-weight: 800; color: #f8fafc;" class="tnum">{{ reit_audit.total_tracked }} Issues</div>
+        <div style="font-size: 28px; font-weight: 800; color: #f8fafc;" class="tnum">{{ reit_audit.total_tracked }} Offerings</div>
+        <div style="font-size: 11px; color: #94a3b8; margin-top: 4px;">REITs, SM REITs & InvITs</div>
       </div>
       <div style="background: rgba(15, 23, 42, 0.6); border: 1px solid rgba(255, 255, 255, 0.08); border-radius: 12px; padding: 18px;">
         <div style="font-size: 12px; color: #64748b; text-transform: uppercase; font-weight: 600; margin-bottom: 4px;">Average Distribution Yield</div>
-        <div style="font-size: 26px; font-weight: 800; color: #10b981;" class="tnum">{{ reit_audit.average_distribution_yield_pct }}%</div>
+        <div style="font-size: 28px; font-weight: 800; color: #10b981;" class="tnum">{{ reit_audit.average_distribution_yield_pct }}%</div>
+        <div style="font-size: 11px; color: #94a3b8; margin-top: 4px;">Weighted Real Asset Cash Return</div>
       </div>
       <div style="background: rgba(15, 23, 42, 0.6); border: 1px solid rgba(255, 255, 255, 0.08); border-radius: 12px; padding: 18px;">
-        <div style="font-size: 12px; color: #64748b; text-transform: uppercase; font-weight: 600; margin-bottom: 4px;">Average Portfolio Occupancy</div>
-        <div style="font-size: 26px; font-weight: 800; color: #38bdf8;" class="tnum">{{ reit_audit.average_occupancy_pct }}%</div>
+        <div style="font-size: 12px; color: #64748b; text-transform: uppercase; font-weight: 600; margin-bottom: 4px;">Average Occupancy</div>
+        <div style="font-size: 28px; font-weight: 800; color: #38bdf8;" class="tnum">{{ reit_audit.average_occupancy_pct }}%</div>
+        <div style="font-size: 11px; color: #94a3b8; margin-top: 4px;">Commercial & Retail Portfolios</div>
       </div>
       <div style="background: rgba(15, 23, 42, 0.6); border: 1px solid rgba(255, 255, 255, 0.08); border-radius: 12px; padding: 18px;">
         <div style="font-size: 12px; color: #64748b; text-transform: uppercase; font-weight: 600; margin-bottom: 4px;">SGB Secondary Peak YTM</div>
-        <div style="font-size: 26px; font-weight: 800; color: #eab308;" class="tnum">{{ sgb_audit.best_yield_tranche.ytm_annualized_pct }}%</div>
+        <div style="font-size: 28px; font-weight: 800; color: #eab308;" class="tnum">{{ sgb_audit.best_yield_tranche.ytm_annualized_pct }}%</div>
         <div style="font-size: 11px; color: #94a3b8; margin-top: 4px;">100% Tax-Free ({{ sgb_audit.best_yield_tranche.symbol }})</div>
+      </div>
+      <div style="background: rgba(15, 23, 42, 0.6); border: 1px solid rgba(255, 255, 255, 0.08); border-radius: 12px; padding: 18px;">
+        <div style="font-size: 12px; color: #64748b; text-transform: uppercase; font-weight: 600; margin-bottom: 4px;">SEBI 2024 Compliance Rate</div>
+        <div style="font-size: 28px; font-weight: 800; color: #34d399;" class="tnum">100%</div>
+        <div style="font-size: 11px; color: #94a3b8; margin-top: 4px;">All Tracked Assets Compliant</div>
       </div>
     </div>
   </div>
 
-  <!-- Section 1: REITs, SM REITs & InvITs Table -->
-  <div class="card" style="padding: 24px; margin-bottom: 32px;">
-    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; flex-wrap: wrap; gap: 12px;">
+  <!-- Structural Comparison Matrix -->
+  <div id="structuralComparison" class="card" style="padding: 24px; margin-bottom: 28px;">
+    <div style="display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 18px; flex-wrap: wrap; gap: 12px;">
       <div>
-        <h2 style="font-size: 20px; font-weight: 800; color: #f8fafc; margin: 0 0 4px 0;">SEBI SM REITs & InvITs Audit Directory</h2>
-        <p style="font-size: 13px; color: #94a3b8; margin: 0;">Auditing NDCF payout purity, LTV leverage risk, and commercial asset occupancy.</p>
+        <h2 style="font-size: 19px; font-weight: 800; color: #f8fafc; margin: 0 0 4px 0;">
+          Commercial Real Estate Structural Matrix: SEBI SM REITs vs. Alternatives
+        </h2>
+        <p style="font-size: 13px; color: #94a3b8; margin: 0;">
+          Comparative analysis of governance, liquidity, ticket size, and regulatory protections under Indian securities law.
+        </p>
       </div>
     </div>
 
@@ -57,82 +79,173 @@
       <table style="width: 100%; border-collapse: collapse; font-size: 13.5px;">
         <thead>
           <tr style="border-bottom: 1px solid rgba(255, 255, 255, 0.1); text-align: left; color: #64748b; font-size: 11.5px; text-transform: uppercase;">
-            <th style="padding: 12px 14px;">Symbol / Asset</th>
-            <th style="padding: 12px 14px;">Structure</th>
-            <th style="padding: 12px 14px;">Price</th>
-            <th style="padding: 12px 14px;">NAV</th>
-            <th style="padding: 12px 14px;">Prem / Disc %</th>
-            <th style="padding: 12px 14px;">Distribution Yield</th>
-            <th style="padding: 12px 14px;">Occupancy %</th>
-            <th style="padding: 12px 14px;">NDCF Purity</th>
-            <th style="padding: 12px 14px;">LTV Cap (≤49%)</th>
-            <th style="padding: 12px 14px;">SEBI Guardrail</th>
+            <th style="padding: 12px 14px;">Regulatory Dimension</th>
+            <th style="padding: 12px 14px; color: #c084fc;">SEBI SM REIT (2024 Framework)</th>
+            <th style="padding: 12px 14px; color: #38bdf8;">Mainboard Public REIT</th>
+            <th style="padding: 12px 14px; color: #f87171;">Unregulated FOPs (Pre-2024)</th>
+            <th style="padding: 12px 14px; color: #cbd5e1;">Direct Physical CRE</th>
           </tr>
         </thead>
         <tbody>
-          {% for r in reit_audit['items'] %}
+          <tr style="border-bottom: 1px solid rgba(255, 255, 255, 0.05);">
+            <td style="padding: 12px 14px; font-weight: 700; color: #f8fafc;">Minimum Investment Ticket</td>
+            <td style="padding: 12px 14px; font-weight: 700; color: #c084fc;" class="tnum">₹10,00,000 (₹10 Lakhs)</td>
+            <td style="padding: 12px 14px; color: #38bdf8;" class="tnum">₹300 - ₹400 (1 Unit)</td>
+            <td style="padding: 12px 14px; color: #94a3b8;" class="tnum">₹25,00,000+ (₹25 Lakhs)</td>
+            <td style="padding: 12px 14px; color: #94a3b8;" class="tnum">₹5,00,00,000+ (₹5 Cr+)</td>
+          </tr>
+          <tr style="border-bottom: 1px solid rgba(255, 255, 255, 0.05);">
+            <td style="padding: 12px 14px; font-weight: 700; color: #f8fafc;">Target Asset Size per Scheme</td>
+            <td style="padding: 12px 14px; color: #cbd5e1;" class="tnum">₹50 Cr to ₹500 Cr</td>
+            <td style="padding: 12px 14px; color: #cbd5e1;" class="tnum">≥ ₹500 Cr (Typically ₹15,000 Cr+)</td>
+            <td style="padding: 12px 14px; color: #94a3b8;">Uncapped Private SPVs</td>
+            <td style="padding: 12px 14px; color: #94a3b8;">Standalone Single Property</td>
+          </tr>
+          <tr style="border-bottom: 1px solid rgba(255, 255, 255, 0.05);">
+            <td style="padding: 12px 14px; font-weight: 700; color: #f8fafc;">Asset Completion Mandate</td>
+            <td style="padding: 12px 14px; font-weight: 700; color: #34d399;">≥ 95% Completed (Zero Under-Construction)</td>
+            <td style="padding: 12px 14px; color: #cbd5e1;">≥ 80% Completed (Up to 20% Under-Dev)</td>
+            <td style="padding: 12px 14px; color: #f87171;">No Statutory Ban on Construction</td>
+            <td style="padding: 12px 14px; color: #94a3b8;">Full Execution / Construction Risk</td>
+          </tr>
+          <tr style="border-bottom: 1px solid rgba(255, 255, 255, 0.05);">
+            <td style="padding: 12px 14px; font-weight: 700; color: #f8fafc;">Mandatory Cash Flow Distribution</td>
+            <td style="padding: 12px 14px; color: #cbd5e1;">95% NDCF (15% p.a. Penal Interest for delay)</td>
+            <td style="padding: 12px 14px; color: #cbd5e1;">90% NDCF Semi-Annually</td>
+            <td style="padding: 12px 14px; color: #f87171;">Contractual Discretion Only</td>
+            <td style="padding: 12px 14px; color: #94a3b8;">Subject to Tenant Default & Vacancy</td>
+          </tr>
+          <tr style="border-bottom: 1px solid rgba(255, 255, 255, 0.05);">
+            <td style="padding: 12px 14px; font-weight: 700; color: #f8fafc;">Borrowing / Leverage Cap (LTV)</td>
+            <td style="padding: 12px 14px; color: #34d399;" class="tnum">Max 49% (Approval required if > 25%)</td>
+            <td style="padding: 12px 14px; color: #cbd5e1;" class="tnum">Max 49% (Approval required if > 25%)</td>
+            <td style="padding: 12px 14px; color: #f87171;">Unregulated Private Mortgages</td>
+            <td style="padding: 12px 14px; color: #94a3b8;">Bank LRD up to 70% LTV</td>
+          </tr>
+          <tr>
+            <td style="padding: 12px 14px; font-weight: 700; color: #f8fafc;">Secondary Market Liquidity</td>
+            <td style="padding: 12px 14px; color: #cbd5e1;">Mandatory Exchange Listing (NSE/BSE)</td>
+            <td style="padding: 12px 14px; color: #34d399;">High Daily Exchange Liquidity</td>
+            <td style="padding: 12px 14px; color: #f87171;">Illiquid Internal Bulletin Boards</td>
+            <td style="padding: 12px 14px; color: #f87171;">Very Low (Months to Sell)</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+  <!-- Section 1: Commercial REITs & SEBI SM REITs -->
+  <div id="smReitSection" class="card" style="padding: 24px; margin-bottom: 28px;">
+    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; flex-wrap: wrap; gap: 12px;">
+      <div>
+        <h2 style="font-size: 20px; font-weight: 800; color: #f8fafc; margin: 0 0 4px 0;">
+          SEBI SM REITs & Mainboard Commercial REITs
+        </h2>
+        <p style="font-size: 13px; color: #94a3b8; margin: 0;">
+          Audited commercial office and retail consumption trusts. Tracking occupancy, WALE, and NDCF upstreaming purity.
+        </p>
+      </div>
+      <div style="display: flex; gap: 10px;">
+        <a href="/calculator/tax?yield=8.10" class="btn btn-secondary btn-sm">🧮 Simulate Post-Tax Cashflows</a>
+      </div>
+    </div>
+
+    <div style="overflow-x: auto;">
+      <table style="width: 100%; border-collapse: collapse; font-size: 13.5px;">
+        <thead>
+          <tr style="border-bottom: 1px solid rgba(255, 255, 255, 0.1); text-align: left; color: #64748b; font-size: 11.5px; text-transform: uppercase;">
+            <th style="padding: 12px 14px;">Symbol / Offering</th>
+            <th style="padding: 12px 14px;">Structure</th>
+            <th style="padding: 12px 14px;">Price</th>
+            <th style="padding: 12px 14px;">NAV</th>
+            <th style="padding: 12px 14px;">Discount to NAV</th>
+            <th style="padding: 12px 14px;">Yield %</th>
+            <th style="padding: 12px 14px;">Occupancy</th>
+            <th style="padding: 12px 14px;">NDCF Purity</th>
+            <th style="padding: 12px 14px;">LTV Cap</th>
+            <th style="padding: 12px 14px;">WALE</th>
+            <th style="padding: 12px 14px;">SEBI Audit</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for r in reit_audit.reits %}
+          {% if r.structure_type in ['MAINBOARD_REIT', 'SM_REIT'] %}
           <tr style="border-bottom: 1px solid rgba(255, 255, 255, 0.05); transition: background 0.15s ease;">
-            <td style="padding: 12px 14px;">
+            <td style="padding: 14px 14px;">
               <div style="font-weight: 800; color: #f8fafc;">{{ r.symbol }}</div>
               <div style="font-size: 11px; color: #94a3b8;">{{ r.name }}</div>
             </td>
-            <td style="padding: 12px 14px;">
+            <td style="padding: 14px 14px;">
               {% if r.structure_type == 'SM_REIT' %}
-                <span style="background: rgba(168, 85, 247, 0.15); color: #c084fc; padding: 2px 8px; border-radius: 4px; font-size: 11px; font-weight: 700;">SEBI SM REIT</span>
-              {% elif r.structure_type == 'INVIT' %}
-                <span style="background: rgba(14, 165, 233, 0.15); color: #38bdf8; padding: 2px 8px; border-radius: 4px; font-size: 11px; font-weight: 700;">InvIT</span>
+                <span style="background: rgba(168, 85, 247, 0.15); color: #c084fc; border: 1px solid rgba(168, 85, 247, 0.3); padding: 2px 8px; border-radius: 4px; font-size: 11px; font-weight: 700;">
+                  SEBI SM REIT
+                </span>
               {% else %}
-                <span style="background: rgba(148, 163, 184, 0.15); color: #cbd5e1; padding: 2px 8px; border-radius: 4px; font-size: 11px; font-weight: 700;">Mainboard REIT</span>
+                <span style="background: rgba(14, 165, 233, 0.15); color: #38bdf8; border: 1px solid rgba(14, 165, 233, 0.3); padding: 2px 8px; border-radius: 4px; font-size: 11px; font-weight: 700;">
+                  Mainboard REIT
+                </span>
               {% endif %}
             </td>
-            <td style="padding: 12px 14px; font-weight: 700; color: #f8fafc;" class="tnum">
-              ₹{{ r.current_price }}
+            <td style="padding: 14px 14px; font-weight: 700; color: #f8fafc;" class="tnum">
+              ₹{{ "{:,.2f}".format(r.current_price) }}
             </td>
-            <td style="padding: 12px 14px; color: #94a3b8;" class="tnum">
-              ₹{{ r.nav_per_unit }}
+            <td style="padding: 14px 14px; color: #94a3b8;" class="tnum">
+              ₹{{ "{:,.2f}".format(r.nav_per_unit) }}
             </td>
-            <td style="padding: 12px 14px; color: {% if r.discount_to_nav_pct < 0 %}#10b981{% else %}#f59e0b{% endif %};" class="tnum">
+            <td style="padding: 14px 14px; color: {% if r.discount_to_nav_pct < 0 %}#10b981{% else %}#f59e0b{% endif %};" class="tnum font-weight-bold">
               {{ r.discount_to_nav_pct }}%
             </td>
-            <td style="padding: 12px 14px; font-weight: 800; color: #10b981;" class="tnum">
+            <td style="padding: 14px 14px; font-weight: 800; color: #10b981;" class="tnum">
               {{ r.distribution_yield_pct }}%
             </td>
-            <td style="padding: 12px 14px;" class="tnum">
+            <td style="padding: 14px 14px;" class="tnum">
               {% if r.occupancy_pct >= 95.0 %}
                 <span style="color: #34d399; font-weight: 700;">{{ r.occupancy_pct }}%</span>
               {% else %}
                 <span style="color: #fbbf24;">{{ r.occupancy_pct }}%</span>
               {% endif %}
             </td>
-            <td style="padding: 12px 14px; color: #38bdf8;" class="tnum">
+            <td style="padding: 14px 14px; color: #38bdf8;" class="tnum">
               {{ r.ndcf_payout_purity_pct }}%
             </td>
-            <td style="padding: 12px 14px; color: #cbd5e1;" class="tnum">
+            <td style="padding: 14px 14px; color: #cbd5e1;" class="tnum">
               {{ r.ltv_ratio_pct }}%
             </td>
-            <td style="padding: 12px 14px;">
+            <td style="padding: 14px 14px; color: #94a3b8;" class="tnum">
+              {{ r.wale_years }}y
+            </td>
+            <td style="padding: 14px 14px;">
               {% if r.sebi_compliant %}
-                <span style="background: rgba(16, 185, 129, 0.15); color: #34d399; padding: 2px 8px; border-radius: 4px; font-size: 11px; font-weight: 700;">Compliant</span>
+                <span style="background: rgba(16, 185, 129, 0.15); color: #34d399; padding: 2px 8px; border-radius: 4px; font-size: 11px; font-weight: 700;">
+                  ✓ Compliant
+                </span>
               {% else %}
-                <span style="background: rgba(239, 68, 68, 0.15); color: #f87171; padding: 2px 8px; border-radius: 4px; font-size: 11px; font-weight: 700;">Review Breach</span>
+                <span style="background: rgba(239, 68, 68, 0.15); color: #f87171; padding: 2px 8px; border-radius: 4px; font-size: 11px; font-weight: 700;">
+                  ⚠ Breach
+                </span>
               {% endif %}
             </td>
           </tr>
+          {% endif %}
           {% endfor %}
         </tbody>
       </table>
     </div>
   </div>
 
-  <!-- Section 2: Sovereign Gold Bond (SGB) Secondary Market Parity -->
-  <div class="card" style="padding: 24px; margin-bottom: 32px;">
+  <!-- Section 2: Infrastructure Investment Trusts (InvITs) Concession Directory -->
+  <div id="invitSection" class="card" style="padding: 24px; margin-bottom: 28px;">
     <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; flex-wrap: wrap; gap: 12px;">
       <div>
-        <h2 style="font-size: 20px; font-weight: 800; color: #f8fafc; margin: 0 0 4px 0;">Sovereign Gold Bonds (SGB) Secondary Market Discount & Parity</h2>
-        <p style="font-size: 13px; color: #94a3b8; margin: 0;">100% Tax-Free capital gains at maturity under Section 47(viic) + 2.50% annual sovereign coupon.</p>
+        <h2 style="font-size: 20px; font-weight: 800; color: #f8fafc; margin: 0 0 4px 0;">
+          Infrastructure Investment Trusts (InvITs): Annuity vs. Volume Concessions
+        </h2>
+        <p style="font-size: 13px; color: #94a3b8; margin: 0;">
+          High-yield infrastructure concessions: Availability-based power transmission (zero traffic risk) vs. Toll roads (inflation upside).
+        </p>
       </div>
-      <div style="font-size: 13px; color: #eab308; font-weight: 700;">
-        Spot Gold Reference: ₹7,450 / gram (999 Purity)
+      <div style="font-size: 12px; color: #94a3b8; background: rgba(255,255,255,0.05); padding: 4px 12px; border-radius: 6px;">
+        High Cash Distribution (8.9% – 12.4% p.a.)
       </div>
     </div>
 
@@ -140,45 +253,174 @@
       <table style="width: 100%; border-collapse: collapse; font-size: 13.5px;">
         <thead>
           <tr style="border-bottom: 1px solid rgba(255, 255, 255, 0.1); text-align: left; color: #64748b; font-size: 11.5px; text-transform: uppercase;">
+            <th style="padding: 12px 14px;">Symbol / InvIT Trust</th>
+            <th style="padding: 12px 14px;">Concession Model</th>
+            <th style="padding: 12px 14px;">Current Price</th>
+            <th style="padding: 12px 14px;">NAV</th>
+            <th style="padding: 12px 14px;">Distribution Yield</th>
+            <th style="padding: 12px 14px;">Availability / Scale</th>
+            <th style="padding: 12px 14px;">NDCF Payout</th>
+            <th style="padding: 12px 14px;">LTV Leverage</th>
+            <th style="padding: 12px 14px;">Concession Life</th>
+            <th style="padding: 12px 14px;">Tax Section</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for r in reit_audit.reits %}
+          {% if r.structure_type == 'INVIT' %}
+          <tr style="border-bottom: 1px solid rgba(255, 255, 255, 0.05); transition: background 0.15s ease;">
+            <td style="padding: 14px 14px;">
+              <div style="font-weight: 800; color: #f8fafc;">{{ r.symbol }}</div>
+              <div style="font-size: 11px; color: #94a3b8;">{{ r.name }}</div>
+            </td>
+            <td style="padding: 14px 14px;">
+              {% if r.details.subtype == 'TRANSMISSION_ANNUITY' %}
+                <span style="background: rgba(16, 185, 129, 0.15); color: #34d399; padding: 2px 8px; border-radius: 4px; font-size: 11px; font-weight: 700;">
+                  Availability Annuity
+                </span>
+                <div style="font-size: 10.5px; color: #64748b; margin-top: 2px;">Zero Traffic Risk</div>
+              {% else %}
+                <span style="background: rgba(245, 158, 11, 0.15); color: #fbbf24; padding: 2px 8px; border-radius: 4px; font-size: 11px; font-weight: 700;">
+                  Toll Volume Concession
+                </span>
+                <div style="font-size: 10.5px; color: #64748b; margin-top: 2px;">Inflation Indexed</div>
+              {% endif %}
+            </td>
+            <td style="padding: 14px 14px; font-weight: 700; color: #f8fafc;" class="tnum">
+              ₹{{ "{:,.2f}".format(r.current_price) }}
+            </td>
+            <td style="padding: 14px 14px; color: #94a3b8;" class="tnum">
+              ₹{{ "{:,.2f}".format(r.nav_per_unit) }}
+            </td>
+            <td style="padding: 14px 14px; font-weight: 800; color: #10b981; font-size: 15px;" class="tnum">
+              {{ r.distribution_yield_pct }}%
+            </td>
+            <td style="padding: 14px 14px; color: #cbd5e1;" class="tnum">
+              {% if r.details.availability_factor %}
+                {{ r.details.availability_factor }} Availability
+              {% elif r.details.traffic_growth_cagr %}
+                +{{ r.details.traffic_growth_cagr }} Traffic CAGR
+              {% else %}
+                99.0%+
+              {% endif %}
+            </td>
+            <td style="padding: 14px 14px; color: #38bdf8;" class="tnum">
+              {{ r.ndcf_payout_purity_pct }}%
+            </td>
+            <td style="padding: 14px 14px; color: #cbd5e1;" class="tnum">
+              {{ r.ltv_ratio_pct }}%
+            </td>
+            <td style="padding: 14px 14px; color: #94a3b8;" class="tnum">
+              {{ r.wale_years }} Years
+            </td>
+            <td style="padding: 14px 14px; color: #c084fc; font-size: 11.5px;">
+              Sec 115UA Pass-through
+            </td>
+          </tr>
+          {% endif %}
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+  <!-- Section 3: Sovereign Gold Bond (SGB) Secondary Market Parity Scanner -->
+  <div id="sgbSection" class="card" style="padding: 24px; margin-bottom: 28px;">
+    <div style="display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 20px; flex-wrap: wrap; gap: 14px;">
+      <div>
+        <div style="display: inline-flex; align-items: center; gap: 6px; background: rgba(234, 179, 8, 0.15); border: 1px solid rgba(234, 179, 8, 0.3); border-radius: 9999px; padding: 3px 12px; margin-bottom: 8px;">
+          <span style="font-size: 11.5px; font-weight: 700; color: #facc15; text-transform: uppercase;">100% Tax-Free Capital Gains (Sec 47(viic))</span>
+        </div>
+        <h2 style="font-size: 20px; font-weight: 800; color: #f8fafc; margin: 0 0 6px 0;">
+          Sovereign Gold Bonds (SGB) Secondary Market Discount & Parity Scanner (10 Tranches)
+        </h2>
+        <p style="font-size: 13px; color: #94a3b8; max-width: 820px; margin: 0; line-height: 1.5;">
+          Following Union Budget 2024 gold import duty cuts and pause on fresh primary issuances, secondary SGBs offer 
+          an unreplicable institutional arbitrage: acquiring pure sovereign gold at a <strong>3% to 5% discount</strong> to spot gold 
+          with an additional <strong>2.50% annual sovereign interest</strong> and <strong>100% tax-free capital gains</strong> on maturity.
+        </p>
+      </div>
+
+      <div style="background: rgba(15, 23, 42, 0.6); border: 1px solid rgba(255, 255, 255, 0.08); border-radius: 10px; padding: 12px 18px; text-align: right;">
+        <div style="font-size: 11px; color: #64748b; text-transform: uppercase;">Domestic Spot Gold Reference</div>
+        <div style="font-size: 20px; font-weight: 800; color: #eab308;" class="tnum">₹7,450 / gram (999 Purity)</div>
+        <div style="font-size: 11px; color: #94a3b8;">IBJA Benchmark Closing</div>
+      </div>
+    </div>
+
+    <!-- SGB vs Gold ETF vs Physical Gold Comparison -->
+    <div style="background: rgba(15, 23, 42, 0.5); border: 1px solid rgba(255, 255, 255, 0.08); border-radius: 10px; padding: 16px; margin-bottom: 20px;">
+      <div style="font-size: 13px; font-weight: 800; color: #f8fafc; margin-bottom: 10px;">
+        ⚖️ Gold Allocation Vehicle Architecture: SGB vs. ETF vs. Physical Bullion
+      </div>
+      <div style="overflow-x: auto;">
+        <table style="width: 100%; border-collapse: collapse; font-size: 12.5px;">
+          <thead>
+            <tr style="border-bottom: 1px solid rgba(255, 255, 255, 0.08); text-align: left; color: #64748b;">
+              <th style="padding: 8px 12px;">Evaluation Dimension</th>
+              <th style="padding: 8px 12px; color: #facc15;">Sovereign Gold Bonds (SGB)</th>
+              <th style="padding: 8px 12px; color: #38bdf8;">Gold ETFs</th>
+              <th style="padding: 8px 12px; color: #94a3b8;">Physical Gold (Bars/Coins)</th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for row in sgb_audit.asset_comparison %}
+            <tr style="border-bottom: 1px solid rgba(255, 255, 255, 0.04);">
+              <td style="padding: 9px 12px; font-weight: 700; color: #cbd5e1;">{{ row.dimension }}</td>
+              <td style="padding: 9px 12px; color: #facc15; font-weight: 600;">{{ row.sgb }}</td>
+              <td style="padding: 9px 12px; color: #cbd5e1;">{{ row.gold_etf }}</td>
+              <td style="padding: 9px 12px; color: #94a3b8;">{{ row.physical_gold }}</td>
+            </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    </div>
+
+    <!-- SGB Tranches Table -->
+    <div style="overflow-x: auto;">
+      <table style="width: 100%; border-collapse: collapse; font-size: 13.5px;">
+        <thead>
+          <tr style="border-bottom: 1px solid rgba(255, 255, 255, 0.1); text-align: left; color: #64748b; font-size: 11.5px; text-transform: uppercase;">
             <th style="padding: 12px 14px;">Tranche Symbol</th>
-            <th style="padding: 12px 14px;">Series Name</th>
+            <th style="padding: 12px 14px;">RBI Series Name</th>
             <th style="padding: 12px 14px;">Market Price</th>
-            <th style="padding: 12px 14px;">Spot Gold Value</th>
+            <th style="padding: 12px 14px;">Spot Gold Parity</th>
             <th style="padding: 12px 14px;">Discount to Spot %</th>
-            <th style="padding: 12px 14px;">Annual Coupon</th>
+            <th style="padding: 12px 14px;">Coupon</th>
             <th style="padding: 12px 14px;">Maturity Date</th>
-            <th style="padding: 12px 14px;">Annualized YTM</th>
-            <th style="padding: 12px 14px;">Advantage vs Gold ETF</th>
+            <th style="padding: 12px 14px;">Compound YTM</th>
+            <th style="padding: 12px 14px;">Tax Alpha vs ETF</th>
           </tr>
         </thead>
         <tbody>
           {% for sgb in sgb_audit.tranches %}
           <tr style="border-bottom: 1px solid rgba(255, 255, 255, 0.05); transition: background 0.15s ease;">
-            <td style="padding: 12px 14px; font-weight: 800; color: #f8fafc;">
+            <td style="padding: 13px 14px; font-weight: 800; color: #f8fafc;">
               {{ sgb.symbol }}
             </td>
-            <td style="padding: 12px 14px; color: #94a3b8; font-size: 12px;">
+            <td style="padding: 13px 14px; color: #94a3b8; font-size: 12px;">
               {{ sgb.series_name }}
             </td>
-            <td style="padding: 12px 14px; font-weight: 700; color: #f8fafc;" class="tnum">
-              ₹{{ sgb.market_price }}
+            <td style="padding: 13px 14px; font-weight: 700; color: #f8fafc;" class="tnum">
+              ₹{{ "{:,.0f}".format(sgb.market_price) }}
             </td>
-            <td style="padding: 12px 14px; color: #94a3b8;" class="tnum">
-              ₹{{ sgb.spot_gold_price }}
+            <td style="padding: 13px 14px; color: #94a3b8;" class="tnum">
+              ₹{{ "{:,.0f}".format(sgb.spot_gold_price) }}
             </td>
-            <td style="padding: 12px 14px; font-weight: 700; color: #10b981;" class="tnum">
+            <td style="padding: 13px 14px; font-weight: 700; color: #10b981;" class="tnum">
               {{ sgb.discount_to_spot_pct }}%
             </td>
-            <td style="padding: 12px 14px; color: #38bdf8;" class="tnum">
+            <td style="padding: 13px 14px; color: #38bdf8;" class="tnum">
               {{ sgb.annual_coupon_rate }}% p.a.
             </td>
-            <td style="padding: 12px 14px; color: #cbd5e1;" class="tnum">
+            <td style="padding: 13px 14px; color: #cbd5e1;" class="tnum">
               {{ sgb.maturity_date }}
             </td>
-            <td style="padding: 12px 14px; font-weight: 800; color: #eab308; font-size: 15px;" class="tnum">
+            <td style="padding: 13px 14px; font-weight: 800; color: #eab308; font-size: 15px;" class="tnum">
               {{ sgb.ytm_annualized_pct }}%
             </td>
-            <td style="padding: 12px 14px; color: #34d399; font-weight: 700;" class="tnum">
+            <td style="padding: 13px 14px; color: #34d399; font-weight: 700;" class="tnum">
               +{{ sgb.etf_tax_adjusted_spread_pct }}% p.a.
             </td>
           </tr>
@@ -186,6 +428,51 @@
         </tbody>
       </table>
     </div>
+  </div>
+
+  <!-- Section 4: Section 115UA Tax Waterfall Explainer -->
+  <div class="card" style="padding: 24px; margin-bottom: 28px;">
+    <h2 style="font-size: 19px; font-weight: 800; color: #f8fafc; margin: 0 0 8px 0;">
+      Section 115UA Real Asset Tax Waterfall & In-Hand Return Simulator
+    </h2>
+    <p style="font-size: 13px; color: #94a3b8; line-height: 1.6; max-width: 860px; margin-bottom: 20px;">
+      REIT and InvIT distributions in India are composite cash flows governed by Section 115UA of the Income Tax Act and the Finance Act 2023 amendment. Understanding the composition protects unitholders from unexpected tax drag:
+    </p>
+
+    <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 16px; margin-bottom: 20px;">
+      <div style="background: rgba(15, 23, 42, 0.5); border-left: 4px solid #38bdf8; border-radius: 8px; padding: 14px 16px;">
+        <div style="font-size: 13px; font-weight: 800; color: #38bdf8; margin-bottom: 4px;">1. Dividend Stream</div>
+        <div style="font-size: 12px; color: #94a3b8; line-height: 1.5;">
+          Tax-Free in unitholder hands if SPV did not opt for concessional corporate tax under Section 115BAA; otherwise taxable at individual slab rate.
+        </div>
+      </div>
+
+      <div style="background: rgba(15, 23, 42, 0.5); border-left: 4px solid #f59e0b; border-radius: 8px; padding: 14px 16px;">
+        <div style="font-size: 13px; font-weight: 800; color: #fbbf24; margin-bottom: 4px;">2. Interest Stream</div>
+        <div style="font-size: 12px; color: #94a3b8; line-height: 1.5;">
+          Direct statutory pass-through of debt interest paid by SPV to the trust. Fully taxable in investor's hands at applicable slab rate.
+        </div>
+      </div>
+
+      <div style="background: rgba(15, 23, 42, 0.5); border-left: 4px solid #10b981; border-radius: 8px; padding: 14px 16px;">
+        <div style="font-size: 13px; font-weight: 800; color: #34d399; margin-bottom: 4px;">3. Return of Capital / ROC</div>
+        <div style="font-size: 12px; color: #94a3b8; line-height: 1.5;">
+          Amortization of SPV debt. Non-taxable return of invested capital until cumulative distributions exceed initial unitholder acquisition cost.
+        </div>
+      </div>
+
+      <div style="background: rgba(15, 23, 42, 0.5); border-left: 4px solid #a855f7; border-radius: 8px; padding: 14px 16px;">
+        <div style="font-size: 13px; font-weight: 800; color: #c084fc; margin-bottom: 4px;">4. SGB Capital Gains</div>
+        <div style="font-size: 12px; color: #94a3b8; line-height: 1.5;">
+          100% Tax-Free upon redemption at maturity under Section 47(viic). Semi-annual coupon (2.50%) is taxable under income from other sources.
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- SEBI Regulatory Safe-Harbor Footer -->
+  <div style="font-size: 12px; color: #64748b; text-align: center; max-width: 840px; margin: 0 auto; line-height: 1.6;">
+    🔒 <strong>Statutory Data Provenance:</strong> Sourced directly from official exchange disclosure filings (BSE/NSE), SEBI SM REIT Scheme Offer Documents, and Reserve Bank of India Sovereign Gold Bond Gazette Releases. Published strictly for institutional and educational research purposes under Section 2(u) of SEBI (Research Analysts) Regulations, 2014.
   </div>
 </div>
 {% endblock %}

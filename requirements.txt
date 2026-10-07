@@ -18,3 +18,4 @@ brotli-asgi==1.2.0
 apscheduler==3.10.4
 selenium==4.23.1
 slowapi==0.1.10
+google-antigravity>=0.1.20

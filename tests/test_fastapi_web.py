@@ -285,8 +285,8 @@ Detailed forensic analysis with exact page grounding to bseindia.com filings.
         res = self.client.get("/debt/INE002A08012")
         self.assertEqual(res.status_code, 200)
         self.assertIn("RELIANCE", res.text)
-        self.assertIn("Pillar 1: Credit Quality & Rating Drift", res.text)
-        self.assertIn("Pillar 2: Capital Hierarchy & Seniority Cover", res.text)
+        self.assertIn("01: Credit Quality & Rating Drift", res.text)
+        self.assertIn("02: Capital Hierarchy & Seniority Cover", res.text)
         self.assertIn("RBI Repo Rate Shock Sensitivity Model", res.text)
 
     def test_debt_api_endpoints(self):
@@ -315,6 +315,29 @@ Detailed forensic analysis with exact page grounding to bseindia.com filings.
         self.assertEqual(res_act.status_code, 200)
         self.assertEqual(res_act.json().get("status"), "success")
 
+        # 5. /api/debt/ingest (validation error for short ISIN)
+        res_bad = self.client.post("/api/debt/ingest", json={"isin": "SHORT"})
+        self.assertEqual(res_bad.status_code, 400)
+
+        # 6. /api/debt/ingest (valid on-demand ISIN ingestion)
+        test_isin = "INE999A08999"
+        res_ingest = self.client.post("/api/debt/ingest", json={
+            "isin": test_isin,
+            "ticker": "TESTCORP",
+            "coupon_rate_pct": 9.20,
+            "seniority_tier": "SENIOR_SECURED"
+        })
+        self.assertEqual(res_ingest.status_code, 200)
+        ingest_data = res_ingest.json()
+        self.assertEqual(ingest_data.get("status"), "success")
+        self.assertEqual(ingest_data.get("isin"), test_isin)
+        self.assertEqual(ingest_data.get("redirect_url"), f"/debt/{test_isin}")
+
+        # 7. /api/debt/ingest (re-ingest existing ISIN)
+        res_exist = self.client.post("/api/debt/ingest", json={"isin": test_isin})
+        self.assertEqual(res_exist.status_code, 200)
+        self.assertTrue(res_exist.json().get("already_exists"))
+
     def test_fund_directory_page(self):
         res = self.client.get("/funds")
         self.assertEqual(res.status_code, 200)
@@ -323,12 +346,23 @@ Detailed forensic analysis with exact page grounding to bseindia.com filings.
         self.assertIn("Active Share", res.text)
 
     def test_fund_dossier_page(self):
+        # 1. Test PPFAS Flexi Cap
         res = self.client.get("/funds/PPFAS_FLEXICAP_DIR")
         self.assertEqual(res.status_code, 200)
         self.assertIn("Parag Parikh Flexi Cap Fund", res.text)
-        self.assertIn("Pillar 1: Dual-Sleeve Constituent Decomposition", res.text)
-        self.assertIn("Pillar 2: True Diversification & Active Share", res.text)
-        self.assertIn("Pillar 5: Intermediary Fee Drag & Wealth Destruction", res.text)
+        self.assertIn("01: Dual-Sleeve Constituent Decomposition", res.text)
+        self.assertIn("02: True Diversification & Active Share", res.text)
+        self.assertIn("05: Intermediary Fee Drag & Wealth Destruction", res.text)
+
+        # 2. Test HDFC Mid-Cap (catches non-researched holding scores)
+        res_hdfc = self.client.get("/funds/HDFC_MIDCAP_DIR")
+        self.assertEqual(res_hdfc.status_code, 200)
+        self.assertIn("HDFC Mid-Cap Opportunities Fund", res_hdfc.text)
+
+        # 3. Test Mirae Asset Large Cap
+        res_mirae = self.client.get("/funds/MIRAE_LARGECAP_DIR")
+        self.assertEqual(res_mirae.status_code, 200)
+        self.assertIn("Mirae Asset Large Cap Fund", res_mirae.text)
 
     def test_fund_overlap_page(self):
         res = self.client.get("/funds/compare/overlap?scheme_a=PPFAS_FLEXICAP_DIR&scheme_b=MIRAE_LARGECAP_DIR")
@@ -402,6 +436,45 @@ Detailed forensic analysis with exact page grounding to bseindia.com filings.
         res_debt = self.client.get("/debt")
         self.assertEqual(res_debt.status_code, 200)
         self.assertIn('active-parent', res_debt.text)
+
+    @patch("web.main.get_stock_fundamentals")
+    @patch("web.main.get_historical_prices")
+    def test_thesis_checkpoint_api_and_modal_markup(self, mock_hist, mock_fund):
+        import pandas as pd
+        mock_fund.return_value = {
+            "current_price": 1520.0,
+            "fifty_two_week_low": 1300.0,
+            "fifty_two_week_high": 1900.0,
+            "pe_ratio": 25.0
+        }
+        mock_hist.return_value = pd.DataFrame()
+
+        # 1. Test POST /api/thesis-checkpoint API
+        payload = {
+            "ticker": "INFY",
+            "decision": "WOULD_BUY_TODAY",
+            "rationale": "Strong balance sheet with zero net debt and durable digital transformation moat.",
+            "current_price": 1850.50,
+            "user_id": "test_analyst_1"
+        }
+        res = self.client.post("/api/thesis-checkpoint", json=payload, headers={"Origin": "http://testserver"})
+        self.assertEqual(res.status_code, 200)
+        data = res.json()
+        self.assertTrue(data.get("success"))
+        self.assertIn("Thesis Checkpoint", data.get("message", ""))
+
+        # 2. Test Invalid Ticker rejection
+        res_invalid = self.client.post("/api/thesis-checkpoint", json={"ticker": "", "decision": "WOULD_BUY_TODAY", "rationale": "test"}, headers={"Origin": "http://testserver"})
+        self.assertEqual(res_invalid.status_code, 400)
+
+        # 3. Test Dossier HTML contains Thesis Modal and trigger buttons
+        res_dossier = self.client.get("/dossier/INFY")
+        self.assertEqual(res_dossier.status_code, 200)
+        html = res_dossier.text
+        self.assertIn("thesisModalBackdrop", html)
+        self.assertIn("thesisModal", html)
+        self.assertIn("Would You Buy Today?", html)
+        self.assertIn("btnOpenThesisTop", html)
 
 
 if __name__ == "__main__":

@@ -262,7 +262,7 @@ class TestPriorities345(unittest.TestCase):
     def test_reit_directory_web_routes(self):
         res = self.client.get("/reits")
         self.assertEqual(res.status_code, 200)
-        self.assertIn("Fractional Real Estate, InvITs & Sovereign Gold", res.text)
+        self.assertIn("Alternative Real Assets, SM REITs & Sovereign Gold Terminal", res.text)
 
         api_res_reits = self.client.get("/api/reits/directory")
         self.assertEqual(api_res_reits.status_code, 200)

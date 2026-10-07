@@ -21,7 +21,7 @@
     </h1>
     <p style="font-size: 15px; color: #94a3b8; max-width: 800px; line-height: 1.6; margin-bottom: 24px;">
       Direct retail access to exchange-listed, demat-credited fixed-income instruments. Every issue is subjected to our 
-      <strong>5-Pillar Credit & Solvency Matrix</strong>—auditing rating drift, capital hierarchy seniority, cash flow coverage, duration risk, and recovery reality.
+      <strong>Credit & Solvency Diagnostic Matrix (01–05)</strong>—auditing rating drift, capital hierarchy seniority, cash flow coverage, duration risk, and recovery reality.
     </p>
 
     <!-- Top KPI Grid -->
@@ -45,13 +45,26 @@
     </div>
   </div>
 
-  <!-- Filter Navigation Tabs -->
-  <div style="display: flex; gap: 8px; overflow-x: auto; padding-bottom: 12px; margin-bottom: 24px;">
-    <a href="/debt" class="btn btn-sm {% if not current_filter %}btn-primary{% else %}btn-secondary{% endif %}" style="border-radius: 9999px;">All Issues ({{ securities|length }})</a>
-    <a href="/debt?seniority=SENIOR_SECURED" class="btn btn-sm {% if current_filter == 'SENIOR_SECURED' %}btn-primary{% else %}btn-secondary{% endif %}" style="border-radius: 9999px;">🛡️ Senior Secured</a>
-    <a href="/debt?is_sdi=true" class="btn btn-sm {% if current_filter == 'is_sdi' %}btn-primary{% else %}btn-secondary{% endif %}" style="border-radius: 9999px;">📦 Securitized Debt (SDIs)</a>
-    <a href="/debt?seniority=SUBORDINATED_TIER_2" class="btn btn-sm {% if current_filter == 'SUBORDINATED_TIER_2' %}btn-primary{% else %}btn-secondary{% endif %}" style="border-radius: 9999px;">🏛️ Tier-II Subordinated</a>
-    <a href="/debt?seniority=PERPETUAL_AT1" class="btn btn-sm {% if current_filter == 'PERPETUAL_AT1' %}btn-primary{% else %}btn-secondary{% endif %}" style="border-radius: 9999px;">⚠️ Perpetual AT1</a>
+  <!-- Action & Filter Bar -->
+  <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 12px; margin-bottom: 24px;">
+    <!-- Filter Navigation Tabs -->
+    <div style="display: flex; gap: 8px; overflow-x: auto; padding-bottom: 4px;">
+      <a href="/debt" class="btn btn-sm {% if not current_filter %}btn-primary{% else %}btn-secondary{% endif %}" style="border-radius: 9999px;">All Issues ({{ securities|length }})</a>
+      <a href="/debt?seniority=SENIOR_SECURED" class="btn btn-sm {% if current_filter == 'SENIOR_SECURED' %}btn-primary{% else %}btn-secondary{% endif %}" style="border-radius: 9999px;">🛡️ Senior Secured</a>
+      <a href="/debt?is_sdi=true" class="btn btn-sm {% if current_filter == 'is_sdi' %}btn-primary{% else %}btn-secondary{% endif %}" style="border-radius: 9999px;">📦 Securitized Debt (SDIs)</a>
+      <a href="/debt?seniority=SUBORDINATED_TIER_2" class="btn btn-sm {% if current_filter == 'SUBORDINATED_TIER_2' %}btn-primary{% else %}btn-secondary{% endif %}" style="border-radius: 9999px;">🏛️ Tier-II Subordinated</a>
+      <a href="/debt?seniority=PERPETUAL_AT1" class="btn btn-sm {% if current_filter == 'PERPETUAL_AT1' %}btn-primary{% else %}btn-secondary{% endif %}" style="border-radius: 9999px;">⚠️ Perpetual AT1</a>
+    </div>
+
+    <!-- Ingest New ISIN Button & Cross-Asset Terminal -->
+    <div style="display: flex; gap: 10px; align-items: center;">
+      <a href="/opportunities" class="btn btn-secondary btn-sm" style="display: inline-flex; align-items: center; gap: 6px; border-radius: 8px; font-weight: 700; border-color: rgba(14, 165, 233, 0.4); color: #38bdf8;">
+        <span>🎯</span> Opportunity Terminal
+      </a>
+      <button id="openIngestModalBtn" onclick="openIngestModal()" class="btn btn-primary btn-sm" style="display: inline-flex; align-items: center; gap: 6px; border-radius: 8px; font-weight: 700; box-shadow: 0 4px 14px rgba(14, 165, 233, 0.25); cursor: pointer;">
+        <span>➕</span> Ingest / Analyze New ISIN
+      </button>
+    </div>
   </div>
 
   <!-- Securities Grid -->
@@ -64,6 +77,11 @@
           <div>
             <span style="font-size: 18px; font-weight: 800; color: #f8fafc; margin-right: 8px;">{{ s.ticker }}</span>
             <span style="font-size: 11px; padding: 2px 8px; border-radius: 4px; background: rgba(255, 255, 255, 0.08); color: #94a3b8; font-family: monospace;">{{ s.series }}</span>
+            {% if s.is_sdi %}
+            <span style="font-size: 10px; padding: 2px 6px; border-radius: 4px; background: rgba(56, 189, 248, 0.15); color: #38bdf8; font-weight: 600; margin-left: 4px;">📦 Ring-Fenced</span>
+            {% else %}
+            <span style="font-size: 10px; padding: 2px 6px; border-radius: 4px; background: rgba(16, 185, 129, 0.12); color: #10b981; font-weight: 600; margin-left: 4px;">📡 Contagion Radar</span>
+            {% endif %}
           </div>
           <span style="font-size: 11px; font-weight: 700; padding: 4px 10px; border-radius: 9999px; background: rgba(16, 185, 129, 0.15); color: #10b981; border: 1px solid rgba(16, 185, 129, 0.3);">
             {{ s.credit_rating }}
@@ -104,7 +122,7 @@
       <!-- Action Button -->
       <div>
         <a href="/debt/{{ s.isin }}" class="btn btn-secondary" style="width: 100%; text-align: center; padding: 10px; font-size: 13px; font-weight: 600; border-radius: 8px;">
-          Analyze 5-Pillar Credit Dossier &rarr;
+          Open Credit Dossier (01–05) &rarr;
         </a>
       </div>
     </div>
@@ -116,4 +134,147 @@
     <strong>Mandatory Regulatory Disclosure:</strong> Fixed-income analytics and credit posture scores are computational risk evaluations derived from publicly listed exchange filings (BSE/NSE) and Credit Rating Agency circulars under the SEBI (Issue and Listing of Non-Convertible Securities) Regulations. Yields-to-Maturity (YTM) are contractual mathematical calculations based on current market traded prices and do not constitute an explicit or implied guarantee of issuer solvency. Investment in debt securities carries market, credit, and liquidity risk.
   </div>
 </div>
+
+<!-- Ingest New ISIN Modal Backdrop -->
+<div id="ingestModalBackdrop" style="display: none; position: fixed; inset: 0; background: rgba(15, 23, 42, 0.85); backdrop-filter: blur(8px); z-index: 1000; align-items: center; justify-content: center; padding: 16px;">
+  <div style="background: var(--bg-card, #1e293b); border: 1px solid rgba(255, 255, 255, 0.15); border-radius: 16px; width: 100%; max-width: 520px; box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.6); overflow: hidden; animation: fadeIn 0.2s ease-out;">
+    <!-- Header -->
+    <div style="display: flex; justify-content: space-between; align-items: center; padding: 20px 24px; border-bottom: 1px solid var(--border-color, rgba(255,255,255,0.08)); background: rgba(15, 23, 42, 0.4);">
+      <div style="display: flex; align-items: center; gap: 10px;">
+        <span style="font-size: 22px;">🏦</span>
+        <div>
+          <h3 style="margin: 0; font-size: 17px; font-weight: 800; color: #f8fafc;">
+            Analyze & Ingest Debt by ISIN
+          </h3>
+          <span style="font-size: 11.5px; color: #38bdf8; font-weight: 600;">
+            BSE / NSE Listed NCDs & SEBI-Regulated SDIs
+          </span>
+        </div>
+      </div>
+      <button onclick="closeIngestModal()" style="background: none; border: none; color: #94a3b8; font-size: 20px; cursor: pointer; padding: 4px; line-height: 1;">✕</button>
+    </div>
+
+    <!-- Body Form -->
+    <form id="ingestDebtForm" onsubmit="handleIngestDebtSubmit(event)" style="padding: 24px;">
+      <div style="margin-bottom: 16px;">
+        <label for="ingestIsinInput" style="display: block; font-size: 12px; font-weight: 700; color: #94a3b8; margin-bottom: 6px; text-transform: uppercase; letter-spacing: 0.05em;">
+          12-Character ISIN <span style="color: #ef4444;">*</span>
+        </label>
+        <input type="text" id="ingestIsinInput" required maxlength="12" placeholder="e.g. INE002A08012 or INF..." style="width: 100%; padding: 12px 14px; background: rgba(15, 23, 42, 0.7); border: 1px solid var(--border-color, rgba(255,255,255,0.15)); border-radius: 8px; color: #f8fafc; font-family: var(--font-mono, monospace); font-size: 14px; letter-spacing: 0.05em; text-transform: uppercase; box-sizing: border-box;" oninput="this.value = this.value.toUpperCase()" />
+        <span style="font-size: 11px; color: #64748b; margin-top: 4px; display: block;">Indian International Securities Identification Number.</span>
+      </div>
+
+      <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-bottom: 16px;">
+        <div>
+          <label for="ingestTickerInput" style="display: block; font-size: 11px; font-weight: 700; color: #94a3b8; margin-bottom: 6px; text-transform: uppercase;">
+            Issuer / Ticker (Optional)
+          </label>
+          <input type="text" id="ingestTickerInput" placeholder="Auto-detected if blank" style="width: 100%; padding: 10px 12px; background: rgba(15, 23, 42, 0.7); border: 1px solid var(--border-color, rgba(255,255,255,0.15)); border-radius: 8px; color: #f8fafc; font-size: 13px; box-sizing: border-box;" />
+        </div>
+        <div>
+          <label for="ingestCouponInput" style="display: block; font-size: 11px; font-weight: 700; color: #94a3b8; margin-bottom: 6px; text-transform: uppercase;">
+            Coupon Rate % (Optional)
+          </label>
+          <input type="number" step="0.01" id="ingestCouponInput" placeholder="e.g. 8.50" style="width: 100%; padding: 10px 12px; background: rgba(15, 23, 42, 0.7); border: 1px solid var(--border-color, rgba(255,255,255,0.15)); border-radius: 8px; color: #f8fafc; font-size: 13px; box-sizing: border-box;" />
+        </div>
+      </div>
+
+      <div style="margin-bottom: 20px;">
+        <label for="ingestSenioritySelect" style="display: block; font-size: 11px; font-weight: 700; color: #94a3b8; margin-bottom: 6px; text-transform: uppercase;">
+          Seniority Waterfall Tier
+        </label>
+        <select id="ingestSenioritySelect" style="width: 100%; padding: 10px 12px; background: rgba(15, 23, 42, 0.7); border: 1px solid var(--border-color, rgba(255,255,255,0.15)); border-radius: 8px; color: #f8fafc; font-size: 13px; box-sizing: border-box;">
+          <option value="SENIOR_SECURED">Senior Secured (Tangible Asset Cover)</option>
+          <option value="SUBORDINATED_TIER_2">Banking Tier-II Subordinated</option>
+          <option value="PERPETUAL_AT1">Additional Tier-1 (AT1 Perpetual)</option>
+          <option value="UNSECURED">Senior Unsecured</option>
+        </select>
+      </div>
+
+      <div id="ingestStatusMsg" style="display: none; padding: 10px 14px; border-radius: 8px; font-size: 12.5px; margin-bottom: 16px;"></div>
+
+      <div style="display: flex; justify-content: flex-end; gap: 10px;">
+        <button type="button" onclick="closeIngestModal()" class="btn btn-secondary btn-sm" style="padding: 10px 18px;">Cancel</button>
+        <button type="submit" id="ingestSubmitBtn" class="btn btn-primary btn-sm" style="padding: 10px 22px; font-weight: 700; cursor: pointer;">
+          <span>🚀 Run Credit & Solvency Audit</span>
+        </button>
+      </div>
+    </form>
+  </div>
+</div>
+
+<script>
+function openIngestModal() {
+  const modal = document.getElementById('ingestModalBackdrop');
+  if (modal) {
+    modal.style.display = 'flex';
+    document.getElementById('ingestIsinInput').focus();
+  }
+}
+function closeIngestModal() {
+  const modal = document.getElementById('ingestModalBackdrop');
+  if (modal) modal.style.display = 'none';
+}
+// Dismiss on clicking backdrop
+window.addEventListener('click', function(e) {
+  const modal = document.getElementById('ingestModalBackdrop');
+  if (e.target === modal) closeIngestModal();
+});
+
+async function handleIngestDebtSubmit(e) {
+  e.preventDefault();
+  const isin = document.getElementById('ingestIsinInput').value.trim().toUpperCase();
+  const ticker = document.getElementById('ingestTickerInput').value.trim().toUpperCase();
+  const coupon = document.getElementById('ingestCouponInput').value;
+  const seniority = document.getElementById('ingestSenioritySelect').value;
+  const btn = document.getElementById('ingestSubmitBtn');
+  const statusBox = document.getElementById('ingestStatusMsg');
+
+  if (isin.length !== 12) {
+    statusBox.style.display = 'block';
+    statusBox.style.background = 'rgba(239, 68, 68, 0.15)';
+    statusBox.style.color = '#ef4444';
+    statusBox.textContent = 'ISIN must be exactly 12 alphanumeric characters.';
+    return;
+  }
+
+  btn.disabled = true;
+  btn.innerHTML = '<span>⏳ Ingesting & Analyzing...</span>';
+  statusBox.style.display = 'block';
+  statusBox.style.background = 'rgba(14, 165, 233, 0.15)';
+  statusBox.style.color = '#38bdf8';
+  statusBox.textContent = 'Calculating credit metrics, YTM, and duration...';
+
+  try {
+    const payload = {
+      isin: isin,
+      ticker: ticker || null,
+      coupon_rate_pct: coupon ? parseFloat(coupon) : null,
+      seniority_tier: seniority
+    };
+    const res = await fetch('/api/debt/ingest', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload)
+    });
+    const data = await res.json();
+    if (res.ok && data.status === 'success') {
+      statusBox.style.background = 'rgba(16, 185, 129, 0.15)';
+      statusBox.style.color = '#10b981';
+      statusBox.textContent = '✓ Successfully audited! Opening credit dossier...';
+      setTimeout(() => {
+        window.location.href = data.redirect_url;
+      }, 400);
+    } else {
+      throw new Error(data.detail || data.message || 'Ingestion failed');
+    }
+  } catch (err) {
+    btn.disabled = false;
+    btn.innerHTML = '<span>🚀 Run Credit & Solvency Audit</span>';
+    statusBox.style.background = 'rgba(239, 68, 68, 0.15)';
+    statusBox.style.color = '#ef4444';
+    statusBox.textContent = err.message;
+  }
+}
+</script>
 {% endblock %}

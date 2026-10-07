@@ -50,12 +50,29 @@ Detailed forensic analysis grounded in bseindia.com filings.
             "prepared_for": "Family Trust Portfolio",
             "custom_disclaimer": "Strictly confidential - for registered client review only."
         }
-        rep_text = "### 7-Pillar Qualitative Health Matrix:\n- Moat: Strong\n\n## Pillar 1: Moat\nClean moat."
+        rep_text = (
+            "### 7-Pillar Qualitative Health Matrix:\n- Moat: Strong\n\n"
+            "## Pillar 1: Moat\nClean moat with INR [Indian Rupee] 500 Cr [Crore] cash.\n\n"
+            "## Pillar 6: Technical & Momentum Overlay\n"
+            "Trades above 50-DMA [50-Day Moving Average] of INR 1400."
+        )
         pdf_bytes = generate_report_pdf("INFY", rep_text, branding=branding)
         self.assertIsInstance(pdf_bytes, bytes)
         self.assertGreater(len(pdf_bytes), 1000)
         # PDF magic bytes
         self.assertTrue(pdf_bytes.startswith(b"%PDF"))
+
+        import fitz
+        doc = fitz.open(stream=pdf_bytes, filetype="pdf")
+        text = "\n".join([page.get_text() for page in doc])
+        # Assert sources section is present
+        self.assertIn("Regulatory Sources", text)
+        self.assertIn("Statutory Disclosures", text)
+        # Assert robotic acronym brackets are cleaned
+        self.assertNotIn("INR [Indian Rupee]", text)
+        self.assertNotIn("Cr [Crore]", text)
+        self.assertNotIn("50-DMA [50-Day Moving Average]", text)
+        self.assertIn("INR 500 Cr", text)
 
     def test_api_pdf_endpoint_with_branding_params(self):
         """Verify /api/pdf/{ticker} accepts branding query parameters."""

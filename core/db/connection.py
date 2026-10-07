@@ -1314,6 +1314,292 @@ def init_db(force: bool = False):
                     cursor.execute("INSERT OR IGNORE INTO schema_migrations (version) VALUES ('v019_auth_otps');")
                 conn.commit()
 
+            # Migration v020: Sovereign SDL fiscal spreads, macro policy corridor & curve history
+            if "v020_sovereign_sdl_and_macro_rates" not in applied:
+                logger.info("Applying schema migration: v020_sovereign_sdl_and_macro_rates...")
+                if supabase_url:
+                    cursor.execute("""
+                        CREATE TABLE IF NOT EXISTS sovereign_sdl_spreads (
+                            id SERIAL PRIMARY KEY,
+                            state_name VARCHAR(100) UNIQUE NOT NULL,
+                            state_code VARCHAR(10) NOT NULL,
+                            tenor_years NUMERIC NOT NULL DEFAULT 10.0,
+                            cut_off_yield NUMERIC NOT NULL,
+                            spread_over_gsec_bps NUMERIC NOT NULL,
+                            fiscal_tier VARCHAR(30) NOT NULL DEFAULT 'TIER_1_PRUDENT',
+                            debt_to_gsdp_pct NUMERIC DEFAULT 0.0,
+                            auction_date VARCHAR(20) NOT NULL,
+                            updated_at TIMESTAMPTZ DEFAULT now()
+                        );
+                        CREATE TABLE IF NOT EXISTS sovereign_macro_rates (
+                            id SERIAL PRIMARY KEY,
+                            metric_key VARCHAR(64) UNIQUE NOT NULL,
+                            metric_name VARCHAR(100) NOT NULL,
+                            metric_value NUMERIC NOT NULL,
+                            unit VARCHAR(20) NOT NULL,
+                            period_label VARCHAR(50) NOT NULL,
+                            source VARCHAR(100) DEFAULT 'RBI_MONETARY_POLICY',
+                            updated_at TIMESTAMPTZ DEFAULT now()
+                        );
+                        CREATE TABLE IF NOT EXISTS sovereign_curve_history (
+                            id SERIAL PRIMARY KEY,
+                            snapshot_key VARCHAR(32) NOT NULL,
+                            tenor_label VARCHAR(64) NOT NULL,
+                            maturity_years NUMERIC NOT NULL,
+                            yield_pct NUMERIC NOT NULL,
+                            UNIQUE(snapshot_key, tenor_label)
+                        );
+                        INSERT INTO schema_migrations (version) VALUES ('v020_sovereign_sdl_and_macro_rates') ON CONFLICT DO NOTHING;
+                    """)
+                else:
+                    cursor.execute("""
+                        CREATE TABLE IF NOT EXISTS sovereign_sdl_spreads (
+                            id INTEGER PRIMARY KEY AUTOINCREMENT,
+                            state_name TEXT UNIQUE NOT NULL,
+                            state_code TEXT NOT NULL,
+                            tenor_years REAL NOT NULL DEFAULT 10.0,
+                            cut_off_yield REAL NOT NULL,
+                            spread_over_gsec_bps REAL NOT NULL,
+                            fiscal_tier TEXT NOT NULL DEFAULT 'TIER_1_PRUDENT',
+                            debt_to_gsdp_pct REAL DEFAULT 0.0,
+                            auction_date TEXT NOT NULL,
+                            updated_at TEXT DEFAULT (datetime('now'))
+                        );
+                    """)
+                    cursor.execute("""
+                        CREATE TABLE IF NOT EXISTS sovereign_macro_rates (
+                            id INTEGER PRIMARY KEY AUTOINCREMENT,
+                            metric_key TEXT UNIQUE NOT NULL,
+                            metric_name TEXT NOT NULL,
+                            metric_value REAL NOT NULL,
+                            unit TEXT NOT NULL,
+                            period_label TEXT NOT NULL,
+                            source TEXT DEFAULT 'RBI_MONETARY_POLICY',
+                            updated_at TEXT DEFAULT (datetime('now'))
+                        );
+                    """)
+                    cursor.execute("""
+                        CREATE TABLE IF NOT EXISTS sovereign_curve_history (
+                            id INTEGER PRIMARY KEY AUTOINCREMENT,
+                            snapshot_key TEXT NOT NULL,
+                            tenor_label TEXT NOT NULL,
+                            maturity_years REAL NOT NULL,
+                            yield_pct REAL NOT NULL,
+                            UNIQUE(snapshot_key, tenor_label)
+                        );
+                    """)
+                    cursor.execute("INSERT OR IGNORE INTO schema_migrations (version) VALUES ('v020_sovereign_sdl_and_macro_rates');")
+                conn.commit()
+
+            # Migration v021: Mutual Fund 7-Pillar Forensic Look-Through Dossiers
+            if "v021_fund_forensic_dossiers" not in applied:
+                logger.info("Applying schema migration: v021_fund_forensic_dossiers...")
+                if supabase_url:
+                    cursor.execute("""
+                        CREATE TABLE IF NOT EXISTS fund_forensic_dossiers (
+                            id SERIAL PRIMARY KEY,
+                            scheme_code VARCHAR(100) UNIQUE NOT NULL,
+                            dossier_text TEXT NOT NULL,
+                            composite_health_score NUMERIC NOT NULL,
+                            weighted_moat_score NUMERIC NOT NULL,
+                            accounting_risk_index NUMERIC NOT NULL,
+                            margin_of_safety_pct NUMERIC NOT NULL,
+                            promoter_pledge_exposure_pct NUMERIC NOT NULL,
+                            active_share_pct NUMERIC NOT NULL,
+                            top_risky_holdings_json TEXT,
+                            top_quality_holdings_json TEXT,
+                            audited_by VARCHAR(100) DEFAULT 'Gemini_Chief_Forensic_Officer',
+                            last_audited_at TIMESTAMPTZ DEFAULT now()
+                        );
+                        CREATE INDEX IF NOT EXISTS idx_fund_dossier_code ON fund_forensic_dossiers(scheme_code);
+                        INSERT INTO schema_migrations (version) VALUES ('v021_fund_forensic_dossiers') ON CONFLICT DO NOTHING;
+                    """)
+                else:
+                    cursor.execute("""
+                        CREATE TABLE IF NOT EXISTS fund_forensic_dossiers (
+                            id INTEGER PRIMARY KEY AUTOINCREMENT,
+                            scheme_code TEXT UNIQUE NOT NULL,
+                            dossier_text TEXT NOT NULL,
+                            composite_health_score REAL NOT NULL,
+                            weighted_moat_score REAL NOT NULL,
+                            accounting_risk_index REAL NOT NULL,
+                            margin_of_safety_pct REAL NOT NULL,
+                            promoter_pledge_exposure_pct REAL NOT NULL,
+                            active_share_pct REAL NOT NULL,
+                            top_risky_holdings_json TEXT,
+                            top_quality_holdings_json TEXT,
+                            audited_by TEXT DEFAULT 'Gemini_Chief_Forensic_Officer',
+                            last_audited_at TEXT DEFAULT (datetime('now'))
+                        );
+                    """)
+                    cursor.execute("CREATE INDEX IF NOT EXISTS idx_fund_dossier_code ON fund_forensic_dossiers(scheme_code);")
+                    cursor.execute("INSERT OR IGNORE INTO schema_migrations (version) VALUES ('v021_fund_forensic_dossiers');")
+                conn.commit()
+
+            # Migration v022: Autonomous Project-Wide System Audit Logs (google-antigravity-sdk)
+            if "v022_project_audit_logs" not in applied:
+                logger.info("Applying schema migration: v022_project_audit_logs...")
+                if supabase_url:
+                    cursor.execute("""
+                        CREATE TABLE IF NOT EXISTS project_audit_logs (
+                            id SERIAL PRIMARY KEY,
+                            audit_id VARCHAR(100) UNIQUE NOT NULL,
+                            overall_score NUMERIC NOT NULL,
+                            strategy_score NUMERIC NOT NULL,
+                            implementation_score NUMERIC NOT NULL,
+                            uiux_score NUMERIC NOT NULL,
+                            status VARCHAR(32) NOT NULL,
+                            tests_total INTEGER NOT NULL DEFAULT 0,
+                            tests_passed INTEGER NOT NULL DEFAULT 0,
+                            tests_failed INTEGER NOT NULL DEFAULT 0,
+                            endpoints_checked INTEGER NOT NULL DEFAULT 0,
+                            endpoints_healthy INTEGER NOT NULL DEFAULT 0,
+                            critical_violations_json TEXT,
+                            recommendations_json TEXT,
+                            pillar_breakdown_json TEXT,
+                            full_markdown_report TEXT NOT NULL,
+                            audit_engine VARCHAR(100) DEFAULT 'google-antigravity-sdk',
+                            created_at TIMESTAMPTZ DEFAULT now()
+                        );
+                        CREATE INDEX IF NOT EXISTS idx_audit_log_id ON project_audit_logs(audit_id);
+                        CREATE INDEX IF NOT EXISTS idx_audit_created_at ON project_audit_logs(created_at DESC);
+                        INSERT INTO schema_migrations (version) VALUES ('v022_project_audit_logs') ON CONFLICT DO NOTHING;
+                    """)
+                else:
+                    cursor.execute("""
+                        CREATE TABLE IF NOT EXISTS project_audit_logs (
+                            id INTEGER PRIMARY KEY AUTOINCREMENT,
+                            audit_id TEXT UNIQUE NOT NULL,
+                            overall_score REAL NOT NULL,
+                            strategy_score REAL NOT NULL,
+                            implementation_score REAL NOT NULL,
+                            uiux_score REAL NOT NULL,
+                            status TEXT NOT NULL,
+                            tests_total INTEGER NOT NULL DEFAULT 0,
+                            tests_passed INTEGER NOT NULL DEFAULT 0,
+                            tests_failed INTEGER NOT NULL DEFAULT 0,
+                            endpoints_checked INTEGER NOT NULL DEFAULT 0,
+                            endpoints_healthy INTEGER NOT NULL DEFAULT 0,
+                            critical_violations_json TEXT,
+                            recommendations_json TEXT,
+                            pillar_breakdown_json TEXT,
+                            full_markdown_report TEXT NOT NULL,
+                            audit_engine TEXT DEFAULT 'google-antigravity-sdk',
+                            created_at TEXT DEFAULT (datetime('now'))
+                        );
+                    """)
+                    cursor.execute("CREATE INDEX IF NOT EXISTS idx_audit_log_id ON project_audit_logs(audit_id);")
+                    cursor.execute("CREATE INDEX IF NOT EXISTS idx_audit_created_at ON project_audit_logs(created_at DESC);")
+                    cursor.execute("INSERT OR IGNORE INTO schema_migrations (version) VALUES ('v022_project_audit_logs');")
+                conn.commit()
+
+            # Migration v023: Sitewide Autonomous Agent Conversations & Turn Transcripts
+            if "v023_agent_transcripts_and_sessions" not in applied:
+                logger.info("Applying schema migration: v023_agent_transcripts_and_sessions...")
+                if supabase_url:
+                    cursor.execute("""
+                        CREATE TABLE IF NOT EXISTS agent_conversations (
+                            id SERIAL PRIMARY KEY,
+                            conversation_id VARCHAR(100) UNIQUE NOT NULL,
+                            user_id VARCHAR(100),
+                            agent_type VARCHAR(64) NOT NULL,
+                            context_ticker VARCHAR(32),
+                            turn_count INTEGER DEFAULT 0,
+                            total_tokens INTEGER DEFAULT 0,
+                            created_at TIMESTAMPTZ DEFAULT now(),
+                            updated_at TIMESTAMPTZ DEFAULT now()
+                        );
+                        CREATE INDEX IF NOT EXISTS idx_agent_conv_id ON agent_conversations(conversation_id);
+                        CREATE INDEX IF NOT EXISTS idx_agent_conv_ticker ON agent_conversations(context_ticker);
+                        CREATE INDEX IF NOT EXISTS idx_agent_conv_user ON agent_conversations(user_id);
+
+                        CREATE TABLE IF NOT EXISTS agent_conversation_turns (
+                            id SERIAL PRIMARY KEY,
+                            conversation_id VARCHAR(100) NOT NULL,
+                            turn_index INTEGER NOT NULL,
+                            sender_role VARCHAR(32) NOT NULL,
+                            content TEXT NOT NULL,
+                            tool_calls_json TEXT,
+                            created_at TIMESTAMPTZ DEFAULT now()
+                        );
+                        CREATE INDEX IF NOT EXISTS idx_agent_turns_conv ON agent_conversation_turns(conversation_id);
+                        INSERT INTO schema_migrations (version) VALUES ('v023_agent_transcripts_and_sessions') ON CONFLICT DO NOTHING;
+                    """)
+                else:
+                    cursor.execute("""
+                        CREATE TABLE IF NOT EXISTS agent_conversations (
+                            id INTEGER PRIMARY KEY AUTOINCREMENT,
+                            conversation_id TEXT UNIQUE NOT NULL,
+                            user_id TEXT,
+                            agent_type TEXT NOT NULL,
+                            context_ticker TEXT,
+                            turn_count INTEGER DEFAULT 0,
+                            total_tokens INTEGER DEFAULT 0,
+                            created_at TEXT DEFAULT (datetime('now')),
+                            updated_at TEXT DEFAULT (datetime('now'))
+                        );
+                    """)
+                    cursor.execute("CREATE INDEX IF NOT EXISTS idx_agent_conv_id ON agent_conversations(conversation_id);")
+                    cursor.execute("CREATE INDEX IF NOT EXISTS idx_agent_conv_ticker ON agent_conversations(context_ticker);")
+                    cursor.execute("CREATE INDEX IF NOT EXISTS idx_agent_conv_user ON agent_conversations(user_id);")
+                    cursor.execute("""
+                        CREATE TABLE IF NOT EXISTS agent_conversation_turns (
+                            id INTEGER PRIMARY KEY AUTOINCREMENT,
+                            conversation_id TEXT NOT NULL,
+                            turn_index INTEGER NOT NULL,
+                            sender_role TEXT NOT NULL,
+                            content TEXT NOT NULL,
+                            tool_calls_json TEXT,
+                            created_at TEXT DEFAULT (datetime('now'))
+                        );
+                    """)
+                    cursor.execute("CREATE INDEX IF NOT EXISTS idx_agent_turns_conv ON agent_conversation_turns(conversation_id);")
+                    cursor.execute("INSERT OR IGNORE INTO schema_migrations (version) VALUES ('v023_agent_transcripts_and_sessions');")
+                conn.commit()
+
+            # Migration v024: Autonomous Proactive Event & Watcher Ledger
+            if "v024_autonomous_event_ledger" not in applied:
+                logger.info("Applying schema migration: v024_autonomous_event_ledger...")
+                if supabase_url:
+                    cursor.execute("""
+                        CREATE TABLE IF NOT EXISTS autonomous_event_ledger (
+                            id SERIAL PRIMARY KEY,
+                            event_id VARCHAR(100) UNIQUE NOT NULL,
+                            event_type VARCHAR(64) NOT NULL,
+                            ticker VARCHAR(32),
+                            trigger_source VARCHAR(64) NOT NULL,
+                            action_taken VARCHAR(64) NOT NULL,
+                            summary TEXT NOT NULL,
+                            metadata_json TEXT,
+                            created_at TIMESTAMPTZ DEFAULT now()
+                        );
+                        CREATE INDEX IF NOT EXISTS idx_event_ledger_id ON autonomous_event_ledger(event_id);
+                        CREATE INDEX IF NOT EXISTS idx_event_ledger_type ON autonomous_event_ledger(event_type);
+                        CREATE INDEX IF NOT EXISTS idx_event_ledger_ticker ON autonomous_event_ledger(ticker);
+                        CREATE INDEX IF NOT EXISTS idx_event_ledger_created ON autonomous_event_ledger(created_at DESC);
+                        INSERT INTO schema_migrations (version) VALUES ('v024_autonomous_event_ledger') ON CONFLICT DO NOTHING;
+                    """)
+                else:
+                    cursor.execute("""
+                        CREATE TABLE IF NOT EXISTS autonomous_event_ledger (
+                            id INTEGER PRIMARY KEY AUTOINCREMENT,
+                            event_id TEXT UNIQUE NOT NULL,
+                            event_type TEXT NOT NULL,
+                            ticker TEXT,
+                            trigger_source TEXT NOT NULL,
+                            action_taken TEXT NOT NULL,
+                            summary TEXT NOT NULL,
+                            metadata_json TEXT,
+                            created_at TEXT DEFAULT (datetime('now'))
+                        );
+                    """)
+                    cursor.execute("CREATE INDEX IF NOT EXISTS idx_event_ledger_id ON autonomous_event_ledger(event_id);")
+                    cursor.execute("CREATE INDEX IF NOT EXISTS idx_event_ledger_type ON autonomous_event_ledger(event_type);")
+                    cursor.execute("CREATE INDEX IF NOT EXISTS idx_event_ledger_ticker ON autonomous_event_ledger(ticker);")
+                    cursor.execute("CREATE INDEX IF NOT EXISTS idx_event_ledger_created ON autonomous_event_ledger(created_at DESC);")
+                    cursor.execute("INSERT OR IGNORE INTO schema_migrations (version) VALUES ('v024_autonomous_event_ledger');")
+                conn.commit()
+
             _DB_INITIALIZED = True
             _INITIALIZED_DBS.add(target_key)
         except Exception as e:

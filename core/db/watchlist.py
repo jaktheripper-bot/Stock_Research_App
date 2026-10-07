@@ -45,6 +45,10 @@ def get_watchlist() -> list:
         conn.close()
     return items
 
+
+get_watchlist_items = get_watchlist
+
+
 get_watchlist.clear = get_watchlist.cache_clear
 
 def add_to_watchlist(ticker: str, short_name: str = "", scrip_code: str = "",

@@ -36,6 +36,14 @@
         <div style="font-size: 14px; color: #94a3b8;">
           Benchmark: <strong style="color: #f8fafc;">{{ scheme.benchmark_index }}</strong> • Manager: <strong style="color: #f8fafc;">{{ scheme.fund_manager }}</strong> • Portfolio Date: {{ scheme.last_portfolio_date }}
         </div>
+        <div style="display: flex; gap: 8px; margin-top: 14px; flex-wrap: wrap;">
+          <button onclick="openCopilot('{{ scheme.scheme_code }}')" class="btn btn-sm" style="background: rgba(14, 165, 233, 0.15); color: #38bdf8; border: 1px solid rgba(14, 165, 233, 0.4); font-weight: 700; border-radius: 9999px; cursor: pointer;">
+            🛡️ Forensic Copilot
+          </button>
+          <a href="/api/pdf/fund/{{ scheme.scheme_code }}" class="btn btn-sm btn-secondary" style="border-radius: 9999px; text-decoration: none; font-size: 12px; font-weight: 600;">
+            📄 Export PDF Dossier
+          </a>
+        </div>
       </div>
 
       <!-- Health Score Gauge -->
@@ -65,6 +73,105 @@
   </div>
   {% endif %}
 
+  <!-- Institutional 7-Pillar Forensic Look-Through Workspace -->
+  {% if forensic_dossier %}
+  <div style="background: linear-gradient(135deg, rgba(30, 27, 75, 0.45) 0%, rgba(15, 23, 42, 0.85) 100%); border: 1px solid rgba(168, 85, 247, 0.3); border-radius: 16px; padding: 24px; margin-bottom: 24px; box-shadow: 0 8px 24px rgba(0, 0, 0, 0.3);">
+    <div style="display: flex; justify-content: space-between; align-items: flex-start; flex-wrap: wrap; gap: 12px; margin-bottom: 18px;">
+      <div>
+        <div style="display: inline-flex; align-items: center; gap: 6px; background: rgba(168, 85, 247, 0.15); border: 1px solid rgba(168, 85, 247, 0.3); border-radius: 9999px; padding: 3px 10px; margin-bottom: 8px;">
+          <span style="width: 6px; height: 6px; border-radius: 50%; background: #c084fc;"></span>
+          <span style="font-size: 11px; font-weight: 700; color: #e9d5ff; text-transform: uppercase;">7-Pillar Equity Look-Through Synthesis</span>
+        </div>
+        <h2 style="font-size: 20px; font-weight: 800; color: #f8fafc; margin: 0;">
+          Constituent Forensic Metrics & Solvency Look-Through
+        </h2>
+        <div style="font-size: 13px; color: #94a3b8; margin-top: 4px;">
+          Aggregated directly from verified 7-pillar institutional stock dossiers in reports.db.
+        </div>
+      </div>
+      <button id="btnReauditFund" onclick="triggerFundReaudit('{{ scheme.scheme_code }}')" class="btn btn-sm btn-outline-primary" style="display: inline-flex; align-items: center; gap: 6px; border-radius: 9999px; font-weight: 600;">
+        <span>🔄</span> Re-Audit Look-Through
+      </button>
+    </div>
+
+    <!-- 4-Card Forensic Meter Strip -->
+    <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 12px; margin-bottom: 20px;">
+      <div style="background: rgba(15, 23, 42, 0.7); border: 1px solid rgba(255, 255, 255, 0.08); border-radius: 12px; padding: 14px;">
+        <div style="font-size: 11px; color: #94a3b8; text-transform: uppercase; font-weight: 600;">Weighted Moat Index</div>
+        <div style="font-size: 24px; font-weight: 800; color: #c084fc; margin: 2px 0;">{{ forensic_dossier.weighted_moat_score }}<span style="font-size: 13px; color: #64748b;">/100</span></div>
+        <div style="font-size: 11px; color: #64748b;">Wide & Moderate Moat capital</div>
+      </div>
+
+      <div style="background: rgba(15, 23, 42, 0.7); border: 1px solid rgba(255, 255, 255, 0.08); border-radius: 12px; padding: 14px;">
+        <div style="font-size: 11px; color: #94a3b8; text-transform: uppercase; font-weight: 600;">Accounting Risk (ASRI)</div>
+        <div style="font-size: 24px; font-weight: 800; color: {% if forensic_dossier.accounting_risk_index <= 5.0 %}#10b981{% elif forensic_dossier.accounting_risk_index <= 15.0 %}#f59e0b{% else %}#ef4444{% endif %}; margin: 2px 0;">
+          {{ forensic_dossier.accounting_risk_index }}%
+        </div>
+        <div style="font-size: 11px; color: {% if forensic_dossier.accounting_risk_index <= 5.0 %}#10b981{% else %}#ef4444{% endif %}; font-weight: 600;">
+          {% if forensic_dossier.accounting_risk_index <= 5.0 %}Institutional Prudence{% elif forensic_dossier.accounting_risk_index <= 15.0 %}Moderate Leverage{% else %}Fiduciary Fragility Warning{% endif %}
+        </div>
+      </div>
+
+      <div style="background: rgba(15, 23, 42, 0.7); border: 1px solid rgba(255, 255, 255, 0.08); border-radius: 12px; padding: 14px;">
+        <div style="font-size: 11px; color: #94a3b8; text-transform: uppercase; font-weight: 600;">Margin of Safety (DCF)</div>
+        <div style="font-size: 24px; font-weight: 800; color: {% if forensic_dossier.margin_of_safety_pct >= 0 %}#10b981{% elif forensic_dossier.margin_of_safety_pct >= -15 %}#f59e0b{% else %}#ef4444{% endif %}; margin: 2px 0;">
+          {{ "{:+.1f}".format(forensic_dossier.margin_of_safety_pct) }}%
+        </div>
+        <div style="font-size: 11px; color: #64748b;">Intrinsic value discount vs price</div>
+      </div>
+
+      <div style="background: rgba(15, 23, 42, 0.7); border: 1px solid rgba(255, 255, 255, 0.08); border-radius: 12px; padding: 14px;">
+        <div style="font-size: 11px; color: #94a3b8; text-transform: uppercase; font-weight: 600;">Promoter Pledge Exposure</div>
+        <div style="font-size: 24px; font-weight: 800; color: {% if forensic_dossier.promoter_pledge_exposure_pct <= 2.0 %}#10b981{% else %}#ef4444{% endif %}; margin: 2px 0;">
+          {{ forensic_dossier.promoter_pledge_exposure_pct }}%
+        </div>
+        <div style="font-size: 11px; color: #64748b;">Capital in high-pledge promoters</div>
+      </div>
+    </div>
+
+    <!-- Dual List: Moat Compounders vs Solvency Watchlist -->
+    <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 14px;">
+      <!-- High Moat Compounders -->
+      <div style="background: rgba(15, 23, 42, 0.5); border: 1px solid rgba(255, 255, 255, 0.05); border-radius: 10px; padding: 14px;">
+        <div style="font-size: 12px; font-weight: 700; color: #10b981; margin-bottom: 8px; display: flex; align-items: center; gap: 6px;">
+          <span>🛡️</span> Fortress Moat Compounders (Top Quality Allocations)
+        </div>
+        <div style="display: flex; flex-direction: column; gap: 6px;">
+          {% for q in forensic_dossier.top_quality_holdings %}
+          <div style="display: flex; justify-content: space-between; align-items: center; font-size: 12px; padding: 4px 0; border-bottom: 1px solid rgba(255, 255, 255, 0.04);">
+            <a href="/dossier/{{ q.identifier }}" style="color: #38bdf8; text-decoration: none; font-weight: 600;">
+              {{ q.name }} ({{ q.identifier }})
+            </a>
+            <span style="color: #94a3b8;">{{ q.weight_pct }}% weight</span>
+          </div>
+          {% else %}
+          <div style="font-size: 12px; color: #64748b;">Diversified core holdings</div>
+          {% endfor %}
+        </div>
+      </div>
+
+      <!-- Solvency Watchlist -->
+      <div style="background: rgba(15, 23, 42, 0.5); border: 1px solid rgba(255, 255, 255, 0.05); border-radius: 10px; padding: 14px;">
+        <div style="font-size: 12px; font-weight: 700; color: #f59e0b; margin-bottom: 8px; display: flex; align-items: center; gap: 6px;">
+          <span>⚠️</span> Forensic Solvency & Valuation Watchlist
+        </div>
+        <div style="display: flex; flex-direction: column; gap: 6px;">
+          {% for r in forensic_dossier.top_risky_holdings %}
+          <div style="display: flex; justify-content: space-between; align-items: center; font-size: 12px; padding: 4px 0; border-bottom: 1px solid rgba(255, 255, 255, 0.04);">
+            <a href="/dossier/{{ r.identifier }}" style="color: #fca5a5; text-decoration: none; font-weight: 600;">
+              {{ r.name }} ({{ r.identifier }})
+            </a>
+            <span style="color: #ef4444; font-weight: 600;">{{ r.weight_pct }}% ({{ "{:+.0f}".format(r.mos_pct) }}% MoS)</span>
+          </div>
+          {% else %}
+          <div style="font-size: 12px; color: #10b981;">✓ Zero elevated forensic accounting or leverage anomalies detected</div>
+          {% endfor %}
+        </div>
+      </div>
+    </div>
+  </div>
+  {% endif %}
+
   <!-- Core 6-Pillar Analytical Workspaces -->
   <div style="display: grid; grid-template-columns: 1fr; gap: 24px;">
 
@@ -73,10 +180,10 @@
       <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px; flex-wrap: wrap; gap: 12px;">
         <div>
           <h2 style="font-size: 18px; font-weight: 700; color: #f8fafc; margin: 0;">
-            Pillar 1: Dual-Sleeve Constituent Decomposition
+            01: Dual-Sleeve Constituent Decomposition
           </h2>
           <div style="font-size: 13px; color: #64748b;">
-            Equity holdings evaluated via 7-Pillar Stock Engine; Debt/bonds evaluated via 5-Pillar Credit Engine.
+            Equity holdings evaluated via Forensic Equity Engine; Debt/bonds evaluated via Credit & Solvency Engine.
           </div>
         </div>
         <!-- Sleeve Weight Tags -->
@@ -131,7 +238,7 @@
               </td>
               <td style="padding: 12px 16px; font-weight: 700; color: #f8fafc;">{{ h.weight_pct }}%</td>
               <td style="padding: 12px 16px; color: #94a3b8;">{{ h.sector_or_rating }}</td>
-              <td style="padding: 12px 16px; font-weight: 800; color: {% if h.score >= 80 %}#10b981{% elif h.score >= 65 %}#38bdf8{% elif h.score >= 50 %}#f59e0b{% else %}#ef4444{% endif %};">
+              <td style="padding: 12px 16px; font-weight: 800; color: {% if h.score is number %}{% if h.score >= 80 %}#10b981{% elif h.score >= 65 %}#38bdf8{% elif h.score >= 50 %}#f59e0b{% else %}#ef4444{% endif %}{% else %}#94a3b8{% endif %};">
                 {{ h.score }}
               </td>
               <td style="padding: 12px 16px; color: #64748b; font-size: 12px;">{{ h.notes }}</td>
@@ -148,7 +255,7 @@
       <!-- Pillar 2: Active Share & Closet Indexing -->
       <div style="background: rgba(30, 41, 59, 0.4); border: 1px solid rgba(255, 255, 255, 0.08); border-radius: 14px; padding: 22px;">
         <h2 style="font-size: 16px; font-weight: 700; color: #f8fafc; margin-bottom: 4px;">
-          Pillar 2: True Diversification & Active Share
+          02: True Diversification & Active Share
         </h2>
         <div style="font-size: 12px; color: #64748b; margin-bottom: 16px;">
           Exposing Closet Indexing: Active Share AS = 0.5 × ∑|w_fund - w_bench|
@@ -179,7 +286,7 @@
       <!-- Pillar 3 & 4: Risk-Adjusted Alpha & Asymmetrical Downside Resilience -->
       <div style="background: rgba(30, 41, 59, 0.4); border: 1px solid rgba(255, 255, 255, 0.08); border-radius: 14px; padding: 22px;">
         <h2 style="font-size: 16px; font-weight: 700; color: #f8fafc; margin-bottom: 4px;">
-          Pillars 3 & 4: Risk-Adjusted Alpha & Downside Capture
+          03 & 04: Risk-Adjusted Alpha & Downside Capture
         </h2>
         <div style="font-size: 12px; color: #64748b; margin-bottom: 16px;">
           Evaluating asymmetrical compounding: Downside Capture Ratio vs Upside Capture Ratio.
@@ -228,7 +335,7 @@
       <div style="display: flex; justify-content: space-between; align-items: flex-start; flex-wrap: wrap; gap: 12px; margin-bottom: 16px;">
         <div>
           <h2 style="font-size: 18px; font-weight: 700; color: #f8fafc; margin: 0;">
-            Pillar 5: Intermediary Fee Drag & Wealth Destruction
+            05: Intermediary Fee Drag & Wealth Destruction
           </h2>
           <div style="font-size: 13px; color: #64748b;">
             Direct Plan vs Regular Plan: Compounded wealth transfer to distributor commissions over time.
@@ -273,6 +380,30 @@
       </p>
     </div>
 
+    <!-- Workspace 6: Institutional Forensic AI Audit Dossier Narrative -->
+    {% if forensic_dossier and forensic_dossier.dossier_text %}
+    <div style="background: rgba(30, 41, 59, 0.4); border: 1px solid rgba(168, 85, 247, 0.25); border-radius: 14px; padding: 26px;">
+      <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 18px; flex-wrap: wrap; gap: 10px;">
+        <div>
+          <h2 style="font-size: 18px; font-weight: 700; color: #f8fafc; margin: 0;">
+            06: Institutional Forensic Qualitative Audit Dossier
+          </h2>
+          <div style="font-size: 13px; color: #94a3b8;">
+            Synthesized by Chief Forensic Officer (Gemini AI) grounded in 7-pillar look-through data.
+          </div>
+        </div>
+        <span style="font-size: 11px; font-weight: 600; color: #c084fc; background: rgba(168, 85, 247, 0.15); border: 1px solid rgba(168, 85, 247, 0.3); padding: 4px 10px; border-radius: 6px;">
+          Audited: {{ (forensic_dossier.last_audited_at|string)[:16] }}
+        </span>
+      </div>
+
+      <!-- Styled Prose Display -->
+      <div style="color: #cbd5e1; font-size: 14px; line-height: 1.7; background: rgba(15, 23, 42, 0.6); border-radius: 12px; padding: 22px; border: 1px solid rgba(255, 255, 255, 0.05); white-space: pre-wrap; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;">
+{{ forensic_dossier.dossier_text }}
+      </div>
+    </div>
+    {% endif %}
+
     <!-- Quick Navigation Bottom Toolbar -->
     <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 12px; margin-top: 8px;">
       <a href="/funds" class="btn btn-secondary btn-sm" style="border-radius: 9999px;">
@@ -285,4 +416,40 @@
 
   </div>
 </div>
+
+<script>
+async function triggerFundReaudit(schemeCode) {
+  const btn = document.getElementById('btnReauditFund');
+  if (btn) {
+    btn.disabled = true;
+    btn.innerHTML = '<span>⏳</span> Auditing Holdings...';
+  }
+  try {
+    const res = await fetch('/api/admin/run-fund-audit', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ scheme_code: schemeCode })
+    });
+    const data = await res.json();
+    if (data.success) {
+      window.location.reload();
+    } else {
+      alert('Audit notice: ' + (data.detail || 'Could not complete audit.'));
+      if (btn) {
+        btn.disabled = false;
+        btn.innerHTML = '<span>🔄</span> Re-Audit Look-Through';
+      }
+    }
+  } catch (err) {
+    alert('Error triggering audit: ' + err);
+    if (btn) {
+      btn.disabled = false;
+      btn.innerHTML = '<span>🔄</span> Re-Audit Look-Through';
+    }
+  }
+}
+</script>
+
+{% include "partials/copilot_modal.html" %}
+<script src="/static/js/copilot.js"></script>
 {% endblock %}

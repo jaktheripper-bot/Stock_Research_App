@@ -673,6 +673,73 @@ window.handlePreMortemSubmit = async function(e, ticker) {
   }
 };
 
+window.openThesisModal = function() {
+  const modal = document.getElementById('thesisModalBackdrop');
+  if (modal) {
+    modal.style.display = 'flex';
+  }
+};
+
+window.closeThesisModal = function() {
+  const modal = document.getElementById('thesisModalBackdrop');
+  if (modal) {
+    modal.style.display = 'none';
+  }
+};
+
+window.handleThesisCheckpointSubmit = async function(e, ticker) {
+  if (e) e.preventDefault();
+  const decisionEl = document.querySelector('input[name="thesisDecision"]:checked');
+  const decision = decisionEl ? decisionEl.value : 'WOULD_BUY_TODAY';
+  const rationale = document.getElementById('thesisRationale')?.value || '';
+  const priceVal = parseFloat(document.getElementById('thesisCurrentPrice')?.value || '0');
+  const statusEl = document.getElementById('thesisStatus');
+  const btn = document.getElementById('btnCommitThesis');
+
+  if (!rationale.trim()) {
+    alert('Please enter an objective rationale before committing your thesis verdict.');
+    return;
+  }
+
+  if (btn) {
+    btn.disabled = true;
+    btn.innerText = 'Committing Verdict...';
+  }
+
+  try {
+    const user = getStoredUser();
+    const resp = await fetch('/api/thesis-checkpoint', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        ticker: ticker,
+        decision: decision,
+        rationale: rationale,
+        current_price: priceVal,
+        user_id: user ? user.id : 'guest_web_user'
+      })
+    });
+    const data = await resp.json();
+    if (resp.ok && data.success) {
+      if (statusEl) {
+        statusEl.innerText = '✅ Committed to Decision Ledger!';
+        statusEl.style.color = 'var(--accent-emerald)';
+      }
+      alert(`⚖️ ${data.message}`);
+      window.closeThesisModal();
+    } else {
+      alert('Error: ' + (data.detail || data.message || 'Could not record checkpoint.'));
+    }
+  } catch (err) {
+    alert('Error recording thesis checkpoint: ' + err.message);
+  } finally {
+    if (btn) {
+      btn.disabled = false;
+      btn.innerText = '🔒 Commit to Ledger';
+    }
+  }
+};
+
 function getStoredUser() {
   try {
     const raw = localStorage.getItem('sr_user');

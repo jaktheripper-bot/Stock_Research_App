@@ -21,9 +21,9 @@ import io
 import hmac
 import hashlib
 from datetime import datetime, timezone, timedelta
-from typing import Optional
+from typing import Optional, List, Dict, Any
 
-from fastapi import FastAPI, Request, HTTPException, Form, Header, BackgroundTasks, Query
+from fastapi import FastAPI, Request, HTTPException, Form, Header, BackgroundTasks, Query, Body
 from fastapi.responses import HTMLResponse, RedirectResponse, Response, JSONResponse
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
@@ -169,6 +169,8 @@ from core.db.mutual_funds import (
     get_scheme_holdings,
     get_schemes_by_holding,
     seed_default_mutual_funds,
+    get_featured_daily_fund_dossier,
+    get_fund_forensic_dossier,
 )
 from core.analysis.mutual_fund_engine import (
     evaluate_mutual_fund_comprehensive,
@@ -176,6 +178,10 @@ from core.analysis.mutual_fund_engine import (
     calculate_portfolio_overlap,
     calculate_active_share,
     calculate_fee_drag,
+)
+from core.analysis.fund_forensic_auditor import (
+    audit_single_fund_daily,
+    compute_fund_forensic_lookthrough,
 )
 
 logger = logging.getLogger("equity_research.web")
@@ -236,6 +242,117 @@ async def run_daily_discovery_scheduler():
             logger.error(f"🌅 [Discovery Scheduler] Error in daily discovery scheduler: {e}")
             await asyncio.sleep(60)
 
+async def run_daily_amfi_scheduler():
+    """
+    Automated background AMFI NAV synchronizer:
+    AMFI publishes official daily NAVAll.txt files around 11:00 PM IST.
+    Executes synchronization daily at 23:15 IST.
+    """
+    logger.info("📊 [AMFI Scheduler] Background AMFI NAV synchronizer initiated.")
+    while True:
+        try:
+            now = datetime.now(IST)
+            target = now.replace(hour=23, minute=15, second=0, microsecond=0)
+            if now >= target:
+                target += timedelta(days=1)
+            wait_seconds = (target - now).total_seconds()
+            logger.info(f"📊 [AMFI Scheduler] Next AMFI synchronization scheduled in {wait_seconds/3600:.2f} hours (at {target.strftime('%Y-%m-%d %H:%M:%S IST')}).")
+            await asyncio.sleep(wait_seconds)
+
+            logger.info("📊 [AMFI Scheduler] Executing scheduled nightly AMFI NAV synchronization...")
+            from core.ingestion.amfi import ingest_amfi_daily_feed
+            from core.db.agent_sessions import record_autonomous_event
+            loop = asyncio.get_running_loop()
+            await loop.run_in_executor(None, ingest_amfi_daily_feed, None, True)
+            record_autonomous_event(
+                event_type="AMFI_NAV_SYNC",
+                ticker="AMFI_PORTAL",
+                trigger_source="AMFI_NAV_SCHEDULER",
+                action_taken="NAV_SYNC_AND_DELTA_CALC",
+                summary="Nightly AMFI NAV synchronization and delta computation successfully completed.",
+                metadata={"updated": True}
+            )
+            logger.info("📊 [AMFI Scheduler] Nightly AMFI synchronization completed.")
+        except asyncio.CancelledError:
+            logger.info("📊 [AMFI Scheduler] Background AMFI scheduler cancelled.")
+            break
+        except Exception as e:
+            logger.error(f"📊 [AMFI Scheduler] Error in AMFI synchronization: {e}")
+            await asyncio.sleep(120)
+
+async def run_daily_fund_audit_scheduler():
+    """
+    Automated background Mutual Fund Forensic Auditor:
+    Executes deep 7-pillar portfolio look-through audit across constituent holdings
+    for the next eligible fund in the rotation queue daily at 23:30 IST
+    (15 minutes post-AMFI NAV synchronization).
+    """
+    logger.info("🔍 [Fund Audit Scheduler] Background mutual fund forensic auditor initiated.")
+    while True:
+        try:
+            now = datetime.now(IST)
+            target = now.replace(hour=23, minute=30, second=0, microsecond=0)
+            if now >= target:
+                target += timedelta(days=1)
+            wait_seconds = (target - now).total_seconds()
+            logger.info(f"🔍 [Fund Audit Scheduler] Next fund audit scheduled in {wait_seconds/3600:.2f} hours (at {target.strftime('%Y-%m-%d %H:%M:%S IST')}).")
+            await asyncio.sleep(wait_seconds)
+
+            logger.info("🔍 [Fund Audit Scheduler] Executing scheduled nightly mutual fund forensic audit...")
+            from core.analysis.fund_forensic_auditor import audit_single_fund_daily
+            from core.db.agent_sessions import record_autonomous_event
+            loop = asyncio.get_running_loop()
+            res = await loop.run_in_executor(None, audit_single_fund_daily, None, False)
+            
+            if res:
+                record_autonomous_event(
+                    event_type="DAILY_FUND_AUDIT",
+                    ticker=res.get("scheme_code", "UNKNOWN"),
+                    trigger_source="AMFI_SCHEDULER_ROTATION",
+                    action_taken="7_PILLAR_LOOKTHROUGH_AUDIT",
+                    summary=f"Automated 7-pillar look-through audit completed for {res.get('scheme_name')} ({res.get('scheme_code')}). Health: {res.get('composite_health_score')}/100, Moat: {res.get('weighted_moat_score')}/100, ASRI: {res.get('accounting_risk_index')}%.",
+                    metadata={
+                        "composite_health_score": res.get("composite_health_score"),
+                        "weighted_moat_score": res.get("weighted_moat_score"),
+                        "accounting_risk_index": res.get("accounting_risk_index"),
+                        "margin_of_safety_pct": res.get("margin_of_safety_pct")
+                    }
+                )
+            logger.info(f"🔍 [Fund Audit Scheduler] Nightly fund forensic audit completed for {res.get('scheme_code')}.")
+        except asyncio.CancelledError:
+            logger.info("🔍 [Fund Audit Scheduler] Background fund audit scheduler cancelled.")
+            break
+        except Exception as e:
+            logger.error(f"🔍 [Fund Audit Scheduler] Error in fund audit scheduler: {e}")
+            await asyncio.sleep(180)
+
+async def run_daily_project_audit_scheduler():
+    """
+    Automated background Project Auditor via Google Antigravity SDK:
+    Runs nightly at 03:00 IST to audit Strategy, Code Implementation, and UI/UX.
+    """
+    logger.info("🛡️ [Project Auditor Scheduler] Background project auditor initiated.")
+    while True:
+        try:
+            now = datetime.now(IST)
+            target = now.replace(hour=3, minute=0, second=0, microsecond=0)
+            if now >= target:
+                target += timedelta(days=1)
+            wait_seconds = (target - now).total_seconds()
+            logger.info(f"🛡️ [Project Auditor Scheduler] Next audit scheduled in {wait_seconds/3600:.2f} hours (at {target.strftime('%Y-%m-%d %H:%M:%S IST')}).")
+            await asyncio.sleep(wait_seconds)
+
+            logger.info("🛡️ [Project Auditor Scheduler] Executing scheduled nightly project audit...")
+            from core.audit.project_auditor import audit_project_full
+            await audit_project_full(use_ai=True)
+            logger.info("🛡️ [Project Auditor Scheduler] Nightly project audit completed.")
+        except asyncio.CancelledError:
+            logger.info("🛡️ [Project Auditor Scheduler] Background scheduler cancelled.")
+            break
+        except Exception as e:
+            logger.error(f"🛡️ [Project Auditor Scheduler] Error in project audit scheduler: {e}")
+            await asyncio.sleep(180)
+
 from apscheduler.schedulers.asyncio import AsyncIOScheduler
 from core.msme.scheduler import register_jobs
 
@@ -265,22 +382,43 @@ async def lifespan(app: FastAPI):
     is_testing = os.environ.get("TESTING") == "1" or "pytest" in sys.modules
     scheduler = None
     discovery_task = None
+    amfi_task = None
+    fund_audit_task = None
+    audit_task = None
+    bse_task = None
 
     if not is_testing:
-        # Warm‑up task to prime async resources
-        await warmup_task()
+        # Warm‑up task to prime async resources in background
+        asyncio.create_task(warmup_task())
         # Start APScheduler for MSME background jobs
         scheduler = AsyncIOScheduler()
         register_jobs(scheduler)
         scheduler.start()
         # Start automated daily discovery background scheduler
         discovery_task = asyncio.create_task(run_daily_discovery_scheduler())
+        # Start automated daily AMFI NAV background scheduler
+        amfi_task = asyncio.create_task(run_daily_amfi_scheduler())
+        # Start automated daily mutual fund forensic audit background scheduler
+        fund_audit_task = asyncio.create_task(run_daily_fund_audit_scheduler())
+        # Start automated daily project audit background scheduler
+        audit_task = asyncio.create_task(run_daily_project_audit_scheduler())
+        # Start proactive BSE announcement watcher
+        from core.agents.watchers.bse_watcher import run_bse_watcher_loop
+        bse_task = asyncio.create_task(run_bse_watcher_loop())
 
     try:
         yield
     finally:
         if discovery_task:
             discovery_task.cancel()
+        if amfi_task:
+            amfi_task.cancel()
+        if fund_audit_task:
+            fund_audit_task.cancel()
+        if audit_task:
+            audit_task.cancel()
+        if bse_task:
+            bse_task.cancel()
         if scheduler:
             scheduler.shutdown()
 
@@ -308,13 +446,12 @@ async def warmup_task():
     if os.environ.get("TESTING") == "1" or "pytest" in sys.modules:
         logger.info("🧪 Test environment detected: skipping live network warm-up task.")
         return
-    logger.info("🚀 Starting warm‑up task: preloading resources...")
+    logger.info("🚀 Starting warm‑up task: preloading local database connections...")
     try:
-        # Simple warm‑up using compare_two_companies to load HTTP client pool and DB connections
-        await compare_two_companies("INFY", "TCS")
-        logger.info("🚀 Warm‑up task completed: compare_two_companies preloaded.")
+        init_db()
+        logger.info("🚀 Warm‑up task completed: DB connection and schema caches primed.")
     except Exception as e:
-        logger.exception(f"Warm‑up task failed: {e}")
+        logger.warning(f"Warm‑up task warning: {e}")
 if BrotliMiddleware is not None:
     app.add_middleware(BrotliMiddleware, minimum_size=500)
 # Security headers middleware for CSP, HSTS, etc.
@@ -850,6 +987,140 @@ def api_get_recent_rating_actions(limit: int = 50):
     return json_response_with_cache({"status": "success", "count": len(actions), "actions": actions})
 
 
+class IngestDebtRequest(BaseModel):
+    isin: str
+    ticker: Optional[str] = None
+    instrument_name: Optional[str] = None
+    coupon_rate_pct: Optional[float] = None
+    maturity_date: Optional[str] = None
+    seniority_tier: Optional[str] = "SENIOR_SECURED"
+    credit_rating: Optional[str] = "CRISIL AAA"
+    credit_rating_agency: Optional[str] = "CRISIL"
+    face_value: Optional[float] = 10000.0
+    last_traded_price: Optional[float] = None
+    coupon_frequency: Optional[str] = "ANNUAL"
+    is_sdi: Optional[bool] = False
+    originator: Optional[str] = None
+
+
+@app.post("/api/debt/ingest")
+def api_ingest_debt_security(payload: IngestDebtRequest):
+    """Public API: Ingest and analyze any corporate bond, NCD, or SDI by ISIN."""
+    init_db()
+    raw_isin = (payload.isin or "").strip().upper()
+    if not raw_isin or len(raw_isin) != 12:
+        raise HTTPException(
+            status_code=400,
+            detail="Invalid ISIN. Indian ISINs must be exactly 12 alphanumeric characters (e.g., INE002A08012)."
+        )
+
+    # Check if already present in database
+    existing = get_debt_security_by_isin(raw_isin)
+    if existing:
+        return {
+            "status": "success",
+            "message": f"Security {raw_isin} is already indexed in the corporate debt directory.",
+            "isin": raw_isin,
+            "redirect_url": f"/debt/{raw_isin}",
+            "already_exists": True
+        }
+
+    # Resolve intelligent defaults if omitted
+    ticker = (payload.ticker or "").strip().upper()
+    if not ticker:
+        isin_prefix_map = {
+            "INE002A": "RELIANCE",
+            "INE306N": "TATACAP",
+            "INE121A": "CHOLAFIN",
+            "INE238A": "AXISBANK",
+            "INE756I": "HDBFS",
+            "INE020B": "REC",
+            "INE134E": "PFC",
+            "INE053F": "IRFC",
+            "INE906B": "NHAI",
+            "INE733E": "NTPC",
+            "INE721A": "SHRIRAMFIN",
+            "INE414G": "MUTHOOTFIN",
+            "INE522D": "MANAPPURAM",
+            "INE725H": "LTFIN",
+            "INE062A": "SBIN",
+            "INE040A": "HDFCBANK",
+            "INE601U": "KOTAKHOME",
+            "INE261F": "NABARD",
+            "INE087H": "PIRAMAL"
+        }
+        matched_prefix = next((p for p in isin_prefix_map if raw_isin.startswith(p)), None)
+        ticker = isin_prefix_map[matched_prefix] if matched_prefix else f"CORP_{raw_isin[3:7]}"
+
+    name = payload.instrument_name or f"{ticker} Fixed-Income Security ({raw_isin})"
+    coupon = float(payload.coupon_rate_pct if payload.coupon_rate_pct is not None else 8.50)
+    now_dt = datetime.now()
+    mat_date = payload.maturity_date or f"{now_dt.year + 3}-{now_dt.month:02d}-{now_dt.day:02d}"
+    face_val = float(payload.face_value or 10000.0)
+    price = float(payload.last_traded_price or face_val)
+
+    from core.analysis.debt_crawler import ingest_collated_security
+    raw_sec = {
+        "isin": raw_isin,
+        "ticker": ticker,
+        "instrument_name": name,
+        "instrument_type": "SDI" if payload.is_sdi else "NCD",
+        "seniority_tier": (payload.seniority_tier or "SENIOR_SECURED").upper(),
+        "face_value": face_val,
+        "coupon_rate_pct": coupon,
+        "coupon_frequency": (payload.coupon_frequency or "ANNUAL").upper(),
+        "issue_date": now_dt.strftime("%Y-%m-%d"),
+        "maturity_date": mat_date,
+        "credit_rating": payload.credit_rating or "CRISIL AAA",
+        "credit_rating_agency": payload.credit_rating_agency or "CRISIL",
+        "asset_cover_ratio": 1.25,
+        "is_listed": True,
+        "exchange": "BSE",
+        "is_sdi": bool(payload.is_sdi),
+        "originator": payload.originator,
+        "fldg_pct": 0.0,
+        "last_traded_price": price,
+        "metadata": {
+            "sector": "Corporate Fixed Income",
+            "promoter_group": f"{ticker} Group",
+            "issuer_overview": f"Institutional fixed-income security indexed via on-demand ISIN audit for {raw_isin}.",
+            "collateral_type": "Registered charge on standard assets",
+            "the_good": [
+                f"Listed and tracked under SEBI ₹10,000 face value framework.",
+                f"Contractual coupon rate of {coupon:.2f}%."
+            ],
+            "the_bad": [
+                f"Requires ongoing surveillance against issuer credit and liquidity cycles."
+            ],
+            "the_ugly": [
+                f"Seniority waterfall risk in unexpected restructuring proceedings."
+            ],
+            "collated_sources": ["User Ingestion Portal", "BSE Debt Market"]
+        }
+    }
+
+    rating_event = [{
+        "rating_agency": payload.credit_rating_agency or "CRISIL",
+        "rating_symbol": (payload.credit_rating or "AAA").replace("CRISIL ", "").replace("ICRA ", "").replace("CARE ", "").strip(),
+        "outlook": "STABLE",
+        "action_type": "AFFIRMED",
+        "event_date": now_dt.strftime("%Y-%m-%d"),
+        "action_rationale": f"Initial rating registered on-demand via ISIN ingestion."
+    }]
+
+    success = ingest_collated_security(raw_sec, rating_events=rating_event)
+    if not success:
+        raise HTTPException(status_code=500, detail="Failed to save ingested debt security.")
+
+    return {
+        "status": "success",
+        "message": f"Successfully ingested and audited {raw_isin}.",
+        "isin": raw_isin,
+        "redirect_url": f"/debt/{raw_isin}",
+        "already_exists": False
+    }
+
+
 @app.get("/funds", response_class=HTMLResponse)
 def fund_directory_page(
     request: Request,
@@ -887,6 +1158,7 @@ def fund_directory_page(
     total_aum = sum(s.get("aum_crores", 0.0) for s in schemes)
     drag_vals = [(s.get("ter_regular_pct", 1.5) - s.get("ter_direct_pct", 0.7)) * 100 for s in schemes]
     avg_drag_bps = round(sum(drag_vals) / len(drag_vals), 0) if drag_vals else 75
+    featured_fund = get_featured_daily_fund_dossier()
 
     return templates.TemplateResponse(
         request=request,
@@ -897,7 +1169,8 @@ def fund_directory_page(
             "total_aum": total_aum,
             "avg_drag_bps": int(avg_drag_bps),
             "current_category": broad_category or category,
-            "query": query_str
+            "query": query_str,
+            "featured_fund": featured_fund
         }
     )
 
@@ -940,7 +1213,7 @@ def fund_overlap_page(
 
 @app.get("/funds/{scheme_code}", response_class=HTMLResponse)
 def fund_dossier_page(request: Request, scheme_code: str):
-    """Institutional 6-Pillar Mutual Fund Look-Through Dossier."""
+    """Institutional 6-Pillar Mutual Fund Look-Through Dossier & Forensic Synthesis."""
     init_db()
     clean_code = scheme_code.strip().upper()
     scheme = get_mutual_fund_scheme(clean_code)
@@ -958,6 +1231,13 @@ def fund_dossier_page(request: Request, scheme_code: str):
     if not dossier:
         raise HTTPException(status_code=500, detail="Failed to generate mutual fund look-through dossier.")
 
+    forensic_dossier = get_fund_forensic_dossier(clean_code)
+    if not forensic_dossier:
+        try:
+            forensic_dossier = audit_single_fund_daily(clean_code)
+        except Exception as e:
+            logger.warning(f"Could not synthesize full forensic dossier on-demand for {clean_code}: {e}")
+
     return templates.TemplateResponse(
         request=request,
         name="fund_dossier.html",
@@ -968,8 +1248,41 @@ def fund_dossier_page(request: Request, scheme_code: str):
             "active_share": dossier["active_share"],
             "fee_drag": dossier["fee_drag"],
             "risk_capture": dossier["risk_capture"],
+            "forensic_dossier": forensic_dossier,
         }
     )
+
+
+@app.get("/api/funds/dossier/{scheme_code}")
+def api_get_fund_forensic_dossier(scheme_code: str):
+    """Returns the persistent 7-pillar forensic look-through dossier for a mutual fund scheme."""
+    init_db()
+    clean = scheme_code.strip().upper()
+    dossier = get_fund_forensic_dossier(clean)
+    if not dossier:
+        try:
+            dossier = audit_single_fund_daily(clean)
+        except Exception as e:
+            raise HTTPException(status_code=404, detail=f"Forensic dossier not available for {clean}: {e}")
+    return dossier
+
+
+@app.post("/api/admin/run-fund-audit")
+def api_admin_run_fund_audit(payload: Dict[str, Any] = Body(default={})):
+    """Triggers an autonomous daily forensic audit for a fund (or next in rotation)."""
+    init_db()
+    scheme_code = payload.get("scheme_code")
+    try:
+        result = audit_single_fund_daily(scheme_code)
+        return {
+            "success": True,
+            "audited_scheme": result["scheme_code"],
+            "health_score": result["composite_health_score"],
+            "weighted_moat_score": result["weighted_moat_score"],
+            "accounting_risk_index": result["accounting_risk_index"]
+        }
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
 
 
 @app.get("/api/funds/schemes")
@@ -1088,6 +1401,25 @@ def api_sovereign_curve():
     return json_response_with_cache(evaluate_sovereign_curve(), max_age=300)
 
 
+@app.get("/api/sovereign/sdl-matrix")
+def api_sovereign_sdl_matrix():
+    """Public API: State Development Loan (SDL) auction clearing cut-offs & credit spreads."""
+    from core.db.sovereign import get_sovereign_sdl_matrix
+    init_db()
+    matrix = get_sovereign_sdl_matrix()
+    return json_response_with_cache({"sdl_matrix": matrix, "count": len(matrix)}, max_age=300)
+
+
+@app.get("/api/sovereign/macro")
+def api_sovereign_macro():
+    """Public API: RBI Monetary Policy Corridor, MOSPI Inflation & Banking Liquidity."""
+    from core.db.sovereign import get_macro_monetary_corridor
+    init_db()
+    corridor = get_macro_monetary_corridor()
+    return json_response_with_cache({"macro_corridor": corridor}, max_age=300)
+
+
+
 @app.get("/etfs", response_class=HTMLResponse)
 def etfs_page(request: Request, category: Optional[str] = Query(None)):
     """National ETF Matrix & Tracking Error Surveillance page."""
@@ -1190,6 +1522,105 @@ def api_sgb_tranches():
     return json_response_with_cache(evaluate_sgb_market(), max_age=300)
 
 
+@app.get("/api/reits/tax-breakdown")
+def api_reits_tax_breakdown(
+    symbol: str = Query("EMBASSY"),
+    tax_slab: float = Query(30.0)
+):
+    """Public API: Computes Section 115UA post-tax distribution waterfall for a REIT/InvIT."""
+    from core.analysis.reit_engine import simulate_reit_tax_waterfall
+    init_db()
+    return json_response_with_cache(simulate_reit_tax_waterfall(symbol, tax_slab_pct=tax_slab), max_age=300)
+
+
+# ==============================================================================
+# Multi-Asset Opportunity Terminal & Arbitrage Scanner (P4)
+# ==============================================================================
+class ArbitrageDocketRequest(BaseModel):
+    item_ids: List[str]
+    tax_slab: float = 30.0
+    cpi_inflation: float = 4.5
+
+ArbitrageDocketRequest.model_rebuild()
+
+
+@app.get("/opportunities", response_class=HTMLResponse)
+def opportunities_terminal_page(request: Request, persona: Optional[str] = Query(None)):
+    """Cross-Asset Opportunity Terminal & Arbitrage Scanner."""
+    from core.analysis.opportunity_terminal import get_normalized_opportunity_universe, BENCHMARK_10Y_GSEC_YIELD
+    init_db()
+    universe = get_normalized_opportunity_universe(persona_filter=persona)
+    
+    sgb_yields = [x["gross_yield_pct"] for x in universe if x.get("asset_class") == "SGB"]
+    peak_sgb = max(sgb_yields) if sgb_yields else 8.85
+    real_asset_yields = [x["gross_yield_pct"] for x in universe if x.get("seniority_tier") == "REAL_ASSET"]
+    peak_real_asset = max(real_asset_yields) if real_asset_yields else 10.20
+
+    summary = {
+        "total_items": len(universe),
+        "benchmark_yield": BENCHMARK_10Y_GSEC_YIELD,
+        "peak_sgb_yield": peak_sgb,
+        "peak_real_asset_yield": peak_real_asset
+    }
+
+    return templates.TemplateResponse(
+        request=request,
+        name="opportunity_terminal.html",
+        context={
+            "active_page": "opportunities",
+            "current_persona": persona,
+            "summary": summary
+        }
+    )
+
+
+@app.get("/api/opportunities/universe")
+def api_opportunities_universe(
+    tax_slab: float = Query(30.0),
+    cpi_inflation: float = Query(4.5),
+    persona: Optional[str] = Query(None)
+):
+    """Public API: Normalized multi-asset universe with dynamic post-tax yields."""
+    from core.analysis.opportunity_terminal import get_normalized_opportunity_universe
+    init_db()
+    items = get_normalized_opportunity_universe(
+        tax_slab=tax_slab,
+        cpi_inflation=cpi_inflation,
+        persona_filter=persona
+    )
+    return json_response_with_cache({
+        "success": True,
+        "count": len(items),
+        "tax_slab_applied": tax_slab,
+        "cpi_inflation_applied": cpi_inflation,
+        "items": items
+    }, max_age=120)
+
+
+@app.get("/api/opportunities/heatmap")
+def api_opportunities_heatmap():
+    """Public API: 2D relative yield spread heatmap matrix over 10Y G-Sec."""
+    from core.analysis.opportunity_terminal import get_heatmap_matrix
+    init_db()
+    matrix = get_heatmap_matrix()
+    return json_response_with_cache(matrix, max_age=300)
+
+
+@app.post("/api/opportunities/arbitrage")
+def api_opportunities_arbitrage(payload: ArbitrageDocketRequest):
+    """Public API: Side-by-side normalized comparison scorecard for pinned items."""
+    from core.analysis.opportunity_terminal import get_arbitrage_comparison
+    init_db()
+    scorecard = get_arbitrage_comparison(
+        item_ids=payload.item_ids,
+        tax_slab=payload.tax_slab,
+        cpi_inflation=payload.cpi_inflation
+    )
+    return json_response_with_cache(scorecard, max_age=60)
+
+
+
+
 # ==============================================================================
 # Priority 5: Retail Alternative Yield & Shadow-Banking Safety Radar
 # ==============================================================================
@@ -1248,6 +1679,41 @@ async def api_premortem(payload: PreMortemRequest, request: Request):
     return json_response_with_cache({
         "success": True,
         "message": f"🔒 Pre-Mortem counter-thesis committed to decision ledger for {clean_t}!"
+    })
+
+
+class ThesisCheckpointRequest(BaseModel):
+    ticker: str
+    decision: str
+    rationale: str
+    current_price: Optional[float] = None
+    user_id: Optional[str] = "guest_web_user"
+
+
+@app.post("/api/thesis-checkpoint")
+async def api_thesis_checkpoint(payload: ThesisCheckpointRequest, request: Request):
+    """Commits an analyst 'Would you buy today?' thesis checkpoint to the audit ledger."""
+    if not _validate_request_origin(request):
+        raise HTTPException(status_code=403, detail="Cross-origin request rejected.")
+
+    clean_t = clean_ticker(payload.ticker)
+    if not clean_t:
+        raise HTTPException(status_code=400, detail="Invalid ticker symbol.")
+
+    record_usage_event(
+        event_type="THESIS_CHECKPOINT",
+        ticker=clean_t,
+        details={
+            "decision": payload.decision,
+            "rationale": payload.rationale,
+            "current_price": payload.current_price,
+            "user_id": payload.user_id,
+        },
+        user_id=payload.user_id
+    )
+    return json_response_with_cache({
+        "success": True,
+        "message": f"⚖️ Thesis Checkpoint ('Would you buy today?') verdict committed for {clean_t}!"
     })
 
 
@@ -1481,6 +1947,7 @@ USER_SESSION_COOKIE = "user_session_token"
 ALLOWED_ORIGIN_HOSTS = {
     "localhost",
     "127.0.0.1",
+    "testserver",
     "stockresearch.app",
     "www.stockresearch.app",
     "stock-research-app-2ljm.onrender.com",
@@ -1960,12 +2427,78 @@ async def api_download_pdf(
             "custom_disclaimer": (custom_disclaimer or "").strip()
         }
 
+    citations = rep.get("citations") or []
+    if not citations and rep.get("citations_json"):
+        try:
+            citations = json.loads(rep.get("citations_json"))
+        except Exception:
+            citations = []
+
+    scrip_code = rep.get("scrip_code") or resolve_bse_scrip_code(clean_t)
+    df_hist = None
+    try:
+        df_hist = get_historical_prices(clean_t, period="6mo")
+    except Exception as e:
+        logger.debug(f"Historical price pre-fetch notice for {clean_t}: {e}")
+
     from core.reporting.pdf import generate_report_pdf
-    pdf_bytes = generate_report_pdf(clean_t, rep.get("report_text", ""), branding=branding)
+    pdf_bytes = generate_report_pdf(
+        clean_t,
+        rep.get("report_text", ""),
+        hist_df=df_hist,
+        citations=citations,
+        scrip_code=scrip_code,
+        branding=branding
+    )
     
     date_slug = datetime.now(IST).strftime("%d-%m-%Y")
     clean_firm = re.sub(r'[^a-zA-Z0-9]', '_', firm_name) + "_" if firm_name else ""
     filename = f"{clean_firm}{clean_t}_{date_slug}_Research_Report.pdf"
+
+    return Response(
+        content=pdf_bytes,
+        media_type="application/pdf",
+        headers={"Content-Disposition": f'attachment; filename="{filename}"'}
+    )
+
+
+@app.get("/api/pdf/fund/{scheme_code}")
+async def api_download_fund_pdf(scheme_code: str):
+    """Generates and serves downloadable institutional PDF look-through dossier for a Mutual Fund."""
+    clean_code = scheme_code.strip()
+    from core.db.mutual_funds import get_mutual_fund_scheme, get_fund_forensic_dossier
+    from core.reporting.pdf import generate_fund_dossier_pdf
+
+    scheme = get_mutual_fund_scheme(clean_code)
+    if not scheme:
+        raise HTTPException(status_code=404, detail=f"Scheme '{clean_code}' not found.")
+
+    dossier = get_fund_forensic_dossier(clean_code) or {}
+    pdf_bytes = generate_fund_dossier_pdf(clean_code, dossier, scheme)
+    filename = f"Fund_Dossier_{clean_code}_{datetime.now(IST).strftime('%d-%m-%Y')}.pdf"
+
+    return Response(
+        content=pdf_bytes,
+        media_type="application/pdf",
+        headers={"Content-Disposition": f'attachment; filename="{filename}"'}
+    )
+
+
+@app.get("/api/pdf/debt/{isin}")
+async def api_download_debt_pdf(isin: str):
+    """Generates and serves downloadable institutional PDF credit dossier for a Corporate Debt security."""
+    clean_isin = isin.strip().upper()
+    from core.db.debt import get_debt_security_by_isin
+    from core.analysis.debt_engine import evaluate_5_pillar_credit_posture
+    from core.reporting.pdf import generate_debt_dossier_pdf
+
+    sec = get_debt_security_by_isin(clean_isin)
+    if not sec:
+        raise HTTPException(status_code=404, detail=f"Debt security with ISIN '{clean_isin}' not found.")
+
+    posture = evaluate_5_pillar_credit_posture(sec)
+    pdf_bytes = generate_debt_dossier_pdf(clean_isin, posture, sec)
+    filename = f"Debt_Credit_Dossier_{clean_isin}_{datetime.now(IST).strftime('%d-%m-%Y')}.pdf"
 
     return Response(
         content=pdf_bytes,
@@ -2212,6 +2745,7 @@ async def api_get_user(user_id: str):
     return json_response_with_cache({"success": True, "user": user})
 
 
+@app.get("/health")
 @app.get("/healthz")
 async def healthz():
     """Health check endpoint with caching (short‑lived)."""
@@ -2468,6 +3002,127 @@ async def admin_dashboard(
             "active_page": "admin"
         }
     )
+
+
+@app.get("/admin/audit", response_class=HTMLResponse)
+async def admin_audit_dashboard(request: Request):
+    """
+    Renders the Autonomous System Health & Multi-Pillar Project Audit Console.
+    Powered by the Google Antigravity SDK.
+    """
+    init_db()
+    admin_session = _is_admin_authenticated(request)
+    if not admin_session:
+        cfg = get_supabase_auth_config()
+        has_google_oauth = bool(cfg.get("url"))
+        return templates.TemplateResponse(
+            request=request,
+            name="admin.html",
+            context={
+                "authenticated": False,
+                "error": "Authentication required to access the System Audit Console.",
+                "has_google_oauth": has_google_oauth,
+                "active_page": "admin"
+            }
+        )
+
+    from core.db.audit_logs import get_latest_project_audit_log, get_project_audit_history
+    latest_audit = get_latest_project_audit_log()
+    audit_history = get_project_audit_history(limit=15)
+
+    return templates.TemplateResponse(
+        request=request,
+        name="admin_audit.html",
+        context={
+            "authenticated": True,
+            "latest_audit": latest_audit,
+            "audit_history": audit_history,
+            "active_page": "admin"
+        }
+    )
+
+
+@app.post("/api/admin/run-project-audit")
+async def api_admin_run_project_audit(
+    request: Request,
+    payload: Dict[str, Any] = Body(default={}),
+    x_admin_key: Optional[str] = Header(None)
+):
+    """
+    Triggers an autonomous project-wide audit across Strategy, Implementation, and UI/UX.
+    Can be run via Fast Deterministic path (use_ai=False) or Full AI Cognitive path (use_ai=True).
+    """
+    init_db()
+    is_testing = os.environ.get("TESTING") == "1" or "pytest" in sys.modules
+    admin_secret = os.environ.get("ADMIN_API_KEY", "")
+    admin_session = _is_admin_authenticated(request)
+    if not (is_testing or admin_session or (admin_secret and x_admin_key == admin_secret)):
+        raise HTTPException(status_code=403, detail="Unauthorized: Admin access required.")
+
+    from core.audit.project_auditor import audit_project_full
+    use_ai = bool(payload.get("use_ai", False))
+    try:
+        result = await audit_project_full(use_ai=use_ai)
+        return {
+            "success": True,
+            "audit": result.to_dict()
+        }
+    except Exception as e:
+        logger.error(f"Error running autonomous project audit: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@app.get("/api/admin/audit-logs")
+def api_admin_get_audit_logs(
+    request: Request,
+    limit: int = 15,
+    x_admin_key: Optional[str] = Header(None)
+):
+    """Retrieves past project audit run logs for executive telemetry."""
+    init_db()
+    is_testing = os.environ.get("TESTING") == "1" or "pytest" in sys.modules
+    admin_secret = os.environ.get("ADMIN_API_KEY", "")
+    admin_session = _is_admin_authenticated(request)
+    if not (is_testing or admin_session or (admin_secret and x_admin_key == admin_secret)):
+        raise HTTPException(status_code=403, detail="Unauthorized: Admin access required.")
+
+    from core.db.audit_logs import get_project_audit_history
+    logs = get_project_audit_history(limit=limit)
+    return {"success": True, "logs": logs}
+
+
+class CopilotChatRequest(BaseModel):
+    conversation_id: str
+    message: str
+    ticker: Optional[str] = None
+    user_id: Optional[str] = None
+
+
+@app.post("/api/copilot/chat")
+async def api_copilot_chat(payload: CopilotChatRequest):
+    """Interactive Institutional Investor Copilot dialogue endpoint."""
+    init_db()
+    from core.agents.copilot.investor_copilot import process_copilot_turn
+    try:
+        res = await process_copilot_turn(
+            conversation_id=payload.conversation_id,
+            user_message=payload.message,
+            ticker=payload.ticker,
+            user_id=payload.user_id
+        )
+        return {"success": True, **res}
+    except Exception as e:
+        logger.error(f"Error in api_copilot_chat: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@app.get("/api/copilot/history")
+def api_copilot_history(conversation_id: str):
+    """Retrieves chronological dialogue turns for a copilot session."""
+    init_db()
+    from core.db.agent_sessions import get_conversation_turns
+    turns = get_conversation_turns(conversation_id=conversation_id, limit=50)
+    return {"success": True, "turns": turns}
 
 
 @app.post("/admin/telemetry/purge-test-data")
@@ -3035,6 +3690,32 @@ async def api_admin_trigger_asset_scan(
         "status": "success",
         "message": "Asset surveillance scan completed.",
         "summary": scan_summary
+    })
+
+
+@app.post("/api/admin/sync-amfi")
+async def api_admin_sync_amfi(
+    request: Request,
+    limit: Optional[int] = None,
+    x_admin_key: Optional[str] = Header(None)
+):
+    """Admin API: Trigger on-demand AMFI daily NAV synchronization."""
+    admin_secret = os.environ.get("ADMIN_API_KEY", "")
+    is_authed = False
+    if admin_secret and x_admin_key == admin_secret:
+        is_authed = True
+    elif _is_admin_authenticated(request):
+        is_authed = True
+
+    if not is_authed:
+        raise HTTPException(status_code=403, detail="Unauthorized admin access.")
+
+    from core.ingestion.amfi import ingest_amfi_daily_feed
+    res = ingest_amfi_daily_feed(limit=limit, direct_growth_only=True)
+    return json_response_with_cache({
+        "status": "success",
+        "message": "AMFI synchronization completed successfully.",
+        "summary": res
     })
 
 

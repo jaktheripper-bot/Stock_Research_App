@@ -1,0 +1,53 @@
+<!-- Institutional Investor Copilot Modal Partial -->
+<div id="copilotModalBackdrop" style="display: none; position: fixed; inset: 0; background: rgba(2, 6, 23, 0.7); backdrop-filter: blur(4px); z-index: 1000; align-items: center; justify-content: flex-end; padding: 1.5rem;">
+    <div id="copilotPanel" style="width: 100%; max-width: 480px; height: calc(100vh - 3rem); background: #0f172a; border: 1px solid rgba(14, 165, 233, 0.3); border-radius: 12px; display: flex; flex-direction: column; overflow: hidden; box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.5), 0 8px 10px -6px rgba(0, 0, 0, 0.5);">
+        
+        <!-- Header -->
+        <div style="padding: 1.25rem; border-bottom: 1px solid #1e293b; display: flex; justify-content: space-between; align-items: center; background: #0b1120;">
+            <div>
+                <div style="font-size: 0.75rem; text-transform: uppercase; font-weight: 700; color: #38bdf8; letter-spacing: 0.05em; display: flex; align-items: center; gap: 0.5rem;">
+                    🛡️ Google Antigravity Agent
+                    <span style="font-size: 0.68rem; padding: 0.15rem 0.4rem; border-radius: 4px; background: rgba(14, 165, 233, 0.15); border: 1px solid rgba(14, 165, 233, 0.3); color: #7dd3fc;">Interactive</span>
+                </div>
+                <h3 style="margin: 0.25rem 0 0 0; font-size: 1.1rem; font-weight: 700; color: #f8fafc;">
+                    Institutional Forensic Copilot
+                </h3>
+            </div>
+            <button onclick="closeCopilot()" style="background: none; border: none; color: #94a3b8; font-size: 1.5rem; cursor: pointer; padding: 0.25rem; line-height: 1;">&times;</button>
+        </div>
+
+        <!-- Safe Harbor Notice Banner -->
+        <div style="padding: 0.6rem 1rem; background: rgba(30, 41, 59, 0.6); border-bottom: 1px solid #1e293b; font-size: 0.75rem; color: #94a3b8; line-height: 1.4;">
+            ⚖️ <strong>SEBI RA Sec. 2(u):</strong> Descriptive diagnostics & Pre-Mortem stress-testing only. Zero Buy/Sell advice.
+        </div>
+
+        <!-- Chat Stream Area -->
+        <div id="copilotMessages" style="flex: 1; overflow-y: auto; padding: 1.25rem; display: flex; flex-direction: column; gap: 1rem;">
+            <div style="background: rgba(30, 41, 59, 0.4); border: 1px solid rgba(255, 255, 255, 0.05); border-radius: 8px; padding: 1rem; font-size: 0.88rem; color: #cbd5e1; line-height: 1.5;">
+                Welcome to the <strong>Forensic Copilot</strong>. I can assist in stress-testing your investment thesis on <strong><span id="copilotContextTicker"></span></strong>, deriving implied growth rates via Reverse DCF, or running a <strong>Pre-Mortem Inversion analysis</strong>.
+            </div>
+        </div>
+
+        <!-- Quick Prompt Chips -->
+        <div style="padding: 0.5rem 1rem; border-top: 1px solid #1e293b; display: flex; gap: 0.5rem; overflow-x: auto; background: #0b1120;">
+            <button onclick="sendQuickPrompt('Run Pre-Mortem Inversion analysis on this stock')" style="white-space: nowrap; font-size: 0.75rem; background: #1e293b; color: #38bdf8; border: 1px solid #334155; padding: 0.35rem 0.65rem; border-radius: 9999px; cursor: pointer;">
+                💀 Pre-Mortem Inversion
+            </button>
+            <button onclick="sendQuickPrompt('What implied growth rate is priced into current CMP?')" style="white-space: nowrap; font-size: 0.75rem; background: #1e293b; color: #cbd5e1; border: 1px solid #334155; padding: 0.35rem 0.65rem; border-radius: 9999px; cursor: pointer;">
+                📉 Reverse DCF Implied Growth
+            </button>
+            <button onclick="sendQuickPrompt('Are there any promoter pledging or governance red flags?')" style="white-space: nowrap; font-size: 0.75rem; background: #1e293b; color: #cbd5e1; border: 1px solid #334155; padding: 0.35rem 0.65rem; border-radius: 9999px; cursor: pointer;">
+                🚩 Governance Check
+            </button>
+        </div>
+
+        <!-- Input Bar -->
+        <div style="padding: 1rem; border-top: 1px solid #1e293b; background: #0f172a; display: flex; gap: 0.5rem;">
+            <input type="text" id="copilotInput" placeholder="Ask a diagnostic or stress-test question..." style="flex: 1; background: #020617; border: 1px solid #334155; border-radius: 6px; padding: 0.65rem 0.85rem; color: #f8fafc; font-size: 0.88rem;" onkeydown="if(event.key === 'Enter') submitCopilotMessage()">
+            <button id="copilotSendBtn" onclick="submitCopilotMessage()" style="background: #0ea5e9; color: #020617; border: none; font-weight: 700; padding: 0.65rem 1rem; border-radius: 6px; cursor: pointer;">
+                Send
+            </button>
+        </div>
+
+    </div>
+</div>

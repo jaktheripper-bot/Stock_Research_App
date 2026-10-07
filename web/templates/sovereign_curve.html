@@ -1,117 +1,318 @@
 {% extends "base.html" %}
 
-{% block title %}Sovereign Risk-Free Benchmarks & RBI Par Yield Curve | Stock Research AI{% endblock %}
-{% block meta_desc %}Real-time Indian sovereign yield curve across Treasury Bills (91D, 182D, 364D), Central G-Secs (2Y to 30Y), and 10Y State Development Loans (SDL) based on official RBI auction cut-offs.{% endblock %}
-{% block og_title %}Sovereign Risk-Free Benchmarks & RBI Par Yield Curve | Stock Research AI{% endblock %}
-{% block og_desc %}Live Indian sovereign yield curve across Treasury Bills, Central G-Secs, and SDL benchmarks based on RBI auction cut-offs.{% endblock %}
+{% block title %}Indian Sovereign Par Yield Curve & Macro Terminal | Stock Research AI{% endblock %}
+{% block meta_desc %}Real-time Indian sovereign debt term structure across Treasury Bills (91D to 364D), Central G-Secs (2Y to 50Y), Sovereign Green Bonds, and State Development Loans (SDL) based on official RBI auction cut-offs.{% endblock %}
+{% block og_title %}Indian Sovereign Par Yield Curve & Macro Terminal | Stock Research AI{% endblock %}
+{% block og_desc %}Institutional Indian sovereign par yield curve, multi-curve comparison, RBI monetary policy corridor, and state development loan (SDL) credit disparity matrix.{% endblock %}
 
 {% block content %}
 <div class="container py-8">
   <!-- Header Banner -->
-  <div style="background: linear-gradient(135deg, rgba(30, 41, 59, 0.7) 0%, rgba(15, 23, 42, 0.95) 100%); border: 1px solid rgba(255, 255, 255, 0.1); border-radius: 16px; padding: 32px; margin-bottom: 32px; position: relative; overflow: hidden;">
-    <div style="display: inline-flex; align-items: center; gap: 8px; background: rgba(14, 165, 233, 0.15); border: 1px solid rgba(14, 165, 233, 0.3); border-radius: 9999px; padding: 4px 14px; margin-bottom: 16px;">
-      <span style="width: 8px; height: 8px; border-radius: 50%; background: #0ea5e9;"></span>
-      <span style="font-size: 12px; font-weight: 700; color: #38bdf8; text-transform: uppercase; letter-spacing: 0.05em;">Official RBI Public Auction Cut-Off Benchmarks</span>
+  <div style="background: linear-gradient(135deg, rgba(30, 41, 59, 0.7) 0%, rgba(15, 23, 42, 0.95) 100%); border: 1px solid rgba(255, 255, 255, 0.1); border-radius: 16px; padding: 32px; margin-bottom: 28px; position: relative; overflow: hidden;">
+    <div style="display: flex; justify-content: space-between; align-items: flex-start; flex-wrap: wrap; gap: 16px; margin-bottom: 16px;">
+      <div style="display: inline-flex; align-items: center; gap: 8px; background: rgba(14, 165, 233, 0.15); border: 1px solid rgba(14, 165, 233, 0.3); border-radius: 9999px; padding: 4px 14px;">
+        <span style="width: 8px; height: 8px; border-radius: 50%; background: #0ea5e9;"></span>
+        <span style="font-size: 12px; font-weight: 700; color: #38bdf8; text-transform: uppercase; letter-spacing: 0.05em;">Official RBI Public Auction Cut-Off Benchmarks</span>
+      </div>
+      <div style="display: inline-flex; align-items: center; gap: 10px;">
+        <a href="#curveVisualizer" class="btn btn-secondary btn-sm">📈 Multi-Curve Chart</a>
+        <a href="#sdlSection" class="btn btn-secondary btn-sm">🏛️ State SDL Spreads</a>
+        <a href="/calculator/tax" class="btn btn-primary btn-sm">🧮 Tax Calculator</a>
+      </div>
     </div>
 
     <h1 style="font-size: 32px; font-weight: 800; color: #f8fafc; margin-bottom: 12px; letter-spacing: -0.02em;">
-      Indian Sovereign Par Yield Curve
+      Indian Sovereign Debt & Macro Terminal
     </h1>
-    <p style="font-size: 15px; color: #94a3b8; max-width: 840px; line-height: 1.6; margin-bottom: 24px;">
+    <p style="font-size: 15px; color: #94a3b8; max-width: 860px; line-height: 1.6; margin-bottom: 24px;">
       The definitive risk-free foundation for Indian capital markets. Synthesized directly from official 
-      <strong>Reserve Bank of India (RBI)</strong> weekly primary auction cut-offs across Treasury Bills, Central Government Securities (G-Sec), and State Development Loans (SDL).
+      <strong>Reserve Bank of India (RBI)</strong> weekly primary auction cut-offs, <strong>CCIL ZCYC</strong> term benchmarks, 
+      and <strong>MOSPI Consumer Price Index</strong> releases across Central Government Securities (G-Sec), Treasury Bills, 
+      Sovereign Green Bonds (SGrB), and State Development Loans (SDL).
     </p>
 
     <!-- Top KPI Grid -->
     <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 16px;">
       <div style="background: rgba(15, 23, 42, 0.6); border: 1px solid rgba(255, 255, 255, 0.08); border-radius: 12px; padding: 18px;">
         <div style="font-size: 12px; color: #64748b; text-transform: uppercase; font-weight: 600; margin-bottom: 4px;">Benchmark 10Y G-Sec</div>
-        <div style="font-size: 26px; font-weight: 800; color: #38bdf8;" class="tnum">{{ analytics.benchmark_10y_gsec }}%</div>
-        <div style="font-size: 11px; color: #94a3b8; margin-top: 4px;">Primary Sovereign Anchor</div>
+        <div style="font-size: 28px; font-weight: 800; color: #38bdf8;" class="tnum">{{ analytics.benchmark_10y_gsec }}%</div>
+        <div style="font-size: 11px; color: #94a3b8; margin-top: 4px;">Primary Sovereign Anchor (GS 2034)</div>
       </div>
       <div style="background: rgba(15, 23, 42, 0.6); border: 1px solid rgba(255, 255, 255, 0.08); border-radius: 12px; padding: 18px;">
         <div style="font-size: 12px; color: #64748b; text-transform: uppercase; font-weight: 600; margin-bottom: 4px;">91-Day T-Bill Cut-Off</div>
-        <div style="font-size: 26px; font-weight: 800; color: #10b981;" class="tnum">{{ analytics.risk_free_short_tbill }}%</div>
-        <div style="font-size: 11px; color: #94a3b8; margin-top: 4px;">Ultra-Short Risk-Free Rate</div>
+        <div style="font-size: 28px; font-weight: 800; color: #10b981;" class="tnum">{{ analytics.risk_free_short_tbill }}%</div>
+        <div style="font-size: 11px; color: #94a3b8; margin-top: 4px;">Short-Term Money Market Anchor</div>
+      </div>
+      <div style="background: rgba(15, 23, 42, 0.6); border: 1px solid rgba(255, 255, 255, 0.08); border-radius: 12px; padding: 18px;">
+        <div style="font-size: 12px; color: #64748b; text-transform: uppercase; font-weight: 600; margin-bottom: 4px;">Real 10Y Risk-Free Yield</div>
+        <div style="font-size: 28px; font-weight: 800; color: #10b981;" class="tnum">+{{ analytics.real_10y_yield }}%</div>
+        <div style="font-size: 11px; color: #94a3b8; margin-top: 4px;">10Y Yield minus CPI ({{ analytics.macro_rates.cpi_inflation.value }}%)</div>
       </div>
       <div style="background: rgba(15, 23, 42, 0.6); border: 1px solid rgba(255, 255, 255, 0.08); border-radius: 12px; padding: 18px;">
         <div style="font-size: 12px; color: #64748b; text-transform: uppercase; font-weight: 600; margin-bottom: 4px;">Term Spread (10Y - 91D)</div>
-        <div style="font-size: 26px; font-weight: 800; color: #f59e0b;" class="tnum">+{{ analytics.term_spread_bps }} bps</div>
-        <div style="font-size: 11px; color: #94a3b8; margin-top: 4px;">Curve Slope: {{ analytics.curve_shape }}</div>
+        <div style="font-size: 28px; font-weight: 800; color: #f59e0b;" class="tnum">+{{ analytics.term_spread_bps }} bps</div>
+        <div style="font-size: 11px; color: #94a3b8; margin-top: 4px;">Posture: {{ analytics.curve_shape }}</div>
       </div>
       <div style="background: rgba(15, 23, 42, 0.6); border: 1px solid rgba(255, 255, 255, 0.08); border-radius: 12px; padding: 18px;">
         <div style="font-size: 12px; color: #64748b; text-transform: uppercase; font-weight: 600; margin-bottom: 4px;">10Y SDL State Spread</div>
-        <div style="font-size: 26px; font-weight: 800; color: #a855f7;" class="tnum">+{{ analytics.sdl_credit_spread_bps }} bps</div>
-        <div style="font-size: 11px; color: #94a3b8; margin-top: 4px;">Sub-Sovereign State Premium</div>
+        <div style="font-size: 28px; font-weight: 800; color: #a855f7;" class="tnum">+{{ analytics.sdl_credit_spread_bps }} bps</div>
+        <div style="font-size: 11px; color: #94a3b8; margin-top: 4px;">Weighted Sub-Sovereign Spread</div>
       </div>
     </div>
   </div>
 
-  <!-- Curve Insights Strip -->
+  <!-- RBI Policy Corridor & Macro Engine -->
+  <div class="card" style="padding: 24px; margin-bottom: 28px;">
+    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 18px; flex-wrap: wrap; gap: 12px;">
+      <div>
+        <h2 style="font-size: 18px; font-weight: 800; color: #f8fafc; margin: 0 0 4px 0;">
+          RBI Monetary Policy Corridor & Liquidity Engine
+        </h2>
+        <p style="font-size: 13px; color: #94a3b8; margin: 0;">
+          Operational bounds governing domestic liquidity and sovereign yield transmission.
+        </p>
+      </div>
+      <span style="font-size: 12px; color: #64748b; background: rgba(255,255,255,0.05); padding: 4px 10px; border-radius: 6px;">
+        Source: RBI Monetary Policy Committee & Operations
+      </span>
+    </div>
+
+    <!-- Corridor Visual Bar -->
+    <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 16px; margin-bottom: 20px;">
+      <div style="background: rgba(15, 23, 42, 0.5); border-left: 4px solid #64748b; border-radius: 8px; padding: 14px 16px;">
+        <div style="font-size: 11px; font-weight: 700; color: #94a3b8; text-transform: uppercase;">Corridor Floor: SDF</div>
+        <div style="font-size: 22px; font-weight: 800; color: #f8fafc; margin: 4px 0;" class="tnum">
+          {{ analytics.macro_rates.sdf_rate.value }}%
+        </div>
+        <div style="font-size: 11px; color: #64748b;">Standing Deposit Facility (Uncollateralized Absorption)</div>
+      </div>
+
+      <div style="background: rgba(14, 165, 233, 0.08); border-left: 4px solid #0ea5e9; border-radius: 8px; padding: 14px 16px;">
+        <div style="font-size: 11px; font-weight: 700; color: #38bdf8; text-transform: uppercase;">Policy Anchor: Repo Rate</div>
+        <div style="font-size: 22px; font-weight: 800; color: #38bdf8; margin: 4px 0;" class="tnum">
+          {{ analytics.macro_rates.repo_rate.value }}%
+        </div>
+        <div style="font-size: 11px; color: #94a3b8;">MPC Headline Rate (Stance: Neutral)</div>
+      </div>
+
+      <div style="background: rgba(15, 23, 42, 0.5); border-left: 4px solid #ef4444; border-radius: 8px; padding: 14px 16px;">
+        <div style="font-size: 11px; font-weight: 700; color: #f87171; text-transform: uppercase;">Corridor Ceiling: MSF</div>
+        <div style="font-size: 22px; font-weight: 800; color: #f8fafc; margin: 4px 0;" class="tnum">
+          {{ analytics.macro_rates.msf_rate.value }}%
+        </div>
+        <div style="font-size: 11px; color: #64748b;">Marginal Standing Facility (Emergency Borrowing)</div>
+      </div>
+
+      <div style="background: rgba(15, 23, 42, 0.5); border-left: 4px solid #10b981; border-radius: 8px; padding: 14px 16px;">
+        <div style="font-size: 11px; font-weight: 700; color: #34d399; text-transform: uppercase;">System Net Liquidity</div>
+        <div style="font-size: 22px; font-weight: 800; color: #10b981; margin: 4px 0;" class="tnum">
+          +₹1,25,400 Cr
+        </div>
+        <div style="font-size: 11px; color: #64748b;">Daily Net LAF Surplus Absorbed by RBI</div>
+      </div>
+    </div>
+
+    <!-- Secondary Transmission Metric Pills -->
+    <div style="display: flex; flex-wrap: wrap; gap: 12px; font-size: 13px; color: #cbd5e1;">
+      <div style="background: rgba(255, 255, 255, 0.04); border: 1px solid rgba(255, 255, 255, 0.08); padding: 8px 14px; border-radius: 8px;">
+        <span style="color: #64748b;">Policy Transmission Spread:</span> 
+        <strong style="color: #38bdf8;" class="tnum">+{{ analytics.policy_spread_bps }} bps</strong> over Repo
+      </div>
+      <div style="background: rgba(255, 255, 255, 0.04); border: 1px solid rgba(255, 255, 255, 0.08); padding: 8px 14px; border-radius: 8px;">
+        <span style="color: #64748b;">Headline CPI Inflation:</span> 
+        <strong style="color: #10b981;" class="tnum">{{ analytics.macro_rates.cpi_inflation.value }}%</strong> (Statutory Target: 4.0%)
+      </div>
+      <div style="background: rgba(255, 255, 255, 0.04); border: 1px solid rgba(255, 255, 255, 0.08); padding: 8px 14px; border-radius: 8px;">
+        <span style="color: #64748b;">Long-Duration Risk Premium (30Y - 10Y):</span> 
+        <strong style="color: #f59e0b;" class="tnum">+{{ analytics.long_premium_bps }} bps</strong>
+      </div>
+      <div style="background: rgba(255, 255, 255, 0.04); border: 1px solid rgba(255, 255, 255, 0.08); padding: 8px 14px; border-radius: 8px;">
+        <span style="color: #64748b;">Sovereign Greenium (Conventional - Green):</span> 
+        <strong style="color: #10b981;" class="tnum">+{{ analytics.greenium_bps }} bps</strong>
+      </div>
+    </div>
+  </div>
+
+  <!-- Multi-Curve Interactive SVG Visualizer -->
+  <div id="curveVisualizer" class="card" style="padding: 24px; margin-bottom: 28px;">
+    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; flex-wrap: wrap; gap: 14px;">
+      <div>
+        <h2 style="font-size: 20px; font-weight: 800; color: #f8fafc; margin: 0 0 4px 0;">
+          Multi-Tenor Sovereign Yield Curve Visualizer
+        </h2>
+        <p style="font-size: 13px; color: #94a3b8; margin: 0;">
+          Square-root scaled maturity axis spanning 91 Days (0.25Y) to India's 50-Year (50.0Y) benchmark.
+        </p>
+      </div>
+
+      <!-- Curve Series Interactive Controls -->
+      <div style="display: flex; align-items: center; gap: 12px; flex-wrap: wrap;">
+        <button id="toggleCurrentBtn" onclick="toggleCurve('current')" class="btn btn-sm" style="background: rgba(14, 165, 233, 0.2); border: 1px solid #0ea5e9; color: #38bdf8; font-weight: 600;">
+          <span style="display: inline-block; width: 10px; height: 3px; background: #38bdf8; vertical-align: middle; margin-right: 6px;"></span>
+          Current Curve
+        </button>
+        <button id="toggle1MBtn" onclick="toggleCurve('one_month_ago')" class="btn btn-sm" style="background: rgba(245, 158, 11, 0.15); border: 1px solid #f59e0b; color: #f59e0b; font-weight: 600;">
+          <span style="display: inline-block; width: 10px; height: 3px; background: #f59e0b; border-style: dashed; vertical-align: middle; margin-right: 6px;"></span>
+          1 Month Ago
+        </button>
+        <button id="toggle1YBtn" onclick="toggleCurve('one_year_ago')" class="btn btn-sm" style="background: rgba(100, 116, 139, 0.15); border: 1px solid #64748b; color: #cbd5e1; font-weight: 600;">
+          <span style="display: inline-block; width: 10px; height: 3px; background: #64748b; vertical-align: middle; margin-right: 6px;"></span>
+          1 Year Ago
+        </button>
+      </div>
+    </div>
+
+    <!-- Pure SVG Responsive Visualizer -->
+    <div style="background: rgba(15, 23, 42, 0.85); border: 1px solid rgba(255, 255, 255, 0.08); border-radius: 12px; padding: 16px; overflow-x: auto; position: relative;">
+      <!-- Interactive Tooltip Overlay -->
+      <div id="curveTooltip" style="display: none; position: absolute; pointer-events: none; background: rgba(15, 23, 42, 0.95); border: 1px solid #38bdf8; border-radius: 6px; padding: 8px 12px; font-size: 12px; color: #f8fafc; z-index: 10; box-shadow: 0 4px 12px rgba(0,0,0,0.5);">
+        <div id="tooltipTenor" style="font-weight: 700; color: #38bdf8;"></div>
+        <div id="tooltipYield" class="tnum" style="color: #f8fafc; font-size: 13px; font-weight: 800;"></div>
+        <div id="tooltipSeries" style="color: #94a3b8; font-size: 11px;"></div>
+      </div>
+
+      <svg id="sovereignSvg" viewBox="0 0 820 340" style="width: 100%; height: auto; min-width: 600px; display: block; overflow: visible;">
+        <defs>
+          <linearGradient id="currentGradient" x1="0%" y1="0%" x2="0%" y2="100%">
+            <stop offset="0%" stop-color="#38bdf8" stop-opacity="0.3"/>
+            <stop offset="100%" stop-color="#38bdf8" stop-opacity="0.0"/>
+          </linearGradient>
+          <filter id="glow" x="-20%" y="-20%" width="140%" height="140%">
+            <feGaussianBlur stdDeviation="3" result="blur" />
+            <feComposite in="SourceGraphic" in2="blur" operator="over" />
+          </filter>
+        </defs>
+
+        <!-- Horizontal Grid Lines & Ticks -->
+        {% for gy in analytics.svg_chart.grid_y %}
+        <line x1="{{ analytics.svg_chart.pad_left }}" y1="{{ gy.y }}" x2="{{ analytics.svg_chart.width - analytics.svg_chart.pad_right }}" y2="{{ gy.y }}" stroke="rgba(255, 255, 255, 0.07)" stroke-dasharray="3,3" />
+        <text x="{{ analytics.svg_chart.pad_left - 8 }}" y="{{ gy.y + 4 }}" text-anchor="end" fill="#64748b" font-size="11" font-family="monospace">{{ gy.label }}</text>
+        {% endfor %}
+
+        <!-- Vertical Grid Lines & Tenor Labels -->
+        {% for gx in analytics.svg_chart.grid_x %}
+        <line x1="{{ gx.x }}" y1="{{ analytics.svg_chart.pad_top }}" x2="{{ gx.x }}" y2="{{ analytics.svg_chart.height - analytics.svg_chart.pad_bottom }}" stroke="rgba(255, 255, 255, 0.05)" />
+        <text x="{{ gx.x }}" y="{{ analytics.svg_chart.height - analytics.svg_chart.pad_bottom + 18 }}" text-anchor="middle" fill="#94a3b8" font-size="10.5" font-weight="600" font-family="sans-serif">{{ gx.label }}</text>
+        {% endfor %}
+
+        <!-- Curve Series: 1 Year Ago -->
+        <g id="curveSeries_one_year_ago" style="transition: opacity 0.3s ease;">
+          <path d="{{ analytics.svg_chart.series.one_year_ago.path_d }}" fill="none" stroke="#64748b" stroke-width="2" stroke-dasharray="3,3" opacity="0.85" />
+          {% for pt in analytics.svg_chart.series.one_year_ago.points %}
+          <circle cx="{{ pt.cx }}" cy="{{ pt.cy }}" r="3" fill="#64748b"
+                  onmouseover="showSvgTooltip(evt, '1 Year Ago', '{{ pt.tenor_label }}', '{{ pt.yield_pct }}%')"
+                  onmouseout="hideSvgTooltip()" style="cursor: pointer;"/>
+          {% endfor %}
+        </g>
+
+        <!-- Curve Series: 1 Month Ago -->
+        <g id="curveSeries_one_month_ago" style="transition: opacity 0.3s ease;">
+          <path d="{{ analytics.svg_chart.series.one_month_ago.path_d }}" fill="none" stroke="#f59e0b" stroke-width="2" stroke-dasharray="5,4" opacity="0.9" />
+          {% for pt in analytics.svg_chart.series.one_month_ago.points %}
+          <circle cx="{{ pt.cx }}" cy="{{ pt.cy }}" r="3.5" fill="#f59e0b"
+                  onmouseover="showSvgTooltip(evt, '1 Month Ago', '{{ pt.tenor_label }}', '{{ pt.yield_pct }}%')"
+                  onmouseout="hideSvgTooltip()" style="cursor: pointer;"/>
+          {% endfor %}
+        </g>
+
+        <!-- Curve Series: Current Curve (Primary) -->
+        <g id="curveSeries_current" style="transition: opacity 0.3s ease;">
+          <path d="{{ analytics.svg_chart.series.current.path_d }}" fill="none" stroke="#38bdf8" stroke-width="3" filter="url(#glow)" />
+          {% for pt in analytics.svg_chart.series.current.points %}
+          <circle cx="{{ pt.cx }}" cy="{{ pt.cy }}" r="4.5" fill="#0f172a" stroke="#38bdf8" stroke-width="2"
+                  onmouseover="showSvgTooltip(evt, 'Current Curve', '{{ pt.tenor_label }}', '{{ pt.yield_pct }}%')"
+                  onmouseout="hideSvgTooltip()" style="cursor: pointer; transition: r 0.15s ease;"/>
+          {% endfor %}
+        </g>
+      </svg>
+    </div>
+
+    <!-- Chart Footnote -->
+    <div style="display: flex; justify-content: space-between; align-items: center; margin-top: 12px; font-size: 11.5px; color: #64748b; flex-wrap: wrap; gap: 8px;">
+      <span>📐 Scaling: Horizontal maturity axis uses square-root scaling ($\sqrt{Maturity}$) to prevent compression of short-term bills.</span>
+      <span>💡 Hover any data point to inspect clearing yield & spread.</span>
+    </div>
+  </div>
+
+  <!-- Institutional Macro Commentary -->
   {% if analytics.macro_insights %}
-  <div style="background: rgba(14, 165, 233, 0.08); border-left: 4px solid var(--accent-cyan); padding: 16px 20px; border-radius: 8px; margin-bottom: 32px;">
-    <div style="font-weight: 700; color: #38bdf8; font-size: 14px; margin-bottom: 6px;">Macro Monetary Dynamics:</div>
-    <ul style="margin: 0; padding-left: 20px; color: #cbd5e1; font-size: 13.5px; line-height: 1.6;">
+  <div class="card" style="padding: 22px 24px; margin-bottom: 28px; border-left: 4px solid #38bdf8;">
+    <div style="font-weight: 800; color: #38bdf8; font-size: 15px; margin-bottom: 10px; display: flex; align-items: center; gap: 8px;">
+      <span>🏛️</span> Institutional Macro Commentary & Sovereign Posture
+    </div>
+    <ul style="margin: 0; padding-left: 20px; color: #cbd5e1; font-size: 13.5px; line-height: 1.7;">
       {% for ins in analytics.macro_insights %}
-      <li>{{ ins }}</li>
+      <li style="margin-bottom: 6px;">{{ ins }}</li>
       {% endfor %}
     </ul>
   </div>
   {% endif %}
 
-  <!-- Sovereign Curve Table -->
-  <div class="card" style="padding: 24px; margin-bottom: 32px;">
+  <!-- Primary Auction Cut-Off Term Structure (All 16 Tenors) -->
+  <div class="card" style="padding: 24px; margin-bottom: 28px;">
     <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; flex-wrap: wrap; gap: 12px;">
       <div>
-        <h2 style="font-size: 20px; font-weight: 800; color: #f8fafc; margin: 0 0 4px 0;">Primary Auction Cut-Off Term Structure</h2>
-        <p style="font-size: 13px; color: #94a3b8; margin: 0;">Immutable RBI primary market clearing yields by maturity tenor.</p>
+        <h2 style="font-size: 20px; font-weight: 800; color: #f8fafc; margin: 0 0 4px 0;">
+          Primary Sovereign Auction Cut-Off Spectrum (16 Tenors)
+        </h2>
+        <p style="font-size: 13px; color: #94a3b8; margin: 0;">
+          Statutory RBI clearing yields from 91-Day T-Bills to the 50-Year G-Sec benchmark and Sovereign Green Bonds.
+        </p>
       </div>
-      <a href="/calculator/tax" class="btn btn-secondary btn-sm">🧮 Compute Net Real Post-Tax Return</a>
+      <div style="display: flex; gap: 10px;">
+        <a href="/calculator/tax?yield={{ analytics.benchmark_10y_gsec }}" class="btn btn-secondary btn-sm">
+          🧮 Compute 10Y Post-Tax Return
+        </a>
+      </div>
     </div>
 
     <div style="overflow-x: auto;">
       <table style="width: 100%; border-collapse: collapse; font-size: 14px;">
         <thead>
           <tr style="border-bottom: 1px solid rgba(255, 255, 255, 0.1); text-align: left; color: #64748b; font-size: 12px; text-transform: uppercase;">
-            <th style="padding: 12px 16px;">Tenor</th>
-            <th style="padding: 12px 16px;">Instrument Type</th>
-            <th style="padding: 12px 16px;">Maturity</th>
-            <th style="padding: 12px 16px;">RBI Cut-Off Yield</th>
-            <th style="padding: 12px 16px;">Spread vs 91D T-Bill</th>
-            <th style="padding: 12px 16px;">Auction Date</th>
-            <th style="padding: 12px 16px;">Settlement Platform</th>
+            <th style="padding: 12px 14px;">Tenor</th>
+            <th style="padding: 12px 14px;">Instrument Class</th>
+            <th style="padding: 12px 14px;">Maturity</th>
+            <th style="padding: 12px 14px;">RBI Cut-Off</th>
+            <th style="padding: 12px 14px;">Spread vs 91D</th>
+            <th style="padding: 12px 14px;">Auction Date</th>
+            <th style="padding: 12px 14px; text-align: right;">Post-Tax Action</th>
           </tr>
         </thead>
         <tbody>
           {% for pt in analytics.curve_points %}
           <tr style="border-bottom: 1px solid rgba(255, 255, 255, 0.05); transition: background 0.15s ease;">
-            <td style="padding: 14px 16px; font-weight: 700; color: #f8fafc;">
+            <td style="padding: 13px 14px; font-weight: 700; color: #f8fafc;">
               {{ pt.tenor_label }}
             </td>
-            <td style="padding: 14px 16px;">
+            <td style="padding: 13px 14px;">
               {% if pt.instrument_type == 'TBILL' %}
-                <span style="background: rgba(16, 185, 129, 0.15); color: #34d399; padding: 2px 8px; border-radius: 4px; font-size: 12px; font-weight: 700;">T-Bill</span>
+                <span style="background: rgba(16, 185, 129, 0.15); color: #34d399; padding: 2px 8px; border-radius: 4px; font-size: 11.5px; font-weight: 700;">T-Bill</span>
               {% elif pt.instrument_type == 'GSEC' %}
-                <span style="background: rgba(14, 165, 233, 0.15); color: #38bdf8; padding: 2px 8px; border-radius: 4px; font-size: 12px; font-weight: 700;">Central G-Sec</span>
+                <span style="background: rgba(14, 165, 233, 0.15); color: #38bdf8; padding: 2px 8px; border-radius: 4px; font-size: 11.5px; font-weight: 700;">Central G-Sec</span>
+              {% elif pt.instrument_type == 'SGRB' %}
+                <span style="background: rgba(16, 185, 129, 0.2); color: #10b981; border: 1px solid rgba(16, 185, 129, 0.4); padding: 2px 8px; border-radius: 4px; font-size: 11.5px; font-weight: 700;">🌱 Green Bond</span>
               {% else %}
-                <span style="background: rgba(168, 85, 247, 0.15); color: #c084fc; padding: 2px 8px; border-radius: 4px; font-size: 12px; font-weight: 700;">State SDL</span>
+                <span style="background: rgba(168, 85, 247, 0.15); color: #c084fc; padding: 2px 8px; border-radius: 4px; font-size: 11.5px; font-weight: 700;">State SDL</span>
               {% endif %}
             </td>
-            <td style="padding: 14px 16px; color: #94a3b8;">
+            <td style="padding: 13px 14px; color: #94a3b8;">
               {{ pt.maturity_years }} Years
             </td>
-            <td style="padding: 14px 16px; font-weight: 800; color: #f8fafc;" class="tnum">
+            <td style="padding: 13px 14px; font-weight: 800; color: #f8fafc;" class="tnum">
               {{ pt.cut_off_yield }}%
             </td>
-            <td style="padding: 14px 16px; color: #f59e0b;" class="tnum">
+            <td style="padding: 13px 14px; color: #f59e0b;" class="tnum">
               {% set spread = (pt.cut_off_yield - analytics.risk_free_short_tbill) * 100 %}
               {% if spread >= 0 %}+{{ spread|round(1) }} bps{% else %}{{ spread|round(1) }} bps{% endif %}
             </td>
-            <td style="padding: 14px 16px; color: #94a3b8;" class="tnum">
+            <td style="padding: 13px 14px; color: #94a3b8;" class="tnum">
               {{ pt.auction_date }}
             </td>
-            <td style="padding: 14px 16px; color: #64748b; font-size: 12px;">
-              RBI E-Kuber / Retail Direct
+            <td style="padding: 13px 14px; text-align: right;">
+              <a href="/calculator/tax?yield={{ pt.cut_off_yield }}" class="btn btn-secondary btn-sm" style="font-size: 11px; padding: 4px 10px;">
+                Tax Return ↗
+              </a>
             </td>
           </tr>
           {% endfor %}
@@ -120,9 +321,178 @@
     </div>
   </div>
 
-  <!-- SEBI Regulatory Safe-Harbor Note -->
-  <div style="font-size: 12px; color: #64748b; text-align: center; max-width: 800px; margin: 0 auto; line-height: 1.6;">
-    🔒 <strong>Data Provenance:</strong> Sourced strictly from official Reserve Bank of India (RBI) Gazette Auction Releases. Yield figures reflect primary auction cut-offs and are published for educational and analytical benchmarking under Section 2(u) of SEBI (Research Analysts) Regulations, 2014.
+  <!-- State Development Loan (SDL) Fiscal Disparity Matrix -->
+  <div id="sdlSection" class="card" style="padding: 24px; margin-bottom: 28px;">
+    <div style="display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 20px; flex-wrap: wrap; gap: 14px;">
+      <div>
+        <div style="display: inline-flex; align-items: center; gap: 6px; background: rgba(168, 85, 247, 0.15); border: 1px solid rgba(168, 85, 247, 0.3); border-radius: 9999px; padding: 3px 12px; margin-bottom: 8px;">
+          <span style="font-size: 11.5px; font-weight: 700; color: #c084fc; text-transform: uppercase;">Sub-Sovereign Debt Term Structure</span>
+        </div>
+        <h2 style="font-size: 20px; font-weight: 800; color: #f8fafc; margin: 0 0 6px 0;">
+          State Development Loan (SDL) Fiscal Disparity Matrix
+        </h2>
+        <p style="font-size: 13px; color: #94a3b8; max-width: 800px; margin: 0; line-height: 1.5;">
+          State-by-state 10-Year auction cut-off yields and credit spreads over the benchmark Central G-Sec (7.12%). 
+          While SDLs are guaranteed via the RBI's statutory debit mechanism, yields diverge based on state fiscal deficit, 
+          debt-to-GSDP leverage, and borrowing frequency.
+        </p>
+      </div>
+
+      <div style="background: rgba(15, 23, 42, 0.6); border: 1px solid rgba(255, 255, 255, 0.08); border-radius: 10px; padding: 12px 18px; text-align: right;">
+        <div style="font-size: 11px; color: #64748b; text-transform: uppercase;">Sovereign Benchmark Anchor</div>
+        <div style="font-size: 18px; font-weight: 800; color: #38bdf8;" class="tnum">10Y G-Sec: {{ analytics.benchmark_10y_gsec }}%</div>
+      </div>
+    </div>
+
+    <!-- SDL Grid Table -->
+    <div style="overflow-x: auto;">
+      <table style="width: 100%; border-collapse: collapse; font-size: 14px;">
+        <thead>
+          <tr style="border-bottom: 1px solid rgba(255, 255, 255, 0.1); text-align: left; color: #64748b; font-size: 12px; text-transform: uppercase;">
+            <th style="padding: 12px 14px;">Borrowing State</th>
+            <th style="padding: 12px 14px;">Fiscal Health Tier</th>
+            <th style="padding: 12px 14px;">Debt to GSDP</th>
+            <th style="padding: 12px 14px;">10Y Cut-Off Yield</th>
+            <th style="padding: 12px 14px;">Spread over G-Sec</th>
+            <th style="padding: 12px 14px;">Auction Date</th>
+            <th style="padding: 12px 14px;">Statutory Guarantee</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for state in analytics.sdl_matrix %}
+          <tr style="border-bottom: 1px solid rgba(255, 255, 255, 0.05); transition: background 0.15s ease;">
+            <td style="padding: 14px 14px; font-weight: 700; color: #f8fafc;">
+              {{ state.state_name }}
+              <span style="font-size: 11px; color: #64748b; margin-left: 4px;">({{ state.state_code }})</span>
+            </td>
+            <td style="padding: 14px 14px;">
+              {% if state.fiscal_tier == 'TIER_1_PRUDENT' %}
+                <span style="background: rgba(16, 185, 129, 0.15); color: #34d399; border: 1px solid rgba(16, 185, 129, 0.3); padding: 3px 8px; border-radius: 4px; font-size: 11.5px; font-weight: 700;">
+                  Tier 1: Prudent (&lt;35 bps)
+                </span>
+              {% elif state.fiscal_tier == 'TIER_2_MODERATE' %}
+                <span style="background: rgba(245, 158, 11, 0.15); color: #fbbf24; border: 1px solid rgba(245, 158, 11, 0.3); padding: 3px 8px; border-radius: 4px; font-size: 11.5px; font-weight: 700;">
+                  Tier 2: Moderate (35-45 bps)
+                </span>
+              {% else %}
+                <span style="background: rgba(239, 68, 68, 0.15); color: #f87171; border: 1px solid rgba(239, 68, 68, 0.3); padding: 3px 8px; border-radius: 4px; font-size: 11.5px; font-weight: 700;">
+                  Tier 3: Stressed (&gt;45 bps)
+                </span>
+              {% endif %}
+            </td>
+            <td style="padding: 14px 14px; color: #cbd5e1;" class="tnum">
+              {{ state.debt_to_gsdp_pct }}%
+            </td>
+            <td style="padding: 14px 14px; font-weight: 800; color: #f8fafc;" class="tnum">
+              {{ state.cut_off_yield }}%
+            </td>
+            <td style="padding: 14px 14px; font-weight: 700;" class="tnum">
+              {% if state.spread_over_gsec_bps < 35 %}
+                <span style="color: #34d399;">+{{ state.spread_over_gsec_bps }} bps</span>
+              {% elif state.spread_over_gsec_bps < 48 %}
+                <span style="color: #fbbf24;">+{{ state.spread_over_gsec_bps }} bps</span>
+              {% else %}
+                <span style="color: #f87171;">+{{ state.spread_over_gsec_bps }} bps</span>
+              {% endif %}
+            </td>
+            <td style="padding: 14px 14px; color: #94a3b8;" class="tnum">
+              {{ state.auction_date }}
+            </td>
+            <td style="padding: 14px 14px; color: #38bdf8; font-size: 12px;">
+              RBI Automatic Debit Mechanism
+            </td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+
+    <div style="background: rgba(14, 165, 233, 0.05); border: 1px solid rgba(14, 165, 233, 0.2); border-radius: 8px; padding: 14px 16px; margin-top: 18px; font-size: 12.5px; color: #94a3b8; line-height: 1.6;">
+      <strong style="color: #38bdf8;">Statutory Credit Nuance:</strong> Unlike US municipal debt where bankruptcy is legally possible, Indian state governments cannot formally default on SDLs. In the event of a debt repayment delay, the Reserve Bank of India has statutory authority to automatically debit the state's account with the RBI (including devolution of central taxes) to service bondholders directly.
+    </div>
+  </div>
+
+  <!-- RBI Retail Direct Educational & Investment Pathway -->
+  <div class="card" style="padding: 24px; margin-bottom: 28px;">
+    <h2 style="font-size: 20px; font-weight: 800; color: #f8fafc; margin: 0 0 8px 0;">
+      RBI Retail Direct: Direct Sovereign Bidding Pathway
+    </h2>
+    <p style="font-size: 13.5px; color: #94a3b8; line-height: 1.6; max-width: 860px; margin-bottom: 20px;">
+      Individual retail investors can participate in primary auctions of Government of India securities and State Development Loans with zero broker commissions and zero custody demat maintenance charges through the Reserve Bank of India's direct portal.
+    </p>
+
+    <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 16px; margin-bottom: 20px;">
+      <div style="background: rgba(15, 23, 42, 0.5); border: 1px solid rgba(255, 255, 255, 0.08); border-radius: 10px; padding: 16px;">
+        <div style="font-size: 14px; font-weight: 800; color: #38bdf8; margin-bottom: 6px;">01. Account Opening</div>
+        <div style="font-size: 12.5px; color: #cbd5e1; line-height: 1.5;">
+          Open a Retail Direct Gilt (RDG) account at <a href="https://rbiretaildirect.org.in" target="_blank" rel="noopener" style="color: #38bdf8; text-decoration: underline;">rbiretaildirect.org.in</a> using your PAN, Aadhaar OTP, and verified savings bank account.
+        </div>
+      </div>
+
+      <div style="background: rgba(15, 23, 42, 0.5); border: 1px solid rgba(255, 255, 255, 0.08); border-radius: 10px; padding: 16px;">
+        <div style="font-size: 14px; font-weight: 800; color: #38bdf8; margin-bottom: 6px;">02. Non-Competitive Bidding</div>
+        <div style="font-size: 12.5px; color: #cbd5e1; line-height: 1.5;">
+          Place bids without guessing yields (minimum ₹10,000). 5% of primary auctions are reserved for retail non-competitive bidders at the weighted average clearing yield.
+        </div>
+      </div>
+
+      <div style="background: rgba(15, 23, 42, 0.5); border: 1px solid rgba(255, 255, 255, 0.08); border-radius: 10px; padding: 16px;">
+        <div style="font-size: 14px; font-weight: 800; color: #38bdf8; margin-bottom: 6px;">03. Payment & Settlement</div>
+        <div style="font-size: 12.5px; color: #cbd5e1; line-height: 1.5;">
+          Block funds via UPI or Net Banking (ASBA). Upon auction cut-off determination on Friday/Tuesday, allotment is settled directly into your RBI Gilt account.
+        </div>
+      </div>
+
+      <div style="background: rgba(15, 23, 42, 0.5); border: 1px solid rgba(255, 255, 255, 0.08); border-radius: 10px; padding: 16px;">
+        <div style="font-size: 14px; font-weight: 800; color: #38bdf8; margin-bottom: 6px;">04. Interest & Liquidity</div>
+        <div style="font-size: 12.5px; color: #cbd5e1; line-height: 1.5;">
+          Semi-annual coupon interest is credited directly to your bank account. Secondary market exit is available via RBI's NDS-OM screen-based order matching.
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- SEBI Regulatory Safe-Harbor & Provenance -->
+  <div style="font-size: 12px; color: #64748b; text-align: center; max-width: 840px; margin: 0 auto; line-height: 1.6;">
+    🔒 <strong>Statutory Data Provenance:</strong> Sourced strictly from official Reserve Bank of India (RBI) Weekly Primary Auction Bulletins, Clearing Corporation of India (CCIL) Zero-Coupon Yield Curve benchmarks, and Ministry of Statistics and Programme Implementation (MOSPI) Consumer Price Index Gazette releases. Sovereign metrics and spreads are published solely for institutional and analytical benchmarking under Section 2(u) of the SEBI (Research Analysts) Regulations, 2014.
   </div>
 </div>
+
+<!-- Inline Pure Vanilla JS for Interactive SVG Tooltips & Curve Toggles -->
+<script>
+  function toggleCurve(seriesKey) {
+    const el = document.getElementById('curveSeries_' + seriesKey);
+    const btn = document.getElementById(
+      seriesKey === 'current' ? 'toggleCurrentBtn' : (seriesKey === 'one_month_ago' ? 'toggle1MBtn' : 'toggle1YBtn')
+    );
+    if (!el || !btn) return;
+    if (el.style.display === 'none') {
+      el.style.display = '';
+      btn.style.opacity = '1';
+    } else {
+      el.style.display = 'none';
+      btn.style.opacity = '0.4';
+    }
+  }
+
+  function showSvgTooltip(evt, seriesName, tenor, yieldPct) {
+    const tooltip = document.getElementById('curveTooltip');
+    if (!tooltip) return;
+    document.getElementById('tooltipTenor').innerText = tenor;
+    document.getElementById('tooltipYield').innerText = yieldPct;
+    document.getElementById('tooltipSeries').innerText = seriesName;
+
+    const rect = evt.target.getBoundingClientRect();
+    const parentRect = tooltip.parentElement.getBoundingClientRect();
+
+    tooltip.style.left = (rect.left - parentRect.left + 10) + 'px';
+    tooltip.style.top = (rect.top - parentRect.top - 40) + 'px';
+    tooltip.style.display = 'block';
+  }
+
+  function hideSvgTooltip() {
+    const tooltip = document.getElementById('curveTooltip');
+    if (tooltip) tooltip.style.display = 'none';
+  }
+</script>
 {% endblock %}

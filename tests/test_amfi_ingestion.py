@@ -209,3 +209,22 @@ class TestAmfiIngestionAndSearch(unittest.TestCase):
         runs_data = resp_auth.json()
         self.assertEqual(runs_data["status"], "success")
         self.assertIsInstance(runs_data["runs"], list)
+
+    def test_admin_sync_amfi_api(self):
+        # Unauthenticated request with clean client should fail with 403
+        unauth_client = TestClient(app)
+        resp_unauth = unauth_client.post("/api/admin/sync-amfi")
+        self.assertEqual(resp_unauth.status_code, 403)
+
+        # Authenticated with admin token
+        token = _generate_admin_token("admin@research.internal", "admin")
+        unauth_client.cookies.set(ADMIN_COOKIE_NAME, token)
+
+        # Trigger sync with limit 3 for fast unit test
+        resp_auth = unauth_client.post("/api/admin/sync-amfi?limit=3")
+        self.assertEqual(resp_auth.status_code, 200)
+        data = resp_auth.json()
+        self.assertEqual(data["status"], "success")
+        self.assertIn("summary", data)
+        self.assertGreaterEqual(data["summary"]["total_parsed"], 1)
+

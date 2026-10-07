@@ -34,7 +34,7 @@ def get_system_prompt(ticker: str, language: str) -> str:
 
 CRITICAL LINGUISTIC RULES:
 1. Write at an 8th-grade reading level. Keep sentences short and simple.
-2. ABBREVIATION MANDATE: On first mention of any abbreviation or acronym (e.g., P/E, ROCE, ROE, EPS, CAGR, DCF, EBITDA, CAPEX, TAM, 50-DMA), immediately provide its full form in brackets [e.g., P/E [Price-to-Earnings Ratio], ROCE [Return on Capital Employed], CAGR [Compound Annual Growth Rate]]. Subsequent mentions should use the acronym alone. Do NOT expand abbreviations inside the `### Health Matrix` block or Markdown table cells/headers.
+2. FINANCIAL UNIT & ACRONYM HYGIENE: Write standard financial denominations and ratios (INR, Cr, FY, YoY, QoQ, P/E, ROCE, ROE, EBITDA, 50-DMA) cleanly without robotic bracket expansions like [Indian Rupee] or [Crore]. Keep paragraph prose fluid, professional, and institutional. Do NOT expand abbreviations inside the `### Health Matrix` block or Markdown table cells/headers.
 3. Express all Indian corporate metrics in Crores (Cr) and Indian Rupees (INR).
 
 # DIAGNOSTIC SUMMARY & KEY TAKEAWAYS

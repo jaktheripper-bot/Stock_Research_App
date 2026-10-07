@@ -130,7 +130,7 @@ Pillars 1 to 4 and Pillar 7 remain fundamentally valid and must NOT be reproduce
 
 CRITICAL RULES:
 1. Write at an 8th-grade reading level. Keep sentences short and clear.
-2. ABBREVIATION MANDATE: On first mention of any acronym (e.g. P/E [Price-to-Earnings Ratio], 50-DMA [50-Day Simple Moving Average]), expand in brackets.
+2. FINANCIAL UNIT & ACRONYM HYGIENE: Write standard financial ratios and denominations (INR, Cr, FY, YoY, QoQ, P/E, 50-DMA) cleanly without robotic bracket expansions. Keep paragraph prose fluid and readable.
 3. Express metrics strictly in INR and Crores.
 4. Strictly NO BUY/HOLD/SELL verdicts, target prices, or portfolio roadmaps under SEBI regulations.
 

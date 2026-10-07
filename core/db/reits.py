@@ -34,9 +34,11 @@ DEFAULT_REITS_AND_INVITS = [
         "sebi_compliant": True,
         "details_json": json.dumps({
             "asset_class": "Grade-A Commercial IT Parks",
+            "subtype": "OFFICE_COMMERCIAL",
             "leasable_area_msf": 45.4,
             "top_tenants": ["JPMorgan", "Cognizant", "NTT Data", "Flipkart"],
-            "city_breakdown": {"Bengaluru": "74%", "Mumbai": "10%", "Pune": "9%", "Noida": "7%"}
+            "city_breakdown": {"Bengaluru": "74%", "Mumbai": "10%", "Pune": "9%", "Noida": "7%"},
+            "tax_breakdown": {"dividend_pct": 38.0, "interest_pct": 34.0, "amortization_pct": 28.0, "rental_pct": 0.0}
         })
     },
     {
@@ -55,9 +57,11 @@ DEFAULT_REITS_AND_INVITS = [
         "sebi_compliant": True,
         "details_json": json.dumps({
             "asset_class": "Tech & SEZ Commercial Parks",
+            "subtype": "OFFICE_COMMERCIAL",
             "leasable_area_msf": 32.0,
             "top_tenants": ["Qualcomm", "Barclays", "Amazon", "Accenture"],
-            "city_breakdown": {"Mumbai Region": "44%", "Hyderabad": "39%", "Pune": "15%"}
+            "city_breakdown": {"Mumbai Region": "44%", "Hyderabad": "39%", "Pune": "15%"},
+            "tax_breakdown": {"dividend_pct": 45.0, "interest_pct": 35.0, "amortization_pct": 20.0, "rental_pct": 0.0}
         })
     },
     {
@@ -76,9 +80,11 @@ DEFAULT_REITS_AND_INVITS = [
         "sebi_compliant": True,
         "details_json": json.dumps({
             "asset_class": "Institutional Grade-A Offices",
+            "subtype": "OFFICE_COMMERCIAL",
             "leasable_area_msf": 25.5,
             "top_tenants": ["TCS", "Cognizant", "RBS", "Barclays"],
-            "city_breakdown": {"NCR": "65%", "Mumbai": "18%", "Kolkata": "17%"}
+            "city_breakdown": {"NCR": "65%", "Mumbai": "18%", "Kolkata": "17%"},
+            "tax_breakdown": {"dividend_pct": 30.0, "interest_pct": 42.0, "amortization_pct": 28.0, "rental_pct": 0.0}
         })
     },
     {
@@ -97,9 +103,11 @@ DEFAULT_REITS_AND_INVITS = [
         "sebi_compliant": True,
         "details_json": json.dumps({
             "asset_class": "Pure-Play Retail Urban Consumption Malls",
+            "subtype": "RETAIL_MALL",
             "leasable_area_msf": 9.8,
             "top_tenants": ["Zara", "PVR INOX", "Shoppers Stop", "H&M"],
-            "city_breakdown": {"Tier-1 Cities": "68%", "High-Growth Tier-2": "32%"}
+            "city_breakdown": {"Tier-1 Cities": "68%", "High-Growth Tier-2": "32%"},
+            "tax_breakdown": {"dividend_pct": 25.0, "interest_pct": 40.0, "amortization_pct": 35.0, "rental_pct": 0.0}
         })
     },
     {
@@ -118,9 +126,81 @@ DEFAULT_REITS_AND_INVITS = [
         "sebi_compliant": True,
         "details_json": json.dumps({
             "asset_class": "Inter-State Power Transmission Assets (TSPs)",
+            "subtype": "TRANSMISSION_ANNUITY",
             "network_length_ckm": 3698.0,
             "availability_factor": "99.8%",
-            "cashflow_nature": "Regulated Availability-Based Annuity"
+            "cashflow_nature": "Regulated Availability-Based Annuity (Zero Traffic Risk)",
+            "tax_breakdown": {"dividend_pct": 45.0, "interest_pct": 30.0, "amortization_pct": 25.0, "rental_pct": 0.0}
+        })
+    },
+    {
+        "symbol": "INDIGRID",
+        "name": "India Grid Trust (IndiGrid)",
+        "structure_type": "INVIT",
+        "current_price": 134.80,
+        "nav_per_unit": 142.00,
+        "discount_to_nav_pct": -5.07,
+        "distribution_yield_pct": 10.80,
+        "occupancy_pct": 99.5,
+        "ndcf_payout_purity_pct": 100.0,
+        "ltv_ratio_pct": 48.5,
+        "wale_years": 32.0,
+        "sponsor_holding_pct": 23.5,
+        "sebi_compliant": True,
+        "details_json": json.dumps({
+            "asset_class": "Power Transmission & Utility Solar Assets",
+            "subtype": "TRANSMISSION_ANNUITY",
+            "network_length_ckm": 8430.0,
+            "availability_factor": "99.7%",
+            "sponsor": "KKR / GIC",
+            "cashflow_nature": "Long-Term Point-to-Point Tariff Contracts (TSA)",
+            "tax_breakdown": {"dividend_pct": 35.0, "interest_pct": 40.0, "amortization_pct": 25.0, "rental_pct": 0.0}
+        })
+    },
+    {
+        "symbol": "IRB_INVIT",
+        "name": "IRB InvIT Fund",
+        "structure_type": "INVIT",
+        "current_price": 68.20,
+        "nav_per_unit": 75.00,
+        "discount_to_nav_pct": -9.07,
+        "distribution_yield_pct": 12.40,
+        "occupancy_pct": 96.5,
+        "ndcf_payout_purity_pct": 96.5,
+        "ltv_ratio_pct": 38.0,
+        "wale_years": 18.0,
+        "sponsor_holding_pct": 19.4,
+        "sebi_compliant": True,
+        "details_json": json.dumps({
+            "asset_class": "National Toll Highway Concessions (BOT / TOT)",
+            "subtype": "TOLL_VOLUME",
+            "lane_kms": 4055.0,
+            "traffic_growth_cagr": "7.2%",
+            "cashflow_nature": "Toll Volume Dependent (Inflation-Indexed Tariff Hikes)",
+            "tax_breakdown": {"dividend_pct": 20.0, "interest_pct": 55.0, "amortization_pct": 25.0, "rental_pct": 0.0}
+        })
+    },
+    {
+        "symbol": "NHAI_INVIT",
+        "name": "National Highways Infra Trust (NHIT)",
+        "structure_type": "INVIT",
+        "current_price": 124.00,
+        "nav_per_unit": 130.00,
+        "discount_to_nav_pct": -4.62,
+        "distribution_yield_pct": 8.90,
+        "occupancy_pct": 100.0,
+        "ndcf_payout_purity_pct": 100.0,
+        "ltv_ratio_pct": 24.5,
+        "wale_years": 24.0,
+        "sponsor_holding_pct": 16.0,
+        "sebi_compliant": True,
+        "details_json": json.dumps({
+            "asset_class": "Sovereign PSU Highway Concessions",
+            "subtype": "TOLL_VOLUME",
+            "lane_kms": 3280.0,
+            "sponsor": "National Highways Authority of India (NHAI)",
+            "cashflow_nature": "High-Density Golden Quadrilateral Concessions",
+            "tax_breakdown": {"dividend_pct": 50.0, "interest_pct": 30.0, "amortization_pct": 20.0, "rental_pct": 0.0}
         })
     },
     {
@@ -139,16 +219,57 @@ DEFAULT_REITS_AND_INVITS = [
         "sebi_compliant": True,
         "details_json": json.dumps({
             "asset_class": "Pre-Leased Tech Commercial Hub (Outer Ring Road, Bengaluru)",
+            "subtype": "SM_FRACTIONAL_OFFICE",
+            "scheme_asset_size_cr": 353.0,
             "leasable_area_sqft": 246935,
             "sole_tenant": "US Tech Multinational",
             "minimum_ticket_inr": 1000000,
-            "leverage": "Zero Debt (100% Equity Funded)"
+            "leverage": "Zero Debt (100% Equity Funded)",
+            "tax_breakdown": {"dividend_pct": 0.0, "interest_pct": 100.0, "amortization_pct": 0.0, "rental_pct": 0.0}
+        })
+    },
+    {
+        "symbol": "SMREIT_HYD_02",
+        "name": "Strata Prime HITEC SM REIT (SEBI Reg.)",
+        "structure_type": "SM_REIT",
+        "current_price": 10000.00,
+        "nav_per_unit": 10000.00,
+        "discount_to_nav_pct": 0.0,
+        "distribution_yield_pct": 9.20,
+        "occupancy_pct": 98.5,
+        "ndcf_payout_purity_pct": 98.0,
+        "ltv_ratio_pct": 15.0,
+        "wale_years": 6.5,
+        "sponsor_holding_pct": 5.5,
+        "sebi_compliant": True,
+        "details_json": json.dumps({
+            "asset_class": "Grade-A Financial District Hub (HITEC City, Hyderabad)",
+            "subtype": "SM_FRACTIONAL_OFFICE",
+            "scheme_asset_size_cr": 125.0,
+            "leasable_area_sqft": 110000,
+            "sole_tenant": "Global Financial Services GCC",
+            "minimum_ticket_inr": 1000000,
+            "leverage": "Conservative Low Leverage (LTV 15.0%)",
+            "tax_breakdown": {"dividend_pct": 10.0, "interest_pct": 90.0, "amortization_pct": 0.0, "rental_pct": 0.0}
         })
     }
 ]
 
-# Baseline Sovereign Gold Bond (SGB) Tranches on Secondary Market
+# Baseline Sovereign Gold Bond (SGB) Tranches on Secondary Market (10 Active Series 2025 to 2032)
 DEFAULT_SGB_TRANCHES = [
+    {
+        "symbol": "SGBNOV25",
+        "series_name": "Sovereign Gold Bond 2017-18 Series VII",
+        "issue_price": 2961.0,
+        "market_price": 7380.0,
+        "spot_gold_price": 7450.0,
+        "discount_to_spot_pct": -0.94,
+        "annual_coupon_rate": 2.50,
+        "maturity_date": "2025-11-27",
+        "ytm_annualized_pct": 8.65,
+        "tax_treatment": "100% Tax-Free Capital Gains (Sec 47(viic))",
+        "etf_tax_adjusted_spread_pct": 1.85
+    },
     {
         "symbol": "SGBNOV26",
         "series_name": "Sovereign Gold Bond 2018-19 Series IV",
@@ -161,6 +282,58 @@ DEFAULT_SGB_TRANCHES = [
         "ytm_annualized_pct": 8.85,
         "tax_treatment": "100% Tax-Free Capital Gains (Sec 47(viic))",
         "etf_tax_adjusted_spread_pct": 1.95
+    },
+    {
+        "symbol": "SGBMAY27",
+        "series_name": "Sovereign Gold Bond 2019-20 Series I",
+        "issue_price": 3196.0,
+        "market_price": 7210.0,
+        "spot_gold_price": 7450.0,
+        "discount_to_spot_pct": -3.22,
+        "annual_coupon_rate": 2.50,
+        "maturity_date": "2027-05-11",
+        "ytm_annualized_pct": 9.05,
+        "tax_treatment": "100% Tax-Free Capital Gains (Sec 47(viic))",
+        "etf_tax_adjusted_spread_pct": 2.05
+    },
+    {
+        "symbol": "SGBOCT27",
+        "series_name": "Sovereign Gold Bond 2019-20 Series VII",
+        "issue_price": 3835.0,
+        "market_price": 7190.0,
+        "spot_gold_price": 7450.0,
+        "discount_to_spot_pct": -3.49,
+        "annual_coupon_rate": 2.50,
+        "maturity_date": "2027-10-21",
+        "ytm_annualized_pct": 9.18,
+        "tax_treatment": "100% Tax-Free Capital Gains (Sec 47(viic))",
+        "etf_tax_adjusted_spread_pct": 2.10
+    },
+    {
+        "symbol": "SGBMAY28",
+        "series_name": "Sovereign Gold Bond 2020-21 Series I",
+        "issue_price": 4639.0,
+        "market_price": 7160.0,
+        "spot_gold_price": 7450.0,
+        "discount_to_spot_pct": -3.89,
+        "annual_coupon_rate": 2.50,
+        "maturity_date": "2028-05-12",
+        "ytm_annualized_pct": 9.28,
+        "tax_treatment": "100% Tax-Free Capital Gains (Sec 47(viic))",
+        "etf_tax_adjusted_spread_pct": 2.15
+    },
+    {
+        "symbol": "SGBNOV28",
+        "series_name": "Sovereign Gold Bond 2020-21 Series VIII",
+        "issue_price": 5177.0,
+        "market_price": 7140.0,
+        "spot_gold_price": 7450.0,
+        "discount_to_spot_pct": -4.16,
+        "annual_coupon_rate": 2.50,
+        "maturity_date": "2028-11-18",
+        "ytm_annualized_pct": 9.35,
+        "tax_treatment": "100% Tax-Free Capital Gains (Sec 47(viic))",
+        "etf_tax_adjusted_spread_pct": 2.20
     },
     {
         "symbol": "SGBMAY29",
@@ -187,6 +360,19 @@ DEFAULT_SGB_TRANCHES = [
         "ytm_annualized_pct": 9.80,
         "tax_treatment": "100% Tax-Free Capital Gains (Sec 47(viic))",
         "etf_tax_adjusted_spread_pct": 2.30
+    },
+    {
+        "symbol": "SGBMAY30",
+        "series_name": "Sovereign Gold Bond 2022-23 Series I",
+        "issue_price": 5041.0,
+        "market_price": 7100.0,
+        "spot_gold_price": 7450.0,
+        "discount_to_spot_pct": -4.70,
+        "annual_coupon_rate": 2.50,
+        "maturity_date": "2030-05-27",
+        "ytm_annualized_pct": 9.95,
+        "tax_treatment": "100% Tax-Free Capital Gains (Sec 47(viic))",
+        "etf_tax_adjusted_spread_pct": 2.35
     },
     {
         "symbol": "SGBFEB32",
@@ -339,8 +525,22 @@ def get_all_reits_and_invits(structure_type: Optional[str] = None) -> List[Dict[
             for r in DEFAULT_REITS_AND_INVITS:
                 save_reit_or_invit(r)
             if structure_type:
-                return [x for x in DEFAULT_REITS_AND_INVITS if x["structure_type"] == structure_type]
-            return DEFAULT_REITS_AND_INVITS
+                cursor.execute(query, (structure_type,))
+            else:
+                cursor.execute(query)
+            rows = cursor.fetchall()
+        else:
+            existing_symbols = {r[1].upper() for r in rows}
+            missing_defaults = [r for r in DEFAULT_REITS_AND_INVITS if r["symbol"].upper() not in existing_symbols]
+            if missing_defaults:
+                logger.info(f"Seeding {len(missing_defaults)} newly added default REITs/InvITs...")
+                for r in missing_defaults:
+                    save_reit_or_invit(r)
+                if structure_type:
+                    cursor.execute(query, (structure_type,))
+                else:
+                    cursor.execute(query)
+                rows = cursor.fetchall()
 
         results = []
         for r in rows:
@@ -477,7 +677,31 @@ def get_all_sgb_tranches() -> List[Dict[str, Any]]:
             logger.info("SGB tranches table is empty. Initializing baseline SGB tranches...")
             for sgb in DEFAULT_SGB_TRANCHES:
                 save_sgb_tranche(sgb)
-            return DEFAULT_SGB_TRANCHES
+            cursor.execute("""
+                SELECT id, symbol, series_name, issue_price, market_price,
+                       spot_gold_price, discount_to_spot_pct, annual_coupon_rate,
+                       maturity_date, ytm_annualized_pct, tax_treatment,
+                       etf_tax_adjusted_spread_pct, updated_at
+                FROM sgb_tranches
+                ORDER BY ytm_annualized_pct DESC;
+            """)
+            rows = cursor.fetchall()
+        else:
+            existing_symbols = {r[1].upper() for r in rows}
+            missing_defaults = [s for s in DEFAULT_SGB_TRANCHES if s["symbol"].upper() not in existing_symbols]
+            if missing_defaults:
+                logger.info(f"Seeding {len(missing_defaults)} newly added default SGB tranches...")
+                for s in missing_defaults:
+                    save_sgb_tranche(s)
+                cursor.execute("""
+                    SELECT id, symbol, series_name, issue_price, market_price,
+                           spot_gold_price, discount_to_spot_pct, annual_coupon_rate,
+                           maturity_date, ytm_annualized_pct, tax_treatment,
+                           etf_tax_adjusted_spread_pct, updated_at
+                    FROM sgb_tranches
+                    ORDER BY ytm_annualized_pct DESC;
+                """)
+                rows = cursor.fetchall()
 
         results = []
         for r in rows:
@@ -503,3 +727,28 @@ def get_all_sgb_tranches() -> List[Dict[str, Any]]:
     finally:
         cursor.close()
         conn.close()
+
+
+get_sgb_tranches = get_all_sgb_tranches
+
+
+
+def get_reit_by_symbol(symbol: str) -> Optional[Dict[str, Any]]:
+    """Retrieves a single REIT or InvIT by symbol."""
+    all_items = get_all_reits_and_invits()
+    sym_clean = symbol.strip().upper()
+    for item in all_items:
+        if item["symbol"].upper() == sym_clean:
+            return item
+    return None
+
+
+def get_sgb_by_symbol(symbol: str) -> Optional[Dict[str, Any]]:
+    """Retrieves a single SGB tranche by symbol."""
+    all_tranches = get_all_sgb_tranches()
+    sym_clean = symbol.strip().upper()
+    for item in all_tranches:
+        if item["symbol"].upper() == sym_clean:
+            return item
+    return None
+

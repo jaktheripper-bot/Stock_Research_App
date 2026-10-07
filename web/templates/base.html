@@ -62,7 +62,7 @@
           </a>
 
           <!-- Markets & Multi-Asset Sub-Tabs -->
-          <div class="nav-item dropdown {% if active_page in ['home', 'debt', 'funds', 'sovereign', 'etfs', 'reits', 'dossier'] %}active-parent{% endif %}" id="navMarketsDropdown">
+          <div class="nav-item dropdown {% if active_page in ['home', 'opportunities', 'debt', 'funds', 'sovereign', 'etfs', 'reits', 'dossier'] %}active-parent{% endif %}" id="navMarketsDropdown">
             <button class="nav-link dropdown-toggle" aria-haspopup="true" aria-expanded="false" id="marketsDropdownBtn">
               <span>Markets</span>
               <svg class="dropdown-chevron" width="10" height="6" viewBox="0 0 10 6" fill="none" xmlns="http://www.w3.org/2000/svg">
@@ -70,11 +70,19 @@
               </svg>
             </button>
             <div class="dropdown-menu" role="menu" aria-labelledby="marketsDropdownBtn">
+              <a href="/opportunities" class="dropdown-item {% if active_page == 'opportunities' %}active{% endif %}" role="menuitem">
+                <div class="dropdown-icon">🎯</div>
+                <div class="dropdown-content">
+                  <div class="dropdown-title">Opportunity Terminal</div>
+                  <div class="dropdown-desc">Cross-asset discovery, spread heatmap & risk-yield frontier</div>
+                </div>
+              </a>
+              <div class="dropdown-divider"></div>
               <a href="/" class="dropdown-item {% if active_page == 'home' %}active{% endif %}" role="menuitem">
                 <div class="dropdown-icon">📈</div>
                 <div class="dropdown-content">
                   <div class="dropdown-title">Equities & Stocks</div>
-                  <div class="dropdown-desc">BSE & NSE 7-Pillar research, DCF & multi-scenario valuation</div>
+                  <div class="dropdown-desc">BSE & NSE forensic research, DCF & multi-scenario valuation</div>
                 </div>
               </a>
               <a href="/debt" class="dropdown-item {% if active_page == 'debt' %}active{% endif %}" role="menuitem">
@@ -158,7 +166,7 @@
                 <div class="dropdown-icon">⚡</div>
                 <div class="dropdown-content">
                   <div class="dropdown-title">Instant Dossier Generator</div>
-                  <div class="dropdown-desc">Synthesize live 7-pillar research report on demand</div>
+                  <div class="dropdown-desc">Synthesize live institutional research report on demand</div>
                 </div>
               </a>
             </div>
@@ -212,6 +220,10 @@
         </nav>
 
         <div class="nav-actions">
+          <a href="/admin/audit" class="badge-autonomous-radar" title="Autonomous Watchers & Event Ledger Active" style="display: inline-flex; align-items: center; gap: 6px; padding: 5px 12px; border-radius: 9999px; background: rgba(16, 185, 129, 0.1); border: 1px solid rgba(16, 185, 129, 0.3); color: #10b981; font-size: 11px; font-weight: 700; text-decoration: none; transition: background 0.2s;">
+            <span style="width: 7px; height: 7px; border-radius: 50%; background: #10b981; box-shadow: 0 0 8px #10b981;"></span>
+            <span>Agent Radar</span>
+          </a>
           <button id="navGenerateBtn" class="btn btn-primary btn-sm" onclick="openGenerateModal()">⚡ Generate Report</button>
           <button id="navSignInBtn" class="btn btn-secondary btn-sm" onclick="openSignInModal()">Sign In / 2 Credits</button>
           <button id="mobileMenuBtn" class="mobile-menu-btn" onclick="toggleMobileMenu()" aria-label="Toggle navigation menu">
@@ -375,7 +387,7 @@
         </div>
 
         <button type="submit" id="generateModalSubmitBtn" class="btn btn-primary" style="width: 100%; padding: 14px; font-size: 15px; font-weight: 700;">
-          ⚡ Synthesize 7-Pillar Dossier (1 Credit)
+          ⚡ Synthesize Institutional Dossier (1 Credit)
         </button>
       </form>
 
@@ -394,7 +406,7 @@
         Synthesizing Institutional Dossier
       </h3>
       <p id="overlayStatusMsg" style="font-size: 14px; color: var(--text-secondary); line-height: 1.6; margin-bottom: 20px;">
-        Ingesting live BSE exchange filings, executing 7-pillar qualitative matrix analysis, computing multi-scenario DCF valuations, and auditing governance footnotes...
+        Ingesting live BSE exchange filings, executing forensic diagnostic matrix analysis (01–07), computing multi-scenario DCF valuations, and auditing governance footnotes...
       </p>
       <div style="background: rgba(14, 165, 233, 0.1); border-radius: 8px; padding: 10px 14px; font-size: 12px; color: var(--accent-cyan);">
         ⏳ Average compilation time: ~20-30 seconds. Please keep this tab open.
@@ -407,6 +419,9 @@
     <div class="container">
       <div class="footer-disclaimer-box">
         <strong>Mandatory SEBI Safe-Harbor Disclosure:</strong> {{ MANDATORY_SEBI_DISCLAIMER }}
+        <div style="margin-top: 8px; font-size: 11.5px; color: var(--text-muted); border-top: 1px solid rgba(255, 255, 255, 0.08); padding-top: 6px; line-height: 1.5;">
+          <strong>Data Grounding & Provenance:</strong> Financial statements, market prices, and disclosure filings are sourced directly from statutory exchange publications (BSE/NSE announcements), official AMFI NAV disclosures, RBI/MOSPI statistical releases, and authorized broker API gateways. All research is automated and educational under Section 2(u) of SEBI (Research Analysts) Regulations, 2014.
+        </div>
       </div>
 
       <div class="footer-grid">

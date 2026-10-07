@@ -1,0 +1,300 @@
+{% extends "base.html" %}
+
+{% block title %}Cross-Asset Opportunity Terminal & Arbitrage Scanner | Stock Research AI{% endblock %}
+{% block meta_desc %}Multi-modal investment discovery across Indian Equities, Corporate Debt, SM REITs, InvITs, SGBs, Sovereign Yields, and Mutual Funds with interactive spread heatmaps and post-tax scatter frontiers.{% endblock %}
+{% block og_title %}Cross-Asset Opportunity Terminal & Arbitrage Scanner | Stock Research AI{% endblock %}
+{% block og_desc %}Institutional discovery replacing flat tabular lists with Bento deal cards, spread heatmaps, risk-return frontiers, and persistent cross-asset arbitrage pinning.{% endblock %}
+
+{% block content %}
+<div class="container py-8">
+  <!-- Top Hero Terminal Header -->
+  <div style="background: linear-gradient(135deg, rgba(30, 41, 59, 0.75) 0%, rgba(15, 23, 42, 0.95) 100%); border: 1px solid rgba(255, 255, 255, 0.12); border-radius: 16px; padding: 32px; margin-bottom: 28px; position: relative; overflow: hidden; box-shadow: 0 10px 30px rgba(0, 0, 0, 0.3);">
+    <div style="position: absolute; top: -60px; right: -60px; width: 220px; height: 220px; background: radial-gradient(circle, rgba(14, 165, 233, 0.18) 0%, transparent 70%); pointer-events: none;"></div>
+    
+    <div style="display: flex; justify-content: space-between; align-items: flex-start; flex-wrap: wrap; gap: 16px; margin-bottom: 16px;">
+      <div style="display: inline-flex; align-items: center; gap: 8px; background: rgba(14, 165, 233, 0.15); border: 1px solid rgba(14, 165, 233, 0.3); border-radius: 9999px; padding: 4px 14px;">
+        <span style="width: 8px; height: 8px; border-radius: 50%; background: #0ea5e9;"></span>
+        <span style="font-size: 12px; font-weight: 700; color: #38bdf8; text-transform: uppercase; letter-spacing: 0.05em;">Institutional Cross-Asset Discovery Engine</span>
+      </div>
+
+      <div style="display: inline-flex; align-items: center; gap: 8px; font-size: 12px; color: #94a3b8; background: rgba(255, 255, 255, 0.05); padding: 4px 12px; border-radius: 8px; border: 1px solid rgba(255, 255, 255, 0.08);">
+        <span>⌨️ Shortcuts: Press <kbd style="background: #1e293b; padding: 2px 6px; border-radius: 4px; font-family: monospace; color: #38bdf8; border: 1px solid #334155;">1</kbd> Cards, <kbd style="background: #1e293b; padding: 2px 6px; border-radius: 4px; font-family: monospace; color: #38bdf8; border: 1px solid #334155;">2</kbd> Heatmap, <kbd style="background: #1e293b; padding: 2px 6px; border-radius: 4px; font-family: monospace; color: #38bdf8; border: 1px solid #334155;">3</kbd> Scatter, <kbd style="background: #1e293b; padding: 2px 6px; border-radius: 4px; font-family: monospace; color: #38bdf8; border: 1px solid #334155;">4</kbd> Table</span>
+      </div>
+    </div>
+
+    <h1 style="font-size: 32px; font-weight: 800; color: #f8fafc; margin-bottom: 12px; letter-spacing: -0.02em;">
+      Multi-Asset Opportunity Terminal & Arbitrage Scanner
+    </h1>
+    <p style="font-size: 15px; color: #94a3b8; max-width: 880px; line-height: 1.6; margin-bottom: 24px;">
+      Navigating beyond flat tabular lists. Cross-asset surveillance spanning <strong>Equities, Corporate Bonds/SDIs, SM REITs, InvITs, Sovereign Gold (SGB), Benchmark G-Secs, and Mutual Funds</strong>. Every offering is normalized against statutory tax regimes (Sec 47(viic), Sec 115UA, Sec 50AA) to reveal true in-hand yield after tax drag and inflation.
+    </p>
+
+    <!-- Top KPI Grid -->
+    <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(190px, 1fr)); gap: 16px;">
+      <div style="background: rgba(15, 23, 42, 0.65); border: 1px solid rgba(255, 255, 255, 0.08); border-radius: 12px; padding: 18px;">
+        <div style="font-size: 12px; color: #64748b; text-transform: uppercase; font-weight: 600; margin-bottom: 4px;">Tracked Universe</div>
+        <div style="font-size: 26px; font-weight: 800; color: #f8fafc;" class="tnum" id="kpiTotalItems">{{ summary.total_items }} Offerings</div>
+        <div style="font-size: 11px; color: #94a3b8; margin-top: 4px;">Across 7 Asset Classes</div>
+      </div>
+      <div style="background: rgba(15, 23, 42, 0.65); border: 1px solid rgba(255, 255, 255, 0.08); border-radius: 12px; padding: 18px;">
+        <div style="font-size: 12px; color: #64748b; text-transform: uppercase; font-weight: 600; margin-bottom: 4px;">10Y G-Sec Anchor</div>
+        <div style="font-size: 26px; font-weight: 800; color: #38bdf8;" class="tnum">{{ summary.benchmark_yield }}%</div>
+        <div style="font-size: 11px; color: #94a3b8; margin-top: 4px;">Statutory Risk-Free Rate</div>
+      </div>
+      <div style="background: rgba(15, 23, 42, 0.65); border: 1px solid rgba(255, 255, 255, 0.08); border-radius: 12px; padding: 18px;">
+        <div style="font-size: 12px; color: #64748b; text-transform: uppercase; font-weight: 600; margin-bottom: 4px;">Peak Tax-Free Alpha</div>
+        <div style="font-size: 26px; font-weight: 800; color: #eab308;" class="tnum">{{ summary.peak_sgb_yield }}%</div>
+        <div style="font-size: 11px; color: #94a3b8; margin-top: 4px;">SGB Secondary Discount (Sec 47)</div>
+      </div>
+      <div style="background: rgba(15, 23, 42, 0.65); border: 1px solid rgba(255, 255, 255, 0.08); border-radius: 12px; padding: 18px;">
+        <div style="font-size: 12px; color: #64748b; text-transform: uppercase; font-weight: 600; margin-bottom: 4px;">Peak Real Asset Cash Yield</div>
+        <div style="font-size: 26px; font-weight: 800; color: #10b981;" class="tnum">{{ summary.peak_real_asset_yield }}%</div>
+        <div style="font-size: 11px; color: #94a3b8; margin-top: 4px;">Infrastructure InvIT / SM REIT</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Persona Playbook Filter Bar -->
+  <div style="display: flex; gap: 8px; overflow-x: auto; padding-bottom: 12px; margin-bottom: 20px;">
+    <button class="btn btn-sm persona-btn btn-primary" onclick="setPersonaFilter('')" data-persona="">
+      🌐 All Offerings ({{ summary.total_items }})
+    </button>
+    <button class="btn btn-sm persona-btn btn-secondary" onclick="setPersonaFilter('capital_preservation')" data-persona="capital_preservation">
+      🛡️ Capital Preservation & Tax-Free Alpha
+    </button>
+    <button class="btn btn-sm persona-btn btn-secondary" onclick="setPersonaFilter('quarterly_cashflow')" data-persona="quarterly_cashflow">
+      💰 Quarterly Cash Flow Stream
+    </button>
+    <button class="btn btn-sm persona-btn btn-secondary" onclick="setPersonaFilter('hni_real_assets')" data-persona="hni_real_assets">
+      🏢 HNI Commercial Real Assets (₹10L+)
+    </button>
+    <button class="btn btn-sm persona-btn btn-secondary" onclick="setPersonaFilter('compounding')" data-persona="compounding">
+      🚀 Asymmetric Compounding Engine
+    </button>
+  </div>
+
+  <!-- Global Controls & View Modality Switcher Bar -->
+  <div style="background: rgba(15, 23, 42, 0.85); border: 1px solid rgba(255, 255, 255, 0.1); border-radius: 14px; padding: 16px 20px; margin-bottom: 24px; display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 16px;">
+    
+    <!-- Modality Selector -->
+    <div style="display: inline-flex; background: rgba(30, 41, 59, 0.8); border: 1px solid rgba(255, 255, 255, 0.1); border-radius: 10px; padding: 4px; gap: 4px;">
+      <button id="viewBtnCards" class="btn btn-sm btn-primary view-mode-btn" onclick="switchView('cards')">
+        🗂️ Bento Cards
+      </button>
+      <button id="viewBtnHeatmap" class="btn btn-sm btn-secondary view-mode-btn" onclick="switchView('heatmap')">
+        📊 Spread Heatmap
+      </button>
+      <button id="viewBtnScatter" class="btn btn-sm btn-secondary view-mode-btn" onclick="switchView('scatter')">
+        📈 Risk-Yield Frontier
+      </button>
+      <button id="viewBtnTable" class="btn btn-sm btn-secondary view-mode-btn" onclick="switchView('table')">
+        📑 Dense Table
+      </button>
+    </div>
+
+    <!-- Sliders and Micro-Controls -->
+    <div style="display: flex; align-items: center; gap: 16px; flex-wrap: wrap;">
+      <!-- Tax Slab Switcher -->
+      <div style="display: flex; align-items: center; gap: 8px;">
+        <span style="font-size: 12px; font-weight: 600; color: #94a3b8;">Tax Slab:</span>
+        <select id="taxSlabSelect" onchange="updateTaxSlab(this.value)" style="background: #1e293b; color: #f8fafc; border: 1px solid rgba(255, 255, 255, 0.15); border-radius: 8px; padding: 6px 12px; font-size: 13px; font-weight: 600; cursor: pointer;">
+          <option value="0">0% (Exempt)</option>
+          <option value="20">20% (Mid-Tier)</option>
+          <option value="30" selected>30% (Standard Slab)</option>
+          <option value="39">39% (HNI Surcharge)</option>
+        </select>
+      </div>
+
+      <!-- Inflation Slider -->
+      <div style="display: flex; align-items: center; gap: 8px;">
+        <span style="font-size: 12px; font-weight: 600; color: #94a3b8;">CPI Inflation:</span>
+        <input type="range" id="inflationSlider" min="3.0" max="7.0" step="0.5" value="4.5" oninput="updateInflation(this.value)" style="width: 80px; accent-color: #0ea5e9; cursor: pointer;">
+        <span id="inflationValLabel" style="font-size: 12px; font-weight: 700; color: #38bdf8; min-width: 35px;" class="tnum">4.5%</span>
+      </div>
+
+      <!-- Quick Search Filter -->
+      <div>
+        <input type="text" id="terminalSearchInput" placeholder="Filter by symbol, rating, asset..." oninput="handleSearch(this.value)" style="background: #1e293b; color: #f8fafc; border: 1px solid rgba(255, 255, 255, 0.15); border-radius: 8px; padding: 6px 14px; font-size: 13px; width: 220px;">
+      </div>
+    </div>
+  </div>
+
+  <!-- ========================================================================= -->
+  <!-- MODALITY 1: 🗂️ BENTO OPPORTUNITY CARDS VIEW                               -->
+  <!-- ========================================================================= -->
+  <div id="viewBentoContainer" class="view-panel">
+    <div id="bentoCardsGrid" style="display: grid; grid-template-columns: repeat(auto-fill, minmax(360px, 1fr)); gap: 20px;">
+      <!-- Populated via Javascript / SSR Fallback -->
+    </div>
+  </div>
+
+  <!-- ========================================================================= -->
+  <!-- MODALITY 2: 📊 RELATIVE YIELD SPREAD HEATMAP MATRIX VIEW                 -->
+  <!-- ========================================================================= -->
+  <div id="viewHeatmapContainer" class="view-panel" style="display: none;">
+    <div class="card" style="padding: 24px; margin-bottom: 24px;">
+      <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px; flex-wrap: wrap; gap: 12px;">
+        <div>
+          <h2 style="font-size: 20px; font-weight: 800; color: #f8fafc; margin: 0 0 4px 0;">
+            Multi-Asset Relative Spread Heatmap Matrix (vs. 10Y G-Sec: 7.10%)
+          </h2>
+          <p style="font-size: 13px; color: #94a3b8; margin: 0;">
+            Basis point spread over statutory sovereign benchmark across asset subtypes and tenure maturities. Amber borders flag negative risk compensation.
+          </p>
+        </div>
+        <div style="display: flex; gap: 12px; font-size: 11.5px; color: #94a3b8; align-items: center;">
+          <span style="display: inline-flex; align-items: center; gap: 4px;"><span style="width: 10px; height: 10px; background: rgba(14, 165, 233, 0.3); border-radius: 2px;"></span> Low Spread (+0 to +75 bps)</span>
+          <span style="display: inline-flex; align-items: center; gap: 4px;"><span style="width: 10px; height: 10px; background: rgba(16, 185, 129, 0.35); border-radius: 2px;"></span> High Real Spread (+75 to +250 bps)</span>
+          <span style="display: inline-flex; align-items: center; gap: 4px;"><span style="width: 10px; height: 10px; background: rgba(245, 158, 11, 0.35); border-radius: 2px;"></span> Deep Alternative (+250+ bps)</span>
+        </div>
+      </div>
+
+      <div style="overflow-x: auto;">
+        <table id="heatmapTable" style="width: 100%; border-collapse: collapse; font-size: 13px;">
+          <thead>
+            <tr style="border-bottom: 1px solid rgba(255, 255, 255, 0.12); text-align: left; color: #64748b; font-size: 11px; text-transform: uppercase;">
+              <th style="padding: 14px; width: 220px;">Asset Category</th>
+              <th style="padding: 14px; text-align: center;">&lt; 1 Year</th>
+              <th style="padding: 14px; text-align: center;">1–3 Years</th>
+              <th style="padding: 14px; text-align: center;">3–5 Years</th>
+              <th style="padding: 14px; text-align: center;">5–10 Years</th>
+              <th style="padding: 14px; text-align: center;">10+ Years</th>
+            </tr>
+          </thead>
+          <tbody id="heatmapTableBody">
+            <!-- Populated via Javascript -->
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+
+  <!-- ========================================================================= -->
+  <!-- MODALITY 3: 📈 RISK VS NET REAL POST-TAX YIELD SCATTER FRONTIER          -->
+  <!-- ========================================================================= -->
+  <div id="viewScatterContainer" class="view-panel" style="display: none;">
+    <div class="card" style="padding: 24px; margin-bottom: 24px;">
+      <div style="display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 16px; flex-wrap: wrap; gap: 12px;">
+        <div>
+          <h2 style="font-size: 20px; font-weight: 800; color: #f8fafc; margin: 0 0 4px 0;">
+            Capital Hierarchy Risk vs. Net Real Post-Tax Return Frontier
+          </h2>
+          <p style="font-size: 13px; color: #94a3b8; margin: 0;">
+            Bubble size indicates minimum ticket size. Y-Axis reflects real in-hand yield after deducting user tax slab and inflation.
+          </p>
+        </div>
+        <div style="font-size: 12px; color: #38bdf8; background: rgba(14, 165, 233, 0.1); border: 1px solid rgba(14, 165, 233, 0.2); padding: 4px 10px; border-radius: 6px;">
+          Hover over bubbles for full recovery recourse and tax breakdown
+        </div>
+      </div>
+
+      <div style="position: relative; height: 500px; width: 100%;">
+        <canvas id="opportunityScatterChart"></canvas>
+      </div>
+    </div>
+  </div>
+
+  <!-- ========================================================================= -->
+  <!-- MODALITY 4: 📑 DENSE INSTITUTIONAL TABLE (POWER ANALYST MODE)             -->
+  <!-- ========================================================================= -->
+  <div id="viewTableContainer" class="view-panel" style="display: none;">
+    <div class="card" style="padding: 24px; margin-bottom: 24px;">
+      <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px; flex-wrap: wrap; gap: 12px;">
+        <div>
+          <h2 style="font-size: 20px; font-weight: 800; color: #f8fafc; margin: 0 0 4px 0;">
+            Dense Institutional Opportunities Table
+          </h2>
+          <p style="font-size: 13px; color: #94a3b8; margin: 0;">
+            Tabular lining numerals (`tnum`), sticky headers, and direct action triggers.
+          </p>
+        </div>
+        <div style="display: flex; gap: 8px;">
+          <button onclick="exportOpportunities('csv')" class="btn btn-secondary btn-sm" style="font-size: 12px;">⬇️ Export CSV</button>
+          <button onclick="exportOpportunities('json')" class="btn btn-secondary btn-sm" style="font-size: 12px;">⬇️ Export JSON</button>
+        </div>
+      </div>
+
+      <div style="overflow-x: auto;">
+        <table style="width: 100%; border-collapse: collapse; font-size: 13px;">
+          <thead>
+            <tr style="border-bottom: 1px solid rgba(255, 255, 255, 0.12); text-align: left; color: #64748b; font-size: 11px; text-transform: uppercase;">
+              <th style="padding: 12px 14px;">Symbol / Name</th>
+              <th style="padding: 12px 14px;">Asset Class</th>
+              <th style="padding: 12px 14px;">Seniority</th>
+              <th style="padding: 12px 14px; text-align: right;">Gross Yield</th>
+              <th style="padding: 12px 14px; text-align: right;">Net (Post-Tax)</th>
+              <th style="padding: 12px 14px; text-align: right;">Real (Net-CPI)</th>
+              <th style="padding: 12px 14px; text-align: right;">Spread (10Y)</th>
+              <th style="padding: 12px 14px; text-align: right;">Min Ticket</th>
+              <th style="padding: 12px 14px; text-align: center;">Actions</th>
+            </tr>
+          </thead>
+          <tbody id="denseTableBody">
+            <!-- Populated via Javascript -->
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+
+</div>
+
+<!-- ========================================================================= -->
+<!-- PERSISTENT CROSS-ASSET ARBITRAGE DOCKET (FLOATING BOTTOM DOCK)            -->
+<!-- ========================================================================= -->
+<div id="arbitrageDocket" style="display: none; position: fixed; bottom: 20px; left: 50%; transform: translateX(-50%); width: calc(100% - 40px); max-width: 1040px; background: rgba(15, 23, 42, 0.95); backdrop-filter: blur(16px); border: 1px solid rgba(14, 165, 233, 0.4); border-radius: 16px; padding: 12px 20px; box-shadow: 0 20px 40px rgba(0, 0, 0, 0.6); z-index: 1000; transition: all 0.25s ease;">
+  <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 12px;">
+    <div style="display: flex; align-items: center; gap: 12px; flex-wrap: wrap;">
+      <div style="display: inline-flex; align-items: center; gap: 6px; font-weight: 800; font-size: 13px; color: #38bdf8;">
+        <span>📌</span>
+        <span>ARBITRAGE DOCKET (<span id="docketCount">0</span>/4)</span>
+      </div>
+      <div id="docketChips" style="display: flex; gap: 8px; flex-wrap: wrap;">
+        <!-- Chips injected here -->
+      </div>
+    </div>
+
+    <div style="display: flex; align-items: center; gap: 10px;">
+      <button onclick="clearDocket()" class="btn btn-secondary btn-sm" style="font-size: 12px; padding: 6px 12px;">Clear All</button>
+      <button onclick="openArbitrageModal()" class="btn btn-primary btn-sm" style="font-size: 13px; font-weight: 700; padding: 6px 16px; box-shadow: 0 4px 14px rgba(14, 165, 233, 0.3);">
+        ⚖️ Compare Side-by-Side &rarr;
+      </button>
+    </div>
+  </div>
+</div>
+
+<!-- ========================================================================= -->
+<!-- SIDE-BY-SIDE ARBITRAGE SCORECARD MODAL                                    -->
+<!-- ========================================================================= -->
+<div id="arbitrageModal" style="display: none; position: fixed; inset: 0; background: rgba(10, 15, 29, 0.85); backdrop-filter: blur(10px); z-index: 1050; overflow-y: auto; padding: 40px 20px;">
+  <div style="max-width: 1140px; margin: 0 auto; background: #0f172a; border: 1px solid rgba(255, 255, 255, 0.15); border-radius: 20px; padding: 32px; box-shadow: 0 25px 50px rgba(0,0,0,0.5); position: relative;">
+    <button onclick="closeArbitrageModal()" style="position: absolute; top: 20px; right: 20px; background: rgba(255, 255, 255, 0.1); border: none; color: #f8fafc; font-size: 16px; width: 32px; height: 32px; border-radius: 50%; cursor: pointer;">✕</button>
+    
+    <div style="margin-bottom: 24px;">
+      <div style="display: inline-flex; align-items: center; gap: 8px; background: rgba(14, 165, 233, 0.15); border: 1px solid rgba(14, 165, 233, 0.3); border-radius: 9999px; padding: 4px 12px; margin-bottom: 8px;">
+        <span style="font-size: 11px; font-weight: 700; color: #38bdf8; text-transform: uppercase;">Normalized Cross-Asset Scorecard</span>
+      </div>
+      <h2 style="font-size: 24px; font-weight: 800; color: #f8fafc; margin-bottom: 6px;">
+        Side-by-Side Arbitrage & Risk Recourse Audit
+      </h2>
+      <p style="font-size: 13.5px; color: #94a3b8; margin: 0;">
+        Comparing selected opportunities across statutory tax frameworks, capital hierarchy seniority, inflation-adjusted alpha, and failure risks.
+      </p>
+    </div>
+
+    <div style="overflow-x: auto;">
+      <table id="arbitrageScorecardTable" style="width: 100%; border-collapse: collapse; font-size: 13.5px;">
+        <thead id="scorecardHead">
+          <!-- Injected via JS -->
+        </thead>
+        <tbody id="scorecardBody">
+          <!-- Injected via JS -->
+        </tbody>
+      </table>
+    </div>
+  </div>
+</div>
+
+<!-- Opportunity Terminal Controller Script -->
+<script src="/static/js/opportunity_terminal.js"></script>
+{% endblock %}

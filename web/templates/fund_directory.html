@@ -44,11 +44,66 @@
     </div>
   </div>
 
+  <!-- Featured Daily Forensic Fund Audit Hero Banner -->
+  {% if featured_fund %}
+  <div style="background: linear-gradient(135deg, rgba(30, 27, 75, 0.7) 0%, rgba(15, 23, 42, 0.95) 100%); border: 1px solid rgba(168, 85, 247, 0.35); border-radius: 16px; padding: 26px; margin-bottom: 28px; box-shadow: 0 10px 30px rgba(0, 0, 0, 0.35); position: relative;">
+    <div style="display: flex; justify-content: space-between; align-items: flex-start; flex-wrap: wrap; gap: 16px;">
+      <div style="flex: 1; min-width: 300px;">
+        <div style="display: inline-flex; align-items: center; gap: 8px; background: rgba(168, 85, 247, 0.2); border: 1px solid rgba(168, 85, 247, 0.4); border-radius: 9999px; padding: 4px 12px; margin-bottom: 12px;">
+          <span style="display: inline-block; width: 8px; height: 8px; border-radius: 50%; background: #c084fc; box-shadow: 0 0 8px #c084fc;"></span>
+          <span style="font-size: 11px; font-weight: 800; color: #e9d5ff; text-transform: uppercase; letter-spacing: 0.05em;">Featured Daily Forensic Fund Audit • 7-Pillar Look-Through</span>
+        </div>
+        <h2 style="font-size: 24px; font-weight: 800; color: #f8fafc; margin-bottom: 6px;">
+          <a href="/funds/{{ featured_fund.scheme_code }}" style="color: inherit; text-decoration: none;">
+            {{ featured_fund.scheme_name }}
+          </a>
+        </h2>
+        <div style="font-size: 13px; color: #94a3b8; margin-bottom: 16px;">
+          {{ featured_fund.fund_house }} • {{ featured_fund.category }} • Benchmark: {{ featured_fund.benchmark_index }} • AUM: ₹{{ "{:,.0f}".format(featured_fund.aum_crores) }} Cr
+        </div>
+
+        <!-- 5-Metric Forensic Look-Through Strip -->
+        <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(130px, 1fr)); gap: 10px; margin-bottom: 16px;">
+          <div style="background: rgba(15, 23, 42, 0.7); border: 1px solid rgba(255, 255, 255, 0.08); border-radius: 10px; padding: 10px 14px;">
+            <div style="font-size: 10px; color: #94a3b8; text-transform: uppercase; font-weight: 600;">Composite Health</div>
+            <div style="font-size: 20px; font-weight: 800; color: #10b981;">{{ featured_fund.composite_health_score }}<span style="font-size: 12px; color: #64748b;">/100</span></div>
+          </div>
+          <div style="background: rgba(15, 23, 42, 0.7); border: 1px solid rgba(255, 255, 255, 0.08); border-radius: 10px; padding: 10px 14px;">
+            <div style="font-size: 10px; color: #94a3b8; text-transform: uppercase; font-weight: 600;">Weighted Moat</div>
+            <div style="font-size: 20px; font-weight: 800; color: #c084fc;">{{ featured_fund.weighted_moat_score }}<span style="font-size: 12px; color: #64748b;">/100</span></div>
+          </div>
+          <div style="background: rgba(15, 23, 42, 0.7); border: 1px solid rgba(255, 255, 255, 0.08); border-radius: 10px; padding: 10px 14px;">
+            <div style="font-size: 10px; color: #94a3b8; text-transform: uppercase; font-weight: 600;">Solvency Risk (ASRI)</div>
+            <div style="font-size: 20px; font-weight: 800; color: {% if featured_fund.accounting_risk_index <= 5.0 %}#10b981{% else %}#ef4444{% endif %};">{{ featured_fund.accounting_risk_index }}%</div>
+          </div>
+          <div style="background: rgba(15, 23, 42, 0.7); border: 1px solid rgba(255, 255, 255, 0.08); border-radius: 10px; padding: 10px 14px;">
+            <div style="font-size: 10px; color: #94a3b8; text-transform: uppercase; font-weight: 600;">Margin of Safety (DCF)</div>
+            <div style="font-size: 20px; font-weight: 800; color: {% if featured_fund.margin_of_safety_pct >= 0 %}#10b981{% else %}#f59e0b{% endif %};">{{ "{:+.1f}".format(featured_fund.margin_of_safety_pct) }}%</div>
+          </div>
+          <div style="background: rgba(15, 23, 42, 0.7); border: 1px solid rgba(255, 255, 255, 0.08); border-radius: 10px; padding: 10px 14px;">
+            <div style="font-size: 10px; color: #94a3b8; text-transform: uppercase; font-weight: 600;">Active Share</div>
+            <div style="font-size: 20px; font-weight: 800; color: #38bdf8;">{{ featured_fund.active_share_pct }}%</div>
+          </div>
+        </div>
+
+        <div style="display: flex; gap: 10px; align-items: center; flex-wrap: wrap;">
+          <a href="/funds/{{ featured_fund.scheme_code }}" class="btn btn-primary btn-sm" style="font-weight: 700; border-radius: 8px; padding: 8px 18px;">
+            Read Institutional Forensic Dossier →
+          </a>
+          <span style="font-size: 12px; color: #64748b;">
+            Audited by Chief Forensic Officer (Gemini AI) • {{ (featured_fund.last_audited_at|string)[:16] }}
+          </span>
+        </div>
+      </div>
+    </div>
+  </div>
+  {% endif %}
+
   <!-- Mutual Fund Search Bar -->
   <div style="background: rgba(30, 41, 59, 0.4); border: 1px solid rgba(255, 255, 255, 0.1); border-radius: 12px; padding: 14px 18px; margin-bottom: 20px;">
     <form action="/funds" method="GET" style="display: flex; gap: 10px; align-items: center; flex-wrap: wrap;">
       <div style="flex: 1; min-width: 260px;">
-        <input type="text" name="q" value="{{ query or '' }}" placeholder="🔍 Search by Scheme Name, AMFI Code, AMC (e.g. Parag Parikh, Quant, 122639)..." class="form-control" style="background: rgba(15, 23, 42, 0.9); border: 1px solid rgba(255, 255, 255, 0.15); color: #fff; padding: 10px 16px; border-radius: 8px; width: 100%;">
+        <input type="text" name="q" value="{{ query or '' }}" placeholder="🔍 Search by Scheme Name, AMFI Code, AMC (e.g. Parag Parikh, HDFC, Mirae, Quant, 122639)..." class="form-control" style="background: rgba(15, 23, 42, 0.9); border: 1px solid rgba(255, 255, 255, 0.15); color: #fff; padding: 10px 16px; border-radius: 8px; width: 100%;">
       </div>
       <button type="submit" class="btn btn-primary btn-sm" style="padding: 10px 18px; font-weight: 700;">Search Schemes</button>
       {% if query %}
@@ -62,14 +117,23 @@
     <div style="display: flex; gap: 8px; overflow-x: auto; padding-bottom: 4px;">
       <a href="/funds" class="btn btn-sm {% if not current_category and not query %}btn-primary{% else %}btn-secondary{% endif %}" style="border-radius: 9999px;">All Schemes ({{ schemes|length }})</a>
       <a href="/funds?broad_category=EQUITY" class="btn btn-sm {% if current_category == 'EQUITY' %}btn-primary{% else %}btn-secondary{% endif %}" style="border-radius: 9999px;">📈 Equity Funds</a>
-      <a href="/funds?broad_category=HYBRID" class="btn btn-sm {% if current_category == 'HYBRID' %}btn-primary{% else %}btn-secondary{% endif %}" style="border-radius: 9999px;">⚖️ Balanced Advantage / Hybrid</a>
-      <a href="/funds?broad_category=DEBT" class="btn btn-sm {% if current_category == 'DEBT' %}btn-primary{% else %}btn-secondary{% endif %}" style="border-radius: 9999px;">🏛️ Corporate Bond & Debt</a>
+      <a href="/funds?category=Flexi+Cap+Fund" class="btn btn-sm {% if current_category == 'Flexi Cap Fund' %}btn-primary{% else %}btn-secondary{% endif %}" style="border-radius: 9999px;">Flexi Cap</a>
+      <a href="/funds?category=Large+Cap+Fund" class="btn btn-sm {% if current_category == 'Large Cap Fund' %}btn-primary{% else %}btn-secondary{% endif %}" style="border-radius: 9999px;">Large Cap</a>
+      <a href="/funds?category=Mid+Cap+Fund" class="btn btn-sm {% if current_category == 'Mid Cap Fund' %}btn-primary{% else %}btn-secondary{% endif %}" style="border-radius: 9999px;">Mid Cap</a>
+      <a href="/funds?category=Small+Cap+Fund" class="btn btn-sm {% if current_category == 'Small Cap Fund' %}btn-primary{% else %}btn-secondary{% endif %}" style="border-radius: 9999px;">Small Cap</a>
+      <a href="/funds?broad_category=HYBRID" class="btn btn-sm {% if current_category == 'HYBRID' %}btn-primary{% else %}btn-secondary{% endif %}" style="border-radius: 9999px;">⚖️ Hybrid / BAF</a>
+      <a href="/funds?broad_category=DEBT" class="btn btn-sm {% if current_category == 'DEBT' %}btn-primary{% else %}btn-secondary{% endif %}" style="border-radius: 9999px;">🏛️ Debt & Corporate Bonds</a>
     </div>
 
-    <!-- Overlap Diagnostic CTA Button -->
-    <a href="/funds/compare/overlap" class="btn btn-sm btn-outline-primary" style="display: inline-flex; align-items: center; gap: 6px; border-radius: 9999px; font-weight: 600;">
-      <span>🔍</span> True Diversification & Overlap Tool →
-    </a>
+    <div style="display: flex; gap: 8px; align-items: center;">
+      <a href="/opportunities" class="btn btn-sm btn-secondary" style="display: inline-flex; align-items: center; gap: 6px; border-radius: 9999px; font-weight: 600; border-color: rgba(14, 165, 233, 0.4); color: #38bdf8;">
+        <span>🎯</span> Opportunity Terminal
+      </a>
+      <!-- Overlap Diagnostic CTA Button -->
+      <a href="/funds/compare/overlap" class="btn btn-sm btn-outline-primary" style="display: inline-flex; align-items: center; gap: 6px; border-radius: 9999px; font-weight: 600;">
+        <span>🔍</span> True Diversification & Overlap Tool →
+      </a>
+    </div>
   </div>
 
   <!-- Schemes Grid -->

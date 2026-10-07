@@ -7,10 +7,15 @@ Run on-demand or before major deployments:
     pytest -m integration
 """
 
+import os
 import pytest
 import pandas as pd
 from core.analysis.fundamentals import get_stock_fundamentals, get_historical_prices
 from bse_master import resolve_canonical_symbol, resolve_bse_scrip_code
+
+# Skip live network socket execution during offline unittest discovery
+if os.environ.get("RUN_INTEGRATION_TESTS") != "1":
+    __test__ = False
 
 @pytest.mark.integration
 class TestLiveExternalProviders:

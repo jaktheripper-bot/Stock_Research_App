@@ -43,13 +43,18 @@
     </div>
   </div>
 
-  <!-- Category Filter Pills -->
-  <div style="display: flex; gap: 8px; overflow-x: auto; padding-bottom: 12px; margin-bottom: 24px;">
-    <a href="/etfs" class="btn btn-sm {% if not current_category %}btn-primary{% else %}btn-secondary{% endif %}" style="border-radius: 9999px;">All ETFs ({{ data.total_tracked_etfs }})</a>
-    <a href="/etfs?category=EQUITY_INDEX" class="btn btn-sm {% if current_category == 'EQUITY_INDEX' %}btn-primary{% else %}btn-secondary{% endif %}" style="border-radius: 9999px;">📈 Equity Indices</a>
-    <a href="/etfs?category=COMMODITY_GOLD" class="btn btn-sm {% if current_category == 'COMMODITY_GOLD' %}btn-primary{% else %}btn-secondary{% endif %}" style="border-radius: 9999px;">🪙 Gold & Commodities</a>
-    <a href="/etfs?category=DEBT_TARGET_MATURITY" class="btn btn-sm {% if current_category == 'DEBT_TARGET_MATURITY' %}btn-primary{% else %}btn-secondary{% endif %}" style="border-radius: 9999px;">🛡️ Bharat Bond & Target Maturity</a>
-    <a href="/etfs?category=LIQUID" class="btn btn-sm {% if current_category == 'LIQUID' %}btn-primary{% else %}btn-secondary{% endif %}" style="border-radius: 9999px;">💧 Overnight & Liquid</a>
+  <!-- Category Filter Pills & Terminal Link -->
+  <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 12px; margin-bottom: 24px;">
+    <div style="display: flex; gap: 8px; overflow-x: auto; padding-bottom: 4px;">
+      <a href="/etfs" class="btn btn-sm {% if not current_category %}btn-primary{% else %}btn-secondary{% endif %}" style="border-radius: 9999px;">All ETFs ({{ data.total_tracked_etfs }})</a>
+      <a href="/etfs?category=EQUITY_INDEX" class="btn btn-sm {% if current_category == 'EQUITY_INDEX' %}btn-primary{% else %}btn-secondary{% endif %}" style="border-radius: 9999px;">📈 Equity Indices</a>
+      <a href="/etfs?category=COMMODITY_GOLD" class="btn btn-sm {% if current_category == 'COMMODITY_GOLD' %}btn-primary{% else %}btn-secondary{% endif %}" style="border-radius: 9999px;">🪙 Gold & Commodities</a>
+      <a href="/etfs?category=DEBT_TARGET_MATURITY" class="btn btn-sm {% if current_category == 'DEBT_TARGET_MATURITY' %}btn-primary{% else %}btn-secondary{% endif %}" style="border-radius: 9999px;">🛡️ Bharat Bond & Target Maturity</a>
+      <a href="/etfs?category=LIQUID" class="btn btn-sm {% if current_category == 'LIQUID' %}btn-primary{% else %}btn-secondary{% endif %}" style="border-radius: 9999px;">💧 Overnight & Liquid</a>
+    </div>
+    <a href="/opportunities" class="btn btn-secondary btn-sm" style="display: inline-flex; align-items: center; gap: 6px; border-radius: 8px; font-weight: 700; border-color: rgba(14, 165, 233, 0.4); color: #38bdf8;">
+      <span>🎯</span> Cross-Asset Terminal
+    </a>
   </div>
 
   <!-- ETF Table -->

@@ -16,8 +16,6 @@ from core.analysis import (
     strip_conclusion_sections,
     format_citations_section,
     compare_revisions,
-    get_eodhd_api_key,
-    fetch_eodhd_stock_data,
     enrich_fundamentals,
     resolve_pe_with_failsafes,
     fetch_latest_bse_announcement,
