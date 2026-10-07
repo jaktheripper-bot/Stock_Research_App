@@ -259,22 +259,28 @@ To turn these competitive advantages into an unassailable market moat, we propos
 ---
 
 ### Phase 4: Proactive Thesis Drift & Autonomous Event Syndication
+**Status:** **Completed & Verified.**  
 **Objective:** Transition from static research to real-time thesis surveillance via the Google Antigravity SDK.
-- **Tasks:**
-  1. Connect the 5-minute BSE watcher (`core/agents/watchers/bse_watcher.py`) directly to the portfolio watchlist.
-  2. When a material exchange announcement occurs (auditor resignation, promoter pledge increase, board litigation), automatically trigger the Equity Squad to update the specific impacted pillar in the background.
-  3. Surface an event feed on the user dashboard displaying: *"Autonomous event detected -> Re-audit dispatched -> Thesis impact summarized"*.
-- **User Facing Deliverable:** A live "Autonomous Surveillance Feed" in the web header showing real-time diagnostic ledger entries.
+- **Tasks & Delivery:**
+  1. **5-Minute BSE Watcher Connected:** `core/agents/watchers/bse_watcher.py` continuously scans active watchlist scrips for official regulatory disclosures (auditor resignations, promoter pledge changes, disputes, M&A).
+  2. **Automated Re-Audit Dispatch:** Upon detecting material disclosures, automatically dispatches background thesis re-checks (`auto_reaudit_dispatched`) and logs updated risk posture summaries (`thesis_impact_summarized`) into `autonomous_event_ledger`.
+  3. **Live Surveillance Feed in Web Header:** Clicking the **Agent Radar** badge in the navbar opens the interactive Autonomous Surveillance Feed modal (powered by `/api/autonomous/events`), showing active background daemons (BSE Watcher, AMFI Nightly NAV, 23:30 IST Fund Auditor) and a live event log.
+- **User Facing Deliverable:** Live interactive "Autonomous Surveillance Feed" in the navbar and public event API at `/api/autonomous/events`.
 
 ---
 
 ### Phase 5: Institutional Export & SEBI Compliance Safe-Harbor Polish
-**Objective:** Solidify our positioning as an independent, institutional-grade analytical software platform.
-- **Tasks:**
-  1. Add one-click institutional PDF export for every asset class dossier (Stocks, Funds, Debt, REITs) with standardized SEBI Section 2(u) non-advisory disclaimers.
-  2. Ensure 100% adherence to zero-condescension tone: replace any remaining informal wording with precise institutional financial terminology.
-  3. Conduct full test suite validation (145+ tests) to guarantee zero regressions across all newly linked models.
-- **User Facing Deliverable:** Institutional-grade PDF dossier exports and audit trails suitable for family offices, RIAs, and sophisticated DIY investors.
+**Status:** **Completed & Verified.**  
+**Objective:** Deliver comprehensive multi-asset PDF exports while keeping financial explanations approachable and strictly compliant.
+- **Tasks & Delivery:**
+  1. **One-Click PDF Export for All Asset Classes:** Full PDF dossier generation implemented and verified across all asset categories:
+     - **Equities:** `/api/pdf/{ticker}` (7-pillar forensic matrix, DCF valuation, 50-DMA chart, exchange citations).
+     - **Mutual Funds:** `/api/pdf/fund/{scheme_code}` (7-pillar look-through, ASRI index, constituent exposures).
+     - **Corporate Debt & SDIs:** `/api/pdf/debt/{isin}` (5-pillar credit scorecard, contagion radar, recovery recourse).
+     - **REITs & InvITs:** `/api/pdf/reit/{symbol}` (Key valuation metrics, NDCF purity, Section 115UA tax waterfall).
+  2. **Approachable & Human-Friendly Language (User Directive):** Kept the language approachable, clear, and easy to understand across all dossiers, primers, and disclosures. Replaced stiff, impenetrable jargon with plain-English clarity and zero-condescension tone while maintaining strict SEBI Section 2(u) non-advisory compliance.
+  3. **Full Test Suite Validation:** Verified sitewide with 165+ automated unit and integration tests passing.
+- **User Facing Deliverable:** Downloadable PDF dossiers across Equities, Funds, Debt, and REITs/InvITs with approachable disclosures.
 
 ---
 

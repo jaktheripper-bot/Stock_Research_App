@@ -2618,6 +2618,27 @@ async def api_download_debt_pdf(isin: str):
     )
 
 
+@app.get("/api/pdf/reit/{symbol}")
+async def api_download_reit_pdf(symbol: str):
+    """Generates and serves downloadable institutional PDF research dossier for a REIT or InvIT."""
+    clean_sym = symbol.strip().upper()
+    from core.db.reits import get_reit_by_symbol
+    from core.reporting.pdf import generate_reit_dossier_pdf
+
+    reit = get_reit_by_symbol(clean_sym)
+    if not reit:
+        raise HTTPException(status_code=404, detail=f"REIT or InvIT with symbol '{clean_sym}' not found.")
+
+    pdf_bytes = generate_reit_dossier_pdf(clean_sym, reit)
+    filename = f"REIT_Dossier_{clean_sym}_{datetime.now(IST).strftime('%d-%m-%Y')}.pdf"
+
+    return Response(
+        content=pdf_bytes,
+        media_type="application/pdf",
+        headers={"Content-Disposition": f'attachment; filename="{filename}"'}
+    )
+
+
 @app.get("/api/v1/reports/{ticker}")
 async def api_v1_get_report(
     ticker: str,
@@ -3200,6 +3221,19 @@ def api_admin_get_audit_logs(
     from core.db.audit_logs import get_project_audit_history
     logs = get_project_audit_history(limit=limit)
     return {"success": True, "logs": logs}
+
+
+@app.get("/api/autonomous/events")
+def api_get_autonomous_events(limit: int = Query(15, ge=1, le=50)):
+    """Public read-only feed of recent autonomous watcher actions and re-audits."""
+    from core.db.agent_sessions import get_recent_autonomous_events
+    init_db()
+    events = get_recent_autonomous_events(limit=limit)
+    return json_response_with_cache({
+        "success": True,
+        "count": len(events),
+        "events": events
+    }, max_age=30)
 
 
 class CopilotChatRequest(BaseModel):

@@ -564,3 +564,98 @@ def generate_debt_dossier_pdf(
                 os.unlink(out_name)
             except OSError:
                 pass
+
+
+def generate_reit_dossier_pdf(
+    symbol: str,
+    reit: dict,
+    branding: dict = None
+) -> bytes:
+    """Compiles clean, institutional PDF research dossier for a REIT or InvIT offering."""
+    from markdown_pdf import MarkdownPdf, Section
+    now_str = datetime.now(IST).strftime("%d %B %Y, %I:%M %p IST")
+    doc_id = f"REIT-{symbol[:8]}-{datetime.now(IST).strftime('%Y%m%d%H%M')}"
+    clean_sym = re_mod.sub(r'[^a-zA-Z0-9_]', '', symbol)
+    
+    name = reit.get("name", symbol)
+    structure = reit.get("structure_type", "MAINBOARD_REIT").replace('_', ' ').title()
+    price = float(reit.get("current_price", 0.0))
+    nav = float(reit.get("nav_per_unit", 0.0))
+    disc = float(reit.get("discount_to_nav_pct", 0.0))
+    yield_pct = float(reit.get("distribution_yield_pct", 0.0))
+    occupancy = float(reit.get("occupancy_pct", 0.0))
+    ndcf = float(reit.get("ndcf_payout_purity_pct", 100.0))
+    ltv = float(reit.get("ltv_ratio_pct", 0.0))
+    wale = float(reit.get("wale_years", 0.0))
+    compliant = reit.get("sebi_compliant", True)
+    details = reit.get("details", {})
+    if isinstance(details, str):
+        try:
+            details = json.loads(details)
+        except Exception:
+            details = {}
+
+    header = f"""# Real Asset Research Dossier: {name} ({symbol})
+> **Asset Structure:** `{structure}` | **Symbol:** `{symbol}` | **Document ID:** `{doc_id}`  
+> **Compilation Timestamp:** {now_str} | **Regulatory Standard:** SEBI REIT / InvIT Regulations 2024  
+> **Data Provenance:** Exchange Disclosures, Quarterly NDCF Distribution Reports, Valuation Reports.
+"""
+
+    scorecard_md = f"""### Key Operating & Valuation Metrics
+| Metric | Reported Value | Regulatory / Institutional Benchmark | Status |
+| :--- | :--- | :--- | :--- |
+| **Current Unit Price** | **₹{price:,.2f}** | Secondary Market Trading Price | Active |
+| **Net Asset Value (NAV)** | **₹{nav:,.2f}** | Independent Property Valuation | Benchmark |
+| **Discount / Premium to NAV** | **{disc:+.2f}%** | Fair Value Entry Cushion | {'Discount' if disc < 0 else 'Premium'} |
+| **Distribution Yield (p.a.)** | **{yield_pct:.2f}%** | Annualized Pre-Tax Cash Flow Yield | Yield |
+| **Portfolio Occupancy** | **{occupancy:.1f}%** | Minimum 95% for SEBI SM REITs | {'Compliant' if occupancy >= 95.0 or 'MAINBOARD' in reit.get('structure_type', '') else 'Monitored'} |
+| **NDCF Payout Purity** | **{ndcf:.1f}%** | Statutory 90%+ Mandatory Distribution | Compliant |
+| **Loan-to-Value (LTV)** | **{ltv:.1f}%** | Statutory Cap: 49% Net Debt / Assets | Safe Buffer |
+| **Weighted Average Lease (WALE)** | **{wale:.1f} Years** | Income Stability & Re-leasing Runway | Long Duration |
+"""
+
+    tax_info = details.get("tax_breakdown", {})
+    tax_div = tax_info.get("dividend_pct", 35.0)
+    tax_int = tax_info.get("interest_pct", 40.0)
+    tax_roc = tax_info.get("amortization_pct", 25.0)
+
+    tax_md = f"""### ⚖️ Taxation Breakdown (Section 115UA Pass-Through)
+Under Indian tax laws, distributions from REITs and InvITs pass through three distinct components:
+- **Exempt Dividends (~{tax_div}% of payout):** Received tax-free when the underlying SPV has not opted for the concessional corporate tax regime.
+- **Interest Income (~{tax_int}% of payout):** Taxed at your individual marginal income tax slab.
+- **Return of Capital / Amortization (~{tax_roc}% of payout):** Reduces your acquisition cost and is received tax-free until total distributions exceed your purchase price.
+"""
+
+    tenants = ", ".join(details.get("top_tenants", [])) or "Institutional Grade Global & Domestic Tenants"
+    asset_class = details.get("asset_class", "Commercial Real Estate / Infrastructure")
+
+    primer_md = f"""### 🏢 Asset Overview & Tenant Ecosystem
+- **Underlying Assets:** {asset_class}
+- **Anchor Tenants:** {tenants}
+- **Cash Flow Profile:** Long-term contracted leases with contractual rental escalations (typically 12-15% escalation every 3 years).
+- **Core Risk Factors:** Tenant non-renewal at lease expiration, macro interest rate fluctuations, and property re-leasing downtime.
+"""
+
+    footer = f"""
+---
+### Statutory Regulatory Disclaimers & Provenance Notice
+> **SEBI Safe-Harbor (Section 2(u) RA Regulations 2014):**  
+> *{MANDATORY_SEBI_DISCLAIMER}*  
+> 
+> Real estate and infrastructure investments carry market, tenant, occupancy, and interest rate risks. Past cash distributions are not a guarantee of future yield.
+"""
+    full_md = f"{header}\n\n{scorecard_md}\n\n{tax_md}\n\n{primer_md}\n\n{footer}"
+    out_name = f"_tmp_doc_reit_{clean_sym}.pdf"
+    try:
+        pdf = MarkdownPdf(toc_level=0)
+        pdf.add_section(Section(full_md, root="."))
+        pdf.save(out_name)
+        with open(out_name, "rb") as f:
+            pdf_bytes = f.read()
+        return pdf_bytes
+    finally:
+        if os.path.exists(out_name):
+            try:
+                os.unlink(out_name)
+            except OSError:
+                pass

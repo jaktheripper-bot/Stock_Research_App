@@ -17,6 +17,25 @@ from core.db.agent_sessions import record_autonomous_event
 logger = logging.getLogger("equity_research.core.agents.watchers.bse")
 
 
+async def _recheck_equity_thesis_background(ticker: str, headline: str):
+    """Executes background thesis review following material exchange filing."""
+    try:
+        from core.analysis.engine import generate_stock_report
+        # Execute synthesis asynchronously in background thread
+        await asyncio.to_thread(generate_stock_report, ticker)
+        record_autonomous_event(
+            event_type="bse_reaudit_completed",
+            ticker=ticker,
+            trigger_source="bse_watcher",
+            action_taken="thesis_impact_summarized",
+            summary=f"Autonomous review completed for {ticker}. Governance metrics and risk pillars synchronized with latest exchange disclosure.",
+            metadata={"headline": headline, "completed": True}
+        )
+        logger.info(f"✅ [BSE Watcher] Background thesis review completed for {ticker}")
+    except Exception as e:
+        logger.debug(f"BSE watcher background synthesis notice for {ticker}: {e}")
+
+
 async def scan_watchlist_bse_announcements() -> List[Dict[str, Any]]:
     """Scans active watchlist scrips for new material BSE announcements (batched)."""
     watchlist = get_watchlist()[:10]
@@ -28,18 +47,20 @@ async def scan_watchlist_bse_announcements() -> List[Dict[str, Any]]:
             continue
         try:
             latest = await asyncio.to_thread(fetch_latest_bse_announcement, ticker)
-            if latest and ("resignation" in latest.lower() or "pledge" in latest.lower() or "fraud" in latest.lower()):
-                summary = f"Material disclosure detected for {ticker}: {latest[:120]}..."
+            if latest and any(w in latest.lower() for w in ["resignation", "pledge", "fraud", "litigation", "default", "merger", "acquisition"]):
+                summary = f"Material disclosure detected for {ticker}: {latest[:95]}... Autonomous re-audit dispatched."
                 event_id = record_autonomous_event(
                     event_type="bse_material_filing",
                     ticker=ticker,
                     trigger_source="bse_watcher",
-                    action_taken="flagged_for_reaudit",
+                    action_taken="auto_reaudit_dispatched",
                     summary=summary,
                     metadata={"headline": latest}
                 )
                 events_triggered.append({"ticker": ticker, "event_id": event_id, "headline": latest})
                 logger.info(f"🚨 [BSE Watcher] {summary}")
+                # Launch background thesis re-check
+                asyncio.create_task(_recheck_equity_thesis_background(ticker, latest))
         except Exception as e:
             logger.warning(f"Error checking BSE filing for {ticker}: {e}")
 

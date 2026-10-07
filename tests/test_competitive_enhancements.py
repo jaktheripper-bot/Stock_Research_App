@@ -225,6 +225,46 @@ class TestCompetitiveEnhancements(unittest.TestCase):
         events = get_recent_autonomous_events(limit=5, event_type="DAILY_FUND_AUDIT")
         self.assertTrue(any(e.get("event_id") == event_id for e in events))
 
+    def test_reit_pdf_generation_and_endpoint(self):
+        """Tests compiling and serving institutional PDF research dossiers for REITs and InvITs."""
+        from core.db.reits import get_reit_by_symbol
+        from core.reporting.pdf import generate_reit_dossier_pdf
+
+        reit = get_reit_by_symbol("EMBASSY")
+        self.assertIsNotNone(reit)
+        pdf_bytes = generate_reit_dossier_pdf("EMBASSY", reit)
+        self.assertTrue(len(pdf_bytes) > 500)
+        self.assertTrue(pdf_bytes.startswith(b"%PDF"))
+
+        # Test HTTP route
+        resp = self.client.get("/api/pdf/reit/EMBASSY")
+        self.assertEqual(resp.status_code, 200)
+        self.assertEqual(resp.headers.get("content-type"), "application/pdf")
+        self.assertTrue(resp.content.startswith(b"%PDF"))
+
+    def test_autonomous_surveillance_feed_endpoint(self):
+        """Tests public /api/autonomous/events feed endpoint."""
+        resp = self.client.get("/api/autonomous/events?limit=5")
+        self.assertEqual(resp.status_code, 200)
+        data = resp.json()
+        self.assertTrue(data.get("success"))
+        self.assertIsInstance(data.get("events"), list)
+
+    def test_bse_watcher_material_filing_event_dispatch(self):
+        """Tests BSE watcher event recording on material exchange disclosures."""
+        import asyncio
+        from core.agents.watchers.bse_watcher import scan_watchlist_bse_announcements
+
+        with patch("core.agents.watchers.bse_watcher.get_watchlist") as mock_wl, \
+             patch("core.agents.watchers.bse_watcher.fetch_latest_bse_announcement") as mock_fetch:
+            mock_wl.return_value = [{"ticker": "TESTCORP"}]
+            mock_fetch.return_value = "Resignation of Statutory Auditor M/s ABC & Co with immediate effect."
+
+            events = asyncio.run(scan_watchlist_bse_announcements())
+            self.assertEqual(len(events), 1)
+            self.assertEqual(events[0]["ticker"], "TESTCORP")
+            self.assertTrue(events[0]["event_id"].startswith("EVT-"))
+
 
 if __name__ == "__main__":
     unittest.main()

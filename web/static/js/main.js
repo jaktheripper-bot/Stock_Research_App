@@ -1044,3 +1044,58 @@ function toggleAllPillars(expand) {
     }
   }, { passive: true });
 })();
+
+// ==============================================================================
+// 10. Autonomous Surveillance Feed Controller (Phase 4)
+// ==============================================================================
+async function toggleSurveillanceFeed() {
+  const modal = document.getElementById('surveillanceModal');
+  if (!modal) return;
+  const isHidden = modal.style.display === 'none' || !modal.style.display;
+  if (isHidden) {
+    modal.style.display = 'block';
+    loadSurveillanceEvents();
+  } else {
+    modal.style.display = 'none';
+  }
+}
+
+async function loadSurveillanceEvents() {
+  const container = document.getElementById('surveillanceEventsList');
+  if (!container) return;
+  container.innerHTML = '<div style="color: #94a3b8; font-size: 12.5px; padding: 16px; text-align: center;">Loading real-time autonomous feed...</div>';
+  try {
+    const res = await fetch('/api/autonomous/events?limit=8');
+    const data = await res.json();
+    const events = data.events || [];
+    if (!events.length) {
+      container.innerHTML = '<div style="color: #94a3b8; font-size: 12.5px; padding: 16px; text-align: center;">No recent autonomous events recorded. System active.</div>';
+      return;
+    }
+    container.innerHTML = events.map(evt => {
+      const typeIcons = {
+        'DAILY_FUND_AUDIT': '🔍',
+        'AMFI_NAV_SYNC': '📊',
+        'bse_material_filing': '🚨',
+        'bse_reaudit_completed': '⚡'
+      };
+      const icon = typeIcons[evt.event_type] || '🤖';
+      return `
+        <div style="background: rgba(30, 41, 59, 0.6); border: 1px solid rgba(255, 255, 255, 0.08); border-radius: 8px; padding: 12px; font-size: 12.5px;">
+          <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 6px;">
+            <div style="display: flex; align-items: center; gap: 6px;">
+              <span>${icon}</span>
+              <strong style="color: #f8fafc;">${evt.ticker || 'SYSTEM'}</strong>
+              <span style="font-size: 10px; padding: 2px 6px; border-radius: 4px; background: rgba(14, 165, 233, 0.15); color: #38bdf8; font-weight: 700;">${(evt.action_taken || evt.event_type).replace(/_/g, ' ')}</span>
+            </div>
+            <span style="font-size: 11px; color: #64748b;">${(evt.created_at || '').slice(0, 16)}</span>
+          </div>
+          <div style="color: #cbd5e1; line-height: 1.4; font-size: 12px;">${evt.summary || 'Autonomous task executed successfully.'}</div>
+        </div>
+      `;
+    }).join('');
+  } catch (err) {
+    container.innerHTML = '<div style="color: #ef4444; font-size: 12.5px; padding: 12px;">Failed to load events. Please try again.</div>';
+  }
+}
+

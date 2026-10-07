@@ -165,6 +165,7 @@
             <th style="padding: 12px 14px;">LTV Cap</th>
             <th style="padding: 12px 14px;">WALE</th>
             <th style="padding: 12px 14px;">SEBI Audit</th>
+            <th style="padding: 12px 14px; text-align: center;">Dossier</th>
           </tr>
         </thead>
         <tbody>
@@ -225,6 +226,11 @@
                 </span>
               {% endif %}
             </td>
+            <td style="padding: 14px 14px; text-align: center;">
+              <a href="/api/pdf/reit/{{ r.symbol }}" class="btn btn-secondary btn-sm" style="font-size: 11px; padding: 4px 8px; text-decoration: none;" title="Download PDF Dossier">
+                ⬇️ PDF
+              </a>
+            </td>
           </tr>
           {% endif %}
           {% endfor %}
@@ -263,6 +269,7 @@
             <th style="padding: 12px 14px;">LTV Leverage</th>
             <th style="padding: 12px 14px;">Concession Life</th>
             <th style="padding: 12px 14px;">Tax Section</th>
+            <th style="padding: 12px 14px; text-align: center;">Dossier</th>
           </tr>
         </thead>
         <tbody>
@@ -315,6 +322,11 @@
             </td>
             <td style="padding: 14px 14px; color: #c084fc; font-size: 11.5px;">
               Sec 115UA Pass-through
+            </td>
+            <td style="padding: 14px 14px; text-align: center;">
+              <a href="/api/pdf/reit/{{ r.symbol }}" class="btn btn-secondary btn-sm" style="font-size: 11px; padding: 4px 8px; text-decoration: none;" title="Download PDF Dossier">
+                ⬇️ PDF
+              </a>
             </td>
           </tr>
           {% endif %}
