@@ -182,6 +182,11 @@ from core.analysis.mutual_fund_engine import (
 from core.analysis.fund_forensic_auditor import (
     audit_single_fund_daily,
     compute_fund_forensic_lookthrough,
+    calculate_deep_dive_credit_cost,
+    create_async_fund_audit_task,
+    run_async_fund_audit_job,
+    get_fund_audit_task_status,
+    ensure_scheme_and_holdings_exist,
 )
 
 logger = logging.getLogger("equity_research.web")
@@ -1238,6 +1243,12 @@ def fund_dossier_page(request: Request, scheme_code: str):
         except Exception as e:
             logger.warning(f"Could not synthesize full forensic dossier on-demand for {clean_code}: {e}")
 
+    credit_quote = None
+    try:
+        credit_quote = calculate_deep_dive_credit_cost(clean_code)
+    except Exception as e:
+        logger.warning(f"Could not calculate credit quote for {clean_code}: {e}")
+
     return templates.TemplateResponse(
         request=request,
         name="fund_dossier.html",
@@ -1249,6 +1260,7 @@ def fund_dossier_page(request: Request, scheme_code: str):
             "fee_drag": dossier["fee_drag"],
             "risk_capture": dossier["risk_capture"],
             "forensic_dossier": forensic_dossier,
+            "credit_quote": credit_quote,
         }
     )
 
@@ -1283,6 +1295,52 @@ def api_admin_run_fund_audit(payload: Dict[str, Any] = Body(default={})):
         }
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
+
+
+@app.post("/api/funds/on-demand-audit")
+async def api_post_on_demand_fund_audit(
+    background_tasks: BackgroundTasks,
+    payload: Dict[str, Any] = Body(default={})
+):
+    """Enqueues an asynchronous look-through forensic audit for any AMFI scheme (pre-seeded or on-demand)."""
+    init_db()
+    scheme_code = (payload.get("scheme_code") or "").strip().upper()
+    if not scheme_code:
+        raise HTTPException(status_code=400, detail="Missing required 'scheme_code' in payload.")
+    allow_deep_dive = bool(payload.get("allow_deep_dive", False))
+
+    task_id = create_async_fund_audit_task(scheme_code, allow_deep_dive=allow_deep_dive)
+    background_tasks.add_task(run_async_fund_audit_job, task_id, scheme_code, allow_deep_dive)
+
+    return {
+        "success": True,
+        "task_id": task_id,
+        "scheme_code": scheme_code,
+        "status": "QUEUED",
+        "message": f"Forensic audit enqueued for {scheme_code}."
+    }
+
+
+@app.get("/api/funds/audit-status/{task_id}")
+def api_get_fund_audit_status(task_id: str):
+    """Returns real-time progress and completion status for an asynchronous fund audit task."""
+    init_db()
+    status = get_fund_audit_task_status(task_id)
+    if not status:
+        raise HTTPException(status_code=404, detail=f"Audit task '{task_id}' not found.")
+    return status
+
+
+@app.get("/api/funds/deep-dive-quote/{scheme_code}")
+def api_get_fund_deep_dive_quote(scheme_code: str):
+    """Returns token credit cost breakdown: Layer 1 (1 credit) vs Layer 2 Deep Dive (1 credit per uncached stock)."""
+    init_db()
+    clean = scheme_code.strip().upper()
+    try:
+        quote = calculate_deep_dive_credit_cost(clean)
+        return quote
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Failed to generate credit quote for {clean}: {str(e)}")
 
 
 @app.get("/api/funds/schemes")

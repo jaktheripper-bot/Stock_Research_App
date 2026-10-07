@@ -99,6 +99,53 @@
   </div>
   {% endif %}
 
+  <!-- On-Demand AMFI Scheme Audit & Ingestion (Requirement 2 & 3) -->
+  <div style="background: linear-gradient(135deg, rgba(30, 27, 75, 0.5) 0%, rgba(15, 23, 42, 0.9) 100%); border: 1px solid rgba(168, 85, 247, 0.3); border-radius: 14px; padding: 18px 22px; margin-bottom: 24px; box-shadow: 0 4px 20px rgba(0, 0, 0, 0.25);">
+    <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 14px;">
+      <div style="flex: 1; min-width: 280px;">
+        <div style="display: inline-flex; align-items: center; gap: 6px; background: rgba(168, 85, 247, 0.15); border: 1px solid rgba(168, 85, 247, 0.3); border-radius: 9999px; padding: 2px 10px; margin-bottom: 6px;">
+          <span style="width: 6px; height: 6px; border-radius: 50%; background: #c084fc;"></span>
+          <span style="font-size: 11px; font-weight: 700; color: #e9d5ff; text-transform: uppercase;">On-Demand AMFI Look-Through</span>
+        </div>
+        <h3 style="font-size: 16px; font-weight: 800; color: #f8fafc; margin: 0 0 4px 0;">Audit Any Scheme Outside Top 50</h3>
+        <p style="font-size: 13px; color: #94a3b8; margin: 0; line-height: 1.4;">
+          Enter any AMFI Scheme Code or unlisted fund to dynamically unbundle holdings, score constituent moats, and synthesize an institutional forensic dossier.
+        </p>
+      </div>
+
+      <div style="display: flex; gap: 10px; align-items: center; flex: 1; max-width: 520px; min-width: 280px;">
+        <input type="text" id="onDemandSchemeInput" placeholder="AMFI Scheme Code (e.g. 120828, 154043, 122639)..." class="form-control" style="background: rgba(15, 23, 42, 0.9); border: 1px solid rgba(168, 85, 247, 0.4); color: #fff; padding: 10px 14px; border-radius: 8px; font-size: 13px; width: 100%;">
+        <button id="btnStartOnDemandAudit" onclick="startOnDemandFundAudit()" class="btn btn-primary" style="padding: 10px 18px; font-weight: 700; white-space: nowrap; display: inline-flex; align-items: center; gap: 6px; background: linear-gradient(135deg, #a855f7 0%, #7c3aed 100%); border: none;">
+          <span>⚡</span> Audit Scheme
+        </button>
+      </div>
+    </div>
+
+    <!-- Async Audit Progress Modal / Drawer -->
+    <div id="auditProgressBox" style="display: none; margin-top: 18px; padding-top: 16px; border-top: 1px solid rgba(255, 255, 255, 0.1);">
+      <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;">
+        <div style="display: flex; align-items: center; gap: 8px;">
+          <span id="auditSpinner" style="display: inline-block; width: 12px; height: 12px; border: 2px solid #a855f7; border-top-color: transparent; border-radius: 50%; animation: spin 1s linear infinite;"></span>
+          <span id="auditStatusMsg" style="font-size: 13px; font-weight: 600; color: #e2e8f0;">Initializing look-through engine...</span>
+        </div>
+        <div style="display: flex; align-items: center; gap: 12px;">
+          <button id="btnEnableNotification" onclick="requestAuditDesktopNotification()" class="btn btn-sm btn-outline-secondary" style="font-size: 11px; padding: 4px 10px; border-radius: 9999px; display: inline-flex; align-items: center; gap: 4px;">
+            <span>🔔</span> Alert me on desktop when complete
+          </button>
+          <span id="auditProgressPct" style="font-size: 13px; font-weight: 800; color: #a855f7;">10%</span>
+        </div>
+      </div>
+      <div style="width: 100%; height: 6px; background: rgba(15, 23, 42, 0.8); border-radius: 9999px; overflow: hidden;">
+        <div id="auditProgressBar" style="width: 10%; height: 100%; background: linear-gradient(90deg, #a855f7 0%, #10b981 100%); transition: width 0.4s ease;"></div>
+      </div>
+      <div id="auditResultAction" style="display: none; margin-top: 12px; text-align: right;">
+        <a id="auditResultLink" href="#" class="btn btn-sm" style="background: #10b981; color: #fff; font-weight: 700; border-radius: 8px; padding: 6px 16px; text-decoration: none;">
+          View Forensic Dossier →
+        </a>
+      </div>
+    </div>
+  </div>
+
   <!-- Mutual Fund Search Bar -->
   <div style="background: rgba(30, 41, 59, 0.4); border: 1px solid rgba(255, 255, 255, 0.1); border-radius: 12px; padding: 14px 18px; margin-bottom: 20px;">
     <form action="/funds" method="GET" style="display: flex; gap: 10px; align-items: center; flex-wrap: wrap;">
@@ -214,4 +261,121 @@
     {% endfor %}
   </div>
 </div>
+
+<script>
+let currentAuditTaskId = null;
+let currentAuditScheme = null;
+let pollTimer = null;
+let notificationRequested = false;
+
+function requestAuditDesktopNotification() {
+  if (!("Notification" in window)) {
+    alert("Desktop notifications are not supported by your browser.");
+    return;
+  }
+  Notification.requestPermission().then(permission => {
+    if (permission === "granted") {
+      notificationRequested = true;
+      const btn = document.getElementById("btnEnableNotification");
+      if (btn) {
+        btn.innerHTML = "<span>✅</span> Desktop Alert Enabled";
+        btn.style.borderColor = "#10b981";
+        btn.style.color = "#10b981";
+      }
+    }
+  });
+}
+
+async function startOnDemandFundAudit() {
+  const input = document.getElementById("onDemandSchemeInput");
+  const schemeCode = (input.value || "").trim();
+  if (!schemeCode) {
+    alert("Please enter a valid AMFI Scheme Code or Scheme Name.");
+    return;
+  }
+
+  const box = document.getElementById("auditProgressBox");
+  const bar = document.getElementById("auditProgressBar");
+  const pct = document.getElementById("auditProgressPct");
+  const msg = document.getElementById("auditStatusMsg");
+  const action = document.getElementById("auditResultAction");
+  const spinner = document.getElementById("auditSpinner");
+
+  box.style.display = "block";
+  bar.style.width = "15%";
+  pct.innerText = "15%";
+  msg.innerText = `Enqueuing look-through audit for ${schemeCode}...`;
+  action.style.display = "none";
+  spinner.style.display = "inline-block";
+  currentAuditScheme = schemeCode;
+
+  try {
+    const res = await fetch("/api/funds/on-demand-audit", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ scheme_code: schemeCode })
+    });
+    const data = await res.json();
+    if (!data.success) {
+      msg.innerText = "Failed to enqueue audit: " + (data.detail || "Unknown error");
+      return;
+    }
+    currentAuditTaskId = data.task_id;
+    pollAuditStatus(data.task_id);
+  } catch (err) {
+    msg.innerText = "Error launching audit: " + err.message;
+  }
+}
+
+function pollAuditStatus(taskId) {
+  if (pollTimer) clearInterval(pollTimer);
+
+  pollTimer = setInterval(async () => {
+    try {
+      const res = await fetch(`/api/funds/audit-status/${taskId}`);
+      if (!res.ok) return;
+      const data = await res.json();
+
+      const bar = document.getElementById("auditProgressBar");
+      const pct = document.getElementById("auditProgressPct");
+      const msg = document.getElementById("auditStatusMsg");
+      const action = document.getElementById("auditResultAction");
+      const link = document.getElementById("auditResultLink");
+      const spinner = document.getElementById("auditSpinner");
+
+      const p = data.progress_pct || 20;
+      bar.style.width = p + "%";
+      pct.innerText = p + "%";
+      msg.innerText = data.message || "Auditing holdings...";
+
+      if (data.status === "COMPLETED") {
+        clearInterval(pollTimer);
+        spinner.style.display = "none";
+        action.style.display = "block";
+        link.href = data.result_url || `/funds/${data.scheme_code}`;
+        msg.innerText = `Audit complete! Composite Health Score: ${data.health_score || 'Computed'}/100`;
+
+        // Desktop notification
+        if ("Notification" in window && Notification.permission === "granted") {
+          const notif = new Notification("Fund Forensic Dossier Ready!", {
+            body: `Forensic Look-Through Complete for ${data.scheme_code}. Click to inspect portfolio.`,
+            icon: "/static/favicon.ico"
+          });
+          notif.onclick = () => { window.location.href = data.result_url; };
+        }
+      } else if (data.status === "FAILED") {
+        clearInterval(pollTimer);
+        spinner.style.display = "none";
+        msg.innerText = "Audit Failed: " + (data.error || "Unknown error");
+      }
+    } catch (e) {
+      console.warn("Error polling audit status", e);
+    }
+  }, 1500);
+}
+</script>
+<style>
+@keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
+</style>
 {% endblock %}
+

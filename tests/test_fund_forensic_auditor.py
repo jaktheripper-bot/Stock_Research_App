@@ -18,7 +18,12 @@ from core.analysis.fund_forensic_auditor import (
     compute_fund_forensic_lookthrough,
     parse_stock_report_health_matrix,
     synthesize_fund_forensic_narrative,
-    audit_single_fund_daily
+    audit_single_fund_daily,
+    calculate_deep_dive_credit_cost,
+    ensure_scheme_and_holdings_exist,
+    create_async_fund_audit_task,
+    run_async_fund_audit_job,
+    get_fund_audit_task_status
 )
 from web.main import app
 
@@ -133,6 +138,62 @@ class TestFundForensicAuditor(unittest.TestCase):
         self.assertIn("weighted_moat_score", data)
         self.assertIn("accounting_risk_index", data)
 
+    def test_deep_dive_quote_and_cost(self):
+        """Verify calculation of Layer 1 vs Layer 2 deep dive credit costs."""
+        quote = calculate_deep_dive_credit_cost("PPFAS_FLEXICAP_DIR")
+        self.assertEqual(quote["scheme_code"], "PPFAS_FLEXICAP_DIR")
+        self.assertGreaterEqual(quote["total_holdings_count"], 10)
+        self.assertEqual(quote["layer1_credits"], 1)
+        self.assertGreaterEqual(quote["uncached_count"], 1)
+        self.assertEqual(quote["total_credits_for_full_audit"], 1 + quote["layer2_deep_dive_credits"])
+
+        # Test API endpoint
+        resp = self.client.get("/api/funds/deep-dive-quote/PPFAS_FLEXICAP_DIR")
+        self.assertEqual(resp.status_code, 200)
+        q_data = resp.json()
+        self.assertEqual(q_data["scheme_code"], "PPFAS_FLEXICAP_DIR")
+        self.assertIn("layer2_deep_dive_credits", q_data)
+        self.assertIn("uncached_stocks", q_data)
+
+    def test_on_demand_audit_api_and_status(self):
+        """Verify on-demand audit enqueueing, task status tracking, and completion."""
+        # 1. Enqueue audit
+        resp = self.client.post("/api/funds/on-demand-audit", json={"scheme_code": "PPFAS_FLEXICAP_DIR"})
+        self.assertEqual(resp.status_code, 200)
+        data = resp.json()
+        self.assertTrue(data["success"])
+        task_id = data["task_id"]
+        self.assertIn("TASK-FUND-PPFAS_FLEXICAP_DIR", task_id)
+
+        # 2. Poll status endpoint
+        resp_status = self.client.get(f"/api/funds/audit-status/{task_id}")
+        self.assertEqual(resp_status.status_code, 200)
+        s_data = resp_status.json()
+        self.assertIn(s_data["status"], ["QUEUED", "PROCESSING", "COMPLETED"])
+        self.assertIn("progress_pct", s_data)
+
+    def test_unlisted_fund_ingestion_and_dossier_markup(self):
+        """Verify that an unlisted AMFI scheme code is dynamically ingested and UI markup includes deep dive options."""
+        # Ensure scheme works dynamically
+        scheme = ensure_scheme_and_holdings_exist("122639")
+        self.assertIsNotNone(scheme)
+        self.assertEqual(scheme["scheme_code"], "122639")
+
+        # Verify Fund Directory page has On-Demand AMFI search card
+        resp_dir = self.client.get("/funds")
+        self.assertEqual(resp_dir.status_code, 200)
+        self.assertIn("Audit Any Scheme Outside Top 50", resp_dir.text)
+        self.assertIn("onDemandSchemeInput", resp_dir.text)
+        self.assertIn("Alert me on desktop when complete", resp_dir.text)
+
+        # Verify Fund Dossier page includes Deep Dive Credit Option
+        resp_dos = self.client.get("/funds/PPFAS_FLEXICAP_DIR")
+        self.assertEqual(resp_dos.status_code, 200)
+        self.assertIn("Deep-Dive Stock Forensic Audit Option", resp_dos.text)
+        self.assertIn("Layer 1 Active (1 Credit)", resp_dos.text)
+        self.assertIn("Initiate Deep-Dive Audit", resp_dos.text)
+
 
 if __name__ == "__main__":
     unittest.main()
+
