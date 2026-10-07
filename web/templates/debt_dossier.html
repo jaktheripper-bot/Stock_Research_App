@@ -46,7 +46,7 @@
           Credit Posture Score: <strong style="color: #f8fafc; font-size: 15px;">{{ posture.composite_score }} / 100</strong>
         </div>
         <div style="display: flex; gap: 8px; margin-top: 4px;">
-          <button onclick="openCopilot('{{ posture.ticker or posture.isin }}')" class="btn btn-sm" style="background: rgba(14, 165, 233, 0.15); color: #38bdf8; border: 1px solid rgba(14, 165, 233, 0.4); font-weight: 700; border-radius: 9999px; cursor: pointer;">
+          <button onclick="openCopilot('{{ posture.ticker or posture.isin }}', 'debt')" class="btn btn-sm" style="background: rgba(14, 165, 233, 0.15); color: #38bdf8; border: 1px solid rgba(14, 165, 233, 0.4); font-weight: 700; border-radius: 9999px; cursor: pointer;">
             🛡️ Forensic Copilot
           </button>
           <a href="/api/pdf/debt/{{ posture.isin }}" class="btn btn-sm btn-secondary" style="border-radius: 9999px; text-decoration: none; font-size: 12px; font-weight: 600;">

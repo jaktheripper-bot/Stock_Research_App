@@ -54,22 +54,22 @@
     </div>
   </div>
 
-  <!-- Persona Playbook Filter Bar -->
+  <!-- Scenario Playbook Filter Bar (Phase 3) -->
   <div style="display: flex; gap: 8px; overflow-x: auto; padding-bottom: 12px; margin-bottom: 20px;">
     <button class="btn btn-sm persona-btn btn-primary" onclick="setPersonaFilter('')" data-persona="">
       🌐 All Offerings ({{ summary.total_items }})
     </button>
     <button class="btn btn-sm persona-btn btn-secondary" onclick="setPersonaFilter('capital_preservation')" data-persona="capital_preservation">
-      🛡️ Capital Preservation & Tax-Free Alpha
+      🛡️ Capital Preservation (Real Return > 0%)
     </button>
     <button class="btn btn-sm persona-btn btn-secondary" onclick="setPersonaFilter('quarterly_cashflow')" data-persona="quarterly_cashflow">
-      💰 Quarterly Cash Flow Stream
+      💰 Maximum Cash Flow (Quarterly Payouts)
     </button>
     <button class="btn btn-sm persona-btn btn-secondary" onclick="setPersonaFilter('hni_real_assets')" data-persona="hni_real_assets">
       🏢 HNI Commercial Real Assets (₹10L+)
     </button>
     <button class="btn btn-sm persona-btn btn-secondary" onclick="setPersonaFilter('compounding')" data-persona="compounding">
-      🚀 Asymmetric Compounding Engine
+      🚀 Asymmetric Upside (Compounding Engine)
     </button>
   </div>
 
@@ -98,10 +98,11 @@
       <div style="display: flex; align-items: center; gap: 8px;">
         <span style="font-size: 12px; font-weight: 600; color: #94a3b8;">Tax Slab:</span>
         <select id="taxSlabSelect" onchange="updateTaxSlab(this.value)" style="background: #1e293b; color: #f8fafc; border: 1px solid rgba(255, 255, 255, 0.15); border-radius: 8px; padding: 6px 12px; font-size: 13px; font-weight: 600; cursor: pointer;">
-          <option value="0">0% (Exempt)</option>
-          <option value="20">20% (Mid-Tier)</option>
-          <option value="30" selected>30% (Standard Slab)</option>
-          <option value="39">39% (HNI Surcharge)</option>
+          <option value="0">0% (Exempt / Low Income)</option>
+          <option value="10">10% (New Tax Regime Base)</option>
+          <option value="20">20% (Middle Slab)</option>
+          <option value="30" selected>30% (Standard 30% Slab)</option>
+          <option value="39">39% (Super HNI Surcharge)</option>
         </select>
       </div>
 
@@ -295,6 +296,10 @@
   </div>
 </div>
 
-<!-- Opportunity Terminal Controller Script -->
+<!-- Institutional Investor Copilot Modal Partial -->
+{% include "partials/copilot_modal.html" %}
+
+<!-- Institutional Copilot & Opportunity Terminal Scripts -->
+<script src="/static/js/copilot.js"></script>
 <script src="/static/js/opportunity_terminal.js"></script>
 {% endblock %}

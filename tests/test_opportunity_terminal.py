@@ -69,6 +69,12 @@ class TestOpportunityTerminalEngine(unittest.TestCase):
         res_hni = calculate_tax_waterfall(10.0, "BOND", tax_slab=39.0)
         self.assertEqual(res_hni["net_yield_pct"], 6.1)
 
+    def test_corporate_debt_10_pct_tax_slab(self):
+        """Verify 10% tax slab under New Tax Regime applies correctly."""
+        res_10 = calculate_tax_waterfall(10.0, "BOND", tax_slab=10.0)
+        self.assertEqual(res_10["net_yield_pct"], 9.0)
+        self.assertEqual(res_10["effective_tax_rate_pct"], 10.0)
+
     def test_equity_long_term_capital_gains_sec_112_a(self):
         """Verify equity and equity mutual funds are taxed at flat 12.5% LTCG."""
         # 14.0% return at 12.5% LTCG -> 12.25% net
@@ -119,16 +125,22 @@ class TestOpportunityTerminalEngine(unittest.TestCase):
             self.assertGreaterEqual(universe[i]["net_yield_pct"], universe[i+1]["net_yield_pct"])
 
     def test_persona_filtering(self):
-        """Verify persona playbooks correctly isolate matching opportunities."""
+        """Verify persona playbooks and Phase 3 scenario aliases correctly isolate matching opportunities."""
         preservation = get_normalized_opportunity_universe(persona_filter="capital_preservation")
         self.assertGreater(len(preservation), 0)
         for item in preservation:
             self.assertIn("capital_preservation", item.get("persona_tags", []))
+            self.assertGreaterEqual(item.get("real_yield_pct", 0), 0)
 
-        cashflow = get_normalized_opportunity_universe(persona_filter="quarterly_cashflow")
+        cashflow = get_normalized_opportunity_universe(persona_filter="maximum_cashflow")
         self.assertGreater(len(cashflow), 0)
         for item in cashflow:
             self.assertIn("quarterly_cashflow", item.get("persona_tags", []))
+
+        upside = get_normalized_opportunity_universe(persona_filter="asymmetric_upside")
+        self.assertGreater(len(upside), 0)
+        for item in upside:
+            self.assertIn("compounding", item.get("persona_tags", []))
 
     def test_get_heatmap_matrix(self):
         """Verify 2D heatmap matrix construction."""
@@ -160,6 +172,8 @@ class TestOpportunityTerminalWebEndpoints(unittest.TestCase):
         self.assertIn("Multi-Asset Opportunity Terminal", resp.text)
         self.assertIn("arbitrageDocket", resp.text)
         self.assertIn("arbitrageModal", resp.text)
+        self.assertIn("copilotModalBackdrop", resp.text)
+        self.assertIn("10% (New Tax Regime Base)", resp.text)
 
     def test_get_api_opportunities_universe(self):
         """GET /api/opportunities/universe should return structured JSON."""

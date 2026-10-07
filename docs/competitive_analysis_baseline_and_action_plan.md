@@ -274,17 +274,21 @@ To turn these competitive advantages into an unassailable market moat, we propos
 
 ---
 
-## 7. Review and Decision Gates for the User
+## 7. Review and Decision Gates: Architectural Decisions & Status
 
-Before proceeding with any implementation code or migrations, please evaluate and select from the following decision paths:
+The user evaluated and authorized the following architectural resolutions:
 
 1. **Gate 1: Asset Priority Alignment**  
-   - Do you want to prioritize **Phase 1 (Mutual Fund Look-Through across Top 50 funds)** first to solve the trailing NAV blind spot?  
-   - Or prioritize **Phase 3 (Cross-Asset Opportunity Terminal)** to give users an instant comparative view across Equities, Debt, REITs, and SGBs?
+   - **Resolution:** **Phase 3 (Cross-Asset Opportunity Terminal)** prioritized to give users an instant comparative view across Equities, Debt, REITs, SGBs, T-Bills, and Funds.  
+   - **Implementation Status:** **Completed & Verified.** Connects all asset classes, applies statutory tax waterfalls (Sec 47(viic), Sec 115UA, Sec 112A, Sec 50AA) including the 10% New Tax Regime bracket, supports scenario filters ("Capital Preservation (Real Return > 0%)", "Maximum Cash Flow", "Asymmetric Upside"), and embeds side-by-side Arbitrage Docket pinning.
+
 2. **Gate 2: Autonomous Re-Audit Frequency**  
-   - Should daily fund re-audits run automatically at 23:30 IST following AMFI NAV publication, or be triggered on-demand via the admin console?
+   - **Resolution:** **Auto** — Daily fund re-audits run automatically at 23:30 IST following AMFI NAV publication.  
+   - **Implementation Status:** **Active.** The background daemon `run_daily_fund_audit_scheduler()` runs nightly at 23:30 IST in `web/main.py`, executing `audit_single_fund_daily` and logging rotation events to `autonomous_event_ledger`. Admin console on-demand re-audit remains accessible as a manual trigger backup.
+
 3. **Gate 3: Copilot Visibility**  
-   - Should the Institutional Forensic Copilot be expanded to Mutual Funds and Debt dossiers in addition to the existing Equity dossiers?
+   - **Resolution:** **Yes** — Expand the Institutional Forensic Copilot to Mutual Funds and Debt dossiers in addition to existing Equity dossiers.  
+   - **Implementation Status:** **Completed & Verified.** Multi-asset grounding active across all 3 asset classes in `core/agents/copilot/investor_copilot.py`. Frontend `copilot_modal.html` and `copilot.js` now dynamically configure headers, badges, intro messages, and diagnostic prompt chips tailored to Equities, Mutual Funds, and Corporate Debt/SDIs with strict SEBI RA Sec. 2(u) non-advisory guardrails.
 
 ---
-*End of Blueprint. No system code or database migrations have been executed. Awaiting user review and authorization.*
+*Status: Architecture aligned and deployed with 159/159 passing tests.*

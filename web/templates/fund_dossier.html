@@ -37,7 +37,7 @@
           Benchmark: <strong style="color: #f8fafc;">{{ scheme.benchmark_index }}</strong> • Manager: <strong style="color: #f8fafc;">{{ scheme.fund_manager }}</strong> • Portfolio Date: {{ scheme.last_portfolio_date }}
         </div>
         <div style="display: flex; gap: 8px; margin-top: 14px; flex-wrap: wrap;">
-          <button onclick="openCopilot('{{ scheme.scheme_code }}')" class="btn btn-sm" style="background: rgba(14, 165, 233, 0.15); color: #38bdf8; border: 1px solid rgba(14, 165, 233, 0.4); font-weight: 700; border-radius: 9999px; cursor: pointer;">
+          <button onclick="openCopilot('{{ scheme.scheme_code }}', 'mutual_fund')" class="btn btn-sm" style="background: rgba(14, 165, 233, 0.15); color: #38bdf8; border: 1px solid rgba(14, 165, 233, 0.4); font-weight: 700; border-radius: 9999px; cursor: pointer;">
             🛡️ Forensic Copilot
           </button>
           <a href="/api/pdf/fund/{{ scheme.scheme_code }}" class="btn btn-sm btn-secondary" style="border-radius: 9999px; text-decoration: none; font-size: 12px; font-weight: 600;">

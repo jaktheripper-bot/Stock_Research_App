@@ -478,10 +478,19 @@ def get_normalized_opportunity_universe(
     except Exception as e:
         logger.error(f"Error aggregating equities for Opportunity Terminal: {e}")
 
-    # Filter by persona if specified
+    # Filter by persona/scenario if specified
     if persona_filter:
         p_clean = persona_filter.strip().lower()
-        items = [x for x in items if p_clean in [p.lower() for p in x.get("persona_tags", [])]]
+        if p_clean in ("capital_preservation", "preservation"):
+            items = [x for x in items if "capital_preservation" in [p.lower() for p in x.get("persona_tags", [])] and x.get("real_yield_pct", 0) >= 0]
+        elif p_clean in ("quarterly_cashflow", "maximum_cashflow", "cashflow"):
+            items = [x for x in items if "quarterly_cashflow" in [p.lower() for p in x.get("persona_tags", [])]]
+        elif p_clean in ("hni_real_assets", "real_assets"):
+            items = [x for x in items if "hni_real_assets" in [p.lower() for p in x.get("persona_tags", [])]]
+        elif p_clean in ("compounding", "asymmetric_upside", "upside"):
+            items = [x for x in items if "compounding" in [p.lower() for p in x.get("persona_tags", [])]]
+        else:
+            items = [x for x in items if p_clean in [p.lower() for p in x.get("persona_tags", [])]]
 
     # Sort descending by Net Real Yield as primary institutional benchmark
     items.sort(key=lambda x: x["net_yield_pct"], reverse=True)

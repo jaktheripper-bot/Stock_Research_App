@@ -253,11 +253,14 @@ function renderBentoCards(items) {
           </div>
         </div>
 
-        <!-- Action Link -->
-        <div>
-          <a href="${item.detail_url}" class="btn btn-secondary btn-sm" style="width: 100%; text-align: center; font-size: 12.5px; font-weight: 600; padding: 8px;">
-            Open Forensic Dossier &rarr;
+        <!-- Action Controls -->
+        <div style="display: flex; gap: 8px;">
+          <a href="${item.detail_url}" class="btn btn-secondary btn-sm" style="flex: 1; text-align: center; font-size: 12px; font-weight: 600; padding: 7px;">
+            Dossier &rarr;
           </a>
+          <button onclick="openCopilot('${item.symbol || item.id}', '${item.asset_class === 'MF' ? 'mutual_fund' : (['BOND', 'SDI'].includes(item.asset_class) ? 'debt' : 'equity')}')" class="btn btn-sm" style="background: rgba(14, 165, 233, 0.15); color: #38bdf8; border: 1px solid rgba(14, 165, 233, 0.3); font-size: 12px; font-weight: 700; padding: 7px 12px; border-radius: 8px; cursor: pointer;" title="Launch Forensic Copilot">
+            🛡️ Copilot
+          </button>
         </div>
       </div>
     `;
@@ -500,9 +503,12 @@ function renderDenseTable(items) {
         <td style="padding: 12px 14px; text-align: right; color: #cbd5e1;" class="tnum">
           ₹${Number(item.min_ticket_inr).toLocaleString('en-IN')}
         </td>
-        <td style="padding: 12px 14px; text-align: center;">
-          <button onclick="togglePin('${item.id}')" style="background: ${isPinned ? 'rgba(14, 165, 233, 0.3)' : 'rgba(255, 255, 255, 0.08)'}; border: 1px solid ${isPinned ? '#0ea5e9' : 'rgba(255, 255, 255, 0.15)'}; border-radius: 6px; color: ${isPinned ? '#38bdf8' : '#94a3b8'}; padding: 4px 8px; font-size: 11px; cursor: pointer;">
+        <td style="padding: 12px 14px; text-align: center; white-space: nowrap;">
+          <button onclick="togglePin('${item.id}')" title="Pin to Arbitrage Docket" style="background: ${isPinned ? 'rgba(14, 165, 233, 0.3)' : 'rgba(255, 255, 255, 0.08)'}; border: 1px solid ${isPinned ? '#0ea5e9' : 'rgba(255, 255, 255, 0.15)'}; border-radius: 6px; color: ${isPinned ? '#38bdf8' : '#94a3b8'}; padding: 4px 8px; font-size: 11px; cursor: pointer; margin-right: 4px;">
             ${isPinned ? '📌' : '➕ Pin'}
+          </button>
+          <button onclick="openCopilot('${item.symbol || item.id}', '${item.asset_class === 'MF' ? 'mutual_fund' : (['BOND', 'SDI'].includes(item.asset_class) ? 'debt' : 'equity')}')" title="Launch Forensic Copilot" style="background: rgba(14, 165, 233, 0.15); border: 1px solid rgba(14, 165, 233, 0.3); border-radius: 6px; color: #38bdf8; padding: 4px 8px; font-size: 11px; cursor: pointer;">
+            🛡️ Copilot
           </button>
         </td>
       </tr>
