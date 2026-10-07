@@ -311,7 +311,6 @@ def generate_invoice_html(
             <div>
                 <div class="brand">STOCK RESEARCH APP</div>
                 <div style="font-size: 12px; color: #64748b; margin-top: 4px;">Institutional Equity Thesis & Drift Surveillance</div>
-                <div style="font-size: 12px; color: #64748b;">SAC Code: {INVOICE_SAC_CODE} (IT Software Services)</div>
             </div>
             <div class="meta">
                 <div style="font-size: 16px; font-weight: 700; color: #0f172a;">TAX INVOICE / RECEIPT</div>

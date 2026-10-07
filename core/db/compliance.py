@@ -10,7 +10,7 @@ logger = logging.getLogger("equity_research.core.db.compliance")
 
 MANDATORY_SEBI_DISCLAIMER = (
     "Mandatory SEBI Safe-Harbor Disclosure: Stock Research AI is an automated, computational financial research "
-    "synthesis software utility (SAC Code 998314). We are NOT registered as a Research Analyst or Investment Adviser "
+    "synthesis software utility. We are NOT registered as a Research Analyst or Investment Adviser "
     "under SEBI regulations. All analytical outputs, 7-pillar scorecards, and syntheses are algorithmically compiled "
     "from public exchange disclosures for educational and research purposes only. Past performance does not guarantee "
     "future results. Consult an independent SEBI-registered advisor before investing."

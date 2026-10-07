@@ -5,7 +5,6 @@ Complies with:
 - Information Technology Act, 2000 & IT (Intermediary Guidelines) Rules, 2021
 - Consumer Protection (E-Commerce) Rules, 2020
 - SEBI (Research Analysts) Regulations, 2014 Safe-Harbor Disclaimers
-- Goods and Services Tax (GST) SAC Code 998314 (Information Technology Software Services)
 """
 
 from core.db.compliance import MANDATORY_SEBI_DISCLAIMER
@@ -20,7 +19,7 @@ POLICIES = {
         <p>By accessing or using the Stock Research App (the "Platform", "Service"), you agree to be bound by these Terms and Conditions. If you do not agree with any part of these terms, you must refrain from using the Service.</p>
 
         <h3>2. Description of Service</h3>
-        <p>The Platform provides an automated, computational financial research synthesis software utility. Under Service Accounting Code (SAC) <strong>998314</strong> (Information Technology Software Services), the Platform aggregates publicly available exchange filings from the Bombay Stock Exchange (BSE) and National Stock Exchange (NSE), computes algorithmic financial ratios, and formats educational 7-pillar qualitative research dossiers using artificial intelligence.</p>
+        <p>The Platform provides an automated, computational financial research synthesis software utility. The Platform aggregates publicly available exchange filings from the Bombay Stock Exchange (BSE) and National Stock Exchange (NSE), computes algorithmic financial ratios, and formats educational 7-pillar qualitative research dossiers using artificial intelligence.</p>
 
         <h3>3. Non-Advisory Safe Harbor (SEBI Compliance)</h3>
         <p><strong>The Platform does not provide investment advice, financial planning, portfolio management services, or buy/hold/sell recommendations.</strong></p>
@@ -121,11 +120,9 @@ POLICIES = {
         <p>We are here to assist with any questions regarding research credits, institutional access, technical support, or billing queries.</p>
 
         <div style="background: rgba(14, 165, 233, 0.08); border-left: 4px solid #0284c7; padding: 16px; border-radius: 6px; margin: 20px 0;">
-            <p style="margin: 0 0 8px 0;"><strong>🏢 Entity Name:</strong> Stock Research App / Equity Research AI</p>
             <p style="margin: 0 0 8px 0;"><strong>📧 Support Email:</strong> <a href="mailto:support@stockresearch.app">support@stockresearch.app</a></p>
             <p style="margin: 0 0 8px 0;"><strong>⏱️ Support Hours:</strong> Monday to Friday, 9:30 AM – 6:30 PM IST</p>
-            <p style="margin: 0 0 8px 0;"><strong>📍 Operational Address:</strong> Indiranagar, 100 Feet Road, Bengaluru, Karnataka 560038, India</p>
-            <p style="margin: 0;"><strong>📱 Support Hotline / WhatsApp:</strong> +91 98450 00000 (Business hours)</p>
+            <p style="margin: 0;"><strong>💬 Support Desk:</strong> Submit inquiries directly via our <a href="/contact">Contact & Support Form</a></p>
         </div>
 
         <h3>Grievance Officer (IT Rules, 2021)</h3>
@@ -141,7 +138,7 @@ POLICIES = {
         "description": "Instant digital delivery policy for software research credits and analytical dossiers.",
         "content_html": """
         <h3>1. Digital Software Products & Services</h3>
-        <p>All items sold on the Stock Research App (Computational Research Credits, Analyst Packs, Pro Memberships, and Institutional Dossiers) are <strong>purely digital software services</strong> under SAC Code 998314.</p>
+        <p>All items sold on the Stock Research App (Computational Research Credits, Analyst Packs, Pro Memberships, and Institutional Dossiers) are <strong>purely digital software services</strong>.</p>
 
         <h3>2. Delivery Mechanism and Timelines</h3>
         <ul>

@@ -327,7 +327,7 @@ def add_user_credits(
         cust_email = acc_info[0] if acc_info else f"{clean_id}@stockresearch.ai"
         cust_name = acc_info[1] if acc_info else "Investor"
 
-        # Compute GST breakdown (Inclusive of 18% GST, SAC 998314)
+        # Compute GST breakdown (Inclusive of 18% GST)
         amt = float(amount_inr)
         if amt > 0:
             base_amt = round(amt / 1.18, 2)
@@ -352,7 +352,7 @@ def add_user_credits(
                     gateway_order_id, gateway_payment_id, status, pack_type, invoice_number,
                     customer_email, customer_name, base_amount_inr, tax_gst_inr, sac_code
                 )
-                VALUES ({p}, {p}, {p}, {p}, {p}, {p}, {p}, {p}, {p}, {p}, {p}, {p}, {p}, {p}, '998314');
+                VALUES ({p}, {p}, {p}, {p}, {p}, {p}, {p}, {p}, {p}, {p}, {p}, {p}, {p}, {p}, '');
                 """,
                 (tx_id, clean_id, amt, credits_to_add, effective_gateway, gateway_order_id, gateway_payment_id, status, pack_type, inv_num, cust_email, cust_name, base_amt, gst_amt)
             )
@@ -445,7 +445,7 @@ def get_all_billables(status: Optional[str] = None, limit: int = 100, offset: in
                 COALESCE(t.customer_name, u.full_name, 'Investor') as name,
                 COALESCE(t.base_amount_inr, 0.0),
                 COALESCE(t.tax_gst_inr, 0.0),
-                COALESCE(t.sac_code, '998314'),
+                COALESCE(t.sac_code, ''),
                 COALESCE(t.refund_amount_inr, 0.0),
                 t.refund_reason,
                 t.gateway_refund_id,
@@ -503,7 +503,7 @@ def get_all_billables(status: Optional[str] = None, limit: int = 100, offset: in
                 "customer_name": r[12],
                 "base_amount_inr": base,
                 "tax_gst_inr": gst,
-                "sac_code": r[15] or "998314",
+                "sac_code": r[15] or "",
                 "refund_amount_inr": float(r[16] or 0.0),
                 "refund_reason": r[17] or "",
                 "gateway_refund_id": r[18] or "",

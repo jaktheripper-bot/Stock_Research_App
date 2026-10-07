@@ -3778,7 +3778,7 @@ async def admin_export_tax_register(request: Request):
             b.get("customer_email"),
             b.get("customer_name"),
             b.get("pack_type"),
-            b.get("sac_code", "998314"),
+            b.get("sac_code", ""),
             f"{base:.2f}",
             f"{half_gst:.2f}",
             f"{half_gst:.2f}",

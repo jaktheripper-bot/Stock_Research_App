@@ -134,9 +134,9 @@ B2B_PACKS: Dict[str, Dict[str, Any]] = {
 
 from core.db.compliance import MANDATORY_SEBI_DISCLAIMER
 
-# SEBI-Compliant Invoice Metadata
+# Invoice Metadata
 INVOICE_SERVICE_DESCRIPTION = "Financial Research Synthesis Software Utility — Computational Research Credits"
-INVOICE_SAC_CODE = "998314"  # Information Technology Software Services
+INVOICE_SAC_CODE = ""
 INVOICE_DISCLAIMER = MANDATORY_SEBI_DISCLAIMER
 
 
