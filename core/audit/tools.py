@@ -201,30 +201,53 @@ def tool_scan_prohibited_terms() -> Dict[str, Any]:
         (r"target\s+price:\s*₹?\d+", "Price forecasting / target price"),
         (r"don't\s+worry,?\s+investing\s+is\s+simple", "Patronizing tone"),
         (r"plain-english\s+explainer\s+for\s+beginners", "Patronizing 'beginner baby-talk'"),
+        # Zero-Hallucination & Anti-Fabrication Patterns:
+        (r"Registered\s+Operating\s+Entity", "Hallucinated 'Registered Operating Entity' claim"),
+        (r"SAC\s*(?:Code)?[:\s]*998314", "Hallucinated GST SAC code 998314"),
+        (r"\b998314\b", "Hallucinated SAC code 998314"),
+        (r"Indiranagar|100\s*Feet\s*Road|\b560038\b", "Hallucinated physical office address"),
+        (r"support@stockresearch\.app", "Hallucinated public email support@stockresearch.app"),
+        (r"grievance@stockresearch\.app", "Hallucinated public email grievance@stockresearch.app"),
+        (r"privacy@stockresearch\.app", "Hallucinated public email privacy@stockresearch.app"),
+        (r"\+91\s*98450", "Hallucinated telephone/hotline"),
+        (r"placeholder=[\"'].*Lyndon.*[\"']", "Author personal name leakage in UI placeholder"),
     ]
 
     findings = []
     scanned_files = 0
+    files_to_scan = []
 
     for root, _, files in os.walk(templates_dir):
         for f in files:
             if f.endswith((".html", ".jinja2")):
-                scanned_files += 1
-                fpath = Path(root) / f
-                try:
-                    content = fpath.read_text(encoding="utf-8")
-                    for pat, desc in prohibited_patterns:
-                        matches = list(re.finditer(pat, content, re.IGNORECASE))
-                        for m in matches:
-                            line_no = content[:m.start()].count("\n") + 1
-                            findings.append({
-                                "file": str(fpath.relative_to(PROJECT_ROOT)),
-                                "line": line_no,
-                                "matched_text": m.group(0),
-                                "violation": desc
-                            })
-                except Exception as e:
-                    logger.warning(f"Error scanning {fpath}: {e}")
+                files_to_scan.append(Path(root) / f)
+
+    legal_file = PROJECT_ROOT / "web" / "legal_content.py"
+    if legal_file.exists():
+        files_to_scan.append(legal_file)
+
+    for fpath in files_to_scan:
+        scanned_files += 1
+        try:
+            content = fpath.read_text(encoding="utf-8")
+            for pat, desc in prohibited_patterns:
+                # Skip root admin login template when checking admin owner whitelist
+                if fpath.name == "admin.html" and "email" in desc.lower():
+                    continue
+                # In legal policies, negative disclaimers ("does not provide buy/sell recommendations") are statutory
+                if fpath.name == "legal_content.py" and "prescriptive" in desc.lower():
+                    continue
+                matches = list(re.finditer(pat, content, re.IGNORECASE))
+                for m in matches:
+                    line_no = content[:m.start()].count("\n") + 1
+                    findings.append({
+                        "file": str(fpath.relative_to(PROJECT_ROOT)),
+                        "line": line_no,
+                        "matched_text": m.group(0),
+                        "violation": desc
+                    })
+        except Exception as e:
+            logger.warning(f"Error scanning {fpath}: {e}")
 
     # Check that SEBI disclaimer is present in base template
     base_template = templates_dir / "base.html"
