@@ -106,7 +106,7 @@ def save_project_audit_log(audit: Dict[str, Any]) -> bool:
                 recommendations_json,
                 pillar_breakdown_json,
                 audit.get("full_markdown_report", ""),
-                audit.get("audit_engine", "google-antigravity-sdk"),
+                audit.get("audit_engine", "autonomous-auditor-engine"),
             ))
         else:
             query = """
@@ -134,7 +134,7 @@ def save_project_audit_log(audit: Dict[str, Any]) -> bool:
                 recommendations_json,
                 pillar_breakdown_json,
                 audit.get("full_markdown_report", ""),
-                audit.get("audit_engine", "google-antigravity-sdk"),
+                audit.get("audit_engine", "autonomous-auditor-engine"),
             ))
         conn.commit()
         return True

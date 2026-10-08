@@ -211,6 +211,27 @@ class TestZeroHallucinationAndGrounding(unittest.TestCase):
         # Must describe review by administration console
         self.assertIn("Admin Desk Review", contact_text)
 
+    def test_no_antigravity_mentions_on_site(self):
+        """Ensures zero mention of Google Antigravity or Antigravity exists in any user-facing template or static UI."""
+        violations = []
+        for fpath in self.template_files:
+            content = fpath.read_text(encoding="utf-8")
+            if re.search(r"antigravity", content, re.IGNORECASE):
+                violations.append(f"{fpath.name} contains mention of 'Antigravity'")
+
+        static_js_dir = PROJECT_ROOT / "web" / "static" / "js"
+        if static_js_dir.exists():
+            for fpath in static_js_dir.glob("*.js"):
+                content = fpath.read_text(encoding="utf-8")
+                if re.search(r"antigravity", content, re.IGNORECASE):
+                    violations.append(f"{fpath.name} contains mention of 'Antigravity'")
+
+        self.assertEqual(
+            violations, [],
+            f"Found forbidden 'Antigravity' mentions on site UI:\n" + "\n".join(violations)
+        )
+
 
 if __name__ == "__main__":
     unittest.main()
+

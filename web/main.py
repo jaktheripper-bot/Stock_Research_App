@@ -334,7 +334,7 @@ async def run_daily_fund_audit_scheduler():
 
 async def run_daily_project_audit_scheduler():
     """
-    Automated background Project Auditor via Google Antigravity SDK:
+    Automated background Project Auditor:
     Runs nightly at 03:00 IST to audit Strategy, Code Implementation, and UI/UX.
     """
     logger.info("🛡️ [Project Auditor Scheduler] Background project auditor initiated.")
@@ -3141,7 +3141,7 @@ async def admin_dashboard(
 async def admin_audit_dashboard(request: Request):
     """
     Renders the Autonomous System Health & Multi-Pillar Project Audit Console.
-    Powered by the Google Antigravity SDK.
+    Continuous Multi-Pillar System Health & Auditing Engine.
     """
     init_db()
     admin_session = _is_admin_authenticated(request)

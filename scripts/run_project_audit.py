@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""CLI Utility for Autonomous Project-Wide Auditing via Google Antigravity SDK.
+"""CLI Utility for Autonomous Project-Wide Auditing.
 
 Usage:
     python3 scripts/run_project_audit.py --full
@@ -24,7 +24,7 @@ from core.db.audit_logs import get_project_audit_history, get_project_audit_by_i
 
 async def main_async():
     parser = argparse.ArgumentParser(description="Autonomous Project-Wide Auditor (Strategy, Code & UI/UX)")
-    parser.add_argument("--full", action="store_true", help="Execute complete audit with Google Antigravity AI synthesis")
+    parser.add_argument("--full", action="store_true", help="Execute complete audit with AI cognitive synthesis")
     parser.add_argument("--quick", action="store_true", help="Execute deterministic-only audit (skips LLM generation)")
     parser.add_argument("--history", action="store_true", help="List recent project audit history from database")
     parser.add_argument("--id", type=str, help="View full markdown dossier of a specific audit by ID")
@@ -63,7 +63,7 @@ async def main_async():
 
     use_ai = not args.quick
     print("\n🔍 Initiating Autonomous Project Audit across Strategy, Code & UI/UX...")
-    print(f"   Engine: Google Antigravity SDK | Mode: {'AI Synthesis' if use_ai else 'Deterministic Fast-Path'}")
+    print(f"   Engine: Autonomous Multi-Agent Auditor | Mode: {'AI Synthesis' if use_ai else 'Deterministic Fast-Path'}")
     print("   Evaluating test suite, live endpoints, SEBI compliance, and AST code hygiene...\n")
 
     result = await audit_project_full(use_ai=use_ai)

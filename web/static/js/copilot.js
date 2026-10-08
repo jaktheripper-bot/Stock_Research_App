@@ -1,6 +1,6 @@
 /**
  * Institutional Investor Copilot Frontend Controller.
- * Powered by Google Antigravity SDK.
+ * Institutional Forensic Intelligence Architecture.
  * Supports Multi-Asset Dispatch across Fundamental Equities, Mutual Funds, and Corporate Debt.
  */
 

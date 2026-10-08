@@ -117,7 +117,7 @@ Comparison Dimension        Definitive Intelligence (Groq)     Stock Research Ap
 Primary Analytical Mode     Generic Natural Language to SQL   Deterministic Multi-Asset Matrix
 Data Integrity Guard        LLM SQL Compilation Validation    Statutory Primary Source Grounding
                                                               (BSE Filings, AMFI NAV, RBI Curve)
-Agent Orchestration         Single-Threaded Context Agent     Google Antigravity Coordinated
+Agent Orchestration         Single-Threaded Context Agent     Autonomous Coordinated
                                                               Multi-Agent Forensic System
 Regulatory Boundary         Unregulated Enterprise BI         SEBI RA Section 2(u) Compliant
                                                               Non-Advisory Educational Safe-Harbor
@@ -133,7 +133,7 @@ Definitive Intelligence built its platform around an open-ended conversational p
 
 ### Lesson 2: Multi-Agent Specialization vs. Monolithic LLM Prompts
 Definitive's early iterations attempted to solve all data interrogation tasks through a single monolithic prompt context. This frequently caused context saturation and attention drift across large schemas.
-* **Our Implementation:** We implemented specialized autonomous subagents via the **Google Antigravity SDK** (`core/analysis/multi_agent_audit.py`):
+* **Our Implementation:** We implemented specialized autonomous subagents via multi-agent forensic orchestration (`core/analysis/multi_agent_audit.py`):
   * `accounting_auditor`: Audits balance-sheet accruals, working capital drift, and off-balance-sheet commitments.
   * `governance_detective`: Scrutinizes promoter share pledges, related-party transactions, and board turnover.
   * `valuation_stress_analyst`: Runs deterministic DCF margin-of-safety corridors and PEAD drift bands.
@@ -153,7 +153,7 @@ Definitive’s acquisition by Groq was driven by the desperate need for **ultra-
 
 1. **Definitive’s Exit Validated the Infrastructure Shift:** Definitive Intelligence proved that building standalone natural language chat wrappers on existing databases has a finite enterprise ceiling; the highest value capture lies either in **owning the underlying inference infrastructure** (Groq's acquisition play) or **owning a deeply defensible, proprietary domain dataset**.
 2. **Domain Specialization is the Ultimate Moat:** Generic enterprise chat tools like Definitive Chat can never provide the specialized forensic depth required for Indian capital markets (e.g., tracking Promoter Pledges on BSE, calculating 60-day PEAD drift corridors, or modeling Basel-III Tier-2 bond PONV loss absorption).
-3. **Execution Ground Truth Wins:** By anchoring our platform in statutory statutory feeds (BSE/NSE, AMFI, RBI, MOSPI) and pairing them with coordinated Antigravity multi-agent auditing, the Stock Research App establishes an institutional-grade research platform that generic AI analytics tools cannot replicate.
+3. **Execution Ground Truth Wins:** By anchoring our platform in statutory statutory feeds (BSE/NSE, AMFI, RBI, MOSPI) and pairing them with coordinated multi-agent forensic auditing, the Stock Research App establishes an institutional-grade research platform that generic AI analytics tools cannot replicate.
 
 ---
 

@@ -18,7 +18,7 @@ However, the platforms tracking and reporting on these investment options suffer
 ### The Purpose of This Document
 This research establishes:
 - **The Baseline:** What existing market leaders provide today across each asset class.
-- **Our Offering Over & Above:** How our exchange-grounded, multi-asset forensic architecture and Google Antigravity autonomous squads deliver unmatched analytical rigor.
+- **Our Offering Over & Above:** How our exchange-grounded, multi-asset forensic architecture and autonomous intelligence squads deliver unmatched analytical rigor.
 - **Action Plan:** A prioritized, step-by-step roadmap to solidify our moat before taking new features live.
 
 ---
@@ -178,7 +178,7 @@ Stock Research App does not attempt to be a faster data table or a discount brok
 - **Industry Baseline:**
   - Either silent (afraid of SEBI liability) or generic chatbots that hallucinate financial data.
 - **Stock Research App (Our Moat):**
-  - **Google Antigravity SDK Autonomous Squads:** Specialized agents (Equity Chief, Credit Auditor, Governance Detective) coordinated with declarative safety policies and command sandboxes.
+  - **Autonomous Forensic Intelligence Squads:** Specialized forensic modules (Equity Chief, Credit Auditor, Governance Detective) coordinated with declarative safety policies and command sandboxes.
   - **SEBI Section 2(u) Mandatory Deflection:** Intercepts retail buy/sell inquiries instantly without token cost, deflecting into rigorous Pre-Mortem inversion diagnostics.
   - **Proactive Watchers:** Continuous 5-minute BSE filing scanner and daily AMFI NAV synchronization recording events into an immutable ledger (`autonomous_event_ledger`).
 
@@ -201,7 +201,7 @@ Stock Research App does not attempt to be a faster data table or a discount brok
 | **Sovereign Curve & SDL Matrix** | ❌ | ❌ | ❌ | ❌ | ❌ | **✅ Real-Yield Spreads** |
 | **Unified Cross-Asset Opportunity Radar** | ❌ | ❌ | ❌ | ❌ | ❌ | **✅ Multi-Asset** |
 | **Autonomous Proactive Event Ledger** | ❌ | ❌ | ❌ | ❌ | ❌ | **✅ 5-Min BSE Watcher** |
-| **Interactive Copilot with SEBI Guard** | ❌ | ❌ | ❌ | ❌ | ❌ | **✅ Antigravity SDK** |
+| **Interactive Copilot with SEBI Guard** | ❌ | ❌ | ❌ | ❌ | ❌ | **✅ Multi-Asset Copilot** |
 
 ---
 
