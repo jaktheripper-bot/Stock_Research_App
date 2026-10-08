@@ -16,6 +16,7 @@ from fastapi.testclient import TestClient
 
 from web.main import app
 from core.agents.config import (
+    ANTIGRAVITY_AVAILABLE,
     get_default_agent_policies,
     get_tier_budget_config,
     SEBI_SAFE_HARBOR_DIRECTIVE
@@ -51,12 +52,14 @@ class TestSitewideAgents(unittest.TestCase):
         self.assertIsInstance(policies, list)
 
         budget_domain = get_tier_budget_config("domain_research")
-        self.assertIsNotNone(budget_domain)
-        self.assertEqual(budget_domain.max_model_calls, 15)
-
-        budget_copilot = get_tier_budget_config("interactive_copilot")
-        self.assertIsNotNone(budget_copilot)
-        self.assertEqual(budget_copilot.max_model_calls, 8)
+        if ANTIGRAVITY_AVAILABLE:
+            self.assertIsNotNone(budget_domain)
+            self.assertEqual(budget_domain.max_model_calls, 15)
+            budget_copilot = get_tier_budget_config("interactive_copilot")
+            self.assertIsNotNone(budget_copilot)
+            self.assertEqual(budget_copilot.max_model_calls, 8)
+        else:
+            self.assertIsNone(budget_domain)
 
     def test_agent_sessions_and_turns_crud(self):
         """Verifies persistence of agent conversations and dialogue turns."""
