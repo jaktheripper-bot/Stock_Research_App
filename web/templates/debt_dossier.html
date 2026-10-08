@@ -161,9 +161,14 @@
           </div>
         </div>
       </div>
-      <div style="display: inline-flex; align-items: center; gap: 6px; padding: 6px 14px; border-radius: 9999px; background: rgba(255, 255, 255, 0.05); border: 1px solid {{ posture.credit_contagion_radar.badge_color }};">
-        <span style="width: 8px; height: 8px; border-radius: 50%; background: {{ posture.credit_contagion_radar.badge_color }};"></span>
-        <span style="font-size: 12px; font-weight: 700; color: {{ posture.credit_contagion_radar.badge_color }};">{{ posture.credit_contagion_radar.radar_label }}</span>
+      <div style="display: flex; align-items: center; gap: 8px;">
+        <button onclick="openCopilot('{{ posture.ticker or posture.isin }}', 'debt', 'contagion', 'Credit Contagion Radar', 'What does the Credit Contagion Radar say about systemic risks for this issuer?')" class="btn btn-sm" style="background: rgba(14, 165, 233, 0.15); color: #38bdf8; border: 1px solid rgba(14, 165, 233, 0.4); border-radius: 9999px; font-weight: 600; font-size: 11px; padding: 4px 10px; cursor: pointer; display: inline-flex; align-items: center; gap: 4px;">
+          <span>🤖</span> Copilot
+        </button>
+        <div style="display: inline-flex; align-items: center; gap: 6px; padding: 6px 14px; border-radius: 9999px; background: rgba(255, 255, 255, 0.05); border: 1px solid {{ posture.credit_contagion_radar.badge_color }};">
+          <span style="width: 8px; height: 8px; border-radius: 50%; background: {{ posture.credit_contagion_radar.badge_color }};"></span>
+          <span style="font-size: 12px; font-weight: 700; color: {{ posture.credit_contagion_radar.badge_color }};">{{ posture.credit_contagion_radar.radar_label }}</span>
+        </div>
       </div>
     </div>
 

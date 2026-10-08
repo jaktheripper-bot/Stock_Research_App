@@ -159,6 +159,22 @@ class TestSitewideAgents(unittest.TestCase):
         self.assertTrue(hist_data.get("success"))
         self.assertGreaterEqual(len(hist_data.get("turns")), 2)
 
+        # 3. Mutual Fund section-aware turn via API
+        conv_mf_id = f"TEST-API-COPILOT-MF-{uuid.uuid4().hex[:8]}"
+        resp_mf = self.client.post("/api/copilot/chat", json={
+            "conversation_id": conv_mf_id,
+            "message": "Explain the distributor commission fee drag.",
+            "ticker": "PPFAS_FLEXICAP_DIR",
+            "asset_type": "mutual_fund",
+            "section": "fee_drag",
+            "section_label": "Intermediary Fee Drag"
+        })
+        self.assertEqual(resp_mf.status_code, 200)
+        data_mf = resp_mf.json()
+        self.assertTrue(data_mf.get("success"))
+        self.assertIn("Fee Drag", data_mf.get("response"))
+        self.assertNotIn("company's Margin of Safety", data_mf.get("response"))
+
 
 if __name__ == "__main__":
     unittest.main()

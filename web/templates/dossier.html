@@ -93,8 +93,13 @@
       <!-- Qualitative Health Matrix Strip -->
       {% if matrix %}
       <div style="margin-top: 18px; background: rgba(30, 41, 59, 0.35); border: 1px solid var(--border-color); border-radius: var(--radius-sm); padding: 14px 18px;">
-        <div style="font-size: 12px; font-weight: 700; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.05em; margin-bottom: 10px;">
-          Qualitative Health Matrix (01–07):
+        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px; flex-wrap: wrap; gap: 8px;">
+          <div style="font-size: 12px; font-weight: 700; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.05em;">
+            Qualitative Health Matrix (01–07):
+          </div>
+          <button onclick="openCopilot('{{ ticker }}', 'equity', 'solvency', 'Qualitative Health Matrix', 'Assess the 7-pillar qualitative health matrix and balance sheet resilience for {{ ticker }}')" class="btn btn-sm" style="background: rgba(14, 165, 233, 0.15); color: #38bdf8; border: 1px solid rgba(14, 165, 233, 0.4); border-radius: 9999px; font-size: 11px; padding: 2px 8px; cursor: pointer;">
+            🤖 Copilot
+          </button>
         </div>
         <div style="display: flex; gap: 10px; flex-wrap: wrap;">
           <span class="badge badge-cyan" title="Competitive Moat">Moat: <strong>{{ matrix.Moat|default('Moderate') }}</strong></span>

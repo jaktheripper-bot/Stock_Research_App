@@ -3242,11 +3242,15 @@ class CopilotChatRequest(BaseModel):
     message: str
     ticker: Optional[str] = None
     user_id: Optional[str] = None
+    asset_type: Optional[str] = None
+    section: Optional[str] = None
+    section_label: Optional[str] = None
+    section_data: Optional[Dict[str, Any]] = None
 
 
 @app.post("/api/copilot/chat")
 async def api_copilot_chat(payload: CopilotChatRequest):
-    """Interactive Institutional Investor Copilot dialogue endpoint."""
+    """Interactive Institutional Investor Copilot dialogue endpoint with multi-asset and section context."""
     init_db()
     from core.agents.copilot.investor_copilot import process_copilot_turn
     try:
@@ -3254,7 +3258,11 @@ async def api_copilot_chat(payload: CopilotChatRequest):
             conversation_id=payload.conversation_id,
             user_message=payload.message,
             ticker=payload.ticker,
-            user_id=payload.user_id
+            user_id=payload.user_id,
+            asset_type=payload.asset_type,
+            section=payload.section,
+            section_label=payload.section_label,
+            section_data=payload.section_data
         )
         return {"success": True, **res}
     except Exception as e:

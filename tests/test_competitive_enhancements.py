@@ -136,10 +136,78 @@ class TestCompetitiveEnhancements(unittest.TestCase):
             res = await process_copilot_turn(
                 conversation_id="TEST-COPILOT-MF-101",
                 user_message="Provide a diagnostic look-through summary of this fund.",
-                ticker="PPFAS_FLEXICAP_DIR"
+                ticker="PPFAS_FLEXICAP_DIR",
+                asset_type="mutual_fund"
             )
             self.assertIn(res["status"], ["COMPLETED", "DETERMINISTIC_FALLBACK"])
             self.assertTrue(len(res["response"]) > 50)
+            # Response must discuss fund forensics and not single company P/E or Reverse DCF
+            self.assertNotIn("company's Margin of Safety", res["response"])
+
+        asyncio.run(_run())
+
+    def test_copilot_mutual_fund_non_advisory_deflection(self):
+        """Tests that retail advisory queries on mutual funds yield fund-specific SEBI notices without stock jargon."""
+        import asyncio
+        from core.agents.copilot.investor_copilot import process_copilot_turn
+
+        async def _run():
+            res = await process_copilot_turn(
+                conversation_id="TEST-COPILOT-MF-DEFLECT",
+                user_message="Should I buy this fund right now?",
+                ticker="PPFAS_FLEXICAP_DIR",
+                asset_type="mutual_fund"
+            )
+            self.assertEqual(res["status"], "REGULATORY_DEFLECTED")
+            self.assertIn("Section 2(u)", res["response"])
+            self.assertIn("Look-Through Forensic Breakdown", res["response"])
+            self.assertIn("Distributor Fee Drag", res["response"])
+            # MUST NOT mention single stock DCF or the company's balance sheet
+            self.assertNotIn("break down the company's Margin of Safety", res["response"])
+
+        asyncio.run(_run())
+
+    def test_copilot_mutual_fund_section_awareness(self):
+        """Tests that clicking Copilot within specific sections yields section-anchored diagnostic intelligence."""
+        import asyncio
+        from core.agents.copilot.investor_copilot import process_copilot_turn
+
+        async def _run():
+            # 1. Fee Drag Section
+            res_fee = await process_copilot_turn(
+                conversation_id="TEST-COPILOT-SEC-FEE",
+                user_message="Explain the fee impact.",
+                ticker="PPFAS_FLEXICAP_DIR",
+                asset_type="mutual_fund",
+                section="fee_drag",
+                section_label="Intermediary Fee Drag"
+            )
+            self.assertIn(res_fee["status"], ["COMPLETED", "DETERMINISTIC_FALLBACK"])
+            self.assertIn("Fee Drag", res_fee["response"])
+
+            # 2. Active Share Section
+            res_as = await process_copilot_turn(
+                conversation_id="TEST-COPILOT-SEC-AS",
+                user_message="Is this fund hugging the benchmark?",
+                ticker="PPFAS_FLEXICAP_DIR",
+                asset_type="mutual_fund",
+                section="active_share",
+                section_label="Active Share & Closet Indexing"
+            )
+            self.assertIn(res_as["status"], ["COMPLETED", "DETERMINISTIC_FALLBACK"])
+            self.assertIn("Active Share", res_as["response"])
+
+            # 3. Look-Through Accounting Risk (ASRI) Section
+            res_asri = await process_copilot_turn(
+                conversation_id="TEST-COPILOT-SEC-ASRI",
+                user_message="What are the accounting red flags?",
+                ticker="PPFAS_FLEXICAP_DIR",
+                asset_type="mutual_fund",
+                section="asri_solvency",
+                section_label="Accounting Risk (ASRI)"
+            )
+            self.assertIn(res_asri["status"], ["COMPLETED", "DETERMINISTIC_FALLBACK"])
+            self.assertIn("Accounting Risk", res_asri["response"])
 
         asyncio.run(_run())
 

@@ -89,44 +89,70 @@
           Aggregated directly from verified 7-pillar institutional stock dossiers in reports.db.
         </div>
       </div>
-      <button id="btnReauditFund" onclick="triggerFundReaudit('{{ scheme.scheme_code }}')" class="btn btn-sm btn-outline-primary" style="display: inline-flex; align-items: center; gap: 6px; border-radius: 9999px; font-weight: 600;">
-        <span>🔄</span> Re-Audit Look-Through
-      </button>
+      <div style="display: flex; gap: 8px; align-items: center; flex-wrap: wrap;">
+        <button onclick="openCopilot('{{ scheme.scheme_code }}', 'mutual_fund', 'lookthrough_metrics', 'Look-Through Metrics', 'Audit the 7-pillar look-through metrics for this fund')" class="btn btn-sm" style="background: rgba(168, 85, 247, 0.15); color: #c084fc; border: 1px solid rgba(168, 85, 247, 0.4); border-radius: 9999px; font-weight: 600; display: inline-flex; align-items: center; gap: 5px; cursor: pointer;">
+          <span>🤖</span> Ask Copilot
+        </button>
+        <button id="btnReauditFund" onclick="triggerFundReaudit('{{ scheme.scheme_code }}')" class="btn btn-sm btn-outline-primary" style="display: inline-flex; align-items: center; gap: 6px; border-radius: 9999px; font-weight: 600;">
+          <span>🔄</span> Re-Audit Look-Through
+        </button>
+      </div>
     </div>
 
     <!-- 4-Card Forensic Meter Strip -->
     <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 12px; margin-bottom: 20px;">
-      <div style="background: rgba(15, 23, 42, 0.7); border: 1px solid rgba(255, 255, 255, 0.08); border-radius: 12px; padding: 14px;">
-        <div style="font-size: 11px; color: #94a3b8; text-transform: uppercase; font-weight: 600;">Weighted Moat Index</div>
-        <div style="font-size: 24px; font-weight: 800; color: #c084fc; margin: 2px 0;">{{ forensic_dossier.weighted_moat_score }}<span style="font-size: 13px; color: #64748b;">/100</span></div>
-        <div style="font-size: 11px; color: #64748b;">Wide & Moderate Moat capital</div>
+      <div style="background: rgba(15, 23, 42, 0.7); border: 1px solid rgba(255, 255, 255, 0.08); border-radius: 12px; padding: 14px; display: flex; flex-direction: column; justify-content: space-between;">
+        <div>
+          <div style="font-size: 11px; color: #94a3b8; text-transform: uppercase; font-weight: 600;">Weighted Moat Index</div>
+          <div style="font-size: 24px; font-weight: 800; color: #c084fc; margin: 2px 0;">{{ forensic_dossier.weighted_moat_score }}<span style="font-size: 13px; color: #64748b;">/100</span></div>
+          <div style="font-size: 11px; color: #64748b;">Wide & Moderate Moat capital</div>
+        </div>
+        <button onclick="openCopilot('{{ scheme.scheme_code }}', 'mutual_fund', 'moat_index', 'Weighted Moat Index', 'Explain the fund\'s Weighted Moat Index and constituent moat quality')" style="margin-top: 8px; background: none; border: none; color: #38bdf8; font-size: 11px; cursor: pointer; padding: 0; text-align: left; display: inline-flex; align-items: center; gap: 3px;">
+          Ask Copilot ↗
+        </button>
       </div>
 
-      <div style="background: rgba(15, 23, 42, 0.7); border: 1px solid rgba(255, 255, 255, 0.08); border-radius: 12px; padding: 14px;">
-        <div style="font-size: 11px; color: #94a3b8; text-transform: uppercase; font-weight: 600;">Accounting Risk (ASRI)</div>
-        <div style="font-size: 24px; font-weight: 800; color: {% if forensic_dossier.accounting_risk_index <= 5.0 %}#10b981{% elif forensic_dossier.accounting_risk_index <= 15.0 %}#f59e0b{% else %}#ef4444{% endif %}; margin: 2px 0;">
-          {{ forensic_dossier.accounting_risk_index }}%
+      <div style="background: rgba(15, 23, 42, 0.7); border: 1px solid rgba(255, 255, 255, 0.08); border-radius: 12px; padding: 14px; display: flex; flex-direction: column; justify-content: space-between;">
+        <div>
+          <div style="font-size: 11px; color: #94a3b8; text-transform: uppercase; font-weight: 600;">Accounting Risk (ASRI)</div>
+          <div style="font-size: 24px; font-weight: 800; color: {% if forensic_dossier.accounting_risk_index <= 5.0 %}#10b981{% elif forensic_dossier.accounting_risk_index <= 15.0 %}#f59e0b{% else %}#ef4444{% endif %}; margin: 2px 0;">
+            {{ forensic_dossier.accounting_risk_index }}%
+          </div>
+          <div style="font-size: 11px; color: {% if forensic_dossier.accounting_risk_index <= 5.0 %}#10b981{% else %}#ef4444{% endif %}; font-weight: 600;">
+            {% if forensic_dossier.accounting_risk_index <= 5.0 %}Institutional Prudence{% elif forensic_dossier.accounting_risk_index <= 15.0 %}Moderate Leverage{% else %}Fiduciary Fragility Warning{% endif %}
+          </div>
         </div>
-        <div style="font-size: 11px; color: {% if forensic_dossier.accounting_risk_index <= 5.0 %}#10b981{% else %}#ef4444{% endif %}; font-weight: 600;">
-          {% if forensic_dossier.accounting_risk_index <= 5.0 %}Institutional Prudence{% elif forensic_dossier.accounting_risk_index <= 15.0 %}Moderate Leverage{% else %}Fiduciary Fragility Warning{% endif %}
-        </div>
+        <button onclick="openCopilot('{{ scheme.scheme_code }}', 'mutual_fund', 'asri_solvency', 'Accounting Risk (ASRI)', 'Which constituent holdings drive the ASRI accounting risk in this fund?')" style="margin-top: 8px; background: none; border: none; color: #38bdf8; font-size: 11px; cursor: pointer; padding: 0; text-align: left; display: inline-flex; align-items: center; gap: 3px;">
+          Ask Copilot ↗
+        </button>
       </div>
 
-      <div style="background: rgba(15, 23, 42, 0.7); border: 1px solid rgba(255, 255, 255, 0.08); border-radius: 12px; padding: 14px;">
-        <div style="font-size: 11px; color: #94a3b8; text-transform: uppercase; font-weight: 600;">Margin of Safety (DCF)</div>
-        <div style="font-size: 24px; font-weight: 800; color: {% if forensic_dossier.margin_of_safety_pct >= 0 %}#10b981{% elif forensic_dossier.margin_of_safety_pct >= -15 %}#f59e0b{% else %}#ef4444{% endif %}; margin: 2px 0;">
-          {{ "{:+.1f}".format(forensic_dossier.margin_of_safety_pct) }}%
+      <div style="background: rgba(15, 23, 42, 0.7); border: 1px solid rgba(255, 255, 255, 0.08); border-radius: 12px; padding: 14px; display: flex; flex-direction: column; justify-content: space-between;">
+        <div>
+          <div style="font-size: 11px; color: #94a3b8; text-transform: uppercase; font-weight: 600;">Margin of Safety (DCF)</div>
+          <div style="font-size: 24px; font-weight: 800; color: {% if forensic_dossier.margin_of_safety_pct >= 0 %}#10b981{% elif forensic_dossier.margin_of_safety_pct >= -15 %}#f59e0b{% else %}#ef4444{% endif %}; margin: 2px 0;">
+            {{ "{:+.1f}".format(forensic_dossier.margin_of_safety_pct) }}%
+          </div>
+          <div style="font-size: 11px; color: #64748b;">Intrinsic value discount vs price</div>
         </div>
-        <div style="font-size: 11px; color: #64748b;">Intrinsic value discount vs price</div>
+        <button onclick="openCopilot('{{ scheme.scheme_code }}', 'mutual_fund', 'margin_of_safety', 'Margin of Safety', 'Evaluate the weighted DCF Margin of Safety for this fund\'s portfolio')" style="margin-top: 8px; background: none; border: none; color: #38bdf8; font-size: 11px; cursor: pointer; padding: 0; text-align: left; display: inline-flex; align-items: center; gap: 3px;">
+          Ask Copilot ↗
+        </button>
       </div>
 
-      <div style="background: rgba(15, 23, 42, 0.7); border: 1px solid rgba(255, 255, 255, 0.08); border-radius: 12px; padding: 14px;">
-        <div style="font-size: 11px; color: #94a3b8; text-transform: uppercase; font-weight: 600;">Promoter Pledge Exposure</div>
-        <div style="font-size: 24px; font-weight: 800; color: {% if forensic_dossier.promoter_pledge_exposure_pct <= 2.0 %}#10b981{% else %}#ef4444{% endif %}; margin: 2px 0;">
-          {{ forensic_dossier.promoter_pledge_exposure_pct }}%
+      <div style="background: rgba(15, 23, 42, 0.7); border: 1px solid rgba(255, 255, 255, 0.08); border-radius: 12px; padding: 14px; display: flex; flex-direction: column; justify-content: space-between;">
+        <div>
+          <div style="font-size: 11px; color: #94a3b8; text-transform: uppercase; font-weight: 600;">Promoter Pledge Exposure</div>
+          <div style="font-size: 24px; font-weight: 800; color: {% if forensic_dossier.promoter_pledge_exposure_pct <= 2.0 %}#10b981{% else %}#ef4444{% endif %}; margin: 2px 0;">
+            {{ forensic_dossier.promoter_pledge_exposure_pct }}%
+          </div>
+          <div style="font-size: 11px; color: #64748b;">Capital in high-pledge promoters</div>
         </div>
-        <div style="font-size: 11px; color: #64748b;">Capital in high-pledge promoters</div>
+        <button onclick="openCopilot('{{ scheme.scheme_code }}', 'mutual_fund', 'promoter_pledge', 'Promoter Pledge Exposure', 'Are there any promoter pledging or corporate governance red flags in underlying holdings?')" style="margin-top: 8px; background: none; border: none; color: #38bdf8; font-size: 11px; cursor: pointer; padding: 0; text-align: left; display: inline-flex; align-items: center; gap: 3px;">
+          Ask Copilot ↗
+        </button>
       </div>
+    </div>
     <!-- Deep-Dive Stock Audit Option Card (Requirement 1 & 2) -->
     {% if credit_quote %}
     <div style="background: rgba(15, 23, 42, 0.7); border: 1px solid rgba(168, 85, 247, 0.35); border-radius: 12px; padding: 18px 20px; margin-bottom: 20px; box-shadow: 0 4px 16px rgba(0, 0, 0, 0.2);">
@@ -233,8 +259,11 @@
             Equity holdings evaluated via Forensic Equity Engine; Debt/bonds evaluated via Credit & Solvency Engine.
           </div>
         </div>
-        <!-- Sleeve Weight Tags -->
-        <div style="display: flex; gap: 8px; font-size: 12px; font-weight: 600;">
+        <!-- Sleeve Weight Tags & Copilot Trigger -->
+        <div style="display: flex; gap: 8px; font-size: 12px; font-weight: 600; align-items: center; flex-wrap: wrap;">
+          <button onclick="openCopilot('{{ scheme.scheme_code }}', 'mutual_fund', 'holdings', 'Constituent Holdings', 'Analyze the dual-sleeve constituent allocation and top holdings of this fund')" class="btn btn-sm" style="background: rgba(14, 165, 233, 0.15); color: #38bdf8; border: 1px solid rgba(14, 165, 233, 0.4); border-radius: 9999px; font-weight: 600; font-size: 11px; padding: 3px 10px; cursor: pointer; display: inline-flex; align-items: center; gap: 4px;">
+            <span>🤖</span> Ask Copilot
+          </button>
           <span style="background: rgba(14, 165, 233, 0.15); color: #38bdf8; padding: 4px 10px; border-radius: 6px;">
             Equity: {{ lookthrough.sleeve_breakdown.equity_weight_pct }}% (Score: {{ lookthrough.sleeve_breakdown.equity_sleeve_score }})
           </span>
@@ -301,9 +330,14 @@
       
       <!-- Pillar 2: Active Share & Closet Indexing -->
       <div style="background: rgba(30, 41, 59, 0.4); border: 1px solid rgba(255, 255, 255, 0.08); border-radius: 14px; padding: 22px;">
-        <h2 style="font-size: 16px; font-weight: 700; color: #f8fafc; margin-bottom: 4px;">
-          02: True Diversification & Active Share
-        </h2>
+        <div style="display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 4px; gap: 10px;">
+          <h2 style="font-size: 16px; font-weight: 700; color: #f8fafc; margin: 0;">
+            02: True Diversification & Active Share
+          </h2>
+          <button onclick="openCopilot('{{ scheme.scheme_code }}', 'mutual_fund', 'active_share', 'Active Share & Closet Indexing', 'Is this fund exhibiting benchmark hugging or closet indexing based on its Active Share?')" class="btn btn-sm" style="background: rgba(14, 165, 233, 0.15); color: #38bdf8; border: 1px solid rgba(14, 165, 233, 0.4); border-radius: 9999px; font-weight: 600; font-size: 11px; padding: 2px 8px; cursor: pointer; display: inline-flex; align-items: center; gap: 3px;">
+            <span>🤖</span> Copilot
+          </button>
+        </div>
         <div style="font-size: 12px; color: #64748b; margin-bottom: 16px;">
           Exposing Closet Indexing: Active Share AS = 0.5 × ∑|w_fund - w_bench|
         </div>
@@ -332,9 +366,14 @@
 
       <!-- Pillar 3 & 4: Risk-Adjusted Alpha & Asymmetrical Downside Resilience -->
       <div style="background: rgba(30, 41, 59, 0.4); border: 1px solid rgba(255, 255, 255, 0.08); border-radius: 14px; padding: 22px;">
-        <h2 style="font-size: 16px; font-weight: 700; color: #f8fafc; margin-bottom: 4px;">
-          03 & 04: Risk-Adjusted Alpha & Downside Capture
-        </h2>
+        <div style="display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 4px; gap: 10px;">
+          <h2 style="font-size: 16px; font-weight: 700; color: #f8fafc; margin: 0;">
+            03 & 04: Risk-Adjusted Alpha & Downside Capture
+          </h2>
+          <button onclick="openCopilot('{{ scheme.scheme_code }}', 'mutual_fund', 'downside_capture', 'Downside Capture & Risk Alpha', 'How does this fund perform during market drawdowns based on its Downside Capture and Sortino ratio?')" class="btn btn-sm" style="background: rgba(14, 165, 233, 0.15); color: #38bdf8; border: 1px solid rgba(14, 165, 233, 0.4); border-radius: 9999px; font-weight: 600; font-size: 11px; padding: 2px 8px; cursor: pointer; display: inline-flex; align-items: center; gap: 3px;">
+            <span>🤖</span> Copilot
+          </button>
+        </div>
         <div style="font-size: 12px; color: #64748b; margin-bottom: 16px;">
           Evaluating asymmetrical compounding: Downside Capture Ratio vs Upside Capture Ratio.
         </div>
@@ -381,10 +420,15 @@
     <div style="background: rgba(30, 41, 59, 0.4); border: 1px solid rgba(255, 255, 255, 0.08); border-radius: 14px; padding: 24px;">
       <div style="display: flex; justify-content: space-between; align-items: flex-start; flex-wrap: wrap; gap: 12px; margin-bottom: 16px;">
         <div>
-          <h2 style="font-size: 18px; font-weight: 700; color: #f8fafc; margin: 0;">
-            05: Intermediary Fee Drag & Wealth Destruction
-          </h2>
-          <div style="font-size: 13px; color: #64748b;">
+          <div style="display: flex; align-items: center; gap: 10px; flex-wrap: wrap;">
+            <h2 style="font-size: 18px; font-weight: 700; color: #f8fafc; margin: 0;">
+              05: Intermediary Fee Drag & Wealth Destruction
+            </h2>
+            <button onclick="openCopilot('{{ scheme.scheme_code }}', 'mutual_fund', 'fee_drag', 'Intermediary Fee Drag', 'Analyze the direct vs regular plan fee drag and compounded wealth lost over time')" class="btn btn-sm" style="background: rgba(14, 165, 233, 0.15); color: #38bdf8; border: 1px solid rgba(14, 165, 233, 0.4); border-radius: 9999px; font-weight: 600; font-size: 11px; padding: 3px 10px; cursor: pointer; display: inline-flex; align-items: center; gap: 4px;">
+              <span>🤖</span> Ask Copilot
+            </button>
+          </div>
+          <div style="font-size: 13px; color: #64748b; margin-top: 4px;">
             Direct Plan vs Regular Plan: Compounded wealth transfer to distributor commissions over time.
           </div>
         </div>
@@ -431,13 +475,18 @@
     {% if forensic_dossier and forensic_dossier.dossier_text %}
     <div style="background: rgba(30, 41, 59, 0.4); border: 1px solid rgba(168, 85, 247, 0.25); border-radius: 14px; padding: 26px;">
       <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 18px; flex-wrap: wrap; gap: 10px;">
-        <div>
-          <h2 style="font-size: 18px; font-weight: 700; color: #f8fafc; margin: 0;">
-            06: Institutional Forensic Qualitative Audit Dossier
-          </h2>
-          <div style="font-size: 13px; color: #94a3b8;">
-            Synthesized by Chief Forensic Officer (Gemini AI) grounded in 7-pillar look-through data.
+        <div style="display: flex; align-items: center; gap: 10px; flex-wrap: wrap;">
+          <div>
+            <h2 style="font-size: 18px; font-weight: 700; color: #f8fafc; margin: 0;">
+              06: Institutional Forensic Qualitative Audit Dossier
+            </h2>
+            <div style="font-size: 13px; color: #94a3b8; margin-top: 2px;">
+              Synthesized by Chief Forensic Officer (Gemini AI) grounded in 7-pillar look-through data.
+            </div>
           </div>
+          <button onclick="openCopilot('{{ scheme.scheme_code }}', 'mutual_fund', 'dossier_narrative', 'Forensic Audit Narrative', 'Synthesize the key fiduciary findings and qualitative red flags from the audit narrative')" class="btn btn-sm" style="background: rgba(168, 85, 247, 0.15); color: #c084fc; border: 1px solid rgba(168, 85, 247, 0.4); border-radius: 9999px; font-weight: 600; font-size: 11px; padding: 3px 10px; cursor: pointer; display: inline-flex; align-items: center; gap: 4px;">
+            <span>🤖</span> Ask Copilot
+          </button>
         </div>
         <span style="font-size: 11px; font-weight: 600; color: #c084fc; background: rgba(168, 85, 247, 0.15); border: 1px solid rgba(168, 85, 247, 0.3); padding: 4px 10px; border-radius: 6px;">
           Audited: {{ (forensic_dossier.last_audited_at|string)[:16] }}

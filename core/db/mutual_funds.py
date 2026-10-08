@@ -212,6 +212,11 @@ def get_mutual_fund_scheme(scheme_code: str) -> Optional[Dict[str, Any]]:
         cursor.execute(sql, (clean_code,))
         row = cursor.fetchone()
         if not row:
+            # Resilient fallback: match prefix or substring in code or scheme_name
+            sql_fallback = "SELECT * FROM mutual_fund_schemes WHERE scheme_code LIKE %s OR scheme_name ILIKE %s LIMIT 1" if use_pg else "SELECT * FROM mutual_fund_schemes WHERE scheme_code LIKE ? OR scheme_name LIKE ? LIMIT 1"
+            cursor.execute(sql_fallback, (f"{clean_code}%", f"%{clean_code}%"))
+            row = cursor.fetchone()
+        if not row:
             return None
         return clean_dict_row(cursor, row)
     except Exception as e:
@@ -1551,6 +1556,10 @@ def get_fund_forensic_dossier(scheme_code: str) -> Optional[Dict[str, Any]]:
         sql = "SELECT * FROM fund_forensic_dossiers WHERE scheme_code = %s" if use_pg else "SELECT * FROM fund_forensic_dossiers WHERE scheme_code = ?"
         cursor.execute(sql, (clean_code,))
         row = cursor.fetchone()
+        if not row:
+            sql_fallback = "SELECT * FROM fund_forensic_dossiers WHERE scheme_code LIKE %s LIMIT 1" if use_pg else "SELECT * FROM fund_forensic_dossiers WHERE scheme_code LIKE ? LIMIT 1"
+            cursor.execute(sql_fallback, (f"{clean_code}%",))
+            row = cursor.fetchone()
         if not row:
             return None
         res = clean_dict_row(cursor, row)
