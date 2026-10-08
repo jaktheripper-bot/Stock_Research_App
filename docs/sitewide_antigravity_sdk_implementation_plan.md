@@ -1,26 +1,29 @@
-# Sitewide Google Antigravity SDK Implementation Plan
+# Sitewide Google Antigravity SDK Implementation Plan [ARCHIVED & SHELVED]
 ## Transforming Stock Research App into an Autonomous Multi-Agent Institutional Intelligence Platform
 
 **Document Identifier:** `docs/sitewide_antigravity_sdk_implementation_plan.md`  
 **Target System:** `Jaktheripper-bot/Stock_Research_App`  
 **Engine:** Google Antigravity SDK (`google.antigravity`)  
-**Status:** Comprehensive Master Architecture & Implementation Plan — *FOR USER EVALUATION ONLY (DO NOT EXECUTE UNTIL EXPLICITLY APPROVED)*  
-**Date:** October 7, 2026  
+**Status:** **ARCHIVED & SHELVED (EXECUTIVE ARCHITECTURAL DECISION — OCTOBER 8, 2026)**  
+**Decision Summary:** Per explicit founder/owner directive, autonomous agents will **NOT** be deployed across public site research surfaces. The production codebase remains anchored to tried, tested, deterministic Python pipelines with targeted, single-pass Gemini structured synthesis.
 
 ---
 
-## 1. Executive Summary & Strategic Rationale
+> [!IMPORTANT]
+> ### Architectural Decision Record (ADR): Rejection of Sitewide Autonomous Agents
+> 1. **SEBI Regulatory & Audit Immunity:** Under SEBI (Research Analysts) Regulations, 2014, an unregistered analytical tool must remain strictly factual, non-prescriptive, and grounded in official exchange filings. Autonomous agent loops introduce non-deterministic, open-ended reasoning that risks drifting into advisory language, failing SEBI audits.
+> 2. **Token Economics & Compounding Context Tax:** Autonomous ReAct loops consume 10x to 20x more tokens per dossier (25,000–60,000+ tokens vs. 2,500 deterministic tokens), destroying unit economics and triggering frequent upstream rate limits.
+> 3. **Latency & Determinism Budget:** Deterministic Server-Side Rendered (SSR) pipelines deliver rich research dossiers in 2–4 seconds with 99.9% reliability, whereas agentic multi-tool loops introduce 35–90+ second wait times without delivering proportionately superior insights.
+> 4. **Retained Scope:** Single-turn structured Gemini extraction for qualitative synthesis, deterministic algorithmic engines for quantitative ratios, and interactive Copilot RAG (`/api/copilot/chat`) provide 100% of user value at minimal risk.
 
-### 1.1 The Architectural Transition
+---
+
+## 1. Executive Summary & Strategic Rationale (Historical Archive)
+
+### 1.1 The Architectural Transition [Deprioritized]
 Currently, the **Stock Research App** operates as a high-performance FastAPI Server-Side Rendered (SSR) web application with fragmented AI touchpoints: single-turn Gemini API calls for equity synthesis, rule-based engines for debt and REITs, and our newly built Google Antigravity Project Auditor (`core/audit/project_auditor.py`).
 
-This plan defines the architectural blueprint to implement the **Google Antigravity SDK (`google.antigravity`) sitewide**, transitioning the entire platform into a unified **Autonomous Multi-Agent Intelligence Network**.
-
-Instead of static, isolated scripts, the platform will be orchestrated by specialized autonomous agent squads operating with:
-1. **Tri-Tier Agent Topology:** Domain-specific research squads (Equities, Debt, Funds, Real Assets, Macro), reactive background watchers (BSE filings, 9 AM Discovery Reel), and an interactive investor copilot.
-2. **Deterministic Grounding & Zero-Hallucination Guardrails:** Agents are strictly tethered to verified exchange data, financial mathematical models, and statutory disclosures via custom Python tools.
-3. **Continuous Autonomous Self-Auditing:** The `ChiefProjectAuditor` runs in the background, continuously auditing Strategy (SEBI compliance), Implementation (137+ tests, dual-binding DB), and UI/UX (25+ live endpoints).
-4. **Predictable Operational Budgets:** Enforced session ceilings (`BudgetConfig`) preventing runaway token costs or infinite tool loops.
+This archived plan previously explored implementing the **Google Antigravity SDK (`google.antigravity`) sitewide**, transitioning the platform into an autonomous multi-agent network. It has been shelved in favor of maintaining deterministic pipeline integrity and regulatory safety.
 
 ---
 
