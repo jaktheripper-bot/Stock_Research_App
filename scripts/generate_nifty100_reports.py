@@ -53,14 +53,19 @@ def is_report_fresh(cached_report: Dict[str, Any], max_age_days: int = 14) -> bo
     """Checks whether cached report timestamp is within the acceptable TTL window."""
     if not cached_report or not cached_report.get("report_text"):
         return False
-    raw_ts = cached_report.get("timestamp")
+    raw_ts = cached_report.get("timestamp") or cached_report.get("raw_timestamp")
     if not raw_ts:
         return False
     try:
         if isinstance(raw_ts, datetime):
             dt = raw_ts
         elif isinstance(raw_ts, str):
-            dt = datetime.fromisoformat(raw_ts.replace("Z", "+00:00"))
+            clean_ts = raw_ts.replace("Z", "+00:00").strip()
+            # Support SQLite standard format YYYY-MM-DD HH:MM:SS
+            if " " in clean_ts and "T" not in clean_ts:
+                dt = datetime.strptime(clean_ts[:19], "%Y-%m-%d %H:%M:%S")
+            else:
+                dt = datetime.fromisoformat(clean_ts)
         else:
             return False
         if dt.tzinfo is None:

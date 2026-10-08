@@ -210,16 +210,90 @@ def upload_sqlite_backup_to_storage(sqlite_path: str, supabase_url: str, service
         logger.error(f"Failed to upload backup to Supabase Storage: {e}")
         return False
 
+def pull_from_supabase_rest(sqlite_path: str, supabase_url: str, service_key: str) -> int:
+    """Pulls all reports from Supabase PostgREST table into local SQLite database."""
+    import requests
+    headers = {
+        "apikey": service_key,
+        "Authorization": f"Bearer {service_key}"
+    }
+    url = f"{supabase_url.rstrip('/')}/rest/v1/reports"
+    logger.info(f"Pulling reports from Supabase REST at {url}...")
+    resp = requests.get(url, headers=headers, timeout=20)
+    if resp.status_code != 200:
+        logger.error(f"Failed to fetch reports from Supabase: {resp.status_code} {resp.text}")
+        return 0
+    
+    rows = resp.json()
+    if not rows:
+        logger.info("No reports found in Supabase.")
+        return 0
+
+    conn = sqlite3.connect(sqlite_path)
+    cursor = conn.cursor()
+    cursor.execute("""
+        CREATE TABLE IF NOT EXISTS reports (
+            ticker TEXT PRIMARY KEY,
+            short_name TEXT,
+            report_text TEXT,
+            timestamp DATETIME DEFAULT CURRENT_TIMESTAMP,
+            baseline_price REAL,
+            baseline_pe TEXT,
+            baseline_mcap REAL,
+            latest_announcement TEXT,
+            citations_json TEXT
+        )
+    """)
+    inserted = 0
+    for r in rows:
+        cursor.execute("""
+            INSERT INTO reports (
+                ticker, short_name, report_text, timestamp, baseline_price,
+                baseline_pe, baseline_mcap, latest_announcement, citations_json
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+            ON CONFLICT (ticker) DO UPDATE SET
+                short_name = excluded.short_name,
+                report_text = excluded.report_text,
+                timestamp = excluded.timestamp,
+                baseline_price = excluded.baseline_price,
+                baseline_pe = excluded.baseline_pe,
+                baseline_mcap = excluded.baseline_mcap,
+                latest_announcement = excluded.latest_announcement,
+                citations_json = excluded.citations_json;
+        """, (
+            r.get("ticker"), r.get("short_name"), r.get("report_text"), r.get("timestamp"),
+            r.get("baseline_price"), r.get("baseline_pe"), r.get("baseline_mcap"),
+            r.get("latest_announcement"), r.get("citations_json")
+        ))
+        inserted += 1
+    conn.commit()
+    conn.close()
+    logger.info(f"✅ Successfully pulled and merged {inserted} reports into {sqlite_path}.")
+    return inserted
+
 def main():
     import argparse
-    parser = argparse.ArgumentParser(description="Sync local SQLite reports to Supabase")
+    parser = argparse.ArgumentParser(description="Sync local SQLite reports to/from Supabase")
     parser.add_argument("--db-path", default=None, help="Path to SQLite file (default: reports.db)")
     parser.add_argument("--supabase-db-url", default=None, help="Direct PostgreSQL connection string")
     parser.add_argument("--supabase-url", default=None, help="Supabase Project REST URL")
     parser.add_argument("--upload-backup", action="store_true", help="Also upload SQLite file to Supabase Storage")
+    parser.add_argument("--pull", action="store_true", help="Pull existing reports from Supabase into local SQLite")
     args = parser.parse_args()
 
     sqlite_path = args.db_path or get_db_path()
+
+    sb_url = args.supabase_url or get_secret("SUPABASE_URL")
+    service_key = get_secret("SUPABASE_SERVICE_ROLE_KEY")
+
+    if args.pull:
+        if sb_url and service_key:
+            pull_from_supabase_rest(sqlite_path, sb_url, service_key)
+            return
+        else:
+            logger.error("SUPABASE_URL and SUPABASE_SERVICE_ROLE_KEY required for --pull.")
+            return
+
     reports = get_local_reports(sqlite_path)
     revisions = get_local_revisions(sqlite_path)
 
@@ -232,9 +306,6 @@ def main():
         return
 
     # Check REST connection
-    sb_url = args.supabase_url or get_secret("SUPABASE_URL")
-    service_key = get_secret("SUPABASE_SERVICE_ROLE_KEY")
-
     if sb_url and service_key:
         sync_via_rest(reports, sb_url, service_key)
         if args.upload_backup:
@@ -247,3 +318,4 @@ def main():
 
 if __name__ == "__main__":
     main()
+

@@ -135,6 +135,38 @@ def save_report_to_archive(stock_data: dict, report_text: str, announcement: str
             log_compliance_event(clean_sym)
         except Exception as ce:
             logger.error(f"Failed to record SEBI compliance event during archive: {ce}")
+
+        # Supabase Cloud Dual-Write Sync (PostgREST)
+        try:
+            from core.config import get_secret
+            sb_url = get_secret("SUPABASE_URL")
+            sb_key = get_secret("SUPABASE_SERVICE_ROLE_KEY")
+            if sb_url and sb_key and not get_supabase_url():
+                import requests
+                rest_url = f"{sb_url.rstrip('/')}/rest/v1/reports"
+                payload = {
+                    "ticker": clean_sym,
+                    "short_name": short_name,
+                    "report_text": report_text,
+                    "baseline_price": curr_price,
+                    "baseline_pe": str(pe or ""),
+                    "baseline_mcap": mcap,
+                    "latest_announcement": announcement,
+                    "citations_json": citations_json
+                }
+                requests.post(
+                    rest_url,
+                    headers={
+                        "apikey": sb_key,
+                        "Authorization": f"Bearer {sb_key}",
+                        "Content-Type": "application/json",
+                        "Prefer": "resolution=merge-duplicates"
+                    },
+                    json=payload,
+                    timeout=5
+                )
+        except Exception as sb_err:
+            logger.debug(f"Dual-write to Supabase REST skipped: {sb_err}")
     except Exception as e:
         try:
             conn.rollback()
@@ -249,6 +281,7 @@ def get_report_by_ticker(ticker: str) -> dict:
             "short_name": row[1] or row[0],
             "report_text": rep_text,
             "raw_timestamp": row[3],
+            "timestamp": row[3],
             "formatted_date": _format_timestamp(row[3]),
             "baseline_price": row[4],
             "baseline_pe": row[5],
