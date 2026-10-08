@@ -68,6 +68,9 @@ from core.db import (
     get_user_credits_balance,
     deduct_user_credits,
     add_user_credits,
+    is_ticker_unlocked_for_user,
+    unlock_ticker_for_user,
+    get_user_unlocked_tickers,
     get_active_discovery_reel,
     get_available_discovery_editions,
     save_discovery_reel,
@@ -701,13 +704,28 @@ def dossier_page(request: Request, ticker: str):
     # Strip redundant Health Matrix markdown list so only top colored badge pills appear
     prose_md = remove_health_matrix_text(prose_md)
 
+    # Determine institutional deep-dive unlock status (Pillars 03 & 05 + Thesis Drift)
+    web_user = _get_current_web_user(request)
+    is_deep_dive_unlocked = False
+    if _is_admin_authenticated(request):
+        is_deep_dive_unlocked = True
+    elif os.environ.get("TESTING") == "1" and (request.headers.get("x-unlock-preview") == "1" or request.query_params.get("unlocked") == "1"):
+        is_deep_dive_unlocked = True
+    elif web_user:
+        is_deep_dive_unlocked = is_ticker_unlocked_for_user(web_user.get("id", ""), canonical)
+
     # Convert report markdown into semantic HTML
     html_content = markdown.markdown(
         prose_md,
         extensions=["tables", "fenced_code", "nl2br"]
     )
     scrip_code = rep.get("scrip_code") or resolve_bse_scrip_code(canonical) or ""
-    html_content = wrap_html_with_collapsible_pillars(html_content, scrip_code)
+    html_content = wrap_html_with_collapsible_pillars(
+        html_content,
+        scrip_code=scrip_code,
+        is_deep_dive_unlocked=is_deep_dive_unlocked,
+        ticker=canonical
+    )
 
     mcap = rep.get("baseline_mcap")
     mcap_formatted = f"₹{format_inr(mcap)}" if mcap else "N/A"
@@ -831,6 +849,8 @@ def dossier_page(request: Request, ticker: str):
             "pead_data": pead_data,
             "linked_debt": linked_debt,
             "contagion_alert": contagion_alert,
+            "is_deep_dive_unlocked": is_deep_dive_unlocked,
+            "web_user": web_user,
         }
     )
 
@@ -2865,6 +2885,85 @@ async def api_synthesize(payload: SynthesizeRequest):
         "dossier_url": f"/dossier/{canonical}",
         "new_balance": new_balance,
         "message": f"Dossier for {canonical} synthesized successfully! 1 credit deducted."
+    })
+
+
+class UnlockDossierRequest(BaseModel):
+    user_id: Optional[str] = None
+
+
+@app.post("/api/dossier/unlock/{ticker}")
+async def api_unlock_dossier(
+    request: Request,
+    ticker: str,
+    payload: Optional[UnlockDossierRequest] = None
+):
+    """
+    Consumes 1 credit and permanently unlocks the institutional deep-dive tier
+    (Forensic Accounting Ledger, Reverse DCF Sandbox & Thesis Drift Migrations) for this equity.
+    """
+    clean_t = clean_ticker(ticker)
+    if not clean_t:
+        raise HTTPException(status_code=400, detail="Invalid ticker symbol.")
+
+    canonical = resolve_canonical_symbol(clean_t) or clean_t
+    web_user = _get_current_web_user(request)
+    uid = web_user.get("id") if web_user else (payload.user_id if payload else None)
+    if not uid:
+        raise HTTPException(
+            status_code=401,
+            detail="Sign in required to unlock institutional deep dives. You will receive 2 free welcome research credits."
+        )
+
+    clean_uid = str(uid).strip()
+    user = get_user_by_id(clean_uid)
+    if not user:
+        raise HTTPException(status_code=404, detail="User account not found. Please sign in.")
+
+    ok, new_bal, msg = unlock_ticker_for_user(user_id=clean_uid, ticker=canonical, amount=1.0)
+    if not ok:
+        raise HTTPException(status_code=402, detail=msg)
+
+    record_usage_event(
+        event_type="dossier_unlock",
+        ticker=canonical,
+        user_id=clean_uid,
+        details={"action": "deep_dive_unlock", "new_balance": new_bal}
+    )
+
+    return json_response_with_cache({
+        "success": True,
+        "ticker": canonical,
+        "new_balance": new_bal,
+        "message": msg
+    })
+
+
+@app.get("/api/dossier/status/{ticker}")
+async def api_dossier_status(request: Request, ticker: str):
+    """
+    Returns the unlock status of the requested ticker for the current user session.
+    """
+    clean_t = clean_ticker(ticker)
+    if not clean_t:
+        raise HTTPException(status_code=400, detail="Invalid ticker symbol.")
+
+    canonical = resolve_canonical_symbol(clean_t) or clean_t
+    web_user = _get_current_web_user(request)
+    is_unlocked = False
+
+    if _is_admin_authenticated(request):
+        is_unlocked = True
+    elif os.environ.get("TESTING") == "1" and (request.headers.get("x-unlock-preview") == "1" or request.query_params.get("unlocked") == "1"):
+        is_unlocked = True
+    elif web_user:
+        is_unlocked = is_ticker_unlocked_for_user(web_user.get("id", ""), canonical)
+
+    return json_response_with_cache({
+        "success": True,
+        "ticker": canonical,
+        "is_unlocked": is_unlocked,
+        "user_id": web_user.get("id") if web_user else None
     })
 
 

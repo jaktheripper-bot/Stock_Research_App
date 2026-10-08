@@ -66,7 +66,7 @@
         <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(130px, 1fr)); gap: 10px; margin-bottom: 16px;">
           <div style="background: rgba(15, 23, 42, 0.7); border: 1px solid rgba(255, 255, 255, 0.08); border-radius: 10px; padding: 10px 14px;">
             <div style="font-size: 10px; color: #94a3b8; text-transform: uppercase; font-weight: 600;">Composite Health</div>
-            <div style="font-size: 20px; font-weight: 800; color: #10b981;">{{ featured_fund.composite_health_score }}<span style="font-size: 12px; color: #64748b;">/100</span></div>
+            <div style="font-size: 20px; font-weight: 800; color: #10b981;">{% if featured_fund.composite_health_score is not none %}{{ featured_fund.composite_health_score }}<span style="font-size: 12px; color: #64748b;">/100</span>{% else %}<span style="font-size: 16px; color: #f59e0b;">Pending</span>{% endif %}</div>
           </div>
           <div style="background: rgba(15, 23, 42, 0.7); border: 1px solid rgba(255, 255, 255, 0.08); border-radius: 10px; padding: 10px 14px;">
             <div style="font-size: 10px; color: #94a3b8; text-transform: uppercase; font-weight: 600;">Weighted Moat</div>

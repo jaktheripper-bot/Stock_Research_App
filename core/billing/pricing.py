@@ -9,6 +9,7 @@ from typing import Dict, Any, List
 # Computational credit action cost schedule
 ACTION_COSTS: Dict[str, float] = {
     "LIVE_SYNTHESIS": 1.0,      # Full 7-pillar institutional synthesis + valuation + PDF
+    "DEEP_DIVE_UNLOCK": 1.0,    # Unlocks Forensic Ledger, Reverse DCF Sandbox & Thesis Drift
     "SURGICAL_REFRESH": 0.25,   # Pillars 5 & 6 announcement incremental delta (Free for Pro)
     "PDF_EXPORT": 0.0,          # Free for active and archived reports
     "ARCHIVE_READ": 0.0,        # Free archival retrieval

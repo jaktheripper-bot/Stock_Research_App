@@ -87,6 +87,9 @@ from core.db.users import (
     get_all_billables,
     get_revenue_analytics_summary,
     process_refund,
+    is_ticker_unlocked_for_user,
+    unlock_ticker_for_user,
+    get_user_unlocked_tickers,
 )
 
 from core.db.discovery import (
@@ -160,6 +163,9 @@ __all__ = [
     "add_user_credits",
     "get_user_transactions",
     "get_user_usage_history",
+    "is_ticker_unlocked_for_user",
+    "unlock_ticker_for_user",
+    "get_user_unlocked_tickers",
     # discovery reel
     "save_discovery_reel",
     "get_active_discovery_reel",

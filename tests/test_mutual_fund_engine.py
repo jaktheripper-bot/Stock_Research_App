@@ -36,8 +36,21 @@ class TestMutualFundEngine(unittest.TestCase):
         self.assertIsNotNone(dossier)
 
         lt = dossier["lookthrough"]
-        self.assertGreaterEqual(lt["composite_health_score"], 80.0)
-        self.assertEqual(lt["health_posture"], "INSTITUTIONAL_ALPHA")
+        # Under strict SEBI zero-hallucination directive: <70% coverage pauses composite score
+        self.assertFalse(lt["has_sufficient_coverage"])
+        self.assertIsNone(lt["composite_health_score"])
+        self.assertEqual(lt["health_posture"], "COVERAGE_PENDING")
+
+        # When verified reports exist for constituent equities, lookthrough unlocks
+        from unittest.mock import patch
+        with patch("core.db.reports.get_report_by_ticker") as mock_rep:
+            mock_rep.return_value = {"report_text": "### Health Matrix\nVerified 7-pillar report"}
+            unlocked_dossier = evaluate_mutual_fund_comprehensive("PPFAS_FLEXICAP_DIR")
+            unlocked_lt = unlocked_dossier["lookthrough"]
+            self.assertTrue(unlocked_lt["has_sufficient_coverage"])
+            self.assertIsNotNone(unlocked_lt["composite_health_score"])
+            self.assertGreaterEqual(unlocked_lt["composite_health_score"], 80.0)
+            self.assertEqual(unlocked_lt["health_posture"], "INSTITUTIONAL_ALPHA")
 
         # Verify sleeve breakdown
         sleeve = lt["sleeve_breakdown"]

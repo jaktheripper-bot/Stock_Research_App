@@ -19,3 +19,6 @@ scratch/
 *.code-workspace
 .cache/
 audits/
+
+# Manually supplied AMC portfolio workbooks (large, re-downloadable)
+data/amc_portfolios/

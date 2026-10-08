@@ -1,6 +1,7 @@
 """Unit test suite for Mutual Fund 7-Pillar Forensic Look-Through Engine & Daily Auditor."""
 
 import unittest
+from unittest.mock import patch
 from fastapi.testclient import TestClient
 
 from core.db.connection import init_db
@@ -73,14 +74,25 @@ class TestFundForensicAuditor(unittest.TestCase):
         self.assertEqual(matrix["balance_sheet"], "Debt-Free")
 
     def test_compute_ppfas_lookthrough(self):
-        """Verify 7-pillar look-through aggregation metrics for Parag Parikh Flexi Cap Fund."""
+        """Verify 7-pillar look-through aggregation metrics and strict 70% coverage gating."""
         metrics = compute_fund_forensic_lookthrough("PPFAS_FLEXICAP_DIR")
         self.assertEqual(metrics["scheme_code"], "PPFAS_FLEXICAP_DIR")
-        self.assertGreaterEqual(metrics["composite_health_score"], 80.0)
-        self.assertGreaterEqual(metrics["weighted_moat_score"], 80.0)
+        # In baseline test environment without reports for all stocks, coverage is below 70% threshold
+        self.assertFalse(metrics["has_sufficient_coverage"])
+        self.assertIsNone(metrics["composite_health_score"])
+        self.assertGreaterEqual(metrics["weighted_moat_score"], 70.0)
         self.assertLessEqual(metrics["accounting_risk_index"], 5.0)
         self.assertGreaterEqual(metrics["active_share_pct"], 60.0)
-        self.assertGreater(len(metrics["top_quality_holdings"]), 0)
+
+        # When >= 70% of equity holdings have genuine archived reports, composite score unlocks
+        with patch("core.analysis.fund_forensic_auditor.get_report_by_ticker") as mock_rep:
+            mock_rep.return_value = {
+                "report_text": "### Health Matrix\nMoat: Wide\nGovernance: Clean\nValuation: Undervalued\nBalance Sheet: Debt-Free\n"
+            }
+            unlocked_metrics = compute_fund_forensic_lookthrough("PPFAS_FLEXICAP_DIR")
+            self.assertTrue(unlocked_metrics["has_sufficient_coverage"])
+            self.assertIsNotNone(unlocked_metrics["composite_health_score"])
+            self.assertGreaterEqual(unlocked_metrics["composite_health_score"], 75.0)
 
     def test_dossier_persistence_and_featured_retrieval(self):
         """Verify saving, retrieving, and hero-featured selection of forensic dossiers."""

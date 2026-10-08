@@ -215,9 +215,10 @@ The implementation roadmap reconciles the platform's multi-asset competitive obj
 │                                                                        │
 │  [ACTIVE]    Task 1: Angel One SmartAPI Broker Gateway Integration    │
 │  [ACTIVE]    Task 2: Custom Website Vector Icon System (SVG Sprites)  │
-│  [ACTIVE]    Task 3: Mutual Fund 50-Scheme Expansion & Style Drift     │
-│  [ACTIVE]    Task 4: Capstone Multi-Asset Portfolio Audit Engine       │
-│  [ACTIVE]    Task 5: Research MSME Analysis Ingestion                  │
+│  [ACTIVE]    Task 3: Upload AMC Portfolio Disclosures (CSV/XLSX)       │
+│  [ACTIVE]    Task 4: Mutual Fund 50-Scheme Expansion & Style Drift     │
+│  [ACTIVE]    Task 5: Capstone Multi-Asset Portfolio Audit Engine       │
+│  [ACTIVE]    Task 6: Research MSME Analysis Ingestion                  │
 │  ────────────────────────────────────────────────────────────────────  │
 │  [COMPLETED] Phase 1 (Core): 7-Pillar Look-Through & Daily Fund Auditor│
 │  [COMPLETED] Phase 2: Equity-to-Debt Contagion Bridge                  │
@@ -231,7 +232,7 @@ The implementation roadmap reconciles the platform's multi-asset competitive obj
 
 ### 6.1 Active Pending Tasks (To Be Completed)
 
-The following 5 tasks constitute the remaining active engineering and design backlog. All items are deduplicated and prioritized by operational and regulatory importance:
+The following 6 tasks constitute the remaining active engineering and design backlog. All items are deduplicated and prioritized by operational and regulatory importance:
 
 #### Priority 1: Critical Exchange Integration (Awaiting Credentials)
 1. **Angel One SmartAPI Broker Gateway Integration:**
@@ -245,22 +246,31 @@ The following 5 tasks constitute the remaining active engineering and design bac
    - **Status:** Pending Design & Asset Generation
    - **Objective:** Eliminate inconsistent operating-system-dependent Unicode emojis across all web views, scorecards, headers, and exports. Replace them with a cohesive, institutional-grade vector SVG icon set (32 required glyphs across 5 categories: Forensic Dimension Matrix, Multi-Asset Class Directory, Navigation & Search, Actions & Terminal Controls, Behavioral & Diagnostic Status Badges).
 
-#### Priority 3: Multi-Asset Expansion (Remaining 19 Schemes & Style Drift Tracking)
-3. **Phase 1: Mutual Fund Universe Expansion to 50 Schemes & Quarterly Style Drift Ledger:**
+#### Priority 3: Data Ingestion & Mutual Fund Report Generation (Awaiting AMC Uploads)
+3. **Upload Monthly Portfolio Disclosures (CSVs/Excel) for Top 150 Funds:**
+   - **Target Files / Directories:** `data/amc_portfolios/<amc_key>/`, `core/ingestion/mf_portfolio_ingest.py`, `scripts/ingest_mf_portfolios.py`
+   - **Status:** Pending AMC Portfolio Disclosures Upload (XLS/XLSX/CSV)
+   - **Objective & Scope:**
+     - Download and deposit monthly portfolio disclosure workbooks/CSVs from major AMCs (SBI, HDFC, ICICI Prudential, Kotak, Axis, ABSL, UTI, Bandhan, Mirae, etc.) into their respective directories under `data/amc_portfolios/<amc_key>/`.
+     - Execute `./run.sh mf-ingest --target 150 --audit` to parse real granular constituent holdings, replace placeholder/default scores (score 68 for equities, flat 90 for debt), and synthesize verified institutional 6-pillar forensic look-through dossiers and qualitative narratives in `reports.db`.
+     - Enables deep fiduciary look-through across top 150 AUM schemes without relying on synthetic benchmark-proxy assumptions.
+
+#### Priority 4: Multi-Asset Expansion (Remaining Schemes & Style Drift Tracking)
+4. **Phase 1: Mutual Fund Universe Expansion to 50 Schemes & Quarterly Style Drift Ledger:**
    - **Target Files:** `core/db/mutual_funds.py`, `core/analysis/fund_forensic_auditor.py`
    - **Status:** In Progress (31 marquee schemes currently active; 19 remaining to reach top 50 AMFI target)
    - **Details:**
      - Expand curated portfolio look-through from 31 to 50 marquee schemes across Flexi Cap, Large & Mid Cap, Mid Cap, and Small Cap.
      - Implement **Fund Style Drift Tracking**: record historical quarterly look-through scores in `mutual_fund_schemes` to detect when fund managers dilute portfolio quality or drift from stated mandates over time.
 
-#### Priority 4: Flagship Platform Capstone (From Site Objective Comparison Analysis)
-4. **Phase 6: Capstone: Holistic Multi-Asset Portfolio Audit Engine (CAS / CSV Upload):**
+#### Priority 5: Flagship Platform Capstone (From Site Objective Comparison Analysis)
+5. **Phase 6: Capstone: Holistic Multi-Asset Portfolio Audit Engine (CAS / CSV Upload):**
    - **Target Files:** `core/analysis/portfolio_auditor.py`, `web/templates/portfolio_audit.html`, `web/main.py`
    - **Status:** Roadmap Phase (From `docs/Site Objective Comparison Analysis.md`)
    - **Objective:** Allow investors to import multi-asset holdings via CAS (Consolidated Account Statement) PDF/Excel or CSV, run all holdings through the 7-pillar equity engine, fund look-through, and debt contagion radar, and output a holistic portfolio health scorecard (net real post-tax yield, inflation drag, concentration risk, and capital preservation buffer).
 
-#### Priority 5: Strategic Scaling & Ingestion Research
-5. **Research MSME Analysis Ingestion:**
+#### Priority 6: Strategic Scaling & Ingestion Research
+6. **Research MSME Analysis Ingestion:**
    - **Target Files:** `core/msme/`
    - **Status:** Pre-development research
    - **Details:** Scope public API endpoints from SIDBI, MCA21, and TReDS for unlisted MSME supplier risk analysis. Zero runtime impact until explicit activation.

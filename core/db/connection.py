@@ -1621,6 +1621,35 @@ def init_db(force: bool = False):
                     cursor.execute("INSERT OR IGNORE INTO schema_migrations (version) VALUES ('v025_landing_pages_telemetry');")
                 conn.commit()
 
+            # Migration v026: User Unlocked Dossiers (Tiered Institutional Paywall)
+            if "v026_user_unlocked_dossiers" not in applied:
+                logger.info("Applying schema migration: v026_user_unlocked_dossiers...")
+                if supabase_url:
+                    cursor.execute("""
+                        CREATE TABLE IF NOT EXISTS user_unlocked_dossiers (
+                            id SERIAL PRIMARY KEY,
+                            user_id TEXT NOT NULL,
+                            ticker TEXT NOT NULL,
+                            unlocked_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
+                            UNIQUE(user_id, ticker)
+                        );
+                        CREATE INDEX IF NOT EXISTS idx_unlocked_dossiers_user ON user_unlocked_dossiers (user_id, ticker);
+                        INSERT INTO schema_migrations (version) VALUES ('v026_user_unlocked_dossiers') ON CONFLICT DO NOTHING;
+                    """)
+                else:
+                    cursor.execute("""
+                        CREATE TABLE IF NOT EXISTS user_unlocked_dossiers (
+                            id INTEGER PRIMARY KEY AUTOINCREMENT,
+                            user_id TEXT NOT NULL,
+                            ticker TEXT NOT NULL,
+                            unlocked_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+                            UNIQUE(user_id, ticker)
+                        );
+                    """)
+                    cursor.execute("CREATE INDEX IF NOT EXISTS idx_unlocked_dossiers_user ON user_unlocked_dossiers (user_id, ticker);")
+                    cursor.execute("INSERT OR IGNORE INTO schema_migrations (version) VALUES ('v026_user_unlocked_dossiers');")
+                conn.commit()
+
             _DB_INITIALIZED = True
             _INITIALIZED_DBS.add(target_key)
         except Exception as e:

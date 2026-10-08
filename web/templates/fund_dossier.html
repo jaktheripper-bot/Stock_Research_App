@@ -47,17 +47,47 @@
       </div>
 
       <!-- Health Score Gauge -->
+      <!-- Health Score Gauge -->
       <div style="text-align: right; background: rgba(15, 23, 42, 0.7); border: 1px solid rgba(255, 255, 255, 0.1); border-radius: 14px; padding: 16px 24px;">
         <div style="font-size: 11px; color: #94a3b8; text-transform: uppercase; font-weight: 600; margin-bottom: 4px;">Composite Health Score</div>
+        {% if lookthrough.has_sufficient_coverage and lookthrough.composite_health_score is not none %}
         <div style="font-size: 38px; font-weight: 900; line-height: 1; color: {% if lookthrough.composite_health_score >= 80 %}#10b981{% elif lookthrough.composite_health_score >= 65 %}#38bdf8{% elif lookthrough.composite_health_score >= 50 %}#f59e0b{% else %}#ef4444{% endif %};">
           {{ lookthrough.composite_health_score }}<span style="font-size: 18px; color: #64748b;">/100</span>
         </div>
         <div style="font-size: 12px; font-weight: 700; margin-top: 4px; color: {% if lookthrough.composite_health_score >= 80 %}#10b981{% elif lookthrough.composite_health_score >= 65 %}#38bdf8{% else %}#ef4444{% endif %};">
           {{ lookthrough.health_posture }}
         </div>
+        {% else %}
+        <div style="font-size: 24px; font-weight: 800; line-height: 1.2; color: #94a3b8; margin-top: 4px;">
+          Coverage Pending
+        </div>
+        <div style="font-size: 11.5px; font-weight: 600; margin-top: 4px; color: #f59e0b;">
+          {{ lookthrough.genuine_coverage_pct|default(0.0) }}% / 70.0% Verified
+        </div>
+        {% endif %}
       </div>
     </div>
   </div>
+
+  <!-- Honest Fiduciary Banner (When Constituent Coverage < 70%) -->
+  {% if not lookthrough.has_sufficient_coverage %}
+  <div style="background: rgba(245, 158, 11, 0.1); border: 1px solid rgba(245, 158, 11, 0.35); border-left: 4px solid #f59e0b; border-radius: 12px; padding: 18px 22px; margin-bottom: 24px; display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 14px;">
+    <div style="display: flex; align-items: center; gap: 12px;">
+      <span style="font-size: 26px;">🛡️</span>
+      <div>
+        <div style="font-weight: 800; color: #fbbf24; font-size: 15px; margin-bottom: 3px;">
+          Look-Through Forensic Audit pending underlying constituent coverage. Full holdings breakdown available below.
+        </div>
+        <div style="font-size: 12.5px; color: #cbd5e1; line-height: 1.5;">
+          Under SEBI RA 2014 Sec. 2(u) non-advisory standards, we strictly require verified 7-pillar institutional research on ≥70% of equity holdings (currently {{ lookthrough.genuine_coverage_pct|default(0.0) }}%) before issuing quantitative composite scores or qualitative AI audit narratives.
+        </div>
+      </div>
+    </div>
+    <a href="#holdingsTable" class="btn btn-secondary btn-sm" style="font-size: 12px; padding: 7px 16px; text-decoration: none; border-radius: 6px;">
+      View Holdings Breakdown ↓
+    </a>
+  </div>
+  {% endif %}
 
   <!-- Fiduciary Warnings Banner (if any) -->
   {% if lookthrough.warnings %}
@@ -99,6 +129,7 @@
       </div>
     </div>
 
+    {% if lookthrough.has_sufficient_coverage %}
     <!-- 4-Card Forensic Meter Strip -->
     <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 12px; margin-bottom: 20px;">
       <div style="background: rgba(15, 23, 42, 0.7); border: 1px solid rgba(255, 255, 255, 0.08); border-radius: 12px; padding: 14px; display: flex; flex-direction: column; justify-content: space-between;">
@@ -153,9 +184,65 @@
         </button>
       </div>
     </div>
+
+    <!-- Dual List: Moat Compounders vs Solvency Watchlist -->
+    <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 14px; margin-bottom: 20px;">
+      <!-- High Moat Compounders -->
+      <div style="background: rgba(15, 23, 42, 0.5); border: 1px solid rgba(255, 255, 255, 0.05); border-radius: 10px; padding: 14px;">
+        <div style="font-size: 12px; font-weight: 700; color: #10b981; margin-bottom: 8px; display: flex; align-items: center; gap: 6px;">
+          <span>🛡️</span> Fortress Moat Compounders (Top Quality Allocations)
+        </div>
+        <div style="display: flex; flex-direction: column; gap: 6px;">
+          {% for q in forensic_dossier.top_quality_holdings %}
+          <div style="display: flex; justify-content: space-between; align-items: center; font-size: 12px; padding: 4px 0; border-bottom: 1px solid rgba(255, 255, 255, 0.04);">
+            <a href="/dossier/{{ q.identifier }}" style="color: #38bdf8; text-decoration: none; font-weight: 600;">
+              {{ q.name }} ({{ q.identifier }})
+            </a>
+            <span style="color: #94a3b8;">{{ q.weight_pct }}% weight</span>
+          </div>
+          {% else %}
+          <div style="font-size: 12px; color: #64748b;">Diversified core holdings</div>
+          {% endfor %}
+        </div>
+      </div>
+
+      <!-- Solvency Watchlist -->
+      <div style="background: rgba(15, 23, 42, 0.5); border: 1px solid rgba(255, 255, 255, 0.05); border-radius: 10px; padding: 14px;">
+        <div style="font-size: 12px; font-weight: 700; color: #f59e0b; margin-bottom: 8px; display: flex; align-items: center; gap: 6px;">
+          <span>⚠️</span> Forensic Solvency & Valuation Watchlist
+        </div>
+        <div style="display: flex; flex-direction: column; gap: 6px;">
+          {% for r in forensic_dossier.top_risky_holdings %}
+          <div style="display: flex; justify-content: space-between; align-items: center; font-size: 12px; padding: 4px 0; border-bottom: 1px solid rgba(255, 255, 255, 0.04);">
+            <a href="/dossier/{{ r.identifier }}" style="color: #fca5a5; text-decoration: none; font-weight: 600;">
+              {{ r.name }} ({{ r.identifier }})
+            </a>
+            <span style="color: #ef4444; font-weight: 600;">{{ r.weight_pct }}% ({{ "{:+.0f}".format(r.mos_pct) }}% MoS)</span>
+          </div>
+          {% else %}
+          <div style="font-size: 12px; color: #10b981;">✓ Zero elevated forensic accounting or leverage anomalies detected</div>
+          {% endfor %}
+        </div>
+      </div>
+    </div>
+    {% else %}
+    <!-- Honest Scoped Pause Card for Look-Through Meters -->
+    <div style="background: rgba(15, 23, 42, 0.7); border: 1px solid rgba(148, 163, 184, 0.2); border-radius: 12px; padding: 22px; margin-bottom: 20px;">
+      <div style="display: flex; align-items: center; gap: 10px; margin-bottom: 8px;">
+        <span style="font-size: 20px;">⏸️</span>
+        <h3 style="font-size: 15px; font-weight: 700; color: #e2e8f0; margin: 0;">
+          Forensic Look-Through Meters Paused Pending Research Coverage
+        </h3>
+      </div>
+      <p style="font-size: 13.5px; color: #94a3b8; margin: 0; line-height: 1.6;">
+        Detailed aggregate metrics (Weighted Moat Index, Accounting Risk ASRI, DCF Margin of Safety, and Promoter Pledge Exposure) require audited 7-pillar research on ≥70% of equity holdings. Current verified constituent coverage is <strong>{{ lookthrough.genuine_coverage_pct|default(0.0) }}%</strong>.
+      </p>
+    </div>
+    {% endif %}
+
     <!-- Deep-Dive Stock Audit Option Card (Requirement 1 & 2) -->
     {% if credit_quote %}
-    <div style="background: rgba(15, 23, 42, 0.7); border: 1px solid rgba(168, 85, 247, 0.35); border-radius: 12px; padding: 18px 20px; margin-bottom: 20px; box-shadow: 0 4px 16px rgba(0, 0, 0, 0.2);">
+    <div style="background: rgba(15, 23, 42, 0.7); border: 1px solid rgba(168, 85, 247, 0.35); border-radius: 12px; padding: 18px 20px; margin-bottom: 10px; box-shadow: 0 4px 16px rgba(0, 0, 0, 0.2);">
       <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 14px;">
         <div style="flex: 1; min-width: 280px;">
           <div style="display: flex; align-items: center; gap: 8px; margin-bottom: 4px;">
@@ -200,48 +287,6 @@
       </div>
     </div>
     {% endif %}
-
-    <!-- Dual List: Moat Compounders vs Solvency Watchlist -->
-    <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 14px;">
-
-      <!-- High Moat Compounders -->
-      <div style="background: rgba(15, 23, 42, 0.5); border: 1px solid rgba(255, 255, 255, 0.05); border-radius: 10px; padding: 14px;">
-        <div style="font-size: 12px; font-weight: 700; color: #10b981; margin-bottom: 8px; display: flex; align-items: center; gap: 6px;">
-          <span>🛡️</span> Fortress Moat Compounders (Top Quality Allocations)
-        </div>
-        <div style="display: flex; flex-direction: column; gap: 6px;">
-          {% for q in forensic_dossier.top_quality_holdings %}
-          <div style="display: flex; justify-content: space-between; align-items: center; font-size: 12px; padding: 4px 0; border-bottom: 1px solid rgba(255, 255, 255, 0.04);">
-            <a href="/dossier/{{ q.identifier }}" style="color: #38bdf8; text-decoration: none; font-weight: 600;">
-              {{ q.name }} ({{ q.identifier }})
-            </a>
-            <span style="color: #94a3b8;">{{ q.weight_pct }}% weight</span>
-          </div>
-          {% else %}
-          <div style="font-size: 12px; color: #64748b;">Diversified core holdings</div>
-          {% endfor %}
-        </div>
-      </div>
-
-      <!-- Solvency Watchlist -->
-      <div style="background: rgba(15, 23, 42, 0.5); border: 1px solid rgba(255, 255, 255, 0.05); border-radius: 10px; padding: 14px;">
-        <div style="font-size: 12px; font-weight: 700; color: #f59e0b; margin-bottom: 8px; display: flex; align-items: center; gap: 6px;">
-          <span>⚠️</span> Forensic Solvency & Valuation Watchlist
-        </div>
-        <div style="display: flex; flex-direction: column; gap: 6px;">
-          {% for r in forensic_dossier.top_risky_holdings %}
-          <div style="display: flex; justify-content: space-between; align-items: center; font-size: 12px; padding: 4px 0; border-bottom: 1px solid rgba(255, 255, 255, 0.04);">
-            <a href="/dossier/{{ r.identifier }}" style="color: #fca5a5; text-decoration: none; font-weight: 600;">
-              {{ r.name }} ({{ r.identifier }})
-            </a>
-            <span style="color: #ef4444; font-weight: 600;">{{ r.weight_pct }}% ({{ "{:+.0f}".format(r.mos_pct) }}% MoS)</span>
-          </div>
-          {% else %}
-          <div style="font-size: 12px; color: #10b981;">✓ Zero elevated forensic accounting or leverage anomalies detected</div>
-          {% endfor %}
-        </div>
-      </div>
-    </div>
   </div>
   {% endif %}
 
@@ -278,7 +323,7 @@
 
       <!-- Granular Holdings Table -->
       <div style="overflow-x: auto; border: 1px solid rgba(255, 255, 255, 0.06); border-radius: 10px;">
-        <table style="width: 100%; border-collapse: collapse; text-align: left; font-size: 13px;">
+        <table id="holdingsTable" style="width: 100%; border-collapse: collapse; text-align: left; font-size: 13px;">
           <thead>
             <tr style="background: rgba(15, 23, 42, 0.6); border-bottom: 1px solid rgba(255, 255, 255, 0.08);">
               <th style="padding: 12px 16px; color: #94a3b8; font-weight: 600;">Identifier</th>
@@ -473,6 +518,7 @@
 
     <!-- Workspace 6: Institutional Forensic AI Audit Dossier Narrative -->
     {% if forensic_dossier and forensic_dossier.dossier_text %}
+    {% if lookthrough.has_sufficient_coverage %}
     <div style="background: rgba(30, 41, 59, 0.4); border: 1px solid rgba(168, 85, 247, 0.25); border-radius: 14px; padding: 26px;">
       <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 18px; flex-wrap: wrap; gap: 10px;">
         <div style="display: flex; align-items: center; gap: 10px; flex-wrap: wrap;">
@@ -498,6 +544,20 @@
 {{ forensic_dossier.dossier_text }}
       </div>
     </div>
+    {% else %}
+    <!-- Fiduciary Notice Card for Workspace 06 -->
+    <div style="background: rgba(30, 41, 59, 0.3); border: 1px dashed rgba(148, 163, 184, 0.25); border-radius: 14px; padding: 22px;">
+      <div style="display: flex; align-items: center; gap: 10px; margin-bottom: 8px;">
+        <span style="font-size: 18px;">🛡️</span>
+        <h3 style="font-size: 15px; font-weight: 700; color: #cbd5e1; margin: 0;">
+          06: Institutional Forensic Qualitative Audit Dossier (Coverage Pending)
+        </h3>
+      </div>
+      <div style="color: #94a3b8; font-size: 13.5px; line-height: 1.6; background: rgba(15, 23, 42, 0.5); border-radius: 10px; padding: 18px; border: 1px solid rgba(255, 255, 255, 0.05); font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;">
+{{ forensic_dossier.dossier_text }}
+      </div>
+    </div>
+    {% endif %}
     {% endif %}
 
     <!-- Quick Navigation Bottom Toolbar -->

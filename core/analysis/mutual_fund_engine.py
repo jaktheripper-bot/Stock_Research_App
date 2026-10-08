@@ -281,6 +281,7 @@ def evaluate_dual_sleeve_lookthrough(
     cash_weight = 0.0
 
     equity_covered_weight = 0.0
+    genuine_covered_weight = 0.0
     equity_weighted_score = 0.0
     debt_weighted_score = 0.0
     cash_score = 100.0  # Cash/TREPS represents risk-free baseline
@@ -314,24 +315,25 @@ def evaluate_dual_sleeve_lookthrough(
             is_researched = bool(rep and rep.get("report_text"))
             if is_researched:
                 score = 82.0  # Verified 7-pillar institutional asset
+                genuine_covered_weight += w
                 equity_covered_weight += w
                 equity_weighted_score += (score * w)
                 posture_badge = "badge-success"
                 notes = "Verified 7-Pillar Equity Dossier Available"
             elif ident in EQUITY_HEALTH_DEFAULTS:
-                # Calibrated baseline proxy for benchmark constituent
+                # Calibrated baseline proxy for benchmark constituent (unverified look-through)
                 score = float(EQUITY_HEALTH_DEFAULTS[ident])
                 equity_covered_weight += w
                 equity_weighted_score += (score * w)
                 if score >= 80:
                     posture_badge = "badge-success"
-                    notes = "High-Quality Capital Compounder"
+                    notes = "High-Quality Capital Compounder (Pending 7-Pillar Audit)"
                 elif score < 65:
                     posture_badge = "badge-warning"
-                    notes = "Elevated Fundamental or Valuation Risk"
+                    notes = "Elevated Fundamental or Valuation Risk (Pending 7-Pillar Audit)"
                 else:
                     posture_badge = "badge-neutral"
-                    notes = "Solid Core Holding"
+                    notes = "Solid Core Holding (Pending 7-Pillar Audit)"
             else:
                 # Strict Zero-Hallucination: Mark unresearched stock as N/A
                 score = None
@@ -381,21 +383,45 @@ def evaluate_dual_sleeve_lookthrough(
             "score": round(score, 1) if score is not None else "N/A",
             "posture_badge": posture_badge,
             "notes": notes,
-            "is_researched": is_researched or (ident in EQUITY_HEALTH_DEFAULTS)
+            "is_researched": is_researched
         })
 
-    # Normalized scores
+    # Normalized coverage calculations
+    MIN_COVERAGE_THRESHOLD = 70.0
+    genuine_coverage_pct = round((genuine_covered_weight / equity_weight * 100.0), 1) if equity_weight > 0 else 100.0
+    has_sufficient_coverage = (genuine_coverage_pct >= MIN_COVERAGE_THRESHOLD)
+
     equity_coverage_pct = round((equity_covered_weight / equity_weight * 100.0), 1) if equity_weight > 0 else 0.0
     eq_score_norm = (equity_weighted_score / equity_covered_weight) if equity_covered_weight > 0 else 72.0
     debt_score_norm = (debt_weighted_score / debt_weight) if debt_weight > 0 else 0.0
 
-    # Composite Fund Health Score
-    composite_health = (
-        (equity_weight / total_weight) * eq_score_norm +
-        (debt_weight / total_weight) * debt_score_norm +
-        (cash_weight / total_weight) * cash_score
-    )
-    composite_health = round(min(100.0, max(0.0, composite_health)), 1)
+    # Composite Fund Health Score calculation with strict coverage gating
+    if has_sufficient_coverage:
+        composite_health = (
+            (equity_weight / total_weight) * eq_score_norm +
+            (debt_weight / total_weight) * debt_score_norm +
+            (cash_weight / total_weight) * cash_score
+        )
+        composite_health = round(min(100.0, max(0.0, composite_health)), 1)
+        if composite_health >= 80.0:
+            health_posture = "INSTITUTIONAL_ALPHA"
+            health_badge = "badge-success"
+        elif composite_health >= 65.0:
+            health_posture = "QUALITY_CORE"
+            health_badge = "badge-neutral"
+        elif composite_health >= 50.0:
+            health_posture = "MEDIOCRE_HOLD"
+            health_badge = "badge-warning"
+        else:
+            health_posture = "FIDUCIARY_ALERT"
+            health_badge = "badge-danger"
+    else:
+        composite_health = None
+        health_posture = "COVERAGE_PENDING"
+        health_badge = "badge-neutral"
+        warnings.append(
+            f"Look-Through Forensic Audit pending underlying constituent coverage ({genuine_coverage_pct}% verified vs 70.0% threshold). Composite Health Score & qualitative narrative paused."
+        )
 
     # Scale and Mandate Drift Checks
     aum = float(scheme.get("aum_crores", 0.0))
@@ -415,30 +441,22 @@ def evaluate_dual_sleeve_lookthrough(
     if "Flexi" in cat and top_10_weight > 60.0:
         warnings.append(f"Top 10 concentration is elevated at {top_10_weight}%, indicating high single-stock dependency.")
 
-    if composite_health >= 80.0:
-        health_posture = "INSTITUTIONAL_ALPHA"
-        health_badge = "badge-success"
-    elif composite_health >= 65.0:
-        health_posture = "QUALITY_CORE"
-        health_badge = "badge-neutral"
-    elif composite_health >= 50.0:
-        health_posture = "MEDIOCRE_HOLD"
-        health_badge = "badge-warning"
-    else:
-        health_posture = "FIDUCIARY_ALERT"
-        health_badge = "badge-danger"
-
     return {
         "composite_health_score": composite_health,
         "health_posture": health_posture,
         "health_badge": health_badge,
+        "has_sufficient_coverage": has_sufficient_coverage,
+        "genuine_coverage_pct": genuine_coverage_pct,
+        "min_coverage_threshold": MIN_COVERAGE_THRESHOLD,
         "sleeve_breakdown": {
             "equity_weight_pct": round(equity_weight, 1),
             "debt_weight_pct": round(debt_weight, 1),
             "cash_weight_pct": round(cash_weight, 1),
-            "equity_sleeve_score": round(eq_score_norm, 1),
+            "equity_sleeve_score": round(eq_score_norm, 1) if has_sufficient_coverage else "Pending",
             "debt_sleeve_score": round(debt_score_norm, 1),
             "equity_coverage_pct": equity_coverage_pct,
+            "genuine_coverage_pct": genuine_coverage_pct,
+            "has_sufficient_coverage": has_sufficient_coverage,
         },
         "top_10_weight_pct": top_10_weight,
         "warnings": warnings,

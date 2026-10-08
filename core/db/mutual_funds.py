@@ -1481,7 +1481,8 @@ def save_fund_forensic_dossier(dossier: Dict[str, Any]) -> bool:
 
     code = dossier["scheme_code"].strip().upper()
     text = dossier.get("dossier_text", "")
-    comp_score = float(dossier.get("composite_health_score", 0.0))
+    raw_comp = dossier.get("composite_health_score")
+    comp_score = float(raw_comp) if raw_comp is not None else -1.0
     moat_score = float(dossier.get("weighted_moat_score", 0.0))
     asri = float(dossier.get("accounting_risk_index", 0.0))
     mos = float(dossier.get("margin_of_safety_pct", 0.0))
@@ -1563,6 +1564,8 @@ def get_fund_forensic_dossier(scheme_code: str) -> Optional[Dict[str, Any]]:
         if not row:
             return None
         res = clean_dict_row(cursor, row)
+        if res.get("composite_health_score") is not None and res["composite_health_score"] < 0:
+            res["composite_health_score"] = None
         if "top_risky_holdings_json" in res and res["top_risky_holdings_json"]:
             try:
                 res["top_risky_holdings"] = json.loads(res["top_risky_holdings_json"])
@@ -1600,6 +1603,8 @@ def get_featured_daily_fund_dossier() -> Optional[Dict[str, Any]]:
         if not row:
             return None
         res = clean_dict_row(cursor, row)
+        if res.get("composite_health_score") is not None and res["composite_health_score"] < 0:
+            res["composite_health_score"] = None
         if "top_risky_holdings_json" in res and res["top_risky_holdings_json"]:
             try:
                 res["top_risky_holdings"] = json.loads(res["top_risky_holdings_json"])

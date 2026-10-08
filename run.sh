@@ -66,6 +66,11 @@ case "$COMMAND" in
         echo "--> [1/1] Executing Real Browser Interaction Audit on Live Deployment..."
         "$PYTHON" test_live_ui.py
         ;;
+    mf-ingest)
+        shift
+        echo "--> Ingesting top mutual fund portfolio disclosures..."
+        "$PYTHON" scripts/ingest_mf_portfolios.py "$@"
+        ;;
     checkpoint)
         shift
         echo "--> [1/1] Managing Release Checkpoint Creation..."
@@ -80,8 +85,18 @@ case "$COMMAND" in
         shift
         "$PYTHON" ci/checkpoint_manager.py list "$@"
         ;;
+    nifty100|nifty-100)
+        shift
+        echo "--> Initiating Nifty 100 Institutional Research Generation Pipeline..."
+        "$PYTHON" scripts/generate_nifty100_reports.py "$@"
+        ;;
+    sync-supabase|supabase-sync)
+        shift
+        echo "--> Syncing local research reports to Supabase..."
+        "$PYTHON" scripts/sync_to_supabase.py "$@"
+        ;;
     *)
-        echo "Usage: ./run.sh [lint | test | bench | preflight | live-audit | start | web | admin | checkpoint | rollback | checkpoints]"
+        echo "Usage: ./run.sh [lint | test | bench | preflight | live-audit | start | web | admin | mf-ingest | nifty100 | sync-supabase | checkpoint | rollback | checkpoints]"
         exit 1
         ;;
 esac

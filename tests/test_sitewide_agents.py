@@ -113,8 +113,12 @@ class TestSitewideAgents(unittest.TestCase):
         """Verifies mutual fund look-through squad."""
         res = audit_fund_lookthrough("PPFAS_FLEXICAP_DIR")
         self.assertEqual(res["scheme_code"], "PPFAS_FLEXICAP_DIR")
-        self.assertGreater(res["composite_health_score"], 0.0)
+        self.assertIn("has_sufficient_coverage", res)
         self.assertIn("weighted_moat_score", res)
+        if res.get("has_sufficient_coverage"):
+            self.assertGreater(res["composite_health_score"], 0.0)
+        else:
+            self.assertIsNone(res["composite_health_score"])
 
     def test_credit_and_real_assets_squads(self):
         """Verifies credit, REIT, and macro squads."""

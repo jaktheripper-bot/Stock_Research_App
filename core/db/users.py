@@ -816,3 +816,136 @@ def _format_user_record(row) -> Dict[str, Any]:
         "created_at": _format_timestamp(row[7]),
         "last_login_at": _format_timestamp(row[8])
     }
+
+
+def is_ticker_unlocked_for_user(user_id: str, ticker: str) -> bool:
+    """
+    Checks if a user has unlocked the deep-dive intelligence tier for a specific ticker.
+    Returns True if:
+    1. User has an active Pro subscription (pro_monthly or pro_annual).
+    2. User has an explicit entry in user_unlocked_dossiers.
+    3. User has a recorded unlock or full synthesis event in credit_usage_ledger.
+    """
+    if not user_id or not ticker:
+        return False
+
+    clean_id = str(user_id).strip()
+    clean_ticker_sym = str(ticker).strip().upper()
+
+    user = get_user_by_id(clean_id)
+    if not user:
+        return False
+
+    if user.get("is_pro"):
+        return True
+
+    init_db()
+    conn = get_db_connection()
+    cursor = conn.cursor()
+    p = get_placeholder()
+
+    try:
+        # Check explicit unlock record
+        cursor.execute(
+            f"SELECT id FROM user_unlocked_dossiers WHERE user_id = {p} AND ticker = {p} LIMIT 1;",
+            (clean_id, clean_ticker_sym)
+        )
+        if cursor.fetchone():
+            return True
+
+        # Check credit usage ledger for prior deep dive unlock or synthesis
+        cursor.execute(
+            f"SELECT id FROM credit_usage_ledger WHERE user_id = {p} AND ticker = {p} AND action_type IN ('DEEP_DIVE_UNLOCK', 'FULL_SYNTHESIS') LIMIT 1;",
+            (clean_id, clean_ticker_sym)
+        )
+        if cursor.fetchone():
+            return True
+
+        return False
+    except Exception as e:
+        logger.error(f"Error checking unlock status for user {user_id} on {ticker}: {e}")
+        return False
+    finally:
+        cursor.close()
+        conn.close()
+
+
+def unlock_ticker_for_user(
+    user_id: str,
+    ticker: str,
+    amount: float = 1.0
+) -> Tuple[bool, float, str]:
+    """
+    Atomically deducts 1 credit and unlocks the institutional deep-dive tier for a ticker.
+    Idempotent: if already unlocked, returns True immediately without deducting credits.
+    """
+    if not user_id:
+        return False, 0.0, "Authentication required to unlock institutional deep-dive."
+
+    clean_id = str(user_id).strip()
+    clean_ticker_sym = str(ticker).strip().upper()
+
+    if is_ticker_unlocked_for_user(clean_id, clean_ticker_sym):
+        current_bal = get_user_credits_balance(clean_id)
+        return True, current_bal, f"Institutional deep-dive for {clean_ticker_sym} is already unlocked."
+
+    # Deduct 1 credit atomically
+    ok, new_balance, msg = deduct_user_credits(
+        user_id=clean_id,
+        ticker=clean_ticker_sym,
+        action_type="DEEP_DIVE_UNLOCK",
+        amount=amount
+    )
+    if not ok:
+        return False, new_balance, msg
+
+    # Record in user_unlocked_dossiers
+    init_db()
+    conn = get_db_connection()
+    cursor = conn.cursor()
+    p = get_placeholder()
+
+    try:
+        if p == "%s":
+            cursor.execute(
+                f"INSERT INTO user_unlocked_dossiers (user_id, ticker) VALUES ({p}, {p}) ON CONFLICT (user_id, ticker) DO NOTHING;",
+                (clean_id, clean_ticker_sym)
+            )
+        else:
+            cursor.execute(
+                f"INSERT OR IGNORE INTO user_unlocked_dossiers (user_id, ticker) VALUES ({p}, {p});",
+                (clean_id, clean_ticker_sym)
+            )
+        conn.commit()
+        logger.info(f"Recorded dossier unlock for user {clean_id} on {clean_ticker_sym}")
+        return True, new_balance, f"Successfully unlocked institutional deep-dive for {clean_ticker_sym}."
+    except Exception as e:
+        logger.error(f"Error recording user unlock dossier {clean_id}/{clean_ticker_sym}: {e}")
+        return True, new_balance, f"Successfully unlocked institutional deep-dive for {clean_ticker_sym}."
+    finally:
+        cursor.close()
+        conn.close()
+
+
+def get_user_unlocked_tickers(user_id: str) -> List[str]:
+    """Returns list of tickers unlocked by this user."""
+    if not user_id:
+        return []
+    clean_id = str(user_id).strip()
+    init_db()
+    conn = get_db_connection()
+    cursor = conn.cursor()
+    p = get_placeholder()
+    try:
+        cursor.execute(
+            f"SELECT DISTINCT ticker FROM user_unlocked_dossiers WHERE user_id = {p};",
+            (clean_id,)
+        )
+        return [row[0] for row in cursor.fetchall()]
+    except Exception as e:
+        logger.error(f"Error fetching unlocked tickers for {clean_id}: {e}")
+        return []
+    finally:
+        cursor.close()
+        conn.close()
+

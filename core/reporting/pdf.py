@@ -417,11 +417,18 @@ def generate_fund_dossier_pdf(
     doc_id = f"MF-{scheme_code[:8].upper()}-{datetime.now(IST).strftime('%Y%m%d%H%M')}"
     clean_name = re_mod.sub(r'[^a-zA-Z0-9_]', '', scheme_code)
     scheme_title = scheme.get("scheme_name", scheme_code)
-    health = float(dossier.get("composite_health_score", 70.0))
-    moat = float(dossier.get("weighted_moat_score", 65.0))
-    asri = float(dossier.get("accounting_risk_index", 15.0))
-    mos = float(dossier.get("margin_of_safety_pct", 0.0))
-    active_share = float(dossier.get("active_share_pct", 75.0))
+    raw_health = dossier.get("composite_health_score")
+    if raw_health is not None and float(raw_health) >= 0:
+        health_val = float(raw_health)
+        health_display = f"{health_val:.1f} / 100"
+        health_status = 'High Quality Portfolio' if health_val >= 75 else ('Moderate Moat' if health_val >= 50 else 'Watchlist Caution')
+    else:
+        health_display = "Coverage Pending"
+        health_status = "Look-Through Audit Paused (< 70% Verified Coverage)"
+    moat = float(dossier.get("weighted_moat_score") or 65.0)
+    asri = float(dossier.get("accounting_risk_index") or 15.0)
+    mos = float(dossier.get("margin_of_safety_pct") or 0.0)
+    active_share = float(dossier.get("active_share_pct") or 75.0)
 
     header = f"""# Mutual Fund Forensic Look-Through Dossier: {scheme_title}
 > **Scheme Code:** `{scheme_code}` | **Document ID:** `{doc_id}`  
@@ -432,7 +439,7 @@ def generate_fund_dossier_pdf(
     scorecard_md = f"""### Executive Look-Through Scorecard
 | Metric | Value | Posture / Status |
 | :--- | :--- | :--- |
-| **Composite Health Score** | **{health:.1f} / 100** | {'High Quality Portfolio' if health >= 75 else 'Moderate Moat'} |
+| **Composite Health Score** | **{health_display}** | {health_status} |
 | **Weighted Moat Score** | **{moat:.1f} / 100** | {'Wide Moat Bias' if moat >= 70 else 'Blend'} |
 | **Accounting Risk Index (ASRI)** | **{asri:.1f}%** | {'Clean Portfolio' if asri < 20 else 'Elevated Audit Caution'} |
 | **Margin of Safety (MoS)** | **{mos:+.1f}%** | {'Discounted Under-Valuation' if mos > 0 else 'Premium Over Fair Value'} |

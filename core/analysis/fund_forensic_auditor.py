@@ -87,6 +87,7 @@ def compute_fund_forensic_lookthrough(scheme_code: str) -> Dict[str, Any]:
 
     equity_weight = 0.0
     equity_covered_weight = 0.0
+    genuine_covered_weight = 0.0
     equity_weighted_score = 0.0
     weighted_moat_sum = 0.0
     weighted_mos_sum = 0.0
@@ -125,6 +126,7 @@ def compute_fund_forensic_lookthrough(scheme_code: str) -> Dict[str, Any]:
 
             if rep and rep.get("report_text"):
                 is_researched = True
+                genuine_covered_weight += w
                 equity_covered_weight += w
                 matrix = parse_stock_report_health_matrix(rep["report_text"])
 
@@ -302,6 +304,11 @@ def compute_fund_forensic_lookthrough(scheme_code: str) -> Dict[str, Any]:
     pledge_exposure_pct = round((pledge_weight / total_weight) * 100.0, 1)
     equity_coverage_pct = round((equity_covered_weight / equity_weight) * 100.0, 1) if equity_weight > 0 else 100.0
 
+    # Genuine 7-pillar coverage check (minimum 70% threshold)
+    MIN_COVERAGE_THRESHOLD = 70.0
+    genuine_coverage_pct = round((genuine_covered_weight / equity_weight * 100.0), 1) if equity_weight > 0 else 100.0
+    has_sufficient_coverage = (genuine_coverage_pct >= MIN_COVERAGE_THRESHOLD)
+
     # Composite health score
     norm_equity_score = (equity_weighted_score / equity_weight) if equity_weight > 0 else 72.0
     composite_health = round(
@@ -327,13 +334,16 @@ def compute_fund_forensic_lookthrough(scheme_code: str) -> Dict[str, Any]:
         "ter_direct_pct": float(scheme.get("ter_direct_pct", 0.75)),
         "ter_regular_pct": float(scheme.get("ter_regular_pct", 1.50)),
         "portfolio_turnover_ratio_pct": float(scheme.get("portfolio_turnover_ratio_pct", 25.0)),
-        "composite_health_score": composite_health,
+        "composite_health_score": composite_health if has_sufficient_coverage else None,
         "weighted_moat_score": norm_moat_score,
         "accounting_risk_index": asri_pct,
         "margin_of_safety_pct": norm_mos_pct,
         "promoter_pledge_exposure_pct": pledge_exposure_pct,
         "active_share_pct": active_share_val,
         "equity_coverage_pct": equity_coverage_pct,
+        "genuine_coverage_pct": genuine_coverage_pct,
+        "has_sufficient_coverage": has_sufficient_coverage,
+        "min_coverage_threshold": MIN_COVERAGE_THRESHOLD,
         "top_risky_holdings": top_risky_holdings[:5],
         "top_quality_holdings": top_quality_holdings[:5],
         "evaluated_holdings": evaluated_holdings
@@ -344,6 +354,24 @@ def synthesize_fund_forensic_narrative(metrics: Dict[str, Any], scheme: Dict[str
     """Produces institutional forensic qualitative analysis via Gemini Flash or deterministic engine."""
     scheme_name = scheme.get("scheme_name", metrics.get("scheme_name", ""))
     scheme_code = metrics.get("scheme_code", "")
+
+    # Zero-Hallucination Gate: If coverage is below threshold, return honest fiduciary notice
+    if not metrics.get("has_sufficient_coverage", True):
+        cov = metrics.get("genuine_coverage_pct", 0.0)
+        return f"""# 06: Institutional Forensic Qualitative Audit Dossier
+
+**Fiduciary Notice under SEBI (Research Analysts) Regulations, 2014 Section 2(u):**
+The underlying equity constituent look-through coverage for **{scheme_name}** currently stands at **{cov}%**, which is below our strict institutional threshold of **70.0%**.
+
+To maintain Zero-Hallucination integrity and prevent misleading investors with unverified proxy assumptions:
+1. **Composite Health Scoring & Qualitative Moat Narrative are temporarily paused** until verified 7-pillar company dossiers are compiled for the remaining constituents.
+2. **Statutory Non-Look-Through Analytics remain 100% active:**
+   - Full disclosed constituent holdings table (equity, debt, TREPS).
+   - Active Share closet-indexing diagnostic.
+   - 10-year direct vs. regular TER fee drag schedule.
+   - AUM scale and mandate liquidity warnings.
+"""
+
     cat = scheme.get("category", "")
     aum = metrics.get("aum_crores", 0.0)
     ter_dir = metrics.get("ter_direct_pct", 0.75)
