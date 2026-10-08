@@ -207,80 +207,79 @@ Stock Research App does not attempt to be a faster data table or a discount brok
 
 ## 6. Strategic Action Plan: Phased Implementation Roadmap
 
-To turn these competitive advantages into an unassailable market moat, we propose an orderly **5-phase action plan**.  
-*(Note: As instructed, no execution actions will be performed until user review and explicit approval).*
+The implementation roadmap reconciles the platform's multi-asset competitive objectives, security/licensing requirements, and behavioral research mandates.
 
 ```
 ┌────────────────────────────────────────────────────────────────────────┐
-│                        STRATEGIC ACTION PLAN PHASES                    │
+│                   IMPLEMENTATION ROADMAP ARCHITECTURE                  │
 │                                                                        │
-│  PHASE 1: Mutual Fund Look-Through Expansion (Top 50 Schemes)          │
-│  PHASE 2: Equity-to-Debt Contagion Bridge (Cross-Asset Risk)           │
-│  PHASE 3: Opportunity Terminal Enhancement (Unified Real Returns)      │
-│  PHASE 4: Proactive Thesis Drift & Event-Driven Re-Audits              │
-│  PHASE 5: Institutional Reporting & SEBI Compliance Safe-Harbor Polish │
+│  [ACTIVE]    Task 1: Angel One SmartAPI Broker Gateway Integration    │
+│  [ACTIVE]    Task 2: Custom Website Vector Icon System (SVG Sprites)  │
+│  [ACTIVE]    Task 3: Mutual Fund 50-Scheme Expansion & Style Drift     │
+│  [ACTIVE]    Task 4: Capstone Multi-Asset Portfolio Audit Engine       │
+│  [ACTIVE]    Task 5: Research MSME Analysis Ingestion                  │
+│  ────────────────────────────────────────────────────────────────────  │
+│  [COMPLETED] Phase 1 (Core): 7-Pillar Look-Through & Daily Fund Auditor│
+│  [COMPLETED] Phase 2: Equity-to-Debt Contagion Bridge                  │
+│  [COMPLETED] Phase 3: Cross-Asset Opportunity Terminal & Tax Engine    │
+│  [COMPLETED] Phase 4: Proactive Thesis Drift & Real-Time Surveillance  │
+│  [COMPLETED] Phase 5: Institutional PDF Export & Approachable Polish   │
 └────────────────────────────────────────────────────────────────────────┘
 ```
 
 ---
 
-### Phase 1: Mutual Fund Look-Through Expansion (Top 50 AMFI Schemes)
-**Objective:** Eliminate the trailing NAV blind spot by expanding the forensic look-through engine across India's largest retail equity funds.
-- **Tasks:**
-  1. Expand fund ingestion beyond the 6 existing baseline funds to the top 50 active funds across Flexi Cap, Large & Mid Cap, Mid Cap, and Small Cap.
-  2. Implement an automated daily audit queue: select one fund per day to run full underlying constituent stock reports and update the fund's **Weighted Moat Score** and **Accounting Risk Index (ASRI)**.
-  3. Introduce **Fund Style Drift Tracking**: record historical quarterly look-through scores in `mutual_fund_schemes` to detect when a fund manager dilutes quality.
-- **User Facing Deliverable:** A dedicated "Forensic Fund Dossier" page showing underlying stock moat exposure, promoter pledge weight, and active share.
+### 6.1 Active Pending Tasks (To Be Completed)
+
+The following 5 tasks constitute the remaining active engineering and design backlog. All items are deduplicated and prioritized by operational and regulatory importance:
+
+#### Priority 1: Critical Exchange Integration (Awaiting Credentials)
+1. **Angel One SmartAPI Broker Gateway Integration:**
+   - **Target Files:** `core/analysis/quote_gateway.py`, `.env`, Render environment variables
+   - **Status:** Pending User Broker API Credentials (`ANGEL_API_KEY`, `ANGEL_CLIENT_CODE`, `ANGEL_PIN`, `ANGEL_TOTP_KEY`)
+   - **Details:** Transition live domestic equity quote ingestion, tick streaming, and market depth from yfinance/scraping fallbacks to official exchange-compliant SmartAPI endpoints with automatic failover, eliminating upstream scraping fragility and licensing risk.
+
+#### Priority 2: Design & Visual Identity (Asset Generation & Template Integration)
+2. **Custom Website Vector Icon System (SVG Sprites):**
+   - **Target Files:** `web/templates/` (all templates), `web/static/css/style.css`, `web/static/icons/` (SVG sprite / symbols)
+   - **Status:** Pending Design & Asset Generation
+   - **Objective:** Eliminate inconsistent operating-system-dependent Unicode emojis across all web views, scorecards, headers, and exports. Replace them with a cohesive, institutional-grade vector SVG icon set (32 required glyphs across 5 categories: Forensic Dimension Matrix, Multi-Asset Class Directory, Navigation & Search, Actions & Terminal Controls, Behavioral & Diagnostic Status Badges).
+
+#### Priority 3: Multi-Asset Expansion (Remaining 19 Schemes & Style Drift Tracking)
+3. **Phase 1: Mutual Fund Universe Expansion to 50 Schemes & Quarterly Style Drift Ledger:**
+   - **Target Files:** `core/db/mutual_funds.py`, `core/analysis/fund_forensic_auditor.py`
+   - **Status:** In Progress (31 marquee schemes currently active; 19 remaining to reach top 50 AMFI target)
+   - **Details:**
+     - Expand curated portfolio look-through from 31 to 50 marquee schemes across Flexi Cap, Large & Mid Cap, Mid Cap, and Small Cap.
+     - Implement **Fund Style Drift Tracking**: record historical quarterly look-through scores in `mutual_fund_schemes` to detect when fund managers dilute portfolio quality or drift from stated mandates over time.
+
+#### Priority 4: Flagship Platform Capstone (From Site Objective Comparison Analysis)
+4. **Phase 6: Capstone: Holistic Multi-Asset Portfolio Audit Engine (CAS / CSV Upload):**
+   - **Target Files:** `core/analysis/portfolio_auditor.py`, `web/templates/portfolio_audit.html`, `web/main.py`
+   - **Status:** Roadmap Phase (From `docs/Site Objective Comparison Analysis.md`)
+   - **Objective:** Allow investors to import multi-asset holdings via CAS (Consolidated Account Statement) PDF/Excel or CSV, run all holdings through the 7-pillar equity engine, fund look-through, and debt contagion radar, and output a holistic portfolio health scorecard (net real post-tax yield, inflation drag, concentration risk, and capital preservation buffer).
+
+#### Priority 5: Strategic Scaling & Ingestion Research
+5. **Research MSME Analysis Ingestion:**
+   - **Target Files:** `core/msme/`
+   - **Status:** Pre-development research
+   - **Details:** Scope public API endpoints from SIDBI, MCA21, and TReDS for unlisted MSME supplier risk analysis. Zero runtime impact until explicit activation.
 
 ---
 
-### Phase 2: Equity-to-Debt Contagion Bridge (Cross-Asset Risk Detection)
-**Status:** **Completed & Verified.**  
-**Objective:** Protect conservative fixed-income investors by linking debt securities directly to corporate equity health.
-- **Tasks & Delivery:**
-  1. **Automated Linkage:** Built bidirectional parent-subsidiary mapping (`get_debt_securities_for_equity`) linking listed equities (`RELIANCE`, `TATAMOTORS`, `LT`, `BAJFINANCE`, `PEL`, `HDFCBANK`, etc.) directly to their listed NCDs.
-  2. **Contagion Spillover Detection:** Evaluates parent governance posture, promoter pledge ratio, and Piotroski F-score to compute the `Credit Contagion Radar` (`ACTIVE_CONTAGION_ALERT`, `MONITORED_EQUITY_DRIFT`, `INSULATED_EQUITY_MOAT`).
-  3. **Bi-Directional Dossier Integration:** 
-     - **Equity Dossiers:** Displays the new **Capital Structure & Listed Corporate NCDs** module showcasing active debenture tranches, seniority tier, YTM, and spillover warnings.
-     - **Debt Dossiers:** Displays the **Credit Contagion Radar** with an immediate 1-click drilldown to the parent equity forensic dossier.
-- **User Facing Deliverable:** Live "Credit Contagion Radar" badge on debt dossiers and "Capital Structure & Listed NCDs" card on equity dossiers.
+### 6.2 Completed & Verified Implementation Tasks (Archived & Struck Through)
 
----
+All roadmap tasks that have already been implemented, tested, and verified are struck through below and archived at the bottom of the tasks register:
 
-### Phase 3: Opportunity Terminal Enhancement (Unified Real Returns)
-**Status:** **Completed & Verified.**  
-**Objective:** Provide investors with an unconflicted, cross-asset comparison terminal that factors in taxes and inflation.
-- **Tasks & Delivery:**
-  1. **All Asset Classes Connected:** Ingests and normalizes across 7 asset sleeves: Fundamental Equities (`reports.db`), Mutual Funds (`mutual_funds.py`), Corporate NCDs & SDIs (`debt.py`), SM REITs & InvITs (`reits.py`), Sovereign Gold Bonds (`reits.py`), Sovereign G-Secs/T-Bills (`sovereign.py`), and National ETFs (`sovereign.py`).
-  2. **Statutory Tax Waterfalls & Real Returns:** Dynamically calculates post-tax real yields net of MOSPI CPI inflation across tax brackets (0%, 10% New Tax Regime, 20%, 30%, 39% HNI Surcharge) citing precise statutes (Sec 47(viic) tax-free SGB capital gains, Sec 115UA hybrid REIT pass-through, Sec 112A 12.5% equity LTCG, Sec 50AA debt marginal rate).
-  3. **Multi-Modal Terminal & Scenario Filters:** Implements 4 distinct discovery views (Bento Cards, 2D Spread Heatmap Matrix, Risk-Return Scatter Frontier, Dense Table), persistent 4-item Arbitrage Docket with side-by-side comparison scorecard modal, and scenario filters: *"Capital Preservation (Real Return > 0%)"*, *"Maximum Cash Flow"*, *"HNI Real Assets"*, and *"Asymmetric Upside"*.
-- **User Facing Deliverable:** Live interactive Opportunity Terminal at `/opportunities` and APIs at `/api/opportunities/universe`, `/api/opportunities/heatmap`, and `/api/opportunities/arbitrage`.
-
----
-
-### Phase 4: Proactive Thesis Drift & Autonomous Event Syndication
-**Status:** **Completed & Verified.**  
-**Objective:** Transition from static research to real-time thesis surveillance via the Google Antigravity SDK.
-- **Tasks & Delivery:**
-  1. **5-Minute BSE Watcher Connected:** `core/agents/watchers/bse_watcher.py` continuously scans active watchlist scrips for official regulatory disclosures (auditor resignations, promoter pledge changes, disputes, M&A).
-  2. **Automated Re-Audit Dispatch:** Upon detecting material disclosures, automatically dispatches background thesis re-checks (`auto_reaudit_dispatched`) and logs updated risk posture summaries (`thesis_impact_summarized`) into `autonomous_event_ledger`.
-  3. **Live Surveillance Feed in Web Header:** Clicking the **Agent Radar** badge in the navbar opens the interactive Autonomous Surveillance Feed modal (powered by `/api/autonomous/events`), showing active background daemons (BSE Watcher, AMFI Nightly NAV, 23:30 IST Fund Auditor) and a live event log.
-- **User Facing Deliverable:** Live interactive "Autonomous Surveillance Feed" in the navbar and public event API at `/api/autonomous/events`.
-
----
-
-### Phase 5: Institutional Export & SEBI Compliance Safe-Harbor Polish
-**Status:** **Completed & Verified.**  
-**Objective:** Deliver comprehensive multi-asset PDF exports while keeping financial explanations approachable and strictly compliant.
-- **Tasks & Delivery:**
-  1. **One-Click PDF Export for All Asset Classes:** Full PDF dossier generation implemented and verified across all asset categories:
-     - **Equities:** `/api/pdf/{ticker}` (7-pillar forensic matrix, DCF valuation, 50-DMA chart, exchange citations).
-     - **Mutual Funds:** `/api/pdf/fund/{scheme_code}` (7-pillar look-through, ASRI index, constituent exposures).
-     - **Corporate Debt & SDIs:** `/api/pdf/debt/{isin}` (5-pillar credit scorecard, contagion radar, recovery recourse).
-     - **REITs & InvITs:** `/api/pdf/reit/{symbol}` (Key valuation metrics, NDCF purity, Section 115UA tax waterfall).
-  2. **Approachable & Human-Friendly Language (User Directive):** Kept the language approachable, clear, and easy to understand across all dossiers, primers, and disclosures. Replaced stiff, impenetrable jargon with plain-English clarity and zero-condescension tone while maintaining strict SEBI Section 2(u) non-advisory compliance.
-  3. **Full Test Suite Validation:** Verified sitewide with 165+ automated unit and integration tests passing.
-- **User Facing Deliverable:** Downloadable PDF dossiers across Equities, Funds, Debt, and REITs/InvITs with approachable disclosures.
+- ~~**Phase 1 (Completed Core Components): 7-Pillar Fund Forensic Look-Through Engine & Autonomous Daily Auditor:** Built `core/analysis/fund_forensic_auditor.py` computing Weighted Economic Moat Index, Accounting & Solvency Risk Index (ASRI), Margin of Safety vs DCF, and Promoter Pledging weight. Built `scripts/run_daily_fund_audit.py` and scheduled nightly background daemon `run_daily_fund_audit_scheduler()` at 23:30 IST in `web/main.py`. Surfaced interactive fund dossier pages at `/funds/{scheme_code}` with hero daily feature banner on `/funds`.~~
+- ~~**Phase 2: Equity-to-Debt Contagion Bridge (Cross-Asset Risk Detection):** Built automated bidirectional parent-subsidiary mapping (`get_debt_securities_for_equity`) linking listed equities (`RELIANCE`, `TATAMOTORS`, `LT`, `BAJFINANCE`, `PEL`, `HDFCBANK`, etc.) directly to their listed NCDs. Evaluates parent governance posture, promoter pledge ratio, and Piotroski F-score to compute the `Credit Contagion Radar` (`ACTIVE_CONTAGION_ALERT`, `MONITORED_EQUITY_DRIFT`, `INSULATED_EQUITY_MOAT`). Live "Credit Contagion Radar" badge on debt dossiers and "Capital Structure & Listed NCDs" card on equity dossiers.~~
+- ~~**Phase 3: Opportunity Terminal Enhancement (Unified Real Returns):** Connected 7 asset sleeves (Fundamental Equities, Mutual Funds, Corporate NCDs/SDIs, SM REITs/InvITs, Sovereign Gold Bonds, Sovereign G-Secs/T-Bills, National ETFs). Implemented statutory tax waterfalls calculating post-tax real yields net of MOSPI CPI inflation across tax brackets (0%, 10% New Tax Regime, 20%, 30%, 39% HNI Surcharge) under Sec 47(viic), Sec 115UA, Sec 112A, Sec 50AA. Built 4 discovery views (Bento Cards, 2D Heatmap Matrix, Risk-Return Scatter Frontier, Dense Table) and persistent 4-item Arbitrage Docket.~~
+- ~~**Phase 4: Proactive Thesis Drift & Autonomous Event Syndication:** Continuous 5-minute BSE watcher (`core/agents/watchers/bse_watcher.py`) scanning watchlist scrips for official regulatory disclosures (auditor resignations, promoter pledge changes, disputes, M&A). Dispatches background thesis re-checks (`auto_reaudit_dispatched`) and logs updated risk posture summaries (`thesis_impact_summarized`) into `autonomous_event_ledger`. Live navbar Agent Radar modal feed and public API `/api/autonomous/events`.~~
+- ~~**Phase 5: Institutional Export & SEBI Compliance Safe-Harbor Polish:** One-click institutional PDF generation across all 4 asset classes (`/api/pdf/{ticker}`, `/api/pdf/fund/{scheme_code}`, `/api/pdf/debt/{isin}`, `/api/pdf/reit/{symbol}`). Approachable, plain-English clarity with zero condescension while strictly embedding SEBI RA Section 2(u) non-advisory educational disclaimers across all dossiers, primers, and exports.~~
+- ~~**Gate 1–3 Architectural Deliverables:** Prioritization of Cross-Asset Opportunity Terminal, automated 23:30 IST daily fund auditor daemon, and multi-asset Copilot expansion across Equities, Mutual Funds, and Corporate Debt/SDIs.~~
+- ~~**Zero-Hallucination & Anti-Fabrication Test Suite:** Built `tests/test_zero_hallucination_and_grounding.py` (8 automated tests) verifying elimination of all corporate entity claims, fake SAC codes (998314), office addresses, fake support emails (`support@stockresearch.app`), and personal name placeholders. Mandated strictly on-site `/contact` grievance review by admin console.~~
+- ~~**Admin Panel Direct Remedial Credit Granting:** Built atomic DB function `admin_grant_user_credits` in `core/db/admin.py`, `POST /admin/users/grant-credits` in `web/main.py`, `#adminGrantCreditsModal` in `web/templates/admin.html`, zero-revenue ledger isolation (`amount_inr = 0.0`, `nature = FREE_GRANT`), support ticket auto-resolution, and automated test suite in `tests/test_admin_credit_grant.py`.~~
+- ~~**Gate 4: Formal Rejection of Sitewide Autonomous Agents:** Preserved deterministic Python pipelines + single-pass structured Gemini synthesis. Shelved and archived sitewide autonomous agent execution loops to guarantee SEBI audit immunity, avoid the 10x–20x compounding context tax, and preserve sub-3s response latency.~~
 
 ---
 

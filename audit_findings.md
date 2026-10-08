@@ -496,48 +496,43 @@ A live route audit across all 73 registered FastAPI endpoints was performed:
 
 ### Active Pending Items (Ranked by Priority & Roadmap Status)
 
-#### Priority 1: Broker Gateway Integration (Awaiting Credentials)
+#### Priority 1: Critical Exchange Integration (Awaiting Credentials)
 1. **Angel One SmartAPI Broker Gateway Integration:**
    - **Files:** `core/analysis/quote_gateway.py`, `.env`, Render environment configuration
    - **Status:** Pending User Broker API Credentials (`ANGEL_API_KEY`, `ANGEL_CLIENT_CODE`, `ANGEL_PIN`, `ANGEL_TOTP_KEY`)
-   - **Details:** Transition domestic equity live quote ingestion, tick streaming, and market depth from scraping to official exchange-compliant SmartAPI endpoints with automatic fallback.
+   - **Details:** Transition domestic equity live quote ingestion, tick streaming, and market depth from yfinance/scraping fallbacks to official exchange-compliant SmartAPI endpoints with automatic failover.
 
-#### Priority 2: Strategic Scaling & Ingestion Research
-2. **Research MSME Analysis Ingestion:**
-   - **Files:** `core/msme/`
-   - **Status:** Pre-development phase
-   - **Details:** Scope public API endpoints from SIDBI, MCA21, and TReDS.
-   - **Environmental Impact:** Pre-development research only; zero runtime impact.
-
-#### Priority 3: Creation of Custom Website Icons (Design, AI Generation & Replacement)
-3. **Custom Website Icon System & AI Asset Generation:**
+#### Priority 2: Creation of Custom Website Icons (Design, AI Generation & Replacement)
+2. **Custom Website Vector Icon System (SVG Sprites):**
    - **Files:** `web/templates/` (all templates), `web/static/css/style.css`, `web/static/icons/` (SVG sprite / symbols)
-   - **Status:** Pending Design & Tool Generation
-   - **Objective:** Eliminate inconsistent operating-system-dependent Unicode emojis (e.g., 🏰, ⚖️, 📊, 🏦, 🏛️, 🪙, 🚨, ⚡, 🛡️, 🔍) across all web views, scorecards, headers, and exports. Replace them with a cohesive, institutional-grade vector SVG icon set.
-   - **Icon Catalog (32 Required Glyphs Across 5 Categories):**
+   - **Status:** Pending Design & Asset Generation
+   - **Objective:** Eliminate inconsistent operating-system-dependent Unicode emojis across all web views, scorecards, headers, and exports. Replace them with a cohesive, institutional-grade vector SVG icon set (32 required glyphs across 5 categories).
+   - **Icon Catalog:**
      1. *Forensic Dimension Matrix (01–07):* Business Moat (Fortress/Citadel), Capital Allocation (Balance Scale), Solvency & Forensics (Financial Health / Ledger Bar), Industry Tailwinds (Compounding Sprout/Leaf), Valuation & Margin of Safety (Target / Price Tag), Technical Structure (Trend Momentum / Candlestick), Governance & Pre-Mortem (Shield / Vault Armor).
      2. *Multi-Asset Class Directory:* Equities (Stock Growth), 9 AM Discovery (Morning Radar / Horizon), Debt / Listed NCDs (Bond Certificate / Bank Vault), Mutual Funds (Pillar Institution), Sovereign Yield Curve (Treasury Curve Line), ETFs & Liquid Index (Asset Basket / Stack), SM REITs & InvITs (Commercial Skyscraper), Tax Calculator (Tax Abacus / Calculator), Sovereign Gold Bonds (Gold Bullion / Mint), Securitized Debt SDIs (Asset-Backed Bundle), Liquid Cash/Surplus (Liquidity Droplet).
      3. *Navigation & Search:* Omni-Search (Forensic Loupe / Magnifying Glass), Morning Reel (Discovery Sun/Radar), User Profile / Session (Identity Glyph), Admin Console (Executive Keyhole/Shield), Contact / Grievance (Support Headset).
      4. *Actions & Terminal Controls:* AI Instant Synthesizer (Neural Lightning Bolt), Download Institutional PDF (Document / File Export), Grounded Citations (Filing Paperclip / Anchor Link), Commit to Audit Ledger (Digital Lock / Seal), Refresh / Synthesize (Sync Cycle), Expand / Collapse (Grid Toggle), Close Modal (Clean Dismiss X).
      5. *Behavioral & Diagnostic Status Badges:* Thesis Intact / Pass (Verified Check Circle), Value Trap / Warning (Warning Triangle), Thesis Breached / Danger (Alert Hexagon / Siren), Safe-Harbor Grounded (SEBI Regulatory Shield), Downgrade (Drift Arrow Down), Upgrade (Momentum Arrow Up), Educational Guide / Insight (Diagnostic Lightbulb / Codex).
-   - **Recommended AI Toolchain:**
-     - **Recraft.ai (Primary Recommendation):** Native vector generator capable of outputting production-ready `.svg` paths with consistent stroke weights (1.5px/2px), configurable color palettes matching the site's dark mode palette (`#0ea5e9`, `#0f172a`, `#f8fafc`, `#10b981`), and strict stylistic cohesion (Line / Duotone / Flat).
-     - **Iconify AI / Streamline AI:** Secondary alternatives for generating structured UI glyphs and icon sets.
-     - **Midjourney v6 + Vectorizer.ai:** High-concept prompt generation converted to scalable SVGs.
-   - **Implementation Architecture:**
-     - Build an SVG sprite sheet or partial (`web/templates/partials/icons.html`) rendering `<svg class="icon icon-{name}"><use href="#icon-{name}"/></svg>`.
-     - Style via `style.css` using `stroke: currentColor` and theme tokens, ensuring sharp rendering at all screen pixel densities and zero OS emoji discrepancies.
 
+#### Priority 3: Mutual Fund Look-Through Expansion (Top 50 Schemes) & Style Drift Tracking
+3. **Mutual Fund Universe Expansion to 50 Schemes & Quarterly Style Drift Ledger:**
+   - **Files:** `core/db/mutual_funds.py`, `core/analysis/fund_forensic_auditor.py`
+   - **Status:** In Progress (31 marquee schemes currently active; 19 remaining to reach top 50 AMFI target)
+   - **Details:**
+     - Expand curated portfolio look-through from 31 to 50 marquee schemes across Flexi Cap, Large & Mid Cap, Mid Cap, and Small Cap.
+     - Implement **Fund Style Drift Tracking**: record historical quarterly look-through scores in `mutual_fund_schemes` to detect when fund managers dilute portfolio quality over time.
 
-#### Priority 4: Mutual Fund Forensic Look-Through Engine & Daily Fund Audit Worker
-- **Status:** **COMPLETED & VERIFIED** (Archived to Item 25 below)
-- **Specification Document:** [`docs/mutual_fund_forensic_lookthrough_architecture.md`](file:///Users/lyndonpinto/Documents/Stock_Research_App/docs/mutual_fund_forensic_lookthrough_architecture.md)
-- **Implementation Plan:** [`fund_forensic_lookthrough_plan.md`](file:///Users/lyndonpinto/.gemini/antigravity-ide/brain/b9e145c4-8354-48bd-9215-0d9aa0f1723b/fund_forensic_lookthrough_plan.md)
+#### Priority 4: Capstone Multi-Asset Portfolio Audit Engine
+4. **Capstone: Holistic Multi-Asset Portfolio Audit Engine (CAS / CSV Upload):**
+   - **Files:** `core/analysis/portfolio_auditor.py`, `web/templates/portfolio_audit.html`, `web/main.py`
+   - **Status:** Roadmap Phase (From `docs/Site Objective Comparison Analysis.md`)
+   - **Objective:** Allow investors to import multi-asset holdings via CAS (Consolidated Account Statement) PDF/Excel or CSV, run all holdings through the 7-pillar equity engine, fund look-through, and debt contagion radar, and output a holistic portfolio health scorecard (net real post-tax yield, inflation drag, concentration risk, and capital preservation buffer).
 
-#### Priority 5: Autonomous Project Auditor Agent via Google Antigravity SDK (Strategy, Code & UI/UX)
-- **Status:** **COMPLETED & VERIFIED** (Archived to Item 26 below)
-- **Architecture & Implementation Plan:** [`docs/autonomous_project_auditor_plan.md`](file:///Users/lyndonpinto/Documents/Stock_Research_App/docs/autonomous_project_auditor_plan.md)
-- **IDE Plan Artifact:** [`autonomous_project_audit_agent_plan.md`](file:///Users/lyndonpinto/.gemini/antigravity-ide/brain/b9e145c4-8354-48bd-9215-0d9aa0f1723b/autonomous_project_audit_agent_plan.md)
+#### Priority 5: Strategic Scaling & Ingestion Research
+5. **Research MSME Analysis Ingestion:**
+   - **Files:** `core/msme/`
+   - **Status:** Pre-development phase
+   - **Details:** Scope public API endpoints from SIDBI, MCA21, and TReDS for unlisted MSME supplier risk analysis. Zero runtime impact until explicit activation.
 
 ---
 
@@ -571,6 +566,12 @@ The following items from the original audit scorecard, behavioral gap analysis, 
 - ~~**24. Multi-Asset Visual Consumption Architecture & Opportunity Terminal (Replacing Plain Jane Lists):** Engineered and deployed the unified Cross-Asset Opportunity Terminal (`/opportunities`) and normalized aggregation engine (`core/analysis/opportunity_terminal.py`). Replaced flat tabular lists across 7 asset classes (Equities, Corporate Debt/SDIs, SM REITs, InvITs, SGBs, Sovereign Yields, and Mutual Funds) with 4 switchable visual consumption modalities: 🗂️ Bento Opportunity Cards with in-cell SVG yield waterfall sparkbars ($\text{Gross Return} \to \text{Tax Drag} \to \text{Net Real Return}$), 📊 2D Relative Yield Spread Heatmap Matrix (+bps vs 10Y G-Sec 7.10%), 📈 Capital Hierarchy Risk vs Net Real Post-Tax Yield Scatter Frontier (Chart.js), and 📑 Dense Institutional Table with tabular lining numerals (`tnum`). Built the persistent floating Cross-Asset Arbitrage Docket (allowing allocators to pin 2 to 4 instruments across ANY asset class for side-by-side normalized scorecards), reactive tax slab (0%, 20%, 30%, 39%) and inflation sliders, 1-click allocator persona filters, and public REST APIs (`/api/opportunities/universe`, `/api/opportunities/heatmap`, `/api/opportunities/arbitrage`). Full test suite verified green with 123/123 tests passing (`tests/test_opportunity_terminal.py`).~~
 - ~~**25. Mutual Fund 7-Pillar Forensic Look-Through Engine & Autonomous Daily Auditor:** Overhauled the mutual fund analytical framework from static commodity past-performance lists into deep forensic audits. Expanded the curated universe from 6 to 31 marquee Indian schemes across 12 AMCs with constituent stock portfolios. Implemented migration `v021_fund_forensic_dossiers` creating the `fund_forensic_dossiers` repository. Developed `core/analysis/fund_forensic_auditor.py` to aggregate company-level 7-pillar reports from `reports.db` into Weighted Economic Moat Index, Accounting & Solvency Risk Index (ASRI), Portfolio Margin of Safety vs. Intrinsic DCF, and Promoter Pledging Exposure. Built the autonomous rotation worker `scripts/run_daily_fund_audit.py` with Gemini AI synthesis (`gemini-3.5-flash-lite`) and offline deterministic fallback. Surfaced the "Featured Daily Forensic Fund Audit" hero banner on `/funds` and embedded the 7-Pillar Look-Through workspace with on-demand re-audit triggers in `web/templates/fund_dossier.html`. Added REST APIs `GET /api/funds/dossier/{scheme_code}` and `POST /api/admin/run-fund-audit`. Verified 100% green with 129 passing unit tests (`tests/test_fund_forensic_auditor.py`).~~
 - ~~**26. Autonomous Project-Wide Auditor Engine via Google Antigravity SDK (Strategy, Code & UI/UX):** Architected and deployed an institutional-grade, multi-pillar project auditor powered by `google.antigravity`. Built database migration `v022_project_audit_logs` and dual-binding repository `core/db/audit_logs.py`. Created deterministic grounding tools in `core/audit/tools.py` for test runner execution, 25-endpoint probing, SEBI prohibited term scanning, AST code hygiene inspection, and CSS design token verification. Developed the autonomous engine in `core/audit/project_auditor.py` with `ChiefProjectAuditor` orchestrating `strategy_auditor`, `code_auditor`, and `uiux_auditor` subagents with Gemini cognitive synthesis (`gemini-3.5-flash-lite`) and offline deterministic fallback. Created CLI runner `scripts/run_project_audit.py` supporting `--quick`, `--full`, and `--history`. Added `/health` alias, `/admin/audit` workspace, and REST APIs `/api/admin/run-project-audit` and `/api/admin/audit-logs` in `web/main.py` with lifespan nightly scheduler at 03:00 IST. Created frontend template `web/templates/admin_audit.html` with Tri-Pillar health meter cards, route coverage matrix, and historical run ledger. Tested and verified 100% green with 137 passing unit tests (`tests/test_project_auditor.py`). Generated live audit dossier: 93.5/100 (EXEMPLARY status).~~
+- ~~**27. Equity-to-Debt Contagion Bridge (Phase 2):** Built automated bidirectional parent-subsidiary mapping (`get_debt_securities_for_equity`) linking listed equities (`RELIANCE`, `TATAMOTORS`, `LT`, `BAJFINANCE`, `PEL`, `HDFCBANK`) directly to corporate debentures. Implemented Credit Contagion Radar (`ACTIVE_CONTAGION_ALERT`, `MONITORED_EQUITY_DRIFT`, `INSULATED_EQUITY_MOAT`) evaluating parent governance, promoter pledge, and Piotroski F-score with bi-directional dossier surfacing across equities and corporate bonds.~~
+- ~~**28. Proactive Thesis Drift & Real-Time Surveillance Feed (Phase 4):** Connected continuous 5-minute BSE watcher (`core/agents/watchers/bse_watcher.py`), scanning watchlist scrips for official regulatory disclosures (auditor resignations, pledge changes, M&A) and recording events to `autonomous_event_ledger`. Wired live navbar Agent Radar modal feed and public API `/api/autonomous/events`.~~
+- ~~**29. Institutional Export & Approachable SEBI Safe-Harbor Polish (Phase 5):** Deployed 1-click institutional PDF generation across all 4 asset classes (`/api/pdf/{ticker}`, `/api/pdf/fund/{scheme_code}`, `/api/pdf/debt/{isin}`, `/api/pdf/reit/{symbol}`). Sanitized phrasing to maintain approachable, plain-English clarity with zero condescension while strictly embedding SEBI RA Section 2(u) non-advisory educational disclaimers.~~
+- ~~**30. Zero-Hallucination & Anti-Fabrication Test Suite & Hygiene Enforcement:** Built `tests/test_zero_hallucination_and_grounding.py` (8 automated tests) verifying elimination of all corporate entity claims, fake SAC codes (998314), office addresses, fake support emails (`support@stockresearch.app`), and personal name placeholders. Mandated strictly on-site `/contact` grievance review by admin console.~~
+- ~~**31. Admin Panel Direct Remedial Credit Granting & Task Remediation Flow:** Built atomic DB function `admin_grant_user_credits` in `core/db/admin.py`, `POST /admin/users/grant-credits` in `web/main.py`, `#adminGrantCreditsModal` in `web/templates/admin.html`, zero-revenue ledger isolation (`amount_inr = 0.0`, `nature = FREE_GRANT`), support ticket auto-resolution, and automated test suite in `tests/test_admin_credit_grant.py`.~~
+- ~~**32. Formal Rejection of Sitewide Autonomous Agents (Gate 4):** Preserved deterministic Python pipelines + single-pass Gemini structured synthesis. Shelved and archived `docs/sitewide_antigravity_sdk_implementation_plan.md` to ensure SEBI audit immunity, avoid the 10x–20x compounding context tax, and preserve sub-3s response latency.~~
 
 
 
