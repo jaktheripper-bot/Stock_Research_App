@@ -13,6 +13,6 @@
 
 ## 2. Zero-Hallucination & Entity Registration Directives
 - **Not Registered Anywhere:** We are an independent software tool and are **NOT registered anywhere**. Never imply corporate registration, corporate entities, physical office addresses, phone numbers, or GST SAC service codes anywhere on the platform or in documents.
-- **Support Channels:** Strictly digital via `support@stockresearch.app` and `grievance@stockresearch.app`.
+- **Support Channels:** Strictly through the on-site Feedback & Complaints Form (`/contact`). NEVER feature email IDs, phone numbers, or external contact details on the site. All inquiries and complaints are reviewed directly by the user/owner via the Admin Console.
 - **Name Placeholder Hygiene:** Do NOT feature the user's personal name (`Lyndon Pinto`) in UI templates or form examples. Use generic Indian names like `Rahul Sharma`.
 - **Approachable Language:** Maintain professional, user-friendly language without condescending or unapproachable jargon.

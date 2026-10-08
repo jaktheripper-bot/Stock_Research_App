@@ -39,7 +39,7 @@ def send_ticket_notification_email(ticket: dict) -> bool:
     smtp_port = int(os.environ.get("SMTP_PORT", 587))
     smtp_user = os.environ.get("SMTP_USER")
     smtp_password = os.environ.get("SMTP_PASSWORD")
-    sender_email = os.environ.get("SMTP_FROM", smtp_user or "notifications@stockresearch.app")
+    sender_email = os.environ.get("SMTP_FROM", smtp_user or "noreply@localhost")
 
     subject = f"🚨 [New Support Ticket] {ticket.get('ticket_id')} - {ticket.get('subject')}"
     body = f"""

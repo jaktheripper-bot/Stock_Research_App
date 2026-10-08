@@ -79,7 +79,7 @@ POLICIES = {
         </ul>
 
         <h3>6. Contact and Grievance Officer</h3>
-        <p>In accordance with the Information Technology Act, 2000, inquiries or data deletion requests may be directed to our Grievance Officer at <code>privacy@stockresearch.app</code>.</p>
+        <p>In accordance with the Information Technology Act, 2000, inquiries or data deletion requests may be submitted directly through our <a href="/contact">Feedback & Grievance Form</a>.</p>
         """
     },
     "refund-policy": {
@@ -94,7 +94,7 @@ POLICIES = {
         <p>We want you to be completely satisfied with our platform:</p>
         <ul>
             <li>If you purchased an <strong>On-Demand Credit Pack</strong> (Single Pass, Analyst 3-Pack, Portfolio 10-Pack) and have <strong>not consumed</strong> any of the purchased credits, you may request a <strong>100% full refund within 7 calendar days</strong> of the purchase date.</li>
-            <li>Refund requests must be submitted via email to <code>support@stockresearch.app</code> along with your order ID or invoice number.</li>
+            <li>Refund requests must be submitted through our <a href="/contact">Feedback & Complaints Form</a> along with your order ID or invoice number.</li>
             <li>Approved refunds are processed through Razorpay back to the original payment source (UPI account or Card) within <strong>5 to 7 business days</strong>.</li>
         </ul>
 
@@ -103,12 +103,12 @@ POLICIES = {
 
         <h3>4. Pro Subscriptions & Cancellations</h3>
         <ul>
-            <li><strong>Monthly Pro Subscriptions:</strong> You may cancel your subscription renewal at any time from your account settings or by emailing support. Cancellation takes effect at the end of the current 30-day billing cycle. No further charges will occur.</li>
+            <li><strong>Monthly Pro Subscriptions:</strong> You may cancel your subscription renewal at any time from your account settings or through our <a href="/contact">Feedback & Support Form</a>. Cancellation takes effect at the end of the current 30-day billing cycle. No further charges will occur.</li>
             <li><strong>Annual Subscriptions:</strong> If you cancel within the first 14 days and have consumed fewer than 10 syntheses, you are eligible for a prorated refund minus transaction gateway fees.</li>
         </ul>
 
         <h3>5. Payment Failures or Erroneous Charges</h3>
-        <p>In the event of a technical issue where your account was debited by your bank but credits were not allocated, our automated reconciliation engine will credit the units within 15 minutes. If unresolved, please contact support for an immediate credit top-up or refund.</p>
+        <p>In the event of a technical issue where your account was debited by your bank but credits were not allocated, our automated reconciliation engine will credit the units within 15 minutes. If unresolved, please submit a ticket through our <a href="/contact">Feedback & Complaints Form</a> for review from our management console.</p>
         """
     },
     "contact": {
@@ -120,15 +120,14 @@ POLICIES = {
         <p>We are here to assist with any questions regarding research credits, institutional access, technical support, or billing queries.</p>
 
         <div style="background: rgba(14, 165, 233, 0.08); border-left: 4px solid #0284c7; padding: 16px; border-radius: 6px; margin: 20px 0;">
-            <p style="margin: 0 0 8px 0;"><strong>📧 Support Email:</strong> <a href="mailto:support@stockresearch.app">support@stockresearch.app</a></p>
-            <p style="margin: 0 0 8px 0;"><strong>⏱️ Support Hours:</strong> Monday to Friday, 9:30 AM – 6:30 PM IST</p>
-            <p style="margin: 0;"><strong>💬 Support Desk:</strong> Submit inquiries directly via our <a href="/contact">Contact & Support Form</a></p>
+            <p style="margin: 0 0 8px 0;"><strong>💬 Administration Review:</strong> All user inquiries, suggestions, and feedback are submitted via our online form and reviewed directly from our administration console.</p>
+            <p style="margin: 0;"><strong>⏱️ Review Schedule:</strong> Monday to Friday, 9:30 AM – 6:30 PM IST</p>
         </div>
 
         <h3>Grievance Officer (IT Rules, 2021)</h3>
         <p>For regulatory compliance, privacy escalations, or legal communications:</p>
-        <p><strong>Name:</strong> Compliance & Operations Lead<br>
-        <strong>Email:</strong> <code>grievance@stockresearch.app</code><br>
+        <p><strong>Desk:</strong> Compliance & Operations Desk<br>
+        <strong>Channel:</strong> Online <a href="/contact">Feedback & Complaints Form</a> (Select "Statutory Grievance / Compliance")<br>
         <strong>Turnaround Time:</strong> Acknowledgment within 24 hours, resolution within 15 business days.</p>
         """
     },
@@ -149,7 +148,7 @@ POLICIES = {
         </ul>
 
         <h3>3. Delivery Issues</h3>
-        <p>If your account balance does not immediately reflect purchased credits following a confirmed bank deduction, please email your transaction receipt to <code>support@stockresearch.app</code>. We guarantee manual fulfillment within 2 hours.</p>
+        <p>If your account balance does not immediately reflect purchased credits following a confirmed bank deduction, please submit your transaction ID or payment reference via our <a href="/contact">Feedback & Complaints Form</a>. Inquiries are audited and reviewed directly from our administration console.</p>
         """
     },
     "disclaimer": {
