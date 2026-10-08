@@ -112,6 +112,7 @@ from core.db.admin import (
     update_admin_last_login,
     record_admin_audit,
     get_admin_audit_logs,
+    admin_grant_user_credits,
 )
 from telemetry import (
     verify_admin_passcode,
@@ -3752,6 +3753,96 @@ async def admin_process_refund(
         )
         msg = f"Refund+failed:+{res.get('error', 'Unknown error')}"
     return RedirectResponse(url=f"/admin?tab=billables&msg={msg}", status_code=303)
+
+@app.post("/admin/users/grant-credits")
+async def admin_grant_credits_endpoint(request: Request):
+    """
+    Administrative endpoint to directly allocate remedial or goodwill research credits
+    to user accounts, compensating for failed synthesis or resolving grievances.
+    """
+    admin_session = _is_admin_authenticated(request)
+    if not admin_session:
+        accept_header = request.headers.get("accept", "")
+        content_type = request.headers.get("content-type", "")
+        if "application/json" in accept_header or "application/json" in content_type:
+            return JSONResponse(status_code=403, content={"success": False, "error": "Admin authorization required."})
+        raise HTTPException(status_code=403, detail="Admin authorization required.")
+
+    content_type = request.headers.get("content-type", "")
+    if "application/json" in content_type:
+        try:
+            body = await request.json()
+        except Exception:
+            body = {}
+        user_identifier = body.get("user_email") or body.get("user_id") or ""
+        credits_val = body.get("credits", 2.0)
+        reason_code = body.get("reason", "TASK_REMEDY")
+        admin_note = body.get("admin_note", "")
+        ticket_id = body.get("ticket_id")
+        task_ticker = body.get("task_ticker")
+        resolve_ticket = body.get("resolve_ticket", True)
+        tab = body.get("tab", "users")
+        is_ajax = True
+    else:
+        form = await request.form()
+        user_identifier = form.get("user_email") or form.get("user_id") or ""
+        credits_val = form.get("credits", 2.0)
+        reason_code = form.get("reason", "TASK_REMEDY")
+        admin_note = form.get("admin_note", "")
+        ticket_id = form.get("ticket_id")
+        task_ticker = form.get("task_ticker")
+        resolve_ticket = form.get("resolve_ticket") in ("true", "1", "on", True)
+        tab = form.get("tab", "users")
+        is_ajax = (
+            request.headers.get("x-requested-with") == "XMLHttpRequest"
+            or "application/json" in request.headers.get("accept", "")
+        )
+
+    try:
+        credits_amount = float(credits_val)
+        if credits_amount <= 0 or credits_amount > 1000.0:
+            raise ValueError("Credits amount must be between 0.1 and 1000.0.")
+    except Exception as e:
+        err_msg = f"Invalid credits amount: {e}"
+        if is_ajax:
+            return JSONResponse(status_code=400, content={"success": False, "error": err_msg})
+        return RedirectResponse(url=f"/admin?tab={tab}&err={urllib.parse.quote_plus(err_msg)}", status_code=303)
+
+    client_ip = request.headers.get("x-forwarded-for") or (request.client.host if request.client else "unknown")
+    user_agent = request.headers.get("user-agent", "")
+    admin_email = admin_session.get("email", "admin")
+
+    result = admin_grant_user_credits(
+        admin_email=admin_email,
+        target_user_identifier=str(user_identifier).strip(),
+        credits_amount=credits_amount,
+        reason_code=str(reason_code).strip(),
+        admin_note=str(admin_note).strip(),
+        ticket_id=str(ticket_id).strip() if ticket_id else None,
+        task_ticker=str(task_ticker).strip() if task_ticker else None,
+        resolve_ticket=bool(resolve_ticket),
+        ip_address=client_ip,
+        user_agent=user_agent
+    )
+
+    if result.get("success"):
+        target_email = result.get("user_email", user_identifier)
+        msg = f"Successfully granted {credits_amount} credits to {target_email}."
+        if is_ajax:
+            return JSONResponse(status_code=200, content={
+                "success": True,
+                "message": msg,
+                "user_email": target_email,
+                "user_id": result.get("user_id"),
+                "credits_added": result.get("credits_added"),
+                "new_balance": result.get("new_balance")
+            })
+        return RedirectResponse(url=f"/admin?tab={tab}&msg={urllib.parse.quote_plus(msg)}", status_code=303)
+    else:
+        err = result.get("error", "Failed to grant credits.")
+        if is_ajax:
+            return JSONResponse(status_code=400, content={"success": False, "error": err})
+        return RedirectResponse(url=f"/admin?tab={tab}&err={urllib.parse.quote_plus(err)}", status_code=303)
 
 @app.get("/admin/export/tax-register")
 async def admin_export_tax_register(request: Request):

@@ -561,18 +561,25 @@
     </div>
 
     <div class="admin-card">
-      <h3 style="margin-top: 0; font-size: 16px; font-weight: 700; margin-bottom: 16px;">Top Active Users in Period</h3>
+      <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px;">
+        <h3 style="margin: 0; font-size: 16px; font-weight: 700;">Top Active Users in Period</h3>
+        <button type="button" class="btn btn-primary btn-sm" onclick="openGrantCreditsModal('', '', 'TASK_REMEDY', '')" style="display: flex; align-items: center; gap: 6px; font-weight: 600; cursor: pointer;">
+          ⚡ Direct Credit Grant
+        </button>
+      </div>
       <div class="admin-table-wrap">
         <table class="admin-table">
           <thead>
             <tr>
               <th>User Email</th>
               <th>User ID</th>
+              <th>Credits</th>
               <th>Total Events</th>
               <th>Distinct Tickers</th>
               <th>PDFs Exported</th>
               <th>Comparisons</th>
               <th>Last Seen</th>
+              <th>Action</th>
             </tr>
           </thead>
           <tbody>
@@ -580,15 +587,21 @@
             <tr>
               <td style="font-weight: 600;">{{ u.email }}</td>
               <td class="mono" style="font-size: 11px; color: #64748b;">{{ u.user_id }}</td>
-              <td class="mono" style="font-weight: 700;">{{ u.total_events }}</td>
+              <td class="mono" style="font-weight: 700; color: #10b981;">{{ "%.1f"|format(u.credits_balance|default(0.0)) }}</td>
+              <td class="mono" style="font-weight: 700;">{{ u.total_actions or u.total_events }}</td>
               <td class="mono">{{ u.distinct_tickers }}</td>
               <td class="mono">{{ u.pdf_exports }}</td>
               <td class="mono">{{ u.comparisons }}</td>
-              <td class="mono" style="font-size: 11px;">{{ u.last_seen }}</td>
+              <td class="mono" style="font-size: 11px;">{{ u.last_active or u.last_seen }}</td>
+              <td>
+                <button type="button" class="btn btn-secondary btn-sm" onclick="openGrantCreditsModal('{{ u.email }}', '', 'TASK_REMEDY', '')" style="padding: 4px 10px; font-size: 11px; color: #10b981; border-color: rgba(16, 185, 129, 0.4); display: inline-flex; align-items: center; gap: 4px; cursor: pointer;" title="Grant remedial credits to {{ u.email }}">
+                  ⚡ Grant Credits
+                </button>
+              </td>
             </tr>
             {% else %}
             <tr>
-              <td colspan="7" style="text-align: center; color: var(--text-secondary, #94a3b8); padding: 30px;">
+              <td colspan="9" style="text-align: center; color: var(--text-secondary, #94a3b8); padding: 30px;">
                 No user telemetry records found in the selected window.
               </td>
             </tr>
@@ -645,17 +658,22 @@
                 <span class="status-pill {{ t.status }}">{{ t.status }}</span>
               </td>
               <td>
-                <form method="POST" action="/admin/tickets/{{ t.ticket_id }}/status" style="display: flex; gap: 6px; align-items: center;">
-                  <select name="status" class="admin-select" style="padding: 4px 8px; font-size: 12px;">
-                    <option value="open" {% if t.status == 'open' %}selected{% endif %}>Open</option>
-                    <option value="in_progress" {% if t.status == 'in_progress' %}selected{% endif %}>In Progress</option>
-                    <option value="resolved" {% if t.status == 'resolved' %}selected{% endif %}>Resolved</option>
-                    <option value="closed" {% if t.status == 'closed' %}selected{% endif %}>Closed</option>
-                  </select>
-                  <button type="submit" class="btn btn-secondary btn-sm" style="padding: 4px 8px; font-size: 11px;">
-                    Update
+                <div style="display: flex; flex-direction: column; gap: 6px;">
+                  <form method="POST" action="/admin/tickets/{{ t.ticket_id }}/status" style="display: flex; gap: 6px; align-items: center;">
+                    <select name="status" class="admin-select" style="padding: 4px 8px; font-size: 12px;">
+                      <option value="open" {% if t.status == 'open' %}selected{% endif %}>Open</option>
+                      <option value="in_progress" {% if t.status == 'in_progress' %}selected{% endif %}>In Progress</option>
+                      <option value="resolved" {% if t.status == 'resolved' %}selected{% endif %}>Resolved</option>
+                      <option value="closed" {% if t.status == 'closed' %}selected{% endif %}>Closed</option>
+                    </select>
+                    <button type="submit" class="btn btn-secondary btn-sm" style="padding: 4px 8px; font-size: 11px;">
+                      Update
+                    </button>
+                  </form>
+                  <button type="button" class="btn btn-secondary btn-sm" onclick="openGrantCreditsModal('{{ t.user_email }}', '{{ t.ticket_id }}', 'TASK_REMEDY', '')" style="padding: 4px 8px; font-size: 11px; color: #f59e0b; border-color: rgba(245, 158, 11, 0.4); background: rgba(245, 158, 11, 0.08); display: inline-flex; align-items: center; justify-content: center; gap: 4px; cursor: pointer;" title="Grant remedial credits & resolve grievance">
+                    ⚡ Grant Remedial Credits
                   </button>
-                </form>
+                </div>
               </td>
             </tr>
             {% else %}
@@ -1443,7 +1461,123 @@
     </div>
   </div>
 
+  <!-- Grant User Credits & Task Remedy Modal -->
+  <div id="adminGrantCreditsModal" class="modal-backdrop" style="display: none; align-items: center; justify-content: center; z-index: 9999;">
+    <div class="modal-dialog" style="max-width: 480px; width: 90%; background: var(--bg-card, #131722); border-radius: 12px; padding: 24px; border: 1px solid rgba(56, 189, 248, 0.4); box-shadow: 0 20px 45px rgba(0, 0, 0, 0.7);">
+      <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px;">
+        <h3 style="margin: 0; font-size: 18px; font-weight: 800; display: flex; align-items: center; gap: 8px;">
+          <span style="color: #38bdf8;">⚡</span> Grant Remedial Credits
+        </h3>
+        <button type="button" onclick="closeGrantCreditsModal()" style="background: none; border: none; color: #94a3b8; font-size: 22px; cursor: pointer;">&times;</button>
+      </div>
+
+      <p style="font-size: 12px; color: var(--text-secondary, #94a3b8); margin-bottom: 16px; line-height: 1.5;">
+        Allocate research credits directly to an investor's account to remedy failed synthesis tasks, compensate support grievances, or provide promotional goodwill. Zero-revenue ledger isolation is strictly enforced.
+      </p>
+
+      <form method="POST" action="/admin/users/grant-credits" id="grantCreditsForm">
+        <input type="hidden" name="tab" id="grantModalTabInput" value="{{ active_tab or 'users' }}">
+
+        <div style="margin-bottom: 12px;">
+          <label style="display: block; font-size: 12px; margin-bottom: 4px; color: #94a3b8; font-weight: 600;">Investor Email or Account ID <span style="color: #ef4444;">*</span></label>
+          <input type="text" name="user_email" id="grantUserEmail" class="admin-input" style="width: 100%; box-sizing: border-box;" required placeholder="investor@example.com">
+        </div>
+
+        <div style="margin-bottom: 12px;">
+          <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 4px;">
+            <label style="font-size: 12px; color: #94a3b8; font-weight: 600;">Credits to Add <span style="color: #ef4444;">*</span></label>
+            <div style="display: flex; gap: 4px;">
+              <button type="button" onclick="setGrantPreset(1.0)" class="btn btn-secondary btn-sm" style="padding: 2px 6px; font-size: 10px;">+1.0 (Dossier)</button>
+              <button type="button" onclick="setGrantPreset(2.0)" class="btn btn-secondary btn-sm" style="padding: 2px 6px; font-size: 10px; color: #38bdf8; border-color: rgba(56, 189, 248, 0.4);">+2.0 (Deep)</button>
+              <button type="button" onclick="setGrantPreset(5.0)" class="btn btn-secondary btn-sm" style="padding: 2px 6px; font-size: 10px;">+5.0 (Pack)</button>
+            </div>
+          </div>
+          <input type="number" step="0.5" min="0.1" max="100.0" name="credits" id="grantCreditsAmount" value="2.0" class="admin-input" style="width: 100%; box-sizing: border-box;" required>
+        </div>
+
+        <div style="margin-bottom: 12px;">
+          <label style="display: block; font-size: 12px; margin-bottom: 4px; color: #94a3b8; font-weight: 600;">Grant Reason Taxonomy</label>
+          <select name="reason" id="grantReason" class="admin-select" style="width: 100%; box-sizing: border-box;">
+            <option value="TASK_REMEDY" selected>TASK_REMEDY (Failed or Stalled Synthesis Task)</option>
+            <option value="SERVICE_DISRUPTION">SERVICE_DISRUPTION (Temporary Gateway / Upstream Downtime)</option>
+            <option value="GOODWILL_COMPENSATION">GOODWILL_COMPENSATION (Grievance Settlement & Goodwill)</option>
+            <option value="PROMOTIONAL_BONUS">PROMOTIONAL_BONUS (Beta Feedback & Evaluation Grant)</option>
+            <option value="MANUAL_ADMIN_ADJUSTMENT">MANUAL_ADMIN_ADJUSTMENT (Administrative Adjustment)</option>
+          </select>
+        </div>
+
+        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-bottom: 12px;">
+          <div>
+            <label style="display: block; font-size: 11px; margin-bottom: 4px; color: #94a3b8;">Linked Ticket ID (Optional)</label>
+            <input type="text" name="ticket_id" id="grantTicketId" class="admin-input" style="width: 100%; box-sizing: border-box;" placeholder="TKT-XXXXXX">
+          </div>
+          <div>
+            <label style="display: block; font-size: 11px; margin-bottom: 4px; color: #94a3b8;">Impacted Ticker (Optional)</label>
+            <input type="text" name="task_ticker" id="grantTaskTicker" class="admin-input" style="width: 100%; box-sizing: border-box;" placeholder="e.g. INFY">
+          </div>
+        </div>
+
+        <div id="grantResolveTicketRow" style="display: none; align-items: center; gap: 8px; margin-bottom: 12px; background: rgba(56, 189, 248, 0.08); padding: 8px 12px; border-radius: 6px; border: 1px solid rgba(56, 189, 248, 0.2);">
+          <input type="checkbox" name="resolve_ticket" id="grantResolveTicket" value="true" checked style="cursor: pointer;">
+          <label for="grantResolveTicket" style="font-size: 12px; color: #e2e8f0; cursor: pointer; user-select: none;">
+            Automatically mark linked ticket as <strong>Resolved</strong> upon grant
+          </label>
+        </div>
+
+        <div style="margin-bottom: 18px;">
+          <label style="display: block; font-size: 11px; margin-bottom: 4px; color: #94a3b8;">Administrative Audit Note (Immutable)</label>
+          <textarea name="admin_note" id="grantAdminNote" class="admin-input" style="width: 100%; box-sizing: border-box; height: 60px; resize: vertical;" placeholder="Reason for remedial credit grant (e.g., failed synthesis retry)"></textarea>
+        </div>
+
+        <div style="display: flex; gap: 10px; justify-content: flex-end;">
+          <button type="button" onclick="closeGrantCreditsModal()" class="btn btn-secondary" style="padding: 8px 16px; font-size: 13px;">
+            Cancel
+          </button>
+          <button type="submit" class="btn btn-primary" style="padding: 8px 18px; font-size: 13px; font-weight: 700; background: #0ea5e9; border-color: #0ea5e9;">
+            ⚡ Confirm & Grant Credits
+          </button>
+        </div>
+      </form>
+    </div>
+  </div>
+
   <script>
+  function openGrantCreditsModal(email, ticketId, reason, ticker) {
+    const modal = document.getElementById('adminGrantCreditsModal');
+    if (!modal) return;
+    document.getElementById('grantUserEmail').value = email || '';
+    document.getElementById('grantTicketId').value = ticketId || '';
+    document.getElementById('grantTaskTicker').value = ticker || '';
+    if (reason) {
+      document.getElementById('grantReason').value = reason;
+    }
+    const resolveRow = document.getElementById('grantResolveTicketRow');
+    const resolveCheckbox = document.getElementById('grantResolveTicket');
+    if (ticketId) {
+      if (resolveRow) resolveRow.style.display = 'flex';
+      if (resolveCheckbox) resolveCheckbox.checked = true;
+    } else {
+      if (resolveRow) resolveRow.style.display = 'none';
+      if (resolveCheckbox) resolveCheckbox.checked = false;
+    }
+    document.getElementById('grantCreditsAmount').value = '2.0';
+    modal.style.display = 'flex';
+  }
+
+  function closeGrantCreditsModal() {
+    const modal = document.getElementById('adminGrantCreditsModal');
+    if (modal) {
+      modal.style.display = 'none';
+    }
+  }
+
+  function setGrantPreset(val) {
+    const input = document.getElementById('grantCreditsAmount');
+    if (input) {
+      input.value = Number(val).toFixed(1);
+    }
+  }
+
   function showTab(tabName) {
     document.querySelectorAll('.admin-tab-pane').forEach(el => el.classList.remove('active'));
     document.querySelectorAll('.admin-tab-btn').forEach(el => el.classList.remove('active'));
@@ -1465,6 +1599,10 @@
     const purgeTabInput = document.getElementById('purgeModalTabInput');
     if (purgeTabInput) {
       purgeTabInput.value = tabName;
+    }
+    const grantTabInput = document.getElementById('grantModalTabInput');
+    if (grantTabInput) {
+      grantTabInput.value = tabName;
     }
 
     // Update URL query parameter smoothly without page reload

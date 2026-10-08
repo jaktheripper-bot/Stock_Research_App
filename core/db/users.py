@@ -477,7 +477,7 @@ def get_all_billables(status: Optional[str] = None, limit: int = 100, offset: in
             if "sim" in g_ord or "sim" in g_pay or gw == "simulation" or "order_test" in g_ord:
                 nature = "SIMULATION"
                 nature_label = "🧪 Sandbox Test"
-            elif pack == "WELCOME_GRANT" or (amt == 0.0 and (gw == "system_grant" or "grant" in pack or "free" in pack)):
+            elif pack == "WELCOME_GRANT" or (amt == 0.0 and (gw in ("system_grant", "admin_grant") or "grant" in pack or "free" in pack)):
                 nature = "FREE_GRANT"
                 nature_label = "🎁 Free Grant (₹0)"
             elif amt > 0 and st in ("success", "paid"):
