@@ -350,5 +350,21 @@
       "revision_count": 47
     },
     "preflight_passed": true
+  },
+  {
+    "tag": "checkpoint_20261008_092558_feat__contextual_section_awareness_and_multi-asset_copilot_isolation",
+    "timestamp": "2026-10-08 09:25:58 IST",
+    "commit_sha": "aa13c81b7de2090955aa964f58b85ec87023a772",
+    "branch": "main",
+    "description": "feat: contextual section awareness and multi-asset copilot isolation",
+    "database": {
+      "exists": true,
+      "filename": "reports_checkpoint_20261008_092558_feat__contextual_section_awareness_and_multi-asset_copilot_isolation.db",
+      "path": ".checkpoints/reports_checkpoint_20261008_092558_feat__contextual_section_awareness_and_multi-asset_copilot_isolation.db",
+      "size_bytes": 2105344,
+      "report_count": 2,
+      "revision_count": 49
+    },
+    "preflight_passed": true
   }
 ]
