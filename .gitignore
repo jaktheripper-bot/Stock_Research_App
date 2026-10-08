@@ -18,3 +18,4 @@ scratch/
 .tmp.driveupload/
 *.code-workspace
 .cache/
+audits/
