@@ -1282,8 +1282,10 @@ details.pillar-accordion[open] summary {
 
 .pillar-summary-left {
   display: flex;
-  align-items: center;
+  align-items: flex-start;
   gap: 12px;
+  flex: 1;
+  min-width: 0;
 }
 
 .pillar-summary-left .badge,
@@ -1294,6 +1296,7 @@ details.pillar-accordion[open] summary {
   min-width: 34px;
   height: 26px;
   padding: 0 9px;
+  margin-top: 1px;
   font-family: var(--font-mono);
   font-size: 12px;
   font-weight: 800;
@@ -1309,9 +1312,8 @@ details.pillar-accordion[open] summary {
   font-weight: 800;
   color: var(--text-primary);
   margin: 0;
-  line-height: 1.25;
-  display: flex;
-  align-items: center;
+  line-height: 1.35;
+  word-break: break-word;
 }
 
 .pillar-chevron {

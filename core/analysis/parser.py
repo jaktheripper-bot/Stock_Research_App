@@ -112,36 +112,43 @@ PILLAR_METADATA = {
         "label": "BSE Announcements",
         "url_path": "corporates/ann.html?scrip_cd={scrip}",
         "name": "BSE Regulatory Disclosures & Macro Bulletins",
+        "standard_title": "Macro-Economic, Geopolitical & Environmental Overlays",
     },
     2: {
         "label": "BSE Transcripts",
         "url_path": "corporates/ann.html?scrip_cd={scrip}",
         "name": "BSE Investor Presentations & Concall Transcripts",
+        "standard_title": "Industry Dynamics & Competitive Positioning",
     },
     3: {
         "label": "BSE Shareholding",
         "url_path": "corporates/ShareholdingPattern.aspx?scrip_cd={scrip}",
         "name": "Official BSE Shareholding Pattern & Promoter Pledging",
+        "standard_title": "Promoter Quality & Fundamental Health",
     },
     4: {
         "label": "BSE Financial Results",
         "url_path": "corporates/Comp_Resultsnew.aspx?scrip_cd={scrip}",
         "name": "BSE Audited Financial Results (Comp_Results)",
+        "standard_title": 'The "Structural vs. Temporary" Drop Diagnostic',
     },
     5: {
         "label": "BSE Valuation Filings",
         "url_path": "corporates/Comp_Resultsnew.aspx?scrip_cd={scrip}",
         "name": "BSE Exchange Earnings Filings & Balance Sheet",
+        "standard_title": "Valuation & Margin of Safety",
     },
     6: {
         "label": "BSE Bhavcopy",
         "url_path": "stock-share-price/-/-/{scrip}/",
         "name": "Official BSE Bhavcopy Trade Execution Records",
+        "standard_title": "Technical & Momentum Overlay",
     },
     7: {
         "label": "BSE BRSR ESG",
         "url_path": "corporates/ann.html?scrip_cd={scrip}",
         "name": "SEBI Business Responsibility and Sustainability Report (BRSR)",
+        "standard_title": "ESG Impact Scorecard",
     },
 }
 
@@ -161,19 +168,32 @@ def wrap_html_with_collapsible_pillars(
       display a teaser paragraph followed by an institutional frosted-glass paywall overlay
       when is_deep_dive_unlocked is False.
     """
-    if not html_content or "Pillar" not in html_content:
+    if not html_content:
+        return html_content
+
+    # Check for presence of pillar token across English, Hindi, and technical sections
+    has_pillar_token = any(token in html_content for token in ("Pillar", "स्तंभ", "Dimension"))
+    if not has_pillar_token:
         return html_content
 
     scrip = str(scrip_code or "").strip()
     if not scrip or not scrip.isdigit():
         scrip = "500209"
 
-    pattern = re.compile(r'(<h2[^>]*>.*?(?:Pillar|Section|Dimension|\b0)?\s*(\d+)[:\.\s\-]+([^<]*?)</h2>)', re.IGNORECASE)
+    # Strict AST heading pattern: requires explicit Pillar/स्तंभ/Dimension token across H1-H3
+    # This prevents subheadings like <h2>1. Profitability risk</h2> or <h2>1. Executive Summary</h2> from hijacking Pillar 1
+    pattern = re.compile(
+        r'(<h[1-3][^>]*>.*?(?:Pillar|स्तंभ|Dimension)\s*(\d+)[:\.\s\-]*([^<]*?)</h[1-3]>)',
+        re.IGNORECASE
+    )
     splits = pattern.split(html_content)
     
     if len(splits) < 5:
-        # Fallback to strict Pillar pattern if flexible pattern didn't match cleanly
-        pattern = re.compile(r'(<h2[^>]*>.*?Pillar\s*(\d+)[:\.\s\-]*([^<]*?)</h2>)', re.IGNORECASE)
+        # Fallback to secondary pattern if token was formatted with non-breaking whitespace or brackets
+        pattern = re.compile(
+            r'(<h[1-3][^>]*>.*?(?:Pillar|स्तंभ|Dimension)[^\w<]*?(\d+)[:\.\s\-]*([^<]*?)</h[1-3]>)',
+            re.IGNORECASE
+        )
         splits = pattern.split(html_content)
         if len(splits) < 5:
             return html_content
@@ -183,7 +203,7 @@ def wrap_html_with_collapsible_pillars(
     t_clean = (ticker or "").upper()
     while i < len(splits):
         num_str = splits[i+1]
-        raw_title = splits[i+2].strip()
+        raw_title = splits[i+2].strip().strip(" :.-")
         body_content = splits[i+3] if i + 3 < len(splits) else ""
 
         try:
@@ -195,7 +215,7 @@ def wrap_html_with_collapsible_pillars(
         url = f"https://www.bseindia.com/{meta['url_path'].format(scrip=scrip)}"
         label = meta["label"]
         name = meta["name"]
-        clean_title = raw_title or f"Section {p_num:02d}"
+        clean_title = raw_title or meta.get("standard_title", f"Pillar {p_num:02d}")
 
         # Tiered Institutional Gating Logic for Pillars 03 & 05
         status_pill_html = ""

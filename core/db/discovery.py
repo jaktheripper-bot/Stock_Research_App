@@ -99,11 +99,13 @@ def save_discovery_reel(items: List[Dict[str, Any]], edition_date: Optional[str]
 
 def get_active_discovery_reel(
     edition_date: Optional[str] = None,
-    exclude_tests: Optional[bool] = None
+    exclude_tests: Optional[bool] = None,
+    allow_fallback: bool = True
 ) -> List[Dict[str, Any]]:
     """
     Retrieves the active morning discovery reel for a given edition date.
-    If edition_date is None or has no items, falls back to the most recent available active edition.
+    If edition_date is None or has no items and allow_fallback is True, falls back to the most recent available active edition.
+    If allow_fallback is False, strictly returns records matching the requested edition_date (or []).
     Excludes synthetic test records on public requests by default.
     """
     init_db()
@@ -139,8 +141,8 @@ def get_active_discovery_reel(
         today_str = now_ist.strftime("%Y-%m-%d")
         is_past_9am = now_ist.hour >= 9
 
-        # Fallback to latest available edition if requested edition yielded no rows
-        if not rows:
+        # Fallback to latest available edition if requested edition yielded no rows and allow_fallback is True
+        if not rows and allow_fallback:
             # If before 9 AM IST, select the latest edition strictly prior to today
             date_filter = f"AND edition_date <= '{today_str}'" if is_past_9am else f"AND edition_date < '{today_str}'"
             query = f"""
