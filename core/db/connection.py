@@ -17,7 +17,10 @@ _CACHED_SUPABASE_URL = None
 _SUPABASE_URL_RESOLVED = False
 
 def get_supabase_url() -> str | None:
-    """Returns configured Supabase DB URL, cached in memory after first resolution."""
+    """Returns configured Supabase DB URL, cached in memory after first resolution.
+    Always returns None during automated unit testing to prevent test pollution of production PostgreSQL."""
+    if os.environ.get("TESTING") == "1" and os.environ.get("TEST_SUPABASE") != "1":
+        return None
     global _CACHED_SUPABASE_URL, _SUPABASE_URL_RESOLVED
     if not _SUPABASE_URL_RESOLVED:
         url = get_secret("SUPABASE_DB_URL")

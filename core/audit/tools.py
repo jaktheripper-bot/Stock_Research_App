@@ -39,6 +39,12 @@ def tool_run_test_suite() -> Dict[str, Any]:
     cmd = [sys.executable, "-m", "unittest", "discover", "-s", "tests"]
     start_time = time.time()
     try:
+        test_env = dict(os.environ)
+        test_env.pop("SUPABASE_DB_URL", None)
+        test_env.pop("SUPABASE_URL", None)
+        test_env["TESTING"] = "1"
+        test_env["AUDIT_RECURSION_GUARD"] = "1"
+
         proc = subprocess.run(
             cmd,
             cwd=str(PROJECT_ROOT),
@@ -46,7 +52,7 @@ def tool_run_test_suite() -> Dict[str, Any]:
             stderr=subprocess.STDOUT,
             text=True,
             timeout=180,
-            env={**os.environ, "TESTING": "1", "AUDIT_RECURSION_GUARD": "1"}
+            env=test_env
         )
         duration = round(time.time() - start_time, 2)
         output = proc.stdout or ""
@@ -69,12 +75,23 @@ def tool_run_test_suite() -> Dict[str, Any]:
         is_ok = "OK" in output and proc.returncode == 0
         passed = total_tests - (failed + errors)
 
+        # Extract specific failing test names for diagnostic transparency
+        failed_tests = []
+        for line in output.splitlines():
+            line_s = line.strip()
+            if line_s.startswith("FAIL:") or line_s.startswith("ERROR:"):
+                failed_tests.append(line_s)
+
+        if failed_tests:
+            logger.warning(f"Test suite failures detected ({len(failed_tests)}): {'; '.join(failed_tests[:5])}")
+
         return {
             "status": "PASS" if is_ok else "FAIL",
             "total_tests": total_tests,
             "passed": passed,
             "failed": failed,
             "errors": errors,
+            "failed_tests": failed_tests,
             "duration_s": reported_duration,
             "exit_code": proc.returncode,
             "summary": f"Ran {total_tests} tests in {reported_duration}s — {'OK' if is_ok else 'FAILED'}"

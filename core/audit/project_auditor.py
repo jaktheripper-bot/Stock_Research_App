@@ -118,7 +118,9 @@ def compute_deterministic_audit_metrics() -> Dict[str, Any]:
 
     if tests_failed > 0:
         impl_score -= 40.0
-        critical_violations.append(f"Automated test suite failure: {tests_failed} test(s) failed out of {tests_total}.")
+        fail_details = "; ".join(test_res.get("failed_tests", [])[:3])
+        detail_msg = f" ({fail_details})" if fail_details else ""
+        critical_violations.append(f"Automated test suite failure: {tests_failed} test(s) failed out of {tests_total}.{detail_msg}")
     elif tests_total == 0:
         impl_score -= 30.0
         critical_violations.append("Automated test discovery returned 0 executed tests.")
