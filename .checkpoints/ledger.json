@@ -510,5 +510,21 @@
       "revision_count": 94
     },
     "preflight_passed": true
+  },
+  {
+    "tag": "checkpoint_20261010_044753_feat__reserve_today_discovery_for_subscribers_and_display_yesterday_badge",
+    "timestamp": "2026-10-10 04:47:53 IST",
+    "commit_sha": "8282d8b6a286a51cd89092d6ed767e88a485ddc0",
+    "branch": "main",
+    "description": "feat: reserve today discovery for subscribers and display yesterday badge",
+    "database": {
+      "exists": true,
+      "filename": "reports_checkpoint_20261010_044753_feat__reserve_today_discovery_for_subscribers_and_display_yesterday_badge.db",
+      "path": ".checkpoints/reports_checkpoint_20261010_044753_feat__reserve_today_discovery_for_subscribers_and_display_yesterday_badge.db",
+      "size_bytes": 5455872,
+      "report_count": 143,
+      "revision_count": 94
+    },
+    "preflight_passed": true
   }
 ]
