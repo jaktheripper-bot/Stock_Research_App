@@ -99,8 +99,8 @@ def build_mutual_fund_deterministic_response(
         try:
             if ter_dir != "N/A" and ter_reg != "N/A":
                 spread_bps = f"{round((float(ter_reg) - float(ter_dir)) * 100, 1)} bps/yr"
-        except Exception:
-            pass
+        except Exception as spread_err:
+            logger.debug("Spread calculation notice: %s", spread_err)
         return (
             f"**Intermediary Fee Drag & Wealth Destruction Audit for {name}:**\n\n"
             f"- Direct Plan TER: {ter_dir}%\n"

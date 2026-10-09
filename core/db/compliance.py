@@ -78,8 +78,8 @@ def get_compliance_audit_logs(ticker: str = None, limit: int = 50) -> list:
             if isinstance(ts, str):
                 try:
                     ts = datetime.fromisoformat(ts.replace("Z", "+00:00"))
-                except Exception:
-                    pass
+                except Exception as parse_err:
+                    logger.debug("Timestamp parsing notice: %s", parse_err)
             if hasattr(ts, "astimezone"):
                 ts = ts.astimezone(IST)
             formatted_date = ts.strftime("%d-%m-%Y %H:%M IST") if hasattr(ts, "strftime") else str(ts)

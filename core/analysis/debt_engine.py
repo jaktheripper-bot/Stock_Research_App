@@ -25,6 +25,7 @@ logger = logging.getLogger(__name__)
 
 # Benchmark 10-Year Government of India (G-Sec) sovereign yield reference
 DEFAULT_BENCHMARK_10Y_GSEC_YIELD = 7.10  # 7.10%
+SHORT_DURATION_SCORE = 85.0
 
 # Standardized Credit Rating Agency Score Weights (0 to 100)
 RATING_SCORES = {
@@ -471,8 +472,8 @@ def evaluate_pillar_3_cash_flow_solvency(
             elif icr_val < 2.0:
                 score -= 15.0
                 notes.append(f"Tight ICR ({icr_val:.1f}x): Narrow margin of safety against revenue declines.")
-        except Exception:
-            pass
+        except Exception as icr_err:
+            logger.debug("ICR parse notice: %s", icr_err)
 
     if dscr is not None:
         try:
@@ -482,8 +483,8 @@ def evaluate_pillar_3_cash_flow_solvency(
             elif dscr_val < 1.10:
                 score -= 20.0
                 notes.append(f"Weak DSCR ({dscr_val:.2f}x): Principal repayment shortfall risk.")
-        except Exception:
-            pass
+        except Exception as dscr_err:
+            logger.debug("DSCR parse notice: %s", dscr_err)
 
     score = max(0.0, min(100.0, score))
 
@@ -531,7 +532,7 @@ def evaluate_pillar_4_duration_risk(
     elif mod_dur <= 2.5:
         duration_posture = "SHORT_TO_MEDIUM_DURATION"
         duration_desc = "Optimal balance of yield vs. moderate interest rate sensitivity."
-        score = 85.0
+        score = SHORT_DURATION_SCORE
     elif mod_dur <= 4.5:
         duration_posture = "MEDIUM_DURATION"
         duration_desc = "Noticeable capital sensitivity to monetary policy rate shifts."

@@ -116,7 +116,7 @@
       <div style="display: flex; gap: 10px; align-items: center; flex: 1; max-width: 520px; min-width: 280px;">
         <input type="text" id="onDemandSchemeInput" placeholder="AMFI Scheme Code (e.g. 120828, 154043, 122639)..." class="form-control" style="background: rgba(15, 23, 42, 0.9); border: 1px solid rgba(168, 85, 247, 0.4); color: #fff; padding: 10px 14px; border-radius: 8px; font-size: 13px; width: 100%;">
         <button id="btnStartOnDemandAudit" onclick="startOnDemandFundAudit()" class="btn btn-primary" style="padding: 10px 18px; font-weight: 700; white-space: nowrap; display: inline-flex; align-items: center; gap: 6px; background: linear-gradient(135deg, #a855f7 0%, #7c3aed 100%); border: none;">
-          <span>⚡</span> Audit Scheme
+          <span><svg class="glyph"><use href="#glyph-zap"></use></svg></span> Audit Scheme
         </button>
       </div>
     </div>
@@ -150,7 +150,7 @@
   <div style="background: rgba(30, 41, 59, 0.4); border: 1px solid rgba(255, 255, 255, 0.1); border-radius: 12px; padding: 14px 18px; margin-bottom: 20px;">
     <form action="/funds" method="GET" style="display: flex; gap: 10px; align-items: center; flex-wrap: wrap;">
       <div style="flex: 1; min-width: 260px;">
-        <input type="text" name="q" value="{{ query or '' }}" placeholder="🔍 Search by Scheme Name, AMFI Code, AMC (e.g. Parag Parikh, HDFC, Mirae, Quant, 122639)..." class="form-control" style="background: rgba(15, 23, 42, 0.9); border: 1px solid rgba(255, 255, 255, 0.15); color: #fff; padding: 10px 16px; border-radius: 8px; width: 100%;">
+        <input type="text" name="q" value="{{ query or '' }}" placeholder="Search by Scheme Name, AMFI Code, AMC (e.g. Parag Parikh, HDFC, Mirae, Quant, 122639)..." class="form-control" style="background: rgba(15, 23, 42, 0.9); border: 1px solid rgba(255, 255, 255, 0.15); color: #fff; padding: 10px 16px; border-radius: 8px; width: 100%;">
       </div>
       <button type="submit" class="btn btn-primary btn-sm" style="padding: 10px 18px; font-weight: 700;">Search Schemes</button>
       {% if query %}
@@ -168,8 +168,8 @@
       <a href="/funds?category=Large+Cap+Fund" class="btn btn-sm {% if current_category == 'Large Cap Fund' %}btn-primary{% else %}btn-secondary{% endif %}" style="border-radius: 9999px;">Large Cap</a>
       <a href="/funds?category=Mid+Cap+Fund" class="btn btn-sm {% if current_category == 'Mid Cap Fund' %}btn-primary{% else %}btn-secondary{% endif %}" style="border-radius: 9999px;">Mid Cap</a>
       <a href="/funds?category=Small+Cap+Fund" class="btn btn-sm {% if current_category == 'Small Cap Fund' %}btn-primary{% else %}btn-secondary{% endif %}" style="border-radius: 9999px;">Small Cap</a>
-      <a href="/funds?broad_category=HYBRID" class="btn btn-sm {% if current_category == 'HYBRID' %}btn-primary{% else %}btn-secondary{% endif %}" style="border-radius: 9999px;">⚖️ Hybrid / BAF</a>
-      <a href="/funds?broad_category=DEBT" class="btn btn-sm {% if current_category == 'DEBT' %}btn-primary{% else %}btn-secondary{% endif %}" style="border-radius: 9999px;">🏛️ Debt & Corporate Bonds</a>
+      <a href="/funds?broad_category=HYBRID" class="btn btn-sm {% if current_category == 'HYBRID' %}btn-primary{% else %}btn-secondary{% endif %}" style="border-radius: 9999px;"><svg class="glyph"><use href="#glyph-scale"></use></svg> Hybrid / BAF</a>
+      <a href="/funds?broad_category=DEBT" class="btn btn-sm {% if current_category == 'DEBT' %}btn-primary{% else %}btn-secondary{% endif %}" style="border-radius: 9999px;"><svg class="glyph"><use href="#glyph-temple"></use></svg> Debt & Corporate Bonds</a>
     </div>
 
     <div style="display: flex; gap: 8px; align-items: center;">
@@ -178,7 +178,7 @@
       </a>
       <!-- Overlap Diagnostic CTA Button -->
       <a href="/funds/compare/overlap" class="btn btn-sm btn-outline-primary" style="display: inline-flex; align-items: center; gap: 6px; border-radius: 9999px; font-weight: 600;">
-        <span>🔍</span> True Diversification & Overlap Tool →
+        <span><svg class="glyph"><use href="#glyph-search"></use></svg></span> True Diversification & Overlap Tool →
       </a>
     </div>
   </div>

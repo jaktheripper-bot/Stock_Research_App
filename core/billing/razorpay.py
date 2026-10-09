@@ -16,12 +16,14 @@ import logging
 import requests
 from typing import Dict, Any, Tuple, Optional
 
+logger = logging.getLogger("equity_research.core.billing")
+
 # Load environment variables from .env
 try:
     from dotenv import load_dotenv
     load_dotenv()
-except Exception:
-    pass
+except Exception as e:
+    logger.debug("dotenv load notice: %s", e)
 
 try:
     import razorpay
@@ -36,8 +38,6 @@ from core.billing.pricing import (
     INVOICE_DISCLAIMER,
 )
 from core.db import add_user_credits, get_user_by_id
-
-logger = logging.getLogger("equity_research.core.billing")
 
 
 class RazorpayAuthError(Exception):

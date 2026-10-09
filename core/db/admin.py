@@ -122,8 +122,8 @@ def add_admin_user(email: str, role: str = "admin", invited_by: Optional[str] = 
         logger.error(f"Error adding admin user '{clean_email}': {e}")
         try:
             conn.rollback()
-        except Exception:
-            pass
+        except Exception as rb_err:
+            logger.debug(f"Rollback failed: {rb_err}")
         return False, f"Database error adding administrator: {e}"
     finally:
         cursor.close()
@@ -158,8 +158,8 @@ def remove_admin_user(email: str, requesting_email: str) -> Tuple[bool, str]:
         logger.error(f"Error deleting admin user '{clean_email}': {e}")
         try:
             conn.rollback()
-        except Exception:
-            pass
+        except Exception as rb_err:
+            logger.debug(f"Rollback failed: {rb_err}")
         return False, f"Failed to delete administrator: {e}"
     finally:
         cursor.close()
@@ -204,8 +204,8 @@ def update_admin_role(email: str, new_role: str, requesting_email: str) -> Tuple
         logger.error(f"Error updating role for '{clean_email}': {e}")
         try:
             conn.rollback()
-        except Exception:
-            pass
+        except Exception as rb_err:
+            logger.debug(f"Rollback failed: {rb_err}")
         return False, f"Failed to update role: {e}"
     finally:
         cursor.close()
@@ -231,8 +231,8 @@ def set_admin_totp_secret(email: str, secret: str) -> bool:
         logger.error(f"Error updating TOTP secret for '{clean_email}': {e}")
         try:
             conn.rollback()
-        except Exception:
-            pass
+        except Exception as rb_err:
+            logger.debug(f"Rollback failed: {rb_err}")
         return False
     finally:
         cursor.close()
@@ -265,8 +265,8 @@ def enable_admin_totp(email: str) -> bool:
         logger.error(f"Error enabling TOTP for '{clean_email}': {e}")
         try:
             conn.rollback()
-        except Exception:
-            pass
+        except Exception as rb_err:
+            logger.debug(f"Rollback failed: {rb_err}")
         return False
     finally:
         cursor.close()
@@ -342,8 +342,8 @@ def record_admin_audit(
         logger.error(f"Error appending admin audit log: {e}")
         try:
             conn.rollback()
-        except Exception:
-            pass
+        except Exception as rb_err:
+            logger.debug(f"Rollback failed: {rb_err}")
         return False
     finally:
         cursor.close()
@@ -572,8 +572,8 @@ def admin_grant_user_credits(
         logger.error(f"Error granting credits to '{clean_target}': {e}", exc_info=True)
         try:
             conn.rollback()
-        except Exception:
-            pass
+        except Exception as rb_err:
+            logger.debug(f"Rollback failed: {rb_err}")
         return {"success": False, "error": f"Database error during credit grant: {e}"}
     finally:
         cursor.close()

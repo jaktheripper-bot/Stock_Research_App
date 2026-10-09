@@ -34,6 +34,8 @@ from core.analysis.fundamentals import get_stock_fundamentals
 
 logger = logging.getLogger("equity_research.core.agents.equity")
 
+ATTRACTIVE_VALUATION_BENCHMARK_SCORE = 85.0
+
 
 def run_deterministic_equity_audit(ticker: str) -> Dict[str, Any]:
     """Offline deterministic fallback generating complete institutional equity audit."""
@@ -52,7 +54,7 @@ def run_deterministic_equity_audit(ticker: str) -> Dict[str, Any]:
     # Deterministic scoring
     accounting_score = 90.0 if fund.get("piotroski_f_score", 7) >= 7 else 70.0
     governance_score = 95.0 if pledge == 0.0 else (60.0 if pledge > 15.0 else 80.0)
-    valuation_score = 85.0 if pe < 25.0 else (65.0 if pe > 40.0 else 75.0)
+    valuation_score = ATTRACTIVE_VALUATION_BENCHMARK_SCORE if pe < 25.0 else (65.0 if pe > 40.0 else 75.0)
     composite_score = round((accounting_score * 0.35) + (governance_score * 0.35) + (valuation_score * 0.30), 1)
 
     return {

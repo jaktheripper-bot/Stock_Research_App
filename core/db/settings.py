@@ -56,8 +56,8 @@ def set_system_setting(key: str, value: str) -> bool:
         logger.error(f"Error persisting system setting '{key}': {e}")
         try:
             conn.rollback()
-        except Exception:
-            pass
+        except Exception as rb_err:
+            logger.debug("Settings rollback notice: %s", rb_err)
         return False
     finally:
         cursor.close()

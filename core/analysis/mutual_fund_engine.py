@@ -10,6 +10,7 @@ Implements the institutional evaluation framework specified in EVALUATION_FRAMEW
 """
 
 import math
+import logging
 from dataclasses import dataclass, field
 from typing import List, Dict, Optional, Any, Tuple
 from datetime import datetime, date
@@ -21,6 +22,10 @@ from core.db.mutual_funds import (
 )
 from core.db.debt import get_debt_security_by_isin
 from core.analysis.debt_engine import evaluate_5_pillar_credit_posture
+
+logger = logging.getLogger("equity_research.core.analysis.mutual_fund_engine")
+VERIFIED_RESEARCHED_EQUITY_SCORE = 82.0
+AA_RATING_BENCHMARK_SCORE = 80.0
 
 
 # Benchmark Top Holdings Proxy Weights for NIFTY 50 / NIFTY 500 Active Share Computation
@@ -309,12 +314,12 @@ def evaluate_dual_sleeve_lookthrough(
             try:
                 from core.db.reports import get_report_by_ticker
                 rep = get_report_by_ticker(ident)
-            except Exception:
-                pass
+            except Exception as rep_err:
+                logger.debug("Report lookup notice for %s: %s", ident, rep_err)
 
             is_researched = bool(rep and rep.get("report_text"))
             if is_researched:
-                score = 82.0  # Verified 7-pillar institutional asset
+                score = VERIFIED_RESEARCHED_EQUITY_SCORE  # Verified 7-pillar institutional asset
                 genuine_covered_weight += w
                 equity_covered_weight += w
                 equity_weighted_score += (score * w)
@@ -356,7 +361,7 @@ def evaluate_dual_sleeve_lookthrough(
                     score = 92.0
                     posture_badge = "badge-success"
                 elif "AA" in sector_or_rating:
-                    score = 80.0
+                    score = AA_RATING_BENCHMARK_SCORE
                     posture_badge = "badge-neutral"
                 elif "A" in sector_or_rating:
                     score = 65.0

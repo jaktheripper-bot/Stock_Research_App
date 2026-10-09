@@ -47,7 +47,7 @@
         </div>
         <div style="display: flex; gap: 8px; margin-top: 4px;">
           <button onclick="openCopilot('{{ posture.ticker or posture.isin }}', 'debt')" class="btn btn-sm" style="background: rgba(14, 165, 233, 0.15); color: #38bdf8; border: 1px solid rgba(14, 165, 233, 0.4); font-weight: 700; border-radius: 9999px; cursor: pointer;">
-            🛡️ Forensic Copilot
+            <svg class="glyph"><use href="#glyph-shield"></use></svg> Forensic Copilot
           </button>
           <a href="/api/pdf/debt/{{ posture.isin }}" class="btn btn-sm btn-secondary" style="border-radius: 9999px; text-decoration: none; font-size: 12px; font-weight: 600;">
             📄 Export PDF
@@ -92,7 +92,7 @@
     </div>
     <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 14px; font-size: 13px; color: #cbd5e1;">
       <div style="background: rgba(15, 23, 42, 0.5); padding: 12px; border-radius: 8px; border: 1px solid rgba(255, 255, 255, 0.05);">
-        <strong style="color: #10b981;">📊 Bank FD Comparison:</strong> {{ posture.primer.fd_comparison }}
+        <strong style="color: #10b981;"><svg class="glyph"><use href="#glyph-chart"></use></svg> Bank FD Comparison:</strong> {{ posture.primer.fd_comparison }}
       </div>
       <div style="background: rgba(15, 23, 42, 0.5); padding: 12px; border-radius: 8px; border: 1px solid rgba(255, 255, 255, 0.05);">
         <strong style="color: #38bdf8;">🔒 Contractual Cash Flows:</strong> {{ posture.primer.contractual_certainty }}

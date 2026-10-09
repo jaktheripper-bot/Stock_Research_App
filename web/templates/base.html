@@ -44,6 +44,70 @@
 </head>
 <body>
 
+  <!-- Institutional Vector SVG Sprite Sheet (Priority 3 Design System) -->
+  <svg style="display: none;" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+    <defs>
+      <symbol id="glyph-shield" viewBox="0 0 24 24">
+        <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/>
+      </symbol>
+      <symbol id="glyph-zap" viewBox="0 0 24 24">
+        <polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/>
+      </symbol>
+      <symbol id="glyph-scale" viewBox="0 0 24 24">
+        <path d="m16 16 3-8 3 8c-.87.65-1.92 1-3 1s-2.13-.35-3-1Z"/>
+        <path d="m2 16 3-8 3 8c-.87.65-1.92 1-3 1s-2.13-.35-3-1Z"/>
+        <path d="M7 21h10"/>
+        <path d="M12 3v18"/>
+        <path d="M3 7h2c2 0 5-1 7-2 2 1 5 2 7 2h2"/>
+      </symbol>
+      <symbol id="glyph-chart" viewBox="0 0 24 24">
+        <line x1="18" y1="20" x2="18" y2="10"/>
+        <line x1="12" y1="20" x2="12" y2="4"/>
+        <line x1="6" y1="20" x2="6" y2="14"/>
+        <line x1="2" y1="20" x2="22" y2="20"/>
+      </symbol>
+      <symbol id="glyph-search" viewBox="0 0 24 24">
+        <circle cx="11" cy="11" r="8"/>
+        <line x1="21" y1="21" x2="16.65" y2="16.65"/>
+      </symbol>
+      <symbol id="glyph-coin" viewBox="0 0 24 24">
+        <circle cx="12" cy="12" r="9"/>
+        <path d="M14.8 9A2 2 0 0 0 13 8h-2a2 2 0 0 0 0 4h2a2 2 0 0 1 0 4h-2a2 2 0 0 1-1.8-1"/>
+        <path d="M12 6v2m0 8v2"/>
+      </symbol>
+      <symbol id="glyph-temple" viewBox="0 0 24 24">
+        <path d="M2 10h20"/>
+        <path d="M12 2 2 7h20L12 2z"/>
+        <path d="M4 10v10"/>
+        <path d="M8 10v10"/>
+        <path d="M12 10v10"/>
+        <path d="M16 10v10"/>
+        <path d="M20 10v10"/>
+        <path d="M2 20h20"/>
+      </symbol>
+      <symbol id="glyph-bank" viewBox="0 0 24 24">
+        <path d="M3 21h18"/>
+        <path d="M5 21V10"/>
+        <path d="M19 21V10"/>
+        <path d="M10 21V10"/>
+        <path d="M14 21V10"/>
+        <path d="M2 10h20L12 3 2 10z"/>
+      </symbol>
+      <symbol id="glyph-alert" viewBox="0 0 24 24">
+        <path d="m21.73 18-8-14a2 2 0 0 0-3.48 0l-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.73-3Z"/>
+        <line x1="12" y1="9" x2="12" y2="13"/>
+        <line x1="12" y1="17" x2="12.01" y2="17"/>
+      </symbol>
+      <symbol id="glyph-castle" viewBox="0 0 24 24">
+        <path d="M2 21h20"/>
+        <path d="M5 21V7l2-2 2 2v2h6V7l2-2 2 2v14"/>
+        <path d="M10 21v-5a2 2 0 0 1 4 0v5"/>
+        <path d="M9 11h.01"/>
+        <path d="M15 11h.01"/>
+      </symbol>
+    </defs>
+  </svg>
+
   <!-- Sticky Header Navigation -->
   <header class="site-header">
     <div class="container">
@@ -58,7 +122,7 @@
 
         <nav id="mainNav" class="main-nav" aria-label="Main Navigation">
           <a href="/search" class="nav-link {% if active_page == 'search' %}active{% endif %}" id="navSearchLink">
-            <span class="nav-icon">🔍</span> Search
+            <span class="nav-icon"><svg class="glyph"><use href="#glyph-search"></use></svg></span> Search
           </a>
 
           <!-- Markets & Multi-Asset Sub-Tabs -->
@@ -86,14 +150,14 @@
                 </div>
               </a>
               <a href="/debt" class="dropdown-item {% if active_page == 'debt' %}active{% endif %}" role="menuitem">
-                <div class="dropdown-icon">🏦</div>
+                <div class="dropdown-icon"><svg class="glyph"><use href="#glyph-bank"></use></svg></div>
                 <div class="dropdown-content">
                   <div class="dropdown-title">Bonds, NCDs & SDIs</div>
                   <div class="dropdown-desc">SEBI ₹10K fixed income, senior secured yields & YTMs</div>
                 </div>
               </a>
               <a href="/funds" class="dropdown-item {% if active_page == 'funds' %}active{% endif %}" role="menuitem">
-                <div class="dropdown-icon">📊</div>
+                <div class="dropdown-icon"><svg class="glyph"><use href="#glyph-chart"></use></svg></div>
                 <div class="dropdown-content">
                   <div class="dropdown-title">Mutual Funds & ETFs</div>
                   <div class="dropdown-desc">Dual-sleeve look-through, active share & fee drag</div>
@@ -108,7 +172,7 @@
               </a>
               <div class="dropdown-divider"></div>
               <a href="/sovereign" class="dropdown-item {% if active_page == 'sovereign' %}active{% endif %}" role="menuitem">
-                <div class="dropdown-icon">🏛️</div>
+                <div class="dropdown-icon"><svg class="glyph"><use href="#glyph-temple"></use></svg></div>
                 <div class="dropdown-content">
                   <div class="dropdown-title">Sovereign Curve & T-Bills</div>
                   <div class="dropdown-desc">RBI T-Bills, 10Y G-Sec & SDL auction benchmarks</div>
@@ -141,7 +205,7 @@
                 </div>
               </a>
               <a href="/compare" class="dropdown-item {% if active_page == 'compare' %}active{% endif %}" role="menuitem">
-                <div class="dropdown-icon">⚖️</div>
+                <div class="dropdown-icon"><svg class="glyph"><use href="#glyph-scale"></use></svg></div>
                 <div class="dropdown-content">
                   <div class="dropdown-title">Peer Comparison</div>
                   <div class="dropdown-desc">Side-by-side financial metrics & valuation disparity</div>
@@ -155,7 +219,7 @@
                 </div>
               </a>
               <a href="/safety-radar" class="dropdown-item {% if active_page == 'safety_radar' %}active{% endif %}" role="menuitem">
-                <div class="dropdown-icon">🚨</div>
+                <div class="dropdown-icon"><svg class="glyph"><use href="#glyph-alert"></use></svg></div>
                 <div class="dropdown-content">
                   <div class="dropdown-title">Retail Safety Radar</div>
                   <div class="dropdown-desc">Danger scorecard for gold leasing & P2P lending</div>
@@ -163,7 +227,7 @@
               </a>
               <div class="dropdown-divider"></div>
               <a href="javascript:void(0)" onclick="openGenerateModal()" class="dropdown-item" role="menuitem">
-                <div class="dropdown-icon">⚡</div>
+                <div class="dropdown-icon"><svg class="glyph"><use href="#glyph-zap"></use></svg></div>
                 <div class="dropdown-content">
                   <div class="dropdown-title">Instant Dossier Generator</div>
                   <div class="dropdown-desc">Synthesize live institutional research report on demand</div>
@@ -194,7 +258,7 @@
                 </div>
               </a>
               <a href="/disclaimer" class="dropdown-item {% if active_page == 'disclaimer' %}active{% endif %}" role="menuitem">
-                <div class="dropdown-icon">🛡️</div>
+                <div class="dropdown-icon"><svg class="glyph"><use href="#glyph-shield"></use></svg></div>
                 <div class="dropdown-content">
                   <div class="dropdown-title">SEBI Safe Harbor</div>
                   <div class="dropdown-desc">Non-advisory disclosures & statutory disclaimers</div>
@@ -224,7 +288,7 @@
             <span style="width: 7px; height: 7px; border-radius: 50%; background: #10b981; box-shadow: 0 0 8px #10b981;"></span>
             <span>Agent Radar</span>
           </button>
-          <button id="navGenerateBtn" class="btn btn-primary btn-sm" onclick="openGenerateModal()">⚡ Generate Report</button>
+          <button id="navGenerateBtn" class="btn btn-primary btn-sm" onclick="openGenerateModal()"><svg class="glyph"><use href="#glyph-zap"></use></svg> Generate Report</button>
           <button id="navSignInBtn" class="btn btn-secondary btn-sm" onclick="openSignInModal()">Sign In / 2 Credits</button>
           <button id="mobileMenuBtn" class="mobile-menu-btn" onclick="toggleMobileMenu()" aria-label="Toggle navigation menu">
             <span class="bar"></span>
@@ -357,7 +421,7 @@
   <div id="generateModal" class="modal-backdrop">
     <div class="modal-dialog" style="max-width: 480px;">
       <div class="modal-header">
-        <h3 style="font-weight: 800; font-size: 20px;">⚡ Generate Institutional Dossier</h3>
+        <h3 style="font-weight: 800; font-size: 20px;"><svg class="glyph"><use href="#glyph-zap"></use></svg> Generate Institutional Dossier</h3>
         <button id="closeGenerateModalBtn" class="modal-close-btn">&times;</button>
       </div>
 
@@ -387,7 +451,7 @@
         </div>
 
         <button type="submit" id="generateModalSubmitBtn" class="btn btn-primary" style="width: 100%; padding: 14px; font-size: 15px; font-weight: 700;">
-          ⚡ Synthesize Institutional Dossier (1 Credit)
+          <svg class="glyph"><use href="#glyph-zap"></use></svg> Synthesize Institutional Dossier (1 Credit)
         </button>
       </form>
 

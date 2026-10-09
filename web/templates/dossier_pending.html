@@ -27,7 +27,7 @@
 
       <div style="display: flex; gap: 10px;">
         <button onclick="synthesizeReport('{{ display_ticker }}')" class="btn btn-primary btn-sm">
-          ⚡ Synthesize Dossier (1 Credit)
+          <svg class="glyph"><use href="#glyph-zap"></use></svg> Synthesize Dossier (1 Credit)
         </button>
       </div>
     </div>
@@ -37,7 +37,7 @@
   <div style="display: grid; grid-template-columns: 3fr 2fr; gap: 24px; margin-bottom: 40px;">
     <div style="background: rgba(15, 23, 42, 0.6); border: 1px solid var(--border-color); border-radius: var(--radius-md); padding: 24px;">
       <h3 style="font-size: 18px; font-weight: 700; margin-bottom: 14px; color: var(--text-primary); display: flex; align-items: center; gap: 8px;">
-        <span>🔍</span> Why is this dossier pending?
+        <span><svg class="glyph"><use href="#glyph-search"></use></svg></span> Why is this dossier pending?
       </h3>
       <p style="color: var(--text-secondary); line-height: 1.6; font-size: 14px; margin-bottom: 16px;">
         Our repository maintains zero-hallucination standards. Rather than serving synthetic AI estimates, each institutional thesis requires live ingestion of verified BSE financial statements, corporate governance filings, and multi-scenario valuation models.
@@ -57,7 +57,7 @@
         </p>
       </div>
       <button onclick="synthesizeReport('{{ display_ticker }}')" class="btn btn-primary" style="text-align: center; width: 100%;">
-        ⚡ Synthesize Dossier (1 Credit)
+        <svg class="glyph"><use href="#glyph-zap"></use></svg> Synthesize Dossier (1 Credit)
       </button>
       <a href="/pricing" class="btn btn-secondary" style="text-align: center; width: 100%; margin-top: 10px; text-decoration: none;">
         View Plans & Pricing →
@@ -70,7 +70,7 @@
   <div style="background: linear-gradient(135deg, rgba(15, 23, 42, 0.9) 0%, rgba(30, 41, 59, 0.8) 100%); border: 1px solid rgba(14, 165, 233, 0.35); border-radius: var(--radius-md); padding: 24px; box-shadow: 0 10px 25px rgba(0, 0, 0, 0.3); margin-bottom: 40px;">
     <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px; flex-wrap: wrap; gap: 12px;">
       <div style="display: flex; align-items: center; gap: 10px;">
-        <span style="font-size: 24px;">🏦</span>
+        <span style="font-size: 24px;"><svg class="glyph"><use href="#glyph-bank"></use></svg></span>
         <div>
           <h3 style="margin: 0; font-size: 18px; font-weight: 800; color: #f8fafc;">
             Capital Structure: Listed Corporate Debentures & NCDs ({{ linked_debt|length }} Tranches)
@@ -206,7 +206,7 @@
   <!-- Mandatory SEBI Safe-Harbor Disclosure -->
   <div style="margin-top: 48px; padding: 20px; background: rgba(15, 23, 42, 0.6); border: 1px solid rgba(255, 255, 255, 0.08); border-radius: var(--radius-md); font-size: 13px; color: var(--text-secondary); line-height: 1.6;">
     <strong style="color: var(--accent-cyan); display: flex; align-items: center; gap: 6px; margin-bottom: 6px;">
-      <span>🛡️</span> Mandatory SEBI Safe-Harbor Disclosure
+      <span><svg class="glyph"><use href="#glyph-shield"></use></svg></span> Mandatory SEBI Safe-Harbor Disclosure
     </strong>
     {{ MANDATORY_SEBI_DISCLAIMER }}
   </div>

@@ -69,8 +69,8 @@ def create_email_otp(email: str) -> Tuple[bool, str, Optional[str]]:
                     if elapsed < RESEND_COOLDOWN_SECONDS and os.environ.get("TESTING") != "1":
                         remaining = int(RESEND_COOLDOWN_SECONDS - elapsed)
                         return False, f"Please wait {remaining} seconds before requesting a new code.", None
-                except Exception:
-                    pass
+                except Exception as parse_err:
+                    logger.debug("OTP created_at parse error: %s", parse_err)
             elif isinstance(created_at, datetime):
                 created_dt = created_at if created_at.tzinfo else created_at.replace(tzinfo=timezone.utc)
                 elapsed = (now_utc - created_dt).total_seconds()

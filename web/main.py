@@ -38,12 +38,13 @@ from web.middleware.security_headers import SecurityHeadersMiddleware
 from slowapi import Limiter
 from slowapi.util import get_remote_address
 from slowapi.errors import RateLimitExceeded
-from fastapi import Request, Response
+logger = logging.getLogger("equity_research.web")
+
 try:
     from dotenv import load_dotenv
     load_dotenv()
-except Exception:
-    pass
+except Exception as dot_err:
+    logger.debug("dotenv load notice: %s", dot_err)
 
 try:
     import toml
@@ -53,8 +54,8 @@ try:
         for _k, _v in _sec.items():
             if isinstance(_v, str) and _k not in os.environ:
                 os.environ[_k] = _v
-except Exception:
-    pass
+except Exception as toml_err:
+    logger.debug("secrets.toml load notice: %s", toml_err)
 
 from pydantic import BaseModel
 
@@ -194,7 +195,7 @@ from core.analysis.fund_forensic_auditor import (
     ensure_scheme_and_holdings_exist,
 )
 
-logger = logging.getLogger("equity_research.web")
+# Logging initialized earlier at module level
 
 from contextlib import asynccontextmanager
 
@@ -747,8 +748,8 @@ def dossier_page(request: Request, ticker: str):
     fund = {}
     try:
         fund = get_stock_fundamentals(canonical) or {}
-    except Exception:
-        pass
+    except Exception as fund_err:
+        logger.debug("Fundamentals lookup notice for %s: %s", canonical, fund_err)
 
     price_val = rep.get("baseline_price") or fund.get("current_price")
     low_52 = fund.get("fifty_two_week_low") or fund.get("52w_low")
@@ -1889,8 +1890,8 @@ async def api_record_telemetry_event(payload: TelemetryEventRequest, request: Re
             p = urlparse(payload.landing_url).path
             if p:
                 resolved_lp = p
-        except Exception:
-            pass
+        except Exception as url_err:
+            logger.debug("Landing URL parse notice: %s", url_err)
     if not resolved_lp:
         resolved_lp = evt_details.get("path") or evt_details.get("page") or "/"
     if not resolved_lp.startswith("/"):
@@ -3445,8 +3446,8 @@ async def admin_purge_test_data(request: Request):
     try:
         form_data = await request.form()
         return_tab = form_data.get("tab")
-    except Exception:
-        pass
+    except Exception as form_err:
+        logger.debug("Form data parse notice: %s", form_err)
     if not return_tab:
         return_tab = request.query_params.get("tab") or "telemetry"
 

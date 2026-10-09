@@ -60,7 +60,7 @@
       🌐 All Offerings ({{ summary.total_items }})
     </button>
     <button class="btn btn-sm persona-btn btn-secondary" onclick="setPersonaFilter('capital_preservation')" data-persona="capital_preservation">
-      🛡️ Capital Preservation (Real Return > 0%)
+      <svg class="glyph"><use href="#glyph-shield"></use></svg> Capital Preservation (Real Return > 0%)
     </button>
     <button class="btn btn-sm persona-btn btn-secondary" onclick="setPersonaFilter('quarterly_cashflow')" data-persona="quarterly_cashflow">
       💰 Maximum Cash Flow (Quarterly Payouts)
@@ -82,7 +82,7 @@
         🗂️ Bento Cards
       </button>
       <button id="viewBtnHeatmap" class="btn btn-sm btn-secondary view-mode-btn" onclick="switchView('heatmap')">
-        📊 Spread Heatmap
+        <svg class="glyph"><use href="#glyph-chart"></use></svg> Spread Heatmap
       </button>
       <button id="viewBtnScatter" class="btn btn-sm btn-secondary view-mode-btn" onclick="switchView('scatter')">
         📈 Risk-Yield Frontier
@@ -130,7 +130,7 @@
   </div>
 
   <!-- ========================================================================= -->
-  <!-- MODALITY 2: 📊 RELATIVE YIELD SPREAD HEATMAP MATRIX VIEW                 -->
+  <!-- MODALITY 2: <svg class="glyph"><use href="#glyph-chart"></use></svg> RELATIVE YIELD SPREAD HEATMAP MATRIX VIEW                 -->
   <!-- ========================================================================= -->
   <div id="viewHeatmapContainer" class="view-panel" style="display: none;">
     <div class="card" style="padding: 24px; margin-bottom: 24px;">
@@ -258,7 +258,7 @@
     <div style="display: flex; align-items: center; gap: 10px;">
       <button onclick="clearDocket()" class="btn btn-secondary btn-sm" style="font-size: 12px; padding: 6px 12px;">Clear All</button>
       <button onclick="openArbitrageModal()" class="btn btn-primary btn-sm" style="font-size: 13px; font-weight: 700; padding: 6px 16px; box-shadow: 0 4px 14px rgba(14, 165, 233, 0.3);">
-        ⚖️ Compare Side-by-Side &rarr;
+        <svg class="glyph"><use href="#glyph-scale"></use></svg> Compare Side-by-Side &rarr;
       </button>
     </div>
   </div>

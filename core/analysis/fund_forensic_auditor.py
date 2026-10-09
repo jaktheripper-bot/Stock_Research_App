@@ -41,6 +41,9 @@ from core.analysis.engine import get_surgical_flash_model
 
 logger = logging.getLogger("equity_research.core.analysis.fund_forensic_auditor")
 
+VALUATION_UNDERVALUED_BENCHMARK_SCORE = 88.0
+MOAT_WIDE_BENCHMARK_SCORE = 88.0
+
 
 def parse_stock_report_health_matrix(report_text: str) -> Dict[str, Any]:
     """Extracts the 7-pillar Health Matrix and forensic flags from an archived stock report."""
@@ -121,8 +124,8 @@ def compute_fund_forensic_lookthrough(scheme_code: str) -> Dict[str, Any]:
             rep = None
             try:
                 rep = get_report_by_ticker(ident)
-            except Exception:
-                pass
+            except Exception as rep_err:
+                logger.debug("Report lookup notice for %s: %s", ident, rep_err)
 
             if rep and rep.get("report_text"):
                 is_researched = True
@@ -169,7 +172,7 @@ def compute_fund_forensic_lookthrough(scheme_code: str) -> Dict[str, Any]:
                 v_val = matrix.get("valuation", "Fair").lower()
                 if "undervalued" in v_val:
                     mos_pct = 22.0
-                    val_score = 88.0
+                    val_score = VALUATION_UNDERVALUED_BENCHMARK_SCORE
                 elif "loss" in v_val:
                     mos_pct = -35.0
                     val_score = 40.0
@@ -195,7 +198,7 @@ def compute_fund_forensic_lookthrough(scheme_code: str) -> Dict[str, Any]:
 
                 if base_score >= 80:
                     moat_label = "Wide"
-                    moat_score = 88.0
+                    moat_score = MOAT_WIDE_BENCHMARK_SCORE
                     mos_pct = 5.0
                     gov_label = "Clean"
                 elif base_score >= 70:
@@ -660,8 +663,8 @@ def calculate_deep_dive_credit_cost(scheme_code: str) -> Dict[str, Any]:
         rep = None
         try:
             rep = get_report_by_ticker(ident)
-        except Exception:
-            pass
+        except Exception as rep_err:
+            logger.debug("Holding report lookup notice for %s: %s", ident, rep_err)
 
         item = {
             "identifier": ident,

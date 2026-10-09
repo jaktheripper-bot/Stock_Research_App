@@ -38,7 +38,7 @@
         </div>
         <div style="display: flex; gap: 8px; margin-top: 14px; flex-wrap: wrap;">
           <button onclick="openCopilot('{{ scheme.scheme_code }}', 'mutual_fund')" class="btn btn-sm" style="background: rgba(14, 165, 233, 0.15); color: #38bdf8; border: 1px solid rgba(14, 165, 233, 0.4); font-weight: 700; border-radius: 9999px; cursor: pointer;">
-            🛡️ Forensic Copilot
+            <svg class="glyph"><use href="#glyph-shield"></use></svg> Forensic Copilot
           </button>
           <a href="/api/pdf/fund/{{ scheme.scheme_code }}" class="btn btn-sm btn-secondary" style="border-radius: 9999px; text-decoration: none; font-size: 12px; font-weight: 600;">
             📄 Export PDF Dossier
@@ -73,7 +73,7 @@
   {% if not lookthrough.has_sufficient_coverage %}
   <div style="background: rgba(245, 158, 11, 0.1); border: 1px solid rgba(245, 158, 11, 0.35); border-left: 4px solid #f59e0b; border-radius: 12px; padding: 18px 22px; margin-bottom: 24px; display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 14px;">
     <div style="display: flex; align-items: center; gap: 12px;">
-      <span style="font-size: 26px;">🛡️</span>
+      <span style="font-size: 26px;"><svg class="glyph"><use href="#glyph-shield"></use></svg></span>
       <div>
         <div style="font-weight: 800; color: #fbbf24; font-size: 15px; margin-bottom: 3px;">
           Look-Through Forensic Audit pending underlying constituent coverage. Full holdings breakdown available below.
@@ -190,7 +190,7 @@
       <!-- High Moat Compounders -->
       <div style="background: rgba(15, 23, 42, 0.5); border: 1px solid rgba(255, 255, 255, 0.05); border-radius: 10px; padding: 14px;">
         <div style="font-size: 12px; font-weight: 700; color: #10b981; margin-bottom: 8px; display: flex; align-items: center; gap: 6px;">
-          <span>🛡️</span> Fortress Moat Compounders (Top Quality Allocations)
+          <span><svg class="glyph"><use href="#glyph-shield"></use></svg></span> Fortress Moat Compounders (Top Quality Allocations)
         </div>
         <div style="display: flex; flex-direction: column; gap: 6px;">
           {% for q in forensic_dossier.top_quality_holdings %}
@@ -265,7 +265,7 @@
             </div>
           </div>
           <button id="btnDeepDiveAudit" onclick="triggerDeepDiveAudit('{{ scheme.scheme_code }}', {{ credit_quote.layer2_deep_dive_credits }})" class="btn btn-sm" style="background: linear-gradient(135deg, #9333ea 0%, #7c3aed 100%); color: #ffffff; border: none; padding: 8px 16px; border-radius: 8px; font-weight: 700; font-size: 13px; display: inline-flex; align-items: center; gap: 6px; cursor: pointer;">
-            <span>⚡</span> Initiate Deep-Dive Audit
+            <span><svg class="glyph"><use href="#glyph-zap"></use></svg></span> Initiate Deep-Dive Audit
           </button>
         </div>
       </div>
@@ -548,7 +548,7 @@
     <!-- Fiduciary Notice Card for Workspace 06 -->
     <div style="background: rgba(30, 41, 59, 0.3); border: 1px dashed rgba(148, 163, 184, 0.25); border-radius: 14px; padding: 22px;">
       <div style="display: flex; align-items: center; gap: 10px; margin-bottom: 8px;">
-        <span style="font-size: 18px;">🛡️</span>
+        <span style="font-size: 18px;"><svg class="glyph"><use href="#glyph-shield"></use></svg></span>
         <h3 style="font-size: 15px; font-weight: 700; color: #cbd5e1; margin: 0;">
           06: Institutional Forensic Qualitative Audit Dossier (Coverage Pending)
         </h3>
@@ -566,7 +566,7 @@
         ← Back to Mutual Funds Screener
       </a>
       <a href="/funds/compare/overlap?scheme_a={{ scheme.scheme_code }}" class="btn btn-primary btn-sm" style="border-radius: 9999px;">
-        🔍 Check Overlap with Another Fund →
+        <svg class="glyph"><use href="#glyph-search"></use></svg> Check Overlap with Another Fund →
       </a>
     </div>
 

@@ -99,8 +99,8 @@ def evaluate_under_the_radar_candidate(candidate: Dict[str, Any]) -> Optional[Di
             p_float = float(str(rep.get("baseline_price")).replace(",", "").strip())
             pe_str = str(rep.get("baseline_pe") or "Fair")
             mcap_float = float(str(rep.get("baseline_mcap") or 0))
-    except Exception:
-        pass
+    except Exception as db_err:
+        logger.debug("DB snapshot lookup notice for %s: %s", canonical, db_err)
 
     # 2. Fast Exchange quote via yfinance fast_info (sub-second)
     if p_float <= 0:
@@ -178,8 +178,8 @@ def evaluate_under_the_radar_candidate(candidate: Dict[str, Any]) -> Optional[Di
             ann = fetch_latest_bse_announcement(scrip_code)
             if ann and len(ann.strip()) > 5:
                 catalyst = ann.strip()
-        except Exception:
-            pass
+        except Exception as ann_err:
+            logger.debug("Announcement lookup notice for %s: %s", scrip_code, ann_err)
 
     ria_thesis = candidate.get("default_thesis") or (
         f"High return on capital (ROCE {roce_float:.1f}%) paired with low leverage (D/E {de_float:.2f}) "

@@ -406,19 +406,19 @@ def compute_deterministic_technical_context(stock_data: dict, hist_df=None) -> d
     try:
         raw_p = stock_data.get("current_price") or stock_data.get("currentValue") or 0.0
         price = float(str(raw_p).replace(",", "").strip())
-    except Exception:
-        pass
+    except Exception as parse_err:
+        logger.debug("Price parse notice: %s", parse_err)
 
     high_52 = None
     low_52 = None
     try:
         high_52 = float(str(stock_data.get("52w_high", "")).replace(",", "").strip())
-    except Exception:
-        pass
+    except Exception as high_err:
+        logger.debug("52w high parse notice: %s", high_err)
     try:
         low_52 = float(str(stock_data.get("52w_low", "")).replace(",", "").strip())
-    except Exception:
-        pass
+    except Exception as low_err:
+        logger.debug("52w low parse notice: %s", low_err)
 
     dma_50 = None
     pct_from_dma50 = None
@@ -464,8 +464,8 @@ def compute_pead_drift_band(stock_data: dict, hist_df=None) -> dict:
     try:
         raw_p = stock_data.get("current_price") or stock_data.get("currentValue") or stock_data.get("baseline_price") or 0.0
         price = float(str(raw_p).replace(",", "").strip())
-    except Exception:
-        pass
+    except Exception as parse_err:
+        logger.debug("PEAD price parse notice: %s", parse_err)
 
     dma_50 = None
     if hist_df is not None and not getattr(hist_df, "empty", True) and "Close" in hist_df.columns:

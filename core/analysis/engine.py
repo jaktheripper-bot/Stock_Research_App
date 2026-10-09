@@ -80,8 +80,8 @@ def get_latest_flash_models(client) -> list:
             _DISCOVERED_MODELS_CACHE["models"] = ordered
             _DISCOVERED_MODELS_CACHE["timestamp"] = now
             return ordered
-    except Exception:
-        pass
+    except Exception as disc_err:
+        logger.debug("Model discovery notice: %s", disc_err)
     return fallback
 
 def get_surgical_flash_model(client) -> str:
@@ -97,8 +97,8 @@ def get_surgical_flash_model(client) -> str:
                 return model_id
         if discovered:
             return discovered[0]
-    except Exception:
-        pass
+    except Exception as surg_err:
+        logger.debug("Surgical model selection notice: %s", surg_err)
     return "gemini-3.8-flash"
 
 def stream_genai_with_fallback(client, prompt: str, system_prompt: str, on_status=None, use_grounding: bool = True, collected_citations: list = None):
@@ -173,8 +173,8 @@ def stream_genai_with_fallback(client, prompt: str, system_prompt: str, on_statu
                     if not extracted_text:
                         try:
                             extracted_text = chunk.text
-                        except Exception:
-                            pass
+                        except Exception as text_err:
+                            logger.debug("Chunk text extraction notice: %s", text_err)
                     if extracted_text:
                         yield extracted_text
                 return

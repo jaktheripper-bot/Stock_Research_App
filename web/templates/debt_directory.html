@@ -50,9 +50,9 @@
     <!-- Filter Navigation Tabs -->
     <div style="display: flex; gap: 8px; overflow-x: auto; padding-bottom: 4px;">
       <a href="/debt" class="btn btn-sm {% if not current_filter %}btn-primary{% else %}btn-secondary{% endif %}" style="border-radius: 9999px;">All Issues ({{ securities|length }})</a>
-      <a href="/debt?seniority=SENIOR_SECURED" class="btn btn-sm {% if current_filter == 'SENIOR_SECURED' %}btn-primary{% else %}btn-secondary{% endif %}" style="border-radius: 9999px;">🛡️ Senior Secured</a>
+      <a href="/debt?seniority=SENIOR_SECURED" class="btn btn-sm {% if current_filter == 'SENIOR_SECURED' %}btn-primary{% else %}btn-secondary{% endif %}" style="border-radius: 9999px;"><svg class="glyph"><use href="#glyph-shield"></use></svg> Senior Secured</a>
       <a href="/debt?is_sdi=true" class="btn btn-sm {% if current_filter == 'is_sdi' %}btn-primary{% else %}btn-secondary{% endif %}" style="border-radius: 9999px;">📦 Securitized Debt (SDIs)</a>
-      <a href="/debt?seniority=SUBORDINATED_TIER_2" class="btn btn-sm {% if current_filter == 'SUBORDINATED_TIER_2' %}btn-primary{% else %}btn-secondary{% endif %}" style="border-radius: 9999px;">🏛️ Tier-II Subordinated</a>
+      <a href="/debt?seniority=SUBORDINATED_TIER_2" class="btn btn-sm {% if current_filter == 'SUBORDINATED_TIER_2' %}btn-primary{% else %}btn-secondary{% endif %}" style="border-radius: 9999px;"><svg class="glyph"><use href="#glyph-temple"></use></svg> Tier-II Subordinated</a>
       <a href="/debt?seniority=PERPETUAL_AT1" class="btn btn-sm {% if current_filter == 'PERPETUAL_AT1' %}btn-primary{% else %}btn-secondary{% endif %}" style="border-radius: 9999px;">⚠️ Perpetual AT1</a>
     </div>
 
@@ -141,7 +141,7 @@
     <!-- Header -->
     <div style="display: flex; justify-content: space-between; align-items: center; padding: 20px 24px; border-bottom: 1px solid var(--border-color, rgba(255,255,255,0.08)); background: rgba(15, 23, 42, 0.4);">
       <div style="display: flex; align-items: center; gap: 10px;">
-        <span style="font-size: 22px;">🏦</span>
+        <span style="font-size: 22px;"><svg class="glyph"><use href="#glyph-bank"></use></svg></span>
         <div>
           <h3 style="margin: 0; font-size: 17px; font-weight: 800; color: #f8fafc;">
             Analyze & Ingest Debt by ISIN

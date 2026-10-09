@@ -49,15 +49,16 @@ class _PooledConnectionProxy:
             try:
                 if not self._conn.closed:
                     self._conn.rollback()
-            except Exception:
-                pass
+            except Exception as e:
+                logger.debug(f"Connection proxy rollback notice: {e}")
             try:
                 self._pool.putconn(self._conn)
-            except Exception:
+            except Exception as e:
+                logger.debug(f"Connection pool return notice: {e}")
                 try:
                     self._conn.close()
-                except Exception:
-                    pass
+                except Exception as close_err:
+                    logger.debug(f"Connection direct close notice: {close_err}")
 
     def __enter__(self):
         return self
@@ -95,8 +96,8 @@ def _acquire_connection_from_pool(pool):
             if conn.closed != 0:
                 try:
                     pool.putconn(conn, close=True)
-                except Exception:
-                    pass
+                except Exception as e:
+                    logger.debug(f"Stale connection return notice: {e}")
                 continue
             with conn.cursor() as cur:
                 cur.execute("SELECT 1;")
@@ -105,8 +106,8 @@ def _acquire_connection_from_pool(pool):
             if conn:
                 try:
                     pool.putconn(conn, close=True)
-                except Exception:
-                    pass
+                except Exception as e:
+                    logger.debug(f"Connection pool retry putconn notice: {e}")
     import psycopg2
     supabase_url = get_supabase_url()
     return psycopg2.connect(supabase_url)
@@ -125,12 +126,13 @@ def _get_raw_connection():
             pool = _get_pg_pool(supabase_url)
             raw_conn = _acquire_connection_from_pool(pool)
             return _PooledConnectionProxy(pool, raw_conn)
-        except Exception:
+        except Exception as e:
+            logger.debug(f"Pooled connection acquisition notice: {e}")
             try:
                 import psycopg2
                 return psycopg2.connect(supabase_url)
-            except Exception:
-                pass
+            except Exception as direct_err:
+                logger.debug(f"Direct psycopg2 fallback notice: {direct_err}")
 
     import sqlite3
     db_path = get_db_path()
@@ -138,8 +140,8 @@ def _get_raw_connection():
     try:
         conn.execute("PRAGMA journal_mode=WAL;")
         conn.execute("PRAGMA busy_timeout=30000;")
-    except Exception:
-        pass
+    except Exception as e:
+        logger.debug(f"SQLite PRAGMA configuration notice: {e}")
     return conn
 
 def get_db_connection():
@@ -274,8 +276,8 @@ def init_db(force: bool = False):
                         if col not in existing_cols:
                             try:
                                 cursor.execute(f"ALTER TABLE reports ADD COLUMN {col} {col_type};")
-                            except Exception:
-                                pass
+                            except Exception as e:
+                                logger.debug(f"Column '{col}' migration notice: {e}")
 
                     cursor.execute('''
                         CREATE TABLE IF NOT EXISTS report_revisions (
@@ -423,8 +425,8 @@ def init_db(force: bool = False):
                         if col not in existing_cols:
                             try:
                                 cursor.execute(f"ALTER TABLE site_usage_events ADD COLUMN {col} {col_type};")
-                            except Exception:
-                                pass
+                            except Exception as e:
+                                logger.debug(f"Column '{col}' migration notice: {e}")
                     cursor.execute('CREATE INDEX IF NOT EXISTS idx_site_usage_session ON site_usage_events (session_id, timestamp DESC);')
                     cursor.execute('CREATE INDEX IF NOT EXISTS idx_site_usage_source ON site_usage_events (traffic_source, timestamp DESC);')
                     cursor.execute("INSERT OR IGNORE INTO schema_migrations (version) VALUES ('v004_traffic_attribution_and_session_tracking');")
@@ -466,15 +468,15 @@ def init_db(force: bool = False):
                     if "citations_json" not in existing_rep_cols:
                         try:
                             cursor.execute("ALTER TABLE reports ADD COLUMN citations_json TEXT;")
-                        except Exception:
-                            pass
+                        except Exception as e:
+                            logger.debug("Migration v006 reports column citations_json notice: %s", e)
                     cursor.execute("PRAGMA table_info(report_revisions);")
                     existing_rev_cols = [c[1] for c in cursor.fetchall()]
                     if "citations_json" not in existing_rev_cols:
                         try:
                             cursor.execute("ALTER TABLE report_revisions ADD COLUMN citations_json TEXT;")
-                        except Exception:
-                            pass
+                        except Exception as e:
+                            logger.debug("Migration v006 report_revisions column citations_json notice: %s", e)
                     cursor.execute("INSERT OR IGNORE INTO schema_migrations (version) VALUES ('v006_report_citations');")
                 conn.commit()
 
@@ -712,15 +714,15 @@ def init_db(force: bool = False):
                     ]:
                         try:
                             cursor.execute(f"ALTER TABLE {col_def[0]} ADD COLUMN {col_def[1]};")
-                        except Exception:
-                            pass
+                        except Exception as e:
+                            logger.debug("Migration v010 add column notice for %s: %s", col_def[1], e)
                     try:
                         cursor.execute("CREATE INDEX IF NOT EXISTS idx_site_usage_user ON site_usage_events (user_id, timestamp DESC);")
                         cursor.execute("CREATE INDEX IF NOT EXISTS idx_site_usage_email ON site_usage_events (user_email, timestamp DESC);")
                         cursor.execute("CREATE INDEX IF NOT EXISTS idx_credit_transactions_status ON credit_transactions (status, created_at DESC);")
                         cursor.execute("CREATE INDEX IF NOT EXISTS idx_credit_transactions_invoice ON credit_transactions (invoice_number);")
-                    except Exception:
-                        pass
+                    except Exception as e:
+                        logger.debug("Migration v010 index creation notice: %s", e)
                     cursor.execute("INSERT OR IGNORE INTO schema_migrations (version) VALUES ('v010_user_usage_and_billables_audit');")
                 conn.commit()
 
@@ -1615,12 +1617,12 @@ def init_db(force: bool = False):
                 else:
                     try:
                         cursor.execute("ALTER TABLE site_usage_events ADD COLUMN landing_page TEXT;")
-                    except Exception:
-                        pass
+                    except Exception as e:
+                        logger.debug("Migration v025 column notice: %s", e)
                     try:
                         cursor.execute("CREATE INDEX IF NOT EXISTS idx_site_usage_landing ON site_usage_events (landing_page, timestamp DESC);")
-                    except Exception:
-                        pass
+                    except Exception as e:
+                        logger.debug("Migration v025 index notice: %s", e)
                     cursor.execute("INSERT OR IGNORE INTO schema_migrations (version) VALUES ('v025_landing_pages_telemetry');")
                 conn.commit()
 

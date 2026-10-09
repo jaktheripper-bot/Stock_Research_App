@@ -26,7 +26,7 @@
       </div>
       <input type="hidden" name="type" value="{{ selected_type or 'ALL' }}">
       <button type="submit" class="btn btn-primary" style="padding: 12px 24px; font-size: 14px; font-weight: 700; border-radius: 10px;">
-        🔍 Search All
+        <svg class="glyph"><use href="#glyph-search"></use></svg> Search All
       </button>
     </form>
   </div>
@@ -41,17 +41,17 @@
       📈 Stocks ({{ search_results.categories.equities|length }})
     </a>
     <a href="/search?q={{ query }}&type=MUTUAL_FUND" class="btn btn-sm {% if selected_type == 'MUTUAL_FUND' %}btn-primary{% else %}btn-secondary{% endif %}" style="border-radius: 9999px;">
-      📊 Mutual Funds ({{ search_results.categories.mutual_funds|length }})
+      <svg class="glyph"><use href="#glyph-chart"></use></svg> Mutual Funds ({{ search_results.categories.mutual_funds|length }})
     </a>
     <a href="/search?q={{ query }}&type=DEBT" class="btn btn-sm {% if selected_type == 'DEBT' %}btn-primary{% else %}btn-secondary{% endif %}" style="border-radius: 9999px;">
-      🏛️ Corporate Debt & NCDs ({{ search_results.categories.corporate_debt|length }})
+      <svg class="glyph"><use href="#glyph-temple"></use></svg> Corporate Debt & NCDs ({{ search_results.categories.corporate_debt|length }})
     </a>
   </div>
 
   <!-- Search Results Sections -->
   {% if search_results.total_matches == 0 %}
   <div style="background: rgba(30, 41, 59, 0.4); border: 1px solid rgba(255, 255, 255, 0.08); border-radius: 12px; padding: 48px; text-align: center;">
-    <div style="font-size: 48px; margin-bottom: 16px;">🔍</div>
+    <div style="font-size: 48px; margin-bottom: 16px;"><svg class="glyph"><use href="#glyph-search"></use></svg></div>
     <h3 style="font-size: 18px; font-weight: 700; color: #f8fafc; margin-bottom: 8px;">No matching investment products found</h3>
     <p style="font-size: 14px; color: #94a3b8; max-width: 500px; margin: 0 auto 20px;">
       We couldn't find any equities, mutual fund schemes, or debt securities matching "<strong>{{ query }}</strong>". Try searching with a broader keyword, ticker symbol, or AMFI scheme code.
@@ -90,7 +90,7 @@
   <div style="margin-bottom: 32px;">
     <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 14px;">
       <h2 style="font-size: 18px; font-weight: 700; color: #f8fafc; display: flex; align-items: center; gap: 8px;">
-        <span>📊</span> Mutual Fund Schemes ({{ search_results.categories.mutual_funds|length }})
+        <span><svg class="glyph"><use href="#glyph-chart"></use></svg></span> Mutual Fund Schemes ({{ search_results.categories.mutual_funds|length }})
       </h2>
     </div>
     <div style="display: grid; grid-template-columns: repeat(auto-fill, minmax(340px, 1fr)); gap: 14px;">
@@ -120,7 +120,7 @@
   <div style="margin-bottom: 32px;">
     <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 14px;">
       <h2 style="font-size: 18px; font-weight: 700; color: #f8fafc; display: flex; align-items: center; gap: 8px;">
-        <span>🏛️</span> Corporate Debt Securities & NCDs ({{ search_results.categories.corporate_debt|length }})
+        <span><svg class="glyph"><use href="#glyph-temple"></use></svg></span> Corporate Debt Securities & NCDs ({{ search_results.categories.corporate_debt|length }})
       </h2>
     </div>
     <div style="display: grid; grid-template-columns: repeat(auto-fill, minmax(340px, 1fr)); gap: 14px;">
@@ -159,7 +159,7 @@
     </div>
 
     <div style="background: rgba(30, 41, 59, 0.4); border: 1px solid rgba(255, 255, 255, 0.08); border-radius: 14px; padding: 24px;">
-      <div style="font-size: 28px; margin-bottom: 12px;">📊</div>
+      <div style="font-size: 28px; margin-bottom: 12px;"><svg class="glyph"><use href="#glyph-chart"></use></svg></div>
       <h3 style="font-size: 17px; font-weight: 700; color: #f8fafc; margin-bottom: 8px;">Mutual Fund Schemes</h3>
       <p style="font-size: 13px; color: #94a3b8; line-height: 1.5; margin-bottom: 16px;">
         AMFI daily NAV tracking, Active Share closet-indexing detection, and 10-year Direct vs Regular TER fee drag models.
@@ -172,7 +172,7 @@
     </div>
 
     <div style="background: rgba(30, 41, 59, 0.4); border: 1px solid rgba(255, 255, 255, 0.08); border-radius: 14px; padding: 24px;">
-      <div style="font-size: 28px; margin-bottom: 12px;">🏛️</div>
+      <div style="font-size: 28px; margin-bottom: 12px;"><svg class="glyph"><use href="#glyph-temple"></use></svg></div>
       <h3 style="font-size: 17px; font-weight: 700; color: #f8fafc; margin-bottom: 8px;">Bonds & Debentures</h3>
       <p style="font-size: 13px; color: #94a3b8; line-height: 1.5; margin-bottom: 16px;">
         5-Pillar Credit & Duration Core for BSE/NSE listed NCDs, Senior Secured Debentures, and Securitized Debt Instruments.

@@ -101,8 +101,8 @@ def add_to_watchlist(ticker: str, short_name: str = "", scrip_code: str = "",
         conn.commit()
         try:
             get_watchlist.cache_clear()
-        except Exception:
-            pass
+        except Exception as clear_err:
+            logger.debug("Cache clear notice: %s", clear_err)
         success = True
     except Exception as e:
         logger.error(f"Database error in add_to_watchlist: {e}")
@@ -124,8 +124,8 @@ def remove_from_watchlist(ticker: str) -> bool:
         conn.commit()
         try:
             get_watchlist.cache_clear()
-        except Exception:
-            pass
+        except Exception as clear_err:
+            logger.debug("Cache clear notice: %s", clear_err)
         success = True
     except Exception as e:
         logger.error(f"Database error in remove_from_watchlist: {e}")
@@ -145,8 +145,8 @@ def is_ticker_in_watchlist(ticker: str) -> bool:
     try:
         cursor.execute(f"SELECT 1 FROM watchlist WHERE ticker = {placeholder}", (clean,))
         in_watch = cursor.fetchone() is not None
-    except Exception:
-        pass
+    except Exception as check_err:
+        logger.debug("Watchlist check notice: %s", check_err)
     finally:
         cursor.close()
         conn.close()

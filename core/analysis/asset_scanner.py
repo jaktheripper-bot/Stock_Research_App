@@ -163,8 +163,8 @@ def scan_debt_securities() -> Dict[str, Any]:
                 days_left = (mat_date - now_date).days
                 if 0 <= days_left <= 30:
                     maturing_soon += 1
-            except Exception:
-                pass
+            except Exception as mat_err:
+                logger.debug("Maturity date parse notice: %s", mat_err)
 
         rating = (sec.get("credit_rating") or "").upper()
         if any(w in rating for w in ("WATCH", "NEGATIVE", "DEFAULT", "D", "BBB-")):
@@ -268,8 +268,8 @@ def get_asset_scan_history(limit: int = 15) -> List[Dict[str, Any]]:
             if r[7]:
                 try:
                     details = json.loads(r[7])
-                except Exception:
-                    pass
+                except Exception as json_err:
+                    logger.debug("Details JSON parse notice: %s", json_err)
             runs.append({
                 "scan_id": r[0],
                 "scan_type": r[1],

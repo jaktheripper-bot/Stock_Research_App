@@ -190,8 +190,8 @@ def record_usage_event(
         try:
             cursor.close()
             conn.close()
-        except Exception:
-            pass
+        except Exception as close_err:
+            logger.debug("Telemetry connection close notice: %s", close_err)
 
 def _build_telemetry_time_filter(
     supabase_url: str,
@@ -384,8 +384,8 @@ def get_site_usage_summary(days: int = None, start_date = None, end_date = None,
                         if not p and d.get("landing_url"):
                             from urllib.parse import urlparse
                             p = urlparse(d["landing_url"]).path
-                    except Exception:
-                        pass
+                    except Exception as parse_err:
+                        logger.debug("Failed to parse telemetry details_json landing page: %s", parse_err)
                 if not p and ev_tick and str(ev_tick).upper() != "APP":
                     p = f"/dossier/{clean_ticker(ev_tick)}"
                 if not p:
@@ -484,8 +484,8 @@ def get_site_usage_summary(days: int = None, start_date = None, end_date = None,
                 LIMIT 6
             ''')
             summary["os_breakdown"] = [{"os": row[0], "count": int(row[1])} for row in cursor.fetchall()]
-        except Exception:
-            pass
+        except Exception as os_err:
+            logger.debug("OS breakdown query notice: %s", os_err)
 
         # 8. Recent Audit Events
         try:
@@ -599,8 +599,8 @@ def get_session_journeys(days: int = None, start_date = None, end_date = None, l
                             if not p and d.get("landing_url"):
                                 from urllib.parse import urlparse
                                 p = urlparse(d["landing_url"]).path
-                        except Exception:
-                            pass
+                        except Exception as parse_err:
+                            logger.debug("Failed to parse journey landing page: %s", parse_err)
                     if not p and ev_ticker and str(ev_ticker).upper() != "APP":
                         p = f"/dossier/{clean_ticker(ev_ticker)}"
                     if not p:
@@ -740,8 +740,8 @@ def get_user_usage_analytics(days: int = None, start_date = None, end_date = Non
                         name = acc[0] or name
                         credits = float(acc[1] or 0.0)
                         tier = (acc[2] or "free").lower()
-                except Exception:
-                    pass
+                except Exception as acc_err:
+                    logger.debug("Failed to fetch user account details for %s: %s", email, acc_err)
 
                 user_list.append({
                     "email": email,
@@ -868,8 +868,8 @@ def purge_test_telemetry() -> dict:
         logger.error(f"Error executing test data purge: {e}")
         try:
             conn.rollback()
-        except Exception:
-            pass
+        except Exception as rb_err:
+            logger.debug("Purge rollback notice: %s", rb_err)
     finally:
         cursor.close()
         conn.close()

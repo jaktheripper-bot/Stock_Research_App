@@ -352,13 +352,13 @@ def tool_audit_design_tokens() -> Dict[str, Any]:
                         cnt = text.count(em)
                         if cnt > 0:
                             emoji_count += cnt
-                except Exception:
-                    pass
+                except Exception as read_err:
+                    logger.debug(f"Template read notice for {fpath}: {read_err}")
 
     return {
         "has_tabular_nums": has_tabular_nums,
         "has_design_tokens": has_design_tokens,
         "legacy_os_emojis_found": emoji_count,
-        "design_health_score": 90.0 if (has_tabular_nums and has_design_tokens) else 75.0,
-        "notes": "Tabular lining numerals and CSS variables active. 32 glyphs tracked in Priority 3 for SVG icon migration."
+        "design_health_score": 100.0 if (has_tabular_nums and has_design_tokens and emoji_count == 0) else (90.0 if (has_tabular_nums and has_design_tokens) else 75.0),
+        "notes": "Tabular lining numerals, CSS variables, and institutional vector SVG glyphs active." if emoji_count == 0 else "Tabular lining numerals and CSS variables active. Legacy glyphs tracked for SVG migration."
     }

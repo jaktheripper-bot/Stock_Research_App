@@ -222,7 +222,7 @@
 {% if not authenticated %}
   <!-- Admin Authentication Lockbox -->
   <div class="admin-login-box">
-    <div style="font-size: 44px; margin-bottom: 12px;">🛡️</div>
+    <div style="font-size: 44px; margin-bottom: 12px;"><svg class="glyph"><use href="#glyph-shield"></use></svg></div>
     <h2 style="font-size: 22px; font-weight: 800; margin-bottom: 8px;">Executive Administrator Portal</h2>
     <p style="color: var(--text-secondary, #94a3b8); font-size: 13px; margin-bottom: 24px;">
       Multi-Factor Access Gate: Google Verified Identity + RFC 6238 Authenticator Security.
@@ -280,7 +280,7 @@
   <!-- Top Header Bar -->
   <div class="admin-header-bar">
     <div class="admin-title-group">
-      <h1>📊 Executive Telemetry & Site Usage Hub</h1>
+      <h1><svg class="glyph"><use href="#glyph-chart"></use></svg> Executive Telemetry & Site Usage Hub</h1>
       <p>Live visitor acquisition, user behavior paths, cache efficiency, institutional billing, and support complaints.</p>
     </div>
 
@@ -311,7 +311,7 @@
       <!-- Real Data Filter Indicator -->
       <div style="display: flex; align-items: center; gap: 6px; background: rgba(15, 23, 42, 0.8); border: 1px solid var(--border-subtle, #1e293b); padding: 6px 10px; border-radius: 8px;">
         {% if exclude_tests %}
-        <span class="status-pill success" style="font-size: 10px; padding: 2px 6px;">🛡️ Clean Real Data</span>
+        <span class="status-pill success" style="font-size: 10px; padding: 2px 6px;"><svg class="glyph"><use href="#glyph-shield"></use></svg> Clean Real Data</span>
         <a href="/admin?window={{ window }}&tab={{ active_tab }}&include_tests=1" style="font-size: 11px; color: #64748b; text-decoration: none;" title="Include synthetic test runs">(Show Tests)</a>
         {% else %}
         <span class="status-pill warning" style="font-size: 10px; padding: 2px 6px;">⚠️ Incl. Test Data</span>
@@ -354,12 +354,12 @@
       <div class="kpi-delta">Distinct Visitor Footprints</div>
     </div>
     <div class="kpi-card">
-      <div class="kpi-label">Total Actions <span>⚡</span></div>
+      <div class="kpi-label">Total Actions <span><svg class="glyph"><use href="#glyph-zap"></use></svg></span></div>
       <div class="kpi-value">{{ summary.total_actions }}</div>
       <div class="kpi-delta">Queries, Dockets & Exports</div>
     </div>
     <div class="kpi-card">
-      <div class="kpi-label">Cache Efficiency <span>🛡️</span></div>
+      <div class="kpi-label">Cache Efficiency <span><svg class="glyph"><use href="#glyph-shield"></use></svg></span></div>
       <div class="kpi-value">{{ summary.cache_efficiency_pct }}%</div>
       <div class="kpi-delta success">Zero-Cost Instant Serve</div>
     </div>
@@ -405,13 +405,13 @@
       👥 Team & Access
     </button>
     <button class="admin-tab-btn {% if active_tab == 'audit' %}active{% endif %}" data-tab="audit" onclick="showTab('audit')">
-      🛡️ Admin Audit Trail
+      <svg class="glyph"><use href="#glyph-shield"></use></svg> Admin Audit Trail
     </button>
     <button class="admin-tab-btn {% if active_tab == 'assets' %}active{% endif %}" data-tab="assets" onclick="showTab('assets')">
       📡 Asset Surveillance
     </button>
     <a href="/admin/audit" class="admin-tab-btn" style="text-decoration: none; color: #38bdf8; border: 1px solid rgba(14, 165, 233, 0.4); background: rgba(14, 165, 233, 0.12); margin-left: auto;">
-      🛡️ Autonomous Project Auditor →
+      <svg class="glyph"><use href="#glyph-shield"></use></svg> Autonomous Project Auditor →
     </a>
   </div>
 
@@ -430,7 +430,7 @@
         <div class="kpi-delta">GST 18%: ₹{{ "{:,.2f}".format(rev_summary.tax_gst_collected_inr) }}</div>
       </div>
       <div class="kpi-card" style="border-left: 3px solid #38bdf8;">
-        <div class="kpi-label">Paid Tokens Issued <span>🪙</span></div>
+        <div class="kpi-label">Paid Tokens Issued <span><svg class="glyph"><use href="#glyph-coin"></use></svg></span></div>
         <div class="kpi-value" style="color: #38bdf8;">{{ "{:,.1f}".format(rev_summary.paid_credits_issued) }}</div>
         <div class="kpi-delta">Cash-Backed Credits</div>
       </div>
@@ -445,7 +445,7 @@
         <div class="kpi-delta warning">{{ rev_summary.refunded_orders_count }} reversal(s)</div>
       </div>
       <div class="kpi-card">
-        <div class="kpi-label">Circulating Liability <span>⚖️</span></div>
+        <div class="kpi-label">Circulating Liability <span><svg class="glyph"><use href="#glyph-scale"></use></svg></span></div>
         <div class="kpi-value">{{ "{:,.1f}".format(rev_summary.credits_in_circulation) }}</div>
         <div class="kpi-delta">{{ rev_summary.active_subscribers_count }} accounts with balance</div>
       </div>
@@ -564,7 +564,7 @@
       <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px;">
         <h3 style="margin: 0; font-size: 16px; font-weight: 700;">Top Active Users in Period</h3>
         <button type="button" class="btn btn-primary btn-sm" onclick="openGrantCreditsModal('', '', 'TASK_REMEDY', '')" style="display: flex; align-items: center; gap: 6px; font-weight: 600; cursor: pointer;">
-          ⚡ Direct Credit Grant
+          <svg class="glyph"><use href="#glyph-zap"></use></svg> Direct Credit Grant
         </button>
       </div>
       <div class="admin-table-wrap">
@@ -595,7 +595,7 @@
               <td class="mono" style="font-size: 11px;">{{ u.last_active or u.last_seen }}</td>
               <td>
                 <button type="button" class="btn btn-secondary btn-sm" onclick="openGrantCreditsModal('{{ u.email }}', '', 'TASK_REMEDY', '')" style="padding: 4px 10px; font-size: 11px; color: #10b981; border-color: rgba(16, 185, 129, 0.4); display: inline-flex; align-items: center; gap: 4px; cursor: pointer;" title="Grant remedial credits to {{ u.email }}">
-                  ⚡ Grant Credits
+                  <svg class="glyph"><use href="#glyph-zap"></use></svg> Grant Credits
                 </button>
               </td>
             </tr>
@@ -671,7 +671,7 @@
                     </button>
                   </form>
                   <button type="button" class="btn btn-secondary btn-sm" onclick="openGrantCreditsModal('{{ t.user_email }}', '{{ t.ticket_id }}', 'TASK_REMEDY', '')" style="padding: 4px 8px; font-size: 11px; color: #f59e0b; border-color: rgba(245, 158, 11, 0.4); background: rgba(245, 158, 11, 0.08); display: inline-flex; align-items: center; justify-content: center; gap: 4px; cursor: pointer;" title="Grant remedial credits & resolve grievance">
-                    ⚡ Grant Remedial Credits
+                    <svg class="glyph"><use href="#glyph-zap"></use></svg> Grant Remedial Credits
                   </button>
                 </div>
               </td>
@@ -1197,7 +1197,7 @@
   <div id="tab-audit" class="admin-tab-pane {% if active_tab == 'audit' %}active{% endif %}">
     <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px;">
       <div>
-        <h3 style="margin: 0; font-size: 18px; font-weight: 800;">🛡️ Immutable Administrator Audit Ledger</h3>
+        <h3 style="margin: 0; font-size: 18px; font-weight: 800;"><svg class="glyph"><use href="#glyph-shield"></use></svg> Immutable Administrator Audit Ledger</h3>
         <p style="color: var(--text-secondary, #94a3b8); font-size: 13px; margin: 4px 0 0 0;">
           Cryptographically recorded actions, authentication events, refund executions, and team modifications.
         </p>
@@ -1277,7 +1277,7 @@
       <div>
         <form method="POST" action="/admin/assets/trigger-scan" style="margin: 0;">
           <button type="submit" class="admin-btn" style="background: linear-gradient(135deg, #0ea5e9, #2563eb); color: #fff; font-weight: 700; border: none; padding: 10px 18px; border-radius: 8px; cursor: pointer;">
-            ⚡ Trigger Ingestion Scan Now
+            <svg class="glyph"><use href="#glyph-zap"></use></svg> Trigger Ingestion Scan Now
           </button>
         </form>
       </div>
@@ -1360,7 +1360,7 @@
           {% else %}
           <tr>
             <td colspan="9" style="text-align: center; color: var(--text-secondary, #94a3b8); padding: 30px;">
-              No asset surveillance runs recorded yet. Click "⚡ Trigger Ingestion Scan Now" above to start the first scan.
+              No asset surveillance runs recorded yet. Click "<svg class="glyph"><use href="#glyph-zap"></use></svg> Trigger Ingestion Scan Now" above to start the first scan.
             </td>
           </tr>
           {% endfor %}
@@ -1466,7 +1466,7 @@
     <div class="modal-dialog" style="max-width: 480px; width: 90%; background: var(--bg-card, #131722); border-radius: 12px; padding: 24px; border: 1px solid rgba(56, 189, 248, 0.4); box-shadow: 0 20px 45px rgba(0, 0, 0, 0.7);">
       <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px;">
         <h3 style="margin: 0; font-size: 18px; font-weight: 800; display: flex; align-items: center; gap: 8px;">
-          <span style="color: #38bdf8;">⚡</span> Grant Remedial Credits
+          <span style="color: #38bdf8;"><svg class="glyph"><use href="#glyph-zap"></use></svg></span> Grant Remedial Credits
         </h3>
         <button type="button" onclick="closeGrantCreditsModal()" style="background: none; border: none; color: #94a3b8; font-size: 22px; cursor: pointer;">&times;</button>
       </div>
@@ -1534,7 +1534,7 @@
             Cancel
           </button>
           <button type="submit" class="btn btn-primary" style="padding: 8px 18px; font-size: 13px; font-weight: 700; background: #0ea5e9; border-color: #0ea5e9;">
-            ⚡ Confirm & Grant Credits
+            <svg class="glyph"><use href="#glyph-zap"></use></svg> Confirm & Grant Credits
           </button>
         </div>
       </form>

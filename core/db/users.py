@@ -129,8 +129,8 @@ def get_or_create_user(
         logger.error(f"Error in get_or_create_user for {email}: {e}")
         try:
             conn.rollback()
-        except Exception:
-            pass
+        except Exception as rb_err:
+            logger.debug(f"Rollback failed: {rb_err}")
         return {}
     finally:
         cursor.close()
@@ -275,8 +275,8 @@ def deduct_user_credits(
         logger.error(f"Error deducting credits for user {user_id}: {e}")
         try:
             conn.rollback()
-        except Exception:
-            pass
+        except Exception as rb_err:
+            logger.debug(f"Rollback failed: {rb_err}")
         return False, 0.0, f"Database transaction error: {e}"
     finally:
         cursor.close()
@@ -403,8 +403,8 @@ def add_user_credits(
         logger.error(f"Error adding credits to user {user_id}: {e}")
         try:
             conn.rollback()
-        except Exception:
-            pass
+        except Exception as rb_err:
+            logger.debug(f"Rollback failed: {rb_err}")
         return False, 0.0
     finally:
         cursor.close()
@@ -606,8 +606,8 @@ def get_revenue_analytics_summary(days: int = None, start_date = None, end_date 
             if c_row:
                 summary["credits_in_circulation"] = float(c_row[0] or 0.0)
                 summary["active_subscribers_count"] = int(c_row[1] or 0)
-        except Exception:
-            pass
+        except Exception as circ_err:
+            logger.debug(f"Credits in circulation query notice: {circ_err}")
 
     except Exception as e:
         logger.error(f"Error computing revenue analytics summary: {e}")
@@ -694,8 +694,8 @@ def process_refund(
         logger.error(f"Error processing refund for {transaction_id}: {e}")
         try:
             conn.rollback()
-        except Exception:
-            pass
+        except Exception as rb_err:
+            logger.debug(f"Rollback failed: {rb_err}")
         return False, f"Database error during refund: {e}"
     finally:
         cursor.close()

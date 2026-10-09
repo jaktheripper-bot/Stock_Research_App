@@ -70,8 +70,8 @@ def evaluate_company_disparity(fund_a: dict, fund_b: dict) -> dict:
     try:
         mcap_a = float(str(fund_a.get("market_cap") or 0).replace(",", "").strip())
         mcap_b = float(str(fund_b.get("market_cap") or 0).replace(",", "").strip())
-    except Exception:
-        pass
+    except Exception as parse_err:
+        logger.debug("Market cap parse error: %s", parse_err)
     
     scale_mismatch = False
     if mcap_a > 0 and mcap_b > 0:

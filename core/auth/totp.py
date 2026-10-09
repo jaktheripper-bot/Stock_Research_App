@@ -18,7 +18,10 @@ import hashlib
 import struct
 import base64
 import urllib.parse
+import logging
 from typing import Optional
+
+logger = logging.getLogger("equity_research.core.auth.totp")
 
 
 def generate_totp_secret(length_bytes: int = 20) -> str:
@@ -83,8 +86,8 @@ def verify_totp_code(secret: str, code: str, interval: int = 30, window: int = 1
             expected = get_totp_code(secret, interval, now + (step * interval))
             if hmac.compare_digest(expected, cleaned_code):
                 return True
-        except Exception:
-            pass
+        except Exception as step_err:
+            logger.debug("TOTP step error: %s", step_err)
 
     return False
 

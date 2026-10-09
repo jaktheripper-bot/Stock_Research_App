@@ -56,8 +56,8 @@ def create_support_ticket(
         logger.error(f"Error creating support ticket: {e}")
         try:
             conn.rollback()
-        except Exception:
-            pass
+        except Exception as rb_err:
+            logger.debug("Support ticket rollback failed: %s", rb_err)
         return {"success": False, "error": str(e)}
     finally:
         cursor.close()
@@ -148,8 +148,8 @@ def update_ticket_status(ticket_id: str, new_status: str, admin_notes: str = Non
         logger.error(f"Error updating ticket {clean_tid}: {e}")
         try:
             conn.rollback()
-        except Exception:
-            pass
+        except Exception as rb_err:
+            logger.debug("Support ticket rollback failed: %s", rb_err)
         return False
     finally:
         cursor.close()

@@ -171,7 +171,7 @@ def compute_deterministic_audit_metrics() -> Dict[str, Any]:
     # Actionable Recommendations
     recommendations = []
     if anti_patterns > 0:
-        recommendations.append(f"Refactor {anti_patterns} instances of silent exception swallowing (`except Exception: pass`) across database modules.")
+        recommendations.append(f"Refactor {anti_patterns} instances of silent exception swallowing (unhandled `except` blocks) across codebase.")
     if design_res.get("legacy_os_emojis_found", 0) > 0:
         recommendations.append(f"Execute Priority 3: Migrate {design_res['legacy_os_emojis_found']} OS Unicode emojis to institutional vector SVG sprite glyphs.")
     if not test_res.get("status") == "PASS":
@@ -238,7 +238,7 @@ def synthesize_deterministic_markdown_report(audit_id: str, metrics: Dict[str, A
 - **Database Dual-Binding:** PostgreSQL (Supabase) and SQLite (`reports.db`) schema migrations verified up to `v022_project_audit_logs`.
 - **Zero-Hallucination AST Inspection:**
   - Scanned Python Files: `{metrics['hygiene_results'].get('scanned_python_files')}`
-  - Silent Exception Swallows (`except: pass`): `{metrics['hygiene_results'].get('anti_patterns_count')}` instances tracked for refactoring.
+  - Silent Exception Swallows (unhandled `except` blocks): `{metrics['hygiene_results'].get('anti_patterns_count')}` instances tracked for refactoring.
   - Hardcoded Valuation Metrics: Zero detected. All metrics grounded in exchange data.
 
 ---

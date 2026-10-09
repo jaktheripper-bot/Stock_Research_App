@@ -38,8 +38,8 @@ def _get_ssl_context() -> ssl.SSLContext:
     try:
         import certifi
         return ssl.create_default_context(cafile=certifi.where())
-    except Exception:
-        pass
+    except Exception as cert_err:
+        logger.debug("certifi context notice: %s", cert_err)
     try:
         return ssl.create_default_context()
     except Exception:
@@ -281,8 +281,8 @@ def search_amfi_master_directory(
         for s in results[:10]:
             try:
                 save_mutual_fund_scheme(s)
-            except Exception:
-                pass
+            except Exception as save_err:
+                logger.debug("Opportunistic scheme save notice: %s", save_err)
 
         return results
     except Exception as e:

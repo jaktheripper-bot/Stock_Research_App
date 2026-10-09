@@ -19,8 +19,8 @@ logger = logging.getLogger("equity_research.core.config")
 try:
     from dotenv import load_dotenv
     load_dotenv()
-except Exception:
-    pass
+except Exception as e:
+    logger.debug("dotenv load notice: %s", e)
 
 _SECRETS_CACHE: Optional[dict] = None
 _SECRETS_LOADED = False

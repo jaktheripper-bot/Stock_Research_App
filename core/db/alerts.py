@@ -184,8 +184,8 @@ def get_unread_alert_count(ticker: str = None) -> int:
         row = cursor.fetchone()
         if row:
             count = row[0]
-    except Exception:
-        pass
+    except Exception as e:
+        logger.debug("Error getting unread alerts count: %s", e)
     finally:
         cursor.close()
         conn.close()

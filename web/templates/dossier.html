@@ -24,10 +24,10 @@
 
         <div style="display: flex; gap: 10px; flex-wrap: wrap; align-items: center;">
           <button onclick="openCopilot('{{ ticker }}', 'equity')" class="btn btn-sm" style="background: rgba(14, 165, 233, 0.15); color: #38bdf8; border: 1px solid rgba(14, 165, 233, 0.4); font-weight: 700;">
-            🛡️ Forensic Copilot
+            <svg class="glyph"><use href="#glyph-shield"></use></svg> Forensic Copilot
           </button>
           <button id="btnOpenThesisTop" onclick="openThesisModal()" class="btn btn-secondary btn-sm" style="font-weight: 700; border-color: rgba(245, 158, 11, 0.4); color: #fbbf24; background: rgba(245, 158, 11, 0.1);">
-            ⚖️ Thesis Checkpoint
+            <svg class="glyph"><use href="#glyph-scale"></use></svg> Thesis Checkpoint
           </button>
           {% if is_deep_dive_unlocked %}
           <span class="badge badge-emerald" style="display: inline-flex; align-items: center; gap: 4px; padding: 6px 12px; font-weight: 700; font-size: 11.5px;">
@@ -129,7 +129,7 @@
       {% if citations %}
       <div style="margin-top: 18px; padding: 14px 18px; background: rgba(56, 189, 248, 0.08); border-left: 3px solid #38bdf8; border-radius: 8px; font-size: 13.5px; color: var(--text-secondary); display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 12px;">
         <div style="display: flex; align-items: center; gap: 8px;">
-          <span style="font-size: 16px;">🛡️</span>
+          <span style="font-size: 16px;"><svg class="glyph"><use href="#glyph-shield"></use></svg></span>
           <span>
             <strong style="color: #38bdf8;">Verified Regulatory Grounding:</strong>
             Synthesized from <strong>{{ citations|length }} primary sources</strong>, including statutory BSE filings, shareholding patterns, and official disclosures.
@@ -207,7 +207,7 @@
         </div>
         <div style="display: flex; align-items: center; gap: 8px; flex-wrap: wrap;">
           <button id="btnOpenThesisPead" class="btn btn-sm" onclick="openThesisModal()" style="font-size: 11.5px; font-weight: 700; padding: 4px 10px; background: rgba(245, 158, 11, 0.15); border: 1px solid rgba(245, 158, 11, 0.4); color: #fbbf24; cursor: pointer; border-radius: 6px; display: inline-flex; align-items: center; gap: 5px;">
-            <span>⚖️</span> "Would You Buy Today?" Checkpoint
+            <span><svg class="glyph"><use href="#glyph-scale"></use></svg></span> "Would You Buy Today?" Checkpoint
           </button>
           <span class="badge" style="{% if pead_data.status == 'bullish' %}background: rgba(16, 185, 129, 0.15); color: #34d399; border: 1px solid rgba(16, 185, 129, 0.3);{% else %}background: rgba(244, 63, 94, 0.15); color: #fb7185; border: 1px solid rgba(244, 63, 94, 0.3);{% endif %} font-weight: 700; font-size: 12px; padding: 5px 12px;">
             {{ pead_data.label }} ({{ pead_data.drift_direction }})
@@ -234,7 +234,7 @@
 
       <!-- Behavioral Nudge Guidance -->
       <div style="padding: 10px 14px; background: rgba(15, 23, 42, 0.7); border-radius: 6px; font-size: 12.5px; color: var(--text-secondary); line-height: 1.5;">
-        <span>🛡️ <strong>Behavioral Intervention:</strong> {{ pead_data.guidance }}</span>
+        <span><svg class="glyph"><use href="#glyph-shield"></use></svg> <strong>Behavioral Intervention:</strong> {{ pead_data.guidance }}</span>
       </div>
     </div>
     {% endif %}
@@ -305,7 +305,7 @@
     <div id="capitalStructure" style="margin-top: 36px; background: linear-gradient(135deg, rgba(15, 23, 42, 0.9) 0%, rgba(30, 41, 59, 0.75) 100%); border: 1px solid rgba(14, 165, 233, 0.35); border-radius: var(--radius-md); padding: 24px; box-shadow: 0 10px 25px rgba(0, 0, 0, 0.3);">
       <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px; flex-wrap: wrap; gap: 12px;">
         <div style="display: flex; align-items: center; gap: 10px;">
-          <span style="font-size: 24px;">🏦</span>
+          <span style="font-size: 24px;"><svg class="glyph"><use href="#glyph-bank"></use></svg></span>
           <div>
             <h3 style="margin: 0; font-size: 18px; font-weight: 800; color: #f8fafc;">
               Capital Structure: Listed Corporate Debentures & NCDs ({{ linked_debt|length }} Tranches)
@@ -378,7 +378,7 @@
     <div id="premortem" style="margin-top: 40px; background: rgba(15, 23, 42, 0.95); border: 1px solid rgba(245, 158, 11, 0.3); border-radius: var(--radius-md); padding: 24px;">
       <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px; flex-wrap: wrap; gap: 8px;">
         <div style="display: flex; align-items: center; gap: 10px;">
-          <span style="font-size: 22px;">⚡</span>
+          <span style="font-size: 22px;"><svg class="glyph"><use href="#glyph-zap"></use></svg></span>
           <h3 style="margin: 0; font-size: 17px; font-weight: 800; color: var(--text-primary);">
             Pre-Mortem Inversion Engine (Charlie Munger Anti-Thesis)
           </h3>
@@ -471,7 +471,7 @@
     <!-- Safe Harbor Footer Note -->
     <div style="margin-top: 36px; padding: 20px; background: rgba(15, 23, 42, 0.6); border: 1px solid rgba(255, 255, 255, 0.08); border-radius: var(--radius-md); font-size: 13px; color: var(--text-secondary); line-height: 1.6;">
       <strong style="color: var(--accent-cyan); display: flex; align-items: center; gap: 6px; margin-bottom: 6px;">
-        <span>🛡️</span> Mandatory SEBI Safe-Harbor Disclosure
+        <span><svg class="glyph"><use href="#glyph-shield"></use></svg></span> Mandatory SEBI Safe-Harbor Disclosure
       </strong>
       {{ MANDATORY_SEBI_DISCLAIMER }}
       <div style="margin-top: 10px; font-size: 12px; color: var(--text-muted); border-top: 1px solid rgba(255, 255, 255, 0.08); padding-top: 8px;">
@@ -487,7 +487,7 @@
     <!-- Modal Header -->
     <div style="background: rgba(30, 41, 59, 0.8); border-bottom: 1px solid rgba(245, 158, 11, 0.25); padding: 18px 24px; display: flex; align-items: center; justify-content: space-between;">
       <div style="display: flex; align-items: center; gap: 10px;">
-        <span style="font-size: 22px;">⚖️</span>
+        <span style="font-size: 22px;"><svg class="glyph"><use href="#glyph-scale"></use></svg></span>
         <div>
           <h3 style="margin: 0; font-size: 16.5px; font-weight: 800; color: #f8fafc;">
             Thesis Integrity Checkpoint
@@ -530,7 +530,7 @@
             <label style="display: flex; align-items: flex-start; gap: 10px; background: rgba(30, 41, 59, 0.5); padding: 10px 14px; border-radius: 8px; border: 1px solid var(--border-color); cursor: pointer;">
               <input type="radio" name="thesisDecision" value="THESIS_BREACHED" style="margin-top: 3px;" />
               <div>
-                <strong style="color: #fb7185; font-size: 13px; display: block;">🚨 No — Thesis Breached (Capital Preservation)</strong>
+                <strong style="color: #fb7185; font-size: 13px; display: block;"><svg class="glyph"><use href="#glyph-alert"></use></svg> No — Thesis Breached (Capital Preservation)</strong>
                 <span style="font-size: 12px; color: #94a3b8;">Fundamental deterioration, governance red flag, or moat degradation requires reallocating capital.</span>
               </div>
             </label>

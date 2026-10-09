@@ -110,8 +110,8 @@ def save_report_to_archive(stock_data: dict, report_text: str, announcement: str
         try:
             get_archived_reports.cache_clear()
             get_report_by_ticker.cache_clear()
-        except Exception:
-            pass
+        except Exception as clear_err:
+            logger.debug("Reports cache clear notice: %s", clear_err)
         # SEBI Compliance: Record statutory Safe Harbor disclaimer audit event
         # IndexNow instant ping – notify search engines of the new/updated dossier
         try:
@@ -170,8 +170,8 @@ def save_report_to_archive(stock_data: dict, report_text: str, announcement: str
     except Exception as e:
         try:
             conn.rollback()
-        except Exception:
-            pass
+        except Exception as rb_err:
+            logger.debug("Report save rollback notice: %s", rb_err)
         logger.error(f"Failed to save report to archive for {clean_sym}: {e}")
         raise
     finally:
