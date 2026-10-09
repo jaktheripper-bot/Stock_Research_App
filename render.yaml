@@ -9,6 +9,10 @@ services:
         value: 3.14.0
       - key: SUPABASE_DB_URL
         sync: false
+      - key: SUPABASE_URL
+        sync: false
+      - key: SUPABASE_ANON_KEY
+        sync: false
       - key: GEMINI_API_KEY
         sync: false
       - key: PERPLEXITY_API_KEY

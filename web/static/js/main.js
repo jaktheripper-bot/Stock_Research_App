@@ -12,7 +12,7 @@
       if (accessToken) {
         const isAdmin = window.location.pathname.startsWith('/admin');
         const callbackUrl = isAdmin ? '/admin/auth/callback' : '/auth/callback';
-        window.location.href = callbackUrl + '?access_token=' + encodeURIComponent(accessToken);
+        window.location.replace(callbackUrl + '?access_token=' + encodeURIComponent(accessToken));
       }
     } catch (e) {
       console.error('Error handling OAuth fragment:', e);
@@ -498,10 +498,22 @@ function initAuthModal() {
 
   syncUserSession();
 
-  // Background balance sync on every page load
+  // Background balance sync or session hydration on page load
   const user = getStoredUser();
   if (user && user.id) {
     refreshUserBalance(user);
+  } else {
+    // Attempt hydration from active HTTP session cookie
+    fetch('/api/auth/me')
+      .then(res => res.ok ? res.json() : null)
+      .then(data => {
+        if (data && data.authenticated && data.user) {
+          localStorage.setItem('sr_user', JSON.stringify(data.user));
+          syncUserSession();
+          refreshUserBalance(data.user);
+        }
+      })
+      .catch(() => {});
   }
 }
 

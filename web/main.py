@@ -2303,6 +2303,18 @@ async def public_auth_google(request: Request, redirect: Optional[str] = "/"):
     )
 
 
+def _extract_jwt_claims(token_str: str) -> dict:
+    """Safely decodes Supabase JWT claims without requiring remote network roundtrips."""
+    try:
+        parts = str(token_str).strip().split(".")
+        if len(parts) >= 2:
+            payload_b64 = parts[1] + "=" * ((4 - len(parts[1]) % 4) % 4)
+            return json.loads(base64.urlsafe_b64decode(payload_b64.encode("utf-8")).decode("utf-8"))
+    except Exception as e:
+        logger.debug(f"JWT claim extraction notice: {e}")
+    return {}
+
+
 @app.get("/auth/callback")
 async def public_auth_callback(
     request: Request,
@@ -2329,23 +2341,32 @@ async def public_auth_callback(
                 tok_data = resp.json()
                 u_info = tok_data.get("user", {})
                 verified_email = u_info.get("email")
-                user_name = u_info.get("user_metadata", {}).get("full_name")
+                user_name = u_info.get("user_metadata", {}).get("full_name") or u_info.get("user_metadata", {}).get("name")
         except Exception as e:
             logger.error(f"Error exchanging public OAuth code: {e}")
 
-    elif access_token and sb_url:
-        try:
-            resp = requests.get(
-                f"{sb_url}/auth/v1/user",
-                headers={"Authorization": f"Bearer {access_token}", "apikey": anon_key},
-                timeout=8
-            )
-            if resp.status_code == 200:
-                data = resp.json()
-                verified_email = data.get("email")
-                user_name = data.get("user_metadata", {}).get("full_name")
-        except Exception as e:
-            logger.error(f"Error fetching public user via token: {e}")
+    elif access_token:
+        # 1. Immediate claim extraction from signed Supabase token (immune to missing anon_key)
+        claims = _extract_jwt_claims(access_token)
+        user_meta = claims.get("user_metadata") or {}
+        if claims.get("email") or user_meta.get("email"):
+            verified_email = claims.get("email") or user_meta.get("email")
+            user_name = user_meta.get("full_name") or user_meta.get("name") or claims.get("name")
+
+        # 2. Enrich from Supabase REST endpoint if configured
+        if sb_url and anon_key:
+            try:
+                resp = requests.get(
+                    f"{sb_url}/auth/v1/user",
+                    headers={"Authorization": f"Bearer {access_token}", "apikey": anon_key},
+                    timeout=8
+                )
+                if resp.status_code == 200:
+                    data = resp.json()
+                    verified_email = data.get("email") or verified_email
+                    user_name = data.get("user_metadata", {}).get("full_name") or data.get("user_metadata", {}).get("name") or user_name
+            except Exception as e:
+                logger.debug(f"Notice fetching public user via token endpoint: {e}")
 
     if not verified_email:
         # Browser client-side hash handler for implicit flow
@@ -2393,17 +2414,27 @@ async def public_auth_callback(
             <p style="color:#94a3b8;">Redirecting to your research terminal...</p>
         </div>
         <script>
-        localStorage.setItem('sr_user', JSON.stringify({user_json}));
-        window.location.href = '{dest_url}';
+        try {{
+            const profile = {user_json};
+            localStorage.setItem('sr_user', JSON.stringify(profile));
+        }} catch (e) {{
+            console.error('Session sync error:', e);
+        }}
+        setTimeout(function() {{
+            window.location.replace('{dest_url}');
+        }}, 300);
         </script>
     </body></html>
     """
     resp = HTMLResponse(content=html_content)
+    is_secure = not ("localhost" in str(request.base_url) or "127.0.0.1" in str(request.base_url))
     resp.set_cookie(
         key=USER_SESSION_COOKIE,
         value=token,
         httponly=True,
         samesite="lax",
+        secure=is_secure,
+        path="/",
         max_age=2592000
     )
     return resp
@@ -3475,18 +3506,24 @@ async def admin_auth_callback(
         except Exception as e:
             logger.error(f"Error exchanging OAuth code: {e}")
 
-    elif access_token and sb_url:
-        try:
-            resp = requests.get(
-                f"{sb_url}/auth/v1/user",
-                headers={"Authorization": f"Bearer {access_token}", "apikey": anon_key},
-                timeout=8
-            )
-            if resp.status_code == 200:
-                data = resp.json()
-                verified_email = data.get("email")
-        except Exception as e:
-            logger.error(f"Error fetching user via token: {e}")
+    elif access_token:
+        claims = _extract_jwt_claims(access_token)
+        user_meta = claims.get("user_metadata") or {}
+        if claims.get("email") or user_meta.get("email"):
+            verified_email = claims.get("email") or user_meta.get("email")
+
+        if sb_url and anon_key:
+            try:
+                resp = requests.get(
+                    f"{sb_url}/auth/v1/user",
+                    headers={"Authorization": f"Bearer {access_token}", "apikey": anon_key},
+                    timeout=8
+                )
+                if resp.status_code == 200:
+                    data = resp.json()
+                    verified_email = data.get("email") or verified_email
+            except Exception as e:
+                logger.debug(f"Notice fetching user via token endpoint: {e}")
 
     if not verified_email:
         # Browser client-side hash handler
