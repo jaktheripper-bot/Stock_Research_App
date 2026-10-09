@@ -1,8 +1,8 @@
 /**
- * Institutional Investor Copilot Frontend Controller.
+ * Institutional Investor Copilot Frontend Controller (v2.0).
  * Institutional Forensic Intelligence Architecture.
  * Supports Multi-Asset Dispatch across Fundamental Equities, Mutual Funds, and Corporate Debt,
- * with Deep Section Contextual Awareness and SEBI Non-Advisory Safe Harbor Guardrails.
+ * with Deep Section Contextual Awareness, Smooth Slide-In Transitions, and SEBI Safe Harbor Guardrails.
  */
 
 let activeConversationId = null;
@@ -16,16 +16,27 @@ const COPILOT_CONFIGS = {
         headerTitle: "Institutional Forensic Copilot",
         assetBadge: "Fundamental Equity",
         introText: (ticker) => `Welcome to the <strong>Forensic Copilot</strong>. I can assist in stress-testing your investment thesis on <strong>${ticker || 'the selected equity'}</strong>, deriving implied growth rates via Reverse DCF, or running a <strong>Pre-Mortem Inversion analysis</strong>.`,
+        features: [
+            { icon: "💀", title: "Pre-Mortem Inversion", desc: "Expose failure modes & thesis destruction risks", prompt: "Run Pre-Mortem Inversion analysis on this stock: what failure modes could destroy shareholder value?" },
+            { icon: "📉", title: "Reverse DCF Growth", desc: "Deconstruct implied growth priced into current CMP", prompt: "What implied growth rate is priced into current CMP based on Reverse DCF?" },
+            { icon: "🚩", title: "Governance Forensic", desc: "Audit promoter pledging & related-party transactions", prompt: "Are there any promoter pledging or corporate governance red flags in recent disclosures?" }
+        ],
         chips: [
             { label: "💀 Pre-Mortem Inversion", prompt: "Run Pre-Mortem Inversion analysis on this stock: what failure modes could destroy shareholder value?" },
             { label: "📉 Reverse DCF Implied Growth", prompt: "What implied growth rate is priced into current CMP based on Reverse DCF?" },
-            { label: "🚩 Governance & Pledging Check", prompt: "Are there any promoter pledging or corporate governance red flags in recent disclosures?" }
+            { label: "🚩 Governance & Pledging Check", prompt: "Are there any promoter pledging or corporate governance red flags in recent disclosures?" },
+            { label: "🛡️ Balance Sheet Solvency", prompt: "Evaluate balance sheet solvency, Altman Z-Score, and leverage ratios for this company." }
         ]
     },
     mutual_fund: {
         headerTitle: "Fund Look-Through Copilot",
         assetBadge: "Mutual Fund Intelligence",
         introText: (ticker) => `Welcome to the <strong>Fund Look-Through Copilot</strong>. I evaluate underlying constituent quality, weighted moat endurance, look-through ASRI accounting stress, active share vs benchmark, and <strong>direct vs regular intermediary fee drag</strong> for <strong>${ticker || 'this scheme'}</strong>.`,
+        features: [
+            { icon: "🏰", title: "Weighted Moat Index", desc: "Constituent economic moat distribution & quality", prompt: "Evaluate the constituent moat distribution and overall portfolio quality for this fund." },
+            { icon: "💸", title: "Intermediary Fee Drag", desc: "20-yr compounded wealth lost to distributor commissions", prompt: "What is the 20-year compounded fee drag and wealth lost to distributor commissions for this fund?" },
+            { icon: "🧭", title: "Active Share & Style Drift", desc: "Audit closet indexing and benchmark hugging", prompt: "Audit the active share and check if this fund is exhibiting benchmark hugging or style drift." }
+        ],
         chips: [
             { label: "🛡️ Moat & Quality Score", prompt: "Evaluate the constituent moat distribution and overall portfolio quality for this fund." },
             { label: "⚠️ High-Risk Holdings", prompt: "Which underlying constituent holdings carry the highest accounting risk or lowest health score?" },
@@ -37,6 +48,11 @@ const COPILOT_CONFIGS = {
         headerTitle: "Credit & Solvency Copilot",
         assetBadge: "Fixed Income & SDI Solvency",
         introText: (ticker) => `Welcome to the <strong>Credit & Solvency Copilot</strong>. I can stress-test Asset Coverage Ratios (ACR), recovery seniority in liquidation, DSCR covenant headroom, and <strong>credit contagion risk</strong> for <strong>${ticker || 'this security'}</strong>.`,
+        features: [
+            { icon: "🛡️", title: "Asset Coverage & Covenants", desc: "Stress-test ACR and DSCR covenant headroom", prompt: "Stress-test the Asset Coverage Ratio (ACR) and DSCR covenant headroom for this instrument." },
+            { icon: "⚖️", title: "Recovery Seniority Tier", desc: "Evaluate recovery seniority & liquidation hierarchy", prompt: "Evaluate recovery seniority and investor recourse in a stressed debt restructuring or liquidation." },
+            { icon: "📡", title: "Credit Contagion Radar", desc: "Analyze parent group linkages and contagion risk", prompt: "What does the Credit Contagion Radar say about the parent group and systemic risks for this issuer?" }
+        ],
         chips: [
             { label: "🛡️ Asset Coverage & Covenants", prompt: "Stress-test the Asset Coverage Ratio (ACR) and DSCR covenant headroom for this instrument." },
             { label: "⚖️ Recovery Seniority Tier", prompt: "Evaluate recovery seniority and investor recourse in a stressed debt restructuring or liquidation." },
@@ -136,6 +152,193 @@ function detectAssetType(ticker) {
     return "equity";
 }
 
+/**
+ * Lightweight, safe markdown formatter for forensic copilot analysis responses.
+ * Escapes raw HTML to prevent injection and turns markdown elements into rich UI tokens.
+ */
+function renderCopilotMarkdown(rawText) {
+    if (!rawText) return "";
+
+    // 1. Escape HTML entities
+    let text = String(rawText)
+        .replace(/&/g, "&amp;")
+        .replace(/</g, "&lt;")
+        .replace(/>/g, "&gt;");
+
+    // 2. Code blocks (```lang ... ```)
+    text = text.replace(/```([a-zA-Z0-9_-]*)\n([\s\S]*?)```/g, function(_, lang, code) {
+        return `<pre class="copilot-table-wrap" style="background: rgba(15, 23, 42, 0.9); padding: 10px; border-radius: 6px;"><code class="copilot-inline-code" style="display:block; white-space:pre;">${code.trim()}</code></pre>`;
+    });
+
+    // 3. Inline code (`code`)
+    text = text.replace(/`([^`]+)`/g, '<code class="copilot-inline-code">$1</code>');
+
+    // 4. Headings (### Title / ## Title)
+    text = text.replace(/^### (.*$)/gim, '<h4>$1</h4>');
+    text = text.replace(/^## (.*$)/gim, '<h4>$1</h4>');
+    text = text.replace(/^# (.*$)/gim, '<h4>$1</h4>');
+
+    // 5. Bold & Italic
+    text = text.replace(/\*\*([^*]+)\*\*/g, '<strong>$1</strong>');
+    text = text.replace(/\*([^*]+)\*/g, '<em>$1</em>');
+
+    // 6. Markdown Tables
+    const lines = text.split("\n");
+    let inTable = false;
+    let tableHtml = "";
+    let processedLines = [];
+
+    for (let i = 0; i < lines.length; i++) {
+        const line = lines[i].trim();
+        if (line.startsWith("|") && line.endsWith("|")) {
+            // Check if delimiter row
+            if (/^\|[-:\s|]+\|$/.test(line)) {
+                continue;
+            }
+            const cells = line.split("|").slice(1, -1).map(c => c.trim());
+            if (!inTable) {
+                inTable = true;
+                tableHtml = '<div class="copilot-table-wrap"><table class="copilot-table"><thead><tr>';
+                cells.forEach(c => { tableHtml += `<th>${c}</th>`; });
+                tableHtml += '</tr></thead><tbody>';
+            } else {
+                tableHtml += '<tr>';
+                cells.forEach(c => { tableHtml += `<td>${c}</td>`; });
+                tableHtml += '</tr>';
+            }
+        } else {
+            if (inTable) {
+                tableHtml += '</tbody></table></div>';
+                processedLines.push(tableHtml);
+                inTable = false;
+                tableHtml = "";
+            }
+            processedLines.push(lines[i]);
+        }
+    }
+    if (inTable) {
+        tableHtml += '</tbody></table></div>';
+        processedLines.push(tableHtml);
+    }
+
+    // 8. Bullet Lists (- Item or * Item)
+    const listLines = processedLines;
+    let inList = false;
+    let inOrderedList = false;
+    let listOutput = [];
+
+    for (let i = 0; i < listLines.length; i++) {
+        const line = listLines[i];
+        const trimmed = line.trim();
+
+        if (trimmed.startsWith("- ") || trimmed.startsWith("* ")) {
+            if (!inList) {
+                if (inOrderedList) { listOutput.push("</ol>"); inOrderedList = false; }
+                listOutput.push("<ul>");
+                inList = true;
+            }
+            listOutput.push(`<li>${trimmed.substring(2)}</li>`);
+        } else if (/^\d+\.\s/.test(trimmed)) {
+            if (!inOrderedList) {
+                if (inList) { listOutput.push("</ul>"); inList = false; }
+                listOutput.push("<ol>");
+                inOrderedList = true;
+            }
+            const content = trimmed.replace(/^\d+\.\s/, "");
+            listOutput.push(`<li>${content}</li>`);
+        } else {
+            if (inList) { listOutput.push("</ul>"); inList = false; }
+            if (inOrderedList) { listOutput.push("</ol>"); inOrderedList = false; }
+            listOutput.push(line);
+        }
+    }
+    if (inList) listOutput.push("</ul>");
+    if (inOrderedList) listOutput.push("</ol>");
+
+    // 9. Clean paragraph separation
+    const finalBlocks = [];
+    let curParaLines = [];
+    const isBlockTag = (str) => {
+        const s = str.trim();
+        return s.startsWith("<h4>") || s.startsWith("<div") || s.startsWith("</div>") ||
+               s.startsWith("<pre") || s.startsWith("<ul>") || s.startsWith("<ol>") ||
+               s.startsWith("<li>") || s.startsWith("</ul>") || s.startsWith("</ol>");
+    };
+
+    for (let i = 0; i < listOutput.length; i++) {
+        const l = listOutput[i];
+        const trimmed = l.trim();
+        if (!trimmed) {
+            if (curParaLines.length > 0) {
+                finalBlocks.push("<p>" + curParaLines.join("<br>") + "</p>");
+                curParaLines = [];
+            }
+        } else if (isBlockTag(trimmed)) {
+            if (curParaLines.length > 0) {
+                finalBlocks.push("<p>" + curParaLines.join("<br>") + "</p>");
+                curParaLines = [];
+            }
+            finalBlocks.push(trimmed);
+        } else {
+            curParaLines.push(trimmed);
+        }
+    }
+    if (curParaLines.length > 0) {
+        finalBlocks.push("<p>" + curParaLines.join("<br>") + "</p>");
+    }
+
+    // 10. Wrap SEBI Non-Advisory Notices in high-clarity notice cards
+    for (let i = 0; i < finalBlocks.length; i++) {
+        if (finalBlocks[i].includes("<strong>SEBI Regulatory Non-Advisory Notice:</strong>")) {
+            finalBlocks[i] = `<div class="copilot-notice-box">${finalBlocks[i]}</div>`;
+        }
+    }
+
+    return finalBlocks.join("\n");
+}
+
+function formatCurrentTime() {
+    const now = new Date();
+    return now.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+}
+
+function renderIntroWelcomeCard(cfg, ticker, sectionLabel) {
+    let html = `
+        <div class="copilot-intro-headline">
+          <span>🧠</span> ${cfg.headerTitle}
+        </div>
+        <div>
+          ${cfg.introText(ticker)}
+        </div>
+    `;
+
+    if (sectionLabel) {
+        html += `
+            <div style="margin-top: 10px; padding: 8px 12px; background: rgba(168, 85, 247, 0.12); border: 1px solid rgba(168, 85, 247, 0.35); border-radius: 8px; font-size: 0.8rem; color: #d8b4fe; display: flex; align-items: center; gap: 6px;">
+                <span>📍</span> <span><strong>Focused Workspace:</strong> ${sectionLabel}. All responses are calibrated to this section.</span>
+            </div>
+        `;
+    }
+
+    if (cfg.features && cfg.features.length) {
+        html += `<div class="copilot-intro-features">`;
+        cfg.features.forEach(f => {
+            html += `
+                <div class="copilot-intro-feature-item" onclick="sendQuickPrompt(${JSON.stringify(f.prompt)})">
+                    <span style="font-size: 1.1rem;">${f.icon}</span>
+                    <div>
+                        <div style="font-weight: 700; color: #f8fafc;">${f.title}</div>
+                        <div style="color: #94a3b8; font-size: 0.74rem;">${f.desc}</div>
+                    </div>
+                </div>
+            `;
+        });
+        html += `</div>`;
+    }
+
+    return html;
+}
+
 function openCopilot(ticker, assetType, section, sectionLabel, initialPrompt) {
     const prevTicker = activeTicker;
     const prevSection = activeSection;
@@ -151,18 +354,12 @@ function openCopilot(ticker, assetType, section, sectionLabel, initialPrompt) {
     if (prevTicker !== activeTicker || prevSection !== activeSection || !activeConversationId) {
         activeConversationId = "COPILOT-" + Date.now() + "-" + Math.random().toString(36).substr(2, 6);
 
-        // Reset message container with tailored intro bubble
+        // Reset message container with styled intro card
         const container = document.getElementById("copilotMessages");
         if (container) {
-            let introHtml = cfg.introText(activeTicker);
-            if (activeSectionLabel) {
-                introHtml += `<div style="margin-top: 0.65rem; padding-top: 0.65rem; border-top: 1px solid rgba(255, 255, 255, 0.08); font-size: 0.82rem; color: #38bdf8; display: flex; align-items: center; gap: 0.35rem;">
-                    <span>📍</span> <span><strong>Focused Workspace:</strong> ${activeSectionLabel}. Ask any diagnostic question anchored to this section.</span>
-                </div>`;
-            }
             container.innerHTML = `
-                <div id="copilotIntroBubble" style="background: rgba(30, 41, 59, 0.4); border: 1px solid rgba(255, 255, 255, 0.05); border-radius: 8px; padding: 1rem; font-size: 0.88rem; color: #cbd5e1; line-height: 1.5;">
-                    ${introHtml}
+                <div id="copilotIntroBubble" class="copilot-intro-card">
+                    ${renderIntroWelcomeCard(cfg, activeTicker, activeSectionLabel)}
                 </div>
             `;
         }
@@ -186,9 +383,9 @@ function openCopilot(ticker, assetType, section, sectionLabel, initialPrompt) {
     }
 
     const tickerSpan = document.getElementById("copilotContextTicker");
-    if (tickerSpan) tickerSpan.textContent = activeTicker || "Universal";
+    if (tickerSpan) tickerSpan.textContent = activeTicker || "UNIVERSAL";
 
-    // Populate Quick Prompt Chips (contextually anchored to active section)
+    // Populate Quick Prompt Chips
     const chipsContainer = document.getElementById("copilotQuickChips");
     if (chipsContainer) {
         let chipsToRender = [];
@@ -199,30 +396,93 @@ function openCopilot(ticker, assetType, section, sectionLabel, initialPrompt) {
         }
 
         chipsContainer.innerHTML = chipsToRender.map(chip => `
-            <button onclick="sendQuickPrompt(${JSON.stringify(chip.prompt)})" style="white-space: nowrap; font-size: 0.75rem; background: #1e293b; color: #38bdf8; border: 1px solid #334155; padding: 0.35rem 0.65rem; border-radius: 9999px; cursor: pointer; transition: background 0.15s ease;">
+            <button onclick="sendQuickPrompt(${JSON.stringify(chip.prompt)})" class="copilot-chip-btn">
                 ${chip.label}
             </button>
         `).join("");
     }
 
+    // Show modal with smooth class-based slide animation
     const modal = document.getElementById("copilotModalBackdrop");
     if (modal) {
         modal.style.display = "flex";
+        // Force reflow for smooth CSS transition
+        void modal.offsetWidth;
+        modal.classList.add("copilot-open");
     }
 
+    // Prepare and focus input
     const input = document.getElementById("copilotInput");
     if (input) {
         if (initialPrompt) {
             input.value = initialPrompt;
         }
-        input.focus();
+        handleCopilotInput(input);
+        setTimeout(() => input.focus(), 100);
     }
 }
 
 function closeCopilot() {
     const modal = document.getElementById("copilotModalBackdrop");
     if (modal) {
-        modal.style.display = "none";
+        modal.classList.remove("copilot-open");
+        setTimeout(() => {
+            if (!modal.classList.contains("copilot-open")) {
+                modal.style.display = "none";
+            }
+        }, 320);
+    }
+}
+
+function resetCopilotChat() {
+    activeConversationId = "COPILOT-" + Date.now() + "-" + Math.random().toString(36).substr(2, 6);
+    const cfg = COPILOT_CONFIGS[activeAssetType] || COPILOT_CONFIGS.equity;
+    const container = document.getElementById("copilotMessages");
+    if (container) {
+        container.innerHTML = `
+            <div id="copilotIntroBubble" class="copilot-intro-card">
+                ${renderIntroWelcomeCard(cfg, activeTicker, activeSectionLabel)}
+            </div>
+        `;
+    }
+    const input = document.getElementById("copilotInput");
+    if (input) {
+        input.value = "";
+        handleCopilotInput(input);
+        input.focus();
+    }
+}
+
+function handleCopilotBackdropClick(event) {
+    if (event.target && event.target.id === "copilotModalBackdrop") {
+        closeCopilot();
+    }
+}
+
+function handleCopilotInput(el) {
+    if (!el) return;
+    // Auto-resize textarea
+    el.style.height = "auto";
+    el.style.height = Math.min(el.scrollHeight, 120) + "px";
+
+    // Toggle send button active state
+    const sendBtn = document.getElementById("copilotSendBtn");
+    if (sendBtn) {
+        const hasText = el.value.trim().length > 0;
+        if (hasText) {
+            sendBtn.classList.add("active");
+            sendBtn.removeAttribute("disabled");
+        } else {
+            sendBtn.classList.remove("active");
+            sendBtn.setAttribute("disabled", "true");
+        }
+    }
+}
+
+function handleCopilotKeydown(event) {
+    if (event.key === "Enter" && !event.shiftKey) {
+        event.preventDefault();
+        submitCopilotMessage();
     }
 }
 
@@ -230,8 +490,24 @@ function sendQuickPrompt(promptText) {
     const input = document.getElementById("copilotInput");
     if (input) {
         input.value = promptText;
+        handleCopilotInput(input);
         submitCopilotMessage();
     }
+}
+
+function copyCopilotTurn(btn, contentText) {
+    if (!navigator.clipboard) return;
+    navigator.clipboard.writeText(contentText).then(() => {
+        const origText = btn.innerHTML;
+        btn.innerHTML = `✓ Copied`;
+        btn.style.color = "#38bdf8";
+        setTimeout(() => {
+            btn.innerHTML = origText;
+            btn.style.color = "";
+        }, 2000);
+    }).catch(err => {
+        console.warn("Failed to copy copilot text:", err);
+    });
 }
 
 async function submitCopilotMessage() {
@@ -242,27 +518,48 @@ async function submitCopilotMessage() {
     if (!input || !input.value.trim()) return;
     const userMsg = input.value.trim();
     input.value = "";
+    handleCopilotInput(input);
 
-    // Append user message to stream
-    const userBubble = document.createElement("div");
-    userBubble.style.cssText = "align-self: flex-end; max-width: 85%; background: #0284c7; color: #f8fafc; padding: 0.75rem 1rem; border-radius: 8px 8px 2px 8px; font-size: 0.88rem; line-height: 1.4;";
-    userBubble.textContent = userMsg;
-    container.appendChild(userBubble);
+    const currentTime = formatCurrentTime();
+
+    // Append user message bubble
+    const userTurn = document.createElement("div");
+    userTurn.className = "copilot-turn copilot-turn-user";
+    userTurn.innerHTML = `
+        <div class="copilot-bubble-user">
+            ${userMsg.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/\n/g, "<br>")}
+        </div>
+        <div class="copilot-turn-meta">You • ${currentTime}</div>
+    `;
+    container.appendChild(userTurn);
     container.scrollTop = container.scrollHeight;
 
-    // Append thinking bubble
-    const thinkingBubble = document.createElement("div");
-    thinkingBubble.style.cssText = "align-self: flex-start; max-width: 85%; background: rgba(30, 41, 59, 0.6); color: #94a3b8; padding: 0.75rem 1rem; border-radius: 8px 8px 8px 2px; font-size: 0.85rem; font-style: italic;";
-    const thinkingLabel = activeAssetType === "mutual_fund" 
-        ? "🧠 Copilot is evaluating fund portfolio forensics & look-through data..." 
-        : (activeAssetType === "debt" 
-            ? "🧠 Copilot is stress-testing capital hierarchy & credit contagion..." 
-            : "🧠 Copilot is evaluating filings & stress-testing thesis...");
-    thinkingBubble.textContent = thinkingLabel;
-    container.appendChild(thinkingBubble);
+    // Append animated thinking wave indicator
+    const thinkingCard = document.createElement("div");
+    thinkingCard.className = "copilot-thinking-card";
+    
+    let thinkingLabel = "Evaluating disclosures & stress-testing thesis...";
+    if (activeAssetType === "mutual_fund") {
+        thinkingLabel = "Evaluating look-through constituents & fee drag...";
+    } else if (activeAssetType === "debt") {
+        thinkingLabel = "Stress-testing capital hierarchy & credit contagion...";
+    }
+
+    thinkingCard.innerHTML = `
+        <div class="copilot-thinking-row">
+            <div class="copilot-typing-dots">
+                <span class="copilot-typing-dot"></span>
+                <span class="copilot-typing-dot"></span>
+                <span class="copilot-typing-dot"></span>
+            </div>
+            <span class="copilot-thinking-text">${thinkingLabel}</span>
+        </div>
+    `;
+    container.appendChild(thinkingCard);
     container.scrollTop = container.scrollHeight;
 
     sendBtn.disabled = true;
+    sendBtn.classList.remove("active");
     input.disabled = true;
 
     try {
@@ -279,18 +576,73 @@ async function submitCopilotMessage() {
             })
         });
         const data = await resp.json();
-        thinkingBubble.remove();
+        thinkingCard.remove();
 
-        const agentBubble = document.createElement("div");
-        agentBubble.style.cssText = "align-self: flex-start; max-width: 90%; background: #1e293b; border: 1px solid rgba(255,255,255,0.08); color: #f8fafc; padding: 0.85rem 1.15rem; border-radius: 8px 8px 8px 2px; font-size: 0.88rem; line-height: 1.5; white-space: pre-wrap;";
-        agentBubble.textContent = data.response || "No response generated.";
-        container.appendChild(agentBubble);
+        const agentText = data.response || "No response generated.";
+        const formattedHtml = renderCopilotMarkdown(agentText);
+        const agentTime = formatCurrentTime();
+
+        const agentTurn = document.createElement("div");
+        agentTurn.className = "copilot-turn copilot-turn-agent";
+        
+        // Escape raw text for safe passing into copy handler
+        const encodedRaw = encodeURIComponent(agentText);
+
+        agentTurn.innerHTML = `
+            <div class="copilot-bubble-agent">
+                <div class="copilot-bubble-header">
+                    <div class="copilot-bubble-header-left">
+                        <svg class="glyph" style="width: 12px; height: 12px;"><use href="#glyph-shield"></use></svg>
+                        <span>Forensic AI Copilot</span>
+                    </div>
+                    <button class="copilot-copy-btn" onclick="copyCopilotTurn(this, decodeURIComponent('${encodedRaw}'))" title="Copy analysis to clipboard">
+                        📋 Copy
+                    </button>
+                </div>
+                <div class="copilot-bubble-body">
+                    ${formattedHtml}
+                </div>
+            </div>
+            <div class="copilot-turn-meta">Institutional Forensic Engine • ${agentTime}</div>
+        `;
+        container.appendChild(agentTurn);
         container.scrollTop = container.scrollHeight;
     } catch (e) {
-        thinkingBubble.textContent = "⚠️ Failed to communicate with Copilot API: " + e;
+        thinkingCard.remove();
+        const errTurn = document.createElement("div");
+        errTurn.className = "copilot-turn copilot-turn-agent";
+        errTurn.innerHTML = `
+            <div class="copilot-bubble-agent" style="border-color: rgba(239, 68, 68, 0.4); background: rgba(239, 68, 68, 0.08);">
+                <div style="color: #f87171; font-weight: 700; margin-bottom: 4px;">⚠️ Copilot Communication Notice</div>
+                <div style="color: #fca5a5; font-size: 0.82rem;">Failed to communicate with Copilot API: ${String(e)}</div>
+            </div>
+        `;
+        container.appendChild(errTurn);
+        container.scrollTop = container.scrollHeight;
     } finally {
-        sendBtn.disabled = false;
         input.disabled = false;
+        handleCopilotInput(input);
         input.focus();
     }
 }
+
+// Global escape key listener to smoothly close copilot
+document.addEventListener("keydown", function(e) {
+    if (e.key === "Escape") {
+        const modal = document.getElementById("copilotModalBackdrop");
+        if (modal && (modal.classList.contains("copilot-open") || modal.style.display === "flex")) {
+            closeCopilot();
+        }
+    }
+});
+
+// Ensure global functions are available on window
+window.openCopilot = openCopilot;
+window.closeCopilot = closeCopilot;
+window.resetCopilotChat = resetCopilotChat;
+window.handleCopilotBackdropClick = handleCopilotBackdropClick;
+window.handleCopilotInput = handleCopilotInput;
+window.handleCopilotKeydown = handleCopilotKeydown;
+window.sendQuickPrompt = sendQuickPrompt;
+window.copyCopilotTurn = copyCopilotTurn;
+window.submitCopilotMessage = submitCopilotMessage;

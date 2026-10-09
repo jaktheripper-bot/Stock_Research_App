@@ -1,54 +1,804 @@
-<!-- Institutional Investor Copilot Modal Partial -->
-<div id="copilotModalBackdrop" style="display: none; position: fixed; inset: 0; background: rgba(2, 6, 23, 0.7); backdrop-filter: blur(4px); z-index: 1000; align-items: center; justify-content: flex-end; padding: 1.5rem;">
-    <div id="copilotPanel" style="width: 100%; max-width: 480px; height: calc(100vh - 3rem); background: #0f172a; border: 1px solid rgba(14, 165, 233, 0.3); border-radius: 12px; display: flex; flex-direction: column; overflow: hidden; box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.5), 0 8px 10px -6px rgba(0, 0, 0, 0.5);">
-        
-        <!-- Header -->
-        <div style="padding: 1.25rem; border-bottom: 1px solid #1e293b; display: flex; justify-content: space-between; align-items: center; background: #0b1120;">
-            <div>
-                <div style="font-size: 0.75rem; text-transform: uppercase; font-weight: 700; color: #38bdf8; letter-spacing: 0.05em; display: flex; align-items: center; gap: 0.5rem; flex-wrap: wrap;">
-                    <svg class="glyph"><use href="#glyph-shield"></use></svg> Institutional Forensic Agent
-                    <span id="copilotAssetBadge" style="font-size: 0.68rem; padding: 0.15rem 0.4rem; border-radius: 4px; background: rgba(14, 165, 233, 0.15); border: 1px solid rgba(14, 165, 233, 0.3); color: #7dd3fc;">Interactive</span>
-                    <span id="copilotSectionBadge" style="display: none; font-size: 0.68rem; padding: 0.15rem 0.45rem; border-radius: 4px; background: rgba(168, 85, 247, 0.2); border: 1px solid rgba(168, 85, 247, 0.4); color: #c084fc; font-weight: 600;"></span>
-                </div>
-                <h3 id="copilotHeaderTitle" style="margin: 0.25rem 0 0 0; font-size: 1.1rem; font-weight: 700; color: #f8fafc;">
-                    Institutional Forensic Copilot
-                </h3>
-            </div>
-            <button onclick="closeCopilot()" style="background: none; border: none; color: #94a3b8; font-size: 1.5rem; cursor: pointer; padding: 0.25rem; line-height: 1;">&times;</button>
-        </div>
+<!-- ==============================================================================
+     Institutional Forensic Copilot - Next-Gen UI Partial
+     WCAG 2.2 AA compliant, glassmorphic slide-in drawer, zero-hallucination non-advisory
+     ============================================================================== -->
 
-        <!-- Safe Harbor Notice Banner -->
-        <div style="padding: 0.6rem 1rem; background: rgba(30, 41, 59, 0.6); border-bottom: 1px solid #1e293b; font-size: 0.75rem; color: #94a3b8; line-height: 1.4;">
-            <svg class="glyph"><use href="#glyph-scale"></use></svg> <strong>SEBI RA Sec. 2(u):</strong> Descriptive diagnostics & Pre-Mortem stress-testing only. Zero Buy/Sell advice.
-        </div>
+<style>
+/* --- Copilot Container & Backdrop Transitions --- */
+.copilot-backdrop {
+  position: fixed;
+  inset: 0;
+  background: rgba(3, 7, 18, 0.72);
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+  z-index: 9999;
+  display: flex;
+  justify-content: flex-end;
+  align-items: stretch;
+  opacity: 0;
+  visibility: hidden;
+  pointer-events: none;
+  transition: opacity 0.3s cubic-bezier(0.16, 1, 0.3, 1), visibility 0.3s ease;
+}
 
-        <!-- Chat Stream Area -->
-        <div id="copilotMessages" style="flex: 1; overflow-y: auto; padding: 1.25rem; display: flex; flex-direction: column; gap: 1rem;">
-            <div id="copilotIntroBubble" style="background: rgba(30, 41, 59, 0.4); border: 1px solid rgba(255, 255, 255, 0.05); border-radius: 8px; padding: 1rem; font-size: 0.88rem; color: #cbd5e1; line-height: 1.5;">
-                Welcome to the <strong>Forensic Copilot</strong>. I can assist in stress-testing your investment thesis on <strong><span id="copilotContextTicker"></span></strong>, deriving implied growth rates via Reverse DCF, or running a <strong>Pre-Mortem Inversion analysis</strong>.
-            </div>
-        </div>
+.copilot-backdrop.copilot-open {
+  opacity: 1;
+  visibility: visible;
+  pointer-events: auto;
+}
 
-        <!-- Quick Prompt Chips -->
-        <div id="copilotQuickChips" style="padding: 0.5rem 1rem; border-top: 1px solid #1e293b; display: flex; gap: 0.5rem; overflow-x: auto; background: #0b1120;">
-            <button onclick="sendQuickPrompt('Run Pre-Mortem Inversion analysis on this stock')" style="white-space: nowrap; font-size: 0.75rem; background: #1e293b; color: #38bdf8; border: 1px solid #334155; padding: 0.35rem 0.65rem; border-radius: 9999px; cursor: pointer;">
-                💀 Pre-Mortem Inversion
-            </button>
-            <button onclick="sendQuickPrompt('What implied growth rate is priced into current CMP?')" style="white-space: nowrap; font-size: 0.75rem; background: #1e293b; color: #cbd5e1; border: 1px solid #334155; padding: 0.35rem 0.65rem; border-radius: 9999px; cursor: pointer;">
-                📉 Reverse DCF Implied Growth
-            </button>
-            <button onclick="sendQuickPrompt('Are there any promoter pledging or governance red flags?')" style="white-space: nowrap; font-size: 0.75rem; background: #1e293b; color: #cbd5e1; border: 1px solid #334155; padding: 0.35rem 0.65rem; border-radius: 9999px; cursor: pointer;">
-                🚩 Governance Check
-            </button>
-        </div>
+/* --- Slide-In Drawer Panel --- */
+.copilot-panel {
+  width: 100%;
+  max-width: 500px;
+  height: calc(100vh - 24px);
+  margin: 12px;
+  background: linear-gradient(180deg, #0b1120 0%, #070d19 100%);
+  border: 1px solid rgba(56, 189, 248, 0.25);
+  border-radius: 16px;
+  box-shadow: 
+    -12px 0 35px rgba(0, 0, 0, 0.65),
+    0 0 50px rgba(14, 165, 233, 0.12),
+    inset 0 1px 0 rgba(255, 255, 255, 0.08);
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  transform: translateX(105%);
+  transition: transform 0.35s cubic-bezier(0.16, 1, 0.3, 1);
+}
 
-        <!-- Input Bar -->
-        <div style="padding: 1rem; border-top: 1px solid #1e293b; background: #0f172a; display: flex; gap: 0.5rem;">
-            <input type="text" id="copilotInput" placeholder="Ask a diagnostic or stress-test question..." style="flex: 1; background: #020617; border: 1px solid #334155; border-radius: 6px; padding: 0.65rem 0.85rem; color: #f8fafc; font-size: 0.88rem;" onkeydown="if(event.key === 'Enter') submitCopilotMessage()">
-            <button id="copilotSendBtn" onclick="submitCopilotMessage()" style="background: #0ea5e9; color: #020617; border: none; font-weight: 700; padding: 0.65rem 1rem; border-radius: 6px; cursor: pointer;">
-                Send
-            </button>
-        </div>
+.copilot-backdrop.copilot-open .copilot-panel {
+  transform: translateX(0);
+}
 
+@media (max-width: 640px) {
+  .copilot-panel {
+    max-width: 100%;
+    height: 100vh;
+    height: 100dvh;
+    margin: 0;
+    border-radius: 0;
+    border-right: none;
+    border-top: none;
+    border-bottom: none;
+  }
+}
+
+/* --- Header --- */
+.copilot-header {
+  padding: 14px 18px;
+  background: rgba(11, 17, 32, 0.95);
+  border-bottom: 1px solid rgba(30, 41, 59, 0.85);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  position: relative;
+}
+
+.copilot-header::after {
+  content: "";
+  position: absolute;
+  bottom: -1px;
+  left: 0;
+  right: 0;
+  height: 1px;
+  background: linear-gradient(90deg, transparent, rgba(56, 189, 248, 0.4), transparent);
+}
+
+.copilot-header-brand {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  min-width: 0;
+}
+
+.copilot-avatar-ring {
+  width: 38px;
+  height: 38px;
+  border-radius: 10px;
+  background: linear-gradient(135deg, rgba(14, 165, 233, 0.2), rgba(99, 102, 241, 0.2));
+  border: 1px solid rgba(56, 189, 248, 0.35);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #38bdf8;
+  font-size: 1.15rem;
+  box-shadow: 0 0 15px rgba(14, 165, 233, 0.2);
+  flex-shrink: 0;
+  position: relative;
+}
+
+.copilot-avatar-pulse {
+  position: absolute;
+  top: -2px;
+  right: -2px;
+  width: 9px;
+  height: 9px;
+  background: #10b981;
+  border-radius: 50%;
+  border: 2px solid #0b1120;
+  box-shadow: 0 0 8px #10b981;
+  animation: copilotGlowPulse 2s infinite ease-in-out;
+}
+
+@keyframes copilotGlowPulse {
+  0%, 100% { transform: scale(1); opacity: 1; }
+  50% { transform: scale(1.3); opacity: 0.7; }
+}
+
+.copilot-title-group {
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+}
+
+.copilot-meta-strip {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-wrap: wrap;
+  margin-bottom: 2px;
+}
+
+.copilot-badge {
+  font-size: 0.65rem;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  padding: 2px 7px;
+  border-radius: 4px;
+  white-space: nowrap;
+}
+
+.copilot-badge-asset {
+  background: rgba(14, 165, 233, 0.15);
+  border: 1px solid rgba(14, 165, 233, 0.35);
+  color: #7dd3fc;
+}
+
+.copilot-badge-section {
+  background: rgba(168, 85, 247, 0.18);
+  border: 1px solid rgba(168, 85, 247, 0.4);
+  color: #d8b4fe;
+}
+
+.copilot-badge-ticker {
+  background: rgba(30, 41, 59, 0.8);
+  border: 1px solid rgba(148, 163, 184, 0.2);
+  color: #f1f5f9;
+  font-family: var(--font-mono, monospace);
+}
+
+.copilot-header-title {
+  font-size: 1.02rem;
+  font-weight: 700;
+  color: #f8fafc;
+  margin: 0;
+  letter-spacing: -0.01em;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.copilot-header-actions {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-shrink: 0;
+}
+
+.copilot-icon-btn {
+  width: 32px;
+  height: 32px;
+  border-radius: 8px;
+  background: rgba(30, 41, 59, 0.6);
+  border: 1px solid rgba(148, 163, 184, 0.15);
+  color: #94a3b8;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  font-size: 0.85rem;
+}
+
+.copilot-icon-btn:hover {
+  background: rgba(255, 255, 255, 0.08);
+  color: #f8fafc;
+  border-color: rgba(148, 163, 184, 0.3);
+  transform: translateY(-1px);
+}
+
+.copilot-close-btn:hover {
+  background: rgba(239, 68, 68, 0.15);
+  border-color: rgba(239, 68, 68, 0.35);
+  color: #f87171;
+}
+
+/* --- Safe Harbor Regulatory Strip --- */
+.copilot-safeharbor {
+  padding: 7px 16px;
+  background: rgba(15, 23, 42, 0.7);
+  border-bottom: 1px solid rgba(30, 41, 59, 0.7);
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 0.72rem;
+  color: #94a3b8;
+  line-height: 1.35;
+}
+
+.copilot-safeharbor-pill {
+  color: #fbbf24;
+  font-weight: 700;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+
+/* --- Chat Messages Scroll Area --- */
+.copilot-messages {
+  flex: 1;
+  overflow-y: auto;
+  padding: 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  scroll-behavior: smooth;
+  scrollbar-width: thin;
+  scrollbar-color: rgba(56, 189, 248, 0.3) transparent;
+}
+
+.copilot-messages::-webkit-scrollbar {
+  width: 5px;
+}
+.copilot-messages::-webkit-scrollbar-track {
+  background: transparent;
+}
+.copilot-messages::-webkit-scrollbar-thumb {
+  background: rgba(56, 189, 248, 0.25);
+  border-radius: 4px;
+}
+.copilot-messages::-webkit-scrollbar-thumb:hover {
+  background: rgba(56, 189, 248, 0.45);
+}
+
+/* --- Welcome / Intro Card --- */
+.copilot-intro-card {
+  background: rgba(15, 23, 42, 0.75);
+  border: 1px solid rgba(56, 189, 248, 0.22);
+  border-radius: 12px;
+  padding: 16px;
+  font-size: 0.88rem;
+  color: #cbd5e1;
+  line-height: 1.55;
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.25);
+  position: relative;
+  overflow: hidden;
+}
+
+.copilot-intro-card::before {
+  content: "";
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 2px;
+  background: linear-gradient(90deg, #0ea5e9, #8b5cf6, #10b981);
+}
+
+.copilot-intro-headline {
+  font-size: 0.95rem;
+  font-weight: 700;
+  color: #f8fafc;
+  margin-bottom: 8px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.copilot-intro-features {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 8px;
+  margin-top: 12px;
+}
+
+.copilot-intro-feature-item {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  background: rgba(30, 41, 59, 0.45);
+  border: 1px solid rgba(255, 255, 255, 0.05);
+  border-radius: 8px;
+  padding: 8px 12px;
+  font-size: 0.8rem;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.copilot-intro-feature-item:hover {
+  background: rgba(14, 165, 233, 0.12);
+  border-color: rgba(56, 189, 248, 0.35);
+  transform: translateX(2px);
+}
+
+/* --- Bubble Styling --- */
+.copilot-turn {
+  display: flex;
+  flex-direction: column;
+  animation: copilotFadeInUp 0.25s cubic-bezier(0.16, 1, 0.3, 1) both;
+}
+
+@keyframes copilotFadeInUp {
+  from {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.copilot-turn-user {
+  align-self: flex-end;
+  max-width: 86%;
+}
+
+.copilot-bubble-user {
+  background: linear-gradient(135deg, #0284c7 0%, #0369a1 100%);
+  border: 1px solid rgba(255, 255, 255, 0.18);
+  color: #ffffff;
+  padding: 10px 14px;
+  border-radius: 14px 14px 3px 14px;
+  font-size: 0.88rem;
+  line-height: 1.45;
+  box-shadow: 0 4px 15px rgba(2, 132, 199, 0.25);
+  word-break: break-word;
+}
+
+.copilot-turn-agent {
+  align-self: flex-start;
+  max-width: 94%;
+}
+
+.copilot-bubble-agent {
+  background: rgba(17, 24, 39, 0.9);
+  border: 1px solid rgba(56, 189, 248, 0.2);
+  border-radius: 14px 14px 14px 3px;
+  padding: 14px 16px;
+  color: #f1f5f9;
+  font-size: 0.88rem;
+  line-height: 1.6;
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.35);
+  word-break: break-word;
+}
+
+.copilot-bubble-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 8px;
+  padding-bottom: 6px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+  font-size: 0.72rem;
+  color: #94a3b8;
+}
+
+.copilot-bubble-header-left {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-weight: 600;
+  color: #38bdf8;
+}
+
+.copilot-copy-btn {
+  background: transparent;
+  border: none;
+  color: #64748b;
+  cursor: pointer;
+  padding: 2px 6px;
+  border-radius: 4px;
+  font-size: 0.7rem;
+  transition: all 0.2s ease;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.copilot-copy-btn:hover {
+  color: #f8fafc;
+  background: rgba(255, 255, 255, 0.08);
+}
+
+.copilot-turn-meta {
+  font-size: 0.68rem;
+  color: #64748b;
+  margin-top: 4px;
+  padding: 0 2px;
+}
+.copilot-turn-user .copilot-turn-meta {
+  text-align: right;
+}
+
+/* --- Rich Formatted Content Elements inside Agent Bubble --- */
+.copilot-bubble-agent h4,
+.copilot-bubble-agent h5 {
+  color: #f8fafc;
+  font-size: 0.95rem;
+  font-weight: 700;
+  margin: 12px 0 6px 0;
+  padding-bottom: 4px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+}
+.copilot-bubble-agent h4:first-child {
+  margin-top: 0;
+}
+
+.copilot-bubble-agent p {
+  margin: 0 0 8px 0;
+}
+.copilot-bubble-agent p:last-child {
+  margin-bottom: 0;
+}
+
+.copilot-bubble-agent strong {
+  color: #38bdf8;
+  font-weight: 700;
+}
+
+.copilot-bubble-agent ul,
+.copilot-bubble-agent ol {
+  margin: 6px 0 10px 18px;
+  padding: 0;
+}
+
+.copilot-bubble-agent li {
+  margin-bottom: 4px;
+  color: #cbd5e1;
+}
+
+.copilot-inline-code {
+  background: rgba(15, 23, 42, 0.8);
+  border: 1px solid rgba(148, 163, 184, 0.2);
+  border-radius: 4px;
+  padding: 1px 5px;
+  font-family: var(--font-mono, monospace);
+  font-size: 0.82rem;
+  color: #38bdf8;
+}
+
+.copilot-table-wrap {
+  overflow-x: auto;
+  margin: 10px 0;
+  border-radius: 6px;
+  border: 1px solid rgba(30, 41, 59, 0.8);
+}
+
+.copilot-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.8rem;
+  text-align: left;
+}
+
+.copilot-table th {
+  background: rgba(15, 23, 42, 0.9);
+  padding: 6px 10px;
+  font-weight: 700;
+  color: #94a3b8;
+  border-bottom: 1px solid rgba(30, 41, 59, 0.8);
+  white-space: nowrap;
+}
+
+.copilot-table td {
+  padding: 6px 10px;
+  border-bottom: 1px solid rgba(30, 41, 59, 0.5);
+  color: #f1f5f9;
+  white-space: nowrap;
+}
+
+.copilot-notice-box {
+  background: rgba(245, 158, 11, 0.08);
+  border-left: 3px solid #f59e0b;
+  border-radius: 0 6px 6px 0;
+  padding: 8px 12px;
+  margin: 8px 0;
+  font-size: 0.82rem;
+  color: #fef3c7;
+}
+
+/* --- Typing Wave Indicator --- */
+.copilot-thinking-card {
+  align-self: flex-start;
+  max-width: 90%;
+  background: rgba(15, 23, 42, 0.7);
+  border: 1px solid rgba(56, 189, 248, 0.15);
+  border-radius: 12px 12px 12px 3px;
+  padding: 12px 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  animation: copilotFadeInUp 0.2s ease both;
+}
+
+.copilot-thinking-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.copilot-typing-dots {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.copilot-typing-dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: #38bdf8;
+  animation: copilotDotBounce 1.4s infinite ease-in-out both;
+}
+
+.copilot-typing-dot:nth-child(1) { animation-delay: -0.32s; }
+.copilot-typing-dot:nth-child(2) { animation-delay: -0.16s; }
+.copilot-typing-dot:nth-child(3) { animation-delay: 0s; }
+
+@keyframes copilotDotBounce {
+  0%, 80%, 100% {
+    transform: scale(0.6);
+    opacity: 0.4;
+  }
+  40% {
+    transform: scale(1.15);
+    opacity: 1;
+    box-shadow: 0 0 6px rgba(56, 189, 248, 0.6);
+  }
+}
+
+.copilot-thinking-text {
+  font-size: 0.82rem;
+  color: #94a3b8;
+  font-style: italic;
+}
+
+/* --- Quick Prompt Chips --- */
+.copilot-chips-wrap {
+  padding: 8px 16px;
+  background: rgba(11, 17, 32, 0.95);
+  border-top: 1px solid rgba(30, 41, 59, 0.7);
+  display: flex;
+  gap: 8px;
+  overflow-x: auto;
+  scrollbar-width: none;
+  -webkit-overflow-scrolling: touch;
+}
+.copilot-chips-wrap::-webkit-scrollbar {
+  display: none;
+}
+
+.copilot-chip-btn {
+  white-space: nowrap;
+  font-size: 0.74rem;
+  font-weight: 500;
+  background: rgba(15, 23, 42, 0.8);
+  color: #cbd5e1;
+  border: 1px solid rgba(56, 189, 248, 0.22);
+  padding: 5px 12px;
+  border-radius: 9999px;
+  cursor: pointer;
+  transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  flex-shrink: 0;
+}
+
+.copilot-chip-btn:hover {
+  background: rgba(14, 165, 233, 0.16);
+  border-color: #38bdf8;
+  color: #f8fafc;
+  transform: translateY(-1px);
+  box-shadow: 0 2px 8px rgba(14, 165, 233, 0.2);
+}
+
+.copilot-chip-btn:active {
+  transform: scale(0.97);
+}
+
+/* --- Input Area --- */
+.copilot-input-bar {
+  padding: 12px 16px 14px 16px;
+  background: rgba(11, 17, 32, 0.98);
+  border-top: 1px solid rgba(30, 41, 59, 0.85);
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.copilot-input-box-wrap {
+  display: flex;
+  align-items: flex-end;
+  gap: 8px;
+  background: rgba(2, 6, 23, 0.85);
+  border: 1px solid rgba(51, 65, 85, 0.8);
+  border-radius: 12px;
+  padding: 6px 8px 6px 12px;
+  transition: all 0.2s ease;
+}
+
+.copilot-input-box-wrap:focus-within {
+  border-color: #0ea5e9;
+  box-shadow: 
+    0 0 0 2px rgba(14, 165, 233, 0.25),
+    0 4px 16px rgba(0, 0, 0, 0.35);
+}
+
+.copilot-textarea {
+  flex: 1;
+  background: transparent;
+  border: none;
+  outline: none;
+  color: #f8fafc;
+  font-family: var(--font-sans, inherit);
+  font-size: 0.88rem;
+  line-height: 1.45;
+  resize: none;
+  max-height: 120px;
+  min-height: 24px;
+  padding: 4px 0;
+}
+
+.copilot-textarea::placeholder {
+  color: #64748b;
+}
+
+.copilot-send-button {
+  width: 34px;
+  height: 34px;
+  border-radius: 10px;
+  background: rgba(30, 41, 59, 0.8);
+  border: 1px solid rgba(148, 163, 184, 0.15);
+  color: #64748b;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: not-allowed;
+  transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+  flex-shrink: 0;
+}
+
+.copilot-send-button.active {
+  background: linear-gradient(135deg, #0ea5e9 0%, #0284c7 100%);
+  border: 1px solid rgba(56, 189, 248, 0.5);
+  color: #ffffff;
+  cursor: pointer;
+  box-shadow: 0 0 15px rgba(14, 165, 233, 0.45);
+}
+
+.copilot-send-button.active:hover {
+  transform: scale(1.06);
+  box-shadow: 0 0 20px rgba(14, 165, 233, 0.65);
+}
+
+.copilot-send-button.active:active {
+  transform: scale(0.96);
+}
+
+.copilot-input-hints {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  font-size: 0.68rem;
+  color: #64748b;
+  padding: 0 4px;
+}
+</style>
+
+<!-- Modal Container & Backdrop -->
+<div id="copilotModalBackdrop" class="copilot-backdrop" onclick="handleCopilotBackdropClick(event)">
+  <div id="copilotPanel" class="copilot-panel" role="dialog" aria-modal="true" aria-labelledby="copilotHeaderTitle">
+    
+    <!-- Header -->
+    <div class="copilot-header">
+      <div class="copilot-header-brand">
+        <div class="copilot-avatar-ring">
+          <svg class="glyph" style="width: 20px; height: 20px;"><use href="#glyph-shield"></use></svg>
+          <div class="copilot-avatar-pulse" title="Copilot Engine Active"></div>
+        </div>
+        <div class="copilot-title-group">
+          <div class="copilot-meta-strip">
+            <span id="copilotAssetBadge" class="copilot-badge copilot-badge-asset">Fundamental Equity</span>
+            <span id="copilotContextTicker" class="copilot-badge copilot-badge-ticker">UNIVERSAL</span>
+            <span id="copilotSectionBadge" class="copilot-badge copilot-badge-section" style="display: none;"></span>
+          </div>
+          <h3 id="copilotHeaderTitle" class="copilot-header-title">
+            Institutional Forensic Copilot
+          </h3>
+        </div>
+      </div>
+
+      <div class="copilot-header-actions">
+        <button onclick="resetCopilotChat()" class="copilot-icon-btn" title="Reset Session / Clear Chat" aria-label="Reset Conversation">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M3 12a9 9 0 0 1 9-9 9.75 9.75 0 0 1 6.74 2.74L21 8"/>
+            <path d="M21 3v5h-5"/>
+            <path d="M21 12a9 9 0 0 1-9 9 9.75 9.75 0 0 1-6.74-2.74L3 16"/>
+            <path d="M8 16H3v5"/>
+          </svg>
+        </button>
+        <button onclick="closeCopilot()" class="copilot-icon-btn copilot-close-btn" title="Close Copilot (Esc)" aria-label="Close Copilot">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+            <line x1="18" y1="6" x2="6" y2="18"/>
+            <line x1="6" y1="6" x2="18" y2="18"/>
+          </svg>
+        </button>
+      </div>
     </div>
+
+    <!-- Safe Harbor Notice Banner -->
+    <div class="copilot-safeharbor">
+      <span class="copilot-safeharbor-pill">
+        <svg class="glyph" style="width: 13px; height: 13px;"><use href="#glyph-scale"></use></svg>
+        SEBI RA Sec. 2(u):
+      </span>
+      <span>Descriptive diagnostics & Pre-Mortem stress-testing only. Non-advisory software utility.</span>
+    </div>
+
+    <!-- Chat Messages Stream -->
+    <div id="copilotMessages" class="copilot-messages">
+      <!-- Default Intro Card (Dynamic content injected on open) -->
+      <div id="copilotIntroBubble" class="copilot-intro-card">
+        <div class="copilot-intro-headline">
+          <span>🧠</span> Institutional Forensic Copilot
+        </div>
+        <div>
+          Welcome to the <strong>Forensic Copilot</strong>. I can assist in stress-testing your investment thesis on <strong>the selected security</strong>, deriving implied growth rates via Reverse DCF, or running a <strong>Pre-Mortem Inversion analysis</strong>.
+        </div>
+      </div>
+    </div>
+
+    <!-- Quick Prompt Chips -->
+    <div id="copilotQuickChips" class="copilot-chips-wrap">
+      <!-- Dynamically populated per asset class & focused section -->
+    </div>
+
+    <!-- Input Bar -->
+    <div class="copilot-input-bar">
+      <div class="copilot-input-box-wrap">
+        <textarea 
+          id="copilotInput" 
+          class="copilot-textarea" 
+          rows="1" 
+          placeholder="Ask a diagnostic question or stress-test thesis..." 
+          oninput="handleCopilotInput(this)" 
+          onkeydown="handleCopilotKeydown(event)"
+          aria-label="Ask Copilot a question"
+        ></textarea>
+        <button 
+          id="copilotSendBtn" 
+          class="copilot-send-button" 
+          onclick="submitCopilotMessage()" 
+          title="Send message (Enter)" 
+          aria-label="Send message"
+          disabled
+        >
+          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+            <line x1="12" y1="19" x2="12" y2="5"/>
+            <polyline points="5 12 12 5 19 12"/>
+          </svg>
+        </button>
+      </div>
+      <div class="copilot-input-hints">
+        <span>Enter ↵ to send • Shift+Enter for new line</span>
+        <span>Esc to close</span>
+      </div>
+    </div>
+
+  </div>
 </div>
