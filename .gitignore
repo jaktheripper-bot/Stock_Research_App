@@ -12,7 +12,9 @@ reports.db
 .vscode/
 *.csv
 rzp-key.csv
-backups/
+backups/*
+!backups/conversations/
+!backups/conversations/**
 *.tar.gz
 scratch/
 .tmp.driveupload/

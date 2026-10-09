@@ -95,8 +95,13 @@ case "$COMMAND" in
         echo "--> Syncing local research reports to Supabase..."
         "$PYTHON" scripts/sync_to_supabase.py "$@"
         ;;
+    dump-chat|backup-chat|dump-session)
+        shift
+        echo "--> Creating formatted conversation transcript & session ledger dump..."
+        "$PYTHON" scripts/dump_conversation.py "$@"
+        ;;
     *)
-        echo "Usage: ./run.sh [lint | test | bench | preflight | live-audit | start | web | admin | mf-ingest | nifty100 | sync-supabase | checkpoint | rollback | checkpoints]"
+        echo "Usage: ./run.sh [lint | test | bench | preflight | live-audit | start | web | admin | mf-ingest | nifty100 | sync-supabase | dump-chat | checkpoint | rollback | checkpoints]"
         exit 1
         ;;
 esac
