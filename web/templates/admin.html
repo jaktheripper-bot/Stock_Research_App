@@ -58,9 +58,33 @@
 }
 .kpi-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
   gap: 16px;
   margin-bottom: 24px;
+}
+.kpi-grid-5 {
+  display: grid;
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+  gap: 16px;
+  margin-bottom: 24px;
+}
+.kpi-grid-6 {
+  display: grid;
+  grid-template-columns: repeat(6, minmax(0, 1fr));
+  gap: 16px;
+  margin-bottom: 24px;
+}
+@media (max-width: 1350px) {
+  .kpi-grid-5 { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+  .kpi-grid-6 { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+}
+@media (max-width: 900px) {
+  .kpi-grid-5 { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .kpi-grid-6 { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+}
+@media (max-width: 580px) {
+  .kpi-grid-5 { grid-template-columns: 1fr; }
+  .kpi-grid-6 { grid-template-columns: 1fr; }
 }
 .kpi-card {
   background: var(--bg-card, #131722);
@@ -108,18 +132,36 @@
   overflow-x: auto;
   border-bottom: 1px solid var(--border-subtle, #1e293b);
   margin-bottom: 24px;
-  padding-bottom: 4px;
+  padding-bottom: 8px;
+  scrollbar-width: thin;
+  scrollbar-color: rgba(14, 165, 233, 0.4) transparent;
+  -webkit-overflow-scrolling: touch;
+}
+.admin-tabs::-webkit-scrollbar {
+  height: 6px;
+}
+.admin-tabs::-webkit-scrollbar-track {
+  background: rgba(15, 23, 42, 0.6);
+  border-radius: 3px;
+}
+.admin-tabs::-webkit-scrollbar-thumb {
+  background: rgba(14, 165, 233, 0.3);
+  border-radius: 3px;
+}
+.admin-tabs::-webkit-scrollbar-thumb:hover {
+  background: rgba(14, 165, 233, 0.5);
 }
 .admin-tab-btn {
   background: transparent;
   border: none;
   color: var(--text-secondary, #94a3b8);
-  font-size: 14px;
+  font-size: 13px;
   font-weight: 600;
-  padding: 10px 18px;
+  padding: 8px 16px;
   border-radius: 8px;
   cursor: pointer;
   white-space: nowrap;
+  flex-shrink: 0;
   transition: all 0.2s ease;
   display: flex;
   align-items: center;
@@ -132,7 +174,8 @@
 .admin-tab-btn.active {
   color: #fff;
   background: rgba(14, 165, 233, 0.15);
-  border: 1px solid rgba(14, 165, 233, 0.3);
+  border: 1px solid rgba(14, 165, 233, 0.35);
+  box-shadow: 0 0 15px rgba(14, 165, 233, 0.1);
 }
 .admin-tab-badge {
   background: #ef4444;
@@ -154,6 +197,7 @@
   overflow-x: auto;
   border-radius: 8px;
   border: 1px solid var(--border-subtle, #1e293b);
+  scrollbar-width: thin;
 }
 .admin-table {
   width: 100%;
@@ -162,17 +206,20 @@
   text-align: left;
 }
 .admin-table th {
-  background: rgba(15, 23, 42, 0.8);
+  background: rgba(15, 23, 42, 0.85);
   padding: 12px 16px;
   font-weight: 700;
   color: var(--text-secondary, #94a3b8);
   border-bottom: 1px solid var(--border-subtle, #1e293b);
   white-space: nowrap;
+  vertical-align: middle;
 }
 .admin-table td {
   padding: 12px 16px;
   border-bottom: 1px solid rgba(30, 41, 59, 0.6);
   color: var(--text-primary, #f8fafc);
+  white-space: nowrap;
+  vertical-align: middle;
 }
 .admin-table tr:hover {
   background: rgba(255, 255, 255, 0.02);
@@ -258,8 +305,7 @@
           name="email" 
           class="admin-input" 
           style="width: 100%; box-sizing: border-box; padding: 10px; font-size: 13px;" 
-          placeholder="lyndnpnto@gmail.com" 
-          value="lyndnpnto@gmail.com"
+          placeholder="admin@example.com" 
           required 
           autofocus
         >
@@ -270,7 +316,7 @@
     </form>
 
     <div style="margin-top: 20px; font-size: 11px; color: #64748b; line-height: 1.5;">
-      🔒 Zero-passcode architecture: Access strictly restricted to whitelisted accounts with active Google Authenticator TOTP verification. Root owner: <strong>lyndnpnto@gmail.com</strong>.
+      🔒 Zero-passcode architecture: Access strictly restricted to whitelisted accounts with active Google Authenticator TOTP verification.
     </div>
   </div>
 
@@ -347,7 +393,7 @@
   {% endif %}
 
   <!-- 5 Top Executive KPI Cards -->
-  <div class="kpi-grid">
+  <div class="kpi-grid-5">
     <div class="kpi-card">
       <div class="kpi-label">Unique Sessions <span>🌐</span></div>
       <div class="kpi-value">{{ summary.unique_sessions }}</div>
@@ -410,7 +456,7 @@
     <button class="admin-tab-btn {% if active_tab == 'assets' %}active{% endif %}" data-tab="assets" onclick="showTab('assets')">
       📡 Asset Surveillance
     </button>
-    <a href="/admin/audit" class="admin-tab-btn" style="text-decoration: none; color: #38bdf8; border: 1px solid rgba(14, 165, 233, 0.4); background: rgba(14, 165, 233, 0.12); margin-left: auto;">
+    <a href="/admin/audit" class="admin-tab-btn" style="text-decoration: none; color: #38bdf8; border: 1px solid rgba(14, 165, 233, 0.4); background: rgba(14, 165, 233, 0.12); flex-shrink: 0;">
       <svg class="glyph"><use href="#glyph-shield"></use></svg> Autonomous Project Auditor →
     </a>
   </div>
@@ -418,7 +464,7 @@
   <!-- TAB 1: Live Billables & Invoices -->
   <div id="tab-billables" class="admin-tab-pane {% if not active_tab or active_tab == 'billables' %}active{% endif %}">
     <!-- Financial Overview Sub-Grid -->
-    <div class="kpi-grid" style="grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));">
+  <div class="kpi-grid-6">
       <div class="kpi-card" style="border-left: 3px solid #10b981;">
         <div class="kpi-label">Verified Cash Income <span>💵</span></div>
         <div class="kpi-value" style="color: #34d399;">₹{{ "{:,.2f}".format(rev_summary.gross_revenue_inr) }}</div>
@@ -1490,9 +1536,10 @@
               <button type="button" onclick="setGrantPreset(1.0)" class="btn btn-secondary btn-sm" style="padding: 2px 6px; font-size: 10px;">+1.0 (Dossier)</button>
               <button type="button" onclick="setGrantPreset(2.0)" class="btn btn-secondary btn-sm" style="padding: 2px 6px; font-size: 10px; color: #38bdf8; border-color: rgba(56, 189, 248, 0.4);">+2.0 (Deep)</button>
               <button type="button" onclick="setGrantPreset(5.0)" class="btn btn-secondary btn-sm" style="padding: 2px 6px; font-size: 10px;">+5.0 (Pack)</button>
+              <button type="button" onclick="setGrantPreset(20.0)" class="btn btn-secondary btn-sm" style="padding: 2px 6px; font-size: 10px; color: #10b981; border-color: rgba(16, 185, 129, 0.4);">+20.0 (Pro)</button>
             </div>
           </div>
-          <input type="number" step="0.5" min="0.1" max="100.0" name="credits" id="grantCreditsAmount" value="2.0" class="admin-input" style="width: 100%; box-sizing: border-box;" required>
+          <input type="number" step="any" min="0.1" max="1000.0" name="credits" id="grantCreditsAmount" value="2.0" class="admin-input" style="width: 100%; box-sizing: border-box;" required placeholder="Enter credits (e.g. 1.0, 2.0, 5.0, 20.0)">
         </div>
 
         <div style="margin-bottom: 12px;">
