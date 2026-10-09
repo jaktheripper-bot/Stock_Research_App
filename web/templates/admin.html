@@ -321,7 +321,7 @@
 
       <!-- Purge Test Data Button (Top Header, All Tabs) -->
       {% if current_admin.role in ['owner', 'admin'] %}
-      <button type="button" onclick="document.getElementById('purgeDataModal').style.display='flex'" class="btn btn-secondary btn-sm" style="color: #f87171; border-color: rgba(239, 68, 68, 0.45); background: rgba(239, 68, 68, 0.08); display: flex; align-items: center; gap: 6px; font-weight: 700; cursor: pointer;" title="Permanently delete synthetic test runs, dummy tickets, and test transactions">
+      <button type="button" onclick="openAdminModal('purgeDataModal')" class="btn btn-secondary btn-sm" style="color: #f87171; border-color: rgba(239, 68, 68, 0.45); background: rgba(239, 68, 68, 0.08); display: flex; align-items: center; gap: 6px; font-weight: 700; cursor: pointer;" title="Permanently delete synthetic test runs, dummy tickets, and test transactions">
         🧹 Purge Test Data
       </button>
       {% endif %}
@@ -457,14 +457,14 @@
         <h3 style="margin: 0; font-size: 16px; font-weight: 700;">💳 Transaction & Tax Invoices Ledger</h3>
         <div style="display: flex; gap: 10px; flex-wrap: wrap;">
           {% if current_admin.role in ['owner', 'admin'] %}
-          <button type="button" onclick="document.getElementById('purgeDataModal').style.display='flex'" class="btn btn-secondary btn-sm" style="color: #f87171; border-color: rgba(239, 68, 68, 0.45); background: rgba(239, 68, 68, 0.08); display: flex; align-items: center; gap: 6px; font-weight: 600; cursor: pointer;">
+          <button type="button" onclick="openAdminModal('purgeDataModal')" class="btn btn-secondary btn-sm" style="color: #f87171; border-color: rgba(239, 68, 68, 0.45); background: rgba(239, 68, 68, 0.08); display: flex; align-items: center; gap: 6px; font-weight: 600; cursor: pointer;">
             🧹 Purge Test Data
           </button>
           {% endif %}
           <a href="/admin/export/tax-register" class="btn btn-secondary btn-sm" download>
             📥 Export GSTR-1 Tax Register (CSV)
           </a>
-          <button class="btn btn-primary btn-sm" onclick="document.getElementById('refundModal').style.display='flex'">
+          <button class="btn btn-primary btn-sm" onclick="openAdminModal('refundModal')">
             ↩️ Process Refund
           </button>
         </div>
@@ -1063,7 +1063,7 @@
       <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px; flex-wrap: wrap; gap: 10px;">
         <h3 style="margin: 0; font-size: 16px; font-weight: 700;">Live Platform Events Stream (Latest 50)</h3>
         {% if current_admin.role in ['owner', 'admin'] %}
-        <button onclick="document.getElementById('purgeDataModal').style.display='flex'" class="btn btn-secondary btn-sm" style="color: #f87171; border-color: rgba(239, 68, 68, 0.4); display: flex; align-items: center; gap: 6px;">
+        <button onclick="openAdminModal('purgeDataModal')" class="btn btn-secondary btn-sm" style="color: #f87171; border-color: rgba(239, 68, 68, 0.4); display: flex; align-items: center; gap: 6px;">
           🧹 Purge Test Data
         </button>
         {% endif %}
@@ -1114,7 +1114,7 @@
           Manage verified team members authorized to access executive telemetry, user journeys, billing, and refunds.
         </p>
       </div>
-      <button class="btn btn-primary btn-sm" onclick="document.getElementById('inviteAdminModal').style.display='flex'">
+      <button class="btn btn-primary btn-sm" onclick="openAdminModal('inviteAdminModal')">
         ➕ Invite Administrator
       </button>
     </div>
@@ -1370,11 +1370,11 @@
   </div>
 
   <!-- Invite Administrator Modal -->
-  <div id="inviteAdminModal" class="modal-backdrop" style="display: none; align-items: center; justify-content: center;">
+  <div id="inviteAdminModal" class="modal-backdrop" style="display: none; align-items: center; justify-content: center; z-index: 9999;">
     <div class="modal-dialog" style="max-width: 440px; background: var(--bg-card, #131722); border-radius: 12px; padding: 24px;">
       <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px;">
         <h3 style="margin: 0; font-size: 18px; font-weight: 800;">➕ Invite Administrator</h3>
-        <button onclick="document.getElementById('inviteAdminModal').style.display='none'" style="background: none; border: none; color: #fff; font-size: 20px; cursor: pointer;">&times;</button>
+        <button type="button" onclick="closeAdminModal('inviteAdminModal')" style="background: none; border: none; color: #fff; font-size: 20px; cursor: pointer;">&times;</button>
       </div>
 
       <form method="POST" action="/admin/team/add">
@@ -1398,11 +1398,11 @@
   </div>
 
   <!-- Refund Modal -->
-  <div id="refundModal" class="modal-backdrop" style="display: none; align-items: center; justify-content: center;">
+  <div id="refundModal" class="modal-backdrop" style="display: none; align-items: center; justify-content: center; z-index: 9999;">
     <div class="modal-dialog" style="max-width: 440px; background: var(--bg-card, #131722); border-radius: 12px; padding: 24px;">
       <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px;">
         <h3 style="margin: 0; font-size: 18px; font-weight: 800;">↩️ Process Order Refund</h3>
-        <button onclick="document.getElementById('refundModal').style.display='none'" style="background: none; border: none; color: #fff; font-size: 20px; cursor: pointer;">&times;</button>
+        <button type="button" onclick="closeAdminModal('refundModal')" style="background: none; border: none; color: #fff; font-size: 20px; cursor: pointer;">&times;</button>
       </div>
 
       <form method="POST" action="/admin/refund">
@@ -1426,11 +1426,11 @@
   </div>
 
   <!-- Purge Test Data Confirmation Modal -->
-  <div id="purgeDataModal" class="modal-backdrop" style="display: none; align-items: center; justify-content: center;">
+  <div id="purgeDataModal" class="modal-backdrop" style="display: none; align-items: center; justify-content: center; z-index: 9999;">
     <div class="modal-dialog" style="max-width: 480px; background: var(--bg-card, #131722); border-radius: 12px; padding: 24px; border: 1px solid rgba(239, 68, 68, 0.4);">
       <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px;">
         <h3 style="margin: 0; font-size: 18px; font-weight: 800; color: #f87171;">🧹 Purge Synthetic Test Data</h3>
-        <button onclick="document.getElementById('purgeDataModal').style.display='none'" style="background: none; border: none; color: #fff; font-size: 20px; cursor: pointer;">&times;</button>
+        <button type="button" onclick="closeAdminModal('purgeDataModal')" style="background: none; border: none; color: #fff; font-size: 20px; cursor: pointer;">&times;</button>
       </div>
 
       <p style="font-size: 13px; color: var(--text-secondary, #94a3b8); margin-bottom: 16px; line-height: 1.5;">
@@ -1451,7 +1451,7 @@
 
       <form method="POST" action="/admin/telemetry/purge-test-data" style="display: flex; gap: 10px; justify-content: flex-end;">
         <input type="hidden" name="tab" id="purgeModalTabInput" value="{{ active_tab or 'billables' }}">
-        <button type="button" onclick="document.getElementById('purgeDataModal').style.display='none'" class="btn btn-secondary" style="padding: 8px 16px; font-size: 13px;">
+        <button type="button" onclick="closeAdminModal('purgeDataModal')" class="btn btn-secondary" style="padding: 8px 16px; font-size: 13px;">
           Cancel
         </button>
         <button type="submit" class="btn btn-primary" style="background: #ef4444; border-color: #ef4444; padding: 8px 16px; font-size: 13px; font-weight: 700;">
@@ -1542,14 +1542,38 @@
   </div>
 
   <script>
+  function openAdminModal(id) {
+    const modal = document.getElementById(id);
+    if (!modal) return;
+    modal.style.display = 'flex';
+    requestAnimationFrame(() => {
+      modal.classList.add('active');
+    });
+  }
+
+  function closeAdminModal(id) {
+    const modal = document.getElementById(id);
+    if (!modal) return;
+    modal.classList.remove('active');
+    setTimeout(() => {
+      if (!modal.classList.contains('active')) {
+        modal.style.display = 'none';
+      }
+    }, 200);
+  }
+
   function openGrantCreditsModal(email, ticketId, reason, ticker) {
     const modal = document.getElementById('adminGrantCreditsModal');
     if (!modal) return;
-    document.getElementById('grantUserEmail').value = email || '';
-    document.getElementById('grantTicketId').value = ticketId || '';
-    document.getElementById('grantTaskTicker').value = ticker || '';
-    if (reason) {
-      document.getElementById('grantReason').value = reason;
+    const emailField = document.getElementById('grantUserEmail');
+    if (emailField) emailField.value = email || '';
+    const ticketField = document.getElementById('grantTicketId');
+    if (ticketField) ticketField.value = ticketId || '';
+    const tickerField = document.getElementById('grantTaskTicker');
+    if (tickerField) tickerField.value = ticker || '';
+    const reasonField = document.getElementById('grantReason');
+    if (reason && reasonField) {
+      reasonField.value = reason;
     }
     const resolveRow = document.getElementById('grantResolveTicketRow');
     const resolveCheckbox = document.getElementById('grantResolveTicket');
@@ -1560,15 +1584,17 @@
       if (resolveRow) resolveRow.style.display = 'none';
       if (resolveCheckbox) resolveCheckbox.checked = false;
     }
-    document.getElementById('grantCreditsAmount').value = '2.0';
-    modal.style.display = 'flex';
+    const creditsField = document.getElementById('grantCreditsAmount');
+    if (creditsField) creditsField.value = '2.0';
+
+    openAdminModal('adminGrantCreditsModal');
+    if (emailField && !email) {
+      setTimeout(() => emailField.focus(), 150);
+    }
   }
 
   function closeGrantCreditsModal() {
-    const modal = document.getElementById('adminGrantCreditsModal');
-    if (modal) {
-      modal.style.display = 'none';
-    }
+    closeAdminModal('adminGrantCreditsModal');
   }
 
   function setGrantPreset(val) {
@@ -1611,7 +1637,7 @@
     window.history.replaceState({}, '', url);
   }
 
-  // Handle windowSelect changes and auto-restore tab state
+  // Global listeners for date-range select, backdrop click, Escape key, and AJAX credit grant
   document.addEventListener('DOMContentLoaded', () => {
     const sel = document.getElementById('windowSelect');
     const customDiv = document.getElementById('customDateRange');
@@ -1634,6 +1660,72 @@
       if (pane) {
         showTab(initialTab);
       }
+    }
+
+    // Close any active modal when clicking directly on the backdrop outside the dialog
+    document.querySelectorAll('.modal-backdrop').forEach(backdrop => {
+      backdrop.addEventListener('click', (e) => {
+        if (e.target === backdrop) {
+          closeAdminModal(backdrop.id);
+        }
+      });
+    });
+
+    // Close any active modal on Escape key press
+    document.addEventListener('keydown', (e) => {
+      if (e.key === 'Escape') {
+        document.querySelectorAll('.modal-backdrop.active').forEach(m => {
+          closeAdminModal(m.id);
+        });
+      }
+    });
+
+    // AJAX Form submission for grantCreditsForm with direct UI feedback & balance refresh
+    const grantForm = document.getElementById('grantCreditsForm');
+    if (grantForm) {
+      grantForm.addEventListener('submit', async (e) => {
+        e.preventDefault();
+        const submitBtn = grantForm.querySelector('button[type="submit"]');
+        const origHtml = submitBtn ? submitBtn.innerHTML : '';
+        if (submitBtn) {
+          submitBtn.disabled = true;
+          submitBtn.innerHTML = 'Granting credits...';
+        }
+
+        try {
+          const formData = new FormData(grantForm);
+          const response = await fetch('/admin/users/grant-credits', {
+            method: 'POST',
+            body: formData,
+            headers: {
+              'Accept': 'application/json',
+              'X-Requested-With': 'XMLHttpRequest'
+            }
+          });
+
+          const data = await response.json().catch(() => ({}));
+          if (response.ok && data.success) {
+            closeGrantCreditsModal();
+            const currentTab = document.getElementById('grantModalTabInput')?.value || 'users';
+            const successMsg = data.message || `Successfully granted credits to ${data.user_email || 'user'}.`;
+            window.location.href = `/admin?tab=${encodeURIComponent(currentTab)}&msg=${encodeURIComponent(successMsg)}`;
+          } else {
+            const errorMsg = data.error || 'Failed to grant credits. Please verify user account and try again.';
+            alert('Grant Error: ' + errorMsg);
+            if (submitBtn) {
+              submitBtn.disabled = false;
+              submitBtn.innerHTML = origHtml;
+            }
+          }
+        } catch (netErr) {
+          console.error('Failed to grant credits:', netErr);
+          alert('Network or server error while granting credits: ' + (netErr.message || 'Unknown error'));
+          if (submitBtn) {
+            submitBtn.disabled = false;
+            submitBtn.innerHTML = origHtml;
+          }
+        }
+      });
     }
   });
   </script>

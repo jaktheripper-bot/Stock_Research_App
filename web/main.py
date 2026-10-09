@@ -130,7 +130,10 @@ from core.db.telemetry import (
     parse_user_agent,
     extract_geo,
     purge_test_telemetry,
+    is_excluded_telemetry_event,
 )
+
+ADMIN_COOKIE_NAME = "admin_session"
 from core.notify import dispatch_support_ticket_alert
 from core.analysis import get_stock_fundamentals, get_historical_prices
 from core.analysis.engine import generate_stock_report
@@ -1846,6 +1849,11 @@ class TelemetryEventRequest(BaseModel):
 @app.post("/api/telemetry/event")
 async def api_record_telemetry_event(payload: TelemetryEventRequest, request: Request):
     """Client-side telemetry event capture for user-level journey and acquisition tracking."""
+    # 0. Exclude admin visits (active admin session cookie or authenticated admin)
+    admin_cookie = request.cookies.get(ADMIN_COOKIE_NAME) or request.cookies.get("admin_session")
+    if admin_cookie or _is_admin_authenticated(request):
+        return json_response_with_cache({"status": "filtered", "reason": "admin_session"})
+
     user_agent = request.headers.get("user-agent", "")
 
     # 1. Resolve traffic attribution from landing payload or headers
@@ -1902,6 +1910,19 @@ async def api_record_telemetry_event(payload: TelemetryEventRequest, request: Re
     evt_details["landing_page"] = resolved_lp
     if payload.landing_url and "landing_url" not in evt_details:
         evt_details["landing_url"] = payload.landing_url
+
+    # 6. Exclude tests and administrator visits
+    if is_excluded_telemetry_event(
+        event_type=payload.event_type or "",
+        ticker=payload.ticker or "",
+        browser=client_env.get("browser", "Chrome"),
+        user_id=payload.user_id or "",
+        user_email=payload.user_email or "",
+        landing_page=resolved_lp,
+        session_id=sess_id,
+        details=evt_details
+    ):
+        return json_response_with_cache({"status": "filtered", "reason": "test_or_admin"})
 
     record_usage_event(
         event_type=payload.event_type,

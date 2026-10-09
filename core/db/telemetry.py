@@ -9,23 +9,134 @@ from telemetry import parse_traffic_source, parse_user_agent, extract_geo
 
 logger = logging.getLogger("equity_research.core.db.telemetry")
 
+def get_admin_emails() -> set[str]:
+    """Retrieves all registered administrator emails, lowercased."""
+    try:
+        from core.db.admin import list_admin_users
+        users = list_admin_users()
+        emails = {u.get("email", "").strip().lower() for u in users if u.get("email")}
+        emails.add("lyndnpnto@gmail.com")
+        return emails
+    except Exception:
+        return {"lyndnpnto@gmail.com"}
+
+
+def get_admin_user_ids() -> set[str]:
+    """Retrieves all registered administrator user IDs."""
+    try:
+        from core.db.admin import list_admin_users
+        users = list_admin_users()
+        ids = {u.get("id", "").strip() for u in users if u.get("id")}
+        ids.update({"adm_owner_lyndon", "admin", "test_admin"})
+        return ids
+    except Exception:
+        return {"adm_owner_lyndon", "admin", "test_admin"}
+
+
 def is_synthetic_test_event(
     event_type: str = "",
     ticker: str = "",
     browser: str = "",
     user_id: str = "",
-    user_email: str = ""
+    user_email: str = "",
+    landing_page: str = "",
+    session_id: str = "",
+    details: dict = None
 ) -> bool:
     """Detects whether an event originates from test runners or synthetic development runs."""
-    if user_email and any(dom in str(user_email).lower() for dom in ["@example.com", "@test.com", "test_"]):
-        return True
-    if user_id and (user_id in ("guest_web_user", "test_user", "testclient", "test_admin") or str(user_id).startswith("test_")):
-        return True
-    if ticker and str(ticker).upper() in ("TEST", "APP", "XYZ", "SAMPLE"):
-        return True
-    if browser and any(b in str(browser).lower() for b in ["testclient", "pytest"]):
-        return True
+    if user_email:
+        em = str(user_email).strip().lower()
+        if any(dom in em for dom in ["@example.com", "@test.com", "@pytest.com", "test_", "ghost_user", "@localhost"]):
+            return True
+        if em.startswith("test") and "@" in em:
+            return True
+    if user_id:
+        uid = str(user_id).strip().lower()
+        if uid in ("guest_web_user", "test_user", "testclient", "test_admin") or uid.startswith("test_") or uid.startswith("usr_test_"):
+            return True
+    if ticker:
+        t = str(ticker).strip().upper()
+        if t in ("TEST", "APP", "XYZ", "SAMPLE", "MOCK") or t.startswith("TEST") or t.startswith("UNIT_TEST_"):
+            return True
+    if browser:
+        b = str(browser).strip().lower()
+        if any(agent in b for agent in ["testclient", "pytest", "python-requests", "playwright", "headless", "curl", "postman"]):
+            return True
+    if session_id:
+        s = str(session_id).strip().lower()
+        if s.startswith("test_") or s.startswith("sess_test") or "test" in s:
+            return True
+    if event_type:
+        ev = str(event_type).strip().upper()
+        if ev.startswith("UNIT_TEST_") or ev.startswith("TEST_"):
+            return True
+    if details and isinstance(details, dict):
+        if details.get("is_test") or details.get("test") or details.get("synthetic"):
+            return True
     return False
+
+
+def is_admin_visit_event(
+    event_type: str = "",
+    user_email: str = "",
+    user_id: str = "",
+    landing_page: str = "",
+    session_id: str = "",
+    details: dict = None
+) -> bool:
+    """Detects whether an event originates from an administrative visit or admin panel interaction."""
+    if event_type and str(event_type).strip().upper().startswith("ADMIN_"):
+        return True
+    if landing_page:
+        lp = str(landing_page).strip().lower()
+        if lp.startswith("/admin") or "/admin" in lp:
+            return True
+    if user_email:
+        em = str(user_email).strip().lower()
+        if em == "lyndnpnto@gmail.com" or em.startswith("admin@"):
+            return True
+        admin_emails = get_admin_emails()
+        if em in admin_emails:
+            return True
+    if user_id:
+        uid = str(user_id).strip().lower()
+        if uid in ("adm_owner_lyndon", "admin", "test_admin") or uid.startswith("adm_"):
+            return True
+    if details and isinstance(details, dict):
+        p = str(details.get("landing_page") or details.get("path") or details.get("page") or "").strip().lower()
+        if p.startswith("/admin") or "/admin" in p:
+            return True
+    return False
+
+
+def is_excluded_telemetry_event(
+    event_type: str = "",
+    ticker: str = "",
+    browser: str = "",
+    user_id: str = "",
+    user_email: str = "",
+    landing_page: str = "",
+    session_id: str = "",
+    details: dict = None
+) -> bool:
+    """Returns True if the event is from automated tests OR from admin visits to the website."""
+    return is_synthetic_test_event(
+        event_type=event_type,
+        ticker=ticker,
+        browser=browser,
+        user_id=user_id,
+        user_email=user_email,
+        landing_page=landing_page,
+        session_id=session_id,
+        details=details
+    ) or is_admin_visit_event(
+        event_type=event_type,
+        user_email=user_email,
+        user_id=user_id,
+        landing_page=landing_page,
+        session_id=session_id,
+        details=details
+    )
 
 
 def classify_page_category(path: str) -> tuple[str, str]:
@@ -98,12 +209,15 @@ def record_usage_event(
     Non-blocking: catches exceptions gracefully so app operations never fail if telemetry is unavailable.
     Filters out synthetic automated test runs and testclient traffic unless explicitly overridden.
     """
-    if not is_test_override and is_synthetic_test_event(
+    if not is_test_override and is_excluded_telemetry_event(
         event_type=event_type,
         ticker=ticker,
         browser=browser,
         user_id=user_id,
-        user_email=user_email
+        user_email=user_email,
+        landing_page=landing_page,
+        session_id=session_id,
+        details=details
     ):
         return
     try:
@@ -216,11 +330,69 @@ def _build_telemetry_time_filter(
             base_clause = f"timestamp >= datetime('now', '-{num_days} days')"
 
     if exclude_tests:
+        admin_emails = get_admin_emails()
+        admin_emails_sql = ", ".join(f"'{e}'" for e in sorted(admin_emails)) if admin_emails else "'lyndnpnto@gmail.com'"
+        admin_ids = get_admin_user_ids()
+        admin_ids_sql = ", ".join(f"'{i}'" for i in sorted(admin_ids)) if admin_ids else "'adm_owner_lyndon'"
+
         base_clause += (
-            " AND (user_email IS NULL OR (user_email NOT LIKE '%@example.com' AND user_email NOT LIKE '%@test.com' AND user_email NOT LIKE 'test_%'))"
-            " AND (user_id IS NULL OR (user_id NOT IN ('guest_web_user', 'test_user', 'testclient', 'test_admin') AND user_id NOT LIKE 'test_%'))"
-            " AND (ticker IS NULL OR ticker NOT IN ('TEST', 'APP', 'XYZ', 'SAMPLE'))"
-            " AND (browser IS NULL OR browser NOT LIKE '%testclient%')"
+            # 1. Exclude synthetic test events & test runner traffic
+            " AND (user_email IS NULL OR ("
+            "     user_email NOT LIKE '%@example.com'"
+            " AND user_email NOT LIKE '%@test.com'"
+            " AND user_email NOT LIKE '%@pytest.com'"
+            " AND user_email NOT LIKE 'test_%'"
+            " AND user_email NOT LIKE '%ghost_user%'"
+            " AND user_email NOT LIKE '%@localhost%'"
+            "))"
+            " AND (user_id IS NULL OR ("
+            "     user_id NOT IN ('guest_web_user', 'test_user', 'testclient', 'test_admin')"
+            " AND user_id NOT LIKE 'test_%'"
+            " AND user_id NOT LIKE 'usr_test_%'"
+            "))"
+            " AND (ticker IS NULL OR ("
+            "     ticker NOT IN ('TEST', 'APP', 'XYZ', 'SAMPLE', 'MOCK')"
+            " AND ticker NOT LIKE 'TEST%'"
+            " AND ticker NOT LIKE 'UNIT_TEST_%'"
+            "))"
+            " AND (browser IS NULL OR ("
+            "     browser NOT LIKE '%testclient%'"
+            " AND browser NOT LIKE '%pytest%'"
+            " AND browser NOT LIKE '%python-requests%'"
+            " AND browser NOT LIKE '%playwright%'"
+            " AND browser NOT LIKE '%headless%'"
+            " AND browser NOT LIKE '%curl%'"
+            "))"
+            " AND (session_id IS NULL OR ("
+            "     session_id NOT LIKE 'test_%'"
+            " AND session_id NOT LIKE 'sess_test%'"
+            "))"
+            " AND (event_type IS NULL OR ("
+            "     event_type NOT LIKE 'UNIT_TEST_%'"
+            " AND event_type NOT LIKE 'TEST_%'"
+            "))"
+            # 2. Exclude administrative visits, admin route activity, and admin accounts
+            f" AND (user_email IS NULL OR (LOWER(user_email) NOT IN ({admin_emails_sql}) AND user_email NOT LIKE 'admin@%'))"
+            f" AND (user_id IS NULL OR (user_id NOT IN ({admin_ids_sql}) AND user_id NOT LIKE 'adm_%' AND user_id != 'admin'))"
+            " AND (event_type IS NULL OR event_type NOT LIKE 'ADMIN_%')"
+            " AND (landing_page IS NULL OR (landing_page NOT LIKE '/admin%' AND landing_page NOT LIKE '%/admin%'))"
+            # 3. Exclude entire sessions that touched admin pages or had admin activity or test runners
+            f" AND (session_id IS NULL OR session_id NOT IN ("
+            f"     SELECT DISTINCT session_id FROM site_usage_events "
+            f"     WHERE session_id IS NOT NULL AND ("
+            f"         landing_page LIKE '/admin%'"
+            f"      OR event_type LIKE 'ADMIN_%'"
+            f"      OR LOWER(user_email) IN ({admin_emails_sql})"
+            f"      OR user_id IN ({admin_ids_sql})"
+            f"      OR user_id LIKE 'adm_%'"
+            f"      OR browser LIKE '%testclient%'"
+            f"      OR browser LIKE '%pytest%'"
+            f"      OR browser LIKE '%python-requests%'"
+            f"      OR browser LIKE '%playwright%'"
+            f"      OR session_id LIKE 'test_%'"
+            f"      OR session_id LIKE 'sess_test%'"
+            f"     )"
+            f" ))"
         )
 
     return base_clause
@@ -494,6 +666,7 @@ def get_site_usage_summary(days: int = None, start_date = None, end_date = None,
                        COALESCE(session_id, '-'), COALESCE(traffic_source, 'Direct'),
                        COALESCE(country, 'IN'), COALESCE(device_type, 'Desktop')
                 FROM site_usage_events
+                WHERE {time_filter}
                 ORDER BY timestamp DESC
                 LIMIT 50
             ''')
@@ -514,6 +687,7 @@ def get_site_usage_summary(days: int = None, start_date = None, end_date = None,
             cursor.execute(f'''
                 SELECT event_type, ticker, latency_ms, cost_saved_usd, timestamp
                 FROM site_usage_events
+                WHERE {time_filter}
                 ORDER BY timestamp DESC
                 LIMIT 20
             ''')
@@ -571,7 +745,7 @@ def get_session_journeys(days: int = None, start_date = None, end_date = None, l
                 cursor.execute(f'''
                     SELECT event_type, ticker, timestamp, COALESCE(landing_page, ''), details
                     FROM site_usage_events
-                    WHERE session_id = {placeholder}
+                    WHERE session_id = {placeholder} AND {time_filter}
                     ORDER BY timestamp ASC
                 ''', (sess_id,))
                 sess_events = cursor.fetchall()
@@ -579,7 +753,7 @@ def get_session_journeys(days: int = None, start_date = None, end_date = None, l
                 cursor.execute(f'''
                     SELECT event_type, ticker, timestamp, '', details
                     FROM site_usage_events
-                    WHERE session_id = {placeholder}
+                    WHERE session_id = {placeholder} AND {time_filter}
                     ORDER BY timestamp ASC
                 ''', (sess_id,))
                 sess_events = cursor.fetchall()
@@ -668,12 +842,24 @@ def get_user_usage_analytics(days: int = None, start_date = None, end_date = Non
 
         # 1. Total registered users & Pro counts
         try:
-            cursor.execute("""
+            admin_emails = get_admin_emails()
+            admin_emails_sql = ", ".join(f"'{e}'" for e in sorted(admin_emails)) if admin_emails else "'lyndnpnto@gmail.com'"
+            cursor.execute(f"""
                 SELECT 
                     COUNT(*), 
                     COUNT(CASE WHEN subscription_tier IN ('pro_monthly', 'pro_annual') THEN 1 END) 
                 FROM user_accounts
-                WHERE email NOT LIKE '%@example.com' AND email NOT LIKE '%@test.com' AND user_id NOT LIKE 'test_%';
+                WHERE email NOT LIKE '%@example.com' 
+                  AND email NOT LIKE '%@test.com' 
+                  AND email NOT LIKE '%@pytest.com'
+                  AND email NOT LIKE 'test_%'
+                  AND email NOT LIKE 'admin@%'
+                  AND id NOT LIKE 'test_%'
+                  AND id NOT LIKE 'usr_test_%'
+                  AND id NOT LIKE 'adm_%'
+                  AND id NOT IN ('guest_web_user', 'test_user', 'testclient', 'test_admin')
+                  AND LOWER(email) NOT IN ({admin_emails_sql})
+                  AND id NOT IN ('adm_owner_lyndon', 'admin');
             """)
             u_row = cursor.fetchone()
             if u_row:
@@ -702,6 +888,8 @@ def get_user_usage_analytics(days: int = None, start_date = None, end_date = Non
 
         # 3. Top active users in period
         try:
+            admin_emails = get_admin_emails()
+            admin_emails_sql = ", ".join(f"'{e}'" for e in sorted(admin_emails)) if admin_emails else "'lyndnpnto@gmail.com'"
             cursor.execute(f"""
                 SELECT 
                     e.user_email,
@@ -713,7 +901,12 @@ def get_user_usage_analytics(days: int = None, start_date = None, end_date = Non
                     MAX(e.timestamp) as last_seen
                 FROM site_usage_events e
                 LEFT JOIN user_accounts u ON LOWER(e.user_email) = LOWER(u.email)
-                WHERE {time_filter} AND e.user_email IS NOT NULL AND e.user_email != ''
+                WHERE {time_filter} 
+                  AND e.user_email IS NOT NULL 
+                  AND e.user_email != ''
+                  AND LOWER(e.user_email) NOT IN ({admin_emails_sql})
+                  AND (u.id IS NULL OR (u.id NOT LIKE 'test_%' AND u.id NOT LIKE 'usr_test_%' AND u.id NOT LIKE 'adm_%'))
+                  AND (u.email IS NULL OR LOWER(u.email) NOT IN ({admin_emails_sql}))
                 GROUP BY e.user_email, u.id
                 ORDER BY total_events DESC
                 LIMIT {limit};
@@ -788,17 +981,36 @@ def purge_test_telemetry() -> dict:
         "users_purged": 0
     }
     try:
-        # 1. Purge synthetic site_usage_events
-        cursor.execute("""
+        admin_emails = get_admin_emails()
+        admin_emails_sql = ", ".join(f"'{e}'" for e in sorted(admin_emails)) if admin_emails else "'lyndnpnto@gmail.com'"
+        admin_ids = get_admin_user_ids()
+        admin_ids_sql = ", ".join(f"'{i}'" for i in sorted(admin_ids)) if admin_ids else "'adm_owner_lyndon'"
+
+        # 1. Purge synthetic test events & admin visit events from site_usage_events
+        cursor.execute(f"""
             DELETE FROM site_usage_events
             WHERE user_email LIKE '%@example.com'
                OR user_email LIKE '%@test.com'
+               OR user_email LIKE '%@pytest.com'
                OR user_email LIKE 'test_%'
+               OR user_email LIKE '%ghost_user%'
+               OR LOWER(user_email) IN ({admin_emails_sql})
                OR user_id IN ('guest_web_user', 'test_user', 'testclient', 'test_admin')
                OR user_id LIKE 'test_%'
-               OR ticker IN ('TEST', 'APP', 'XYZ', 'SAMPLE')
+               OR user_id LIKE 'usr_test_%'
+               OR user_id IN ({admin_ids_sql})
+               OR user_id LIKE 'adm_%'
+               OR ticker IN ('TEST', 'APP', 'XYZ', 'SAMPLE', 'MOCK')
+               OR ticker LIKE 'TEST%'
+               OR ticker LIKE 'UNIT_TEST_%'
                OR browser LIKE '%testclient%'
-               OR browser LIKE '%pytest%';
+               OR browser LIKE '%pytest%'
+               OR browser LIKE '%python-requests%'
+               OR event_type LIKE 'UNIT_TEST_%'
+               OR event_type LIKE 'TEST_%'
+               OR event_type LIKE 'ADMIN_%'
+               OR landing_page LIKE '/admin%'
+               OR landing_page LIKE '%/admin%';
         """)
         purged_counts["events_purged"] = cursor.rowcount if cursor.rowcount and cursor.rowcount > 0 else 0
 
@@ -808,6 +1020,7 @@ def purge_test_telemetry() -> dict:
                 DELETE FROM support_tickets
                 WHERE user_email LIKE '%@example.com'
                    OR user_email LIKE '%@test.com'
+                   OR user_email LIKE '%@pytest.com'
                    OR user_email LIKE 'test_%'
                    OR ticket_id LIKE 'TKT-TEST-%'
                    OR subject LIKE '%[TEST]%';
@@ -824,6 +1037,7 @@ def purge_test_telemetry() -> dict:
                    OR customer_email LIKE '%@test.com'
                    OR customer_email LIKE '%@pytest.com'
                    OR user_id LIKE 'test_%'
+                   OR user_id LIKE 'usr_test_%'
                    OR user_id IN ('guest_web_user', 'test_user', 'testclient', 'test_admin')
                    OR gateway_order_id LIKE 'order_test_%'
                    OR gateway_order_id LIKE 'order_sim_%'
@@ -846,6 +1060,7 @@ def purge_test_telemetry() -> dict:
                    OR email LIKE '%@test.com'
                    OR email LIKE '%@pytest.com'
                    OR id LIKE 'test_%'
+                   OR id LIKE 'usr_test_%'
                    OR id IN ('guest_web_user', 'test_user', 'testclient', 'test_admin');
             """)
             purged_counts["users_purged"] = cursor.rowcount if cursor.rowcount and cursor.rowcount > 0 else 0
@@ -857,6 +1072,7 @@ def purge_test_telemetry() -> dict:
             cursor.execute("""
                 DELETE FROM credit_usage_ledger
                 WHERE user_id LIKE 'test_%'
+                   OR user_id LIKE 'usr_test_%'
                    OR user_id IN ('guest_web_user', 'test_user', 'testclient', 'test_admin');
             """)
             purged_counts["ledger_purged"] = cursor.rowcount if cursor.rowcount and cursor.rowcount > 0 else 0

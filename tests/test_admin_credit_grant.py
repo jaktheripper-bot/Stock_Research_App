@@ -137,9 +137,10 @@ class TestAdminCreditGrant(unittest.TestCase):
     def test_admin_grant_validation_rejections(self):
         """Verify invalid user identifier or invalid credit amounts are cleanly rejected."""
         # Non-existent user
+        ghost_email = f"ghost_user_{uuid.uuid4().hex[:8]}@example.com"
         res_nonexistent = admin_grant_user_credits(
             admin_email=self.admin_email,
-            target_user_identifier="non_existent_ghost_user@example.com",
+            target_user_identifier=ghost_email,
             credits_amount=2.0
         )
         self.assertFalse(res_nonexistent.get("success"))

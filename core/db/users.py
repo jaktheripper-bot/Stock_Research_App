@@ -428,9 +428,9 @@ def get_all_billables(status: Optional[str] = None, limit: int = 100, offset: in
             where_conditions.append(f"t.status = {p}")
             params.append(status.lower())
         if exclude_tests:
-            where_conditions.append("(t.customer_email IS NULL OR (t.customer_email NOT LIKE '%@example.com' AND t.customer_email NOT LIKE '%@test.com' AND t.customer_email NOT LIKE '%@pytest.com'))")
-            where_conditions.append("(t.user_id NOT LIKE 'test_%' AND t.user_id NOT IN ('guest_web_user', 'testclient', 'test_admin', 'test_user'))")
-            where_conditions.append("(t.gateway_order_id IS NULL OR (t.gateway_order_id NOT LIKE 'order_test_%' AND t.gateway_order_id NOT LIKE 'order_sim_%'))")
+            where_conditions.append("(t.customer_email IS NULL OR (t.customer_email NOT LIKE '%@example.com' AND t.customer_email NOT LIKE '%@test.com' AND t.customer_email NOT LIKE '%@pytest.com' AND t.customer_email NOT LIKE 'test_%'))")
+            where_conditions.append("(t.user_id NOT LIKE 'test_%' AND t.user_id NOT LIKE 'usr_test_%' AND t.user_id NOT IN ('guest_web_user', 'testclient', 'test_admin', 'test_user'))")
+            where_conditions.append("(t.gateway_order_id IS NULL OR (t.gateway_order_id NOT LIKE 'order_test_%' AND t.gateway_order_id NOT LIKE 'order_sim_%' AND t.gateway_order_id NOT LIKE 'test_%'))")
             where_conditions.append("(t.gateway_payment_id IS NULL OR (t.gateway_payment_id NOT LIKE 'pay_test_%' AND t.gateway_payment_id NOT LIKE 'pay_sim_%'))")
             where_conditions.append("t.payment_gateway != 'simulation'")
 
@@ -551,7 +551,33 @@ def get_revenue_analytics_summary(days: int = None, start_date = None, end_date 
         time_filter = _build_telemetry_time_filter(supabase_url, days=days, start_date=start_date, end_date=end_date, exclude_tests=False)
         time_filter_tx = time_filter.replace("timestamp", "created_at")
         if exclude_tests:
-            time_filter_tx += " AND (customer_email IS NULL OR (customer_email NOT LIKE '%@example.com' AND customer_email NOT LIKE '%@test.com' AND customer_email NOT LIKE '%@pytest.com')) AND (user_id IS NULL OR (user_id NOT LIKE 'test_%' AND user_id NOT IN ('guest_web_user', 'testclient', 'test_admin', 'test_user'))) AND (gateway_order_id IS NULL OR (gateway_order_id NOT LIKE 'order_test_%' AND gateway_order_id NOT LIKE 'order_sim_%')) AND (gateway_payment_id IS NULL OR (gateway_payment_id NOT LIKE 'pay_test_%' AND gateway_payment_id NOT LIKE 'pay_sim_%')) AND payment_gateway != 'simulation'"
+            from core.db.telemetry import get_admin_emails
+            admin_emails = get_admin_emails()
+            admin_emails_sql = ", ".join(f"'{e}'" for e in sorted(admin_emails)) if admin_emails else "'lyndnpnto@gmail.com'"
+            time_filter_tx += (
+                f" AND (customer_email IS NULL OR ("
+                f"     customer_email NOT LIKE '%@example.com'"
+                f" AND customer_email NOT LIKE '%@test.com'"
+                f" AND customer_email NOT LIKE '%@pytest.com'"
+                f" AND customer_email NOT LIKE 'test_%'"
+                f" AND LOWER(customer_email) NOT IN ({admin_emails_sql})"
+                f"))"
+                f" AND (user_id IS NULL OR ("
+                f"     user_id NOT LIKE 'test_%'"
+                f" AND user_id NOT LIKE 'usr_test_%'"
+                f" AND user_id NOT IN ('guest_web_user', 'testclient', 'test_admin', 'test_user', 'admin', 'adm_owner_lyndon')"
+                f"))"
+                f" AND (gateway_order_id IS NULL OR ("
+                f"     gateway_order_id NOT LIKE 'order_test_%'"
+                f" AND gateway_order_id NOT LIKE 'order_sim_%'"
+                f" AND gateway_order_id NOT LIKE 'test_%'"
+                f"))"
+                f" AND (gateway_payment_id IS NULL OR ("
+                f"     gateway_payment_id NOT LIKE 'pay_test_%'"
+                f" AND gateway_payment_id NOT LIKE 'pay_sim_%'"
+                f"))"
+                f" AND payment_gateway != 'simulation'"
+            )
 
         # 1. Total paid revenue, GST, order count, and separate paid vs free token accounting
         cursor.execute(f"""
@@ -601,7 +627,24 @@ def get_revenue_analytics_summary(days: int = None, start_date = None, end_date 
 
         # 2. Credits in circulation across all users (unearned revenue liability)
         try:
-            cursor.execute("SELECT SUM(credits_balance), COUNT(CASE WHEN subscription_tier IN ('pro_monthly', 'pro_annual') THEN 1 END) FROM user_accounts;")
+            user_where = ""
+            if exclude_tests:
+                from core.db.telemetry import get_admin_emails
+                admin_emails = get_admin_emails()
+                admin_emails_sql = ", ".join(f"'{e}'" for e in sorted(admin_emails)) if admin_emails else "'lyndnpnto@gmail.com'"
+                user_where = (
+                    f"WHERE email NOT LIKE '%@example.com' "
+                    f"  AND email NOT LIKE '%@test.com' "
+                    f"  AND email NOT LIKE '%@pytest.com' "
+                    f"  AND email NOT LIKE 'test_%' "
+                    f"  AND email NOT LIKE 'admin@%' "
+                    f"  AND id NOT LIKE 'test_%' "
+                    f"  AND id NOT LIKE 'usr_test_%' "
+                    f"  AND id NOT LIKE 'adm_%' "
+                    f"  AND id NOT IN ('guest_web_user', 'test_user', 'testclient', 'test_admin', 'admin', 'adm_owner_lyndon') "
+                    f"  AND LOWER(email) NOT IN ({admin_emails_sql})"
+                )
+            cursor.execute(f"SELECT SUM(credits_balance), COUNT(CASE WHEN subscription_tier IN ('pro_monthly', 'pro_annual') THEN 1 END) FROM user_accounts {user_where};")
             c_row = cursor.fetchone()
             if c_row:
                 summary["credits_in_circulation"] = float(c_row[0] or 0.0)
