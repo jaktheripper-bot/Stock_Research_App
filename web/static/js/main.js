@@ -3,6 +3,23 @@
  * Autocomplete, Instant Lookup, Razorpay Checkout Modal, and Report Synthesis
  */
 
+// Immediate OAuth Fragment Interceptor (captures #access_token=... if Supabase redirects to root or any page)
+(function checkOAuthFragment() {
+  if (window.location.hash && window.location.hash.includes('access_token=')) {
+    try {
+      const hashParams = new URLSearchParams(window.location.hash.substring(1));
+      const accessToken = hashParams.get('access_token');
+      if (accessToken) {
+        const isAdmin = window.location.pathname.startsWith('/admin');
+        const callbackUrl = isAdmin ? '/admin/auth/callback' : '/auth/callback';
+        window.location.href = callbackUrl + '?access_token=' + encodeURIComponent(accessToken);
+      }
+    } catch (e) {
+      console.error('Error handling OAuth fragment:', e);
+    }
+  }
+})();
+
 document.addEventListener('DOMContentLoaded', () => {
   initSearchAutocomplete();
   initCheckoutModals();

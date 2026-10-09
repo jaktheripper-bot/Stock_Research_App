@@ -207,3 +207,14 @@ By treating the brand name as a highly engineered neuro-linguistic asset rather 
 > 71. Indus Valley Annual Report 2025 | PDF | Business Cycle \- Scribd, [https\://www\.scribd.com/document/831409624/1740217308339](https://www.scribd.com/document/831409624/1740217308339)  
 > 72. Young Researchers 2023-24 \- MES Garware College of Commerce, [https\://gcc.mespune.in/wp-content/uploads/2024/02/National-research-competition.pdf](https://gcc.mespune.in/wp-content/uploads/2024/02/National-research-competition.pdf)  
 > 73. global information and business strategies \- gitarattan, [https\://gitarattan.edu.in/Conference\_Proceedings\_2019/PDF.pdf](https://gitarattan.edu.in/Conference_Proceedings_2019/PDF.pdf)
+
+---
+
+## **Appendix: Selected Brand Resolution — Anvik**
+
+* **Brand Name:** **Anvik** (`/an-vik/`)
+* **Linguistic Root:** Truncation of **Anvikshiki** (The ancient Indian science of systematic inquiry, logic, and rigorous audit).
+* **Strategic Fit:** Directly aligns with the platform's core identity as a forensic tool rather than an advisory broker. It speaks specifically to the "Forensic Sceptic" archetype who requires algorithmic extraction of regulatory filings to avoid governance traps.
+* **Phonosemantics:** Utilizes the front vowel `/ɪ/` to signal analytical speed and precision, terminating in a hard velar plosive (`'k'`). This triggers the **"K-effect,"** which psycholinguistic research confirms yields significantly higher rates of brand memory and cognitive recognition.
+* **IP / Domain Status:** Highly distinct neologism. Short, modern, and punchy enough for a `.io`, `.ai`, or `.in` extension without trademark collision.
+* **UI Tooltip & Footer Spec:** *"Anvik (from Anvikshiki): The systematic application of logic and inquiry to uncover fundamental reality."*

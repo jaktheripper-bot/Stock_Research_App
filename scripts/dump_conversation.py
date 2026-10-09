@@ -162,7 +162,10 @@ def update_index(backup_dir: str):
         fp.write("\n".join(content))
 
 def main():
-    conv_id = "01b2b15b-59cf-41b5-848c-8b94e11b6aec"
+    conv_id = sys.argv[1] if len(sys.argv) > 1 else "b8438222-9ca8-4687-a897-0574a408db2e"
+    session_tag = sys.argv[2] if len(sys.argv) > 2 else "anvik_brand_and_api_architecture"
+    session_title = sys.argv[3] if len(sys.argv) > 3 else "Anvik Brand Definition & API Architecture"
+    
     app_data_dir = os.path.expanduser("~/.gemini/antigravity-ide")
     transcript_path = os.path.join(app_data_dir, "brain", conv_id, ".system_generated", "logs", "transcript.jsonl")
 
@@ -174,7 +177,7 @@ def main():
     date_str = datetime.now(IST).strftime("%Y%m%d")
     time_str = datetime.now(IST).strftime("%H%M%S")
 
-    md_filename = f"session_{date_str}_{time_str}_nifty50_sync_and_mf_research.md"
+    md_filename = f"session_{date_str}_{time_str}_{session_tag}.md"
     jsonl_filename = f"session_{date_str}_{time_str}_raw_transcript.jsonl"
 
     md_path = os.path.join(BACKUP_CONV_DIR, md_filename)
@@ -186,7 +189,7 @@ def main():
 
     # 2. Generate formatted Markdown
     turns = parse_transcript(transcript_path)
-    md_content = generate_markdown(turns, conv_id, f"{date_str} (Nifty 50 Rollout & MF Research)")
+    md_content = generate_markdown(turns, conv_id, f"{date_str} ({session_title})")
     with open(md_path, "w", encoding="utf-8") as fp:
         fp.write(md_content)
 
