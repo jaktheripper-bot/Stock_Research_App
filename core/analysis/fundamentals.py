@@ -153,8 +153,8 @@ def resolve_pe_with_failsafes(ticker: str, scrip: str = "") -> str:
             b_pe = str(rep["baseline_pe"]).strip()
             if b_pe and b_pe not in ["", "N/A", "-", "None", "0"]:
                 return b_pe
-    except Exception:
-        pass
+    except Exception as err:
+        logger.debug(f"Baseline PE lookup notice for {clean}: {err}")
 
     # Tier 1: BSE ComHeader Direct (Fast official API, 1.5s timeout)
     if scrip and str(scrip).isdigit():
@@ -299,8 +299,8 @@ def get_stock_fundamentals(query: str) -> dict:
                     rep = get_report_by_ticker_sync(canonical)
                     if rep and rep.get("baseline_pe"):
                         pe = str(rep["baseline_pe"]).strip()
-                except Exception:
-                    pass
+                except Exception as err:
+                    logger.debug(f"Fast gateway baseline PE lookup notice: {err}")
 
                 res_dict = {
                     "ticker": canonical or clean,

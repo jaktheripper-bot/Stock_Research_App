@@ -283,7 +283,7 @@ def tool_scan_prohibited_terms() -> Dict[str, Any]:
 
 
 def tool_scan_code_hygiene() -> Dict[str, Any]:
-    """Scans Python codebase for hardcoded score anti-patterns, silent exception swallowing, and secrets."""
+    """Scans codebase for hardcoded score anti-patterns, silent exception swallowing, and frontend inline quote injection bugs."""
     core_dir = PROJECT_ROOT / "core"
     web_dir = PROJECT_ROOT / "web"
 
@@ -293,13 +293,19 @@ def tool_scan_code_hygiene() -> Dict[str, Any]:
         (r"except:\s*pass\b", "Bare except silent pass anti-pattern"),
     ]
 
+    frontend_anti_patterns = [
+        (r'onclick=[\"\'][^\"\']*?\$\{JSON\.stringify', "Dangerous unescaped JSON.stringify inside inline HTML onclick attribute"),
+    ]
+
     findings = []
+    scanned_python_files = 0
     scanned_files = 0
 
     for search_dir in [core_dir, web_dir]:
         for root, _, files in os.walk(search_dir):
             for f in files:
                 if f.endswith(".py"):
+                    scanned_python_files += 1
                     scanned_files += 1
                     fpath = Path(root) / f
                     try:
@@ -316,9 +322,27 @@ def tool_scan_code_hygiene() -> Dict[str, Any]:
                                 })
                     except Exception as e:
                         logger.warning(f"Error scanning {fpath}: {e}")
+                elif f.endswith((".js", ".html")):
+                    scanned_files += 1
+                    fpath = Path(root) / f
+                    try:
+                        content = fpath.read_text(encoding="utf-8")
+                        for pat, desc in frontend_anti_patterns:
+                            matches = list(re.finditer(pat, content))
+                            for m in matches:
+                                line_no = content[:m.start()].count("\n") + 1
+                                findings.append({
+                                    "file": str(fpath.relative_to(PROJECT_ROOT)),
+                                    "line": line_no,
+                                    "matched_text": m.group(0),
+                                    "anti_pattern": desc
+                                })
+                    except Exception as e:
+                        logger.warning(f"Error scanning {fpath}: {e}")
 
     return {
-        "scanned_python_files": scanned_files,
+        "scanned_python_files": scanned_python_files,
+        "scanned_files": scanned_files,
         "anti_patterns_count": len(findings),
         "is_clean": len(findings) == 0,
         "findings": findings

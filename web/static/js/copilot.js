@@ -324,9 +324,9 @@ function renderIntroWelcomeCard(cfg, ticker, sectionLabel) {
         html += `<div class="copilot-intro-features">`;
         cfg.features.forEach(f => {
             html += `
-                <div class="copilot-intro-feature-item" onclick="sendQuickPrompt(${JSON.stringify(f.prompt)})">
-                    <span style="font-size: 1.1rem;">${f.icon}</span>
-                    <div>
+                <div class="copilot-intro-feature-item" data-copilot-prompt="${encodeURIComponent(f.prompt)}" role="button" tabindex="0">
+                    <span style="font-size: 1.1rem; pointer-events: none;">${f.icon}</span>
+                    <div style="pointer-events: none;">
                         <div style="font-weight: 700; color: #f8fafc;">${f.title}</div>
                         <div style="color: #94a3b8; font-size: 0.74rem;">${f.desc}</div>
                     </div>
@@ -396,7 +396,7 @@ function openCopilot(ticker, assetType, section, sectionLabel, initialPrompt) {
         }
 
         chipsContainer.innerHTML = chipsToRender.map(chip => `
-            <button onclick="sendQuickPrompt(${JSON.stringify(chip.prompt)})" class="copilot-chip-btn">
+            <button type="button" class="copilot-chip-btn" data-copilot-prompt="${encodeURIComponent(chip.prompt)}">
                 ${chip.label}
             </button>
         `).join("");
@@ -487,6 +487,7 @@ function handleCopilotKeydown(event) {
 }
 
 function sendQuickPrompt(promptText) {
+    if (!promptText) return;
     const input = document.getElementById("copilotInput");
     if (input) {
         input.value = promptText;
@@ -496,7 +497,7 @@ function sendQuickPrompt(promptText) {
 }
 
 function copyCopilotTurn(btn, contentText) {
-    if (!navigator.clipboard) return;
+    if (!navigator.clipboard || !contentText) return;
     navigator.clipboard.writeText(contentText).then(() => {
         const origText = btn.innerHTML;
         btn.innerHTML = `✓ Copied`;
@@ -585,7 +586,7 @@ async function submitCopilotMessage() {
         const agentTurn = document.createElement("div");
         agentTurn.className = "copilot-turn copilot-turn-agent";
         
-        // Escape raw text for safe passing into copy handler
+        // Escape raw text for safe passing into copy handler via data attribute
         const encodedRaw = encodeURIComponent(agentText);
 
         agentTurn.innerHTML = `
@@ -595,7 +596,7 @@ async function submitCopilotMessage() {
                         <svg class="glyph" style="width: 12px; height: 12px;"><use href="#glyph-shield"></use></svg>
                         <span>Forensic AI Copilot</span>
                     </div>
-                    <button class="copilot-copy-btn" onclick="copyCopilotTurn(this, decodeURIComponent('${encodedRaw}'))" title="Copy analysis to clipboard">
+                    <button type="button" class="copilot-copy-btn" data-copilot-copy="${encodedRaw}" title="Copy analysis to clipboard">
                         📋 Copy
                     </button>
                 </div>
@@ -626,6 +627,47 @@ async function submitCopilotMessage() {
     }
 }
 
+// Delegated click listener for all interactive Copilot prompts & copy buttons
+document.addEventListener("click", function(e) {
+    // 1. Quick Prompt triggers (intro feature cards & chip buttons)
+    const promptTrigger = e.target.closest("[data-copilot-prompt]");
+    if (promptTrigger) {
+        e.preventDefault();
+        e.stopPropagation();
+        const rawPrompt = promptTrigger.getAttribute("data-copilot-prompt");
+        if (rawPrompt) {
+            sendQuickPrompt(decodeURIComponent(rawPrompt));
+        }
+        return;
+    }
+
+    // 2. Copy turn button
+    const copyBtn = e.target.closest("[data-copilot-copy]");
+    if (copyBtn) {
+        e.preventDefault();
+        e.stopPropagation();
+        const rawCopy = copyBtn.getAttribute("data-copilot-copy");
+        if (rawCopy) {
+            copyCopilotTurn(copyBtn, decodeURIComponent(rawCopy));
+        }
+        return;
+    }
+});
+
+// Accessible keyboard navigation (Enter/Space on feature cards)
+document.addEventListener("keydown", function(e) {
+    if (e.key === "Enter" || e.key === " ") {
+        const promptTrigger = e.target.closest(".copilot-intro-feature-item[data-copilot-prompt]");
+        if (promptTrigger && document.activeElement === promptTrigger) {
+            e.preventDefault();
+            const rawPrompt = promptTrigger.getAttribute("data-copilot-prompt");
+            if (rawPrompt) {
+                sendQuickPrompt(decodeURIComponent(rawPrompt));
+            }
+        }
+    }
+});
+
 // Global escape key listener to smoothly close copilot
 document.addEventListener("keydown", function(e) {
     if (e.key === "Escape") {
@@ -646,3 +688,4 @@ window.handleCopilotKeydown = handleCopilotKeydown;
 window.sendQuickPrompt = sendQuickPrompt;
 window.copyCopilotTurn = copyCopilotTurn;
 window.submitCopilotMessage = submitCopilotMessage;
+

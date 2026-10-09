@@ -760,12 +760,46 @@
         <div>
           Welcome to the <strong>Forensic Copilot</strong>. I can assist in stress-testing your investment thesis on <strong>the selected security</strong>, deriving implied growth rates via Reverse DCF, or running a <strong>Pre-Mortem Inversion analysis</strong>.
         </div>
+        <div class="copilot-intro-features">
+          <div class="copilot-intro-feature-item" data-copilot-prompt="Run%20Pre-Mortem%20Inversion%20analysis%20on%20this%20stock%3A%20what%20failure%20modes%20could%20destroy%20shareholder%20value%3F" role="button" tabindex="0">
+            <span style="font-size: 1.1rem; pointer-events: none;">💀</span>
+            <div style="pointer-events: none;">
+              <div style="font-weight: 700; color: #f8fafc;">Pre-Mortem Inversion</div>
+              <div style="color: #94a3b8; font-size: 0.74rem;">Expose failure modes & thesis destruction risks</div>
+            </div>
+          </div>
+          <div class="copilot-intro-feature-item" data-copilot-prompt="What%20implied%20growth%20rate%20is%20priced%20into%20current%20CMP%20based%20on%20Reverse%20DCF%3F" role="button" tabindex="0">
+            <span style="font-size: 1.1rem; pointer-events: none;">📉</span>
+            <div style="pointer-events: none;">
+              <div style="font-weight: 700; color: #f8fafc;">Reverse DCF Growth</div>
+              <div style="color: #94a3b8; font-size: 0.74rem;">Deconstruct implied growth priced into current CMP</div>
+            </div>
+          </div>
+          <div class="copilot-intro-feature-item" data-copilot-prompt="Are%20there%20any%20promoter%20pledging%20or%20corporate%20governance%20red%20flags%20in%20recent%20disclosures%3F" role="button" tabindex="0">
+            <span style="font-size: 1.1rem; pointer-events: none;">🚩</span>
+            <div style="pointer-events: none;">
+              <div style="font-weight: 700; color: #f8fafc;">Governance Forensic</div>
+              <div style="color: #94a3b8; font-size: 0.74rem;">Audit promoter pledging & related-party transactions</div>
+            </div>
+          </div>
+        </div>
       </div>
     </div>
 
     <!-- Quick Prompt Chips -->
     <div id="copilotQuickChips" class="copilot-chips-wrap">
-      <!-- Dynamically populated per asset class & focused section -->
+      <button type="button" class="copilot-chip-btn" data-copilot-prompt="Run%20Pre-Mortem%20Inversion%20analysis%20on%20this%20stock%3A%20what%20failure%20modes%20could%20destroy%20shareholder%20value%3F">
+        💀 Pre-Mortem Inversion
+      </button>
+      <button type="button" class="copilot-chip-btn" data-copilot-prompt="What%20implied%20growth%20rate%20is%20priced%20into%20current%20CMP%20based%20on%20Reverse%20DCF%3F">
+        📉 Reverse DCF Implied Growth
+      </button>
+      <button type="button" class="copilot-chip-btn" data-copilot-prompt="Are%20there%20any%20promoter%20pledging%20or%20corporate%20governance%20red%20flags%20in%20recent%20disclosures%3F">
+        🚩 Governance & Pledging Check
+      </button>
+      <button type="button" class="copilot-chip-btn" data-copilot-prompt="Evaluate%20balance%20sheet%20solvency%2C%20Altman%20Z-Score%2C%20and%20leverage%20ratios%20for%20this%20company.">
+        🛡️ Balance Sheet Solvency
+      </button>
     </div>
 
     <!-- Input Bar -->
