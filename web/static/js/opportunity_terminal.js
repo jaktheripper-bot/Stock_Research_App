@@ -181,16 +181,16 @@ function renderBentoCards(items) {
           <!-- Header Bar -->
           <div style="display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 12px;">
             <div style="display: flex; gap: 6px; flex-wrap: wrap; align-items: center;">
-              <span style="font-size: 11px; font-weight: 700; padding: 2px 8px; border-radius: 4px; background: rgba(255, 255, 255, 0.08); color: ${seniorBadgeColor}; border: 1px solid ${seniorBadgeColor}40;">
+              <span style="font-size: 12px; font-weight: 700; padding: 3px 9px; border-radius: 4px; background: rgba(255, 255, 255, 0.08); color: ${seniorBadgeColor}; border: 1px solid ${seniorBadgeColor}40;">
                 ${item.seniority_tier.replace('_', ' ')}
               </span>
-              <span style="font-size: 11px; font-weight: 700; padding: 2px 8px; border-radius: 4px; background: rgba(255, 255, 255, 0.05); color: #cbd5e1;">
+              <span style="font-size: 12px; font-weight: 700; padding: 3px 9px; border-radius: 4px; background: rgba(255, 255, 255, 0.05); color: #cbd5e1;">
                 ${item.credit_rating || 'RATED'}
               </span>
             </div>
 
             <!-- Pin Button -->
-            <button onclick="togglePin('${item.id}')" title="Pin to Cross-Asset Arbitrage Docket" style="background: ${isPinned ? 'rgba(14, 165, 233, 0.3)' : 'rgba(255, 255, 255, 0.08)'}; border: 1px solid ${isPinned ? '#0ea5e9' : 'rgba(255, 255, 255, 0.15)'}; border-radius: 6px; color: ${isPinned ? '#38bdf8' : '#94a3b8'}; padding: 4px 8px; font-size: 12px; cursor: pointer; display: flex; align-items: center; gap: 4px;">
+            <button onclick="togglePin('${item.id}')" title="Pin to Cross-Asset Arbitrage Docket" style="background: ${isPinned ? 'rgba(14, 165, 233, 0.3)' : 'rgba(255, 255, 255, 0.08)'}; border: 1px solid ${isPinned ? '#0ea5e9' : 'rgba(255, 255, 255, 0.15)'}; border-radius: 6px; color: ${isPinned ? '#38bdf8' : '#94a3b8'}; padding: 5px 10px; font-size: 12.5px; cursor: pointer; display: flex; align-items: center; gap: 4px;">
               <span>${isPinned ? '📌 Pinned' : '➕ Pin'}</span>
             </button>
           </div>
@@ -198,27 +198,27 @@ function renderBentoCards(items) {
           <!-- Title -->
           <div style="margin-bottom: 14px;">
             <div style="font-size: 18px; font-weight: 800; color: #f8fafc; letter-spacing: -0.01em;">${item.symbol}</div>
-            <div style="font-size: 12.5px; color: #94a3b8; line-height: 1.4; margin-top: 2px; min-height: 34px;">${item.name}</div>
+            <div style="font-size: 13.5px; color: #94a3b8; line-height: 1.4; margin-top: 2px; min-height: 34px;">${item.name}</div>
           </div>
 
           <!-- Yield Highlights Grid -->
           <div style="display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 8px; background: rgba(15, 23, 42, 0.6); padding: 10px 12px; border-radius: 8px; margin-bottom: 14px; text-align: center;">
             <div>
-              <div style="font-size: 10.5px; color: #64748b; text-transform: uppercase;">Gross YTM</div>
+              <div style="font-size: 12px; font-weight: 600; color: #64748b; text-transform: uppercase;">Gross YTM</div>
               <div style="font-size: 16px; font-weight: 800; color: #38bdf8;" class="tnum">${item.gross_yield_pct}%</div>
             </div>
             <div>
-              <div style="font-size: 10.5px; color: #64748b; text-transform: uppercase;">Net (Post-Tax)</div>
+              <div style="font-size: 12px; font-weight: 600; color: #64748b; text-transform: uppercase;">Net (Post-Tax)</div>
               <div style="font-size: 16px; font-weight: 800; color: #10b981;" class="tnum">${item.net_yield_pct}%</div>
             </div>
             <div>
-              <div style="font-size: 10.5px; color: #64748b; text-transform: uppercase;">10Y Spread</div>
+              <div style="font-size: 12px; font-weight: 600; color: #64748b; text-transform: uppercase;">10Y Spread</div>
               <div style="font-size: 16px; font-weight: 800; color: ${item.spread_vs_10y_gsec_bps >= 0 ? '#f59e0b' : '#ef4444'};" class="tnum">${item.spread_vs_10y_gsec_bps >= 0 ? '+' : ''}${item.spread_vs_10y_gsec_bps} bps</div>
             </div>
           </div>
 
           <!-- In-Cell SVG Yield Waterfall Sparkbar -->
-          <div style="background: rgba(15, 23, 42, 0.4); border-radius: 8px; padding: 10px 12px; margin-bottom: 14px; font-size: 11.5px;">
+          <div style="background: rgba(15, 23, 42, 0.4); border-radius: 8px; padding: 10px 12px; margin-bottom: 14px; font-size: 13px;">
             <div style="display: flex; justify-content: space-between; margin-bottom: 4px; color: #94a3b8;">
               <span>Gross Nominal: <strong style="color: #38bdf8;">${item.gross_yield_pct}%</strong></span>
               <span>Net in Hand: <strong style="color: #10b981;">${item.net_yield_pct}%</strong></span>
@@ -230,14 +230,14 @@ function renderBentoCards(items) {
             <div style="width: 100%; height: 6px; background: rgba(255, 255, 255, 0.08); border-radius: 3px; overflow: hidden; margin-bottom: 6px; display: flex;">
               <div style="width: ${netWidth}%; background: linear-gradient(90deg, #10b981, #34d399);"></div>
             </div>
-            <div style="display: flex; justify-content: space-between; font-size: 11px; color: #64748b;">
+            <div style="display: flex; justify-content: space-between; font-size: 12px; color: #64748b;">
               <span>Real Alpha (Net - ${currentInflation}% CPI):</span>
               <span style="font-weight: 700; color: ${realAlpha >= 0 ? '#34d399' : '#f87171'};" class="tnum">${realAlpha >= 0 ? '+' : ''}${realAlpha}%</span>
             </div>
           </div>
 
           <!-- Micro Details -->
-          <div style="font-size: 11.5px; color: #94a3b8; margin-bottom: 16px; line-height: 1.5;">
+          <div style="font-size: 13px; color: #94a3b8; margin-bottom: 16px; line-height: 1.5;">
             <div style="display: flex; justify-content: space-between; margin-bottom: 4px;">
               <span style="color: #64748b;">Min Ticket:</span>
               <span style="font-weight: 600; color: #cbd5e1;">₹${Number(item.min_ticket_inr).toLocaleString('en-IN')}</span>
@@ -255,10 +255,10 @@ function renderBentoCards(items) {
 
         <!-- Action Controls -->
         <div style="display: flex; gap: 8px;">
-          <a href="${item.detail_url}" class="btn btn-secondary btn-sm" style="flex: 1; text-align: center; font-size: 12px; font-weight: 600; padding: 7px;">
+          <a href="${item.detail_url}" class="btn btn-secondary btn-sm" style="flex: 1; text-align: center; font-size: 13px; font-weight: 600; padding: 8px 12px;">
             Dossier &rarr;
           </a>
-          <button onclick="openCopilot('${item.symbol || item.id}', '${item.asset_class === 'MF' ? 'mutual_fund' : (['BOND', 'SDI'].includes(item.asset_class) ? 'debt' : 'equity')}')" class="btn btn-sm" style="background: rgba(14, 165, 233, 0.15); color: #38bdf8; border: 1px solid rgba(14, 165, 233, 0.3); font-size: 12px; font-weight: 700; padding: 7px 12px; border-radius: 8px; cursor: pointer;" title="Launch Forensic Copilot">
+          <button onclick="openCopilot('${item.symbol || item.id}', '${item.asset_class === 'MF' ? 'mutual_fund' : (['BOND', 'SDI'].includes(item.asset_class) ? 'debt' : 'equity')}')" class="btn btn-sm" style="background: rgba(14, 165, 233, 0.15); color: #38bdf8; border: 1px solid rgba(14, 165, 233, 0.3); font-size: 13px; font-weight: 700; padding: 8px 12px; border-radius: 8px; cursor: pointer;" title="Launch Forensic Copilot">
             🛡️ Copilot
           </button>
         </div>
@@ -316,15 +316,15 @@ function renderHeatmap() {
             <td style="padding: 10px; text-align: center;">
               <div style="background: ${bgStyle}; border: 1px solid ${borderStyle}; border-radius: 8px; padding: 8px; position: relative; transition: transform 0.15s ease;">
                 <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 2px;">
-                  <span style="font-weight: 800; font-size: 12px; color: #f8fafc;">${cell.symbol}</span>
-                  <button onclick="togglePin('${cell.item_id}')" title="Pin to Docket" style="background: none; border: none; font-size: 11px; cursor: pointer; color: ${isPinned ? '#38bdf8' : '#64748b'};">
+                  <span style="font-weight: 800; font-size: 13px; color: #f8fafc;">${cell.symbol}</span>
+                  <button onclick="togglePin('${cell.item_id}')" title="Pin to Docket" style="background: none; border: none; font-size: 12px; cursor: pointer; color: ${isPinned ? '#38bdf8' : '#64748b'};">
                     ${isPinned ? '📌' : '➕'}
                   </button>
                 </div>
-                <div style="font-size: 14px; font-weight: 800; color: ${textStyle};" class="tnum">
+                <div style="font-size: 14.5px; font-weight: 800; color: ${textStyle};" class="tnum">
                   ${cell.gross_yield_pct}%
                 </div>
-                <div style="font-size: 11px; font-weight: 600; color: ${textStyle};" class="tnum">
+                <div style="font-size: 12px; font-weight: 600; color: ${textStyle};" class="tnum">
                   ${spread >= 0 ? '+' : ''}${spread} bps
                 </div>
               </div>
@@ -479,35 +479,35 @@ function renderDenseTable(items) {
     return `
       <tr style="border-bottom: 1px solid rgba(255, 255, 255, 0.05); transition: background 0.15s ease;">
         <td style="padding: 12px 14px;">
-          <div style="font-weight: 800; color: #f8fafc;">${item.symbol}</div>
-          <div style="font-size: 11px; color: #94a3b8; max-width: 240px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">${item.name}</div>
+          <div style="font-weight: 800; color: #f8fafc; font-size: 14.5px;">${item.symbol}</div>
+          <div style="font-size: 12.5px; color: #94a3b8; max-width: 240px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">${item.name}</div>
         </td>
-        <td style="padding: 12px 14px; font-size: 12px; color: #cbd5e1;">
+        <td style="padding: 12px 14px; font-size: 13px; color: #cbd5e1;">
           ${item.category_label}
         </td>
-        <td style="padding: 12px 14px; font-size: 11.5px;">
-          <span style="padding: 2px 8px; border-radius: 4px; background: rgba(255, 255, 255, 0.06); color: #cbd5e1;">${item.seniority_tier.replace('_', ' ')}</span>
+        <td style="padding: 12px 14px; font-size: 12.5px;">
+          <span style="padding: 3px 9px; border-radius: 4px; background: rgba(255, 255, 255, 0.06); color: #cbd5e1; font-weight: 600;">${item.seniority_tier.replace('_', ' ')}</span>
         </td>
-        <td style="padding: 12px 14px; text-align: right; font-weight: 700; color: #38bdf8;" class="tnum">
+        <td style="padding: 12px 14px; text-align: right; font-weight: 700; color: #38bdf8; font-size: 14px;" class="tnum">
           ${item.gross_yield_pct}%
         </td>
-        <td style="padding: 12px 14px; text-align: right; font-weight: 800; color: #10b981;" class="tnum">
+        <td style="padding: 12px 14px; text-align: right; font-weight: 800; color: #10b981; font-size: 14px;" class="tnum">
           ${item.net_yield_pct}%
         </td>
-        <td style="padding: 12px 14px; text-align: right; font-weight: 700; color: ${item.real_yield_pct >= 0 ? '#34d399' : '#f87171'};" class="tnum">
+        <td style="padding: 12px 14px; text-align: right; font-weight: 700; color: ${item.real_yield_pct >= 0 ? '#34d399' : '#f87171'}; font-size: 14px;" class="tnum">
           ${item.real_yield_pct >= 0 ? '+' : ''}${item.real_yield_pct}%
         </td>
-        <td style="padding: 12px 14px; text-align: right; font-weight: 600; color: #f59e0b;" class="tnum">
+        <td style="padding: 12px 14px; text-align: right; font-weight: 600; color: #f59e0b; font-size: 13.5px;" class="tnum">
           ${item.spread_vs_10y_gsec_bps >= 0 ? '+' : ''}${item.spread_vs_10y_gsec_bps} bps
         </td>
-        <td style="padding: 12px 14px; text-align: right; color: #cbd5e1;" class="tnum">
+        <td style="padding: 12px 14px; text-align: right; color: #cbd5e1; font-size: 13px;" class="tnum">
           ₹${Number(item.min_ticket_inr).toLocaleString('en-IN')}
         </td>
         <td style="padding: 12px 14px; text-align: center; white-space: nowrap;">
-          <button onclick="togglePin('${item.id}')" title="Pin to Arbitrage Docket" style="background: ${isPinned ? 'rgba(14, 165, 233, 0.3)' : 'rgba(255, 255, 255, 0.08)'}; border: 1px solid ${isPinned ? '#0ea5e9' : 'rgba(255, 255, 255, 0.15)'}; border-radius: 6px; color: ${isPinned ? '#38bdf8' : '#94a3b8'}; padding: 4px 8px; font-size: 11px; cursor: pointer; margin-right: 4px;">
+          <button onclick="togglePin('${item.id}')" title="Pin to Arbitrage Docket" style="background: ${isPinned ? 'rgba(14, 165, 233, 0.3)' : 'rgba(255, 255, 255, 0.08)'}; border: 1px solid ${isPinned ? '#0ea5e9' : 'rgba(255, 255, 255, 0.15)'}; border-radius: 6px; color: ${isPinned ? '#38bdf8' : '#94a3b8'}; padding: 5px 10px; font-size: 12px; cursor: pointer; margin-right: 4px;">
             ${isPinned ? '📌' : '➕ Pin'}
           </button>
-          <button onclick="openCopilot('${item.symbol || item.id}', '${item.asset_class === 'MF' ? 'mutual_fund' : (['BOND', 'SDI'].includes(item.asset_class) ? 'debt' : 'equity')}')" title="Launch Forensic Copilot" style="background: rgba(14, 165, 233, 0.15); border: 1px solid rgba(14, 165, 233, 0.3); border-radius: 6px; color: #38bdf8; padding: 4px 8px; font-size: 11px; cursor: pointer;">
+          <button onclick="openCopilot('${item.symbol || item.id}', '${item.asset_class === 'MF' ? 'mutual_fund' : (['BOND', 'SDI'].includes(item.asset_class) ? 'debt' : 'equity')}')" title="Launch Forensic Copilot" style="background: rgba(14, 165, 233, 0.15); border: 1px solid rgba(14, 165, 233, 0.3); border-radius: 6px; color: #38bdf8; padding: 5px 10px; font-size: 12px; cursor: pointer;">
             🛡️ Copilot
           </button>
         </td>
@@ -603,7 +603,7 @@ function updateDocketUI() {
     const sym = item ? item.symbol : id;
     const netY = item ? `${item.net_yield_pct}% Net` : '';
     return `
-      <div style="background: rgba(30, 41, 59, 0.9); border: 1px solid rgba(14, 165, 233, 0.3); border-radius: 9999px; padding: 2px 10px; display: inline-flex; align-items: center; gap: 6px; font-size: 11.5px; color: #f8fafc;">
+      <div style="background: rgba(30, 41, 59, 0.9); border: 1px solid rgba(14, 165, 233, 0.3); border-radius: 9999px; padding: 4px 12px; display: inline-flex; align-items: center; gap: 6px; font-size: 12.5px; color: #f8fafc;">
         <span><strong>${sym}</strong> ${netY}</span>
         <button onclick="togglePin('${id}')" style="background: none; border: none; color: #94a3b8; font-size: 13px; cursor: pointer; padding: 0;">✕</button>
       </div>
@@ -665,7 +665,7 @@ function renderScorecardTable(items) {
       ${items.map(it => `
         <th style="padding: 12px; font-size: 15px; font-weight: 800; color: #f8fafc;">
           ${it.symbol}
-          <div style="font-size: 11px; font-weight: 400; color: #94a3b8;">${it.category_label}</div>
+          <div style="font-size: 12px; font-weight: 500; color: #94a3b8;">${it.category_label}</div>
         </th>
       `).join('')}
     </tr>

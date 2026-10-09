@@ -55,28 +55,28 @@
         <div class="kpi-card">
           <div class="kpi-label">Current Quote</div>
           <div class="kpi-val tnum">₹{{ current_price|default('N/A') }}</div>
-          <a href="https://www.bseindia.com/stock-share-price/-/-/{% if scrip_code and scrip_code != 'N/A' %}{{ scrip_code }}{% else %}500209{% endif %}/" target="_blank" rel="noopener noreferrer" style="font-size: 10px; color: var(--accent-cyan); text-decoration: underline; text-underline-offset: 2px; margin-top: 4px; display: inline-flex; align-items: center; gap: 3px;">
+          <a href="https://www.bseindia.com/stock-share-price/-/-/{% if scrip_code and scrip_code != 'N/A' %}{{ scrip_code }}{% else %}500209{% endif %}/" target="_blank" rel="noopener noreferrer" style="font-size: 12px; font-weight: 600; color: var(--accent-cyan); text-decoration: underline; text-underline-offset: 2px; margin-top: 4px; display: inline-flex; align-items: center; gap: 3px;">
             BSE Live Quote ↗
           </a>
         </div>
         <div class="kpi-card">
           <div class="kpi-label">Trailing P/E</div>
           <div class="kpi-val tnum">{{ pe_ratio|default('N/A') }}</div>
-          <a href="https://www.bseindia.com/corporates/Comp_Resultsnew.aspx?scrip_cd={% if scrip_code and scrip_code != 'N/A' %}{{ scrip_code }}{% else %}500209{% endif %}" target="_blank" rel="noopener noreferrer" style="font-size: 10px; color: var(--accent-cyan); text-decoration: underline; text-underline-offset: 2px; margin-top: 4px; display: inline-flex; align-items: center; gap: 3px;">
+          <a href="https://www.bseindia.com/corporates/Comp_Resultsnew.aspx?scrip_cd={% if scrip_code and scrip_code != 'N/A' %}{{ scrip_code }}{% else %}500209{% endif %}" target="_blank" rel="noopener noreferrer" style="font-size: 12px; font-weight: 600; color: var(--accent-cyan); text-decoration: underline; text-underline-offset: 2px; margin-top: 4px; display: inline-flex; align-items: center; gap: 3px;">
             BSE Results Filing ↗
           </a>
         </div>
         <div class="kpi-card">
           <div class="kpi-label">Market Capitalization</div>
           <div class="kpi-val tnum">{{ market_cap_str|default('N/A') }}</div>
-          <a href="https://www.bseindia.com/stock-share-price/-/-/{% if scrip_code and scrip_code != 'N/A' %}{{ scrip_code }}{% else %}500209{% endif %}/" target="_blank" rel="noopener noreferrer" style="font-size: 10px; color: var(--accent-cyan); text-decoration: underline; text-underline-offset: 2px; margin-top: 4px; display: inline-flex; align-items: center; gap: 3px;">
+          <a href="https://www.bseindia.com/stock-share-price/-/-/{% if scrip_code and scrip_code != 'N/A' %}{{ scrip_code }}{% else %}500209{% endif %}/" target="_blank" rel="noopener noreferrer" style="font-size: 12px; font-weight: 600; color: var(--accent-cyan); text-decoration: underline; text-underline-offset: 2px; margin-top: 4px; display: inline-flex; align-items: center; gap: 3px;">
             BSE Capital Float ↗
           </a>
         </div>
         <div class="kpi-card">
           <div class="kpi-label">BSE Scrip Code</div>
           <div class="kpi-val tnum">{{ scrip_code|default('N/A') }}</div>
-          <a href="https://www.bseindia.com/stock-share-price/-/-/{% if scrip_code and scrip_code != 'N/A' %}{{ scrip_code }}{% else %}500209{% endif %}/" target="_blank" rel="noopener noreferrer" style="font-size: 10px; color: var(--accent-cyan); text-decoration: underline; text-underline-offset: 2px; margin-top: 4px; display: inline-flex; align-items: center; gap: 3px;">
+          <a href="https://www.bseindia.com/stock-share-price/-/-/{% if scrip_code and scrip_code != 'N/A' %}{{ scrip_code }}{% else %}500209{% endif %}/" target="_blank" rel="noopener noreferrer" style="font-size: 12px; font-weight: 600; color: var(--accent-cyan); text-decoration: underline; text-underline-offset: 2px; margin-top: 4px; display: inline-flex; align-items: center; gap: 3px;">
             BSE Scrip Profile ↗
           </a>
         </div>
@@ -218,7 +218,7 @@
 
       <!-- Drift Corridor Visual Band -->
       <div style="background: rgba(30, 41, 59, 0.5); border-radius: 8px; padding: 16px; margin-bottom: 14px;">
-        <div style="display: flex; justify-content: space-between; align-items: center; font-size: 12px; color: var(--text-muted); margin-bottom: 8px;">
+        <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 8px; font-size: 13px; color: var(--text-muted); margin-bottom: 8px;">
           <span>Corridor Floor: <strong style="color: #cbd5e1;" class="tnum">₹{{ pead_data.lower_bound }}</strong></span>
           <span>Current Base: <strong style="color: #38bdf8;" class="tnum">₹{{ pead_data.current_price }}</strong></span>
           <span>Projected Drift Target: <strong style="{% if pead_data.status == 'bullish' %}color: #34d399;{% else %}color: #fb7185;{% endif %}" class="tnum">₹{{ pead_data.target_drift }}</strong></span>

@@ -327,8 +327,8 @@ function renderIntroWelcomeCard(cfg, ticker, sectionLabel) {
                 <div class="copilot-intro-feature-item" data-copilot-prompt="${encodeURIComponent(f.prompt)}" role="button" tabindex="0">
                     <span style="font-size: 1.1rem; pointer-events: none;">${f.icon}</span>
                     <div style="pointer-events: none;">
-                        <div style="font-weight: 700; color: #f8fafc;">${f.title}</div>
-                        <div style="color: #94a3b8; font-size: 0.74rem;">${f.desc}</div>
+                        <div style="font-weight: 700; color: #f8fafc; font-size: 0.90rem;">${f.title}</div>
+                        <div style="color: #94a3b8; font-size: 0.82rem; line-height: 1.4; margin-top: 2px;">${f.desc}</div>
                     </div>
                 </div>
             `;
