@@ -20,6 +20,7 @@ import csv
 import io
 import hmac
 import hashlib
+import requests
 from datetime import datetime, timezone, timedelta
 from typing import Optional, List, Dict, Any
 
