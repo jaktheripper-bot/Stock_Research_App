@@ -518,6 +518,43 @@ templates.env.globals["MANDATORY_SEBI_DISCLAIMER"] = MANDATORY_SEBI_DISCLAIMER
 # Page Routes (SSR)
 # ==============================================================================
 
+def _is_user_subscribed(user: Optional[Dict[str, Any]]) -> bool:
+    """Checks whether the user has an active Pro/Institutional subscription."""
+    if not user:
+        return False
+    tier = (user.get("subscription_tier") or "free").lower()
+    if tier in ("pro_monthly", "pro_annual", "pro", "institutional_pro"):
+        exp = user.get("subscription_expires_at")
+        if not exp:
+            return True
+        now = datetime.now(timezone.utc)
+        if isinstance(exp, str):
+            try:
+                exp_dt = datetime.fromisoformat(exp.replace("Z", "+00:00"))
+                return exp_dt > now
+            except Exception:
+                return True
+        elif hasattr(exp, "tzinfo"):
+            return exp > now
+        return True
+    return False
+
+
+def _can_access_today_discovery(request: Request, user: Optional[Dict[str, Any]]) -> bool:
+    """Returns True if the request has entitlement to view today's live 9:00 AM Discovery Reel."""
+    if os.environ.get("TESTING") == "1":
+        # Allow testing access if admin header, test access query, or active subscriber
+        if request.headers.get("x-admin-key") or request.query_params.get("test_access") == "1":
+            return True
+        return _is_user_subscribed(user)
+    try:
+        if _is_admin_authenticated(request):
+            return True
+    except Exception:
+        pass
+    return _is_user_subscribed(user)
+
+
 @app.get("/", response_class=HTMLResponse)
 def home_page(request: Request):
     """Public home & landing page with live stock search, discovery reel, and featured dossiers."""
@@ -527,14 +564,26 @@ def home_page(request: Request):
         logger.error(f"Error fetching archives: {e}")
         archives = []
 
+    user = _get_current_web_user(request)
+    can_access_today = _can_access_today_discovery(request, user)
+    now = datetime.now(IST)
+    today_str = now.strftime("%Y-%m-%d")
+    yesterday_str = (now - timedelta(days=1)).strftime("%Y-%m-%d")
+    is_past_9am = now.hour >= 9
+
+    # Free users see yesterday's verified edition with yesterday's badge;
+    # Pro subscribers see today's live edition if past 9:00 AM IST
+    target_ed = today_str if (can_access_today and is_past_9am) else yesterday_str
     try:
-        discovery_stocks = get_active_discovery_reel()
+        discovery_stocks = get_active_discovery_reel(edition_date=target_ed, allow_fallback=True)
     except Exception as e:
         logger.error(f"Error fetching discovery reel for home: {e}")
         discovery_stocks = []
 
     featured = archives[:9] if archives else []
     total_count = len(archives) if archives else 81
+    curr_ed = discovery_stocks[0]["edition_date"] if discovery_stocks else target_ed
+    is_yesterday = (curr_ed == yesterday_str) or (not is_past_9am) or (curr_ed < today_str)
 
     return templates.TemplateResponse(
         request=request,
@@ -545,6 +594,10 @@ def home_page(request: Request):
             "discovery_stocks": discovery_stocks,
             "total_reports": total_count,
             "pricing_packs": PRICING_PACKS,
+            "is_yesterday_edition": is_yesterday,
+            "can_access_today": can_access_today,
+            "today_date": today_str,
+            "yesterday_date": yesterday_str,
         }
     )
 
@@ -605,15 +658,52 @@ def api_search_products(
 @app.get("/discovery", response_class=HTMLResponse)
 def discovery_page(request: Request, edition: Optional[str] = Query(None)):
     """The Morning Discovery Reel: nightly screening of under-the-radar equities."""
+    user = _get_current_web_user(request)
+    can_access_today = _can_access_today_discovery(request, user)
+
+    now = datetime.now(IST)
+    today_str = now.strftime("%Y-%m-%d")
+    yesterday_str = (now - timedelta(days=1)).strftime("%Y-%m-%d")
+    is_past_9am = now.hour >= 9
+
+    # Calculate countdown until next 09:00 AM IST drop
+    target_9am = now.replace(hour=9, minute=0, second=0, microsecond=0)
+    if now >= target_9am:
+        target_9am += timedelta(days=1)
+    seconds_until_9am = int((target_9am - now).total_seconds())
+    hours_until_9am = seconds_until_9am // 3600
+    mins_until_9am = (seconds_until_9am % 3600) // 60
+
     try:
-        discovery_stocks = get_active_discovery_reel(edition_date=edition)
         available_editions = get_available_discovery_editions(exclude_tests=True)
+    except Exception as e:
+        logger.error(f"Error fetching discovery editions: {e}")
+        available_editions = []
+
+    if edition:
+        selected_edition = edition
+    else:
+        # Default edition selection:
+        # If user is subscribed and today's edition exists past 9:00 AM, show today's edition!
+        if can_access_today and is_past_9am and today_str in available_editions:
+            selected_edition = today_str
+        elif today_str in available_editions and is_past_9am:
+            # Free user visiting /discovery: default to yesterday's archive so they can read in full with yesterday's badge, while seeing the top banner pointing to today's live Pro edition!
+            selected_edition = yesterday_str if yesterday_str in available_editions else (available_editions[1] if len(available_editions) > 1 else today_str)
+        else:
+            # Before 9:00 AM or today not yet in DB: show yesterday's edition
+            selected_edition = yesterday_str if yesterday_str in available_editions else (available_editions[0] if available_editions else today_str)
+
+    try:
+        discovery_stocks = get_active_discovery_reel(edition_date=selected_edition, allow_fallback=True)
     except Exception as e:
         logger.error(f"Error fetching discovery reel: {e}")
         discovery_stocks = []
-        available_editions = []
 
-    current_ed = edition or (discovery_stocks[0]["edition_date"] if discovery_stocks else datetime.now(IST).strftime("%Y-%m-%d"))
+    actual_edition = discovery_stocks[0]["edition_date"] if discovery_stocks else selected_edition
+    is_today_edition = (actual_edition == today_str and is_past_9am)
+    is_yesterday_edition = (actual_edition == yesterday_str) or (not is_past_9am) or (actual_edition < today_str)
+    is_locked_for_user = (is_today_edition and not can_access_today)
 
     return templates.TemplateResponse(
         request=request,
@@ -622,7 +712,17 @@ def discovery_page(request: Request, edition: Optional[str] = Query(None)):
             "active_page": "discovery",
             "discovery_stocks": discovery_stocks,
             "available_editions": available_editions,
-            "current_edition": current_ed,
+            "current_edition": actual_edition,
+            "today_date": today_str,
+            "yesterday_date": yesterday_str,
+            "is_today_edition": is_today_edition,
+            "is_yesterday_edition": is_yesterday_edition,
+            "is_locked_for_user": is_locked_for_user,
+            "can_access_today": can_access_today,
+            "is_past_9am": is_past_9am,
+            "seconds_until_9am": seconds_until_9am,
+            "hours_until_9am": hours_until_9am,
+            "mins_until_9am": mins_until_9am,
         }
     )
 
