@@ -3,7 +3,12 @@ import unittest
 from datetime import date
 from unittest.mock import patch
 
-import openpyxl
+try:
+    import openpyxl
+    HAS_OPENPYXL = True
+except ImportError:
+    HAS_OPENPYXL = False
+    openpyxl = None
 
 from core.ingestion.mf_portfolio_ingest import (
     amc_key_for_fund_house,
@@ -61,6 +66,7 @@ def _book_bytes(builder):
     return buf.getvalue()
 
 
+@unittest.skipUnless(HAS_OPENPYXL, "openpyxl is required for synthetic workbook ingestion tests")
 class TestParser(unittest.TestCase):
     def test_sniff_ignores_extension(self):
         data = _book_bytes(lambda wb: _equity_sheet(wb, "EA", "Alpha Fund", [0.5, 0.3, 0.17]))
@@ -192,6 +198,7 @@ class TestUniverseRanking(unittest.TestCase):
         self.assertEqual([r["aum_rank"] for r in ranked], [1, 2])
 
 
+@unittest.skipUnless(HAS_OPENPYXL, "openpyxl is required for synthetic workbook ingestion tests")
 class TestOrchestratorSkipAndReplace(unittest.TestCase):
     def _universe(self):
         return [
