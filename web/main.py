@@ -2274,10 +2274,22 @@ async def api_signin(payload: SignInRequest):
     return resp
 
 
+def resolve_app_base_url(request: Request) -> str:
+    """
+    Resolves canonical public base URL handling reverse proxies (Render SSL termination).
+    Ensures that when hosted on Render or custom domains, the protocol is strictly https://.
+    """
+    proto = request.headers.get("x-forwarded-proto") or request.url.scheme or "http"
+    host = request.headers.get("x-forwarded-host") or request.headers.get("host") or request.url.netloc
+    if "onrender.com" in host or ("localhost" not in host and "127.0.0.1" not in host and "testserver" not in host):
+        proto = "https"
+    return f"{proto}://{host}".rstrip("/")
+
+
 @app.get("/auth/google")
 async def public_auth_google(request: Request, redirect: Optional[str] = "/"):
     """Public Google OAuth initiation via Supabase GoTrue."""
-    base_url = str(request.base_url).rstrip("/")
+    base_url = resolve_app_base_url(request)
     redirect_target = f"{base_url}/auth/callback?next={urllib.parse.quote(redirect or '/')}"
     cfg = get_supabase_auth_config()
     sb_url = cfg.get("url")
@@ -3423,7 +3435,7 @@ async def admin_purge_test_data(request: Request):
 @app.get("/admin/auth/google")
 async def admin_auth_google(request: Request):
     """Initiates Google OAuth for Admin Portal via Supabase GoTrue."""
-    base_url = str(request.base_url).rstrip("/")
+    base_url = resolve_app_base_url(request)
     redirect_target = f"{base_url}/admin/auth/callback"
     cfg = get_supabase_auth_config()
     sb_url = cfg.get("url")
