@@ -1128,3 +1128,43 @@ async function loadSurveillanceEvents() {
   }
 }
 
+// ==============================================================================
+// Instant Dossier Hover Prefetcher & Tactile Click Feedback
+// ==============================================================================
+const _prefetchedDossierUrls = new Set();
+
+function prefetchDossierUrl(url) {
+  if (!url || _prefetchedDossierUrls.has(url)) return;
+  _prefetchedDossierUrls.add(url);
+  const link = document.createElement('link');
+  link.rel = 'prefetch';
+  link.href = url;
+  document.head.appendChild(link);
+}
+
+document.addEventListener('mouseover', (e) => {
+  const a = e.target.closest('a');
+  if (a && a.href && a.origin === window.location.origin) {
+    const p = a.pathname;
+    if (p.startsWith('/dossier/') || p.startsWith('/funds/') || p.startsWith('/debt/') || p.startsWith('/opportunities')) {
+      prefetchDossierUrl(p);
+    }
+  }
+}, { passive: true });
+
+document.addEventListener('click', (e) => {
+  const a = e.target.closest('a');
+  if (a && a.href && a.origin === window.location.origin && !a.target && !e.ctrlKey && !e.metaKey) {
+    const p = a.pathname;
+    if (p.startsWith('/dossier/') || p.startsWith('/funds/') || p.startsWith('/debt/')) {
+      if (a.classList.contains('btn') && !a.dataset.loading) {
+        a.dataset.loading = 'true';
+        a.style.opacity = '0.75';
+        a.style.pointerEvents = 'none';
+        a.innerHTML = `<span style="display: inline-block; animation: spin 0.6s linear infinite; margin-right: 4px;">⚡</span> Loading...`;
+      }
+    }
+  }
+});
+
+

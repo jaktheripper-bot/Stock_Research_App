@@ -144,34 +144,24 @@ def enrich_fundamentals(ticker: str, data: dict) -> dict:
 
 def resolve_pe_with_failsafes(ticker: str, scrip: str = "") -> str:
     clean = clean_ticker(ticker).replace(" ", "")
-    # Tier 1: Consolidated yfinance
-    try:
-        symbols = [f"{clean}.NS", f"{clean}.BO"]
-        if scrip and str(scrip).isdigit():
-            symbols.append(f"{scrip}.BO")
-        with contextlib.redirect_stderr(io.StringIO()):
-            for s in symbols:
-                try:
-                    tk = yf.Ticker(s)
-                    info = tk.info or {}
-                    trailing_eps = info.get("trailingEps")
-                    trailing_pe = info.get("trailingPE")
-                    if trailing_eps is not None and float(trailing_eps) <= 0:
-                        return "N/A (Loss-Making)"
-                    if trailing_pe and float(trailing_pe) > 0:
-                        return f"{float(trailing_pe):.2f}"
-                except Exception as err:
-                    logger.debug(f"yfinance Ticker probe notice for {s}: {err}")
-                    continue
-    except Exception as e:
-        logger.debug(f"P/E resolution via yfinance failed: {e}")
 
-    # Tier 2: BSE ComHeader Direct
+    # Tier 0: Instant check against verified report baseline in database
+    try:
+        from core.db.reports import get_report_by_ticker_sync
+        rep = get_report_by_ticker_sync(clean)
+        if rep and rep.get("baseline_pe"):
+            b_pe = str(rep["baseline_pe"]).strip()
+            if b_pe and b_pe not in ["", "N/A", "-", "None", "0"]:
+                return b_pe
+    except Exception:
+        pass
+
+    # Tier 1: BSE ComHeader Direct (Fast official API, 1.5s timeout)
     if scrip and str(scrip).isdigit():
         try:
             url = f"https://api.bseindia.com/BseIndiaAPI/api/ComHeader/w?quotetype=EQ&scripcode={scrip}&seriesid="
             headers = {"User-Agent": "Mozilla/5.0", "Referer": "https://www.bseindia.com/"}
-            res = requests.get(url, headers=headers, timeout=3)
+            res = requests.get(url, headers=headers, timeout=1.5)
             if res.status_code == 200:
                 raw_pe = res.json().get("PE")
                 if raw_pe and str(raw_pe).strip() not in ["", "-", "None", "0", "0.00"]:
@@ -179,6 +169,18 @@ def resolve_pe_with_failsafes(ticker: str, scrip: str = "") -> str:
                     return f"{val:.2f}" if val > 0 else "N/A (Loss-Making)"
         except Exception as e:
             logger.debug(f"BSE ComHeader direct P/E fetch notice: {e}")
+
+    # Tier 2: Fast single-symbol yfinance check (using fast_info)
+    try:
+        sym = f"{clean}.BO" if clean.isdigit() else f"{clean}.NS"
+        tk = yf.Ticker(sym)
+        fast = getattr(tk, "fast_info", None)
+        pe = getattr(fast, "pe", None) or getattr(fast, "trailing_pe", None)
+        if pe and float(pe) > 0:
+            return f"{float(pe):.2f}"
+    except Exception as e:
+        logger.debug(f"P/E resolution via yfinance failed: {e}")
+
     return "N/A"
 
 @ttl_cache(ttl_seconds=300, maxsize=256)
@@ -258,7 +260,7 @@ def get_stock_fundamentals(query: str) -> dict:
     now = time.time()
     if clean in _FUNDAMENTALS_CACHE:
         ts, cached_val = _FUNDAMENTALS_CACHE[clean]
-        if (now - ts) < 300:  # 5 min TTL
+        if (now - ts) < 900:  # 15 min TTL
             return dict(cached_val)
 
     canonical = resolve_canonical_symbol(query) or clean
@@ -272,60 +274,83 @@ def get_stock_fundamentals(query: str) -> dict:
             _FUNDAMENTALS_CACHE[canonical] = (now, raw_data)
             return raw_data
     except Exception as bse_err:
-        logger.warning(f"BSE direct quote failed for {query}/{canonical} ({bse_err}). Attempting secondary gateways...")
+        logger.debug(f"BSE direct quote notice for {query}/{canonical}: {bse_err}. Checking fast secondary gateways...")
 
-    # 2. Secondary Resilience Fallback via yfinance
+    # 2. Secondary Fast Gateway via yfinance (using fast_info)
     try:
-        candidate_symbols = [f"{canonical}.NS", f"{canonical}.BO"]
-        if clean != canonical:
-            candidate_symbols.extend([f"{clean}.NS", f"{clean}.BO"])
+        primary_sym = f"{canonical}.BO" if str(canonical).isdigit() else f"{canonical}.NS"
+        candidate_symbols = [primary_sym]
+        if primary_sym.endswith(".NS"):
+            candidate_symbols.append(f"{canonical}.BO")
+
         for sym in candidate_symbols:
             t = yf.Ticker(sym)
             fast = getattr(t, "fast_info", None)
-            info = {}
-            try:
-                info = t.info or {}
-            except Exception as err:
-                logger.debug(f"yfinance info notice for {sym}: {err}")
+            price = getattr(fast, "last_price", None)
+            if price and float(price) > 0:
+                mcap = getattr(fast, "market_cap", None) or "N/A"
+                high_52 = getattr(fast, "year_high", None) or "N/A"
+                low_52 = getattr(fast, "year_low", None) or "N/A"
 
-            price = None
-            if fast and hasattr(fast, "last_price") and fast.last_price:
-                price = fast.last_price
-            elif info.get("currentPrice"):
-                price = info.get("currentPrice")
-            elif info.get("regularMarketPrice"):
-                price = info.get("regularMarketPrice")
-
-            if price:
-                mcap = getattr(fast, "market_cap", None) or info.get("marketCap") or "N/A"
-                pe = info.get("trailingPE") or info.get("forwardPE") or "N/A"
-                if isinstance(pe, (int, float)) and pe <= 0:
-                    pe = "N/A"
+                # Check if we have baseline PE in reports DB
+                pe = "N/A"
+                try:
+                    from core.db.reports import get_report_by_ticker_sync
+                    rep = get_report_by_ticker_sync(canonical)
+                    if rep and rep.get("baseline_pe"):
+                        pe = str(rep["baseline_pe"]).strip()
+                except Exception:
+                    pass
 
                 res_dict = {
                     "ticker": canonical or clean,
-                    "short_name": info.get("shortName") or info.get("longName") or canonical or clean,
-                    "sector": info.get("sector") or "General Industry",
-                    "industry": info.get("industry") or "Diversified",
+                    "short_name": canonical or clean,
+                    "sector": "General Industry",
+                    "industry": "Diversified",
                     "market_cap": mcap,
-                    "pe_ratio": f"{pe:.2f}" if isinstance(pe, (int, float)) else str(pe),
-                    "current_price": round(price, 2),
-                    "52w_high": getattr(fast, "year_high", None) or info.get("fiftyTwoWeekHigh") or "N/A",
-                    "52w_low": getattr(fast, "year_low", None) or info.get("fiftyTwoWeekLow") or "N/A",
-                    "description": info.get("longBusinessSummary") or f"Exchange data synthesized for {clean}.",
-                    "exchange_status": "Active / Secondary (yfinance Fallback)",
+                    "pe_ratio": pe,
+                    "current_price": round(float(price), 2),
+                    "52w_high": round(float(high_52), 2) if isinstance(high_52, (int, float)) else str(high_52),
+                    "52w_low": round(float(low_52), 2) if isinstance(low_52, (int, float)) else str(low_52),
+                    "description": f"Exchange data synthesized for {clean}.",
+                    "exchange_status": "Active / Secondary (yfinance Fast Gateway)",
                     "is_fallback": True
                 }
                 _FUNDAMENTALS_CACHE[clean] = (now, res_dict)
                 _FUNDAMENTALS_CACHE[canonical] = (now, res_dict)
                 return res_dict
     except Exception as yf_err:
-        logger.error(f"yfinance fallback also failed for {query}: {yf_err}")
+        logger.debug(f"yfinance fast gateway notice for {query}: {yf_err}")
 
-    # If both fail, raise clean error
+    # 3. Tertiary Resilience: Instant Database Report Baseline Fallback
+    try:
+        from core.db.reports import get_report_by_ticker_sync
+        rep = get_report_by_ticker_sync(canonical)
+        if rep and rep.get("baseline_price"):
+            res_dict = {
+                "ticker": canonical or clean,
+                "short_name": rep.get("short_name", canonical or clean),
+                "sector": "General Industry",
+                "industry": "Diversified",
+                "market_cap": rep.get("baseline_mcap") or "N/A",
+                "pe_ratio": str(rep.get("baseline_pe") or "N/A"),
+                "current_price": round(float(rep["baseline_price"]), 2),
+                "52w_high": "N/A",
+                "52w_low": "N/A",
+                "description": f"Audited research baseline for {clean}.",
+                "exchange_status": "Audited Baseline (Database Fallback)",
+                "is_fallback": True
+            }
+            _FUNDAMENTALS_CACHE[clean] = (now, res_dict)
+            _FUNDAMENTALS_CACHE[canonical] = (now, res_dict)
+            return res_dict
+    except Exception as db_err:
+        logger.debug(f"Database baseline fallback notice for {query}: {db_err}")
+
+    # If all fail, raise clean error
     raise ExchangeDataFetchError(clean, "Both primary BSE and secondary market gateways failed to return live quotes.")
 
-@ttl_cache(ttl_seconds=900, maxsize=128)
+@ttl_cache(ttl_seconds=3600, maxsize=256)
 def get_historical_prices(ticker: str, period: str = "6mo"):
     """
     Fetches trailing daily historical prices via yfinance, attempting BSE (.BO)
