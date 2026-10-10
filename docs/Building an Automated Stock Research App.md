@@ -143,123 +143,76 @@ Instead of routing through yfinance, Path B fetches quotes directly from Google 
 
 Run this Terminal command to inject get\_latest\_flash\_models() and wire it into stream\_genai\_with\_fallback() \[Certain\]:
 
-## **1\. Executive Summary & System Overview**
+## **1\. Executive Summary & Multi-Asset Intelligence Platform**
 
-The **Equity Research AI Analysis Platform** is an automated, cloud-resilient financial analysis application built with Python and Streamlit. It synthesizes exchange-cleared market fundamentals from BSE India with real-time web intelligence using Google Gemini models to generate 7-pillar equity research reports.
+The **Stock Research App** is an autonomous, institutional-grade equity and multi-asset intelligence platform engineered for Indian capital markets (NSE/BSE, AMFI, RBI Sovereign, and SEBI-registered REITs/InvITs). Built with FastAPI, Jinja2 SSR, and modern Glassmorphism ergonomics, the platform synthesizes primary exchange data, level-2 order book depth, corporate disclosures, and sovereign benchmarks to generate deep-dive quantitative and qualitative intelligence across 11 distinct report types.
 
 **Core Architectural Directives:**
 
-> * **Zero-Hallucination Data Integrity:** Synthetic or AI-estimated financial metrics (P/E, Market Cap, 52-Week Range) are strictly prohibited. The system enforces hard stops when exchange quotes fail.  
-> * **Two-Tier Caching & Delta Gating:** Live exchange metrics update on every search, but expensive qualitative LLM regenerations trigger only when material events (price moves ≥5%, new BSE filings, or TTL \>14 days) occur.  
-> * **Real-Time User Feedback:** Perceived latency is minimized using Streamlit two-phase rendering, progress status containers, and token streaming via Automatic Function Calling (AFC).
+> * **SEBI Safe Harbor & Zero-Hallucination Integrity:** Synthetic, unverified, or AI-estimated financial figures are strictly prohibited. Reports conclude after factual diagnostic matrices; zero forward-looking buy/sell/hold advice or target prices are generated.
+> * **Exchange-Grounded Data Provenance:** Live Level-2 market depth, quotes, and historical candles ingested via official exchange gateways (Angel One SmartAPI) routed through dedicated AWS static proxy egress (`13.54.76.134:8888`), authenticated via pure Python RFC 6238 TOTP.
+> * **Two-Tier Caching & Delta Gating:** Expensive qualitative LLM regenerations trigger only on material events: price moves $\ge 5\%$, new BSE filings, report age $> 14$ days, or poisoned cache self-healing.
+> * **Deterministic Cortex Compression:** 12 mathematical pre-processing engines (Chanakya Clean-Room, Varan DuPont ROE, Setu Capital Matrix, Garuda Event Reflex, Sutra Look-Through, Valuation Radar, Sector Scoring, Institutional Flow Sieve) pre-compute ratios before LLM synthesis, reducing latency and slashing token consumption.
 
-## **2\. Data Pipeline & Resolution Framework**
+---
 
-### **2.1 Dynamic BSE Scrip Resolution (bse\_master.py)**
+## **2\. Data Pipeline & Multi-Asset Ingestion Architecture**
 
-To map user queries (tickers, brand aliases, corporate names) to official 6-digit BSE scrip codes without static hardcoding or fragile CSV parsing, the resolver employs a 5-tier resolution order:
+### **2.1 Dynamic BSE/NSE Scrip Resolution (`bse_master.py`)**
+
+To map user queries (tickers, brand aliases, corporate names) to official 6-digit BSE scrip codes and NSE symbols without static hardcoding:
 
 > * **Direct 6-Digit Code:** Validates numeric strings (e.g., `500209`).  
-> * **Learned Dynamic Aliases (dynamic\_aliases.json):** Fast-path file cache for dynamically discovered mappings.  
-> * **Static Brand Map (PRIMARY\_BSE\_MAP):** High-frequency brand-to-entity overrides (e.g., `ZOMATO` → `543320` \[Eternal Ltd\], `PAYTM` → `543396` \[One97 Communications\]).  
-> * **Active Master Universe (bse\_scrips\_cache.json):** Auto-synced JSON map containing 5,000+ active BSE equities from `https://api.bseindia.com/BseIndiaAPI/api/ListofScripData/w`, correctly indexing the lowercase `scrip_id` symbol field.  
-> * **Just-In-Time (JIT) AI Discovery:** On lookup miss, Gemini Grounded Search identifies the candidate 6-digit scrip code. The candidate is strictly verified via a live BSE quote handshake before appending to `dynamic_aliases.json`.
+> * **Learned Dynamic Aliases (`dynamic_aliases.json`):** Fast-path file cache for dynamically discovered mappings.  
+> * **Static Brand Map (`PRIMARY_BSE_MAP`):** High-frequency brand-to-entity overrides (e.g., `ZOMATO` → `543320`, `PAYTM` → `543396`).  
+> * **Active Master Universe (`bse_scrips_cache.json`):** Auto-synced JSON map containing 5,000+ active BSE equities from official exchange API endpoints.  
+> * **Just-In-Time (JIT) Discovery:** On lookup miss, Gemini Grounded Search identifies candidate scrip codes, strictly verified via live exchange handshake before caching.
 
-### **2.2 Live Exchange Ingestion & Fundamental Enrichment**
+### **2.2 Multi-Asset Ingestion Feeds**
+1. **Equities & Derivatives:** Angel One SmartAPI Level-2 order book (best 5 bids/asks) via AWS static proxy (`13.54.76.134:8888`) with fallback to BSE direct APIs and `yfinance`.
+2. **Mutual Funds & ETFs:** Association of Mutual Funds in India (AMFI) daily `NAVAll.txt` statutory text feed + monthly AMC constituent portfolio disclosures.
+3. **Corporate Debt & NCDs:** BSE/NSE Debt Reporting Platforms and public Credit Rating Agency (CRA) press releases (CRISIL, ICRA, CARE, India Ratings).
+4. **Sovereign Yield Curve & Macro:** Clearing Corporation of India (CCIL) & Reserve Bank of India (RBI) FBIL benchmark rate sheets + MOSPI CPI open data.
+5. **Commercial REITs & InvITs:** BSE listed equity filings and AMC Net Distributable Cash Flow (NDCF) quarterly compliance releases.
 
-Direct BSE exchange data is fetched via `bsedata.bse.BSE.getQuote()`. Missing fundamental ratios (P/E Ratio, Market Cap, Sector) are enriched safely via a secondary `yfinance` lookup wrapper (targeting `{TICKER}.BO` or `{TICKER}.NS`). If exchange ingestion fails entirely, the system raises an explicit exception rather than fabricating data.
+---
 
-## **3\. Material Change Gate & Caching Architecture**
+## **3\. Material Change Gate & Caching Architecture (`core/analysis/delta.py`)**
 
-To conserve Gemini API credits and avoid useless re-generation on minor price noise, the application routes query evaluations through a deterministic gating function (`evaluate_material_change` in `analyzer.py`):
+To conserve Gemini API credits and avoid useless re-generation on minor price noise, query evaluations route through a deterministic 4-gate evaluation function:
 
 | Gate Condition | Trigger Threshold | Action Taken |
 | :---- | :---- | :---- |
-| **Temporal Expiration** | Cached report age \> 14 days | Forces fresh Gemini report generation. |
-| **Regulatory Disclosures** | New filing on BSE Corporate Announcements API | Forces fresh Gemini report generation incorporating new announcement. |
-| **Price Volatility Shift** | Live price delta ≥ 5% vs baseline | Forces fresh Gemini report generation to evaluate technical shift. |
-| **No Material Event** | Delta \< 5%, no new filings, age ≤ 14 days | Serves cached report instantly; updates top metric cards with live price. |
+| **Cache Self-Healing** | Missing sections, poisoned cache, or API error signatures | Invalidates cache and forces clean re-synthesis. |
+| **Temporal Expiration** | Cached report age $> 14$ days | Forces fresh Gemini report generation with updated financial trailing data. |
+| **Regulatory Disclosures** | New filing on BSE Corporate Announcements API | Triggers Garuda event reflex or forces fresh report incorporating disclosure. |
+| **Price Volatility Shift** | Live price delta $\ge 5\%$ vs baseline | Forces fresh Gemini report generation to evaluate fundamental and technical shift. |
+| **No Material Event** | Delta $< 5\%$, no new filings, age $\le 14$ days | Serves cached report instantly (< 20ms); enriches with live Level-2 depth. |
 
-## **4\. Persistence & Database Migration (db.py)**
+---
 
-The database layer provides transparent dual-binding: using PostgreSQL via `psycopg2` when `SUPABASE_DB_URL` is defined, or falling back to local SQLite (`reports.db`) for local development.
+## **4\. Dual-Binding Persistence & Audit Archiving (`core/db/`)**
 
-**Schema Definition (reports Table):**
+The persistence layer guarantees high-throughput read latency while preserving complete historical audit trails:
+* **Local Fast-Path:** SQLite database `reports.db` in WAL mode for sub-millisecond local reads.
+* **Cloud Persistence:** Asynchronous synchronization with Supabase PostgreSQL cloud database.
+* **Immutable Audit Trail:** Append-only table `report_revisions` archiving complete qualitative snapshots, prompts, and timestamps on every material update.
+* **Frozen Database Snapshots:** Disaster-recovery snapshots archived to `.checkpoints/reports_checkpoint_*.db` with tag ledger entries in `CHECKPOINTS.md`.
 
-> * `ticker` (TEXT PRIMARY KEY), `short_name` (TEXT), `report_text` (TEXT)  
-> * `timestamp` (TIMESTAMPTZ / DATETIME DEFAULT CURRENT\_TIMESTAMP)  
-> * `baseline_price` (NUMERIC/REAL), `baseline_pe` (TEXT), `baseline_mcap` (NUMERIC/REAL)  
-> * `latest_announcement` (TEXT)
+---
 
-## **5\. Real-Time Streaming & Gemini Integration**
+## **5\. Qualitative Synthesis & AI Failover Cascade (`core/analysis/engine.py`)**
 
-### **5.1 Google Search Grounding & Model Routing**
+* **Dynamic Flash Model Discovery:** Discovers and sorts the latest available Gemini Flash models (`gemini-3.8-flash`, `gemini-3.7-flash`), filtering out single-purpose audio/image variants.
+* **Surgical Flash Selection:** Routes high-volume delta updates through lightweight, cost-effective models (`gemini-3.5-flash-lite`).
+* **Multi-Provider Failover:** Catches Google quota/status errors (429, 503) and cascades to Perplexity's search-grounded `sonar-pro` model or deterministic rule engines.
 
-All qualitative analysis is grounded in live web data using Gemini’s native search tool (`tools=[{"google_search": {}}]`). To protect against regional model deprecations or capacity spikes (503 UNAVAILABLE), requests route through a multi-model fallback cascade:
+---
 
-`models_to_try = ["gemini-3.6-flash", "gemini-3.5-flash-lite", "gemini-flash-latest"]`
+## **6\. Evaluation Criteria Across All Site Reports**
 
-### **5.2 Chat-Based AFC Streaming Pattern**
-
-Direct use of `generate_content_stream` with Automatic Function Calling (AFC) triggers candidate text warnings. To stream properly, the application initializes a Chat session via `client.chats.create()` and consumes `chat.send_message_stream()`:
-
-```py
-def stream_genai_with_fallback(client, prompt: str, system_prompt: str):
-    models_to_try = ["gemini-3.6-flash", "gemini-3.5-flash-lite", "gemini-flash-latest"]
-    for model_name in models_to_try:
-        for attempt in range(4):
-            try:
-                chat = client.chats.create(
-                    model=model_name,
-                    config=genai.types.GenerateContentConfig(
-                        system_instruction=system_prompt,
-                        tools=[{"google_search": {}}],
-                    )
-                )
-                response_stream = chat.send_message_stream(prompt)
-                for chunk in response_stream:
-                    if hasattr(chunk, "text") and chunk.text:
-                        yield chunk.text
-                return
-            except Exception as e:
-                if any(err in str(e) for err in ["429", "503", "UNAVAILABLE"]):
-                    time.sleep((2 ** attempt) + 1)
-                    continue
-                break
-```
-
-### **5.3 Multi-Provider Failover Architecture (Perplexity Integration)**
-
-If all Gemini models exhaust retries during a major cluster outage, the generator catches the exception and seamlessly failovers to Perplexity’s search-grounded `sonar-pro` model using the OpenAI-compatible SDK (`https://api.perplexity.ai`), ensuring continuous uptime.
-
-## **6\. Zero-Hallucination Error Handling & UI Telemetry**
-
-When a pipeline error occurs (unresolvable ticker or exchange timeout), the app strictly halts rather than returning synthetic estimates. It presents a structured JSON Telemetry Card in the UI for instant debugging:
-
-```json
-{
-  "timestamp_utc": "2026-09-14T19:45:00Z",
-  "query_entered": "INVALID_TICKER",
-  "error_stage": "Ticker & Scrip Resolution",
-  "error_type": "TickerResolutionError",
-  "error_message": "Could not resolve an official BSE scrip code for 'INVALID_TICKER'.",
-  "system": {
-    "python": "3.11.9",
-    "os": "Darwin"
-  },
-  "traceback_tail": ["..."]
-}
-```
-
-## **7\. Prioritized Feature Backlog**
-
-Future roadmap milestones ranked by end-user decision impact:
-
-> 1. **Live Token Streaming (Implemented):** Cuts perceived latency from \~20s to \<2s.  
-> 2. **7-Pillar Visual Health Card:** Instant visual pass/fail grid above long-form report prose.  
-> 3. **6-Month Price & Valuation Trend Chart:** Embeds lightweight Altair price momentum charts.  
-> 4. **Material Filing Alert Badges:** Displays explicitly why a report was updated (e.g., "Triggered by Q3 Earnings Filing").  
-> 5. **Archived Report Differential Tracker:** Side-by-side comparison of thesis drift across quarters.
+For the exhaustive mathematical definitions, diagnostic thresholds, and evaluation formulas across all 11 reports created on the platform (Equities 7-Pillar + Cockpit, Morning Discovery, Mutual Funds 6-Pillar Look-Through, Corporate Debt 5-Pillar Credit Matrix, Sovereign Yield Curve, REITs/InvITs Sec 115UA Waterfall, Index ETFs, Net Post-Tax Real Return Deflator, and Safety Radar), refer directly to the master specification:
+* **Master Specification:** [`docs/REPORT_EVALUATION_FRAMEWORKS.md`](file:///Users/lyndonpinto/Documents/Stock_Research_App/docs/REPORT_EVALUATION_FRAMEWORKS.md) and [`.antigravity/docs/EVALUATION_FRAMEWORKS.md`](file:///Users/lyndonpinto/Documents/Stock_Research_App/.antigravity/docs/EVALUATION_FRAMEWORKS.md).
 
 `python3 - << 'EOF'`  
 `with open("analyzer.py", "r", encoding="utf-8") as f:`  

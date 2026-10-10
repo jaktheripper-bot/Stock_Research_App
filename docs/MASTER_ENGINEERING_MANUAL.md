@@ -155,6 +155,10 @@ The platform operates across 5 layered subsystems:
 * **Cloud Persistence:** Every insert or update replicates asynchronously to Supabase cloud PostgreSQL.
 * **Immutable Auditing:** Table `report_revisions` retains complete historical qualitative snapshots, timestamps, and LLM prompts.
 
+> [!NOTE]
+> **Complete Report Evaluation Frameworks Specification:**  
+> For the comprehensive mathematical formulations, evaluation criteria, and authoritative data source matrices for all 11 reports created on the platform, refer to [`docs/REPORT_EVALUATION_FRAMEWORKS.md`](file:///Users/lyndonpinto/Documents/Stock_Research_App/docs/REPORT_EVALUATION_FRAMEWORKS.md) and [`.antigravity/docs/EVALUATION_FRAMEWORKS.md`](file:///Users/lyndonpinto/Documents/Stock_Research_App/.antigravity/docs/EVALUATION_FRAMEWORKS.md).
+
 ---
 
 ## 3. Operational Process Flows for Audit Verification

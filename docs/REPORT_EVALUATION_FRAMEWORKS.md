@@ -1,6 +1,6 @@
 # Multi-Asset Institutional Report Evaluation Frameworks, Data Sources & Operational Flows Specification
 
-**Document Identifier:** `.antigravity/docs/EVALUATION_FRAMEWORKS.md`  
+**Document Identifier:** `docs/REPORT_EVALUATION_FRAMEWORKS.md`  
 **Document Version:** 3.0.0 | **Effective Date:** 2026-10-10  
 **Target System:** `Stock Research App` (`main` branch)  
 **Compliance Standards:** 
@@ -48,7 +48,7 @@ Every numerical metric, order book depth, corporate filing, and regulatory discl
 
 ## 2. Operational Generation & Invalidation Flows
 
-The generation of all reports follows deterministic, audited process flows to guarantee data freshnes, cost efficiency, and sub-second rendering latencies.
+The generation of all reports follows deterministic, audited process flows to guarantee data freshness, cost efficiency, and sub-second rendering latencies.
 
 ### 2.1 Equity Research Dossier Flow (`GET /dossier/{ticker}`)
 ```mermaid
