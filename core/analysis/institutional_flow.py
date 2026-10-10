@@ -8,9 +8,25 @@ Ingests real-time exchange Level-2 order books via Angel One SmartAPI to diagnos
 """
 
 from typing import Dict, Any, List, Optional
+import math
 import logging
 
 logger = logging.getLogger("equity_research.core.analysis.institutional_flow")
+
+
+def _safe_float(v: Any, default: float = 0.0) -> float:
+    if v is None:
+        return default
+    if isinstance(v, (int, float)):
+        if math.isnan(v) or math.isinf(v):
+            return default
+        return float(v)
+    try:
+        clean = str(v).strip().replace(",", "").replace("%", "")
+        f = float(clean)
+        return default if (math.isnan(f) or math.isinf(f)) else f
+    except (ValueError, TypeError):
+        return default
 
 
 def analyze_institutional_flow(
@@ -18,6 +34,7 @@ def analyze_institutional_flow(
 ) -> Dict[str, Any]:
     """
     Transforms raw Level-2 order depth data into actionable institutional flow diagnostics.
+    Hardened against nulls, non-dict payloads, commas, strings, and NaN/inf numbers.
     """
     if not quote_data or not isinstance(quote_data, dict):
         return {
@@ -35,14 +52,14 @@ def analyze_institutional_flow(
             "ask_book": [],
         }
 
-    ltp = float(quote_data.get("ltp") or 0.0)
-    total_buy = float(quote_data.get("total_buy_qty") or 0.0)
-    total_sell = float(quote_data.get("total_sell_qty") or 0.0)
-    upper_circuit = float(quote_data.get("upper_circuit") or 0.0)
-    lower_circuit = float(quote_data.get("lower_circuit") or 0.0)
-    spread_bps = float(quote_data.get("bid_ask_spread_bps") or 0.0)
-    imbalance_ratio = float(quote_data.get("order_imbalance_ratio") or 0.50)
-    regime = quote_data.get("depth_pressure_regime") or "EQUILIBRIUM"
+    ltp = _safe_float(quote_data.get("ltp"))
+    total_buy = _safe_float(quote_data.get("total_buy_qty"))
+    total_sell = _safe_float(quote_data.get("total_sell_qty"))
+    upper_circuit = _safe_float(quote_data.get("upper_circuit"))
+    lower_circuit = _safe_float(quote_data.get("lower_circuit"))
+    spread_bps = _safe_float(quote_data.get("bid_ask_spread_bps"))
+    imbalance_ratio = max(0.0, min(1.0, _safe_float(quote_data.get("order_imbalance_ratio"), default=0.50)))
+    regime = str(quote_data.get("depth_pressure_regime") or "EQUILIBRIUM")
 
     # Circuit limit buffer calculation
     lower_buffer_pct = 0.0

@@ -30,27 +30,48 @@ TAX_SLABS = {
 DEFAULT_CPI_INFLATION = 5.00
 
 
+def _safe_float(v: Any, default: float = 0.0) -> float:
+    if v is None:
+        return default
+    if isinstance(v, (int, float)):
+        if math.isnan(v) or math.isinf(v):
+            return default
+        return float(v)
+    try:
+        clean = str(v).strip().replace(",", "").replace("%", "")
+        f = float(clean)
+        return default if (math.isnan(f) or math.isinf(f)) else f
+    except (ValueError, TypeError):
+        return default
+
+
 def calculate_net_real_return(
     nominal_annual_return_pct: float,
     tax_rate_pct: float,
     cpi_inflation_pct: float = DEFAULT_CPI_INFLATION
-) -> Dict[str, float]:
+) -> Dict[str, Any]:
     """
     Computes exact post-tax nominal return, tax drag, and real purchasing power return.
     Uses continuous compounding deflator formula: (1 + R_post) / (1 + Inflation) - 1.
+    Hardened against division-by-zero (-100% inflation) and NaN inputs.
     """
-    r_nom = nominal_annual_return_pct / 100.0
-    t_rate = tax_rate_pct / 100.0
-    inf = cpi_inflation_pct / 100.0
+    nom_pct = _safe_float(nominal_annual_return_pct, default=0.0)
+    tax_pct = max(0.0, min(100.0, _safe_float(tax_rate_pct, default=0.0)))
+    cpi_pct = _safe_float(cpi_inflation_pct, default=DEFAULT_CPI_INFLATION)
+
+    r_nom = nom_pct / 100.0
+    t_rate = tax_pct / 100.0
+    inf = cpi_pct / 100.0
 
     post_tax_nominal = r_nom * (1.0 - t_rate)
-    real_return = ((1.0 + post_tax_nominal) / (1.0 + inf)) - 1.0
+    deflator = max(0.001, 1.0 + inf)
+    real_return = ((1.0 + post_tax_nominal) / deflator) - 1.0
     tax_drag_pct = (r_nom - post_tax_nominal) * 100.0
 
     return {
-        "nominal_return_pct": round(nominal_annual_return_pct, 2),
+        "nominal_return_pct": round(nom_pct, 2),
         "post_tax_nominal_pct": round(post_tax_nominal * 100.0, 2),
-        "cpi_inflation_pct": round(cpi_inflation_pct, 2),
+        "cpi_inflation_pct": round(cpi_pct, 2),
         "net_real_return_pct": round(real_return * 100.0, 2),
         "tax_drag_pct": round(tax_drag_pct, 2),
         "purchasing_power_verdict": "Wealth Compounding" if real_return > 0.015 else ("Capital Preserved" if real_return >= 0 else "Wealth Destruction (Negative Real Yield)")
@@ -72,8 +93,10 @@ def compare_asset_classes_post_tax(
     6. Equity Index ETF / Mutual Fund (12.00% nominal)
     7. Debt Mutual Fund (7.20% nominal)
     """
-    t_slab = marginal_tax_slab_pct / 100.0
-    inf = cpi_inflation_pct / 100.0
+    t_slab = max(0.0, min(100.0, _safe_float(marginal_tax_slab_pct, default=30.0))) / 100.0
+    cpi_inf = _safe_float(cpi_inflation_pct, default=DEFAULT_CPI_INFLATION)
+    inf = cpi_inf / 100.0
+    h_years = max(0.1, _safe_float(holding_period_years, default=3.0))
 
     # 1. Bank Fixed Deposit
     fd_nom = 7.10

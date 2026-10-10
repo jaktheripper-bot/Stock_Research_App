@@ -25,6 +25,21 @@ import logging
 logger = logging.getLogger(__name__)
 
 
+def _safe_float(v: Any, default: float = 0.0) -> float:
+    if v is None:
+        return default
+    if isinstance(v, (int, float)):
+        if math.isnan(v) or math.isinf(v):
+            return default
+        return float(v)
+    try:
+        clean = str(v).strip().replace(",", "").replace("%", "")
+        f = float(clean)
+        return default if (math.isnan(f) or math.isinf(f)) else f
+    except (ValueError, TypeError):
+        return default
+
+
 @dataclass
 class CapitalTranche:
     tier: str  # "SOVEREIGN", "SENIOR_SECURED_NCD", "SUBORDINATED_DEBT", "HYBRID_REIT", "RESIDUAL_EQUITY"
@@ -79,7 +94,16 @@ class SetuMatrixEngine:
     ) -> SetuMatrixResult:
         """
         Executes on-demand capital structure transmission evaluation.
+        Hardened against null symbols, ratings, and invalid numeric values.
         """
+        clean_symbol = str(symbol or "UNKNOWN").upper().strip()
+        clean_rating = str(debt_credit_rating or "AAA").upper().strip()
+        fcf_yield = _safe_float(equity_fcf_yield_pct, default=0.0)
+        gsec_yield = _safe_float(gsec_10y_yield_pct, default=cls.DEFAULT_GSEC_10Y)
+        mf_flow = _safe_float(mutual_fund_net_flow_cr, default=0.0)
+        pledge_val = _safe_float(promoter_pledge_pct, default=0.0)
+        slab_pct = max(0.0, min(100.0, _safe_float(tax_slab_pct, default=30.0)))
+
         # Estimate senior debt YTM from rating if not directly provided
         if senior_debt_ytm_pct is None:
             spread_map = {
@@ -91,31 +115,33 @@ class SetuMatrixEngine:
                 "A": 4.00,
                 "BBB": 5.50,
             }
-            spread = spread_map.get(debt_credit_rating.upper(), 1.50)
-            senior_debt_ytm_pct = round(gsec_10y_yield_pct + spread, 2)
+            spread = spread_map.get(clean_rating, 1.50)
+            senior_debt_ytm_pct = round(gsec_yield + spread, 2)
+        else:
+            senior_debt_ytm_pct = _safe_float(senior_debt_ytm_pct, default=gsec_yield + 1.50)
 
         # Seniority spread: Equity FCF Yield vs Senior Debt YTM
-        seniority_spread_bps = round((equity_fcf_yield_pct - senior_debt_ytm_pct) * 100.0, 1)
-        credit_spread_bps = round((senior_debt_ytm_pct - gsec_10y_yield_pct) * 100.0, 1)
+        seniority_spread_bps = round((fcf_yield - senior_debt_ytm_pct) * 100.0, 1)
+        credit_spread_bps = round((senior_debt_ytm_pct - gsec_yield) * 100.0, 1)
 
         # Build capital tranches
-        tax_drag = 1.0 - (tax_slab_pct / 100.0)
+        tax_drag = max(0.0, 1.0 - (slab_pct / 100.0))
         tranches = [
             CapitalTranche(
                 tier="SOVEREIGN",
                 instrument_name="10Y Benchmark GOI G-Sec",
-                nominal_yield_pct=gsec_10y_yield_pct,
-                post_tax_yield_pct=round(gsec_10y_yield_pct * tax_drag, 2),
+                nominal_yield_pct=gsec_yield,
+                post_tax_yield_pct=round(gsec_yield * tax_drag, 2),
                 seniority_rank=1,
                 rating="SOV",
             ),
             CapitalTranche(
                 tier="SENIOR_SECURED_NCD",
-                instrument_name=f"{symbol} Senior Secured NCD",
+                instrument_name=f"{clean_symbol} Senior Secured NCD",
                 nominal_yield_pct=senior_debt_ytm_pct,
                 post_tax_yield_pct=round(senior_debt_ytm_pct * tax_drag, 2),
                 seniority_rank=2,
-                rating=debt_credit_rating,
+                rating=clean_rating,
             ),
             CapitalTranche(
                 tier="HYBRID_REIT",
@@ -127,9 +153,9 @@ class SetuMatrixEngine:
             ),
             CapitalTranche(
                 tier="RESIDUAL_EQUITY",
-                instrument_name=f"{symbol} Common Equity",
-                nominal_yield_pct=equity_fcf_yield_pct,
-                post_tax_yield_pct=round(equity_fcf_yield_pct * (1.0 - 0.125), 2),  # 12.5% LTCG under Sec 112A
+                instrument_name=f"{clean_symbol} Common Equity",
+                nominal_yield_pct=fcf_yield,
+                post_tax_yield_pct=round(fcf_yield * (1.0 - 0.125), 2),  # 12.5% LTCG under Sec 112A
                 seniority_rank=5,
                 rating="EQUITY_RESIDUAL",
             ),
@@ -190,10 +216,10 @@ class SetuMatrixEngine:
         )
 
         return SetuMatrixResult(
-            symbol=symbol,
-            equity_fcf_yield_pct=round(equity_fcf_yield_pct, 2),
+            symbol=clean_symbol,
+            equity_fcf_yield_pct=round(fcf_yield, 2),
             senior_debt_ytm_pct=round(senior_debt_ytm_pct, 2),
-            gsec_10y_benchmark_pct=round(gsec_10y_yield_pct, 2),
+            gsec_10y_benchmark_pct=round(gsec_yield, 2),
             seniority_spread_bps=seniority_spread_bps,
             credit_spread_bps=credit_spread_bps,
             capital_posture_regime=regime,

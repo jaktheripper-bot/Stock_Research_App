@@ -8,14 +8,30 @@ Grounded strictly in verified exchange filings, operating metrics, and balance s
 """
 
 from typing import Dict, Any, List, Optional
+import math
 import logging
 
 logger = logging.getLogger("equity_research.core.analysis.bull_bear")
 
 
+def _safe_float(v: Any, default: float = 0.0) -> float:
+    if v is None:
+        return default
+    if isinstance(v, (int, float)):
+        if math.isnan(v) or math.isinf(v):
+            return default
+        return float(v)
+    try:
+        clean = str(v).strip().replace(",", "").replace("%", "")
+        f = float(clean)
+        return default if (math.isnan(f) or math.isinf(f)) else f
+    except (ValueError, TypeError):
+        return default
+
+
 def synthesize_bull_bear_thesis(
     ticker: str,
-    fundamentals: Dict[str, Any],
+    fundamentals: Optional[Dict[str, Any]],
     sector_data: Optional[Dict[str, Any]] = None,
     valuation_data: Optional[Dict[str, Any]] = None,
     forensic_data: Optional[Dict[str, Any]] = None,
@@ -23,13 +39,16 @@ def synthesize_bull_bear_thesis(
 ) -> Dict[str, Any]:
     """
     Synthesizes the core operational merits and risks into a digestible 60-second summary.
+    Hardened against null fundamentals, non-numeric strings, and format specifier errors.
     """
-    roce = float(fundamentals.get("roce") or fundamentals.get("return_on_capital") or 15.0)
-    roe = float(fundamentals.get("roe") or fundamentals.get("return_on_equity") or 14.0)
-    de = float(fundamentals.get("debt_to_equity") or fundamentals.get("debt_equity") or 0.2)
-    pe = float(fundamentals.get("pe_ratio") or 22.0)
-    sales_growth = float(fundamentals.get("sales_growth_3y") or 12.0)
-    sector_name = (sector_data.get("sector_display_name") if sector_data else "Industry") or "Industry"
+    fund = fundamentals if isinstance(fundamentals, dict) else {}
+    roce = _safe_float(fund.get("roce") or fund.get("return_on_capital"), 15.0)
+    roe = _safe_float(fund.get("roe") or fund.get("return_on_equity"), 14.0)
+    de = _safe_float(fund.get("debt_to_equity") or fund.get("debt_equity"), 0.2)
+    pe = _safe_float(fund.get("pe_ratio"), 22.0)
+    sales_growth = _safe_float(fund.get("sales_growth_3y"), 12.0)
+    sec_dict = sector_data if isinstance(sector_data, dict) else {}
+    sector_name = str(sec_dict.get("sector_display_name") or "Industry")
 
     bull_points: List[Dict[str, str]] = []
     bear_points: List[Dict[str, str]] = []
@@ -78,14 +97,19 @@ def synthesize_bull_bear_thesis(
         })
 
     # 3. Growth & Market Valuation
-    mos = valuation_data.get("margin_of_safety_pct", 0.0) if valuation_data else 0.0
-    flow_regime = flow_data.get("flow_regime", "") if flow_data else ""
+    val_dict = valuation_data if isinstance(valuation_data, dict) else {}
+    fl_dict = flow_data if isinstance(flow_data, dict) else {}
+    for_dict = forensic_data if isinstance(forensic_data, dict) else {}
+
+    mos = _safe_float(val_dict.get("margin_of_safety_pct"), 0.0)
+    fair_val = _safe_float(val_dict.get("fair_value"), 0.0)
+    flow_regime = str(fl_dict.get("flow_regime") or "")
 
     if mos > 10.0:
         bull_points.append({
             "pillar": "Valuation & Flow",
             "title": "Defensive Margin of Safety",
-            "detail": f"Trades at a {mos:.1f}% discount to intrinsic fair value (₹{valuation_data.get('fair_value', 0):,.2f}), offering downside valuation protection."
+            "detail": f"Trades at a {mos:.1f}% discount to intrinsic fair value (₹{fair_val:,.2f}), offering downside valuation protection."
         })
     elif "ACCUMULATION" in flow_regime:
         bull_points.append({
@@ -124,12 +148,12 @@ def synthesize_bull_bear_thesis(
         })
 
     # 2. Forensic / Governance Risks
-    flags = forensic_data.get("red_flags", []) if forensic_data else []
+    flags = for_dict.get("red_flags", []) if isinstance(for_dict.get("red_flags"), list) else []
     if flags:
         bear_points.append({
             "pillar": "Governance / Accounting",
             "title": "Surveillance Flags Identified",
-            "detail": f"Forensic sieve flagged: {'; '.join(flags[:2])}. Requires monitoring of cash flow realization."
+            "detail": f"Forensic sieve flagged: {'; '.join(str(f) for f in flags[:2])}. Requires monitoring of cash flow realization."
         })
     elif de > 0.60:
         bear_points.append({
@@ -145,17 +169,18 @@ def synthesize_bull_bear_thesis(
         })
 
     # 3. Market Depth & Drawdown Risk
-    if flow_data and "DISTRIBUTION" in flow_data.get("flow_regime", ""):
+    lc_buffer = _safe_float(fl_dict.get("lower_circuit_buffer_pct"), default=10.0)
+    if "DISTRIBUTION" in str(fl_dict.get("flow_regime") or ""):
         bear_points.append({
             "pillar": "Order Book Dynamics",
             "title": "Sell-Side Supply Overhang",
             "detail": "Angel One Level-2 depth indicates heavy ask-side volume capping intermediate upside momentum."
         })
-    elif flow_data and flow_data.get("lower_circuit_buffer_pct", 10.0) <= 4.0:
+    elif lc_buffer <= 4.0:
         bear_points.append({
             "pillar": "Liquidity Volatility",
             "title": "Proximity to Lower Circuit Band",
-            "detail": f"Stock is within {flow_data.get('lower_circuit_buffer_pct'):.1f}% of its daily exchange lower circuit freeze."
+            "detail": f"Stock is within {lc_buffer:.1f}% of its daily exchange lower circuit freeze."
         })
     else:
         bear_points.append({

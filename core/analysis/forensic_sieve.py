@@ -16,14 +16,19 @@ logger = logging.getLogger("equity_research.core.analysis.forensic_sieve")
 
 def evaluate_forensic_sieve(
     symbol: str,
-    fundamentals: Dict[str, Any]
+    fundamentals: Optional[Dict[str, Any]]
 ) -> Dict[str, Any]:
     """
     Evaluates corporate governance, accounting integrity, and balance sheet truth.
     Returns composite score, traffic light badge, and granular red flags.
+    Hardened against null fundamentals and malformed records.
     """
+    safe_fund = dict(fundamentals) if isinstance(fundamentals, dict) else {}
+    if not safe_fund.get("symbol") and not safe_fund.get("ticker"):
+        safe_fund["symbol"] = str(symbol or "UNKNOWN").upper().strip()
+
     # 1. Run ChanakyaGate 10-Point Clean-Room Sieve in SOFT diagnostic mode
-    chanakya_res = ChanakyaGate.evaluate_from_dict(fundamentals, mode="SOFT")
+    chanakya_res = ChanakyaGate.evaluate_from_dict(safe_fund, mode="SOFT")
 
     # 2. Extract flags and analyze severity
     red_flags = list(chanakya_res.flags)

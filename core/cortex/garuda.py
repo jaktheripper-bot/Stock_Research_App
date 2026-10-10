@@ -85,9 +85,14 @@ class GarudaReflexEngine:
     ) -> MicroSnapshotDelta:
         """
         Classifies an announcement and builds a surgical micro-snapshot delta.
+        Hardened against nulls, non-string types, and malformed inputs.
         """
-        cleaned_hl = headline.strip()
-        hasher = hashlib.sha256(f"{symbol}:{cleaned_hl}:{filing_date}".encode("utf-8"))
+        clean_symbol = str(symbol or "UNKNOWN").upper().strip()
+        cleaned_hl = str(headline or "").strip()
+        clean_date = str(filing_date or "").strip()
+        clean_url = str(details_url or "").strip()
+
+        hasher = hashlib.sha256(f"{clean_symbol}:{cleaned_hl}:{clean_date}".encode("utf-8"))
         ann_hash = hasher.hexdigest()[:12]
 
         target_pillar = 1
@@ -104,22 +109,21 @@ class GarudaReflexEngine:
         pillar_title = cls.PILLAR_TITLES.get(target_pillar, "Corporate Disclosures")
 
         # Create structured markdown bulletin snippet
-        date_str = filing_date if filing_date else datetime.now().strftime("%Y-%m-%d")
+        date_str = clean_date if clean_date else datetime.now().strftime("%Y-%m-%d")
         badge_urgency = "🔴 CRITICAL NOTICE" if urgency == "IMMEDIATE_REFRESH" else "🔵 REGULATORY UPDATE"
         
         snippet = (
-            f"\n> **{badge_urgency} ({date_str})** — `{symbol}`  \n"
+            f"\n> **{badge_urgency} ({date_str})** — `{clean_symbol}`  \n"
             f"> **Catalyst:** `{catalyst}` | **Filing Hash:** `{ann_hash}`  \n"
-            f"> {cleaned_hl}\n"
+            f"> {cleaned_hl if cleaned_hl else 'Routine regulatory filing / disclosure'}\n"
         )
-        if details_url:
-            snippet += f"> [Official BSE Disclosure Document]({details_url})\n"
-
+        if clean_url:
+            snippet += f"> [Official BSE Disclosure Document]({clean_url})\n"
 
         action_required = urgency in ["IMMEDIATE_REFRESH", "ROUTINE_PATCH"]
 
         return MicroSnapshotDelta(
-            symbol=symbol,
+            symbol=clean_symbol,
             target_pillar_id=target_pillar,
             target_pillar_title=pillar_title,
             catalyst_type=catalyst,
@@ -135,18 +139,20 @@ class GarudaReflexEngine:
     def process_feed(
         cls,
         symbol: str,
-        announcements: List[Dict[str, Any]],
+        announcements: Optional[List[Dict[str, Any]]],
     ) -> List[MicroSnapshotDelta]:
         """
         Processes a cohort of recent announcements and returns actionable deltas.
+        Hardened against null feeds and non-dict feed elements.
         """
         deltas: List[MicroSnapshotDelta] = []
-        for ann in announcements:
-            hl = ann.get("headline") or ann.get("NEWS_SUB") or ann.get("subject", "")
+        safe_feed = [a for a in (announcements or []) if isinstance(a, dict)]
+        for ann in safe_feed:
+            hl = str(ann.get("headline") or ann.get("NEWS_SUB") or ann.get("subject") or "").strip()
             if not hl:
                 continue
-            f_date = ann.get("date") or ann.get("NEWS_DT") or ""
-            url = ann.get("url") or ann.get("ATTACHMENTNAME") or ""
+            f_date = str(ann.get("date") or ann.get("NEWS_DT") or "").strip()
+            url = str(ann.get("url") or ann.get("ATTACHMENTNAME") or "").strip()
             delta = cls.classify_announcement(
                 symbol=symbol,
                 headline=hl,

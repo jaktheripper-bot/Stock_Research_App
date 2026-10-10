@@ -15,6 +15,21 @@ import logging
 logger = logging.getLogger("equity_research.core.analysis.valuation_radar")
 
 
+def _safe_float(v: Any, default: float = 0.0) -> float:
+    if v is None:
+        return default
+    if isinstance(v, (int, float)):
+        if math.isnan(v) or math.isinf(v):
+            return default
+        return float(v)
+    try:
+        clean = str(v).strip().replace(",", "").replace("%", "")
+        f = float(clean)
+        return default if (math.isnan(f) or math.isinf(f)) else f
+    except (ValueError, TypeError):
+        return default
+
+
 def compute_valuation_radar(
     current_price: float,
     pe_ratio: float,
@@ -27,8 +42,12 @@ def compute_valuation_radar(
 ) -> Dict[str, Any]:
     """
     Computes a triangulated intrinsic fair value range and Margin of Safety %.
+    Hardened against division by zero, discount rate inversions, and corrupt price inputs.
     """
-    if current_price <= 0:
+    c_price = _safe_float(current_price)
+    pe = _safe_float(pe_ratio)
+
+    if c_price <= 0:
         return {
             "status": "UNAVAILABLE",
             "fair_value": 0.0,
@@ -39,38 +58,47 @@ def compute_valuation_radar(
         }
 
     # 1. Derive or estimate normalized EPS
-    if eps is None or eps <= 0:
-        if pe_ratio > 0:
-            eps = round(current_price / pe_ratio, 2)
+    s_eps = _safe_float(eps) if eps is not None else 0.0
+    if s_eps <= 0:
+        if pe > 0:
+            s_eps = round(c_price / pe, 2)
         else:
-            eps = round(current_price * 0.04, 2)  # Conservative 4% earnings yield default
+            s_eps = round(c_price * 0.04, 2)  # Conservative 4% earnings yield default
 
-    growth_rate = (sales_growth_3y or 12.0) / 100.0
+    s_growth = _safe_float(sales_growth_3y, default=12.0)
+    growth_rate = s_growth / 100.0
     # Conservative cap on initial 5-year growth to prevent DCF hyper-extrapolation
     growth_rate = max(0.04, min(0.18, growth_rate))
 
+    # Safe discount rate & perpetual growth spread (Strictly prevents ZeroDivisionError)
+    disc_rate = max(0.02, _safe_float(discount_rate, default=0.11))
+    raw_term = _safe_float(terminal_growth_rate, default=0.045)
+    # Ensure terminal growth is clamped below discount rate by at least 150 bps
+    term_rate = min(disc_rate - 0.015, max(0.01, raw_term))
+    spread = max(0.015, disc_rate - term_rate)
+
     # Model 1: 5-Year Historical Median Multiple Fair Value
-    med_pe = historical_median_pe or 22.0
-    model1_pe_value = round(eps * med_pe, 2)
+    med_pe = max(5.0, _safe_float(historical_median_pe, default=22.0))
+    model1_pe_value = round(s_eps * med_pe, 2)
 
     # Model 2: 2-Stage Conservative DCF
     # Stage 1: 5 Years cash flow projection
     pv_stage1 = 0.0
-    projected_eps = eps
+    projected_eps = s_eps
     for year in range(1, 6):
         projected_eps *= (1.0 + growth_rate)
-        pv_stage1 += projected_eps / math.pow(1.0 + discount_rate, year)
+        pv_stage1 += projected_eps / math.pow(1.0 + disc_rate, year)
 
     # Stage 2: Terminal Value
-    terminal_eps = projected_eps * (1.0 + terminal_growth_rate)
-    terminal_value = terminal_eps / (discount_rate - terminal_growth_rate)
-    pv_terminal = terminal_value / math.pow(1.0 + discount_rate, 5)
+    terminal_eps = projected_eps * (1.0 + term_rate)
+    terminal_value = terminal_eps / spread
+    pv_terminal = terminal_value / math.pow(1.0 + disc_rate, 5)
 
     model2_dcf_value = round(pv_stage1 + pv_terminal, 2)
 
     # Model 3: Graham / Earnings Power Value (Zero-growth asset floor)
     # EPV = EPS / Discount Rate (sustainable earnings in perpetuity without expansion capex)
-    model3_epv_value = round(eps / discount_rate, 2)
+    model3_epv_value = round(s_eps / disc_rate, 2)
 
     # Triangulate Composite Intrinsic Fair Value
     # 40% DCF, 35% Historical Median PE, 25% Conservative EPV
@@ -89,7 +117,7 @@ def compute_valuation_radar(
     # Positive means current price is below fair value (Discount)
     # Negative means current price is above fair value (Premium / Overvalued)
     if composite_fair_value > 0:
-        margin_of_safety = round(((composite_fair_value - current_price) / composite_fair_value) * 100.0, 1)
+        margin_of_safety = round(((composite_fair_value - c_price) / composite_fair_value) * 100.0, 1)
     else:
         margin_of_safety = 0.0
 

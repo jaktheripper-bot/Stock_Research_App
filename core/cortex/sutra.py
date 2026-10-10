@@ -20,6 +20,21 @@ import logging
 logger = logging.getLogger(__name__)
 
 
+def _safe_float(v: Any, default: float = 0.0) -> float:
+    if v is None:
+        return default
+    if isinstance(v, (int, float)):
+        if math.isnan(v) or math.isinf(v):
+            return default
+        return float(v)
+    try:
+        clean = str(v).strip().replace(",", "").replace("%", "")
+        f = float(clean)
+        return default if (math.isnan(f) or math.isinf(f)) else f
+    except (ValueError, TypeError):
+        return default
+
+
 # Canonical top-holding profiles for prominent Indian mutual fund schemes (Fallback matrix)
 SCHEME_TOP_HOLDINGS_REGISTRY: Dict[str, Dict[str, float]] = {
     # PPFAS Flexi Cap Fund Direct
@@ -119,35 +134,39 @@ class SutraLookThroughEngine:
     @classmethod
     def audit_portfolio(
         cls,
-        direct_equities: List[Dict[str, Any]],     # [{"symbol": "HDFCBANK", "value_inr": 100000}, ...]
-        mutual_funds: List[Dict[str, Any]],        # [{"scheme_key": "PPFAS_FLEXICAP", "value_inr": 300000}, ...]
-        fixed_income_and_sov: List[Dict[str, Any]], # [{"asset_type": "GSEC/SGB/REIT", "value_inr": 100000}, ...]
+        direct_equities: Optional[List[Dict[str, Any]]],
+        mutual_funds: Optional[List[Dict[str, Any]]],
+        fixed_income_and_sov: Optional[List[Dict[str, Any]]],
     ) -> SutraLookThroughResult:
         """
         Executes complete multi-asset look-through deconstruction.
+        Hardened against nulls, non-dict items, strings with commas, and negative values.
         """
-        total_direct_val = sum(float(x.get("value_inr", 0)) for x in direct_equities)
-        total_mf_val = sum(float(x.get("value_inr", 0)) for x in mutual_funds)
-        total_sov_debt_val = sum(float(x.get("value_inr", 0)) for x in fixed_income_and_sov)
+        safe_eq = [x for x in (direct_equities or []) if isinstance(x, dict)]
+        safe_mf = [x for x in (mutual_funds or []) if isinstance(x, dict)]
+        safe_fi = [x for x in (fixed_income_and_sov or []) if isinstance(x, dict)]
+
+        total_direct_val = sum(max(0.0, _safe_float(x.get("value_inr"))) for x in safe_eq)
+        total_mf_val = sum(max(0.0, _safe_float(x.get("value_inr"))) for x in safe_mf)
+        total_sov_debt_val = sum(max(0.0, _safe_float(x.get("value_inr"))) for x in safe_fi)
         total_portfolio_val = max(1.0, total_direct_val + total_mf_val + total_sov_debt_val)
 
         # 1. Unpack consolidated company holdings
         # Map: symbol -> {"direct_val": float, "indirect_val": float, "funds": list}
         stock_map: Dict[str, Dict[str, Any]] = {}
 
-        for de in direct_equities:
-            sym = de.get("symbol", "").upper().strip()
-            val = float(de.get("value_inr", 0))
+        for de in safe_eq:
+            sym = str(de.get("symbol") or "").upper().strip()
+            val = max(0.0, _safe_float(de.get("value_inr")))
             if not sym or val <= 0:
                 continue
             if sym not in stock_map:
                 stock_map[sym] = {"direct_val": 0.0, "indirect_val": 0.0, "funds": []}
             stock_map[sym]["direct_val"] += val
 
-        for mf in mutual_funds:
-            scheme_key = mf.get("scheme_key") or mf.get("symbol", "")
-            scheme_key = scheme_key.upper().strip()
-            mf_val = float(mf.get("value_inr", 0))
+        for mf in safe_mf:
+            scheme_key = str(mf.get("scheme_key") or mf.get("symbol") or "").upper().strip()
+            mf_val = max(0.0, _safe_float(mf.get("value_inr")))
             if not scheme_key or mf_val <= 0:
                 continue
 
@@ -220,9 +239,9 @@ class SutraLookThroughEngine:
         sov_val = 0.0
         debt_val = 0.0
         reit_val = 0.0
-        for fi in fixed_income_and_sov:
-            atype = str(fi.get("asset_type", "")).upper()
-            v = float(fi.get("value_inr", 0))
+        for fi in safe_fi:
+            atype = str(fi.get("asset_type") or "").upper()
+            v = max(0.0, _safe_float(fi.get("value_inr")))
             if "SOV" in atype or "GSEC" in atype or "SGB" in atype or "GOLD" in atype:
                 sov_val += v
             elif "REIT" in atype or "REAL" in atype:
@@ -251,8 +270,8 @@ class SutraLookThroughEngine:
         health_score = max(20.0, min(100.0, health_score))
 
         summary = (
-            f"Sutra Audit: Analyzed ₹{total_portfolio_val:,.0f} across {len(direct_equities)} direct equities, "
-            f"{len(mutual_funds)} mutual funds, and {len(fixed_income_and_sov)} fixed-income assets. "
+            f"Sutra Audit: Analyzed ₹{total_portfolio_val:,.0f} across {len(safe_eq)} direct equities, "
+            f"{len(safe_mf)} mutual funds, and {len(safe_fi)} fixed-income assets. "
             f"Top holding: {exposures[0].symbol if exposures else 'None'} ({exposures[0].total_exposure_pct if exposures else 0:.1f}%). "
             f"Fiduciary Health Score: {health_score:.1f}/100. Alerts: {len(hidden_overlap_alerts)}."
         )

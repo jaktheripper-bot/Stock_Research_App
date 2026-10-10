@@ -26,6 +26,7 @@ import socket
 import logging
 from typing import Optional, Dict, Any, Tuple
 import requests
+import math
 
 from core.config import get_secret
 
@@ -36,20 +37,33 @@ def generate_rfc6238_totp(secret: str, digits: int = 6, interval: int = 30) -> s
     """
     Generates a standard 6-digit Time-based One-Time Password (RFC 6238).
     Pure Python standard library implementation with zero external dependencies.
+    Resilient to whitespace, lowercase characters, missing padding, and invalid inputs.
     """
-    clean_secret = secret.strip().replace(" ", "").upper()
-    # Add padding if required
-    missing_padding = len(clean_secret) % 8
-    if missing_padding:
-        clean_secret += "=" * (8 - missing_padding)
-    
-    key = base64.b32decode(clean_secret)
-    counter = int(time.time() // interval)
-    msg = struct.pack(">Q", counter)
-    digest = hmac.new(key, msg, hashlib.sha1).digest()
-    offset = digest[-1] & 0x0F
-    code = (struct.unpack(">I", digest[offset:offset + 4])[0] & 0x7FFFFFFF) % (10 ** digits)
-    return str(code).zfill(digits)
+    if not secret or not isinstance(secret, str):
+        return ""
+
+    try:
+        clean_secret = secret.strip().replace(" ", "").upper()
+        # Filter for valid base32 characters (A-Z, 2-7)
+        clean_secret = "".join(c for c in clean_secret if c in "ABCDEFGHIJKLMNOPQRSTUVWXYZ234567")
+        if not clean_secret:
+            return ""
+
+        # Add padding if required
+        missing_padding = len(clean_secret) % 8
+        if missing_padding:
+            clean_secret += "=" * (8 - missing_padding)
+
+        key = base64.b32decode(clean_secret)
+        counter = int(time.time() // interval)
+        msg = struct.pack(">Q", counter)
+        digest = hmac.new(key, msg, hashlib.sha1).digest()
+        offset = digest[-1] & 0x0F
+        code = (struct.unpack(">I", digest[offset:offset + 4])[0] & 0x7FFFFFFF) % (10 ** digits)
+        return str(code).zfill(digits)
+    except Exception as e:
+        logger.warning(f"RFC 6238 TOTP generation notice: {e}")
+        return ""
 
 
 class AngelOneGateway:
@@ -282,23 +296,36 @@ class AngelOneGateway:
     @classmethod
     def compute_depth_analytics(
         cls,
-        buy_book: List[Dict[str, Any]],
-        sell_book: List[Dict[str, Any]],
+        buy_book: Optional[List[Dict[str, Any]]],
+        sell_book: Optional[List[Dict[str, Any]]],
     ) -> Dict[str, Any]:
         """
         Computes institutional order book depth analytics from 5-tier bid/ask books.
+        Hardened against null books, missing price/quantity values, and type errors.
         """
-        tot_buy_qty = sum(float(b.get("quantity", 0)) for b in buy_book)
-        tot_sell_qty = sum(float(s.get("quantity", 0)) for s in sell_book)
+        def _safe_float(v: Any) -> float:
+            if v is None:
+                return 0.0
+            try:
+                f = float(str(v).strip().replace(",", ""))
+                return 0.0 if math.isnan(f) or math.isinf(f) else f
+            except (ValueError, TypeError):
+                return 0.0
+
+        b_list = [b for b in (buy_book or []) if isinstance(b, dict)]
+        s_list = [s for s in (sell_book or []) if isinstance(s, dict)]
+
+        tot_buy_qty = sum(_safe_float(b.get("quantity")) for b in b_list)
+        tot_sell_qty = sum(_safe_float(s.get("quantity")) for s in s_list)
         
-        tot_buy_val = sum(float(b.get("quantity", 0)) * float(b.get("price", 0)) for b in buy_book)
-        tot_sell_val = sum(float(s.get("quantity", 0)) * float(s.get("price", 0)) for s in sell_book)
+        tot_buy_val = sum(_safe_float(b.get("quantity")) * _safe_float(b.get("price")) for b in b_list)
+        tot_sell_val = sum(_safe_float(s.get("quantity")) * _safe_float(s.get("price")) for s in s_list)
         
         denom = tot_buy_qty + tot_sell_qty
         imbalance = ((tot_buy_qty - tot_sell_qty) / denom) if denom > 0 else 0.0
 
-        best_bid = float(buy_book[0].get("price", 0)) if buy_book else 0.0
-        best_ask = float(sell_book[0].get("price", 0)) if sell_book else 0.0
+        best_bid = _safe_float(b_list[0].get("price")) if b_list else 0.0
+        best_ask = _safe_float(s_list[0].get("price")) if s_list else 0.0
         spread_bps = ((best_ask - best_bid) / best_bid * 10000.0) if best_bid > 0 and best_ask > best_bid else 0.0
 
         if imbalance > 0.25:

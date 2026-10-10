@@ -29,6 +29,26 @@ import logging
 logger = logging.getLogger(__name__)
 
 
+def _safe_float(v: Any, default: float = 0.0) -> float:
+    if v is None:
+        return default
+    if isinstance(v, (int, float)):
+        if math.isnan(v) or math.isinf(v):
+            return default
+        return float(v)
+    try:
+        clean = str(v).strip().replace(",", "").replace("%", "")
+        f = float(clean)
+        return default if (math.isnan(f) or math.isinf(f)) else f
+    except (ValueError, TypeError):
+        return default
+
+
+def _safe_int(v: Any, default: int = 0) -> int:
+    f = _safe_float(v, default=float(default))
+    return int(round(f))
+
+
 @dataclass
 class ChanakyaCheckResult:
     check_name: str
@@ -365,29 +385,31 @@ class ChanakyaGate:
         )
 
     @classmethod
-    def evaluate_from_dict(cls, data: Dict[str, Any], mode: str = "STRICT") -> ChanakyaResult:
+    def evaluate_from_dict(cls, data: Optional[Dict[str, Any]], mode: str = "STRICT") -> ChanakyaResult:
         """
         Convenience adapter to evaluate from standard stock dictionary or fundamentals payload.
+        Hardened against null dictionaries, non-numeric strings, commas, and NaNs.
         """
-        symbol = data.get("symbol") or data.get("ticker", "UNKNOWN")
-        mcap = float(data.get("market_cap_cr") or data.get("mcap_cr") or (data.get("base_mcap", 0) / 1e7) or 100.0)
-        cfo = float(data.get("operating_cash_flow_cr") or data.get("cfo_cr", 15.0))
-        ebitda = float(data.get("ebitda_cr") or data.get("ebitda", 20.0))
-        pbt = float(data.get("reported_pbt_cr") or data.get("pbt_cr", 15.0))
-        tax = float(data.get("tax_paid_cr") or data.get("tax_cr", 3.8))
-        pledge = float(data.get("promoter_pledge_pct") or data.get("pledge_pct", 0.0))
-        pledge_delta = float(data.get("promoter_pledge_qoq_delta", 0.0))
-        auditor_churn = int(data.get("auditor_replacements_3y", 0))
-        cont_liab = float(data.get("contingent_liabilities_cr", 0.0))
-        net_worth = float(data.get("net_worth_cr") or data.get("tangible_net_worth_cr", 50.0))
-        rpt = float(data.get("rpt_transaction_cr", 0.0))
-        revenue = float(data.get("net_revenue_cr") or data.get("sales_cr", 100.0))
-        dso = float(data.get("dso_days", 45.0))
-        dso_prior = float(data.get("dso_prior_year", 45.0))
-        sales_growth = float(data.get("sales_growth_3y") or data.get("sales_growth_pct", 15.0))
-        de = float(data.get("debt_to_equity", 0.1))
-        icr = float(data.get("interest_coverage_ratio", 10.0))
-        is_fin = bool(data.get("is_financial_sector") or ("Bank" in str(data.get("sector", ""))))
+        d = data if isinstance(data, dict) else {}
+        symbol = str(d.get("symbol") or d.get("ticker") or "UNKNOWN").upper().strip()
+        mcap = _safe_float(d.get("market_cap_cr") or d.get("mcap_cr") or (_safe_float(d.get("base_mcap")) / 1e7), default=100.0)
+        cfo = _safe_float(d.get("operating_cash_flow_cr") or d.get("cfo_cr"), default=15.0)
+        ebitda = _safe_float(d.get("ebitda_cr") or d.get("ebitda"), default=20.0)
+        pbt = _safe_float(d.get("reported_pbt_cr") or d.get("pbt_cr"), default=15.0)
+        tax = _safe_float(d.get("tax_paid_cr") or d.get("tax_cr"), default=3.8)
+        pledge = _safe_float(d.get("promoter_pledge_pct") or d.get("pledge_pct"), default=0.0)
+        pledge_delta = _safe_float(d.get("promoter_pledge_qoq_delta"), default=0.0)
+        auditor_churn = _safe_int(d.get("auditor_replacements_3y"), default=0)
+        cont_liab = _safe_float(d.get("contingent_liabilities_cr"), default=0.0)
+        net_worth = _safe_float(d.get("net_worth_cr") or d.get("tangible_net_worth_cr"), default=50.0)
+        rpt = _safe_float(d.get("rpt_transaction_cr"), default=0.0)
+        revenue = _safe_float(d.get("net_revenue_cr") or d.get("sales_cr"), default=100.0)
+        dso = _safe_float(d.get("dso_days"), default=45.0)
+        dso_prior = _safe_float(d.get("dso_prior_year"), default=45.0)
+        sales_growth = _safe_float(d.get("sales_growth_3y") or d.get("sales_growth_pct"), default=15.0)
+        de = _safe_float(d.get("debt_to_equity"), default=0.1)
+        icr = _safe_float(d.get("interest_coverage_ratio"), default=10.0)
+        is_fin = bool(d.get("is_financial_sector") or ("Bank" in str(d.get("sector", ""))))
 
         return cls.evaluate(
             symbol=symbol,

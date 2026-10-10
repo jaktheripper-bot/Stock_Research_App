@@ -7,9 +7,26 @@ Replaces generic one-size-fits-all scoring with domain-appropriate financial sie
 """
 
 from typing import Dict, Any, List, Optional, Tuple
+import math
 import logging
 
 logger = logging.getLogger("equity_research.core.analysis.sector_scoring")
+
+
+def _safe_float(v: Any, default: float = 0.0) -> float:
+    if v is None:
+        return default
+    if isinstance(v, (int, float)):
+        if math.isnan(v) or math.isinf(v):
+            return default
+        return float(v)
+    try:
+        clean = str(v).strip().replace(",", "").replace("%", "")
+        f = float(clean)
+        return default if (math.isnan(f) or math.isinf(f)) else f
+    except (ValueError, TypeError):
+        return default
+
 
 # Sector taxonomy classification keyword map
 SECTOR_KEYWORDS = {
@@ -152,8 +169,9 @@ def detect_sector(
 ) -> str:
     """
     Infers the high-level sector classification using symbol, industry description, and name.
+    Hardened against null and non-string tickers.
     """
-    clean_sym = ticker.upper().replace("-EQ", "").strip()
+    clean_sym = str(ticker or "").upper().replace("-EQ", "").strip()
     if clean_sym in KNOWN_TICKER_SECTORS:
         return KNOWN_TICKER_SECTORS[clean_sym]
 
@@ -161,7 +179,7 @@ def detect_sector(
     if any(b in clean_sym for b in ["BANK", "HDFC", "ICICI", "KOTAK", "AXIS", "SBIN", "PNB", "INDUSIND"]):
         return "BFSI"
 
-    text_to_check = f"{clean_sym} {industry_str} {company_name}".upper()
+    text_to_check = f"{clean_sym} {str(industry_str or '')} {str(company_name or '')}".upper()
     for sector, keywords in SECTOR_KEYWORDS.items():
         for kw in keywords:
             if kw in text_to_check:
@@ -172,23 +190,26 @@ def detect_sector(
 
 def evaluate_sector_fundamentals(
     ticker: str,
-    fundamentals: Dict[str, Any],
+    fundamentals: Optional[Dict[str, Any]],
     industry_str: str = "",
     company_name: str = ""
 ) -> Dict[str, Any]:
     """
     Computes a tailored sector scorecard, highlighting native operational metrics.
+    Hardened against null fundamentals, strings with commas, and NaN ratios.
     """
     sector = detect_sector(ticker, industry_str, company_name)
     benchmarks = SECTOR_BENCHMARKS.get(sector, SECTOR_BENCHMARKS["CONSUMER_FMCG"])
 
-    # Extract base fundamentals
-    roce = float(fundamentals.get("roce") or fundamentals.get("return_on_capital") or 15.0)
-    roe = float(fundamentals.get("roe") or fundamentals.get("return_on_equity") or 14.0)
-    debt_equity = float(fundamentals.get("debt_to_equity") or fundamentals.get("debt_equity") or 0.25)
-    pe_ratio = float(fundamentals.get("pe_ratio") or 22.0)
-    pb_ratio = float(fundamentals.get("pb_ratio") or 3.0)
-    sales_growth = float(fundamentals.get("sales_growth_3y") or fundamentals.get("revenue_growth") or 12.0)
+    fund = fundamentals if isinstance(fundamentals, dict) else {}
+
+    # Extract base fundamentals safely
+    roce = _safe_float(fund.get("roce") or fund.get("return_on_capital"), 15.0)
+    roe = _safe_float(fund.get("roe") or fund.get("return_on_equity"), 14.0)
+    debt_equity = _safe_float(fund.get("debt_to_equity") or fund.get("debt_equity"), 0.25)
+    pe_ratio = _safe_float(fund.get("pe_ratio"), 22.0)
+    pb_ratio = _safe_float(fund.get("pb_ratio"), 3.0)
+    sales_growth = _safe_float(fund.get("sales_growth_3y") or fund.get("revenue_growth"), 12.0)
 
     score_components = []
     kpis = []
