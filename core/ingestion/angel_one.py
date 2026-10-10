@@ -427,11 +427,20 @@ class AngelOneGateway:
         if not from_date:
             from_date = (datetime.now() - timedelta(days=120)).strftime("%Y-%m-%d 09:15")
 
+        local_ip = "127.0.0.1"
+        try:
+            local_ip = socket.gethostbyname(socket.gethostname())
+        except Exception:
+            pass
+
         headers = {
             "Content-Type": "application/json",
             "Accept": "application/json",
             "X-UserType": "USER",
             "X-SourceID": "WEB",
+            "X-ClientLocalIP": local_ip,
+            "X-ClientPublicIP": local_ip,
+            "X-MACAddress": "00:00:00:00:00:00",
             "X-PrivateKey": api_key,
             "Authorization": f"Bearer {jwt_token}",
         }
