@@ -142,6 +142,197 @@
       {% endif %}
     </div>
 
+    <!-- Institutional Equity Intelligence Cockpit (Category 1 Upgrade) -->
+    {% if equity_intel %}
+    <div style="margin-bottom: 30px; background: rgba(15, 23, 42, 0.85); border: 1px solid rgba(56, 189, 248, 0.25); border-radius: var(--radius-md); padding: 22px; backdrop-filter: blur(12px); box-shadow: 0 8px 32px rgba(0,0,0,0.3);">
+      
+      <!-- Cockpit Header Banner -->
+      <div style="display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid rgba(255,255,255,0.08); padding-bottom: 16px; margin-bottom: 20px; flex-wrap: wrap; gap: 14px;">
+        <div>
+          <div style="font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.08em; color: #38bdf8; display: flex; align-items: center; gap: 6px;">
+            <span>⚡</span> Institutional Intelligence Cockpit
+          </div>
+          <div style="font-size: 20px; font-weight: 800; color: #f8fafc; margin-top: 4px;">
+            {{ equity_intel.sector_intelligence.sector_display_name }} Diagnostic Profile
+          </div>
+        </div>
+        
+        <div style="display: flex; align-items: center; gap: 12px; flex-wrap: wrap;">
+          <div style="text-align: right;">
+            <div style="font-size: 11px; color: var(--text-muted);">Composite Quality</div>
+            <div style="font-size: 22px; font-weight: 800; color: {{ equity_intel.composite_color }};">
+              {{ equity_intel.composite_score }}<span style="font-size: 13px; color: var(--text-muted);">/100</span>
+            </div>
+          </div>
+          <span class="badge" style="background: rgba(14, 165, 233, 0.15); color: {{ equity_intel.composite_color }}; border: 1px solid {{ equity_intel.composite_color }}44; font-weight: 700; font-size: 12px; padding: 6px 12px; border-radius: 9999px;">
+            {{ equity_intel.composite_verdict.replace('_', ' ') }}
+          </span>
+        </div>
+      </div>
+
+      <!-- 4 Pillars Ribbon -->
+      <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 12px; margin-bottom: 20px;">
+        
+        <!-- Sector Pillar -->
+        <div style="background: rgba(30, 41, 59, 0.5); border: 1px solid rgba(255,255,255,0.06); border-radius: 8px; padding: 12px 14px;">
+          <div style="display: flex; justify-content: space-between; align-items: center;">
+            <span style="font-size: 11px; color: var(--text-muted); font-weight: 600;">SECTOR EFFICIENCY</span>
+            <span style="font-size: 12px; font-weight: 800; color: {{ equity_intel.sector_intelligence.badge_color }};">{{ equity_intel.sector_intelligence.score }}/100</span>
+          </div>
+          <div style="font-size: 13.5px; font-weight: 700; color: #e2e8f0; margin-top: 4px;">
+            {{ equity_intel.sector_intelligence.verdict.replace('_', ' ').title() }}
+          </div>
+        </div>
+
+        <!-- Valuation Radar Pillar -->
+        <div style="background: rgba(30, 41, 59, 0.5); border: 1px solid rgba(255,255,255,0.06); border-radius: 8px; padding: 12px 14px;">
+          <div style="display: flex; justify-content: space-between; align-items: center;">
+            <span style="font-size: 11px; color: var(--text-muted); font-weight: 600;">MARGIN OF SAFETY</span>
+            <span style="font-size: 12px; font-weight: 800; color: {{ equity_intel.valuation_radar.badge_color }};">
+              {% if equity_intel.valuation_radar.margin_of_safety_pct >= 0 %}+{% endif %}{{ equity_intel.valuation_radar.margin_of_safety_pct }}%
+            </span>
+          </div>
+          <div style="font-size: 13.5px; font-weight: 700; color: #e2e8f0; margin-top: 4px;">
+            ₹{{ "{:,.2f}".format(equity_intel.valuation_radar.fair_value) }} <span style="font-size: 11px; color: var(--text-muted); font-weight: normal;">Intrinsic</span>
+          </div>
+        </div>
+
+        <!-- Forensic Pillar -->
+        <div style="background: rgba(30, 41, 59, 0.5); border: 1px solid rgba(255,255,255,0.06); border-radius: 8px; padding: 12px 14px;">
+          <div style="display: flex; justify-content: space-between; align-items: center;">
+            <span style="font-size: 11px; color: var(--text-muted); font-weight: 600;">360° FORENSIC AUDIT</span>
+            <span style="font-size: 12px; font-weight: 800; color: {{ equity_intel.forensic_intelligence.badge_color }};">{{ equity_intel.forensic_intelligence.passed_count }}/{{ equity_intel.forensic_intelligence.total_checks }} Passed</span>
+          </div>
+          <div style="font-size: 13.5px; font-weight: 700; color: {{ equity_intel.forensic_intelligence.badge_color }}; margin-top: 4px;">
+            {{ equity_intel.forensic_intelligence.badge_label }}
+          </div>
+        </div>
+
+        <!-- Institutional Flow Pillar (Angel One) -->
+        <div style="background: rgba(30, 41, 59, 0.5); border: 1px solid rgba(255,255,255,0.06); border-radius: 8px; padding: 12px 14px;">
+          <div style="display: flex; justify-content: space-between; align-items: center;">
+            <span style="font-size: 11px; color: var(--text-muted); font-weight: 600;">EXCHANGE DEPTH (L2)</span>
+            <span style="font-size: 12px; font-weight: 800; color: {{ equity_intel.institutional_flow.badge_color }};">{{ equity_intel.institutional_flow.score }}/100</span>
+          </div>
+          <div style="font-size: 13.5px; font-weight: 700; color: {{ equity_intel.institutional_flow.badge_color }}; margin-top: 4px;">
+            {{ equity_intel.institutional_flow.flow_regime.replace('_', ' ').title() }}
+          </div>
+        </div>
+
+      </div>
+
+      <!-- Sector-Native Metrics Grid & Level-2 Snapshot -->
+      <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(320px, 1fr)); gap: 16px; margin-bottom: 22px;">
+        
+        <!-- Native Sector KPI Card -->
+        <div style="background: rgba(15, 23, 42, 0.6); border: 1px solid rgba(255,255,255,0.08); border-radius: 8px; padding: 16px;">
+          <div style="font-size: 13px; font-weight: 700; color: #38bdf8; margin-bottom: 12px; display: flex; align-items: center; justify-content: space-between;">
+            <span>Sector Benchmark Metrics ({{ equity_intel.sector_intelligence.sector_display_name }})</span>
+            <span style="font-size: 11px; color: var(--text-muted);">vs Indian Industry Peers</span>
+          </div>
+          <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px;">
+            {% for k in equity_intel.sector_intelligence.kpis %}
+            <div style="background: rgba(30, 41, 59, 0.4); border-radius: 6px; padding: 8px 10px;">
+              <div style="font-size: 11px; color: var(--text-muted);">{{ k.name }}</div>
+              <div style="font-size: 15px; font-weight: 700; color: #f1f5f9; margin-top: 2px;">{{ k.val }}</div>
+              <div style="font-size: 10.5px; color: {% if k.status == 'PASS' %}#10b981{% else %}#fbbf24{% endif %}; margin-top: 2px;">
+                {{ k.benchmark }} ({{ k.status }})
+              </div>
+            </div>
+            {% endfor %}
+          </div>
+          <div style="font-size: 12px; color: var(--text-secondary); margin-top: 12px; line-height: 1.4;">
+            {{ equity_intel.sector_intelligence.narrative }}
+          </div>
+        </div>
+
+        <!-- Angel One Market Depth & Circuit Bands -->
+        <div style="background: rgba(15, 23, 42, 0.6); border: 1px solid rgba(255,255,255,0.08); border-radius: 8px; padding: 16px;">
+          <div style="font-size: 13px; font-weight: 700; color: #38bdf8; margin-bottom: 12px; display: flex; align-items: center; justify-content: space-between;">
+            <span>Live Order Depth & Circuit Proximity</span>
+            <span class="badge" style="font-size: 10.5px; background: rgba(56, 189, 248, 0.15); color: #38bdf8;">{{ equity_intel.institutional_flow.source }}</span>
+          </div>
+
+          <div style="display: flex; justify-content: space-between; margin-bottom: 10px; font-size: 12px;">
+            <div>
+              <span style="color: var(--text-muted);">Order Imbalance:</span>
+              <strong style="color: {{ equity_intel.institutional_flow.badge_color }};"> {{ (equity_intel.institutional_flow.imbalance_ratio * 100)|round(1) }}% Bids</strong>
+            </div>
+            <div>
+              <span style="color: var(--text-muted);">Bid-Ask Spread:</span>
+              <strong style="color: #f1f5f9;"> {{ equity_intel.institutional_flow.spread_bps }} bps</strong>
+            </div>
+          </div>
+
+          <!-- Circuit Limit Buffers -->
+          <div style="background: rgba(30, 41, 59, 0.4); border-radius: 6px; padding: 10px; margin-bottom: 10px;">
+            <div style="display: flex; justify-content: space-between; font-size: 11.5px; margin-bottom: 4px;">
+              <span style="color: #ef4444;">Lower Circuit Buffer: <strong>{{ equity_intel.institutional_flow.lower_circuit_buffer_pct }}%</strong></span>
+              <span style="color: #10b981;">Upper Circuit Buffer: <strong>{{ equity_intel.institutional_flow.upper_circuit_buffer_pct }}%</strong></span>
+            </div>
+            <div style="height: 6px; background: rgba(255,255,255,0.1); border-radius: 9999px; overflow: hidden; display: flex;">
+              <div style="width: 50%; background: #ef444466;"></div>
+              <div style="width: 50%; background: #10b98166;"></div>
+            </div>
+          </div>
+
+          <div style="font-size: 12px; color: var(--text-secondary); line-height: 1.4;">
+            {{ equity_intel.institutional_flow.narrative }}
+          </div>
+        </div>
+
+      </div>
+
+      <!-- 60-Second "Bull vs. Bear" Structural Thesis Box -->
+      {% if equity_intel.bull_bear_thesis %}
+      <div style="border-top: 1px solid rgba(255,255,255,0.08); padding-top: 18px;">
+        <div style="font-size: 12px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.05em; color: var(--text-muted); margin-bottom: 14px;">
+          ⚖️ The 60-Second Structural Thesis: Key Drivers vs Critical Vulnerabilities
+        </div>
+
+        <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(320px, 1fr)); gap: 16px;">
+          
+          <!-- Bull Thesis Column -->
+          <div style="background: rgba(16, 185, 129, 0.05); border: 1px solid rgba(16, 185, 129, 0.25); border-radius: 8px; padding: 14px 16px;">
+            <div style="font-size: 13.5px; font-weight: 700; color: #10b981; margin-bottom: 10px; display: flex; align-items: center; gap: 6px;">
+              <span>🟢</span> Top 3 Structural Tailwinds (Bull Case)
+            </div>
+            <div style="display: flex; flex-direction: column; gap: 10px;">
+              {% for b in equity_intel.bull_bear_thesis.bull_thesis %}
+              <div>
+                <div style="font-size: 12.5px; font-weight: 700; color: #f1f5f9;">{{ loop.index }}. {{ b.title }}</div>
+                <div style="font-size: 12px; color: #94a3b8; line-height: 1.35; margin-top: 2px;">{{ b.detail }}</div>
+              </div>
+              {% endfor %}
+            </div>
+          </div>
+
+          <!-- Bear Thesis Column -->
+          <div style="background: rgba(239, 68, 68, 0.05); border: 1px solid rgba(239, 68, 68, 0.25); border-radius: 8px; padding: 14px 16px;">
+            <div style="font-size: 13.5px; font-weight: 700; color: #f87171; margin-bottom: 10px; display: flex; align-items: center; gap: 6px;">
+              <span>🔴</span> Top 3 Specific Vulnerabilities (Bear Case)
+            </div>
+            <div style="display: flex; flex-direction: column; gap: 10px;">
+              {% for r in equity_intel.bull_bear_thesis.bear_thesis %}
+              <div>
+                <div style="font-size: 12.5px; font-weight: 700; color: #f1f5f9;">{{ loop.index }}. {{ r.title }}</div>
+                <div style="font-size: 12px; color: #94a3b8; line-height: 1.35; margin-top: 2px;">{{ r.detail }}</div>
+              </div>
+              {% endfor %}
+            </div>
+          </div>
+
+        </div>
+
+        <div style="font-size: 11px; color: var(--text-muted); margin-top: 12px; text-align: center;">
+          {{ equity_intel.bull_bear_thesis.compliance_notice }}
+        </div>
+      </div>
+      {% endif %}
+
+    </div>
+    {% endif %}
+
     <!-- Multi-Quarter Thesis Drift Surveillance Card (Hoisted Above Report) -->
     {% if diff %}
     <div style="margin-bottom: 30px; background: rgba(15, 23, 42, 0.9); border: 1px solid rgba(14, 165, 233, 0.35); border-radius: var(--radius-md); padding: 22px;">

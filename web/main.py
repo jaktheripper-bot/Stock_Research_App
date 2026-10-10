@@ -937,6 +937,19 @@ def dossier_page(request: Request, ticker: str):
     except Exception as e:
         logger.debug(f"Linked debt query notice for {canonical}: {e}")
 
+    # Phase 1 Upgrade: Institutional Equity Intelligence (Sector, Flow, Forensics, Valuation Radar, Bull/Bear)
+    equity_intel = None
+    try:
+        from core.analysis.equity_dossier_intelligence import compile_equity_dossier_intelligence
+        equity_intel = compile_equity_dossier_intelligence(
+            ticker=canonical,
+            fundamentals=fund,
+            company_name=rep.get("short_name", canonical),
+            industry_str=rep.get("industry", ""),
+        )
+    except Exception as e:
+        logger.debug(f"Equity dossier intelligence compilation notice for {canonical}: {e}")
+
     return templates.TemplateResponse(
         request=request,
         name="dossier.html",
@@ -965,6 +978,7 @@ def dossier_page(request: Request, ticker: str):
             "contagion_alert": contagion_alert,
             "is_deep_dive_unlocked": is_deep_dive_unlocked,
             "web_user": web_user,
+            "equity_intel": equity_intel,
         }
     )
 
@@ -3218,6 +3232,34 @@ async def api_dossier_status(request: Request, ticker: str):
         "is_unlocked": is_unlocked,
         "user_id": web_user.get("id") if web_user else None
     })
+
+
+@app.get("/api/dossier/intel/{ticker}")
+async def api_dossier_intel(ticker: str):
+    """
+    Returns comprehensive Category 1 institutional equity intelligence:
+    Sector-native metrics, Angel One level-2 depth, 360 forensic sieve, valuation radar, and bull/bear thesis.
+    """
+    clean_t = clean_ticker(ticker)
+    if not clean_t:
+        raise HTTPException(status_code=400, detail="Invalid ticker symbol.")
+    canonical = resolve_canonical_symbol(clean_t) or clean_t
+    
+    rep = get_report_by_ticker_sync(canonical) or {}
+    fund = {}
+    try:
+        fund = get_stock_fundamentals(canonical) or {}
+    except Exception as e:
+        logger.debug(f"Fundamentals lookup notice for {canonical}: {e}")
+
+    from core.analysis.equity_dossier_intelligence import compile_equity_dossier_intelligence
+    intel = compile_equity_dossier_intelligence(
+        ticker=canonical,
+        fundamentals=fund,
+        company_name=rep.get("short_name", canonical),
+        industry_str=rep.get("industry", ""),
+    )
+    return json_response_with_cache({"success": True, "intelligence": intel})
 
 
 @app.get("/api/user/{user_id}")
