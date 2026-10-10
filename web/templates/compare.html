@@ -153,32 +153,32 @@
         <!-- Price to Book -->
         <tr style="border-bottom: 1px solid rgba(255,255,255,0.04);">
           <td style="padding: 12px 24px; color: var(--text-secondary); font-weight: 500;">Price to Book (P/B)</td>
-          <td class="tnum" style="padding: 12px 24px; color: var(--text-primary);">{{ fund_a.pb_ratio|default('N/A') }}</td>
-          <td class="tnum" style="padding: 12px 24px; color: var(--text-primary);">{{ fund_b.pb_ratio|default('N/A') }}</td>
+          <td class="tnum" style="padding: 12px 24px; color: var(--text-primary);">{{ fund_a.pb_ratio|default(fund_a.price_to_book|default('N/A')) }}</td>
+          <td class="tnum" style="padding: 12px 24px; color: var(--text-primary);">{{ fund_b.pb_ratio|default(fund_b.price_to_book|default('N/A')) }}</td>
         </tr>
         <!-- EV / EBITDA -->
         <tr style="border-bottom: 1px solid rgba(255,255,255,0.04); background: rgba(30, 41, 59, 0.2);">
           <td style="padding: 12px 24px; color: var(--text-secondary); font-weight: 500;">EV / EBITDA Multiple</td>
-          <td class="tnum" style="padding: 12px 24px; color: var(--text-primary);">{{ fund_a.ev_ebitda|default('N/A') }}</td>
-          <td class="tnum" style="padding: 12px 24px; color: var(--text-primary);">{{ fund_b.ev_ebitda|default('N/A') }}</td>
+          <td class="tnum" style="padding: 12px 24px; color: var(--text-primary);">{{ fund_a.ev_ebitda|default(fund_a.ev_to_ebitda|default('N/A')) }}</td>
+          <td class="tnum" style="padding: 12px 24px; color: var(--text-primary);">{{ fund_b.ev_ebitda|default(fund_b.ev_to_ebitda|default('N/A')) }}</td>
         </tr>
         <!-- ROCE % -->
         <tr style="border-bottom: 1px solid rgba(255,255,255,0.04);">
           <td style="padding: 12px 24px; color: var(--text-secondary); font-weight: 500;">ROCE (Return on Capital Employed)</td>
-          <td class="tnum" style="padding: 12px 24px; font-weight: 700; color: var(--text-primary);">{{ fund_a.roce|default('N/A') }}{% if fund_a.roce and fund_a.roce != 'N/A' %}%{% endif %}</td>
-          <td class="tnum" style="padding: 12px 24px; font-weight: 700; color: var(--text-primary);">{{ fund_b.roce|default('N/A') }}{% if fund_b.roce and fund_b.roce != 'N/A' %}%{% endif %}</td>
+          <td class="tnum" style="padding: 12px 24px; font-weight: 700; color: var(--text-primary);">{% set roce_a = fund_a.roce|default(fund_a.roce_pct) %}{% if roce_a and roce_a != 'N/A' %}{{ roce_a|string|replace('%', '') }}%{% else %}N/A{% endif %}</td>
+          <td class="tnum" style="padding: 12px 24px; font-weight: 700; color: var(--text-primary);">{% set roce_b = fund_b.roce|default(fund_b.roce_pct) %}{% if roce_b and roce_b != 'N/A' %}{{ roce_b|string|replace('%', '') }}%{% else %}N/A{% endif %}</td>
         </tr>
         <!-- ROE % -->
         <tr style="border-bottom: 1px solid rgba(255,255,255,0.04); background: rgba(30, 41, 59, 0.2);">
           <td style="padding: 12px 24px; color: var(--text-secondary); font-weight: 500;">ROE (Return on Equity)</td>
-          <td class="tnum" style="padding: 12px 24px; color: var(--text-primary);">{{ fund_a.roe|default('N/A') }}{% if fund_a.roe and fund_a.roe != 'N/A' %}%{% endif %}</td>
-          <td class="tnum" style="padding: 12px 24px; color: var(--text-primary);">{{ fund_b.roe|default('N/A') }}{% if fund_b.roe and fund_b.roe != 'N/A' %}%{% endif %}</td>
+          <td class="tnum" style="padding: 12px 24px; color: var(--text-primary);">{% if fund_a.roe and fund_a.roe != 'N/A' %}{{ fund_a.roe|string|replace('%', '') }}%{% else %}N/A{% endif %}</td>
+          <td class="tnum" style="padding: 12px 24px; color: var(--text-primary);">{% if fund_b.roe and fund_b.roe != 'N/A' %}{{ fund_b.roe|string|replace('%', '') }}%{% else %}N/A{% endif %}</td>
         </tr>
         <!-- Operating Margin % -->
         <tr style="border-bottom: 1px solid rgba(255,255,255,0.04);">
           <td style="padding: 12px 24px; color: var(--text-secondary); font-weight: 500;">Operating Margin (OPM)</td>
-          <td class="tnum" style="padding: 12px 24px; color: var(--text-primary);">{{ fund_a.operating_margin|default('N/A') }}{% if fund_a.operating_margin and fund_a.operating_margin != 'N/A' %}%{% endif %}</td>
-          <td class="tnum" style="padding: 12px 24px; color: var(--text-primary);">{{ fund_b.operating_margin|default('N/A') }}{% if fund_b.operating_margin and fund_b.operating_margin != 'N/A' %}%{% endif %}</td>
+          <td class="tnum" style="padding: 12px 24px; color: var(--text-primary);">{% set opm_a = fund_a.operating_margin|default(fund_a.opm) %}{% if opm_a and opm_a != 'N/A' %}{{ opm_a|string|replace('%', '') }}%{% else %}N/A{% endif %}</td>
+          <td class="tnum" style="padding: 12px 24px; color: var(--text-primary);">{% set opm_b = fund_b.operating_margin|default(fund_b.opm) %}{% if opm_b and opm_b != 'N/A' %}{{ opm_b|string|replace('%', '') }}%{% else %}N/A{% endif %}</td>
         </tr>
         <!-- Debt to Equity -->
         <tr style="border-bottom: 1px solid rgba(255,255,255,0.04); background: rgba(30, 41, 59, 0.2);">
@@ -189,8 +189,8 @@
         <!-- 52-Week Range -->
         <tr style="border-bottom: 1px solid rgba(255,255,255,0.04);">
           <td style="padding: 12px 24px; color: var(--text-secondary); font-weight: 500;">52-Week Range (Low – High)</td>
-          <td class="tnum" style="padding: 12px 24px; color: var(--text-primary);">{% if fund_a.fifty_two_week_low and fund_a.fifty_two_week_high and fund_a.fifty_two_week_low != 'N/A' and fund_a.fifty_two_week_high != 'N/A' %}₹{{ fund_a.fifty_two_week_low }} – ₹{{ fund_a.fifty_two_week_high }}{% else %}N/A{% endif %}</td>
-          <td class="tnum" style="padding: 12px 24px; color: var(--text-primary);">{% if fund_b.fifty_two_week_low and fund_b.fifty_two_week_high and fund_b.fifty_two_week_low != 'N/A' and fund_b.fifty_two_week_high != 'N/A' %}₹{{ fund_b.fifty_two_week_low }} – ₹{{ fund_b.fifty_two_week_high }}{% else %}N/A{% endif %}</td>
+          <td class="tnum" style="padding: 12px 24px; color: var(--text-primary);">{% set low_a = fund_a.fifty_two_week_low|default(fund_a['52w_low']) %}{% set high_a = fund_a.fifty_two_week_high|default(fund_a['52w_high']) %}{% if low_a and high_a and low_a != 'N/A' and high_a != 'N/A' %}₹{{ low_a|string|replace('₹', '') }} – ₹{{ high_a|string|replace('₹', '') }}{% else %}N/A{% endif %}</td>
+          <td class="tnum" style="padding: 12px 24px; color: var(--text-primary);">{% set low_b = fund_b.fifty_two_week_low|default(fund_b['52w_low']) %}{% set high_b = fund_b.fifty_two_week_high|default(fund_b['52w_high']) %}{% if low_b and high_b and low_b != 'N/A' and high_b != 'N/A' %}₹{{ low_b|string|replace('₹', '') }} – ₹{{ high_b|string|replace('₹', '') }}{% else %}N/A{% endif %}</td>
         </tr>
       </tbody>
     </table>

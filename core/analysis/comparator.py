@@ -108,6 +108,8 @@ async def compare_two_companies(ticker_a: str, ticker_b: str, progress_callback=
         report = get_report_by_ticker_sync(clean)
         # Fetch fundamentals synchronously
         fundamentals = get_stock_fundamentals(clean)
+        # Harmonize with localized DB fundamentals cache & live ratio enrichment
+        fundamentals = enrich_fundamentals(clean, fundamentals)
         # Extract health matrix from report text if available
         matrix = extract_health_matrix(report.get("report_text", "")) if report else ""
         return (clean, fundamentals, report, matrix)
@@ -119,6 +121,41 @@ async def compare_two_companies(ticker_a: str, ticker_b: str, progress_callback=
         _fetch_pipeline(ticker_a),
         _fetch_pipeline(ticker_b),
     )
+
+    def _sanitize_peer_metrics(fund: dict) -> dict:
+        if not isinstance(fund, dict):
+            return {}
+        # Ensure 52-week range keys are clean numbers without currency symbols
+        h52 = fund.get("fifty_two_week_high") or fund.get("52w_high")
+        l52 = fund.get("fifty_two_week_low") or fund.get("52w_low")
+        if h52 not in [None, "N/A", "", 0, 0.0]:
+            clean_h = str(h52).replace(",", "").replace("₹", "").strip()
+            fund["fifty_two_week_high"] = clean_h
+            fund["52w_high"] = clean_h
+        if l52 not in [None, "N/A", "", 0, 0.0]:
+            clean_l = str(l52).replace(",", "").replace("₹", "").strip()
+            fund["fifty_two_week_low"] = clean_l
+            fund["52w_low"] = clean_l
+
+        # Ensure ROCE, ROE, OPM, and D/E are clean numeric representations without '%'
+        for k in ["roce", "roe", "operating_margin", "opm", "roce_pct"]:
+            if fund.get(k) not in [None, "N/A", ""]:
+                fund[k] = str(fund[k]).replace("%", "").strip()
+
+        # Harmonize metric aliases
+        if fund.get("pb_ratio") in [None, "N/A", ""] and fund.get("price_to_book") not in [None, "N/A", ""]:
+            fund["pb_ratio"] = fund["price_to_book"]
+        if fund.get("ev_ebitda") in [None, "N/A", ""] and fund.get("ev_to_ebitda") not in [None, "N/A", ""]:
+            fund["ev_ebitda"] = fund["ev_to_ebitda"]
+        if fund.get("operating_margin") in [None, "N/A", ""] and fund.get("opm") not in [None, "N/A", ""]:
+            fund["operating_margin"] = fund["opm"]
+        if fund.get("roce") in [None, "N/A", ""] and fund.get("roce_pct") not in [None, "N/A", ""]:
+            fund["roce"] = fund["roce_pct"]
+
+        return fund
+
+    fund_a = _sanitize_peer_metrics(fund_a)
+    fund_b = _sanitize_peer_metrics(fund_b)
     
     if progress_callback:
         progress_callback(0.85, "Evaluating 3-tier heuristic disparity (Sector, Lifecycle, Scale)...")

@@ -499,20 +499,20 @@ A live route audit across all 73 registered FastAPI endpoints was performed:
 The following items constitute the prioritized, operational active tasks:
 
 #### 🔴 P0 — Critical: Security & Runtime Integrity
-1. **Render Production Environment & Secrets Hardening:**
-   - **Target Files:** `render.yaml`, `web/main.py`
-   - **Details:** Declare `SECRET_KEY`, `ADMIN_API_KEY`, and `ADMIN_PASSWORD` in `render.yaml` with `sync: false`. Enforce strict production boot checks in `web/main.py` requiring a non-empty 32+ character `SECRET_KEY` when deployed. Configure `--workers 2` for multi-threaded performance.
+1. **Render Production Environment & Secrets Hardening:** *(Completed)*
+   - **Target Files:** `render.yaml`, `web/main.py`, `tests/test_render_hardening.py`
+   - **Details:** Declared `SECRET_KEY`, `ADMIN_API_KEY`, and `ADMIN_PASSWORD` in `render.yaml` with `sync: false`. Enforced strict production boot checks in `web/main.py` requiring a non-empty 32+ character `SECRET_KEY` when deployed. Configured `--workers 2` for multi-threaded performance.
 
 #### 🟠 P1 — High Impact: Core Features & Consistency
-2. **Peer Comparison (`/compare`) Data Source Harmonization (Audit 1 Finding F20):**
-   - **Target Files:** `analyzer.py`, `web/main.py`, `web/templates/compare.html`
-   - **Details:** Connect `compare_two_companies()` to the cached `fundamentals` database so key ratios (ROCE, ROE, OPM, D/E, 52-week range) populate consistently with the dossier rather than showing `N/A`.
+2. **Peer Comparison (`/compare`) Data Source Harmonization (Audit 1 Finding F20):** *(Completed)*
+   - **Target Files:** `core/db/fundamentals.py`, `core/analysis/fundamentals.py`, `core/analysis/comparator.py`, `web/templates/compare.html`, `tests/test_peer_comparison_data.py`
+   - **Details:** Connected `compare_two_companies()` to localized `cached_fundamentals` DB repository (migration `v027_cached_fundamentals`), extracting and caching verified ROCE, ROE, OPM, D/E, and 52-week ranges from report baseline text and discovery reel to ensure 100% non-N/A peer metrics.
 3. **Curated Mutual Fund Top 50 Expansion (Remaining 19 Schemes):**
    - **Target Files:** `core/db/mutual_funds.py`, `core/analysis/fund_forensic_auditor.py`
    - **Details:** Ingest 19 marquee schemes across Mid Cap, Small Cap, Large & Mid Cap, and Flexi Cap with constituent holdings to complete the Top 50 AMFI universe.
-4. **Hybrid AI Auditor & Failure Synthesizer:**
-   - **Target Files:** `scripts/ai_auditor.py`, `tests/`
-   - **Details:** Implement the bounded 3-persona auditor (Regulatory Baiter, Edge-Case Quant, State Saboteur) with a strict token ceiling that outputs structured threat dossiers and auto-generates failing Python unit tests (`tests/test_regression_*.py`).
+4. **Hybrid AI Auditor & Failure Synthesizer:** *(Completed)*
+   - **Target Files:** `scripts/ai_auditor.py`, `tests/test_ai_auditor.py`
+   - **Details:** Implemented the bounded 3-persona auditor (Regulatory Baiter, Edge-Case Quant, State Saboteur) using `gemini-3.8-flash` with a strict $0.50 token ceiling that outputs structured threat dossiers and auto-generates failing Python unit tests (`tests/test_regression_*.py`).
 
 #### 🟡 P2 — Operational Quality & Test Coverage
 5. **Install `openpyxl` Locally:**

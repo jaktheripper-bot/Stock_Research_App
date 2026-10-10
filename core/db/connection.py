@@ -1655,6 +1655,61 @@ def init_db(force: bool = False):
                     cursor.execute("INSERT OR IGNORE INTO schema_migrations (version) VALUES ('v026_user_unlocked_dossiers');")
                 conn.commit()
 
+            # Migration v027: Localized Fundamentals Cache for Peer Comparison & Fast-Path Resolution
+            if "v027_cached_fundamentals" not in applied:
+                logger.info("Applying schema migration: v027_cached_fundamentals...")
+                if supabase_url:
+                    cursor.execute("""
+                        CREATE TABLE IF NOT EXISTS cached_fundamentals (
+                            ticker VARCHAR(32) PRIMARY KEY,
+                            company_name VARCHAR(255),
+                            sector VARCHAR(100),
+                            industry VARCHAR(100),
+                            current_price NUMERIC,
+                            market_cap NUMERIC,
+                            pe_ratio VARCHAR(32),
+                            forward_pe VARCHAR(32),
+                            pb_ratio VARCHAR(32),
+                            ev_ebitda VARCHAR(32),
+                            roce NUMERIC,
+                            roe NUMERIC,
+                            operating_margin NUMERIC,
+                            debt_to_equity NUMERIC,
+                            fifty_two_week_high NUMERIC,
+                            fifty_two_week_low NUMERIC,
+                            source VARCHAR(64) DEFAULT 'LOCAL_DB_HARMONIZED',
+                            updated_at TIMESTAMPTZ DEFAULT now()
+                        );
+                        CREATE INDEX IF NOT EXISTS idx_cached_fundamentals_ticker ON cached_fundamentals (ticker);
+                        INSERT INTO schema_migrations (version) VALUES ('v027_cached_fundamentals') ON CONFLICT DO NOTHING;
+                    """)
+                else:
+                    cursor.execute("""
+                        CREATE TABLE IF NOT EXISTS cached_fundamentals (
+                            ticker TEXT PRIMARY KEY,
+                            company_name TEXT,
+                            sector TEXT,
+                            industry TEXT,
+                            current_price REAL,
+                            market_cap REAL,
+                            pe_ratio TEXT,
+                            forward_pe TEXT,
+                            pb_ratio TEXT,
+                            ev_ebitda TEXT,
+                            roce REAL,
+                            roe REAL,
+                            operating_margin REAL,
+                            debt_to_equity REAL,
+                            fifty_two_week_high REAL,
+                            fifty_two_week_low REAL,
+                            source TEXT DEFAULT 'LOCAL_DB_HARMONIZED',
+                            updated_at TEXT DEFAULT (datetime('now'))
+                        );
+                    """)
+                    cursor.execute("CREATE INDEX IF NOT EXISTS idx_cached_fundamentals_ticker ON cached_fundamentals (ticker);")
+                    cursor.execute("INSERT OR IGNORE INTO schema_migrations (version) VALUES ('v027_cached_fundamentals');")
+                conn.commit()
+
             _DB_INITIALIZED = True
             _INITIALIZED_DBS.add(target_key)
         except Exception as e:

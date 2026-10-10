@@ -53,11 +53,44 @@ def ttl_cache(ttl_seconds: int = 300, maxsize: int = 128):
     return decorator
 
 def enrich_fundamentals(ticker: str, data: dict) -> dict:
-    """Enriches stock fundamentals with institutional ratios (fallback to yfinance)."""
+    """
+    Enriches stock fundamentals with institutional ratios.
+    First checks localized DB fundamentals cache, then falls back to yfinance backfill,
+    and persists enriched metrics into cached_fundamentals repository.
+    """
+    clean_sym = clean_ticker(ticker)
+    if data is None:
+        data = {}
+
+    # 1. Primary enrichment: Localized DB fundamentals cache
+    try:
+        from core.db.fundamentals import get_cached_fundamentals
+        cached = get_cached_fundamentals(clean_sym)
+        if cached:
+            for k in [
+                "roce", "roce_pct", "roe", "operating_margin", "opm",
+                "debt_to_equity", "pb_ratio", "price_to_book", "ev_ebitda",
+                "ev_to_ebitda", "forward_pe", "fifty_two_week_high",
+                "fifty_two_week_low", "52w_high", "52w_low"
+            ]:
+                if data.get(k) in [None, "N/A", "", 0, 0.0] and cached.get(k) is not None:
+                    data[k] = cached[k]
+
+            if data.get("sector") in [None, "N/A", "", "General Industry", "Core Industry"] and cached.get("sector"):
+                data["sector"] = cached["sector"]
+            if data.get("industry") in [None, "N/A", "", "Diversified"] and cached.get("industry"):
+                data["industry"] = cached["industry"]
+            if data.get("market_cap") in [None, "N/A", 0, "0"] and cached.get("market_cap"):
+                data["market_cap"] = cached["market_cap"]
+            if data.get("current_price") in [None, "N/A", 0, 0.0] and cached.get("current_price"):
+                data["current_price"] = cached["current_price"]
+            if data.get("pe_ratio") in [None, "N/A", ""] and cached.get("pe_ratio"):
+                data["pe_ratio"] = cached["pe_ratio"]
+    except Exception as cache_err:
+        logger.debug(f"Localized fundamentals cache enrichment notice for {clean_sym}: {cache_err}")
 
     # 2. Secondary enrichment: yfinance backfill
     try:
-        clean_sym = clean_ticker(ticker)
         yf_ticker = f"{clean_sym}.BO" if clean_sym.isdigit() else f"{clean_sym}.NS"
         info = yf.Ticker(yf_ticker).info or {}
 
@@ -74,11 +107,11 @@ def enrich_fundamentals(ticker: str, data: dict) -> dict:
                 data["market_cap"] = int(mcap)
 
         # Sector & Industry
-        if data.get("sector") in [None, "N/A", "-", "", "Core Industry", "Diversified / Core Industry"]:
+        if data.get("sector") in [None, "N/A", "-", "", "Core Industry", "Diversified / Core Industry", "General Industry"]:
             sec = info.get("sector")
             if sec:
                 data["sector"] = sec
-        if data.get("industry") in [None, "N/A", "-", "", "General Corporate"]:
+        if data.get("industry") in [None, "N/A", "-", "", "General Corporate", "Diversified"]:
             ind = info.get("industry")
             if ind:
                 data["industry"] = ind
@@ -87,59 +120,108 @@ def enrich_fundamentals(ticker: str, data: dict) -> dict:
         fpe = info.get("forwardPE")
         if fpe and isinstance(fpe, (int, float)) and fpe > 0:
             data["forward_pe"] = f"{float(fpe):.2f}"
-        else:
-            data["forward_pe"] = data.get("forward_pe", "N/A")
+        elif "forward_pe" not in data:
+            data["forward_pe"] = "N/A"
 
         pb = info.get("priceToBook")
         if pb and isinstance(pb, (int, float)) and pb > 0:
+            data["pb_ratio"] = f"{float(pb):.2f}"
             data["price_to_book"] = f"{float(pb):.2f}"
-        else:
-            data["price_to_book"] = data.get("price_to_book", "N/A")
+        elif "pb_ratio" not in data:
+            data["pb_ratio"] = data.get("price_to_book", "N/A")
+            data["price_to_book"] = data.get("pb_ratio", "N/A")
 
         eve = info.get("enterpriseToEbitda")
         if eve and isinstance(eve, (int, float)) and 0 < eve < 500:
+            data["ev_ebitda"] = f"{float(eve):.2f}"
             data["ev_to_ebitda"] = f"{float(eve):.2f}"
-        else:
-            data["ev_to_ebitda"] = data.get("ev_to_ebitda", "N/A")
+        elif "ev_ebitda" not in data:
+            data["ev_ebitda"] = data.get("ev_to_ebitda", "N/A")
+            data["ev_to_ebitda"] = data.get("ev_ebitda", "N/A")
 
         roe = info.get("returnOnEquity")
         if roe is not None and isinstance(roe, (int, float)):
-            data["roe"] = f"{float(roe * 100):.1f}%"
-        else:
-            data["roe"] = data.get("roe", "N/A")
+            data["roe"] = round(float(roe * 100), 2)
+        elif data.get("roe") is None:
+            data["roe"] = "N/A"
 
         opm = info.get("operatingMargins")
         if opm is not None and isinstance(opm, (int, float)):
-            data["opm"] = f"{float(opm * 100):.1f}%"
-        else:
-            data["opm"] = data.get("opm", "N/A")
+            opm_val = round(float(opm * 100), 2)
+            data["operating_margin"] = opm_val
+            data["opm"] = opm_val
+        elif data.get("operating_margin") is None:
+            data["operating_margin"] = data.get("opm", "N/A")
+            data["opm"] = data.get("operating_margin", "N/A")
 
         npm = info.get("profitMargins")
         if npm is not None and isinstance(npm, (int, float)):
-            data["npm"] = f"{float(npm * 100):.1f}%"
-        else:
-            data["npm"] = data.get("npm", "N/A")
+            data["npm"] = round(float(npm * 100), 2)
 
         de = info.get("debtToEquity")
         if de is not None and isinstance(de, (int, float)):
-            data["debt_to_equity"] = f"{float(de):.2f}"
-        else:
-            data["debt_to_equity"] = data.get("debt_to_equity", "N/A")
+            data["debt_to_equity"] = round(float(de), 2)
+        elif data.get("debt_to_equity") is None:
+            data["debt_to_equity"] = "N/A"
 
         dy = info.get("dividendYield")
         if dy is not None and isinstance(dy, (int, float)):
             val = dy if dy > 1 else dy * 100
             data["dividend_yield"] = f"{float(val):.2f}%"
-        else:
-            data["dividend_yield"] = data.get("dividend_yield", "N/A")
 
         cr = info.get("currentRatio")
         if cr is not None and isinstance(cr, (int, float)):
             data["current_ratio"] = f"{float(cr):.2f}"
-        else:
-            data["current_ratio"] = data.get("current_ratio", "N/A")
+
+        # 52-week numbers from yfinance if missing
+        if data.get("fifty_two_week_high") in [None, "N/A"] and info.get("fiftyTwoWeekHigh"):
+            data["fifty_two_week_high"] = round(float(info["fiftyTwoWeekHigh"]), 2)
+            data["52w_high"] = data["fifty_two_week_high"]
+        if data.get("fifty_two_week_low") in [None, "N/A"] and info.get("fiftyTwoWeekLow"):
+            data["fifty_two_week_low"] = round(float(info["fiftyTwoWeekLow"]), 2)
+            data["52w_low"] = data["fifty_two_week_low"]
+
     except Exception as e:
         logger.warning(f"Background fundamental enrichment notice: {e}")
+
+    # Harmonize complementary aliases
+    if data.get("roce") is not None:
+        data["roce_pct"] = data["roce"]
+    elif data.get("roce_pct") is not None:
+        data["roce"] = data["roce_pct"]
+
+    if data.get("fifty_two_week_high") is not None:
+        data["52w_high"] = data["fifty_two_week_high"]
+    elif data.get("52w_high") not in [None, "N/A"]:
+        data["fifty_two_week_high"] = data["52w_high"]
+
+    if data.get("fifty_two_week_low") is not None:
+        data["52w_low"] = data["fifty_two_week_low"]
+    elif data.get("52w_low") not in [None, "N/A"]:
+        data["fifty_two_week_low"] = data["52w_low"]
+
+    if data.get("operating_margin") is not None:
+        data["opm"] = data["operating_margin"]
+    elif data.get("opm") not in [None, "N/A"]:
+        data["operating_margin"] = data["opm"]
+
+    if data.get("pb_ratio") not in [None, "N/A"]:
+        data["price_to_book"] = data["pb_ratio"]
+    elif data.get("price_to_book") not in [None, "N/A"]:
+        data["pb_ratio"] = data["price_to_book"]
+
+    if data.get("ev_ebitda") not in [None, "N/A"]:
+        data["ev_to_ebitda"] = data["ev_ebitda"]
+    elif data.get("ev_to_ebitda") not in [None, "N/A"]:
+        data["ev_ebitda"] = data["ev_to_ebitda"]
+
+    # 3. Persist enriched state back to localized database cache
+    try:
+        from core.db.fundamentals import save_cached_fundamentals
+        save_cached_fundamentals(clean_sym, data)
+    except Exception as save_err:
+        logger.debug(f"Cached fundamentals persistence notice: {save_err}")
+
     return data
 
 def resolve_pe_with_failsafes(ticker: str, scrip: str = "") -> str:
@@ -250,6 +332,60 @@ def fetch_bse_exchange_data(query: str) -> dict:
 
 _FUNDAMENTALS_CACHE = {}
 
+def _enrich_with_cached_db_fundamentals(res_dict: dict, symbol: str) -> dict:
+    """Blends localized DB fundamentals cache to ensure non-N/A ratios even on live exchange quote hits."""
+    if not isinstance(res_dict, dict):
+        return res_dict
+    try:
+        from core.db.fundamentals import get_cached_fundamentals
+        cached = get_cached_fundamentals(symbol)
+        if cached:
+            for k in [
+                "roce", "roce_pct", "roe", "operating_margin", "opm",
+                "debt_to_equity", "pb_ratio", "price_to_book", "ev_ebitda",
+                "ev_to_ebitda", "forward_pe"
+            ]:
+                if res_dict.get(k) in [None, "N/A", "", 0, 0.0] and cached.get(k) is not None:
+                    res_dict[k] = cached[k]
+
+            if res_dict.get("52w_high") in [None, "N/A", "", 0, 0.0] and cached.get("fifty_two_week_high"):
+                res_dict["52w_high"] = cached["fifty_two_week_high"]
+            if res_dict.get("52w_low") in [None, "N/A", "", 0, 0.0] and cached.get("fifty_two_week_low"):
+                res_dict["52w_low"] = cached["fifty_two_week_low"]
+            if res_dict.get("fifty_two_week_high") in [None, "N/A", "", 0, 0.0]:
+                res_dict["fifty_two_week_high"] = cached.get("fifty_two_week_high") or res_dict.get("52w_high")
+            if res_dict.get("fifty_two_week_low") in [None, "N/A", "", 0, 0.0]:
+                res_dict["fifty_two_week_low"] = cached.get("fifty_two_week_low") or res_dict.get("52w_low")
+            if res_dict.get("sector") in [None, "N/A", "", "General Industry"] and cached.get("sector"):
+                res_dict["sector"] = cached["sector"]
+            if res_dict.get("industry") in [None, "N/A", "", "Diversified"] and cached.get("industry"):
+                res_dict["industry"] = cached["industry"]
+    except Exception as e:
+        logger.debug(f"Cached fundamentals blend notice for {symbol}: {e}")
+
+    # Harmonize complementary aliases
+    if res_dict.get("roce") is not None:
+        res_dict["roce_pct"] = res_dict["roce"]
+    elif res_dict.get("roce_pct") is not None:
+        res_dict["roce"] = res_dict["roce_pct"]
+
+    if res_dict.get("fifty_two_week_high") is not None:
+        res_dict["52w_high"] = res_dict["fifty_two_week_high"]
+    elif res_dict.get("52w_high") not in [None, "N/A"]:
+        res_dict["fifty_two_week_high"] = res_dict["52w_high"]
+
+    if res_dict.get("fifty_two_week_low") is not None:
+        res_dict["52w_low"] = res_dict["fifty_two_week_low"]
+    elif res_dict.get("52w_low") not in [None, "N/A"]:
+        res_dict["fifty_two_week_low"] = res_dict["52w_low"]
+
+    if res_dict.get("operating_margin") is not None:
+        res_dict["opm"] = res_dict["operating_margin"]
+    elif res_dict.get("opm") not in [None, "N/A"]:
+        res_dict["operating_margin"] = res_dict["opm"]
+
+    return res_dict
+
 def get_stock_fundamentals(query: str) -> dict:
     """
     Primary entry point: Fetches verified exchange data from BSE.
@@ -290,6 +426,7 @@ def get_stock_fundamentals(query: str) -> dict:
                     "exchange_status": "Active / Primary (Exchange Feed)",
                     "is_fallback": False,
                 }
+                res_dict = _enrich_with_cached_db_fundamentals(res_dict, canonical or clean)
                 _FUNDAMENTALS_CACHE[clean] = (now, res_dict)
                 _FUNDAMENTALS_CACHE[canonical] = (now, res_dict)
                 return res_dict
@@ -300,6 +437,7 @@ def get_stock_fundamentals(query: str) -> dict:
     try:
         raw_data = fetch_bse_exchange_data(canonical)
         if raw_data and not raw_data.get("is_fallback", False):
+            raw_data = _enrich_with_cached_db_fundamentals(raw_data, canonical or clean)
             _FUNDAMENTALS_CACHE[clean] = (now, raw_data)
             _FUNDAMENTALS_CACHE[canonical] = (now, raw_data)
             return raw_data
@@ -347,14 +485,25 @@ def get_stock_fundamentals(query: str) -> dict:
                     "exchange_status": "Active / Secondary (yfinance Fast Gateway)",
                     "is_fallback": True
                 }
+                res_dict = _enrich_with_cached_db_fundamentals(res_dict, canonical or clean)
                 _FUNDAMENTALS_CACHE[clean] = (now, res_dict)
                 _FUNDAMENTALS_CACHE[canonical] = (now, res_dict)
                 return res_dict
     except Exception as yf_err:
         logger.debug(f"yfinance fast gateway notice for {query}: {yf_err}")
 
-    # 3. Tertiary Resilience: Instant Database Report Baseline Fallback
+    # 3. Tertiary Resilience: Instant Localized Database Fundamentals Fallback
     try:
+        from core.db.fundamentals import get_cached_fundamentals
+        cached_fund = get_cached_fundamentals(canonical or clean)
+        if cached_fund and cached_fund.get("current_price"):
+            res_dict = dict(cached_fund)
+            res_dict["is_fallback"] = True
+            res_dict["exchange_status"] = "Audited Baseline (Database Fallback)"
+            _FUNDAMENTALS_CACHE[clean] = (now, res_dict)
+            _FUNDAMENTALS_CACHE[canonical] = (now, res_dict)
+            return res_dict
+
         from core.db.reports import get_report_by_ticker_sync
         rep = get_report_by_ticker_sync(canonical)
         if rep and rep.get("baseline_price"):

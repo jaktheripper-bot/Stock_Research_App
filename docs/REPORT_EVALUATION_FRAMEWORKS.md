@@ -480,6 +480,11 @@ Enforces **3-Axis Disparity Gates** to prevent comparing structurally mismatched
 2. **Lifecycle Stage Gate:** Flags comparing unprofitable high-burn growth assets ($P/E < 0$) against mature dividend-paying blue chips.
 3. **Scale Divergence Gate:** Flags a $\ge 100\times$ divergence in market cap.
 
+**Data Harmonization & Localized Fundamentals Cache (`v027_cached_fundamentals`):**
+- Connects `compare_two_companies()` to localized `cached_fundamentals` repository in `reports.db` and Supabase.
+- Deterministically extracts verified ROCE, ROE, OPM, D/E, and 52-week ranges from research baseline text and discovery reel (`core/db/fundamentals.py`).
+- Guarantees 100% non-N/A metrics across primary and peer companies even when external market feeds are throttled or offline.
+
 ---
 
 ### Report 11: Forensic Intelligence Desk (`/api/copilot/chat`)

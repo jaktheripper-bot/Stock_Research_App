@@ -105,6 +105,13 @@ from core.db.support import (
     get_open_tickets_count,
 )
 
+from core.db.fundamentals import (
+    get_cached_fundamentals,
+    save_cached_fundamentals,
+    sync_all_cached_fundamentals,
+    extract_fundamentals_from_report_text,
+)
+
 __all__ = [
     # connection
     "IST",
@@ -175,4 +182,9 @@ __all__ = [
     "get_support_tickets",
     "update_ticket_status",
     "get_open_tickets_count",
+    # fundamentals cache
+    "get_cached_fundamentals",
+    "save_cached_fundamentals",
+    "sync_all_cached_fundamentals",
+    "extract_fundamentals_from_report_text",
 ]
