@@ -41,7 +41,8 @@ from core.audit.tools import (
     tool_probe_web_endpoints,
     tool_scan_prohibited_terms,
     tool_scan_code_hygiene,
-    tool_audit_design_tokens
+    tool_audit_design_tokens,
+    tool_audit_frontend_and_api_contracts
 )
 from core.db.audit_logs import save_project_audit_log
 from core.config import get_secret
@@ -93,6 +94,9 @@ def compute_deterministic_audit_metrics() -> Dict[str, Any]:
     logger.info("Auditing CSS design tokens & behavioral styling...")
     design_res = tool_audit_design_tokens()
 
+    logger.info("Auditing client-side click wiring, API contracts & link health...")
+    contracts_res = tool_audit_frontend_and_api_contracts()
+
     # --- 1. Pillar: Strategy Score (0-100) ---
     strategy_score = 100.0
     critical_violations = []
@@ -107,6 +111,10 @@ def compute_deterministic_audit_metrics() -> Dict[str, Any]:
     if not terms_res.get("has_statutory_disclaimer"):
         strategy_score -= 20.0
         critical_violations.append("Missing statutory SEBI Section 2(u) non-advisory disclaimer in base template.")
+
+    if contracts_res.get("stale_external_links_count", 0) > 0:
+        strategy_score -= min(contracts_res["stale_external_links_count"] * 10.0, 20.0)
+        critical_violations.append(f"Deprecated exchange URLs detected: {contracts_res['stale_external_links_count']} link(s) point to defunct BSE ASPX forms.")
 
     strategy_score = max(round(strategy_score, 1), 0.0)
 
@@ -124,6 +132,10 @@ def compute_deterministic_audit_metrics() -> Dict[str, Any]:
     elif tests_total == 0:
         impl_score -= 30.0
         critical_violations.append("Automated test discovery returned 0 executed tests.")
+
+    if contracts_res.get("unmapped_api_routes_count", 0) > 0:
+        impl_score -= min(contracts_res["unmapped_api_routes_count"] * 10.0, 20.0)
+        critical_violations.append(f"Broken API contract: {contracts_res['unmapped_api_routes_count']} frontend fetch call(s) target unmapped FastAPI backend routes.")
 
     # Deduct minor points for silent exception swallow anti-patterns
     anti_patterns = hygiene_res.get("anti_patterns_count", 0)
@@ -145,6 +157,11 @@ def compute_deterministic_audit_metrics() -> Dict[str, Any]:
 
     if endpoints_failed > 0:
         critical_violations.append(f"{endpoints_failed} web endpoint(s) failed health check or threw error status.")
+
+    if contracts_res.get("orphaned_onclicks_count", 0) > 0:
+        uiux_score_deduction = min(contracts_res["orphaned_onclicks_count"] * 10.0, 30.0)
+        endpoint_subscore = max(endpoint_subscore - uiux_score_deduction, 0.0)
+        critical_violations.append(f"Client-side click wiring failure: {contracts_res['orphaned_onclicks_count']} template onclick handler(s) call undefined JavaScript functions.")
 
     # Design tokens & tabular nums account for 40% of UI/UX score
     design_subscore = (design_res.get("design_health_score", 80.0) / 100.0) * 40.0
@@ -174,6 +191,12 @@ def compute_deterministic_audit_metrics() -> Dict[str, Any]:
         recommendations.append(f"Refactor {anti_patterns} instances of silent exception swallowing (unhandled `except` blocks) across codebase.")
     if design_res.get("legacy_os_emojis_found", 0) > 0:
         recommendations.append(f"Execute Priority 3: Migrate {design_res['legacy_os_emojis_found']} OS Unicode emojis to institutional vector SVG sprite glyphs.")
+    if contracts_res.get("orphaned_onclicks_count", 0) > 0:
+        recommendations.append(f"Implement missing JavaScript handlers for {contracts_res['orphaned_onclicks_count']} orphaned onclick attributes.")
+    if contracts_res.get("unmapped_api_routes_count", 0) > 0:
+        recommendations.append(f"Wire backend FastAPI endpoints for {contracts_res['unmapped_api_routes_count']} unmapped frontend AJAX calls.")
+    if contracts_res.get("stale_external_links_count", 0) > 0:
+        recommendations.append(f"Replace {contracts_res['stale_external_links_count']} deprecated BSE ASPX links with modern portal routes.")
     if not test_res.get("status") == "PASS":
         recommendations.append("Investigate and resolve failing automated unit tests in `tests/`.")
     if endpoints_failed > 0:
@@ -194,6 +217,7 @@ def compute_deterministic_audit_metrics() -> Dict[str, Any]:
         "terms_results": terms_res,
         "hygiene_results": hygiene_res,
         "design_results": design_res,
+        "contracts_results": contracts_res,
     }
 
 
@@ -219,8 +243,8 @@ def synthesize_deterministic_markdown_report(audit_id: str, metrics: Dict[str, A
 | Audit Pillar | Score | Status | Key Evaluation Criteria |
 | :--- | :---: | :---: | :--- |
 | **Pillar 1: Strategy & Regulatory** | **{metrics['strategy_score']}/100** | {'PASS' if metrics['strategy_score'] >= 80 else 'WARN'} | SEBI Safe Harbor Section 2(u), Tone Neutrality, 7-Pillar Alignment |
-| **Pillar 2: Technical & Code** | **{metrics['implementation_score']}/100** | {'PASS' if metrics['implementation_score'] >= 80 else 'WARN'} | Unit Tests (129+), Dual-Binding DB, Zero-Hallucination AST |
-| **Pillar 3: UI/UX & Front-End** | **{metrics['uiux_score']}/100** | {'PASS' if metrics['uiux_score'] >= 80 else 'WARN'} | 25+ Live Routes, Tabular Lining Numerals, Design Tokens |
+| **Pillar 2: Technical & Code** | **{metrics['implementation_score']}/100** | {'PASS' if metrics['implementation_score'] >= 80 else 'WARN'} | Unit Tests (129+), Dual-Binding DB, Zero-Hallucination AST, API Contracts |
+| **Pillar 3: UI/UX & Front-End** | **{metrics['uiux_score']}/100** | {'PASS' if metrics['uiux_score'] >= 80 else 'WARN'} | 25+ Live Routes, Tabular Lining Numerals, Click Wiring, Design Tokens |
 | **Composite Project Health** | **{overall}/100** | **{status}** | Weighted Aggregate (35% Strategy, 35% Impl, 30% UI/UX) |
 
 ---
@@ -251,7 +275,14 @@ def synthesize_deterministic_markdown_report(audit_id: str, metrics: Dict[str, A
 
 ---
 
-## 5. Critical Violations & Remediation Items
+## 5. Client-Side Click-Wiring, API Contracts & Link Grounding
+- **Template Onclick Handlers Audited:** `{metrics.get('contracts_results', {}).get('total_onclick_handlers', 0)}` handlers across `{metrics.get('contracts_results', {}).get('templates_scanned', 0)}` templates ({'🟢 100% Wired to Defined JS Functions' if metrics.get('contracts_results', {}).get('orphaned_onclicks_count', 0) == 0 else f"🔴 {metrics.get('contracts_results', {}).get('orphaned_onclicks_count')} Orphaned Handler(s)"}).
+- **Frontend AJAX API Contracts:** `{metrics.get('contracts_results', {}).get('frontend_api_fetches_count', 0)}` endpoints audited ({'🟢 100% Mapped to Active FastAPI Routes' if metrics.get('contracts_results', {}).get('unmapped_api_routes_count', 0) == 0 else f"🔴 {metrics.get('contracts_results', {}).get('unmapped_api_routes_count')} Unmapped Route(s)"}).
+- **Exchange Link Grounding & URL Health:** {'🟢 Clean — Zero legacy/broken BSE ASPX forms detected.' if metrics.get('contracts_results', {}).get('stale_external_links_count', 0) == 0 else f"🔴 {metrics.get('contracts_results', {}).get('stale_external_links_count')} Deprecated Link(s) Found."}
+
+---
+
+## 6. Critical Violations & Remediation Items
 
 ### Critical Violations ({crit_count})
 """
@@ -354,7 +385,8 @@ async def audit_project_full(use_ai: bool = True) -> ProjectAuditResult:
         pillar_breakdown={
             "strategy": metrics["terms_results"],
             "implementation": metrics["hygiene_results"],
-            "uiux": metrics["design_results"]
+            "uiux": metrics["design_results"],
+            "contracts": metrics.get("contracts_results", {})
         },
         full_markdown_report=full_report,
         audit_engine="autonomous-auditor-engine" if ANTIGRAVITY_AVAILABLE else "deterministic-fallback",

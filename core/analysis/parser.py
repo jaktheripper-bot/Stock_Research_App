@@ -128,13 +128,13 @@ PILLAR_METADATA = {
     },
     4: {
         "label": "BSE Financial Results",
-        "url_path": "corporates/Comp_Resultsnew.aspx?scrip_cd={scrip}",
-        "name": "BSE Audited Financial Results (Comp_Results)",
+        "url_path": "stock-share-price/-/-/{scrip}/financials-results/",
+        "name": "BSE Audited Financial Results",
         "standard_title": 'The "Structural vs. Temporary" Drop Diagnostic',
     },
     5: {
         "label": "BSE Valuation Filings",
-        "url_path": "corporates/Comp_Resultsnew.aspx?scrip_cd={scrip}",
+        "url_path": "stock-share-price/-/-/{scrip}/financials-results/",
         "name": "BSE Exchange Earnings Filings & Balance Sheet",
         "standard_title": "Valuation & Margin of Safety",
     },

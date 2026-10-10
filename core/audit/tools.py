@@ -386,3 +386,144 @@ def tool_audit_design_tokens() -> Dict[str, Any]:
         "design_health_score": 100.0 if (has_tabular_nums and has_design_tokens and emoji_count == 0) else (90.0 if (has_tabular_nums and has_design_tokens) else 75.0),
         "notes": "Tabular lining numerals, CSS variables, and institutional vector SVG glyphs active." if emoji_count == 0 else "Tabular lining numerals and CSS variables active. Legacy glyphs tracked for SVG migration."
     }
+
+
+def tool_audit_frontend_and_api_contracts() -> Dict[str, Any]:
+    """
+    Audits client-side HTML-to-JavaScript click wiring, AJAX fetch API contracts,
+    and external exchange link integrity to catch runtime ReferenceErrors, unmapped endpoints,
+    and broken portal queries.
+    """
+    templates_dir = PROJECT_ROOT / "web" / "templates"
+    js_dir = PROJECT_ROOT / "web" / "static" / "js"
+    main_py_path = PROJECT_ROOT / "web" / "main.py"
+
+    # 1. Collect all declared JavaScript functions
+    js_code = ""
+    for js_file in js_dir.glob("*.js"):
+        try:
+            js_code += js_file.read_text(encoding="utf-8") + "\n"
+        except Exception as e:
+            logger.warning(f"Error reading JS file {js_file}: {e}")
+
+    defined_fns = set()
+    patterns = [
+        r"function\s+([a-zA-Z0-9_$]+)\s*\(",
+        r"window\.([a-zA-Z0-9_$]+)\s*=",
+        r"(?:const|let|var)\s+([a-zA-Z0-9_$]+)\s*=\s*(?:function|\([^)]*\)\s*=>)"
+    ]
+    for pat in patterns:
+        for m in re.finditer(pat, js_code):
+            defined_fns.add(m.group(1))
+
+    # Collect template inline scripts
+    inline_fns = set()
+    for html_file in templates_dir.rglob("*.html"):
+        try:
+            content = html_file.read_text(encoding="utf-8")
+            for script in re.findall(r"<script[^>]*>(.*?)</script>", content, re.DOTALL):
+                for pat in [r"function\s+([a-zA-Z0-9_$]+)\s*\(", r"window\.([a-zA-Z0-9_$]+)\s*="]:
+                    for m in re.finditer(pat, script):
+                        inline_fns.add(m.group(1))
+        except Exception as e:
+            logger.warning(f"Error parsing inline scripts in {html_file}: {e}")
+
+    allowed_builtins = {
+        "alert", "confirm", "prompt", "history", "location", "close", "focus",
+        "this", "event"
+    }
+    all_allowed = defined_fns | inline_fns | allowed_builtins
+
+    # 2. Check all onclick attributes across HTML templates
+    onclick_pat = re.compile(r"onclick=[\"\']\s*([a-zA-Z0-9_$]+)\s*(?:\([^)]*\))?\s*[\"\']")
+    orphaned_onclicks = []
+    total_onclicks = 0
+    scanned_templates = 0
+
+    for html_file in templates_dir.rglob("*.html"):
+        scanned_templates += 1
+        try:
+            content = html_file.read_text(encoding="utf-8")
+            for m in onclick_pat.finditer(content):
+                total_onclicks += 1
+                fn_name = m.group(1)
+                if fn_name not in all_allowed:
+                    line_no = content[:m.start()].count("\n") + 1
+                    orphaned_onclicks.append({
+                        "template": str(html_file.relative_to(PROJECT_ROOT)),
+                        "line": line_no,
+                        "function": fn_name
+                    })
+        except Exception as e:
+            logger.warning(f"Error checking onclicks in {html_file}: {e}")
+
+    # 3. Check AJAX fetch calls vs backend FastAPI routes
+    backend_routes = set()
+    if main_py_path.exists():
+        try:
+            main_code = main_py_path.read_text(encoding="utf-8")
+            backend_routes = set(re.findall(r"@app\.(?:get|post|put|delete|patch)\([\"'](/api/[^\"'?]+)[\"']", main_code))
+        except Exception as e:
+            logger.warning(f"Error reading main.py for routes: {e}")
+
+    fetch_pat = re.compile(r"fetch\([\"'`\`](/api/[^\"'`\?\$]+)")
+    frontend_fetches = set(m.group(1) for m in fetch_pat.finditer(js_code))
+    for html_file in templates_dir.rglob("*.html"):
+        try:
+            content = html_file.read_text(encoding="utf-8")
+            for m in fetch_pat.finditer(content):
+                frontend_fetches.add(m.group(1))
+        except Exception:
+            pass
+
+    unmapped_fetches = []
+    for f_route in sorted(frontend_fetches):
+        matched = False
+        for b_route in backend_routes:
+            base_b = b_route.split("{")[0]
+            if f_route.startswith(base_b):
+                matched = True
+                break
+        if not matched:
+            unmapped_fetches.append(f_route)
+
+    # 4. Check for deprecated external links (e.g. broken BSE Comp_Resultsnew.aspx)
+    stale_links = []
+    for search_dir in [templates_dir, PROJECT_ROOT / "core"]:
+        for root, _, files in os.walk(search_dir):
+            for f in files:
+                if f.endswith((".py", ".html")):
+                    fp = Path(root) / f
+                    if fp.resolve() == Path(__file__).resolve():
+                        continue
+                    try:
+                        txt = fp.read_text(encoding="utf-8", errors="ignore")
+                        if "Comp_Resultsnew.aspx" in txt:
+                            stale_links.append(str(fp.relative_to(PROJECT_ROOT)))
+                    except Exception:
+                        pass
+
+    is_clean = len(orphaned_onclicks) == 0 and len(unmapped_fetches) == 0 and len(stale_links) == 0
+    contract_score = 100.0
+    if orphaned_onclicks:
+        contract_score -= min(len(orphaned_onclicks) * 15.0, 45.0)
+    if unmapped_fetches:
+        contract_score -= min(len(unmapped_fetches) * 15.0, 30.0)
+    if stale_links:
+        contract_score -= min(len(stale_links) * 10.0, 25.0)
+
+    contract_score = max(round(contract_score, 1), 0.0)
+
+    return {
+        "templates_scanned": scanned_templates,
+        "total_onclick_handlers": total_onclicks,
+        "orphaned_onclicks_count": len(orphaned_onclicks),
+        "orphaned_onclicks": orphaned_onclicks,
+        "frontend_api_fetches_count": len(frontend_fetches),
+        "unmapped_api_routes_count": len(unmapped_fetches),
+        "unmapped_api_routes": unmapped_fetches,
+        "stale_external_links_count": len(stale_links),
+        "stale_external_links": stale_links,
+        "is_clean": is_clean,
+        "contract_health_score": contract_score
+    }

@@ -82,7 +82,7 @@ def build_sources_section(ticker: str, citations: list = None, scrip_code: str =
             ("BSE Regulatory Disclosures & Corporate Announcements", f"https://www.bseindia.com/corporates/ann.html?scrip_cd={scrip}", "BSE Statutory Feed"),
             ("BSE Concall Transcripts & Investor Presentations", f"https://www.bseindia.com/corporates/ann.html?scrip_cd={scrip}", "Management Transcripts"),
             ("Official BSE Shareholding Pattern & Promoter Pledging", f"https://www.bseindia.com/corporates/ShareholdingPattern.aspx?scrip_cd={scrip}", "Shareholding Archive"),
-            ("BSE Audited Financial Statements & Balance Sheet", f"https://www.bseindia.com/corporates/Comp_Resultsnew.aspx?scrip_cd={scrip}", "Financial Results (Comp_Results)"),
+            ("BSE Audited Financial Statements & Balance Sheet", f"https://www.bseindia.com/stock-share-price/-/-/{scrip}/financials-results/", "Financial Results (Exchange Feed)"),
             ("Official BSE Bhavcopy Trade Execution & Price History", f"https://www.bseindia.com/stock-share-price/-/-/{scrip}/", "Historical Market Execution"),
             ("SEBI Business Responsibility and Sustainability Report (BRSR)", f"https://www.bseindia.com/corporates/ann.html?scrip_cd={scrip}", "Statutory ESG Filing"),
         ]
