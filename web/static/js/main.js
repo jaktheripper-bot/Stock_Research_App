@@ -411,14 +411,46 @@ window.synthesizeReport = async function(ticker, forceRefresh = false) {
     return;
   }
 
-  // Show the institutional synthesis overlay
+  // Show the institutional synthesis overlay with 30-second progressive timer
   const overlay = document.getElementById('synthesizingOverlay');
   const overlayTitle = document.getElementById('overlayTickerTitle');
+  const overlayBar = document.getElementById('overlayProgressBar');
+  const overlayStage = document.getElementById('overlayProgressStage');
+  const overlayTime = document.getElementById('overlayProgressTime');
+  const overlayStatusMsg = document.getElementById('overlayStatusMsg');
+  let overlayTimer = null;
+
   if (overlayTitle) {
     overlayTitle.innerText = `Synthesizing Dossier: ${ticker}`;
   }
   if (overlay) {
+    if (overlayBar) overlayBar.style.width = '0%';
+    if (overlayTime) overlayTime.innerText = '0s / ~30s';
+    if (overlayStage) overlayStage.innerText = 'Step 1/4: Ingesting BSE Filings';
     overlay.classList.add('active');
+
+    const startMs = Date.now();
+    overlayTimer = setInterval(() => {
+      const elapsed = Math.floor((Date.now() - startMs) / 1000);
+      const cappedSec = Math.min(30, elapsed);
+      const pct = Math.min(96, (cappedSec / 30) * 96);
+      if (overlayBar) overlayBar.style.width = `${pct.toFixed(1)}%`;
+      if (overlayTime) overlayTime.innerText = `${cappedSec}s / ~30s`;
+
+      if (cappedSec < 8) {
+        if (overlayStage) overlayStage.innerText = "Step 1/4: Ingesting BSE Filings & L2 Depth";
+        if (overlayStatusMsg) overlayStatusMsg.innerText = "Ingesting verified corporate filings from BSE and parsing Level-2 order book depth...";
+      } else if (cappedSec < 18) {
+        if (overlayStage) overlayStage.innerText = "Step 2/4: Executing 7-Pillar Cortex & Sieve";
+        if (overlayStatusMsg) overlayStatusMsg.innerText = "Running Chanakya clean-room filter, DuPont ROE decomposition, and promoter pledge audits...";
+      } else if (cappedSec < 26) {
+        if (overlayStage) overlayStage.innerText = "Step 3/4: Solving Reverse DCF & Valuation";
+        if (overlayStatusMsg) overlayStatusMsg.innerText = "Computing implied market growth rate vs. 12% WACC hurdle rate and sector benchmarks...";
+      } else {
+        if (overlayStage) overlayStage.innerText = "Step 4/4: Finalizing Institutional Thesis";
+        if (overlayStatusMsg) overlayStatusMsg.innerText = "Assembling statutory disclosures, footnote citations, and generating presentation view...";
+      }
+    }, 500);
   }
 
   try {
@@ -435,6 +467,9 @@ window.synthesizeReport = async function(ticker, forceRefresh = false) {
     const data = await resp.json();
 
     if (resp.ok && data.success) {
+      if (overlayTimer) clearInterval(overlayTimer);
+      if (overlayBar) overlayBar.style.width = '100%';
+
       // Update local credits atomically
       if (data.new_balance !== undefined) {
         user.credits_balance = data.new_balance;
@@ -453,6 +488,7 @@ window.synthesizeReport = async function(ticker, forceRefresh = false) {
       // Navigate directly to the newly generated dossier
       window.location.href = data.dossier_url;
     } else {
+      if (overlayTimer) clearInterval(overlayTimer);
       if (overlay) overlay.classList.remove('active');
 
       const detail = data.detail || data.message || 'Synthesis failed.';
@@ -471,9 +507,75 @@ window.synthesizeReport = async function(ticker, forceRefresh = false) {
       await refreshUserBalance(user);
     }
   } catch (err) {
+    if (overlayTimer) clearInterval(overlayTimer);
     if (overlay) overlay.classList.remove('active');
     alert('Synthesis Request Error: ' + err.message);
     await refreshUserBalance(user);
+  }
+};
+
+// ==============================================================================
+// 4b. Institutional Deep-Dive Unlock — Consumes 1 Credit to unlock Pillars 03 & 05 & PDF
+// ==============================================================================
+
+window.unlockDeepDive = async function(ticker) {
+  const cleanTicker = (ticker || '').trim().toUpperCase();
+  if (!cleanTicker) return;
+
+  const user = getStoredUser();
+  if (!user) {
+    alert('Sign in required to unlock institutional deep dives. You will receive 2 free welcome research credits on registration.');
+    openSignInModal();
+    return;
+  }
+
+  const balance = parseFloat(user.credits_balance) || 0;
+  if (balance < 1) {
+    if (confirm(`Unlocking the Institutional Deep-Dive (Forensic Accounting Ledger, Reverse DCF & Institutional PDF Export) requires 1 research credit.\n\nCurrent balance: ${balance} credits.\n\nWould you like to visit the Pricing page to top up credits?`)) {
+      window.location.href = '/pricing';
+    }
+    return;
+  }
+
+  if (!confirm(`Unlock the full Institutional Deep-Dive for ${cleanTicker}?\n\nThis permanently unlocks Pillar 03 (Forensic Sieve), Pillar 05 (Reverse DCF Sandbox), and full PDF download for this equity.\n\nCost: 1 Research Credit\nCurrent Balance: ${balance} credits`)) {
+    return;
+  }
+
+  try {
+    const resp = await fetch(`/api/dossier/unlock/${cleanTicker}`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        ticker: cleanTicker,
+        user_id: user.id
+      })
+    });
+
+    const data = await resp.json();
+
+    if (resp.ok && data.success) {
+      if (data.new_balance !== undefined) {
+        user.credits_balance = data.new_balance;
+        localStorage.setItem('sr_user', JSON.stringify(user));
+        syncUserSession();
+      }
+      alert(`🎉 ${data.message || `Institutional Deep-Dive for ${cleanTicker} unlocked successfully!`}\n\nRemaining Balance: ${data.new_balance} credits.`);
+      window.location.reload();
+    } else {
+      const detail = data.detail || data.message || 'Unlock failed.';
+      if (resp.status === 402) {
+        if (confirm(`${detail}\n\nWould you like to purchase more credits on the Pricing page?`)) {
+          window.location.href = '/pricing';
+        }
+      } else if (resp.status === 401) {
+        alert(detail);
+        openSignInModal();
+      } else {
+        alert('❌ ' + detail);
+      }
+    }
+  } catch (err) {
+    alert('Network error while processing deep-dive unlock: ' + err.message);
   }
 };
 
@@ -1152,16 +1254,57 @@ document.addEventListener('mouseover', (e) => {
   }
 }, { passive: true });
 
+// ==============================================================================
+// 30-Second Progressive Fill Loading Animation for Dossier Action Triggers
+// ==============================================================================
+function startButtonProgressFill(btn, baseLabel = 'Loading Dossier') {
+  if (!btn || btn.dataset.progressActive) return;
+  btn.dataset.progressActive = 'true';
+  btn.classList.add('btn-loading-progress');
+  btn.style.pointerEvents = 'none';
+
+  const startMs = Date.now();
+  const updateProgress = () => {
+    const elapsedMs = Date.now() - startMs;
+    const elapsedSec = Math.min(30, Math.floor(elapsedMs / 1000));
+
+    // Progress fill percentage: 0% -> 88% over 25s, then crawls smoothly to 96%
+    let pct = 0;
+    if (elapsedMs < 25000) {
+      pct = Math.min(88, (elapsedMs / 25000) * 88);
+    } else {
+      pct = Math.min(96, 88 + ((elapsedMs - 25000) / 5000) * 8);
+    }
+
+    btn.style.setProperty('--btn-progress', `${pct.toFixed(1)}%`);
+
+    let stage = baseLabel;
+    if (elapsedSec < 8) {
+      stage = 'Ingesting Data';
+    } else if (elapsedSec < 18) {
+      stage = '7-Pillar Cortex';
+    } else if (elapsedSec < 26) {
+      stage = 'Reverse DCF';
+    } else {
+      stage = 'Finalizing';
+    }
+
+    btn.innerHTML = `<span class="btn-progress-label"><span style="display:inline-block; animation: spin 0.6s linear infinite;">⚡</span> ${stage}... ${elapsedSec}s / ~30s</span>`;
+  };
+
+  updateProgress();
+  btn._progressInterval = setInterval(updateProgress, 500);
+}
+
 document.addEventListener('click', (e) => {
-  const a = e.target.closest('a');
-  if (a && a.href && a.origin === window.location.origin && !a.target && !e.ctrlKey && !e.metaKey) {
-    const p = a.pathname;
-    if (p.startsWith('/dossier/') || p.startsWith('/funds/') || p.startsWith('/debt/')) {
-      if (a.classList.contains('btn') && !a.dataset.loading) {
-        a.dataset.loading = 'true';
-        a.style.opacity = '0.75';
-        a.style.pointerEvents = 'none';
-        a.innerHTML = `<span style="display: inline-block; animation: spin 0.6s linear infinite; margin-right: 4px;">⚡</span> Loading...`;
+  const a = e.target.closest('a, button');
+  if (a && !a.dataset.progressActive) {
+    if (a.tagName === 'A' && a.href && a.origin === window.location.origin && !a.target && !e.ctrlKey && !e.metaKey) {
+      const p = a.pathname;
+      if (p.startsWith('/dossier/') || p.startsWith('/funds/') || p.startsWith('/debt/')) {
+        if (a.classList.contains('btn')) {
+          startButtonProgressFill(a, 'Loading Dossier');
+        }
       }
     }
   }

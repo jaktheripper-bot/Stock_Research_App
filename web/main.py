@@ -3195,7 +3195,7 @@ async def api_unlock_dossier(
     (Forensic Accounting Ledger, Reverse DCF Sandbox & Thesis Drift Migrations) for this equity.
     """
     clean_t = clean_ticker(ticker)
-    if not clean_t:
+    if not clean_t or not any(c.isalnum() for c in clean_t):
         raise HTTPException(status_code=400, detail="Invalid ticker symbol.")
 
     canonical = resolve_canonical_symbol(clean_t) or clean_t

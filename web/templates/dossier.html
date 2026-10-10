@@ -10,15 +10,17 @@
       <div class="ticker-title-wrap">
         <div>
           <h1 class="ticker-title">{{ ticker }} <span class="ticker-sub">({{ short_name }})</span></h1>
-          <div class="dossier-meta">
-            <span>📅 Evaluated: {{ formatted_date|default('Recent') }}</span>
-            <span>•</span>
+          <div class="dossier-meta-strip">
+            <span class="dossier-meta-pill">📅 Evaluated: {{ formatted_date|default('Recent') }}</span>
+            <span class="dossier-meta-sep">•</span>
             <span class="badge badge-emerald"><span class="status-dot status-dot-emerald"></span> Verified Exchange Feed</span>
-            <div class="data-provenance" style="margin-top:4px; font-size:12px; color:var(--text-secondary);">Data sourced directly from statutory exchange filings and cross‑checked against institutional market feeds.</div>
-            <span>•</span>
-            <a href="#citations" class="badge badge-cyan" style="text-decoration: none; cursor: pointer; pointer-events: auto;">
+            <span class="dossier-meta-sep">•</span>
+            <a href="#citations" class="badge badge-cyan" style="text-decoration: none; cursor: pointer; pointer-events: auto;" title="View all grounded statutory exchange filings">
               <span>📎</span> <span>{{ citations|length }} Grounded Sources</span>
             </a>
+          </div>
+          <div class="dossier-provenance-subline">
+            Data sourced directly from statutory exchange filings and cross‑checked against institutional market feeds.
           </div>
         </div>
 
@@ -50,42 +52,32 @@
         </div>
       </div>
 
-      <!-- Financial Metrics KPI Strip with Direct BSE Citations -->
+      <!-- Financial Metrics KPI Strip -->
       <div class="kpi-strip">
         <div class="kpi-card">
           <div class="kpi-label">Current Quote</div>
           <div class="kpi-val tnum">{% if current_price and current_price != 'N/A' %}₹{{ current_price }}{% else %}N/A{% endif %}</div>
-          {% if scrip_code and scrip_code != 'N/A' %}
-          <a href="https://www.bseindia.com/stock-share-price/-/-/{{ scrip_code }}/" target="_blank" rel="noopener noreferrer" style="font-size: 12px; font-weight: 600; color: var(--accent-cyan); text-decoration: underline; text-underline-offset: 2px; margin-top: 4px; display: inline-flex; align-items: center; gap: 3px;">
-            BSE Live Quote ↗
-          </a>
-          {% endif %}
+          <div style="font-size: 11.5px; color: var(--text-muted); margin-top: 4px;">Live Exchange Depth</div>
         </div>
         <div class="kpi-card">
           <div class="kpi-label">Trailing P/E</div>
           <div class="kpi-val tnum">{{ pe_ratio|default('N/A') }}</div>
-          {% if scrip_code and scrip_code != 'N/A' %}
-          <a href="https://www.bseindia.com/corporates/Comp_Resultsnew.aspx?scrip_cd={{ scrip_code }}" target="_blank" rel="noopener noreferrer" style="font-size: 12px; font-weight: 600; color: var(--accent-cyan); text-decoration: underline; text-underline-offset: 2px; margin-top: 4px; display: inline-flex; align-items: center; gap: 3px;">
-            BSE Results Filing ↗
-          </a>
-          {% endif %}
+          <div style="font-size: 11.5px; color: var(--text-muted); margin-top: 4px;">Statutory TTM Valuation</div>
         </div>
         <div class="kpi-card">
           <div class="kpi-label">Market Capitalization</div>
           <div class="kpi-val tnum">{{ market_cap_str|default('N/A') }}</div>
-          {% if scrip_code and scrip_code != 'N/A' %}
-          <a href="https://www.bseindia.com/stock-share-price/-/-/{{ scrip_code }}/" target="_blank" rel="noopener noreferrer" style="font-size: 12px; font-weight: 600; color: var(--accent-cyan); text-decoration: underline; text-underline-offset: 2px; margin-top: 4px; display: inline-flex; align-items: center; gap: 3px;">
-            BSE Capital Float ↗
-          </a>
-          {% endif %}
+          <div style="font-size: 11.5px; color: var(--text-muted); margin-top: 4px;">Institutional Free-Float</div>
         </div>
         <div class="kpi-card">
           <div class="kpi-label">BSE Scrip Code</div>
           <div class="kpi-val tnum">{{ scrip_code|default('N/A') }}</div>
           {% if scrip_code and scrip_code != 'N/A' %}
-          <a href="https://www.bseindia.com/stock-share-price/-/-/{{ scrip_code }}/" target="_blank" rel="noopener noreferrer" style="font-size: 12px; font-weight: 600; color: var(--accent-cyan); text-decoration: underline; text-underline-offset: 2px; margin-top: 4px; display: inline-flex; align-items: center; gap: 3px;">
-            BSE Scrip Profile ↗
+          <a href="https://www.bseindia.com/stock-share-price/-/-/{{ scrip_code }}/" target="_blank" rel="noopener noreferrer" style="font-size: 12px; font-weight: 600; color: var(--accent-cyan); text-decoration: underline; text-underline-offset: 2px; margin-top: 4px; display: inline-flex; align-items: center; gap: 3px;" title="Official BSE Company Security Profile">
+            Official BSE Profile ↗
           </a>
+          {% else %}
+          <div style="font-size: 11.5px; color: var(--text-muted); margin-top: 4px;">Exchange Scrip Master</div>
           {% endif %}
         </div>
       </div>
