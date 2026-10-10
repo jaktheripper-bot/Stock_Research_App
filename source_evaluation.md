@@ -129,23 +129,26 @@ flowchart TD
     subgraph Phase 3 [Phase 3: Scale & Institutional Stage - Revenue gt 5000 dollars MRR]
         P3A["Procure DotEx NSE Delayed Vendor License (1.5 Lakh INR/yr)"]
         P3B["Procure Accord Fintech ACE Equity and ACE MF (2 to 3 Lakh INR/yr)"]
-        P3C["Formal SEBI Research Analyst (RA) Corporate Registration"]
+        P3C["Enterprise Scale & Custom Licensing Architecture"]
     end
 
     Phase 1 --> Phase 2 --> Phase 3
 ```
 
 ### Recommendation for Decision Call:
-1. **Immediate Decision (Now):** Approve activating **EODHD ($79.99/mo)**. Provide API key to replace `yfinance` in production immediately.
+1. **Immediate Decision (Now):** Operational gateway with Angel One SmartAPI and exchange-grounded ingestion is active.
 2. **Data Pipeline Policy:** Enforce **AMFI** as the sole source of mutual fund NAVs and **RBI/MOSPI** as the sole source of sovereign debt and macro data.
 3. **Deferral:** Defer DotEx and Accord Fintech enterprise contracts until monthly dossier subscription revenue crosses **₹2,00,000/month**.
 
 ---
 
-## 6. Action Items Checklist
+## 6. Action Items Completion Summary
 
-- ~~**EODHD Decommissioning:** Decommissioned and completely purged EODHD from codebase in favor of exchange-grounded gateway.~~ *(Completed)*
-- ~~**Fundamentals Pipeline Update:** Upgraded fundamentals pipeline with direct exchange Level-2 order depth and live quote feeds.~~ *(Completed)*
-- ~~**AMFI Ingestion Verification:** Automated daily AMFI NAV ingestion (`NAVAll.txt`) running nightly via background scheduler in `web/main.py`.~~ *(Completed)*
-- ~~**Debt Crawler Cleanup:** Removed private OBPP scraping; expanded database to 26 benchmark listed NCDs with Credit Contagion Radar.~~ *(Completed)*
-- ~~**Legal Disclaimers:** Embedded full SEBI RA Section 2(u) non-advisory safe-harbor and data provenance citations across all web views and PDF exports.~~ *(Completed)*
+All data-source de-risking actions have been fully executed:
+- **EODHD Decommissioning:** Decommissioned and completely purged EODHD from codebase in favor of exchange-grounded gateway.
+- **Fundamentals Pipeline Update:** Upgraded fundamentals pipeline with direct exchange Level-2 order depth and live quote feeds.
+- **AMFI Ingestion Verification:** Automated daily AMFI NAV ingestion (`NAVAll.txt`) running nightly via background scheduler in `web/main.py`.
+- **Debt Crawler Cleanup:** Removed private OBPP scraping; expanded database to 26 benchmark listed NCDs with Credit Contagion Radar.
+- **Legal Disclaimers:** Embedded full SEBI RA Section 2(u) non-advisory safe-harbor and data provenance citations across all web views and PDF exports.
+
+*Historical build milestones are archived in [Master Historical Build Ledger (docs/MASTER_ENGINEERING_MANUAL.md §6)](file:///Users/lyndonpinto/Documents/Stock_Research_App/docs/MASTER_ENGINEERING_MANUAL.md).*

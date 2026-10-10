@@ -36,8 +36,8 @@
    - [6.5 Complete Route & Endpoint Health Matrix (73 Routes)](#65-complete-route--endpoint-health-matrix-73-routes)
 7. [Dimension 6: Prioritized Recommendations & Action Plan](#7-dimension-6-prioritized-recommendations--action-plan)
    - [7.1 Upstream Data Sourcing vs. Commercial Monetization Risk](#critical-analysis-upstream-data-sourcing-vs-commercial-monetization-risk)
-   - [7.2 Active Pending Items](#active-pending-items-ranked-by-priority--roadmap-status)
-   - [7.3 Completed Tasks & Audit Items (Archived)](#completed-tasks--audit-items-verified--archived)
+   - [7.2 Prioritized Active Task Register (P0 to P3)](#72-prioritized-active-task-register-p0-to-p3)
+   - [7.3 Historical Build & Completion Ledger](#73-historical-build--completion-ledger)
 
 
 ---
@@ -381,9 +381,9 @@ graph TD
 
 ### 5.4 Architectural Feature Gaps (Research vs. Web Production)
 
-~~While core behavioral interventions are present, the following features described in the research study were originally identified as gaps:~~
-1. ~~**PEAD 60-Day Visual Drift Band:** *(Resolved & Implemented)* Integrated `compute_pead_drift_band()` in `core/analysis/fundamentals.py` and rendered native SVG corridor on `/dossier/{ticker}`.~~
-2. ~~**Interactive Thesis Violation Modal:** *(Resolved & Implemented)* Integrated `POST /api/thesis-checkpoint`, modal dialog `#thesisModalBackdrop`, and event wiring in `web/static/js/main.js`.~~
+All behavioral intervention features specified in the research study are fully implemented:
+1. **PEAD 60-Day Visual Drift Band:** Integrated `compute_pead_drift_band()` in `core/analysis/fundamentals.py` and rendered native SVG corridor on `/dossier/{ticker}`.
+2. **Interactive Thesis Violation Modal:** Integrated `POST /api/thesis-checkpoint`, modal dialog `#thesisModalBackdrop`, and event wiring in `web/static/js/main.js`.
 
 ---
 
@@ -486,86 +486,50 @@ A live route audit across all 73 registered FastAPI endpoints was performed:
 > 4. **SEBI RA Regulations 2014 Compliance:** Under Section 2(u), fee-based research requires verifiable data provenance and zero hallucination. Silent scraper failures risk publishing stale or inaccurate metrics.
 > 5. **Technical Fragility:** Cloud hosting IPs (Render, AWS) are aggressively blocked by Akamai and Cloudflare WAFs with HTTP 429 errors or Turnstile challenges during live user dossier generation.
 >
-> **Actionable Remediation:**
-> - ~~Decommission and purge **EODHD** from the codebase (incompatible with domestic strategy).~~ *(Completed)*
-> - Transition primary equity quote ingestion to **Angel One SmartAPI** (broker API integration / Bring-Your-Own-Broker gateway for exchange-compliant tick and market depth). *(Pending User Broker Credentials)*
-> - ~~Restrict mutual fund look-through to **AMFI statutory utility feeds (`NAVAll.txt`)** and macro/sovereign to **RBI/MOSPI open gazette data** (both 100% free and legally compliant).~~ *(Completed)*
-> - ~~Embed mandatory SEBI RA Section 2(u) disclaimers and data provenance footers across all PDF and web reports.~~ *(Completed)*
+> **Actionable Remediation Summary:**
+> - Decommissioned and purged **EODHD** from the codebase in favor of exchange-grounded gateway. *(Completed)*
+> - Transitioned primary equity quote ingestion to **Angel One SmartAPI** broker gateway with AWS static IP egress (`13.54.76.134:8888`) and RFC 6238 TOTP session token lifecycle. *(Completed)*
+> - Restricted mutual fund look-through to **AMFI statutory utility feeds (`NAVAll.txt`)** and macro/sovereign to **RBI/MOSPI open gazette data** (both 100% free and legally compliant). *(Completed)*
+> - Embedded mandatory SEBI RA Section 2(u) non-advisory disclaimers and data provenance footers across all PDF and web reports. *(Completed)*
 
 ---
 
-### Active Pending Items (Actually Pending)
+### 7.2 Prioritized Active Task Register (P0 to P3)
 
-The following items constitute the truly active, operational tasks remaining:
+The following items constitute the prioritized, operational active tasks:
 
-1. **Curated Mutual Fund Look-Through Expansion (Remaining 19 Schemes to Reach Top 50 Target):**
-   - **Files:** `core/db/mutual_funds.py`, `core/analysis/fund_forensic_auditor.py`
-   - **Status:** In Progress (31 marquee schemes currently active; 19 remaining to reach top 50 AMFI target)
-   - **Details:** Expand curated portfolio holdings from 31 to 50 marquee schemes across Flexi Cap, Large & Mid Cap, Mid Cap, and Small Cap categories. Record historical quarterly look-through scores in `mutual_fund_schemes` to detect fund manager style drift over time.
+#### 🔴 P0 — Critical: Security & Runtime Integrity
+1. **Render Production Environment & Secrets Hardening:**
+   - **Target Files:** `render.yaml`, `web/main.py`
+   - **Details:** Declare `SECRET_KEY`, `ADMIN_API_KEY`, and `ADMIN_PASSWORD` in `render.yaml` with `sync: false`. Enforce strict production boot checks in `web/main.py` requiring a non-empty 32+ character `SECRET_KEY` when deployed. Configure `--workers 2` for multi-threaded performance.
 
-2. **Operational Gateway Liveness & Token Lifecycle Monitoring:**
-   - **Files:** `core/ingestion/angel_one.py`, `scripts/verify_angel_proxy_ip.py`
-   - **Status:** Operational / Active Monitoring
+#### 🟠 P1 — High Impact: Core Features & Consistency
+2. **Peer Comparison (`/compare`) Data Source Harmonization (Audit 1 Finding F20):**
+   - **Target Files:** `analyzer.py`, `web/main.py`, `web/templates/compare.html`
+   - **Details:** Connect `compare_two_companies()` to the cached `fundamentals` database so key ratios (ROCE, ROE, OPM, D/E, 52-week range) populate consistently with the dossier rather than showing `N/A`.
+3. **Curated Mutual Fund Top 50 Expansion (Remaining 19 Schemes):**
+   - **Target Files:** `core/db/mutual_funds.py`, `core/analysis/fund_forensic_auditor.py`
+   - **Details:** Ingest 19 marquee schemes across Mid Cap, Small Cap, Large & Mid Cap, and Flexi Cap with constituent holdings to complete the Top 50 AMFI universe.
+4. **Hybrid AI Auditor & Failure Synthesizer:**
+   - **Target Files:** `scripts/ai_auditor.py`, `tests/`
+   - **Details:** Implement the bounded 3-persona auditor (Regulatory Baiter, Edge-Case Quant, State Saboteur) with a strict token ceiling that outputs structured threat dossiers and auto-generates failing Python unit tests (`tests/test_regression_*.py`).
+
+#### 🟡 P2 — Operational Quality & Test Coverage
+5. **Install `openpyxl` Locally:**
+   - **Details:** Ensure all 303 unit tests run locally (unskipping the 13 tests in `test_mf_portfolio_ingest.py`).
+6. **Operational Gateway Liveness & Token Lifecycle Monitoring:**
+   - **Target Files:** `core/ingestion/angel_one.py`, `scripts/verify_angel_proxy_ip.py`
    - **Details:** Maintain continuous uptime of the AWS Lightsail proxy daemon (`13.54.76.134:8888`) and verify automated RFC 6238 TOTP session token renewals during live Indian market trading hours (09:15 to 15:30 IST).
 
+#### ⚪ P3 — Hygiene & Explicitly Parked Backlog
+- **Deferred Items:** Custom Vector Icon System (SVG Sprites), Unlisted MSME Analysis Ingestion, and Full CAS Encrypted PDF Parser.
+
 ---
 
-### Completed & Non-Relevant Implementation Tasks (Archived & Struck Through)
+### 7.3 Historical Build & Completion Ledger
 
-All roadmap tasks that have been implemented, tested, and verified, as well as tasks that are non-relevant or do not need to be implemented right now, are struck through below:
-
-#### A. Recently Implemented Production Features (Struck Through)
-- ~~**Exchange Gateway & Level-2 Order Depth Integration:** Built `core/ingestion/angel_one.py` with AWS static IP forward proxy egress (`13.54.76.134:8888`), pure Python RFC 6238 TOTP generator, Level-2 5-tier order book depth, and historical candle parser. Integrated into `core/analysis/fundamentals.py` and `scripts/update_all_reports.py`. Refreshed all 143 company dossiers with live quotes and order depth and synchronized to Supabase Cloud PostgreSQL.~~
-- ~~**Category 1 Institutional Equity Cockpit:** Implemented `core/analysis/sector_scoring.py` (BFSI, IT, Capital Goods, Pharma, FMCG), `core/analysis/valuation_radar.py` (2-stage DCF, Graham EPV, Historical PE, Margin of Safety), `core/analysis/institutional_flow.py` (Order Imbalance, Spread bps, Circuit Buffer), `core/analysis/forensic_sieve.py`, and `core/analysis/bull_bear.py` (60-second structural thesis). Wired `GET /api/dossier/intel/{ticker}` into executive cockpit UI (`web/templates/dossier.html`).~~
-- ~~**5 Institutional Analytical Engines (Cortex Suite):** Implemented 10-Point Deterministic Forensic Screening Sieve (`core/cortex/chanakya.py`), Multi-Year Financial & DuPont Ledger (`core/cortex/varan.py`), Cross-Asset Capital Structure Matrix (`core/cortex/setu.py`), Event-Driven Corporate Announcement Classifier (`core/cortex/garuda.py`), and Multi-Asset Portfolio Look-Through Engine (`core/cortex/sutra.py`). Exposed via `/api/cortex/*` and hardened against 80 adversarial stress tests.~~
-- ~~**Multi-Asset Portfolio Look-Through Calculation Engine:** Implemented `SutraLookThroughEngine` in `core/cortex/sutra.py` and route `/api/cortex/portfolio-look-through` for consolidated multi-asset portfolio de-risking and single-stock concentration detection.~~
-- ~~**Admin 2FA Gate & Security Authentication:** Implemented zero-dependency RFC 6238 TOTP 2FA gate (`core/auth/totp.py`, `/admin/setup-2fa`, `/admin/verify-2fa`) and Email OTP authentication (`core/auth/otp.py`).~~
-- ~~**Full Database Batch Refresh & Supabase Cloud Synchronization:** Ingested and refreshed all 143 company reports in `reports.db` with live exchange quotes and Level-2 depth via `scripts/update_all_reports.py`. Synchronized all 143 records to Supabase Cloud PostgreSQL.~~
-- ~~**Master Engineering Documentation & Evaluation Frameworks:** Authored comprehensive Master Engineering Manual (`docs/MASTER_ENGINEERING_MANUAL.md`) and Multi-Asset Report Evaluation Frameworks (`docs/REPORT_EVALUATION_FRAMEWORKS.md` & `.antigravity/docs/EVALUATION_FRAMEWORKS.md`).~~
-- ~~**Descriptive Title Harmonization & Brand Sanitization:** Removed all user-facing mentions of broker brands in favor of 'Official Exchange Live Feed' / 'Exchange Level-2 Depth'. Replaced proprietary engine codenames with simple, intuitive descriptive titles across UI templates, summaries, and API routes.~~
-
-#### B. Non-Relevant / Deferred Tasks (Do Not Need Implementation Right Now - Struck Through)
-- ~~**[NOT NEEDED RIGHT NOW / DEFERRED] Custom Website Vector Icon System (SVG Sprites):** Purely cosmetic asset task. Existing modern glassmorphism tokens, curated status badges, and typography provide a polished UI without custom SVG icon replacement.~~
-- ~~**[NOT NEEDED RIGHT NOW / DEFERRED] Research MSME Analysis Ingestion:** Pre-development research for unlisted MSME supplier risk via SIDBI/MCA21. Zero relevance to active listed equity/fixed-income/MF research platform.~~
-- ~~**[NOT NEEDED RIGHT NOW / DEFERRED] Upload Monthly Portfolio Disclosures (CSVs/Excel) for Top 150 Funds:** AMFI statutory daily NAV ingestion (`NAVAll.txt`) and 31 marquee curated funds are already operational. Manual parsing of 150 proprietary AMC monthly workbooks is deferred as out of scope.~~
-- ~~**[NOT NEEDED RIGHT NOW / DEFERRED] Full CAS PDF Parser with Password Unlocking:** Encrypted third-party PDF parsing across CAMS/KFintech is deferred enterprise tooling. Core look-through calculation engine is already operational.~~
-
-#### C. Historical Completed Tasks (Archived)
-
-The following items from the original audit scorecard, behavioral gap analysis, and remediation plan have been **fully resolved, implemented, tested, and verified**:
-
-- ~~**1. Resolve Dual-Architecture Ambiguity (Legacy Streamlit Removal):** Deleted `app.py`, `admin.py`, `lint_streamlit.py`, `test_ui_headless.py`, `test_live_ui.py`, `.streamlit/`, and the entire `ui/` directory. Decoupled `telemetry.py`, `alerts.py`, and `sanitize_archive.py`. Extracted standalone `core/formatters.py` and `core/reporting/pdf.py`. Removed `streamlit` and `altair` from `requirements.txt`.~~
-- ~~**2. Modernize CI/CD Pre-Flight Verification Gate:** Modernized `check_system.py`, `ci/checkpoint_manager.py`, and `run.sh` to mount FastAPI `TestClient(app)` and execute full automated test discovery (`unittest discover -s tests`). Streamlit linter and headless tests removed from release gates.~~
-- ~~**3. Fix SEO Domain Discrepancy in `robots.txt`:** Updated `robots.txt` sitemap directive from staging Render URL to canonical custom domain `https://stockresearch.app/sitemap.xml` with dynamic host fallback.~~
-- ~~**4. Implement Test Database Isolation:** Updated `core/db/connection.py` with `get_db_path()` to dynamically connect to `test_reports.db` when `TESTING=1`. Added per-target migration initialization tracking (`_INITIALIZED_DBS`) ensuring unit tests never mutate production `reports.db`. Exported `get_db_path` through `core.db` and facade `db.py`.~~
-- ~~**5. Harmonize Schema Contracts in Database Repositories:** Added flexible dictionary key aliases (`cmp_inr`, `current_price`, `market_price`, `nav`, `nav_inr`, `nav_per_unit`) across `core/db/reits.py`, `core/db/sovereign.py`, and `core/db/safety_radar.py`. Eliminated silent exception swallowing.~~
-- ~~**6. Harden Public Site Authentication (Email OTP & Google OAuth):** Replaced unverified single-field email sign-in with Google OAuth (`/auth/google`, `/auth/callback`) and 6-digit Email OTP (`/api/auth/send-otp`, `/api/auth/verify-otp`) using salted SHA-256 hashes in `auth_otps`. Enforced rate limiting, 10-minute expiry, and signed 30-day session cookies (`user_session_token`). Public modal UI and JS handlers fully integrated. Verified by automated tests in `tests/test_auth_and_isolation.py`.~~
-- ~~**7. PDF Export Styling & Embedded SEBI Safe-Harbor Watermark:** Embedded mandatory SEBI RA Section 2(u) educational disclaimer, document receipt ID (`SR-DOC-...`), timestamp, and explicit data provenance citations into exported PDF headers and footers in `core/reporting/pdf.py`.~~
-- ~~**8. CSRF & Request Origin Validation on State-Mutating Endpoints:** Implemented `_validate_request_origin()` middleware checks across `/api/create-order`, `/api/verify-payment`, and `/api/premortem`. Untrusted cross-origin requests are rejected with HTTP 403.~~
-- ~~**9. Port PEAD 60-Day Visual Drift Band to Web Dossier:** Implemented `compute_pead_drift_band()` in `core/analysis/fundamentals.py` and rendered the Thesis Integrity Checkpoint & 60-day PEAD Drift Corridor in `web/templates/dossier.html` to fulfill behavioral research specifications against Disposition Effect and Sunk Cost Fallacy.~~
-- ~~**10. Dynamic Open Graph & Meta Tags for Multi-Asset Pages:** Added rich OpenGraph and Twitter meta cards across `sovereign_curve.html`, `etf_matrix.html`, `reit_directory.html`, `safety_radar.html`, `tax_calculator.html`, `debt_directory.html`, and `fund_directory.html`. Corrected preload tag typo in `base.html`.~~
-- ~~**11. Custom Report Branding for Corporate & Advisory Bulk Packs:** Implemented custom advisory desk branding headers, advisor registration numbers, client attribution, and custom advisory disclaimers in `core/reporting/pdf.py` and query parameters on `/api/pdf/{ticker}`. Verified by automated tests in `tests/test_api_v1_and_branding.py`.~~
-- ~~**12. Build Public Developer API Endpoint (`/api/v1/reports/{ticker}`):** Implemented token-authenticated `/api/v1/reports/{ticker}` endpoint in `web/main.py`. Delivers structured JSON reports containing 7-pillar health scores, deterministic technical indicators, PEAD 60-day drift projections, grounded citations, and SEBI regulatory disclaimers with HTTP 300s caching and robot noindex headers. Verified by automated tests in `tests/test_api_v1_and_branding.py`.~~
-- ~~**13. Decommission & Purge EODHD Ingestion Layer:** Completely excised EODHD API dependencies across `core/analysis/fundamentals.py`, `core/analysis/__init__.py`, analyzer.py, `render.yaml`, and `.env`. Replaced with deterministic exchange/yfinance fallback and prepared gateway interface for Angel One SmartAPI.~~
-- ~~**14. Configure Gemini AI API Credentials & Live 7-Pillar Synthesis Verification:** Configured `GEMINI_API_KEY` in environment. Executed live end-to-end synthesis on `INFY` generating 7,530 characters of grounded qualitative multi-pillar analysis across Business Moat, Management Integrity, Industry Tailwinds, Financial Forensics, Valuation & Margin of Safety, Technical Structure, and Catalysts/Risks. Verified archival in `reports.db` (revision 48) and institutional PDF compilation (282 KB).~~
-- ~~**15. Interactive Thesis Violation Confirmation Modal ("Would you buy today?"):** Implemented `POST /api/thesis-checkpoint` in `web/main.py` with `ThesisCheckpointRequest` pydantic model. Wired interactive modal dialog (`#thesisModalBackdrop`) and trigger action points in `web/templates/dossier.html` and `web/static/js/main.js`. Enforces behavioral interruption against Sunk Cost Fallacy and Disposition Effect when fundamental thesis breach score degrades. Verified by unit tests in `tests/test_fastapi_web.py`.~~
-- ~~**16. Automated AMFI NAV Daily Synchronization Worker & Admin API:** Built standalone CLI sync utility `scripts/sync_amfi.py` supporting `--limit`, `--all-options`, `--force-refresh`, and `--diff-mode`. Implemented background async worker `run_daily_amfi_scheduler()` in `web/main.py` scheduled nightly at 23:15 IST and wired to FastAPI `lifespan`. Added authenticated administrative endpoint `POST /api/admin/sync-amfi`. Verified by unit tests in `tests/test_amfi_ingestion.py`.~~
-- ~~**17. Data Provenance Footers & SEBI Section 2(u) Disclaimers Across All Exports:** Audited and upgraded all web templates (`web/templates/base.html`, `web/templates/dossier.html`) and PDF engine (`core/reporting/pdf.py`). Every analysis card, dossier view, and PDF export explicitly cites official statutory authorities (BSE/NSE announcements, AMFI, RBI, MOSPI) and authorized broker gateway APIs, reinforcing SEBI Research Analyst Regulations 2014 Section 2(u) non-advisory compliance.~~
-- ~~**18. Tone Neutrality & Condescension Filter Site-Wide:** Excised all patronizing phrasing across the platform. Removed the `'Plain-English Explainer'` badge pill from `web/templates/debt_dossier.html` and substituted `'Plain-English Takeaway'` with `'💡 Key Takeaway'`. Refactored `core/analysis/debt_engine.py` to replace colloquial phrasing with institutional, objective risk and recovery terminology.~~
-- ~~**19. Multi-Agent Forensic Audit Module:** Developed `core/analysis/multi_agent_audit.py`. Implemented a coordinated multi-agent audit architecture with specialized subagents (`accounting_auditor`, `governance_detective`, `valuation_stress_analyst`) orchestrated by a `chief_forensic_officer`, supported by domain tools and deterministic zero-downtime offline fallback. Verified by automated tests in `tests/test_multi_agent_audit.py`.~~
-- ~~**20. Expanded Corporate Debt & SDI Universe (26 Offerings):** Expanded the benchmark corporate fixed-income universe in `core/db/debt.py` from 6 to 26 active offerings across Sovereign/PSU bonds (REC, PFC, IRFC, NHAI, NTPC Green, NABARD), Banking Tier-II capital (SBI, HDFC Bank), diversified retail NBFCs (Bajaj, L&T, Muthoot, Shriram, Manappuram, Kotak Prime, Piramal), and Securitized Debt Instruments (Wint Wealth InvoiceX Series II). Seeded into local SQLite `reports.db`.~~
-- ~~**21. On-Demand ISIN Ingestion Portal & Public API:** Built `POST /api/debt/ingest` in `web/main.py` allowing users to audit and index any corporate bond or SDI by 12-character ISIN. Equipped with issuer/ticker heuristics, financial mathematics derivation (YTM, Macaulay duration, modified duration), credit rating registration, and duplicate detection. Integrated interactive `#ingestModalBackdrop` modal dialog in `web/templates/debt_directory.html`. Verified by unit tests in `tests/test_fastapi_web.py`.~~
-- ~~**22. Indian Sovereign Par Yield Curve & Macro Terminal Overhaul:** Upgraded `/sovereign` into an institutional-grade Sovereign Debt & Macro Terminal. Expanded to 16 statutory benchmarks (91D, 182D, 364D T-Bills; 2Y to 50Y G-Sec; 5Y/10Y Sovereign Green Bonds; 10Y SDL). Implemented pure-SVG multi-curve visualizer (Current, 1M Ago, 1Y Ago), RBI Monetary Policy Corridor (Repo 6.50%, SDF 6.25%, MSF 6.75%), State Development Loan (SDL) Fiscal Disparity Matrix across 10 borrowing states, and RBI Retail Direct educational pathway. Verified by automated tests in `tests/test_sovereign_engine.py` (97/97 tests green).~~
-- ~~**23. Fractional Real Estate (SM REITs), InvITs & Sovereign Gold (SGB) Terminal Overhaul:** Overhauled `/reits` into an institutional-grade Alternative Real Assets & Yield Terminal. Expanded universe to 10 offerings across Mainboard REITs (`EMBASSY`, `MINDSPACE`, `BIRET`, `NEXUS`), InvITs (`PGINVIT`, `INDIGRID`, `IRB_INVIT`, `NHAI_INVIT`), and licensed SEBI SM REIT schemes (PropShare Platina, Strata Prime HITEC). Implemented SEBI (REIT) Regulations 2024 compliance gatekeeper (completed asset occupancy $\ge 95\%$, NDCF payout $\ge 95\%$, LTV $\le 49\%$, zero under-construction assets). Built Section 115UA multi-component tax waterfall engine and public API `/api/reits/tax-breakdown`. Expanded Sovereign Gold Bond secondary market discount & parity scanner across 10 active tranches (2025–2032 maturities) under Section 47(viic) 100% tax-free capital gains statute. Created comprehensive unit and integration test suite `tests/test_reit_and_sgb_engine.py` (109/109 full project tests passing).~~
-- ~~**24. Multi-Asset Visual Consumption Architecture & Opportunity Terminal (Replacing Plain Jane Lists):** Engineered and deployed the unified Cross-Asset Opportunity Terminal (`/opportunities`) and normalized aggregation engine (`core/analysis/opportunity_terminal.py`). Replaced flat tabular lists across 7 asset classes (Equities, Corporate Debt/SDIs, SM REITs, InvITs, SGBs, Sovereign Yields, and Mutual Funds) with 4 switchable visual consumption modalities: 🗂️ Bento Opportunity Cards with in-cell SVG yield waterfall sparkbars ($\text{Gross Return} \to \text{Tax Drag} \to \text{Net Real Return}$), 📊 2D Relative Yield Spread Heatmap Matrix (+bps vs 10Y G-Sec 7.10%), 📈 Capital Hierarchy Risk vs Net Real Post-Tax Yield Scatter Frontier (Chart.js), and 📑 Dense Institutional Table with tabular lining numerals (`tnum`). Built the persistent floating Cross-Asset Arbitrage Docket (allowing allocators to pin 2 to 4 instruments across ANY asset class for side-by-side normalized scorecards), reactive tax slab (0%, 20%, 30%, 39%) and inflation sliders, 1-click allocator persona filters, and public REST APIs (`/api/opportunities/universe`, `/api/opportunities/heatmap`, `/api/opportunities/arbitrage`). Full test suite verified green with 123/123 tests passing (`tests/test_opportunity_terminal.py`).~~
-- ~~**25. Mutual Fund 7-Pillar Forensic Look-Through Engine & Autonomous Daily Auditor:** Overhauled the mutual fund analytical framework from static commodity past-performance lists into deep forensic audits. Expanded the curated universe from 6 to 31 marquee Indian schemes across 12 AMCs with constituent stock portfolios. Implemented migration `v021_fund_forensic_dossiers` creating the `fund_forensic_dossiers` repository. Developed `core/analysis/fund_forensic_auditor.py` to aggregate company-level 7-pillar reports from `reports.db` into Weighted Economic Moat Index, Accounting & Solvency Risk Index (ASRI), Portfolio Margin of Safety vs. Intrinsic DCF, and Promoter Pledging Exposure. Built the autonomous rotation worker `scripts/run_daily_fund_audit.py` with Gemini AI synthesis (`gemini-3.5-flash-lite`) and offline deterministic fallback. Surfaced the "Featured Daily Forensic Fund Audit" hero banner on `/funds` and embedded the 7-Pillar Look-Through workspace with on-demand re-audit triggers in `web/templates/fund_dossier.html`. Added REST APIs `GET /api/funds/dossier/{scheme_code}` and `POST /api/admin/run-fund-audit`. Verified 100% green with 129 passing unit tests (`tests/test_fund_forensic_auditor.py`).~~
-- ~~**26. Autonomous Project-Wide Auditor Engine (Strategy, Code & UI/UX):** Architected and deployed an institutional-grade, multi-pillar project auditor. Built database migration `v022_project_audit_logs` and dual-binding repository `core/db/audit_logs.py`. Created deterministic grounding tools in `core/audit/tools.py` for test runner execution, 25-endpoint probing, SEBI prohibited term scanning, AST code hygiene inspection, and CSS design token verification. Developed the autonomous engine in `core/audit/project_auditor.py` with `ChiefProjectAuditor` orchestrating `strategy_auditor`, `code_auditor`, and `uiux_auditor` subagents with Gemini cognitive synthesis (`gemini-3.5-flash-lite`) and offline deterministic fallback. Created CLI runner `scripts/run_project_audit.py` supporting `--quick`, `--full`, and `--history`. Added `/health` alias, `/admin/audit` workspace, and REST APIs `/api/admin/run-project-audit` and `/api/admin/audit-logs` in `web/main.py` with lifespan nightly scheduler at 03:00 IST. Created frontend template `web/templates/admin_audit.html` with Tri-Pillar health meter cards, route coverage matrix, and historical run ledger. Tested and verified 100% green with 137 passing unit tests (`tests/test_project_auditor.py`). Generated live audit dossier: 93.5/100 (EXEMPLARY status).~~
-- ~~**27. Equity-to-Debt Contagion Bridge (Phase 2):** Built automated bidirectional parent-subsidiary mapping (`get_debt_securities_for_equity`) linking listed equities (`RELIANCE`, `TATAMOTORS`, `LT`, `BAJFINANCE`, `PEL`, `HDFCBANK`) directly to corporate debentures. Implemented Credit Contagion Radar (`ACTIVE_CONTAGION_ALERT`, `MONITORED_EQUITY_DRIFT`, `INSULATED_EQUITY_MOAT`) evaluating parent governance, promoter pledge, and Piotroski F-score with bi-directional dossier surfacing across equities and corporate bonds.~~
-- ~~**28. Proactive Thesis Drift & Real-Time Surveillance Feed (Phase 4):** Connected continuous 5-minute BSE watcher (`core/agents/watchers/bse_watcher.py`), scanning watchlist scrips for official regulatory disclosures (auditor resignations, pledge changes, M&A) and recording events to `autonomous_event_ledger`. Wired live navbar Agent Radar modal feed and public API `/api/autonomous/events`.~~
-- ~~**29. Institutional Export & Approachable SEBI Safe-Harbor Polish (Phase 5):** Deployed 1-click institutional PDF generation across all 4 asset classes (`/api/pdf/{ticker}`, `/api/pdf/fund/{scheme_code}`, `/api/pdf/debt/{isin}`, `/api/pdf/reit/{symbol}`). Sanitized phrasing to maintain approachable, plain-English clarity with zero condescension while strictly embedding SEBI RA Section 2(u) non-advisory educational disclaimers.~~
-- ~~**30. Zero-Hallucination & Anti-Fabrication Test Suite & Hygiene Enforcement:** Built `tests/test_zero_hallucination_and_grounding.py` (8 automated tests) verifying elimination of all corporate entity claims, fake SAC codes (998314), office addresses, fake support emails (`support@stockresearch.app`), and personal name placeholders. Mandated strictly on-site `/contact` grievance review by admin console.~~
-- ~~**31. Admin Panel Direct Remedial Credit Granting & Task Remediation Flow:** Built atomic DB function `admin_grant_user_credits` in `core/db/admin.py`, `POST /admin/users/grant-credits` in `web/main.py`, `#adminGrantCreditsModal` in `web/templates/admin.html`, zero-revenue ledger isolation (`amount_inr = 0.0`, `nature = FREE_GRANT`), support ticket auto-resolution, and automated test suite in `tests/test_admin_credit_grant.py`.~~
-- ~~**32. Formal Rejection of Sitewide Autonomous Agents (Gate 4):** Preserved deterministic Python pipelines + single-pass Gemini structured synthesis. Shelved and archived `docs/sitewide_antigravity_sdk_implementation_plan.md` to ensure SEBI audit immunity, avoid the 10x–20x compounding context tax, and preserve sub-3s response latency.~~
+All 32 historical milestones, major architectural deliverables (Cortex suite, Sutra look-through, Angel One Level-2 depth, sovereign curve, REITs/InvITs terminal, and SEBI compliance polish), and batch audit remediations are archived and maintained in the Master Engineering Manual:
+👉 [**Master Historical Build Ledger (docs/MASTER_ENGINEERING_MANUAL.md §6)**](file:///Users/lyndonpinto/Documents/Stock_Research_App/docs/MASTER_ENGINEERING_MANUAL.md).
 
 
 
