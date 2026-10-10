@@ -760,7 +760,7 @@ def dossier_page(request: Request, ticker: str):
     rep = get_report_by_ticker_sync(canonical)
     if not rep or not rep.get("report_text"):
         # Resolve company details for the pending template
-        scrip = resolve_bse_scrip_code(canonical) or "BSE Listed"
+        scrip = resolve_bse_scrip_code(canonical) or "N/A"
         cached = get_bse_scrips_cache()
         company_name = canonical
         if cached:
@@ -842,7 +842,8 @@ def dossier_page(request: Request, ticker: str):
     )
 
     mcap = rep.get("baseline_mcap")
-    mcap_formatted = f"₹{format_inr(mcap)}" if mcap else "N/A"
+    # format_inr() already prefixes the rupee symbol.
+    mcap_formatted = format_inr(mcap) if mcap else "N/A"
 
     # 7-Pillar Health Matrix
     matrix = extract_health_matrix(raw_md)
@@ -959,7 +960,7 @@ def dossier_page(request: Request, ticker: str):
             "current_price": str(rep.get("baseline_price") or "N/A"),
             "pe_ratio": str(rep.get("baseline_pe") or "N/A"),
             "market_cap_str": mcap_formatted,
-            "scrip_code": rep.get("scrip_code", "BSE Listed"),
+            "scrip_code": scrip_code if str(scrip_code or "").strip().isdigit() else "N/A",
             "formatted_date": rep.get("formatted_date", "Archived"),
             "report_html": html_content,
             "citations": citations,

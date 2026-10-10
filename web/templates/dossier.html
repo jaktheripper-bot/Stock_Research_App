@@ -54,31 +54,39 @@
       <div class="kpi-strip">
         <div class="kpi-card">
           <div class="kpi-label">Current Quote</div>
-          <div class="kpi-val tnum">₹{{ current_price|default('N/A') }}</div>
-          <a href="https://www.bseindia.com/stock-share-price/-/-/{% if scrip_code and scrip_code != 'N/A' %}{{ scrip_code }}{% else %}500209{% endif %}/" target="_blank" rel="noopener noreferrer" style="font-size: 12px; font-weight: 600; color: var(--accent-cyan); text-decoration: underline; text-underline-offset: 2px; margin-top: 4px; display: inline-flex; align-items: center; gap: 3px;">
+          <div class="kpi-val tnum">{% if current_price and current_price != 'N/A' %}₹{{ current_price }}{% else %}N/A{% endif %}</div>
+          {% if scrip_code and scrip_code != 'N/A' %}
+          <a href="https://www.bseindia.com/stock-share-price/-/-/{{ scrip_code }}/" target="_blank" rel="noopener noreferrer" style="font-size: 12px; font-weight: 600; color: var(--accent-cyan); text-decoration: underline; text-underline-offset: 2px; margin-top: 4px; display: inline-flex; align-items: center; gap: 3px;">
             BSE Live Quote ↗
           </a>
+          {% endif %}
         </div>
         <div class="kpi-card">
           <div class="kpi-label">Trailing P/E</div>
           <div class="kpi-val tnum">{{ pe_ratio|default('N/A') }}</div>
-          <a href="https://www.bseindia.com/corporates/Comp_Resultsnew.aspx?scrip_cd={% if scrip_code and scrip_code != 'N/A' %}{{ scrip_code }}{% else %}500209{% endif %}" target="_blank" rel="noopener noreferrer" style="font-size: 12px; font-weight: 600; color: var(--accent-cyan); text-decoration: underline; text-underline-offset: 2px; margin-top: 4px; display: inline-flex; align-items: center; gap: 3px;">
+          {% if scrip_code and scrip_code != 'N/A' %}
+          <a href="https://www.bseindia.com/corporates/Comp_Resultsnew.aspx?scrip_cd={{ scrip_code }}" target="_blank" rel="noopener noreferrer" style="font-size: 12px; font-weight: 600; color: var(--accent-cyan); text-decoration: underline; text-underline-offset: 2px; margin-top: 4px; display: inline-flex; align-items: center; gap: 3px;">
             BSE Results Filing ↗
           </a>
+          {% endif %}
         </div>
         <div class="kpi-card">
           <div class="kpi-label">Market Capitalization</div>
           <div class="kpi-val tnum">{{ market_cap_str|default('N/A') }}</div>
-          <a href="https://www.bseindia.com/stock-share-price/-/-/{% if scrip_code and scrip_code != 'N/A' %}{{ scrip_code }}{% else %}500209{% endif %}/" target="_blank" rel="noopener noreferrer" style="font-size: 12px; font-weight: 600; color: var(--accent-cyan); text-decoration: underline; text-underline-offset: 2px; margin-top: 4px; display: inline-flex; align-items: center; gap: 3px;">
+          {% if scrip_code and scrip_code != 'N/A' %}
+          <a href="https://www.bseindia.com/stock-share-price/-/-/{{ scrip_code }}/" target="_blank" rel="noopener noreferrer" style="font-size: 12px; font-weight: 600; color: var(--accent-cyan); text-decoration: underline; text-underline-offset: 2px; margin-top: 4px; display: inline-flex; align-items: center; gap: 3px;">
             BSE Capital Float ↗
           </a>
+          {% endif %}
         </div>
         <div class="kpi-card">
           <div class="kpi-label">BSE Scrip Code</div>
           <div class="kpi-val tnum">{{ scrip_code|default('N/A') }}</div>
-          <a href="https://www.bseindia.com/stock-share-price/-/-/{% if scrip_code and scrip_code != 'N/A' %}{{ scrip_code }}{% else %}500209{% endif %}/" target="_blank" rel="noopener noreferrer" style="font-size: 12px; font-weight: 600; color: var(--accent-cyan); text-decoration: underline; text-underline-offset: 2px; margin-top: 4px; display: inline-flex; align-items: center; gap: 3px;">
+          {% if scrip_code and scrip_code != 'N/A' %}
+          <a href="https://www.bseindia.com/stock-share-price/-/-/{{ scrip_code }}/" target="_blank" rel="noopener noreferrer" style="font-size: 12px; font-weight: 600; color: var(--accent-cyan); text-decoration: underline; text-underline-offset: 2px; margin-top: 4px; display: inline-flex; align-items: center; gap: 3px;">
             BSE Scrip Profile ↗
           </a>
+          {% endif %}
         </div>
       </div>
 

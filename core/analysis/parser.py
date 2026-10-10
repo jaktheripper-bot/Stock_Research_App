@@ -152,6 +152,17 @@ PILLAR_METADATA = {
     },
 }
 
+# Data-free placeholder shown under the paywall blur when a gated pillar has little text.
+# It must never contain figures: blurred HTML is still readable in page source.
+_LOCKED_SKELETON_HTML = """
+<div aria-hidden="true" style="display: grid; gap: 10px; margin-top: 12px;">
+  <div style="height: 12px; width: 92%; border-radius: 6px; background: rgba(148, 163, 184, 0.18);"></div>
+  <div style="height: 12px; width: 78%; border-radius: 6px; background: rgba(148, 163, 184, 0.18);"></div>
+  <div style="height: 12px; width: 85%; border-radius: 6px; background: rgba(148, 163, 184, 0.18);"></div>
+  <div style="height: 12px; width: 64%; border-radius: 6px; background: rgba(148, 163, 184, 0.18);"></div>
+</div>
+"""
+
 def wrap_html_with_collapsible_pillars(
     html_content: str,
     scrip_code: str = "",
@@ -176,9 +187,10 @@ def wrap_html_with_collapsible_pillars(
     if not has_pillar_token:
         return html_content
 
+    # Only build exchange links from a real, numeric BSE scrip code for THIS company.
+    # Never substitute another company's code: a wrong citation is worse than none.
     scrip = str(scrip_code or "").strip()
-    if not scrip or not scrip.isdigit():
-        scrip = "500209"
+    has_valid_scrip = bool(scrip) and scrip.isdigit()
 
     # Strict AST heading pattern: requires explicit Pillar/स्तंभ/Dimension token across H1-H3
     # This prevents subheadings like <h2>1. Profitability risk</h2> or <h2>1. Executive Summary</h2> from hijacking Pillar 1
@@ -212,7 +224,7 @@ def wrap_html_with_collapsible_pillars(
             p_num = 1
 
         meta = PILLAR_METADATA.get(p_num, PILLAR_METADATA[1])
-        url = f"https://www.bseindia.com/{meta['url_path'].format(scrip=scrip)}"
+        url = f"https://www.bseindia.com/{meta['url_path'].format(scrip=scrip)}" if has_valid_scrip else ""
         label = meta["label"]
         name = meta["name"]
         clean_title = raw_title or meta.get("standard_title", f"Pillar {p_num:02d}")
@@ -239,18 +251,7 @@ def wrap_html_with_collapsible_pillars(
                     remainder = body_content[300:].strip()
 
                 if p_num == 3:
-                    fallback_preview = """
-<table style="width: 100%; border-collapse: collapse; margin-top: 10px;">
-  <thead><tr style="border-bottom: 1px solid rgba(148, 163, 184, 0.2);"><th style="text-align: left; padding: 6px;">Forensic Metric</th><th>Calculated Value</th><th>Institutional Threshold</th><th>Verdict</th></tr></thead>
-  <tbody>
-    <tr><td style="padding: 6px;">Beneish M-Score</td><td class="tnum">-2.84</td><td class="tnum">&lt; -1.78</td><td>Non-Manipulator</td></tr>
-    <tr><td style="padding: 6px;">Total Accruals to Assets</td><td class="tnum">-0.042</td><td class="tnum">&lt; 0.05</td><td>Conservative</td></tr>
-    <tr><td style="padding: 6px;">Related-Party Exposure</td><td class="tnum">1.4% Net Worth</td><td class="tnum">&lt; 5.0%</td><td>Clean Arm's-Length</td></tr>
-    <tr><td style="padding: 6px;">Contingent Liabilities Headroom</td><td class="tnum">2.1% Net Worth</td><td class="tnum">&lt; 15.0%</td><td>Low Risk</td></tr>
-  </tbody>
-</table>
-<p>Detailed balance sheet scrubbing reveals zero off-balance sheet guarantees or promoter fee leakage across statutory notes 14 through 28.</p>
-"""
+                    fallback_preview = _LOCKED_SKELETON_HTML
                     blur_body = remainder if len(remainder) > 120 else (remainder + fallback_preview)
                     paywall_card = f"""
 <div class="gated-pillar-container">
@@ -287,19 +288,7 @@ def wrap_html_with_collapsible_pillars(
                     rendered_body = f"{teaser}\n{paywall_card}"
 
                 elif p_num == 5:
-                    fallback_preview = """
-<table style="width: 100%; border-collapse: collapse; margin-top: 10px;">
-  <thead><tr style="border-bottom: 1px solid rgba(148, 163, 184, 0.2);"><th style="text-align: left; padding: 6px;">Reverse DCF Parameter</th><th>Base Case</th><th>Bear Scenario</th><th>Bull Scenario</th></tr></thead>
-  <tbody>
-    <tr><td style="padding: 6px;">Implied FCF Growth (Y1-Y5)</td><td class="tnum">11.4% CAGR</td><td class="tnum">7.8% CAGR</td><td class="tnum">14.6% CAGR</td></tr>
-    <tr><td style="padding: 6px;">Cost of Capital (WACC)</td><td class="tnum">11.5%</td><td class="tnum">12.5%</td><td class="tnum">10.5%</td></tr>
-    <tr><td style="padding: 6px;">Terminal Multiple (EV/EBITDA)</td><td class="tnum">16.0x</td><td class="tnum">12.0x</td><td class="tnum">20.0x</td></tr>
-    <tr><td style="padding: 6px;">Intrinsic Value / Share</td><td class="tnum">₹1,840</td><td class="tnum">₹1,320</td><td class="tnum">₹2,210</td></tr>
-    <tr><td style="padding: 6px;">Margin of Safety Discount</td><td class="tnum">+18.5%</td><td class="tnum">-14.2%</td><td class="tnum">+42.0%</td></tr>
-  </tbody>
-</table>
-<p>Market is currently pricing in a moderate deceleration in reinvestment runway. Intrinsic margin of safety remains favorable relative to historical 10-year median.</p>
-"""
+                    fallback_preview = _LOCKED_SKELETON_HTML
                     blur_body = remainder if len(remainder) > 120 else (remainder + fallback_preview)
                     paywall_card = f"""
 <div class="gated-pillar-container">
@@ -335,6 +324,25 @@ def wrap_html_with_collapsible_pillars(
 """
                     rendered_body = f"{teaser}\n{paywall_card}"
 
+        if has_valid_scrip:
+            source_chip_html = (
+                f'<a href="{url}" target="_blank" rel="noopener noreferrer" class="badge" '
+                f'style="background: rgba(56, 189, 248, 0.12); color: #38bdf8; border: 1px solid rgba(56, 189, 248, 0.25); '
+                f'text-decoration: none; font-size: 11px; font-weight: 600;" onclick="event.stopPropagation()">'
+                f'📄 {label} ↗</a>'
+            )
+            citation_strip_html = (
+                f'<span>📄 <strong>Primary Exchange Source:</strong> '
+                f'<a href="{url}" target="_blank" rel="noopener noreferrer" class="pillar-citation-link">{name}</a> '
+                f'(official BSE page for BSE scrip {scrip}).</span>'
+            )
+        else:
+            source_chip_html = ""
+            citation_strip_html = (
+                '<span>📄 <strong>Primary Exchange Source:</strong> '
+                'BSE scrip code not yet resolved for this company, so no exchange link is shown.</span>'
+            )
+
         card = f"""
 <details class="pillar-accordion" id="pillar-{p_num}" open>
   <summary>
@@ -344,15 +352,13 @@ def wrap_html_with_collapsible_pillars(
       {status_pill_html}
     </div>
     <div style="display: flex; align-items: center; gap: 10px;">
-      <a href="{url}" target="_blank" rel="noopener noreferrer" class="badge" style="background: rgba(56, 189, 248, 0.12); color: #38bdf8; border: 1px solid rgba(56, 189, 248, 0.25); text-decoration: none; font-size: 11px; font-weight: 600;" onclick="event.stopPropagation()">
-        📄 {label} ↗
-      </a>
+      {source_chip_html}
       <span class="pillar-chevron">▼</span>
     </div>
   </summary>
   <div class="pillar-body">
     <div class="pillar-citation-strip">
-      <span>🛡️ <strong>Exact Page Grounding:</strong> Verified against <a href="{url}" target="_blank" rel="noopener noreferrer" class="pillar-citation-link">{name}</a>. Ingested under SEBI statutory safe-harbor standards.</span>
+      {citation_strip_html}
     </div>
     {rendered_body}
   </div>

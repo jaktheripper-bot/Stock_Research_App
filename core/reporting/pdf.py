@@ -69,19 +69,24 @@ def build_sources_section(ticker: str, citations: list = None, scrip_code: str =
                 lines.append(f"{source_idx}. **{title}** — *{stype}*")
                 source_idx += 1
 
-    # 2. Add primary exchange filings for this ticker using scrip_code
+    # 2. Add primary exchange filings for this ticker using scrip_code.
+    # Only company-specific links built from THIS company's numeric scrip code;
+    # never substitute another company's code.
     from bse_master import resolve_bse_scrip_code
     scrip = str(scrip_code or resolve_bse_scrip_code(clean) or "").strip()
-    if not scrip or not scrip.isdigit():
-        scrip = "500209"
+    has_valid_scrip = bool(scrip) and scrip.isdigit()
 
-    statutory_links = [
-        ("BSE Regulatory Disclosures & Corporate Announcements", f"https://www.bseindia.com/corporates/ann.html?scrip_cd={scrip}", "BSE Statutory Feed"),
-        ("BSE Concall Transcripts & Investor Presentations", f"https://www.bseindia.com/corporates/ann.html?scrip_cd={scrip}", "Management Transcripts"),
-        ("Official BSE Shareholding Pattern & Promoter Pledging", f"https://www.bseindia.com/corporates/ShareholdingPattern.aspx?scrip_cd={scrip}", "Shareholding Archive"),
-        ("BSE Audited Financial Statements & Balance Sheet", f"https://www.bseindia.com/corporates/Comp_Resultsnew.aspx?scrip_cd={scrip}", "Financial Results (Comp_Results)"),
-        ("Official BSE Bhavcopy Trade Execution & Price History", f"https://www.bseindia.com/stock-share-price/-/-/{scrip}/", "Historical Market Execution"),
-        ("SEBI Business Responsibility and Sustainability Report (BRSR)", f"https://www.bseindia.com/corporates/ann.html?scrip_cd={scrip}", "Statutory ESG Filing"),
+    statutory_links = []
+    if has_valid_scrip:
+        statutory_links += [
+            ("BSE Regulatory Disclosures & Corporate Announcements", f"https://www.bseindia.com/corporates/ann.html?scrip_cd={scrip}", "BSE Statutory Feed"),
+            ("BSE Concall Transcripts & Investor Presentations", f"https://www.bseindia.com/corporates/ann.html?scrip_cd={scrip}", "Management Transcripts"),
+            ("Official BSE Shareholding Pattern & Promoter Pledging", f"https://www.bseindia.com/corporates/ShareholdingPattern.aspx?scrip_cd={scrip}", "Shareholding Archive"),
+            ("BSE Audited Financial Statements & Balance Sheet", f"https://www.bseindia.com/corporates/Comp_Resultsnew.aspx?scrip_cd={scrip}", "Financial Results (Comp_Results)"),
+            ("Official BSE Bhavcopy Trade Execution & Price History", f"https://www.bseindia.com/stock-share-price/-/-/{scrip}/", "Historical Market Execution"),
+            ("SEBI Business Responsibility and Sustainability Report (BRSR)", f"https://www.bseindia.com/corporates/ann.html?scrip_cd={scrip}", "Statutory ESG Filing"),
+        ]
+    statutory_links += [
         ("AMFI Mutual Fund Statutory Holdings & NAV Utility", "https://www.amfiindia.com/research-information/other-data/raw-data", "AMFI Statutory Feed"),
         ("RBI / FBIL Sovereign Benchmark Par Yield Gazettes", "https://www.fbil.org.in", "RBI Sovereign Benchmarks"),
     ]

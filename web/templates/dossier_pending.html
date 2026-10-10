@@ -17,11 +17,17 @@
           {{ display_ticker }} <span style="font-size: 20px; font-weight: 500; color: var(--text-secondary);">({{ company_name }})</span>
         </h1>
         <div style="font-size: 13px; color: var(--text-muted); display: flex; gap: 12px; flex-wrap: wrap;">
+          {% if scrip_code and scrip_code != 'N/A' %}
           <span>Exchange: <strong>BSE Listed</strong></span>
           <span>•</span>
           <span>Scrip Code: <strong class="tnum">{{ scrip_code }}</strong></span>
           <span>•</span>
           <span>Grounding: <strong>Verified Exchange Master</strong></span>
+          {% else %}
+          <span>Exchange: <strong>Not found in the BSE scrip master</strong></span>
+          <span>•</span>
+          <span>Please check the ticker spelling or try a suggestion below.</span>
+          {% endif %}
         </div>
       </div>
 

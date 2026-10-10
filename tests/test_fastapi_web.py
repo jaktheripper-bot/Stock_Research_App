@@ -110,10 +110,34 @@ Detailed forensic analysis with exact page grounding to bseindia.com filings.
         self.assertIn("chart.umd.min.js", html)
         self.assertIn("6-Month Price Momentum & 50-DMA Trendline", html)
 
-        # 4. Collapsible 7-pillar accordion structure with exact BSE citations
+        # 4. Collapsible 7-pillar accordion structure with company-specific BSE source links
         self.assertIn("details class=\"pillar-accordion\"", html)
-        self.assertIn("Exact Page Grounding:", html)
+        self.assertIn("Primary Exchange Source:", html)
         self.assertIn("bseindia.com", html)
+
+        # 5. Data-accuracy guards (Audit 1, Batch C)
+        self.assertNotIn("Exact Page Grounding", html)          # overstated verification claim removed
+        self.assertNotIn("/BSE Listed/", html)                  # no placeholder text inside links
+        self.assertNotIn("scrip_cd=BSE Listed", html)
+        self.assertNotIn("₹₹", html)                            # no double rupee symbol
+        self.assertNotIn("₹N/A", html)
+        self.assertNotIn("-2.84", html)                         # fabricated Beneish preview figure
+        self.assertNotIn("₹1,840", html)                        # fabricated reverse-DCF preview figure
+
+    def test_pillar_links_never_borrow_another_company_scrip(self):
+        """Without a valid scrip code, pillar cards must show no exchange link at all."""
+        from core.analysis.parser import wrap_html_with_collapsible_pillars
+        import markdown as md
+        body = "\n\n".join(f"### Pillar {i}: Title {i}\nBody text {i}." for i in range(1, 8))
+        out = wrap_html_with_collapsible_pillars(md.markdown(body), scrip_code="", ticker="NEWCO")
+        self.assertEqual(out.count('class="pillar-accordion"'), 7)
+        self.assertNotIn("bseindia.com", out)
+        self.assertNotIn("500209", out)
+        self.assertIn("BSE scrip code not yet resolved", out)
+
+        out_valid = wrap_html_with_collapsible_pillars(md.markdown(body), scrip_code="500325", ticker="RELIANCE")
+        self.assertIn("scrip_cd=500325", out_valid)
+        self.assertNotIn("500209", out_valid)
 
     def test_discovery_page(self):
         res = self.client.get("/discovery")
