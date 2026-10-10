@@ -212,14 +212,14 @@ The implementation roadmap reconciles the platform's multi-asset competitive obj
 ```
 ┌────────────────────────────────────────────────────────────────────────┐
 │                   IMPLEMENTATION ROADMAP ARCHITECTURE                  │
-│                                                                        │
-│  [ACTIVE]    P0: Render Production Environment & Secrets Hardening     │
-│  [ACTIVE]    P1: Peer Comparison (/compare) Data Source Harmonization  │
-│  [ACTIVE]    P1: Mutual Fund Top 50 Expansion (Remaining 19 Schemes)   │
-│  [ACTIVE]    P1: Hybrid AI Auditor & Test Synthesizer (scripts/)       │
+│  [ACTIVE]    P1: Mutual Fund Top 100 Expansion (Next 50 Schemes)       │
 │  [ACTIVE]    P2: Local Test Suite Completeness (Install openpyxl)      │
 │  [ACTIVE]    P2: Operational Gateway Liveness & Token Lifecycle Check  │
 │  ────────────────────────────────────────────────────────────────────  │
+│  [COMPLETED] Mutual Fund Universe Top 50 Benchmark Expansion          │
+│  [COMPLETED] Render Production Environment & Secrets Hardening         │
+│  [COMPLETED] Peer Comparison (/compare) Data Source Harmonization      │
+│  [COMPLETED] Hybrid AI Auditor & Test Synthesizer (scripts/)           │
 │  [COMPLETED] Angel One SmartAPI Gateway (Level-2 Order Depth + Proxy)  │
 │  [COMPLETED] Capstone Multi-Asset Portfolio Look-Through Engine (Sutra)│
 │  [COMPLETED] Phase 1 (Core): 7-Pillar Look-Through & Daily Fund Auditor│
@@ -253,11 +253,14 @@ The following items constitute the active operational tasks remaining:
 4. **Hybrid AI Auditor & Failure Synthesizer:** *(Completed)*
    - **Target Files:** `scripts/ai_auditor.py`, `tests/test_ai_auditor.py`
    - **Details:** Implemented the bounded 3-persona auditor (Regulatory Baiter, Edge-Case Quant, State Saboteur) using `gemini-3.8-flash` with a strict $0.50 token ceiling that outputs structured threat dossiers and auto-generates failing Python unit tests (`tests/test_regression_*.py`).
+5. **Curated Mutual Fund Top 100 Expansion (Next 50 Schemes):** *(Pending)*
+   - **Target Files:** `core/db/mutual_funds.py`, `core/analysis/fund_forensic_auditor.py`, `tests/test_mutual_fund_top100_expansion.py`
+   - **Details:** Expand canonical institutional universe from Top 50 to Top 100 marquee schemes across Multi Cap, Focused, Value/Contra, ELSS, Large Cap, and Thematic/Sectoral categories with verified AMFI metrics, expense drag ratios, active share benchmarks, and constituent equity holdings mapped to the platform 143-equity database.
 
 #### 🟡 P2 — Operational Quality & Test Coverage
-5. **Install `openpyxl` Locally:**
+6. **Install `openpyxl` Locally:**
    - **Details:** Ensure all 303 unit tests run locally (unskipping the 13 tests in `test_mf_portfolio_ingest.py`).
-6. **Operational Gateway Liveness & Token Lifecycle Monitoring:**
+7. **Operational Gateway Liveness & Token Lifecycle Monitoring:**
    - **Target Files:** `core/ingestion/angel_one.py`, `scripts/verify_angel_proxy_ip.py`
    - **Details:** Maintain continuous uptime of the AWS Lightsail proxy daemon (`13.54.76.134:8888`) and verify automated RFC 6238 TOTP session token renewals during live Indian market trading hours (09:15 to 15:30 IST).
 
