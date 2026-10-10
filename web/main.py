@@ -378,9 +378,25 @@ async def run_daily_project_audit_scheduler():
 
 from apscheduler.schedulers.asyncio import AsyncIOScheduler
 from core.msme.scheduler import register_jobs
+from core.config import get_secret
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
+    # Strict Production Boot Guard: Enforce SECRET_KEY security when running on Render or production environment
+    env = (os.environ.get("ENVIRONMENT") or "").strip().lower()
+    is_render = (os.environ.get("RENDER") or "").strip().lower() in ["true", "1"]
+    if env == "production" or is_render:
+        secret_key = (os.environ.get("SECRET_KEY") or get_secret("SECRET_KEY") or "").strip()
+        if not secret_key or len(secret_key) < 32 or secret_key == "stock_research_user_session_salt_2026":
+            raise RuntimeError(
+                "CRITICAL PRODUCTION BOOT FAILURE: SECRET_KEY is missing, insecure, or shorter than 32 characters. "
+                "Declare a high-entropy SECRET_KEY (minimum 32 characters) in production environment variables."
+            )
+        admin_key = (os.environ.get("ADMIN_API_KEY") or get_secret("ADMIN_API_KEY") or "").strip()
+        admin_pwd = (os.environ.get("ADMIN_PASSWORD") or get_secret("ADMIN_PASSWORD") or "").strip()
+        if not admin_key or not admin_pwd:
+            logger.warning("Production Notice: ADMIN_API_KEY or ADMIN_PASSWORD should be declared in production.")
+
     # Initialize DB migrations on startup
     # Include MSME router
     from core.msme.router import router as msme_router
@@ -2335,7 +2351,7 @@ ALLOWED_ORIGIN_HOSTS = {
 }
 
 def _get_user_signing_key() -> bytes:
-    key = os.environ.get("SECRET_KEY") or os.environ.get("ADMIN_API_KEY") or "stock_research_user_session_salt_2026"
+    key = os.environ.get("SECRET_KEY") or get_secret("SECRET_KEY") or os.environ.get("ADMIN_API_KEY") or get_secret("ADMIN_API_KEY") or "stock_research_user_session_salt_2026"
     return key.encode("utf-8")
 
 def _generate_user_session_token(user_id: str, email: str) -> str:
