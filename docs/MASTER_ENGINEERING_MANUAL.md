@@ -284,21 +284,24 @@ Use this matrix to locate the responsible code files, functions, and remedies fo
 
 ---
 
-## 5. Maintenance Protocol: Keeping This Document Living & Up-To-Date
+## 5. Maintenance Protocol: Mandatory Living Documentation Synchronization
 
-To prevent documentation decay, follow this standard procedure whenever introducing code changes:
+Per Directive 3 in [`AGENTS.md`](file:///Users/lyndonpinto/Documents/Stock_Research_App/AGENTS.md), **documentation must be updated synchronously in the exact same commit whenever code is modified**. To prevent documentation decay, follow this non-negotiable Standard Operating Procedure:
 
 ### Standard Operating Procedure (SOP)
-1. **Whenever a New Engine or Route is Created:**
-   - Add the route to **Section 1 (Site Inventory)**.
-   - Document its mathematical formulation and architectural tier in **Section 2 (Architecture)**.
-   - Add a row to **Section 4 (Code-to-Feature Navigation Matrix)** with known failure modes.
-2. **Whenever a Bug or Edge-Case is Hardened:**
+1. **Whenever a New Engine, Route, or Gateway is Created/Modified:**
+   - Update **Section 1 (Site Inventory & Route Breakdown)** with new endpoints, modal triggers, and UI templates.
+   - Document its mathematical formulation and layer in **Section 2 (Architecture & Component Breakdown)**.
+   - Update Mermaid diagrams in **Section 3 (Operational Process Flows)** to reflect real runtime handshakes.
+   - Add/update a row in **Section 4 (Code-to-Feature Navigation Matrix)** with primary functions, callers, and diagnostic failure fixes.
+2. **Whenever Report Generation, Ingestion, or Criteria Change:**
+   - Update [`docs/REPORT_EVALUATION_FRAMEWORKS.md`](file:///Users/lyndonpinto/Documents/Stock_Research_App/docs/REPORT_EVALUATION_FRAMEWORKS.md) and [`.antigravity/docs/EVALUATION_FRAMEWORKS.md`](file:///Users/lyndonpinto/Documents/Stock_Research_App/.antigravity/docs/EVALUATION_FRAMEWORKS.md) with updated mathematical models, TTLs, and data gateways.
+3. **Whenever a Bug or Adversarial Edge-Case is Hardened:**
    - Record the discovery and remedy in Section 4.
    - Add a corresponding test case to [`tests/test_adversarial_stress.py`](file:///Users/lyndonpinto/Documents/Stock_Research_App/tests/test_adversarial_stress.py).
-3. **Whenever Running `./run.sh checkpoint`:**
+4. **Whenever Creating a Checkpoint (`./run.sh checkpoint`):**
    - Update **Section 6 (Historical Build Ledger)** with the new tag, commit hash, timestamp, and backup folder.
-   - Sync this manual to `main` and remote `origin`.
+   - Sync this manual to `main`, `dev`, and remote `origin`.
 
 ---
 
@@ -308,6 +311,7 @@ The table below links every major release, structural change, and engine impleme
 
 | Date & Time (IST) | Checkpoint Tag | Git Commit | Backup Directory | Architectural Updates & Implemented Changes |
 | :--- | :--- | :--- | :--- | :--- |
+| **2026-10-10 15:15:13** | `checkpoint_20261010_151513` | `e1d53a9` / `bcf134e` | `backups/20261010_151503/`<br>`backups/20261010_151454/` | **Comprehensive Documentation Audit & Corrections:**<br>• Audited all system documentation for omissions, errors, and hallucinations.<br>• Corrected 5 route/modal mismatches, Angel One method signatures, and template paths.<br>• Documented `equity_dossier_intelligence.py`, `forensic_sieve.py`, `bull_bear.py`, and `core/auth/`.<br>• Corrected premature claims regarding inline Varan DeltaPacket compression and Garuda autonomous DB mutation.<br>• Verified 279/279 tests passing and synchronized release tag to `origin`. |
 | **2026-10-10 15:08:04** | `checkpoint_20261010_150804` | `01716d8` / `656c1ae` | `backups/20261010_150804/`<br>`backups/20261010_150655/` | **Comprehensive 11-Report Evaluation Frameworks Specification:**<br>• Authored `docs/REPORT_EVALUATION_FRAMEWORKS.md` and synced `.antigravity/docs/EVALUATION_FRAMEWORKS.md`.<br>• Documented mathematical formulations, data sources, and operational flows for all 11 platform reports.<br>• Verified 279/279 tests passing and verified against immutable database checkpoints. |
 | **2026-10-10 15:00:01** | `checkpoint_20261010_150001` | `8d7ccc4` / `ad32977` | `backups/20261010_145951/`<br>`backups/20261010_145912/` | **Master Engineering Manual & Architecture Specification:**<br>• Authored comprehensive 6-part Master Engineering Manual (`docs/MASTER_ENGINEERING_MANUAL.md`).<br>• Fully documented complete site directory, 5-tier architecture, deterministic process flows (Mermaid), and code-to-feature troubleshooting matrix.<br>• Verified 279/279 tests passing and verified against immutable database checkpoints. |
 | **2026-10-10 14:19:09** | `checkpoint_20261010_141909` | `f8196d5` / `0cb2e79` | `backups/20261010_141925/`<br>`backups/20261010_141900/` | **Engine Adversarial Hardening Suite:**<br>• Stress tested all 12 analytical and cortex engines with 80 pathological inputs.<br>• Fixed 22 vulnerabilities (negative equity DuPont, zero-division DCF/tax deflator, NoneType feed/headline crashes, comma string float parsing).<br>• Created permanent test suite `tests/test_adversarial_stress.py` (279 passing tests). |

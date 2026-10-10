@@ -212,7 +212,42 @@ def run_suite():
         ))
         print(f"   ❌ FastAPI smoke test failed: {e}")
 
-    # 7. Project Health Ledger Update (PROJECT_STATUS.md)
+    # 7. Living Documentation Integrity & Synchronization Audit
+    print("\n7. Auditing Living Documentation Integrity & Synchronization...")
+    doc_paths = [
+        "docs/MASTER_ENGINEERING_MANUAL.md",
+        "docs/REPORT_EVALUATION_FRAMEWORKS.md",
+        ".antigravity/docs/EVALUATION_FRAMEWORKS.md",
+        ".antigravity/docs/ARCHITECTURE.md",
+        "AGENTS.md",
+    ]
+    for dp in doc_paths:
+        if not os.path.exists(dp) or os.path.getsize(dp) < 100:
+            issues.append((
+                "Documentation Sync",
+                f"Required documentation file '{dp}' is missing or empty.",
+                f"Restore and update '{dp}' per Directive 3 in AGENTS.md."
+            ))
+            print(f"   ❌ Missing/empty documentation: {dp}")
+        else:
+            print(f"   ✅ Documentation verified: {dp}")
+
+    try:
+        with open(".antigravity/docs/ARCHITECTURE.md", "r", encoding="utf-8") as f:
+            arch_content = f.read()
+        if "app.py" in arch_content or "ui/views" in arch_content:
+            issues.append((
+                "Documentation Sync",
+                "Legacy Streamlit components (app.py/ui/views) detected in .antigravity/docs/ARCHITECTURE.md.",
+                "Synchronize .antigravity/docs/ARCHITECTURE.md with production FastAPI SSR architecture."
+            ))
+            print("   ❌ Legacy Streamlit references found in .antigravity/docs/ARCHITECTURE.md")
+        else:
+            print("   ✅ Architecture document verified free of legacy Streamlit components.")
+    except Exception as e:
+        pass
+
+    # 8. Project Health Ledger Update (PROJECT_STATUS.md)
     timestamp_str = datetime.now(IST).strftime('%Y-%m-%d %H:%M:%S IST')
     status_summary = "ALL SYSTEMS OPERATIONAL" if not issues else f"{len(issues)} ISSUE(S) DETECTED"
     
