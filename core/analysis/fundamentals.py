@@ -270,10 +270,9 @@ def get_stock_fundamentals(query: str) -> dict:
     try:
         from core.ingestion.angel_one import AngelOneGateway
         if AngelOneGateway.is_configured():
-            token = scrip if scrip else canonical
-            exch = "BSE" if (scrip and str(scrip).isdigit()) else "NSE"
-            quote = AngelOneGateway.get_quote_with_depth(exch, token)
+            quote = AngelOneGateway.get_stock_quote(canonical or clean)
             if quote and quote.get("ltp"):
+
                 res_dict = {
                     "ticker": canonical or clean,
                     "short_name": canonical or clean,

@@ -226,6 +226,106 @@ class AngelOneGateway:
             logger.warning(f"Angel One SmartAPI connection notice: {req_err}")
             return None
 
+    # Top Nifty constituents mapped to canonical NSE security tokens
+    CANONICAL_NSE_TOKENS: Dict[str, str] = {
+        "INFY": "1594",
+        "RELIANCE": "2885",
+        "HDFCBANK": "1333",
+        "TCS": "11536",
+        "ICICIBANK": "4963",
+        "SBIN": "3045",
+        "BHARTIARTL": "10604",
+        "ITC": "1660",
+        "KOTAKBANK": "1922",
+        "LT": "11483",
+        "AXISBANK": "5900",
+        "TATAMOTORS": "3456",
+        "MARUTI": "10999",
+        "SUNPHARMA": "3351",
+        "TITAN": "3506",
+        "BAJFINANCE": "317",
+        "HCLTECH": "7229",
+        "WIPRO": "3787",
+        "NTPC": "11630",
+        "POWERGRID": "14977",
+        "ONGC": "2475",
+        "TATASTEEL": "3499",
+        "COALINDIA": "20374",
+        "ADANIENT": "25",
+        "ADANIPORTS": "15083",
+    }
+
+    @classmethod
+
+    def resolve_symbol_token(cls, query: str) -> Tuple[str, str]:
+        """
+        Resolves a symbol query to (exchange, token).
+        Checks NSE token registry first, then BSE scrip code.
+        """
+        from normalizer import clean_ticker
+        from bse_master import resolve_canonical_symbol, resolve_bse_scrip_code
+
+        clean = clean_ticker(query).upper()
+        canonical = (resolve_canonical_symbol(clean) or clean).upper()
+
+        if canonical in cls.CANONICAL_NSE_TOKENS:
+            return ("NSE", cls.CANONICAL_NSE_TOKENS[canonical])
+
+
+        scrip = resolve_bse_scrip_code(canonical) or resolve_bse_scrip_code(clean)
+        if scrip:
+            return ("BSE", str(scrip))
+
+        # Default fallback
+        return ("NSE", clean)
+
+    @classmethod
+    def compute_depth_analytics(
+        cls,
+        buy_book: List[Dict[str, Any]],
+        sell_book: List[Dict[str, Any]],
+    ) -> Dict[str, Any]:
+        """
+        Computes institutional order book depth analytics from 5-tier bid/ask books.
+        """
+        tot_buy_qty = sum(float(b.get("quantity", 0)) for b in buy_book)
+        tot_sell_qty = sum(float(s.get("quantity", 0)) for s in sell_book)
+        
+        tot_buy_val = sum(float(b.get("quantity", 0)) * float(b.get("price", 0)) for b in buy_book)
+        tot_sell_val = sum(float(s.get("quantity", 0)) * float(s.get("price", 0)) for s in sell_book)
+        
+        denom = tot_buy_qty + tot_sell_qty
+        imbalance = ((tot_buy_qty - tot_sell_qty) / denom) if denom > 0 else 0.0
+
+        best_bid = float(buy_book[0].get("price", 0)) if buy_book else 0.0
+        best_ask = float(sell_book[0].get("price", 0)) if sell_book else 0.0
+        spread_bps = ((best_ask - best_bid) / best_bid * 10000.0) if best_bid > 0 and best_ask > best_bid else 0.0
+
+        if imbalance > 0.25:
+            regime = "ACCUMULATION_DOMINANT"
+        elif imbalance < -0.25:
+            regime = "DISTRIBUTION_PRESSURE"
+        else:
+            regime = "BALANCED_EQUILIBRIUM"
+
+        return {
+            "total_buy_qty": tot_buy_qty,
+            "total_sell_qty": tot_sell_qty,
+            "total_buy_val_cr": round(tot_buy_val / 1e7, 3),
+            "total_sell_val_cr": round(tot_sell_val / 1e7, 3),
+            "order_imbalance_ratio": round(imbalance, 3),
+            "bid_ask_spread_bps": round(spread_bps, 1),
+            "depth_pressure_regime": regime,
+        }
+
+    @classmethod
+    def get_stock_quote(cls, query: str) -> Optional[Dict[str, Any]]:
+        """
+        High-level helper to resolve exchange token and fetch verified quote with market depth.
+        """
+        exch, token = cls.resolve_symbol_token(query)
+        return cls.get_quote_with_depth(exch, token)
+
     @classmethod
     def get_quote_with_depth(
         cls,
@@ -268,16 +368,12 @@ class AngelOneGateway:
                     return None
                 q = fetched[0]
                 
-                # Depth analysis: Order Imbalance Ratio
+                # Depth analysis
                 depth = q.get("depth", {})
                 buy_book = depth.get("buy", [])
                 sell_book = depth.get("sell", [])
                 
-                tot_buy_qty = sum(float(b.get("quantity", 0)) for b in buy_book)
-                tot_sell_qty = sum(float(s.get("quantity", 0)) for s in sell_book)
-                
-                denom = tot_buy_qty + tot_sell_qty
-                imbalance_ratio = ((tot_buy_qty - tot_sell_qty) / denom) if denom > 0 else 0.0
+                analytics = cls.compute_depth_analytics(buy_book, sell_book)
 
                 return {
                     "exchange": exchange.upper(),
@@ -293,9 +389,11 @@ class AngelOneGateway:
                     "lower_circuit": float(q.get("lowerCircuit", 0)),
                     "52w_high": float(q.get("52WeekHigh", 0)),
                     "52w_low": float(q.get("52WeekLow", 0)),
-                    "total_buy_qty": tot_buy_qty,
-                    "total_sell_qty": tot_sell_qty,
-                    "order_imbalance_ratio": round(imbalance_ratio, 3),
+                    "total_buy_qty": analytics["total_buy_qty"],
+                    "total_sell_qty": analytics["total_sell_qty"],
+                    "order_imbalance_ratio": analytics["order_imbalance_ratio"],
+                    "bid_ask_spread_bps": analytics["bid_ask_spread_bps"],
+                    "depth_pressure_regime": analytics["depth_pressure_regime"],
                     "depth_buy_5": buy_book,
                     "depth_sell_5": sell_book,
                     "source": "Angel One SmartAPI (Exchange Audited)",
@@ -304,3 +402,95 @@ class AngelOneGateway:
             logger.debug(f"Angel One quote fetch notice: {e}")
             return None
         return None
+
+    @classmethod
+    def get_historical_candles(
+        cls,
+        query: str,
+        interval: str = "ONE_DAY",
+        from_date: str = "",
+        to_date: str = "",
+    ) -> Optional[List[Dict[str, Any]]]:
+        """
+        Fetches official exchange historical candles for VWAP and moving averages.
+        """
+        jwt_token = cls.authenticate()
+        if not jwt_token:
+            return None
+
+        exch, token = cls.resolve_symbol_token(query)
+        api_key = (get_secret("ANGEL_API_KEY") or os.environ.get("ANGEL_API_KEY", "")).strip()
+
+        from datetime import datetime, timedelta
+        if not to_date:
+            to_date = datetime.now().strftime("%Y-%m-%d 15:30")
+        if not from_date:
+            from_date = (datetime.now() - timedelta(days=120)).strftime("%Y-%m-%d 09:15")
+
+        headers = {
+            "Content-Type": "application/json",
+            "Accept": "application/json",
+            "X-UserType": "USER",
+            "X-SourceID": "WEB",
+            "X-PrivateKey": api_key,
+            "Authorization": f"Bearer {jwt_token}",
+        }
+
+        payload = {
+            "exchange": exch.upper(),
+            "symboltoken": str(token),
+            "interval": interval,
+            "fromdate": from_date,
+            "todate": to_date,
+        }
+
+        proxies = cls.get_proxy_config()
+        url = f"{cls.BASE_URL}{cls.HISTORICAL_ENDPOINT}"
+
+        try:
+            resp = requests.post(url, json=payload, headers=headers, proxies=proxies, timeout=8)
+            data = resp.json()
+            if resp.status_code == 200 and data.get("status") and data.get("data"):
+                raw_candles = data["data"]
+                candles = []
+                for c in raw_candles:
+                    # Format: [timestamp, open, high, low, close, volume]
+                    if len(c) >= 6:
+                        candles.append({
+                            "timestamp": c[0],
+                            "open": float(c[1]),
+                            "high": float(c[2]),
+                            "low": float(c[3]),
+                            "close": float(c[4]),
+                            "volume": int(c[5]),
+                        })
+                return candles
+        except Exception as e:
+            logger.debug(f"Angel One historical candles notice for {query}: {e}")
+            return None
+        return None
+
+    @classmethod
+    def format_dossier_market_depth_badge(cls, quote_data: Dict[str, Any]) -> str:
+        """
+        Generates an executive Level-2 Market Depth & Circuit Band callout for dossiers.
+        """
+        if not quote_data:
+            return ""
+        imb = quote_data.get("order_imbalance_ratio", 0.0)
+        regime = "Institutional Accumulation" if imb > 0.20 else ("Distribution Pressure" if imb < -0.20 else "Balanced Depth")
+        badge_color = "🟢" if imb > 0.20 else ("🔴" if imb < -0.20 else "⚪")
+        uc = quote_data.get("upper_circuit", 0.0)
+        lc = quote_data.get("lower_circuit", 0.0)
+        ltp = quote_data.get("ltp", 0.0)
+        
+        circuit_info = ""
+        if uc > 0 and lc > 0 and ltp > 0:
+            uc_dist = ((uc - ltp) / ltp) * 100.0
+            circuit_info = f" | **Circuit Bands:** ₹{lc:,.2f} / ₹{uc:,.2f} (+{uc_dist:.1f}% to UC)"
+
+        return (
+            f"\n> **{badge_color} Angel One Level-2 Depth:** `{regime}` (Order Imbalance: {imb:+.2f}){circuit_info}  \n"
+            f"> *Source: Angel One SmartAPI (Exchange Audited Live Feed)*\n"
+        )
+

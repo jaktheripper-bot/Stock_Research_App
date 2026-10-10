@@ -542,5 +542,21 @@
       "revision_count": 94
     },
     "preflight_passed": true
+  },
+  {
+    "tag": "checkpoint_20261010_121851_feat__Angel_One_SmartAPI_gateway_with_selective_static_proxy_egress_and_IP_verifier",
+    "timestamp": "2026-10-10 12:18:51 IST",
+    "commit_sha": "5d959e5784f97d588e89db9d3b03d0ffb0c338f7",
+    "branch": "main",
+    "description": "feat: Angel One SmartAPI gateway with selective static proxy egress and IP verifier",
+    "database": {
+      "exists": true,
+      "filename": "reports_checkpoint_20261010_121851_feat__Angel_One_SmartAPI_gateway_with_selective_static_proxy_egress_and_IP_verifier.db",
+      "path": ".checkpoints/reports_checkpoint_20261010_121851_feat__Angel_One_SmartAPI_gateway_with_selective_static_proxy_egress_and_IP_verifier.db",
+      "size_bytes": 5464064,
+      "report_count": 143,
+      "revision_count": 94
+    },
+    "preflight_passed": true
   }
 ]

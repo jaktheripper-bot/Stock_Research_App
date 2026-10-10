@@ -73,6 +73,44 @@ class TestAngelOneGateway(unittest.TestCase):
             res = AngelOneGateway.get_quote_with_depth("NSE", "3045")
             self.assertIsNone(res)
 
+    def test_resolve_symbol_token_nse(self):
+        exch, token = AngelOneGateway.resolve_symbol_token("INFY")
+        self.assertEqual(exch, "NSE")
+        self.assertEqual(token, "1594")
+
+        exch, token = AngelOneGateway.resolve_symbol_token("RELIANCE")
+        self.assertEqual(exch, "NSE")
+        self.assertEqual(token, "2885")
+
+    def test_resolve_symbol_token_bse_fallback(self):
+        # ONIDA is in PRIMARY_BSE_MAP with 500279
+        exch, token = AngelOneGateway.resolve_symbol_token("ONIDA")
+        self.assertEqual(exch, "BSE")
+        self.assertEqual(token, "500279")
+
+    def test_compute_depth_analytics(self):
+        buy_book = [{"price": 100.0, "quantity": 1000}, {"price": 99.5, "quantity": 500}]
+        sell_book = [{"price": 100.5, "quantity": 200}, {"price": 101.0, "quantity": 300}]
+        analytics = AngelOneGateway.compute_depth_analytics(buy_book, sell_book)
+        self.assertEqual(analytics["total_buy_qty"], 1500)
+        self.assertEqual(analytics["total_sell_qty"], 500)
+        self.assertAlmostEqual(analytics["order_imbalance_ratio"], 0.5, places=2)
+        self.assertEqual(analytics["depth_pressure_regime"], "ACCUMULATION_DOMINANT")
+        self.assertGreater(analytics["bid_ask_spread_bps"], 0.0)
+
+    def test_format_dossier_market_depth_badge(self):
+        dummy_quote = {
+            "order_imbalance_ratio": 0.35,
+            "upper_circuit": 1500.0,
+            "lower_circuit": 1300.0,
+            "ltp": 1420.0,
+        }
+        badge = AngelOneGateway.format_dossier_market_depth_badge(dummy_quote)
+        self.assertIn("Angel One Level-2 Depth", badge)
+        self.assertIn("Institutional Accumulation", badge)
+        self.assertIn("Circuit Bands", badge)
+
 
 if __name__ == "__main__":
     unittest.main()
+
