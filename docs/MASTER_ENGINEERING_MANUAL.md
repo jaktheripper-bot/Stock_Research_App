@@ -28,13 +28,15 @@ The platform provides a comprehensive suite of institutional research and asset 
   │  ├── / (Landing Page)                     ├── /debt (Corporate Bonds)    ├── /calculator/tax│
   │  ├── /discovery (Morning 9 AM Terminal)   ├── /sovereign (Yield Curve)   ├── /safety-radar  │
   │  ├── /dossier/{ticker} (7-Pillar Report)  ├── /funds (Mutual Funds)      ├── /compare       │
-  │  └── /opportunities (Opportunity Map)     ├── /reits (REITs & InvITs)    └── /watchlist     │
+  │  └── /opportunities (Opportunity Map)     ├── /funds/compare/overlap     └── Watchlist Modal│
+  │                                           ├── /reits (REITs & InvITs)        (/api/watchlist)│
   │                                           └── /etfs (Index Matrix)                          │
   │                                                                                             │
   │  USER & SUBSCRIPTION MANAGEMENT           ADMINISTRATION & AUDIT         LEGAL & COMPLIANCE │
-  │  ├── /pricing (Paywall & Pro Plans)       ├── /admin (Control Console)   ├── /terms         │
-  │  ├── /billing (Razorpay Invoicing)        ├── /admin/audit (Project Log) ├── /disclaimer    │
-  │  └── /auth (OTP & Session Management)     └── /admin/2fa (Security Gate) └── /contact       │
+  │  ├── /pricing (Pro Plans & Checkout)      ├── /admin (Control Console)   ├── /terms         │
+  │  ├── /api/create-order (Razorpay Gateway) ├── /admin/audit (Project Log) ├── /disclaimer    │
+  │  └── Sitewide Auth Modal (/api/auth/*)    ├── /admin/setup-2fa           └── /contact       │
+  │                                           └── /admin/verify-2fa                             │
   │                                                                                             │
   └─────────────────────────────────────────────────────────────────────────────────────────────┘
 ```
@@ -50,16 +52,16 @@ The platform provides a comprehensive suite of institutional research and asset 
 | **Fixed Income & NCDs** (`/debt`, `/debt/{symbol}`) | [`debt_directory.html`](file:///Users/lyndonpinto/Documents/Stock_Research_App/web/templates/debt_directory.html), [`debt_dossier.html`](file:///Users/lyndonpinto/Documents/Stock_Research_App/web/templates/debt_dossier.html) | Indian corporate debt directory tracking Senior Secured NCDs, yields to maturity (YTM), credit rating migrations, and default spreads. |
 | **Sovereign Yield Curve** (`/sovereign`) | [`sovereign_curve.html`](file:///Users/lyndonpinto/Documents/Stock_Research_App/web/templates/sovereign_curve.html) | Real-time Indian Government 10Y Benchmark G-Sec, Treasury Bills, and State Development Loans (SDL) yield curve and policy rate wedges. |
 | **Mutual Fund Schemes** (`/funds`, `/funds/{key}`) | [`fund_directory.html`](file:///Users/lyndonpinto/Documents/Stock_Research_App/web/templates/fund_directory.html), [`fund_dossier.html`](file:///Users/lyndonpinto/Documents/Stock_Research_App/web/templates/fund_dossier.html) | AMFI-ingested scheme explorer providing underlying company look-through, expense drag audits, and manager style drift tracking. |
-| **Fund Overlap Auditor** (`/funds/overlap`) | [`fund_overlap.html`](file:///Users/lyndonpinto/Documents/Stock_Research_App/web/templates/fund_overlap.html) | Detects hidden duplicate equity holdings across paired mutual fund schemes to eliminate redundant AMC management fees. |
+| **Fund Overlap Auditor** (`/funds/compare/overlap`, `/api/funds/overlap`) | [`fund_overlap.html`](file:///Users/lyndonpinto/Documents/Stock_Research_App/web/templates/fund_overlap.html) | Detects hidden duplicate equity holdings across paired mutual fund schemes to eliminate redundant AMC management fees. |
 | **Commercial REITs & InvITs** (`/reits`) | [`reit_directory.html`](file:///Users/lyndonpinto/Documents/Stock_Research_App/web/templates/reit_directory.html) | Directory of all Indian listed commercial REITs (Embassy, Mindspace, Brookfield, Nexus) and SM REITs with Sec 115UA tax-exempt distribution breakdowns. |
 | **Index ETFs Matrix** (`/etfs`) | [`etf_matrix.html`](file:///Users/lyndonpinto/Documents/Stock_Research_App/web/templates/etf_matrix.html) | Low-cost index tracker analyzing tracking error, cash-equivalent liquidity, and intraday NAV spreads. |
-| **Net Post-Tax Real Return Calculator** (`/calculator/tax`) | [`tax_calculator.html`](file:///Users/lyndonpinto/Documents/Stock_Research_App/web/templates/index.html) | Multi-asset purchasing power deflator factoring in MOSPI CPI inflation, Section 50AA debt slab taxation, Section 112A equity LTCG, and Section 47(viic) SGB exemptions. |
+| **Net Post-Tax Real Return Calculator** (`/calculator/tax`) | [`tax_calculator.html`](file:///Users/lyndonpinto/Documents/Stock_Research_App/web/templates/tax_calculator.html) | Multi-asset purchasing power deflator factoring in MOSPI CPI inflation, Section 50AA debt slab taxation, Section 112A equity LTCG, and Section 47(viic) SGB exemptions. |
 | **Institutional Safety Radar** (`/safety-radar`) | [`safety_radar.html`](file:///Users/lyndonpinto/Documents/Stock_Research_App/web/templates/safety_radar.html) | Cross-asset risk matrix comparing capital hierarchy seniority, default risks, and liquidation recovery rank. |
 | **Stock Comparator** (`/compare`) | [`compare.html`](file:///Users/lyndonpinto/Documents/Stock_Research_App/web/templates/compare.html) | Side-by-side fundamental, forensic, and valuation comparison between 2 or 3 Indian listed equities. |
 | **Investor Copilot** (Sitewide Slide Drawer) | [`partials/copilot_modal.html`](file:///Users/lyndonpinto/Documents/Stock_Research_App/web/templates/partials/copilot_modal.html) | Interactive slide-drawer AI copilot delivering grounded contextual explanations, formula derivations, and deterministic analysis. |
-| **User Watchlist** (`/watchlist`) | Integrated Modal & API | Localized and authenticated user portfolio and watchlist tracking. |
-| **Pricing & Paywall** (`/pricing`, `/billing`) | [`pricing.html`](file:///Users/lyndonpinto/Documents/Stock_Research_App/web/templates/pricing.html) | Subscription management integrated with Razorpay payment gateway for Pro access tiers and single-report unlock credits. |
-| **Admin Console & Surveillance** (`/admin`, `/admin/audit`) | [`admin.html`](file:///Users/lyndonpinto/Documents/Stock_Research_App/web/templates/admin.html), [`admin_audit.html`](file:///Users/lyndonpinto/Documents/Stock_Research_App/web/templates/admin_audit.html) | Restricted console with 2FA protection for auditing telemetry, user credits, automated test runs, AST hygiene, and regulatory term scans. |
+| **User Watchlist** (Modal & API) | [`partials/auth_modal.html`](file:///Users/lyndonpinto/Documents/Stock_Research_App/web/templates/partials/auth_modal.html), `/api/watchlist` | Localized and authenticated user portfolio and watchlist tracking. |
+| **Pricing & Billing** (`/pricing`, `/api/create-order`) | [`pricing.html`](file:///Users/lyndonpinto/Documents/Stock_Research_App/web/templates/pricing.html) | Subscription management integrated with Razorpay payment gateway for Pro access tiers and single-report unlock credits. |
+| **Admin Console & Audit** (`/admin`, `/admin/audit`) | [`admin.html`](file:///Users/lyndonpinto/Documents/Stock_Research_App/web/templates/admin.html), [`admin_audit.html`](file:///Users/lyndonpinto/Documents/Stock_Research_App/web/templates/admin_audit.html) | Restricted console with 2FA protection (`/admin/setup-2fa`, `/admin/verify-2fa`) for auditing telemetry, user credits, automated test runs, AST hygiene, and regulatory term scans. |
 | **Regulatory & Support** (`/terms`, `/disclaimer`, `/contact`) | [`terms.html`](file:///Users/lyndonpinto/Documents/Stock_Research_App/web/templates/terms.html), [`disclaimer.html`](file:///Users/lyndonpinto/Documents/Stock_Research_App/web/templates/disclaimer.html), [`contact.html`](file:///Users/lyndonpinto/Documents/Stock_Research_App/web/templates/contact.html) | SEBI Safe Harbor disclosures, terms of use, privacy policy, and on-site feedback/complaints form. |
 
 ---
@@ -136,21 +138,31 @@ The platform operates across 5 layered subsystems:
   9. Tangible capital and retained earnings preservation.
   10. Institutional liquidity and market cap threshold ($\ge ₹25\text{ Cr}$).
 * **Varan Financial Ledger ([`varan.py`](file:///Users/lyndonpinto/Documents/Stock_Research_App/core/cortex/varan.py)):**
-  Computes multi-year CAGRs, 3-Stage DuPont ROE decomposition ($\text{Margin} \times \text{Turnover} \times \text{Leverage}$), and Cash Conversion Cycles (CCC). Synthesizes an ultra-compressed JSON `DeltaPacket` (~500 tokens) that reduces downstream LLM synthesis latency to under 2 seconds.
+  Deterministic ledger computing multi-year CAGRs, 3-Stage DuPont ROE decomposition ($\text{Margin} \times \text{Turnover} \times \text{Leverage}$), and Cash Conversion Cycles (CCC). Formats structured `DeltaPacket` payloads for analytical evaluation. *(Note: Live qualitative report synthesis in `core/analysis/engine.py` currently synthesizes directly via search grounding; inline prompt injection of the Varan DeltaPacket is architected as an upcoming token-compression optimization).*
 * **Setu Capital Structure Matrix ([`setu.py`](file:///Users/lyndonpinto/Documents/Stock_Research_App/core/cortex/setu.py)):**
   Relational capital hierarchy linking Common Equity FCF yield to Senior Secured NCD yields, Indian 10Y Benchmark G-Secs, and Commercial REIT distributions. Automatically diagnoses **Capital Structure Inversions** (where equity yields less than senior secured debt).
 * **Garuda Event-Driven Reflex ([`garuda.py`](file:///Users/lyndonpinto/Documents/Stock_Research_App/core/cortex/garuda.py)):**
-  Ingests real-time BSE corporate disclosures, classifies announcements via deterministic regex taxonomy to specific 7-Pillar segments, and generates surgical `MicroSnapshotDelta` packets without re-running entire reports.
+  Ingests BSE corporate disclosures, classifies announcements via deterministic regex taxonomy to specific 7-Pillar segments, and generates surgical `MicroSnapshotDelta` packets. Exposed via `POST /api/cortex/garuda/classify`.
 * **Sutra Multi-Asset Look-Through ([`sutra.py`](file:///Users/lyndonpinto/Documents/Stock_Research_App/core/cortex/sutra.py)):**
-  Deconstructs mutual fund schemes down to underlying equities to uncover hidden single-stock concentration and sector crowding across combined investor portfolios.
+  Deconstructs mutual fund schemes down to underlying equities to uncover hidden single-stock concentration and sector crowding across combined investor portfolios. Exposed via `POST /api/cortex/sutra/audit`.
+* **Equity Dossier Intelligence Coordinator ([`equity_dossier_intelligence.py`](file:///Users/lyndonpinto/Documents/Stock_Research_App/core/analysis/equity_dossier_intelligence.py)):**
+  The central runtime orchestrator for Category 1 Institutional Cockpits. Ingests live quotes and level-2 depth from `AngelOneGateway`, executes `valuation_radar`, `sector_scoring`, `institutional_flow`, `forensic_sieve`, and `bull_bear`, and computes the composite cockpit score ($0-100$) rendered on `/dossier/{ticker}` and `/api/dossier/intel/{ticker}`.
 * **Valuation Radar ([`valuation_radar.py`](file:///Users/lyndonpinto/Documents/Stock_Research_App/core/analysis/valuation_radar.py)):**
   Triangulates intrinsic fair value range combining a 5-Year Historical Median P/E multiple (35%), a 2-Stage conservative DCF (40%), and Graham Earnings Power Value (EPV, 25%). Computes Margin of Safety % against current exchange quotes.
 * **Sector-Native Scoring ([`sector_scoring.py`](file:///Users/lyndonpinto/Documents/Stock_Research_App/core/analysis/sector_scoring.py)):**
   Replaces one-size-fits-all scoring with sector-tailored sieves (BFSI Net Interest Margin/RoA/NPAs, IT FCF/ROCE, Capital Goods Asset Turnover).
 * **Institutional Flow Engine ([`institutional_flow.py`](file:///Users/lyndonpinto/Documents/Stock_Research_App/core/analysis/institutional_flow.py)):**
   Quantifies institutional accumulation vs distribution pressure from Level-2 order books, computes true bid-ask spread bps, and calculates lower/upper circuit freeze buffers.
+* **Forensic Sieve Engine ([`forensic_sieve.py`](file:///Users/lyndonpinto/Documents/Stock_Research_App/core/analysis/forensic_sieve.py)):**
+  A 6-point statutory forensic sieve executing checks on Tax Wedge / ETR, CFO/EBITDA realization, promoter integrity, leverage, return stability, and auditor qualifications.
+* **Bull/Bear Thesis Engine ([`bull_bear.py`](file:///Users/lyndonpinto/Documents/Stock_Research_App/core/analysis/bull_bear.py)):**
+  Synthesizes deterministic 60-second Bull vs. Bear structural cases using primary financial inputs, operating leverage, and capital efficiency metrics.
 
-#### C. Database Dual-Binding & Persistence Layer (`core/db/`)
+#### C. Authentication & Security Services (`core/auth/`)
+* **Email OTP Verification ([`core/auth/otp.py`](file:///Users/lyndonpinto/Documents/Stock_Research_App/core/auth/otp.py)):** Generates, hashes, and validates 6-digit email OTPs with 10-minute expiry and exponential throttling.
+* **Admin 2FA Security Gate ([`core/auth/totp.py`](file:///Users/lyndonpinto/Documents/Stock_Research_App/core/auth/totp.py)):** Pure Python RFC 6238 TOTP implementation for admin setup and second-factor verification (`/admin/setup-2fa`, `/admin/verify-2fa`).
+
+#### D. Database Dual-Binding & Persistence Layer (`core/db/`)
 * **Local Fast-Path:** SQLite database [`reports.db`](file:///Users/lyndonpinto/Documents/Stock_Research_App/reports.db) serves high-throughput reads in single-digit milliseconds.
 * **Cloud Persistence:** Every insert or update replicates asynchronously to Supabase cloud PostgreSQL.
 * **Immutable Auditing:** Table `report_revisions` retains complete historical qualitative snapshots, timestamps, and LLM prompts.
@@ -191,36 +203,38 @@ sequenceDiagram
     participant User as Client Browser
     participant Router as web/main.py
     participant Cache as SQLite reports.db
+    participant Intel as compile_equity_dossier_intelligence()
     participant Angel as AngelOneGateway (AWS Proxy)
-    participant Radar as ValuationRadar & SectorScoring
+    participant Cortex as ValuationRadar, SectorScoring, ForensicSieve
     participant UI as Jinja2 Template (dossier.html)
 
     User->>Router: GET /dossier/{ticker}
     Router->>Cache: Query cached 7-pillar report & metadata
-    Cache-->>Router: Stored Qualitative Dossier
-    Router->>Angel: Fetch Live Quote, LTP & Level-2 Depth
-    Angel-->>Router: Live LTP, Imbalance Ratio, Spread bps
-    Router->>Radar: Compute Valuation Radar & Sector Scorecard
-    Radar-->>Router: Triangulated Fair Value & Margin of Safety
-    Router->>UI: Hydrate dossier.html with Cockpit metrics
+    Cache-->>Router: Stored Qualitative Dossier (Gemini search-grounded)
+    Router->>Intel: compile_equity_dossier_intelligence(ticker, fund_data)
+    Intel->>Angel: Fetch Live Quote, LTP & Level-2 Depth
+    Angel-->>Intel: Live LTP, Imbalance Ratio, Spread bps
+    Intel->>Cortex: Compute Valuation Radar, Sector Score & Forensic Sieve
+    Cortex-->>Intel: Fair Value, Margin of Safety, Forensic Flags
+    Intel-->>Router: Composite Cockpit Payload & Score
+    Router->>UI: Hydrate dossier.html with Cockpit metrics & 7 Pillars
     UI-->>User: Rendered Institutional Dossier (< 50ms)
 ```
 
-### Process Flow 3: Event-Driven Announcement Micro-Snapshot Flow (Garuda)
+### Process Flow 3: Event-Driven Announcement Classification Flow (Garuda API)
 ```mermaid
 sequenceDiagram
     autonumber
-    participant Feed as BSE Corporate Announcement Feed
+    participant Client as Client / Admin Console
+    participant Router as POST /api/cortex/garuda/classify
     participant Garuda as GarudaReflexEngine (garuda.py)
-    participant DB as reports.db / Supabase
-    participant Client as Frontend Dashboard
 
-    Feed->>Garuda: Raw disclosure (Symbol, Headline, PDF URL)
-    Garuda->>Garuda: Regex taxonomy classification
-    Garuda->>Garuda: Generate MicroSnapshotDelta (Target Pillar 1-7)
-    Garuda->>DB: Append surgical bulletin snippet to target pillar
-    Garuda->>DB: Invalidate pillar cache & log audit hash
-    DB-->>Client: Real-time update reflected on next request
+    Client->>Router: POST /api/cortex/garuda/classify (Symbol, Headline, Details)
+    Router->>Garuda: classify_announcement(symbol, headline, details)
+    Garuda->>Garuda: Regex taxonomy matching against 7 statutory pillars
+    Garuda->>Garuda: Generate MicroSnapshotDelta (Target Pillar, Impact Severity, Summary)
+    Garuda-->>Router: Structured MicroSnapshotDelta
+    Router-->>Client: 200 OK (Surgical Delta Classification Payload)
 ```
 
 ### Process Flow 4: Pre-Commit & Checkpoint Verification Gate
@@ -248,7 +262,8 @@ Use this matrix to locate the responsible code files, functions, and remedies fo
 
 | Feature / System Module | Route / Entry Point | Primary Backend Implementation | Frontend Template / JS | Known Failure Modes & Diagnostic Fixes |
 | :--- | :--- | :--- | :--- | :--- |
-| **Angel One SmartAPI Gateway** | `core/ingestion/angel_one.py` | `AngelOneGateway.fetch_quote`, `generate_rfc6238_totp` | `web/main.py:270-310` | • Proxy 403: Verify Lightsail proxy daemon (`tinyproxy`) on port 8888.<br>• TOTP error: Check `ANGEL_TOTP_KEY` base32 format in `.env`. |
+| **Angel One SmartAPI Gateway** | `core/ingestion/angel_one.py` | `AngelOneGateway.get_stock_quote`, `get_quote_with_depth` | `web/main.py:943`, `web/main.py:3255` | • Proxy 403: Verify Lightsail proxy daemon (`tinyproxy`) on port 8888.<br>• TOTP error: Check `ANGEL_TOTP_KEY` base32 format in `.env`. |
+| **Equity Dossier Coordinator** | `GET /dossier/{sym}`, `GET /api/dossier/intel/{sym}` | [`core/analysis/equity_dossier_intelligence.py`](file:///Users/lyndonpinto/Documents/Stock_Research_App/core/analysis/equity_dossier_intelligence.py) | `templates/dossier.html` | • Fallback quote: Fails gracefully to offline payload with N/A badges if quote provider times out. |
 | **Chanakya Forensic Filter** | `GET /api/cortex/chanakya/{sym}` | [`core/cortex/chanakya.py:ChanakyaGate`](file:///Users/lyndonpinto/Documents/Stock_Research_App/core/cortex/chanakya.py) | `templates/dossier.html` | • Insolvent company crash: Verify `_safe_float` handles negative net worth and strings with commas. |
 | **Varan Financial Ledger** | Internal Cortex API | [`core/cortex/varan.py:VaranEngine`](file:///Users/lyndonpinto/Documents/Stock_Research_App/core/cortex/varan.py) | `core/agents/equity/` | • DuPont failure: Verify `total_equity_cr <= 0` flags `NEGATIVE_EQUITY_DEFICIT`. |
 | **Setu Capital Matrix** | `GET /api/cortex/setu/{sym}` | [`core/cortex/setu.py:SetuMatrixEngine`](file:///Users/lyndonpinto/Documents/Stock_Research_App/core/cortex/setu.py) | `templates/dossier.html` | • Rating error: Confirm rating is uppercase string; `spread_map` defaults safely to 1.50%. |
@@ -257,11 +272,14 @@ Use this matrix to locate the responsible code files, functions, and remedies fo
 | **Valuation Radar** | `GET /api/dossier/intel/{sym}` | [`core/analysis/valuation_radar.py`](file:///Users/lyndonpinto/Documents/Stock_Research_App/core/analysis/valuation_radar.py) | `templates/dossier.html` | • ZeroDivisionError: Enforced `spread = max(0.015, discount_rate - terminal_growth_rate)`. |
 | **Sector Scoring Engine** | `GET /api/dossier/intel/{sym}` | [`core/analysis/sector_scoring.py`](file:///Users/lyndonpinto/Documents/Stock_Research_App/core/analysis/sector_scoring.py) | `templates/dossier.html` | • String float error: Numeric sanitization via `_safe_float` strips commas and `%` symbols. |
 | **Institutional Flow Sieve** | `GET /api/dossier/intel/{sym}` | [`core/analysis/institutional_flow.py`](file:///Users/lyndonpinto/Documents/Stock_Research_App/core/analysis/institutional_flow.py) | `templates/dossier.html` | • Missing book depth: Returns default `UNAVAILABLE` payload outside market hours without breaking page. |
+| **Forensic Sieve Engine** | `GET /api/dossier/intel/{sym}` | [`core/analysis/forensic_sieve.py`](file:///Users/lyndonpinto/Documents/Stock_Research_App/core/analysis/forensic_sieve.py) | `templates/dossier.html` | • Missing statutory fields: Default to neutral scores without breaking synthesis. |
 | **Bull/Bear Thesis Engine** | `GET /api/dossier/intel/{sym}` | [`core/analysis/bull_bear.py`](file:///Users/lyndonpinto/Documents/Stock_Research_App/core/analysis/bull_bear.py) | `templates/dossier.html` | • Format specifier crash: All variables pass through `_safe_float` before format `{:,.2f}`. |
 | **Tax & Inflation Calculator** | `GET /calculator/tax`, `POST /api/tax/compute` | [`core/analysis/tax_calculator.py`](file:///Users/lyndonpinto/Documents/Stock_Research_App/core/analysis/tax_calculator.py) | `templates/tax_calculator.html` | • -100% inflation division by zero: Deflator clamped with `max(0.001, 1.0 + inf)`. |
 | **Investor Copilot** | `POST /api/copilot/chat` | [`core/agents/copilot/investor_copilot.py`](file:///Users/lyndonpinto/Documents/Stock_Research_App/core/agents/copilot/investor_copilot.py) | `static/js/copilot.js` | • LLM 403 or quota exhaustion: Automatically falls back to deterministic rule-based response. |
 | **Daily 9 AM Discovery** | `GET /discovery`, `POST /api/discovery/refresh` | [`core/analysis/discovery.py`](file:///Users/lyndonpinto/Documents/Stock_Research_App/core/analysis/discovery.py) | `templates/discovery.html` | • Stale cohort: Check `is_today_published()` and SQLite timestamp indexing. |
 | **Dual-Binding Database Sync** | `core/db/connection.py` | `get_db_connection`, `execute_write` | Supabase REST Client | • Supabase offline: Writes succeed locally in SQLite; background worker queues sync retry. |
+| **Email OTP Authentication** | `POST /api/auth/send-otp`, `verify-otp` | [`core/auth/otp.py`](file:///Users/lyndonpinto/Documents/Stock_Research_App/core/auth/otp.py) | `templates/partials/auth_modal.html` | • Expiry/Lockout: Clamped to 10-minute expiry; 3-attempt lock protects against brute force. |
+| **Admin 2FA Security Gate** | `GET/POST /admin/setup-2fa`, `verify-2fa` | [`core/auth/totp.py`](file:///Users/lyndonpinto/Documents/Stock_Research_App/core/auth/totp.py) | `templates/admin.html` | • Clock skew: Validates trailing and current 30-second RFC 6238 time step intervals. |
 | **Admin Surveillance Console** | `GET /admin`, `GET /admin/audit` | [`web/main.py`](file:///Users/lyndonpinto/Documents/Stock_Research_App/web/main.py), [`core/audit/project_auditor.py`](file:///Users/lyndonpinto/Documents/Stock_Research_App/core/audit/project_auditor.py) | `templates/admin.html` | • Session rejection: Verify `ADMIN_PASSWORD` in `.env` and valid session cookie. |
 
 ---
@@ -290,6 +308,7 @@ The table below links every major release, structural change, and engine impleme
 
 | Date & Time (IST) | Checkpoint Tag | Git Commit | Backup Directory | Architectural Updates & Implemented Changes |
 | :--- | :--- | :--- | :--- | :--- |
+| **2026-10-10 15:08:04** | `checkpoint_20261010_150804` | `01716d8` / `656c1ae` | `backups/20261010_150804/`<br>`backups/20261010_150655/` | **Comprehensive 11-Report Evaluation Frameworks Specification:**<br>• Authored `docs/REPORT_EVALUATION_FRAMEWORKS.md` and synced `.antigravity/docs/EVALUATION_FRAMEWORKS.md`.<br>• Documented mathematical formulations, data sources, and operational flows for all 11 platform reports.<br>• Verified 279/279 tests passing and verified against immutable database checkpoints. |
 | **2026-10-10 15:00:01** | `checkpoint_20261010_150001` | `8d7ccc4` / `ad32977` | `backups/20261010_145951/`<br>`backups/20261010_145912/` | **Master Engineering Manual & Architecture Specification:**<br>• Authored comprehensive 6-part Master Engineering Manual (`docs/MASTER_ENGINEERING_MANUAL.md`).<br>• Fully documented complete site directory, 5-tier architecture, deterministic process flows (Mermaid), and code-to-feature troubleshooting matrix.<br>• Verified 279/279 tests passing and verified against immutable database checkpoints. |
 | **2026-10-10 14:19:09** | `checkpoint_20261010_141909` | `f8196d5` / `0cb2e79` | `backups/20261010_141925/`<br>`backups/20261010_141900/` | **Engine Adversarial Hardening Suite:**<br>• Stress tested all 12 analytical and cortex engines with 80 pathological inputs.<br>• Fixed 22 vulnerabilities (negative equity DuPont, zero-division DCF/tax deflator, NoneType feed/headline crashes, comma string float parsing).<br>• Created permanent test suite `tests/test_adversarial_stress.py` (279 passing tests). |
 | **2026-10-10 14:09:09** | `checkpoint_20261010_140909` | `174c6a4` / `849cf34` | `backups/20261010_140858/`<br>`backups/20261010_140841/` | **Full Database Batch Refresh & Cloud Sync:**<br>• Created `scripts/update_all_reports.py` and updated all 143 company dossiers with live Angel One quotes and order depth.<br>• Synchronized all 143 records to Supabase Cloud PostgreSQL with 0 errors.<br>• Preserved historical revisions in `report_revisions` table. |

@@ -34,7 +34,7 @@ Every numerical metric, order book depth, corporate filing, and regulatory discl
 | :--- | :--- | :--- | :--- | :--- | :--- |
 | **1. Equity Research Dossier** (`/dossier/{sym}`) | **Angel One SmartAPI Gateway** (`core/ingestion/angel_one.py`) | HTTPS REST + WebSockets via **AWS Lightsail Static Proxy** (`13.54.76.134:8888`), authenticated with pure Python RFC 6238 TOTP | **BSE Direct API** (`bse_master.py`) + `yfinance` fast_info fallback | Live L2 Depth on demand; 14-day TTL for qualitative synthesis (invalidated on $\ge 5\%$ price jump or new BSE filing) | 🟢 **STATUTORY & LICENSED**<br>Broker API session under personal client agreement + BSE public filing repository. |
 | **2. Morning Discovery Screening** (`/discovery`) | **BSE India Active Scrip Master** + **Angel One Quotes** | Daily batch cron at 09:00 AM IST via AWS Static IP Proxy | Cached NSE/BSE Universe (`bse_scrips_cache.json`) | 24 Hours (re-generated daily at 09:00 AM IST prior to market open) | 🟢 **STATUTORY**<br>Official BSE/NSE master universe with deterministic Chanakya filter. |
-| **3. Mutual Fund Schemes & Overlap** (`/funds`, `/funds/overlap`) | **AMFI India Daily NAV API** (`NAVAll.txt`) | HTTP streaming download from `portal.amfiindia.com` (~1.5 MB text feed) | AMC Monthly Portfolio Disclosures (SEBI mandated `.xls` / `.csv`) | NAV updated daily at 23:15 IST; constituent holdings updated monthly (30-day TTL) | 🟢 **OFFICIAL STATUTORY UTILITY**<br>AMFI is the SEBI-mandated statutory authority. 100% legal immunity. |
+| **3. Mutual Fund Schemes & Overlap** (`/funds`, `/funds/compare/overlap`) | **AMFI India Daily NAV API** (`NAVAll.txt`) | HTTP streaming download from `portal.amfiindia.com` (~1.5 MB text feed) | AMC Monthly Portfolio Disclosures (SEBI mandated `.xls` / `.csv`) | NAV updated daily at 23:15 IST; constituent holdings updated monthly (30-day TTL) | 🟢 **OFFICIAL STATUTORY UTILITY**<br>AMFI is the SEBI-mandated statutory authority. 100% legal immunity. |
 | **4. Corporate Debt & NCDs** (`/debt`, `/debt/{sym}`) | **BSE / NSE Debt Reporting Platform** + Credit Rating Agencies (CRAs) | Direct public parser for BSE Debt Bhavcopy; CRA press releases (CRISIL, ICRA, CARE) | MCA Charge Filings & SEBI OBPP Public Registers | Daily EOD for secondary yields; immediate upon CRA rating action publication | 🟢 **REGULATORY DISCLOSURES**<br>Public CRA rating actions and exchange trade reporting logs. No private OBPP scraping. |
 | **5. Sovereign Benchmark & Macro** (`/sovereign`) | **CCIL (Clearing Corp of India)** & **RBI DBIE** | FBIL daily benchmark rate sheets + MOSPI Open Data Portal (`api.mospi.gov.in`) | Hardcoded Nelson-Siegel 1Y–30Y baseline benchmark anchors | Daily at 18:00 IST upon publication of FBIL clearing cut-offs | 🟢 **SOVEREIGN PUBLIC RECORD**<br>Direct Govt of India and RBI gazette data. Zero copyright friction. |
 | **6. Commercial REITs & InvITs** (`/reits`) | **BSE Listed Equities** + **AMC NDCF Filings** | Direct extraction from BSE corporate quarterly compliance reports & annual NDCF filings | SEBI Registered Valuer semi-annual reports | Quarterly upon earnings release; 90-day TTL | 🟢 **STATUTORY DISCLOSURES**<br>Mandatory SEBI REIT Regulations 2014 & SM REIT Regs 2024 disclosures. |
@@ -48,7 +48,7 @@ Every numerical metric, order book depth, corporate filing, and regulatory discl
 
 ## 2. Operational Generation & Invalidation Flows
 
-The generation of all reports follows deterministic, audited process flows to guarantee data freshnes, cost efficiency, and sub-second rendering latencies.
+The generation of all reports follows deterministic, audited process flows to guarantee data freshness, cost efficiency, and sub-second rendering latencies.
 
 ### 2.1 Equity Research Dossier Flow (`GET /dossier/{ticker}`)
 ```mermaid
@@ -59,7 +59,7 @@ sequenceDiagram
     participant DB as SQLite reports.db & Supabase
     participant Gate as MaterialChangeGate (core/analysis/delta.py)
     participant Angel as AngelOneGateway (via AWS Proxy)
-    participant Cortex as Cortex Engines (Chanakya, Varan, Radar, Flow)
+    participant Intel as compile_equity_dossier_intelligence()
     participant LLM as Gemini Flash Cascade (core/analysis/engine.py)
 
     Browser->>Router: GET /dossier/{ticker}
@@ -73,15 +73,13 @@ sequenceDiagram
         Gate-->>Router: SERVE_CACHED (Zero Token Overhead)
     else Gate 2: Cache Poisoned, Expired (> 14 days), Price Move >= 5%, or New BSE Filing
         Gate-->>Router: TRIGGER_REGENERATION
-        Router->>Cortex: Execute Chanakya Clean-Room, Varan DuPont, & Valuation Radar
-        Cortex-->>Router: Pre-computed DeltaPacket (~500 tokens)
-        Router->>LLM: Stream Gemini Synthesis across 7 Pillars
+        Router->>LLM: Stream Gemini Synthesis across 7 Pillars (Search Grounding)
         LLM-->>Router: Structured Qualitative Dossier
         Router->>DB: save_report_to_archive() & replicate to Supabase
     end
 
-    Router->>Cortex: Compute Institutional Flow (Imbalance, Spread bps) & Bull/Bear Thesis
-    Cortex-->>Router: Cockpit Metrics
+    Router->>Intel: Execute compile_equity_dossier_intelligence(ticker, fund_data)
+    Intel-->>Router: Cockpit Metrics (Valuation Radar, Sector Score, Flow, Forensic Sieve, Bull/Bear)
     Router-->>Browser: Rendered Institutional Dossier (HTML + Glassmorphism UI)
 ```
 

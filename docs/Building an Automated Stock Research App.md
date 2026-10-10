@@ -1,4 +1,16 @@
-### **System Architecture & Technical Knowledge Base: Automated Stock Research App**
+# Historical Prototyping Scratchpad: Automated Stock Research App
+> [!WARNING]
+> **HISTORICAL DEVELOPMENT ARCHIVE & SCRATCHPAD**  
+> This file is a historical record of early conversational prompts, terminal patch scripts, and early Streamlit development discussions.  
+> It has been **superseded by the authoritative specifications:**
+> - [Master Engineering Manual & Architecture Specification](file:///Users/lyndonpinto/Documents/Stock_Research_App/docs/MASTER_ENGINEERING_MANUAL.md)
+> - [Multi-Asset Report Evaluation Frameworks Specification](file:///Users/lyndonpinto/Documents/Stock_Research_App/docs/REPORT_EVALUATION_FRAMEWORKS.md)
+>
+> **CAUTION:** Do **NOT** execute the embedded heredoc terminal scripts (`python3 - << 'EOF' ...`) found in this file, as they target obsolete file layouts and will overwrite production FastAPI code with legacy prototypes.
+
+---
+
+### **System Architecture & Technical Knowledge Base (Early Prototype Phase)**
 
 Run this Terminal command to:
 

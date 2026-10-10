@@ -33,10 +33,25 @@
   * `core/analysis/comparator.py`: Cross-company institutional peer comparison, side-by-side metric alignment, and 3-axis disparity diagnostics (Sector, Lifecycle, Scale).
 * **Zero-Breaking-Change Root Facade (`analyzer.py`):** The root `analyzer.py` exposes a 43-line facade re-exporting all symbols from `core.analysis`, ensuring zero import breakage across UI views, tests, and CLI task runners.
 
-## 6. Modular Presentation & View Controller Architecture
-* **Modular `ui/views/` Package:** The public user interface is cleanly separated into focused view controllers:
-  * `ui/views/state.py`: Session state synchronization, deep linking URL persistence, and 5-phase research pipeline execution.
-  * `ui/views/sidebar.py`: Stock lookup search, archive selectbox, multi-quarter revision diffing, and revision timelines.
-  * `ui/views/alerts_view.py`: Granular event alerting hub, unread badge counters, triage actions, and watchlist management.
-  * `ui/views/dossier_view.py`: Search input, language selection, active dossier metrics, streaming synthesis progress, scorecard, and PDF export.
-* **Lean Top-Level Application Orchestrator (`app.py`):** Reduced from 1,276 lines to 170 lines, coordinating page configuration, GA4 telemetry, CSS styling, sidebar rendering, and clean route dispatch.
+## 6. Server-Side Rendered Presentation & API Architecture
+* **FastAPI Application Orchestrator (`web/main.py`):** High-concurrency async ASGI application serving Jinja2 server-side rendered HTML views, rate limiting, and REST API routes.
+  * Public Views: `/` (Landing), `/discovery` (9 AM Terminal), `/dossier/{ticker}` (Equity Dossier & Cockpit), `/funds` & `/funds/compare/overlap` (Mutual Funds), `/debt` (Corporate Bonds), `/sovereign` (Yield Curve), `/reits` (REITs/InvITs), `/etfs` (Index Matrix), `/calculator/tax` (Post-Tax Deflator), `/safety-radar` (Cross-Asset Safety), `/compare` (Stock Comparator), `/pricing` (Subscription & Checkout).
+  * REST APIs: `/api/dossier/intel/{ticker}`, `/api/cortex/*`, `/api/copilot/chat`, `/api/funds/overlap`, `/api/tax/compute`, `/api/auth/*`.
+  * Security & Auth: Standard library Email OTP (`core/auth/otp.py`) and Admin 2FA TOTP (`core/auth/totp.py`).
+  * Modern Dark-Glassmorphism Design System: `web/static/css/style.css`, Inter typography, 100% viewport zoom lock, and interactive slide-drawer Copilot (`web/static/js/copilot.js`).
+
+## 7. Deterministic Cortex & Multi-Asset Engines
+* **Cortex Forensic & Structural Sieve Package (`core/cortex/`):**
+  * `chanakya.py`: 10-Point Deterministic Clean-Room Forensic Filter.
+  * `varan.py`: Multi-Year XBRL Delta & 3-Stage DuPont ROE Decomposition Ledger.
+  * `setu.py`: Relational Cross-Asset Capital Hierarchy & Inversion Detector.
+  * `garuda.py`: BSE Corporate Announcement Regex Classifier & MicroSnapshot Delta Generator.
+  * `sutra.py`: Multi-Asset Mutual Fund Look-Through Concentration & Overlap Engine.
+* **Institutional Cockpit Coordinator (`core/analysis/equity_dossier_intelligence.py`):**
+  * Orchestrates `valuation_radar.py` (2-Stage DCF + EPV + P/E Median), `sector_scoring.py` (BFSI, IT, Infra, Pharma), `institutional_flow.py` (Level-2 Order Imbalance & Circuit Locks), `forensic_sieve.py` (6-point check), and `bull_bear.py` (60-sec structural thesis).
+* **Multi-Asset Analytics (`core/analysis/`):**
+  * `tax_calculator.py`: Post-tax real purchasing power deflator factoring in MOSPI CPI and Sec 50AA/112A/47(viic).
+  * `sovereign_engine.py`: RBI FBIL benchmark yield curve & policy wedges.
+  * `reit_engine.py`: SEBI Commercial & SM REIT distribution waterfalls under Sec 115UA.
+  * `etf_engine.py`: Low-cost tracking error and exchange liquidity spreads.
+  * `safety_radar.py`: Cross-asset liquidation seniority and shadow-banking danger scores.
