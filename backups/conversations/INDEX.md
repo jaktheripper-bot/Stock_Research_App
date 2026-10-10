@@ -4,6 +4,7 @@ This directory stores complete chronological conversation dossiers and transcrip
 
 ## Available Session Archives
 
+- [Session Conversation Dossier: 20261011 (MSME Ingestion, Mutual Fund Top 50, Render Hardening & Vestnomics Domain)](./session_20261011_011139_msme_ingestion_and_multi_asset_platform.md)
 - [Session Conversation Dossier: 20261009 (Anvik Brand Definition & API Architecture)](./session_20261009_230435_anvik_brand_and_api_architecture.md)
 - [Session Conversation Dossier: 20261009 (Anvik Brand Definition & API Architecture)](./session_20261009_224756_anvik_brand_and_api_architecture.md)
 - [Session Conversation Dossier: 20261009 (Anvik Brand Definition & API Architecture)](./session_20261009_224735_anvik_brand_and_api_architecture.md)

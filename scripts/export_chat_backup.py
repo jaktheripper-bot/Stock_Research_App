@@ -15,14 +15,24 @@ from datetime import datetime
 import pytz
 
 IST = pytz.timezone("Asia/Kolkata")
-CONVERSATION_ID = "b8438222-9ca8-4687-a897-0574a408db2e"
-SOURCE_LOG_DIR = f"/Users/lyndonpinto/.gemini/antigravity-ide/brain/{CONVERSATION_ID}/.system_generated/logs"
-ARTIFACT_DIR = f"/Users/lyndonpinto/.gemini/antigravity-ide/brain/{CONVERSATION_ID}"
-WORKSPACE_ROOT = "/Users/lyndonpinto/Documents/Stock_Research_App"
+WORKSPACE_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 
 
-def export_chat(overwrite_latest: bool = False):
+def get_conversation_id(cli_arg: str = None) -> str:
+    if cli_arg:
+        return cli_arg
+    if os.environ.get("CONVERSATION_ID"):
+        return os.environ.get("CONVERSATION_ID")
+    # Default to current active conversation ID
+    return "7563b837-aa20-4a95-aed0-32af746d2010"
+
+
+def export_chat(conversation_id: str = None, overwrite_latest: bool = False):
     now_ist = datetime.now(IST)
+    conv_id = get_conversation_id(conversation_id)
+    source_log_dir = os.path.expanduser(f"~/.gemini/antigravity-ide/brain/{conv_id}/.system_generated/logs")
+    artifact_dir = os.path.expanduser(f"~/.gemini/antigravity-ide/brain/{conv_id}")
+
     chat_root = os.path.join(WORKSPACE_ROOT, "backups", "chat")
     os.makedirs(chat_root, exist_ok=True)
 
@@ -44,8 +54,8 @@ def export_chat(overwrite_latest: bool = False):
         backup_dir = os.path.join(chat_root, f"chat_backup_{ts_str}")
         os.makedirs(backup_dir, exist_ok=True)
 
-    transcript_full_path = os.path.join(SOURCE_LOG_DIR, "transcript_full.jsonl")
-    transcript_compact_path = os.path.join(SOURCE_LOG_DIR, "transcript.jsonl")
+    transcript_full_path = os.path.join(source_log_dir, "transcript_full.jsonl")
+    transcript_compact_path = os.path.join(source_log_dir, "transcript.jsonl")
 
     # 1. Copy raw JSONL files
     if os.path.exists(transcript_full_path):
@@ -59,7 +69,7 @@ def export_chat(overwrite_latest: bool = False):
     md_lines = [
         f"# Conversation Transcript Backup",
         f"",
-        f"- **Conversation ID:** `{CONVERSATION_ID}`",
+        f"- **Conversation ID:** `{conv_id}`",
         f"- **Backup Timestamp:** {now_ist.strftime('%Y-%m-%d %H:%M:%S IST')}",
         f"- **Source Log:** `{input_file}`",
         f"",
@@ -135,9 +145,12 @@ def export_chat(overwrite_latest: bool = False):
         f.write(md_content)
 
     # Also copy to Artifact directory so it is viewable directly in IDE
-    artifact_md_path = os.path.join(ARTIFACT_DIR, "chat_history_backup.md")
-    with open(artifact_md_path, "w", encoding="utf-8") as f:
-        f.write(md_content)
+    if os.path.exists(artifact_dir):
+        artifact_md_path = os.path.join(artifact_dir, "chat_history_backup.md")
+        with open(artifact_md_path, "w", encoding="utf-8") as f:
+            f.write(md_content)
+    else:
+        artifact_md_path = None
 
     # 3. Create / Overwrite .tar.gz archive
     tar_path = f"{backup_dir}.tar.gz"
@@ -154,10 +167,16 @@ def export_chat(overwrite_latest: bool = False):
     print(f"📁 Directory: {backup_dir}")
     print(f"📦 Archive:   {tar_path}")
     print(f"📄 Markdown:  {md_file_path}")
-    print(f"🎨 Artifact:  {artifact_md_path}")
+    if artifact_md_path:
+        print(f"🎨 Artifact:  {artifact_md_path}")
     print(f"📊 Total User Prompts Captured: {turn_count}")
 
 
 if __name__ == "__main__":
-    overwrite = any(arg in sys.argv for arg in ("--overwrite-latest", "--overwrite", "-o"))
-    export_chat(overwrite_latest=overwrite)
+    import argparse
+    parser = argparse.ArgumentParser(description="Export Chat Backup")
+    parser.add_argument("conversation_id", nargs="?", default=None, help="Antigravity conversation ID")
+    parser.add_argument("--overwrite", "--overwrite-latest", "-o", action="store_true", help="Overwrite latest backup")
+    args = parser.parse_args()
+
+    export_chat(conversation_id=args.conversation_id, overwrite_latest=args.overwrite)

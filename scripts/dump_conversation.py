@@ -162,12 +162,15 @@ def update_index(backup_dir: str):
         fp.write("\n".join(content))
 
 def main():
-    conv_id = sys.argv[1] if len(sys.argv) > 1 else "b8438222-9ca8-4687-a897-0574a408db2e"
-    session_tag = sys.argv[2] if len(sys.argv) > 2 else "anvik_brand_and_api_architecture"
-    session_title = sys.argv[3] if len(sys.argv) > 3 else "Anvik Brand Definition & API Architecture"
+    conv_id = sys.argv[1] if len(sys.argv) > 1 else os.environ.get("CONVERSATION_ID", "7563b837-aa20-4a95-aed0-32af746d2010")
+    session_tag = sys.argv[2] if len(sys.argv) > 2 else "msme_ingestion_and_multi_asset_platform"
+    session_title = sys.argv[3] if len(sys.argv) > 3 else "MSME Ingestion, Mutual Fund Top 50, Render Hardening & Vestnomics Domain"
     
     app_data_dir = os.path.expanduser("~/.gemini/antigravity-ide")
-    transcript_path = os.path.join(app_data_dir, "brain", conv_id, ".system_generated", "logs", "transcript.jsonl")
+    logs_dir = os.path.join(app_data_dir, "brain", conv_id, ".system_generated", "logs")
+    transcript_full = os.path.join(logs_dir, "transcript_full.jsonl")
+    transcript_compact = os.path.join(logs_dir, "transcript.jsonl")
+    transcript_path = transcript_full if os.path.exists(transcript_full) else transcript_compact
 
     if not os.path.exists(transcript_path):
         print(f"❌ Transcript file not found at: {transcript_path}")
