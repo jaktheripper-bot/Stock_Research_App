@@ -330,7 +330,7 @@ Format as clean markdown with sections:
         client = Client(api_key=api_key)
         response = await asyncio.to_thread(
             client.models.generate_content,
-            model="gemini-3.5-flash-lite",
+            model="gemini-3.8-flash",
             contents=prompt
         )
         ai_commentary = response.text or ""

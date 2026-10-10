@@ -285,6 +285,16 @@ def build_equity_deterministic_response(
     cmp_display = f"{float(cmp_val):,.2f}" if isinstance(cmp_val, (int, float)) or (isinstance(cmp_val, str) and cmp_val.replace('.', '', 1).isdigit()) else str(cmp_val)
     pe_display = f"{float(pe_val):.2f}x" if isinstance(pe_val, (int, float)) or (isinstance(pe_val, str) and pe_val.replace('.', '', 1).isdigit()) else str(pe_val)
 
+    # 0. Regulatory & Advisory Safe-Harbor Guardrail
+    if any(k in msg for k in ["should i buy", "should i sell", "buy target", "guaranteed", "price target", "target price", "recommendation", "multibagger", "stock tip"]):
+        return (
+            f"**SEBI Regulatory Non-Advisory Notice for {name}:**\n\n"
+            f"Under SEBI (Research Analysts) Regulations 2014 Section 2(u), this platform provides purely educational, diagnostic, and deterministic research. "
+            f"We strictly do **not** provide buy/sell/hold recommendations, target prices, trade execution signals, or return guarantees.\n\n"
+            f"To evaluate {name} objectively without narrative bias, you can review its **Reverse DCF Implied Growth** "
+            f"(to inspect what annual FCF growth CMP ₹{cmp_display} is pricing in) or analyze the **Pre-Mortem Inversion** vectors."
+        )
+
     # 1. Pre-Mortem Inversion / Failure Modes / Thesis Destruction
     if sec in ["pre_mortem", "risks", "inversion"] or any(k in msg for k in ["pre-mortem", "inversion", "failure mode", "destroy", "risk", "threat", "vulnerabilit", "worst case", "bear case", "downside"]):
         macro_posture = matrix.get("Macro", "Headwinds")
@@ -700,7 +710,7 @@ Recent Conversation History:
     try:
         client = Client(api_key=api_key)
         resp = await client.aio.models.generate_content(
-            model="gemini-3.5-flash-lite",
+            model="gemini-3.8-flash",
             contents=f"{system_prompt}\n\nUSER: {user_message}\nCOPILOT:"
         )
         agent_reply = resp.text or "Unable to formulate response."
