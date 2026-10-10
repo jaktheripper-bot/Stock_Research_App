@@ -21,6 +21,8 @@ from core.analysis.fundamentals import (
     get_stock_fundamentals,
     fetch_latest_bse_announcement,
 )
+from core.cortex.chanakya import ChanakyaGate
+
 
 logger = logging.getLogger("equity_research.core.analysis.discovery")
 
@@ -171,6 +173,12 @@ def evaluate_under_the_radar_candidate(candidate: Dict[str, Any]) -> Optional[Di
     if de_float > 0.8:
         return None
 
+    # Phase 1: Chanakya Clean-Room Forensic Screening Sieve
+    chanakya_res = ChanakyaGate.evaluate_from_dict(candidate, mode="STRICT")
+    if not chanakya_res.overall_passed:
+        logger.info(f"Chanakya Sieve excluded candidate {canonical}: {chanakya_res.summary}")
+        return None
+
     # Ingest latest corporate filing headline
     catalyst = "BSE Corporate Announcements & Disclosures"
     if scrip_code:
@@ -196,6 +204,8 @@ def evaluate_under_the_radar_candidate(candidate: Dict[str, Any]) -> Optional[Di
         "roce_pct": round(roce_float, 1),
         "debt_to_equity": round(de_float, 2),
         "sales_growth_3y": round(sales_growth_float, 1),
+        "chanakya_score": chanakya_res.clean_room_score,
+        "chanakya_status": chanakya_res.status,
         "ria_thesis": ria_thesis,
         "catalyst_headline": catalyst,
         "key_metrics": {
@@ -203,9 +213,11 @@ def evaluate_under_the_radar_candidate(candidate: Dict[str, Any]) -> Optional[Di
             "roe": f"{roe_float:.1f}%",
             "debt_to_equity": f"{de_float:.2f}",
             "pe": pe_str,
-            "cap_tier": cap_tier
+            "cap_tier": cap_tier,
+            "chanakya_score": f"{chanakya_res.clean_room_score:.0f}/100"
         }
     }
+
 
 
 def curate_morning_discovery_cohort(target_count: int = 12) -> List[Dict[str, Any]]:
