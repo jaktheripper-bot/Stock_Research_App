@@ -1,0 +1,359 @@
+{% extends "base.html" %}
+
+{% block title %}Unlisted MSME & Emerging SME Directory | Institutional Research{% endblock %}
+{% block meta_desc %}Comprehensive registry of unlisted Indian Micro, Small, and Medium Enterprises under the MSMED Act 2020. Track annual turnover, industrial clusters, and enterprise growth tiers.{% endblock %}
+{% block og_title %}Unlisted MSME & Emerging SME Directory | Vestnomics{% endblock %}
+{% block og_desc %}Statutory registry intelligence, turnover classification, and cluster analysis across India's industrial corridors.{% endblock %}
+
+{% block content %}
+<div class="container py-8">
+  <!-- Hero Section -->
+  <div style="background: linear-gradient(135deg, rgba(30, 41, 59, 0.7) 0%, rgba(15, 23, 42, 0.95) 100%); border: 1px solid rgba(255, 255, 255, 0.1); border-radius: 16px; padding: 32px; margin-bottom: 32px; position: relative; overflow: hidden;">
+    <div style="position: absolute; top: -50px; right: -50px; width: 240px; height: 240px; background: radial-gradient(circle, rgba(14, 165, 233, 0.15) 0%, transparent 70%); pointer-events: none;"></div>
+    
+    <div style="display: inline-flex; align-items: center; gap: 8px; background: rgba(14, 165, 233, 0.15); border: 1px solid rgba(14, 165, 233, 0.3); border-radius: 9999px; padding: 4px 12px; margin-bottom: 16px;">
+      <span style="width: 8px; height: 8px; border-radius: 50%; background: #0ea5e9;"></span>
+      <span style="font-size: 12px; font-weight: 700; color: #38bdf8; text-transform: uppercase; letter-spacing: 0.05em;">Unlisted Enterprises • MSMED Act 2020 Framework</span>
+    </div>
+
+    <h1 style="font-size: 32px; font-weight: 800; color: #f8fafc; margin-bottom: 12px; letter-spacing: -0.02em;">
+      Unlisted MSME & Emerging SME Directory
+    </h1>
+    <p style="font-size: 15px; color: #94a3b8; max-width: 840px; line-height: 1.6; margin-bottom: 24px;">
+      Statutory registry intelligence covering verified unlisted manufacturing enterprises and SME growth champions across India's primary industrial corridors. Classifies enterprises into <strong>Micro</strong> (&lt; ₹5 Cr), <strong>Small</strong> (₹5–50 Cr), and <strong>Medium</strong> (₹50–250 Cr) tiers under the revised MSMED Act 2020 statutory criteria.
+    </p>
+
+    <!-- Top KPI Grid -->
+    <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(170px, 1fr)); gap: 16px;">
+      <div style="background: rgba(15, 23, 42, 0.6); border: 1px solid rgba(255, 255, 255, 0.08); border-radius: 12px; padding: 16px;">
+        <div style="font-size: 12px; color: #64748b; text-transform: uppercase; font-weight: 600; margin-bottom: 4px;">Registered MSMEs</div>
+        <div style="font-size: 24px; font-weight: 800; color: #f8fafc;">{{ total_firms }} Firms</div>
+      </div>
+      <div style="background: rgba(15, 23, 42, 0.6); border: 1px solid rgba(255, 255, 255, 0.08); border-radius: 12px; padding: 16px;">
+        <div style="font-size: 12px; color: #64748b; text-transform: uppercase; font-weight: 600; margin-bottom: 4px;">Aggregate Turnover</div>
+        <div style="font-size: 24px; font-weight: 800; color: #38bdf8;">₹{{ "{:,.1f}".format(total_turnover) }} Cr</div>
+      </div>
+      <div style="background: rgba(15, 23, 42, 0.6); border: 1px solid rgba(255, 255, 255, 0.08); border-radius: 12px; padding: 16px;">
+        <div style="font-size: 12px; color: #64748b; text-transform: uppercase; font-weight: 600; margin-bottom: 4px;">Medium (₹50–250 Cr)</div>
+        <div style="font-size: 24px; font-weight: 800; color: #10b981;">{{ medium_count }} Firms</div>
+      </div>
+      <div style="background: rgba(15, 23, 42, 0.6); border: 1px solid rgba(255, 255, 255, 0.08); border-radius: 12px; padding: 16px;">
+        <div style="font-size: 12px; color: #64748b; text-transform: uppercase; font-weight: 600; margin-bottom: 4px;">Small (₹5–50 Cr)</div>
+        <div style="font-size: 24px; font-weight: 800; color: #60a5fa;">{{ small_count }} Firms</div>
+      </div>
+      <div style="background: rgba(15, 23, 42, 0.6); border: 1px solid rgba(255, 255, 255, 0.08); border-radius: 12px; padding: 16px;">
+        <div style="font-size: 12px; color: #64748b; text-transform: uppercase; font-weight: 600; margin-bottom: 4px;">Industrial Hubs</div>
+        <div style="font-size: 24px; font-weight: 800; color: #c084fc;">{{ states_count }} States</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Search & Filter Controls -->
+  <div style="background: rgba(15, 23, 42, 0.7); border: 1px solid rgba(255, 255, 255, 0.08); border-radius: 14px; padding: 20px; margin-bottom: 24px;">
+    <form method="get" action="/msme" style="display: flex; gap: 12px; flex-wrap: wrap; align-items: center;">
+      <!-- Search Input -->
+      <div style="flex: 2; min-width: 220px; position: relative;">
+        <input
+          type="text"
+          name="q"
+          value="{{ current_q }}"
+          placeholder="Search by enterprise name, UIN, city, or sector..."
+          style="width: 100%; background: rgba(30, 41, 59, 0.8); border: 1px solid rgba(255, 255, 255, 0.15); border-radius: 8px; padding: 10px 14px; color: #f8fafc; font-size: 14px; outline: none;"
+        >
+      </div>
+
+      <!-- Sector Filter -->
+      <div style="flex: 1; min-width: 160px;">
+        <select
+          name="sector"
+          onchange="this.form.submit()"
+          style="width: 100%; background: rgba(30, 41, 59, 0.8); border: 1px solid rgba(255, 255, 255, 0.15); border-radius: 8px; padding: 10px 14px; color: #f8fafc; font-size: 14px; outline: none;"
+        >
+          <option value="">All Sectors</option>
+          {% for s in sectors %}
+          <option value="{{ s }}" {% if current_sector == s %}selected{% endif %}>
+            {{ s|replace('_', ' ')|title }}
+          </option>
+          {% endfor %}
+        </select>
+      </div>
+
+      <!-- State Filter -->
+      <div style="flex: 1; min-width: 160px;">
+        <select
+          name="state"
+          onchange="this.form.submit()"
+          style="width: 100%; background: rgba(30, 41, 59, 0.8); border: 1px solid rgba(255, 255, 255, 0.15); border-radius: 8px; padding: 10px 14px; color: #f8fafc; font-size: 14px; outline: none;"
+        >
+          <option value="">All States</option>
+          {% for st in states %}
+          <option value="{{ st }}" {% if current_state == st %}selected{% endif %}>
+            {{ st }}
+          </option>
+          {% endfor %}
+        </select>
+      </div>
+
+      <!-- Tier Filter -->
+      <div style="flex: 1; min-width: 150px;">
+        <select
+          name="tier"
+          onchange="this.form.submit()"
+          style="width: 100%; background: rgba(30, 41, 59, 0.8); border: 1px solid rgba(255, 255, 255, 0.15); border-radius: 8px; padding: 10px 14px; color: #f8fafc; font-size: 14px; outline: none;"
+        >
+          <option value="">All Tiers</option>
+          <option value="medium" {% if current_tier == 'medium' %}selected{% endif %}>Medium (&ge; ₹50 Cr)</option>
+          <option value="small" {% if current_tier == 'small' %}selected{% endif %}>Small (₹5–50 Cr)</option>
+          <option value="micro" {% if current_tier == 'micro' %}selected{% endif %}>Micro (&lt; ₹5 Cr)</option>
+        </select>
+      </div>
+
+      <button type="submit" class="btn btn-primary" style="padding: 10px 20px; font-weight: 700; border-radius: 8px;">
+        Apply Filter
+      </button>
+
+      {% if current_q or current_sector or current_state or current_tier %}
+      <a href="/msme" class="btn btn-secondary" style="padding: 10px 16px; border-radius: 8px; font-size: 13px;">
+        Clear
+      </a>
+      {% endif %}
+    </form>
+  </div>
+
+  <!-- Enterprise Directory Table -->
+  <div style="background: rgba(15, 23, 42, 0.6); border: 1px solid rgba(255, 255, 255, 0.08); border-radius: 16px; overflow: hidden; margin-bottom: 32px;">
+    <div style="padding: 16px 20px; border-bottom: 1px solid rgba(255, 255, 255, 0.08); display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 8px;">
+      <div style="font-size: 14px; font-weight: 700; color: #f8fafc;">
+        Showing {{ firms|length }} Enterprises
+      </div>
+      <div style="font-size: 12px; color: #64748b;">
+        Source: Ministry of MSME / Udyam Gazette Open Feed • 2026 Refresh
+      </div>
+    </div>
+
+    <div style="overflow-x: auto;">
+      <table style="width: 100%; border-collapse: collapse; text-align: left; font-size: 14px;">
+        <thead>
+          <tr style="background: rgba(30, 41, 59, 0.6); border-bottom: 1px solid rgba(255, 255, 255, 0.08); color: #94a3b8; font-size: 12px; text-transform: uppercase; letter-spacing: 0.04em;">
+            <th style="padding: 14px 18px;">Enterprise Name & UIN</th>
+            <th style="padding: 14px 18px;">Sector Classification</th>
+            <th style="padding: 14px 18px;">Industrial Cluster</th>
+            <th style="padding: 14px 18px; text-align: right;">Annual Turnover</th>
+            <th style="padding: 14px 18px; text-align: center;">MSME Tier</th>
+            <th style="padding: 14px 18px; text-align: center;">Headcount</th>
+            <th style="padding: 14px 18px; text-align: center;">Action</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for f in firms %}
+          <tr style="border-bottom: 1px solid rgba(255, 255, 255, 0.05); transition: background 0.15s ease;" onmouseover="this.style.background='rgba(30, 41, 59, 0.4)'" onmouseout="this.style.background='transparent'">
+            <!-- Name & UIN -->
+            <td style="padding: 14px 18px;">
+              <div style="font-weight: 700; color: #f8fafc; font-size: 15px; margin-bottom: 3px;">
+                {{ f.name }}
+              </div>
+              <div style="font-family: monospace; font-size: 11px; color: #64748b; display: inline-flex; align-items: center; gap: 4px;">
+                <span style="background: rgba(148, 163, 184, 0.1); padding: 2px 6px; border-radius: 4px; border: 1px solid rgba(255,255,255,0.05);">
+                  {{ f.uin }}
+                </span>
+              </div>
+            </td>
+
+            <!-- Sector -->
+            <td style="padding: 14px 18px;">
+              <span style="display: inline-block; background: rgba(56, 189, 248, 0.12); color: #38bdf8; border: 1px solid rgba(56, 189, 248, 0.25); border-radius: 6px; padding: 3px 8px; font-size: 12px; font-weight: 600;">
+                {{ f.sector|replace('_', ' ')|title }}
+              </span>
+            </td>
+
+            <!-- Location -->
+            <td style="padding: 14px 18px; color: #cbd5e1;">
+              <div>{{ f.city }}</div>
+              <div style="font-size: 12px; color: #64748b;">{{ f.state }}</div>
+            </td>
+
+            <!-- Turnover -->
+            <td style="padding: 14px 18px; text-align: right; font-weight: 800; font-size: 15px;">
+              {% if f.annual_turnover is not none %}
+                <span style="color: {% if f.annual_turnover >= 50.0 %}#10b981{% elif f.annual_turnover >= 5.0 %}#60a5fa{% else %}#f59e0b{% endif %};">
+                  ₹{{ "{:,.1f}".format(f.annual_turnover) }} Cr
+                </span>
+              {% else %}
+                <span style="color: #64748b;">N/A</span>
+              {% endif %}
+            </td>
+
+            <!-- Tier Badge -->
+            <td style="padding: 14px 18px; text-align: center;">
+              {% if f.tier == "Medium" %}
+              <span style="background: rgba(16, 185, 129, 0.15); color: #34d399; border: 1px solid rgba(16, 185, 129, 0.3); border-radius: 9999px; padding: 2px 10px; font-size: 11px; font-weight: 700; text-transform: uppercase;">
+                Medium
+              </span>
+              {% elif f.tier == "Small" %}
+              <span style="background: rgba(59, 130, 246, 0.15); color: #60a5fa; border: 1px solid rgba(59, 130, 246, 0.3); border-radius: 9999px; padding: 2px 10px; font-size: 11px; font-weight: 700; text-transform: uppercase;">
+                Small
+              </span>
+              {% else %}
+              <span style="background: rgba(245, 158, 11, 0.15); color: #fbbf24; border: 1px solid rgba(245, 158, 11, 0.3); border-radius: 9999px; padding: 2px 10px; font-size: 11px; font-weight: 700; text-transform: uppercase;">
+                Micro
+              </span>
+              {% endif %}
+            </td>
+
+            <!-- Employees -->
+            <td style="padding: 14px 18px; text-align: center; color: #cbd5e1; font-weight: 600;">
+              {% if f.employee_count %}
+                {{ f.employee_count }}
+              {% else %}
+                <span style="color: #64748b;">-</span>
+              {% endif %}
+            </td>
+
+            <!-- Action -->
+            <td style="padding: 14px 18px; text-align: center;">
+              <button
+                type="button"
+                class="btn btn-secondary btn-sm"
+                style="font-size: 12px; font-weight: 700; border-radius: 6px; padding: 6px 12px;"
+                onclick="inspectMsme('{{ f.uin }}')"
+              >
+                Inspect
+              </button>
+            </td>
+          </tr>
+          {% else %}
+          <tr>
+            <td colspan="7" style="padding: 48px; text-align: center; color: #64748b;">
+              <div style="font-size: 16px; font-weight: 600; color: #94a3b8; margin-bottom: 6px;">No MSME enterprises matched your query</div>
+              <div style="font-size: 13px;">Try clearing filters or adjusting your search term.</div>
+            </td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+  <!-- Statutory Classification Criteria Drawer / Footer Explainer -->
+  <div style="background: rgba(30, 41, 59, 0.4); border: 1px solid rgba(255, 255, 255, 0.08); border-radius: 14px; padding: 24px; margin-bottom: 32px;">
+    <h3 style="font-size: 16px; font-weight: 700; color: #f8fafc; margin-bottom: 12px; display: flex; align-items: center; gap: 8px;">
+      <span style="width: 6px; height: 6px; border-radius: 50%; background: #38bdf8;"></span>
+      MSMED Act 2020 Classification Norms (Gazette Notification S.O. 2119(E))
+    </h3>
+    <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap: 16px; font-size: 13px; color: #94a3b8; line-height: 1.6;">
+      <div style="background: rgba(15, 23, 42, 0.5); padding: 14px; border-radius: 8px; border: 1px solid rgba(255,255,255,0.05);">
+        <strong style="color: #fbbf24;">Micro Enterprise:</strong>
+        <div>Plant & Machinery / Equipment Investment not exceeding <strong>₹1.00 Crore</strong> and Annual Turnover not exceeding <strong>₹5.00 Crores</strong>.</div>
+      </div>
+      <div style="background: rgba(15, 23, 42, 0.5); padding: 14px; border-radius: 8px; border: 1px solid rgba(255,255,255,0.05);">
+        <strong style="color: #60a5fa;">Small Enterprise:</strong>
+        <div>Investment in Plant & Machinery not exceeding <strong>₹10.00 Crores</strong> and Annual Turnover not exceeding <strong>₹50.00 Crores</strong>.</div>
+      </div>
+      <div style="background: rgba(15, 23, 42, 0.5); padding: 14px; border-radius: 8px; border: 1px solid rgba(255,255,255,0.05);">
+        <strong style="color: #34d399;">Medium Enterprise:</strong>
+        <div>Investment in Plant & Machinery not exceeding <strong>₹50.00 Crores</strong> and Annual Turnover not exceeding <strong>₹250.00 Crores</strong>.</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Statutory Safe Harbor Notice -->
+  <div style="border-top: 1px solid rgba(255, 255, 255, 0.08); padding-top: 18px; font-size: 12px; color: #64748b; line-height: 1.5; text-align: center;">
+    <strong>Statutory Regulatory Notice:</strong> Enterprise records are grounded in open gazette disclosures from the Udyam Registration Portal under the Ministry of Micro, Small and Medium Enterprises. This repository is provided purely for quantitative research and informational indexing. It does not constitute investment advice or solicitation under SEBI (Research Analysts) Regulations, 2014.
+  </div>
+</div>
+
+<!-- MSME Inspection Modal -->
+<div id="msmeModal" style="display: none; position: fixed; inset: 0; background: rgba(0, 0, 0, 0.75); backdrop-filter: blur(8px); z-index: 9999; align-items: center; justify-content: center; padding: 20px;">
+  <div style="background: #0f172a; border: 1px solid rgba(255, 255, 255, 0.15); border-radius: 16px; max-width: 620px; width: 100%; padding: 28px; box-shadow: 0 20px 40px rgba(0,0,0,0.6); position: relative;">
+    <button
+      type="button"
+      onclick="closeMsmeModal()"
+      style="position: absolute; top: 16px; right: 16px; background: transparent; border: none; color: #94a3b8; font-size: 20px; cursor: pointer;"
+    >&times;</button>
+
+    <div style="display: inline-flex; align-items: center; gap: 6px; background: rgba(14, 165, 233, 0.15); border: 1px solid rgba(14, 165, 233, 0.3); border-radius: 9999px; padding: 2px 10px; margin-bottom: 12px;">
+      <span style="width: 6px; height: 6px; border-radius: 50%; background: #38bdf8;"></span>
+      <span id="modalTierBadge" style="font-size: 11px; font-weight: 700; color: #38bdf8; text-transform: uppercase;"></span>
+    </div>
+
+    <h2 id="modalFirmName" style="font-size: 22px; font-weight: 800; color: #f8fafc; margin-bottom: 6px;"></h2>
+    <div id="modalFirmUin" style="font-family: monospace; font-size: 12px; color: #64748b; margin-bottom: 20px;"></div>
+
+    <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 14px; margin-bottom: 20px;">
+      <div style="background: rgba(30, 41, 59, 0.6); border: 1px solid rgba(255,255,255,0.06); border-radius: 10px; padding: 12px;">
+        <div style="font-size: 11px; color: #94a3b8; text-transform: uppercase; font-weight: 600; margin-bottom: 3px;">Annual Turnover</div>
+        <div id="modalTurnover" style="font-size: 18px; font-weight: 800; color: #38bdf8;"></div>
+      </div>
+      <div style="background: rgba(30, 41, 59, 0.6); border: 1px solid rgba(255,255,255,0.06); border-radius: 10px; padding: 12px;">
+        <div style="font-size: 11px; color: #94a3b8; text-transform: uppercase; font-weight: 600; margin-bottom: 3px;">Employee Headcount</div>
+        <div id="modalEmployees" style="font-size: 18px; font-weight: 800; color: #f8fafc;"></div>
+      </div>
+      <div style="background: rgba(30, 41, 59, 0.6); border: 1px solid rgba(255,255,255,0.06); border-radius: 10px; padding: 12px;">
+        <div style="font-size: 11px; color: #94a3b8; text-transform: uppercase; font-weight: 600; margin-bottom: 3px;">Sector / NIC Code</div>
+        <div id="modalSector" style="font-size: 14px; font-weight: 700; color: #cbd5e1;"></div>
+      </div>
+      <div style="background: rgba(30, 41, 59, 0.6); border: 1px solid rgba(255,255,255,0.06); border-radius: 10px; padding: 12px;">
+        <div style="font-size: 11px; color: #94a3b8; text-transform: uppercase; font-weight: 600; margin-bottom: 3px;">Cluster / State</div>
+        <div id="modalLocation" style="font-size: 14px; font-weight: 700; color: #cbd5e1;"></div>
+      </div>
+    </div>
+
+    <div style="background: rgba(15, 23, 42, 0.7); border: 1px solid rgba(255,255,255,0.05); border-radius: 10px; padding: 12px; margin-bottom: 20px; font-size: 12px; color: #94a3b8; line-height: 1.5;">
+      <div><strong>Udyam Registration Date:</strong> <span id="modalRegDate" style="color: #cbd5e1;"></span></div>
+      <div><strong>Statutory Source:</strong> <span id="modalSource" style="color: #cbd5e1;"></span></div>
+      <div><strong>Institutional Cluster:</strong> High-growth unlisted enterprise operating in verified state industrial development zones.</div>
+    </div>
+
+    <div style="display: flex; justify-content: flex-end; gap: 10px;">
+      <button
+        type="button"
+        onclick="closeMsmeModal()"
+        class="btn btn-primary"
+        style="padding: 8px 20px; border-radius: 8px; font-weight: 700;"
+      >
+        Close Profile
+      </button>
+    </div>
+  </div>
+</div>
+
+<script>
+async function inspectMsme(uin) {
+  try {
+    const res = await fetch(`/api/msme/${encodeURIComponent(uin)}`);
+    if (!res.ok) {
+      alert("Unable to fetch enterprise details.");
+      return;
+    }
+    const data = await res.json();
+    document.getElementById("modalFirmName").innerText = data.name || "N/A";
+    document.getElementById("modalFirmUin").innerText = "UIN: " + (data.uin || "N/A");
+    document.getElementById("modalTierBadge").innerText = (data.tier || "Enterprise") + " Tier";
+    document.getElementById("modalTurnover").innerText = data.annual_turnover !== null ? `₹${data.annual_turnover.toFixed(1)} Cr` : "N/A";
+    document.getElementById("modalEmployees").innerText = data.employee_count ? `${data.employee_count} Persons` : "Not Disclosed";
+    document.getElementById("modalSector").innerText = (data.sector ? data.sector.replace(/_/g, ' ') : "General Manufacturing") + (data.sector_code ? ` (NIC ${data.sector_code})` : "");
+    document.getElementById("modalLocation").innerText = `${data.city || 'District'}, ${data.state || 'India'}`;
+    document.getElementById("modalRegDate").innerText = data.registration_date || "Historical";
+    document.getElementById("modalSource").innerText = data.source || "Udyam Gazette";
+
+    const modal = document.getElementById("msmeModal");
+    modal.style.display = "flex";
+  } catch (err) {
+    console.error("Error inspecting MSME:", err);
+    alert("Error fetching enterprise data.");
+  }
+}
+
+function closeMsmeModal() {
+  const modal = document.getElementById("msmeModal");
+  modal.style.display = "none";
+}
+
+// Close modal on escape key
+document.addEventListener("keydown", function(e) {
+  if (e.key === "Escape") {
+    closeMsmeModal();
+  }
+});
+</script>
+{% endblock %}

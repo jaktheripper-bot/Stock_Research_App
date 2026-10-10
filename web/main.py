@@ -398,9 +398,6 @@ async def lifespan(app: FastAPI):
             logger.warning("Production Notice: ADMIN_API_KEY or ADMIN_PASSWORD should be declared in production.")
 
     # Initialize DB migrations on startup
-    # Include MSME router
-    from core.msme.router import router as msme_router
-    app.include_router(msme_router, prefix="/api/msme")
     init_db()
 
     # Pre-seed foundational benchmark securities if empty on startup (out-of-band, not during HTTP requests)
@@ -417,6 +414,13 @@ async def lifespan(app: FastAPI):
             seed_default_debt_securities()
     except Exception as e:
         logger.warning(f"Initial debt bootstrap seed skipped: {e}")
+
+    try:
+        from core.msme.seed import get_active_msme_firms_count, seed_default_msme_firms
+        if get_active_msme_firms_count() == 0:
+            seed_default_msme_firms()
+    except Exception as e:
+        logger.warning(f"Initial MSME bootstrap seed skipped: {e}")
 
     is_testing = os.environ.get("TESTING") == "1" or "pytest" in sys.modules
     scheduler = None
@@ -467,6 +471,10 @@ app = FastAPI(
     version="2.0.0",
     lifespan=lifespan
 )
+
+# Include MSME API router at top level
+from core.msme.router import router as msme_router
+app.include_router(msme_router, prefix="/api/msme")
 
 # Cache-Control / ETag helper for cheap JSON endpoints
 def json_response_with_cache(data: dict, max_age: int = 3600) -> JSONResponse:
@@ -1733,6 +1741,108 @@ def api_tax_calculator(
     return json_response_with_cache(
         calculate_net_real_return(nominal_return, tax_rate, cpi_inflation),
         max_age=3600
+    )
+
+
+# ==============================================================================
+# Unlisted MSME & Emerging SME Directory (MSMED Act 2020)
+# ==============================================================================
+@app.get("/msme", response_class=HTMLResponse)
+def msme_directory_page(
+    request: Request,
+    sector: Optional[str] = None,
+    state: Optional[str] = None,
+    tier: Optional[str] = None,
+    q: Optional[str] = None
+):
+    """Unlisted MSME & Emerging SME Directory under the MSMED Act 2020."""
+    init_db()
+    from core.msme.seed import get_active_msme_firms_count, seed_default_msme_firms
+    if get_active_msme_firms_count() == 0:
+        seed_default_msme_firms()
+
+    from core.msme.utils import build_search_query, classify_msme_tier
+    from core.db.connection import get_db_connection, get_supabase_url
+    conn = get_db_connection()
+    cur = conn.cursor()
+    use_pg = bool(get_supabase_url())
+    placeholder = "%s" if use_pg else "?"
+
+    where, values = build_search_query(
+        {"q": q, "sector": sector, "state": state, "tier": tier},
+        placeholder=placeholder
+    )
+
+    sql = f"""
+        SELECT uin, name, sector_name, city, state, annual_turnover,
+               employee_count, registration_date, source
+        FROM msme_firms
+        WHERE {where}
+        ORDER BY annual_turnover DESC, name ASC
+        LIMIT 100
+    """
+    cur.execute(sql, values)
+    rows = cur.fetchall()
+
+    cur.execute("SELECT COUNT(*), COALESCE(SUM(annual_turnover), 0), COUNT(DISTINCT state) FROM msme_firms")
+    stat_row = cur.fetchone()
+    total_firms = stat_row[0] if stat_row else 0
+    total_turnover = round(float(stat_row[1]), 1) if stat_row and stat_row[1] else 0.0
+    states_count = stat_row[2] if stat_row else 0
+
+    cur.execute("SELECT COUNT(*) FROM msme_firms WHERE annual_turnover < 5.0 OR annual_turnover IS NULL")
+    micro_count = cur.fetchone()[0]
+
+    cur.execute("SELECT COUNT(*) FROM msme_firms WHERE annual_turnover >= 5.0 AND annual_turnover < 50.0")
+    small_count = cur.fetchone()[0]
+
+    cur.execute("SELECT COUNT(*) FROM msme_firms WHERE annual_turnover >= 50.0")
+    medium_count = cur.fetchone()[0]
+
+    cur.execute("SELECT DISTINCT sector_name FROM msme_firms WHERE sector_name IS NOT NULL AND sector_name != '' ORDER BY sector_name ASC")
+    sectors = [r[0] for r in cur.fetchall()]
+
+    cur.execute("SELECT DISTINCT state FROM msme_firms WHERE state IS NOT NULL AND state != '' ORDER BY state ASC")
+    states = [r[0] for r in cur.fetchall()]
+
+    cur.close()
+    conn.close()
+
+    firms = []
+    for r in rows:
+        turnover = float(r[5]) if r[5] is not None else None
+        firms.append({
+            "uin": r[0],
+            "name": r[1],
+            "sector": r[2],
+            "city": r[3],
+            "state": r[4],
+            "annual_turnover": turnover,
+            "employee_count": int(r[6]) if r[6] is not None else None,
+            "registration_date": r[7],
+            "source": r[8],
+            "tier": classify_msme_tier(turnover)
+        })
+
+    return templates.TemplateResponse(
+        request=request,
+        name="msme_directory.html",
+        context={
+            "active_page": "msme",
+            "firms": firms,
+            "total_firms": total_firms,
+            "total_turnover": total_turnover,
+            "states_count": states_count,
+            "micro_count": micro_count,
+            "small_count": small_count,
+            "medium_count": medium_count,
+            "sectors": sectors,
+            "states": states,
+            "current_sector": sector,
+            "current_state": state,
+            "current_tier": tier,
+            "current_q": q or ""
+        }
     )
 
 
