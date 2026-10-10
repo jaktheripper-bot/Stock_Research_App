@@ -334,7 +334,7 @@ a {
 """
     else:
         header_branding = f"""# Equity Research Dossier: {display_title}
-> **Platform:** [Stock Research AI](https://stockresearch.app) | **Document ID:** `{doc_receipt_id}`  
+> **Platform:** [Vestnomics](https://vestnomics.app) | **Document ID:** `{doc_receipt_id}`  
 > **Compilation Timestamp:** {now_str} | **Licensing Tier:** Standard Subscriber Deliverable  
 > **Data Provenance:** Statutory Exchange Disclosures (BSE/NSE), Authoritative Broker Gateway APIs, and Official AMFI/RBI Repositories.
 """

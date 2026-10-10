@@ -2345,6 +2345,8 @@ ALLOWED_ORIGIN_HOSTS = {
     "localhost",
     "127.0.0.1",
     "testserver",
+    "vestnomics.app",
+    "www.vestnomics.app",
     "stockresearch.app",
     "www.stockresearch.app",
     "stock-research-app-2ljm.onrender.com",
@@ -3053,7 +3055,7 @@ async def api_v1_get_report(
             "citations_count": len(rep.get("citations", [])),
             "citations": rep.get("citations", []),
             "regulatory_disclaimer": "Educational research under SEBI RA Regulations Section 2(u). Not an investment recommendation.",
-            "attribution": "Stock Research AI (https://stockresearch.app)"
+            "attribution": "Vestnomics (https://vestnomics.app)"
         },
         headers={
             "Cache-Control": "public, max-age=300",
@@ -3069,12 +3071,13 @@ async def sitemap_xml():
     # Use current date for static pages
     now_iso = datetime.now(timezone.utc).strftime("%Y-%m-%d")
 
-    base_url = "https://stockresearch.app"
+    base_url = (os.environ.get("CANONICAL_DOMAIN") or "https://vestnomics.app").rstrip("/")
     xml_lines = [
         '<?xml version="1.0" encoding="UTF-8"?>',
         '<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">',
         f'  <url><loc>{base_url}/</loc><lastmod>{now_iso}</lastmod><changefreq>hourly</changefreq><priority>1.0</priority></url>',
         f'  <url><loc>{base_url}/discovery</loc><lastmod>{now_iso}</lastmod><changefreq>daily</changefreq><priority>0.9</priority></url>',
+        f'  <url><loc>{base_url}/opportunities</loc><lastmod>{now_iso}</lastmod><changefreq>daily</changefreq><priority>0.9</priority></url>',
         f'  <url><loc>{base_url}/search</loc><lastmod>{now_iso}</lastmod><changefreq>daily</changefreq><priority>0.9</priority></url>',
         f'  <url><loc>{base_url}/compare</loc><lastmod>{now_iso}</lastmod><changefreq>weekly</changefreq><priority>0.8</priority></url>',
         f'  <url><loc>{base_url}/debt</loc><lastmod>{now_iso}</lastmod><changefreq>daily</changefreq><priority>0.8</priority></url>',
@@ -3111,7 +3114,7 @@ async def sitemap_xml():
             else:
                 lastmod_date = now_iso
             xml_lines.append(
-                f'  <url><loc>https://stockresearch.app/dossier/{t}</loc><lastmod>{lastmod_date}</lastmod><changefreq>weekly</changefreq><priority>0.9</priority></url>'
+                f'  <url><loc>{base_url}/dossier/{t}</loc><lastmod>{lastmod_date}</lastmod><changefreq>weekly</changefreq><priority>0.9</priority></url>'
             )
 
     xml_lines.append('</urlset>')
@@ -4449,12 +4452,13 @@ async def api_admin_get_scan_runs(
 @app.get("/robots.txt", response_class=Response)
 async def robots_txt():
     """Provides search engine crawler directives and XML sitemap index pointer."""
+    base_url = (os.environ.get("CANONICAL_DOMAIN") or "https://vestnomics.app").rstrip("/")
     content = (
         "User-agent: *\n"
         "Allow: /\n"
         "Disallow: /api/\n"
         "Disallow: /admin\n\n"
-        "Sitemap: https://stockresearch.app/sitemap.xml\n"
+        f"Sitemap: {base_url}/sitemap.xml\n"
     )
     return Response(content=content, media_type="text/plain")
 

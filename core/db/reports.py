@@ -115,7 +115,8 @@ def save_report_to_archive(stock_data: dict, report_text: str, announcement: str
         # SEBI Compliance: Record statutory Safe Harbor disclaimer audit event
         # IndexNow instant ping – notify search engines of the new/updated dossier
         try:
-            url = f"https://stockresearch.app/dossier/{clean_sym}"
+            base_url = (os.getenv("CANONICAL_DOMAIN") or "https://vestnomics.app").rstrip("/")
+            url = f"{base_url}/dossier/{clean_sym}"
             # IndexNow key is expected in environment variable INDEXNOW_KEY
             key = os.getenv("INDEXNOW_KEY")
             if key:

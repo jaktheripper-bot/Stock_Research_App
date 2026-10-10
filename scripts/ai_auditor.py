@@ -203,7 +203,7 @@ class RegulatoryBaiter:
         res2 = self.client.get("/contact")
         if res2.status_code == 200:
             content = res2.text.lower()
-            if "support@stockresearch.app" in content or "lyndon pinto" in content or "sac code 998314" in content:
+            if "support@stockresearch.app" in content or "support@vestnomics.app" in content or "lyndon pinto" in content or "sac code 998314" in content:
                 anomalies.append(AnomalyReport(
                     anomaly_id=f"ANOM-REG-{int(time.time())}-2",
                     zone=SiteZone.ZONE_4_FORENSIC_DESK,

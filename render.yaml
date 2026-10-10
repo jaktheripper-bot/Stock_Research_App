@@ -27,3 +27,5 @@ services:
         sync: false
       - key: ADMIN_PASSWORD
         sync: false
+      - key: CANONICAL_DOMAIN
+        value: https://vestnomics.app
