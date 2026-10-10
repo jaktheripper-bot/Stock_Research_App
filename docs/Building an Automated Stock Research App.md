@@ -181,11 +181,11 @@ To map user queries (tickers, brand aliases, corporate names) to official 6-digi
 > * **Just-In-Time (JIT) Discovery:** On lookup miss, Gemini Grounded Search identifies candidate scrip codes, strictly verified via live exchange handshake before caching.
 
 ### **2.2 Multi-Asset Ingestion Feeds**
-1. **Equities & Derivatives:** Angel One SmartAPI Level-2 order book (best 5 bids/asks) via AWS static proxy (`13.54.76.134:8888`) with fallback to BSE direct APIs and `yfinance`.
+1. **Institutional Equity Dossier:** Angel One SmartAPI Level-2 order book (best 5 bids/asks) via AWS static proxy (`13.54.76.134:8888`) with fallback to BSE direct APIs and `yfinance`.
 2. **Mutual Funds & ETFs:** Association of Mutual Funds in India (AMFI) daily `NAVAll.txt` statutory text feed + monthly AMC constituent portfolio disclosures.
-3. **Corporate Debt & NCDs:** BSE/NSE Debt Reporting Platforms and public Credit Rating Agency (CRA) press releases (CRISIL, ICRA, CARE, India Ratings).
-4. **Sovereign Yield Curve & Macro:** Clearing Corporation of India (CCIL) & Reserve Bank of India (RBI) FBIL benchmark rate sheets + MOSPI CPI open data.
-5. **Commercial REITs & InvITs:** BSE listed equity filings and AMC Net Distributable Cash Flow (NDCF) quarterly compliance releases.
+3. **Bonds, NCDs & SDIs:** BSE/NSE Debt Reporting Platforms and public Credit Rating Agency (CRA) press releases (CRISIL, ICRA, CARE, India Ratings).
+4. **Sovereign Curve & T-Bills:** Clearing Corporation of India (CCIL) & Reserve Bank of India (RBI) FBIL benchmark rate sheets + MOSPI CPI open data.
+5. **SM REITs, InvITs & SGBs:** BSE listed equity filings and AMC Net Distributable Cash Flow (NDCF) quarterly compliance releases.
 
 ---
 
@@ -223,7 +223,7 @@ The persistence layer guarantees high-throughput read latency while preserving c
 
 ## **6\. Evaluation Criteria Across All Site Reports**
 
-For the exhaustive mathematical definitions, diagnostic thresholds, and evaluation formulas across all 11 reports created on the platform (Equities 7-Pillar + Cockpit, Morning Discovery, Mutual Funds 6-Pillar Look-Through, Corporate Debt 5-Pillar Credit Matrix, Sovereign Yield Curve, REITs/InvITs Sec 115UA Waterfall, Index ETFs, Net Post-Tax Real Return Deflator, and Safety Radar), refer directly to the master specification:
+For the exhaustive mathematical definitions, diagnostic thresholds, and evaluation formulas across all 11 reports created on the platform (Institutional Equity Dossier 7-Pillar + Cockpit, Stock Discovery @9AM, Mutual Funds & ETFs Look-Through, Bonds, NCDs & SDIs, Sovereign Curve & T-Bills, SM REITs, InvITs & SGBs, National ETF Matrix, Net Real Tax Calculator, and Retail Safety Radar), refer directly to the master specification:
 * **Master Specification:** [`docs/REPORT_EVALUATION_FRAMEWORKS.md`](file:///Users/lyndonpinto/Documents/Stock_Research_App/docs/REPORT_EVALUATION_FRAMEWORKS.md) and [`.antigravity/docs/EVALUATION_FRAMEWORKS.md`](file:///Users/lyndonpinto/Documents/Stock_Research_App/.antigravity/docs/EVALUATION_FRAMEWORKS.md).
 
 `python3 - << 'EOF'`  

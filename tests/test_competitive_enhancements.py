@@ -268,14 +268,14 @@ class TestCompetitiveEnhancements(unittest.TestCase):
         self.assertEqual(resp_debt.status_code, 200)
         self.assertIn("Credit Contagion Radar", resp_debt.text)
         self.assertIn("/dossier/RELIANCE", resp_debt.text)
-        self.assertIn("Forensic Copilot", resp_debt.text)
+        self.assertTrue("Forensic Desk" in resp_debt.text or "Forensic Copilot" in resp_debt.text)
         self.assertIn("Export PDF", resp_debt.text)
         self.assertIn("copilotModalBackdrop", resp_debt.text)
 
         # 3. Fund dossier contains Copilot trigger and PDF export
         resp_fund = self.client.get("/funds/PPFAS_FLEXICAP_DIR")
         self.assertEqual(resp_fund.status_code, 200)
-        self.assertIn("Forensic Copilot", resp_fund.text)
+        self.assertTrue("Forensic Desk" in resp_fund.text or "Forensic Copilot" in resp_fund.text)
         self.assertIn("Export PDF Dossier", resp_fund.text)
         self.assertIn("copilotModalBackdrop", resp_fund.text)
 

@@ -17,7 +17,7 @@
 
 Historically, the platform's evaluation framework was confined strictly to the **7 Pillars of Fundamental Equity Analysis** (evaluating business compounding, economic moats, governance, and cash flow durability). 
 
-As the platform evolved into an **Autonomous Multi-Asset Research Platform**, the evaluation methodology expanded across **11 distinct report types** spanning Equities, Curated Discovery, Mutual Funds, Corporate Debt, Sovereign Benchmark Yields, Commercial REITs/InvITs, Index ETFs, Post-Tax Inflation Deflators, Cross-Asset Safety Radars, Peer Comparators, and the Investor Copilot.
+As the platform evolved into an **Autonomous Multi-Asset Research Platform**, the evaluation methodology expanded across **11 distinct report types** spanning Equities (Institutional Equity Dossier), Curated Discovery (Stock Discovery @9AM), Mutual Funds & ETFs (with Fund Overlap Auditor), Bonds, NCDs & SDIs, Sovereign Curve & T-Bills, SM REITs, InvITs & SGBs, National ETF Matrix, Net Real Tax Calculator, Retail Safety Radar, Peer Comparison, and the Forensic Intelligence Desk.
 
 This document serves as the **authoritative engineering and audit specification** defining:
 1. **Data Sources & Ingestion Provenance** for every report created on the site.
@@ -32,17 +32,17 @@ Every numerical metric, order book depth, corporate filing, and regulatory discl
 
 | Report Type / Domain | Primary Ingestion Gateway | Protocol & Routing Mechanism | Secondary Fallback | Update Frequency & TTL | Legal & SEBI Provenance Status |
 | :--- | :--- | :--- | :--- | :--- | :--- |
-| **1. Equity Research Dossier** (`/dossier/{sym}`) | **Angel One SmartAPI Gateway** (`core/ingestion/angel_one.py`) | HTTPS REST + WebSockets via **AWS Lightsail Static Proxy** (`13.54.76.134:8888`), authenticated with pure Python RFC 6238 TOTP | **BSE Direct API** (`bse_master.py`) + `yfinance` fast_info fallback | Live L2 Depth on demand; 14-day TTL for qualitative synthesis (invalidated on $\ge 5\%$ price jump or new BSE filing) | 🟢 **STATUTORY & LICENSED**<br>Broker API session under personal client agreement + BSE public filing repository. |
-| **2. Morning Discovery Screening** (`/discovery`) | **BSE India Active Scrip Master** + **Angel One Quotes** | Daily batch cron at 09:00 AM IST via AWS Static IP Proxy | Cached NSE/BSE Universe (`bse_scrips_cache.json`) | 24 Hours (re-generated daily at 09:00 AM IST prior to market open) | 🟢 **STATUTORY**<br>Official BSE/NSE master universe with deterministic Chanakya filter. |
-| **3. Mutual Fund Schemes & Overlap** (`/funds`, `/funds/compare/overlap`) | **AMFI India Daily NAV API** (`NAVAll.txt`) | HTTP streaming download from `portal.amfiindia.com` (~1.5 MB text feed) | AMC Monthly Portfolio Disclosures (SEBI mandated `.xls` / `.csv`) | NAV updated daily at 23:15 IST; constituent holdings updated monthly (30-day TTL) | 🟢 **OFFICIAL STATUTORY UTILITY**<br>AMFI is the SEBI-mandated statutory authority. 100% legal immunity. |
-| **4. Corporate Debt & NCDs** (`/debt`, `/debt/{sym}`) | **BSE / NSE Debt Reporting Platform** + Credit Rating Agencies (CRAs) | Direct public parser for BSE Debt Bhavcopy; CRA press releases (CRISIL, ICRA, CARE) | MCA Charge Filings & SEBI OBPP Public Registers | Daily EOD for secondary yields; immediate upon CRA rating action publication | 🟢 **REGULATORY DISCLOSURES**<br>Public CRA rating actions and exchange trade reporting logs. No private OBPP scraping. |
-| **5. Sovereign Benchmark & Macro** (`/sovereign`) | **CCIL (Clearing Corp of India)** & **RBI DBIE** | FBIL daily benchmark rate sheets + MOSPI Open Data Portal (`api.mospi.gov.in`) | Hardcoded Nelson-Siegel 1Y–30Y baseline benchmark anchors | Daily at 18:00 IST upon publication of FBIL clearing cut-offs | 🟢 **SOVEREIGN PUBLIC RECORD**<br>Direct Govt of India and RBI gazette data. Zero copyright friction. |
-| **6. Commercial REITs & InvITs** (`/reits`) | **BSE Listed Equities** + **AMC NDCF Filings** | Direct extraction from BSE corporate quarterly compliance reports & annual NDCF filings | SEBI Registered Valuer semi-annual reports | Quarterly upon earnings release; 90-day TTL | 🟢 **STATUTORY DISCLOSURES**<br>Mandatory SEBI REIT Regulations 2014 & SM REIT Regs 2024 disclosures. |
-| **7. Index ETFs Matrix** (`/etfs`) | **NSE / BSE Exchange Live Quotes** + **AMFI Scheme Master** | Angel One SmartAPI Level-2 book + AMFI NAV feed | yfinance Fast Info | Live intraday quotes; EOD NAV for tracking error computation | 🟢 **LICENSED & STATUTORY** |
-| **8. Net Real Post-Tax Deflator** (`/calculator/tax`) | **MOSPI CPI Inflation Index** + **Income Tax Department** | Direct statutory formula computation based on Finance Act 2024 / Sec 50AA, 112A | Static 2024–2025 Central Board of Direct Taxes (CBDT) tax brackets | Real-time parametric calculations (client & server-side) | 🟢 **STATUTORY FORMULA** |
-| **9. Institutional Safety Radar** (`/safety-radar`) | **Cross-Asset Capital Structure Matrix** (`core/cortex/setu.py`) | Synthesized across Sovereign, Corporate Debt, REIT, and Equity registries | Internal relational DB mapping | Continuous synchronization with debt/equity databases | 🟢 **DETERMINISTIC DIAGNOSTIC** |
-| **10. Equity Peer Comparator** (`/compare`) | **Dual-Binding Database** (`reports.db` + Supabase) | Multi-entity relational query with dynamic 3-axis disparity gating | Live Angel One quote enrichment | Instant cached query (< 15ms) | 🟢 **FACTUAL COMPARISON** |
-| **11. Investor Copilot Drawer** (`/api/copilot/chat`) | **Google Gemini 2.5 Flash / 3.5 Flash** (via `google-genai` SDK) | REST API via HTTPS, grounded in active page context + pre-computed Cortex packets | Perplexity `sonar-pro` API fallback; rule-based deterministic fallback | Ephemeral multi-turn context; stateless server execution | 🟢 **SAFE HARBOR SECTION 2(u)**<br>Deterministic refusal of Buy/Sell inquiries; factual diagnostics only. |
+| **1. Institutional Equity Dossier** (`/dossier/{sym}`) | **Angel One SmartAPI Gateway** (`core/ingestion/angel_one.py`) | HTTPS REST + WebSockets via **AWS Lightsail Static Proxy** (`13.54.76.134:8888`), authenticated with pure Python RFC 6238 TOTP | **BSE Direct API** (`bse_master.py`) + `yfinance` fast_info fallback | Live L2 Depth on demand; 14-day TTL for qualitative synthesis (invalidated on $\ge 5\%$ price jump or new BSE filing) | 🟢 **STATUTORY & LICENSED**<br>Broker API session under personal client agreement + BSE public filing repository. |
+| **2. Stock Discovery @9AM** (`/discovery`) | **BSE India Active Scrip Master** + **Angel One Quotes** | Daily batch cron at 09:00 AM IST via AWS Static IP Proxy | Cached NSE/BSE Universe (`bse_scrips_cache.json`) | 24 Hours (re-generated daily at 09:00 AM IST prior to market open) | 🟢 **STATUTORY**<br>Official BSE/NSE master universe with deterministic Chanakya filter. |
+| **3. Mutual Funds & ETFs** (`/funds`, `/funds/compare/overlap`) | **AMFI India Daily NAV API** (`NAVAll.txt`) | HTTP streaming download from `portal.amfiindia.com` (~1.5 MB text feed) | AMC Monthly Portfolio Disclosures (SEBI mandated `.xls` / `.csv`) | NAV updated daily at 23:15 IST; constituent holdings updated monthly (30-day TTL) | 🟢 **OFFICIAL STATUTORY UTILITY**<br>AMFI is the SEBI-mandated statutory authority. 100% legal immunity. |
+| **4. Bonds, NCDs & SDIs** (`/debt`, `/debt/{sym}`) | **BSE / NSE Debt Reporting Platform** + Credit Rating Agencies (CRAs) | Direct public parser for BSE Debt Bhavcopy; CRA press releases (CRISIL, ICRA, CARE) | MCA Charge Filings & SEBI OBPP Public Registers | Daily EOD for secondary yields; immediate upon CRA rating action publication | 🟢 **REGULATORY DISCLOSURES**<br>Public CRA rating actions and exchange trade reporting logs. No private OBPP scraping. |
+| **5. Sovereign Curve & T-Bills** (`/sovereign`) | **CCIL (Clearing Corp of India)** & **RBI DBIE** | FBIL daily benchmark rate sheets + MOSPI Open Data Portal (`api.mospi.gov.in`) | Hardcoded Nelson-Siegel 1Y–30Y baseline benchmark anchors | Daily at 18:00 IST upon publication of FBIL clearing cut-offs | 🟢 **SOVEREIGN PUBLIC RECORD**<br>Direct Govt of India and RBI gazette data. Zero copyright friction. |
+| **6. SM REITs, InvITs & SGBs** (`/reits`) | **BSE Listed Equities** + **AMC NDCF Filings** | Direct extraction from BSE corporate quarterly compliance reports & annual NDCF filings | SEBI Registered Valuer semi-annual reports | Quarterly upon earnings release; 90-day TTL | 🟢 **STATUTORY DISCLOSURES**<br>Mandatory SEBI REIT Regulations 2014 & SM REIT Regs 2024 disclosures. |
+| **7. National ETF Matrix** (`/etfs`) | **NSE / BSE Exchange Live Quotes** + **AMFI Scheme Master** | Angel One SmartAPI Level-2 book + AMFI NAV feed | yfinance Fast Info | Live intraday quotes; EOD NAV for tracking error computation | 🟢 **LICENSED & STATUTORY** |
+| **8. Net Real Tax Calculator** (`/calculator/tax`) | **MOSPI CPI Inflation Index** + **Income Tax Department** | Direct statutory formula computation based on Finance Act 2024 / Sec 50AA, 112A | Static 2024–2025 Central Board of Direct Taxes (CBDT) tax brackets | Real-time parametric calculations (client & server-side) | 🟢 **STATUTORY FORMULA** |
+| **9. Retail Safety Radar** (`/safety-radar`) | **Cross-Asset Capital Structure Matrix** (`core/cortex/setu.py`) | Synthesized across Sovereign, Corporate Debt, REIT, and Equity registries | Internal relational DB mapping | Continuous synchronization with debt/equity databases | 🟢 **DETERMINISTIC DIAGNOSTIC** |
+| **10. Peer Comparison** (`/compare`) | **Dual-Binding Database** (`reports.db` + Supabase) | Multi-entity relational query with dynamic 3-axis disparity gating | Live Angel One quote enrichment | Instant cached query (< 15ms) | 🟢 **FACTUAL COMPARISON** |
+| **11. Forensic Intelligence Desk** (`/api/copilot/chat`) | **Google Gemini 2.5 Flash / 3.5 Flash** (via `google-genai` SDK) | REST API via HTTPS, grounded in active page context + pre-computed Cortex packets | Perplexity `sonar-pro` API fallback; rule-based deterministic fallback | Ephemeral multi-turn context; stateless server execution | 🟢 **SAFE HARBOR SECTION 2(u)**<br>Deterministic refusal of Buy/Sell inquiries; factual diagnostics only. |
 
 ---
 
@@ -50,7 +50,7 @@ Every numerical metric, order book depth, corporate filing, and regulatory discl
 
 The generation of all reports follows deterministic, audited process flows to guarantee data freshness, cost efficiency, and sub-second rendering latencies.
 
-### 2.1 Equity Research Dossier Flow (`GET /dossier/{ticker}`)
+### 2.1 Institutional Equity Dossier Flow (`GET /dossier/{ticker}`)
 ```mermaid
 sequenceDiagram
     autonumber
@@ -83,7 +83,7 @@ sequenceDiagram
     Router-->>Browser: Rendered Institutional Dossier (HTML + Glassmorphism UI)
 ```
 
-### 2.2 Morning 9:00 AM Discovery Screening Pipeline
+### 2.2 Stock Discovery @9AM Pipeline
 ```mermaid
 sequenceDiagram
     autonumber
@@ -107,7 +107,7 @@ sequenceDiagram
     UI->>DB: Query 'today' cohort (Pro subscribers) vs 'yesterday' archive (Public)
 ```
 
-### 2.3 Mutual Fund 7-Pillar Look-Through & Overlap Flow
+### 2.3 Mutual Funds & ETFs Look-Through & Overlap Flow
 ```mermaid
 sequenceDiagram
     autonumber
@@ -137,9 +137,9 @@ sequenceDiagram
 
 ---
 
-### Report 1: Equity Research Dossier (`/dossier/{ticker}`)
+### Report 1: Institutional Equity Dossier (`/dossier/{ticker}`)
 
-The Equity Research Dossier is the platform's flagship intelligence asset. It evaluates equities across **Two Interlocking Tiers**: (A) The Statutory 7-Pillar Qualitative Synthesis, and (B) The Deterministic Institutional Cockpit & Cortex Engines.
+The Institutional Equity Dossier is the platform's flagship intelligence asset. It evaluates equities across **Two Interlocking Tiers**: (A) The Statutory 7-Pillar Qualitative Synthesis, and (B) The Deterministic Institutional Cockpit & Cortex Engines.
 
 #### Part A: The Statutory 7-Pillar Qualitative Synthesis
 Every generated equity dossier structures its narrative strictly across 7 statutory pillars to ensure zero regulatory ambiguity and eliminate hallucination:
@@ -289,7 +289,7 @@ Synthesizes a strictly balanced dual-scenario thesis:
 
 ---
 
-### Report 2: Morning 9:00 AM Discovery Screening Report (`/discovery`)
+### Report 2: Stock Discovery @9AM Report (`/discovery`)
 
 The Discovery report runs daily at 09:00 AM IST prior to the opening of the Indian capital markets (NSE/BSE).
 
@@ -308,7 +308,7 @@ The Discovery report runs daily at 09:00 AM IST prior to the opening of the Indi
 
 ---
 
-### Report 3: Mutual Fund Dossier & Overlap Report (`/funds/{key}`, `/funds/overlap`)
+### Report 3: Mutual Funds & ETFs Dossier & Overlap Report (`/funds/{key}`, `/funds/overlap`)
 
 Evaluates mutual funds not as black-box historical performance vehicles, but through the **6-Pillar Look-Through & Fiduciary Matrix**:
 
@@ -361,7 +361,7 @@ Evaluates mutual funds not as black-box historical performance vehicles, but thr
 
 ---
 
-### Report 4: Corporate Debt & NCD Dossier (`/debt/{symbol}`)
+### Report 4: Bonds, NCDs & SDIs Dossier (`/debt/{symbol}`)
 
 Fixed income analysis inverts the equity upside paradigm. The upside is contractually capped at the yield, while the downside is a 100% loss of principal.
 
@@ -401,7 +401,7 @@ Fixed income analysis inverts the equity upside paradigm. The upside is contract
 
 ---
 
-### Report 5: Sovereign Benchmark & Macro Yield Curve (`/sovereign`)
+### Report 5: Sovereign Curve & T-Bills Report (`/sovereign`)
 
 * **Nelson-Siegel Yield Curve Interpolation:**
   $$y(m) = \beta_0 + \beta_1 \left( \frac{1 - e^{-m/\tau}}{m/\tau} \right) + \beta_2 \left( \frac{1 - e^{-m/\tau}}{m/\tau} - e^{-m/\tau} \right)$$
@@ -416,7 +416,7 @@ Fixed income analysis inverts the equity upside paradigm. The upside is contract
 
 ---
 
-### Report 6: Commercial REITs & InvITs Dossier (`/reits`)
+### Report 6: SM REITs, InvITs & SGBs Dossier (`/reits`)
 
 Evaluates listed commercial real estate under the SEBI REIT Regulations and March 2024 SM REIT framework:
 
@@ -437,7 +437,7 @@ Evaluates listed commercial real estate under the SEBI REIT Regulations and Marc
 
 ---
 
-### Report 7: Index ETF Matrix Report (`/etfs`)
+### Report 7: National ETF Matrix Report (`/etfs`)
 
 * **Tracking Error ($\text{TE}$):**
   $$\text{TE} = \sqrt{\frac{1}{n-1} \sum_{t=1}^n (R_{\text{ETF}, t} - R_{\text{Index}, t} - \overline{\Delta})^2} \le 0.25\%$$
@@ -448,7 +448,7 @@ Evaluates listed commercial real estate under the SEBI REIT Regulations and Marc
 
 ---
 
-### Report 8: Net Real Post-Tax Return Deflator (`/calculator/tax`)
+### Report 8: Net Real Tax Calculator Report (`/calculator/tax`)
 
 Calculates purchasing power preservation factoring in inflation and statutory tax codes:
 $$R_{\text{real}} = \frac{1 + R_{\text{nominal}} \cdot (1 - T)}{1 + \pi_{\text{CPI}}} - 1$$
@@ -461,19 +461,19 @@ Where:
 
 ---
 
-### Report 9: Institutional Safety Radar Report (`/safety-radar`)
+### Report 9: Retail Safety Radar Report (`/safety-radar`)
 
 Classifies assets across a **6-Tier Capital Seniority Waterfall**:
 1. *Tier 1: Sovereign Debt (T-Bills, G-Secs, SGBs)* — Sovereign guarantee, 0% default probability, liquidation rank #1.
 2. *Tier 2: Senior Secured Corporate NCDs* — Tangible asset charge with MCA, recovery rank #2.
 3. *Tier 3: Securitized Debt Instruments (SDIs) & Insured Bank FDs* — Bankruptcy-remote pool / DICGC insurance up to ₹5 Lakh.
-4. *Tier 4: Commercial REITs & InvITs* — Contractual rental NDCF upstreaming; max 49% debt ceiling.
+4. *Tier 4: SM REITs, InvITs & SGBs* — Contractual rental NDCF upstreaming; max 49% debt ceiling.
 5. *Tier 5: Debt Mutual Funds* — Open-ended pooled credit risk with duration/mark-to-market exposure.
 6. *Tier 6: Common Equity* — Residual cash flow claim; 100% principal at risk in bankruptcy.
 
 ---
 
-### Report 10: Multi-Company Comparator Report (`/compare`)
+### Report 10: Peer Comparison Report (`/compare`)
 
 Enforces **3-Axis Disparity Gates** to prevent comparing structurally mismatched companies:
 1. **Sector/Business Model Gate:** Mismatched sectors (e.g., Banking vs SaaS) suppress non-comparable multiples (EV/EBITDA, P/B) and highlight universal cash metrics: Return on Invested Capital (ROIC), Free Cash Flow Yield, and 3-Year Revenue CAGR.
@@ -482,7 +482,7 @@ Enforces **3-Axis Disparity Gates** to prevent comparing structurally mismatched
 
 ---
 
-### Report 11: Investor Copilot Drawer (`/api/copilot/chat`)
+### Report 11: Forensic Intelligence Desk (`/api/copilot/chat`)
 
 * **Grounded Context Ingestion:** Interrogates active screen metrics, 7-pillar qualitative matrices, and Cortex packets.
 * **Deterministic Fallback:** If upstream LLM experiences 403 or quota limits, falls back to structured rule-based financial explanations.

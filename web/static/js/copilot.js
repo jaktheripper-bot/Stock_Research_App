@@ -1,5 +1,5 @@
 /**
- * Institutional Investor Copilot Frontend Controller (v2.0).
+ * Forensic Intelligence Desk Frontend Controller (v2.0).
  * Institutional Forensic Intelligence Architecture.
  * Supports Multi-Asset Dispatch across Fundamental Equities, Mutual Funds, and Corporate Debt,
  * with Deep Section Contextual Awareness, Smooth Slide-In Transitions, and SEBI Safe Harbor Guardrails.

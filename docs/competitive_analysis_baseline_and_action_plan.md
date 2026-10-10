@@ -174,7 +174,7 @@ Stock Research App does not attempt to be a faster data table or a discount brok
   - **State Development Loan (SDL) Disparity Matrix:** Evaluates 10-year SDL spreads across states against Debt-to-GSDP ratios and fiscal deficits.
   - **Opportunity Terminal Heatmap:** Unified cross-asset ranking scoring Equities, Funds, Corporate NCDs, REITs, SGBs, and T-Bills on a standardized Risk-Adjusted Real Return scale.
 
-### 6. Interactive Investor Copilot & Surveillance
+### 6. Interactive Forensic Intelligence Desk & Surveillance
 - **Industry Baseline:**
   - Either silent (afraid of SEBI liability) or generic chatbots that hallucinate financial data.
 - **Stock Research App (Our Moat):**
@@ -201,7 +201,7 @@ Stock Research App does not attempt to be a faster data table or a discount brok
 | **Sovereign Curve & SDL Matrix** | ❌ | ❌ | ❌ | ❌ | ❌ | **✅ Real-Yield Spreads** |
 | **Unified Cross-Asset Opportunity Radar** | ❌ | ❌ | ❌ | ❌ | ❌ | **✅ Multi-Asset** |
 | **Autonomous Proactive Event Ledger** | ❌ | ❌ | ❌ | ❌ | ❌ | **✅ 5-Min BSE Watcher** |
-| **Interactive Copilot with SEBI Guard** | ❌ | ❌ | ❌ | ❌ | ❌ | **✅ Multi-Asset Copilot** |
+| **Interactive Forensic Desk with SEBI Guard** | ❌ | ❌ | ❌ | ❌ | ❌ | **✅ Multi-Asset Forensic Desk** |
 
 ---
 
@@ -292,8 +292,8 @@ The user evaluated and authorized the following architectural resolutions:
    - **Resolution:** **Auto** — Daily fund re-audits run automatically at 23:30 IST following AMFI NAV publication.  
    - **Implementation Status:** **Active.** The background daemon `run_daily_fund_audit_scheduler()` runs nightly at 23:30 IST in `web/main.py`, executing `audit_single_fund_daily` and logging rotation events to `autonomous_event_ledger`. Admin console on-demand re-audit remains accessible as a manual trigger backup.
 
-3. **Gate 3: Copilot Visibility**  
-   - **Resolution:** **Yes** — Expand the Institutional Forensic Copilot to Mutual Funds and Debt dossiers in addition to existing Equity dossiers.  
+3. **Gate 3: Forensic Intelligence Desk Multi-Asset Visibility**  
+   - **Resolution:** **Yes** — Expand the Forensic Intelligence Desk to Mutual Funds and Debt dossiers in addition to existing Equity dossiers.  
    - **Implementation Status:** **Completed & Verified.** Multi-asset grounding active across all 3 asset classes in `core/agents/copilot/investor_copilot.py`. Frontend `copilot_modal.html` and `copilot.js` now dynamically configure headers, badges, intro messages, and diagnostic prompt chips tailored to Equities, Mutual Funds, and Corporate Debt/SDIs with strict SEBI RA Sec. 2(u) non-advisory guardrails.
 
 4. **Gate 4: Site Architecture & Autonomous Agent Policy (October 8, 2026)**  
@@ -302,7 +302,7 @@ The user evaluated and authorized the following architectural resolutions:
      1. **SEBI Audit & Non-Advisory Protection:** Autonomous agent loops produce open-ended, non-deterministic reasoning that risks drifting into advisory language, exposing the platform under SEBI (Research Analysts) Regulations, 2014. Deterministic code guarantees auditable exchange grounding.  
      2. **Token Economics:** Avoids the 10x–20x compounding context tax of ReAct loops (25k–60k tokens vs. 2.5k deterministic tokens per report).  
      3. **Latency & Reliability:** Preserves sub-3s response times and 99.9% uptime over fragile multi-step tool iterations.  
-   - **Implementation Status:** **Enforced.** The site retains deterministic Python data ingestion + single-pass structured Gemini synthesis + constrained Copilot RAG.
+   - **Implementation Status:** **Enforced.** The site retains deterministic Python data ingestion + single-pass structured Gemini synthesis + constrained Forensic Intelligence Desk RAG.
 
 ---
 *Status: Architecture aligned, hardened, and deployed with 179/179 passing tests.*

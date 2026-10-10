@@ -53,7 +53,7 @@ graph TD
     end
 
     subgraph "Investor Interaction & Terminal Surfaces"
-        Copilot["Institutional Forensic Copilot<br/>(AgentBehavior.INTERACTIVE)"]
+        ForensicDesk["Forensic Intelligence Desk<br/>(AgentBehavior.INTERACTIVE)"]
         WebViews["FastAPI SSR Terminal Views<br/>(/, /dossier, /funds, /opportunities, /admin)"]
     end
 
@@ -65,7 +65,7 @@ graph TD
     DebtSquad --> WebViews
     RealAssetSquad --> WebViews
     MacroSquad --> WebViews
-    Copilot <--> WebViews
+    ForensicDesk <--> WebViews
     Auditor -.->|Surveillance| WebViews
     Auditor -.->|Surveillance| Domain Research Squads
 ```
@@ -134,15 +134,15 @@ Using the Google Antigravity SDK native triggers (`google.antigravity.triggers.e
 
 ---
 
-### Tier 3: Interactive Investor Copilot (`AgentBehavior.INTERACTIVE`)
+### Tier 3: Interactive Forensic Intelligence Desk (`AgentBehavior.INTERACTIVE`)
 
-To empower allocators and researchers without violating SEBI Safe Harbor, the platform provides an **Interactive Forensic Copilot** on `/dossier/{ticker}`:
+To empower allocators and researchers without violating SEBI Safe Harbor, the platform provides the **Forensic Intelligence Desk** (short form: **Forensic Desk**) on `/dossier/{ticker}` (keyboard shortcut: `⌘K` / `Ctrl+K`):
 
 1. **Collaborative Research Mode:**
    - Configured with `capabilities=CapabilitiesConfig(agent_behavior=AgentBehavior.INTERACTIVE)`.
    - Equipped with `BuiltinTools.ASK_QUESTION` to seek clarifications when inquiries are ambiguous.
 2. **Behavioral Bias Inversion Engine:**
-   - When a user asks about an underperforming stock, the Copilot automatically invokes the **Pre-Mortem Inversion Tool**:
+   - When a user asks about an underperforming stock, the Forensic Desk automatically invokes the **Pre-Mortem Inversion Tool**:
      *"Before analyzing upside scenarios, let us examine the 3 primary structural failure modes identified in recent filings..."*
    - Actively counters Sunk Cost Fallacy and Disposition Effect.
 3. **Strict Non-Advisory Guardrails:**
@@ -257,7 +257,7 @@ Phase 2: Domain Research Squads (Equities, Debt, Funds, REITs, Macro Agents)
 Phase 3: Proactive Background Watchers (BSE Filings, 9 AM Discovery Reel, AMFI Sync)
    │
    ▼
-Phase 4: Interactive Investor Copilot & Pre-Mortem Dialog (/dossier/{ticker})
+Phase 4: Interactive Forensic Intelligence Desk & Pre-Mortem Dialog (/dossier/{ticker})
    │
    ▼
 Phase 5: Sitewide Integration, CI/CD Gate Enforcement & Live Production Deployment
@@ -298,13 +298,13 @@ Phase 5: Sitewide Integration, CI/CD Gate Enforcement & Live Production Deployme
 
 ---
 
-### Phase 4: Interactive Investor Copilot & Pre-Mortem Dialog
-- **Objective:** Equip web dossiers (`/dossier/{ticker}`) with an interactive research copilot that actively mitigates investor behavioral biases.
+### Phase 4: Interactive Forensic Intelligence Desk & Pre-Mortem Dialog
+- **Objective:** Equip web dossiers (`/dossier/{ticker}`) with the interactive Forensic Intelligence Desk that actively mitigates investor behavioral biases.
 - **Deliverables:**
   - `core/agents/copilot/`: Interactive copilot agent (`AgentBehavior.INTERACTIVE`).
   - `web/static/js/copilot.js` & `web/templates/partials/copilot_modal.html`: Institutional chat sidebar with streaming responses and Pre-Mortem inversion triggers.
   - REST endpoints: `POST /api/copilot/chat` and `GET /api/copilot/history`.
-- **Evaluation Gate:** Strict validation that Copilot refuses to answer Buy/Sell questions, enforces SEBI Section 2(u) disclaimers, and properly invokes Pre-Mortem prompts.
+- **Evaluation Gate:** Strict validation that Forensic Desk refuses to answer Buy/Sell questions, enforces SEBI Section 2(u) disclaimers, and properly invokes Pre-Mortem prompts.
 
 ---
 

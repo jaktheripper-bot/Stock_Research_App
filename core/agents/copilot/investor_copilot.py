@@ -1,7 +1,7 @@
-"""Interactive Institutional Investor Copilot powered by Google Antigravity SDK.
+"""Interactive Forensic Intelligence Desk (Forensic Desk) powered by Google Antigravity SDK.
 
 Configured with `AgentBehavior.INTERACTIVE`:
-- Answers deep structural research questions about any stock or fund
+- Answers deep structural research questions about any stock, fund, or bond
 - Incorporates the Pre-Mortem Inversion Engine to counter behavioral biases
 - Enforces strict SEBI Safe Harbor non-advisory guardrails
 - Records all conversational turns and tool traces into `agent_conversations`
@@ -54,7 +54,7 @@ def check_non_advisory_compliance(message: str, asset_class: str = "EQUITY") -> 
             if asset_class == "MUTUAL_FUND":
                 return (
                     "**SEBI Regulatory Non-Advisory Notice:**\n\n"
-                    "Under SEBI Research Analyst Regulations 2014 Section 2(u), this research copilot operates "
+                    "Under SEBI Research Analyst Regulations 2014 Section 2(u), the Forensic Intelligence Desk operates "
                     "strictly as an institutional software diagnostic utility and is prohibited from providing personalized investment advice, "
                     "fund recommendations, or Buy/Sell/Switch calls.\n\n"
                     "I can, however, provide an objective **Look-Through Forensic Breakdown** of the fund's Weighted Moat Index, "
@@ -64,7 +64,7 @@ def check_non_advisory_compliance(message: str, asset_class: str = "EQUITY") -> 
             elif asset_class == "CORPORATE_DEBT":
                 return (
                     "**SEBI Regulatory Non-Advisory Notice:**\n\n"
-                    "Under SEBI Research Analyst Regulations 2014 Section 2(u), this research copilot operates "
+                    "Under SEBI Research Analyst Regulations 2014 Section 2(u), the Forensic Intelligence Desk operates "
                     "strictly as an institutional software diagnostic utility and is prohibited from providing personalized investment advice, "
                     "credit buy/sell ratings, or investment calls.\n\n"
                     "I can, however, provide an objective evaluation of the issuer's **Asset Coverage Ratio (ACR)**, "
@@ -74,7 +74,7 @@ def check_non_advisory_compliance(message: str, asset_class: str = "EQUITY") -> 
             else:
                 return (
                     "**SEBI Regulatory Non-Advisory Notice:**\n\n"
-                    "Under SEBI Research Analyst Regulations 2014 Section 2(u), this research copilot operates "
+                    "Under SEBI Research Analyst Regulations 2014 Section 2(u), the Forensic Intelligence Desk operates "
                     "strictly as a software diagnostic utility and is prohibited from providing personalized investment advice, "
                     "price targets, or Buy/Sell/Hold verdicts.\n\n"
                     "I can, however, provide an objective **Pre-Mortem Inversion Analysis** or break down the company's "
@@ -685,7 +685,7 @@ async def process_copilot_turn(
         )
 
     system_prompt = f"""{SEBI_SAFE_HARBOR_DIRECTIVE}
-You are the Institutional Investor Copilot on Stock Research App.
+You are the Forensic Intelligence Desk (Forensic Desk) on Stock Research AI.
 You assist allocators and research analysts in stress-testing investment theses across Equities, Mutual Funds, and Corporate Debt using our multi-asset forensic frameworks.
 
 {asset_instructions}

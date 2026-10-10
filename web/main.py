@@ -3681,7 +3681,7 @@ class CopilotChatRequest(BaseModel):
 
 @app.post("/api/copilot/chat")
 async def api_copilot_chat(payload: CopilotChatRequest):
-    """Interactive Institutional Investor Copilot dialogue endpoint with multi-asset and section context."""
+    """Interactive Forensic Intelligence Desk dialogue endpoint with multi-asset and section context."""
     init_db()
     from core.agents.copilot.investor_copilot import process_copilot_turn
     try:
