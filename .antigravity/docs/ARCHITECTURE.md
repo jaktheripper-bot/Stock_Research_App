@@ -38,7 +38,7 @@
   * Public Views: `/` (Landing), `/discovery` (9 AM Terminal), `/dossier/{ticker}` (Equity Dossier & Cockpit), `/funds` & `/funds/compare/overlap` (Mutual Funds), `/debt` (Corporate Bonds), `/sovereign` (Yield Curve), `/reits` (REITs/InvITs), `/etfs` (Index Matrix), `/calculator/tax` (Post-Tax Deflator), `/safety-radar` (Cross-Asset Safety), `/compare` (Stock Comparator), `/pricing` (Subscription & Checkout).
   * REST APIs: `/api/dossier/intel/{ticker}`, `/api/cortex/*`, `/api/copilot/chat`, `/api/funds/overlap`, `/api/tax/compute`, `/api/auth/*`.
   * Security & Auth: Standard library Email OTP (`core/auth/otp.py`) and Admin 2FA TOTP (`core/auth/totp.py`).
-  * Modern Dark-Glassmorphism Design System: `web/static/css/style.css`, Inter typography, 100% viewport zoom lock, and interactive slide-drawer Copilot (`web/static/js/copilot.js`).
+  * Modern Dark-Glassmorphism Design System: `web/static/css/style.css`, Inter typography, 100% viewport zoom lock, strict visual affordance separation (squircle 8px buttons vs. dark matte telemetry badges), decluttered 2-zone 7-pillar accordions with executive lead styling, and interactive slide-drawer Forensic Intelligence Desk (`web/static/js/copilot.js`, shortcut: `⌘K`).
 
 ## 7. Deterministic Cortex & Multi-Asset Engines
 * **Cortex Forensic & Structural Sieve Package (`core/cortex/`):**

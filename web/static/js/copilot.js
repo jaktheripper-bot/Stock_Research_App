@@ -13,9 +13,9 @@ let activeSectionLabel = "";
 
 const COPILOT_CONFIGS = {
     equity: {
-        headerTitle: "Institutional Forensic Copilot",
-        assetBadge: "Fundamental Equity",
-        introText: (ticker) => `Welcome to the <strong>Forensic Copilot</strong>. I can assist in stress-testing your investment thesis on <strong>${ticker || 'the selected equity'}</strong>, deriving implied growth rates via Reverse DCF, or running a <strong>Pre-Mortem Inversion analysis</strong>.`,
+        headerTitle: "Forensic Intelligence Desk",
+        assetBadge: "Fundamental Equity Intelligence",
+        introText: (ticker) => `Welcome to the <strong>Forensic Intelligence Desk</strong>. I can assist in stress-testing your investment thesis on <strong>${ticker || 'the selected equity'}</strong>, deriving implied growth rates via Reverse DCF, or running a <strong>Pre-Mortem Inversion analysis</strong>.`,
         features: [
             { icon: "💀", title: "Pre-Mortem Inversion", desc: "Expose failure modes & thesis destruction risks", prompt: "Run Pre-Mortem Inversion analysis on this stock: what failure modes could destroy shareholder value?" },
             { icon: "📉", title: "Reverse DCF Growth", desc: "Deconstruct implied growth priced into current CMP", prompt: "What implied growth rate is priced into current CMP based on Reverse DCF?" },
@@ -29,9 +29,9 @@ const COPILOT_CONFIGS = {
         ]
     },
     mutual_fund: {
-        headerTitle: "Fund Look-Through Copilot",
+        headerTitle: "Fund Look-Through Intelligence Desk",
         assetBadge: "Mutual Fund Intelligence",
-        introText: (ticker) => `Welcome to the <strong>Fund Look-Through Copilot</strong>. I evaluate underlying constituent quality, weighted moat endurance, look-through ASRI accounting stress, active share vs benchmark, and <strong>direct vs regular intermediary fee drag</strong> for <strong>${ticker || 'this scheme'}</strong>.`,
+        introText: (ticker) => `Welcome to the <strong>Fund Look-Through Intelligence Desk</strong>. I evaluate underlying constituent quality, weighted moat endurance, look-through ASRI accounting stress, active share vs benchmark, and <strong>direct vs regular intermediary fee drag</strong> for <strong>${ticker || 'this scheme'}</strong>.`,
         features: [
             { icon: "🏰", title: "Weighted Moat Index", desc: "Constituent economic moat distribution & quality", prompt: "Evaluate the constituent moat distribution and overall portfolio quality for this fund." },
             { icon: "💸", title: "Intermediary Fee Drag", desc: "20-yr compounded wealth lost to distributor commissions", prompt: "What is the 20-year compounded fee drag and wealth lost to distributor commissions for this fund?" },
@@ -45,9 +45,9 @@ const COPILOT_CONFIGS = {
         ]
     },
     debt: {
-        headerTitle: "Credit & Solvency Copilot",
+        headerTitle: "Credit & Solvency Intelligence Desk",
         assetBadge: "Fixed Income & SDI Solvency",
-        introText: (ticker) => `Welcome to the <strong>Credit & Solvency Copilot</strong>. I can stress-test Asset Coverage Ratios (ACR), recovery seniority in liquidation, DSCR covenant headroom, and <strong>credit contagion risk</strong> for <strong>${ticker || 'this security'}</strong>.`,
+        introText: (ticker) => `Welcome to the <strong>Credit & Solvency Intelligence Desk</strong>. I can stress-test Asset Coverage Ratios (ACR), recovery seniority in liquidation, DSCR covenant headroom, and <strong>credit contagion risk</strong> for <strong>${ticker || 'this security'}</strong>.`,
         features: [
             { icon: "🛡️", title: "Asset Coverage & Covenants", desc: "Stress-test ACR and DSCR covenant headroom", prompt: "Stress-test the Asset Coverage Ratio (ACR) and DSCR covenant headroom for this instrument." },
             { icon: "⚖️", title: "Recovery Seniority Tier", desc: "Evaluate recovery seniority & liquidation hierarchy", prompt: "Evaluate recovery seniority and investor recourse in a stressed debt restructuring or liquidation." },
@@ -668,7 +668,29 @@ document.addEventListener("keydown", function(e) {
     }
 });
 
-// Global escape key listener to smoothly close copilot
+function toggleForensicDesk() {
+    const modal = document.getElementById("copilotModalBackdrop");
+    if (modal && (modal.classList.contains("copilot-open") || modal.style.display === "flex")) {
+        closeCopilot();
+    } else {
+        const ticker = activeTicker || window.__CURRENT_TICKER || "";
+        const assetType = activeAssetType || window.__CURRENT_ASSET_TYPE || "equity";
+        openCopilot(ticker, assetType);
+    }
+}
+
+// Global shortcut listener: ⌘K or Ctrl+K or / (when not typing in an input)
+document.addEventListener("keydown", function(e) {
+    if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === "k") {
+        e.preventDefault();
+        toggleForensicDesk();
+    } else if (e.key === "/" && !["INPUT", "TEXTAREA", "SELECT"].includes(document.activeElement?.tagName)) {
+        e.preventDefault();
+        toggleForensicDesk();
+    }
+});
+
+// Global escape key listener to smoothly close modal
 document.addEventListener("keydown", function(e) {
     if (e.key === "Escape") {
         const modal = document.getElementById("copilotModalBackdrop");
@@ -681,6 +703,9 @@ document.addEventListener("keydown", function(e) {
 // Ensure global functions are available on window
 window.openCopilot = openCopilot;
 window.closeCopilot = closeCopilot;
+window.openForensicDesk = openCopilot;
+window.closeForensicDesk = closeCopilot;
+window.toggleForensicDesk = toggleForensicDesk;
 window.resetCopilotChat = resetCopilotChat;
 window.handleCopilotBackdropClick = handleCopilotBackdropClick;
 window.handleCopilotInput = handleCopilotInput;
@@ -688,4 +713,5 @@ window.handleCopilotKeydown = handleCopilotKeydown;
 window.sendQuickPrompt = sendQuickPrompt;
 window.copyCopilotTurn = copyCopilotTurn;
 window.submitCopilotMessage = submitCopilotMessage;
+
 

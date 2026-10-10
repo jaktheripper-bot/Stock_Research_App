@@ -258,8 +258,8 @@ function renderBentoCards(items) {
           <a href="${item.detail_url}" class="btn btn-secondary btn-sm" style="flex: 1; text-align: center; font-size: 13px; font-weight: 600; padding: 8px 12px;">
             Dossier &rarr;
           </a>
-          <button onclick="openCopilot('${item.symbol || item.id}', '${item.asset_class === 'MF' ? 'mutual_fund' : (['BOND', 'SDI'].includes(item.asset_class) ? 'debt' : 'equity')}')" class="btn btn-sm" style="background: rgba(14, 165, 233, 0.15); color: #38bdf8; border: 1px solid rgba(14, 165, 233, 0.3); font-size: 13px; font-weight: 700; padding: 8px 12px; border-radius: 8px; cursor: pointer;" title="Launch Forensic Copilot">
-            🛡️ Copilot
+          <button onclick="openCopilot('${item.symbol || item.id}', '${item.asset_class === 'MF' ? 'mutual_fund' : (['BOND', 'SDI'].includes(item.asset_class) ? 'debt' : 'equity')}')" class="btn btn-hero-ai btn-sm" style="font-size: 13px; font-weight: 700; padding: 8px 12px; cursor: pointer;" title="Launch Forensic Intelligence Desk">
+            ⚡ Forensic Desk
           </button>
         </div>
       </div>
@@ -507,8 +507,8 @@ function renderDenseTable(items) {
           <button onclick="togglePin('${item.id}')" title="Pin to Arbitrage Docket" style="background: ${isPinned ? 'rgba(14, 165, 233, 0.3)' : 'rgba(255, 255, 255, 0.08)'}; border: 1px solid ${isPinned ? '#0ea5e9' : 'rgba(255, 255, 255, 0.15)'}; border-radius: 6px; color: ${isPinned ? '#38bdf8' : '#94a3b8'}; padding: 5px 10px; font-size: 12px; cursor: pointer; margin-right: 4px;">
             ${isPinned ? '📌' : '➕ Pin'}
           </button>
-          <button onclick="openCopilot('${item.symbol || item.id}', '${item.asset_class === 'MF' ? 'mutual_fund' : (['BOND', 'SDI'].includes(item.asset_class) ? 'debt' : 'equity')}')" title="Launch Forensic Copilot" style="background: rgba(14, 165, 233, 0.15); border: 1px solid rgba(14, 165, 233, 0.3); border-radius: 6px; color: #38bdf8; padding: 5px 10px; font-size: 12px; cursor: pointer;">
-            🛡️ Copilot
+          <button onclick="openCopilot('${item.symbol || item.id}', '${item.asset_class === 'MF' ? 'mutual_fund' : (['BOND', 'SDI'].includes(item.asset_class) ? 'debt' : 'equity')}')" title="Launch Forensic Intelligence Desk" class="btn btn-hero-ai btn-sm" style="padding: 4px 8px; font-size: 11px; cursor: pointer;">
+            ⚡ Forensic Desk
           </button>
         </td>
       </tr>

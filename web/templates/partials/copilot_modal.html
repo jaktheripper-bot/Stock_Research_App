@@ -709,7 +709,7 @@
       <div class="copilot-header-brand">
         <div class="copilot-avatar-ring">
           <svg class="glyph" style="width: 20px; height: 20px;"><use href="#glyph-shield"></use></svg>
-          <div class="copilot-avatar-pulse" title="Copilot Engine Active"></div>
+          <div class="copilot-avatar-pulse" title="Forensic Engine Active"></div>
         </div>
         <div class="copilot-title-group">
           <div class="copilot-meta-strip">
@@ -718,7 +718,7 @@
             <span id="copilotSectionBadge" class="copilot-badge copilot-badge-section" style="display: none;"></span>
           </div>
           <h3 id="copilotHeaderTitle" class="copilot-header-title">
-            Institutional Forensic Copilot
+            Forensic Intelligence Desk
           </h3>
         </div>
       </div>
@@ -732,7 +732,7 @@
             <path d="M8 16H3v5"/>
           </svg>
         </button>
-        <button onclick="closeCopilot()" class="copilot-icon-btn copilot-close-btn" title="Close Copilot (Esc)" aria-label="Close Copilot">
+        <button onclick="closeCopilot()" class="copilot-icon-btn copilot-close-btn" title="Close Forensic Desk (Esc)" aria-label="Close Forensic Desk">
           <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
             <line x1="18" y1="6" x2="6" y2="18"/>
             <line x1="6" y1="6" x2="18" y2="18"/>
@@ -755,10 +755,10 @@
       <!-- Default Intro Card (Dynamic content injected on open) -->
       <div id="copilotIntroBubble" class="copilot-intro-card">
         <div class="copilot-intro-headline">
-          <span>🧠</span> Institutional Forensic Copilot
+          <span>🏛️</span> Forensic Intelligence Desk
         </div>
         <div>
-          Welcome to the <strong>Forensic Copilot</strong>. I can assist in stress-testing your investment thesis on <strong>the selected security</strong>, deriving implied growth rates via Reverse DCF, or running a <strong>Pre-Mortem Inversion analysis</strong>.
+          Welcome to the <strong>Forensic Intelligence Desk</strong>. I can assist in stress-testing your investment thesis on <strong>the selected security</strong>, deriving implied growth rates via Reverse DCF, or running a <strong>Pre-Mortem Inversion analysis</strong>.
         </div>
         <div class="copilot-intro-features">
           <div class="copilot-intro-feature-item" data-copilot-prompt="Run%20Pre-Mortem%20Inversion%20analysis%20on%20this%20stock%3A%20what%20failure%20modes%20could%20destroy%20shareholder%20value%3F" role="button" tabindex="0">
@@ -809,10 +809,10 @@
           id="copilotInput" 
           class="copilot-textarea" 
           rows="1" 
-          placeholder="Ask a diagnostic question or stress-test thesis..." 
+          placeholder="Ask a forensic diagnostic question or stress-test thesis (⌘K)..." 
           oninput="handleCopilotInput(this)" 
           onkeydown="handleCopilotKeydown(event)"
-          aria-label="Ask Copilot a question"
+          aria-label="Ask Forensic Desk a question"
         ></textarea>
         <button 
           id="copilotSendBtn" 
@@ -830,9 +830,17 @@
       </div>
       <div class="copilot-input-hints">
         <span>Enter ↵ to send • Shift+Enter for new line</span>
-        <span>Esc to close</span>
+        <span>Esc to close • ⌘K to toggle</span>
       </div>
     </div>
 
   </div>
 </div>
+
+<!-- Persistent Floating Hero Dock Launcher for Forensic Intelligence Desk -->
+<div id="forensicDeskFloatingDock" class="forensic-desk-fab" onclick="openCopilot(window.__CURRENT_TICKER || '{{ ticker|default('') }}', window.__CURRENT_ASSET_TYPE || '{{ asset_type|default('equity') }}')" role="button" tabindex="0" title="Launch Forensic Intelligence Desk (Shortcut: ⌘K or /)">
+  <span class="pulse-dot"></span>
+  <span class="fab-label">⚡ Forensic Desk</span>
+  <span class="fab-shortcut">⌘K</span>
+</div>
+

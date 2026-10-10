@@ -325,21 +325,20 @@ def wrap_html_with_collapsible_pillars(
                     rendered_body = f"{teaser}\n{paywall_card}"
 
         if has_valid_scrip:
-            source_chip_html = (
-                f'<a href="{url}" target="_blank" rel="noopener noreferrer" class="badge" '
-                f'style="background: rgba(56, 189, 248, 0.12); color: #38bdf8; border: 1px solid rgba(56, 189, 248, 0.25); '
-                f'text-decoration: none; font-size: 11px; font-weight: 600;" onclick="event.stopPropagation()">'
-                f'📄 {label} ↗</a>'
-            )
             citation_strip_html = (
-                f'<span>📄 <strong>Primary Exchange Source:</strong> '
+                f'<div style="display: flex; align-items: center; gap: 8px;">'
+                f'<span>📡</span>'
+                f'<span><strong>Primary Exchange Source:</strong> '
                 f'<a href="{url}" target="_blank" rel="noopener noreferrer" class="pillar-citation-link">{name}</a> '
                 f'(official BSE page for BSE scrip {scrip}).</span>'
+                f'</div>'
+                f'<a href="{url}" target="_blank" rel="noopener noreferrer" class="btn btn-secondary btn-sm" '
+                f'style="font-size: 11.5px; padding: 4px 10px; font-weight: 600; text-decoration: none;" onclick="event.stopPropagation()">'
+                f'📄 Open BSE {label} ↗</a>'
             )
         else:
-            source_chip_html = ""
             citation_strip_html = (
-                '<span>📄 <strong>Primary Exchange Source:</strong> '
+                '<span>📡 <strong>Primary Exchange Source:</strong> '
                 'BSE scrip code not yet resolved for this company, so no exchange link is shown.</span>'
             )
 
@@ -351,8 +350,7 @@ def wrap_html_with_collapsible_pillars(
       <h3 class="pillar-summary-title">{clean_title}</h3>
       {status_pill_html}
     </div>
-    <div style="display: flex; align-items: center; gap: 10px;">
-      {source_chip_html}
+    <div class="pillar-summary-right">
       <span class="pillar-chevron">▼</span>
     </div>
   </summary>

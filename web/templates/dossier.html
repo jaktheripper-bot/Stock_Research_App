@@ -13,31 +13,31 @@
           <div class="dossier-meta">
             <span>📅 Evaluated: {{ formatted_date|default('Recent') }}</span>
             <span>•</span>
-            <span class="badge badge-emerald">Verified Exchange Feed</span>
+            <span class="badge badge-emerald"><span class="status-dot status-dot-emerald"></span> Verified Exchange Feed</span>
             <div class="data-provenance" style="margin-top:4px; font-size:12px; color:var(--text-secondary);">Data sourced directly from statutory exchange filings and cross‑checked against institutional market feeds.</div>
             <span>•</span>
-            <a href="#citations" class="badge" style="background: rgba(56, 189, 248, 0.15); color: #38bdf8; border: 1px solid rgba(56, 189, 248, 0.3); text-decoration: none; font-weight: 600; display: inline-flex; align-items: center; gap: 4px; padding: 2px 10px; border-radius: 999px;">
+            <a href="#citations" class="badge badge-cyan" style="text-decoration: none; cursor: pointer; pointer-events: auto;">
               <span>📎</span> <span>{{ citations|length }} Grounded Sources</span>
             </a>
           </div>
         </div>
 
         <div style="display: flex; gap: 10px; flex-wrap: wrap; align-items: center;">
-          <button onclick="openCopilot('{{ ticker }}', 'equity')" class="btn btn-sm" style="background: rgba(14, 165, 233, 0.15); color: #38bdf8; border: 1px solid rgba(14, 165, 233, 0.4); font-weight: 700;">
-            <svg class="glyph"><use href="#glyph-shield"></use></svg> Forensic Copilot
+          <button onclick="openCopilot('{{ ticker }}', 'equity')" class="btn btn-hero-ai btn-sm" title="Launch Forensic Intelligence Desk (Shortcut: ⌘K or /)">
+            <svg class="glyph"><use href="#glyph-shield"></use></svg> ⚡ Forensic Desk
           </button>
-          <button id="btnOpenThesisTop" onclick="openThesisModal()" class="btn btn-secondary btn-sm" style="font-weight: 700; border-color: rgba(245, 158, 11, 0.4); color: #fbbf24; background: rgba(245, 158, 11, 0.1);">
+          <button id="btnOpenThesisTop" onclick="openThesisModal()" class="btn btn-secondary btn-sm" style="font-weight: 700; border-color: rgba(245, 158, 11, 0.4); color: #fbbf24;">
             <svg class="glyph"><use href="#glyph-scale"></use></svg> Thesis Checkpoint
           </button>
           {% if is_deep_dive_unlocked %}
-          <span class="badge badge-emerald" style="display: inline-flex; align-items: center; gap: 4px; padding: 6px 12px; font-weight: 700; font-size: 11.5px;">
-            🔓 Institutional Unlocked
+          <span class="badge badge-emerald">
+            <span class="status-dot status-dot-emerald"></span> 🔓 Institutional Unlocked
           </span>
           <a href="/api/pdf/{{ ticker }}" class="btn btn-primary btn-sm" download>
             📄 Download Institutional PDF
           </a>
           {% else %}
-          <button onclick="unlockDeepDive('{{ ticker }}')" class="btn btn-primary btn-sm" style="display: inline-flex; align-items: center; gap: 6px; background: linear-gradient(135deg, #0284c7 0%, #0369a1 100%); font-weight: 700;">
+          <button onclick="unlockDeepDive('{{ ticker }}')" class="btn btn-primary btn-sm">
             <span>🔓</span> Unlock Deep-Dive (1 Credit)
           </button>
           <button onclick="unlockDeepDive('{{ ticker }}')" class="btn btn-secondary btn-sm" title="Unlock required to download full institutional PDF with forensic accounting schedules">
@@ -117,18 +117,18 @@
           <div style="font-size: 12px; font-weight: 700; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.05em;">
             Qualitative Health Matrix (01–07):
           </div>
-          <button onclick="openCopilot('{{ ticker }}', 'equity', 'solvency', 'Qualitative Health Matrix', 'Assess the 7-pillar qualitative health matrix and balance sheet resilience for {{ ticker }}')" class="btn btn-sm" style="background: rgba(14, 165, 233, 0.15); color: #38bdf8; border: 1px solid rgba(14, 165, 233, 0.4); border-radius: 9999px; font-size: 11px; padding: 2px 8px; cursor: pointer;">
-            🤖 Copilot
+          <button onclick="openCopilot('{{ ticker }}', 'equity', 'solvency', 'Qualitative Health Matrix', 'Assess the 7-pillar qualitative health matrix and balance sheet resilience for {{ ticker }}')" class="btn btn-secondary btn-sm" style="font-size: 11px; padding: 3px 10px;" title="Audit qualitative matrix with Forensic Intelligence Desk">
+            ⚡ Forensic Desk
           </button>
         </div>
         <div style="display: flex; gap: 10px; flex-wrap: wrap;">
-          <span class="badge badge-cyan" title="Competitive Moat">Moat: <strong>{{ matrix.Moat|default('Moderate') }}</strong></span>
-          <span class="badge badge-emerald" title="Capital Allocation">Capital: <strong>{{ matrix.CapitalAllocation|default('Disciplined') }}</strong></span>
-          <span class="badge" style="background: rgba(245, 158, 11, 0.15); color: #fbbf24; border: 1px solid rgba(245, 158, 11, 0.3);" title="Valuation Multiple">Valuation: <strong>{{ matrix.Valuation|default('Fair') }}</strong></span>
-          <span class="badge badge-emerald" title="Balance Sheet">Solvency: <strong>{{ matrix.BalanceSheet|default('Resilient') }}</strong></span>
-          <span class="badge badge-emerald" title="Management Governance">Governance: <strong>{{ matrix.Governance|default('Clean') }}</strong></span>
-          <span class="badge badge-cyan" title="Macro Environment">Macro: <strong>{{ matrix.Macro|default('Neutral') }}</strong></span>
-          <span class="badge" style="background: rgba(148, 163, 184, 0.15); color: var(--text-secondary); border: 1px solid rgba(148, 163, 184, 0.25);" title="Drop Diagnostic">Diagnostic: <strong>{{ matrix.Diagnostic|default('Neutral') }}</strong></span>
+          <span class="badge badge-cyan" title="Competitive Moat"><span class="status-dot status-dot-cyan"></span> Moat: <strong>{{ matrix.Moat|default('Moderate') }}</strong></span>
+          <span class="badge badge-emerald" title="Capital Allocation"><span class="status-dot status-dot-emerald"></span> Capital: <strong>{{ matrix.CapitalAllocation|default('Disciplined') }}</strong></span>
+          <span class="badge badge-amber" title="Valuation Multiple"><span class="status-dot status-dot-amber"></span> Valuation: <strong>{{ matrix.Valuation|default('Fair') }}</strong></span>
+          <span class="badge badge-emerald" title="Balance Sheet"><span class="status-dot status-dot-emerald"></span> Solvency: <strong>{{ matrix.BalanceSheet|default('Resilient') }}</strong></span>
+          <span class="badge badge-emerald" title="Management Governance"><span class="status-dot status-dot-emerald"></span> Governance: <strong>{{ matrix.Governance|default('Clean') }}</strong></span>
+          <span class="badge badge-cyan" title="Macro Environment"><span class="status-dot status-dot-cyan"></span> Macro: <strong>{{ matrix.Macro|default('Neutral') }}</strong></span>
+          <span class="badge badge-slate" title="Drop Diagnostic"><span class="status-dot status-dot-slate"></span> Diagnostic: <strong>{{ matrix.Diagnostic|default('Neutral') }}</strong></span>
         </div>
       </div>
       {% endif %}
@@ -887,5 +887,9 @@ document.addEventListener('DOMContentLoaded', function() {
 </script>
 {% endif %}
 {% include "partials/copilot_modal.html" %}
+<script>
+  window.__CURRENT_TICKER = "{{ ticker }}";
+  window.__CURRENT_ASSET_TYPE = "equity";
+</script>
 <script src="/static/js/copilot.js"></script>
 {% endblock %}
