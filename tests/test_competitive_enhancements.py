@@ -290,8 +290,21 @@ class TestCompetitiveEnhancements(unittest.TestCase):
             metadata={"health_score": 85.0}
         )
         self.assertTrue(event_id.startswith("EVT-"))
-        events = get_recent_autonomous_events(limit=5, event_type="DAILY_FUND_AUDIT")
+        events = get_recent_autonomous_events(limit=5, event_type="DAILY_FUND_AUDIT", include_test_events=True)
         self.assertTrue(any(e.get("event_id") == event_id for e in events))
+
+        # Clean up test event so DB remains unpolluted
+        from core.db.connection import get_db_connection
+        conn = get_db_connection()
+        cur = conn.cursor()
+        try:
+            cur.execute("DELETE FROM autonomous_event_ledger WHERE event_id = ?", (event_id,))
+            conn.commit()
+        except Exception:
+            pass
+        finally:
+            cur.close()
+            conn.close()
 
     def test_reit_pdf_generation_and_endpoint(self):
         """Tests compiling and serving institutional PDF research dossiers for REITs and InvITs."""

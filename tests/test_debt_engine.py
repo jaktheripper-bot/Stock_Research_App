@@ -36,6 +36,21 @@ class TestDebtEngineAndRepository(unittest.TestCase):
     def setUpClass(cls):
         seed_default_debt_securities()
 
+    @classmethod
+    def tearDownClass(cls):
+        from core.db.connection import get_db_connection
+        conn = get_db_connection()
+        cur = conn.cursor()
+        try:
+            cur.execute("DELETE FROM corporate_debt_securities WHERE isin = 'INE999TEST01' OR ticker = 'UNITTESTCORP'")
+            cur.execute("DELETE FROM credit_rating_events WHERE isin = 'INE999TEST01' OR ticker = 'UNITTESTCORP'")
+            conn.commit()
+        except Exception:
+            pass
+        finally:
+            cur.close()
+            conn.close()
+
     # ==========================================================================
     # 1. Fixed-Income Mathematical Core Tests
     # ==========================================================================

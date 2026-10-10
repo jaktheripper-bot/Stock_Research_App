@@ -47,6 +47,8 @@ html {
 }
 
 body {
+  margin: 0;
+  padding: 0;
   font-family: var(--font-sans);
   background-color: var(--bg-primary);
   color: var(--text-primary);
@@ -1316,7 +1318,9 @@ details.pillar-accordion[open] summary {
   padding: 0;
   line-height: 1.35;
   display: block;
-  word-break: break-word;
+  overflow-wrap: break-word;
+  word-break: normal;
+  hyphens: none;
 }
 
 .pillar-chevron {
@@ -1503,4 +1507,127 @@ details.pillar-accordion[open] .pillar-chevron {
   to {
     transform: rotate(360deg);
   }
+}
+
+/* ==============================================================================
+   Gated Pillar Paywall & Institutional Preview Overlay
+   ============================================================================== */
+
+.gated-pillar-container {
+  position: relative;
+  overflow: hidden;
+  border-radius: var(--radius-md);
+  margin-top: 16px;
+  border: 1px solid rgba(14, 165, 233, 0.25);
+  background: rgba(15, 23, 42, 0.65);
+  min-height: 240px;
+}
+
+.gated-blur-content {
+  padding: 16px 20px 80px 20px;
+  filter: blur(4px);
+  -webkit-filter: blur(4px);
+  opacity: 0.35;
+  user-select: none;
+  pointer-events: none;
+  max-height: 160px;
+  overflow: hidden;
+}
+
+.gated-paywall-overlay {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+  padding: 24px 20px;
+  background: linear-gradient(180deg, rgba(10, 15, 29, 0.72) 0%, rgba(10, 15, 29, 0.94) 100%);
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+  z-index: 2;
+}
+
+.gated-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  background: rgba(14, 165, 233, 0.15);
+  color: var(--accent-cyan);
+  border: 1px solid rgba(14, 165, 233, 0.3);
+  font-size: 11px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  padding: 4px 12px;
+  border-radius: var(--radius-full);
+  margin-bottom: 10px;
+}
+
+.gated-title {
+  font-size: 18px;
+  font-weight: 800;
+  color: var(--text-primary);
+  margin: 0 0 8px 0;
+  letter-spacing: -0.01em;
+}
+
+.gated-desc {
+  font-size: 13px;
+  color: var(--text-secondary);
+  max-width: 580px;
+  margin: 0 0 14px 0;
+  line-height: 1.5;
+}
+
+.gated-features-grid {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  justify-content: center;
+  max-width: 640px;
+  margin-bottom: 16px;
+}
+
+.gated-feature-chip {
+  font-size: 11.5px;
+  font-weight: 600;
+  background: rgba(30, 41, 59, 0.8);
+  color: #e2e8f0;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  padding: 4px 10px;
+  border-radius: var(--radius-sm);
+}
+
+.gated-action-row {
+  margin-bottom: 10px;
+}
+
+.gated-action-row .btn-primary {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 14px;
+  font-weight: 700;
+  padding: 10px 22px;
+  border-radius: var(--radius-md);
+  box-shadow: 0 0 20px rgba(14, 165, 233, 0.35);
+  transition: all 0.2s ease;
+}
+
+.gated-action-row .btn-primary:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 0 26px rgba(14, 165, 233, 0.55);
+}
+
+.gated-subtext {
+  font-size: 11.5px;
+  color: var(--text-muted);
+}
+
+.gated-subtext a {
+  color: var(--accent-cyan);
+  text-decoration: underline;
+  text-underline-offset: 2px;
 }

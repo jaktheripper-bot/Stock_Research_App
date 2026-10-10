@@ -47,13 +47,18 @@ def compute_valuation_radar(
     c_price = _safe_float(current_price)
     pe = _safe_float(pe_ratio)
 
-    if c_price <= 0:
+    if c_price <= 0 or (pe <= 0 and (_safe_float(eps) if eps is not None else 0.0) <= 0):
         return {
             "status": "UNAVAILABLE",
+            "current_price": c_price,
             "fair_value": 0.0,
+            "range_low": 0.0,
+            "range_high": 0.0,
             "margin_of_safety_pct": 0.0,
-            "regime": "UNDEFINED",
+            "regime": "DATA_UNAVAILABLE",
+            "badge_label": "Valuation Not Available",
             "badge_color": "#64748b",
+            "summary": "Fundamental earnings or price data is not disclosed or currently negative, precluding intrinsic multiple modeling.",
             "models": {}
         }
 
@@ -63,7 +68,7 @@ def compute_valuation_radar(
         if pe > 0:
             s_eps = round(c_price / pe, 2)
         else:
-            s_eps = round(c_price * 0.04, 2)  # Conservative 4% earnings yield default
+            s_eps = 0.0
 
     s_growth = _safe_float(sales_growth_3y, default=12.0)
     growth_rate = s_growth / 100.0

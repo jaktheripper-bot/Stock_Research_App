@@ -213,22 +213,47 @@ def record_autonomous_event(
         conn.close()
 
 
-def get_recent_autonomous_events(limit: int = 25, event_type: Optional[str] = None) -> List[Dict[str, Any]]:
+def get_recent_autonomous_events(
+    limit: int = 25, 
+    event_type: Optional[str] = None,
+    include_test_events: bool = False
+) -> List[Dict[str, Any]]:
     """Retrieves recent autonomous trigger actions from the event ledger."""
     conn = get_db_connection()
     cursor = conn.cursor()
     use_pg = is_supabase_enabled()
 
     try:
+        base_filter = """
+            (ticker IS NULL OR (ticker NOT LIKE '%TEST%' AND ticker NOT LIKE '%UNITTEST%'))
+            AND (trigger_source IS NULL OR trigger_source NOT IN ('unit_test', 'TEST_SUITE_ROTATION'))
+        """
         if event_type:
             placeholder = "%s" if use_pg else "?"
-            cursor.execute(f"""
-                SELECT * FROM autonomous_event_ledger
-                WHERE event_type = {placeholder}
-                ORDER BY id DESC LIMIT {limit};
-            """, (event_type,))
+            if include_test_events:
+                cursor.execute(f"""
+                    SELECT * FROM autonomous_event_ledger
+                    WHERE event_type = {placeholder}
+                    ORDER BY id DESC LIMIT {limit};
+                """, (event_type,))
+            else:
+                cursor.execute(f"""
+                    SELECT * FROM autonomous_event_ledger
+                    WHERE event_type = {placeholder} AND {base_filter}
+                    ORDER BY id DESC LIMIT {limit};
+                """, (event_type,))
         else:
-            cursor.execute(f"SELECT * FROM autonomous_event_ledger ORDER BY id DESC LIMIT {limit};")
+            if include_test_events:
+                cursor.execute(f"""
+                    SELECT * FROM autonomous_event_ledger 
+                    ORDER BY id DESC LIMIT {limit};
+                """)
+            else:
+                cursor.execute(f"""
+                    SELECT * FROM autonomous_event_ledger 
+                    WHERE {base_filter}
+                    ORDER BY id DESC LIMIT {limit};
+                """)
         rows = cursor.fetchall()
         return [clean_row(cursor, r) for r in rows]
     except Exception as e:

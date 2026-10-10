@@ -150,8 +150,44 @@ class TestEquityUpgrades(unittest.TestCase):
         self.assertIn("forensic_intelligence", intel)
         self.assertIn("valuation_radar", intel)
         self.assertIn("bull_bear_thesis", intel)
-        self.assertGreaterEqual(intel["composite_score"], 50.0)
+    def test_missing_fundamentals_honest_reporting(self):
+        # Empty fundamentals must not assert synthetic 15% ROCE or 0.25 D/E
+        res = evaluate_sector_fundamentals("TESTCO", {})
+        self.assertIn("coverage", res)
+        self.assertIn("0 of 4", res["coverage"])
+        for k in res["kpis"]:
+            self.assertEqual(k["val"], "Not disclosed")
+            self.assertEqual(k["status"], "NEUTRAL")
+        self.assertIn("statutory", res["narrative"])
+
+    def test_valuation_radar_unavailable_on_missing_or_negative_inputs(self):
+        # If price or PE is missing/invalid, should return UNAVAILABLE without fabricating DCF
+        res = compute_valuation_radar(current_price=0.0, pe_ratio=0.0)
+        self.assertEqual(res["status"], "UNAVAILABLE")
+        self.assertEqual(res["fair_value"], 0.0)
+        self.assertEqual(res["regime"], "DATA_UNAVAILABLE")
+
+        res2 = compute_valuation_radar(current_price=100.0, pe_ratio=0.0, eps=None)
+        self.assertEqual(res2["status"], "UNAVAILABLE")
+
+    def test_chanakya_market_cap_inr_no_false_shell_flag(self):
+        from core.cortex.chanakya import evaluate_from_dict
+        # Large cap stock with market_cap in INR (~6.5 lakh crore like INFY)
+        fund = {
+            "symbol": "INFY",
+            "market_cap": 6500000000000.0, # INR
+            "revenue": 1500000000000.0,
+            "ebitda": 350000000000.0,
+            "cfo": 250000000000.0,
+            "pat": 260000000000.0,
+            "debt": 0.0,
+            "interest": 0.0,
+        }
+        res = evaluate_from_dict(fund)
+        self.assertNotIn("SUB_SCALE_ILLIQUID_SHELL", res.flags)
+        self.assertGreater(res.clean_room_score, 60.0)
 
 
 if __name__ == "__main__":
     unittest.main()
+

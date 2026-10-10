@@ -820,7 +820,7 @@ EQUITY_TICKER_MAP = {
 }
 
 
-def evaluate_equity_cross_contagion(security: Dict[str, Any]) -> Dict[str, Any]:
+def evaluate_equity_cross_contagion(security: Dict[str, Any], fetch_live_fundamentals: bool = True) -> Dict[str, Any]:
     """
     Evaluates Equity-to-Debt Contagion Bridge:
     Cross-references corporate debt issuers against parent equity metrics, reports.db dossiers,
@@ -904,7 +904,7 @@ def evaluate_equity_cross_contagion(security: Dict[str, Any]) -> Dict[str, Any]:
     is_mocked = isinstance(get_stock_fundamentals, Mock)
     has_meta_pledge = (meta.get("promoter_pledged_pct") is not None) or (meta.get("pledged_promoter_holding") is not None)
 
-    if is_mocked or (not os.environ.get("TESTING") and not has_meta_pledge and not meta.get("debt_to_equity")):
+    if fetch_live_fundamentals and (is_mocked or (not os.environ.get("TESTING") and not has_meta_pledge and not meta.get("debt_to_equity"))):
         try:
             fund = get_stock_fundamentals(equity_ticker)
             if fund and isinstance(fund, dict):
@@ -1003,7 +1003,8 @@ def evaluate_equity_cross_contagion(security: Dict[str, Any]) -> Dict[str, Any]:
 def evaluate_5_pillar_credit_posture(
     security: Dict[str, Any],
     rating_history: Optional[List[Dict[str, Any]]] = None,
-    issuer_fundamentals: Optional[Dict[str, Any]] = None
+    issuer_fundamentals: Optional[Dict[str, Any]] = None,
+    include_live_equity_contagion: bool = True
 ) -> Dict[str, Any]:
     """
     Synthesizes the complete Institutional 5-Pillar Credit & Solvency Matrix,
@@ -1091,7 +1092,7 @@ def evaluate_5_pillar_credit_posture(
             warnings.append(note)
 
     # Equity-to-Debt Contagion Radar
-    contagion_radar = evaluate_equity_cross_contagion(security)
+    contagion_radar = evaluate_equity_cross_contagion(security, fetch_live_fundamentals=include_live_equity_contagion)
     if contagion_radar.get("radar_status") == "ACTIVE_CONTAGION_ALERT":
         warnings.append(f"Credit Contagion Radar Alert: {contagion_radar.get('radar_summary')}")
 

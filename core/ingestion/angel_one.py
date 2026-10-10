@@ -18,6 +18,7 @@ Provides official, exchange-authorized market data ingestion for Indian equities
 import os
 import time
 import json
+import threading
 import hmac
 import hashlib
 import struct
@@ -77,7 +78,9 @@ class AngelOneGateway:
     HISTORICAL_ENDPOINT: str = "/rest/secure/angelbroking/historical/v1/getCandleData"
 
     _session_cache: Dict[str, Any] = {}
-    _session_lock = False
+    _auth_lock: threading.Lock = threading.Lock()
+    _last_auth_failure_time: float = 0.0
+    _AUTH_FAILURE_COOLDOWN: float = 300.0  # 5 minutes failure cooldown
 
     @classmethod
     def get_proxy_config(cls) -> Optional[Dict[str, str]]:
@@ -160,6 +163,7 @@ class AngelOneGateway:
         """
         Authenticates with Angel One SmartAPI and caches the JWT bearer token.
         Returns the valid JWT token, or None if authentication fails.
+        Enforces a 5-minute failure cooldown to prevent repeating 10s request blocks.
         """
         now = time.time()
         cached = cls._session_cache.get("jwt_token")
@@ -168,77 +172,96 @@ class AngelOneGateway:
         if not force_refresh and cached and now < cached_exp:
             return cached
 
-        if not cls.is_configured():
-            logger.debug("Angel One SmartAPI credentials not fully configured; skipping.")
+        # Check failure cooldown before acquiring lock or issuing network call
+        if not force_refresh and (now - cls._last_auth_failure_time < cls._AUTH_FAILURE_COOLDOWN):
+            logger.debug("Angel One SmartAPI login in failure cooldown; skipping attempt.")
             return None
 
-        api_key = (get_secret("ANGEL_API_KEY") or os.environ.get("ANGEL_API_KEY", "")).strip()
-        client_code = (get_secret("ANGEL_CLIENT_CODE") or os.environ.get("ANGEL_CLIENT_CODE", "")).strip()
-        pin = (get_secret("ANGEL_PIN") or os.environ.get("ANGEL_PIN", "")).strip()
-        totp_key = (get_secret("ANGEL_TOTP_KEY") or os.environ.get("ANGEL_TOTP_KEY", "")).strip()
-
-        try:
-            totp_code = generate_rfc6238_totp(totp_key)
-        except Exception as e:
-            logger.error(f"Failed to generate RFC 6238 TOTP for Angel One: {e}")
-            return None
-
-        local_ip = "127.0.0.1"
-        try:
-            local_ip = socket.gethostbyname(socket.gethostname())
-        except Exception:
-            pass
-
-        headers = {
-            "Content-Type": "application/json",
-            "Accept": "application/json",
-            "X-UserType": "USER",
-            "X-SourceID": "WEB",
-            "X-ClientLocalIP": local_ip,
-            "X-ClientPublicIP": local_ip,
-            "X-MACAddress": "00:00:00:00:00:00",
-            "X-PrivateKey": api_key,
-        }
-
-        payload = {
-            "clientcode": client_code,
-            "password": pin,
-            "totp": totp_code,
-        }
-
-        proxies = cls.get_proxy_config()
-        url = f"{cls.BASE_URL}{cls.LOGIN_ENDPOINT}"
-
-        try:
-            logger.info("Connecting to Angel One SmartAPI auth gateway via selective proxy...")
-            resp = requests.post(url, json=payload, headers=headers, proxies=proxies, timeout=10)
-            data = resp.json()
-
-            if resp.status_code == 200 and data.get("status") and data.get("data"):
-                token_data = data["data"]
-                jwt_token = token_data.get("jwtToken")
-                feed_token = token_data.get("feedToken")
-                # Token valid for ~20 hours (standard SmartAPI TTL is 24h)
-                cls._session_cache = {
-                    "jwt_token": jwt_token,
-                    "feed_token": feed_token,
-                    "token_expiry": now + (20 * 3600),
-                }
-                logger.info("Successfully established verified Angel One SmartAPI session.")
-                return jwt_token
-            else:
-                err_code = data.get("errorcode", "UNKNOWN")
-                err_msg = data.get("message", "Authentication rejected")
-                logger.warning(f"Angel One SmartAPI login failed [{err_code}]: {err_msg}")
-                if "IP" in err_msg or err_code in ["AG8001", "AB1004"]:
-                    logger.error(
-                        "Angel One IP Whitelist Alert: The outbound IP is not registered as the "
-                        "Primary Static IP in your SmartAPI dashboard. Check scripts/verify_angel_proxy_ip.py."
-                    )
+        with cls._auth_lock:
+            # Re-verify under lock
+            now = time.time()
+            cached = cls._session_cache.get("jwt_token")
+            cached_exp = cls._session_cache.get("token_expiry", 0)
+            if not force_refresh and cached and now < cached_exp:
+                return cached
+            if not force_refresh and (now - cls._last_auth_failure_time < cls._AUTH_FAILURE_COOLDOWN):
                 return None
-        except Exception as req_err:
-            logger.warning(f"Angel One SmartAPI connection notice: {req_err}")
-            return None
+
+            if not cls.is_configured():
+                logger.debug("Angel One SmartAPI credentials not fully configured; skipping.")
+                return None
+
+            api_key = (get_secret("ANGEL_API_KEY") or os.environ.get("ANGEL_API_KEY", "")).strip()
+            client_code = (get_secret("ANGEL_CLIENT_CODE") or os.environ.get("ANGEL_CLIENT_CODE", "")).strip()
+            pin = (get_secret("ANGEL_PIN") or os.environ.get("ANGEL_PIN", "")).strip()
+            totp_key = (get_secret("ANGEL_TOTP_KEY") or os.environ.get("ANGEL_TOTP_KEY", "")).strip()
+
+            try:
+                totp_code = generate_rfc6238_totp(totp_key)
+            except Exception as e:
+                logger.error(f"Failed to generate RFC 6238 TOTP for Angel One: {e}")
+                cls._last_auth_failure_time = time.time()
+                return None
+
+            local_ip = "127.0.0.1"
+            try:
+                local_ip = socket.gethostbyname(socket.gethostname())
+            except Exception:
+                pass
+
+            headers = {
+                "Content-Type": "application/json",
+                "Accept": "application/json",
+                "X-UserType": "USER",
+                "X-SourceID": "WEB",
+                "X-ClientLocalIP": local_ip,
+                "X-ClientPublicIP": local_ip,
+                "X-MACAddress": "00:00:00:00:00:00",
+                "X-PrivateKey": api_key,
+            }
+
+            payload = {
+                "clientcode": client_code,
+                "password": pin,
+                "totp": totp_code,
+            }
+
+            proxies = cls.get_proxy_config()
+            url = f"{cls.BASE_URL}{cls.LOGIN_ENDPOINT}"
+
+            try:
+                logger.info("Connecting to Angel One SmartAPI auth gateway via selective proxy...")
+                resp = requests.post(url, json=payload, headers=headers, proxies=proxies, timeout=10)
+                data = resp.json()
+
+                if resp.status_code == 200 and data.get("status") and data.get("data"):
+                    token_data = data["data"]
+                    jwt_token = token_data.get("jwtToken")
+                    feed_token = token_data.get("feedToken")
+                    # Token valid for ~20 hours (standard SmartAPI TTL is 24h)
+                    cls._session_cache = {
+                        "jwt_token": jwt_token,
+                        "feed_token": feed_token,
+                        "token_expiry": now + (20 * 3600),
+                    }
+                    cls._last_auth_failure_time = 0.0
+                    logger.info("Successfully established verified Angel One SmartAPI session.")
+                    return jwt_token
+                else:
+                    err_code = data.get("errorcode", "UNKNOWN")
+                    err_msg = data.get("message", "Authentication rejected")
+                    cls._last_auth_failure_time = time.time()
+                    logger.warning(f"Angel One SmartAPI login failed [{err_code}]: {err_msg}")
+                    if "IP" in err_msg or err_code in ["AG8001", "AB1004"]:
+                        logger.error(
+                            "Angel One IP Whitelist Alert: The outbound IP is not registered as the "
+                            "Primary Static IP in your SmartAPI dashboard. Check scripts/verify_angel_proxy_ip.py."
+                        )
+                    return None
+            except Exception as req_err:
+                cls._last_auth_failure_time = time.time()
+                logger.warning(f"Angel One SmartAPI connection notice: {req_err}")
+                return None
 
     # Top Nifty constituents mapped to canonical NSE security tokens
     CANONICAL_NSE_TOKENS: Dict[str, str] = {

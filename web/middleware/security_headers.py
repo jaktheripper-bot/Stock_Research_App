@@ -10,18 +10,17 @@ from starlette.responses import Response
 class SecurityHeadersMiddleware(BaseHTTPMiddleware):
     async def dispatch(self, request: Request, call_next):
         response: Response = await call_next(request)
-        # Content Security Policy – restrict sources
+        # Content Security Policy – restrict sources while permitting inline UI logic and CDNs
         csp = (
             "default-src 'self'; "
-            "script-src 'self' https://cdn.jsdelivr.net; "
-            "style-src 'self' https://fonts.googleapis.com 'unsafe-inline'; "
+            "script-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net https://checkout.razorpay.com; "
+            "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; "
             "font-src 'self' https://fonts.gstatic.com; "
-            "img-src 'self' data:; "
-            "connect-src 'self'; "
+            "img-src 'self' data: https:; "
+            "connect-src 'self' https://lapi.razorpay.com https://cdn.jsdelivr.net; "
             "frame-ancestors 'none';"
         )
-        # Use ASCII hyphens for header names to avoid UnicodeEncodeError
-        response.headers["Content-Security-Policy"] = " ".join(csp)
+        response.headers["Content-Security-Policy"] = csp
         # Strict Transport Security – 6 months, include subdomains, preload
         response.headers["Strict-Transport-Security"] = "max-age=15552000; includeSubDomains; preload"
         # Referrer Policy – no referrer

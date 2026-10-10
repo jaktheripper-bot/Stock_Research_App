@@ -366,6 +366,19 @@ Detailed forensic analysis with exact page grounding to bseindia.com filings.
         self.assertEqual(res_exist.status_code, 200)
         self.assertTrue(res_exist.json().get("already_exists"))
 
+        # Clean up test security from database
+        from core.db.connection import get_db_connection
+        conn = get_db_connection()
+        cur = conn.cursor()
+        try:
+            cur.execute("DELETE FROM corporate_debt_securities WHERE isin = ?", (test_isin,))
+            conn.commit()
+        except Exception:
+            pass
+        finally:
+            cur.close()
+            conn.close()
+
     def test_fund_directory_page(self):
         res = self.client.get("/funds")
         self.assertEqual(res.status_code, 200)

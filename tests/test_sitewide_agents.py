@@ -94,9 +94,22 @@ class TestSitewideAgents(unittest.TestCase):
         )
         self.assertTrue(evt_id.startswith("EVT-"))
 
-        events = get_recent_autonomous_events(limit=5, event_type="test_bse_filing")
+        events = get_recent_autonomous_events(limit=5, event_type="test_bse_filing", include_test_events=True)
         self.assertGreaterEqual(len(events), 1)
         self.assertEqual(events[0]["ticker"], "TCS")
+
+        # Clean up test event so DB remains unpolluted
+        from core.db.connection import get_db_connection
+        conn = get_db_connection()
+        cur = conn.cursor()
+        try:
+            cur.execute("DELETE FROM autonomous_event_ledger WHERE event_id = ?", (evt_id,))
+            conn.commit()
+        except Exception:
+            pass
+        finally:
+            cur.close()
+            conn.close()
 
     @patch("core.agents.tools_base.fetch_latest_bse_announcement", return_value="Board approved interim dividend and audited accounts.")
     def test_equity_forensic_squad(self, mock_bse):

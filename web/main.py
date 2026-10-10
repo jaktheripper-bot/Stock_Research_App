@@ -779,7 +779,7 @@ def dossier_page(request: Request, ticker: str):
             linked_debt = get_debt_securities_for_equity(canonical)
             if linked_debt:
                 from core.analysis.debt_engine import evaluate_equity_cross_contagion
-                contagion_alert = evaluate_equity_cross_contagion(linked_debt[0])
+                contagion_alert = evaluate_equity_cross_contagion(linked_debt[0], fetch_live_fundamentals=False)
         except Exception as e:
             logger.debug(f"Linked debt query notice for pending {canonical}: {e}")
 
@@ -1111,7 +1111,7 @@ def api_get_debt_securities(
 
     results = []
     for s in secs:
-        eval_summary = evaluate_5_pillar_credit_posture(s)
+        eval_summary = evaluate_5_pillar_credit_posture(s, include_live_equity_contagion=False)
         results.append({
             "isin": s["isin"],
             "ticker": s["ticker"],
@@ -3650,10 +3650,21 @@ def api_get_autonomous_events(limit: int = Query(15, ge=1, le=50)):
     from core.db.agent_sessions import get_recent_autonomous_events
     init_db()
     events = get_recent_autonomous_events(limit=limit)
+    sanitized = [
+        {
+            "event_id": ev.get("event_id"),
+            "event_type": ev.get("event_type"),
+            "ticker": ev.get("ticker"),
+            "action_taken": ev.get("action_taken"),
+            "summary": ev.get("summary"),
+            "created_at": str(ev.get("created_at")),
+        }
+        for ev in events
+    ]
     return json_response_with_cache({
         "success": True,
-        "count": len(events),
-        "events": events
+        "count": len(sanitized),
+        "events": sanitized
     }, max_age=30)
 
 

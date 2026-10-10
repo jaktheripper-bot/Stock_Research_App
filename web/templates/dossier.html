@@ -197,11 +197,19 @@
           <div style="display: flex; justify-content: space-between; align-items: center;">
             <span style="font-size: 11px; color: var(--text-muted); font-weight: 600;">MARGIN OF SAFETY</span>
             <span style="font-size: 12px; font-weight: 800; color: {{ equity_intel.valuation_radar.badge_color }};">
-              {% if equity_intel.valuation_radar.margin_of_safety_pct >= 0 %}+{% endif %}{{ equity_intel.valuation_radar.margin_of_safety_pct }}%
+              {% if equity_intel.valuation_radar.status == 'UNAVAILABLE' %}
+                N/A
+              {% else %}
+                {% if equity_intel.valuation_radar.margin_of_safety_pct >= 0 %}+{% endif %}{{ equity_intel.valuation_radar.margin_of_safety_pct }}%
+              {% endif %}
             </span>
           </div>
           <div style="font-size: 13.5px; font-weight: 700; color: #e2e8f0; margin-top: 4px;">
-            ₹{{ "{:,.2f}".format(equity_intel.valuation_radar.fair_value) }} <span style="font-size: 11px; color: var(--text-muted); font-weight: normal;">Intrinsic</span>
+            {% if equity_intel.valuation_radar.status == 'UNAVAILABLE' %}
+              <span style="color: var(--text-muted); font-size: 12.5px;">Pending Financial Disclosures</span>
+            {% else %}
+              ₹{{ "{:,.2f}".format(equity_intel.valuation_radar.fair_value) }} <span style="font-size: 11px; color: var(--text-muted); font-weight: normal;">Intrinsic</span>
+            {% endif %}
           </div>
         </div>
 
@@ -236,14 +244,19 @@
         <div style="background: rgba(15, 23, 42, 0.6); border: 1px solid rgba(255,255,255,0.08); border-radius: 8px; padding: 16px;">
           <div style="font-size: 13px; font-weight: 700; color: #38bdf8; margin-bottom: 12px; display: flex; align-items: center; justify-content: space-between;">
             <span>Sector Benchmark Metrics ({{ equity_intel.sector_intelligence.sector_display_name }})</span>
-            <span style="font-size: 11px; color: var(--text-muted);">vs Indian Industry Peers</span>
+            <div style="display: flex; align-items: center; gap: 8px;">
+              {% if equity_intel.sector_intelligence.coverage %}
+              <span class="badge" style="font-size: 10px; background: rgba(56, 189, 248, 0.12); color: #38bdf8;">{{ equity_intel.sector_intelligence.coverage }}</span>
+              {% endif %}
+              <span style="font-size: 11px; color: var(--text-muted);">vs Indian Industry Peers</span>
+            </div>
           </div>
           <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px;">
             {% for k in equity_intel.sector_intelligence.kpis %}
             <div style="background: rgba(30, 41, 59, 0.4); border-radius: 6px; padding: 8px 10px;">
               <div style="font-size: 11px; color: var(--text-muted);">{{ k.name }}</div>
               <div style="font-size: 15px; font-weight: 700; color: #f1f5f9; margin-top: 2px;">{{ k.val }}</div>
-              <div style="font-size: 10.5px; color: {% if k.status == 'PASS' %}#10b981{% else %}#fbbf24{% endif %}; margin-top: 2px;">
+              <div style="font-size: 10.5px; color: {% if k.status == 'PASS' %}#10b981{% elif k.status == 'NEUTRAL' %}#94a3b8{% else %}#fbbf24{% endif %}; margin-top: 2px;">
                 {{ k.benchmark }} ({{ k.status }})
               </div>
             </div>
@@ -261,6 +274,12 @@
             <span class="badge" style="font-size: 10.5px; background: rgba(56, 189, 248, 0.15); color: #38bdf8;">{{ equity_intel.institutional_flow.source }}</span>
           </div>
 
+          {% if equity_intel.institutional_flow.status == 'UNAVAILABLE' or equity_intel.institutional_flow.flow_regime == 'DATA_UNAVAILABLE' %}
+          <div style="background: rgba(30, 41, 59, 0.4); border-radius: 6px; padding: 12px; margin-bottom: 10px; text-align: center;">
+            <div style="font-size: 13px; font-weight: 600; color: var(--text-muted);">Level-2 Order Depth Offline</div>
+            <div style="font-size: 11px; color: var(--text-secondary); margin-top: 4px;">Real-time bid/ask queues and circuit proximity stream during active exchange market hours.</div>
+          </div>
+          {% else %}
           <div style="display: flex; justify-content: space-between; margin-bottom: 10px; font-size: 12px;">
             <div>
               <span style="color: var(--text-muted);">Order Imbalance:</span>
@@ -283,6 +302,8 @@
               <div style="width: 50%; background: #10b98166;"></div>
             </div>
           </div>
+          {% endif %}
+
 
           <div style="font-size: 12px; color: var(--text-secondary); line-height: 1.4;">
             {{ equity_intel.institutional_flow.narrative }}

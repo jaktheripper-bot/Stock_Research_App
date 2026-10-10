@@ -28,6 +28,24 @@ def _safe_float(v: Any, default: float = 0.0) -> float:
         return default
 
 
+def _parse_optional_float(v: Any) -> Optional[float]:
+    """Parses a float if present, valid, and not an empty/N/A placeholder; otherwise returns None."""
+    if v is None:
+        return None
+    if isinstance(v, (int, float)):
+        if math.isnan(v) or math.isinf(v):
+            return None
+        return float(v)
+    s = str(v).strip().replace(",", "").replace("%", "")
+    if not s or s.upper() in ("N/A", "NONE", "NAN", "-", ""):
+        return None
+    try:
+        f = float(s)
+        return None if (math.isnan(f) or math.isinf(f)) else f
+    except (ValueError, TypeError):
+        return None
+
+
 # Sector taxonomy classification keyword map
 SECTOR_KEYWORDS = {
     "BFSI": [
@@ -203,128 +221,203 @@ def evaluate_sector_fundamentals(
 
     fund = fundamentals if isinstance(fundamentals, dict) else {}
 
-    # Extract base fundamentals safely
-    roce = _safe_float(fund.get("roce") or fund.get("return_on_capital"), 15.0)
-    roe = _safe_float(fund.get("roe") or fund.get("return_on_equity"), 14.0)
-    debt_equity = _safe_float(fund.get("debt_to_equity") or fund.get("debt_equity"), 0.25)
-    pe_ratio = _safe_float(fund.get("pe_ratio"), 22.0)
-    pb_ratio = _safe_float(fund.get("pb_ratio"), 3.0)
-    sales_growth = _safe_float(fund.get("sales_growth_3y") or fund.get("revenue_growth"), 12.0)
+    # Extract base fundamentals safely without synthetic fallback values
+    roce = _parse_optional_float(fund.get("roce") or fund.get("return_on_capital"))
+    roe = _parse_optional_float(fund.get("roe") or fund.get("return_on_equity"))
+    debt_equity = _parse_optional_float(fund.get("debt_to_equity") or fund.get("debt_equity"))
+    pe_ratio = _parse_optional_float(fund.get("pe_ratio"))
+    pb_ratio = _parse_optional_float(fund.get("pb_ratio") or fund.get("price_to_book"))
+    sales_growth = _parse_optional_float(fund.get("sales_growth_3y") or fund.get("revenue_growth"))
+    fcf_raw = _parse_optional_float(fund.get("fcf_conversion") or fund.get("fcf_conversion_ratio") or fund.get("fcf_margin"))
 
     score_components = []
     kpis = []
+    narrative_points = []
 
     if sector == "BFSI":
         # Specialized Banking / Lending Model
-        # In Indian banking, low D/E is meaningless; NIM, asset quality, and RoA are prime
-        roa_est = round(roe * 0.08, 2)  # Conservative synthetic proxy if RoA direct unstated
-        pcr_est = 72.5                  # Industry median
-        gnpa_est = 2.4                  # Healthy Indian banking cycle average
-        
         # 1. RoA Quality (Target > 1.2%)
-        roa_score = min(30.0, (roa_est / benchmarks["roa_floor"]) * 25.0)
-        score_components.append(("Return on Assets (RoA)", roa_score, 30.0))
-        kpis.append({"name": "Est. Return on Assets (RoA)", "val": f"{roa_est:.2f}%", "benchmark": f"> {benchmarks['roa_floor']}%", "status": "PASS" if roa_est >= benchmarks["roa_floor"] else "WATCH"})
+        roa_direct = _parse_optional_float(fund.get("roa") or fund.get("return_on_assets"))
+        if roa_direct is not None:
+            roa_score = min(30.0, (roa_direct / benchmarks["roa_floor"]) * 25.0)
+            score_components.append(("Return on Assets (RoA)", roa_score, 30.0))
+            kpis.append({"name": "Return on Assets (RoA)", "val": f"{roa_direct:.2f}%", "benchmark": f"> {benchmarks['roa_floor']}%", "status": "PASS" if roa_direct >= benchmarks["roa_floor"] else "WATCH"})
+            narrative_points.append(f"RoA of {roa_direct:.2f}%")
+        elif roe is not None:
+            roa_est = round(roe * 0.08, 2)
+            roa_score = min(30.0, (roa_est / benchmarks["roa_floor"]) * 25.0)
+            score_components.append(("Return on Assets (RoA)", roa_score, 30.0))
+            kpis.append({"name": "Est. Return on Assets (RoA)", "val": f"{roa_est:.2f}%", "benchmark": f"> {benchmarks['roa_floor']}%", "status": "PASS" if roa_est >= benchmarks["roa_floor"] else "WATCH"})
+            narrative_points.append(f"est. RoA of {roa_est:.2f}%")
+        else:
+            kpis.append({"name": "Return on Assets (RoA)", "val": "Not disclosed", "benchmark": f"> {benchmarks['roa_floor']}%", "status": "NEUTRAL"})
 
         # 2. Capital Multiplier / PBV Valuation
-        pb_score = 30.0 if pb_ratio <= benchmarks["pb_median"] else max(10.0, 30.0 - (pb_ratio - benchmarks["pb_median"]) * 8.0)
-        score_components.append(("P/BV Multiple", pb_score, 30.0))
-        kpis.append({"name": "Price-to-Book (P/BV)", "val": f"{pb_ratio:.2f}x", "benchmark": f"< {benchmarks['pb_median']}x", "status": "PASS" if pb_ratio <= benchmarks["pb_median"] else "ELEVATED"})
+        if pb_ratio is not None:
+            pb_score = 30.0 if pb_ratio <= benchmarks["pb_median"] else max(10.0, 30.0 - (pb_ratio - benchmarks["pb_median"]) * 8.0)
+            score_components.append(("P/BV Multiple", pb_score, 30.0))
+            kpis.append({"name": "Price-to-Book (P/BV)", "val": f"{pb_ratio:.2f}x", "benchmark": f"< {benchmarks['pb_median']}x", "status": "PASS" if pb_ratio <= benchmarks["pb_median"] else "ELEVATED"})
+            narrative_points.append(f"P/BV multiple of {pb_ratio:.2f}x")
+        else:
+            kpis.append({"name": "Price-to-Book (P/BV)", "val": "Not disclosed", "benchmark": f"< {benchmarks['pb_median']}x", "status": "NEUTRAL"})
 
         # 3. Credit Cycle Resilience
-        credit_score = 25.0 if gnpa_est <= benchmarks["gnpa_ceiling"] else 12.0
-        score_components.append(("Asset Quality Buffer", credit_score, 25.0))
-        kpis.append({"name": "Systemic Credit Stress", "val": "Benign NPA Cycle", "benchmark": "GNPA < 3.5%", "status": "PASS"})
+        gnpa = _parse_optional_float(fund.get("gnpa_pct") or fund.get("gnpa"))
+        if gnpa is not None:
+            credit_score = 25.0 if gnpa <= benchmarks["gnpa_ceiling"] else 12.0
+            score_components.append(("Asset Quality Buffer", credit_score, 25.0))
+            kpis.append({"name": "Gross NPA (GNPA)", "val": f"{gnpa:.2f}%", "benchmark": f"< {benchmarks['gnpa_ceiling']}%", "status": "PASS" if gnpa <= benchmarks["gnpa_ceiling"] else "WATCH"})
+            narrative_points.append(f"GNPA of {gnpa:.2f}%")
+        else:
+            kpis.append({"name": "Gross NPA (GNPA)", "val": "Not disclosed", "benchmark": f"< {benchmarks['gnpa_ceiling']}%", "status": "NEUTRAL"})
 
         # 4. Long-Term Franchise Compounding (ROE)
-        roe_score = min(15.0, (roe / 14.0) * 15.0)
-        score_components.append(("Return on Equity (ROE)", roe_score, 15.0))
-        kpis.append({"name": "Return on Equity (ROE)", "val": f"{roe:.1f}%", "benchmark": "> 14.0%", "status": "PASS" if roe >= 14.0 else "WATCH"})
+        if roe is not None:
+            roe_score = min(15.0, (roe / 14.0) * 15.0)
+            score_components.append(("Return on Equity (ROE)", roe_score, 15.0))
+            kpis.append({"name": "Return on Equity (ROE)", "val": f"{roe:.1f}%", "benchmark": "> 14.0%", "status": "PASS" if roe >= 14.0 else "WATCH"})
+            narrative_points.append(f"ROE of {roe:.1f}%")
+        else:
+            kpis.append({"name": "Return on Equity (ROE)", "val": "Not disclosed", "benchmark": "> 14.0%", "status": "NEUTRAL"})
 
-        diagnostic_narrative = (
-            f"Evaluated on BFSI capital adequacy & underwriting standards. "
-            f"P/BV of {pb_ratio:.1f}x with an ROE of {roe:.1f}% indicates sound franchise capital conversion."
-        )
+        if narrative_points:
+            diagnostic_narrative = f"Evaluated on BFSI capital adequacy & underwriting standards with verified {', '.join(narrative_points)}."
+        else:
+            diagnostic_narrative = "BFSI banking franchise evaluated; awaiting additional statutory balance sheet disclosures."
 
     elif sector == "IT_TECH":
         # Specialized Technology & SaaS Model
-        # Asset light: FCF conversion, ROCE, and low leverage
-        fcf_conversion = 82.0  # Top-tier Indian IT median
-        
         # 1. Capital Productivity (ROCE)
-        roce_score = min(35.0, (roce / benchmarks["roce_floor"]) * 30.0)
-        score_components.append(("ROCE Productivity", roce_score, 35.0))
-        kpis.append({"name": "ROCE", "val": f"{roce:.1f}%", "benchmark": f"> {benchmarks['roce_floor']}%", "status": "PASS" if roce >= benchmarks["roce_floor"] else "WATCH"})
+        if roce is not None:
+            roce_score = min(35.0, (roce / benchmarks["roce_floor"]) * 30.0)
+            score_components.append(("ROCE Productivity", roce_score, 35.0))
+            kpis.append({"name": "ROCE", "val": f"{roce:.1f}%", "benchmark": f"> {benchmarks['roce_floor']}%", "status": "PASS" if roce >= benchmarks["roce_floor"] else "WATCH"})
+            narrative_points.append(f"ROCE of {roce:.1f}%")
+        else:
+            kpis.append({"name": "ROCE", "val": "Not disclosed", "benchmark": f"> {benchmarks['roce_floor']}%", "status": "NEUTRAL"})
 
         # 2. Solvency & Balance Sheet Cash Cushions
-        de_score = 30.0 if debt_equity <= benchmarks["debt_equity_ceiling"] else max(5.0, 30.0 - debt_equity * 40.0)
-        score_components.append(("Debt-to-Equity", de_score, 30.0))
-        kpis.append({"name": "Debt-to-Equity", "val": f"{debt_equity:.2f}", "benchmark": f"< {benchmarks['debt_equity_ceiling']}", "status": "PASS" if debt_equity <= benchmarks["debt_equity_ceiling"] else "ELEVATED"})
+        if debt_equity is not None:
+            de_score = 30.0 if debt_equity <= benchmarks["debt_equity_ceiling"] else max(5.0, 30.0 - debt_equity * 40.0)
+            score_components.append(("Debt-to-Equity", de_score, 30.0))
+            kpis.append({"name": "Debt-to-Equity", "val": f"{debt_equity:.2f}", "benchmark": f"< {benchmarks['debt_equity_ceiling']}", "status": "PASS" if debt_equity <= benchmarks["debt_equity_ceiling"] else "ELEVATED"})
+            narrative_points.append(f"D/E of {debt_equity:.2f}")
+        else:
+            kpis.append({"name": "Debt-to-Equity", "val": "Not disclosed", "benchmark": f"< {benchmarks['debt_equity_ceiling']}", "status": "NEUTRAL"})
 
-        # 3. Free Cash Flow Generation
-        fcf_score = 20.0 if fcf_conversion >= benchmarks["fcf_conversion_floor"] else 10.0
-        score_components.append(("Cash Flow Conversion", fcf_score, 20.0))
-        kpis.append({"name": "FCF Conversion Ratio", "val": f"{fcf_conversion:.0f}%", "benchmark": f"> {benchmarks['fcf_conversion_floor']}%", "status": "PASS"})
+        # 3. Free Cash Flow Generation (No hard-coded fallback)
+        if fcf_raw is not None:
+            fcf_score = 20.0 if fcf_raw >= benchmarks["fcf_conversion_floor"] else 10.0
+            score_components.append(("Cash Flow Conversion", fcf_score, 20.0))
+            kpis.append({"name": "FCF Conversion Ratio", "val": f"{fcf_raw:.0f}%", "benchmark": f"> {benchmarks['fcf_conversion_floor']}%", "status": "PASS" if fcf_raw >= benchmarks["fcf_conversion_floor"] else "WATCH"})
+            narrative_points.append(f"FCF conversion at {fcf_raw:.0f}%")
+        else:
+            kpis.append({"name": "FCF Conversion Ratio", "val": "Not disclosed", "benchmark": f"> {benchmarks['fcf_conversion_floor']}%", "status": "NEUTRAL"})
 
         # 4. Growth Visibility
-        growth_score = min(15.0, (sales_growth / 12.0) * 15.0)
-        score_components.append(("Revenue Momentum", growth_score, 15.0))
-        kpis.append({"name": "3-Year Revenue CAGR", "val": f"{sales_growth:.1f}%", "benchmark": "> 12.0%", "status": "PASS" if sales_growth >= 12.0 else "MODERATE"})
+        if sales_growth is not None:
+            growth_score = min(15.0, (sales_growth / 12.0) * 15.0)
+            score_components.append(("Revenue Momentum", growth_score, 15.0))
+            kpis.append({"name": "3-Year Revenue CAGR", "val": f"{sales_growth:.1f}%", "benchmark": "> 12.0%", "status": "PASS" if sales_growth >= 12.0 else "MODERATE"})
+            narrative_points.append(f"3-year sales growth of {sales_growth:.1f}%")
+        else:
+            kpis.append({"name": "3-Year Revenue CAGR", "val": "Not disclosed", "benchmark": "> 12.0%", "status": "NEUTRAL"})
 
-        diagnostic_narrative = (
-            f"Evaluated on IT capital efficiency. Negligible leverage ({debt_equity:.2f} D/E) and "
-            f"a strong ROCE of {roce:.1f}% support institutional shareholder returns."
-        )
+        if narrative_points:
+            diagnostic_narrative = f"Evaluated on IT capital efficiency and cash flow metrics with {', '.join(narrative_points)}."
+        else:
+            diagnostic_narrative = "Evaluated on IT capital efficiency; awaiting additional statutory reporting disclosures."
 
     elif sector == "CAPITAL_GOODS_INFRA":
         # Capital Goods, Engineering & Manufacturing
-        # Working capital cycle, operating leverage, debt coverage
-        roce_score = min(30.0, (roce / benchmarks["roce_floor"]) * 25.0)
-        score_components.append(("ROCE Threshold", roce_score, 30.0))
-        kpis.append({"name": "Capital Efficiency (ROCE)", "val": f"{roce:.1f}%", "benchmark": f"> {benchmarks['roce_floor']}%", "status": "PASS" if roce >= benchmarks["roce_floor"] else "WATCH"})
+        if roce is not None:
+            roce_score = min(30.0, (roce / benchmarks["roce_floor"]) * 25.0)
+            score_components.append(("ROCE Threshold", roce_score, 30.0))
+            kpis.append({"name": "Capital Efficiency (ROCE)", "val": f"{roce:.1f}%", "benchmark": f"> {benchmarks['roce_floor']}%", "status": "PASS" if roce >= benchmarks["roce_floor"] else "WATCH"})
+            narrative_points.append(f"ROCE of {roce:.1f}%")
+        else:
+            kpis.append({"name": "Capital Efficiency (ROCE)", "val": "Not disclosed", "benchmark": f"> {benchmarks['roce_floor']}%", "status": "NEUTRAL"})
 
-        de_score = 30.0 if debt_equity <= benchmarks["debt_equity_ceiling"] else max(5.0, 30.0 - (debt_equity - benchmarks["debt_equity_ceiling"]) * 35.0)
-        score_components.append(("Solvency Resilience", de_score, 30.0))
-        kpis.append({"name": "Debt-to-Equity", "val": f"{debt_equity:.2f}", "benchmark": f"< {benchmarks['debt_equity_ceiling']}", "status": "PASS" if debt_equity <= benchmarks["debt_equity_ceiling"] else "CAUTION"})
+        if debt_equity is not None:
+            de_score = 30.0 if debt_equity <= benchmarks["debt_equity_ceiling"] else max(5.0, 30.0 - (debt_equity - benchmarks["debt_equity_ceiling"]) * 35.0)
+            score_components.append(("Solvency Resilience", de_score, 30.0))
+            kpis.append({"name": "Debt-to-Equity", "val": f"{debt_equity:.2f}", "benchmark": f"< {benchmarks['debt_equity_ceiling']}", "status": "PASS" if debt_equity <= benchmarks["debt_equity_ceiling"] else "CAUTION"})
+            narrative_points.append(f"D/E of {debt_equity:.2f}")
+        else:
+            kpis.append({"name": "Debt-to-Equity", "val": "Not disclosed", "benchmark": f"< {benchmarks['debt_equity_ceiling']}", "status": "NEUTRAL"})
 
-        growth_score = min(25.0, (sales_growth / 15.0) * 20.0)
-        score_components.append(("Order-Book Execution", growth_score, 25.0))
-        kpis.append({"name": "3Y Revenue Growth", "val": f"{sales_growth:.1f}%", "benchmark": "> 15.0%", "status": "PASS" if sales_growth >= 15.0 else "MODERATE"})
+        if sales_growth is not None:
+            growth_score = min(25.0, (sales_growth / 15.0) * 20.0)
+            score_components.append(("Order-Book Execution", growth_score, 25.0))
+            kpis.append({"name": "3Y Revenue Growth", "val": f"{sales_growth:.1f}%", "benchmark": "> 15.0%", "status": "PASS" if sales_growth >= 15.0 else "MODERATE"})
+            narrative_points.append(f"sales growth of {sales_growth:.1f}%")
+        else:
+            kpis.append({"name": "3Y Revenue Growth", "val": "Not disclosed", "benchmark": "> 15.0%", "status": "NEUTRAL"})
 
-        pe_score = 15.0 if pe_ratio <= benchmarks["pe_median"] else max(5.0, 15.0 - (pe_ratio - benchmarks["pe_median"]) * 0.5)
-        score_components.append(("Capex Cycle Valuation", pe_score, 15.0))
-        kpis.append({"name": "Trailing P/E Multiple", "val": f"{pe_ratio:.1f}x", "benchmark": f"< {benchmarks['pe_median']}x", "status": "PASS" if pe_ratio <= benchmarks["pe_median"] else "ELEVATED"})
+        if pe_ratio is not None:
+            pe_score = 15.0 if pe_ratio <= benchmarks["pe_median"] else max(5.0, 15.0 - (pe_ratio - benchmarks["pe_median"]) * 0.5)
+            score_components.append(("Capex Cycle Valuation", pe_score, 15.0))
+            kpis.append({"name": "Trailing P/E Multiple", "val": f"{pe_ratio:.1f}x", "benchmark": f"< {benchmarks['pe_median']}x", "status": "PASS" if pe_ratio <= benchmarks["pe_median"] else "ELEVATED"})
+            narrative_points.append(f"trailing P/E of {pe_ratio:.1f}x")
+        else:
+            kpis.append({"name": "Trailing P/E Multiple", "val": "Not disclosed", "benchmark": f"< {benchmarks['pe_median']}x", "status": "NEUTRAL"})
 
-        diagnostic_narrative = (
-            f"Assessed on infrastructure and capex upcycle criteria. Debt-to-equity is {debt_equity:.2f} "
-            f"with ROCE compounding at {roce:.1f}%."
-        )
+        if narrative_points:
+            diagnostic_narrative = f"Assessed on infrastructure and capex upcycle criteria with {', '.join(narrative_points)}."
+        else:
+            diagnostic_narrative = "Assessed on infrastructure criteria; awaiting statutory segment disclosures."
 
     else:
         # General Manufacturing / Consumer / Chemicals
-        roce_score = min(35.0, (roce / benchmarks["roce_floor"]) * 30.0)
-        score_components.append(("ROCE Margin", roce_score, 35.0))
-        kpis.append({"name": "ROCE Productivity", "val": f"{roce:.1f}%", "benchmark": f"> {benchmarks['roce_floor']}%", "status": "PASS" if roce >= benchmarks["roce_floor"] else "WATCH"})
+        if roce is not None:
+            roce_score = min(35.0, (roce / benchmarks["roce_floor"]) * 30.0)
+            score_components.append(("ROCE Margin", roce_score, 35.0))
+            kpis.append({"name": "ROCE Productivity", "val": f"{roce:.1f}%", "benchmark": f"> {benchmarks['roce_floor']}%", "status": "PASS" if roce >= benchmarks["roce_floor"] else "WATCH"})
+            narrative_points.append(f"ROCE of {roce:.1f}%")
+        else:
+            kpis.append({"name": "ROCE Productivity", "val": "Not disclosed", "benchmark": f"> {benchmarks['roce_floor']}%", "status": "NEUTRAL"})
 
-        de_score = 30.0 if debt_equity <= benchmarks["debt_equity_ceiling"] else max(5.0, 30.0 - debt_equity * 35.0)
-        score_components.append(("Debt Burden", de_score, 30.0))
-        kpis.append({"name": "Debt-to-Equity", "val": f"{debt_equity:.2f}", "benchmark": f"< {benchmarks['debt_equity_ceiling']}", "status": "PASS" if debt_equity <= benchmarks["debt_equity_ceiling"] else "ELEVATED"})
+        if debt_equity is not None:
+            de_score = 30.0 if debt_equity <= benchmarks["debt_equity_ceiling"] else max(5.0, 30.0 - debt_equity * 35.0)
+            score_components.append(("Debt Burden", de_score, 30.0))
+            kpis.append({"name": "Debt-to-Equity", "val": f"{debt_equity:.2f}", "benchmark": f"< {benchmarks['debt_equity_ceiling']}", "status": "PASS" if debt_equity <= benchmarks["debt_equity_ceiling"] else "ELEVATED"})
+            narrative_points.append(f"D/E of {debt_equity:.2f}")
+        else:
+            kpis.append({"name": "Debt-to-Equity", "val": "Not disclosed", "benchmark": f"< {benchmarks['debt_equity_ceiling']}", "status": "NEUTRAL"})
 
-        growth_score = min(20.0, (sales_growth / 12.0) * 18.0)
-        score_components.append(("Volume Compounding", growth_score, 20.0))
-        kpis.append({"name": "Sales Expansion (3Y)", "val": f"{sales_growth:.1f}%", "benchmark": "> 12.0%", "status": "PASS" if sales_growth >= 12.0 else "MODERATE"})
+        if sales_growth is not None:
+            growth_score = min(20.0, (sales_growth / 12.0) * 18.0)
+            score_components.append(("Volume Compounding", growth_score, 20.0))
+            kpis.append({"name": "Sales Expansion (3Y)", "val": f"{sales_growth:.1f}%", "benchmark": "> 12.0%", "status": "PASS" if sales_growth >= 12.0 else "MODERATE"})
+            narrative_points.append(f"sales growth of {sales_growth:.1f}%")
+        else:
+            kpis.append({"name": "Sales Expansion (3Y)", "val": "Not disclosed", "benchmark": "> 12.0%", "status": "NEUTRAL"})
 
-        pe_score = 15.0 if pe_ratio <= benchmarks["pe_median"] else max(5.0, 15.0 - (pe_ratio - benchmarks["pe_median"]) * 0.4)
-        score_components.append(("Relative Multiple", pe_score, 15.0))
-        kpis.append({"name": "Trailing P/E", "val": f"{pe_ratio:.1f}x", "benchmark": f"< {benchmarks['pe_median']}x", "status": "PASS" if pe_ratio <= benchmarks["pe_median"] else "ELEVATED"})
+        if pe_ratio is not None:
+            pe_score = 15.0 if pe_ratio <= benchmarks["pe_median"] else max(5.0, 15.0 - (pe_ratio - benchmarks["pe_median"]) * 0.4)
+            score_components.append(("Relative Multiple", pe_score, 15.0))
+            kpis.append({"name": "Trailing P/E", "val": f"{pe_ratio:.1f}x", "benchmark": f"< {benchmarks['pe_median']}x", "status": "PASS" if pe_ratio <= benchmarks["pe_median"] else "ELEVATED"})
+            narrative_points.append(f"trailing P/E of {pe_ratio:.1f}x")
+        else:
+            kpis.append({"name": "Trailing P/E", "val": "Not disclosed", "benchmark": f"< {benchmarks['pe_median']}x", "status": "NEUTRAL"})
 
-        diagnostic_narrative = (
-            f"Evaluated against Indian manufacturing & consumer peer medians. "
-            f"Generates {roce:.1f}% ROCE with a debt-to-equity ratio of {debt_equity:.2f}."
-        )
+        if narrative_points:
+            diagnostic_narrative = f"Evaluated against peer benchmarks with verified {', '.join(narrative_points)}."
+        else:
+            diagnostic_narrative = "Evaluated against industry benchmarks; awaiting additional statutory accounting filings."
 
-    total_score = round(sum(s[1] for s in score_components), 1)
-    normalized_score = max(0.0, min(100.0, total_score))
+    # Compute normalized score strictly based on available components
+    # If some components are missing, scale proportionally to 100 base without penalizing
+    total_earned = sum(s[1] for s in score_components)
+    total_max = sum(s[2] for s in score_components)
+
+    if total_max > 0:
+        normalized_score = round(max(0.0, min(100.0, (total_earned / total_max) * 100.0)), 1)
+    else:
+        normalized_score = 50.0  # Neutral baseline when completely unpopulated
+
+    disclosed_count = len(score_components)
+    total_kpis = len(kpis)
 
     if normalized_score >= 80.0:
         verdict = "INDUSTRY_OUTPERFORMER"
@@ -348,4 +441,8 @@ def evaluate_sector_fundamentals(
         "kpis": kpis,
         "narrative": diagnostic_narrative,
         "benchmarks": benchmarks,
+        "coverage": f"Based on {disclosed_count} of {total_kpis} metrics",
+        "disclosed_count": disclosed_count,
+        "total_kpi_count": total_kpis,
     }
+

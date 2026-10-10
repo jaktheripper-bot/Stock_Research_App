@@ -58,14 +58,19 @@ def compile_equity_dossier_intelligence(
     )
 
     # 5. Multi-Model Valuation Radar
-    current_price = float(
+    raw_price = (
         (angel_quote.get("ltp") if angel_quote else None) or 
         fundamentals.get("current_price") or 
         fundamentals.get("base_price") or 
-        100.0
+        0.0
     )
-    pe_ratio = float(fundamentals.get("pe_ratio") or 22.0)
-    sales_growth = float(fundamentals.get("sales_growth_3y") or 12.0)
+    current_price = float(raw_price) if raw_price is not None else 0.0
+    
+    raw_pe = fundamentals.get("pe_ratio")
+    pe_ratio = float(raw_pe) if raw_pe is not None else 0.0
+
+    raw_growth = fundamentals.get("sales_growth_3y")
+    sales_growth = float(raw_growth) if raw_growth is not None else None
     
     valuation_data = compute_valuation_radar(
         current_price=current_price,
@@ -86,23 +91,36 @@ def compile_equity_dossier_intelligence(
 
     # 7. Synthesize Institutional Quality Composite Score (0-100)
     # Weights: 30% Sector Operations, 25% Valuation & MoS, 25% Forensic Integrity, 20% Institutional Flow
-    sector_weight = 0.30
-    valuation_weight = 0.25
-    forensic_weight = 0.25
-    flow_weight = 0.20
+    sec_score = float(sector_data.get("score", 60.0))
+    for_score = float(forensic_data.get("score", 80.0))
+    flow_score = float(flow_data.get("score", 60.0))
 
-    # Derive 0-100 valuation sub-score from Margin of Safety
-    mos = valuation_data.get("margin_of_safety_pct", 0.0)
-    # Mos > 25% -> 95, Mos 0% -> 65, Mos -30% -> 35
-    val_subscore = max(10.0, min(100.0, 65.0 + (mos * 1.2)))
+    if valuation_data.get("status") == "UNAVAILABLE":
+        # Reweight available pillars proportionally: Sector (40%), Forensic (33.3%), Flow (26.7%)
+        composite_score = round(
+            (sec_score * 0.40) +
+            (for_score * 0.333) +
+            (flow_score * 0.267),
+            1
+        )
+    else:
+        sector_weight = 0.30
+        valuation_weight = 0.25
+        forensic_weight = 0.25
+        flow_weight = 0.20
 
-    composite_score = round(
-        (sector_data.get("score", 60.0) * sector_weight) +
-        (val_subscore * valuation_weight) +
-        (forensic_data.get("score", 80.0) * forensic_weight) +
-        (flow_data.get("score", 60.0) * flow_weight),
-        1
-    )
+        # Derive 0-100 valuation sub-score from Margin of Safety
+        mos = valuation_data.get("margin_of_safety_pct", 0.0)
+        # Mos > 25% -> 95, Mos 0% -> 65, Mos -30% -> 35
+        val_subscore = max(10.0, min(100.0, 65.0 + (mos * 1.2)))
+
+        composite_score = round(
+            (sec_score * sector_weight) +
+            (val_subscore * valuation_weight) +
+            (for_score * forensic_weight) +
+            (flow_score * flow_weight),
+            1
+        )
 
     if composite_score >= 80.0:
         composite_verdict = "INSTITUTIONAL_LEADER"

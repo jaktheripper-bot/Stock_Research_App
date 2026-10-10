@@ -301,6 +301,7 @@ def get_active_debt_securities(
     use_pg = is_supabase_enabled()
 
     clauses = ["is_listed = TRUE" if use_pg else "is_listed = 1"]
+    clauses.append("(ticker NOT LIKE '%TEST%' AND ticker NOT LIKE '%UNITTEST%' AND isin NOT LIKE '%TEST%' AND instrument_name NOT LIKE '%Test%')")
     params = []
 
     if seniority:

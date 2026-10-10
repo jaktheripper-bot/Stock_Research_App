@@ -251,8 +251,8 @@ def wrap_html_with_collapsible_pillars(
                     remainder = body_content[300:].strip()
 
                 if p_num == 3:
-                    fallback_preview = _LOCKED_SKELETON_HTML
-                    blur_body = remainder if len(remainder) > 120 else (remainder + fallback_preview)
+                    lead_snippet = (remainder[:180].rstrip() + "...") if len(remainder) > 180 else remainder
+                    blur_body = f"""<div style="opacity: 0.5; filter: blur(3px); user-select: none; pointer-events: none;"><p style="margin: 0; line-height: 1.6;">{lead_snippet}</p>\n{_LOCKED_SKELETON_HTML}</div>"""
                     paywall_card = f"""
 <div class="gated-pillar-container">
   <div class="gated-blur-content">
@@ -288,8 +288,8 @@ def wrap_html_with_collapsible_pillars(
                     rendered_body = f"{teaser}\n{paywall_card}"
 
                 elif p_num == 5:
-                    fallback_preview = _LOCKED_SKELETON_HTML
-                    blur_body = remainder if len(remainder) > 120 else (remainder + fallback_preview)
+                    lead_snippet = (remainder[:180].rstrip() + "...") if len(remainder) > 180 else remainder
+                    blur_body = f"""<div style="opacity: 0.5; filter: blur(3px); user-select: none; pointer-events: none;"><p style="margin: 0; line-height: 1.6;">{lead_snippet}</p>\n{_LOCKED_SKELETON_HTML}</div>"""
                     paywall_card = f"""
 <div class="gated-pillar-container">
   <div class="gated-blur-content">

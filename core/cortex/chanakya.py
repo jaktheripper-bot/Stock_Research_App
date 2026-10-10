@@ -392,7 +392,20 @@ class ChanakyaGate:
         """
         d = data if isinstance(data, dict) else {}
         symbol = str(d.get("symbol") or d.get("ticker") or "UNKNOWN").upper().strip()
-        mcap = _safe_float(d.get("market_cap_cr") or d.get("mcap_cr") or (_safe_float(d.get("base_mcap")) / 1e7), default=100.0)
+        # Extract market cap in Crores safely (fundamentals.py provides market_cap in INR, or market_cap_cr)
+        raw_mcap = d.get("market_cap_cr") or d.get("mcap_cr")
+        if raw_mcap is None and d.get("market_cap"):
+            # fundamentals.py uses market_cap in INR (e.g. 4.15e12) or in Cr if < 1e7
+            val = _safe_float(d.get("market_cap"), default=0.0)
+            raw_mcap = (val / 1e7) if val > 1e7 else val
+        elif raw_mcap is None and d.get("base_mcap"):
+            val = _safe_float(d.get("base_mcap"), default=0.0)
+            raw_mcap = (val / 1e7) if val > 1e7 else val
+
+        mcap = _safe_float(raw_mcap, default=100.0)
+        if mcap <= 0:
+            mcap = 100.0
+
         cfo = _safe_float(d.get("operating_cash_flow_cr") or d.get("cfo_cr"), default=15.0)
         ebitda = _safe_float(d.get("ebitda_cr") or d.get("ebitda"), default=20.0)
         pbt = _safe_float(d.get("reported_pbt_cr") or d.get("pbt_cr"), default=15.0)
@@ -435,3 +448,8 @@ class ChanakyaGate:
             market_cap_cr=mcap,
             mode=mode,
         )
+
+
+def evaluate_from_dict(data: Dict[str, Any], mode: str = "SCREENING") -> ChanakyaScorecard:
+    """Convenience module-level wrapper for ChanakyaGate.evaluate_from_dict."""
+    return ChanakyaGate.evaluate_from_dict(data, mode=mode)
