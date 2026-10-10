@@ -77,6 +77,10 @@ Detailed forensic analysis with exact page grounding to bseindia.com filings.
         self.assertIn("Cross-Company Peer Comparator", res.text)
         self.assertIn("INFY", res.text)
         self.assertIn("TCS", res.text)
+        # Live audit regression: market cap rendered "₹₹" and missing ranges rendered "₹N/A".
+        self.assertNotIn("₹₹", res.text)
+        self.assertNotIn("₹N/A", res.text)
+        self.assertIn("₹1500.0", res.text)
 
     @patch("web.main.get_stock_fundamentals")
     @patch("web.main.get_historical_prices")

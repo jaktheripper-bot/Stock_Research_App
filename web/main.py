@@ -1014,7 +1014,7 @@ async def compare_page(
     for f_key in ["fund_a", "fund_b"]:
         m = comp_data.get(f_key, {}).get("market_cap")
         if m:
-            comp_data[f_key]["market_cap_str"] = f"₹{format_inr(m)}"
+            comp_data[f_key]["market_cap_str"] = format_inr(m)  # format_inr already prefixes ₹
 
     return templates.TemplateResponse(
         request=request,

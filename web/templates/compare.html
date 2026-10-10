@@ -129,8 +129,8 @@
         <!-- Current Quote -->
         <tr style="border-bottom: 1px solid rgba(255,255,255,0.04);">
           <td style="padding: 12px 24px; color: var(--text-secondary); font-weight: 500;">Live Quote Price</td>
-          <td class="tnum" style="padding: 12px 24px; font-weight: 700; color: var(--text-primary);">₹{{ fund_a.current_price|default('N/A') }}</td>
-          <td class="tnum" style="padding: 12px 24px; font-weight: 700; color: var(--text-primary);">₹{{ fund_b.current_price|default('N/A') }}</td>
+          <td class="tnum" style="padding: 12px 24px; font-weight: 700; color: var(--text-primary);">{% if fund_a.current_price and fund_a.current_price != 'N/A' %}₹{{ fund_a.current_price }}{% else %}N/A{% endif %}</td>
+          <td class="tnum" style="padding: 12px 24px; font-weight: 700; color: var(--text-primary);">{% if fund_b.current_price and fund_b.current_price != 'N/A' %}₹{{ fund_b.current_price }}{% else %}N/A{% endif %}</td>
         </tr>
         <!-- Market Cap -->
         <tr style="border-bottom: 1px solid rgba(255,255,255,0.04); background: rgba(30, 41, 59, 0.2);">
@@ -189,8 +189,8 @@
         <!-- 52-Week Range -->
         <tr style="border-bottom: 1px solid rgba(255,255,255,0.04);">
           <td style="padding: 12px 24px; color: var(--text-secondary); font-weight: 500;">52-Week Range (Low – High)</td>
-          <td class="tnum" style="padding: 12px 24px; color: var(--text-primary);">₹{{ fund_a.fifty_two_week_low|default('N/A') }} – ₹{{ fund_a.fifty_two_week_high|default('N/A') }}</td>
-          <td class="tnum" style="padding: 12px 24px; color: var(--text-primary);">₹{{ fund_b.fifty_two_week_low|default('N/A') }} – ₹{{ fund_b.fifty_two_week_high|default('N/A') }}</td>
+          <td class="tnum" style="padding: 12px 24px; color: var(--text-primary);">{% if fund_a.fifty_two_week_low and fund_a.fifty_two_week_high and fund_a.fifty_two_week_low != 'N/A' and fund_a.fifty_two_week_high != 'N/A' %}₹{{ fund_a.fifty_two_week_low }} – ₹{{ fund_a.fifty_two_week_high }}{% else %}N/A{% endif %}</td>
+          <td class="tnum" style="padding: 12px 24px; color: var(--text-primary);">{% if fund_b.fifty_two_week_low and fund_b.fifty_two_week_high and fund_b.fifty_two_week_low != 'N/A' and fund_b.fifty_two_week_high != 'N/A' %}₹{{ fund_b.fifty_two_week_low }} – ₹{{ fund_b.fifty_two_week_high }}{% else %}N/A{% endif %}</td>
         </tr>
       </tbody>
     </table>
