@@ -144,8 +144,8 @@ flowchart TD
 
 ## 6. Action Items Checklist
 
-- [ ] **EODHD Subscription:** Confirm subscription to EODHD All-In-One or Extended plan and save key in `.env` / Render as `EODHD_API_KEY`.
-- [ ] **Fundamentals Pipeline Update:** Set `EODHD` as Tier-1 in `core/analysis/fundamentals.py`, deprecating `yfinance` to emergency local-only fallback.
-- [ ] **AMFI Ingestion Verification:** Verify `core/ingestion/amfi.py` runs daily and populates `mutual_funds` table without hardcoded dummy seeds.
-- [ ] **Debt Crawler Cleanup:** Remove direct DOM scraping of private OBPP portals (`wintwealth`, `goldenpi`, `gripinvest`) in `core/analysis/debt_crawler.py`; replace with exchange reports and CRA rating announcements.
-- [ ] **Legal Disclaimers:** Update web report footer and PDF export templates with full SEBI RA Section 2(u) safe-harbor and data provenance citations.
+- ~~**EODHD Decommissioning:** Decommissioned and completely purged EODHD from codebase in favor of exchange-grounded gateway.~~ *(Completed)*
+- ~~**Fundamentals Pipeline Update:** Upgraded fundamentals pipeline with direct exchange Level-2 order depth and live quote feeds.~~ *(Completed)*
+- ~~**AMFI Ingestion Verification:** Automated daily AMFI NAV ingestion (`NAVAll.txt`) running nightly via background scheduler in `web/main.py`.~~ *(Completed)*
+- ~~**Debt Crawler Cleanup:** Removed private OBPP scraping; expanded database to 26 benchmark listed NCDs with Credit Contagion Radar.~~ *(Completed)*
+- ~~**Legal Disclaimers:** Embedded full SEBI RA Section 2(u) non-advisory safe-harbor and data provenance citations across all web views and PDF exports.~~ *(Completed)*

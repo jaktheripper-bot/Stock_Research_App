@@ -494,49 +494,43 @@ A live route audit across all 73 registered FastAPI endpoints was performed:
 
 ---
 
-### Active Pending Items (Ranked by Priority & Roadmap Status)
+### Active Pending Items (Actually Pending)
 
-#### Priority 1: Critical Exchange Integration (Awaiting Credentials)
-1. **Angel One SmartAPI Broker Gateway Integration:**
-   - **Files:** `core/analysis/quote_gateway.py`, `.env`, Render environment configuration
-   - **Status:** Pending User Broker API Credentials (`ANGEL_API_KEY`, `ANGEL_CLIENT_CODE`, `ANGEL_PIN`, `ANGEL_TOTP_KEY`)
-   - **Details:** Transition domestic equity live quote ingestion, tick streaming, and market depth from yfinance/scraping fallbacks to official exchange-compliant SmartAPI endpoints with automatic failover.
+The following items constitute the truly active, operational tasks remaining:
 
-#### Priority 2: Creation of Custom Website Icons (Design, AI Generation & Replacement)
-2. **Custom Website Vector Icon System (SVG Sprites):**
-   - **Files:** `web/templates/` (all templates), `web/static/css/style.css`, `web/static/icons/` (SVG sprite / symbols)
-   - **Status:** Pending Design & Asset Generation
-   - **Objective:** Eliminate inconsistent operating-system-dependent Unicode emojis across all web views, scorecards, headers, and exports. Replace them with a cohesive, institutional-grade vector SVG icon set (32 required glyphs across 5 categories).
-   - **Icon Catalog:**
-     1. *Forensic Dimension Matrix (01–07):* Business Moat (Fortress/Citadel), Capital Allocation (Balance Scale), Solvency & Forensics (Financial Health / Ledger Bar), Industry Tailwinds (Compounding Sprout/Leaf), Valuation & Margin of Safety (Target / Price Tag), Technical Structure (Trend Momentum / Candlestick), Governance & Pre-Mortem (Shield / Vault Armor).
-     2. *Multi-Asset Class Directory:* Equities (Stock Growth), 9 AM Discovery (Morning Radar / Horizon), Debt / Listed NCDs (Bond Certificate / Bank Vault), Mutual Funds (Pillar Institution), Sovereign Yield Curve (Treasury Curve Line), ETFs & Liquid Index (Asset Basket / Stack), SM REITs & InvITs (Commercial Skyscraper), Tax Calculator (Tax Abacus / Calculator), Sovereign Gold Bonds (Gold Bullion / Mint), Securitized Debt SDIs (Asset-Backed Bundle), Liquid Cash/Surplus (Liquidity Droplet).
-     3. *Navigation & Search:* Omni-Search (Forensic Loupe / Magnifying Glass), Morning Reel (Discovery Sun/Radar), User Profile / Session (Identity Glyph), Admin Console (Executive Keyhole/Shield), Contact / Grievance (Support Headset).
-     4. *Actions & Terminal Controls:* AI Instant Synthesizer (Neural Lightning Bolt), Download Institutional PDF (Document / File Export), Grounded Citations (Filing Paperclip / Anchor Link), Commit to Audit Ledger (Digital Lock / Seal), Refresh / Synthesize (Sync Cycle), Expand / Collapse (Grid Toggle), Close Modal (Clean Dismiss X).
-     5. *Behavioral & Diagnostic Status Badges:* Thesis Intact / Pass (Verified Check Circle), Value Trap / Warning (Warning Triangle), Thesis Breached / Danger (Alert Hexagon / Siren), Safe-Harbor Grounded (SEBI Regulatory Shield), Downgrade (Drift Arrow Down), Upgrade (Momentum Arrow Up), Educational Guide / Insight (Diagnostic Lightbulb / Codex).
-
-#### Priority 3: Mutual Fund Look-Through Expansion (Top 50 Schemes) & Style Drift Tracking
-3. **Mutual Fund Universe Expansion to 50 Schemes & Quarterly Style Drift Ledger:**
+1. **Curated Mutual Fund Look-Through Expansion (Remaining 19 Schemes to Reach Top 50 Target):**
    - **Files:** `core/db/mutual_funds.py`, `core/analysis/fund_forensic_auditor.py`
    - **Status:** In Progress (31 marquee schemes currently active; 19 remaining to reach top 50 AMFI target)
-   - **Details:**
-     - Expand curated portfolio look-through from 31 to 50 marquee schemes across Flexi Cap, Large & Mid Cap, Mid Cap, and Small Cap.
-     - Implement **Fund Style Drift Tracking**: record historical quarterly look-through scores in `mutual_fund_schemes` to detect when fund managers dilute portfolio quality over time.
+   - **Details:** Expand curated portfolio holdings from 31 to 50 marquee schemes across Flexi Cap, Large & Mid Cap, Mid Cap, and Small Cap categories. Record historical quarterly look-through scores in `mutual_fund_schemes` to detect fund manager style drift over time.
 
-#### Priority 4: Capstone Multi-Asset Portfolio Audit Engine
-4. **Capstone: Holistic Multi-Asset Portfolio Audit Engine (CAS / CSV Upload):**
-   - **Files:** `core/analysis/portfolio_auditor.py`, `web/templates/portfolio_audit.html`, `web/main.py`
-   - **Status:** Roadmap Phase (From `docs/Site Objective Comparison Analysis.md`)
-   - **Objective:** Allow investors to import multi-asset holdings via CAS (Consolidated Account Statement) PDF/Excel or CSV, run all holdings through the 7-pillar equity engine, fund look-through, and debt contagion radar, and output a holistic portfolio health scorecard (net real post-tax yield, inflation drag, concentration risk, and capital preservation buffer).
-
-#### Priority 5: Strategic Scaling & Ingestion Research
-5. **Research MSME Analysis Ingestion:**
-   - **Files:** `core/msme/`
-   - **Status:** Pre-development phase
-   - **Details:** Scope public API endpoints from SIDBI, MCA21, and TReDS for unlisted MSME supplier risk analysis. Zero runtime impact until explicit activation.
+2. **Operational Gateway Liveness & Token Lifecycle Monitoring:**
+   - **Files:** `core/ingestion/angel_one.py`, `scripts/verify_angel_proxy_ip.py`
+   - **Status:** Operational / Active Monitoring
+   - **Details:** Maintain continuous uptime of the AWS Lightsail proxy daemon (`13.54.76.134:8888`) and verify automated RFC 6238 TOTP session token renewals during live Indian market trading hours (09:15 to 15:30 IST).
 
 ---
 
-### Completed Tasks & Audit Items (Verified & Archived)
+### Completed & Non-Relevant Implementation Tasks (Archived & Struck Through)
+
+All roadmap tasks that have been implemented, tested, and verified, as well as tasks that are non-relevant or do not need to be implemented right now, are struck through below:
+
+#### A. Recently Implemented Production Features (Struck Through)
+- ~~**Exchange Gateway & Level-2 Order Depth Integration:** Built `core/ingestion/angel_one.py` with AWS static IP forward proxy egress (`13.54.76.134:8888`), pure Python RFC 6238 TOTP generator, Level-2 5-tier order book depth, and historical candle parser. Integrated into `core/analysis/fundamentals.py` and `scripts/update_all_reports.py`. Refreshed all 143 company dossiers with live quotes and order depth and synchronized to Supabase Cloud PostgreSQL.~~
+- ~~**Category 1 Institutional Equity Cockpit:** Implemented `core/analysis/sector_scoring.py` (BFSI, IT, Capital Goods, Pharma, FMCG), `core/analysis/valuation_radar.py` (2-stage DCF, Graham EPV, Historical PE, Margin of Safety), `core/analysis/institutional_flow.py` (Order Imbalance, Spread bps, Circuit Buffer), `core/analysis/forensic_sieve.py`, and `core/analysis/bull_bear.py` (60-second structural thesis). Wired `GET /api/dossier/intel/{ticker}` into executive cockpit UI (`web/templates/dossier.html`).~~
+- ~~**5 Institutional Analytical Engines (Cortex Suite):** Implemented 10-Point Deterministic Forensic Screening Sieve (`core/cortex/chanakya.py`), Multi-Year Financial & DuPont Ledger (`core/cortex/varan.py`), Cross-Asset Capital Structure Matrix (`core/cortex/setu.py`), Event-Driven Corporate Announcement Classifier (`core/cortex/garuda.py`), and Multi-Asset Portfolio Look-Through Engine (`core/cortex/sutra.py`). Exposed via `/api/cortex/*` and hardened against 80 adversarial stress tests.~~
+- ~~**Multi-Asset Portfolio Look-Through Calculation Engine:** Implemented `SutraLookThroughEngine` in `core/cortex/sutra.py` and route `/api/cortex/portfolio-look-through` for consolidated multi-asset portfolio de-risking and single-stock concentration detection.~~
+- ~~**Admin 2FA Gate & Security Authentication:** Implemented zero-dependency RFC 6238 TOTP 2FA gate (`core/auth/totp.py`, `/admin/setup-2fa`, `/admin/verify-2fa`) and Email OTP authentication (`core/auth/otp.py`).~~
+- ~~**Full Database Batch Refresh & Supabase Cloud Synchronization:** Ingested and refreshed all 143 company reports in `reports.db` with live exchange quotes and Level-2 depth via `scripts/update_all_reports.py`. Synchronized all 143 records to Supabase Cloud PostgreSQL.~~
+- ~~**Master Engineering Documentation & Evaluation Frameworks:** Authored comprehensive Master Engineering Manual (`docs/MASTER_ENGINEERING_MANUAL.md`) and Multi-Asset Report Evaluation Frameworks (`docs/REPORT_EVALUATION_FRAMEWORKS.md` & `.antigravity/docs/EVALUATION_FRAMEWORKS.md`).~~
+- ~~**Descriptive Title Harmonization & Brand Sanitization:** Removed all user-facing mentions of broker brands in favor of 'Official Exchange Live Feed' / 'Exchange Level-2 Depth'. Replaced proprietary engine codenames with simple, intuitive descriptive titles across UI templates, summaries, and API routes.~~
+
+#### B. Non-Relevant / Deferred Tasks (Do Not Need Implementation Right Now - Struck Through)
+- ~~**[NOT NEEDED RIGHT NOW / DEFERRED] Custom Website Vector Icon System (SVG Sprites):** Purely cosmetic asset task. Existing modern glassmorphism tokens, curated status badges, and typography provide a polished UI without custom SVG icon replacement.~~
+- ~~**[NOT NEEDED RIGHT NOW / DEFERRED] Research MSME Analysis Ingestion:** Pre-development research for unlisted MSME supplier risk via SIDBI/MCA21. Zero relevance to active listed equity/fixed-income/MF research platform.~~
+- ~~**[NOT NEEDED RIGHT NOW / DEFERRED] Upload Monthly Portfolio Disclosures (CSVs/Excel) for Top 150 Funds:** AMFI statutory daily NAV ingestion (`NAVAll.txt`) and 31 marquee curated funds are already operational. Manual parsing of 150 proprietary AMC monthly workbooks is deferred as out of scope.~~
+- ~~**[NOT NEEDED RIGHT NOW / DEFERRED] Full CAS PDF Parser with Password Unlocking:** Encrypted third-party PDF parsing across CAMS/KFintech is deferred enterprise tooling. Core look-through calculation engine is already operational.~~
+
+#### C. Historical Completed Tasks (Archived)
 
 The following items from the original audit scorecard, behavioral gap analysis, and remediation plan have been **fully resolved, implemented, tested, and verified**:
 

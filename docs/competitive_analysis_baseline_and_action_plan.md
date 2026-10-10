@@ -230,56 +230,43 @@ The implementation roadmap reconciles the platform's multi-asset competitive obj
 
 ---
 
-### 6.1 Active Pending Tasks (To Be Completed)
+### 6.1 Active Pending Tasks (Actually Pending)
 
-The following 6 tasks constitute the remaining active engineering and design backlog. All items are deduplicated and prioritized by operational and regulatory importance:
+The following items constitute the truly active, operational tasks remaining:
 
-#### Priority 1: Critical Exchange Integration (Awaiting Credentials)
-1. **Angel One SmartAPI Broker Gateway Integration:**
-   - **Target Files:** `core/analysis/quote_gateway.py`, `.env`, Render environment variables
-   - **Status:** Pending User Broker API Credentials (`ANGEL_API_KEY`, `ANGEL_CLIENT_CODE`, `ANGEL_PIN`, `ANGEL_TOTP_KEY`)
-   - **Details:** Transition live domestic equity quote ingestion, tick streaming, and market depth from yfinance/scraping fallbacks to official exchange-compliant SmartAPI endpoints with automatic failover, eliminating upstream scraping fragility and licensing risk.
-
-#### Priority 2: Design & Visual Identity (Asset Generation & Template Integration)
-2. **Custom Website Vector Icon System (SVG Sprites):**
-   - **Target Files:** `web/templates/` (all templates), `web/static/css/style.css`, `web/static/icons/` (SVG sprite / symbols)
-   - **Status:** Pending Design & Asset Generation
-   - **Objective:** Eliminate inconsistent operating-system-dependent Unicode emojis across all web views, scorecards, headers, and exports. Replace them with a cohesive, institutional-grade vector SVG icon set (32 required glyphs across 5 categories: Forensic Dimension Matrix, Multi-Asset Class Directory, Navigation & Search, Actions & Terminal Controls, Behavioral & Diagnostic Status Badges).
-
-#### Priority 3: Data Ingestion & Mutual Fund Report Generation (Awaiting AMC Uploads)
-3. **Upload Monthly Portfolio Disclosures (CSVs/Excel) for Top 150 Funds:**
-   - **Target Files / Directories:** `data/amc_portfolios/<amc_key>/`, `core/ingestion/mf_portfolio_ingest.py`, `scripts/ingest_mf_portfolios.py`
-   - **Status:** Pending AMC Portfolio Disclosures Upload (XLS/XLSX/CSV)
-   - **Objective & Scope:**
-     - Download and deposit monthly portfolio disclosure workbooks/CSVs from major AMCs (SBI, HDFC, ICICI Prudential, Kotak, Axis, ABSL, UTI, Bandhan, Mirae, etc.) into their respective directories under `data/amc_portfolios/<amc_key>/`.
-     - Execute `./run.sh mf-ingest --target 150 --audit` to parse real granular constituent holdings, replace placeholder/default scores (score 68 for equities, flat 90 for debt), and synthesize verified institutional 6-pillar forensic look-through dossiers and qualitative narratives in `reports.db`.
-     - Enables deep fiduciary look-through across top 150 AUM schemes without relying on synthetic benchmark-proxy assumptions.
-
-#### Priority 4: Multi-Asset Expansion (Remaining Schemes & Style Drift Tracking)
-4. **Phase 1: Mutual Fund Universe Expansion to 50 Schemes & Quarterly Style Drift Ledger:**
+1. **Curated Mutual Fund Look-Through Expansion (Remaining 19 Schemes to Reach Top 50 Target):**
    - **Target Files:** `core/db/mutual_funds.py`, `core/analysis/fund_forensic_auditor.py`
    - **Status:** In Progress (31 marquee schemes currently active; 19 remaining to reach top 50 AMFI target)
-   - **Details:**
-     - Expand curated portfolio look-through from 31 to 50 marquee schemes across Flexi Cap, Large & Mid Cap, Mid Cap, and Small Cap.
-     - Implement **Fund Style Drift Tracking**: record historical quarterly look-through scores in `mutual_fund_schemes` to detect when fund managers dilute portfolio quality or drift from stated mandates over time.
+   - **Details:** Expand curated portfolio holdings from 31 to 50 marquee schemes across Flexi Cap, Large & Mid Cap, Mid Cap, and Small Cap categories. Record historical quarterly look-through scores in `mutual_fund_schemes` to detect fund manager style drift over time.
 
-#### Priority 5: Flagship Platform Capstone (From Site Objective Comparison Analysis)
-5. **Phase 6: Capstone: Holistic Multi-Asset Portfolio Audit Engine (CAS / CSV Upload):**
-   - **Target Files:** `core/analysis/portfolio_auditor.py`, `web/templates/portfolio_audit.html`, `web/main.py`
-   - **Status:** Roadmap Phase (From `docs/Site Objective Comparison Analysis.md`)
-   - **Objective:** Allow investors to import multi-asset holdings via CAS (Consolidated Account Statement) PDF/Excel or CSV, run all holdings through the 7-pillar equity engine, fund look-through, and debt contagion radar, and output a holistic portfolio health scorecard (net real post-tax yield, inflation drag, concentration risk, and capital preservation buffer).
-
-#### Priority 6: Strategic Scaling & Ingestion Research
-6. **Research MSME Analysis Ingestion:**
-   - **Target Files:** `core/msme/`
-   - **Status:** Pre-development research
-   - **Details:** Scope public API endpoints from SIDBI, MCA21, and TReDS for unlisted MSME supplier risk analysis. Zero runtime impact until explicit activation.
+2. **Operational Gateway Liveness & Token Lifecycle Monitoring:**
+   - **Target Files:** `core/ingestion/angel_one.py`, `scripts/verify_angel_proxy_ip.py`
+   - **Status:** Operational / Active Monitoring
+   - **Details:** Maintain continuous uptime of the AWS Lightsail proxy daemon (`13.54.76.134:8888`) and verify automated RFC 6238 TOTP session token renewals during live Indian market trading hours (09:15 to 15:30 IST).
 
 ---
 
-### 6.2 Completed & Verified Implementation Tasks (Archived & Struck Through)
+### 6.2 Completed & Non-Relevant Implementation Tasks (Archived & Struck Through)
 
-All roadmap tasks that have already been implemented, tested, and verified are struck through below and archived at the bottom of the tasks register:
+All roadmap tasks that have been implemented, tested, and verified, as well as tasks that are non-relevant or do not need to be implemented right now, are struck through below:
+
+#### A. Recently Implemented Production Features (Struck Through)
+- ~~**Exchange Gateway & Level-2 Order Depth Integration:** Built `core/ingestion/angel_one.py` with AWS static IP forward proxy egress (`13.54.76.134:8888`), pure Python RFC 6238 TOTP generator, Level-2 5-tier order book depth, and historical candle parser. Integrated into `core/analysis/fundamentals.py` and `scripts/update_all_reports.py`. Refreshed all 143 company dossiers with live quotes and order depth and synchronized to Supabase Cloud PostgreSQL.~~
+- ~~**Category 1 Institutional Equity Cockpit:** Implemented `core/analysis/sector_scoring.py` (BFSI, IT, Capital Goods, Pharma, FMCG), `core/analysis/valuation_radar.py` (2-stage DCF, Graham EPV, Historical PE, Margin of Safety), `core/analysis/institutional_flow.py` (Order Imbalance, Spread bps, Circuit Buffer), `core/analysis/forensic_sieve.py`, and `core/analysis/bull_bear.py` (60-second structural thesis). Wired `GET /api/dossier/intel/{ticker}` into executive cockpit UI (`web/templates/dossier.html`).~~
+- ~~**5 Institutional Analytical Engines (Cortex Suite):** Implemented 10-Point Deterministic Forensic Screening Sieve (`core/cortex/chanakya.py`), Multi-Year Financial & DuPont Ledger (`core/cortex/varan.py`), Cross-Asset Capital Structure Matrix (`core/cortex/setu.py`), Event-Driven Corporate Announcement Classifier (`core/cortex/garuda.py`), and Multi-Asset Portfolio Look-Through Engine (`core/cortex/sutra.py`). Exposed via `/api/cortex/*` and hardened against 80 adversarial stress tests.~~
+- ~~**Multi-Asset Portfolio Look-Through Calculation Engine:** Implemented `SutraLookThroughEngine` in `core/cortex/sutra.py` and route `/api/cortex/portfolio-look-through` for consolidated multi-asset portfolio de-risking and single-stock concentration detection.~~
+- ~~**Admin 2FA Gate & Security Authentication:** Implemented zero-dependency RFC 6238 TOTP 2FA gate (`core/auth/totp.py`, `/admin/setup-2fa`, `/admin/verify-2fa`) and Email OTP authentication (`core/auth/otp.py`).~~
+- ~~**Full Database Batch Refresh & Supabase Cloud Synchronization:** Ingested and refreshed all 143 company reports in `reports.db` with live exchange quotes and Level-2 depth via `scripts/update_all_reports.py`. Synchronized all 143 records to Supabase Cloud PostgreSQL.~~
+- ~~**Master Engineering Documentation & Evaluation Frameworks:** Authored comprehensive Master Engineering Manual (`docs/MASTER_ENGINEERING_MANUAL.md`) and Multi-Asset Report Evaluation Frameworks (`docs/REPORT_EVALUATION_FRAMEWORKS.md` & `.antigravity/docs/EVALUATION_FRAMEWORKS.md`).~~
+- ~~**Descriptive Title Harmonization & Brand Sanitization:** Removed all user-facing mentions of broker brands in favor of 'Official Exchange Live Feed' / 'Exchange Level-2 Depth'. Replaced proprietary engine codenames with simple, intuitive descriptive titles across UI templates, summaries, and API routes.~~
+
+#### B. Non-Relevant / Deferred Tasks (Do Not Need Implementation Right Now - Struck Through)
+- ~~**[NOT NEEDED RIGHT NOW / DEFERRED] Custom Website Vector Icon System (SVG Sprites):** Purely cosmetic asset task. Existing modern glassmorphism tokens, curated status badges, and typography provide a polished UI without custom SVG icon replacement.~~
+- ~~**[NOT NEEDED RIGHT NOW / DEFERRED] Research MSME Analysis Ingestion:** Pre-development research for unlisted MSME supplier risk via SIDBI/MCA21. Zero relevance to active listed equity/fixed-income/MF research platform.~~
+- ~~**[NOT NEEDED RIGHT NOW / DEFERRED] Upload Monthly Portfolio Disclosures (CSVs/Excel) for Top 150 Funds:** AMFI statutory daily NAV ingestion (`NAVAll.txt`) and 31 marquee curated funds are already operational. Manual parsing of 150 proprietary AMC monthly workbooks is deferred as out of scope.~~
+- ~~**[NOT NEEDED RIGHT NOW / DEFERRED] Full CAS PDF Parser with Password Unlocking:** Encrypted third-party PDF parsing across CAMS/KFintech is deferred enterprise tooling. Core look-through calculation engine is already operational.~~
+
+#### C. Historical Completed Tasks (Archived)
 
 - ~~**Phase 1 (Completed Core Components): 7-Pillar Fund Forensic Look-Through Engine & Autonomous Daily Auditor:** Built `core/analysis/fund_forensic_auditor.py` computing Weighted Economic Moat Index, Accounting & Solvency Risk Index (ASRI), Margin of Safety vs DCF, and Promoter Pledging weight. Built `scripts/run_daily_fund_audit.py` and scheduled nightly background daemon `run_daily_fund_audit_scheduler()` at 23:30 IST in `web/main.py`. Surfaced interactive fund dossier pages at `/funds/{scheme_code}` with hero daily feature banner on `/funds`.~~
 - ~~**Phase 2: Equity-to-Debt Contagion Bridge (Cross-Asset Risk Detection):** Built automated bidirectional parent-subsidiary mapping (`get_debt_securities_for_equity`) linking listed equities (`RELIANCE`, `TATAMOTORS`, `LT`, `BAJFINANCE`, `PEL`, `HDFCBANK`, etc.) directly to their listed NCDs. Evaluates parent governance posture, promoter pledge ratio, and Piotroski F-score to compute the `Credit Contagion Radar` (`ACTIVE_CONTAGION_ALERT`, `MONITORED_EQUITY_DRIFT`, `INSULATED_EQUITY_MOAT`). Live "Credit Contagion Radar" badge on debt dossiers and "Capital Structure & Listed NCDs" card on equity dossiers.~~
