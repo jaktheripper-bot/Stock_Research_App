@@ -210,7 +210,7 @@ class SetuMatrixEngine:
             ))
 
         summary = (
-            f"Setu Transmission: {regime}. Seniority Spread: {seniority_spread_bps:+.0f} bps vs Senior NCD "
+            f"Capital Structure Transmission: {regime}. Seniority Spread: {seniority_spread_bps:+.0f} bps vs Senior NCD "
             f"({senior_debt_ytm_pct:.2f}%). Credit Spread: {credit_spread_bps:.0f} bps over 10Y G-Sec. "
             f"Anomalies detected: {len(anomalies)}."
         )

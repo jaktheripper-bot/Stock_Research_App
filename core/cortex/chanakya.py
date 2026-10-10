@@ -368,7 +368,7 @@ class ChanakyaGate:
             status = "FORENSIC_EXCLUSION"
 
         summary = (
-            f"Chanakya Sieve: {status} (Score {clean_room_score:.1f}/100). "
+            f"Forensic Clean-Room Sieve: {status} (Score {clean_room_score:.1f}/100). "
             f"{'Passed clean-room filter.' if overall_passed else 'Excluded due to forensic flags.'} "
             f"Critical Flags: {critical_failures}, Warnings: {warning_failures}."
         )

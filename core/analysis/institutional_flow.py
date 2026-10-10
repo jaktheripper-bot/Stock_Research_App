@@ -1,7 +1,7 @@
 """
 Institutional Flow & Market Depth Sieve
 =======================================
-Ingests real-time exchange Level-2 order books via Angel One SmartAPI to diagnose:
+Ingests real-time exchange Level-2 order books via direct gateway to diagnose:
 1. Institutional Accumulation vs Distribution regimes (Order Imbalance Ratio).
 2. True Market Liquidity & Execution Friction (Bid-Ask Spread in Basis Points).
 3. Circuit Limit Freeze Proximity (Upper & Lower Circuit Buffers).

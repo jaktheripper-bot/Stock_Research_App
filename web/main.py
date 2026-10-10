@@ -1886,25 +1886,34 @@ def api_safety_radar(category: Optional[str] = None):
 
 
 # ==============================================================================
-# Proprietary Anvik Cortex Institutional Engines API Suite (Phases 1 - 5)
+# Institutional Analytical Engines API Suite (Phases 1 - 5)
 # ==============================================================================
 
-class GarudaClassifyRequest(BaseModel):
+class AnnouncementClassifyRequest(BaseModel):
     symbol: str
     headline: str
     filing_date: Optional[str] = ""
     details_url: Optional[str] = ""
 
 
-class SutraAuditRequest(BaseModel):
+# Backwards compatibility alias
+GarudaClassifyRequest = AnnouncementClassifyRequest
+
+
+class PortfolioLookThroughRequest(BaseModel):
     direct_equities: List[Dict[str, Any]] = []
     mutual_funds: List[Dict[str, Any]] = []
     fixed_income_and_sov: List[Dict[str, Any]] = []
 
 
+# Backwards compatibility alias
+SutraAuditRequest = PortfolioLookThroughRequest
+
+
+@app.get("/api/cortex/forensic-sieve/{ticker}")
 @app.get("/api/cortex/chanakya/{ticker}")
-def api_cortex_chanakya(ticker: str, mode: str = "SOFT"):
-    """Public API: Chanakya Clean-Room 10-point deterministic forensic screening audit."""
+def api_cortex_forensic_sieve(ticker: str, mode: str = "SOFT"):
+    """Public API: 10-Point Deterministic Forensic Screening Audit."""
     from core.cortex import ChanakyaGate
     from core.db import get_report_by_ticker_sync
     from normalizer import clean_ticker
@@ -1923,9 +1932,13 @@ def api_cortex_chanakya(ticker: str, mode: str = "SOFT"):
     return json_response_with_cache(asdict(res), max_age=60)
 
 
+api_cortex_chanakya = api_cortex_forensic_sieve
+
+
+@app.get("/api/cortex/capital-matrix/{ticker}")
 @app.get("/api/cortex/setu/{ticker}")
-def api_cortex_setu(ticker: str, fcf_yield: Optional[float] = None):
-    """Public API: Setu Cross-Asset Capital Structure Matrix and Seniority Spreads."""
+def api_cortex_capital_matrix(ticker: str, fcf_yield: Optional[float] = None):
+    """Public API: Cross-Asset Capital Structure Matrix and Seniority Spreads."""
     from core.cortex import SetuMatrixEngine
     from normalizer import clean_ticker
     from dataclasses import asdict
@@ -1935,9 +1948,13 @@ def api_cortex_setu(ticker: str, fcf_yield: Optional[float] = None):
     return json_response_with_cache(asdict(res), max_age=60)
 
 
+api_cortex_setu = api_cortex_capital_matrix
+
+
+@app.post("/api/cortex/announcement-classifier")
 @app.post("/api/cortex/garuda/classify")
-def api_cortex_garuda_classify(payload: GarudaClassifyRequest):
-    """Public API: Garuda Event-Driven announcement classifier and surgical micro-snapshot."""
+def api_cortex_announcement_classify(payload: AnnouncementClassifyRequest):
+    """Public API: Event-Driven Corporate Announcement Classifier and Micro-Snapshot."""
     from core.cortex import GarudaReflexEngine
     from dataclasses import asdict
     delta = GarudaReflexEngine.classify_announcement(
@@ -1949,9 +1966,13 @@ def api_cortex_garuda_classify(payload: GarudaClassifyRequest):
     return JSONResponse(content=asdict(delta))
 
 
+api_cortex_garuda_classify = api_cortex_announcement_classify
+
+
+@app.post("/api/cortex/portfolio-look-through")
 @app.post("/api/cortex/sutra/audit")
-def api_cortex_sutra_audit(payload: SutraAuditRequest):
-    """Public API: Sutra Multi-Asset Portfolio Look-Through and Concentration De-Risking."""
+def api_cortex_portfolio_look_through(payload: PortfolioLookThroughRequest):
+    """Public API: Multi-Asset Portfolio Look-Through and Concentration De-Risking."""
     from core.cortex import SutraLookThroughEngine
     from dataclasses import asdict
     res = SutraLookThroughEngine.audit_portfolio(
@@ -1960,6 +1981,9 @@ def api_cortex_sutra_audit(payload: SutraAuditRequest):
         fixed_income_and_sov=payload.fixed_income_and_sov,
     )
     return JSONResponse(content=asdict(res))
+
+
+api_cortex_sutra_audit = api_cortex_portfolio_look_through
 
 
 
@@ -3238,7 +3262,7 @@ async def api_dossier_status(request: Request, ticker: str):
 async def api_dossier_intel(ticker: str):
     """
     Returns comprehensive Category 1 institutional equity intelligence:
-    Sector-native metrics, Angel One level-2 depth, 360 forensic sieve, valuation radar, and bull/bear thesis.
+    Sector-native metrics, exchange level-2 depth, 360 forensic sieve, valuation radar, and bull/bear thesis.
     """
     clean_t = clean_ticker(ticker)
     if not clean_t:

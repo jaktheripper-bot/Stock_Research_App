@@ -3,8 +3,8 @@ Equity Dossier Intelligence Coordinator
 =======================================
 Synthesizes:
 1. Sector-Native Operational Scoring (BFSI, IT, Capital Goods, Healthcare, Consumer)
-2. Angel One Live Level-2 Market Depth & Flow Analytics
-3. Unified 360° Forensic Health Sieve (Chanakya 10-point check)
+2. Exchange Live Level-2 Market Depth & Flow Analytics
+3. Unified 360° Forensic Health Sieve (10-Point Deterministic Filter)
 4. Multi-Model Valuation Radar & Margin of Safety
 5. Bull vs. Bear Structural Thesis
 Produces a unified institutional equity intelligence package for web dossiers and APIs.

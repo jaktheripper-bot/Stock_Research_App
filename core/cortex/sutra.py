@@ -270,7 +270,7 @@ class SutraLookThroughEngine:
         health_score = max(20.0, min(100.0, health_score))
 
         summary = (
-            f"Sutra Audit: Analyzed ₹{total_portfolio_val:,.0f} across {len(safe_eq)} direct equities, "
+            f"Portfolio Look-Through Audit: Analyzed ₹{total_portfolio_val:,.0f} across {len(safe_eq)} direct equities, "
             f"{len(safe_mf)} mutual funds, and {len(safe_fi)} fixed-income assets. "
             f"Top holding: {exposures[0].symbol if exposures else 'None'} ({exposures[0].total_exposure_pct if exposures else 0:.1f}%). "
             f"Fiduciary Health Score: {health_score:.1f}/100. Alerts: {len(hidden_overlap_alerts)}."

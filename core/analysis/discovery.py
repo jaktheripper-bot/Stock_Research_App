@@ -173,10 +173,10 @@ def evaluate_under_the_radar_candidate(candidate: Dict[str, Any]) -> Optional[Di
     if de_float > 0.8:
         return None
 
-    # Phase 1: Chanakya Clean-Room Forensic Screening Sieve
+    # Phase 1: 10-Point Deterministic Forensic Screening Sieve
     chanakya_res = ChanakyaGate.evaluate_from_dict(candidate, mode="STRICT")
     if not chanakya_res.overall_passed:
-        logger.info(f"Chanakya Sieve excluded candidate {canonical}: {chanakya_res.summary}")
+        logger.info(f"Forensic Clean-Room Sieve excluded candidate {canonical}: {chanakya_res.summary}")
         return None
 
     # Ingest latest corporate filing headline

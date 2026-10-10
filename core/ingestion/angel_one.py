@@ -423,7 +423,7 @@ class AngelOneGateway:
                     "depth_pressure_regime": analytics["depth_pressure_regime"],
                     "depth_buy_5": buy_book,
                     "depth_sell_5": sell_book,
-                    "source": "Angel One SmartAPI (Exchange Audited)",
+                    "source": "Official Exchange Live Feed",
                 }
         except Exception as e:
             logger.debug(f"Angel One quote fetch notice: {e}")
@@ -526,7 +526,7 @@ class AngelOneGateway:
             circuit_info = f" | **Circuit Bands:** ₹{lc:,.2f} / ₹{uc:,.2f} (+{uc_dist:.1f}% to UC)"
 
         return (
-            f"\n> **{badge_color} Angel One Level-2 Depth:** `{regime}` (Order Imbalance: {imb:+.2f}){circuit_info}  \n"
-            f"> *Source: Angel One SmartAPI (Exchange Audited Live Feed)*\n"
+            f"\n> **{badge_color} Exchange Level-2 Depth:** `{regime}` (Order Imbalance: {imb:+.2f}){circuit_info}  \n"
+            f"> *Source: Official Exchange Live Feed*\n"
         )
 

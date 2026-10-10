@@ -174,7 +174,7 @@ def synthesize_bull_bear_thesis(
         bear_points.append({
             "pillar": "Order Book Dynamics",
             "title": "Sell-Side Supply Overhang",
-            "detail": "Angel One Level-2 depth indicates heavy ask-side volume capping intermediate upside momentum."
+            "detail": "Exchange Level-2 depth indicates heavy ask-side volume capping intermediate upside momentum."
         })
     elif lc_buffer <= 4.0:
         bear_points.append({

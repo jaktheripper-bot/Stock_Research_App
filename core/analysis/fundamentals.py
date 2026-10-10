@@ -286,8 +286,8 @@ def get_stock_fundamentals(query: str) -> dict:
                     "order_imbalance_ratio": quote.get("order_imbalance_ratio", 0.0),
                     "upper_circuit": quote.get("upper_circuit", 0.0),
                     "lower_circuit": quote.get("lower_circuit", 0.0),
-                    "description": f"Official Angel One exchange feed for {clean}.",
-                    "exchange_status": "Active / Primary (Angel One SmartAPI)",
+                    "description": f"Live exchange feed for {clean}.",
+                    "exchange_status": "Active / Primary (Exchange Feed)",
                     "is_fallback": False,
                 }
                 _FUNDAMENTALS_CACHE[clean] = (now, res_dict)

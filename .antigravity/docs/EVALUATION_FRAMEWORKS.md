@@ -191,9 +191,11 @@ Every generated equity dossier structures its narrative strictly across 7 statut
 
 #### Part B: Institutional Cockpit & Cortex Engines
 
+> **UI Presentation Principle:** To maintain cognitive clarity and prevent overwhelming users, the web application never displays arbitrary proprietary brand names or broker-specific marketing. All user-facing views feature simple, intuitive, descriptive titles (e.g. *10-Point Forensic Clean-Room Sieve*, *Cross-Asset Capital Structure Matrix*, *Event-Driven Corporate Announcement Classifier*, *Multi-Asset Portfolio Look-Through Engine*, and *Official Exchange Live Feed*). Internal Python classes and file paths retain their symbols for engineering traceability.
+
 Prior to any LLM execution, 12 high-speed deterministic engines execute against primary exchange data:
 
-##### 1. Chanakya Clean-Room Forensic Filter (`core/cortex/chanakya.py`)
+##### 1. 10-Point Forensic Clean-Room Sieve (`ChanakyaGate`, `core/cortex/chanakya.py`)
 Executes 10 deterministic accounting clean-room tests, returning a Clean-Room Score ($0-100$):
 1. **$CFO / EBITDA$ Realization Ratio:**
    $$\text{Realization} = \frac{\text{Cash Flow from Operations}}{\text{EBITDA}} \ge 0.35$$
@@ -220,7 +222,7 @@ Executes 10 deterministic accounting clean-room tests, returning a Clean-Room Sc
 10. **Institutional Market Capitalization Threshold:**
     $$\text{Market Capitalization} \ge ₹25.0 \text{ Crores}$$
 
-##### 2. Varan Multi-Year XBRL & 3-Stage DuPont ROE Engine (`core/cortex/varan.py`)
+##### 2. Multi-Year Financial & DuPont Ledger (`VaranEngine`, `core/cortex/varan.py`)
 Decomposes corporate Return on Equity (ROE) into operating efficiency, asset utilization, and financial leverage:
 $$\text{ROE} = \left( \frac{\text{Net Income}}{\text{Revenue}} \right) \times \left( \frac{\text{Revenue}}{\text{Total Assets}} \right) \times \left( \frac{\text{Total Assets}}{\text{Shareholders' Equity}} \right)$$
 $$\text{ROE} = \text{Net Profit Margin} \times \text{Asset Turnover} \times \text{Equity Multiplier}$$
@@ -228,17 +230,23 @@ $$\text{ROE} = \text{Net Profit Margin} \times \text{Asset Turnover} \times \tex
 * *Cash Conversion Cycle (CCC):*
   $$\text{CCC} = \text{Days Inventory Outstanding (DIO)} + \text{Days Sales Outstanding (DSO)} - \text{Days Payable Outstanding (DPO)}$$
 
-##### 3. Setu Cross-Asset Capital Hierarchy & Inversion Detector (`core/cortex/setu.py`)
+##### 3. Cross-Asset Capital Structure Matrix (`SetuMatrixEngine`, `core/cortex/setu.py`)
 Audits the pricing of common equity relative to the issuer's senior debt instruments:
 $$\text{Equity Free Cash Flow Yield} = \frac{\text{FCFF}}{\text{Market Capitalization}}$$
 * **Capital Structure Inversion Diagnostic:**
   $$\text{If } \text{Equity FCF Yield} < \text{Senior Secured NCD Yield} \implies \text{CAPITAL STRUCTURE INVERSION ALERT}$$
   *Meaning: Investors are accepting lower cash yield on junior equity than institutional lenders demand on senior secured collateralized bonds.*
 
-##### 4. Garuda Event-Driven BSE Micro-Snapshot Sieve (`core/cortex/garuda.py`)
+##### 4. Event-Driven Corporate Announcement Classifier (`GarudaReflexEngine`, `core/cortex/garuda.py`)
 Ingests real-time BSE corporate disclosures, classifying announcements via deterministic regex taxonomy to specific 7-Pillar targets (Pillar 1 to Pillar 7) without re-generating entire dossiers.
 
-##### 5. Valuation Radar Engine (`core/analysis/valuation_radar.py`)
+##### 5. Multi-Asset Portfolio Look-Through Engine (`SutraLookThroughEngine`, `core/cortex/sutra.py`)
+Deconstructs mutual fund schemes down to underlying portfolio holdings to expose real consolidated equity concentration, duplicate holdings, and sector crowding across combined investor portfolios.
+* Calculates effective individual stock weight across direct equities and indirect mutual fund portfolios:
+  $$w_{\text{eff}}(i) = w_{\text{direct}}(i) + \sum_{j} w_{\text{fund}}(j) \cdot w_{j}(i)$$
+* Flags hidden concentration alerts whenever effective portfolio exposure to a single stock exceeds $12.0\%$.
+
+##### 6. Valuation Radar Engine (`core/analysis/valuation_radar.py`)
 Triangulates intrinsic fair value range combining three independent valuation paradigms:
 $$\text{Fair Value} = 0.35 \cdot V_{\text{Historical PE}} + 0.40 \cdot V_{\text{2-Stage DCF}} + 0.25 \cdot V_{\text{Graham EPV}}$$
 1. **5-Year Historical Median P/E Multiple ($V_{\text{Historical PE}}$):**
@@ -254,7 +262,7 @@ $$\text{Fair Value} = 0.35 \cdot V_{\text{Historical PE}} + 0.40 \cdot V_{\text{
   * *Fair Value:* $-15.0\% < \text{Margin of Safety} < +15.0\%$
   * *Overvalued / Stretched:* $\text{Margin of Safety} \le -15.0\%$
 
-##### 6. Sector-Native Scoring Engine (`core/analysis/sector_scoring.py`)
+##### 7. Sector-Native Scoring Engine (`core/analysis/sector_scoring.py`)
 Replaces uniform ratios with sector-specialized diagnostic weights:
 * **BFSI (Banks & NBFCs):** Net Interest Margin (NIM $\ge 3.5\%$), Return on Assets (RoA $\ge 1.2\%$), Gross NPA ($\le 3.0\%$), Capital Adequacy Ratio (CAR $\ge 15.0\%$).
 * **IT Services:** FCF-to-PAT realization ($\ge 85\%$), Return on Capital Employed (ROCE $\ge 25\%$), LTM Attrition Rate ($\le 18\%$), Offshore-Onsite Revenue Spread.
@@ -262,8 +270,8 @@ Replaces uniform ratios with sector-specialized diagnostic weights:
 * **Pharma & Life Sciences:** US FDA Form 483 Inspection Status (Zero Official Action Indicated - OAI), R&D Spend as % of Sales ($\ge 6.0\%$).
 * **FMCG & Consumer:** Gross Margin Durability ($\ge 45\%$), Advertising-to-Sales ($\ge 7.0\%$), Working Capital Cycle ($\le 15\text{ Days}$).
 
-##### 7. Institutional Flow Sieve (`core/analysis/institutional_flow.py`)
-Ingests live Level-2 (5-tier best bid/ask) order books from Angel One SmartAPI:
+##### 8. Institutional Flow Sieve (`core/analysis/institutional_flow.py`)
+Ingests live Level-2 (5-tier best bid/ask) order books via direct exchange gateway:
 * **Order Book Imbalance Ratio:**
   $$\text{Imbalance Ratio} = \frac{\sum_{i=1}^5 Q_{\text{Bid}, i} - \sum_{i=1}^5 Q_{\text{Ask}, i}}{\sum_{i=1}^5 Q_{\text{Bid}, i} + \sum_{i=1}^5 Q_{\text{Ask}, i}}$$
   * $\text{Ratio} > +0.20 \implies$ Institutional Accumulation Pressure
@@ -274,7 +282,7 @@ Ingests live Level-2 (5-tier best bid/ask) order books from Angel One SmartAPI:
 * **Circuit Freeze Buffer (%):**
   $$\text{Lower Buffer} = \frac{\text{LTP} - \text{Lower Circuit}}{\text{LTP}} \times 100\%, \quad \text{Upper Buffer} = \frac{\text{Upper Circuit} - \text{LTP}}{\text{LTP}} \times 100\%$$
 
-##### 8. 60-Second Institutional Bull / Bear Scenario Engine (`core/analysis/bull_bear.py`)
+##### 9. 60-Second Institutional Bull / Bear Scenario Engine (`core/analysis/bull_bear.py`)
 Synthesizes a strictly balanced dual-scenario thesis:
 * **Institutional Bull Case:** Catalyst 1 (Operating leverage), Catalyst 2 (Valuation multiple mean-reversion), Catalyst 3 (Market share expansion).
 * **Forensic Bear Case:** Risk 1 (Input margin compression), Risk 2 (Governance / contingent liability overhang), Risk 3 (Valuation de-rating).

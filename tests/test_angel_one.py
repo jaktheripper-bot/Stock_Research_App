@@ -106,7 +106,7 @@ class TestAngelOneGateway(unittest.TestCase):
             "ltp": 1420.0,
         }
         badge = AngelOneGateway.format_dossier_market_depth_badge(dummy_quote)
-        self.assertIn("Angel One Level-2 Depth", badge)
+        self.assertIn("Exchange Level-2 Depth", badge)
         self.assertIn("Institutional Accumulation", badge)
         self.assertIn("Circuit Bands", badge)
 
