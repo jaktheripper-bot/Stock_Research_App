@@ -247,9 +247,9 @@ The following items constitute the active operational tasks remaining:
 2. **Peer Comparison (`/compare`) Data Source Harmonization (Audit 1 Finding F20):** *(Completed)*
    - **Target Files:** `core/db/fundamentals.py`, `core/analysis/fundamentals.py`, `core/analysis/comparator.py`, `web/templates/compare.html`, `tests/test_peer_comparison_data.py`
    - **Details:** Connected `compare_two_companies()` to localized `cached_fundamentals` DB repository (migration `v027_cached_fundamentals`), extracting and caching verified ROCE, ROE, OPM, D/E, and 52-week ranges from report baseline text and discovery reel to ensure 100% non-N/A peer metrics.
-3. **Curated Mutual Fund Top 50 Expansion (Remaining 19 Schemes):**
-   - **Target Files:** `core/db/mutual_funds.py`, `core/analysis/fund_forensic_auditor.py`
-   - **Details:** Ingest 19 marquee schemes across Mid Cap, Small Cap, Large & Mid Cap, and Flexi Cap with constituent holdings to complete the Top 50 AMFI universe.
+3. **Curated Mutual Fund Top 50 Expansion (Remaining 19 Schemes):** *(Completed)*
+   - **Target Files:** `core/db/mutual_funds.py`, `core/analysis/fund_forensic_auditor.py`, `tests/test_mutual_fund_top50_expansion.py`
+   - **Details:** Ingested 19 marquee institutional equity schemes across Flexi Cap (5), Mid Cap (5), Small Cap (5), and Large & Mid Cap (4) with constituent holdings, verified AMFI metrics, active share, Sortino ratio, and 7-pillar look-through integration to complete the Top 50 canonical universe.
 4. **Hybrid AI Auditor & Failure Synthesizer:** *(Completed)*
    - **Target Files:** `scripts/ai_auditor.py`, `tests/test_ai_auditor.py`
    - **Details:** Implemented the bounded 3-persona auditor (Regulatory Baiter, Edge-Case Quant, State Saboteur) using `gemini-3.8-flash` with a strict $0.50 token ceiling that outputs structured threat dossiers and auto-generates failing Python unit tests (`tests/test_regression_*.py`).
