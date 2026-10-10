@@ -223,9 +223,9 @@ def wrap_html_with_collapsible_pillars(
 
         if p_num in (3, 5):
             if is_deep_dive_unlocked:
-                status_pill_html = '<span class="badge badge-emerald" style="font-size: 11px; margin-left: 8px;">🔓 Institutional Unlocked</span>'
+                status_pill_html = '<span class="badge badge-emerald" style="font-size: 11px;">🔓 Institutional Unlocked</span>'
             else:
-                status_pill_html = '<span class="badge" style="background: rgba(245, 158, 11, 0.15); color: #fbbf24; border: 1px solid rgba(245, 158, 11, 0.3); font-size: 11px; margin-left: 8px;">🔒 Institutional Gated (1 Credit)</span>'
+                status_pill_html = '<span class="badge" style="background: rgba(245, 158, 11, 0.15); color: #fbbf24; border: 1px solid rgba(245, 158, 11, 0.3); font-size: 11px;">🔒 Institutional Gated (1 Credit)</span>'
                 
                 # Split body into introductory teaser paragraph and locked remainder
                 teaser = ""
