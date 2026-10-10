@@ -100,8 +100,13 @@ case "$COMMAND" in
         echo "--> Creating formatted conversation transcript & session ledger dump..."
         "$PYTHON" scripts/dump_conversation.py "$@"
         ;;
+    update-reports|refresh-reports)
+        shift
+        echo "--> Updating all reports in reports.db with exchange data and syncing..."
+        "$PYTHON" scripts/update_all_reports.py "$@"
+        ;;
     *)
-        echo "Usage: ./run.sh [lint | test | bench | preflight | live-audit | start | web | admin | mf-ingest | nifty100 | sync-supabase | dump-chat | checkpoint | rollback | checkpoints]"
+        echo "Usage: ./run.sh [lint | test | bench | preflight | live-audit | start | web | admin | mf-ingest | nifty100 | sync-supabase | update-reports | dump-chat | checkpoint | rollback | checkpoints]"
         exit 1
         ;;
 esac
