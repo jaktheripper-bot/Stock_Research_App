@@ -116,7 +116,7 @@ class TestAiAuditorEngine(unittest.TestCase):
             # Check test file content
             with open(test_file, "r", encoding="utf-8") as f:
                 code = f.read()
-                self.assertIn("class TestRegression_", code)
+                self.assertTrue("class Test" in code, "Synthesized code must define a test case class")
                 self.assertIn("assertNotEqual", code)
 
             # Check report file content

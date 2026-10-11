@@ -1,3 +1,5 @@
+import os
+os.environ["TESTING"] = "1"
 import unittest
 import urllib.parse
 from pathlib import Path

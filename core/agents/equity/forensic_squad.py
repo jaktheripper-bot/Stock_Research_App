@@ -47,9 +47,20 @@ def run_deterministic_equity_audit(ticker: str) -> Dict[str, Any]:
     filing_raw = tool_get_recent_bse_disclosures(clean)
     filing = json.loads(filing_raw)
 
-    pe = float(fund.get("pe_ratio") or 25.0)
-    debt_eq = float(fund.get("debt_to_equity") or 0.5)
-    pledge = float(fund.get("promoter_pledged_pct") or 0.0)
+    try:
+        pe = float(fund.get("pe_ratio") or 25.0)
+    except (ValueError, TypeError):
+        pe = 25.0
+
+    try:
+        debt_eq = float(fund.get("debt_to_equity") or 0.5)
+    except (ValueError, TypeError):
+        debt_eq = 0.5
+
+    try:
+        pledge = float(fund.get("promoter_pledged_pct") or 0.0)
+    except (ValueError, TypeError):
+        pledge = 0.0
 
     # Deterministic scoring
     accounting_score = 90.0 if fund.get("piotroski_f_score", 7) >= 7 else 70.0
