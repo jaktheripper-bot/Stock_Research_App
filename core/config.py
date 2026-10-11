@@ -83,3 +83,13 @@ def get_secret(key: str, default: Any = None) -> Any:
             return sec_val
 
     return default
+
+
+def yfinance_fallback_enabled() -> bool:
+    """Whether the unofficial yfinance gap-filler may be used.
+
+    On by default: exchange-grounded feeds (Angel One, BSE, cache) are tried first and
+    yfinance only fills fields they cannot supply, so reports stay complete while the
+    platform's reputation is being built. Set YFINANCE_FALLBACK=0 to disable it.
+    """
+    return str(get_secret("YFINANCE_FALLBACK", "1")).strip().lower() in ("1", "true", "yes", "on")

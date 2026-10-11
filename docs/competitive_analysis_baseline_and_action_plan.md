@@ -267,7 +267,9 @@ The following items constitute the active operational tasks remaining:
 
 #### ⚪ P3 — Hygiene & Explicitly Parked Backlog
 - **Completed (2026-10-11):** Unlisted MSME & SME Intelligence Platform (`/msme`, `core/msme/`) — Full 60-enterprise benchmark cluster seeding, dual-dialect SQL search, statutory MSMED Act 2020 tier classification, resilient open data ingestion, and interactive directory terminal.
-- **Deferred Items:** Custom Vector Icon System (SVG Sprites) and Full CAS Encrypted PDF Parser.
+- **Completed (2026-10-11):** Audit AUD-20261010-213000 remediation — dynamic `_IncludedRouter` contract scanner, zero silent `except: pass`, and SVG sprite glyph migration of the audited legacy emojis (score 100.0/100).
+- **Deferred Items:** Full CAS Encrypted PDF Parser.
+- **Parked (build only if users ask for mobile) — Mobile Brief Mode:** Compact, read-only "brief" response style for the Forensic Intelligence Desk on a mobile-first page (e.g. `/m`): 3–4 line headline score + top risk flag + link to the full desktop dossier, a daily digest of the 9AM discovery picks, and one-pillar-at-a-time follow-ups. Constraints: summarise only already-computed data (zero-hallucination), keep the SEBI non-advisory line on every reply, respect credits and gated pillars, and stay deterministic per Gate 4 (no autonomous agent loops). A native app or Telegram/WhatsApp channel is a later step only on real demand.
 
 ---
 

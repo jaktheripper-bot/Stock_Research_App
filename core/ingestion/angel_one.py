@@ -33,6 +33,21 @@ from core.config import get_secret
 
 logger = logging.getLogger("equity_research.core.ingestion.angel_one")
 
+# Angel One allows ~3 historical-candle calls/sec; space calls 0.4s apart (process-wide).
+_CANDLE_MIN_INTERVAL = 0.4
+_candle_lock = threading.Lock()
+_candle_last_call = 0.0
+
+
+def _candle_rate_wait() -> None:
+    global _candle_last_call
+    with _candle_lock:
+        wait = _CANDLE_MIN_INTERVAL - (time.monotonic() - _candle_last_call)
+        if wait > 0:
+            time.sleep(wait)
+        _candle_last_call = time.monotonic()
+
+
 
 def generate_rfc6238_totp(secret: str, digits: int = 6, interval: int = 30) -> str:
     """
@@ -507,7 +522,13 @@ class AngelOneGateway:
         url = f"{cls.BASE_URL}{cls.HISTORICAL_ENDPOINT}"
 
         try:
+            _candle_rate_wait()
             resp = requests.post(url, json=payload, headers=headers, proxies=proxies, timeout=8)
+            body_txt = (resp.text or "").lower()
+            if resp.status_code == 429 or "exceeding access rate" in body_txt or "rate limit" in body_txt:
+                time.sleep(1.2)
+                _candle_rate_wait()
+                resp = requests.post(url, json=payload, headers=headers, proxies=proxies, timeout=8)
             data = resp.json()
             if resp.status_code == 200 and data.get("status") and data.get("data"):
                 raw_candles = data["data"]

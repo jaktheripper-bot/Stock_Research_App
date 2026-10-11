@@ -6,7 +6,7 @@
 
 ## 2. Scrip Resolution & Data Ingestion
 * **5-Tier BSE Resolution:** Queries map to 6-digit BSE codes via: (1) Direct 6-Digit Code, (2) `dynamic_aliases.json`, (3) Static `PRIMARY_BSE_MAP`, (4) Active Master Universe `bse_scrips_cache.json`, and (5) Just-In-Time Gemini Grounded Search[cite: 2].
-* **Ingestion:** Primary data is fetched via direct BSE exchange APIs. Missing valuation fields fall back to a consolidated `yfinance` parser, returning "N/A" rather than guessing if data is unavailable[cite: 6].
+* **Ingestion:** Primary data is fetched via Angel One SmartAPI (quotes, daily candles) and direct BSE exchange APIs. Missing valuation fields are filled by a consolidated `yfinance` parser (gap-filler, `YFINANCE_FALLBACK=0` disables), returning "N/A" rather than guessing if data is unavailable[cite: 6].
 
 ## 3. Persistence & AI Routing
 * **Database Dual-Binding:** Transparent failover between PostgreSQL (Supabase) for production and SQLite (`reports.db`) for local development[cite: 2].

@@ -4031,6 +4031,20 @@ async def admin_direct_verify(request: Request, email: str = Form(...)):
     )
     return resp
 
+def _build_local_qr_data_uri(payload: str) -> str:
+    """Renders a QR code locally as an inline SVG data URI.
+
+    The TOTP provisioning URI contains the shared 2FA secret, so it must never be
+    sent to a third-party QR service.
+    """
+    import base64
+    import io
+    import segno
+    buf = io.BytesIO()
+    segno.make(payload, error="m").save(buf, kind="svg", scale=5, border=2, dark="#000000", light="#ffffff")
+    return "data:image/svg+xml;base64," + base64.b64encode(buf.getvalue()).decode("ascii")
+
+
 @app.get("/admin/setup-2fa", response_class=HTMLResponse)
 async def admin_setup_2fa_view(request: Request, err: Optional[str] = None):
     pending_token = request.cookies.get(ADMIN_2FA_PENDING_COOKIE)
@@ -4048,7 +4062,7 @@ async def admin_setup_2fa_view(request: Request, err: Optional[str] = None):
         set_admin_totp_secret(email, secret)
 
     totp_uri = get_totp_uri(secret, email, issuer="Stock Research App")
-    qr_img_url = f"https://api.qrserver.com/v1/create-qr-code/?size=200x200&data={urllib.parse.quote(totp_uri)}"
+    qr_img_url = _build_local_qr_data_uri(totp_uri)
 
     return templates.TemplateResponse(
         request=request,

@@ -104,23 +104,36 @@ def evaluate_under_the_radar_candidate(candidate: Dict[str, Any]) -> Optional[Di
     except Exception as db_err:
         logger.debug("DB snapshot lookup notice for %s: %s", canonical, db_err)
 
-    # 2. Fast Exchange quote via yfinance fast_info (sub-second)
+    # 2. Official exchange quote via Angel One SmartAPI
     if p_float <= 0:
         try:
-            import yfinance as yf
-            sym = f"{canonical}.NS"
-            t = yf.Ticker(sym)
-            fast = getattr(t, "fast_info", None)
-            if fast and hasattr(fast, "last_price") and fast.last_price:
-                p_float = float(fast.last_price)
-                mcap_float = float(getattr(fast, "market_cap", 0) or 0)
-            else:
-                # Try .BO
-                t_bo = yf.Ticker(f"{canonical}.BO")
-                fast_bo = getattr(t_bo, "fast_info", None)
-                if fast_bo and hasattr(fast_bo, "last_price") and fast_bo.last_price:
-                    p_float = float(fast_bo.last_price)
-                    mcap_float = float(getattr(fast_bo, "market_cap", 0) or 0)
+            from core.ingestion.angel_one import AngelOneGateway
+            if AngelOneGateway.is_configured():
+                aq = AngelOneGateway.get_stock_quote(canonical)
+                if aq and aq.get("ltp"):
+                    p_float = float(aq["ltp"])
+        except Exception as angel_err:
+            logger.debug(f"Angel One quote notice for {canonical}: {angel_err}")
+
+    # 2b. Opt-in unofficial yfinance fast_info (off by default)
+    if p_float <= 0:
+        try:
+            from core.config import yfinance_fallback_enabled
+            if yfinance_fallback_enabled():
+                import yfinance as yf
+                sym = f"{canonical}.NS"
+                t = yf.Ticker(sym)
+                fast = getattr(t, "fast_info", None)
+                if fast and hasattr(fast, "last_price") and fast.last_price:
+                    p_float = float(fast.last_price)
+                    mcap_float = float(getattr(fast, "market_cap", 0) or 0)
+                else:
+                    # Try .BO
+                    t_bo = yf.Ticker(f"{canonical}.BO")
+                    fast_bo = getattr(t_bo, "fast_info", None)
+                    if fast_bo and hasattr(fast_bo, "last_price") and fast_bo.last_price:
+                        p_float = float(fast_bo.last_price)
+                        mcap_float = float(getattr(fast_bo, "market_cap", 0) or 0)
         except Exception as yf_err:
             logger.debug(f"Fast info quote notice for {canonical}: {yf_err}")
 

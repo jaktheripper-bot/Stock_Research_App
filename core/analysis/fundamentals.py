@@ -15,7 +15,7 @@ from bsedata.bse import BSE
 from normalizer import clean_ticker
 from bse_master import resolve_bse_scrip_code, resolve_canonical_symbol
 from core.analysis.exceptions import ExchangeDataFetchError
-from core.config import get_secret
+from core.config import get_secret, yfinance_fallback_enabled
 
 logger = logging.getLogger("equity_research.core.analysis.fundamentals")
 
@@ -92,7 +92,9 @@ def enrich_fundamentals(ticker: str, data: dict) -> dict:
     # 2. Secondary enrichment: yfinance backfill
     try:
         yf_ticker = f"{clean_sym}.BO" if clean_sym.isdigit() else f"{clean_sym}.NS"
-        info = yf.Ticker(yf_ticker).info or {}
+        # yfinance is an unofficial source; with the fallback off, empty info leaves
+        # missing fields as 'N/A' (Not disclosed) rather than pulling third-party data.
+        info = (yf.Ticker(yf_ticker).info or {}) if yfinance_fallback_enabled() else {}
 
         # Trailing P/E
         if data.get("pe_ratio") in [None, "N/A", "-", "", 0, "0"]:
@@ -252,16 +254,17 @@ def resolve_pe_with_failsafes(ticker: str, scrip: str = "") -> str:
         except Exception as e:
             logger.debug(f"BSE ComHeader direct P/E fetch notice: {e}")
 
-    # Tier 2: Fast single-symbol yfinance check (using fast_info)
-    try:
-        sym = f"{clean}.BO" if clean.isdigit() else f"{clean}.NS"
-        tk = yf.Ticker(sym)
-        fast = getattr(tk, "fast_info", None)
-        pe = getattr(fast, "pe", None) or getattr(fast, "trailing_pe", None)
-        if pe and float(pe) > 0:
-            return f"{float(pe):.2f}"
-    except Exception as e:
-        logger.debug(f"P/E resolution via yfinance failed: {e}")
+    # Tier 2: Fast single-symbol yfinance check (using fast_info) - only when explicitly enabled
+    if yfinance_fallback_enabled():
+        try:
+            sym = f"{clean}.BO" if clean.isdigit() else f"{clean}.NS"
+            tk = yf.Ticker(sym)
+            fast = getattr(tk, "fast_info", None)
+            pe = getattr(fast, "pe", None) or getattr(fast, "trailing_pe", None)
+            if pe and float(pe) > 0:
+                return f"{float(pe):.2f}"
+        except Exception as e:
+            logger.debug(f"P/E resolution via yfinance failed: {e}")
 
     return "N/A"
 
@@ -451,6 +454,8 @@ def get_stock_fundamentals(query: str) -> dict:
         candidate_symbols = [primary_sym]
         if primary_sym.endswith(".NS"):
             candidate_symbols.append(f"{canonical}.BO")
+        if not yfinance_fallback_enabled():
+            candidate_symbols = []
 
         for sym in candidate_symbols:
             t = yf.Ticker(sym)
@@ -571,16 +576,31 @@ def get_historical_prices(ticker: str, period: str = "6mo"):
             logger.debug(f"Reverse lookup notice for scrip {clean}: {e}")
 
     df = pd.DataFrame()
-    for suffix in [".BO", ".NS"]:
-        try:
-            sym = f"{clean}{suffix}"
-            t = yf.Ticker(sym)
-            hist = t.history(period=period)
-            if hist is not None and not hist.empty and len(hist) > 5:
-                df = hist
-                break
-        except Exception:
-            continue
+
+    # Primary: official exchange daily candles via Angel One SmartAPI
+    try:
+        from core.ingestion.angel_one import AngelOneGateway
+        if AngelOneGateway.is_configured():
+            lookback_days = {"1mo": 35, "3mo": 100, "6mo": 190, "1y": 370, "2y": 740}.get(period, 190)
+            from_date = (datetime.now() - timedelta(days=lookback_days)).strftime("%Y-%m-%d 09:15")
+            candles = AngelOneGateway.get_historical_candles(clean, from_date=from_date)
+            if candles and len(candles) > 5:
+                df = pd.DataFrame(candles).rename(columns={"timestamp": "Date", "close": "Close", "volume": "Volume"})
+    except Exception as angel_err:
+        logger.debug(f"Angel One historical candles notice for {clean}: {angel_err}")
+
+    # Last resort (opt-in only): unofficial yfinance history
+    if df.empty and yfinance_fallback_enabled():
+        for suffix in [".BO", ".NS"]:
+            try:
+                sym = f"{clean}{suffix}"
+                t = yf.Ticker(sym)
+                hist = t.history(period=period)
+                if hist is not None and not hist.empty and len(hist) > 5:
+                    df = hist
+                    break
+            except Exception:
+                continue
 
     if df.empty:
         return None
