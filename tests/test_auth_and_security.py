@@ -1,0 +1,387 @@
+"""
+Consolidated Auth, Security, Admin Remediation & Production Hardening Suite
+===========================================================================
+Unifies:
+1. Email OTP authentication, session cookies, database isolation, and CSRF/origin protection
+2. Admin direct remedial credit granting, atomic DB transactions, audit logging & ticket updates
+3. Render production configuration, worker concurrency, and secret key boot guards
+"""
+import asyncio
+import os
+from pathlib import Path
+import unittest
+from unittest.mock import patch
+import uuid
+
+os.environ["TESTING"] = "1"
+
+from fastapi import FastAPI
+from fastapi.testclient import TestClient
+
+from core.analysis.fundamentals import compute_pead_drift_band
+from core.auth.otp import create_email_otp, verify_email_otp
+from core.db.admin import (
+    admin_grant_user_credits,
+    get_admin_audit_logs,
+)
+from core.db.connection import get_db_path, init_db
+from core.db.support import create_support_ticket, get_support_tickets
+from core.db.users import (
+    get_all_billables,
+    get_or_create_user,
+    get_user_by_email,
+    get_user_credits_balance,
+)
+from web.main import (
+    ADMIN_COOKIE_NAME,
+    _generate_admin_token,
+    app,
+    lifespan,
+)
+
+PROJECT_ROOT = Path(__file__).resolve().parent.parent
+
+
+# ==============================================================================
+# 1. User Authentication, Session Cookies & CSRF Origin Isolation
+# ==============================================================================
+class TestAuthAndIsolation(unittest.TestCase):
+    @classmethod
+    def setUpClass(cls):
+        cls.client = TestClient(app)
+
+    def test_database_isolation_routing(self):
+        db_path = get_db_path()
+        self.assertTrue(
+            db_path.endswith("test_reports.db"),
+            f"Expected db_path to end with test_reports.db, got {db_path}"
+        )
+        self.assertIn("reports.db", db_path or "")
+
+    def test_otp_lifecycle_and_verification(self):
+        test_email = "investor_lifecycle@example.com"
+        success, msg, code = create_email_otp(test_email)
+        self.assertTrue(success, f"Failed to create OTP: {msg}")
+        self.assertIsNotNone(code)
+        self.assertEqual(len(code), 6)
+        self.assertTrue(code.isdigit())
+
+        # Verification with invalid code
+        valid_bad, err = verify_email_otp(test_email, "000000")
+        self.assertFalse(valid_bad)
+        self.assertIn("Invalid", err)
+
+        # Verification with correct code
+        valid_good, ok_msg = verify_email_otp(test_email, code)
+        self.assertTrue(valid_good)
+        self.assertIn("verified", ok_msg.lower())
+
+        # Second verification should fail (already consumed / deleted)
+        valid_repeat, _ = verify_email_otp(test_email, code)
+        self.assertFalse(valid_repeat)
+
+    def test_otp_test_bypass_code_under_testing_env(self):
+        test_email = "bypass_tester@example.com"
+        create_email_otp(test_email)
+        valid, msg = verify_email_otp(test_email, "123456")
+        self.assertTrue(valid)
+        self.assertIn("verified", msg.lower())
+
+    def test_api_auth_send_and_verify_otp(self):
+        email = "frontend_user@example.com"
+
+        resp_send = self.client.post("/api/auth/send-otp", json={"email": email})
+        self.assertEqual(resp_send.status_code, 200)
+        data_send = resp_send.json()
+        self.assertTrue(data_send["success"])
+        self.assertIn("test_code", data_send)
+
+        resp_verify = self.client.post("/api/auth/verify-otp", json={
+            "email": email,
+            "code": "123456"
+        })
+        self.assertEqual(resp_verify.status_code, 200)
+        data_verify = resp_verify.json()
+        self.assertTrue(data_verify["success"])
+        self.assertIn("user", data_verify)
+        self.assertEqual(data_verify["user"]["email"], email)
+        self.assertIn("user_session_token", resp_verify.cookies)
+
+        cookies = {"user_session_token": resp_verify.cookies["user_session_token"]}
+        resp_me = self.client.get("/api/auth/me", cookies=cookies)
+        self.assertEqual(resp_me.status_code, 200)
+        data_me = resp_me.json()
+        self.assertTrue(data_me["authenticated"])
+        self.assertEqual(data_me["user"]["email"], email)
+
+        resp_out = self.client.post("/api/auth/signout", cookies=cookies)
+        self.assertEqual(resp_out.status_code, 200)
+        self.assertTrue(resp_out.json()["success"])
+
+    def test_csrf_origin_validation_rejection(self):
+        headers = {"Origin": "https://malicious-phishing-site.xyz"}
+        resp_order = self.client.post("/api/create-order", json={"plan_id": "single"}, headers=headers)
+        self.assertEqual(resp_order.status_code, 403)
+        self.assertIn("Cross-origin request rejected", resp_order.json().get("detail", ""))
+
+        resp_pm = self.client.post(
+            "/api/premortem",
+            json={"ticker": "INFY", "failure_vector": "Margin Compression", "anti_thesis_notes": "Test anti thesis"},
+            headers=headers
+        )
+        self.assertEqual(resp_pm.status_code, 403)
+        self.assertIn("Cross-origin request rejected", resp_pm.json().get("detail", ""))
+
+    def test_pead_drift_band_computation(self):
+        import pandas as pd
+        stock_bull = {"current_price": 1000.0}
+        df_bull = pd.DataFrame({"Close": [900.0] * 50})
+        res_bull = compute_pead_drift_band(stock_bull, df_bull)
+        self.assertTrue(res_bull["active"])
+        self.assertEqual(res_bull["status"], "bullish")
+        self.assertEqual(res_bull["vector"], "ACCUMULATION_DRIFT")
+        self.assertGreater(res_bull["target_drift"], 1000.0)
+        self.assertGreater(res_bull["upper_bound"], res_bull["target_drift"])
+
+        stock_bear = {"current_price": 800.0}
+        df_bear = pd.DataFrame({"Close": [950.0] * 50})
+        res_bear = compute_pead_drift_band(stock_bear, df_bear)
+        self.assertTrue(res_bear["active"])
+        self.assertEqual(res_bear["status"], "bearish")
+        self.assertEqual(res_bear["vector"], "COMPRESSION_DRIFT")
+        self.assertLess(res_bear["target_drift"], 800.0)
+        self.assertIn("Disposition Effect", res_bear["guidance"])
+
+
+# ==============================================================================
+# 2. Admin Credit Grants & Atomic Ledger Transactions
+# ==============================================================================
+class TestAdminCreditGrant(unittest.TestCase):
+    @classmethod
+    def setUpClass(cls):
+        init_db()
+        cls.client = TestClient(app)
+        cls.admin_email = "lyndnpnto@gmail.com"
+        cls.admin_cookie = _generate_admin_token(cls.admin_email, "owner")
+
+    def setUp(self):
+        self.unique_suffix = uuid.uuid4().hex[:8]
+        self.test_user_email = f"remedy_user_{self.unique_suffix}@example.com"
+        self.user_record = get_or_create_user(
+            user_id=f"usr_test_{self.unique_suffix}",
+            email=self.test_user_email,
+            full_name="Remedy Test User"
+        )
+        self.assertEqual(float(self.user_record.get("credits_balance", 0.0)), 2.0)
+
+    def test_admin_grant_user_credits_atomic_db_transaction(self):
+        initial_balance = get_user_credits_balance(self.user_record["id"])
+        self.assertEqual(initial_balance, 2.0)
+
+        res = admin_grant_user_credits(
+            admin_email=self.admin_email,
+            target_user_identifier=self.test_user_email,
+            credits_amount=2.0,
+            reason_code="TASK_REMEDY",
+            admin_note="Compensating for failed synthesis retry on INFY",
+            task_ticker="INFY"
+        )
+
+        self.assertTrue(res.get("success"), f"Grant failed: {res.get('error')}")
+        self.assertEqual(res.get("credits_added"), 2.0)
+        self.assertEqual(res.get("old_balance"), 2.0)
+        self.assertEqual(res.get("new_balance"), 4.0)
+
+        updated_user = get_user_by_email(self.test_user_email)
+        self.assertIsNotNone(updated_user)
+        self.assertEqual(float(updated_user["credits_balance"]), 4.0)
+
+        billables = get_all_billables(limit=100, exclude_tests=False)
+        grant_tx = next((b for b in billables if b["customer_email"] == self.test_user_email and "ADMIN_GRANT" in b["pack_type"]), None)
+        self.assertIsNotNone(grant_tx, "Expected credit_transactions entry for admin grant.")
+        self.assertEqual(grant_tx["amount_inr"], 0.0, "Remedial credits must strictly have 0.0 INR value.")
+        self.assertEqual(grant_tx["base_amount_inr"], 0.0)
+        self.assertEqual(grant_tx["tax_gst_inr"], 0.0)
+        self.assertEqual(grant_tx["nature"], "FREE_GRANT", "Transaction nature must be classified as FREE_GRANT.")
+        self.assertEqual(grant_tx["credits_added"], 2.0)
+
+        audit_logs = get_admin_audit_logs(limit=20)
+        grant_log = next((l for l in audit_logs if l["action"] == "GRANT_USER_CREDITS" and l["target_id"] == self.user_record["id"]), None)
+        self.assertIsNotNone(grant_log, "Expected admin_audit_log entry for GRANT_USER_CREDITS.")
+        self.assertEqual(grant_log["admin_email"], self.admin_email)
+        details = grant_log.get("details_parsed", {})
+        self.assertEqual(details.get("credits_granted"), 2.0)
+        self.assertEqual(details.get("reason_code"), "TASK_REMEDY")
+        self.assertEqual(details.get("task_ticker"), "INFY")
+        self.assertEqual(details.get("nature"), "FREE_GRANT")
+
+    def test_admin_grant_with_ticket_auto_resolution(self):
+        ticket_res = create_support_ticket(
+            user_email=self.test_user_email,
+            subject="Synthesis failed on TCS",
+            message="Credits deducted but synthesis timed out",
+            user_name="Remedy Test User",
+            category="synthesis_error"
+        )
+        self.assertTrue(ticket_res.get("success"))
+        ticket_id = ticket_res["ticket_id"]
+
+        res = admin_grant_user_credits(
+            admin_email=self.admin_email,
+            target_user_identifier=self.test_user_email,
+            credits_amount=1.0,
+            reason_code="TASK_REMEDY",
+            admin_note="Restored 1.0 credit after timeout review",
+            ticket_id=ticket_id,
+            task_ticker="TCS",
+            resolve_ticket=True
+        )
+        self.assertTrue(res.get("success"))
+        self.assertEqual(res.get("new_balance"), 3.0)
+
+        tickets = get_support_tickets(status="all", exclude_tests=False)
+        target_ticket = next((t for t in tickets if t["ticket_id"] == ticket_id), None)
+        self.assertIsNotNone(target_ticket)
+        self.assertEqual(target_ticket["status"], "resolved")
+        self.assertIn("[Admin Credits Granted: +1.0", target_ticket["admin_notes"])
+        self.assertIn("Restored 1.0 credit after timeout review", target_ticket["admin_notes"])
+
+    def test_admin_grant_validation_rejections(self):
+        ghost_email = f"ghost_user_{uuid.uuid4().hex[:8]}@example.com"
+        res_nonexistent = admin_grant_user_credits(
+            admin_email=self.admin_email,
+            target_user_identifier=ghost_email,
+            credits_amount=2.0
+        )
+        self.assertFalse(res_nonexistent.get("success"))
+        self.assertIn("not found", res_nonexistent.get("error", "").lower())
+
+        res_zero = admin_grant_user_credits(
+            admin_email=self.admin_email,
+            target_user_identifier=self.test_user_email,
+            credits_amount=0.0
+        )
+        self.assertFalse(res_zero.get("success"))
+
+        res_neg = admin_grant_user_credits(
+            admin_email=self.admin_email,
+            target_user_identifier=self.test_user_email,
+            credits_amount=-5.0
+        )
+        self.assertFalse(res_neg.get("success"))
+
+    def test_endpoint_unauthorized_rejection(self):
+        res = self.client.post(
+            "/admin/users/grant-credits",
+            json={"user_email": self.test_user_email, "credits": 2.0},
+            headers={"Accept": "application/json"}
+        )
+        self.assertEqual(res.status_code, 403)
+
+        res_form = self.client.post(
+            "/admin/users/grant-credits",
+            data={"user_email": self.test_user_email, "credits": 2.0}
+        )
+        self.assertEqual(res_form.status_code, 403)
+
+    def test_endpoint_authenticated_json_ajax_success(self):
+        payload = {
+            "user_email": self.test_user_email,
+            "credits": 2.0,
+            "reason": "TASK_REMEDY",
+            "admin_note": "Sequence diagram verification grant",
+            "task_ticker": "INFY"
+        }
+        res = self.client.post(
+            "/admin/users/grant-credits",
+            json=payload,
+            cookies={ADMIN_COOKIE_NAME: self.admin_cookie},
+            headers={"Accept": "application/json"}
+        )
+        self.assertEqual(res.status_code, 200)
+        data = res.json()
+        self.assertTrue(data.get("success"))
+        self.assertEqual(data.get("new_balance"), 4.0)
+        self.assertEqual(data.get("credits_added"), 2.0)
+        self.assertEqual(data.get("user_email"), self.test_user_email)
+        self.assertIn(f"Successfully granted 2.0 credits to {self.test_user_email}", data.get("message"))
+
+    def test_endpoint_authenticated_form_post_redirect(self):
+        form_data = {
+            "user_email": self.test_user_email,
+            "credits": "1.5",
+            "reason": "GOODWILL_COMPENSATION",
+            "admin_note": "Goodwill top-up",
+            "tab": "users"
+        }
+        res = self.client.post(
+            "/admin/users/grant-credits",
+            data=form_data,
+            cookies={ADMIN_COOKIE_NAME: self.admin_cookie},
+            follow_redirects=False
+        )
+        self.assertEqual(res.status_code, 303)
+        location = res.headers.get("location", "")
+        self.assertIn("tab=users", location)
+        self.assertIn("Successfully+granted+1.5+credits", location)
+        self.assertEqual(get_user_credits_balance(self.user_record["id"]), 3.5)
+
+
+# ==============================================================================
+# 3. Render Production Hardening & Secret Guards
+# ==============================================================================
+class TestRenderHardening(unittest.TestCase):
+    def test_render_yaml_configuration(self):
+        render_yaml_path = PROJECT_ROOT / "render.yaml"
+        self.assertTrue(render_yaml_path.exists(), "render.yaml file does not exist")
+
+        with open(render_yaml_path, "r", encoding="utf-8") as f:
+            content = f.read()
+
+        self.assertRegex(content, r"startCommand:\s*.*--workers 2", "render.yaml startCommand must configure --workers 2")
+
+        required_secrets = ["SECRET_KEY", "ADMIN_API_KEY", "ADMIN_PASSWORD"]
+        for sec in required_secrets:
+            pattern = rf"- key:\s*{sec}\s*\n\s*sync:\s*false"
+            self.assertRegex(content, pattern, f"Secret {sec} in render.yaml must be declared with sync: false")
+
+    def test_production_boot_guard_rejects_missing_secret_key(self):
+        test_app = FastAPI()
+
+        with patch.dict(os.environ, {"ENVIRONMENT": "production", "SECRET_KEY": "stock_research_user_session_salt_2026"}):
+            with self.assertRaises(RuntimeError) as ctx:
+                async def run_boot():
+                    async with lifespan(test_app):
+                        pass
+                asyncio.run(run_boot())
+            self.assertIn("CRITICAL PRODUCTION BOOT FAILURE", str(ctx.exception))
+
+        with patch.dict(os.environ, {"ENVIRONMENT": "production", "SECRET_KEY": "too_short_key_12345"}):
+            with self.assertRaises(RuntimeError) as ctx:
+                async def run_boot():
+                    async with lifespan(test_app):
+                        pass
+                asyncio.run(run_boot())
+            self.assertIn("shorter than 32 characters", str(ctx.exception))
+
+        with patch.dict(os.environ, {"ENVIRONMENT": "production", "SECRET_KEY": ""}):
+            with self.assertRaises(RuntimeError) as ctx:
+                async def run_boot():
+                    async with lifespan(test_app):
+                        pass
+                asyncio.run(run_boot())
+            self.assertIn("missing, insecure", str(ctx.exception))
+
+    def test_production_boot_guard_accepts_valid_secret_key(self):
+        test_app = FastAPI()
+        valid_key = "a" * 32
+
+        with patch.dict(os.environ, {"ENVIRONMENT": "production", "SECRET_KEY": valid_key, "TESTING": "1"}):
+            async def run_boot():
+                async with lifespan(test_app):
+                    pass
+            asyncio.run(run_boot())
+
+
+if __name__ == "__main__":
+    unittest.main()

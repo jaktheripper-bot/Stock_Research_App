@@ -1,25 +1,59 @@
-"""Mutual Fund and Corporate Debt Deep Dive paywall: dossier pages, APIs, PDFs and the Forensic Desk."""
+"""
+Consolidated Paywalls & Access Control Test Suite
+==================================================
+Unifies:
+1. Equity Pillar 03/05 Paywall (Copilot redaction & route entitlement)
+2. PDF Watermarking & Gated Pillar Redaction
+3. Mutual Fund & Corporate Debt Deep Dive Paywalls (pages, APIs, PDFs, Forensic Desk, and credit unlocks)
+"""
 import asyncio
 import os
-
-os.environ["TESTING"] = "1"
-
 import unittest
 from unittest import mock
+
+os.environ["TESTING"] = "1"
 
 from fastapi.testclient import TestClient
 
 from core.agents.copilot.forensic_desk import (
+    GATED_PILLAR_NOTICE,
     build_unlock_notice,
     detect_gated_topic,
     process_forensic_desk_turn,
+    redact_gated_pillars,
 )
 from core.db import init_db
-from core.reporting.pdf import generate_debt_dossier_pdf, generate_fund_dossier_pdf
+from core.reporting.pdf import (
+    apply_pdf_watermark,
+    generate_debt_dossier_pdf,
+    generate_fund_dossier_pdf,
+)
 
 UNLOCK = {"x-unlock-preview": "1"}
 FUND = "PPFAS_FLEXICAP_DIR"
 DEBT = "INE002A08012"
+
+EQUITY_REPORT = (
+    "## Pillar 1: Macro\nMacro text\n\n"
+    "## Pillar 2: Business\nBusiness text\n\n"
+    "## Pillar 3: Cash Flow Solvency\nSECRET_P3 coverage detail\n\n"
+    "## Pillar 4: Governance\nGovernance text\n\n"
+    "## Pillar 5: Valuation & Margin of Safety\nSECRET_P5 intrinsic value\n\n"
+    "## Pillar 6: Technical\nTechnical text\n"
+)
+
+
+def _tiny_pdf() -> bytes:
+    try:
+        import pymupdf as fitz_mod
+    except ImportError:
+        import fitz as fitz_mod
+    doc = fitz_mod.open()
+    page = doc.new_page()
+    page.insert_text((72, 72), "Body text")
+    data = doc.tobytes()
+    doc.close()
+    return data
 
 
 def _pdf_text(pdf: bytes) -> str:
@@ -33,6 +67,114 @@ def _pdf_text(pdf: bytes) -> str:
     return text
 
 
+# ==============================================================================
+# 1. Equity Copilot & Pillar Redaction
+# ==============================================================================
+class TestEquityRedaction(unittest.TestCase):
+    def test_gated_pillars_removed_others_kept(self):
+        out = redact_gated_pillars(EQUITY_REPORT)
+        self.assertNotIn("SECRET_P3", out)
+        self.assertNotIn("SECRET_P5", out)
+        for kept in ("Macro text", "Business text", "Governance text", "Technical text"):
+            self.assertIn(kept, out)
+        self.assertEqual(out.count(GATED_PILLAR_NOTICE), 2)
+
+    def test_empty_text_is_safe(self):
+        self.assertEqual(redact_gated_pillars(""), "")
+
+
+class TestCopilotRouteEntitlement(unittest.TestCase):
+    def _post(self, **kwargs):
+        from web.main import app
+        client = TestClient(app)
+        body = {"conversation_id": "c1", "message": "summarise", "ticker": "INFY", "user_id": "spoofed_paid_user"}
+        with mock.patch("core.agents.copilot.forensic_desk.process_forensic_desk_turn", new=mock.AsyncMock(return_value={"response": "ok"})) as turn:
+            client.post("/api/copilot/chat", json=body, **kwargs)
+        return turn.call_args.kwargs
+
+    def test_anonymous_is_locked_and_spoofed_user_id_ignored(self):
+        kw = self._post()
+        self.assertFalse(kw["deep_dive_unlocked"])
+        self.assertIsNone(kw["user_id"])
+
+    def test_payload_user_id_never_unlocks(self):
+        with mock.patch("web.main.is_ticker_unlocked_for_user", return_value=True) as unlocked:
+            kw = self._post()
+        self.assertFalse(kw["deep_dive_unlocked"])
+        unlocked.assert_not_called()
+
+    def test_signed_in_unlocked_user_gets_full_context(self):
+        with mock.patch("web.main._get_current_web_user", return_value={"id": "u1"}), \
+             mock.patch("web.main.is_ticker_unlocked_for_user", return_value=True):
+            kw = self._post()
+        self.assertTrue(kw["deep_dive_unlocked"])
+        self.assertEqual(kw["user_id"], "u1")
+
+    def test_signed_in_user_without_unlock_stays_locked(self):
+        with mock.patch("web.main._get_current_web_user", return_value={"id": "u1"}), \
+             mock.patch("web.main.is_ticker_unlocked_for_user", return_value=False):
+            kw = self._post()
+        self.assertFalse(kw["deep_dive_unlocked"])
+
+
+# ==============================================================================
+# 2. PDF Watermarks & Equity PDF Gating
+# ==============================================================================
+class TestWatermark(unittest.TestCase):
+    def test_stamps_notice_and_account_ref(self):
+        out = _pdf_text(apply_pdf_watermark(_tiny_pdf(), "usr_abc123"))
+        self.assertIn("Body text", out)
+        self.assertIn("Personal, non-commercial use only", out)
+        self.assertIn("usr_abc123", out)
+
+    def test_anonymous_has_notice_without_account(self):
+        out = _pdf_text(apply_pdf_watermark(_tiny_pdf(), ""))
+        self.assertIn("Redistribution is prohibited", out)
+        self.assertNotIn("Licensed to account", out)
+
+    def test_fails_open_on_bad_input(self):
+        self.assertEqual(apply_pdf_watermark(b"not a pdf", "x"), b"not a pdf")
+
+
+class TestEquityPdfPaywall(unittest.TestCase):
+    def _download(self, headers=None):
+        from web.main import app
+        captured = {}
+
+        def fake_generate(ticker, rep_text, **kwargs):
+            captured["text"] = rep_text
+            return _tiny_pdf()
+
+        rep = {"report_text": EQUITY_REPORT, "citations": []}
+        with mock.patch.dict(os.environ, {"TESTING": "1"}), \
+             mock.patch("web.main.get_report_by_ticker_sync", return_value=rep), \
+             mock.patch("web.main.get_historical_prices", return_value=None), \
+             mock.patch("core.reporting.pdf.generate_report_pdf", side_effect=fake_generate):
+            resp = TestClient(app).get("/api/pdf/INFY", headers=headers or {})
+        return resp, captured.get("text", "")
+
+    def test_locked_user_pdf_excludes_gated_pillars(self):
+        resp, text = self._download()
+        self.assertEqual(resp.status_code, 200)
+        self.assertNotIn("SECRET_P3", text)
+        self.assertNotIn("SECRET_P5", text)
+        self.assertIn("Macro text", text)
+        self.assertIn("Unlock this ticker", text)
+
+    def test_unlocked_user_pdf_has_full_report(self):
+        resp, text = self._download({"x-unlock-preview": "1"})
+        self.assertEqual(resp.status_code, 200)
+        self.assertIn("SECRET_P3", text)
+        self.assertIn("SECRET_P5", text)
+
+    def test_pdf_response_is_watermarked(self):
+        resp, _ = self._download()
+        self.assertIn("Personal, non-commercial use only", _pdf_text(resp.content))
+
+
+# ==============================================================================
+# 3. Fund & Debt Paywall Topic Detection
+# ==============================================================================
 class TestTopicDetection(unittest.TestCase):
     def test_fund_gated_topics(self):
         self.assertIsNotNone(detect_gated_topic("MUTUAL_FUND", None, "what is the moat score?"))
@@ -56,6 +198,9 @@ class TestTopicDetection(unittest.TestCase):
         self.assertIn("fees", text)
 
 
+# ==============================================================================
+# 4. Forensic Desk Multi-Asset Paywall
+# ==============================================================================
 class TestForensicDeskPaywall(unittest.TestCase):
     @classmethod
     def setUpClass(cls):
@@ -140,6 +285,9 @@ class TestForensicDeskPaywall(unittest.TestCase):
             self.assertNotIn(gated, captured)
 
 
+# ==============================================================================
+# 5. Pages & APIs Gating
+# ==============================================================================
 class TestPagesAndApis(unittest.TestCase):
     @classmethod
     def setUpClass(cls):
@@ -164,7 +312,6 @@ class TestPagesAndApis(unittest.TestCase):
         self.assertNotIn("03: Cash Flow Solvency", text)
         self.assertNotIn("05: Recovery Reality", text)
         self.assertNotIn("Cross-references parent equity distress", text)
-        # Free pillars stay visible
         self.assertIn("01: Credit Quality", text)
         self.assertIn("04: Duration", text)
 
@@ -197,6 +344,9 @@ class TestPagesAndApis(unittest.TestCase):
         self.assertNotIn("deep_dive_locked", posture)
 
 
+# ==============================================================================
+# 6. Unlock Endpoints & Entitlements
+# ==============================================================================
 class TestUnlockEndpoints(unittest.TestCase):
     @classmethod
     def setUpClass(cls):
@@ -230,7 +380,7 @@ class TestUnlockEndpoints(unittest.TestCase):
         from web.main import _asset_unlocked_for_request
 
         def only_equity(user_id, ticker):
-            return ticker == FUND  # an equity-style un-namespaced key
+            return ticker == FUND
 
         request = mock.Mock()
         request.headers = {}
@@ -240,7 +390,10 @@ class TestUnlockEndpoints(unittest.TestCase):
             self.assertFalse(_asset_unlocked_for_request(request, "FUND", FUND))
 
 
-class TestPdfPaywall(unittest.TestCase):
+# ==============================================================================
+# 7. Fund & Debt PDF Paywalls
+# ==============================================================================
+class TestFundAndDebtPdfPaywall(unittest.TestCase):
     def test_fund_pdf_hides_deep_dive_when_locked(self):
         dossier = {
             "composite_health_score": 71.0, "weighted_moat_score": 91.7, "accounting_risk_index": 3.3,

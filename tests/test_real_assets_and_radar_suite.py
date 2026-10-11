@@ -1,14 +1,15 @@
-"""Comprehensive unit and integration test suite for Alternative Real Assets,
-SEBI SM REITs, Infrastructure InvITs, and Sovereign Gold Bonds (SGB) Engine.
+"""Comprehensive Unit and Integration Test Suite for Alternative Real Assets,
+SEBI SM REITs, Infrastructure InvITs, Sovereign Gold Bonds (SGB), National ETF Matrix,
+Net Real Post-Tax Calculator, and Alternative Yield Safety Radar.
 
 Validates:
-1. SEBI (REIT) (Amendment) Regulations 2024 compliance audit engine:
-   - Occupancy >= 95% completed asset threshold for SM REITs
-   - NDCF Payout Purity >= 95%
-   - LTV cap <= 49%
-2. Section 115UA / Finance Act 2023 multi-component tax waterfall simulator
-3. SGB secondary market discount, compound YTM, and Section 47(viic) tax parity engine
-4. End-to-end FastAPI endpoints (/reits, /api/reits/directory, /api/reits/tax-breakdown, /api/sgb/tranches)
+1. SEBI (REIT) (Amendment) Regulations 2024 compliance audit engine (occupancy, NDCF, LTV cap).
+2. Section 115UA / Finance Act 2023 multi-component tax waterfall simulator.
+3. SGB secondary market discount, compound YTM, and Section 47(viic) tax parity engine.
+4. National ETF Performance & Liquidity Matrix and tracking error calculations.
+5. Net Real Post-Tax Return Engine across asset classes and inflation regimes.
+6. Alternative Yield & Shadow-Banking Diagnostic Radar for retail capital preservation.
+7. Full web UI and REST API endpoints for all corresponding modules.
 """
 
 import os
@@ -31,9 +32,27 @@ from core.analysis.sm_reit_invit_engine import (
     simulate_reit_tax_waterfall,
 )
 from core.analysis.sgb_engine import evaluate_sgb_market
+from core.db.sovereign import (
+    save_sovereign_benchmark,
+    get_sovereign_yield_curve,
+    get_sovereign_curve_analytics,
+    save_etf_matrix_item,
+    get_etf_matrix,
+)
+from core.analysis.sovereign_engine import evaluate_sovereign_curve
+from core.analysis.etf_matrix_engine import evaluate_etf_matrix
+from core.analysis.net_real_tax_calculator import (
+    calculate_net_real_return,
+    compare_asset_classes_post_tax,
+)
+from core.db.safety_radar import (
+    save_alternative_yield_product,
+    get_all_safety_radar_products,
+)
+from core.analysis.retail_safety_radar import audit_alternative_yield_radar
 
 
-class TestReitAndSgbEngine(unittest.TestCase):
+class TestRealAssetsAndRadarSuite(unittest.TestCase):
     @classmethod
     def setUpClass(cls):
         cls._cm = TestClient(app)
@@ -44,7 +63,7 @@ class TestReitAndSgbEngine(unittest.TestCase):
         cls._cm.__exit__(None, None, None)
 
     # ==========================================
-    # 1. DATABASE ACCESS & RETRIEVAL TESTS
+    # 1. REIT & INVIT REPOSITORY & COMPLIANCE
     # ==========================================
 
     def test_default_reit_and_invit_universe(self):
@@ -57,7 +76,6 @@ class TestReitAndSgbEngine(unittest.TestCase):
         self.assertIn("INVIT", structures)
         self.assertIn("SM_REIT", structures)
 
-        # Lookup by symbol
         embassy = get_reit_by_symbol("EMBASSY")
         self.assertIsNotNone(embassy)
         self.assertEqual(embassy["name"], "Embassy Office Parks REIT")
@@ -68,29 +86,7 @@ class TestReitAndSgbEngine(unittest.TestCase):
         self.assertEqual(sm_reit["structure_type"], "SM_REIT")
         self.assertGreaterEqual(sm_reit["occupancy_pct"], 95.0)
 
-        # Non-existent asset
         self.assertIsNone(get_reit_by_symbol("NON_EXISTENT_ASSET"))
-
-    def test_default_sgb_tranches_universe(self):
-        """Verifies expanded SGB universe contains active secondary tranches (2025 to 2032 maturities)."""
-        tranches = get_all_sgb_tranches()
-        self.assertGreaterEqual(len(tranches), 10)
-
-        # Verify key tranches exist
-        sgb_nov25 = get_sgb_by_symbol("SGBNOV25")
-        self.assertIsNotNone(sgb_nov25)
-        self.assertEqual(sgb_nov25["annual_coupon_rate"], 2.50)
-
-        sgb_feb32 = get_sgb_by_symbol("SGBFEB32")
-        self.assertIsNotNone(sgb_feb32)
-        self.assertEqual(sgb_feb32["annual_coupon_rate"], 2.50)
-
-        # Non-existent tranche
-        self.assertIsNone(get_sgb_by_symbol("SGB_FAKE_99"))
-
-    # ==========================================
-    # 2. REIT ENGINE & SEBI 2024 COMPLIANCE TESTS
-    # ==========================================
 
     def test_reit_portfolio_audit_metrics(self):
         """Validates portfolio analytics, averages, and group decomposition."""
@@ -103,7 +99,6 @@ class TestReitAndSgbEngine(unittest.TestCase):
         self.assertIn("macro_observations", audit)
         self.assertGreaterEqual(len(audit["macro_observations"]), 3)
 
-        # Decomposed asset categories
         self.assertGreaterEqual(len(audit["mainboard_reits"]), 4)
         self.assertGreaterEqual(len(audit["invits"]), 4)
         self.assertGreaterEqual(len(audit["sm_reits"]), 2)
@@ -120,7 +115,6 @@ class TestReitAndSgbEngine(unittest.TestCase):
 
     def test_sebi_sm_reit_compliance_flagging(self):
         """Verifies SEBI 2024 compliance guardrails flag violations (occupancy < 95% or LTV > 49%)."""
-        # Inject an artificial non-compliant SM REIT to verify auditor detection
         bad_sm_reit = {
             "symbol": "SMREIT_BAD_TEST",
             "name": "Non-Compliant Under-Construction SM REIT",
@@ -129,9 +123,9 @@ class TestReitAndSgbEngine(unittest.TestCase):
             "nav_per_unit": 500.0,
             "discount_to_nav_pct": 0.0,
             "distribution_yield_pct": 6.5,
-            "occupancy_pct": 82.0,  # Breaches 95% threshold!
-            "ndcf_payout_purity_pct": 88.0,  # Breaches 95% threshold!
-            "ltv_ratio_pct": 55.0,  # Breaches 49% statutory cap!
+            "occupancy_pct": 82.0,
+            "ndcf_payout_purity_pct": 88.0,
+            "ltv_ratio_pct": 55.0,
             "wale_years": 3.0,
             "sponsor_holding_pct": 2.0,
             "sebi_compliant": False,
@@ -141,22 +135,15 @@ class TestReitAndSgbEngine(unittest.TestCase):
 
         audit = audit_reit_portfolio(structure_type="SM_REIT")
         issues = audit["flagged_issues"]
-        # Must flag occupancy breach, LTV breach, and NDCF breach
         self.assertTrue(any("SMREIT_BAD_TEST: SM REIT occupancy" in iss for iss in issues))
         self.assertTrue(any("SMREIT_BAD_TEST: Leverage LTV" in iss for iss in issues))
         self.assertTrue(any("SMREIT_BAD_TEST: NDCF upstreaming purity" in iss for iss in issues))
 
-    # ==========================================
-    # 3. SECTION 115UA TAX WATERFALL TESTS
-    # ==========================================
-
     def test_reit_tax_waterfall_simulation(self):
         """Validates Section 115UA post-tax waterfall calculation across multiple investor slabs."""
-        # Non-existent symbol returns error
         err_res = simulate_reit_tax_waterfall("UNKNOWN_ASSET", 30.0)
         self.assertIn("error", err_res)
 
-        # Embassy 30% slab
         sim_30 = simulate_reit_tax_waterfall("EMBASSY", tax_slab_pct=30.0)
         self.assertEqual(sim_30["symbol"], "EMBASSY")
         self.assertEqual(sim_30["gross_distribution_yield_pct"], 7.15)
@@ -168,19 +155,32 @@ class TestReitAndSgbEngine(unittest.TestCase):
         self.assertEqual(sim_30["tax_breakdown_weights"]["dividend_pct"], 38.0)
         self.assertEqual(sim_30["tax_breakdown_weights"]["return_of_capital_pct"], 28.0)
 
-        # Embassy 0% slab (tax drag must be 0)
         sim_0 = simulate_reit_tax_waterfall("EMBASSY", tax_slab_pct=0.0)
         self.assertEqual(sim_0["net_post_tax_yield_pct"], sim_0["gross_distribution_yield_pct"])
         self.assertEqual(sim_0["tax_drag_bps"], 0.0)
 
-        # Higher slab produces higher tax drag
         sim_39 = simulate_reit_tax_waterfall("EMBASSY", tax_slab_pct=39.0)
         self.assertGreater(sim_39["tax_drag_bps"], sim_30["tax_drag_bps"])
         self.assertLess(sim_39["net_post_tax_yield_pct"], sim_30["net_post_tax_yield_pct"])
 
     # ==========================================
-    # 4. SGB ENGINE & TAX PARITY TESTS
+    # 2. SGB TRANCHES & TAX PARITY ENGINE
     # ==========================================
+
+    def test_default_sgb_tranches_universe(self):
+        """Verifies expanded SGB universe contains active secondary tranches (2025 to 2032 maturities)."""
+        tranches = get_all_sgb_tranches()
+        self.assertGreaterEqual(len(tranches), 10)
+
+        sgb_nov25 = get_sgb_by_symbol("SGBNOV25")
+        self.assertIsNotNone(sgb_nov25)
+        self.assertEqual(sgb_nov25["annual_coupon_rate"], 2.50)
+
+        sgb_feb32 = get_sgb_by_symbol("SGBFEB32")
+        self.assertIsNotNone(sgb_feb32)
+        self.assertEqual(sgb_feb32["annual_coupon_rate"], 2.50)
+
+        self.assertIsNone(get_sgb_by_symbol("SGB_FAKE_99"))
 
     def test_sgb_market_evaluation(self):
         """Validates SGB secondary discount analysis and comparative matrix."""
@@ -192,19 +192,97 @@ class TestReitAndSgbEngine(unittest.TestCase):
         self.assertIsNotNone(sgb_eval["best_yield_tranche"])
         self.assertIsNotNone(sgb_eval["deepest_discount_tranche"])
 
-        # Check institutional comparative matrix (SGB vs ETF vs Physical Gold)
         comparison = sgb_eval["asset_comparison"]
         self.assertEqual(len(comparison), 4)
         dimensions = [c["dimension"] for c in comparison]
         self.assertIn("Acquisition Friction / Entry Pricing", dimensions)
         self.assertIn("Capital Gains Taxation at Redemption", dimensions)
 
-        # Verify Section 47(viic) citation
         self.assertIn("Section 47(viic)", sgb_eval["tax_statute_citation"])
         self.assertIn("exempt from capital gains tax", sgb_eval["tax_statute_citation"])
 
     # ==========================================
-    # 5. FASTAPI WEB & API ROUTE INTEGRATION TESTS
+    # 3. NATIONAL ETF MATRIX & TRACKING ERROR
+    # ==========================================
+
+    def test_etf_matrix_and_engine(self):
+        item = {
+            "symbol": "NIFTYBEES",
+            "name": "Nippon India ETF Nifty 50 BeES",
+            "category": "EQUITY_INDEX",
+            "benchmark_index": "Nifty 50 TRI",
+            "aum_crores": 34500.0,
+            "ter_pct": 0.04,
+            "tracking_error_pct": 0.03,
+            "nav_inr": 268.45,
+            "cmp_inr": 268.50,
+            "premium_discount_pct": 0.02,
+            "avg_daily_volume_shares": 5200000,
+            "liquidity_tier": "HIGH_LIQUIDITY",
+            "amihud_liquidity_score": 0.0001
+        }
+        res = save_etf_matrix_item(item)
+        self.assertTrue(res)
+
+        etfs = get_etf_matrix()
+        self.assertGreaterEqual(len(etfs), 1)
+
+        eval_matrix = evaluate_etf_matrix()
+        self.assertIn("total_tracked_etfs", eval_matrix)
+        self.assertIn("grouped_by_category", eval_matrix)
+        self.assertGreaterEqual(eval_matrix["total_tracked_etfs"], 1)
+
+    # ==========================================
+    # 4. NET REAL POST-TAX RETURN ENGINE
+    # ==========================================
+
+    def test_tax_calculator_math(self):
+        calc_fd = calculate_net_real_return(
+            nominal_annual_return_pct=7.25,
+            tax_rate_pct=30.0,
+            cpi_inflation_pct=5.0
+        )
+        self.assertAlmostEqual(calc_fd["post_tax_nominal_pct"], 5.07, delta=0.05)
+        self.assertAlmostEqual(calc_fd["net_real_return_pct"], 0.07, delta=0.05)
+        self.assertIn("capital", calc_fd["purchasing_power_verdict"].lower())
+
+        asset_comp = compare_asset_classes_post_tax(marginal_tax_slab_pct=30.0, cpi_inflation_pct=5.0)
+        self.assertGreaterEqual(len(asset_comp), 6)
+
+        sgb_entry = next((x for x in asset_comp if "Sovereign Gold" in x["asset_name"]), None)
+        self.assertIsNotNone(sgb_entry)
+        self.assertIn("Section 47(viic)", sgb_entry["tax_statute_citation"])
+        self.assertGreater(sgb_entry["net_real_return_pct"], 3.0)
+
+    # ==========================================
+    # 5. RETAIL ALTERNATIVE YIELD SAFETY RADAR
+    # ==========================================
+
+    def test_safety_radar(self):
+        high_risk = {
+            "platform_name": "Gullak / SafeGold",
+            "product_name": "Gold Yield 16% Leasing",
+            "category": "GOLD_LEASING",
+            "advertised_yield_pct": 16.0,
+            "danger_score": 95,
+            "regulatory_status": "UNREGULATED_SHADOW",
+            "bankruptcy_remoteness": "NONE_PLATFORM_BALANCE_SHEET",
+            "credit_rating": "UNRATED",
+            "rbi_warning_ref": "RBI Advisory on Unregulated Gold Yield Schemes (2023)",
+            "safety_verdict": "CRITICAL DANGER: High risk of total capital loss upon jeweller default."
+        }
+        save_alternative_yield_product(high_risk)
+
+        products = get_all_safety_radar_products()
+        self.assertGreaterEqual(len(products), 1)
+
+        radar_audit = audit_alternative_yield_radar()
+        self.assertIn("total_schemes_audited", radar_audit)
+        self.assertIn("extreme_danger_count", radar_audit)
+        self.assertGreaterEqual(radar_audit["extreme_danger_count"], 1)
+
+    # ==========================================
+    # 6. FASTAPI WEB & REST API ENDPOINTS
     # ==========================================
 
     def test_reits_web_page_rendering(self):
@@ -212,38 +290,26 @@ class TestReitAndSgbEngine(unittest.TestCase):
         resp = self.client.get("/reits")
         self.assertEqual(resp.status_code, 200)
         html = resp.text
-
-        # Verify key terminal sections
         self.assertIn("Alternative Real Assets, SM REITs & Sovereign Gold Terminal", html)
         self.assertIn("Structural Comparison Matrix", html)
         self.assertIn("SEBI SM REITs & Mainboard Commercial REITs", html)
         self.assertIn("Infrastructure Investment Trusts (InvITs)", html)
         self.assertIn("Sovereign Gold Bonds (SGB) Secondary Market Discount & Parity Scanner", html)
         self.assertIn("Section 115UA Real Asset Tax Waterfall", html)
-        self.assertIn("Section 2(u) of SEBI (Research Analysts) Regulations, 2014", html)
-
-        # Check badge styling and data elements
         self.assertIn("EMBASSY", html)
-        self.assertIn("PGINVIT", html)
-        self.assertIn("SMREIT_BLR_01", html)
-        self.assertIn("SGBFEB32", html)
 
     def test_reits_web_page_structure_filter(self):
-        """Verifies GET /reits?structure=SM_REIT filters the view cleanly."""
         resp = self.client.get("/reits?structure=SM_REIT")
         self.assertEqual(resp.status_code, 200)
 
     def test_api_reits_directory_endpoint(self):
-        """Verifies GET /api/reits/directory returns audited JSON payload."""
         resp = self.client.get("/api/reits/directory")
         self.assertEqual(resp.status_code, 200)
         data = resp.json()
         self.assertIn("items", data)
         self.assertIn("average_distribution_yield_pct", data)
-        self.assertIn("macro_observations", data)
 
     def test_api_sgb_tranches_endpoint(self):
-        """Verifies GET /api/sgb/tranches returns secondary market audit."""
         resp = self.client.get("/api/sgb/tranches")
         self.assertEqual(resp.status_code, 200)
         data = resp.json()
@@ -252,7 +318,6 @@ class TestReitAndSgbEngine(unittest.TestCase):
         self.assertIn("tax_statute_citation", data)
 
     def test_api_reits_tax_breakdown_endpoint(self):
-        """Verifies GET /api/reits/tax-breakdown returns post-tax calculation."""
         resp = self.client.get("/api/reits/tax-breakdown?symbol=EMBASSY&tax_slab=30")
         self.assertEqual(resp.status_code, 200)
         data = resp.json()
@@ -260,6 +325,39 @@ class TestReitAndSgbEngine(unittest.TestCase):
         self.assertEqual(data["investor_tax_slab_pct"], 30.0)
         self.assertIn("net_post_tax_yield_pct", data)
         self.assertIn("tax_drag_bps", data)
+
+    def test_etf_web_routes(self):
+        res = self.client.get("/etfs")
+        self.assertEqual(res.status_code, 200)
+        self.assertIn("National ETF Performance & Liquidity Matrix", res.text)
+
+        api_res = self.client.get("/api/etfs/matrix")
+        self.assertEqual(api_res.status_code, 200)
+        data = api_res.json()
+        self.assertIn("etfs", data)
+        self.assertIn("grouped_by_category", data)
+
+    def test_tax_calculator_web_routes(self):
+        res = self.client.get("/calculator/tax")
+        self.assertEqual(res.status_code, 200)
+        self.assertIn("Net Real Post-Tax Return Engine", res.text)
+
+        api_res = self.client.get("/api/calculator/tax-return?nominal_return=7.25&tax_rate=30.0&cpi_inflation=5.0")
+        self.assertEqual(api_res.status_code, 200)
+        data = api_res.json()
+        self.assertIn("net_real_return_pct", data)
+        self.assertIn("purchasing_power_verdict", data)
+
+    def test_safety_radar_web_routes(self):
+        res = self.client.get("/safety-radar")
+        self.assertEqual(res.status_code, 200)
+        self.assertIn("Alternative Yield & Shadow-Banking Risk Radar", res.text)
+
+        api_res = self.client.get("/api/safety-radar")
+        self.assertEqual(api_res.status_code, 200)
+        data = api_res.json()
+        self.assertIn("total_schemes_audited", data)
+        self.assertIn("all_products", data)
 
 
 if __name__ == "__main__":

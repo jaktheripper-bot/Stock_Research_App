@@ -1,14 +1,22 @@
-"""Comprehensive Unit and Integration Test Suite for Corporate Debt & 5-Pillar Credit Engine.
+"""Comprehensive Unit and Integration Test Suite for Fixed Income & Sovereign Debt.
 
 Verifies:
 1. Fixed-Income Mathematical Core (YTM solver, Macaulay/Modified Duration, Convexity, Rate Shocks).
 2. 5-Pillar Credit & Solvency Matrix (Rating Drift, Seniority/ACR, ICR/DSCR, Duration, Recovery/SDI FLDG).
 3. AT1 Perpetual loss-absorption write-down regulatory alerts.
 4. Database repository operations (dual-binding SQLite/PostgreSQL, CRUD, chronological rating events).
+5. Indian Sovereign Par Yield Curve, Macro Corridor, and SDL Fiscal Disparity Matrix.
+6. Square-root scaling SVG curve generation and sovereign web/API endpoints.
 """
+
+import os
+os.environ["TESTING"] = "1"
 
 import unittest
 from datetime import date
+from fastapi.testclient import TestClient
+from web.main import app
+
 from core.db.debt import (
     save_debt_security,
     get_debt_security_by_isin,
@@ -27,7 +35,24 @@ from core.analysis.debt_engine import (
     evaluate_pillar_3_cash_flow_solvency,
     evaluate_pillar_4_duration_risk,
     evaluate_pillar_5_recovery_and_pool_quality,
-    evaluate_5_pillar_credit_posture
+    evaluate_5_pillar_credit_posture,
+    calculate_tax_drag_and_real_return
+)
+from core.analysis.debt_catalogue import (
+    get_collation_platform_catalog,
+    normalize_debt_security_payload
+)
+from core.analysis.sovereign_engine import (
+    evaluate_sovereign_curve,
+    generate_curve_svg_data
+)
+from core.db.sovereign import (
+    DEFAULT_SOVEREIGN_BENCHMARKS,
+    save_sovereign_benchmark,
+    get_sovereign_yield_curve,
+    get_sovereign_sdl_matrix,
+    get_macro_monetary_corridor,
+    get_historical_sovereign_curves
 )
 
 
@@ -124,7 +149,6 @@ class TestDebtEngineAndRepository(unittest.TestCase):
     # ==========================================================================
 
     def test_pillar_1_credit_drift_and_spread(self):
-        # AAA rating with positive outlook
         p1_aaa = evaluate_pillar_1_credit_quality(
             credit_rating="CRISIL AAA",
             rating_history=[{"action_type": "UPGRADE", "outlook": "POSITIVE"}],
@@ -135,29 +159,25 @@ class TestDebtEngineAndRepository(unittest.TestCase):
         self.assertEqual(p1_aaa["base_symbol"], "AAA")
         self.assertTrue(p1_aaa["is_investment_grade"])
 
-        # BBB rating with thin spread triggers uncompensated risk warning
         p1_thin = evaluate_pillar_1_credit_quality(
             credit_rating="CARE BBB",
             rating_history=[],
             ytm_pct=7.50,
-            benchmark_yield=7.10  # 40 bps spread
+            benchmark_yield=7.10
         )
         self.assertIsNotNone(p1_thin["warning"])
         self.assertIn("Uncompensated Credit Risk", p1_thin["warning"])
 
     def test_pillar_2_seniority_and_at1_warning(self):
-        # Senior secured with healthy ACR
         p2_sec = evaluate_pillar_2_capital_hierarchy("SENIOR_SECURED", asset_cover_ratio=1.40)
         self.assertEqual(p2_sec["score"], 100.0)
         self.assertFalse(p2_sec["covenant_breach"])
         self.assertIsNone(p2_sec["critical_warning"])
 
-        # Senior secured with covenant breach (ACR < 1.0)
         p2_breach = evaluate_pillar_2_capital_hierarchy("SENIOR_SECURED", asset_cover_ratio=0.85)
         self.assertTrue(p2_breach["covenant_breach"])
         self.assertLess(p2_breach["score"], 70.0)
 
-        # Perpetual AT1 must trigger critical regulatory warning
         p2_at1 = evaluate_pillar_2_capital_hierarchy("PERPETUAL_AT1")
         self.assertIsNotNone(p2_at1["critical_warning"])
         self.assertIn("Point of Non-Viability", p2_at1["critical_warning"])
@@ -165,7 +185,6 @@ class TestDebtEngineAndRepository(unittest.TestCase):
         self.assertEqual(p2_at1["score"], 10.0)
 
     def test_pillar_3_cash_flow_solvency(self):
-        # Robust solvency
         p3_good = evaluate_pillar_3_cash_flow_solvency({
             "interest_coverage": 4.5,
             "dscr": 1.45,
@@ -173,7 +192,6 @@ class TestDebtEngineAndRepository(unittest.TestCase):
         })
         self.assertGreaterEqual(p3_good["score"], 85.0)
 
-        # Distressed solvency (ICR < 1.5)
         p3_bad = evaluate_pillar_3_cash_flow_solvency({
             "interest_coverage": 1.2,
             "dscr": 0.95
@@ -198,14 +216,12 @@ class TestDebtEngineAndRepository(unittest.TestCase):
         self.assertIn("credit enhancement", p5_sdi["details"]["fldg_status"].lower())
 
     def test_composite_5_pillar_synthesis(self):
-        # 1. Reliance AAA NCD
         rel = get_debt_security_by_isin("INE002A08012")
         self.assertIsNotNone(rel)
         posture_rel = evaluate_5_pillar_credit_posture(rel)
         self.assertEqual(posture_rel["posture"], "INSTITUTIONAL_PRIME")
         self.assertGreaterEqual(posture_rel["composite_score"], 80.0)
 
-        # 2. AT1 Perpetual Bond
         at1 = get_debt_security_by_isin("INE090A08UD5")
         self.assertIsNotNone(at1)
         posture_at1 = evaluate_5_pillar_credit_posture(at1)
@@ -274,41 +290,35 @@ class TestDebtEngineAndRepository(unittest.TestCase):
 
     def test_institutional_narrative_and_primer_synthesis(self):
         """Verifies that evaluate_5_pillar_credit_posture generates comprehensive narrative dossiers."""
-        sec = get_debt_security_by_isin("INE414G07GE7")  # Muthoot Finance
+        sec = get_debt_security_by_isin("INE414G07GE7")
         self.assertIsNotNone(sec)
 
         posture = evaluate_5_pillar_credit_posture(sec)
 
-        # 1. Executive Primer
         self.assertIn("primer", posture)
         self.assertIn("What Am I Looking At?", posture["primer"]["title"])
         self.assertIn("summary", posture["primer"])
         self.assertIn("fd_comparison", posture["primer"])
 
-        # 2. Issuer Profile
         self.assertIn("issuer_profile", posture)
         self.assertEqual(posture["issuer_profile"]["ticker"], "MUTHOOTFIN")
         self.assertIn("description", posture["issuer_profile"])
         self.assertIn("gnpa_pct", posture["issuer_profile"])
 
-        # 3. Investment Thesis
         self.assertIn("investment_thesis", posture)
         self.assertGreaterEqual(len(posture["investment_thesis"]["the_good"]), 2)
         self.assertGreaterEqual(len(posture["investment_thesis"]["the_bad"]), 2)
         self.assertGreaterEqual(len(posture["investment_thesis"]["the_ugly"]), 1)
 
-        # 4. Tax Drag Schedule
         self.assertIn("tax_drag_schedule", posture)
         self.assertIn("benchmark_30pct_post_tax_yield", posture["tax_drag_schedule"])
         self.assertIn("slab_breakdown", posture["tax_drag_schedule"])
 
-        # 5. Collation Sources
         self.assertIn("collated_sources", posture)
         source_names = [s["name"] for s in posture["collated_sources"]]
         self.assertIn("Wint Wealth", source_names)
         self.assertIn("BSE Debt Market", source_names)
 
-        # 6. Deep narrative inside each pillar
         for p_key in ["p1_credit_quality", "p2_capital_hierarchy", "p3_solvency", "p4_duration", "p5_recovery"]:
             p = posture["pillars"][p_key]
             self.assertIn("educational_overview", p, f"{p_key} missing educational_overview")
@@ -317,18 +327,13 @@ class TestDebtEngineAndRepository(unittest.TestCase):
 
     def test_tax_drag_calculator_accuracy(self):
         """Verifies tax drag calculations against known tax slabs."""
-        from core.analysis.debt_engine import calculate_tax_drag_and_real_return
         res = calculate_tax_drag_and_real_return(ytm_pct=10.0, inflation_pct=5.5)
         self.assertEqual(res["nominal_ytm_pct"], 10.0)
-
-        # 30% slab with 4% cess is 31.2% effective tax -> 10.0 * (1 - 0.312) = 6.88%
         self.assertAlmostEqual(res["benchmark_30pct_post_tax_yield"], 6.88, delta=0.05)
-        # Real return = 6.88 - 5.5 = +1.38%
         self.assertAlmostEqual(res["benchmark_30pct_real_return"], 1.38, delta=0.05)
 
     def test_debt_crawler_collation_catalog(self):
         """Verifies supported platform directory for Indian alternative fixed-income collation."""
-        from core.analysis.debt_catalogue import get_collation_platform_catalog, normalize_debt_security_payload
         catalog = get_collation_platform_catalog()
         platforms = catalog["platforms"]
         self.assertIn("WINT_WEALTH", platforms)
@@ -351,6 +356,135 @@ class TestDebtEngineAndRepository(unittest.TestCase):
         self.assertGreater(normalized["macaulay_duration_years"], 0.0)
 
 
+class TestSovereignEngineAndTerminal(unittest.TestCase):
+    @classmethod
+    def setUpClass(cls):
+        for b in DEFAULT_SOVEREIGN_BENCHMARKS:
+            save_soVEREIGN_benchmark = save_sovereign_benchmark(b)
+        cls.client = TestClient(app)
+
+    def test_sovereign_yield_curve_benchmarks(self):
+        """Verifies 16 statutory sovereign benchmarks are retrieved from repository."""
+        curve = get_sovereign_yield_curve()
+        self.assertGreaterEqual(len(curve), 16)
+        tenors = {item["tenor_label"] for item in curve}
+        self.assertIn("91D_TBILL", tenors)
+        self.assertIn("182D_TBILL", tenors)
+        self.assertIn("364D_TBILL", tenors)
+        self.assertIn("2Y_GSEC", tenors)
+        self.assertIn("5Y_GSEC", tenors)
+        self.assertIn("5Y_SGRB", tenors)
+        self.assertIn("10Y_GSEC", tenors)
+        self.assertIn("10Y_SGRB", tenors)
+        self.assertIn("10Y_SDL", tenors)
+        self.assertIn("50Y_GSEC", tenors)
+
+    def test_sdl_fiscal_matrix(self):
+        """Verifies State Development Loan benchmarks across 10 borrowing states."""
+        sdls = get_sovereign_sdl_matrix()
+        self.assertGreaterEqual(len(sdls), 10)
+        state_codes = {s["state_code"] for s in sdls}
+        self.assertIn("MH", state_codes)
+        self.assertIn("GJ", state_codes)
+        self.assertIn("KA", state_codes)
+        self.assertIn("TN", state_codes)
+        self.assertIn("UP", state_codes)
+        self.assertIn("WB", state_codes)
+        self.assertIn("PB", state_codes)
+
+        # Spreads should be sorted ascending
+        spreads = [s["spread_over_gsec_bps"] for s in sdls]
+        self.assertEqual(spreads, sorted(spreads))
+
+    def test_macro_monetary_corridor(self):
+        """Verifies RBI Policy corridor and MOSPI inflation rates."""
+        corridor = get_macro_monetary_corridor()
+        self.assertIn("repo_rate", corridor)
+        self.assertIn("sdf_rate", corridor)
+        self.assertIn("msf_rate", corridor)
+        self.assertIn("cpi_inflation", corridor)
+        self.assertEqual(corridor["repo_rate"]["value"], 6.50)
+        self.assertEqual(corridor["sdf_rate"]["value"], 6.25)
+        self.assertEqual(corridor["msf_rate"]["value"], 6.75)
+        self.assertEqual(corridor["cpi_inflation"]["value"], 3.65)
+
+    def test_svg_chart_coordinate_generation(self):
+        """Verifies mathematical square-root scaling and SVG path construction."""
+        hist = get_historical_sovereign_curves()
+        chart = generate_curve_svg_data(hist, width=820, height=340)
+        self.assertEqual(chart["width"], 820)
+        self.assertEqual(chart["height"], 340)
+        self.assertIn("current", chart["series"])
+        self.assertIn("one_month_ago", chart["series"])
+        self.assertIn("one_year_ago", chart["series"])
+
+        current_path = chart["series"]["current"]["path_d"]
+        self.assertTrue(current_path.startswith("M "))
+        self.assertIn(" L ", current_path)
+
+        for pt in chart["series"]["current"]["points"]:
+            self.assertGreaterEqual(pt["cx"], chart["pad_left"])
+            self.assertLessEqual(pt["cx"], chart["width"] - chart["pad_right"])
+            self.assertGreaterEqual(pt["cy"], chart["pad_top"])
+            self.assertLessEqual(pt["cy"], chart["height"] - chart["pad_bottom"])
+
+    def test_evaluate_sovereign_curve(self):
+        """Verifies the complete analytical payload for the Sovereign Terminal."""
+        analytics = evaluate_sovereign_curve()
+        self.assertEqual(analytics["benchmark_10y_gsec"], 7.12)
+        self.assertEqual(analytics["risk_free_short_tbill"], 6.84)
+        self.assertEqual(analytics["term_spread_bps"], 28.0)
+        self.assertEqual(analytics["real_10y_yield"], 3.47)
+        self.assertEqual(analytics["greenium_bps"], 4.0)
+        self.assertGreaterEqual(len(analytics["curve_points"]), 16)
+        self.assertGreaterEqual(len(analytics["sdl_matrix"]), 10)
+        self.assertGreaterEqual(len(analytics["macro_insights"]), 3)
+
+        for insight in analytics["macro_insights"]:
+            self.assertNotIn("plain-english", insight.lower())
+            self.assertNotIn("for dummies", insight.lower())
+
+    def test_web_sovereign_page_renders_cleanly(self):
+        """Verifies GET /sovereign renders 200 OK with all terminal modules."""
+        resp = self.client.get("/sovereign")
+        self.assertEqual(resp.status_code, 200)
+        html = resp.text
+        self.assertIn("Indian Sovereign Debt & Macro Terminal", html)
+        self.assertIn("RBI Monetary Policy Corridor", html)
+        self.assertIn("sovereignSvg", html)
+        self.assertIn("State Development Loan (SDL) Fiscal Disparity Matrix", html)
+        self.assertIn("RBI Retail Direct", html)
+        self.assertIn("50Y_GSEC", html)
+        self.assertIn("10Y_SGRB", html)
+        self.assertIn("Maharashtra", html)
+        self.assertIn("Punjab", html)
+
+    def test_api_sovereign_curve_endpoint(self):
+        """Verifies GET /api/sovereign/curve returns 200 OK and valid JSON."""
+        resp = self.client.get("/api/sovereign/curve")
+        self.assertEqual(resp.status_code, 200)
+        data = resp.json()
+        self.assertEqual(data["benchmark_10y_gsec"], 7.12)
+        self.assertIn("svg_chart", data)
+        self.assertIn("sdl_matrix", data)
+
+    def test_api_sovereign_sdl_matrix_endpoint(self):
+        """Verifies GET /api/sovereign/sdl-matrix returns 200 OK."""
+        resp = self.client.get("/api/sovereign/sdl-matrix")
+        self.assertEqual(resp.status_code, 200)
+        data = resp.json()
+        self.assertIn("sdl_matrix", data)
+        self.assertGreaterEqual(data["count"], 10)
+
+    def test_api_sovereign_macro_endpoint(self):
+        """Verifies GET /api/sovereign/macro returns 200 OK."""
+        resp = self.client.get("/api/sovereign/macro")
+        self.assertEqual(resp.status_code, 200)
+        data = resp.json()
+        self.assertIn("macro_corridor", data)
+        self.assertIn("repo_rate", data["macro_corridor"])
+        self.assertEqual(data["macro_corridor"]["repo_rate"]["value"], 6.50)
+
+
 if __name__ == "__main__":
     unittest.main()
-

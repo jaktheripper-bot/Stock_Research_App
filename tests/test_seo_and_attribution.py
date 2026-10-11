@@ -1,0 +1,209 @@
+"""
+Consolidated SEO, Domain Configuration & Traffic Attribution Test Suite
+========================================================================
+Unifies:
+1. SEO & GEO Tracking (AI referrers, crawler bot logging, honest defaults)
+2. Share Button, Clean-URL capturing & self-referencing canonical tags
+3. vestnomics.app canonical domain whitelisting, origin checks, sitemap & robots.txt
+"""
+import html as html_mod
+import os
+import re
+import time
+import unittest
+from unittest import mock
+
+from fastapi.testclient import TestClient
+from starlette.requests import Request
+
+from core.db.telemetry import _build_telemetry_time_filter, _seo_channel
+from telemetry import (
+    classify_bot,
+    extract_geo,
+    parse_traffic_source,
+    parse_user_agent,
+)
+from web.main import ALLOWED_ORIGIN_HOSTS, app, _validate_request_origin
+
+
+# ==============================================================================
+# 1. AI Referrers & Channel Grouping
+# ==============================================================================
+class TestAiReferrers(unittest.TestCase):
+    def test_ai_engines_are_classified(self):
+        self.assertEqual(parse_traffic_source("https://chatgpt.com/", {})[0], "ChatGPT (AI)")
+        self.assertEqual(parse_traffic_source("https://www.perplexity.ai/search", {})[0], "Perplexity (AI)")
+        self.assertEqual(parse_traffic_source("https://claude.ai/", {})[0], "Claude (AI)")
+        self.assertEqual(parse_traffic_source("https://copilot.microsoft.com/", {})[0], "Copilot (AI)")
+
+    def test_gemini_is_not_counted_as_google_search(self):
+        self.assertEqual(parse_traffic_source("https://gemini.google.com/app", {})[0], "Gemini (AI)")
+        self.assertEqual(parse_traffic_source("https://www.google.com/search?q=x", {})[0], "Google Search")
+
+    def test_channel_grouping(self):
+        self.assertEqual(_seo_channel("Google Search"), "Organic Search")
+        self.assertEqual(_seo_channel("ChatGPT (AI)"), "AI Search")
+        self.assertEqual(_seo_channel("LinkedIn"), "Other")
+
+
+# ==============================================================================
+# 2. Honest Defaults (No Synthetic Demographics)
+# ==============================================================================
+class TestHonestDefaults(unittest.TestCase):
+    def test_missing_geo_is_unknown_not_india(self):
+        self.assertEqual(extract_geo({}), "Unknown")
+        self.assertEqual(extract_geo({"user-agent": "x"}), "Unknown")
+        self.assertEqual(extract_geo({"cf-ipcountry": "in"}), "IN")
+
+    def test_missing_user_agent_is_unknown(self):
+        self.assertEqual(parse_user_agent("")["device"], "Unknown")
+
+
+# ==============================================================================
+# 3. Crawler Logging & Filtering
+# ==============================================================================
+class TestCrawlerLogging(unittest.TestCase):
+    def test_classify_bot(self):
+        self.assertEqual(classify_bot("Mozilla/5.0 (compatible; Googlebot/2.1)")[0], "Googlebot")
+        self.assertEqual(classify_bot("Mozilla/5.0 AppleWebKit; compatible; GPTBot/1.1")[1], "AI")
+        self.assertIsNone(classify_bot("Mozilla/5.0 (Macintosh) Safari/605"))
+        self.assertIsNone(classify_bot(""))
+
+    def test_visitor_filter_excludes_bot_events_but_seo_view_can_include(self):
+        self.assertIn("BOT_CRAWL", _build_telemetry_time_filter("", days=7))
+        self.assertNotIn("BOT_CRAWL", _build_telemetry_time_filter("", days=7, include_bots=True))
+
+    def test_middleware_logs_crawler_but_not_humans(self):
+        client = TestClient(app)
+        with mock.patch("core.db.telemetry.record_crawler_hit") as hit:
+            client.get("/robots.txt", headers={"user-agent": "Mozilla/5.0 (compatible; Googlebot/2.1)"})
+            client.get("/robots.txt", headers={"user-agent": "Mozilla/5.0 (Macintosh) Safari/605"})
+            time.sleep(0.3)
+            self.assertEqual(hit.call_count, 1)
+            self.assertEqual(hit.call_args[0][0], "Googlebot")
+            self.assertEqual(hit.call_args[0][2], "/robots.txt")
+
+
+# ==============================================================================
+# 4. Shared Link Attribution
+# ==============================================================================
+class TestSharedLinkAttribution(unittest.TestCase):
+    def test_share_utm_is_labelled_shared_link(self):
+        self.assertEqual(parse_traffic_source("", {"utm_source": "share"})[0], "Shared Link")
+        self.assertEqual(parse_traffic_source("https://www.linkedin.com/", {"utm_source": "SHARE"})[0], "Shared Link")
+
+    def test_other_campaigns_keep_their_label(self):
+        self.assertEqual(parse_traffic_source("", {"utm_source": "newsletter"})[0], "newsletter")
+
+
+# ==============================================================================
+# 5. Canonical URLs & Share Buttons
+# ==============================================================================
+class TestCanonicalAndShareButton(unittest.TestCase):
+    def setUp(self):
+        self.client = TestClient(app)
+
+    def _canonical(self, html):
+        m = re.search(r'<link rel="canonical" href="([^"]+)"', html)
+        return m.group(1) if m else None
+
+    def test_home_has_canonical_without_tracking_params(self):
+        resp = self.client.get("/pricing?utm_source=share&utm_medium=referral&utm_campaign=dossier")
+        canon = self._canonical(resp.text)
+        self.assertIsNotNone(canon)
+        self.assertTrue(canon.endswith("/pricing"))
+        self.assertNotIn("utm_", canon)
+        self.assertIn('property="og:url"', resp.text)
+
+    def test_compare_canonical_keeps_both_tickers_and_has_share_button(self):
+        resp = self.client.get("/compare?a=infy&b=tcs&utm_source=share")
+        canon = self._canonical(resp.text)
+        self.assertIsNotNone(canon)
+        self.assertTrue(html_mod.unescape(canon).endswith("/compare?a=INFY&b=TCS"))
+        self.assertNotIn("utm_", canon)
+        self.assertIn("shareCurrentPage('compare')", resp.text)
+
+    def test_trailing_slash_is_normalised(self):
+        resp = self.client.get("/pricing/", follow_redirects=True)
+        canon = self._canonical(resp.text)
+        if canon:
+            self.assertFalse(canon.endswith("/"))
+
+
+# ==============================================================================
+# 6. Vestnomics Domain Configuration & Whitelisting
+# ==============================================================================
+class TestVestnomicsDomainConfig(unittest.TestCase):
+    def setUp(self):
+        self.client = TestClient(app)
+
+    def test_allowed_origin_hosts_includes_vestnomics(self):
+        self.assertIn("vestnomics.app", ALLOWED_ORIGIN_HOSTS)
+        self.assertIn("www.vestnomics.app", ALLOWED_ORIGIN_HOSTS)
+
+    def test_validate_request_origin_with_vestnomics(self):
+        scope_root = {
+            "type": "http",
+            "method": "POST",
+            "headers": [
+                (b"origin", b"https://vestnomics.app"),
+                (b"host", b"vestnomics.app")
+            ]
+        }
+        req_root = Request(scope_root)
+        self.assertTrue(_validate_request_origin(req_root))
+
+        scope_www = {
+            "type": "http",
+            "method": "POST",
+            "headers": [
+                (b"referer", b"https://www.vestnomics.app/discovery"),
+                (b"host", b"www.vestnomics.app")
+            ]
+        }
+        req_www = Request(scope_www)
+        self.assertTrue(_validate_request_origin(req_www))
+
+    def test_robots_txt_specifies_vestnomics_sitemap(self):
+        res = self.client.get("/robots.txt")
+        self.assertEqual(res.status_code, 200)
+        self.assertIn("Sitemap: https://vestnomics.app/sitemap.xml", res.text)
+
+    def test_sitemap_xml_contains_vestnomics_urls(self):
+        res = self.client.get("/sitemap.xml")
+        self.assertEqual(res.status_code, 200)
+        self.assertIn("https://vestnomics.app/", res.text)
+        self.assertIn("https://vestnomics.app/discovery", res.text)
+        self.assertIn("https://vestnomics.app/opportunities", res.text)
+
+    def test_sitemap_xml_respects_canonical_domain_env_override(self):
+        old_val = os.environ.get("CANONICAL_DOMAIN")
+        try:
+            os.environ["CANONICAL_DOMAIN"] = "https://custom.vestnomics.app"
+            res = self.client.get("/sitemap.xml")
+            self.assertEqual(res.status_code, 200)
+            self.assertIn("https://custom.vestnomics.app/", res.text)
+        finally:
+            if old_val is not None:
+                os.environ["CANONICAL_DOMAIN"] = old_val
+            else:
+                os.environ.pop("CANONICAL_DOMAIN", None)
+
+    def test_telemetry_self_host_filter_handles_vestnomics(self):
+        source, detail = parse_traffic_source(
+            referrer="https://vestnomics.app/discovery",
+            query_params={}
+        )
+        self.assertEqual(source, "Direct / Bookmark")
+        self.assertEqual(detail, "Direct")
+
+        source_www, detail_www = parse_traffic_source(
+            referrer="https://www.vestnomics.app/reits",
+            query_params={}
+        )
+        self.assertEqual(source_www, "Direct / Bookmark")
+        self.assertEqual(detail_www, "Direct")
+
+
+if __name__ == "__main__":
+    unittest.main()

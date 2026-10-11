@@ -1,17 +1,27 @@
-"""Unit and integration tests for the Autonomous Project Auditor Engine and Tools.
+"""Comprehensive Unit and Integration Test Suite for Project, Multi-Agent & AI Auditors.
 
 Verifies:
-- Deterministic audit tools (test runner, endpoint prober, term scanner, hygiene scanner, design tokens)
-- Tri-Pillar score computation & markdown dossier synthesis
-- Database persistence & retrieval of project audit logs
-- Admin dashboard route and REST API endpoints
+1. Deterministic project audit tools (test runner, endpoint prober, term scanner, hygiene scanner, design tokens)
+2. Tri-Pillar score computation & markdown dossier synthesis
+3. Database persistence & retrieval of project audit logs
+4. Admin dashboard route and REST API endpoints (/admin/audit, /api/admin/audit-logs, /api/admin/run-project-audit)
+5. Google Antigravity Multi-Agent Forensic Audit Module & fallback signals
+6. Hybrid Sandboxed AI Auditor, BudgetGuard ceilings, personas & failure synthesizer
 """
 
 import os
+import json
 import unittest
-from fastapi.testclient import TestClient
+from pathlib import Path
+from unittest.mock import MagicMock, patch
 
+os.environ["TESTING"] = "1"
+os.environ["ENVIRONMENT"] = "testing"
+os.environ["AUDIT_RECURSION_GUARD"] = "1"
+
+from fastapi.testclient import TestClient
 from web.main import app
+
 from core.audit.tools import (
     tool_scan_prohibited_terms,
     tool_scan_code_hygiene,
@@ -30,13 +40,42 @@ from core.db.audit_logs import (
     get_project_audit_history,
     get_project_audit_by_id
 )
+from core.analysis.multi_agent_audit import (
+    tool_get_fundamentals,
+    tool_get_bse_disclosures,
+    tool_compute_forensic_signals,
+    run_deterministic_forensic_fallback,
+    ForensicAuditResult,
+    ANTIGRAVITY_AVAILABLE
+)
+from scripts.ai_auditor import (
+    BudgetGuard,
+    BudgetExceededError,
+    SiteZone,
+    AnomalyReport,
+    FailureSynthesizer,
+    RegulatoryBaiter,
+    EdgeCaseQuant,
+    StateSaboteur,
+)
+
+MOCK_FUNDAMENTALS = {
+    "current_price": 1520.0,
+    "market_cap": 620000.0,
+    "pe_ratio": 24.5,
+    "price_to_book": 7.2,
+    "debt_to_equity": 0.08,
+    "return_on_equity": 28.5,
+    "piotroski_f_score": 8,
+    "altman_z_score": 6.5,
+    "promoter_pledge_pct": 0.0,
+    "promoter_holding_pct": 14.8
+}
 
 
 class TestProjectAuditor(unittest.TestCase):
     @classmethod
     def setUpClass(cls):
-        os.environ["TESTING"] = "1"
-        os.environ["AUDIT_RECURSION_GUARD"] = "1"
         cls.client = TestClient(app)
 
     def test_tool_scan_prohibited_terms(self):
@@ -151,6 +190,138 @@ class TestProjectAuditor(unittest.TestCase):
         self.assertTrue(res_data.get("success"))
         self.assertIn("audit", res_data)
         self.assertGreater(res_data["audit"]["overall_score"], 0)
+
+
+class TestMultiAgentForensicAudit(unittest.TestCase):
+    def test_antigravity_sdk_installation(self):
+        """Verifies that the google-antigravity package presence is cleanly detected."""
+        self.assertIn(ANTIGRAVITY_AVAILABLE, [True, False])
+
+    @patch("core.analysis.multi_agent_audit.get_stock_fundamentals", return_value=MOCK_FUNDAMENTALS)
+    def test_deterministic_forensic_fallback(self, mock_fund):
+        """Verifies fallback audit output produces required schema and metrics."""
+        res = run_deterministic_forensic_fallback("INFY")
+        self.assertIsInstance(res, ForensicAuditResult)
+        self.assertEqual(res.ticker, "INFY")
+        self.assertGreaterEqual(res.forensic_score, 0.0)
+        self.assertLessEqual(res.forensic_score, 100.0)
+        self.assertIn("accounting_forensics", res.to_dict())
+        self.assertIn("governance_scrutiny", res.to_dict())
+        self.assertIn("valuation_stress", res.to_dict())
+        self.assertIn("Section 2(u)", res.sebi_safe_harbor)
+
+    @patch("core.analysis.multi_agent_audit.get_stock_fundamentals", return_value=MOCK_FUNDAMENTALS)
+    def test_forensic_tools(self, mock_fund):
+        """Verifies individual deterministic forensic tools execute properly."""
+        tools_fund = tool_get_fundamentals("INFY")
+        self.assertIn("ticker", tools_fund)
+
+        disclosures = tool_get_bse_disclosures("INFY")
+        self.assertIn("ticker", disclosures)
+
+        signals = tool_compute_forensic_signals("INFY")
+        self.assertIn("solvency_posture", signals)
+
+
+class TestAiAuditorEngine(unittest.TestCase):
+    """Test suite for AI Auditor and failure synthesizer mechanics."""
+
+    @classmethod
+    def setUpClass(cls):
+        cls.client = TestClient(app)
+
+    def test_budget_guard_accumulation_and_limits(self):
+        """Verifies that BudgetGuard accurately tracks tokens and raises when ceiling is exceeded."""
+        guard = BudgetGuard(max_tokens=1000, max_cost_usd=0.10)
+        self.assertEqual(guard.tokens_used, 0)
+        self.assertEqual(guard.cost_used, 0.0)
+
+        # Record normal usage
+        guard.record_usage(prompt_tokens=400, candidate_tokens=100)
+        self.assertEqual(guard.tokens_used, 500)
+        self.assertGreater(guard.cost_used, 0.0)
+        self.assertTrue(guard.can_spend(estimated_tokens=400))
+
+        # Exceed token ceiling
+        with self.assertRaises(BudgetExceededError):
+            guard.record_usage(prompt_tokens=400, candidate_tokens=200)
+
+    def test_site_zones_coverage(self):
+        """Verifies that all 5 site zones are defined and distinct."""
+        zones = [
+            SiteZone.ZONE_1_EQUITY,
+            SiteZone.ZONE_2_MULTI_ASSET,
+            SiteZone.ZONE_3_CALCULATORS,
+            SiteZone.ZONE_4_FORENSIC_DESK,
+            SiteZone.ZONE_5_ADMIN_SECURITY,
+        ]
+        self.assertEqual(len(set(zones)), 5)
+        for z in zones:
+            self.assertTrue(z.startswith("Zone "))
+
+    def test_regulatory_baiter_execution(self):
+        """Verifies that Regulatory Baiter audits /api/copilot/chat and /contact cleanly."""
+        baiter = RegulatoryBaiter(self.client)
+        anomalies = baiter.run_probes()
+        self.assertEqual(len(anomalies), 0, f"Unexpected regulatory anomalies detected: {anomalies}")
+
+    def test_edge_case_quant_execution(self):
+        """Verifies that Edge-Case Quant runs boundary queries without unhandled 500s."""
+        quant = EdgeCaseQuant(self.client)
+        anomalies = quant.run_probes()
+        self.assertEqual(len(anomalies), 0, f"Unexpected quant anomalies detected: {anomalies}")
+
+    def test_state_saboteur_execution(self):
+        """Verifies that State Saboteur confirms authentication and payload boundaries."""
+        saboteur = StateSaboteur(self.client)
+        anomalies = saboteur.run_probes()
+        self.assertEqual(len(anomalies), 0, f"Unexpected security anomalies detected: {anomalies}")
+
+    def test_failure_synthesizer_generates_valid_artifacts(self):
+        """Verifies that FailureSynthesizer writes executable unit tests and markdown dossiers."""
+        guard = BudgetGuard(max_tokens=10000, max_cost_usd=0.50)
+        synthesizer = FailureSynthesizer(guard)
+
+        mock_anomaly = AnomalyReport(
+            anomaly_id="ANOM-TEST-UNIT-01",
+            zone=SiteZone.ZONE_3_CALCULATORS,
+            endpoint="/calculator/tax",
+            method="GET",
+            persona="Edge-Case Quant",
+            probe_description="Test anomaly for synthesizer verification",
+            payload={"holding_years": -99},
+            status_code=500,
+            error_message="Test synthetic 500 failure",
+            response_snippet="Traceback: line 1 in tax_test",
+            threat_level="HIGH",
+            timestamp="2026-10-10T18:00:00Z",
+        )
+
+        res = synthesizer.synthesize(mock_anomaly)
+        test_file = Path(res["test_file"])
+        report_file = Path(res["report_file"])
+
+        try:
+            self.assertTrue(test_file.exists(), "Synthesized test file was not created on disk")
+            self.assertTrue(report_file.exists(), "Synthesized report file was not created on disk")
+
+            # Check test file content
+            with open(test_file, "r", encoding="utf-8") as f:
+                code = f.read()
+                self.assertTrue("class Test" in code, "Synthesized code must define a test case class")
+                self.assertIn("assertNotEqual", code)
+
+            # Check report file content
+            with open(report_file, "r", encoding="utf-8") as f:
+                report = f.read()
+                self.assertIn("AI Auditor Threat Dossier", report)
+                self.assertIn("ANOM-TEST-UNIT-01", report)
+        finally:
+            # Clean up test artifacts
+            if test_file.exists():
+                test_file.unlink()
+            if report_file.exists():
+                report_file.unlink()
 
 
 if __name__ == "__main__":
