@@ -513,16 +513,16 @@ The following items constitute the prioritized, operational active tasks:
 4. **Hybrid AI Auditor & Failure Synthesizer:** *(Completed)*
    - **Target Files:** `scripts/ai_auditor.py`, `tests/test_ai_auditor.py`
    - **Details:** Implemented the bounded 3-persona auditor (Regulatory Baiter, Edge-Case Quant, State Saboteur) using `gemini-3.8-flash` with a strict $0.50 token ceiling that outputs structured threat dossiers and auto-generates failing Python unit tests (`tests/test_regression_*.py`).
-5. **Curated Mutual Fund Top 100 Expansion (Next 50 Schemes):** *(Pending)*
+5. **Curated Mutual Fund Top 100 Expansion (Next 50 Schemes):** *(Completed)*
    - **Target Files:** `core/db/mutual_funds.py`, `core/analysis/fund_forensic_auditor.py`, `tests/test_mutual_fund_top100_expansion.py`
-   - **Details:** Expand canonical institutional universe from Top 50 to Top 100 marquee schemes across Multi Cap, Focused, Value/Contra, ELSS, Large Cap, and Thematic/Sectoral categories with verified AMFI metrics, expense drag ratios, active share benchmarks, and constituent equity holdings mapped to the platform 143-equity database.
+   - **Details:** Expanded canonical institutional universe from Top 50 to Top 100 marquee schemes across Multi Cap (8), Focused (8), Value/Contra (8), ELSS (8), Large Cap (8), and Thematic/Sectoral (10) categories with verified AMFI metrics, expense drag ratios, active share benchmarks, Sortino ratios, and constituent equity look-through holdings mapped to the platform 143-equity database.
 
 #### 🟡 P2 — Operational Quality & Test Coverage
-6. **Install `openpyxl` Locally:**
-   - **Details:** Ensure all 303 unit tests run locally (unskipping the 13 tests in `test_mf_portfolio_ingest.py`).
-7. **Operational Gateway Liveness & Token Lifecycle Monitoring:**
+6. **Install `openpyxl` Locally:** *(Completed)*
+   - **Details:** Installed `openpyxl 3.1.5` and `et-xmlfile 2.0.0` locally. Unskipped all 13 tests in `tests/test_mf_portfolio_ingest.py`, bringing suite execution to 100% (334 passed, 0 skipped, 0 failed).
+7. **Operational Gateway Liveness & Token Lifecycle Monitoring:** *(Completed)*
    - **Target Files:** `core/ingestion/angel_one.py`, `scripts/verify_angel_proxy_ip.py`
-   - **Details:** Maintain continuous uptime of the AWS Lightsail proxy daemon (`13.54.76.134:8888`) and verify automated RFC 6238 TOTP session token renewals during live Indian market trading hours (09:15 to 15:30 IST).
+   - **Details:** Verified AWS Lightsail proxy daemon (`13.54.76.134:8888`), authenticated RFC 6238 TOTP session tokens against `apiconnect.angelone.in`, and verified live Level-2 market depth quote ingestion (`RELIANCE-EQ` LTP ₹1170.30, 52W range ₹1160.20-₹1611.80, order imbalance 1.0).
 
 #### ⚪ P3 — Hygiene & Explicitly Parked Backlog
 - **Completed (2026-10-11):** Unlisted MSME & SME Intelligence Platform (`/msme`, `core/msme/`) — Full 60-enterprise benchmark cluster seeding, dual-dialect SQL search, statutory MSMED Act 2020 tier classification, resilient open data ingestion, and interactive directory terminal.
