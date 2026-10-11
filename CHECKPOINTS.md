@@ -10,7 +10,7 @@
 
 | Checkpoint Tag | IST Timestamp | Commit | DB Reports | Description |
 |:---|:---|:---|:---|:---|
-| `checkpoint_20261012_001527_all_equities_institutional_directory` | 2026-10-12 00:15:27 IST | `fecc7fd` | 143 rep / 244 rev | all_equities_institutional_directory |
+| `checkpoint_20261012_001527_all_equities_institutional_directory` | 2026-10-12 00:15:27 IST | `3e29e7e` | 143 rep / 244 rev | all_equities_institutional_directory |
 | `checkpoint_20261011_234536` | 2026-10-11 23:45:36 IST | `acbc4ee` | 143 rep / 244 rev | Production Release Checkpoint |
 | `checkpoint_20261011_180641` | 2026-10-11 18:06:41 IST | `44ea7bf` | 143 rep / 244 rev | Production Release Checkpoint |
 | `checkpoint_20261011_171649_Multi-asset_paywall__SEO_analytics__and_Stages_1-5_renames` | 2026-10-11 17:16:49 IST | `f1dfdb8` | 143 rep / 239 rev | Multi-asset paywall, SEO analytics, and Stages 1-5 renames |
