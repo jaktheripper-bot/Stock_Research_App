@@ -610,8 +610,8 @@ async def process_copilot_turn(
                     if linked_debt:
                         from core.analysis.debt_engine import evaluate_equity_cross_contagion
                         contagion_alert = evaluate_equity_cross_contagion(linked_debt[0], fetch_live_fundamentals=False)
-                except Exception:
-                    pass
+                except Exception as e:
+                    logger.debug(f"Cross-contagion lookup notice for {clean_ticker}: {e}")
 
                 cmp_val = rep.get("baseline_price") or fund.get("current_price") or "N/A"
                 pe_val = rep.get("baseline_pe") or fund.get("pe_ratio") or "N/A"

@@ -47,7 +47,7 @@
         </div>
         <div style="display: flex; gap: 8px; margin-top: 4px;">
           <button onclick="openCopilot('{{ posture.ticker or posture.isin }}', 'debt')" class="btn btn-hero-ai btn-sm" title="Launch Forensic Intelligence Desk (Shortcut: ⌘K or /)">
-            <svg class="glyph"><use href="#glyph-shield"></use></svg> ⚡ Forensic Desk
+            <svg class="glyph"><use href="#glyph-shield"></use></svg> Forensic Desk
           </button>
           <a href="/api/pdf/debt/{{ posture.isin }}" class="btn btn-sm btn-secondary" style="text-decoration: none; font-size: 12px; font-weight: 600;">
             📄 Export PDF
@@ -163,7 +163,7 @@
       </div>
       <div style="display: flex; align-items: center; gap: 8px;">
         <button onclick="openCopilot('{{ posture.ticker or posture.isin }}', 'debt', 'contagion', 'Credit Contagion Radar', 'What does the Credit Contagion Radar say about systemic risks for this issuer?')" class="btn btn-secondary btn-sm" style="font-weight: 600; font-size: 11px; padding: 4px 10px; cursor: pointer; display: inline-flex; align-items: center; gap: 4px;">
-          <span>⚡</span> Forensic Desk
+          <svg class="glyph"><use href="#glyph-zap"></use></svg> Forensic Desk
         </button>
         <div style="display: inline-flex; align-items: center; gap: 6px; padding: 6px 14px; border-radius: 9999px; background: rgba(255, 255, 255, 0.05); border: 1px solid {{ posture.credit_contagion_radar.badge_color }};">
           <span style="width: 8px; height: 8px; border-radius: 50%; background: {{ posture.credit_contagion_radar.badge_color }};"></span>

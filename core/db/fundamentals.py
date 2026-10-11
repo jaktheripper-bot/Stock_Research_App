@@ -32,8 +32,8 @@ def extract_fundamentals_from_report_text(report_text: str, fallback_data: Optio
         if m_roce:
             try:
                 res["roce"] = float(m_roce.group(1))
-            except Exception:
-                pass
+            except Exception as e:
+                logger.debug("Failed parsing ROCE from report text: %s", e)
 
     # 2. ROE (Return on Equity)
     if res.get("roe") in [None, "N/A", "", 0, 0.0]:
@@ -43,8 +43,8 @@ def extract_fundamentals_from_report_text(report_text: str, fallback_data: Optio
         if m_roe:
             try:
                 res["roe"] = float(m_roe.group(1))
-            except Exception:
-                pass
+            except Exception as e:
+                logger.debug("Failed parsing ROE from report text: %s", e)
 
     # 3. Operating Margin (OPM) / EBITDA Margin
     if res.get("operating_margin") in [None, "N/A", "", 0, 0.0]:
@@ -54,8 +54,8 @@ def extract_fundamentals_from_report_text(report_text: str, fallback_data: Optio
         if m_opm:
             try:
                 res["operating_margin"] = float(m_opm.group(1))
-            except Exception:
-                pass
+            except Exception as e:
+                logger.debug("Failed parsing OPM from report text: %s", e)
 
     # 4. Debt-to-Equity (D/E)
     if res.get("debt_to_equity") in [None, "N/A", ""]:
@@ -66,8 +66,8 @@ def extract_fundamentals_from_report_text(report_text: str, fallback_data: Optio
             if m_de:
                 try:
                     res["debt_to_equity"] = float(m_de.group(1))
-                except Exception:
-                    pass
+                except Exception as e:
+                    logger.debug("Failed parsing D/E from report text: %s", e)
 
     # 5. 52-Week High & Low
     if res.get("fifty_two_week_high") in [None, "N/A", "", 0, 0.0] or res.get("fifty_two_week_low") in [None, "N/A", "", 0, 0.0]:
@@ -76,13 +76,13 @@ def extract_fundamentals_from_report_text(report_text: str, fallback_data: Optio
         if mh and res.get("fifty_two_week_high") in [None, "N/A", "", 0, 0.0]:
             try:
                 res["fifty_two_week_high"] = float(mh.group(1).replace(",", "").strip())
-            except Exception:
-                pass
+            except Exception as e:
+                logger.debug("Failed parsing 52-week high from report text: %s", e)
         if ml and res.get("fifty_two_week_low") in [None, "N/A", "", 0, 0.0]:
             try:
                 res["fifty_two_week_low"] = float(ml.group(1).replace(",", "").strip())
-            except Exception:
-                pass
+            except Exception as e:
+                logger.debug("Failed parsing 52-week low from report text: %s", e)
 
         # Combined range pattern fallback: "52-week range of 1,000 - 1,500"
         if res.get("fifty_two_week_high") in [None, "N/A", ""] or res.get("fifty_two_week_low") in [None, "N/A", ""]:
@@ -93,8 +93,8 @@ def extract_fundamentals_from_report_text(report_text: str, fallback_data: Optio
                     val2 = float(m_comb.group(2).replace(",", "").strip())
                     res["fifty_two_week_low"] = min(val1, val2)
                     res["fifty_two_week_high"] = max(val1, val2)
-                except Exception:
-                    pass
+                except Exception as e:
+                    logger.debug("Failed parsing 52-week range from report text: %s", e)
 
     # 6. Price to Book (P/B)
     if res.get("pb_ratio") in [None, "N/A", ""]:

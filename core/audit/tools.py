@@ -462,10 +462,28 @@ def tool_audit_frontend_and_api_contracts() -> Dict[str, Any]:
 
     # 3. Check AJAX fetch calls vs backend FastAPI routes
     backend_routes = set()
+    try:
+        from web.main import app
+        for r in app.routes:
+            if hasattr(r, "path"):
+                backend_routes.add(r.path)
+            elif hasattr(r, "original_router") and hasattr(r.original_router, "routes"):
+                prefix = getattr(getattr(r, "include_context", None), "prefix", "")
+                for sub_r in r.original_router.routes:
+                    if hasattr(sub_r, "path"):
+                        backend_routes.add(prefix + sub_r.path)
+            elif hasattr(r, "routes"):
+                prefix = getattr(getattr(r, "include_context", None), "prefix", "")
+                for sub_r in r.routes:
+                    if hasattr(sub_r, "path"):
+                        backend_routes.add(prefix + sub_r.path)
+    except Exception as e:
+        logger.debug(f"Dynamic route inspection fallback: {e}")
+
     if main_py_path.exists():
         try:
             main_code = main_py_path.read_text(encoding="utf-8")
-            backend_routes = set(re.findall(r"@app\.(?:get|post|put|delete|patch)\([\"'](/api/[^\"'?]+)[\"']", main_code))
+            backend_routes.update(re.findall(r"@app\.(?:get|post|put|delete|patch)\([\"'](/api/[^\"'?]+)[\"']", main_code))
         except Exception as e:
             logger.warning(f"Error reading main.py for routes: {e}")
 
@@ -476,15 +494,15 @@ def tool_audit_frontend_and_api_contracts() -> Dict[str, Any]:
             content = html_file.read_text(encoding="utf-8")
             for m in fetch_pat.finditer(content):
                 frontend_fetches.add(m.group(1))
-        except Exception:
-            pass
+        except Exception as e:
+            logger.debug(f"Error reading template {html_file} for fetch scanning: {e}")
 
     unmapped_fetches = []
     for f_route in sorted(frontend_fetches):
         matched = False
         for b_route in backend_routes:
             base_b = b_route.split("{")[0]
-            if f_route.startswith(base_b):
+            if f_route.startswith(base_b) or base_b.startswith(f_route):
                 matched = True
                 break
         if not matched:
@@ -503,8 +521,8 @@ def tool_audit_frontend_and_api_contracts() -> Dict[str, Any]:
                         txt = fp.read_text(encoding="utf-8", errors="ignore")
                         if "Comp_Resultsnew.aspx" in txt:
                             stale_links.append(str(fp.relative_to(PROJECT_ROOT)))
-                    except Exception:
-                        pass
+                    except Exception as e:
+                        logger.debug(f"Error scanning file {fp} for stale links: {e}")
 
     is_clean = len(orphaned_onclicks) == 0 and len(unmapped_fetches) == 0 and len(stale_links) == 0
     contract_score = 100.0

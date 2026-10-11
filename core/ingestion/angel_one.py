@@ -206,8 +206,8 @@ class AngelOneGateway:
             local_ip = "127.0.0.1"
             try:
                 local_ip = socket.gethostbyname(socket.gethostname())
-            except Exception:
-                pass
+            except Exception as e:
+                logger.debug(f"Unable to resolve hostname IP for Angel One auth header: {e}")
 
             headers = {
                 "Content-Type": "application/json",
@@ -480,8 +480,8 @@ class AngelOneGateway:
         local_ip = "127.0.0.1"
         try:
             local_ip = socket.gethostbyname(socket.gethostname())
-        except Exception:
-            pass
+        except Exception as e:
+            logger.debug(f"Unable to resolve hostname IP for Angel One historic candle request: {e}")
 
         headers = {
             "Content-Type": "application/json",

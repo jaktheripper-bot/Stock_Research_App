@@ -240,8 +240,8 @@ async def run_daily_discovery_scheduler():
         today_str = now.strftime("%Y-%m-%d")
         if get_active_discovery_reel(today_str, exclude_tests=True, allow_fallback=False):
             last_run_date = today_str
-    except Exception:
-        pass
+    except Exception as e:
+        logger.debug(f"[Discovery Scheduler] Initial reel check notice: {e}")
 
     while True:
         try:
@@ -574,8 +574,8 @@ def _can_access_today_discovery(request: Request, user: Optional[Dict[str, Any]]
     try:
         if _is_admin_authenticated(request):
             return True
-    except Exception:
-        pass
+    except Exception as e:
+        logger.debug(f"Admin auth check in deep dive access notice: {e}")
     return _is_user_subscribed(user)
 
 
@@ -2053,8 +2053,8 @@ def api_cortex_forensic_sieve(ticker: str, mode: str = "SOFT"):
         try:
             mcap_val = float(str(rep.get("baseline_mcap") or 100).replace(",", "").strip())
             data["market_cap_cr"] = (mcap_val / 1e7) if mcap_val > 1e6 else mcap_val
-        except Exception:
-            pass
+        except Exception as e:
+            logger.debug(f"Parsing baseline mcap notice for {clean_t}: {e}")
     res = ChanakyaGate.evaluate_from_dict(data, mode=mode)
     return json_response_with_cache(asdict(res), max_age=60)
 
