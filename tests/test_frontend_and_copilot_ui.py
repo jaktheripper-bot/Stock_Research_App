@@ -98,10 +98,16 @@ class TestFrontendClickWiringAndCredits(unittest.TestCase):
         css_content = style_css_path.read_text(encoding="utf-8")
         self.assertIn(".btn-loading-progress", css_content)
         self.assertIn("--btn-progress", css_content)
+        self.assertIn(".btn-instant-pressed", css_content)
 
         main_js_path = self.project_root / "web" / "static" / "js" / "main.js"
         js_content = main_js_path.read_text(encoding="utf-8")
         self.assertIn("startButtonProgressFill", js_content)
+        self.assertIn("resetButtonProgressFill", js_content)
+        self.assertIn("resetAllButtonProgressFills", js_content)
+        self.assertIn("pageshow", js_content)
+        self.assertIn("pagehide", js_content)
+        self.assertIn("popstate", js_content)
         self.assertIn("overlayProgressBar", js_content)
         self.assertIn("overlayProgressTime", js_content)
 

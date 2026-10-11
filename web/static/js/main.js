@@ -42,6 +42,8 @@ function initSearchAutocomplete() {
     e.preventDefault();
     const query = searchInput.value.trim().toUpperCase();
     if (query) {
+      const submitBtn = searchForm.querySelector('button[type="submit"], .btn-search, .search-btn');
+      if (submitBtn) startButtonProgressFill(submitBtn, 'Searching');
       window.location.href = `/dossier/${encodeURIComponent(query)}`;
     }
   });
@@ -1374,25 +1376,69 @@ document.addEventListener('mouseover', (e) => {
 }, { passive: true });
 
 // ==============================================================================
-// 30-Second Progressive Fill Loading Animation for Dossier Action Triggers
+// 30-Second Progressive Fill Loading Animation & BFCache Navigation Lifecycle
 // ==============================================================================
+const _activeProgressButtons = new Set();
+
+function resetButtonProgressFill(btn) {
+  if (!btn) return;
+  if (btn._progressInterval) {
+    clearInterval(btn._progressInterval);
+    btn._progressInterval = null;
+  }
+  if (btn._progressSafetyTimeout) {
+    clearTimeout(btn._progressSafetyTimeout);
+    btn._progressSafetyTimeout = null;
+  }
+  if (btn.dataset.originalHtml) {
+    btn.innerHTML = btn.dataset.originalHtml;
+    delete btn.dataset.originalHtml;
+    btn.removeAttribute('data-original-html');
+  }
+  btn.classList.remove('btn-loading-progress');
+  btn.classList.remove('btn-instant-pressed');
+  btn.style.removeProperty('--btn-progress');
+  delete btn.dataset.progressActive;
+  btn.removeAttribute('data-progress-active');
+  _activeProgressButtons.delete(btn);
+}
+
+function resetAllButtonProgressFills() {
+  _activeProgressButtons.forEach(btn => resetButtonProgressFill(btn));
+  _activeProgressButtons.clear();
+  document.querySelectorAll('.btn-loading-progress, [data-progress-active]').forEach(btn => {
+    resetButtonProgressFill(btn);
+  });
+}
+
+window.resetButtonProgressFill = resetButtonProgressFill;
+window.resetAllButtonProgressFills = resetAllButtonProgressFills;
+
 function startButtonProgressFill(btn, baseLabel = 'Loading Dossier') {
   if (!btn || btn.dataset.progressActive) return;
+
+  // Cache original innerHTML before mutating DOM so it can be restored on Back navigation
+  if (!btn.dataset.originalHtml) {
+    btn.dataset.originalHtml = btn.innerHTML;
+  }
+
   btn.dataset.progressActive = 'true';
   btn.classList.add('btn-loading-progress');
-  btn.style.pointerEvents = 'none';
+  _activeProgressButtons.add(btn);
 
   const startMs = Date.now();
+  const INITIAL_PCT = 14; // Immediate perceptible progress bar start on the first frame
+
   const updateProgress = () => {
     const elapsedMs = Date.now() - startMs;
     const elapsedSec = Math.min(30, Math.floor(elapsedMs / 1000));
 
-    // Progress fill percentage: 0% -> 88% over 25s, then crawls smoothly to 96%
-    let pct = 0;
-    if (elapsedMs < 25000) {
-      pct = Math.min(88, (elapsedMs / 25000) * 88);
+    // Progress fill percentage: Starts immediately at 14%, fills smoothly to 88% over 24s, crawls to 96%
+    let pct = INITIAL_PCT;
+    if (elapsedMs < 24000) {
+      pct = INITIAL_PCT + (elapsedMs / 24000) * (88 - INITIAL_PCT);
     } else {
-      pct = Math.min(96, 88 + ((elapsedMs - 25000) / 5000) * 8);
+      pct = Math.min(96, 88 + ((elapsedMs - 24000) / 6000) * 8);
     }
 
     btn.style.setProperty('--btn-progress', `${pct.toFixed(1)}%`);
@@ -1411,22 +1457,84 @@ function startButtonProgressFill(btn, baseLabel = 'Loading Dossier') {
     btn.innerHTML = `<span class="btn-progress-label"><span style="display:inline-block; animation: spin 0.6s linear infinite;">⚡</span> ${stage}... ${elapsedSec}s / ~30s</span>`;
   };
 
+  // Synchronous immediate visual update on the exact click tick
   updateProgress();
-  btn._progressInterval = setInterval(updateProgress, 500);
+
+  // High-frequency 100ms interval for silky-smooth continuous progress movement
+  btn._progressInterval = setInterval(updateProgress, 100);
+
+  // Safety watchdog: Auto-reset button if navigation didn't happen after 40 seconds
+  btn._progressSafetyTimeout = setTimeout(() => {
+    resetButtonProgressFill(btn);
+  }, 40000);
 }
 
+// Global click interceptor with capture: true for instant reaction
 document.addEventListener('click', (e) => {
   const a = e.target.closest('a, button');
-  if (a && !a.dataset.progressActive) {
-    if (a.tagName === 'A' && a.href && a.origin === window.location.origin && !a.target && !e.ctrlKey && !e.metaKey) {
-      const p = a.pathname;
-      if (p.startsWith('/dossier/') || p.startsWith('/funds/') || p.startsWith('/debt/')) {
-        if (a.classList.contains('btn')) {
-          startButtonProgressFill(a, 'Loading Dossier');
-        }
+  if (!a) return;
+
+  // Prevent multiple double-clicks if already actively loading
+  if (a.dataset.progressActive === 'true') {
+    e.preventDefault();
+    e.stopPropagation();
+    return;
+  }
+
+  if (a.tagName === 'A' && a.href && a.origin === window.location.origin && !a.target && !e.ctrlKey && !e.metaKey && !e.shiftKey) {
+    const p = a.pathname;
+    if (p.startsWith('/dossier/') || p.startsWith('/funds/') || p.startsWith('/debt/')) {
+      if (a.classList.contains('btn')) {
+        startButtonProgressFill(a, 'Loading Dossier');
       }
     }
   }
+}, true); // Use capture phase so listener fires immediately at the top of the event tree
+
+// Tactile press state for instantaneous pointer responsiveness
+document.addEventListener('pointerdown', (e) => {
+  if (e.button !== 0) return; // Left click only
+  const a = e.target.closest('a.btn, button.btn');
+  if (a && !a.dataset.progressActive && a.origin === window.location.origin) {
+    const p = a.pathname;
+    if (p && (p.startsWith('/dossier/') || p.startsWith('/funds/') || p.startsWith('/debt/'))) {
+      a.classList.add('btn-instant-pressed');
+    }
+  }
+}, { passive: true, capture: true });
+
+['pointerup', 'pointercancel', 'pointerleave'].forEach(evt => {
+  document.addEventListener(evt, () => {
+    document.querySelectorAll('.btn-instant-pressed').forEach(el => el.classList.remove('btn-instant-pressed'));
+  }, { passive: true });
+});
+
+// BFCache and History Navigation Lifecycle Guards
+// Resets all loading buttons back to pristine original state whenever page is shown (back/forward cache)
+window.addEventListener('pageshow', (event) => {
+  resetAllButtonProgressFills();
+});
+
+// Terminate active background intervals immediately when navigating away
+window.addEventListener('pagehide', () => {
+  _activeProgressButtons.forEach(btn => {
+    if (btn._progressInterval) {
+      clearInterval(btn._progressInterval);
+      btn._progressInterval = null;
+    }
+    if (btn._progressSafetyTimeout) {
+      clearTimeout(btn._progressSafetyTimeout);
+      btn._progressSafetyTimeout = null;
+    }
+  });
+});
+
+window.addEventListener('popstate', () => {
+  resetAllButtonProgressFills();
+});
+
+document.addEventListener('DOMContentLoaded', () => {
+  resetAllButtonProgressFills();
 });
 
 

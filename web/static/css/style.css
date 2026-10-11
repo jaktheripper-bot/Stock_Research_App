@@ -933,11 +933,12 @@ article.dossier-article {
 .btn-loading-progress {
   position: relative !important;
   overflow: hidden !important;
-  pointer-events: none !important;
+  cursor: progress !important;
   user-select: none;
-  border-color: rgba(14, 165, 233, 0.5) !important;
+  border-color: rgba(14, 165, 233, 0.6) !important;
   color: #f8fafc !important;
   background-color: #0f172a !important;
+  box-shadow: inset 0 0 12px rgba(14, 165, 233, 0.18) !important;
 }
 
 .btn-loading-progress::before {
@@ -947,9 +948,11 @@ article.dossier-article {
   left: 0;
   bottom: 0;
   width: var(--btn-progress, 0%);
-  background: linear-gradient(90deg, rgba(14, 165, 233, 0.22) 0%, rgba(14, 165, 233, 0.48) 100%);
+  background: linear-gradient(90deg, rgba(14, 165, 233, 0.25) 0%, rgba(14, 165, 233, 0.55) 100%);
   border-right: 2px solid var(--accent-cyan, #0ea5e9);
-  transition: width 0.4s ease-out;
+  box-shadow: 0 0 10px rgba(14, 165, 233, 0.75);
+  transition: width 0.12s linear;
+  will-change: width;
   z-index: 1;
 }
 
@@ -966,6 +969,12 @@ article.dossier-article {
   gap: 6px;
   font-variant-numeric: tabular-nums;
   font-weight: 600;
+}
+
+.btn-instant-pressed {
+  transform: scale(0.985);
+  opacity: 0.92;
+  transition: transform 0.06s ease, opacity 0.06s ease;
 }
 
 /* Static Status Pills & Informational Badges (Non-Clickable) */
