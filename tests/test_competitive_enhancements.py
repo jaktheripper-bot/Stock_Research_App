@@ -130,10 +130,10 @@ class TestCompetitiveEnhancements(unittest.TestCase):
     def test_multi_asset_copilot_mutual_fund(self):
         """Tests that Copilot correctly grounds context when querying a mutual fund scheme."""
         import asyncio
-        from core.agents.copilot.investor_copilot import process_copilot_turn
+        from core.agents.copilot.forensic_desk import process_forensic_desk_turn
 
         async def _run():
-            res = await process_copilot_turn(
+            res = await process_forensic_desk_turn(
                 conversation_id="TEST-COPILOT-MF-101",
                 user_message="Provide a diagnostic look-through summary of this fund.",
                 ticker="PPFAS_FLEXICAP_DIR",
@@ -149,10 +149,10 @@ class TestCompetitiveEnhancements(unittest.TestCase):
     def test_copilot_mutual_fund_non_advisory_deflection(self):
         """Tests that retail advisory queries on mutual funds yield fund-specific SEBI notices without stock jargon."""
         import asyncio
-        from core.agents.copilot.investor_copilot import process_copilot_turn
+        from core.agents.copilot.forensic_desk import process_forensic_desk_turn
 
         async def _run():
-            res = await process_copilot_turn(
+            res = await process_forensic_desk_turn(
                 conversation_id="TEST-COPILOT-MF-DEFLECT",
                 user_message="Should I buy this fund right now?",
                 ticker="PPFAS_FLEXICAP_DIR",
@@ -170,11 +170,11 @@ class TestCompetitiveEnhancements(unittest.TestCase):
     def test_copilot_mutual_fund_section_awareness(self):
         """Tests that clicking Copilot within specific sections yields section-anchored diagnostic intelligence."""
         import asyncio
-        from core.agents.copilot.investor_copilot import process_copilot_turn
+        from core.agents.copilot.forensic_desk import process_forensic_desk_turn
 
         async def _run():
             # 1. Fee Drag Section
-            res_fee = await process_copilot_turn(
+            res_fee = await process_forensic_desk_turn(
                 conversation_id="TEST-COPILOT-SEC-FEE",
                 user_message="Explain the fee impact.",
                 ticker="PPFAS_FLEXICAP_DIR",
@@ -186,7 +186,7 @@ class TestCompetitiveEnhancements(unittest.TestCase):
             self.assertIn("Fee Drag", res_fee["response"])
 
             # 2. Active Share Section
-            res_as = await process_copilot_turn(
+            res_as = await process_forensic_desk_turn(
                 conversation_id="TEST-COPILOT-SEC-AS",
                 user_message="Is this fund hugging the benchmark?",
                 ticker="PPFAS_FLEXICAP_DIR",
@@ -198,13 +198,14 @@ class TestCompetitiveEnhancements(unittest.TestCase):
             self.assertIn("Active Share", res_as["response"])
 
             # 3. Look-Through Accounting Risk (ASRI) Section
-            res_asri = await process_copilot_turn(
+            res_asri = await process_forensic_desk_turn(
                 conversation_id="TEST-COPILOT-SEC-ASRI",
                 user_message="What are the accounting red flags?",
                 ticker="PPFAS_FLEXICAP_DIR",
                 asset_type="mutual_fund",
                 section="asri_solvency",
-                section_label="Accounting Risk (ASRI)"
+                section_label="Accounting Risk (ASRI)",
+                deep_dive_unlocked=True
             )
             self.assertIn(res_asri["status"], ["COMPLETED", "DETERMINISTIC_FALLBACK"])
             self.assertIn("Accounting Risk", res_asri["response"])
@@ -214,10 +215,10 @@ class TestCompetitiveEnhancements(unittest.TestCase):
     def test_multi_asset_copilot_debt_security(self):
         """Tests that Copilot correctly grounds context when querying a debt security."""
         import asyncio
-        from core.agents.copilot.investor_copilot import process_copilot_turn
+        from core.agents.copilot.forensic_desk import process_forensic_desk_turn
 
         async def _run():
-            res = await process_copilot_turn(
+            res = await process_forensic_desk_turn(
                 conversation_id="TEST-COPILOT-DEBT-102",
                 user_message="Assess the solvency and duration risk of this NCD.",
                 ticker="INE002A08012"
@@ -264,7 +265,7 @@ class TestCompetitiveEnhancements(unittest.TestCase):
         self.assertIn("/admin/audit", resp_home.text)
 
         # 2. Debt dossier contains Contagion Radar, Copilot trigger, and link to parent equity
-        resp_debt = self.client.get("/debt/INE002A08012")
+        resp_debt = self.client.get("/debt/INE002A08012", headers={"x-unlock-preview": "1"})
         self.assertEqual(resp_debt.status_code, 200)
         self.assertIn("Credit Contagion Radar", resp_debt.text)
         self.assertIn("/dossier/RELIANCE", resp_debt.text)

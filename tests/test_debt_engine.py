@@ -328,7 +328,7 @@ class TestDebtEngineAndRepository(unittest.TestCase):
 
     def test_debt_crawler_collation_catalog(self):
         """Verifies supported platform directory for Indian alternative fixed-income collation."""
-        from core.analysis.debt_crawler import get_collation_platform_catalog, normalize_debt_security_payload
+        from core.analysis.debt_catalogue import get_collation_platform_catalog, normalize_debt_security_payload
         catalog = get_collation_platform_catalog()
         platforms = catalog["platforms"]
         self.assertIn("WINT_WEALTH", platforms)

@@ -25,6 +25,9 @@
         </div>
 
         <div style="display: flex; gap: 10px; flex-wrap: wrap; align-items: center;">
+          <button id="btnShareDossier" onclick="shareCurrentPage('dossier')" class="btn btn-secondary btn-sm" title="Copy or share a link to this report" aria-label="Share this report">
+            <span>🔗</span> Share
+          </button>
           <button onclick="openCopilot('{{ ticker }}', 'equity')" class="btn btn-hero-ai btn-sm" title="Launch Forensic Intelligence Desk (Shortcut: ⌘K or /)">
             <svg class="glyph"><use href="#glyph-shield"></use></svg> Forensic Desk
           </button>

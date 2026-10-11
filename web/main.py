@@ -136,8 +136,8 @@ from core.db.telemetry import (
 ADMIN_COOKIE_NAME = "admin_session"
 from core.notify import dispatch_support_ticket_alert
 from core.analysis import get_stock_fundamentals, get_historical_prices
-from core.analysis.engine import generate_stock_report
-from core.analysis.comparator import compare_two_companies
+from core.analysis.dossier_report_synthesis import generate_stock_report
+from core.analysis.peer_comparison import compare_two_companies
 from core.analysis.parser import (
     extract_health_matrix,
     compare_revisions,
@@ -181,14 +181,14 @@ from core.db.mutual_funds import (
     get_featured_daily_fund_dossier,
     get_fund_forensic_dossier,
 )
-from core.analysis.mutual_fund_engine import (
+from core.analysis.mutual_funds_engine import (
     evaluate_mutual_fund_comprehensive,
     evaluate_dual_sleeve_lookthrough,
     calculate_portfolio_overlap,
     calculate_active_share,
     calculate_fee_drag,
 )
-from core.analysis.fund_forensic_auditor import (
+from core.analysis.fund_overlap_auditor import (
     audit_single_fund_daily,
     compute_fund_forensic_lookthrough,
     calculate_deep_dive_credit_cost,
@@ -322,7 +322,7 @@ async def run_daily_fund_audit_scheduler():
             await asyncio.sleep(wait_seconds)
 
             logger.info("🔍 [Fund Audit Scheduler] Executing scheduled nightly mutual fund forensic audit...")
-            from core.analysis.fund_forensic_auditor import audit_single_fund_daily
+            from core.analysis.fund_overlap_auditor import audit_single_fund_daily
             from core.db.agent_sessions import record_autonomous_event
             loop = asyncio.get_running_loop()
             res = await loop.run_in_executor(None, audit_single_fund_daily, None, False)
@@ -531,11 +531,57 @@ class HeadMethodMiddleware(BaseHTTPMiddleware):
 
 app.add_middleware(HeadMethodMiddleware)
 
+
+class CrawlerLogMiddleware(BaseHTTPMiddleware):
+    """Logs fetches by known search/AI crawlers (they never run the browser telemetry script)."""
+    async def dispatch(self, request: Request, call_next):
+        response = await call_next(request)
+        try:
+            path = request.url.path
+            if request.method in ("GET", "HEAD") and not path.startswith(("/static", "/api", "/admin")):
+                from telemetry import classify_bot
+                bot = classify_bot(request.headers.get("user-agent", ""))
+                if bot:
+                    from core.db.telemetry import record_crawler_hit
+                    asyncio.get_running_loop().run_in_executor(
+                        None, record_crawler_hit, bot[0], bot[1], path, response.status_code
+                    )
+        except Exception as crawl_err:
+            logger.debug("Crawler log notice: %s", crawl_err)
+        return response
+
+app.add_middleware(CrawlerLogMiddleware)
+
 # Static files & Jinja2 templates
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 app.mount("/static", StaticFiles(directory=os.path.join(BASE_DIR, "static")), name="static")
 templates = Jinja2Templates(directory=os.path.join(BASE_DIR, "templates"))
 templates.env.globals["MANDATORY_SEBI_DISCLAIMER"] = MANDATORY_SEBI_DISCLAIMER
+
+
+def canonical_for(request) -> str:
+    """Canonical URL for a request: configured domain + path, without tracking or stray query params.
+
+    /compare keeps its two tickers (a, b) because they define the page content.
+    """
+    try:
+        base = (os.environ.get("CANONICAL_DOMAIN") or "https://vestnomics.app").rstrip("/")
+        path = request.url.path or "/"
+        if len(path) > 1:
+            path = path.rstrip("/")
+        url = f"{base}{path}"
+        if path == "/compare":
+            a = (request.query_params.get("a") or "").strip().upper()
+            b = (request.query_params.get("b") or "").strip().upper()
+            if a and b:
+                url += "?" + urllib.parse.urlencode({"a": a, "b": b})
+        return url
+    except Exception as canon_err:
+        logger.debug("Canonical URL notice: %s", canon_err)
+        return ""
+
+
+templates.env.globals["canonical_for"] = canonical_for
 
 
 # ==============================================================================
@@ -965,8 +1011,8 @@ def dossier_page(request: Request, ticker: str):
     # Phase 1 Upgrade: Institutional Equity Intelligence (Sector, Flow, Forensics, Valuation Radar, Bull/Bear)
     equity_intel = None
     try:
-        from core.analysis.equity_dossier_intelligence import compile_equity_dossier_intelligence
-        equity_intel = compile_equity_dossier_intelligence(
+        from core.analysis.equity_dossier import compile_equity_dossier
+        equity_intel = compile_equity_dossier(
             ticker=canonical,
             fundamentals=fund,
             company_name=rep.get("short_name", canonical),
@@ -1104,6 +1150,7 @@ def debt_dossier_page(request: Request, isin: str):
 
     rating_history = get_rating_history(clean_isin)
     posture = evaluate_5_pillar_credit_posture(sec, rating_history=rating_history)
+    is_deep_dive_unlocked = _asset_unlocked_for_request(request, "DEBT", clean_isin)
 
     return templates.TemplateResponse(
         request=request,
@@ -1113,6 +1160,9 @@ def debt_dossier_page(request: Request, isin: str):
             "security": sec,
             "posture": posture,
             "rating_history": rating_history,
+            "is_deep_dive_unlocked": is_deep_dive_unlocked,
+            "unlock_kind": "DEBT",
+            "unlock_id": clean_isin,
         }
     )
 
@@ -1159,8 +1209,8 @@ def api_get_debt_securities(
 
 
 @app.get("/api/debt/security/{isin}")
-def api_get_debt_security_detail(isin: str):
-    """Public API: Detailed 5-Pillar Credit & Solvency evaluation for a specific ISIN."""
+def api_get_debt_security_detail(isin: str, request: Request):
+    """Public API: 5-Pillar Credit & Solvency evaluation; Deep Dive parts require the 1-credit unlock."""
     init_db()
     clean_isin = isin.strip().upper()
     sec = get_debt_security_by_isin(clean_isin)
@@ -1170,12 +1220,24 @@ def api_get_debt_security_detail(isin: str):
     rating_history = get_rating_history(clean_isin)
     posture = evaluate_5_pillar_credit_posture(sec, rating_history=rating_history)
 
-    return json_response_with_cache({
-        "status": "success",
-        "security": sec,
-        "posture": posture,
-        "rating_history": rating_history
-    })
+    locked = not _asset_unlocked_for_request(request, "DEBT", clean_isin)
+    if locked:
+        posture = dict(posture)
+        posture.pop("credit_contagion_radar", None)
+        pillars = dict(posture.get("pillars") or {})
+        for gated in DEBT_GATED_PILLAR_KEYS:
+            pillars.pop(gated, None)
+        posture["pillars"] = pillars
+        posture["deep_dive_locked"] = True
+        posture["unlock_endpoint"] = f"/api/debt/unlock/{clean_isin}"
+
+    return JSONResponse(
+        {"status": "success", "security": sec, "posture": posture, "rating_history": rating_history},
+        headers={"Cache-Control": "private, no-store"}
+    )
+
+
+DEBT_GATED_PILLAR_KEYS = ("p3_solvency", "p5_recovery")
 
 
 @app.get("/api/debt/ticker/{ticker}")
@@ -1267,7 +1329,7 @@ def api_ingest_debt_security(payload: IngestDebtRequest):
     face_val = float(payload.face_value or 10000.0)
     price = float(payload.last_traded_price or face_val)
 
-    from core.analysis.debt_crawler import ingest_collated_security
+    from core.analysis.debt_catalogue import ingest_collated_security
     raw_sec = {
         "isin": raw_isin,
         "ticker": ticker,
@@ -1446,6 +1508,13 @@ def fund_dossier_page(request: Request, scheme_code: str):
         except Exception as e:
             logger.warning(f"Could not synthesize full forensic dossier on-demand for {clean_code}: {e}")
 
+    is_deep_dive_unlocked = _asset_unlocked_for_request(request, "FUND", clean_code)
+    forensic_locked = False
+    if forensic_dossier and not is_deep_dive_unlocked:
+        # Keep only the free headline; moat, ASRI, margin of safety, pledges and narrative are Deep Dive
+        forensic_dossier = None
+        forensic_locked = True
+
     credit_quote = None
     try:
         credit_quote = calculate_deep_dive_credit_cost(clean_code)
@@ -1464,13 +1533,20 @@ def fund_dossier_page(request: Request, scheme_code: str):
             "risk_capture": dossier["risk_capture"],
             "forensic_dossier": forensic_dossier,
             "credit_quote": credit_quote,
+            "is_deep_dive_unlocked": is_deep_dive_unlocked,
+            "forensic_locked": forensic_locked,
+            "unlock_kind": "FUND",
+            "unlock_id": clean_code,
         }
     )
 
 
+FUND_FREE_DOSSIER_KEYS = ("scheme_code", "scheme_name", "composite_health_score", "last_audited_at")
+
+
 @app.get("/api/funds/dossier/{scheme_code}")
-def api_get_fund_forensic_dossier(scheme_code: str):
-    """Returns the persistent 7-pillar forensic look-through dossier for a mutual fund scheme."""
+def api_get_fund_forensic_dossier(scheme_code: str, request: Request):
+    """Returns the 7-pillar forensic look-through dossier; locked users only get the free headline fields."""
     init_db()
     clean = scheme_code.strip().upper()
     dossier = get_fund_forensic_dossier(clean)
@@ -1479,6 +1555,11 @@ def api_get_fund_forensic_dossier(scheme_code: str):
             dossier = audit_single_fund_daily(clean)
         except Exception as e:
             raise HTTPException(status_code=404, detail=f"Forensic dossier not available for {clean}: {e}")
+    if not _asset_unlocked_for_request(request, "FUND", clean):
+        free = {k: dossier.get(k) for k in FUND_FREE_DOSSIER_KEYS if k in dossier}
+        free["deep_dive_locked"] = True
+        free["unlock_endpoint"] = f"/api/funds/unlock/{clean}"
+        return free
     return dossier
 
 
@@ -1684,7 +1765,7 @@ def api_sovereign_macro():
 @app.get("/etfs", response_class=HTMLResponse)
 def etfs_page(request: Request, category: Optional[str] = Query(None)):
     """National ETF Matrix & Tracking Error Surveillance page."""
-    from core.analysis.etf_engine import evaluate_etf_matrix
+    from core.analysis.etf_matrix_engine import evaluate_etf_matrix
     init_db()
     matrix_data = evaluate_etf_matrix(category=category)
     return templates.TemplateResponse(
@@ -1701,7 +1782,7 @@ def etfs_page(request: Request, category: Optional[str] = Query(None)):
 @app.get("/api/etfs/matrix")
 def api_etfs_matrix(category: Optional[str] = None):
     """Public API: National ETF Matrix with premium/discount and tracking errors."""
-    from core.analysis.etf_engine import evaluate_etf_matrix
+    from core.analysis.etf_matrix_engine import evaluate_etf_matrix
     init_db()
     return json_response_with_cache(evaluate_etf_matrix(category=category), max_age=120)
 
@@ -1713,7 +1794,7 @@ def tax_calculator_page(
     inflation: float = Query(5.0)
 ):
     """Net Real Post-Tax Return & Purchasing Power Calculator page."""
-    from core.analysis.tax_calculator import compare_asset_classes_post_tax
+    from core.analysis.net_real_tax_calculator import compare_asset_classes_post_tax
     assets = compare_asset_classes_post_tax(
         marginal_tax_slab_pct=tax_slab,
         cpi_inflation_pct=inflation
@@ -1737,7 +1818,7 @@ def api_tax_calculator(
     cpi_inflation: float = Query(5.0)
 ):
     """Public API: Computes exact net post-tax nominal return, tax drag, and real purchasing power."""
-    from core.analysis.tax_calculator import calculate_net_real_return
+    from core.analysis.net_real_tax_calculator import calculate_net_real_return
     return json_response_with_cache(
         calculate_net_real_return(nominal_return, tax_rate, cpi_inflation),
         max_age=3600
@@ -1852,7 +1933,7 @@ def msme_directory_page(
 @app.get("/reits", response_class=HTMLResponse)
 def reits_page(request: Request, structure: Optional[str] = Query(None)):
     """SEBI SM REITs, Mainboard REITs, InvITs & SGB Secondary Parity directory."""
-    from core.analysis.reit_engine import audit_reit_portfolio
+    from core.analysis.sm_reit_invit_engine import audit_reit_portfolio
     from core.analysis.sgb_engine import evaluate_sgb_market
     init_db()
     reit_audit = audit_reit_portfolio(structure_type=structure)
@@ -1872,7 +1953,7 @@ def reits_page(request: Request, structure: Optional[str] = Query(None)):
 @app.get("/api/reits/directory")
 def api_reits_directory(structure: Optional[str] = None):
     """Public API: Audited REITs, SM REITs, and InvITs."""
-    from core.analysis.reit_engine import audit_reit_portfolio
+    from core.analysis.sm_reit_invit_engine import audit_reit_portfolio
     init_db()
     return json_response_with_cache(audit_reit_portfolio(structure_type=structure), max_age=300)
 
@@ -1891,7 +1972,7 @@ def api_reits_tax_breakdown(
     tax_slab: float = Query(30.0)
 ):
     """Public API: Computes Section 115UA post-tax distribution waterfall for a REIT/InvIT."""
-    from core.analysis.reit_engine import simulate_reit_tax_waterfall
+    from core.analysis.sm_reit_invit_engine import simulate_reit_tax_waterfall
     init_db()
     return json_response_with_cache(simulate_reit_tax_waterfall(symbol, tax_slab_pct=tax_slab), max_age=300)
 
@@ -1990,7 +2071,7 @@ def api_opportunities_arbitrage(payload: ArbitrageDocketRequest):
 @app.get("/safety-radar", response_class=HTMLResponse)
 def safety_radar_page(request: Request, category: Optional[str] = Query(None)):
     """Retail Safety & Shadow-Banking Diagnostic Radar page."""
-    from core.analysis.safety_radar import audit_alternative_yield_radar
+    from core.analysis.retail_safety_radar import audit_alternative_yield_radar
     init_db()
     radar_data = audit_alternative_yield_radar(category=category)
     return templates.TemplateResponse(
@@ -2007,7 +2088,7 @@ def safety_radar_page(request: Request, category: Optional[str] = Query(None)):
 @app.get("/api/safety-radar")
 def api_safety_radar(category: Optional[str] = None):
     """Public API: Danger scores and regulatory warnings for alternative yield schemes."""
-    from core.analysis.safety_radar import audit_alternative_yield_radar
+    from core.analysis.retail_safety_radar import audit_alternative_yield_radar
     init_db()
     return json_response_with_cache(audit_alternative_yield_radar(category=category), max_age=300)
 
@@ -2284,9 +2365,9 @@ async def api_record_telemetry_event(payload: TelemetryEventRequest, request: Re
         traffic_source=traffic_source,
         referrer=clean_ref,
         country=country,
-        device_type=client_env.get("device", "Desktop"),
-        browser=client_env.get("browser", "Chrome"),
-        os=client_env.get("os", "macOS"),
+        device_type=client_env.get("device", "Unknown"),
+        browser=client_env.get("browser", "Unknown"),
+        os=client_env.get("os", "Unknown"),
         user_id=payload.user_id,
         user_email=payload.user_email,
         landing_page=resolved_lp
@@ -2950,9 +3031,106 @@ async def api_verify_payment(payload: VerifyPaymentRequest, request: Request):
         raise HTTPException(status_code=400, detail=str(e))
 
 
+def _deep_dive_unlocked_for_request(request: Request, ticker: str) -> bool:
+    """Single server-side rule for the Pillar 03/05 paywall, shared by copilot and PDF export."""
+    if _is_admin_authenticated(request):
+        return True
+    if os.environ.get("TESTING") == "1" and request.headers.get("x-unlock-preview") == "1":
+        return True
+    web_user = _get_current_web_user(request)
+    if web_user and ticker:
+        t_clean = clean_ticker(ticker)
+        canonical = resolve_canonical_symbol(t_clean) or t_clean
+        return bool(is_ticker_unlocked_for_user(web_user.get("id", ""), canonical))
+    return False
+
+
+def _asset_unlock_key(kind: str, asset_id: str) -> str:
+    """Namespaced key so fund/debt unlocks never collide with equity tickers (e.g. 'FUND:119551')."""
+    return f"{kind.upper()}:{str(asset_id).strip().upper()}"
+
+
+def _asset_unlocked_for_request(request: Request, kind: str, asset_id: str) -> bool:
+    """Server-side rule for the Mutual Fund / Corporate Debt deep-dive paywall (1 credit each)."""
+    if _is_admin_authenticated(request):
+        return True
+    if os.environ.get("TESTING") == "1" and request.headers.get("x-unlock-preview") == "1":
+        return True
+    web_user = _get_current_web_user(request)
+    if web_user and asset_id:
+        return bool(is_ticker_unlocked_for_user(web_user.get("id", ""), _asset_unlock_key(kind, asset_id)))
+    return False
+
+
+def _unlock_asset_deep_dive(request: Request, kind: str, asset_id: str, label: str):
+    """Charges 1 credit (idempotent) and records the unlock for a fund scheme or debt security."""
+    web_user = _get_current_web_user(request)
+    if not web_user:
+        raise HTTPException(
+            status_code=401,
+            detail="Sign in to unlock the Deep Dive. New accounts get 2 free welcome credits."
+        )
+    uid = str(web_user.get("id", "")).strip()
+    key = _asset_unlock_key(kind, asset_id)
+    ok, new_bal, msg = unlock_ticker_for_user(user_id=uid, ticker=key, amount=1.0)
+    if not ok:
+        raise HTTPException(status_code=402, detail=msg)
+    record_usage_event(
+        event_type="dossier_unlock",
+        ticker=key,
+        user_id=uid,
+        details={"action": f"{kind.lower()}_deep_dive_unlock", "new_balance": new_bal}
+    )
+    return json_response_with_cache({
+        "success": True,
+        "asset_kind": kind,
+        "asset_id": str(asset_id).strip().upper(),
+        "new_balance": new_bal,
+        "message": f"Deep Dive unlocked for {label}."
+    })
+
+
+@app.post("/api/funds/unlock/{scheme_code}")
+async def api_unlock_fund_deep_dive(request: Request, scheme_code: str):
+    """Consumes 1 credit to permanently unlock the Deep Dive sections of a mutual fund dossier."""
+    init_db()
+    clean_code = scheme_code.strip().upper()
+    if not clean_code:
+        raise HTTPException(status_code=404, detail="Mutual fund scheme not found.")
+    if not get_mutual_fund_scheme(clean_code):
+        from core.ingestion.amfi import search_amfi_master_directory
+        if not search_amfi_master_directory(clean_code, limit=1):
+            raise HTTPException(status_code=404, detail="Mutual fund scheme not found.")
+    return _unlock_asset_deep_dive(request, "FUND", clean_code, clean_code)
+
+
+@app.post("/api/debt/unlock/{isin}")
+async def api_unlock_debt_deep_dive(request: Request, isin: str):
+    """Consumes 1 credit to permanently unlock the Deep Dive sections of a debt security dossier."""
+    init_db()
+    clean_isin = isin.strip().upper()
+    if not clean_isin or not get_debt_security_by_isin(clean_isin):
+        raise HTTPException(status_code=404, detail="Debt security not found.")
+    return _unlock_asset_deep_dive(request, "DEBT", clean_isin, clean_isin)
+
+
+
+def _pdf_account_ref(request: Request) -> str:
+    """Opaque account reference stamped on PDFs (never the email address)."""
+    web_user = _get_current_web_user(request)
+    return str(web_user.get("id", ""))[:12] if web_user else ""
+
+
+PDF_LOCKED_NOTICE = (
+    "*Institutional deep-dive section. Unlock this ticker on the website (1 credit) "
+    "to include it in your PDF.*"
+)
+
+
 @app.get("/api/pdf/{ticker}")
 async def api_download_pdf(
     ticker: str,
+    request: Request,
     firm_name: Optional[str] = None,
     advisor_reg_no: Optional[str] = None,
     prepared_for: Optional[str] = None,
@@ -2993,15 +3171,20 @@ async def api_download_pdf(
     except Exception as e:
         logger.debug(f"Historical price pre-fetch notice for {clean_t}: {e}")
 
-    from core.reporting.pdf import generate_report_pdf
+    from core.reporting.pdf import generate_report_pdf, apply_pdf_watermark
+    report_text_for_pdf = rep.get("report_text", "")
+    if not _deep_dive_unlocked_for_request(request, clean_t):
+        from core.agents.copilot.forensic_desk import redact_gated_pillars
+        report_text_for_pdf = redact_gated_pillars(report_text_for_pdf, notice=PDF_LOCKED_NOTICE)
     pdf_bytes = generate_report_pdf(
         clean_t,
-        rep.get("report_text", ""),
+        report_text_for_pdf,
         hist_df=df_hist,
         citations=citations,
         scrip_code=scrip_code,
         branding=branding
     )
+    pdf_bytes = apply_pdf_watermark(pdf_bytes, _pdf_account_ref(request))
     
     date_slug = datetime.now(IST).strftime("%d-%m-%Y")
     clean_firm = re.sub(r'[^a-zA-Z0-9]', '_', firm_name) + "_" if firm_name else ""
@@ -3015,7 +3198,7 @@ async def api_download_pdf(
 
 
 @app.get("/api/pdf/fund/{scheme_code}")
-async def api_download_fund_pdf(scheme_code: str):
+async def api_download_fund_pdf(scheme_code: str, request: Request):
     """Generates and serves downloadable institutional PDF look-through dossier for a Mutual Fund."""
     clean_code = scheme_code.strip()
     from core.db.mutual_funds import get_mutual_fund_scheme, get_fund_forensic_dossier
@@ -3026,7 +3209,12 @@ async def api_download_fund_pdf(scheme_code: str):
         raise HTTPException(status_code=404, detail=f"Scheme '{clean_code}' not found.")
 
     dossier = get_fund_forensic_dossier(clean_code) or {}
-    pdf_bytes = generate_fund_dossier_pdf(clean_code, dossier, scheme)
+    pdf_bytes = generate_fund_dossier_pdf(
+        clean_code, dossier, scheme,
+        deep_dive_unlocked=_asset_unlocked_for_request(request, "FUND", clean_code)
+    )
+    from core.reporting.pdf import apply_pdf_watermark
+    pdf_bytes = apply_pdf_watermark(pdf_bytes, _pdf_account_ref(request))
     filename = f"Fund_Dossier_{clean_code}_{datetime.now(IST).strftime('%d-%m-%Y')}.pdf"
 
     return Response(
@@ -3037,7 +3225,7 @@ async def api_download_fund_pdf(scheme_code: str):
 
 
 @app.get("/api/pdf/debt/{isin}")
-async def api_download_debt_pdf(isin: str):
+async def api_download_debt_pdf(isin: str, request: Request):
     """Generates and serves downloadable institutional PDF credit dossier for a Corporate Debt security."""
     clean_isin = isin.strip().upper()
     from core.db.debt import get_debt_security_by_isin
@@ -3049,7 +3237,12 @@ async def api_download_debt_pdf(isin: str):
         raise HTTPException(status_code=404, detail=f"Debt security with ISIN '{clean_isin}' not found.")
 
     posture = evaluate_5_pillar_credit_posture(sec)
-    pdf_bytes = generate_debt_dossier_pdf(clean_isin, posture, sec)
+    pdf_bytes = generate_debt_dossier_pdf(
+        clean_isin, posture, sec,
+        deep_dive_unlocked=_asset_unlocked_for_request(request, "DEBT", clean_isin)
+    )
+    from core.reporting.pdf import apply_pdf_watermark
+    pdf_bytes = apply_pdf_watermark(pdf_bytes, _pdf_account_ref(request))
     filename = f"Debt_Credit_Dossier_{clean_isin}_{datetime.now(IST).strftime('%d-%m-%Y')}.pdf"
 
     return Response(
@@ -3060,7 +3253,7 @@ async def api_download_debt_pdf(isin: str):
 
 
 @app.get("/api/pdf/reit/{symbol}")
-async def api_download_reit_pdf(symbol: str):
+async def api_download_reit_pdf(symbol: str, request: Request):
     """Generates and serves downloadable institutional PDF research dossier for a REIT or InvIT."""
     clean_sym = symbol.strip().upper()
     from core.db.reits import get_reit_by_symbol
@@ -3071,6 +3264,8 @@ async def api_download_reit_pdf(symbol: str):
         raise HTTPException(status_code=404, detail=f"REIT or InvIT with symbol '{clean_sym}' not found.")
 
     pdf_bytes = generate_reit_dossier_pdf(clean_sym, reit)
+    from core.reporting.pdf import apply_pdf_watermark
+    pdf_bytes = apply_pdf_watermark(pdf_bytes, _pdf_account_ref(request))
     filename = f"REIT_Dossier_{clean_sym}_{datetime.now(IST).strftime('%d-%m-%Y')}.pdf"
 
     return Response(
@@ -3406,8 +3601,8 @@ async def api_dossier_intel(ticker: str):
     except Exception as e:
         logger.debug(f"Fundamentals lookup notice for {canonical}: {e}")
 
-    from core.analysis.equity_dossier_intelligence import compile_equity_dossier_intelligence
-    intel = compile_equity_dossier_intelligence(
+    from core.analysis.equity_dossier import compile_equity_dossier
+    intel = compile_equity_dossier(
         ticker=canonical,
         fundamentals=fund,
         company_name=rep.get("short_name", canonical),
@@ -3648,6 +3843,15 @@ async def admin_dashboard(
     except Exception:
         session_journeys = []
 
+    try:
+        from core.db.telemetry import get_seo_summary
+        seo_summary = get_seo_summary(days=selected_days or 30)
+    except Exception as seo_err:
+        logger.warning(f"Error fetching SEO summary: {seo_err}")
+        seo_summary = {"days": selected_days or 30, "crawlers": [], "crawl_pages": [], "crawl_total": 0,
+                       "channels": [], "organic_landing_pages": [], "daily_trend": [],
+                       "total_sessions": 0, "search_sessions": 0}
+
     admin_team = list_admin_users()
     admin_audit_logs = get_admin_audit_logs(limit=100)
 
@@ -3681,6 +3885,7 @@ async def admin_dashboard(
             "support_tickets": support_tickets,
             "open_tickets_count": open_tickets_count,
             "session_journeys": session_journeys,
+            "seo_summary": seo_summary,
             "active_page": "admin"
         }
     )
@@ -3809,20 +4014,28 @@ class CopilotChatRequest(BaseModel):
 
 
 @app.post("/api/copilot/chat")
-async def api_copilot_chat(payload: CopilotChatRequest):
+async def api_copilot_chat(payload: CopilotChatRequest, request: Request):
     """Interactive Forensic Intelligence Desk dialogue endpoint with multi-asset and section context."""
     init_db()
-    from core.agents.copilot.investor_copilot import process_copilot_turn
+    from core.agents.copilot.forensic_desk import process_forensic_desk_turn
+
+    # Paywall: decide entitlement server-side with the same rule as the dossier page
+    web_user = _get_current_web_user(request)
+    deep_dive_unlocked = _deep_dive_unlocked_for_request(request, payload.ticker or "")
+    trusted_user_id = web_user.get("id") if web_user else None
+
     try:
-        res = await process_copilot_turn(
+        res = await process_forensic_desk_turn(
             conversation_id=payload.conversation_id,
             user_message=payload.message,
             ticker=payload.ticker,
-            user_id=payload.user_id,
+            user_id=trusted_user_id,
             asset_type=payload.asset_type,
             section=payload.section,
             section_label=payload.section_label,
-            section_data=payload.section_data
+            section_data=payload.section_data,
+            deep_dive_unlocked=deep_dive_unlocked,
+            unlock_checker=lambda kind, asset_id: _asset_unlocked_for_request(request, kind, asset_id)
         )
         return {"success": True, **res}
     except Exception as e:

@@ -389,6 +389,29 @@ a {
                 pass
 
 
+def apply_pdf_watermark(pdf_bytes: bytes, account_ref: str = "") -> bytes:
+    """Stamps each page with a personal-use footer and margin text. Fails open: returns the original PDF on error."""
+    try:
+        try:
+            import pymupdf as fitz_mod
+        except ImportError:
+            import fitz as fitz_mod
+        stamp = datetime.now(IST).strftime("%d-%b-%Y %H:%M IST")
+        ref = f"Licensed to account {account_ref} | " if account_ref else ""
+        footer = f"{ref}Downloaded {stamp} | Personal, non-commercial use only. Redistribution is prohibited."
+        doc = fitz_mod.open(stream=pdf_bytes, filetype="pdf")
+        for page in doc:
+            rect = page.rect
+            page.insert_text((28, rect.height - 14), footer, fontsize=6.5, color=(0.45, 0.45, 0.45))
+            page.insert_text((rect.width - 12, rect.height - 40), footer, fontsize=6, color=(0.7, 0.7, 0.7), rotate=90)
+        out = doc.tobytes(garbage=3, deflate=True)
+        doc.close()
+        return out
+    except Exception as wm_err:
+        logger.warning(f"PDF watermark notice: {wm_err}")
+        return pdf_bytes
+
+
 def generate_report_pdf(
     ticker: str,
     rep_text: str,
@@ -414,7 +437,8 @@ def generate_fund_dossier_pdf(
     scheme_code: str,
     dossier: dict,
     scheme: dict,
-    branding: dict = None
+    branding: dict = None,
+    deep_dive_unlocked: bool = True
 ) -> bytes:
     """Compiles institutional PDF dossier for a Mutual Fund scheme."""
     from markdown_pdf import MarkdownPdf, Section
@@ -441,14 +465,23 @@ def generate_fund_dossier_pdf(
 > **Data Provenance:** Official AMFI Daily NAV Data, AMC Monthly Portfolio Disclosures & BSE/NSE Listings.
 """
 
+    if deep_dive_unlocked:
+        deep_rows = f"""| **Weighted Moat Score** | **{moat:.1f} / 100** | {'Wide Moat Bias' if moat >= 70 else 'Blend'} |
+| **Accounting Risk Index (ASRI)** | **{asri:.1f}%** | {'Clean Portfolio' if asri < 20 else 'Elevated Audit Caution'} |
+| **Margin of Safety (MoS)** | **{mos:+.1f}%** | {'Discounted Under-Valuation' if mos > 0 else 'Premium Over Fair Value'} |
+"""
+    else:
+        deep_rows = (
+            "| **Weighted Moat Score** | Deep Dive | Unlock on the website (1 credit) |\n"
+            "| **Accounting Risk Index (ASRI)** | Deep Dive | Unlock on the website (1 credit) |\n"
+            "| **Margin of Safety (MoS)** | Deep Dive | Unlock on the website (1 credit) |\n"
+        )
+
     scorecard_md = f"""### Executive Look-Through Scorecard
 | Metric | Value | Posture / Status |
 | :--- | :--- | :--- |
 | **Composite Health Score** | **{health_display}** | {health_status} |
-| **Weighted Moat Score** | **{moat:.1f} / 100** | {'Wide Moat Bias' if moat >= 70 else 'Blend'} |
-| **Accounting Risk Index (ASRI)** | **{asri:.1f}%** | {'Clean Portfolio' if asri < 20 else 'Elevated Audit Caution'} |
-| **Margin of Safety (MoS)** | **{mos:+.1f}%** | {'Discounted Under-Valuation' if mos > 0 else 'Premium Over Fair Value'} |
-| **Active Share (Closet-Indexing)** | **{active_share:.1f}%** | {'True Active Alpha' if active_share >= 60 else 'Closet Indexing Drag'} |
+{deep_rows}| **Active Share (Closet-Indexing)** | **{active_share:.1f}%** | {'True Active Alpha' if active_share >= 60 else 'Closet Indexing Drag'} |
 """
 
     meta_table = f"""### Scheme Profile & Portfolio Facts
@@ -457,7 +490,13 @@ def generate_fund_dossier_pdf(
 | {scheme.get('category', 'Equity')} | {scheme.get('benchmark_index', 'NIFTY 500')} | {scheme.get('risk_grade', 'Very High')} | {scheme.get('fund_house', 'AMC')} | {scheme.get('fund_manager', 'Manager')} |
 """
 
-    narrative = dossier.get("dossier_text", "No detailed narrative recorded.")
+    if deep_dive_unlocked:
+        narrative = dossier.get("dossier_text", "No detailed narrative recorded.")
+    else:
+        narrative = (
+            "*The look-through forensic narrative, promoter-pledge exposure and flagged holdings are part of the "
+            "Deep Dive. Unlock this scheme on the website (1 credit) to include them in your PDF.*"
+        )
     footer = f"""
 ---
 ### Statutory Regulatory Disclaimers & Provenance Notice
@@ -487,7 +526,8 @@ def generate_debt_dossier_pdf(
     isin: str,
     posture: dict,
     security: dict,
-    branding: dict = None
+    branding: dict = None,
+    deep_dive_unlocked: bool = True
 ) -> bytes:
     """Compiles institutional PDF credit dossier for a Corporate Debt security."""
     from markdown_pdf import MarkdownPdf, Section
@@ -522,12 +562,18 @@ def generate_debt_dossier_pdf(
 | **Capital Seniority** | **{sen}** | Waterfall Priority in Insolvency (IBC) |
 """
 
-    contagion_md = f"""### 📡 Credit Contagion Radar (Parent Equity Linkage)
+    if deep_dive_unlocked:
+        contagion_md = f"""### 📡 Credit Contagion Radar (Parent Equity Linkage)
 > **Contagion Status:** **{radar.get('radar_label', 'Active Radar')}**  
 > **Risk Tier:** `{radar.get('risk_level', 'LOW')}`  
 > **Parent Equity:** `{radar.get('equity_ticker', 'N/A')}`  
 > **Contagion Summary:** {radar.get('radar_summary', 'Isolated.')}
 """
+    else:
+        contagion_md = (
+            "### 📡 Credit Contagion Radar\n"
+            "> *Part of the Deep Dive. Unlock this security on the website (1 credit) to include it.*\n"
+        )
 
     primer_summary = posture.get("primer", {}).get("summary", "")
     primer_md = f"""### Executive Investment Primer
@@ -541,6 +587,8 @@ def generate_debt_dossier_pdf(
     p1 = posture.get("pillars", {}).get("p1_credit_quality", {}).get("institutional_analysis", "")
     p2 = posture.get("pillars", {}).get("p2_capital_hierarchy", {}).get("institutional_analysis", "")
     p3 = posture.get("pillars", {}).get("p3_solvency", {}).get("institutional_analysis", "")
+    if not deep_dive_unlocked:
+        p3 = "*Part of the Deep Dive. Unlock this security on the website (1 credit) to include it.*"
 
     pillars_md = f"""### 5-Pillar Diagnostic Teardown
 #### 01: Credit Quality & Rating Drift

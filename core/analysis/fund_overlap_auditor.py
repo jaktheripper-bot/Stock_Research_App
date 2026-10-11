@@ -32,14 +32,14 @@ from core.db.mutual_funds import (
     save_mutual_fund_holdings,
 )
 from core.db.agent_sessions import record_autonomous_event
-from core.analysis.mutual_fund_engine import (
+from core.analysis.mutual_funds_engine import (
     calculate_active_share,
     EQUITY_HEALTH_DEFAULTS,
     BENCHMARK_PROXIES,
 )
-from core.analysis.engine import get_surgical_flash_model
+from core.analysis.dossier_report_synthesis import get_surgical_flash_model
 
-logger = logging.getLogger("equity_research.core.analysis.fund_forensic_auditor")
+logger = logging.getLogger("equity_research.core.analysis.fund_overlap_auditor")
 
 VALUATION_UNDERVALUED_BENCHMARK_SCORE = 88.0
 MOAT_WIDE_BENCHMARK_SCORE = 88.0

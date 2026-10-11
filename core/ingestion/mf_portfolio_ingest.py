@@ -320,7 +320,7 @@ def ingest_top_funds(
 
     audited = 0
     if audit and not dry_run:
-        from core.analysis.fund_forensic_auditor import audit_single_fund_daily
+        from core.analysis.fund_overlap_auditor import audit_single_fund_daily
         for item in ingested:
             try:
                 audit_single_fund_daily(item["scheme_code"])

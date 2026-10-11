@@ -271,7 +271,7 @@ for name, sym, fund in test_sieve_cases:
 # 9. Bull Bear Thesis
 # -------------------------------------------------------------------------
 print("\n--- 9. Testing BullBearThesis ---")
-from core.analysis.bull_bear import synthesize_bull_bear_thesis
+from core.analysis.dossier_bull_bear import synthesize_bull_bear_thesis
 
 test_bull_bear_cases = [
     ("None fundamentals", "INFY", None),
@@ -347,7 +347,7 @@ for name, fn, args in test_cortex_cases:
 # 12. Tax Calculator Engine
 # -------------------------------------------------------------------------
 print("\n--- 12. Testing TaxCalculator ---")
-from core.analysis.tax_calculator import calculate_net_real_return, compare_asset_classes_post_tax
+from core.analysis.net_real_tax_calculator import calculate_net_real_return, compare_asset_classes_post_tax
 
 test_tax_cases = [
     ("Inflation -100% (Division by zero)", -100.0),

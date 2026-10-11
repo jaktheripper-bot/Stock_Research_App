@@ -15,7 +15,7 @@ from core.db.mutual_funds import (
     get_featured_daily_fund_dossier,
     get_next_fund_for_daily_audit
 )
-from core.analysis.fund_forensic_auditor import (
+from core.analysis.fund_overlap_auditor import (
     compute_fund_forensic_lookthrough,
     parse_stock_report_health_matrix,
     synthesize_fund_forensic_narrative,
@@ -85,7 +85,7 @@ class TestFundForensicAuditor(unittest.TestCase):
         self.assertGreaterEqual(metrics["active_share_pct"], 60.0)
 
         # When >= 70% of equity holdings have genuine archived reports, composite score unlocks
-        with patch("core.analysis.fund_forensic_auditor.get_report_by_ticker") as mock_rep:
+        with patch("core.analysis.fund_overlap_auditor.get_report_by_ticker") as mock_rep:
             mock_rep.return_value = {
                 "report_text": "### Health Matrix\nMoat: Wide\nGovernance: Clean\nValuation: Undervalued\nBalance Sheet: Debt-Free\n"
             }
@@ -137,13 +137,13 @@ class TestFundForensicAuditor(unittest.TestCase):
         self.assertIn("Featured Daily Forensic", resp.text)
 
         # 2. Fund Dossier page
-        resp_dos = self.client.get("/funds/PPFAS_FLEXICAP_DIR")
+        resp_dos = self.client.get("/funds/PPFAS_FLEXICAP_DIR", headers={"x-unlock-preview": "1"})
         self.assertEqual(resp_dos.status_code, 200)
         self.assertIn("7-Pillar Equity Look-Through", resp_dos.text)
         self.assertIn("Weighted Moat Index", resp_dos.text)
 
         # 3. API endpoint
-        resp_api = self.client.get("/api/funds/dossier/PPFAS_FLEXICAP_DIR")
+        resp_api = self.client.get("/api/funds/dossier/PPFAS_FLEXICAP_DIR", headers={"x-unlock-preview": "1"})
         self.assertEqual(resp_api.status_code, 200)
         data = resp_api.json()
         self.assertEqual(data["scheme_code"], "PPFAS_FLEXICAP_DIR")
@@ -199,7 +199,7 @@ class TestFundForensicAuditor(unittest.TestCase):
         self.assertIn("Alert me on desktop when complete", resp_dir.text)
 
         # Verify Fund Dossier page includes Deep Dive Credit Option
-        resp_dos = self.client.get("/funds/PPFAS_FLEXICAP_DIR")
+        resp_dos = self.client.get("/funds/PPFAS_FLEXICAP_DIR", headers={"x-unlock-preview": "1"})
         self.assertEqual(resp_dos.status_code, 200)
         self.assertIn("Deep-Dive Stock Forensic Audit Option", resp_dos.text)
         self.assertIn("Layer 1 Active (1 Credit)", resp_dos.text)

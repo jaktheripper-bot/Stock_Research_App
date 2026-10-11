@@ -49,12 +49,12 @@ flowchart TD
     subgraph Daily Fund Audit Worker [scripts/run_daily_fund_audit.py]
         Queue[Fund Rotation Queue\nPick 1 Fund / Day] --> Inspector[Portfolio Constituent Inspector]
         Inspector --> Checker{Are All Stock Audits Fresh in reports.db?}
-        Checker -->|No / Stale| StockEngine[Trigger 7-Pillar Stock Audit\ncore.analysis.engine & yfinance]
+        Checker -->|No / Stale| StockEngine[Trigger 7-Pillar Stock Audit\ncore.analysis.dossier_report_synthesis & yfinance]
         StockEngine --> StockDB[(reports.db\n7-Pillar Stock Dossiers)]
         Checker -->|Yes| StockDB
     end
 
-    subgraph Forensic Look-Through Aggregator [core/analysis/fund_forensic_auditor.py]
+    subgraph Forensic Look-Through Aggregator [core/analysis/fund_overlap_auditor.py]
         StockDB --> Aggregator[Forensic Aggregator]
         Holdings --> Aggregator
         Aggregator --> W_Moat[Weighted Moat Score]
@@ -178,14 +178,14 @@ To ensure the directory immediately covers India's most popular funds, we expand
   - `fund_forensic_dossiers` (stores synthesized AI qualitative reports, weighted moat score, ASRI index, intrinsic MoS gap, last audit date).
 - Expand `DEFAULT_MUTUAL_FUNDS` in `core/db/mutual_funds.py` with the 28 new marquee funds and their constituent portfolios.
 
-### Phase 2: Forensic Look-Through Engine (`core/analysis/fund_forensic_auditor.py`)
+### Phase 2: Forensic Look-Through Engine (`core/analysis/fund_overlap_auditor.py`)
 - Build `compute_fund_forensic_lookthrough(scheme_code)`:
   - Traverses holdings, queries `reports.db` for each stock's 7-pillar report.
   - Extracts and computes weighted Moat, Beneish M-Score risk, Intrinsic Valuation discount, and Promoter Pledge %.
   - Identifies top 3 risky constituents and top 3 anchor quality compounders.
 
 ### Phase 3: Daily Fund Audit Worker & Gemini AI Synthesis
-- Build `audit_single_fund_daily(scheme_code=None)` in `core/analysis/fund_forensic_auditor.py` and CLI script `scripts/run_daily_fund_audit.py`.
+- Build `audit_single_fund_daily(scheme_code=None)` in `core/analysis/fund_overlap_auditor.py` and CLI script `scripts/run_daily_fund_audit.py`.
 - Formulate prompt template for Gemini AI producing institutional qualitative synthesis.
 - Expose admin endpoint `POST /api/admin/run-fund-audit` allowing manual triggering or specific scheme auditing.
 

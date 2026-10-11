@@ -312,7 +312,8 @@ def _build_telemetry_time_filter(
     days: int = None,
     start_date = None,
     end_date = None,
-    exclude_tests: bool = True
+    exclude_tests: bool = True,
+    include_bots: bool = False
 ) -> str:
     """Constructs dynamic SQL WHERE clause for relative days or exact start/end date ranges with automated test exclusion."""
     if start_date and end_date:
@@ -394,6 +395,10 @@ def _build_telemetry_time_filter(
             f"     )"
             f" ))"
         )
+
+    if exclude_tests and not include_bots:
+        # Crawler hits are logged as BOT_CRAWL events and must never count as visitors
+        base_clause += " AND (event_type IS NULL OR event_type != 'BOT_CRAWL')"
 
     return base_clause
 
@@ -492,9 +497,9 @@ def get_site_usage_summary(days: int = None, start_date = None, end_date = None,
         # 4. Traffic Sources ("Where they are coming from")
         try:
             cursor.execute(f'''
-                SELECT COALESCE(traffic_source, 'Direct / Bookmark'), COUNT(*) as cnt
+                SELECT COALESCE(traffic_source, 'Direct / Bookmark'), COUNT(DISTINCT session_id) as cnt
                 FROM site_usage_events
-                WHERE {time_filter}
+                WHERE {time_filter} AND session_id IS NOT NULL AND session_id != ''
                 GROUP BY COALESCE(traffic_source, 'Direct / Bookmark')
                 ORDER BY cnt DESC
                 LIMIT 8
@@ -502,7 +507,8 @@ def get_site_usage_summary(days: int = None, start_date = None, end_date = None,
             src_rows = cursor.fetchall()
             total_src = sum(r[1] for r in src_rows) or 1
             summary["traffic_sources"] = [
-                {"source": row[0], "count": int(row[1]), "pct": round((row[1] / total_src) * 100.0, 1)}
+                {"source": row[0], "count": int(row[1]), "pct": round((row[1] / total_src) * 100.0, 1),
+                 "percentage": round((row[1] / total_src) * 100.0, 1)}
                 for row in src_rows
             ]
         except Exception:
@@ -511,9 +517,9 @@ def get_site_usage_summary(days: int = None, start_date = None, end_date = None,
         # 5. Top Referring URLs
         try:
             cursor.execute(f'''
-                SELECT referrer, COUNT(*) as cnt
+                SELECT referrer, COUNT(DISTINCT session_id) as cnt
                 FROM site_usage_events
-                WHERE {time_filter} AND referrer IS NOT NULL AND referrer != '' AND referrer != 'Direct'
+                WHERE {time_filter} AND session_id IS NOT NULL AND session_id != '' AND referrer IS NOT NULL AND referrer != '' AND referrer != 'Direct'
                 GROUP BY referrer
                 ORDER BY cnt DESC
                 LIMIT 8
@@ -615,43 +621,43 @@ def get_site_usage_summary(days: int = None, start_date = None, end_date = None,
         # 6. Geographic Distribution (Countries)
         try:
             cursor.execute(f'''
-                SELECT COALESCE(country, 'IN'), COUNT(*) as cnt
+                SELECT COALESCE(country, 'Unknown'), COUNT(DISTINCT session_id) as cnt
                 FROM site_usage_events
-                WHERE {time_filter}
-                GROUP BY COALESCE(country, 'IN')
+                WHERE {time_filter} AND session_id IS NOT NULL AND session_id != ''
+                GROUP BY COALESCE(country, 'Unknown')
                 ORDER BY cnt DESC
                 LIMIT 8
             ''')
             summary["geographic_distribution"] = [{"country": row[0], "count": int(row[1])} for row in cursor.fetchall()]
         except Exception:
-            summary["geographic_distribution"] = [{"country": "IN", "count": summary["total_actions"]}]
+            summary["geographic_distribution"] = []
 
         # 7. Device Types, Browsers, and OS
         try:
             cursor.execute(f'''
-                SELECT COALESCE(device_type, 'Desktop'), COUNT(*) as cnt
+                SELECT COALESCE(device_type, 'Unknown'), COUNT(DISTINCT session_id) as cnt
                 FROM site_usage_events
-                WHERE {time_filter}
-                GROUP BY COALESCE(device_type, 'Desktop')
+                WHERE {time_filter} AND session_id IS NOT NULL AND session_id != ''
+                GROUP BY COALESCE(device_type, 'Unknown')
                 ORDER BY cnt DESC
             ''')
             summary["device_breakdown"] = [{"device": row[0], "count": int(row[1])} for row in cursor.fetchall()]
 
             cursor.execute(f'''
-                SELECT COALESCE(browser, 'Chrome'), COUNT(*) as cnt
+                SELECT COALESCE(browser, 'Unknown'), COUNT(DISTINCT session_id) as cnt
                 FROM site_usage_events
-                WHERE {time_filter}
-                GROUP BY COALESCE(browser, 'Chrome')
+                WHERE {time_filter} AND session_id IS NOT NULL AND session_id != ''
+                GROUP BY COALESCE(browser, 'Unknown')
                 ORDER BY cnt DESC
                 LIMIT 6
             ''')
             summary["browser_breakdown"] = [{"browser": row[0], "count": int(row[1])} for row in cursor.fetchall()]
 
             cursor.execute(f'''
-                SELECT COALESCE(os, 'macOS'), COUNT(*) as cnt
+                SELECT COALESCE(os, 'Unknown'), COUNT(DISTINCT session_id) as cnt
                 FROM site_usage_events
-                WHERE {time_filter}
-                GROUP BY COALESCE(os, 'macOS')
+                WHERE {time_filter} AND session_id IS NOT NULL AND session_id != ''
+                GROUP BY COALESCE(os, 'Unknown')
                 ORDER BY cnt DESC
                 LIMIT 6
             ''')
@@ -664,7 +670,7 @@ def get_site_usage_summary(days: int = None, start_date = None, end_date = None,
             cursor.execute(f'''
                 SELECT event_type, ticker, latency_ms, cost_saved_usd, timestamp,
                        COALESCE(session_id, '-'), COALESCE(traffic_source, 'Direct'),
-                       COALESCE(country, 'IN'), COALESCE(device_type, 'Desktop')
+                       COALESCE(country, 'Unknown'), COALESCE(device_type, 'Unknown')
                 FROM site_usage_events
                 WHERE {time_filter}
                 ORDER BY timestamp DESC
@@ -1091,4 +1097,118 @@ def purge_test_telemetry() -> dict:
         conn.close()
 
     return purged_counts
+
+
+_ORGANIC_SEARCH_SOURCES = {"Google Search", "Bing Search", "Yahoo Search", "DuckDuckGo"}
+
+
+def record_crawler_hit(bot_name: str, kind: str, path: str, status_code: int = 200) -> None:
+    """Logs a search/AI crawler fetch. Stored as BOT_CRAWL events, which are excluded from visitor analytics."""
+    record_usage_event(
+        event_type="BOT_CRAWL",
+        details={"bot": bot_name, "kind": kind, "status": int(status_code), "path": path},
+        traffic_source="Crawler",
+        browser=bot_name,
+        os=kind,
+        device_type="Bot",
+        landing_page=path,
+        is_test_override=True,
+    )
+
+
+def _seo_channel(source: str) -> str:
+    src = source or ""
+    if src in _ORGANIC_SEARCH_SOURCES:
+        return "Organic Search"
+    if src.endswith("(AI)") or src == "Other AI Search":
+        return "AI Search"
+    return "Other"
+
+
+def get_seo_summary(days: int = 30) -> dict:
+    """SEO/GEO effort tracking: crawler visits, organic + AI-search sessions, landing pages and downstream actions."""
+    summary = {
+        "days": days,
+        "crawlers": [],
+        "crawl_pages": [],
+        "crawl_total": 0,
+        "channels": [],
+        "organic_landing_pages": [],
+        "daily_trend": [],
+        "total_sessions": 0,
+        "search_sessions": 0,
+    }
+    init_db()
+    conn = get_db_connection()
+    cursor = conn.cursor()
+    try:
+        time_filter = _build_telemetry_time_filter(
+            get_supabase_url(), days=days, exclude_tests=True, include_bots=True
+        )
+        cursor.execute(f'''
+            SELECT event_type, session_id, traffic_source, COALESCE(landing_page, ''), browser, os, timestamp, details
+            FROM site_usage_events
+            WHERE {time_filter}
+            ORDER BY timestamp ASC
+        ''')
+        rows = cursor.fetchall()
+    except Exception as e:
+        logger.warning(f"SEO summary query notice: {e}")
+        rows = []
+    finally:
+        try:
+            cursor.close()
+            conn.close()
+        except Exception as close_err:
+            logger.debug("SEO summary close notice: %s", close_err)
+
+    bots, crawl_pages = {}, {}
+    sessions = {}
+    for ev_type, sess, source, lp, browser, os_kind, ts, det in rows:
+        if ev_type == "BOT_CRAWL":
+            name = browser or "Unknown bot"
+            status = 200
+            try:
+                d = json.loads(det) if isinstance(det, str) else (det or {})
+                status = int(d.get("status", 200))
+            except Exception as parse_err:
+                logger.debug("Crawler details parse notice: %s", parse_err)
+            b = bots.setdefault(name, {"bot": name, "kind": os_kind or "Search", "hits": 0, "pages": set(), "errors": 0, "last_seen": ""})
+            b["hits"] += 1
+            b["pages"].add(lp)
+            b["errors"] += 1 if status >= 400 else 0
+            b["last_seen"] = str(ts)[:16]
+            crawl_pages[lp] = crawl_pages.get(lp, 0) + 1
+            continue
+        if not sess:
+            continue
+        s = sessions.setdefault(sess, {"source": source or "Direct / Bookmark", "landing": lp or "/", "date": str(ts)[:10], "pdf": False, "pricing": False})
+        if ev_type == "PDF_DOWNLOAD":
+            s["pdf"] = True
+        if "/pricing" in (lp or ""):
+            s["pricing"] = True
+
+    summary["crawlers"] = sorted(
+        ({"bot": b["bot"], "kind": b["kind"], "hits": b["hits"], "pages": len(b["pages"]), "errors": b["errors"], "last_seen": b["last_seen"]} for b in bots.values()),
+        key=lambda x: x["hits"], reverse=True,
+    )
+    summary["crawl_total"] = sum(b["hits"] for b in summary["crawlers"])
+    summary["crawl_pages"] = [{"path": p, "hits": h} for p, h in sorted(crawl_pages.items(), key=lambda x: x[1], reverse=True)[:12]]
+
+    channels = {"Organic Search": [0, 0, 0], "AI Search": [0, 0, 0], "Other": [0, 0, 0]}
+    landing, trend = {}, {}
+    for s in sessions.values():
+        ch = _seo_channel(s["source"])
+        channels[ch][0] += 1
+        channels[ch][1] += 1 if s["pdf"] else 0
+        channels[ch][2] += 1 if s["pricing"] else 0
+        if ch != "Other":
+            landing[s["landing"]] = landing.get(s["landing"], 0) + 1
+            trend[s["date"]] = trend.get(s["date"], 0) + 1
+    summary["total_sessions"] = len(sessions)
+    summary["search_sessions"] = channels["Organic Search"][0] + channels["AI Search"][0]
+    summary["channels"] = [{"channel": k, "sessions": v[0], "pdf_sessions": v[1], "pricing_sessions": v[2]} for k, v in channels.items()]
+    summary["organic_landing_pages"] = [{"path": p, "sessions": c} for p, c in sorted(landing.items(), key=lambda x: x[1], reverse=True)[:12]]
+    summary["daily_trend"] = [{"date": d, "sessions": c} for d, c in sorted(trend.items())]
+    return summary
 

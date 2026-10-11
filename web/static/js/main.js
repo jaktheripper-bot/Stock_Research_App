@@ -579,6 +579,56 @@ window.unlockDeepDive = async function(ticker) {
   }
 };
 
+// Mutual Fund / Corporate Debt Deep Dive unlock (1 credit, permanent per scheme or security)
+window.unlockAssetDeepDive = async function(kind, assetId) {
+  const cleanKind = (kind || '').toUpperCase();
+  const cleanId = (assetId || '').trim();
+  if (!cleanId || !['FUND', 'DEBT'].includes(cleanKind)) return;
+
+  const user = getStoredUser();
+  if (!user) {
+    alert('Sign in to unlock the Deep Dive. New accounts get 2 free welcome credits.');
+    openSignInModal();
+    return;
+  }
+
+  const balance = parseFloat(user.credits_balance) || 0;
+  if (balance < 1) {
+    if (confirm(`The Deep Dive costs 1 research credit and your balance is ${balance}.\n\nOpen the Pricing page to top up?`)) {
+      window.location.href = '/pricing';
+    }
+    return;
+  }
+
+  if (!confirm(`Unlock the Deep Dive for ${cleanId}?\n\nCost: 1 research credit (permanent for this ${cleanKind === 'FUND' ? 'scheme' : 'security'}).\nBalance: ${balance} credits.`)) {
+    return;
+  }
+
+  const path = cleanKind === 'FUND' ? 'funds' : 'debt';
+  try {
+    const resp = await fetch(`/api/${path}/unlock/${encodeURIComponent(cleanId)}`, { method: 'POST' });
+    const data = await resp.json();
+    if (resp.ok && data.success) {
+      if (data.new_balance !== undefined) {
+        user.credits_balance = data.new_balance;
+        localStorage.setItem('sr_user', JSON.stringify(user));
+        syncUserSession();
+      }
+      window.location.reload();
+    } else if (resp.status === 402) {
+      if (confirm(`${data.detail || 'Not enough credits.'}\n\nOpen the Pricing page?`)) window.location.href = '/pricing';
+    } else if (resp.status === 401) {
+      alert(data.detail || 'Please sign in.');
+      openSignInModal();
+    } else {
+      alert(data.detail || 'Unlock failed.');
+    }
+  } catch (err) {
+    alert('Network error while unlocking: ' + err.message);
+  }
+};
+
+
 // ==============================================================================
 // 5. Authentication & User Session Management
 // ==============================================================================
@@ -894,13 +944,26 @@ function getTelemetrySessionId() {
   }
 }
 
+function stripTrackingParams() {
+  // Remove campaign tags from the visible URL after they have been captured, so a copied address-bar link is clean
+  try {
+    const url = new URL(window.location.href);
+    let changed = false;
+    ['utm_source', 'utm_medium', 'utm_campaign', 'utm_term', 'utm_content', 'ref', 'source'].forEach(function(k) {
+      if (url.searchParams.has(k)) { url.searchParams.delete(k); changed = true; }
+    });
+    if (changed) window.history.replaceState(window.history.state, '', url.pathname + url.search + url.hash);
+  } catch {}
+}
+
 function getAcquisitionData() {
   try {
-    let data = sessionStorage.getItem('sr_acquisition');
-    if (data) return JSON.parse(data);
-
-    // Initial landing capture
     const params = new URLSearchParams(window.location.search);
+    const hasCampaign = !!(params.get('utm_source') || params.get('ref') || params.get('source'));
+    let data = sessionStorage.getItem('sr_acquisition');
+    if (data && !hasCampaign) return JSON.parse(data);
+
+    // Initial landing capture (or a fresh campaign/share link opened in an existing tab session)
     const ref = document.referrer || '';
     // Discard internal navigation from same origin
     const isInternal = ref && ref.startsWith(window.location.origin);
@@ -919,6 +982,7 @@ function getAcquisitionData() {
       captured_at: new Date().toISOString()
     };
     sessionStorage.setItem('sr_acquisition', JSON.stringify(acquisition));
+    stripTrackingParams();
     return acquisition;
   } catch {
     return {};
@@ -959,6 +1023,61 @@ window.trackUserEvent = function(eventType, ticker, details) {
       body: JSON.stringify(payload)
     }).catch(() => {});
   } catch {}
+};
+
+function showShareToast(message) {
+  const el = document.createElement('div');
+  el.textContent = message;
+  el.setAttribute('role', 'status');
+  el.style.cssText = 'position:fixed;left:50%;bottom:28px;transform:translateX(-50%);background:#0f172a;color:#e2e8f0;border:1px solid rgba(14,165,233,0.5);padding:10px 18px;border-radius:10px;font-size:13px;font-weight:600;z-index:10000;box-shadow:0 8px 30px rgba(0,0,0,0.4);';
+  document.body.appendChild(el);
+  setTimeout(function() { el.remove(); }, 2600);
+}
+
+window.shareCurrentPage = async function(kind) {
+  try {
+    // Prefer the canonical origin so links shared from a preview/render URL still point at the real domain
+    let origin = window.location.origin;
+    const canon = document.querySelector('link[rel="canonical"]');
+    if (canon && canon.href) { origin = new URL(canon.href).origin; }
+
+    const url = new URL(origin + window.location.pathname);
+    if (window.location.pathname === '/compare') {
+      const cur = new URLSearchParams(window.location.search);
+      if (cur.get('a')) url.searchParams.set('a', cur.get('a'));
+      if (cur.get('b')) url.searchParams.set('b', cur.get('b'));
+    }
+    url.searchParams.set('utm_source', 'share');
+    url.searchParams.set('utm_medium', 'referral');
+    url.searchParams.set('utm_campaign', kind || 'page');
+    const link = url.toString();
+    const title = document.title || 'Stock Research AI';
+
+    let method = 'copy';
+    if (navigator.share) {
+      try {
+        await navigator.share({ title: title, text: title, url: link });
+        method = 'native';
+      } catch (err) {
+        if (err && err.name === 'AbortError') return;
+        method = 'copy';
+      }
+    }
+    if (method === 'copy') {
+      if (navigator.clipboard && navigator.clipboard.writeText) {
+        await navigator.clipboard.writeText(link);
+      } else {
+        const ta = document.createElement('textarea');
+        ta.value = link; document.body.appendChild(ta); ta.select();
+        document.execCommand('copy'); ta.remove();
+      }
+      showShareToast('Link copied. Recipients see the public report; unlocked sections stay with your account.');
+    }
+    const parts = window.location.pathname.split('/');
+    window.trackUserEvent('share_click', kind === 'dossier' ? (parts[2] || '') : '', { method: method, kind: kind || 'page' });
+  } catch {
+    showShareToast('Could not copy the link. Please copy it from the address bar.');
+  }
 };
 
 // Track initial page view with logged-in user attribution and source retention

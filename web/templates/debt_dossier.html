@@ -149,7 +149,7 @@
   </div>
 
   <!-- Credit Contagion Radar: Equity-to-Debt Spillover Analysis -->
-  {% if posture.credit_contagion_radar %}
+  {% if posture.credit_contagion_radar and is_deep_dive_unlocked %}
   <div style="background: linear-gradient(135deg, rgba(15, 23, 42, 0.8) 0%, rgba(30, 41, 59, 0.6) 100%); border: 1px solid rgba(255, 255, 255, 0.1); border-radius: 14px; padding: 24px; margin-bottom: 24px;">
     <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px; flex-wrap: wrap; gap: 10px;">
       <div style="display: flex; align-items: center; gap: 10px;">
@@ -282,6 +282,7 @@
     </div>
 
     <!-- Pillar 3 -->
+    {% if is_deep_dive_unlocked %}
     <div style="background: rgba(30, 41, 59, 0.6); border: 1px solid rgba(255, 255, 255, 0.08); border-radius: 14px; padding: 24px;">
       <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px;">
         <h3 style="font-size: 17px; font-weight: 700; color: #f8fafc; margin: 0;">03: Cash Flow Solvency & Coverage</h3>
@@ -306,6 +307,12 @@
         <strong>💡 Key Takeaway:</strong> {{ posture.pillars.p3_solvency.plain_english_takeaway }}
       </div>
     </div>
+    {% else %}
+    {% set lock_title = 'Credit Contagion Radar, Cash Flow Solvency and Recovery Reality' %}
+    {% set lock_blurb = 'The free report covers rating, seniority, duration and yield. The Deep Dive adds the parts that show how this issuer behaves under stress.' %}
+    {% set lock_points = ['Credit Contagion Radar: how parent-equity distress and group leverage could spill over', 'Pillar 03: interest cover, DSCR and leverage against covenant thresholds', 'Pillar 05: realistic recovery, FLDG buffers and bankruptcy remoteness', 'Ask the Forensic Desk about all three'] %}
+    {% include "partials/asset_unlock_card.html" %}
+    {% endif %}
 
     <!-- Pillar 4 -->
     <div style="background: rgba(30, 41, 59, 0.6); border: 1px solid rgba(255, 255, 255, 0.08); border-radius: 14px; padding: 24px;">
@@ -334,6 +341,7 @@
     </div>
 
     <!-- Pillar 5 -->
+    {% if is_deep_dive_unlocked %}
     <div style="background: rgba(30, 41, 59, 0.6); border: 1px solid rgba(255, 255, 255, 0.08); border-radius: 14px; padding: 24px;">
       <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px;">
         <h3 style="font-size: 17px; font-weight: 700; color: #f8fafc; margin: 0;">05: Recovery Reality & Securitization Quality</h3>
@@ -364,6 +372,7 @@
         <strong>💡 Key Takeaway:</strong> {{ posture.pillars.p5_recovery.plain_english_takeaway }}
       </div>
     </div>
+    {% endif %}
   </div>
 
   <!-- Executive Investment Thesis: The Good, The Bad, The Ugly -->

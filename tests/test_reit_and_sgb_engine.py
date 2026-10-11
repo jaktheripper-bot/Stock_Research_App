@@ -26,7 +26,7 @@ from core.db.reits import (
     save_reit_or_invit,
     save_sgb_tranche,
 )
-from core.analysis.reit_engine import (
+from core.analysis.sm_reit_invit_engine import (
     audit_reit_portfolio,
     simulate_reit_tax_waterfall,
 )

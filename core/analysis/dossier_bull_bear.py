@@ -11,7 +11,7 @@ from typing import Dict, Any, List, Optional
 import math
 import logging
 
-logger = logging.getLogger("equity_research.core.analysis.bull_bear")
+logger = logging.getLogger("equity_research.core.analysis.dossier_bull_bear")
 
 
 def _safe_float(v: Any, default: float = 0.0) -> float:

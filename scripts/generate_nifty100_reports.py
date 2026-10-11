@@ -19,7 +19,7 @@ from typing import Dict, Any, List
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 from core.universe.nifty100 import NIFTY_100_CONSTITUENTS, get_nifty100_symbols, get_nifty100_constituent
-from core.analysis.engine import generate_stock_report
+from core.analysis.dossier_report_synthesis import generate_stock_report
 from core.db.reports import get_report_by_ticker, get_archived_reports
 from core.config import get_secret
 from bse_master import resolve_bse_scrip_code

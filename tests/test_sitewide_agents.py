@@ -33,9 +33,9 @@ from core.agents.funds.lookthrough_squad import audit_fund_lookthrough
 from core.agents.debt.credit_squad import audit_credit_offering
 from core.agents.reits.real_assets_squad import audit_real_asset, scan_sgb_parity_discounts
 from core.agents.macro.macro_squad import audit_macro_yield_environment
-from core.agents.copilot.investor_copilot import (
+from core.agents.copilot.forensic_desk import (
     check_non_advisory_compliance,
-    process_copilot_turn
+    process_forensic_desk_turn
 )
 
 

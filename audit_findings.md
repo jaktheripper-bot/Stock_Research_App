@@ -280,19 +280,19 @@ The application's stated objective (articulated across `.antigravity/docs/STRATE
 #### Priority 3: Sovereign Curve & ETF Analytics
 - **Roadmap Goal:** Sovereign risk-free benchmarks (T-Bills, 10-Yr G-Sec, SDLs), ETF performance/liquidity matrix, and net real post-tax return calculator (marginal tax slabs + MOSPI CPI deflator).
 - **Actual Implementation:** **FULLY DELIVERED**
-  - Database & Analysis: `core/db/sovereign.py`, `core/analysis/sovereign_engine.py`, `core/analysis/etf_engine.py`, `core/analysis/tax_calculator.py`.
+  - Database & Analysis: `core/db/sovereign.py`, `core/analysis/sovereign_engine.py`, `core/analysis/etf_matrix_engine.py`, `core/analysis/net_real_tax_calculator.py`.
   - Web UI: `/sovereign`, `/etfs`, and `/calculator/tax` with real-time interactive calculations and API endpoints.
 
 #### Priority 4: Fractional Real Estate (SM REITs) & Sovereign Gold (SGB)
 - **Roadmap Goal:** Monitor SEBI SM REITs & InvITs under 2024 regulations (occupancy $\ge 95\%$, NDCF payout $\ge 95\%$, LTV $\le 49\%$), and SGB secondary market parity with Section 47(viic) capital gains tax exemptions.
 - **Actual Implementation:** **FULLY DELIVERED**
-  - Database & Analysis: `core/db/reits.py`, `core/analysis/reit_engine.py`, `core/analysis/sgb_engine.py`.
+  - Database & Analysis: `core/db/reits.py`, `core/analysis/sm_reit_invit_engine.py`, `core/analysis/sgb_engine.py`.
   - Web UI: `/reits` directory and `/api/sgb/tranches`.
 
 #### Priority 5: Retail Safety & Shadow-Banking Diagnostic Radar
 - **Roadmap Goal:** Diagnostic guardrail highlighting counterparty risks in unregulated gold leasing (Gullak Gold+), RBI-restricted P2P lending (12Club/LiquiLoans), and unrated NBFC deposits with a 0-100 Danger Score.
 - **Actual Implementation:** **FULLY DELIVERED**
-  - Database & Analysis: `core/db/safety_radar.py`, `core/analysis/safety_radar.py`.
+  - Database & Analysis: `core/db/safety_radar.py`, `core/analysis/retail_safety_radar.py`.
   - Web UI: `/safety-radar` and `/api/safety-radar` rendering risk scorecards, regulatory status, and safe alternative recommendations.
 
 ---
@@ -505,16 +505,16 @@ The following items constitute the prioritized, operational active tasks:
 
 #### 🟠 P1 — High Impact: Core Features & Consistency
 2. **Peer Comparison (`/compare`) Data Source Harmonization (Audit 1 Finding F20):** *(Completed)*
-   - **Target Files:** `core/db/fundamentals.py`, `core/analysis/fundamentals.py`, `core/analysis/comparator.py`, `web/templates/compare.html`, `tests/test_peer_comparison_data.py`
+   - **Target Files:** `core/db/fundamentals.py`, `core/analysis/fundamentals.py`, `core/analysis/peer_comparison.py`, `web/templates/compare.html`, `tests/test_peer_comparison_data.py`
    - **Details:** Connected `compare_two_companies()` to localized `cached_fundamentals` DB repository (migration `v027_cached_fundamentals`), extracting and caching verified ROCE, ROE, OPM, D/E, and 52-week ranges from report baseline text and discovery reel to ensure 100% non-N/A peer metrics.
 3. **Curated Mutual Fund Top 50 Expansion (Remaining 19 Schemes):** *(Completed)*
-   - **Target Files:** `core/db/mutual_funds.py`, `core/analysis/fund_forensic_auditor.py`, `tests/test_mutual_fund_top50_expansion.py`
+   - **Target Files:** `core/db/mutual_funds.py`, `core/analysis/fund_overlap_auditor.py`, `tests/test_mutual_fund_top50_expansion.py`
    - **Details:** Ingested 19 marquee institutional equity schemes across Flexi Cap (5), Mid Cap (5), Small Cap (5), and Large & Mid Cap (4) with constituent holdings, verified AMFI metrics, active share, Sortino ratio, and 7-pillar look-through integration to complete the Top 50 canonical universe.
 4. **Hybrid AI Auditor & Failure Synthesizer:** *(Completed)*
    - **Target Files:** `scripts/ai_auditor.py`, `tests/test_ai_auditor.py`
    - **Details:** Implemented the bounded 3-persona auditor (Regulatory Baiter, Edge-Case Quant, State Saboteur) using `gemini-3.8-flash` with a strict $0.50 token ceiling that outputs structured threat dossiers and auto-generates failing Python unit tests (`tests/test_regression_*.py`).
 5. **Curated Mutual Fund Top 100 Expansion (Next 50 Schemes):** *(Completed)*
-   - **Target Files:** `core/db/mutual_funds.py`, `core/analysis/fund_forensic_auditor.py`, `tests/test_mutual_fund_top100_expansion.py`
+   - **Target Files:** `core/db/mutual_funds.py`, `core/analysis/fund_overlap_auditor.py`, `tests/test_mutual_fund_top100_expansion.py`
    - **Details:** Expanded canonical institutional universe from Top 50 to Top 100 marquee schemes across Multi Cap (8), Focused (8), Value/Contra (8), ELSS (8), Large Cap (8), and Thematic/Sectoral (10) categories with verified AMFI metrics, expense drag ratios, active share benchmarks, Sortino ratios, and constituent equity look-through holdings mapped to the platform 143-equity database.
 
 #### 🟡 P2 — Operational Quality & Test Coverage

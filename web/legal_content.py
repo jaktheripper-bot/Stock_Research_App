@@ -29,7 +29,7 @@ POLICIES = {
         <p>Access to automated live AI syntheses requires computational research credits or an active Pro subscription. Credits are non-transferable, possess no cash surrender value, and represent consumption units of server processing compute.</p>
 
         <h3>5. Intellectual Property</h3>
-        <p>All software architecture, algorithms, user interfaces, branding, and aggregated analysis formats are the intellectual property of the Platform operator. Users may download and print individual research reports for personal, non-commercial educational use.</p>
+        <p>All software architecture, algorithms, user interfaces, branding, and aggregated analysis formats are the intellectual property of the Platform operator. Users may download and print individual research reports for personal, non-commercial educational use. Reports, including any content unlocked with credits, may not be resold, republished, shared in bulk, or redistributed. Downloaded PDFs carry a personal-use notice and, when you are signed in, an anonymous account reference.</p>
 
         <h3>6. Limitation of Liability</h3>
         <p>While the Platform ingests public data directly from verified exchange endpoints, no guarantee of absolute accuracy or uninterrupted server uptime is made. The operators shall not be liable for any direct, indirect, incidental, or consequential financial losses arising from the use or inability to use the Platform.</p>
@@ -64,6 +64,7 @@ POLICIES = {
         <ul>
             <li>Authenticate your account and maintain your credit balance in our database.</li>
             <li>Deliver requested research syntheses and issue tax invoices.</li>
+            <li>Stamp downloaded PDFs with an anonymous account reference to deter redistribution. Your email address is never printed on a PDF.</li>
             <li>Prevent abuse, rate limiting violations, and bot scraping.</li>
         </ul>
 

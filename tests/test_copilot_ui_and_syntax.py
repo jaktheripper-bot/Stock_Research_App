@@ -116,7 +116,7 @@ class TestCopilotUIAndSyntax(unittest.TestCase):
                 "message": prompt_text,
                 "ticker": "PPFAS_FLEXICAP_DIR",
                 "asset_type": "mutual_fund"
-            })
+            }, headers={"x-unlock-preview": "1"})
             self.assertEqual(resp.status_code, 200)
             text = resp.json().get("response", "")
             responses[opt_key] = text
@@ -144,7 +144,7 @@ class TestCopilotUIAndSyntax(unittest.TestCase):
                 "message": prompt_text,
                 "ticker": "IN0020210012",
                 "asset_type": "debt"
-            })
+            }, headers={"x-unlock-preview": "1"})
             self.assertEqual(resp.status_code, 200)
             text = resp.json().get("response", "")
             responses[opt_key] = text

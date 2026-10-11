@@ -24,7 +24,7 @@ from core.analysis.fundamentals import (
 from core.cortex.chanakya import ChanakyaGate
 
 
-logger = logging.getLogger("equity_research.core.analysis.discovery")
+logger = logging.getLogger("equity_research.core.analysis.stock_discovery")
 
 # Curated pool of high-quality under-the-radar candidates spanning 10 distinct sectors
 CANDIDATE_UNIVERSE = [

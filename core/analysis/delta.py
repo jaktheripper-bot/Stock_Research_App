@@ -8,7 +8,7 @@ from google import genai
 
 from core.db import save_report_to_archive
 from core.analysis.fundamentals import fetch_latest_bse_announcement, compute_deterministic_technical_context
-from core.analysis.engine import get_surgical_flash_model
+from core.analysis.dossier_report_synthesis import get_surgical_flash_model
 
 logger = logging.getLogger("equity_research.core.analysis.delta")
 

@@ -13,8 +13,8 @@ from core.analysis.sector_scoring import detect_sector, evaluate_sector_fundamen
 from core.analysis.institutional_flow import analyze_institutional_flow
 from core.analysis.forensic_sieve import evaluate_forensic_sieve
 from core.analysis.valuation_radar import compute_valuation_radar
-from core.analysis.bull_bear import synthesize_bull_bear_thesis
-from core.analysis.equity_dossier_intelligence import compile_equity_dossier_intelligence
+from core.analysis.dossier_bull_bear import synthesize_bull_bear_thesis
+from core.analysis.equity_dossier import compile_equity_dossier
 
 
 class TestEquityUpgrades(unittest.TestCase):
@@ -137,7 +137,7 @@ class TestEquityUpgrades(unittest.TestCase):
             "lower_circuit": 1053.0,
             "bid_ask_spread_bps": 5.0,
         }
-        intel = compile_equity_dossier_intelligence(
+        intel = compile_equity_dossier(
             ticker="RELIANCE",
             fundamentals=fund,
             company_name="Reliance Industries Ltd",

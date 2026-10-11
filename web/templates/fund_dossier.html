@@ -287,6 +287,11 @@
     </div>
     {% endif %}
   </div>
+  {% elif forensic_locked %}
+  {% set lock_title = 'Look-Through Forensics & Audit Narrative' %}
+  {% set lock_blurb = 'The free report already shows fees, active share, holdings and the headline health score. The Deep Dive opens up what sits underneath the portfolio.' %}
+  {% set lock_points = ['Weighted moat score and the top compounder holdings', 'Look-through accounting risk (ASRI) and promoter pledge exposure, with the flagged holdings named', 'Weighted margin of safety: is the portfolio at a DCF discount or premium', 'The written 7-pillar audit narrative, and the Forensic Desk can answer questions on all of it'] %}
+  {% include "partials/asset_unlock_card.html" %}
   {% endif %}
 
   <!-- Core 6-Pillar Analytical Workspaces -->

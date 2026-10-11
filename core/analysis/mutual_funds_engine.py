@@ -23,7 +23,7 @@ from core.db.mutual_funds import (
 from core.db.debt import get_debt_security_by_isin
 from core.analysis.debt_engine import evaluate_5_pillar_credit_posture
 
-logger = logging.getLogger("equity_research.core.analysis.mutual_fund_engine")
+logger = logging.getLogger("equity_research.core.analysis.mutual_funds_engine")
 VERIFIED_RESEARCHED_EQUITY_SCORE = 82.0
 AA_RATING_BENCHMARK_SCORE = 80.0
 

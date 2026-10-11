@@ -16,7 +16,7 @@ from core.analysis.fundamentals import get_stock_fundamentals, fetch_latest_bse_
 from screener import pass_pre_screening_gates
 from checker import verify_stock_report
 
-logger = logging.getLogger("equity_research.core.analysis.engine")
+logger = logging.getLogger("equity_research.core.analysis.dossier_report_synthesis")
 
 def get_system_prompt(ticker: str, language: str) -> str:
     lang_rule = "The report must be entirely in English (India) using British/Indian spelling." if language == "English (India)" else f"The report must be fully translated into {language} without omitting technical rigor."

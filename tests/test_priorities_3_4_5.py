@@ -22,8 +22,8 @@ from core.db.sovereign import (
     get_etf_matrix,
 )
 from core.analysis.sovereign_engine import evaluate_sovereign_curve
-from core.analysis.etf_engine import evaluate_etf_matrix
-from core.analysis.tax_calculator import (
+from core.analysis.etf_matrix_engine import evaluate_etf_matrix
+from core.analysis.net_real_tax_calculator import (
     calculate_net_real_return,
     compare_asset_classes_post_tax,
 )
@@ -33,13 +33,13 @@ from core.db.reits import (
     save_sgb_tranche,
     get_all_sgb_tranches,
 )
-from core.analysis.reit_engine import audit_reit_portfolio
+from core.analysis.sm_reit_invit_engine import audit_reit_portfolio
 from core.analysis.sgb_engine import evaluate_sgb_market
 from core.db.safety_radar import (
     save_alternative_yield_product,
     get_all_safety_radar_products,
 )
-from core.analysis.safety_radar import audit_alternative_yield_radar
+from core.analysis.retail_safety_radar import audit_alternative_yield_radar
 
 
 class TestPriorities345(unittest.TestCase):

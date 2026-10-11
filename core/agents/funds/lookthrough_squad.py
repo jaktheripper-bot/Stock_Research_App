@@ -12,7 +12,7 @@ import logging
 from typing import Dict, Any, Optional
 
 from core.agents.tools_base import tool_get_fund_holdings
-from core.analysis.fund_forensic_auditor import compute_fund_forensic_lookthrough
+from core.analysis.fund_overlap_auditor import compute_fund_forensic_lookthrough
 from core.db.mutual_funds import get_mutual_fund_by_code, get_scheme_holdings
 
 logger = logging.getLogger("equity_research.core.agents.funds")

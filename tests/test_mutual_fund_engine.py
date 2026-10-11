@@ -8,7 +8,7 @@ from core.db.mutual_funds import (
     get_scheme_holdings,
     get_schemes_by_holding
 )
-from core.analysis.mutual_fund_engine import (
+from core.analysis.mutual_funds_engine import (
     calculate_active_share,
     calculate_portfolio_overlap,
     calculate_fee_drag,
@@ -64,7 +64,7 @@ class TestMutualFundEngine(unittest.TestCase):
         self.assertFalse(ashare["is_closet_indexer"])
 
     def test_closet_indexing_detection(self):
-        from core.analysis.mutual_fund_engine import BENCHMARK_PROXIES
+        from core.analysis.mutual_funds_engine import BENCHMARK_PROXIES
         # Create a synthetic index hugger portfolio (matches Nifty 50 benchmark proxy)
         index_hugger_holdings = [
             {"holding_type": "EQUITY", "identifier": k, "weight_pct": v}

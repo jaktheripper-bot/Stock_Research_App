@@ -1,0 +1,21 @@
+<!-- Deep Dive unlock card for fund / debt dossiers.
+     Expects: lock_title, lock_blurb, lock_points (list of strings), unlock_kind ('FUND'|'DEBT'), unlock_id.
+     The locked content is never rendered into the page: this card replaces it server-side. -->
+<div class="asset-unlock-card" data-unlock-kind="{{ unlock_kind }}" style="background: linear-gradient(135deg, rgba(30, 41, 59, 0.7) 0%, rgba(15, 23, 42, 0.85) 100%); border: 1px dashed rgba(56, 189, 248, 0.35); border-radius: 14px; padding: 22px 24px; margin-bottom: 20px;">
+  <div style="display: flex; justify-content: space-between; align-items: center; gap: 16px; flex-wrap: wrap;">
+    <div style="flex: 1 1 320px;">
+      <div style="font-size: 11px; font-weight: 700; letter-spacing: 0.06em; text-transform: uppercase; color: #38bdf8; margin-bottom: 6px;">🔒 Deep Dive</div>
+      <h3 style="font-size: 17px; font-weight: 700; color: #f8fafc; margin: 0 0 6px;">{{ lock_title }}</h3>
+      <p style="font-size: 13.5px; color: #94a3b8; line-height: 1.55; margin: 0 0 10px;">{{ lock_blurb }}</p>
+      <ul style="margin: 0; padding-left: 18px; font-size: 13px; color: #cbd5e1; line-height: 1.7;">
+        {% for point in lock_points %}<li>{{ point }}</li>{% endfor %}
+      </ul>
+    </div>
+    <div style="text-align: center;">
+      <button type="button" id="btnUnlock{{ unlock_kind }}" onclick="unlockAssetDeepDive('{{ unlock_kind }}', '{{ unlock_id }}')" class="btn btn-primary" style="font-weight: 700; padding: 10px 20px; border-radius: 9999px; cursor: pointer;">
+        Unlock for 1 credit
+      </button>
+      <div style="font-size: 11.5px; color: #64748b; margin-top: 6px;">One-time, permanent for this {{ 'scheme' if unlock_kind == 'FUND' else 'security' }}</div>
+    </div>
+  </div>
+</div>

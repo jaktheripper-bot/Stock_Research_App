@@ -59,7 +59,7 @@ sequenceDiagram
     participant DB as SQLite reports.db & Supabase
     participant Gate as MaterialChangeGate (core/analysis/delta.py)
     participant Angel as AngelOneGateway (via AWS Proxy)
-    participant Intel as compile_equity_dossier_intelligence()
+    participant Intel as compile_equity_dossier()
     participant LLM as Gemini Flash Cascade (core/analysis/engine.py)
 
     Browser->>Router: GET /dossier/{ticker}
@@ -78,7 +78,7 @@ sequenceDiagram
         Router->>DB: save_report_to_archive() & replicate to Supabase
     end
 
-    Router->>Intel: Execute compile_equity_dossier_intelligence(ticker, fund_data)
+    Router->>Intel: Execute compile_equity_dossier(ticker, fund_data)
     Intel-->>Router: Cockpit Metrics (Valuation Radar, Sector Score, Flow, Forensic Sieve, Bull/Bear)
     Router-->>Browser: Rendered Institutional Dossier (HTML + Glassmorphism UI)
 ```
@@ -88,7 +88,7 @@ sequenceDiagram
 sequenceDiagram
     autonumber
     participant Cron as 09:00 AM IST Cron Daemon
-    participant Disc as core/analysis/discovery.py
+    participant Disc as core/analysis/stock_discovery.py
     participant Angel as AngelOne / BSE Feed
     participant Chan as ChanakyaGate (core/cortex/chanakya.py)
     participant DB as reports.db (discovery_cohorts table)

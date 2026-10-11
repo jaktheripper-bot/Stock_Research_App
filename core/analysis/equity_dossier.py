@@ -17,13 +17,13 @@ from core.analysis.sector_scoring import evaluate_sector_fundamentals
 from core.analysis.institutional_flow import analyze_institutional_flow
 from core.analysis.forensic_sieve import evaluate_forensic_sieve
 from core.analysis.valuation_radar import compute_valuation_radar
-from core.analysis.bull_bear import synthesize_bull_bear_thesis
+from core.analysis.dossier_bull_bear import synthesize_bull_bear_thesis
 from core.ingestion.angel_one import AngelOneGateway
 
-logger = logging.getLogger("equity_research.core.analysis.equity_dossier_intelligence")
+logger = logging.getLogger("equity_research.core.analysis.equity_dossier")
 
 
-def compile_equity_dossier_intelligence(
+def compile_equity_dossier(
     ticker: str,
     fundamentals: Dict[str, Any],
     company_name: str = "",

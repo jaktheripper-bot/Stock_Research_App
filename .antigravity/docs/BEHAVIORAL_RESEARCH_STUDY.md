@@ -239,7 +239,7 @@ To operationalize these behavioral insights across the `Stock_Research_App` code
 | **Thesis Integrity Checkpoint** | `core/analysis/delta.py`, `core/db/reports.py`, `ui/scorecard.py` | Extend `compare_revisions()` to compare user-locked baseline quantitative thresholds against current filings; render explicit "Would you buy today?" confirmation modal upon breach. |
 | **PEAD Drift Tracking** | `core/analysis/fundamentals.py`, `ui/charts.py` | Ingest quarterly earnings announcement dates; compute Standardized Unexpected Earnings (SUE); render 60-day historical post-earnings drift band to combat loss-averse holding. |
 | **Forensic Cash Flow Quality Card** | `core/analysis/fundamentals.py`, `ui/views/dossier_view.py` | 3-year historical variance table comparing Operating Cash Flow vs Net Profit to detect working-capital traps and aggressive revenue recognition. |
-| **3-Tier Disparity Gates** | `core/analysis/comparator.py`, `ui/comparison.py` | Maintain and expand the 3-axis diagnostic (Sector, Lifecycle, Scale) with auto-normalization to ROIC and FCF yield. |
+| **3-Tier Disparity Gates** | `core/analysis/peer_comparison.py`, `ui/comparison.py` | Maintain and expand the 3-axis diagnostic (Sector, Lifecycle, Scale) with auto-normalization to ROIC and FCF yield. |
 | **SEBI LODR Regulation 30/33 Sweeper** | `core/analysis/fundamentals.py`, `core/db/alerts.py`, `alerts.py` | Filter BSE announcement categories specifically for auditor resignations, promoter share pledge changes, and forensic governance disclosures. |
 
 ---

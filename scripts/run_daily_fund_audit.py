@@ -30,7 +30,7 @@ from core.db.mutual_funds import (
     get_next_fund_for_daily_audit,
     seed_default_mutual_funds
 )
-from core.analysis.fund_forensic_auditor import (
+from core.analysis.fund_overlap_auditor import (
     audit_single_fund_daily,
     compute_fund_forensic_lookthrough
 )

@@ -20,7 +20,7 @@ logger = logging.getLogger("equity_research.core.agents.watchers.bse")
 async def _recheck_equity_thesis_background(ticker: str, headline: str):
     """Executes background thesis review following material exchange filing."""
     try:
-        from core.analysis.engine import generate_stock_report
+        from core.analysis.dossier_report_synthesis import generate_stock_report
         # Execute synthesis asynchronously in background thread
         await asyncio.to_thread(generate_stock_report, ticker)
         record_autonomous_event(

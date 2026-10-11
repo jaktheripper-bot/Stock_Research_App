@@ -25,8 +25,8 @@ from core.db.mutual_funds import (
     get_scheme_holdings,
     get_active_mutual_funds,
 )
-from core.analysis.fund_forensic_auditor import compute_fund_forensic_lookthrough
-from core.analysis.mutual_fund_engine import calculate_portfolio_overlap
+from core.analysis.fund_overlap_auditor import compute_fund_forensic_lookthrough
+from core.analysis.mutual_funds_engine import calculate_portfolio_overlap
 
 
 NEW_19_SCHEME_CODES = [
@@ -114,7 +114,7 @@ class TestMutualFundTop50Expansion(unittest.TestCase):
             "QUANT_SMALLCAP_DIR",
             "MIRAE_LARGEMID_DIR"
         ]
-        with patch("core.analysis.fund_forensic_auditor.get_report_by_ticker") as mock_rep:
+        with patch("core.analysis.fund_overlap_auditor.get_report_by_ticker") as mock_rep:
             mock_rep.return_value = {
                 "report_text": "### Health Matrix\nMoat: Wide\nGovernance: Clean\nValuation: Undervalued\nBalance Sheet: Debt-Free\n"
             }

@@ -606,6 +606,17 @@ async function submitCopilotMessage() {
             </div>
             <div class="copilot-turn-meta">Institutional Forensic Engine • ${agentTime}</div>
         `;
+        if (data.unlock_required && typeof window.unlockAssetDeepDive === "function") {
+            const unlockBtn = document.createElement("button");
+            unlockBtn.type = "button";
+            unlockBtn.className = "btn btn-primary btn-sm";
+            unlockBtn.style.cssText = "margin-top: 10px; font-weight: 700; border-radius: 9999px; cursor: pointer;";
+            unlockBtn.textContent = "Unlock Deep Dive for 1 credit";
+            unlockBtn.addEventListener("click", function() {
+                window.unlockAssetDeepDive(data.unlock_required.asset_kind, data.unlock_required.asset_id);
+            });
+            agentTurn.querySelector(".copilot-bubble-body").appendChild(unlockBtn);
+        }
         container.appendChild(agentTurn);
         container.scrollTop = container.scrollHeight;
     } catch (e) {

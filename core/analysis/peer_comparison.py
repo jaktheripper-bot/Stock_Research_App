@@ -7,7 +7,7 @@ from core.db import get_report_by_ticker_sync
 from core.analysis.fundamentals import get_stock_fundamentals, enrich_fundamentals
 from core.analysis.parser import extract_health_matrix
 
-logger = logging.getLogger("equity_research.core.analysis.comparator")
+logger = logging.getLogger("equity_research.core.analysis.peer_comparison")
 import asyncio
 def evaluate_company_disparity(fund_a: dict, fund_b: dict) -> dict:
     """

@@ -123,7 +123,7 @@ def get_session_id() -> str:
 def parse_user_agent(ua_string: str) -> dict:
     """Classifies user agent into device, browser, and operating system."""
     if not ua_string:
-        return {"device": "Desktop", "browser": "Unknown", "os": "Unknown"}
+        return {"device": "Unknown", "browser": "Unknown", "os": "Unknown"}
 
     ua = ua_string.lower()
 
@@ -173,6 +173,8 @@ def parse_traffic_source(referrer: str, query_params: dict) -> tuple:
     # 1. UTM Attribution
     utm_source = query_params.get("utm_source") or query_params.get("ref") or query_params.get("source")
     if utm_source:
+        if str(utm_source).strip().lower() == "share":
+            return "Shared Link", referrer or "Share Button"
         return str(utm_source), referrer or "Campaign Link"
 
     # 2. Direct Navigation
@@ -183,6 +185,20 @@ def parse_traffic_source(referrer: str, query_params: dict) -> tuple:
     # Filter self-referential navigations (internal links within the app)
     if any(self_host in ref_lower for self_host in ("stock-research-app", "onrender.com", "localhost", "127.0.0.1", "vestnomics", "vestnomics.app", "stockresearch.app")):
         return "Direct / Bookmark", "Direct"
+
+    # AI answer engines first: gemini.google.com would otherwise match the generic Google rule
+    if "gemini.google." in ref_lower or "bard.google." in ref_lower:
+        return "Gemini (AI)", referrer
+    elif any(k in ref_lower for k in ["chatgpt.com", "chat.openai.com", "openai.com"]):
+        return "ChatGPT (AI)", referrer
+    elif "perplexity.ai" in ref_lower:
+        return "Perplexity (AI)", referrer
+    elif any(k in ref_lower for k in ["claude.ai", "anthropic.com"]):
+        return "Claude (AI)", referrer
+    elif any(k in ref_lower for k in ["copilot.microsoft.com", "bing.com/chat"]):
+        return "Copilot (AI)", referrer
+    elif any(k in ref_lower for k in ["you.com", "phind.com", "kagi.com"]):
+        return "Other AI Search", referrer
 
     if "google." in ref_lower:
         return "Google Search", referrer
@@ -236,17 +252,55 @@ def parse_traffic_source(referrer: str, query_params: dict) -> tuple:
         except Exception:
             return "Referral", referrer
 
+# (user-agent substring, display name, kind). Order matters: more specific first.
+_BOT_SIGNATURES = (
+    ("googlebot", "Googlebot", "Search"),
+    ("google-extended", "Google-Extended (Gemini training)", "AI"),
+    ("bingbot", "Bingbot", "Search"),
+    ("duckduckbot", "DuckDuckBot", "Search"),
+    ("yandexbot", "YandexBot", "Search"),
+    ("baiduspider", "Baiduspider", "Search"),
+    ("applebot", "Applebot", "Search"),
+    ("gptbot", "GPTBot (OpenAI)", "AI"),
+    ("oai-searchbot", "OAI-SearchBot (ChatGPT search)", "AI"),
+    ("chatgpt-user", "ChatGPT-User", "AI"),
+    ("perplexitybot", "PerplexityBot", "AI"),
+    ("perplexity-user", "Perplexity-User", "AI"),
+    ("claudebot", "ClaudeBot (Anthropic)", "AI"),
+    ("claude-web", "Claude-Web", "AI"),
+    ("anthropic-ai", "Anthropic-AI", "AI"),
+    ("ccbot", "CCBot (Common Crawl)", "AI"),
+    ("bytespider", "Bytespider", "AI"),
+    ("amazonbot", "Amazonbot", "AI"),
+    ("meta-externalagent", "Meta-ExternalAgent", "AI"),
+    ("ahrefsbot", "AhrefsBot", "SEO Tool"),
+    ("semrushbot", "SemrushBot", "SEO Tool"),
+    ("mj12bot", "MJ12bot", "SEO Tool"),
+)
+
+
+def classify_bot(user_agent: str):
+    """Returns (bot_name, kind) for a known crawler user agent, otherwise None."""
+    ua = (user_agent or "").lower()
+    if not ua:
+        return None
+    for needle, name, kind in _BOT_SIGNATURES:
+        if needle in ua:
+            return name, kind
+    return None
+
+
 def extract_geo(headers: dict) -> str:
     """Extract country from reverse proxy headers (Cloudflare, Vercel, etc.)."""
     if not headers:
-        return "IN"
+        return "Unknown"
     cf_country = headers.get("cf-ipcountry")
     if cf_country and cf_country != "XX":
         return cf_country.upper()
     x_country = headers.get("x-country-code") or headers.get("x-vercel-ip-country")
     if x_country:
         return x_country.upper()
-    return "IN"
+    return "Unknown"
 
 def get_visitor_context() -> dict:
     """Assembles full client environment, traffic attribution, and session info."""

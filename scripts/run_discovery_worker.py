@@ -22,8 +22,8 @@ if ROOT_DIR not in sys.path:
 from core.db.connection import init_db, IST
 from core.db.reports import get_report_by_ticker_sync
 from core.db.discovery import save_discovery_reel, get_active_discovery_reel
-from core.analysis.discovery import curate_morning_discovery_cohort
-from core.analysis.engine import generate_stock_report
+from core.analysis.stock_discovery import curate_morning_discovery_cohort
+from core.analysis.dossier_report_synthesis import generate_stock_report
 
 logging.basicConfig(
     level=logging.INFO,

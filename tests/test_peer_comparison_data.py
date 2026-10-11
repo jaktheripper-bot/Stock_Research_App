@@ -10,7 +10,7 @@ from core.db.fundamentals import (
     sync_all_cached_fundamentals,
 )
 from core.analysis.fundamentals import enrich_fundamentals, get_stock_fundamentals
-from core.analysis.comparator import compare_two_companies
+from core.analysis.peer_comparison import compare_two_companies
 import asyncio
 
 

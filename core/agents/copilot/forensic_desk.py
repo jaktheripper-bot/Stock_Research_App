@@ -10,6 +10,7 @@ Configured with `AgentBehavior.INTERACTIVE`:
 import os
 import sys
 import json
+import re
 import logging
 import asyncio
 from typing import Dict, Any, List, Optional
@@ -95,6 +96,7 @@ def build_mutual_fund_deterministic_response(
     name = context_data.get("scheme_name") or ticker or "Mutual Fund Scheme"
     sec = (section or "").lower().strip()
     msg = (user_message or "").lower().strip()
+    locked = bool(context_data.get("deep_dive_locked"))
 
     if sec == "fee_drag" or any(k in msg for k in ["fee drag", "direct", "regular", "ter", "commission", "expense ratio", "wealth lost", "drag"]):
         ter_dir = context_data.get("ter_direct_pct", "N/A")
@@ -129,7 +131,7 @@ def build_mutual_fund_deterministic_response(
             "which mathematically guarantees long-term net-of-fee underperformance.\n\n"
             "Would you like to drill into the top constituent holdings or portfolio concentration?"
         )
-    elif sec in ["asri_solvency", "accounting_risk"] or any(k in msg for k in ["asri", "accounting risk", "pledg", "risky", "high-risk", "stress index"]):
+    elif not locked and (sec in ["asri_solvency", "accounting_risk"] or any(k in msg for k in ["asri", "accounting risk", "pledg", "risky", "high-risk", "stress index"])):
         asri = context_data.get("accounting_risk_index", "N/A")
         pledge = context_data.get("promoter_pledge_exposure_pct", 0.0)
         risky = context_data.get("top_risky_holdings", [])
@@ -143,7 +145,7 @@ def build_mutual_fund_deterministic_response(
             "screening for aggressive revenue recognition, Beneish M-score flags, and high promoter pledge encumbrances.\n\n"
             "Which underlying holding would you like to inspect in detail?"
         )
-    elif sec in ["moat_index", "quality"] or any(k in msg for k in ["moat", "quality", "compounder", "pricing power", "economic moat"]):
+    elif not locked and (sec in ["moat_index", "quality"] or any(k in msg for k in ["moat", "quality", "compounder", "pricing power", "economic moat"])):
         moat = context_data.get("weighted_moat_score", "N/A")
         comp = context_data.get("composite_health_score", "N/A")
         quality = context_data.get("top_quality_holdings", [])
@@ -157,7 +159,7 @@ def build_mutual_fund_deterministic_response(
             "and market share protection across the underlying constituent companies.\n\n"
             "Would you like to examine valuation margins or downside capture next?"
         )
-    elif sec == "margin_of_safety" or any(k in msg for k in ["margin of safety", "dcf", "intrinsic", "discount", "premium"]):
+    elif not locked and (sec == "margin_of_safety" or any(k in msg for k in ["margin of safety", "dcf", "intrinsic", "discount", "premium"])):
         mos = context_data.get("margin_of_safety_pct", "N/A")
         return (
             f"**Weighted Margin of Safety (DCF) Diagnostic for {name}:**\n\n"
@@ -171,12 +173,16 @@ def build_mutual_fund_deterministic_response(
         risky = context_data.get("top_risky_holdings", [])
         quality = context_data.get("top_quality_holdings", [])
         aum = context_data.get("aum_crores", "N/A")
+        watch_lines = (
+            "" if locked else
+            f"- Fortress Moat Allocations: {len(quality)} tracked core holdings\n"
+            f"- Solvency Watchlist Allocations: {len(risky)} flagged holdings\n"
+        )
         return (
             f"**Constituent Holdings & Asset Allocation for {name}:**\n\n"
             f"- Category: {context_data.get('category', 'Equity Scheme')}\n"
             f"- AUM: ₹{aum} Cr\n"
-            f"- Fortress Moat Allocations: {len(quality)} tracked core holdings\n"
-            f"- Solvency Watchlist Allocations: {len(risky)} flagged holdings\n\n"
+            f"{watch_lines}\n"
             "**Look-Through Framework:** Each constituent stock is individually evaluated via our 7-Pillar Equity Forensic Engine.\n\n"
             "Would you like to analyze a specific holding or check active share?"
         )
@@ -190,7 +196,7 @@ def build_mutual_fund_deterministic_response(
             "combined with healthy upside participation to produce superior risk-adjusted alpha over full market cycles.\n\n"
             "Would you like to inspect active share or fee drag next?"
         )
-    elif sec == "dossier_narrative" or any(k in msg for k in ["narrative", "audit", "summary", "qualitative", "findings"]):
+    elif not locked and (sec == "dossier_narrative" or any(k in msg for k in ["narrative", "audit", "summary", "qualitative", "findings"])):
         dossier_text = context_data.get("dossier_text", "")
         summary_snip = (dossier_text[:350] + "...") if len(dossier_text) > 350 else dossier_text
         return (
@@ -203,12 +209,17 @@ def build_mutual_fund_deterministic_response(
     else:
         # Default Mutual Fund Look-Through Summary
         aum = context_data.get("aum_crores", "N/A")
-        return (
-            f"**Forensic Look-Through Summary for {name}:**\n\n"
-            f"- Composite Health Score: {context_data.get('composite_health_score', 'N/A')}/100\n"
+        deep_lines = (
+            "- Moat, accounting-risk and margin-of-safety scores: 🔒 part of the Deep Dive (1 credit)\n"
+            if locked else
             f"- Weighted Moat Score: {context_data.get('weighted_moat_score', 'N/A')}/100\n"
             f"- Look-Through Accounting Risk Index (ASRI): {context_data.get('accounting_risk_index', 'N/A')}%\n"
             f"- Weighted Margin of Safety: {context_data.get('margin_of_safety_pct', 'N/A')}%\n"
+        )
+        return (
+            f"**Forensic Look-Through Summary for {name}:**\n\n"
+            f"- Composite Health Score: {context_data.get('composite_health_score', 'N/A')}/100\n"
+            f"{deep_lines}"
             f"- Active Share: {context_data.get('active_share_pct', 'N/A')}%\n"
             f"- AUM: ₹{aum} Cr\n\n"
             "What specific look-through metric, constituent holding, or fee drag area would you like to investigate?"
@@ -225,6 +236,7 @@ def build_debt_deterministic_response(
     name = context_data.get("instrument_name") or ticker or "Debt Security"
     sec = (section or "").lower().strip()
     msg = (user_message or "").lower().strip()
+    locked = bool(context_data.get("deep_dive_locked"))
 
     if sec in ["covenants", "asset_coverage"] or any(k in msg for k in ["covenant", "acr", "asset coverage", "coverage", "dscr", "headroom"]):
         return (
@@ -235,7 +247,7 @@ def build_debt_deterministic_response(
             "**Solvency Assessment:** Evaluates underlying asset encumbrance, security charge, and DSCR headroom against covenant thresholds.\n\n"
             "Would you like to examine the Credit Contagion Radar or duration profile?"
         )
-    elif sec in ["contagion", "radar"] or any(k in msg for k in ["contagion", "radar", "group", "systemic", "cross-default", "parent"]):
+    elif not locked and (sec in ["contagion", "radar"] or any(k in msg for k in ["contagion", "radar", "group", "systemic", "cross-default", "parent"])):
         return (
             f"**Credit Contagion Radar Analysis for {name}:**\n\n"
             f"- Status: {context_data.get('contagion_radar_status', 'N/A')} ({context_data.get('contagion_risk_level', 'N/A')})\n"
@@ -253,14 +265,20 @@ def build_debt_deterministic_response(
             "Would you like to evaluate covenant headroom or duration sensitivity?"
         )
     else:
+        if locked:
+            radar_lines = "- Credit Contagion Radar: 🔒 part of the Deep Dive (1 credit)\n\n"
+        else:
+            radar_lines = (
+                f"- Credit Contagion Radar: {context_data.get('contagion_radar_status', 'N/A')} ({context_data.get('contagion_risk_level', 'N/A')})\n\n"
+                f"> {context_data.get('radar_summary', '')}\n\n"
+            )
         return (
             f"**Credit & Solvency Summary for {name}:**\n\n"
             f"- Credit Rating: {context_data.get('credit_rating', 'N/A')}\n"
             f"- YTM: {context_data.get('ytm_pct', 'N/A')}%\n"
             f"- Duration: {context_data.get('macaulay_duration_years', 'N/A')} yrs\n"
             f"- Seniority: {context_data.get('seniority_tier', 'N/A')}\n"
-            f"- Credit Contagion Radar: {context_data.get('contagion_radar_status', 'N/A')} ({context_data.get('contagion_risk_level', 'N/A')})\n\n"
-            f"> {context_data.get('radar_summary', '')}\n\n"
+            f"{radar_lines}"
             "What specific solvency or capital hierarchy pillar would you like to drill into?"
         )
 
@@ -463,7 +481,113 @@ def build_equity_deterministic_response(
         )
 
 
-async def process_copilot_turn(
+GATED_PILLARS = (3, 5)
+GATED_PILLAR_NOTICE = (
+    "[Institutional deep-dive pillar locked. The user has not unlocked this ticker, so its contents "
+    "must not be summarised, paraphrased or hinted at. Tell them it is available with 1 credit.]"
+)
+
+
+def redact_gated_pillars(report_text: str, notice: str = GATED_PILLAR_NOTICE) -> str:
+    """Replaces the body of gated Pillars (03, 05) in markdown report text with a locked notice."""
+    if not report_text:
+        return report_text
+    heading = re.compile(r"^\s*#{1,4}\s*.*?(?:Pillar|Dimension)\s*0?(\d+)", re.IGNORECASE)
+    out, skipping = [], False
+    for line in report_text.splitlines():
+        m = heading.match(line)
+        if m:
+            skipping = int(m.group(1)) in GATED_PILLARS
+            out.append(line)
+            if skipping:
+                out.append(notice)
+            continue
+        if not skipping:
+            out.append(line)
+    return "\n".join(out)
+
+
+# ---------------------------------------------------------------------------
+# Mutual Fund & Corporate Debt deep-dive gating (1 credit per scheme / security)
+# Free: headline score, fees, active share, holdings, rating, YTM, duration, seniority.
+# Locked: the forensic depth that costs real analysis (see GATED_* below).
+# ---------------------------------------------------------------------------
+MF_GATED_FIELDS = (
+    "weighted_moat_score", "accounting_risk_index", "margin_of_safety_pct",
+    "promoter_pledge_exposure_pct", "top_risky_holdings", "top_quality_holdings", "dossier_text",
+)
+DEBT_GATED_FIELDS = (
+    "contagion_radar_status", "contagion_risk_level", "radar_summary",
+)
+
+# (label, what you get, section ids, message keywords)
+_GATED_TOPICS = {
+    "MUTUAL_FUND": [
+        ("Look-Through Accounting Risk (ASRI) & promoter pledges",
+         "which underlying holdings carry accounting stress or pledged promoter shares",
+         {"asri_solvency", "accounting_risk"},
+         ["asri", "accounting risk", "pledg", "risky", "high-risk", "stress index"]),
+        ("Weighted Moat & Quality Index",
+         "the fund's moat score and its top compounder holdings",
+         {"moat_index", "quality"},
+         ["moat", "compounder", "pricing power"]),
+        ("Weighted Margin of Safety",
+         "whether the portfolio trades at a DCF discount or premium",
+         {"margin_of_safety"},
+         ["margin of safety", "dcf", "intrinsic"]),
+        ("Forensic Audit Narrative",
+         "the written 7-pillar audit findings for this scheme",
+         {"dossier_narrative"},
+         ["forensic narrative", "qualitative", "audit findings", "findings"]),
+    ],
+    "CORPORATE_DEBT": [
+        ("Credit Contagion Radar",
+         "how parent-equity distress and group leverage could spill over to this issuer",
+         {"contagion", "radar"},
+         ["contagion", "radar", "cross-default", "systemic", "parent", "group leverage"]),
+        ("Cash Flow Solvency (Pillar 03)",
+         "interest cover, DSCR and leverage against covenant thresholds",
+         {"solvency", "cash_flow"},
+         ["dscr", "interest coverage", "icr", "debt service", "net debt", "ebitda"]),
+        ("Recovery Reality (Pillar 05)",
+         "realistic recovery expectations, FLDG buffers and bankruptcy remoteness",
+         {"recovery_reality", "securitization"},
+         ["fldg", "securitis", "securitiz", "bankruptcy remote", "recovery reality"]),
+    ],
+}
+
+_ASSET_NOUN = {"MUTUAL_FUND": "scheme", "CORPORATE_DEBT": "security"}
+
+
+def detect_gated_topic(asset_class: str, section: Optional[str], user_message: str):
+    """Returns (label, blurb) when the turn targets a locked deep-dive topic, else None."""
+    sec = (section or "").lower().strip()
+    msg = (user_message or "").lower()
+    for label, blurb, sections, keywords in _GATED_TOPICS.get(asset_class, []):
+        if sec in sections or any(k in msg for k in keywords):
+            return label, blurb
+    return None
+
+
+def build_unlock_notice(asset_class: str, name: str, topic) -> str:
+    """Friendly, value-first prompt asking for 1 credit instead of revealing locked data."""
+    label, blurb = topic
+    noun = _ASSET_NOUN.get(asset_class, "asset")
+    free = (
+        "fees, active share, holdings and the headline health score"
+        if asset_class == "MUTUAL_FUND"
+        else "rating, yield, duration and seniority"
+    )
+    return (
+        f"🔒 **{label}** is part of the Deep Dive for {name}.\n\n"
+        f"Unlocking shows {blurb}. It costs **1 credit**, is permanent for this {noun}, "
+        f"and also unlocks the matching sections on the page. Use the **Unlock** button to continue.\n\n"
+        f"Meanwhile I'm happy to go through the free parts: {free}."
+    )
+
+
+
+async def process_forensic_desk_turn(
     conversation_id: str,
     user_message: str,
     ticker: Optional[str] = None,
@@ -471,7 +595,9 @@ async def process_copilot_turn(
     asset_type: Optional[str] = None,
     section: Optional[str] = None,
     section_label: Optional[str] = None,
-    section_data: Optional[Dict[str, Any]] = None
+    section_data: Optional[Dict[str, Any]] = None,
+    deep_dive_unlocked: bool = False,
+    unlock_checker: Optional[Any] = None
 ) -> Dict[str, Any]:
     """Processes a user dialogue turn with conversational memory, multi-asset grounding, and section awareness."""
     # 1. Ensure conversation exists in DB
@@ -519,7 +645,8 @@ async def process_copilot_turn(
         "asset_class": resolved_asset_class,
         "active_section": section,
         "active_section_label": section_label,
-        "section_data": section_data or {}
+        # Client-supplied section data is untrusted and could carry gated text; drop it unless unlocked
+        "section_data": (section_data or {}) if deep_dive_unlocked else {}
     }
 
     if clean_ticker:
@@ -626,15 +753,45 @@ async def process_copilot_turn(
                     "market_cap": mcap_val,
                     "market_cap_str": mcap_str,
                     "health_matrix": matrix,
-                    "report_text": rep.get("report_text", ""),
+                    "report_text": rep.get("report_text", "") if deep_dive_unlocked else redact_gated_pillars(rep.get("report_text", "")),
                     "citations_count": len(rep.get("citations") or []),
-                    "reverse_dcf": dcf_dict,
+                    # Reverse DCF is Pillar 05 (valuation) content, so it is gated too
+                    "reverse_dcf": dcf_dict if deep_dive_unlocked else {},
                     "fundamentals": fund,
                     "linked_debt": linked_debt,
                     "contagion_alert": contagion_alert
                 })
             except Exception as e:
                 logger.warning(f"Error grounding equity context for {clean_ticker}: {e}")
+
+    # 5b. Fund / debt deep-dive paywall (1 credit per scheme or security).
+    # Entitlement is decided by the caller (server-side) via unlock_checker(kind, asset_id).
+    if resolved_asset_class in ("MUTUAL_FUND", "CORPORATE_DEBT"):
+        kind = "FUND" if resolved_asset_class == "MUTUAL_FUND" else "DEBT"
+        asset_id = (
+            context_data.get("scheme_code") if kind == "FUND" else context_data.get("isin")
+        ) or clean_ticker
+        if unlock_checker is not None:
+            asset_unlocked = bool(unlock_checker(kind, asset_id))
+        else:
+            asset_unlocked = bool(deep_dive_unlocked)
+        context_data["deep_dive_locked"] = not asset_unlocked
+        context_data["section_data"] = (section_data or {}) if asset_unlocked else {}
+        if not asset_unlocked:
+            gated = MF_GATED_FIELDS if kind == "FUND" else DEBT_GATED_FIELDS
+            for field in gated:
+                context_data.pop(field, None)
+            topic = detect_gated_topic(resolved_asset_class, section, user_message)
+            if topic:
+                display = context_data.get("scheme_name") or context_data.get("instrument_name") or clean_ticker or "this asset"
+                notice = build_unlock_notice(resolved_asset_class, display, topic)
+                append_conversation_turn(conversation_id, "agent", notice)
+                return {
+                    "conversation_id": conversation_id,
+                    "response": notice,
+                    "status": "UNLOCK_REQUIRED",
+                    "unlock_required": {"asset_kind": kind, "asset_id": asset_id, "credits": 1},
+                }
 
     # 6. Cognitive AI Response Synthesis
     history = get_conversation_turns(conversation_id, limit=6)
@@ -686,6 +843,17 @@ async def process_copilot_turn(
             "CRITICAL ASSET DIRECTIVE: THIS IS A FUNDAMENTAL EQUITY SECURITY.\n"
             "- Evaluate company fundamentals, Reverse DCF implied growth rates, and forensic accounting solvency.\n"
             "- When discussing risks, actively employ Pre-Mortem Inversion (identifying thesis failure modes).\n"
+        )
+
+    if context_data.get("deep_dive_locked"):
+        asset_instructions += (
+            "================================================================================\n"
+            "LOCKED DEEP-DIVE DIRECTIVE: The user has NOT unlocked this asset's Deep Dive.\n"
+            "- The context deliberately omits the locked metrics. Do NOT state, estimate, infer, or recall them from\n"
+            "  general knowledge or memory for this specific security (including contagion/group risk, solvency\n"
+            "  coverage ratios, recovery expectations, moat/ASRI/margin-of-safety scores, pledge data, audit narrative).\n"
+            "- If asked for any of it, say it is part of the Deep Dive and costs 1 credit, then offer the free topics.\n"
+            "- Never describe what the locked numbers 'probably' are.\n"
         )
 
     section_instructions = ""

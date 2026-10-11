@@ -29,7 +29,7 @@ from core.analysis.asset_scanner import (
     get_asset_scan_runs,
     scan_debt_securities
 )
-from core.analysis.mutual_fund_engine import evaluate_dual_sleeve_lookthrough
+from core.analysis.mutual_funds_engine import evaluate_dual_sleeve_lookthrough
 from core.db.connection import init_db
 from web.main import app, _generate_admin_token, ADMIN_COOKIE_NAME
 

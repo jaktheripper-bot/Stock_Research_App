@@ -26,8 +26,8 @@ from core.analysis.valuation_radar import compute_valuation_radar
 from core.analysis.sector_scoring import detect_sector, evaluate_sector_fundamentals
 from core.analysis.institutional_flow import analyze_institutional_flow
 from core.analysis.forensic_sieve import evaluate_forensic_sieve
-from core.analysis.bull_bear import synthesize_bull_bear_thesis
-from core.analysis.tax_calculator import calculate_net_real_return, compare_asset_classes_post_tax
+from core.analysis.dossier_bull_bear import synthesize_bull_bear_thesis
+from core.analysis.net_real_tax_calculator import calculate_net_real_return, compare_asset_classes_post_tax
 
 
 class TestAdversarialEngineResilience(unittest.TestCase):

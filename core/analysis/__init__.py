@@ -35,7 +35,7 @@ from core.analysis.fundamentals import (
     compute_pead_drift_band,
 )
 
-from core.analysis.engine import (
+from core.analysis.dossier_report_synthesis import (
     get_system_prompt,
     get_latest_flash_models,
     get_surgical_flash_model,
@@ -53,7 +53,7 @@ from core.analysis.delta import (
     execute_surgical_pillar_update,
 )
 
-from core.analysis.comparator import (
+from core.analysis.peer_comparison import (
     evaluate_company_disparity,
     compare_two_companies,
 )
@@ -66,7 +66,7 @@ from core.analysis.metrics import (
     calculate_overall_health_score,
 )
 
-from core.analysis.discovery import (
+from core.analysis.stock_discovery import (
     CANDIDATE_UNIVERSE,
     evaluate_under_the_radar_candidate,
     curate_morning_discovery_cohort,
