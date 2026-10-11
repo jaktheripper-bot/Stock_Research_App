@@ -65,7 +65,8 @@ def get_google_oauth_url(redirect_uri: Optional[str] = None) -> str:
     if not base_url:
         return ""
 
-    callback_target = redirect_uri or "http://localhost:8501"
+    canonical = (os.environ.get("CANONICAL_DOMAIN") or "https://vestnomics.app").rstrip("/")
+    callback_target = redirect_uri or f"{canonical}/auth/callback"
     return f"{base_url}/auth/v1/authorize?provider=google&redirect_to={callback_target}"
 
 

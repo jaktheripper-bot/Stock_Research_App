@@ -2737,7 +2737,14 @@ def resolve_app_base_url(request: Request) -> str:
     Ensures that when hosted on Render or custom domains, the protocol is strictly https://.
     """
     proto = request.headers.get("x-forwarded-proto") or request.url.scheme or "http"
-    host = request.headers.get("x-forwarded-host") or request.headers.get("host") or request.url.netloc
+    host = request.headers.get("x-forwarded-host") or request.headers.get("host") or request.url.netloc or ""
+
+    # In production on Render or when CANONICAL_DOMAIN is configured:
+    # If the incoming host header is missing or loopback, fallback to the canonical domain.
+    is_prod = bool(os.environ.get("RENDER")) or os.environ.get("ENVIRONMENT") == "production"
+    if is_prod and (not host or "localhost" in host or "127.0.0.1" in host):
+        return (os.environ.get("CANONICAL_DOMAIN") or "https://vestnomics.app").rstrip("/")
+
     if "onrender.com" in host or ("localhost" not in host and "127.0.0.1" not in host and "testserver" not in host):
         proto = "https"
     return f"{proto}://{host}".rstrip("/")
@@ -2747,13 +2754,25 @@ def resolve_app_base_url(request: Request) -> str:
 async def public_auth_google(request: Request, redirect: Optional[str] = "/"):
     """Public Google OAuth initiation via Supabase GoTrue."""
     base_url = resolve_app_base_url(request)
-    redirect_target = f"{base_url}/auth/callback?next={urllib.parse.quote(redirect or '/')}"
+    redirect_target = f"{base_url}/auth/callback"
     cfg = get_supabase_auth_config()
     sb_url = cfg.get("url")
 
     if sb_url:
         oauth_url = f"{sb_url}/auth/v1/authorize?provider=google&redirect_to={urllib.parse.quote(redirect_target)}"
-        return RedirectResponse(url=oauth_url, status_code=303)
+        resp = RedirectResponse(url=oauth_url, status_code=303)
+        if redirect and redirect != "/":
+            is_secure = base_url.startswith("https://")
+            resp.set_cookie(
+                key="oauth_next",
+                value=redirect,
+                max_age=600,
+                httponly=True,
+                samesite="lax",
+                secure=is_secure,
+                path="/"
+            )
+        return resp
     return RedirectResponse(
         url="/?err=Google+OAuth+not+yet+configured.+Please+use+Email+OTP+verification.",
         status_code=303
@@ -2857,7 +2876,8 @@ async def public_auth_callback(
     user = get_or_create_user(user_id=user_id, email=clean_email, full_name=full_name)
 
     token = _generate_user_session_token(user_id, clean_email)
-    dest_url = next or "/"
+    oauth_next_cookie = (request.cookies.get("oauth_next") or "").strip('"')
+    dest_url = next if (next and next != "/") else (oauth_next_cookie or "/")
     if not dest_url.startswith("/"):
         dest_url = "/"
 
@@ -2884,7 +2904,8 @@ async def public_auth_callback(
     </body></html>
     """
     resp = HTMLResponse(content=html_content)
-    is_secure = not ("localhost" in str(request.base_url) or "127.0.0.1" in str(request.base_url))
+    base_url = resolve_app_base_url(request)
+    is_secure = base_url.startswith("https://")
     resp.set_cookie(
         key=USER_SESSION_COOKIE,
         value=token,
@@ -2894,6 +2915,8 @@ async def public_auth_callback(
         path="/",
         max_age=2592000
     )
+    if oauth_next_cookie:
+        resp.delete_cookie(key="oauth_next", path="/")
     return resp
 
 
