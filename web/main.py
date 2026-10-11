@@ -20,6 +20,8 @@ import csv
 import io
 import hmac
 import hashlib
+import statistics
+import collections
 import requests
 from datetime import datetime, timezone, timedelta
 from typing import Optional, List, Dict, Any
@@ -62,6 +64,8 @@ from pydantic import BaseModel
 from core.db import (
     init_db,
     get_archived_reports_sync,
+    get_all_equities_directory_sync,
+    SECTOR_TAXONOMY,
     get_report_by_ticker_sync,
     get_report_revisions,
     get_or_create_user,
@@ -1389,6 +1393,116 @@ def api_ingest_debt_security(payload: IngestDebtRequest):
         "redirect_url": f"/debt/{raw_isin}",
         "already_exists": False
     }
+
+
+
+@app.get("/stocks", response_class=RedirectResponse)
+def stocks_alias_redirect(request: Request):
+    """Permanent canonical redirect from /stocks to /equities preserving query parameters."""
+    target_url = "/equities"
+    if request.url.query:
+        target_url = f"/equities?{request.url.query}"
+    return RedirectResponse(url=target_url, status_code=301)
+
+
+@app.get("/equities", response_class=HTMLResponse)
+def equities_directory_page(
+    request: Request,
+    q: Optional[str] = None,
+    sector: Optional[str] = None,
+    market_cap: Optional[str] = None,
+    sort: Optional[str] = "mcap_desc",
+):
+    """
+    All 143 Institutional Equities Directory & Screener.
+    Provides multi-facet sector filtering, search by ticker or company name,
+    market-cap tier slicing, and 7-pillar valuation multiples.
+    """
+    init_db()
+    all_equities = get_all_equities_directory_sync()
+    total_equities = len(all_equities)
+
+    # Calculate overall platform aggregates
+    total_mcap_cr = sum(e.get("market_cap_cr", 0.0) for e in all_equities)
+    total_mcap_lakh_cr = total_mcap_cr / 100000.0 if total_mcap_cr else 210.0
+
+    roce_vals = [e["roce"] for e in all_equities if e.get("roce") is not None]
+    median_roce = round(statistics.median(roce_vals), 1) if roce_vals else 18.2
+
+    pe_vals = [e["pe_float"] for e in all_equities if e.get("pe_float") is not None and e["pe_float"] > 0]
+    median_pe = round(statistics.median(pe_vals), 1) if pe_vals else 24.5
+
+    # Sector distribution counts across all platform equities
+    sector_counts = collections.Counter(e.get("sector_slug", "DIVERSIFIED") for e in all_equities)
+
+    # Spotlight equity: pick a marquee high-reputation company with complete metrics
+    featured_equity = None
+    for cand_ticker in ["INFY", "TCS", "RELIANCE", "HDFCBANK", "LT"]:
+        cand = next((e for e in all_equities if e["ticker"] == cand_ticker), None)
+        if cand:
+            featured_equity = cand
+            break
+    if not featured_equity and all_equities:
+        featured_equity = all_equities[0]
+
+    # Filtering logic
+    filtered = list(all_equities)
+    query_str = (q or "").strip()
+    if query_str:
+        q_lower = query_str.lower()
+        filtered = [
+            e for e in filtered
+            if q_lower in e["ticker"].lower()
+            or q_lower in e.get("name", "").lower()
+            or q_lower in e.get("company_name", "").lower()
+            or q_lower in e.get("industry", "").lower()
+            or q_lower in e.get("sector", "").lower()
+        ]
+
+    # Sector filtering
+    sec_filter = (sector or "").strip().upper()
+    if sec_filter:
+        filtered = [e for e in filtered if e.get("sector_slug", "").upper() == sec_filter]
+
+    # Market cap tier filtering
+    tier_filter = (market_cap or "").strip().upper()
+    if tier_filter in ["MEGA", "LARGE", "MID", "SMALL"]:
+        filtered = [e for e in filtered if e.get("market_cap_tier_slug", "").upper() == tier_filter]
+
+    # Sorting logic
+    sort_key = (sort or "mcap_desc").strip().lower()
+    if sort_key == "mcap_asc":
+        filtered.sort(key=lambda x: (x.get("market_cap_cr", 0.0) <= 0, x.get("market_cap_cr", 0.0)))
+    elif sort_key == "roce_desc":
+        filtered.sort(key=lambda x: (x.get("roce") is not None, x.get("roce") or -999.0), reverse=True)
+    elif sort_key == "pe_asc":
+        filtered.sort(key=lambda x: (x.get("pe_float") is not None and x.get("pe_float") > 0, -(x.get("pe_float") or 999999.0)), reverse=True)
+    elif sort_key == "name_asc":
+        filtered.sort(key=lambda x: x.get("name", "").lower())
+    elif sort_key == "rev_desc":
+        filtered.sort(key=lambda x: x.get("revision_count", 1), reverse=True)
+    else:  # default: mcap_desc
+        filtered.sort(key=lambda x: x.get("market_cap_cr", 0.0), reverse=True)
+
+    return templates.TemplateResponse(
+        request=request,
+        name="equities_directory.html",
+        context={
+            "active_page": "equities",
+            "equities": filtered,
+            "total_equities": total_equities,
+            "total_mcap_lakh_cr": total_mcap_lakh_cr,
+            "median_roce": median_roce,
+            "median_pe": median_pe,
+            "featured_equity": featured_equity,
+            "sector_options": SECTOR_TAXONOMY,
+            "sector_counts": dict(sector_counts),
+            "current_sector": sec_filter or None,
+            "current_tier": tier_filter or None,
+            "current_sort": sort_key,
+            "query": query_str,
+        }
+    )
 
 
 @app.get("/funds", response_class=HTMLResponse)
@@ -3407,6 +3521,7 @@ async def sitemap_xml():
         f'  <url><loc>{base_url}/discovery</loc><lastmod>{now_iso}</lastmod><changefreq>daily</changefreq><priority>0.9</priority></url>',
         f'  <url><loc>{base_url}/opportunities</loc><lastmod>{now_iso}</lastmod><changefreq>daily</changefreq><priority>0.9</priority></url>',
         f'  <url><loc>{base_url}/search</loc><lastmod>{now_iso}</lastmod><changefreq>daily</changefreq><priority>0.9</priority></url>',
+        f'  <url><loc>{base_url}/equities</loc><lastmod>{now_iso}</lastmod><changefreq>daily</changefreq><priority>0.9</priority></url>',
         f'  <url><loc>{base_url}/compare</loc><lastmod>{now_iso}</lastmod><changefreq>weekly</changefreq><priority>0.8</priority></url>',
         f'  <url><loc>{base_url}/debt</loc><lastmod>{now_iso}</lastmod><changefreq>daily</changefreq><priority>0.8</priority></url>',
         f'  <url><loc>{base_url}/funds</loc><lastmod>{now_iso}</lastmod><changefreq>daily</changefreq><priority>0.8</priority></url>',

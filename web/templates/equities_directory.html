@@ -1,0 +1,299 @@
+{% extends "base.html" %}
+
+{% block title %}Institutional Equities Directory (143 Dossiers) | Stock Research AI{% endblock %}
+{% block meta_desc %}Institutional research directory of all 143 verified Indian equities. Inspect 7-pillar scorecards, reverse DCF margin of safety, and forensic DuPont ledgers grounded in official BSE/NSE corporate filings.{% endblock %}
+{% block og_title %}Institutional Equities Directory (143 Dossiers) | Stock Research AI{% endblock %}
+{% block og_desc %}Inspect verified 7-Pillar scorecards, reverse DCF margin of safety, and forensic accounting ledgers across 143 monitored Indian equities.{% endblock %}
+
+{% block content %}
+<div class="container py-8">
+  <!-- Hero Section (Matches Fiduciary Stature of /funds) -->
+  <div style="background: linear-gradient(135deg, rgba(30, 41, 59, 0.75) 0%, rgba(15, 23, 42, 0.95) 100%); border: 1px solid rgba(255, 255, 255, 0.1); border-radius: 16px; padding: 32px; margin-bottom: 32px; position: relative; overflow: hidden;">
+    <div style="position: absolute; top: -50px; right: -50px; width: 220px; height: 220px; background: radial-gradient(circle, rgba(14, 165, 233, 0.15) 0%, transparent 70%); pointer-events: none;"></div>
+    
+    <div style="display: inline-flex; align-items: center; gap: 8px; background: rgba(14, 165, 233, 0.15); border: 1px solid rgba(14, 165, 233, 0.35); border-radius: 9999px; padding: 4px 12px; margin-bottom: 16px;">
+      <span style="width: 8px; height: 8px; border-radius: 50%; background: var(--accent-cyan, #0ea5e9);"></span>
+      <span style="font-size: 12px; font-weight: 700; color: #38bdf8; text-transform: uppercase; letter-spacing: 0.05em;">Equities & Institutional Dossiers • 7-Pillar Forensic Engine</span>
+    </div>
+
+    <h1 style="font-size: 32px; font-weight: 800; color: #f8fafc; margin-bottom: 12px; letter-spacing: -0.02em;">
+      Institutional Equities Directory
+    </h1>
+    <p style="font-size: 15px; color: #94a3b8; max-width: 840px; line-height: 1.6; margin-bottom: 24px;">
+      Exhaustive institutional equity research repository covering all <strong>{{ total_equities }} verified Indian equities</strong>. 
+      Every dossier is grounded in primary exchange filings (BSE/NSE), featuring 7-Pillar health scorecards, reverse DCF implied growth rates, 
+      DuPont ROE decompositions, and promoter pledging surveillance.
+    </p>
+
+    <!-- Top KPI Grid -->
+    <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 16px;">
+      <div style="background: rgba(15, 23, 42, 0.65); border: 1px solid rgba(255, 255, 255, 0.08); border-radius: 12px; padding: 16px;">
+        <div style="font-size: 12px; color: #64748b; text-transform: uppercase; font-weight: 600; margin-bottom: 4px;">Monitored Equities</div>
+        <div style="font-size: 24px; font-weight: 800; color: #f8fafc;">{{ total_equities }} Companies</div>
+      </div>
+      <div style="background: rgba(15, 23, 42, 0.65); border: 1px solid rgba(255, 255, 255, 0.08); border-radius: 12px; padding: 16px;">
+        <div style="font-size: 12px; color: #64748b; text-transform: uppercase; font-weight: 600; margin-bottom: 4px;">Combined Market Cap</div>
+        <div style="font-size: 24px; font-weight: 800; color: var(--accent-cyan, #0ea5e9);">₹{{ "{:,.0f}".format(total_mcap_lakh_cr) }} Lakh Cr</div>
+      </div>
+      <div style="background: rgba(15, 23, 42, 0.65); border: 1px solid rgba(255, 255, 255, 0.08); border-radius: 12px; padding: 16px;">
+        <div style="font-size: 12px; color: #64748b; text-transform: uppercase; font-weight: 600; margin-bottom: 4px;">Median Capital Return (ROCE)</div>
+        <div style="font-size: 24px; font-weight: 800; color: var(--accent-emerald, #10b981);">{{ median_roce }}%</div>
+      </div>
+      <div style="background: rgba(15, 23, 42, 0.65); border: 1px solid rgba(255, 255, 255, 0.08); border-radius: 12px; padding: 16px;">
+        <div style="font-size: 12px; color: #64748b; text-transform: uppercase; font-weight: 600; margin-bottom: 4px;">Median Trailing Valuation</div>
+        <div style="font-size: 24px; font-weight: 800; color: #a5b4fc;">{{ median_pe }}x P/E</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Featured Equity Spotlight Banner -->
+  {% if featured_equity %}
+  <div style="background: linear-gradient(135deg, rgba(15, 23, 42, 0.95) 0%, rgba(30, 41, 59, 0.7) 100%); border: 1px solid rgba(14, 165, 233, 0.4); border-radius: 16px; padding: 26px; margin-bottom: 28px; box-shadow: 0 10px 30px rgba(0, 0, 0, 0.35); position: relative;">
+    <div style="display: flex; justify-content: space-between; align-items: flex-start; flex-wrap: wrap; gap: 16px;">
+      <div style="flex: 1; min-width: 300px;">
+        <div style="display: inline-flex; align-items: center; gap: 8px; background: rgba(14, 165, 233, 0.15); border: 1px solid rgba(14, 165, 233, 0.3); border-radius: 9999px; padding: 4px 12px; margin-bottom: 12px;">
+          <span style="display: inline-block; width: 8px; height: 8px; border-radius: 50%; background: #38bdf8; box-shadow: 0 0 8px #38bdf8;"></span>
+          <span style="font-size: 11px; font-weight: 800; color: #bae6fd; text-transform: uppercase; letter-spacing: 0.05em;">Featured Institutional Equity Spotlight • 7-Pillar Dossier</span>
+        </div>
+        
+        <div style="display: flex; align-items: baseline; gap: 12px; margin-bottom: 6px;">
+          <h2 style="font-size: 26px; font-weight: 800; color: #f8fafc; margin: 0;">
+            <a href="/dossier/{{ featured_equity.ticker }}" style="color: inherit; text-decoration: none;">
+              {{ featured_equity.ticker }}
+            </a>
+          </h2>
+          <span style="font-size: 20px; font-weight: 700; color: var(--accent-emerald, #10b981);">{{ featured_equity.formatted_price }}</span>
+          <span class="badge badge-cyan">{{ featured_equity.market_cap_tier }}</span>
+        </div>
+        
+        <div style="font-size: 14px; color: #94a3b8; margin-bottom: 16px;">
+          {{ featured_equity.name }} • {{ featured_equity.sector }} • Market Cap: {{ featured_equity.formatted_mcap }} • {{ featured_equity.revision_count }} Institutional Revisions
+        </div>
+
+        <!-- 5-Metric Spotlight Strip -->
+        <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(130px, 1fr)); gap: 10px; margin-bottom: 16px;">
+          <div style="background: rgba(15, 23, 42, 0.7); border: 1px solid rgba(255, 255, 255, 0.08); border-radius: 10px; padding: 10px 14px;">
+            <div style="font-size: 10px; color: #94a3b8; text-transform: uppercase; font-weight: 600;">ROCE (Capital Return)</div>
+            <div style="font-size: 20px; font-weight: 800; color: var(--accent-cyan, #0ea5e9);">{{ featured_equity.roce_pct }}</div>
+          </div>
+          <div style="background: rgba(15, 23, 42, 0.7); border: 1px solid rgba(255, 255, 255, 0.08); border-radius: 10px; padding: 10px 14px;">
+            <div style="font-size: 10px; color: #94a3b8; text-transform: uppercase; font-weight: 600;">Debt-to-Equity</div>
+            <div style="font-size: 20px; font-weight: 800; color: #a5b4fc;">{{ featured_equity.debt_to_equity }}</div>
+          </div>
+          <div style="background: rgba(15, 23, 42, 0.7); border: 1px solid rgba(255, 255, 255, 0.08); border-radius: 10px; padding: 10px 14px;">
+            <div style="font-size: 10px; color: #94a3b8; text-transform: uppercase; font-weight: 600;">Trailing P/E</div>
+            <div style="font-size: 20px; font-weight: 800; color: #f8fafc;">{{ featured_equity.pe_ratio }}</div>
+          </div>
+          <div style="background: rgba(15, 23, 42, 0.7); border: 1px solid rgba(255, 255, 255, 0.08); border-radius: 10px; padding: 10px 14px;">
+            <div style="font-size: 10px; color: #94a3b8; text-transform: uppercase; font-weight: 600;">Operating Margin</div>
+            <div style="font-size: 20px; font-weight: 800; color: var(--accent-emerald, #10b981);">{{ featured_equity.operating_margin }}</div>
+          </div>
+          <div style="background: rgba(15, 23, 42, 0.7); border: 1px solid rgba(255, 255, 255, 0.08); border-radius: 10px; padding: 10px 14px;">
+            <div style="font-size: 10px; color: #94a3b8; text-transform: uppercase; font-weight: 600;">Market Cap</div>
+            <div style="font-size: 20px; font-weight: 800; color: #f8fafc;">{{ featured_equity.formatted_mcap }}</div>
+          </div>
+        </div>
+
+        <div style="display: flex; gap: 10px; align-items: center; flex-wrap: wrap;">
+          <a href="/dossier/{{ featured_equity.ticker }}" class="btn btn-primary btn-sm" style="font-weight: 700; border-radius: 8px; padding: 8px 20px;">
+            Inspect Full Institutional Dossier →
+          </a>
+          <span style="font-size: 12px; color: #64748b;">
+            Last Evaluated: {{ featured_equity.formatted_date }}
+          </span>
+        </div>
+      </div>
+    </div>
+  </div>
+  {% endif %}
+
+  <!-- Search & Filter Controls Container -->
+  <div style="background: rgba(30, 41, 59, 0.4); border: 1px solid rgba(255, 255, 255, 0.1); border-radius: 14px; padding: 18px 20px; margin-bottom: 24px;">
+    <!-- Search Bar -->
+    <form action="/equities" method="GET" style="display: flex; gap: 10px; align-items: center; flex-wrap: wrap; margin-bottom: 16px;">
+      <div style="flex: 1; min-width: 280px; position: relative;">
+        <input 
+          type="text" 
+          name="q" 
+          id="equitiesSearchInput" 
+          value="{{ query or '' }}" 
+          placeholder="Search by Ticker or Company Name (e.g. INFY, TCS, Reliance, Kaynes, Dynamatic, Neuland)..." 
+          class="form-control" 
+          style="background: rgba(15, 23, 42, 0.9); border: 1px solid rgba(255, 255, 255, 0.15); color: #fff; padding: 10px 16px; border-radius: 8px; width: 100%; font-size: 14px;"
+        >
+      </div>
+      
+      <!-- Preserved Hidden Inputs for Filter Continuity -->
+      {% if current_sector %}
+      <input type="hidden" name="sector" value="{{ current_sector }}">
+      {% endif %}
+      {% if current_tier %}
+      <input type="hidden" name="market_cap" value="{{ current_tier }}">
+      {% endif %}
+      {% if current_sort %}
+      <input type="hidden" name="sort" value="{{ current_sort }}">
+      {% endif %}
+
+      <button type="submit" class="btn btn-primary btn-sm" style="padding: 10px 20px; font-weight: 700;">Search Equities</button>
+      {% if query %}
+      <a href="/equities{% if current_sector %}?sector={{ current_sector }}{% endif %}" class="btn btn-secondary btn-sm" style="padding: 10px 14px;">Clear Search</a>
+      {% endif %}
+    </form>
+
+    <!-- Sector Navigation Tabs (Horizontal Scrollable) -->
+    <div style="margin-bottom: 14px;">
+      <div style="display: flex; gap: 8px; overflow-x: auto; padding-bottom: 6px;">
+        <a href="/equities?{% if current_tier %}market_cap={{ current_tier }}&{% endif %}{% if current_sort %}sort={{ current_sort }}&{% endif %}{% if query %}q={{ query }}{% endif %}" class="btn btn-sm {% if not current_sector %}btn-primary{% else %}btn-secondary{% endif %}" style="border-radius: 9999px; white-space: nowrap;">
+          All Equities ({{ total_equities }})
+        </a>
+        {% for s_slug, s_info in sector_options.items() %}
+        <a href="/equities?sector={{ s_slug }}{% if current_tier %}&market_cap={{ current_tier }}{% endif %}{% if current_sort %}&sort={{ current_sort }}{% endif %}{% if query %}&q={{ query }}{% endif %}" class="btn btn-sm {% if current_sector == s_slug %}btn-primary{% else %}btn-secondary{% endif %}" style="border-radius: 9999px; white-space: nowrap;">
+          {{ s_info[1] }} {{ s_info[0] }} ({{ sector_counts.get(s_slug, 0) }})
+        </a>
+        {% endfor %}
+      </div>
+    </div>
+
+    <!-- Secondary Controls Bar: Market Cap Tier & Sorting -->
+    <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 12px; padding-top: 12px; border-top: 1px solid rgba(255, 255, 255, 0.08);">
+      <!-- Market Cap Filter Chips -->
+      <div style="display: flex; gap: 6px; align-items: center; flex-wrap: wrap;">
+        <span style="font-size: 11px; font-weight: 700; color: #64748b; text-transform: uppercase; margin-right: 4px;">Cap Size:</span>
+        <a href="/equities?{% if current_sector %}sector={{ current_sector }}&{% endif %}{% if current_sort %}sort={{ current_sort }}&{% endif %}{% if query %}q={{ query }}{% endif %}" class="chip {% if not current_tier %}active{% endif %}" style="text-decoration: none; font-size: 11.5px; padding: 4px 10px;">All</a>
+        <a href="/equities?market_cap=MEGA{% if current_sector %}&sector={{ current_sector }}{% endif %}{% if current_sort %}&sort={{ current_sort }}{% endif %}{% if query %}&q={{ query }}{% endif %}" class="chip {% if current_tier == 'MEGA' %}active{% endif %}" style="text-decoration: none; font-size: 11.5px; padding: 4px 10px;">Mega-Cap (&gt;₹1L Cr)</a>
+        <a href="/equities?market_cap=LARGE{% if current_sector %}&sector={{ current_sector }}{% endif %}{% if current_sort %}&sort={{ current_sort }}{% endif %}{% if query %}&q={{ query }}{% endif %}" class="chip {% if current_tier == 'LARGE' %}active{% endif %}" style="text-decoration: none; font-size: 11.5px; padding: 4px 10px;">Large-Cap (₹25k–1L Cr)</a>
+        <a href="/equities?market_cap=MID{% if current_sector %}&sector={{ current_sector }}{% endif %}{% if current_sort %}&sort={{ current_sort }}{% endif %}{% if query %}&q={{ query }}{% endif %}" class="chip {% if current_tier == 'MID' %}active{% endif %}" style="text-decoration: none; font-size: 11.5px; padding: 4px 10px;">Mid-Cap (₹5k–25k Cr)</a>
+        <a href="/equities?market_cap=SMALL{% if current_sector %}&sector={{ current_sector }}{% endif %}{% if current_sort %}&sort={{ current_sort }}{% endif %}{% if query %}&q={{ query }}{% endif %}" class="chip {% if current_tier == 'SMALL' %}active{% endif %}" style="text-decoration: none; font-size: 11.5px; padding: 4px 10px;">Small-Cap (&lt;₹5k Cr)</a>
+      </div>
+
+      <!-- Sorting Selector -->
+      <div style="display: flex; gap: 8px; align-items: center;">
+        <label for="sortSelect" style="font-size: 11px; font-weight: 700; color: #64748b; text-transform: uppercase;">Sort By:</label>
+        <select id="sortSelect" onchange="window.location.href=this.value" style="background: rgba(15, 23, 42, 0.9); border: 1px solid rgba(255, 255, 255, 0.15); color: #f8fafc; padding: 5px 12px; border-radius: 6px; font-size: 12px; cursor: pointer;">
+          <option value="/equities?sort=mcap_desc{% if current_sector %}&sector={{ current_sector }}{% endif %}{% if current_tier %}&market_cap={{ current_tier }}{% endif %}{% if query %}&q={{ query }}{% endif %}" {% if current_sort == 'mcap_desc' %}selected{% endif %}>Market Cap: High to Low</option>
+          <option value="/equities?sort=mcap_asc{% if current_sector %}&sector={{ current_sector }}{% endif %}{% if current_tier %}&market_cap={{ current_tier }}{% endif %}{% if query %}&q={{ query }}{% endif %}" {% if current_sort == 'mcap_asc' %}selected{% endif %}>Market Cap: Low to High</option>
+          <option value="/equities?sort=roce_desc{% if current_sector %}&sector={{ current_sector }}{% endif %}{% if current_tier %}&market_cap={{ current_tier }}{% endif %}{% if query %}&q={{ query }}{% endif %}" {% if current_sort == 'roce_desc' %}selected{% endif %}>Capital Efficiency (ROCE)</option>
+          <option value="/equities?sort=pe_asc{% if current_sector %}&sector={{ current_sector }}{% endif %}{% if current_tier %}&market_cap={{ current_tier }}{% endif %}{% if query %}&q={{ query }}{% endif %}" {% if current_sort == 'pe_asc' %}selected{% endif %}>Valuation (Lowest P/E)</option>
+          <option value="/equities?sort=name_asc{% if current_sector %}&sector={{ current_sector }}{% endif %}{% if current_tier %}&market_cap={{ current_tier }}{% endif %}{% if query %}&q={{ query }}{% endif %}" {% if current_sort == 'name_asc' %}selected{% endif %}>Company Name (A–Z)</option>
+          <option value="/equities?sort=rev_desc{% if current_sector %}&sector={{ current_sector }}{% endif %}{% if current_tier %}&market_cap={{ current_tier }}{% endif %}{% if query %}&q={{ query }}{% endif %}" {% if current_sort == 'rev_desc' %}selected{% endif %}>Most Revisions / Audits</option>
+        </select>
+      </div>
+    </div>
+  </div>
+
+  <!-- Active Results Count Header -->
+  <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px;">
+    <div style="font-size: 14px; font-weight: 600; color: #94a3b8;">
+      Showing <strong style="color: #f8fafc;">{{ equities|length }}</strong> of {{ total_equities }} Institutional Equities
+      {% if query %}<span style="color: var(--accent-cyan);">matching "{{ query }}"</span>{% endif %}
+      {% if current_sector %}<span style="color: #c084fc;">in {{ sector_options.get(current_sector, [current_sector])[0] }}</span>{% endif %}
+    </div>
+    <div style="display: flex; gap: 8px;">
+      <a href="/opportunities" class="btn btn-sm btn-secondary" style="border-radius: 9999px; font-size: 11.5px;">🎯 Opportunity Terminal</a>
+      <a href="/funds" class="btn btn-sm btn-secondary" style="border-radius: 9999px; font-size: 11.5px;">💼 Mutual Funds Look-Through</a>
+    </div>
+  </div>
+
+  <!-- Equities Cards Grid -->
+  {% if equities %}
+  <div style="display: grid; grid-template-columns: repeat(auto-fill, minmax(350px, 1fr)); gap: 20px;">
+    {% for eq in equities %}
+    <div class="stat-card" style="display: flex; flex-direction: column; justify-content: space-between; background: rgba(30, 41, 59, 0.45); border: 1px solid rgba(255, 255, 255, 0.09); border-radius: 14px; padding: 22px; transition: transform 0.2s, border-color 0.2s;" onmouseover="this.style.borderColor='rgba(14, 165, 233, 0.45)'; this.style.transform='translateY(-2px)';" onmouseout="this.style.borderColor='rgba(255, 255, 255, 0.09)'; this.style.transform='translateY(0)';">
+      <div>
+        <!-- Badges Bar -->
+        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px;">
+          <span style="font-size: 11px; font-weight: 700; color: #38bdf8; background: rgba(14, 165, 233, 0.12); padding: 3px 8px; border-radius: 6px; text-transform: uppercase;">
+            {{ eq.sector_icon }} {{ eq.sector }}
+          </span>
+          <div style="display: flex; gap: 6px;">
+            <span class="badge {% if eq.market_cap_tier == 'Mega-Cap' %}badge-cyan{% elif eq.market_cap_tier == 'Large-Cap' %}badge-purple{% else %}badge-slate{% endif %}" style="font-size: 10.5px; padding: 2px 7px;">
+              {{ eq.market_cap_tier }}
+            </span>
+            <span class="badge badge-slate" style="font-size: 10.5px; padding: 2px 7px;">
+              {{ eq.revision_count }} revs
+            </span>
+          </div>
+        </div>
+
+        <!-- Ticker & Price Header -->
+        <div style="display: flex; justify-content: space-between; align-items: baseline; margin-bottom: 4px;">
+          <h2 style="font-size: 20px; font-weight: 800; color: #f8fafc; margin: 0;">
+            <a href="/dossier/{{ eq.ticker }}" style="color: inherit; text-decoration: none;">
+              {{ eq.ticker }}
+            </a>
+          </h2>
+          <span style="font-size: 18px; font-weight: 700; color: var(--accent-emerald, #10b981);">
+            {{ eq.formatted_price }}
+          </span>
+        </div>
+
+        <!-- Full Company Name & Industry -->
+        <div style="font-size: 13px; color: #94a3b8; margin-bottom: 16px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;" title="{{ eq.name }}">
+          {{ eq.name }}
+        </div>
+
+        <!-- 3-Column Primary Financial Multiples Strip (Matches Homepage Cards) -->
+        <div style="display: flex; gap: 8px; margin-bottom: 14px;">
+          <div style="flex: 1; background: rgba(15, 23, 42, 0.6); padding: 7px 8px; border-radius: 6px; text-align: center; border: 1px solid rgba(255, 255, 255, 0.04);">
+            <div style="font-size: 10px; color: var(--text-muted); text-transform: uppercase; font-weight: 600;">ROCE</div>
+            <div class="tnum" style="font-size: 13px; font-weight: 700; color: var(--accent-cyan, #0ea5e9);">
+              {{ eq.roce_pct }}
+            </div>
+          </div>
+          <div style="flex: 1; background: rgba(15, 23, 42, 0.6); padding: 7px 8px; border-radius: 6px; text-align: center; border: 1px solid rgba(255, 255, 255, 0.04);">
+            <div style="font-size: 10px; color: var(--text-muted); text-transform: uppercase; font-weight: 600;">D/E</div>
+            <div class="tnum" style="font-size: 13px; font-weight: 700; color: #a5b4fc;">
+              {{ eq.debt_to_equity }}
+            </div>
+          </div>
+          <div style="flex: 1; background: rgba(15, 23, 42, 0.6); padding: 7px 8px; border-radius: 6px; text-align: center; border: 1px solid rgba(255, 255, 255, 0.04);">
+            <div style="font-size: 10px; color: var(--text-muted); text-transform: uppercase; font-weight: 600;">P/E</div>
+            <div class="tnum" style="font-size: 13px; font-weight: 700; color: var(--text-primary, #f8fafc);">
+              {{ eq.pe_ratio }}
+            </div>
+          </div>
+        </div>
+
+        <!-- Secondary Information Strip -->
+        <div style="font-size: 11.5px; color: #64748b; display: flex; justify-content: space-between; margin-bottom: 16px; padding: 0 2px;">
+          <span>Market Cap: <strong style="color: #94a3b8;">{{ eq.formatted_mcap }}</strong></span>
+          <span>OPM: <strong style="color: #94a3b8;">{{ eq.operating_margin }}</strong></span>
+        </div>
+      </div>
+
+      <!-- Action Button (Pre-wired with instant loading fill & BFCache restore) -->
+      <a href="/dossier/{{ eq.ticker }}" class="btn btn-secondary btn-sm" style="width: 100%; display: flex; justify-content: center; align-items: center; gap: 6px; font-weight: 600;">
+        <span>Inspect Full Dossier</span>
+        <span>→</span>
+      </a>
+    </div>
+    {% endfor %}
+  </div>
+  {% else %}
+  <!-- Empty State -->
+  <div style="background: rgba(30, 41, 59, 0.4); border: 1px dashed rgba(255, 255, 255, 0.15); border-radius: 16px; padding: 48px 24px; text-align: center; margin-top: 20px;">
+    <div style="font-size: 40px; margin-bottom: 12px;">🔍</div>
+    <h3 style="font-size: 20px; font-weight: 700; color: #f8fafc; margin-bottom: 8px;">No Institutional Equities Match Your Criteria</h3>
+    <p style="font-size: 14px; color: #94a3b8; max-width: 480px; margin: 0 auto 20px auto; line-height: 1.5;">
+      We couldn't find any audited equities matching "{{ query or current_sector or current_tier }}". Try broadening your search or resetting active filters.
+    </p>
+    <a href="/equities" class="btn btn-primary btn-sm" style="font-weight: 700; padding: 8px 20px;">
+      Reset All Filters & View All 143 Equities
+    </a>
+  </div>
+  {% endif %}
+
+  <!-- Institutional Disclaimer Footer -->
+  <div style="margin-top: 48px; padding-top: 24px; border-top: 1px solid rgba(255, 255, 255, 0.08); font-size: 12px; color: #64748b; line-height: 1.5;">
+    <p style="margin-bottom: 8px;">
+      <strong>Statutory Regulatory Disclosure:</strong> Stock Research AI is an independent software tool and research analytical engine. 
+      We are not registered as a SEBI Research Analyst (RA) or Investment Adviser (IA). 
+      All quantitative metrics, DuPont ROE decompositions, and reverse DCF valuations are deterministic computational representations grounded in verified historical corporate disclosures published by the BSE and NSE.
+    </p>
+    <p style="margin: 0;">
+      Nothing on this page constitutes an offer, solicitation, or recommendation to buy, hold, or liquidate any security. 
+      Historical performance does not guarantee future market outcomes. Consult a SEBI-registered professional before making investment decisions.
+    </p>
+  </div>
+</div>
+{% endblock %}

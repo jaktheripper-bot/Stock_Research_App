@@ -430,3 +430,192 @@ def get_revision_by_id(rev_id: int) -> dict:
         cursor.close()
         conn.close()
     return record
+
+
+# ==============================================================================
+# All Equities Institutional Directory
+# ==============================================================================
+
+SECTOR_TAXONOMY = {
+    "IT_TECH": ("IT & Technology", "💻"),
+    "BFSI": ("BFSI & Financials", "🏛️"),
+    "HEALTHCARE_PHARMA": ("Healthcare & Pharma", "🔬"),
+    "CAPITAL_GOODS_INFRA": ("Capital Goods & Infra", "⚙️"),
+    "AUTOMOTIVE": ("Automotive & Mobility", "🚗"),
+    "CONSUMER_FMCG": ("Consumer & Retail", "🛍️"),
+    "CHEMICALS_MATERIALS": ("Chemicals & Materials", "🧪"),
+    "COMMODITIES_ENERGY": ("Energy & Commodities", "⚡"),
+    "EMS_DEFENCE": ("EMS & Defence", "🛡️"),
+    "DIVERSIFIED": ("Diversified Industrials", "🏭"),
+}
+
+
+def resolve_equity_sector(ticker: str, name: str, cached_sec: str = None) -> str:
+    """Classifies an equity into standard sector taxonomies."""
+    from core.analysis.sector_scoring import KNOWN_TICKER_SECTORS, SECTOR_KEYWORDS
+    c_sec = str(cached_sec or "")
+    if "Specialty Chemicals" in c_sec:
+        return "CHEMICALS_MATERIALS"
+    if "EMS & Defence" in c_sec:
+        return "EMS_DEFENCE"
+    if "Precision Engineering" in c_sec or "Building Materials" in c_sec or "Industrial Machinery" in c_sec:
+        return "CAPITAL_GOODS_INFRA"
+    if "Renewables & Power" in c_sec:
+        return "COMMODITIES_ENERGY"
+    if "Healthcare" in c_sec:
+        return "HEALTHCARE_PHARMA"
+    if "Automotive" in c_sec:
+        return "AUTOMOTIVE"
+    if ticker in KNOWN_TICKER_SECTORS:
+        return KNOWN_TICKER_SECTORS[ticker]
+    combined = f"{ticker} {name}".upper()
+    for sec_slug, kws in SECTOR_KEYWORDS.items():
+        if any(kw in combined for kw in kws):
+            return sec_slug
+    return "DIVERSIFIED"
+
+
+def get_all_equities_directory_sync() -> list:
+    """
+    Returns complete list of all 143 verified institutional equities joined with
+    cached fundamentals, sector taxonomy, market cap tiers, and revision metadata.
+    """
+    init_db()
+    conn = get_db_connection()
+    cursor = conn.cursor()
+    equities = []
+    try:
+        cursor.execute('''
+            SELECT 
+                r.ticker, 
+                r.short_name, 
+                r.timestamp, 
+                COALESCE(rev.cnt, 1) as rev_count,
+                f.company_name, 
+                f.sector, 
+                f.industry, 
+                f.current_price, 
+                f.market_cap, 
+                f.pe_ratio, 
+                f.roce, 
+                f.roe, 
+                f.debt_to_equity, 
+                f.operating_margin, 
+                f.fifty_two_week_high, 
+                f.fifty_two_week_low
+            FROM reports r
+            LEFT JOIN (SELECT ticker, COUNT(*) as cnt FROM report_revisions GROUP BY ticker) rev ON r.ticker = rev.ticker
+            LEFT JOIN cached_fundamentals f ON r.ticker = f.ticker
+        ''')
+        rows = cursor.fetchall()
+        for r in rows:
+            ticker = r[0]
+            short_name = r[1] or ticker
+            raw_ts = r[2]
+            rev_cnt = int(r[3]) if r[3] else 1
+            comp_name = r[4]
+            cached_sec = r[5]
+            ind = r[6] or "Diversified"
+            cmp_val = r[7]
+            mcap_val = r[8]
+            pe_val = r[9]
+            roce_val = r[10]
+            roe_val = r[11]
+            de_val = r[12]
+            opm_val = r[13]
+            high52 = r[14]
+            low52 = r[15]
+
+            # Prefer descriptive company name
+            name = short_name if (short_name and short_name != ticker) else (comp_name or ticker)
+
+            # Resolve Sector
+            sec_slug = resolve_equity_sector(ticker, name, cached_sec)
+            sec_label, sec_icon = SECTOR_TAXONOMY.get(sec_slug, ("Diversified Industrials", "🏭"))
+
+            # Market Cap in Crores
+            mcap_cr = round(float(mcap_val) / 1e7, 1) if mcap_val else 0.0
+            if mcap_cr >= 100000:
+                tier, tier_slug = "Mega-Cap", "MEGA"
+            elif mcap_cr >= 25000:
+                tier, tier_slug = "Large-Cap", "LARGE"
+            elif mcap_cr >= 5000:
+                tier, tier_slug = "Mid-Cap", "MID"
+            else:
+                tier, tier_slug = "Small-Cap", "SMALL"
+
+            # Parse CMP
+            try:
+                cmp_float = float(str(cmp_val).replace(",", "").strip()) if cmp_val else 0.0
+            except Exception:
+                cmp_float = 0.0
+
+            # Parse P/E
+            try:
+                pe_float = float(str(pe_val).replace(",", "").strip())
+                pe_str = f"{pe_float:.1f}x"
+            except Exception:
+                pe_float = None
+                pe_str = "N/A" if pe_val in [None, "N/A", ""] else str(pe_val)
+
+            # Parse ROCE
+            try:
+                roce_float = float(str(roce_val).replace("%", "").strip()) if roce_val is not None else None
+            except Exception:
+                roce_float = None
+
+            # Parse ROE
+            try:
+                roe_float = float(str(roe_val).replace("%", "").strip()) if roe_val is not None else None
+            except Exception:
+                roe_float = None
+
+            # Parse D/E
+            try:
+                de_float = float(str(de_val).replace("x", "").strip()) if de_val is not None else 0.0
+            except Exception:
+                de_float = 0.0
+
+            # Parse OPM
+            try:
+                opm_float = float(str(opm_val).replace("%", "").strip()) if opm_val is not None else None
+            except Exception:
+                opm_float = None
+
+            equities.append({
+                "ticker": ticker,
+                "name": name,
+                "short_name": short_name,
+                "company_name": comp_name or name,
+                "sector": sec_label,
+                "sector_slug": sec_slug,
+                "sector_icon": sec_icon,
+                "industry": ind,
+                "current_price": cmp_float,
+                "formatted_price": f"₹{cmp_float:,.2f}" if cmp_float > 0 else "N/A",
+                "market_cap_cr": mcap_cr,
+                "formatted_mcap": f"₹{mcap_cr:,.0f} Cr" if mcap_cr > 0 else "N/A",
+                "market_cap_tier": tier,
+                "market_cap_tier_slug": tier_slug,
+                "pe_ratio": pe_str,
+                "pe_float": pe_float,
+                "roce": roce_float,
+                "roce_pct": f"{roce_float:.1f}%" if roce_float is not None else "N/A",
+                "roe": roe_float,
+                "roe_pct": f"{roe_float:.1f}%" if roe_float is not None else "N/A",
+                "debt_to_equity": f"{de_float:.2f}x",
+                "debt_to_equity_float": de_float,
+                "operating_margin": f"{opm_float:.1f}%" if opm_float is not None else "N/A",
+                "operating_margin_float": opm_float,
+                "fifty_two_week_high": high52 or "N/A",
+                "fifty_two_week_low": low52 or "N/A",
+                "revision_count": rev_cnt,
+                "formatted_date": _format_timestamp(raw_ts),
+                "dossier_url": f"/dossier/{ticker}",
+            })
+    except Exception as e:
+        logger.error(f"Database query error in get_all_equities_directory_sync: {e}")
+    finally:
+        cursor.close()
+        conn.close()
+    return equities

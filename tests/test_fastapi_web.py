@@ -517,6 +517,38 @@ Detailed forensic analysis with exact page grounding to bseindia.com filings.
         self.assertIn("Would You Buy Today?", html)
         self.assertIn("btnOpenThesisTop", html)
 
+    def test_equities_directory_page(self):
+        # 1. Test canonical redirect from /stocks to /equities
+        res_stocks = self.client.get("/stocks", follow_redirects=False)
+        self.assertEqual(res_stocks.status_code, 301)
+        self.assertIn("/equities", res_stocks.headers.get("location", ""))
+
+        # 2. Test /equities default load
+        res = self.client.get("/equities")
+        self.assertEqual(res.status_code, 200)
+        self.assertIn("Institutional Equities Directory", res.text)
+        self.assertIn("Monitored Equities", res.text)
+        self.assertIn("INFY", res.text)
+
+        # 3. Test search query
+        res_q = self.client.get("/equities?q=INFY")
+        self.assertEqual(res_q.status_code, 200)
+        self.assertIn("INFY", res_q.text)
+
+        # 4. Test sector filtering
+        res_sec = self.client.get("/equities?sector=IT_TECH")
+        self.assertEqual(res_sec.status_code, 200)
+        self.assertIn("IT &amp; Technology", res_sec.text)
+
+        # 5. Test market cap tier filtering
+        res_tier = self.client.get("/equities?market_cap=MEGA")
+        self.assertEqual(res_tier.status_code, 200)
+
+        # 6. Test sorting parameters
+        for s_mode in ["mcap_desc", "mcap_asc", "roce_desc", "pe_asc", "name_asc", "rev_desc"]:
+            res_sort = self.client.get(f"/equities?sort={s_mode}")
+            self.assertEqual(res_sort.status_code, 200)
+
 
 if __name__ == "__main__":
     unittest.main()

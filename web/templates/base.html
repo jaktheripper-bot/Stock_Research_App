@@ -130,7 +130,7 @@
           </a>
 
           <!-- Markets & Multi-Asset Sub-Tabs -->
-          <div class="nav-item dropdown {% if active_page in ['home', 'opportunities', 'debt', 'funds', 'sovereign', 'etfs', 'reits', 'dossier', 'msme'] %}active-parent{% endif %}" id="navMarketsDropdown">
+          <div class="nav-item dropdown {% if active_page in ['home', 'equities', 'opportunities', 'debt', 'funds', 'sovereign', 'etfs', 'reits', 'dossier', 'msme'] %}active-parent{% endif %}" id="navMarketsDropdown">
             <button class="nav-link dropdown-toggle" aria-haspopup="true" aria-expanded="false" id="marketsDropdownBtn">
               <span>Markets</span>
               <svg class="dropdown-chevron" width="10" height="6" viewBox="0 0 10 6" fill="none" xmlns="http://www.w3.org/2000/svg">
@@ -146,11 +146,11 @@
                 </div>
               </a>
               <div class="dropdown-divider"></div>
-              <a href="/" class="dropdown-item {% if active_page == 'home' %}active{% endif %}" role="menuitem">
+              <a href="/equities" class="dropdown-item {% if active_page == 'equities' %}active{% endif %}" role="menuitem">
                 <div class="dropdown-icon">📈</div>
                 <div class="dropdown-content">
                   <div class="dropdown-title">Equities & Stocks</div>
-                  <div class="dropdown-desc">BSE & NSE forensic research, DCF & multi-scenario valuation</div>
+                  <div class="dropdown-desc">All 143 verified BSE & NSE institutional dossiers & screener</div>
                 </div>
               </a>
               <a href="/debt" class="dropdown-item {% if active_page == 'debt' %}active{% endif %}" role="menuitem">
@@ -573,10 +573,10 @@
         <div>
           <div class="footer-col-title">Platform</div>
           <ul class="footer-links">
-            <li><a href="/">Explore Stock Dossiers</a></li>
+            <li><a href="/equities">All 143 Equities Directory</a></li>
+            <li><a href="/opportunities">Opportunity Terminal</a></li>
+            <li><a href="/funds">Mutual Funds Look-Through</a></li>
             <li><a href="/pricing">Pricing & Credit Packs</a></li>
-            <li><a href="/dossier/INFY">Sample Report: INFY</a></li>
-            <li><a href="/dossier/TCS">Sample Report: TCS</a></li>
             <li><a href="/admin">🔐 Executive Admin Hub</a></li>
           </ul>
         </div>

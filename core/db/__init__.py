@@ -42,6 +42,8 @@ from core.db.reports import (
     get_revision_by_id,
     _get_report_by_ticker_sync as get_report_by_ticker_sync,
     _get_archived_reports_sync as get_archived_reports_sync,
+    get_all_equities_directory_sync,
+    SECTOR_TAXONOMY,
 )
 
 from core.db.watchlist import (
@@ -139,6 +141,7 @@ __all__ = [
     "get_report_by_ticker_sync",
     "get_report_revisions",
     "get_revision_by_id",
+    "get_all_equities_directory_sync",
     # watchlist
     "get_watchlist",
     "add_to_watchlist",
