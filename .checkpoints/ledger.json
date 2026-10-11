@@ -894,5 +894,21 @@
       "revision_count": 239
     },
     "preflight_passed": true
+  },
+  {
+    "tag": "checkpoint_20261011_171649_Multi-asset_paywall__SEO_analytics__and_Stages_1-5_renames",
+    "timestamp": "2026-10-11 17:16:49 IST",
+    "commit_sha": "f1dfdb86ce10dc643ca4a38c5a992b438785273c",
+    "branch": "main",
+    "description": "Multi-asset paywall, SEO analytics, and Stages 1-5 renames",
+    "database": {
+      "exists": true,
+      "filename": "reports_checkpoint_20261011_171649_Multi-asset_paywall__SEO_analytics__and_Stages_1-5_renames.db",
+      "path": ".checkpoints/reports_checkpoint_20261011_171649_Multi-asset_paywall__SEO_analytics__and_Stages_1-5_renames.db",
+      "size_bytes": 7532544,
+      "report_count": 143,
+      "revision_count": 239
+    },
+    "preflight_passed": true
   }
 ]
