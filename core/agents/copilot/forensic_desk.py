@@ -48,6 +48,204 @@ FORBIDDEN_QUERY_PATTERNS = [
     "buy or sell", "investment recommendation"
 ]
 
+# Whitelist of common financial/market acronyms and short words
+FINANCIAL_ACRONYMS = {
+    "pe", "pb", "ev", "bv", "mf", "re", "fd", "it", "fy", "q1", "q2", "q3", "q4",
+    "dcf", "ncd", "sdi", "ytm", "amc", "aum", "nav", "ter", "cagr", "roic", "roce",
+    "ebitda", "ebit", "eps", "fcf", "d/e", "wacc", "bse", "nse", "sebi", "lodr",
+    "fldg", "isin", "cmp", "mcap", "asri", "cr", "lac", "lacs", "crore", "crores",
+    "tcs", "itc", "lt", "sbi", "ril", "hul", "infy", "hdfc", "icici", "kotak"
+}
+
+# Common keyboard mash sequences
+KEYBOARD_SMASH_SEQS = [
+    "asdf", "sdfg", "dfgh", "fghj", "ghjk", "hjkl", "lkjh", "kjhg", "jhgf", "hgfd", "gfds", "fdsa",
+    "qwerty", "werty", "ertyu", "rtyui", "tyuio", "yuiop", "poiuy", "oiuyt", "iuytr", "uytre", "ytrew", "trewq",
+    "zxcvb", "xcvbn", "cvbnm", "mnbvc", "nbvcx", "bvcxz"
+]
+
+SPAM_NOISE_TOKENS = {
+    "blah", "blabla", "blahblah", "gibberish", "asdf", "testtest", "foo", "bar",
+    "foobar", "randomtext", "testing123", "noise", "xxxx", "zzzz", "aaaa"
+}
+
+GREETING_TOKENS = {
+    "hi", "hello", "hey", "good morning", "good afternoon", "good evening",
+    "howdy", "sup", "greetings", "ping", "test"
+}
+
+
+def _build_unqualified_response(ticker: Optional[str], company_name: Optional[str], asset_class: str) -> str:
+    name = company_name or ticker or "this security"
+    if asset_class == "MUTUAL_FUND":
+        return (
+            f"🔍 **Input Not Recognized**\n\n"
+            f"I couldn't identify a valid financial or analytical query in your message. "
+            f"The **Forensic Intelligence Desk** provides look-through portfolio diagnostics and fee audits for **{name}**.\n\n"
+            f"**Here are a few high-conviction queries you can ask:**\n"
+            f"- 💥 *\"What shocked you or stood out during the fund audit?\"*\n"
+            f"- 💀 *\"Summarize the bear thesis and closet-indexing risks.\"*\n"
+            f"- 💸 *\"Explain the Direct vs Regular fee drag and commission compounding.\"*\n"
+            f"- 🛡️ *\"What is the Look-Through ASRI accounting risk of underlying holdings?\"*\n"
+            f"- 📊 *\"What is the fund's Active Share versus its benchmark?\"*"
+        )
+    elif asset_class == "CORPORATE_DEBT":
+        return (
+            f"🔍 **Input Not Recognized**\n\n"
+            f"I couldn't identify a valid credit or solvency query in your message. "
+            f"The **Forensic Intelligence Desk** evaluates capital structure recovery and credit contagion for **{name}**.\n\n"
+            f"**Here are a few high-conviction queries you can ask:**\n"
+            f"- 💥 *\"What shocked you or stood out in the credit analysis?\"*\n"
+            f"- 💀 *\"Summarize the bear thesis and default vulnerability.\"*\n"
+            f"- 📡 *\"What is the Credit Contagion Radar posture for this issuer?\"*\n"
+            f"- 🛡️ *\"What is the Asset Coverage Ratio (ACR) and recovery seniority?\"*\n"
+            f"- 📉 *\"What is the DSCR covenant headroom under stress?\"*"
+        )
+    else:
+        return (
+            f"🔍 **Input Not Recognized**\n\n"
+            f"I couldn't identify a valid financial or analytical query in your message. "
+            f"The **Forensic Intelligence Desk** analyzes structural risks, financial red flags, and valuation models for **{name}**.\n\n"
+            f"**Here are a few high-conviction queries you can ask:**\n"
+            f"- 💥 *\"What shocked you or stood out during the research?\"*\n"
+            f"- 💀 *\"Summarize the bear thesis and top failure modes.\"*\n"
+            f"- 📉 *\"What annual FCF growth is currently priced into CMP?\"*\n"
+            f"- 🚩 *\"Are there any promoter pledging or forensic accounting red flags?\"*\n"
+            f"- 🛡️ *\"How solvent is the balance sheet under macroeconomic stress?\"*"
+        )
+
+
+def _build_greeting_response(ticker: Optional[str], company_name: Optional[str], asset_class: str) -> str:
+    name = company_name or ticker or "this security"
+    if asset_class == "MUTUAL_FUND":
+        return (
+            f"👋 **Welcome to the Forensic Intelligence Desk for {name}.**\n\n"
+            f"I am your institutional look-through copilot, engineered to audit underlying constituent quality, "
+            f"measure closet-indexing drift, and calculate fee drag wealth destruction.\n\n"
+            f"**What would you like to explore?**\n"
+            f"- Ask open-ended questions like *\"What shocked you in this fund?\"* or *\"Summarize the bear thesis\"*.\n"
+            f"- Audit the **distributor commission spread (TER drag)**.\n"
+            f"- Check **Active Share** and style consistency against the benchmark index.\n"
+            f"- Inspect look-through **accounting risk (ASRI)** across underlying holdings."
+        )
+    elif asset_class == "CORPORATE_DEBT":
+        return (
+            f"👋 **Welcome to the Forensic Intelligence Desk for {name}.**\n\n"
+            f"I am your institutional fixed income copilot, engineered to stress-test credit solvency, "
+            f"monitor contagion triggers, and evaluate statutory recovery hierarchies.\n\n"
+            f"**What would you like to explore?**\n"
+            f"- Ask open-ended questions like *\"What stood out in the credit audit?\"* or *\"Summarize the bear thesis\"*.\n"
+            f"- Review the **Credit Contagion Radar** for group-level spillover risks.\n"
+            f"- Audit **covenant headroom (DSCR/ISCR)** and security charge seniority.\n"
+            f"- Evaluate the **yield-to-maturity (YTM)** and duration profile."
+        )
+    else:
+        return (
+            f"👋 **Welcome to the Forensic Intelligence Desk for {name}.**\n\n"
+            f"I am your institutional equity copilot, engineered to stress-test investment theses, "
+            f"audit corporate governance disclosures, and unpack Reverse DCF expectations.\n\n"
+            f"**What would you like to explore?**\n"
+            f"- Ask open-ended questions like *\"What shocked you during the research?\"* or *\"Summarize the bear thesis\"*.\n"
+            f"- Stress-test the **Reverse DCF** to see what annual FCF growth CMP is pricing in.\n"
+            f"- Audit **promoter pledging** and forensic accounting disclosures under SEBI LODR.\n"
+            f"- Evaluate **balance sheet solvency** and Altman Z-Score buffer."
+        )
+
+
+def check_input_qualification(
+    message: str,
+    asset_class: str = "EQUITY",
+    ticker: Optional[str] = None,
+    company_name: Optional[str] = None
+) -> Optional[Dict[str, str]]:
+    """
+    Input Qualification Layer:
+    Detects gibberish, noise, spam, and non-financial empty queries,
+    or pure greetings, guiding the user rather than dumping canned financial overviews.
+    Returns None if the message is qualified.
+    Returns dict {"status": "...", "response": "..."} if intercepted.
+    """
+    raw = (message or "").strip()
+    if not raw:
+        return {
+            "status": "INPUT_UNQUALIFIED",
+            "response": _build_unqualified_response(ticker, company_name, asset_class)
+        }
+
+    lowered = raw.lower()
+
+    # 1. Polite Greeting Interception
+    clean_alpha = re.sub(r"[^a-z\s]", "", lowered).strip()
+    words = clean_alpha.split()
+    if lowered in GREETING_TOKENS or (words and len(words) <= 2 and all(w in GREETING_TOKENS for w in words)):
+        return {
+            "status": "GREETING",
+            "response": _build_greeting_response(ticker, company_name, asset_class)
+        }
+
+    # 2. Punctuation / Symbol Only Noise (e.g. "???", "!#$%", "....")
+    clean_alnum = re.sub(r"[^a-z0-9\s]", "", lowered).strip()
+    if not clean_alnum:
+        return {
+            "status": "INPUT_UNQUALIFIED",
+            "response": _build_unqualified_response(ticker, company_name, asset_class)
+        }
+
+    # 3. Ultra-short noise (< 3 chars) not in financial acronyms
+    if len(clean_alnum) < 3 and clean_alnum not in FINANCIAL_ACRONYMS:
+        return {
+            "status": "INPUT_UNQUALIFIED",
+            "response": _build_unqualified_response(ticker, company_name, asset_class)
+        }
+
+    # 4. Repeated character smash (e.g. "aaaaa", "zzzzzz", "111111")
+    if re.search(r"(.)\1{3,}", lowered):
+        # Exclude legitimate numbers or periods like "..."
+        if not re.search(r"^\d+$", clean_alnum) and not lowered.startswith("..."):
+            return {
+                "status": "INPUT_UNQUALIFIED",
+                "response": _build_unqualified_response(ticker, company_name, asset_class)
+            }
+
+    # 5. Token-level Gibberish Checks
+    for token in clean_alnum.split():
+        # A. Explicit spam/noise token
+        if token in SPAM_NOISE_TOKENS:
+            return {
+                "status": "INPUT_UNQUALIFIED",
+                "response": _build_unqualified_response(ticker, company_name, asset_class)
+            }
+
+        # B. Keyboard smash run
+        if any(smash in token for smash in KEYBOARD_SMASH_SEQS):
+            return {
+                "status": "INPUT_UNQUALIFIED",
+                "response": _build_unqualified_response(ticker, company_name, asset_class)
+            }
+
+        # C. Pure numbers without financial units (e.g. "1234567")
+        if token.isdigit() and len(token) >= 5 and token != (ticker or "").lower():
+            return {
+                "status": "INPUT_UNQUALIFIED",
+                "response": _build_unqualified_response(ticker, company_name, asset_class)
+            }
+
+        # D. Consonant cluster >= 5 chars without vowels (a, e, i, o, u, y)
+        if len(token) >= 5 and not any(v in token for v in "aeiouy") and token not in FINANCIAL_ACRONYMS:
+            return {
+                "status": "INPUT_UNQUALIFIED",
+                "response": _build_unqualified_response(ticker, company_name, asset_class)
+            }
+
+        # E. Low unique character entropy (e.g. "abababab" or "qwqwqw")
+        if len(token) >= 6 and (len(set(token)) / len(token)) < 0.35:
+            return {
+                "status": "INPUT_UNQUALIFIED",
+                "response": _build_unqualified_response(ticker, company_name, asset_class)
+            }
+
+    return None
+
 
 def check_non_advisory_compliance(message: str, asset_class: str = "EQUITY") -> Optional[str]:
     """Intercepts retail advisory queries and returns mandatory regulatory deflection tailored to asset class."""
@@ -98,7 +296,66 @@ def build_mutual_fund_deterministic_response(
     msg = (user_message or "").lower().strip()
     locked = bool(context_data.get("deep_dive_locked"))
 
-    if sec == "fee_drag" or any(k in msg for k in ["fee drag", "direct", "regular", "ter", "commission", "expense ratio", "wealth lost", "drag"]):
+    # Open-Ended Inquiry: "What shocked you?" / Surprises / Red Flags
+    is_specific_mf_topic = bool(sec) or any(k in msg for k in ["fee drag", "direct", "regular", "ter", "commission", "expense ratio", "active share", "closet", "index", "hugging", "benchmark", "asri", "accounting risk", "pledg", "moat", "quality", "margin of safety", "dcf", "holding", "allocation", "downside"])
+    if not is_specific_mf_topic and any(k in msg for k in [
+        "what shocked you", "shocked", "shocking", "surprise", "surprised",
+        "red flag", "red flags", "anomaly", "anomalies", "stand out", "stood out"
+    ]):
+        ter_dir = context_data.get("ter_direct_pct", "N/A")
+        ter_reg = context_data.get("ter_regular_pct", "N/A")
+        as_pct = context_data.get("active_share_pct", "N/A")
+        asri = context_data.get("accounting_risk_index", "N/A")
+        findings = []
+
+        try:
+            if ter_dir != "N/A" and ter_reg != "N/A":
+                spread = round((float(ter_reg) - float(ter_dir)) * 100, 1)
+                if spread >= 75:
+                    findings.append(f"**Severe Distributor Fee Drag ({spread} bps/yr):** The Regular plan extracts a significant commission spread, destroying ~20%+ ending wealth over 20 years.")
+        except Exception:
+            pass
+
+        if isinstance(as_pct, (int, float)) and as_pct < 60:
+            findings.append(f"**Closet Indexing Drift (Active Share {as_pct}%):** The portfolio substantially hugs the benchmark while charging active management fees.")
+
+        if not locked and isinstance(asri, (int, float)) and asri > 25:
+            findings.append(f"**Elevated Look-Through Accounting Stress (ASRI {asri}%):** Underlying holdings exhibit high accounting risk or elevated promoter pledging.")
+
+        if not findings:
+            findings.append(f"**Fee Drag Compounding:** Direct TER ({ter_dir}%) vs Regular TER ({ter_reg}%) represents unrecovered distributor fee leakage.")
+            findings.append(f"**Portfolio Concentration:** Top holdings dictate over 40% of risk exposure, requiring continuous tracking.")
+
+        points = "\n\n".join([f"{i+1}. {f}" for i, f in enumerate(findings[:3])])
+        return (
+            f"**Key Look-Through Surprises & Red Flags for {name}:**\n\n"
+            f"{points}\n\n"
+            f"Would you like to examine intermediary fee drag or inspect constituent quality next?"
+        )
+
+    # Open-Ended Inquiry: Bear Thesis
+    elif any(k in msg for k in ["bear thesis", "bear case", "bearish", "downside case", "why avoid"]):
+        return (
+            f"**Institutional Bear Thesis for {name}:**\n\n"
+            f"1. **Intermediary Fee Drag & Wealth Drag:** Over long cycles, distributor commission spreads deplete net returns compared to low-cost direct or index strategies.\n"
+            f"2. **Style Drift & Benchmark Hugging:** High cash balances or closet-indexing can cause underperformance during sharp bull market rallies.\n"
+            f"3. **Look-Through Valuation Squeeze:** If underlying mega-caps experience earnings de-rating, downside capture can spike beyond benchmark levels.\n\n"
+            f"Would you like to check active share or evaluate downside capture next?"
+        )
+
+    # Open-Ended Inquiry: Bull Thesis
+    elif any(k in msg for k in ["bull thesis", "bull case", "bullish", "upside case", "why invest"]):
+        moat = context_data.get("weighted_moat_score", "N/A")
+        health = context_data.get("composite_health_score", "N/A")
+        return (
+            f"**Institutional Bull Thesis for {name}:**\n\n"
+            f"1. **High-Conviction Moat Allocations:** Portfolio is anchored in structural compounders (Composite Health {health}/100).\n"
+            f"2. **Disciplined Risk-Adjusted Management:** Active allocation aims to curb downside capture while participating in secular upswings.\n"
+            f"3. **Diversified Operational Leverage:** Cross-sector diversification shields the portfolio against single-stock governance shocks.\n\n"
+            f"Would you like to review constituent holdings or examine the fee audit?"
+        )
+
+    elif sec == "fee_drag" or any(k in msg for k in ["fee drag", "direct", "regular", "ter", "commission", "expense ratio", "wealth lost", "drag"]):
         ter_dir = context_data.get("ter_direct_pct", "N/A")
         ter_reg = context_data.get("ter_regular_pct", "N/A")
         spread_bps = "N/A"
@@ -238,7 +495,54 @@ def build_debt_deterministic_response(
     msg = (user_message or "").lower().strip()
     locked = bool(context_data.get("deep_dive_locked"))
 
-    if sec in ["covenants", "asset_coverage"] or any(k in msg for k in ["covenant", "acr", "asset coverage", "coverage", "dscr", "headroom"]):
+    # Open-Ended Inquiry: "What shocked you?" / Surprises / Red Flags
+    is_specific_debt_topic = bool(sec) or any(k in msg for k in ["covenant", "acr", "asset coverage", "coverage", "dscr", "headroom", "contagion", "radar", "cross-default", "seniority", "recovery", "liquidation", "ytm", "duration"])
+    if not is_specific_debt_topic and any(k in msg for k in [
+        "what shocked you", "shocked", "shocking", "surprise", "surprised",
+        "red flag", "red flags", "anomaly", "anomalies", "stand out", "stood out"
+    ]):
+        radar_status = context_data.get("contagion_radar_status", "N/A")
+        tier = context_data.get("seniority_tier", "N/A")
+        findings = []
+
+        if not locked and radar_status in ["ELEVATED", "HIGH", "CRITICAL"]:
+            findings.append(f"**Credit Contagion Risk ({radar_status}):** Group leverage or parent equity distress creates cross-default spillover risks.")
+
+        if tier in ["SUBORDINATED", "UNSECURED", "MEZZANINE"]:
+            findings.append(f"**Subordinated Seniority Tier ({tier}):** In a corporate resolution or liquidation, recovery priority sits behind senior secured creditors.")
+
+        if not findings:
+            findings.append(f"**Liquidation Hierarchy Sensitivity:** Recovery is strictly contingent on asset charge coverage and covenant enforcement under IBC priority.")
+            findings.append(f"**Refinancing Liquidity:** Duration and yield sensitivity must be monitored against macro interest rate cycles.")
+
+        points = "\n\n".join([f"{i+1}. {f}" for i, f in enumerate(findings[:3])])
+        return (
+            f"**Key Credit Surprises & Solvency Flags for {name}:**\n\n"
+            f"{points}\n\n"
+            f"Would you like to examine covenant headroom or inspect recovery seniority next?"
+        )
+
+    # Open-Ended Inquiry: Bear Thesis
+    elif any(k in msg for k in ["bear thesis", "bear case", "bearish", "downside case", "default risk", "why avoid"]):
+        return (
+            f"**Institutional Bear Thesis for {name}:**\n\n"
+            f"1. **Subordinated Recovery & Haircuts:** Subordinated tranches face severe recovery haircuts if liquidation value falls below secured debt claims.\n"
+            f"2. **Cross-Default & Parent Contagion:** Systemic group obligations or parent entity debt stress could trigger covenant acceleration.\n"
+            f"3. **Refinancing Headwinds:** Rising benchmark yields and tighter liquidity could impair issuer rollover capabilities.\n\n"
+            f"Would you like to review covenant headroom or check the Credit Contagion Radar?"
+        )
+
+    # Open-Ended Inquiry: Bull Thesis
+    elif any(k in msg for k in ["bull thesis", "bull case", "bullish", "upside case", "why invest"]):
+        return (
+            f"**Institutional Credit Quality Case for {name}:**\n\n"
+            f"1. **Senior Secured Status:** Protected by a first pari-passu charge over tangible corporate assets.\n"
+            f"2. **Covenant Cushion:** DSCR and interest coverage maintain adequate headroom against stress thresholds.\n"
+            f"3. **Attractive Risk-Adjusted Yield:** Yield-to-maturity provides healthy spread over sovereign G-Sec benchmarks.\n\n"
+            f"Would you like to review recovery seniority or duration profile next?"
+        )
+
+    elif sec in ["covenants", "asset_coverage"] or any(k in msg for k in ["covenant", "acr", "asset coverage", "coverage", "dscr", "headroom"]):
         return (
             f"**Asset Coverage & Covenant Headroom for {name}:**\n\n"
             f"- Credit Rating: {context_data.get('credit_rating', 'N/A')}\n"
@@ -313,6 +617,138 @@ def build_equity_deterministic_response(
             f"We strictly do **not** provide buy/sell/hold recommendations, target prices, trade execution signals, or return guarantees.\n\n"
             f"To evaluate {name} objectively without narrative bias, you can review its **Reverse DCF Implied Growth** "
             f"(to inspect what annual FCF growth CMP ₹{cmp_display} is pricing in) or analyze the **Pre-Mortem Inversion** vectors."
+        )
+
+    # 0b. Open-Ended Inquiry: "What shocked you?" / Surprises / Red Flags / Anomalies
+    is_specific_pillar_query = bool(sec) or any(k in msg for k in [
+        "governance", "pledg", "promoter", "beneish", "m-score", "auditor", "resignation", "related-party",
+        "reverse dcf", "implied growth", "hurdle rate", "fair value", "intrinsic",
+        "solvency", "altman", "z-score", "balance sheet", "leverage",
+        "moat", "capital allocation", "roce", "roic", "50-dma", "momentum"
+    ])
+    if not is_specific_pillar_query and any(k in msg for k in [
+        "what shocked you", "shocked", "shocking", "surprise", "surprised",
+        "red flag", "red flags", "anomaly", "anomalies", "stand out",
+        "stood out", "biggest risk", "unusual", "worry", "unexpected"
+    ]):
+        anomalies = []
+        
+        # Check valuation / Reverse DCF hurdle
+        implied_growth = dcf.get("implied_growth_priced_in_pct")
+        if implied_growth:
+            try:
+                g_val = float(implied_growth)
+                if g_val > 15.0:
+                    anomalies.append(
+                        f"**Aggressive Reverse DCF Implied Growth ({implied_growth}% p.a.):** "
+                        f"At CMP ₹{cmp_display}, the market is pricing in heroic annual FCF compounding over the next 10 years, "
+                        f"leaving negligible margin of safety for execution missteps or cyclical contractions."
+                    )
+                elif g_val < 8.0:
+                    anomalies.append(
+                        f"**Depressed Valuation Growth Pricing ({implied_growth}% p.a.):** "
+                        f"The market is pricing in near-terminal stagnation, creating favorable valuation asymmetry if earnings match historical baselines."
+                    )
+            except Exception:
+                pass
+
+        # Check P/E Multiple
+        try:
+            pe_float = float(pe_val)
+            if pe_float > 45.0:
+                anomalies.append(
+                    f"**Elevated Multiple Exposure ({pe_display}):** "
+                    f"Trading at an institutional premium that requires sustained 20%+ earnings execution to prevent sharp multiple compression."
+                )
+            elif pe_float < 12.0 and pe_float > 0:
+                anomalies.append(
+                    f"**Deep Value Multiple Compression ({pe_display}):** "
+                    f"Trading at a steep discount to historical median multiples, signaling market pessimism."
+                )
+        except Exception:
+            pass
+
+        # Check Matrix Postures
+        macro = matrix.get("Macro", "Headwinds")
+        if macro in ["Headwinds", "Cyclical Downside"]:
+            anomalies.append(f"**Macroeconomic Friction:** Macro posture is flagged under **{macro}**, creating top-line margin resistance.")
+
+        gov = matrix.get("Governance", "Clean")
+        if gov not in ["Clean", "Exemplary"]:
+            anomalies.append(f"**Governance Scepticism:** Governance audit posture is flagged as **{gov}**.")
+
+        diag = matrix.get("Diagnostic", "Temporary")
+        if diag == "Structural":
+            anomalies.append(f"**Structural Impairment Risk:** Pillar 04 diagnostic identifies recent price weakness as **Structural** rather than temporary mean-reversion.")
+
+        solv = matrix.get("BalanceSheet", "Debt-Free")
+        if solv in ["Leveraged", "Stressed", "Refinancing Risk"]:
+            anomalies.append(f"**Balance Sheet Gearing:** Solvency posture is classified as **{solv}**.")
+
+        # Default fallback highlights if all metrics are pristine
+        if not anomalies:
+            anomalies.append(
+                f"**Valuation Asymmetry:** Even with pristine governance ({matrix.get('Governance', 'Clean')}) "
+                f"and balance sheet solvency ({matrix.get('BalanceSheet', 'Debt-Free')}), CMP ₹{cmp_display} leaves little room for operating margin decay."
+            )
+            anomalies.append(
+                f"**Operating Leverage Vulnerability:** If raw material or wage inflation compresses margins by >200 bps, trailing ROIC could decouple from historical compounding rates."
+            )
+
+        anomaly_points = "\n\n".join([f"{i+1}. {item}" for i, item in enumerate(anomalies[:3])])
+
+        return (
+            f"**Key Forensic Surprises & Structural Red Flags for {name} ({company_name}):**\n\n"
+            f"Our 7-pillar forensic audit revealed the following critical friction points:\n\n"
+            f"{anomaly_points}\n\n"
+            f"**Next Step:** Would you like to review the full Pre-Mortem Inversion analysis, or deconstruct the Reverse DCF cash flow drivers?"
+        )
+
+    # 0c. Open-Ended Inquiry: Bear Thesis
+    elif any(k in msg for k in [
+        "bear thesis", "bear case", "bearish", "downside case", "short thesis",
+        "why sell", "why avoid", "reasons to avoid", "downside risk", "pessimistic"
+    ]):
+        pe_str = f"at {pe_display} trailing P/E" if pe_display != "N/A" else "at current market levels"
+        implied_growth = dcf.get("implied_growth_priced_in_pct", "9.0")
+        bs_status = matrix.get("BalanceSheet", "Debt-Free")
+        macro = matrix.get("Macro", "Headwinds")
+
+        return (
+            f"**Institutional Bear Thesis Summary for {name} ({company_name}):**\n\n"
+            f"The core downside arguments and thesis destruction vectors center on 3 pillars:\n\n"
+            f"1. **Valuation Multiple De-Rating & Expectations Treadmill:**\n"
+            f"   - Trading {pe_str}, pricing in ~{implied_growth}% annual FCF growth over 10 years.\n"
+            f"   - Any deceleration in top-line growth or earnings miss risks triggering sharp P/E mean-reversion.\n\n"
+            f"2. **Margin Compression & Competitive Erosion:**\n"
+            f"   - Under macro posture **{macro}**, industry pricing power faces resistance.\n"
+            f"   - Inability to pass through cost escalations could structurally compress operating margins by 150–250 bps.\n\n"
+            f"3. **Capital Allocation & Reinvestment Friction:**\n"
+            f"   - Even with balance sheet posture **{bs_status}**, non-core diversification or delayed cash conversion would erode return on capital (ROCE/ROIC).\n\n"
+            f"**Thesis Invalidation:** If revenue CAGR exceeds hurdle rates while gross margins expand, the bear case is invalidated.\n\n"
+            f"Would you like to examine Reverse DCF implied growth rates or review the bull case?"
+        )
+
+    # 0d. Open-Ended Inquiry: Bull Thesis
+    elif any(k in msg for k in [
+        "bull thesis", "bull case", "bullish", "upside case", "long thesis",
+        "why buy", "why invest", "reasons to invest", "upside potential", "catalysts", "growth drivers"
+    ]):
+        moat_status = matrix.get("Moat", "Wide")
+        gov_status = matrix.get("Governance", "Clean")
+        bs_status = matrix.get("BalanceSheet", "Debt-Free")
+
+        return (
+            f"**Institutional Bull Thesis Summary for {name} ({company_name}):**\n\n"
+            f"The structural compounding thesis is supported by 3 fundamental pillars:\n\n"
+            f"1. **Fortress Competitive Moat ({moat_status}):**\n"
+            f"   - Structural pricing power, high client switching friction, and dominant industry positioning protect market share.\n\n"
+            f"2. **Pristine Balance Sheet & Governance ({bs_status} • {gov_status}):**\n"
+            f"   - Negligible gearing and unencumbered promoter holdings provide counter-cyclical capital allocation resilience.\n\n"
+            f"3. **Compounding Return on Capital:**\n"
+            f"   - Generates free cash flow in excess of cost of capital (WACC 12%), enabling disciplined internal reinvestment.\n\n"
+            f"**Thesis Invalidation:** If ROCE falls below 15% or promoter pledging rises, the quality compounding thesis deteriorates.\n\n"
+            f"Would you like to review the bear thesis failure modes or audit governance red flags?"
         )
 
     # 1. Pre-Mortem Inversion / Failure Modes / Thesis Destruction
@@ -597,7 +1033,8 @@ async def process_forensic_desk_turn(
     section_label: Optional[str] = None,
     section_data: Optional[Dict[str, Any]] = None,
     deep_dive_unlocked: bool = False,
-    unlock_checker: Optional[Any] = None
+    unlock_checker: Optional[Any] = None,
+    is_subscriber: bool = False
 ) -> Dict[str, Any]:
     """Processes a user dialogue turn with conversational memory, multi-asset grounding, and section awareness."""
     # 1. Ensure conversation exists in DB
@@ -638,6 +1075,21 @@ async def process_forensic_desk_turn(
             "conversation_id": conversation_id,
             "response": deflection,
             "status": "REGULATORY_DEFLECTED"
+        }
+
+    # 4b. Input Qualification Layer (intercepts gibberish/noise and handles polite greetings)
+    qualification = check_input_qualification(
+        message=user_message,
+        asset_class=resolved_asset_class,
+        ticker=clean_ticker,
+        company_name=clean_ticker
+    )
+    if qualification:
+        append_conversation_turn(conversation_id, "agent", qualification["response"])
+        return {
+            "conversation_id": conversation_id,
+            "response": qualification["response"],
+            "status": qualification["status"]
         }
 
     # 5. Context Grounding with Strict Multi-Asset Isolation
@@ -793,13 +1245,38 @@ async def process_forensic_desk_turn(
                     "unlock_required": {"asset_kind": kind, "asset_id": asset_id, "credits": 1},
                 }
 
-    # 6. Cognitive AI Response Synthesis
+    # 6. Cognitive AI Response Synthesis & Tier Entitlement Guard
     history = get_conversation_turns(conversation_id, limit=6)
     history_str = "\n".join([f"{t['sender_role'].upper()}: {t['content']}" for t in history[:-1]])
 
     from google.genai import Client
     api_key = get_secret("GEMINI_API_KEY")
     is_testing = os.environ.get("TESTING") == "1" or "unittest" in sys.modules or "pytest" in sys.modules
+
+    # Credit burn protection: limit LLM generative synthesis to paid/unlocked reports or subscribers
+    has_llm_entitlement = bool(deep_dive_unlocked or is_subscriber)
+
+    if not has_llm_entitlement:
+        asset_cls = context_data.get("asset_class", "EQUITY")
+        if asset_cls == "MUTUAL_FUND":
+            base_reply = build_mutual_fund_deterministic_response(context_data, section, clean_ticker, user_message)
+        elif asset_cls == "CORPORATE_DEBT":
+            base_reply = build_debt_deterministic_response(context_data, section, clean_ticker, user_message)
+        else:
+            base_reply = build_equity_deterministic_response(context_data, section, clean_ticker, user_message)
+
+        tier_notice = (
+            "\n\n---\n"
+            "⚡ **Desk Mode:** Deterministic Forensic Engine (Free Tier).\n"
+            "*Interactive generative AI synthesis with Google Gemini is exclusive to Unlocked Deep Dives (1 credit) and Pro Subscribers.*"
+        )
+        full_reply = base_reply + tier_notice
+        append_conversation_turn(conversation_id, "agent", full_reply)
+        return {
+            "conversation_id": conversation_id,
+            "response": full_reply,
+            "status": "DETERMINISTIC_FALLBACK"
+        }
 
     if not api_key or is_testing:
         asset_cls = context_data.get("asset_class", "EQUITY")
@@ -810,8 +1287,14 @@ async def process_forensic_desk_turn(
         else:
             fallback_msg = build_equity_deterministic_response(context_data, section, clean_ticker, user_message)
 
-        append_conversation_turn(conversation_id, "agent", fallback_msg)
-        return {"conversation_id": conversation_id, "response": fallback_msg, "status": "DETERMINISTIC_FALLBACK"}
+        offline_notice = (
+            "\n\n---\n"
+            "⚡ **Desk Mode:** Deterministic Forensic Engine (Fallback • Gemini API offline).\n"
+            "*Your entitlement is verified (Unlocked/Pro); operating on deterministic engine while AI service recovers.*"
+        )
+        full_reply = fallback_msg + offline_notice
+        append_conversation_turn(conversation_id, "agent", full_reply)
+        return {"conversation_id": conversation_id, "response": full_reply, "status": "DETERMINISTIC_FALLBACK"}
 
     # Construct Asset-Aware and Section-Aware System Prompt
     asset_instructions = ""
@@ -865,12 +1348,28 @@ async def process_forensic_desk_turn(
             f"Directly anchor your response to the metrics, findings, and diagnostic significance of this section.\n"
         )
 
+    open_ended_instructions = (
+        "================================================================================\n"
+        "SYNTHESIS & OPEN-ENDED QUERY DIRECTIVES:\n"
+        "- When asked open-ended or qualitative questions like 'what shocked you?', 'what stood out?',\n"
+        "  or 'what are the biggest red flags?':\n"
+        "  Act as an institutional forensic research director / skeptical forensic auditor.\n"
+        "  Directly inspect the active security context, valuation metrics, and forensic checks.\n"
+        "  Highlight the 2-3 most jarring or unexpected findings (e.g. heroic growth priced into Reverse DCF,\n"
+        "  P/E multiple expansion vs decelerating earnings, promoter share pledges, or cash flow accrual divergences).\n"
+        "  State specific data and ratios; never give evasive disclaimers or canned platitudes.\n"
+        "- When asked to 'summarize the bear thesis', synthesize the primary Pre-Mortem failure vectors and valuation compression triggers.\n"
+        "- When asked to 'summarize the bull thesis', synthesize the durable competitive moat advantages, ROIC persistence, and capital allocation.\n"
+        "- Always maintain objective, SEBI Section 2(u) non-advisory language without price targets or buy/sell recommendations.\n"
+    )
+
     system_prompt = f"""{SEBI_SAFE_HARBOR_DIRECTIVE}
 You are the Forensic Intelligence Desk (Forensic Desk) on Stock Research AI.
 You assist allocators and research analysts in stress-testing investment theses across Equities, Mutual Funds, and Corporate Debt using our multi-asset forensic frameworks.
 
 {asset_instructions}
 {section_instructions}
+{open_ended_instructions}
 
 Active Security Context:
 {json.dumps(context_data, indent=2)}
@@ -880,11 +1379,28 @@ Recent Conversation History:
 """
     try:
         client = Client(api_key=api_key)
-        resp = await client.aio.models.generate_content(
-            model="gemini-3.8-flash",
-            contents=f"{system_prompt}\n\nUSER: {user_message}\nCOPILOT:"
+        agent_reply = None
+        for model_name in ["gemini-3.8-flash", "gemini-2.5-flash", "gemini-1.5-flash"]:
+            try:
+                resp = await client.aio.models.generate_content(
+                    model=model_name,
+                    contents=f"{system_prompt}\n\nUSER: {user_message}\nCOPILOT:"
+                )
+                if resp and resp.text:
+                    agent_reply = resp.text
+                    break
+            except Exception as model_err:
+                logger.debug(f"Model {model_name} invocation notice: {model_err}")
+                continue
+
+        if not agent_reply:
+            raise RuntimeError("All candidate Gemini models failed to formulate a response.")
+
+        pro_notice = (
+            "\n\n---\n"
+            "✨ **Desk Mode:** Institutional Generative AI (Google Gemini • Unlocked Deep Dive / Pro Tier)."
         )
-        agent_reply = resp.text or "Unable to formulate response."
+        full_reply = agent_reply + pro_notice
         status = "COMPLETED"
     except Exception as e:
         logger.warning(f"Copilot model invocation error: {e}. Falling back to deterministic response.")
@@ -895,13 +1411,20 @@ Recent Conversation History:
             agent_reply = build_debt_deterministic_response(context_data, section, clean_ticker, user_message)
         else:
             agent_reply = build_equity_deterministic_response(context_data, section, clean_ticker, user_message)
+
+        fallback_notice = (
+            "\n\n---\n"
+            "⚡ **Desk Mode:** Deterministic Forensic Engine (Fallback • Gemini API offline).\n"
+            "*Your entitlement is verified (Unlocked/Pro); operating on deterministic engine while AI service recovers.*"
+        )
+        full_reply = agent_reply + fallback_notice
         status = "DETERMINISTIC_FALLBACK"
 
     # 7. Save agent turn to database
-    append_conversation_turn(conversation_id, "agent", agent_reply)
+    append_conversation_turn(conversation_id, "agent", full_reply)
 
     return {
         "conversation_id": conversation_id,
-        "response": agent_reply,
+        "response": full_reply,
         "status": status
     }

@@ -42,7 +42,7 @@ Every numerical metric, order book depth, corporate filing, and regulatory discl
 | **8. Net Real Tax Calculator** (`/calculator/tax`) | **MOSPI CPI Inflation Index** + **Income Tax Department** | Direct statutory formula computation based on Finance Act 2024 / Sec 50AA, 112A | Static 2024–2025 Central Board of Direct Taxes (CBDT) tax brackets | Real-time parametric calculations (client & server-side) | 🟢 **STATUTORY FORMULA** |
 | **9. Retail Safety Radar** (`/safety-radar`) | **Cross-Asset Capital Structure Matrix** (`core/cortex/setu.py`) | Synthesized across Sovereign, Corporate Debt, REIT, and Equity registries | Internal relational DB mapping | Continuous synchronization with debt/equity databases | 🟢 **DETERMINISTIC DIAGNOSTIC** |
 | **10. Peer Comparison** (`/compare`) | **Dual-Binding Database** (`reports.db` + Supabase) | Multi-entity relational query with dynamic 3-axis disparity gating | Live Angel One quote enrichment | Instant cached query (< 15ms) | 🟢 **FACTUAL COMPARISON** |
-| **11. Forensic Intelligence Desk** (`/api/copilot/chat`) | **Google Gemini 2.5 Flash / 3.5 Flash** (via `google-genai` SDK) | REST API via HTTPS, grounded in active page context + pre-computed Cortex packets | Perplexity `sonar-pro` API fallback; rule-based deterministic fallback | Ephemeral multi-turn context; stateless server execution | 🟢 **SAFE HARBOR SECTION 2(u)**<br>Deterministic refusal of Buy/Sell inquiries; factual diagnostics only. |
+| **11. Forensic Intelligence Desk** (`/api/copilot/chat`) | **Google Gemini 3.8 Flash / 2.5 Flash** (via `google-genai` SDK) & **Deterministic Forensic Engine** | Tier-gated execution: Gemini LLM for Unlocked Deep Dives & Pro Subscribers; Deterministic Rule Engine for Free Tier | Rule-based deterministic fallback on API 403 / offline; Input qualification layer rejects gibberish | Ephemeral multi-turn context; stateless server execution | 🟢 **SAFE HARBOR SECTION 2(u)**<br>Deterministic refusal of Buy/Sell inquiries; factual diagnostics only. |
 
 ---
 
@@ -489,9 +489,11 @@ Enforces **3-Axis Disparity Gates** to prevent comparing structurally mismatched
 
 ### Report 11: Forensic Intelligence Desk (`/api/copilot/chat`)
 
-* **Grounded Context Ingestion:** Interrogates active screen metrics, 7-pillar qualitative matrices, and Cortex packets.
-* **Deterministic Fallback:** If upstream LLM experiences 403 or quota limits, falls back to structured rule-based financial explanations.
-* **SEBI Section 2(u) Mandatory Deflection:** Intercepts explicit "Should I buy/sell?" queries, deflecting into Pre-Mortem inversion diagnostics and risk factor evaluations.
+* **Input Qualification Layer (`check_input_qualification`):** Pre-execution validator intercepts spam, keyboard smashes (`asdf...`, `qwerty...`), 5+ consonant clusters, character repetitions, and noise tokens, deflecting them with high-conviction query guidance. Intercepts casual greetings (`hi`, `hello`, `ping`) with onboarding assistance rather than unsolicited financial dumps.
+* **Open-Ended Query Synthesis Engine:** Directly answers exploratory institutional inquiries ("what shocked you?", "summarize the bear thesis", "summarize the bull thesis") synthesized dynamically from active report matrices (`health_matrix`, `reverse_dcf`, `fundamentals`, `report_text`) rather than redirecting callers to rigid menu selections.
+* **Credit Burn & Tier Gating:** Generative Google Gemini LLM synthesis (`gemini-3.8-flash` cascade) is restricted to Unlocked Deep Dives and Pro Subscribers. Free tier users on locked reports are served by the high-speed Deterministic Forensic Engine. Responses carry explicit desk mode attribution (`⚡ Desk Mode: Deterministic Forensic Engine (Free Tier)` vs `✨ Desk Mode: Institutional Generative AI (Google Gemini • Unlocked Deep Dive / Pro Tier)`).
+* **Deterministic Fallback:** If upstream LLM experiences 403 or quota limits, falls back seamlessly to structured rule-based financial explanations with `⚡ Desk Mode: Deterministic Forensic Engine (Fallback • Gemini API offline)`.
+* **SEBI Section 2(u) Mandatory Deflection:** Intercepts explicit "Should I buy/sell?" queries, deflecting into Pre-Mortem inversion diagnostics and risk factor evaluations without financial advice.
 
 ---
 

@@ -4184,6 +4184,10 @@ async def api_copilot_chat(payload: CopilotChatRequest, request: Request):
     deep_dive_unlocked = _deep_dive_unlocked_for_request(request, payload.ticker or "")
     trusted_user_id = web_user.get("id") if web_user else None
 
+    # Subscriber check for AI generative synthesis entitlement
+    tier = (web_user.get("subscription_tier") or "free").lower() if web_user else "free"
+    is_subscriber = tier in ("pro_monthly", "pro_annual") or "pro" in tier or _is_admin_authenticated(request)
+
     try:
         res = await process_forensic_desk_turn(
             conversation_id=payload.conversation_id,
@@ -4195,7 +4199,8 @@ async def api_copilot_chat(payload: CopilotChatRequest, request: Request):
             section_label=payload.section_label,
             section_data=payload.section_data,
             deep_dive_unlocked=deep_dive_unlocked,
-            unlock_checker=lambda kind, asset_id: _asset_unlocked_for_request(request, kind, asset_id)
+            unlock_checker=lambda kind, asset_id: _asset_unlocked_for_request(request, kind, asset_id),
+            is_subscriber=is_subscriber
         )
         return {"success": True, **res}
     except Exception as e:
