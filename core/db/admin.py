@@ -6,6 +6,7 @@ Dual-binding support for PostgreSQL (Supabase) and local SQLite.
 ==============================================================================
 """
 
+import os
 import uuid
 import json
 import logging
@@ -22,42 +23,148 @@ from core.db.connection import (
 logger = logging.getLogger("equity_research.core.db.admin")
 
 DEFAULT_OWNER_EMAIL = "lyndnpnto@gmail.com"
+AUTHORIZED_OWNER_EMAILS = {"lyndnpnto@gmail.com", "lyndonpinto@gmail.com"}
+
+STANDARD_ADMIN_COLUMNS = [
+    "id", "email", "role", "totp_secret", "totp_enabled",
+    "invited_by", "created_at", "updated_at", "last_login_at"
+]
 
 
-def _clean_dict_row(cursor, row: Any) -> Dict[str, Any]:
+def get_authorized_bootstrap_emails() -> set:
+    """Returns the set of hardcoded and environment-configured owner emails authorized to bootstrap access."""
+    bootstrap = {em.strip().lower() for em in AUTHORIZED_OWNER_EMAILS}
+    bootstrap.add(DEFAULT_OWNER_EMAIL.strip().lower())
+    env_admin = os.environ.get("ADMIN_EMAIL", "").strip().lower()
+    if env_admin:
+        bootstrap.add(env_admin)
+    env_owner = os.environ.get("OWNER_EMAIL", "").strip().lower()
+    if env_owner:
+        bootstrap.add(env_owner)
+    env_admins = os.environ.get("ADMIN_EMAILS", "")
+    if env_admins:
+        for em in env_admins.split(","):
+            clean = em.strip().lower()
+            if clean:
+                bootstrap.add(clean)
+    return bootstrap
+
+
+def _clean_dict_row(cursor, row: Any, fallback_cols: Optional[List[str]] = None) -> Dict[str, Any]:
     if not row:
         return {}
+    if isinstance(row, dict):
+        return dict(row)
+    if hasattr(row, "keys"):
+        try:
+            return dict(row)
+        except Exception:
+            pass
     if hasattr(cursor, "description") and cursor.description:
         cols = [d[0] for d in cursor.description]
         return dict(zip(cols, row))
+    cols = fallback_cols or STANDARD_ADMIN_COLUMNS
+    if cols and len(row) <= len(cols):
+        return dict(zip(cols[:len(row)], row))
     return {}
 
 
 def get_admin_user(email: str) -> Optional[Dict[str, Any]]:
-    """Retrieve administrator record by email (case-insensitive)."""
+    """Retrieve administrator record by email (case-insensitive) with guaranteed owner auto-bootstrap."""
     if not email:
         return None
-    init_db()
-    conn = get_db_connection()
-    cursor = conn.cursor()
-    placeholder = get_placeholder()
     clean_email = email.strip().lower()
+    placeholder = get_placeholder()
 
+    # 1. Attempt database lookup
     try:
-        cursor.execute(
-            f"SELECT * FROM admin_users WHERE LOWER(email) = LOWER({placeholder}) LIMIT 1;",
-            (clean_email,)
-        )
-        row = cursor.fetchone()
-        if row:
-            return _clean_dict_row(cursor, row)
-        return None
+        init_db()
+        conn = get_db_connection()
+        cursor = conn.cursor()
+        try:
+            cursor.execute(
+                f"SELECT * FROM admin_users WHERE LOWER(email) = LOWER({placeholder}) LIMIT 1;",
+                (clean_email,)
+            )
+            row = cursor.fetchone()
+            if row:
+                res = _clean_dict_row(cursor, row, STANDARD_ADMIN_COLUMNS)
+                if res and res.get("email"):
+                    return res
+        finally:
+            cursor.close()
+            conn.close()
     except Exception as e:
         logger.error(f"Error fetching admin user '{clean_email}': {e}")
-        return None
-    finally:
-        cursor.close()
-        conn.close()
+
+    # 2. Resilient Owner Auto-Bootstrap Fallback
+    # If the email matches the authorized owner/bootstrap whitelist, ensure the owner is NEVER locked out
+    bootstrap_emails = get_authorized_bootstrap_emails()
+    if clean_email in bootstrap_emails:
+        logger.info(f"Auto-bootstrapping authorized owner admin record for '{clean_email}'...")
+        admin_id = f"adm_owner_{clean_email.split('@')[0]}"
+        now_iso = datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M:%S")
+
+        # Attempt to persist/upsert into DB without destroying existing totp_secret
+        try:
+            conn = get_db_connection()
+            cursor = conn.cursor()
+            p = get_placeholder()
+            supabase_url = get_supabase_url()
+            try:
+                if supabase_url:
+                    cursor.execute(
+                        f"""
+                        INSERT INTO admin_users (id, email, role, totp_enabled, created_at, updated_at)
+                        VALUES ({p}, {p}, 'owner', FALSE, now(), now())
+                        ON CONFLICT (email) DO UPDATE SET role = 'owner';
+                        """,
+                        (admin_id, clean_email)
+                    )
+                else:
+                    cursor.execute(
+                        f"""
+                        INSERT OR IGNORE INTO admin_users (id, email, role, totp_enabled)
+                        VALUES ({p}, {p}, 'owner', 0);
+                        """,
+                        (admin_id, clean_email)
+                    )
+                    cursor.execute(
+                        f"UPDATE admin_users SET role = 'owner' WHERE LOWER(email) = LOWER({p});",
+                        (clean_email,)
+                    )
+                conn.commit()
+
+                # Re-fetch persisted record
+                cursor.execute(
+                    f"SELECT * FROM admin_users WHERE LOWER(email) = LOWER({p}) LIMIT 1;",
+                    (clean_email,)
+                )
+                r = cursor.fetchone()
+                if r:
+                    persisted_res = _clean_dict_row(cursor, r, STANDARD_ADMIN_COLUMNS)
+                    if persisted_res and persisted_res.get("email"):
+                        return persisted_res
+            finally:
+                cursor.close()
+                conn.close()
+        except Exception as persist_err:
+            logger.warning(f"Could not persist auto-bootstrapped admin '{clean_email}': {persist_err}")
+
+        # Return guaranteed in-memory owner record if DB insert or re-fetch failed
+        return {
+            "id": admin_id,
+            "email": clean_email,
+            "role": "owner",
+            "totp_secret": None,
+            "totp_enabled": 0,
+            "invited_by": None,
+            "created_at": now_iso,
+            "updated_at": now_iso,
+            "last_login_at": None,
+        }
+
+    return None
 
 
 def list_admin_users() -> List[Dict[str, Any]]:
@@ -139,7 +246,7 @@ def remove_admin_user(email: str, requesting_email: str) -> Tuple[bool, str]:
     if not target:
         return False, "Administrator not found."
 
-    if target.get("role") == "owner" and clean_email == DEFAULT_OWNER_EMAIL.lower():
+    if target.get("role") == "owner" and clean_email in get_authorized_bootstrap_emails():
         return False, "The root platform owner account cannot be deleted."
 
     if clean_email == clean_req:
@@ -178,7 +285,7 @@ def update_admin_role(email: str, new_role: str, requesting_email: str) -> Tuple
     if not target:
         return False, "Administrator not found."
 
-    if target.get("role") == "owner" and clean_email == DEFAULT_OWNER_EMAIL.lower() and clean_role != "owner":
+    if target.get("role") == "owner" and clean_email in get_authorized_bootstrap_emails() and clean_role != "owner":
         return False, "The root platform owner role cannot be downgraded."
 
     init_db()

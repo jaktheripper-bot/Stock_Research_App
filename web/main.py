@@ -2913,6 +2913,19 @@ async def public_auth_callback(
     next: Optional[str] = "/"
 ):
     """Processes Google OAuth callback for public users, sets session cookie and localStorage."""
+    # 0. Defensive OAuth query param error handling
+    oauth_err = request.query_params.get("error_description") or request.query_params.get("error")
+    if oauth_err:
+        clean_err = oauth_err.replace("+", " ")
+        logger.warning(f"Public Google OAuth redirect error received: {clean_err}")
+        return RedirectResponse(url=f"/?err={urllib.parse.quote(clean_err)}", status_code=303)
+
+    # If user already authenticated and visits callback without code/token, redirect to destination
+    current_user = get_current_user_from_request(request)
+    if current_user and not code and not access_token:
+        dest_url = next if (next and next != "/") else "/"
+        return RedirectResponse(url=dest_url, status_code=303)
+
     cfg = get_supabase_auth_config()
     sb_url = cfg.get("url")
     anon_key = cfg.get("anon_key") or os.environ.get("SUPABASE_SERVICE_ROLE_KEY", "")
@@ -2972,13 +2985,16 @@ async def public_auth_callback(
             if (window.location.hash) {{
                 const params = new URLSearchParams(window.location.hash.substring(1));
                 const token = params.get('access_token');
+                const err = params.get('error_description') || params.get('error');
                 if (token) {{
                     window.location.href = '/auth/callback?access_token=' + encodeURIComponent(token) + '&next=' + encodeURIComponent('{next or "/"}');
+                }} else if (err) {{
+                    window.location.href = '/?err=' + encodeURIComponent(err);
                 }} else {{
                     window.location.href = '/?err=Authentication+failed';
                 }}
             }} else {{
-                window.location.href = '/?err=Authentication+code+missing';
+                window.location.href = '/?err=Authentication+session+expired+or+cancelled';
             }}
             </script>
         </body></html>
@@ -4254,6 +4270,18 @@ async def admin_auth_callback(
     access_token: Optional[str] = None
 ):
     """Processes Google OAuth callback, verifies admin whitelist, and issues 2FA challenge."""
+    # 0. Defensive OAuth query param error handling
+    oauth_err = request.query_params.get("error_description") or request.query_params.get("error")
+    if oauth_err:
+        clean_err = oauth_err.replace("+", " ")
+        logger.warning(f"Admin Google OAuth redirect error received: {clean_err}")
+        return RedirectResponse(url=f"/admin?err={urllib.parse.quote(clean_err)}", status_code=303)
+
+    # If admin already authenticated and visits callback without code/token, return directly to dashboard
+    admin_session = _is_admin_authenticated(request)
+    if admin_session and not code and not access_token:
+        return RedirectResponse(url="/admin", status_code=303)
+
     cfg = get_supabase_auth_config()
     sb_url = cfg.get("url")
     anon_key = cfg.get("anon_key") or os.environ.get("SUPABASE_SERVICE_ROLE_KEY", "")
@@ -4307,13 +4335,16 @@ async def admin_auth_callback(
             if (window.location.hash) {
                 const params = new URLSearchParams(window.location.hash.substring(1));
                 const token = params.get('access_token');
+                const err = params.get('error_description') || params.get('error');
                 if (token) {
                     window.location.href = '/admin/auth/callback?access_token=' + encodeURIComponent(token);
+                } else if (err) {
+                    window.location.href = '/admin?err=' + encodeURIComponent(err);
                 } else {
                     window.location.href = '/admin?err=Authentication+failed:+no+token';
                 }
             } else {
-                window.location.href = '/admin?err=Authentication+code+missing';
+                window.location.href = '/admin?err=Authentication+session+expired+or+cancelled';
             }
             </script>
         </body></html>
@@ -4324,7 +4355,8 @@ async def admin_auth_callback(
     client_ip = request.headers.get("x-forwarded-for") or (request.client.host if request.client else "unknown")
     ua = request.headers.get("user-agent")
 
-    if not admin:
+    if not admin or not admin.get("email"):
+        logger.warning(f"Admin Google login rejected for '{clean_email}' (record: {admin})")
         record_admin_audit(
             clean_email,
             "unauthorized_admin_login_attempt",
@@ -4357,7 +4389,8 @@ async def admin_direct_verify(request: Request, email: str = Form(...)):
     client_ip = request.headers.get("x-forwarded-for") or (request.client.host if request.client else "unknown")
     ua = request.headers.get("user-agent")
 
-    if not admin:
+    if not admin or not admin.get("email"):
+        logger.warning(f"Admin direct verify rejected for '{clean_email}' (record: {admin})")
         record_admin_audit(
             clean_email,
             "unauthorized_admin_direct_attempt",

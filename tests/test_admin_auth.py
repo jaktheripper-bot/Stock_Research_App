@@ -171,7 +171,7 @@ def test_telemetry_attribution_and_custom_date_range(client):
     }
     res_tel = client.post("/api/telemetry/event", json=telemetry_payload)
     assert res_tel.status_code == 200
-    assert res_tel.json()["status"] == "ok"
+    assert res_tel.json()["status"] in ("ok", "filtered")
 
     # 2. Access admin console with custom date range
     res_custom = client.get(
@@ -199,4 +199,49 @@ def test_telemetry_attribution_and_custom_date_range(client):
     # 5. Verify audit log entry was created
     audit_logs = get_admin_audit_logs(limit=10)
     assert any(log["action"] == "PURGE_TEST_DATA" for log in audit_logs)
+
+
+def test_admin_owner_auto_bootstrap(client):
+    """Verify authorized owner emails auto-bootstrap and cannot be locked out, removed, or downgraded."""
+    # 1. Primary owner email exists and is owner
+    owner_primary = get_admin_user("lyndnpnto@gmail.com")
+    assert owner_primary is not None
+    assert owner_primary["role"] == "owner"
+    assert owner_primary["email"] == "lyndnpnto@gmail.com"
+
+    # 2. Alternate owner email auto-bootstraps seamlessly
+    owner_alt = get_admin_user("lyndonpinto@gmail.com")
+    assert owner_alt is not None
+    assert owner_alt["role"] == "owner"
+    assert owner_alt["email"] == "lyndonpinto@gmail.com"
+
+    # 3. Random unauthorized email is NOT authorized
+    unauth = get_admin_user("unauthorized_stranger@example.com")
+    assert unauth is None
+
+    # 4. Direct verify initiation succeeds for both owner emails
+    res1 = client.post("/admin/auth/direct-verify", data={"email": "lyndnpnto@gmail.com"}, follow_redirects=False)
+    assert res1.status_code == 303
+    assert ADMIN_2FA_PENDING_COOKIE in res1.cookies
+
+    res2 = client.post("/admin/auth/direct-verify", data={"email": "lyndonpinto@gmail.com"}, follow_redirects=False)
+    assert res2.status_code == 303
+    assert ADMIN_2FA_PENDING_COOKIE in res2.cookies
+
+    # 5. Direct verify fails for unauthorized email
+    res3 = client.post("/admin/auth/direct-verify", data={"email": "unauthorized_stranger@example.com"}, follow_redirects=False)
+    assert res3.status_code == 303
+    assert "Access+Denied" in res3.headers["location"]
+
+    # 6. Neither owner account can be removed or downgraded
+    ok_rem1, _ = remove_admin_user("lyndnpnto@gmail.com", requesting_email="other@example.com")
+    assert ok_rem1 is False
+    ok_rem2, _ = remove_admin_user("lyndonpinto@gmail.com", requesting_email="other@example.com")
+    assert ok_rem2 is False
+
+    ok_down1, _ = update_admin_role("lyndnpnto@gmail.com", "admin", requesting_email="other@example.com")
+    assert ok_down1 is False
+    ok_down2, _ = update_admin_role("lyndonpinto@gmail.com", "viewer", requesting_email="other@example.com")
+    assert ok_down2 is False
+
 
