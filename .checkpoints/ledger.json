@@ -974,5 +974,21 @@
       "revision_count": 244
     },
     "preflight_passed": true
+  },
+  {
+    "tag": "checkpoint_20261012_200528_checkpoint_20261012_200500_public_oauth_callback_nameerror_and_root_code_forwarder",
+    "timestamp": "2026-10-12 20:05:28 IST",
+    "commit_sha": "9a52c23bd86ea714a5f0b17c89dc241f24504b98",
+    "branch": "main",
+    "description": "checkpoint_20261012_200500_public_oauth_callback_nameerror_and_root_code_forwarder",
+    "database": {
+      "exists": true,
+      "filename": "reports_checkpoint_20261012_200528_checkpoint_20261012_200500_public_oauth_callback_nameerror_and_root_code_forwarder.db",
+      "path": ".checkpoints/reports_checkpoint_20261012_200528_checkpoint_20261012_200500_public_oauth_callback_nameerror_and_root_code_forwarder.db",
+      "size_bytes": 7651328,
+      "report_count": 143,
+      "revision_count": 244
+    },
+    "preflight_passed": true
   }
 ]

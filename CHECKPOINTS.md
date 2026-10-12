@@ -10,7 +10,7 @@
 
 | Checkpoint Tag | IST Timestamp | Commit | DB Reports | Description |
 |:---|:---|:---|:---|:---|
-| `checkpoint_20261012_200528_checkpoint_20261012_200500_public_oauth_callback_nameerror_and_root_code_forwarder` | 2026-10-12 20:05:28 IST | `9c773e6` | 143 rep / 244 rev | checkpoint_20261012_200500_public_oauth_callback_nameerror_and_root_code_forwarder |
+| `checkpoint_20261012_200528_checkpoint_20261012_200500_public_oauth_callback_nameerror_and_root_code_forwarder` | 2026-10-12 20:05:28 IST | `9a52c23` | 143 rep / 244 rev | checkpoint_20261012_200500_public_oauth_callback_nameerror_and_root_code_forwarder |
 | `checkpoint_20261012_190357_checkpoint_20261012_190500_admin_auth_autobootstrap_and_oauth_error_defensive_guard` | 2026-10-12 19:03:57 IST | `8e6dc25` | 143 rep / 244 rev | checkpoint_20261012_190500_admin_auth_autobootstrap_and_oauth_error_defensive_guard |
 | `checkpoint_20261012_001527_all_equities_institutional_directory` | 2026-10-12 00:15:27 IST | `3e29e7e` | 143 rep / 244 rev | all_equities_institutional_directory |
 | `checkpoint_20261011_234536` | 2026-10-11 23:45:36 IST | `acbc4ee` | 143 rep / 244 rev | Production Release Checkpoint |
