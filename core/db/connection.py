@@ -15,10 +15,12 @@ _DB_INIT_LOCK = threading.Lock()
 
 _CACHED_SUPABASE_URL = None
 _SUPABASE_URL_RESOLVED = False
+_PG_AVAILABLE = None  # None = untested, True = alive, False = failed
+_PG_LAST_FAIL = 0.0
+_PG_FAIL_COOLDOWN = 60.0  # retry failed postgres after 60s cooldown
 
-def get_supabase_url() -> str | None:
-    """Returns configured Supabase DB URL, cached in memory after first resolution.
-    Always returns None during automated unit testing to prevent test pollution of production PostgreSQL."""
+def get_configured_supabase_url() -> str | None:
+    """Returns configured Supabase DB URL from secrets or environment, or None in unit tests."""
     if os.environ.get("TESTING") == "1" and os.environ.get("TEST_SUPABASE") != "1":
         return None
     global _CACHED_SUPABASE_URL, _SUPABASE_URL_RESOLVED
@@ -28,9 +30,69 @@ def get_supabase_url() -> str | None:
         _SUPABASE_URL_RESOLVED = True
     return _CACHED_SUPABASE_URL
 
+def is_postgres_active() -> bool:
+    """Returns True if PostgreSQL is configured and active, False if fallen back to SQLite."""
+    global _PG_AVAILABLE, _PG_LAST_FAIL
+    raw_url = get_configured_supabase_url()
+    if not raw_url:
+        return False
+    if _PG_AVAILABLE is False:
+        import time
+        if time.time() - _PG_LAST_FAIL < _PG_FAIL_COOLDOWN:
+            return False
+        _PG_AVAILABLE = None  # Cooldown passed, allow retry
+    return True
+
+def get_supabase_url() -> str | None:
+    """Returns active Supabase DB URL if PostgreSQL is reachable, None if running on SQLite fallback."""
+    raw_url = get_configured_supabase_url()
+    if not raw_url or not is_postgres_active():
+        return None
+    return raw_url
+
 def get_placeholder() -> str:
     """Returns '%s' for PostgreSQL/Supabase or '?' for SQLite."""
     return "%s" if get_supabase_url() else "?"
+
+def is_postgres_connection(conn) -> bool:
+    """Returns True if the connection is an active PostgreSQL connection, False for SQLite."""
+    if conn is None:
+        return False
+    try:
+        import sqlite3
+        if isinstance(conn, sqlite3.Connection):
+            return False
+    except Exception:
+        pass
+    if hasattr(conn, "_conn"):
+        try:
+            import sqlite3
+            if isinstance(conn._conn, sqlite3.Connection):
+                return False
+        except Exception:
+            pass
+    # Must have cursor that supports mogrify (psycopg2 specific)
+    try:
+        cur = conn.cursor()
+        has_pg = hasattr(cur, "mogrify")
+        try:
+            cur.close()
+        except Exception:
+            pass
+        return has_pg
+    except Exception:
+        return False
+
+def _normalize_pg_dsn(dsn: str) -> str:
+    """Ensures sslmode=require for cloud Postgres hosts if not specified."""
+    if not dsn or not isinstance(dsn, str):
+        return dsn
+    dsn = dsn.strip()
+    cloud_hosts = ("supabase.co", "supabase.com", "neon.tech", "render.com", "aws.com")
+    if any(h in dsn for h in cloud_hosts) and "sslmode=" not in dsn:
+        sep = "&" if "?" in dsn else "?"
+        dsn = f"{dsn}{sep}sslmode=require"
+    return dsn
 
 class _PooledConnectionProxy:
     """Proxy wrapper around a psycopg2 connection checked out from ThreadedConnectionPool.
@@ -85,6 +147,7 @@ def _get_pg_pool(dsn: str):
                     keepalives_idle=30,
                     keepalives_interval=10,
                     keepalives_count=5,
+                    connect_timeout=10,
                 )
     return _PG_POOLS[dsn]
 
@@ -109,8 +172,8 @@ def _acquire_connection_from_pool(pool):
                 except Exception as e:
                     logger.debug(f"Connection pool retry putconn notice: {e}")
     import psycopg2
-    supabase_url = get_supabase_url()
-    return psycopg2.connect(supabase_url)
+    supabase_url = get_configured_supabase_url()
+    return psycopg2.connect(_normalize_pg_dsn(supabase_url), connect_timeout=10)
 
 def get_db_path() -> str:
     """Returns the SQLite database path based on environment."""
@@ -119,20 +182,40 @@ def get_db_path() -> str:
     return os.environ.get("DB_PATH", "reports.db")
 
 def _get_raw_connection():
-    """Returns an unwrapped direct PostgreSQL or SQLite connection."""
-    supabase_url = get_supabase_url()
-    if supabase_url:
+    """Returns an unwrapped direct PostgreSQL or SQLite connection with automatic dual-binding failover."""
+    global _PG_AVAILABLE, _PG_LAST_FAIL
+    raw_url = get_configured_supabase_url()
+
+    can_try_pg = bool(raw_url)
+    if _PG_AVAILABLE is False:
+        import time
+        if time.time() - _PG_LAST_FAIL < _PG_FAIL_COOLDOWN:
+            can_try_pg = False
+        else:
+            _PG_AVAILABLE = None  # Cooldown passed; retry PG
+
+    if can_try_pg:
+        norm_url = _normalize_pg_dsn(raw_url)
         try:
-            pool = _get_pg_pool(supabase_url)
+            pool = _get_pg_pool(norm_url)
             raw_conn = _acquire_connection_from_pool(pool)
+            _PG_AVAILABLE = True
             return _PooledConnectionProxy(pool, raw_conn)
         except Exception as e:
-            logger.debug(f"Pooled connection acquisition notice: {e}")
+            logger.warning(f"Pooled PostgreSQL connection failed: {e}. Attempting direct fallback...")
             try:
                 import psycopg2
-                return psycopg2.connect(supabase_url)
+                direct_conn = psycopg2.connect(norm_url, connect_timeout=10)
+                _PG_AVAILABLE = True
+                return direct_conn
             except Exception as direct_err:
-                logger.debug(f"Direct psycopg2 fallback notice: {direct_err}")
+                import time
+                _PG_AVAILABLE = False
+                _PG_LAST_FAIL = time.time()
+                logger.warning(
+                    f"Direct PostgreSQL fallback failed: {direct_err}. "
+                    f"Transparently failing over to local SQLite database ({get_db_path()})."
+                )
 
     import sqlite3
     db_path = get_db_path()
@@ -146,8 +229,8 @@ def _get_raw_connection():
 
 def get_db_connection():
     """Returns a pooled PostgreSQL connection or WAL-mode SQLite fallback connection."""
-    supabase_url = get_supabase_url()
-    target_key = supabase_url if supabase_url else get_db_path()
+    raw_url = get_configured_supabase_url()
+    target_key = "postgres" if (raw_url and is_postgres_active()) else get_db_path()
 
     if target_key not in _INITIALIZED_DBS:
         init_db()
@@ -155,19 +238,29 @@ def get_db_connection():
     return _get_raw_connection()
 
 def init_db(force: bool = False):
-    """Initializes tables and executes incremental schema migrations (v001 - v019)."""
+    """Initializes tables and executes incremental schema migrations (v001 - v027)."""
     global _DB_INITIALIZED, _INITIALIZED_DBS
-    supabase_url = get_supabase_url()
-    target_key = supabase_url if supabase_url else get_db_path()
+
+    conn = _get_raw_connection()
+    is_pg = is_postgres_connection(conn)
+    supabase_url = get_configured_supabase_url() if is_pg else None
+    target_key = "postgres" if is_pg else get_db_path()
 
     if (target_key in _INITIALIZED_DBS) and not force:
+        try:
+            conn.close()
+        except Exception:
+            pass
         return
 
     with _DB_INIT_LOCK:
         if (target_key in _INITIALIZED_DBS) and not force:
+            try:
+                conn.close()
+            except Exception:
+                pass
             return
 
-        conn = _get_raw_connection()
         cursor = conn.cursor()
 
         try:
@@ -674,6 +767,9 @@ def init_db(force: bool = False):
                     ''')
                     cursor.execute('CREATE INDEX IF NOT EXISTS idx_support_tickets_status ON support_tickets (status, created_at DESC);')
                     cursor.execute('CREATE INDEX IF NOT EXISTS idx_support_tickets_email ON support_tickets (user_email);')
+                    cursor.execute("INSERT OR IGNORE INTO schema_migrations (version) VALUES ('v009_support_tickets_and_feedback');")
+                conn.commit()
+
             # Migration v010: User Usage Attribution & Billables Audit Ledger
             if "v010_user_usage_and_billables_audit" not in applied:
                 logger.info("Applying schema migration: v010_user_usage_and_billables_audit...")

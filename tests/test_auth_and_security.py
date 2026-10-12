@@ -471,6 +471,87 @@ class TestRenderHardening(unittest.TestCase):
         self.assertEqual(r_authed.headers.get("location"), "/opportunities")
 
 
+# ==============================================================================
+# 5. Database Dual-Binding & SQLite Transparent Failover
+# ==============================================================================
+class TestDatabaseDualBindingFailover(unittest.TestCase):
+    def test_init_db_transparent_sqlite_failover_when_postgres_unreachable(self):
+        """Verifies that when SUPABASE_DB_URL is set to an unreachable host, init_db()
+        transparently falls back to SQLite without raising 'near EXISTS: syntax error'."""
+        import tempfile
+        import sqlite3
+        from core.db.connection import (
+            init_db,
+            is_postgres_connection,
+            get_placeholder,
+            _PG_AVAILABLE,
+        )
+        import core.db.connection as conn_mod
+
+        # Create temporary clean SQLite database file
+        with tempfile.NamedTemporaryFile(suffix=".db", delete=False) as tf:
+            temp_db_path = tf.name
+
+        old_testing = os.environ.pop("TESTING", None)
+        old_test_sb = os.environ.pop("TEST_SUPABASE", None)
+        old_sb_url = os.environ.get("SUPABASE_DB_URL")
+        old_db_path = os.environ.get("DB_PATH")
+
+        try:
+            # Point to unreachable PostgreSQL URL and fresh SQLite path
+            os.environ["SUPABASE_DB_URL"] = "postgresql://invalid_user:invalid_pass@127.0.0.1:5432/invalid_db"
+            os.environ["DB_PATH"] = temp_db_path
+            conn_mod._CACHED_SUPABASE_URL = "postgresql://invalid_user:invalid_pass@127.0.0.1:5432/invalid_db"
+            conn_mod._SUPABASE_URL_RESOLVED = True
+            conn_mod._PG_AVAILABLE = None  # Reset availability state
+
+            # Test connection inspector on pure SQLite connection
+            s_conn = sqlite3.connect(":memory:")
+            self.assertFalse(is_postgres_connection(s_conn))
+            s_conn.close()
+
+            # Execute init_db(force=True) on fresh database - MUST NOT raise OperationalError
+            init_db(force=True)
+
+            # Placeholder must be '?' for SQLite, not '%s'
+            self.assertEqual(get_placeholder(), "?")
+
+            # Verify that all 27 migrations successfully created core tables in SQLite
+            verify_conn = sqlite3.connect(temp_db_path)
+            cursor = verify_conn.cursor()
+            cursor.execute("SELECT count(*) FROM schema_migrations;")
+            migration_count = cursor.fetchone()[0]
+            self.assertGreaterEqual(migration_count, 27)
+
+            # Verify reports table exists and has baseline columns
+            cursor.execute("PRAGMA table_info(reports);")
+            columns = [c[1] for c in cursor.fetchall()]
+            self.assertIn("baseline_price", columns)
+            self.assertIn("baseline_pe", columns)
+            self.assertIn("baseline_mcap", columns)
+            self.assertIn("latest_announcement", columns)
+            verify_conn.close()
+        finally:
+            if old_testing is not None:
+                os.environ["TESTING"] = old_testing
+            if old_test_sb is not None:
+                os.environ["TEST_SUPABASE"] = old_test_sb
+            if old_sb_url is not None:
+                os.environ["SUPABASE_DB_URL"] = old_sb_url
+            else:
+                os.environ.pop("SUPABASE_DB_URL", None)
+            if old_db_path is not None:
+                os.environ["DB_PATH"] = old_db_path
+            else:
+                os.environ.pop("DB_PATH", None)
+            conn_mod._CACHED_SUPABASE_URL = None
+            conn_mod._SUPABASE_URL_RESOLVED = False
+            conn_mod._PG_AVAILABLE = None
+            if os.path.exists(temp_db_path):
+                os.remove(temp_db_path)
+
+
 if __name__ == "__main__":
     unittest.main()
+
 
