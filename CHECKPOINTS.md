@@ -1,6 +1,6 @@
 # Production Release Checkpoints & Disaster Recovery Ledger
-**Last Checkpoint:** 2026-10-12 20:05:28 IST  
-**Total Verified Rollback Points:** 62  
+**Last Checkpoint:** 2026-10-12 20:09:12 IST  
+**Total Verified Rollback Points:** 63  
 
 > [!NOTE]
 > These checkpoints represent byte-for-byte verified working releases that passed the 4-tier pre-flight audit.
@@ -10,6 +10,7 @@
 
 | Checkpoint Tag | IST Timestamp | Commit | DB Reports | Description |
 |:---|:---|:---|:---|:---|
+| `checkpoint_20261012_200912_checkpoint_20261012_201000_vestfolio_app_domain_whitelisting_and_canonical_routing` | 2026-10-12 20:09:12 IST | `22c398a` | 143 rep / 244 rev | checkpoint_20261012_201000_vestfolio_app_domain_whitelisting_and_canonical_routing |
 | `checkpoint_20261012_200528_checkpoint_20261012_200500_public_oauth_callback_nameerror_and_root_code_forwarder` | 2026-10-12 20:05:28 IST | `9a52c23` | 143 rep / 244 rev | checkpoint_20261012_200500_public_oauth_callback_nameerror_and_root_code_forwarder |
 | `checkpoint_20261012_190357_checkpoint_20261012_190500_admin_auth_autobootstrap_and_oauth_error_defensive_guard` | 2026-10-12 19:03:57 IST | `8e6dc25` | 143 rep / 244 rev | checkpoint_20261012_190500_admin_auth_autobootstrap_and_oauth_error_defensive_guard |
 | `checkpoint_20261012_001527_all_equities_institutional_directory` | 2026-10-12 00:15:27 IST | `3e29e7e` | 143 rep / 244 rev | all_equities_institutional_directory |
