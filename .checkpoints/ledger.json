@@ -990,5 +990,21 @@
       "revision_count": 244
     },
     "preflight_passed": true
+  },
+  {
+    "tag": "checkpoint_20261012_200912_checkpoint_20261012_201000_vestfolio_app_domain_whitelisting_and_canonical_routing",
+    "timestamp": "2026-10-12 20:09:12 IST",
+    "commit_sha": "f7f6df6c2ed1f226a73c454f07a649e3c10cae79",
+    "branch": "main",
+    "description": "checkpoint_20261012_201000_vestfolio_app_domain_whitelisting_and_canonical_routing",
+    "database": {
+      "exists": true,
+      "filename": "reports_checkpoint_20261012_200912_checkpoint_20261012_201000_vestfolio_app_domain_whitelisting_and_canonical_routing.db",
+      "path": ".checkpoints/reports_checkpoint_20261012_200912_checkpoint_20261012_201000_vestfolio_app_domain_whitelisting_and_canonical_routing.db",
+      "size_bytes": 7651328,
+      "report_count": 143,
+      "revision_count": 244
+    },
+    "preflight_passed": true
   }
 ]
