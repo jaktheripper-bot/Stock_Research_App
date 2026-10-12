@@ -430,6 +430,47 @@ class TestRenderHardening(unittest.TestCase):
             oauth_url = get_google_oauth_url()
             self.assertIn("redirect_to=https://vestnomics.app/auth/callback", oauth_url)
 
+    def test_public_auth_callback_token_exchange_and_root_code_forwarder(self):
+        import base64
+        import json
+        client = TestClient(app)
+
+        # 1. Root code forwarder forwards ?code=... to /auth/callback?code=...
+        r_root_code = client.get("/?code=sb-test-code-999", follow_redirects=False)
+        self.assertEqual(r_root_code.status_code, 303)
+        self.assertIn("/auth/callback?code=sb-test-code-999", r_root_code.headers.get("location", ""))
+
+        # 2. Public auth callback without code/token returns client-side hash handler HTML
+        r_empty = client.get("/auth/callback", follow_redirects=False)
+        self.assertEqual(r_empty.status_code, 200)
+        self.assertIn("Verifying Identity...", r_empty.text)
+
+        # 3. Defensive error param handling redirects to /?err=...
+        r_err = client.get("/auth/callback?error=access_denied&error_description=User+cancelled+flow", follow_redirects=False)
+        self.assertEqual(r_err.status_code, 303)
+        self.assertIn("/?err=User%20cancelled%20flow", r_err.headers.get("location", ""))
+
+        # 4. Public auth callback with access_token successfully sets session cookie and localStorage
+        payload = base64.urlsafe_b64encode(json.dumps({
+            "email": "verified_oauth_user@example.com",
+            "user_metadata": {"full_name": "Verified User"}
+        }).encode()).decode().rstrip("=")
+        jwt_token = f"header.{payload}.sig"
+
+        r_token = client.get(f"/auth/callback?access_token={jwt_token}", follow_redirects=False)
+        self.assertEqual(r_token.status_code, 200)
+        self.assertIn("Welcome, Verified User!", r_token.text)
+        self.assertIn("localStorage.setItem('sr_user'", r_token.text)
+        set_cookies = r_token.headers.get_list("set-cookie")
+        self.assertTrue(any("user_session_token=" in c for c in set_cookies))
+
+        # 5. Already authenticated user visiting callback without tokens redirects to destination
+        token_str = [c for c in set_cookies if "user_session_token=" in c][0].split(";", 1)[0].split("=", 1)[1]
+        r_authed = client.get("/auth/callback?next=/opportunities", cookies={"user_session_token": token_str}, follow_redirects=False)
+        self.assertEqual(r_authed.status_code, 303)
+        self.assertEqual(r_authed.headers.get("location"), "/opportunities")
+
 
 if __name__ == "__main__":
     unittest.main()
+

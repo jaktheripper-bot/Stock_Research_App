@@ -632,6 +632,10 @@ def _can_access_today_discovery(request: Request, user: Optional[Dict[str, Any]]
 @app.get("/", response_class=HTMLResponse)
 def home_page(request: Request):
     """Public home & landing page with live stock search, discovery reel, and featured dossiers."""
+    code = request.query_params.get("code")
+    if code:
+        return RedirectResponse(url=f"/auth/callback?code={urllib.parse.quote(code)}", status_code=303)
+
     try:
         archives = get_archived_reports_sync()
     except Exception as e:
@@ -2921,7 +2925,7 @@ async def public_auth_callback(
         return RedirectResponse(url=f"/?err={urllib.parse.quote(clean_err)}", status_code=303)
 
     # If user already authenticated and visits callback without code/token, redirect to destination
-    current_user = get_current_user_from_request(request)
+    current_user = _get_current_web_user(request)
     if current_user and not code and not access_token:
         dest_url = next if (next and next != "/") else "/"
         return RedirectResponse(url=dest_url, status_code=303)

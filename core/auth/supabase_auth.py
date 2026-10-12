@@ -47,7 +47,7 @@ def get_supabase_auth_config() -> Dict[str, str]:
             project_ref = match.group(1)
             supabase_url = f"https://{project_ref}.supabase.co"
 
-    anon_key = get_secret("SUPABASE_ANON_KEY")
+    anon_key = get_secret("SUPABASE_ANON_KEY") or get_secret("SUPABASE_SERVICE_ROLE_KEY") or os.environ.get("SUPABASE_SERVICE_ROLE_KEY") or ""
 
     return {
         "url": (supabase_url or "").rstrip("/"),
