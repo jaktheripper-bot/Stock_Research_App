@@ -229,6 +229,9 @@ def tool_scan_prohibited_terms() -> Dict[str, Any]:
         (r"support@vestnomics\.app", "Hallucinated public email support@vestnomics.app"),
         (r"grievance@vestnomics\.app", "Hallucinated public email grievance@vestnomics.app"),
         (r"privacy@vestnomics\.app", "Hallucinated public email privacy@vestnomics.app"),
+        (r"support@vestfolio\.app", "Hallucinated public email support@vestfolio.app"),
+        (r"grievance@vestfolio\.app", "Hallucinated public email grievance@vestfolio.app"),
+        (r"privacy@vestfolio\.app", "Hallucinated public email privacy@vestfolio.app"),
         (r"\+91\s*98450", "Hallucinated telephone/hotline"),
         (r"placeholder=[\"'].*Lyndon.*[\"']", "Author personal name leakage in UI placeholder"),
     ]

@@ -140,6 +140,8 @@ class TestVestnomicsDomainConfig(unittest.TestCase):
     def test_allowed_origin_hosts_includes_vestnomics(self):
         self.assertIn("vestnomics.app", ALLOWED_ORIGIN_HOSTS)
         self.assertIn("www.vestnomics.app", ALLOWED_ORIGIN_HOSTS)
+        self.assertIn("vestfolio.app", ALLOWED_ORIGIN_HOSTS)
+        self.assertIn("www.vestfolio.app", ALLOWED_ORIGIN_HOSTS)
 
     def test_validate_request_origin_with_vestnomics(self):
         scope_root = {

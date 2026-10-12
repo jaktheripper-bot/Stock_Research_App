@@ -2654,6 +2654,8 @@ ALLOWED_ORIGIN_HOSTS = {
     "localhost",
     "127.0.0.1",
     "testserver",
+    "vestfolio.app",
+    "www.vestfolio.app",
     "vestnomics.app",
     "www.vestnomics.app",
     "stockresearch.app",

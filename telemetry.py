@@ -183,7 +183,7 @@ def parse_traffic_source(referrer: str, query_params: dict) -> tuple:
 
     ref_lower = referrer.lower()
     # Filter self-referential navigations (internal links within the app)
-    if any(self_host in ref_lower for self_host in ("stock-research-app", "onrender.com", "localhost", "127.0.0.1", "vestnomics", "vestnomics.app", "stockresearch.app")):
+    if any(self_host in ref_lower for self_host in ("stock-research-app", "onrender.com", "localhost", "127.0.0.1", "vestfolio", "vestfolio.app", "vestnomics", "vestnomics.app", "stockresearch.app")):
         return "Direct / Bookmark", "Direct"
 
     # AI answer engines first: gemini.google.com would otherwise match the generic Google rule
