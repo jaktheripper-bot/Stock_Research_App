@@ -942,5 +942,37 @@
       "revision_count": 244
     },
     "preflight_passed": true
+  },
+  {
+    "tag": "checkpoint_20261012_001527_all_equities_institutional_directory",
+    "timestamp": "2026-10-12 00:15:27 IST",
+    "commit_sha": "3e29e7eadc7de610a98b9dfd96ecb059d26f6d02",
+    "branch": "main",
+    "description": "all_equities_institutional_directory",
+    "database": {
+      "exists": true,
+      "filename": "reports_checkpoint_20261012_001527_all_equities_institutional_directory.db",
+      "path": ".checkpoints/reports_checkpoint_20261012_001527_all_equities_institutional_directory.db",
+      "size_bytes": 7614464,
+      "report_count": 143,
+      "revision_count": 244
+    },
+    "preflight_passed": true
+  },
+  {
+    "tag": "checkpoint_20261012_190357_checkpoint_20261012_190500_admin_auth_autobootstrap_and_oauth_error_defensive_guard",
+    "timestamp": "2026-10-12 19:03:57 IST",
+    "commit_sha": "8e6dc25d0323ec97ce1716f452f20a45db73a696",
+    "branch": "main",
+    "description": "checkpoint_20261012_190500_admin_auth_autobootstrap_and_oauth_error_defensive_guard",
+    "database": {
+      "exists": true,
+      "filename": "reports_checkpoint_20261012_190357_checkpoint_20261012_190500_admin_auth_autobootstrap_and_oauth_error_defensive_guard.db",
+      "path": ".checkpoints/reports_checkpoint_20261012_190357_checkpoint_20261012_190500_admin_auth_autobootstrap_and_oauth_error_defensive_guard.db",
+      "size_bytes": 7639040,
+      "report_count": 143,
+      "revision_count": 244
+    },
+    "preflight_passed": true
   }
 ]
