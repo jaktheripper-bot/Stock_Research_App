@@ -274,13 +274,12 @@ sequenceDiagram
 ### Process Flow 4: Pre-Commit & Checkpoint Verification Gate
 ```mermaid
 flowchart TD
-    Start([Developer / Agent Prepares Commit]) --> Step1[Run ./run.sh backup]
-    Step1 --> Step2[Run Unit Tests: python3 -m unittest discover -s tests]
-    Step2 --> TestDecision{All 279 Tests Pass?}
-    TestDecision -- No --> FixErrors[Debug & Fix Engine Vulnerabilities] --> Step2
-    TestDecision -- Yes --> Step3[Execute git commit]
-    Step3 --> Step4[Run ./run.sh backup post-commit]
-    Step4 --> Step5[Run ./run.sh checkpoint]
+    Start([Developer / Agent Prepares Commit]) --> Step1[Run Unit Tests: python3 -m unittest discover -s tests]
+    Step1 --> TestDecision{All Tests Pass?}
+    TestDecision -- No --> FixErrors[Debug & Fix Engine Vulnerabilities] --> Step1
+    TestDecision -- Yes --> Step2[Execute git commit]
+    Step2 --> Step3[Run ./run.sh backup - Single Post-Commit Backup]
+    Step3 --> Step4[Run ./run.sh checkpoint]
     Step5 --> Step6[Freeze SQLite DB to .checkpoints/]
     Step6 --> Step7[Create Annotated Git Tag]
     Step7 --> Step8[Sync dev branch with main]

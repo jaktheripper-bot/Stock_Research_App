@@ -1,13 +1,13 @@
 # Workspace Directives & Agent Rules
 
 ## 1. Mandatory Backup Protocol
-**Always create a backup BEFORE and AFTER committing changes.**
+**Create exactly ONE backup AFTER committing changes.**
 
 - **Pre-Commit:**
-  - Execute `./run.sh backup` (which tars `web/` and `reports.db` to `backups/<TIMESTAMP>/`).
   - Verify that tests pass (`python3 -m unittest discover -s tests`).
+  - Do NOT create a pre-commit backup.
 - **Post-Commit:**
-  - Immediately execute `./run.sh backup` to archive the new state.
+  - Immediately execute exactly one backup via `./run.sh backup` (which tars `web/` and `reports.db` to `backups/<TIMESTAMP>/`) to archive the newly committed state.
   - Sync with local tracking branches / checkpoints (`./run.sh checkpoint` or sync to `dev`).
   - Push commit to remote `origin` to secure work in cloud storage.
 
