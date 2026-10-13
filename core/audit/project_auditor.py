@@ -35,6 +35,61 @@ try:
     ANTIGRAVITY_AVAILABLE = True
 except ImportError:
     ANTIGRAVITY_AVAILABLE = False
+    types = None
+
+from core.brand.moatnomics_house import get_system_prompt_context, MOATNOMICS_BRAND_HOUSE
+
+if ANTIGRAVITY_AVAILABLE and hasattr(types, "SubagentConfig"):
+    moatnomics_strategy_subagent = types.SubagentConfig(
+        name="moatnomics_brand_auditor",
+        description="Audits all website copy, UI templates, and AI prompts to ensure strict adherence to the Moatnomics Dual-Mandate Brand House and SEBI Safe Harbor regulations.",
+        capabilities=types.SubagentCapabilities(
+            enabled_tools=[
+                types.BuiltinTools.VIEW_FILE,
+                types.BuiltinTools.SEARCH_DIR,
+            ],
+            agent_behavior=types.AgentBehavior.AUTONOMOUS,
+        ),
+        system_instructions=f"""
+    You are the Chief Brand & Strategy Auditor for {MOATNOMICS_BRAND_HOUSE['brand_name']}.
+    {get_system_prompt_context()}
+    
+    Your Job:
+    1. Scan HTML templates (`web/templates/`) and UI copy.
+    2. Ensure the "Dual-Mandate" (protecting the user from bias AND the asset from competitors) is clearly communicated in feature descriptions.
+    3. Flag any copy that sounds like a "Broker" (gamified, hyped) or violates SEBI Safe Harbor.
+    4. FATAL ERROR: Flag the use of any forbidden words: {json.dumps(MOATNOMICS_BRAND_HOUSE['forbidden_vocabulary'])}.
+    5. Ensure features are named strictly following the Branded House taxonomy (e.g., 'Moatnomics Copilot', 'Moatnomics Funds').
+    
+    If you detect violations, output the exact file path, line number, and a suggested rewrite that aligns with the Moatnomics Dual-Mandate.
+    """
+    )
+else:
+    @dataclass
+    class _FallbackSubagentConfig:
+        name: str
+        description: str
+        capabilities: Any
+        system_instructions: str
+
+    moatnomics_strategy_subagent = _FallbackSubagentConfig(
+        name="moatnomics_brand_auditor",
+        description="Audits all website copy, UI templates, and AI prompts to ensure strict adherence to the Moatnomics Dual-Mandate Brand House and SEBI Safe Harbor regulations.",
+        capabilities=None,
+        system_instructions=f"""
+    You are the Chief Brand & Strategy Auditor for {MOATNOMICS_BRAND_HOUSE['brand_name']}.
+    {get_system_prompt_context()}
+    
+    Your Job:
+    1. Scan HTML templates (`web/templates/`) and UI copy.
+    2. Ensure the "Dual-Mandate" (protecting the user from bias AND the asset from competitors) is clearly communicated in feature descriptions.
+    3. Flag any copy that sounds like a "Broker" (gamified, hyped) or violates SEBI Safe Harbor.
+    4. FATAL ERROR: Flag the use of any forbidden words: {json.dumps(MOATNOMICS_BRAND_HOUSE['forbidden_vocabulary'])}.
+    5. Ensure features are named strictly following the Branded House taxonomy (e.g., 'Moatnomics Copilot', 'Moatnomics Funds').
+    
+    If you detect violations, output the exact file path, line number, and a suggested rewrite that aligns with the Moatnomics Dual-Mandate.
+    """
+    )
 
 from core.audit.tools import (
     tool_run_test_suite,

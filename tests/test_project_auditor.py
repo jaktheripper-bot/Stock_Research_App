@@ -324,5 +324,21 @@ class TestAiAuditorEngine(unittest.TestCase):
                 report_file.unlink()
 
 
+class TestMoatnomicsBrandAuditorSubagent(unittest.TestCase):
+    """Verifies the Moatnomics Chief Brand & Strategy Auditor Subagent configuration."""
+
+    def test_subagent_configuration_and_instructions(self):
+        from core.audit import moatnomics_strategy_subagent
+        self.assertIsNotNone(moatnomics_strategy_subagent)
+        self.assertEqual(moatnomics_strategy_subagent.name, "moatnomics_brand_auditor")
+        self.assertIn("Moatnomics Dual-Mandate", moatnomics_strategy_subagent.description)
+        self.assertIn("SEBI Safe Harbor", moatnomics_strategy_subagent.description)
+        self.assertIn("Chief Brand & Strategy Auditor for Moatnomics", moatnomics_strategy_subagent.system_instructions)
+        self.assertIn("Dual-Mandate", moatnomics_strategy_subagent.system_instructions)
+        self.assertIn("FATAL ERROR: Flag the use of any forbidden words", moatnomics_strategy_subagent.system_instructions)
+        self.assertIn("Multibagger", moatnomics_strategy_subagent.system_instructions)
+        self.assertIn("Moatnomics Copilot", moatnomics_strategy_subagent.system_instructions)
+
+
 if __name__ == "__main__":
     unittest.main()

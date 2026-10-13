@@ -205,6 +205,8 @@ The platform operates across 5 layered subsystems:
   Encapsulates the Moatnomics brand identity, tagline (*"Audit the Asset. Protect the Allocator."*), Dual-Mandate philosophy (auditing asset economic moats while constructing cognitive moats against behavioral bias for allocators), tone and voice directives (clinical, objective, empirical, surgical, institutional grade), and SEBI safe harbor boundaries.
 * **Agent System Prompt Context Generator ([`get_system_prompt_context()`](file:///Users/lyndonpinto/Documents/Stock_Research_App/core/brand/moatnomics_house.py)):**
   Compiles the brand philosophy, clinical tone, and SEBI safe harbor rules directly into system prompt context injected into Google Gemini LLM synthesis across the Forensic Intelligence Desk (`core/agents/copilot/forensic_desk.py`).
+* **Moatnomics Chief Brand & Strategy Auditor Subagent ([`moatnomics_strategy_subagent`, `core/audit/project_auditor.py`](file:///Users/lyndonpinto/Documents/Stock_Research_App/core/audit/project_auditor.py)):**
+  Autonomous Antigravity `SubagentConfig` instantiated with `VIEW_FILE` and `SEARCH_DIR` capabilities, auditing all HTML templates, UI copy, and agent prompts to ensure strict adherence to the Dual-Mandate, SEBI Safe Harbor, forbidden vocabulary avoidance, and Branded House taxonomy.
 
 
 > [!NOTE]
