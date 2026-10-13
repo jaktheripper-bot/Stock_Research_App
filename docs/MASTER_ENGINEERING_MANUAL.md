@@ -280,7 +280,7 @@ flowchart TD
     TestDecision -- Yes --> Step2[Execute git commit]
     Step2 --> Step3[Run ./run.sh backup - Single Post-Commit Backup]
     Step3 --> Step4[Run ./run.sh checkpoint]
-    Step5 --> Step6[Freeze SQLite DB to .checkpoints/]
+    Step4 --> Step5[Freeze SQLite DB to .checkpoints/]
     Step6 --> Step7[Create Annotated Git Tag]
     Step7 --> Step8[Sync dev branch with main]
     Step8 --> Step9[Push git push origin main && git push origin --tags]
