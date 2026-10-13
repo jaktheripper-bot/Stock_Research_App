@@ -41,6 +41,8 @@ ALLOWED_ORIGIN_HOSTS = {
     "localhost",
     "127.0.0.1",
     "testserver",
+    "moatnomics.com",
+    "www.moatnomics.com",
     "vestfolio.app",
     "www.vestfolio.app",
     "vestnomics.app",
@@ -54,7 +56,7 @@ ALLOWED_ORIGIN_HOSTS = {
 def canonical_for(request: Request) -> str:
     """Canonical URL for a request: configured domain + path, without tracking or stray query params."""
     try:
-        base = (os.environ.get("CANONICAL_DOMAIN") or "https://vestnomics.app").rstrip("/")
+        base = (os.environ.get("CANONICAL_DOMAIN") or "https://moatnomics.com").rstrip("/")
         path = request.url.path or "/"
         if len(path) > 1:
             path = path.rstrip("/")
@@ -96,7 +98,7 @@ def resolve_app_base_url(request: Request) -> str:
 
     is_prod = bool(os.environ.get("RENDER")) or os.environ.get("ENVIRONMENT") == "production"
     if is_prod and (not host or "localhost" in host or "127.0.0.1" in host):
-        return (os.environ.get("CANONICAL_DOMAIN") or "https://vestnomics.app").rstrip("/")
+        return (os.environ.get("CANONICAL_DOMAIN") or "https://moatnomics.com").rstrip("/")
 
     if "onrender.com" in host or ("localhost" not in host and "127.0.0.1" not in host and "testserver" not in host):
         proto = "https"

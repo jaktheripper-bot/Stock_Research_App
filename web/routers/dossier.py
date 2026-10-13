@@ -475,7 +475,7 @@ async def api_v1_get_report(
             "citations_count": len(rep.get("citations", [])),
             "citations": rep.get("citations", []),
             "regulatory_disclaimer": "Educational research under SEBI RA Regulations Section 2(u). Not an investment recommendation.",
-            "attribution": "Vestnomics (https://vestnomics.app)"
+            "attribution": "Moatnomics (https://moatnomics.com)"
         },
         headers={
             "Cache-Control": "public, max-age=300",

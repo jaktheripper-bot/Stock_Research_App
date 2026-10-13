@@ -1698,7 +1698,7 @@ async def sitemap_xml():
     archives = get_archived_reports_sync()
     now_iso = datetime.now(timezone.utc).strftime("%Y-%m-%d")
 
-    base_url = (os.environ.get("CANONICAL_DOMAIN") or "https://vestnomics.app").rstrip("/")
+    base_url = (os.environ.get("CANONICAL_DOMAIN") or "https://moatnomics.com").rstrip("/")
     xml_lines = [
         '<?xml version="1.0" encoding="UTF-8"?>',
         '<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">',
@@ -1750,7 +1750,7 @@ async def sitemap_xml():
 @app.get("/robots.txt", response_class=Response)
 async def robots_txt():
     """Provides search engine crawler directives and XML sitemap index pointer."""
-    base_url = (os.environ.get("CANONICAL_DOMAIN") or "https://vestnomics.app").rstrip("/")
+    base_url = (os.environ.get("CANONICAL_DOMAIN") or "https://moatnomics.com").rstrip("/")
     content = (
         "User-agent: *\n"
         "Allow: /\n"

@@ -28,4 +28,4 @@ services:
       - key: ADMIN_PASSWORD
         sync: false
       - key: CANONICAL_DOMAIN
-        value: https://vestfolio.app
+        value: https://moatnomics.com

@@ -133,23 +133,25 @@ class TestCanonicalAndShareButton(unittest.TestCase):
 # ==============================================================================
 # 6. Vestnomics Domain Configuration & Whitelisting
 # ==============================================================================
-class TestVestnomicsDomainConfig(unittest.TestCase):
+class TestMoatnomicsDomainConfig(unittest.TestCase):
     def setUp(self):
         self.client = TestClient(app)
 
-    def test_allowed_origin_hosts_includes_vestnomics(self):
+    def test_allowed_origin_hosts_includes_moatnomics(self):
+        self.assertIn("moatnomics.com", ALLOWED_ORIGIN_HOSTS)
+        self.assertIn("www.moatnomics.com", ALLOWED_ORIGIN_HOSTS)
         self.assertIn("vestnomics.app", ALLOWED_ORIGIN_HOSTS)
         self.assertIn("www.vestnomics.app", ALLOWED_ORIGIN_HOSTS)
         self.assertIn("vestfolio.app", ALLOWED_ORIGIN_HOSTS)
         self.assertIn("www.vestfolio.app", ALLOWED_ORIGIN_HOSTS)
 
-    def test_validate_request_origin_with_vestnomics(self):
+    def test_validate_request_origin_with_moatnomics(self):
         scope_root = {
             "type": "http",
             "method": "POST",
             "headers": [
-                (b"origin", b"https://vestnomics.app"),
-                (b"host", b"vestnomics.app")
+                (b"origin", b"https://moatnomics.com"),
+                (b"host", b"moatnomics.com")
             ]
         }
         req_root = Request(scope_root)
@@ -159,48 +161,48 @@ class TestVestnomicsDomainConfig(unittest.TestCase):
             "type": "http",
             "method": "POST",
             "headers": [
-                (b"referer", b"https://www.vestnomics.app/discovery"),
-                (b"host", b"www.vestnomics.app")
+                (b"referer", b"https://www.moatnomics.com/discovery"),
+                (b"host", b"www.moatnomics.com")
             ]
         }
         req_www = Request(scope_www)
         self.assertTrue(_validate_request_origin(req_www))
 
-    def test_robots_txt_specifies_vestnomics_sitemap(self):
+    def test_robots_txt_specifies_moatnomics_sitemap(self):
         res = self.client.get("/robots.txt")
         self.assertEqual(res.status_code, 200)
-        self.assertIn("Sitemap: https://vestnomics.app/sitemap.xml", res.text)
+        self.assertIn("Sitemap: https://moatnomics.com/sitemap.xml", res.text)
 
-    def test_sitemap_xml_contains_vestnomics_urls(self):
+    def test_sitemap_xml_contains_moatnomics_urls(self):
         res = self.client.get("/sitemap.xml")
         self.assertEqual(res.status_code, 200)
-        self.assertIn("https://vestnomics.app/", res.text)
-        self.assertIn("https://vestnomics.app/discovery", res.text)
-        self.assertIn("https://vestnomics.app/opportunities", res.text)
+        self.assertIn("https://moatnomics.com/", res.text)
+        self.assertIn("https://moatnomics.com/discovery", res.text)
+        self.assertIn("https://moatnomics.com/opportunities", res.text)
 
     def test_sitemap_xml_respects_canonical_domain_env_override(self):
         old_val = os.environ.get("CANONICAL_DOMAIN")
         try:
-            os.environ["CANONICAL_DOMAIN"] = "https://custom.vestnomics.app"
+            os.environ["CANONICAL_DOMAIN"] = "https://custom.moatnomics.com"
             res = self.client.get("/sitemap.xml")
             self.assertEqual(res.status_code, 200)
-            self.assertIn("https://custom.vestnomics.app/", res.text)
+            self.assertIn("https://custom.moatnomics.com/", res.text)
         finally:
             if old_val is not None:
                 os.environ["CANONICAL_DOMAIN"] = old_val
             else:
                 os.environ.pop("CANONICAL_DOMAIN", None)
 
-    def test_telemetry_self_host_filter_handles_vestnomics(self):
+    def test_telemetry_self_host_filter_handles_moatnomics(self):
         source, detail = parse_traffic_source(
-            referrer="https://vestnomics.app/discovery",
+            referrer="https://moatnomics.com/discovery",
             query_params={}
         )
         self.assertEqual(source, "Direct / Bookmark")
         self.assertEqual(detail, "Direct")
 
         source_www, detail_www = parse_traffic_source(
-            referrer="https://www.vestnomics.app/reits",
+            referrer="https://www.moatnomics.com/reits",
             query_params={}
         )
         self.assertEqual(source_www, "Direct / Bookmark")

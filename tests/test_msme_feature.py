@@ -159,7 +159,7 @@ class TestMsmeFeatureSuite(unittest.TestCase):
         html = response.text
         self.assertIn("Unlisted MSME & Emerging SME Directory", html)
         self.assertIn("MSMED Act 2020", html)
-        self.assertIn("vestnomics", html.lower())
+        self.assertIn("moatnomics", html.lower())
 
         # Check navigation item in base.html
         home_res = self.client.get("/")
