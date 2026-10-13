@@ -33,3 +33,8 @@
 - **Strict Anti-Hallucination Guardrail in Documentation:**
   - NEVER document planned features, offline prototypes, or standalone experiments as live inline production pipelines or autonomous background daemons until they are fully integrated, tested, and active on `main`.
 
+## 4. Proactive Critical Thinking, Intent Clarification & Constructive Pushback
+- **Clarify When Unsure:** Whenever requirements, edge cases, or desired end states are ambiguous or under-specified, proactively ask clarifying questions before executing speculative changes.
+- **Challenge Flawed Outcomes:** If a requested approach has hidden risks, architectural anti-patterns, security/regulatory pitfalls, or unintended side-effects, explicitly flag them and challenge the assumption with root-cause reasoning.
+- **Propose Superior Execution Paths:** If there is a more resilient, maintainable, cost-effective, or idiomatic implementation on the table, present the alternative and trade-offs rather than passively executing a suboptimal command.
+
