@@ -10,7 +10,7 @@
 
 | Checkpoint Tag | IST Timestamp | Commit | DB Reports | Description |
 |:---|:---|:---|:---|:---|
-| `checkpoint_20261013_224931` | 2026-10-13 22:49:31 IST | `c8bb975` | 143 rep / 247 rev | Production Release Checkpoint |
+| `checkpoint_20261013_224931` | 2026-10-13 22:49:31 IST | `cf1d479` | 143 rep / 247 rev | Production Release Checkpoint |
 | `checkpoint_20261013_223452` | 2026-10-13 22:34:52 IST | `186de28` | 143 rep / 247 rev | Production Release Checkpoint |
 | `checkpoint_20261013_213543` | 2026-10-13 21:35:43 IST | `3e63a31` | 143 rep / 247 rev | Production Release Checkpoint |
 | `checkpoint_20261012_200912_checkpoint_20261012_201000_vestfolio_app_domain_whitelisting_and_canonical_routing` | 2026-10-12 20:09:12 IST | `f7f6df6` | 143 rep / 244 rev | checkpoint_20261012_201000_vestfolio_app_domain_whitelisting_and_canonical_routing |
