@@ -215,5 +215,33 @@ class TestForensicDeskEnhancements(unittest.TestCase):
         self.assertIn("Welcome to the Forensic Intelligence Desk", data.get("response"))
 
 
+    def test_llm_route_generative_synthesis_when_entitled(self):
+        """Verifies that entitled users on main successfully route through Gemini LLM synthesis."""
+        async def _run():
+            from unittest.mock import patch, MagicMock, AsyncMock
+            import core.agents.copilot.forensic_desk as fd
+            mock_client = MagicMock()
+            mock_resp = MagicMock()
+            mock_resp.text = "Here is the institutional forensic analysis synthesized by Gemini."
+            mock_client.aio.models.generate_content = AsyncMock(return_value=mock_resp)
+
+            with patch.dict(os.environ, {"TESTING": "0", "PYTEST_CURRENT_TEST": ""}), \
+                 patch.object(fd, "get_secret", return_value="fake_api_key"), \
+                 patch("google.genai.Client", return_value=mock_client):
+                res = await process_forensic_desk_turn(
+                    conversation_id="TEST-LLM-SUCCESS",
+                    user_message="What shocked you about this stock?",
+                    ticker="INFY",
+                    deep_dive_unlocked=True,
+                    is_subscriber=True
+                )
+                self.assertEqual(res["status"], "COMPLETED")
+                self.assertIn("Institutional Generative AI (Google Gemini • Unlocked Deep Dive / Pro Tier)", res["response"])
+                self.assertIn("Here is the institutional forensic analysis", res["response"])
+                mock_client.aio.models.generate_content.assert_called_once()
+
+        asyncio.run(_run())
+
+
 if __name__ == "__main__":
     unittest.main()

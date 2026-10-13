@@ -1249,9 +1249,9 @@ async def process_forensic_desk_turn(
     history = get_conversation_turns(conversation_id, limit=6)
     history_str = "\n".join([f"{t['sender_role'].upper()}: {t['content']}" for t in history[:-1]])
 
-    from google.genai import Client
+    from google.genai import Client, types as genai_types
     api_key = get_secret("GEMINI_API_KEY")
-    is_testing = os.environ.get("TESTING") == "1" or "unittest" in sys.modules or "pytest" in sys.modules
+    is_testing = os.environ.get("TESTING") == "1" or bool(os.environ.get("PYTEST_CURRENT_TEST"))
 
     # Credit burn protection: limit LLM generative synthesis to paid/unlocked reports or subscribers
     has_llm_entitlement = bool(deep_dive_unlocked or is_subscriber)
@@ -1380,11 +1380,14 @@ Recent Conversation History:
     try:
         client = Client(api_key=api_key)
         agent_reply = None
-        for model_name in ["gemini-3.8-flash", "gemini-2.5-flash", "gemini-1.5-flash"]:
+        for model_name in ["gemini-3.8-flash", "gemini-3.5-flash-lite", "gemini-3.1-flash-lite", "gemini-2.5-flash"]:
             try:
                 resp = await client.aio.models.generate_content(
                     model=model_name,
-                    contents=f"{system_prompt}\n\nUSER: {user_message}\nCOPILOT:"
+                    contents=f"{system_prompt}\n\nUSER: {user_message}\nCOPILOT:",
+                    config=genai_types.GenerateContentConfig(
+                        automatic_function_calling=genai_types.AutomaticFunctionCallingConfig(disable=True)
+                    )
                 )
                 if resp and resp.text:
                     agent_reply = resp.text

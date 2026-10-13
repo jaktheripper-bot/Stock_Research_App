@@ -16,6 +16,7 @@ Complies with SEBI (Issue and Listing of Non-Convertible Securities) Regulations
 """
 
 import os
+import sys
 import math
 import logging
 from datetime import datetime, date
@@ -899,9 +900,9 @@ def evaluate_equity_cross_contagion(security: Dict[str, Any], fetch_live_fundame
         governance_posture = meta.get("governance_score") or meta.get("governance_posture")
 
     from core.analysis.fundamentals import get_stock_fundamentals
-    from unittest.mock import Mock
-
-    is_mocked = isinstance(get_stock_fundamentals, Mock)
+    mock_mod = sys.modules.get("unittest.mock")
+    mock_cls = getattr(mock_mod, "Mock", None) if mock_mod else None
+    is_mocked = bool(mock_cls and isinstance(get_stock_fundamentals, mock_cls))
     has_meta_pledge = (meta.get("promoter_pledged_pct") is not None) or (meta.get("pledged_promoter_holding") is not None)
 
     if fetch_live_fundamentals and (is_mocked or (not os.environ.get("TESTING") and not has_meta_pledge and not meta.get("debt_to_equity"))):

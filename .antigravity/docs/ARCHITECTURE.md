@@ -70,7 +70,7 @@
   * Multi-asset conversational research agent (`process_forensic_desk_turn`) calibrated across Equities, Mutual Funds, and Corporate Debt.
   * **Input Qualification Layer (`check_input_qualification`):** Rejects keyboard mash, consonant clusters, and symbol noise with high-conviction query guidance; deflects casual greetings into onboarding assistance.
   * **Open-Ended Query Synthesis Engine:** Directly resolves high-conviction questions ("what shocked you?", "summarize the bear thesis", "summarize the bull thesis") synthesized dynamically from active report matrices (`health_matrix`, `reverse_dcf`, `fundamentals`).
-  * **Tier & Credit Burn Protection:** Limits Google Gemini LLM API generation (`gemini-3.8-flash` cascade) to Unlocked Deep Dives and Pro Subscribers; Free users receive deterministic rule-based analysis with explicit desk mode badges.
+  * **Tier & Credit Burn Protection:** Limits Google Gemini LLM API generation (modernized cascade `gemini-3.8-flash` -> `gemini-3.5-flash-lite` -> `gemini-3.1-flash-lite` -> `gemini-2.5-flash`, AFC disabled) to Unlocked Deep Dives and Pro Subscribers; Free users receive deterministic rule-based analysis with explicit desk mode badges. Test mode is isolated via execution environment variables (`TESTING=1`, `PYTEST_CURRENT_TEST`) preventing `sys.modules` pollution.
   * Enforces SEBI non-advisory compliance, server-side deep-dive paywall gating, and automated credit unlock prompts.
   * Orchestrates `valuation_radar.py` (2-Stage DCF + EPV + P/E Median), `sector_scoring.py` (BFSI, IT, Infra, Pharma), `institutional_flow.py` (Level-2 Order Imbalance & Circuit Locks), `forensic_sieve.py` (6-point check), and `dossier_bull_bear.py` (60-sec structural thesis).
 * **Multi-Asset Analytics (`core/analysis/`):**

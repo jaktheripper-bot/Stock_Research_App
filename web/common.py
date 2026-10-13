@@ -319,6 +319,9 @@ def _deep_dive_unlocked_for_request(request: Request, ticker: str) -> bool:
     get_user_fn = _get_override_fn("web.main", "_get_current_web_user", _get_current_web_user)
     web_user = get_user_fn(request)
     if web_user and ticker:
+        tier = (web_user.get("subscription_tier") or "free").lower()
+        if tier in ("pro_monthly", "pro_annual") or "pro" in tier or web_user.get("is_pro"):
+            return True
         t_clean = clean_ticker(ticker)
         canonical = resolve_canonical_symbol(t_clean) or t_clean
         from core.db import is_ticker_unlocked_for_user
