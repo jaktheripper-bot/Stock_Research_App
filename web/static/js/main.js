@@ -315,12 +315,12 @@ window.openCheckout = function(planId, planName, amountInr, credits) {
             key: orderData.key_id,
             amount: orderData.amount,
             currency: orderData.currency || 'INR',
-            name: 'Stock Research AI',
+            name: 'Moatnomics',
             description: planName + ' — Computational Research Credits',
             order_id: orderData.order_id || orderData.id,
             prefill: {
               name: (storedUser && storedUser.full_name) ? storedUser.full_name : 'Test Investor',
-              email: (storedUser && storedUser.email) ? storedUser.email : 'investor@stockresearch.ai',
+              email: (storedUser && storedUser.email) ? storedUser.email : 'investor@moatnomics.com',
               contact: (storedUser && storedUser.phone) ? storedUser.phone : '9820098200'
             },
             theme: {
@@ -1057,7 +1057,7 @@ window.shareCurrentPage = async function(kind) {
     url.searchParams.set('utm_medium', 'referral');
     url.searchParams.set('utm_campaign', kind || 'page');
     const link = url.toString();
-    const title = document.title || 'Stock Research AI';
+    const title = document.title || 'Moatnomics';
 
     let method = 'copy';
     if (navigator.share) {

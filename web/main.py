@@ -1,5 +1,5 @@
 """
-Stock Research AI - FastAPI Web Application.
+Moatnomics - FastAPI Web Application.
 
 High-performance Server-Side Rendered (SSR) institutional equity research portal.
 Provides:
@@ -447,8 +447,8 @@ async def lifespan(app: FastAPI):
 
 
 app = FastAPI(
-    title="Stock Research AI",
-    description="Institutional-Grade 7-Pillar Equity Research Engine Grounded in Public Filings",
+    title="Moatnomics",
+    description="Dual-Mandate Fundamental Research Platform: Audit the Asset, Protect the Allocator",
     version="2.0.0",
     lifespan=lifespan
 )
@@ -1688,7 +1688,7 @@ async def disclaimer_page(request: Request):
 @app.get("/healthz")
 async def healthz():
     """Health check endpoint with caching (short‑lived)."""
-    data = {"status": "healthy", "service": "Stock Research AI Web Server", "timestamp": datetime.now(IST).isoformat()}
+    data = {"status": "healthy", "service": "Moatnomics Web Server", "timestamp": datetime.now(IST).isoformat()}
     return json_response_with_cache(data, max_age=30)
 
 

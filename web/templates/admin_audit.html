@@ -1,6 +1,6 @@
 {% extends "base.html" %}
 
-{% block title %}System Health & Autonomous Audit Console — Stock Research App{% endblock %}
+{% block title %}System Health & Autonomous Audit Console — Moatnomics{% endblock %}
 
 {% block content %}
 <div class="audit-workspace" style="max-width: 1380px; margin: 0 auto; padding: 2rem 1rem 4rem 1rem;">
@@ -261,14 +261,29 @@ async function triggerAudit(useAi) {
             headers: { "Content-Type": "application/json" },
             body: JSON.stringify({ use_ai: useAi })
         });
-        const data = await resp.json();
+        
+        let data;
+        const contentType = resp.headers.get("content-type") || "";
+        if (contentType.includes("application/json")) {
+            data = await resp.json();
+        } else {
+            const rawText = await resp.text();
+            throw new Error(`Server returned status ${resp.status}: ${rawText.slice(0, 150)}`);
+        }
+
+        if (!resp.ok) {
+            const errorMsg = data.detail || data.error || `HTTP ${resp.status}`;
+            alert("Audit execution error: " + errorMsg);
+            return;
+        }
+
         if (data.success) {
             window.location.reload();
         } else {
             alert("Audit execution returned error: " + (data.error || "Unknown"));
         }
     } catch (e) {
-        alert("Failed to communicate with audit API: " + e);
+        alert("Failed to communicate with audit API: " + (e.message || e));
     } finally {
         btnQuick.disabled = false;
         btnFull.disabled = false;

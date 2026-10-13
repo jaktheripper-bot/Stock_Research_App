@@ -3,8 +3,8 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, minimum-scale=1.0">
-  <title>{% block title %}Stock Research AI | Institutional Equity Thesis & Drift Surveillance{% endblock %}</title>
-  <meta name="description" content="{% block meta_desc %}Automated institutional-grade 7-pillar equity research engine for BSE & NSE equities. Multi-scenario valuation, thesis drift surveillance, and zero-hallucination regulatory grounding.{% endblock %}">
+  <title>{% block title %}Moatnomics | Audit the Asset. Protect the Allocator.{% endblock %}</title>
+  <meta name="description" content="{% block meta_desc %}Moatnomics Dual-Mandate fundamental intelligence: We audit the economic moat of the asset, while constructing a cognitive moat for the allocator.{% endblock %}">
   {% if canonical_for is defined and request is defined and request %}{% set _canon = canonical_for(request) %}{% if _canon %}
   <link rel="canonical" href="{{ _canon }}">
   <meta property="og:url" content="{{ _canon }}">
@@ -12,13 +12,13 @@
   
   <!-- OpenGraph / Social Meta Tags -->
   <meta property="og:type" content="website">
-  <meta property="og:site_name" content="Stock Research AI">
-  <meta property="og:title" content="{% block og_title %}Stock Research AI — Institutional Equity Thesis & Drift Surveillance{% endblock %}">
-  <meta property="og:description" content="{% block og_desc %}Automated 7-pillar equity research dossiers, multi-scenario valuations, and BSE exchange audit surveillance.{% endblock %}">
+  <meta property="og:site_name" content="Moatnomics">
+  <meta property="og:title" content="{% block og_title %}Moatnomics — Audit the Asset. Protect the Allocator.{% endblock %}">
+  <meta property="og:description" content="{% block og_desc %}Moatnomics Dual-Mandate fundamental intelligence: We audit the economic moat of the asset, while constructing a cognitive moat for the allocator.{% endblock %}">
   <meta name="twitter:card" content="summary_large_image">
   
   <!-- Favicon & Stylesheet -->
-  <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>📈</text></svg>">
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><rect width='100' height='100' rx='20' fill='%230ea5e9'/><path d='M20 80h60M30 80V35l10-10 10 10v10h10V25l10-10 10 10v55' stroke='%23020617' stroke-width='8' fill='none' stroke-linecap='round'/></svg>">
   <link rel="preload" href="/static/css/style.css?v=20261010_1540" as="style" onload="this.rel='stylesheet'">
   <link rel="preload" href="/static/js/main.js" as="script">
   <link rel="stylesheet" href="/static/css/style.css?v=20261010_1540">
@@ -28,7 +28,7 @@
   {
     "@context": "https://schema.org",
     "@type": "SoftwareApplication",
-    "name": "Stock Research AI",
+    "name": "Moatnomics",
     "applicationCategory": "BusinessApplication",
     "operatingSystem": "Web",
     "offers": {
@@ -36,7 +36,7 @@
       "price": "299",
       "priceCurrency": "INR"
     },
-    "description": "Institutional-grade 7-pillar financial research synthesis software utility grounded in public exchange disclosures."
+    "description": "Moatnomics Dual-Mandate fundamental intelligence: We audit the economic moat of the asset, while constructing a cognitive moat for the allocator."
   }
   </script>
 
@@ -117,10 +117,12 @@
     <div class="container">
       <div class="nav-wrap">
         <a href="/" class="brand-link">
-          <div class="brand-logo">📈</div>
+          <div class="brand-logo">
+            <svg class="glyph" style="width: 22px; height: 22px; color: #020617; stroke: currentColor;"><use href="#glyph-castle"></use></svg>
+          </div>
           <div class="brand-text-block">
-            <span class="brand-text">STOCK RESEARCH <span style="color: var(--accent-cyan);">AI</span></span>
-            <span class="brand-sub">Institutional Equity Engine</span>
+            <span class="brand-text">MOAT<span style="color: var(--accent-cyan);">NOMICS</span></span>
+            <span class="brand-sub">Audit the Asset. Protect the Allocator.</span>
           </div>
         </a>
 
@@ -369,7 +371,7 @@
   <div id="authModal" class="modal-backdrop">
     <div class="modal-dialog" style="max-width: 440px;">
       <div class="modal-header">
-        <h3 style="font-weight: 800; font-size: 20px;">Sign In to Stock Research AI</h3>
+        <h3 style="font-weight: 800; font-size: 20px;">Sign In to Moatnomics</h3>
         <button id="closeAuthModalBtn" class="modal-close-btn">&times;</button>
       </div>
 
@@ -561,12 +563,14 @@
 
       <div class="footer-grid">
         <div class="footer-brand">
-          <div style="display: flex; align-items: center; gap: 8px; margin-bottom: 12px;">
-            <span style="font-size: 22px;">📈</span>
-            <span style="font-weight: 800; font-size: 16px; color: var(--text-primary);">Stock Research AI</span>
+          <div style="display: flex; align-items: center; gap: 10px; margin-bottom: 12px;">
+            <div class="brand-logo" style="width: 32px; height: 32px;">
+              <svg class="glyph" style="width: 18px; height: 18px; color: #020617; stroke: currentColor;"><use href="#glyph-castle"></use></svg>
+            </div>
+            <span style="font-weight: 800; font-size: 18px; color: var(--text-primary); letter-spacing: -0.02em;">MOAT<span style="color: var(--accent-cyan);">NOMICS</span></span>
           </div>
-          <p style="color: var(--text-secondary); line-height: 1.6; margin-bottom: 16px;">
-            Empowering retail investors and institutional analysts with zero-hallucination fundamental synthesis and multi-quarter thesis drift surveillance.
+          <p style="color: var(--text-secondary); line-height: 1.6; margin-bottom: 16px; font-size: 13px;">
+            Audit the Asset. Protect the Allocator. Dual-Mandate fundamental research: We audit the economic moat of the asset, while constructing a cognitive moat for the investor.
           </p>
         </div>
 

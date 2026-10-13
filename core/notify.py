@@ -44,7 +44,7 @@ def send_ticket_notification_email(ticket: dict) -> bool:
     subject = f"🚨 [New Support Ticket] {ticket.get('ticket_id')} - {ticket.get('subject')}"
     body = f"""
 ===============================================================
-STOCK RESEARCH AI - NEW USER COMPLAINT / SUPPORT TICKET
+MOATNOMICS - NEW USER COMPLAINT / SUPPORT TICKET
 ===============================================================
 
 Ticket Reference: {ticket.get('ticket_id')}

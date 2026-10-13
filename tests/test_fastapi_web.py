@@ -50,7 +50,8 @@ Detailed forensic analysis with exact page grounding to bseindia.com filings.
     def test_home_page(self):
         res = self.client.get("/")
         self.assertEqual(res.status_code, 200)
-        self.assertIn("Institutional Equity Research Engine", res.text)
+        self.assertIn("Audit the Asset.", res.text)
+        self.assertIn("Protect the Allocator.", res.text)
         self.assertIn("ZERO-HALLUCINATION DATA INTEGRITY", res.text)
 
     def test_pricing_page(self):
