@@ -579,6 +579,11 @@ async function submitCopilotMessage() {
         const data = await resp.json();
         thinkingCard.remove();
 
+        if (!resp.ok) {
+            const errorMsg = data.detail || data.message || `Server returned HTTP ${resp.status}`;
+            throw new Error(errorMsg);
+        }
+
         const agentText = data.response || "No response generated.";
         const formattedHtml = renderCopilotMarkdown(agentText);
         const agentTime = formatCurrentTime();

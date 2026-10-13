@@ -304,6 +304,29 @@ class TestCopilotUIAndSyntax(unittest.TestCase):
         self.assertIn("Recovery Seniority & Liquidation Hierarchy", responses["seniority"])
         self.assertIn("Credit Contagion Radar Analysis", responses["contagion"])
 
+    def test_open_ended_and_liveness_queries(self):
+        """Verifies that open-ended and liveness conversational queries produce robust responses."""
+        queries = [
+            ("begin", "I don't know, where should we begin?", "Forensic Research Roadmap"),
+            ("liveness", "Why don't you respond to me?", "Forensic Intelligence Desk Active"),
+            ("best_thing", "tell me the best thing about this stock?", "Bull Thesis")
+        ]
+
+        for key, prompt, expected_keyword in queries:
+            resp = self.client.post("/api/copilot/chat", json={
+                "conversation_id": f"TEST-COPILOT-OPEN-{key}",
+                "message": prompt,
+                "ticker": "CUPID",
+                "asset_type": "equity"
+            })
+            self.assertEqual(resp.status_code, 200)
+            data = resp.json()
+            self.assertTrue(data.get("success"))
+            text = data.get("response", "")
+            self.assertTrue(len(text) > 200, f"Query '{prompt}' yielded truncated response")
+            self.assertIn(expected_keyword, text, f"Query '{prompt}' missing expected keyword '{expected_keyword}'")
+
 
 if __name__ == "__main__":
     unittest.main()
+
