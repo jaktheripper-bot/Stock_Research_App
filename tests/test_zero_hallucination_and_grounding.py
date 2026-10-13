@@ -122,6 +122,10 @@ class TestZeroHallucinationAndGrounding(unittest.TestCase):
             r"grievance@vestnomics\.app",
             r"privacy@vestnomics\.app",
             r"support@vestnomics\.ai",
+            r"support@moatnomics\.com",
+            r"grievance@moatnomics\.com",
+            r"privacy@moatnomics\.com",
+            r"support@moatnomics\.ai",
             r"mailto:",
         ]
 

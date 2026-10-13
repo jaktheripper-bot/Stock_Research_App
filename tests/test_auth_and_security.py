@@ -396,39 +396,39 @@ class TestRenderHardening(unittest.TestCase):
         self.assertEqual(resolve_app_base_url(req_local), "http://localhost:8000")
 
         # Reverse proxy on Render / custom domain
-        req_prod = MockRequest(headers={"x-forwarded-proto": "https", "x-forwarded-host": "vestnomics.app"})
-        self.assertEqual(resolve_app_base_url(req_prod), "https://vestnomics.app")
+        req_prod = MockRequest(headers={"x-forwarded-proto": "https", "x-forwarded-host": "moatnomics.com"})
+        self.assertEqual(resolve_app_base_url(req_prod), "https://moatnomics.com")
 
         # Production fallback if internal loopback header sent
-        with patch.dict(os.environ, {"ENVIRONMENT": "production", "CANONICAL_DOMAIN": "https://vestnomics.app"}):
+        with patch.dict(os.environ, {"ENVIRONMENT": "production", "CANONICAL_DOMAIN": "https://moatnomics.com"}):
             req_loopback = MockRequest(headers={"host": "127.0.0.1:10000"})
-            self.assertEqual(resolve_app_base_url(req_loopback), "https://vestnomics.app")
+            self.assertEqual(resolve_app_base_url(req_loopback), "https://moatnomics.com")
 
     def test_public_auth_google_clean_redirect_and_cookie(self):
         client = TestClient(app)
         # 1. Default redirect produces clean /auth/callback target
-        r = client.get("/auth/google", headers={"host": "vestnomics.app", "x-forwarded-proto": "https"}, follow_redirects=False)
+        r = client.get("/auth/google", headers={"host": "moatnomics.com", "x-forwarded-proto": "https"}, follow_redirects=False)
         self.assertEqual(r.status_code, 303)
         loc = r.headers.get("location", "")
-        self.assertIn("redirect_to=https%3A//vestnomics.app/auth/callback", loc)
+        self.assertIn("redirect_to=https%3A//moatnomics.com/auth/callback", loc)
         self.assertNotIn("next%3D", loc)
         self.assertNotIn("oauth_next", r.cookies)
 
         # 2. Custom redirect sets oauth_next cookie
         r2 = client.get(
             "/auth/google?redirect=/opportunities",
-            headers={"host": "vestnomics.app", "x-forwarded-proto": "https"},
+            headers={"host": "moatnomics.com", "x-forwarded-proto": "https"},
             follow_redirects=False
         )
         self.assertEqual(r2.status_code, 303)
-        self.assertIn("redirect_to=https%3A//vestnomics.app/auth/callback", r2.headers.get("location", ""))
+        self.assertIn("redirect_to=https%3A//moatnomics.com/auth/callback", r2.headers.get("location", ""))
         self.assertEqual(r2.cookies.get("oauth_next", "").strip('"'), "/opportunities")
 
     def test_get_google_oauth_url_canonical_fallback(self):
         from core.auth.supabase_auth import get_google_oauth_url
-        with patch.dict(os.environ, {"CANONICAL_DOMAIN": "https://vestnomics.app"}):
+        with patch.dict(os.environ, {"CANONICAL_DOMAIN": "https://moatnomics.com"}):
             oauth_url = get_google_oauth_url()
-            self.assertIn("redirect_to=https://vestnomics.app/auth/callback", oauth_url)
+            self.assertIn("redirect_to=https://moatnomics.com/auth/callback", oauth_url)
 
     def test_public_auth_callback_token_exchange_and_root_code_forwarder(self):
         import base64
