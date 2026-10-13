@@ -272,7 +272,9 @@
   {% else %}
   <!-- Empty State -->
   <div style="background: rgba(30, 41, 59, 0.4); border: 1px dashed rgba(255, 255, 255, 0.15); border-radius: 16px; padding: 48px 24px; text-align: center; margin-top: 20px;">
-    <div style="font-size: 40px; margin-bottom: 12px;">🔍</div>
+    <div style="margin-bottom: 16px; display: inline-flex; align-items: center; justify-content: center; width: 56px; height: 56px; border-radius: 50%; background: rgba(56, 189, 248, 0.1); border: 1px solid rgba(56, 189, 248, 0.2); color: #38bdf8;">
+      <svg class="glyph" style="width: 28px; height: 28px;"><use href="#glyph-search"></use></svg>
+    </div>
     <h3 style="font-size: 20px; font-weight: 700; color: #f8fafc; margin-bottom: 8px;">No Institutional Equities Match Your Criteria</h3>
     <p style="font-size: 14px; color: #94a3b8; max-width: 480px; margin: 0 auto 20px auto; line-height: 1.5;">
       We couldn't find any audited equities matching "{{ query or current_sector or current_tier }}". Try broadening your search or resetting active filters.

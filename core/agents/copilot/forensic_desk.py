@@ -1212,8 +1212,8 @@ async def process_forensic_desk_turn(
                             try:
                                 from core.db.fundamentals import save_cached_fundamentals
                                 save_cached_fundamentals(clean_ticker, fund)
-                            except Exception:
-                                pass
+                            except Exception as save_err:
+                                logger.debug(f"Cache fundamentals save notice for {clean_ticker}: {save_err}")
                     except Exception as fund_err:
                         logger.debug(f"Live fundamentals bounded fetch notice for {clean_ticker}: {fund_err}")
                         fund = {}
