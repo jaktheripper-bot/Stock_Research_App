@@ -69,31 +69,38 @@ def get_support_tickets(status: str = None, limit: int = 50, exclude_tests: bool
     init_db()
     conn = get_db_connection()
     cursor = conn.cursor()
-    placeholder = get_placeholder()
+    p = get_placeholder()
     tickets = []
 
-    test_filter = "AND (user_email NOT LIKE '%@example.com' AND user_email NOT LIKE '%@test.com' AND ticket_id NOT LIKE 'TKT-TEST-%')" if exclude_tests else ""
+    where_clauses = ["1=1"]
+    params = []
+
+    if status and status.lower() != "all":
+        where_clauses.append(f"status = {p}")
+        params.append(status.lower().strip())
+
+    if exclude_tests:
+        where_clauses.append(f"user_email NOT LIKE {p}")
+        params.append("%@example.com")
+        where_clauses.append(f"user_email NOT LIKE {p}")
+        params.append("%@test.com")
+        where_clauses.append(f"user_email NOT LIKE {p}")
+        params.append("%@pytest.com")
+        where_clauses.append(f"ticket_id NOT LIKE {p}")
+        params.append("TKT-TEST-%")
+
+    safe_limit = max(1, min(int(limit or 50), 500))
+
+    query = f'''
+        SELECT id, ticket_id, user_email, user_name, category, subject, message, status, admin_notes, source, created_at
+        FROM support_tickets
+        WHERE {' AND '.join(where_clauses)}
+        ORDER BY created_at DESC
+        LIMIT {safe_limit}
+    '''
 
     try:
-        if status and status.lower() != "all":
-            query = f'''
-                SELECT id, ticket_id, user_email, user_name, category, subject, message, status, admin_notes, source, created_at
-                FROM support_tickets
-                WHERE status = {placeholder} {test_filter}
-                ORDER BY created_at DESC
-                LIMIT {placeholder}
-            '''
-            cursor.execute(query, (status.lower(), limit))
-        else:
-            query = f'''
-                SELECT id, ticket_id, user_email, user_name, category, subject, message, status, admin_notes, source, created_at
-                FROM support_tickets
-                WHERE 1=1 {test_filter}
-                ORDER BY created_at DESC
-                LIMIT {placeholder}
-            '''
-            cursor.execute(query, (limit,))
-
+        cursor.execute(query, tuple(params))
         rows = cursor.fetchall()
         for r in rows:
             tickets.append({
@@ -161,12 +168,27 @@ def get_open_tickets_count(exclude_tests: bool = True) -> int:
     init_db()
     conn = get_db_connection()
     cursor = conn.cursor()
-    test_filter = "AND user_email NOT LIKE '%@example.com' AND user_email NOT LIKE '%@test.com' AND ticket_id NOT LIKE 'TKT-TEST-%'" if exclude_tests else ""
+    p = get_placeholder()
+    where_clauses = ["status IN ('open', 'in_progress')"]
+    params = []
+
+    if exclude_tests:
+        where_clauses.append(f"user_email NOT LIKE {p}")
+        params.append("%@example.com")
+        where_clauses.append(f"user_email NOT LIKE {p}")
+        params.append("%@test.com")
+        where_clauses.append(f"user_email NOT LIKE {p}")
+        params.append("%@pytest.com")
+        where_clauses.append(f"ticket_id NOT LIKE {p}")
+        params.append("TKT-TEST-%")
+
+    query = f"SELECT COUNT(*) FROM support_tickets WHERE {' AND '.join(where_clauses)};"
     try:
-        cursor.execute(f"SELECT COUNT(*) FROM support_tickets WHERE status = 'open' {test_filter};")
+        cursor.execute(query, tuple(params))
         row = cursor.fetchone()
         return row[0] if row else 0
-    except Exception:
+    except Exception as e:
+        logger.error(f"Error fetching open tickets count: {e}")
         return 0
     finally:
         cursor.close()

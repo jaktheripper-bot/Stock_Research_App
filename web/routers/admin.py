@@ -197,12 +197,14 @@ async def admin_dashboard(
 
     try:
         support_tickets = get_support_tickets(limit=50, exclude_tests=exclude_tests)
-    except Exception:
+    except Exception as ste:
+        logger.error(f"Error fetching support tickets: {ste}")
         support_tickets = []
 
     try:
         open_tickets_count = get_open_tickets_count(exclude_tests=exclude_tests)
-    except Exception:
+    except Exception as oce:
+        logger.error(f"Error fetching open tickets count: {oce}")
         open_tickets_count = 0
 
     try:

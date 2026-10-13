@@ -246,6 +246,42 @@ class TestAdminCreditGrant(unittest.TestCase):
         self.assertIn("[Admin Credits Granted: +1.0", target_ticket["admin_notes"])
         self.assertIn("Restored 1.0 credit after timeout review", target_ticket["admin_notes"])
 
+    def test_support_ticket_query_parameterization_and_exclusion(self):
+        """Verifies support tickets and open count queries function correctly under test exclusion filters without SQL placeholder crashes."""
+        from core.db.support import get_open_tickets_count, create_support_ticket, get_support_tickets
+        # Create a test-flagged ticket
+        test_tkt = create_support_ticket(
+            user_email="qa_runner@test.com",
+            subject="Synthetic QA Ticket",
+            message="Auto generated test run",
+            user_name="QA Bot"
+        )
+        self.assertTrue(test_tkt.get("success"))
+
+        # Create a genuine user ticket
+        genuine_email = f"investor_{uuid.uuid4().hex[:6]}@domain.org"
+        real_tkt = create_support_ticket(
+            user_email=genuine_email,
+            subject="Real Account Inquiry",
+            message="Need assist on sovereign bond yields",
+            user_name="Real Investor"
+        )
+        self.assertTrue(real_tkt.get("success"))
+
+        # Verify exclude_tests=True includes genuine ticket and excludes test ticket
+        tickets = get_support_tickets(exclude_tests=True)
+        ticket_emails = [t["user_email"] for t in tickets]
+        self.assertIn(genuine_email, ticket_emails)
+        self.assertNotIn("qa_runner@test.com", ticket_emails)
+
+        # Verify get_open_tickets_count excludes test tickets
+        open_count = get_open_tickets_count(exclude_tests=True)
+        self.assertGreaterEqual(open_count, 1)
+
+        # Verify status filtering works cleanly without psycopg2 % interpolation crash
+        open_tickets = get_support_tickets(status="open", exclude_tests=True)
+        self.assertTrue(any(t["ticket_id"] == real_tkt["ticket_id"] for t in open_tickets))
+
     def test_admin_grant_validation_rejections(self):
         ghost_email = f"ghost_user_{uuid.uuid4().hex[:8]}@example.com"
         res_nonexistent = admin_grant_user_credits(
