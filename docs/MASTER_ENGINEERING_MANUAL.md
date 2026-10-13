@@ -200,6 +200,12 @@ The platform operates across 5 layered subsystems:
   * **Executive Lead Styling:** Opening paragraph of each pillar (`.pillar-body > p:first-of-type`) styled with a 3px cyan callout bar, 15px font size, and elevated line height for instant executive takeaways without altering underlying content.
   * **Typographic Rhythm:** Increased body paragraph vertical spacing to 20px, boosted bold financial terms to high-contrast `#ffffff`, custom styled luminous cyan bullet markers (`▹`), and upgraded blockquotes.
 
+#### F. Brand Architecture & Cognitive Moat Layer (`core/brand/`)
+* **Moatnomics Brand House ([`core/brand/moatnomics_house.py`](file:///Users/lyndonpinto/Documents/Stock_Research_App/core/brand/moatnomics_house.py)):**
+  Encapsulates the Moatnomics brand identity, tagline (*"Audit the Asset. Protect the Allocator."*), Dual-Mandate philosophy (auditing asset economic moats while constructing cognitive moats against behavioral bias for allocators), tone and voice directives (clinical, objective, empirical, surgical, institutional grade), and SEBI safe harbor boundaries.
+* **Agent System Prompt Context Generator ([`get_system_prompt_context()`](file:///Users/lyndonpinto/Documents/Stock_Research_App/core/brand/moatnomics_house.py)):**
+  Compiles the brand philosophy, clinical tone, and SEBI safe harbor rules directly into system prompt context injected into Google Gemini LLM synthesis across the Forensic Intelligence Desk (`core/agents/copilot/forensic_desk.py`).
+
 
 > [!NOTE]
 > **Complete Report Evaluation Frameworks Specification:**  

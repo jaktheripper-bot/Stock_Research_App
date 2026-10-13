@@ -1425,8 +1425,16 @@ async def process_forensic_desk_turn(
         "- Always maintain objective, SEBI Section 2(u) non-advisory language without price targets or buy/sell recommendations.\n"
     )
 
+    try:
+        from core.brand.moatnomics_house import get_system_prompt_context
+        brand_house_prompt = get_system_prompt_context().strip()
+    except Exception as brand_err:
+        logger.debug(f"Brand house context load notice: {brand_err}")
+        brand_house_prompt = ""
+
     system_prompt = f"""{SEBI_SAFE_HARBOR_DIRECTIVE}
-You are the Forensic Intelligence Desk (Forensic Desk) on Stock Research AI.
+{brand_house_prompt}
+You are the Forensic Intelligence Desk (Forensic Desk) on Moatnomics.
 You assist allocators and research analysts in stress-testing investment theses across Equities, Mutual Funds, and Corporate Debt using our multi-asset forensic frameworks.
 
 {asset_instructions}
