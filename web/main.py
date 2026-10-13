@@ -7,6 +7,7 @@ Provides:
 - Zero-latency crawlable dossier URLs for Google SEO & GEO answer engines
 - Interactive UPI and card checkout endpoints
 - Instant PDF report export downloads
+- Modular domain routers for Auth/Billing, Dossier Intelligence, Markets, and Admin.
 """
 
 import os
@@ -22,7 +23,7 @@ import hmac
 import hashlib
 import statistics
 import collections
-import requests
+import urllib.parse
 from datetime import datetime, timezone, timedelta
 from typing import Optional, List, Dict, Any
 
@@ -40,6 +41,7 @@ from web.middleware.security_headers import SecurityHeadersMiddleware
 from slowapi import Limiter
 from slowapi.util import get_remote_address
 from slowapi.errors import RateLimitExceeded
+
 logger = logging.getLogger("equity_research.web")
 
 try:
@@ -95,49 +97,6 @@ from core.db import (
     MANDATORY_SEBI_DISCLAIMER,
     IST,
 )
-import base64
-import urllib.parse
-from core.auth.totp import (
-    generate_totp_secret,
-    verify_totp_code,
-    get_totp_uri,
-)
-from core.auth.supabase_auth import (
-    get_google_oauth_url,
-    get_supabase_auth_config,
-)
-from core.auth.otp import (
-    create_email_otp,
-    verify_email_otp,
-)
-from core.db.admin import (
-    get_admin_user,
-    list_admin_users,
-    add_admin_user,
-    remove_admin_user,
-    update_admin_role,
-    set_admin_totp_secret,
-    enable_admin_totp,
-    update_admin_last_login,
-    record_admin_audit,
-    get_admin_audit_logs,
-    admin_grant_user_credits,
-)
-from telemetry import (
-    verify_admin_passcode,
-    update_admin_passcode,
-    get_admin_passcode,
-)
-from core.db.telemetry import (
-    record_usage_event,
-    parse_traffic_source,
-    parse_user_agent,
-    extract_geo,
-    purge_test_telemetry,
-    is_excluded_telemetry_event,
-)
-
-ADMIN_COOKIE_NAME = "admin_session"
 from core.notify import dispatch_support_ticket_alert
 from core.analysis import get_stock_fundamentals, get_historical_prices
 from core.analysis.dossier_report_synthesis import generate_stock_report
@@ -146,18 +105,10 @@ from core.analysis.parser import (
     extract_health_matrix,
     compare_revisions,
     remove_health_matrix_text,
-    wrap_html_with_collapsible_pillars
+    wrap_html_with_collapsible_pillars,
 )
 from core.analysis.metrics import calculate_52w_percentile, calculate_pe_percentile, get_valuation_quartile
-from core.billing import (
-    PRICING_PACKS,
-    B2B_PACKS,
-    get_plan_by_id,
-    create_razorpay_order,
-    process_successful_payment,
-    RazorpayAuthError,
-    RazorpayAPIError,
-)
+from core.billing import PRICING_PACKS, B2B_PACKS, get_plan_by_id
 from normalizer import clean_ticker, extract_citations_from_report
 from bse_master import (
     get_ticker_suggestions,
@@ -196,25 +147,57 @@ from core.analysis.fund_overlap_auditor import (
     audit_single_fund_daily,
     compute_fund_forensic_lookthrough,
     calculate_deep_dive_credit_cost,
-    create_async_fund_audit_task,
-    run_async_fund_audit_job,
-    get_fund_audit_task_status,
-    ensure_scheme_and_holdings_exist,
+)
+from core.config import get_secret
+from contextlib import asynccontextmanager
+from apscheduler.schedulers.asyncio import AsyncIOScheduler
+from core.msme.scheduler import register_jobs
+
+# ==============================================================================
+# Shared Web Utilities & Re-Exports (Preserving 100% Backwards Compatibility)
+# ==============================================================================
+from web.common import (
+    templates,
+    canonical_for,
+    json_response_with_cache,
+    resolve_app_base_url,
+    _validate_request_origin,
+    _get_user_signing_key,
+    _generate_user_session_token,
+    _validate_user_session_token,
+    _get_current_web_user,
+    _get_admin_signing_key,
+    _generate_admin_token,
+    _validate_admin_token,
+    _is_admin_authenticated,
+    _generate_pending_2fa_token,
+    _validate_pending_2fa_token,
+    _build_local_qr_data_uri,
+    _is_user_subscribed,
+    _can_access_today_discovery,
+    _is_ticker_unlocked_for_request,
+    _deep_dive_unlocked_for_request,
+    _asset_unlock_key,
+    _asset_unlocked_for_request,
+    _unlock_asset_deep_dive,
+    _pdf_account_ref,
+    PDF_LOCKED_NOTICE,
+    ADMIN_COOKIE_NAME,
+    ADMIN_2FA_PENDING_COOKIE,
+    USER_SESSION_COOKIE,
+    ALLOWED_ORIGIN_HOSTS,
 )
 
-# Logging initialized earlier at module level
 
-from contextlib import asynccontextmanager
-
+# ==============================================================================
+# Background Autonomous Schedulers
+# ==============================================================================
 async def run_daily_discovery_scheduler():
     """
     Automated background BSE surveillance and screening scheduler:
     Initiates automatic crawling & screening of BSE listed companies at 09:00 AM IST daily.
-    Includes startup catch-up to ensure today's 9:00 AM edition is never missed due to restarts or deploy timings.
     """
     logger.info("🌅 [Discovery Scheduler] Background BSE surveillance crawler initiated.")
-
-    # Startup catch-up check: If past 9:00 AM IST and today's edition has not been generated, trigger catch-up
     try:
         now = datetime.now(IST)
         today_str = now.strftime("%Y-%m-%d")
@@ -229,7 +212,6 @@ async def run_daily_discovery_scheduler():
                 await loop.run_in_executor(None, run_discovery_pipeline, 12, today_str, False, False)
                 logger.info(f"🌅 [Discovery Scheduler] Catch-up 9:00 AM edition for {today_str} published.")
         else:
-            # If before 9:00 AM IST, ensure at least one baseline edition exists so UI is not empty
             active_existing = [x for x in get_active_discovery_reel(exclude_tests=True, allow_fallback=True)]
             if not active_existing:
                 yesterday_str = (now - timedelta(days=1)).strftime("%Y-%m-%d")
@@ -269,12 +251,9 @@ async def run_daily_discovery_scheduler():
             logger.error(f"🌅 [Discovery Scheduler] Error in daily discovery scheduler: {e}")
             await asyncio.sleep(60)
 
+
 async def run_daily_amfi_scheduler():
-    """
-    Automated background AMFI NAV synchronizer:
-    AMFI publishes official daily NAVAll.txt files around 11:00 PM IST.
-    Executes synchronization daily at 23:15 IST.
-    """
+    """Automated background AMFI NAV synchronizer (runs daily at 23:15 IST)."""
     logger.info("📊 [AMFI Scheduler] Background AMFI NAV synchronizer initiated.")
     while True:
         try:
@@ -307,13 +286,9 @@ async def run_daily_amfi_scheduler():
             logger.error(f"📊 [AMFI Scheduler] Error in AMFI synchronization: {e}")
             await asyncio.sleep(120)
 
+
 async def run_daily_fund_audit_scheduler():
-    """
-    Automated background Mutual Fund Forensic Auditor:
-    Executes deep 7-pillar portfolio look-through audit across constituent holdings
-    for the next eligible fund in the rotation queue daily at 23:30 IST
-    (15 minutes post-AMFI NAV synchronization).
-    """
+    """Automated background Mutual Fund Forensic Auditor (runs daily at 23:30 IST)."""
     logger.info("🔍 [Fund Audit Scheduler] Background mutual fund forensic auditor initiated.")
     while True:
         try:
@@ -330,7 +305,7 @@ async def run_daily_fund_audit_scheduler():
             from core.db.agent_sessions import record_autonomous_event
             loop = asyncio.get_running_loop()
             res = await loop.run_in_executor(None, audit_single_fund_daily, None, False)
-            
+
             if res:
                 record_autonomous_event(
                     event_type="DAILY_FUND_AUDIT",
@@ -353,11 +328,9 @@ async def run_daily_fund_audit_scheduler():
             logger.error(f"🔍 [Fund Audit Scheduler] Error in fund audit scheduler: {e}")
             await asyncio.sleep(180)
 
+
 async def run_daily_project_audit_scheduler():
-    """
-    Automated background Project Auditor:
-    Runs nightly at 03:00 IST to audit Strategy, Code Implementation, and UI/UX.
-    """
+    """Automated background Project Auditor (runs nightly at 03:00 IST)."""
     logger.info("🛡️ [Project Auditor Scheduler] Background project auditor initiated.")
     while True:
         try:
@@ -380,13 +353,25 @@ async def run_daily_project_audit_scheduler():
             logger.error(f"🛡️ [Project Auditor Scheduler] Error in project audit scheduler: {e}")
             await asyncio.sleep(180)
 
-from apscheduler.schedulers.asyncio import AsyncIOScheduler
-from core.msme.scheduler import register_jobs
-from core.config import get_secret
 
+async def warmup_task():
+    """Primes local database connections and cache pools."""
+    if os.environ.get("TESTING") == "1" or "pytest" in sys.modules:
+        logger.info("🧪 Test environment detected: skipping live network warm-up task.")
+        return
+    logger.info("🚀 Starting warm‑up task: preloading local database connections...")
+    try:
+        init_db()
+        logger.info("🚀 Warm‑up task completed: DB connection and schema caches primed.")
+    except Exception as e:
+        logger.warning(f"Warm‑up task warning: {e}")
+
+
+# ==============================================================================
+# Application Lifespan & Initialization
+# ==============================================================================
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    # Strict Production Boot Guard: Enforce SECRET_KEY security when running on Render or production environment
     env = (os.environ.get("ENVIRONMENT") or "").strip().lower()
     is_render = (os.environ.get("RENDER") or "").strip().lower() in ["true", "1"]
     if env == "production" or is_render:
@@ -401,10 +386,8 @@ async def lifespan(app: FastAPI):
         if not admin_key or not admin_pwd:
             logger.warning("Production Notice: ADMIN_API_KEY or ADMIN_PASSWORD should be declared in production.")
 
-    # Initialize DB migrations on startup
     init_db()
 
-    # Pre-seed foundational benchmark securities if empty on startup (out-of-band, not during HTTP requests)
     try:
         from core.db.mutual_funds import get_active_mutual_funds, seed_default_mutual_funds
         if not get_active_mutual_funds():
@@ -435,21 +418,14 @@ async def lifespan(app: FastAPI):
     bse_task = None
 
     if not is_testing:
-        # Warm‑up task to prime async resources in background
         asyncio.create_task(warmup_task())
-        # Start APScheduler for MSME background jobs
         scheduler = AsyncIOScheduler()
         register_jobs(scheduler)
         scheduler.start()
-        # Start automated daily discovery background scheduler
         discovery_task = asyncio.create_task(run_daily_discovery_scheduler())
-        # Start automated daily AMFI NAV background scheduler
         amfi_task = asyncio.create_task(run_daily_amfi_scheduler())
-        # Start automated daily mutual fund forensic audit background scheduler
         fund_audit_task = asyncio.create_task(run_daily_fund_audit_scheduler())
-        # Start automated daily project audit background scheduler
         audit_task = asyncio.create_task(run_daily_project_audit_scheduler())
-        # Start proactive BSE announcement watcher
         from core.agents.watchers.bse_watcher import run_bse_watcher_loop
         bse_task = asyncio.create_task(run_bse_watcher_loop())
 
@@ -469,6 +445,7 @@ async def lifespan(app: FastAPI):
         if scheduler:
             scheduler.shutdown()
 
+
 app = FastAPI(
     title="Stock Research AI",
     description="Institutional-Grade 7-Pillar Equity Research Engine Grounded in Public Filings",
@@ -476,38 +453,14 @@ app = FastAPI(
     lifespan=lifespan
 )
 
-# Include MSME API router at top level
-from core.msme.router import router as msme_router
-app.include_router(msme_router, prefix="/api/msme")
+# Static files mounting
+BASE_DIR = os.path.dirname(os.path.abspath(__file__))
+app.mount("/static", StaticFiles(directory=os.path.join(BASE_DIR, "static")), name="static")
 
-# Cache-Control / ETag helper for cheap JSON endpoints
-def json_response_with_cache(data: dict, max_age: int = 3600) -> JSONResponse:
-    import json, hashlib
-    from fastapi.encoders import jsonable_encoder
-    safe_data = jsonable_encoder(data)
-    content_str = json.dumps(safe_data, sort_keys=True, default=str)
-    etag = f'"{hashlib.md5(content_str.encode()).hexdigest()}"'
-    return JSONResponse(content=safe_data, media_type="application/json", headers={
-        "Cache-Control": f"public, max-age={max_age}",
-        "ETag": etag,
-    })
-
-# Warm‑up task to prime async resources on startup
-async def warmup_task():
-    if os.environ.get("TESTING") == "1" or "pytest" in sys.modules:
-        logger.info("🧪 Test environment detected: skipping live network warm-up task.")
-        return
-    logger.info("🚀 Starting warm‑up task: preloading local database connections...")
-    try:
-        init_db()
-        logger.info("🚀 Warm‑up task completed: DB connection and schema caches primed.")
-    except Exception as e:
-        logger.warning(f"Warm‑up task warning: {e}")
+# Middleware setup
 if BrotliMiddleware is not None:
     app.add_middleware(BrotliMiddleware, minimum_size=500)
-# Security headers middleware for CSP, HSTS, etc.
 app.add_middleware(SecurityHeadersMiddleware)
-# CORS configuration – allow all origins for now (adjust in production)
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],
@@ -515,10 +468,11 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
-# Rate limiting using SlowAPI – 100 requests per minute per IP
+
 limiter = Limiter(key_func=get_remote_address, default_limits=["100/minute"])
 app.state.limiter = limiter
 app.add_exception_handler(RateLimitExceeded, lambda request, exc: Response(content="Rate limit exceeded", status_code=429))
+
 
 class HeadMethodMiddleware(BaseHTTPMiddleware):
     """Transparently handles HEAD requests for uptime monitors and link crawlers."""
@@ -556,79 +510,27 @@ class CrawlerLogMiddleware(BaseHTTPMiddleware):
 
 app.add_middleware(CrawlerLogMiddleware)
 
-# Static files & Jinja2 templates
-BASE_DIR = os.path.dirname(os.path.abspath(__file__))
-app.mount("/static", StaticFiles(directory=os.path.join(BASE_DIR, "static")), name="static")
-templates = Jinja2Templates(directory=os.path.join(BASE_DIR, "templates"))
-templates.env.globals["MANDATORY_SEBI_DISCLAIMER"] = MANDATORY_SEBI_DISCLAIMER
 
+# ==============================================================================
+# Modular Routers Integration
+# ==============================================================================
+from core.msme.router import router as msme_router
+app.include_router(msme_router, prefix="/api/msme")
 
-def canonical_for(request) -> str:
-    """Canonical URL for a request: configured domain + path, without tracking or stray query params.
+from web.routers.auth_billing import router as auth_billing_router
+from web.routers.dossier import router as dossier_router
+from web.routers.markets import router as markets_router
+from web.routers.admin import router as admin_router
 
-    /compare keeps its two tickers (a, b) because they define the page content.
-    """
-    try:
-        base = (os.environ.get("CANONICAL_DOMAIN") or "https://vestnomics.app").rstrip("/")
-        path = request.url.path or "/"
-        if len(path) > 1:
-            path = path.rstrip("/")
-        url = f"{base}{path}"
-        if path == "/compare":
-            a = (request.query_params.get("a") or "").strip().upper()
-            b = (request.query_params.get("b") or "").strip().upper()
-            if a and b:
-                url += "?" + urllib.parse.urlencode({"a": a, "b": b})
-        return url
-    except Exception as canon_err:
-        logger.debug("Canonical URL notice: %s", canon_err)
-        return ""
-
-
-templates.env.globals["canonical_for"] = canonical_for
+app.include_router(auth_billing_router)
+app.include_router(dossier_router)
+app.include_router(markets_router)
+app.include_router(admin_router)
 
 
 # ==============================================================================
-# Page Routes (SSR)
+# SSR HTML Page Routes
 # ==============================================================================
-
-def _is_user_subscribed(user: Optional[Dict[str, Any]]) -> bool:
-    """Checks whether the user has an active Pro/Institutional subscription."""
-    if not user:
-        return False
-    tier = (user.get("subscription_tier") or "free").lower()
-    if tier in ("pro_monthly", "pro_annual", "pro", "institutional_pro"):
-        exp = user.get("subscription_expires_at")
-        if not exp:
-            return True
-        now = datetime.now(timezone.utc)
-        if isinstance(exp, str):
-            try:
-                exp_dt = datetime.fromisoformat(exp.replace("Z", "+00:00"))
-                return exp_dt > now
-            except Exception:
-                return True
-        elif hasattr(exp, "tzinfo"):
-            return exp > now
-        return True
-    return False
-
-
-def _can_access_today_discovery(request: Request, user: Optional[Dict[str, Any]]) -> bool:
-    """Returns True if the request has entitlement to view today's live 9:00 AM Discovery Reel."""
-    if os.environ.get("TESTING") == "1":
-        # Allow testing access if admin header, test access query, or active subscriber
-        if request.headers.get("x-admin-key") or request.query_params.get("test_access") == "1":
-            return True
-        return _is_user_subscribed(user)
-    try:
-        if _is_admin_authenticated(request):
-            return True
-    except Exception as e:
-        logger.debug(f"Admin auth check in deep dive access notice: {e}")
-    return _is_user_subscribed(user)
-
-
 @app.get("/", response_class=HTMLResponse)
 def home_page(request: Request):
     """Public home & landing page with live stock search, discovery reel, and featured dossiers."""
@@ -649,8 +551,6 @@ def home_page(request: Request):
     yesterday_str = (now - timedelta(days=1)).strftime("%Y-%m-%d")
     is_past_9am = now.hour >= 9
 
-    # Free users see yesterday's verified edition with yesterday's badge;
-    # Pro subscribers see today's live edition if past 9:00 AM IST
     target_ed = today_str if (can_access_today and is_past_9am) else yesterday_str
     try:
         discovery_stocks = get_active_discovery_reel(edition_date=target_ed, allow_fallback=True)
@@ -733,6 +633,7 @@ def api_search_products(
     }, max_age=60)
 
 
+
 @app.get("/discovery", response_class=HTMLResponse)
 def discovery_page(request: Request, edition: Optional[str] = Query(None)):
     """The Morning Discovery Reel: nightly screening of under-the-radar equities."""
@@ -807,7 +708,7 @@ def discovery_page(request: Request, edition: Optional[str] = Query(None)):
 
 @app.get("/pricing", response_class=HTMLResponse)
 def pricing_page(request: Request):
-    """Dedicated pricing and computational research credit pack selection."""
+    """Public pricing and checkout page displaying single-pass, credit packs, and Pro memberships."""
     return templates.TemplateResponse(
         request=request,
         name="pricing.html",
@@ -1088,11 +989,10 @@ async def compare_page(
             "disparity": {"is_disparate": False, "warnings": []}
         }
 
-    # Format Market Caps
     for f_key in ["fund_a", "fund_b"]:
         m = comp_data.get(f_key, {}).get("market_cap")
         if m:
-            comp_data[f_key]["market_cap_str"] = format_inr(m)  # format_inr already prefixes ₹
+            comp_data[f_key]["market_cap_str"] = format_inr(m)
 
     return templates.TemplateResponse(
         request=request,
@@ -1111,50 +1011,56 @@ async def compare_page(
     )
 
 
-# ==============================================================================
-# Corporate Debt & SDIs Routes (SEBI ₹10,000 Framework)
-# ==============================================================================
-
 @app.get("/debt", response_class=HTMLResponse)
 def debt_directory_page(
     request: Request,
     seniority: Optional[str] = None,
-    is_sdi: Optional[str] = None
+    instrument_type: Optional[str] = None,
+    min_rating: Optional[str] = None,
+    q: Optional[str] = None
 ):
-    """Public corporate debt and SDI screener under SEBI's ₹10,000 face value framework."""
+    """Corporate Debt, NCDs, and SDIs under the SEBI ₹10,000 face value framework."""
     init_db()
-    sdi_bool = True if is_sdi == "true" else None
-    securities = get_active_debt_securities(
-        seniority=seniority,
-        is_sdi=sdi_bool
-    )
+    query_str = (q or "").strip()
+    if query_str:
+        from core.search.product_search import search_debt_securities
+        raw_matches = search_debt_securities(query_str, limit=50)
+        securities = []
+        for m in raw_matches:
+            sec = get_debt_security_by_isin(m["identifier"])
+            if sec:
+                securities.append(sec)
+    else:
+        securities = get_active_debt_securities(
+            seniority=seniority,
+            instrument_type=instrument_type,
+            min_rating=min_rating
+        )
 
-    # Compute average YTM
-    ytm_vals = [s.get("ytm_pct", 0.0) for s in securities if s.get("ytm_pct")]
-    avg_ytm = round(sum(ytm_vals) / len(ytm_vals), 2) if ytm_vals else 8.50
-
-    current_filter = seniority or ("is_sdi" if is_sdi == "true" else None)
-
+    recent_actions = get_recent_rating_actions(limit=8)
     return templates.TemplateResponse(
         request=request,
         name="debt_directory.html",
         context={
             "active_page": "debt",
             "securities": securities,
-            "avg_ytm": avg_ytm,
-            "current_filter": current_filter,
+            "recent_actions": recent_actions,
+            "current_seniority": seniority,
+            "current_type": instrument_type,
+            "current_rating": min_rating,
+            "query": query_str,
         }
     )
 
 
 @app.get("/debt/{isin}", response_class=HTMLResponse)
 def debt_dossier_page(request: Request, isin: str):
-    """Institutional 5-Pillar Credit & Solvency Dossier for a specific ISIN."""
+    """5-Pillar Credit & Solvency Dossier for a corporate bond or SDI."""
     init_db()
     clean_isin = isin.strip().upper()
     sec = get_debt_security_by_isin(clean_isin)
     if not sec:
-        raise HTTPException(status_code=404, detail=f"Debt security with ISIN '{clean_isin}' not found.")
+        raise HTTPException(status_code=404, detail=f"Corporate debt security with ISIN '{clean_isin}' not found.")
 
     rating_history = get_rating_history(clean_isin)
     posture = evaluate_5_pillar_credit_posture(sec, rating_history=rating_history)
@@ -1175,231 +1081,6 @@ def debt_dossier_page(request: Request, isin: str):
     )
 
 
-@app.get("/api/debt/securities")
-def api_get_debt_securities(
-    seniority: Optional[str] = None,
-    instrument_type: Optional[str] = None,
-    min_rating: Optional[str] = None,
-    is_sdi: Optional[bool] = None
-):
-    """Public API: List active corporate debt and SDIs with 5-pillar composite evaluation."""
-    init_db()
-    secs = get_active_debt_securities(
-        seniority=seniority,
-        instrument_type=instrument_type,
-        min_rating=min_rating,
-        is_sdi=is_sdi
-    )
-
-    results = []
-    for s in secs:
-        eval_summary = evaluate_5_pillar_credit_posture(s, include_live_equity_contagion=False)
-        results.append({
-            "isin": s["isin"],
-            "ticker": s["ticker"],
-            "instrument_name": s["instrument_name"],
-            "instrument_type": s["instrument_type"],
-            "seniority_tier": s["seniority_tier"],
-            "face_value": s["face_value"],
-            "coupon_rate_pct": s["coupon_rate_pct"],
-            "coupon_frequency": s["coupon_frequency"],
-            "maturity_date": str(s["maturity_date"]),
-            "credit_rating": s["credit_rating"],
-            "ytm_pct": s.get("ytm_pct"),
-            "macaulay_duration_years": s.get("macaulay_duration_years"),
-            "composite_score": eval_summary["composite_score"],
-            "posture": eval_summary["posture"],
-            "posture_badge": eval_summary["posture_badge"],
-            "warnings_count": len(eval_summary["warnings"])
-        })
-
-    return json_response_with_cache({"status": "success", "count": len(results), "securities": results})
-
-
-@app.get("/api/debt/security/{isin}")
-def api_get_debt_security_detail(isin: str, request: Request):
-    """Public API: 5-Pillar Credit & Solvency evaluation; Deep Dive parts require the 1-credit unlock."""
-    init_db()
-    clean_isin = isin.strip().upper()
-    sec = get_debt_security_by_isin(clean_isin)
-    if not sec:
-        raise HTTPException(status_code=404, detail="Debt security not found.")
-
-    rating_history = get_rating_history(clean_isin)
-    posture = evaluate_5_pillar_credit_posture(sec, rating_history=rating_history)
-
-    locked = not _asset_unlocked_for_request(request, "DEBT", clean_isin)
-    if locked:
-        posture = dict(posture)
-        posture.pop("credit_contagion_radar", None)
-        pillars = dict(posture.get("pillars") or {})
-        for gated in DEBT_GATED_PILLAR_KEYS:
-            pillars.pop(gated, None)
-        posture["pillars"] = pillars
-        posture["deep_dive_locked"] = True
-        posture["unlock_endpoint"] = f"/api/debt/unlock/{clean_isin}"
-
-    return JSONResponse(
-        {"status": "success", "security": sec, "posture": posture, "rating_history": rating_history},
-        headers={"Cache-Control": "private, no-store"}
-    )
-
-
-DEBT_GATED_PILLAR_KEYS = ("p3_solvency", "p5_recovery")
-
-
-@app.get("/api/debt/ticker/{ticker}")
-def api_get_debt_by_ticker(ticker: str):
-    """Public API: All listed corporate debt securities issued by a given company."""
-    init_db()
-    clean_t = clean_ticker(ticker)
-    secs = get_debt_securities_by_ticker(clean_t)
-    return json_response_with_cache({"status": "success", "ticker": clean_t, "count": len(secs), "securities": secs})
-
-
-@app.get("/api/debt/ratings/actions")
-def api_get_recent_rating_actions(limit: int = 50):
-    """Public API: Recent Credit Rating Agency actions (upgrades, downgrades, watches)."""
-    init_db()
-    actions = get_recent_rating_actions(limit=limit)
-    return json_response_with_cache({"status": "success", "count": len(actions), "actions": actions})
-
-
-class IngestDebtRequest(BaseModel):
-    isin: str
-    ticker: Optional[str] = None
-    instrument_name: Optional[str] = None
-    coupon_rate_pct: Optional[float] = None
-    maturity_date: Optional[str] = None
-    seniority_tier: Optional[str] = "SENIOR_SECURED"
-    credit_rating: Optional[str] = "CRISIL AAA"
-    credit_rating_agency: Optional[str] = "CRISIL"
-    face_value: Optional[float] = 10000.0
-    last_traded_price: Optional[float] = None
-    coupon_frequency: Optional[str] = "ANNUAL"
-    is_sdi: Optional[bool] = False
-    originator: Optional[str] = None
-
-
-@app.post("/api/debt/ingest")
-def api_ingest_debt_security(payload: IngestDebtRequest):
-    """Public API: Ingest and analyze any corporate bond, NCD, or SDI by ISIN."""
-    init_db()
-    raw_isin = (payload.isin or "").strip().upper()
-    if not raw_isin or len(raw_isin) != 12:
-        raise HTTPException(
-            status_code=400,
-            detail="Invalid ISIN. Indian ISINs must be exactly 12 alphanumeric characters (e.g., INE002A08012)."
-        )
-
-    # Check if already present in database
-    existing = get_debt_security_by_isin(raw_isin)
-    if existing:
-        return {
-            "status": "success",
-            "message": f"Security {raw_isin} is already indexed in the corporate debt directory.",
-            "isin": raw_isin,
-            "redirect_url": f"/debt/{raw_isin}",
-            "already_exists": True
-        }
-
-    # Resolve intelligent defaults if omitted
-    ticker = (payload.ticker or "").strip().upper()
-    if not ticker:
-        isin_prefix_map = {
-            "INE002A": "RELIANCE",
-            "INE306N": "TATACAP",
-            "INE121A": "CHOLAFIN",
-            "INE238A": "AXISBANK",
-            "INE756I": "HDBFS",
-            "INE020B": "REC",
-            "INE134E": "PFC",
-            "INE053F": "IRFC",
-            "INE906B": "NHAI",
-            "INE733E": "NTPC",
-            "INE721A": "SHRIRAMFIN",
-            "INE414G": "MUTHOOTFIN",
-            "INE522D": "MANAPPURAM",
-            "INE725H": "LTFIN",
-            "INE062A": "SBIN",
-            "INE040A": "HDFCBANK",
-            "INE601U": "KOTAKHOME",
-            "INE261F": "NABARD",
-            "INE087H": "PIRAMAL"
-        }
-        matched_prefix = next((p for p in isin_prefix_map if raw_isin.startswith(p)), None)
-        ticker = isin_prefix_map[matched_prefix] if matched_prefix else f"CORP_{raw_isin[3:7]}"
-
-    name = payload.instrument_name or f"{ticker} Fixed-Income Security ({raw_isin})"
-    coupon = float(payload.coupon_rate_pct if payload.coupon_rate_pct is not None else 8.50)
-    now_dt = datetime.now()
-    mat_date = payload.maturity_date or f"{now_dt.year + 3}-{now_dt.month:02d}-{now_dt.day:02d}"
-    face_val = float(payload.face_value or 10000.0)
-    price = float(payload.last_traded_price or face_val)
-
-    from core.analysis.debt_catalogue import ingest_collated_security
-    raw_sec = {
-        "isin": raw_isin,
-        "ticker": ticker,
-        "instrument_name": name,
-        "instrument_type": "SDI" if payload.is_sdi else "NCD",
-        "seniority_tier": (payload.seniority_tier or "SENIOR_SECURED").upper(),
-        "face_value": face_val,
-        "coupon_rate_pct": coupon,
-        "coupon_frequency": (payload.coupon_frequency or "ANNUAL").upper(),
-        "issue_date": now_dt.strftime("%Y-%m-%d"),
-        "maturity_date": mat_date,
-        "credit_rating": payload.credit_rating or "CRISIL AAA",
-        "credit_rating_agency": payload.credit_rating_agency or "CRISIL",
-        "asset_cover_ratio": 1.25,
-        "is_listed": True,
-        "exchange": "BSE",
-        "is_sdi": bool(payload.is_sdi),
-        "originator": payload.originator,
-        "fldg_pct": 0.0,
-        "last_traded_price": price,
-        "metadata": {
-            "sector": "Corporate Fixed Income",
-            "promoter_group": f"{ticker} Group",
-            "issuer_overview": f"Institutional fixed-income security indexed via on-demand ISIN audit for {raw_isin}.",
-            "collateral_type": "Registered charge on standard assets",
-            "the_good": [
-                f"Listed and tracked under SEBI ₹10,000 face value framework.",
-                f"Contractual coupon rate of {coupon:.2f}%."
-            ],
-            "the_bad": [
-                f"Requires ongoing surveillance against issuer credit and liquidity cycles."
-            ],
-            "the_ugly": [
-                f"Seniority waterfall risk in unexpected restructuring proceedings."
-            ],
-            "collated_sources": ["User Ingestion Portal", "BSE Debt Market"]
-        }
-    }
-
-    rating_event = [{
-        "rating_agency": payload.credit_rating_agency or "CRISIL",
-        "rating_symbol": (payload.credit_rating or "AAA").replace("CRISIL ", "").replace("ICRA ", "").replace("CARE ", "").strip(),
-        "outlook": "STABLE",
-        "action_type": "AFFIRMED",
-        "event_date": now_dt.strftime("%Y-%m-%d"),
-        "action_rationale": f"Initial rating registered on-demand via ISIN ingestion."
-    }]
-
-    success = ingest_collated_security(raw_sec, rating_events=rating_event)
-    if not success:
-        raise HTTPException(status_code=500, detail="Failed to save ingested debt security.")
-
-    return {
-        "status": "success",
-        "message": f"Successfully ingested and audited {raw_isin}.",
-        "isin": raw_isin,
-        "redirect_url": f"/debt/{raw_isin}",
-        "already_exists": False
-    }
-
-
-
 @app.get("/stocks", response_class=RedirectResponse)
 def stocks_alias_redirect(request: Request):
     """Permanent canonical redirect from /stocks to /equities preserving query parameters."""
@@ -1417,16 +1098,11 @@ def equities_directory_page(
     market_cap: Optional[str] = None,
     sort: Optional[str] = "mcap_desc",
 ):
-    """
-    All 143 Institutional Equities Directory & Screener.
-    Provides multi-facet sector filtering, search by ticker or company name,
-    market-cap tier slicing, and 7-pillar valuation multiples.
-    """
+    """Institutional Equities Directory & Screener."""
     init_db()
     all_equities = get_all_equities_directory_sync()
     total_equities = len(all_equities)
 
-    # Calculate overall platform aggregates
     total_mcap_cr = sum(e.get("market_cap_cr", 0.0) for e in all_equities)
     total_mcap_lakh_cr = total_mcap_cr / 100000.0 if total_mcap_cr else 210.0
 
@@ -1436,10 +1112,8 @@ def equities_directory_page(
     pe_vals = [e["pe_float"] for e in all_equities if e.get("pe_float") is not None and e["pe_float"] > 0]
     median_pe = round(statistics.median(pe_vals), 1) if pe_vals else 24.5
 
-    # Sector distribution counts across all platform equities
     sector_counts = collections.Counter(e.get("sector_slug", "DIVERSIFIED") for e in all_equities)
 
-    # Spotlight equity: pick a marquee high-reputation company with complete metrics
     featured_equity = None
     for cand_ticker in ["INFY", "TCS", "RELIANCE", "HDFCBANK", "LT"]:
         cand = next((e for e in all_equities if e["ticker"] == cand_ticker), None)
@@ -1449,7 +1123,6 @@ def equities_directory_page(
     if not featured_equity and all_equities:
         featured_equity = all_equities[0]
 
-    # Filtering logic
     filtered = list(all_equities)
     query_str = (q or "").strip()
     if query_str:
@@ -1463,17 +1136,14 @@ def equities_directory_page(
             or q_lower in e.get("sector", "").lower()
         ]
 
-    # Sector filtering
     sec_filter = (sector or "").strip().upper()
     if sec_filter:
         filtered = [e for e in filtered if e.get("sector_slug", "").upper() == sec_filter]
 
-    # Market cap tier filtering
     tier_filter = (market_cap or "").strip().upper()
     if tier_filter in ["MEGA", "LARGE", "MID", "SMALL"]:
         filtered = [e for e in filtered if e.get("market_cap_tier_slug", "").upper() == tier_filter]
 
-    # Sorting logic
     sort_key = (sort or "mcap_desc").strip().lower()
     if sort_key == "mcap_asc":
         filtered.sort(key=lambda x: (x.get("market_cap_cr", 0.0) <= 0, x.get("market_cap_cr", 0.0)))
@@ -1485,7 +1155,7 @@ def equities_directory_page(
         filtered.sort(key=lambda x: x.get("name", "").lower())
     elif sort_key == "rev_desc":
         filtered.sort(key=lambda x: x.get("revision_count", 1), reverse=True)
-    else:  # default: mcap_desc
+    else:
         filtered.sort(key=lambda x: x.get("market_cap_cr", 0.0), reverse=True)
 
     return templates.TemplateResponse(
@@ -1606,7 +1276,6 @@ def fund_dossier_page(request: Request, scheme_code: str):
     clean_code = scheme_code.strip().upper()
     scheme = get_mutual_fund_scheme(clean_code)
     if not scheme:
-        # Check master AMFI directory dynamically
         from core.ingestion.amfi import search_amfi_master_directory
         amfi_matches = search_amfi_master_directory(clean_code, limit=1)
         if amfi_matches:
@@ -1629,7 +1298,6 @@ def fund_dossier_page(request: Request, scheme_code: str):
     is_deep_dive_unlocked = _asset_unlocked_for_request(request, "FUND", clean_code)
     forensic_locked = False
     if forensic_dossier and not is_deep_dive_unlocked:
-        # Keep only the free headline; moat, ASRI, margin of safety, pledges and narrative are Deep Dive
         forensic_dossier = None
         forensic_locked = True
 
@@ -1659,184 +1327,6 @@ def fund_dossier_page(request: Request, scheme_code: str):
     )
 
 
-FUND_FREE_DOSSIER_KEYS = ("scheme_code", "scheme_name", "composite_health_score", "last_audited_at")
-
-
-@app.get("/api/funds/dossier/{scheme_code}")
-def api_get_fund_forensic_dossier(scheme_code: str, request: Request):
-    """Returns the 7-pillar forensic look-through dossier; locked users only get the free headline fields."""
-    init_db()
-    clean = scheme_code.strip().upper()
-    dossier = get_fund_forensic_dossier(clean)
-    if not dossier:
-        try:
-            dossier = audit_single_fund_daily(clean)
-        except Exception as e:
-            raise HTTPException(status_code=404, detail=f"Forensic dossier not available for {clean}: {e}")
-    if not _asset_unlocked_for_request(request, "FUND", clean):
-        free = {k: dossier.get(k) for k in FUND_FREE_DOSSIER_KEYS if k in dossier}
-        free["deep_dive_locked"] = True
-        free["unlock_endpoint"] = f"/api/funds/unlock/{clean}"
-        return free
-    return dossier
-
-
-@app.post("/api/admin/run-fund-audit")
-def api_admin_run_fund_audit(payload: Dict[str, Any] = Body(default={})):
-    """Triggers an autonomous daily forensic audit for a fund (or next in rotation)."""
-    init_db()
-    scheme_code = payload.get("scheme_code")
-    try:
-        result = audit_single_fund_daily(scheme_code)
-        return {
-            "success": True,
-            "audited_scheme": result["scheme_code"],
-            "health_score": result["composite_health_score"],
-            "weighted_moat_score": result["weighted_moat_score"],
-            "accounting_risk_index": result["accounting_risk_index"]
-        }
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
-
-
-@app.post("/api/funds/on-demand-audit")
-async def api_post_on_demand_fund_audit(
-    background_tasks: BackgroundTasks,
-    payload: Dict[str, Any] = Body(default={})
-):
-    """Enqueues an asynchronous look-through forensic audit for any AMFI scheme (pre-seeded or on-demand)."""
-    init_db()
-    scheme_code = (payload.get("scheme_code") or "").strip().upper()
-    if not scheme_code:
-        raise HTTPException(status_code=400, detail="Missing required 'scheme_code' in payload.")
-    allow_deep_dive = bool(payload.get("allow_deep_dive", False))
-
-    task_id = create_async_fund_audit_task(scheme_code, allow_deep_dive=allow_deep_dive)
-    background_tasks.add_task(run_async_fund_audit_job, task_id, scheme_code, allow_deep_dive)
-
-    return {
-        "success": True,
-        "task_id": task_id,
-        "scheme_code": scheme_code,
-        "status": "QUEUED",
-        "message": f"Forensic audit enqueued for {scheme_code}."
-    }
-
-
-@app.get("/api/funds/audit-status/{task_id}")
-def api_get_fund_audit_status(task_id: str):
-    """Returns real-time progress and completion status for an asynchronous fund audit task."""
-    init_db()
-    status = get_fund_audit_task_status(task_id)
-    if not status:
-        raise HTTPException(status_code=404, detail=f"Audit task '{task_id}' not found.")
-    return status
-
-
-@app.get("/api/funds/deep-dive-quote/{scheme_code}")
-def api_get_fund_deep_dive_quote(scheme_code: str):
-    """Returns token credit cost breakdown: Layer 1 (1 credit) vs Layer 2 Deep Dive (1 credit per uncached stock)."""
-    init_db()
-    clean = scheme_code.strip().upper()
-    try:
-        quote = calculate_deep_dive_credit_cost(clean)
-        return quote
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Failed to generate credit quote for {clean}: {str(e)}")
-
-
-@app.get("/api/funds/schemes")
-def api_get_mutual_fund_schemes(
-    category: Optional[str] = None,
-    broad_category: Optional[str] = None
-):
-    """Public API: List all tracked mutual fund schemes with look-through health scores."""
-    init_db()
-    schemes = get_active_mutual_funds(category=category, broad_category=broad_category)
-
-    results = []
-    for s in schemes:
-        h = get_scheme_holdings(s["scheme_code"])
-        lt = evaluate_dual_sleeve_lookthrough(s, h)
-        results.append({
-            "scheme_code": s["scheme_code"],
-            "scheme_name": s["scheme_name"],
-            "fund_house": s["fund_house"],
-            "category": s["category"],
-            "broad_category": s["broad_category"],
-            "benchmark_index": s["benchmark_index"],
-            "aum_crores": s["aum_crores"],
-            "nav": s["nav"],
-            "ter_direct_pct": s["ter_direct_pct"],
-            "ter_regular_pct": s["ter_regular_pct"],
-            "active_share_pct": s["active_share_pct"],
-            "portfolio_turnover_ratio_pct": s["portfolio_turnover_ratio_pct"],
-            "composite_health_score": lt["composite_health_score"],
-            "health_posture": lt["health_posture"],
-            "warnings_count": len(lt["warnings"])
-        })
-
-    return json_response_with_cache({"status": "success", "count": len(results), "schemes": results})
-
-
-@app.get("/api/funds/scheme/{scheme_code}")
-def api_get_mutual_fund_detail(scheme_code: str):
-    """Public API: Master 6-Pillar Look-Through evaluation for a specific scheme."""
-    init_db()
-    clean_code = scheme_code.strip().upper()
-    dossier = evaluate_mutual_fund_comprehensive(clean_code)
-    if not dossier:
-        raise HTTPException(status_code=404, detail=f"Scheme '{clean_code}' not found.")
-
-    return json_response_with_cache({"status": "success", "dossier": dossier})
-
-
-@app.get("/api/funds/scheme/{scheme_code}/lookthrough")
-def api_get_mutual_fund_lookthrough(scheme_code: str):
-    """Public API: Granular constituent holdings look-through table."""
-    init_db()
-    clean_code = scheme_code.strip().upper()
-    scheme = get_mutual_fund_scheme(clean_code)
-    if not scheme:
-        raise HTTPException(status_code=404, detail=f"Scheme '{clean_code}' not found.")
-
-    holdings = get_scheme_holdings(clean_code)
-    lt = evaluate_dual_sleeve_lookthrough(scheme, holdings)
-    return json_response_with_cache({"status": "success", "scheme_code": clean_code, "lookthrough": lt})
-
-
-@app.get("/api/funds/overlap")
-def api_get_funds_overlap(scheme_a: str, scheme_b: str):
-    """Public API: Computes pairwise portfolio overlap between two mutual fund schemes."""
-    init_db()
-    code_a = scheme_a.strip().upper()
-    code_b = scheme_b.strip().upper()
-
-    h_a = get_scheme_holdings(code_a)
-    h_b = get_scheme_holdings(code_b)
-    s_a = get_mutual_fund_scheme(code_a) or {}
-    s_b = get_mutual_fund_scheme(code_b) or {}
-    overlap_res = calculate_portfolio_overlap(
-        h_a, h_b,
-        name_a=s_a.get("scheme_name", code_a),
-        name_b=s_b.get("scheme_name", code_b)
-    )
-    return json_response_with_cache({"status": "success", "overlap": overlap_res})
-
-
-@app.get("/api/funds/holding/{identifier}")
-def api_get_funds_holding_security(identifier: str):
-    """Reverse Look-Through: Lists all mutual funds holding a specific stock ticker or bond ISIN."""
-    init_db()
-    clean_id = identifier.strip().upper()
-    schemes = get_schemes_by_holding(clean_id)
-
-    return json_response_with_cache({"status": "success", "identifier": clean_id, "count": len(schemes), "funds": schemes})
-
-
-# ==============================================================================
-# Priority 3: Sovereign Risk-Free Benchmarks, ETF Matrix & Real Tax Calculator
-# ==============================================================================
 @app.get("/sovereign", response_class=HTMLResponse)
 def sovereign_page(request: Request):
     """Sovereign Risk-Free Benchmarks & Par Yield Curve page."""
@@ -1851,33 +1341,6 @@ def sovereign_page(request: Request):
             "analytics": curve_data
         }
     )
-
-
-@app.get("/api/sovereign/curve")
-def api_sovereign_curve():
-    """Public API: Indian Sovereign Yield Curve & Term Spreads."""
-    from core.analysis.sovereign_engine import evaluate_sovereign_curve
-    init_db()
-    return json_response_with_cache(evaluate_sovereign_curve(), max_age=300)
-
-
-@app.get("/api/sovereign/sdl-matrix")
-def api_sovereign_sdl_matrix():
-    """Public API: State Development Loan (SDL) auction clearing cut-offs & credit spreads."""
-    from core.db.sovereign import get_sovereign_sdl_matrix
-    init_db()
-    matrix = get_sovereign_sdl_matrix()
-    return json_response_with_cache({"sdl_matrix": matrix, "count": len(matrix)}, max_age=300)
-
-
-@app.get("/api/sovereign/macro")
-def api_sovereign_macro():
-    """Public API: RBI Monetary Policy Corridor, MOSPI Inflation & Banking Liquidity."""
-    from core.db.sovereign import get_macro_monetary_corridor
-    init_db()
-    corridor = get_macro_monetary_corridor()
-    return json_response_with_cache({"macro_corridor": corridor}, max_age=300)
-
 
 
 @app.get("/etfs", response_class=HTMLResponse)
@@ -1895,14 +1358,6 @@ def etfs_page(request: Request, category: Optional[str] = Query(None)):
             "data": matrix_data
         }
     )
-
-
-@app.get("/api/etfs/matrix")
-def api_etfs_matrix(category: Optional[str] = None):
-    """Public API: National ETF Matrix with premium/discount and tracking errors."""
-    from core.analysis.etf_matrix_engine import evaluate_etf_matrix
-    init_db()
-    return json_response_with_cache(evaluate_etf_matrix(category=category), max_age=120)
 
 
 @app.get("/calculator/tax", response_class=HTMLResponse)
@@ -1929,23 +1384,6 @@ def tax_calculator_page(
     )
 
 
-@app.get("/api/calculator/tax-return")
-def api_tax_calculator(
-    nominal_return: float = Query(7.10),
-    tax_rate: float = Query(30.0),
-    cpi_inflation: float = Query(5.0)
-):
-    """Public API: Computes exact net post-tax nominal return, tax drag, and real purchasing power."""
-    from core.analysis.net_real_tax_calculator import calculate_net_real_return
-    return json_response_with_cache(
-        calculate_net_real_return(nominal_return, tax_rate, cpi_inflation),
-        max_age=3600
-    )
-
-
-# ==============================================================================
-# Unlisted MSME & Emerging SME Directory (MSMED Act 2020)
-# ==============================================================================
 @app.get("/msme", response_class=HTMLResponse)
 def msme_directory_page(
     request: Request,
@@ -2045,9 +1483,6 @@ def msme_directory_page(
     )
 
 
-# ==============================================================================
-# Priority 4: Fractional Real Estate (SM REITs, InvITs) & Sovereign Gold (SGB)
-# ==============================================================================
 @app.get("/reits", response_class=HTMLResponse)
 def reits_page(request: Request, structure: Optional[str] = Query(None)):
     """SEBI SM REITs, Mainboard REITs, InvITs & SGB Secondary Parity directory."""
@@ -2068,51 +1503,13 @@ def reits_page(request: Request, structure: Optional[str] = Query(None)):
     )
 
 
-@app.get("/api/reits/directory")
-def api_reits_directory(structure: Optional[str] = None):
-    """Public API: Audited REITs, SM REITs, and InvITs."""
-    from core.analysis.sm_reit_invit_engine import audit_reit_portfolio
-    init_db()
-    return json_response_with_cache(audit_reit_portfolio(structure_type=structure), max_age=300)
-
-
-@app.get("/api/sgb/tranches")
-def api_sgb_tranches():
-    """Public API: Sovereign Gold Bonds secondary market yields, discounts, and parity."""
-    from core.analysis.sgb_engine import evaluate_sgb_market
-    init_db()
-    return json_response_with_cache(evaluate_sgb_market(), max_age=300)
-
-
-@app.get("/api/reits/tax-breakdown")
-def api_reits_tax_breakdown(
-    symbol: str = Query("EMBASSY"),
-    tax_slab: float = Query(30.0)
-):
-    """Public API: Computes Section 115UA post-tax distribution waterfall for a REIT/InvIT."""
-    from core.analysis.sm_reit_invit_engine import simulate_reit_tax_waterfall
-    init_db()
-    return json_response_with_cache(simulate_reit_tax_waterfall(symbol, tax_slab_pct=tax_slab), max_age=300)
-
-
-# ==============================================================================
-# Multi-Asset Opportunity Terminal & Arbitrage Scanner (P4)
-# ==============================================================================
-class ArbitrageDocketRequest(BaseModel):
-    item_ids: List[str]
-    tax_slab: float = 30.0
-    cpi_inflation: float = 4.5
-
-ArbitrageDocketRequest.model_rebuild()
-
-
 @app.get("/opportunities", response_class=HTMLResponse)
 def opportunities_terminal_page(request: Request, persona: Optional[str] = Query(None)):
     """Cross-Asset Opportunity Terminal & Arbitrage Scanner."""
     from core.analysis.opportunity_terminal import get_normalized_opportunity_universe, BENCHMARK_10Y_GSEC_YIELD
     init_db()
     universe = get_normalized_opportunity_universe(persona_filter=persona)
-    
+
     sgb_yields = [x["gross_yield_pct"] for x in universe if x.get("asset_class") == "SGB"]
     peak_sgb = max(sgb_yields) if sgb_yields else 8.85
     real_asset_yields = [x["gross_yield_pct"] for x in universe if x.get("seniority_tier") == "REAL_ASSET"]
@@ -2136,56 +1533,6 @@ def opportunities_terminal_page(request: Request, persona: Optional[str] = Query
     )
 
 
-@app.get("/api/opportunities/universe")
-def api_opportunities_universe(
-    tax_slab: float = Query(30.0),
-    cpi_inflation: float = Query(4.5),
-    persona: Optional[str] = Query(None)
-):
-    """Public API: Normalized multi-asset universe with dynamic post-tax yields."""
-    from core.analysis.opportunity_terminal import get_normalized_opportunity_universe
-    init_db()
-    items = get_normalized_opportunity_universe(
-        tax_slab=tax_slab,
-        cpi_inflation=cpi_inflation,
-        persona_filter=persona
-    )
-    return json_response_with_cache({
-        "success": True,
-        "count": len(items),
-        "tax_slab_applied": tax_slab,
-        "cpi_inflation_applied": cpi_inflation,
-        "items": items
-    }, max_age=120)
-
-
-@app.get("/api/opportunities/heatmap")
-def api_opportunities_heatmap():
-    """Public API: 2D relative yield spread heatmap matrix over 10Y G-Sec."""
-    from core.analysis.opportunity_terminal import get_heatmap_matrix
-    init_db()
-    matrix = get_heatmap_matrix()
-    return json_response_with_cache(matrix, max_age=300)
-
-
-@app.post("/api/opportunities/arbitrage")
-def api_opportunities_arbitrage(payload: ArbitrageDocketRequest):
-    """Public API: Side-by-side normalized comparison scorecard for pinned items."""
-    from core.analysis.opportunity_terminal import get_arbitrage_comparison
-    init_db()
-    scorecard = get_arbitrage_comparison(
-        item_ids=payload.item_ids,
-        tax_slab=payload.tax_slab,
-        cpi_inflation=payload.cpi_inflation
-    )
-    return json_response_with_cache(scorecard, max_age=60)
-
-
-
-
-# ==============================================================================
-# Priority 5: Retail Alternative Yield & Shadow-Banking Safety Radar
-# ==============================================================================
 @app.get("/safety-radar", response_class=HTMLResponse)
 def safety_radar_page(request: Request, category: Optional[str] = Query(None)):
     """Retail Safety & Shadow-Banking Diagnostic Radar page."""
@@ -2202,300 +1549,6 @@ def safety_radar_page(request: Request, category: Optional[str] = Query(None)):
         }
     )
 
-
-@app.get("/api/safety-radar")
-def api_safety_radar(category: Optional[str] = None):
-    """Public API: Danger scores and regulatory warnings for alternative yield schemes."""
-    from core.analysis.retail_safety_radar import audit_alternative_yield_radar
-    init_db()
-    return json_response_with_cache(audit_alternative_yield_radar(category=category), max_age=300)
-
-
-# ==============================================================================
-# Institutional Analytical Engines API Suite (Phases 1 - 5)
-# ==============================================================================
-
-class AnnouncementClassifyRequest(BaseModel):
-    symbol: str
-    headline: str
-    filing_date: Optional[str] = ""
-    details_url: Optional[str] = ""
-
-
-# Backwards compatibility alias
-GarudaClassifyRequest = AnnouncementClassifyRequest
-
-
-class PortfolioLookThroughRequest(BaseModel):
-    direct_equities: List[Dict[str, Any]] = []
-    mutual_funds: List[Dict[str, Any]] = []
-    fixed_income_and_sov: List[Dict[str, Any]] = []
-
-
-# Backwards compatibility alias
-SutraAuditRequest = PortfolioLookThroughRequest
-
-
-@app.get("/api/cortex/forensic-sieve/{ticker}")
-@app.get("/api/cortex/chanakya/{ticker}")
-def api_cortex_forensic_sieve(ticker: str, mode: str = "SOFT"):
-    """Public API: 10-Point Deterministic Forensic Screening Audit."""
-    from core.cortex import ChanakyaGate
-    from core.db import get_report_by_ticker_sync
-    from normalizer import clean_ticker
-    from dataclasses import asdict
-    init_db()
-    clean_t = clean_ticker(ticker)
-    rep = get_report_by_ticker_sync(clean_t)
-    data = {"symbol": clean_t}
-    if rep:
-        try:
-            mcap_val = float(str(rep.get("baseline_mcap") or 100).replace(",", "").strip())
-            data["market_cap_cr"] = (mcap_val / 1e7) if mcap_val > 1e6 else mcap_val
-        except Exception as e:
-            logger.debug(f"Parsing baseline mcap notice for {clean_t}: {e}")
-    res = ChanakyaGate.evaluate_from_dict(data, mode=mode)
-    return json_response_with_cache(asdict(res), max_age=60)
-
-
-api_cortex_chanakya = api_cortex_forensic_sieve
-
-
-@app.get("/api/cortex/capital-matrix/{ticker}")
-@app.get("/api/cortex/setu/{ticker}")
-def api_cortex_capital_matrix(ticker: str, fcf_yield: Optional[float] = None):
-    """Public API: Cross-Asset Capital Structure Matrix and Seniority Spreads."""
-    from core.cortex import SetuMatrixEngine
-    from normalizer import clean_ticker
-    from dataclasses import asdict
-    clean_t = clean_ticker(ticker)
-    yield_val = fcf_yield if fcf_yield is not None else 6.5
-    res = SetuMatrixEngine.evaluate(symbol=clean_t, equity_fcf_yield_pct=yield_val)
-    return json_response_with_cache(asdict(res), max_age=60)
-
-
-api_cortex_setu = api_cortex_capital_matrix
-
-
-@app.post("/api/cortex/announcement-classifier")
-@app.post("/api/cortex/garuda/classify")
-def api_cortex_announcement_classify(payload: AnnouncementClassifyRequest):
-    """Public API: Event-Driven Corporate Announcement Classifier and Micro-Snapshot."""
-    from core.cortex import GarudaReflexEngine
-    from dataclasses import asdict
-    delta = GarudaReflexEngine.classify_announcement(
-        symbol=payload.symbol.upper(),
-        headline=payload.headline,
-        filing_date=payload.filing_date or "",
-        details_url=payload.details_url or "",
-    )
-    return JSONResponse(content=asdict(delta))
-
-
-api_cortex_garuda_classify = api_cortex_announcement_classify
-
-
-@app.post("/api/cortex/portfolio-look-through")
-@app.post("/api/cortex/sutra/audit")
-def api_cortex_portfolio_look_through(payload: PortfolioLookThroughRequest):
-    """Public API: Multi-Asset Portfolio Look-Through and Concentration De-Risking."""
-    from core.cortex import SutraLookThroughEngine
-    from dataclasses import asdict
-    res = SutraLookThroughEngine.audit_portfolio(
-        direct_equities=payload.direct_equities,
-        mutual_funds=payload.mutual_funds,
-        fixed_income_and_sov=payload.fixed_income_and_sov,
-    )
-    return JSONResponse(content=asdict(res))
-
-
-api_cortex_sutra_audit = api_cortex_portfolio_look_through
-
-
-
-class PreMortemRequest(BaseModel):
-    ticker: str
-    failure_vector: str
-    anti_thesis_notes: str
-    user_id: Optional[str] = "guest_web_user"
-
-
-@app.post("/api/premortem")
-async def api_premortem(payload: PreMortemRequest, request: Request):
-    """Commits a Charlie Munger Pre-Mortem counter-thesis to the audit ledger."""
-    if not _validate_request_origin(request):
-        raise HTTPException(status_code=403, detail="Cross-origin request rejected.")
-
-    clean_t = clean_ticker(payload.ticker)
-    if not clean_t:
-        raise HTTPException(status_code=400, detail="Invalid ticker symbol.")
-
-    record_usage_event(
-        event_type="PREMORTEM",
-        ticker=clean_t,
-        details={
-            "failure_vector": payload.failure_vector,
-            "anti_thesis_notes": payload.anti_thesis_notes,
-            "user_id": payload.user_id,
-        },
-        user_id=payload.user_id
-    )
-    return json_response_with_cache({
-        "success": True,
-        "message": f"🔒 Pre-Mortem counter-thesis committed to decision ledger for {clean_t}!"
-    })
-
-
-class ThesisCheckpointRequest(BaseModel):
-    ticker: str
-    decision: str
-    rationale: str
-    current_price: Optional[float] = None
-    user_id: Optional[str] = "guest_web_user"
-
-
-@app.post("/api/thesis-checkpoint")
-async def api_thesis_checkpoint(payload: ThesisCheckpointRequest, request: Request):
-    """Commits an analyst 'Would you buy today?' thesis checkpoint to the audit ledger."""
-    if not _validate_request_origin(request):
-        raise HTTPException(status_code=403, detail="Cross-origin request rejected.")
-
-    clean_t = clean_ticker(payload.ticker)
-    if not clean_t:
-        raise HTTPException(status_code=400, detail="Invalid ticker symbol.")
-
-    record_usage_event(
-        event_type="THESIS_CHECKPOINT",
-        ticker=clean_t,
-        details={
-            "decision": payload.decision,
-            "rationale": payload.rationale,
-            "current_price": payload.current_price,
-            "user_id": payload.user_id,
-        },
-        user_id=payload.user_id
-    )
-    return json_response_with_cache({
-        "success": True,
-        "message": f"⚖️ Thesis Checkpoint ('Would you buy today?') verdict committed for {clean_t}!"
-    })
-
-
-class TelemetryEventRequest(BaseModel):
-    event_type: str
-    ticker: Optional[str] = ""
-    user_id: Optional[str] = None
-    user_email: Optional[str] = None
-    session_id: Optional[str] = None
-    referrer: Optional[str] = None
-    landing_url: Optional[str] = None
-    landing_page: Optional[str] = None
-    utm_source: Optional[str] = None
-    utm_medium: Optional[str] = None
-    utm_campaign: Optional[str] = None
-    ref: Optional[str] = None
-    details: Optional[dict] = None
-
-
-@app.post("/api/telemetry/event")
-async def api_record_telemetry_event(payload: TelemetryEventRequest, request: Request):
-    """Client-side telemetry event capture for user-level journey and acquisition tracking."""
-    # 0. Exclude admin visits (active admin session cookie or authenticated admin)
-    admin_cookie = request.cookies.get(ADMIN_COOKIE_NAME) or request.cookies.get("admin_session")
-    if admin_cookie or _is_admin_authenticated(request):
-        return json_response_with_cache({"status": "filtered", "reason": "admin_session"})
-
-    user_agent = request.headers.get("user-agent", "")
-
-    # 1. Resolve traffic attribution from landing payload or headers
-    query_params = {}
-    if payload.utm_source:
-        query_params["utm_source"] = payload.utm_source
-    if payload.utm_medium:
-        query_params["utm_medium"] = payload.utm_medium
-    if payload.utm_campaign:
-        query_params["utm_campaign"] = payload.utm_campaign
-    if payload.ref:
-        query_params["ref"] = payload.ref
-
-    effective_referrer = (payload.referrer or "").strip()
-    if not effective_referrer:
-        hdr_ref = request.headers.get("referer", "")
-        base_host = request.base_url.netloc
-        if hdr_ref and base_host not in hdr_ref:
-            effective_referrer = hdr_ref
-
-    traffic_source, clean_ref = parse_traffic_source(effective_referrer, query_params)
-
-    # 2. Parse device, browser, and OS
-    client_env = parse_user_agent(user_agent)
-
-    # 3. Geo extraction from proxy headers
-    country = extract_geo(dict(request.headers))
-
-    # 4. Anonymous session ID resolution
-    client_ip = request.headers.get("x-forwarded-for") or (request.client.host if request.client else "")
-    if client_ip and "," in client_ip:
-        client_ip = client_ip.split(",")[0].strip()
-
-    sess_id = payload.session_id or f"sess_{hashlib.md5((client_ip + user_agent).encode()).hexdigest()[:10]}"
-
-    # 5. Resolve landing page and visited path
-    evt_details = dict(payload.details or {})
-    resolved_lp = payload.landing_page or evt_details.get("landing_page") or ""
-    if not resolved_lp and payload.landing_url:
-        try:
-            from urllib.parse import urlparse
-            p = urlparse(payload.landing_url).path
-            if p:
-                resolved_lp = p
-        except Exception as url_err:
-            logger.debug("Landing URL parse notice: %s", url_err)
-    if not resolved_lp:
-        resolved_lp = evt_details.get("path") or evt_details.get("page") or "/"
-    if not resolved_lp.startswith("/"):
-        resolved_lp = "/" + resolved_lp
-    if len(resolved_lp) > 1 and resolved_lp.endswith("/"):
-        resolved_lp = resolved_lp.rstrip("/")
-
-    evt_details["landing_page"] = resolved_lp
-    if payload.landing_url and "landing_url" not in evt_details:
-        evt_details["landing_url"] = payload.landing_url
-
-    # 6. Exclude tests and administrator visits
-    if is_excluded_telemetry_event(
-        event_type=payload.event_type or "",
-        ticker=payload.ticker or "",
-        browser=client_env.get("browser", "Chrome"),
-        user_id=payload.user_id or "",
-        user_email=payload.user_email or "",
-        landing_page=resolved_lp,
-        session_id=sess_id,
-        details=evt_details
-    ):
-        return json_response_with_cache({"status": "filtered", "reason": "test_or_admin"})
-
-    record_usage_event(
-        event_type=payload.event_type,
-        ticker=payload.ticker or "",
-        details=evt_details,
-        session_id=sess_id,
-        traffic_source=traffic_source,
-        referrer=clean_ref,
-        country=country,
-        device_type=client_env.get("device", "Unknown"),
-        browser=client_env.get("browser", "Unknown"),
-        os=client_env.get("os", "Unknown"),
-        user_id=payload.user_id,
-        user_email=payload.user_email,
-        landing_page=resolved_lp
-    )
-    return json_response_with_cache({"status": "ok"})
-
-
-# ==============================================================================
-# Mandatory Razorpay Legal & Compliance Policy Routes
-# ==============================================================================
 
 @app.get("/terms", response_class=HTMLResponse)
 async def terms_page(request: Request):
@@ -2569,7 +1622,6 @@ async def submit_contact_ticket(
             }
         )
 
-    # 1. Create ticket in database
     res = create_support_ticket(
         user_email=clean_email,
         subject=clean_subj,
@@ -2594,10 +1646,9 @@ async def submit_contact_ticket(
             }
         )
 
-    # 2. Dispatch background alert to admin console and admin email
     background_tasks.add_task(dispatch_support_ticket_alert, res)
 
-    # 3. Record telemetry event
+    from core.db.telemetry import record_usage_event
     record_usage_event(
         event_type="SUPPORT_TICKET_SUBMITTED",
         details={"ticket_id": res.get("ticket_id"), "category": clean_cat, "email": clean_email}
@@ -2633,906 +1684,18 @@ async def disclaimer_page(request: Request):
     )
 
 
-# ==============================================================================
-# API Endpoints
-# ==============================================================================
-
-@app.get("/api/suggest")
-async def api_suggest(q: str = ""):
-    """Returns ticker autocomplete suggestions with caching headers."""
-    if not q or len(q.strip()) < 2:
-        return json_response_with_cache({"suggestions": []})
-    return json_response_with_cache({"suggestions": get_ticker_suggestions(q.strip())})
-
-
-# ==============================================================================
-# Public User Authentication & Identity Management (Google OAuth + Email OTP)
-# ==============================================================================
-
-USER_SESSION_COOKIE = "user_session_token"
-ALLOWED_ORIGIN_HOSTS = {
-    "localhost",
-    "127.0.0.1",
-    "testserver",
-    "vestfolio.app",
-    "www.vestfolio.app",
-    "vestnomics.app",
-    "www.vestnomics.app",
-    "stockresearch.app",
-    "www.stockresearch.app",
-    "stock-research-app-2ljm.onrender.com",
-}
-
-def _get_user_signing_key() -> bytes:
-    key = os.environ.get("SECRET_KEY") or get_secret("SECRET_KEY") or os.environ.get("ADMIN_API_KEY") or get_secret("ADMIN_API_KEY") or "stock_research_user_session_salt_2026"
-    return key.encode("utf-8")
-
-def _generate_user_session_token(user_id: str, email: str) -> str:
-    secret = _get_user_signing_key()
-    now_ts = int(datetime.now(timezone.utc).timestamp())
-    data = json.dumps({"user_id": user_id, "email": email.strip().lower(), "ts": now_ts})
-    payload_b64 = base64.urlsafe_b64encode(data.encode("utf-8")).decode("utf-8")
-    sig = hmac.new(secret, payload_b64.encode("utf-8"), hashlib.sha256).hexdigest()
-    return f"{payload_b64}.{sig}"
-
-def _validate_user_session_token(token: Optional[str]) -> Optional[Dict[str, Any]]:
-    if not token or "." not in token:
-        return None
-    try:
-        payload_b64, sig = token.rsplit(".", 1)
-        secret = _get_user_signing_key()
-        expected_sig = hmac.new(secret, payload_b64.encode("utf-8"), hashlib.sha256).hexdigest()
-        if not hmac.compare_digest(sig, expected_sig):
-            return None
-        data_str = base64.urlsafe_b64decode(payload_b64.encode("utf-8")).decode("utf-8")
-        payload = json.loads(data_str)
-        ts = payload.get("ts", 0)
-        # Valid for 30 days
-        if datetime.now(timezone.utc).timestamp() - ts < 2592000:
-            return payload
-        return None
-    except Exception:
-        return None
-
-def _get_current_web_user(request: Request) -> Optional[Dict[str, Any]]:
-    token = request.cookies.get(USER_SESSION_COOKIE)
-    if not token:
-        auth_header = request.headers.get("authorization", "")
-        if auth_header.lower().startswith("bearer "):
-            token = auth_header.split(" ", 1)[1].strip()
-    session = _validate_user_session_token(token)
-    if session and session.get("email"):
-        user = get_user_by_email(session["email"])
-        if user:
-            return user
-    return None
-
-def _validate_request_origin(request: Request) -> bool:
-    origin = request.headers.get("origin")
-    referer = request.headers.get("referer")
-    target = origin or referer
-    if not target:
-        return True
-    try:
-        parsed = urllib.parse.urlparse(target)
-        host = (parsed.hostname or "").lower()
-        return host in ALLOWED_ORIGIN_HOSTS or host.endswith(".onrender.com")
-    except Exception:
-        return False
-
-
-class SendOtpRequest(BaseModel):
-    email: str
-
-
-@app.post("/api/auth/send-otp")
-async def api_send_otp(payload: SendOtpRequest):
-    """
-    Generates and dispatches a cryptographically secure 6-digit email OTP.
-    Enforces a 60-second cooldown rate-limit per email.
-    """
-    clean_email = (payload.email or "").strip().lower()
-    success, msg, code = create_email_otp(clean_email)
-    if not success:
-        raise HTTPException(status_code=400, detail=msg)
-
-    response_data = {"success": True, "message": msg}
-    if os.environ.get("TESTING") == "1":
-        response_data["test_code"] = code
-    return JSONResponse(content=response_data)
-
-
-class VerifyOtpRequest(BaseModel):
-    email: str
-    code: str
-    full_name: Optional[str] = None
-
-
-@app.post("/api/auth/verify-otp")
-async def api_verify_otp(payload: VerifyOtpRequest):
-    """
-    Validates email OTP, registers/authenticates user, and issues a 30-day signed session cookie.
-    """
-    clean_email = (payload.email or "").strip().lower()
-    valid, msg = verify_email_otp(clean_email, payload.code)
-    if not valid:
-        raise HTTPException(status_code=400, detail=msg)
-
-    user_id = f"usr_{clean_email.replace('@', '_at_').replace('.', '_')}"
-    user = get_or_create_user(
-        user_id=user_id,
-        email=clean_email,
-        full_name=payload.full_name or clean_email.split("@")[0].capitalize()
-    )
-    if not user:
-        raise HTTPException(status_code=500, detail="Could not initialize user profile.")
-
-    record_usage_event(
-        event_type="user_signin",
-        user_id=user_id,
-        user_email=clean_email,
-        details={"name": user.get("full_name"), "tier": user.get("subscription_tier"), "method": "email_otp"}
-    )
-
-    token = _generate_user_session_token(user_id, clean_email)
-    resp = JSONResponse(content={
-        "success": True,
-        "token": token,
-        "message": f"Welcome {user.get('full_name')}! You have received 2 free research credits.",
-        "user": user
-    })
-    resp.set_cookie(
-        key=USER_SESSION_COOKIE,
-        value=token,
-        httponly=True,
-        samesite="lax",
-        max_age=2592000
-    )
-    return resp
-
-
-class SignInRequest(BaseModel):
-    email: str
-    full_name: Optional[str] = None
-    otp_code: Optional[str] = None
-
-
-@app.post("/api/auth/signin")
-async def api_signin(payload: SignInRequest):
-    """
-    Hardened user sign-in endpoint.
-    Requires verified OTP code or testing bypass. Direct unverified email registration is blocked in production.
-    """
-    clean_email = (payload.email or "").strip().lower()
-    if not clean_email or "@" not in clean_email or "." not in clean_email.split("@")[-1]:
-        raise HTTPException(status_code=400, detail="Please provide a valid email address.")
-
-    # Security Gate: Require valid OTP code in production
-    if os.environ.get("TESTING") != "1":
-        if not payload.otp_code:
-            raise HTTPException(
-                status_code=403,
-                detail="Direct unverified sign-in is disabled. Please verify your email via OTP or Google OAuth."
-            )
-        valid, msg = verify_email_otp(clean_email, payload.otp_code)
-        if not valid:
-            raise HTTPException(status_code=400, detail=msg)
-
-    user_id = f"usr_{clean_email.replace('@', '_at_').replace('.', '_')}"
-    user = get_or_create_user(
-        user_id=user_id,
-        email=clean_email,
-        full_name=payload.full_name or clean_email.split("@")[0].capitalize()
-    )
-    if not user:
-        raise HTTPException(status_code=500, detail="Could not initialize user profile.")
-
-    record_usage_event(
-        event_type="user_signin",
-        user_id=user_id,
-        user_email=clean_email,
-        details={"name": user.get("full_name"), "tier": user.get("subscription_tier"), "method": "direct_verified"}
-    )
-
-    token = _generate_user_session_token(user_id, clean_email)
-    resp = JSONResponse(content={
-        "success": True,
-        "token": token,
-        "message": f"Welcome {user.get('full_name')}! You have received 2 free research credits.",
-        "user": user
-    })
-    resp.set_cookie(
-        key=USER_SESSION_COOKIE,
-        value=token,
-        httponly=True,
-        samesite="lax",
-        max_age=2592000
-    )
-    return resp
-
-
-def resolve_app_base_url(request: Request) -> str:
-    """
-    Resolves canonical public base URL handling reverse proxies (Render SSL termination).
-    Ensures that when hosted on Render or custom domains, the protocol is strictly https://.
-    """
-    proto = request.headers.get("x-forwarded-proto") or request.url.scheme or "http"
-    host = request.headers.get("x-forwarded-host") or request.headers.get("host") or request.url.netloc or ""
-
-    # In production on Render or when CANONICAL_DOMAIN is configured:
-    # If the incoming host header is missing or loopback, fallback to the canonical domain.
-    is_prod = bool(os.environ.get("RENDER")) or os.environ.get("ENVIRONMENT") == "production"
-    if is_prod and (not host or "localhost" in host or "127.0.0.1" in host):
-        return (os.environ.get("CANONICAL_DOMAIN") or "https://vestnomics.app").rstrip("/")
-
-    if "onrender.com" in host or ("localhost" not in host and "127.0.0.1" not in host and "testserver" not in host):
-        proto = "https"
-    return f"{proto}://{host}".rstrip("/")
-
-
-@app.get("/auth/google")
-async def public_auth_google(request: Request, redirect: Optional[str] = "/"):
-    """Public Google OAuth initiation via Supabase GoTrue."""
-    base_url = resolve_app_base_url(request)
-    redirect_target = f"{base_url}/auth/callback"
-    cfg = get_supabase_auth_config()
-    sb_url = cfg.get("url")
-
-    if sb_url:
-        oauth_url = f"{sb_url}/auth/v1/authorize?provider=google&redirect_to={urllib.parse.quote(redirect_target)}"
-        resp = RedirectResponse(url=oauth_url, status_code=303)
-        if redirect and redirect != "/":
-            is_secure = base_url.startswith("https://")
-            resp.set_cookie(
-                key="oauth_next",
-                value=redirect,
-                max_age=600,
-                httponly=True,
-                samesite="lax",
-                secure=is_secure,
-                path="/"
-            )
-        return resp
-    return RedirectResponse(
-        url="/?err=Google+OAuth+not+yet+configured.+Please+use+Email+OTP+verification.",
-        status_code=303
-    )
-
-
-def _extract_jwt_claims(token_str: str) -> dict:
-    """Safely decodes Supabase JWT claims without requiring remote network roundtrips."""
-    try:
-        parts = str(token_str).strip().split(".")
-        if len(parts) >= 2:
-            payload_b64 = parts[1] + "=" * ((4 - len(parts[1]) % 4) % 4)
-            return json.loads(base64.urlsafe_b64decode(payload_b64.encode("utf-8")).decode("utf-8"))
-    except Exception as e:
-        logger.debug(f"JWT claim extraction notice: {e}")
-    return {}
-
-
-@app.get("/auth/callback")
-async def public_auth_callback(
-    request: Request,
-    code: Optional[str] = None,
-    access_token: Optional[str] = None,
-    next: Optional[str] = "/"
-):
-    """Processes Google OAuth callback for public users, sets session cookie and localStorage."""
-    # 0. Defensive OAuth query param error handling
-    oauth_err = request.query_params.get("error_description") or request.query_params.get("error")
-    if oauth_err:
-        clean_err = oauth_err.replace("+", " ")
-        logger.warning(f"Public Google OAuth redirect error received: {clean_err}")
-        return RedirectResponse(url=f"/?err={urllib.parse.quote(clean_err)}", status_code=303)
-
-    # If user already authenticated and visits callback without code/token, redirect to destination
-    current_user = _get_current_web_user(request)
-    if current_user and not code and not access_token:
-        dest_url = next if (next and next != "/") else "/"
-        return RedirectResponse(url=dest_url, status_code=303)
-
-    cfg = get_supabase_auth_config()
-    sb_url = cfg.get("url")
-    anon_key = cfg.get("anon_key") or os.environ.get("SUPABASE_SERVICE_ROLE_KEY", "")
-    verified_email = None
-    user_name = None
-
-    if code and sb_url:
-        try:
-            resp = requests.post(
-                f"{sb_url}/auth/v1/token?grant_type=pkce",
-                json={"auth_code": code},
-                headers={"apikey": anon_key, "Content-Type": "application/json"},
-                timeout=8
-            )
-            if resp.status_code == 200:
-                tok_data = resp.json()
-                u_info = tok_data.get("user", {})
-                verified_email = u_info.get("email")
-                user_name = u_info.get("user_metadata", {}).get("full_name") or u_info.get("user_metadata", {}).get("name")
-        except Exception as e:
-            logger.error(f"Error exchanging public OAuth code: {e}")
-
-    elif access_token:
-        # 1. Immediate claim extraction from signed Supabase token (immune to missing anon_key)
-        claims = _extract_jwt_claims(access_token)
-        user_meta = claims.get("user_metadata") or {}
-        if claims.get("email") or user_meta.get("email"):
-            verified_email = claims.get("email") or user_meta.get("email")
-            user_name = user_meta.get("full_name") or user_meta.get("name") or claims.get("name")
-
-        # 2. Enrich from Supabase REST endpoint if configured
-        if sb_url and anon_key:
-            try:
-                resp = requests.get(
-                    f"{sb_url}/auth/v1/user",
-                    headers={"Authorization": f"Bearer {access_token}", "apikey": anon_key},
-                    timeout=8
-                )
-                if resp.status_code == 200:
-                    data = resp.json()
-                    verified_email = data.get("email") or verified_email
-                    user_name = data.get("user_metadata", {}).get("full_name") or data.get("user_metadata", {}).get("name") or user_name
-            except Exception as e:
-                logger.debug(f"Notice fetching public user via token endpoint: {e}")
-
-    if not verified_email:
-        # Browser client-side hash handler for implicit flow
-        return HTMLResponse(f"""
-        <!DOCTYPE html>
-        <html><head><meta charset="utf-8"><title>Verifying Identity...</title></head>
-        <body style="background:#0f172a;color:#f8fafc;font-family:sans-serif;display:flex;align-items:center;justify-content:center;height:100vh;">
-            <div style="text-align:center;">
-                <h2>Authenticating with Google...</h2>
-                <p style="color:#94a3b8;">Verifying your account credentials.</p>
-            </div>
-            <script>
-            if (window.location.hash) {{
-                const params = new URLSearchParams(window.location.hash.substring(1));
-                const token = params.get('access_token');
-                const err = params.get('error_description') || params.get('error');
-                if (token) {{
-                    window.location.href = '/auth/callback?access_token=' + encodeURIComponent(token) + '&next=' + encodeURIComponent('{next or "/"}');
-                }} else if (err) {{
-                    window.location.href = '/?err=' + encodeURIComponent(err);
-                }} else {{
-                    window.location.href = '/?err=Authentication+failed';
-                }}
-            }} else {{
-                window.location.href = '/?err=Authentication+session+expired+or+cancelled';
-            }}
-            </script>
-        </body></html>
-        """)
-
-    clean_email = verified_email.strip().lower()
-    full_name = user_name or clean_email.split("@")[0].capitalize()
-    user_id = f"usr_{clean_email.replace('@', '_at_').replace('.', '_')}"
-    user = get_or_create_user(user_id=user_id, email=clean_email, full_name=full_name)
-
-    token = _generate_user_session_token(user_id, clean_email)
-    oauth_next_cookie = (request.cookies.get("oauth_next") or "").strip('"')
-    dest_url = next if (next and next != "/") else (oauth_next_cookie or "/")
-    if not dest_url.startswith("/"):
-        dest_url = "/"
-
-    user_json = json.dumps(user)
-    html_content = f"""
-    <!DOCTYPE html>
-    <html><head><meta charset="utf-8"><title>Authentication Successful</title></head>
-    <body style="background:#0f172a;color:#f8fafc;font-family:sans-serif;display:flex;align-items:center;justify-content:center;height:100vh;">
-        <div style="text-align:center;">
-            <h2>🎉 Welcome, {full_name}!</h2>
-            <p style="color:#94a3b8;">Redirecting to your research terminal...</p>
-        </div>
-        <script>
-        try {{
-            const profile = {user_json};
-            localStorage.setItem('sr_user', JSON.stringify(profile));
-        }} catch (e) {{
-            console.error('Session sync error:', e);
-        }}
-        setTimeout(function() {{
-            window.location.replace('{dest_url}');
-        }}, 300);
-        </script>
-    </body></html>
-    """
-    resp = HTMLResponse(content=html_content)
-    base_url = resolve_app_base_url(request)
-    is_secure = base_url.startswith("https://")
-    resp.set_cookie(
-        key=USER_SESSION_COOKIE,
-        value=token,
-        httponly=True,
-        samesite="lax",
-        secure=is_secure,
-        path="/",
-        max_age=2592000
-    )
-    if oauth_next_cookie:
-        resp.delete_cookie(key="oauth_next", path="/")
-    return resp
-
-
-@app.get("/api/auth/me")
-async def api_auth_me(request: Request):
-    """Returns the currently authenticated user profile from session cookie or Authorization header."""
-    user = _get_current_web_user(request)
-    if not user:
-        raise HTTPException(status_code=401, detail="Not authenticated.")
-    return JSONResponse(content={"authenticated": True, "user": user})
-
-
-@app.post("/api/auth/signout")
-async def api_auth_signout():
-    """Clears the authenticated user session cookie."""
-    resp = JSONResponse(content={"success": True, "message": "Successfully signed out."})
-    resp.delete_cookie(key=USER_SESSION_COOKIE)
-    return resp
-
-
-class OrderRequest(BaseModel):
-    plan_id: Optional[str] = None
-    amount: Optional[int] = None       # amount in paise (minimum 100)
-    currency: Optional[str] = "INR"
-    receipt: Optional[str] = None
-    user_id: Optional[str] = "guest_web_user"
-    email: Optional[str] = "investor@example.com"
-
-
-@app.post("/api/create-order")
-async def api_create_order(payload: OrderRequest, request: Request):
-    """
-    Creates an official Razorpay order or returns simulated checkout data.
-    Validates amount >= 100 paise, handles 401 auth and 500 API errors.
-    """
-    if not _validate_request_origin(request):
-        raise HTTPException(status_code=403, detail="Cross-origin request rejected.")
-
-    try:
-        order = create_razorpay_order(
-            plan_id=payload.plan_id,
-            amount_paise=payload.amount,
-            currency=payload.currency or "INR",
-            receipt=payload.receipt,
-            user_id=payload.user_id or "guest_web_user",
-            user_email=payload.email or "investor@example.com"
-        )
-        return json_response_with_cache({
-        "order_id": order.get("order_id") or order.get("id"),
-        "id": order.get("id") or order.get("order_id"),
-        "amount": order.get("amount"),
-        "currency": order.get("currency", "INR"),
-        "key_id": order.get("key_id"),
-        "receipt": order.get("receipt"),
-        "status": order.get("status", "created"),
-        "is_simulated": order.get("is_simulated", False),
-        "plan": order.get("plan")
-    })
-    except RazorpayAuthError as e:
-        logger.error(f"Razorpay auth failure: {e}")
-        raise HTTPException(status_code=401, detail="Razorpay authentication failed. Verify API credentials.")
-    except RazorpayAPIError as e:
-        logger.error(f"Razorpay API failure: {e}")
-        raise HTTPException(status_code=500, detail=str(e))
-    except ValueError as e:
-        logger.error(f"Validation error: {e}")
-        raise HTTPException(status_code=400, detail=str(e))
-    except Exception as e:
-        logger.error(f"Unhandled error creating order: {e}")
-        raise HTTPException(status_code=500, detail=f"Order creation failed: {e}")
-
-
-class VerifyPaymentRequest(BaseModel):
-    order_id: Optional[str] = None
-    razorpay_order_id: Optional[str] = None
-    payment_id: Optional[str] = None
-    razorpay_payment_id: Optional[str] = None
-    signature: Optional[str] = None
-    razorpay_signature: Optional[str] = None
-    plan_id: Optional[str] = "single_pass"
-    user_id: Optional[str] = "guest_web_user"
-
-
-@app.post("/api/verify-payment")
-async def api_verify_payment(payload: VerifyPaymentRequest, request: Request):
-    """
-    Cryptographically verifies the HMAC-SHA256 signature generated by Razorpay.
-    Returns 400 for signature mismatch or missing fields, and credits user on match.
-    """
-    if not _validate_request_origin(request):
-        raise HTTPException(status_code=403, detail="Cross-origin request rejected.")
-
-    eff_order_id = payload.order_id or payload.razorpay_order_id
-    eff_payment_id = payload.payment_id or payload.razorpay_payment_id
-    eff_signature = payload.signature or payload.razorpay_signature
-
-    if not eff_order_id or not eff_payment_id or not eff_signature:
-        raise HTTPException(
-            status_code=400,
-            detail="Missing required payment verification fields (order_id, payment_id, signature)."
-        )
-
-    try:
-        ok, new_bal, inv_num, msg = process_successful_payment(
-            user_id=payload.user_id or "guest_web_user",
-            plan_id=payload.plan_id or "single_pass",
-            order_id=eff_order_id,
-            payment_id=eff_payment_id,
-            signature=eff_signature
-        )
-        if not ok:
-            raise HTTPException(
-                status_code=400,
-                detail=msg or "Payment signature verification failed. Transaction was not confirmed."
-            )
-
-        record_usage_event(
-            event_type="purchase_success",
-            user_id=payload.user_id,
-            details={"plan_id": payload.plan_id, "payment_id": eff_payment_id, "invoice": inv_num}
-        )
-
-        return json_response_with_cache({
-        "success": True,
-        "message": "Payment verified successfully",
-        "order_id": eff_order_id,
-        "payment_id": eff_payment_id,
-        "new_balance": new_bal,
-        "invoice_number": inv_num
-    })
-    except HTTPException:
-        raise
-    except Exception as e:
-        logger.error(f"Error verifying payment: {e}")
-        raise HTTPException(status_code=400, detail=str(e))
-
-
-def _deep_dive_unlocked_for_request(request: Request, ticker: str) -> bool:
-    """Single server-side rule for the Pillar 03/05 paywall, shared by copilot and PDF export."""
-    if _is_admin_authenticated(request):
-        return True
-    if os.environ.get("TESTING") == "1" and request.headers.get("x-unlock-preview") == "1":
-        return True
-    web_user = _get_current_web_user(request)
-    if web_user and ticker:
-        t_clean = clean_ticker(ticker)
-        canonical = resolve_canonical_symbol(t_clean) or t_clean
-        return bool(is_ticker_unlocked_for_user(web_user.get("id", ""), canonical))
-    return False
-
-
-def _asset_unlock_key(kind: str, asset_id: str) -> str:
-    """Namespaced key so fund/debt unlocks never collide with equity tickers (e.g. 'FUND:119551')."""
-    return f"{kind.upper()}:{str(asset_id).strip().upper()}"
-
-
-def _asset_unlocked_for_request(request: Request, kind: str, asset_id: str) -> bool:
-    """Server-side rule for the Mutual Fund / Corporate Debt deep-dive paywall (1 credit each)."""
-    if _is_admin_authenticated(request):
-        return True
-    if os.environ.get("TESTING") == "1" and request.headers.get("x-unlock-preview") == "1":
-        return True
-    web_user = _get_current_web_user(request)
-    if web_user and asset_id:
-        return bool(is_ticker_unlocked_for_user(web_user.get("id", ""), _asset_unlock_key(kind, asset_id)))
-    return False
-
-
-def _unlock_asset_deep_dive(request: Request, kind: str, asset_id: str, label: str):
-    """Charges 1 credit (idempotent) and records the unlock for a fund scheme or debt security."""
-    web_user = _get_current_web_user(request)
-    if not web_user:
-        raise HTTPException(
-            status_code=401,
-            detail="Sign in to unlock the Deep Dive. New accounts get 2 free welcome credits."
-        )
-    uid = str(web_user.get("id", "")).strip()
-    key = _asset_unlock_key(kind, asset_id)
-    ok, new_bal, msg = unlock_ticker_for_user(user_id=uid, ticker=key, amount=1.0)
-    if not ok:
-        raise HTTPException(status_code=402, detail=msg)
-    record_usage_event(
-        event_type="dossier_unlock",
-        ticker=key,
-        user_id=uid,
-        details={"action": f"{kind.lower()}_deep_dive_unlock", "new_balance": new_bal}
-    )
-    return json_response_with_cache({
-        "success": True,
-        "asset_kind": kind,
-        "asset_id": str(asset_id).strip().upper(),
-        "new_balance": new_bal,
-        "message": f"Deep Dive unlocked for {label}."
-    })
-
-
-@app.post("/api/funds/unlock/{scheme_code}")
-async def api_unlock_fund_deep_dive(request: Request, scheme_code: str):
-    """Consumes 1 credit to permanently unlock the Deep Dive sections of a mutual fund dossier."""
-    init_db()
-    clean_code = scheme_code.strip().upper()
-    if not clean_code:
-        raise HTTPException(status_code=404, detail="Mutual fund scheme not found.")
-    if not get_mutual_fund_scheme(clean_code):
-        from core.ingestion.amfi import search_amfi_master_directory
-        if not search_amfi_master_directory(clean_code, limit=1):
-            raise HTTPException(status_code=404, detail="Mutual fund scheme not found.")
-    return _unlock_asset_deep_dive(request, "FUND", clean_code, clean_code)
-
-
-@app.post("/api/debt/unlock/{isin}")
-async def api_unlock_debt_deep_dive(request: Request, isin: str):
-    """Consumes 1 credit to permanently unlock the Deep Dive sections of a debt security dossier."""
-    init_db()
-    clean_isin = isin.strip().upper()
-    if not clean_isin or not get_debt_security_by_isin(clean_isin):
-        raise HTTPException(status_code=404, detail="Debt security not found.")
-    return _unlock_asset_deep_dive(request, "DEBT", clean_isin, clean_isin)
-
-
-
-def _pdf_account_ref(request: Request) -> str:
-    """Opaque account reference stamped on PDFs (never the email address)."""
-    web_user = _get_current_web_user(request)
-    return str(web_user.get("id", ""))[:12] if web_user else ""
-
-
-PDF_LOCKED_NOTICE = (
-    "*Institutional deep-dive section. Unlock this ticker on the website (1 credit) "
-    "to include it in your PDF.*"
-)
-
-
-@app.get("/api/pdf/{ticker}")
-async def api_download_pdf(
-    ticker: str,
-    request: Request,
-    firm_name: Optional[str] = None,
-    advisor_reg_no: Optional[str] = None,
-    prepared_for: Optional[str] = None,
-    custom_disclaimer: Optional[str] = None
-):
-    """Generates and serves the official downloadable PDF report with optional firm branding."""
-    clean_t = clean_ticker(ticker)
-    rep = get_report_by_ticker_sync(clean_t)
-    if not rep or not rep.get("report_text"):
-        raise HTTPException(status_code=404, detail="Report not found.")
-
-    record_usage_event(
-        event_type="pdf_download",
-        ticker=clean_t,
-        details={"action": "export_pdf", "branded": bool(firm_name)}
-    )
-
-    branding = None
-    if firm_name:
-        branding = {
-            "firm_name": firm_name.strip(),
-            "advisor_reg_no": (advisor_reg_no or "").strip(),
-            "prepared_for": (prepared_for or "").strip(),
-            "custom_disclaimer": (custom_disclaimer or "").strip()
-        }
-
-    citations = rep.get("citations") or []
-    if not citations and rep.get("citations_json"):
-        try:
-            citations = json.loads(rep.get("citations_json"))
-        except Exception:
-            citations = []
-
-    scrip_code = rep.get("scrip_code") or resolve_bse_scrip_code(clean_t)
-    df_hist = None
-    try:
-        df_hist = get_historical_prices(clean_t, period="6mo")
-    except Exception as e:
-        logger.debug(f"Historical price pre-fetch notice for {clean_t}: {e}")
-
-    from core.reporting.pdf import generate_report_pdf, apply_pdf_watermark
-    report_text_for_pdf = rep.get("report_text", "")
-    if not _deep_dive_unlocked_for_request(request, clean_t):
-        from core.agents.copilot.forensic_desk import redact_gated_pillars
-        report_text_for_pdf = redact_gated_pillars(report_text_for_pdf, notice=PDF_LOCKED_NOTICE)
-    pdf_bytes = generate_report_pdf(
-        clean_t,
-        report_text_for_pdf,
-        hist_df=df_hist,
-        citations=citations,
-        scrip_code=scrip_code,
-        branding=branding
-    )
-    pdf_bytes = apply_pdf_watermark(pdf_bytes, _pdf_account_ref(request))
-    
-    date_slug = datetime.now(IST).strftime("%d-%m-%Y")
-    clean_firm = re.sub(r'[^a-zA-Z0-9]', '_', firm_name) + "_" if firm_name else ""
-    filename = f"{clean_firm}{clean_t}_{date_slug}_Research_Report.pdf"
-
-    return Response(
-        content=pdf_bytes,
-        media_type="application/pdf",
-        headers={"Content-Disposition": f'attachment; filename="{filename}"'}
-    )
-
-
-@app.get("/api/pdf/fund/{scheme_code}")
-async def api_download_fund_pdf(scheme_code: str, request: Request):
-    """Generates and serves downloadable institutional PDF look-through dossier for a Mutual Fund."""
-    clean_code = scheme_code.strip()
-    from core.db.mutual_funds import get_mutual_fund_scheme, get_fund_forensic_dossier
-    from core.reporting.pdf import generate_fund_dossier_pdf
-
-    scheme = get_mutual_fund_scheme(clean_code)
-    if not scheme:
-        raise HTTPException(status_code=404, detail=f"Scheme '{clean_code}' not found.")
-
-    dossier = get_fund_forensic_dossier(clean_code) or {}
-    pdf_bytes = generate_fund_dossier_pdf(
-        clean_code, dossier, scheme,
-        deep_dive_unlocked=_asset_unlocked_for_request(request, "FUND", clean_code)
-    )
-    from core.reporting.pdf import apply_pdf_watermark
-    pdf_bytes = apply_pdf_watermark(pdf_bytes, _pdf_account_ref(request))
-    filename = f"Fund_Dossier_{clean_code}_{datetime.now(IST).strftime('%d-%m-%Y')}.pdf"
-
-    return Response(
-        content=pdf_bytes,
-        media_type="application/pdf",
-        headers={"Content-Disposition": f'attachment; filename="{filename}"'}
-    )
-
-
-@app.get("/api/pdf/debt/{isin}")
-async def api_download_debt_pdf(isin: str, request: Request):
-    """Generates and serves downloadable institutional PDF credit dossier for a Corporate Debt security."""
-    clean_isin = isin.strip().upper()
-    from core.db.debt import get_debt_security_by_isin
-    from core.analysis.debt_engine import evaluate_5_pillar_credit_posture
-    from core.reporting.pdf import generate_debt_dossier_pdf
-
-    sec = get_debt_security_by_isin(clean_isin)
-    if not sec:
-        raise HTTPException(status_code=404, detail=f"Debt security with ISIN '{clean_isin}' not found.")
-
-    posture = evaluate_5_pillar_credit_posture(sec)
-    pdf_bytes = generate_debt_dossier_pdf(
-        clean_isin, posture, sec,
-        deep_dive_unlocked=_asset_unlocked_for_request(request, "DEBT", clean_isin)
-    )
-    from core.reporting.pdf import apply_pdf_watermark
-    pdf_bytes = apply_pdf_watermark(pdf_bytes, _pdf_account_ref(request))
-    filename = f"Debt_Credit_Dossier_{clean_isin}_{datetime.now(IST).strftime('%d-%m-%Y')}.pdf"
-
-    return Response(
-        content=pdf_bytes,
-        media_type="application/pdf",
-        headers={"Content-Disposition": f'attachment; filename="{filename}"'}
-    )
-
-
-@app.get("/api/pdf/reit/{symbol}")
-async def api_download_reit_pdf(symbol: str, request: Request):
-    """Generates and serves downloadable institutional PDF research dossier for a REIT or InvIT."""
-    clean_sym = symbol.strip().upper()
-    from core.db.reits import get_reit_by_symbol
-    from core.reporting.pdf import generate_reit_dossier_pdf
-
-    reit = get_reit_by_symbol(clean_sym)
-    if not reit:
-        raise HTTPException(status_code=404, detail=f"REIT or InvIT with symbol '{clean_sym}' not found.")
-
-    pdf_bytes = generate_reit_dossier_pdf(clean_sym, reit)
-    from core.reporting.pdf import apply_pdf_watermark
-    pdf_bytes = apply_pdf_watermark(pdf_bytes, _pdf_account_ref(request))
-    filename = f"REIT_Dossier_{clean_sym}_{datetime.now(IST).strftime('%d-%m-%Y')}.pdf"
-
-    return Response(
-        content=pdf_bytes,
-        media_type="application/pdf",
-        headers={"Content-Disposition": f'attachment; filename="{filename}"'}
-    )
-
-
-@app.get("/api/v1/reports/{ticker}")
-async def api_v1_get_report(
-    ticker: str,
-    request: Request,
-    authorization: Optional[str] = Header(None),
-    x_api_key: Optional[str] = Header(None)
-):
-    """
-    Public Developer API v1: Institutional Equity Research Report Endpoint.
-    Authenticates via Bearer Token or X-API-Key header.
-    Returns structured JSON with 7-pillar matrix, deterministic technicals,
-    PEAD drift projections, primary source citations, and regulatory grounding.
-    """
-    provided_key = None
-    if authorization and authorization.lower().startswith("bearer "):
-        provided_key = authorization[7:].strip()
-    elif x_api_key:
-        provided_key = x_api_key.strip()
-
-    is_valid_auth = False
-    admin_key = os.environ.get("ADMIN_API_KEY")
-    if os.environ.get("TESTING") == "1":
-        is_valid_auth = True
-    elif provided_key:
-        if admin_key and hmac.compare_digest(provided_key, admin_key):
-            is_valid_auth = True
-        elif provided_key.startswith("sr_dev_") or provided_key.startswith("usr_"):
-            is_valid_auth = True
-    else:
-        cookie_token = request.cookies.get(USER_SESSION_COOKIE)
-        if _validate_user_session_token(cookie_token):
-            is_valid_auth = True
-
-    if not is_valid_auth:
-        raise HTTPException(
-            status_code=401,
-            detail="Unauthorized: Valid API key required via 'Authorization: Bearer <key>' or 'X-API-Key' header."
-        )
-
-    clean_t = clean_ticker(ticker)
-    if not clean_t:
-        raise HTTPException(status_code=400, detail="Invalid ticker symbol.")
-
-    rep = get_report_by_ticker_sync(clean_t)
-    if not rep or not rep.get("report_text"):
-        raise HTTPException(status_code=404, detail=f"Report for '{clean_t}' not found in research archives.")
-
-    from core.analysis.parser import extract_health_matrix
-    from core.analysis.metrics import calculate_overall_health_score
-    from core.analysis.fundamentals import compute_deterministic_technical_context, compute_pead_drift_band
-    report_text = rep.get("report_text", "")
-    matrix = extract_health_matrix(report_text)
-    overall_health = calculate_overall_health_score(matrix)
-    tech_context = compute_deterministic_technical_context(rep)
-    pead_context = compute_pead_drift_band(rep)
-
-    record_usage_event(
-        event_type="api_v1_fetch",
-        ticker=clean_t,
-        details={"source": "developer_api"}
-    )
-
-    return JSONResponse(
-        content={
-            "success": True,
-            "version": "v1",
-            "ticker": clean_t,
-            "company_name": rep.get("short_name", clean_t),
-            "scrip_code": rep.get("scrip_code", "N/A"),
-            "sector": rep.get("sector", "N/A"),
-            "evaluated_at": rep.get("formatted_date", "Recent"),
-            "current_price_inr": float(rep.get("baseline_price") or tech_context.get("price") or 0.0),
-            "pe_ratio": str(rep.get("baseline_pe") or "N/A"),
-            "market_cap_inr": rep.get("market_cap") or tech_context.get("mcap"),
-            "7_pillar_health": {
-                "overall_status": overall_health.get("status", "Neutral"),
-                "total_score": overall_health.get("total_score", 0),
-                "max_score": 21,
-                "pillars": matrix
-            },
-            "technical_indicators": tech_context,
-            "pead_drift_analysis": pead_context,
-            "citations_count": len(rep.get("citations", [])),
-            "citations": rep.get("citations", []),
-            "regulatory_disclaimer": "Educational research under SEBI RA Regulations Section 2(u). Not an investment recommendation.",
-            "attribution": "Vestnomics (https://vestnomics.app)"
-        },
-        headers={
-            "Cache-Control": "public, max-age=300",
-            "X-Robots-Tag": "noindex"
-        }
-    )
+@app.get("/health")
+@app.get("/healthz")
+async def healthz():
+    """Health check endpoint with caching (short‑lived)."""
+    data = {"status": "healthy", "service": "Stock Research AI Web Server", "timestamp": datetime.now(IST).isoformat()}
+    return json_response_with_cache(data, max_age=30)
 
 
 @app.get("/sitemap.xml", response_class=Response)
 async def sitemap_xml():
     """Generates automated XML sitemap for Google/Perplexity/Bing search crawlers."""
     archives = get_archived_reports_sync()
-    # Use current date for static pages
     now_iso = datetime.now(timezone.utc).strftime("%Y-%m-%d")
 
     base_url = (os.environ.get("CANONICAL_DOMAIN") or "https://vestnomics.app").rstrip("/")
@@ -3564,11 +1727,9 @@ async def sitemap_xml():
     for a in archives:
         t = a.get("ticker")
         if t:
-            # Use the report's raw_timestamp for lastmod if available, fallback to now_iso
             raw_ts = a.get("raw_timestamp")
             if raw_ts:
                 try:
-                    # Ensure datetime object; if string, parse ISO
                     if isinstance(raw_ts, str):
                         dt = datetime.fromisoformat(raw_ts.replace('Z', '+00:00'))
                     else:
@@ -3586,1388 +1747,6 @@ async def sitemap_xml():
     return Response(content="\n".join(xml_lines), media_type="application/xml")
 
 
-class SynthesizeRequest(BaseModel):
-    ticker: str
-    user_id: str
-    force_refresh: Optional[bool] = False
-
-
-@app.post("/api/synthesize")
-async def api_synthesize(payload: SynthesizeRequest):
-    """
-    Deducts 1 credit from user balance and triggers a full 7-pillar AI synthesis.
-    Returns the generated dossier URL on success.
-    Automatically refunds the consumed credit if synthesis or archiving fails.
-    """
-    clean_t = clean_ticker(payload.ticker)
-    if not clean_t:
-        raise HTTPException(status_code=400, detail="Invalid ticker symbol.")
-
-    canonical = resolve_canonical_symbol(clean_t) or clean_t
-    clean_uid = str(payload.user_id).strip()
-    if not clean_uid:
-        raise HTTPException(status_code=401, detail="Sign in required to generate reports.")
-
-    # Check if a dossier already exists and is fresh (< 14 days old) unless force_refresh is requested
-    existing = get_report_by_ticker_sync(canonical)
-    if existing and existing.get("report_text") and not payload.force_refresh:
-        return json_response_with_cache({
-            "success": True,
-            "already_exists": True,
-            "ticker": canonical,
-            "dossier_url": f"/dossier/{canonical}",
-            "new_balance": get_user_credits_balance(clean_uid),
-            "message": f"An existing dossier for {canonical} is already available. No credits were deducted."
-        })
-
-    # Deduct 1 credit atomically
-    ok, new_balance, msg = deduct_user_credits(
-        user_id=clean_uid,
-        ticker=canonical,
-        action_type="FULL_SYNTHESIS",
-        amount=1.0
-    )
-    if not ok:
-        raise HTTPException(status_code=402, detail=msg)
-
-    # Trigger synchronous report generation
-    try:
-        report_text = generate_stock_report(canonical)
-    except Exception as e:
-        logger.error(f"Synthesis failed for {canonical}: {e}")
-        # Automatic refund on failure
-        add_user_credits(clean_uid, 0.0, 1.0, pack_type="REFUND_FAILED_SYNTHESIS")
-        refunded_bal = get_user_credits_balance(clean_uid)
-        raise HTTPException(
-            status_code=500,
-            detail=f"Report generation encountered an error for {canonical}. Your research credit has been automatically refunded (balance: {refunded_bal:.1f} credits). Error: {e}"
-        )
-
-    # Verify that the report was archived and contains content
-    rep = get_report_by_ticker_sync(canonical)
-    if not rep or not rep.get("report_text"):
-        # Automatic refund on verification failure
-        add_user_credits(clean_uid, 0.0, 1.0, pack_type="REFUND_FAILED_SYNTHESIS")
-        refunded_bal = get_user_credits_balance(clean_uid)
-        raise HTTPException(
-            status_code=500,
-            detail=f"Synthesis could not verify report archiving for {canonical}. Your credit has been automatically refunded (balance: {refunded_bal:.1f} credits)."
-        )
-
-    return json_response_with_cache({
-        "success": True,
-        "already_exists": False,
-        "ticker": canonical,
-        "dossier_url": f"/dossier/{canonical}",
-        "new_balance": new_balance,
-        "message": f"Dossier for {canonical} synthesized successfully! 1 credit deducted."
-    })
-
-
-class UnlockDossierRequest(BaseModel):
-    user_id: Optional[str] = None
-
-
-@app.post("/api/dossier/unlock/{ticker}")
-async def api_unlock_dossier(
-    request: Request,
-    ticker: str,
-    payload: Optional[UnlockDossierRequest] = None
-):
-    """
-    Consumes 1 credit and permanently unlocks the institutional deep-dive tier
-    (Forensic Accounting Ledger, Reverse DCF Sandbox & Thesis Drift Migrations) for this equity.
-    """
-    clean_t = clean_ticker(ticker)
-    if not clean_t or not any(c.isalnum() for c in clean_t):
-        raise HTTPException(status_code=400, detail="Invalid ticker symbol.")
-
-    canonical = resolve_canonical_symbol(clean_t) or clean_t
-    web_user = _get_current_web_user(request)
-    uid = web_user.get("id") if web_user else (payload.user_id if payload else None)
-    if not uid:
-        raise HTTPException(
-            status_code=401,
-            detail="Sign in required to unlock institutional deep dives. You will receive 2 free welcome research credits."
-        )
-
-    clean_uid = str(uid).strip()
-    user = get_user_by_id(clean_uid)
-    if not user:
-        raise HTTPException(status_code=404, detail="User account not found. Please sign in.")
-
-    ok, new_bal, msg = unlock_ticker_for_user(user_id=clean_uid, ticker=canonical, amount=1.0)
-    if not ok:
-        raise HTTPException(status_code=402, detail=msg)
-
-    record_usage_event(
-        event_type="dossier_unlock",
-        ticker=canonical,
-        user_id=clean_uid,
-        details={"action": "deep_dive_unlock", "new_balance": new_bal}
-    )
-
-    return json_response_with_cache({
-        "success": True,
-        "ticker": canonical,
-        "new_balance": new_bal,
-        "message": msg
-    })
-
-
-@app.get("/api/dossier/status/{ticker}")
-async def api_dossier_status(request: Request, ticker: str):
-    """
-    Returns the unlock status of the requested ticker for the current user session.
-    """
-    clean_t = clean_ticker(ticker)
-    if not clean_t:
-        raise HTTPException(status_code=400, detail="Invalid ticker symbol.")
-
-    canonical = resolve_canonical_symbol(clean_t) or clean_t
-    web_user = _get_current_web_user(request)
-    is_unlocked = False
-
-    if _is_admin_authenticated(request):
-        is_unlocked = True
-    elif os.environ.get("TESTING") == "1" and (request.headers.get("x-unlock-preview") == "1" or request.query_params.get("unlocked") == "1"):
-        is_unlocked = True
-    elif web_user:
-        is_unlocked = is_ticker_unlocked_for_user(web_user.get("id", ""), canonical)
-
-    return json_response_with_cache({
-        "success": True,
-        "ticker": canonical,
-        "is_unlocked": is_unlocked,
-        "user_id": web_user.get("id") if web_user else None
-    })
-
-
-@app.get("/api/dossier/intel/{ticker}")
-async def api_dossier_intel(ticker: str):
-    """
-    Returns comprehensive Category 1 institutional equity intelligence:
-    Sector-native metrics, exchange level-2 depth, 360 forensic sieve, valuation radar, and bull/bear thesis.
-    """
-    clean_t = clean_ticker(ticker)
-    if not clean_t:
-        raise HTTPException(status_code=400, detail="Invalid ticker symbol.")
-    canonical = resolve_canonical_symbol(clean_t) or clean_t
-    
-    rep = get_report_by_ticker_sync(canonical) or {}
-    fund = {}
-    try:
-        fund = get_stock_fundamentals(canonical) or {}
-    except Exception as e:
-        logger.debug(f"Fundamentals lookup notice for {canonical}: {e}")
-
-    from core.analysis.equity_dossier import compile_equity_dossier
-    intel = compile_equity_dossier(
-        ticker=canonical,
-        fundamentals=fund,
-        company_name=rep.get("short_name", canonical),
-        industry_str=rep.get("industry", ""),
-    )
-    return json_response_with_cache({"success": True, "intelligence": intel})
-
-
-@app.get("/api/user/{user_id}")
-async def api_get_user(user_id: str):
-    """Returns current user profile and credit balance with caching headers."""
-    clean_uid = str(user_id).strip()
-    user = get_user_by_id(clean_uid)
-    if not user:
-        raise HTTPException(status_code=404, detail="User not found.")
-    return json_response_with_cache({"success": True, "user": user})
-
-
-@app.get("/health")
-@app.get("/healthz")
-async def healthz():
-    """Health check endpoint with caching (short‑lived)."""
-    data = {"status": "healthy", "service": "Stock Research AI Web Server", "timestamp": datetime.now(IST).isoformat()}
-    return json_response_with_cache(data, max_age=30)
-
-
-@app.post("/api/admin/run-discovery")
-@app.post("/api/admin/run-discovery-refresh")
-async def api_run_discovery(
-    request: Request,
-    background_tasks: BackgroundTasks,
-    x_admin_key: Optional[str] = Header(None),
-    count: int = 12,
-    force: bool = False
-):
-    """Triggers the Morning Discovery Reel screening and dossier synthesis worker."""
-    is_testing = os.environ.get("TESTING") == "1" or "pytest" in sys.modules
-    admin_secret = os.environ.get("ADMIN_API_KEY", "")
-    is_authed = is_testing
-    if admin_secret and x_admin_key == admin_secret:
-        is_authed = True
-    elif _is_admin_authenticated(request):
-        is_authed = True
-
-    if not is_authed:
-        raise HTTPException(status_code=403, detail="Unauthorized admin access.")
-
-    from scripts.run_discovery_worker import run_discovery_pipeline
-    background_tasks.add_task(run_discovery_pipeline, target_count=count, force_synthesis=force)
-    return json_response_with_cache({
-        "status": "initiated",
-        "message": f"Morning Discovery Reel worker dispatched for {count} equities (force={force})."
-    })
-
-
-# ==============================================================================
-# Executive Administrator Portal & Site Usage Analytics Hub
-# Google OAuth + RFC 6238 TOTP 2FA + Whitelist + Immutable Audit Trail
-# ==============================================================================
-
-ADMIN_COOKIE_NAME = "admin_session"
-ADMIN_2FA_PENDING_COOKIE = "admin_2fa_pending"
-
-def _get_admin_signing_key() -> bytes:
-    key = os.environ.get("ADMIN_API_KEY") or os.environ.get("SUPABASE_SERVICE_ROLE_KEY") or "stock_research_admin_master_secret_2026"
-    return key.encode("utf-8")
-
-def _generate_admin_token(email: str, role: str) -> str:
-    secret = _get_admin_signing_key()
-    now_ts = int(datetime.now(timezone.utc).timestamp())
-    data = json.dumps({"email": email.strip().lower(), "role": role, "ts": now_ts})
-    payload_b64 = base64.urlsafe_b64encode(data.encode("utf-8")).decode("utf-8")
-    sig = hmac.new(secret, payload_b64.encode("utf-8"), hashlib.sha256).hexdigest()
-    return f"{payload_b64}.{sig}"
-
-def _validate_admin_token(token: Optional[str]) -> Optional[Dict[str, Any]]:
-    if not token or "." not in token:
-        return None
-    try:
-        payload_b64, sig = token.rsplit(".", 1)
-        secret = _get_admin_signing_key()
-        expected_sig = hmac.new(secret, payload_b64.encode("utf-8"), hashlib.sha256).hexdigest()
-        if not hmac.compare_digest(sig, expected_sig):
-            return None
-        data_str = base64.urlsafe_b64decode(payload_b64.encode("utf-8")).decode("utf-8")
-        payload = json.loads(data_str)
-        ts = payload.get("ts", 0)
-        # Valid for 24 hours
-        if datetime.now(timezone.utc).timestamp() - ts < 86400:
-            return payload
-        return None
-    except Exception:
-        return None
-
-def _is_admin_authenticated(request: Request) -> Optional[Dict[str, Any]]:
-    token = request.cookies.get(ADMIN_COOKIE_NAME)
-    return _validate_admin_token(token)
-
-def _generate_pending_2fa_token(email: str) -> str:
-    secret = _get_admin_signing_key()
-    now_ts = int(datetime.now(timezone.utc).timestamp())
-    data = json.dumps({"pending_email": email.strip().lower(), "ts": now_ts})
-    payload_b64 = base64.urlsafe_b64encode(data.encode("utf-8")).decode("utf-8")
-    sig = hmac.new(secret, payload_b64.encode("utf-8"), hashlib.sha256).hexdigest()
-    return f"{payload_b64}.{sig}"
-
-def _validate_pending_2fa_token(token: Optional[str]) -> Optional[str]:
-    if not token or "." not in token:
-        return None
-    try:
-        payload_b64, sig = token.rsplit(".", 1)
-        secret = _get_admin_signing_key()
-        expected_sig = hmac.new(secret, payload_b64.encode("utf-8"), hashlib.sha256).hexdigest()
-        if not hmac.compare_digest(sig, expected_sig):
-            return None
-        data = json.loads(base64.urlsafe_b64decode(payload_b64.encode("utf-8")).decode("utf-8"))
-        ts = data.get("ts", 0)
-        # Valid for 15 minutes
-        if datetime.now(timezone.utc).timestamp() - ts < 900:
-            return data.get("pending_email")
-        return None
-    except Exception:
-        return None
-
-@app.get("/admin", response_class=HTMLResponse)
-async def admin_dashboard(
-    request: Request,
-    window: str = "30d",
-    tab: Optional[str] = "billables",
-    start_date: Optional[str] = None,
-    end_date: Optional[str] = None,
-    include_tests: int = 0,
-    msg: Optional[str] = None,
-    err: Optional[str] = None
-):
-    admin_session = _is_admin_authenticated(request)
-    if not admin_session:
-        cfg = get_supabase_auth_config()
-        has_google_oauth = bool(cfg.get("url"))
-        return templates.TemplateResponse(
-            request=request,
-            name="admin.html",
-            context={
-                "authenticated": False,
-                "error": err,
-                "has_google_oauth": has_google_oauth,
-                "active_page": "admin"
-            }
-        )
-
-    current_email = admin_session.get("email")
-    admin_profile = get_admin_user(current_email) or {"email": current_email, "role": admin_session.get("role", "admin")}
-    exclude_tests = not bool(include_tests)
-
-    # Compute date ranges
-    today = datetime.now(IST).date()
-    parsed_start = None
-    parsed_end = None
-    selected_days = 30
-
-    if window == "24h":
-        selected_days = 1
-    elif window == "7d":
-        selected_days = 7
-    elif window == "30d":
-        selected_days = 30
-    elif window == "90d":
-        selected_days = 90
-    elif window == "mtd":
-        parsed_start = today.replace(day=1)
-        parsed_end = today
-        selected_days = None
-    elif window == "custom" or (start_date and end_date):
-        window = "custom"
-        try:
-            if start_date:
-                parsed_start = datetime.strptime(start_date.strip(), "%Y-%m-%d").date()
-            if end_date:
-                parsed_end = datetime.strptime(end_date.strip(), "%Y-%m-%d").date()
-            if parsed_start and parsed_end:
-                selected_days = None
-            else:
-                selected_days = 30
-                window = "30d"
-        except Exception as de:
-            logger.warning(f"Error parsing custom date range: {de}")
-            selected_days = 30
-            window = "30d"
-
-    try:
-        summary = get_site_usage_summary(days=selected_days, start_date=parsed_start, end_date=parsed_end, exclude_tests=exclude_tests)
-    except Exception as e:
-        logger.error(f"Error fetching site usage summary: {e}")
-        summary = {
-            "unique_sessions": 0, "total_actions": 0, "cache_efficiency_pct": 0.0,
-            "total_cost_saved_usd": 0.0, "pdf_downloads": 0, "action_breakdown": {},
-            "top_searched_tickers": [], "traffic_sources": [], "top_referrers": [],
-            "geographic_distribution": [], "device_breakdown": [], "browser_breakdown": [],
-            "os_breakdown": [], "recent_events": []
-        }
-
-    try:
-        rev_summary = get_revenue_analytics_summary(days=selected_days, start_date=parsed_start, end_date=parsed_end, exclude_tests=exclude_tests)
-    except Exception as e:
-        logger.error(f"Error fetching rev summary: {e}")
-        rev_summary = {
-            "gross_revenue_inr": 0.0, "net_revenue_inr": 0.0, "tax_gst_collected_inr": 0.0,
-            "refunded_amount_inr": 0.0, "paid_orders_count": 0, "refunded_orders_count": 0,
-            "credits_in_circulation": 0.0, "active_subscribers_count": 0
-        }
-
-    try:
-        billables = get_all_billables(limit=100, exclude_tests=exclude_tests)
-    except Exception:
-        billables = []
-
-    try:
-        user_analytics = get_user_usage_analytics(days=selected_days, start_date=parsed_start, end_date=parsed_end, limit=50, exclude_tests=exclude_tests)
-    except Exception:
-        user_analytics = {
-            "total_registered_users": 0, "active_users_in_period": 0,
-            "signed_in_actions_count": 0, "guest_actions_count": 0,
-            "pro_subscribers_count": 0, "top_users": []
-        }
-
-    try:
-        support_tickets = get_support_tickets(limit=50, exclude_tests=exclude_tests)
-    except Exception:
-        support_tickets = []
-
-    try:
-        open_tickets_count = get_open_tickets_count(exclude_tests=exclude_tests)
-    except Exception:
-        open_tickets_count = 0
-
-    try:
-        session_journeys = get_session_journeys(days=selected_days, start_date=parsed_start, end_date=parsed_end, limit=25, exclude_tests=exclude_tests)
-    except Exception:
-        session_journeys = []
-
-    try:
-        from core.db.telemetry import get_seo_summary
-        seo_summary = get_seo_summary(days=selected_days or 30)
-    except Exception as seo_err:
-        logger.warning(f"Error fetching SEO summary: {seo_err}")
-        seo_summary = {"days": selected_days or 30, "crawlers": [], "crawl_pages": [], "crawl_total": 0,
-                       "channels": [], "organic_landing_pages": [], "daily_trend": [],
-                       "total_sessions": 0, "search_sessions": 0}
-
-    admin_team = list_admin_users()
-    admin_audit_logs = get_admin_audit_logs(limit=100)
-
-    try:
-        from core.analysis.asset_scanner import get_asset_scan_runs
-        asset_scans = get_asset_scan_runs(limit=30)
-    except Exception:
-        asset_scans = []
-
-    return templates.TemplateResponse(
-        request=request,
-        name="admin.html",
-        context={
-            "authenticated": True,
-            "current_admin": admin_profile,
-            "admin_team": admin_team,
-            "admin_audit_logs": admin_audit_logs,
-            "asset_scans": asset_scans,
-            "active_tab": tab,
-            "window": window,
-            "exclude_tests": exclude_tests,
-            "include_tests": include_tests,
-            "start_date_str": parsed_start.strftime("%Y-%m-%d") if parsed_start else "",
-            "end_date_str": parsed_end.strftime("%Y-%m-%d") if parsed_end else "",
-            "notification": msg,
-            "error": err,
-            "summary": summary,
-            "rev_summary": rev_summary,
-            "billables": billables,
-            "user_analytics": user_analytics,
-            "support_tickets": support_tickets,
-            "open_tickets_count": open_tickets_count,
-            "session_journeys": session_journeys,
-            "seo_summary": seo_summary,
-            "active_page": "admin"
-        }
-    )
-
-
-@app.get("/admin/audit", response_class=HTMLResponse)
-async def admin_audit_dashboard(request: Request):
-    """
-    Renders the Autonomous System Health & Multi-Pillar Project Audit Console.
-    Continuous Multi-Pillar System Health & Auditing Engine.
-    """
-    init_db()
-    admin_session = _is_admin_authenticated(request)
-    if not admin_session:
-        cfg = get_supabase_auth_config()
-        has_google_oauth = bool(cfg.get("url"))
-        return templates.TemplateResponse(
-            request=request,
-            name="admin.html",
-            context={
-                "authenticated": False,
-                "error": "Authentication required to access the System Audit Console.",
-                "has_google_oauth": has_google_oauth,
-                "active_page": "admin"
-            }
-        )
-
-    from core.db.audit_logs import get_latest_project_audit_log, get_project_audit_history
-    latest_audit = get_latest_project_audit_log()
-    audit_history = get_project_audit_history(limit=15)
-
-    return templates.TemplateResponse(
-        request=request,
-        name="admin_audit.html",
-        context={
-            "authenticated": True,
-            "latest_audit": latest_audit,
-            "audit_history": audit_history,
-            "active_page": "admin"
-        }
-    )
-
-
-@app.post("/api/admin/run-project-audit")
-async def api_admin_run_project_audit(
-    request: Request,
-    payload: Dict[str, Any] = Body(default={}),
-    x_admin_key: Optional[str] = Header(None)
-):
-    """
-    Triggers an autonomous project-wide audit across Strategy, Implementation, and UI/UX.
-    Can be run via Fast Deterministic path (use_ai=False) or Full AI Cognitive path (use_ai=True).
-    """
-    init_db()
-    is_testing = os.environ.get("TESTING") == "1" or "pytest" in sys.modules
-    admin_secret = os.environ.get("ADMIN_API_KEY", "")
-    admin_session = _is_admin_authenticated(request)
-    if not (is_testing or admin_session or (admin_secret and x_admin_key == admin_secret)):
-        raise HTTPException(status_code=403, detail="Unauthorized: Admin access required.")
-
-    from core.audit.project_auditor import audit_project_full
-    use_ai = bool(payload.get("use_ai", False))
-    try:
-        result = await audit_project_full(use_ai=use_ai)
-        return {
-            "success": True,
-            "audit": result.to_dict()
-        }
-    except Exception as e:
-        logger.error(f"Error running autonomous project audit: {e}")
-        raise HTTPException(status_code=500, detail=str(e))
-
-
-@app.get("/api/admin/audit-logs")
-def api_admin_get_audit_logs(
-    request: Request,
-    limit: int = 15,
-    x_admin_key: Optional[str] = Header(None)
-):
-    """Retrieves past project audit run logs for executive telemetry."""
-    init_db()
-    is_testing = os.environ.get("TESTING") == "1" or "pytest" in sys.modules
-    admin_secret = os.environ.get("ADMIN_API_KEY", "")
-    admin_session = _is_admin_authenticated(request)
-    if not (is_testing or admin_session or (admin_secret and x_admin_key == admin_secret)):
-        raise HTTPException(status_code=403, detail="Unauthorized: Admin access required.")
-
-    from core.db.audit_logs import get_project_audit_history
-    logs = get_project_audit_history(limit=limit)
-    return {"success": True, "logs": logs}
-
-
-@app.get("/api/autonomous/events")
-def api_get_autonomous_events(limit: int = Query(15, ge=1, le=50)):
-    """Public read-only feed of recent autonomous watcher actions and re-audits."""
-    from core.db.agent_sessions import get_recent_autonomous_events
-    init_db()
-    events = get_recent_autonomous_events(limit=limit)
-    sanitized = [
-        {
-            "event_id": ev.get("event_id"),
-            "event_type": ev.get("event_type"),
-            "ticker": ev.get("ticker"),
-            "action_taken": ev.get("action_taken"),
-            "summary": ev.get("summary"),
-            "created_at": str(ev.get("created_at")),
-        }
-        for ev in events
-    ]
-    return json_response_with_cache({
-        "success": True,
-        "count": len(sanitized),
-        "events": sanitized
-    }, max_age=30)
-
-
-class CopilotChatRequest(BaseModel):
-    conversation_id: str
-    message: str
-    ticker: Optional[str] = None
-    user_id: Optional[str] = None
-    asset_type: Optional[str] = None
-    section: Optional[str] = None
-    section_label: Optional[str] = None
-    section_data: Optional[Dict[str, Any]] = None
-
-
-@app.post("/api/copilot/chat")
-async def api_copilot_chat(payload: CopilotChatRequest, request: Request):
-    """Interactive Forensic Intelligence Desk dialogue endpoint with multi-asset and section context."""
-    init_db()
-    from core.agents.copilot.forensic_desk import process_forensic_desk_turn
-
-    # Paywall: decide entitlement server-side with the same rule as the dossier page
-    web_user = _get_current_web_user(request)
-    deep_dive_unlocked = _deep_dive_unlocked_for_request(request, payload.ticker or "")
-    trusted_user_id = web_user.get("id") if web_user else None
-
-    # Subscriber check for AI generative synthesis entitlement
-    tier = (web_user.get("subscription_tier") or "free").lower() if web_user else "free"
-    is_subscriber = tier in ("pro_monthly", "pro_annual") or "pro" in tier or _is_admin_authenticated(request)
-
-    try:
-        res = await process_forensic_desk_turn(
-            conversation_id=payload.conversation_id,
-            user_message=payload.message,
-            ticker=payload.ticker,
-            user_id=trusted_user_id,
-            asset_type=payload.asset_type,
-            section=payload.section,
-            section_label=payload.section_label,
-            section_data=payload.section_data,
-            deep_dive_unlocked=deep_dive_unlocked,
-            unlock_checker=lambda kind, asset_id: _asset_unlocked_for_request(request, kind, asset_id),
-            is_subscriber=is_subscriber
-        )
-        return {"success": True, **res}
-    except Exception as e:
-        logger.error(f"Error in api_copilot_chat: {e}")
-        raise HTTPException(status_code=500, detail=str(e))
-
-
-@app.get("/api/copilot/history")
-def api_copilot_history(conversation_id: str):
-    """Retrieves chronological dialogue turns for a copilot session."""
-    init_db()
-    from core.db.agent_sessions import get_conversation_turns
-    turns = get_conversation_turns(conversation_id=conversation_id, limit=50)
-    return {"success": True, "turns": turns}
-
-
-@app.post("/admin/telemetry/purge-test-data")
-async def admin_purge_test_data(request: Request):
-    """
-    Purges synthetic test records across telemetry, tickets, and transactions.
-    Restricted to authorized 'owner' and 'admin' roles.
-    """
-    admin_session = _is_admin_authenticated(request)
-    if not admin_session:
-        raise HTTPException(status_code=401, detail="Unauthorized admin session.")
-
-    role = admin_session.get("role", "viewer")
-    if role not in ("owner", "admin"):
-        raise HTTPException(status_code=403, detail="Forbidden. Only owners and administrators can purge test data.")
-
-    client_ip = request.headers.get("x-forwarded-for") or (request.client.host if request.client else "unknown")
-    if client_ip and "," in client_ip:
-        client_ip = client_ip.split(",")[0].strip()
-
-    # Determine originating tab to preserve user context (default to telemetry)
-    return_tab = None
-    try:
-        form_data = await request.form()
-        return_tab = form_data.get("tab")
-    except Exception as form_err:
-        logger.debug("Form data parse notice: %s", form_err)
-    if not return_tab:
-        return_tab = request.query_params.get("tab") or "telemetry"
-
-    counts = purge_test_telemetry()
-
-    record_admin_audit(
-        admin_email=admin_session.get("email"),
-        action="PURGE_TEST_DATA",
-        target_type="telemetry_and_tickets",
-        details=counts,
-        ip_address=client_ip
-    )
-
-    msg = f"Successfully+purged+{counts.get('events_purged', 0)}+test+events,+{counts.get('tickets_purged', 0)}+test+tickets,+and+{counts.get('transactions_purged', 0)}+test+orders.+Dashboard+is+now+clean."
-    return RedirectResponse(url=f"/admin?tab={return_tab}&msg={msg}", status_code=303)
-
-@app.get("/admin/auth/google")
-async def admin_auth_google(request: Request):
-    """Initiates Google OAuth for Admin Portal via Supabase GoTrue."""
-    base_url = resolve_app_base_url(request)
-    redirect_target = f"{base_url}/admin/auth/callback"
-    cfg = get_supabase_auth_config()
-    sb_url = cfg.get("url")
-
-    if sb_url:
-        oauth_url = f"{sb_url}/auth/v1/authorize?provider=google&redirect_to={urllib.parse.quote(redirect_target)}"
-        return RedirectResponse(url=oauth_url, status_code=303)
-    return RedirectResponse(
-        url="/admin?err=Supabase+Google+OAuth+not+yet+configured.+Use+direct+verification+or+consult+setup+guide.",
-        status_code=303
-    )
-
-@app.get("/admin/auth/callback")
-async def admin_auth_callback(
-    request: Request,
-    code: Optional[str] = None,
-    access_token: Optional[str] = None
-):
-    """Processes Google OAuth callback, verifies admin whitelist, and issues 2FA challenge."""
-    # 0. Defensive OAuth query param error handling
-    oauth_err = request.query_params.get("error_description") or request.query_params.get("error")
-    if oauth_err:
-        clean_err = oauth_err.replace("+", " ")
-        logger.warning(f"Admin Google OAuth redirect error received: {clean_err}")
-        return RedirectResponse(url=f"/admin?err={urllib.parse.quote(clean_err)}", status_code=303)
-
-    # If admin already authenticated and visits callback without code/token, return directly to dashboard
-    admin_session = _is_admin_authenticated(request)
-    if admin_session and not code and not access_token:
-        return RedirectResponse(url="/admin", status_code=303)
-
-    cfg = get_supabase_auth_config()
-    sb_url = cfg.get("url")
-    anon_key = cfg.get("anon_key") or os.environ.get("SUPABASE_SERVICE_ROLE_KEY", "")
-    verified_email = None
-
-    if code and sb_url:
-        try:
-            resp = requests.post(
-                f"{sb_url}/auth/v1/token?grant_type=pkce",
-                json={"auth_code": code},
-                headers={"apikey": anon_key, "Content-Type": "application/json"},
-                timeout=8
-            )
-            if resp.status_code == 200:
-                tok_data = resp.json()
-                user_info = tok_data.get("user", {})
-                verified_email = user_info.get("email")
-        except Exception as e:
-            logger.error(f"Error exchanging OAuth code: {e}")
-
-    elif access_token:
-        claims = _extract_jwt_claims(access_token)
-        user_meta = claims.get("user_metadata") or {}
-        if claims.get("email") or user_meta.get("email"):
-            verified_email = claims.get("email") or user_meta.get("email")
-
-        if sb_url and anon_key:
-            try:
-                resp = requests.get(
-                    f"{sb_url}/auth/v1/user",
-                    headers={"Authorization": f"Bearer {access_token}", "apikey": anon_key},
-                    timeout=8
-                )
-                if resp.status_code == 200:
-                    data = resp.json()
-                    verified_email = data.get("email") or verified_email
-            except Exception as e:
-                logger.debug(f"Notice fetching user via token endpoint: {e}")
-
-    if not verified_email:
-        # Browser client-side hash handler
-        return HTMLResponse("""
-        <!DOCTYPE html>
-        <html><head><meta charset="utf-8"><title>Verifying Identity...</title></head>
-        <body style="background:#0f172a;color:#f8fafc;font-family:sans-serif;display:flex;align-items:center;justify-content:center;height:100vh;">
-            <div style="text-align:center;">
-                <h2>Authenticating with Google...</h2>
-                <p style="color:#94a3b8;">Verifying administrator credentials.</p>
-            </div>
-            <script>
-            if (window.location.hash) {
-                const params = new URLSearchParams(window.location.hash.substring(1));
-                const token = params.get('access_token');
-                const err = params.get('error_description') || params.get('error');
-                if (token) {
-                    window.location.href = '/admin/auth/callback?access_token=' + encodeURIComponent(token);
-                } else if (err) {
-                    window.location.href = '/admin?err=' + encodeURIComponent(err);
-                } else {
-                    window.location.href = '/admin?err=Authentication+failed:+no+token';
-                }
-            } else {
-                window.location.href = '/admin?err=Authentication+session+expired+or+cancelled';
-            }
-            </script>
-        </body></html>
-        """)
-
-    clean_email = verified_email.strip().lower()
-    admin = get_admin_user(clean_email)
-    client_ip = request.headers.get("x-forwarded-for") or (request.client.host if request.client else "unknown")
-    ua = request.headers.get("user-agent")
-
-    if not admin or not admin.get("email"):
-        logger.warning(f"Admin Google login rejected for '{clean_email}' (record: {admin})")
-        record_admin_audit(
-            clean_email,
-            "unauthorized_admin_login_attempt",
-            details={"reason": "Email not in admin whitelist"},
-            ip_address=client_ip,
-            user_agent=ua
-        )
-        return RedirectResponse(
-            url=f"/admin?err=Access+Denied:+Google+account+'{clean_email}'+is+not+an+authorized+administrator.+Contact+the+owner.",
-            status_code=303
-        )
-
-    pending_token = _generate_pending_2fa_token(clean_email)
-    next_url = "/admin/verify-2fa" if admin.get("totp_enabled") else "/admin/setup-2fa"
-    resp = RedirectResponse(url=next_url, status_code=303)
-    resp.set_cookie(
-        key=ADMIN_2FA_PENDING_COOKIE,
-        value=pending_token,
-        httponly=True,
-        samesite="lax",
-        max_age=900
-    )
-    return resp
-
-@app.post("/admin/auth/direct-verify")
-async def admin_direct_verify(request: Request, email: str = Form(...)):
-    """Direct sign-in entry for whitelisted admins while external OAuth is configured."""
-    clean_email = (email or "").strip().lower()
-    admin = get_admin_user(clean_email)
-    client_ip = request.headers.get("x-forwarded-for") or (request.client.host if request.client else "unknown")
-    ua = request.headers.get("user-agent")
-
-    if not admin or not admin.get("email"):
-        logger.warning(f"Admin direct verify rejected for '{clean_email}' (record: {admin})")
-        record_admin_audit(
-            clean_email,
-            "unauthorized_admin_direct_attempt",
-            details={"reason": "Email not on whitelist"},
-            ip_address=client_ip,
-            user_agent=ua
-        )
-        return RedirectResponse(
-            url=f"/admin?err=Access+Denied:+Email+'{clean_email}'+is+not+on+the+administrator+whitelist.",
-            status_code=303
-        )
-
-    pending_token = _generate_pending_2fa_token(clean_email)
-    next_url = "/admin/verify-2fa" if admin.get("totp_enabled") else "/admin/setup-2fa"
-    resp = RedirectResponse(url=next_url, status_code=303)
-    resp.set_cookie(
-        key=ADMIN_2FA_PENDING_COOKIE,
-        value=pending_token,
-        httponly=True,
-        samesite="lax",
-        max_age=900
-    )
-    return resp
-
-def _build_local_qr_data_uri(payload: str) -> str:
-    """Renders a QR code locally as an inline SVG data URI.
-
-    The TOTP provisioning URI contains the shared 2FA secret, so it must never be
-    sent to a third-party QR service.
-    """
-    import base64
-    import io
-    import segno
-    buf = io.BytesIO()
-    segno.make(payload, error="m").save(buf, kind="svg", scale=5, border=2, dark="#000000", light="#ffffff")
-    return "data:image/svg+xml;base64," + base64.b64encode(buf.getvalue()).decode("ascii")
-
-
-@app.get("/admin/setup-2fa", response_class=HTMLResponse)
-async def admin_setup_2fa_view(request: Request, err: Optional[str] = None):
-    pending_token = request.cookies.get(ADMIN_2FA_PENDING_COOKIE)
-    email = _validate_pending_2fa_token(pending_token)
-    if not email:
-        return RedirectResponse(url="/admin?err=Session+expired.+Please+sign+in+again.", status_code=303)
-
-    admin = get_admin_user(email)
-    if not admin:
-        return RedirectResponse(url="/admin", status_code=303)
-
-    secret = admin.get("totp_secret")
-    if not secret:
-        secret = generate_totp_secret()
-        set_admin_totp_secret(email, secret)
-
-    totp_uri = get_totp_uri(secret, email, issuer="Stock Research App")
-    qr_img_url = _build_local_qr_data_uri(totp_uri)
-
-    return templates.TemplateResponse(
-        request=request,
-        name="admin_2fa.html",
-        context={
-            "mode": "setup",
-            "email": email,
-            "secret": secret,
-            "qr_img_url": qr_img_url,
-            "error": err,
-            "active_page": "admin"
-        }
-    )
-
-@app.post("/admin/setup-2fa")
-async def admin_setup_2fa_post(request: Request, code: str = Form(...)):
-    pending_token = request.cookies.get(ADMIN_2FA_PENDING_COOKIE)
-    email = _validate_pending_2fa_token(pending_token)
-    if not email:
-        return RedirectResponse(url="/admin?err=Session+expired.+Please+sign+in+again.", status_code=303)
-
-    admin = get_admin_user(email)
-    if not admin or not admin.get("totp_secret"):
-        return RedirectResponse(url="/admin/setup-2fa?err=Setup+error.+Please+retry.", status_code=303)
-
-    secret = admin.get("totp_secret")
-    if not verify_totp_code(secret, code):
-        return RedirectResponse(url="/admin/setup-2fa?err=Invalid+6-digit+code.+Please+check+your+authenticator+app.", status_code=303)
-
-    # Success! Enable 2FA permanently
-    enable_admin_totp(email)
-    update_admin_last_login(email)
-    client_ip = request.headers.get("x-forwarded-for") or (request.client.host if request.client else "unknown")
-    ua = request.headers.get("user-agent")
-
-    record_admin_audit(
-        email,
-        "totp_enrolled_and_authenticated",
-        target_type="admin_user",
-        target_id=email,
-        details={"status": "2FA activated"},
-        ip_address=client_ip,
-        user_agent=ua
-    )
-
-    session_token = _generate_admin_token(email, admin.get("role", "admin"))
-    resp = RedirectResponse(url="/admin?msg=2FA+enrolled+successfully!+Welcome+to+the+Executive+Console.", status_code=303)
-    resp.set_cookie(key=ADMIN_COOKIE_NAME, value=session_token, httponly=True, samesite="lax", max_age=86400)
-    resp.delete_cookie(key=ADMIN_2FA_PENDING_COOKIE)
-    return resp
-
-@app.get("/admin/verify-2fa", response_class=HTMLResponse)
-async def admin_verify_2fa_view(request: Request, err: Optional[str] = None):
-    pending_token = request.cookies.get(ADMIN_2FA_PENDING_COOKIE)
-    email = _validate_pending_2fa_token(pending_token)
-    if not email:
-        return RedirectResponse(url="/admin?err=Session+expired.+Please+sign+in+again.", status_code=303)
-
-    return templates.TemplateResponse(
-        request=request,
-        name="admin_2fa.html",
-        context={
-            "mode": "verify",
-            "email": email,
-            "error": err,
-            "active_page": "admin"
-        }
-    )
-
-@app.post("/admin/verify-2fa")
-async def admin_verify_2fa_post(request: Request, code: str = Form(...)):
-    pending_token = request.cookies.get(ADMIN_2FA_PENDING_COOKIE)
-    email = _validate_pending_2fa_token(pending_token)
-    if not email:
-        return RedirectResponse(url="/admin?err=Session+expired.+Please+sign+in+again.", status_code=303)
-
-    admin = get_admin_user(email)
-    if not admin or not admin.get("totp_secret"):
-        return RedirectResponse(url="/admin/setup-2fa", status_code=303)
-
-    client_ip = request.headers.get("x-forwarded-for") or (request.client.host if request.client else "unknown")
-    ua = request.headers.get("user-agent")
-
-    if not verify_totp_code(admin["totp_secret"], code):
-        record_admin_audit(
-            email,
-            "login_2fa_failed",
-            target_type="admin_user",
-            target_id=email,
-            details={"reason": "Incorrect 6-digit TOTP code"},
-            ip_address=client_ip,
-            user_agent=ua
-        )
-        return RedirectResponse(url="/admin/verify-2fa?err=Invalid+6-digit+code.+Please+try+again.", status_code=303)
-
-    # Valid 2FA code!
-    update_admin_last_login(email)
-    record_admin_audit(
-        email,
-        "login_2fa_success",
-        target_type="admin_user",
-        target_id=email,
-        details={"status": "authenticated"},
-        ip_address=client_ip,
-        user_agent=ua
-    )
-
-    session_token = _generate_admin_token(email, admin.get("role", "admin"))
-    resp = RedirectResponse(url="/admin", status_code=303)
-    resp.set_cookie(key=ADMIN_COOKIE_NAME, value=session_token, httponly=True, samesite="lax", max_age=86400)
-    resp.delete_cookie(key=ADMIN_2FA_PENDING_COOKIE)
-    return resp
-
-@app.get("/admin/logout")
-@app.post("/admin/logout")
-async def admin_logout(request: Request):
-    admin_session = _is_admin_authenticated(request)
-    if admin_session:
-        client_ip = request.headers.get("x-forwarded-for") or (request.client.host if request.client else "unknown")
-        record_admin_audit(
-            admin_session.get("email"),
-            "admin_logout",
-            target_type="admin_user",
-            ip_address=client_ip
-        )
-    response = RedirectResponse(url="/admin", status_code=303)
-    response.delete_cookie(key=ADMIN_COOKIE_NAME)
-    response.delete_cookie(key=ADMIN_2FA_PENDING_COOKIE)
-    return response
-
-@app.post("/admin/team/add")
-async def admin_team_add(
-    request: Request,
-    email: str = Form(...),
-    role: str = Form("admin")
-):
-    admin_session = _is_admin_authenticated(request)
-    if not admin_session:
-        raise HTTPException(status_code=403, detail="Admin authorization required.")
-
-    if admin_session.get("role") not in ("owner", "admin"):
-        return RedirectResponse(url="/admin?tab=team&err=Only+owners+and+admins+can+invite+team+members.", status_code=303)
-
-    current_email = admin_session.get("email")
-    ok, msg = add_admin_user(email, role, invited_by=current_email)
-    client_ip = request.headers.get("x-forwarded-for") or (request.client.host if request.client else "unknown")
-
-    if ok:
-        record_admin_audit(
-            current_email,
-            "add_admin_user",
-            target_type="admin_user",
-            target_id=email.strip().lower(),
-            details={"assigned_role": role},
-            ip_address=client_ip
-        )
-        return RedirectResponse(url=f"/admin?tab=team&msg={msg}", status_code=303)
-    return RedirectResponse(url=f"/admin?tab=team&err={msg}", status_code=303)
-
-@app.post("/admin/team/remove")
-async def admin_team_remove(
-    request: Request,
-    email: str = Form(...)
-):
-    admin_session = _is_admin_authenticated(request)
-    if not admin_session:
-        raise HTTPException(status_code=403, detail="Admin authorization required.")
-
-    if admin_session.get("role") not in ("owner", "admin"):
-        return RedirectResponse(url="/admin?tab=team&err=Only+owners+and+admins+can+remove+team+members.", status_code=303)
-
-    current_email = admin_session.get("email")
-    ok, msg = remove_admin_user(email, requesting_email=current_email)
-    client_ip = request.headers.get("x-forwarded-for") or (request.client.host if request.client else "unknown")
-
-    if ok:
-        record_admin_audit(
-            current_email,
-            "remove_admin_user",
-            target_type="admin_user",
-            target_id=email.strip().lower(),
-            ip_address=client_ip
-        )
-        return RedirectResponse(url=f"/admin?tab=team&msg={msg}", status_code=303)
-    return RedirectResponse(url=f"/admin?tab=team&err={msg}", status_code=303)
-
-@app.post("/admin/team/role")
-async def admin_team_role(
-    request: Request,
-    email: str = Form(...),
-    new_role: str = Form(...)
-):
-    admin_session = _is_admin_authenticated(request)
-    if not admin_session:
-        raise HTTPException(status_code=403, detail="Admin authorization required.")
-
-    if admin_session.get("role") != "owner":
-        return RedirectResponse(url="/admin?tab=team&err=Only+platform+owners+can+modify+roles.", status_code=303)
-
-    current_email = admin_session.get("email")
-    ok, msg = update_admin_role(email, new_role, requesting_email=current_email)
-    client_ip = request.headers.get("x-forwarded-for") or (request.client.host if request.client else "unknown")
-
-    if ok:
-        record_admin_audit(
-            current_email,
-            "update_admin_role",
-            target_type="admin_user",
-            target_id=email.strip().lower(),
-            details={"new_role": new_role},
-            ip_address=client_ip
-        )
-        return RedirectResponse(url=f"/admin?tab=team&msg={msg}", status_code=303)
-    return RedirectResponse(url=f"/admin?tab=team&err={msg}", status_code=303)
-
-@app.post("/admin/tickets/{ticket_id}/status")
-async def admin_update_ticket(
-    ticket_id: str,
-    request: Request,
-    status: str = Form(...),
-    admin_notes: Optional[str] = Form(None)
-):
-    admin_session = _is_admin_authenticated(request)
-    if not admin_session:
-        raise HTTPException(status_code=403, detail="Admin authorization required.")
-
-    ok = update_ticket_status(ticket_id, status, admin_notes)
-    current_email = admin_session.get("email")
-    client_ip = request.headers.get("x-forwarded-for") or (request.client.host if request.client else "unknown")
-
-    if ok:
-        record_admin_audit(
-            current_email,
-            "update_ticket_status",
-            target_type="ticket",
-            target_id=ticket_id,
-            details={"new_status": status, "admin_notes": admin_notes},
-            ip_address=client_ip
-        )
-    msg = f"Ticket+{ticket_id}+status+updated+to+{status}" if ok else "Failed+to+update+ticket"
-    return RedirectResponse(url=f"/admin?tab=tickets&msg={msg}", status_code=303)
-
-@app.post("/admin/refund")
-async def admin_process_refund(
-    request: Request,
-    order_id: str = Form(...),
-    user_email: str = Form(...),
-    reason: Optional[str] = Form("Customer request")
-):
-    admin_session = _is_admin_authenticated(request)
-    if not admin_session:
-        raise HTTPException(status_code=403, detail="Admin authorization required.")
-
-    current_email = admin_session.get("email")
-    client_ip = request.headers.get("x-forwarded-for") or (request.client.host if request.client else "unknown")
-
-    res = process_refund(gateway_order_id=order_id, user_email=user_email, reason=reason)
-    if res.get("success"):
-        record_admin_audit(
-            current_email,
-            "process_refund_success",
-            target_type="order",
-            target_id=order_id,
-            details={"user_email": user_email, "amount": res.get("refund_amount", 0), "reason": reason},
-            ip_address=client_ip
-        )
-        msg = f"Refund+of+Rs+{res.get('refund_amount', 0)}+processed+successfully+for+{order_id}"
-    else:
-        record_admin_audit(
-            current_email,
-            "process_refund_failed",
-            target_type="order",
-            target_id=order_id,
-            details={"user_email": user_email, "error": res.get("error")},
-            ip_address=client_ip
-        )
-        msg = f"Refund+failed:+{res.get('error', 'Unknown error')}"
-    return RedirectResponse(url=f"/admin?tab=billables&msg={msg}", status_code=303)
-
-@app.post("/admin/users/grant-credits")
-async def admin_grant_credits_endpoint(request: Request):
-    """
-    Administrative endpoint to directly allocate remedial or goodwill research credits
-    to user accounts, compensating for failed synthesis or resolving grievances.
-    """
-    admin_session = _is_admin_authenticated(request)
-    if not admin_session:
-        accept_header = request.headers.get("accept", "")
-        content_type = request.headers.get("content-type", "")
-        if "application/json" in accept_header or "application/json" in content_type:
-            return JSONResponse(status_code=403, content={"success": False, "error": "Admin authorization required."})
-        raise HTTPException(status_code=403, detail="Admin authorization required.")
-
-    content_type = request.headers.get("content-type", "")
-    if "application/json" in content_type:
-        try:
-            body = await request.json()
-        except Exception:
-            body = {}
-        user_identifier = body.get("user_email") or body.get("user_id") or ""
-        credits_val = body.get("credits", 2.0)
-        reason_code = body.get("reason", "TASK_REMEDY")
-        admin_note = body.get("admin_note", "")
-        ticket_id = body.get("ticket_id")
-        task_ticker = body.get("task_ticker")
-        resolve_ticket = body.get("resolve_ticket", True)
-        tab = body.get("tab", "users")
-        is_ajax = True
-    else:
-        form = await request.form()
-        user_identifier = form.get("user_email") or form.get("user_id") or ""
-        credits_val = form.get("credits", 2.0)
-        reason_code = form.get("reason", "TASK_REMEDY")
-        admin_note = form.get("admin_note", "")
-        ticket_id = form.get("ticket_id")
-        task_ticker = form.get("task_ticker")
-        resolve_ticket = form.get("resolve_ticket") in ("true", "1", "on", True)
-        tab = form.get("tab", "users")
-        is_ajax = (
-            request.headers.get("x-requested-with") == "XMLHttpRequest"
-            or "application/json" in request.headers.get("accept", "")
-        )
-
-    try:
-        credits_amount = float(credits_val)
-        if credits_amount <= 0 or credits_amount > 1000.0:
-            raise ValueError("Credits amount must be between 0.1 and 1000.0.")
-    except Exception as e:
-        err_msg = f"Invalid credits amount: {e}"
-        if is_ajax:
-            return JSONResponse(status_code=400, content={"success": False, "error": err_msg})
-        return RedirectResponse(url=f"/admin?tab={tab}&err={urllib.parse.quote_plus(err_msg)}", status_code=303)
-
-    client_ip = request.headers.get("x-forwarded-for") or (request.client.host if request.client else "unknown")
-    user_agent = request.headers.get("user-agent", "")
-    admin_email = admin_session.get("email", "admin")
-
-    result = admin_grant_user_credits(
-        admin_email=admin_email,
-        target_user_identifier=str(user_identifier).strip(),
-        credits_amount=credits_amount,
-        reason_code=str(reason_code).strip(),
-        admin_note=str(admin_note).strip(),
-        ticket_id=str(ticket_id).strip() if ticket_id else None,
-        task_ticker=str(task_ticker).strip() if task_ticker else None,
-        resolve_ticket=bool(resolve_ticket),
-        ip_address=client_ip,
-        user_agent=user_agent
-    )
-
-    if result.get("success"):
-        target_email = result.get("user_email", user_identifier)
-        msg = f"Successfully granted {credits_amount} credits to {target_email}."
-        if is_ajax:
-            return JSONResponse(status_code=200, content={
-                "success": True,
-                "message": msg,
-                "user_email": target_email,
-                "user_id": result.get("user_id"),
-                "credits_added": result.get("credits_added"),
-                "new_balance": result.get("new_balance")
-            })
-        return RedirectResponse(url=f"/admin?tab={tab}&msg={urllib.parse.quote_plus(msg)}", status_code=303)
-    else:
-        err = result.get("error", "Failed to grant credits.")
-        if is_ajax:
-            return JSONResponse(status_code=400, content={"success": False, "error": err})
-        return RedirectResponse(url=f"/admin?tab={tab}&err={urllib.parse.quote_plus(err)}", status_code=303)
-
-@app.get("/admin/export/tax-register")
-async def admin_export_tax_register(request: Request):
-    if not _is_admin_authenticated(request):
-        raise HTTPException(status_code=403, detail="Admin authorization required.")
-
-    billables = get_all_billables(status="success", limit=1000)
-    output = io.StringIO()
-    writer = csv.writer(output)
-    writer.writerow([
-        "Invoice Number", "Date", "Customer Email", "Customer Name",
-        "Pack Type", "SAC Code", "Taxable Value (INR)", "CGST 9% (INR)",
-        "SGST 9% (INR)", "IGST 18% (INR)", "Total Invoice Value (INR)",
-        "Status", "Gateway Order ID", "Gateway Payment ID"
-    ])
-    for b in billables:
-        base = b.get("base_amount_inr", 0.0)
-        gst = b.get("tax_gst_inr", 0.0)
-        half_gst = round(gst / 2, 2)
-        total = b.get("amount_inr", 0.0)
-        writer.writerow([
-            b.get("invoice_number"),
-            b.get("date"),
-            b.get("customer_email"),
-            b.get("customer_name"),
-            b.get("pack_type"),
-            b.get("sac_code", ""),
-            f"{base:.2f}",
-            f"{half_gst:.2f}",
-            f"{half_gst:.2f}",
-            "0.00",
-            f"{total:.2f}",
-            b.get("status"),
-            b.get("gateway_order_id"),
-            b.get("gateway_payment_id")
-        ])
-
-    csv_data = output.getvalue()
-    today_str = datetime.now(IST).strftime("%Y%m%d")
-    return Response(
-        content=csv_data,
-        media_type="text/csv",
-        headers={
-            "Content-Disposition": f"attachment; filename=GSTR1_Tax_Register_{today_str}.csv"
-        }
-    )
-
-
-@app.post("/admin/assets/trigger-scan")
-async def admin_trigger_scan_form(request: Request):
-    """Admin UI action: Trigger full AMFI and Debt asset surveillance scan."""
-    if not _is_admin_authenticated(request):
-        raise HTTPException(status_code=403, detail="Admin authorization required.")
-
-    from core.analysis.asset_scanner import run_comprehensive_asset_scan
-    res = run_comprehensive_asset_scan()
-    msg = f"Asset+scan+completed:+{res.get('total_scanned', 0)}+scanned,+{res.get('new_assets', 0)}+new,+{res.get('changed_assets', 0)}+updated."
-    return RedirectResponse(url=f"/admin?tab=assets&msg={msg}", status_code=303)
-
-
-@app.post("/api/admin/assets/scan")
-async def api_admin_trigger_asset_scan(
-    request: Request,
-    background_tasks: BackgroundTasks,
-    x_admin_key: Optional[str] = Header(None)
-):
-    """Admin API: Trigger asset surveillance scan across mutual funds and debt securities."""
-    admin_secret = os.environ.get("ADMIN_API_KEY", "")
-    is_authed = False
-    if admin_secret and x_admin_key == admin_secret:
-        is_authed = True
-    elif _is_admin_authenticated(request):
-        is_authed = True
-
-    if not is_authed:
-        raise HTTPException(status_code=403, detail="Unauthorized admin access.")
-
-    from core.analysis.asset_scanner import run_comprehensive_asset_scan
-    scan_summary = run_comprehensive_asset_scan()
-    return json_response_with_cache({
-        "status": "success",
-        "message": "Asset surveillance scan completed.",
-        "summary": scan_summary
-    })
-
-
-@app.post("/api/admin/sync-amfi")
-async def api_admin_sync_amfi(
-    request: Request,
-    limit: Optional[int] = None,
-    x_admin_key: Optional[str] = Header(None)
-):
-    """Admin API: Trigger on-demand AMFI daily NAV synchronization."""
-    admin_secret = os.environ.get("ADMIN_API_KEY", "")
-    is_authed = False
-    if admin_secret and x_admin_key == admin_secret:
-        is_authed = True
-    elif _is_admin_authenticated(request):
-        is_authed = True
-
-    if not is_authed:
-        raise HTTPException(status_code=403, detail="Unauthorized admin access.")
-
-    from core.ingestion.amfi import ingest_amfi_daily_feed
-    res = ingest_amfi_daily_feed(limit=limit, direct_growth_only=True)
-    return json_response_with_cache({
-        "status": "success",
-        "message": "AMFI synchronization completed successfully.",
-        "summary": res
-    })
-
-
-@app.get("/api/admin/assets/scan-runs")
-async def api_admin_get_scan_runs(
-    request: Request,
-    limit: int = 50,
-    x_admin_key: Optional[str] = Header(None)
-):
-    """Admin API: Query historical immutable asset scan ledger records."""
-    admin_secret = os.environ.get("ADMIN_API_KEY", "")
-    is_authed = False
-    if admin_secret and x_admin_key == admin_secret:
-        is_authed = True
-    elif _is_admin_authenticated(request):
-        is_authed = True
-
-    if not is_authed:
-        raise HTTPException(status_code=403, detail="Unauthorized admin access.")
-
-    from core.analysis.asset_scanner import get_asset_scan_runs
-    runs = get_asset_scan_runs(limit=limit)
-    return json_response_with_cache({
-        "status": "success",
-        "count": len(runs),
-        "runs": runs
-    })
-
-
-# ==============================================================================
-# SEO & Standard Web Best Practice Endpoints
-# ==============================================================================
-
 @app.get("/robots.txt", response_class=Response)
 async def robots_txt():
     """Provides search engine crawler directives and XML sitemap index pointer."""
@@ -4980,4 +1759,3 @@ async def robots_txt():
         f"Sitemap: {base_url}/sitemap.xml\n"
     )
     return Response(content=content, media_type="text/plain")
-

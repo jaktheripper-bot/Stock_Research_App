@@ -313,8 +313,8 @@ def build_mutual_fund_deterministic_response(
                 spread = round((float(ter_reg) - float(ter_dir)) * 100, 1)
                 if spread >= 75:
                     findings.append(f"**Severe Distributor Fee Drag ({spread} bps/yr):** The Regular plan extracts a significant commission spread, destroying ~20%+ ending wealth over 20 years.")
-        except Exception:
-            pass
+        except Exception as e:
+            logger.debug(f"Fee drag calculation parse notice: {e}")
 
         if isinstance(as_pct, (int, float)) and as_pct < 60:
             findings.append(f"**Closet Indexing Drift (Active Share {as_pct}%):** The portfolio substantially hugs the benchmark while charging active management fees.")
@@ -649,8 +649,8 @@ def build_equity_deterministic_response(
                         f"**Depressed Valuation Growth Pricing ({implied_growth}% p.a.):** "
                         f"The market is pricing in near-terminal stagnation, creating favorable valuation asymmetry if earnings match historical baselines."
                     )
-            except Exception:
-                pass
+            except Exception as e:
+                logger.debug(f"Implied growth parse notice: {e}")
 
         # Check P/E Multiple
         try:
@@ -665,8 +665,8 @@ def build_equity_deterministic_response(
                     f"**Deep Value Multiple Compression ({pe_display}):** "
                     f"Trading at a steep discount to historical median multiples, signaling market pessimism."
                 )
-        except Exception:
-            pass
+        except Exception as e:
+            logger.debug(f"PE ratio parse notice: {e}")
 
         # Check Matrix Postures
         macro = matrix.get("Macro", "Headwinds")

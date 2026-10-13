@@ -36,7 +36,7 @@ def run_suite():
         ("db", "db.py"),
         ("screener", "screener.py"),
         ("normalizer", "normalizer.py"),
-        ("alerts", "alerts.py"),
+        ("core.db.alerts", "core/db/alerts.py"),
         ("telemetry", "telemetry.py"),
         ("core.formatters", "core/formatters.py"),
         ("core.reporting.pdf", "core/reporting/pdf.py"),

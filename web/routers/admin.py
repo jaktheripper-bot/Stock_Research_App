@@ -1,0 +1,1181 @@
+"""Executive Administration Portal, Security 2FA, and Audit Console Router.
+
+Provides:
+- Executive Analytics Dashboard & KPI tracking across sessions, journeys, and revenue
+- Mandatory Whitelist + Google OAuth + RFC 6238 TOTP 2FA multi-factor authentication
+- Immutable Admin Audit Trail logging
+- Team management (invites, role promotions, removals)
+- Remedial User Credit allocation and Razorpay refunds
+- GSTR-1 Tax Register CSV exports
+- System-wide Autonomous Project Health & Multi-Pillar Audits
+- AMFI and Debt asset surveillance scans and scheduled worker dispatchers
+- Forensic Intelligence Copilot chat dialogue and conversation history APIs
+"""
+
+import os
+import io
+import csv
+import json
+import logging
+import urllib.parse
+import requests
+from datetime import datetime, timezone
+from typing import Optional, List, Dict, Any
+from pydantic import BaseModel
+
+from fastapi import APIRouter, Request, Response, HTTPException, Form, Header, Query, Body, BackgroundTasks
+from fastapi.responses import HTMLResponse, RedirectResponse, JSONResponse
+
+from core.db import (
+    init_db,
+    get_all_billables,
+    get_revenue_analytics_summary,
+    process_refund,
+    get_site_usage_summary,
+    get_session_journeys,
+    get_user_usage_analytics,
+    get_support_tickets,
+    get_open_tickets_count,
+    update_ticket_status,
+    IST,
+)
+from core.auth.totp import generate_totp_secret, verify_totp_code, get_totp_uri
+from core.auth.supabase_auth import get_supabase_auth_config
+from core.db.admin import (
+    get_admin_user,
+    list_admin_users,
+    add_admin_user,
+    remove_admin_user,
+    update_admin_role,
+    set_admin_totp_secret,
+    enable_admin_totp,
+    update_admin_last_login,
+    record_admin_audit,
+    get_admin_audit_logs,
+    admin_grant_user_credits,
+)
+from core.db.telemetry import purge_test_telemetry
+from web.common import (
+    templates,
+    resolve_app_base_url,
+    _get_current_web_user,
+    _is_admin_authenticated,
+    _generate_admin_token,
+    _validate_admin_token,
+    _generate_pending_2fa_token,
+    _validate_pending_2fa_token,
+    _build_local_qr_data_uri,
+    _extract_jwt_claims,
+    _deep_dive_unlocked_for_request,
+    _asset_unlocked_for_request,
+    ADMIN_COOKIE_NAME,
+    ADMIN_2FA_PENDING_COOKIE,
+    json_response_with_cache,
+)
+
+logger = logging.getLogger("equity_research.web.admin")
+
+router = APIRouter(tags=["admin"])
+
+
+# ==============================================================================
+# Pydantic Schemas
+# ==============================================================================
+class CopilotChatRequest(BaseModel):
+    conversation_id: str
+    message: str
+    ticker: Optional[str] = None
+    user_id: Optional[str] = None
+    asset_type: Optional[str] = None
+    section: Optional[str] = None
+    section_label: Optional[str] = None
+    section_data: Optional[Dict[str, Any]] = None
+
+
+# ==============================================================================
+# Executive Dashboard View
+# ==============================================================================
+@router.get("/admin", response_class=HTMLResponse)
+async def admin_dashboard(
+    request: Request,
+    window: str = "30d",
+    tab: Optional[str] = "billables",
+    start_date: Optional[str] = None,
+    end_date: Optional[str] = None,
+    include_tests: int = 0,
+    msg: Optional[str] = None,
+    err: Optional[str] = None
+):
+    admin_session = _is_admin_authenticated(request)
+    if not admin_session:
+        cfg = get_supabase_auth_config()
+        has_google_oauth = bool(cfg.get("url"))
+        return templates.TemplateResponse(
+            request=request,
+            name="admin.html",
+            context={
+                "authenticated": False,
+                "error": err,
+                "has_google_oauth": has_google_oauth,
+                "active_page": "admin"
+            }
+        )
+
+    current_email = admin_session.get("email")
+    admin_profile = get_admin_user(current_email) or {"email": current_email, "role": admin_session.get("role", "admin")}
+    exclude_tests = not bool(include_tests)
+
+    today = datetime.now(IST).date()
+    parsed_start = None
+    parsed_end = None
+    selected_days = 30
+
+    if window == "24h":
+        selected_days = 1
+    elif window == "7d":
+        selected_days = 7
+    elif window == "30d":
+        selected_days = 30
+    elif window == "90d":
+        selected_days = 90
+    elif window == "mtd":
+        parsed_start = today.replace(day=1)
+        parsed_end = today
+        selected_days = None
+    elif window == "custom" or (start_date and end_date):
+        window = "custom"
+        try:
+            if start_date:
+                parsed_start = datetime.strptime(start_date.strip(), "%Y-%m-%d").date()
+            if end_date:
+                parsed_end = datetime.strptime(end_date.strip(), "%Y-%m-%d").date()
+            if parsed_start and parsed_end:
+                selected_days = None
+            else:
+                selected_days = 30
+                window = "30d"
+        except Exception as de:
+            logger.warning(f"Error parsing custom date range: {de}")
+            selected_days = 30
+            window = "30d"
+
+    try:
+        summary = get_site_usage_summary(days=selected_days, start_date=parsed_start, end_date=parsed_end, exclude_tests=exclude_tests)
+    except Exception as e:
+        logger.error(f"Error fetching site usage summary: {e}")
+        summary = {
+            "unique_sessions": 0, "total_actions": 0, "cache_efficiency_pct": 0.0,
+            "total_cost_saved_usd": 0.0, "pdf_downloads": 0, "action_breakdown": {},
+            "top_searched_tickers": [], "traffic_sources": [], "top_referrers": [],
+            "geographic_distribution": [], "device_breakdown": [], "browser_breakdown": [],
+            "os_breakdown": [], "recent_events": []
+        }
+
+    try:
+        rev_summary = get_revenue_analytics_summary(days=selected_days, start_date=parsed_start, end_date=parsed_end, exclude_tests=exclude_tests)
+    except Exception as e:
+        logger.error(f"Error fetching rev summary: {e}")
+        rev_summary = {
+            "gross_revenue_inr": 0.0, "net_revenue_inr": 0.0, "tax_gst_collected_inr": 0.0,
+            "refunded_amount_inr": 0.0, "paid_orders_count": 0, "refunded_orders_count": 0,
+            "credits_in_circulation": 0.0, "active_subscribers_count": 0
+        }
+
+    try:
+        billables = get_all_billables(limit=100, exclude_tests=exclude_tests)
+    except Exception:
+        billables = []
+
+    try:
+        user_analytics = get_user_usage_analytics(days=selected_days, start_date=parsed_start, end_date=parsed_end, limit=50, exclude_tests=exclude_tests)
+    except Exception:
+        user_analytics = {
+            "total_registered_users": 0, "active_users_in_period": 0,
+            "signed_in_actions_count": 0, "guest_actions_count": 0,
+            "pro_subscribers_count": 0, "top_users": []
+        }
+
+    try:
+        support_tickets = get_support_tickets(limit=50, exclude_tests=exclude_tests)
+    except Exception:
+        support_tickets = []
+
+    try:
+        open_tickets_count = get_open_tickets_count(exclude_tests=exclude_tests)
+    except Exception:
+        open_tickets_count = 0
+
+    try:
+        session_journeys = get_session_journeys(days=selected_days, start_date=parsed_start, end_date=parsed_end, limit=25, exclude_tests=exclude_tests)
+    except Exception:
+        session_journeys = []
+
+    try:
+        from core.db.telemetry import get_seo_summary
+        seo_summary = get_seo_summary(days=selected_days or 30)
+    except Exception as seo_err:
+        logger.warning(f"Error fetching SEO summary: {seo_err}")
+        seo_summary = {"days": selected_days or 30, "crawlers": [], "crawl_pages": [], "crawl_total": 0,
+                       "channels": [], "organic_landing_pages": [], "daily_trend": [],
+                       "total_sessions": 0, "search_sessions": 0}
+
+    admin_team = list_admin_users()
+    admin_audit_logs = get_admin_audit_logs(limit=100)
+
+    try:
+        from core.analysis.asset_scanner import get_asset_scan_runs
+        asset_scans = get_asset_scan_runs(limit=30)
+    except Exception:
+        asset_scans = []
+
+    return templates.TemplateResponse(
+        request=request,
+        name="admin.html",
+        context={
+            "authenticated": True,
+            "current_admin": admin_profile,
+            "admin_team": admin_team,
+            "admin_audit_logs": admin_audit_logs,
+            "asset_scans": asset_scans,
+            "active_tab": tab,
+            "window": window,
+            "exclude_tests": exclude_tests,
+            "include_tests": include_tests,
+            "start_date_str": parsed_start.strftime("%Y-%m-%d") if parsed_start else "",
+            "end_date_str": parsed_end.strftime("%Y-%m-%d") if parsed_end else "",
+            "notification": msg,
+            "error": err,
+            "summary": summary,
+            "rev_summary": rev_summary,
+            "billables": billables,
+            "user_analytics": user_analytics,
+            "support_tickets": support_tickets,
+            "open_tickets_count": open_tickets_count,
+            "session_journeys": session_journeys,
+            "seo_summary": seo_summary,
+            "active_page": "admin"
+        }
+    )
+
+
+# ==============================================================================
+# Multi-Pillar System Health & Audit Console
+# ==============================================================================
+@router.get("/admin/audit", response_class=HTMLResponse)
+async def admin_audit_dashboard(request: Request):
+    """Renders the Autonomous System Health & Multi-Pillar Project Audit Console."""
+    init_db()
+    admin_session = _is_admin_authenticated(request)
+    if not admin_session:
+        cfg = get_supabase_auth_config()
+        has_google_oauth = bool(cfg.get("url"))
+        return templates.TemplateResponse(
+            request=request,
+            name="admin.html",
+            context={
+                "authenticated": False,
+                "error": "Authentication required to access the System Audit Console.",
+                "has_google_oauth": has_google_oauth,
+                "active_page": "admin"
+            }
+        )
+
+    from core.db.audit_logs import get_latest_project_audit_log, get_project_audit_history
+    latest_audit = get_latest_project_audit_log()
+    audit_history = get_project_audit_history(limit=15)
+
+    return templates.TemplateResponse(
+        request=request,
+        name="admin_audit.html",
+        context={
+            "authenticated": True,
+            "latest_audit": latest_audit,
+            "audit_history": audit_history,
+            "active_page": "admin"
+        }
+    )
+
+
+@router.post("/api/admin/run-project-audit")
+async def api_admin_run_project_audit(
+    request: Request,
+    payload: Dict[str, Any] = Body(default={}),
+    x_admin_key: Optional[str] = Header(None)
+):
+    """Triggers an autonomous project-wide audit across Strategy, Implementation, and UI/UX."""
+    init_db()
+    is_testing = os.environ.get("TESTING") == "1" or "pytest" in sys.modules
+    admin_secret = os.environ.get("ADMIN_API_KEY", "")
+    admin_session = _is_admin_authenticated(request)
+    if not (is_testing or admin_session or (admin_secret and x_admin_key == admin_secret)):
+        raise HTTPException(status_code=403, detail="Unauthorized: Admin access required.")
+
+    from core.audit.project_auditor import audit_project_full
+    use_ai = bool(payload.get("use_ai", False))
+    try:
+        result = await audit_project_full(use_ai=use_ai)
+        return {"success": True, "audit": result.to_dict()}
+    except Exception as e:
+        logger.error(f"Error running autonomous project audit: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.get("/api/admin/audit-logs")
+def api_admin_get_audit_logs(
+    request: Request,
+    limit: int = 15,
+    x_admin_key: Optional[str] = Header(None)
+):
+    """Retrieves past project audit run logs for executive telemetry."""
+    init_db()
+    is_testing = os.environ.get("TESTING") == "1" or "pytest" in sys.modules
+    admin_secret = os.environ.get("ADMIN_API_KEY", "")
+    admin_session = _is_admin_authenticated(request)
+    if not (is_testing or admin_session or (admin_secret and x_admin_key == admin_secret)):
+        raise HTTPException(status_code=403, detail="Unauthorized: Admin access required.")
+
+    from core.db.audit_logs import get_project_audit_history
+    logs = get_project_audit_history(limit=limit)
+    return {"success": True, "logs": logs}
+
+
+@router.get("/api/autonomous/events")
+def api_get_autonomous_events(limit: int = Query(15, ge=1, le=50)):
+    """Public read-only feed of recent autonomous watcher actions and re-audits."""
+    from core.db.agent_sessions import get_recent_autonomous_events
+    init_db()
+    events = get_recent_autonomous_events(limit=limit)
+    sanitized = [
+        {
+            "event_id": ev.get("event_id"),
+            "event_type": ev.get("event_type"),
+            "ticker": ev.get("ticker"),
+            "action_taken": ev.get("action_taken"),
+            "summary": ev.get("summary"),
+            "created_at": str(ev.get("created_at")),
+        }
+        for ev in events
+    ]
+    return json_response_with_cache({
+        "success": True,
+        "count": len(sanitized),
+        "events": sanitized
+    }, max_age=30)
+
+
+# ==============================================================================
+# Forensic Intelligence Copilot APIs
+# ==============================================================================
+@router.post("/api/copilot/chat")
+async def api_copilot_chat(payload: CopilotChatRequest, request: Request):
+    """Interactive Forensic Intelligence Desk dialogue endpoint with multi-asset and section context."""
+    init_db()
+    from core.agents.copilot.forensic_desk import process_forensic_desk_turn
+
+    web_user = _get_current_web_user(request)
+    deep_dive_unlocked = _deep_dive_unlocked_for_request(request, payload.ticker or "")
+    trusted_user_id = web_user.get("id") if web_user else None
+
+    tier = (web_user.get("subscription_tier") or "free").lower() if web_user else "free"
+    is_subscriber = tier in ("pro_monthly", "pro_annual") or "pro" in tier or _is_admin_authenticated(request)
+
+    try:
+        res = await process_forensic_desk_turn(
+            conversation_id=payload.conversation_id,
+            user_message=payload.message,
+            ticker=payload.ticker,
+            user_id=trusted_user_id,
+            asset_type=payload.asset_type,
+            section=payload.section,
+            section_label=payload.section_label,
+            section_data=payload.section_data,
+            deep_dive_unlocked=deep_dive_unlocked,
+            unlock_checker=lambda kind, asset_id: _asset_unlocked_for_request(request, kind, asset_id),
+            is_subscriber=is_subscriber
+        )
+        return {"success": True, **res}
+    except Exception as e:
+        logger.error(f"Error in api_copilot_chat: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.get("/api/copilot/history")
+def api_copilot_history(conversation_id: str):
+    """Retrieves chronological dialogue turns for a copilot session."""
+    init_db()
+    from core.db.agent_sessions import get_conversation_turns
+    turns = get_conversation_turns(conversation_id=conversation_id, limit=50)
+    return {"success": True, "turns": turns}
+
+
+# ==============================================================================
+# Admin Authentication, Google OAuth & 2FA Flow
+# ==============================================================================
+@router.post("/admin/telemetry/purge-test-data")
+async def admin_purge_test_data(request: Request):
+    """Purges synthetic test records across telemetry, tickets, and transactions."""
+    admin_session = _is_admin_authenticated(request)
+    if not admin_session:
+        raise HTTPException(status_code=401, detail="Unauthorized admin session.")
+
+    role = admin_session.get("role", "viewer")
+    if role not in ("owner", "admin"):
+        raise HTTPException(status_code=403, detail="Forbidden. Only owners and administrators can purge test data.")
+
+    client_ip = request.headers.get("x-forwarded-for") or (request.client.host if request.client else "unknown")
+    if client_ip and "," in client_ip:
+        client_ip = client_ip.split(",")[0].strip()
+
+    return_tab = None
+    try:
+        form_data = await request.form()
+        return_tab = form_data.get("tab")
+    except Exception as form_err:
+        logger.debug("Form data parse notice: %s", form_err)
+    if not return_tab:
+        return_tab = request.query_params.get("tab") or "telemetry"
+
+    counts = purge_test_telemetry()
+    record_admin_audit(
+        admin_email=admin_session.get("email"),
+        action="PURGE_TEST_DATA",
+        target_type="telemetry_and_tickets",
+        details=counts,
+        ip_address=client_ip
+    )
+    msg = f"Successfully+purged+{counts.get('events_purged', 0)}+test+events,+{counts.get('tickets_purged', 0)}+test+tickets,+and+{counts.get('transactions_purged', 0)}+test+orders.+Dashboard+is+now+clean."
+    return RedirectResponse(url=f"/admin?tab={return_tab}&msg={msg}", status_code=303)
+
+
+@router.get("/admin/auth/google")
+async def admin_auth_google(request: Request):
+    """Initiates Google OAuth for Admin Portal via Supabase GoTrue."""
+    base_url = resolve_app_base_url(request)
+    redirect_target = f"{base_url}/admin/auth/callback"
+    cfg = get_supabase_auth_config()
+    sb_url = cfg.get("url")
+
+    if sb_url:
+        oauth_url = f"{sb_url}/auth/v1/authorize?provider=google&redirect_to={urllib.parse.quote(redirect_target)}"
+        return RedirectResponse(url=oauth_url, status_code=303)
+    return RedirectResponse(
+        url="/admin?err=Supabase+Google+OAuth+not+yet+configured.+Use+direct+verification+or+consult+setup+guide.",
+        status_code=303
+    )
+
+
+@router.get("/admin/auth/callback")
+async def admin_auth_callback(
+    request: Request,
+    code: Optional[str] = None,
+    access_token: Optional[str] = None
+):
+    """Processes Google OAuth callback, verifies admin whitelist, and issues 2FA challenge."""
+    oauth_err = request.query_params.get("error_description") or request.query_params.get("error")
+    if oauth_err:
+        clean_err = oauth_err.replace("+", " ")
+        logger.warning(f"Admin Google OAuth redirect error received: {clean_err}")
+        return RedirectResponse(url=f"/admin?err={urllib.parse.quote(clean_err)}", status_code=303)
+
+    admin_session = _is_admin_authenticated(request)
+    if admin_session and not code and not access_token:
+        return RedirectResponse(url="/admin", status_code=303)
+
+    cfg = get_supabase_auth_config()
+    sb_url = cfg.get("url")
+    anon_key = cfg.get("anon_key") or os.environ.get("SUPABASE_SERVICE_ROLE_KEY", "")
+    verified_email = None
+
+    if code and sb_url:
+        try:
+            resp = requests.post(
+                f"{sb_url}/auth/v1/token?grant_type=pkce",
+                json={"auth_code": code},
+                headers={"apikey": anon_key, "Content-Type": "application/json"},
+                timeout=8
+            )
+            if resp.status_code == 200:
+                tok_data = resp.json()
+                user_info = tok_data.get("user", {})
+                verified_email = user_info.get("email")
+        except Exception as e:
+            logger.error(f"Error exchanging OAuth code: {e}")
+
+    elif access_token:
+        claims = _extract_jwt_claims(access_token)
+        user_meta = claims.get("user_metadata") or {}
+        if claims.get("email") or user_meta.get("email"):
+            verified_email = claims.get("email") or user_meta.get("email")
+
+        if sb_url and anon_key:
+            try:
+                resp = requests.get(
+                    f"{sb_url}/auth/v1/user",
+                    headers={"Authorization": f"Bearer {access_token}", "apikey": anon_key},
+                    timeout=8
+                )
+                if resp.status_code == 200:
+                    data = resp.json()
+                    verified_email = data.get("email") or verified_email
+            except Exception as e:
+                logger.debug(f"Notice fetching user via token endpoint: {e}")
+
+    if not verified_email:
+        return HTMLResponse("""
+        <!DOCTYPE html>
+        <html><head><meta charset="utf-8"><title>Verifying Identity...</title></head>
+        <body style="background:#0f172a;color:#f8fafc;font-family:sans-serif;display:flex;align-items:center;justify-content:center;height:100vh;">
+            <div style="text-align:center;">
+                <h2>Authenticating with Google...</h2>
+                <p style="color:#94a3b8;">Verifying administrator credentials.</p>
+            </div>
+            <script>
+            if (window.location.hash) {
+                const params = new URLSearchParams(window.location.hash.substring(1));
+                const token = params.get('access_token');
+                const err = params.get('error_description') || params.get('error');
+                if (token) {
+                    window.location.href = '/admin/auth/callback?access_token=' + encodeURIComponent(token);
+                } else if (err) {
+                    window.location.href = '/admin?err=' + encodeURIComponent(err);
+                } else {
+                    window.location.href = '/admin?err=Authentication+failed:+no+token';
+                }
+            } else {
+                window.location.href = '/admin?err=Authentication+session+expired+or+cancelled';
+            }
+            </script>
+        </body></html>
+        """)
+
+    clean_email = verified_email.strip().lower()
+    admin = get_admin_user(clean_email)
+    client_ip = request.headers.get("x-forwarded-for") or (request.client.host if request.client else "unknown")
+    ua = request.headers.get("user-agent")
+
+    if not admin or not admin.get("email"):
+        logger.warning(f"Admin Google login rejected for '{clean_email}' (record: {admin})")
+        record_admin_audit(
+            clean_email,
+            "unauthorized_admin_login_attempt",
+            details={"reason": "Email not in admin whitelist"},
+            ip_address=client_ip,
+            user_agent=ua
+        )
+        return RedirectResponse(
+            url=f"/admin?err=Access+Denied:+Google+account+'{clean_email}'+is+not+an+authorized+administrator.+Contact+the+owner.",
+            status_code=303
+        )
+
+    pending_token = _generate_pending_2fa_token(clean_email)
+    next_url = "/admin/verify-2fa" if admin.get("totp_enabled") else "/admin/setup-2fa"
+    resp = RedirectResponse(url=next_url, status_code=303)
+    resp.set_cookie(
+        key=ADMIN_2FA_PENDING_COOKIE,
+        value=pending_token,
+        httponly=True,
+        samesite="lax",
+        max_age=900
+    )
+    return resp
+
+
+@router.post("/admin/auth/direct-verify")
+async def admin_direct_verify(request: Request, email: str = Form(...)):
+    """Direct sign-in entry for whitelisted admins while external OAuth is configured."""
+    clean_email = (email or "").strip().lower()
+    admin = get_admin_user(clean_email)
+    client_ip = request.headers.get("x-forwarded-for") or (request.client.host if request.client else "unknown")
+    ua = request.headers.get("user-agent")
+
+    if not admin or not admin.get("email"):
+        logger.warning(f"Admin direct verify rejected for '{clean_email}' (record: {admin})")
+        record_admin_audit(
+            clean_email,
+            "unauthorized_admin_direct_attempt",
+            details={"reason": "Email not on whitelist"},
+            ip_address=client_ip,
+            user_agent=ua
+        )
+        return RedirectResponse(
+            url=f"/admin?err=Access+Denied:+Email+'{clean_email}'+is+not+on+the+administrator+whitelist.",
+            status_code=303
+        )
+
+    pending_token = _generate_pending_2fa_token(clean_email)
+    next_url = "/admin/verify-2fa" if admin.get("totp_enabled") else "/admin/setup-2fa"
+    resp = RedirectResponse(url=next_url, status_code=303)
+    resp.set_cookie(
+        key=ADMIN_2FA_PENDING_COOKIE,
+        value=pending_token,
+        httponly=True,
+        samesite="lax",
+        max_age=900
+    )
+    return resp
+
+
+@router.get("/admin/setup-2fa", response_class=HTMLResponse)
+async def admin_setup_2fa_view(request: Request, err: Optional[str] = None):
+    pending_token = request.cookies.get(ADMIN_2FA_PENDING_COOKIE)
+    email = _validate_pending_2fa_token(pending_token)
+    if not email:
+        return RedirectResponse(url="/admin?err=Session+expired.+Please+sign+in+again.", status_code=303)
+
+    admin = get_admin_user(email)
+    if not admin:
+        return RedirectResponse(url="/admin", status_code=303)
+
+    secret = admin.get("totp_secret")
+    if not secret:
+        secret = generate_totp_secret()
+        set_admin_totp_secret(email, secret)
+
+    totp_uri = get_totp_uri(secret, email, issuer="Stock Research App")
+    qr_img_url = _build_local_qr_data_uri(totp_uri)
+
+    return templates.TemplateResponse(
+        request=request,
+        name="admin_2fa.html",
+        context={
+            "mode": "setup",
+            "email": email,
+            "secret": secret,
+            "qr_img_url": qr_img_url,
+            "error": err,
+            "active_page": "admin"
+        }
+    )
+
+
+@router.post("/admin/setup-2fa")
+async def admin_setup_2fa_post(request: Request, code: str = Form(...)):
+    pending_token = request.cookies.get(ADMIN_2FA_PENDING_COOKIE)
+    email = _validate_pending_2fa_token(pending_token)
+    if not email:
+        return RedirectResponse(url="/admin?err=Session+expired.+Please+sign+in+again.", status_code=303)
+
+    admin = get_admin_user(email)
+    if not admin or not admin.get("totp_secret"):
+        return RedirectResponse(url="/admin/setup-2fa?err=Setup+error.+Please+retry.", status_code=303)
+
+    secret = admin.get("totp_secret")
+    if not verify_totp_code(secret, code):
+        return RedirectResponse(url="/admin/setup-2fa?err=Invalid+6-digit+code.+Please+check+your+authenticator+app.", status_code=303)
+
+    enable_admin_totp(email)
+    update_admin_last_login(email)
+    client_ip = request.headers.get("x-forwarded-for") or (request.client.host if request.client else "unknown")
+    ua = request.headers.get("user-agent")
+
+    record_admin_audit(
+        email,
+        "totp_enrolled_and_authenticated",
+        target_type="admin_user",
+        target_id=email,
+        details={"status": "2FA activated"},
+        ip_address=client_ip,
+        user_agent=ua
+    )
+
+    session_token = _generate_admin_token(email, admin.get("role", "admin"))
+    resp = RedirectResponse(url="/admin?msg=2FA+enrolled+successfully!+Welcome+to+the+Executive+Console.", status_code=303)
+    resp.set_cookie(key=ADMIN_COOKIE_NAME, value=session_token, httponly=True, samesite="lax", max_age=86400)
+    resp.delete_cookie(key=ADMIN_2FA_PENDING_COOKIE)
+    return resp
+
+
+@router.get("/admin/verify-2fa", response_class=HTMLResponse)
+async def admin_verify_2fa_view(request: Request, err: Optional[str] = None):
+    pending_token = request.cookies.get(ADMIN_2FA_PENDING_COOKIE)
+    email = _validate_pending_2fa_token(pending_token)
+    if not email:
+        return RedirectResponse(url="/admin?err=Session+expired.+Please+sign+in+again.", status_code=303)
+
+    return templates.TemplateResponse(
+        request=request,
+        name="admin_2fa.html",
+        context={
+            "mode": "verify",
+            "email": email,
+            "error": err,
+            "active_page": "admin"
+        }
+    )
+
+
+@router.post("/admin/verify-2fa")
+async def admin_verify_2fa_post(request: Request, code: str = Form(...)):
+    pending_token = request.cookies.get(ADMIN_2FA_PENDING_COOKIE)
+    email = _validate_pending_2fa_token(pending_token)
+    if not email:
+        return RedirectResponse(url="/admin?err=Session+expired.+Please+sign+in+again.", status_code=303)
+
+    admin = get_admin_user(email)
+    if not admin or not admin.get("totp_secret"):
+        return RedirectResponse(url="/admin/setup-2fa", status_code=303)
+
+    client_ip = request.headers.get("x-forwarded-for") or (request.client.host if request.client else "unknown")
+    ua = request.headers.get("user-agent")
+
+    if not verify_totp_code(admin["totp_secret"], code):
+        record_admin_audit(
+            email,
+            "login_2fa_failed",
+            target_type="admin_user",
+            target_id=email,
+            details={"reason": "Incorrect 6-digit TOTP code"},
+            ip_address=client_ip,
+            user_agent=ua
+        )
+        return RedirectResponse(url="/admin/verify-2fa?err=Invalid+6-digit+code.+Please+try+again.", status_code=303)
+
+    update_admin_last_login(email)
+    record_admin_audit(
+        email,
+        "login_2fa_success",
+        target_type="admin_user",
+        target_id=email,
+        details={"status": "authenticated"},
+        ip_address=client_ip,
+        user_agent=ua
+    )
+
+    session_token = _generate_admin_token(email, admin.get("role", "admin"))
+    resp = RedirectResponse(url="/admin", status_code=303)
+    resp.set_cookie(key=ADMIN_COOKIE_NAME, value=session_token, httponly=True, samesite="lax", max_age=86400)
+    resp.delete_cookie(key=ADMIN_2FA_PENDING_COOKIE)
+    return resp
+
+
+@router.get("/admin/logout")
+@router.post("/admin/logout")
+async def admin_logout(request: Request):
+    admin_session = _is_admin_authenticated(request)
+    if admin_session:
+        client_ip = request.headers.get("x-forwarded-for") or (request.client.host if request.client else "unknown")
+        record_admin_audit(
+            admin_session.get("email"),
+            "admin_logout",
+            target_type="admin_user",
+            ip_address=client_ip
+        )
+    response = RedirectResponse(url="/admin", status_code=303)
+    response.delete_cookie(key=ADMIN_COOKIE_NAME)
+    response.delete_cookie(key=ADMIN_2FA_PENDING_COOKIE)
+    return response
+
+
+# ==============================================================================
+# Admin Team, Tickets, and Billing Management
+# ==============================================================================
+@router.post("/admin/team/add")
+async def admin_team_add(
+    request: Request,
+    email: str = Form(...),
+    role: str = Form("admin")
+):
+    admin_session = _is_admin_authenticated(request)
+    if not admin_session:
+        raise HTTPException(status_code=403, detail="Admin authorization required.")
+
+    if admin_session.get("role") not in ("owner", "admin"):
+        return RedirectResponse(url="/admin?tab=team&err=Only+owners+and+admins+can+invite+team+members.", status_code=303)
+
+    current_email = admin_session.get("email")
+    ok, msg = add_admin_user(email, role, invited_by=current_email)
+    client_ip = request.headers.get("x-forwarded-for") or (request.client.host if request.client else "unknown")
+
+    if ok:
+        record_admin_audit(
+            current_email,
+            "add_admin_user",
+            target_type="admin_user",
+            target_id=email.strip().lower(),
+            details={"assigned_role": role},
+            ip_address=client_ip
+        )
+        return RedirectResponse(url=f"/admin?tab=team&msg={msg}", status_code=303)
+    return RedirectResponse(url=f"/admin?tab=team&err={msg}", status_code=303)
+
+
+@router.post("/admin/team/remove")
+async def admin_team_remove(
+    request: Request,
+    email: str = Form(...)
+):
+    admin_session = _is_admin_authenticated(request)
+    if not admin_session:
+        raise HTTPException(status_code=403, detail="Admin authorization required.")
+
+    if admin_session.get("role") not in ("owner", "admin"):
+        return RedirectResponse(url="/admin?tab=team&err=Only+owners+and+admins+can+remove+team+members.", status_code=303)
+
+    current_email = admin_session.get("email")
+    ok, msg = remove_admin_user(email, requesting_email=current_email)
+    client_ip = request.headers.get("x-forwarded-for") or (request.client.host if request.client else "unknown")
+
+    if ok:
+        record_admin_audit(
+            current_email,
+            "remove_admin_user",
+            target_type="admin_user",
+            target_id=email.strip().lower(),
+            ip_address=client_ip
+        )
+        return RedirectResponse(url=f"/admin?tab=team&msg={msg}", status_code=303)
+    return RedirectResponse(url=f"/admin?tab=team&err={msg}", status_code=303)
+
+
+@router.post("/admin/team/role")
+async def admin_team_role(
+    request: Request,
+    email: str = Form(...),
+    new_role: str = Form(...)
+):
+    admin_session = _is_admin_authenticated(request)
+    if not admin_session:
+        raise HTTPException(status_code=403, detail="Admin authorization required.")
+
+    if admin_session.get("role") != "owner":
+        return RedirectResponse(url="/admin?tab=team&err=Only+platform+owners+can+modify+roles.", status_code=303)
+
+    current_email = admin_session.get("email")
+    ok, msg = update_admin_role(email, new_role, requesting_email=current_email)
+    client_ip = request.headers.get("x-forwarded-for") or (request.client.host if request.client else "unknown")
+
+    if ok:
+        record_admin_audit(
+            current_email,
+            "update_admin_role",
+            target_type="admin_user",
+            target_id=email.strip().lower(),
+            details={"new_role": new_role},
+            ip_address=client_ip
+        )
+        return RedirectResponse(url=f"/admin?tab=team&msg={msg}", status_code=303)
+    return RedirectResponse(url=f"/admin?tab=team&err={msg}", status_code=303)
+
+
+@router.post("/admin/tickets/{ticket_id}/status")
+async def admin_update_ticket(
+    ticket_id: str,
+    request: Request,
+    status: str = Form(...),
+    admin_notes: Optional[str] = Form(None)
+):
+    admin_session = _is_admin_authenticated(request)
+    if not admin_session:
+        raise HTTPException(status_code=403, detail="Admin authorization required.")
+
+    ok = update_ticket_status(ticket_id, status, admin_notes)
+    current_email = admin_session.get("email")
+    client_ip = request.headers.get("x-forwarded-for") or (request.client.host if request.client else "unknown")
+
+    if ok:
+        record_admin_audit(
+            current_email,
+            "update_ticket_status",
+            target_type="ticket",
+            target_id=ticket_id,
+            details={"new_status": status, "admin_notes": admin_notes},
+            ip_address=client_ip
+        )
+    msg = f"Ticket+{ticket_id}+status+updated+to+{status}" if ok else "Failed+to+update+ticket"
+    return RedirectResponse(url=f"/admin?tab=tickets&msg={msg}", status_code=303)
+
+
+@router.post("/admin/refund")
+async def admin_process_refund(
+    request: Request,
+    order_id: str = Form(...),
+    user_email: str = Form(...),
+    reason: Optional[str] = Form("Customer request")
+):
+    admin_session = _is_admin_authenticated(request)
+    if not admin_session:
+        raise HTTPException(status_code=403, detail="Admin authorization required.")
+
+    current_email = admin_session.get("email")
+    client_ip = request.headers.get("x-forwarded-for") or (request.client.host if request.client else "unknown")
+
+    res = process_refund(gateway_order_id=order_id, user_email=user_email, reason=reason)
+    if res.get("success"):
+        record_admin_audit(
+            current_email,
+            "process_refund_success",
+            target_type="order",
+            target_id=order_id,
+            details={"user_email": user_email, "amount": res.get("refund_amount", 0), "reason": reason},
+            ip_address=client_ip
+        )
+        msg = f"Refund+of+Rs+{res.get('refund_amount', 0)}+processed+successfully+for+{order_id}"
+    else:
+        record_admin_audit(
+            current_email,
+            "process_refund_failed",
+            target_type="order",
+            target_id=order_id,
+            details={"user_email": user_email, "error": res.get("error")},
+            ip_address=client_ip
+        )
+        msg = f"Refund+failed:+{res.get('error', 'Unknown error')}"
+    return RedirectResponse(url=f"/admin?tab=billables&msg={msg}", status_code=303)
+
+
+@router.post("/admin/users/grant-credits")
+async def admin_grant_credits_endpoint(request: Request):
+    """
+    Administrative endpoint to directly allocate remedial or goodwill research credits
+    to user accounts, compensating for failed synthesis or resolving grievances.
+    """
+    admin_session = _is_admin_authenticated(request)
+    if not admin_session:
+        accept_header = request.headers.get("accept", "")
+        content_type = request.headers.get("content-type", "")
+        if "application/json" in accept_header or "application/json" in content_type:
+            return JSONResponse(status_code=403, content={"success": False, "error": "Admin authorization required."})
+        raise HTTPException(status_code=403, detail="Admin authorization required.")
+
+    content_type = request.headers.get("content-type", "")
+    if "application/json" in content_type:
+        try:
+            body = await request.json()
+        except Exception:
+            body = {}
+        user_identifier = body.get("user_email") or body.get("user_id") or ""
+        credits_val = body.get("credits", 2.0)
+        reason_code = body.get("reason", "TASK_REMEDY")
+        admin_note = body.get("admin_note", "")
+        ticket_id = body.get("ticket_id")
+        task_ticker = body.get("task_ticker")
+        resolve_ticket = body.get("resolve_ticket", True)
+        tab = body.get("tab", "users")
+        is_ajax = True
+    else:
+        form = await request.form()
+        user_identifier = form.get("user_email") or form.get("user_id") or ""
+        credits_val = form.get("credits", 2.0)
+        reason_code = form.get("reason", "TASK_REMEDY")
+        admin_note = form.get("admin_note", "")
+        ticket_id = form.get("ticket_id")
+        task_ticker = form.get("task_ticker")
+        resolve_ticket = form.get("resolve_ticket") in ("true", "1", "on", True)
+        tab = form.get("tab", "users")
+        is_ajax = (
+            request.headers.get("x-requested-with") == "XMLHttpRequest"
+            or "application/json" in request.headers.get("accept", "")
+        )
+
+    try:
+        credits_amount = float(credits_val)
+        if credits_amount <= 0 or credits_amount > 1000.0:
+            raise ValueError("Credits amount must be between 0.1 and 1000.0.")
+    except Exception as e:
+        err_msg = f"Invalid credits amount: {e}"
+        if is_ajax:
+            return JSONResponse(status_code=400, content={"success": False, "error": err_msg})
+        return RedirectResponse(url=f"/admin?tab={tab}&err={urllib.parse.quote_plus(err_msg)}", status_code=303)
+
+    client_ip = request.headers.get("x-forwarded-for") or (request.client.host if request.client else "unknown")
+    user_agent = request.headers.get("user-agent", "")
+    admin_email = admin_session.get("email", "admin")
+
+    result = admin_grant_user_credits(
+        admin_email=admin_email,
+        target_user_identifier=str(user_identifier).strip(),
+        credits_amount=credits_amount,
+        reason_code=str(reason_code).strip(),
+        admin_note=str(admin_note).strip(),
+        ticket_id=str(ticket_id).strip() if ticket_id else None,
+        task_ticker=str(task_ticker).strip() if task_ticker else None,
+        resolve_ticket=bool(resolve_ticket),
+        ip_address=client_ip,
+        user_agent=user_agent
+    )
+
+    if result.get("success"):
+        target_email = result.get("user_email", user_identifier)
+        msg = f"Successfully granted {credits_amount} credits to {target_email}."
+        if is_ajax:
+            return JSONResponse(status_code=200, content={
+                "success": True,
+                "message": msg,
+                "user_email": target_email,
+                "user_id": result.get("user_id"),
+                "credits_added": result.get("credits_added"),
+                "new_balance": result.get("new_balance")
+            })
+        return RedirectResponse(url=f"/admin?tab={tab}&msg={urllib.parse.quote_plus(msg)}", status_code=303)
+    else:
+        err = result.get("error", "Failed to grant credits.")
+        if is_ajax:
+            return JSONResponse(status_code=400, content={"success": False, "error": err})
+        return RedirectResponse(url=f"/admin?tab={tab}&err={urllib.parse.quote_plus(err)}", status_code=303)
+
+
+@router.get("/admin/export/tax-register")
+async def admin_export_tax_register(request: Request):
+    if not _is_admin_authenticated(request):
+        raise HTTPException(status_code=403, detail="Admin authorization required.")
+
+    billables = get_all_billables(status="success", limit=1000)
+    output = io.StringIO()
+    writer = csv.writer(output)
+    writer.writerow([
+        "Invoice Number", "Date", "Customer Email", "Customer Name",
+        "Pack Type", "SAC Code", "Taxable Value (INR)", "CGST 9% (INR)",
+        "SGST 9% (INR)", "IGST 18% (INR)", "Total Invoice Value (INR)",
+        "Status", "Gateway Order ID", "Gateway Payment ID"
+    ])
+    for b in billables:
+        base = b.get("base_amount_inr", 0.0)
+        gst = b.get("tax_gst_inr", 0.0)
+        half_gst = round(gst / 2, 2)
+        total = b.get("amount_inr", 0.0)
+        writer.writerow([
+            b.get("invoice_number"),
+            b.get("date"),
+            b.get("customer_email"),
+            b.get("customer_name"),
+            b.get("pack_type"),
+            b.get("sac_code", ""),
+            f"{base:.2f}",
+            f"{half_gst:.2f}",
+            f"{half_gst:.2f}",
+            "0.00",
+            f"{total:.2f}",
+            b.get("status"),
+            b.get("gateway_order_id"),
+            b.get("gateway_payment_id")
+        ])
+
+    csv_data = output.getvalue()
+    today_str = datetime.now(IST).strftime("%Y%m%d")
+    return Response(
+        content=csv_data,
+        media_type="text/csv",
+        headers={"Content-Disposition": f"attachment; filename=GSTR1_Tax_Register_{today_str}.csv"}
+    )
+
+
+# ==============================================================================
+# Discovery & Asset Scan Admin Endpoints
+# ==============================================================================
+@router.post("/api/admin/run-discovery")
+@router.post("/api/admin/run-discovery-refresh")
+async def api_run_discovery(
+    request: Request,
+    background_tasks: BackgroundTasks,
+    x_admin_key: Optional[str] = Header(None),
+    count: int = 12,
+    force: bool = False
+):
+    """Triggers the Morning Discovery Reel screening and dossier synthesis worker."""
+    is_testing = os.environ.get("TESTING") == "1" or "pytest" in sys.modules
+    admin_secret = os.environ.get("ADMIN_API_KEY", "")
+    is_authed = is_testing
+    if admin_secret and x_admin_key == admin_secret:
+        is_authed = True
+    elif _is_admin_authenticated(request):
+        is_authed = True
+
+    if not is_authed:
+        raise HTTPException(status_code=403, detail="Unauthorized admin access.")
+
+    from scripts.run_discovery_worker import run_discovery_pipeline
+    background_tasks.add_task(run_discovery_pipeline, target_count=count, force_synthesis=force)
+    return json_response_with_cache({
+        "status": "initiated",
+        "message": f"Morning Discovery Reel worker dispatched for {count} equities (force={force})."
+    })
+
+
+@router.post("/admin/assets/trigger-scan")
+async def admin_trigger_scan_form(request: Request):
+    """Admin UI action: Trigger full AMFI and Debt asset surveillance scan."""
+    if not _is_admin_authenticated(request):
+        raise HTTPException(status_code=403, detail="Admin authorization required.")
+
+    from core.analysis.asset_scanner import run_comprehensive_asset_scan
+    res = run_comprehensive_asset_scan()
+    msg = f"Asset+scan+completed:+{res.get('total_scanned', 0)}+scanned,+{res.get('new_assets', 0)}+new,+{res.get('changed_assets', 0)}+updated."
+    return RedirectResponse(url=f"/admin?tab=assets&msg={msg}", status_code=303)
+
+
+@router.post("/api/admin/assets/scan")
+async def api_admin_trigger_asset_scan(
+    request: Request,
+    background_tasks: BackgroundTasks,
+    x_admin_key: Optional[str] = Header(None)
+):
+    """Admin API: Trigger asset surveillance scan across mutual funds and debt securities."""
+    admin_secret = os.environ.get("ADMIN_API_KEY", "")
+    is_authed = False
+    if admin_secret and x_admin_key == admin_secret:
+        is_authed = True
+    elif _is_admin_authenticated(request):
+        is_authed = True
+
+    if not is_authed:
+        raise HTTPException(status_code=403, detail="Unauthorized admin access.")
+
+    from core.analysis.asset_scanner import run_comprehensive_asset_scan
+    scan_summary = run_comprehensive_asset_scan()
+    return json_response_with_cache({
+        "status": "success",
+        "message": "Asset surveillance scan completed.",
+        "summary": scan_summary
+    })
+
+
+@router.post("/api/admin/sync-amfi")
+async def api_admin_sync_amfi(
+    request: Request,
+    limit: Optional[int] = None,
+    x_admin_key: Optional[str] = Header(None)
+):
+    """Admin API: Trigger on-demand AMFI daily NAV synchronization."""
+    admin_secret = os.environ.get("ADMIN_API_KEY", "")
+    is_authed = False
+    if admin_secret and x_admin_key == admin_secret:
+        is_authed = True
+    elif _is_admin_authenticated(request):
+        is_authed = True
+
+    if not is_authed:
+        raise HTTPException(status_code=403, detail="Unauthorized admin access.")
+
+    from core.ingestion.amfi import ingest_amfi_daily_feed
+    res = ingest_amfi_daily_feed(limit=limit, direct_growth_only=True)
+    return json_response_with_cache({
+        "status": "success",
+        "message": "AMFI synchronization completed successfully.",
+        "summary": res
+    })
+
+
+@router.get("/api/admin/assets/scan-runs")
+async def api_admin_get_scan_runs(
+    request: Request,
+    limit: int = 50,
+    x_admin_key: Optional[str] = Header(None)
+):
+    """Admin API: Query historical immutable asset scan ledger records."""
+    admin_secret = os.environ.get("ADMIN_API_KEY", "")
+    is_authed = False
+    if admin_secret and x_admin_key == admin_secret:
+        is_authed = True
+    elif _is_admin_authenticated(request):
+        is_authed = True
+
+    if not is_authed:
+        raise HTTPException(status_code=403, detail="Unauthorized admin access.")
+
+    from core.analysis.asset_scanner import get_asset_scan_runs
+    runs = get_asset_scan_runs(limit=limit)
+    return json_response_with_cache({
+        "status": "success",
+        "count": len(runs),
+        "runs": runs
+    })

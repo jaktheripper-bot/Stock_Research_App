@@ -25,7 +25,7 @@ class MsmeFirm(BaseModel):
     last_updated: Optional[str] = Field(None, description="Timestamp of the most recent update")
 
     class Config:
-        orm_mode = True
+        from_attributes = True
 
 """
 SQLAlchemy model (or dataclass fallback) for the `msme_firms` table.

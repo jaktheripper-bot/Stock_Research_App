@@ -63,8 +63,8 @@ case "$COMMAND" in
         "$PYTHON" -m uvicorn web.main:app --host 0.0.0.0 --port 8000 --reload
         ;;
     live-audit|live_audit|audit-live)
-        echo "--> [1/1] Executing Real Browser Interaction Audit on Live Deployment..."
-        "$PYTHON" test_live_ui.py
+        echo "--> [1/1] Executing Project Audit & Endpoint Contract Verification..."
+        "$PYTHON" scripts/run_project_audit.py --quick
         ;;
     mf-ingest)
         shift

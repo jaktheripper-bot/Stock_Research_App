@@ -58,8 +58,8 @@ def _clean_dict_row(cursor, row: Any, fallback_cols: Optional[List[str]] = None)
     if hasattr(row, "keys"):
         try:
             return dict(row)
-        except Exception:
-            pass
+        except Exception as e:
+            logger.debug(f"Row mapping note: {e}")
     if hasattr(cursor, "description") and cursor.description:
         cols = [d[0] for d in cursor.description]
         return dict(zip(cols, row))

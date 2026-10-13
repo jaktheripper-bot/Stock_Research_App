@@ -62,23 +62,23 @@ def is_postgres_connection(conn) -> bool:
         import sqlite3
         if isinstance(conn, sqlite3.Connection):
             return False
-    except Exception:
-        pass
+    except Exception as e:
+        logger.debug(f"Direct connection check note: {e}")
     if hasattr(conn, "_conn"):
         try:
             import sqlite3
             if isinstance(conn._conn, sqlite3.Connection):
                 return False
-        except Exception:
-            pass
+        except Exception as e:
+            logger.debug(f"Inner connection check note: {e}")
     # Must have cursor that supports mogrify (psycopg2 specific)
     try:
         cur = conn.cursor()
         has_pg = hasattr(cur, "mogrify")
         try:
             cur.close()
-        except Exception:
-            pass
+        except Exception as e:
+            logger.debug(f"Mogrify check cleanup note: {e}")
         return has_pg
     except Exception:
         return False
@@ -249,16 +249,16 @@ def init_db(force: bool = False):
     if (target_key in _INITIALIZED_DBS) and not force:
         try:
             conn.close()
-        except Exception:
-            pass
+        except Exception as e:
+            logger.debug(f"Pre-init connection close note: {e}")
         return
 
     with _DB_INIT_LOCK:
         if (target_key in _INITIALIZED_DBS) and not force:
             try:
                 conn.close()
-            except Exception:
-                pass
+            except Exception as e:
+                logger.debug(f"Locked pre-init connection close note: {e}")
             return
 
         cursor = conn.cursor()
