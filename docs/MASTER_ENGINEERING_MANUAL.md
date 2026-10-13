@@ -377,6 +377,8 @@ Per Directive 3 in [`AGENTS.md`](file:///Users/lyndonpinto/Documents/Stock_Resea
 4. **Whenever Creating a Checkpoint (`./run.sh checkpoint`):**
    - Update **Section 6 (Historical Build Ledger)** with the new tag, commit hash, timestamp, and backup folder.
    - Sync this manual to `main`, `dev`, and remote `origin`.
+5. **Before Stating Task Completion:**
+   - Adhere to Directive 5 in [`AGENTS.md`](file:///Users/lyndonpinto/Documents/Stock_Research_App/AGENTS.md): Empirically double-check that every code change, test assertion, and documentation update discussed in the session is physically present on disk and active in runtime before marking any task as complete.
 
 ---
 

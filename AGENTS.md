@@ -38,3 +38,13 @@
 - **Challenge Flawed Outcomes:** If a requested approach has hidden risks, architectural anti-patterns, security/regulatory pitfalls, or unintended side-effects, explicitly flag them and challenge the assumption with root-cause reasoning.
 - **Propose Superior Execution Paths:** If there is a more resilient, maintainable, cost-effective, or idiomatic implementation on the table, present the alternative and trade-offs rather than passively executing a suboptimal command.
 
+## 5. Mandatory Empirical Verification Protocol Before Declaring Task Completion
+**NEVER state or declare that a task, feature, or remediation is completed without first empirically double-checking and verifying that every single change discussed in the session is actually implemented on disk and active in code.**
+
+- **Ground-Truth File Inspection:** Directly inspect the modified lines in destination files using file viewing or search tools before summarizing results. Never assume an edit succeeded based on intent alone.
+- **Exhaustive Scope Checklist:** Compare the live diff and working tree against every action item, discussion point, and user request raised in the session to ensure zero unaddressed or forgotten items.
+- **Runtime & Test Validation:** Execute the test suite and verification tools (`python3 -m unittest discover -s tests`, `scripts/run_project_audit.py --quick`) and inspect actual runtime outputs before reporting completion.
+- **Git State & Remote Alignment:** Confirm working tree is clean (`git status`), commits and annotated tags are pushed, and tracking branches (`main`, `dev`, `origin`) are strictly aligned.
+- **Zero Premature Conclusions:** If any change is partial, blocked, or pending further user input, explicitly disclose its exact state rather than asserting that the task is finished.
+
+
