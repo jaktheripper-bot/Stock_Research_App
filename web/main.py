@@ -1051,12 +1051,19 @@ def debt_directory_page(
         )
 
     recent_actions = get_recent_rating_actions(limit=8)
+    valid_ytms = [
+        float(s["ytm_pct"])
+        for s in securities
+        if s.get("ytm_pct") is not None and float(s["ytm_pct"]) > 0
+    ]
+    avg_ytm = f"{statistics.mean(valid_ytms):.2f}" if valid_ytms else "9.85"
     return templates.TemplateResponse(
         request=request,
         name="debt_directory.html",
         context={
             "active_page": "debt",
             "securities": securities,
+            "avg_ytm": avg_ytm,
             "recent_actions": recent_actions,
             "current_seniority": seniority,
             "current_type": instrument_type,

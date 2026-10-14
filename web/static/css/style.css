@@ -417,9 +417,6 @@ nav.main-nav {
   transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1);
 }
 
-.nav-btn-text-short {
-  display: none;
-}
 
 .mobile-menu-btn {
   display: none;
@@ -1842,12 +1839,11 @@ body:has(.copilot-backdrop.copilot-open) #forensicDeskFloatingDock {
 }
 
 @media (max-width: 440px) {
-  .nav-btn-text-full {
-    display: none;
-  }
-
-  .nav-btn-text-short {
-    display: inline;
+  .nav-actions .btn {
+    min-height: 32px;
+    padding: 5px 8px;
+    font-size: 11px;
+    gap: 4px;
   }
 }
 
