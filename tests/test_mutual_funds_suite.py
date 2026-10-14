@@ -132,6 +132,9 @@ NEW_50_SCHEME_CODES = [
     "DSP_HEALTHCARE_DIR",
 ]
 
+from core.db.mutual_funds_expansion_101_200 import SCHEMES_101_TO_200
+NEW_100_SCHEME_CODES = [s["scheme_code"] for s in SCHEMES_101_TO_200]
+
 
 # ==============================================================================
 # 1. Base Mutual Fund Engine & Look-Through Diagnostics
@@ -351,7 +354,7 @@ class TestMutualFundTop100Expansion(unittest.TestCase):
         cls.client = TestClient(app)
 
     def test_seeded_count_is_one_hundred(self):
-        self.assertEqual(self.seeded_count, 100)
+        self.assertGreaterEqual(self.seeded_count, 100)
         active = get_active_mutual_funds()
         self.assertGreaterEqual(len(active), 100)
 
@@ -444,6 +447,90 @@ class TestMutualFundTop100Expansion(unittest.TestCase):
         data = res_api.json()
         self.assertEqual(data.get("scheme_code"), "360ONE_FOCUSED_DIR")
         self.assertIn("composite_health_score", data)
+
+
+# ==============================================================================
+# 3b. Top 200 Canonical Universe Expansion (Schemes 101 to 200)
+# ==============================================================================
+class TestMutualFundTop200Expansion(unittest.TestCase):
+    @classmethod
+    def setUpClass(cls):
+        init_db()
+        cls.seeded_count = seed_default_mutual_funds()
+        cls.client = TestClient(app)
+
+    def test_seeded_count_is_two_hundred(self):
+        self.assertEqual(self.seeded_count, 200)
+        active = get_active_mutual_funds(limit=250)
+        self.assertGreaterEqual(len(active), 200)
+
+    def test_all_one_hundred_expansion_schemes_exist_in_db(self):
+        self.assertEqual(len(NEW_100_SCHEME_CODES), 100)
+        for code in NEW_100_SCHEME_CODES:
+            scheme = get_mutual_fund_scheme(code)
+            self.assertIsNotNone(scheme, f"Scheme {code} not found in database")
+            self.assertEqual(scheme["scheme_code"], code)
+            self.assertGreater(float(scheme.get("aum_crores", 0)), 0, f"Scheme {code} has 0 AUM")
+            self.assertGreater(float(scheme.get("nav", 0)), 0, f"Scheme {code} has 0 NAV")
+            ter_dir = float(scheme.get("ter_direct_pct", 0))
+            ter_reg = float(scheme.get("ter_regular_pct", 0))
+            self.assertGreater(ter_dir, 0.0, f"Scheme {code} has 0 direct TER")
+            self.assertGreater(ter_reg, ter_dir, f"Scheme {code} regular TER <= direct TER")
+
+    def test_all_one_hundred_expansion_schemes_have_holdings(self):
+        for code in NEW_100_SCHEME_CODES:
+            holdings = get_scheme_holdings(code)
+            self.assertGreaterEqual(len(holdings), 5, f"Scheme {code} has fewer than 5 holdings")
+            total_weight = sum(float(h.get("weight_pct", 0.0)) for h in holdings)
+            self.assertGreaterEqual(total_weight, 35.0, f"Scheme {code} total holding weight too low")
+
+    def test_category_distribution_of_200_fund_universe(self):
+        schemes = get_active_mutual_funds(limit=250)
+        cats = {}
+        for s in schemes:
+            c = s.get("category", "")
+            cats[c] = cats.get(c, 0) + 1
+
+        self.assertGreaterEqual(cats.get("Multi Asset Allocation Fund", 0), 12)
+        self.assertGreaterEqual(cats.get("Balanced Advantage Fund", 0), 12)
+        self.assertGreaterEqual(cats.get("Index Funds / ETFs", 0), 14)
+        self.assertGreaterEqual(cats.get("Sectoral / Thematic Fund", 0), 20)
+        self.assertGreaterEqual(cats.get("Small Cap Fund", 0), 15)
+        self.assertGreaterEqual(cats.get("Mid Cap Fund", 0), 18)
+        self.assertGreaterEqual(cats.get("Flexi Cap Fund", 0), 15)
+        self.assertGreaterEqual(cats.get("Value / Contra Fund", 0), 15)
+
+    def test_web_routes_for_top200_expansion_schemes(self):
+        res_multi = self.client.get("/funds/ICICI_MULTI_ASSET_DIR")
+        self.assertEqual(res_multi.status_code, 200)
+        self.assertIn("ICICI Prudential Multi-Asset Fund", res_multi.text)
+
+        res_baf = self.client.get("/funds/HDFC_BAF_DIR")
+        self.assertEqual(res_baf.status_code, 200)
+        self.assertIn("HDFC Balanced Advantage Fund", res_baf.text)
+
+        res_def = self.client.get("/funds/HDFC_DEFENCE_DIR")
+        self.assertEqual(res_def.status_code, 200)
+        self.assertIn("HDFC Defence Fund", res_def.text)
+
+        res_small = self.client.get("/funds/BANDHAN_SMALLCAP_DIR")
+        self.assertEqual(res_small.status_code, 200)
+        self.assertIn("Bandhan Small Cap Fund", res_small.text)
+
+        res_api = self.client.get("/api/funds/dossier/QUANT_FLEXICAP_DIR")
+        self.assertEqual(res_api.status_code, 200)
+        data = res_api.json()
+        self.assertEqual(data.get("scheme_code"), "QUANT_FLEXICAP_DIR")
+
+    def test_portfolio_overlap_between_expansion_schemes(self):
+        holdings_energy1 = get_scheme_holdings("TATA_RESOURCES_ENERGY_DIR")
+        holdings_energy2 = get_scheme_holdings("DSP_ENERGY_DIR")
+
+        overlap = calculate_portfolio_overlap(holdings_energy1, holdings_energy2, "Tata Energy", "DSP Energy")
+        self.assertIn("overlap_pct", overlap)
+        self.assertIn("shared_holdings", overlap)
+        self.assertGreaterEqual(overlap["overlap_pct"], 15.0)
+        self.assertTrue(any(s["identifier"] == "RELIANCE" for s in overlap["shared_holdings"]))
 
 
 # ==============================================================================

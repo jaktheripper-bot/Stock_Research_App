@@ -234,7 +234,7 @@ get_mutual_fund_by_code = get_mutual_fund_scheme
 def get_active_mutual_funds(
     category: Optional[str] = None,
     broad_category: Optional[str] = None,
-    limit: int = 100
+    limit: int = 250
 ) -> List[Dict[str, Any]]:
     """Retrieves active mutual fund schemes filtered by category."""
     conn = get_db_connection()
@@ -4889,8 +4889,14 @@ def seed_default_mutual_funds() -> int:
         'ter_regular_pct': 1.95}
     ]
 
-    for s in schemes:
-        holdings = s.pop("holdings", [])
+    try:
+        from core.db.mutual_funds_expansion_101_200 import SCHEMES_101_TO_200
+        all_schemes = [dict(s) for s in schemes] + [dict(s) for s in SCHEMES_101_TO_200]
+    except ImportError:
+        all_schemes = [dict(s) for s in schemes]
+
+    for s in all_schemes:
+        holdings = list(s.pop("holdings", []))
         if save_mutual_fund_scheme(s):
             save_mutual_fund_holdings(s["scheme_code"], holdings)
             seeded += 1
