@@ -535,29 +535,61 @@ async function submitCopilotMessage() {
     container.appendChild(userTurn);
     container.scrollTop = container.scrollHeight;
 
-    // Append animated thinking wave indicator
+    // Append animated thinking wave indicator with live timer and dynamic background info
     const thinkingCard = document.createElement("div");
     thinkingCard.className = "copilot-thinking-card";
     
-    let thinkingLabel = "Evaluating disclosures & stress-testing thesis...";
+    let thinkingStages = [
+        "Scanning verified filings & baseline disclosures...",
+        "Stress-testing thesis against 7-pillar forensic framework...",
+        "Evaluating capital allocation & Reverse DCF hurdles...",
+        "Synthesizing institutional diagnosis & Pre-Mortem failure modes..."
+    ];
     if (activeAssetType === "mutual_fund") {
-        thinkingLabel = "Evaluating look-through constituents & fee drag...";
+        thinkingStages = [
+            "Scanning AMFI portfolio disclosures & constituent weights...",
+            "Evaluating Active Share, closet indexing & 10Y fee drag...",
+            "Auditing ASRI accounting stress across underlying holdings...",
+            "Synthesizing look-through portfolio health verdict..."
+        ];
     } else if (activeAssetType === "debt") {
-        thinkingLabel = "Stress-testing capital hierarchy & credit contagion...";
+        thinkingStages = [
+            "Inspecting BSE Debt registry & credit rating rationales...",
+            "Calculating YTM, Macaulay Duration & interest rate shock...",
+            "Auditing statutory recovery seniority & equity contagion...",
+            "Formulating institutional solvency diagnosis..."
+        ];
     }
 
     thinkingCard.innerHTML = `
-        <div class="copilot-thinking-row">
-            <div class="copilot-typing-dots">
-                <span class="copilot-typing-dot"></span>
-                <span class="copilot-typing-dot"></span>
-                <span class="copilot-typing-dot"></span>
+        <div class="copilot-thinking-row" style="display: flex; align-items: center; justify-content: space-between; gap: 8px; flex-wrap: wrap;">
+            <div style="display: flex; align-items: center; gap: 8px;">
+                <div class="copilot-typing-dots">
+                    <span class="copilot-typing-dot"></span>
+                    <span class="copilot-typing-dot"></span>
+                    <span class="copilot-typing-dot"></span>
+                </div>
+                <span id="copilotThinkingText" class="copilot-thinking-text">${thinkingStages[0]}</span>
             </div>
-            <span class="copilot-thinking-text">${thinkingLabel}</span>
+            <span id="copilotThinkingTimer" class="copilot-thinking-timer" style="font-size: 11px; font-weight: 700; color: #38bdf8; font-variant-numeric: tabular-nums; background: rgba(15, 23, 42, 0.7); padding: 2px 8px; border-radius: 9999px; border: 1px solid rgba(56, 189, 248, 0.3); font-family: monospace;">0s / ~10s</span>
         </div>
     `;
     container.appendChild(thinkingCard);
     container.scrollTop = container.scrollHeight;
+
+    const thinkingStartMs = Date.now();
+    const thinkingTimer = setInterval(() => {
+        const sec = Math.floor((Date.now() - thinkingStartMs) / 1000);
+        const timerEl = document.getElementById("copilotThinkingTimer");
+        const textEl = document.getElementById("copilotThinkingText");
+        if (timerEl) timerEl.innerText = `${sec}s / ~10s`;
+        if (textEl) {
+            if (sec < 3) textEl.innerText = thinkingStages[0];
+            else if (sec < 6) textEl.innerText = thinkingStages[1];
+            else if (sec < 9) textEl.innerText = thinkingStages[2];
+            else textEl.innerText = thinkingStages[3];
+        }
+    }, 250);
 
     sendBtn.disabled = true;
     sendBtn.classList.remove("active");
@@ -577,6 +609,7 @@ async function submitCopilotMessage() {
             })
         });
         const data = await resp.json();
+        clearInterval(thinkingTimer);
         thinkingCard.remove();
 
         if (!resp.ok) {

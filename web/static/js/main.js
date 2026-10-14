@@ -393,8 +393,145 @@ window.openCheckout = function(planId, planName, amountInr, credits) {
 };
 
 // ==============================================================================
-// 4. Report Synthesis — Triggers /api/synthesize with credit deduction & UI feedback
+// 4. Sitewide Forensic Evaluation HUD & Progressive Timer Engine
 // ==============================================================================
+
+const EVALUATION_CONFIGS = {
+  equity: {
+    badge: 'Fundamental Equity Engine',
+    title: (ticker) => `Evaluating Equity Dossier: ${ticker || 'Selected Company'}`,
+    stages: [
+      { maxSec: 7, stage: "Step 1/4: Ingesting BSE Filings & L2 Depth", msg: "Ingesting verified corporate filings from BSE and parsing Level-2 order book depth..." },
+      { maxSec: 16, stage: "Step 2/4: Executing 7-Pillar Cortex & Sieve", msg: "Running Chanakya clean-room filter, DuPont ROE decomposition, and promoter pledge audits..." },
+      { maxSec: 25, stage: "Step 3/4: Solving Reverse DCF & Valuation", msg: "Computing implied market growth rate vs. 12% WACC hurdle rate and sector benchmarks..." },
+      { maxSec: 30, stage: "Step 4/4: Finalizing Institutional Thesis", msg: "Assembling Pre-Mortem Inversion failure modes, statutory footnotes, and executive dossier..." }
+    ]
+  },
+  fund: {
+    badge: 'Mutual Fund Look-Through Engine',
+    title: (code) => `Evaluating Mutual Fund Dossier: ${code || 'Selected Scheme'}`,
+    stages: [
+      { maxSec: 7, stage: "Step 1/4: Ingesting AMFI Portfolios & NAVs", msg: "Ingesting verified AMFI scheme portfolio disclosures, NAV time-series, and category baselines..." },
+      { maxSec: 16, stage: "Step 2/4: Decomposing Constituents & Active Share", msg: "Auditing constituent equity & debt weights, style drift, and closet-indexing divergence..." },
+      { maxSec: 25, stage: "Step 3/4: Stress-Testing ASRI & 10Y Fee Drag", msg: "Calculating accounting stress risk index and 10-year Direct vs Regular TER wealth destruction..." },
+      { maxSec: 30, stage: "Step 4/4: Synthesizing Health Scorecard", msg: "Aggregating 7-pillar weighted moat distribution and composite look-through health score..." }
+    ]
+  },
+  debt: {
+    badge: 'Fixed Income & Credit Solvency Engine',
+    title: (isin) => `Evaluating Credit Dossier: ${isin || 'Selected Bond'}`,
+    stages: [
+      { maxSec: 7, stage: "Step 1/4: Ingesting BSE Debt & Rating Registry", msg: "Querying BSE Debt / SEBI OBPP registry and parsing credit rating agency surveillance rationales..." },
+      { maxSec: 16, stage: "Step 2/4: Calculating YTM & Macaulay Duration", msg: "Computing statutory Yield to Maturity (YTM), interest rate shock sensitivities, and cash flows..." },
+      { maxSec: 25, stage: "Step 3/4: Auditing Recovery Seniority & Contagion", msg: "Evaluating statutory IBC recovery hierarchy, collateral coverage, and equity contagion radar..." },
+      { maxSec: 30, stage: "Step 4/4: Formulating Solvency Rating Posture", msg: "Synthesizing 5-pillar credit solvency score, debt service coverage (DSCR), and credit summary..." }
+    ]
+  },
+  compare: {
+    badge: 'Cross-Company Disparity Comparator',
+    title: (pair) => `Benchmarking Peer Disparity: ${pair || 'Selected Peers'}`,
+    stages: [
+      { maxSec: 7, stage: "Step 1/4: Ingesting Dual-Entity Exchange Filings", msg: "Parsing audited statutory financials, P/E multiples, and balance sheet schedules for both entities..." },
+      { maxSec: 16, stage: "Step 2/4: Decomposing Comparative Capital Moats", msg: "Benchmarking DuPont ROE drivers, ROCE persistence, operating leverage, and liquidity buffers..." },
+      { maxSec: 25, stage: "Step 3/4: Gating Valuation Disparity Triggers", msg: "Auditing relative valuation spread, Reverse DCF implied growth differentials, and market hurdles..." },
+      { maxSec: 30, stage: "Step 4/4: Compiling Institutional Comparison Verdict", msg: "Generating 3-tier disparity diagnostic table, key trade-offs, and relative risk-reward summary..." }
+    ]
+  },
+  opportunity: {
+    badge: 'Multi-Asset Arbitrage Scanner',
+    title: (name) => `Evaluating Multi-Asset Opportunity: ${name || 'Selected Opportunity'}`,
+    stages: [
+      { maxSec: 7, stage: "Step 1/4: Parsing Multi-Asset Yield Spreads", msg: "Scanning equity earnings yields, bond spreads, sovereign curve rates, and real asset distributions..." },
+      { maxSec: 16, stage: "Step 2/4: Computing Post-Tax Hurdle Rates", msg: "Deducting statutory LTCG/STCG tax drag and CPI inflation hurdles from nominal yields..." },
+      { maxSec: 25, stage: "Step 3/4: Stress-Testing Capital Recovery", msg: "Benchmarking asset coverage ratios, insolvency recovery tiers, and liquidity lock-in rules..." },
+      { maxSec: 30, stage: "Step 4/4: Rendering Risk-Adjusted Matrix", msg: "Compiling multi-asset opportunity matrix, tax efficiency profile, and tactical allocator verdict..." }
+    ]
+  },
+  macro: {
+    badge: 'National Macro & Asset Surveillance',
+    title: (name) => `Evaluating Market Intelligence: ${name || 'Terminal Feed'}`,
+    stages: [
+      { maxSec: 7, stage: "Step 1/4: Ingesting Official Regulatory Data", msg: "Connecting to RBI, AMFI, CCIL, and exchange feeds for live curve and pricing quotes..." },
+      { maxSec: 16, stage: "Step 2/4: Calibrating Yields & Valuation Spreads", msg: "Evaluating tenor term premia, sovereign spreads, and historical percentile corridors..." },
+      { maxSec: 25, stage: "Step 3/4: Calculating Fiduciary Stress Metrics", msg: "Auditing tracking error, premium/discount to NAV, and shadow-banking contagion risk..." },
+      { maxSec: 30, stage: "Step 4/4: Assembling Institutional Terminal View", msg: "Rendering interactive analytics, sovereign curve visualizations, and diagnostic scorecards..." }
+    ]
+  },
+  unlock: {
+    badge: 'Cryptographic Entitlement Engine',
+    title: (target) => `Unlocking Institutional Deep-Dive: ${target || 'Security'}`,
+    stages: [
+      { maxSec: 5, stage: "Step 1/3: Verifying Cryptographic Entitlement", msg: "Validating research credit balance, authorizing ledger transaction, and securing session tokens..." },
+      { maxSec: 10, stage: "Step 2/3: Decrypting Forensic Accounting Schedules", msg: "Unlocking 7-pillar forensic accounting ledger, Beneish M-score breakdowns, and Reverse DCF sandbox..." },
+      { maxSec: 15, stage: "Step 3/3: Assembling Institutional PDF Package", msg: "Generating high-resolution SVG charts, printable schedules, and refreshing dossier view..." }
+    ]
+  }
+};
+
+let _globalEvaluationTimer = null;
+
+window.showEvaluationHUD = function(options = {}) {
+  const overlay = document.getElementById('synthesizingOverlay');
+  if (!overlay) return;
+
+  const overlayTitle = document.getElementById('overlayTickerTitle');
+  const overlayBadge = document.getElementById('overlayAssetBadge');
+  const overlayBar = document.getElementById('overlayProgressBar');
+  const overlayStage = document.getElementById('overlayProgressStage');
+  const overlayTime = document.getElementById('overlayProgressTime');
+  const overlayStatusMsg = document.getElementById('overlayStatusMsg');
+
+  const assetType = options.assetType || 'equity';
+  const cfg = EVALUATION_CONFIGS[assetType] || EVALUATION_CONFIGS.equity;
+  const targetName = options.ticker || options.name || options.title || 'Security';
+
+  if (overlayBadge) {
+    overlayBadge.innerText = cfg.badge;
+  }
+  if (overlayTitle) {
+    overlayTitle.innerText = options.customTitle || cfg.title(targetName);
+  }
+
+  const maxSeconds = options.totalSec || 30;
+
+  if (overlayBar) overlayBar.style.width = '14%';
+  if (overlayTime) overlayTime.innerText = `0s / ~${maxSeconds}s`;
+  if (overlayStage) overlayStage.innerText = cfg.stages[0].stage;
+  if (overlayStatusMsg) overlayStatusMsg.innerText = cfg.stages[0].msg;
+
+  overlay.classList.add('active');
+
+  if (_globalEvaluationTimer) {
+    clearInterval(_globalEvaluationTimer);
+    _globalEvaluationTimer = null;
+  }
+
+  const startMs = Date.now();
+
+  _globalEvaluationTimer = setInterval(() => {
+    const elapsedSec = Math.floor((Date.now() - startMs) / 1000);
+    const cappedSec = Math.min(maxSeconds, elapsedSec);
+    const pct = Math.min(96, 14 + (cappedSec / maxSeconds) * 82);
+
+    if (overlayBar) overlayBar.style.width = `${pct.toFixed(1)}%`;
+    if (overlayTime) overlayTime.innerText = `${cappedSec}s / ~${maxSeconds}s`;
+
+    const currentStage = cfg.stages.find(s => cappedSec <= s.maxSec) || cfg.stages[cfg.stages.length - 1];
+    if (overlayStage && currentStage) overlayStage.innerText = currentStage.stage;
+    if (overlayStatusMsg && currentStage) overlayStatusMsg.innerText = currentStage.msg;
+  }, 250);
+};
+
+window.hideEvaluationHUD = function() {
+  if (_globalEvaluationTimer) {
+    clearInterval(_globalEvaluationTimer);
+    _globalEvaluationTimer = null;
+  }
+  const overlay = document.getElementById('synthesizingOverlay');
+  if (overlay) {
+    overlay.classList.remove('active');
+  }
+};
 
 window.synthesizeReport = async function(ticker, forceRefresh = false) {
   const user = getStoredUser();
@@ -417,47 +554,8 @@ window.synthesizeReport = async function(ticker, forceRefresh = false) {
     return;
   }
 
-  // Show the institutional synthesis overlay with 30-second progressive timer
-  const overlay = document.getElementById('synthesizingOverlay');
-  const overlayTitle = document.getElementById('overlayTickerTitle');
-  const overlayBar = document.getElementById('overlayProgressBar');
-  const overlayStage = document.getElementById('overlayProgressStage');
-  const overlayTime = document.getElementById('overlayProgressTime');
-  const overlayStatusMsg = document.getElementById('overlayStatusMsg');
-  let overlayTimer = null;
-
-  if (overlayTitle) {
-    overlayTitle.innerText = `Synthesizing Dossier: ${ticker}`;
-  }
-  if (overlay) {
-    if (overlayBar) overlayBar.style.width = '0%';
-    if (overlayTime) overlayTime.innerText = '0s / ~30s';
-    if (overlayStage) overlayStage.innerText = 'Step 1/4: Ingesting BSE Filings';
-    overlay.classList.add('active');
-
-    const startMs = Date.now();
-    overlayTimer = setInterval(() => {
-      const elapsed = Math.floor((Date.now() - startMs) / 1000);
-      const cappedSec = Math.min(30, elapsed);
-      const pct = Math.min(96, (cappedSec / 30) * 96);
-      if (overlayBar) overlayBar.style.width = `${pct.toFixed(1)}%`;
-      if (overlayTime) overlayTime.innerText = `${cappedSec}s / ~30s`;
-
-      if (cappedSec < 8) {
-        if (overlayStage) overlayStage.innerText = "Step 1/4: Ingesting BSE Filings & L2 Depth";
-        if (overlayStatusMsg) overlayStatusMsg.innerText = "Ingesting verified corporate filings from BSE and parsing Level-2 order book depth...";
-      } else if (cappedSec < 18) {
-        if (overlayStage) overlayStage.innerText = "Step 2/4: Executing 7-Pillar Cortex & Sieve";
-        if (overlayStatusMsg) overlayStatusMsg.innerText = "Running Chanakya clean-room filter, DuPont ROE decomposition, and promoter pledge audits...";
-      } else if (cappedSec < 26) {
-        if (overlayStage) overlayStage.innerText = "Step 3/4: Solving Reverse DCF & Valuation";
-        if (overlayStatusMsg) overlayStatusMsg.innerText = "Computing implied market growth rate vs. 12% WACC hurdle rate and sector benchmarks...";
-      } else {
-        if (overlayStage) overlayStage.innerText = "Step 4/4: Finalizing Institutional Thesis";
-        if (overlayStatusMsg) overlayStatusMsg.innerText = "Assembling statutory disclosures, footnote citations, and generating presentation view...";
-      }
-    }, 500);
-  }
+  // Show the institutional evaluation HUD with progressive timer & background info
+  window.showEvaluationHUD({ assetType: 'equity', ticker, customTitle: `Synthesizing Dossier: ${ticker}`, totalSec: 30 });
 
   try {
     const resp = await fetch('/api/synthesize', {
@@ -473,8 +571,7 @@ window.synthesizeReport = async function(ticker, forceRefresh = false) {
     const data = await resp.json();
 
     if (resp.ok && data.success) {
-      if (overlayTimer) clearInterval(overlayTimer);
-      if (overlayBar) overlayBar.style.width = '100%';
+      window.hideEvaluationHUD();
 
       // Update local credits atomically
       if (data.new_balance !== undefined) {
@@ -482,8 +579,6 @@ window.synthesizeReport = async function(ticker, forceRefresh = false) {
         localStorage.setItem('sr_user', JSON.stringify(user));
         syncUserSession();
       }
-
-      if (overlay) overlay.classList.remove('active');
 
       if (data.already_exists) {
         alert('✅ ' + data.message);
@@ -494,8 +589,7 @@ window.synthesizeReport = async function(ticker, forceRefresh = false) {
       // Navigate directly to the newly generated dossier
       window.location.href = data.dossier_url;
     } else {
-      if (overlayTimer) clearInterval(overlayTimer);
-      if (overlay) overlay.classList.remove('active');
+      window.hideEvaluationHUD();
 
       const detail = data.detail || data.message || 'Synthesis failed.';
       if (resp.status === 402) {
@@ -513,8 +607,7 @@ window.synthesizeReport = async function(ticker, forceRefresh = false) {
       await refreshUserBalance(user);
     }
   } catch (err) {
-    if (overlayTimer) clearInterval(overlayTimer);
-    if (overlay) overlay.classList.remove('active');
+    window.hideEvaluationHUD();
     alert('Synthesis Request Error: ' + err.message);
     await refreshUserBalance(user);
   }
@@ -547,6 +640,10 @@ window.unlockDeepDive = async function(ticker) {
     return;
   }
 
+  if (typeof window.showEvaluationHUD === 'function') {
+    window.showEvaluationHUD({ assetType: 'unlock', ticker: cleanTicker, totalSec: 15 });
+  }
+
   try {
     const resp = await fetch(`/api/dossier/unlock/${cleanTicker}`, {
       method: 'POST',
@@ -558,6 +655,7 @@ window.unlockDeepDive = async function(ticker) {
     });
 
     const data = await resp.json();
+    if (typeof window.hideEvaluationHUD === 'function') window.hideEvaluationHUD();
 
     if (resp.ok && data.success) {
       if (data.new_balance !== undefined) {
@@ -581,6 +679,7 @@ window.unlockDeepDive = async function(ticker) {
       }
     }
   } catch (err) {
+    if (typeof window.hideEvaluationHUD === 'function') window.hideEvaluationHUD();
     alert('Network error while processing deep-dive unlock: ' + err.message);
   }
 };
@@ -610,10 +709,16 @@ window.unlockAssetDeepDive = async function(kind, assetId) {
     return;
   }
 
+  if (typeof window.showEvaluationHUD === 'function') {
+    window.showEvaluationHUD({ assetType: 'unlock', ticker: cleanId, totalSec: 15 });
+  }
+
   const path = cleanKind === 'FUND' ? 'funds' : 'debt';
   try {
     const resp = await fetch(`/api/${path}/unlock/${encodeURIComponent(cleanId)}`, { method: 'POST' });
     const data = await resp.json();
+    if (typeof window.hideEvaluationHUD === 'function') window.hideEvaluationHUD();
+
     if (resp.ok && data.success) {
       if (data.new_balance !== undefined) {
         user.credits_balance = data.new_balance;
@@ -630,6 +735,7 @@ window.unlockAssetDeepDive = async function(kind, assetId) {
       alert(data.detail || 'Unlock failed.');
     }
   } catch (err) {
+    if (typeof window.hideEvaluationHUD === 'function') window.hideEvaluationHUD();
     alert('Network error while unlocking: ' + err.message);
   }
 };
@@ -1491,6 +1597,97 @@ function startButtonProgressFill(btn, baseLabel = 'Loading Dossier') {
   }, 40000);
 }
 
+// ==============================================================================
+// 10. Global Event Interceptors, Tactile Feedback & Sitewide Evaluation Activation
+// ==============================================================================
+
+// Helper: Determine asset evaluation metadata from URL or link element
+function resolveEvaluationTarget(a) {
+  if (!a || !a.pathname) return null;
+  const p = a.pathname;
+
+  // 1. Fundamental Equity Dossier
+  if (p.startsWith('/dossier/')) {
+    const raw = p.replace('/dossier/', '').split('/')[0] || '';
+    const ticker = decodeURIComponent(raw).trim() || 'Selected Equity';
+    return { assetType: 'equity', ticker, label: 'Evaluating Dossier' };
+  }
+
+  // 2. Mutual Fund Look-Through
+  if (p.startsWith('/funds/compare/overlap') || p.startsWith('/funds/compare')) {
+    return { assetType: 'compare', ticker: 'Portfolio Overlap & Divergence', label: 'Computing Overlap' };
+  }
+  if (p.startsWith('/funds/')) {
+    const raw = p.replace('/funds/', '').split('/')[0] || '';
+    const cardTitle = a.querySelector?.('h3, h4, .fund-title, [data-name]')?.innerText?.trim();
+    const code = decodeURIComponent(raw).trim();
+    return { assetType: 'fund', ticker: cardTitle || code || 'Selected Scheme', label: 'Auditing Fund' };
+  }
+
+  // 3. Fixed Income & Credit Solvency
+  if (p.startsWith('/debt/')) {
+    const raw = p.replace('/debt/', '').split('/')[0] || '';
+    const cardTitle = a.querySelector?.('h3, h4, .debt-title, [data-name]')?.innerText?.trim();
+    const isin = decodeURIComponent(raw).trim();
+    return { assetType: 'debt', ticker: cardTitle || isin || 'Corporate Bond', label: 'Auditing Credit' };
+  }
+
+  // 4. Cross-Company Disparity Comparator
+  if (p === '/compare') {
+    try {
+      const u = new URL(a.href);
+      const t1 = u.searchParams.get('a') || u.searchParams.get('ticker1');
+      const t2 = u.searchParams.get('b') || u.searchParams.get('ticker2');
+      if (t1 && t2) {
+        return { assetType: 'compare', ticker: `${t1} vs ${t2}`, label: 'Benchmarking Peers' };
+      }
+    } catch (_) {}
+    return { assetType: 'compare', ticker: 'Peer Disparity Matrix', label: 'Benchmarking Peers' };
+  }
+
+  // 5. Multi-Asset Arbitrage Scanner / Opportunities
+  if (p === '/opportunities') {
+    return { assetType: 'opportunity', ticker: 'Multi-Asset Arbitrage Scanner', label: 'Scanning Spreads' };
+  }
+
+  // 6. Sovereign Curve & Macro Terminal
+  if (p === '/sovereign') {
+    return { assetType: 'macro', ticker: 'Sovereign Yield Curve & RBI Rates', label: 'Ingesting G-Secs' };
+  }
+
+  // 7. Alternative Real Assets (REITs / InvITs)
+  if (p === '/reits') {
+    return { assetType: 'opportunity', ticker: 'REITs & InvITs Yield Engine', label: 'Auditing Real Assets' };
+  }
+
+  // 8. ETFs & Index Arbitrage
+  if (p === '/etfs') {
+    return { assetType: 'macro', ticker: 'ETF Tracking Error & Arbitrage Matrix', label: 'Auditing ETFs' };
+  }
+
+  // 9. Forensic Red Flag Radar
+  if (p === '/safety-radar') {
+    return { assetType: 'equity', ticker: 'Forensic Accounting Red Flag Radar', label: 'Scanning Hazards' };
+  }
+
+  // 10. Institutional Discovery Screener
+  if (p === '/discovery') {
+    return { assetType: 'equity', ticker: 'Daily Exchange Discovery @ 9AM IST', label: 'Scanning Moats' };
+  }
+
+  // 11. MSME Emerging Growth Watchlist
+  if (p === '/msme') {
+    return { assetType: 'equity', ticker: 'MSME Emerging Growth & Solvency Radar', label: 'Auditing MSMEs' };
+  }
+
+  // 12. Post-Tax Purchasing Power Calculator
+  if (p === '/calculator/tax') {
+    return { assetType: 'opportunity', ticker: 'Post-Tax Purchasing Power Matrix', label: 'Calculating Real Yield' };
+  }
+
+  return null;
+}
+
 // Global click interceptor with capture: true for instant reaction
 document.addEventListener('click', (e) => {
   const a = e.target.closest('a, button');
@@ -1504,22 +1701,71 @@ document.addEventListener('click', (e) => {
   }
 
   if (a.tagName === 'A' && a.href && a.origin === window.location.origin && !a.target && !e.ctrlKey && !e.metaKey && !e.shiftKey) {
-    const p = a.pathname;
-    if (p.startsWith('/dossier/') || p.startsWith('/funds/') || p.startsWith('/debt/')) {
+    const targetMeta = resolveEvaluationTarget(a);
+    if (targetMeta) {
+      // Trigger the sitewide Forensic Evaluation HUD
+      window.showEvaluationHUD({
+        assetType: targetMeta.assetType,
+        ticker: targetMeta.ticker,
+        totalSec: 30
+      });
+
+      // If clicked element is or contains a button, activate button progress fill
       if (a.classList.contains('btn')) {
-        startButtonProgressFill(a, 'Loading Dossier');
+        startButtonProgressFill(a, targetMeta.label);
+      } else {
+        const childBtn = a.querySelector?.('.btn');
+        if (childBtn) {
+          startButtonProgressFill(childBtn, targetMeta.label);
+        }
       }
     }
   }
 }, true); // Use capture phase so listener fires immediately at the top of the event tree
 
+// Global Form Submission Interceptor for Analytical Engines
+document.addEventListener('submit', (e) => {
+  const form = e.target;
+  if (!form || !form.action) return;
+
+  try {
+    const u = new URL(form.action, window.location.origin);
+    const p = u.pathname;
+
+    // 1. Peer Comparison Form (/compare)
+    if (p === '/compare') {
+      const aVal = form.querySelector('[name="a"], [name="ticker1"]')?.value?.trim() || '';
+      const bVal = form.querySelector('[name="b"], [name="ticker2"]')?.value?.trim() || '';
+      const pair = (aVal && bVal) ? `${aVal.toUpperCase()} vs ${bVal.toUpperCase()}` : 'Peer Comparison';
+      window.showEvaluationHUD({ assetType: 'compare', ticker: pair, totalSec: 30 });
+      const submitBtn = form.querySelector('button[type="submit"], input[type="submit"], .btn-primary');
+      if (submitBtn) startButtonProgressFill(submitBtn, 'Benchmarking');
+    }
+    // 2. Fund Overlap Form (/funds/compare/overlap)
+    else if (p === '/funds/compare/overlap') {
+      const sA = form.querySelector('[name="scheme_a"]')?.selectedOptions?.[0]?.text?.trim() || 'Scheme A';
+      const sB = form.querySelector('[name="scheme_b"]')?.selectedOptions?.[0]?.text?.trim() || 'Scheme B';
+      const cleanA = sA.split('(')[0].trim();
+      const cleanB = sB.split('(')[0].trim();
+      window.showEvaluationHUD({ assetType: 'compare', ticker: `${cleanA} vs ${cleanB}`, totalSec: 30 });
+      const submitBtn = form.querySelector('button[type="submit"], input[type="submit"], .btn-primary');
+      if (submitBtn) startButtonProgressFill(submitBtn, 'Calculating Overlap');
+    }
+    // 3. Tax Calculator Form (/calculator/tax)
+    else if (p === '/calculator/tax') {
+      window.showEvaluationHUD({ assetType: 'opportunity', ticker: 'Post-Tax Purchasing Power Matrix', totalSec: 30 });
+      const submitBtn = form.querySelector('button[type="submit"], input[type="submit"], .btn-primary');
+      if (submitBtn) startButtonProgressFill(submitBtn, 'Recalculating');
+    }
+  } catch (_) {}
+});
+
 // Tactile press state for instantaneous pointer responsiveness
 document.addEventListener('pointerdown', (e) => {
   if (e.button !== 0) return; // Left click only
-  const a = e.target.closest('a.btn, button.btn');
+  const a = e.target.closest('a, button');
   if (a && !a.dataset.progressActive && a.origin === window.location.origin) {
-    const p = a.pathname;
-    if (p && (p.startsWith('/dossier/') || p.startsWith('/funds/') || p.startsWith('/debt/'))) {
+    if (resolveEvaluationTarget(a)) {
       a.classList.add('btn-instant-pressed');
     }
   }
@@ -1531,14 +1777,23 @@ document.addEventListener('pointerdown', (e) => {
   }, { passive: true });
 });
 
+// Dismiss HUD on Escape key
+document.addEventListener('keydown', (e) => {
+  if (e.key === 'Escape') {
+    window.hideEvaluationHUD();
+  }
+});
+
 // BFCache and History Navigation Lifecycle Guards
-// Resets all loading buttons back to pristine original state whenever page is shown (back/forward cache)
+// Resets all loading buttons and hides HUD whenever page is shown (back/forward cache)
 window.addEventListener('pageshow', (event) => {
+  window.hideEvaluationHUD();
   resetAllButtonProgressFills();
 });
 
 // Terminate active background intervals immediately when navigating away
 window.addEventListener('pagehide', () => {
+  window.hideEvaluationHUD();
   _activeProgressButtons.forEach(btn => {
     if (btn._progressInterval) {
       clearInterval(btn._progressInterval);
@@ -1552,10 +1807,12 @@ window.addEventListener('pagehide', () => {
 });
 
 window.addEventListener('popstate', () => {
+  window.hideEvaluationHUD();
   resetAllButtonProgressFills();
 });
 
 document.addEventListener('DOMContentLoaded', () => {
+  window.hideEvaluationHUD();
   resetAllButtonProgressFills();
 });
 

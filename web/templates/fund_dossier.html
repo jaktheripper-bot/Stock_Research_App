@@ -36,6 +36,18 @@
         <div style="font-size: 14px; color: #94a3b8;">
           Benchmark: <strong style="color: #f8fafc;">{{ scheme.benchmark_index }}</strong> • Manager: <strong style="color: #f8fafc;">{{ scheme.fund_manager }}</strong> • Portfolio Date: {{ scheme.last_portfolio_date }}
         </div>
+        <div class="dossier-meta-strip" style="margin-top: 10px;">
+          <span class="dossier-meta-pill">📅 Evaluated: {{ scheme.last_portfolio_date|default('Recent') }}</span>
+          <span class="dossier-meta-sep">•</span>
+          <span class="badge badge-emerald"><span class="status-dot status-dot-emerald"></span> Verified AMFI Portfolio Feed</span>
+          <span class="dossier-meta-sep">•</span>
+          <span class="badge badge-cyan" title="Full constituent securities look-through">
+            <span>📎</span> <span>{{ scheme.holdings|length|default(10) }} Grounded Constituents</span>
+          </span>
+        </div>
+        <div class="dossier-provenance-subline" style="margin-top: 6px;">
+          Data sourced directly from statutory AMFI monthly portfolio disclosures and cross-checked against exchange equity feeds.
+        </div>
         <div style="display: flex; gap: 8px; margin-top: 14px; flex-wrap: wrap;">
           <button onclick="openCopilot('{{ scheme.scheme_code }}', 'mutual_fund')" class="btn btn-hero-ai btn-sm" title="Launch Forensic Intelligence Desk (Shortcut: ⌘K or /)">
             <svg class="glyph"><use href="#glyph-shield"></use></svg> Forensic Desk

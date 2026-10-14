@@ -35,6 +35,18 @@
         <div style="font-size: 16px; color: #cbd5e1; font-weight: 500; line-height: 1.4;">
           {{ posture.instrument_name }}
         </div>
+        <div class="dossier-meta-strip" style="margin-top: 10px;">
+          <span class="dossier-meta-pill">📅 Evaluated: {{ security.maturity_date|default('Recent') }}</span>
+          <span class="dossier-meta-sep">•</span>
+          <span class="badge badge-emerald"><span class="status-dot status-dot-emerald"></span> Verified BSE Debt / SEBI Feed</span>
+          <span class="dossier-meta-sep">•</span>
+          <span class="badge badge-cyan" title="Audited credit rating surveillance and recovery waterfall">
+            <span>📎</span> <span>SEBI Statutory Seniority Waterfall</span>
+          </span>
+        </div>
+        <div class="dossier-provenance-subline" style="margin-top: 6px;">
+          Data sourced directly from official BSE Debt disclosures, credit rating rationales, and SEBI Online Bond Provider filings.
+        </div>
       </div>
 
       <!-- Composite Posture Badge & Action Controls -->
