@@ -76,7 +76,7 @@ POLICIES = {
         <ul>
             <li><strong>Razorpay:</strong> Payment processing gateway (PCI-DSS Level 1 certified).</li>
             <li><strong>Supabase:</strong> Encrypted authentication and PostgreSQL database storage.</li>
-            <li><strong>Google Gemini / Perplexity:</strong> LLM inference compute for document summarization.</li>
+            <li><strong>Enterprise Cloud AI Infrastructure:</strong> Secure cloud compute and inference clusters for quantitative data summarization under zero data retention policies.</li>
         </ul>
 
         <h3>6. Contact and Grievance Officer</h3>

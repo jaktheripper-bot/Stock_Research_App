@@ -599,7 +599,7 @@ async function submitCopilotMessage() {
                 <div class="copilot-bubble-header">
                     <div class="copilot-bubble-header-left">
                         <svg class="glyph" style="width: 12px; height: 12px;"><use href="#glyph-shield"></use></svg>
-                        <span>Forensic AI Copilot</span>
+                        <span>Forensic Intelligence Desk</span>
                     </div>
                     <button type="button" class="copilot-copy-btn" data-copilot-copy="${encodedRaw}" title="Copy analysis to clipboard">
                         📋 Copy
@@ -609,7 +609,7 @@ async function submitCopilotMessage() {
                     ${formattedHtml}
                 </div>
             </div>
-            <div class="copilot-turn-meta">Institutional Forensic Engine • ${agentTime}</div>
+            <div class="copilot-turn-meta">Forensic Intelligence Desk • ${agentTime}</div>
         `;
         if (data.unlock_required && typeof window.unlockAssetDeepDive === "function") {
             const unlockBtn = document.createElement("button");
@@ -630,8 +630,8 @@ async function submitCopilotMessage() {
         errTurn.className = "copilot-turn copilot-turn-agent";
         errTurn.innerHTML = `
             <div class="copilot-bubble-agent" style="border-color: rgba(239, 68, 68, 0.4); background: rgba(239, 68, 68, 0.08);">
-                <div style="color: #f87171; font-weight: 700; margin-bottom: 4px;">⚠️ Copilot Communication Notice</div>
-                <div style="color: #fca5a5; font-size: 0.82rem;">Failed to communicate with Copilot API: ${String(e)}</div>
+                <div style="color: #f87171; font-weight: 700; margin-bottom: 4px;">⚠️ Forensic Intelligence Desk Notice</div>
+                <div style="color: #fca5a5; font-size: 0.82rem;">The Forensic Intelligence Desk encountered a temporary connection issue. Please retry your inquiry or select a diagnostic chip below.</div>
             </div>
         `;
         container.appendChild(errTurn);

@@ -236,7 +236,7 @@ class TestForensicDeskEnhancements(unittest.TestCase):
                     is_subscriber=True
                 )
                 self.assertEqual(res["status"], "COMPLETED")
-                self.assertIn("Institutional Generative AI (Google Gemini • Unlocked Deep Dive / Pro Tier)", res["response"])
+                self.assertIn("Institutional Generative Synthesis (Unlocked Deep Dive / Pro Tier)", res["response"])
                 self.assertIn("Here is the institutional forensic analysis", res["response"])
                 mock_client.aio.models.generate_content.assert_called_once()
 

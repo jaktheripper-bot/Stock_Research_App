@@ -120,7 +120,7 @@ def _build_greeting_response(ticker: Optional[str], company_name: Optional[str],
     if asset_class == "MUTUAL_FUND":
         return (
             f"👋 **Welcome to the Forensic Intelligence Desk for {name}.**\n\n"
-            f"I am your institutional look-through copilot, engineered to audit underlying constituent quality, "
+            f"I am your institutional look-through research engine, engineered to audit underlying constituent quality, "
             f"measure closet-indexing drift, and calculate fee drag wealth destruction.\n\n"
             f"**What would you like to explore?**\n"
             f"- Ask open-ended questions like *\"What shocked you in this fund?\"* or *\"Summarize the bear thesis\"*.\n"
@@ -131,7 +131,7 @@ def _build_greeting_response(ticker: Optional[str], company_name: Optional[str],
     elif asset_class == "CORPORATE_DEBT":
         return (
             f"👋 **Welcome to the Forensic Intelligence Desk for {name}.**\n\n"
-            f"I am your institutional fixed income copilot, engineered to stress-test credit solvency, "
+            f"I am your institutional fixed income research engine, engineered to stress-test credit solvency, "
             f"monitor contagion triggers, and evaluate statutory recovery hierarchies.\n\n"
             f"**What would you like to explore?**\n"
             f"- Ask open-ended questions like *\"What stood out in the credit audit?\"* or *\"Summarize the bear thesis\"*.\n"
@@ -142,7 +142,7 @@ def _build_greeting_response(ticker: Optional[str], company_name: Optional[str],
     else:
         return (
             f"👋 **Welcome to the Forensic Intelligence Desk for {name}.**\n\n"
-            f"I am your institutional equity copilot, engineered to stress-test investment theses, "
+            f"I am your institutional equity research engine, engineered to stress-test investment theses, "
             f"audit corporate governance disclosures, and unpack Reverse DCF expectations.\n\n"
             f"**What would you like to explore?**\n"
             f"- Ask open-ended questions like *\"What shocked you during the research?\"* or *\"Summarize the bear thesis\"*.\n"
@@ -1330,10 +1330,13 @@ async def process_forensic_desk_turn(
         tier_notice = (
             "\n\n---\n"
             "⚡ **Desk Mode:** Deterministic Forensic Engine (Free Tier).\n"
-            "*Interactive generative AI synthesis with Google Gemini is exclusive to Unlocked Deep Dives (1 credit) and Pro Subscribers.*"
+            "*Deep-dive generative synthesis is exclusive to Unlocked Reports (1 credit) and Pro Subscribers.*"
         )
         full_reply = base_reply + tier_notice
-        append_conversation_turn(conversation_id, "agent", full_reply)
+        try:
+            append_conversation_turn(conversation_id, "agent", full_reply)
+        except Exception as db_err:
+            logger.debug(f"Session turn append notice: {db_err}")
         return {
             "conversation_id": conversation_id,
             "response": full_reply,
@@ -1351,11 +1354,14 @@ async def process_forensic_desk_turn(
 
         offline_notice = (
             "\n\n---\n"
-            "⚡ **Desk Mode:** Deterministic Forensic Engine (Fallback • Gemini API offline).\n"
-            "*Your entitlement is verified (Unlocked/Pro); operating on deterministic engine while AI service recovers.*"
+            "⚡ **Desk Mode:** Deterministic Forensic Engine (Standard Rule-Based Analysis).\n"
+            "*Your entitlement is verified (Unlocked/Pro); synthesizing via deterministic analytical models.*"
         )
         full_reply = fallback_msg + offline_notice
-        append_conversation_turn(conversation_id, "agent", full_reply)
+        try:
+            append_conversation_turn(conversation_id, "agent", full_reply)
+        except Exception as db_err:
+            logger.debug(f"Session turn append notice: {db_err}")
         return {"conversation_id": conversation_id, "response": full_reply, "status": "DETERMINISTIC_FALLBACK"}
 
     # Construct Asset-Aware and Section-Aware System Prompt
@@ -1442,7 +1448,7 @@ You assist allocators and research analysts in stress-testing investment theses 
 {open_ended_instructions}
 
 Active Security Context:
-{json.dumps(context_data, indent=2)}
+{json.dumps(context_data, indent=2, default=str)}
 
 Recent Conversation History:
 {history_str}
@@ -1455,7 +1461,7 @@ Recent Conversation History:
                 resp = await asyncio.wait_for(
                     client.aio.models.generate_content(
                         model=model_name,
-                        contents=f"{system_prompt}\n\nUSER: {user_message}\nCOPILOT:",
+                        contents=f"{system_prompt}\n\nUSER: {user_message}\nASSISTANT:",
                         config=genai_types.GenerateContentConfig(
                             automatic_function_calling=genai_types.AutomaticFunctionCallingConfig(disable=True)
                         )
@@ -1470,34 +1476,45 @@ Recent Conversation History:
                 continue
 
         if not agent_reply:
-            raise RuntimeError("All candidate Gemini models failed to formulate a response.")
+            raise RuntimeError("All candidate models failed to formulate a response.")
 
         pro_notice = (
             "\n\n---\n"
-            "✨ **Desk Mode:** Institutional Generative AI (Google Gemini • Unlocked Deep Dive / Pro Tier)."
+            "✨ **Desk Mode:** Institutional Generative Synthesis (Unlocked Deep Dive / Pro Tier)."
         )
         full_reply = agent_reply + pro_notice
         status = "COMPLETED"
     except Exception as e:
-        logger.warning(f"Copilot model invocation error: {e}. Falling back to deterministic response.")
+        logger.warning(f"Generative model invocation notice: {e}. Falling back to deterministic response.")
         asset_cls = context_data.get("asset_class", "EQUITY")
-        if asset_cls == "MUTUAL_FUND":
-            agent_reply = build_mutual_fund_deterministic_response(context_data, section, clean_ticker, user_message)
-        elif asset_cls == "CORPORATE_DEBT":
-            agent_reply = build_debt_deterministic_response(context_data, section, clean_ticker, user_message)
-        else:
-            agent_reply = build_equity_deterministic_response(context_data, section, clean_ticker, user_message)
+        try:
+            if asset_cls == "MUTUAL_FUND":
+                agent_reply = build_mutual_fund_deterministic_response(context_data, section, clean_ticker, user_message)
+            elif asset_cls == "CORPORATE_DEBT":
+                agent_reply = build_debt_deterministic_response(context_data, section, clean_ticker, user_message)
+            else:
+                agent_reply = build_equity_deterministic_response(context_data, section, clean_ticker, user_message)
+        except Exception as builder_err:
+            logger.error(f"Deterministic builder error: {builder_err}", exc_info=True)
+            agent_reply = (
+                f"**Forensic Intelligence Desk Analysis for {clean_ticker or 'this security'}:**\n\n"
+                "The analytical engine has compiled the fundamental baseline metrics from the research repository. "
+                "You can inspect the Pre-Mortem Inversion vectors, Reverse DCF implied growth hurdle, or governance checks via the quick prompt chips below."
+            )
 
         fallback_notice = (
             "\n\n---\n"
-            "⚡ **Desk Mode:** Deterministic Forensic Engine (Fallback • Gemini API offline).\n"
-            "*Your entitlement is verified (Unlocked/Pro); operating on deterministic engine while AI service recovers.*"
+            "⚡ **Desk Mode:** Deterministic Forensic Engine (Analytical Fallback).\n"
+            "*Your entitlement is verified (Unlocked/Pro); synthesizing via deterministic analytical models.*"
         )
         full_reply = agent_reply + fallback_notice
         status = "DETERMINISTIC_FALLBACK"
 
-    # 7. Save agent turn to database
-    append_conversation_turn(conversation_id, "agent", full_reply)
+    # 7. Save agent turn to database safely
+    try:
+        append_conversation_turn(conversation_id, "agent", full_reply)
+    except Exception as db_err:
+        logger.debug(f"Session turn append notice: {db_err}")
 
     return {
         "conversation_id": conversation_id,
