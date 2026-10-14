@@ -679,6 +679,124 @@ Cash reserve of 12% cushions against broad equity sell-offs.
             self.assertIn("AMFI Monthly Portfolio Disclosure", resp_dos.text)
             self.assertIn("toggleAllFundPillars", resp_dos.text)
 
+    def test_deep_dive_audit_constituent_synthesis_and_meter_unpausing(self):
+        """Verifies that allow_deep_dive=True executes constituent stock auditing, archives reports, and unpauses meters."""
+        from core.db.connection import get_db_connection
+        from core.db.reports import get_report_by_ticker
+        from core.db.mutual_funds import save_mutual_fund_scheme, save_mutual_fund_holdings
+        from core.analysis.fund_overlap_auditor import (
+            create_async_fund_audit_task,
+            run_async_fund_audit_job,
+            get_fund_audit_task_status,
+            calculate_deep_dive_credit_cost
+        )
+        from core.analysis.mutual_funds_engine import evaluate_mutual_fund_comprehensive
+
+        scheme_code = "TEST_MIDCAP_GROWTH_DIR"
+
+        def _cleanup():
+            conn = get_db_connection()
+            c = conn.cursor()
+            c.execute("DELETE FROM mutual_fund_schemes WHERE scheme_code = 'TEST_MIDCAP_GROWTH_DIR';")
+            c.execute("DELETE FROM mutual_fund_holdings WHERE scheme_code = 'TEST_MIDCAP_GROWTH_DIR';")
+            c.execute("DELETE FROM fund_forensic_dossiers WHERE scheme_code = 'TEST_MIDCAP_GROWTH_DIR';")
+            c.execute("DELETE FROM reports WHERE ticker IN ('TESTUNCACHED1', 'TESTUNCACHED2');")
+            c.execute("DELETE FROM report_revisions WHERE ticker IN ('TESTUNCACHED1', 'TESTUNCACHED2');")
+            conn.commit()
+            get_report_by_ticker.cache_clear()
+
+        _cleanup()
+        try:
+            scheme_data = {
+                "scheme_code": scheme_code,
+                "scheme_name": "Test Midcap Growth Fund - Direct",
+                "fund_house": "Test AMC",
+                "category": "Mid Cap Fund",
+                "broad_category": "EQUITY",
+                "benchmark_index": "NIFTY MIDCAP 150 TRI",
+                "aum_crores": 3200.0,
+                "nav": 45.0,
+                "ter_direct_pct": 0.65,
+                "ter_regular_pct": 1.45,
+                "portfolio_turnover_ratio_pct": 28.0,
+                "active_share_pct": 74.0,
+                "risk_grade": "Very High",
+                "fund_manager": "Forensic Quant",
+                "last_portfolio_date": "2026-10-10"
+            }
+            save_mutual_fund_scheme(scheme_data)
+
+            # 2 uncached constituents (80% equity weight total)
+            holdings = [
+                {
+                    "holding_type": "EQUITY",
+                    "identifier": "TESTUNCACHED1",
+                    "holding_name": "Test Uncached Stock One Ltd",
+                    "weight_pct": 45.0,
+                    "sector_or_rating": "Industrial Technology"
+                },
+                {
+                    "holding_type": "EQUITY",
+                    "identifier": "TESTUNCACHED2",
+                    "holding_name": "Test Uncached Stock Two Ltd",
+                    "weight_pct": 35.0,
+                    "sector_or_rating": "Healthcare Diagnostics"
+                },
+                {
+                    "holding_type": "CASH_EQUIVALENT",
+                    "identifier": "TREPS",
+                    "holding_name": "Tri-Party Repo Cash Collateral",
+                    "weight_pct": 20.0,
+                    "sector_or_rating": "CASH"
+                }
+            ]
+            save_mutual_fund_holdings(scheme_code, holdings)
+
+            # Verify quote before deep dive shows 2 uncached stocks
+            quote_before = calculate_deep_dive_credit_cost(scheme_code)
+            self.assertEqual(quote_before["uncached_count"], 2)
+            self.assertEqual(quote_before["layer2_deep_dive_credits"], 2)
+
+            # Verify dossier before shows 0% coverage and paused meters
+            dossier_before = evaluate_mutual_fund_comprehensive(scheme_code)
+            self.assertLess(dossier_before["lookthrough"]["genuine_coverage_pct"], 70.0)
+
+            # Run async deep dive task with allow_deep_dive=True
+            task_id = create_async_fund_audit_task(scheme_code, allow_deep_dive=True)
+            self.assertIn(f"TASK-FUND-{scheme_code}", task_id)
+
+            run_async_fund_audit_job(task_id, scheme_code, allow_deep_dive=True)
+
+            # Check task completion status
+            status = get_fund_audit_task_status(task_id)
+            self.assertIsNotNone(status)
+            self.assertEqual(status["status"], "COMPLETED")
+            self.assertEqual(status["progress_pct"], 100)
+            self.assertEqual(status["stage"], "COMPLETE")
+            self.assertIn("Deep-dive constituent audit complete", status["message"])
+
+            # Verify quote after shows 0 uncached stocks (100% cached)
+            quote_after = calculate_deep_dive_credit_cost(scheme_code)
+            self.assertEqual(quote_after["uncached_count"], 0)
+            self.assertEqual(quote_after["layer2_deep_dive_credits"], 0)
+            self.assertEqual(quote_after["cached_count"], 2)
+
+            # Verify dossier after has 80% genuine coverage (100% of equity sleeve) and unpaused
+            dossier_after = evaluate_mutual_fund_comprehensive(scheme_code)
+            self.assertGreaterEqual(dossier_after["lookthrough"]["genuine_coverage_pct"], 70.0)
+
+            # Verify web page reflects unpaused state and modal markup
+            resp = self.client.get(f"/funds/{scheme_code}", headers={"x-unlock-preview": "1"})
+            self.assertEqual(resp.status_code, 200)
+            self.assertNotIn("Forensic Look-Through Meters Paused", resp.text)
+            self.assertIn("100% Constituent Coverage Active", resp.text)
+            self.assertIn("deepDiveModal", resp.text)
+            self.assertIn("deepDiveProgressBox", resp.text)
+            self.assertIn("deepDiveCountdown", resp.text)
+
+        finally:
+            _cleanup()
+
 
 
 if __name__ == "__main__":

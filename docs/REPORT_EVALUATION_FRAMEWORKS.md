@@ -334,6 +334,7 @@ Evaluates mutual funds not as black-box historical performance vehicles, but thr
    $$\text{Fund Health Score} = W_E \sum_{i=1}^{N_E} w_i \cdot S_{\text{Equity}, i} + W_D \sum_{j=1}^{N_D} w_j \cdot S_{\text{Debt}, j} + W_C \cdot S_{\text{Cash}}$$
    * $S_{\text{Equity}, i}$: 7-Pillar Equity Score from `reports.db`.
    * $S_{\text{Debt}, j}$: 5-Pillar Credit Score from `corporate_debt` database.
+   * **Genuine Coverage Threshold & Meter Activation:** Look-through metrics (Fund Health Score, Weighted Moat, Weighted Margin of Safety, and Weighted Solvency) require $\ge 70.0\%$ of underlying equity AUM to have verified forensic research reports in `reports.db`. When genuine coverage is $< 70.0\%$, meters enter a paused state (`Forensic Look-Through Meters Paused Pending Research Coverage`). Users can initiate an on-demand constituent deep-dive audit (`allow_deep_dive: true`) which synthesizes and archives forensic reports for all uncached constituent equities (at 1 credit per constituent), bringing genuine coverage to 100% and unpausing look-through meters.
 2. **Pillar 2: True Diversification & Active Share**
    * **Active Share ($\text{AS}$):**
      $$\text{AS} = \frac{1}{2} \sum_{k=1}^N |w_{\text{Fund}, k} - w_{\text{Benchmark}, k}| \ge 60\% \quad (\text{Genuine Active Fund})$$

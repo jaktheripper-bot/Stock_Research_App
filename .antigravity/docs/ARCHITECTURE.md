@@ -39,7 +39,7 @@
   * `core/analysis/retail_safety_radar.py`: Cross-asset capital hierarchy risk comparator.
   * `core/analysis/net_real_tax_calculator.py`: Post-tax purchasing power deflator.
   * `core/analysis/mutual_funds_engine.py`: AMFI 6-pillar look-through, fee drag, and active share evaluator.
-  * `core/analysis/fund_overlap_auditor.py`: Pairwise portfolio overlap matrix and constituent look-through aggregator.
+  * `core/analysis/fund_overlap_auditor.py`: Pairwise portfolio overlap matrix, constituent look-through aggregator, and on-demand constituent deep-dive audit synthesizer/archiver with staged progress tracking.
   * `core/analysis/debt_catalogue.py`: Structured catalogue of Indian corporate debt securities and SDIs.
   * `core/analysis/sm_reit_invit_engine.py`: Commercial REIT, InvIT, and SGB distribution yield engine.
 * **Zero-Breaking-Change Root Facade (`analyzer.py`):** The root `analyzer.py` exposes a 43-line facade re-exporting all symbols from `core.analysis`, ensuring zero import breakage across UI views, tests, and CLI task runners.

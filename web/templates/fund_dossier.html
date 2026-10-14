@@ -244,18 +244,28 @@
     <div style="background: rgba(15, 23, 42, 0.7); border: 1px solid rgba(168, 85, 247, 0.35); border-radius: 12px; padding: 18px 20px; margin-bottom: 10px; box-shadow: 0 4px 16px rgba(0, 0, 0, 0.2);">
       <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 14px;">
         <div style="flex: 1; min-width: 280px;">
-          <div style="display: flex; align-items: center; gap: 8px; margin-bottom: 4px;">
+          <div style="display: flex; align-items: center; gap: 8px; margin-bottom: 4px; flex-wrap: wrap;">
             <span style="font-size: 16px;">🔬</span>
             <span style="font-size: 14px; font-weight: 800; color: #f8fafc; letter-spacing: -0.01em;">Deep-Dive Stock Forensic Audit Option</span>
             <span style="font-size: 11px; padding: 2px 8px; border-radius: 9999px; background: rgba(16, 185, 129, 0.15); color: #10b981; font-weight: 700; border: 1px solid rgba(16, 185, 129, 0.3);">Layer 1 Active (1 Credit)</span>
+            {% if credit_quote.uncached_count == 0 %}
+            <span style="font-size: 11px; padding: 2px 8px; border-radius: 9999px; background: rgba(16, 185, 129, 0.15); color: #10b981; font-weight: 700; border: 1px solid rgba(16, 185, 129, 0.3);">✓ 100% Constituent Coverage Active</span>
+            {% else %}
+            <span style="font-size: 11px; padding: 2px 8px; border-radius: 9999px; background: rgba(168, 85, 247, 0.15); color: #c084fc; font-weight: 700; border: 1px solid rgba(168, 85, 247, 0.3);">Layer 2 Deep-Dive Available</span>
+            {% endif %}
           </div>
           <p style="font-size: 13px; color: #94a3b8; margin: 0; line-height: 1.5;">
+            {% if credit_quote.uncached_count == 0 %}
+            <strong>All {{ credit_quote.equity_holdings_count }} equity constituents</strong> have verified 7-pillar dossiers in reports.db (100% portfolio weight). Full look-through meters and forensic narrative are active.
+            {% else %}
             <strong>{{ credit_quote.cached_count }}</strong> of {{ credit_quote.equity_holdings_count }} equity constituents have full 7-pillar dossiers in reports.db ({{ credit_quote.cached_weight_pct }}% weight). 
             <strong style="color: #c084fc;">{{ credit_quote.uncached_count }} stocks</strong> ({{ credit_quote.uncached_weight_pct }}% weight) are currently evaluated via deterministic fundamental ratios.
+            {% endif %}
           </p>
         </div>
 
         <div style="display: flex; align-items: center; gap: 14px; flex-wrap: wrap;">
+          {% if credit_quote.uncached_count > 0 %}
           <div style="text-align: right;">
             <div style="font-size: 11px; color: #94a3b8; text-transform: uppercase; font-weight: 600;">Deep Dive Cost</div>
             <div style="font-size: 18px; font-weight: 800; color: #c084fc;">
@@ -263,25 +273,129 @@
               <span style="font-size: 12px; color: #64748b; font-weight: 400;">({{ credit_quote.uncached_count }} stocks)</span>
             </div>
           </div>
-          <button id="btnDeepDiveAudit" onclick="triggerDeepDiveAudit('{{ scheme.scheme_code }}', {{ credit_quote.layer2_deep_dive_credits }})" class="btn btn-sm" style="background: linear-gradient(135deg, #9333ea 0%, #7c3aed 100%); color: #ffffff; border: none; padding: 8px 16px; border-radius: 8px; font-weight: 700; font-size: 13px; display: inline-flex; align-items: center; gap: 6px; cursor: pointer;">
+          <button id="btnDeepDiveAudit" onclick="openDeepDiveModal()" class="btn btn-sm" style="background: linear-gradient(135deg, #9333ea 0%, #7c3aed 100%); color: #ffffff; border: none; padding: 8px 18px; border-radius: 8px; font-weight: 700; font-size: 13px; display: inline-flex; align-items: center; gap: 6px; cursor: pointer; box-shadow: 0 4px 14px rgba(147, 51, 234, 0.4);">
             <span><svg class="glyph"><use href="#glyph-zap"></use></svg></span> Initiate Deep-Dive Audit
           </button>
+          {% else %}
+          <button id="btnDeepDiveAudit" onclick="executeDeepDiveAudit('{{ scheme.scheme_code }}', 1)" class="btn btn-sm btn-outline-secondary" style="font-weight: 700; font-size: 12px; padding: 6px 14px; border-radius: 8px; display: inline-flex; align-items: center; gap: 6px;">
+            <span>🔄</span> Refresh Look-Through Audit
+          </button>
+          {% endif %}
         </div>
       </div>
 
       <!-- Deep Dive Progress Box (Hidden initially) -->
-      <div id="deepDiveProgressBox" style="display: none; margin-top: 14px; padding-top: 12px; border-top: 1px solid rgba(255, 255, 255, 0.08);">
-        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 6px;">
-          <span id="deepDiveMsg" style="font-size: 12px; color: #e2e8f0; font-weight: 600;">Initializing deep dive audit...</span>
-          <div style="display: flex; align-items: center; gap: 10px;">
-            <button id="btnDeepDiveNotif" onclick="requestDossierDesktopNotification()" class="btn btn-sm btn-outline-secondary" style="font-size: 11px; padding: 2px 8px; border-radius: 9999px;">
-              <span>🔔</span> Alert me on desktop when complete
-            </button>
-            <span id="deepDivePct" style="font-size: 12px; color: #a855f7; font-weight: 800;">10%</span>
+      <div id="deepDiveProgressBox" style="display: none; margin-top: 14px; padding: 16px 18px; border-radius: 10px; background: rgba(15, 23, 42, 0.9); border: 1px solid rgba(168, 85, 247, 0.35); box-shadow: inset 0 2px 4px rgba(0,0,0,0.3);">
+        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px; flex-wrap: wrap; gap: 8px;">
+          <div>
+            <div id="deepDiveStageTitle" style="font-size: 13px; color: #f8fafc; font-weight: 700; display: flex; align-items: center; gap: 6px;">
+              <span id="deepDiveSpinner" class="spinner" style="width: 14px; height: 14px; border: 2px solid rgba(168, 85, 247, 0.2); border-top-color: #c084fc; border-radius: 50%; display: inline-block; animation: spin 0.8s linear infinite;"></span>
+              <span>Initializing Constituent Audit Engine...</span>
+            </div>
+            <div id="deepDiveMsg" style="font-size: 12px; color: #94a3b8; margin-top: 2px;">
+              Connecting to market data feed...
+            </div>
+          </div>
+          <div style="display: flex; align-items: center; gap: 12px;">
+            <div id="deepDiveCountdown" style="font-size: 12px; font-weight: 700; color: #fbbf24; background: rgba(245, 158, 11, 0.12); padding: 3px 10px; border-radius: 9999px; border: 1px solid rgba(245, 158, 11, 0.3);">
+              ⏳ Estimated: ~{{ credit_quote.layer2_deep_dive_credits * 3 + 3 }}s remaining
+            </div>
+            <span id="deepDivePct" style="font-size: 14px; color: #c084fc; font-weight: 900; min-width: 40px; text-align: right;">8%</span>
           </div>
         </div>
-        <div style="width: 100%; height: 5px; background: rgba(15, 23, 42, 0.8); border-radius: 9999px; overflow: hidden;">
-          <div id="deepDiveBar" style="width: 10%; height: 100%; background: linear-gradient(90deg, #a855f7 0%, #10b981 100%); transition: width 0.4s ease;"></div>
+
+        <!-- Progress Bar Container -->
+        <div style="width: 100%; height: 8px; background: rgba(30, 41, 59, 0.8); border-radius: 9999px; overflow: hidden; position: relative;">
+          <div id="deepDiveBar" style="width: 8%; height: 100%; background: linear-gradient(90deg, #9333ea 0%, #38bdf8 50%, #10b981 100%); transition: width 0.8s cubic-bezier(0.4, 0, 0.2, 1); border-radius: 9999px;"></div>
+        </div>
+
+        <!-- Progress Stage Indicator & Desktop Alert -->
+        <div style="display: flex; justify-content: space-between; align-items: center; margin-top: 10px; flex-wrap: wrap; gap: 8px;">
+          <div id="deepDiveStockBadge" style="font-size: 11.5px; font-weight: 600; color: #38bdf8; display: inline-flex; align-items: center; gap: 6px;">
+            <span style="width: 6px; height: 6px; border-radius: 50%; background: #38bdf8;"></span>
+            <span id="deepDiveStockText">Preparing constituent audit queue ({{ credit_quote.uncached_count }} stocks)...</span>
+          </div>
+          <button id="btnDeepDiveNotif" onclick="requestDossierDesktopNotification()" class="btn btn-sm btn-outline-secondary" style="font-size: 11px; padding: 2px 8px; border-radius: 9999px;">
+            <span>🔔</span> Alert me on desktop when complete
+          </button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Institutional Constituent Deep-Dive Confirmation Modal -->
+    <div id="deepDiveModal" style="display: none; position: fixed; inset: 0; background: rgba(10, 15, 29, 0.85); backdrop-filter: blur(10px); z-index: 9999; align-items: center; justify-content: center; padding: 20px;">
+      <div style="background: #0f172a; border: 1px solid rgba(168, 85, 247, 0.4); border-radius: 16px; max-width: 540px; width: 100%; box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.7); overflow: hidden; animation: fadeInModal 0.2s ease-out;">
+        <!-- Modal Header -->
+        <div style="background: linear-gradient(135deg, rgba(147, 51, 234, 0.2) 0%, rgba(30, 41, 59, 0.6) 100%); padding: 20px 24px; border-bottom: 1px solid rgba(255, 255, 255, 0.08); display: flex; justify-content: space-between; align-items: center;">
+          <div style="display: flex; align-items: center; gap: 10px;">
+            <div style="width: 38px; height: 38px; border-radius: 10px; background: rgba(168, 85, 247, 0.2); border: 1px solid rgba(168, 85, 247, 0.4); display: flex; align-items: center; justify-content: center; font-size: 18px;">
+              🔬
+            </div>
+            <div>
+              <h3 style="margin: 0; font-size: 16px; font-weight: 800; color: #f8fafc; letter-spacing: -0.01em;">
+                Constituent Deep-Dive Audit
+              </h3>
+              <div style="font-size: 12px; color: #c084fc; font-weight: 600;">
+                {{ scheme.scheme_code }} • 7-Pillar Look-Through Synthesis
+              </div>
+            </div>
+          </div>
+          <button onclick="closeDeepDiveModal()" style="background: none; border: none; color: #94a3b8; font-size: 20px; cursor: pointer; padding: 4px 8px; border-radius: 6px; line-height: 1;">✕</button>
+        </div>
+
+        <!-- Modal Body -->
+        <div style="padding: 24px;">
+          <p style="font-size: 13.5px; color: #cbd5e1; line-height: 1.6; margin: 0 0 16px 0;">
+            You are about to execute an in-depth forensic look-through audit across all uncached constituent equities in <strong>{{ scheme.scheme_name }}</strong>.
+          </p>
+
+          <!-- Scope Breakdown Grid -->
+          <div style="background: rgba(15, 23, 42, 0.6); border: 1px solid rgba(255, 255, 255, 0.08); border-radius: 12px; padding: 14px 16px; margin-bottom: 16px;">
+            <div style="display: flex; justify-content: space-between; font-size: 13px; margin-bottom: 8px;">
+              <span style="color: #94a3b8;">Constituents Requiring Audit:</span>
+              <strong style="color: #f8fafc;">{{ credit_quote.uncached_count }} Equities ({{ credit_quote.uncached_weight_pct }}% Weight)</strong>
+            </div>
+            <div style="display: flex; justify-content: space-between; font-size: 13px; margin-bottom: 8px;">
+              <span style="color: #94a3b8;">Analysis Scope:</span>
+              <span style="color: #38bdf8; font-weight: 600;">Full 7-Pillars + DCF + ASRI Stress Test</span>
+            </div>
+            <div style="display: flex; justify-content: space-between; font-size: 13px; margin-bottom: 8px;">
+              <span style="color: #94a3b8;">Estimated Processing Duration:</span>
+              <span style="color: #fbbf24; font-weight: 700;">~{{ credit_quote.layer2_deep_dive_credits * 3 + 3 }} seconds</span>
+            </div>
+            <div style="display: flex; justify-content: space-between; font-size: 13px; padding-top: 8px; border-top: 1px solid rgba(255, 255, 255, 0.06);">
+              <span style="color: #e2e8f0; font-weight: 700;">Research Credit Usage:</span>
+              <span style="color: #c084fc; font-weight: 800; font-size: 15px;">{{ credit_quote.layer2_deep_dive_credits }} Credits</span>
+            </div>
+          </div>
+
+          <!-- Constituent Pills -->
+          <div style="margin-bottom: 16px;">
+            <div style="font-size: 11px; text-transform: uppercase; font-weight: 700; color: #64748b; margin-bottom: 6px; letter-spacing: 0.05em;">
+              Equities In Audit Queue:
+            </div>
+            <div style="display: flex; flex-wrap: wrap; gap: 6px; max-height: 100px; overflow-y: auto;">
+              {% for s in credit_quote.uncached_stocks %}
+              <span style="font-size: 11.5px; font-weight: 600; padding: 3px 8px; border-radius: 6px; background: rgba(168, 85, 247, 0.12); color: #c084fc; border: 1px solid rgba(168, 85, 247, 0.25);">
+                {{ s.identifier }} ({{ s.weight_pct }}%)
+              </span>
+              {% endfor %}
+            </div>
+          </div>
+
+          <div style="font-size: 12px; color: #94a3b8; line-height: 1.5; background: rgba(56, 189, 248, 0.08); border-left: 3px solid #38bdf8; padding: 8px 12px; border-radius: 0 6px 6px 0;">
+            💡 <strong>Outcome:</strong> Once complete, the 4 aggregate look-through meters (Moat Index, Accounting Risk Index, DCF Margin of Safety, Promoter Pledge) will automatically unpause with verified portfolio scores.
+          </div>
+        </div>
+
+        <!-- Modal Footer -->
+        <div style="background: rgba(15, 23, 42, 0.8); padding: 16px 24px; border-top: 1px solid rgba(255, 255, 255, 0.08); display: flex; justify-content: flex-end; align-items: center; gap: 12px;">
+          <button type="button" onclick="closeDeepDiveModal()" class="btn btn-secondary btn-sm" style="padding: 8px 16px; border-radius: 8px; font-weight: 600;">
+            Cancel
+          </button>
+          <button id="btnConfirmDeepDive" type="button" onclick="executeDeepDiveAudit('{{ scheme.scheme_code }}', {{ credit_quote.layer2_deep_dive_credits }})" class="btn btn-sm" style="background: linear-gradient(135deg, #9333ea 0%, #7c3aed 100%); color: #ffffff; border: none; padding: 8px 20px; border-radius: 8px; font-weight: 700; font-size: 13px; display: inline-flex; align-items: center; gap: 6px; cursor: pointer; box-shadow: 0 4px 12px rgba(147, 51, 234, 0.4);">
+            <span>⚡</span> Authorize & Begin Audit ({{ credit_quote.layer2_deep_dive_credits }} Credits)
+          </button>
         </div>
       </div>
     </div>
@@ -663,26 +777,61 @@ function requestDossierDesktopNotification() {
   });
 }
 
-async function triggerDeepDiveAudit(schemeCode, creditCost) {
-  const confirmed = confirm(
-    `Initiate Deep-Dive Forensic Stock Audit for ${schemeCode}?\n\n` +
-    `• Evaluates all ${creditCost} uncached constituent stocks with full 7-pillar forensic accounting & DCF.\n` +
-    `• Credit Usage: ${creditCost} credits.\n\n` +
-    `Proceed?`
-  );
-  if (!confirmed) return;
+function openDeepDiveModal() {
+  const modal = document.getElementById("deepDiveModal");
+  if (modal) {
+    modal.style.display = "flex";
+  }
+}
+
+function closeDeepDiveModal() {
+  const modal = document.getElementById("deepDiveModal");
+  if (modal) {
+    modal.style.display = "none";
+  }
+}
+
+function triggerDeepDiveAudit(schemeCode, creditCost) {
+  openDeepDiveModal();
+}
+
+async function executeDeepDiveAudit(schemeCode, creditCost) {
+  closeDeepDiveModal();
 
   const btn = document.getElementById("btnDeepDiveAudit");
   const pBox = document.getElementById("deepDiveProgressBox");
   const pBar = document.getElementById("deepDiveBar");
   const pPct = document.getElementById("deepDivePct");
   const pMsg = document.getElementById("deepDiveMsg");
+  const pStage = document.getElementById("deepDiveStageTitle");
+  const pCountdown = document.getElementById("deepDiveCountdown");
+  const pStockText = document.getElementById("deepDiveStockText");
 
-  if (btn) btn.disabled = true;
+  if (btn) {
+    btn.disabled = true;
+    btn.style.opacity = "0.5";
+    btn.innerHTML = `<span>⏳</span> Auditing Constituents...`;
+  }
   if (pBox) pBox.style.display = "block";
-  if (pBar) pBar.style.width = "20%";
-  if (pPct) pPct.innerText = "20%";
-  if (pMsg) pMsg.innerText = `Enqueuing deep dive audit for ${creditCost} constituent stocks...`;
+  if (pBar) {
+    pBar.style.width = "8%";
+    pBar.style.background = "linear-gradient(90deg, #9333ea 0%, #38bdf8 50%, #10b981 100%)";
+  }
+  if (pPct) pPct.innerText = "8%";
+  if (pMsg) pMsg.innerText = `Dispatching constituent deep-dive audit for ${creditCost} stocks...`;
+  if (pStage) {
+    pStage.innerHTML = `<span class="spinner" style="width: 14px; height: 14px; border: 2px solid rgba(168, 85, 247, 0.2); border-top-color: #c084fc; border-radius: 50%; display: inline-block; animation: spin 0.8s linear infinite;"></span> <span>Initializing Constituent Audit Engine...</span>`;
+  }
+
+  let estimatedRemaining = Math.max(8, creditCost * 3 + 3);
+  let countdownTimer = setInterval(() => {
+    if (estimatedRemaining > 2) {
+      estimatedRemaining--;
+      if (pCountdown) {
+        pCountdown.innerText = `⏳ Estimated: ~${estimatedRemaining}s remaining`;
+      }
+    }
+  }, 1000);
 
   try {
     const res = await fetch("/api/funds/on-demand-audit", {
@@ -692,45 +841,97 @@ async function triggerDeepDiveAudit(schemeCode, creditCost) {
     });
     const data = await res.json();
     if (!data.success) {
+      clearInterval(countdownTimer);
       if (pMsg) pMsg.innerText = "Error: " + (data.detail || "Could not start audit");
-      if (btn) btn.disabled = false;
+      if (btn) {
+        btn.disabled = false;
+        btn.style.opacity = "1";
+        btn.innerHTML = `<span>⚡</span> Initiate Deep-Dive Audit`;
+      }
       return;
     }
 
-    // Poll status
+    // Representative status polling
     const pollInterval = setInterval(async () => {
       try {
         const sRes = await fetch(`/api/funds/audit-status/${data.task_id}`);
         if (!sRes.ok) return;
         const sData = await sRes.json();
 
-        if (pBar) pBar.style.width = (sData.progress_pct || 30) + "%";
-        if (pPct) pPct.innerText = (sData.progress_pct || 30) + "%";
-        if (pMsg) pMsg.innerText = sData.message || "Auditing constituents...";
+        const pct = Math.min(100, Math.max(8, sData.progress_pct || 8));
+        if (pBar) pBar.style.width = pct + "%";
+        if (pPct) pPct.innerText = pct + "%";
+
+        if (sData.stage_title && pStage) {
+          const spinHtml = sData.status !== "COMPLETED" ? 
+            `<span class="spinner" style="width: 14px; height: 14px; border: 2px solid rgba(168, 85, 247, 0.2); border-top-color: #c084fc; border-radius: 50%; display: inline-block; animation: spin 0.8s linear infinite;"></span>` : 
+            `<span>✅</span>`;
+          pStage.innerHTML = `${spinHtml} <span>${sData.stage_title}</span>`;
+        }
+
+        if (sData.message && pMsg) {
+          pMsg.innerText = sData.message;
+        }
+
+        if (sData.estimated_seconds_remaining !== undefined && pCountdown) {
+          if (sData.status === "COMPLETED") {
+            pCountdown.innerText = "✓ Complete";
+            pCountdown.style.background = "rgba(16, 185, 129, 0.15)";
+            pCountdown.style.color = "#10b981";
+            pCountdown.style.borderColor = "rgba(16, 185, 129, 0.3)";
+          } else {
+            const sec = sData.estimated_seconds_remaining;
+            pCountdown.innerText = sec > 0 ? `⏳ Estimated: ~${sec}s remaining` : "⏳ Finalizing look-through aggregation...";
+          }
+        }
+
+        if (sData.current_ticker && pStockText) {
+          const sName = sData.current_stock_name ? ` (${sData.current_stock_name})` : "";
+          const sIdx = (sData.completed_stocks || 0) + 1;
+          const sTot = sData.total_stocks || creditCost;
+          pStockText.innerText = `Active: ${sData.current_ticker}${sName} [${sIdx}/${sTot}]`;
+        }
 
         if (sData.status === "COMPLETED") {
           clearInterval(pollInterval);
-          if (pMsg) pMsg.innerText = "Deep Dive Complete! Reloading dossier...";
+          clearInterval(countdownTimer);
+          if (pBar) {
+            pBar.style.width = "100%";
+            pBar.style.background = "#10b981";
+          }
+          if (pPct) pPct.innerText = "100%";
+          if (pMsg) pMsg.innerText = "Deep-dive constituent audit complete! All look-through meters unpaused. Reloading...";
+          
           if ("Notification" in window && Notification.permission === "granted") {
             new Notification("Deep-Dive Look-Through Ready!", {
-              body: `Deep dive audit complete for ${schemeCode}. Dossier reloaded.`,
+              body: `Deep dive audit complete for ${schemeCode}. Dossier reloaded with full constituent coverage.`,
               icon: "/static/favicon.ico"
             });
           }
           setTimeout(() => window.location.reload(), 1200);
         } else if (sData.status === "FAILED") {
           clearInterval(pollInterval);
+          clearInterval(countdownTimer);
           if (pMsg) pMsg.innerText = "Audit Failed: " + (sData.error || "Unknown error");
-          if (btn) btn.disabled = false;
+          if (btn) {
+            btn.disabled = false;
+            btn.style.opacity = "1";
+            btn.innerHTML = `<span>⚡</span> Initiate Deep-Dive Audit`;
+          }
         }
       } catch (pollErr) {
         console.warn("Poll error", pollErr);
       }
-    }, 1500);
+    }, 1000);
 
   } catch (err) {
+    clearInterval(countdownTimer);
     if (pMsg) pMsg.innerText = "Error triggering deep dive: " + err.message;
-    if (btn) btn.disabled = false;
+    if (btn) {
+      btn.disabled = false;
+      btn.style.opacity = "1";
+      btn.innerHTML = `<span>⚡</span> Initiate Deep-Dive Audit`;
+    }
   }
 }
 </script>
