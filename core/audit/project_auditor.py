@@ -402,8 +402,8 @@ async def audit_project_full(use_ai: bool = True) -> ProjectAuditResult:
     audit_id = f"AUD-{datetime.now(timezone.utc).strftime('%Y%m%d-%H%M%S')}"
     logger.info(f"Starting Project Audit: {audit_id}")
 
-    # 1. Deterministic Grounding
-    metrics = compute_deterministic_audit_metrics()
+    # 1. Deterministic Grounding (Non-blocking executor thread)
+    metrics = await asyncio.to_thread(compute_deterministic_audit_metrics)
 
     # 2. Base Markdown Report
     base_report = synthesize_deterministic_markdown_report(audit_id, metrics)
@@ -414,10 +414,10 @@ async def audit_project_full(use_ai: bool = True) -> ProjectAuditResult:
     else:
         full_report = base_report
 
-    # 4. Save to audits/ file
+    # 4. Save to audits/ file (Non-blocking)
     file_path = AUDITS_DIR / f"project_audit_{datetime.now(timezone.utc).strftime('%Y%m%d_%H%M%S')}.md"
     try:
-        file_path.write_text(full_report, encoding="utf-8")
+        await asyncio.to_thread(file_path.write_text, full_report, encoding="utf-8")
         logger.info(f"Saved audit dossier to: {file_path}")
     except Exception as e:
         logger.error(f"Error saving audit file: {e}")
@@ -448,7 +448,7 @@ async def audit_project_full(use_ai: bool = True) -> ProjectAuditResult:
         created_at=datetime.now(timezone.utc).isoformat()
     )
 
-    # 6. Persist to Database
-    save_project_audit_log(result.to_dict())
+    # 6. Persist to Database (Non-blocking)
+    await asyncio.to_thread(save_project_audit_log, result.to_dict())
     logger.info(f"Completed and persisted project audit: {audit_id} with score {result.overall_score}/100")
     return result

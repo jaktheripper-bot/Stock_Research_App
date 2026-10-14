@@ -191,6 +191,22 @@ class TestProjectAuditor(unittest.TestCase):
         self.assertIn("audit", res_data)
         self.assertGreater(res_data["audit"]["overall_score"], 0)
 
+        # 5. POST /api/admin/run-project-audit (Async background path)
+        resp_async = self.client.post("/api/admin/run-project-audit", json={"use_ai": False, "async_task": True})
+        self.assertEqual(resp_async.status_code, 200)
+        async_data = resp_async.json()
+        self.assertTrue(async_data.get("success"))
+        self.assertIn("audit_id", async_data)
+        self.assertEqual(async_data.get("status"), "RUNNING")
+
+        # 6. GET /api/admin/project-audit-status/{audit_id}
+        task_id = async_data["audit_id"]
+        resp_status = self.client.get(f"/api/admin/project-audit-status/{task_id}")
+        self.assertEqual(resp_status.status_code, 200)
+        status_data = resp_status.json()
+        self.assertTrue(status_data.get("success"))
+        self.assertIn(status_data.get("status"), ["RUNNING", "COMPLETED"])
+
 
 class TestMultiAgentForensicAudit(unittest.TestCase):
     def test_antigravity_sdk_installation(self):

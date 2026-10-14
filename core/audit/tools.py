@@ -125,7 +125,7 @@ def tool_probe_web_endpoints(base_url: Optional[str] = None) -> Dict[str, Any]:
     from fastapi.testclient import TestClient
     from web.main import app
 
-    client = TestClient(app)
+    client = TestClient(app, raise_server_exceptions=False)
 
     routes_to_test = [
         # Core views

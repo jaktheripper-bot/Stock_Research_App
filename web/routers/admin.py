@@ -78,6 +78,8 @@ logger = logging.getLogger("equity_research.web.admin")
 
 router = APIRouter(tags=["admin"])
 
+_ACTIVE_PROJECT_AUDITS: Dict[str, Dict[str, Any]] = {}
+
 
 # ==============================================================================
 # Pydantic Schemas
@@ -323,6 +325,7 @@ async def admin_audit_dashboard(request: Request):
 @router.post("/api/admin/run-project-audit")
 async def api_admin_run_project_audit(
     request: Request,
+    background_tasks: BackgroundTasks,
     payload: Dict[str, Any] = Body(default={}),
     x_admin_key: Optional[str] = Header(None)
 ):
@@ -336,12 +339,91 @@ async def api_admin_run_project_audit(
 
     from core.audit.project_auditor import audit_project_full
     use_ai = bool(payload.get("use_ai", False))
+    async_mode = bool(payload.get("async_task", False))
+
+    if async_mode:
+        audit_id = f"AUD-{datetime.now(timezone.utc).strftime('%Y%m%d-%H%M%S')}"
+        if len(_ACTIVE_PROJECT_AUDITS) > 100:
+            sorted_keys = sorted(_ACTIVE_PROJECT_AUDITS.keys())
+            for old_key in sorted_keys[:-50]:
+                _ACTIVE_PROJECT_AUDITS.pop(old_key, None)
+
+        _ACTIVE_PROJECT_AUDITS[audit_id] = {
+            "audit_id": audit_id,
+            "status": "RUNNING",
+            "progress_message": "Running test discovery, probing 25+ endpoints, and inspecting code hygiene...",
+            "created_at": datetime.now(timezone.utc).isoformat(),
+            "use_ai": use_ai,
+            "result": None,
+            "error": None
+        }
+
+        async def _run_audit_background(a_id: str, ai_enabled: bool):
+            try:
+                res = await audit_project_full(use_ai=ai_enabled)
+                _ACTIVE_PROJECT_AUDITS[a_id]["status"] = "COMPLETED"
+                _ACTIVE_PROJECT_AUDITS[a_id]["result"] = res.to_dict()
+                _ACTIVE_PROJECT_AUDITS[a_id]["progress_message"] = "Audit completed successfully."
+            except Exception as e:
+                logger.error(f"Background project audit failed: {e}")
+                _ACTIVE_PROJECT_AUDITS[a_id]["status"] = "FAILED"
+                _ACTIVE_PROJECT_AUDITS[a_id]["error"] = str(e)
+                _ACTIVE_PROJECT_AUDITS[a_id]["progress_message"] = f"Audit failed: {e}"
+
+        background_tasks.add_task(_run_audit_background, audit_id, use_ai)
+        return {
+            "success": True,
+            "status": "RUNNING",
+            "audit_id": audit_id,
+            "message": "Autonomous project audit initiated in background."
+        }
+
+    # Synchronous path for CLI and existing unit tests
     try:
         result = await audit_project_full(use_ai=use_ai)
         return {"success": True, "audit": result.to_dict()}
     except Exception as e:
         logger.error(f"Error running autonomous project audit: {e}")
         raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.get("/api/admin/project-audit-status/{audit_id}")
+def api_admin_project_audit_status(
+    audit_id: str,
+    request: Request,
+    x_admin_key: Optional[str] = Header(None)
+):
+    """Returns real-time progress and completion status for an asynchronous project audit."""
+    init_db()
+    is_testing = os.environ.get("TESTING") == "1" or "pytest" in sys.modules
+    admin_secret = os.environ.get("ADMIN_API_KEY", "")
+    admin_session = _is_admin_authenticated(request)
+    if not (is_testing or admin_session or (admin_secret and x_admin_key == admin_secret)):
+        raise HTTPException(status_code=403, detail="Unauthorized: Admin access required.")
+
+    task = _ACTIVE_PROJECT_AUDITS.get(audit_id)
+    if not task:
+        from core.db.audit_logs import get_project_audit_by_id
+        db_audit = get_project_audit_by_id(audit_id)
+        if db_audit:
+            return {
+                "success": True,
+                "status": "COMPLETED",
+                "audit_id": audit_id,
+                "progress_message": "Audit completed.",
+                "audit": db_audit,
+                "error": None
+            }
+        raise HTTPException(status_code=404, detail=f"Audit task '{audit_id}' not found.")
+
+    return {
+        "success": True,
+        "status": task.get("status", "UNKNOWN"),
+        "audit_id": audit_id,
+        "progress_message": task.get("progress_message", ""),
+        "audit": task.get("result"),
+        "error": task.get("error")
+    }
 
 
 @router.get("/api/admin/audit-logs")

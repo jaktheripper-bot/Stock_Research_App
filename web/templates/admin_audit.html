@@ -103,7 +103,7 @@
     <div id="auditRunningAlert" style="display: none; background: rgba(14, 165, 233, 0.1); border: 1px solid rgba(14, 165, 233, 0.3); border-radius: 8px; padding: 1rem 1.25rem; margin-bottom: 1.5rem; color: #38bdf8;">
         <div style="display: flex; align-items: center; gap: 0.75rem;">
             <div class="spinner" style="width: 18px; height: 18px; border: 2px solid rgba(56, 189, 248, 0.3); border-top-color: #38bdf8; border-radius: 50%; animation: spin 0.8s linear infinite;"></div>
-            <span style="font-size: 0.9rem; font-weight: 600;">Autonomous audit in progress... Running test discovery, probing 25+ endpoints, and inspecting code hygiene.</span>
+            <span id="auditRunningAlertText" style="font-size: 0.9rem; font-weight: 600;">Autonomous audit in progress... Running test discovery, probing 25+ endpoints, and inspecting code hygiene.</span>
         </div>
     </div>
 
@@ -315,43 +315,130 @@ async function triggerAudit(useAi) {
     const btnQuick = document.getElementById("btnRunQuickAudit");
     const btnFull = document.getElementById("btnRunFullAudit");
     const alertBox = document.getElementById("auditRunningAlert");
+    const alertText = document.getElementById("auditRunningAlertText");
 
     btnQuick.disabled = true;
     btnFull.disabled = true;
     btnQuick.style.opacity = "0.5";
     btnFull.style.opacity = "0.5";
     alertBox.style.display = "block";
+    if (alertText) {
+        alertText.textContent = useAi
+            ? "Initiating Full AI Cognitive Audit (evaluating Strategy, Code & UI/UX)..."
+            : "Initiating Fast Deterministic Audit (testing 429+ assertions & probing 25+ routes)...";
+    }
 
     try {
         const resp = await fetch("/api/admin/run-project-audit", {
             method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ use_ai: useAi })
+            headers: { 
+                "Content-Type": "application/json",
+                "Accept": "application/json"
+            },
+            credentials: "same-origin",
+            body: JSON.stringify({ use_ai: useAi, async_task: true })
         });
         
-        let data;
-        const contentType = resp.headers.get("content-type") || "";
-        if (contentType.includes("application/json")) {
-            data = await resp.json();
-        } else {
-            const rawText = await resp.text();
-            throw new Error(`Server returned status ${resp.status}: ${rawText.slice(0, 150)}`);
+        const rawText = await resp.text();
+        let data = null;
+        if (rawText && rawText.trim().length > 0) {
+            try {
+                data = JSON.parse(rawText);
+            } catch (jsonErr) {
+                console.warn("Audit response was not valid JSON:", jsonErr, rawText);
+            }
         }
 
         if (!resp.ok) {
-            const errorMsg = data.detail || data.error || `HTTP ${resp.status}`;
+            const errorMsg = (data && (data.detail || data.error || data.message))
+                || (rawText ? rawText.slice(0, 200) : `HTTP ${resp.status} ${resp.statusText || 'Error'}`);
             alert("Audit execution error: " + errorMsg);
+            btnQuick.disabled = false;
+            btnFull.disabled = false;
+            btnQuick.style.opacity = "1";
+            btnFull.style.opacity = "1";
+            alertBox.style.display = "none";
             return;
         }
 
-        if (data.success) {
-            window.location.reload();
-        } else {
-            alert("Audit execution returned error: " + (data.error || "Unknown"));
+        if (!data || !data.success) {
+            const err = (data && (data.error || data.detail)) || "Unknown response structure";
+            alert("Audit trigger returned error: " + err);
+            btnQuick.disabled = false;
+            btnFull.disabled = false;
+            btnQuick.style.opacity = "1";
+            btnFull.style.opacity = "1";
+            alertBox.style.display = "none";
+            return;
         }
+
+        // If returned synchronously (fallback)
+        if (data.audit && !data.status) {
+            window.location.reload();
+            return;
+        }
+
+        // Asynchronous poll loop
+        const auditId = data.audit_id;
+        if (!auditId) {
+            window.location.reload();
+            return;
+        }
+
+        let attempts = 0;
+        const maxAttempts = 120; // 120 * 2000ms = 4 minutes maximum
+        const pollInterval = setInterval(async () => {
+            attempts++;
+            if (attempts > maxAttempts) {
+                clearInterval(pollInterval);
+                alert("Audit execution timed out on the client. Check past audits ledger after reloading.");
+                window.location.reload();
+                return;
+            }
+
+            try {
+                const pollResp = await fetch(`/api/admin/project-audit-status/${encodeURIComponent(auditId)}`, {
+                    headers: { "Accept": "application/json" },
+                    credentials: "same-origin"
+                });
+                const pollText = await pollResp.text();
+                let pollData = null;
+                if (pollText && pollText.trim().length > 0) {
+                    try {
+                        pollData = JSON.parse(pollText);
+                    } catch (e) {}
+                }
+
+                if (!pollResp.ok) {
+                    return;
+                }
+
+                if (pollData && pollData.status === "COMPLETED") {
+                    clearInterval(pollInterval);
+                    if (alertText) {
+                        alertText.textContent = "Audit completed successfully! Updating dashboard...";
+                    }
+                    setTimeout(() => {
+                        window.location.reload();
+                    }, 600);
+                } else if (pollData && pollData.status === "FAILED") {
+                    clearInterval(pollInterval);
+                    alert("Audit execution failed: " + (pollData.error || "Unknown background error"));
+                    btnQuick.disabled = false;
+                    btnFull.disabled = false;
+                    btnQuick.style.opacity = "1";
+                    btnFull.style.opacity = "1";
+                    alertBox.style.display = "none";
+                } else if (pollData && pollData.progress_message && alertText) {
+                    alertText.textContent = pollData.progress_message;
+                }
+            } catch (pollErr) {
+                console.warn("Audit polling error:", pollErr);
+            }
+        }, 2000);
+
     } catch (e) {
         alert("Failed to communicate with audit API: " + (e.message || e));
-    } finally {
         btnQuick.disabled = false;
         btnFull.disabled = false;
         btnQuick.style.opacity = "1";
