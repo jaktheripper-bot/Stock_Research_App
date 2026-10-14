@@ -106,6 +106,7 @@ from core.analysis.parser import (
     compare_revisions,
     remove_health_matrix_text,
     wrap_html_with_collapsible_pillars,
+    wrap_fund_dossier_with_collapsible_dimensions,
 )
 from core.analysis.metrics import calculate_52w_percentile, calculate_pe_percentile, get_valuation_quartile
 from core.billing import PRICING_PACKS, B2B_PACKS, get_plan_by_id
@@ -1301,6 +1302,14 @@ def fund_dossier_page(request: Request, scheme_code: str):
         forensic_dossier = None
         forensic_locked = True
 
+    forensic_dossier_html = ""
+    if forensic_dossier and forensic_dossier.get("dossier_text"):
+        forensic_dossier_html = wrap_fund_dossier_with_collapsible_dimensions(
+            forensic_dossier.get("dossier_text", ""),
+            scheme_code=clean_code,
+            scheme_name=dossier.get("scheme", {}).get("scheme_name", "")
+        )
+
     credit_quote = None
     try:
         credit_quote = calculate_deep_dive_credit_cost(clean_code)
@@ -1318,6 +1327,7 @@ def fund_dossier_page(request: Request, scheme_code: str):
             "fee_drag": dossier["fee_drag"],
             "risk_capture": dossier["risk_capture"],
             "forensic_dossier": forensic_dossier,
+            "forensic_dossier_html": forensic_dossier_html,
             "credit_quote": credit_quote,
             "is_deep_dive_unlocked": is_deep_dive_unlocked,
             "forensic_locked": forensic_locked,

@@ -367,6 +367,159 @@ def wrap_html_with_collapsible_pillars(
 
     return "\n".join(output_parts)
 
+
+# ==============================================================================
+# Mutual Fund Forensic Qualitative Audit Dimension Metadata & Parser
+# ==============================================================================
+FUND_DIMENSION_METADATA = {
+    1: {
+        "standard_title": "Mandate Integrity & Style Drift (Active Share)",
+        "badge_label": "01",
+        "category": "MANDATE & ACTIVE SHARE",
+        "citation_source": "AMFI Monthly Portfolio Disclosure & Scheme Information Document (SID)",
+        "citation_desc": "Grounded in latest AMFI portfolio disclosures, market cap boundaries, and benchmark tracking error metrics.",
+        "doc_url": "https://www.amfiindia.com/research-information/other-data/scheme-details",
+        "doc_label": "AMFI Portfolio",
+    },
+    2: {
+        "standard_title": "Forensic Solvency & Accounting Fragility (ASRI Analysis)",
+        "badge_label": "02",
+        "category": "ASRI & SOLVENCY",
+        "citation_source": "Constituent MCA / BSE Audited Balance Sheets & Beneish M-Score Audits",
+        "citation_desc": "Look-through corporate governance, debt leverage, promoter pledging, and forensic earnings quality of holdings.",
+        "doc_url": "https://www.bseindia.com/corporates/ann.html",
+        "doc_label": "BSE Filings",
+    },
+    3: {
+        "standard_title": "Economic Moat & Intrinsic Margin of Safety (DCF Capital Moat)",
+        "badge_label": "03",
+        "category": "MOAT & INTRINSIC VALUATION",
+        "citation_source": "Institutional DCF Valuation Engine & ROCE Durability Framework",
+        "citation_desc": "Portfolio weighted Economic Moat Index, pricing power durability, and intrinsic DCF margin of safety headroom.",
+        "doc_url": "https://www.amfiindia.com/",
+        "doc_label": "Valuation Model",
+    },
+    4: {
+        "standard_title": "Manager Fee Justification & Wealth Drag (TER)",
+        "badge_label": "04",
+        "category": "TER & FEE LEAKAGE",
+        "citation_source": "AMFI Statutory TER Disclosures & SEBI (Mutual Funds) Regulations",
+        "citation_desc": "Direct vs Regular expense differential analysis and compounded intermediary wealth destruction schedule.",
+        "doc_url": "https://www.amfiindia.com/research-information/ter-of-mutual-fund-schemes",
+        "doc_label": "AMFI TER Portal",
+    },
+    5: {
+        "standard_title": "Pre-Mortem Scenario: Liquidity Stress & Market Shocks",
+        "badge_label": "05",
+        "category": "STRESS TEST & LIQUIDITY",
+        "citation_source": "SEBI Liquidity Risk Management Framework & Stress Testing Mandates",
+        "citation_desc": "Simulated 25% broad market correction, small-cap illiquidity concentration, and cash/TREPS buffer resilience.",
+        "doc_url": "https://www.sebi.gov.in/legal/circulars/sep-2020/circular-on-stress-testing-and-liquidity-risk-management-framework-for-mutual-funds_47491.html",
+        "doc_label": "SEBI Circular",
+    },
+}
+
+
+def wrap_fund_dossier_with_collapsible_dimensions(
+    dossier_text: str,
+    scheme_code: str = "",
+    scheme_name: str = ""
+) -> str:
+    """
+    Transforms flat mutual fund qualitative audit markdown/HTML narrative into interactive,
+    institutional <details class="pillar-accordion" open> blocks with regulatory citations,
+    dimensional badge headers, and editorial prose styling matching the stock evaluation reports.
+    """
+    if not dossier_text:
+        return ""
+
+    is_html = "<h1" in dossier_text or "<h2" in dossier_text or "<h3" in dossier_text or "<p>" in dossier_text
+    if not is_html:
+        import markdown
+        html_content = markdown.markdown(
+            dossier_text,
+            extensions=["tables", "fenced_code", "nl2br"]
+        )
+    else:
+        html_content = dossier_text
+
+    pattern = re.compile(
+        r'(<h[1-3][^>]*>.*?(?:Dimension|Pillar|\b)\s*0?([1-9]\d*)[:\.\s\-]+([^<]*?)</h[1-3]>)',
+        re.IGNORECASE
+    )
+    splits = pattern.split(html_content)
+    if len(splits) < 5:
+        # Fallback if no numbered dimensions matched: wrap in prose container
+        return f'<div class="dossier-prose">{html_content}</div>'
+
+    # Clean lead-in content before Dimension 1 (remove redundant H1 and horizontal rules)
+    clean_intro = re.sub(r'<h1[^>]*>.*?</h1>', '', splits[0], flags=re.IGNORECASE).strip()
+    clean_intro = re.sub(r'<hr\s*/?>', '', clean_intro).strip()
+
+    output_parts = []
+    if clean_intro:
+        output_parts.append(f'<div class="dossier-intro-lead" style="margin-bottom: 20px;">{clean_intro}</div>')
+
+    i = 1
+    while i < len(splits):
+        num_str = splits[i+1]
+        raw_title = splits[i+2].strip().strip(" :.-")
+        body_content = splits[i+3] if i + 3 < len(splits) else ""
+
+        try:
+            d_num = int(num_str)
+        except ValueError:
+            d_num = 1
+
+        meta = FUND_DIMENSION_METADATA.get(d_num, {
+            "standard_title": raw_title or f"Dimension {d_num:02d}",
+            "badge_label": f"{d_num:02d}",
+            "category": "FORENSIC QUALITATIVE AUDIT",
+            "citation_source": "AMFI Regulatory Filings & Portfolio Disclosures",
+            "citation_desc": "Statutory disclosure grounded under SEBI (Mutual Funds) Regulations.",
+            "doc_url": "https://www.amfiindia.com/",
+            "doc_label": "AMFI Portal",
+        })
+
+        clean_title = raw_title or meta.get("standard_title", f"Dimension {d_num:02d}")
+        category = meta.get("category", "FORENSIC QUALITATIVE AUDIT")
+        citation_source = meta.get("citation_source", "AMFI Regulatory Filings")
+        citation_desc = meta.get("citation_desc", "")
+        doc_url = meta.get("doc_url", "https://www.amfiindia.com/")
+        doc_label = meta.get("doc_label", "AMFI Portal")
+
+        citation_strip_html = f"""<div style="display: flex; align-items: center; gap: 8px;">
+        <span>📡</span>
+        <span><strong>Regulatory Grounding:</strong> <span class="pillar-citation-link">{citation_source}</span> — {citation_desc}</span>
+      </div>
+      <a href="{doc_url}" target="_blank" rel="noopener noreferrer" class="btn btn-secondary btn-sm" style="font-size: 11.5px; padding: 4px 10px; font-weight: 600; text-decoration: none;" onclick="event.stopPropagation()">
+        📄 {doc_label} ↗
+      </a>"""
+
+        card = f"""<details class="pillar-accordion" id="fund-dimension-{d_num}" open>
+  <summary>
+    <div class="pillar-summary-left">
+      <span class="badge badge-cyan pillar-badge">{d_num:02d}</span>
+      <h3 class="pillar-summary-title">{clean_title}</h3>
+      <span class="badge" style="background: rgba(168, 85, 247, 0.15); color: #c084fc; border: 1px solid rgba(168, 85, 247, 0.3); font-size: 11px;">{category}</span>
+    </div>
+    <div class="pillar-summary-right">
+      <span class="pillar-chevron">▼</span>
+    </div>
+  </summary>
+  <div class="pillar-body">
+    <div class="pillar-citation-strip">
+      {citation_strip_html}
+    </div>
+    {body_content}
+  </div>
+</details>"""
+        output_parts.append(card)
+        i += 4
+
+    return "\n".join(output_parts)
+
+
 def compare_revisions(rev_a: dict, rev_b: dict) -> dict:
     """
     Standalone differential engine: compares two discrete report states (State A vs State B).

@@ -45,6 +45,7 @@ from core.analysis.fund_overlap_auditor import (
     run_async_fund_audit_job,
     get_fund_audit_task_status,
 )
+from core.analysis.parser import wrap_fund_dossier_with_collapsible_dimensions, FUND_DIMENSION_METADATA
 
 NEW_19_SCHEME_CODES = [
     # Flexi Cap (5)
@@ -603,6 +604,81 @@ class TestFundForensicAuditor(unittest.TestCase):
         self.assertIn("Deep-Dive Stock Forensic Audit Option", resp_dos.text)
         self.assertIn("Layer 1 Active (1 Credit)", resp_dos.text)
         self.assertIn("Initiate Deep-Dive Audit", resp_dos.text)
+
+    def test_wrap_fund_dossier_with_collapsible_dimensions(self):
+        sample_md = """# INSTITUTIONAL FORENSIC DOSSIER: Test Growth Fund
+
+## 1. Mandate Integrity vs Ground Reality (Active Share & Style Drift)
+Active share is 72.4% with disciplined category fidelity.
+
+## 2. Forensic Solvency & Accounting Fragility (ASRI Analysis)
+ASRI is 3.8% indicating high balance sheet durability.
+
+## 3. Economic Moat & Intrinsic Margin of Safety (DCF Capital Moat)
+Weighted Moat index stands at 78.5/100.
+
+## 4. Manager Fee Justification vs Passive Index Drag
+Direct TER is 0.70% vs Regular TER of 1.55%.
+
+## 5. Pre-Mortem Scenario: What Breaks in a Severe Market Stress Test?
+Cash reserve of 12% cushions against broad equity sell-offs.
+"""
+        html_out = wrap_fund_dossier_with_collapsible_dimensions(sample_md, "TEST_GROWTH", "Test Growth Fund")
+        self.assertIn("details class=\"pillar-accordion\" id=\"fund-dimension-1\"", html_out)
+        self.assertIn("details class=\"pillar-accordion\" id=\"fund-dimension-5\"", html_out)
+        self.assertIn("MANDATE & ACTIVE SHARE", html_out)
+        self.assertIn("ASRI & SOLVENCY", html_out)
+        self.assertIn("MOAT & INTRINSIC VALUATION", html_out)
+        self.assertIn("TER & FEE LEAKAGE", html_out)
+        self.assertIn("STRESS TEST & LIQUIDITY", html_out)
+        self.assertIn("pillar-citation-strip", html_out)
+        self.assertIn("AMFI Monthly Portfolio Disclosure", html_out)
+
+    def test_fund_dossier_workspace_06_accordion_formatting(self):
+        mock_dossier = {
+            "scheme_code": "PPFAS_FLEXICAP_DIR",
+            "dossier_text": """# INSTITUTIONAL FORENSIC DOSSIER: Parag Parikh Flexi Cap Fund
+
+## 1. Mandate Integrity vs Ground Reality (Active Share & Style Drift)
+Active share is 72.4% with disciplined category fidelity.
+
+## 2. Forensic Solvency & Accounting Fragility (ASRI Analysis)
+ASRI is 3.8% indicating high balance sheet durability.
+
+## 3. Economic Moat & Intrinsic Margin of Safety (DCF Capital Moat)
+Weighted Moat index stands at 78.5/100.
+
+## 4. Manager Fee Justification vs Passive Index Drag
+Direct TER is 0.70% vs Regular TER of 1.55%.
+
+## 5. Pre-Mortem Scenario: What Breaks in a Severe Market Stress Test?
+Cash reserve of 12% cushions against broad equity sell-offs.
+""",
+            "composite_health_score": 85.0,
+            "weighted_moat_score": 86.5,
+            "accounting_risk_index": 0.0,
+            "margin_of_safety_pct": 5.2,
+            "promoter_pledge_exposure_pct": 0.0,
+            "active_share_pct": 72.4,
+            "top_risky_holdings": [],
+            "top_quality_holdings": [{"ticker": "ITC", "weight": 8.5}],
+            "audited_by": "Gemini_Chief_Forensic_Officer",
+            "last_audited_at": "2026-10-14 00:00:00"
+        }
+
+        with patch("core.db.reports.get_report_by_ticker", return_value={"report_text": "### Health Matrix\nMoat: Wide"}), \
+             patch("web.main.get_fund_forensic_dossier", return_value=mock_dossier):
+            resp_dos = self.client.get("/funds/PPFAS_FLEXICAP_DIR", headers={"x-unlock-preview": "1"})
+            self.assertEqual(resp_dos.status_code, 200)
+            self.assertIn("btnExpandAllFundPillars", resp_dos.text)
+            self.assertIn("btnCollapseAllFundPillars", resp_dos.text)
+            self.assertIn("fundDossierPillars", resp_dos.text)
+            self.assertIn("details class=\"pillar-accordion\" id=\"fund-dimension-1\"", resp_dos.text)
+            self.assertIn("MANDATE & ACTIVE SHARE", resp_dos.text)
+            self.assertIn("pillar-citation-strip", resp_dos.text)
+            self.assertIn("AMFI Monthly Portfolio Disclosure", resp_dos.text)
+            self.assertIn("toggleAllFundPillars", resp_dos.text)
+
 
 
 if __name__ == "__main__":

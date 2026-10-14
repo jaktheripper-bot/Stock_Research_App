@@ -1272,6 +1272,24 @@ function toggleAllPillars(expand) {
   }
 }
 
+function toggleAllFundPillars(expand) {
+  const accordions = document.querySelectorAll('#fundDossierPillars details.pillar-accordion, details.pillar-accordion');
+  accordions.forEach(el => {
+    el.open = expand;
+  });
+  const expandBtn = document.getElementById('btnExpandAllFundPillars');
+  const collapseBtn = document.getElementById('btnCollapseAllFundPillars');
+  if (expandBtn && collapseBtn) {
+    if (expand) {
+      expandBtn.classList.add('active');
+      collapseBtn.classList.remove('active');
+    } else {
+      collapseBtn.classList.add('active');
+      expandBtn.classList.remove('active');
+    }
+  }
+}
+
 // ==============================================================================
 // 9. Instant Hover Prefetching for Fluid Navigation
 // ==============================================================================

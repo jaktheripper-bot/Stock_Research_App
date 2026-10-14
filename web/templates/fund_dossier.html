@@ -543,9 +543,28 @@
         </span>
       </div>
 
-      <!-- Styled Prose Display -->
-      <div style="color: #cbd5e1; font-size: 14px; line-height: 1.7; background: rgba(15, 23, 42, 0.6); border-radius: 12px; padding: 22px; border: 1px solid rgba(255, 255, 255, 0.05); white-space: pre-wrap; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;">
-{{ forensic_dossier.dossier_text }}
+      <!-- Section Accordion Toolbar Controls -->
+      <div class="pillar-toolbar" style="margin-bottom: 20px;">
+        <div style="display: flex; align-items: center; gap: 10px;">
+          <span style="font-size: 18px;">📑</span>
+          <div>
+            <strong style="font-size: 14px; color: var(--text-primary); display: block;">Institutional Forensic Dimensions (01–05)</strong>
+            <span style="font-size: 11px; color: var(--text-muted);">Every qualitative thesis grounded in look-through portfolio forensics and AMFI/SEBI disclosures</span>
+          </div>
+        </div>
+        <div class="pillar-toolbar-btns">
+          <button id="btnExpandAllFundPillars" class="pillar-toolbar-btn active" onclick="toggleAllFundPillars(true)">
+            ⊞ Expand All (01–05)
+          </button>
+          <button id="btnCollapseAllFundPillars" class="pillar-toolbar-btn" onclick="toggleAllFundPillars(false)">
+            ⊟ Collapse All
+          </button>
+        </div>
+      </div>
+
+      <!-- Styled Editorial Prose & Accordions -->
+      <div id="fundDossierPillars" class="dossier-prose">
+        {{ (forensic_dossier_html or forensic_dossier.dossier_text)|safe }}
       </div>
     </div>
     {% else %}
@@ -557,8 +576,8 @@
           06: Institutional Forensic Qualitative Audit Dossier (Coverage Pending)
         </h3>
       </div>
-      <div style="color: #94a3b8; font-size: 13.5px; line-height: 1.6; background: rgba(15, 23, 42, 0.5); border-radius: 10px; padding: 18px; border: 1px solid rgba(255, 255, 255, 0.05); font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;">
-{{ forensic_dossier.dossier_text }}
+      <div class="dossier-prose">
+        {{ (forensic_dossier_html or forensic_dossier.dossier_text)|safe }}
       </div>
     </div>
     {% endif %}
@@ -578,6 +597,24 @@
 </div>
 
 <script>
+function toggleAllFundPillars(expand) {
+  const accordions = document.querySelectorAll('#fundDossierPillars details.pillar-accordion, details.pillar-accordion');
+  accordions.forEach(el => {
+    el.open = expand;
+  });
+  const expandBtn = document.getElementById('btnExpandAllFundPillars');
+  const collapseBtn = document.getElementById('btnCollapseAllFundPillars');
+  if (expandBtn && collapseBtn) {
+    if (expand) {
+      expandBtn.classList.add('active');
+      collapseBtn.classList.remove('active');
+    } else {
+      collapseBtn.classList.add('active');
+      expandBtn.classList.remove('active');
+    }
+  }
+}
+
 async function triggerFundReaudit(schemeCode) {
   const btn = document.getElementById('btnReauditFund');
   if (btn) {
