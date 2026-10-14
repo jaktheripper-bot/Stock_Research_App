@@ -271,6 +271,19 @@ Detailed forensic analysis with exact page grounding to bseindia.com filings.
         self.assertIn("Team & Access", res_dash.text)
         self.assertIn("Admin Audit Trail", res_dash.text)
 
+    def test_admin_audit_navigation_bar_and_tabs(self):
+        client = self._get_authenticated_admin_client()
+        res_audit = client.get("/admin/audit")
+        self.assertEqual(res_audit.status_code, 200)
+        self.assertIn("admin-tabs", res_audit.text)
+        self.assertIn("Return to Executive Console", res_audit.text)
+        self.assertIn("Live Billables &amp; Inflow", res_audit.text)
+        self.assertIn("User Accounts &amp; Usage", res_audit.text)
+        self.assertIn("Support Grievances", res_audit.text)
+        self.assertIn("Autonomous Project Auditor", res_audit.text)
+        self.assertIn("Platform Home", res_audit.text)
+        self.assertIn("Admin Console", res_audit.text)
+
     def test_admin_update_ticket_status(self):
         from core.db.support import create_support_ticket
         client = self._get_authenticated_admin_client()

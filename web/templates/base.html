@@ -254,6 +254,13 @@
             Pricing
           </a>
 
+          <!-- Executive Admin Console Nav Link (Visible when active_page is 'admin') -->
+          {% if active_page == 'admin' %}
+          <a href="/admin" class="nav-link active" id="navAdminLink" style="color: #38bdf8; font-weight: 700; display: inline-flex; align-items: center; gap: 6px; border: 1px solid rgba(14, 165, 233, 0.35); background: rgba(14, 165, 233, 0.12); border-radius: 6px; padding: 4px 10px;">
+            <svg class="glyph" style="width: 14px; height: 14px;"><use href="#glyph-shield"></use></svg> Admin Console
+          </a>
+          {% endif %}
+
           <!-- Governance & Support Sub-Tabs -->
           <div class="nav-item dropdown {% if active_page in ['contact', 'disclaimer', 'terms', 'privacy', 'refund'] %}active-parent{% endif %}" id="navGovDropdown">
             <button class="nav-link dropdown-toggle" aria-haspopup="true" aria-expanded="false" id="govDropdownBtn">

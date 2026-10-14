@@ -301,8 +301,10 @@ async def admin_audit_dashboard(request: Request):
         )
 
     from core.db.audit_logs import get_latest_project_audit_log, get_project_audit_history
+    from core.db.support import get_open_tickets_count
     latest_audit = get_latest_project_audit_log()
     audit_history = get_project_audit_history(limit=15)
+    open_tickets_count = get_open_tickets_count()
 
     return templates.TemplateResponse(
         request=request,
@@ -311,7 +313,9 @@ async def admin_audit_dashboard(request: Request):
             "authenticated": True,
             "latest_audit": latest_audit,
             "audit_history": audit_history,
-            "active_page": "admin"
+            "open_tickets_count": open_tickets_count,
+            "active_page": "admin",
+            "active_tab": "audit"
         }
     )
 

@@ -3,14 +3,81 @@
 {% block title %}System Health & Autonomous Audit Console — Moatnomics{% endblock %}
 
 {% block content %}
-<div class="audit-workspace" style="max-width: 1380px; margin: 0 auto; padding: 2rem 1rem 4rem 1rem;">
+<div class="audit-workspace" style="max-width: 1440px; margin: 0 auto; padding: 1.5rem 1.25rem 4rem 1.25rem;">
+
+    <!-- Top Navigation & Return Bar -->
+    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1.25rem; flex-wrap: wrap; gap: 0.75rem; background: rgba(15, 23, 42, 0.7); border: 1px solid rgba(255, 255, 255, 0.08); border-radius: 10px; padding: 0.75rem 1rem;">
+        <div style="display: flex; align-items: center; gap: 0.75rem; flex-wrap: wrap;">
+            <a href="/admin" class="btn" style="background: rgba(14, 165, 233, 0.15); color: #38bdf8; border: 1px solid rgba(14, 165, 233, 0.35); padding: 0.45rem 0.85rem; border-radius: 6px; font-size: 0.82rem; font-weight: 700; text-decoration: none; display: inline-flex; align-items: center; gap: 0.4rem; transition: all 0.2s;">
+                <svg class="glyph" style="width: 14px; height: 14px;"><use href="#glyph-shield"></use></svg> &larr; Return to Executive Console
+            </a>
+            <span style="color: #475569; font-size: 0.8rem;">|</span>
+            <div style="font-size: 0.82rem; color: #94a3b8; display: inline-flex; align-items: center; gap: 0.4rem;">
+                <a href="/admin" style="color: #94a3b8; text-decoration: none;">Executive Console</a>
+                <span style="color: #475569;">/</span>
+                <span style="color: #38bdf8; font-weight: 600;">System Health &amp; Autonomous Project Auditor</span>
+            </div>
+        </div>
+
+        <div style="display: flex; align-items: center; gap: 0.5rem; flex-wrap: wrap;">
+            <a href="/" class="btn" style="background: rgba(30, 41, 59, 0.6); color: #cbd5e1; border: 1px solid rgba(255, 255, 255, 0.08); padding: 0.45rem 0.75rem; border-radius: 6px; font-size: 0.8rem; font-weight: 600; text-decoration: none; display: inline-flex; align-items: center; gap: 0.35rem;">
+                🌐 Platform Home
+            </a>
+            <a href="/equities" class="btn" style="background: rgba(30, 41, 59, 0.6); color: #cbd5e1; border: 1px solid rgba(255, 255, 255, 0.08); padding: 0.45rem 0.75rem; border-radius: 6px; font-size: 0.8rem; font-weight: 600; text-decoration: none; display: inline-flex; align-items: center; gap: 0.35rem;">
+                📈 Equities
+            </a>
+            <a href="/opportunities" class="btn" style="background: rgba(30, 41, 59, 0.6); color: #cbd5e1; border: 1px solid rgba(255, 255, 255, 0.08); padding: 0.45rem 0.75rem; border-radius: 6px; font-size: 0.8rem; font-weight: 600; text-decoration: none; display: inline-flex; align-items: center; gap: 0.35rem;">
+                🎯 Opportunities
+            </a>
+            <a href="/contact" class="btn" style="background: rgba(30, 41, 59, 0.6); color: #cbd5e1; border: 1px solid rgba(255, 255, 255, 0.08); padding: 0.45rem 0.75rem; border-radius: 6px; font-size: 0.8rem; font-weight: 600; text-decoration: none; display: inline-flex; align-items: center; gap: 0.35rem;">
+                🎧 Grievances Desk
+            </a>
+        </div>
+    </div>
+
+    <!-- Admin Operational Tabs Navigation Bar -->
+    <div class="admin-tabs" style="margin-bottom: 1.5rem;">
+        <a href="/admin?tab=billables" class="admin-tab-btn">
+            💳 Live Billables &amp; Inflow
+        </a>
+        <a href="/admin?tab=users" class="admin-tab-btn">
+            👤 User Accounts &amp; Usage
+        </a>
+        <a href="/admin?tab=tickets" class="admin-tab-btn">
+            📩 Support Grievances
+            {% if open_tickets_count and open_tickets_count > 0 %}
+            <span class="admin-tab-badge">{{ open_tickets_count }}</span>
+            {% endif %}
+        </a>
+        <a href="/admin?tab=traffic" class="admin-tab-btn">
+            🌐 Traffic &amp; Landing Pages
+        </a>
+        <a href="/admin?tab=seo" class="admin-tab-btn">
+            🔎 SEO &amp; Search Visibility
+        </a>
+        <a href="/admin?tab=journeys" class="admin-tab-btn">
+            🧭 Session Journeys
+        </a>
+        <a href="/admin?tab=telemetry" class="admin-tab-btn">
+            📜 Live Audit Stream
+        </a>
+        <a href="/admin?tab=team" class="admin-tab-btn">
+            👥 Team &amp; Access
+        </a>
+        <a href="/admin?tab=audit" class="admin-tab-btn">
+            <svg class="glyph" style="width: 13px; height: 13px;"><use href="#glyph-shield"></use></svg> Admin Audit Trail
+        </a>
+        <a href="/admin?tab=assets" class="admin-tab-btn">
+            📡 Asset Surveillance
+        </a>
+        <a href="/admin/audit" class="admin-tab-btn active">
+            <svg class="glyph" style="width: 13px; height: 13px;"><use href="#glyph-shield"></use></svg> Autonomous Project Auditor
+        </a>
+    </div>
 
     <!-- Breadcrumb & Top Bar -->
     <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1.5rem; flex-wrap: wrap; gap: 1rem;">
         <div>
-            <div style="font-size: 0.82rem; color: #94a3b8; margin-bottom: 0.25rem;">
-                <a href="/admin" style="color: #0ea5e9; text-decoration: none;">Executive Console</a> / <span>System Audits</span>
-            </div>
             <h1 style="font-size: 1.75rem; font-weight: 700; color: #f8fafc; margin: 0; letter-spacing: -0.02em; display: flex; align-items: center; gap: 0.75rem;">
                 <svg class="glyph"><use href="#glyph-shield"></use></svg> Autonomous Project Auditor
                 <span style="font-size: 0.75rem; font-weight: 600; padding: 0.2rem 0.6rem; border-radius: 9999px; background: rgba(14, 165, 233, 0.15); color: #38bdf8; border: 1px solid rgba(14, 165, 233, 0.3);">
@@ -18,7 +85,7 @@
                 </span>
             </h1>
             <p style="color: #94a3b8; font-size: 0.88rem; margin: 0.35rem 0 0 0;">
-                Continuous automated multi-pillar auditing across Strategy & SEBI Safe-Harbor, Code Implementation, and UI/UX.
+                Continuous automated multi-pillar auditing across Strategy &amp; SEBI Safe-Harbor, Code Implementation, and UI/UX.
             </p>
         </div>
 
