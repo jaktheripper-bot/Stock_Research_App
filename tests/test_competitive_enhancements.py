@@ -258,10 +258,10 @@ class TestCompetitiveEnhancements(unittest.TestCase):
 
     def test_web_ui_radar_and_copilot_markup(self):
         """Tests that base template, debt dossier, and fund dossier contain radar and copilot markup."""
-        # 1. Base nav contains Agent Radar
+        # 1. Base nav and action buttons
         resp_home = self.client.get("/")
         self.assertEqual(resp_home.status_code, 200)
-        self.assertIn("Agent Radar", resp_home.text)
+        self.assertIn("Generate Report", resp_home.text)
         self.assertIn("/admin/audit", resp_home.text)
 
         # 2. Debt dossier contains Contagion Radar, Copilot trigger, and link to parent equity

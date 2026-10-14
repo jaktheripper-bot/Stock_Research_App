@@ -1,9 +1,9 @@
 {% extends "base.html" %}
 
-{% block title %}Institutional Equities Directory (143 Dossiers) | Moatnomics{% endblock %}
-{% block meta_desc %}Institutional research directory of all 143 verified Indian equities. Inspect 7-pillar scorecards, reverse DCF margin of safety, and forensic DuPont ledgers grounded in official BSE/NSE corporate filings.{% endblock %}
-{% block og_title %}Institutional Equities Directory (143 Dossiers) | Moatnomics{% endblock %}
-{% block og_desc %}Inspect verified 7-Pillar scorecards, reverse DCF margin of safety, and forensic accounting ledgers across 143 monitored Indian equities.{% endblock %}
+{% block title %}Institutional Equities Directory | Moatnomics{% endblock %}
+{% block meta_desc %}Institutional research directory of verified Indian equities. Inspect 7-pillar scorecards, reverse DCF margin of safety, and forensic DuPont ledgers grounded in official BSE/NSE corporate filings.{% endblock %}
+{% block og_title %}Institutional Equities Directory | Moatnomics{% endblock %}
+{% block og_desc %}Inspect verified 7-Pillar scorecards, reverse DCF margin of safety, and forensic accounting ledgers across monitored Indian equities.{% endblock %}
 
 {% block content %}
 <div class="container py-8">
@@ -20,7 +20,7 @@
       Institutional Equities Directory
     </h1>
     <p style="font-size: 15px; color: #94a3b8; max-width: 840px; line-height: 1.6; margin-bottom: 24px;">
-      Exhaustive institutional equity research repository covering all <strong>{{ total_equities }} verified Indian equities</strong>. 
+      Exhaustive institutional equity research repository covering verified Indian equities. 
       Every dossier is grounded in primary exchange filings (BSE/NSE), featuring 7-Pillar health scorecards, reverse DCF implied growth rates, 
       DuPont ROE decompositions, and promoter pledging surveillance.
     </p>
@@ -297,7 +297,7 @@
       We couldn't find any audited equities matching "{{ query or current_sector or current_tier }}". Try broadening your search or resetting active filters.
     </p>
     <a href="/equities" class="btn btn-primary btn-sm" style="font-weight: 700; padding: 8px 20px;">
-      Reset All Filters & View All 143 Equities
+      Reset All Filters &amp; View All Equities
     </a>
   </div>
   {% endif %}

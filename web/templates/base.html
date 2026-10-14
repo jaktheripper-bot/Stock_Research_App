@@ -131,14 +131,14 @@
             <span class="nav-icon"><svg class="glyph"><use href="#glyph-search"></use></svg></span> Search
           </a>
 
-          <!-- Direct Stock Reports Link (All 143 Dossiers) -->
+          <!-- Direct Stock Reports Link -->
           <a href="/equities" class="nav-link {% if active_page == 'equities' %}active{% endif %}" id="navStockReportsLink">
-            <span class="nav-icon">📈</span> Stock Reports <span class="badge badge-cyan" style="font-size: 10px; padding: 2px 7px; margin-left: 3px; border-radius: 9999px;">143</span>
+            <span class="nav-icon">📈</span> Stock Reports
           </a>
 
-          <!-- Direct Mutual Funds Link (All 200 Schemes) -->
+          <!-- Direct Mutual Funds Link -->
           <a href="/funds" class="nav-link {% if active_page == 'funds' %}active{% endif %}" id="navFundsLink">
-            <span class="nav-icon"><svg class="glyph"><use href="#glyph-chart"></use></svg></span> Mutual Funds <span class="badge badge-purple" style="font-size: 10px; padding: 2px 7px; margin-left: 3px; border-radius: 9999px;">200</span>
+            <span class="nav-icon"><svg class="glyph"><use href="#glyph-chart"></use></svg></span> Mutual Funds
           </a>
 
           <!-- Markets & Multi-Asset Sub-Tabs -->
@@ -162,7 +162,7 @@
                 <div class="dropdown-icon">📈</div>
                 <div class="dropdown-content">
                   <div class="dropdown-title">Equities & Stocks</div>
-                  <div class="dropdown-desc">All 143 verified BSE & NSE institutional dossiers & screener</div>
+                  <div class="dropdown-desc">All verified BSE & NSE institutional dossiers & screener</div>
                 </div>
               </a>
               <a href="/debt" class="dropdown-item {% if active_page == 'debt' %}active{% endif %}" role="menuitem">
@@ -314,12 +314,15 @@
         </nav>
 
         <div class="nav-actions">
-          <button id="navAgentRadarBtn" onclick="toggleSurveillanceFeed()" class="badge-autonomous-radar" title="Open Autonomous Surveillance Feed" style="display: inline-flex; align-items: center; gap: 6px; padding: 5px 12px; border-radius: 9999px; background: rgba(16, 185, 129, 0.1); border: 1px solid rgba(16, 185, 129, 0.3); color: #10b981; font-size: 11px; font-weight: 700; cursor: pointer; transition: background 0.2s;">
-            <span style="width: 7px; height: 7px; border-radius: 50%; background: #10b981; box-shadow: 0 0 8px #10b981;"></span>
-            <span>Agent Radar</span>
+          <button id="navGenerateBtn" class="btn btn-primary btn-sm" onclick="openGenerateModal()">
+            <svg class="glyph"><use href="#glyph-zap"></use></svg>
+            <span class="nav-btn-text-full">Generate Report</span>
+            <span class="nav-btn-text-short">Generate</span>
           </button>
-          <button id="navGenerateBtn" class="btn btn-primary btn-sm" onclick="openGenerateModal()"><svg class="glyph"><use href="#glyph-zap"></use></svg> Generate Report</button>
-          <button id="navSignInBtn" class="btn btn-secondary btn-sm" onclick="openSignInModal()">Sign In / 2 Credits</button>
+          <button id="navSignInBtn" class="btn btn-secondary btn-sm" onclick="openSignInModal()">
+            <span class="nav-btn-text-full">Sign In / 2 Credits</span>
+            <span class="nav-btn-text-short">Sign In</span>
+          </button>
           <button id="mobileMenuBtn" class="mobile-menu-btn" onclick="toggleMobileMenu()" aria-label="Toggle navigation menu">
             <span class="bar"></span>
             <span class="bar"></span>
@@ -594,7 +597,7 @@
         <div>
           <div class="footer-col-title">Platform</div>
           <ul class="footer-links">
-            <li><a href="/equities">All 143 Equities Directory</a></li>
+            <li><a href="/equities">Institutional Equities Directory</a></li>
             <li><a href="/opportunities">Opportunity Terminal</a></li>
             <li><a href="/funds">Mutual Funds Look-Through</a></li>
             <li><a href="/pricing">Pricing & Credit Packs</a></li>

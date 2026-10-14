@@ -57,7 +57,7 @@
   <div class="container">
     <div class="stats-grid">
       <div class="stat-card">
-        <div class="stat-num tnum">{{ total_reports|default(81) }}+</div>
+        <div class="stat-num">BSE &amp; NSE</div>
         <div class="stat-label">Verified Institutional Dossiers</div>
       </div>
       <div class="stat-card">
@@ -211,11 +211,11 @@
   <div class="container">
     <div class="section-head" style="margin-bottom: 28px;">
       <div class="section-tag" style="background: rgba(14, 165, 233, 0.15); color: #38bdf8; border: 1px solid rgba(14, 165, 233, 0.3);">
-        Public Research Repository • {{ all_equities|length if all_equities else total_reports }} Institutional Dossiers
+        Public Research Repository • Institutional Dossiers
       </div>
       <h2 class="section-title">Browse Verified Stock Research Reports</h2>
       <p class="section-sub">
-        100% free and open access to all <strong>{{ all_equities|length if all_equities else total_reports }} monitored BSE &amp; NSE institutional equity dossiers</strong>. 
+        100% free and open access to <strong>monitored BSE &amp; NSE institutional equity dossiers</strong>. 
         Filter by sector, search tickers, and inspect 7-pillar scorecards with reverse DCF margin of safety and DuPont ROE decompositions.
       </p>
     </div>
@@ -228,7 +228,7 @@
           <input 
             type="text" 
             id="homeStockSearchInput" 
-            placeholder="Search all {{ all_equities|length if all_equities else '143' }} stock reports by ticker, name, or industry (e.g. INFY, TCS, Reliance, Kaynes, Neuland, BFSI)..." 
+            placeholder="Search stock reports by ticker, name, or industry (e.g. INFY, TCS, Reliance, Kaynes, Neuland, BFSI)..." 
             class="form-control" 
             style="background: rgba(15, 23, 42, 0.9); border: 1px solid rgba(255, 255, 255, 0.15); color: #fff; padding: 11px 16px; border-radius: 8px; width: 100%; font-size: 14px;"
             oninput="filterHomeStockReports()"
@@ -247,12 +247,12 @@
       <div>
         <div style="display: flex; gap: 8px; overflow-x: auto; padding-bottom: 6px;" id="homeSectorPills">
           <button type="button" class="btn btn-sm btn-primary home-sector-btn" data-sector="ALL" onclick="selectHomeSector('ALL', this)" style="border-radius: 9999px; white-space: nowrap;">
-            All Reports ({{ all_equities|length if all_equities else total_reports }})
+            All Reports
           </button>
           {% if sector_options %}
           {% for s_slug, s_info in sector_options.items() %}
           <button type="button" class="btn btn-sm btn-secondary home-sector-btn" data-sector="{{ s_slug }}" onclick="selectHomeSector('{{ s_slug }}', this)" style="border-radius: 9999px; white-space: nowrap;">
-            {{ s_info[1] }} {{ s_info[0] }} ({{ sector_counts.get(s_slug, 0) }})
+            {{ s_info[1] }} {{ s_info[0] }}
           </button>
           {% endfor %}
           {% endif %}
@@ -263,7 +263,7 @@
     <!-- Active Summary Bar -->
     <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px; padding: 0 4px;">
       <div style="font-size: 13.5px; font-weight: 600; color: #94a3b8;">
-        Showing <strong id="homeVisibleCounter" style="color: #f8fafc;">12</strong> of <strong id="homeTotalMatchesCounter" style="color: #38bdf8;">{{ all_equities|length if all_equities else total_reports }}</strong> Institutional Stock Reports
+        Showing <strong id="homeVisibleCounter" style="color: #f8fafc;">12</strong> of <strong id="homeTotalMatchesCounter" style="color: #38bdf8;">All</strong> Institutional Stock Reports
         <span id="homeActiveFilterLabel" style="color: #c084fc; margin-left: 6px;"></span>
       </div>
       <div style="display: flex; gap: 8px;">
@@ -382,24 +382,24 @@
         We couldn't find any audited equities matching your active search or sector.
       </p>
       <button type="button" onclick="clearHomeStockSearch(); selectHomeSector('ALL', document.querySelector('.home-sector-btn[data-sector=\'ALL\']'))" class="btn btn-primary btn-sm" style="font-weight: 700;">
-        Reset Search &amp; Show All {{ all_equities|length if all_equities else '143' }} Reports
+        Reset Search &amp; Show All Reports
       </button>
     </div>
 
     <!-- Load More & Full Screener Controls -->
-    <div style="display: flex; flex-direction: column; align-items: center; gap: 14px; margin-top: 36px;">
-      <div id="homeLoadMoreWrapper" style="display: flex; gap: 10px;">
-        <button type="button" id="btnHomeLoadMore" onclick="loadMoreHomeReports(12)" class="btn btn-secondary" style="padding: 10px 24px; font-weight: 600; border-radius: 9999px;">
+    <div class="home-reports-actions">
+      <div id="homeLoadMoreWrapper" class="home-load-more-group">
+        <button type="button" id="btnHomeLoadMore" onclick="loadMoreHomeReports(12)" class="btn btn-secondary home-action-btn">
           <span>Load More Reports (+12)</span>
         </button>
-        <button type="button" id="btnHomeShowAll" onclick="showAllHomeReports()" class="btn btn-secondary" style="padding: 10px 20px; font-weight: 600; border-radius: 9999px;">
-          <span>Show All {{ all_equities|length if all_equities else '143' }}</span>
+        <button type="button" id="btnHomeShowAll" onclick="showAllHomeReports()" class="btn btn-secondary home-action-btn">
+          <span>Show All Reports</span>
         </button>
       </div>
 
-      <div>
-        <a href="/equities" class="btn btn-primary" style="padding: 12px 28px; font-weight: 700; border-radius: 9999px; display: inline-flex; align-items: center; gap: 8px;">
-          <span>Launch Full Institutional Screener (All 143 Equities)</span>
+      <div class="home-screener-wrapper">
+        <a href="/equities" class="btn btn-primary home-screener-btn">
+          <span>Launch Full Institutional Screener</span>
           <span>→</span>
         </a>
       </div>
