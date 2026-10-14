@@ -544,11 +544,37 @@ def api_sovereign_macro():
 
 
 @router.get("/api/etfs/matrix")
-def api_etfs_matrix(category: Optional[str] = None):
-    """Public API: National ETF Matrix with premium/discount and tracking errors."""
+def api_etfs_matrix(
+    category: Optional[str] = Query(None),
+    q: Optional[str] = Query(None),
+    sort_by: Optional[str] = Query(None),
+    limit: Optional[int] = Query(None)
+):
+    """Public API: National ETF Matrix with search, category filtering, and tracking errors."""
     from core.analysis.etf_matrix_engine import evaluate_etf_matrix
     init_db()
-    return json_response_with_cache(evaluate_etf_matrix(category=category), max_age=120)
+    data = evaluate_etf_matrix(category=category, query=q, sort_by=sort_by, limit=limit)
+    return json_response_with_cache(data, max_age=120)
+
+
+@router.get("/api/etfs/{symbol}")
+def api_etf_detail(symbol: str):
+    """Public API: Single ETF deep audit with category peers and forensic arbitrage spread."""
+    from core.analysis.etf_matrix_engine import get_etf_detail
+    init_db()
+    data = get_etf_detail(symbol)
+    if not data:
+        raise HTTPException(status_code=404, detail=f"ETF symbol '{symbol}' not found in master matrix.")
+    return json_response_with_cache(data, max_age=300)
+
+
+@router.post("/api/admin/etfs/trigger-ingest")
+def api_admin_trigger_etf_ingest():
+    """Admin API: Triggers dynamic live synchronization of AMFI-listed ETF universe."""
+    from core.ingestion.etf_ingest import ingest_all_amfi_etfs
+    init_db()
+    result = ingest_all_amfi_etfs(force_refresh=True)
+    return {"status": "SUCCESS", "result": result}
 
 
 @router.get("/api/calculator/tax-return")

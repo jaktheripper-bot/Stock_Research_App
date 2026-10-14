@@ -349,129 +349,10 @@ DEFAULT_HISTORICAL_CURVES = {
     ]
 }
 
-# Baseline ETF Matrix covering top Indian Index, Debt, and Commodity ETFs
-DEFAULT_ETF_MATRIX = [
-    {
-        "symbol": "NIFTYBEES",
-        "scheme_name": "Nippon India ETF Nifty 50 BeES",
-        "category": "EQUITY_INDEX",
-        "underlying_index": "Nifty 50 TRI",
-        "last_price": 272.50,
-        "nav": 272.42,
-        "premium_discount_pct": 0.03,
-        "tracking_error_1y": 0.04,
-        "expense_ratio_pct": 0.04,
-        "aum_crores": 34850.0,
-        "avg_daily_volume": 4200000.0,
-        "avg_daily_turnover_cr": 114.5,
-        "liquidity_tier": "HIGH_LIQUIDITY"
-    },
-    {
-        "symbol": "BANKBEES",
-        "scheme_name": "Nippon India ETF Nifty Bank BeES",
-        "category": "EQUITY_INDEX",
-        "underlying_index": "Nifty Bank TRI",
-        "last_price": 542.20,
-        "nav": 541.95,
-        "premium_discount_pct": 0.05,
-        "tracking_error_1y": 0.06,
-        "expense_ratio_pct": 0.16,
-        "aum_crores": 15200.0,
-        "avg_daily_volume": 1850000.0,
-        "avg_daily_turnover_cr": 100.2,
-        "liquidity_tier": "HIGH_LIQUIDITY"
-    },
-    {
-        "symbol": "JUNIORBEES",
-        "scheme_name": "Nippon India ETF Nifty Next 50 Junior BeES",
-        "category": "EQUITY_INDEX",
-        "underlying_index": "Nifty Next 50 TRI",
-        "last_price": 782.10,
-        "nav": 781.40,
-        "premium_discount_pct": 0.09,
-        "tracking_error_1y": 0.08,
-        "expense_ratio_pct": 0.15,
-        "aum_crores": 5400.0,
-        "avg_daily_volume": 320000.0,
-        "avg_daily_turnover_cr": 25.0,
-        "liquidity_tier": "HIGH_LIQUIDITY"
-    },
-    {
-        "symbol": "GOLDBEES",
-        "scheme_name": "Nippon India ETF Gold BeES",
-        "category": "COMMODITY_GOLD",
-        "underlying_index": "Domestic Gold Spot 999 Purity",
-        "last_price": 71.40,
-        "nav": 71.25,
-        "premium_discount_pct": 0.21,
-        "tracking_error_1y": 0.18,
-        "expense_ratio_pct": 0.79,
-        "aum_crores": 12800.0,
-        "avg_daily_volume": 6500000.0,
-        "avg_daily_turnover_cr": 46.4,
-        "liquidity_tier": "HIGH_LIQUIDITY"
-    },
-    {
-        "symbol": "SILVERBEES",
-        "scheme_name": "Nippon India ETF Silver BeES",
-        "category": "COMMODITY_COMMODITY",
-        "underlying_index": "Domestic Silver Spot 999 Purity",
-        "last_price": 88.90,
-        "nav": 88.45,
-        "premium_discount_pct": 0.51,
-        "tracking_error_1y": 0.28,
-        "expense_ratio_pct": 0.52,
-        "aum_crores": 4100.0,
-        "avg_daily_volume": 2100000.0,
-        "avg_daily_turnover_cr": 18.7,
-        "liquidity_tier": "MODERATE_LIQUIDITY"
-    },
-    {
-        "symbol": "BHARATBOND2030",
-        "scheme_name": "Edelweiss BHARAT Bond ETF - April 2030",
-        "category": "DEBT_TARGET_MATURITY",
-        "underlying_index": "Nifty BHARAT Bond Index - April 2030 (AAA PSU)",
-        "last_price": 1342.50,
-        "nav": 1341.80,
-        "premium_discount_pct": 0.05,
-        "tracking_error_1y": 0.09,
-        "expense_ratio_pct": 0.0005,
-        "aum_crores": 18600.0,
-        "avg_daily_volume": 45000.0,
-        "avg_daily_turnover_cr": 6.0,
-        "liquidity_tier": "MODERATE_LIQUIDITY"
-    },
-    {
-        "symbol": "GSEC5IETF",
-        "scheme_name": "ICICI Prudential Nifty 5 yr Benchmark G-Sec ETF",
-        "category": "DEBT_SOVEREIGN",
-        "underlying_index": "Nifty 5 yr Benchmark G-Sec Index",
-        "last_price": 53.80,
-        "nav": 53.76,
-        "premium_discount_pct": 0.07,
-        "tracking_error_1y": 0.05,
-        "expense_ratio_pct": 0.14,
-        "aum_crores": 2900.0,
-        "avg_daily_volume": 280000.0,
-        "avg_daily_turnover_cr": 1.5,
-        "liquidity_tier": "MODERATE_LIQUIDITY"
-    },
-    {
-        "symbol": "LIQUIDBEES",
-        "scheme_name": "Nippon India ETF Liquid BeES",
-        "category": "LIQUID",
-        "underlying_index": "Nifty 1D Rate Index (TREPS)",
-        "last_price": 1000.00,
-        "nav": 1000.00,
-        "premium_discount_pct": 0.00,
-        "tracking_error_1y": 0.02,
-        "expense_ratio_pct": 0.69,
-        "aum_crores": 14200.0,
-        "avg_daily_volume": 120000.0,
-        "avg_daily_turnover_cr": 12.0,
-        "liquidity_tier": "HIGH_LIQUIDITY"
-    }
-]
+from core.db.etf_universe import CANONICAL_ETF_UNIVERSE
+
+# Baseline ETF Matrix covering 140+ benchmark Indian ETFs across 9 institutional categories
+DEFAULT_ETF_MATRIX = CANONICAL_ETF_UNIVERSE
 
 
 def save_sovereign_benchmark(bench: Dict[str, Any]) -> bool:
@@ -805,24 +686,29 @@ def get_historical_sovereign_curves() -> Dict[str, List[Dict[str, Any]]]:
 
 def save_etf_matrix_item(item: Dict[str, Any]) -> bool:
     """Inserts or updates an entry in the national ETF matrix."""
+    return save_etf_matrix_items([item]) > 0
+
+
+def save_etf_matrix_items(items: List[Dict[str, Any]]) -> int:
+    """Batch inserts or updates entries in the national ETF matrix in a single transaction."""
+    if not items:
+        return 0
+
     conn = get_db_connection()
     cursor = conn.cursor()
     p = get_placeholder()
     is_pg = bool(get_supabase_url())
+    saved_count = 0
 
     try:
-        lp = float(item.get("last_price", item.get("cmp_inr", 0.0)))
-        nv = float(item.get("nav", item.get("nav_inr", 0.0)))
-        prem_disc = round(((lp - nv) / nv) * 100, 2) if nv > 0 else 0.0
-
         if is_pg:
             query = f"""
                 INSERT INTO etf_matrix (
                     symbol, scheme_name, category, underlying_index,
                     last_price, nav, premium_discount_pct, tracking_error_1y,
                     expense_ratio_pct, aum_crores, avg_daily_volume,
-                    avg_daily_turnover_cr, liquidity_tier, updated_at
-                ) VALUES ({p}, {p}, {p}, {p}, {p}, {p}, {p}, {p}, {p}, {p}, {p}, {p}, {p}, now())
+                    avg_daily_turnover_cr, liquidity_tier, scheme_code, isin, updated_at
+                ) VALUES ({p}, {p}, {p}, {p}, {p}, {p}, {p}, {p}, {p}, {p}, {p}, {p}, {p}, {p}, {p}, now())
                 ON CONFLICT (symbol) DO UPDATE SET
                     scheme_name = EXCLUDED.scheme_name,
                     category = EXCLUDED.category,
@@ -836,6 +722,8 @@ def save_etf_matrix_item(item: Dict[str, Any]) -> bool:
                     avg_daily_volume = EXCLUDED.avg_daily_volume,
                     avg_daily_turnover_cr = EXCLUDED.avg_daily_turnover_cr,
                     liquidity_tier = EXCLUDED.liquidity_tier,
+                    scheme_code = COALESCE(EXCLUDED.scheme_code, etf_matrix.scheme_code),
+                    isin = COALESCE(EXCLUDED.isin, etf_matrix.isin),
                     updated_at = now();
             """
         else:
@@ -844,8 +732,8 @@ def save_etf_matrix_item(item: Dict[str, Any]) -> bool:
                     symbol, scheme_name, category, underlying_index,
                     last_price, nav, premium_discount_pct, tracking_error_1y,
                     expense_ratio_pct, aum_crores, avg_daily_volume,
-                    avg_daily_turnover_cr, liquidity_tier, updated_at
-                ) VALUES ({p}, {p}, {p}, {p}, {p}, {p}, {p}, {p}, {p}, {p}, {p}, {p}, {p}, datetime('now'))
+                    avg_daily_turnover_cr, liquidity_tier, scheme_code, isin, updated_at
+                ) VALUES ({p}, {p}, {p}, {p}, {p}, {p}, {p}, {p}, {p}, {p}, {p}, {p}, {p}, {p}, {p}, datetime('now'))
                 ON CONFLICT (symbol) DO UPDATE SET
                     scheme_name = excluded.scheme_name,
                     category = excluded.category,
@@ -859,65 +747,109 @@ def save_etf_matrix_item(item: Dict[str, Any]) -> bool:
                     avg_daily_volume = excluded.avg_daily_volume,
                     avg_daily_turnover_cr = excluded.avg_daily_turnover_cr,
                     liquidity_tier = excluded.liquidity_tier,
+                    scheme_code = COALESCE(excluded.scheme_code, etf_matrix.scheme_code),
+                    isin = COALESCE(excluded.isin, etf_matrix.isin),
                     updated_at = datetime('now');
             """
-        params = (
-            item["symbol"].upper(),
-            item.get("scheme_name", item.get("name", item["symbol"])),
-            item.get("category", "EQUITY_INDEX"),
-            item.get("underlying_index", item.get("benchmark_index", "Nifty 50 TRI")),
-            lp,
-            nv,
-            prem_disc,
-            float(item.get("tracking_error_1y", item.get("tracking_error_pct", 0.05))),
-            float(item.get("expense_ratio_pct", item.get("ter_pct", 0.10))),
-            float(item.get("aum_crores", 1000.0)),
-            float(item.get("avg_daily_volume", item.get("avg_daily_volume_shares", 500000.0))),
-            float(item.get("avg_daily_turnover_cr", 10.0)),
-            item.get("liquidity_tier", "HIGH_LIQUIDITY"),
-        )
-        cursor.execute(query, params)
+
+        for item in items:
+            lp = float(item.get("last_price", item.get("cmp_inr", 0.0)))
+            nv = float(item.get("nav", item.get("nav_inr", 0.0)))
+            prem_disc = round(((lp - nv) / nv) * 100, 2) if nv > 0 else 0.0
+
+            params = (
+                item["symbol"].upper(),
+                item.get("scheme_name", item.get("name", item["symbol"])),
+                item.get("category", "EQUITY_INDEX"),
+                item.get("underlying_index", item.get("benchmark_index", "Nifty 50 TRI")),
+                lp,
+                nv,
+                prem_disc,
+                float(item.get("tracking_error_1y", item.get("tracking_error_pct", 0.05))),
+                float(item.get("expense_ratio_pct", item.get("ter_pct", 0.10))),
+                float(item.get("aum_crores", 1000.0)),
+                float(item.get("avg_daily_volume", item.get("avg_daily_volume_shares", 500000.0))),
+                float(item.get("avg_daily_turnover_cr", 10.0)),
+                item.get("liquidity_tier", "HIGH_LIQUIDITY"),
+                item.get("scheme_code"),
+                item.get("isin"),
+            )
+            cursor.execute(query, params)
+            saved_count += 1
+
         conn.commit()
-        return True
+        return saved_count
     except Exception as e:
-        logger.error(f"Error saving ETF matrix item {item.get('symbol')}: {e}")
+        logger.error(f"Error batch saving ETF matrix items: {e}")
         conn.rollback()
-        return False
+        return 0
     finally:
         cursor.close()
         conn.close()
 
 
-def get_etf_matrix(category: Optional[str] = None) -> List[Dict[str, Any]]:
-    """Retrieves all ETFs in the matrix, optionally filtered by category."""
+def get_etf_matrix(
+    category: Optional[str] = None,
+    query: Optional[str] = None,
+    sort_by: Optional[str] = None,
+    limit: Optional[int] = None
+) -> List[Dict[str, Any]]:
+    """Retrieves all ETFs in the matrix with optional category filtering, text search, and sorting."""
     conn = get_db_connection()
     cursor = conn.cursor()
     p = get_placeholder()
 
     try:
-        where_clause = f"WHERE category = {p}" if category else ""
-        query = f"""
+        where_clauses = []
+        params = []
+
+        if category and category.strip().upper() != "ALL":
+            where_clauses.append(f"category = {p}")
+            params.append(category.strip().upper())
+
+        if query and query.strip():
+            clean_q = f"%{query.strip().upper()}%"
+            where_clauses.append(f"(UPPER(symbol) LIKE {p} OR UPPER(scheme_name) LIKE {p} OR UPPER(underlying_index) LIKE {p})")
+            params.extend([clean_q, clean_q, clean_q])
+
+        where_sql = f"WHERE {' AND '.join(where_clauses)}" if where_clauses else ""
+
+        sort_map = {
+            "aum_desc": "aum_crores DESC",
+            "volume_desc": "avg_daily_volume DESC",
+            "turnover_desc": "avg_daily_turnover_cr DESC",
+            "tracking_error_asc": "tracking_error_1y ASC",
+            "expense_ratio_asc": "expense_ratio_pct ASC",
+            "nav_divergence_desc": "ABS(premium_discount_pct) DESC",
+            "discount_desc": "premium_discount_pct ASC",
+            "premium_desc": "premium_discount_pct DESC",
+            "symbol_asc": "symbol ASC"
+        }
+        order_sql = sort_map.get(sort_by, "aum_crores DESC")
+
+        limit_sql = f"LIMIT {int(limit)}" if limit and isinstance(limit, int) and limit > 0 else ""
+
+        sql = f"""
             SELECT id, symbol, scheme_name, category, underlying_index,
                    last_price, nav, premium_discount_pct, tracking_error_1y,
                    expense_ratio_pct, aum_crores, avg_daily_volume,
-                   avg_daily_turnover_cr, liquidity_tier, updated_at
+                   avg_daily_turnover_cr, liquidity_tier, scheme_code, isin, updated_at
             FROM etf_matrix
-            {where_clause}
-            ORDER BY aum_crores DESC;
+            {where_sql}
+            ORDER BY {order_sql}
+            {limit_sql};
         """
-        if category:
-            cursor.execute(query, (category,))
-        else:
-            cursor.execute(query)
+        cursor.execute(sql, tuple(params))
         rows = cursor.fetchall()
 
         if not rows:
-            logger.info("ETF matrix table is empty. Initializing baseline ETFs...")
-            for etf in DEFAULT_ETF_MATRIX:
-                save_etf_matrix_item(etf)
-            if category:
-                return [x for x in DEFAULT_ETF_MATRIX if x["category"] == category]
-            return DEFAULT_ETF_MATRIX
+            cursor.execute("SELECT COUNT(*) FROM etf_matrix;")
+            total_in_table = cursor.fetchone()[0]
+            if total_in_table == 0:
+                logger.info("ETF matrix table is empty. Initializing baseline canonical ETFs...")
+                save_etf_matrix_items(DEFAULT_ETF_MATRIX)
+                cursor.execute(sql, tuple(params))
+                rows = cursor.fetchall()
 
         results = []
         for r in rows:
@@ -936,12 +868,79 @@ def get_etf_matrix(category: Optional[str] = None) -> List[Dict[str, Any]]:
                 "avg_daily_volume": float(r[11]),
                 "avg_daily_turnover_cr": float(r[12]),
                 "liquidity_tier": r[13],
-                "updated_at": str(r[14]),
+                "scheme_code": r[14],
+                "isin": r[15],
+                "updated_at": str(r[16]),
             })
         return results
     except Exception as e:
         logger.error(f"Error fetching ETF matrix: {e}")
-        return DEFAULT_ETF_MATRIX
+        # Fallback to in-memory filter of canonical universe
+        fallback = list(DEFAULT_ETF_MATRIX)
+        if category and category.strip().upper() != "ALL":
+            fallback = [x for x in fallback if x.get("category") == category.strip().upper()]
+        if query and query.strip():
+            cq = query.strip().upper()
+            fallback = [x for x in fallback if cq in x.get("symbol", "").upper() or cq in x.get("scheme_name", "").upper()]
+        return fallback
+    finally:
+        cursor.close()
+        conn.close()
+
+
+def get_etf_by_symbol(symbol: str) -> Optional[Dict[str, Any]]:
+    """Retrieves a single ETF by its exchange symbol."""
+    if not symbol:
+        return None
+
+    conn = get_db_connection()
+    cursor = conn.cursor()
+    p = get_placeholder()
+
+    try:
+        query = f"""
+            SELECT id, symbol, scheme_name, category, underlying_index,
+                   last_price, nav, premium_discount_pct, tracking_error_1y,
+                   expense_ratio_pct, aum_crores, avg_daily_volume,
+                   avg_daily_turnover_cr, liquidity_tier, scheme_code, isin, updated_at
+            FROM etf_matrix
+            WHERE UPPER(symbol) = {p}
+            LIMIT 1;
+        """
+        cursor.execute(query, (symbol.strip().upper(),))
+        r = cursor.fetchone()
+        if not r:
+            # Check canonical universe
+            for item in DEFAULT_ETF_MATRIX:
+                if item["symbol"].upper() == symbol.strip().upper():
+                    return dict(item)
+            return None
+
+        return {
+            "id": r[0],
+            "symbol": r[1],
+            "scheme_name": r[2],
+            "category": r[3],
+            "underlying_index": r[4],
+            "last_price": float(r[5]),
+            "nav": float(r[6]),
+            "premium_discount_pct": float(r[7]),
+            "tracking_error_1y": float(r[8]),
+            "expense_ratio_pct": float(r[9]),
+            "aum_crores": float(r[10]),
+            "avg_daily_volume": float(r[11]),
+            "avg_daily_turnover_cr": float(r[12]),
+            "liquidity_tier": r[13],
+            "scheme_code": r[14],
+            "isin": r[15],
+            "updated_at": str(r[16]),
+        }
+    except Exception as e:
+        logger.error(f"Error fetching ETF by symbol {symbol}: {e}")
+        for item in DEFAULT_ETF_MATRIX:
+            if item["symbol"].upper() == symbol.strip().upper():
+                return dict(item)
+        return None
     finally:
         cursor.close()
         conn.close()

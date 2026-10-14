@@ -1,124 +1,215 @@
 {% extends "base.html" %}
 
 {% block title %}National ETF Matrix & Tracking Error Surveillance | Moatnomics{% endblock %}
-{% block meta_desc %}Real-time Indian ETF matrix auditing exchange price vs NAV premium/discount, tracking error, expense ratio drag, and Amihud liquidity tiers for Index, Debt, and Commodity ETFs.{% endblock %}
+{% block meta_desc %}Institutional Indian ETF matrix auditing 140+ AMFI-listed ETFs: exchange CMP vs NAV fair value, tracking error deviations, expense ratio fee drag, and secondary market liquidity depth.{% endblock %}
 {% block og_title %}National ETF Matrix & Tracking Error Surveillance | Moatnomics{% endblock %}
 {% block og_desc %}Live tracking error, exchange liquidity spread, and NAV discount matrix across Indian ETFs.{% endblock %}
 
 {% block content %}
 <div class="container py-8">
   <!-- Header Banner -->
-  <div style="background: linear-gradient(135deg, rgba(30, 41, 59, 0.7) 0%, rgba(15, 23, 42, 0.95) 100%); border: 1px solid rgba(255, 255, 255, 0.1); border-radius: 16px; padding: 32px; margin-bottom: 32px; position: relative; overflow: hidden;">
-    <div style="display: inline-flex; align-items: center; gap: 8px; background: rgba(16, 185, 129, 0.15); border: 1px solid rgba(16, 185, 129, 0.3); border-radius: 9999px; padding: 4px 14px; margin-bottom: 16px;">
-      <span style="width: 8px; height: 8px; border-radius: 50%; background: #10b981;"></span>
-      <span style="font-size: 12px; font-weight: 700; color: #34d399; text-transform: uppercase; letter-spacing: 0.05em;">National ETF Matrix • Tracking Error & Liquidity Surveillance</span>
+  <div style="background: linear-gradient(135deg, rgba(30, 41, 59, 0.7) 0%, rgba(15, 23, 42, 0.95) 100%); border: 1px solid rgba(255, 255, 255, 0.1); border-radius: 16px; padding: 32px; margin-bottom: 28px; position: relative; overflow: hidden;">
+    <div style="display: flex; justify-content: space-between; align-items: flex-start; flex-wrap: wrap; gap: 16px; margin-bottom: 16px;">
+      <div style="display: inline-flex; align-items: center; gap: 8px; background: rgba(16, 185, 129, 0.15); border: 1px solid rgba(16, 185, 129, 0.3); border-radius: 9999px; padding: 4px 14px;">
+        <span style="width: 8px; height: 8px; border-radius: 50%; background: #10b981;"></span>
+        <span style="font-size: 12px; font-weight: 700; color: #34d399; text-transform: uppercase; letter-spacing: 0.05em;">National ETF Matrix • 140+ AMFI Passive Benchmarks</span>
+      </div>
+      <button id="sync-amfi-btn" onclick="triggerAmfiSync()" class="btn btn-secondary btn-sm" style="display: inline-flex; align-items: center; gap: 8px; font-size: 12px; border-radius: 8px; border-color: rgba(56, 189, 248, 0.4); color: #38bdf8;">
+        <span id="sync-icon">🔄</span> <span id="sync-text">Sync AMFI Feed</span>
+      </button>
     </div>
 
     <h1 style="font-size: 32px; font-weight: 800; color: #f8fafc; margin-bottom: 12px; letter-spacing: -0.02em;">
       National ETF Performance & Liquidity Matrix
     </h1>
-    <p style="font-size: 15px; color: #94a3b8; max-width: 840px; line-height: 1.6; margin-bottom: 24px;">
-      Exchange Traded Funds (ETFs) performance, tracking error, and liquidity depth. Every ETF is evaluated against its 
-      <strong>True NAV Fair Value</strong>, tracking error deviation, total expense ratio (TER) fee drag, and secondary market liquidity depth.
+    <p style="font-size: 15px; color: #94a3b8; max-width: 880px; line-height: 1.6; margin-bottom: 24px;">
+      Surveillance of all AMFI-registered Exchange Traded Funds across Equity, Debt, Commodity, and Factor categories. Every ETF is evaluated against its 
+      <strong>Statutory NAV Fair Value</strong>, 1-year tracking error divergence, total expense ratio (TER) fee drag, and secondary market liquidity depth.
     </p>
 
     <!-- Evaluated Metadata Strip & Provenance Info -->
     <div class="dossier-meta-strip" style="margin-bottom: 20px;">
-      <span>📅 Evaluated: Live Benchmark • Verified AMFI / Exchange NAV Feed • Dual-Exchange Order Books</span>
+      <span>📅 Evaluated: Live Master Feed • AMFI Statutory NAVAll Dispatches • Dual-Exchange Order Books</span>
     </div>
-    <p class="dossier-provenance-subline">End-of-day NAVs and Level-2 order book tracking errors computed directly from statutory exchange dispatches.</p>
+    <p class="dossier-provenance-subline">End-of-day NAVs, tracking error deviations, and liquidity tiers calculated directly from regulatory dispatches and exchange execution feeds.</p>
 
     <!-- Top KPI Grid -->
     <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 16px;">
       <div style="background: rgba(15, 23, 42, 0.6); border: 1px solid rgba(255, 255, 255, 0.08); border-radius: 12px; padding: 18px;">
-        <div style="font-size: 12px; color: #64748b; text-transform: uppercase; font-weight: 600; margin-bottom: 4px;">Tracked ETFs</div>
-        <div style="font-size: 26px; font-weight: 800; color: #f8fafc;" class="tnum">{{ data.total_tracked_etfs }} Schemes</div>
+        <div style="font-size: 12px; color: #64748b; text-transform: uppercase; font-weight: 600; margin-bottom: 4px;">Tracked Schemes</div>
+        <div style="font-size: 26px; font-weight: 800; color: #f8fafc;" class="tnum">{{ data.total_tracked_etfs }} <span style="font-size: 13px; font-weight: 500; color: #64748b;">/ {{ data.total_universe_count }}</span></div>
       </div>
       <div style="background: rgba(15, 23, 42, 0.6); border: 1px solid rgba(255, 255, 255, 0.08); border-radius: 12px; padding: 18px;">
         <div style="font-size: 12px; color: #64748b; text-transform: uppercase; font-weight: 600; margin-bottom: 4px;">Total ETF AUM</div>
-        <div style="font-size: 26px; font-weight: 800; color: #38bdf8;" class="tnum">₹{{ data.total_aum_crores|round(0) }} Cr</div>
+        <div style="font-size: 26px; font-weight: 800; color: #38bdf8;" class="tnum">₹{{ data.total_aum_lakh_cr }} Lk Cr</div>
       </div>
       <div style="background: rgba(15, 23, 42, 0.6); border: 1px solid rgba(255, 255, 255, 0.08); border-radius: 12px; padding: 18px;">
         <div style="font-size: 12px; color: #64748b; text-transform: uppercase; font-weight: 600; margin-bottom: 4px;">High-Liquidity Core</div>
         <div style="font-size: 26px; font-weight: 800; color: #10b981;" class="tnum">{{ data.high_liquidity_count }} ETFs</div>
       </div>
       <div style="background: rgba(15, 23, 42, 0.6); border: 1px solid rgba(255, 255, 255, 0.08); border-radius: 12px; padding: 18px;">
-        <div style="font-size: 12px; color: #64748b; text-transform: uppercase; font-weight: 600; margin-bottom: 4px;">NAV Divergence Alerts</div>
+        <div style="font-size: 12px; color: #64748b; text-transform: uppercase; font-weight: 600; margin-bottom: 4px;">NAV Mispricing Alerts</div>
         <div style="font-size: 26px; font-weight: 800; color: #f59e0b;" class="tnum">{{ data.nav_divergence_alerts }} Issues</div>
       </div>
     </div>
   </div>
 
-  <!-- Category Filter Pills & Terminal Link -->
-  <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 12px; margin-bottom: 24px;">
-    <div style="display: flex; gap: 8px; overflow-x: auto; padding-bottom: 4px;">
-      <a href="/etfs" class="btn btn-sm {% if not current_category %}btn-primary{% else %}btn-secondary{% endif %}" style="border-radius: 9999px;">All ETFs ({{ data.total_tracked_etfs }})</a>
-      <a href="/etfs?category=EQUITY_INDEX" class="btn btn-sm {% if current_category == 'EQUITY_INDEX' %}btn-primary{% else %}btn-secondary{% endif %}" style="border-radius: 9999px;">📈 Equity Indices</a>
-      <a href="/etfs?category=COMMODITY_GOLD" class="btn btn-sm {% if current_category == 'COMMODITY_GOLD' %}btn-primary{% else %}btn-secondary{% endif %}" style="border-radius: 9999px;"><svg class="glyph"><use href="#glyph-coin"></use></svg> Gold & Commodities</a>
-      <a href="/etfs?category=DEBT_TARGET_MATURITY" class="btn btn-sm {% if current_category == 'DEBT_TARGET_MATURITY' %}btn-primary{% else %}btn-secondary{% endif %}" style="border-radius: 9999px;"><svg class="glyph"><use href="#glyph-shield"></use></svg> Bharat Bond & Target Maturity</a>
-      <a href="/etfs?category=LIQUID" class="btn btn-sm {% if current_category == 'LIQUID' %}btn-primary{% else %}btn-secondary{% endif %}" style="border-radius: 9999px;">💧 Overnight & Liquid</a>
-    </div>
-    <a href="/opportunities" class="btn btn-secondary btn-sm" style="display: inline-flex; align-items: center; gap: 6px; border-radius: 8px; font-weight: 700; border-color: rgba(14, 165, 233, 0.4); color: #38bdf8;">
-      <span>🎯</span> Cross-Asset Terminal
-    </a>
+  <!-- Search, Filter & Sort Controls -->
+  <div style="background: rgba(15, 23, 42, 0.5); border: 1px solid rgba(255, 255, 255, 0.08); border-radius: 14px; padding: 16px 20px; margin-bottom: 24px;">
+    <form id="filter-form" method="GET" action="/etfs" style="display: flex; flex-wrap: wrap; gap: 14px; align-items: center; justify-content: space-between;">
+      <input type="hidden" name="category" id="hidden-category" value="{{ current_category }}">
+
+      <!-- Search Input -->
+      <div style="flex: 1 1 280px; position: relative;">
+        <span style="position: absolute; left: 14px; top: 50%; transform: translateY(-50%); font-size: 14px; color: #64748b;">🔍</span>
+        <input 
+          type="text" 
+          name="q" 
+          id="etf-search-input"
+          value="{{ current_query }}" 
+          placeholder="Search by Symbol, AMC, Index, or Keyword (e.g. Nifty 50, Gold, CPSE)..." 
+          style="width: 100%; padding: 10px 14px 10px 38px; background: rgba(30, 41, 59, 0.8); border: 1px solid rgba(255, 255, 255, 0.12); border-radius: 8px; color: #f8fafc; font-size: 13.5px; outline: none;"
+          onkeydown="if(event.key === 'Enter'){ this.form.submit(); }"
+        >
+      </div>
+
+      <!-- Sort Dropdown -->
+      <div style="display: flex; align-items: center; gap: 10px;">
+        <label for="sort_by" style="font-size: 12.5px; color: #94a3b8; font-weight: 600; white-space: nowrap;">Sort By:</label>
+        <select 
+          name="sort_by" 
+          id="sort_by" 
+          onchange="document.getElementById('filter-form').submit()" 
+          style="padding: 9px 12px; background: rgba(30, 41, 59, 0.8); border: 1px solid rgba(255, 255, 255, 0.12); border-radius: 8px; color: #f8fafc; font-size: 13px; outline: none; cursor: pointer;"
+        >
+          <option value="aum_desc" {% if current_sort == 'aum_desc' %}selected{% endif %}>Highest AUM (₹ Cr)</option>
+          <option value="volume_desc" {% if current_sort == 'volume_desc' %}selected{% endif %}>Highest Daily Volume</option>
+          <option value="tracking_error_asc" {% if current_sort == 'tracking_error_asc' %}selected{% endif %}>Lowest Tracking Error (1Y)</option>
+          <option value="expense_ratio_asc" {% if current_sort == 'expense_ratio_asc' %}selected{% endif %}>Lowest TER Expense Drag</option>
+          <option value="nav_divergence_desc" {% if current_sort == 'nav_divergence_desc' %}selected{% endif %}>Max NAV Mispricing (Arbitrage)</option>
+          <option value="symbol_asc" {% if current_sort == 'symbol_asc' %}selected{% endif %}>Ticker Symbol (A-Z)</option>
+        </select>
+
+        <button type="submit" class="btn btn-sm btn-primary" style="border-radius: 8px; padding: 8px 16px;">Filter</button>
+        {% if current_query or current_category != 'ALL' %}
+        <a href="/etfs" class="btn btn-sm btn-secondary" style="border-radius: 8px; padding: 8px 14px; color: #94a3b8;">Reset</a>
+        {% endif %}
+      </div>
+    </form>
   </div>
 
-  <!-- ETF Table -->
-  <div class="card" style="padding: 24px; margin-bottom: 32px;">
+  <!-- Category Filter Tab Pills -->
+  <div style="display: flex; gap: 8px; overflow-x: auto; padding-bottom: 12px; margin-bottom: 24px; -webkit-overflow-scrolling: touch;">
+    {% set cat_badges = [
+      ('ALL', 'All ETFs', '🌐'),
+      ('EQUITY_INDEX', 'Equity Indices', '📈'),
+      ('EQUITY_SECTORAL', 'Sectoral & Thematic', '🏭'),
+      ('EQUITY_FACTOR', 'Smart Beta', '⚡'),
+      ('COMMODITY_GOLD', 'Gold', '🪙'),
+      ('COMMODITY_SILVER', 'Silver', '🥈'),
+      ('DEBT_SOVEREIGN', 'G-Sec & Gilts', '🏛️'),
+      ('DEBT_TARGET_MATURITY', 'Bharat Bond', '🛡️'),
+      ('LIQUID', 'Liquid & Overnight', '💧'),
+      ('INTERNATIONAL', 'Global / US', '🌍')
+    ] %}
+
+    {% for cat_id, cat_title, cat_icon in cat_badges %}
+    {% set count = data.category_counts.get(cat_id, 0) %}
+    <a 
+      href="/etfs?category={{ cat_id }}{% if current_query %}&q={{ current_query }}{% endif %}{% if current_sort %}&sort_by={{ current_sort }}{% endif %}" 
+      class="btn btn-sm {% if current_category == cat_id %}btn-primary{% else %}btn-secondary{% endif %}" 
+      style="border-radius: 9999px; white-space: nowrap; font-size: 12.5px; padding: 6px 14px; display: inline-flex; align-items: center; gap: 6px;"
+    >
+      <span>{{ cat_icon }}</span>
+      <span>{{ cat_title }}</span>
+      <span style="font-size: 11px; opacity: 0.8; background: rgba(255,255,255,0.15); padding: 1px 6px; border-radius: 9999px;">{{ count }}</span>
+    </a>
+    {% endfor %}
+  </div>
+
+  <!-- ETF Table Card -->
+  <div class="card" style="padding: 24px; margin-bottom: 32px; border-radius: 14px; background: rgba(15, 23, 42, 0.7); border: 1px solid rgba(255, 255, 255, 0.08);">
+    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px;">
+      <div style="font-size: 13.5px; color: #94a3b8; font-weight: 600;">
+        Showing <span style="color: #f8fafc; font-weight: 700;">{{ data.total_tracked_etfs }}</span> matching ETFs
+      </div>
+      <div style="font-size: 12px; color: #64748b;">
+        Click any row for deep forensic audit & peer comparison
+      </div>
+    </div>
+
     <div style="overflow-x: auto;">
       <table style="width: 100%; border-collapse: collapse; font-size: 13.5px;">
         <thead>
           <tr style="border-bottom: 1px solid rgba(255, 255, 255, 0.1); text-align: left; color: #64748b; font-size: 11.5px; text-transform: uppercase;">
             <th style="padding: 12px 14px;">Symbol / Scheme</th>
             <th style="padding: 12px 14px;">Category</th>
-            <th style="padding: 12px 14px;">Market Price</th>
-            <th style="padding: 12px 14px;">NAV</th>
-            <th style="padding: 12px 14px;">Prem / Disc %</th>
-            <th style="padding: 12px 14px;">1Y Tracking Error</th>
-            <th style="padding: 12px 14px;">TER Fee</th>
-            <th style="padding: 12px 14px;">AUM</th>
-            <th style="padding: 12px 14px;">Liquidity Tier</th>
+            <th style="padding: 12px 14px;">Underlying Benchmark</th>
+            <th style="padding: 12px 14px; text-align: right;">Market CMP</th>
+            <th style="padding: 12px 14px; text-align: right;">Fair NAV</th>
+            <th style="padding: 12px 14px; text-align: right;">Prem / Disc %</th>
+            <th style="padding: 12px 14px; text-align: right;">1Y Track Error</th>
+            <th style="padding: 12px 14px; text-align: right;">TER Fee</th>
+            <th style="padding: 12px 14px; text-align: right;">AUM</th>
+            <th style="padding: 12px 14px; text-align: center;">Liquidity Tier</th>
           </tr>
         </thead>
-        <tbody>
+        <tbody id="etf-table-body">
           {% for etf in data.etfs %}
-          <tr style="border-bottom: 1px solid rgba(255, 255, 255, 0.05); transition: background 0.15s ease;">
+          <tr 
+            onclick="openEtfModal('{{ etf.symbol }}')" 
+            style="border-bottom: 1px solid rgba(255, 255, 255, 0.05); cursor: pointer; transition: background 0.15s ease;"
+            onmouseover="this.style.background='rgba(30, 41, 59, 0.6)'" 
+            onmouseout="this.style.background='transparent'"
+          >
             <td style="padding: 12px 14px;">
-              <div style="font-weight: 800; color: #f8fafc;">{{ etf.symbol }}</div>
-              <div style="font-size: 11px; color: #94a3b8; max-width: 220px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">{{ etf.scheme_name }}</div>
+              <div style="font-weight: 800; color: #f8fafc; display: flex; align-items: center; gap: 6px;">
+                <span>{{ etf.symbol }}</span>
+                {% if etf.arbitrage_signal == 'PREMIUM_EXPENSIVE' %}
+                  <span title="Premium Surcharge Alert" style="font-size: 11px; color: #f59e0b;">⚠️</span>
+                {% elif etf.arbitrage_signal == 'DISCOUNT_ATTRACTIVE' %}
+                  <span title="Discount Opportunity" style="font-size: 11px; color: #10b981;">💡</span>
+                {% endif %}
+              </div>
+              <div style="font-size: 11.5px; color: #94a3b8; max-width: 240px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;" title="{{ etf.scheme_name }}">{{ etf.scheme_name }}</div>
             </td>
-            <td style="padding: 12px 14px; font-size: 12px; color: #cbd5e1;">
-              {{ etf.category }}
+            <td style="padding: 12px 14px; font-size: 11.5px; color: #cbd5e1;">
+              <span style="background: rgba(255, 255, 255, 0.06); padding: 2px 7px; border-radius: 4px;">{{ etf.category }}</span>
             </td>
-            <td style="padding: 12px 14px; font-weight: 700; color: #f8fafc;" class="tnum">
-              ₹{{ etf.last_price }}
+            <td style="padding: 12px 14px; font-size: 11.5px; color: #94a3b8; max-width: 200px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;" title="{{ etf.underlying_index }}">
+              {{ etf.underlying_index }}
             </td>
-            <td style="padding: 12px 14px; color: #94a3b8;" class="tnum">
-              ₹{{ etf.nav }}
+            <td style="padding: 12px 14px; font-weight: 700; color: #f8fafc; text-align: right;" class="tnum">
+              ₹{{ etf.last_price|round(2) }}
             </td>
-            <td style="padding: 12px 14px; font-weight: 700;" class="tnum">
-              {% if etf.premium_discount_pct > 0.3 %}
-                <span style="color: #f59e0b;">+{{ etf.premium_discount_pct }}% (Prem)</span>
-              {% elif etf.premium_discount_pct < -0.3 %}
-                <span style="color: #10b981;">{{ etf.premium_discount_pct }}% (Disc)</span>
+            <td style="padding: 12px 14px; color: #94a3b8; text-align: right;" class="tnum">
+              ₹{{ etf.nav|round(2) }}
+            </td>
+            <td style="padding: 12px 14px; font-weight: 700; text-align: right;" class="tnum">
+              {% if etf.premium_discount_pct > 0.5 %}
+                <span style="color: #f59e0b; background: rgba(245, 158, 11, 0.12); padding: 2px 6px; border-radius: 4px;">+{{ etf.premium_discount_pct }}% (Prem)</span>
+              {% elif etf.premium_discount_pct < -0.5 %}
+                <span style="color: #34d399; background: rgba(16, 185, 129, 0.12); padding: 2px 6px; border-radius: 4px;">{{ etf.premium_discount_pct }}% (Disc)</span>
               {% else %}
                 <span style="color: #94a3b8;">{{ etf.premium_discount_pct }}%</span>
               {% endif %}
             </td>
-            <td style="padding: 12px 14px; color: #38bdf8;" class="tnum">
+            <td style="padding: 12px 14px; color: #38bdf8; text-align: right; font-weight: 600;" class="tnum">
               {{ etf.tracking_error_1y }}%
             </td>
-            <td style="padding: 12px 14px; color: #cbd5e1;" class="tnum">
+            <td style="padding: 12px 14px; color: #cbd5e1; text-align: right;" class="tnum">
               {{ etf.expense_ratio_pct }}%
             </td>
-            <td style="padding: 12px 14px; color: #94a3b8;" class="tnum">
-              ₹{{ etf.aum_crores|round(0) }} Cr
+            <td style="padding: 12px 14px; color: #f8fafc; font-weight: 600; text-align: right;" class="tnum">
+              {{ etf.aum_formatted }}
             </td>
-            <td style="padding: 12px 14px;">
+            <td style="padding: 12px 14px; text-align: center;">
               {% if etf.liquidity_tier == 'HIGH_LIQUIDITY' %}
-                <span style="background: rgba(16, 185, 129, 0.15); color: #34d399; padding: 2px 8px; border-radius: 4px; font-size: 11px; font-weight: 700;">High (₹{{ etf.avg_daily_turnover_cr }} Cr/d)</span>
-              {% else %}
+                <span style="background: rgba(16, 185, 129, 0.15); color: #34d399; padding: 2px 8px; border-radius: 4px; font-size: 11px; font-weight: 700;">High</span>
+              {% elif etf.liquidity_tier == 'MODERATE_LIQUIDITY' %}
                 <span style="background: rgba(245, 158, 11, 0.15); color: #fbbf24; padding: 2px 8px; border-radius: 4px; font-size: 11px; font-weight: 700;">Moderate</span>
+              {% else %}
+                <span style="background: rgba(148, 163, 184, 0.15); color: #94a3b8; padding: 2px 8px; border-radius: 4px; font-size: 11px; font-weight: 600;">Low</span>
               {% endif %}
             </td>
           </tr>
@@ -129,8 +220,183 @@
   </div>
 
   <!-- Disclaimer Footer -->
-  <div style="font-size: 12px; color: #64748b; text-align: center; max-width: 800px; margin: 0 auto; line-height: 1.6;">
-    🔒 <strong>Data Sources:</strong> AMFI NAVAll.txt and Association of Mutual Funds in India statutory Tracking Error disclosures. Exchange prices represent delayed End-of-Day closing levels. For educational and analytical research under SEBI RA regulations.
+  <div style="font-size: 12px; color: #64748b; text-align: center; max-width: 840px; margin: 0 auto; line-height: 1.6;">
+    🔒 <strong>Statutory Regulatory Disclosures:</strong> Data sourced from official AMFI daily NAVAll dispatches and statutory tracking error declarations under SEBI (Mutual Funds) Regulations, 1996. Secondary market prices reflect end-of-day traded levels. For educational and passive research analysis.
   </div>
 </div>
+
+<!-- ETF Forensic Detail Modal -->
+<div id="etf-modal" style="display: none; position: fixed; inset: 0; background: rgba(0, 0, 0, 0.75); backdrop-filter: blur(6px); z-index: 9999; align-items: center; justify-content: center; padding: 20px;">
+  <div style="background: #0f172a; border: 1px solid rgba(255, 255, 255, 0.15); border-radius: 16px; max-width: 720px; width: 100%; max-height: 85vh; overflow-y: auto; padding: 28px; position: relative; box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.5);">
+    <button onclick="closeEtfModal()" style="position: absolute; right: 20px; top: 20px; background: transparent; border: none; font-size: 20px; color: #94a3b8; cursor: pointer;">✕</button>
+    <div id="etf-modal-content">
+      <div style="text-align: center; padding: 40px; color: #94a3b8;">
+        Loading ETF forensic profile...
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+async function openEtfModal(symbol) {
+  const modal = document.getElementById('etf-modal');
+  const content = document.getElementById('etf-modal-content');
+  modal.style.display = 'flex';
+  content.innerHTML = '<div style="text-align: center; padding: 40px; color: #94a3b8;">Loading ETF forensic profile...</div>';
+
+  try {
+    const res = await fetch(`/api/etfs/${symbol}`);
+    if (!res.ok) throw new Error('Failed to load ETF');
+    const data = await res.json();
+    const etf = data.etf;
+
+    let premColor = '#94a3b8';
+    let premLabel = 'Fair Value';
+    if (etf.premium_discount_pct > 0.5) {
+      premColor = '#f59e0b';
+      premLabel = `+${etf.premium_discount_pct}% Premium`;
+    } else if (etf.premium_discount_pct < -0.5) {
+      premColor = '#34d399';
+      premLabel = `${etf.premium_discount_pct}% Discount`;
+    }
+
+    let notesHtml = '';
+    if (data.forensic_notes && data.forensic_notes.length > 0) {
+      notesHtml = data.forensic_notes.map(n => `
+        <div style="background: rgba(30, 41, 59, 0.6); border-left: 3px solid ${n.type === 'OPPORTUNITY' || n.type === 'STRENGTH' ? '#10b981' : '#f59e0b'}; padding: 12px 14px; border-radius: 6px; margin-bottom: 10px;">
+          <div style="font-weight: 700; font-size: 13px; color: #f8fafc; margin-bottom: 2px;">${n.title}</div>
+          <div style="font-size: 12px; color: #94a3b8; line-height: 1.5;">${n.desc}</div>
+        </div>
+      `).join('');
+    }
+
+    let peersHtml = '';
+    if (data.peers && data.peers.length > 0) {
+      peersHtml = `
+        <div style="margin-top: 20px;">
+          <div style="font-size: 13px; font-weight: 700; color: #f8fafc; margin-bottom: 10px; text-transform: uppercase; letter-spacing: 0.04em;">Category Peers (${etf.category})</div>
+          <div style="overflow-x: auto;">
+            <table style="width: 100%; border-collapse: collapse; font-size: 12px;">
+              <thead>
+                <tr style="border-bottom: 1px solid rgba(255,255,255,0.08); color: #64748b; text-align: left;">
+                  <th style="padding: 6px 8px;">Symbol</th>
+                  <th style="padding: 6px 8px; text-align: right;">CMP</th>
+                  <th style="padding: 6px 8px; text-align: right;">Prem / Disc</th>
+                  <th style="padding: 6px 8px; text-align: right;">1Y Track Error</th>
+                  <th style="padding: 6px 8px; text-align: right;">TER Fee</th>
+                  <th style="padding: 6px 8px; text-align: right;">AUM</th>
+                </tr>
+              </thead>
+              <tbody>
+                ${data.peers.map(p => `
+                  <tr style="border-bottom: 1px solid rgba(255,255,255,0.04);">
+                    <td style="padding: 6px 8px; font-weight: 700; color: #38bdf8;">${p.symbol}</td>
+                    <td style="padding: 6px 8px; text-align: right;" class="tnum">₹${p.last_price}</td>
+                    <td style="padding: 6px 8px; text-align: right;" class="tnum">${p.premium_discount_pct}%</td>
+                    <td style="padding: 6px 8px; text-align: right; color: #38bdf8;" class="tnum">${p.tracking_error_1y}%</td>
+                    <td style="padding: 6px 8px; text-align: right;" class="tnum">${p.expense_ratio_pct}%</td>
+                    <td style="padding: 6px 8px; text-align: right; color: #94a3b8;" class="tnum">₹${Math.round(p.aum_crores)} Cr</td>
+                  </tr>
+                `).join('')}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      `;
+    }
+
+    content.innerHTML = `
+      <div style="display: flex; align-items: center; gap: 10px; margin-bottom: 6px;">
+        <span style="font-size: 24px; font-weight: 800; color: #f8fafc;">${etf.symbol}</span>
+        <span style="background: rgba(56, 189, 248, 0.15); color: #38bdf8; font-size: 11px; font-weight: 700; padding: 2px 8px; border-radius: 4px;">${etf.category}</span>
+        <span style="background: rgba(16, 185, 129, 0.15); color: #34d399; font-size: 11px; font-weight: 700; padding: 2px 8px; border-radius: 4px;">${etf.liquidity_tier}</span>
+      </div>
+      <div style="font-size: 13.5px; color: #94a3b8; margin-bottom: 18px;">${etf.scheme_name}</div>
+
+      <!-- Quick Metrics Grid -->
+      <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(130px, 1fr)); gap: 12px; margin-bottom: 20px;">
+        <div style="background: rgba(30, 41, 59, 0.5); padding: 12px; border-radius: 8px;">
+          <div style="font-size: 11px; color: #64748b; text-transform: uppercase;">Market CMP</div>
+          <div style="font-size: 18px; font-weight: 800; color: #f8fafc;" class="tnum">₹${etf.last_price}</div>
+        </div>
+        <div style="background: rgba(30, 41, 59, 0.5); padding: 12px; border-radius: 8px;">
+          <div style="font-size: 11px; color: #64748b; text-transform: uppercase;">Fair NAV</div>
+          <div style="font-size: 18px; font-weight: 800; color: #94a3b8;" class="tnum">₹${etf.nav}</div>
+        </div>
+        <div style="background: rgba(30, 41, 59, 0.5); padding: 12px; border-radius: 8px;">
+          <div style="font-size: 11px; color: #64748b; text-transform: uppercase;">Arbitrage Spread</div>
+          <div style="font-size: 18px; font-weight: 800; color: ${premColor};" class="tnum">${premLabel}</div>
+        </div>
+        <div style="background: rgba(30, 41, 59, 0.5); padding: 12px; border-radius: 8px;">
+          <div style="font-size: 11px; color: #64748b; text-transform: uppercase;">1Y Track Error</div>
+          <div style="font-size: 18px; font-weight: 800; color: #38bdf8;" class="tnum">${etf.tracking_error_1y}%</div>
+        </div>
+        <div style="background: rgba(30, 41, 59, 0.5); padding: 12px; border-radius: 8px;">
+          <div style="font-size: 11px; color: #64748b; text-transform: uppercase;">Total AUM</div>
+          <div style="font-size: 18px; font-weight: 800; color: #f8fafc;" class="tnum">${data.aum_formatted}</div>
+        </div>
+      </div>
+
+      <!-- Underlying Index Spec -->
+      <div style="background: rgba(15, 23, 42, 0.8); border: 1px solid rgba(255, 255, 255, 0.08); border-radius: 8px; padding: 12px 16px; margin-bottom: 20px;">
+        <div style="font-size: 11px; color: #64748b; text-transform: uppercase; font-weight: 600; margin-bottom: 2px;">Replicated Benchmark Index</div>
+        <div style="font-size: 13.5px; font-weight: 700; color: #f8fafc;">${etf.underlying_index}</div>
+        ${etf.scheme_code ? `<div style="font-size: 11px; color: #64748b; margin-top: 4px;">AMFI Code: ${etf.scheme_code} ${etf.isin ? `• ISIN: ${etf.isin}` : ''}</div>` : ''}
+      </div>
+
+      <!-- Forensic Notes -->
+      <div style="margin-bottom: 16px;">
+        <div style="font-size: 13px; font-weight: 700; color: #f8fafc; margin-bottom: 10px; text-transform: uppercase; letter-spacing: 0.04em;">Forensic Audit Notes</div>
+        ${notesHtml}
+      </div>
+
+      <!-- Peers -->
+      ${peersHtml}
+    `;
+  } catch (err) {
+    content.innerHTML = `<div style="text-align: center; padding: 40px; color: #ef4444;">Failed to load ETF details: ${err.message}</div>`;
+  }
+}
+
+function closeEtfModal() {
+  document.getElementById('etf-modal').style.display = 'none';
+}
+
+async function triggerAmfiSync() {
+  const btn = document.getElementById('sync-amfi-btn');
+  const icon = document.getElementById('sync-icon');
+  const text = document.getElementById('sync-text');
+  btn.disabled = true;
+  text.textContent = 'Syncing...';
+  icon.style.display = 'inline-block';
+  icon.style.animation = 'spin 1s linear infinite';
+
+  try {
+    const res = await fetch('/api/admin/etfs/trigger-ingest', { method: 'POST' });
+    const json = await res.json();
+    if (json.status === 'SUCCESS') {
+      text.textContent = 'Synced!';
+      setTimeout(() => { window.location.reload(); }, 600);
+    } else {
+      text.textContent = 'Sync Failed';
+      btn.disabled = false;
+    }
+  } catch (err) {
+    text.textContent = 'Sync Error';
+    btn.disabled = false;
+  }
+}
+
+// Close modal on escape key
+document.addEventListener('keydown', (e) => {
+  if (e.key === 'Escape') closeEtfModal();
+});
+</script>
+
+<style>
+@keyframes spin {
+  from { transform: rotate(0deg); }
+  to { transform: rotate(360deg); }
+}
+</style>
 {% endblock %}

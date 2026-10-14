@@ -1806,6 +1806,42 @@ def init_db(force: bool = False):
                     cursor.execute("INSERT OR IGNORE INTO schema_migrations (version) VALUES ('v027_cached_fundamentals');")
                 conn.commit()
 
+            # Migration v028: National ETF Matrix Expansion (120+ AMFI ETFs & Full Universe)
+            if "v028_etf_matrix_expansion" not in applied:
+                logger.info("Applying schema migration: v028_etf_matrix_expansion...")
+                if supabase_url:
+                    cursor.execute("""
+                        ALTER TABLE etf_matrix ADD COLUMN IF NOT EXISTS scheme_code VARCHAR(32);
+                        ALTER TABLE etf_matrix ADD COLUMN IF NOT EXISTS isin VARCHAR(32);
+                        CREATE INDEX IF NOT EXISTS idx_etf_matrix_category ON etf_matrix (category);
+                        CREATE INDEX IF NOT EXISTS idx_etf_matrix_symbol ON etf_matrix (symbol);
+                        CREATE INDEX IF NOT EXISTS idx_etf_matrix_aum ON etf_matrix (aum_crores DESC);
+                        INSERT INTO schema_migrations (version) VALUES ('v028_etf_matrix_expansion') ON CONFLICT DO NOTHING;
+                    """)
+                else:
+                    try:
+                        cursor.execute("ALTER TABLE etf_matrix ADD COLUMN scheme_code TEXT;")
+                    except Exception as e:
+                        logger.debug("Migration v028 scheme_code column notice: %s", e)
+                    try:
+                        cursor.execute("ALTER TABLE etf_matrix ADD COLUMN isin TEXT;")
+                    except Exception as e:
+                        logger.debug("Migration v028 isin column notice: %s", e)
+                    try:
+                        cursor.execute("CREATE INDEX IF NOT EXISTS idx_etf_matrix_category ON etf_matrix (category);")
+                    except Exception as e:
+                        logger.debug("Migration v028 category index notice: %s", e)
+                    try:
+                        cursor.execute("CREATE INDEX IF NOT EXISTS idx_etf_matrix_symbol ON etf_matrix (symbol);")
+                    except Exception as e:
+                        logger.debug("Migration v028 symbol index notice: %s", e)
+                    try:
+                        cursor.execute("CREATE INDEX IF NOT EXISTS idx_etf_matrix_aum ON etf_matrix (aum_crores DESC);")
+                    except Exception as e:
+                        logger.debug("Migration v028 aum index notice: %s", e)
+                    cursor.execute("INSERT OR IGNORE INTO schema_migrations (version) VALUES ('v028_etf_matrix_expansion');")
+                conn.commit()
+
             _DB_INITIALIZED = True
             _INITIALIZED_DBS.add(target_key)
         except Exception as e:

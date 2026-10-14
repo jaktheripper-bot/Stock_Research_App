@@ -1383,17 +1383,24 @@ def sovereign_page(request: Request):
 
 
 @app.get("/etfs", response_class=HTMLResponse)
-def etfs_page(request: Request, category: Optional[str] = Query(None)):
+def etfs_page(
+    request: Request,
+    category: Optional[str] = Query(None),
+    q: Optional[str] = Query(None),
+    sort_by: Optional[str] = Query(None)
+):
     """National ETF Matrix & Tracking Error Surveillance page."""
     from core.analysis.etf_matrix_engine import evaluate_etf_matrix
     init_db()
-    matrix_data = evaluate_etf_matrix(category=category)
+    matrix_data = evaluate_etf_matrix(category=category, query=q, sort_by=sort_by)
     return templates.TemplateResponse(
         request=request,
         name="etf_matrix.html",
         context={
             "active_page": "etfs",
-            "current_category": category,
+            "current_category": category or "ALL",
+            "current_query": q or "",
+            "current_sort": sort_by or "aum_desc",
             "data": matrix_data
         }
     )
