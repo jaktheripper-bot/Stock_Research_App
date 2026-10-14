@@ -120,6 +120,7 @@
           placeholder="Search by Ticker or Company Name (e.g. INFY, TCS, Reliance, Kaynes, Dynamatic, Neuland)..." 
           class="form-control" 
           style="background: rgba(15, 23, 42, 0.9); border: 1px solid rgba(255, 255, 255, 0.15); color: #fff; padding: 10px 16px; border-radius: 8px; width: 100%; font-size: 14px;"
+          oninput="liveFilterDirectoryEquities()"
         >
       </div>
       
@@ -198,7 +199,7 @@
   {% if equities %}
   <div style="display: grid; grid-template-columns: repeat(auto-fill, minmax(350px, 1fr)); gap: 20px;">
     {% for eq in equities %}
-    <div class="stat-card" style="display: flex; flex-direction: column; justify-content: space-between; background: rgba(30, 41, 59, 0.45); border: 1px solid rgba(255, 255, 255, 0.09); border-radius: 14px; padding: 22px; transition: transform 0.2s, border-color 0.2s;" onmouseover="this.style.borderColor='rgba(14, 165, 233, 0.45)'; this.style.transform='translateY(-2px)';" onmouseout="this.style.borderColor='rgba(255, 255, 255, 0.09)'; this.style.transform='translateY(0)';">
+    <div class="stat-card equity-dir-card" data-ticker="{{ eq.ticker|lower }}" data-name="{{ eq.name|lower }}" data-industry="{{ (eq.industry|default(''))|lower }}" style="display: flex; flex-direction: column; justify-content: space-between; background: rgba(30, 41, 59, 0.45); border: 1px solid rgba(255, 255, 255, 0.09); border-radius: 14px; padding: 22px; transition: transform 0.2s, border-color 0.2s;" onmouseover="this.style.borderColor='rgba(14, 165, 233, 0.45)'; this.style.transform='translateY(-2px)';" onmouseout="this.style.borderColor='rgba(255, 255, 255, 0.09)'; this.style.transform='translateY(0)';">
       <div>
         <!-- Badges Bar -->
         <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px;">
@@ -229,7 +230,7 @@
 
         <!-- Full Company Name & Industry -->
         <div style="font-size: 13px; color: #94a3b8; margin-bottom: 16px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;" title="{{ eq.name }}">
-          {{ eq.name }}
+          {{ eq.name }} • <span style="color: #64748b;">{{ eq.industry }}</span>
         </div>
 
         <!-- 3-Column Primary Financial Multiples Strip (Matches Homepage Cards) -->
@@ -254,16 +255,32 @@
           </div>
         </div>
 
-        <!-- Secondary Information Strip -->
-        <div style="font-size: 11.5px; color: #64748b; display: flex; justify-content: space-between; margin-bottom: 16px; padding: 0 2px;">
-          <span>Market Cap: <strong style="color: #94a3b8;">{{ eq.formatted_mcap }}</strong></span>
-          <span>OPM: <strong style="color: #94a3b8;">{{ eq.operating_margin }}</strong></span>
+        <!-- Qualitative Indicators Strip (Matches MF cards) -->
+        <div style="font-size: 12px; color: #94a3b8; display: flex; flex-direction: column; gap: 6px; margin-bottom: 16px;">
+          <div style="display: flex; justify-content: space-between;">
+            <span>Return on Equity (ROE):</span>
+            <strong style="color: {% if eq.roe and eq.roe >= 15.0 %}#10b981{% elif eq.roe and eq.roe > 0 %}#38bdf8{% else %}#94a3b8{% endif %};">
+              {{ eq.roe_pct }}
+            </strong>
+          </div>
+          <div style="display: flex; justify-content: space-between;">
+            <span>Operating Margin (OPM):</span>
+            <strong style="color: #38bdf8;">{{ eq.operating_margin }}</strong>
+          </div>
+          <div style="display: flex; justify-content: space-between;">
+            <span>52-Week Range:</span>
+            <span style="color: #f8fafc; font-weight: 500;">₹{{ eq.fifty_two_week_low }} – ₹{{ eq.fifty_two_week_high }}</span>
+          </div>
+          <div style="display: flex; justify-content: space-between;">
+            <span>Market Cap:</span>
+            <span style="color: #f8fafc; font-weight: 600;">{{ eq.formatted_mcap }}</span>
+          </div>
         </div>
       </div>
 
       <!-- Action Button (Pre-wired with instant loading fill & BFCache restore) -->
-      <a href="/dossier/{{ eq.ticker }}" class="btn btn-secondary btn-sm" style="width: 100%; display: flex; justify-content: center; align-items: center; gap: 6px; font-weight: 600;">
-        <span>Inspect Full Dossier</span>
+      <a href="/dossier/{{ eq.ticker }}" class="btn btn-secondary btn-sm" style="width: 100%; display: flex; justify-content: center; align-items: center; gap: 6px; font-weight: 600; border-radius: 8px;">
+        <span>Inspect Full 7-Pillar Dossier</span>
         <span>→</span>
       </a>
     </div>
@@ -298,4 +315,21 @@
     </p>
   </div>
 </div>
+
+<script>
+  function liveFilterDirectoryEquities() {
+    const qInput = document.getElementById('equitiesSearchInput');
+    const q = (qInput ? qInput.value : '').toLowerCase().trim();
+    const cards = Array.from(document.querySelectorAll('.equity-dir-card'));
+    
+    cards.forEach(card => {
+      const ticker = card.getAttribute('data-ticker') || '';
+      const name = card.getAttribute('data-name') || '';
+      const industry = card.getAttribute('data-industry') || '';
+
+      const match = !q || ticker.includes(q) || name.includes(q) || industry.includes(q);
+      card.style.display = match ? 'flex' : 'none';
+    });
+  }
+</script>
 {% endblock %}

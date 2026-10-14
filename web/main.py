@@ -545,6 +545,12 @@ def home_page(request: Request):
         logger.error(f"Error fetching archives: {e}")
         archives = []
 
+    try:
+        all_equities = get_all_equities_directory_sync()
+    except Exception as e:
+        logger.error(f"Error fetching all equities for home: {e}")
+        all_equities = []
+
     user = _get_current_web_user(request)
     can_access_today = _can_access_today_discovery(request, user)
     now = datetime.now(IST)
@@ -560,9 +566,11 @@ def home_page(request: Request):
         discovery_stocks = []
 
     featured = archives[:9] if archives else []
-    total_count = len(archives) if archives else 81
+    total_count = len(all_equities) if all_equities else (len(archives) if archives else 143)
     curr_ed = discovery_stocks[0]["edition_date"] if discovery_stocks else target_ed
     is_yesterday = (curr_ed == yesterday_str) or (not is_past_9am) or (curr_ed < today_str)
+
+    sector_counts = collections.Counter(e.get("sector_slug", "DIVERSIFIED") for e in all_equities)
 
     return templates.TemplateResponse(
         request=request,
@@ -570,6 +578,10 @@ def home_page(request: Request):
         context={
             "active_page": "home",
             "featured_reports": featured,
+            "all_equities": all_equities,
+            "total_equities": total_count,
+            "sector_options": SECTOR_TAXONOMY,
+            "sector_counts": dict(sector_counts),
             "discovery_stocks": discovery_stocks,
             "total_reports": total_count,
             "pricing_packs": PRICING_PACKS,
@@ -1085,6 +1097,16 @@ def debt_dossier_page(request: Request, isin: str):
 @app.get("/stocks", response_class=RedirectResponse)
 def stocks_alias_redirect(request: Request):
     """Permanent canonical redirect from /stocks to /equities preserving query parameters."""
+    target_url = "/equities"
+    if request.url.query:
+        target_url = f"/equities?{request.url.query}"
+    return RedirectResponse(url=target_url, status_code=301)
+
+
+@app.get("/reports", response_class=RedirectResponse)
+@app.get("/reports/", response_class=RedirectResponse)
+def reports_alias_redirect(request: Request):
+    """Permanent canonical redirect from /reports to /equities preserving query parameters."""
     target_url = "/equities"
     if request.url.query:
         target_url = f"/equities?{request.url.query}"

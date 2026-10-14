@@ -206,41 +206,307 @@
 </section>
 {% endif %}
 
-<!-- Featured Archived Reports Section -->
-<section style="padding: 60px 0; background: rgba(15, 23, 42, 0.4);">
+<!-- Interactive Institutional Stock Reports Browser Section (Matches Fiduciary MFs Card System) -->
+<section style="padding: 60px 0; background: rgba(15, 23, 42, 0.45); border-top: 1px solid rgba(255, 255, 255, 0.05); border-bottom: 1px solid rgba(255, 255, 255, 0.05);">
   <div class="container">
-    <div class="section-head">
-      <div class="section-tag">Public Research Repository</div>
-      <h2 class="section-title">Explore Verified Equities</h2>
-      <p class="section-sub">100% free and open access to existing archived institutional dossiers. Read, inspect 7-pillar scorecards, and download official PDF reports.</p>
+    <div class="section-head" style="margin-bottom: 28px;">
+      <div class="section-tag" style="background: rgba(14, 165, 233, 0.15); color: #38bdf8; border: 1px solid rgba(14, 165, 233, 0.3);">
+        Public Research Repository • {{ all_equities|length if all_equities else total_reports }} Institutional Dossiers
+      </div>
+      <h2 class="section-title">Browse Verified Stock Research Reports</h2>
+      <p class="section-sub">
+        100% free and open access to all <strong>{{ all_equities|length if all_equities else total_reports }} monitored BSE &amp; NSE institutional equity dossiers</strong>. 
+        Filter by sector, search tickers, and inspect 7-pillar scorecards with reverse DCF margin of safety and DuPont ROE decompositions.
+      </p>
     </div>
 
-    <div style="display: grid; grid-template-columns: repeat(auto-fill, minmax(300px, 1fr)); gap: 20px;">
-      {% for rep in featured_reports %}
-      <div class="stat-card" style="display: flex; flex-direction: column; justify-content: space-between;">
-        <div>
-          <div style="display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 8px;">
-            <span style="font-weight: 800; font-size: 18px; color: var(--text-primary);">{{ rep.ticker }}</span>
-            <span class="badge badge-cyan">{{ rep.revision_count|default(1) }} revs</span>
-          </div>
-          <div style="font-size: 13px; color: var(--text-secondary); margin-bottom: 12px;">{{ rep.short_name|default(rep.ticker) }}</div>
-          <div style="font-size: 12px; color: var(--text-muted); margin-bottom: 16px;">Last Evaluated: {{ rep.formatted_date|default('Recent') }}</div>
+    <!-- Search Bar & Sector Filter Pills Controls (Matches MFs Architecture) -->
+    <div style="background: rgba(30, 41, 59, 0.5); border: 1px solid rgba(255, 255, 255, 0.1); border-radius: 14px; padding: 18px 20px; margin-bottom: 24px; box-shadow: 0 4px 20px rgba(0, 0, 0, 0.2);">
+      <!-- Search Input Line -->
+      <div style="display: flex; gap: 10px; align-items: center; flex-wrap: wrap; margin-bottom: 16px;">
+        <div style="flex: 1; min-width: 260px; position: relative;">
+          <input 
+            type="text" 
+            id="homeStockSearchInput" 
+            placeholder="Search all {{ all_equities|length if all_equities else '143' }} stock reports by ticker, name, or industry (e.g. INFY, TCS, Reliance, Kaynes, Neuland, BFSI)..." 
+            class="form-control" 
+            style="background: rgba(15, 23, 42, 0.9); border: 1px solid rgba(255, 255, 255, 0.15); color: #fff; padding: 11px 16px; border-radius: 8px; width: 100%; font-size: 14px;"
+            oninput="filterHomeStockReports()"
+          >
         </div>
-        <a href="/dossier/{{ rep.ticker }}" class="btn btn-secondary btn-sm" style="width: 100%;">
-          View Full Dossier →
+        <button type="button" id="btnHomeClearSearch" onclick="clearHomeStockSearch()" class="btn btn-secondary btn-sm" style="display: none; padding: 11px 16px; font-weight: 600;">
+          Clear
+        </button>
+        <a href="/equities" class="btn btn-primary btn-sm" style="padding: 11px 20px; font-weight: 700; white-space: nowrap; display: inline-flex; align-items: center; gap: 6px;">
+          <span>Open Full Screener</span>
+          <span>→</span>
         </a>
+      </div>
+
+      <!-- Horizontally Scrollable Sector Pills -->
+      <div>
+        <div style="display: flex; gap: 8px; overflow-x: auto; padding-bottom: 6px;" id="homeSectorPills">
+          <button type="button" class="btn btn-sm btn-primary home-sector-btn" data-sector="ALL" onclick="selectHomeSector('ALL', this)" style="border-radius: 9999px; white-space: nowrap;">
+            All Reports ({{ all_equities|length if all_equities else total_reports }})
+          </button>
+          {% if sector_options %}
+          {% for s_slug, s_info in sector_options.items() %}
+          <button type="button" class="btn btn-sm btn-secondary home-sector-btn" data-sector="{{ s_slug }}" onclick="selectHomeSector('{{ s_slug }}', this)" style="border-radius: 9999px; white-space: nowrap;">
+            {{ s_info[1] }} {{ s_info[0] }} ({{ sector_counts.get(s_slug, 0) }})
+          </button>
+          {% endfor %}
+          {% endif %}
+        </div>
+      </div>
+    </div>
+
+    <!-- Active Summary Bar -->
+    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px; padding: 0 4px;">
+      <div style="font-size: 13.5px; font-weight: 600; color: #94a3b8;">
+        Showing <strong id="homeVisibleCounter" style="color: #f8fafc;">12</strong> of <strong id="homeTotalMatchesCounter" style="color: #38bdf8;">{{ all_equities|length if all_equities else total_reports }}</strong> Institutional Stock Reports
+        <span id="homeActiveFilterLabel" style="color: #c084fc; margin-left: 6px;"></span>
+      </div>
+      <div style="display: flex; gap: 8px;">
+        <a href="/equities" class="btn btn-sm btn-outline-primary" style="border-radius: 9999px; font-size: 12px; font-weight: 600;">
+          All Equities Screener →
+        </a>
+      </div>
+    </div>
+
+    <!-- Stock Reports Cards Grid (Matches MFs Card Stature) -->
+    <div id="homeStockCardsGrid" style="display: grid; grid-template-columns: repeat(auto-fill, minmax(350px, 1fr)); gap: 20px;">
+      {% set display_list = all_equities if all_equities else featured_reports %}
+      {% for eq in display_list %}
+      <div 
+        class="home-stock-card" 
+        data-ticker="{{ eq.ticker|lower }}" 
+        data-name="{{ (eq.name|default(eq.short_name)|default(eq.ticker))|lower }}" 
+        data-sector="{{ eq.sector_slug|default('DIVERSIFIED') }}" 
+        data-industry="{{ (eq.industry|default(''))|lower }}"
+        style="background: rgba(30, 41, 59, 0.45); border: 1px solid rgba(255, 255, 255, 0.09); border-radius: 14px; padding: 22px; display: flex; flex-direction: column; justify-content: space-between; transition: transform 0.2s, border-color 0.2s;"
+        onmouseover="this.style.borderColor='rgba(14, 165, 233, 0.45)'; this.style.transform='translateY(-2px)';" 
+        onmouseout="this.style.borderColor='rgba(255, 255, 255, 0.09)'; this.style.transform='translateY(0)';"
+      >
+        <div>
+          <!-- Badges Bar -->
+          <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px;">
+            <span style="font-size: 11px; font-weight: 700; color: #38bdf8; background: rgba(14, 165, 233, 0.12); padding: 3px 8px; border-radius: 6px; text-transform: uppercase;">
+              {{ eq.sector_icon|default('📈') }} {{ eq.sector|default('Equities') }}
+            </span>
+            <div style="display: flex; gap: 6px;">
+              {% if eq.market_cap_tier %}
+              <span class="badge {% if eq.market_cap_tier == 'Mega-Cap' %}badge-cyan{% elif eq.market_cap_tier == 'Large-Cap' %}badge-purple{% else %}badge-slate{% endif %}" style="font-size: 10.5px; padding: 2px 7px;">
+                {{ eq.market_cap_tier }}
+              </span>
+              {% endif %}
+              <span class="badge badge-slate" style="font-size: 10.5px; padding: 2px 7px;">
+                {{ eq.revision_count|default(1) }} revs
+              </span>
+            </div>
+          </div>
+
+          <!-- Ticker & Price Header -->
+          <div style="display: flex; justify-content: space-between; align-items: baseline; margin-bottom: 4px;">
+            <h3 style="font-size: 20px; font-weight: 800; color: #f8fafc; margin: 0;">
+              <a href="/dossier/{{ eq.ticker }}" style="color: inherit; text-decoration: none;">
+                {{ eq.ticker }}
+              </a>
+            </h3>
+            <span style="font-size: 18px; font-weight: 700; color: var(--accent-emerald, #10b981);">
+              {{ eq.formatted_price|default('Verified') }}
+            </span>
+          </div>
+
+          <!-- Full Company Name & Industry -->
+          <div style="font-size: 13px; color: #94a3b8; margin-bottom: 16px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;" title="{{ eq.name|default(eq.short_name)|default(eq.ticker) }}">
+            {{ eq.name|default(eq.short_name)|default(eq.ticker) }} • <span style="color: #64748b;">{{ eq.industry|default('BSE/NSE Filing') }}</span>
+          </div>
+
+          <!-- 3-Column Primary Financial Multiples Strip (Matches MFs) -->
+          <div style="display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; background: rgba(15, 23, 42, 0.6); border-radius: 10px; padding: 10px 8px; margin-bottom: 16px; border: 1px solid rgba(255, 255, 255, 0.05); text-align: center;">
+            <div>
+              <div style="font-size: 10px; color: #64748b; text-transform: uppercase; font-weight: 600;">ROCE</div>
+              <div class="tnum" style="font-size: 14px; font-weight: 800; color: var(--accent-cyan, #0ea5e9);">
+                {{ eq.roce_pct|default('N/A') }}
+              </div>
+            </div>
+            <div>
+              <div style="font-size: 10px; color: #64748b; text-transform: uppercase; font-weight: 600;">D/E</div>
+              <div class="tnum" style="font-size: 14px; font-weight: 800; color: #a5b4fc;">
+                {{ eq.debt_to_equity|default('N/A') }}
+              </div>
+            </div>
+            <div>
+              <div style="font-size: 10px; color: #64748b; text-transform: uppercase; font-weight: 600;">P/E</div>
+              <div class="tnum" style="font-size: 14px; font-weight: 800; color: var(--text-primary, #f8fafc);">
+                {{ eq.pe_ratio|default('N/A') }}
+              </div>
+            </div>
+          </div>
+
+          <!-- Qualitative Indicators (Matches MFs Layout) -->
+          <div style="font-size: 12px; color: #94a3b8; display: flex; flex-direction: column; gap: 6px; margin-bottom: 16px;">
+            <div style="display: flex; justify-content: space-between;">
+              <span>Return on Equity (ROE):</span>
+              <strong style="color: {% if eq.roe and eq.roe >= 15.0 %}#10b981{% elif eq.roe and eq.roe > 0 %}#38bdf8{% else %}#94a3b8{% endif %};">
+                {{ eq.roe_pct|default('N/A') }}
+              </strong>
+            </div>
+            <div style="display: flex; justify-content: space-between;">
+              <span>Operating Margin (OPM):</span>
+              <strong style="color: #38bdf8;">{{ eq.operating_margin|default('N/A') }}</strong>
+            </div>
+            <div style="display: flex; justify-content: space-between;">
+              <span>Market Cap:</span>
+              <span style="color: #f8fafc; font-weight: 600;">{{ eq.formatted_mcap|default('Exchange Disclosed') }}</span>
+            </div>
+          </div>
+        </div>
+
+        <!-- Action Button -->
+        <div>
+          <a href="/dossier/{{ eq.ticker }}" class="btn btn-secondary btn-sm" style="width: 100%; display: flex; justify-content: center; align-items: center; gap: 6px; font-weight: 600; border-radius: 8px;">
+            <span>Inspect Full 7-Pillar Dossier</span>
+            <span>→</span>
+          </a>
+        </div>
       </div>
       {% endfor %}
     </div>
 
-    <div style="text-align: center; margin-top: 32px;">
-      <a href="/equities" class="btn btn-primary" style="padding: 12px 28px; font-weight: 700; border-radius: 9999px; display: inline-flex; align-items: center; gap: 8px;">
-        <span>Browse All 143 Institutional Equities &amp; Screener</span>
-        <span>→</span>
-      </a>
+    <!-- Empty State for Filter/Search Zero Matches -->
+    <div id="homeStockEmptyState" style="display: none; background: rgba(30, 41, 59, 0.4); border: 1px dashed rgba(255, 255, 255, 0.15); border-radius: 14px; padding: 40px 20px; text-align: center; margin-top: 16px;">
+      <div style="font-size: 36px; margin-bottom: 12px;"><svg class="glyph"><use href="#glyph-search"></use></svg></div>
+      <h3 style="font-size: 18px; font-weight: 700; color: #f8fafc; margin-bottom: 6px;">No Stock Reports Match Your Filter</h3>
+      <p style="font-size: 13.5px; color: #94a3b8; max-width: 440px; margin: 0 auto 16px auto;">
+        We couldn't find any audited equities matching your active search or sector.
+      </p>
+      <button type="button" onclick="clearHomeStockSearch(); selectHomeSector('ALL', document.querySelector('.home-sector-btn[data-sector=\'ALL\']'))" class="btn btn-primary btn-sm" style="font-weight: 700;">
+        Reset Search &amp; Show All {{ all_equities|length if all_equities else '143' }} Reports
+      </button>
+    </div>
+
+    <!-- Load More & Full Screener Controls -->
+    <div style="display: flex; flex-direction: column; align-items: center; gap: 14px; margin-top: 36px;">
+      <div id="homeLoadMoreWrapper" style="display: flex; gap: 10px;">
+        <button type="button" id="btnHomeLoadMore" onclick="loadMoreHomeReports(12)" class="btn btn-secondary" style="padding: 10px 24px; font-weight: 600; border-radius: 9999px;">
+          <span>Load More Reports (+12)</span>
+        </button>
+        <button type="button" id="btnHomeShowAll" onclick="showAllHomeReports()" class="btn btn-secondary" style="padding: 10px 20px; font-weight: 600; border-radius: 9999px;">
+          <span>Show All {{ all_equities|length if all_equities else '143' }}</span>
+        </button>
+      </div>
+
+      <div>
+        <a href="/equities" class="btn btn-primary" style="padding: 12px 28px; font-weight: 700; border-radius: 9999px; display: inline-flex; align-items: center; gap: 8px;">
+          <span>Launch Full Institutional Screener (All 143 Equities)</span>
+          <span>→</span>
+        </a>
+      </div>
     </div>
   </div>
 </section>
+
+<!-- Client-side Interactive Filter Script -->
+<script>
+  let homeCurrentSector = 'ALL';
+  let homeVisibleLimit = 12;
+
+  function filterHomeStockReports() {
+    const qInput = document.getElementById('homeStockSearchInput');
+    const q = (qInput ? qInput.value : '').toLowerCase().trim();
+    const clearBtn = document.getElementById('btnHomeClearSearch');
+    if (clearBtn) clearBtn.style.display = q ? 'inline-block' : 'none';
+
+    const cards = Array.from(document.querySelectorAll('.home-stock-card'));
+    let matchedCards = [];
+
+    cards.forEach(card => {
+      const ticker = card.getAttribute('data-ticker') || '';
+      const name = card.getAttribute('data-name') || '';
+      const sector = card.getAttribute('data-sector') || '';
+      const industry = card.getAttribute('data-industry') || '';
+
+      const matchesQuery = !q || ticker.includes(q) || name.includes(q) || industry.includes(q) || sector.toLowerCase().includes(q);
+      const matchesSector = (homeCurrentSector === 'ALL') || (sector === homeCurrentSector);
+
+      if (matchesQuery && matchesSector) {
+        matchedCards.push(card);
+      } else {
+        card.style.display = 'none';
+      }
+    });
+
+    // If query or sector filter active, allow showing all matched, or respect limit
+    const isFiltered = (q.length > 0) || (homeCurrentSector !== 'ALL');
+    const effectiveLimit = isFiltered ? matchedCards.length : homeVisibleLimit;
+
+    matchedCards.forEach((card, idx) => {
+      if (idx < effectiveLimit) {
+        card.style.display = 'flex';
+      } else {
+        card.style.display = 'none';
+      }
+    });
+
+    // Update counters
+    const counterEl = document.getElementById('homeVisibleCounter');
+    const matchesEl = document.getElementById('homeTotalMatchesCounter');
+    const emptyState = document.getElementById('homeStockEmptyState');
+    const loadMoreWrapper = document.getElementById('homeLoadMoreWrapper');
+
+    if (counterEl) counterEl.textContent = Math.min(effectiveLimit, matchedCards.length);
+    if (matchesEl) matchesEl.textContent = matchedCards.length;
+
+    if (emptyState) emptyState.style.display = (matchedCards.length === 0) ? 'block' : 'none';
+    if (loadMoreWrapper) {
+      loadMoreWrapper.style.display = (isFiltered || effectiveLimit >= matchedCards.length) ? 'none' : 'flex';
+    }
+  }
+
+  function selectHomeSector(sectorSlug, btnEl) {
+    homeCurrentSector = sectorSlug;
+    document.querySelectorAll('.home-sector-btn').forEach(btn => {
+      btn.classList.remove('btn-primary');
+      btn.classList.add('btn-secondary');
+    });
+    if (btnEl) {
+      btnEl.classList.remove('btn-secondary');
+      btnEl.classList.add('btn-primary');
+    }
+
+    const labelEl = document.getElementById('homeActiveFilterLabel');
+    if (labelEl) {
+      labelEl.textContent = (sectorSlug === 'ALL') ? '' : `• Filtered by ${btnEl ? btnEl.textContent.trim().split('(')[0] : sectorSlug}`;
+    }
+
+    filterHomeStockReports();
+  }
+
+  function clearHomeStockSearch() {
+    const qInput = document.getElementById('homeStockSearchInput');
+    if (qInput) {
+      qInput.value = '';
+      qInput.focus();
+    }
+    filterHomeStockReports();
+  }
+
+  function loadMoreHomeReports(increment) {
+    homeVisibleLimit += (increment || 12);
+    filterHomeStockReports();
+  }
+
+  function showAllHomeReports() {
+    homeVisibleLimit = 9999;
+    filterHomeStockReports();
+  }
+
+  // Initialize display on DOM ready
+  document.addEventListener('DOMContentLoaded', function() {
+    filterHomeStockReports();
+  });
+</script>
 
 <!-- Pricing Section -->
 <section class="pricing-section">

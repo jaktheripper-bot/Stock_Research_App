@@ -562,6 +562,35 @@ Detailed forensic analysis with exact page grounding to bseindia.com filings.
             res_sort = self.client.get(f"/equities?sort={s_mode}")
             self.assertEqual(res_sort.status_code, 200)
 
+    def test_reports_canonical_redirect(self):
+        """Verify /reports and /reports/ permanently redirect to /equities preserving parameters."""
+        res = self.client.get("/reports", follow_redirects=False)
+        self.assertEqual(res.status_code, 301)
+        self.assertIn("/equities", res.headers.get("location", ""))
+
+        res_slash = self.client.get("/reports/", follow_redirects=False)
+        self.assertEqual(res_slash.status_code, 301)
+        self.assertIn("/equities", res_slash.headers.get("location", ""))
+
+        res_query = self.client.get("/reports?q=TCS", follow_redirects=False)
+        self.assertEqual(res_query.status_code, 301)
+        self.assertIn("/equities?q=TCS", res_query.headers.get("location", ""))
+
+    def test_home_stock_reports_browser(self):
+        """Verify homepage renders interactive stock reports browser with rich cards mirroring MFs."""
+        res = self.client.get("/")
+        self.assertEqual(res.status_code, 200)
+        html = res.text
+        self.assertIn("Browse Verified Stock Research Reports", html)
+        self.assertIn("home-stock-card", html)
+        self.assertIn("homeStockSearchInput", html)
+        self.assertIn("homeSectorPills", html)
+        self.assertIn("Stock Reports", html)
+        self.assertIn("Mutual Funds", html)
+        self.assertIn("Inspect Full 7-Pillar Dossier", html)
+        self.assertIn("Return on Equity (ROE):", html)
+        self.assertIn("Operating Margin (OPM):", html)
+
 
 if __name__ == "__main__":
     unittest.main()

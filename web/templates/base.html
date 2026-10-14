@@ -131,6 +131,16 @@
             <span class="nav-icon"><svg class="glyph"><use href="#glyph-search"></use></svg></span> Search
           </a>
 
+          <!-- Direct Stock Reports Link (All 143 Dossiers) -->
+          <a href="/equities" class="nav-link {% if active_page == 'equities' %}active{% endif %}" id="navStockReportsLink">
+            <span class="nav-icon">📈</span> Stock Reports <span class="badge badge-cyan" style="font-size: 10px; padding: 2px 7px; margin-left: 3px; border-radius: 9999px;">143</span>
+          </a>
+
+          <!-- Direct Mutual Funds Link (All 200 Schemes) -->
+          <a href="/funds" class="nav-link {% if active_page == 'funds' %}active{% endif %}" id="navFundsLink">
+            <span class="nav-icon"><svg class="glyph"><use href="#glyph-chart"></use></svg></span> Mutual Funds <span class="badge badge-purple" style="font-size: 10px; padding: 2px 7px; margin-left: 3px; border-radius: 9999px;">200</span>
+          </a>
+
           <!-- Markets & Multi-Asset Sub-Tabs -->
           <div class="nav-item dropdown {% if active_page in ['home', 'equities', 'opportunities', 'debt', 'funds', 'sovereign', 'etfs', 'reits', 'dossier', 'msme'] %}active-parent{% endif %}" id="navMarketsDropdown">
             <button class="nav-link dropdown-toggle" aria-haspopup="true" aria-expanded="false" id="marketsDropdownBtn">
