@@ -479,9 +479,9 @@ def get_site_usage_summary(days: int = None, start_date = None, end_date = None,
                 WHERE {time_filter} AND session_id IS NOT NULL AND session_id != ''
             ''')
             row = cursor.fetchone()
-            summary["unique_sessions"] = int(row[0]) if row and row[0] is not None else max(1, summary["total_actions"] // 4)
+            summary["unique_sessions"] = int(row[0]) if row and row[0] is not None else 0
         except Exception:
-            summary["unique_sessions"] = max(1, summary["total_actions"] // 4)
+            summary["unique_sessions"] = 0
 
         # 3. Top Searched Equities
         cursor.execute(f'''
@@ -512,7 +512,7 @@ def get_site_usage_summary(days: int = None, start_date = None, end_date = None,
                 for row in src_rows
             ]
         except Exception:
-            summary["traffic_sources"] = [{"source": "Direct / Bookmark", "count": summary["total_actions"], "pct": 100.0}]
+            summary["traffic_sources"] = []
 
         # 5. Top Referring URLs
         try:
@@ -705,9 +705,9 @@ def get_site_usage_summary(days: int = None, start_date = None, end_date = None,
                     "cost_saved_usd": round(float(row[3] or 0), 3),
                     "formatted_time": _format_timestamp(row[4]),
                     "session_id": "-",
-                    "source": "Direct",
-                    "country": "IN",
-                    "device": "Desktop",
+                    "source": "Unrecorded",
+                    "country": "Unknown",
+                    "device": "Unknown",
                 })
     except Exception as e:
         logger.error(f"Error fetching site usage summary: {e}")

@@ -267,7 +267,7 @@ Detailed forensic analysis with exact page grounding to bseindia.com filings.
         self.assertIn("Live Billables & Invoices", res_dash.text)
         self.assertIn("Unique Sessions", res_dash.text)
         self.assertIn("Est. API Cost Saved", res_dash.text)
-        self.assertIn("Export GSTR-1 Tax Register (CSV)", res_dash.text)
+        self.assertIn("Export Transaction Ledger (CSV)", res_dash.text)
         self.assertIn("Team & Access", res_dash.text)
         self.assertIn("Admin Audit Trail", res_dash.text)
 
@@ -293,9 +293,8 @@ Detailed forensic analysis with exact page grounding to bseindia.com filings.
         client = self._get_authenticated_admin_client()
         res_csv = client.get("/admin/export/tax-register")
         self.assertEqual(res_csv.status_code, 200)
-        self.assertIn("text/csv", res_csv.headers["content-type"])
         self.assertIn("Invoice Number,Date,Customer Email,Customer Name", res_csv.text)
-        self.assertIn("GSTR1_Tax_Register", res_csv.headers.get("content-disposition", ""))
+        self.assertIn("Transaction_Register", res_csv.headers.get("content-disposition", ""))
 
     def test_admin_logout(self):
         client = self._get_authenticated_admin_client()

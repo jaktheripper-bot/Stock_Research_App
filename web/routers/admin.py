@@ -82,6 +82,11 @@ router = APIRouter(tags=["admin"])
 # ==============================================================================
 # Pydantic Schemas
 # ==============================================================================
+from core.agents.copilot.admin_copilot import (
+    process_admin_copilot_turn,
+    execute_confirmed_admin_action,
+)
+
 class CopilotChatRequest(BaseModel):
     conversation_id: str
     message: str
@@ -91,6 +96,18 @@ class CopilotChatRequest(BaseModel):
     section: Optional[str] = None
     section_label: Optional[str] = None
     section_data: Optional[Dict[str, Any]] = None
+
+
+class AdminCopilotChatRequest(BaseModel):
+    message: str
+    history: Optional[List[Dict[str, Any]]] = None
+    context: Optional[Dict[str, Any]] = None
+
+
+class AdminCopilotExecuteRequest(BaseModel):
+    action_type: str
+    payload: Dict[str, Any]
+    proposal_id: Optional[str] = None
 
 
 # ==============================================================================
@@ -1018,6 +1035,7 @@ async def admin_grant_credits_endpoint(request: Request):
 
 
 @router.get("/admin/export/tax-register")
+@router.get("/admin/export/transactions")
 async def admin_export_tax_register(request: Request):
     if not _is_admin_authenticated(request):
         raise HTTPException(status_code=403, detail="Admin authorization required.")
@@ -1027,27 +1045,23 @@ async def admin_export_tax_register(request: Request):
     writer = csv.writer(output)
     writer.writerow([
         "Invoice Number", "Date", "Customer Email", "Customer Name",
-        "Pack Type", "SAC Code", "Taxable Value (INR)", "CGST 9% (INR)",
-        "SGST 9% (INR)", "IGST 18% (INR)", "Total Invoice Value (INR)",
-        "Status", "Gateway Order ID", "Gateway Payment ID"
+        "Pack Type", "Payment Method", "Gross Amount (INR)", "Refunded (INR)",
+        "Net Amount (INR)", "Status", "Gateway Order ID", "Gateway Payment ID"
     ])
     for b in billables:
-        base = b.get("base_amount_inr", 0.0)
-        gst = b.get("tax_gst_inr", 0.0)
-        half_gst = round(gst / 2, 2)
-        total = b.get("amount_inr", 0.0)
+        gross = float(b.get("amount_inr", 0.0) or 0.0)
+        refunded = float(b.get("refund_amount_inr", 0.0) or 0.0)
+        net = max(0.0, gross - refunded)
         writer.writerow([
             b.get("invoice_number"),
             b.get("date"),
             b.get("customer_email"),
             b.get("customer_name"),
             b.get("pack_type"),
-            b.get("sac_code", ""),
-            f"{base:.2f}",
-            f"{half_gst:.2f}",
-            f"{half_gst:.2f}",
-            "0.00",
-            f"{total:.2f}",
+            b.get("payment_method", "Online (Razorpay UPI/Card)"),
+            f"{gross:.2f}",
+            f"{refunded:.2f}",
+            f"{net:.2f}",
             b.get("status"),
             b.get("gateway_order_id"),
             b.get("gateway_payment_id")
@@ -1058,7 +1072,7 @@ async def admin_export_tax_register(request: Request):
     return Response(
         content=csv_data,
         media_type="text/csv",
-        headers={"Content-Disposition": f"attachment; filename=GSTR1_Tax_Register_{today_str}.csv"}
+        headers={"Content-Disposition": f"attachment; filename=Transaction_Register_{today_str}.csv"}
     )
 
 
@@ -1182,3 +1196,62 @@ async def api_admin_get_scan_runs(
         "count": len(runs),
         "runs": runs
     })
+
+
+# ==============================================================================
+# Admin Executive Copilot Endpoints
+# ==============================================================================
+@router.post("/api/admin/copilot/chat")
+async def api_admin_copilot_chat(
+    request: Request,
+    req: AdminCopilotChatRequest = Body(...)
+):
+    """
+    Interactive Q&A and operational orchestration endpoint for the Admin Copilot.
+    Requires active administrator authentication.
+    """
+    admin_session = _is_admin_authenticated(request)
+    if not admin_session:
+        raise HTTPException(status_code=403, detail="Admin authorization required.")
+
+    res = await process_admin_copilot_turn(
+        admin_user=admin_session,
+        message=req.message,
+        history=req.history,
+        context=req.context
+    )
+    return JSONResponse(status_code=200, content={
+        "success": True,
+        "reply": res.get("reply"),
+        "action_proposal": res.get("action_proposal"),
+        "status": res.get("status")
+    })
+
+
+@router.post("/api/admin/copilot/execute")
+async def api_admin_copilot_execute(
+    request: Request,
+    req: AdminCopilotExecuteRequest = Body(...)
+):
+    """
+    Executes a confirmed administrative action proposal after the administrator
+    has reviewed the action card and explicitly clicked 'Confirm & Execute'.
+    """
+    admin_session = _is_admin_authenticated(request)
+    if not admin_session:
+        raise HTTPException(status_code=403, detail="Admin authorization required.")
+
+    client_ip = request.headers.get("x-forwarded-for") or (request.client.host if request.client else "unknown")
+    if client_ip and "," in client_ip:
+        client_ip = client_ip.split(",")[0].strip()
+    user_agent = request.headers.get("user-agent", "")
+
+    result = execute_confirmed_admin_action(
+        action_type=req.action_type,
+        payload=req.payload,
+        admin_user=admin_session,
+        client_ip=client_ip,
+        user_agent=user_agent
+    )
+    status_code = 200 if result.get("success") else 400
+    return JSONResponse(status_code=status_code, content=result)

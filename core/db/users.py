@@ -620,10 +620,10 @@ def get_revenue_analytics_summary(days: int = None, start_date = None, end_date 
             summary["free_credits_issued"] = float(row[5] or 0.0)
             summary["paid_credits_issued"] = float(row[6] or 0.0)
 
-            # 18% GST calculation (Price inclusive of GST)
-            if gross > 0:
-                summary["net_revenue_inr"] = round((gross - refund_sum) / 1.18, 2)
-                summary["tax_gst_collected_inr"] = round((gross - refund_sum) - summary["net_revenue_inr"], 2)
+            # Honest Cash Accounting: Net collections = Gross paid orders minus refunds (Platform is independent, not GST registered)
+            summary["net_revenue_inr"] = round(max(0.0, gross - refund_sum), 2)
+            summary["net_inflow_inr"] = summary["net_revenue_inr"]
+            summary["tax_gst_collected_inr"] = 0.0
 
         # 2. Credits in circulation across all users (unearned revenue liability)
         try:

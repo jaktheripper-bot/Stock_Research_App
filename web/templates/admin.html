@@ -262,7 +262,224 @@
 @media (max-width: 900px) {
   .grid-2col { grid-template-columns: 1fr; }
 }
+
+/* Executive Copilot Drawer & Action Card Styling */
+.copilot-drawer {
+  position: fixed;
+  bottom: 24px;
+  right: 24px;
+  width: 460px;
+  max-width: calc(100vw - 32px);
+  height: 640px;
+  max-height: calc(100vh - 48px);
+  background: rgba(11, 15, 25, 0.98);
+  border: 1px solid rgba(14, 165, 233, 0.4);
+  border-radius: 16px;
+  box-shadow: 0 20px 50px rgba(0, 0, 0, 0.75), 0 0 35px rgba(14, 165, 233, 0.2);
+  z-index: 9999;
+  display: none;
+  flex-direction: column;
+  overflow: hidden;
+  backdrop-filter: blur(20px);
+}
+.copilot-header {
+  padding: 14px 18px;
+  background: rgba(15, 23, 42, 0.95);
+  border-bottom: 1px solid rgba(30, 41, 59, 0.8);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+.copilot-title {
+  font-size: 14px;
+  font-weight: 700;
+  color: #f8fafc;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.copilot-badge {
+  font-size: 10px;
+  font-weight: 600;
+  padding: 2px 8px;
+  border-radius: 9999px;
+  background: rgba(14, 165, 233, 0.15);
+  color: #38bdf8;
+  border: 1px solid rgba(14, 165, 233, 0.3);
+}
+.copilot-chips {
+  display: flex;
+  gap: 6px;
+  padding: 8px 14px;
+  overflow-x: auto;
+  white-space: nowrap;
+  background: rgba(15, 23, 42, 0.6);
+  border-bottom: 1px solid rgba(30, 41, 59, 0.6);
+}
+.copilot-chip {
+  background: rgba(30, 41, 59, 0.7);
+  border: 1px solid rgba(51, 65, 85, 0.8);
+  color: #94a3b8;
+  font-size: 11px;
+  font-weight: 600;
+  padding: 4px 10px;
+  border-radius: 9999px;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+.copilot-chip:hover {
+  background: rgba(14, 165, 233, 0.2);
+  color: #38bdf8;
+  border-color: rgba(14, 165, 233, 0.4);
+}
+.copilot-messages {
+  flex: 1;
+  padding: 16px;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+.copilot-msg {
+  max-width: 90%;
+  padding: 10px 14px;
+  border-radius: 12px;
+  font-size: 13px;
+  line-height: 1.5;
+  word-wrap: break-word;
+}
+.copilot-msg.user {
+  align-self: flex-end;
+  background: #0284c7;
+  color: #ffffff;
+  border-bottom-right-radius: 2px;
+}
+.copilot-msg.bot {
+  align-self: flex-start;
+  background: rgba(30, 41, 59, 0.75);
+  color: #f1f5f9;
+  border: 1px solid rgba(51, 65, 85, 0.8);
+  border-bottom-left-radius: 2px;
+}
+.copilot-msg.bot p { margin: 0 0 8px; }
+.copilot-msg.bot p:last-child { margin: 0; }
+.copilot-msg.bot ul, .copilot-msg.bot ol { margin: 6px 0; padding-left: 20px; }
+.copilot-msg.bot code { background: rgba(0,0,0,0.3); padding: 2px 4px; border-radius: 4px; font-family: 'JetBrains Mono', monospace; font-size: 11px; }
+
+/* Interactive Action Proposal Card */
+.copilot-action-card {
+  margin-top: 10px;
+  background: rgba(15, 23, 42, 0.95);
+  border: 1px solid rgba(245, 158, 11, 0.45);
+  border-radius: 10px;
+  padding: 12px 14px;
+  box-shadow: 0 4px 15px rgba(0,0,0,0.35);
+}
+.action-card-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 8px;
+}
+.action-card-badge {
+  font-size: 10px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  padding: 2px 6px;
+  border-radius: 4px;
+  background: rgba(245, 158, 11, 0.2);
+  color: #fbbf24;
+  border: 1px solid rgba(245, 158, 11, 0.4);
+}
+.action-card-title {
+  font-weight: 700;
+  font-size: 13px;
+  color: #f8fafc;
+  margin-bottom: 6px;
+}
+.action-card-summary {
+  font-size: 12px;
+  color: #94a3b8;
+  margin-bottom: 8px;
+  line-height: 1.4;
+}
+.action-card-warning {
+  background: rgba(239, 68, 68, 0.1);
+  border: 1px solid rgba(239, 68, 68, 0.25);
+  color: #fca5a5;
+  font-size: 11px;
+  padding: 6px 8px;
+  border-radius: 6px;
+  margin-bottom: 10px;
+}
+.action-card-payload {
+  background: rgba(0, 0, 0, 0.4);
+  border: 1px solid rgba(30, 41, 59, 0.6);
+  border-radius: 6px;
+  padding: 6px 8px;
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 11px;
+  color: #38bdf8;
+  max-height: 110px;
+  overflow-y: auto;
+  margin-bottom: 10px;
+  white-space: pre-wrap;
+}
+.action-card-actions {
+  display: flex;
+  gap: 8px;
+}
+.action-card-success {
+  background: rgba(16, 185, 129, 0.15);
+  border: 1px solid rgba(16, 185, 129, 0.35);
+  color: #6ee7b7;
+  padding: 8px 10px;
+  border-radius: 6px;
+  font-size: 12px;
+  font-weight: 600;
+}
+.copilot-input-area {
+  padding: 12px 14px;
+  background: rgba(15, 23, 42, 0.95);
+  border-top: 1px solid rgba(30, 41, 59, 0.8);
+  display: flex;
+  gap: 8px;
+  align-items: center;
+}
+.copilot-input {
+  flex: 1;
+  background: rgba(30, 41, 59, 0.6);
+  border: 1px solid rgba(51, 65, 85, 0.8);
+  border-radius: 8px;
+  color: #f8fafc;
+  padding: 8px 12px;
+  font-size: 13px;
+}
+.copilot-input:focus {
+  outline: none;
+  border-color: #0ea5e9;
+  background: rgba(30, 41, 59, 0.9);
+}
+.copilot-send-btn {
+  background: linear-gradient(135deg, #0284c7, #0ea5e9);
+  color: white;
+  border: none;
+  border-radius: 8px;
+  padding: 8px 14px;
+  font-weight: 700;
+  font-size: 13px;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+.copilot-send-btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
 </style>
+
 
 <div class="admin-container">
 
@@ -372,6 +589,11 @@
       </button>
       {% endif %}
 
+      <!-- Executive Copilot Toggle Button -->
+      <button type="button" onclick="toggleAdminCopilot()" class="btn btn-primary btn-sm" style="background: linear-gradient(135deg, #0284c7, #0ea5e9); border: none; box-shadow: 0 0 14px rgba(14, 165, 233, 0.35); font-weight: 700; display: flex; align-items: center; gap: 6px; cursor: pointer;" title="Toggle Executive Intelligence Copilot">
+        <span>🤖</span> Executive Copilot
+      </button>
+
       <!-- Admin Identity & 2FA Badge -->
       <div style="display: flex; align-items: center; gap: 8px; background: rgba(15, 23, 42, 0.8); border: 1px solid var(--border-subtle, #1e293b); padding: 6px 12px; border-radius: 8px;">
         <span style="font-size: 12px; color: #f8fafc; font-weight: 600;">👤 {{ current_admin.email }}</span>
@@ -410,9 +632,9 @@
       <div class="kpi-delta success">Zero-Cost Instant Serve</div>
     </div>
     <div class="kpi-card">
-      <div class="kpi-label">Est. API Cost Saved <span>💰</span></div>
+      <div class="kpi-label">Est. API Cost Saved <span title="Heuristic estimate based on ~$0.015 baseline token generation cost mitigated per cached response">💡</span></div>
       <div class="kpi-value">${{ "%.2f"|format(summary.total_cost_saved_usd) }}</div>
-      <div class="kpi-delta success">Grounding Fee Bypass</div>
+      <div class="kpi-delta success">Cache Mitigation Heuristic</div>
     </div>
     <div class="kpi-card">
       <div class="kpi-label">PDFs Exported <span>📄</span></div>
@@ -474,9 +696,9 @@
         <div class="kpi-delta success">{{ rev_summary.paid_orders_count }} Verified Paid Order(s)</div>
       </div>
       <div class="kpi-card">
-        <div class="kpi-label">Net Software Rev <span>📈</span></div>
-        <div class="kpi-value">₹{{ "{:,.2f}".format(rev_summary.net_revenue_inr) }}</div>
-        <div class="kpi-delta">GST 18%: ₹{{ "{:,.2f}".format(rev_summary.tax_gst_collected_inr) }}</div>
+        <div class="kpi-label">Net Cash Inflow <span>📈</span></div>
+        <div class="kpi-value" style="color: #38bdf8;">₹{{ "{:,.2f}".format(rev_summary.net_revenue_inr) }}</div>
+        <div class="kpi-delta">Gross Less Refunds</div>
       </div>
       <div class="kpi-card" style="border-left: 3px solid #38bdf8;">
         <div class="kpi-label">Paid Tokens Issued <span><svg class="glyph"><use href="#glyph-coin"></use></svg></span></div>
@@ -503,15 +725,15 @@
     <!-- Actions & Table -->
     <div class="admin-card">
       <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px; flex-wrap: wrap; gap: 12px;">
-        <h3 style="margin: 0; font-size: 16px; font-weight: 700;">💳 Transaction & Tax Invoices Ledger</h3>
+        <h3 style="margin: 0; font-size: 16px; font-weight: 700;">💳 Transaction &amp; Receipts Ledger</h3>
         <div style="display: flex; gap: 10px; flex-wrap: wrap;">
           {% if current_admin.role in ['owner', 'admin'] %}
           <button type="button" onclick="openAdminModal('purgeDataModal')" class="btn btn-secondary btn-sm" style="color: #f87171; border-color: rgba(239, 68, 68, 0.45); background: rgba(239, 68, 68, 0.08); display: flex; align-items: center; gap: 6px; font-weight: 600; cursor: pointer;">
             🧹 Purge Test Data
           </button>
           {% endif %}
-          <a href="/admin/export/tax-register" class="btn btn-secondary btn-sm" download>
-            📥 Export GSTR-1 Tax Register (CSV)
+          <a href="/admin/export/transactions" class="btn btn-secondary btn-sm" download>
+            📥 Export Transaction Ledger (CSV)
           </a>
           <button class="btn btn-primary btn-sm" onclick="openAdminModal('refundModal')">
             ↩️ Process Refund
@@ -529,8 +751,8 @@
               <th>Nature</th>
               <th>Pack & Credits</th>
               <th>Total INR</th>
-              <th>Base Value</th>
-              <th>GST (18%)</th>
+              <th>Refunded</th>
+              <th>Net INR</th>
               <th>Status</th>
               <th>Order / Ref</th>
             </tr>
@@ -560,8 +782,8 @@
                 <span style="font-size: 11px; color: var(--text-secondary, #94a3b8); margin-left: 4px;">(+{{ b.credits_added }})</span>
               </td>
               <td class="mono" style="font-weight: 700;">₹{{ "{:,.2f}".format(b.amount_inr) }}</td>
-              <td class="mono">₹{{ "{:,.2f}".format(b.base_amount_inr) }}</td>
-              <td class="mono">₹{{ "{:,.2f}".format(b.tax_gst_inr) }}</td>
+              <td class="mono" style="color: {% if b.refund_amount_inr %}#f87171{% else %}#64748b{% endif %};">₹{{ "{:,.2f}".format(b.refund_amount_inr or 0.0) }}</td>
+              <td class="mono" style="color: #38bdf8;">₹{{ "{:,.2f}".format([b.amount_inr - (b.refund_amount_inr or 0.0), 0.0]|max) }}</td>
               <td>
                 <span class="status-pill {% if b.status == 'success' or b.status == 'paid' %}success{% elif b.status == 'refunded' %}open{% else %}closed{% endif %}">
                   {{ b.status }}
@@ -1885,6 +2107,295 @@
       });
     }
   });
+  </script>
+
+  <!-- ========================================================================= -->
+  <!-- Executive Copilot Floating Trigger & Interactive Drawer                     -->
+  <!-- ========================================================================= -->
+  <div id="adminCopilotFloatingTrigger" onclick="toggleAdminCopilot()" style="position: fixed; bottom: 24px; right: 24px; z-index: 9998; cursor: pointer; display: flex; align-items: center; gap: 8px; background: linear-gradient(135deg, #0284c7, #0ea5e9); color: #fff; padding: 12px 18px; border-radius: 9999px; box-shadow: 0 10px 30px rgba(0,0,0,0.5), 0 0 20px rgba(14,165,233,0.4); font-weight: 700; font-size: 13px; transition: transform 0.2s ease;">
+    <span>🤖</span> Executive Copilot
+  </div>
+
+  <div id="adminCopilotDrawer" class="copilot-drawer">
+    <!-- Header -->
+    <div class="copilot-header">
+      <div class="copilot-title">
+        <span>🤖</span>
+        <span>Executive Copilot</span>
+        <span class="copilot-badge">Dual-Mandate AI</span>
+      </div>
+      <button type="button" onclick="closeAdminCopilot()" style="background: none; border: none; color: #94a3b8; font-size: 18px; cursor: pointer; padding: 4px 8px; border-radius: 4px;" title="Close Copilot">
+        ✕
+      </button>
+    </div>
+
+    <!-- Quick Prompt Chips -->
+    <div class="copilot-chips">
+      <button type="button" class="copilot-chip" onclick="handleQuickChip('What are our unique sessions and top visited routes?')">📊 Sessions & Paths</button>
+      <button type="button" class="copilot-chip" onclick="handleQuickChip('Summarize our net cash inflow and recent billables.')">💰 Cash Inflow</button>
+      <button type="button" class="copilot-chip" onclick="handleQuickChip('Show me open support tickets and complaints.')">📬 Open Tickets</button>
+      <button type="button" class="copilot-chip" onclick="handleQuickChip('What is our cache hit rate and estimated API savings?')">⚡ Cache Savings</button>
+      <button type="button" class="copilot-chip" onclick="handleQuickChip('Who has admin access and is 2FA enabled?')">👥 Team Access</button>
+      <button type="button" class="copilot-chip" onclick="handleQuickChip('Purge test telemetry and dummy tickets from the dashboard')">🧹 Purge Test Data</button>
+      <button type="button" class="copilot-chip" onclick="handleQuickChip('Trigger comprehensive asset surveillance scan')">📡 Scan Assets</button>
+    </div>
+
+    <!-- Messages Container -->
+    <div id="copilotMessages" class="copilot-messages">
+      <div class="copilot-msg bot">
+        <p><strong>👋 Welcome to the Moatnomics Executive Copilot.</strong></p>
+        <p>I can analyze live dashboard telemetry, cash flows, and support grievances, or coordinate platform changes with verified 2-step confirmation.</p>
+        <p style="font-size: 11px; color: #94a3b8; margin-top: 6px;">Try: <em>"Grant 5 credits to user@example.com"</em> or <em>"Summarize our net cash inflow"</em>.</p>
+      </div>
+    </div>
+
+    <!-- Input Bar -->
+    <form id="copilotForm" onsubmit="handleCopilotSubmit(event)" class="copilot-input-area">
+      <input 
+        type="text" 
+        id="copilotInput" 
+        class="copilot-input" 
+        placeholder="Ask about dashboard metrics or request changes..." 
+        autocomplete="off"
+      >
+      <button type="submit" id="copilotSendBtn" class="copilot-send-btn">
+        <span>Send</span> <span>→</span>
+      </button>
+    </form>
+  </div>
+
+  <script>
+  // Executive Copilot Client Controller
+  let copilotHistory = [];
+  const activeWindow = "{{ window or '30d' }}";
+  const activeIncludeTests = {{ include_tests or 0 }};
+
+  function toggleAdminCopilot() {
+    const drawer = document.getElementById('adminCopilotDrawer');
+    const trigger = document.getElementById('adminCopilotFloatingTrigger');
+    if (!drawer) return;
+    if (drawer.style.display === 'flex') {
+      drawer.style.display = 'none';
+      if (trigger) trigger.style.display = 'flex';
+    } else {
+      drawer.style.display = 'flex';
+      if (trigger) trigger.style.display = 'none';
+      const input = document.getElementById('copilotInput');
+      if (input) input.focus();
+    }
+  }
+
+  function closeAdminCopilot() {
+    const drawer = document.getElementById('adminCopilotDrawer');
+    const trigger = document.getElementById('adminCopilotFloatingTrigger');
+    if (drawer) drawer.style.display = 'none';
+    if (trigger) trigger.style.display = 'flex';
+  }
+
+  function handleQuickChip(promptText) {
+    const input = document.getElementById('copilotInput');
+    if (input) {
+      input.value = promptText;
+      const form = document.getElementById('copilotForm');
+      if (form) form.dispatchEvent(new Event('submit', { cancelable: true }));
+    }
+  }
+
+  function formatCopilotMarkdown(text) {
+    if (!text) return '';
+    let escaped = text
+      .replace(/&/g, '&amp;')
+      .replace(/</g, '&lt;')
+      .replace(/>/g, '&gt;');
+
+    // Bold **text**
+    escaped = escaped.replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>');
+    // Italic *text*
+    escaped = escaped.replace(/\*(.*?)\*/g, '<em>$1</em>');
+    // Inline code `code`
+    escaped = escaped.replace(/`([^`]+)`/g, '<code>$1</code>');
+    // Bullet lines
+    escaped = escaped.replace(/^[ \t]*-[ \t]+(.*)$/gm, '<li>$1</li>');
+    escaped = escaped.replace(/(<li>.*<\/li>)/s, '<ul>$1</ul>');
+    // Paragraphs
+    const paras = escaped.split(/\n\n+/).map(p => {
+      p = p.trim();
+      if (!p) return '';
+      if (p.startsWith('<ul>') || p.startsWith('<li>') || p.startsWith('<div')) return p;
+      return `<p>${p.replace(/\n/g, '<br>')}</p>`;
+    }).filter(Boolean);
+
+    return paras.join('');
+  }
+
+  async function handleCopilotSubmit(e) {
+    e.preventDefault();
+    const input = document.getElementById('copilotInput');
+    const sendBtn = document.getElementById('copilotSendBtn');
+    const msgContainer = document.getElementById('copilotMessages');
+    if (!input || !msgContainer) return;
+
+    const message = input.value.trim();
+    if (!message) return;
+
+    // Append User Message
+    const userDiv = document.createElement('div');
+    userDiv.className = 'copilot-msg user';
+    userDiv.textContent = message;
+    msgContainer.appendChild(userDiv);
+    input.value = '';
+    msgContainer.scrollTop = msgContainer.scrollHeight;
+
+    // Append Loading Indicator
+    const loadingDiv = document.createElement('div');
+    loadingDiv.className = 'copilot-msg bot copilot-loading';
+    loadingDiv.innerHTML = '<span style="color: #94a3b8; font-style: italic;">⏳ Consulting live telemetry & governance ledger...</span>';
+    msgContainer.appendChild(loadingDiv);
+    msgContainer.scrollTop = msgContainer.scrollHeight;
+
+    if (sendBtn) sendBtn.disabled = true;
+
+    try {
+      const response = await fetch('/api/admin/copilot/chat', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Accept': 'application/json'
+        },
+        body: JSON.stringify({
+          message: message,
+          history: copilotHistory,
+          context: {
+            window: activeWindow,
+            include_tests: activeIncludeTests
+          }
+        })
+      });
+
+      const data = await response.json().catch(() => ({}));
+      loadingDiv.remove();
+
+      if (response.ok && data.success) {
+        // Append Bot Reply
+        const botDiv = document.createElement('div');
+        botDiv.className = 'copilot-msg bot';
+        botDiv.innerHTML = formatCopilotMarkdown(data.reply);
+
+        // If action proposal attached, render interactive confirmation card
+        if (data.action_proposal) {
+          const prop = data.action_proposal;
+          const cardId = 'card_' + prop.proposal_id;
+          const warnHtml = prop.impact_warning ? `<div class="action-card-warning">⚠️ ${prop.impact_warning}</div>` : '';
+          const payloadJson = JSON.stringify(prop.payload, null, 2);
+
+          const cardHtml = `
+            <div class="copilot-action-card" id="${cardId}">
+              <div class="action-card-header">
+                <span class="action-card-badge">Action Required • Confirmation Step</span>
+                <span style="font-size: 10px; color: #94a3b8; font-family: monospace;">${prop.action_type}</span>
+              </div>
+              <div class="action-card-title">${prop.title}</div>
+              <div class="action-card-summary">${prop.summary}</div>
+              ${warnHtml}
+              <div class="action-card-payload">${payloadJson}</div>
+              <div class="action-card-actions" id="actions_${cardId}">
+                <button type="button" class="btn btn-primary btn-sm" onclick="executeCopilotAction('${prop.proposal_id}', '${prop.action_type}', ${JSON.stringify(prop.payload).replace(/"/g, '&quot;')}, '${cardId}')" style="background: linear-gradient(135deg, #10b981, #059669); border: none; font-weight: 700; cursor: pointer;">
+                  ✓ Confirm & Execute
+                </button>
+                <button type="button" class="btn btn-secondary btn-sm" onclick="cancelCopilotAction('${cardId}')" style="cursor: pointer;">
+                  ✕ Cancel
+                </button>
+              </div>
+            </div>
+          `;
+          botDiv.insertAdjacentHTML('beforeend', cardHtml);
+        }
+
+        msgContainer.appendChild(botDiv);
+        msgContainer.scrollTop = msgContainer.scrollHeight;
+
+        // Record into history
+        copilotHistory.push({ role: 'user', content: message });
+        copilotHistory.push({ role: 'model', content: data.reply || '' });
+        if (copilotHistory.length > 10) copilotHistory = copilotHistory.slice(-10);
+      } else {
+        const errorDiv = document.createElement('div');
+        errorDiv.className = 'copilot-msg bot';
+        errorDiv.innerHTML = `<span style="color: #fca5a5;">❌ Error: ${data.error || 'Failed to process request.'}</span>`;
+        msgContainer.appendChild(errorDiv);
+        msgContainer.scrollTop = msgContainer.scrollHeight;
+      }
+    } catch (err) {
+      loadingDiv.remove();
+      const errDiv = document.createElement('div');
+      errDiv.className = 'copilot-msg bot';
+      errDiv.innerHTML = `<span style="color: #fca5a5;">❌ Network Error: ${err.message || 'Server connection lost.'}</span>`;
+      msgContainer.appendChild(errDiv);
+      msgContainer.scrollTop = msgContainer.scrollHeight;
+    } finally {
+      if (sendBtn) sendBtn.disabled = false;
+      if (input) input.focus();
+    }
+  }
+
+  async function executeCopilotAction(proposalId, actionType, payload, cardId) {
+    const actionsDiv = document.getElementById('actions_' + cardId);
+    if (actionsDiv) {
+      actionsDiv.innerHTML = '<span style="color: #38bdf8; font-size: 12px; font-weight: 600;">⏳ Executing mutation & recording immutable audit trail...</span>';
+    }
+
+    try {
+      const resp = await fetch('/api/admin/copilot/execute', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Accept': 'application/json'
+        },
+        body: JSON.stringify({
+          action_type: actionType,
+          payload: payload,
+          proposal_id: proposalId
+        })
+      });
+
+      const resData = await resp.json().catch(() => ({}));
+      if (resp.ok && resData.success) {
+        if (actionsDiv) {
+          const successMsg = resData.message || 'Operation executed and audited successfully.';
+          actionsDiv.outerHTML = `
+            <div class="action-card-success">
+              ✅ <strong>Executed & Audited:</strong> ${successMsg}
+              <div style="font-size: 10px; color: #6ee7b7; margin-top: 4px; font-weight: normal;">
+                Transaction logged in immutable Admin Audit Trail.
+              </div>
+            </div>
+          `;
+        }
+      } else {
+        if (actionsDiv) {
+          const errDetail = resData.error || 'Execution failed. Please verify administrative permissions.';
+          actionsDiv.innerHTML = `
+            <div style="color: #fca5a5; font-size: 12px; margin-bottom: 8px;">❌ ${errDetail}</div>
+            <button type="button" class="btn btn-secondary btn-sm" onclick="cancelCopilotAction('${cardId}')">Dismiss</button>
+          `;
+        }
+      }
+    } catch (netErr) {
+      if (actionsDiv) {
+        actionsDiv.innerHTML = `
+          <div style="color: #fca5a5; font-size: 12px; margin-bottom: 8px;">❌ Network error: ${netErr.message}</div>
+          <button type="button" class="btn btn-secondary btn-sm" onclick="cancelCopilotAction('${cardId}')">Dismiss</button>
+        `;
+      }
+    }
+  }
+
+  function cancelCopilotAction(cardId) {
+    const actionsDiv = document.getElementById('actions_' + cardId);
+    if (actionsDiv) {
+      actionsDiv.innerHTML = '<span style="color: #94a3b8; font-size: 11px; font-style: italic;">✕ Action proposal cancelled by administrator. Zero database modifications performed.</span>';
+    }
+  }
   </script>
 
 {% endif %}
