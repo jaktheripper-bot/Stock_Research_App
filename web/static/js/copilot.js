@@ -78,7 +78,7 @@ const COPILOT_CONFIGS = {
     },
     reit: {
         headerTitle: "REIT & InvIT Cash Flow Desk",
-        assetBadge: "REIT & InvIT Cash Flow Intelligence",
+        assetBadge: "REIT & InvIT Cash Flow",
         introText: (ticker) => `Welcome to the <strong>REIT & InvIT Cash Flow Desk</strong>. I evaluate Section 115UA tax waterfalls (Interest, Dividend, Return of Capital, Rental), statutory <strong>NDCF payout purity</strong> (≥90% Mainboard, ≥95% SM REIT), WALE & tenant concentration, and <strong>Pre-Mortem Inversion risk</strong> for <strong>${ticker || 'this Trust'}</strong>.`,
         features: [
             { icon: "🏛️", title: "Sec 115UA Tax Waterfall", desc: "Audit distribution components & net post-tax yield", prompt: "Evaluate the Section 115UA tax distribution waterfall and net post-tax yield across tax slabs for this REIT/InvIT." },
@@ -812,6 +812,13 @@ async function submitCopilotMessage() {
     handleCopilotInput(input);
 
     const currentTime = formatCurrentTime();
+
+    // Transition from empty welcome state to active conversation:
+    // Hide the welcome intro card to prevent half-scrolled clipping and maximize message height
+    const introCard = document.getElementById("copilotIntroBubble");
+    if (introCard) {
+        introCard.style.display = "none";
+    }
 
     // Append user message bubble
     const userTurn = document.createElement("div");
