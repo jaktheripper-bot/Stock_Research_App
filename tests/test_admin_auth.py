@@ -202,47 +202,33 @@ def test_telemetry_attribution_and_custom_date_range(client):
 
 
 def test_admin_owner_auto_bootstrap(client):
-    """Verify authorized owner emails auto-bootstrap and cannot be locked out, removed, or downgraded."""
+    """Verify authorized owner email auto-bootstraps and cannot be locked out, removed, or downgraded."""
     # 1. Primary owner email exists and is owner
     owner_primary = get_admin_user("lyndnpnto@gmail.com")
     assert owner_primary is not None
     assert owner_primary["role"] == "owner"
     assert owner_primary["email"] == "lyndnpnto@gmail.com"
 
-    # 2. Alternate owner email auto-bootstraps seamlessly
-    owner_alt = get_admin_user("lyndonpinto@gmail.com")
-    assert owner_alt is not None
-    assert owner_alt["role"] == "owner"
-    assert owner_alt["email"] == "lyndonpinto@gmail.com"
-
-    # 3. Random unauthorized email is NOT authorized
+    # 2. Random unauthorized email is NOT authorized
     unauth = get_admin_user("unauthorized_stranger@example.com")
     assert unauth is None
 
-    # 4. Direct verify initiation succeeds for both owner emails
+    # 3. Direct verify initiation succeeds for owner email
     res1 = client.post("/admin/auth/direct-verify", data={"email": "lyndnpnto@gmail.com"}, follow_redirects=False)
     assert res1.status_code == 303
     assert ADMIN_2FA_PENDING_COOKIE in res1.cookies
 
-    res2 = client.post("/admin/auth/direct-verify", data={"email": "lyndonpinto@gmail.com"}, follow_redirects=False)
-    assert res2.status_code == 303
-    assert ADMIN_2FA_PENDING_COOKIE in res2.cookies
-
-    # 5. Direct verify fails for unauthorized email
+    # 4. Direct verify fails for unauthorized email
     res3 = client.post("/admin/auth/direct-verify", data={"email": "unauthorized_stranger@example.com"}, follow_redirects=False)
     assert res3.status_code == 303
     assert "Access+Denied" in res3.headers["location"]
 
-    # 6. Neither owner account can be removed or downgraded
+    # 5. Owner account cannot be removed or downgraded
     ok_rem1, _ = remove_admin_user("lyndnpnto@gmail.com", requesting_email="other@example.com")
     assert ok_rem1 is False
-    ok_rem2, _ = remove_admin_user("lyndonpinto@gmail.com", requesting_email="other@example.com")
-    assert ok_rem2 is False
 
     ok_down1, _ = update_admin_role("lyndnpnto@gmail.com", "admin", requesting_email="other@example.com")
     assert ok_down1 is False
-    ok_down2, _ = update_admin_role("lyndonpinto@gmail.com", "viewer", requesting_email="other@example.com")
-    assert ok_down2 is False
 
 
 def test_admin_dev_login_and_next_url(client):
@@ -262,7 +248,7 @@ def test_admin_dev_login_and_next_url(client):
 def test_admin_2fa_local_bypass_code_and_next_url(client):
     """Verify 000000 bypass on localhost preserves next_url destination."""
     # 1. Direct verify with next_url
-    res_init = client.post("/admin/auth/direct-verify", data={"email": "lyndonpinto@gmail.com", "next_url": "/admin?tab=tickets"}, follow_redirects=False)
+    res_init = client.post("/admin/auth/direct-verify", data={"email": "lyndnpnto@gmail.com", "next_url": "/admin?tab=tickets"}, follow_redirects=False)
     assert res_init.status_code == 303
     assert "/admin/verify-2fa?next=" in res_init.headers["location"]
     pending_cookie = res_init.cookies[ADMIN_2FA_PENDING_COOKIE]

@@ -24,7 +24,7 @@ def get_admin_notification_email() -> str:
     return (
         os.environ.get("ADMIN_ALERT_EMAIL")
         or os.environ.get("ADMIN_EMAIL")
-        or "lyndonpinto@gmail.com"  # Configured site owner from local system git config
+        or "lyndnpnto@gmail.com"
     )
 
 

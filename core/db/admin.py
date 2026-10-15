@@ -23,7 +23,7 @@ from core.db.connection import (
 logger = logging.getLogger("equity_research.core.db.admin")
 
 DEFAULT_OWNER_EMAIL = "lyndnpnto@gmail.com"
-AUTHORIZED_OWNER_EMAILS = {"lyndnpnto@gmail.com", "lyndonpinto@gmail.com"}
+AUTHORIZED_OWNER_EMAILS = {"lyndnpnto@gmail.com"}
 
 STANDARD_ADMIN_COLUMNS = [
     "id", "email", "role", "totp_secret", "totp_enabled",
