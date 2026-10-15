@@ -123,6 +123,12 @@
       </div>
       {% endif %}
 
+      {% if is_local_dev %}
+      <div style="background: rgba(14, 165, 233, 0.12); border: 1px solid rgba(14, 165, 233, 0.35); color: #38bdf8; padding: 10px 14px; border-radius: 8px; font-size: 12.5px; margin-bottom: 20px; text-align: left; line-height: 1.5;">
+        🛠️ <strong>Local Development Notice:</strong> Enter your 6-digit Authenticator code, or use emergency local bypass code <code style="font-weight: 800; background: rgba(0,0,0,0.4); color: #fff; padding: 2px 7px; border-radius: 4px; letter-spacing: 0.1em;">000000</code>.
+      </div>
+      {% endif %}
+
       <form method="POST" action="/admin/verify-2fa">
         <div style="margin-bottom: 24px;">
           <input 
@@ -142,9 +148,12 @@
         </button>
       </form>
 
-      <div style="margin-top: 24px; font-size: 12px;">
+      <div style="margin-top: 24px; font-size: 12px; display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 10px;">
         <a href="/admin/logout" style="color: var(--accent-cyan, #0ea5e9); text-decoration: none;">
           ← Switch Account / Cancel
+        </a>
+        <a href="/admin/setup-2fa?reset=1" style="color: #94a3b8; text-decoration: underline;" title="Generate a fresh QR code to scan">
+          🔄 Re-scan / Reset 2FA
         </a>
       </div>
     {% endif %}

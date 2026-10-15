@@ -54,8 +54,9 @@ class TestMultiCurrencyPricing(unittest.TestCase):
         self.assertIn("Razorpay", conv["notice"])
 
     def test_all_supported_currencies_exist(self):
-        """Ensures all 8 global investor currencies are defined with valid metadata."""
-        expected_currencies = ["INR", "USD", "EUR", "GBP", "AED", "SGD", "CAD", "AUD"]
+        """Ensures all 3 global investor currencies are defined with valid metadata."""
+        expected_currencies = ["INR", "USD", "EUR"]
+        self.assertEqual(len(SUPPORTED_CURRENCIES), 3)
         for code in expected_currencies:
             self.assertIn(code, SUPPORTED_CURRENCIES)
             curr = SUPPORTED_CURRENCIES[code]
@@ -66,11 +67,6 @@ class TestMultiCurrencyPricing(unittest.TestCase):
     def test_country_to_currency_mapping(self):
         """Validates major geopolitical regions map to expected currencies."""
         self.assertEqual(COUNTRY_TO_CURRENCY_MAP.get("US"), "USD")
-        self.assertEqual(COUNTRY_TO_CURRENCY_MAP.get("GB"), "GBP")
-        self.assertEqual(COUNTRY_TO_CURRENCY_MAP.get("AE"), "AED")
-        self.assertEqual(COUNTRY_TO_CURRENCY_MAP.get("SG"), "SGD")
-        self.assertEqual(COUNTRY_TO_CURRENCY_MAP.get("CA"), "CAD")
-        self.assertEqual(COUNTRY_TO_CURRENCY_MAP.get("AU"), "AUD")
         self.assertEqual(COUNTRY_TO_CURRENCY_MAP.get("DE"), "EUR")
         self.assertEqual(COUNTRY_TO_CURRENCY_MAP.get("FR"), "EUR")
         self.assertEqual(COUNTRY_TO_CURRENCY_MAP.get("IN"), "INR")
@@ -85,7 +81,8 @@ class TestMultiCurrencyPricing(unittest.TestCase):
         self.assertEqual(data.get("buffer_pct"), 3.5)
         self.assertIn("USD", data.get("currencies", {}))
         self.assertIn("EUR", data.get("currencies", {}))
-        self.assertIn("AED", data.get("currencies", {}))
+        self.assertIn("INR", data.get("currencies", {}))
+        self.assertEqual(len(data.get("currencies", {})), 3)
 
     def test_pricing_page_renders_currency_dropdown_and_data_attributes(self):
         """Validates that /pricing SSR contains the dropdown, transparency notice, and base prices."""
@@ -101,8 +98,7 @@ class TestMultiCurrencyPricing(unittest.TestCase):
         self.assertIn('id="currencySelect"', html)
         self.assertIn('value="USD"', html)
         self.assertIn('value="EUR"', html)
-        self.assertIn('value="GBP"', html)
-        self.assertIn('value="AED"', html)
+        self.assertIn('value="INR"', html)
 
         # 3. Dynamic attributes present
         self.assertIn('data-base-inr="299"', html)
@@ -121,15 +117,15 @@ class TestMultiCurrencyPricing(unittest.TestCase):
         self.assertEqual(resp_us.status_code, 200)
         self.assertIn('value="USD" selected', resp_us.text)
 
-        # UK visitor
-        resp_uk = self.client.get("/pricing", headers={"cf-ipcountry": "GB"})
-        self.assertEqual(resp_uk.status_code, 200)
-        self.assertIn('value="GBP" selected', resp_uk.text)
+        # Eurozone visitor
+        resp_eu = self.client.get("/pricing", headers={"cf-ipcountry": "DE"})
+        self.assertEqual(resp_eu.status_code, 200)
+        self.assertIn('value="EUR" selected', resp_eu.text)
 
-        # UAE visitor
-        resp_ae = self.client.get("/pricing", headers={"cf-ipcountry": "AE"})
-        self.assertEqual(resp_ae.status_code, 200)
-        self.assertIn('value="AED" selected', resp_ae.text)
+        # Other international visitor maps to USD
+        resp_intl = self.client.get("/pricing", headers={"cf-ipcountry": "GB"})
+        self.assertEqual(resp_intl.status_code, 200)
+        self.assertIn('value="USD" selected', resp_intl.text)
 
         # Query param override takes precedence
         resp_query = self.client.get("/pricing?currency=EUR", headers={"cf-ipcountry": "US"})

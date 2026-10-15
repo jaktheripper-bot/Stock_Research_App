@@ -240,12 +240,7 @@ function initCheckoutModals() {
 const SUPPORTED_CURRENCIES = {
   INR: { code: 'INR', symbol: '₹', name: 'Indian Rupee', flag: '🇮🇳', rate: 1.0, buffer: 0.0, is_base: true },
   USD: { code: 'USD', symbol: '$', name: 'US Dollar', flag: '🇺🇸', rate: 88.50, buffer: 0.035, is_base: false },
-  EUR: { code: 'EUR', symbol: '€', name: 'Euro', flag: '🇪🇺', rate: 96.50, buffer: 0.035, is_base: false },
-  GBP: { code: 'GBP', symbol: '£', name: 'British Pound', flag: '🇬🇧', rate: 115.00, buffer: 0.035, is_base: false },
-  AED: { code: 'AED', symbol: 'AED ', name: 'UAE Dirham', flag: '🇦🇪', rate: 24.10, buffer: 0.035, is_base: false },
-  SGD: { code: 'SGD', symbol: 'S$ ', name: 'Singapore Dollar', flag: '🇸🇬', rate: 68.00, buffer: 0.035, is_base: false },
-  CAD: { code: 'CAD', symbol: 'CA$ ', name: 'Canadian Dollar', flag: '🇨🇦', rate: 64.00, buffer: 0.035, is_base: false },
-  AUD: { code: 'AUD', symbol: 'A$ ', name: 'Australian Dollar', flag: '🇦🇺', rate: 58.00, buffer: 0.035, is_base: false }
+  EUR: { code: 'EUR', symbol: '€', name: 'Euro', flag: '🇪🇺', rate: 96.50, buffer: 0.035, is_base: false }
 };
 
 let currentCurrency = 'INR';
@@ -285,14 +280,8 @@ function detectUserCurrency() {
   try {
     const tz = (Intl.DateTimeFormat().resolvedOptions().timeZone || '').toLowerCase();
     if (tz.includes('calcutta') || tz.includes('kolkata')) return 'INR';
-    if (tz.includes('new_york') || tz.includes('chicago') || tz.includes('los_angeles') || tz.includes('denver') || tz.includes('phoenix') || tz.includes('detroit') || tz.includes('indiana') || tz.includes('honolulu') || tz.includes('anchorage')) return 'USD';
-    if (tz.includes('toronto') || tz.includes('vancouver') || tz.includes('montreal') || tz.includes('edmonton') || tz.includes('winnipeg') || tz.includes('halifax') || tz.includes('st_johns')) return 'CAD';
-    if (tz.includes('london') || tz.includes('belfast')) return 'GBP';
-    if (tz.includes('dubai') || tz.includes('abu_dhabi') || tz.includes('muscat')) return 'AED';
-    if (tz.includes('singapore')) return 'SGD';
-    if (tz.includes('sydney') || tz.includes('melbourne') || tz.includes('brisbane') || tz.includes('perth') || tz.includes('adelaide')) return 'AUD';
-    if (tz.startsWith('europe/')) return 'EUR';
-    if (tz.startsWith('america/')) return 'USD';
+    if (tz.startsWith('europe/') || tz.includes('london')) return 'EUR';
+    if (tz.startsWith('america/') || tz.includes('tokyo') || tz.includes('singapore') || tz.includes('dubai') || tz.includes('sydney')) return 'USD';
   } catch (e) {
     console.debug('Timezone currency detection notice:', e);
   }

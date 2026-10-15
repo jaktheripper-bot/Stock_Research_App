@@ -43,71 +43,15 @@ SUPPORTED_CURRENCIES: Dict[str, Dict[str, Any]] = {
         "buffer_pct": 0.035,
         "symbol_position": "prefix",
     },
-    "GBP": {
-        "code": "GBP",
-        "symbol": "£",
-        "name": "British Pound",
-        "flag": "🇬🇧",
-        "rate_vs_inr": 115.00,
-        "is_base": False,
-        "buffer_pct": 0.035,
-        "symbol_position": "prefix",
-    },
-    "AED": {
-        "code": "AED",
-        "symbol": "AED ",
-        "name": "UAE Dirham",
-        "flag": "🇦🇪",
-        "rate_vs_inr": 24.10,
-        "is_base": False,
-        "buffer_pct": 0.035,
-        "symbol_position": "prefix",
-    },
-    "SGD": {
-        "code": "SGD",
-        "symbol": "S$ ",
-        "name": "Singapore Dollar",
-        "flag": "🇸🇬",
-        "rate_vs_inr": 68.00,
-        "is_base": False,
-        "buffer_pct": 0.035,
-        "symbol_position": "prefix",
-    },
-    "CAD": {
-        "code": "CAD",
-        "symbol": "CA$ ",
-        "name": "Canadian Dollar",
-        "flag": "🇨🇦",
-        "rate_vs_inr": 64.00,
-        "is_base": False,
-        "buffer_pct": 0.035,
-        "symbol_position": "prefix",
-    },
-    "AUD": {
-        "code": "AUD",
-        "symbol": "A$ ",
-        "name": "Australian Dollar",
-        "flag": "🇦🇺",
-        "rate_vs_inr": 58.00,
-        "is_base": False,
-        "buffer_pct": 0.035,
-        "symbol_position": "prefix",
-    },
 }
 
-# Country code to default currency mapping
+# Country code to default currency mapping (INR for India, EUR for Eurozone, USD for all other regions)
 COUNTRY_TO_CURRENCY_MAP: Dict[str, str] = {
     "IN": "INR",
     "US": "USD",
     "PR": "USD",
     "GU": "USD",
     "VI": "USD",
-    "GB": "GBP",
-    "UK": "GBP",
-    "AE": "AED",
-    "SG": "SGD",
-    "CA": "CAD",
-    "AU": "AUD",
     # Eurozone
     "DE": "EUR",
     "FR": "EUR",
@@ -195,7 +139,9 @@ def resolve_currency_for_request(request: Request) -> str:
         or ""
     ).strip().upper()
 
-    if country and country in COUNTRY_TO_CURRENCY_MAP:
-        return COUNTRY_TO_CURRENCY_MAP[country]
+    if country:
+        if country == "IN":
+            return "INR"
+        return COUNTRY_TO_CURRENCY_MAP.get(country, "USD")
 
     return "INR"
