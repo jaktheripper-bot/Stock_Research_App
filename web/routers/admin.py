@@ -1085,7 +1085,15 @@ async def api_admin_get_ticket_thread(ticket_id: str, request: Request):
     if not ticket:
         raise HTTPException(status_code=404, detail="Ticket not found.")
 
-    return JSONResponse(status_code=200, content={"success": True, "ticket": ticket, "responses": ticket.get("responses", [])})
+    from core.notify import is_email_service_configured, get_email_service_status
+
+    return JSONResponse(status_code=200, content={
+        "success": True,
+        "ticket": ticket,
+        "responses": ticket.get("responses", []),
+        "email_service_configured": is_email_service_configured(),
+        "email_service_status": get_email_service_status()
+    })
 
 
 @router.post("/admin/tickets/{ticket_id}/reply")
@@ -1122,8 +1130,18 @@ async def admin_reply_ticket(
     # 1. Determine email dispatch
     should_email = dispatch_email in ("on", "true", "1", True)
     email_dispatched = False
+    from core.notify import is_email_service_configured
+    email_configured = is_email_service_configured()
+    email_status_text = "Disabled by admin"
+
     if should_email:
         email_dispatched = send_ticket_reply_email(ticket, clean_reply, admin_name=admin_name)
+        if not email_configured:
+            email_status_text = "Mock Logged (outgoing credentials unconfigured)"
+        elif email_dispatched:
+            email_status_text = "Delivered via live email service"
+        else:
+            email_status_text = "Delivery failed (see server logs)"
 
     # 2. Record response in database
     add_ticket_response(
@@ -1153,6 +1171,7 @@ async def admin_reply_ticket(
                 admin_note=f"Remedial grant from ticket response {ticket_id}",
                 ticket_id=ticket_id,
                 resolve_ticket=False,
+                auto_provision=True,
                 ip_address=client_ip
             )
             credits_granted = credits_val
@@ -1169,6 +1188,8 @@ async def admin_reply_ticket(
             "recipient_email": ticket.get("user_email"),
             "new_status": new_status,
             "email_dispatched": email_dispatched,
+            "email_configured": email_configured,
+            "email_status_text": email_status_text,
             "credits_granted": credits_granted,
             "reply_preview": clean_reply[:100]
         },
@@ -1183,12 +1204,16 @@ async def admin_reply_ticket(
             "ticket_id": ticket_id,
             "new_status": new_status,
             "email_dispatched": email_dispatched,
-            "message": f"Response sent to {ticket.get('user_email')}. Email dispatched: {'Yes' if email_dispatched else 'Logged'}."
+            "email_service_configured": email_configured,
+            "email_status_text": email_status_text,
+            "message": f"Response recorded for {ticket.get('user_email')}. Outgoing Email: {email_status_text}."
         })
 
-    msg = f"Response+sent+to+{ticket.get('user_email')}"
+    msg = f"Response+recorded+for+{ticket.get('user_email')}"
     if email_dispatched:
         msg += "+and+email+dispatched"
+    elif should_email and not email_configured:
+        msg += "+(email+unconfigured+-+mock+logged)"
     if credits_granted > 0:
         msg += f"+(+{credits_granted}+credits+granted)"
     return RedirectResponse(url=f"/admin?tab=tickets&msg={msg}", status_code=303)

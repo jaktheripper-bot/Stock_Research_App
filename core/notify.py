@@ -28,18 +28,124 @@ def get_admin_notification_email() -> str:
     )
 
 
-def send_ticket_notification_email(ticket: dict) -> bool:
-    """
-    Sends an email notification to the administrator regarding a newly submitted
-    complaint, billing dispute, or support ticket.
-    If SMTP credentials are not configured, logs the dispatch gracefully.
-    """
-    admin_email = get_admin_notification_email()
+def is_email_service_configured() -> bool:
+    """Checks whether real outgoing email credentials are configured in the environment."""
+    if os.environ.get("RESEND_API_KEY"):
+        return True
+    return bool(os.environ.get("SMTP_HOST") and os.environ.get("SMTP_USER") and os.environ.get("SMTP_PASSWORD"))
+
+
+def get_email_service_status() -> dict:
+    """Returns metadata describing active outgoing email provider."""
+    if os.environ.get("RESEND_API_KEY"):
+        return {
+            "configured": True,
+            "provider": "Resend API",
+            "from_email": os.environ.get("SMTP_FROM") or "noreply@moatnomics.com"
+        }
+    if os.environ.get("SMTP_HOST") and os.environ.get("SMTP_USER") and os.environ.get("SMTP_PASSWORD"):
+        host = os.environ.get("SMTP_HOST")
+        port = os.environ.get("SMTP_PORT", 587)
+        return {
+            "configured": True,
+            "provider": f"SMTP ({host}:{port})",
+            "from_email": os.environ.get("SMTP_FROM") or os.environ.get("SMTP_USER")
+        }
+    return {
+        "configured": False,
+        "provider": "Mock / Console Logging (Unsent)",
+        "from_email": "noreply@localhost"
+    }
+
+
+def _dispatch_via_resend(from_email: str, to_email: str, subject: str, text: str, html: Optional[str] = None) -> bool:
+    """Dispatches outgoing email via Resend HTTP REST API."""
+    resend_api_key = os.environ.get("RESEND_API_KEY")
+    if not resend_api_key:
+        return False
+    try:
+        import json
+        import urllib.request
+        payload = {
+            "from": from_email,
+            "to": [to_email],
+            "subject": subject,
+            "text": text,
+        }
+        if html:
+            payload["html"] = html
+
+        req = urllib.request.Request(
+            "https://api.resend.com/emails",
+            data=json.dumps(payload).encode("utf-8"),
+            headers={
+                "Authorization": f"Bearer {resend_api_key}",
+                "Content-Type": "application/json",
+                "User-Agent": "Moatnomics-Notifier/1.0"
+            },
+            method="POST"
+        )
+        with urllib.request.urlopen(req, timeout=10) as resp:
+            if resp.status in (200, 201):
+                logger.info("Dispatched email via Resend API to %s (Subject: %s)", to_email, subject)
+                return True
+            logger.error("Resend API responded with unexpected status %s for %s", resp.status, to_email)
+            return False
+    except Exception as e:
+        logger.error("Error dispatching email via Resend API to %s: %s", to_email, e)
+        return False
+
+
+def _dispatch_via_smtp(from_email: str, to_email: str, subject: str, text: str, html: Optional[str] = None) -> bool:
+    """Dispatches outgoing email via SMTP TLS/SSL."""
     smtp_host = os.environ.get("SMTP_HOST")
     smtp_port = int(os.environ.get("SMTP_PORT", 587))
     smtp_user = os.environ.get("SMTP_USER")
     smtp_password = os.environ.get("SMTP_PASSWORD")
-    sender_email = os.environ.get("SMTP_FROM", smtp_user or "noreply@localhost")
+
+    if not (smtp_host and smtp_user and smtp_password):
+        return False
+
+    try:
+        if html:
+            msg = MIMEMultipart("alternative")
+            msg["From"] = from_email
+            msg["To"] = to_email
+            msg["Subject"] = subject
+            msg.attach(MIMEText(text, "plain"))
+            msg.attach(MIMEText(html, "html"))
+        else:
+            msg = MIMEMultipart()
+            msg["From"] = from_email
+            msg["To"] = to_email
+            msg["Subject"] = subject
+            msg.attach(MIMEText(text, "plain"))
+
+        if smtp_port == 465:
+            with smtplib.SMTP_SSL(smtp_host, smtp_port, timeout=10) as server:
+                server.login(smtp_user, smtp_password)
+                server.send_message(msg)
+        else:
+            with smtplib.SMTP(smtp_host, smtp_port, timeout=10) as server:
+                server.starttls()
+                server.login(smtp_user, smtp_password)
+                server.send_message(msg)
+
+        logger.info("Dispatched email via SMTP (%s:%s) to %s (Subject: %s)", smtp_host, smtp_port, to_email, subject)
+        return True
+    except Exception as e:
+        logger.error("Failed to dispatch SMTP email to %s: %s", to_email, e)
+        return False
+
+
+def send_ticket_notification_email(ticket: dict) -> bool:
+    """
+    Sends an email notification to the administrator regarding a newly submitted
+    complaint, billing dispute, or support ticket.
+    If SMTP / Resend credentials are not configured, logs the dispatch gracefully and returns False.
+    """
+    admin_email = get_admin_notification_email()
+    sender_email = os.environ.get("SMTP_FROM") or os.environ.get("SMTP_USER") or "noreply@moatnomics.com"
 
     subject = f"🚨 [New Support Ticket] {ticket.get('ticket_id')} - {ticket.get('subject')}"
     body = f"""
@@ -68,32 +174,18 @@ Turnaround Target: 24h SEBI / IT Rules 2021 statutory acknowledgment.
 ===============================================================
 """
 
-    # If SMTP is configured, attempt secure delivery
-    if smtp_host and smtp_user and smtp_password:
-        try:
-            msg = MIMEMultipart()
-            msg["From"] = sender_email
-            msg["To"] = admin_email
-            msg["Subject"] = subject
-            msg.attach(MIMEText(body, "plain"))
+    if os.environ.get("RESEND_API_KEY"):
+        return _dispatch_via_resend(sender_email, admin_email, subject, body)
 
-            with smtplib.SMTP(smtp_host, smtp_port, timeout=10) as server:
-                server.starttls()
-                server.login(smtp_user, smtp_password)
-                server.send_message(msg)
+    if os.environ.get("SMTP_HOST") and os.environ.get("SMTP_USER") and os.environ.get("SMTP_PASSWORD"):
+        return _dispatch_via_smtp(sender_email, admin_email, subject, body)
 
-            logger.info(f"Dispatched email notification for ticket {ticket.get('ticket_id')} to {admin_email}")
-            return True
-        except Exception as e:
-            logger.error(f"Failed to dispatch SMTP email for ticket {ticket.get('ticket_id')}: {e}")
-            return False
-    else:
-        # Graceful logging fallback when SMTP server is pending configuration
-        logger.info(
-            f"[MOCK/LOG EMAIL ALERT] Sent to: {admin_email} | Subject: {subject} | "
-            f"Ticket: {ticket.get('ticket_id')} from {ticket.get('user_email')}"
-        )
-        return True
+    # Graceful logging fallback when SMTP server is pending configuration
+    logger.info(
+        f"[MOCK/LOG EMAIL ALERT] (Unsent: email service unconfigured) Sent to: {admin_email} | Subject: {subject} | "
+        f"Ticket: {ticket.get('ticket_id')} from {ticket.get('user_email')}"
+    )
+    return False
 
 
 def dispatch_support_ticket_alert(ticket: dict):
@@ -132,23 +224,18 @@ def dispatch_support_ticket_alert(ticket: dict):
 def send_ticket_reply_email(ticket: dict, reply_message: str, admin_name: str = "Research Desk") -> bool:
     """
     Sends an email response directly to the user regarding their support ticket or grievance.
-    If SMTP credentials are not configured, logs the dispatch gracefully and returns True (mock delivery).
+    If SMTP credentials are not configured, logs the dispatch gracefully and returns False (not delivered).
     """
     user_email = ticket.get("user_email")
     if not user_email:
         logger.warning("Cannot dispatch reply email: ticket %s has no user_email", ticket.get("ticket_id"))
         return False
 
-    smtp_host = os.environ.get("SMTP_HOST")
-    smtp_port = int(os.environ.get("SMTP_PORT", 587))
-    smtp_user = os.environ.get("SMTP_USER")
-    smtp_password = os.environ.get("SMTP_PASSWORD")
-    sender_email = os.environ.get("SMTP_FROM", smtp_user or "noreply@moatnomics.com")
-
     ticket_id = ticket.get("ticket_id", "TKT")
     original_subject = ticket.get("subject", "Support Inquiry")
     subject = f"Re: [{ticket_id}] {original_subject}"
     user_name = ticket.get("user_name") or "Investor"
+    sender_email = os.environ.get("SMTP_FROM") or os.environ.get("SMTP_USER") or "noreply@moatnomics.com"
 
     text_body = f"""Hello {user_name},
 
@@ -215,31 +302,18 @@ Moatnomics Service Desk
 </html>
 """
 
-    if smtp_host and smtp_user and smtp_password:
-        try:
-            msg = MIMEMultipart("alternative")
-            msg["From"] = sender_email
-            msg["To"] = user_email
-            msg["Subject"] = subject
-            msg.attach(MIMEText(text_body, "plain"))
-            msg.attach(MIMEText(html_body, "html"))
+    if os.environ.get("RESEND_API_KEY"):
+        return _dispatch_via_resend(sender_email, user_email, subject, text_body, html=html_body)
 
-            with smtplib.SMTP(smtp_host, smtp_port, timeout=10) as server:
-                server.starttls()
-                server.login(smtp_user, smtp_password)
-                server.send_message(msg)
+    if os.environ.get("SMTP_HOST") and os.environ.get("SMTP_USER") and os.environ.get("SMTP_PASSWORD"):
+        return _dispatch_via_smtp(sender_email, user_email, subject, text_body, html=html_body)
 
-            logger.info("Dispatched email response for ticket %s to %s", ticket_id, user_email)
-            return True
-        except Exception as e:
-            logger.error("Failed to dispatch SMTP email response to %s for ticket %s: %s", user_email, ticket_id, e)
-            return False
-    else:
-        logger.info(
-            "[MOCK/LOG USER EMAIL REPLY] Dispatched to: %s | Subject: %s | Ticket: %s | Preview: %s...",
-            user_email,
-            subject,
-            ticket_id,
-            reply_message[:80],
-        )
-        return True
+    logger.warning(
+        "[MOCK/LOG USER EMAIL REPLY] Outgoing email credentials not configured (SMTP_HOST/RESEND_API_KEY). "
+        "Email NOT dispatched over network. Logged for ticket %s to %s | Subject: %s | Preview: %s...",
+        ticket_id,
+        user_email,
+        subject,
+        reply_message[:80],
+    )
+    return False

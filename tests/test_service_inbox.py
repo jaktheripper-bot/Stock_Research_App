@@ -75,17 +75,17 @@ class TestServiceInboxAndEmailReply(unittest.TestCase):
         self.assertGreaterEqual(len(ticket["responses"]), 2)
 
     def test_send_ticket_reply_email_mock_fallback(self):
-        """Test that send_ticket_reply_email gracefully falls back to logging without crashing."""
+        """Test that send_ticket_reply_email gracefully falls back to logging without crashing and returns False when unconfigured."""
         ticket = get_ticket_by_id(self.ticket_id)
         ok = send_ticket_reply_email(
             ticket=ticket,
             reply_message="This is a test response dispatched to the user."
         )
-        self.assertTrue(ok)
+        self.assertFalse(ok)
 
     @patch("smtplib.SMTP")
     def test_send_ticket_reply_email_with_smtp(self, mock_smtp_cls):
-        """Test SMTP dispatch when credentials are configured in environment."""
+        """Test SMTP STARTTLS dispatch on port 587 when credentials are configured."""
         mock_server = MagicMock()
         mock_smtp_cls.return_value.__enter__.return_value = mock_server
 
@@ -105,6 +105,47 @@ class TestServiceInboxAndEmailReply(unittest.TestCase):
             mock_server.starttls.assert_called_once()
             mock_server.login.assert_called_with("mailer@moatnomics.com", "secretpassword")
             mock_server.send_message.assert_called_once()
+
+    @patch("smtplib.SMTP_SSL")
+    def test_send_ticket_reply_email_with_smtp_ssl(self, mock_smtp_ssl_cls):
+        """Test SMTP SSL dispatch on port 465."""
+        mock_server = MagicMock()
+        mock_smtp_ssl_cls.return_value.__enter__.return_value = mock_server
+
+        with patch.dict("os.environ", {
+            "SMTP_HOST": "smtp.gmail.com",
+            "SMTP_PORT": "465",
+            "SMTP_USER": "mailer@moatnomics.com",
+            "SMTP_PASSWORD": "secretpassword",
+            "SMTP_FROM": "support@moatnomics.com"
+        }):
+            ticket = get_ticket_by_id(self.ticket_id)
+            ok = send_ticket_reply_email(
+                ticket=ticket,
+                reply_message="Official response dispatched through secure SMTP SSL 465."
+            )
+            self.assertTrue(ok)
+            mock_server.login.assert_called_with("mailer@moatnomics.com", "secretpassword")
+            mock_server.send_message.assert_called_once()
+
+    @patch("urllib.request.urlopen")
+    def test_send_ticket_reply_email_with_resend(self, mock_urlopen):
+        """Test HTTP REST API email dispatch when RESEND_API_KEY is configured."""
+        mock_resp = MagicMock()
+        mock_resp.status = 200
+        mock_urlopen.return_value.__enter__.return_value = mock_resp
+
+        with patch.dict("os.environ", {
+            "RESEND_API_KEY": "re_test_key_xyz",
+            "SMTP_FROM": "support@moatnomics.com"
+        }):
+            ticket = get_ticket_by_id(self.ticket_id)
+            ok = send_ticket_reply_email(
+                ticket=ticket,
+                reply_message="Official response dispatched through Resend REST API."
+            )
+            self.assertTrue(ok)
+            mock_urlopen.assert_called_once()
 
     def test_admin_reply_ticket_auth_enforced(self):
         """Test that unauthenticated requests to POST /admin/tickets/{ticket_id}/reply are rejected."""
