@@ -152,6 +152,7 @@
             <th style="padding: 12px 14px; text-align: right;">TER Fee</th>
             <th style="padding: 12px 14px; text-align: right;">AUM</th>
             <th style="padding: 12px 14px; text-align: center;">Liquidity Tier</th>
+            <th style="padding: 12px 14px; text-align: center;">Dossier</th>
           </tr>
         </thead>
         <tbody id="etf-table-body">
@@ -211,6 +212,11 @@
               {% else %}
                 <span style="background: rgba(148, 163, 184, 0.15); color: #94a3b8; padding: 2px 8px; border-radius: 4px; font-size: 11px; font-weight: 600;">Low</span>
               {% endif %}
+            </td>
+            <td style="padding: 12px 14px; text-align: center;" onclick="event.stopPropagation();">
+              <a href="/etfs/{{ etf.symbol }}" class="btn btn-sm btn-secondary" style="font-size: 11px; padding: 4px 10px; text-decoration: none; border-radius: 6px; font-weight: 600; color: #38bdf8; border-color: rgba(56, 189, 248, 0.3);">
+                Dossier →
+              </a>
             </td>
           </tr>
           {% endfor %}
@@ -352,6 +358,14 @@ async function openEtfModal(symbol) {
 
       <!-- Peers -->
       ${peersHtml}
+
+      <!-- Full Dossier Link -->
+      <div style="margin-top: 24px; padding-top: 16px; border-top: 1px solid rgba(255, 255, 255, 0.08); display: flex; justify-content: flex-end; gap: 10px;">
+        <button onclick="closeEtfModal()" class="btn btn-secondary btn-sm" style="border-radius: 8px;">Close</button>
+        <a href="/etfs/${etf.symbol}" class="btn btn-primary btn-sm" style="display: inline-flex; align-items: center; gap: 6px; text-decoration: none; font-weight: 700; padding: 8px 18px; border-radius: 8px;">
+          Open Full Institutional Dossier →
+        </a>
+      </div>
     `;
   } catch (err) {
     content.innerHTML = `<div style="text-align: center; padding: 40px; color: #ef4444;">Failed to load ETF details: ${err.message}</div>`;

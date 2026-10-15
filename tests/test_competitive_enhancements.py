@@ -261,7 +261,10 @@ class TestCompetitiveEnhancements(unittest.TestCase):
         # 1. Base nav and action buttons
         resp_home = self.client.get("/")
         self.assertEqual(resp_home.status_code, 200)
-        self.assertIn("Generate Report", resp_home.text)
+        self.assertIn("Stock Reports & Equities", resp_home.text)
+        self.assertIn("Mutual Funds", resp_home.text)
+        self.assertIn("navSignInBtn", resp_home.text)
+        self.assertNotIn("navGenerateBtn", resp_home.text)
         self.assertIn("/admin/audit", resp_home.text)
 
         # 2. Debt dossier contains Contagion Radar, Copilot trigger, and link to parent equity

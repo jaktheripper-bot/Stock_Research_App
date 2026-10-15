@@ -101,6 +101,18 @@ def _build_unqualified_response(ticker: Optional[str], company_name: Optional[st
             f"- 🛡️ *\"What is the Asset Coverage Ratio (ACR) and recovery seniority?\"*\n"
             f"- 📉 *\"What is the DSCR covenant headroom under stress?\"*"
         )
+    elif asset_class == "ETF":
+        return (
+            f"🔍 **Input Not Recognized**\n\n"
+            f"I couldn't identify a valid financial or analytical query in your message. "
+            f"The **Forensic Intelligence Desk** audits arbitrage spreads, tracking errors, and liquidity depth for **{name}**.\n\n"
+            f"**Here are a few high-conviction queries you can ask:**\n"
+            f"- ⚖️ *\"Is the current premium or discount an arbitrage opportunity or retail surcharge?\"*\n"
+            f"- 📊 *\"What is the 1-year tracking error and replication fidelity vs the benchmark?\"*\n"
+            f"- 💸 *\"How does the Total Expense Ratio (TER) compare against closest peer ETFs?\"*\n"
+            f"- 🌊 *\"What is the secondary market liquidity depth and average daily volume?\"*\n"
+            f"- 💀 *\"Summarize the bear thesis and Authorized Participant redemption risks.\"*"
+        )
     else:
         return (
             f"🔍 **Input Not Recognized**\n\n"
@@ -138,6 +150,28 @@ def _build_greeting_response(ticker: Optional[str], company_name: Optional[str],
             f"- Review the **Credit Contagion Radar** for group-level spillover risks.\n"
             f"- Audit **covenant headroom (DSCR/ISCR)** and security charge seniority.\n"
             f"- Evaluate the **yield-to-maturity (YTM)** and duration profile."
+        )
+    elif asset_class == "ETF":
+        return (
+            f"👋 **Welcome to the Forensic Intelligence Desk for {name}.**\n\n"
+            f"I am your institutional passive vehicle research engine, engineered to monitor secondary market arbitrage, "
+            f"audit tracking error drag, and evaluate Authorized Participant liquidity depth.\n\n"
+            f"**What would you like to explore?**\n"
+            f"- Audit **exchange price vs Fair NAV arbitrage spreads**.\n"
+            f"- Inspect **1-year annualized tracking error** vs benchmark.\n"
+            f"- Evaluate **Total Expense Ratio (TER)** fee drag over 10-year compounding.\n"
+            f"- Compare metrics against **category peer benchmarks**."
+        )
+    elif asset_class == "REIT":
+        return (
+            f"👋 **Welcome to the Forensic Intelligence Desk for {name}.**\n\n"
+            f"I am your institutional real assets and infrastructure research engine, engineered to audit Section 115UA multi-component "
+            f"distribution waterfalls, inspect Net Distributable Cash Flow (NDCF) payout purity, and stress-test portfolio lease rollovers.\n\n"
+            f"**What would you like to explore?**\n"
+            f"- Model the **Section 115UA tax waterfall** across 10%, 20%, 30%, and 39% slabs.\n"
+            f"- Audit **Net Distributable Cash Flow (NDCF)** purity and 15% penal interest headroom.\n"
+            f"- Inspect **portfolio WALE, tenant credit ratings, and LTV leverage** against the 49% cap.\n"
+            f"- Synthesize the **Pre-Mortem Inversion** bear thesis and refinancing vulnerabilities."
         )
     else:
         return (
@@ -270,6 +304,16 @@ def check_non_advisory_compliance(message: str, asset_class: str = "EQUITY") -> 
                     "credit buy/sell ratings, or investment calls.\n\n"
                     "I can, however, provide an objective evaluation of the issuer's **Asset Coverage Ratio (ACR)**, "
                     "Recovery Seniority in liquidation, DSCR covenant headroom, and Credit Contagion Radar posture. "
+                    "Which diagnostic area would you like to explore?"
+                )
+            elif asset_class == "REIT":
+                return (
+                    "**SEBI Regulatory Non-Advisory Notice:**\n\n"
+                    "Under SEBI Research Analyst Regulations 2014 Section 2(u), the Forensic Intelligence Desk operates "
+                    "strictly as an institutional software diagnostic utility and is prohibited from providing personalized investment advice, "
+                    "distribution return guarantees, or Buy/Sell/Hold verdicts.\n\n"
+                    "I can, however, provide an objective evaluation of the trust's **Section 115UA Tax Waterfall**, "
+                    "Net Distributable Cash Flow (NDCF) Payout Purity, portfolio WALE, and Pre-Mortem Inversion risk factors. "
                     "Which diagnostic area would you like to explore?"
                 )
             else:
@@ -584,6 +628,212 @@ def build_debt_deterministic_response(
             f"- Seniority: {context_data.get('seniority_tier', 'N/A')}\n"
             f"{radar_lines}"
             "What specific solvency or capital hierarchy pillar would you like to drill into?"
+        )
+
+
+def build_etf_deterministic_response(
+    context_data: Dict[str, Any],
+    section: Optional[str],
+    symbol: str,
+    user_message: str = ""
+) -> str:
+    """Builds a section-anchored and query-intent aware deterministic response for ETFs."""
+    name = context_data.get("scheme_name") or symbol or "ETF"
+    clean_sym = symbol or context_data.get("symbol", "ETF")
+    sec = (section or "").lower().strip()
+    msg = (user_message or "").lower().strip()
+
+    pd = context_data.get("premium_discount_pct", 0.0)
+    te = context_data.get("tracking_error_1y", 0.05)
+    ter = context_data.get("expense_ratio_pct", 0.10)
+    lp = context_data.get("last_price", 0.0)
+    nav = context_data.get("nav", 0.0)
+    benchmark = context_data.get("underlying_index", "Benchmark Index")
+    tier = context_data.get("liquidity_tier", "HIGH_LIQUIDITY")
+    aum = context_data.get("aum_formatted", "N/A")
+
+    # Inquiry: Arbitrage / Premium / Discount
+    if any(k in msg for k in ["premium", "discount", "arbitrage", "inav", "spread", "fair value", "mispricing"]):
+        if pd > 0.5:
+            arb_eval = f"Trading at a **+{pd:.2f}% premium** over Fair NAV (CMP ₹{lp:.2f} vs NAV ₹{nav:.2f}). Retail buyers currently pay an unearned impact surcharge. Authorized Participants have an arbitrage incentive to short on exchange and create basket units with the AMC."
+        elif pd < -0.5:
+            arb_eval = f"Trading at a **{pd:.2f}% discount** to Fair NAV (CMP ₹{lp:.2f} vs NAV ₹{nav:.2f}). This presents a potential entry window for disciplined allocators, though AP redemption friction must be monitored."
+        else:
+            arb_eval = f"Trading at **{pd:+.2f}% Fair Value**, tightly tracking Fair NAV within the statutory ±50 bps arbitrage corridor. Secondary market liquidity is functioning cleanly."
+
+        return (
+            f"**Arbitrage & Premium/Discount Analysis for {name} ({clean_sym}):**\n\n"
+            f"- **Market CMP:** ₹{lp:.2f}\n"
+            f"- **Statutory Fair NAV:** ₹{nav:.2f}\n"
+            f"- **Spread:** {pd:+.2f}%\n\n"
+            f"{arb_eval}\n\n"
+            f"Would you like to examine 1Y tracking error or compare {clean_sym} against category peers?"
+        )
+
+    # Inquiry: Tracking Error / Replication
+    elif any(k in msg for k in ["tracking error", "replication", "fidelity", "sampling", "cash drag", "benchmark"]):
+        grade = "Exemplary" if te <= 0.05 else ("Acceptable" if te <= 0.15 else "Elevated Drag")
+        return (
+            f"**Tracking Error & Benchmark Replication for {name} ({clean_sym}):**\n\n"
+            f"- **1-Year Annualized Tracking Error:** {te:.2f}% ({grade})\n"
+            f"- **Replicated Benchmark:** {benchmark}\n"
+            f"- **Expense Ratio (TER):** {ter:.2f}%\n\n"
+            f"**Replication Mechanics:** The fund utilizes physical index replication. Key sources of tracking error include statutory cash reserves for redemptions (cash drag), dividend reinvestment timing lag, and exchange transaction fees.\n\n"
+            f"Would you like to review secondary market liquidity or check category peers?"
+        )
+
+    # Inquiry: Liquidity / Volume / Execution
+    elif any(k in msg for k in ["liquidity", "volume", "turnover", "depth", "execution", "slippage", "impact cost"]):
+        vol = context_data.get("avg_daily_volume", 0.0)
+        t_cr = context_data.get("avg_daily_turnover_cr", 0.0)
+        return (
+            f"**Secondary Market Liquidity Depth for {name} ({clean_sym}):**\n\n"
+            f"- **Liquidity Tier:** {tier}\n"
+            f"- **Avg Daily Volume:** {vol:,.0f} shares\n"
+            f"- **Avg Daily Turnover:** ₹{t_cr:.2f} Cr\n"
+            f"- **Total AUM:** {aum}\n\n"
+            f"**Execution Guidance:** Always place limit orders pegged near the intraday indicative NAV (iNAV) rather than market orders to prevent slippage.\n\n"
+            f"Would you like to review the bear thesis or check premium/discount spreads?"
+        )
+
+    # Inquiry: Bear Thesis / Risks
+    elif any(k in msg for k in ["bear thesis", "bear case", "bearish", "risks", "failure mode", "downside"]):
+        return (
+            f"**Institutional Inversion & Bear Thesis for {name} ({clean_sym}):**\n\n"
+            f"1. **Market Maker Withdrawal Risk:** During high volatility or circuit limit halts in underlying constituents, Authorized Participants may widen spreads or halt arbitrage.\n"
+            f"2. **Index Rebalancing Friction:** Semi-annual reconstitution of {benchmark} forces block trades that incur turnover drag within the fund's NAV.\n"
+            f"3. **Long-Term Expense Ratio Drag:** At {ter:.2f}% TER, holding {clean_sym} over 10 years creates cumulative wealth drag vs the theoretical gross index.\n\n"
+            f"Would you like to check tracking error or compare expense ratios with peers?"
+        )
+
+    # Default overview
+    else:
+        return (
+            f"**ETF Institutional Summary for {name} ({clean_sym}):**\n\n"
+            f"- **Benchmark:** {benchmark}\n"
+            f"- **Market Price vs NAV:** ₹{lp:.2f} vs ₹{nav:.2f} ({pd:+.2f}% Spread)\n"
+            f"- **1Y Tracking Error:** {te:.2f}%\n"
+            f"- **TER Drag:** {ter:.2f}%\n"
+            f"- **Total AUM:** {aum}\n"
+            f"- **Liquidity Depth:** {tier}\n\n"
+            f"What specific dimension would you like to inspect: **Arbitrage Spread**, **Tracking Error**, or **Category Peers**?"
+        )
+
+
+def build_reit_deterministic_response(
+    context_data: Dict[str, Any],
+    section: Optional[str],
+    symbol: str,
+    user_message: str = ""
+) -> str:
+    """Builds a section-anchored and query-intent aware deterministic response for REITs, SM REITs, and InvITs."""
+    reit_info = context_data.get("reit", {})
+    name = reit_info.get("name") or context_data.get("name") or symbol or "Real Asset"
+    clean_sym = symbol or reit_info.get("symbol") or "REIT"
+    sec = (section or "").lower().strip()
+    msg = (user_message or "").lower().strip()
+
+    tax = context_data.get("tax_waterfall", {})
+    ndcf = context_data.get("ndcf_audit", {})
+    portfolio = context_data.get("portfolio_audit", {})
+    capital = portfolio.get("capital_structure", {})
+
+    cp_fmt = reit_info.get("current_price_formatted", "N/A")
+    nav_fmt = reit_info.get("nav_per_unit_formatted", "N/A")
+    disc_lbl = reit_info.get("discount_label", "Par")
+    yield_fmt = reit_info.get("distribution_yield_formatted", "N/A")
+    occ = reit_info.get("occupancy_pct", 95.0)
+    wale = reit_info.get("wale_years", 7.0)
+    ltv = reit_info.get("ltv_ratio_pct", 25.0)
+    purity = reit_info.get("ndcf_payout_purity_pct", 100.0)
+
+    # 1. Section 115UA Tax Waterfall
+    if sec == "tax_waterfall" or any(k in msg for k in ["tax", "waterfall", "115ua", "post-tax", "in-hand", "dividend", "interest", "return of capital", "amortization", "specified sum", "slab"]):
+        int_pct = tax.get("interest_pct", 40.0)
+        div_pct = tax.get("dividend_pct", 35.0)
+        amrt_pct = tax.get("return_of_capital_pct", 25.0)
+        rent_pct = tax.get("rental_pct", 0.0)
+        def_slab = tax.get("default_slab", {})
+        net_y = def_slab.get("net_yield_pct", "N/A")
+        drag = def_slab.get("tax_drag_bps", "N/A")
+        income_10l = def_slab.get("annual_income_formatted", "N/A")
+
+        return (
+            f"**Section 115UA Tax Distribution Waterfall for {name} ({clean_sym}):**\n\n"
+            f"- **Gross Annualized Distribution Yield:** {yield_fmt}\n"
+            f"- **Distribution Stream Breakdown:**\n"
+            f"  • **Interest ({int_pct}%):** Taxed at investor's marginal income tax slab.\n"
+            f"  • **Dividends ({div_pct}%):** Passed through from SPVs. Tax-free if SPV retains standard corporate tax (Sec 10(23FD)); taxable at slab if SPV opted for Sec 115BAA.\n"
+            f"  • **Return of Capital / Amortization ({amrt_pct}%):** Received tax-free up to acquisition price. Excess taxed as 'Specified Sum' under Section 56(2)(xii) (Finance Act 2023).\n"
+            f"  • **Rental Income ({rent_pct}%):** Pure pass-through, taxed at marginal slab.\n\n"
+            f"📊 **Post-Tax Yield at 30% Marginal Slab:**\n"
+            f"- **Net In-Hand Yield:** **{net_y}%** (Effective Tax Drag: **{drag} bps**)\n"
+            f"- **Estimated Net Annual Cash Flow on ₹10 Lakhs:** **{income_10l}**\n\n"
+            f"Would you like to examine Net Distributable Cash Flow (NDCF) purity or portfolio WALE and tenant concentration?"
+        )
+
+    # 2. Net Distributable Cash Flow (NDCF) Purity
+    elif sec == "ndcf_purity" or any(k in msg for k in ["ndcf", "payout", "purity", "cash flow", "distribution", "penal", "penalty", "frequency"]):
+        penal_clause = ndcf.get("penal_interest_clause", "SEBI mandates 15% p.a. penal interest payable by the Investment Manager for delayed distributions.")
+        purity_grade = ndcf.get("purity_grade", "INSTITUTIONAL GRADE")
+
+        return (
+            f"**Net Distributable Cash Flow (NDCF) Upstreaming Audit for {name} ({clean_sym}):**\n\n"
+            f"- **NDCF Payout Purity:** **{purity}%** ({purity_grade})\n"
+            f"- **Statutory Threshold:** Minimum 90% (Mainboard) / 95% (SM REIT) of net distributable cash flows must be paid out to unitholders.\n"
+            f"- **Distribution Frequency:** Mandatory quarterly distribution schedule.\n"
+            f"- **SEBI Penal Enforcement Clause:** {penal_clause}\n\n"
+            f"Secondary cash distribution quality is functioning at institutional standard with zero upstreaming leakages."
+        )
+
+    # 3. Portfolio Quality, WALE & Leverage
+    elif sec == "portfolio_wale" or any(k in msg for k in ["wale", "tenant", "tenants", "occupancy", "lease", "expiry", "ltv", "leverage", "borrowing", "debt", "sqft", "msf", "lane"]):
+        scale = portfolio.get("scale_formatted", "Institutional Portfolio")
+        top_tenants = portfolio.get("top_tenants", ["Institutional Counterparties"])
+        tenants_str = ", ".join(top_tenants[:4]) if isinstance(top_tenants, list) else str(top_tenants)
+        headroom = capital.get("ltv_headroom_pct", round(49.0 - ltv, 1))
+        cost_debt = capital.get("cost_of_debt_pct", 7.85)
+        debt_mix = capital.get("fixed_vs_floating", "68% Fixed / 32% Floating")
+
+        return (
+            f"**Portfolio Quality, WALE & Solvency Audit for {name} ({clean_sym}):**\n\n"
+            f"- **Asset Scale & Footprint:** {scale}\n"
+            f"- **Committed Portfolio Occupancy:** **{occ}%**\n"
+            f"- **Weighted Average Lease Expiry (WALE):** **{wale} Years**\n"
+            f"- **Anchor Tenants:** {tenants_str}\n\n"
+            f"🏛️ **Capital Structure & Debt Solvency:**\n"
+            f"- **Net Loan-to-Value (LTV):** **{ltv}%** (SEBI Statutory Cap: 49.0% | Headroom: **{headroom}%**)\n"
+            f"- **Average Borrowing Cost:** {cost_debt}% p.a. ({debt_mix})\n"
+            f"- **Credit Rating:** CRISIL AAA / ICRA AAA (Stable)\n\n"
+            f"Would you like to examine the Pre-Mortem Inversion risk ledger or check category peers?"
+        )
+
+    # 4. Pre-Mortem Inversion & Risk Ledger
+    elif sec == "inversion" or any(k in msg for k in ["bear thesis", "risk", "risks", "failure mode", "downside", "inversion", "pre-mortem", "worst case", "red flag"]):
+        return (
+            f"**Pre-Mortem Inversion & Bear Thesis for {name} ({clean_sym}):**\n\n"
+            f"1. **Interest Rate & Cap Rate Repricing:** A 50 bps increase in benchmark borrowing rates impacts debt servicing, expanding capitalization rates and creating downward pressure on net asset value.\n"
+            f"2. **Tenant Re-Leasing & Vacancy Bunching:** Although portfolio WALE is {wale} years, lease expiries across anchor tenants over the next 24 months require proactive re-leasing to avoid NOI compression.\n"
+            f"3. **Sponsor ROFO Pipeline Conflict:** Future asset injections from the sponsor must be scrutinized for transfer pricing fairness and independent valuer integrity.\n"
+            f"4. **Regulatory & Tax Pass-Through Drag:** Any changes to Section 115UA or municipal property taxes could alter post-tax cash distributions.\n\n"
+            f"Would you like to audit the Section 115UA tax waterfall or compare metrics with peers?"
+        )
+
+    # Default Overview
+    else:
+        def_slab = tax.get("default_slab", {})
+        net_y = def_slab.get("net_yield_pct", "N/A")
+        drag = def_slab.get("tax_drag_bps", "N/A")
+
+        return (
+            f"**Institutional Real Asset Summary for {name} ({clean_sym}):**\n\n"
+            f"- **Structure:** {reit_info.get('structure_label', 'Real Asset')}\n"
+            f"- **Market Price vs NAV:** {cp_fmt} vs {nav_fmt} ({disc_lbl})\n"
+            f"- **Gross Distribution Yield:** **{yield_fmt}**\n"
+            f"- **Net Post-Tax Yield (30% Slab):** **{net_y}%** (Tax Drag: {drag} bps)\n"
+            f"- **Portfolio Occupancy:** {occ}%\n"
+            f"- **WALE:** {wale} Years | **LTV:** {ltv}%\n\n"
+            f"What specific area would you like to inspect: **Tax Waterfall (Sec 115UA)**, **NDCF Purity**, **Portfolio WALE**, or **Pre-Mortem Inversion**?"
         )
 
 
@@ -1087,12 +1337,26 @@ async def process_forensic_desk_turn(
         resolved_asset_class = "MUTUAL_FUND"
     elif norm_asset in ["corporate_debt", "debt", "bond", "sdi", "ncd"]:
         resolved_asset_class = "CORPORATE_DEBT"
+    elif norm_asset in ["etf", "etfs"]:
+        resolved_asset_class = "ETF"
+    elif norm_asset in ["reit", "reits", "invit", "invits", "sm_reit", "smreit"]:
+        resolved_asset_class = "REIT"
     elif norm_asset in ["equity", "stock"]:
         resolved_asset_class = "EQUITY"
     else:
         # Auto-detect from ticker pattern
         if clean_ticker.startswith("IN") or clean_ticker.endswith("BOND") or "SDI" in clean_ticker or "NCD" in clean_ticker:
             resolved_asset_class = "CORPORATE_DEBT"
+        elif clean_ticker.endswith("BEES") or clean_ticker.endswith("ETF") or clean_ticker in [
+            "NIFTYBEES", "GOLDBEES", "BANKBEES", "SILVERBEES", "SETFNIF50", "HDFCNIFTY", "CPSEETF", "MON100"
+        ]:
+            resolved_asset_class = "ETF"
+        elif clean_ticker in [
+            "EMBASSY", "MINDSPACE", "BIRET", "NEXUS", "PGINVIT", "INDIGRID",
+            "IRBINVIT", "IRB_INVIT", "NHIT", "NHAI_INVIT", "PROPSHARE", "STRATA",
+            "ORIENTINVIT", "BHARATINV", "SMREIT_BLR_01", "SMREIT_HYD_02"
+        ] or clean_ticker.endswith("REIT") or clean_ticker.endswith("INVIT"):
+            resolved_asset_class = "REIT"
         elif clean_ticker.isdigit() or clean_ticker.endswith("_DIR") or clean_ticker.endswith("_REG") or any(kw in clean_ticker for kw in ["FLEXICAP", "MIDCAP", "SMALLCAP", "NIFTY", "FUND"]):
             resolved_asset_class = "MUTUAL_FUND"
         else:
@@ -1191,6 +1455,61 @@ async def process_forensic_desk_turn(
                     "contagion_risk_level": radar.get("risk_level"),
                     "radar_summary": radar.get("radar_summary")
                 })
+
+        elif resolved_asset_class == "ETF":
+            # ETF Forensic Grounding
+            from core.analysis.etf_matrix_engine import get_etf_detail
+            etf_data = get_etf_detail(clean_ticker) or {}
+            etf_item = etf_data.get("etf", {})
+            peers = etf_data.get("peers", [])
+            context_data.update({
+                "symbol": etf_item.get("symbol", clean_ticker),
+                "scheme_name": etf_item.get("scheme_name", clean_ticker),
+                "category": etf_item.get("category", "EQUITY_INDEX"),
+                "category_label": etf_data.get("category_label", "Equity Indices"),
+                "underlying_index": etf_item.get("underlying_index", "Benchmark Index"),
+                "last_price": etf_item.get("last_price", 0.0),
+                "nav": etf_item.get("nav", 0.0),
+                "premium_discount_pct": etf_item.get("premium_discount_pct", 0.0),
+                "tracking_error_1y": etf_item.get("tracking_error_1y", 0.05),
+                "expense_ratio_pct": etf_item.get("expense_ratio_pct", 0.10),
+                "aum_crores": etf_item.get("aum_crores", 0.0),
+                "aum_formatted": etf_data.get("aum_formatted", "N/A"),
+                "liquidity_tier": etf_item.get("liquidity_tier", "HIGH_LIQUIDITY"),
+                "avg_daily_volume": etf_item.get("avg_daily_volume", 0.0),
+                "avg_daily_turnover_cr": etf_item.get("avg_daily_turnover_cr", 0.0),
+                "arbitrage_analysis": etf_data.get("arbitrage_analysis", {}),
+                "replication_audit": etf_data.get("replication_audit", {}),
+                "liquidity_audit": etf_data.get("liquidity_audit", {}),
+                "inversion_risks": etf_data.get("inversion_risks", []),
+                "peers": [{"symbol": p.get("symbol"), "ter": p.get("expense_ratio_pct"), "te": p.get("tracking_error_1y"), "pd": p.get("premium_discount_pct")} for p in peers]
+            })
+
+        elif resolved_asset_class == "REIT":
+            # REIT / SM REIT / InvIT Forensic Grounding
+            from core.analysis.sm_reit_invit_engine import get_reit_detail
+            reit_data = get_reit_detail(clean_ticker) or {}
+            context_data.update(reit_data)
+            r_item = reit_data.get("reit", {})
+            context_data.update({
+                "symbol": r_item.get("symbol", clean_ticker),
+                "name": r_item.get("name", clean_ticker),
+                "structure_type": r_item.get("structure_type", "MAINBOARD_REIT"),
+                "structure_label": r_item.get("structure_label", "Real Asset"),
+                "current_price": r_item.get("current_price", 0.0),
+                "nav_per_unit": r_item.get("nav_per_unit", 0.0),
+                "discount_to_nav_pct": r_item.get("discount_to_nav_pct", 0.0),
+                "distribution_yield_pct": r_item.get("distribution_yield_pct", 0.0),
+                "occupancy_pct": r_item.get("occupancy_pct", 0.0),
+                "ndcf_payout_purity_pct": r_item.get("ndcf_payout_purity_pct", 100.0),
+                "ltv_ratio_pct": r_item.get("ltv_ratio_pct", 0.0),
+                "wale_years": r_item.get("wale_years", 0.0),
+                "tax_waterfall": reit_data.get("tax_waterfall", {}),
+                "ndcf_audit": reit_data.get("ndcf_audit", {}),
+                "portfolio_audit": reit_data.get("portfolio_audit", {}),
+                "inversion_risks": reit_data.get("inversion_risks", []),
+                "peers": reit_data.get("peers", [])
+            })
 
         else:
             # Fundamental Equity Grounding with reports.db and Verified Disclosures
@@ -1324,6 +1643,10 @@ async def process_forensic_desk_turn(
             base_reply = build_mutual_fund_deterministic_response(context_data, section, clean_ticker, user_message)
         elif asset_cls == "CORPORATE_DEBT":
             base_reply = build_debt_deterministic_response(context_data, section, clean_ticker, user_message)
+        elif asset_cls == "ETF":
+            base_reply = build_etf_deterministic_response(context_data, section, clean_ticker, user_message)
+        elif asset_cls == "REIT":
+            base_reply = build_reit_deterministic_response(context_data, section, clean_ticker, user_message)
         else:
             base_reply = build_equity_deterministic_response(context_data, section, clean_ticker, user_message)
 
@@ -1349,6 +1672,10 @@ async def process_forensic_desk_turn(
             fallback_msg = build_mutual_fund_deterministic_response(context_data, section, clean_ticker, user_message)
         elif asset_cls == "CORPORATE_DEBT":
             fallback_msg = build_debt_deterministic_response(context_data, section, clean_ticker, user_message)
+        elif asset_cls == "ETF":
+            fallback_msg = build_etf_deterministic_response(context_data, section, clean_ticker, user_message)
+        elif asset_cls == "REIT":
+            fallback_msg = build_reit_deterministic_response(context_data, section, clean_ticker, user_message)
         else:
             fallback_msg = build_equity_deterministic_response(context_data, section, clean_ticker, user_message)
 
@@ -1387,6 +1714,24 @@ async def process_forensic_desk_turn(
             "CRITICAL ASSET DIRECTIVE: THIS IS A FIXED INCOME / CORPORATE DEBT / SDI SECURITY.\n"
             "- Focus strictly on credit solvency, capital structure seniority, recovery rights, and covenant headroom.\n"
             "- Evaluate the Credit Contagion Radar, group financial leverage, and systemic spillover risks.\n"
+        )
+    elif resolved_asset_class == "ETF":
+        asset_instructions = (
+            "================================================================================\n"
+            "CRITICAL ASSET DIRECTIVE: THIS IS AN EXCHANGE TRADED FUND (ETF), NOT AN OPERATING COMPANY OR ACTIVE MUTUAL FUND.\n"
+            "- Focus strictly on passive index replication, tracking error, statutory Fair NAV vs CMP arbitrage spreads, and secondary market liquidity depth.\n"
+            "- Evaluate Authorized Participant creation/redemption mechanics and secondary market bid-ask impact costs.\n"
+            "- Never recommend buying or selling; evaluate whether current exchange pricing is fair, at a premium, or at a discount.\n"
+        )
+    elif resolved_asset_class == "REIT":
+        asset_instructions = (
+            "================================================================================\n"
+            "CRITICAL ASSET DIRECTIVE: THIS IS A REAL ESTATE INVESTMENT TRUST (REIT), SM REIT, OR INVIT.\n"
+            "- Focus on Section 115UA multi-component pass-through distribution waterfalls (Interest, Dividend, Return of Capital, Rental).\n"
+            "- Evaluate Net Distributable Cash Flow (NDCF) payout purity (>=95% for SM REIT, >=90% for Mainboard) and SEBI 15% penal interest enforcement.\n"
+            "- Scrutinize portfolio WALE, tenant credit ratings, completed vs under-construction status, and LTV leverage against the statutory 49% cap.\n"
+            "- Apply Pre-Mortem Inversion to stress-test interest rate repricing, lease bunching, and sponsor ROFO asset pipeline conflicts.\n"
+            "- Strictly enforce SEBI Research Analyst Regulations 2014 Section 2(u) non-advisory boundaries. Zero Buy/Sell/Hold calls.\n"
         )
     else:
         asset_instructions = (

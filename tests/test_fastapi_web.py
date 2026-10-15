@@ -470,15 +470,16 @@ Detailed forensic analysis with exact page grounding to bseindia.com filings.
         self.assertIn("Pricing", html)
         self.assertIn("Search", html)
 
-        # Sub-tab dropdown items
-        self.assertIn("Equities & Stocks", html)
+        # Sub-tab dropdown items (Stock Reports & Mutual Funds consolidated in Markets; Generate Report removed)
+        self.assertIn("Stock Reports & Equities", html)
+        self.assertIn("Mutual Funds", html)
         self.assertIn("Bonds, NCDs & SDIs", html)
-        self.assertIn("Mutual Funds & ETFs", html)
         self.assertIn("Morning Discovery @9AM", html)
         self.assertIn("Peer Comparison", html)
-        self.assertIn("Instant Dossier Generator", html)
         self.assertIn("Support & Grievances", html)
         self.assertIn("SEBI Safe Harbor", html)
+        self.assertNotIn("Instant Dossier Generator", html)
+        self.assertNotIn("navGenerateBtn", html)
 
         # Accessibility semantics
         self.assertIn('aria-haspopup="true"', html)

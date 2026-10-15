@@ -359,6 +359,65 @@ class TestRealAssetsAndRadarSuite(unittest.TestCase):
         self.assertIn("total_schemes_audited", data)
         self.assertIn("all_products", data)
 
+    def test_reit_dossier_web_routes(self):
+        """Test individual institutional dossier web pages for Mainboard REITs, SM REITs, and InvITs."""
+        for sym in ["EMBASSY", "PROPSHARE", "PGINVIT", "IRBINVIT", "NHIT"]:
+            resp = self.client.get(f"/reits/{sym}")
+            self.assertEqual(resp.status_code, 200, f"Failed for {sym}")
+            self.assertIn("Section 115UA Tax Waterfall Simulator", resp.text)
+            self.assertIn("NDCF Payout Purity", resp.text)
+            self.assertIn("Pillar 1: Tax Architecture", resp.text)
+            self.assertIn("Pillar 4: Behavioral Pre-Mortem Inversion", resp.text)
+
+    def test_reit_dossier_legacy_alias_resolution(self):
+        """Verify backward-compatible resolution of legacy synthetic symbols to genuine entities."""
+        for alias in ["SMREIT_BLR_01", "SMREIT_HYD_02", "IRB_INVIT", "NHAI_INVIT"]:
+            resp = self.client.get(f"/reits/{alias}")
+            self.assertEqual(resp.status_code, 200, f"Failed alias resolution for {alias}")
+            self.assertIn("Section 115UA Tax Waterfall", resp.text)
+
+    def test_reit_dossier_not_found(self):
+        """Verify 404 response for invalid REIT symbol."""
+        resp = self.client.get("/reits/INVALID_TRUST_XYZ")
+        self.assertEqual(resp.status_code, 404)
+
+    def test_reit_detail_sec_115ua_math(self):
+        """Verify mathematical integrity of Section 115UA multi-slab calculations and NDCF purity."""
+        from core.analysis.sm_reit_invit_engine import get_reit_detail
+        detail = get_reit_detail("EMBASSY")
+        self.assertIsNotNone(detail)
+        reit = detail["reit"]
+        tax = detail["tax_waterfall"]
+        ndcf = detail["ndcf_audit"]
+
+        # Check distribution percentages sum to ~100%
+        total_dist_pct = tax["dividend_pct"] + tax["interest_pct"] + tax["return_of_capital_pct"] + tax["rental_pct"]
+        self.assertAlmostEqual(total_dist_pct, 100.0, places=1)
+
+        # Check 5 tax slabs
+        slabs = tax["slabs"]
+        self.assertEqual(len(slabs), 5)
+        slab_0 = slabs[0]
+        slab_30 = slabs[3]
+        slab_39 = slabs[4]
+
+        # At 0% slab, net yield equals gross yield and tax drag is 0
+        self.assertEqual(slab_0["slab_rate_pct"], 0.0)
+        self.assertEqual(slab_0["net_post_tax_yield_pct"], reit["distribution_yield_pct"])
+        self.assertEqual(slab_0["tax_drag_bps"], 0)
+
+        # At 30% slab, tax drag > 0 and net yield < gross yield
+        self.assertGreater(slab_30["tax_drag_bps"], 0)
+        self.assertLess(slab_30["net_post_tax_yield_pct"], reit["distribution_yield_pct"])
+        self.assertLess(slab_39["net_post_tax_yield_pct"], slab_30["net_post_tax_yield_pct"])
+
+        # Check NDCF compliance
+        self.assertGreaterEqual(ndcf["payout_purity_pct"], ndcf["statutory_minimum_pct"])
+
+        # Check 4 inversion failure modes
+        self.assertEqual(len(detail["inversion_risks"]), 4)
+
 
 if __name__ == "__main__":
     unittest.main()
+

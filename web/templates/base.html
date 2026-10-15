@@ -131,16 +131,6 @@
             <span class="nav-icon"><svg class="glyph"><use href="#glyph-search"></use></svg></span> Search
           </a>
 
-          <!-- Direct Stock Reports Link -->
-          <a href="/equities" class="nav-link {% if active_page == 'equities' %}active{% endif %}" id="navStockReportsLink">
-            <span class="nav-icon">📈</span> Stock Reports
-          </a>
-
-          <!-- Direct Mutual Funds Link -->
-          <a href="/funds" class="nav-link {% if active_page == 'funds' %}active{% endif %}" id="navFundsLink">
-            <span class="nav-icon"><svg class="glyph"><use href="#glyph-chart"></use></svg></span> Mutual Funds
-          </a>
-
           <!-- Markets & Multi-Asset Sub-Tabs -->
           <div class="nav-item dropdown {% if active_page in ['home', 'equities', 'opportunities', 'debt', 'funds', 'sovereign', 'etfs', 'reits', 'dossier', 'msme'] %}active-parent{% endif %}" id="navMarketsDropdown">
             <button class="nav-link dropdown-toggle" aria-haspopup="true" aria-expanded="false" id="marketsDropdownBtn">
@@ -150,32 +140,17 @@
               </svg>
             </button>
             <div class="dropdown-menu" role="menu" aria-labelledby="marketsDropdownBtn">
-              <a href="/opportunities" class="dropdown-item {% if active_page == 'opportunities' %}active{% endif %}" role="menuitem">
-                <div class="dropdown-icon">🎯</div>
-                <div class="dropdown-content">
-                  <div class="dropdown-title">Opportunity Terminal</div>
-                  <div class="dropdown-desc">Cross-asset discovery, spread heatmap & risk-yield frontier</div>
-                </div>
-              </a>
-              <div class="dropdown-divider"></div>
               <a href="/equities" class="dropdown-item {% if active_page == 'equities' %}active{% endif %}" role="menuitem">
                 <div class="dropdown-icon">📈</div>
                 <div class="dropdown-content">
-                  <div class="dropdown-title">Equities & Stocks</div>
+                  <div class="dropdown-title">Stock Reports & Equities</div>
                   <div class="dropdown-desc">All verified BSE & NSE institutional dossiers & screener</div>
-                </div>
-              </a>
-              <a href="/debt" class="dropdown-item {% if active_page == 'debt' %}active{% endif %}" role="menuitem">
-                <div class="dropdown-icon"><svg class="glyph"><use href="#glyph-bank"></use></svg></div>
-                <div class="dropdown-content">
-                  <div class="dropdown-title">Bonds, NCDs & SDIs</div>
-                  <div class="dropdown-desc">SEBI ₹10K fixed income, senior secured yields & YTMs</div>
                 </div>
               </a>
               <a href="/funds" class="dropdown-item {% if active_page == 'funds' %}active{% endif %}" role="menuitem">
                 <div class="dropdown-icon"><svg class="glyph"><use href="#glyph-chart"></use></svg></div>
                 <div class="dropdown-content">
-                  <div class="dropdown-title">Mutual Funds & ETFs</div>
+                  <div class="dropdown-title">Mutual Funds</div>
                   <div class="dropdown-desc">Dual-sleeve look-through, active share & fee drag</div>
                 </div>
               </a>
@@ -187,6 +162,13 @@
                 </div>
               </a>
               <div class="dropdown-divider"></div>
+              <a href="/debt" class="dropdown-item {% if active_page == 'debt' %}active{% endif %}" role="menuitem">
+                <div class="dropdown-icon"><svg class="glyph"><use href="#glyph-bank"></use></svg></div>
+                <div class="dropdown-content">
+                  <div class="dropdown-title">Bonds, NCDs & SDIs</div>
+                  <div class="dropdown-desc">SEBI ₹10K fixed income, senior secured yields & YTMs</div>
+                </div>
+              </a>
               <a href="/sovereign" class="dropdown-item {% if active_page == 'sovereign' %}active{% endif %}" role="menuitem">
                 <div class="dropdown-icon"><svg class="glyph"><use href="#glyph-temple"></use></svg></div>
                 <div class="dropdown-content">
@@ -199,6 +181,14 @@
                 <div class="dropdown-content">
                   <div class="dropdown-title">SM REITs, InvITs & SGBs</div>
                   <div class="dropdown-desc">Fractional real estate, NDCF purity & gold parity</div>
+                </div>
+              </a>
+              <div class="dropdown-divider"></div>
+              <a href="/opportunities" class="dropdown-item {% if active_page == 'opportunities' %}active{% endif %}" role="menuitem">
+                <div class="dropdown-icon">🎯</div>
+                <div class="dropdown-content">
+                  <div class="dropdown-title">Opportunity Terminal</div>
+                  <div class="dropdown-desc">Cross-asset discovery, spread heatmap & risk-yield frontier</div>
                 </div>
               </a>
               <a href="/msme" class="dropdown-item {% if active_page == 'msme' %}active{% endif %}" role="menuitem">
@@ -246,14 +236,6 @@
                 <div class="dropdown-content">
                   <div class="dropdown-title">Retail Safety Radar</div>
                   <div class="dropdown-desc">Danger scorecard for gold leasing & P2P lending</div>
-                </div>
-              </a>
-              <div class="dropdown-divider"></div>
-              <a href="javascript:void(0)" onclick="openGenerateModal()" class="dropdown-item" role="menuitem">
-                <div class="dropdown-icon"><svg class="glyph"><use href="#glyph-zap"></use></svg></div>
-                <div class="dropdown-content">
-                  <div class="dropdown-title">Instant Dossier Generator</div>
-                  <div class="dropdown-desc">Synthesize live institutional research report on demand</div>
                 </div>
               </a>
             </div>
@@ -314,10 +296,6 @@
         </nav>
 
         <div class="nav-actions">
-          <button id="navGenerateBtn" class="btn btn-primary btn-sm" onclick="openGenerateModal()">
-            <svg class="glyph"><use href="#glyph-zap"></use></svg>
-            <span>Generate Report</span>
-          </button>
           <button id="navSignInBtn" class="btn btn-secondary btn-sm" onclick="openSignInModal()">
             <span>Sign In / 2 Credits</span>
           </button>

@@ -1,0 +1,358 @@
+{% extends "base.html" %}
+
+{% block title %}{{ etf.symbol }} | ETF Institutional Dossier & Arbitrage Surveillance{% endblock %}
+{% block meta_desc %}Institutional ETF audit of {{ etf.scheme_name }} ({{ etf.symbol }}). Live market CMP vs statutory Fair NAV arbitrage spread, 1-year tracking error fidelity, and category peer comparison.{% endblock %}
+{% block og_title %}{{ etf.symbol }} — {{ etf.scheme_name }} | Institutional ETF Dossier{% endblock %}
+{% block og_desc %}Live tracking error, secondary market spread, and Fair NAV arbitrage matrix for {{ etf.symbol }}.{% endblock %}
+
+{% block content %}
+<div class="container py-8">
+  <!-- Breadcrumbs -->
+  <div style="font-size: 13px; color: #64748b; margin-bottom: 20px; display: flex; align-items: center; gap: 8px;">
+    <a href="/" style="color: #94a3b8; text-decoration: none;">Home</a>
+    <span>›</span>
+    <a href="/etfs" style="color: #94a3b8; text-decoration: none;">ETF Matrix</a>
+    <span>›</span>
+    <span style="color: #f8fafc; font-weight: 600;">{{ etf.symbol }}</span>
+  </div>
+
+  <!-- Header Banner -->
+  <div style="background: linear-gradient(135deg, rgba(30, 41, 59, 0.8) 0%, rgba(15, 23, 42, 0.95) 100%); border: 1px solid rgba(255, 255, 255, 0.1); border-radius: 16px; padding: 28px; margin-bottom: 24px; position: relative; overflow: hidden;">
+    <div style="display: flex; justify-content: space-between; align-items: flex-start; flex-wrap: wrap; gap: 16px;">
+      <div>
+        <!-- Badges -->
+        <div style="display: inline-flex; align-items: center; gap: 8px; margin-bottom: 12px; flex-wrap: wrap;">
+          <span style="font-size: 12px; font-weight: 700; color: #38bdf8; background: rgba(14, 165, 233, 0.15); border: 1px solid rgba(14, 165, 233, 0.3); padding: 4px 10px; border-radius: 6px; text-transform: uppercase;">
+            {{ category_label }}
+          </span>
+          <span style="font-size: 12px; font-weight: 600; color: #c084fc; background: rgba(168, 85, 247, 0.15); border: 1px solid rgba(168, 85, 247, 0.3); padding: 4px 10px; border-radius: 6px;">
+            AMC: {{ amc_issuer }}
+          </span>
+          {% if etf.isin %}
+          <span style="font-size: 12px; font-weight: 600; color: #94a3b8; background: rgba(255, 255, 255, 0.05); padding: 4px 10px; border-radius: 6px;">
+            ISIN: {{ etf.isin }}
+          </span>
+          {% endif %}
+          {% if etf.scheme_code %}
+          <span style="font-size: 12px; font-weight: 600; color: #94a3b8; background: rgba(255, 255, 255, 0.05); padding: 4px 10px; border-radius: 6px;">
+            AMFI Code: {{ etf.scheme_code }}
+          </span>
+          {% endif %}
+        </div>
+
+        <h1 style="font-size: 30px; font-weight: 800; color: #f8fafc; margin-bottom: 8px; letter-spacing: -0.01em;">
+          {{ etf.scheme_name }}
+        </h1>
+        <div style="font-size: 14.5px; color: #94a3b8; line-height: 1.5;">
+          Underlying Benchmark: <strong style="color: #f8fafc;">{{ etf.underlying_index }}</strong> • Exchange Ticker: <strong style="color: #38bdf8;">{{ etf.symbol }}</strong>
+        </div>
+
+        <!-- Provenance Strip -->
+        <div class="dossier-meta-strip" style="margin-top: 14px;">
+          <span class="dossier-meta-pill">📅 Evaluated: Live AMFI Feed</span>
+          <span class="dossier-meta-sep">•</span>
+          <span class="badge badge-emerald"><span class="status-dot status-dot-emerald"></span> Statutory Dispatched NAV</span>
+          <span class="dossier-meta-sep">•</span>
+          <span class="badge badge-cyan"><span>⚡</span> <span>Dual-Exchange CMP Feeds</span></span>
+        </div>
+        <div class="dossier-provenance-subline" style="margin-top: 6px;">
+          Statutory end-of-day NAV verified against AMFI master feed; exchange pricing cross-referenced across NSE and BSE secondary trading order books.
+        </div>
+
+        <!-- Action Buttons -->
+        <div style="display: flex; gap: 10px; margin-top: 16px; flex-wrap: wrap;">
+          <button onclick="openCopilot('{{ etf.symbol }}', 'etf')" class="btn btn-hero-ai btn-sm" title="Launch Forensic Intelligence Desk (Shortcut: ⌘K or /)">
+            <svg class="glyph"><use href="#glyph-shield"></use></svg> Forensic Desk
+          </button>
+          <a href="/etfs" class="btn btn-sm btn-secondary" style="text-decoration: none; font-size: 12px; font-weight: 600;">
+            ← Back to National Matrix
+          </a>
+        </div>
+      </div>
+
+      <!-- Arbitrage Spread Status Card -->
+      <div style="text-align: right; background: rgba(15, 23, 42, 0.7); border: 1px solid rgba(255, 255, 255, 0.1); border-radius: 14px; padding: 18px 24px; min-width: 220px;">
+        <div style="font-size: 11.5px; color: #94a3b8; text-transform: uppercase; font-weight: 700; margin-bottom: 6px;">Secondary Market Spread</div>
+        <div style="font-size: 34px; font-weight: 900; line-height: 1; color: {{ arbitrage.badge_color }};" class="tnum">
+          {% if arbitrage.spread_pct > 0 %}+{{ arbitrage.spread_pct }}%{% else %}{{ arbitrage.spread_pct }}%{% endif %}
+        </div>
+        <div style="font-size: 12.5px; font-weight: 700; margin-top: 6px; color: {{ arbitrage.badge_color }};">
+          {% if arbitrage.signal == 'PREMIUM_EXPENSIVE' %}
+            Premium Surcharge
+          {% elif arbitrage.signal == 'DISCOUNT_ATTRACTIVE' %}
+            Discount Entry
+          {% else %}
+            Fair NAV Alignment
+          {% endif %}
+        </div>
+        <div style="font-size: 11px; color: #64748b; margin-top: 4px;">
+          Difference: ₹{{ arbitrage.spread_inr }}
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Top KPI Grid -->
+  <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 14px; margin-bottom: 28px;">
+    <div style="background: rgba(15, 23, 42, 0.6); border: 1px solid rgba(255, 255, 255, 0.08); border-radius: 12px; padding: 16px;">
+      <div style="font-size: 11.5px; color: #64748b; text-transform: uppercase; font-weight: 600; margin-bottom: 4px;">Exchange CMP</div>
+      <div style="font-size: 24px; font-weight: 800; color: #f8fafc;" class="tnum">₹{{ etf.last_price|round(2) }}</div>
+      <div style="font-size: 11px; color: #94a3b8; margin-top: 2px;">Live Market Price</div>
+    </div>
+    <div style="background: rgba(15, 23, 42, 0.6); border: 1px solid rgba(255, 255, 255, 0.08); border-radius: 12px; padding: 16px;">
+      <div style="font-size: 11.5px; color: #64748b; text-transform: uppercase; font-weight: 600; margin-bottom: 4px;">Statutory Fair NAV</div>
+      <div style="font-size: 24px; font-weight: 800; color: #38bdf8;" class="tnum">₹{{ etf.nav|round(2) }}</div>
+      <div style="font-size: 11px; color: #94a3b8; margin-top: 2px;">AMFI Verified NAV</div>
+    </div>
+    <div style="background: rgba(15, 23, 42, 0.6); border: 1px solid rgba(255, 255, 255, 0.08); border-radius: 12px; padding: 16px;">
+      <div style="font-size: 11.5px; color: #64748b; text-transform: uppercase; font-weight: 600; margin-bottom: 4px;">1Y Tracking Error</div>
+      <div style="font-size: 24px; font-weight: 800; color: #10b981;" class="tnum">{{ etf.tracking_error_1y }}%</div>
+      <div style="font-size: 11px; color: #34d399; margin-top: 2px;">Grade: {{ replication.tracking_error_grade }}</div>
+    </div>
+    <div style="background: rgba(15, 23, 42, 0.6); border: 1px solid rgba(255, 255, 255, 0.08); border-radius: 12px; padding: 16px;">
+      <div style="font-size: 11.5px; color: #64748b; text-transform: uppercase; font-weight: 600; margin-bottom: 4px;">Total Expense Ratio</div>
+      <div style="font-size: 24px; font-weight: 800; color: #cbd5e1;" class="tnum">{{ etf.expense_ratio_pct }}%</div>
+      <div style="font-size: 11px; color: #94a3b8; margin-top: 2px;">Annual TER Fee Drag</div>
+    </div>
+    <div style="background: rgba(15, 23, 42, 0.6); border: 1px solid rgba(255, 255, 255, 0.08); border-radius: 12px; padding: 16px;">
+      <div style="font-size: 11.5px; color: #64748b; text-transform: uppercase; font-weight: 600; margin-bottom: 4px;">Total Scheme AUM</div>
+      <div style="font-size: 24px; font-weight: 800; color: #f8fafc;" class="tnum">{{ aum_formatted }}</div>
+      <div style="font-size: 11px; color: #94a3b8; margin-top: 2px;">Institutional Pool Size</div>
+    </div>
+    <div style="background: rgba(15, 23, 42, 0.6); border: 1px solid rgba(255, 255, 255, 0.08); border-radius: 12px; padding: 16px;">
+      <div style="font-size: 11.5px; color: #64748b; text-transform: uppercase; font-weight: 600; margin-bottom: 4px;">Liquidity Tier</div>
+      <div style="font-size: 24px; font-weight: 800; color: {% if liquidity.tier == 'HIGH_LIQUIDITY' %}#10b981{% elif liquidity.tier == 'MODERATE_LIQUIDITY' %}#fbbf24{% else %}#94a3b8{% endif %};">
+        {{ liquidity.tier_badge }}
+      </div>
+      <div style="font-size: 11px; color: #94a3b8; margin-top: 2px;">Vol: {{ liquidity.avg_daily_volume|round|int }} sh/day</div>
+    </div>
+  </div>
+
+  <!-- Section 1: Arbitrage Corridor & Premium/Discount Analysis -->
+  <div class="card" style="background: rgba(15, 23, 42, 0.7); border: 1px solid rgba(255, 255, 255, 0.1); border-radius: 14px; padding: 24px; margin-bottom: 24px;">
+    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px; flex-wrap: wrap; gap: 10px;">
+      <div>
+        <div style="font-size: 12px; font-weight: 700; color: #38bdf8; text-transform: uppercase; letter-spacing: 0.05em;">Pillar 1: Secondary Market Arbitrage</div>
+        <h2 style="font-size: 20px; font-weight: 800; color: #f8fafc; margin-top: 2px;">Live Premium / Discount Surveillance</h2>
+      </div>
+      <button onclick="openCopilot('{{ etf.symbol }}', 'etf', 'arbitrage', 'Arbitrage Spread', 'Audit the secondary market arbitrage spread and fair value premium for {{ etf.symbol }}')" class="btn btn-secondary btn-sm" style="font-size: 12px; font-weight: 600; display: inline-flex; align-items: center; gap: 6px;">
+        <svg class="glyph"><use href="#glyph-shield"></use></svg> Audit Arbitrage with Desk
+      </button>
+    </div>
+
+    <!-- Visual Spread Gauge -->
+    <div style="background: rgba(30, 41, 59, 0.6); border: 1px solid rgba(255, 255, 255, 0.08); border-radius: 12px; padding: 20px; margin-bottom: 20px;">
+      <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px; font-size: 13px;">
+        <span style="color: #94a3b8;">Fair NAV: <strong style="color: #f8fafc;">₹{{ etf.nav|round(2) }}</strong></span>
+        <span style="font-weight: 700; color: {{ arbitrage.badge_color }};">
+          {{ arbitrage.corridor_status }}
+        </span>
+        <span style="color: #94a3b8;">Exchange CMP: <strong style="color: #f8fafc;">₹{{ etf.last_price|round(2) }}</strong></span>
+      </div>
+
+      <!-- Spread Bar -->
+      <div style="height: 10px; background: rgba(15, 23, 42, 0.8); border-radius: 9999px; overflow: hidden; position: relative;">
+        <div style="position: absolute; left: 50%; top: 0; bottom: 0; width: 2px; background: rgba(255, 255, 255, 0.3);"></div>
+        {% set bar_pct = (arbitrage.spread_pct * 10) + 50 %}
+        {% set bounded_bar = 95 if bar_pct > 95 else (5 if bar_pct < 5 else bar_pct) %}
+        <div style="position: absolute; left: {{ bounded_bar }}%; top: 50%; transform: translate(-50%, -50%); width: 16px; height: 16px; border-radius: 50%; background: {{ arbitrage.badge_color }}; border: 2px solid #ffffff; box-shadow: 0 0 10px {{ arbitrage.badge_color }};"></div>
+      </div>
+      <div style="display: flex; justify-content: space-between; font-size: 11px; color: #64748b; margin-top: 8px;">
+        <span>-5.0% (Deep Discount)</span>
+        <span>0.0% (Fair Value Equilibrium)</span>
+        <span>+5.0% (Steep Premium)</span>
+      </div>
+    </div>
+
+    <!-- Diagnostic Cards Grid -->
+    <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 16px;">
+      <div style="background: rgba(30, 41, 59, 0.4); border: 1px solid rgba(255, 255, 255, 0.05); border-radius: 10px; padding: 16px;">
+        <div style="font-size: 12px; font-weight: 700; color: #38bdf8; margin-bottom: 4px; text-transform: uppercase;">Authorized Participant (AP) Mechanics</div>
+        <p style="font-size: 13px; color: #cbd5e1; line-height: 1.5; margin: 0;">
+          {{ arbitrage.ap_incentive }} Minimum creation basket size is approximately ₹{{ arbitrage.creation_basket_approx_cr }} Cr directly with {{ amc_issuer }}.
+        </p>
+      </div>
+      <div style="background: rgba(30, 41, 59, 0.4); border: 1px solid rgba(255, 255, 255, 0.05); border-radius: 10px; padding: 16px;">
+        <div style="font-size: 12px; font-weight: 700; color: #fbbf24; margin-bottom: 4px; text-transform: uppercase;">Retail Allocator Guidance</div>
+        <p style="font-size: 13px; color: #cbd5e1; line-height: 1.5; margin: 0;">
+          {{ arbitrage.retail_guidance }}
+        </p>
+      </div>
+    </div>
+  </div>
+
+  <!-- Section 2: Tracking Error & Replication Fidelity Audit -->
+  <div class="card" style="background: rgba(15, 23, 42, 0.7); border: 1px solid rgba(255, 255, 255, 0.1); border-radius: 14px; padding: 24px; margin-bottom: 24px;">
+    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px; flex-wrap: wrap; gap: 10px;">
+      <div>
+        <div style="font-size: 12px; font-weight: 700; color: #10b981; text-transform: uppercase; letter-spacing: 0.05em;">Pillar 2: Index Fidelity</div>
+        <h2 style="font-size: 20px; font-weight: 800; color: #f8fafc; margin-top: 2px;">Tracking Error & Fee Drag Audit</h2>
+      </div>
+      <button onclick="openCopilot('{{ etf.symbol }}', 'etf', 'tracking_error', 'Tracking Error Fidelity', 'Explain the 1-year tracking error and replication fidelity for {{ etf.symbol }} vs its benchmark index')" class="btn btn-secondary btn-sm" style="font-size: 12px; font-weight: 600; display: inline-flex; align-items: center; gap: 6px;">
+        <svg class="glyph"><use href="#glyph-shield"></use></svg> Audit Tracking Error
+      </button>
+    </div>
+
+    <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 16px; margin-bottom: 20px;">
+      <div style="background: rgba(30, 41, 59, 0.4); border: 1px solid rgba(255, 255, 255, 0.05); border-radius: 10px; padding: 16px;">
+        <div style="font-size: 11.5px; color: #64748b; text-transform: uppercase; font-weight: 600; margin-bottom: 2px;">Replication Architecture</div>
+        <div style="font-size: 16px; font-weight: 700; color: #f8fafc; margin-bottom: 6px;">{{ replication.replication_style }}</div>
+        <div style="font-size: 12.5px; color: #94a3b8; line-height: 1.5;">
+          Directly holds constituent securities in the exact proportion dictated by <strong>{{ etf.underlying_index }}</strong>.
+        </div>
+      </div>
+
+      <div style="background: rgba(30, 41, 59, 0.4); border: 1px solid rgba(255, 255, 255, 0.05); border-radius: 10px; padding: 16px;">
+        <div style="font-size: 11.5px; color: #64748b; text-transform: uppercase; font-weight: 600; margin-bottom: 2px;">1-Year Annualized Tracking Error</div>
+        <div style="font-size: 16px; font-weight: 700; color: #10b981; margin-bottom: 6px;" class="tnum">{{ replication.tracking_error_1y }}% ({{ replication.tracking_error_grade }})</div>
+        <div style="font-size: 12.5px; color: #94a3b8; line-height: 1.5;">
+          Reflects standard deviation of daily return differences between NAV and the theoretical TRI benchmark.
+        </div>
+      </div>
+    </div>
+
+    <!-- Drag Breakdown Table -->
+    <div style="background: rgba(15, 23, 42, 0.8); border: 1px solid rgba(255, 255, 255, 0.06); border-radius: 10px; overflow: hidden;">
+      <div style="padding: 12px 16px; background: rgba(255, 255, 255, 0.03); font-size: 12px; font-weight: 700; color: #94a3b8; text-transform: uppercase;">
+        Constituent Drag Sources on Net NAV
+      </div>
+      <table style="width: 100%; border-collapse: collapse; font-size: 13px;">
+        <tbody>
+          {% for drag in replication.drag_breakdown %}
+          <tr style="border-top: 1px solid rgba(255, 255, 255, 0.05);">
+            <td style="padding: 12px 16px; font-weight: 700; color: #f8fafc; width: 220px;">{{ drag.factor }}</td>
+            <td style="padding: 12px 16px; color: #38bdf8; font-weight: 600; width: 140px;" class="tnum">{{ drag.impact }}</td>
+            <td style="padding: 12px 16px; color: #94a3b8;">{{ drag.source }}</td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+  <!-- Section 3: Category Peer Comparison Table -->
+  <div class="card" style="background: rgba(15, 23, 42, 0.7); border: 1px solid rgba(255, 255, 255, 0.1); border-radius: 14px; padding: 24px; margin-bottom: 24px;">
+    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px; flex-wrap: wrap; gap: 10px;">
+      <div>
+        <div style="font-size: 12px; font-weight: 700; color: #c084fc; text-transform: uppercase; letter-spacing: 0.05em;">Pillar 3: Competitive Benchmarking</div>
+        <h2 style="font-size: 20px; font-weight: 800; color: #f8fafc; margin-top: 2px;">Category Peer Comparison ({{ category_label }})</h2>
+      </div>
+      <button onclick="openCopilot('{{ etf.symbol }}', 'etf', 'peers', 'Peer Comparison', 'Compare {{ etf.symbol }} against its closest peers in the {{ category_label }} category on TER and Tracking Error')" class="btn btn-secondary btn-sm" style="font-size: 12px; font-weight: 600; display: inline-flex; align-items: center; gap: 6px;">
+        <svg class="glyph"><use href="#glyph-shield"></use></svg> Compare with Peers
+      </button>
+    </div>
+
+    {% if peers %}
+    <div style="overflow-x: auto;">
+      <table style="width: 100%; border-collapse: collapse; font-size: 13px;">
+        <thead>
+          <tr style="border-bottom: 1px solid rgba(255, 255, 255, 0.1); text-align: left; color: #64748b; font-size: 11px; text-transform: uppercase;">
+            <th style="padding: 10px 14px;">Symbol / Scheme</th>
+            <th style="padding: 10px 14px; text-align: right;">CMP</th>
+            <th style="padding: 10px 14px; text-align: right;">Fair NAV</th>
+            <th style="padding: 10px 14px; text-align: right;">Spread %</th>
+            <th style="padding: 10px 14px; text-align: right;">1Y Track Error</th>
+            <th style="padding: 10px 14px; text-align: right;">TER Fee</th>
+            <th style="padding: 10px 14px; text-align: right;">Total AUM</th>
+            <th style="padding: 10px 14px; text-align: center;">Action</th>
+          </tr>
+        </thead>
+        <tbody>
+          <!-- Subject ETF Row Highlighted -->
+          <tr style="background: rgba(56, 189, 248, 0.1); border-left: 3px solid #38bdf8; border-bottom: 1px solid rgba(255, 255, 255, 0.08);">
+            <td style="padding: 12px 14px;">
+              <span style="font-weight: 800; color: #38bdf8;">{{ etf.symbol }}</span>
+              <span style="font-size: 11px; background: rgba(56, 189, 248, 0.2); color: #38bdf8; padding: 1px 6px; border-radius: 4px; margin-left: 6px;">Current</span>
+              <div style="font-size: 11.5px; color: #94a3b8; max-width: 200px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">{{ etf.scheme_name }}</div>
+            </td>
+            <td style="padding: 12px 14px; font-weight: 700; color: #f8fafc; text-align: right;" class="tnum">₹{{ etf.last_price|round(2) }}</td>
+            <td style="padding: 12px 14px; color: #94a3b8; text-align: right;" class="tnum">₹{{ etf.nav|round(2) }}</td>
+            <td style="padding: 12px 14px; font-weight: 700; text-align: right;" class="tnum">
+              <span style="color: {{ arbitrage.badge_color }};">{% if etf.premium_discount_pct > 0 %}+{{ etf.premium_discount_pct }}%{% else %}{{ etf.premium_discount_pct }}%{% endif %}</span>
+            </td>
+            <td style="padding: 12px 14px; color: #10b981; text-align: right; font-weight: 600;" class="tnum">{{ etf.tracking_error_1y }}%</td>
+            <td style="padding: 12px 14px; color: #cbd5e1; text-align: right;" class="tnum">{{ etf.expense_ratio_pct }}%</td>
+            <td style="padding: 12px 14px; color: #f8fafc; font-weight: 600; text-align: right;" class="tnum">{{ aum_formatted }}</td>
+            <td style="padding: 12px 14px; text-align: center;">
+              <span style="font-size: 11px; color: #38bdf8; font-weight: 700;">Active</span>
+            </td>
+          </tr>
+
+          <!-- Peer Rows -->
+          {% for peer in peers %}
+          <tr style="border-bottom: 1px solid rgba(255, 255, 255, 0.05); transition: background 0.15s ease;" onmouseover="this.style.background='rgba(30, 41, 59, 0.5)'" onmouseout="this.style.background='transparent'">
+            <td style="padding: 12px 14px;">
+              <a href="/etfs/{{ peer.symbol }}" style="font-weight: 800; color: #f8fafc; text-decoration: none;">{{ peer.symbol }}</a>
+              <div style="font-size: 11.5px; color: #64748b; max-width: 200px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">{{ peer.scheme_name }}</div>
+            </td>
+            <td style="padding: 12px 14px; color: #f8fafc; text-align: right;" class="tnum">₹{{ peer.last_price|round(2) }}</td>
+            <td style="padding: 12px 14px; color: #94a3b8; text-align: right;" class="tnum">₹{{ peer.nav|round(2) }}</td>
+            <td style="padding: 12px 14px; text-align: right;" class="tnum">
+              {% if peer.premium_discount_pct > 0.5 %}
+                <span style="color: #f59e0b;">+{{ peer.premium_discount_pct }}%</span>
+              {% elif peer.premium_discount_pct < -0.5 %}
+                <span style="color: #34d399;">{{ peer.premium_discount_pct }}%</span>
+              {% else %}
+                <span style="color: #94a3b8;">{{ peer.premium_discount_pct }}%</span>
+              {% endif %}
+            </td>
+            <td style="padding: 12px 14px; color: #38bdf8; text-align: right;" class="tnum">{{ peer.tracking_error_1y }}%</td>
+            <td style="padding: 12px 14px; color: #cbd5e1; text-align: right;" class="tnum">{{ peer.expense_ratio_pct }}%</td>
+            <td style="padding: 12px 14px; color: #f8fafc; text-align: right;" class="tnum">{{ peer.aum_formatted }}</td>
+            <td style="padding: 12px 14px; text-align: center;">
+              <a href="/etfs/{{ peer.symbol }}" class="btn btn-sm btn-secondary" style="font-size: 11px; padding: 3px 8px; text-decoration: none;">View Dossier</a>
+            </td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+    {% else %}
+    <div style="padding: 24px; text-align: center; color: #94a3b8; font-size: 13.5px;">
+      No direct category peers available in this specific cohort.
+    </div>
+    {% endif %}
+  </div>
+
+  <!-- Section 4: Pre-Mortem Inversion & Structural Risk Ledger -->
+  <div class="card" style="background: rgba(15, 23, 42, 0.7); border: 1px solid rgba(255, 255, 255, 0.1); border-radius: 14px; padding: 24px; margin-bottom: 24px;">
+    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px; flex-wrap: wrap; gap: 10px;">
+      <div>
+        <div style="font-size: 12px; font-weight: 700; color: #f59e0b; text-transform: uppercase; letter-spacing: 0.05em;">Pillar 4: Behavioral Pre-Mortem Inversion</div>
+        <h2 style="font-size: 20px; font-weight: 800; color: #f8fafc; margin-top: 2px;">Structural Failure Modes & Risk Monitorables</h2>
+      </div>
+      <button onclick="openCopilot('{{ etf.symbol }}', 'etf', 'inversion', 'Pre-Mortem Inversion', 'Synthesize the bear thesis and top 3 failure modes for holding {{ etf.symbol }}')" class="btn btn-secondary btn-sm" style="font-size: 12px; font-weight: 600; display: inline-flex; align-items: center; gap: 6px;">
+        <svg class="glyph"><use href="#glyph-shield"></use></svg> Challenge Thesis
+      </button>
+    </div>
+
+    <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 14px;">
+      {% for risk in inversion_risks %}
+      <div style="background: rgba(30, 41, 59, 0.5); border: 1px solid rgba(255, 255, 255, 0.06); border-radius: 10px; padding: 16px;">
+        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 6px;">
+          <div style="font-size: 13.5px; font-weight: 700; color: #f8fafc;">{{ risk.title }}</div>
+          <span style="font-size: 10.5px; font-weight: 700; padding: 2px 6px; border-radius: 4px; background: {% if risk.severity == 'CRITICAL' %}rgba(239, 68, 68, 0.2){% elif risk.severity == 'ELEVATED' %}rgba(245, 158, 11, 0.2){% else %}rgba(56, 189, 248, 0.15){% endif %}; color: {% if risk.severity == 'CRITICAL' %}#f87171{% elif risk.severity == 'ELEVATED' %}#fbbf24{% else %}#38bdf8{% endif %};">
+            {{ risk.severity }}
+          </span>
+        </div>
+        <div style="font-size: 12.5px; color: #94a3b8; line-height: 1.5;">
+          {{ risk.desc }}
+        </div>
+      </div>
+      {% endfor %}
+    </div>
+  </div>
+
+  <!-- Statutory Disclaimer Strip -->
+  <div style="background: rgba(15, 23, 42, 0.5); border: 1px solid rgba(255, 255, 255, 0.06); border-radius: 10px; padding: 16px 20px; font-size: 12px; color: #64748b; line-height: 1.6;">
+    <strong style="color: #94a3b8;">SEBI Statutory Safe Harbor Compliance:</strong> This analytical dossier is generated strictly for informational and quantitative research evaluation under SEBI (Research Analysts) Regulations, 2014 Section 2(u). It does not constitute a buy, sell, or hold recommendation. Net asset values, secondary market quotes, and tracking error figures are computed from public regulatory dispatches and exchange execution feeds. Past replication performance does not guarantee future tracking fidelity.
+  </div>
+</div>
+
+{% include "partials/copilot_modal.html" %}
+<script>
+  window.__CURRENT_TICKER = "{{ etf.symbol }}";
+  window.__CURRENT_ASSET_TYPE = "etf";
+</script>
+<script src="/static/js/copilot.js"></script>
+{% endblock %}

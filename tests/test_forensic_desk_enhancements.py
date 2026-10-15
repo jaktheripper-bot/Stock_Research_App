@@ -242,6 +242,22 @@ class TestForensicDeskEnhancements(unittest.TestCase):
 
         asyncio.run(_run())
 
+    def test_reit_copilot_chat_turn(self):
+        """Verifies REIT asset class grounding, Section 115UA waterfall, and NDCF purity response."""
+        resp = self.client.post("/api/copilot/chat", json={
+            "conversation_id": "TEST-REIT-COPILOT-101",
+            "message": "Evaluate the Section 115UA tax waterfall and NDCF payout purity for this trust.",
+            "ticker": "EMBASSY",
+            "asset_type": "reit"
+        })
+        self.assertEqual(resp.status_code, 200)
+        data = resp.json()
+        self.assertTrue(data.get("success"))
+        response_text = data.get("response", "")
+        self.assertIn("Section 115UA Tax Distribution Waterfall", response_text)
+        self.assertIn("Post-Tax Yield at 30% Marginal Slab", response_text)
+        self.assertIn("Return of Capital / Amortization", response_text)
+
 
 if __name__ == "__main__":
     unittest.main()

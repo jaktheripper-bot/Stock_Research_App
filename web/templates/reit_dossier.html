@@ -1,0 +1,525 @@
+{% extends "base.html" %}
+
+{% block title %}{{ reit.symbol }} | Institutional REIT & InvIT Cash Flow Dossier{% endblock %}
+{% block meta_desc %}Institutional cash flow audit of {{ reit.name }} ({{ reit.symbol }}). Section 115UA tax waterfall across marginal slabs, statutory NDCF payout purity, portfolio WALE, and Pre-Mortem Inversion.{% endblock %}
+{% block og_title %}{{ reit.symbol }} — {{ reit.name }} | Institutional REIT Dossier{% endblock %}
+{% block og_desc %}Section 115UA tax distribution breakdown, NDCF payout purity, and portfolio WALE audit for {{ reit.symbol }}.{% endblock %}
+
+{% block content %}
+<div class="container py-8">
+  <!-- Breadcrumbs -->
+  <div style="font-size: 13px; color: #64748b; margin-bottom: 20px; display: flex; align-items: center; gap: 8px;">
+    <a href="/" style="color: #94a3b8; text-decoration: none;">Home</a>
+    <span>›</span>
+    <a href="/reits" style="color: #94a3b8; text-decoration: none;">Real Assets & REIT Matrix</a>
+    <span>›</span>
+    <span style="color: #f8fafc; font-weight: 600;">{{ reit.symbol }}</span>
+  </div>
+
+  <!-- Header Banner -->
+  <div style="background: linear-gradient(135deg, rgba(30, 41, 59, 0.85) 0%, rgba(15, 23, 42, 0.95) 100%); border: 1px solid rgba(255, 255, 255, 0.1); border-radius: 16px; padding: 28px; margin-bottom: 24px; position: relative; overflow: hidden;">
+    <div style="display: flex; justify-content: space-between; align-items: flex-start; flex-wrap: wrap; gap: 16px;">
+      <div>
+        <!-- Badges -->
+        <div style="display: inline-flex; align-items: center; gap: 8px; margin-bottom: 12px; flex-wrap: wrap;">
+          <span style="font-size: 12px; font-weight: 700; color: {% if reit.structure_type == 'SM_REIT' %}#c084fc{% elif reit.structure_type == 'INVIT' %}#fbbf24{% else %}#38bdf8{% endif %}; background: {% if reit.structure_type == 'SM_REIT' %}rgba(168, 85, 247, 0.15){% elif reit.structure_type == 'INVIT' %}rgba(245, 158, 11, 0.15){% else %}rgba(14, 165, 233, 0.15){% endif %}; border: 1px solid {% if reit.structure_type == 'SM_REIT' %}rgba(168, 85, 247, 0.3){% elif reit.structure_type == 'INVIT' %}rgba(245, 158, 11, 0.3){% else %}rgba(14, 165, 233, 0.3){% endif %}; padding: 4px 10px; border-radius: 6px; text-transform: uppercase;">
+            {{ reit.structure_label }}
+          </span>
+          <span style="font-size: 12px; font-weight: 600; color: #94a3b8; background: rgba(255, 255, 255, 0.05); padding: 4px 10px; border-radius: 6px;">
+            Sponsor: <strong style="color: #f8fafc;">{{ reit.sponsor }}</strong>
+          </span>
+          {% if reit.isin and reit.isin != 'N/A' %}
+          <span style="font-size: 12px; font-weight: 600; color: #94a3b8; background: rgba(255, 255, 255, 0.05); padding: 4px 10px; border-radius: 6px;">
+            ISIN: {{ reit.isin }}
+          </span>
+          {% endif %}
+          <span style="font-size: 12px; font-weight: 600; color: #34d399; background: rgba(16, 185, 129, 0.12); border: 1px solid rgba(16, 185, 129, 0.25); padding: 4px 10px; border-radius: 6px;">
+            Min Ticket: {{ reit.min_investment_ticket }}
+          </span>
+        </div>
+
+        <h1 style="font-size: 30px; font-weight: 800; color: #f8fafc; margin-bottom: 8px; letter-spacing: -0.01em;">
+          {{ reit.name }}
+        </h1>
+        <div style="font-size: 14.5px; color: #94a3b8; line-height: 1.5;">
+          Asset Focus: <strong style="color: #f8fafc;">{{ portfolio_audit.asset_class }} ({{ portfolio_audit.subtype }})</strong> • Exchange Ticker: <strong style="color: #38bdf8;">{{ reit.symbol }}</strong>
+        </div>
+
+        <!-- Provenance Strip -->
+        <div class="dossier-meta-strip" style="margin-top: 14px;">
+          <span class="dossier-meta-pill">📅 Trustee & Exchange Dispatches</span>
+          <span class="dossier-meta-sep">•</span>
+          <span class="badge badge-emerald"><span class="status-dot status-dot-emerald"></span> SEBI Statutory Appraised NAV</span>
+          <span class="dossier-meta-sep">•</span>
+          <span class="badge badge-cyan"><span>⚡</span> <span>Dual-Exchange CMP Feeds</span></span>
+        </div>
+        <div class="dossier-provenance-subline" style="margin-top: 6px;">
+          Independent valuer appraisals verified against SEBI quarterly filings; Net Distributable Cash Flow (NDCF) audited under Section 115UA and SEBI REIT/InvIT Regulations.
+        </div>
+
+        <!-- Action Buttons -->
+        <div style="display: flex; gap: 10px; margin-top: 16px; flex-wrap: wrap;">
+          <button onclick="openCopilot('{{ reit.symbol }}', 'reit')" class="btn btn-hero-ai btn-sm" title="Launch Forensic Intelligence Desk (Shortcut: ⌘K or /)">
+            <svg class="glyph"><use href="#glyph-shield"></use></svg> Forensic Desk
+          </button>
+          <a href="/api/pdf/reit/{{ reit.symbol }}" class="btn btn-sm btn-secondary" style="text-decoration: none; font-size: 12px; font-weight: 600;" title="Download Comprehensive Institutional PDF Dossier">
+            ⬇️ Download PDF Dossier
+          </a>
+          <a href="/reits" class="btn btn-sm btn-secondary" style="text-decoration: none; font-size: 12px; font-weight: 600;">
+            ← Back to Real Assets Matrix
+          </a>
+        </div>
+      </div>
+
+      <!-- Discount / Premium to NAV Status Card -->
+      <div style="text-align: right; background: rgba(15, 23, 42, 0.75); border: 1px solid rgba(255, 255, 255, 0.1); border-radius: 14px; padding: 18px 24px; min-width: 230px;">
+        <div style="font-size: 11.5px; color: #94a3b8; text-transform: uppercase; font-weight: 700; margin-bottom: 6px;">Valuation vs Appraised NAV</div>
+        <div style="font-size: 34px; font-weight: 900; line-height: 1; color: {% if reit.discount_to_nav_pct < 0 %}#34d399{% elif reit.discount_to_nav_pct > 0 %}#f59e0b{% else %}#94a3b8{% endif %};" class="tnum">
+          {% if reit.discount_to_nav_pct > 0 %}+{{ reit.discount_to_nav_pct }}%{% else %}{{ reit.discount_to_nav_pct }}%{% endif %}
+        </div>
+        <div style="font-size: 12.5px; font-weight: 700; margin-top: 6px; color: {% if reit.discount_to_nav_pct < 0 %}#34d399{% elif reit.discount_to_nav_pct > 0 %}#f59e0b{% else %}#94a3b8{% endif %};">
+          {{ reit.discount_label }}
+        </div>
+        <div style="font-size: 11px; color: #64748b; margin-top: 4px;">
+          NAV: {{ reit.nav_per_unit_formatted }} • CMP: {{ reit.current_price_formatted }}
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Top KPI Grid -->
+  <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 14px; margin-bottom: 28px;">
+    <div style="background: rgba(15, 23, 42, 0.6); border: 1px solid rgba(255, 255, 255, 0.08); border-radius: 12px; padding: 16px;">
+      <div style="font-size: 11.5px; color: #64748b; text-transform: uppercase; font-weight: 600; margin-bottom: 4px;">Current Market Price</div>
+      <div style="font-size: 24px; font-weight: 800; color: #f8fafc;" class="tnum">{{ reit.current_price_formatted }}</div>
+      <div style="font-size: 11px; color: #94a3b8; margin-top: 2px;">Exchange Quoted CMP</div>
+    </div>
+    <div style="background: rgba(15, 23, 42, 0.6); border: 1px solid rgba(255, 255, 255, 0.08); border-radius: 12px; padding: 16px;">
+      <div style="font-size: 11.5px; color: #64748b; text-transform: uppercase; font-weight: 600; margin-bottom: 4px;">Statutory Appraised NAV</div>
+      <div style="font-size: 24px; font-weight: 800; color: #38bdf8;" class="tnum">{{ reit.nav_per_unit_formatted }}</div>
+      <div style="font-size: 11px; color: #94a3b8; margin-top: 2px;">Independent Valuer NAV</div>
+    </div>
+    <div style="background: rgba(15, 23, 42, 0.6); border: 1px solid rgba(255, 255, 255, 0.08); border-radius: 12px; padding: 16px;">
+      <div style="font-size: 11.5px; color: #64748b; text-transform: uppercase; font-weight: 600; margin-bottom: 4px;">Gross Distribution Yield</div>
+      <div style="font-size: 24px; font-weight: 800; color: #10b981;" class="tnum">{{ reit.distribution_yield_formatted }}</div>
+      <div style="font-size: 11px; color: #34d399; margin-top: 2px;">Annualized Cash Payout</div>
+    </div>
+    <div style="background: rgba(15, 23, 42, 0.6); border: 1px solid rgba(255, 255, 255, 0.08); border-radius: 12px; padding: 16px;">
+      <div style="font-size: 11.5px; color: #64748b; text-transform: uppercase; font-weight: 600; margin-bottom: 4px;">NDCF Payout Purity</div>
+      <div style="font-size: 24px; font-weight: 800; color: #c084fc;" class="tnum">{{ reit.ndcf_payout_purity_pct }}%</div>
+      <div style="font-size: 11px; color: #94a3b8; margin-top: 2px;">SEBI Cap: ≥{{ ndcf_audit.statutory_minimum_pct }}%</div>
+    </div>
+    <div style="background: rgba(15, 23, 42, 0.6); border: 1px solid rgba(255, 255, 255, 0.08); border-radius: 12px; padding: 16px;">
+      <div style="font-size: 11.5px; color: #64748b; text-transform: uppercase; font-weight: 600; margin-bottom: 4px;">Committed Occupancy</div>
+      <div style="font-size: 24px; font-weight: 800; color: #f8fafc;" class="tnum">{{ reit.occupancy_pct }}%</div>
+      <div style="font-size: 11px; color: #94a3b8; margin-top: 2px;">Active Leased Base</div>
+    </div>
+    <div style="background: rgba(15, 23, 42, 0.6); border: 1px solid rgba(255, 255, 255, 0.08); border-radius: 12px; padding: 16px;">
+      <div style="font-size: 11.5px; color: #64748b; text-transform: uppercase; font-weight: 600; margin-bottom: 4px;">Portfolio WALE / LTV</div>
+      <div style="font-size: 24px; font-weight: 800; color: #cbd5e1;" class="tnum">{{ reit.wale_years }}y / {{ reit.ltv_ratio_pct }}%</div>
+      <div style="font-size: 11px; color: #94a3b8; margin-top: 2px;">Lease Expiry / Leverage</div>
+    </div>
+  </div>
+
+  <!-- Section 1: Interactive Section 115UA Tax Waterfall Engine -->
+  <div class="card" style="background: rgba(15, 23, 42, 0.7); border: 1px solid rgba(255, 255, 255, 0.1); border-radius: 14px; padding: 24px; margin-bottom: 24px;">
+    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px; flex-wrap: wrap; gap: 10px;">
+      <div>
+        <div style="font-size: 12px; font-weight: 700; color: #38bdf8; text-transform: uppercase; letter-spacing: 0.05em;">Pillar 1: Tax Architecture & Post-Tax Realization</div>
+        <h2 style="font-size: 20px; font-weight: 800; color: #f8fafc; margin-top: 2px;">Section 115UA Tax Waterfall Simulator</h2>
+      </div>
+      <button onclick="openCopilot('{{ reit.symbol }}', 'reit', 'tax_waterfall', 'Sec 115UA Tax Waterfall', 'Audit the Section 115UA tax waterfall and net post-tax yield across tax slabs for {{ reit.symbol }}')" class="btn btn-secondary btn-sm" style="font-size: 12px; font-weight: 600; display: inline-flex; align-items: center; gap: 6px;">
+        <svg class="glyph"><use href="#glyph-shield"></use></svg> Audit Tax Waterfall with Desk
+      </button>
+    </div>
+
+    <!-- Distribution Stream Composition Bar -->
+    <div style="background: rgba(30, 41, 59, 0.6); border: 1px solid rgba(255, 255, 255, 0.08); border-radius: 12px; padding: 20px; margin-bottom: 20px;">
+      <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px; font-size: 13px;">
+        <span style="font-weight: 700; color: #f8fafc;">Statutory Cash Distribution Breakdown</span>
+        <span style="color: #94a3b8;">Gross Annual Yield: <strong style="color: #10b981;">{{ reit.distribution_yield_formatted }}</strong></span>
+      </div>
+
+      <!-- Multi-segment bar -->
+      <div style="height: 18px; background: rgba(15, 23, 42, 0.8); border-radius: 8px; overflow: hidden; display: flex; box-shadow: inset 0 1px 3px rgba(0,0,0,0.5);">
+        {% if tax_waterfall.return_of_capital_pct > 0 %}
+        <div style="width: {{ tax_waterfall.return_of_capital_pct }}%; background: #10b981;" title="Return of Capital: {{ tax_waterfall.return_of_capital_pct }}% (Tax Exempt up to Cost)"></div>
+        {% endif %}
+        {% if tax_waterfall.dividend_pct > 0 %}
+        <div style="width: {{ tax_waterfall.dividend_pct }}%; background: #38bdf8;" title="Dividend: {{ tax_waterfall.dividend_pct }}% (Exempt if SPV opted for 25% tax)"></div>
+        {% endif %}
+        {% if tax_waterfall.interest_pct > 0 %}
+        <div style="width: {{ tax_waterfall.interest_pct }}%; background: #c084fc;" title="Interest: {{ tax_waterfall.interest_pct }}% (Taxable at marginal slab)"></div>
+        {% endif %}
+        {% if tax_waterfall.rental_pct > 0 %}
+        <div style="width: {{ tax_waterfall.rental_pct }}%; background: #f59e0b;" title="Rental: {{ tax_waterfall.rental_pct }}% (Taxable at marginal slab)"></div>
+        {% endif %}
+      </div>
+
+      <!-- Legend -->
+      <div style="display: flex; flex-wrap: wrap; gap: 16px; margin-top: 12px; font-size: 12px;">
+        <div style="display: flex; align-items: center; gap: 6px;">
+          <span style="width: 12px; height: 12px; border-radius: 3px; background: #10b981; display: inline-block;"></span>
+          <span style="color: #cbd5e1;">Return of Capital (Amortization): <strong>{{ tax_waterfall.return_of_capital_pct }}%</strong> <span style="color: #34d399; font-size: 11px;">(Tax-Free)</span></span>
+        </div>
+        <div style="display: flex; align-items: center; gap: 6px;">
+          <span style="width: 12px; height: 12px; border-radius: 3px; background: #38bdf8; display: inline-block;"></span>
+          <span style="color: #cbd5e1;">Dividend: <strong>{{ tax_waterfall.dividend_pct }}%</strong> <span style="color: #38bdf8; font-size: 11px;">(Exempt SPV)</span></span>
+        </div>
+        <div style="display: flex; align-items: center; gap: 6px;">
+          <span style="width: 12px; height: 12px; border-radius: 3px; background: #c084fc; display: inline-block;"></span>
+          <span style="color: #cbd5e1;">Interest: <strong>{{ tax_waterfall.interest_pct }}%</strong> <span style="color: #c084fc; font-size: 11px;">(Taxable)</span></span>
+        </div>
+        {% if tax_waterfall.rental_pct > 0 %}
+        <div style="display: flex; align-items: center; gap: 6px;">
+          <span style="width: 12px; height: 12px; border-radius: 3px; background: #f59e0b; display: inline-block;"></span>
+          <span style="color: #cbd5e1;">Rental: <strong>{{ tax_waterfall.rental_pct }}%</strong> <span style="color: #f59e0b; font-size: 11px;">(Taxable)</span></span>
+        </div>
+        {% endif %}
+      </div>
+    </div>
+
+    <!-- Reactive Slab Selector Interface -->
+    <div style="background: rgba(15, 23, 42, 0.85); border: 1px solid rgba(255, 255, 255, 0.08); border-radius: 12px; padding: 20px; margin-bottom: 20px;">
+      <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 14px; flex-wrap: wrap; gap: 10px;">
+        <span style="font-size: 12px; font-weight: 700; color: #94a3b8; text-transform: uppercase;">Select Your Applicable Income Tax Bracket:</span>
+        <span id="activeSlabIndicator" style="font-size: 12px; font-weight: 700; color: #38bdf8; background: rgba(56, 189, 248, 0.1); padding: 3px 10px; border-radius: 6px; border: 1px solid rgba(56, 189, 248, 0.2);">
+          Active: 30% Slab (Standard)
+        </span>
+      </div>
+
+      <!-- Slab Buttons -->
+      <div style="display: flex; gap: 8px; flex-wrap: wrap; margin-bottom: 20px;" id="slabButtonContainer">
+        {% for s in tax_waterfall.slabs %}
+        <button type="button" class="btn btn-sm slab-select-btn {% if s.slab_rate_pct == 30.0 %}active-slab-btn{% else %}btn-secondary{% endif %}" data-slab="{{ s.slab_rate_pct }}" onclick="selectTaxSlab({{ s.slab_rate_pct }})" style="font-size: 12.5px; font-weight: 700; padding: 8px 14px; border-radius: 8px;">
+          {{ s.slab_rate_pct|int }}% Slab {% if s.slab_rate_pct == 0.0 %}(Exempt){% elif s.slab_rate_pct == 30.0 %}(Standard){% elif s.slab_rate_pct == 39.0 %}(HNI / Surcharge){% endif %}
+        </button>
+        {% endfor %}
+      </div>
+
+      <!-- Dynamic Post-Tax Realization Metrics -->
+      <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 14px; background: rgba(30, 41, 59, 0.5); border: 1px solid rgba(255, 255, 255, 0.05); border-radius: 10px; padding: 18px;">
+        <div>
+          <div style="font-size: 11px; color: #94a3b8; text-transform: uppercase; font-weight: 700;">Net Post-Tax Yield</div>
+          <div id="dynamicPostTaxYield" style="font-size: 28px; font-weight: 900; color: #10b981; margin-top: 4px;" class="tnum">
+            {{ tax_waterfall.default_slab.net_post_tax_yield_pct }}%
+          </div>
+          <div style="font-size: 11px; color: #64748b; margin-top: 2px;">True in-hand yield</div>
+        </div>
+
+        <div>
+          <div style="font-size: 11px; color: #94a3b8; text-transform: uppercase; font-weight: 700;">Tax Drag</div>
+          <div id="dynamicTaxDrag" style="font-size: 28px; font-weight: 900; color: #f59e0b; margin-top: 4px;" class="tnum">
+            {{ tax_waterfall.default_slab.tax_drag_bps }} bps
+          </div>
+          <div style="font-size: 11px; color: #64748b; margin-top: 2px;">Lost to marginal taxation</div>
+        </div>
+
+        <div>
+          <div style="font-size: 11px; color: #94a3b8; text-transform: uppercase; font-weight: 700;">Annual Tax per ₹10,000</div>
+          <div id="dynamicTaxPaid" style="font-size: 28px; font-weight: 900; color: #f87171; margin-top: 4px;" class="tnum">
+            ₹{{ tax_waterfall.default_slab.annual_tax_per_10k }}
+          </div>
+          <div style="font-size: 11px; color: #64748b; margin-top: 2px;">TDS & self-assessment</div>
+        </div>
+
+        <div>
+          <div style="font-size: 11px; color: #94a3b8; text-transform: uppercase; font-weight: 700;">Tax Shield Efficiency</div>
+          <div id="dynamicShieldEfficiency" style="font-size: 28px; font-weight: 900; color: #38bdf8; margin-top: 4px;" class="tnum">
+            {{ tax_waterfall.default_slab.tax_shield_efficiency_pct }}%
+          </div>
+          <div style="font-size: 11px; color: #64748b; margin-top: 2px;">Protected from full taxation</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Statutory Section 115UA & Finance Act 2023 Rules Box -->
+    <div style="background: rgba(30, 41, 59, 0.4); border: 1px solid rgba(255, 255, 255, 0.06); border-radius: 10px; padding: 16px; font-size: 12.5px; color: #cbd5e1; line-height: 1.6;">
+      <strong style="color: #38bdf8;">Statutory Tax Mechanics (Section 115UA & Finance Act 2023):</strong>
+      {{ tax_waterfall.sec_115ua_commentary }}
+    </div>
+  </div>
+
+  <!-- Section 2: Statutory NDCF Payout Purity & Cash Conversion Audit -->
+  <div class="card" style="background: rgba(15, 23, 42, 0.7); border: 1px solid rgba(255, 255, 255, 0.1); border-radius: 14px; padding: 24px; margin-bottom: 24px;">
+    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px; flex-wrap: wrap; gap: 10px;">
+      <div>
+        <div style="font-size: 12px; font-weight: 700; color: #10b981; text-transform: uppercase; letter-spacing: 0.05em;">Pillar 2: Statutory Distribution Mandate</div>
+        <h2 style="font-size: 20px; font-weight: 800; color: #f8fafc; margin-top: 2px;">NDCF Payout Purity & Penal Clause Surveillance</h2>
+      </div>
+      <button onclick="openCopilot('{{ reit.symbol }}', 'reit', 'ndcf_purity', 'NDCF Payout Purity', 'Audit the NDCF payout purity and SEBI 15% penal interest clause compliance for {{ reit.symbol }}')" class="btn btn-secondary btn-sm" style="font-size: 12px; font-weight: 600; display: inline-flex; align-items: center; gap: 6px;">
+        <svg class="glyph"><use href="#glyph-shield"></use></svg> Audit NDCF with Desk
+      </button>
+    </div>
+
+    <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 16px; margin-bottom: 20px;">
+      <div style="background: rgba(30, 41, 59, 0.4); border: 1px solid rgba(255, 255, 255, 0.05); border-radius: 10px; padding: 18px;">
+        <div style="font-size: 11.5px; color: #64748b; text-transform: uppercase; font-weight: 600; margin-bottom: 4px;">Mandatory Distribution Mandate</div>
+        <div style="font-size: 20px; font-weight: 800; color: #f8fafc; margin-bottom: 6px;">
+          {{ reit.ndcf_payout_purity_pct }}% Distributed <span style="font-size: 12px; color: #34d399; font-weight: 600;">(Min: {{ ndcf_audit.statutory_minimum_pct }}%)</span>
+        </div>
+        <div style="font-size: 12.5px; color: #94a3b8; line-height: 1.5;">
+          Under SEBI regulations, at least {{ ndcf_audit.statutory_minimum_pct }}% of Net Distributable Cash Flow generated by Special Purpose Vehicles (SPVs) must be distributed to unitholders.
+        </div>
+      </div>
+
+      <div style="background: rgba(30, 41, 59, 0.4); border: 1px solid rgba(255, 255, 255, 0.05); border-radius: 10px; padding: 18px;">
+        <div style="font-size: 11.5px; color: #64748b; text-transform: uppercase; font-weight: 600; margin-bottom: 4px;">Distribution Frequency & Payout Schedule</div>
+        <div style="font-size: 16px; font-weight: 700; color: #38bdf8; margin-bottom: 6px;">
+          {{ ndcf_audit.distribution_frequency }}
+        </div>
+        <div style="font-size: 12.5px; color: #94a3b8; line-height: 1.5;">
+          Trust deed mandates payment directly into unitholder registered bank accounts within 15 calendar days from the record date.
+        </div>
+      </div>
+    </div>
+
+    <!-- SEBI 15% Penal Clause Alert -->
+    <div style="background: rgba(16, 185, 129, 0.08); border: 1px solid rgba(16, 185, 129, 0.25); border-radius: 10px; padding: 16px; margin-bottom: 20px; display: flex; align-items: flex-start; gap: 12px;">
+      <div style="font-size: 20px; line-height: 1;">⚖️</div>
+      <div>
+        <div style="font-size: 13px; font-weight: 700; color: #34d399; margin-bottom: 3px;">SEBI 15% Statutory Penal Interest Clause</div>
+        <div style="font-size: 12.5px; color: #cbd5e1; line-height: 1.5;">
+          {{ ndcf_audit.penal_interest_clause }} The Investment Manager cannot deduct this interest from trust assets; it must be paid out of the Manager's own balance sheet.
+        </div>
+      </div>
+    </div>
+
+    <!-- Quarterly DPU Trajectory Cards -->
+    <div style="background: rgba(15, 23, 42, 0.8); border: 1px solid rgba(255, 255, 255, 0.06); border-radius: 10px; padding: 16px;">
+      <div style="font-size: 12px; font-weight: 700; color: #94a3b8; text-transform: uppercase; margin-bottom: 12px;">
+        Recent 4-Quarter Distribution Per Unit (DPU) Trajectory
+      </div>
+      <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(130px, 1fr)); gap: 10px;">
+        {% for q in ndcf_audit.quarterly_dpu_history %}
+        <div style="background: rgba(30, 41, 59, 0.5); border: 1px solid rgba(255, 255, 255, 0.05); border-radius: 8px; padding: 12px; text-align: center;">
+          <div style="font-size: 11px; color: #64748b; font-weight: 600;">{{ q.quarter }}</div>
+          <div style="font-size: 18px; font-weight: 800; color: #f8fafc; margin-top: 4px;" class="tnum">₹{{ q.dpu|round(2) }}</div>
+          <div style="font-size: 10.5px; color: #10b981; margin-top: 2px;">✓ Dispatched</div>
+        </div>
+        {% endfor %}
+      </div>
+    </div>
+  </div>
+
+  <!-- Section 3: Portfolio Scale, WALE & Tenant Concentration -->
+  <div class="card" style="background: rgba(15, 23, 42, 0.7); border: 1px solid rgba(255, 255, 255, 0.1); border-radius: 14px; padding: 24px; margin-bottom: 24px;">
+    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px; flex-wrap: wrap; gap: 10px;">
+      <div>
+        <div style="font-size: 12px; font-weight: 700; color: #c084fc; text-transform: uppercase; letter-spacing: 0.05em;">Pillar 3: Real Asset Quality & Counterparty Risk</div>
+        <h2 style="font-size: 20px; font-weight: 800; color: #f8fafc; margin-top: 2px;">Portfolio Scale, WALE & Capital Structure</h2>
+      </div>
+      <button onclick="openCopilot('{{ reit.symbol }}', 'reit', 'portfolio_wale', 'Portfolio WALE & Tenants', 'Analyze the portfolio WALE, top tenants, and leverage LTV for {{ reit.symbol }}')" class="btn btn-secondary btn-sm" style="font-size: 12px; font-weight: 600; display: inline-flex; align-items: center; gap: 6px;">
+        <svg class="glyph"><use href="#glyph-shield"></use></svg> Audit Portfolio with Desk
+      </button>
+    </div>
+
+    <!-- Portfolio Metrics Grid -->
+    <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 14px; margin-bottom: 20px;">
+      <div style="background: rgba(30, 41, 59, 0.4); border: 1px solid rgba(255, 255, 255, 0.05); border-radius: 10px; padding: 16px;">
+        <div style="font-size: 11.5px; color: #64748b; text-transform: uppercase; font-weight: 600; margin-bottom: 2px;">Asset Scale & Footprint</div>
+        <div style="font-size: 18px; font-weight: 800; color: #f8fafc; margin-bottom: 4px;">{{ portfolio_audit.scale_formatted }}</div>
+        <div style="font-size: 12px; color: #94a3b8;">Total leasable area / infrastructure assets</div>
+      </div>
+
+      <div style="background: rgba(30, 41, 59, 0.4); border: 1px solid rgba(255, 255, 255, 0.05); border-radius: 10px; padding: 16px;">
+        <div style="font-size: 11.5px; color: #64748b; text-transform: uppercase; font-weight: 600; margin-bottom: 2px;">Weighted Average Lease Expiry (WALE)</div>
+        <div style="font-size: 18px; font-weight: 800; color: #38bdf8; margin-bottom: 4px;" class="tnum">{{ portfolio_audit.wale_years }} Years</div>
+        <div style="font-size: 12px; color: #94a3b8;">Remaining contractual revenue visibility</div>
+      </div>
+
+      <div style="background: rgba(30, 41, 59, 0.4); border: 1px solid rgba(255, 255, 255, 0.05); border-radius: 10px; padding: 16px;">
+        <div style="font-size: 11.5px; color: #64748b; text-transform: uppercase; font-weight: 600; margin-bottom: 2px;">Leverage LTV vs SEBI Cap</div>
+        <div style="font-size: 18px; font-weight: 800; color: #10b981; margin-bottom: 4px;" class="tnum">{{ portfolio_audit.capital_structure.ltv_ratio_pct }}% <span style="font-size: 12px; color: #94a3b8; font-weight: 600;">(Cap: 49%)</span></div>
+        <div style="font-size: 12px; color: #94a3b8;">{{ portfolio_audit.capital_structure.ltv_headroom_pct }}% headroom below statutory limit</div>
+      </div>
+
+      <div style="background: rgba(30, 41, 59, 0.4); border: 1px solid rgba(255, 255, 255, 0.05); border-radius: 10px; padding: 16px;">
+        <div style="font-size: 11.5px; color: #64748b; text-transform: uppercase; font-weight: 600; margin-bottom: 2px;">Borrowing Profile & Rating</div>
+        <div style="font-size: 15px; font-weight: 700; color: #f8fafc; margin-bottom: 4px;">{{ portfolio_audit.capital_structure.credit_rating }}</div>
+        <div style="font-size: 12px; color: #94a3b8;">Avg Cost: {{ portfolio_audit.capital_structure.cost_of_debt_pct }}% • {{ portfolio_audit.capital_structure.fixed_vs_floating }}</div>
+      </div>
+    </div>
+
+    <!-- Top Anchor Tenants List -->
+    <div style="background: rgba(15, 23, 42, 0.8); border: 1px solid rgba(255, 255, 255, 0.06); border-radius: 10px; padding: 18px;">
+      <div style="font-size: 12px; font-weight: 700; color: #94a3b8; text-transform: uppercase; margin-bottom: 10px;">
+        Key Anchor Counterparties & Top Occupiers
+      </div>
+      <div style="display: flex; flex-wrap: wrap; gap: 8px;">
+        {% for tenant in portfolio_audit.top_tenants %}
+        <span style="background: rgba(255, 255, 255, 0.05); border: 1px solid rgba(255, 255, 255, 0.08); padding: 6px 12px; border-radius: 6px; font-size: 13px; color: #f8fafc; font-weight: 600;">
+          🏢 {{ tenant }}
+        </span>
+        {% endfor %}
+      </div>
+    </div>
+  </div>
+
+  <!-- Section 4: Pre-Mortem Inversion & Downside Risk Ledger -->
+  <div class="card" style="background: rgba(15, 23, 42, 0.7); border: 1px solid rgba(255, 255, 255, 0.1); border-radius: 14px; padding: 24px; margin-bottom: 24px;">
+    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px; flex-wrap: wrap; gap: 10px;">
+      <div>
+        <div style="font-size: 12px; font-weight: 700; color: #f59e0b; text-transform: uppercase; letter-spacing: 0.05em;">Pillar 4: Behavioral Pre-Mortem Inversion</div>
+        <h2 style="font-size: 20px; font-weight: 800; color: #f8fafc; margin-top: 2px;">Structural Failure Modes & Downside Vulnerabilities</h2>
+      </div>
+      <button onclick="openCopilot('{{ reit.symbol }}', 'reit', 'inversion', 'Pre-Mortem Inversion', 'Synthesize the bear thesis and top 3 failure modes for holding {{ reit.symbol }}')" class="btn btn-secondary btn-sm" style="font-size: 12px; font-weight: 600; display: inline-flex; align-items: center; gap: 6px;">
+        <svg class="glyph"><use href="#glyph-shield"></use></svg> Challenge Thesis
+      </button>
+    </div>
+
+    <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 14px;">
+      {% for risk in inversion_risks %}
+      <div style="background: rgba(30, 41, 59, 0.5); border: 1px solid rgba(255, 255, 255, 0.06); border-radius: 10px; padding: 16px;">
+        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 6px;">
+          <div style="font-size: 13.5px; font-weight: 700; color: #f8fafc;">{{ risk.category }}</div>
+          <span style="font-size: 10.5px; font-weight: 700; padding: 2px 6px; border-radius: 4px; background: {% if risk.severity in ['CRITICAL', 'HIGH'] %}rgba(239, 68, 68, 0.2){% elif risk.severity == 'MODERATE' %}rgba(245, 158, 11, 0.2){% else %}rgba(56, 189, 248, 0.15){% endif %}; color: {% if risk.severity in ['CRITICAL', 'HIGH'] %}#f87171{% elif risk.severity == 'MODERATE' %}#fbbf24{% else %}#38bdf8{% endif %};">
+            {{ risk.severity }}
+          </span>
+        </div>
+        <div style="font-size: 12.5px; color: #94a3b8; line-height: 1.5;">
+          {{ risk.thesis }}
+        </div>
+      </div>
+      {% endfor %}
+    </div>
+  </div>
+
+  <!-- Section 5: Category Peer Comparison Table -->
+  <div class="card" style="background: rgba(15, 23, 42, 0.7); border: 1px solid rgba(255, 255, 255, 0.1); border-radius: 14px; padding: 24px; margin-bottom: 24px;">
+    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px; flex-wrap: wrap; gap: 10px;">
+      <div>
+        <div style="font-size: 12px; font-weight: 700; color: #c084fc; text-transform: uppercase; letter-spacing: 0.05em;">Pillar 5: Competitive Benchmarking</div>
+        <h2 style="font-size: 20px; font-weight: 800; color: #f8fafc; margin-top: 2px;">Category Peer Comparison ({{ reit.structure_label }})</h2>
+      </div>
+      <a href="/reits" class="btn btn-secondary btn-sm" style="font-size: 12px; font-weight: 600; text-decoration: none;">
+        View All Real Assets →
+      </a>
+    </div>
+
+    {% if peers %}
+    <div style="overflow-x: auto;">
+      <table style="width: 100%; border-collapse: collapse; font-size: 13px;">
+        <thead>
+          <tr style="border-bottom: 1px solid rgba(255, 255, 255, 0.1); text-align: left; color: #64748b; font-size: 11px; text-transform: uppercase;">
+            <th style="padding: 10px 14px;">Symbol / Trust</th>
+            <th style="padding: 10px 14px; text-align: right;">Price</th>
+            <th style="padding: 10px 14px; text-align: right;">Appraised NAV</th>
+            <th style="padding: 10px 14px; text-align: right;">Discount / Prem %</th>
+            <th style="padding: 10px 14px; text-align: right;">Gross Yield %</th>
+            <th style="padding: 10px 14px; text-align: right;">Occupancy %</th>
+            <th style="padding: 10px 14px; text-align: right;">LTV %</th>
+            <th style="padding: 10px 14px; text-align: right;">WALE</th>
+            <th style="padding: 10px 14px; text-align: center;">Action</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for peer in peers %}
+          <tr style="border-bottom: 1px solid rgba(255, 255, 255, 0.05); {% if peer.is_current %}background: rgba(56, 189, 248, 0.1); border-left: 3px solid #38bdf8;{% else %}transition: background 0.15s ease;{% endif %}" {% if not peer.is_current %}onmouseover="this.style.background='rgba(30, 41, 59, 0.5)'" onmouseout="this.style.background='transparent'"{% endif %}>
+            <td style="padding: 12px 14px;">
+              <span style="font-weight: 800; color: {% if peer.is_current %}#38bdf8{% else %}#f8fafc{% endif %};">{{ peer.symbol }}</span>
+              {% if peer.is_current %}<span style="font-size: 11px; background: rgba(56, 189, 248, 0.2); color: #38bdf8; padding: 1px 6px; border-radius: 4px; margin-left: 6px;">Current</span>{% endif %}
+              <div style="font-size: 11.5px; color: #94a3b8; max-width: 220px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">{{ peer.name }}</div>
+            </td>
+            <td style="padding: 12px 14px; font-weight: 700; color: #f8fafc; text-align: right;" class="tnum">
+              ₹{{ "{:,.2f}".format(peer.current_price) }}
+            </td>
+            <td style="padding: 12px 14px; color: #94a3b8; text-align: right;" class="tnum">
+              ₹{{ "{:,.2f}".format(peer.nav_per_unit) }}
+            </td>
+            <td style="padding: 12px 14px; font-weight: 700; text-align: right;" class="tnum">
+              <span style="color: {% if peer.discount_to_nav_pct < 0 %}#34d399{% elif peer.discount_to_nav_pct > 0 %}#f59e0b{% else %}#94a3b8{% endif %};">
+                {% if peer.discount_to_nav_pct > 0 %}+{{ peer.discount_to_nav_pct }}%{% else %}{{ peer.discount_to_nav_pct }}%{% endif %}
+              </span>
+            </td>
+            <td style="padding: 12px 14px; color: #10b981; text-align: right; font-weight: 700;" class="tnum">{{ peer.distribution_yield_pct }}%</td>
+            <td style="padding: 12px 14px; color: #cbd5e1; text-align: right;" class="tnum">{{ peer.occupancy_pct }}%</td>
+            <td style="padding: 12px 14px; color: #cbd5e1; text-align: right;" class="tnum">{{ peer.ltv_ratio_pct }}%</td>
+            <td style="padding: 12px 14px; color: #94a3b8; text-align: right;" class="tnum">{{ peer.wale_years }}y</td>
+            <td style="padding: 12px 14px; text-align: center;">
+              {% if peer.is_current %}
+                <span style="font-size: 11px; color: #38bdf8; font-weight: 700;">Active</span>
+              {% else %}
+                <a href="/reits/{{ peer.symbol }}" class="btn btn-sm btn-secondary" style="font-size: 11px; padding: 3px 8px; text-decoration: none;">View Dossier</a>
+              {% endif %}
+            </td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+    {% endif %}
+  </div>
+
+  <!-- Statutory Disclaimer Strip -->
+  <div style="background: rgba(15, 23, 42, 0.5); border: 1px solid rgba(255, 255, 255, 0.06); border-radius: 10px; padding: 16px 20px; font-size: 12px; color: #64748b; line-height: 1.6;">
+    <strong style="color: #94a3b8;">SEBI Statutory Safe Harbor Compliance:</strong> This analytical dossier is generated strictly for informational and quantitative research evaluation under SEBI (Research Analysts) Regulations, 2014 Section 2(u). It does not constitute a buy, sell, or hold recommendation. Net asset values, quarterly distributions, and appraisal metrics are computed from regulatory filings and independent valuer reports. Past distribution history does not guarantee future cash flow yields.
+  </div>
+</div>
+
+{% include "partials/copilot_modal.html" %}
+
+<script>
+  window.__CURRENT_TICKER = "{{ reit.symbol }}";
+  window.__CURRENT_ASSET_TYPE = "reit";
+
+  // Reactive Tax Waterfall Client-Side Logic
+  const TAX_SLABS_DATA = {{ tax_waterfall.slabs | tojson }};
+
+  function selectTaxSlab(slabRate) {
+    const slab = TAX_SLABS_DATA.find(s => Math.abs(s.slab_rate_pct - slabRate) < 0.1);
+    if (!slab) return;
+
+    // Update active button styling
+    const buttons = document.querySelectorAll('.slab-select-btn');
+    buttons.forEach(btn => {
+      const btnRate = parseFloat(btn.getAttribute('data-slab'));
+      if (Math.abs(btnRate - slabRate) < 0.1) {
+        btn.classList.add('active-slab-btn');
+        btn.classList.remove('btn-secondary');
+        btn.style.background = '#38bdf8';
+        btn.style.color = '#020617';
+        btn.style.borderColor = '#38bdf8';
+      } else {
+        btn.classList.remove('active-slab-btn');
+        btn.classList.add('btn-secondary');
+        btn.style.background = '';
+        btn.style.color = '';
+        btn.style.borderColor = '';
+      }
+    });
+
+    // Update metric displays
+    const yieldEl = document.getElementById('dynamicPostTaxYield');
+    const dragEl = document.getElementById('dynamicTaxDrag');
+    const taxPaidEl = document.getElementById('dynamicTaxPaid');
+    const shieldEl = document.getElementById('dynamicShieldEfficiency');
+    const indicatorEl = document.getElementById('activeSlabIndicator');
+
+    if (yieldEl) yieldEl.textContent = slab.net_post_tax_yield_pct + '%';
+    if (dragEl) dragEl.textContent = slab.tax_drag_bps + ' bps';
+    if (taxPaidEl) taxPaidEl.textContent = '₹' + slab.annual_tax_per_10k;
+    if (shieldEl) shieldEl.textContent = slab.tax_shield_efficiency_pct + '%';
+    if (indicatorEl) {
+      let desc = slabRate === 0 ? 'Exempt / Low Income' : (slabRate === 30 ? 'Standard Slab' : (slabRate === 39 ? 'HNI / Surcharge' : slabRate + '% Slab'));
+      indicatorEl.textContent = `Active: ${slabRate}% (${desc})`;
+    }
+  }
+
+  // Set default button styling on load
+  document.addEventListener("DOMContentLoaded", function() {
+    selectTaxSlab(30.0);
+  });
+</script>
+<style>
+  .slab-select-btn {
+    transition: all 0.2s ease;
+  }
+  .active-slab-btn {
+    background: #38bdf8 !important;
+    color: #020617 !important;
+    border-color: #38bdf8 !important;
+  }
+</style>
+<script src="/static/js/copilot.js"></script>
+{% endblock %}

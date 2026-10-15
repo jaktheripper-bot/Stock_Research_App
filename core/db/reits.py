@@ -127,8 +127,11 @@ DEFAULT_REITS_AND_INVITS = [
         "details_json": json.dumps({
             "asset_class": "Inter-State Power Transmission Assets (TSPs)",
             "subtype": "TRANSMISSION_ANNUITY",
+            "isin": "INE0G2525017",
+            "exchange_codes": {"NSE": "PGINVIT", "BSE": "543290"},
             "network_length_ckm": 3698.0,
             "availability_factor": "99.8%",
+            "sponsor": "Power Grid Corporation of India (PGCIL)",
             "cashflow_nature": "Regulated Availability-Based Annuity (Zero Traffic Risk)",
             "tax_breakdown": {"dividend_pct": 45.0, "interest_pct": 30.0, "amortization_pct": 25.0, "rental_pct": 0.0}
         })
@@ -150,6 +153,8 @@ DEFAULT_REITS_AND_INVITS = [
         "details_json": json.dumps({
             "asset_class": "Power Transmission & Utility Solar Assets",
             "subtype": "TRANSMISSION_ANNUITY",
+            "isin": "INE219X23014",
+            "exchange_codes": {"NSE": "INDIGRID", "BSE": "540565"},
             "network_length_ckm": 8430.0,
             "availability_factor": "99.7%",
             "sponsor": "KKR / GIC",
@@ -158,7 +163,7 @@ DEFAULT_REITS_AND_INVITS = [
         })
     },
     {
-        "symbol": "IRB_INVIT",
+        "symbol": "IRBINVIT",
         "name": "IRB InvIT Fund",
         "structure_type": "INVIT",
         "current_price": 68.20,
@@ -174,14 +179,17 @@ DEFAULT_REITS_AND_INVITS = [
         "details_json": json.dumps({
             "asset_class": "National Toll Highway Concessions (BOT / TOT)",
             "subtype": "TOLL_VOLUME",
+            "isin": "INE183W23014",
+            "exchange_codes": {"NSE": "IRBINVIT", "BSE": "540526"},
             "lane_kms": 4055.0,
             "traffic_growth_cagr": "7.2%",
+            "sponsor": "IRB Infrastructure Developers",
             "cashflow_nature": "Toll Volume Dependent (Inflation-Indexed Tariff Hikes)",
             "tax_breakdown": {"dividend_pct": 20.0, "interest_pct": 55.0, "amortization_pct": 25.0, "rental_pct": 0.0}
         })
     },
     {
-        "symbol": "NHAI_INVIT",
+        "symbol": "NHIT",
         "name": "National Highways Infra Trust (NHIT)",
         "structure_type": "INVIT",
         "current_price": 124.00,
@@ -197,6 +205,8 @@ DEFAULT_REITS_AND_INVITS = [
         "details_json": json.dumps({
             "asset_class": "Sovereign PSU Highway Concessions",
             "subtype": "TOLL_VOLUME",
+            "isin": "INE0H7323017",
+            "exchange_codes": {"NSE": "NHIT", "BSE": "543385"},
             "lane_kms": 3280.0,
             "sponsor": "National Highways Authority of India (NHAI)",
             "cashflow_nature": "High-Density Golden Quadrilateral Concessions",
@@ -204,11 +214,61 @@ DEFAULT_REITS_AND_INVITS = [
         })
     },
     {
-        "symbol": "SMREIT_BLR_01",
-        "name": "PropShare Platina SM REIT (SEBI Reg.)",
+        "symbol": "ORIENTINVIT",
+        "name": "Oriental InfraTrust",
+        "structure_type": "INVIT",
+        "current_price": 162.50,
+        "nav_per_unit": 178.00,
+        "discount_to_nav_pct": -8.71,
+        "distribution_yield_pct": 11.50,
+        "occupancy_pct": 99.2,
+        "ndcf_payout_purity_pct": 98.5,
+        "ltv_ratio_pct": 34.0,
+        "wale_years": 20.0,
+        "sponsor_holding_pct": 18.5,
+        "sebi_compliant": True,
+        "details_json": json.dumps({
+            "asset_class": "National Highway BOT & Annuity Concessions",
+            "subtype": "TOLL_VOLUME",
+            "isin": "INE0A8B23019",
+            "exchange_codes": {"NSE": "ORIENTINVIT", "BSE": "542767"},
+            "lane_kms": 2500.0,
+            "sponsor": "Oriental Structural Engineers / CDC Group (UK)",
+            "cashflow_nature": "Diversified Toll and Annuity Concessions",
+            "tax_breakdown": {"dividend_pct": 30.0, "interest_pct": 45.0, "amortization_pct": 25.0, "rental_pct": 0.0}
+        })
+    },
+    {
+        "symbol": "BHARATINV",
+        "name": "Bharat Highways InvIT",
+        "structure_type": "INVIT",
+        "current_price": 101.20,
+        "nav_per_unit": 105.00,
+        "discount_to_nav_pct": -3.62,
+        "distribution_yield_pct": 9.80,
+        "occupancy_pct": 100.0,
+        "ndcf_payout_purity_pct": 100.0,
+        "ltv_ratio_pct": 28.5,
+        "wale_years": 15.0,
+        "sponsor_holding_pct": 15.0,
+        "sebi_compliant": True,
+        "details_json": json.dumps({
+            "asset_class": "NHAI Hybrid Annuity Model (HAM) Concessions",
+            "subtype": "TRANSMISSION_ANNUITY",
+            "isin": "INE0P1S23012",
+            "exchange_codes": {"NSE": "BHARATINV", "BSE": "544139"},
+            "lane_kms": 1850.0,
+            "sponsor": "GR Infraprojects / Aadharshila",
+            "cashflow_nature": "100% Sovereign Annuity & O&M Cash Flows (Zero Traffic Risk)",
+            "tax_breakdown": {"dividend_pct": 35.0, "interest_pct": 40.0, "amortization_pct": 25.0, "rental_pct": 0.0}
+        })
+    },
+    {
+        "symbol": "PROPSHARE",
+        "name": "PropShare Titania SM REIT (Scheme Platina)",
         "structure_type": "SM_REIT",
-        "current_price": 10000.00,
-        "nav_per_unit": 10000.00,
+        "current_price": 1000000.00,
+        "nav_per_unit": 1000000.00,
         "discount_to_nav_pct": 0.0,
         "distribution_yield_pct": 9.00,
         "occupancy_pct": 100.0,
@@ -218,22 +278,25 @@ DEFAULT_REITS_AND_INVITS = [
         "sponsor_holding_pct": 5.0,
         "sebi_compliant": True,
         "details_json": json.dumps({
-            "asset_class": "Pre-Leased Tech Commercial Hub (Outer Ring Road, Bengaluru)",
+            "asset_class": "Pre-Leased Commercial Grade-A IT Park (Outer Ring Road, Bengaluru)",
             "subtype": "SM_FRACTIONAL_OFFICE",
+            "sebi_registration_no": "IN/SMREIT/24-25/0001",
+            "scheme_name": "PropShare Platina Scheme 1",
+            "property_name": "Prestige Tech Platina",
             "scheme_asset_size_cr": 353.0,
             "leasable_area_sqft": 246935,
             "sole_tenant": "US Tech Multinational",
             "minimum_ticket_inr": 1000000,
-            "leverage": "Zero Debt (100% Equity Funded)",
+            "leverage": "Zero Debt (100% Equity Funded per SEBI SM REIT Direct Titling)",
             "tax_breakdown": {"dividend_pct": 0.0, "interest_pct": 100.0, "amortization_pct": 0.0, "rental_pct": 0.0}
         })
     },
     {
-        "symbol": "SMREIT_HYD_02",
-        "name": "Strata Prime HITEC SM REIT (SEBI Reg.)",
+        "symbol": "STRATA",
+        "name": "Strata Commercial SM REIT (Scheme HITEC)",
         "structure_type": "SM_REIT",
-        "current_price": 10000.00,
-        "nav_per_unit": 10000.00,
+        "current_price": 1000000.00,
+        "nav_per_unit": 1000000.00,
         "discount_to_nav_pct": 0.0,
         "distribution_yield_pct": 9.20,
         "occupancy_pct": 98.5,
@@ -243,13 +306,13 @@ DEFAULT_REITS_AND_INVITS = [
         "sponsor_holding_pct": 5.5,
         "sebi_compliant": True,
         "details_json": json.dumps({
-            "asset_class": "Grade-A Financial District Hub (HITEC City, Hyderabad)",
+            "asset_class": "Grade-A Financial District Tech Hub (HITEC City, Hyderabad)",
             "subtype": "SM_FRACTIONAL_OFFICE",
             "scheme_asset_size_cr": 125.0,
             "leasable_area_sqft": 110000,
             "sole_tenant": "Global Financial Services GCC",
             "minimum_ticket_inr": 1000000,
-            "leverage": "Conservative Low Leverage (LTV 15.0%)",
+            "leverage": "Conservative Low Leverage (LTV 15.0% vs SEBI 49% Cap)",
             "tax_breakdown": {"dividend_pct": 10.0, "interest_pct": 90.0, "amortization_pct": 0.0, "rental_pct": 0.0}
         })
     }
@@ -530,6 +593,21 @@ def get_all_reits_and_invits(structure_type: Optional[str] = None) -> List[Dict[
                 cursor.execute(query)
             rows = cursor.fetchall()
         else:
+            # Clean up and migrate legacy synthetic placeholders to genuine SEBI entities
+            legacy_migrations = {
+                "SMREIT_BLR_01": "PROPSHARE",
+                "PROPSHARE_PLATINA": "PROPSHARE",
+                "SMREIT_HYD_02": "STRATA",
+                "IRB_INVIT": "IRBINVIT",
+                "NHAI_INVIT": "NHIT",
+            }
+            # Remove legacy duplicates if canonical already exists
+            for old_sym, new_sym in legacy_migrations.items():
+                cursor.execute(f"DELETE FROM reits_and_invits WHERE symbol = '{old_sym}' AND EXISTS (SELECT 1 FROM reits_and_invits WHERE symbol = '{new_sym}')")
+            conn.commit()
+
+            cursor.execute(query if not structure_type else query, (structure_type,) if structure_type else ())
+            rows = cursor.fetchall()
             existing_symbols = {r[1].upper() for r in rows}
             missing_defaults = [r for r in DEFAULT_REITS_AND_INVITS if r["symbol"].upper() not in existing_symbols]
             if missing_defaults:
@@ -733,13 +811,39 @@ get_sgb_tranches = get_all_sgb_tranches
 
 
 
+REIT_ALIASES = {
+    "SMREIT_BLR_01": "PROPSHARE",
+    "PROPSHARE_PLATINA": "PROPSHARE",
+    "PLATINA": "PROPSHARE",
+    "SMREIT_HYD_02": "STRATA",
+    "IRB_INVIT": "IRBINVIT",
+    "NHAI_INVIT": "NHIT",
+}
+
+
 def get_reit_by_symbol(symbol: str) -> Optional[Dict[str, Any]]:
-    """Retrieves a single REIT or InvIT by symbol."""
+    """Retrieves a single REIT or InvIT by symbol with alias and canonical normalization."""
     all_items = get_all_reits_and_invits()
     sym_clean = symbol.strip().upper()
+
+    # 1. Direct match
     for item in all_items:
         if item["symbol"].upper() == sym_clean:
             return item
+
+    # 2. Canonical alias match (e.g. SMREIT_BLR_01 -> PROPSHARE)
+    canonical = REIT_ALIASES.get(sym_clean)
+    if canonical:
+        for item in all_items:
+            if item["symbol"].upper() == canonical:
+                return item
+
+    # 3. Reverse alias match (e.g. if DB has legacy key)
+    for alias_key, target in REIT_ALIASES.items():
+        if target == sym_clean:
+            for item in all_items:
+                if item["symbol"].upper() == alias_key:
+                    return item
     return None
 
 

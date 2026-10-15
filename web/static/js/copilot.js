@@ -58,10 +58,65 @@ const COPILOT_CONFIGS = {
             { label: "⚖️ Recovery Seniority Tier", prompt: "Evaluate recovery seniority and investor recourse in a stressed debt restructuring or liquidation." },
             { label: "📡 Credit Contagion Radar", prompt: "What does the Credit Contagion Radar say about the parent group and systemic risks for this issuer?" }
         ]
+    },
+    etf: {
+        headerTitle: "ETF & Arbitrage Intelligence Desk",
+        assetBadge: "ETF Arbitrage & Tracking Intelligence",
+        introText: (ticker) => `Welcome to the <strong>ETF & Arbitrage Intelligence Desk</strong>. I evaluate secondary market pricing vs Fair NAV, 1-year tracking error fidelity, expense ratio drag, and <strong>Authorized Participant creation/redemption arbitrage</strong> for <strong>${ticker || 'this ETF'}</strong>.`,
+        features: [
+            { icon: "⚖️", title: "Arbitrage & Fair Value", desc: "Audit CMP vs statutory Fair NAV premium/discount", prompt: "Evaluate the secondary market premium/discount spread and arbitrage corridor for this ETF." },
+            { icon: "🎯", title: "Tracking Error Fidelity", desc: "1Y annualized deviation vs benchmark index TRI", prompt: "Audit the 1-year annualized tracking error and replication fidelity for this ETF." },
+            { icon: "🌊", title: "Liquidity Depth & Impact", desc: "Analyze daily volume, turnover, and bid-ask spread proxy", prompt: "What is the secondary market liquidity depth, average daily volume, and impact cost for this ETF?" }
+        ],
+        chips: [
+            { label: "⚖️ Arbitrage & Premium Spread", prompt: "Evaluate the secondary market premium/discount spread and arbitrage corridor for this ETF." },
+            { label: "🎯 1Y Tracking Error", prompt: "Audit the 1-year annualized tracking error and replication fidelity for this ETF." },
+            { label: "💸 TER Fee Drag vs Peers", prompt: "Compare the expense ratio (TER) and 10-year fee drag of this ETF against category peers." },
+            { label: "🌊 Liquidity Depth", prompt: "What is the secondary market liquidity depth, average daily volume, and impact cost for this ETF?" },
+            { label: "💀 Inversion & AP Risk", prompt: "Synthesize the bear thesis and Authorized Participant withdrawal risks during high market volatility." }
+        ]
+    },
+    reit: {
+        headerTitle: "REIT & InvIT Cash Flow Desk",
+        assetBadge: "REIT & InvIT Cash Flow Intelligence",
+        introText: (ticker) => `Welcome to the <strong>REIT & InvIT Cash Flow Desk</strong>. I evaluate Section 115UA tax waterfalls (Interest, Dividend, Return of Capital, Rental), statutory <strong>NDCF payout purity</strong> (≥90% Mainboard, ≥95% SM REIT), WALE & tenant concentration, and <strong>Pre-Mortem Inversion risk</strong> for <strong>${ticker || 'this Trust'}</strong>.`,
+        features: [
+            { icon: "🏛️", title: "Sec 115UA Tax Waterfall", desc: "Audit distribution components & net post-tax yield", prompt: "Evaluate the Section 115UA tax distribution waterfall and net post-tax yield across tax slabs for this REIT/InvIT." },
+            { icon: "💧", title: "NDCF Payout Purity", desc: "Audit statutory distribution vs SEBI 15% penal threshold", prompt: "Analyze the NDCF payout purity, cash conversion, and SEBI compliance for this trust." },
+            { icon: "🏢", title: "Portfolio Scale & WALE", desc: "Evaluate portfolio occupancy, lease expiry, and tenant risk", prompt: "Evaluate the portfolio scale, Weighted Average Lease Expiry (WALE), and top tenant concentration." }
+        ],
+        chips: [
+            { label: "🏛️ Sec 115UA Tax Waterfall", prompt: "Evaluate the Section 115UA tax distribution waterfall and net post-tax yield across tax slabs for this REIT/InvIT." },
+            { label: "💧 NDCF Payout Purity", prompt: "Analyze the NDCF payout purity, cash conversion, and SEBI compliance for this trust." },
+            { label: "🏢 Portfolio WALE & Tenants", prompt: "Evaluate the portfolio scale, Weighted Average Lease Expiry (WALE), and top tenant concentration." },
+            { label: "⚡ Leverage & LTV Headroom", prompt: "What is the leverage LTV vs SEBI 49% statutory cap and interest coverage headroom?" },
+            { label: "💀 Inversion & Refinancing Risk", prompt: "Synthesize the bear thesis, refinancing risks, and tenant vacancy shocks under Pre-Mortem Inversion." }
+        ]
     }
 };
 
 const SECTION_CHIPS = {
+    reit: {
+        tax_waterfall: [
+            { label: "🏛️ Sec 115UA Post-Tax Yield", prompt: "Break down the post-tax yield across the 0%, 10%, 20%, 30%, and 39% tax slabs for this REIT/InvIT." },
+            { label: "💸 ROC Tax Treatment", prompt: "Explain the tax treatment of Return of Capital (Amortization) and Section 56(2)(xii) specified sum threshold." },
+            { label: "⚖️ Dividend SPV Tax Exemption", prompt: "Is the dividend component exempt or taxable in unitholder hands based on SPV Sec 115BAA status?" }
+        ],
+        ndcf_purity: [
+            { label: "💧 NDCF Distribution Purity", prompt: "Audit the NDCF payout purity against SEBI's statutory mandate (≥90% for Mainboard, ≥95% for SM REIT)." },
+            { label: "⚠️ SEBI 15% Penal Clause", prompt: "Does this trust risk the SEBI 15% penal interest rate for delayed distributions?" },
+            { label: "📉 Free Cash Flow vs NDCF", prompt: "Analyze the spread between accounting Net Distributable Cash Flow and true operating free cash flow." }
+        ],
+        portfolio_wale: [
+            { label: "🏢 Lease Expiry Schedule", prompt: "Analyze the lease expiry concentration and renewal risk over the next 3 years." },
+            { label: "🎯 Top 3 Tenant Concentration", prompt: "How vulnerable is distribution cash flow if the top 3 tenants vacate or downsize?" },
+            { label: "📐 Occupancy & Mark-to-Market", prompt: "Evaluate current physical occupancy and mark-to-market rental escalation headroom." }
+        ],
+        inversion: [
+            { label: "💀 Inversion Failure Modes", prompt: "What structural failure modes or macro shocks could permanently impair distributions for this REIT/InvIT?" },
+            { label: "⚡ Interest Rate Sensitivity", prompt: "How does a 150 bps rise in benchmark bond yields impact the unit price and NAV cap rate?" }
+        ]
+    },
     mutual_fund: {
         fee_drag: [
             { label: "💸 20-Yr Compounded Drag", prompt: "What is the 20-year compounded fee drag and total wealth lost between Direct and Regular plans for this fund?" },
@@ -133,17 +188,45 @@ const SECTION_CHIPS = {
             { label: "📡 Credit Contagion Radar", prompt: "What does the Credit Contagion Radar say about the parent group and systemic risks for this issuer?" },
             { label: "🚨 Cross-Default Risks", prompt: "Are there any cross-default triggers or related-party exposure in the group structure?" }
         ]
+    },
+    etf: {
+        arbitrage: [
+            { label: "⚖️ Fair NAV Spread", prompt: "What is the current premium or discount percentage over Fair NAV and is retail paying an impact surcharge?" },
+            { label: "🏦 AP Creation Incentives", prompt: "How do Authorized Participants arbitrage this spread via creation/redemption baskets?" },
+            { label: "🎯 Retail Limit Order Strategy", prompt: "What execution strategy should retail investors use to minimize slippage on this ETF?" }
+        ],
+        tracking_error: [
+            { label: "🎯 1Y Tracking Error", prompt: "How does the 1-year tracking error compare to the institutional benchmark standard?" },
+            { label: "💸 Drag Sources", prompt: "What portion of tracking error comes from TER, cash drag, and dividend reinvestment latency?" }
+        ],
+        peers: [
+            { label: "📊 Compare with Peers", prompt: "Compare this ETF against its category peers on TER, tracking error, and liquidity depth." },
+            { label: "🏆 Cheapest in Category", prompt: "Is this ETF the most cost-efficient vehicle in its category?" }
+        ],
+        inversion: [
+            { label: "💀 Structural Failure Modes", prompt: "What are the top 3 structural failure modes for holding this ETF long-term?" },
+            { label: "⚡ AP Freeze in Crashes", prompt: "How do Authorized Participants behave during circuit breaker market drawdowns?" }
+        ]
     }
 };
 
 function detectAssetType(ticker) {
+    if (window.__CURRENT_ASSET_TYPE) return window.__CURRENT_ASSET_TYPE;
     const loc = window.location.pathname.toLowerCase();
+    if (loc.includes("/reits")) return "reit";
+    if (loc.includes("/etfs")) return "etf";
     if (loc.includes("/funds")) return "mutual_fund";
     if (loc.includes("/debt")) return "debt";
     if (!ticker) return "equity";
 
     const clean = String(ticker).trim().toUpperCase();
-    if (/^\d+$/.test(clean) || clean.endsWith("_DIR") || clean.endsWith("_REG") || clean.includes("FLEXICAP") || clean.includes("MIDCAP") || clean.includes("SMALLCAP") || clean.includes("NIFTY") || clean.includes("FUND") || clean.includes("GROWTH")) {
+    if (["EMBASSY", "MINDSPACE", "BIRET", "NEXUS", "PGINVIT", "INDIGRID", "IRBINVIT", "NHIT", "ORIENTINVIT", "BHARATINV", "PROPSHARE", "STRATA", "SMREIT_BLR_01", "SMREIT_HYD_02", "IRB_INVIT", "NHAI_INVIT"].includes(clean) || clean.includes("REIT") || clean.includes("INVIT")) {
+        return "reit";
+    }
+    if (clean.endsWith("BEES") || clean.endsWith("ETF") || ["NIFTYBEES", "GOLDBEES", "BANKBEES", "SILVERBEES", "SETFNIF50", "HDFCNIFTY", "CPSEETF", "MON100"].includes(clean)) {
+        return "etf";
+    }
+    if (/^\d+$/.test(clean) || clean.endsWith("_DIR") || clean.endsWith("_REG") || clean.includes("FLEXICAP") || clean.includes("MIDCAP") || clean.includes("SMALLCAP") || clean.includes("FUND") || clean.includes("GROWTH")) {
         return "mutual_fund";
     }
     if (clean.startsWith("IN") || clean.includes("BOND") || clean.includes("SDI") || clean.includes("NCD")) {

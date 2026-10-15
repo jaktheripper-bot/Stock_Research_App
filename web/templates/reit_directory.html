@@ -179,7 +179,7 @@
           {% if r.structure_type in ['MAINBOARD_REIT', 'SM_REIT'] %}
           <tr style="border-bottom: 1px solid rgba(255, 255, 255, 0.05); transition: background 0.15s ease;">
             <td style="padding: 14px 14px;">
-              <div style="font-weight: 800; color: #f8fafc;">{{ r.symbol }}</div>
+              <a href="/reits/{{ r.symbol }}" style="font-weight: 800; color: #f8fafc; text-decoration: none; display: inline-block;">{{ r.symbol }}</a>
               <div style="font-size: 11px; color: #94a3b8;">{{ r.name }}</div>
             </td>
             <td style="padding: 14px 14px;">
@@ -232,7 +232,10 @@
                 </span>
               {% endif %}
             </td>
-            <td style="padding: 14px 14px; text-align: center;">
+            <td style="padding: 14px 14px; text-align: center; white-space: nowrap;">
+              <a href="/reits/{{ r.symbol }}" class="btn btn-primary btn-sm" style="font-size: 11px; padding: 4px 8px; text-decoration: none; margin-right: 4px;" title="View Institutional Dossier">
+                📊 Dossier
+              </a>
               <a href="/api/pdf/reit/{{ r.symbol }}" class="btn btn-secondary btn-sm" style="font-size: 11px; padding: 4px 8px; text-decoration: none;" title="Download PDF Dossier">
                 ⬇️ PDF
               </a>
@@ -283,7 +286,7 @@
           {% if r.structure_type == 'INVIT' %}
           <tr style="border-bottom: 1px solid rgba(255, 255, 255, 0.05); transition: background 0.15s ease;">
             <td style="padding: 14px 14px;">
-              <div style="font-weight: 800; color: #f8fafc;">{{ r.symbol }}</div>
+              <a href="/reits/{{ r.symbol }}" style="font-weight: 800; color: #f8fafc; text-decoration: none; display: inline-block;">{{ r.symbol }}</a>
               <div style="font-size: 11px; color: #94a3b8;">{{ r.name }}</div>
             </td>
             <td style="padding: 14px 14px;">
@@ -329,7 +332,10 @@
             <td style="padding: 14px 14px; color: #c084fc; font-size: 11.5px;">
               Sec 115UA Pass-through
             </td>
-            <td style="padding: 14px 14px; text-align: center;">
+            <td style="padding: 14px 14px; text-align: center; white-space: nowrap;">
+              <a href="/reits/{{ r.symbol }}" class="btn btn-primary btn-sm" style="font-size: 11px; padding: 4px 8px; text-decoration: none; margin-right: 4px;" title="View Institutional Dossier">
+                📊 Dossier
+              </a>
               <a href="/api/pdf/reit/{{ r.symbol }}" class="btn btn-secondary btn-sm" style="font-size: 11px; padding: 4px 8px; text-decoration: none;" title="Download PDF Dossier">
                 ⬇️ PDF
               </a>

@@ -209,6 +209,15 @@ class TestETFMatrixEngine(unittest.TestCase):
         self.assertIn("aum_formatted", detail)
         self.assertIn("peers", detail)
         self.assertIn("forensic_notes", detail)
+        self.assertIn("arbitrage_analysis", detail)
+        self.assertIn("replication_audit", detail)
+        self.assertIn("liquidity_audit", detail)
+        self.assertIn("inversion_risks", detail)
+        self.assertIn("amc_issuer", detail)
+        self.assertEqual(detail["amc_issuer"], "Nippon India Mutual Fund")
+        self.assertIn("market_price", detail["arbitrage_analysis"])
+        self.assertIn("fair_nav", detail["arbitrage_analysis"])
+        self.assertIn("spread_pct", detail["arbitrage_analysis"])
 
 
 class TestWebAndApiEndpoints(unittest.TestCase):
@@ -228,6 +237,43 @@ class TestWebAndApiEndpoints(unittest.TestCase):
         self.assertIn("National ETF Performance & Liquidity Matrix", response.text)
         self.assertIn("Equity Indices", response.text)
         self.assertIn("Gold", response.text)
+        self.assertIn("/etfs/NIFTYBEES", response.text)
+
+    def test_etf_dossier_html_niftybees(self):
+        """Validates the ETF Institutional Dossier (/etfs/NIFTYBEES)."""
+        response = self.client.get("/etfs/NIFTYBEES")
+        self.assertEqual(response.status_code, 200)
+        html = response.text
+        self.assertIn("Nippon India ETF Nifty 50 BeES", html)
+        self.assertIn("NIFTYBEES", html)
+        self.assertIn("Secondary Market Spread", html)
+        self.assertIn("Statutory Fair NAV", html)
+        self.assertIn("1Y Tracking Error", html)
+        self.assertIn("Total Expense Ratio", html)
+        self.assertIn("Category Peer Comparison", html)
+        self.assertIn("Structural Failure Modes", html)
+        self.assertIn("SEBI Statutory Safe Harbor Compliance", html)
+        self.assertIn("openCopilot('NIFTYBEES', 'etf')", html)
+
+        # Semantic render hygiene assertions
+        self.assertNotIn("None%", html)
+        self.assertNotIn("NaN%", html)
+        self.assertNotIn("₹None", html)
+        self.assertNotIn("Gemini", html)
+        self.assertNotIn("Copilot Desk Notice: Exception", html)
+
+    def test_etf_dossier_html_goldbees(self):
+        """Validates commodity gold ETF dossier (/etfs/GOLDBEES)."""
+        response = self.client.get("/etfs/GOLDBEES")
+        self.assertEqual(response.status_code, 200)
+        html = response.text
+        self.assertIn("Gold BeES", html)
+        self.assertIn("Direct Physical Bullion Vault", html)
+
+    def test_etf_dossier_not_found(self):
+        """Validates 404 behavior for unknown ETF symbols."""
+        response = self.client.get("/etfs/UNKNOWN_ETF_999")
+        self.assertEqual(response.status_code, 404)
 
     def test_api_etfs_matrix_endpoint(self):
         response = self.client.get("/api/etfs/matrix")
@@ -242,6 +288,8 @@ class TestWebAndApiEndpoints(unittest.TestCase):
         self.assertEqual(response.status_code, 200)
         data = response.json()
         self.assertEqual(data["etf"]["symbol"], "NIFTYBEES")
+        self.assertIn("arbitrage_analysis", data)
+        self.assertIn("replication_audit", data)
 
     def test_api_etfs_detail_not_found(self):
         response = self.client.get("/api/etfs/NONEXISTENT_TICKER_999")
@@ -253,6 +301,38 @@ class TestWebAndApiEndpoints(unittest.TestCase):
         data = response.json()
         self.assertEqual(data["status"], "SUCCESS")
 
+    def test_etf_copilot_chat_arbitrage_query(self):
+        """Validates Forensic Intelligence Desk interaction for ETF queries."""
+        payload = {
+            "conversation_id": "test-etf-copilot-arb",
+            "message": "What is the arbitrage spread and premium for NIFTYBEES?",
+            "ticker": "NIFTYBEES",
+            "asset_type": "etf"
+        }
+        response = self.client.post("/api/copilot/chat", json=payload)
+        self.assertEqual(response.status_code, 200)
+        data = response.json()
+        self.assertTrue(data.get("success"))
+        resp_text = data.get("response", "")
+        self.assertIn("NIFTYBEES", resp_text)
+        self.assertTrue("Arbitrage" in resp_text or "Fair NAV" in resp_text or "Spread" in resp_text)
+        self.assertNotIn("Gemini", resp_text)
+
+    def test_etf_copilot_chat_regulatory_deflection(self):
+        """Validates SEBI Safe Harbor non-advisory deflection for ETF queries."""
+        payload = {
+            "conversation_id": "test-etf-copilot-deflect",
+            "message": "Should I buy NIFTYBEES today?",
+            "ticker": "NIFTYBEES",
+            "asset_type": "etf"
+        }
+        response = self.client.post("/api/copilot/chat", json=payload)
+        self.assertEqual(response.status_code, 200)
+        data = response.json()
+        self.assertTrue(data.get("success"))
+        self.assertEqual(data.get("status"), "REGULATORY_DEFLECTED")
+
 
 if __name__ == "__main__":
     unittest.main()
+

@@ -1406,6 +1406,37 @@ def etfs_page(
     )
 
 
+@app.get("/etfs/{symbol}", response_class=HTMLResponse)
+def etf_dossier_page(request: Request, symbol: str):
+    """Institutional ETF Dossier with live premium/discount tracking and arbitrage surveillance."""
+    from core.analysis.etf_matrix_engine import get_etf_detail
+    init_db()
+    clean_sym = symbol.strip().upper()
+    detail = get_etf_detail(clean_sym)
+    if not detail:
+        raise HTTPException(status_code=404, detail=f"ETF '{clean_sym}' not found in master matrix.")
+
+    return templates.TemplateResponse(
+        request=request,
+        name="etf_dossier.html",
+        context={
+            "active_page": "etfs",
+            "symbol": clean_sym,
+            "data": detail,
+            "etf": detail["etf"],
+            "amc_issuer": detail["amc_issuer"],
+            "category_label": detail["category_label"],
+            "aum_formatted": detail["aum_formatted"],
+            "arbitrage": detail["arbitrage_analysis"],
+            "replication": detail["replication_audit"],
+            "liquidity": detail["liquidity_audit"],
+            "inversion_risks": detail["inversion_risks"],
+            "peers": detail["peers"],
+            "forensic_notes": detail["forensic_notes"]
+        }
+    )
+
+
 @app.get("/calculator/tax", response_class=HTMLResponse)
 def tax_calculator_page(
     request: Request,
@@ -1545,6 +1576,34 @@ def reits_page(request: Request, structure: Optional[str] = Query(None)):
             "current_structure": structure,
             "reit_audit": reit_audit,
             "sgb_audit": sgb_audit
+        }
+    )
+
+
+@app.get("/reits/{symbol}", response_class=HTMLResponse)
+def reit_dossier_page(request: Request, symbol: str):
+    """Institutional REIT & InvIT Dossier with Sec 115UA tax waterfall and NDCF payout purity."""
+    from core.analysis.sm_reit_invit_engine import get_reit_detail
+    init_db()
+    clean_sym = symbol.strip().upper()
+    detail = get_reit_detail(clean_sym)
+    if not detail:
+        raise HTTPException(status_code=404, detail=f"REIT/InvIT '{clean_sym}' not found in master registry.")
+
+    return templates.TemplateResponse(
+        request=request,
+        name="reit_dossier.html",
+        context={
+            "active_page": "reits",
+            "symbol": detail["reit"]["symbol"],
+            "data": detail,
+            "reit": detail["reit"],
+            "tax_waterfall": detail["tax_waterfall"],
+            "ndcf_audit": detail["ndcf_audit"],
+            "portfolio_audit": detail["portfolio_audit"],
+            "inversion_risks": detail["inversion_risks"],
+            "peers": detail["peers"],
+            "forensic_notes": detail["forensic_notes"]
         }
     )
 
@@ -1788,6 +1847,30 @@ async def sitemap_xml():
             xml_lines.append(
                 f'  <url><loc>{base_url}/dossier/{t}</loc><lastmod>{lastmod_date}</lastmod><changefreq>weekly</changefreq><priority>0.9</priority></url>'
             )
+
+    try:
+        from core.db.sovereign import get_etf_matrix
+        top_etfs = get_etf_matrix(limit=30)
+        for etf in top_etfs:
+            sym = etf.get("symbol")
+            if sym:
+                xml_lines.append(
+                    f'  <url><loc>{base_url}/etfs/{sym}</loc><lastmod>{now_iso}</lastmod><changefreq>weekly</changefreq><priority>0.8</priority></url>'
+                )
+    except Exception as etf_sitemap_err:
+        logger.debug(f"Sitemap ETF append notice: {etf_sitemap_err}")
+
+    try:
+        from core.db.reits import get_all_reits_and_invits
+        all_reits = get_all_reits_and_invits()
+        for r in all_reits:
+            sym = r.get("symbol")
+            if sym:
+                xml_lines.append(
+                    f'  <url><loc>{base_url}/reits/{sym}</loc><lastmod>{now_iso}</lastmod><changefreq>weekly</changefreq><priority>0.8</priority></url>'
+                )
+    except Exception as reit_sitemap_err:
+        logger.debug(f"Sitemap REIT append notice: {reit_sitemap_err}")
 
     xml_lines.append('</urlset>')
     return Response(content="\n".join(xml_lines), media_type="application/xml")
