@@ -1842,6 +1842,41 @@ def init_db(force: bool = False):
                     cursor.execute("INSERT OR IGNORE INTO schema_migrations (version) VALUES ('v028_etf_matrix_expansion');")
                 conn.commit()
 
+            # Migration v029: Service Inbox & Support Ticket Responses
+            if "v029_ticket_responses_and_service_inbox" not in applied:
+                logger.info("Applying schema migration: v029_ticket_responses_and_service_inbox...")
+                if supabase_url:
+                    cursor.execute("""
+                        CREATE TABLE IF NOT EXISTS ticket_responses (
+                            id SERIAL PRIMARY KEY,
+                            ticket_id VARCHAR(64) NOT NULL,
+                            sender_type VARCHAR(32) NOT NULL DEFAULT 'admin',
+                            sender_email VARCHAR(255),
+                            sender_name VARCHAR(255),
+                            message TEXT NOT NULL,
+                            email_dispatched BOOLEAN DEFAULT FALSE,
+                            created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+                        );
+                        CREATE INDEX IF NOT EXISTS idx_ticket_responses_tid ON ticket_responses (ticket_id, created_at ASC);
+                        INSERT INTO schema_migrations (version) VALUES ('v029_ticket_responses_and_service_inbox') ON CONFLICT DO NOTHING;
+                    """)
+                else:
+                    cursor.execute("""
+                        CREATE TABLE IF NOT EXISTS ticket_responses (
+                            id INTEGER PRIMARY KEY AUTOINCREMENT,
+                            ticket_id TEXT NOT NULL,
+                            sender_type TEXT NOT NULL DEFAULT 'admin',
+                            sender_email TEXT,
+                            sender_name TEXT,
+                            message TEXT NOT NULL,
+                            email_dispatched INTEGER DEFAULT 0,
+                            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+                        );
+                    """)
+                    cursor.execute("CREATE INDEX IF NOT EXISTS idx_ticket_responses_tid ON ticket_responses (ticket_id, created_at ASC);")
+                    cursor.execute("INSERT OR IGNORE INTO schema_migrations (version) VALUES ('v029_ticket_responses_and_service_inbox');")
+                conn.commit()
+
             _DB_INITIALIZED = True
             _INITIALIZED_DBS.add(target_key)
         except Exception as e:

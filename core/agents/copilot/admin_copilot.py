@@ -42,7 +42,10 @@ from core.db import (
     get_support_tickets,
     get_open_tickets_count,
     update_ticket_status,
+    add_ticket_response,
+    get_ticket_by_id,
 )
+from core.notify import send_ticket_reply_email
 from core.db.admin import (
     get_admin_user,
     list_admin_users,
@@ -67,6 +70,7 @@ logger = logging.getLogger("equity_research.core.agents.copilot.admin")
 class AdminActionType:
     GRANT_CREDITS = "GRANT_CREDITS"
     UPDATE_TICKET = "UPDATE_TICKET"
+    REPLY_TICKET = "REPLY_TICKET"
     PROCESS_REFUND = "PROCESS_REFUND"
     PURGE_TEST_DATA = "PURGE_TEST_DATA"
     TRIGGER_ASSET_SCAN = "TRIGGER_ASSET_SCAN"
@@ -77,6 +81,7 @@ class AdminActionType:
 ALLOWED_ROLES_PER_ACTION = {
     AdminActionType.GRANT_CREDITS: {"owner", "admin"},
     AdminActionType.UPDATE_TICKET: {"owner", "admin"},
+    AdminActionType.REPLY_TICKET: {"owner", "admin"},
     AdminActionType.PROCESS_REFUND: {"owner", "admin"},
     AdminActionType.PURGE_TEST_DATA: {"owner", "admin"},
     AdminActionType.TRIGGER_ASSET_SCAN: {"owner", "admin", "viewer"},
@@ -360,6 +365,54 @@ def execute_confirmed_admin_action(
             }
         else:
             return {"success": False, "error": f"Failed to update support ticket {ticket_id}."}
+
+    # 2B. REPLY_TICKET
+    elif action_type == AdminActionType.REPLY_TICKET:
+        ticket_id = str(payload.get("ticket_id") or "").strip()
+        reply_message = str(payload.get("reply_message") or "").strip()
+        new_status = str(payload.get("status") or "resolved").strip().lower()
+        dispatch_email = bool(payload.get("dispatch_email", True))
+
+        if not ticket_id or not reply_message:
+            return {"success": False, "error": "Ticket ID and reply message are required."}
+
+        ticket = get_ticket_by_id(ticket_id, include_responses=False)
+        if not ticket:
+            return {"success": False, "error": f"Ticket {ticket_id} not found."}
+
+        email_dispatched = False
+        if dispatch_email:
+            email_dispatched = send_ticket_reply_email(ticket, reply_message)
+
+        add_ticket_response(
+            ticket_id=ticket_id,
+            message=reply_message,
+            sender_email=admin_email,
+            sender_name="Moatnomics Service Desk",
+            sender_type="admin",
+            email_dispatched=email_dispatched
+        )
+        update_ticket_status(ticket_id=ticket_id, new_status=new_status)
+
+        record_admin_audit(
+            admin_email=admin_email,
+            action="REPLY_TICKET_VIA_COPILOT",
+            target_type="ticket",
+            target_id=ticket_id,
+            details={
+                "recipient_email": ticket.get("user_email"),
+                "new_status": new_status,
+                "email_dispatched": email_dispatched,
+                "reply_preview": reply_message[:100]
+            },
+            ip_address=client_ip,
+            user_agent=user_agent
+        )
+        return {
+            "success": True,
+            "ticket_id": ticket_id,
+            "message": f"Successfully replied to ticket {ticket_id}. Email dispatched: {'Yes' if email_dispatched else 'Mock/Logged'}."
+        }
 
     # 3. PROCESS_REFUND
     elif action_type == AdminActionType.PROCESS_REFUND:

@@ -127,3 +127,119 @@ def dispatch_support_ticket_alert(ticket: dict):
         send_ticket_notification_email(ticket)
     except Exception as e:
         logger.error(f"Error sending email alert for ticket {tid}: {e}")
+
+
+def send_ticket_reply_email(ticket: dict, reply_message: str, admin_name: str = "Research Desk") -> bool:
+    """
+    Sends an email response directly to the user regarding their support ticket or grievance.
+    If SMTP credentials are not configured, logs the dispatch gracefully and returns True (mock delivery).
+    """
+    user_email = ticket.get("user_email")
+    if not user_email:
+        logger.warning("Cannot dispatch reply email: ticket %s has no user_email", ticket.get("ticket_id"))
+        return False
+
+    smtp_host = os.environ.get("SMTP_HOST")
+    smtp_port = int(os.environ.get("SMTP_PORT", 587))
+    smtp_user = os.environ.get("SMTP_USER")
+    smtp_password = os.environ.get("SMTP_PASSWORD")
+    sender_email = os.environ.get("SMTP_FROM", smtp_user or "noreply@moatnomics.com")
+
+    ticket_id = ticket.get("ticket_id", "TKT")
+    original_subject = ticket.get("subject", "Support Inquiry")
+    subject = f"Re: [{ticket_id}] {original_subject}"
+    user_name = ticket.get("user_name") or "Investor"
+
+    text_body = f"""Hello {user_name},
+
+Thank you for reaching out to Moatnomics.
+
+{reply_message}
+
+---
+Ticket Reference: {ticket_id}
+Original Subject: {original_subject}
+Original Message:
+"{ticket.get('message', '').strip()}"
+
+You can view ongoing status or submit further queries through our contact desk:
+https://moatnomics.com/contact
+
+Kind regards,
+Moatnomics Service Desk
+"""
+
+    html_body = f"""<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <style>
+    body {{ font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; line-height: 1.6; color: #1e293b; background-color: #f8fafc; margin: 0; padding: 24px; }}
+    .container {{ max-width: 600px; margin: 0 auto; background: #ffffff; border-radius: 8px; border: 1px solid #e2e8f0; overflow: hidden; }}
+    .header {{ background: #0b1329; color: #ffffff; padding: 20px 24px; border-bottom: 2px solid #0ea5e9; }}
+    .header h2 {{ margin: 0; font-size: 18px; font-weight: 700; letter-spacing: -0.01em; color: #ffffff; }}
+    .header p {{ margin: 4px 0 0; font-size: 12px; color: #94a3b8; }}
+    .content {{ padding: 24px; }}
+    .reply-box {{ background: #f0fdf4; border-left: 4px solid #10b981; padding: 16px; border-radius: 4px; font-size: 15px; color: #0f172a; margin: 16px 0; white-space: pre-wrap; }}
+    .original-quote {{ background: #f8fafc; border-left: 4px solid #cbd5e1; padding: 14px; font-size: 13px; color: #64748b; margin-top: 20px; border-radius: 4px; }}
+    .footer {{ background: #f1f5f9; padding: 16px 24px; font-size: 12px; color: #64748b; border-top: 1px solid #e2e8f0; text-align: center; }}
+    .footer a {{ color: #0284c7; text-decoration: none; }}
+    .badge {{ display: inline-block; background: #e0f2fe; color: #0369a1; padding: 2px 8px; border-radius: 4px; font-size: 11px; font-weight: 600; }}
+  </style>
+</head>
+<body>
+  <div class="container">
+    <div class="header">
+      <h2>Moatnomics Service Desk</h2>
+      <p>Ticket Reference: <span class="badge">{ticket_id}</span></p>
+    </div>
+    <div class="content">
+      <p>Hello <strong>{user_name}</strong>,</p>
+      <p>Thank you for reaching out to us. We have reviewed your query and here is our update:</p>
+      
+      <div class="reply-box">{reply_message}</div>
+      
+      <div class="original-quote">
+        <p style="margin: 0 0 6px 0; font-weight: 600; color: #475569;">In reference to your message ({ticket.get('created_at', 'recently')}):</p>
+        <p style="margin: 0; font-style: italic;">"{ticket.get('message', '').strip()}"</p>
+      </div>
+
+      <p style="margin-top: 24px; font-size: 14px;">If you have any further questions or require additional details, you can connect with us directly via the <a href="https://moatnomics.com/contact" style="color: #0284c7; font-weight: 600;">Feedback & Grievances Desk</a>.</p>
+    </div>
+    <div class="footer">
+      <p style="margin: 0 0 4px 0;">Moatnomics &bull; Independent Quantitative Equity & Asset Intelligence</p>
+      <p style="margin: 0;">This email was sent in direct response to inquiry {ticket_id}.</p>
+    </div>
+  </div>
+</body>
+</html>
+"""
+
+    if smtp_host and smtp_user and smtp_password:
+        try:
+            msg = MIMEMultipart("alternative")
+            msg["From"] = sender_email
+            msg["To"] = user_email
+            msg["Subject"] = subject
+            msg.attach(MIMEText(text_body, "plain"))
+            msg.attach(MIMEText(html_body, "html"))
+
+            with smtplib.SMTP(smtp_host, smtp_port, timeout=10) as server:
+                server.starttls()
+                server.login(smtp_user, smtp_password)
+                server.send_message(msg)
+
+            logger.info("Dispatched email response for ticket %s to %s", ticket_id, user_email)
+            return True
+        except Exception as e:
+            logger.error("Failed to dispatch SMTP email response to %s for ticket %s: %s", user_email, ticket_id, e)
+            return False
+    else:
+        logger.info(
+            "[MOCK/LOG USER EMAIL REPLY] Dispatched to: %s | Subject: %s | Ticket: %s | Preview: %s...",
+            user_email,
+            subject,
+            ticket_id,
+            reply_message[:80],
+        )
+        return True

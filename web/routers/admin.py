@@ -38,8 +38,12 @@ from core.db import (
     get_support_tickets,
     get_open_tickets_count,
     update_ticket_status,
+    add_ticket_response,
+    get_ticket_responses,
+    get_ticket_by_id,
     IST,
 )
+from core.notify import send_ticket_reply_email
 from core.auth.totp import generate_totp_secret, verify_totp_code, get_totp_uri
 from core.auth.supabase_auth import get_supabase_auth_config
 from core.db.admin import (
@@ -996,6 +1000,126 @@ async def admin_update_ticket(
             ip_address=client_ip
         )
     msg = f"Ticket+{ticket_id}+status+updated+to+{status}" if ok else "Failed+to+update+ticket"
+    return RedirectResponse(url=f"/admin?tab=tickets&msg={msg}", status_code=303)
+
+
+@router.get("/api/admin/tickets/{ticket_id}/thread")
+async def api_admin_get_ticket_thread(ticket_id: str, request: Request):
+    """Retrieves full ticket context and all chronological responses for the Service Inbox."""
+    admin_session = _is_admin_authenticated(request)
+    if not admin_session:
+        raise HTTPException(status_code=403, detail="Admin authorization required.")
+
+    ticket = get_ticket_by_id(ticket_id, include_responses=True)
+    if not ticket:
+        raise HTTPException(status_code=404, detail="Ticket not found.")
+
+    return JSONResponse(status_code=200, content={"success": True, "ticket": ticket, "responses": ticket.get("responses", [])})
+
+
+@router.post("/admin/tickets/{ticket_id}/reply")
+async def admin_reply_ticket(
+    ticket_id: str,
+    request: Request,
+    reply_message: str = Form(...),
+    status: Optional[str] = Form("resolved"),
+    dispatch_email: Optional[str] = Form("on"),
+    grant_remedial_credits: Optional[float] = Form(0.0),
+    admin_notes: Optional[str] = Form(None)
+):
+    """
+    Submits a response to a support ticket, updates ticket status, logs the message thread,
+    optionally grants remedial credits, and dispatches an email notification to the user's email address.
+    """
+    admin_session = _is_admin_authenticated(request)
+    if not admin_session:
+        raise HTTPException(status_code=403, detail="Admin authorization required.")
+
+    ticket = get_ticket_by_id(ticket_id, include_responses=False)
+    if not ticket:
+        raise HTTPException(status_code=404, detail="Ticket not found.")
+
+    clean_reply = str(reply_message or "").strip()
+    if not clean_reply:
+        err_msg = "Reply message cannot be empty."
+        return RedirectResponse(url=f"/admin?tab=tickets&err={urllib.parse.quote_plus(err_msg)}", status_code=303)
+
+    admin_email = admin_session.get("email", "support@moatnomics.com")
+    admin_name = "Moatnomics Service Desk"
+    client_ip = request.headers.get("x-forwarded-for") or (request.client.host if request.client else "unknown")
+
+    # 1. Determine email dispatch
+    should_email = dispatch_email in ("on", "true", "1", True)
+    email_dispatched = False
+    if should_email:
+        email_dispatched = send_ticket_reply_email(ticket, clean_reply, admin_name=admin_name)
+
+    # 2. Record response in database
+    add_ticket_response(
+        ticket_id=ticket_id,
+        message=clean_reply,
+        sender_email=admin_email,
+        sender_name=admin_name,
+        sender_type="admin",
+        email_dispatched=email_dispatched
+    )
+
+    # 3. Update status and admin notes if provided
+    new_status = str(status or ticket.get("status", "in_progress")).strip().lower()
+    combined_notes = admin_notes or ticket.get("admin_notes")
+    update_ticket_status(ticket_id, new_status, combined_notes)
+
+    # 4. Handle optional remedial credits grant
+    credits_granted = 0.0
+    if grant_remedial_credits and float(grant_remedial_credits) > 0:
+        try:
+            credits_val = float(grant_remedial_credits)
+            admin_grant_user_credits(
+                admin_email=admin_email,
+                target_user_identifier=ticket.get("user_email"),
+                credits_amount=credits_val,
+                reason_code="TASK_REMEDY",
+                admin_note=f"Remedial grant from ticket response {ticket_id}",
+                ticket_id=ticket_id,
+                resolve_ticket=False,
+                ip_address=client_ip
+            )
+            credits_granted = credits_val
+        except Exception as e:
+            logger.error("Error granting remedial credits during ticket reply: %s", e)
+
+    # 5. Record admin audit log
+    record_admin_audit(
+        admin_email,
+        "reply_support_ticket",
+        target_type="ticket",
+        target_id=ticket_id,
+        details={
+            "recipient_email": ticket.get("user_email"),
+            "new_status": new_status,
+            "email_dispatched": email_dispatched,
+            "credits_granted": credits_granted,
+            "reply_preview": clean_reply[:100]
+        },
+        ip_address=client_ip
+    )
+
+    # 6. Response handling (AJAX vs Form Redirect)
+    is_ajax = request.headers.get("x-requested-with") == "XMLHttpRequest" or "application/json" in request.headers.get("accept", "")
+    if is_ajax:
+        return JSONResponse(status_code=200, content={
+            "success": True,
+            "ticket_id": ticket_id,
+            "new_status": new_status,
+            "email_dispatched": email_dispatched,
+            "message": f"Response sent to {ticket.get('user_email')}. Email dispatched: {'Yes' if email_dispatched else 'Logged'}."
+        })
+
+    msg = f"Response+sent+to+{ticket.get('user_email')}"
+    if email_dispatched:
+        msg += "+and+email+dispatched"
+    if credits_granted > 0:
+        msg += f"+(+{credits_granted}+credits+granted)"
     return RedirectResponse(url=f"/admin?tab=tickets&msg={msg}", status_code=303)
 
 

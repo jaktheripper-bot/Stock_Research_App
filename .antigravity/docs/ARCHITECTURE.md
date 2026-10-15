@@ -19,6 +19,7 @@
   * `core/db/reports.py`: Snapshot archiving, time-series differential revisions, and structured query retrieval.
   * `core/db/watchlist.py`: Watched scrips, automated surveillance scan timestamps, and tracking status.
   * `core/db/alerts.py`: BSE material surveillance event ledger, notification counts, and user dismissals.
+  * `core/db/support.py`: Support tickets, customer inquiry threads (`ticket_responses`), and status tracking.
   * `core/db/telemetry.py`: Privacy-preserving user action journeys, geographic/device demographics, and API credit cost savings.
   * `core/db/settings.py`: Dynamic system configuration key-value storage.
 * **Zero-Breaking-Change Root Facade (`db.py`):** The root `db.py` exposes a 100% backwards-compatible facade re-exporting all symbols from `core.db`, ensuring existing scripts, test suites, and preflight checks operate with zero import breakage.
@@ -55,6 +56,7 @@
     * Server-side redaction across page templates, public JSON APIs, and PDF exports.
   * SEO & Attribution: Canonical `<link rel="canonical">` and `og:url` tags on all views, `CrawlerLogMiddleware` with bot detection, admin SEO visibility dashboard, and `utm_source=share` attribution.
   * Security & Auth: Standard library Email OTP (`core/auth/otp.py`) and Admin 2FA TOTP (`core/auth/totp.py`).
+  * Admin Service Inbox & Notification Dispatch: `/admin?tab=tickets`, `/api/admin/tickets/{ticket_id}/thread`, `POST /admin/tickets/{ticket_id}/reply`, two-way email notification engine (`core/notify.py:send_ticket_reply_email`) with standard SMTP dispatch, test/dev mock fallback, and executive copilot resolution.
   * Modern Dark-Glassmorphism Design System: `web/static/css/style.css`, Inter typography, 100% viewport zoom lock, strict visual affordance separation (squircle 8px buttons vs. dark matte telemetry badges), decluttered 2-zone 7-pillar accordions with executive lead styling, and interactive slide-drawer Forensic Intelligence Desk (`web/static/js/copilot.js`, shortcut: `⌘K`).
 
 ## 7. Deterministic Cortex & Multi-Asset Engines

@@ -652,7 +652,7 @@
       👤 User Accounts & Usage
     </button>
     <button class="admin-tab-btn {% if active_tab == 'tickets' %}active{% endif %}" data-tab="tickets" onclick="showTab('tickets')">
-      📩 Support Grievances
+      📩 Service Inbox & Tickets
       {% if open_tickets_count > 0 %}
       <span class="admin-tab-badge">{{ open_tickets_count }}</span>
       {% endif %}
@@ -886,11 +886,20 @@
   <!-- TAB 3: Support Grievances & Tickets -->
   <div id="tab-tickets" class="admin-tab-pane {% if active_tab == 'tickets' %}active{% endif %}">
     <div class="admin-card">
-      <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px;">
-        <h3 style="margin: 0; font-size: 16px; font-weight: 700;">📩 Grievance Redressal & Support Tickets</h3>
-        <span class="status-pill {% if open_tickets_count > 0 %}open{% else %}success{% endif %}">
-          {{ open_tickets_count }} Unresolved Tickets
-        </span>
+      <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px; flex-wrap: wrap; gap: 12px;">
+        <div>
+          <h3 style="margin: 0; font-size: 16px; font-weight: 700; display: flex; align-items: center; gap: 8px;">
+            <span>📩</span> Service Inbox & User Inquiries
+          </h3>
+          <p style="margin: 4px 0 0; font-size: 12px; color: var(--text-secondary, #94a3b8);">
+            Review inbound user inquiries, view full message history, and email responses directly to users' registered mail IDs.
+          </p>
+        </div>
+        <div style="display: flex; align-items: center; gap: 10px;">
+          <span class="status-pill {% if open_tickets_count > 0 %}open{% else %}success{% endif %}">
+            {{ open_tickets_count }} Unresolved Tickets
+          </span>
+        </div>
       </div>
 
       <div class="admin-table-wrap">
@@ -901,9 +910,9 @@
               <th>Created</th>
               <th>User</th>
               <th>Category</th>
-              <th>Subject & Message</th>
+              <th>Subject & Inquiry</th>
               <th>Status</th>
-              <th>Action</th>
+              <th>Service Actions</th>
             </tr>
           </thead>
           <tbody>
@@ -919,6 +928,11 @@
               <td style="max-width: 320px;">
                 <div style="font-weight: 600; margin-bottom: 4px;">{{ t.subject }}</div>
                 <div style="font-size: 12px; color: var(--text-secondary, #94a3b8); white-space: pre-wrap;">{{ t.message }}</div>
+                {% if t.responses and t.responses|length > 0 %}
+                <div style="margin-top: 6px; font-size: 11px; color: #38bdf8; background: rgba(14, 165, 233, 0.1); padding: 3px 8px; border-radius: 4px; display: inline-flex; align-items: center; gap: 4px;">
+                  <svg class="glyph" style="width: 12px; height: 12px;"><use href="#glyph-mail"></use></svg> {{ t.responses|length }} response(s) sent
+                </div>
+                {% endif %}
                 {% if t.admin_notes %}
                 <div style="margin-top: 6px; font-size: 11px; color: #a5b4fc; background: rgba(99, 102, 241, 0.1); padding: 4px 8px; border-radius: 4px;">
                   Note: {{ t.admin_notes }}
@@ -930,19 +944,22 @@
               </td>
               <td>
                 <div style="display: flex; flex-direction: column; gap: 6px;">
-                  <form method="POST" action="/admin/tickets/{{ t.ticket_id }}/status" style="display: flex; gap: 6px; align-items: center;">
-                    <select name="status" class="admin-select" style="padding: 4px 8px; font-size: 12px;">
+                  <button type="button" class="btn btn-primary btn-sm" onclick="openTicketReplyModal('{{ t.ticket_id }}')" style="padding: 5px 10px; font-size: 11.5px; font-weight: 700; display: inline-flex; align-items: center; justify-content: center; gap: 6px; cursor: pointer;" title="Reply to inquiry and trigger email dispatch to {{ t.user_email }}">
+                    <svg class="glyph" style="width: 13px; height: 13px;"><use href="#glyph-mail"></use></svg> Reply & Email
+                  </button>
+                  <form method="POST" action="/admin/tickets/{{ t.ticket_id }}/status" style="display: flex; gap: 4px; align-items: center;">
+                    <select name="status" class="admin-select" style="padding: 3px 6px; font-size: 11px;">
                       <option value="open" {% if t.status == 'open' %}selected{% endif %}>Open</option>
                       <option value="in_progress" {% if t.status == 'in_progress' %}selected{% endif %}>In Progress</option>
                       <option value="resolved" {% if t.status == 'resolved' %}selected{% endif %}>Resolved</option>
                       <option value="closed" {% if t.status == 'closed' %}selected{% endif %}>Closed</option>
                     </select>
-                    <button type="submit" class="btn btn-secondary btn-sm" style="padding: 4px 8px; font-size: 11px;">
+                    <button type="submit" class="btn btn-secondary btn-sm" style="padding: 3px 6px; font-size: 10px;">
                       Update
                     </button>
                   </form>
                   <button type="button" class="btn btn-secondary btn-sm" onclick="openGrantCreditsModal('{{ t.user_email }}', '{{ t.ticket_id }}', 'TASK_REMEDY', '')" style="padding: 4px 8px; font-size: 11px; color: #f59e0b; border-color: rgba(245, 158, 11, 0.4); background: rgba(245, 158, 11, 0.08); display: inline-flex; align-items: center; justify-content: center; gap: 4px; cursor: pointer;" title="Grant remedial credits & resolve grievance">
-                    <svg class="glyph"><use href="#glyph-zap"></use></svg> Grant Remedial Credits
+                    <svg class="glyph"><use href="#glyph-zap"></use></svg> Remedial Credits
                   </button>
                 </div>
               </td>
@@ -950,7 +967,7 @@
             {% else %}
             <tr>
               <td colspan="7" style="text-align: center; color: var(--text-secondary, #94a3b8); padding: 30px;">
-                No support tickets found. All investor grievances resolved!
+                No support tickets found. All investor inquiries and grievances resolved!
               </td>
             </tr>
             {% endfor %}
@@ -1920,7 +1937,210 @@
     </div>
   </div>
 
+  <!-- Service Inbox Direct Ticket Reply & Email Modal -->
+  <div id="adminTicketReplyModal" class="modal-backdrop" style="display: none; align-items: center; justify-content: center; z-index: 9999;">
+    <div class="modal-dialog" style="max-width: 640px; width: 92%; max-height: 90vh; display: flex; flex-direction: column; background: var(--bg-card, #131722); border-radius: 12px; padding: 24px; border: 1px solid rgba(14, 165, 233, 0.4); box-shadow: 0 20px 45px rgba(0, 0, 0, 0.75); overflow: hidden;">
+      <!-- Header -->
+      <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px; flex-shrink: 0;">
+        <h3 style="margin: 0; font-size: 17px; font-weight: 800; display: flex; align-items: center; gap: 8px;">
+          <span style="color: #38bdf8;"><svg class="glyph"><use href="#glyph-mail"></use></svg></span>
+          <span>Service Inbox: Respond to Ticket <span id="replyModalTicketId" class="mono" style="color: #38bdf8;"></span></span>
+        </h3>
+        <button type="button" onclick="closeTicketReplyModal()" style="background: none; border: none; color: #94a3b8; font-size: 22px; cursor: pointer;">&times;</button>
+      </div>
+
+      <!-- Ticket Metadata Summary Strip -->
+      <div id="replyModalMetaStrip" style="background: rgba(15, 23, 42, 0.7); border: 1px solid var(--border-subtle, #1e293b); border-radius: 8px; padding: 12px 14px; margin-bottom: 12px; flex-shrink: 0; font-size: 12.5px;">
+        <div style="display: flex; justify-content: space-between; margin-bottom: 6px; flex-wrap: wrap; gap: 6px;">
+          <div>
+            <strong style="color: var(--text-primary);" id="replyModalUserName">User</strong>
+            <span style="color: #94a3b8; margin-left: 6px;" id="replyModalUserEmail">email@example.com</span>
+          </div>
+          <div>
+            <span class="status-pill closed" id="replyModalCategory">general</span>
+            <span class="status-pill open" id="replyModalStatus" style="margin-left: 4px;">open</span>
+          </div>
+        </div>
+        <div style="font-weight: 600; color: #38bdf8; margin-bottom: 4px;" id="replyModalSubject">Subject</div>
+        <div style="font-size: 12px; color: #cbd5e1; max-height: 80px; overflow-y: auto; background: rgba(0,0,0,0.25); padding: 8px; border-radius: 4px; white-space: pre-wrap;" id="replyModalMessage">Message</div>
+      </div>
+
+      <!-- Scrollable Message & Responses Thread -->
+      <div style="flex-grow: 1; overflow-y: auto; max-height: 200px; margin-bottom: 14px; padding-right: 4px;">
+        <div style="font-size: 11px; text-transform: uppercase; font-weight: 700; color: #94a3b8; margin-bottom: 8px; letter-spacing: 0.05em;">
+          Conversation History & Responses (<span id="replyModalThreadCount">0</span>)
+        </div>
+        <div id="replyModalThreadList" style="display: flex; flex-direction: column; gap: 8px;">
+          <div style="font-size: 12px; color: #94a3b8; font-style: italic; padding: 10px; text-align: center;">No previous responses sent yet.</div>
+        </div>
+      </div>
+
+      <!-- Response Form -->
+      <form method="POST" id="ticketReplyForm" onsubmit="handleTicketReplySubmit(event)" style="flex-shrink: 0;">
+        <input type="hidden" name="tab" value="tickets">
+
+        <!-- Quick Template Chips -->
+        <div style="display: flex; gap: 6px; margin-bottom: 8px; flex-wrap: wrap; align-items: center;">
+          <span style="font-size: 11px; color: #94a3b8; font-weight: 600;">Quick Responses:</span>
+          <button type="button" onclick="insertReplyTemplate('investigating')" class="btn btn-secondary btn-sm" style="padding: 2px 7px; font-size: 10px;">📋 Investigating</button>
+          <button type="button" onclick="insertReplyTemplate('resolved')" class="btn btn-secondary btn-sm" style="padding: 2px 7px; font-size: 10px; color: #10b981; border-color: rgba(16, 185, 129, 0.4);">✅ Resolved</button>
+          <button type="button" onclick="insertReplyTemplate('credits')" class="btn btn-secondary btn-sm" style="padding: 2px 7px; font-size: 10px; color: #f59e0b; border-color: rgba(245, 158, 11, 0.4);">🎁 +2 Credits</button>
+          <button type="button" onclick="insertReplyTemplate('clarification')" class="btn btn-secondary btn-sm" style="padding: 2px 7px; font-size: 10px;">❓ Clarification</button>
+        </div>
+
+        <div style="margin-bottom: 10px;">
+          <textarea name="reply_message" id="ticketReplyMessage" class="admin-input" style="width: 100%; box-sizing: border-box; height: 85px; resize: vertical; font-size: 13px; line-height: 1.5;" required placeholder="Type direct email response to the user..."></textarea>
+        </div>
+
+        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-bottom: 10px;">
+          <div>
+            <label style="display: block; font-size: 11px; margin-bottom: 4px; color: #94a3b8; font-weight: 600;">Update Ticket Status</label>
+            <select name="status" id="replyTicketStatus" class="admin-select" style="width: 100%; box-sizing: border-box; font-size: 12px; padding: 6px 8px;">
+              <option value="resolved" selected>Resolved (Recommended)</option>
+              <option value="in_progress">In Progress</option>
+              <option value="open">Keep Open</option>
+              <option value="closed">Closed</option>
+            </select>
+          </div>
+          <div>
+            <label style="display: block; font-size: 11px; margin-bottom: 4px; color: #94a3b8; font-weight: 600;">Remedial Credits (Optional)</label>
+            <input type="number" step="any" min="0" max="100" name="grant_remedial_credits" id="replyRemedialCredits" value="0.0" class="admin-input" style="width: 100%; box-sizing: border-box; font-size: 12px; padding: 6px 8px;" placeholder="0.0">
+          </div>
+        </div>
+
+        <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 14px; background: rgba(14, 165, 233, 0.08); padding: 8px 12px; border-radius: 6px; border: 1px solid rgba(14, 165, 233, 0.2);">
+          <label style="display: flex; align-items: center; gap: 8px; font-size: 12px; color: #e2e8f0; cursor: pointer; user-select: none; margin: 0;">
+            <input type="checkbox" name="dispatch_email" id="replyDispatchEmail" value="on" checked style="cursor: pointer;">
+            <span>Trigger outgoing email notification to user (<strong id="replyDispatchEmailLabel">user</strong>)</span>
+          </label>
+          <span style="font-size: 11px; color: #38bdf8; font-weight: 600;">SMTP TLS</span>
+        </div>
+
+        <div style="display: flex; gap: 10px; justify-content: flex-end;">
+          <button type="button" onclick="closeTicketReplyModal()" class="btn btn-secondary" style="padding: 8px 16px; font-size: 13px;">
+            Cancel
+          </button>
+          <button type="submit" id="replySubmitBtn" class="btn btn-primary" style="padding: 8px 18px; font-size: 13px; font-weight: 700; background: #0ea5e9; border-color: #0ea5e9; display: inline-flex; align-items: center; gap: 6px;">
+            <svg class="glyph"><use href="#glyph-mail"></use></svg> Send Response & Email User
+          </button>
+        </div>
+      </form>
+    </div>
+  </div>
+
   <script>
+  let currentReplyTicket = null;
+
+  async function openTicketReplyModal(ticketId) {
+    const modal = document.getElementById('adminTicketReplyModal');
+    if (!modal) return;
+
+    // Reset fields
+    document.getElementById('replyModalTicketId').innerText = ticketId;
+    document.getElementById('replyModalUserName').innerText = 'Loading...';
+    document.getElementById('replyModalUserEmail').innerText = '';
+    document.getElementById('replyModalCategory').innerText = '';
+    document.getElementById('replyModalStatus').innerText = '';
+    document.getElementById('replyModalSubject').innerText = 'Loading...';
+    document.getElementById('replyModalMessage').innerText = 'Loading ticket details...';
+    document.getElementById('replyModalThreadCount').innerText = '0';
+    document.getElementById('replyModalThreadList').innerHTML = '<div style="font-size: 12px; color: #94a3b8; text-align: center; padding: 12px;">Loading thread...</div>';
+    document.getElementById('ticketReplyMessage').value = '';
+    document.getElementById('replyRemedialCredits').value = '0.0';
+    document.getElementById('ticketReplyForm').action = `/admin/tickets/${ticketId}/reply`;
+
+    openAdminModal('adminTicketReplyModal');
+
+    try {
+      const resp = await fetch(`/api/admin/tickets/${ticketId}/thread`);
+      if (!resp.ok) {
+        throw new Error('Failed to load ticket thread: ' + resp.statusText);
+      }
+      const data = await resp.json();
+      const t = data.ticket;
+      currentReplyTicket = t;
+
+      document.getElementById('replyModalUserName').innerText = t.user_name || 'Investor';
+      document.getElementById('replyModalUserEmail').innerText = t.user_email || '';
+      document.getElementById('replyDispatchEmailLabel').innerText = t.user_email || 'user';
+      document.getElementById('replyModalCategory').innerText = (t.category || 'general').toUpperCase();
+      document.getElementById('replyModalStatus').innerText = (t.status || 'open').toUpperCase();
+      document.getElementById('replyModalStatus').className = `status-pill ${t.status || 'open'}`;
+      document.getElementById('replyModalSubject').innerText = t.subject || 'No subject';
+      document.getElementById('replyModalMessage').innerText = t.message || '';
+
+      const threadList = document.getElementById('replyModalThreadList');
+      const responses = data.responses || [];
+      document.getElementById('replyModalThreadCount').innerText = responses.length;
+
+      if (responses.length === 0) {
+        threadList.innerHTML = '<div style="font-size: 12px; color: #94a3b8; font-style: italic; padding: 10px; text-align: center; background: rgba(255,255,255,0.02); border-radius: 6px;">No previous replies sent yet. Send the first response below.</div>';
+      } else {
+        threadList.innerHTML = responses.map(r => `
+          <div style="background: rgba(15, 23, 42, 0.85); border-left: 3px solid #38bdf8; border-radius: 4px; padding: 10px 12px; font-size: 12.5px;">
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 4px; font-size: 11px;">
+              <span style="font-weight: 700; color: #38bdf8;">🛡️ ${r.sender_name || 'Moatnomics Desk'}</span>
+              <div style="display: flex; align-items: center; gap: 8px;">
+                <span class="mono" style="color: #94a3b8;">${r.created_at}</span>
+                <span style="font-size: 10px; padding: 1px 5px; border-radius: 3px; background: ${r.email_dispatched ? 'rgba(16,185,129,0.15)' : 'rgba(245,158,11,0.15)'}; color: ${r.email_dispatched ? '#10b981' : '#f59e0b'};">
+                  ${r.email_dispatched ? '✓ Email Sent' : 'Mock Logged'}
+                </span>
+              </div>
+            </div>
+            <div style="color: #e2e8f0; line-height: 1.45; white-space: pre-wrap;">${r.message}</div>
+          </div>
+        `).join('');
+      }
+
+      setTimeout(() => {
+        document.getElementById('ticketReplyMessage').focus();
+      }, 100);
+
+    } catch (err) {
+      console.error(err);
+      document.getElementById('replyModalMessage').innerText = 'Error loading ticket thread: ' + err.message;
+    }
+  }
+
+  function closeTicketReplyModal() {
+    closeAdminModal('adminTicketReplyModal');
+  }
+
+  function insertReplyTemplate(type) {
+    const input = document.getElementById('ticketReplyMessage');
+    const statusSelect = document.getElementById('replyTicketStatus');
+    const creditsInput = document.getElementById('replyRemedialCredits');
+    if (!input) return;
+
+    const userName = (currentReplyTicket && currentReplyTicket.user_name) ? currentReplyTicket.user_name : 'there';
+
+    if (type === 'investigating') {
+      input.value = `Hello ${userName},\n\nThank you for reaching out to us. We have received your inquiry and our research desk is currently investigating this for you.\n\nWe will get back to you with a resolution as soon as possible.`;
+      if (statusSelect) statusSelect.value = 'in_progress';
+      if (creditsInput) creditsInput.value = '0.0';
+    } else if (type === 'resolved') {
+      input.value = `Hello ${userName},\n\nThank you for your patience. We have reviewed your query and resolved the issue. Everything should now be working smoothly on your account.\n\nPlease let us know if you need any further assistance!`;
+      if (statusSelect) statusSelect.value = 'resolved';
+      if (creditsInput) creditsInput.value = '0.0';
+    } else if (type === 'credits') {
+      input.value = `Hello ${userName},\n\nWe sincerely apologize for any inconvenience caused. We have resolved the issue and allocated 2 complimentary research credits to your account as a goodwill gesture.\n\nThank you for helping us protect and improve the platform!`;
+      if (statusSelect) statusSelect.value = 'resolved';
+      if (creditsInput) creditsInput.value = '2.0';
+    } else if (type === 'clarification') {
+      input.value = `Hello ${userName},\n\nThank you for contacting us. To help us resolve your issue promptly, could you please provide a few additional details regarding what you observed?\n\nOnce received, we will immediately take action.`;
+      if (statusSelect) statusSelect.value = 'in_progress';
+      if (creditsInput) creditsInput.value = '0.0';
+    }
+  }
+
+  function handleTicketReplySubmit(e) {
+    const btn = document.getElementById('replySubmitBtn');
+    if (btn) {
+      btn.disabled = true;
+      btn.innerHTML = '<span class="status-dot-pulse"></span> Sending & Dispatching Email...';
+    }
+  }
+
   function openAdminModal(id) {
     const modal = document.getElementById(id);
     if (!modal) return;

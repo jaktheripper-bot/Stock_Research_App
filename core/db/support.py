@@ -3,6 +3,7 @@
 import logging
 import uuid
 from datetime import datetime
+from typing import Optional, List, Dict
 from core.db.connection import init_db, get_db_connection, get_supabase_url, get_placeholder, IST
 from core.db.reports import _format_timestamp
 
@@ -115,6 +116,7 @@ def get_support_tickets(status: str = None, limit: int = 50, exclude_tests: bool
                 "admin_notes": r[8] or "",
                 "source": r[9] or "web_contact",
                 "created_at": _format_timestamp(r[10]),
+                "responses": [],
             })
     except Exception as e:
         logger.error(f"Error fetching support tickets: {e}")
@@ -122,7 +124,150 @@ def get_support_tickets(status: str = None, limit: int = 50, exclude_tests: bool
         cursor.close()
         conn.close()
 
+    # Populate conversation response thread for each ticket
+    for t in tickets:
+        try:
+            t["responses"] = get_ticket_responses(t["ticket_id"])
+        except Exception as e:
+            logger.debug("Failed fetching responses for ticket %s: %s", t.get("ticket_id"), e)
+            t["responses"] = []
+
     return tickets
+
+
+def add_ticket_response(
+    ticket_id: str,
+    message: str,
+    sender_email: Optional[str] = None,
+    sender_name: str = "Support Desk",
+    sender_type: str = "admin",
+    email_dispatched: bool = False
+) -> dict:
+    """
+    Records an outgoing or incoming response to a support ticket.
+    """
+    init_db()
+    conn = get_db_connection()
+    cursor = conn.cursor()
+    p = get_placeholder()
+
+    clean_tid = str(ticket_id or "").strip()
+    clean_msg = str(message or "").strip()
+    clean_sender_email = str(sender_email or "").strip().lower() if sender_email else None
+    clean_sender_name = str(sender_name or "Support Desk").strip()
+    clean_sender_type = str(sender_type or "admin").strip().lower()
+    disp_val = True if email_dispatched else False
+
+    try:
+        query = f'''
+            INSERT INTO ticket_responses (ticket_id, sender_type, sender_email, sender_name, message, email_dispatched)
+            VALUES ({p}, {p}, {p}, {p}, {p}, {p})
+        '''
+        cursor.execute(query, (clean_tid, clean_sender_type, clean_sender_email, clean_sender_name, clean_msg, disp_val))
+        cursor.execute(f"UPDATE support_tickets SET updated_at = CURRENT_TIMESTAMP WHERE ticket_id = {p};", (clean_tid,))
+        conn.commit()
+        return {
+            "success": True,
+            "ticket_id": clean_tid,
+            "sender_type": clean_sender_type,
+            "sender_email": clean_sender_email,
+            "sender_name": clean_sender_name,
+            "message": clean_msg,
+            "email_dispatched": disp_val,
+            "created_at": datetime.now(IST).strftime("%d-%m-%Y %H:%M IST")
+        }
+    except Exception as e:
+        logger.error(f"Error adding ticket response for {clean_tid}: {e}")
+        try:
+            conn.rollback()
+        except Exception as rb_err:
+            logger.debug("Ticket response rollback failed: %s", rb_err)
+        return {"success": False, "error": str(e)}
+    finally:
+        cursor.close()
+        conn.close()
+
+
+def get_ticket_responses(ticket_id: str) -> list:
+    """Retrieves all responses / message history for a specific ticket in chronological order."""
+    init_db()
+    conn = get_db_connection()
+    cursor = conn.cursor()
+    p = get_placeholder()
+    responses = []
+    clean_tid = str(ticket_id or "").strip()
+
+    query = f'''
+        SELECT id, ticket_id, sender_type, sender_email, sender_name, message, email_dispatched, created_at
+        FROM ticket_responses
+        WHERE ticket_id = {p}
+        ORDER BY created_at ASC
+    '''
+    try:
+        cursor.execute(query, (clean_tid,))
+        rows = cursor.fetchall()
+        for r in rows:
+            responses.append({
+                "id": r[0],
+                "ticket_id": r[1],
+                "sender_type": r[2] or "admin",
+                "sender_email": r[3] or "",
+                "sender_name": r[4] or "Support Desk",
+                "message": r[5] or "",
+                "email_dispatched": bool(r[6]),
+                "created_at": _format_timestamp(r[7]),
+            })
+    except Exception as e:
+        logger.error(f"Error fetching ticket responses for {clean_tid}: {e}")
+    finally:
+        cursor.close()
+        conn.close()
+
+    return responses
+
+
+def get_ticket_by_id(ticket_id: str, include_responses: bool = True) -> Optional[dict]:
+    """Retrieves a single support ticket by its ticket_id, optionally including full response thread."""
+    init_db()
+    conn = get_db_connection()
+    cursor = conn.cursor()
+    p = get_placeholder()
+    clean_tid = str(ticket_id or "").strip()
+
+    query = f'''
+        SELECT id, ticket_id, user_email, user_name, category, subject, message, status, admin_notes, source, created_at
+        FROM support_tickets
+        WHERE ticket_id = {p}
+        LIMIT 1
+    '''
+    ticket = None
+    try:
+        cursor.execute(query, (clean_tid,))
+        r = cursor.fetchone()
+        if r:
+            ticket = {
+                "id": r[0],
+                "ticket_id": r[1],
+                "user_email": r[2],
+                "user_name": r[3] or "",
+                "category": r[4] or "general",
+                "subject": r[5] or "",
+                "message": r[6] or "",
+                "status": r[7] or "open",
+                "admin_notes": r[8] or "",
+                "source": r[9] or "web_contact",
+                "created_at": _format_timestamp(r[10]),
+                "responses": []
+            }
+            if include_responses:
+                ticket["responses"] = get_ticket_responses(clean_tid)
+    except Exception as e:
+        logger.error(f"Error fetching ticket {clean_tid}: {e}")
+    finally:
+        cursor.close()
+        conn.close()
+
+    return ticket
 
 
 def update_ticket_status(ticket_id: str, new_status: str, admin_notes: str = None) -> bool:

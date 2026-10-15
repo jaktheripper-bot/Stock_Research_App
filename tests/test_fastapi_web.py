@@ -279,7 +279,7 @@ Detailed forensic analysis with exact page grounding to bseindia.com filings.
         self.assertIn("Return to Executive Console", res_audit.text)
         self.assertIn("Live Billables &amp; Inflow", res_audit.text)
         self.assertIn("User Accounts &amp; Usage", res_audit.text)
-        self.assertIn("Support Grievances", res_audit.text)
+        self.assertTrue("Service Inbox" in res_audit.text or "Support Grievances" in res_audit.text)
         self.assertIn("Autonomous Project Auditor", res_audit.text)
         self.assertIn("Platform Home", res_audit.text)
         self.assertIn("Admin Console", res_audit.text)

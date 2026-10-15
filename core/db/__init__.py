@@ -105,6 +105,9 @@ from core.db.support import (
     get_support_tickets,
     update_ticket_status,
     get_open_tickets_count,
+    add_ticket_response,
+    get_ticket_responses,
+    get_ticket_by_id,
 )
 
 from core.db.fundamentals import (
@@ -185,6 +188,9 @@ __all__ = [
     "get_support_tickets",
     "update_ticket_status",
     "get_open_tickets_count",
+    "add_ticket_response",
+    "get_ticket_responses",
+    "get_ticket_by_id",
     # fundamentals cache
     "get_cached_fundamentals",
     "save_cached_fundamentals",
