@@ -168,9 +168,9 @@ class TestRealAssetsAndRadarSuite(unittest.TestCase):
     # ==========================================
 
     def test_default_sgb_tranches_universe(self):
-        """Verifies expanded SGB universe contains active secondary tranches (2025 to 2032 maturities)."""
+        """Verifies expanded SGB universe contains all 35+ active secondary tranches (2025 to 2032 maturities)."""
         tranches = get_all_sgb_tranches()
-        self.assertGreaterEqual(len(tranches), 10)
+        self.assertGreaterEqual(len(tranches), 35)
 
         sgb_nov25 = get_sgb_by_symbol("SGBNOV25")
         self.assertIsNotNone(sgb_nov25)
@@ -186,7 +186,7 @@ class TestRealAssetsAndRadarSuite(unittest.TestCase):
         """Validates SGB secondary discount analysis and comparative matrix."""
         sgb_eval = evaluate_sgb_market()
         self.assertIn("total_tranches_tracked", sgb_eval)
-        self.assertGreaterEqual(sgb_eval["total_tranches_tracked"], 10)
+        self.assertGreaterEqual(sgb_eval["total_tranches_tracked"], 35)
         self.assertGreater(sgb_eval["average_annualized_ytm_pct"], 6.0)
         self.assertIn("spot_gold_reference_inr", sgb_eval)
         self.assertIsNotNone(sgb_eval["best_yield_tranche"])

@@ -205,7 +205,7 @@ def search_mutual_funds(query: str, limit: int = 10) -> List[Dict[str, Any]]:
 
 
 def search_debt_securities(query: str, limit: int = 10) -> List[Dict[str, Any]]:
-    """Searches corporate debt, NCDs, and bonds by ISIN, issuer name, or rating."""
+    """Searches corporate debt, NCDs, and bonds by ISIN, ticker, instrument name, or rating."""
     clean_q = query.strip().lower()
     matches = []
 
@@ -216,32 +216,42 @@ def search_debt_securities(query: str, limit: int = 10) -> List[Dict[str, Any]]:
         p = get_placeholder()
         cursor.execute(
             f"""
-            SELECT isin, issuer_name, instrument_type, credit_rating, coupon_rate_pct, ytm_pct, face_value_inr
-            FROM debt_securities
-            WHERE LOWER(issuer_name) LIKE {p}
+            SELECT isin, ticker, instrument_name, instrument_type, credit_rating, coupon_rate_pct, ytm_pct, face_value
+            FROM corporate_debt_securities
+            WHERE LOWER(ticker) LIKE {p}
+               OR LOWER(instrument_name) LIKE {p}
                OR LOWER(isin) LIKE {p}
                OR LOWER(credit_rating) LIKE {p}
                OR LOWER(instrument_type) LIKE {p}
+            ORDER BY ytm_pct DESC
             LIMIT {limit};
             """,
-            (f"%{clean_q}%", f"%{clean_q}%", f"%{clean_q}%", f"%{clean_q}%")
+            (f"%{clean_q}%", f"%{clean_q}%", f"%{clean_q}%", f"%{clean_q}%", f"%{clean_q}%")
         )
         rows = cursor.fetchall()
         for r in rows:
+            isin_val = r[0]
+            ticker_val = r[1] or ""
+            name_val = r[2] or f"{ticker_val} NCD"
+            inst_type = r[3] or "BOND"
+            rating_val = r[4] or "AAA"
+            coupon_val = r[5] or 0.0
+            ytm_val = r[6] or coupon_val
             matches.append({
                 "product_type": "DEBT",
-                "identifier": r[0],
-                "title": f"{r[1]} {r[4]}% {r[2]}",
-                "subtitle": f"{r[0]} • Rating: {r[3]} • YTM: {r[5]}%",
-                "url": f"/debt/{r[0]}",
+                "identifier": isin_val,
+                "title": name_val,
+                "subtitle": f"{isin_val} • Rating: {rating_val} • YTM: {ytm_val:.2f}%",
+                "url": f"/debt/{isin_val}",
                 "badge": "Corporate Debt",
                 "badge_class": "badge-warning",
                 "details": {
-                    "isin": r[0],
-                    "issuer": r[1],
-                    "credit_rating": r[3],
-                    "coupon": f"{r[4]}%",
-                    "ytm": f"{r[5]}%"
+                    "isin": isin_val,
+                    "ticker": ticker_val,
+                    "issuer": name_val,
+                    "credit_rating": rating_val,
+                    "coupon": f"{coupon_val}%",
+                    "ytm": f"{ytm_val}%"
                 }
             })
         cursor.close()

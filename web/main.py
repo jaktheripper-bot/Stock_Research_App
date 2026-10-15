@@ -397,9 +397,8 @@ async def lifespan(app: FastAPI):
         logger.warning(f"Initial mutual fund bootstrap seed skipped: {e}")
 
     try:
-        from core.db.debt import get_active_debt_securities, seed_default_debt_securities
-        if not get_active_debt_securities():
-            seed_default_debt_securities()
+        from core.db.debt import seed_default_debt_securities
+        seed_default_debt_securities()
     except Exception as e:
         logger.warning(f"Initial debt bootstrap seed skipped: {e}")
 
@@ -1871,6 +1870,18 @@ async def sitemap_xml():
                 )
     except Exception as reit_sitemap_err:
         logger.debug(f"Sitemap REIT append notice: {reit_sitemap_err}")
+
+    try:
+        from core.db.debt import get_active_debt_securities
+        all_debt = get_active_debt_securities(limit=150)
+        for d in all_debt:
+            isin_val = d.get("isin")
+            if isin_val:
+                xml_lines.append(
+                    f'  <url><loc>{base_url}/debt/{isin_val}</loc><lastmod>{now_iso}</lastmod><changefreq>weekly</changefreq><priority>0.8</priority></url>'
+                )
+    except Exception as debt_sitemap_err:
+        logger.debug(f"Sitemap Debt append notice: {debt_sitemap_err}")
 
     xml_lines.append('</urlset>')
     return Response(content="\n".join(xml_lines), media_type="application/xml")

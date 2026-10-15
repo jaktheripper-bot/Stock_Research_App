@@ -270,6 +270,22 @@ class TestDebtEngineAndRepository(unittest.TestCase):
         by_ticker = get_debt_securities_by_ticker("UNITTESTCORP")
         self.assertEqual(len(by_ticker), 1)
 
+    def test_canonical_debt_universe_scale_and_diversity(self):
+        """Verifies that the corporate debt universe contains 100+ benchmark instruments across all 5 sectors."""
+        from core.db.debt_universe import CANONICAL_DEBT_UNIVERSE
+        self.assertGreaterEqual(len(CANONICAL_DEBT_UNIVERSE), 100)
+
+        active_securities = get_active_debt_securities(limit=500)
+        self.assertGreaterEqual(len(active_securities), 100)
+
+        # Check presence of all key categories
+        tickers = {s.get("ticker", "").upper() for s in active_securities}
+        self.assertIn("PFC", tickers)
+        self.assertIn("RELIANCE", tickers)
+        self.assertIn("HDFCBANK", tickers)
+        self.assertIn("ADANIPORTS", tickers)
+        self.assertIn("WINT_INVOICEX_1", tickers)
+
     def test_record_and_retrieve_rating_events(self):
         event = {
             "isin": "INE999TEST01",
