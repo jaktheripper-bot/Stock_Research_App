@@ -258,6 +258,139 @@ class TestForensicDeskEnhancements(unittest.TestCase):
         self.assertIn("Post-Tax Yield at 30% Marginal Slab", response_text)
         self.assertIn("Return of Capital / Amortization", response_text)
 
+    def test_reit_post_tax_yield_slabs_table(self):
+        """Verifies multi-slab yield simulation table with 0%, 10%, 20%, 30%, 39% slabs."""
+        resp = self.client.post("/api/copilot/chat", json={
+            "conversation_id": "TEST-REIT-SLABS-102",
+            "message": "Break down the post-tax yield across the 0%, 10%, 20%, 30%, and 39% tax slabs for this REIT/InvIT.",
+            "ticker": "PROPSHARE",
+            "asset_type": "reit",
+            "section": "tax_waterfall"
+        })
+        self.assertEqual(resp.status_code, 200)
+        data = resp.json()
+        self.assertTrue(data.get("success"))
+        text = data.get("response", "")
+        self.assertIn("Multi-Slab Post-Tax Yield Simulation", text)
+        self.assertIn("Marginal Tax Slab", text)
+        self.assertIn("39% (Peak HNI)", text)
+        self.assertIn("Tax Shield Efficiency", text)
+
+    def test_reit_roc_tax_treatment(self):
+        """Verifies Return of Capital & Section 56(2)(xii) analysis."""
+        resp = self.client.post("/api/copilot/chat", json={
+            "conversation_id": "TEST-REIT-ROC-103",
+            "message": "Explain the tax treatment of Return of Capital (Amortization) and Section 56(2)(xii) specified sum threshold.",
+            "ticker": "PROPSHARE",
+            "asset_type": "reit",
+            "section": "tax_waterfall"
+        })
+        self.assertEqual(resp.status_code, 200)
+        data = resp.json()
+        self.assertTrue(data.get("success"))
+        text = data.get("response", "")
+        self.assertIn("Section 56(2)(xii)", text)
+        self.assertIn("Specified Sum", text)
+        self.assertIn("Cost Base Reduction", text)
+
+    def test_reit_spv_dividend_exemption(self):
+        """Verifies SPV Dividend Section 10(23FD) vs Section 115BAA corporate tax analysis."""
+        resp = self.client.post("/api/copilot/chat", json={
+            "conversation_id": "TEST-REIT-DIV-104",
+            "message": "Is the dividend component exempt or taxable in unitholder hands based on SPV Sec 115BAA status?",
+            "ticker": "PROPSHARE",
+            "asset_type": "reit",
+            "section": "tax_waterfall"
+        })
+        self.assertEqual(resp.status_code, 200)
+        data = resp.json()
+        self.assertTrue(data.get("success"))
+        text = data.get("response", "")
+        self.assertIn("SPV Dividend Tax Pass-Through Audit", text)
+        self.assertIn("Section 10(23FD)", text)
+        self.assertIn("Section 115BAA", text)
+
+    def test_reit_sebi_15pct_penal_clause(self):
+        """Verifies SEBI 15% p.a. penal interest enforcement clause response."""
+        resp = self.client.post("/api/copilot/chat", json={
+            "conversation_id": "TEST-REIT-PENAL-105",
+            "message": "Does this trust risk the SEBI 15% penal interest rate for delayed distributions?",
+            "ticker": "PROPSHARE",
+            "asset_type": "reit",
+            "section": "ndcf_purity"
+        })
+        self.assertEqual(resp.status_code, 200)
+        data = resp.json()
+        self.assertTrue(data.get("success"))
+        text = data.get("response", "")
+        self.assertIn("SEBI 15% p.a. Penal Interest Enforcement Audit", text)
+        self.assertIn("15 working days", text)
+        self.assertIn("Investment Manager", text)
+
+    def test_reit_fcf_vs_ndcf(self):
+        """Verifies spread analysis between true Operating FCF and Accounting NDCF."""
+        resp = self.client.post("/api/copilot/chat", json={
+            "conversation_id": "TEST-REIT-FCF-106",
+            "message": "Analyze the spread between accounting Net Distributable Cash Flow and true operating free cash flow.",
+            "ticker": "PROPSHARE",
+            "asset_type": "reit",
+            "section": "ndcf_purity"
+        })
+        self.assertEqual(resp.status_code, 200)
+        data = resp.json()
+        self.assertTrue(data.get("success"))
+        text = data.get("response", "")
+        self.assertIn("Operating Free Cash Flow (FCF)", text)
+        self.assertIn("Maintenance Capex Deductions", text)
+
+    def test_reit_lease_expiry_and_renewals(self):
+        """Verifies Lease Expiry schedule, WALE, and contractual escalations response."""
+        resp = self.client.post("/api/copilot/chat", json={
+            "conversation_id": "TEST-REIT-LEASE-107",
+            "message": "Analyze the lease expiry concentration and renewal risk over the next 3 years.",
+            "ticker": "PROPSHARE",
+            "asset_type": "reit",
+            "section": "portfolio_wale"
+        })
+        self.assertEqual(resp.status_code, 200)
+        data = resp.json()
+        self.assertTrue(data.get("success"))
+        text = data.get("response", "")
+        self.assertIn("Lease Expiry Schedule & Re-Leasing Pipeline", text)
+        self.assertIn("Contractual Rental Escalations", text)
+
+    def test_reit_top_tenant_concentration(self):
+        """Verifies Top 3 anchor tenant concentration and GCC counterparty response."""
+        resp = self.client.post("/api/copilot/chat", json={
+            "conversation_id": "TEST-REIT-TENANT-108",
+            "message": "How vulnerable is distribution cash flow if the top 3 tenants vacate or downsize?",
+            "ticker": "PROPSHARE",
+            "asset_type": "reit",
+            "section": "portfolio_wale"
+        })
+        self.assertEqual(resp.status_code, 200)
+        data = resp.json()
+        self.assertTrue(data.get("success"))
+        text = data.get("response", "")
+        self.assertIn("Anchor Tenant Quality & Counterparty Concentration", text)
+        self.assertIn("Downside Protection", text)
+
+    def test_reit_rate_hike_shock(self):
+        """Verifies +150 bps interest rate and cap-rate expansion stress test."""
+        resp = self.client.post("/api/copilot/chat", json={
+            "conversation_id": "TEST-REIT-RATE-109",
+            "message": "How does a 150 bps rise in benchmark bond yields impact the unit price and NAV cap rate?",
+            "ticker": "PROPSHARE",
+            "asset_type": "reit",
+            "section": "inversion"
+        })
+        self.assertEqual(resp.status_code, 200)
+        data = resp.json()
+        self.assertTrue(data.get("success"))
+        text = data.get("response", "")
+        self.assertIn("Sensitivity Stress-Test", text)
+        self.assertIn("+150 bps Benchmark Yield Spike", text)
+
 
 if __name__ == "__main__":
     unittest.main()
