@@ -20,7 +20,7 @@
   <!-- Favicon & Stylesheet -->
   <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><rect width='100' height='100' rx='20' fill='%230ea5e9'/><path d='M20 80h60M30 80V35l10-10 10 10v10h10V25l10-10 10 10v55' stroke='%23020617' stroke-width='8' fill='none' stroke-linecap='round'/></svg>">
   <link rel="preload" href="/static/css/style.css?v=20261014_1920" as="style" onload="this.rel='stylesheet'">
-  <link rel="preload" href="/static/js/main.js" as="script">
+  <link rel="preload" href="/static/js/main.js?v=20261015_2130" as="script">
   <link rel="stylesheet" href="/static/css/style.css?v=20261014_1920">
 
   <!-- Schema.org Structured Data -->
@@ -327,8 +327,11 @@
       </div>
 
       <div style="display: flex; justify-content: space-between; align-items: baseline; margin-bottom: 12px;">
-        <span style="font-size: 14px; color: var(--text-secondary);">Total Payable (Inclusive of 18% GST):</span>
-        <span id="modalPlanPrice" style="font-size: 28px; font-weight: 800; color: var(--text-primary);">₹0</span>
+        <span id="modalPayableLabel" style="font-size: 14px; color: var(--text-secondary);">Total Payable:</span>
+        <div style="text-align: right;">
+          <div id="modalPlanPrice" style="font-size: 28px; font-weight: 800; color: var(--text-primary);">₹0</div>
+          <div id="modalLocalEquiv" style="font-size: 12px; color: var(--accent-cyan); font-weight: 600; display: none;"></div>
+        </div>
       </div>
 
       <div style="background: rgba(30, 41, 59, 0.4); border-radius: 8px; padding: 12px 16px; margin-bottom: 20px; font-size: 12px;">
@@ -337,13 +340,17 @@
           <strong id="modalPlanCredits" style="color: var(--accent-emerald);">0 Credits</strong>
         </div>
         <div style="display: flex; justify-content: space-between; margin-bottom: 4px;">
-          <span style="color: var(--text-muted);">Base Amount:</span>
-          <span id="modalBasePrice" class="tnum">₹0.00</span>
+          <span style="color: var(--text-muted);">Gateway Settlement:</span>
+          <span id="modalBasePrice" class="tnum">₹0.00 INR</span>
         </div>
-        <div style="display: flex; justify-content: space-between;">
-          <span style="color: var(--text-muted);">GST (18%):</span>
-          <span id="modalGstPrice" class="tnum">₹0.00</span>
+        <div id="modalBufferRow" style="display: none; justify-content: space-between;">
+          <span style="color: var(--text-muted);">Est. Card & Forex Buffer:</span>
+          <span id="modalBufferPrice" class="tnum" style="color: var(--accent-amber);">~3.5% included</span>
         </div>
+      </div>
+
+      <div id="modalIntlNotice" style="display: none; margin-bottom: 14px; padding: 9px 12px; background: rgba(14, 165, 233, 0.08); border: 1px solid rgba(14, 165, 233, 0.2); border-radius: 6px; font-size: 11.5px; color: var(--text-secondary); line-height: 1.45;">
+        🌐 <strong>International Card Notice:</strong> Razorpay processes transactions in INR (₹). Your bank automatically converts this to your card's billing currency with estimated fees included in the conversion preview.
       </div>
 
       <button id="modalConfirmBtn" class="btn btn-primary" style="width: 100%; padding: 14px; font-size: 15px; margin-bottom: 10px;">
@@ -624,6 +631,6 @@
     </div>
   </footer>
 
-  <script src="/static/js/main.js"></script>
+  <script src="/static/js/main.js?v=20261015_2130"></script>
 </body>
 </html>

@@ -13,11 +13,42 @@
     </p>
   </div>
 
+  <!-- Currency Selector & International Transparency Toolbar -->
+  <div class="pricing-controls" style="display: flex; justify-content: flex-end; align-items: center; margin: 18px 0 20px; gap: 12px; flex-wrap: wrap;">
+    <div style="display: inline-flex; align-items: center; gap: 10px; background: rgba(15, 23, 42, 0.7); border: 1px solid var(--border-subtle); padding: 7px 16px; border-radius: 999px; box-shadow: 0 2px 8px rgba(0,0,0,0.25);">
+      <label for="currencySelect" style="font-size: 12.5px; color: var(--text-secondary); font-weight: 600; display: inline-flex; align-items: center; gap: 6px; margin: 0; cursor: pointer;">
+        <svg class="glyph" style="width: 14px; height: 14px;"><use href="#glyph-globe"></use></svg> Display Currency:
+      </label>
+      <select id="currencySelect" onchange="setPricingCurrency(this.value)" style="background: rgba(11, 19, 41, 0.85); color: var(--accent-cyan); border: 1px solid rgba(56, 189, 248, 0.3); border-radius: 6px; font-size: 13px; font-weight: 700; cursor: pointer; outline: none; padding: 4px 10px;">
+        <option value="INR" {% if detected_currency == 'INR' or not detected_currency %}selected{% endif %}>🇮🇳 INR (₹)</option>
+        <option value="USD" {% if detected_currency == 'USD' %}selected{% endif %}>🇺🇸 USD ($)</option>
+        <option value="EUR" {% if detected_currency == 'EUR' %}selected{% endif %}>🇪🇺 EUR (€)</option>
+        <option value="GBP" {% if detected_currency == 'GBP' %}selected{% endif %}>🇬🇧 GBP (£)</option>
+        <option value="AED" {% if detected_currency == 'AED' %}selected{% endif %}>🇦🇪 AED (AED)</option>
+        <option value="SGD" {% if detected_currency == 'SGD' %}selected{% endif %}>🇸🇬 SGD (S$)</option>
+        <option value="CAD" {% if detected_currency == 'CAD' %}selected{% endif %}>🇨🇦 CAD (CA$)</option>
+        <option value="AUD" {% if detected_currency == 'AUD' %}selected{% endif %}>🇦🇺 AUD (A$)</option>
+      </select>
+    </div>
+  </div>
+
+  <!-- Indicative Local Currency Transparency Notice -->
+  <div id="currencyNoticeBanner" style="display: none; margin-bottom: 24px; padding: 12px 18px; background: rgba(14, 165, 233, 0.08); border: 1px solid rgba(14, 165, 233, 0.25); border-radius: var(--radius-md); font-size: 13px; color: var(--text-secondary); line-height: 1.55;">
+    <div style="display: flex; align-items: flex-start; gap: 10px;">
+      <span style="font-size: 16px; line-height: 1.2;">🌐</span>
+      <div>
+        <strong style="color: var(--accent-cyan);">Indicative Local Currency Pricing:</strong>
+        Prices displayed in <strong id="noticeCurrencyCode" style="color: var(--text-primary);">USD ($)</strong> are approximate conversions including an estimated ~3.5% international card & banking forex buffer. All final checkout orders are billed in Indian Rupees (INR ₹) via secure Razorpay checkout.
+      </div>
+    </div>
+  </div>
+
   <div class="pricing-grid">
     <!-- Single Pass -->
     <div class="plan-card">
       <span class="plan-name">Single Research Pass</span>
-      <div class="plan-price">₹299</div>
+      <div class="plan-price" data-base-inr="299">₹299</div>
+      <div class="plan-price-sub" data-base-inr="299" style="font-size: 12px; color: var(--text-muted); margin-top: -6px; margin-bottom: 12px; display: none;">(₹299 INR base)</div>
       <div class="plan-credits"><svg class="glyph"><use href="#glyph-coin"></use></svg> 1 Full Research Credit</div>
       <p class="plan-desc">Deep-dive into any single BSE/NSE equity with full AI reasoning.</p>
       <ul class="plan-features">
@@ -27,7 +58,7 @@
         <li>Regulatory Exchange Citations</li>
         <li>Never expires</li>
       </ul>
-      <button onclick="openCheckout('single_pass', 'Single Research Pass', 299, 1.0)" class="btn btn-secondary" style="width: 100%;">
+      <button onclick="openCheckout('single_pass', 'Single Research Pass', 299, 1.0)" class="btn btn-secondary plan-checkout-btn" data-base-inr="299" style="width: 100%;">
         Purchase Single Pass
       </button>
     </div>
@@ -36,8 +67,9 @@
     <div class="plan-card popular">
       <span class="plan-badge">Most Popular</span>
       <span class="plan-name">Analyst 3-Pack</span>
-      <div class="plan-price">₹699</div>
-      <div class="plan-credits"><svg class="glyph"><use href="#glyph-coin"></use></svg> 3 Research Credits (₹233/stock)</div>
+      <div class="plan-price" data-base-inr="699">₹699</div>
+      <div class="plan-price-sub" data-base-inr="699" style="font-size: 12px; color: var(--text-muted); margin-top: -6px; margin-bottom: 12px; display: none;">(₹699 INR base)</div>
+      <div class="plan-credits"><svg class="glyph"><use href="#glyph-coin"></use></svg> 3 Research Credits <span class="unit-rate" data-per-stock-inr="233">(₹233/stock)</span></div>
       <p class="plan-desc">Ideal for evaluating peer contenders and comparing top 3 industry leaders.</p>
       <ul class="plan-features">
         <li>3 Full Institutional Forensic Syntheses</li>
@@ -46,7 +78,7 @@
         <li>Unlimited PDF Downloads</li>
         <li>Never expires</li>
       </ul>
-      <button onclick="openCheckout('analyst_3pack', 'Analyst 3-Pack', 699, 3.0)" class="btn btn-primary" style="width: 100%;">
+      <button onclick="openCheckout('analyst_3pack', 'Analyst 3-Pack', 699, 3.0)" class="btn btn-primary plan-checkout-btn" data-base-inr="699" style="width: 100%;">
         Purchase Analyst 3-Pack
       </button>
     </div>
@@ -54,8 +86,9 @@
     <!-- Portfolio 10-Pack -->
     <div class="plan-card">
       <span class="plan-name">Portfolio 10-Pack</span>
-      <div class="plan-price">₹1,799</div>
-      <div class="plan-credits"><svg class="glyph"><use href="#glyph-coin"></use></svg> 10 Research Credits (₹180/stock)</div>
+      <div class="plan-price" data-base-inr="1799">₹1,799</div>
+      <div class="plan-price-sub" data-base-inr="1799" style="font-size: 12px; color: var(--text-muted); margin-top: -6px; margin-bottom: 12px; display: none;">(₹1,799 INR base)</div>
+      <div class="plan-credits"><svg class="glyph"><use href="#glyph-coin"></use></svg> 10 Research Credits <span class="unit-rate" data-per-stock-inr="180">(₹180/stock)</span></div>
       <p class="plan-desc">Comprehensive institutional audit for an entire equity portfolio.</p>
       <ul class="plan-features">
         <li>10 Full Institutional Forensic Syntheses</li>
@@ -64,7 +97,7 @@
         <li>Differential Analysis Audits</li>
         <li>Never expires</li>
       </ul>
-      <button onclick="openCheckout('portfolio_10pack', 'Portfolio 10-Pack', 1799, 10.0)" class="btn btn-secondary" style="width: 100%;">
+      <button onclick="openCheckout('portfolio_10pack', 'Portfolio 10-Pack', 1799, 10.0)" class="btn btn-secondary plan-checkout-btn" data-base-inr="1799" style="width: 100%;">
         Purchase 10-Pack
       </button>
     </div>
@@ -72,7 +105,8 @@
     <!-- Pro Monthly -->
     <div class="plan-card">
       <span class="plan-name">Pro Desk (Monthly)</span>
-      <div class="plan-price">₹999 <span class="cycle">/month</span></div>
+      <div class="plan-price" data-base-inr="999"><span class="price-val">₹999</span> <span class="cycle">/month</span></div>
+      <div class="plan-price-sub" data-base-inr="999" style="font-size: 12px; color: var(--text-muted); margin-top: -6px; margin-bottom: 12px; display: none;">(₹999 INR base)</div>
       <div class="plan-credits">⭐ 40 Syntheses / mo</div>
       <p class="plan-desc">Continuous surveillance engine for full-time investors and advisors.</p>
       <ul class="plan-features">
@@ -82,7 +116,7 @@
         <li>Unlimited PDF Exports</li>
         <li>Cancel anytime</li>
       </ul>
-      <button onclick="openCheckout('pro_monthly', 'Pro Desk (Monthly)', 999, 40.0)" class="btn btn-secondary" style="width: 100%;">
+      <button onclick="openCheckout('pro_monthly', 'Pro Desk (Monthly)', 999, 40.0)" class="btn btn-secondary plan-checkout-btn" data-base-inr="999" style="width: 100%;">
         Subscribe Monthly
       </button>
     </div>
@@ -97,16 +131,17 @@
           High-volume computational packs for family offices, wealth managers, and boutique equity research desks.
         </p>
       </div>
-      <div style="display: flex; gap: 14px;">
-        <button onclick="openCheckout('b2b_50', 'Corporate 50-Pack', 5999, 50.0)" class="btn btn-secondary">
+      <div style="display: flex; gap: 14px; flex-wrap: wrap;">
+        <button onclick="openCheckout('b2b_50', 'Corporate 50-Pack', 5999, 50.0)" class="btn btn-secondary b2b-btn" data-base-inr="5999" data-label="Corporate 50-Pack">
           Corporate 50-Pack (₹5,999)
         </button>
-        <button onclick="openCheckout('b2b_150', 'Enterprise 150-Pack', 16999, 150.0)" class="btn btn-primary">
+        <button onclick="openCheckout('b2b_150', 'Enterprise 150-Pack', 16999, 150.0)" class="btn btn-primary b2b-btn" data-base-inr="16999" data-label="Enterprise 150-Pack">
           Enterprise 150-Pack (₹16,999)
         </button>
       </div>
     </div>
   </div>
+
 
   <!-- Direct UPI Payment Section (razorpay.me/@stockresearchapp) -->
   <div style="margin-top: 36px; padding: 28px 36px; background: linear-gradient(135deg, rgba(14, 165, 233, 0.08) 0%, rgba(16, 185, 129, 0.08) 100%); border: 1px solid rgba(14, 165, 233, 0.25); border-radius: var(--radius-lg); display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 20px;">
@@ -144,7 +179,7 @@
     <div style="margin-bottom: 20px;">
       <h4 style="font-size: 16px; font-weight: 700; color: var(--text-primary); margin-bottom: 6px;">How does payment and delivery work?</h4>
       <p style="font-size: 14px; color: var(--text-secondary); line-height: 1.6;">
-        Payments are processed securely via UPI (Google Pay, PhonePe, Paytm), NetBanking, or Cards through Razorpay. Credits are delivered to your online account instantly within 2 seconds upon payment confirmation. An official GST tax invoice is generated automatically.
+        Payments are processed securely via UPI (Google Pay, PhonePe, Paytm), NetBanking, or Cards through Razorpay. Credits are delivered to your online account instantly within 2 seconds upon payment confirmation. An electronic transaction receipt is generated automatically.
       </p>
     </div>
 

@@ -30,6 +30,7 @@ document.addEventListener('DOMContentLoaded', () => {
   initGenerateModal();
   initAuthModal();
   initNavigationDropdowns();
+  initPricingCurrency();
 });
 
 // ==============================================================================
@@ -233,6 +234,174 @@ function initCheckoutModals() {
   }
 }
 
+// ==============================================================================
+// Multi-Currency Converter & Indicative Pricing Architecture
+// ==============================================================================
+const SUPPORTED_CURRENCIES = {
+  INR: { code: 'INR', symbol: '₹', name: 'Indian Rupee', flag: '🇮🇳', rate: 1.0, buffer: 0.0, is_base: true },
+  USD: { code: 'USD', symbol: '$', name: 'US Dollar', flag: '🇺🇸', rate: 88.50, buffer: 0.035, is_base: false },
+  EUR: { code: 'EUR', symbol: '€', name: 'Euro', flag: '🇪🇺', rate: 96.50, buffer: 0.035, is_base: false },
+  GBP: { code: 'GBP', symbol: '£', name: 'British Pound', flag: '🇬🇧', rate: 115.00, buffer: 0.035, is_base: false },
+  AED: { code: 'AED', symbol: 'AED ', name: 'UAE Dirham', flag: '🇦🇪', rate: 24.10, buffer: 0.035, is_base: false },
+  SGD: { code: 'SGD', symbol: 'S$ ', name: 'Singapore Dollar', flag: '🇸🇬', rate: 68.00, buffer: 0.035, is_base: false },
+  CAD: { code: 'CAD', symbol: 'CA$ ', name: 'Canadian Dollar', flag: '🇨🇦', rate: 64.00, buffer: 0.035, is_base: false },
+  AUD: { code: 'AUD', symbol: 'A$ ', name: 'Australian Dollar', flag: '🇦🇺', rate: 58.00, buffer: 0.035, is_base: false }
+};
+
+let currentCurrency = 'INR';
+
+function convertInrPrice(amountInr, currencyCode) {
+  const code = (currencyCode || 'INR').toUpperCase();
+  const curr = SUPPORTED_CURRENCIES[code] || SUPPORTED_CURRENCIES.INR;
+  if (curr.is_base) {
+    return {
+      code: 'INR',
+      symbol: '₹',
+      amount: amountInr,
+      formatted: '₹' + Number(amountInr).toLocaleString('en-IN'),
+      is_base: true
+    };
+  }
+  const rawForeign = amountInr / curr.rate;
+  const effectiveAmount = rawForeign * (1.0 + curr.buffer);
+  const formatted = curr.symbol + effectiveAmount.toFixed(2);
+  return {
+    code: code,
+    symbol: curr.symbol,
+    amount: effectiveAmount,
+    formatted: formatted,
+    is_base: false
+  };
+}
+
+function detectUserCurrency() {
+  const saved = localStorage.getItem('preferred_currency');
+  if (saved && SUPPORTED_CURRENCIES[saved.toUpperCase()]) {
+    return saved.toUpperCase();
+  }
+  if (window.__DETECTED_CURRENCY && SUPPORTED_CURRENCIES[window.__DETECTED_CURRENCY.toUpperCase()]) {
+    return window.__DETECTED_CURRENCY.toUpperCase();
+  }
+  try {
+    const tz = (Intl.DateTimeFormat().resolvedOptions().timeZone || '').toLowerCase();
+    if (tz.includes('calcutta') || tz.includes('kolkata')) return 'INR';
+    if (tz.includes('new_york') || tz.includes('chicago') || tz.includes('los_angeles') || tz.includes('denver') || tz.includes('phoenix') || tz.includes('detroit') || tz.includes('indiana') || tz.includes('honolulu') || tz.includes('anchorage')) return 'USD';
+    if (tz.includes('toronto') || tz.includes('vancouver') || tz.includes('montreal') || tz.includes('edmonton') || tz.includes('winnipeg') || tz.includes('halifax') || tz.includes('st_johns')) return 'CAD';
+    if (tz.includes('london') || tz.includes('belfast')) return 'GBP';
+    if (tz.includes('dubai') || tz.includes('abu_dhabi') || tz.includes('muscat')) return 'AED';
+    if (tz.includes('singapore')) return 'SGD';
+    if (tz.includes('sydney') || tz.includes('melbourne') || tz.includes('brisbane') || tz.includes('perth') || tz.includes('adelaide')) return 'AUD';
+    if (tz.startsWith('europe/')) return 'EUR';
+    if (tz.startsWith('america/')) return 'USD';
+  } catch (e) {
+    console.debug('Timezone currency detection notice:', e);
+  }
+  return 'INR';
+}
+
+window.setPricingCurrency = function(code) {
+  if (!SUPPORTED_CURRENCIES[code]) return;
+  currentCurrency = code;
+  localStorage.setItem('preferred_currency', code);
+
+  const select = document.getElementById('currencySelect');
+  if (select && select.value !== code) {
+    select.value = code;
+  }
+
+  updatePricingDisplay();
+};
+
+function updatePricingDisplay() {
+  const isBase = currentCurrency === 'INR';
+  const curr = SUPPORTED_CURRENCIES[currentCurrency] || SUPPORTED_CURRENCIES.INR;
+
+  const noticeBanner = document.getElementById('currencyNoticeBanner');
+  const noticeCode = document.getElementById('noticeCurrencyCode');
+  if (noticeBanner) {
+    if (isBase) {
+      noticeBanner.style.display = 'none';
+    } else {
+      noticeBanner.style.display = 'block';
+      if (noticeCode) {
+        noticeCode.innerText = `${curr.name} (${curr.code} ${curr.symbol.trim()})`;
+      }
+    }
+  }
+
+  document.querySelectorAll('.plan-price[data-base-inr]').forEach(el => {
+    const baseInr = parseFloat(el.getAttribute('data-base-inr'));
+    if (!isNaN(baseInr)) {
+      const conv = convertInrPrice(baseInr, currentCurrency);
+      const isMonthly = el.innerHTML.includes('/month') || el.querySelector('.cycle');
+      if (isBase) {
+        el.innerHTML = isMonthly ? `<span class="price-val">₹${baseInr.toLocaleString('en-IN')}</span> <span class="cycle">/month</span>` : `₹${baseInr.toLocaleString('en-IN')}`;
+      } else {
+        el.innerHTML = isMonthly ? `<span class="price-val">~${conv.formatted}</span> <span class="cycle">/month</span>` : `~${conv.formatted}`;
+      }
+    }
+  });
+
+  document.querySelectorAll('.plan-price-sub[data-base-inr]').forEach(el => {
+    const baseInr = parseFloat(el.getAttribute('data-base-inr'));
+    if (!isNaN(baseInr)) {
+      if (isBase) {
+        el.style.display = 'none';
+      } else {
+        el.style.display = 'block';
+        el.innerText = `(Billed as ₹${baseInr.toLocaleString('en-IN')} INR)`;
+      }
+    }
+  });
+
+  document.querySelectorAll('.unit-rate[data-per-stock-inr]').forEach(el => {
+    const rateInr = parseFloat(el.getAttribute('data-per-stock-inr'));
+    if (!isNaN(rateInr)) {
+      if (isBase) {
+        el.innerText = `(₹${rateInr}/stock)`;
+      } else {
+        const conv = convertInrPrice(rateInr, currentCurrency);
+        el.innerText = `(~${conv.formatted}/stock)`;
+      }
+    }
+  });
+
+  document.querySelectorAll('.plan-checkout-btn[data-base-inr]').forEach(btn => {
+    const baseInr = parseFloat(btn.getAttribute('data-base-inr'));
+    const baseText = btn.getAttribute('data-base-label') || btn.innerText.split(' (~')[0].split(' (₹')[0].trim();
+    if (!btn.getAttribute('data-base-label')) {
+      btn.setAttribute('data-base-label', baseText);
+    }
+    if (isBase) {
+      btn.innerText = baseText;
+    } else {
+      const conv = convertInrPrice(baseInr, currentCurrency);
+      btn.innerText = `${baseText} (~${conv.formatted})`;
+    }
+  });
+
+  document.querySelectorAll('.b2b-btn[data-base-inr]').forEach(btn => {
+    const baseInr = parseFloat(btn.getAttribute('data-base-inr'));
+    const label = btn.getAttribute('data-label') || 'Pack';
+    if (isBase) {
+      btn.innerText = `${label} (₹${baseInr.toLocaleString('en-IN')})`;
+    } else {
+      const conv = convertInrPrice(baseInr, currentCurrency);
+      btn.innerText = `${label} (~${conv.formatted})`;
+    }
+  });
+}
+
+function initPricingCurrency() {
+  const detected = detectUserCurrency();
+  currentCurrency = detected;
+  const select = document.getElementById('currencySelect');
+  if (select) {
+    select.value = detected;
+  }
+  updatePricingDisplay();
+}
+
 // Global checkout trigger
 window.openCheckout = function(planId, planName, amountInr, credits) {
   const storedUser = getStoredUser();
@@ -246,16 +415,38 @@ window.openCheckout = function(planId, planName, amountInr, credits) {
   const modal = document.getElementById('checkoutModal');
   if (!modal) return;
 
-  document.getElementById('modalPlanName').innerText = planName;
-  document.getElementById('modalPlanPrice').innerText = '₹' + Number(amountInr).toLocaleString('en-IN');
-  document.getElementById('modalPlanCredits').innerText = credits + ' Research Credits';
-  
-  const basePrice = (amountInr / 1.18).toFixed(2);
-  const gstPrice = (amountInr - basePrice).toFixed(2);
-  document.getElementById('modalBasePrice').innerText = '₹' + basePrice;
-  document.getElementById('modalGstPrice').innerText = '₹' + gstPrice;
+  const conv = convertInrPrice(amountInr, currentCurrency);
+  const isBase = currentCurrency === 'INR';
 
+  document.getElementById('modalPlanName').innerText = planName;
+  document.getElementById('modalPlanCredits').innerText = credits + ' Research Credits';
+
+  const priceEl = document.getElementById('modalPlanPrice');
+  const localEquivEl = document.getElementById('modalLocalEquiv');
+  const basePriceEl = document.getElementById('modalBasePrice');
+  const bufferRow = document.getElementById('modalBufferRow');
+  const intlNotice = document.getElementById('modalIntlNotice');
   const confirmBtn = document.getElementById('modalConfirmBtn');
+
+  if (isBase) {
+    if (priceEl) priceEl.innerText = '₹' + Number(amountInr).toLocaleString('en-IN');
+    if (localEquivEl) localEquivEl.style.display = 'none';
+    if (basePriceEl) basePriceEl.innerText = '₹' + Number(amountInr).toLocaleString('en-IN') + ' INR';
+    if (bufferRow) bufferRow.style.display = 'none';
+    if (intlNotice) intlNotice.style.display = 'none';
+    if (confirmBtn) confirmBtn.innerText = 'Pay via UPI / Card (Instant Confirmation)';
+  } else {
+    if (priceEl) priceEl.innerText = '~' + conv.formatted;
+    if (localEquivEl) {
+      localEquivEl.style.display = 'block';
+      localEquivEl.innerText = 'Billed as ₹' + Number(amountInr).toLocaleString('en-IN') + ' INR';
+    }
+    if (basePriceEl) basePriceEl.innerText = '₹' + Number(amountInr).toLocaleString('en-IN') + ' INR';
+    if (bufferRow) bufferRow.style.display = 'flex';
+    if (intlNotice) intlNotice.style.display = 'block';
+    if (confirmBtn) confirmBtn.innerText = 'Pay ₹' + Number(amountInr).toLocaleString('en-IN') + ' INR (~' + conv.formatted + ')';
+  }
+
   if (confirmBtn) {
     confirmBtn.onclick = async () => {
       confirmBtn.disabled = true;

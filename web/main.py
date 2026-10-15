@@ -109,8 +109,16 @@ from core.analysis.parser import (
     wrap_fund_dossier_with_collapsible_dimensions,
 )
 from core.analysis.metrics import calculate_52w_percentile, calculate_pe_percentile, get_valuation_quartile
-from core.billing import PRICING_PACKS, B2B_PACKS, get_plan_by_id
+from core.billing import (
+    PRICING_PACKS,
+    B2B_PACKS,
+    get_plan_by_id,
+    SUPPORTED_CURRENCIES,
+    resolve_currency_for_request,
+)
 from normalizer import clean_ticker, extract_citations_from_report
+
+
 from bse_master import (
     get_ticker_suggestions,
     resolve_canonical_symbol,
@@ -721,6 +729,7 @@ def discovery_page(request: Request, edition: Optional[str] = Query(None)):
 @app.get("/pricing", response_class=HTMLResponse)
 def pricing_page(request: Request):
     """Public pricing and checkout page displaying single-pass, credit packs, and Pro memberships."""
+    detected_currency = resolve_currency_for_request(request)
     return templates.TemplateResponse(
         request=request,
         name="pricing.html",
@@ -728,6 +737,8 @@ def pricing_page(request: Request):
             "active_page": "pricing",
             "pricing_packs": PRICING_PACKS,
             "b2b_packs": B2B_PACKS,
+            "supported_currencies": SUPPORTED_CURRENCIES,
+            "detected_currency": detected_currency,
         }
     )
 

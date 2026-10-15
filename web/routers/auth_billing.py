@@ -34,6 +34,9 @@ from core.billing import (
     process_successful_payment,
     RazorpayAuthError,
     RazorpayAPIError,
+    SUPPORTED_CURRENCIES,
+    convert_inr_to_currency,
+    resolve_currency_for_request,
 )
 from web.common import (
     resolve_app_base_url,
@@ -610,3 +613,20 @@ async def api_get_user(user_id: str):
     if not user:
         raise HTTPException(status_code=404, detail="User not found")
     return json_response_with_cache(user)
+
+
+@router.get("/api/billing/currencies")
+async def api_get_currencies(request: Request):
+    """
+    Returns supported display currencies, reference exchange rates, and buffer info.
+    Includes detected currency based on request origin headers or cookies.
+    """
+    detected_currency = resolve_currency_for_request(request)
+    return json_response_with_cache({
+        "success": True,
+        "base_currency": "INR",
+        "detected_currency": detected_currency,
+        "buffer_pct": 3.5,
+        "currencies": SUPPORTED_CURRENCIES
+    })
+

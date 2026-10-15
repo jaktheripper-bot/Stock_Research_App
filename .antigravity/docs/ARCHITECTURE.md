@@ -46,8 +46,8 @@
 
 ## 6. Server-Side Rendered Presentation & API Architecture
 * **FastAPI Application Orchestrator (`web/main.py`):** High-concurrency async ASGI application serving Jinja2 server-side rendered HTML views, rate limiting, and REST API routes.
-  * Public Views: `/` (Landing), `/discovery` (Stock Discovery @9AM), `/dossier/{ticker}` (Institutional Equity Dossier), `/opportunities` (Opportunity Terminal), `/funds` & `/funds/compare/overlap` (Mutual Funds & ETFs / Fund Overlap Auditor), `/debt` (Bonds, NCDs & SDIs), `/sovereign` (Sovereign Curve & T-Bills), `/reits` (SM REITs, InvITs & SGBs), `/etfs` (National ETF Matrix), `/calculator/tax` (Net Real Tax Calculator), `/safety-radar` (Retail Safety Radar), `/compare` (Peer Comparison), `/pricing` (Pricing & Billing).
-  * REST APIs: `/api/dossier/intel/{ticker}`, `/api/cortex/*`, `/api/copilot/chat`, `/api/funds/overlap`, `/api/tax/compute`, `/api/auth/*`.
+  * Public Views: `/` (Landing), `/discovery` (Stock Discovery @9AM), `/dossier/{ticker}` (Institutional Equity Dossier), `/opportunities` (Opportunity Terminal), `/funds` & `/funds/compare/overlap` (Mutual Funds & ETFs / Fund Overlap Auditor), `/debt` (Bonds, NCDs & SDIs), `/sovereign` (Sovereign Curve & T-Bills), `/reits` (SM REITs, InvITs & SGBs), `/etfs` (National ETF Matrix), `/calculator/tax` (Net Real Tax Calculator), `/safety-radar` (Retail Safety Radar), `/compare` (Peer Comparison), `/pricing` (Pricing & Billing with Location-Aware Multi-Currency Engine & Forex Buffer).
+  * REST APIs: `/api/dossier/intel/{ticker}`, `/api/cortex/*`, `/api/copilot/chat`, `/api/funds/overlap`, `/api/tax/compute`, `/api/auth/*`, `/api/billing/currencies`.
   * Deep-Dive Paywalls (1 Credit / Permanent):
     * Equity: `POST /api/dossier/unlock/{ticker}` (Pillars 03/05, Reverse DCF Sandbox).
     * Mutual Funds: `POST /api/funds/unlock/{scheme_code}` (7-Pillar Look-Through Forensics, Weighted Moat, ASRI, Audit Narrative).
