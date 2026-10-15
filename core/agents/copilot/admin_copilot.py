@@ -644,9 +644,44 @@ def parse_deterministic_admin_query(
         is_self_target = (target_email == admin_email)
         recipient_display = "your administrator account" if is_self_target else f"account `{target_email}`"
 
+        # Seamless Immediate Execution for Self Credit Grants:
+        # When an authenticated administrator commands their Copilot to allocate credits to themselves,
+        # execute immediately without requiring a redundant 2-step confirmation proposal card.
+        if is_self_target:
+            grant_res = admin_grant_user_credits(
+                admin_email=admin_email,
+                target_user_identifier=admin_email,
+                credits_amount=credits_val,
+                reason_code="TASK_REMEDY",
+                admin_note=f"Granted via Admin Executive Copilot by {admin_email}",
+                ticket_id=ticket_id,
+                resolve_ticket=bool(ticket_id),
+                auto_provision=True
+            )
+            if grant_res.get("success"):
+                new_bal = grant_res.get("new_balance", credits_val)
+                reply = (
+                    f"✅ **Successfully Granted {credits_val:.1f} Research Credits to Your Account**\n\n"
+                    f"- **Target Account:** `{admin_email}`\n"
+                    f"- **Credits Added:** `+{credits_val:.1f}`\n"
+                    f"- **Updated Available Balance:** **{new_bal:.1f} credits**\n"
+                    f"- **Audit Status:** Committed to database and recorded in immutable Admin Audit Trail (`GRANT_USER_CREDITS`)."
+                )
+                exec_meta = {
+                    "action_type": AdminActionType.GRANT_CREDITS,
+                    "status": "EXECUTED",
+                    "new_balance": new_bal,
+                    "target_user": admin_email,
+                    "credits": credits_val
+                }
+                return reply, exec_meta
+            else:
+                err_msg = grant_res.get("error", "Failed to allocate credits.")
+                return f"❌ **Credit Allocation Failed:** {err_msg}", None
+
         proposal = create_action_proposal(
             action_type=AdminActionType.GRANT_CREDITS,
-            title=f"Grant {credits_val} Credits to {'Myself' if is_self_target else target_email}",
+            title=f"Grant {credits_val} Credits to {target_email}",
             summary=f"Allocate {credits_val} research credits to {recipient_display} (Reason: TASK_REMEDY).",
             payload={
                 "target_user": target_email,
@@ -935,10 +970,14 @@ async def process_admin_copilot_turn(
 
     if is_testing or not api_key:
         reply, proposal = parse_deterministic_admin_query(clean_msg, admin_user, kpis)
+        is_executed = bool(proposal and proposal.get("status") == "EXECUTED")
+        new_bal = proposal.get("new_balance") if is_executed else None
+        active_prop = None if is_executed else proposal
         return {
             "reply": reply,
-            "action_proposal": proposal,
-            "status": "COMPLETED_DETERMINISTIC"
+            "action_proposal": active_prop,
+            "status": "COMPLETED_EXECUTED" if is_executed else "COMPLETED_DETERMINISTIC",
+            "new_balance": new_bal
         }
 
     # Attempt Generative AI Cascade
@@ -1034,6 +1073,35 @@ RECENT CONVERSATION HISTORY:
                         if not target or target in ("myself", "me", "self", "my account", "my_account", "current_user", "admin", "owner"):
                             payload["target_user"] = admin_user.get("email")
 
+                    # If this is a self-credit grant from GenAI, auto-execute directly without requiring confirmation
+                    target = str(payload.get("target_user") or "").strip().lower()
+                    admin_email = (admin_user.get("email") or "").strip().lower()
+                    if action_type == AdminActionType.GRANT_CREDITS and target == admin_email:
+                        credits_val = float(payload.get("credits", 5.0))
+                        grant_res = admin_grant_user_credits(
+                            admin_email=admin_email,
+                            target_user_identifier=admin_email,
+                            credits_amount=credits_val,
+                            reason_code="TASK_REMEDY",
+                            admin_note=f"Granted via Admin Executive Copilot by {admin_email}",
+                            auto_provision=True
+                        )
+                        if grant_res.get("success"):
+                            new_bal = grant_res.get("new_balance", credits_val)
+                            clean_reply = (
+                                f"✅ **Successfully Granted {credits_val:.1f} Research Credits to Your Account**\n\n"
+                                f"- **Target Account:** `{admin_email}`\n"
+                                f"- **Credits Added:** `+{credits_val:.1f}`\n"
+                                f"- **Updated Available Balance:** **{new_bal:.1f} credits**\n"
+                                f"- **Audit Status:** Committed to database and recorded in immutable Admin Audit Trail (`GRANT_USER_CREDITS`)."
+                            )
+                            return {
+                                "reply": clean_reply,
+                                "action_proposal": None,
+                                "status": "COMPLETED_EXECUTED",
+                                "new_balance": new_bal
+                            }
+
                     action_proposal = create_action_proposal(
                         action_type=action_type,
                         title=parsed.get("title", f"Execute {action_type}"),
@@ -1052,6 +1120,13 @@ RECENT CONVERSATION HISTORY:
         if not action_proposal:
             _, fallback_prop = parse_deterministic_admin_query(clean_msg, admin_user, kpis)
             if fallback_prop:
+                if fallback_prop.get("status") == "EXECUTED":
+                    return {
+                        "reply": agent_reply,
+                        "action_proposal": None,
+                        "status": "COMPLETED_EXECUTED",
+                        "new_balance": fallback_prop.get("new_balance")
+                    }
                 action_proposal = fallback_prop
 
         return {
@@ -1063,8 +1138,12 @@ RECENT CONVERSATION HISTORY:
     except Exception as e:
         logger.warning(f"Admin Copilot LLM generation error: {e}. Executing deterministic fallback.")
         reply, proposal = parse_deterministic_admin_query(clean_msg, admin_user, kpis)
+        is_executed = bool(proposal and proposal.get("status") == "EXECUTED")
+        new_bal = proposal.get("new_balance") if is_executed else None
+        active_prop = None if is_executed else proposal
         return {
             "reply": reply,
-            "action_proposal": proposal,
-            "status": "COMPLETED_FALLBACK"
+            "action_proposal": active_prop,
+            "status": "COMPLETED_EXECUTED" if is_executed else "COMPLETED_FALLBACK",
+            "new_balance": new_bal
         }

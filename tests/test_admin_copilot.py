@@ -188,30 +188,44 @@ class TestAdminCopilot(unittest.TestCase):
         self.assertTrue(prop["requires_confirmation"])
 
     def test_process_admin_copilot_turn_grant_credits_to_self(self):
-        """Verify credit requests targeting 'myself' or 'me' automatically resolve to admin email."""
+        """Verify credit requests targeting 'myself' or 'me' automatically resolve to admin email and directly execute."""
         import asyncio
+        from core.db.users import get_user_by_email
         owner_user = {"email": self.owner_email, "role": "owner"}
 
-        # 1. "send some credits to myself"
+        # Fetch baseline balance (ensuring account initialized)
+        from core.db.users import get_or_create_user
+        u_before = get_user_by_email(self.owner_email)
+        if not u_before:
+            u_before = get_or_create_user(user_id="usr_owner_test", email=self.owner_email, full_name="Owner")
+        base_bal = float(u_before.get("credits_balance", 0.0))
+
+        # 1. "send some credits to myself" -> Auto-executes without confirmation friction
         res1 = asyncio.run(process_admin_copilot_turn(
             admin_user=owner_user,
             message="send some credits to myself"
         ))
-        self.assertIsNotNone(res1["action_proposal"])
-        prop1 = res1["action_proposal"]
-        self.assertEqual(prop1["action_type"], AdminActionType.GRANT_CREDITS)
-        self.assertEqual(prop1["payload"]["target_user"], self.owner_email)
-        self.assertEqual(prop1["payload"]["credits"], 5.0)
+        self.assertIsNone(res1["action_proposal"])
+        self.assertEqual(res1["status"], "COMPLETED_EXECUTED")
+        self.assertIn("Successfully Granted 5.0 Research Credits", res1["reply"])
+        self.assertEqual(res1["new_balance"], base_bal + 5.0)
+
+        # Verify in database
+        u_after1 = get_user_by_email(self.owner_email)
+        self.assertEqual(float(u_after1["credits_balance"]), base_bal + 5.0)
 
         # 2. "give me 10 credits"
         res2 = asyncio.run(process_admin_copilot_turn(
             admin_user=owner_user,
             message="give me 10 credits"
         ))
-        self.assertIsNotNone(res2["action_proposal"])
-        prop2 = res2["action_proposal"]
-        self.assertEqual(prop2["payload"]["target_user"], self.owner_email)
-        self.assertEqual(prop2["payload"]["credits"], 10.0)
+        self.assertIsNone(res2["action_proposal"])
+        self.assertEqual(res2["status"], "COMPLETED_EXECUTED")
+        self.assertIn("Successfully Granted 10.0 Research Credits", res2["reply"])
+        self.assertEqual(res2["new_balance"], base_bal + 15.0)
+
+        u_after2 = get_user_by_email(self.owner_email)
+        self.assertEqual(float(u_after2["credits_balance"]), base_bal + 15.0)
 
     def test_api_admin_copilot_chat_endpoint_unauthorized(self):
         """Verify /api/admin/copilot/chat blocks unauthenticated access with 403."""

@@ -15,41 +15,53 @@ from email.mime.multipart import MIMEMultipart
 from typing import Optional
 
 from core.db import record_alert_event
+from core.config import get_secret
 
 logger = logging.getLogger("equity_research.core.notify")
+
+
+def _get_cfg(key: str, default: Optional[str] = None) -> Optional[str]:
+    """Retrieves configuration value across os.environ, .env, and local secrets."""
+    val = os.environ.get(key)
+    if val:
+        return val
+    secret_val = get_secret(key)
+    if secret_val:
+        return str(secret_val)
+    return default
 
 
 def get_admin_notification_email() -> str:
     """Retrieves target admin recipient email."""
     return (
-        os.environ.get("ADMIN_ALERT_EMAIL")
-        or os.environ.get("ADMIN_EMAIL")
+        _get_cfg("ADMIN_ALERT_EMAIL")
+        or _get_cfg("ADMIN_EMAIL")
         or "lyndnpnto@gmail.com"
     )
 
 
 def is_email_service_configured() -> bool:
     """Checks whether real outgoing email credentials are configured in the environment."""
-    if os.environ.get("RESEND_API_KEY"):
+    if _get_cfg("RESEND_API_KEY"):
         return True
-    return bool(os.environ.get("SMTP_HOST") and os.environ.get("SMTP_USER") and os.environ.get("SMTP_PASSWORD"))
+    return bool(_get_cfg("SMTP_HOST") and _get_cfg("SMTP_USER") and _get_cfg("SMTP_PASSWORD"))
 
 
 def get_email_service_status() -> dict:
     """Returns metadata describing active outgoing email provider."""
-    if os.environ.get("RESEND_API_KEY"):
+    if _get_cfg("RESEND_API_KEY"):
         return {
             "configured": True,
             "provider": "Resend API",
-            "from_email": os.environ.get("SMTP_FROM") or "noreply@moatnomics.com"
+            "from_email": _get_cfg("SMTP_FROM") or "noreply@moatnomics.com"
         }
-    if os.environ.get("SMTP_HOST") and os.environ.get("SMTP_USER") and os.environ.get("SMTP_PASSWORD"):
-        host = os.environ.get("SMTP_HOST")
-        port = os.environ.get("SMTP_PORT", 587)
+    if _get_cfg("SMTP_HOST") and _get_cfg("SMTP_USER") and _get_cfg("SMTP_PASSWORD"):
+        host = _get_cfg("SMTP_HOST")
+        port = _get_cfg("SMTP_PORT", "587")
         return {
             "configured": True,
             "provider": f"SMTP ({host}:{port})",
-            "from_email": os.environ.get("SMTP_FROM") or os.environ.get("SMTP_USER")
+            "from_email": _get_cfg("SMTP_FROM") or _get_cfg("SMTP_USER")
         }
     return {
         "configured": False,
@@ -60,7 +72,7 @@ def get_email_service_status() -> dict:
 
 def _dispatch_via_resend(from_email: str, to_email: str, subject: str, text: str, html: Optional[str] = None) -> bool:
     """Dispatches outgoing email via Resend HTTP REST API."""
-    resend_api_key = os.environ.get("RESEND_API_KEY")
+    resend_api_key = _get_cfg("RESEND_API_KEY")
     if not resend_api_key:
         return False
     try:
@@ -98,10 +110,10 @@ def _dispatch_via_resend(from_email: str, to_email: str, subject: str, text: str
 
 def _dispatch_via_smtp(from_email: str, to_email: str, subject: str, text: str, html: Optional[str] = None) -> bool:
     """Dispatches outgoing email via SMTP TLS/SSL."""
-    smtp_host = os.environ.get("SMTP_HOST")
-    smtp_port = int(os.environ.get("SMTP_PORT", 587))
-    smtp_user = os.environ.get("SMTP_USER")
-    smtp_password = os.environ.get("SMTP_PASSWORD")
+    smtp_host = _get_cfg("SMTP_HOST")
+    smtp_port = int(_get_cfg("SMTP_PORT", "587"))
+    smtp_user = _get_cfg("SMTP_USER")
+    smtp_password = _get_cfg("SMTP_PASSWORD")
 
     if not (smtp_host and smtp_user and smtp_password):
         return False
@@ -174,10 +186,10 @@ Turnaround Target: 24h SEBI / IT Rules 2021 statutory acknowledgment.
 ===============================================================
 """
 
-    if os.environ.get("RESEND_API_KEY"):
+    if _get_cfg("RESEND_API_KEY"):
         return _dispatch_via_resend(sender_email, admin_email, subject, body)
 
-    if os.environ.get("SMTP_HOST") and os.environ.get("SMTP_USER") and os.environ.get("SMTP_PASSWORD"):
+    if _get_cfg("SMTP_HOST") and _get_cfg("SMTP_USER") and _get_cfg("SMTP_PASSWORD"):
         return _dispatch_via_smtp(sender_email, admin_email, subject, body)
 
     # Graceful logging fallback when SMTP server is pending configuration
@@ -302,10 +314,10 @@ Moatnomics Service Desk
 </html>
 """
 
-    if os.environ.get("RESEND_API_KEY"):
+    if _get_cfg("RESEND_API_KEY"):
         return _dispatch_via_resend(sender_email, user_email, subject, text_body, html=html_body)
 
-    if os.environ.get("SMTP_HOST") and os.environ.get("SMTP_USER") and os.environ.get("SMTP_PASSWORD"):
+    if _get_cfg("SMTP_HOST") and _get_cfg("SMTP_USER") and _get_cfg("SMTP_PASSWORD"):
         return _dispatch_via_smtp(sender_email, user_email, subject, text_body, html=html_body)
 
     logger.warning(

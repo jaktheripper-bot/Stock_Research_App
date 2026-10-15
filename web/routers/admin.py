@@ -269,12 +269,23 @@ async def admin_dashboard(
     except Exception:
         asset_scans = []
 
+    admin_user_credits = 0.0
+    try:
+        from core.db.users import get_user_by_email
+        if admin_profile and admin_profile.get("email"):
+            u_acc = get_user_by_email(admin_profile["email"])
+            if u_acc:
+                admin_user_credits = float(u_acc.get("credits_balance", 0.0))
+    except Exception:
+        admin_user_credits = 0.0
+
     return templates.TemplateResponse(
         request=request,
         name="admin.html",
         context={
             "authenticated": True,
             "current_admin": admin_profile,
+            "admin_user_credits": admin_user_credits,
             "admin_team": admin_team,
             "admin_audit_logs": admin_audit_logs,
             "asset_scans": asset_scans,
@@ -1538,7 +1549,8 @@ async def api_admin_copilot_chat(
         "success": True,
         "reply": res.get("reply"),
         "action_proposal": res.get("action_proposal"),
-        "status": res.get("status")
+        "status": res.get("status"),
+        "new_balance": res.get("new_balance")
     })
 
 
