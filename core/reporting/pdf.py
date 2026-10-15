@@ -629,7 +629,8 @@ def generate_debt_dossier_pdf(
 def generate_reit_dossier_pdf(
     symbol: str,
     reit: dict,
-    branding: dict = None
+    branding: dict = None,
+    deep_dive_unlocked: bool = True
 ) -> bytes:
     """Compiles clean, institutional PDF research dossier for a REIT or InvIT offering."""
     from markdown_pdf import MarkdownPdf, Section
@@ -696,6 +697,18 @@ Under Indian tax laws, distributions from REITs and InvITs pass through three di
 - **Core Risk Factors:** Tenant non-renewal at lease expiration, macro interest rate fluctuations, and property re-leasing downtime.
 """
 
+    if deep_dive_unlocked:
+        inversion_md = f"""### 🛡️ Behavioral Pre-Mortem Inversion Risk Ledger
+- **Pillar 4.1 (Cap Rate & Interest Rate Sensitivity):** Shifts in RBI benchmark 10Y G-Sec yields directly impact property capitalization rates, valuation cushions, and refinancing costs.
+- **Pillar 4.2 (Tenant Vacancy & Expiry Concentration):** Lease expirations within 24–36 months create cash flow re-leasing latency and downtime risk.
+- **Pillar 4.3 (Sponsor ROFO & Asset Injection Conflict):** Pipeline asset transfers from sponsor balance sheets require independent trustee valuation audits to prevent dilutive acquisitions.
+- **Pillar 4.4 (Section 115UA Regulatory Tax Friction):** Finance Act 2023 taxation of 'Specified Sum' distributions above original issue price creates taxable amortization friction under Section 56(2)(xii).
+"""
+    else:
+        inversion_md = f"""### 🛡️ Behavioral Pre-Mortem Inversion Risk Ledger (Locked)
+> *Institutional Deep-Dive Section. Unlock this trust on the website (1 credit) to include the full Behavioral Pre-Mortem Inversion Risk Ledger and structural failure mode analysis in your PDF.*
+"""
+
     footer = f"""
 ---
 ### Statutory Regulatory Disclaimers & Provenance Notice
@@ -704,7 +717,7 @@ Under Indian tax laws, distributions from REITs and InvITs pass through three di
 > 
 > Real estate and infrastructure investments carry market, tenant, occupancy, and interest rate risks. Past cash distributions are not a guarantee of future yield.
 """
-    full_md = f"{header}\n\n{scorecard_md}\n\n{tax_md}\n\n{primer_md}\n\n{footer}"
+    full_md = f"{header}\n\n{scorecard_md}\n\n{tax_md}\n\n{primer_md}\n\n{inversion_md}\n\n{footer}"
     out_name = f"_tmp_doc_reit_{clean_sym}.pdf"
     try:
         pdf = MarkdownPdf(toc_level=0)

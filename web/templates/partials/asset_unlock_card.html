@@ -15,7 +15,7 @@
       <button type="button" id="btnUnlock{{ unlock_kind }}" onclick="unlockAssetDeepDive('{{ unlock_kind }}', '{{ unlock_id }}')" class="btn btn-primary" style="font-weight: 700; padding: 10px 20px; border-radius: 9999px; cursor: pointer;">
         Unlock for 1 credit
       </button>
-      <div style="font-size: 11.5px; color: #64748b; margin-top: 6px;">One-time, permanent for this {{ 'scheme' if unlock_kind == 'FUND' else 'security' }}</div>
+      <div style="font-size: 11.5px; color: #64748b; margin-top: 6px;">One-time, permanent for this {{ 'scheme' if unlock_kind == 'FUND' else ('trust' if unlock_kind == 'REIT' else 'security') }}</div>
     </div>
   </div>
 </div>

@@ -618,6 +618,18 @@ def api_reits_tax_breakdown(
     return json_response_with_cache(simulate_reit_tax_waterfall(symbol, tax_slab_pct=tax_slab), max_age=300)
 
 
+@router.post("/api/reits/unlock/{symbol}")
+async def api_unlock_reit_deep_dive(request: Request, symbol: str):
+    """Consumes 1 credit to permanently unlock the Deep Dive sections of a REIT or InvIT dossier."""
+    init_db()
+    clean_sym = symbol.strip().upper()
+    from core.db.reits import get_reit_by_symbol
+    reit = get_reit_by_symbol(clean_sym)
+    if not reit:
+        raise HTTPException(status_code=404, detail=f"REIT or InvIT with symbol '{clean_sym}' not found.")
+    return _unlock_asset_deep_dive(request, "REIT", clean_sym, reit.get("name", clean_sym))
+
+
 # ==============================================================================
 # Opportunity Terminal & Arbitrage Endpoints
 # ==============================================================================

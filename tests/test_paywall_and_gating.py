@@ -27,6 +27,7 @@ from core.reporting.pdf import (
     apply_pdf_watermark,
     generate_debt_dossier_pdf,
     generate_fund_dossier_pdf,
+    generate_reit_dossier_pdf,
 )
 
 UNLOCK = {"x-unlock-preview": "1"}
@@ -421,6 +422,41 @@ class TestFundAndDebtPdfPaywall(unittest.TestCase):
         full = _pdf_text(generate_debt_dossier_pdf("INE000000001", posture, security))
         self.assertIn("SECRET_RADAR_SUMMARY", full)
         self.assertIn("SECRET_P3_ANALYSIS", full)
+
+    def test_reit_pdf_hides_deep_dive_when_locked(self):
+        from core.db.reits import get_reit_by_symbol
+        reit = get_reit_by_symbol("EMBASSY")
+        locked = _pdf_text(generate_reit_dossier_pdf("EMBASSY", reit, deep_dive_unlocked=False))
+        self.assertIn("Institutional Deep-Dive Section", locked)
+        self.assertNotIn("Pillar 4.1 (Cap Rate", locked)
+        full = _pdf_text(generate_reit_dossier_pdf("EMBASSY", reit, deep_dive_unlocked=True))
+        self.assertIn("Behavioral Pre-Mortem Inversion Risk Ledger", full)
+        self.assertIn("Pillar 4.1 (Cap Rate", full)
+
+
+class TestReitPaywallAndUnlock(unittest.TestCase):
+    def setUp(self):
+        init_db()
+        from web.main import app
+        self.client = TestClient(app)
+
+    def test_reit_dossier_shows_unlock_card_when_locked(self):
+        resp = self.client.get("/reits/EMBASSY")
+        self.assertEqual(resp.status_code, 200)
+        self.assertIn("Unlock Deep-Dive (1 Credit)", resp.text)
+        self.assertIn("Download PDF (Locked)", resp.text)
+        self.assertIn("Behavioral Pre-Mortem Inversion Risk Ledger", resp.text)
+
+    def test_reit_dossier_shows_unlocked_when_unlocked(self):
+        resp = self.client.get("/reits/EMBASSY", headers=UNLOCK)
+        self.assertEqual(resp.status_code, 200)
+        self.assertIn("Institutional Unlocked", resp.text)
+        self.assertIn("Download Institutional PDF", resp.text)
+        self.assertIn("Structural Failure Modes", resp.text)
+
+    def test_reit_unlock_endpoint_requires_auth(self):
+        resp = self.client.post("/api/reits/unlock/EMBASSY")
+        self.assertEqual(resp.status_code, 401)
 
 
 if __name__ == "__main__":

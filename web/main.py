@@ -1589,12 +1589,15 @@ def reit_dossier_page(request: Request, symbol: str):
     if not detail:
         raise HTTPException(status_code=404, detail=f"REIT/InvIT '{clean_sym}' not found in master registry.")
 
+    canonical_sym = detail["reit"]["symbol"]
+    is_deep_dive_unlocked = _asset_unlocked_for_request(request, "REIT", canonical_sym)
+
     return templates.TemplateResponse(
         request=request,
         name="reit_dossier.html",
         context={
             "active_page": "reits",
-            "symbol": detail["reit"]["symbol"],
+            "symbol": canonical_sym,
             "data": detail,
             "reit": detail["reit"],
             "tax_waterfall": detail["tax_waterfall"],
@@ -1602,7 +1605,8 @@ def reit_dossier_page(request: Request, symbol: str):
             "portfolio_audit": detail["portfolio_audit"],
             "inversion_risks": detail["inversion_risks"],
             "peers": detail["peers"],
-            "forensic_notes": detail["forensic_notes"]
+            "forensic_notes": detail["forensic_notes"],
+            "is_deep_dive_unlocked": is_deep_dive_unlocked
         }
     )
 

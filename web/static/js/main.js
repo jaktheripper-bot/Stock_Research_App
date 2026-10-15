@@ -688,7 +688,7 @@ window.unlockDeepDive = async function(ticker) {
 window.unlockAssetDeepDive = async function(kind, assetId) {
   const cleanKind = (kind || '').toUpperCase();
   const cleanId = (assetId || '').trim();
-  if (!cleanId || !['FUND', 'DEBT'].includes(cleanKind)) return;
+  if (!cleanId || !['FUND', 'DEBT', 'REIT'].includes(cleanKind)) return;
 
   const user = getStoredUser();
   if (!user) {
@@ -705,7 +705,8 @@ window.unlockAssetDeepDive = async function(kind, assetId) {
     return;
   }
 
-  if (!confirm(`Unlock the Deep Dive for ${cleanId}?\n\nCost: 1 research credit (permanent for this ${cleanKind === 'FUND' ? 'scheme' : 'security'}).\nBalance: ${balance} credits.`)) {
+  const entityType = cleanKind === 'FUND' ? 'scheme' : (cleanKind === 'REIT' ? 'trust' : 'security');
+  if (!confirm(`Unlock the Deep Dive for ${cleanId}?\n\nCost: 1 research credit (permanent for this ${entityType}).\nBalance: ${balance} credits.`)) {
     return;
   }
 
@@ -713,7 +714,7 @@ window.unlockAssetDeepDive = async function(kind, assetId) {
     window.showEvaluationHUD({ assetType: 'unlock', ticker: cleanId, totalSec: 15 });
   }
 
-  const path = cleanKind === 'FUND' ? 'funds' : 'debt';
+  const path = cleanKind === 'FUND' ? 'funds' : (cleanKind === 'REIT' ? 'reits' : 'debt');
   try {
     const resp = await fetch(`/api/${path}/unlock/${encodeURIComponent(cleanId)}`, { method: 'POST' });
     const data = await resp.json();

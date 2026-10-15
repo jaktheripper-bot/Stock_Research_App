@@ -58,13 +58,25 @@
         </div>
 
         <!-- Action Buttons -->
-        <div style="display: flex; gap: 10px; margin-top: 16px; flex-wrap: wrap;">
+        <div style="display: flex; gap: 10px; margin-top: 16px; flex-wrap: wrap; align-items: center;">
           <button onclick="openCopilot('{{ reit.symbol }}', 'reit')" class="btn btn-hero-ai btn-sm" title="Launch Forensic Intelligence Desk (Shortcut: ⌘K or /)">
             <svg class="glyph"><use href="#glyph-shield"></use></svg> Forensic Desk
           </button>
-          <a href="/api/pdf/reit/{{ reit.symbol }}" class="btn btn-sm btn-secondary" style="text-decoration: none; font-size: 12px; font-weight: 600;" title="Download Comprehensive Institutional PDF Dossier">
-            ⬇️ Download PDF Dossier
+          {% if is_deep_dive_unlocked %}
+          <span class="badge badge-emerald">
+            <span class="status-dot status-dot-emerald"></span> 🔓 Institutional Unlocked
+          </span>
+          <a href="/api/pdf/reit/{{ reit.symbol }}" class="btn btn-primary btn-sm" download title="Download Full Institutional PDF Dossier">
+            📄 Download Institutional PDF
           </a>
+          {% else %}
+          <button type="button" onclick="unlockAssetDeepDive('REIT', '{{ reit.symbol }}')" class="btn btn-primary btn-sm">
+            <span>🔓</span> Unlock Deep-Dive (1 Credit)
+          </button>
+          <button type="button" onclick="unlockAssetDeepDive('REIT', '{{ reit.symbol }}')" class="btn btn-secondary btn-sm" title="Unlock required to download full institutional PDF with Pre-Mortem Inversion schedules">
+            📄 Download PDF (Locked)
+          </button>
+          {% endif %}
           <a href="/reits" class="btn btn-sm btn-secondary" style="text-decoration: none; font-size: 12px; font-weight: 600;">
             ← Back to Real Assets Matrix
           </a>
@@ -357,6 +369,7 @@
   </div>
 
   <!-- Section 4: Pre-Mortem Inversion & Downside Risk Ledger -->
+  {% if is_deep_dive_unlocked %}
   <div class="card" style="background: rgba(15, 23, 42, 0.7); border: 1px solid rgba(255, 255, 255, 0.1); border-radius: 14px; padding: 24px; margin-bottom: 24px;">
     <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px; flex-wrap: wrap; gap: 10px;">
       <div>
@@ -384,6 +397,18 @@
       {% endfor %}
     </div>
   </div>
+  {% else %}
+  {% set lock_title = 'Behavioral Pre-Mortem Inversion Risk Ledger & Structural Failure Modes' %}
+  {% set lock_blurb = 'The free dossier covers Appraised NAV, Section 115UA Tax Waterfall, NDCF Payout Purity, Portfolio Scale/WALE, and Category Peer Benchmarking. The Deep Dive unlocks the institutional bear thesis and failure mode analysis.' %}
+  {% set lock_points = [
+    'Pillar 4: Structural Failure Modes covering Cap Rate / Interest Rate Sensitivity, Tenant Vacancy Drift, and Sponsor ROFO Governance',
+    'Comprehensive Institutional PDF Download with unwatermarked financial schedules',
+    'Full Forensic Intelligence Desk Copilot interrogation for this trust'
+  ] %}
+  {% set unlock_kind = 'REIT' %}
+  {% set unlock_id = reit.symbol %}
+  {% include "partials/asset_unlock_card.html" %}
+  {% endif %}
 
   <!-- Section 5: Category Peer Comparison Table -->
   <div class="card" style="background: rgba(15, 23, 42, 0.7); border: 1px solid rgba(255, 255, 255, 0.1); border-radius: 14px; padding: 24px; margin-bottom: 24px;">

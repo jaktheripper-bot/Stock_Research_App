@@ -356,7 +356,7 @@ def _asset_unlock_key(kind: str, asset_id: str) -> str:
 
 
 def _asset_unlocked_for_request(request: Request, kind: str, asset_id: str) -> bool:
-    """Server-side rule for the Mutual Fund / Corporate Debt deep-dive paywall (1 credit each)."""
+    """Server-side rule for the Mutual Fund / Corporate Debt / REIT deep-dive paywall (1 credit each)."""
     admin_auth_fn = _get_override_fn("web.main", "_is_admin_authenticated", _is_admin_authenticated)
     if admin_auth_fn(request):
         return True
@@ -365,6 +365,9 @@ def _asset_unlocked_for_request(request: Request, kind: str, asset_id: str) -> b
     get_user_fn = _get_override_fn("web.main", "_get_current_web_user", _get_current_web_user)
     web_user = get_user_fn(request)
     if web_user and asset_id:
+        tier = (web_user.get("subscription_tier") or "free").lower()
+        if tier in ("pro_monthly", "pro_annual") or "pro" in tier or web_user.get("is_pro"):
+            return True
         from core.db import is_ticker_unlocked_for_user
         check_fn = _get_override_fn("web.main", "is_ticker_unlocked_for_user", is_ticker_unlocked_for_user)
         return bool(check_fn(web_user.get("id", ""), _asset_unlock_key(kind, asset_id)))

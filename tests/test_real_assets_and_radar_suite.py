@@ -362,12 +362,20 @@ class TestRealAssetsAndRadarSuite(unittest.TestCase):
     def test_reit_dossier_web_routes(self):
         """Test individual institutional dossier web pages for Mainboard REITs, SM REITs, and InvITs."""
         for sym in ["EMBASSY", "PROPSHARE", "PGINVIT", "IRBINVIT", "NHIT"]:
+            # Baseline free tier view
             resp = self.client.get(f"/reits/{sym}")
             self.assertEqual(resp.status_code, 200, f"Failed for {sym}")
             self.assertIn("Section 115UA Tax Waterfall Simulator", resp.text)
             self.assertIn("NDCF Payout Purity", resp.text)
             self.assertIn("Pillar 1: Tax Architecture", resp.text)
-            self.assertIn("Pillar 4: Behavioral Pre-Mortem Inversion", resp.text)
+            self.assertIn("Unlock Deep-Dive (1 Credit)", resp.text)
+            self.assertIn("Behavioral Pre-Mortem Inversion Risk Ledger", resp.text)
+
+            # Unlocked Deep-Dive view (via Pro / credit / preview header)
+            resp_unlocked = self.client.get(f"/reits/{sym}", headers={"x-unlock-preview": "1"})
+            self.assertEqual(resp_unlocked.status_code, 200)
+            self.assertIn("Pillar 4: Behavioral Pre-Mortem Inversion", resp_unlocked.text)
+            self.assertIn("Institutional Unlocked", resp_unlocked.text)
 
     def test_reit_dossier_legacy_alias_resolution(self):
         """Verify backward-compatible resolution of legacy synthetic symbols to genuine entities."""

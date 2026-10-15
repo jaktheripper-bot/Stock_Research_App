@@ -375,7 +375,8 @@ async def api_download_reit_pdf(symbol: str, request: Request):
     if not reit:
         raise HTTPException(status_code=404, detail=f"REIT or InvIT with symbol '{clean_sym}' not found.")
 
-    pdf_bytes = generate_reit_dossier_pdf(clean_sym, reit)
+    is_unlocked = _asset_unlocked_for_request(request, "REIT", clean_sym)
+    pdf_bytes = generate_reit_dossier_pdf(clean_sym, reit, deep_dive_unlocked=is_unlocked)
     pdf_bytes = apply_pdf_watermark(pdf_bytes, _pdf_account_ref(request))
     filename = f"REIT_Dossier_{clean_sym}_{datetime.now(IST).strftime('%d-%m-%Y')}.pdf"
 
