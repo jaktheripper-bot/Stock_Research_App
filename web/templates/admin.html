@@ -2370,6 +2370,7 @@
 
     <!-- Quick Prompt Chips -->
     <div class="copilot-chips">
+      <button type="button" class="copilot-chip" onclick="handleQuickChip('Grant 5 credits to myself')">🎁 Add 5 Credits to Myself</button>
       <button type="button" class="copilot-chip" onclick="handleQuickChip('What are our unique sessions and top visited routes?')">📊 Sessions & Paths</button>
       <button type="button" class="copilot-chip" onclick="handleQuickChip('Summarize our net cash inflow and recent billables.')">💰 Cash Inflow</button>
       <button type="button" class="copilot-chip" onclick="handleQuickChip('Show me open support tickets and complaints.')">📬 Open Tickets</button>
@@ -2523,6 +2524,9 @@
         // If action proposal attached, render interactive confirmation card
         if (data.action_proposal) {
           const prop = data.action_proposal;
+          window.activeCopilotProposals = window.activeCopilotProposals || {};
+          window.activeCopilotProposals[prop.proposal_id] = prop;
+
           const cardId = 'card_' + prop.proposal_id;
           const warnHtml = prop.impact_warning ? `<div class="action-card-warning">⚠️ ${prop.impact_warning}</div>` : '';
           const payloadJson = JSON.stringify(prop.payload, null, 2);
@@ -2538,7 +2542,7 @@
               ${warnHtml}
               <div class="action-card-payload">${payloadJson}</div>
               <div class="action-card-actions" id="actions_${cardId}">
-                <button type="button" class="btn btn-primary btn-sm" onclick="executeCopilotAction('${prop.proposal_id}', '${prop.action_type}', ${JSON.stringify(prop.payload).replace(/"/g, '&quot;')}, '${cardId}')" style="background: linear-gradient(135deg, #10b981, #059669); border: none; font-weight: 700; cursor: pointer;">
+                <button type="button" class="btn btn-primary btn-sm" onclick="executeCopilotAction('${prop.proposal_id}', '${cardId}')" style="background: linear-gradient(135deg, #10b981, #059669); border: none; font-weight: 700; cursor: pointer;">
                   ✓ Confirm & Execute
                 </button>
                 <button type="button" class="btn btn-secondary btn-sm" onclick="cancelCopilotAction('${cardId}')" style="cursor: pointer;">
@@ -2577,11 +2581,15 @@
     }
   }
 
-  async function executeCopilotAction(proposalId, actionType, payload, cardId) {
+  async function executeCopilotAction(proposalId, cardId, directActionType, directPayload) {
     const actionsDiv = document.getElementById('actions_' + cardId);
     if (actionsDiv) {
       actionsDiv.innerHTML = '<span style="color: #38bdf8; font-size: 12px; font-weight: 600;">⏳ Executing mutation & recording immutable audit trail...</span>';
     }
+
+    const prop = (window.activeCopilotProposals && window.activeCopilotProposals[proposalId]) || {};
+    const actionType = directActionType || prop.action_type || '';
+    const payload = directPayload || prop.payload || {};
 
     try {
       const resp = await fetch('/api/admin/copilot/execute', {
@@ -2601,9 +2609,11 @@
       if (resp.ok && resData.success) {
         if (actionsDiv) {
           const successMsg = resData.message || 'Operation executed and audited successfully.';
+          const balInfo = (resData.new_balance !== undefined) ? `<div style="font-size: 11px; color: #a7f3d0; margin-top: 4px;">Updated Balance: <strong>${resData.new_balance} credits</strong></div>` : '';
           actionsDiv.outerHTML = `
             <div class="action-card-success">
               ✅ <strong>Executed & Audited:</strong> ${successMsg}
+              ${balInfo}
               <div style="font-size: 10px; color: #6ee7b7; margin-top: 4px; font-weight: normal;">
                 Transaction logged in immutable Admin Audit Trail.
               </div>

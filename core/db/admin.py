@@ -497,6 +497,7 @@ def admin_grant_user_credits(
     ticket_id: Optional[str] = None,
     task_ticker: Optional[str] = None,
     resolve_ticket: bool = True,
+    auto_provision: bool = False,
     ip_address: Optional[str] = None,
     user_agent: Optional[str] = None
 ) -> Dict[str, Any]:
@@ -541,6 +542,23 @@ def admin_grant_user_credits(
             (clean_target, clean_target)
         )
         user_row = cursor.fetchone()
+        if not user_row:
+            # Auto-provision if granting to self, authorized bootstrap owner, or explicit auto_provision requested
+            should_auto_provision = auto_provision or (clean_target == clean_admin) or (clean_target in get_authorized_bootstrap_emails())
+            if should_auto_provision and ("@" in clean_target or clean_target.startswith("usr_")):
+                import re
+                from core.db.users import get_or_create_user
+                gen_user_id = f"usr_{re.sub(r'[^a-zA-Z0-9]', '_', clean_target.lower())[:32]}"
+                gen_user_email = clean_target if "@" in clean_target else f"{clean_target}@user.local"
+                gen_user_name = clean_target.split("@")[0].replace(".", " ").title() if "@" in clean_target else "Investor"
+                new_user = get_or_create_user(user_id=gen_user_id, email=gen_user_email, full_name=gen_user_name)
+                if new_user:
+                    cursor.execute(
+                        f"SELECT id, email, full_name, credits_balance FROM user_accounts WHERE id = {p} OR LOWER(email) = LOWER({p}) LIMIT 1;",
+                        (new_user.get("id"), gen_user_email)
+                    )
+                    user_row = cursor.fetchone()
+
         if not user_row:
             return {"success": False, "error": f"User '{target_user_identifier}' not found in registered accounts."}
 

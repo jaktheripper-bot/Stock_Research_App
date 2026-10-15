@@ -187,6 +187,32 @@ class TestAdminCopilot(unittest.TestCase):
         self.assertEqual(prop["payload"]["credits"], 5.0)
         self.assertTrue(prop["requires_confirmation"])
 
+    def test_process_admin_copilot_turn_grant_credits_to_self(self):
+        """Verify credit requests targeting 'myself' or 'me' automatically resolve to admin email."""
+        import asyncio
+        owner_user = {"email": self.owner_email, "role": "owner"}
+
+        # 1. "send some credits to myself"
+        res1 = asyncio.run(process_admin_copilot_turn(
+            admin_user=owner_user,
+            message="send some credits to myself"
+        ))
+        self.assertIsNotNone(res1["action_proposal"])
+        prop1 = res1["action_proposal"]
+        self.assertEqual(prop1["action_type"], AdminActionType.GRANT_CREDITS)
+        self.assertEqual(prop1["payload"]["target_user"], self.owner_email)
+        self.assertEqual(prop1["payload"]["credits"], 5.0)
+
+        # 2. "give me 10 credits"
+        res2 = asyncio.run(process_admin_copilot_turn(
+            admin_user=owner_user,
+            message="give me 10 credits"
+        ))
+        self.assertIsNotNone(res2["action_proposal"])
+        prop2 = res2["action_proposal"]
+        self.assertEqual(prop2["payload"]["target_user"], self.owner_email)
+        self.assertEqual(prop2["payload"]["credits"], 10.0)
+
     def test_api_admin_copilot_chat_endpoint_unauthorized(self):
         """Verify /api/admin/copilot/chat blocks unauthenticated access with 403."""
         res = self.client.post(

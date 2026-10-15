@@ -79,14 +79,14 @@ class AdminActionType:
 
 
 ALLOWED_ROLES_PER_ACTION = {
-    AdminActionType.GRANT_CREDITS: {"owner", "admin"},
-    AdminActionType.UPDATE_TICKET: {"owner", "admin"},
-    AdminActionType.REPLY_TICKET: {"owner", "admin"},
-    AdminActionType.PROCESS_REFUND: {"owner", "admin"},
-    AdminActionType.PURGE_TEST_DATA: {"owner", "admin"},
-    AdminActionType.TRIGGER_ASSET_SCAN: {"owner", "admin", "viewer"},
-    AdminActionType.TRIGGER_PROJECT_AUDIT: {"owner", "admin", "viewer"},
-    AdminActionType.SYNC_AMFI: {"owner", "admin"},
+    AdminActionType.GRANT_CREDITS: {"owner", "admin", "super_admin", "superadmin"},
+    AdminActionType.UPDATE_TICKET: {"owner", "admin", "super_admin", "superadmin"},
+    AdminActionType.REPLY_TICKET: {"owner", "admin", "super_admin", "superadmin"},
+    AdminActionType.PROCESS_REFUND: {"owner", "admin", "super_admin", "superadmin"},
+    AdminActionType.PURGE_TEST_DATA: {"owner", "admin", "super_admin", "superadmin"},
+    AdminActionType.TRIGGER_ASSET_SCAN: {"owner", "admin", "viewer", "super_admin", "superadmin"},
+    AdminActionType.TRIGGER_PROJECT_AUDIT: {"owner", "admin", "viewer", "super_admin", "superadmin"},
+    AdminActionType.SYNC_AMFI: {"owner", "admin", "super_admin", "superadmin"},
 }
 
 
@@ -293,6 +293,13 @@ def execute_confirmed_admin_action(
     admin_email = admin_user.get("email").strip().lower()
     admin_role = (admin_user.get("role") or "viewer").strip().lower()
 
+    # Normalize roles: bootstrap owners always possess supreme owner privileges
+    from core.db.admin import get_authorized_bootstrap_emails
+    if admin_email in get_authorized_bootstrap_emails():
+        admin_role = "owner"
+    elif admin_role in ("super_admin", "superadmin"):
+        admin_role = "admin"
+
     allowed_roles = ALLOWED_ROLES_PER_ACTION.get(action_type, {"owner"})
     if admin_role not in allowed_roles:
         err_msg = f"Forbidden: Action '{action_type}' requires role in {list(allowed_roles)}. Current role is '{admin_role}'."
@@ -310,6 +317,9 @@ def execute_confirmed_admin_action(
     # 1. GRANT_CREDITS
     if action_type == AdminActionType.GRANT_CREDITS:
         target_user = str(payload.get("target_user") or payload.get("user_email") or payload.get("user_id") or "").strip()
+        # Seamlessly resolve self-references to the authenticated admin's own email
+        if not target_user or target_user.lower() in ("myself", "me", "self", "my account", "my_account", "current_user", "admin", "owner"):
+            target_user = admin_email
         try:
             credits_val = float(payload.get("credits", 2.0))
             if credits_val <= 0 or credits_val > 1000.0:
@@ -332,6 +342,7 @@ def execute_confirmed_admin_action(
             ticket_id=ticket_id,
             task_ticker=task_ticker,
             resolve_ticket=resolve_ticket,
+            auto_provision=True,
             ip_address=client_ip,
             user_agent=user_agent
         )
@@ -585,18 +596,28 @@ def parse_deterministic_admin_query(
         return reply, proposal
 
     # 2. Action Intent: Grant Credits
-    if any(k in msg for k in ["grant", "give", "allocate", "credit"]) and any(k in msg for k in ["credit", "balance", "token"]):
-        # Extract target email
+    credit_verbs = ["grant", "give", "allocate", "credit", "send", "add", "transfer", "load", "issue", "top up", "topup", "push", "deposit"]
+    credit_nouns = ["credit", "credits", "balance", "token", "tokens"]
+    if any(k in msg for k in credit_verbs) and any(k in msg for k in credit_nouns):
+        # Extract target email if explicitly provided
         email_match = re.search(r"[\w\.-]+@[\w\.-]+\.\w+", user_message)
-        target_email = email_match.group(0) if email_match else ""
+        target_email = email_match.group(0).lower().strip() if email_match else ""
 
-        # Extract numeric credit amount
+        # Detect self-reference ('myself', 'me', 'my account', etc.) with strict word boundaries
+        is_self = bool(re.search(r"\b(myself|me|my\s+account|my\s+email|self|mine|to\s+me|for\s+me|to\s+myself)\b", msg))
+        admin_email = (admin_user.get("email") or "").strip().lower()
+
+        if not target_email:
+            if is_self or admin_email:
+                target_email = admin_email
+
+        # Extract numeric credit amount, defaulting cleanly to 5.0
         num_matches = re.findall(r"\b(\d+(?:\.\d+)?)\b", user_message)
-        credits_val = 2.0
+        credits_val = 5.0
         if num_matches:
             for n in num_matches:
                 val = float(n)
-                if val > 0 and val <= 500:
+                if val > 0 and val <= 1000:
                     credits_val = val
                     break
 
@@ -616,19 +637,22 @@ def parse_deterministic_admin_query(
             return (
                 "⚠️ **Target User Required**\n\n"
                 "To grant remedial research credits, please specify the recipient user's email address "
-                "(e.g., `Grant 5 credits to user@example.com`).",
+                "(e.g., `Grant 5 credits to user@example.com` or `Send 5 credits to myself`).",
                 None
             )
 
+        is_self_target = (target_email == admin_email)
+        recipient_display = "your administrator account" if is_self_target else f"account `{target_email}`"
+
         proposal = create_action_proposal(
             action_type=AdminActionType.GRANT_CREDITS,
-            title=f"Grant {credits_val} Credits to {target_email}",
-            summary=f"Allocate {credits_val} research credits to account `{target_email}` (Reason: TASK_REMEDY).",
+            title=f"Grant {credits_val} Credits to {'Myself' if is_self_target else target_email}",
+            summary=f"Allocate {credits_val} research credits to {recipient_display} (Reason: TASK_REMEDY).",
             payload={
                 "target_user": target_email,
                 "credits": credits_val,
                 "reason": "TASK_REMEDY",
-                "admin_note": f"Granted via Admin Executive Copilot by {admin_user.get('email', 'admin')}",
+                "admin_note": f"Granted via Admin Executive Copilot by {admin_email or 'admin'}",
                 "ticket_id": ticket_id,
                 "resolve_ticket": bool(ticket_id)
             },
@@ -638,7 +662,7 @@ def parse_deterministic_admin_query(
         reply = (
             f"📋 **Action Proposal Prepared: Grant {credits_val} Credits**\n\n"
             f"I have prepared an administrative proposal to allocate **{credits_val} research credits** "
-            f"to user **{target_email}**."
+            f"to **{recipient_display}** (`{target_email}`)."
             + (f" Linked ticket: `{ticket_id}` (will be marked resolved)." if ticket_id else "") + "\n\n"
             "Please review the summary below and click **Confirm & Execute** to finalize."
         )
@@ -954,6 +978,7 @@ OPERATIONAL DIRECTIVES:
 2. We are an independent software tool and NOT registered anywhere. There are NO GST splits or fake SAC codes. Net cash inflow = Gross less refunds.
 3. If the administrator asks you to make ANY change (e.g. grant credits, update a ticket, issue a refund, purge test data, scan assets):
    - You MUST formulate an action proposal.
+   - If the administrator asks to grant or send credits to 'myself', 'me', 'my account', or does not specify another recipient email address, set target_user in the proposal payload to '{admin_user.get('email')}'. If no specific amount is requested, default to 5 credits.
    - At the end of your response, output a markdown block with language tag `proposal` containing valid JSON with this exact schema:
    ```proposal
    {{
@@ -1002,11 +1027,18 @@ RECENT CONVERSATION HISTORY:
                 parsed = json.loads(raw_json)
                 action_type = parsed.get("action_type")
                 if action_type:
+                    payload = parsed.get("payload", {})
+                    # Normalize self target in GenAI proposals
+                    if action_type == AdminActionType.GRANT_CREDITS:
+                        target = str(payload.get("target_user") or "").strip().lower()
+                        if not target or target in ("myself", "me", "self", "my account", "my_account", "current_user", "admin", "owner"):
+                            payload["target_user"] = admin_user.get("email")
+
                     action_proposal = create_action_proposal(
                         action_type=action_type,
                         title=parsed.get("title", f"Execute {action_type}"),
                         summary=parsed.get("summary", ""),
-                        payload=parsed.get("payload", {}),
+                        payload=payload,
                         impact_level=parsed.get("impact_level", "MEDIUM"),
                         impact_warning=parsed.get("impact_warning", "")
                     )
