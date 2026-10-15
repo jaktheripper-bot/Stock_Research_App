@@ -1,6 +1,6 @@
 # Production Release Checkpoints & Disaster Recovery Ledger
-**Last Checkpoint:** 2026-10-14 10:05:11 IST  
-**Total Verified Rollback Points:** 71  
+**Last Checkpoint:** 2026-10-15 08:47:28 IST  
+**Total Verified Rollback Points:** 72  
 
 > [!NOTE]
 > These checkpoints represent byte-for-byte verified working releases that passed the 4-tier pre-flight audit.
@@ -10,6 +10,7 @@
 
 | Checkpoint Tag | IST Timestamp | Commit | DB Reports | Description |
 |:---|:---|:---|:---|:---|
+| `checkpoint_20261015_084728_Sectional_Intelligence_Workspace_routing__sub-intent_engine_and_zero-clipping_scroll_hardening` | 2026-10-15 08:47:28 IST | `e29684c` | 143 rep / 247 rev | Sectional Intelligence Workspace routing, sub-intent engine and zero-clipping scroll hardening |
 | `checkpoint_20261014_100511_Site_Title_Spacing__Agent_Radar_Removal__Responsive_Buttons___Single_Stocks_Count_Authority` | 2026-10-14 10:05:11 IST | `f99f844` | 143 rep / 247 rev | Site Title Spacing, Agent Radar Removal, Responsive Buttons & Single Stocks Count Authority |
 | `checkpoint_20261014_093722_Interactive_Stock_Reports_Card_Browser_and_Nav_Elevation` | 2026-10-14 09:37:22 IST | `b45dfd5` | 143 rep / 247 rev | Interactive Stock Reports Card Browser and Nav Elevation |
 | `checkpoint_20261014_083001_Top_200_Mutual_Fund_Canonical_Universe_Expansion` | 2026-10-14 08:30:01 IST | `8cf6674` | 143 rep / 247 rev | Top 200 Mutual Fund Canonical Universe Expansion |
