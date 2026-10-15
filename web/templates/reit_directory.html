@@ -81,9 +81,9 @@
       </div>
     </div>
 
-    <div style="overflow-x: auto;">
-      <table style="width: 100%; border-collapse: collapse; font-size: 13.5px;">
-        <thead>
+    <div class="table-sticky-wrap">
+      <table class="table-sticky" style="width: 100%; border-collapse: collapse; font-size: 13.5px;">
+        <thead class="sticky-thead">
           <tr style="border-bottom: 1px solid rgba(255, 255, 255, 0.1); text-align: left; color: #64748b; font-size: 11.5px; text-transform: uppercase;">
             <th style="padding: 12px 14px;">Regulatory Dimension</th>
             <th style="padding: 12px 14px; color: #c084fc;">SEBI SM REIT (2024 Framework)</th>
@@ -156,9 +156,9 @@
       </div>
     </div>
 
-    <div style="overflow-x: auto;">
-      <table style="width: 100%; border-collapse: collapse; font-size: 13.5px;">
-        <thead>
+    <div class="table-sticky-wrap">
+      <table class="table-sticky" style="width: 100%; border-collapse: collapse; font-size: 13.5px;">
+        <thead class="sticky-thead">
           <tr style="border-bottom: 1px solid rgba(255, 255, 255, 0.1); text-align: left; color: #64748b; font-size: 11.5px; text-transform: uppercase;">
             <th style="padding: 12px 14px;">Symbol / Offering</th>
             <th style="padding: 12px 14px;">Structure</th>
@@ -264,9 +264,9 @@
       </div>
     </div>
 
-    <div style="overflow-x: auto;">
-      <table style="width: 100%; border-collapse: collapse; font-size: 13.5px;">
-        <thead>
+    <div class="table-sticky-wrap">
+      <table class="table-sticky" style="width: 100%; border-collapse: collapse; font-size: 13.5px;">
+        <thead class="sticky-thead">
           <tr style="border-bottom: 1px solid rgba(255, 255, 255, 0.1); text-align: left; color: #64748b; font-size: 11.5px; text-transform: uppercase;">
             <th style="padding: 12px 14px;">Symbol / InvIT Trust</th>
             <th style="padding: 12px 14px;">Concession Model</th>
@@ -402,9 +402,9 @@
     </div>
 
     <!-- SGB Tranches Table -->
-    <div style="overflow-x: auto;">
-      <table style="width: 100%; border-collapse: collapse; font-size: 13.5px;">
-        <thead>
+    <div class="table-sticky-wrap">
+      <table class="table-sticky" style="width: 100%; border-collapse: collapse; font-size: 13.5px;">
+        <thead class="sticky-thead">
           <tr style="border-bottom: 1px solid rgba(255, 255, 255, 0.1); text-align: left; color: #64748b; font-size: 11.5px; text-transform: uppercase;">
             <th style="padding: 12px 14px;">Tranche Symbol</th>
             <th style="padding: 12px 14px;">RBI Series Name</th>
@@ -454,15 +454,182 @@
     </div>
   </div>
 
-  <!-- Section 4: Section 115UA Tax Waterfall Explainer -->
-  <div class="card" style="padding: 24px; margin-bottom: 28px;">
-    <h2 style="font-size: 19px; font-weight: 800; color: #f8fafc; margin: 0 0 8px 0;">
-      Section 115UA Real Asset Tax Waterfall & In-Hand Return Simulator
-    </h2>
-    <p style="font-size: 13px; color: #94a3b8; line-height: 1.6; max-width: 860px; margin-bottom: 20px;">
-      REIT and InvIT distributions in India are composite cash flows governed by Section 115UA of the Income Tax Act and the Finance Act 2023 amendment. Understanding the composition protects unitholders from unexpected tax drag:
-    </p>
+  <!-- Section 4: Interactive Section 115UA Real Asset Tax Waterfall & In-Hand Return Simulator -->
+  <div id="taxSimulatorSection" class="card" style="padding: 26px; margin-bottom: 28px; background: rgba(15, 23, 42, 0.75); border: 1px solid rgba(255, 255, 255, 0.1); border-radius: 14px;">
+    <div style="display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 20px; flex-wrap: wrap; gap: 14px;">
+      <div>
+        <div style="display: inline-flex; align-items: center; gap: 6px; background: rgba(56, 189, 248, 0.12); border: 1px solid rgba(56, 189, 248, 0.25); border-radius: 9999px; padding: 3px 12px; margin-bottom: 8px;">
+          <span style="font-size: 11.5px; font-weight: 700; color: #38bdf8; text-transform: uppercase;">Interactive Tax Simulator • Section 115UA & Finance Act 2023</span>
+        </div>
+        <h2 style="font-size: 20px; font-weight: 800; color: #f8fafc; margin: 0 0 6px 0;">
+          Section 115UA Real Asset Tax Waterfall & In-Hand Return Simulator
+        </h2>
+        <p style="font-size: 13px; color: #94a3b8; max-width: 860px; margin: 0; line-height: 1.6;">
+          REIT and InvIT distributions in India are composite cash flows governed by Section 115UA of the Income Tax Act. Select any listed trust and your personal marginal tax bracket to model your true in-hand yield, annual tax drag, and statutory tax shield efficiency:
+        </p>
+      </div>
 
+      <div style="display: flex; gap: 10px; align-items: center;">
+        <button type="button" onclick="openCopilot('EMBASSY', 'reit', 'tax_waterfall', 'Sec 115UA Tax Waterfall', 'Audit Section 115UA composite tax waterfalls and post-tax realizations across REITs and InvITs')" class="btn btn-secondary btn-sm" style="font-size: 12px; font-weight: 600; display: inline-flex; align-items: center; gap: 6px;">
+          <svg class="glyph"><use href="#glyph-shield"></use></svg> Audit Tax Waterfall with Desk
+        </button>
+      </div>
+    </div>
+
+    <!-- Interactive Simulator Controls Grid -->
+    <div style="background: rgba(30, 41, 59, 0.6); border: 1px solid rgba(255, 255, 255, 0.08); border-radius: 12px; padding: 22px; margin-bottom: 22px;">
+      <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 20px; margin-bottom: 20px;">
+        <!-- Entity Selector -->
+        <div>
+          <label style="display: block; font-size: 12px; font-weight: 700; color: #94a3b8; text-transform: uppercase; margin-bottom: 8px;">
+            1. Select Listed Trust / Offering:
+          </label>
+          <select id="waterfallEntitySelect" onchange="onWaterfallEntityChange(this.value)" style="width: 100%; background: #0f172a; border: 1px solid rgba(255, 255, 255, 0.15); border-radius: 8px; padding: 10px 14px; font-size: 13.5px; color: #f8fafc; font-weight: 600; cursor: pointer; outline: none;">
+            <optgroup label="Mainboard Commercial REITs">
+              <option value="EMBASSY" selected>Embassy Office Parks REIT (7.15% Yield)</option>
+              <option value="MINDSPACE">Mindspace Business Parks REIT (6.80% Yield)</option>
+              <option value="BIRET">Brookfield India Real Estate Trust (8.10% Yield)</option>
+              <option value="NEXUS">Nexus Select Trust Retail REIT (7.40% Yield)</option>
+            </optgroup>
+            <optgroup label="Genuine SEBI SM REITs">
+              <option value="PROPSHARE">PropShare Titania SM REIT Platina (9.00% Yield)</option>
+              <option value="STRATA">Strata Commercial SM REIT HITEC (9.25% Yield)</option>
+            </optgroup>
+            <optgroup label="Infrastructure Investment Trusts (InvITs)">
+              <option value="PGINVIT">PowerGrid Infrastructure InvIT (11.20% Yield)</option>
+              <option value="INDIGRID">India Grid Trust Transmission InvIT (10.80% Yield)</option>
+              <option value="IRBINVIT">IRB InvIT Toll Road Fund (12.40% Yield)</option>
+              <option value="ORIENTINVIT">Oriental InfraTrust Road Concessions (11.50% Yield)</option>
+              <option value="BHARATINV">Bharat Highways InvIT (9.80% Yield)</option>
+              <option value="NHIT">National Highways Infra Trust (8.90% Yield)</option>
+            </optgroup>
+            <optgroup label="Custom Simulation">
+              <option value="CUSTOM">Custom Parameters (User Input)</option>
+            </optgroup>
+          </select>
+        </div>
+
+        <!-- Tax Bracket Selector -->
+        <div>
+          <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;">
+            <label style="font-size: 12px; font-weight: 700; color: #94a3b8; text-transform: uppercase;">
+              2. Applicable Marginal Tax Slab:
+            </label>
+            <span id="dirActiveSlabBadge" style="font-size: 11px; font-weight: 700; color: #38bdf8; background: rgba(56, 189, 248, 0.12); padding: 2px 8px; border-radius: 4px;">
+              Active: 30% Slab (Standard)
+            </span>
+          </div>
+          <div style="display: flex; gap: 6px; flex-wrap: wrap;" id="dirSlabBtnGroup">
+            <button type="button" class="btn btn-sm dir-slab-btn btn-secondary" data-slab="0.0" onclick="onDirTaxSlabSelect(0.0)" style="font-size: 12px; font-weight: 700; padding: 7px 11px; border-radius: 7px;">0% (Exempt)</button>
+            <button type="button" class="btn btn-sm dir-slab-btn btn-secondary" data-slab="10.0" onclick="onDirTaxSlabSelect(10.0)" style="font-size: 12px; font-weight: 700; padding: 7px 11px; border-radius: 7px;">10%</button>
+            <button type="button" class="btn btn-sm dir-slab-btn btn-secondary" data-slab="20.0" onclick="onDirTaxSlabSelect(20.0)" style="font-size: 12px; font-weight: 700; padding: 7px 11px; border-radius: 7px;">20%</button>
+            <button type="button" class="btn btn-sm dir-slab-btn btn-primary" data-slab="30.0" onclick="onDirTaxSlabSelect(30.0)" style="font-size: 12px; font-weight: 700; padding: 7px 11px; border-radius: 7px;">30% (Standard)</button>
+            <button type="button" class="btn btn-sm dir-slab-btn btn-secondary" data-slab="39.0" onclick="onDirTaxSlabSelect(39.0)" style="font-size: 12px; font-weight: 700; padding: 7px 11px; border-radius: 7px;">39% (Peak HNI)</button>
+          </div>
+        </div>
+      </div>
+
+      <!-- Custom Input Drawer (Only shown when CUSTOM is selected) -->
+      <div id="dirCustomParamsBox" style="display: none; background: rgba(15, 23, 42, 0.85); border: 1px dashed rgba(56, 189, 248, 0.35); border-radius: 10px; padding: 16px; margin-bottom: 20px;">
+        <div style="font-size: 12px; font-weight: 700; color: #38bdf8; text-transform: uppercase; margin-bottom: 12px;">Custom Parameters</div>
+        <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(130px, 1fr)); gap: 14px;">
+          <div>
+            <label style="font-size: 11px; color: #94a3b8; display: block; margin-bottom: 4px;">Gross Yield (%)</label>
+            <input type="number" id="customGrossYield" value="8.50" step="0.1" min="0" max="25" oninput="onCustomParamChange()" style="width: 100%; background: #1e293b; border: 1px solid rgba(255,255,255,0.15); border-radius: 6px; padding: 6px 10px; color: #fff; font-weight: 700;">
+          </div>
+          <div>
+            <label style="font-size: 11px; color: #94a3b8; display: block; margin-bottom: 4px;">Return of Capital (%)</label>
+            <input type="number" id="customRocPct" value="30" step="1" min="0" max="100" oninput="onCustomParamChange()" style="width: 100%; background: #1e293b; border: 1px solid rgba(255,255,255,0.15); border-radius: 6px; padding: 6px 10px; color: #34d399; font-weight: 700;">
+          </div>
+          <div>
+            <label style="font-size: 11px; color: #94a3b8; display: block; margin-bottom: 4px;">Exempt Dividend (%)</label>
+            <input type="number" id="customDivPct" value="35" step="1" min="0" max="100" oninput="onCustomParamChange()" style="width: 100%; background: #1e293b; border: 1px solid rgba(255,255,255,0.15); border-radius: 6px; padding: 6px 10px; color: #38bdf8; font-weight: 700;">
+          </div>
+          <div>
+            <label style="font-size: 11px; color: #94a3b8; display: block; margin-bottom: 4px;">Taxable Interest (%)</label>
+            <input type="number" id="customIntPct" value="35" step="1" min="0" max="100" oninput="onCustomParamChange()" style="width: 100%; background: #1e293b; border: 1px solid rgba(255,255,255,0.15); border-radius: 6px; padding: 6px 10px; color: #c084fc; font-weight: 700;">
+          </div>
+          <div>
+            <label style="font-size: 11px; color: #94a3b8; display: block; margin-bottom: 4px;">Taxable Rental (%)</label>
+            <input type="number" id="customRentPct" value="0" step="1" min="0" max="100" oninput="onCustomParamChange()" style="width: 100%; background: #1e293b; border: 1px solid rgba(255,255,255,0.15); border-radius: 6px; padding: 6px 10px; color: #f59e0b; font-weight: 700;">
+          </div>
+        </div>
+      </div>
+
+      <!-- Multi-segment Distribution Waterfall Progress Bar -->
+      <div style="background: rgba(15, 23, 42, 0.8); border: 1px solid rgba(255, 255, 255, 0.08); border-radius: 10px; padding: 16px; margin-bottom: 20px;">
+        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px; font-size: 12.5px;">
+          <span style="font-weight: 700; color: #f8fafc;">Statutory Cash Distribution Decomposition</span>
+          <span style="color: #94a3b8;">Gross Pre-Tax Yield: <strong id="dirGrossYieldText" style="color: #38bdf8;">7.15%</strong></span>
+        </div>
+
+        <div style="height: 18px; background: rgba(0, 0, 0, 0.4); border-radius: 8px; overflow: hidden; display: flex; box-shadow: inset 0 1px 3px rgba(0,0,0,0.6);" id="dirWaterfallBar">
+          <div id="barRoc" style="width: 30%; background: #10b981;" title="Return of Capital: 30% (Tax-Free)"></div>
+          <div id="barDiv" style="width: 35%; background: #38bdf8;" title="Dividend: 35% (Exempt SPV)"></div>
+          <div id="barInt" style="width: 35%; background: #c084fc;" title="Interest: 35% (Taxable)"></div>
+          <div id="barRent" style="width: 0%; background: #f59e0b;" title="Rental: 0% (Taxable)"></div>
+        </div>
+
+        <!-- Legend -->
+        <div style="display: flex; flex-wrap: wrap; gap: 14px; margin-top: 10px; font-size: 11.5px;">
+          <div style="display: flex; align-items: center; gap: 5px;">
+            <span style="width: 10px; height: 10px; border-radius: 2px; background: #10b981; display: inline-block;"></span>
+            <span style="color: #cbd5e1;">Return of Capital: <strong id="legendRoc">30%</strong> <span style="color: #34d399;">(Tax-Free)</span></span>
+          </div>
+          <div style="display: flex; align-items: center; gap: 5px;">
+            <span style="width: 10px; height: 10px; border-radius: 2px; background: #38bdf8; display: inline-block;"></span>
+            <span style="color: #cbd5e1;">Exempt Dividend: <strong id="legendDiv">35%</strong> <span style="color: #38bdf8;">(0% Tax)</span></span>
+          </div>
+          <div style="display: flex; align-items: center; gap: 5px;">
+            <span style="width: 10px; height: 10px; border-radius: 2px; background: #c084fc; display: inline-block;"></span>
+            <span style="color: #cbd5e1;">Interest: <strong id="legendInt">35%</strong> <span style="color: #c084fc;">(Slab Tax)</span></span>
+          </div>
+          <div style="display: flex; align-items: center; gap: 5px;">
+            <span style="width: 10px; height: 10px; border-radius: 2px; background: #f59e0b; display: inline-block;"></span>
+            <span style="color: #cbd5e1;">Rental: <strong id="legendRent">0%</strong> <span style="color: #f59e0b;">(Slab Tax)</span></span>
+          </div>
+        </div>
+      </div>
+
+      <!-- Real-Time Output Metrics -->
+      <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 14px; margin-bottom: 18px;">
+        <div style="background: rgba(15, 23, 42, 0.7); border: 1px solid rgba(255, 255, 255, 0.05); border-radius: 10px; padding: 14px 16px;">
+          <div style="font-size: 11px; color: #94a3b8; text-transform: uppercase; font-weight: 700;">Net In-Hand Yield</div>
+          <div id="dirNetYieldVal" style="font-size: 26px; font-weight: 900; color: #10b981; margin-top: 2px;" class="tnum">6.02%</div>
+          <div style="font-size: 11px; color: #64748b; margin-top: 2px;">Post-tax realized return</div>
+        </div>
+
+        <div style="background: rgba(15, 23, 42, 0.7); border: 1px solid rgba(255, 255, 255, 0.05); border-radius: 10px; padding: 14px 16px;">
+          <div style="font-size: 11px; color: #94a3b8; text-transform: uppercase; font-weight: 700;">Annual Tax Drag</div>
+          <div id="dirTaxDragVal" style="font-size: 26px; font-weight: 900; color: #f59e0b; margin-top: 2px;" class="tnum">113 bps</div>
+          <div style="font-size: 11px; color: #64748b; margin-top: 2px;">Lost to marginal taxation</div>
+        </div>
+
+        <div style="background: rgba(15, 23, 42, 0.7); border: 1px solid rgba(255, 255, 255, 0.05); border-radius: 10px; padding: 14px 16px;">
+          <div style="font-size: 11px; color: #94a3b8; text-transform: uppercase; font-weight: 700;">Cash Flow on ₹10 Lakhs</div>
+          <div id="dirCash10LVal" style="font-size: 26px; font-weight: 900; color: #f8fafc; margin-top: 2px;" class="tnum">₹60,200 / yr</div>
+          <div style="font-size: 11px; color: #64748b; margin-top: 2px;">vs ₹71,500 pre-tax</div>
+        </div>
+
+        <div style="background: rgba(15, 23, 42, 0.7); border: 1px solid rgba(255, 255, 255, 0.05); border-radius: 10px; padding: 14px 16px;">
+          <div style="font-size: 11px; color: #94a3b8; text-transform: uppercase; font-weight: 700;">Tax Shield Efficiency</div>
+          <div id="dirShieldVal" style="font-size: 26px; font-weight: 900; color: #38bdf8; margin-top: 2px;" class="tnum">84.2%</div>
+          <div style="font-size: 11px; color: #64748b; margin-top: 2px;">Yield shielded from tax</div>
+        </div>
+      </div>
+
+      <!-- Real-Time Narrative & Action Bar -->
+      <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 12px; background: rgba(15, 23, 42, 0.5); border-radius: 8px; padding: 12px 16px;">
+        <div id="dirSummaryText" style="font-size: 12.5px; color: #cbd5e1; line-height: 1.5; max-width: 780px;">
+          At a 30.0% tax slab, Embassy Office Parks REIT delivers an effective in-hand yield of 6.02% (vs 7.15% gross), with a tax drag of 113.0 bps due to 30.0% return of capital protection and 35.0% SPV-exempt dividends under Section 115UA.
+        </div>
+        <a id="dirInspectDossierLink" href="/reits/EMBASSY" class="btn btn-primary btn-sm" style="font-size: 12px; font-weight: 700; white-space: nowrap; display: inline-flex; align-items: center; gap: 6px;">
+          Inspect Full Dossier →
+        </a>
+      </div>
+    </div>
+
+    <!-- Statutory Section 115UA Rules Cards -->
     <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 16px; margin-bottom: 20px;">
       <div style="background: rgba(15, 23, 42, 0.5); border-left: 4px solid #38bdf8; border-radius: 8px; padding: 14px 16px;">
         <div style="font-size: 13px; font-weight: 800; color: #38bdf8; margin-bottom: 4px;">1. Dividend Stream</div>
@@ -481,7 +648,7 @@
       <div style="background: rgba(15, 23, 42, 0.5); border-left: 4px solid #10b981; border-radius: 8px; padding: 14px 16px;">
         <div style="font-size: 13px; font-weight: 800; color: #34d399; margin-bottom: 4px;">3. Return of Capital / ROC</div>
         <div style="font-size: 12px; color: #94a3b8; line-height: 1.5;">
-          Amortization of SPV debt. Non-taxable return of invested capital until cumulative distributions exceed initial unitholder acquisition cost.
+          Amortization of SPV debt. Non-taxable return of invested capital until cumulative distributions exceed initial unitholder acquisition cost (Sec 56(2)(xii)).
         </div>
       </div>
 
@@ -493,6 +660,139 @@
       </div>
     </div>
   </div>
+
+  <script>
+    const REIT_TAX_DATA = {
+      "EMBASSY": { name: "Embassy Office Parks REIT", yield: 7.15, div: 35.0, int: 35.0, roc: 30.0, rent: 0.0, url: "/reits/EMBASSY" },
+      "MINDSPACE": { name: "Mindspace Business Parks REIT", yield: 6.80, div: 35.0, int: 35.0, roc: 30.0, rent: 0.0, url: "/reits/MINDSPACE" },
+      "BIRET": { name: "Brookfield India Real Estate Trust", yield: 8.10, div: 35.0, int: 35.0, roc: 30.0, rent: 0.0, url: "/reits/BIRET" },
+      "NEXUS": { name: "Nexus Select Trust", yield: 7.40, div: 35.0, int: 35.0, roc: 30.0, rent: 0.0, url: "/reits/NEXUS" },
+      "PROPSHARE": { name: "PropShare Titania SM REIT (Platina)", yield: 9.00, div: 0.0, int: 100.0, roc: 0.0, rent: 0.0, url: "/reits/PROPSHARE" },
+      "STRATA": { name: "Strata Commercial SM REIT (HITEC)", yield: 9.25, div: 10.0, int: 90.0, roc: 0.0, rent: 0.0, url: "/reits/STRATA" },
+      "PGINVIT": { name: "POWERGRID Infrastructure InvIT", yield: 11.20, div: 35.0, int: 35.0, roc: 30.0, rent: 0.0, url: "/reits/PGINVIT" },
+      "INDIGRID": { name: "India Grid Trust (IndiGrid)", yield: 10.80, div: 35.0, int: 40.0, roc: 25.0, rent: 0.0, url: "/reits/INDIGRID" },
+      "IRBINVIT": { name: "IRB InvIT Fund", yield: 12.40, div: 20.0, int: 55.0, roc: 25.0, rent: 0.0, url: "/reits/IRBINVIT" },
+      "ORIENTINVIT": { name: "Oriental InfraTrust", yield: 11.50, div: 30.0, int: 45.0, roc: 25.0, rent: 0.0, url: "/reits/ORIENTINVIT" },
+      "BHARATINV": { name: "Bharat Highways InvIT", yield: 9.80, div: 35.0, int: 40.0, roc: 25.0, rent: 0.0, url: "/reits/BHARATINV" },
+      "NHIT": { name: "National Highways Infra Trust (NHIT)", yield: 8.90, div: 50.0, int: 30.0, roc: 20.0, rent: 0.0, url: "/reits/NHIT" }
+    };
+
+    let dirSelectedSlab = 30.0;
+    let dirCurrentSymbol = "EMBASSY";
+
+    function onWaterfallEntityChange(symbol) {
+      dirCurrentSymbol = symbol;
+      const customBox = document.getElementById("dirCustomParamsBox");
+      const inspectBtn = document.getElementById("dirInspectDossierLink");
+      if (symbol === "CUSTOM") {
+        customBox.style.display = "block";
+        inspectBtn.style.display = "none";
+      } else {
+        customBox.style.display = "none";
+        inspectBtn.style.display = "inline-flex";
+        const entity = REIT_TAX_DATA[symbol];
+        if (entity) {
+          inspectBtn.href = entity.url;
+        }
+      }
+      recomputeWaterfall();
+    }
+
+    function onDirTaxSlabSelect(slabRate) {
+      dirSelectedSlab = slabRate;
+      document.querySelectorAll(".dir-slab-btn").forEach(btn => {
+        if (parseFloat(btn.dataset.slab) === slabRate) {
+          btn.classList.remove("btn-secondary");
+          btn.classList.add("btn-primary");
+        } else {
+          btn.classList.remove("btn-primary");
+          btn.classList.add("btn-secondary");
+        }
+      });
+
+      const badge = document.getElementById("dirActiveSlabBadge");
+      if (slabRate === 0.0) badge.textContent = "Active: 0% Slab (Exempt)";
+      else if (slabRate === 30.0) badge.textContent = "Active: 30% Slab (Standard)";
+      else if (slabRate === 39.0) badge.textContent = "Active: 39% Slab (Peak HNI)";
+      else badge.textContent = `Active: ${slabRate}% Slab`;
+
+      recomputeWaterfall();
+    }
+
+    function onCustomParamChange() {
+      recomputeWaterfall();
+    }
+
+    function recomputeWaterfall() {
+      let grossYield, divPct, intPct, rocPct, rentPct, entityName;
+
+      if (dirCurrentSymbol === "CUSTOM") {
+        grossYield = parseFloat(document.getElementById("customGrossYield").value) || 0.0;
+        rocPct = parseFloat(document.getElementById("customRocPct").value) || 0.0;
+        divPct = parseFloat(document.getElementById("customDivPct").value) || 0.0;
+        intPct = parseFloat(document.getElementById("customIntPct").value) || 0.0;
+        rentPct = parseFloat(document.getElementById("customRentPct").value) || 0.0;
+        entityName = "Custom Portfolio";
+      } else {
+        const entity = REIT_TAX_DATA[dirCurrentSymbol] || REIT_TAX_DATA["EMBASSY"];
+        grossYield = entity.yield;
+        divPct = entity.div;
+        intPct = entity.int;
+        rocPct = entity.roc;
+        rentPct = entity.rent;
+        entityName = entity.name;
+      }
+
+      // Normalize weights
+      const totalWeight = (rocPct + divPct + intPct + rentPct) || 100.0;
+      const normRoc = (rocPct / totalWeight) * 100;
+      const normDiv = (divPct / totalWeight) * 100;
+      const normInt = (intPct / totalWeight) * 100;
+      const normRent = (rentPct / totalWeight) * 100;
+
+      // Update multi-segment bar & legend
+      document.getElementById("barRoc").style.width = normRoc + "%";
+      document.getElementById("barDiv").style.width = normDiv + "%";
+      document.getElementById("barInt").style.width = normInt + "%";
+      document.getElementById("barRent").style.width = normRent + "%";
+
+      document.getElementById("legendRoc").textContent = Math.round(normRoc) + "%";
+      document.getElementById("legendDiv").textContent = Math.round(normDiv) + "%";
+      document.getElementById("legendInt").textContent = Math.round(normInt) + "%";
+      document.getElementById("legendRent").textContent = Math.round(normRent) + "%";
+
+      document.getElementById("dirGrossYieldText").textContent = grossYield.toFixed(2) + "%";
+
+      // Mathematical waterfall formulation
+      const taxOnInt = (normInt / 100) * (dirSelectedSlab / 100);
+      const taxOnRent = (normRent / 100) * (dirSelectedSlab / 100);
+      const blendedTaxRate = taxOnInt + taxOnRent;
+
+      const netYield = Math.max(0, grossYield * (1.0 - blendedTaxRate));
+      const taxDragBps = Math.round((grossYield - netYield) * 100);
+      const annualIncome10L = Math.round(1000000 * (netYield / 100));
+      const preTax10L = Math.round(1000000 * (grossYield / 100));
+      const shieldEfficiency = dirSelectedSlab > 0 
+        ? Math.max(0, Math.min(100, Math.round((1.0 - (blendedTaxRate / (dirSelectedSlab / 100))) * 1000) / 10))
+        : 100.0;
+
+      // Update KPIs
+      document.getElementById("dirNetYieldVal").textContent = netYield.toFixed(2) + "%";
+      document.getElementById("dirTaxDragVal").textContent = taxDragBps + " bps";
+      document.getElementById("dirCash10LVal").textContent = "₹" + annualIncome10L.toLocaleString("en-IN") + " / yr";
+      document.getElementById("dirShieldVal").textContent = shieldEfficiency.toFixed(1) + "%";
+
+      // Update commentary
+      const protectedPct = Math.round(normRoc + normDiv);
+      document.getElementById("dirSummaryText").textContent = 
+        `At a ${dirSelectedSlab.toFixed(1)}% tax slab, ${entityName} delivers an effective in-hand yield of ${netYield.toFixed(2)}% (vs ${grossYield.toFixed(2)}% gross), with a tax drag of ${taxDragBps} bps because ${protectedPct}% of its distribution (${Math.round(normRoc)}% Return of Capital + ${Math.round(normDiv)}% SPV-exempt Dividend) is completely shielded from slab taxation under Section 115UA.`;
+    }
+
+    // Run on load
+    document.addEventListener("DOMContentLoaded", function() {
+      recomputeWaterfall();
+    });
+  </script>
 
   <!-- SEBI Regulatory Safe-Harbor Footer -->
   <div style="font-size: 12px; color: #64748b; text-align: center; max-width: 840px; margin: 0 auto; line-height: 1.6;">
