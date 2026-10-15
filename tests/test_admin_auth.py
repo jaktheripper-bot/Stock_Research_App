@@ -245,3 +245,38 @@ def test_admin_owner_auto_bootstrap(client):
     assert ok_down2 is False
 
 
+def test_admin_dev_login_and_next_url(client):
+    """Verify one-click dev-login route sets admin session and preserves next_url."""
+    # 1. Dev login with destination URL
+    res = client.post("/admin/auth/dev-login", data={"next_url": "/admin?tab=tickets"}, follow_redirects=False)
+    assert res.status_code == 303
+    assert res.headers.get("location") == "/admin?tab=tickets"
+    assert ADMIN_COOKIE_NAME in res.cookies
+
+    # 2. Access dashboard with the session cookie
+    dash_res = client.get("/admin?tab=tickets", cookies={ADMIN_COOKIE_NAME: res.cookies[ADMIN_COOKIE_NAME]})
+    assert dash_res.status_code == 200
+    assert "Executive Telemetry & Site Usage Hub" in dash_res.text
+
+
+def test_admin_2fa_local_bypass_code_and_next_url(client):
+    """Verify 000000 bypass on localhost preserves next_url destination."""
+    # 1. Direct verify with next_url
+    res_init = client.post("/admin/auth/direct-verify", data={"email": "lyndonpinto@gmail.com", "next_url": "/admin?tab=tickets"}, follow_redirects=False)
+    assert res_init.status_code == 303
+    assert "/admin/verify-2fa?next=" in res_init.headers["location"]
+    pending_cookie = res_init.cookies[ADMIN_2FA_PENDING_COOKIE]
+
+    # 2. Verify with emergency code 000000
+    res_verify = client.post(
+        "/admin/verify-2fa",
+        data={"code": "000000", "next_url": "/admin?tab=tickets"},
+        cookies={ADMIN_2FA_PENDING_COOKIE: pending_cookie},
+        follow_redirects=False
+    )
+    assert res_verify.status_code == 303
+    assert res_verify.headers.get("location") == "/admin?tab=tickets"
+    assert ADMIN_COOKIE_NAME in res_verify.cookies
+
+
+

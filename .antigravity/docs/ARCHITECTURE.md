@@ -55,7 +55,7 @@
     * Corporate Debt: `POST /api/debt/unlock/{isin}` (Credit Contagion Radar, Cash Flow Solvency Pillar 03, Recovery Reality Pillar 05).
     * Server-side redaction across page templates, public JSON APIs, and PDF exports.
   * SEO & Attribution: Canonical `<link rel="canonical">` and `og:url` tags on all views, `CrawlerLogMiddleware` with bot detection, admin SEO visibility dashboard, and `utm_source=share` attribution.
-  * Security & Auth: Standard library Email OTP (`core/auth/otp.py`) and Admin 2FA TOTP (`core/auth/totp.py`).
+  * Security & Auth: Standard library Email OTP (`core/auth/otp.py`) and Admin 2FA TOTP (`core/auth/totp.py`) with ±120s drift tolerance (`window=4`), instantaneous QR re-scan (`/admin/setup-2fa?reset=1`), localhost bypass code `000000`, 1-click local dev fast track (`POST /admin/auth/dev-login`), and `next_url` destination preservation.
   * Admin Service Inbox & Notification Dispatch: `/admin?tab=tickets`, `/api/admin/tickets/{ticket_id}/thread`, `POST /admin/tickets/{ticket_id}/reply`, two-way email notification engine (`core/notify.py:send_ticket_reply_email`) with standard SMTP dispatch, test/dev mock fallback, and executive copilot resolution.
   * Modern Dark-Glassmorphism Design System: `web/static/css/style.css`, Inter typography, 100% viewport zoom lock, strict visual affordance separation (squircle 8px buttons vs. dark matte telemetry badges), decluttered 2-zone 7-pillar accordions with executive lead styling, and interactive slide-drawer Forensic Intelligence Desk (`web/static/js/copilot.js`, shortcut: `⌘K`).
 

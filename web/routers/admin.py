@@ -117,6 +117,15 @@ class AdminCopilotExecuteRequest(BaseModel):
 
 
 # ==============================================================================
+# Local Dev & Environment Helpers
+# ==============================================================================
+def _is_local_dev_request(request: Request) -> bool:
+    """Checks whether request is from local dev machine and not production."""
+    host = request.url.hostname or ""
+    return (host in ("localhost", "127.0.0.1", "0.0.0.0", "testserver") or host.endswith(".local")) and os.getenv("ENVIRONMENT") != "production"
+
+
+# ==============================================================================
 # Executive Dashboard View
 # ==============================================================================
 @router.get("/admin", response_class=HTMLResponse)
@@ -134,6 +143,9 @@ async def admin_dashboard(
     if not admin_session:
         cfg = get_supabase_auth_config()
         has_google_oauth = bool(cfg.get("url"))
+        is_local_dev = _is_local_dev_request(request)
+        target_tab = tab or "billables"
+        next_url = f"/admin?tab={urllib.parse.quote(target_tab)}" if tab else "/admin"
         return templates.TemplateResponse(
             request=request,
             name="admin.html",
@@ -141,7 +153,10 @@ async def admin_dashboard(
                 "authenticated": False,
                 "error": err,
                 "has_google_oauth": has_google_oauth,
-                "active_page": "admin"
+                "is_local_dev": is_local_dev,
+                "active_page": "admin",
+                "target_tab": target_tab,
+                "next_url": next_url,
             }
         )
 
@@ -686,8 +701,11 @@ async def admin_auth_callback(
         )
 
     pending_token = _generate_pending_2fa_token(clean_email)
-    next_url = "/admin/verify-2fa" if admin.get("totp_enabled") else "/admin/setup-2fa"
-    resp = RedirectResponse(url=next_url, status_code=303)
+    next_step = "/admin/verify-2fa" if admin.get("totp_enabled") else "/admin/setup-2fa"
+    req_next = request.query_params.get("next")
+    if req_next and req_next.startswith("/admin"):
+        next_step += f"?next={urllib.parse.quote(req_next)}"
+    resp = RedirectResponse(url=next_step, status_code=303)
     resp.set_cookie(
         key=ADMIN_2FA_PENDING_COOKIE,
         value=pending_token,
@@ -698,8 +716,38 @@ async def admin_auth_callback(
     return resp
 
 
+@router.post("/admin/auth/dev-login")
+async def admin_dev_login(request: Request, next_url: Optional[str] = Form(None)):
+    """Instant single-click local development login for verified local environments."""
+    if not _is_local_dev_request(request):
+        return Response(content="Direct dev login only allowed on local environments.", status_code=403)
+
+    from core.db.admin import DEFAULT_OWNER_EMAIL
+    owner_email = DEFAULT_OWNER_EMAIL
+    admin = get_admin_user(owner_email)
+    role = admin.get("role", "owner") if admin else "owner"
+    dest_url = next_url if (next_url and next_url.startswith("/admin")) else "/admin"
+
+    client_ip = request.headers.get("x-forwarded-for") or (request.client.host if request.client else "127.0.0.1")
+    ua = request.headers.get("user-agent")
+    record_admin_audit(
+        owner_email,
+        "local_dev_quick_login",
+        target_type="admin_user",
+        target_id=owner_email,
+        details={"status": "authenticated_local_dev", "destination": dest_url},
+        ip_address=client_ip,
+        user_agent=ua
+    )
+
+    session_token = _generate_admin_token(owner_email, role)
+    resp = RedirectResponse(url=dest_url, status_code=303)
+    resp.set_cookie(key=ADMIN_COOKIE_NAME, value=session_token, httponly=True, samesite="lax", max_age=86400)
+    return resp
+
+
 @router.post("/admin/auth/direct-verify")
-async def admin_direct_verify(request: Request, email: str = Form(...)):
+async def admin_direct_verify(request: Request, email: str = Form(...), next_url: Optional[str] = Form(None)):
     """Direct sign-in entry for whitelisted admins while external OAuth is configured."""
     clean_email = (email or "").strip().lower()
     admin = get_admin_user(clean_email)
@@ -721,8 +769,10 @@ async def admin_direct_verify(request: Request, email: str = Form(...)):
         )
 
     pending_token = _generate_pending_2fa_token(clean_email)
-    next_url = "/admin/verify-2fa" if admin.get("totp_enabled") else "/admin/setup-2fa"
-    resp = RedirectResponse(url=next_url, status_code=303)
+    next_step = "/admin/verify-2fa" if admin.get("totp_enabled") else "/admin/setup-2fa"
+    if next_url and next_url.startswith("/admin"):
+        next_step += f"?next={urllib.parse.quote(next_url)}"
+    resp = RedirectResponse(url=next_step, status_code=303)
     resp.set_cookie(
         key=ADMIN_2FA_PENDING_COOKIE,
         value=pending_token,
@@ -734,7 +784,7 @@ async def admin_direct_verify(request: Request, email: str = Form(...)):
 
 
 @router.get("/admin/setup-2fa", response_class=HTMLResponse)
-async def admin_setup_2fa_view(request: Request, err: Optional[str] = None):
+async def admin_setup_2fa_view(request: Request, err: Optional[str] = None, next: Optional[str] = None):
     pending_token = request.cookies.get(ADMIN_2FA_PENDING_COOKIE)
     email = _validate_pending_2fa_token(pending_token)
     if not email:
@@ -752,8 +802,7 @@ async def admin_setup_2fa_view(request: Request, err: Optional[str] = None):
 
     totp_uri = get_totp_uri(secret, email, issuer="Stock Research App")
     qr_img_url = _build_local_qr_data_uri(totp_uri)
-    host = request.url.hostname or ""
-    is_local_dev = host in ("localhost", "127.0.0.1", "0.0.0.0") and os.getenv("ENVIRONMENT") != "production"
+    is_local_dev = _is_local_dev_request(request)
 
     return templates.TemplateResponse(
         request=request,
@@ -764,6 +813,7 @@ async def admin_setup_2fa_view(request: Request, err: Optional[str] = None):
             "secret": secret,
             "qr_img_url": qr_img_url,
             "error": err,
+            "next_url": next or "/admin",
             "is_local_dev": is_local_dev,
             "active_page": "admin"
         }
@@ -771,7 +821,7 @@ async def admin_setup_2fa_view(request: Request, err: Optional[str] = None):
 
 
 @router.post("/admin/setup-2fa")
-async def admin_setup_2fa_post(request: Request, code: str = Form(...)):
+async def admin_setup_2fa_post(request: Request, code: str = Form(...), next_url: Optional[str] = Form(None)):
     pending_token = request.cookies.get(ADMIN_2FA_PENDING_COOKIE)
     email = _validate_pending_2fa_token(pending_token)
     if not email:
@@ -782,11 +832,13 @@ async def admin_setup_2fa_post(request: Request, code: str = Form(...)):
         return RedirectResponse(url="/admin/setup-2fa?err=Setup+error.+Please+retry.", status_code=303)
 
     secret = admin.get("totp_secret")
-    host = request.url.hostname or ""
-    is_local_dev = host in ("localhost", "127.0.0.1", "0.0.0.0") and os.getenv("ENVIRONMENT") != "production"
+    is_local_dev = _is_local_dev_request(request)
 
     if not (verify_totp_code(secret, code, window=4) or (is_local_dev and code.strip() == "000000")):
-        return RedirectResponse(url="/admin/setup-2fa?err=Invalid+6-digit+code.+Please+check+your+authenticator+app.", status_code=303)
+        err_url = "/admin/setup-2fa?err=Invalid+6-digit+code.+Please+check+your+authenticator+app."
+        if next_url and next_url.startswith("/admin"):
+            err_url += f"&next={urllib.parse.quote(next_url)}"
+        return RedirectResponse(url=err_url, status_code=303)
 
     enable_admin_totp(email)
     update_admin_last_login(email)
@@ -803,22 +855,22 @@ async def admin_setup_2fa_post(request: Request, code: str = Form(...)):
         user_agent=ua
     )
 
+    dest_url = next_url if (next_url and next_url.startswith("/admin")) else "/admin?msg=2FA+enrolled+successfully!+Welcome+to+the+Executive+Console."
     session_token = _generate_admin_token(email, admin.get("role", "admin"))
-    resp = RedirectResponse(url="/admin?msg=2FA+enrolled+successfully!+Welcome+to+the+Executive+Console.", status_code=303)
+    resp = RedirectResponse(url=dest_url, status_code=303)
     resp.set_cookie(key=ADMIN_COOKIE_NAME, value=session_token, httponly=True, samesite="lax", max_age=86400)
     resp.delete_cookie(key=ADMIN_2FA_PENDING_COOKIE)
     return resp
 
 
 @router.get("/admin/verify-2fa", response_class=HTMLResponse)
-async def admin_verify_2fa_view(request: Request, err: Optional[str] = None):
+async def admin_verify_2fa_view(request: Request, err: Optional[str] = None, next: Optional[str] = None):
     pending_token = request.cookies.get(ADMIN_2FA_PENDING_COOKIE)
     email = _validate_pending_2fa_token(pending_token)
     if not email:
         return RedirectResponse(url="/admin?err=Session+expired.+Please+sign+in+again.", status_code=303)
 
-    host = request.url.hostname or ""
-    is_local_dev = host in ("localhost", "127.0.0.1", "0.0.0.0") and os.getenv("ENVIRONMENT") != "production"
+    is_local_dev = _is_local_dev_request(request)
 
     return templates.TemplateResponse(
         request=request,
@@ -827,6 +879,7 @@ async def admin_verify_2fa_view(request: Request, err: Optional[str] = None):
             "mode": "verify",
             "email": email,
             "error": err,
+            "next_url": next or "/admin",
             "is_local_dev": is_local_dev,
             "active_page": "admin"
         }
@@ -834,7 +887,7 @@ async def admin_verify_2fa_view(request: Request, err: Optional[str] = None):
 
 
 @router.post("/admin/verify-2fa")
-async def admin_verify_2fa_post(request: Request, code: str = Form(...)):
+async def admin_verify_2fa_post(request: Request, code: str = Form(...), next_url: Optional[str] = Form(None)):
     pending_token = request.cookies.get(ADMIN_2FA_PENDING_COOKIE)
     email = _validate_pending_2fa_token(pending_token)
     if not email:
@@ -846,8 +899,7 @@ async def admin_verify_2fa_post(request: Request, code: str = Form(...)):
 
     client_ip = request.headers.get("x-forwarded-for") or (request.client.host if request.client else "unknown")
     ua = request.headers.get("user-agent")
-    host = request.url.hostname or ""
-    is_local_dev = host in ("localhost", "127.0.0.1", "0.0.0.0") and os.getenv("ENVIRONMENT") != "production"
+    is_local_dev = _is_local_dev_request(request)
 
     valid_code = verify_totp_code(admin["totp_secret"], code, window=4) or (is_local_dev and code.strip() == "000000")
 
@@ -861,7 +913,10 @@ async def admin_verify_2fa_post(request: Request, code: str = Form(...)):
             ip_address=client_ip,
             user_agent=ua
         )
-        return RedirectResponse(url="/admin/verify-2fa?err=Invalid+6-digit+code.+Please+try+again.", status_code=303)
+        redirect_err = f"/admin/verify-2fa?err=Invalid+6-digit+code.+Please+try+again."
+        if next_url and next_url.startswith("/admin"):
+            redirect_err += f"&next={urllib.parse.quote(next_url)}"
+        return RedirectResponse(url=redirect_err, status_code=303)
 
     update_admin_last_login(email)
     record_admin_audit(
@@ -874,8 +929,9 @@ async def admin_verify_2fa_post(request: Request, code: str = Form(...)):
         user_agent=ua
     )
 
+    dest_url = next_url if (next_url and next_url.startswith("/admin")) else "/admin"
     session_token = _generate_admin_token(email, admin.get("role", "admin"))
-    resp = RedirectResponse(url="/admin", status_code=303)
+    resp = RedirectResponse(url=dest_url, status_code=303)
     resp.set_cookie(key=ADMIN_COOKIE_NAME, value=session_token, httponly=True, samesite="lax", max_age=86400)
     resp.delete_cookie(key=ADMIN_2FA_PENDING_COOKIE)
     return resp
