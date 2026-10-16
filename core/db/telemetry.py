@@ -250,8 +250,8 @@ def compute_page_dwell_and_visit_tree(all_events: list) -> dict:
                 try:
                     from urllib.parse import urlparse
                     p = urlparse(det["landing_url"]).path
-                except Exception:
-                    pass
+                except Exception as url_err:
+                    logger.debug("URL parse notice: %s", url_err)
         if not p and ev_tick and str(ev_tick).upper() != "APP":
             p = f"/dossier/{clean_ticker(ev_tick)}"
         if not p:
@@ -270,8 +270,8 @@ def compute_page_dwell_and_visit_tree(all_events: list) -> dict:
             try:
                 s_ts = str(ts_raw).strip().replace("T", " ")[:19]
                 ts = datetime.strptime(s_ts, "%Y-%m-%d %H:%M:%S")
-            except Exception:
-                pass
+            except Exception as ts_err:
+                logger.debug("Timestamp parse notice: %s", ts_err)
 
         if effective_sess not in session_events:
             session_events[effective_sess] = []
@@ -1009,8 +1009,8 @@ def get_traffic_flow_analytics(days: int = None, start_date = None, end_date = N
         try:
             cursor.close()
             conn.close()
-        except Exception:
-            pass
+        except Exception as close_err:
+            logger.debug("Traffic flow cursor close notice: %s", close_err)
 
 
 def get_session_journeys(days: int = None, start_date = None, end_date = None, limit: int = 25, exclude_tests: bool = True) -> list:

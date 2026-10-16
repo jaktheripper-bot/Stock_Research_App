@@ -364,8 +364,8 @@ def get_active_debt_securities(
         try:
             cursor.close()
             conn.close()
-        except Exception:
-            pass
+        except Exception as close_err:
+            logger.debug("Debt cursor close notice: %s", close_err)
 
 def record_rating_event(event: Dict[str, Any]) -> bool:
     """Records a Credit Rating Agency action (upgrade, downgrade, watch, affirmation)."""
