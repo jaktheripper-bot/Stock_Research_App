@@ -17,6 +17,7 @@ import sys
 import io
 import csv
 import json
+import asyncio
 import logging
 import urllib.parse
 import requests
@@ -1679,3 +1680,55 @@ async def api_admin_copilot_execute(
     )
     status_code = 200 if result.get("success") else 400
     return JSONResponse(status_code=status_code, content=result)
+
+
+@router.post("/api/admin/stocks/run-daily-ingest")
+async def api_admin_run_daily_stock_ingest(
+    request: Request,
+    count: int = Query(15, ge=1, le=50),
+    edition_date: Optional[str] = Query(None),
+    skip_gemini: bool = Query(False)
+):
+    """
+    Triggers the Daily 08:30 AM 15-Stock Ingestion & Mutual Fund Look-Through Re-Audit.
+    Requires administrator authentication.
+    """
+    admin_session = _is_admin_authenticated(request)
+    if not admin_session:
+        raise HTTPException(status_code=403, detail="Admin authorization required.")
+
+    from core.analysis.daily_stock_ingestion import ingest_daily_stock_cohort
+    loop = asyncio.get_running_loop()
+    res = await loop.run_in_executor(None, ingest_daily_stock_cohort, edition_date, count, skip_gemini)
+    return JSONResponse(status_code=200, content={
+        "success": True,
+        "result": res
+    })
+
+
+@router.get("/api/admin/stocks/ingestion-queue")
+def api_admin_get_stock_ingestion_queue(
+    request: Request,
+    limit: int = Query(20, ge=1, le=100)
+):
+    """
+    Returns the priority queue of uncovered mutual fund constituent stocks
+    and overall mutual fund coverage progress statistics.
+    Requires administrator authentication.
+    """
+    admin_session = _is_admin_authenticated(request)
+    if not admin_session:
+        raise HTTPException(status_code=403, detail="Admin authorization required.")
+
+    from core.analysis.daily_stock_ingestion import (
+        get_uncovered_mutual_fund_holdings_queue,
+        get_ingestion_progress_stats,
+    )
+    queue = get_uncovered_mutual_fund_holdings_queue(limit=limit)
+    stats = get_ingestion_progress_stats()
+    return JSONResponse(status_code=200, content={
+        "success": True,
+        "stats": stats,
+        "queue": queue
+    })
+

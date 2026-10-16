@@ -33,7 +33,7 @@ Every numerical metric, order book depth, corporate filing, and regulatory discl
 | Report Type / Domain | Primary Ingestion Gateway | Protocol & Routing Mechanism | Secondary Fallback | Update Frequency & TTL | Legal & SEBI Provenance Status |
 | :--- | :--- | :--- | :--- | :--- | :--- |
 | **1. Institutional Equity Dossier** (`/dossier/{sym}`) | **Angel One SmartAPI Gateway** (`core/ingestion/angel_one.py`) | HTTPS REST + WebSockets via **AWS Lightsail Static Proxy** (`13.54.76.134:8888`), authenticated with pure Python RFC 6238 TOTP | **BSE Direct API** (`bse_master.py`) + `yfinance` gap-filler (only for fields exchange feeds lack; disable with `YFINANCE_FALLBACK=0`); Angel One daily candles for price history | Live L2 Depth on demand; 14-day TTL for qualitative synthesis (invalidated on $\ge 5\%$ price jump or new BSE filing) | 🟢 **STATUTORY & LICENSED**<br>Broker API session under personal client agreement + BSE public filing repository. |
-| **2. Stock Discovery @9AM** (`/discovery`) | **BSE India Active Scrip Master** + **Angel One Quotes** | Daily batch cron at 09:00 AM IST via AWS Static IP Proxy | Cached NSE/BSE Universe (`bse_scrips_cache.json`) | 24 Hours (re-generated daily at 09:00 AM IST prior to market open) | 🟢 **STATUTORY**<br>Official BSE/NSE master universe with deterministic Chanakya filter. |
+| **2. Stock Discovery & Daily 15-Stock Ingestion** (`/discovery`, `/equities`) | **BSE India Active Scrip Master** + **AMFI Mutual Fund Holdings Registry** (`mutual_fund_holdings`) + **Angel One Quotes** | Daily autonomous batch at 08:30 AM IST (15-stock MF constituent ingestion) & 09:00 AM IST (Discovery reel refresh) | Cached NSE/BSE Universe (`bse_scrips_cache.json`) + `mutual_fund_holdings` | 24 Hours (daily pre-market run with boot catch-up & admin trigger) | 🟢 **STATUTORY**<br>Official BSE/NSE master universe + AMFI statutory portfolio disclosures with deterministic Chanakya filter. |
 | **3. Mutual Funds & ETFs** (`/funds`, `/funds/compare/overlap`) | **AMFI India Daily NAV API** (`NAVAll.txt`) | HTTP streaming download from `portal.amfiindia.com` (~1.5 MB text feed) | AMC Monthly Portfolio Disclosures (SEBI mandated `.xls` / `.csv`) | NAV updated daily at 23:15 IST; constituent holdings updated monthly (30-day TTL) | 🟢 **OFFICIAL STATUTORY UTILITY**<br>AMFI is the SEBI-mandated statutory authority. 100% legal immunity. |
 | **4. Bonds, NCDs & SDIs** (`/debt`, `/debt/{sym}`) | **BSE / NSE Debt Reporting Platform** + Credit Rating Agencies (CRAs) | Direct public parser for BSE Debt Bhavcopy; CRA press releases (CRISIL, ICRA, CARE) | MCA Charge Filings & SEBI OBPP Public Registers | Daily EOD for secondary yields; immediate upon CRA rating action publication | 🟢 **REGULATORY DISCLOSURES**<br>Public CRA rating actions and exchange trade reporting logs. No private OBPP scraping. |
 | **5. Sovereign Curve & T-Bills** (`/sovereign`) | **CCIL (Clearing Corp of India)** & **RBI DBIE** | FBIL daily benchmark rate sheets + MOSPI Open Data Portal (`api.mospi.gov.in`) | Hardcoded Nelson-Siegel 1Y–30Y baseline benchmark anchors | Daily at 18:00 IST upon publication of FBIL clearing cut-offs | 🟢 **SOVEREIGN PUBLIC RECORD**<br>Direct Govt of India and RBI gazette data. Zero copyright friction. |
@@ -84,28 +84,46 @@ sequenceDiagram
     Router-->>Browser: Rendered Institutional Dossier (HTML + Glassmorphism UI)
 ```
 
-### 2.2 Stock Discovery @9AM Pipeline
+### 2.2 Daily 15-Stock Ingestion & Pre-Market Discovery Pipeline
+
+The daily pre-market operational pipeline operates in two coordinated phases to continuously deliver fresh research to allocators while systematically expanding underlying equity coverage across the Indian mutual fund universe:
+
 ```mermaid
 sequenceDiagram
     autonumber
-    participant Cron as 09:00 AM IST Cron Daemon
+    participant Sched as Background Scheduler (08:30 AM & 09:00 AM IST)
+    participant Ingest as core/analysis/daily_stock_ingestion.py
     participant Disc as core/analysis/stock_discovery.py
-    participant Angel as AngelOne / BSE Feed
-    participant Chan as ChanakyaGate (core/cortex/chanakya.py)
-    participant DB as reports.db (discovery_cohorts table)
-    participant UI as /discovery View
+    participant MFDB as reports.db (mutual_fund_holdings)
+    participant RepDB as reports.db (reports & revisions)
+    participant FundEng as core/analysis/mutual_funds_engine.py
+    participant UI as /discovery & /equities Views
 
-    Cron->>Disc: Trigger refresh_daily_discovery()
-    Disc->>Angel: Fetch active universe quotes & volume
-    Disc->>Disc: Filter for minimum liquidity (Turnover >= ₹1 Cr)
-    loop For each candidate stock
-        Disc->>Chan: Run 10-Point Clean-Room Sieve (mode="SOFT")
-        Chan-->>Disc: Forensic Score (0-100) & Red Flags
+    Note over Sched, Ingest: Phase 1: 08:30 AM IST - Daily 15-Stock MF Constituent Ingestion
+    Sched->>Ingest: Trigger ingest_daily_stock_cohort(target_count=15)
+    Ingest->>MFDB: get_uncovered_mutual_fund_holdings_queue(limit=15)
+    MFDB-->>Ingest: Prioritized uncovered equities (scheme_count DESC, total_weight_pct DESC)
+    loop For each candidate equity (e.g. RELIANCE, COFORGE)
+        Ingest->>Ingest: Synthesize 7-Pillar AI Dossier + 7-Check Health Matrix
+        Ingest->>RepDB: Archive to reports & cached_fundamentals
     end
-    Disc->>Disc: Rank Top 10 Growth Leaders & Top 10 Value/Safety Candidates
-    Disc->>DB: Insert cohort with timestamp & publish date
-    Disc-->>Cron: Discovery Cohort Successfully Published
-    UI->>DB: Query 'today' cohort (Pro subscribers) vs 'yesterday' archive (Public)
+    Ingest->>MFDB: Find all mutual fund schemes holding newly ingested stocks
+    loop For each affected mutual fund scheme
+        Ingest->>FundEng: compute_fund_forensic_lookthrough(scheme_code)
+        FundEng->>MFDB: Recalculate & cache look-through scores, unpausing meters
+    end
+    Ingest->>RepDB: Log event in autonomous_events & publish to discovery reel
+
+    Note over Sched, Disc: Phase 2: 09:00 AM IST - Stock Discovery Candidate Screening
+    Sched->>Disc: Trigger refresh_daily_discovery()
+    Disc->>Disc: Fetch active universe quotes & filter turnover >= ₹1 Cr
+    loop For each candidate stock
+        Disc->>Disc: Run 10-Point Clean-Room Soft Sieve & Rank Top Candidates
+    end
+    Disc->>RepDB: Insert discovery cohort with publish date
+    Disc-->>Sched: Cohort successfully published
+
+    UI->>RepDB: Query /discovery (renders MF footprint badge) & /equities (market_cap=RECENT chip)
 ```
 
 ### 2.3 Mutual Funds & ETFs Look-Through & Overlap Flow
@@ -290,11 +308,24 @@ Synthesizes a strictly balanced dual-scenario thesis:
 
 ---
 
-### Report 2: Stock Discovery @9AM Report (`/discovery`)
+### Report 2: Stock Discovery @9AM & Daily 15-Stock Ingestion Report (`/discovery`, `/equities`)
 
-The Discovery report runs daily at 09:00 AM IST prior to the opening of the Indian capital markets (NSE/BSE).
+The Discovery report and institutional equity ingestion pipeline run daily prior to the opening of the Indian capital markets (NSE/BSE).
 
-* **Screening Universe:** Top 500 active Indian equities by market capitalization.
+* **Operational Cadence & Ingestion Timing:**
+  * **08:30 AM IST (Daily 15-Stock Ingestion):** Ingests exactly 15 new researched equities prioritized from uncovered mutual fund holdings (`core/analysis/daily_stock_ingestion.py`).
+  * **09:00 AM IST (Discovery Reel Refresh):** Refreshes top momentum, growth, and value candidate reels from the broader liquid universe.
+* **Constituent Queue Ranking Algorithm:**
+  Uncovered equities holding mutual fund investments are ranked deterministically:
+  $$\text{Priority Score} = \text{Scheme Count} \times 10^6 + \text{Total Portfolio Weight (\%)} \times 10^2$$
+  Institutional bellwethers held by the largest number of funds (e.g. Reliance, Max Healthcare, Coforge, Persistent Systems, Bharat Forge) are inducted first.
+* **Analytical Synthesis & Archival Standards:**
+  * Full 7-Pillar Institutional AI Dossier with statutory 7-Check Health Matrix (`Pillar 01: Moat`, `Pillar 02: Governance`, `Pillar 03: Valuation`, `Pillar 04: Solvency`, `Pillar 05: Diagnostic`, `Pillar 06: Capital Allocation`, `Pillar 07: Macro`).
+  * Extraction of fundamental ratios into `cached_fundamentals` and immutable snapshot archiving in `reports` and `report_revisions`.
+* **Allocator Showcase & Discovery Affordances:**
+  * **Mutual Fund Institutional Footprint Badge:** Rendered on `/discovery` asset cards (`🏛️ Held by X Mutual Funds` + `₹Y Cr AUM`) linking direct stock conviction to institutional fund manager backing.
+  * **Recently Inducted Filter:** Institutional Equities Directory (`/equities`) features a dedicated `🆕 Recently Inducted` filter chip (`market_cap=RECENT`) and cards display `🆕 INDUCTED` badges for all stocks synthesized within the last 48 hours.
+* **Screening Universe (General Discovery Reel):** Top 500 active Indian equities by market capitalization.
 * **Pre-Screening Liquidity Gate:**
   * Median 30-Day Daily Trading Volume $\ge 50,000$ shares.
   * Daily Average Turnover $\ge ₹1.0 \text{ Crore}$.
@@ -336,6 +367,7 @@ Evaluates mutual funds not as black-box historical performance vehicles, but thr
    * $S_{\text{Equity}, i}$: 7-Pillar Equity Score from `reports.db`.
    * $S_{\text{Debt}, j}$: 5-Pillar Credit Score from `corporate_debt` database.
    * **Genuine Coverage Threshold & Meter Activation:** Look-through metrics (Fund Health Score, Weighted Moat, Weighted Margin of Safety, and Weighted Solvency) require $\ge 70.0\%$ of underlying equity AUM to have verified forensic research reports in `reports.db`. When genuine coverage is $< 70.0\%$, meters enter a paused state (`Forensic Look-Through Meters Paused Pending Research Coverage`). Users can initiate an on-demand constituent deep-dive audit (`allow_deep_dive: true`) which synthesizes and archives forensic reports for all uncached constituent equities (at 1 credit per constituent), bringing genuine coverage to 100% and unpausing look-through meters.
+   * **Autonomous Coverage Saturation & Look-Through Recalculation:** The platform executes an autonomous pre-market **Daily 15-Stock Ingestion Pipeline** (`core/analysis/daily_stock_ingestion.py`), systematically closing the coverage gap from 84 covered to 501 total unique mutual fund equities in ~28 days. Every morning at 08:30 AM IST, upon archiving the 15 daily priority stocks, all mutual fund schemes holding any newly ingested constituent have their cached look-through snapshots invalidated and automatically recalculated via `compute_fund_forensic_lookthrough(scheme_code)`. This continuously unpauses look-through meters across all 200 canonical mutual fund schemes.
 2. **Pillar 2: True Diversification & Active Share**
    * **Active Share ($\text{AS}$):**
      $$\text{AS} = \frac{1}{2} \sum_{k=1}^N |w_{\text{Fund}, k} - w_{\text{Benchmark}, k}| \ge 60\% \quad (\text{Genuine Active Fund})$$

@@ -187,7 +187,7 @@
         </div>
 
         <!-- Key Financial Metrics Bar -->
-        <div style="display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; background: rgba(15, 23, 42, 0.5); border: 1px solid rgba(255, 255, 255, 0.05); border-radius: 10px; padding: 10px; margin-bottom: 18px; text-align: center;">
+        <div style="display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; background: rgba(15, 23, 42, 0.5); border: 1px solid rgba(255, 255, 255, 0.05); border-radius: 10px; padding: 10px; margin-bottom: 14px; text-align: center;">
           <div>
             <div style="font-size: 11px; color: var(--text-muted); font-weight: 600;">ROCE</div>
             <div class="tnum" style="font-size: 14px; font-weight: 800; color: var(--accent-cyan);">{{ item.roce_pct }}%</div>
@@ -205,6 +205,23 @@
             <div class="tnum" style="font-size: 14px; font-weight: 800; color: var(--accent-emerald);">+{{ item.sales_growth_3y }}%</div>
           </div>
         </div>
+
+        <!-- Mutual Fund Institutional Footprint Badge -->
+        {% if item.key_metrics and item.key_metrics.scheme_count %}
+        <div style="background: rgba(99, 102, 241, 0.12); border: 1px solid rgba(99, 102, 241, 0.35); border-radius: 8px; padding: 8px 12px; margin-bottom: 14px; display: flex; align-items: center; justify-content: space-between;">
+          <div style="display: flex; align-items: center; gap: 6px;">
+            <span style="font-size: 13px;">🏛️</span>
+            <span style="font-size: 12px; font-weight: 700; color: #a5b4fc;">
+              Held by {{ item.key_metrics.scheme_count }} Mutual Funds
+            </span>
+          </div>
+          {% if item.key_metrics.estimated_aum_cr %}
+          <span class="tnum" style="font-size: 11px; font-weight: 800; color: #c7d2fe; background: rgba(99, 102, 241, 0.25); padding: 2px 6px; border-radius: 4px;">
+            {{ item.key_metrics.estimated_aum_cr }} AUM
+          </span>
+          {% endif %}
+        </div>
+        {% endif %}
 
         <!-- Compounding Thesis Undercurrent -->
         <div style="background: rgba(14, 165, 233, 0.06); border-left: 3px solid var(--accent-cyan); border-radius: 6px; padding: 12px 14px; margin-bottom: 14px;">

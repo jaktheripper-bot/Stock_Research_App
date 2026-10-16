@@ -582,6 +582,24 @@ def get_all_equities_directory_sync() -> list:
             except Exception:
                 opm_float = None
 
+            # Calculate recently inducted status (within last 48 hours)
+            is_recently_inducted = False
+            if raw_ts:
+                try:
+                    if isinstance(raw_ts, str):
+                        ts_clean = raw_ts.replace("Z", "+00:00")
+                        ts_dt = datetime.fromisoformat(ts_clean)
+                        if not ts_dt.tzinfo:
+                            ts_dt = ts_dt.replace(tzinfo=IST)
+                    elif isinstance(raw_ts, datetime):
+                        ts_dt = raw_ts if raw_ts.tzinfo else raw_ts.replace(tzinfo=IST)
+                    else:
+                        ts_dt = None
+                    if ts_dt and (datetime.now(IST) - ts_dt.astimezone(IST)).total_seconds() < 48 * 3600:
+                        is_recently_inducted = True
+                except Exception:
+                    is_recently_inducted = False
+
             equities.append({
                 "ticker": ticker,
                 "name": name,
@@ -612,6 +630,7 @@ def get_all_equities_directory_sync() -> list:
                 "revision_count": rev_cnt,
                 "formatted_date": _format_timestamp(raw_ts),
                 "dossier_url": f"/dossier/{ticker}",
+                "is_recently_inducted": is_recently_inducted,
             })
     except Exception as e:
         logger.error(f"Database query error in get_all_equities_directory_sync: {e}")

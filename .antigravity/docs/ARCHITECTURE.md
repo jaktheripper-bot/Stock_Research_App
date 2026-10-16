@@ -29,14 +29,12 @@
   * `core/analysis/exceptions.py`: Robust pipeline exception taxonomy (`PipelineError`, `TickerResolutionError`, `ExchangeDataFetchError`).
   * `core/analysis/parser.py`: 7-pillar health matrix extraction, regulatory sanitization, citations footnote formatting, and time-series qualitative drift differential comparisons.
   * `core/analysis/fundamentals.py`: Primary BSE exchange quote resolution, consolidated `yfinance` ratio fallback, 50-DMA/technical precomputation, and corporate announcements feed.
-  * `core/analysis/exceptions.py`: Robust pipeline exception taxonomy (`PipelineError`, `TickerResolutionError`, `ExchangeDataFetchError`).
-  * `core/analysis/parser.py`: 7-pillar health matrix extraction, regulatory sanitization, citations footnote formatting, and time-series qualitative drift differential comparisons.
-  * `core/analysis/fundamentals.py`: Primary BSE exchange quote resolution, consolidated `yfinance` ratio fallback, 50-DMA/technical precomputation, and corporate announcements feed.
   * `core/analysis/dossier_report_synthesis.py`: Dynamic Flash model discovery cascade, Perplexity `sonar-pro` failover, SSE stream parsing, and visual citations attribution ingestion.
   * `core/analysis/dossier_bull_bear.py`: 60-second institutional Bull vs Bear thesis synthesis.
   * `core/analysis/delta.py`: 4-gate material change evaluation, self-healing cache checks, pillar markdown splicing, and zero-grounding-fee surgical valuation/technicals refresh.
   * `core/analysis/peer_comparison.py`: Cross-company institutional peer comparison, side-by-side metric alignment, and 3-axis disparity diagnostics (Sector, Lifecycle, Scale).
   * `core/analysis/stock_discovery.py`: 09:00 AM daily pre-market candidate discovery pipeline.
+  * `core/analysis/daily_stock_ingestion.py`: Pre-market 08:30 AM 15-stock ingestion pipeline, uncovered mutual fund constituent queue prioritization (`scheme_count DESC, total_weight_pct DESC`), 7-pillar synthesis with 7-check health matrix, and incremental mutual fund look-through recalculation.
   * `core/analysis/retail_safety_radar.py`: Cross-asset capital hierarchy risk comparator.
   * `core/analysis/net_real_tax_calculator.py`: Post-tax purchasing power deflator.
   * `core/analysis/mutual_funds_engine.py`: AMFI 6-pillar look-through, fee drag, and active share evaluator across 200 canonical mutual fund schemes.
@@ -47,8 +45,8 @@
 
 ## 6. Server-Side Rendered Presentation & API Architecture
 * **FastAPI Application Orchestrator (`web/main.py`):** High-concurrency async ASGI application serving Jinja2 server-side rendered HTML views, rate limiting, and REST API routes.
-  * Public Views: `/` (Landing), `/discovery` (Stock Discovery @9AM), `/dossier/{ticker}` (Institutional Equity Dossier), `/opportunities` (Opportunity Terminal), `/funds` & `/funds/compare/overlap` (Mutual Funds & ETFs / Fund Overlap Auditor), `/debt` (Bonds, NCDs & SDIs), `/sovereign` (Sovereign Curve & T-Bills), `/reits` (SM REITs, InvITs & SGBs), `/etfs` (National ETF Matrix), `/calculator/tax` (Net Real Tax Calculator), `/safety-radar` (Retail Safety Radar), `/compare` (Peer Comparison), `/pricing` (Pricing & Billing with Location-Aware Multi-Currency Engine & Forex Buffer).
-  * REST APIs: `/api/dossier/intel/{ticker}`, `/api/cortex/*`, `/api/copilot/chat`, `/api/funds/overlap`, `/api/tax/compute`, `/api/auth/*`, `/api/billing/currencies`.
+  * Public Views: `/` (Landing), `/discovery` (Stock Discovery @9AM), `/equities` (Institutional Equities Directory with `market_cap=RECENT` Recently Inducted filter), `/dossier/{ticker}` (Institutional Equity Dossier), `/opportunities` (Opportunity Terminal), `/funds` & `/funds/compare/overlap` (Mutual Funds & ETFs / Fund Overlap Auditor), `/debt` (Bonds, NCDs & SDIs), `/sovereign` (Sovereign Curve & T-Bills), `/reits` (SM REITs, InvITs & SGBs), `/etfs` (National ETF Matrix), `/calculator/tax` (Net Real Tax Calculator), `/safety-radar` (Retail Safety Radar), `/compare` (Peer Comparison), `/pricing` (Pricing & Billing with Location-Aware Multi-Currency Engine & Forex Buffer).
+  * REST APIs: `/api/dossier/intel/{ticker}`, `/api/cortex/*`, `/api/copilot/chat`, `/api/funds/overlap`, `/api/tax/compute`, `/api/auth/*`, `/api/billing/currencies`, `/api/admin/stocks/run-daily-ingest`, `/api/admin/stocks/ingestion-queue`.
   * Deep-Dive Paywalls (1 Credit / Permanent):
     * Equity: `POST /api/dossier/unlock/{ticker}` (Pillars 03/05, Reverse DCF Sandbox).
     * Mutual Funds: `POST /api/funds/unlock/{scheme_code}` (7-Pillar Look-Through Forensics, Weighted Moat, ASRI, Audit Narrative).
