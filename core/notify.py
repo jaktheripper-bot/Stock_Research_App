@@ -22,9 +22,9 @@ logger = logging.getLogger("equity_research.core.notify")
 
 def _get_cfg(key: str, default: Optional[str] = None) -> Optional[str]:
     """Retrieves configuration value across os.environ, .env, and local secrets."""
-    val = os.environ.get(key)
-    if val:
-        return val
+    if key in os.environ:
+        val = os.environ[key]
+        return val if val != "" else default
     secret_val = get_secret(key)
     if secret_val:
         return str(secret_val)
@@ -78,6 +78,13 @@ def _dispatch_via_resend(from_email: str, to_email: str, subject: str, text: str
     try:
         import json
         import urllib.request
+        import ssl
+        try:
+            import certifi
+            ctx = ssl.create_default_context(cafile=certifi.where())
+        except Exception:
+            ctx = ssl.create_default_context()
+
         payload = {
             "from": from_email,
             "to": [to_email],
@@ -97,7 +104,7 @@ def _dispatch_via_resend(from_email: str, to_email: str, subject: str, text: str
             },
             method="POST"
         )
-        with urllib.request.urlopen(req, timeout=10) as resp:
+        with urllib.request.urlopen(req, context=ctx, timeout=10) as resp:
             if resp.status in (200, 201):
                 logger.info("Dispatched email via Resend API to %s (Subject: %s)", to_email, subject)
                 return True
@@ -157,7 +164,7 @@ def send_ticket_notification_email(ticket: dict) -> bool:
     If SMTP / Resend credentials are not configured, logs the dispatch gracefully and returns False.
     """
     admin_email = get_admin_notification_email()
-    sender_email = os.environ.get("SMTP_FROM") or os.environ.get("SMTP_USER") or "noreply@moatnomics.com"
+    sender_email = _get_cfg("SMTP_FROM") or _get_cfg("RESEND_FROM") or _get_cfg("SMTP_USER") or "noreply@moatnomics.com"
 
     subject = f"🚨 [New Support Ticket] {ticket.get('ticket_id')} - {ticket.get('subject')}"
     body = f"""
@@ -247,7 +254,7 @@ def send_ticket_reply_email(ticket: dict, reply_message: str, admin_name: str = 
     original_subject = ticket.get("subject", "Support Inquiry")
     subject = f"Re: [{ticket_id}] {original_subject}"
     user_name = ticket.get("user_name") or "Investor"
-    sender_email = os.environ.get("SMTP_FROM") or os.environ.get("SMTP_USER") or "noreply@moatnomics.com"
+    sender_email = _get_cfg("SMTP_FROM") or _get_cfg("RESEND_FROM") or _get_cfg("SMTP_USER") or "noreply@moatnomics.com"
 
     text_body = f"""Hello {user_name},
 

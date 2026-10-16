@@ -76,12 +76,18 @@ class TestServiceInboxAndEmailReply(unittest.TestCase):
 
     def test_send_ticket_reply_email_mock_fallback(self):
         """Test that send_ticket_reply_email gracefully falls back to logging without crashing and returns False when unconfigured."""
-        ticket = get_ticket_by_id(self.ticket_id)
-        ok = send_ticket_reply_email(
-            ticket=ticket,
-            reply_message="This is a test response dispatched to the user."
-        )
-        self.assertFalse(ok)
+        with patch.dict("os.environ", {
+            "RESEND_API_KEY": "",
+            "SMTP_HOST": "",
+            "SMTP_USER": "",
+            "SMTP_PASSWORD": ""
+        }):
+            ticket = get_ticket_by_id(self.ticket_id)
+            ok = send_ticket_reply_email(
+                ticket=ticket,
+                reply_message="This is a test response dispatched to the user."
+            )
+            self.assertFalse(ok)
 
     @patch("smtplib.SMTP")
     def test_send_ticket_reply_email_with_smtp(self, mock_smtp_cls):
@@ -90,6 +96,7 @@ class TestServiceInboxAndEmailReply(unittest.TestCase):
         mock_smtp_cls.return_value.__enter__.return_value = mock_server
 
         with patch.dict("os.environ", {
+            "RESEND_API_KEY": "",
             "SMTP_HOST": "smtp.example.com",
             "SMTP_PORT": "587",
             "SMTP_USER": "mailer@moatnomics.com",
@@ -113,6 +120,7 @@ class TestServiceInboxAndEmailReply(unittest.TestCase):
         mock_smtp_ssl_cls.return_value.__enter__.return_value = mock_server
 
         with patch.dict("os.environ", {
+            "RESEND_API_KEY": "",
             "SMTP_HOST": "smtp.gmail.com",
             "SMTP_PORT": "465",
             "SMTP_USER": "mailer@moatnomics.com",
@@ -155,8 +163,9 @@ class TestServiceInboxAndEmailReply(unittest.TestCase):
         )
         self.assertEqual(resp.status_code, 403)
 
+    @patch("web.routers.admin.send_ticket_reply_email", return_value=True)
     @patch("web.routers.admin._is_admin_authenticated")
-    def test_admin_reply_ticket_endpoint_flow(self, mock_auth):
+    def test_admin_reply_ticket_endpoint_flow(self, mock_auth, mock_send_email):
         """Test the full admin reply endpoint flow with status update and email dispatch."""
         mock_auth.return_value = {
             "email": "owner@moatnomics.com",
@@ -185,6 +194,7 @@ class TestServiceInboxAndEmailReply(unittest.TestCase):
         reply_json = reply_resp.json()
         self.assertTrue(reply_json["success"])
         self.assertEqual(reply_json["new_status"], "resolved")
+        mock_send_email.assert_called_once()
 
         # Verify state in DB
         ticket_after = get_ticket_by_id(self.ticket_id, include_responses=True)
@@ -192,8 +202,9 @@ class TestServiceInboxAndEmailReply(unittest.TestCase):
         self.assertGreaterEqual(len(ticket_after["responses"]), 1)
         self.assertIn("equity risk premium", ticket_after["responses"][-1]["message"])
 
+    @patch("core.agents.copilot.admin_copilot.send_ticket_reply_email", return_value=True)
     @patch("core.agents.copilot.admin_copilot.get_admin_user")
-    def test_copilot_reply_ticket_action(self, mock_get_admin):
+    def test_copilot_reply_ticket_action(self, mock_get_admin, mock_send_email):
         """Test REPLY_TICKET action via Admin Copilot."""
         mock_get_admin.return_value = {"email": "admin@moatnomics.com", "role": "admin"}
         action_res = execute_confirmed_admin_action(
@@ -208,6 +219,7 @@ class TestServiceInboxAndEmailReply(unittest.TestCase):
         )
         self.assertTrue(action_res["success"])
         self.assertEqual(action_res["ticket_id"], self.ticket_id)
+        mock_send_email.assert_called_once()
 
 
 if __name__ == "__main__":
