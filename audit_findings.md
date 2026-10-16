@@ -496,6 +496,10 @@ A live route audit across all 73 registered FastAPI endpoints was performed:
 
 ### 7.2 Prioritized Active Task Register (P0 to P3)
 
+> [!NOTE]
+> For active feature requests, owner directives, and platform roadmaps created after October 16, 2026, refer to the authoritative register:
+> 👉 [**Authoritative Platform Roadmap & Pending Tasks Register (`docs/PENDING_TASKS.md`)**](file:///Users/lyndonpinto/Documents/Stock_Research_App/docs/PENDING_TASKS.md).
+
 The following items constitute the prioritized, operational active tasks:
 
 #### 🔴 P0 — Critical: Security & Runtime Integrity
