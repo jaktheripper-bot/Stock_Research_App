@@ -1262,5 +1262,21 @@
       "revision_count": 246
     },
     "preflight_passed": true
+  },
+  {
+    "tag": "checkpoint_20261016_235410_Activate_live_Resend_API_email_dispatch_with_certifi_SSL_context_and_test_isolation",
+    "timestamp": "2026-10-16 23:54:10 IST",
+    "commit_sha": "d5e284cadf188248dba020c2202261c8088849f9",
+    "branch": "main",
+    "description": "Activate live Resend API email dispatch with certifi SSL context and test isolation",
+    "database": {
+      "exists": true,
+      "filename": "reports_checkpoint_20261016_235410_Activate_live_Resend_API_email_dispatch_with_certifi_SSL_context_and_test_isolation.db",
+      "path": ".checkpoints/reports_checkpoint_20261016_235410_Activate_live_Resend_API_email_dispatch_with_certifi_SSL_context_and_test_isolation.db",
+      "size_bytes": 15663104,
+      "report_count": 142,
+      "revision_count": 246
+    },
+    "preflight_passed": true
   }
 ]
