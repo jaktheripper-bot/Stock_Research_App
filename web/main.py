@@ -1570,6 +1570,26 @@ def msme_directory_page(
     )
 
 
+@app.get("/msme/{uin}", response_class=HTMLResponse)
+def msme_dossier_page(request: Request, uin: str):
+    """Institutional 4-Pillar Forensic Dossier for an Unlisted MSME / Emerging SME."""
+    init_db()
+    from core.msme.router import get_msme_detail
+    dossier = get_msme_detail(uin)
+    if not dossier:
+        raise HTTPException(status_code=404, detail=f"MSME enterprise with UIN '{uin}' not found")
+
+    return templates.TemplateResponse(
+        request=request,
+        name="msme_dossier.html",
+        context={
+            "request": request,
+            "active_page": "msme",
+            "dossier": dossier
+        }
+    )
+
+
 @app.get("/reits", response_class=HTMLResponse)
 def reits_page(request: Request, structure: Optional[str] = Query(None)):
     """SEBI SM REITs, Mainboard REITs, InvITs & SGB Secondary Parity directory."""
@@ -1834,6 +1854,7 @@ async def sitemap_xml():
         f'  <url><loc>{base_url}/calculator/tax</loc><lastmod>{now_iso}</lastmod><changefreq>monthly</changefreq><priority>0.8</priority></url>',
         f'  <url><loc>{base_url}/reits</loc><lastmod>{now_iso}</lastmod><changefreq>weekly</changefreq><priority>0.8</priority></url>',
         f'  <url><loc>{base_url}/safety-radar</loc><lastmod>{now_iso}</lastmod><changefreq>weekly</changefreq><priority>0.8</priority></url>',
+        f'  <url><loc>{base_url}/msme</loc><lastmod>{now_iso}</lastmod><changefreq>weekly</changefreq><priority>0.8</priority></url>',
         f'  <url><loc>{base_url}/pricing</loc><lastmod>{now_iso}</lastmod><changefreq>weekly</changefreq><priority>0.8</priority></url>',
         f'  <url><loc>{base_url}/terms</loc><lastmod>{now_iso}</lastmod><priority>0.5</priority></url>',
         f'  <url><loc>{base_url}/privacy</loc><lastmod>{now_iso}</lastmod><priority>0.5</priority></url>',
@@ -1897,6 +1918,21 @@ async def sitemap_xml():
                 )
     except Exception as debt_sitemap_err:
         logger.debug(f"Sitemap Debt append notice: {debt_sitemap_err}")
+
+    try:
+        from core.msme.seed import get_active_msme_firms_count
+        from core.db.connection import get_db_connection
+        conn = get_db_connection()
+        cur = conn.cursor()
+        cur.execute("SELECT uin FROM msme_firms LIMIT 100")
+        for (m_uin,) in cur.fetchall():
+            xml_lines.append(
+                f'  <url><loc>{base_url}/msme/{m_uin}</loc><lastmod>{now_iso}</lastmod><changefreq>monthly</changefreq><priority>0.7</priority></url>'
+            )
+        cur.close()
+        conn.close()
+    except Exception as msme_sitemap_err:
+        logger.debug(f"Sitemap MSME append notice: {msme_sitemap_err}")
 
     xml_lines.append('</urlset>')
     return Response(content="\n".join(xml_lines), media_type="application/xml")

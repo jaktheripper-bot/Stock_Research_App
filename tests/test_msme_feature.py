@@ -1,14 +1,18 @@
-"""Comprehensive Unit and Integration Test Suite for Unlisted MSME & SME Intelligence Platform.
+"""Comprehensive Unit, Integration and DOM Contract Test Suite for Unlisted MSME & SME Intelligence Platform.
 
 Validates:
 1. Canonical MSME Seeding Engine & MSMED Act 2020 Tier Classification
 2. Ingestion Pipeline Fallback & Resiliency
 3. Dual-Dialect Search & Filter Engine (SQLite & PostgreSQL Compatible)
-4. MSME REST API Endpoints (/api/msme/stats, /sectors, /states, /search, /{uin})
-5. Web Directory Route & Navigation Wiring (/msme)
+4. Full 4-Pillar Analytical Forensic Engine (Working Capital, Listed Supply Chain, Solvency, Moat Score)
+5. MSME REST API Endpoints (/api/msme/stats, /sectors, /states, /search, /{uin})
+6. Standalone Institutional Dossier Route & 4-Pillar HTML Rendering (/msme/{uin})
+7. Web Directory DOM Modal Contract, Element Binding & Click-Wiring (/msme)
+8. XML Sitemap Inclusion for /msme and enterprise dossiers
 """
 
 import os
+import re
 import unittest
 from fastapi.testclient import TestClient
 
@@ -25,6 +29,10 @@ from core.msme.utils import (
     paginate
 )
 from core.msme.ingest_ministry import run_monthly_job
+from core.msme.forensic_engine import (
+    compute_msme_forensic_dossier,
+    SECTOR_FORENSIC_BENCHMARKS
+)
 from web.main import app
 
 
@@ -87,6 +95,53 @@ class TestMsmeFeatureSuite(unittest.TestCase):
         count = run_monthly_job()
         self.assertGreaterEqual(count, len(CANONICAL_MSME_FIRMS))
 
+    def test_compute_msme_forensic_dossier_all_4_pillars(self):
+        """Empirically assert full quantitative & qualitative depth across all 4 forensic pillars."""
+        for firm in CANONICAL_MSME_FIRMS[:10]:
+            dossier = compute_msme_forensic_dossier(firm)
+            
+            # Assert Top Identifiers
+            self.assertEqual(dossier["uin"], firm["uin"])
+            self.assertEqual(dossier["name"], firm["name"])
+            self.assertIn(dossier["tier"], ["Micro", "Small", "Medium"])
+
+            # Pillar 1: Working Capital & CCC
+            p1 = dossier["pillar_1_working_capital"]
+            self.assertGreater(p1["dso_days"], 0)
+            self.assertGreater(p1["dio_days"], 0)
+            self.assertGreater(p1["dpo_days"], 0)
+            self.assertEqual(p1["net_ccc_days"], p1["dso_days"] + p1["dio_days"] - p1["dpo_days"])
+            self.assertGreater(p1["working_capital_req_cr"], 0)
+            self.assertIn(p1["stress_level"], ["Low Stress", "Moderate", "Elevated Stretch", "Severe Working Capital Drag"])
+            self.assertTrue(len(p1["summary"]) > 20)
+
+            # Pillar 2: Listed Corporate Supply-Chain Linkages
+            p2 = dossier["pillar_2_supply_chain"]
+            self.assertIn("tier", p2["oem_supplier_tier"].lower())
+            self.assertGreaterEqual(len(p2["listed_buyers"]), 2)
+            for buyer in p2["listed_buyers"]:
+                self.assertTrue(buyer["ticker"].isupper())
+                self.assertIn("name", buyer)
+                self.assertIn("role", buyer)
+
+            # Pillar 3: Solvency & TReDS Risk
+            p3 = dossier["pillar_3_solvency"]
+            self.assertGreater(p3["ebitda_margin_pct"], 0)
+            self.assertGreater(p3["estimated_ebitda_cr"], 0)
+            self.assertGreater(p3["interest_coverage_ratio"], 0)
+            self.assertIn(p3["icr_health"], ["Strong Solvency", "Adequate Coverage", "Narrow Headroom", "Vulnerable"])
+            self.assertIn("Tier", p3["treds_grade"])
+            self.assertIn("%", p3["treds_discount_cost"])
+
+            # Pillar 4: Cluster Moat & Pre-Mortem Risk Inversion
+            p4 = dossier["pillar_4_moat"]
+            self.assertGreaterEqual(p4["moat_score"], 35)
+            self.assertLessEqual(p4["moat_score"], 95)
+            self.assertIn(p4["moat_tier"], ["Institutional Quality Vendor", "Core Industrial Specialist", "Developing Ancillary Workshop"])
+            self.assertIn("Moat", p4["moat_badge"])
+            self.assertGreaterEqual(len(p4["growth_catalysts"]), 2)
+            self.assertGreaterEqual(len(p4["fragility_vectors"]), 2)
+
     def test_api_msme_stats_endpoint(self):
         """Verify GET /api/msme/stats returns aggregate metrics."""
         response = self.client.get("/api/msme/stats")
@@ -137,8 +192,8 @@ class TestMsmeFeatureSuite(unittest.TestCase):
             self.assertEqual(r["tier"], "Medium")
             self.assertGreaterEqual(r["annual_turnover"], 50.0)
 
-    def test_api_msme_profile_by_uin_endpoint(self):
-        """Verify GET /api/msme/{uin} for valid and invalid records."""
+    def test_api_msme_profile_by_uin_endpoint_with_forensic_payload(self):
+        """Verify GET /api/msme/{uin} returns rich 4-pillar forensic dossier."""
         sample_uin = CANONICAL_MSME_FIRMS[0]["uin"]
         response = self.client.get(f"/api/msme/{sample_uin}")
         self.assertEqual(response.status_code, 200)
@@ -147,24 +202,114 @@ class TestMsmeFeatureSuite(unittest.TestCase):
         self.assertIn("name", firm)
         self.assertIn("annual_turnover", firm)
         self.assertIn("tier", firm)
+        
+        # Verify 4 analytical pillars in API response
+        self.assertIn("pillar_1_working_capital", firm)
+        self.assertIn("pillar_2_supply_chain", firm)
+        self.assertIn("pillar_3_solvency", firm)
+        self.assertIn("pillar_4_moat", firm)
 
         # 404 for invalid UIN
         not_found = self.client.get("/api/msme/INVALID-UIN-12345")
         self.assertEqual(not_found.status_code, 404)
 
-    def test_msme_web_directory_page_and_navigation(self):
-        """Verify /msme HTML route loads successfully and base template links to it."""
+    def test_msme_standalone_dossier_page_html_and_4_pillars(self):
+        """Verify standalone /msme/{uin} HTML route renders complete forensic analysis."""
+        sample_uin = CANONICAL_MSME_FIRMS[0]["uin"]
+        response = self.client.get(f"/msme/{sample_uin}")
+        self.assertEqual(response.status_code, 200)
+        html = response.text
+
+        # Verify header identifiers
+        self.assertIn(sample_uin, html)
+        self.assertIn(CANONICAL_MSME_FIRMS[0]["name"], html)
+        self.assertIn("Back to MSME & SME Directory", html)
+
+        # Verify all 4 analytical pillars in rendered HTML
+        self.assertIn("01.", html)
+        self.assertIn("Working Capital & Cash Conversion", html)
+        self.assertIn("02.", html)
+        self.assertIn("Listed Corporate Supply Chain", html)
+        self.assertIn("03.", html)
+        self.assertIn("Solvency, Margins & TReDS Liquidity", html)
+        self.assertIn("04.", html)
+        self.assertIn("Cluster Moat & Pre-Mortem Inversion", html)
+
+        # Verify listed buyer links to equity dossiers
+        self.assertIn('href="/dossier/TATAMOTORS"', html)
+        self.assertIn("Forensic Moat Score", html)
+
+        # 404 for non-existent enterprise
+        res_404 = self.client.get("/msme/UDYAM-FAKE-00-0000000")
+        self.assertEqual(res_404.status_code, 404)
+
+    def test_msme_web_directory_dom_modal_and_inspect_wiring(self):
+        """
+        DOM Contract Test: Verify that /msme template contains all target elements
+        expected by the inspectMsme() client-side JavaScript, ensuring zero ReferenceErrors.
+        """
         response = self.client.get("/msme")
         self.assertEqual(response.status_code, 200)
         html = response.text
-        self.assertIn("Unlisted MSME & Emerging SME Directory", html)
-        self.assertIn("MSMED Act 2020", html)
-        self.assertIn("moatnomics", html.lower())
 
-        # Check navigation item in base.html
-        home_res = self.client.get("/")
-        self.assertEqual(home_res.status_code, 200)
-        self.assertIn('href="/msme"', home_res.text)
+        # 1. Assert Modal Container & Backdrop
+        self.assertIn('id="msmeModal"', html)
+        self.assertIn('class="modal-backdrop"', html)
+        self.assertIn('class="modal-dialog"', html)
+
+        # 2. Extract and assert EVERY DOM element ID populated by inspectMsme() in JS
+        required_element_ids = [
+            "modalFirmName",
+            "modalFirmUin",
+            "modalTierBadge",
+            "modalSectorBadge",
+            "modalLocation",
+            "modalSource",
+            "modalMoatScoreBadge",
+            "modalTurnover",
+            "modalCCC",
+            "modalWCR",
+            "modalEmployees",
+            "modalStressBadge",
+            "modalDSO",
+            "modalDIO",
+            "modalDPO",
+            "modalCCCSummary",
+            "modalSupplierTier",
+            "modalListedBuyers",
+            "modalICRBadge",
+            "modalEbitda",
+            "modalTredsDesc",
+            "modalCapexBarrier",
+            "modalFragilityVector",
+            "modalFullDossierLink",
+        ]
+        for elem_id in required_element_ids:
+            self.assertIn(
+                f'id="{elem_id}"',
+                html,
+                f"Critical DOM Contract Violation: Element #{elem_id} missing from msme_directory.html but expected by inspectMsme() JS"
+            )
+
+        # 3. Assert Table Rows have Inspect Buttons wired with 'this' pointer
+        inspect_button_matches = re.findall(r'onclick="inspectMsme\(\'([^\']+)\',\s*this\)"', html)
+        self.assertGreater(len(inspect_button_matches), 0, "No valid inspectMsme buttons found in table rows")
+        
+        # Test that the first wired UIN is valid
+        first_wired_uin = inspect_button_matches[0]
+        api_check = self.client.get(f"/api/msme/{first_wired_uin}")
+        self.assertEqual(api_check.status_code, 200, f"Wired button UIN {first_wired_uin} returns HTTP error on API")
+
+        # 4. Assert direct link to standalone dossier on enterprise names
+        self.assertIn(f'href="/msme/{first_wired_uin}"', html)
+
+    def test_msme_sitemap_xml_inclusion(self):
+        """Verify XML sitemap includes /msme directory and individual enterprise dossiers."""
+        response = self.client.get("/sitemap.xml")
+        self.assertEqual(response.status_code, 200)
+        xml = response.text
+        self.assertIn("<loc>https://moatnomics.com/msme</loc>", xml)
+        self.assertIn("<loc>https://moatnomics.com/msme/UDYAM-", xml)
 
 
 if __name__ == "__main__":

@@ -17,12 +17,12 @@
 
 Historically, the platform's evaluation framework was confined strictly to the **7 Pillars of Fundamental Equity Analysis** (evaluating business compounding, economic moats, governance, and cash flow durability). 
 
-As the platform evolved into an **Autonomous Multi-Asset Research Platform**, the evaluation methodology expanded across **11 distinct report types** spanning Equities (Institutional Equity Dossier), Curated Discovery (Stock Discovery @9AM), Mutual Funds & ETFs (with Fund Overlap Auditor), Bonds, NCDs & SDIs, Sovereign Curve & T-Bills, SM REITs, InvITs & SGBs, National ETF Matrix, Net Real Tax Calculator, Retail Safety Radar, Peer Comparison, and the Forensic Intelligence Desk.
+As the platform evolved into an **Autonomous Multi-Asset Research Platform**, the evaluation methodology expanded across **12 distinct report types** spanning Equities (Institutional Equity Dossier), Curated Discovery (Stock Discovery @9AM), Mutual Funds & ETFs (with Fund Overlap Auditor), Bonds, NCDs & SDIs, Sovereign Curve & T-Bills, SM REITs, InvITs & SGBs, National ETF Matrix, Unlisted MSME & SME Forensic Dossier, Net Real Tax Calculator, Retail Safety Radar, Peer Comparison, and the Forensic Intelligence Desk.
 
 This document serves as the **authoritative engineering and audit specification** defining:
 1. **Data Sources & Ingestion Provenance** for every report created on the site.
 2. **Operational End-to-End Generation & Invalidation Flows** detailing the deterministic life cycle of each report.
-3. **Comprehensive Evaluation Criteria & Mathematical Formulations** across all 11 reports, including the 7 statutory equity pillars and all 12 analytical/cortex engines.
+3. **Comprehensive Evaluation Criteria & Mathematical Formulations** across all 12 reports, including the 7 statutory equity pillars and all 12 analytical/cortex engines.
 
 ---
 
@@ -39,10 +39,11 @@ Every numerical metric, order book depth, corporate filing, and regulatory discl
 | **5. Sovereign Curve & T-Bills** (`/sovereign`) | **CCIL (Clearing Corp of India)** & **RBI DBIE** | FBIL daily benchmark rate sheets + MOSPI Open Data Portal (`api.mospi.gov.in`) | Hardcoded Nelson-Siegel 1Y–30Y baseline benchmark anchors | Daily at 18:00 IST upon publication of FBIL clearing cut-offs | 🟢 **SOVEREIGN PUBLIC RECORD**<br>Direct Govt of India and RBI gazette data. Zero copyright friction. |
 | **6. SM REITs, InvITs & SGBs** (`/reits`) | **BSE Listed Equities** + **AMC NDCF Filings** | Direct extraction from BSE corporate quarterly compliance reports & annual NDCF filings | SEBI Registered Valuer semi-annual reports | Quarterly upon earnings release; 90-day TTL | 🟢 **STATUTORY DISCLOSURES**<br>Mandatory SEBI REIT Regulations 2014 & SM REIT Regs 2024 disclosures. |
 | **7. National ETF Matrix** (`/etfs`) | **NSE / BSE Exchange Live Quotes** + **AMFI Scheme Master** | Angel One SmartAPI Level-2 book + AMFI NAV feed | yfinance Fast Info | Live intraday quotes; EOD NAV for tracking error computation | 🟢 **LICENSED & STATUTORY** |
-| **8. Net Real Tax Calculator** (`/calculator/tax`) | **MOSPI CPI Inflation Index** + **Income Tax Department** | Direct statutory formula computation based on Finance Act 2024 / Sec 50AA, 112A | Static 2024–2025 Central Board of Direct Taxes (CBDT) tax brackets | Real-time parametric calculations (client & server-side) | 🟢 **STATUTORY FORMULA** |
-| **9. Retail Safety Radar** (`/safety-radar`) | **Cross-Asset Capital Structure Matrix** (`core/cortex/setu.py`) | Synthesized across Sovereign, Corporate Debt, REIT, and Equity registries | Internal relational DB mapping | Continuous synchronization with debt/equity databases | 🟢 **DETERMINISTIC DIAGNOSTIC** |
-| **10. Peer Comparison** (`/compare`) | **Dual-Binding Database** (`reports.db` + Supabase) | Multi-entity relational query with dynamic 3-axis disparity gating | Live Angel One quote enrichment | Instant cached query (< 15ms) | 🟢 **FACTUAL COMPARISON** |
-| **11. Forensic Intelligence Desk** (`/api/copilot/chat`) | **Google Gemini 3.8 Flash / 2.5 Flash** (via `google-genai` SDK) & **Deterministic Forensic Engine** | Tier-gated execution: Gemini LLM for Unlocked Deep Dives & Pro Subscribers; Deterministic Rule Engine for Free Tier | Rule-based deterministic fallback on API 403 / offline; Input qualification layer rejects gibberish | Ephemeral multi-turn context; stateless server execution | 🟢 **SAFE HARBOR SECTION 2(u)**<br>Deterministic refusal of Buy/Sell inquiries; factual diagnostics only. |
+| **8. Unlisted MSME & SME Forensic Dossier** (`/msme/{uin}`, `/msme`) | **Ministry of MSME Udyam Open Gazette** & **Industrial Benchmarks** (`core/msme/forensic_engine.py`) | Direct statutory Udyam registry ingestion + 6-sector calibrated analytical modeling | Local canonical industrial clusters & vendor seed matrix | Continuous caching; 30-day TTL | 🟢 **STATUTORY OPEN DATA & HEURISTIC**<br>Open government gazette registry under MSMED Act 2020. |
+| **9. Net Real Tax Calculator** (`/calculator/tax`) | **MOSPI CPI Inflation Index** + **Income Tax Department** | Direct statutory formula computation based on Finance Act 2024 / Sec 50AA, 112A | Static 2024–2025 Central Board of Direct Taxes (CBDT) tax brackets | Real-time parametric calculations (client & server-side) | 🟢 **STATUTORY FORMULA** |
+| **10. Retail Safety Radar** (`/safety-radar`) | **Cross-Asset Capital Structure Matrix** (`core/cortex/setu.py`) | Synthesized across Sovereign, Corporate Debt, REIT, and Equity registries | Internal relational DB mapping | Continuous synchronization with debt/equity databases | 🟢 **DETERMINISTIC DIAGNOSTIC** |
+| **11. Peer Comparison** (`/compare`) | **Dual-Binding Database** (`reports.db` + Supabase) | Multi-entity relational query with dynamic 3-axis disparity gating | Live Angel One quote enrichment | Instant cached query (< 15ms) | 🟢 **FACTUAL COMPARISON** |
+| **12. Forensic Intelligence Desk** (`/api/copilot/chat`) | **Google Gemini 3.8 Flash / 2.5 Flash** (via `google-genai` SDK) & **Deterministic Forensic Engine** | Tier-gated execution: Gemini LLM for Unlocked Deep Dives & Pro Subscribers; Deterministic Rule Engine for Free Tier | Rule-based deterministic fallback on API 403 / offline; Input qualification layer rejects gibberish | Ephemeral multi-turn context; stateless server execution | 🟢 **SAFE HARBOR SECTION 2(u)**<br>Deterministic refusal of Buy/Sell inquiries; factual diagnostics only. |
 
 ---
 
@@ -495,6 +496,28 @@ Enforces **3-Axis Disparity Gates** to prevent comparing structurally mismatched
 * **Credit Burn & Tier Gating:** Generative Google Gemini LLM synthesis (modernized cascade: `gemini-3.8-flash` -> `gemini-3.5-flash-lite` -> `gemini-3.1-flash-lite` -> `gemini-2.5-flash` with automatic function calling disabled) is restricted to Unlocked Deep Dives and Pro Subscribers (verified via `web/common.py:_deep_dive_unlocked_for_request`). Free tier users on locked reports are served by the high-speed Deterministic Forensic Engine. Responses carry explicit desk mode attribution (`⚡ Desk Mode: Deterministic Forensic Engine (Free Tier)` vs `✨ Desk Mode: Institutional Generative AI (Google Gemini • Unlocked Deep Dive / Pro Tier)`).
 * **Deterministic Fallback & Test Isolation:** If upstream LLM experiences 403 or quota limits, falls back seamlessly to structured rule-based financial explanations with `⚡ Desk Mode: Deterministic Forensic Engine (Fallback • Gemini API offline)`. Test mode detection strictly uses execution environment variables (`TESTING=1` and `PYTEST_CURRENT_TEST`), eliminating global `sys.modules` pollution from inline imports.
 * **SEBI Section 2(u) Mandatory Deflection:** Intercepts explicit "Should I buy/sell?" queries, deflecting into Pre-Mortem inversion diagnostics and risk factor evaluations without financial advice.
+
+---
+
+### Report 12: Unlisted MSME & Emerging SME Forensic Dossier (`/msme/{uin}`)
+
+* **Statutory Regulatory Grounding:** Governed by the Micro, Small and Medium Enterprises Development (MSMED) Act, 2020. Classifies enterprises into Micro (< ₹5 Cr), Small (₹5 Cr – ₹50 Cr), and Medium (₹50 Cr – ₹250 Cr) based on audited annual turnover.
+* **Pillar 1: Working Capital Cycle & Cash Conversion Cycle (CCC):**
+  $$\text{Net CCC (Days)} = \text{DSO} + \text{DIO} - \text{DPO}$$
+  $$\text{Working Capital Requirement (₹ Cr)} = \frac{\text{Net CCC}}{365} \times \text{Annual Turnover}$$
+  - Evaluates working capital stretch against statutory Section 15 of the MSMED Act 2020 (45-day buyer payment ceiling). Flags operational strain when receivables exceed 75 days.
+* **Pillar 2: Listed Corporate Supply-Chain Linkages:**
+  - Correlates unlisted tier-1 and tier-2 vendor clusters to listed anchor conglomerates on NSE/BSE (`TATAMOTORS`, `BHARATFORG`, `SUNPHARMA`, `CIPLA`, `DIXON`, `KAYNES`, `PAGEIND`, etc.).
+  - Quantifies vendor replacement barriers and OEM dependency risks.
+* **Pillar 3: Solvency, Operating Margins & TReDS Liquidity Risk:**
+  - Computes sector-calibrated operating profitability: Estimated EBITDA margin % and Interest Coverage Ratio (ICR):
+    $$\text{ICR} = \frac{\text{Estimated EBIT}}{\text{Estimated Interest Obligation}}$$
+  - Classifies TReDS platform factoring liquidity into Tier A (prime non-recourse discounting on RXIL/M1xchange at ~7.5%–8.2%), Tier B (standard listed buyer factoring at ~8.5%–9.5%), and Tier C (collateral-dependent factoring).
+  - Highlights statutory protection under MSMED Section 16 (compound interest at 3x RBI bank rate on overdue receivables > 45 days).
+* **Pillar 4: Cluster Moat & Pre-Mortem Risk Inversion:**
+  - Computes heuristic Capital Replacement Moat Score (0–100) combining scale economies, employee productivity ($\frac{\text{Turnover}}{\text{Headcount}}$), solvency headroom, and capex asset intensity.
+  - Generates structural growth catalysts alongside inverted pre-mortem fragility vectors (e.g. client concentration, raw material pass-through drag, automated competition).
+* **SEBI Safe Harbor:** Strictly non-advisory institutional analytics grounded in open government Udyam registry gazettes and industrial benchmarks.
 
 ---
 

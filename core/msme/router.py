@@ -175,9 +175,11 @@ def search_msme(
     return json_response_with_cache(payload, ttl_seconds=120)
 
 
-@router.get("/{uin}")
-def get_msme(uin: str):
-    """Returns single MSME firm intelligence record by UIN."""
+from core.msme.forensic_engine import compute_msme_forensic_dossier
+
+
+def get_msme_detail(uin: str) -> Optional[Dict[str, Any]]:
+    """Retrieves single MSME firm and computes complete forensic analysis dossier."""
     conn = get_db_connection()
     cur = conn.cursor()
     use_pg = bool(get_supabase_url())
@@ -195,14 +197,15 @@ def get_msme(uin: str):
     conn.close()
 
     if not row:
-        raise HTTPException(status_code=404, detail=f"MSME firm with UIN '{uin}' not found")
+        return None
 
     turnover = float(row[6]) if row[6] is not None else None
-    payload = {
+    base_data = {
         "uin": row[0],
         "name": row[1],
         "sector_code": row[2],
         "sector": row[3],
+        "sector_name": row[3],
         "city": row[4],
         "state": row[5],
         "annual_turnover": turnover,
@@ -212,4 +215,20 @@ def get_msme(uin: str):
         "last_updated": str(row[10]) if row[10] else None,
         "tier": classify_msme_tier(turnover)
     }
-    return json_response_with_cache(payload, ttl_seconds=300)
+
+    # Enrich with full 4-pillar forensic analytics
+    dossier = compute_msme_forensic_dossier(base_data)
+    dossier["sector_code"] = base_data["sector_code"]
+    dossier["last_updated"] = base_data["last_updated"]
+    return dossier
+
+
+@router.get("/{uin}")
+def get_msme(uin: str):
+    """Returns single MSME firm intelligence record and 4-pillar forensic dossier by UIN."""
+    dossier = get_msme_detail(uin)
+    if not dossier:
+        raise HTTPException(status_code=404, detail=f"MSME firm with UIN '{uin}' not found")
+
+    return json_response_with_cache(dossier, ttl_seconds=300)
+

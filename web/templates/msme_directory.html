@@ -149,9 +149,9 @@
           <tr style="border-bottom: 1px solid rgba(255, 255, 255, 0.05); transition: background 0.15s ease;" onmouseover="this.style.background='rgba(30, 41, 59, 0.4)'" onmouseout="this.style.background='transparent'">
             <!-- Name & UIN -->
             <td style="padding: 14px 18px;">
-              <div style="font-weight: 700; color: #f8fafc; font-size: 15px; margin-bottom: 3px;">
+              <a href="/msme/{{ f.uin }}" style="font-weight: 700; color: #f8fafc; font-size: 15px; margin-bottom: 3px; text-decoration: none; display: block; transition: color 0.15s ease;" onmouseover="this.style.color='#38bdf8';" onmouseout="this.style.color='#f8fafc';">
                 {{ f.name }}
-              </div>
+              </a>
               <div style="font-family: monospace; font-size: 11px; color: #64748b; display: inline-flex; align-items: center; gap: 4px;">
                 <span style="background: rgba(148, 163, 184, 0.1); padding: 2px 6px; border-radius: 4px; border: 1px solid rgba(255,255,255,0.05);">
                   {{ f.uin }}
@@ -213,9 +213,10 @@
             <td style="padding: 14px 18px; text-align: center;">
               <button
                 type="button"
+                id="inspectBtn-{{ f.uin }}"
                 class="btn btn-secondary btn-sm"
                 style="font-size: 12px; font-weight: 700; border-radius: 6px; padding: 6px 12px;"
-                onclick="inspectMsme('{{ f.uin }}')"
+                onclick="inspectMsme('{{ f.uin }}', this)"
               >
                 Inspect
               </button>
@@ -258,95 +259,248 @@
 
   <!-- Statutory Safe Harbor Notice -->
   <div style="border-top: 1px solid rgba(255, 255, 255, 0.08); padding-top: 18px; font-size: 12px; color: #64748b; line-height: 1.5; text-align: center;">
-    <strong>Statutory Regulatory Notice:</strong> Enterprise records are grounded in open gazette disclosures from the Udyam Registration Portal under the Ministry of Micro, Small and Medium Enterprises. This repository is provided purely for quantitative research and informational indexing. It does not constitute investment advice or solicitation under SEBI (Research Analysts) Regulations, 2014.
+    <strong>Statutory Regulatory Notice:</strong> Enterprise records are grounded in open gazette disclosures from the Udyam Registration Portal under the Ministry of Micro, Small and Medium Enterprises. Financial ratios, working capital cycles, and solvency metrics are computed by Moatnomics using sector-calibrated industrial benchmarks and statutory criteria under the MSMED Act 2020. This repository is provided purely for quantitative research and informational indexing. It does not constitute investment advice or solicitation under SEBI (Research Analysts) Regulations, 2014.
   </div>
 </div>
 
-<!-- MSME Inspection Modal -->
-<div id="msmeModal" style="display: none; position: fixed; inset: 0; background: rgba(0, 0, 0, 0.75); backdrop-filter: blur(8px); z-index: 9999; align-items: center; justify-content: center; padding: 20px;">
-  <div style="background: #0f172a; border: 1px solid rgba(255, 255, 255, 0.15); border-radius: 16px; max-width: 620px; width: 100%; padding: 28px; box-shadow: 0 20px 40px rgba(0,0,0,0.6); position: relative;">
-    <button
-      type="button"
-      onclick="closeMsmeModal()"
-      style="position: absolute; top: 16px; right: 16px; background: transparent; border: none; color: #94a3b8; font-size: 20px; cursor: pointer;"
-    >&times;</button>
-
-    <div style="display: inline-flex; align-items: center; gap: 6px; background: rgba(14, 165, 233, 0.15); border: 1px solid rgba(14, 165, 233, 0.3); border-radius: 9999px; padding: 2px 10px; margin-bottom: 12px;">
-      <span style="width: 6px; height: 6px; border-radius: 50%; background: #38bdf8;"></span>
-      <span id="modalTierBadge" style="font-size: 11px; font-weight: 700; color: #38bdf8; text-transform: uppercase;"></span>
-    </div>
-
-    <h2 id="modalFirmName" style="font-size: 22px; font-weight: 800; color: #f8fafc; margin-bottom: 6px;"></h2>
-    <div id="modalFirmUin" style="font-family: monospace; font-size: 12px; color: #64748b; margin-bottom: 20px;"></div>
-
-    <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 14px; margin-bottom: 20px;">
-      <div style="background: rgba(30, 41, 59, 0.6); border: 1px solid rgba(255,255,255,0.06); border-radius: 10px; padding: 12px;">
-        <div style="font-size: 11px; color: #94a3b8; text-transform: uppercase; font-weight: 600; margin-bottom: 3px;">Annual Turnover</div>
-        <div id="modalTurnover" style="font-size: 18px; font-weight: 800; color: #38bdf8;"></div>
+<!-- MSME 4-Pillar Forensic Inspection Modal -->
+<div id="msmeModal" class="modal-backdrop" onclick="handleMsmeModalBackdropClick(event)">
+  <div class="modal-dialog" style="max-width: 780px; width: 92%; max-height: 88vh; overflow-y: auto; padding: 28px;">
+    <!-- Modal Header -->
+    <div style="display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 18px;">
+      <div>
+        <div style="display: inline-flex; align-items: center; gap: 8px; margin-bottom: 8px; flex-wrap: wrap;">
+          <span id="modalTierBadge" style="font-size: 11px; font-weight: 700; color: #38bdf8; background: rgba(14, 165, 233, 0.15); border: 1px solid rgba(14, 165, 233, 0.3); border-radius: 9999px; padding: 2px 10px; text-transform: uppercase;"></span>
+          <span id="modalMoatScoreBadge" style="font-size: 11px; font-weight: 700; padding: 2px 10px; border-radius: 9999px;"></span>
+          <span id="modalSectorBadge" style="font-size: 11px; font-weight: 600; color: #cbd5e1; background: rgba(255,255,255,0.06); padding: 2px 8px; border-radius: 4px;"></span>
+        </div>
+        <h2 id="modalFirmName" style="font-size: 24px; font-weight: 800; color: #f8fafc; margin-bottom: 4px; line-height: 1.25;"></h2>
+        <div style="display: flex; align-items: center; gap: 8px; font-size: 12px; color: var(--text-muted); flex-wrap: wrap;">
+          <span id="modalFirmUin" style="font-family: monospace; color: #94a3b8;"></span>
+          <span>•</span>
+          <span id="modalLocation"></span>
+        </div>
       </div>
-      <div style="background: rgba(30, 41, 59, 0.6); border: 1px solid rgba(255,255,255,0.06); border-radius: 10px; padding: 12px;">
-        <div style="font-size: 11px; color: #94a3b8; text-transform: uppercase; font-weight: 600; margin-bottom: 3px;">Employee Headcount</div>
-        <div id="modalEmployees" style="font-size: 18px; font-weight: 800; color: #f8fafc;"></div>
-      </div>
-      <div style="background: rgba(30, 41, 59, 0.6); border: 1px solid rgba(255,255,255,0.06); border-radius: 10px; padding: 12px;">
-        <div style="font-size: 11px; color: #94a3b8; text-transform: uppercase; font-weight: 600; margin-bottom: 3px;">Sector / NIC Code</div>
-        <div id="modalSector" style="font-size: 14px; font-weight: 700; color: #cbd5e1;"></div>
-      </div>
-      <div style="background: rgba(30, 41, 59, 0.6); border: 1px solid rgba(255,255,255,0.06); border-radius: 10px; padding: 12px;">
-        <div style="font-size: 11px; color: #94a3b8; text-transform: uppercase; font-weight: 600; margin-bottom: 3px;">Cluster / State</div>
-        <div id="modalLocation" style="font-size: 14px; font-weight: 700; color: #cbd5e1;"></div>
-      </div>
-    </div>
-
-    <div style="background: rgba(15, 23, 42, 0.7); border: 1px solid rgba(255,255,255,0.05); border-radius: 10px; padding: 12px; margin-bottom: 20px; font-size: 12px; color: #94a3b8; line-height: 1.5;">
-      <div><strong>Udyam Registration Date:</strong> <span id="modalRegDate" style="color: #cbd5e1;"></span></div>
-      <div><strong>Statutory Source:</strong> <span id="modalSource" style="color: #cbd5e1;"></span></div>
-      <div><strong>Institutional Cluster:</strong> High-growth unlisted enterprise operating in verified state industrial development zones.</div>
-    </div>
-
-    <div style="display: flex; justify-content: flex-end; gap: 10px;">
       <button
         type="button"
         onclick="closeMsmeModal()"
-        class="btn btn-primary"
-        style="padding: 8px 20px; border-radius: 8px; font-weight: 700;"
-      >
-        Close Profile
-      </button>
+        class="modal-close-btn"
+        style="background: transparent; border: none; color: #94a3b8; font-size: 24px; cursor: pointer; padding: 0 4px; line-height: 1;"
+      >&times;</button>
+    </div>
+
+    <!-- 4 Top KPI Cards -->
+    <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 12px; margin-bottom: 20px;">
+      <div style="background: rgba(30, 41, 59, 0.6); border: 1px solid rgba(255,255,255,0.06); border-radius: 8px; padding: 12px;">
+        <div style="font-size: 11px; color: var(--text-muted); text-transform: uppercase; font-weight: 600; margin-bottom: 2px;">Annual Turnover</div>
+        <div id="modalTurnover" style="font-size: 19px; font-weight: 800; color: #38bdf8;"></div>
+      </div>
+      <div style="background: rgba(30, 41, 59, 0.6); border: 1px solid rgba(255,255,255,0.06); border-radius: 8px; padding: 12px;">
+        <div style="font-size: 11px; color: var(--text-muted); text-transform: uppercase; font-weight: 600; margin-bottom: 2px;">Cash Conversion</div>
+        <div id="modalCCC" style="font-size: 19px; font-weight: 800;"></div>
+      </div>
+      <div style="background: rgba(30, 41, 59, 0.6); border: 1px solid rgba(255,255,255,0.06); border-radius: 8px; padding: 12px;">
+        <div style="font-size: 11px; color: var(--text-muted); text-transform: uppercase; font-weight: 600; margin-bottom: 2px;">Working Capital Req</div>
+        <div id="modalWCR" style="font-size: 19px; font-weight: 800; color: #f8fafc;"></div>
+      </div>
+      <div style="background: rgba(30, 41, 59, 0.6); border: 1px solid rgba(255,255,255,0.06); border-radius: 8px; padding: 12px;">
+        <div style="font-size: 11px; color: var(--text-muted); text-transform: uppercase; font-weight: 600; margin-bottom: 2px;">Headcount</div>
+        <div id="modalEmployees" style="font-size: 19px; font-weight: 800; color: #f8fafc;"></div>
+      </div>
+    </div>
+
+    <!-- 4-Pillar Detailed Forensic Tabs / Cards -->
+    <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 14px; margin-bottom: 20px;">
+      <!-- Pillar 1: Working Capital & CCC -->
+      <div style="background: rgba(15, 23, 42, 0.8); border: 1px solid rgba(255,255,255,0.08); border-radius: 10px; padding: 16px;">
+        <div style="font-size: 12px; font-weight: 800; color: var(--accent-cyan); text-transform: uppercase; margin-bottom: 8px; display: flex; justify-content: space-between;">
+          <span>01. Working Capital & CCC</span>
+          <span id="modalStressBadge" style="font-size: 10.5px;"></span>
+        </div>
+        <div style="display: flex; justify-content: space-between; font-size: 12px; color: var(--text-secondary); margin-bottom: 6px;">
+          <span>DSO (Receivables): <strong id="modalDSO" style="color: #f8fafc;"></strong></span>
+          <span>DIO (Inventory): <strong id="modalDIO" style="color: #f8fafc;"></strong></span>
+          <span>DPO (Payables): <strong id="modalDPO" style="color: #f8fafc;"></strong></span>
+        </div>
+        <div id="modalCCCSummary" style="font-size: 11.5px; color: var(--text-muted); line-height: 1.45;"></div>
+      </div>
+
+      <!-- Pillar 2: Listed Corporate Linkages -->
+      <div style="background: rgba(15, 23, 42, 0.8); border: 1px solid rgba(255,255,255,0.08); border-radius: 10px; padding: 16px;">
+        <div style="font-size: 12px; font-weight: 800; color: var(--accent-cyan); text-transform: uppercase; margin-bottom: 8px;">
+          02. Listed Supply Chain Links
+        </div>
+        <div id="modalSupplierTier" style="font-size: 12px; font-weight: 700; color: #cbd5e1; margin-bottom: 6px;"></div>
+        <div id="modalListedBuyers" style="display: flex; flex-wrap: wrap; gap: 6px;"></div>
+      </div>
+
+      <!-- Pillar 3: Solvency & TReDS -->
+      <div style="background: rgba(15, 23, 42, 0.8); border: 1px solid rgba(255,255,255,0.08); border-radius: 10px; padding: 16px;">
+        <div style="font-size: 12px; font-weight: 800; color: var(--accent-cyan); text-transform: uppercase; margin-bottom: 8px; display: flex; justify-content: space-between;">
+          <span>03. Solvency & Margins</span>
+          <span id="modalICRBadge" style="font-size: 10.5px; font-weight: 700;"></span>
+        </div>
+        <div style="font-size: 12px; color: var(--text-secondary); margin-bottom: 4px;">
+          Estimated EBITDA: <strong id="modalEbitda" style="color: #38bdf8;"></strong>
+        </div>
+        <div id="modalTredsDesc" style="font-size: 11.5px; color: var(--text-muted); line-height: 1.45;"></div>
+      </div>
+
+      <!-- Pillar 4: Cluster Moat & Risk -->
+      <div style="background: rgba(15, 23, 42, 0.8); border: 1px solid rgba(255,255,255,0.08); border-radius: 10px; padding: 16px;">
+        <div style="font-size: 12px; font-weight: 800; color: var(--accent-cyan); text-transform: uppercase; margin-bottom: 8px;">
+          04. Cluster Moat & Pre-Mortem
+        </div>
+        <div id="modalCapexBarrier" style="font-size: 11.5px; color: #cbd5e1; margin-bottom: 6px;"></div>
+        <div id="modalFragilityVector" style="font-size: 11.5px; color: #f87171; line-height: 1.4;"></div>
+      </div>
+    </div>
+
+    <!-- Modal Footer Actions -->
+    <div style="display: flex; justify-content: space-between; align-items: center; border-top: 1px solid rgba(255, 255, 255, 0.08); padding-top: 16px; flex-wrap: wrap; gap: 10px;">
+      <div style="font-size: 11.5px; color: var(--text-muted);">
+        Statutory Source: <span id="modalSource" style="color: #cbd5e1;"></span>
+      </div>
+      <div style="display: flex; gap: 10px;">
+        <button
+          type="button"
+          onclick="closeMsmeModal()"
+          class="btn btn-secondary"
+          style="padding: 8px 16px; border-radius: 8px; font-size: 13px; font-weight: 600;"
+        >
+          Dismiss
+        </button>
+        <a
+          id="modalFullDossierLink"
+          href="#"
+          class="btn btn-primary"
+          style="padding: 8px 20px; border-radius: 8px; font-size: 13px; font-weight: 700; text-decoration: none; display: inline-flex; align-items: center; gap: 6px;"
+        >
+          <span>Open Full Dossier</span>
+          <span>→</span>
+        </a>
+      </div>
     </div>
   </div>
 </div>
 
 <script>
-async function inspectMsme(uin) {
+async function inspectMsme(uin, btnElement) {
+  const origText = btnElement ? btnElement.innerText : 'Inspect';
+  if (btnElement) {
+    btnElement.innerText = 'Analyzing...';
+    btnElement.style.pointerEvents = 'none';
+    btnElement.style.opacity = '0.7';
+  }
+
   try {
     const res = await fetch(`/api/msme/${encodeURIComponent(uin)}`);
     if (!res.ok) {
-      alert("Unable to fetch enterprise details.");
+      alert("Unable to fetch enterprise forensic dossier.");
       return;
     }
     const data = await res.json();
+
+    // Populate Header
     document.getElementById("modalFirmName").innerText = data.name || "N/A";
     document.getElementById("modalFirmUin").innerText = "UIN: " + (data.uin || "N/A");
     document.getElementById("modalTierBadge").innerText = (data.tier || "Enterprise") + " Tier";
-    document.getElementById("modalTurnover").innerText = data.annual_turnover !== null ? `₹${data.annual_turnover.toFixed(1)} Cr` : "N/A";
-    document.getElementById("modalEmployees").innerText = data.employee_count ? `${data.employee_count} Persons` : "Not Disclosed";
-    document.getElementById("modalSector").innerText = (data.sector ? data.sector.replace(/_/g, ' ') : "General Manufacturing") + (data.sector_code ? ` (NIC ${data.sector_code})` : "");
-    document.getElementById("modalLocation").innerText = `${data.city || 'District'}, ${data.state || 'India'}`;
-    document.getElementById("modalRegDate").innerText = data.registration_date || "Historical";
+    document.getElementById("modalSectorBadge").innerText = (data.sector ? data.sector.replace(/_/g, ' ') : "General Manufacturing").toUpperCase();
+    document.getElementById("modalLocation").innerText = `📍 ${data.city || 'District'}, ${data.state || 'India'}`;
     document.getElementById("modalSource").innerText = data.source || "Udyam Gazette";
 
+    // Moat Badge
+    const moat = data.pillar_4_moat || {};
+    const moatScore = moat.moat_score || 50;
+    const moatBadge = document.getElementById("modalMoatScoreBadge");
+    moatBadge.innerText = `Moat: ${moatScore}/100 • ${moat.moat_badge || 'Moderate Moat'}`;
+    moatBadge.style.color = moat.moat_color || '#38bdf8';
+    moatBadge.style.background = 'rgba(255, 255, 255, 0.06)';
+    moatBadge.style.border = `1px solid ${moat.moat_color || '#38bdf8'}40`;
+
+    // 4 Top KPIs
+    document.getElementById("modalTurnover").innerText = data.annual_turnover !== null ? `₹${data.annual_turnover.toFixed(1)} Cr` : "N/A";
+    
+    const p1 = data.pillar_1_working_capital || {};
+    const cccEl = document.getElementById("modalCCC");
+    cccEl.innerText = `${p1.net_ccc_days || 0}d`;
+    cccEl.style.color = p1.stress_color || '#38bdf8';
+
+    document.getElementById("modalWCR").innerText = `₹${(p1.working_capital_req_cr || 0).toFixed(1)} Cr`;
+    document.getElementById("modalEmployees").innerText = data.employee_count ? `${data.employee_count} Staff` : "Not Disclosed";
+
+    // Pillar 1 Details
+    const stressEl = document.getElementById("modalStressBadge");
+    stressEl.innerText = p1.stress_level || 'Moderate';
+    stressEl.style.color = p1.stress_color || '#38bdf8';
+    document.getElementById("modalDSO").innerText = `${p1.dso_days || 0}d`;
+    document.getElementById("modalDIO").innerText = `${p1.dio_days || 0}d`;
+    document.getElementById("modalDPO").innerText = `${p1.dpo_days || 0}d`;
+    document.getElementById("modalCCCSummary").innerText = p1.summary || '';
+
+    // Pillar 2: Supply Chain Linkages
+    const p2 = data.pillar_2_supply_chain || {};
+    document.getElementById("modalSupplierTier").innerText = p2.oem_supplier_tier || 'OEM Supplier';
+    const buyersContainer = document.getElementById("modalListedBuyers");
+    buyersContainer.innerHTML = '';
+    const buyers = p2.listed_buyers || [];
+    if (buyers.length > 0) {
+      buyers.forEach(b => {
+        const link = document.createElement('a');
+        link.href = `/dossier/${encodeURIComponent(b.ticker)}`;
+        link.innerText = `${b.ticker} ↗`;
+        link.title = `${b.name} (${b.role})`;
+        link.style.cssText = 'font-size: 11px; font-weight: 700; background: rgba(56, 189, 248, 0.12); color: #38bdf8; border: 1px solid rgba(56, 189, 248, 0.3); border-radius: 4px; padding: 2px 7px; text-decoration: none;';
+        buyersContainer.appendChild(link);
+      });
+    } else {
+      buyersContainer.innerHTML = '<span style="font-size: 11px; color: var(--text-muted);">Regional Industrial OEM Links</span>';
+    }
+
+    // Pillar 3: Solvency & TReDS
+    const p3 = data.pillar_3_solvency || {};
+    const icrBadge = document.getElementById("modalICRBadge");
+    icrBadge.innerText = `ICR: ${p3.interest_coverage_ratio || '3.5'}x (${p3.icr_health || 'Stable'})`;
+    icrBadge.style.color = p3.icr_color || '#10b981';
+    document.getElementById("modalEbitda").innerText = `${p3.ebitda_margin_pct || 12}% (~₹${p3.estimated_ebitda_cr || 0} Cr)`;
+    document.getElementById("modalTredsDesc").innerText = `TReDS Rating: ${p3.treds_grade || 'Tier B'}. Expected Discounting: ${p3.treds_discount_cost || '~8.5% p.a.'}.`;
+
+    // Pillar 4: Cluster Moat & Risk
+    const capexText = p2.capex_barrier ? `Capex Barrier: ${p2.capex_barrier}` : '';
+    document.getElementById("modalCapexBarrier").innerText = capexText;
+    const frags = moat.fragility_vectors || [];
+    document.getElementById("modalFragilityVector").innerText = frags.length > 0 ? `Risk: ${frags[0]}` : '';
+
+    // Deep Link to standalone dossier
+    const fullLink = document.getElementById("modalFullDossierLink");
+    fullLink.href = `/msme/${encodeURIComponent(data.uin)}`;
+
+    // Open Modal
     const modal = document.getElementById("msmeModal");
+    modal.classList.add("active");
     modal.style.display = "flex";
   } catch (err) {
     console.error("Error inspecting MSME:", err);
-    alert("Error fetching enterprise data.");
+    alert("Error fetching enterprise data. Please check network connection.");
+  } finally {
+    if (btnElement) {
+      btnElement.innerText = origText;
+      btnElement.style.pointerEvents = 'auto';
+      btnElement.style.opacity = '1';
+    }
   }
 }
 
 function closeMsmeModal() {
   const modal = document.getElementById("msmeModal");
+  modal.classList.remove("active");
   modal.style.display = "none";
+}
+
+function handleMsmeModalBackdropClick(e) {
+  if (e.target.id === 'msmeModal') {
+    closeMsmeModal();
+  }
 }
 
 // Close modal on escape key
