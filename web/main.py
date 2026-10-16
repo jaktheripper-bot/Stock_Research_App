@@ -220,6 +220,8 @@ async def run_daily_discovery_scheduler():
                 logger.info(f"🌅 [Discovery Scheduler] Missing 9:00 AM edition for today ({today_str}). Triggering catch-up screening...")
                 await loop.run_in_executor(None, run_discovery_pipeline, 12, today_str, False, False)
                 logger.info(f"🌅 [Discovery Scheduler] Catch-up 9:00 AM edition for {today_str} published.")
+            from core.msme.daily_ingest import ingest_daily_msme_cohort
+            await loop.run_in_executor(None, ingest_daily_msme_cohort, today_str, 15)
         else:
             active_existing = [x for x in get_active_discovery_reel(exclude_tests=True, allow_fallback=True)]
             if not active_existing:
@@ -246,12 +248,16 @@ async def run_daily_discovery_scheduler():
             if now.hour >= 9 and last_run_date != today_str:
                 from core.db.discovery import get_active_discovery_reel
                 active_today = get_active_discovery_reel(today_str, exclude_tests=True, allow_fallback=False)
+                from scripts.run_discovery_worker import run_discovery_pipeline
+                from core.msme.daily_ingest import ingest_daily_msme_cohort
+                loop = asyncio.get_running_loop()
                 if not active_today:
                     logger.info(f"🌅 [Discovery Scheduler] 09:00 AM IST trigger reached for {today_str}. Running discovery pipeline...")
-                    from scripts.run_discovery_worker import run_discovery_pipeline
-                    loop = asyncio.get_running_loop()
                     await loop.run_in_executor(None, run_discovery_pipeline, 12, today_str, False, False)
                     logger.info(f"🌅 [Discovery Scheduler] Automated 9:00 AM BSE discovery edition published for {today_str}.")
+                # Daily 9:00 AM MSME cohort ingestion
+                await loop.run_in_executor(None, ingest_daily_msme_cohort, today_str, 15)
+                logger.info(f"🏭 [MSME Ingest] 09:00 AM IST unlisted MSME cohort ingestion completed for {today_str}.")
                 last_run_date = today_str
         except asyncio.CancelledError:
             logger.info("🌅 [Discovery Scheduler] Background scheduler cancelled.")

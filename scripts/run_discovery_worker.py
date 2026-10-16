@@ -46,7 +46,7 @@ def run_discovery_pipeline(
     logger.info(f"Target count: {target_count} under-the-radar equities across diverse sectors.")
 
     # 1. Screen and curate cohort
-    cohort = curate_morning_discovery_cohort(target_count=target_count)
+    cohort = curate_morning_discovery_cohort(target_count=target_count, edition_date=edition_date)
     if not cohort:
         logger.error("Screening engine returned 0 candidate stocks. Pipeline aborted.")
         return False

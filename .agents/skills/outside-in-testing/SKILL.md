@@ -140,13 +140,40 @@ def assert_template_hygiene(html_content: str):
             assert "{%" not in val_str, f"Unrendered Jinja tag '{{%' in <{tag.name} {attr_name}=\"{val_str}\">"
 ```
 
+### 8. Dynamic Cadence & Time-Series Rotation Contracts (Zero Static Facades)
+Never test scheduled pipelines or time-series features solely with static fixtures or by checking that routes return HTTP 200:
+1. **Unmocked Ingestion Testing:**
+   Directly invoke scheduled worker functions (`run_daily_msme_cohort(15)`, `curate_morning_discovery_cohort()`) and assert that database records actually advance:
+   ```python
+   def test_daily_cadence_advancement(self):
+       initial_count = get_active_msme_firms_count()
+       added = run_daily_msme_cohort(count=15)
+       self.assertEqual(added, 15)
+       self.assertEqual(get_active_msme_firms_count(), initial_count + 15)
+   ```
+2. **Rotation Validation Across Consecutive Editions:**
+   Assert that consecutive editions or scheduled runs do NOT merely duplicate 100% of previous items:
+   ```python
+   def test_consecutive_edition_rotation(self):
+       edition_1 = [x["ticker"] for x in get_active_discovery_reel("2026-10-15")]
+       edition_2 = [x["ticker"] for x in get_active_discovery_reel("2026-10-16")]
+       intersection = set(edition_1).intersection(set(edition_2))
+       # At least 25% of the reel must be fresh/rotated
+       self.assertLess(len(intersection), len(edition_1), "Discovery reel has zero rotation across consecutive editions!")
+   ```
+3. **Data Provenance & Freshness Assertion:**
+   Assert that every rendered table, card, or directory includes a visible date stamp or provenance tag showing when the record was published or ingested.
+
 ---
 
 ## When to Run Outside-In Tests
 
-1. **Before Committing Any UI or Template Change:**
+1. **Before Committing Any UI, Modal, or Template Change:**
    Always run test suite including outside-in contract assertions.
 2. **When Adding New Modals or Actions:**
    Ensure `onclick`, DOM IDs, modal backdrop, and analytical payload pass the contract.
-3. **During Headless / Browser Subagent Verification:**
+3. **When Modifying Any Scheduled Job or Ingestion Engine:**
+   Ensure time-series rotation and unmocked database incrementation pass Pillar 8.
+4. **During Headless / Browser Subagent Verification:**
    Verify visual centering, click events, progress spinner, and modal appearance via screenshots or DOM inspection before declaring completion.
+

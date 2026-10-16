@@ -1433,6 +1433,32 @@ async def api_run_discovery(
     })
 
 
+@router.post("/api/admin/msme/run-daily-ingest")
+async def api_run_msme_daily_ingest(
+    request: Request,
+    background_tasks: BackgroundTasks,
+    x_admin_key: Optional[str] = Header(None),
+    count: int = 15,
+    edition_date: Optional[str] = None
+):
+    admin_secret = os.environ.get("ADMIN_API_KEY", "")
+    is_authed = False
+    if admin_secret and x_admin_key == admin_secret:
+        is_authed = True
+    elif _is_admin_authenticated(request):
+        is_authed = True
+
+    if not is_authed:
+        raise HTTPException(status_code=403, detail="Unauthorized admin access.")
+
+    from core.msme.daily_ingest import ingest_daily_msme_cohort
+    background_tasks.add_task(ingest_daily_msme_cohort, edition_date=edition_date, count=count)
+    return json_response_with_cache({
+        "status": "initiated",
+        "message": f"Daily MSME ingestion worker dispatched for {count} firms (date={edition_date or 'today'})."
+    })
+
+
 @router.post("/admin/assets/trigger-scan")
 async def admin_trigger_scan_form(request: Request):
     """Admin UI action: Trigger full AMFI and Debt asset surveillance scan."""
