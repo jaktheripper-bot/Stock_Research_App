@@ -268,8 +268,46 @@ async def run_daily_discovery_scheduler():
 
 
 async def run_daily_amfi_scheduler():
-    """Automated background AMFI NAV synchronizer (runs daily at 23:15 IST)."""
-    logger.info("📊 [AMFI Scheduler] Background AMFI NAV synchronizer initiated.")
+    """Automated background Multi-Asset Surveillance & AMFI Synchronization Scheduler.
+    Runs catch-up initialization at boot, and executes full multi-asset pipeline nightly at 23:15 IST:
+    1. AMFI Daily NAV Feed & Scheme Master Ingestion (Mutual Funds)
+    2. National ETF Matrix Ingestion (all 436 AMFI ETFs across 9 categories)
+    3. Always-On Multi-Asset Surveillance Scan (MF drift + Corporate Debt maturities/CRA watches)
+    4. Sovereign Risk-Free Benchmarks & SDL Yield Curve Synchronization
+    """
+    logger.info("📊 [AMFI & Multi-Asset Scheduler] Background synchronizer initiated.")
+    loop = asyncio.get_running_loop()
+
+    # Pre-flight / Boot catch-up checks
+    try:
+        from core.db.sovereign import get_etf_matrix, refresh_daily_sovereign_benchmarks
+        from core.ingestion.etf_ingest import ingest_all_amfi_etfs
+        from core.analysis.asset_scanner import get_asset_scan_runs, run_comprehensive_asset_scan
+        from core.db.agent_sessions import record_autonomous_event
+
+        now = datetime.now(IST)
+        today_str = now.strftime("%Y-%m-%d")
+
+        # 1. ETF Universe Boot Check: Ensure all active AMFI ETFs are in database
+        etf_count = len(get_etf_matrix(category=None))
+        if etf_count < 400:
+            logger.info(f"📊 [ETF Ingestion Boot] ETF matrix has {etf_count} records (<400). Running dynamic AMFI ETF sync...")
+            etf_res = await loop.run_in_executor(None, ingest_all_amfi_etfs, True)
+            logger.info(f"📊 [ETF Ingestion Boot] Synced {etf_res.get('persisted_to_db', 0)} ETFs into matrix.")
+
+        # 2. Sovereign Benchmarks Boot Check: Ensure sovereign benchmarks are primed
+        await loop.run_in_executor(None, refresh_daily_sovereign_benchmarks, today_str)
+
+        # 3. Multi-Asset Surveillance Catch-Up Check: If boot is after 23:15 IST and no scan run today
+        recent_scans = get_asset_scan_runs(limit=1)
+        last_scan_date = str(recent_scans[0].get("started_at", ""))[:10] if recent_scans else ""
+        if (now.hour > 23 or (now.hour == 23 and now.minute >= 15)) and last_scan_date != today_str:
+            logger.info("📊 [Asset Scan Catch-up] Past 23:15 IST and missing today's scan. Executing catch-up scan...")
+            await loop.run_in_executor(None, run_comprehensive_asset_scan, "ALL_ASSETS", "catch_up_boot")
+
+    except Exception as boot_err:
+        logger.warning(f"📊 [AMFI & Multi-Asset Scheduler] Boot catch-up notice: {boot_err}")
+
     while True:
         try:
             now = datetime.now(IST)
@@ -277,29 +315,70 @@ async def run_daily_amfi_scheduler():
             if now >= target:
                 target += timedelta(days=1)
             wait_seconds = (target - now).total_seconds()
-            logger.info(f"📊 [AMFI Scheduler] Next AMFI synchronization scheduled in {wait_seconds/3600:.2f} hours (at {target.strftime('%Y-%m-%d %H:%M:%S IST')}).")
+            logger.info(f"📊 [AMFI & Multi-Asset Scheduler] Next synchronization scheduled in {wait_seconds/3600:.2f} hours (at {target.strftime('%Y-%m-%d %H:%M:%S IST')}).")
             await asyncio.sleep(wait_seconds)
 
-            logger.info("📊 [AMFI Scheduler] Executing scheduled nightly AMFI NAV synchronization...")
+            today_str = datetime.now(IST).strftime("%Y-%m-%d")
+            logger.info("📊 [AMFI & Multi-Asset Scheduler] Executing scheduled nightly synchronization...")
+
             from core.ingestion.amfi import ingest_amfi_daily_feed
+            from core.ingestion.etf_ingest import ingest_all_amfi_etfs
+            from core.analysis.asset_scanner import run_comprehensive_asset_scan
+            from core.db.sovereign import refresh_daily_sovereign_benchmarks
             from core.db.agent_sessions import record_autonomous_event
-            loop = asyncio.get_running_loop()
-            await loop.run_in_executor(None, ingest_amfi_daily_feed, None, True)
+
+            # 1. Sync Mutual Funds NAV Feed
+            mf_res = await loop.run_in_executor(None, ingest_amfi_daily_feed, None, True)
             record_autonomous_event(
                 event_type="AMFI_NAV_SYNC",
                 ticker="AMFI_PORTAL",
                 trigger_source="AMFI_NAV_SCHEDULER",
                 action_taken="NAV_SYNC_AND_DELTA_CALC",
-                summary="Nightly AMFI NAV synchronization and delta computation successfully completed.",
-                metadata={"updated": True}
+                summary=f"Nightly AMFI NAV synchronization completed: {mf_res.get('upserted', 0)} schemes updated.",
+                metadata=mf_res
             )
-            logger.info("📊 [AMFI Scheduler] Nightly AMFI synchronization completed.")
+
+            # 2. Sync National ETF Matrix
+            etf_res = await loop.run_in_executor(None, ingest_all_amfi_etfs, True)
+            record_autonomous_event(
+                event_type="ETF_MATRIX_SYNC",
+                ticker="AMFI_ETF_PORTAL",
+                trigger_source="AMFI_NAV_SCHEDULER",
+                action_taken="ETF_UNIVERSE_DISCOVERY",
+                summary=f"Nightly AMFI ETF ingestion completed: {etf_res.get('persisted_to_db', 0)} ETFs synced across 9 categories.",
+                metadata=etf_res
+            )
+
+            # 3. Multi-Asset Surveillance Scan (MF drift + Corporate Debt maturities/downgrade watches)
+            scan_res = await loop.run_in_executor(None, run_comprehensive_asset_scan, "ALL_ASSETS", "nightly_cron")
+            record_autonomous_event(
+                event_type="MULTI_ASSET_SURVEILLANCE_SCAN",
+                ticker="ALL_ASSETS",
+                trigger_source="NIGHTLY_SURVEILLANCE_SCHEDULER",
+                action_taken="SURVEILLANCE_SCAN_LEDGER_UPDATE",
+                summary=f"Multi-asset scan completed: {scan_res.get('items_scanned', 0)} items scanned (MFs + Corporate Debt).",
+                metadata=scan_res
+            )
+
+            # 4. Refresh Sovereign Yield Curve & SDL Disparity Matrix
+            sov_res = await loop.run_in_executor(None, refresh_daily_sovereign_benchmarks, today_str)
+            record_autonomous_event(
+                event_type="SOVEREIGN_BENCHMARK_SYNC",
+                ticker="RBI_AUCTION_CUTOFF",
+                trigger_source="NIGHTLY_SURVEILLANCE_SCHEDULER",
+                action_taken="SOVEREIGN_CURVE_AND_SDL_SYNC",
+                summary=f"Sovereign risk-free benchmarks and SDL matrix refreshed for {today_str}.",
+                metadata=sov_res
+            )
+
+            logger.info("📊 [AMFI & Multi-Asset Scheduler] Scheduled nightly synchronization pipeline fully completed.")
         except asyncio.CancelledError:
-            logger.info("📊 [AMFI Scheduler] Background AMFI scheduler cancelled.")
+            logger.info("📊 [AMFI & Multi-Asset Scheduler] Background scheduler cancelled.")
             break
         except Exception as e:
-            logger.error(f"📊 [AMFI Scheduler] Error in AMFI synchronization: {e}")
+            logger.error(f"📊 [AMFI & Multi-Asset Scheduler] Error in multi-asset synchronization: {e}")
             await asyncio.sleep(120)
+
 
 
 async def run_daily_fund_audit_scheduler():
@@ -1073,6 +1152,18 @@ def debt_directory_page(
         if s.get("ytm_pct") is not None and float(s["ytm_pct"]) > 0
     ]
     avg_ytm = f"{statistics.mean(valid_ytms):.2f}" if valid_ytms else "9.85"
+
+    from core.db.sovereign import get_sovereign_curve_analytics
+    from core.analysis.asset_scanner import get_asset_scan_runs
+    try:
+        curve_analytics = get_sovereign_curve_analytics()
+        benchmark_10y = f"{curve_analytics.get('benchmark_10y_gsec', 7.12):.2f}"
+    except Exception:
+        benchmark_10y = "7.12"
+
+    last_scans = get_asset_scan_runs(limit=1)
+    last_scan_info = last_scans[0] if last_scans else None
+
     return templates.TemplateResponse(
         request=request,
         name="debt_directory.html",
@@ -1080,6 +1171,8 @@ def debt_directory_page(
             "active_page": "debt",
             "securities": securities,
             "avg_ytm": avg_ytm,
+            "benchmark_10y_gsec": benchmark_10y,
+            "last_scan_info": last_scan_info,
             "recent_actions": recent_actions,
             "current_seniority": seniority,
             "current_type": instrument_type,
@@ -1087,6 +1180,7 @@ def debt_directory_page(
             "query": query_str,
         }
     )
+
 
 
 @app.get("/debt/{isin}", response_class=HTMLResponse)

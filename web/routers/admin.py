@@ -1549,6 +1549,78 @@ async def api_admin_get_scan_runs(
     })
 
 
+@router.post("/api/admin/sovereign/refresh")
+async def api_admin_refresh_sovereign(
+    request: Request,
+    edition_date: Optional[str] = Query(None),
+    x_admin_key: Optional[str] = Header(None)
+):
+    """Admin API: Trigger on-demand sovereign benchmarks & SDL yield curve synchronization."""
+    admin_secret = os.environ.get("ADMIN_API_KEY", "")
+    admin_user = _is_admin_authenticated(request)
+    is_authed = False
+    admin_email = "api_key_system"
+    if admin_secret and x_admin_key == admin_secret:
+        is_authed = True
+    elif admin_user:
+        is_authed = True
+        admin_email = admin_user.get("email", "admin")
+
+    if not is_authed:
+        raise HTTPException(status_code=403, detail="Unauthorized admin access.")
+
+    from core.db.sovereign import refresh_daily_sovereign_benchmarks
+    summary = refresh_daily_sovereign_benchmarks(edition_date=edition_date)
+    record_admin_audit(
+        admin_email,
+        "refresh_sovereign_benchmarks",
+        target_type="sovereign_curve",
+        target_id=summary.get("edition_date", "today"),
+        details=summary
+    )
+    return json_response_with_cache({
+        "status": "success",
+        "message": "Sovereign yield curve benchmarks synchronized successfully.",
+        "summary": summary
+    })
+
+
+@router.post("/api/admin/assets/scan")
+async def api_admin_run_asset_scan(
+    request: Request,
+    scan_type: str = Query("ALL_ASSETS"),
+    x_admin_key: Optional[str] = Header(None)
+):
+    """Admin API: Dispatches an immediate multi-asset surveillance scan (MFs, Corporate Debt)."""
+    admin_secret = os.environ.get("ADMIN_API_KEY", "")
+    admin_user = _is_admin_authenticated(request)
+    is_authed = False
+    admin_email = "api_key_system"
+    if admin_secret and x_admin_key == admin_secret:
+        is_authed = True
+    elif admin_user:
+        is_authed = True
+        admin_email = admin_user.get("email", "admin")
+
+    if not is_authed:
+        raise HTTPException(status_code=403, detail="Unauthorized admin access.")
+
+    from core.analysis.asset_scanner import run_comprehensive_asset_scan
+    res = run_comprehensive_asset_scan(scan_type=scan_type, triggered_by=f"admin_console:{admin_email}")
+    record_admin_audit(
+        admin_email,
+        "run_asset_scan",
+        target_type="multi_asset_scan",
+        target_id=res.get("scan_id", "scan"),
+        details=res
+    )
+    return json_response_with_cache({
+        "status": "success",
+        "message": "Asset scan completed successfully.",
+        "result": res
+    })
+
+
 # ==============================================================================
 # Admin Executive Copilot Endpoints
 # ==============================================================================

@@ -12,7 +12,7 @@
     <div style="display: flex; justify-content: space-between; align-items: flex-start; flex-wrap: wrap; gap: 16px; margin-bottom: 16px;">
       <div style="display: inline-flex; align-items: center; gap: 8px; background: rgba(16, 185, 129, 0.15); border: 1px solid rgba(16, 185, 129, 0.3); border-radius: 9999px; padding: 4px 14px;">
         <span style="width: 8px; height: 8px; border-radius: 50%; background: #10b981;"></span>
-        <span style="font-size: 12px; font-weight: 700; color: #34d399; text-transform: uppercase; letter-spacing: 0.05em;">National ETF Matrix • 140+ AMFI Passive Benchmarks</span>
+        <span style="font-size: 12px; font-weight: 700; color: #34d399; text-transform: uppercase; letter-spacing: 0.05em;">National ETF Matrix • {{ data.total_tracked_etfs }}+ AMFI Passive Benchmarks</span>
       </div>
       <button id="sync-amfi-btn" onclick="triggerAmfiSync()" class="btn btn-secondary btn-sm" style="display: inline-flex; align-items: center; gap: 8px; font-size: 12px; border-radius: 8px; border-color: rgba(56, 189, 248, 0.4); color: #38bdf8;">
         <span id="sync-icon">🔄</span> <span id="sync-text">Sync AMFI Feed</span>

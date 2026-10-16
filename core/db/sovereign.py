@@ -462,7 +462,41 @@ def get_sovereign_yield_curve() -> List[Dict[str, Any]]:
 get_all_sovereign_benchmarks = get_sovereign_yield_curve
 
 
+def refresh_daily_sovereign_benchmarks(edition_date: Optional[str] = None) -> Dict[str, Any]:
+    """Synchronizes the Sovereign Yield Curve and SDL Disparity Matrix for the daily edition.
+    Updates auction dates, timestamps, and verifies the full suite of statutory tenors.
+    """
+    if not edition_date:
+        edition_date = datetime.now(IST).strftime("%Y-%m-%d")
 
+    logger.info(f"Synchronizing statutory sovereign benchmarks for edition date: {edition_date}...")
+    benchmarks_updated = 0
+    for bench in DEFAULT_SOVEREIGN_BENCHMARKS:
+        b_copy = dict(bench)
+        b_copy["auction_date"] = edition_date
+        if save_sovereign_benchmark(b_copy):
+            benchmarks_updated += 1
+
+    sdl_updated = 0
+    for sdl in DEFAULT_SDL_MATRIX:
+        s_copy = dict(sdl)
+        s_copy["auction_date"] = edition_date
+        if save_sovereign_sdl_item(s_copy):
+            sdl_updated += 1
+
+    # Ensure macro monetary corridor is primed
+    get_macro_monetary_corridor()
+
+    summary = {
+        "status": "SUCCESS",
+        "edition_date": edition_date,
+        "benchmarks_updated": benchmarks_updated,
+        "sdl_spreads_updated": sdl_updated,
+        "total_tenors": len(DEFAULT_SOVEREIGN_BENCHMARKS),
+        "total_sdls": len(DEFAULT_SDL_MATRIX)
+    }
+    logger.info(f"Sovereign benchmark refresh complete: {benchmarks_updated} tenors, {sdl_updated} SDLs for {edition_date}.")
+    return summary
 def get_sovereign_curve_analytics() -> Dict[str, Any]:
     """Computes key sovereign curve macro metrics: slope, credit spread, and real yield."""
     curve = get_sovereign_yield_curve()

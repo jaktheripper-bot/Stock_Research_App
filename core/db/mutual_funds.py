@@ -234,7 +234,7 @@ get_mutual_fund_by_code = get_mutual_fund_scheme
 def get_active_mutual_funds(
     category: Optional[str] = None,
     broad_category: Optional[str] = None,
-    limit: int = 250
+    limit: Optional[int] = 500
 ) -> List[Dict[str, Any]]:
     """Retrieves active mutual fund schemes filtered by category."""
     conn = get_db_connection()
@@ -252,7 +252,8 @@ def get_active_mutual_funds(
         params.append(broad_category.strip().upper())
 
     where_str = f"WHERE {' AND '.join(clauses)}" if clauses else ""
-    sql = f"SELECT * FROM mutual_fund_schemes {where_str} ORDER BY aum_crores DESC LIMIT {limit}"
+    limit_str = f"LIMIT {int(limit)}" if limit and isinstance(limit, int) and limit > 0 else ""
+    sql = f"SELECT * FROM mutual_fund_schemes {where_str} ORDER BY aum_crores DESC {limit_str}".strip()
 
     try:
         cursor.execute(sql, tuple(params))

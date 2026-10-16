@@ -36,13 +36,19 @@
       </div>
       <div style="background: rgba(15, 23, 42, 0.6); border: 1px solid rgba(255, 255, 255, 0.08); border-radius: 12px; padding: 16px;">
         <div style="font-size: 12px; color: #64748b; text-transform: uppercase; font-weight: 600; margin-bottom: 4px;">Benchmark 10Y G-Sec</div>
-        <div style="font-size: 24px; font-weight: 800; color: #38bdf8;">7.10%</div>
+        <div style="font-size: 24px; font-weight: 800; color: #38bdf8;">{{ benchmark_10y_gsec or "7.12" }}%</div>
       </div>
       <div style="background: rgba(15, 23, 42, 0.6); border: 1px solid rgba(255, 255, 255, 0.08); border-radius: 12px; padding: 16px;">
         <div style="font-size: 12px; color: #64748b; text-transform: uppercase; font-weight: 600; margin-bottom: 4px;">Settlement Platform</div>
         <div style="font-size: 24px; font-weight: 800; color: #f8fafc;">BSE / NSE RFQ</div>
       </div>
     </div>
+    {% if last_scan_info %}
+    <div style="display: flex; align-items: center; gap: 8px; margin-top: 14px; font-size: 12px; color: #64748b;">
+      <span style="display: inline-block; width: 7px; height: 7px; border-radius: 50%; background: #10b981;"></span>
+      <span>CRA Surveillance & Maturity Scan: <strong style="color: #94a3b8;">{{ last_scan_info.status|upper }}</strong> (Last cycle: {{ last_scan_info.started_at[:16] }})</span>
+    </div>
+    {% endif %}
   </div>
 
   <!-- Action & Filter Bar -->
