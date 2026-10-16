@@ -39,7 +39,7 @@ from web.main import (
     lifespan,
 )
 
-PROJECT_ROOT = Path(__file__).resolve().parent.parent
+PROJECT_ROOT = Path(__file__).resolve().parent.parent.parent
 
 
 # ==============================================================================

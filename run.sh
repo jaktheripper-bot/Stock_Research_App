@@ -25,10 +25,25 @@ case "$COMMAND" in
         echo "--> [1/1] Running System Contract & Integrity Audit..."
         "$PYTHON" check_system.py
         ;;
+    test-fast|fast-test)
+        echo "--> Running Fast Unit & Cortex Domain Suite (< 2s)..."
+        "$PYTHON" -m unittest discover -s tests/unit
+        echo "✅ Fast unit tests passed."
+        ;;
+    test-outside-in|outside-in)
+        echo "--> Running Outside-In UI, Modals & Route Contract Suite (~7s)..."
+        "$PYTHON" -m unittest discover -s tests/outside_in
+        echo "✅ Outside-in web contract tests passed."
+        ;;
+    test-integration)
+        echo "--> Running Integration & Pipeline Suite (~8s)..."
+        "$PYTHON" -m unittest discover -s tests/integration
+        echo "✅ Integration tests passed."
+        ;;
     test)
         echo "--> [1/2] Running System Integrity & Contract Audit..."
         "$PYTHON" check_system.py
-        echo "--> [2/2] Running Regression Test Suite..."
+        echo "--> [2/2] Running Regression Test Suite across all 5 domains..."
         "$PYTHON" -m unittest discover -s tests
         echo "✅ All tests passed successfully."
         ;;
