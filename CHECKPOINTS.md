@@ -1,6 +1,6 @@
 # Production Release Checkpoints & Disaster Recovery Ledger
-**Last Checkpoint:** 2026-10-16 23:54:10 IST  
-**Total Verified Rollback Points:** 80  
+**Last Checkpoint:** 2026-10-17 00:13:33 IST  
+**Total Verified Rollback Points:** 81  
 
 > [!NOTE]
 > These checkpoints represent byte-for-byte verified working releases that passed the 4-tier pre-flight audit.
@@ -10,6 +10,7 @@
 
 | Checkpoint Tag | IST Timestamp | Commit | DB Reports | Description |
 |:---|:---|:---|:---|:---|
+| `checkpoint_20261017_001333_Register_subscribed_user_updates_bouquet_and_branded_email_tracking_in_pending_tasks` | 2026-10-17 00:13:33 IST | `7051eb0` | 142 rep / 246 rev | Register subscribed user updates bouquet and branded email tracking in pending tasks |
 | `checkpoint_20261016_235410_Activate_live_Resend_API_email_dispatch_with_certifi_SSL_context_and_test_isolation` | 2026-10-16 23:54:10 IST | `d5e284c` | 142 rep / 246 rev | Activate live Resend API email dispatch with certifi SSL context and test isolation |
 | `checkpoint_20261016_224449_Synchronize_Section_4_test_links__add_subTest_parameterization__and_wire_daily_mf-ingest_to_discovery_worker` | 2026-10-16 22:44:49 IST | `66b08f8` | 142 rep / 246 rev | Synchronize Section 4 test links, add subTest parameterization, and wire daily mf-ingest to discovery worker |
 | `checkpoint_20261016_223017_Five_domain_test_suite_consolidation_and_fast_runner` | 2026-10-16 22:30:17 IST | `46a2e14` | 142 rep / 246 rev | Five domain test suite consolidation and fast runner |
