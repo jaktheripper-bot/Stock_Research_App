@@ -356,8 +356,15 @@ class TestUnlockEndpoints(unittest.TestCase):
         cls.client = TestClient(app)
 
     def test_unlock_requires_sign_in(self):
-        self.assertEqual(self.client.post(f"/api/funds/unlock/{FUND}").status_code, 401)
-        self.assertEqual(self.client.post(f"/api/debt/unlock/{DEBT}").status_code, 401)
+        targets = [
+            f"/api/funds/unlock/{FUND}",
+            f"/api/debt/unlock/{DEBT}",
+            "/api/reits/unlock/EMBASSY",
+            "/api/dossier/unlock/INFY",
+        ]
+        for url in targets:
+            with self.subTest(url=url):
+                self.assertEqual(self.client.post(url).status_code, 401)
 
     def test_unknown_assets_404(self):
         self.assertEqual(self.client.post("/api/debt/unlock/NOPE000000000").status_code, 404)

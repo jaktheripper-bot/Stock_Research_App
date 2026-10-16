@@ -113,21 +113,39 @@ def run_discovery_pipeline(
 
 
 def main():
-    parser = argparse.ArgumentParser(description="Morning Discovery Reel Batch Worker")
-    parser.add_argument("--count", type=int, default=12, help="Target number of stocks in cohort (10-15)")
+    parser = argparse.ArgumentParser(description="Morning Discovery Reel & Daily Institutional Ingestion Worker")
+    parser.add_argument("--count", type=int, default=15, help="Target number of stocks in cohort (default: 15)")
     parser.add_argument("--date", type=str, default=None, help="Edition date in YYYY-MM-DD format")
     parser.add_argument("--dry-run", action="store_true", help="Run screening without archiving or generating reports")
     parser.add_argument("--force", action="store_true", help="Force new AI synthesis for all stocks regardless of cache")
+    parser.add_argument("--mode", choices=["all", "mf-ingest", "discovery"], default="all",
+                        help="Ingestion mode: 'mf-ingest' (uncovered MF constituents), 'discovery' (surveillance screening), or 'all' (default)")
 
     args = parser.parse_args()
-    success = run_discovery_pipeline(
-        target_count=args.count,
-        edition_date=args.date,
-        dry_run=args.dry_run,
-        force_synthesis=args.force
-    )
+
+    success = False
+    if args.mode in ("all", "mf-ingest"):
+        logger.info("🏛️ Running Daily 15-Stock Institutional Ingestion & Mutual Fund Saturation...")
+        from core.analysis.daily_stock_ingestion import ingest_daily_stock_cohort
+        res = ingest_daily_stock_cohort(
+            edition_date=args.date,
+            count=args.count,
+            skip_gemini=args.dry_run
+        )
+        logger.info(f"Ingestion result: {res.get('status')} | Ingested: {res.get('ingested_count')} stocks | Affected Funds: {res.get('affected_funds_count')}")
+        success = res.get("status") in ("success", "already_ingested")
+
+    if args.mode in ("all", "discovery") and not success:
+        success = run_discovery_pipeline(
+            target_count=args.count,
+            edition_date=args.date,
+            dry_run=args.dry_run,
+            force_synthesis=args.force
+        )
+
     sys.exit(0 if success else 1)
 
 
 if __name__ == "__main__":
     main()
+

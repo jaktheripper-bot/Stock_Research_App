@@ -199,8 +199,28 @@ Detailed forensic analysis with exact page grounding to bseindia.com filings.
     def test_legal_policy_routes(self):
         from web.legal_content import POLICIES
         for slug in POLICIES.keys():
-            res = self.client.get(f"/{slug}")
-            self.assertEqual(res.status_code, 200, f"Policy route /{slug} failed")
+            with self.subTest(slug=slug):
+                res = self.client.get(f"/{slug}")
+                self.assertEqual(res.status_code, 200, f"Policy route /{slug} failed")
+
+    def test_primary_public_routes_parameterized(self):
+        """Verifies primary public SSR view routes respond 200 with required keyword integrity."""
+        primary_routes = [
+            ("/", "Audit the Asset."),
+            ("/discovery", "Stock Discovery @9AM"),
+            ("/equities", "Institutional Equities"),
+            ("/funds", "Mutual Fund Look-Through"),
+            ("/debt", "Corporate Debt"),
+            ("/reits", "REITs & InvITs"),
+            ("/calculator/tax", "Net Real Tax Calculator"),
+            ("/pricing", "Single Research Pass"),
+            ("/contact", "Submit an Inquiry"),
+        ]
+        for path, keyword in primary_routes:
+            with self.subTest(path=path):
+                res = self.client.get(path)
+                self.assertEqual(res.status_code, 200, f"Public route {path} failed with {res.status_code}")
+                self.assertIn(keyword, res.text, f"Route {path} missing keyword: {keyword}")
 
     def test_admin_run_discovery_api(self):
         from unittest.mock import patch
