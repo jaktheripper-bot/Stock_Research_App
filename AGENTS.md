@@ -47,4 +47,28 @@
 - **Git State & Remote Alignment:** Confirm working tree is clean (`git status`), commits and annotated tags are pushed, and tracking branches (`main`, `dev`, `origin`) are strictly aligned.
 - **Zero Premature Conclusions:** If any change is partial, blocked, or pending further user input, explicitly disclose its exact state rather than asserting that the task is finished.
 
+## 6. Mandatory Outside-In Testing Protocol (UI-to-Code Contracts)
+**Never test simply from the inside-out (validating backend mathematical functions and asserting HTTP 200). Always test from the outside-in (user interaction contract down to code).**
+
+Whenever authoring, refactoring, or verifying web pages, modals, buttons, or interactive forms, the test suite and verification workflow MUST empirically validate:
+1. **Trigger Affordance & JS Wiring:**
+   - Every `<button>` or interactive trigger must feature valid tactile classes (`.btn`, `.btn-primary`, `.btn-secondary`), clear user-facing labels, and non-empty action attributes.
+   - Every `onclick="handler()"` attribute in HTML templates must map to an active, syntactically valid JavaScript function in loaded scripts, preventing undefined ReferenceErrors.
+2. **Interaction & Progress State:**
+   - User actions that trigger async operations must immediately reflect an active loading/progress state (e.g. disabling the trigger, showing `"Analyzing..."` or a spinner) and restore gracefully upon completion or failure.
+3. **DOM Element Binding Contracts (Zero Null References):**
+   - Every `document.getElementById('xyz')` queried by client scripts must be statically verified or runtime-asserted against the target rendered DOM.
+   - Forbid tests that pass HTTP 200 while client-side scripts throw runtime `TypeError: Cannot set property 'innerText' of null`.
+4. **Modal Centering & Viewport Architecture:**
+   - Every modal MUST adhere to the standardized `.modal-backdrop` and `.modal-dialog` contract.
+   - Modals must NEVER be nested inside containers with `overflow: hidden`, `overflow-x: auto`, or relative layout traps that clip them outside the viewport upon scrolling.
+   - Every modal MUST include a functional close button, backdrop-click dismissal, and `Escape` key listener.
+5. **Client-Side API Route Contracts:**
+   - Every AJAX `fetch('/api/...')` target in JavaScript or inline scripts must be cross-referenced against active, registered FastAPI server routes with valid parameter payloads.
+6. **Substantive Analytical Depth (Value Covenant):**
+   - Interactive modals, deep-dive cards, and analytical drawers must render genuine domain intelligence (credit risk ratios, working capital cycles, benchmark deltas, moat scores, failure mode alerts), never trivial data echoes or hollow placeholder text.
+7. **Template Attribute & Rendering Hygiene:**
+   - Rendered HTML must be audited with BeautifulSoup to assert zero unrendered Jinja expressions (`{{` or `{%`) leak into `href`, `onclick`, `id`, `class`, or `data-*` attributes.
+
+
 
