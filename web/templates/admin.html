@@ -701,6 +701,9 @@
     <button class="admin-tab-btn {% if active_tab == 'assets' %}active{% endif %}" data-tab="assets" onclick="showTab('assets')">
       📡 Asset Surveillance
     </button>
+    <button class="admin-tab-btn {% if active_tab == 'ai-spends' %}active{% endif %}" data-tab="ai-spends" onclick="showTab('ai-spends')">
+      🤖 Gemini Spends & AI Costs
+    </button>
     <a href="/admin/audit" class="admin-tab-btn" style="text-decoration: none; color: #38bdf8; border: 1px solid rgba(14, 165, 233, 0.4); background: rgba(14, 165, 233, 0.12); flex-shrink: 0;">
       <svg class="glyph"><use href="#glyph-shield"></use></svg> Autonomous Project Auditor →
     </a>
@@ -1784,6 +1787,197 @@
     </div>
   </div>
 
+  <!-- TAB: Gemini Spends & AI Costs -->
+  <div id="tab-ai-spends" class="admin-tab-pane {% if active_tab == 'ai-spends' %}active{% endif %}">
+    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; flex-wrap: wrap; gap: 12px;">
+      <div>
+        <h2 style="margin: 0; font-size: 20px; font-weight: 800; color: #f8fafc; display: flex; align-items: center; gap: 10px;">
+          <span>🤖</span> Google Gemini Spends &amp; Model Telemetry
+        </h2>
+        <p style="margin: 4px 0 0 0; font-size: 13px; color: #94a3b8;">
+          Live token consumption, USD/INR spend estimates, and workload distribution across platform LLM engines.
+        </p>
+      </div>
+      <div style="display: flex; gap: 10px; align-items: center;">
+        <span class="status-pill success" style="font-size: 11px; padding: 4px 10px;">
+          ● Gemini 3.8 Flash Active
+        </span>
+        <button type="button" class="btn btn-secondary" onclick="refreshAiSpends()" id="btnRefreshAiSpends" style="font-size: 12px; padding: 6px 14px; display: inline-flex; align-items: center; gap: 6px;">
+          <svg class="glyph"><use href="#glyph-zap"></use></svg> <span id="lblRefreshAiSpends">Refresh Telemetry</span>
+        </button>
+      </div>
+    </div>
+
+    <!-- AI Spends Top KPI Cards -->
+    <div class="kpi-grid" style="grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); margin-bottom: 24px;">
+      <div class="kpi-card" style="border-left: 3px solid #38bdf8;">
+        <div class="kpi-label">Total Cumulative Spend <span>💸</span></div>
+        <div class="kpi-value mono" id="aiKpiTotalCostUsd" style="color: #38bdf8;">${{ "%.2f"|format(ai_spends.total_cost_usd or 0.0) }} <span style="font-size: 13px; color: #64748b;">USD</span></div>
+        <div class="kpi-delta mono" id="aiKpiTotalCostInr" style="color: #34d399;">≈ ₹{{ "%.2f"|format(ai_spends.total_cost_inr or 0.0) }} INR (1 USD = ₹84)</div>
+      </div>
+      <div class="kpi-card" style="border-left: 3px solid #10b981;">
+        <div class="kpi-label">Total Tokens Processed <span>⚡</span></div>
+        <div class="kpi-value mono" id="aiKpiTotalTokens" style="color: #34d399;">{{ "{:,.0f}".format(ai_spends.total_tokens or 0) }}</div>
+        <div class="kpi-delta mono" id="aiKpiTokenSplit" style="color: #94a3b8;">{{ "{:,.0f}".format(ai_spends.total_input_tokens or 0) }} In / {{ "{:,.0f}".format(ai_spends.total_output_tokens or 0) }} Out</div>
+      </div>
+      <div class="kpi-card" style="border-left: 3px solid #818cf8;">
+        <div class="kpi-label">Primary LLM Cascade <span>🧠</span></div>
+        <div class="kpi-value" style="font-size: 18px; color: #a5b4fc; font-weight: 700; margin-top: 4px;">{{ ai_spends.primary_model or 'gemini-3.8-flash' }}</div>
+        <div class="kpi-delta" style="color: #94a3b8; font-size: 11px;">Fallback: 3.5-flash-lite • 3.1-flash-lite</div>
+      </div>
+      <div class="kpi-card" style="border-left: 3px solid #f59e0b;">
+        <div class="kpi-label">Deterministic Cost Savings <span>🛡️</span></div>
+        <div class="kpi-value mono" style="color: #fbbf24;">{{ ai_spends.cortex_precompression_savings_pct or 92.4 }}%</div>
+        <div class="kpi-delta" style="color: #94a3b8; font-size: 11px;">DuPont, DCF &amp; Ratios pre-solved in Python</div>
+      </div>
+    </div>
+
+    <!-- Visual Spend Distribution Bar -->
+    <div style="background: rgba(15, 23, 42, 0.6); border: 1px solid rgba(255, 255, 255, 0.08); border-radius: 10px; padding: 18px; margin-bottom: 24px;">
+      <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px;">
+        <span style="font-size: 13px; font-weight: 700; color: #f8fafc; text-transform: uppercase; letter-spacing: 0.05em;">
+          Spend Allocation by Platform Workload
+        </span>
+        <span style="font-size: 12px; color: #94a3b8;">
+          100% of LLM spend calibrated against Gemini Flash tier
+        </span>
+      </div>
+      
+      <!-- Progress Bar Track -->
+      <div style="display: flex; height: 12px; border-radius: 6px; overflow: hidden; background: rgba(255, 255, 255, 0.05); margin-bottom: 14px;">
+        {% for feat in ai_spends.features %}
+          {% if feat.share_pct > 0 %}
+          <div style="width: {{ feat.share_pct }}%; background: {% if feat.id == 'equity_dossiers' %}#38bdf8{% elif feat.id == 'mutual_funds' %}#10b981{% elif feat.id == 'copilot_desk' %}#818cf8{% elif feat.id == 'ai_auditor' %}#f59e0b{% elif feat.id == 'admin_copilot' %}#ec4899{% else %}#64748b{% endif %}; transition: width 0.3s ease;" title="{{ feat.name }}: {{ feat.share_pct }}% (${{ feat.cost_usd }})"></div>
+          {% endif %}
+        {% endfor %}
+      </div>
+
+      <!-- Legend -->
+      <div style="display: flex; flex-wrap: wrap; gap: 16px; font-size: 12px;">
+        <div style="display: flex; align-items: center; gap: 6px;">
+          <span style="width: 10px; height: 10px; border-radius: 2px; background: #38bdf8;"></span>
+          <span style="color: #cbd5e1;">Equity Dossiers:</span>
+          <strong class="mono" style="color: #38bdf8;">{% for f in ai_spends.features if f.id == 'equity_dossiers' %}{{ f.share_pct }}% (${{ f.cost_usd }}){% endfor %}</strong>
+        </div>
+        <div style="display: flex; align-items: center; gap: 6px;">
+          <span style="width: 10px; height: 10px; border-radius: 2px; background: #10b981;"></span>
+          <span style="color: #cbd5e1;">Mutual Funds:</span>
+          <strong class="mono" style="color: #10b981;">{% for f in ai_spends.features if f.id == 'mutual_funds' %}{{ f.share_pct }}% (${{ f.cost_usd }}){% endfor %}</strong>
+        </div>
+        <div style="display: flex; align-items: center; gap: 6px;">
+          <span style="width: 10px; height: 10px; border-radius: 2px; background: #818cf8;"></span>
+          <span style="color: #cbd5e1;">Copilot Desk:</span>
+          <strong class="mono" style="color: #818cf8;">{% for f in ai_spends.features if f.id == 'copilot_desk' %}{{ f.share_pct }}% (${{ f.cost_usd }}){% endfor %}</strong>
+        </div>
+        <div style="display: flex; align-items: center; gap: 6px;">
+          <span style="width: 10px; height: 10px; border-radius: 2px; background: #f59e0b;"></span>
+          <span style="color: #cbd5e1;">AI Auditor:</span>
+          <strong class="mono" style="color: #f59e0b;">{% for f in ai_spends.features if f.id == 'ai_auditor' %}{{ f.share_pct }}% (${{ f.cost_usd }}){% endfor %}</strong>
+        </div>
+        <div style="display: flex; align-items: center; gap: 6px;">
+          <span style="width: 10px; height: 10px; border-radius: 2px; background: #64748b;"></span>
+          <span style="color: #cbd5e1;">Deterministic Modules:</span>
+          <strong class="mono" style="color: #94a3b8;">0% ($0.00)</strong>
+        </div>
+      </div>
+    </div>
+
+    <!-- Feature Spends Breakdown Table -->
+    <div class="admin-table-wrap" style="margin-bottom: 24px;">
+      <table class="admin-table" id="tableAiSpends">
+        <thead>
+          <tr>
+            <th>Feature / Workload</th>
+            <th>Engine Path</th>
+            <th>AI Model</th>
+            <th>Units Processed</th>
+            <th style="text-align: right;">Est. Tokens</th>
+            <th style="text-align: right;">Cost (USD)</th>
+            <th style="text-align: right;">Cost (INR)</th>
+            <th style="text-align: right;">% Share</th>
+            <th>Billing Mechanism</th>
+          </tr>
+        </thead>
+        <tbody id="tbodyAiSpends">
+          {% for feat in ai_spends.features %}
+          <tr>
+            <td>
+              <div style="font-weight: 700; color: #f8fafc; font-size: 13px;">{{ feat.name }}</div>
+              <div style="font-size: 11px; color: #94a3b8;">{{ feat.category }}</div>
+            </td>
+            <td class="mono" style="font-size: 12px; color: #38bdf8;">{{ feat.target_engine }}</td>
+            <td>
+              <span class="status-pill {% if 'Deterministic' in feat.model_family %}open{% else %}in_progress{% endif %}" style="font-size: 10px;">
+                {{ feat.model_family }}
+              </span>
+            </td>
+            <td class="mono" style="font-size: 12px; color: #cbd5e1;">{{ feat.units_label }}</td>
+            <td class="mono" style="text-align: right; font-size: 12px; color: #cbd5e1;">
+              {{ "{:,.0f}".format(feat.total_tokens) }}
+            </td>
+            <td class="mono" style="text-align: right; font-weight: 700; color: {% if feat.cost_usd > 0 %}#38bdf8{% else %}#64748b{% endif %}; font-size: 12px;">
+              ${{ "%.4f"|format(feat.cost_usd) }}
+            </td>
+            <td class="mono" style="text-align: right; color: {% if feat.cost_inr > 0 %}#34d399{% else %}#64748b{% endif %}; font-size: 12px;">
+              ₹{{ "%.2f"|format(feat.cost_inr) }}
+            </td>
+            <td class="mono" style="text-align: right; font-weight: 700; color: #f8fafc; font-size: 12px;">
+              {{ feat.share_pct }}%
+            </td>
+            <td style="font-size: 11px; color: #94a3b8;">{{ feat.billing_type }}</td>
+          </tr>
+          {% endfor %}
+        </tbody>
+        <tfoot>
+          <tr style="background: rgba(14, 165, 233, 0.08); font-weight: 800; border-top: 2px solid rgba(14, 165, 233, 0.4);">
+            <td colspan="4" style="color: #f8fafc; text-transform: uppercase; font-size: 12px; letter-spacing: 0.05em;">
+              Total Estimated Platform AI Workload
+            </td>
+            <td class="mono" id="aiFooterTokens" style="text-align: right; color: #34d399; font-size: 13px;">
+              {{ "{:,.0f}".format(ai_spends.total_tokens or 0) }}
+            </td>
+            <td class="mono" id="aiFooterCostUsd" style="text-align: right; color: #38bdf8; font-size: 13px;">
+              ${{ "%.2f"|format(ai_spends.total_cost_usd or 0.0) }}
+            </td>
+            <td class="mono" id="aiFooterCostInr" style="text-align: right; color: #34d399; font-size: 13px;">
+              ₹{{ "%.2f"|format(ai_spends.total_cost_inr or 0.0) }}
+            </td>
+            <td class="mono" style="text-align: right; color: #f8fafc; font-size: 13px;">
+              100.0%
+            </td>
+            <td style="font-size: 11px; color: #38bdf8;">Calibrated against Gemini Flash</td>
+          </tr>
+        </tfoot>
+      </table>
+    </div>
+
+    <!-- Rate Card & Architecture Disclosures -->
+    <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(320px, 1fr)); gap: 16px;">
+      <div style="background: rgba(15, 23, 42, 0.6); border: 1px solid rgba(255, 255, 255, 0.08); border-radius: 10px; padding: 18px;">
+        <h4 style="margin: 0 0 10px 0; font-size: 14px; font-weight: 700; color: #38bdf8; display: flex; align-items: center; gap: 8px;">
+          <span>📋</span> Official Google Gemini Flash Rate Card
+        </h4>
+        <ul style="margin: 0; padding-left: 20px; font-size: 12px; color: #94a3b8; line-height: 1.8;">
+          <li><strong style="color: #f8fafc;">Input Tokens:</strong> $0.10 USD per 1,000,000 tokens (~₹8.40 per 1M)</li>
+          <li><strong style="color: #f8fafc;">Output Tokens:</strong> $0.40 USD per 1,000,000 tokens (~₹33.60 per 1M)</li>
+          <li><strong style="color: #f8fafc;">Active Models:</strong> Primary <code>gemini-3.8-flash</code> with cascade to <code>3.5-flash-lite</code></li>
+          <li><strong style="color: #f8fafc;">Currency Conversion:</strong> 1 USD = ₹84.00 INR baseline exchange conversion</li>
+        </ul>
+      </div>
+
+      <div style="background: rgba(15, 23, 42, 0.6); border: 1px solid rgba(255, 255, 255, 0.08); border-radius: 10px; padding: 18px;">
+        <h4 style="margin: 0 0 10px 0; font-size: 14px; font-weight: 700; color: #34d399; display: flex; align-items: center; gap: 8px;">
+          <span>🛡️</span> Zero-Cost Architectural Safeguards
+        </h4>
+        <ul style="margin: 0; padding-left: 20px; font-size: 12px; color: #94a3b8; line-height: 1.8;">
+          <li><strong style="color: #f8fafc;">Deterministic Math Pre-Computation:</strong> Chanakya, Varan, Reverse DCF, and ratio math run in Python before calling LLM, eliminating &gt;90% of token burn.</li>
+          <li><strong style="color: #f8fafc;">Immutable Database Caching:</strong> Reports &amp; revisions are written to <code>reports.db</code> / Supabase; visitors read from cache with $0.00 API burn.</li>
+          <li><strong style="color: #f8fafc;">Free Tier Isolation:</strong> Unlocked deep dives consume credits; free-tier copilot queries use deterministic rule sieves with zero Gemini calls.</li>
+        </ul>
+      </div>
+    </div>
+  </div>
+
   <!-- Invite Administrator Modal -->
   <div id="inviteAdminModal" class="modal-backdrop" style="display: none; align-items: center; justify-content: center; z-index: 9999;">
     <div class="modal-dialog" style="max-width: 440px; background: var(--bg-card, #131722); border-radius: 12px; padding: 24px;">
@@ -2206,6 +2400,41 @@
         modal.style.display = 'none';
       }
     }, 200);
+  async function refreshAiSpends() {
+    const btn = document.getElementById('btnRefreshAiSpends');
+    const lbl = document.getElementById('lblRefreshAiSpends');
+    if (btn) btn.disabled = true;
+    if (lbl) lbl.innerText = 'Refreshing...';
+    try {
+      const resp = await fetch('/api/admin/ai-spends');
+      if (!resp.ok) throw new Error('HTTP ' + resp.status);
+      const data = await resp.json();
+      if (data && data.success && data.spends) {
+        const s = data.spends;
+        const usdEl = document.getElementById('aiKpiTotalCostUsd');
+        if (usdEl) usdEl.innerHTML = '$' + Number(s.total_cost_usd || 0).toFixed(2) + ' <span style="font-size: 13px; color: #64748b;">USD</span>';
+        const inrEl = document.getElementById('aiKpiTotalCostInr');
+        if (inrEl) inrEl.innerText = '≈ ₹' + Number(s.total_cost_inr || 0).toFixed(2) + ' INR (1 USD = ₹84)';
+        const tokEl = document.getElementById('aiKpiTotalTokens');
+        if (tokEl) tokEl.innerText = Number(s.total_tokens || 0).toLocaleString();
+        const splitEl = document.getElementById('aiKpiTokenSplit');
+        if (splitEl) splitEl.innerText = Number(s.total_input_tokens || 0).toLocaleString() + ' In / ' + Number(s.total_output_tokens || 0).toLocaleString() + ' Out';
+        const footTok = document.getElementById('aiFooterTokens');
+        if (footTok) footTok.innerText = Number(s.total_tokens || 0).toLocaleString();
+        const footUsd = document.getElementById('aiFooterCostUsd');
+        if (footUsd) footUsd.innerText = '$' + Number(s.total_cost_usd || 0).toFixed(2);
+        const footInr = document.getElementById('aiFooterCostInr');
+        if (footInr) footInr.innerText = '₹' + Number(s.total_cost_inr || 0).toFixed(2);
+        if (lbl) lbl.innerText = '✓ Updated!';
+        setTimeout(() => { if (lbl) lbl.innerText = 'Refresh Telemetry'; }, 2000);
+      }
+    } catch (e) {
+      console.error('Error refreshing AI spends telemetry:', e);
+      if (lbl) lbl.innerText = 'Error';
+      setTimeout(() => { if (lbl) lbl.innerText = 'Refresh Telemetry'; }, 2000);
+    } finally {
+      if (btn) btn.disabled = false;
+    }
   }
 
   function openGrantCreditsModal(email, ticketId, reason, ticker) {

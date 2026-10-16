@@ -280,6 +280,14 @@ async def admin_dashboard(
     except Exception:
         admin_user_credits = 0.0
 
+    ai_spends = {}
+    try:
+        from core.analytics.ai_spends import get_gemini_spends_summary
+        ai_spends = get_gemini_spends_summary()
+    except Exception as ai_err:
+        logger.warning(f"Error compiling AI spends summary: {ai_err}")
+        ai_spends = {}
+
     return templates.TemplateResponse(
         request=request,
         name="admin.html",
@@ -306,6 +314,7 @@ async def admin_dashboard(
             "open_tickets_count": open_tickets_count,
             "session_journeys": session_journeys,
             "seo_summary": seo_summary,
+            "ai_spends": ai_spends,
             "active_page": "admin"
         }
     )
@@ -1730,5 +1739,24 @@ def api_admin_get_stock_ingestion_queue(
         "success": True,
         "stats": stats,
         "queue": queue
+    })
+
+
+@router.get("/api/admin/ai-spends")
+def api_admin_ai_spends(request: Request):
+    """
+    Returns real-time Gemini token consumption, USD/INR spend estimates,
+    model rate cards, and feature-by-feature cost breakdown across the platform.
+    Requires administrator authentication.
+    """
+    admin_session = _is_admin_authenticated(request)
+    if not admin_session:
+        raise HTTPException(status_code=403, detail="Admin authorization required.")
+
+    from core.analytics.ai_spends import get_gemini_spends_summary
+    spends = get_gemini_spends_summary()
+    return JSONResponse(status_code=200, content={
+        "success": True,
+        "spends": spends
     })
 
