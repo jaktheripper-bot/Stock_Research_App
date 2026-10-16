@@ -70,6 +70,9 @@ from core.db.telemetry import (
     get_site_usage_summary,
     get_session_journeys,
     get_user_usage_analytics,
+    get_traffic_flow_analytics,
+    compute_page_dwell_and_visit_tree,
+    format_duration,
 )
 
 from core.db.settings import (
@@ -164,6 +167,9 @@ __all__ = [
     "_build_telemetry_time_filter",
     "get_site_usage_summary",
     "get_session_journeys",
+    "get_traffic_flow_analytics",
+    "compute_page_dwell_and_visit_tree",
+    "format_duration",
     # settings
     "get_system_setting",
     "set_system_setting",

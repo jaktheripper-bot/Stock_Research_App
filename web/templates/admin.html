@@ -1038,6 +1038,42 @@
           {{ summary.traffic_sources[0].percentage if summary.traffic_sources else 100 }}% Channel Share
         </div>
       </div>
+      <div class="kpi-card" style="border-left: 3px solid #06b6d4;">
+        <div class="kpi-label">Avg Link Dwell Time <span>⏱️</span></div>
+        <div class="kpi-value mono" style="font-size: 20px; color: #06b6d4;">
+          {{ summary.formatted_overall_avg_dwell }}
+        </div>
+        <div class="kpi-delta">
+          {{ summary.overall_avg_dwell_seconds }}s across active visits
+        </div>
+      </div>
+      <div class="kpi-card" style="border-left: 3px solid #8b5cf6;">
+        <div class="kpi-label">Total Attention Spent <span>📖</span></div>
+        <div class="kpi-value mono" style="font-size: 20px; color: #a78bfa;">
+          {{ summary.total_dwell_hours }} <span style="font-size: 13px; color: #94a3b8;">hrs</span>
+        </div>
+        <div class="kpi-delta">
+          Aggregated Reading Time
+        </div>
+      </div>
+      <div class="kpi-card" style="border-left: 3px solid #10b981;">
+        <div class="kpi-label">Site Visit Transitions <span>🔀</span></div>
+        <div class="kpi-value mono" style="font-size: 20px; color: #34d399;">
+          {{ summary.total_navigation_transitions }}
+        </div>
+        <div class="kpi-delta">
+          Inter-Page Clicks Recorded
+        </div>
+      </div>
+      <div class="kpi-card" style="border-left: 3px solid #ec4899;">
+        <div class="kpi-label">Top Downstream Driver <span>🌳</span></div>
+        <div class="kpi-value mono" style="font-size: 16px; color: #f472b6; word-break: break-all;">
+          {{ summary.top_contributing_page.from_path if summary.top_contributing_page else '/' }}
+        </div>
+        <div class="kpi-delta">
+          {{ summary.top_contributing_page.total_outbound if summary.top_contributing_page else 0 }} outbound clicks generated
+        </div>
+      </div>
     </div>
 
     <!-- Top Landing Pages & Visited Routes Grid -->
@@ -1150,6 +1186,180 @@
             </tbody>
           </table>
         </div>
+      </div>
+    </div>
+
+    <!-- Link Dwell Time Breakdown -->
+    <div class="admin-card" style="margin-bottom: 24px;">
+      <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 12px; margin-bottom: 16px;">
+        <div>
+          <h3 style="margin: 0; font-size: 16px; font-weight: 700; display: flex; align-items: center; gap: 8px;">
+            <span>⏱️</span> Page Dwell &amp; Link Reading Time Breakdown
+          </h3>
+          <p style="margin: 4px 0 0; color: var(--text-secondary, #94a3b8); font-size: 12px;">
+            Empirical measure of human engagement, reading depth, and dwell duration per internal route and link.
+          </p>
+        </div>
+        <div style="display: flex; align-items: center; gap: 10px;">
+          <input type="text" id="inputFilterDwell" placeholder="Filter route or tier..." onkeyup="filterDwellTable()"
+                 class="admin-input" style="font-size: 12px; padding: 6px 12px; width: 220px; background: rgba(0,0,0,0.3); border: 1px solid rgba(255,255,255,0.12); border-radius: 6px; color: #fff;">
+          <span class="status-pill closed" style="font-size: 11px;">
+            Avg: <strong style="color: #38bdf8; margin-left: 4px;">{{ summary.formatted_overall_avg_dwell }}</strong>
+          </span>
+        </div>
+      </div>
+      <div class="admin-table-wrap">
+        <table class="admin-table" id="tablePageDwellTimes">
+          <thead>
+            <tr>
+              <th>Page Link / URL Route</th>
+              <th>Category</th>
+              <th>Avg Dwell Time</th>
+              <th>Engagement Tier</th>
+              <th>Total Attention Spent</th>
+              <th>Visits Tracked</th>
+              <th style="min-width: 140px;">Attention Share</th>
+            </tr>
+          </thead>
+          <tbody>
+            {% set max_dwell = summary.page_dwell_times[0].total_dwell_seconds if summary.page_dwell_times else 1 %}
+            {% for item in summary.page_dwell_times %}
+            <tr class="dwell-row" data-path="{{ item.path }}" data-tier="{{ item.tier }}">
+              <td>
+                <a href="{{ item.path }}" target="_blank" style="color: #38bdf8; text-decoration: none; font-weight: 600; font-family: monospace; font-size: 12px; display: inline-flex; align-items: center; gap: 4px;">
+                  {{ item.path }} <span style="font-size: 10px; opacity: 0.7;">↗</span>
+                </a>
+              </td>
+              <td>
+                <span class="status-pill closed" style="font-size: 11px; white-space: nowrap;">
+                  {{ item.icon }} {{ item.category }}
+                </span>
+              </td>
+              <td class="mono" style="font-weight: 700; color: #f8fafc;">
+                {{ item.formatted_avg_dwell }}
+                <span style="font-size: 11px; font-weight: normal; color: #64748b; margin-left: 4px;">({{ item.avg_dwell_seconds }}s)</span>
+              </td>
+              <td>
+                <span style="display: inline-flex; align-items: center; gap: 6px; padding: 3px 8px; border-radius: 9999px; font-size: 11px; font-weight: 600; background: rgba(255,255,255,0.06); color: {{ item.badge_color }}; border: 1px solid {{ item.badge_color }}40;">
+                  <span style="width: 6px; height: 6px; border-radius: 50%; background: {{ item.badge_color }};"></span>
+                  {{ item.tier_label }}
+                </span>
+              </td>
+              <td class="mono" style="font-weight: 600; color: #c084fc;">{{ item.formatted_total_dwell }}</td>
+              <td class="mono">{{ item.visits_count }}</td>
+              <td>
+                <div style="display: flex; align-items: center; gap: 8px;">
+                  <div style="flex: 1; height: 6px; background: rgba(255,255,255,0.08); border-radius: 3px; overflow: hidden;">
+                    <div style="width: {{ [((item.total_dwell_seconds / [max_dwell, 1]|max) * 100)|round(1), 100]|min }}%; height: 100%; background: linear-gradient(90deg, #06b6d4, #38bdf8); border-radius: 3px;"></div>
+                  </div>
+                  <span class="mono" style="font-size: 11px; color: #38bdf8; min-width: 32px; text-align: right;">{{ [((item.total_dwell_seconds / [max_dwell, 1]|max) * 100)|round(0)|int, 100]|min }}%</span>
+                </div>
+              </td>
+            </tr>
+            {% else %}
+            <tr>
+              <td colspan="7" style="text-align: center; color: var(--text-secondary, #94a3b8); padding: 25px;">
+                No link dwell duration telemetry recorded in this period.
+              </td>
+            </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    </div>
+
+    <!-- Site Visit Tree & Internal Click Contributions -->
+    <div class="admin-card" style="margin-bottom: 24px;">
+      <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 12px; margin-bottom: 18px;">
+        <div>
+          <h3 style="margin: 0; font-size: 16px; font-weight: 700; display: flex; align-items: center; gap: 8px;">
+            <span>🌳</span> Site Visit Tree &amp; Internal Click Contributions
+          </h3>
+          <p style="margin: 4px 0 0; color: var(--text-secondary, #94a3b8); font-size: 12px;">
+            Source-to-destination transition graph tracking which origin pages generated downstream clicks across the platform, and where sessions exited.
+          </p>
+        </div>
+        <div style="display: flex; align-items: center; gap: 10px;">
+          <input type="text" id="inputFilterVisitTree" placeholder="Filter origin or destination route..." onkeyup="filterSiteVisitTree()"
+                 class="admin-input" style="font-size: 12px; padding: 6px 12px; width: 260px; background: rgba(0,0,0,0.3); border: 1px solid rgba(255,255,255,0.12); border-radius: 6px; color: #fff;">
+          <span class="status-pill closed" style="font-size: 11px;">
+            Transitions: <strong style="color: #34d399; margin-left: 4px;">{{ summary.total_navigation_transitions }}</strong>
+          </span>
+        </div>
+      </div>
+
+      <div id="siteVisitTreeContainer" style="display: flex; flex-direction: column; gap: 16px;">
+        {% for tree_node in summary.site_visit_tree %}
+        <div class="visit-tree-card"
+             data-from-path="{{ tree_node.from_path }}"
+             data-dest-paths="{% for d in tree_node.destinations %}{{ d.to_path }} {% endfor %}"
+             style="background: rgba(15, 23, 42, 0.6); border: 1px solid rgba(255,255,255,0.08); border-left: 4px solid #38bdf8; border-radius: 10px; padding: 16px 20px;">
+          
+          <!-- Node Header -->
+          <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 10px; margin-bottom: 12px; padding-bottom: 10px; border-bottom: 1px solid rgba(255,255,255,0.06);">
+            <div style="display: flex; align-items: center; gap: 10px;">
+              <span style="font-size: 18px;">📍</span>
+              <div>
+                <a href="{{ tree_node.from_path }}" target="_blank" style="color: #38bdf8; text-decoration: none; font-weight: 700; font-family: monospace; font-size: 14px; display: inline-flex; align-items: center; gap: 4px;">
+                  {{ tree_node.from_path }} <span style="font-size: 11px; opacity: 0.7;">↗</span>
+                </a>
+                <span class="status-pill closed" style="font-size: 11px; margin-left: 8px;">
+                  {{ tree_node.icon }} {{ tree_node.category }}
+                </span>
+              </div>
+            </div>
+            <div style="display: flex; align-items: center; gap: 10px; flex-wrap: wrap;">
+              <span class="status-pill" style="font-size: 11px; background: rgba(56, 189, 248, 0.15); color: #38bdf8; border: 1px solid rgba(56, 189, 248, 0.3);">
+                🔀 <strong>{{ tree_node.total_outbound }}</strong> Outbound Clicks Contributed
+              </span>
+              <span class="status-pill" style="font-size: 11px; background: rgba(244, 63, 94, 0.12); color: #fb7185; border: 1px solid rgba(244, 63, 94, 0.25);">
+                🚪 <strong>{{ tree_node.exit_rate_pct }}%</strong> Session Exit Rate ({{ tree_node.exit_count }} exits)
+              </span>
+            </div>
+          </div>
+
+          <!-- Destinations Sub-Tree -->
+          {% if tree_node.destinations %}
+          <div style="padding-left: 8px;">
+            <div style="font-size: 11px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.05em; color: #64748b; margin-bottom: 8px;">
+              Downstream Pages Visited from this Origin:
+            </div>
+            <div style="display: flex; flex-direction: column; gap: 8px;">
+              {% for dest in tree_node.destinations %}
+              <div style="display: flex; align-items: center; justify-content: space-between; gap: 14px; background: rgba(255,255,255,0.02); padding: 8px 12px; border-radius: 6px; border: 1px solid rgba(255,255,255,0.04);">
+                <div style="display: flex; align-items: center; gap: 10px; min-width: 240px;">
+                  <span style="color: #64748b; font-size: 12px;">↳</span>
+                  <a href="{{ dest.to_path }}" target="_blank" style="color: #f1f5f9; text-decoration: none; font-weight: 600; font-family: monospace; font-size: 12px;">
+                    {{ dest.to_path }}
+                  </a>
+                  <span style="font-size: 11px; color: #94a3b8; background: rgba(255,255,255,0.05); padding: 2px 6px; border-radius: 4px;">
+                    {{ dest.icon }} {{ dest.category }}
+                  </span>
+                </div>
+                <div style="display: flex; align-items: center; gap: 16px; flex: 1; max-width: 400px;">
+                  <div style="flex: 1; height: 6px; background: rgba(255,255,255,0.08); border-radius: 3px; overflow: hidden;">
+                    <div style="width: {{ dest.percentage }}%; height: 100%; background: linear-gradient(90deg, #10b981, #34d399); border-radius: 3px;"></div>
+                  </div>
+                  <span class="mono" style="font-size: 12px; font-weight: 700; color: #34d399; min-width: 45px; text-align: right;">{{ dest.percentage }}%</span>
+                  <span class="mono" style="font-size: 11px; color: #94a3b8; min-width: 70px; text-align: right;">
+                    <strong>{{ dest.count }}</strong> clicks
+                  </span>
+                </div>
+              </div>
+              {% endfor %}
+            </div>
+          </div>
+          {% else %}
+          <div style="font-size: 12px; color: #64748b; padding: 6px 0; font-style: italic;">
+            Terminal route — visitors only ended their sessions on this page. Zero downstream outbound clicks recorded.
+          </div>
+          {% endif %}
+        </div>
+        {% else %}
+        <div style="text-align: center; color: var(--text-secondary, #94a3b8); padding: 30px; background: rgba(0,0,0,0.2); border-radius: 8px;">
+          No multi-page navigation transitions recorded in this period.
+        </div>
+        {% endfor %}
       </div>
     </div>
 
@@ -2400,6 +2610,8 @@
         modal.style.display = 'none';
       }
     }, 200);
+  }
+
   async function refreshAiSpends() {
     const btn = document.getElementById('btnRefreshAiSpends');
     const lbl = document.getElementById('lblRefreshAiSpends');
@@ -2435,6 +2647,38 @@
     } finally {
       if (btn) btn.disabled = false;
     }
+  }
+
+  function filterDwellTable() {
+    const input = document.getElementById('inputFilterDwell');
+    if (!input) return;
+    const filter = input.value.toLowerCase().trim();
+    const rows = document.querySelectorAll('#tablePageDwellTimes tbody tr.dwell-row');
+    rows.forEach(row => {
+      const path = (row.getAttribute('data-path') || '').toLowerCase();
+      const tier = (row.getAttribute('data-tier') || '').toLowerCase();
+      if (!filter || path.includes(filter) || tier.includes(filter)) {
+        row.style.display = '';
+      } else {
+        row.style.display = 'none';
+      }
+    });
+  }
+
+  function filterSiteVisitTree() {
+    const input = document.getElementById('inputFilterVisitTree');
+    if (!input) return;
+    const filter = input.value.toLowerCase().trim();
+    const cards = document.querySelectorAll('.visit-tree-card');
+    cards.forEach(card => {
+      const fromPath = (card.getAttribute('data-from-path') || '').toLowerCase();
+      const destPaths = (card.getAttribute('data-dest-paths') || '').toLowerCase();
+      if (!filter || fromPath.includes(filter) || destPaths.includes(filter)) {
+        card.style.display = '';
+      } else {
+        card.style.display = 'none';
+      }
+    });
   }
 
   function openGrantCreditsModal(email, ticketId, reason, ticker) {

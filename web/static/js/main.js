@@ -1318,6 +1318,88 @@ window.trackUserEvent = function(eventType, ticker, details) {
   } catch {}
 };
 
+function initDwellAndTransitionTelemetry() {
+  if (typeof window === 'undefined' || typeof document === 'undefined') return;
+  if (window.location.pathname.startsWith('/admin')) return;
+
+  const pageEnterTime = Date.now();
+  let lastBeaconSent = false;
+
+  function sendDwellBeacon(destinationPath) {
+    const elapsedSeconds = Math.max(1, Math.round((Date.now() - pageEnterTime) / 1000));
+    if (elapsedSeconds > 1800) return;
+
+    try {
+      const user = getStoredUser();
+      const acq = getAcquisitionData();
+      const currentPath = window.location.pathname;
+
+      const payload = {
+        event_type: 'PAGE_DWELL',
+        ticker: '',
+        user_id: user ? user.id : null,
+        user_email: user ? user.email : null,
+        session_id: getTelemetrySessionId(),
+        referrer: acq.referrer || '',
+        landing_url: acq.landing_url || window.location.href,
+        landing_page: currentPath,
+        details: {
+          path: currentPath,
+          dwell_seconds: elapsedSeconds,
+          to_path: destinationPath || null,
+          title: document.title || ''
+        }
+      };
+
+      const blob = new Blob([JSON.stringify(payload)], { type: 'application/json' });
+      if (navigator.sendBeacon) {
+        navigator.sendBeacon('/api/telemetry/event', blob);
+      } else {
+        fetch('/api/telemetry/event', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(payload),
+          keepalive: true
+        }).catch(() => {});
+      }
+    } catch {}
+  }
+
+  document.addEventListener('click', (e) => {
+    const link = e.target.closest('a[href]');
+    if (!link) return;
+    const href = link.getAttribute('href');
+    if (!href || href.startsWith('#') || href.startsWith('javascript:') || href.startsWith('mailto:') || href.startsWith('tel:')) return;
+
+    let targetPath = '';
+    try {
+      const url = new URL(href, window.location.origin);
+      if (url.origin === window.location.origin) {
+        targetPath = url.pathname;
+      }
+    } catch {}
+
+    if (targetPath && targetPath !== window.location.pathname) {
+      sendDwellBeacon(targetPath);
+      lastBeaconSent = true;
+    }
+  }, { capture: true, passive: true });
+
+  window.addEventListener('pagehide', () => {
+    if (!lastBeaconSent) {
+      sendDwellBeacon(null);
+      lastBeaconSent = true;
+    }
+  });
+
+  document.addEventListener('visibilitychange', () => {
+    if (document.visibilityState === 'hidden' && !lastBeaconSent) {
+      sendDwellBeacon(null);
+      lastBeaconSent = true;
+    }
+  });
+}
+
 function showShareToast(message) {
   const el = document.createElement('div');
   el.textContent = message;
@@ -1995,6 +2077,7 @@ window.addEventListener('popstate', () => {
 document.addEventListener('DOMContentLoaded', () => {
   window.hideEvaluationHUD();
   resetAllButtonProgressFills();
+  initDwellAndTransitionTelemetry();
 });
 
 

@@ -36,6 +36,7 @@ from core.db import (
     get_site_usage_summary,
     get_session_journeys,
     get_user_usage_analytics,
+    get_traffic_flow_analytics,
     get_support_tickets,
     get_open_tickets_count,
     update_ticket_status,
@@ -207,6 +208,11 @@ async def admin_dashboard(
             "unique_sessions": 0, "total_actions": 0, "cache_efficiency_pct": 0.0,
             "total_cost_saved_usd": 0.0, "pdf_downloads": 0, "action_breakdown": {},
             "top_searched_tickers": [], "traffic_sources": [], "top_referrers": [],
+            "top_landing_pages": [], "top_visited_pages": [],
+            "page_dwell_times": [], "site_visit_tree": [],
+            "overall_avg_dwell_seconds": 0.0, "formatted_overall_avg_dwell": "0s",
+            "total_dwell_hours": 0.0, "total_navigation_transitions": 0,
+            "top_contributing_page": None,
             "geographic_distribution": [], "device_breakdown": [], "browser_breakdown": [],
             "os_breakdown": [], "recent_events": []
         }
@@ -1759,4 +1765,42 @@ def api_admin_ai_spends(request: Request):
         "success": True,
         "spends": spends
     })
+
+
+@router.get("/api/admin/traffic/flow")
+def api_admin_traffic_flow(
+    request: Request,
+    days: Optional[int] = Query(30, ge=1, le=365),
+    start_date: Optional[str] = Query(None),
+    end_date: Optional[str] = Query(None),
+    include_tests: Optional[bool] = Query(False)
+):
+    """
+    Returns granular page dwell times and the internal site visit navigation tree (transition matrix).
+    Requires administrator authentication.
+    """
+    admin_session = _is_admin_authenticated(request)
+    if not admin_session:
+        raise HTTPException(status_code=403, detail="Admin authorization required.")
+
+    parsed_start = None
+    parsed_end = None
+    if start_date and end_date:
+        try:
+            parsed_start = datetime.strptime(start_date.strip(), "%Y-%m-%d").date()
+            parsed_end = datetime.strptime(end_date.strip(), "%Y-%m-%d").date()
+        except Exception:
+            parsed_start, parsed_end = None, None
+
+    flow = get_traffic_flow_analytics(
+        days=days if not (parsed_start and parsed_end) else None,
+        start_date=parsed_start,
+        end_date=parsed_end,
+        exclude_tests=not include_tests
+    )
+    return JSONResponse(status_code=200, content={
+        "success": True,
+        "flow": flow
+    })
+
 

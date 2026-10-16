@@ -2,6 +2,7 @@
 
 import json
 import logging
+from datetime import datetime
 from normalizer import clean_ticker
 from core.db.connection import init_db, get_db_connection, get_supabase_url, get_placeholder
 from core.db.reports import _format_timestamp
@@ -179,11 +180,235 @@ def classify_page_category(path: str) -> tuple[str, str]:
         return "ETF Matrix & Benchmarks", "📊"
     if clean_p.startswith("/admin"):
         return "Executive Admin Console", "🔐"
+    if clean_p.startswith("/equities") or clean_p.startswith("/stocks") or clean_p.startswith("/reports"):
+        return "Equities Screener & Directory", "📊"
+    if clean_p.startswith("/msme"):
+        return "MSME Enterprise Directory", "🏭"
     if any(clean_p.startswith(x) for x in ["/terms", "/privacy", "/refund", "/disclaimer"]):
         return "Legal & Policies", "📑"
     if clean_p.startswith("/contact") or clean_p.startswith("/support"):
         return "Investor Support Grievances", "📩"
     return "Platform Page", "🌐"
+
+
+def format_duration(seconds: float) -> str:
+    """Formats numeric seconds into human-readable duration string (e.g. 45s, 2m 14s, 1h 22m)."""
+    sec = int(round(seconds))
+    if sec < 60:
+        return f"{sec}s"
+    mins = sec // 60
+    rem = sec % 60
+    if mins < 60:
+        return f"{mins}m {rem:02d}s" if rem else f"{mins}m"
+    hrs = mins // 60
+    rem_m = mins % 60
+    return f"{hrs}h {rem_m:02d}m"
+
+
+def _estimate_default_dwell(path: str) -> float:
+    """Estimated default dwell time for terminal visits without subsequent events."""
+    p = (path or "").lower()
+    if "/dossier/" in p:
+        return 65.0
+    if any(k in p for k in ["/funds/", "/debt/", "/reits/", "/msme/"]):
+        return 55.0
+    if "/compare" in p:
+        return 45.0
+    if "/pricing" in p:
+        return 35.0
+    if any(k in p for k in ["/equities", "/discovery", "/funds", "/debt", "/reits", "/msme"]):
+        return 30.0
+    if p in ("/", "/safety-radar", "/sovereign"):
+        return 25.0
+    return 20.0
+
+
+def compute_page_dwell_and_visit_tree(all_events: list) -> dict:
+    """
+    Computes:
+    1. Average and aggregate dwell time per page route from inter-event deltas and explicit client dwell measurements.
+    2. Site Visit Tree / Transition Matrix tracking which pages contributed to which subsequent clicks within the site.
+    3. Global summary statistics (average session dwell, total transitions).
+    """
+    session_events = {}
+
+    for ev_row in all_events:
+        eid, sess_id, lp_col, det_raw, ev_tick, ev_type, ts_raw = ev_row[:7]
+        effective_sess = str(sess_id).strip() if sess_id and str(sess_id).strip() else f"anon_{eid}"
+
+        p = str(lp_col).strip() if lp_col else ""
+        det = {}
+        if det_raw:
+            try:
+                det = json.loads(det_raw) if isinstance(det_raw, str) else det_raw
+            except Exception:
+                det = {}
+
+        if not p and det:
+            p = det.get("landing_page") or det.get("path") or det.get("page") or ""
+            if not p and det.get("landing_url"):
+                try:
+                    from urllib.parse import urlparse
+                    p = urlparse(det["landing_url"]).path
+                except Exception:
+                    pass
+        if not p and ev_tick and str(ev_tick).upper() != "APP":
+            p = f"/dossier/{clean_ticker(ev_tick)}"
+        if not p:
+            if "COMPARE" in (ev_type or ""): p = "/compare"
+            elif "TICKET" in (ev_type or ""): p = "/contact"
+            elif "PDF" in (ev_type or ""): p = f"/dossier/{clean_ticker(ev_tick)}" if ev_tick else "/dossier"
+            else: p = "/"
+
+        if not p.startswith("/"):
+            p = "/" + p
+        if len(p) > 1 and p.endswith("/"):
+            p = p.rstrip("/")
+
+        ts = None
+        if ts_raw:
+            try:
+                s_ts = str(ts_raw).strip().replace("T", " ")[:19]
+                ts = datetime.strptime(s_ts, "%Y-%m-%d %H:%M:%S")
+            except Exception:
+                pass
+
+        if effective_sess not in session_events:
+            session_events[effective_sess] = []
+        session_events[effective_sess].append({
+            "path": p,
+            "timestamp": ts,
+            "details": det,
+            "event_type": ev_type
+        })
+
+    dwell_accum = {}
+    transitions = {}
+    session_exits = {}
+
+    for s_id, ev_list in session_events.items():
+        for i in range(len(ev_list)):
+            curr = ev_list[i]
+            p = curr["path"]
+            c_dwell = curr["details"].get("dwell_seconds") or curr["details"].get("duration_seconds")
+
+            # 1. Dwell time calculation
+            if c_dwell is not None and float(c_dwell) > 0:
+                dwell = min(float(c_dwell), 1800.0)
+            elif i + 1 < len(ev_list) and curr["timestamp"] and ev_list[i + 1]["timestamp"]:
+                delta = (ev_list[i + 1]["timestamp"] - curr["timestamp"]).total_seconds()
+                if 1.0 <= delta <= 1800.0:
+                    dwell = delta
+                else:
+                    dwell = _estimate_default_dwell(p)
+            else:
+                dwell = _estimate_default_dwell(p)
+
+            if p not in dwell_accum:
+                dwell_accum[p] = []
+            dwell_accum[p].append(dwell)
+
+            # 2. Site Visit Tree / Transitions tracking
+            c_to = curr["details"].get("to_path")
+            if c_to and c_to != p:
+                c_to_clean = c_to if c_to.startswith("/") else "/" + c_to
+                if len(c_to_clean) > 1 and c_to_clean.endswith("/"):
+                    c_to_clean = c_to_clean.rstrip("/")
+                if p not in transitions:
+                    transitions[p] = {}
+                transitions[p][c_to_clean] = transitions[p].get(c_to_clean, 0) + 1
+            elif i + 1 < len(ev_list):
+                next_p = ev_list[i + 1]["path"]
+                if next_p != p:
+                    if p not in transitions:
+                        transitions[p] = {}
+                    transitions[p][next_p] = transitions[p].get(next_p, 0) + 1
+            else:
+                session_exits[p] = session_exits.get(p, 0) + 1
+
+    page_dwell_times = []
+    all_dwell_values = []
+    for path, d_list in dwell_accum.items():
+        samples = len(d_list)
+        tot_sec = sum(d_list)
+        avg_sec = round(tot_sec / max(1, samples), 1)
+        all_dwell_values.extend(d_list)
+        cat_name, cat_icon = classify_page_category(path)
+
+        if avg_sec >= 90:
+            tier = "high"
+            tier_label = "Deep Read (>90s)"
+            badge_color = "#10b981"
+        elif avg_sec >= 35:
+            tier = "medium"
+            tier_label = "Engaged (35s–90s)"
+            badge_color = "#38bdf8"
+        else:
+            tier = "quick"
+            tier_label = "Glance (<35s)"
+            badge_color = "#94a3b8"
+
+        page_dwell_times.append({
+            "path": path,
+            "category": cat_name,
+            "icon": cat_icon,
+            "avg_dwell_seconds": avg_sec,
+            "formatted_avg_dwell": format_duration(avg_sec),
+            "total_dwell_seconds": round(tot_sec, 1),
+            "formatted_total_dwell": format_duration(tot_sec),
+            "visits_count": samples,
+            "tier": tier,
+            "tier_label": tier_label,
+            "badge_color": badge_color,
+        })
+
+    page_dwell_times.sort(key=lambda x: (x["total_dwell_seconds"], x["visits_count"]), reverse=True)
+
+    site_visit_tree = []
+    total_transitions_count = 0
+    for from_p, dest_dict in transitions.items():
+        total_outbound = sum(dest_dict.values())
+        total_transitions_count += total_outbound
+        exits = session_exits.get(from_p, 0)
+        cat_name, cat_icon = classify_page_category(from_p)
+
+        destinations = []
+        for to_p, cnt in sorted(dest_dict.items(), key=lambda x: x[1], reverse=True):
+            to_cat, to_icon = classify_page_category(to_p)
+            destinations.append({
+                "to_path": to_p,
+                "category": to_cat,
+                "icon": to_icon,
+                "count": cnt,
+                "percentage": round((cnt / max(1, total_outbound)) * 100.0, 1)
+            })
+
+        exit_rate = round((exits / max(1, total_outbound + exits)) * 100.0, 1)
+
+        site_visit_tree.append({
+            "from_path": from_p,
+            "category": cat_name,
+            "icon": cat_icon,
+            "total_outbound": total_outbound,
+            "exit_count": exits,
+            "exit_rate_pct": exit_rate,
+            "destinations": destinations
+        })
+
+    site_visit_tree.sort(key=lambda x: x["total_outbound"], reverse=True)
+
+    overall_avg_sec = round(sum(all_dwell_values) / max(1, len(all_dwell_values)), 1) if all_dwell_values else 0.0
+    overall_total_sec = sum(all_dwell_values) if all_dwell_values else 0.0
+
+    return {
+        "page_dwell_times": page_dwell_times,
+        "site_visit_tree": site_visit_tree,
+        "overall_avg_dwell_seconds": overall_avg_sec,
+        "formatted_overall_avg_dwell": format_duration(overall_avg_sec),
+        "total_dwell_hours": round(overall_total_sec / 3600.0, 2),
+        "total_navigation_transitions": total_transitions_count,
+        "top_contributing_page": site_visit_tree[0] if site_visit_tree else None
+    }
 
 
 def record_usage_event(
@@ -427,6 +652,13 @@ def get_site_usage_summary(days: int = None, start_date = None, end_date = None,
         "top_referrers": [],
         "top_landing_pages": [],
         "top_visited_pages": [],
+        "page_dwell_times": [],
+        "site_visit_tree": [],
+        "overall_avg_dwell_seconds": 0.0,
+        "formatted_overall_avg_dwell": "0s",
+        "total_dwell_hours": 0.0,
+        "total_navigation_transitions": 0,
+        "top_contributing_page": None,
         "geographic_distribution": [],
         "device_breakdown": [],
         "browser_breakdown": [],
@@ -613,10 +845,25 @@ def get_site_usage_summary(days: int = None, start_date = None, end_date = None,
                     "unique_sessions": len(v_data["sessions"]),
                     "percentage": round((v_data["views"] / total_all_views) * 100.0, 1)
                 })
+
+            # 5c. Link Dwell Times and Site Visit Navigation Tree
+            try:
+                flow_data = compute_page_dwell_and_visit_tree(all_events)
+                summary["page_dwell_times"] = flow_data.get("page_dwell_times", [])
+                summary["site_visit_tree"] = flow_data.get("site_visit_tree", [])
+                summary["overall_avg_dwell_seconds"] = flow_data.get("overall_avg_dwell_seconds", 0.0)
+                summary["formatted_overall_avg_dwell"] = flow_data.get("formatted_overall_avg_dwell", "0s")
+                summary["total_dwell_hours"] = flow_data.get("total_dwell_hours", 0.0)
+                summary["total_navigation_transitions"] = flow_data.get("total_navigation_transitions", 0)
+                summary["top_contributing_page"] = flow_data.get("top_contributing_page")
+            except Exception as dwell_tree_err:
+                logger.warning(f"Error computing dwell and site visit tree in telemetry: {dwell_tree_err}")
         except Exception as lp_err:
             logger.warning(f"Error computing top landing pages: {lp_err}")
             summary["top_landing_pages"] = []
             summary["top_visited_pages"] = []
+            summary["page_dwell_times"] = []
+            summary["site_visit_tree"] = []
 
         # 6. Geographic Distribution (Countries)
         try:
@@ -715,6 +962,56 @@ def get_site_usage_summary(days: int = None, start_date = None, end_date = None,
         cursor.close()
         conn.close()
     return summary
+
+
+def get_traffic_flow_analytics(days: int = None, start_date = None, end_date = None, exclude_tests: bool = True) -> dict:
+    """
+    Computes fine-grained link dwell times and internal transition navigation tree
+    across sessions for the traffic and landing pages analytics dashboard.
+    """
+    init_db()
+    conn = get_db_connection()
+    cursor = conn.cursor()
+    supabase_url = get_supabase_url()
+    try:
+        time_filter = _build_telemetry_time_filter(
+            supabase_url, days=days, start_date=start_date, end_date=end_date, exclude_tests=exclude_tests
+        )
+        try:
+            cursor.execute(f'''
+                SELECT id, session_id, COALESCE(landing_page, ''), details, ticker, event_type, timestamp
+                FROM site_usage_events
+                WHERE {time_filter}
+                ORDER BY timestamp ASC
+            ''')
+            all_events = cursor.fetchall()
+        except Exception:
+            cursor.execute(f'''
+                SELECT id, session_id, '', details, ticker, event_type, timestamp
+                FROM site_usage_events
+                WHERE {time_filter}
+                ORDER BY timestamp ASC
+            ''')
+            all_events = cursor.fetchall()
+        return compute_page_dwell_and_visit_tree(all_events)
+    except Exception as e:
+        logger.error(f"Error computing traffic flow analytics: {e}")
+        return {
+            "page_dwell_times": [],
+            "site_visit_tree": [],
+            "overall_avg_dwell_seconds": 0.0,
+            "formatted_overall_avg_dwell": "0s",
+            "total_dwell_hours": 0.0,
+            "total_navigation_transitions": 0,
+            "top_contributing_page": None
+        }
+    finally:
+        try:
+            cursor.close()
+            conn.close()
+        except Exception:
+            pass
+
 
 def get_session_journeys(days: int = None, start_date = None, end_date = None, limit: int = 25, exclude_tests: bool = True) -> list:
     """Reconstructs chronological user journeys grouped by session ID across a selectable date range."""
