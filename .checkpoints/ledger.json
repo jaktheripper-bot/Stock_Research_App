@@ -1198,5 +1198,21 @@
       "revision_count": 247
     },
     "preflight_passed": true
+  },
+  {
+    "tag": "checkpoint_20261016_100737_Multi-asset_anti-staleness_and_AMFI_ETF_surveillance",
+    "timestamp": "2026-10-16 10:07:37 IST",
+    "commit_sha": "42f4587d263f2673ff5b3d152954db43902e6a59",
+    "branch": "main",
+    "description": "Multi-asset anti-staleness and AMFI ETF surveillance",
+    "database": {
+      "exists": true,
+      "filename": "reports_checkpoint_20261016_100737_Multi-asset_anti-staleness_and_AMFI_ETF_surveillance.db",
+      "path": ".checkpoints/reports_checkpoint_20261016_100737_Multi-asset_anti-staleness_and_AMFI_ETF_surveillance.db",
+      "size_bytes": 15597568,
+      "report_count": 143,
+      "revision_count": 247
+    },
+    "preflight_passed": true
   }
 ]
