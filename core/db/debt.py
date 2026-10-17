@@ -326,7 +326,9 @@ def get_active_debt_securities(
         params.append(True if is_sdi else False)
 
     where_str = " AND ".join(clauses)
-    sql = f"SELECT * FROM corporate_debt_securities WHERE {where_str} ORDER BY ytm_pct DESC LIMIT {limit}"
+    p = "%s" if use_pg else "?"
+    sql = f"SELECT * FROM corporate_debt_securities WHERE {where_str} ORDER BY ytm_pct DESC LIMIT {p}"
+    params.append(int(limit))
 
     try:
         cursor.execute(sql, tuple(params))
@@ -435,8 +437,9 @@ def get_recent_rating_actions(limit: int = 50) -> List[Dict[str, Any]]:
     use_pg = is_postgres_connection(conn)
 
     try:
-        sql = f"SELECT * FROM credit_rating_events ORDER BY event_date DESC LIMIT {limit}"
-        cursor.execute(sql)
+        p = "%s" if use_pg else "?"
+        sql = f"SELECT * FROM credit_rating_events ORDER BY event_date DESC LIMIT {p}"
+        cursor.execute(sql, (int(limit),))
         rows = cursor.fetchall()
         return [clean_dict_row(cursor, r) for r in rows]
     except Exception as e:

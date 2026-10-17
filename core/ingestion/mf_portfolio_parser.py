@@ -18,7 +18,7 @@ import io
 import logging
 import re
 from datetime import date, datetime
-from typing import Any, Dict, Iterable, Iterator, List, Optional, Tuple
+from typing import Any, Dict, Iterable, Iterator, List, Optional, Tuple, Generator
 
 logger = logging.getLogger(__name__)
 
@@ -46,7 +46,7 @@ def sniff_format(data: bytes) -> str:
     return "csv"
 
 
-def load_sheets(data: bytes) -> Iterator[Tuple[str, Iterable[List[Any]]]]:
+def load_sheets(data: bytes) -> Generator[Tuple[str, Iterable[List[Any]]], None, None]:
     """Yields (sheet_name, row_iterator) for every sheet in an xlsx/xls/csv payload."""
     fmt = sniff_format(data)
     if fmt == "html":

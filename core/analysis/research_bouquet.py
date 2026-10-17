@@ -85,7 +85,7 @@ def compile_research_bouquet(edition_date: Optional[str] = None) -> Dict[str, An
                 "dossier_url": f"/dossier/{p.get('canonical', p.get('ticker'))}"
             })
     except Exception as eq_err:
-        logger.debug("Equity discovery picks notice for bouquet: %s", eq_err)
+        logger.warning("Equity discovery picks notice for bouquet: %s", eq_err)
         # Resilient fallback sample
         equity_picks = [
             {

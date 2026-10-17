@@ -93,7 +93,7 @@ def get_gemini_spends_summary() -> Dict[str, Any]:
                 if row:
                     copilot_user_turns = int(row[0] or 0)
             except Exception as e:
-                logger.debug(f"AI spend telemetry: agent_conversation_turns count query error: {e}")
+                logger.warning(f"AI spend telemetry: agent_conversation_turns count query error: {e}")
 
             # 4. Project AI Audits with Google Gemini
             try:
@@ -102,16 +102,16 @@ def get_gemini_spends_summary() -> Dict[str, Any]:
                 if row:
                     ai_audits_count = int(row[0] or 0)
             except Exception as e:
-                logger.debug(f"AI spend telemetry: project_audit_logs query error: {e}")
+                logger.warning(f"AI spend telemetry: project_audit_logs query error: {e}")
 
             # 5. Admin Copilot Actions
             try:
-                cursor.execute("SELECT COUNT(*) FROM admin_audit_log WHERE action_type LIKE '%COPILOT%' OR details LIKE '%copilot%';")
+                cursor.execute("SELECT COUNT(*) FROM admin_audit_log WHERE action LIKE '%COPILOT%' OR details LIKE '%copilot%';")
                 row = cursor.fetchone()
                 if row:
                     admin_copilot_turns = int(row[0] or 0)
             except Exception as e:
-                logger.debug(f"AI spend telemetry: admin_audit_log query error: {e}")
+                logger.warning(f"AI spend telemetry: admin_audit_log query error: {e}")
 
     except Exception as top_err:
         logger.warning(f"Error querying AI spend telemetry database: {top_err}")

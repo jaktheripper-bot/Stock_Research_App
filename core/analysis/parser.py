@@ -83,7 +83,7 @@ def format_citations_section(citations: list[dict], stock_data: dict = None) -> 
     seen = set()
     idx = 1
     for c in citations:
-        uri = (c.get("uri") or "").strip()
+        uri = (c.get("uri") or c.get("url") or "").strip()
         title = (c.get("title") or "Exchange / Public Document").strip()
         stype = (c.get("source_type") or "Verified Grounding").strip()
 
@@ -106,6 +106,8 @@ def format_citations_section(citations: list[dict], stock_data: dict = None) -> 
         elif title:
             lines.append(f"{idx}. **{title}** — *{stype}*")
             idx += 1
+
+    return "\n".join(lines)
 
 PILLAR_METADATA = {
     1: {

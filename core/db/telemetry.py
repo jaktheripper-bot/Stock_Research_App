@@ -13,13 +13,13 @@ logger = logging.getLogger("equity_research.core.db.telemetry")
 def get_admin_emails() -> set[str]:
     """Retrieves all registered administrator emails, lowercased."""
     try:
-        from core.db.admin import list_admin_users
+        from core.db.admin import list_admin_users, get_authorized_bootstrap_emails
         users = list_admin_users()
         emails = {u.get("email", "").strip().lower() for u in users if u.get("email")}
-        emails.add("lyndnpnto@gmail.com")
+        emails.update(get_authorized_bootstrap_emails())
         return emails
     except Exception:
-        return {"lyndnpnto@gmail.com"}
+        return {"admin@moatnomics.com"}
 
 
 def get_admin_user_ids() -> set[str]:
@@ -94,7 +94,7 @@ def is_admin_visit_event(
             return True
     if user_email:
         em = str(user_email).strip().lower()
-        if em == "lyndnpnto@gmail.com" or em.startswith("admin@"):
+        if em.startswith("admin@") or em in get_admin_emails():
             return True
         admin_emails = get_admin_emails()
         if em in admin_emails:
@@ -557,9 +557,9 @@ def _build_telemetry_time_filter(
 
     if exclude_tests:
         admin_emails = get_admin_emails()
-        admin_emails_sql = ", ".join(f"'{e}'" for e in sorted(admin_emails)) if admin_emails else "'lyndnpnto@gmail.com'"
+        admin_emails_sql = ", ".join(f"'{e}'" for e in sorted(admin_emails)) if admin_emails else "'admin@moatnomics.com'"
         admin_ids = get_admin_user_ids()
-        admin_ids_sql = ", ".join(f"'{i}'" for i in sorted(admin_ids)) if admin_ids else "'adm_owner_lyndon'"
+        admin_ids_sql = ", ".join(f"'{i}'" for i in sorted(admin_ids)) if admin_ids else "'adm_owner_primary'"
 
         base_clause += (
             # 1. Exclude synthetic test events & test runner traffic
@@ -1146,7 +1146,7 @@ def get_user_usage_analytics(days: int = None, start_date = None, end_date = Non
         # 1. Total registered users & Pro counts
         try:
             admin_emails = get_admin_emails()
-            admin_emails_sql = ", ".join(f"'{e}'" for e in sorted(admin_emails)) if admin_emails else "'lyndnpnto@gmail.com'"
+            admin_emails_sql = ", ".join(f"'{e}'" for e in sorted(admin_emails)) if admin_emails else "'admin@moatnomics.com'"
             cursor.execute(f"""
                 SELECT 
                     COUNT(*), 
@@ -1192,7 +1192,7 @@ def get_user_usage_analytics(days: int = None, start_date = None, end_date = Non
         # 3. Top active users in period
         try:
             admin_emails = get_admin_emails()
-            admin_emails_sql = ", ".join(f"'{e}'" for e in sorted(admin_emails)) if admin_emails else "'lyndnpnto@gmail.com'"
+            admin_emails_sql = ", ".join(f"'{e}'" for e in sorted(admin_emails)) if admin_emails else "'admin@moatnomics.com'"
             cursor.execute(f"""
                 SELECT 
                     e.user_email,
@@ -1285,9 +1285,9 @@ def purge_test_telemetry() -> dict:
     }
     try:
         admin_emails = get_admin_emails()
-        admin_emails_sql = ", ".join(f"'{e}'" for e in sorted(admin_emails)) if admin_emails else "'lyndnpnto@gmail.com'"
+        admin_emails_sql = ", ".join(f"'{e}'" for e in sorted(admin_emails)) if admin_emails else "'admin@moatnomics.com'"
         admin_ids = get_admin_user_ids()
-        admin_ids_sql = ", ".join(f"'{i}'" for i in sorted(admin_ids)) if admin_ids else "'adm_owner_lyndon'"
+        admin_ids_sql = ", ".join(f"'{i}'" for i in sorted(admin_ids)) if admin_ids else "'adm_owner_primary'"
 
         # 1. Purge synthetic test events & admin visit events from site_usage_events
         cursor.execute(f"""

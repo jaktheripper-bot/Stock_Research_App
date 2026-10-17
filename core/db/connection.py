@@ -237,6 +237,10 @@ def get_db_connection():
 
     return _get_raw_connection()
 
+# Alias for standard DB connection access
+get_connection = get_db_connection
+
+
 def init_db(force: bool = False):
     """Initializes tables and executes incremental schema migrations (v001 - v027)."""
     global _DB_INITIALIZED, _INITIALIZED_DBS
@@ -1105,7 +1109,7 @@ def init_db(force: bool = False):
                         CREATE INDEX IF NOT EXISTS idx_admin_audit_email ON admin_audit_log(admin_email);
 
                         INSERT INTO admin_users (id, email, role, totp_enabled, created_at, updated_at)
-                        VALUES ('adm_owner_lyndon', 'lyndnpnto@gmail.com', 'owner', FALSE, now(), now())
+                        VALUES ('adm_owner_primary', 'admin@moatnomics.com', 'owner', FALSE, now(), now())
                         ON CONFLICT (email) DO NOTHING;
 
                         INSERT INTO schema_migrations (version) VALUES ('v014_admin_users_and_audit_trail') ON CONFLICT DO NOTHING;
@@ -1141,7 +1145,7 @@ def init_db(force: bool = False):
                     cursor.execute("CREATE INDEX IF NOT EXISTS idx_admin_audit_email ON admin_audit_log(admin_email);")
                     cursor.execute("""
                         INSERT OR IGNORE INTO admin_users (id, email, role, totp_enabled)
-                        VALUES ('adm_owner_lyndon', 'lyndnpnto@gmail.com', 'owner', 0);
+                        VALUES ('adm_owner_primary', 'admin@moatnomics.com', 'owner', 0);
                     """)
                     cursor.execute("INSERT OR IGNORE INTO schema_migrations (version) VALUES ('v014_admin_users_and_audit_trail');")
                 conn.commit()

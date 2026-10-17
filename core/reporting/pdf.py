@@ -1,5 +1,6 @@
 """Executive PDF Compilation Component for Stock Research App."""
 
+import json
 import logging
 import os
 import re as re_mod

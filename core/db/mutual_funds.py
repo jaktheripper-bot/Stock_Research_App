@@ -252,7 +252,12 @@ def get_active_mutual_funds(
         params.append(broad_category.strip().upper())
 
     where_str = f"WHERE {' AND '.join(clauses)}" if clauses else ""
-    limit_str = f"LIMIT {int(limit)}" if limit and isinstance(limit, int) and limit > 0 else ""
+    if limit and isinstance(limit, int) and limit > 0:
+        p = "%s" if use_pg else "?"
+        limit_str = f"LIMIT {p}"
+        params.append(int(limit))
+    else:
+        limit_str = ""
     sql = f"SELECT * FROM mutual_fund_schemes {where_str} ORDER BY aum_crores DESC {limit_str}".strip()
 
     try:

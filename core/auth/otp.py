@@ -31,7 +31,10 @@ RESEND_COOLDOWN_SECONDS = 60
 
 
 def _hash_otp(email: str, code: str) -> str:
-    salt = os.environ.get("ADMIN_API_KEY", "stock_research_otp_salt_2026")
+    salt = os.environ.get("ADMIN_API_KEY") or os.environ.get("SECRET_KEY") or os.environ.get("SUPABASE_JWT_SECRET")
+    if not salt:
+        import sys
+        salt = hashlib.sha256(f"{os.getpid()}:{sys.executable}".encode()).hexdigest()
     payload = f"{email.strip().lower()}:{code.strip()}:{salt}"
     return hashlib.sha256(payload.encode("utf-8")).hexdigest()
 

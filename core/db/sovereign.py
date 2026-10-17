@@ -861,7 +861,11 @@ def get_etf_matrix(
         }
         order_sql = sort_map.get(sort_by, "aum_crores DESC")
 
-        limit_sql = f"LIMIT {int(limit)}" if limit and isinstance(limit, int) and limit > 0 else ""
+        if limit and isinstance(limit, int) and limit > 0:
+            limit_sql = f"LIMIT {p}"
+            params.append(int(limit))
+        else:
+            limit_sql = ""
 
         sql = f"""
             SELECT id, symbol, scheme_name, category, underlying_index,

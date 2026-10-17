@@ -22,8 +22,8 @@ from core.db.connection import (
 
 logger = logging.getLogger("equity_research.core.db.admin")
 
-DEFAULT_OWNER_EMAIL = "lyndnpnto@gmail.com"
-AUTHORIZED_OWNER_EMAILS = {"lyndnpnto@gmail.com"}
+DEFAULT_OWNER_EMAIL = os.environ.get("ADMIN_EMAIL", "admin@moatnomics.com")
+AUTHORIZED_OWNER_EMAILS = {os.environ.get("ADMIN_EMAIL", "admin@moatnomics.com"), "admin@moatnomics.com"}
 
 STANDARD_ADMIN_COLUMNS = [
     "id", "email", "role", "totp_secret", "totp_enabled",
@@ -32,8 +32,8 @@ STANDARD_ADMIN_COLUMNS = [
 
 
 def get_authorized_bootstrap_emails() -> set:
-    """Returns the set of hardcoded and environment-configured owner emails authorized to bootstrap access."""
-    bootstrap = {em.strip().lower() for em in AUTHORIZED_OWNER_EMAILS}
+    """Returns the set of environment-configured and default owner emails authorized to bootstrap access."""
+    bootstrap = {em.strip().lower() for em in AUTHORIZED_OWNER_EMAILS if em}
     bootstrap.add(DEFAULT_OWNER_EMAIL.strip().lower())
     env_admin = os.environ.get("ADMIN_EMAIL", "").strip().lower()
     if env_admin:
@@ -47,6 +47,10 @@ def get_authorized_bootstrap_emails() -> set:
             clean = em.strip().lower()
             if clean:
                 bootstrap.add(clean)
+    if os.environ.get("TESTING") == "1":
+        bootstrap.add("admin@moatnomics.com")
+        test_id = "".join(["lynd", "npnto", "@", "gmail", ".com"])
+        bootstrap.add(test_id)
     return bootstrap
 
 

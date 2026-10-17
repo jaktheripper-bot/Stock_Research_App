@@ -327,11 +327,11 @@ def add_user_credits(
         cust_email = acc_info[0] if acc_info else f"{clean_id}@stockresearch.ai"
         cust_name = acc_info[1] if acc_info else "Investor"
 
-        # Compute GST breakdown (Inclusive of 18% GST)
+        # Unregistered independent software tool: zero GST tax breakdown
         amt = float(amount_inr)
         if amt > 0:
-            base_amt = round(amt / 1.18, 2)
-            gst_amt = round(amt - base_amt, 2)
+            base_amt = round(amt, 2)
+            gst_amt = 0.0
         else:
             base_amt = 0.0
             gst_amt = 0.0
@@ -464,8 +464,8 @@ def get_all_billables(status: Optional[str] = None, limit: int = 100, offset: in
             base = float(r[13] or 0.0)
             gst = float(r[14] or 0.0)
             if amt > 0 and base == 0.0 and gst == 0.0:
-                base = round(amt / 1.18, 2)
-                gst = round(amt - base, 2)
+                base = round(amt, 2)
+                gst = 0.0
 
             # Classify transaction nature (Verified Cash vs Free Token Grant vs Simulation)
             g_ord = (r[5] or "").lower()
@@ -553,7 +553,7 @@ def get_revenue_analytics_summary(days: int = None, start_date = None, end_date 
         if exclude_tests:
             from core.db.telemetry import get_admin_emails
             admin_emails = get_admin_emails()
-            admin_emails_sql = ", ".join(f"'{e}'" for e in sorted(admin_emails)) if admin_emails else "'lyndnpnto@gmail.com'"
+            admin_emails_sql = ", ".join(f"'{e}'" for e in sorted(admin_emails)) if admin_emails else "'admin@moatnomics.com'"
             time_filter_tx += (
                 f" AND (customer_email IS NULL OR ("
                 f"     customer_email NOT LIKE '%@example.com'"
@@ -565,7 +565,7 @@ def get_revenue_analytics_summary(days: int = None, start_date = None, end_date 
                 f" AND (user_id IS NULL OR ("
                 f"     user_id NOT LIKE 'test_%'"
                 f" AND user_id NOT LIKE 'usr_test_%'"
-                f" AND user_id NOT IN ('guest_web_user', 'testclient', 'test_admin', 'test_user', 'admin', 'adm_owner_lyndon')"
+                f" AND user_id NOT IN ('guest_web_user', 'testclient', 'test_admin', 'test_user', 'admin', 'adm_owner_primary', 'adm_owner_lyndon')"
                 f"))"
                 f" AND (gateway_order_id IS NULL OR ("
                 f"     gateway_order_id NOT LIKE 'order_test_%'"
@@ -631,7 +631,7 @@ def get_revenue_analytics_summary(days: int = None, start_date = None, end_date 
             if exclude_tests:
                 from core.db.telemetry import get_admin_emails
                 admin_emails = get_admin_emails()
-                admin_emails_sql = ", ".join(f"'{e}'" for e in sorted(admin_emails)) if admin_emails else "'lyndnpnto@gmail.com'"
+                admin_emails_sql = ", ".join(f"'{e}'" for e in sorted(admin_emails)) if admin_emails else "'admin@moatnomics.com'"
                 user_where = (
                     f"WHERE email NOT LIKE '%@example.com' "
                     f"  AND email NOT LIKE '%@test.com' "
@@ -641,7 +641,7 @@ def get_revenue_analytics_summary(days: int = None, start_date = None, end_date 
                     f"  AND id NOT LIKE 'test_%' "
                     f"  AND id NOT LIKE 'usr_test_%' "
                     f"  AND id NOT LIKE 'adm_%' "
-                    f"  AND id NOT IN ('guest_web_user', 'test_user', 'testclient', 'test_admin', 'admin', 'adm_owner_lyndon') "
+                    f"  AND id NOT IN ('guest_web_user', 'test_user', 'testclient', 'test_admin', 'admin', 'adm_owner_primary', 'adm_owner_lyndon') "
                     f"  AND LOWER(email) NOT IN ({admin_emails_sql})"
                 )
             cursor.execute(f"SELECT SUM(credits_balance), COUNT(CASE WHEN subscription_tier IN ('pro_monthly', 'pro_annual') THEN 1 END) FROM user_accounts {user_where};")

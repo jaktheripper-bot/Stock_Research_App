@@ -71,6 +71,9 @@ class TestAdminAuthSuite(unittest.TestCase):
         self.assertEqual(owner["role"], "owner")
         self.assertEqual(owner["email"].lower(), "lyndnpnto@gmail.com")
     
+        # Ensure test isolation by clearing any leftover test admin
+        remove_admin_user("test_admin@example.com", requesting_email="lyndnpnto@gmail.com")
+
         # Add a new admin
         ok, msg = add_admin_user("test_admin@example.com", role="admin", invited_by="lyndnpnto@gmail.com")
         self.assertTrue(ok)

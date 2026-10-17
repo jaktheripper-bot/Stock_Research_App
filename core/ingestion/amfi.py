@@ -34,16 +34,13 @@ CACHE_TTL_SECONDS = 12 * 3600  # 12 hours
 
 
 def _get_ssl_context() -> ssl.SSLContext:
-    """Creates a resilient SSL context, falling back to unverified if certificates fail."""
+    """Creates a verified SSL context using certifi CA bundle or system certificates."""
     try:
         import certifi
         return ssl.create_default_context(cafile=certifi.where())
     except Exception as cert_err:
         logger.debug("certifi context notice: %s", cert_err)
-    try:
-        return ssl.create_default_context()
-    except Exception:
-        return ssl._create_unverified_context()
+    return ssl.create_default_context()
 
 
 def fetch_amfi_nav_raw(force_refresh: bool = False, timeout_sec: int = 20) -> str:

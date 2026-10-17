@@ -36,7 +36,7 @@ def get_admin_notification_email() -> str:
     return (
         _get_cfg("ADMIN_ALERT_EMAIL")
         or _get_cfg("ADMIN_EMAIL")
-        or "lyndnpnto@gmail.com"
+        or "admin@moatnomics.com"
     )
 
 

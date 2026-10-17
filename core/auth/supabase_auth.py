@@ -12,6 +12,7 @@ import os
 import re
 import logging
 import requests
+import contextvars
 from typing import Optional, Dict, Any, Tuple
 
 from core.db import (
@@ -24,8 +25,8 @@ from core.config import get_secret
 
 logger = logging.getLogger("equity_research.core.auth")
 
-_BARE_USER_SESSION = None
-_BARE_AUTH_TOKEN = None
+_user_session_var: contextvars.ContextVar[Optional[Dict[str, Any]]] = contextvars.ContextVar("user_session", default=None)
+_auth_token_var: contextvars.ContextVar[Optional[str]] = contextvars.ContextVar("auth_token", default=None)
 
 def _is_streamlit_running() -> bool:
     return False
@@ -40,8 +41,6 @@ def get_supabase_auth_config() -> Dict[str, str]:
     # Fallback: Extract from SUPABASE_DB_URL
     if not supabase_url:
         db_url = get_supabase_url() or ""
-        # e.g. postgresql://postgres.omswdxrtzrvlszkidssh:pass@aws-0-ap-southeast-1.pooler.supabase.com:5432/postgres
-        # or postgres://...@[ref].supabase.co
         match = re.search(r"postgres(?:ql)?://(?:postgres\.)?([a-z0-9]+):", db_url)
         if match:
             project_ref = match.group(1)
@@ -73,8 +72,7 @@ def get_google_oauth_url(redirect_uri: Optional[str] = None) -> str:
 def send_magic_link(email: str, redirect_uri: Optional[str] = None) -> Tuple[bool, str]:
     """
     Dispatches a Supabase Magic Link / OTP login email to the user.
-    If Supabase Anon Key is configured, sends via GoTrue API.
-    If not yet configured, completes direct verified sign-in for seamless onboarding.
+    Strictly verifies email delivery via Supabase GoTrue API; never auto-logs in unverified users.
     """
     clean_email = email.strip().lower()
     if not clean_email or "@" not in clean_email or "." not in clean_email.split("@")[-1]:
@@ -104,44 +102,24 @@ def send_magic_link(email: str, redirect_uri: Optional[str] = None) -> Tuple[boo
                 return True, f"Magic link dispatched! Check your inbox ({clean_email}) to complete sign in."
             else:
                 logger.warning(f"Supabase OTP error: {resp.status_code} - {resp.text}")
-                # Fallback to direct sign-in if email server is pending SMTP setup
-                return _complete_direct_signin(clean_email)
+                return False, f"Failed to dispatch magic link. Authentication gateway returned {resp.status_code}."
         except Exception as e:
             logger.error(f"Failed to dispatch magic link via Supabase: {e}")
-            return _complete_direct_signin(clean_email)
+            return False, f"Authentication service error: {e}"
 
-    # Frictionless immediate access fallback when external SMTP is not yet wired
-    return _complete_direct_signin(clean_email)
-
-
-def _complete_direct_signin(clean_email: str) -> Tuple[bool, str]:
-    """
-    Directly signs in or registers the user in Supabase Postgres user_accounts,
-    assigning 2 welcome credits immediately.
-    """
-    user_id = f"usr_{clean_email.replace('@', '_at_').replace('.', '_')}"
-    user = get_or_create_user(
-        user_id=user_id,
-        email=clean_email,
-        full_name=clean_email.split("@")[0].capitalize(),
-    )
-    if user:
-        set_session_user(user)
-        return True, f"Welcome {user.get('full_name')}! You have received 2 free research credits."
-    return False, "Could not initialize user profile. Please try again."
+    return False, "Authentication service is not configured. Please use Google Sign-In or contact support."
 
 
 def set_session_user(user_record: Dict[str, Any], auth_token: Optional[str] = None):
-    """Stores active user session record into Streamlit session state or bare storage."""
-    global _BARE_USER_SESSION, _BARE_AUTH_TOKEN
-    _BARE_USER_SESSION = user_record
-    _BARE_AUTH_TOKEN = auth_token
+    """Stores active user session record into thread-safe ContextVar."""
+    _user_session_var.set(user_record)
+    _auth_token_var.set(auth_token)
     logger.info(f"Active session set for: {user_record.get('email')} (Credits: {user_record.get('credits_balance')})")
 
 
 def get_current_user() -> Optional[Dict[str, Any]]:
     """Returns the currently authenticated user dictionary or None if unauthenticated."""
-    return _BARE_USER_SESSION
+    return _user_session_var.get()
 
 
 def is_authenticated() -> bool:
@@ -152,9 +130,9 @@ def is_authenticated() -> bool:
 
 def sign_out_user():
     """Clears active user session."""
-    global _BARE_USER_SESSION, _BARE_AUTH_TOKEN
-    _BARE_USER_SESSION = None
-    _BARE_AUTH_TOKEN = None
+    _user_session_var.set(None)
+    _auth_token_var.set(None)
+
 
 
 def refresh_current_user() -> Optional[Dict[str, Any]]:

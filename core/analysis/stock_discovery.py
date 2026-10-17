@@ -367,3 +367,13 @@ def curate_morning_discovery_cohort(
         f"Fresh turnover: {len(fresh_selected)}/{len(selected_cohort)} ({rotation_pct:.1f}% rotation vs prior edition)."
     )
     return selected_cohort
+
+
+def get_daily_discovery_picks(edition_date: Optional[str] = None, limit: int = 3) -> List[Dict[str, Any]]:
+    """Retrieves top daily discovery picks for research bouquets or digest summaries."""
+    from core.db.discovery import get_active_discovery_reel
+    reel = get_active_discovery_reel(edition_date=edition_date)
+    if not reel:
+        reel = curate_morning_discovery_cohort(target_count=max(limit, 12), edition_date=edition_date)
+    return reel[:limit] if reel else []
+

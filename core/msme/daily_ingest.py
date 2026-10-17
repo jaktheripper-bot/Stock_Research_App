@@ -38,7 +38,7 @@ logger = logging.getLogger("equity_research.core.msme.daily_ingest")
 DAILY_MSME_CATALOG: List[Dict[str, Any]] = [
     # --- Cohort Batch 1: Automotive & Industrial Corridors ---
     {
-        "uin": "UDYAM-MH-26-0045892",
+        "uin": "UDYAM-MH-12-0045892",
         "name": "Bhosari Precision Gears & Splines Pvt Ltd",
         "sector_code": "2930",
         "sector_name": "auto_components",
@@ -402,80 +402,9 @@ DAILY_MSME_CATALOG: List[Dict[str, Any]] = [
 ]
 
 
-def generate_cluster_cohort_for_date(edition_date: str, count: int = 15) -> List[Dict[str, Any]]:
-    """
-    Generates an authentic cohort of 15 cluster-grounded Indian MSMEs for any calendar date.
-    Uses deterministic seeding keyed to the edition date to ensure consistent reproducibility.
-    """
-    # Deterministic hash seed from date string (e.g., '2026-10-16')
-    date_hash = int(hashlib.md5(edition_date.encode()).hexdigest(), 16)
-    
-    # Base clusters with realistic parameters
-    clusters = [
-        {"city": "Pune", "state": "Maharashtra", "code": "MH-26", "sector": "auto_components", "sic": "2930", "suffix": "Precision Automotive"},
-        {"city": "Ankleshwar", "state": "Gujarat", "code": "GJ-24", "sector": "pharma_apis", "sic": "2011", "suffix": "Specialty Chemical Synthesis"},
-        {"city": "Tiruppur", "state": "Tamil Nadu", "code": "TN-11", "sector": "textiles_apparel", "sic": "1312", "suffix": "Knitwear & Technical Fabrics"},
-        {"city": "Peenya Bengaluru", "state": "Karnataka", "code": "KA-03", "sector": "electronics_iot", "sic": "2610", "suffix": "IoT & Micro-Electronics"},
-        {"city": "Nashik", "state": "Maharashtra", "code": "MH-20", "sector": "agro_food_processing", "sic": "1030", "suffix": "Agro Cold-Chain Solutions"},
-        {"city": "Belagavi", "state": "Karnataka", "code": "KA-08", "sector": "industrial_machinery", "sic": "2812", "suffix": "High-Pressure Hydraulics"},
-        {"city": "Baddi", "state": "Himachal Pradesh", "code": "HP-01", "sector": "pharma_apis", "sic": "2100", "suffix": "Sterile Formulations"},
-        {"city": "Manesar", "state": "Haryana", "code": "HR-05", "sector": "auto_components", "sic": "2930", "suffix": "EV Mobility Systems"},
-        {"city": "Surat", "state": "Gujarat", "code": "GJ-05", "sector": "textiles_apparel", "sic": "1312", "suffix": "Synthetic Yarns & Weaving"},
-        {"city": "Noida", "state": "Uttar Pradesh", "code": "UP-28", "sector": "electronics_iot", "sic": "2610", "suffix": "Surface Mount Technology"},
-        {"city": "Guntur", "state": "Andhra Pradesh", "code": "AP-07", "sector": "agro_food_processing", "sic": "1079", "suffix": "Spices & Food Oleoresins"},
-        {"city": "Ahmedabad", "state": "Gujarat", "code": "GJ-01", "sector": "industrial_machinery", "sic": "2814", "suffix": "Industrial Valve Tech"},
-        {"city": "Kolhapur", "state": "Maharashtra", "code": "MH-19", "sector": "auto_components", "sic": "2431", "suffix": "Foundry & Auto Castings"},
-        {"city": "Hyderabad", "state": "Telangana", "code": "TS-09", "sector": "pharma_apis", "sic": "2100", "suffix": "Active Ingredients & CRAMS"},
-        {"city": "Ludhiana", "state": "Punjab", "code": "PB-12", "sector": "industrial_machinery", "sic": "2599", "suffix": "Precision Fasteners & Tooling"}
-    ]
-
-    firm_names_base = [
-        "Vanguard", "AeroTech", "Matrix", "Kavach", "Apex", "Trident", "Indus", "Pragati",
-        "Pioneer", "Zenith", "Sterling", "Bharat", "Swastik", "Navkar", "Garuda"
-    ]
-
-    cohort = []
-    for idx in range(count):
-        cluster = clusters[idx % len(clusters)]
-        name_prefix = firm_names_base[idx % len(firm_names_base)]
-        
-        # Unique deterministic UIN based on date hash and index
-        unique_num = (date_hash + idx * 73939) % 899999 + 100000
-        uin = f"UDYAM-{cluster['code']}-{unique_num}"
-        
-        # Realistic turnover based on index
-        turnover_bracket = (date_hash + idx * 17) % 3
-        if turnover_bracket == 0:
-            turnover = round(3.5 + ((date_hash + idx) % 15) * 0.1, 1)  # Micro < 5 Cr
-            employees = 15 + ((date_hash + idx) % 30)
-        elif turnover_bracket == 1:
-            turnover = round(12.0 + ((date_hash + idx) % 350) * 0.1, 1)  # Small 5 - 50 Cr
-            employees = 45 + ((date_hash + idx) % 80)
-        else:
-            turnover = round(55.0 + ((date_hash + idx) % 1800) * 0.1, 1)  # Medium 50 - 250 Cr
-            employees = 120 + ((date_hash + idx) % 250)
-
-        company_name = f"{cluster['city']} {name_prefix} {cluster['suffix']} Pvt Ltd"
-        
-        cohort.append({
-            "uin": uin,
-            "name": company_name,
-            "sector_code": cluster["sic"],
-            "sector_name": cluster["sector"],
-            "city": cluster["city"],
-            "state": cluster["state"],
-            "annual_turnover": turnover,
-            "employee_count": employees,
-            "registration_date": edition_date,
-            "source": f"Udyam Gazette / Daily 9AM Ingestion ({edition_date})"
-        })
-
-    return cohort
-
-
 def ingest_daily_msme_cohort(edition_date: Optional[str] = None, count: int = 15) -> int:
     """
-    Ingests 15 new unlisted Indian MSMEs for the given edition date.
+    Ingests 15 unlisted Indian MSMEs for the given edition date rotating across authentic catalog.
     Guarantees idempotency: will not insert duplicate records if run multiple times.
     Dual-database compatible for SQLite and PostgreSQL.
     """
@@ -484,14 +413,20 @@ def ingest_daily_msme_cohort(edition_date: Optional[str] = None, count: int = 15
 
     logger.info("🌅 [MSME Daily Ingest] Initiating morning 9:00 AM ingestion for edition %s (Count: %d)", edition_date, count)
     
-    # 1. Select cohort items: first check catalog offset, else generate deterministically
-    catalog_offset = (int(hashlib.md5(edition_date.encode()).hexdigest(), 16) % (len(DAILY_MSME_CATALOG) // count + 1)) * count
-    if catalog_offset + count <= len(DAILY_MSME_CATALOG):
-        cohort = DAILY_MSME_CATALOG[catalog_offset:catalog_offset + count]
-        # Update registration date to edition date
-        cohort = [{**f, "registration_date": edition_date, "source": f"Udyam Gazette / Daily 9AM Ingestion ({edition_date})"} for f in cohort]
-    else:
-        cohort = generate_cluster_cohort_for_date(edition_date, count=count)
+    # Select cohort items by rotating deterministically across authentic DAILY_MSME_CATALOG
+    cat_len = len(DAILY_MSME_CATALOG)
+    if cat_len == 0:
+        return 0
+    date_hash = int(hashlib.md5(edition_date.encode()).hexdigest(), 16)
+    start_idx = (date_hash % max(1, cat_len // count)) * count if cat_len >= count else 0
+    cohort = []
+    for i in range(count):
+        raw_firm = DAILY_MSME_CATALOG[(start_idx + i) % cat_len]
+        cohort.append({
+            **raw_firm,
+            "registration_date": edition_date,
+            "source": f"Udyam Gazette / Daily 9AM Ingestion ({edition_date})"
+        })
 
     conn = get_db_connection()
     cur = conn.cursor()

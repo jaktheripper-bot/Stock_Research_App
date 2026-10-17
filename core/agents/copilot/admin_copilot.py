@@ -434,22 +434,21 @@ def execute_confirmed_admin_action(
         if not order_id or not user_email:
             return {"success": False, "error": "Both order_id and user_email are required for refunds."}
 
-        res = process_refund(gateway_order_id=order_id, user_email=user_email, reason=reason)
-        if res.get("success"):
+        success, msg = process_refund(transaction_id=order_id, reason=reason, admin_notes=f"User: {user_email}")
+        if success:
             record_admin_audit(
                 admin_email=admin_email,
                 action="REFUND_VIA_COPILOT",
                 target_type="order",
                 target_id=order_id,
-                details={"user_email": user_email, "amount": res.get("refund_amount", 0.0), "reason": reason},
+                details={"user_email": user_email, "reason": reason, "result": msg},
                 ip_address=client_ip,
                 user_agent=user_agent
             )
             return {
                 "success": True,
                 "order_id": order_id,
-                "refund_amount": res.get("refund_amount", 0.0),
-                "message": f"Refund of ₹{res.get('refund_amount', 0.0)} processed successfully for order {order_id}."
+                "message": msg
             }
         else:
             record_admin_audit(
@@ -457,11 +456,11 @@ def execute_confirmed_admin_action(
                 action="REFUND_FAILED_VIA_COPILOT",
                 target_type="order",
                 target_id=order_id,
-                details={"user_email": user_email, "error": res.get("error")},
+                details={"user_email": user_email, "error": msg},
                 ip_address=client_ip,
                 user_agent=user_agent
             )
-            return {"success": False, "error": res.get("error", "Refund processing failed.")}
+            return {"success": False, "error": msg}
 
     # 4. PURGE_TEST_DATA
     elif action_type == AdminActionType.PURGE_TEST_DATA:

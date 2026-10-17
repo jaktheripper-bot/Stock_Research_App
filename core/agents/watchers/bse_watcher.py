@@ -33,7 +33,7 @@ async def _recheck_equity_thesis_background(ticker: str, headline: str):
         )
         logger.info(f"✅ [BSE Watcher] Background thesis review completed for {ticker}")
     except Exception as e:
-        logger.debug(f"BSE watcher background synthesis notice for {ticker}: {e}")
+        logger.warning(f"BSE watcher background synthesis notice for {ticker}: {e}")
 
 
 async def scan_watchlist_bse_announcements() -> List[Dict[str, Any]]:

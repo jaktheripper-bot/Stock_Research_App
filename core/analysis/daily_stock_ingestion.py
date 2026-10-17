@@ -235,7 +235,7 @@ def generate_deterministic_7pillar_report(stock_data: Dict[str, Any], candidate_
     solvency_rating = "Debt-Free" if de <= 0.05 else ("Moderate Debt" if de <= 0.5 else "High Debt")
     valuation_rating = "Fair" if pe != "N/A" else "Undervalued"
 
-    report_markdown = f"""You are an institutional equity research analyst. Write a comprehensive research report for {ticker}.
+    report_markdown = f"""# Institutional Equity Research Dossier: {company_name} ({ticker})
 
 ### Health Matrix
 - Macro: Stable

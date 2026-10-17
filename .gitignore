@@ -24,3 +24,5 @@ audits/
 
 # Manually supplied AMC portfolio workbooks (large, re-downloadable)
 data/amc_portfolios/
+moatnomics_codebase.txt
+project_structure.txt
