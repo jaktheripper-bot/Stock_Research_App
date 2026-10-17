@@ -207,23 +207,32 @@ async def run_daily_discovery_scheduler():
     Initiates automatic crawling & screening of BSE listed companies at 09:00 AM IST daily.
     """
     logger.info("🌅 [Discovery Scheduler] Background BSE surveillance crawler initiated.")
+    last_stock_run_date = None
+    last_msme_run_date = None
+
     try:
         now = datetime.now(IST)
         today_str = now.strftime("%Y-%m-%d")
-        from core.db.discovery import get_active_discovery_reel
         from core.analysis.daily_stock_ingestion import ingest_daily_stock_cohort
+        from core.msme.daily_ingest import ingest_daily_msme_cohort
 
         loop = asyncio.get_running_loop()
         is_past_830 = (now.hour > 8) or (now.hour == 8 and now.minute >= 30)
+        is_past_900 = now.hour >= 9
+
         if is_past_830:
-            active_today = [x for x in get_active_discovery_reel(today_str, exclude_tests=True, allow_fallback=False)]
-            if not active_today:
-                logger.info(f"🌅 [Discovery Scheduler] Missing 08:30 AM cohort for today ({today_str}). Triggering daily 15-stock ingestion...")
-                await loop.run_in_executor(None, ingest_daily_stock_cohort, today_str, 15, False)
-                logger.info(f"🌅 [Discovery Scheduler] 15-stock ingestion & mutual fund look-through re-audit completed for {today_str}.")
-            from core.msme.daily_ingest import ingest_daily_msme_cohort
-            await loop.run_in_executor(None, ingest_daily_msme_cohort, today_str, 15)
+            logger.info(f"🌅 [Discovery Scheduler] Past 08:30 AM IST on boot for {today_str}. Triggering daily 15-stock ingestion...")
+            await loop.run_in_executor(None, ingest_daily_stock_cohort, today_str, 15, False)
+            logger.info(f"🌅 [Discovery Scheduler] 15-stock ingestion & mutual fund look-through re-audit completed for {today_str}.")
+            last_stock_run_date = today_str
+
+            if is_past_900:
+                logger.info(f"🏭 [Discovery Scheduler] Past 09:00 AM IST on boot for {today_str}. Triggering daily MSME cohort ingestion...")
+                await loop.run_in_executor(None, ingest_daily_msme_cohort, today_str, 15)
+                logger.info(f"🏭 [Discovery Scheduler] MSME cohort ingestion completed for {today_str}.")
+                last_msme_run_date = today_str
         else:
+            from core.db.discovery import get_active_discovery_reel
             active_existing = [x for x in get_active_discovery_reel(exclude_tests=True, allow_fallback=True)]
             if not active_existing:
                 yesterday_str = (now - timedelta(days=1)).strftime("%Y-%m-%d")
@@ -232,35 +241,28 @@ async def run_daily_discovery_scheduler():
     except Exception as boot_err:
         logger.warning(f"🌅 [Discovery Scheduler] Catch-up check notice: {boot_err}")
 
-    last_run_date = None
-    try:
-        now = datetime.now(IST)
-        today_str = now.strftime("%Y-%m-%d")
-        if get_active_discovery_reel(today_str, exclude_tests=True, allow_fallback=False):
-            last_run_date = today_str
-    except Exception as e:
-        logger.debug(f"[Discovery Scheduler] Initial reel check notice: {e}")
-
     while True:
         try:
             await asyncio.sleep(60)
             now = datetime.now(IST)
             today_str = now.strftime("%Y-%m-%d")
             is_past_830 = (now.hour > 8) or (now.hour == 8 and now.minute >= 30)
-            if is_past_830 and last_run_date != today_str:
-                from core.db.discovery import get_active_discovery_reel
-                active_today = get_active_discovery_reel(today_str, exclude_tests=True, allow_fallback=False)
+            is_past_900 = now.hour >= 9
+            loop = asyncio.get_running_loop()
+
+            if is_past_830 and last_stock_run_date != today_str:
                 from core.analysis.daily_stock_ingestion import ingest_daily_stock_cohort
+                logger.info(f"🌅 [Discovery Scheduler] 08:30 AM IST trigger reached for {today_str}. Running daily 15-stock ingestion...")
+                await loop.run_in_executor(None, ingest_daily_stock_cohort, today_str, 15, False)
+                logger.info(f"🌅 [Discovery Scheduler] Daily 15-stock ingestion & mutual fund look-through re-audit completed for {today_str}.")
+                last_stock_run_date = today_str
+
+            if is_past_900 and last_msme_run_date != today_str:
                 from core.msme.daily_ingest import ingest_daily_msme_cohort
-                loop = asyncio.get_running_loop()
-                if not active_today:
-                    logger.info(f"🌅 [Discovery Scheduler] 08:30 AM IST trigger reached for {today_str}. Running daily 15-stock ingestion...")
-                    await loop.run_in_executor(None, ingest_daily_stock_cohort, today_str, 15, False)
-                    logger.info(f"🌅 [Discovery Scheduler] Daily 15-stock ingestion & mutual fund look-through re-audit completed for {today_str}.")
-                if now.hour >= 9:
-                    await loop.run_in_executor(None, ingest_daily_msme_cohort, today_str, 15)
-                    logger.info(f"🏭 [MSME Ingest] 09:00 AM IST unlisted MSME cohort ingestion completed for {today_str}.")
-                    last_run_date = today_str
+                logger.info(f"🏭 [MSME Ingest] 09:00 AM IST trigger reached for {today_str}. Running daily MSME cohort ingestion...")
+                await loop.run_in_executor(None, ingest_daily_msme_cohort, today_str, 15)
+                logger.info(f"🏭 [MSME Ingest] 09:00 AM IST unlisted MSME cohort ingestion completed for {today_str}.")
+                last_msme_run_date = today_str
         except asyncio.CancelledError:
             logger.info("🌅 [Discovery Scheduler] Background scheduler cancelled.")
             break
