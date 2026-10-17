@@ -250,6 +250,7 @@ def get_asset_scan_history(limit: int = 15) -> List[Dict[str, Any]]:
     conn = get_db_connection()
     cursor = conn.cursor()
     p = get_placeholder()
+    safe_limit = max(1, min(int(limit or 15), 100))
     try:
         cursor.execute(
             f"""
@@ -258,8 +259,9 @@ def get_asset_scan_history(limit: int = 15) -> List[Dict[str, Any]]:
                    started_at, completed_at, error_message
             FROM asset_scan_runs
             ORDER BY started_at DESC
-            LIMIT {limit};
-            """
+            LIMIT {p};
+            """,
+            (safe_limit,)
         )
         rows = cursor.fetchall()
         runs = []

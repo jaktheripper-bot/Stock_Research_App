@@ -170,7 +170,24 @@ class SutraLookThroughEngine:
             if not scheme_key or mf_val <= 0:
                 continue
 
-            holdings = SCHEME_TOP_HOLDINGS_REGISTRY.get(scheme_key, {})
+            # 1. Query live/persisted scheme holdings from SQLite/Postgres first
+            holdings: Dict[str, float] = {}
+            try:
+                from core.db.mutual_funds import get_scheme_holdings
+                db_holdings = get_scheme_holdings(scheme_key)
+                if db_holdings:
+                    for h in db_holdings:
+                        sym = str(h.get("identifier") or h.get("holding_name") or "").upper().strip()
+                        wt = _safe_float(h.get("weight_pct"))
+                        if sym and wt > 0:
+                            holdings[sym] = wt
+            except Exception as e:
+                logger.warning("Error fetching holdings from database for %s: %s", scheme_key, e)
+
+            # 2. Fall back to curated registry if no DB records found
+            if not holdings:
+                holdings = SCHEME_TOP_HOLDINGS_REGISTRY.get(scheme_key, {})
+
             for sym, weight_in_fund in holdings.items():
                 indirect_inr = (weight_in_fund / 100.0) * mf_val
                 if sym not in stock_map:

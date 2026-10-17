@@ -135,6 +135,44 @@ def compile_equity_dossier(
         composite_verdict = "ELEVATED_VULNERABILITY"
         composite_color = "#ef4444"
 
+    # 8. Varan Deterministic Financial Ingestion & Delta Packet
+    varan_packet = None
+    try:
+        from core.cortex.varan import VaranEngine
+        rev = float(fundamentals.get("revenue_cr") or 100.0)
+        ebitda = float(fundamentals.get("ebitda_cr") or 20.0)
+        pat = float(fundamentals.get("pat_cr") or 10.0)
+        cfo = float(fundamentals.get("operating_cash_flow_cr") or 15.0)
+        capex = float(fundamentals.get("capex_cr") or 5.0)
+        bs = fundamentals.get("balance_sheet") if isinstance(fundamentals.get("balance_sheet"), dict) else {}
+        varan_packet = VaranEngine.compile_delta_packet(
+            symbol=ticker,
+            annual_revenues=fundamentals.get("historical_revenues") or [rev],
+            annual_ebitda=fundamentals.get("historical_ebitda") or [ebitda],
+            annual_pat=fundamentals.get("historical_pat") or [pat],
+            annual_cfo=fundamentals.get("historical_cfo") or [cfo],
+            annual_capex=fundamentals.get("historical_capex") or [capex],
+            latest_balance_sheet=bs,
+        )
+    except Exception as e:
+        logger.debug(f"VaranEngine compilation notice for {ticker}: {e}")
+
+    # 9. Setu Cross-Asset Capital Structure Matrix
+    setu_matrix = None
+    try:
+        from core.cortex.setu import SetuMatrixEngine
+        fcf_yield = float(fundamentals.get("fcf_yield_pct") or 5.0)
+        rating = str(fundamentals.get("credit_rating") or "AAA")
+        pledge = float(fundamentals.get("promoter_pledge_pct") or 0.0)
+        setu_matrix = SetuMatrixEngine.evaluate(
+            symbol=ticker,
+            equity_fcf_yield_pct=fcf_yield,
+            debt_credit_rating=rating,
+            promoter_pledge_pct=pledge,
+        )
+    except Exception as e:
+        logger.debug(f"SetuMatrixEngine evaluation notice for {ticker}: {e}")
+
     return {
         "ticker": ticker,
         "composite_score": composite_score,
@@ -145,4 +183,6 @@ def compile_equity_dossier(
         "forensic_intelligence": forensic_data,
         "valuation_radar": valuation_data,
         "bull_bear_thesis": bull_bear_data,
+        "varan_delta_packet": varan_packet,
+        "setu_capital_matrix": setu_matrix,
     }

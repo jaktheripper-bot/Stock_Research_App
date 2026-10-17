@@ -69,8 +69,11 @@ def compile_research_bouquet(edition_date: Optional[str] = None) -> Dict[str, An
     # 1. Equities from 9:00 AM Morning Discovery Reel
     equity_picks = []
     try:
-        from core.analysis.stock_discovery import get_daily_discovery_picks
-        raw_picks = get_daily_discovery_picks(edition_date=date_str, limit=3)
+        from core.db.discovery import get_active_discovery_reel
+        raw_picks = get_active_discovery_reel(edition_date=date_str, limit=3)
+        if not raw_picks:
+            from core.analysis.stock_discovery import get_daily_discovery_picks
+            raw_picks = get_daily_discovery_picks(edition_date=date_str, limit=3)
         for p in raw_picks:
             equity_picks.append({
                 "ticker": p.get("ticker", "UNKNOWN"),

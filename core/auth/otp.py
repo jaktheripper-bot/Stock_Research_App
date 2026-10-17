@@ -17,6 +17,7 @@ Features:
 import os
 import secrets
 import hashlib
+import hmac
 import logging
 from datetime import datetime, timezone, timedelta
 from typing import Tuple, Optional, Dict, Any
@@ -29,14 +30,23 @@ OTP_TTL_MINUTES = 10
 MAX_VERIFICATION_ATTEMPTS = 5
 RESEND_COOLDOWN_SECONDS = 60
 
+OTP_HMAC_SECRET = (
+    os.environ.get("OTP_HMAC_SECRET") or
+    os.environ.get("SECRET_KEY") or
+    os.environ.get("ADMIN_API_KEY") or
+    hashlib.sha256(f"moatnomics_otp_{os.getpid()}".encode()).hexdigest()
+).encode("utf-8")
+
 
 def _hash_otp(email: str, code: str) -> str:
-    salt = os.environ.get("ADMIN_API_KEY") or os.environ.get("SECRET_KEY") or os.environ.get("SUPABASE_JWT_SECRET")
-    if not salt:
-        import sys
-        salt = hashlib.sha256(f"{os.getpid()}:{sys.executable}".encode()).hexdigest()
-    payload = f"{email.strip().lower()}:{code.strip()}:{salt}"
-    return hashlib.sha256(payload.encode("utf-8")).hexdigest()
+    secret = (
+        os.environ.get("OTP_HMAC_SECRET") or
+        os.environ.get("SECRET_KEY") or
+        os.environ.get("ADMIN_API_KEY") or
+        hashlib.sha256(f"moatnomics_otp_{os.getpid()}".encode()).hexdigest()
+    ).encode("utf-8")
+    payload = f"{email.strip().lower()}:{code.strip()}".encode("utf-8")
+    return hmac.new(secret, payload, hashlib.sha256).hexdigest()
 
 
 def create_email_otp(email: str) -> Tuple[bool, str, Optional[str]]:

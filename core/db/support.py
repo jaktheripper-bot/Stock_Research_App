@@ -91,13 +91,14 @@ def get_support_tickets(status: str = None, limit: int = 50, exclude_tests: bool
         params.append("TKT-TEST-%")
 
     safe_limit = max(1, min(int(limit or 50), 500))
+    params.append(safe_limit)
 
     query = f'''
         SELECT id, ticket_id, user_email, user_name, category, subject, message, status, admin_notes, source, created_at
         FROM support_tickets
         WHERE {' AND '.join(where_clauses)}
         ORDER BY created_at DESC
-        LIMIT {safe_limit}
+        LIMIT {p}
     '''
 
     try:

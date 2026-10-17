@@ -158,12 +158,13 @@ def get_conversation_turns(conversation_id: str, limit: int = 50) -> List[Dict[s
 
     try:
         placeholder = "%s" if use_pg else "?"
+        safe_limit = max(1, min(int(limit or 50), 500))
         cursor.execute(f"""
             SELECT * FROM agent_conversation_turns
             WHERE conversation_id = {placeholder}
             ORDER BY turn_index ASC
-            LIMIT {limit};
-        """, (conversation_id,))
+            LIMIT {placeholder};
+        """, (conversation_id, safe_limit))
         rows = cursor.fetchall()
         return [clean_row(cursor, r) for r in rows]
     except Exception as e:
@@ -224,36 +225,37 @@ def get_recent_autonomous_events(
     use_pg = is_postgres_connection(conn)
 
     try:
+        placeholder = "%s" if use_pg else "?"
+        safe_limit = max(1, min(int(limit or 50), 500))
         base_filter = """
             (ticker IS NULL OR (ticker NOT LIKE '%TEST%' AND ticker NOT LIKE '%UNITTEST%'))
             AND (trigger_source IS NULL OR trigger_source NOT IN ('unit_test', 'TEST_SUITE_ROTATION'))
         """
         if event_type:
-            placeholder = "%s" if use_pg else "?"
             if include_test_events:
                 cursor.execute(f"""
                     SELECT * FROM autonomous_event_ledger
                     WHERE event_type = {placeholder}
-                    ORDER BY id DESC LIMIT {limit};
-                """, (event_type,))
+                    ORDER BY id DESC LIMIT {placeholder};
+                """, (event_type, safe_limit))
             else:
                 cursor.execute(f"""
                     SELECT * FROM autonomous_event_ledger
                     WHERE event_type = {placeholder} AND {base_filter}
-                    ORDER BY id DESC LIMIT {limit};
-                """, (event_type,))
+                    ORDER BY id DESC LIMIT {placeholder};
+                """, (event_type, safe_limit))
         else:
             if include_test_events:
                 cursor.execute(f"""
                     SELECT * FROM autonomous_event_ledger 
-                    ORDER BY id DESC LIMIT {limit};
-                """)
+                    ORDER BY id DESC LIMIT {placeholder};
+                """, (safe_limit,))
             else:
                 cursor.execute(f"""
                     SELECT * FROM autonomous_event_ledger 
                     WHERE {base_filter}
-                    ORDER BY id DESC LIMIT {limit};
-                """)
+                    ORDER BY id DESC LIMIT {placeholder};
+                """, (safe_limit,))
         rows = cursor.fetchall()
         return [clean_row(cursor, r) for r in rows]
     except Exception as e:

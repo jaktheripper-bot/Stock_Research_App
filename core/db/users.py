@@ -454,8 +454,11 @@ def get_all_billables(status: Optional[str] = None, limit: int = 100, offset: in
             LEFT JOIN user_accounts u ON t.user_id = u.id
             {where_clause}
             ORDER BY t.created_at DESC
-            LIMIT {limit} OFFSET {offset};
+            LIMIT {p} OFFSET {p};
         """
+        safe_limit = max(1, min(int(limit or 100), 1000))
+        safe_offset = max(0, int(offset or 0))
+        params.extend([safe_limit, safe_offset])
         cursor.execute(query, tuple(params))
         rows = cursor.fetchall()
         billables = []
@@ -754,6 +757,7 @@ def get_user_transactions(user_id: str, limit: int = 20) -> List[Dict[str, Any]]
     conn = get_db_connection()
     cursor = conn.cursor()
     p = get_placeholder()
+    safe_limit = max(1, min(int(limit or 20), 500))
     try:
         cursor.execute(
             f"""
@@ -761,9 +765,9 @@ def get_user_transactions(user_id: str, limit: int = 20) -> List[Dict[str, Any]]
             FROM credit_transactions
             WHERE user_id = {p}
             ORDER BY created_at DESC
-            LIMIT {limit};
+            LIMIT {p};
             """,
-            (str(user_id).strip(),)
+            (str(user_id).strip(), safe_limit)
         )
         rows = cursor.fetchall()
         return [
@@ -796,6 +800,7 @@ def get_user_usage_history(user_id: str, limit: int = 30) -> List[Dict[str, Any]
     conn = get_db_connection()
     cursor = conn.cursor()
     p = get_placeholder()
+    safe_limit = max(1, min(int(limit or 30), 500))
     try:
         cursor.execute(
             f"""
@@ -803,9 +808,9 @@ def get_user_usage_history(user_id: str, limit: int = 30) -> List[Dict[str, Any]
             FROM credit_usage_ledger
             WHERE user_id = {p}
             ORDER BY created_at DESC
-            LIMIT {limit};
+            LIMIT {p};
             """,
-            (str(user_id).strip(),)
+            (str(user_id).strip(), safe_limit)
         )
         rows = cursor.fetchall()
         return [

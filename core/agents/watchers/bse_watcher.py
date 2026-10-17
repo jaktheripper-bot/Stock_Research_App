@@ -10,7 +10,7 @@ import logging
 from datetime import datetime, timezone
 from typing import Dict, Any, List
 
-from core.analysis.fundamentals import fetch_latest_bse_announcement
+from core.analysis.fundamentals import fetch_latest_bse_announcement, resolve_bse_scrip_code
 from core.db.watchlist import get_watchlist
 from core.db.agent_sessions import record_autonomous_event
 
@@ -46,7 +46,9 @@ async def scan_watchlist_bse_announcements() -> List[Dict[str, Any]]:
         if not ticker:
             continue
         try:
-            latest = await asyncio.to_thread(fetch_latest_bse_announcement, ticker)
+            # Resolve 6-digit numeric BSE scrip code before calling fetch_latest_bse_announcement
+            scrip_code = item.get("scrip_code") or resolve_bse_scrip_code(ticker) or ticker
+            latest = await asyncio.to_thread(fetch_latest_bse_announcement, str(scrip_code))
             if latest and any(w in latest.lower() for w in ["resignation", "pledge", "fraud", "litigation", "default", "merger", "acquisition"]):
                 summary = f"Material disclosure detected for {ticker}: {latest[:95]}... Autonomous re-audit dispatched."
                 event_id = record_autonomous_event(

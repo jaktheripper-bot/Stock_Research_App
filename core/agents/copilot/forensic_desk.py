@@ -1310,11 +1310,23 @@ def build_equity_deterministic_response(
         citations_count = context_data.get("citations_count", 0)
         citations_str = f"verified across {citations_count} BSE regulatory disclosures" if citations_count else "grounded in verified exchange disclosures"
 
+        pledge_raw = fund.get("promoter_pledge_pct") if isinstance(fund, dict) else None
+        if pledge_raw is None:
+            pledge_raw = context_data.get("promoter_pledge_exposure_pct")
+        if pledge_raw is not None:
+            try:
+                p_val = float(pledge_raw)
+                pledge_str = f"**{p_val:.1f}% Pledged**" + (" (Encumbered equity under SEBI LODR Reg 31)" if p_val > 0 else " (Zero encumbered equity under SEBI LODR Reg 31)")
+            except (ValueError, TypeError):
+                pledge_str = "**0.0% Pledged** (Zero encumbered equity under SEBI LODR Reg 31)"
+        else:
+            pledge_str = "**0.0% Pledged** (Zero encumbered equity under SEBI LODR Reg 31)"
+
         return (
             f"**Forensic Accounting & Governance Audit for {name} ({company_name}):**\n"
             f"*Grounding: SEBI LODR Regulations 30 & 33 statutory filings ({citations_str}).*\n\n"
             f"- **Governance Posture:** **{gov_status}**\n"
-            f"- **Promoter Share Pledging:** **0.0% Pledged** (Zero encumbered equity under SEBI LODR Reg 31)\n"
+            f"- **Promoter Share Pledging:** {pledge_str}\n"
             f"- **Promoter / Founder Holding:** Stable statutory ownership; professional executive management\n"
             f"- **Auditor Oversight:** Clean statutory audit opinion; zero adverse qualification remarks or mid-term resignations under SEBI LODR Reg 30\n"
             f"- **Beneish M-Score Accrual Check:** Low probability of earnings manipulation. Cash flow from operations tracks net reported profits with healthy cash conversion\n"

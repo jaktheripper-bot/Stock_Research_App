@@ -1025,6 +1025,8 @@ def get_session_journeys(days: int = None, start_date = None, end_date = None, l
             supabase_url, days=days, start_date=start_date, end_date=end_date, exclude_tests=exclude_tests
         )
 
+        placeholder = get_placeholder()
+        safe_limit = max(1, min(int(limit or 25), 500))
         cursor.execute(f'''
             SELECT session_id,
                    MIN(timestamp) as session_start,
@@ -1038,10 +1040,9 @@ def get_session_journeys(days: int = None, start_date = None, end_date = None, l
             WHERE {time_filter} AND session_id IS NOT NULL AND session_id != ''
             GROUP BY session_id
             ORDER BY session_start DESC
-            LIMIT {limit}
-        ''')
+            LIMIT {placeholder}
+        ''', (safe_limit,))
         sessions = cursor.fetchall()
-        placeholder = get_placeholder()
         for s in sessions:
             sess_id, start_ts, source, ref, country, device, browser, count = s
             try:
@@ -1193,6 +1194,8 @@ def get_user_usage_analytics(days: int = None, start_date = None, end_date = Non
         try:
             admin_emails = get_admin_emails()
             admin_emails_sql = ", ".join(f"'{e}'" for e in sorted(admin_emails)) if admin_emails else "'admin@moatnomics.com'"
+            p = get_placeholder()
+            safe_limit = max(1, min(int(limit or 20), 500))
             cursor.execute(f"""
                 SELECT 
                     e.user_email,
@@ -1212,8 +1215,8 @@ def get_user_usage_analytics(days: int = None, start_date = None, end_date = Non
                   AND (u.email IS NULL OR LOWER(u.email) NOT IN ({admin_emails_sql}))
                 GROUP BY e.user_email, u.id
                 ORDER BY total_events DESC
-                LIMIT {limit};
-            """)
+                LIMIT {p};
+            """, (safe_limit,))
             top_rows = cursor.fetchall()
             user_list = []
             for r in top_rows:

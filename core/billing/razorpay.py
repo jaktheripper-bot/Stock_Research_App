@@ -284,16 +284,15 @@ def generate_invoice_html(
     """
     Generates a formal, printable HTML invoice receipt complying with Indian IT service rules.
     """
-    gst_rate = 0.18
-    base_amount = round(amount_inr / (1 + gst_rate), 2)
-    gst_amount = round(amount_inr - base_amount, 2)
+    tax_amount = 0.0
+    base_amount = round(amount_inr, 2)
 
     return f"""
     <!DOCTYPE html>
     <html>
     <head>
         <meta charset="utf-8">
-        <title>Invoice {invoice_number}</title>
+        <title>Receipt {invoice_number}</title>
         <style>
             body {{ font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; margin: 40px; color: #1e293b; }}
             .header {{ display: flex; justify-content: space-between; border-bottom: 2px solid #e2e8f0; padding-bottom: 20px; }}
@@ -309,12 +308,12 @@ def generate_invoice_html(
     <body>
         <div class="header">
             <div>
-                <div class="brand">STOCK RESEARCH APP</div>
+                <div class="brand">MOATNOMICS</div>
                 <div style="font-size: 12px; color: #64748b; margin-top: 4px;">Institutional Equity Thesis & Drift Surveillance</div>
             </div>
             <div class="meta">
-                <div style="font-size: 16px; font-weight: 700; color: #0f172a;">TAX INVOICE / RECEIPT</div>
-                <div>Invoice #: {invoice_number}</div>
+                <div style="font-size: 16px; font-weight: 700; color: #0f172a;">PAYMENT RECEIPT</div>
+                <div>Receipt #: {invoice_number}</div>
                 <div>Date: {date_str}</div>
                 <div>Payment ID: {payment_id}</div>
                 <div>Billed To: {user_email}</div>
@@ -326,8 +325,8 @@ def generate_invoice_html(
                 <tr>
                     <th>Item Description</th>
                     <th>Credits Granted</th>
-                    <th>Base Amount (INR)</th>
-                    <th>GST (18%)</th>
+                    <th>Amount (INR)</th>
+                    <th>Tax (0%)</th>
                     <th>Total (INR)</th>
                 </tr>
             </thead>
@@ -339,17 +338,18 @@ def generate_invoice_html(
                     </td>
                     <td>{credits_added:.1f} Credits</td>
                     <td>₹{base_amount:.2f}</td>
-                    <td>₹{gst_amount:.2f}</td>
+                    <td>₹{tax_amount:.2f}</td>
                     <td>₹{amount_inr:.2f}</td>
                 </tr>
                 <tr class="total-row">
-                    <td colspan="4" style="text-align: right;">Total Paid (Inclusive of Taxes):</td>
+                    <td colspan="4" style="text-align: right;">Total Paid:</td>
                     <td>₹{amount_inr:.2f}</td>
                 </tr>
             </tbody>
         </table>
 
         <div class="disclaimer">
+            <p style="margin-bottom: 8px;"><strong>Entity Notice:</strong> Moatnomics is an independent computational research tool and is not registered as a corporate entity or under GST. This electronic transaction receipt confirms purchase of digital computational credits (Tax: ₹0.00).</p>
             <strong>Mandatory Safe-Harbor Disclosure:</strong><br>
             {INVOICE_DISCLAIMER}
         </div>

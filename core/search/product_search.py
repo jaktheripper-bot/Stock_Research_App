@@ -85,14 +85,15 @@ def search_equities(query: str, limit: int = 10) -> List[Dict[str, Any]]:
         conn = get_db_connection()
         cursor = conn.cursor()
         p = get_placeholder()
+        safe_limit = max(1, min(int(limit or 10), 100))
         cursor.execute(
             f"""
             SELECT ticker, short_name, baseline_price, baseline_pe
             FROM reports
             WHERE ticker LIKE {p} OR short_name LIKE {p}
-            LIMIT {limit};
+            LIMIT {p};
             """,
-            (f"%{clean_q}%", f"%{clean_q_lower}%")
+            (f"%{clean_q}%", f"%{clean_q_lower}%", safe_limit)
         )
         rows = cursor.fetchall()
         seen = {m["identifier"] for m in matches}
@@ -136,6 +137,7 @@ def search_mutual_funds(query: str, limit: int = 10) -> List[Dict[str, Any]]:
         conn = get_db_connection()
         cursor = conn.cursor()
         p = get_placeholder()
+        safe_limit = max(1, min(int(limit or 10), 100))
         cursor.execute(
             f"""
             SELECT scheme_code, scheme_name, fund_house, category, nav, aum_crores, broad_category
@@ -144,9 +146,9 @@ def search_mutual_funds(query: str, limit: int = 10) -> List[Dict[str, Any]]:
                OR LOWER(scheme_code) LIKE {p}
                OR LOWER(fund_house) LIKE {p}
                OR LOWER(category) LIKE {p}
-            LIMIT {limit};
+            LIMIT {p};
             """,
-            (f"%{clean_q}%", f"%{clean_q}%", f"%{clean_q}%", f"%{clean_q}%")
+            (f"%{clean_q}%", f"%{clean_q}%", f"%{clean_q}%", f"%{clean_q}%", safe_limit)
         )
         rows = cursor.fetchall()
         for r in rows:
@@ -214,6 +216,7 @@ def search_debt_securities(query: str, limit: int = 10) -> List[Dict[str, Any]]:
         conn = get_db_connection()
         cursor = conn.cursor()
         p = get_placeholder()
+        safe_limit = max(1, min(int(limit or 10), 100))
         cursor.execute(
             f"""
             SELECT isin, ticker, instrument_name, instrument_type, credit_rating, coupon_rate_pct, ytm_pct, face_value
@@ -224,9 +227,9 @@ def search_debt_securities(query: str, limit: int = 10) -> List[Dict[str, Any]]:
                OR LOWER(credit_rating) LIKE {p}
                OR LOWER(instrument_type) LIKE {p}
             ORDER BY ytm_pct DESC
-            LIMIT {limit};
+            LIMIT {p};
             """,
-            (f"%{clean_q}%", f"%{clean_q}%", f"%{clean_q}%", f"%{clean_q}%", f"%{clean_q}%")
+            (f"%{clean_q}%", f"%{clean_q}%", f"%{clean_q}%", f"%{clean_q}%", f"%{clean_q}%", safe_limit)
         )
         rows = cursor.fetchall()
         for r in rows:

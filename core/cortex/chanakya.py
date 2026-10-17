@@ -71,6 +71,10 @@ class ChanakyaResult:
     summary: str = ""
 
 
+ChanakyaVerdict = ChanakyaResult
+ChanakyaScorecard = ChanakyaResult
+
+
 class ChanakyaGate:
     """
     Deterministic Clean-Room Screening Filter for Indian Capital Markets.
@@ -450,6 +454,6 @@ class ChanakyaGate:
         )
 
 
-def evaluate_from_dict(data: Dict[str, Any], mode: str = "SCREENING") -> ChanakyaScorecard:
+def evaluate_from_dict(data: Dict[str, Any], mode: str = "STRICT") -> ChanakyaVerdict:
     """Convenience module-level wrapper for ChanakyaGate.evaluate_from_dict."""
     return ChanakyaGate.evaluate_from_dict(data, mode=mode)
