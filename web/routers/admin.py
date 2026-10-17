@@ -294,6 +294,24 @@ async def admin_dashboard(
         logger.warning(f"Error compiling AI spends summary: {ai_err}")
         ai_spends = {}
 
+    try:
+        from core.db.digest import get_digest_subscribers, get_digest_dispatch_history
+        from core.notify import get_email_service_status, get_admin_notification_email
+        from core.analysis.research_bouquet import get_tracking_base_url
+        digest_subs = get_digest_subscribers(only_active_pro=False)
+        pro_subs = [s for s in digest_subs if s.get("subscription_tier") in ("pro_monthly", "pro_annual") or s.get("is_subscriber")]
+        digest_summary = {
+            "total_subscribers": len(digest_subs),
+            "pro_subscribers": len(pro_subs),
+            "email_service": get_email_service_status(),
+            "admin_email": get_admin_notification_email(),
+            "tracking_url": get_tracking_base_url(),
+            "recent_dispatches": get_digest_dispatch_history(limit=10)
+        }
+    except Exception as dig_err:
+        logger.debug(f"Error compiling digest summary for admin view: {dig_err}")
+        digest_summary = {}
+
     return templates.TemplateResponse(
         request=request,
         name="admin.html",
@@ -321,6 +339,7 @@ async def admin_dashboard(
             "session_journeys": session_journeys,
             "seo_summary": seo_summary,
             "ai_spends": ai_spends,
+            "digest_summary": digest_summary,
             "active_page": "admin"
         }
     )
@@ -1801,6 +1820,104 @@ def api_admin_traffic_flow(
     return JSONResponse(status_code=200, content={
         "success": True,
         "flow": flow
+    })
+
+
+@router.get("/api/admin/digest/preview")
+async def api_admin_digest_preview(request: Request, edition_date: Optional[str] = None):
+    """Generates preview of today's Research Bouquet with recipient counters and HTML/Text previews."""
+    if not _is_admin_authenticated(request):
+        raise HTTPException(status_code=401, detail="Unauthorized")
+
+    from core.analysis.research_bouquet import (
+        compile_research_bouquet,
+        render_bouquet_html,
+        render_bouquet_text,
+        get_tracking_base_url,
+    )
+    from core.db.digest import get_digest_subscribers
+    from core.notify import get_email_service_status, get_admin_notification_email
+
+    bouquet = compile_research_bouquet(edition_date=edition_date)
+    subscribers = get_digest_subscribers(only_active_pro=False)
+    pro_subscribers = [s for s in subscribers if s.get("subscription_tier") in ("pro_monthly", "pro_annual") or s.get("is_subscriber")]
+
+    preview_sub = subscribers[0] if subscribers else {
+        "email": get_admin_notification_email(),
+        "full_name": "Moatnomics Preview Subscriber",
+        "unsubscribe_token": "preview_sample_token"
+    }
+
+    html = render_bouquet_html(bouquet, subscriber=preview_sub)
+    text = render_bouquet_text(bouquet, subscriber=preview_sub)
+
+    return JSONResponse(status_code=200, content={
+        "success": True,
+        "bouquet": bouquet,
+        "html_preview": html,
+        "text_preview": text,
+        "recipients_summary": {
+            "total_subscribers": len(subscribers),
+            "pro_subscribers": len(pro_subscribers)
+        },
+        "email_service": get_email_service_status(),
+        "admin_email": get_admin_notification_email(),
+        "tracking_url": get_tracking_base_url()
+    })
+
+
+@router.post("/api/admin/digest/dispatch-test")
+async def api_admin_digest_dispatch_test(request: Request):
+    """Dispatches a single test Research Bouquet to administrator email."""
+    if not _is_admin_authenticated(request):
+        raise HTTPException(status_code=401, detail="Unauthorized")
+
+    from core.notify import dispatch_research_bouquet, get_admin_notification_email
+
+    try:
+        body = await request.json()
+    except Exception:
+        body = {}
+
+    target_email = (body.get("recipient_email") or get_admin_notification_email()).strip()
+    edition_date = body.get("edition_date")
+
+    result = dispatch_research_bouquet(edition_date=edition_date, test_recipient=target_email)
+    return JSONResponse(status_code=200, content=result)
+
+
+@router.post("/api/admin/digest/broadcast")
+async def api_admin_digest_broadcast(request: Request):
+    """Broadcasts today's Research Bouquet to all eligible subscribers."""
+    if not _is_admin_authenticated(request):
+        raise HTTPException(status_code=401, detail="Unauthorized")
+
+    from core.notify import dispatch_research_bouquet
+
+    try:
+        body = await request.json()
+    except Exception:
+        body = {}
+
+    only_active_pro = bool(body.get("only_active_pro", False))
+    edition_date = body.get("edition_date")
+
+    result = dispatch_research_bouquet(edition_date=edition_date, only_active_pro=only_active_pro)
+    return JSONResponse(status_code=200, content=result)
+
+
+@router.get("/api/admin/digest/history")
+async def api_admin_digest_history(request: Request, limit: int = 15):
+    """Returns chronological digest dispatch logs."""
+    if not _is_admin_authenticated(request):
+        raise HTTPException(status_code=401, detail="Unauthorized")
+
+    from core.db.digest import get_digest_dispatch_history
+
+    history = get_digest_dispatch_history(limit=limit)
+    return JSONResponse(status_code=200, content={
+        "success": True,
+        "history": history
     })
 
 

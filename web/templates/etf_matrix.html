@@ -61,7 +61,7 @@
 
       <!-- Search Input -->
       <div style="flex: 1 1 280px; position: relative;">
-        <span style="position: absolute; left: 14px; top: 50%; transform: translateY(-50%); font-size: 14px; color: #64748b;">🔍</span>
+        <svg class="glyph" style="position: absolute; left: 14px; top: 50%; transform: translateY(-50%); width: 14px; height: 14px; color: #64748b;"><use href="#glyph-search"></use></svg>
         <input 
           type="text" 
           name="q" 
@@ -101,26 +101,26 @@
   <!-- Category Filter Tab Pills -->
   <div style="display: flex; gap: 8px; overflow-x: auto; padding-bottom: 12px; margin-bottom: 24px; -webkit-overflow-scrolling: touch;">
     {% set cat_badges = [
-      ('ALL', 'All ETFs', '🌐'),
-      ('EQUITY_INDEX', 'Equity Indices', '📈'),
-      ('EQUITY_SECTORAL', 'Sectoral & Thematic', '🏭'),
-      ('EQUITY_FACTOR', 'Smart Beta', '⚡'),
-      ('COMMODITY_GOLD', 'Gold', '🪙'),
-      ('COMMODITY_SILVER', 'Silver', '🥈'),
-      ('DEBT_SOVEREIGN', 'G-Sec & Gilts', '🏛️'),
-      ('DEBT_TARGET_MATURITY', 'Bharat Bond', '🛡️'),
-      ('LIQUID', 'Liquid & Overnight', '💧'),
-      ('INTERNATIONAL', 'Global / US', '🌍')
+      ('ALL', 'All ETFs', 'glyph-globe'),
+      ('EQUITY_INDEX', 'Equity Indices', 'glyph-chart'),
+      ('EQUITY_SECTORAL', 'Sectoral & Thematic', 'glyph-bank'),
+      ('EQUITY_FACTOR', 'Smart Beta', 'glyph-zap'),
+      ('COMMODITY_GOLD', 'Gold', 'glyph-coin'),
+      ('COMMODITY_SILVER', 'Silver', 'glyph-coin'),
+      ('DEBT_SOVEREIGN', 'G-Sec & Gilts', 'glyph-temple'),
+      ('DEBT_TARGET_MATURITY', 'Bharat Bond', 'glyph-shield'),
+      ('LIQUID', 'Liquid & Overnight', 'glyph-zap'),
+      ('INTERNATIONAL', 'Global / US', 'glyph-globe')
     ] %}
 
-    {% for cat_id, cat_title, cat_icon in cat_badges %}
+    {% for cat_id, cat_title, cat_glyph in cat_badges %}
     {% set count = data.category_counts.get(cat_id, 0) %}
     <a 
       href="/etfs?category={{ cat_id }}{% if current_query %}&q={{ current_query }}{% endif %}{% if current_sort %}&sort_by={{ current_sort }}{% endif %}" 
       class="btn btn-sm {% if current_category == cat_id %}btn-primary{% else %}btn-secondary{% endif %}" 
       style="border-radius: 9999px; white-space: nowrap; font-size: 12.5px; padding: 6px 14px; display: inline-flex; align-items: center; gap: 6px;"
     >
-      <span>{{ cat_icon }}</span>
+      <svg class="glyph" style="width: 13px; height: 13px;"><use href="#{{ cat_glyph }}"></use></svg>
       <span>{{ cat_title }}</span>
       <span style="font-size: 11px; opacity: 0.8; background: rgba(255,255,255,0.15); padding: 1px 6px; border-radius: 9999px;">{{ count }}</span>
     </a>

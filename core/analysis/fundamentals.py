@@ -18,6 +18,19 @@ from core.analysis.exceptions import ExchangeDataFetchError
 from core.config import get_secret, yfinance_fallback_enabled
 
 logger = logging.getLogger("equity_research.core.analysis.fundamentals")
+logging.getLogger("yfinance").setLevel(logging.CRITICAL)
+
+@contextlib.contextmanager
+def suppress_yfinance_noise():
+    """Context manager to suppress unhandled yfinance stderr noise (HTTP 403 policy errors, delisted warnings)."""
+    buf = io.StringIO()
+    with contextlib.redirect_stderr(buf):
+        try:
+            yield
+        finally:
+            err = buf.getvalue().strip()
+            if err and "403" not in err and "delisted" not in err and "Expecting value" not in err and "not allowed by policy" not in err:
+                logger.debug(f"yfinance notice: {err}")
 
 def ttl_cache(ttl_seconds: int = 300, maxsize: int = 128):
     """Thread-safe in-memory TTL and LRU cache for external market data requests."""
@@ -94,7 +107,14 @@ def enrich_fundamentals(ticker: str, data: dict) -> dict:
         yf_ticker = f"{clean_sym}.BO" if clean_sym.isdigit() else f"{clean_sym}.NS"
         # yfinance is an unofficial source; with the fallback off, empty info leaves
         # missing fields as 'N/A' (Not disclosed) rather than pulling third-party data.
-        info = (yf.Ticker(yf_ticker).info or {}) if yfinance_fallback_enabled() else {}
+        info = {}
+        if yfinance_fallback_enabled():
+            with suppress_yfinance_noise():
+                try:
+                    info = yf.Ticker(yf_ticker).info or {}
+                except Exception as yf_err:
+                    logger.debug(f"yfinance info fetch notice for {yf_ticker}: {yf_err}")
+                    info = {}
 
         # Trailing P/E
         if data.get("pe_ratio") in [None, "N/A", "-", "", 0, "0"]:
@@ -258,9 +278,10 @@ def resolve_pe_with_failsafes(ticker: str, scrip: str = "") -> str:
     if yfinance_fallback_enabled():
         try:
             sym = f"{clean}.BO" if clean.isdigit() else f"{clean}.NS"
-            tk = yf.Ticker(sym)
-            fast = getattr(tk, "fast_info", None)
-            pe = getattr(fast, "pe", None) or getattr(fast, "trailing_pe", None)
+            with suppress_yfinance_noise():
+                tk = yf.Ticker(sym)
+                fast = getattr(tk, "fast_info", None)
+                pe = getattr(fast, "pe", None) or getattr(fast, "trailing_pe", None)
             if pe and float(pe) > 0:
                 return f"{float(pe):.2f}"
         except Exception as e:
@@ -458,9 +479,13 @@ def get_stock_fundamentals(query: str) -> dict:
             candidate_symbols = []
 
         for sym in candidate_symbols:
-            t = yf.Ticker(sym)
-            fast = getattr(t, "fast_info", None)
-            price = getattr(fast, "last_price", None)
+            try:
+                with suppress_yfinance_noise():
+                    t = yf.Ticker(sym)
+                    fast = getattr(t, "fast_info", None)
+                    price = getattr(fast, "last_price", None)
+            except Exception:
+                price = None
             if price and float(price) > 0:
                 mcap = getattr(fast, "market_cap", None) or "N/A"
                 high_52 = getattr(fast, "year_high", None) or "N/A"
@@ -594,8 +619,9 @@ def get_historical_prices(ticker: str, period: str = "6mo"):
         for suffix in [".BO", ".NS"]:
             try:
                 sym = f"{clean}{suffix}"
-                t = yf.Ticker(sym)
-                hist = t.history(period=period)
+                with suppress_yfinance_noise():
+                    t = yf.Ticker(sym)
+                    hist = t.history(period=period)
                 if hist is not None and not hist.empty and len(hist) > 5:
                     df = hist
                     break

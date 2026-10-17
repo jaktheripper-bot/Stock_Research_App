@@ -120,6 +120,14 @@ from core.db.fundamentals import (
     extract_fundamentals_from_report_text,
 )
 
+from core.db.digest import (
+    get_digest_subscribers,
+    get_subscriber_by_token,
+    set_user_digest_subscription,
+    record_digest_dispatch,
+    get_digest_dispatch_history,
+)
+
 __all__ = [
     # connection
     "IST",
@@ -202,4 +210,10 @@ __all__ = [
     "save_cached_fundamentals",
     "sync_all_cached_fundamentals",
     "extract_fundamentals_from_report_text",
+    # research bouquet & digest
+    "get_digest_subscribers",
+    "get_subscriber_by_token",
+    "set_user_digest_subscription",
+    "record_digest_dispatch",
+    "get_digest_dispatch_history",
 ]

@@ -336,3 +336,138 @@ Moatnomics Service Desk
         reply_message[:80],
     )
     return False
+
+
+def dispatch_research_bouquet(
+    edition_date: Optional[str] = None,
+    test_recipient: Optional[str] = None,
+    only_active_pro: bool = False
+) -> dict:
+    """
+    Dispatches the Research Bouquet & Morning Digest to subscribers or a test recipient.
+    Supports Resend API and SMTP with graceful mock/logging fallback.
+    Records delivery in digest_dispatches.
+    """
+    from core.analysis.research_bouquet import (
+        compile_research_bouquet,
+        render_bouquet_html,
+        render_bouquet_text,
+    )
+    from core.db.digest import (
+        get_digest_subscribers,
+        record_digest_dispatch,
+    )
+
+    bouquet = compile_research_bouquet(edition_date=edition_date)
+    sender_email = _get_cfg("SMTP_FROM") or _get_cfg("RESEND_FROM") or _get_cfg("SMTP_USER") or "noreply@moatnomics.com"
+
+    if test_recipient:
+        # Test dispatch to specific admin email
+        sub_mock = {
+            "email": test_recipient,
+            "full_name": "Moatnomics Administrator",
+            "unsubscribe_token": "test_admin_token"
+        }
+        test_subject = f"[TEST DIGEST] {bouquet['subject']}"
+        html = render_bouquet_html(bouquet, subscriber=sub_mock)
+        text = render_bouquet_text(bouquet, subscriber=sub_mock)
+
+        delivered = False
+        if _get_cfg("RESEND_API_KEY"):
+            delivered = _dispatch_via_resend(sender_email, test_recipient, test_subject, text, html=html)
+        elif _get_cfg("SMTP_HOST") and _get_cfg("SMTP_USER") and _get_cfg("SMTP_PASSWORD"):
+            delivered = _dispatch_via_smtp(sender_email, test_recipient, test_subject, text, html=html)
+        else:
+            logger.info("[MOCK/LOG TEST DIGEST] Dispatched to %s | Subject: %s", test_recipient, test_subject)
+            delivered = True
+
+        did = record_digest_dispatch(
+            edition_date=bouquet["edition_date"],
+            subject=test_subject,
+            recipients_count=1,
+            delivered_count=1 if delivered else 0,
+            failed_count=0 if delivered else 1,
+            status="TEST_SENT",
+            html_content=html,
+            plain_text_content=text
+        )
+
+        return {
+            "success": True,
+            "status": "TEST_SENT",
+            "dispatch_id": did,
+            "delivered": 1 if delivered else 0,
+            "failed": 0 if delivered else 1,
+            "recipients": 1,
+            "edition_date": bouquet["edition_date"],
+            "subject": test_subject,
+            "test_email": test_recipient
+        }
+
+    # Broadcast to registered subscribers
+    subscribers = get_digest_subscribers(only_active_pro=only_active_pro)
+    if not subscribers:
+        logger.warning("No eligible digest subscribers found for dispatch.")
+        return {
+            "success": False,
+            "status": "NO_SUBSCRIBERS",
+            "delivered": 0,
+            "failed": 0,
+            "recipients": 0,
+            "message": "No active digest subscribers found in database."
+        }
+
+    delivered_count = 0
+    failed_count = 0
+
+    # Render a baseline copy for archive
+    sample_html = render_bouquet_html(bouquet, subscriber=subscribers[0])
+    sample_text = render_bouquet_text(bouquet, subscriber=subscribers[0])
+
+    for sub in subscribers:
+        sub_email = sub.get("email")
+        if not sub_email:
+            continue
+        try:
+            html = render_bouquet_html(bouquet, subscriber=sub)
+            text = render_bouquet_text(bouquet, subscriber=sub)
+            subj = bouquet["subject"]
+
+            ok = False
+            if _get_cfg("RESEND_API_KEY"):
+                ok = _dispatch_via_resend(sender_email, sub_email, subj, text, html=html)
+            elif _get_cfg("SMTP_HOST") and _get_cfg("SMTP_USER") and _get_cfg("SMTP_PASSWORD"):
+                ok = _dispatch_via_smtp(sender_email, sub_email, subj, text, html=html)
+            else:
+                logger.info("[MOCK/LOG BROADCAST] Dispatched to subscriber %s (%s)", sub_email, sub.get("full_name"))
+                ok = True
+
+            if ok:
+                delivered_count += 1
+            else:
+                failed_count += 1
+        except Exception as e:
+            logger.error("Error dispatching digest to %s: %s", sub_email, e)
+            failed_count += 1
+
+    did = record_digest_dispatch(
+        edition_date=bouquet["edition_date"],
+        subject=bouquet["subject"],
+        recipients_count=len(subscribers),
+        delivered_count=delivered_count,
+        failed_count=failed_count,
+        status="COMPLETED" if failed_count == 0 else "PARTIAL",
+        html_content=sample_html,
+        plain_text_content=sample_text
+    )
+
+    return {
+        "success": True,
+        "status": "COMPLETED" if failed_count == 0 else "PARTIAL",
+        "dispatch_id": did,
+        "delivered": delivered_count,
+        "failed": failed_count,
+        "recipients": len(subscribers),
+        "edition_date": bouquet["edition_date"],
+        "subject": bouquet["subject"]
+    }

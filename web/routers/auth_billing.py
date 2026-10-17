@@ -630,3 +630,118 @@ async def api_get_currencies(request: Request):
         "currencies": SUPPORTED_CURRENCIES
     })
 
+
+@router.get("/api/notifications/unsubscribe")
+async def api_unsubscribe_notifications(request: Request, token: Optional[str] = None, email: Optional[str] = None):
+    """
+    Statutory 1-Click Unsubscribe Endpoint (IT Rules 2021 & Anti-Spam Compliance).
+    Supports token-based or email-based unsubscribes.
+    Returns clean confirmation HTML for browser navigation, or JSON for programmatic requests.
+    """
+    from core.db.digest import set_user_digest_subscription, get_subscriber_by_token
+
+    param = (token or email or "").strip()
+    if not param:
+        raise HTTPException(status_code=400, detail="Missing unsubscribe token or email parameter.")
+
+    subscriber = get_subscriber_by_token(param)
+    success = set_user_digest_subscription(param, subscribe=False)
+
+    accept_header = request.headers.get("accept", "")
+    is_html_request = "text/html" in accept_header
+
+    if is_html_request:
+        email_display = subscriber["email"] if subscriber else param
+        resubscribe_url = f"/api/notifications/resubscribe?token={urllib.parse.quote(param)}"
+        html = f"""<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Unsubscribed — Moatnomics Research</title>
+  <style>
+    body {{ font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; background: #0b1329; color: #f8fafc; margin: 0; padding: 40px 16px; display: flex; align-items: center; justify-content: center; min-height: 80vh; }}
+    .card {{ background: #131d38; border: 1px solid rgba(255,255,255,0.1); border-radius: 12px; max-width: 520px; width: 100%; padding: 32px; box-shadow: 0 10px 25px rgba(0,0,0,0.4); text-align: center; }}
+    .icon {{ font-size: 40px; margin-bottom: 16px; }}
+    h1 {{ font-size: 22px; font-weight: 800; margin: 0 0 10px; color: #ffffff; }}
+    p {{ font-size: 14px; color: #94a3b8; line-height: 1.6; margin: 0 0 20px; }}
+    .email-badge {{ background: rgba(14,165,233,0.15); color: #38bdf8; padding: 4px 10px; border-radius: 6px; font-weight: 600; font-family: monospace; }}
+    .btn {{ display: inline-block; padding: 10px 20px; border-radius: 8px; font-size: 13.5px; font-weight: 700; text-decoration: none; cursor: pointer; transition: all 0.2s; }}
+    .btn-secondary {{ background: rgba(255,255,255,0.06); color: #e2e8f0; border: 1px solid rgba(255,255,255,0.15); }}
+    .btn-secondary:hover {{ background: rgba(255,255,255,0.12); }}
+    .btn-undo {{ background: #0ea5e9; color: #020617; border: none; margin-right: 10px; }}
+    .footer-note {{ font-size: 12px; color: #64748b; margin-top: 24px; border-top: 1px solid rgba(255,255,255,0.08); padding-top: 16px; }}
+  </style>
+</head>
+<body>
+  <div class="card">
+    <div class="icon">✉️</div>
+    <h1>You have been unsubscribed</h1>
+    <p>
+      We have updated your preferences. <span class="email-badge">{email_display}</span> will no longer receive the daily Moatnomics Research Bouquet and Morning Digest.
+    </p>
+    <div style="margin-top: 24px;">
+      <a href="{resubscribe_url}" class="btn btn-undo">Undo &amp; Re-subscribe</a>
+      <a href="/" class="btn btn-secondary">Return to Platform</a>
+    </div>
+    <div class="footer-note">
+      Your research credits, bookmarks, and account access remain unaffected.
+    </div>
+  </div>
+</body>
+</html>"""
+        return HTMLResponse(content=html, status_code=200)
+
+    return JSONResponse(status_code=200, content={
+        "success": True,
+        "unsubscribed": success,
+        "message": f"Successfully unsubscribed from Moatnomics Research Digest."
+    })
+
+
+@router.get("/api/notifications/resubscribe")
+async def api_resubscribe_notifications(request: Request, token: Optional[str] = None, email: Optional[str] = None):
+    """Re-subscribes user to Research Digest."""
+    from core.db.digest import set_user_digest_subscription
+
+    param = (token or email or "").strip()
+    if not param:
+        raise HTTPException(status_code=400, detail="Missing token or email parameter.")
+
+    success = set_user_digest_subscription(param, subscribe=True)
+
+    accept_header = request.headers.get("accept", "")
+    is_html_request = "text/html" in accept_header
+
+    if is_html_request:
+        html = f"""<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <title>Re-subscribed — Moatnomics Research</title>
+  <style>
+    body {{ font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; background: #0b1329; color: #f8fafc; margin: 0; padding: 40px 16px; display: flex; align-items: center; justify-content: center; min-height: 80vh; }}
+    .card {{ background: #131d38; border: 1px solid rgba(255,255,255,0.1); border-radius: 12px; max-width: 520px; width: 100%; padding: 32px; box-shadow: 0 10px 25px rgba(0,0,0,0.4); text-align: center; }}
+    .icon {{ font-size: 40px; margin-bottom: 16px; }}
+    h1 {{ font-size: 22px; font-weight: 800; margin: 0 0 10px; color: #ffffff; }}
+    p {{ font-size: 14px; color: #94a3b8; line-height: 1.6; margin: 0 0 20px; }}
+    .btn {{ display: inline-block; padding: 10px 20px; border-radius: 8px; font-size: 13.5px; font-weight: 700; text-decoration: none; background: #0ea5e9; color: #020617; }}
+  </style>
+</head>
+<body>
+  <div class="card">
+    <div class="icon">✅</div>
+    <h1>Subscription Restored</h1>
+    <p>You have successfully re-subscribed to the daily Moatnomics Research Bouquet and Morning Digest.</p>
+    <a href="/" class="btn">Return to Platform</a>
+  </div>
+</body>
+</html>"""
+        return HTMLResponse(content=html, status_code=200)
+
+    return JSONResponse(status_code=200, content={
+        "success": True,
+        "subscribed": success,
+        "message": "Successfully re-subscribed to Moatnomics Research Digest."
+    })
+

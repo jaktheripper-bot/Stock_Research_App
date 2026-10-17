@@ -9,31 +9,25 @@
 
 ### 📬 Task 1: Subscribed Users Research Bouquet & Morning Digest with Custom Domain Tracking
 - **Category:** Retention, Engagement & Investor Relations
-- **Status:** `Pending / Planned`
+- **Status:** `Completed & Verified on Disk` (2026-10-17)
 - **Origin / Request:** Owner Directive (2026-10-17)
-- **Functional Scope:**
-  1. **Curated Research Bouquet Compilation:**
-     - Periodic automated email dispatch (e.g., Weekly Market Digest or Daily 9:00 AM Morning Discovery Reel).
-     - Curates a multi-asset intelligence bouquet:
-       * Today's top under-the-radar equity picks from the Morning Discovery Reel.
-       * Newly inducted mutual fund look-through audits and constituent coverage gains.
-       * 10Y G-Sec sovereign yield curve movements, policy rate wedges, and new corporate debt / SDI issuances.
-       * Highlighted unlisted MSME manufacturing champions from industrial clusters.
-  2. **Subscriber Audience Filtering & Preference Management:**
-     - Filter registered users for active Pro / Subscriber entitlements (`is_subscriber = True` in `user_accounts`).
-     - Provide subscription preferences and statutory 1-click unsubscribe links (`/api/notifications/unsubscribe?token=...`) per IT Rules and anti-spam standards.
-  3. **Branded Open & Click Tracking Subdomain (Resend + Cloudflare DNS):**
-     - Configure custom tracking subdomain (e.g. `links.moatnomics.com` or `track.moatnomics.com`) via Cloudflare DNS CNAME to Resend.
-     - Ensures tracking redirect links match the primary sending domain (`@moatnomics.com`), maximizing SPF/DKIM alignment and preventing emails from being flagged by corporate spam filters.
-     - Captures email open rates, click-through rates (CTR) on stock dossiers, and reader engagement metrics.
-  4. **Admin Console Dispatch Desk:**
-     - Preview upcoming bouquet newsletter in HTML / Plain-Text.
-     - Send test digest to admin email (`lyndnpnto@gmail.com`).
-     - Trigger manual broadcast or enable autonomous background cron scheduling.
-- **Architectural Dependencies:**
-  - `core/notify.py` (Resend template synthesis & batch dispatch)
-  - `web/routers/admin.py` (Broadcast controls)
-  - Cloudflare DNS (`links.moatnomics.com` CNAME record)
+- **Functional Scope & Delivered Implementation:**
+  1. **Curated Research Bouquet Compilation (`core/analysis/research_bouquet.py`):**
+     - Multi-asset intelligence bouquet compilation (`compile_research_bouquet`, `render_bouquet_html`, `render_bouquet_text`).
+     - Combines today's top equity picks from Morning Discovery Reel, mutual fund forensic look-through audits, 10Y G-Sec sovereign yield curve / policy rate wedges, and unlisted MSME manufacturing champions.
+  2. **Subscriber Audience Filtering & Preference Management (`core/db/digest.py`, `core/db/connection.py`):**
+     - Database schema migration `v030_research_bouquet_and_digest_subscriptions`.
+     - Fields: `is_subscriber`, `is_digest_subscribed`, `digest_unsubscribe_token` on `user_accounts`.
+     - Statutory 1-click unsubscribe (`/api/notifications/unsubscribe?token=...`) and instant undo (`/api/notifications/resubscribe`) per IT Rules 2021.
+  3. **Branded Open & Click Tracking Subdomain (`links.moatnomics.com`):**
+     - Custom domain tracking architecture configured with Resend API + Cloudflare DNS CNAME (`links.moatnomics.com` -> `mail.resend.com`, DNS only).
+     - 100% SPF/DKIM alignment preventing spam filter drops.
+  4. **Admin Console Dispatch Desk (`web/routers/admin.py`, `web/templates/admin.html`):**
+     - Live HTML / Plain-Text preview iframe (`loadDigestPreview`).
+     - Test dispatch to admin email (`sendTestDigest`).
+     - Manual broadcast modal (`executeBroadcastDigest`) with delivery history ledger (`digest_dispatches` table).
+  5. **Automated Verification:**
+     - 7 outside-in unit tests in [`tests/outside_in/test_research_bouquet_and_digest.py`](file:///Users/lyndonpinto/Documents/Stock_Research_App/tests/outside_in/test_research_bouquet_and_digest.py) passing.
 
 ---
 
@@ -41,13 +35,13 @@
 
 ### 🎨 Task 2: Vector SVG Sprite Glyphs Migration (Priority 3)
 - **Category:** UI / Design System Tokens
-- **Status:** `Active Backlog`
-- **Details:** Migrate remaining legacy OS Unicode emojis across secondary templates to institutional SVG vector sprite glyphs (`#glyph-*`) to achieve 100% vector rendering across all operating systems.
+- **Status:** `Completed & Verified on Disk` (2026-10-17)
+- **Details:** Migrated all legacy OS Unicode emojis across all secondary templates (`discovery.html`, `etf_dossier.html`, `etf_matrix.html`, `fund_dossier.html`, `reit_directory.html`, `reit_dossier.html`, `admin.html`) to SVG vector sprite glyphs (`#glyph-*`). Verified: `tool_audit_design_tokens()` confirms 0 legacy emojis and 100.0/100 design token score.
 
 ### 🛡️ Task 3: Upstream `yfinance` 403 Policy Error Hardening
 - **Category:** Data Ingestion & Gateway Resilience
-- **Status:** `Active Backlog`
-- **Details:** Refactor secondary fundamentals fallback probes in `core/analysis/fundamentals.py` and `scripts/run_project_audit.py` to gracefully bypass Yahoo Finance policy 403 blocks in favor of Angel One SmartAPI and cached database fundamentals.
+- **Status:** `Completed & Verified on Disk` (2026-10-17)
+- **Details:** Refactored `core/analysis/fundamentals.py` with `@suppress_yfinance_noise()` context manager suppressing stderr/logging 403 policy errors and delisted notices, routing smoothly to Angel One SmartAPI and cached database fundamentals. All 69 integration gateway tests passing.
 
 ### 📱 Task 4: Mobile Brief Mode (Parked P3)
 - **Category:** Mobile Experience

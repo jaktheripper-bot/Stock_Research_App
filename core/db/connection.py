@@ -1877,6 +1877,66 @@ def init_db(force: bool = False):
                     cursor.execute("INSERT OR IGNORE INTO schema_migrations (version) VALUES ('v029_ticket_responses_and_service_inbox');")
                 conn.commit()
 
+            # Migration v030: Research Bouquet & Digest Subscriptions
+            if "v030_research_bouquet_and_digest_subscriptions" not in applied:
+                logger.info("Applying schema migration: v030_research_bouquet_and_digest_subscriptions...")
+                if supabase_url:
+                    cursor.execute("""
+                        ALTER TABLE user_accounts ADD COLUMN IF NOT EXISTS is_subscriber BOOLEAN DEFAULT FALSE;
+                        ALTER TABLE user_accounts ADD COLUMN IF NOT EXISTS is_digest_subscribed BOOLEAN DEFAULT TRUE;
+                        ALTER TABLE user_accounts ADD COLUMN IF NOT EXISTS digest_unsubscribe_token VARCHAR(128);
+
+                        CREATE TABLE IF NOT EXISTS digest_dispatches (
+                            id VARCHAR(64) PRIMARY KEY,
+                            edition_date VARCHAR(32) NOT NULL,
+                            subject VARCHAR(255) NOT NULL,
+                            recipients_count INTEGER DEFAULT 0,
+                            delivered_count INTEGER DEFAULT 0,
+                            failed_count INTEGER DEFAULT 0,
+                            status VARCHAR(32) DEFAULT 'PENDING',
+                            html_content TEXT,
+                            plain_text_content TEXT,
+                            created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+                        );
+                        CREATE INDEX IF NOT EXISTS idx_user_accounts_digest_sub ON user_accounts (is_digest_subscribed, is_subscriber);
+                        CREATE INDEX IF NOT EXISTS idx_user_accounts_unsub_token ON user_accounts (digest_unsubscribe_token);
+                        CREATE INDEX IF NOT EXISTS idx_digest_dispatches_date ON digest_dispatches (edition_date, created_at DESC);
+                        INSERT INTO schema_migrations (version) VALUES ('v030_research_bouquet_and_digest_subscriptions') ON CONFLICT DO NOTHING;
+                    """)
+                else:
+                    try:
+                        cursor.execute("ALTER TABLE user_accounts ADD COLUMN is_subscriber INTEGER DEFAULT 0;")
+                    except Exception as e:
+                        logger.debug("Migration v030 is_subscriber column notice: %s", e)
+                    try:
+                        cursor.execute("ALTER TABLE user_accounts ADD COLUMN is_digest_subscribed INTEGER DEFAULT 1;")
+                    except Exception as e:
+                        logger.debug("Migration v030 is_digest_subscribed column notice: %s", e)
+                    try:
+                        cursor.execute("ALTER TABLE user_accounts ADD COLUMN digest_unsubscribe_token TEXT;")
+                    except Exception as e:
+                        logger.debug("Migration v030 digest_unsubscribe_token column notice: %s", e)
+
+                    cursor.execute("""
+                        CREATE TABLE IF NOT EXISTS digest_dispatches (
+                            id TEXT PRIMARY KEY,
+                            edition_date TEXT NOT NULL,
+                            subject TEXT NOT NULL,
+                            recipients_count INTEGER DEFAULT 0,
+                            delivered_count INTEGER DEFAULT 0,
+                            failed_count INTEGER DEFAULT 0,
+                            status TEXT DEFAULT 'PENDING',
+                            html_content TEXT,
+                            plain_text_content TEXT,
+                            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+                        );
+                    """)
+                    cursor.execute("CREATE INDEX IF NOT EXISTS idx_user_accounts_digest_sub ON user_accounts (is_digest_subscribed, is_subscriber);")
+                    cursor.execute("CREATE INDEX IF NOT EXISTS idx_user_accounts_unsub_token ON user_accounts (digest_unsubscribe_token);")
+                    cursor.execute("CREATE INDEX IF NOT EXISTS idx_digest_dispatches_date ON digest_dispatches (edition_date, created_at DESC);")
+                    cursor.execute("INSERT OR IGNORE INTO schema_migrations (version) VALUES ('v030_research_bouquet_and_digest_subscriptions');")
+                conn.commit()
+
             _DB_INITIALIZED = True
             _INITIALIZED_DBS.add(target_key)
         except Exception as e:

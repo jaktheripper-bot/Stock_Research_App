@@ -406,7 +406,7 @@
             Cancel
           </button>
           <button id="btnConfirmDeepDive" type="button" onclick="executeDeepDiveAudit('{{ scheme.scheme_code }}', {{ credit_quote.layer2_deep_dive_credits }})" class="btn btn-sm" style="background: linear-gradient(135deg, #9333ea 0%, #7c3aed 100%); color: #ffffff; border: none; padding: 8px 20px; border-radius: 8px; font-weight: 700; font-size: 13px; display: inline-flex; align-items: center; gap: 6px; cursor: pointer; box-shadow: 0 4px 12px rgba(147, 51, 234, 0.4);">
-            <span>⚡</span> Authorize & Begin Audit ({{ credit_quote.layer2_deep_dive_credits }} Credits)
+            <svg class="glyph" style="width: 14px; height: 14px;"><use href="#glyph-zap"></use></svg> Authorize & Begin Audit ({{ credit_quote.layer2_deep_dive_credits }} Credits)
           </button>
         </div>
       </div>
@@ -858,7 +858,7 @@ async function executeDeepDiveAudit(schemeCode, creditCost) {
       if (btn) {
         btn.disabled = false;
         btn.style.opacity = "1";
-        btn.innerHTML = `<span>⚡</span> Initiate Deep-Dive Audit`;
+        btn.innerHTML = `<svg class="glyph" style="width: 14px; height: 14px;"><use href="#glyph-zap"></use></svg> Initiate Deep-Dive Audit`;
       }
       return;
     }
@@ -928,7 +928,7 @@ async function executeDeepDiveAudit(schemeCode, creditCost) {
           if (btn) {
             btn.disabled = false;
             btn.style.opacity = "1";
-            btn.innerHTML = `<span>⚡</span> Initiate Deep-Dive Audit`;
+            btn.innerHTML = `<svg class="glyph" style="width: 14px; height: 14px;"><use href="#glyph-zap"></use></svg> Initiate Deep-Dive Audit`;
           }
         }
       } catch (pollErr) {
@@ -942,7 +942,7 @@ async function executeDeepDiveAudit(schemeCode, creditCost) {
     if (btn) {
       btn.disabled = false;
       btn.style.opacity = "1";
-      btn.innerHTML = `<span>⚡</span> Initiate Deep-Dive Audit`;
+      btn.innerHTML = `<svg class="glyph" style="width: 14px; height: 14px;"><use href="#glyph-zap"></use></svg> Initiate Deep-Dive Audit`;
     }
   }
 }
