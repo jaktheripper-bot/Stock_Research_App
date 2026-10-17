@@ -10,7 +10,7 @@ from decimal import Decimal
 from datetime import datetime, date, timezone
 from typing import Optional, List, Dict, Any
 
-from core.db.connection import get_db_connection, get_supabase_url
+from core.db.connection import get_db_connection, get_supabase_url, is_postgres_connection, is_postgres_active
 from core.db.debt_universe import (
     CANONICAL_DEBT_UNIVERSE,
     CANONICAL_DEBT_BY_ISIN,
@@ -18,7 +18,7 @@ from core.db.debt_universe import (
 )
 
 def is_supabase_enabled() -> bool:
-    return bool(get_supabase_url())
+    return bool(get_supabase_url() and is_postgres_active())
 
 logger = logging.getLogger(__name__)
 
@@ -63,7 +63,7 @@ def save_debt_security(sec: Dict[str, Any]) -> bool:
     """Inserts or updates a corporate debt security or SDI."""
     conn = get_db_connection()
     cursor = conn.cursor()
-    use_pg = is_supabase_enabled()
+    use_pg = is_postgres_connection(conn)
 
     isin = sec["isin"].strip().upper()
     ticker = sec.get("ticker", "").strip().upper()
@@ -202,7 +202,7 @@ def get_debt_security_by_isin(isin: str) -> Optional[Dict[str, Any]]:
     """Retrieves a single corporate debt security or SDI by its ISIN."""
     conn = get_db_connection()
     cursor = conn.cursor()
-    use_pg = is_supabase_enabled()
+    use_pg = is_postgres_connection(conn)
     clean_isin = isin.strip().upper()
 
     try:
@@ -227,7 +227,7 @@ def get_debt_securities_by_ticker(ticker: str) -> List[Dict[str, Any]]:
     """Retrieves all debt securities issued by a given company ticker."""
     conn = get_db_connection()
     cursor = conn.cursor()
-    use_pg = is_supabase_enabled()
+    use_pg = is_postgres_connection(conn)
     clean_ticker = ticker.strip().upper()
 
     try:
@@ -285,7 +285,7 @@ def get_debt_securities_for_equity(equity_ticker: str) -> List[Dict[str, Any]]:
 
     conn = get_db_connection()
     cursor = conn.cursor()
-    use_pg = is_supabase_enabled()
+    use_pg = is_postgres_connection(conn)
     try:
         placeholders = ", ".join(["%s" if use_pg else "?" for _ in matching_debt_tickers])
         sql = f"SELECT * FROM corporate_debt_securities WHERE UPPER(ticker) IN ({placeholders}) ORDER BY maturity_date ASC"
@@ -309,7 +309,7 @@ def get_active_debt_securities(
     """Retrieves active debt securities filtered by seniority, rating, and instrument type."""
     conn = get_db_connection()
     cursor = conn.cursor()
-    use_pg = is_supabase_enabled()
+    use_pg = is_postgres_connection(conn)
 
     clauses = ["(CAST(is_listed AS TEXT) IN ('1', 'true', 'TRUE', 't') OR is_listed IS TRUE)" if use_pg else "(is_listed = 1 OR CAST(is_listed AS TEXT) = '1')"]
     clauses.append("(ticker NOT LIKE '%TEST%' AND ticker NOT LIKE '%UNITTEST%' AND isin NOT LIKE '%TEST%' AND instrument_name NOT LIKE '%Test%')")
@@ -371,7 +371,7 @@ def record_rating_event(event: Dict[str, Any]) -> bool:
     """Records a Credit Rating Agency action (upgrade, downgrade, watch, affirmation)."""
     conn = get_db_connection()
     cursor = conn.cursor()
-    use_pg = is_supabase_enabled()
+    use_pg = is_postgres_connection(conn)
 
     isin = event["isin"].strip().upper()
     ticker = event.get("ticker", "").strip().upper()
@@ -413,7 +413,7 @@ def get_rating_history(isin: str) -> List[Dict[str, Any]]:
     """Retrieves chronological credit rating history for an ISIN."""
     conn = get_db_connection()
     cursor = conn.cursor()
-    use_pg = is_supabase_enabled()
+    use_pg = is_postgres_connection(conn)
     clean_isin = isin.strip().upper()
 
     try:
@@ -432,7 +432,7 @@ def get_recent_rating_actions(limit: int = 50) -> List[Dict[str, Any]]:
     """Retrieves latest credit rating agency actions across all issuers."""
     conn = get_db_connection()
     cursor = conn.cursor()
-    use_pg = is_supabase_enabled()
+    use_pg = is_postgres_connection(conn)
 
     try:
         sql = f"SELECT * FROM credit_rating_events ORDER BY event_date DESC LIMIT {limit}"

@@ -10,10 +10,10 @@ from decimal import Decimal
 from datetime import datetime, date, timezone
 from typing import Optional, List, Dict, Any
 
-from core.db.connection import get_db_connection, get_supabase_url
+from core.db.connection import get_db_connection, get_supabase_url, is_postgres_connection, is_postgres_active
 
 def is_supabase_enabled() -> bool:
-    return bool(get_supabase_url())
+    return bool(get_supabase_url() and is_postgres_active())
 
 logger = logging.getLogger(__name__)
 
@@ -47,7 +47,7 @@ def save_mutual_fund_scheme(scheme: Dict[str, Any]) -> bool:
     """Inserts or updates a mutual fund scheme master record."""
     conn = get_db_connection()
     cursor = conn.cursor()
-    use_pg = is_supabase_enabled()
+    use_pg = is_postgres_connection(conn)
 
     code = scheme["scheme_code"].strip().upper()
     name = scheme["scheme_name"].strip()
@@ -154,7 +154,7 @@ def save_mutual_fund_holdings(scheme_code: str, holdings: List[Dict[str, Any]]) 
     """Replaces or saves the portfolio constituents for a mutual fund scheme."""
     conn = get_db_connection()
     cursor = conn.cursor()
-    use_pg = is_supabase_enabled()
+    use_pg = is_postgres_connection(conn)
     clean_code = scheme_code.strip().upper()
 
     try:
@@ -204,7 +204,7 @@ def get_mutual_fund_scheme(scheme_code: str) -> Optional[Dict[str, Any]]:
     """Fetches a single mutual fund scheme record."""
     conn = get_db_connection()
     cursor = conn.cursor()
-    use_pg = is_supabase_enabled()
+    use_pg = is_postgres_connection(conn)
     clean_code = scheme_code.strip().upper()
 
     try:
@@ -239,7 +239,7 @@ def get_active_mutual_funds(
     """Retrieves active mutual fund schemes filtered by category."""
     conn = get_db_connection()
     cursor = conn.cursor()
-    use_pg = is_supabase_enabled()
+    use_pg = is_postgres_connection(conn)
 
     clauses = []
     params = []
@@ -271,7 +271,7 @@ def get_scheme_holdings(scheme_code: str) -> List[Dict[str, Any]]:
     """Fetches all granular portfolio constituents for a mutual fund scheme sorted by weight."""
     conn = get_db_connection()
     cursor = conn.cursor()
-    use_pg = is_supabase_enabled()
+    use_pg = is_postgres_connection(conn)
     clean_code = scheme_code.strip().upper()
 
     try:
@@ -308,7 +308,7 @@ def get_schemes_by_holding(identifier: str) -> List[Dict[str, Any]]:
     """Reverse Look-Through: finds which mutual funds hold a specific stock ticker or bond ISIN."""
     conn = get_db_connection()
     cursor = conn.cursor()
-    use_pg = is_supabase_enabled()
+    use_pg = is_postgres_connection(conn)
     clean_id = identifier.strip().upper()
 
     try:
@@ -4909,7 +4909,7 @@ def save_fund_forensic_dossier(dossier: Dict[str, Any]) -> bool:
     """Saves or updates a synthesized 7-pillar forensic fund dossier."""
     conn = get_db_connection()
     cursor = conn.cursor()
-    use_pg = is_supabase_enabled()
+    use_pg = is_postgres_connection(conn)
 
     code = dossier["scheme_code"].strip().upper()
     text = dossier.get("dossier_text", "")
@@ -4982,7 +4982,7 @@ def get_fund_forensic_dossier(scheme_code: str) -> Optional[Dict[str, Any]]:
     """Retrieves the latest forensic look-through dossier for a fund scheme."""
     conn = get_db_connection()
     cursor = conn.cursor()
-    use_pg = is_supabase_enabled()
+    use_pg = is_postgres_connection(conn)
     clean_code = scheme_code.strip().upper()
 
     try:

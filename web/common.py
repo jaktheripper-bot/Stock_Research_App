@@ -81,11 +81,31 @@ def json_response_with_cache(data: dict, max_age: int = 3600) -> JSONResponse:
     safe_data = jsonable_encoder(data)
     content_str = json.dumps(safe_data, sort_keys=True, default=str)
     etag = f'"{hashlib.md5(content_str.encode()).hexdigest()}"'
+
+    # Anti-staleness guard: Never cache empty or error payloads at the edge/CDN.
+    # This prevents transient startup / cold migration states from locking in empty responses for 3600s.
+    is_empty = False
+    if isinstance(safe_data, dict):
+        if safe_data.get("count") == 0:
+            is_empty = True
+        elif safe_data.get("status") in ("error", "failed"):
+            is_empty = True
+        elif safe_data.get("success") is False:
+            is_empty = True
+        elif "data" in safe_data and isinstance(safe_data["data"], list) and len(safe_data["data"]) == 0:
+            is_empty = True
+        elif "securities" in safe_data and isinstance(safe_data["securities"], list) and len(safe_data["securities"]) == 0:
+            is_empty = True
+        elif "items" in safe_data and isinstance(safe_data["items"], list) and len(safe_data["items"]) == 0:
+            is_empty = True
+
+    cache_header = "no-cache, no-store, must-revalidate" if is_empty else f"public, max-age={max_age}"
+
     return JSONResponse(
         content=safe_data,
         media_type="application/json",
         headers={
-            "Cache-Control": f"public, max-age={max_age}",
+            "Cache-Control": cache_header,
             "ETag": etag,
         }
     )

@@ -11,10 +11,10 @@ from decimal import Decimal
 from datetime import datetime, date, timezone
 from typing import Optional, List, Dict, Any
 
-from core.db.connection import get_db_connection, get_supabase_url
+from core.db.connection import get_db_connection, get_supabase_url, is_postgres_connection, is_postgres_active
 
 def is_supabase_enabled() -> bool:
-    return bool(get_supabase_url())
+    return bool(get_supabase_url() and is_postgres_active())
 
 logger = logging.getLogger(__name__)
 
@@ -59,7 +59,7 @@ def create_or_get_agent_conversation(
     """Retrieves an existing conversation or initializes a new one."""
     conn = get_db_connection()
     cursor = conn.cursor()
-    use_pg = is_supabase_enabled()
+    use_pg = is_postgres_connection(conn)
 
     try:
         placeholder = "%s" if use_pg else "?"
@@ -107,7 +107,7 @@ def append_conversation_turn(
     """Appends a dialogue turn to the conversation history and increments turn counter."""
     conn = get_db_connection()
     cursor = conn.cursor()
-    use_pg = is_supabase_enabled()
+    use_pg = is_postgres_connection(conn)
     tool_calls_json = json.dumps(tool_calls or [])
 
     try:
@@ -154,7 +154,7 @@ def get_conversation_turns(conversation_id: str, limit: int = 50) -> List[Dict[s
     """Retrieves chronological dialogue turns for a conversation."""
     conn = get_db_connection()
     cursor = conn.cursor()
-    use_pg = is_supabase_enabled()
+    use_pg = is_postgres_connection(conn)
 
     try:
         placeholder = "%s" if use_pg else "?"
@@ -185,7 +185,7 @@ def record_autonomous_event(
     """Records an autonomous trigger or background watcher event into the ledger."""
     conn = get_db_connection()
     cursor = conn.cursor()
-    use_pg = is_supabase_enabled()
+    use_pg = is_postgres_connection(conn)
     event_id = f"EVT-{datetime.now(timezone.utc).strftime('%Y%m%d%H%M%S')}-{os.urandom(3).hex()}"
     metadata_json = json.dumps(metadata or {})
 
@@ -221,7 +221,7 @@ def get_recent_autonomous_events(
     """Retrieves recent autonomous trigger actions from the event ledger."""
     conn = get_db_connection()
     cursor = conn.cursor()
-    use_pg = is_supabase_enabled()
+    use_pg = is_postgres_connection(conn)
 
     try:
         base_filter = """

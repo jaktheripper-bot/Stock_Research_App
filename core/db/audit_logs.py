@@ -10,10 +10,10 @@ from decimal import Decimal
 from datetime import datetime, date
 from typing import Optional, List, Dict, Any
 
-from core.db.connection import get_db_connection, get_supabase_url
+from core.db.connection import get_db_connection, get_supabase_url, is_postgres_connection, is_postgres_active
 
 def is_supabase_enabled() -> bool:
-    return bool(get_supabase_url())
+    return bool(get_supabase_url() and is_postgres_active())
 
 logger = logging.getLogger(__name__)
 
@@ -56,7 +56,7 @@ def save_project_audit_log(audit: Dict[str, Any]) -> bool:
     """Inserts an autonomous project audit log into the database."""
     conn = get_db_connection()
     cursor = conn.cursor()
-    use_pg = is_supabase_enabled()
+    use_pg = is_postgres_connection(conn)
 
     critical_violations_json = json.dumps(audit.get("critical_violations", []))
     recommendations_json = json.dumps(audit.get("recommendations", []))
@@ -169,7 +169,7 @@ def get_project_audit_history(limit: int = 10) -> List[Dict[str, Any]]:
     """Retrieves recent audit logs in reverse chronological order."""
     conn = get_db_connection()
     cursor = conn.cursor()
-    use_pg = is_supabase_enabled()
+    use_pg = is_postgres_connection(conn)
     try:
         placeholder = "%s" if use_pg else "?"
         cursor.execute(f"SELECT * FROM project_audit_logs ORDER BY id DESC LIMIT {placeholder};", (limit,))
@@ -187,7 +187,7 @@ def get_project_audit_by_id(audit_id: str) -> Optional[Dict[str, Any]]:
     """Retrieves a specific audit log by its unique audit_id."""
     conn = get_db_connection()
     cursor = conn.cursor()
-    use_pg = is_supabase_enabled()
+    use_pg = is_postgres_connection(conn)
     try:
         placeholder = "%s" if use_pg else "?"
         cursor.execute(f"SELECT * FROM project_audit_logs WHERE audit_id = {placeholder};", (audit_id,))

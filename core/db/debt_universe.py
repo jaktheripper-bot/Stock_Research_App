@@ -3,7 +3,7 @@
 Complies with SEBI (Issue and Listing of Non-Convertible Securities) Regulations
 and the SEBI ₹10,000 Face Value Democratization Framework (July 2024 Amendments).
 
-Contains 105 benchmark corporate debt instruments spanning 5 essential institutional segments:
+Contains 130 benchmark corporate debt instruments spanning 5 essential institutional segments:
 1. PSU & Sovereign-Backed Quasi-Gilt Bonds (25 instruments: PFC, REC, NTPC, NHAI, IRFC, IOCL, etc.)
 2. Marquee Conglomerates & Corporate Giants (25 instruments: RIL, Tata Motors, L&T, TCS, M&M, etc.)
 3. Premier Banking & Financial Institutions (Senior, Tier-II & Infra) (25 instruments: SBI, HDFC, ICICI, etc.)
@@ -5372,7 +5372,1208 @@ CANONICAL_DEBT_UNIVERSE: List[Dict[str, Any]] = [
                         "GoldenPi"
             ]
         }
-    }
+    },
+    {   'asset_cover_ratio': 1.2,
+    'coupon_frequency': 'MONTHLY',
+    'coupon_rate_pct': 10.25,
+    'credit_rating': 'ICRA A+',
+    'credit_rating_agency': 'ICRA',
+    'exchange': 'NSE',
+    'face_value': 10000.0,
+    'fldg_pct': 5.0,
+    'instrument_name': 'Vivriti Gold Loan Receivables Series I Securitized Debt Instrument',
+    'instrument_type': 'SDI',
+    'is_listed': True,
+    'is_sdi': True,
+    'isin': 'IN901SDI0012',
+    'issue_date': '2024-01-15',
+    'last_traded_price': 10000.0,
+    'macaulay_duration_years': 0.72,
+    'maturity_date': '2025-07-15',
+    'metadata': {   'collated_sources': ['Wint Wealth', 'Grip Invest', 'NSE Debt'],
+                    'collateral_type': 'Bankruptcy-remote pool of retail loans held in SPV trust',
+                    'credit_rating_rationale': 'ICRA A+(SO) rating reflects the bankruptcy-remote '
+                                               'structural isolation of the loan pool and the 5.0% '
+                                               'First Loss Default Guarantee (FLDG) deposited in '
+                                               'an escrow account with the Trustee.',
+                    'fldg_pct': 5.0,
+                    'issuer_overview': 'This Securitized Debt Instrument (SDI) represents '
+                                       'pass-through units issued by a SEBI-registered SPV Trust '
+                                       'managed by Vivriti. The trust holds an isolated pool of '
+                                       'retail secured loans originated by KrazyBee Financial '
+                                       'Services. Monthly borrower principal and interest '
+                                       "collections are remitted directly to unitholders' demat "
+                                       'bank accounts.',
+                    'pool_size_cr': 45.0,
+                    'promoter_group': 'KrazyBee / Vivriti Asset Management',
+                    'sector': 'Securitized Retail Debt (SDI)',
+                    'the_bad': [   'Zero Secondary Liquidity: SDIs have virtually no exchange '
+                                   'trading volume; investors must hold through monthly '
+                                   'amortization to maturity.',
+                                   'Origination Servicing Risk: If originator operations halt, an '
+                                   'alternate backup servicer must step in to manage loan '
+                                   'collections.'],
+                    'the_good': [   'Bankruptcy Remote: The loan pool is legally ring-fenced in a '
+                                    'trust; if the originator goes bankrupt, creditors cannot '
+                                    'touch these assets.',
+                                    '5% FLDG Protection: First Loss Default Guarantee absorbs the '
+                                    'first 5% of borrower defaults before investor principal is '
+                                    'impacted.',
+                                    'Monthly Cash Flow: Monthly coupon + principal amortization '
+                                    'accelerates capital recovery within 18 months.'],
+                    'the_ugly': [   'Catastrophic Pool Default Spike: If retail borrower defaults '
+                                    'exceed the 5.0% FLDG buffer, investors face direct pro-rata '
+                                    'principal haircuts.'],
+                    'underlying_loan_type': 'Secured Digital Gold & Consumer Asset Loans'},
+    'modified_duration_years': 0.65,
+    'originator': 'KrazyBee Financial Services Pvt Ltd',
+    'scrip_code': '939900',
+    'seniority_tier': 'SENIOR_SECURED',
+    'series': 'SDI-1',
+    'ticker': 'KRAZYSDI',
+    'ytm_pct': 10.25},
+    {   'asset_cover_ratio': 1.25,
+    'coupon_frequency': 'MONTHLY',
+    'coupon_rate_pct': 11.2,
+    'credit_rating': 'CRISIL A',
+    'credit_rating_agency': 'CRISIL',
+    'exchange': 'NSE',
+    'face_value': 10000.0,
+    'fldg_pct': 8.0,
+    'instrument_name': 'Grip LeaseX Corporate Equipment Rental Series II SDI',
+    'instrument_type': 'SDI',
+    'is_listed': True,
+    'is_sdi': True,
+    'isin': 'IN902SDI0025',
+    'issue_date': '2024-02-10',
+    'last_traded_price': 10000.0,
+    'macaulay_duration_years': 0.98,
+    'maturity_date': '2026-02-10',
+    'metadata': {   'collated_sources': ['Grip Invest', 'Wint Wealth', 'NSE Debt'],
+                    'collateral_type': 'Leased industrial equipment, EV fleet assets, and '
+                                       'contracted lease rentals',
+                    'credit_rating_rationale': 'CRISIL A(SO) rating supported by strong corporate '
+                                               'lessee counterparty credit profiles, hypothecated '
+                                               'equipment title, and an 8.0% cash credit '
+                                               'enhancement (FLDG).',
+                    'fldg_pct': 8.0,
+                    'issuer_overview': 'LeaseX is a SEBI-regulated Securitized Debt Instrument '
+                                       'backed by corporate equipment and electric vehicle fleet '
+                                       'lease agreements entered into with blue-chip and '
+                                       'high-growth Indian companies. Lease rental payments flow '
+                                       'directly into an escrow account administered by an '
+                                       'independent SEBI debenture trustee.',
+                    'pool_size_cr': 30.0,
+                    'promoter_group': 'Grip Invest Alternative Assets',
+                    'sector': 'Equipment Leasing Securitized Debt (SDI)',
+                    'the_bad': [   'Corporate Counterparty Concentration: Pool returns rely on a '
+                                   'concentrated group of corporate lessees paying monthly rentals '
+                                   'on time.',
+                                   'Equipment Repossession Friction: If a lessee defaults, '
+                                   'reclaiming and liquidating industrial machinery can take '
+                                   'several months.'],
+                    'the_good': [   'High 11.20% Net YTM: One of the highest institutional yields '
+                                    'available under the SEBI ₹10,000 framework.',
+                                    'Substantial 8% FLDG: Substantial cash cushion protects '
+                                    'against lessee payment delays.',
+                                    'Monthly Demat Payouts: Regular monthly interest and principal '
+                                    'repayment credited directly via RTGS/NEFT.'],
+                    'the_ugly': [   'Lessee Bankruptcy & Equipment Obsolescence: If multiple '
+                                    'lessees declare insolvency under NCLT simultaneously, '
+                                    'recovered lease equipment salvage values may be heavily '
+                                    'discounted.'],
+                    'underlying_loan_type': 'Corporate Operating & Financial Leases'},
+    'modified_duration_years': 0.89,
+    'originator': 'Grip Invest / Virenxia Capital',
+    'scrip_code': '939915',
+    'seniority_tier': 'SENIOR_SECURED',
+    'series': 'SDI-2',
+    'ticker': 'LEASEXSDI',
+    'ytm_pct': 11.2},
+    {   'asset_cover_ratio': 1.2,
+    'coupon_frequency': 'MONTHLY',
+    'coupon_rate_pct': 10.5,
+    'credit_rating': 'CRISIL A',
+    'credit_rating_agency': 'CRISIL',
+    'exchange': 'NSE',
+    'face_value': 10000.0,
+    'fldg_pct': 10.0,
+    'instrument_name': 'Wint Wealth InvoiceX Series II Blue-Chip Vendor SDI',
+    'instrument_type': 'SDI',
+    'is_listed': True,
+    'is_sdi': True,
+    'isin': 'INE001A08029',
+    'issue_date': '2024-05-01',
+    'last_traded_price': 10000.0,
+    'macaulay_duration_years': 0.82,
+    'maturity_date': '2025-11-01',
+    'metadata': {   'collated_sources': ['Wint Wealth', 'NSE Debt'],
+                    'collateral_type': 'Accepted supply chain invoices payable by Tier-1 corporate '
+                                       'buyers',
+                    'credit_rating_rationale': 'CRISIL A(SO) rating underpinned by '
+                                               'bankruptcy-remote SPV structure, accepted invoice '
+                                               'mandates on high-rated corporate anchors, and 10% '
+                                               'cash FLDG reserve.',
+                    'fldg_pct': 10.0,
+                    'issuer_overview': 'SEBI-regulated Securitized Debt Instrument issued by an '
+                                       'independent trust holding accepted supply-chain invoices '
+                                       'drawn on Fortune-500 / Nifty-50 corporate buyers with an '
+                                       'irrevocable 10% First Loss Default Guarantee.',
+                    'pool_size_cr': 45.0,
+                    'promoter_group': 'Bankruptcy-Remote Trust (SEBI Regulated SDI)',
+                    'sector': 'Securitized Vendor Invoice Discounting',
+                    'the_bad': [   'Non-sovereign credit risk on underlying corporate buyer '
+                                   'counterparties',
+                                   'Modest secondary market liquidity; designed to be held to '
+                                   'maturity'],
+                    'the_good': [   'High 10.50% YTM paid out monthly directly to investor bank '
+                                    'account',
+                                    'Substantial 10% cash FLDG buffer absorbs invoice defaults',
+                                    'Ultra-short 0.8-year duration with zero equity market '
+                                    'correlation'],
+                    'the_ugly': [   'Systemic commercial dispute between anchor buyers and vendors '
+                                    'freezing invoice settlement'],
+                    'underlying_loan_type': 'Corporate Supply Chain Receivables'},
+    'modified_duration_years': 0.74,
+    'originator': 'Vivriti Capital / KredX Vendor Trust',
+    'scrip_code': '939002',
+    'seniority_tier': 'SENIOR_SECURED',
+    'series': 'SDI2',
+    'ticker': 'WINT_INVOICEX',
+    'ytm_pct': 10.5},
+    {   'asset_cover_ratio': 1.35,
+    'coupon_frequency': 'ANNUAL',
+    'coupon_rate_pct': 7.65,
+    'credit_rating': 'CRISIL AAA',
+    'credit_rating_agency': 'CRISIL',
+    'exchange': 'BSE',
+    'face_value': 10000.0,
+    'fldg_pct': 0.0,
+    'instrument_name': 'REC Limited 7.65% Maharatna PSU Bond 2031',
+    'instrument_type': 'PSU_BOND',
+    'is_listed': True,
+    'is_sdi': False,
+    'isin': 'INE020B08898',
+    'issue_date': '2023-11-20',
+    'last_traded_price': 10020.0,
+    'macaulay_duration_years': 5.4,
+    'maturity_date': '2031-11-20',
+    'metadata': {   'aum_cr': '₹5,10,000+ Cr Loan Book',
+                    'collated_sources': ['BSE Debt Market', 'IndiaBonds'],
+                    'collateral_type': 'First pari-passu charge on standard project loan assets',
+                    'interest_coverage': 2.1,
+                    'issuer_overview': 'REC Limited is a central Maharatna public sector '
+                                       'enterprise dedicated to financing power generation, '
+                                       'transmission, renewable energy, and infrastructure '
+                                       'projects across India.',
+                    'promoter_group': 'Government of India (PFC Owned / Ministry of Power)',
+                    'sector': 'Power Sector Public Financial Institution',
+                    'the_bad': [   'High state discom sector concentration risk',
+                                   'Duration of 5+ years creates price sensitivity to RBI rate '
+                                   'shifts'],
+                    'the_good': [   'Quasi-sovereign credit risk with 100% government ownership '
+                                    'chain',
+                                    'CRISIL AAA highest safety badge',
+                                    "Essential strategic financier of India's national power grid"],
+                    'the_ugly': [   'Structural delays in state electricity regulatory commission '
+                                    'tariff revisions']},
+    'modified_duration_years': 5.02,
+    'originator': None,
+    'scrip_code': '935402',
+    'seniority_tier': 'SENIOR_SECURED',
+    'series': 'P1',
+    'ticker': 'REC',
+    'ytm_pct': 7.61},
+    {   'asset_cover_ratio': 1.0,
+    'coupon_frequency': 'ANNUAL',
+    'coupon_rate_pct': 7.95,
+    'credit_rating': 'CRISIL AAA',
+    'credit_rating_agency': 'CRISIL',
+    'exchange': 'NSE',
+    'face_value': 10000.0,
+    'fldg_pct': 0.0,
+    'instrument_name': 'HDFC Bank 7.95% Subordinated Tier-II Non-Convertible Bond 2033',
+    'instrument_type': 'Subordinated Tier-II',
+    'is_listed': True,
+    'is_sdi': False,
+    'isin': 'INE040A08377',
+    'issue_date': '2023-08-18',
+    'last_traded_price': 9980.0,
+    'macaulay_duration_years': 5.4,
+    'maturity_date': '2033-08-18',
+    'metadata': {   'aum_cr': 'Total Balance Sheet ₹36,00,000+ Cr',
+                    'collated_sources': ['GoldenPi', 'IndiaBonds', 'NSE Debt'],
+                    'collateral_type': 'Unsecured Subordinated Regulatory Capital (Tier-II)',
+                    'crar_pct': 19.8,
+                    'credit_rating_rationale': 'CRISIL AAA/Stable rating reflects systemically '
+                                               'vital franchise, exceptional funding profile, '
+                                               'market-leading asset quality, and robust capital '
+                                               'buffers.',
+                    'gnpa_pct': 1.26,
+                    'issuer_overview': "HDFC Bank Limited is India's largest private sector bank "
+                                       'and a designated Domestic Systemically Important Bank '
+                                       '(D-SIB) by the RBI. Holding over ₹25 lakh crore in '
+                                       "deposits, HDFC Bank's balance sheet is universally "
+                                       'recognized as the bedrock of the Indian financial '
+                                       'ecosystem.',
+                    'nnpa_pct': 0.35,
+                    'promoter_group': 'HDFC Bank (Institutionally Held D-SIB)',
+                    'sector': 'Private Sector Banking (D-SIB)',
+                    'the_bad': [   'Subordinated Liquidation Rank: Tier-II bonds rank junior to '
+                                   'retail depositors and senior creditors in resolution.',
+                                   'High Duration Sensitivity: 5.0-year modified duration implies '
+                                   '~5% price volatility for every 100 bps shift in long-term '
+                                   'sovereign bond yields.'],
+                    'the_good': [   'Too Big To Fail (D-SIB): Designated systemically important '
+                                    'bank; sovereign-like regulatory supervision.',
+                                    'Rock-Solid Asset Quality: Net NPA of 0.35% with 75% provision '
+                                    'coverage ratio.',
+                                    'Long-Term Compounding: 10-year locked coupon providing '
+                                    'predictable retirement cash flows.'],
+                    'the_ugly': [   'Point of Non-Viability (PONV) Risk: While near-impossible for '
+                                    'HDFC Bank, Basel III Tier-II debt can be converted or written '
+                                    'off under extreme RBI bank failure intervention.']},
+    'modified_duration_years': 5.0,
+    'originator': None,
+    'scrip_code': '938330',
+    'seniority_tier': 'SUBORDINATED_TIER_2',
+    'series': 'T2',
+    'ticker': 'HDFCBANK',
+    'ytm_pct': 7.98},
+    {   'asset_cover_ratio': 1.1,
+    'coupon_frequency': 'ANNUAL',
+    'coupon_rate_pct': 7.84,
+    'credit_rating': 'CRISIL AAA',
+    'credit_rating_agency': 'CRISIL',
+    'exchange': 'BSE',
+    'face_value': 10000.0,
+    'fldg_pct': 0.0,
+    'instrument_name': 'HDFC Bank 7.84% Basel-III Tier-II Capital Bond 2033',
+    'instrument_type': 'TIER_2_BOND',
+    'is_listed': True,
+    'is_sdi': False,
+    'isin': 'INE040A08472',
+    'issue_date': '2023-09-22',
+    'last_traded_price': 10060.0,
+    'macaulay_duration_years': 6.2,
+    'maturity_date': '2033-09-22',
+    'metadata': {   'aum_cr': '₹36,00,000+ Cr Balance Sheet',
+                    'collated_sources': ['BSE Debt Market', 'GoldenPi'],
+                    'collateral_type': 'Unsecured subordinated Tier-II regulatory capital',
+                    'interest_coverage': 5.2,
+                    'issuer_overview': "HDFC Bank is India's largest private sector bank following "
+                                       'the historic merger with parent HDFC Limited, maintaining '
+                                       'pristine underwriting discipline and market leadership.',
+                    'promoter_group': 'HDFC Bank Institutional Shareholding',
+                    'sector': 'Private Sector Banking',
+                    'the_bad': [   'Subordinated claim in bankruptcy hierarchy',
+                                   'Tax drag on annual coupon payments'],
+                    'the_good': [   'Pristine underwriting standards with Gross NPA consistently '
+                                    'near 1.2%',
+                                    'CRISIL AAA highest institutional credit rating',
+                                    'Domestic Systemically Important Bank (D-SIB) status'],
+                    'the_ugly': [   'Systemic regulatory invocation of PONV loss absorption '
+                                    '(virtually zero historical precedent for HDFC)']},
+    'modified_duration_years': 5.75,
+    'originator': None,
+    'scrip_code': '935502',
+    'seniority_tier': 'TIER_2_SUBORDINATED',
+    'series': 'T2',
+    'ticker': 'HDFCBANK',
+    'ytm_pct': 7.74},
+    {   'asset_cover_ratio': 1.5,
+    'coupon_frequency': 'ANNUAL',
+    'coupon_rate_pct': 7.49,
+    'credit_rating': 'CRISIL AAA',
+    'credit_rating_agency': 'CRISIL',
+    'exchange': 'BSE',
+    'face_value': 10000.0,
+    'fldg_pct': 0.0,
+    'instrument_name': 'Indian Railway Finance Corp 7.49% Sovereign-Guaranteed Bond 2033',
+    'instrument_type': 'PSU_BOND',
+    'is_listed': True,
+    'is_sdi': False,
+    'isin': 'INE053F08082',
+    'issue_date': '2023-08-25',
+    'last_traded_price': 9980.0,
+    'macaulay_duration_years': 6.8,
+    'maturity_date': '2033-08-25',
+    'metadata': {   'aum_cr': '₹4,60,000+ Cr Assets Under Lease',
+                    'collated_sources': ['BSE Debt Market', 'IndiaBonds'],
+                    'collateral_type': 'First charge on railway wagons, locomotives, and track '
+                                       'infrastructure',
+                    'interest_coverage': 3.1,
+                    'issuer_overview': 'IRFC is the dedicated market borrowing arm of the Indian '
+                                       'Railways. It leases railway rolling stock and '
+                                       'infrastructure assets to the Ministry of Railways with '
+                                       'guaranteed lease rentals.',
+                    'promoter_group': 'Ministry of Railways, Government of India',
+                    'sector': 'Railway Rolling Stock Leasing',
+                    'the_bad': [   'Long duration of 6+ years entails mark-to-market volatility '
+                                   'before maturity',
+                                   'Yield is only marginally above G-Sec benchmarks'],
+                    'the_good': [   'Zero historical NPA on sovereign railway lease book',
+                                    'Direct statutory backing by Ministry of Railways',
+                                    'Highest AAA safety rating from all major agencies'],
+                    'the_ugly': [   'Adverse revision in bilateral lease terms with Ministry of '
+                                    'Railways']},
+    'modified_duration_years': 6.32,
+    'originator': None,
+    'scrip_code': '935404',
+    'seniority_tier': 'SENIOR_SECURED',
+    'series': 'P3',
+    'ticker': 'IRFC',
+    'ytm_pct': 7.52},
+    {   'asset_cover_ratio': 1.1,
+    'coupon_frequency': 'ANNUAL',
+    'coupon_rate_pct': 7.75,
+    'credit_rating': 'CRISIL AAA',
+    'credit_rating_agency': 'CRISIL',
+    'exchange': 'BSE',
+    'face_value': 10000.0,
+    'fldg_pct': 0.0,
+    'instrument_name': 'State Bank of India 7.75% Basel-III Tier-II Capital Bond 2034',
+    'instrument_type': 'TIER_2_BOND',
+    'is_listed': True,
+    'is_sdi': False,
+    'isin': 'INE062A08298',
+    'issue_date': '2024-04-12',
+    'last_traded_price': 10025.0,
+    'macaulay_duration_years': 6.95,
+    'maturity_date': '2034-04-12',
+    'metadata': {   'aum_cr': '₹60,00,000+ Cr Asset Base',
+                    'collated_sources': ['BSE Debt Market', 'IndiaBonds'],
+                    'collateral_type': 'Unsecured subordinated Tier-II regulatory capital',
+                    'interest_coverage': 4.8,
+                    'issuer_overview': "State Bank of India is the nation's largest commercial "
+                                       'bank commanding over 22% deposit market share, backed by '
+                                       'majority sovereign ownership.',
+                    'promoter_group': 'Government of India (57.5% Sovereign Stake)',
+                    'sector': 'Public Sector Banking',
+                    'the_bad': [   'Subordinated to depositors and senior creditors in liquidation '
+                                   'waterfall',
+                                   'Long 10-year maturity with 6.45-year modified duration'],
+                    'the_good': [   'Sovereign-backed banking giant with systemic importance '
+                                    '(D-SIB)',
+                                    'Highest CRISIL AAA rating for Tier-II capital',
+                                    'High liquidity in secondary exchange RFQ market'],
+                    'the_ugly': [   'Statutory Point of Non-Viability (PONV) loss absorption '
+                                    'clause under Basel-III framework']},
+    'modified_duration_years': 6.45,
+    'originator': None,
+    'scrip_code': '935501',
+    'seniority_tier': 'TIER_2_SUBORDINATED',
+    'series': 'T1',
+    'ticker': 'SBIN',
+    'ytm_pct': 7.71},
+    {   'asset_cover_ratio': 1.25,
+    'coupon_frequency': 'ANNUAL',
+    'coupon_rate_pct': 9.5,
+    'credit_rating': 'CARE AA',
+    'credit_rating_agency': 'CARE',
+    'exchange': 'BSE',
+    'face_value': 10000.0,
+    'fldg_pct': 0.0,
+    'instrument_name': 'Piramal Capital & Housing 9.50% Senior Secured NCD 2026',
+    'instrument_type': 'NCD',
+    'is_listed': True,
+    'is_sdi': False,
+    'isin': 'INE087H07123',
+    'issue_date': '2023-04-20',
+    'last_traded_price': 10030.0,
+    'macaulay_duration_years': 1.15,
+    'maturity_date': '2026-04-20',
+    'metadata': {   'aum_cr': '₹68,000+ Cr AUM',
+                    'collated_sources': ['BSE Debt Market', 'Wint Wealth', 'GoldenPi'],
+                    'collateral_type': 'First pari-passu charge on standard housing loan '
+                                       'receivables',
+                    'interest_coverage': 2.2,
+                    'issuer_overview': 'Piramal Capital & Housing Finance is a major retail '
+                                       'housing finance company created through the resolution of '
+                                       'erstwhile DHFL, focused on affordable home loans and '
+                                       'retail credit.',
+                    'promoter_group': 'Piramal Group (Ajay Piramal)',
+                    'sector': 'Housing Finance & Wholesale Credit',
+                    'the_bad': [   'Legacy wholesale real estate loan book runoff',
+                                   'CARE AA rating reflects historical resolution restructuring'],
+                    'the_good': [   'High 9.35% yield providing +225 bps premium over G-Sec '
+                                    'benchmark',
+                                    'Short 1-year duration limits interest rate sensitivity',
+                                    'Rapidly expanding affordable retail housing portfolio'],
+                    'the_ugly': [   'Protracted legal challenges regarding resolution waterfall '
+                                    'distributions']},
+    'modified_duration_years': 1.05,
+    'originator': None,
+    'scrip_code': '936306',
+    'seniority_tier': 'SENIOR_SECURED',
+    'series': 'N9',
+    'ticker': 'PIRAMAL',
+    'ytm_pct': 9.35},
+    {   'asset_cover_ratio': 1.0,
+    'coupon_frequency': 'ANNUAL',
+    'coupon_rate_pct': 10.5,
+    'credit_rating': 'CRISIL AA',
+    'credit_rating_agency': 'CRISIL',
+    'exchange': 'BSE',
+    'face_value': 10000.0,
+    'fldg_pct': 0.0,
+    'instrument_name': 'IndusInd Bank 10.50% Additional Tier-1 Perpetual Subordinated Debt',
+    'instrument_type': 'Perpetual AT1',
+    'is_listed': True,
+    'is_sdi': False,
+    'isin': 'INE090A08UD5',
+    'issue_date': '2021-03-24',
+    'last_traded_price': 9750.0,
+    'macaulay_duration_years': 4.1,
+    'maturity_date': '2099-12-31',
+    'metadata': {   'aum_cr': 'Loan Book ₹3,45,000+ Cr',
+                    'collated_sources': ['GoldenPi', 'IndiaBonds', 'BSE Debt Market'],
+                    'collateral_type': 'Perpetual Quasi-Equity Loss-Absorbing Instrument',
+                    'crar_pct': 17.5,
+                    'credit_rating_rationale': 'CRISIL AA/Stable rating on AT1 bonds is lower than '
+                                               "bank's senior rating due to inherent "
+                                               'loss-absorption triggers under RBI Basel III '
+                                               'guidelines.',
+                    'gnpa_pct': 1.93,
+                    'issuer_overview': 'IndusInd Bank Limited is a mid-to-large private commercial '
+                                       'bank with specialized leadership in vehicle financing, '
+                                       'microfinance (Bharat Financial Inclusion Ltd), and gem & '
+                                       'jewellery financing.',
+                    'nnpa_pct': 0.57,
+                    'promoter_group': 'Hinduja Group',
+                    'sector': 'Private Sector Banking',
+                    'the_bad': [   'Perpetual Instrument: No contractual maturity date; repayment '
+                                   'relies entirely on bank exercising 5-year or 10-year call '
+                                   'option.',
+                                   'Coupon Discretion: Bank can skip coupon payment if capital '
+                                   'adequacy falls below regulatory limits, with zero catch-up '
+                                   '(non-cumulative).'],
+                    'the_good': [   'Very High Yield: 10.85% YTM provides superior cash flow for '
+                                    'accredited institutional risk capital.',
+                                    'Strong Capital Base: CRAR of 17.5% keeps bank well above '
+                                    'minimum regulatory trigger levels.'],
+                    'the_ugly': [   'Permanent Write-Off at PONV: Under RBI Basel III guidelines, '
+                                    'AT1 bonds can be written down to zero without shareholder '
+                                    'consent if RBI declares Point of Non-Viability (as witnessed '
+                                    'in Yes Bank March 2020).']},
+    'modified_duration_years': 3.7,
+    'originator': None,
+    'scrip_code': '939015',
+    'seniority_tier': 'PERPETUAL_AT1',
+    'series': 'AT1',
+    'ticker': 'INDUSINDBK',
+    'ytm_pct': 10.85},
+    {   'asset_cover_ratio': 1.4,
+    'coupon_frequency': 'ANNUAL',
+    'coupon_rate_pct': 8.1,
+    'credit_rating': 'CRISIL AAA',
+    'credit_rating_agency': 'CRISIL',
+    'exchange': 'BSE',
+    'face_value': 10000.0,
+    'fldg_pct': 0.0,
+    'instrument_name': 'Bajaj Finance 8.10% Senior Secured NCD 2029',
+    'instrument_type': 'NCD',
+    'is_listed': True,
+    'is_sdi': False,
+    'isin': 'INE121A08080',
+    'issue_date': '2024-01-10',
+    'last_traded_price': 10050.0,
+    'macaulay_duration_years': 3.82,
+    'maturity_date': '2029-01-10',
+    'metadata': {   'aum_cr': '₹3,50,000+ Cr AUM',
+                    'collated_sources': ['BSE Debt Market', 'GoldenPi'],
+                    'collateral_type': 'First pari-passu charge on consumer and SME loan '
+                                       'receivables',
+                    'crar_pct': 21.5,
+                    'gnpa_pct': 0.95,
+                    'interest_coverage': 4.2,
+                    'issuer_overview': "Bajaj Finance Limited is India's largest and most "
+                                       'diversified consumer finance NBFC with over ₹3,50,000 Cr '
+                                       'in AUM and pristine asset quality metrics.',
+                    'nnpa_pct': 0.35,
+                    'promoter_group': 'Bajaj Group (Sanjiv Bajaj)',
+                    'sector': 'Retail NBFC',
+                    'the_bad': [   'Tight credit spread of ~88 bps over sovereign G-Sec benchmark',
+                                   'Post-tax yield for 30% slab is ~5.49%'],
+                    'the_good': [   'Pristine CRISIL AAA credit profile with fortress balance '
+                                    'sheet',
+                                    'Gross NPA below 1% across economic cycles',
+                                    '1.40x asset cover registered with debenture trustee'],
+                    'the_ugly': [   'Unforeseen regulatory changes from RBI on unsecured retail '
+                                    'lending risk weights']},
+    'modified_duration_years': 3.54,
+    'originator': None,
+    'scrip_code': '936201',
+    'seniority_tier': 'SENIOR_SECURED',
+    'series': 'N3',
+    'ticker': 'BAJAJFIN',
+    'ytm_pct': 7.98},
+    {   'asset_cover_ratio': 1.25,
+    'coupon_frequency': 'ANNUAL',
+    'coupon_rate_pct': 8.75,
+    'credit_rating': 'CRISIL AA+',
+    'credit_rating_agency': 'CRISIL',
+    'exchange': 'BSE',
+    'face_value': 10000.0,
+    'fldg_pct': 0.0,
+    'instrument_name': 'Cholamandalam Investment 8.75% NCD 2027',
+    'instrument_type': 'NCD',
+    'is_listed': True,
+    'is_sdi': False,
+    'isin': 'INE121A08999',
+    'issue_date': '2026-10-07',
+    'last_traded_price': 10000.0,
+    'macaulay_duration_years': 2.77,
+    'maturity_date': '2029-10-07',
+    'metadata': {   'collated_sources': ['User Ingestion Portal', 'BSE Debt Market'],
+                    'collateral_type': 'Registered charge on standard assets',
+                    'issuer_overview': 'Institutional fixed-income security indexed via on-demand '
+                                       'ISIN audit for INE121A08999.',
+                    'promoter_group': 'CHOLAFIN Group',
+                    'sector': 'Corporate Fixed Income',
+                    'the_bad': [   'Requires ongoing surveillance against issuer credit and '
+                                   'liquidity cycles.'],
+                    'the_good': [   'Listed and tracked under SEBI ₹10,000 face value framework.',
+                                    'Contractual coupon rate of 8.75%.'],
+                    'the_ugly': [   'Seniority waterfall risk in unexpected restructuring '
+                                    'proceedings.']},
+    'modified_duration_years': 2.49,
+    'originator': None,
+    'scrip_code': None,
+    'seniority_tier': 'SENIOR_SECURED',
+    'series': 'N1',
+    'ticker': 'CHOLAFIN',
+    'ytm_pct': 11.36},
+    {   'asset_cover_ratio': 1.3,
+    'coupon_frequency': 'ANNUAL',
+    'coupon_rate_pct': 7.72,
+    'credit_rating': 'ICRA AAA',
+    'credit_rating_agency': 'ICRA',
+    'exchange': 'BSE',
+    'face_value': 10000.0,
+    'fldg_pct': 0.0,
+    'instrument_name': 'Power Finance Corporation 7.72% Maharatna PSU Bond 2030',
+    'instrument_type': 'PSU_BOND',
+    'is_listed': True,
+    'is_sdi': False,
+    'isin': 'INE134E08KJ4',
+    'issue_date': '2023-10-15',
+    'last_traded_price': 10040.0,
+    'macaulay_duration_years': 4.65,
+    'maturity_date': '2030-10-15',
+    'metadata': {   'aum_cr': '₹5,40,000+ Cr AUM',
+                    'collated_sources': ['BSE Debt Market', 'GoldenPi'],
+                    'collateral_type': 'First pari-passu charge on infrastructure loan receivables',
+                    'interest_coverage': 2.2,
+                    'issuer_overview': 'PFC is the largest infrastructure finance company in India '
+                                       'dedicated exclusively to financing power generation, '
+                                       'transmission, distribution, and green hydrogen projects.',
+                    'promoter_group': 'Government of India (Ministry of Power)',
+                    'sector': 'Power Sector Public Financial Institution',
+                    'the_bad': [   'Credit spread is only ~56 bps over 10Y G-Sec',
+                                   "Taxable at investor's marginal slab rate"],
+                    'the_good': [   'Maharatna PSU backed by strategic sovereign importance',
+                                    'Flawless debt repayment track record since inception',
+                                    'Sovereign-equivalent CRISIL/ICRA AAA rating'],
+                    'the_ugly': [   'Severe systemic fiscal stress at state power distribution '
+                                    'companies (Discoms)']},
+    'modified_duration_years': 4.32,
+    'originator': None,
+    'scrip_code': '935403',
+    'seniority_tier': 'SENIOR_SECURED',
+    'series': 'P2',
+    'ticker': 'PFC',
+    'ytm_pct': 7.66},
+    {   'asset_cover_ratio': 1.5,
+    'coupon_frequency': 'ANNUAL',
+    'coupon_rate_pct': 7.62,
+    'credit_rating': 'CRISIL AAA',
+    'credit_rating_agency': 'CRISIL',
+    'exchange': 'BSE',
+    'face_value': 10000.0,
+    'fldg_pct': 0.0,
+    'instrument_name': 'NABARD 7.62% Rural Infrastructure Development Bond 2030',
+    'instrument_type': 'PSU_BOND',
+    'is_listed': True,
+    'is_sdi': False,
+    'isin': 'INE261F08CL8',
+    'issue_date': '2023-06-30',
+    'last_traded_price': 10015.0,
+    'macaulay_duration_years': 4.8,
+    'maturity_date': '2030-06-30',
+    'metadata': {   'aum_cr': '₹8,00,000+ Cr Asset Base',
+                    'collated_sources': ['BSE Debt Market', 'GoldenPi'],
+                    'collateral_type': 'Statutory charge on apex refinance loan assets',
+                    'interest_coverage': 3.8,
+                    'issuer_overview': "NABARD is India's apex statutory development bank for "
+                                       'agriculture and rural development, refinancing rural '
+                                       'cooperative banks and state infrastructure projects.',
+                    'promoter_group': 'Government of India (100% Sovereign Ownership)',
+                    'sector': 'Apex Agricultural & Rural Development Finance',
+                    'the_bad': [   'Low credit spread over central government bonds (~49 bps)',
+                                   'Taxable interest income'],
+                    'the_good': [   '100% Government of India owned statutory apex bank',
+                                    'Zero historical default probability with CRISIL AAA rating',
+                                    'Exempt from RBI lending limits due to sovereign mandate'],
+                    'the_ugly': [   'Statutory structural reorganization of rural cooperative '
+                                    'banking sector']},
+    'modified_duration_years': 4.46,
+    'originator': None,
+    'scrip_code': '935407',
+    'seniority_tier': 'SENIOR_SECURED',
+    'series': 'P6',
+    'ticker': 'NABARD',
+    'ytm_pct': 7.59},
+    {   'asset_cover_ratio': 1.3,
+    'coupon_frequency': 'ANNUAL',
+    'coupon_rate_pct': 8.85,
+    'credit_rating': 'CRISIL AAA',
+    'credit_rating_agency': 'CRISIL',
+    'exchange': 'BSE',
+    'face_value': 10000.0,
+    'fldg_pct': 0.0,
+    'instrument_name': 'Tata Capital Financial Services 8.85% Senior Secured NCD 2027',
+    'instrument_type': 'NCD',
+    'is_listed': True,
+    'is_sdi': False,
+    'isin': 'INE306N07MM3',
+    'issue_date': '2023-09-01',
+    'last_traded_price': 10080.0,
+    'macaulay_duration_years': 1.82,
+    'maturity_date': '2027-09-01',
+    'metadata': {   'aum_cr': '₹1,45,000+ Cr AUM',
+                    'collated_sources': ['BSE Debt Market', 'Wint Wealth', 'GoldenPi'],
+                    'collateral_type': 'First pari-passu charge on standard book debts and '
+                                       'receivables',
+                    'crar_pct': 18.2,
+                    'credit_rating_rationale': 'CRISIL AAA rating is anchored by the strategic '
+                                               'importance to Tata Sons, proven track record of '
+                                               'timely equity infusion, pristine asset quality, '
+                                               'and healthy capital adequacy.',
+                    'gnpa_pct': 1.45,
+                    'interest_coverage': 3.8,
+                    'issuer_overview': 'Tata Capital Financial Services Limited is the flagship '
+                                       'financial services arm of the Tata Group. The company '
+                                       'operates a well-diversified loan book spanning retail '
+                                       'consumer finance, commercial auto loans, housing finance, '
+                                       'and SME corporate credit across 400+ branches nationwide.',
+                    'nnpa_pct': 0.38,
+                    'promoter_group': 'Tata Sons (100% Ultimate Parentage)',
+                    'roa_pct': 2.3,
+                    'sector': 'Diversified NBFC',
+                    'the_bad': [   'Moderate Reinvestment Window: 2.5-year maturity requires '
+                                   'redeployment planning in late 2027.',
+                                   'Subdued Secondary Turnover: Retail lot exits on BSE RFQ '
+                                   'typically trade with small discount spreads.'],
+                    'the_good': [   'Tata Group Pedigree: Unmatched moral and financial backing '
+                                    'from parent Tata Sons.',
+                                    'Pristine Asset Quality: Gross NPA of 1.45% and Net NPA of '
+                                    '0.38% represent top-decile NBFC asset quality in India.',
+                                    'Comfortable Asset Cover: 1.30x registered hypothecation cover '
+                                    'with Catalyst Trusteeship Ltd.'],
+                    'the_ugly': [   'Systemic NBFC Liquidity Shock: In a sharp systemic liquidity '
+                                    'squeeze, credit spreads for non-bank lenders could widen, '
+                                    'causing paper drawdowns before maturity.']},
+    'modified_duration_years': 1.68,
+    'originator': None,
+    'scrip_code': '936102',
+    'seniority_tier': 'SENIOR_SECURED',
+    'series': 'N2',
+    'ticker': 'TATACAP',
+    'ytm_pct': 8.52},
+    {   'asset_cover_ratio': 1.2,
+    'coupon_frequency': 'ANNUAL',
+    'coupon_rate_pct': 10.45,
+    'credit_rating': 'CRISIL A',
+    'credit_rating_agency': 'CRISIL',
+    'exchange': 'BSE',
+    'face_value': 10000.0,
+    'fldg_pct': 0.0,
+    'instrument_name': 'Navi Finserv 10.45% Senior Secured NCD 2026',
+    'instrument_type': 'NCD',
+    'is_listed': True,
+    'is_sdi': False,
+    'isin': 'INE342T07279',
+    'issue_date': '2024-03-05',
+    'last_traded_price': 10000.0,
+    'macaulay_duration_years': 0.95,
+    'maturity_date': '2026-03-05',
+    'metadata': {   'aum_cr': '₹11,500+ Cr AUM',
+                    'collated_sources': ['Wint Wealth', 'GoldenPi', 'BSE Debt Market'],
+                    'collateral_type': 'First charge on personal and housing loan book receivables',
+                    'crar_pct': 27.5,
+                    'credit_rating_rationale': 'CRISIL A/Stable rating supported by significant '
+                                               'equity capitalization from founder Sachin Bansal, '
+                                               'comfortable liquidity buffers, and rapid digital '
+                                               'scalability, constrained by seasoning of '
+                                               'uncollateralized personal loan portfolio.',
+                    'gnpa_pct': 3.2,
+                    'interest_coverage': 2.6,
+                    'issuer_overview': 'Navi Finserv Limited is a technology-first digital NBFC '
+                                       'founded by Sachin Bansal. The company originates 100% '
+                                       'paperless personal loans and home loans via its '
+                                       'proprietary mobile app, relying on automated algorithmic '
+                                       'underwriting and UPI e-mandates for collection.',
+                    'nnpa_pct': 1.1,
+                    'promoter_group': 'Sachin Bansal (Co-founder, Flipkart)',
+                    'roa_pct': 2.1,
+                    'sector': 'Fintech Digital Lending NBFC',
+                    'the_bad': [   'Unsecured Personal Loan Vulnerability: Underwriting algorithms '
+                                   'face higher loss rates during retail job cuts or fintech '
+                                   'collection friction.',
+                                   'CRISIL A Rating: Single-A credit rating carries higher credit '
+                                   'spread risk and sensitivity to RBI unsecured lending '
+                                   'circulars.'],
+                    'the_good': [   'High Double-Digit Yield: 10.45% YTM provides premium yield '
+                                    '(+335 bps over G-Secs) popular among retail fixed-income '
+                                    'accumulators.',
+                                    'Enormous Capital Adequacy: CRAR of 27.5% provides deep equity '
+                                    'absorption cushion against unexpected loan write-offs.',
+                                    'Short Tenure: 2-year maturity minimizes duration and '
+                                    'reinvestment exposure.'],
+                    'the_ugly': [   'Regulatory Clampdown on Digital Fintech NBFCs: RBI '
+                                    'restrictions on digital originations or surge in digital '
+                                    'collection defaults could impair loan recovery.']},
+    'modified_duration_years': 0.86,
+    'originator': None,
+    'scrip_code': '938550',
+    'seniority_tier': 'SENIOR_SECURED',
+    'series': 'N1',
+    'ticker': 'NAVIFIN',
+    'ytm_pct': 10.45},
+    {   'asset_cover_ratio': 1.35,
+    'coupon_frequency': 'ANNUAL',
+    'coupon_rate_pct': 9.15,
+    'credit_rating': 'ICRA AA+',
+    'credit_rating_agency': 'ICRA',
+    'exchange': 'BSE',
+    'face_value': 10000.0,
+    'fldg_pct': 0.0,
+    'instrument_name': 'Muthoot Finance 9.15% Senior Secured Gold Loan Backed NCD 2026',
+    'instrument_type': 'NCD',
+    'is_listed': True,
+    'is_sdi': False,
+    'isin': 'INE414G07GE7',
+    'issue_date': '2023-01-10',
+    'last_traded_price': 10040.0,
+    'macaulay_duration_years': 0.74,
+    'maturity_date': '2026-07-10',
+    'metadata': {   'aum_cr': '₹75,000+ Cr AUM',
+                    'collated_sources': [   'BSE Debt Market',
+                                            'Wint Wealth',
+                                            'GoldenPi',
+                                            'IndiaBonds'],
+                    'collateral_type': 'Hypothecation of physical gold bullion loan portfolio',
+                    'crar_pct': 25.4,
+                    'credit_rating_rationale': "ICRA AA+/Stable rating reflects Muthoot's "
+                                               'unchallenged leadership in gold financing, '
+                                               'extraordinary capital adequacy (CRAR 25.4%), '
+                                               'stellar profitability (RoA >5%), and strong '
+                                               'gold-backed collateral cushions.',
+                    'gnpa_pct': 3.8,
+                    'interest_coverage': 4.1,
+                    'issuer_overview': "Muthoot Finance Limited is India's largest gold loan NBFC, "
+                                       'holding over 185 tonnes of physical gold bullion '
+                                       'collateral in bank-grade vaults across 5,000+ branches. '
+                                       'Gold loans carry ultra-short tenures (under 12 months), '
+                                       'low average LTV (65-70%), and immediate liquidity via gold '
+                                       'auctions upon borrower default.',
+                    'nnpa_pct': 0.9,
+                    'promoter_group': 'Muthoot M. George Family',
+                    'roa_pct': 5.1,
+                    'sector': 'Gold Loan NBFC',
+                    'the_bad': [   'Regulatory Surveillance: RBI norms on gold loan cash '
+                                   'disbursements and LTV caps introduce operational compliance '
+                                   'sensitivity.',
+                                   'Gold Price Sensitivity: A sustained crash in global gold '
+                                   'bullion prices (>30%) could reduce collateral auction recovery '
+                                   'margins.'],
+                    'the_good': [   'Liquid Physical Collateral: Every rupee lent is backed by '
+                                    'pledged 22-carat gold jewellery stored in branch vaults.',
+                                    'High Profitability Buffer: Return on Assets exceeding 5% '
+                                    'provides enormous cash flow cushion against operational '
+                                    'shocks.',
+                                    'High Coupon: 9.15% coupon generates steady, predictable '
+                                    'annual income.'],
+                    'the_ugly': [   'Severe Multi-Branch Vault Heist or Collateral Fraud: Any '
+                                    'systemic breach in vault physical security or localized gold '
+                                    'spurious pledge fraud could impact brand trust.']},
+    'modified_duration_years': 0.68,
+    'originator': None,
+    'scrip_code': '937210',
+    'seniority_tier': 'SENIOR_SECURED',
+    'series': 'N4',
+    'ticker': 'MUTHOOTFIN',
+    'ytm_pct': 8.92},
+    {   'asset_cover_ratio': 1.35,
+    'coupon_frequency': 'ANNUAL',
+    'coupon_rate_pct': 8.9,
+    'credit_rating': 'CRISIL AA+',
+    'credit_rating_agency': 'CRISIL',
+    'exchange': 'BSE',
+    'face_value': 10000.0,
+    'fldg_pct': 0.0,
+    'instrument_name': 'Muthoot Finance 8.90% Senior Secured NCD 2026',
+    'instrument_type': 'NCD',
+    'is_listed': True,
+    'is_sdi': False,
+    'isin': 'INE414G07HG2',
+    'issue_date': '2023-07-15',
+    'last_traded_price': 10070.0,
+    'macaulay_duration_years': 1.35,
+    'maturity_date': '2026-07-15',
+    'metadata': {   'aum_cr': '₹80,000+ Cr Gold Loan AUM',
+                    'collated_sources': ['BSE Debt Market', 'GoldenPi'],
+                    'collateral_type': 'First charge on physical gold jewellery receivables and '
+                                       'liquid assets',
+                    'crar_pct': 27.5,
+                    'gnpa_pct': 3.4,
+                    'interest_coverage': 3.4,
+                    'issuer_overview': "Muthoot Finance is India's largest gold financing NBFC "
+                                       'holding over 180 tonnes of physical gold jewellery '
+                                       'collateral securely stored in bank-grade vaults.',
+                    'nnpa_pct': 1.1,
+                    'promoter_group': 'Muthoot Group (M. G. George Muthoot Family)',
+                    'sector': 'Gold Loan NBFC',
+                    'the_bad': [   'Sensitivity to sharp domestic gold price drops triggering '
+                                   'auction delays',
+                                   'Increasing competition from private banks in retail gold '
+                                   'loans'],
+                    'the_good': [   'Short duration of 1.35 years minimizes interest rate exposure',
+                                    'Backed by physical 22k gold collateral held in company vaults',
+                                    'Exceptional 27.5% CRAR capital buffer'],
+                    'the_ugly': ['Sudden regulatory cap on gold loan LTV ratios from RBI']},
+    'modified_duration_years': 1.25,
+    'originator': None,
+    'scrip_code': '936302',
+    'seniority_tier': 'SENIOR_SECURED',
+    'series': 'N5',
+    'ticker': 'MUTHOOTFIN',
+    'ytm_pct': 8.45},
+    {   'asset_cover_ratio': 1.3,
+    'coupon_frequency': 'ANNUAL',
+    'coupon_rate_pct': 9.25,
+    'credit_rating': 'CRISIL AA',
+    'credit_rating_agency': 'CRISIL',
+    'exchange': 'BSE',
+    'face_value': 10000.0,
+    'fldg_pct': 0.0,
+    'instrument_name': 'Manappuram Finance 9.25% Senior Secured NCD 2027',
+    'instrument_type': 'NCD',
+    'is_listed': True,
+    'is_sdi': False,
+    'isin': 'INE522D07BG2',
+    'issue_date': '2024-03-01',
+    'last_traded_price': 10050.0,
+    'macaulay_duration_years': 1.85,
+    'maturity_date': '2027-03-01',
+    'metadata': {   'aum_cr': '₹42,000+ Cr AUM',
+                    'collated_sources': ['BSE Debt Market', 'Wint Wealth'],
+                    'collateral_type': 'First charge on standard book debts and physical gold loan '
+                                       'contracts',
+                    'interest_coverage': 2.8,
+                    'issuer_overview': 'Manappuram Finance is a leading non-banking financial '
+                                       'company offering gold loans, microfinance (Asirvad), '
+                                       'housing finance, and commercial vehicle loans.',
+                    'promoter_group': 'V.P. Nandakumar Family',
+                    'sector': 'Gold Loan & Microfinance NBFC',
+                    'the_bad': [   'Microfinance subsidiary (Asirvad) exposes group to regional '
+                                   'credit risks',
+                                   'Higher funding cost compared to AAA NBFC peers'],
+                    'the_good': [   'High 9.05% YTM offering generous credit spread for CRISIL AA '
+                                    'rating',
+                                    'Strong liquidity buffer and fast turnaround gold loan '
+                                    'operations',
+                                    '1.30x asset cover registered with Catalyst Trusteeship'],
+                    'the_ugly': [   'Regional microfinance political unrest or farm loan waiver '
+                                    'disruptions']},
+    'modified_duration_years': 1.7,
+    'originator': None,
+    'scrip_code': '936303',
+    'seniority_tier': 'SENIOR_SECURED',
+    'series': 'N6',
+    'ticker': 'MANAPPURAM',
+    'ytm_pct': 9.05},
+    {   'asset_cover_ratio': 1.35,
+    'coupon_frequency': 'ANNUAL',
+    'coupon_rate_pct': 8.35,
+    'credit_rating': 'CRISIL AAA',
+    'credit_rating_agency': 'CRISIL',
+    'exchange': 'BSE',
+    'face_value': 10000.0,
+    'fldg_pct': 0.0,
+    'instrument_name': 'Kotak Mahindra Prime 8.35% Senior Secured NCD 2028',
+    'instrument_type': 'NCD',
+    'is_listed': True,
+    'is_sdi': False,
+    'isin': 'INE601U07054',
+    'issue_date': '2023-11-05',
+    'last_traded_price': 10040.0,
+    'macaulay_duration_years': 2.95,
+    'maturity_date': '2028-11-05',
+    'metadata': {   'aum_cr': '₹34,000+ Cr AUM',
+                    'collated_sources': ['BSE Debt Market', 'IndiaBonds'],
+                    'collateral_type': 'First charge on hypothecated vehicle loan contracts',
+                    'interest_coverage': 4.1,
+                    'issuer_overview': 'Kotak Mahindra Prime is the dedicated automobile financing '
+                                       'subsidiary of Kotak Mahindra Bank, holding a conservative, '
+                                       'high-quality passenger vehicle loan book.',
+                    'promoter_group': 'Kotak Mahindra Bank (100% Parentage)',
+                    'sector': 'Car Finance & Retail Lending',
+                    'the_bad': [   'Modest yield premium (~114 bps) over risk-free G-Sec',
+                                   'Passenger vehicle retail sales cyclicality'],
+                    'the_good': [   '100% Kotak Bank parentage with impeccable conservative '
+                                    'governance',
+                                    'CRISIL AAA highest credit safety rating',
+                                    'Hypothecated vehicle collateral provides swift legal '
+                                    'repossession rights'],
+                    'the_ugly': [   'Sudden automotive residual value crash across domestic used '
+                                    'car auctions']},
+    'modified_duration_years': 2.72,
+    'originator': None,
+    'scrip_code': '936305',
+    'seniority_tier': 'SENIOR_SECURED',
+    'series': 'N8',
+    'ticker': 'KOTAKHOME',
+    'ytm_pct': 8.24},
+    {   'asset_cover_ratio': 1.25,
+    'coupon_frequency': 'ANNUAL',
+    'coupon_rate_pct': 9.15,
+    'credit_rating': 'IND AA+',
+    'credit_rating_agency': 'INDIA RATINGS',
+    'exchange': 'BSE',
+    'face_value': 10000.0,
+    'fldg_pct': 0.0,
+    'instrument_name': 'Shriram Finance 9.15% Senior Secured NCD 2027',
+    'instrument_type': 'NCD',
+    'is_listed': True,
+    'is_sdi': False,
+    'isin': 'INE721A07PM9',
+    'issue_date': '2023-12-01',
+    'last_traded_price': 10090.0,
+    'macaulay_duration_years': 2.15,
+    'maturity_date': '2027-12-01',
+    'metadata': {   'aum_cr': '₹2,20,000+ Cr AUM',
+                    'collated_sources': ['BSE Debt Market', 'Wint Wealth', 'GoldenPi'],
+                    'collateral_type': 'First pari-passu charge on commercial vehicle and '
+                                       'equipment loan receivables',
+                    'crar_pct': 20.4,
+                    'gnpa_pct': 5.2,
+                    'interest_coverage': 2.6,
+                    'issuer_overview': "Shriram Finance is India's largest retail asset financing "
+                                       'NBFC specializing in pre-owned commercial vehicles, MSME '
+                                       'loans, two-wheelers, and gold loans across semi-urban and '
+                                       'rural markets.',
+                    'nnpa_pct': 2.8,
+                    'promoter_group': 'Shriram Group',
+                    'sector': 'Commercial Vehicle & MSME NBFC',
+                    'the_bad': [   'Higher Gross NPA profile (~5%) typical of rural borrower '
+                                   'demographics',
+                                   'Vulnerable to diesel price spikes and monsoon agricultural '
+                                   'disruptions'],
+                    'the_good': [   'Attractive 8.86% YTM offering +176 bps credit spread over '
+                                    'G-Sec',
+                                    'Market leadership in high-yield used commercial vehicle '
+                                    'lending',
+                                    'Strong 20%+ capital adequacy ratio'],
+                    'the_ugly': [   'Extended national freight freight rate collapse impairing '
+                                    'truck operator cash flows']},
+    'modified_duration_years': 1.98,
+    'originator': None,
+    'scrip_code': '936301',
+    'seniority_tier': 'SENIOR_SECURED',
+    'series': 'N4',
+    'ticker': 'SHRIRAMFIN',
+    'ytm_pct': 8.86},
+    {   'asset_cover_ratio': 1.25,
+    'coupon_frequency': 'ANNUAL',
+    'coupon_rate_pct': 9.1,
+    'credit_rating': 'CRISIL AA+',
+    'credit_rating_agency': 'CRISIL',
+    'exchange': 'BSE',
+    'face_value': 10000.0,
+    'fldg_pct': 0.0,
+    'instrument_name': 'Shriram Finance 9.10% Senior Secured NCD 2027',
+    'instrument_type': 'NCD',
+    'is_listed': True,
+    'is_sdi': False,
+    'isin': 'INE721A07RV3',
+    'issue_date': '2024-01-09',
+    'last_traded_price': 10020.0,
+    'macaulay_duration_years': 1.28,
+    'maturity_date': '2027-01-09',
+    'metadata': {   'aum_cr': '₹2,14,000+ Cr AUM',
+                    'collated_sources': ['BSE Debt Market', 'Wint Wealth', 'GoldenPi'],
+                    'collateral_type': 'First pari-passu hypothecation on vehicle loan receivables',
+                    'crar_pct': 20.8,
+                    'credit_rating_rationale': "CRISIL AA+/Stable rating recognizes Shriram's "
+                                               'unassailable franchise in used commercial vehicle '
+                                               'financing, proven collection mechanisms through '
+                                               'economic downturns, and healthy capitalization '
+                                               'post-merger.',
+                    'gnpa_pct': 5.3,
+                    'interest_coverage': 3.2,
+                    'issuer_overview': "Shriram Finance Limited is India's largest retail asset "
+                                       'financing NBFC, formed via the mega-merger of Shriram '
+                                       'Transport Finance and Shriram City Union Finance. The '
+                                       'company commands deep entrenched presence in pre-owned '
+                                       'commercial vehicle financing, rural two-wheeler loans, '
+                                       'MSME micro-enterprise lending, and gold loans across '
+                                       '3,000+ branches.',
+                    'nnpa_pct': 2.7,
+                    'promoter_group': 'Shriram Group',
+                    'roa_pct': 3.1,
+                    'sector': 'Commercial Vehicle & MSME Finance',
+                    'the_bad': [   'High Headline GNPA: Gross NPA of 5.3% reflects informal '
+                                   'borrower profiles (though mitigated by high yields and '
+                                   'repossession rights).',
+                                   'Fuel Price & Freight Cycle Sensitivity: Road transport demand '
+                                   'slowdowns directly impact transporter repayment velocity.'],
+                    'the_good': [   'Market Leadership: Unrivaled 40-year history underwriting '
+                                    "Bharat's informal road logistics and used commercial "
+                                    'transport economy.',
+                                    'Substantial Yield: 9.02% YTM offers +192 bps over 10Y G-Secs '
+                                    'with monthly/annual coupon stability.',
+                                    'High Capital Base: CRAR of 20.8% well above regulatory '
+                                    'thresholds.'],
+                    'the_ugly': [   'Severe Rural Drought / Diesel Price Spiral: Widespread '
+                                    'logistics fleet standstills would trigger spike in credit '
+                                    'provisioning.']},
+    'modified_duration_years': 1.17,
+    'originator': None,
+    'scrip_code': '937812',
+    'seniority_tier': 'SENIOR_SECURED',
+    'series': 'N3',
+    'ticker': 'SHRIRAMFIN',
+    'ytm_pct': 9.02},
+    {   'asset_cover_ratio': 1.35,
+    'coupon_frequency': 'ANNUAL',
+    'coupon_rate_pct': 8.45,
+    'credit_rating': 'CRISIL AAA',
+    'credit_rating_agency': 'CRISIL',
+    'exchange': 'BSE',
+    'face_value': 10000.0,
+    'fldg_pct': 0.0,
+    'instrument_name': 'L&T Finance Holdings 8.45% Senior Secured NCD 2028',
+    'instrument_type': 'NCD',
+    'is_listed': True,
+    'is_sdi': False,
+    'isin': 'INE725H08070',
+    'issue_date': '2023-05-18',
+    'last_traded_price': 10080.0,
+    'macaulay_duration_years': 2.75,
+    'maturity_date': '2028-05-18',
+    'metadata': {   'aum_cr': '₹90,000+ Cr AUM',
+                    'collated_sources': ['BSE Debt Market', 'GoldenPi'],
+                    'collateral_type': 'First pari-passu charge on standard retail loan '
+                                       'receivables',
+                    'interest_coverage': 3.5,
+                    'issuer_overview': 'L&T Finance Holdings is a leading retail financial '
+                                       "services company backed by India's engineering giant "
+                                       'Larsen & Toubro, with focus on farm equipment, rural '
+                                       'business loans, and urban consumer finance.',
+                    'promoter_group': 'Larsen & Toubro Limited (Parentage)',
+                    'sector': 'Diversified Retail NBFC',
+                    'the_bad': [   'Modest credit spread over G-Sec benchmark (~111 bps)',
+                                   'Cyclical vulnerability in rural tractor financing'],
+                    'the_good': [   'Pristine L&T parentage providing unmatched financial backing',
+                                    'CRISIL AAA highest institutional credit rating',
+                                    'Successful complete transition into a retail-focused lender'],
+                    'the_ugly': [   'Severe sequential rural drought impairing farm equipment '
+                                    'collection efficiency']},
+    'modified_duration_years': 2.54,
+    'originator': None,
+    'scrip_code': '936304',
+    'seniority_tier': 'SENIOR_SECURED',
+    'series': 'N7',
+    'ticker': 'LTFIN',
+    'ytm_pct': 8.21},
+    {   'asset_cover_ratio': 1.45,
+    'coupon_frequency': 'ANNUAL',
+    'coupon_rate_pct': 7.4,
+    'credit_rating': 'CRISIL AAA',
+    'credit_rating_agency': 'CRISIL',
+    'exchange': 'BSE',
+    'face_value': 10000.0,
+    'fldg_pct': 0.0,
+    'instrument_name': 'NTPC Limited 7.40% Green Energy Transition Bond 2034',
+    'instrument_type': 'PSU_BOND',
+    'is_listed': True,
+    'is_sdi': False,
+    'isin': 'INE733E07KA5',
+    'issue_date': '2024-02-10',
+    'last_traded_price': 9940.0,
+    'macaulay_duration_years': 7.2,
+    'maturity_date': '2034-02-10',
+    'metadata': {   'aum_cr': '₹4,20,000+ Cr Enterprise Net Worth',
+                    'collated_sources': ['BSE Debt Market', 'IndiaBonds'],
+                    'collateral_type': 'First charge on solar, wind, and hydro renewable '
+                                       'generation assets',
+                    'interest_coverage': 4.5,
+                    'issuer_overview': "NTPC Limited is India's largest energy conglomerate with "
+                                       '76+ GW installed generation capacity and a rapid multi-GW '
+                                       'renewable energy expansion program.',
+                    'promoter_group': 'Government of India (Ministry of Power)',
+                    'sector': 'Power Generation & Clean Energy',
+                    'the_bad': [   'Long duration of 7.2 years exposes secondary pricing to yield '
+                                   'curve shifts',
+                                   'Low credit spread'],
+                    'the_good': [   'Dedicated green financing vehicle with certified ESG '
+                                    'compliance',
+                                    'CRISIL AAA sovereign-equivalent stability',
+                                    "Dominant ~24% contribution to India's total power generation"],
+                    'the_ugly': [   'Severe coal supply bottlenecks or geopolitical thermal '
+                                    'commodity shocks']},
+    'modified_duration_years': 6.7,
+    'originator': None,
+    'scrip_code': '935406',
+    'seniority_tier': 'SENIOR_SECURED',
+    'series': 'P5',
+    'ticker': 'NTPC',
+    'ytm_pct': 7.49},
+    {   'asset_cover_ratio': 1.35,
+    'coupon_frequency': 'ANNUAL',
+    'coupon_rate_pct': 7.6,
+    'credit_rating': 'CARE AAA',
+    'credit_rating_agency': 'CARE',
+    'exchange': 'BSE',
+    'face_value': 10000.0,
+    'fldg_pct': 0.0,
+    'instrument_name': 'National Highways Authority 7.60% Infrastructure Bond 2032',
+    'instrument_type': 'PSU_BOND',
+    'is_listed': True,
+    'is_sdi': False,
+    'isin': 'INE906B07GD8',
+    'issue_date': '2022-12-15',
+    'last_traded_price': 10010.0,
+    'macaulay_duration_years': 5.9,
+    'maturity_date': '2032-12-15',
+    'metadata': {   'aum_cr': 'Statutory Authority',
+                    'collated_sources': ['BSE Debt Market', 'GoldenPi'],
+                    'collateral_type': 'Charge on designated national highway toll cash flows and '
+                                       'cess receipts',
+                    'interest_coverage': 2.5,
+                    'issuer_overview': 'NHAI is the statutory authority responsible for the '
+                                       'development, maintenance, and toll monetization of the '
+                                       'national highways network in India.',
+                    'promoter_group': 'Ministry of Road Transport and Highways (MoRTH)',
+                    'sector': 'National Highway Infrastructure',
+                    'the_bad': [   'High absolute leverage across national highway projects',
+                                   'Toll collection volatility during extreme monsoon disruptions'],
+                    'the_good': [   'Essential national backbone asset with statutory government '
+                                    'backing',
+                                    'Highest CARE AAA rating',
+                                    'Settled on BSE/NSE exchange debt segment'],
+                    'the_ugly': [   'Structural shifts in central fuel cess allocations towards '
+                                    'highway construction']},
+    'modified_duration_years': 5.48,
+    'originator': None,
+    'scrip_code': '935405',
+    'seniority_tier': 'SENIOR_SECURED',
+    'series': 'P4',
+    'ticker': 'NHAI',
+    'ytm_pct': 7.58}
+
 ]
 
 # Helper lookup by ISIN and Ticker
