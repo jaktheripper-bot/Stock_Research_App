@@ -720,6 +720,56 @@ class TestSynthesizeSessionAuth(unittest.TestCase):
                             self.assertTrue(data.get("already_exists"))
 
 
+# ==============================================================================
+# 7. /api/dossier/unlock/{ticker} Session Cookie & Auth Contract
+# ==============================================================================
+class TestDossierUnlockSessionAuth(unittest.TestCase):
+    def setUp(self):
+        from web.main import app
+        from starlette.testclient import TestClient
+        self.client = TestClient(app)
+
+    def test_dossier_unlock_unauthenticated_rejected_401(self):
+        """Unauthenticated unlock requests must return 401 with AUTH_REQUIRED code."""
+        resp = self.client.post("/api/dossier/unlock/INFY")
+        self.assertEqual(resp.status_code, 401)
+        data = resp.json()
+        self.assertEqual(data.get("status"), "error")
+        self.assertEqual(data.get("code"), "AUTH_REQUIRED")
+        self.assertEqual(data.get("message"), "Sign in required to unlock dossiers.")
+
+    def test_dossier_unlock_spoofed_user_id_rejected(self):
+        """Passing spoofed user_id in payload without verified session cookie must be rejected with 401."""
+        resp = self.client.post(
+            "/api/dossier/unlock/INFY",
+            json={"user_id": "usr_victim_account"}
+        )
+        self.assertEqual(resp.status_code, 401)
+        data = resp.json()
+        self.assertEqual(data.get("status"), "error")
+        self.assertEqual(data.get("code"), "AUTH_REQUIRED")
+
+    def test_dossier_unlock_authenticated_session_success(self):
+        """Authenticated session uses web_user id to unlock dossier."""
+        web_user = {
+            "id": "usr_verified_777",
+            "email": "verified_777@example.com",
+            "credits_balance": 5.0,
+            "subscription_tier": "free"
+        }
+        with patch("web.main._get_current_web_user", return_value=web_user):
+            with patch("web.routers.dossier.get_user_by_id", return_value=web_user):
+                with patch("web.main.unlock_ticker_for_user", return_value=(True, 4.0, "Dossier unlocked successfully")):
+                    resp = self.client.post(
+                        "/api/dossier/unlock/INFY",
+                        json={"user_id": "spoofed_ignored_id"}
+                    )
+                    self.assertEqual(resp.status_code, 200)
+                    data = resp.json()
+                    self.assertTrue(data.get("success"))
+                    self.assertEqual(data.get("new_balance"), 4.0)
+
+
 if __name__ == "__main__":
     unittest.main()
 

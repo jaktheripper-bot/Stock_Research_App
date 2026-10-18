@@ -182,12 +182,17 @@ async def api_unlock_dossier(
     canonical = resolve_canonical_symbol(clean_t) or clean_t
     get_user_fn = _get_override_fn("web.main", "_get_current_web_user", _get_current_web_user)
     web_user = get_user_fn(request)
-    uid = web_user.get("id") if web_user else (payload.user_id if payload else None)
-    if not uid:
-        raise HTTPException(
+    if not web_user:
+        return JSONResponse(
             status_code=401,
-            detail="Sign in required to unlock institutional deep dives. You will receive 2 free welcome research credits."
+            content={
+                "status": "error",
+                "code": "AUTH_REQUIRED",
+                "message": "Sign in required to unlock dossiers.",
+                "detail": "Sign in required to unlock dossiers."
+            }
         )
+    uid = web_user.get("id")
 
     clean_uid = str(uid).strip()
     user = get_user_by_id(clean_uid)
