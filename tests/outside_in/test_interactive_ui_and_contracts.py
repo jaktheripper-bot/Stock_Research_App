@@ -810,6 +810,10 @@ class TestCopilotUIAndSyntax(unittest.TestCase):
         self.assertIn('document.querySelectorAll(".modal-backdrop")', content)
         self.assertIn("initUserInvalidAriaSync", content)
         self.assertIn('el.setAttribute("aria-invalid", el.matches(":user-invalid") ? "true" : "false");', content)
+        self.assertIn('document.querySelectorAll(\'[hidden="until-found"]\')', content)
+        self.assertIn('panel.addEventListener("beforematch"', content)
+        self.assertIn('panel.removeAttribute("hidden");', content)
+        self.assertIn('trigger.setAttribute("aria-expanded", "true");', content)
 
     def test_equity_options_yield_distinct_responses(self):
         """Verifies that each option within the Forensic Intelligence Desk for Equities returns a unique, data-grounded response."""

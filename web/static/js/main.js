@@ -2365,5 +2365,30 @@ document.addEventListener("keydown", (e) => {
   });
 })();
 
+/**
+ * 5. Searchable Collapsible Disclosure Sync (hidden="until-found" & beforematch)
+ * Automatically reveals collapsed panels when browser Find-in-Page (Ctrl+F) matches content.
+ */
+function initUntilFoundPanels() {
+  document.querySelectorAll('[hidden="until-found"]').forEach((panel) => {
+    panel.addEventListener("beforematch", () => {
+      panel.removeAttribute("hidden");
+      const trigger = document.querySelector(`[aria-controls="${panel.id}"]`);
+      if (trigger) trigger.setAttribute("aria-expanded", "true");
+    });
+  });
+}
+document.addEventListener("DOMContentLoaded", initUntilFoundPanels);
+
+// Attach to any custom collapsible panel using hidden="until-found"
+document.querySelectorAll('[hidden="until-found"]').forEach((panel) => {
+  panel.addEventListener("beforematch", () => {
+    panel.removeAttribute("hidden");
+    const trigger = document.querySelector(`[aria-controls="${panel.id}"]`);
+    if (trigger) trigger.setAttribute("aria-expanded", "true");
+  });
+});
+
+
 
 
