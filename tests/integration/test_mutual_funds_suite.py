@@ -199,7 +199,7 @@ class TestMutualFundEngine(unittest.TestCase):
 
         self.assertGreater(overlap["overlap_pct"], 25.0)
         self.assertLess(overlap["overlap_pct"], 60.0)
-        self.assertEqual(overlap["verdict"], "MODERATE_CONVERGENCE")
+        self.assertEqual(overlap["verdict"], "MODERATE_STYLE_OVERLAP")
         self.assertIn("overlap", overlap["recommendation"].lower())
         self.assertGreater(overlap["shared_holdings_count"], 0)
 
@@ -207,6 +207,18 @@ class TestMutualFundEngine(unittest.TestCase):
         self.assertIn("HDFCBANK", shared_idents)
         self.assertIn("RELIANCE", shared_idents)
         self.assertIn("INFY", shared_idents)
+
+        # Test identical scheme comparison guard
+        identical = calculate_portfolio_overlap("PPFAS", {"HDFCBANK": 8.4}, "PPFAS", {"HDFCBANK": 8.4})
+        self.assertEqual(identical["overlap_pct"], 100.0)
+        self.assertEqual(identical["verdict"], "IDENTICAL_SCHEME_SELECTED")
+        self.assertEqual(identical["badge"], "badge-danger")
+
+        # Test insufficient holdings data guard
+        missing = calculate_portfolio_overlap("Scheme A", {}, "Scheme B", {})
+        self.assertEqual(missing["overlap_pct"], 0.0)
+        self.assertEqual(missing["verdict"], "INSUFFICIENT_HOLDINGS_DATA")
+        self.assertEqual(missing["badge"], "badge-warning")
 
     def test_fee_drag_and_wealth_destruction_schedule(self):
         drag = calculate_fee_drag(

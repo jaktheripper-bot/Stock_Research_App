@@ -75,31 +75,54 @@
       <div>
         <div style="font-size: 12px; color: #64748b; text-transform: uppercase; margin-bottom: 4px;">Pairwise Portfolio Duplication</div>
         <h2 style="font-size: 22px; font-weight: 800; color: #f8fafc; margin: 0;">
-          {{ overlap_res.fund_a_name }} <span style="color: #64748b;">vs</span> {{ overlap_res.fund_b_name }}
+          {{ overlap_res.scheme_a_name|default(overlap_res.fund_a_name) }} <span style="color: #64748b;">vs</span> {{ overlap_res.scheme_b_name|default(overlap_res.fund_b_name) }}
         </h2>
       </div>
 
       <div style="text-align: right;">
         <div style="font-size: 11px; color: #94a3b8; text-transform: uppercase; font-weight: 600;">Portfolio Overlap Score</div>
-        <div style="font-size: 38px; font-weight: 900; line-height: 1; color: {% if overlap_res.overlap_pct > 50 %}#ef4444{% elif overlap_res.overlap_pct >= 25 %}#f59e0b{% else %}#10b981{% endif %};">
+        <div style="font-size: 38px; font-weight: 900; line-height: 1; color: {% if overlap_res.overlap_pct >= 45 %}#ef4444{% elif overlap_res.overlap_pct >= 22 %}#f59e0b{% else %}#10b981{% endif %};">
           {{ overlap_res.overlap_pct }}%
         </div>
-        <div style="font-size: 12px; font-weight: 700; margin-top: 4px; color: {% if overlap_res.overlap_pct > 50 %}#ef4444{% elif overlap_res.overlap_pct >= 25 %}#f59e0b{% else %}#10b981{% endif %};">
+        <div style="font-size: 12px; font-weight: 700; margin-top: 4px; color: {% if overlap_res.overlap_pct >= 45 %}#ef4444{% elif overlap_res.overlap_pct >= 22 %}#f59e0b{% else %}#10b981{% endif %};">
           {{ overlap_res.verdict }}
         </div>
       </div>
     </div>
 
+    {% if overlap_res.verdict == 'IDENTICAL_SCHEME_SELECTED' %}
+    <div class="alert alert-danger" style="margin-bottom: 20px; padding: 12px 18px; border-radius: 8px; background: rgba(239, 68, 68, 0.1); border-left: 4px solid #ef4444; color: #fca5a5;">
+      <strong>⚠️ Identical Scheme Selected:</strong> {{ overlap_res.verdict_text }}
+    </div>
+    {% elif overlap_res.verdict == 'INSUFFICIENT_HOLDINGS_DATA' %}
+    <div class="alert alert-warning" style="margin-bottom: 20px; padding: 12px 18px; border-radius: 8px; background: rgba(245, 158, 11, 0.1); border-left: 4px solid #f59e0b; color: #fcd34d;">
+      <strong>⚠️ Holdings Data Notice:</strong> {{ overlap_res.verdict_text }}
+    </div>
+    {% endif %}
+
     <!-- Diagnostic Verdict Notice -->
-    <div style="background: rgba(15, 23, 42, 0.6); border-radius: 10px; padding: 14px 18px; border: 1px solid rgba(255, 255, 255, 0.05); margin-bottom: 24px;">
+    <div style="background: rgba(15, 23, 42, 0.6); border-radius: 10px; padding: 14px 18px; border: 1px solid rgba(255, 255, 255, 0.05); margin-bottom: 20px;">
       <div style="font-size: 14px; color: #e2e8f0; line-height: 1.5;">
-        💡 <strong>Fiduciary Recommendation:</strong> {{ overlap_res.recommendation }}
+        💡 <strong>Fiduciary Recommendation:</strong> {{ overlap_res.verdict_text|default(overlap_res.recommendation) }}
       </div>
+    </div>
+
+    <!-- Portfolio Constituents Summary Badges -->
+    <div style="display: flex; gap: 10px; flex-wrap: wrap; margin-bottom: 24px;">
+      <span class="badge" style="background: rgba(14, 165, 233, 0.15); color: #38bdf8; font-size: 12px; padding: 6px 12px; border: 1px solid rgba(14, 165, 233, 0.3);">
+        {{ overlap_res.common_count|default(overlap_res.shared_holdings_count) }} Common Holdings
+      </span>
+      <span class="badge" style="background: rgba(148, 163, 184, 0.15); color: #cbd5e1; font-size: 12px; padding: 6px 12px; border: 1px solid rgba(148, 163, 184, 0.25);">
+        {{ overlap_res.unique_a_count|default(0) }} Unique to Scheme A
+      </span>
+      <span class="badge" style="background: rgba(148, 163, 184, 0.15); color: #cbd5e1; font-size: 12px; padding: 6px 12px; border: 1px solid rgba(148, 163, 184, 0.25);">
+        {{ overlap_res.unique_b_count|default(0) }} Unique to Scheme B
+      </span>
     </div>
 
     <!-- Shared Holdings Breakdown Table -->
     <h3 style="font-size: 16px; font-weight: 700; color: #f8fafc; margin-bottom: 12px;">
-      Shared Constituent Holdings ({{ overlap_res.shared_holdings_count }} Common Stocks/Bonds)
+      Shared Constituent Holdings ({{ overlap_res.common_count|default(overlap_res.shared_holdings_count) }} Common Stocks/Bonds)
     </h3>
 
     {% if overlap_res.shared_holdings %}

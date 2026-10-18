@@ -164,69 +164,235 @@ def calculate_active_share(
 
 
 def calculate_portfolio_overlap(
-    holdings_a: List[Dict[str, Any]],
-    holdings_b: List[Dict[str, Any]],
-    name_a: str = "Fund A",
-    name_b: str = "Fund B"
+    *args: Any,
+    **kwargs: Any
 ) -> Dict[str, Any]:
-    """Computes pairwise portfolio overlap Overlap(A, B) = sum(min(w_A, w_B))."""
-    map_a = {}
-    names_map = {}
-    for h in holdings_a:
-        ident = h.get("identifier", "").strip().upper()
-        if ident and ident not in ("CASH", "TREPS"):
-            map_a[ident] = map_a.get(ident, 0.0) + float(h.get("weight_pct", 0.0))
-            names_map[ident] = h.get("holding_name", ident)
+    """
+    Calculates portfolio overlap between two mutual fund schemes using
+    Overlap(A, B) = sum_i min(w_i,A, w_i,B).
+    Guards against missing holdings data and identical scheme comparison.
 
-    map_b = {}
-    for h in holdings_b:
-        ident = h.get("identifier", "").strip().upper()
-        if ident and ident not in ("CASH", "TREPS"):
-            map_b[ident] = map_b.get(ident, 0.0) + float(h.get("weight_pct", 0.0))
-            names_map[ident] = h.get("holding_name", ident)
+    Supports both calling conventions:
+    1. calculate_portfolio_overlap(name_a, map_a, name_b, map_b) where map_a/map_b are Dict[str, float] or holdings lists.
+    2. calculate_portfolio_overlap(holdings_a, holdings_b, name_a="Fund A", name_b="Fund B").
+    """
+    actual_name_a: str = ""
+    actual_name_b: str = ""
+    raw_a: Any = None
+    raw_b: Any = None
 
-    common_keys = set(map_a.keys()).intersection(set(map_b.keys()))
-    overlap_pct = 0.0
-    shared_holdings = []
+    if len(args) >= 2 and isinstance(args[0], str) and isinstance(args[1], (dict, list)):
+        # (name_a: str, map_a: Dict/List, name_b: str, map_b: Dict/List)
+        actual_name_a = args[0]
+        raw_a = args[1]
+        if len(args) >= 3 and isinstance(args[2], str):
+            actual_name_b = args[2]
+        else:
+            actual_name_b = kwargs.get("name_b", "Scheme B")
+        if len(args) >= 4:
+            raw_b = args[3]
+        else:
+            raw_b = kwargs.get("map_b") or kwargs.get("holdings_b")
+    elif len(args) >= 2:
+        # (holdings_a, holdings_b, [name_a], [name_b])
+        raw_a = args[0]
+        raw_b = args[1]
+        if len(args) >= 4 and isinstance(args[2], str) and isinstance(args[3], str):
+            actual_name_a = args[2]
+            actual_name_b = args[3]
+        elif len(args) >= 3 and isinstance(args[2], str):
+            actual_name_a = args[2]
+            actual_name_b = kwargs.get("name_b", "Fund B")
+        else:
+            actual_name_a = kwargs.get("name_a", "Fund A")
+            actual_name_b = kwargs.get("name_b", "Fund B")
+    elif len(args) == 1:
+        if isinstance(args[0], str):
+            actual_name_a = args[0]
+            raw_a = kwargs.get("map_a") or kwargs.get("holdings_a")
+            actual_name_b = kwargs.get("name_b", "Scheme B")
+            raw_b = kwargs.get("map_b") or kwargs.get("holdings_b")
+        else:
+            raw_a = args[0]
+            raw_b = kwargs.get("holdings_b") or kwargs.get("map_b")
+            actual_name_a = kwargs.get("name_a", "Fund A")
+            actual_name_b = kwargs.get("name_b", "Fund B")
+    else:
+        # Pure kwargs
+        actual_name_a = kwargs.get("name_a") or kwargs.get("scheme_a_name") or "Scheme A"
+        actual_name_b = kwargs.get("name_b") or kwargs.get("scheme_b_name") or "Scheme B"
+        raw_a = kwargs.get("map_a") if "map_a" in kwargs else kwargs.get("holdings_a")
+        raw_b = kwargs.get("map_b") if "map_b" in kwargs else kwargs.get("holdings_b")
 
-    for k in common_keys:
-        w_a = map_a[k]
-        w_b = map_b[k]
-        min_w = min(w_a, w_b)
-        overlap_pct += min_w
-        shared_holdings.append({
-            "identifier": k,
-            "name": names_map.get(k, k),
-            "weight_fund_a": round(w_a, 2),
-            "weight_fund_b": round(w_b, 2),
-            "overlap_weight": round(min_w, 2)
-        })
+    # Helper to extract normalized {identifier: weight} and {identifier: display_name}
+    def _extract_map(items: Any) -> Tuple[Dict[str, float], Dict[str, str]]:
+        res_map: Dict[str, float] = {}
+        names_map: Dict[str, str] = {}
+        if not items:
+            return res_map, names_map
+        if isinstance(items, dict):
+            for k, v in items.items():
+                ident = str(k).strip().upper()
+                if ident and ident not in ("CASH", "TREPS", "NET CURRENT ASSETS", "TREPS/REVERSE REPO"):
+                    try:
+                        w = float(v)
+                    except (ValueError, TypeError):
+                        w = 0.0
+                    res_map[ident] = res_map.get(ident, 0.0) + w
+                    names_map[ident] = str(k).strip()
+            return res_map, names_map
+        if isinstance(items, list):
+            for h in items:
+                if isinstance(h, dict):
+                    ident = (h.get("identifier") or h.get("stock") or h.get("ticker") or "").strip().upper()
+                    if ident and ident not in ("CASH", "TREPS", "NET CURRENT ASSETS", "TREPS/REVERSE REPO"):
+                        try:
+                            w = float(h.get("weight_pct", h.get("weight", h.get("weight_a", 0.0))) or 0.0)
+                        except (ValueError, TypeError):
+                            w = 0.0
+                        res_map[ident] = res_map.get(ident, 0.0) + w
+                        names_map[ident] = h.get("holding_name") or h.get("name") or ident
+        return res_map, names_map
 
-    shared_holdings.sort(key=lambda x: x["overlap_weight"], reverse=True)
-    overlap_pct = round(overlap_pct, 1)
+    norm_map_a, names_a = _extract_map(raw_a)
+    norm_map_b, names_b = _extract_map(raw_b)
+    names_combined = {**names_a, **names_b}
 
-    if overlap_pct > 50.0:
-        verdict = "HIGH_DUPLICATION_RISK"
-        badge = "badge-danger"
-        recommendation = "Severe portfolio overlap. Holding both funds provides illusory diversification with doubled expense fees."
-    elif overlap_pct >= 25.0:
-        verdict = "MODERATE_CONVERGENCE"
+    if not norm_map_a or not norm_map_b:
+        fallback_a = actual_name_a or "Unknown Scheme A"
+        fallback_b = actual_name_b or "Unknown Scheme B"
+        verdict = "INSUFFICIENT_HOLDINGS_DATA"
+        verdict_text = (
+            "Constituent portfolio holdings are currently unavailable for one or both selected schemes. "
+            "Cannot verify diversification or compute overlap."
+        )
         badge = "badge-warning"
-        recommendation = "Moderate overlap in core holdings. Ensure sector/cap allocations remain complementary."
+        return {
+            "scheme_a_name": fallback_a,
+            "scheme_b_name": fallback_b,
+            "fund_a_name": fallback_a,
+            "fund_b_name": fallback_b,
+            "overlap_pct": 0.0,
+            "common_count": 0,
+            "common_stocks": [],
+            "shared_holdings_count": 0,
+            "shared_holdings": [],
+            "unique_a_count": len(norm_map_a),
+            "unique_b_count": len(norm_map_b),
+            "verdict": verdict,
+            "verdict_text": verdict_text,
+            "recommendation": verdict_text,
+            "badge": badge,
+        }
+
+    # Guard against comparing a scheme with itself
+    is_same_name = bool(actual_name_a and actual_name_b and actual_name_a.strip().lower() == actual_name_b.strip().lower())
+    is_same_map = (norm_map_a == norm_map_b)
+    if is_same_name or is_same_map:
+        common_stocks = [
+            {
+                "stock": stock,
+                "weight_a": round(w_a, 2),
+                "weight_b": round(w_a, 2),
+                "min_weight": round(w_a, 2),
+            }
+            for stock, w_a in sorted(norm_map_a.items(), key=lambda x: x[1], reverse=True)
+        ]
+        shared_holdings = [
+            {
+                "identifier": s["stock"],
+                "name": names_combined.get(s["stock"], s["stock"]),
+                "weight_fund_a": s["weight_a"],
+                "weight_fund_b": s["weight_b"],
+                "overlap_weight": s["min_weight"],
+            }
+            for s in common_stocks
+        ]
+        verdict = "IDENTICAL_SCHEME_SELECTED"
+        verdict_text = (
+            "You selected the exact same mutual fund scheme in both slots (100% constituent identity). "
+            "Please select two distinct schemes to audit portfolio diversification."
+        )
+        badge = "badge-danger"
+        return {
+            "scheme_a_name": actual_name_a,
+            "scheme_b_name": actual_name_b,
+            "fund_a_name": actual_name_a,
+            "fund_b_name": actual_name_b,
+            "overlap_pct": 100.0,
+            "common_count": len(common_stocks),
+            "common_stocks": common_stocks,
+            "shared_holdings_count": len(common_stocks),
+            "shared_holdings": shared_holdings,
+            "unique_a_count": 0,
+            "unique_b_count": 0,
+            "verdict": verdict,
+            "verdict_text": verdict_text,
+            "recommendation": verdict_text,
+            "badge": badge,
+        }
+
+    common_keys = set(norm_map_a.keys()).intersection(set(norm_map_b.keys()))
+    overlap_weight = 0.0
+    common_stocks = []
+
+    for stock in common_keys:
+        w_a = float(norm_map_a[stock])
+        w_b = float(norm_map_b[stock])
+        min_w = min(w_a, w_b)
+        overlap_weight += min_w
+        common_stocks.append(
+            {
+                "stock": stock,
+                "weight_a": round(w_a, 2),
+                "weight_b": round(w_b, 2),
+                "min_weight": round(min_w, 2),
+            }
+        )
+
+    common_stocks.sort(key=lambda x: x["min_weight"], reverse=True)
+    overlap_pct = round(min(100.0, overlap_weight), 1)
+
+    if overlap_pct >= 45.0:
+        verdict = "CLOSET_DUPLICATION_ALERT"
+        verdict_text = "High portfolio redundancy — holding both schemes compounds single-stock concentration & fee drag."
+        badge = "badge-danger"
+    elif overlap_pct >= 22.0:
+        verdict = "MODERATE_STYLE_OVERLAP"
+        verdict_text = "Moderate core benchmark overlap — acceptable only if satellite weights diverge meaningfully."
+        badge = "badge-warning"
     else:
         verdict = "TRUE_DIVERSIFICATION"
+        verdict_text = "Excellent portfolio complementarity with minimal cross-scheme holding duplication."
         badge = "badge-success"
-        recommendation = "Excellent portfolio complementarity with minimal cross-scheme holding duplication."
+
+    shared_holdings = [
+        {
+            "identifier": s["stock"],
+            "name": names_combined.get(s["stock"], s["stock"]),
+            "weight_fund_a": s["weight_a"],
+            "weight_fund_b": s["weight_b"],
+            "overlap_weight": s["min_weight"],
+        }
+        for s in common_stocks
+    ]
 
     return {
-        "fund_a_name": name_a,
-        "fund_b_name": name_b,
+        "scheme_a_name": actual_name_a,
+        "scheme_b_name": actual_name_b,
+        "fund_a_name": actual_name_a,
+        "fund_b_name": actual_name_b,
         "overlap_pct": overlap_pct,
+        "common_count": len(common_stocks),
+        "common_stocks": common_stocks,
+        "shared_holdings_count": len(common_stocks),
+        "shared_holdings": shared_holdings,
+        "unique_a_count": len(norm_map_a) - len(common_stocks),
+        "unique_b_count": len(norm_map_b) - len(common_stocks),
         "verdict": verdict,
+        "verdict_text": verdict_text,
+        "recommendation": verdict_text,
         "badge": badge,
-        "recommendation": recommendation,
-        "shared_holdings_count": len(shared_holdings),
-        "shared_holdings": shared_holdings
     }
 
 

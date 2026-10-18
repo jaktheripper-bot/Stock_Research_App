@@ -574,6 +574,15 @@ Detailed forensic analysis with exact page grounding to bseindia.com filings.
         self.assertIn("Mutual Fund Portfolio Overlap & Duplication Diagnostic", res.text)
         self.assertIn("Portfolio Overlap Score", res.text)
         self.assertIn("Shared Constituent Holdings", res.text)
+        self.assertIn("Common Holdings", res.text)
+        self.assertIn("MODERATE_STYLE_OVERLAP", res.text)
+
+        # Test identical scheme selection in UI
+        res_same = self.client.get("/funds/compare/overlap?scheme_a=PPFAS_FLEXICAP_DIR&scheme_b=PPFAS_FLEXICAP_DIR")
+        self.assertEqual(res_same.status_code, 200)
+        self.assertIn("Identical Scheme Selected", res_same.text)
+        self.assertIn("100.0%", res_same.text)
+        self.assertIn("IDENTICAL_SCHEME_SELECTED", res_same.text)
 
     def test_fund_api_endpoints(self):
         # 1. /api/funds/schemes
