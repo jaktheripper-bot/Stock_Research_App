@@ -32,9 +32,11 @@
       </div>
 
       <div style="display: flex; gap: 10px;">
-        <button onclick="synthesizeReport('{{ display_ticker }}')" class="btn btn-primary btn-sm">
+        {% if scrip_code and scrip_code != 'N/A' %}
+        <button onclick="synthesizeReport('{{ ticker }}')" class="btn btn-primary btn-sm">
           <svg class="glyph"><use href="#glyph-zap"></use></svg> Synthesize Dossier (1 Credit)
         </button>
+        {% endif %}
       </div>
     </div>
   </div>
@@ -62,9 +64,18 @@
           Includes institutional PDF report export, exchange footnote citations, and multi-scenario DCF valuation.
         </p>
       </div>
-      <button onclick="synthesizeReport('{{ display_ticker }}')" class="btn btn-primary" style="text-align: center; width: 100%;">
-        <svg class="glyph"><use href="#glyph-zap"></use></svg> Synthesize Dossier (1 Credit)
-      </button>
+      {% if scrip_code and scrip_code != 'N/A' %}
+          <button id="synthesizeBtn" class="btn btn-primary" style="text-align: center; width: 100%;" onclick="synthesizeReport('{{ ticker }}')">
+              ⚡ Synthesize Forensic Dossier (1 Credit)
+          </button>
+      {% else %}
+          <button id="synthesizeBtn" class="btn btn-secondary" style="text-align: center; width: 100%;" disabled title="Ticker not found in BSE/NSE scrip master">
+              🚫 Unlisted / Unrecognized Ticker (Cannot Synthesize)
+          </button>
+          <p style="margin-top: 0.75rem; color: var(--text-muted); font-size: 0.9rem;">
+              <strong>{{ ticker }}</strong> could not be matched to a listed BSE or NSE security. Please select one of the suggested scrips below or search the directory.
+          </p>
+      {% endif %}
       <a href="/pricing" class="btn btn-secondary" style="text-align: center; width: 100%; margin-top: 10px; text-decoration: none;">
         View Plans & Pricing →
       </a>

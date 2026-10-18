@@ -959,6 +959,7 @@ def dossier_page(request: Request, ticker: str):
             request=request,
             name="dossier_pending.html",
             context={
+                "ticker": canonical,
                 "display_ticker": canonical,
                 "company_name": company_name,
                 "scrip_code": scrip,

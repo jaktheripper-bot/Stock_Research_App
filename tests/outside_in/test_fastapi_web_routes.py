@@ -200,6 +200,22 @@ Detailed forensic analysis with exact page grounding to bseindia.com filings.
         self.assertNotIn("-2.84", html)                         # fabricated Beneish preview figure
         self.assertNotIn("₹1,840", html)                        # fabricated reverse-DCF preview figure
 
+    def test_dossier_pending_synthesize_buttons(self):
+        # 1. Unlisted ticker: disabled button with explanatory notice
+        res_unlisted = self.client.get("/dossier/UNLISTEDFAKE123")
+        self.assertEqual(res_unlisted.status_code, 200)
+        self.assertIn('id="synthesizeBtn"', res_unlisted.text)
+        self.assertIn("🚫 Unlisted / Unrecognized Ticker (Cannot Synthesize)", res_unlisted.text)
+        self.assertIn("could not be matched to a listed BSE or NSE security", res_unlisted.text)
+        self.assertIn("disabled", res_unlisted.text)
+
+        # 2. Listed pending ticker: active synthesis button with 1 Credit prompt
+        res_listed = self.client.get("/dossier/ABB")
+        self.assertEqual(res_listed.status_code, 200)
+        self.assertIn('id="synthesizeBtn"', res_listed.text)
+        self.assertIn("⚡ Synthesize Forensic Dossier (1 Credit)", res_listed.text)
+        self.assertIn("onclick=\"synthesizeReport('ABB')\"", res_listed.text)
+
     def test_pillar_links_never_borrow_another_company_scrip(self):
         """Without a valid scrip code, pillar cards must show no exchange link at all."""
         from core.analysis.parser import wrap_html_with_collapsible_pillars
