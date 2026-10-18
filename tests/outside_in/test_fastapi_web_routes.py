@@ -505,14 +505,22 @@ Detailed forensic analysis with exact page grounding to bseindia.com filings.
         # Outside-in DOM & JS wiring contracts
         self.assertIn('id="ingestDebtForm"', res.text)
         self.assertIn('id="ingestIsin"', res.text)
+        self.assertIn('id="ingestIsinInput"', res.text)
         self.assertIn('id="ingestIssuer"', res.text)
+        self.assertIn('id="ingestTickerInput"', res.text)
         self.assertIn('id="ingestRating"', res.text)
+        self.assertIn('id="ingestSenioritySelect"', res.text)
         self.assertIn('id="ingestCoupon"', res.text)
+        self.assertIn('id="ingestCouponInput"', res.text)
         self.assertIn('id="ingestDebtError"', res.text)
+        self.assertIn('id="ingestStatusMsg"', res.text)
         self.assertIn('id="ingestDebtSubmitBtn"', res.text)
+        self.assertIn('id="ingestSubmitBtn"', res.text)
         self.assertIn("handleIngestDebtSubmit", res.text)
         self.assertIn("openIngestDebtModal", res.text)
         self.assertIn("closeIngestDebtModal", res.text)
+        self.assertIn("closeIngestModal", res.text)
+        self.assertIn("e.key === 'Escape'", res.text)
 
     def test_debt_dossier_page(self):
         res = self.client.get("/debt/INE002A08012")

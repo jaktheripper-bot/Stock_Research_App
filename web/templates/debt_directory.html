@@ -166,15 +166,17 @@
         <label for="ingestIsin" style="display: block; font-size: 12px; font-weight: 700; color: #94a3b8; margin-bottom: 6px; text-transform: uppercase; letter-spacing: 0.05em;">
           12-Character ISIN <span style="color: #ef4444;">*</span>
         </label>
-        <input type="text" id="ingestIsin" name="isin" required maxlength="12" placeholder="e.g. INE002A08534" style="width: 100%; padding: 12px 14px; background: rgba(15, 23, 42, 0.7); border: 1px solid var(--border-color, rgba(255,255,255,0.15)); border-radius: 8px; color: #f8fafc; font-family: var(--font-mono, monospace); font-size: 14px; letter-spacing: 0.05em; text-transform: uppercase; box-sizing: border-box;" oninput="this.value = this.value.toUpperCase()" />
+        <input type="text" id="ingestIsin" name="isin" required maxlength="12" placeholder="e.g. INE002A08534" style="width: 100%; padding: 12px 14px; background: rgba(15, 23, 42, 0.7); border: 1px solid var(--border-color, rgba(255,255,255,0.15)); border-radius: 8px; color: #f8fafc; font-family: var(--font-mono, monospace); font-size: 14px; letter-spacing: 0.05em; text-transform: uppercase; box-sizing: border-box;" oninput="this.value = this.value.toUpperCase(); if(document.getElementById('ingestIsinInput')) document.getElementById('ingestIsinInput').value = this.value;" />
+        <input type="hidden" id="ingestIsinInput" name="isin_input" />
         <span style="font-size: 11px; color: #64748b; margin-top: 4px; display: block;">Indian International Securities Identification Number starting with 'IN'.</span>
       </div>
 
       <div style="margin-bottom: 16px;">
         <label for="ingestIssuer" style="display: block; font-size: 11px; font-weight: 700; color: #94a3b8; margin-bottom: 6px; text-transform: uppercase;">
-          Issuer Name <span style="color: #ef4444;">*</span>
+          Issuer Name / Ticker <span style="color: #ef4444;">*</span>
         </label>
-        <input type="text" id="ingestIssuer" name="issuer_name" required placeholder="e.g. Reliance Industries Limited" style="width: 100%; padding: 10px 12px; background: rgba(15, 23, 42, 0.7); border: 1px solid var(--border-color, rgba(255,255,255,0.15)); border-radius: 8px; color: #f8fafc; font-size: 13px; box-sizing: border-box;" />
+        <input type="text" id="ingestIssuer" name="issuer_name" required placeholder="e.g. Reliance Industries Limited" style="width: 100%; padding: 10px 12px; background: rgba(15, 23, 42, 0.7); border: 1px solid var(--border-color, rgba(255,255,255,0.15)); border-radius: 8px; color: #f8fafc; font-size: 13px; box-sizing: border-box;" oninput="if(document.getElementById('ingestTickerInput')) document.getElementById('ingestTickerInput').value = this.value;" />
+        <input type="hidden" id="ingestTickerInput" name="ticker_input" />
       </div>
 
       <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-bottom: 16px;">
@@ -193,21 +195,29 @@
             <option value="CRISIL A+">CRISIL A+ (Adequate Safety)</option>
             <option value="CRISIL BBB">CRISIL BBB (Moderate Safety)</option>
           </select>
+          <select id="ingestSenioritySelect" name="seniority_select" style="display: none;">
+            <option value="SENIOR_SECURED" selected>Senior Secured</option>
+            <option value="SENIOR_UNSECURED">Senior Unsecured</option>
+            <option value="SUBORDINATED">Subordinated</option>
+          </select>
         </div>
         <div>
           <label for="ingestCoupon" style="display: block; font-size: 11px; font-weight: 700; color: #94a3b8; margin-bottom: 6px; text-transform: uppercase;">
             Coupon Rate % <span style="color: #ef4444;">*</span>
           </label>
-          <input type="number" step="0.01" id="ingestCoupon" name="coupon_rate" required placeholder="e.g. 8.50" min="0" max="30" style="width: 100%; padding: 10px 12px; background: rgba(15, 23, 42, 0.7); border: 1px solid var(--border-color, rgba(255,255,255,0.15)); border-radius: 8px; color: #f8fafc; font-size: 13px; box-sizing: border-box;" />
+          <input type="number" step="0.01" id="ingestCoupon" name="coupon_rate" required placeholder="e.g. 8.50" min="0" max="30" style="width: 100%; padding: 10px 12px; background: rgba(15, 23, 42, 0.7); border: 1px solid var(--border-color, rgba(255,255,255,0.15)); border-radius: 8px; color: #f8fafc; font-size: 13px; box-sizing: border-box;" oninput="if(document.getElementById('ingestCouponInput')) document.getElementById('ingestCouponInput').value = this.value;" />
+          <input type="hidden" id="ingestCouponInput" name="coupon_input" />
         </div>
       </div>
 
-      <div id="ingestDebtError" style="display: none; padding: 10px 14px; border-radius: 8px; font-size: 12.5px; margin-bottom: 16px; background: rgba(239, 68, 68, 0.15); color: #ef4444; border-left: 3px solid #ef4444;"></div>
+      <div id="ingestDebtError" style="display: none; padding: 10px 14px; border-radius: 8px; font-size: 12.5px; margin-bottom: 16px; background: rgba(239, 68, 68, 0.15); color: #ef4444; border-left: 3px solid #ef4444;">
+        <span id="ingestStatusMsg"></span>
+      </div>
 
       <div style="display: flex; justify-content: flex-end; gap: 10px;">
         <button type="button" onclick="closeIngestDebtModal()" class="btn btn-secondary btn-sm" style="padding: 10px 18px;">Cancel</button>
         <button type="submit" id="ingestDebtSubmitBtn" class="btn btn-primary btn-sm" style="padding: 10px 22px; font-weight: 700; cursor: pointer;">
-          <span>🚀 Run Credit & Solvency Audit</span>
+          <span id="ingestSubmitBtn">🚀 Run Credit & Solvency Audit</span>
         </button>
       </div>
     </form>
@@ -219,7 +229,7 @@ function openIngestDebtModal() {
   const modal = document.getElementById('ingestModalBackdrop');
   if (modal) {
     modal.style.display = 'flex';
-    const isinEl = document.getElementById('ingestIsin');
+    const isinEl = document.getElementById('ingestIsin') || document.getElementById('ingestIsinInput');
     if (isinEl) isinEl.focus();
   }
 }
@@ -230,77 +240,121 @@ function closeIngestDebtModal() {
 const openIngestModal = openIngestDebtModal;
 const closeIngestModal = closeIngestDebtModal;
 
-// Dismiss on clicking backdrop
+// Dismiss on clicking backdrop or pressing Escape
 window.addEventListener('click', function(e) {
   const modal = document.getElementById('ingestModalBackdrop');
-  if (e.target === modal) closeIngestDebtModal();
+  if (e.target === modal) closeIngestModal();
+});
+window.addEventListener('keydown', function(e) {
+  if (e.key === 'Escape') closeIngestModal();
 });
 
 async function handleIngestDebtSubmit(e) {
-    e.preventDefault();
-    const isin = document.getElementById('ingestIsin').value.trim().toUpperCase();
-    const name = document.getElementById('ingestIssuer').value.trim();
-    const rating = document.getElementById('ingestRating').value;
-    const coupon = parseFloat(document.getElementById('ingestCoupon').value);
-    const errEl = document.getElementById('ingestDebtError');
-    const btn = document.getElementById('ingestDebtSubmitBtn');
+  e.preventDefault();
+  const isinEl = document.getElementById('ingestIsinInput') || document.getElementById('ingestIsin');
+  const isin = (isinEl ? isinEl.value : '').trim().toUpperCase();
 
-    if (!/^IN[A-Z0-9]{10}$/.test(isin)) {
-        errEl.textContent = "Please enter a valid 12-character Indian ISIN starting with 'IN' (e.g., INE002A08534).";
-        errEl.style.display = 'block';
-        return;
-    }
-    if (!name || name.length < 3) {
-        errEl.textContent = "Please enter a valid Issuer Name (at least 3 characters).";
-        errEl.style.display = 'block';
-        return;
-    }
-    if (isNaN(coupon) || coupon < 0 || coupon > 30) {
-        errEl.textContent = "Please enter a realistic annual coupon rate between 0% and 30%.";
-        errEl.style.display = 'block';
-        return;
-    }
+  const tickerEl = document.getElementById('ingestTickerInput') || document.getElementById('ingestIssuer');
+  const ticker = tickerEl ? tickerEl.value.trim().toUpperCase() : '';
 
-    errEl.style.display = 'none';
-    const origText = btn.textContent;
+  const couponEl = document.getElementById('ingestCouponInput') || document.getElementById('ingestCoupon');
+  const couponRaw = couponEl ? couponEl.value : '';
+
+  const seniorityEl = document.getElementById('ingestSenioritySelect') || document.getElementById('ingestRating');
+  const seniority = seniorityEl ? seniorityEl.value : 'SENIOR_SECURED';
+
+  const btn = document.getElementById('ingestSubmitBtn') || document.getElementById('ingestDebtSubmitBtn');
+  const statusBox = document.getElementById('ingestStatusMsg') || document.getElementById('ingestDebtError');
+
+  if (!/^IN[A-Z0-9]{10}$/.test(isin)) {
+    if (statusBox) {
+      statusBox.style.display = 'block';
+      statusBox.style.background = 'rgba(239, 68, 68, 0.15)';
+      statusBox.style.color = '#ef4444';
+      statusBox.textContent = "Please enter a valid 12-character Indian ISIN starting with 'IN' (e.g. INE002A08012).";
+    }
+    return;
+  }
+
+  let parsedCoupon = null;
+  if (couponRaw !== '') {
+    parsedCoupon = parseFloat(couponRaw);
+    if (isNaN(parsedCoupon) || parsedCoupon < 0 || parsedCoupon > 30) {
+      if (statusBox) {
+        statusBox.style.display = 'block';
+        statusBox.style.background = 'rgba(239, 68, 68, 0.15)';
+        statusBox.style.color = '#ef4444';
+        statusBox.textContent = 'Coupon rate must be between 0% and 30%.';
+      }
+      return;
+    }
+  }
+
+  if (btn) {
     btn.disabled = true;
-    btn.textContent = 'Synthesizing Bond Scorecard...';
+    btn.innerHTML = '<span>⏳ Ingesting & Analyzing...</span>';
+  }
+  if (statusBox) {
+    statusBox.style.display = 'block';
+    statusBox.style.background = 'rgba(14, 165, 233, 0.15)';
+    statusBox.style.color = '#38bdf8';
+    statusBox.textContent = 'Calculating credit metrics, YTM, and duration...';
+  }
 
-    try {
-        const res = await fetch('/api/debt/ingest', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-                isin: isin,
-                issuer_name: name,
-                credit_rating: rating,
-                coupon_rate: coupon
-            })
-        });
-        const data = await res.json().catch(() => ({}));
+  try {
+    const issuerEl = document.getElementById('ingestIssuer');
+    const ratingEl = document.getElementById('ingestRating');
+    const payload = {
+      isin: isin,
+      ticker: ticker || null,
+      issuer_name: (issuerEl ? issuerEl.value.trim() : '') || null,
+      credit_rating: (ratingEl ? ratingEl.value : '') || null,
+      coupon_rate_pct: parsedCoupon,
+      seniority_tier: seniority
+    };
+    const res = await fetch('/api/debt/ingest', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload)
+    });
+    const data = await res.json().catch(() => ({}));
 
-        if (res.status === 401 || res.status === 403) {
-            localStorage.removeItem('sr_user');
-            if (typeof updateNavAuthUI === 'function') updateNavAuthUI(null);
-            closeIngestDebtModal();
-            if (typeof openSignInModal === 'function') openSignInModal();
-            return;
-        }
-
-        if (!res.ok) {
-            const msg = typeof data.detail === 'string'
-                ? data.detail
-                : (data.detail?.message || data.error || 'Failed to ingest bond ISIN.');
-            throw new Error(msg);
-        }
-
-        window.location.href = `/debt/${encodeURIComponent(data.isin || isin)}`;
-    } catch (err) {
-        errEl.textContent = err.message;
-        errEl.style.display = 'block';
+    if (res.status === 401 || res.status === 403) {
+      if (btn) {
         btn.disabled = false;
-        btn.textContent = origText;
+        btn.innerHTML = '<span>🚀 Run Credit & Solvency Audit</span>';
+      }
+      localStorage.removeItem('sr_user');
+      if (typeof updateNavAuthUI === 'function') updateNavAuthUI(null);
+      closeIngestModal();
+      if (typeof openSignInModal === 'function') openSignInModal();
+      return;
     }
+
+    if (res.ok && (data.status === 'success' || data.success)) {
+      if (statusBox) {
+        statusBox.style.background = 'rgba(16, 185, 129, 0.15)';
+        statusBox.style.color = '#10b981';
+        statusBox.textContent = '✓ Successfully audited! Opening credit dossier...';
+      }
+      setTimeout(() => {
+        window.location.href = data.redirect_url || `/debt/${encodeURIComponent(data.isin || isin)}`;
+      }, 400);
+    } else {
+      const msg = typeof data.detail === 'string' ? data.detail : (data.detail?.message || data.message || 'Ingestion failed');
+      throw new Error(msg);
+    }
+  } catch (err) {
+    if (btn) {
+      btn.disabled = false;
+      btn.innerHTML = '<span>🚀 Run Credit & Solvency Audit</span>';
+    }
+    if (statusBox) {
+      statusBox.style.background = 'rgba(239, 68, 68, 0.15)';
+      statusBox.style.color = '#ef4444';
+      statusBox.textContent = err.message;
+    }
+  }
 }
 </script>
 {% endblock %}
