@@ -1,35 +1,32 @@
 # web/middleware/security_headers.py
-"""Middleware to inject security‑related HTTP headers.
-Ensures a baseline of CSP, HSTS, Referrer‑Policy, X‑Content‑Type‑Options, and Permissions‑Policy.
-"""
-
 from starlette.middleware.base import BaseHTTPMiddleware
 from starlette.requests import Request
 from starlette.responses import Response
 
+
 class SecurityHeadersMiddleware(BaseHTTPMiddleware):
     async def dispatch(self, request: Request, call_next):
         response: Response = await call_next(request)
-        # Content Security Policy – restrict sources while permitting inline UI logic, CDNs, and Razorpay Checkout
         csp = (
             "default-src 'self'; "
             "script-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net https://checkout.razorpay.com https://cdn.razorpay.com; "
             "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; "
             "font-src 'self' https://fonts.gstatic.com; "
             "img-src 'self' data: https:; "
-            "connect-src 'self' https://api.razorpay.com https://lumberjack.razorpay.com https://lapi.razorpay.com https://cdn.jsdelivr.net; "
+            "connect-src 'self' https://lapi.razorpay.com https://api.razorpay.com https://checkout.razorpay.com https://cdn.razorpay.com https://cdn.jsdelivr.net; "
             "frame-src 'self' https://api.razorpay.com https://checkout.razorpay.com; "
+            "object-src 'none'; "
+            "base-uri 'self'; "
             "frame-ancestors 'none';"
         )
         response.headers["Content-Security-Policy"] = csp
-        # Strict Transport Security – 6 months, include subdomains, preload
         response.headers["Strict-Transport-Security"] = "max-age=15552000; includeSubDomains; preload"
-        # Referrer Policy – no referrer
-        response.headers["Referrer-Policy"] = "no-referrer"
-        # X-Content-Type-Options – nosniff
+        response.headers["Referrer-Policy"] = "strict-origin-when-cross-origin"
         response.headers["X-Content-Type-Options"] = "nosniff"
-        # Permissions-Policy – disable risky features while permitting Razorpay checkout payments
+        response.headers["Cross-Origin-Opener-Policy"] = "same-origin-allow-popups"
         response.headers["Permissions-Policy"] = (
-            'geolocation=(), microphone=(), camera=(), fullscreen=*, payment=(self "https://api.razorpay.com" "https://checkout.razorpay.com")'
+            'geolocation=(), microphone=(), camera=(), fullscreen=(self), '
+            'payment=(self "https://checkout.razorpay.com" "https://api.razorpay.com"), '
+            'focus-without-user-activation=()'
         )
         return response
