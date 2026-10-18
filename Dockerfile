@@ -1,18 +1,19 @@
-FROM python:3.14-slim
+FROM python:3.11-slim
 
 WORKDIR /app
 
-# Install system dependencies for psycopg2 and compilation
 RUN apt-get update && apt-get install -y --no-install-recommends \
-    gcc \
-    libpq-dev \
-    curl \
-    && rm -rf /var/lib/apt/lists/*
+    build-essential \
+    && rm -rf /var/lib/apt/lists/* \
+    && useradd -m -u 10001 appuser
 
 COPY requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
 
-COPY . .
+COPY --chown=appuser:appuser . .
 
-EXPOSE 8000 8501
+USER appuser
+
+EXPOSE 8000
+
 CMD ["sh", "-c", "uvicorn web.main:app --host 0.0.0.0 --port ${PORT:-8000}"]
