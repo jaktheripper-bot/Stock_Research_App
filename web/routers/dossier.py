@@ -64,7 +64,7 @@ router = APIRouter(tags=["dossier"])
 # ==============================================================================
 class SynthesizeRequest(BaseModel):
     ticker: str
-    user_id: str
+    user_id: Optional[str] = None
     force_refresh: Optional[bool] = False
 
 
@@ -76,20 +76,22 @@ class UnlockDossierRequest(BaseModel):
 # Dossier Synthesis & Status Endpoints
 # ==============================================================================
 @router.post("/api/synthesize")
-async def api_synthesize(payload: SynthesizeRequest, request: Request):
-    """
-    Deducts 1 credit from user balance and triggers a full 7-pillar AI synthesis.
-    Returns the generated dossier URL on success.
-    Automatically refunds the consumed credit if synthesis or archiving fails.
-    """
+async def synthesize_report(request: Request, payload: SynthesizeRequest):
+    """Requires a verified session cookie; ignores unverified client-supplied user_id."""
+    web_user = _get_current_web_user(request)
+    is_admin = _is_admin_authenticated(request)
+    if not web_user and not is_admin:
+        raise HTTPException(
+            status_code=401,
+            detail={"error": "AUTHENTICATION_REQUIRED", "message": "Please sign in to synthesize a dossier."}
+        )
+    clean_uid = web_user["id"] if web_user else "admin_console"
+
     clean_t = clean_ticker(payload.ticker)
     if not clean_t:
         raise HTTPException(status_code=400, detail="Invalid ticker symbol.")
 
     canonical = resolve_canonical_symbol(clean_t) or clean_t
-    clean_uid = str(payload.user_id).strip()
-    if not clean_uid:
-        raise HTTPException(status_code=401, detail="Sign in required to generate reports.")
 
     existing = get_report_by_ticker_sync(canonical)
     if existing and existing.get("report_text") and not payload.force_refresh:
@@ -98,14 +100,13 @@ async def api_synthesize(payload: SynthesizeRequest, request: Request):
             "already_exists": True,
             "ticker": canonical,
             "dossier_url": f"/dossier/{canonical}",
-            "new_balance": get_user_credits_balance(clean_uid),
+            "new_balance": get_user_credits_balance(clean_uid) if web_user else 999.0,
             "message": f"An existing dossier for {canonical} is already available. No credits were deducted."
         })
 
-    web_user = _get_current_web_user(request)
     from core.billing.qos_governor import authorize_llm_execution
     client_ip = request.client.host if request.client else ""
-    user_email = web_user.get("email", "") if web_user else (getattr(payload, "user_email", "") or clean_uid)
+    user_email = web_user.get("email", "") if web_user else "admin_console"
     synth_auth, synth_reason = authorize_llm_execution(
         actor_type="USER_SYNTHESIS",
         user_email=user_email,
@@ -117,36 +118,39 @@ async def api_synthesize(payload: SynthesizeRequest, request: Request):
             detail="Hourly synthesis velocity cap reached (maximum 20 reports/hour per user) to protect account quota. Please retry later."
         )
 
-    ok, new_balance, msg = deduct_user_credits(
-
-        user_id=clean_uid,
-        ticker=canonical,
-        action_type="FULL_SYNTHESIS",
-        amount=1.0
-    )
-
-    if not ok:
-        raise HTTPException(status_code=402, detail=msg)
+    if not is_admin:
+        ok, new_balance, msg = deduct_user_credits(
+            user_id=clean_uid,
+            ticker=canonical,
+            action_type="FULL_SYNTHESIS",
+            amount=1.0
+        )
+        if not ok:
+            raise HTTPException(status_code=402, detail=msg)
+    else:
+        new_balance = get_user_credits_balance(clean_uid) if web_user else 999.0
 
     try:
         report_text = generate_stock_report(canonical)
     except Exception as e:
         logger.error(f"Synthesis failed for {canonical}: {e}")
-        add_user_credits(clean_uid, 0.0, 1.0, pack_type="REFUND_FAILED_SYNTHESIS")
-        refunded_bal = get_user_credits_balance(clean_uid)
-        raise HTTPException(
-            status_code=500,
-            detail=f"Report generation encountered an error for {canonical}. Your research credit has been automatically refunded (balance: {refunded_bal:.1f} credits). Error: {e}"
-        )
+        if not is_admin and web_user:
+            add_user_credits(clean_uid, 0.0, 1.0, pack_type="REFUND_FAILED_SYNTHESIS")
+            refunded_bal = get_user_credits_balance(clean_uid)
+            detail_msg = f"Report generation encountered an error for {canonical}. Your research credit has been automatically refunded (balance: {refunded_bal:.1f} credits). Error: {e}"
+        else:
+            detail_msg = f"Report generation encountered an error for {canonical}. Error: {e}"
+        raise HTTPException(status_code=500, detail=detail_msg)
 
     rep = get_report_by_ticker_sync(canonical)
     if not rep or not rep.get("report_text"):
-        add_user_credits(clean_uid, 0.0, 1.0, pack_type="REFUND_FAILED_SYNTHESIS")
-        refunded_bal = get_user_credits_balance(clean_uid)
-        raise HTTPException(
-            status_code=500,
-            detail=f"Synthesis could not verify report archiving for {canonical}. Your credit has been automatically refunded (balance: {refunded_bal:.1f} credits)."
-        )
+        if not is_admin and web_user:
+            add_user_credits(clean_uid, 0.0, 1.0, pack_type="REFUND_FAILED_SYNTHESIS")
+            refunded_bal = get_user_credits_balance(clean_uid)
+            detail_msg = f"Synthesis could not verify report archiving for {canonical}. Your credit has been automatically refunded (balance: {refunded_bal:.1f} credits)."
+        else:
+            detail_msg = f"Synthesis could not verify report archiving for {canonical}."
+        raise HTTPException(status_code=500, detail=detail_msg)
 
     return json_response_with_cache({
         "success": True,
@@ -154,8 +158,11 @@ async def api_synthesize(payload: SynthesizeRequest, request: Request):
         "ticker": canonical,
         "dossier_url": f"/dossier/{canonical}",
         "new_balance": new_balance,
-        "message": f"Dossier for {canonical} synthesized successfully! 1 credit deducted."
+        "message": f"Dossier for {canonical} synthesized successfully! 1 credit deducted." if not is_admin else f"Dossier for {canonical} synthesized successfully via Admin Console!"
     })
+
+
+api_synthesize = synthesize_report
 
 
 @router.post("/api/dossier/unlock/{ticker}")

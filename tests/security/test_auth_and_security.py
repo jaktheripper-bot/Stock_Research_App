@@ -661,6 +661,65 @@ class TestRazorpaySignatureVerification(unittest.TestCase):
             self.assertFalse(verify_payment_signature("order_real_123", "pay_real_123", "sig_123"))
 
 
+# ==============================================================================
+# 6. /api/synthesize Verified Session Cookie & Ignored Client user_id
+# ==============================================================================
+class TestSynthesizeSessionAuth(unittest.TestCase):
+    def setUp(self):
+        from web.main import app
+        from starlette.testclient import TestClient
+        self.client = TestClient(app)
+
+    def test_synthesize_unauthenticated_rejected_401(self):
+        """Unauthenticated requests must be rejected with 401 and AUTHENTICATION_REQUIRED."""
+        resp = self.client.post(
+            "/api/synthesize",
+            json={"ticker": "INFY", "user_id": "spoofed_user_123"}
+        )
+        self.assertEqual(resp.status_code, 401)
+        data = resp.json().get("detail", {})
+        self.assertEqual(data.get("error"), "AUTHENTICATION_REQUIRED")
+        self.assertIn("Please sign in to synthesize a dossier", data.get("message", ""))
+
+    def test_synthesize_ignores_client_supplied_user_id(self):
+        """The endpoint must ignore client-supplied user_id and strictly resolve from verified session."""
+        web_user = {
+            "id": "usr_verified_session_789",
+            "email": "verified_session@example.com",
+            "credits_balance": 10.0,
+            "subscription_tier": "free"
+        }
+        with patch("web.routers.dossier._get_current_web_user", return_value=web_user):
+            with patch("web.routers.dossier.clean_ticker", return_value="INFY"):
+                with patch("web.routers.dossier.resolve_canonical_symbol", return_value="INFY"):
+                    with patch("web.routers.dossier.get_report_by_ticker_sync", return_value={"report_text": "Sample report"}):
+                        resp = self.client.post(
+                            "/api/synthesize",
+                            json={"ticker": "INFY", "user_id": "attacker_spoofed_victim_id", "force_refresh": False}
+                        )
+                        self.assertEqual(resp.status_code, 200)
+                        data = resp.json()
+                        self.assertTrue(data.get("success"))
+                        self.assertTrue(data.get("already_exists"))
+
+    def test_synthesize_admin_authenticated_without_web_user(self):
+        """An authenticated admin without a web user can synthesize using clean_uid='admin_console'."""
+        admin_session = {"email": "admin@moatnomics.com", "role": "super_admin"}
+        with patch("web.routers.dossier._get_current_web_user", return_value=None):
+            with patch("web.routers.dossier._is_admin_authenticated", return_value=admin_session):
+                with patch("web.routers.dossier.clean_ticker", return_value="TCS"):
+                    with patch("web.routers.dossier.resolve_canonical_symbol", return_value="TCS"):
+                        with patch("web.routers.dossier.get_report_by_ticker_sync", return_value={"report_text": "TCS report"}):
+                            resp = self.client.post(
+                                "/api/synthesize",
+                                json={"ticker": "TCS"}
+                            )
+                            self.assertEqual(resp.status_code, 200)
+                            data = resp.json()
+                            self.assertTrue(data.get("success"))
+                            self.assertTrue(data.get("already_exists"))
+
+
 if __name__ == "__main__":
     unittest.main()
 

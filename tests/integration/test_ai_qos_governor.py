@@ -221,6 +221,7 @@ class TestAiQosGovernor(unittest.TestCase):
 
     def test_06_dossier_synthesis_velocity_cap_http_429(self):
         """Outside-In: Full synthesis route rejects beyond hourly velocity cap with HTTP 429."""
+        from unittest import mock
         client = TestClient(app)
         email = "burst_allocator@test.com"
 
@@ -228,13 +229,14 @@ class TestAiQosGovernor(unittest.TestCase):
         for _ in range(MAX_SYNTHESIS_PER_USER_HOUR):
             authorize_llm_execution("USER_SYNTHESIS", user_email=email)
 
-        # Now attempting full synthesis returns HTTP 429
-        resp = client.post(
-            "/api/synthesize",
-            json={"ticker": "SYNTH_TEST_99", "user_id": email, "force_refresh": True}
-        )
-        self.assertEqual(resp.status_code, 429)
-        self.assertIn("Hourly synthesis velocity cap reached", resp.json().get("detail", ""))
+        # Authenticated user attempting full synthesis returns HTTP 429
+        with mock.patch("web.routers.dossier._get_current_web_user", return_value={"id": "usr_burst", "email": email, "subscription_tier": "free"}):
+            resp = client.post(
+                "/api/synthesize",
+                json={"ticker": "SYNTH_TEST_99", "user_id": email, "force_refresh": True}
+            )
+            self.assertEqual(resp.status_code, 429)
+            self.assertIn("Hourly synthesis velocity cap reached", resp.json().get("detail", ""))
 
 
 
