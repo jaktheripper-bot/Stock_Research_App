@@ -932,7 +932,8 @@ admin_direct_verify = admin_auth_direct_verify
 @router.get("/admin/setup-2fa", response_class=HTMLResponse)
 async def admin_setup_2fa_view(request: Request, err: Optional[str] = None, next: Optional[str] = None):
     pending_token = request.cookies.get(ADMIN_2FA_PENDING_COOKIE)
-    email = _validate_pending_2fa_token(pending_token)
+    admin_session = _is_admin_authenticated(request)
+    email = _validate_pending_2fa_token(pending_token) or (admin_session.get("email") if admin_session else None)
     if not email:
         return RedirectResponse(url="/admin?err=Session+expired.+Please+sign+in+again.", status_code=303)
 
@@ -941,7 +942,16 @@ async def admin_setup_2fa_view(request: Request, err: Optional[str] = None, next
         return RedirectResponse(url="/admin", status_code=303)
 
     secret = admin.get("totp_secret")
+    has_active_totp = bool(secret and admin.get("totp_enabled"))
     force_reset = request.query_params.get("reset") == "1"
+
+    # Block unauthenticated 2FA secret overwrite when TOTP is already enrolled
+    if has_active_totp and force_reset and not (admin_session or _is_local_dev_request(request)):
+        return RedirectResponse(
+            url="/admin/verify-2fa?err=2FA+is+already+active.+Please+sign+in+before+resetting.",
+            status_code=303
+        )
+
     if not secret or force_reset:
         secret = generate_totp_secret()
         set_admin_totp_secret(email, secret)
