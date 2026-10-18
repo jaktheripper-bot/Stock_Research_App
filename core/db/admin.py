@@ -593,7 +593,7 @@ def admin_grant_user_credits(
                 )
                 VALUES ({p}, {p}, {p}, {p}, 0.0, {p}, 'admin_grant', {p}, {p}, 'success', {p}, {p}, 0.0, 0.0, '', now());
                 """,
-                (tx_id, user_id, user_email, user_name, credits_val, clean_ticket or "ADMIN_GRANT", f"grant_by_{clean_admin}", pack_type, inv_num)
+                (tx_id, user_id, user_email, user_name, credits_val, clean_ticket or "ADMIN_GRANT", None, pack_type, inv_num)
             )
             # Insert into credit_usage_ledger
             cursor.execute(
@@ -614,7 +614,7 @@ def admin_grant_user_credits(
                 )
                 VALUES ({p}, {p}, {p}, {p}, 0.0, {p}, 'admin_grant', {p}, {p}, 'success', {p}, {p}, 0.0, 0.0, '', {p});
                 """,
-                (tx_id, user_id, user_email, user_name, credits_val, clean_ticket or "ADMIN_GRANT", f"grant_by_{clean_admin}", pack_type, inv_num, now_ts)
+                (tx_id, user_id, user_email, user_name, credits_val, clean_ticket or "ADMIN_GRANT", None, pack_type, inv_num, now_ts)
             )
             # Insert into credit_usage_ledger
             cursor.execute(

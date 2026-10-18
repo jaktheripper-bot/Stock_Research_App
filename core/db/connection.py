@@ -631,6 +631,11 @@ def init_db(force: bool = False):
                         );
                     ''')
                     cursor.execute('CREATE INDEX IF NOT EXISTS idx_credit_transactions_user ON credit_transactions (user_id, created_at DESC);')
+                    cursor.execute('''
+                        CREATE UNIQUE INDEX IF NOT EXISTS idx_credit_tx_unique_payment_id
+                        ON credit_transactions(gateway_payment_id)
+                        WHERE gateway_payment_id IS NOT NULL AND gateway_payment_id != '';
+                    ''')
 
                     cursor.execute('''
                         CREATE TABLE IF NOT EXISTS credit_usage_ledger (
@@ -679,6 +684,11 @@ def init_db(force: bool = False):
                         );
                     ''')
                     cursor.execute('CREATE INDEX IF NOT EXISTS idx_credit_transactions_user ON credit_transactions (user_id, created_at DESC);')
+                    cursor.execute('''
+                        CREATE UNIQUE INDEX IF NOT EXISTS idx_credit_tx_unique_payment_id
+                        ON credit_transactions(gateway_payment_id)
+                        WHERE gateway_payment_id IS NOT NULL AND gateway_payment_id != '';
+                    ''')
 
                     cursor.execute('''
                         CREATE TABLE IF NOT EXISTS credit_usage_ledger (
@@ -2004,6 +2014,38 @@ def init_db(force: bool = False):
                     except Exception as e:
                         logger.debug("Migration v032 updated_at column notice: %s", e)
                     cursor.execute("INSERT INTO schema_migrations (version) VALUES (\'v032_user_accounts_updated_at\') ON CONFLICT DO NOTHING;")
+                conn.commit()
+
+            # Migration v033: Credit Transactions Unique Payment ID Idempotency Index
+            if "v033_credit_transactions_unique_payment_id" not in applied:
+                logger.info("Applying schema migration: v033_credit_transactions_unique_payment_id...")
+                if supabase_url:
+                    cursor.execute("""
+                        UPDATE credit_transactions
+                        SET gateway_payment_id = NULL
+                        WHERE payment_gateway = 'admin_grant' OR gateway_payment_id LIKE 'grant_by_%';
+
+                        CREATE UNIQUE INDEX IF NOT EXISTS idx_credit_tx_unique_payment_id
+                        ON credit_transactions(gateway_payment_id)
+                        WHERE gateway_payment_id IS NOT NULL AND gateway_payment_id != '';
+
+                        INSERT INTO schema_migrations (version) VALUES ('v033_credit_transactions_unique_payment_id') ON CONFLICT DO NOTHING;
+                    """)
+                else:
+                    try:
+                        cursor.execute("""
+                            UPDATE credit_transactions
+                            SET gateway_payment_id = NULL
+                            WHERE payment_gateway = 'admin_grant' OR gateway_payment_id LIKE 'grant_by_%';
+                        """)
+                        cursor.execute("""
+                            CREATE UNIQUE INDEX IF NOT EXISTS idx_credit_tx_unique_payment_id
+                            ON credit_transactions(gateway_payment_id)
+                            WHERE gateway_payment_id IS NOT NULL AND gateway_payment_id != '';
+                        """)
+                    except Exception as e:
+                        logger.warning("Migration v033 unique index notice: %s", e)
+                    cursor.execute("INSERT INTO schema_migrations (version) VALUES (\'v033_credit_transactions_unique_payment_id\') ON CONFLICT DO NOTHING;")
                 conn.commit()
 
             _DB_INITIALIZED = True
