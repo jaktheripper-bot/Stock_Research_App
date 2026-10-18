@@ -1760,7 +1760,58 @@ Detailed forensic analysis grounded in bseindia.com filings.
             else:
                 os.environ.pop("ADMIN_API_KEY", None)
 
+class TestSlowAPIRateLimiter(unittest.TestCase):
+    """Verifies SlowAPIMiddleware, app.state.limiter, and 429 RateLimitExceeded handler."""
 
+    def test_limiter_and_middleware_registration(self):
+        from web.main import app
+        from slowapi.middleware import SlowAPIMiddleware
+        self.assertTrue(hasattr(app.state, "limiter"))
+        self.assertIsNotNone(app.state.limiter)
+        middleware_classes = [m.cls for m in app.user_middleware]
+        self.assertIn(SlowAPIMiddleware, middleware_classes)
+
+    def test_rate_limit_exceeded_handler(self):
+        from unittest.mock import MagicMock
+        from web.main import app
+        from slowapi.errors import RateLimitExceeded
+        from starlette.requests import Request
+        handler = app.exception_handlers.get(RateLimitExceeded)
+        self.assertIsNotNone(handler)
+        scope = {"type": "http", "method": "GET", "path": "/test", "headers": []}
+        req = Request(scope)
+        mock_limit = MagicMock(error_message=None, limit="100/minute")
+        exc = RateLimitExceeded(mock_limit)
+        resp = handler(req, exc)
+        self.assertEqual(resp.status_code, 429)
+        self.assertEqual(resp.body, b"Rate limit exceeded")
+
+    def test_slowapi_middleware_functional_throttling(self):
+        from fastapi import FastAPI, Response
+        from fastapi.testclient import TestClient
+        from slowapi import Limiter
+        from slowapi.util import get_remote_address
+        from slowapi.errors import RateLimitExceeded
+        from slowapi.middleware import SlowAPIMiddleware
+
+        sub_app = FastAPI()
+        sub_limiter = Limiter(key_func=get_remote_address, default_limits=["2/minute"])
+        sub_app.state.limiter = sub_limiter
+        sub_app.add_exception_handler(RateLimitExceeded, lambda request, exc: Response(content="Rate limit exceeded", status_code=429))
+        sub_app.add_middleware(SlowAPIMiddleware)
+
+        @sub_app.get("/limited-ping")
+        def limited_ping():
+            return {"status": "ok"}
+
+        client = TestClient(sub_app)
+        r1 = client.get("/limited-ping")
+        self.assertEqual(r1.status_code, 200)
+        r2 = client.get("/limited-ping")
+        self.assertEqual(r2.status_code, 200)
+        r3 = client.get("/limited-ping")
+        self.assertEqual(r3.status_code, 429)
+        self.assertEqual(r3.text, "Rate limit exceeded")
 
 
 if __name__ == "__main__":

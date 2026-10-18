@@ -41,6 +41,7 @@ from web.middleware.security_headers import SecurityHeadersMiddleware
 from slowapi import Limiter
 from slowapi.util import get_remote_address
 from slowapi.errors import RateLimitExceeded
+from slowapi.middleware import SlowAPIMiddleware
 
 logger = logging.getLogger("equity_research.web")
 
@@ -643,6 +644,7 @@ app.add_middleware(
 limiter = Limiter(key_func=get_remote_address, default_limits=["100/minute"])
 app.state.limiter = limiter
 app.add_exception_handler(RateLimitExceeded, lambda request, exc: Response(content="Rate limit exceeded", status_code=429))
+app.add_middleware(SlowAPIMiddleware)
 
 
 class HeadMethodMiddleware(BaseHTTPMiddleware):
