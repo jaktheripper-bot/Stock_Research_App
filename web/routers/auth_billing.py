@@ -608,12 +608,16 @@ async def api_record_telemetry_event(payload: TelemetryEventRequest, request: Re
 
 
 @router.get("/api/user/{user_id}")
-async def api_get_user(user_id: str):
-    """Returns basic user profile including remaining research credits."""
+def api_get_user(user_id: str, request: Request):
+    """Fetches user profile only for the authenticated session owner or admin."""
+    web_user = _get_current_web_user(request)
+    if not _is_admin_authenticated(request):
+        if not web_user or web_user.get("id") != user_id.strip():
+            raise HTTPException(status_code=403, detail="Forbidden: cannot inspect another user's profile.")
     user = get_user_by_id(user_id)
     if not user:
         raise HTTPException(status_code=404, detail="User not found")
-    return json_response_with_cache(user)
+    return {"status": "success", "user": user}
 
 
 @router.get("/api/billing/currencies")

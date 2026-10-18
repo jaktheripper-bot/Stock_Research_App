@@ -35,6 +35,7 @@ from core.db.users import (
 from web.main import (
     ADMIN_COOKIE_NAME,
     _generate_admin_token,
+    _generate_user_session_token,
     app,
     lifespan,
 )
@@ -847,6 +848,68 @@ class TestApiV1DeveloperAuth(unittest.TestCase):
                 os.environ["ADMIN_API_KEY"] = orig_admin_key
             else:
                 os.environ.pop("ADMIN_API_KEY", None)
+
+
+class TestUserProfileApiAuth(unittest.TestCase):
+    """Verifies IDOR protection and role-based access control on /api/user/{user_id}."""
+
+    @classmethod
+    def setUpClass(cls):
+        init_db()
+        cls.client = TestClient(app)
+        cls.user_a = get_or_create_user("usr_profile_auth_a", "alice@example.com", "Alice Tester")
+        cls.user_b = get_or_create_user("usr_profile_auth_b", "bob@example.com", "Bob Tester")
+        cls.token_a = _generate_user_session_token(cls.user_a["id"], cls.user_a["email"])
+        cls.token_b = _generate_user_session_token(cls.user_b["id"], cls.user_b["email"])
+        cls.admin_token = _generate_admin_token("admin@example.com", "owner")
+
+    def test_unauthenticated_request_rejected_403(self):
+        """Unauthenticated requests cannot fetch any user profile."""
+        res = self.client.get(f"/api/user/{self.user_a['id']}")
+        self.assertEqual(res.status_code, 403)
+        self.assertIn("cannot inspect another user's profile", res.json().get("detail", ""))
+
+    def test_user_cannot_inspect_another_user_profile_403(self):
+        """User A is forbidden from inspecting User B's profile (IDOR defense)."""
+        res = self.client.get(
+            f"/api/user/{self.user_b['id']}",
+            cookies={"user_session_token": self.token_a}
+        )
+        self.assertEqual(res.status_code, 403)
+        self.assertIn("cannot inspect another user's profile", res.json().get("detail", ""))
+
+    def test_user_can_inspect_own_profile_200(self):
+        """User A can successfully inspect their own profile."""
+        res = self.client.get(
+            f"/api/user/{self.user_a['id']}",
+            cookies={"user_session_token": self.token_a}
+        )
+        self.assertEqual(res.status_code, 200)
+        data = res.json()
+        self.assertEqual(data.get("status"), "success")
+        self.assertIn("user", data)
+        self.assertEqual(data["user"]["id"], self.user_a["id"])
+        self.assertEqual(data["user"]["email"], "alice@example.com")
+
+    def test_admin_can_inspect_any_user_profile_200(self):
+        """Authenticated admin can inspect any registered user profile."""
+        res = self.client.get(
+            f"/api/user/{self.user_a['id']}",
+            cookies={ADMIN_COOKIE_NAME: self.admin_token}
+        )
+        self.assertEqual(res.status_code, 200)
+        data = res.json()
+        self.assertEqual(data.get("status"), "success")
+        self.assertEqual(data["user"]["id"], self.user_a["id"])
+
+    def test_admin_inspect_nonexistent_user_returns_404(self):
+        """Non-existent user profile query by admin returns 404 Not Found."""
+        res = self.client.get(
+            "/api/user/usr_nonexistent_profile_9999",
+            cookies={ADMIN_COOKIE_NAME: self.admin_token}
+        )
+        self.assertEqual(res.status_code, 404)
+        self.assertEqual(res.json().get("detail"), "User not found")
 
 
 if __name__ == "__main__":

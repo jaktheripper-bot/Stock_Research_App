@@ -1504,7 +1504,7 @@ async function refreshUserBalance(user) {
     const resp = await fetch(`/api/user/${encodeURIComponent(user.id)}`);
     if (resp.ok) {
       const data = await resp.json();
-      if (data.success && data.user) {
+      if ((data.success || data.status === 'success') && data.user) {
         localStorage.setItem('sr_user', JSON.stringify(data.user));
         syncUserSession();
       }
