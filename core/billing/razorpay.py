@@ -82,6 +82,19 @@ def is_razorpay_configured() -> bool:
     return bool(key_id and key_secret)
 
 
+_ORDER_INTENT_CACHE: Dict[str, Dict[str, Any]] = {}
+
+
+def _record_order_intent(order_id: str, user_id: str, plan_id: Optional[str], amount_paise: int) -> None:
+    if order_id:
+        _ORDER_INTENT_CACHE[order_id] = {
+            "user_id": user_id,
+            "plan_id": plan_id,
+            "amount_paise": int(amount_paise),
+            "created_at": int(time.time()),
+        }
+
+
 def create_razorpay_order(
     plan_id: Optional[str] = None,
     amount_paise: Optional[int] = None,
