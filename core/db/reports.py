@@ -301,6 +301,7 @@ def get_report_by_ticker(ticker: str) -> dict:
 
 _get_report_by_ticker_sync = get_report_by_ticker
 get_report_by_ticker_sync = get_report_by_ticker
+get_latest_report = get_report_by_ticker
 
 @lru_cache(maxsize=128)
 def get_report_revisions(ticker: str) -> list:

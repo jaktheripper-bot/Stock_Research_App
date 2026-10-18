@@ -2,6 +2,7 @@ import os
 import re
 import json
 import difflib
+from typing import Optional
 from normalizer import clean_ticker
 
 PRIMARY_BSE_MAP = {
@@ -241,10 +242,12 @@ def _get_cached_candidates() -> list:
     _SUGGESTION_CANDIDATES["alias_mtime"] = _ALIASES_CACHE.get("mtime", 0)
     return cand_list
 
-def get_ticker_suggestions(query: str, n: int = 3) -> list:
+def get_ticker_suggestions(query: str, n: int = 3, limit: Optional[int] = None) -> list:
     """Finds closest matching ticker symbols or company names using fuzzy string matching."""
     if not query:
         return []
+    if limit is not None:
+        n = limit
     clean = clean_ticker(query)
     candidates = _get_cached_candidates()
     return difflib.get_close_matches(clean, candidates, n=n, cutoff=0.5)

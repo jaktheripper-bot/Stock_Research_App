@@ -773,6 +773,33 @@ Detailed forensic analysis with exact page grounding to bseindia.com filings.
         self.assertIn("Return on Equity (ROE):", html)
         self.assertIn("Operating Margin (OPM):", html)
 
+    def test_api_synthesize_unrecognized_ticker_preflight_validation(self):
+        """Verify /api/synthesize rejects unlisted tickers with 404 UNRECOGNIZED_TICKER and suggestions."""
+        web_user = {
+            "id": "usr_test_user_preflight",
+            "email": "preflight@example.com",
+            "credits_balance": 10.0,
+            "subscription_tier": "free",
+        }
+        with patch("web.routers.dossier._get_current_web_user", return_value=web_user):
+            with patch("web.routers.dossier.clean_ticker", return_value="TOTALLYUNKNOWN123"):
+                with patch("web.routers.dossier.resolve_canonical_symbol", return_value="TOTALLYUNKNOWN123"):
+                    with patch("web.routers.dossier.resolve_bse_scrip_code", return_value=None):
+                        with patch("web.routers.dossier.get_latest_report", return_value={}):
+                            with patch("web.routers.dossier.get_ticker_suggestions", return_value=["INFY", "TCS"]):
+                                resp = self.client.post(
+                                    "/api/synthesize",
+                                    json={"ticker": "TOTALLYUNKNOWN123"}
+                                )
+                                self.assertEqual(resp.status_code, 404)
+                                data = resp.json()
+                                detail = data.get("detail", {})
+                                self.assertEqual(detail.get("error"), "UNRECOGNIZED_TICKER")
+                                self.assertIn("TOTALLYUNKNOWN123", detail.get("message", ""))
+                                self.assertIn("Did you mean: INFY, TCS?", detail.get("message", ""))
+                                self.assertEqual(detail.get("suggestions"), ["INFY", "TCS"])
+
+
 
 
 

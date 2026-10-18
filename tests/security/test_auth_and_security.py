@@ -742,6 +742,30 @@ class TestSynthesizeSessionAuth(unittest.TestCase):
                             self.assertTrue(data.get("success"))
                             self.assertTrue(data.get("already_exists"))
 
+    def test_synthesize_unrecognized_ticker_preflight_404(self):
+        """Unrecognized ticker must fail pre-flight validation with 404 UNRECOGNIZED_TICKER before charging credits."""
+        web_user = {
+            "id": "usr_verified_session_789",
+            "email": "verified_session@example.com",
+            "credits_balance": 10.0,
+            "subscription_tier": "free"
+        }
+        with patch("web.routers.dossier._get_current_web_user", return_value=web_user):
+            with patch("web.routers.dossier.clean_ticker", return_value="TOTALLYFAKETICKER"):
+                with patch("web.routers.dossier.resolve_canonical_symbol", return_value="TOTALLYFAKETICKER"):
+                    with patch("web.routers.dossier.resolve_bse_scrip_code", return_value=None):
+                        with patch("web.routers.dossier.get_latest_report", return_value={}):
+                            resp = self.client.post(
+                                "/api/synthesize",
+                                json={"ticker": "TOTALLYFAKETICKER"}
+                            )
+                            self.assertEqual(resp.status_code, 404)
+                            data = resp.json()
+                            detail = data.get("detail", {})
+                            self.assertEqual(detail.get("error"), "UNRECOGNIZED_TICKER")
+                            self.assertIn("not found in the BSE/NSE scrip master", detail.get("message", ""))
+                            self.assertIn("suggestions", detail)
+
 
 # ==============================================================================
 # 7. /api/dossier/unlock/{ticker} Session Cookie & Auth Contract

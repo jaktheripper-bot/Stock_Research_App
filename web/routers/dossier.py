@@ -25,11 +25,12 @@ from starlette.concurrency import run_in_threadpool
 PDF_SEMAPHORE = asyncio.Semaphore(4)
 
 from normalizer import clean_ticker
-from bse_master import resolve_canonical_symbol, resolve_bse_scrip_code
+from bse_master import resolve_canonical_symbol, resolve_bse_scrip_code, get_ticker_suggestions
 from core.config import get_secret
 from core.db import (
     init_db,
     get_report_by_ticker_sync,
+    get_latest_report,
     get_user_credits_balance,
     deduct_user_credits,
     add_user_credits,
@@ -93,6 +94,23 @@ async def synthesize_report(request: Request, payload: SynthesizeRequest):
         raise HTTPException(status_code=400, detail="Invalid ticker symbol.")
 
     canonical = resolve_canonical_symbol(clean_t) or clean_t
+
+    # Pre-flight validation: Ensure ticker is a recognized BSE/NSE security or archived entity
+    scrip_code = resolve_bse_scrip_code(canonical)
+    existing_report = get_latest_report(canonical)
+    if (not scrip_code or scrip_code == "N/A") and not existing_report:
+        suggestions = get_ticker_suggestions(canonical, limit=5)
+        raise HTTPException(
+            status_code=404,
+            detail={
+                "error": "UNRECOGNIZED_TICKER",
+                "message": (
+                    f"'{canonical}' was not found in the BSE/NSE scrip master. "
+                    + (f"Did you mean: {', '.join(suggestions)}?" if suggestions else "Please verify the ticker symbol.")
+                ),
+                "suggestions": suggestions,
+            },
+        )
 
     existing = get_report_by_ticker_sync(canonical)
     if existing and existing.get("report_text") and not payload.force_refresh:

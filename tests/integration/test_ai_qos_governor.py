@@ -233,7 +233,7 @@ class TestAiQosGovernor(unittest.TestCase):
         with mock.patch("web.routers.dossier._get_current_web_user", return_value={"id": "usr_burst", "email": email, "subscription_tier": "free"}):
             resp = client.post(
                 "/api/synthesize",
-                json={"ticker": "SYNTH_TEST_99", "user_id": email, "force_refresh": True}
+                json={"ticker": "INFY", "user_id": email, "force_refresh": True}
             )
             self.assertEqual(resp.status_code, 429)
             self.assertIn("Hourly synthesis velocity cap reached", resp.json().get("detail", ""))
