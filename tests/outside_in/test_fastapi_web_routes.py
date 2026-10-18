@@ -618,8 +618,15 @@ Detailed forensic analysis with exact page grounding to bseindia.com filings.
         status_text = soup.find(id="auditStatusText")
         self.assertIsNotNone(status_text, "Expected #auditStatusText status message element")
 
+        self.assertIsNotNone(soup.find(id="auditProgressBox"), "Expected #auditProgressBox")
+        self.assertIsNotNone(soup.find(id="auditProgressBar"), "Expected #auditProgressBar")
+        self.assertIsNotNone(soup.find(id="auditProgressPct"), "Expected #auditProgressPct")
+        self.assertIsNotNone(soup.find(id="auditStatusMsg"), "Expected #auditStatusMsg")
+        self.assertIsNotNone(soup.find(id="auditResultAction"), "Expected #auditResultAction")
+
         # Verify JS function presence
         self.assertIn("async function startOnDemandFundAudit()", res.text)
+        self.assertIn("function pollAuditStatus(", res.text)
         self.assertIn("/api/funds/on-demand-audit", res.text)
 
     def test_fund_dossier_page(self):

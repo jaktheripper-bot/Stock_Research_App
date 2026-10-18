@@ -123,16 +123,24 @@
 
     <!-- Async Audit Progress Modal / Drawer -->
     <div id="onDemandAuditStatus" style="display: none; margin-top: 18px; padding-top: 16px; border-top: 1px solid rgba(255, 255, 255, 0.1);">
-      <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;">
-        <div style="display: flex; align-items: center; gap: 8px;">
-          <span id="auditSpinner" style="display: inline-block; width: 12px; height: 12px; border: 2px solid #a855f7; border-top-color: transparent; border-radius: 50%; animation: spin 1s linear infinite;"></span>
-          <span id="auditStatusText" style="font-size: 13px; font-weight: 600; color: #e2e8f0;">Initializing look-through engine...</span>
+      <div id="auditProgressBox" style="display: block;">
+        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;">
+          <div style="display: flex; align-items: center; gap: 8px;">
+            <span id="auditSpinner" style="display: inline-block; width: 12px; height: 12px; border: 2px solid #a855f7; border-top-color: transparent; border-radius: 50%; animation: spin 1s linear infinite;"></span>
+            <span id="auditStatusMsg" style="font-size: 13px; font-weight: 600; color: #e2e8f0;">Initializing look-through engine...</span>
+            <span id="auditStatusText" style="display: none;">Initializing look-through engine...</span>
+          </div>
+          <div style="display: flex; align-items: center; gap: 12px;">
+            <span id="auditProgressPct" style="font-size: 12px; font-weight: 700; color: #c084fc;">15%</span>
+            <button id="btnEnableNotification" onclick="requestAuditDesktopNotification()" class="btn btn-sm btn-outline-secondary" style="font-size: 11px; padding: 4px 10px; border-radius: 9999px; display: inline-flex; align-items: center; gap: 4px;">
+              <span>🔔</span> Alert me on desktop when complete
+            </button>
+          </div>
         </div>
-        <div style="display: flex; align-items: center; gap: 12px;">
-          <button id="btnEnableNotification" onclick="requestAuditDesktopNotification()" class="btn btn-sm btn-outline-secondary" style="font-size: 11px; padding: 4px 10px; border-radius: 9999px; display: inline-flex; align-items: center; gap: 4px;">
-            <span>🔔</span> Alert me on desktop when complete
-          </button>
+        <div style="width: 100%; height: 6px; background: rgba(15, 23, 42, 0.8); border-radius: 999px; overflow: hidden; margin-bottom: 8px;">
+          <div id="auditProgressBar" style="width: 15%; height: 100%; background: linear-gradient(90deg, #a855f7 0%, #7c3aed 100%); transition: width 0.3s ease;"></div>
         </div>
+        <div id="auditResultAction" style="display: none; margin-top: 8px;"></div>
       </div>
     </div>
   </div>
@@ -277,70 +285,154 @@ function requestAuditDesktopNotification() {
   });
 }
 
+let currentAuditScheme = null;
+let currentAuditTaskId = null;
+let auditPollTimer = null;
+
 async function startOnDemandFundAudit() {
-    const input = document.getElementById("onDemandFundInput");
-    const statusBox = document.getElementById("onDemandAuditStatus");
-    const statusText = document.getElementById("auditStatusText");
-    const spinner = document.getElementById("auditSpinner");
-    const btn = document.getElementById("onDemandAuditBtn");
+  const input = document.getElementById("onDemandSchemeInput") || document.getElementById("onDemandFundInput");
+  const schemeCode = (input ? input.value : "").trim();
+  if (!schemeCode) {
+    alert("Please enter a valid AMFI Scheme Code or Scheme Name.");
+    return;
+  }
 
-    const code = (input ? input.value : "").trim();
-    if (!code) {
-        alert("Please enter a valid 6-digit AMFI Scheme Code (e.g., 122639).");
-        return;
+  const box = document.getElementById("auditProgressBox") || document.getElementById("onDemandAuditStatus");
+  const bar = document.getElementById("auditProgressBar");
+  const pct = document.getElementById("auditProgressPct");
+  const msg = document.getElementById("auditStatusMsg") || document.getElementById("auditStatusText");
+  const action = document.getElementById("auditResultAction");
+  const spinner = document.getElementById("auditSpinner");
+  const btn = document.getElementById("onDemandAuditBtn");
+
+  if (btn) btn.disabled = true;
+  if (box) box.style.display = "block";
+  if (bar) bar.style.width = "15%";
+  if (pct) pct.innerText = "15%";
+  if (msg) {
+    msg.style.color = "var(--text-secondary, #e2e8f0)";
+    msg.innerText = `Enqueuing look-through audit for ${schemeCode}...`;
+  }
+  if (action) action.style.display = "none";
+  if (spinner) spinner.style.display = "inline-block";
+  currentAuditScheme = schemeCode;
+
+  try {
+    const res = await fetch("/api/funds/on-demand-audit", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ scheme_code: schemeCode })
+    });
+    const data = await res.json().catch(() => ({}));
+
+    if (res.status === 401 || res.status === 403) {
+      if (spinner) spinner.style.display = "none";
+      if (bar) bar.style.width = "0%";
+      if (pct) pct.innerText = "0%";
+      if (btn) btn.disabled = false;
+      localStorage.removeItem("sr_user");
+      if (typeof updateNavAuthUI === "function") updateNavAuthUI(null);
+      if (msg) {
+        msg.style.color = "#f59e0b";
+        msg.innerText = data.detail || "Authentication required. Please sign in to enqueue on-demand fund audits.";
+      }
+      if (typeof openSignInModal === "function") openSignInModal();
+      return;
     }
 
-    if (btn) btn.disabled = true;
-    if (statusBox) statusBox.style.display = "block";
-    if (spinner) spinner.style.display = "inline-block";
-    if (statusText) {
-        statusText.style.color = "var(--text-secondary)";
-        statusText.innerText = "Querying AMFI / MFAPI & computing Jensen's Alpha, Sortino & Rolling Return Consistency...";
+    if (!res.ok || !data.success) {
+      if (spinner) spinner.style.display = "none";
+      if (bar) bar.style.width = "0%";
+      if (pct) pct.innerText = "0%";
+      if (btn) btn.disabled = false;
+      const errDetail = typeof data.detail === "string" ? data.detail : (data.detail?.message || data.error || "Unknown error");
+      if (msg) {
+        msg.style.color = "#ef4444";
+        msg.innerText = "Failed to enqueue audit: " + errDetail;
+      }
+      return;
     }
 
+    currentAuditTaskId = data.task_id;
+    if (bar) bar.style.width = "30%";
+    if (pct) pct.innerText = "30%";
+    if (msg) msg.innerText = `Audit task queued for ${data.scheme_name || schemeCode}...`;
+    pollAuditStatus(data.task_id);
+  } catch (err) {
+    if (spinner) spinner.style.display = "none";
+    if (bar) bar.style.width = "0%";
+    if (pct) pct.innerText = "0%";
+    if (btn) btn.disabled = false;
+    if (msg) {
+      msg.style.color = "#ef4444";
+      msg.innerText = "Error launching audit: " + err.message;
+    }
+  }
+}
+
+function pollAuditStatus(taskId) {
+  if (auditPollTimer) clearInterval(auditPollTimer);
+  const bar = document.getElementById("auditProgressBar");
+  const pct = document.getElementById("auditProgressPct");
+  const msg = document.getElementById("auditStatusMsg") || document.getElementById("auditStatusText");
+  const spinner = document.getElementById("auditSpinner");
+  const btn = document.getElementById("onDemandAuditBtn");
+
+  let attempts = 0;
+  auditPollTimer = setInterval(async () => {
+    attempts++;
     try {
-        const res = await fetch("/api/funds/on-demand-audit", {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ scheme_code: code })
-        });
-        const data = await res.json().catch(() => ({}));
-
-        if (res.status === 401 || res.status === 403) {
-            if (spinner) spinner.style.display = "none";
-            localStorage.removeItem("sr_user");
-            if (typeof updateNavAuthUI === "function") updateNavAuthUI(null);
-            if (statusText) {
-                statusText.style.color = "#f59e0b";
-                statusText.innerText = "Authentication required. Please sign in to run a live AMFI audit.";
-            }
-            if (typeof openSignInModal === "function") openSignInModal();
-            return;
+      const res = await fetch(`/api/funds/audit-status/${encodeURIComponent(taskId)}`);
+      if (!res.ok) {
+        if (attempts > 30) {
+          clearInterval(auditPollTimer);
+          if (spinner) spinner.style.display = "none";
+          if (btn) btn.disabled = false;
+          if (msg) {
+            msg.style.color = "#ef4444";
+            msg.innerText = "Audit task timed out. Please try again.";
+          }
         }
+        return;
+      }
+      const task = await res.json().catch(() => ({}));
+      const progress = Math.min(100, Math.max(20, task.progress_pct || (attempts * 12)));
+      if (bar) bar.style.width = `${progress}%`;
+      if (pct) pct.innerText = `${progress}%`;
+      if (task.message && msg) msg.innerText = task.message;
 
-        if (res.ok && data.success) {
-            if (statusText) {
-                statusText.style.color = "#10b981";
-                statusText.innerText = `Audit Complete for ${data.scheme_name || code}! Redirecting to forensic scorecard...`;
-            }
-            window.location.href = `/funds/${encodeURIComponent(data.scheme_code || code)}`;
-        } else {
-            if (spinner) spinner.style.display = "none";
-            const msg = (data.detail && data.detail.message) || data.detail || data.error || "Could not locate AMFI scheme code.";
-            if (statusText) {
-                statusText.style.color = "#ef4444";
-                statusText.innerText = `Audit Error: ${msg}`;
-            }
-        }
-    } catch (err) {
+      if (task.status === "COMPLETED") {
+        clearInterval(auditPollTimer);
         if (spinner) spinner.style.display = "none";
-        if (statusText) {
-            statusText.style.color = "#ef4444";
-            statusText.innerText = "Network error while contacting the AMFI audit engine. Please try again.";
+        if (bar) bar.style.width = "100%";
+        if (pct) pct.innerText = "100%";
+        const targetCode = task.scheme_code || currentAuditScheme;
+        if (msg) {
+          msg.style.color = "#10b981";
+          msg.innerText = `Audit Complete for ${task.scheme_name || targetCode}! Redirecting to scorecard...`;
         }
-    } finally {
         if (btn) btn.disabled = false;
+        setTimeout(() => {
+          window.location.href = `/funds/${encodeURIComponent(targetCode)}`;
+        }, 800);
+      } else if (task.status === "FAILED") {
+        clearInterval(auditPollTimer);
+        if (spinner) spinner.style.display = "none";
+        if (btn) btn.disabled = false;
+        if (msg) {
+          msg.style.color = "#ef4444";
+          msg.innerText = `Audit Error: ${task.error || task.message || "Failed to synthesize fund dossier."}`;
+        }
+      }
+    } catch (e) {
+      console.error("Polling audit status error:", e);
+      if (attempts > 30) {
+        clearInterval(auditPollTimer);
+        if (spinner) spinner.style.display = "none";
+        if (btn) btn.disabled = false;
+      }
     }
+  }, 1000);
 }
 </script>
 <style>
