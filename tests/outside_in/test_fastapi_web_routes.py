@@ -337,6 +337,18 @@ Detailed forensic analysis with exact page grounding to bseindia.com filings.
         self.assertIn("Submit an Inquiry or Complaint", res_get.text)
         self.assertIn("Grievance Redressal", res_get.text)
 
+        soup = BeautifulSoup(res_get.text, "html.parser")
+        contact_ids = ["contactUserName", "contactUserEmail", "contactCategory", "contactSubject", "contactMessage"]
+        for cid in contact_ids:
+            self.assertIsNotNone(soup.find(id=cid), f"Missing #{cid} in /contact form")
+            label = soup.find("label", attrs={"for": cid})
+            self.assertIsNotNone(label, f"Missing label[for='{cid}'] in /contact form")
+
+        email_input = soup.find(id="contactUserEmail")
+        self.assertEqual(email_input.get("autocomplete"), "email")
+        name_input = soup.find(id="contactUserName")
+        self.assertEqual(name_input.get("autocomplete"), "name")
+
         # 2. POST /contact creates ticket and dispatches alert
         post_data = {
             "user_name": "Test Investor",
