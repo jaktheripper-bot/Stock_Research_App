@@ -1,6 +1,6 @@
 # Production Release Checkpoints & Disaster Recovery Ledger
-**Last Checkpoint:** 2026-10-18 14:24:07 IST  
-**Total Verified Rollback Points:** 84  
+**Last Checkpoint:** 2026-10-18 23:11:14 IST  
+**Total Verified Rollback Points:** 85  
 
 > [!NOTE]
 > These checkpoints represent byte-for-byte verified working releases that passed the 4-tier pre-flight audit.
@@ -10,6 +10,7 @@
 
 | Checkpoint Tag | IST Timestamp | Commit | DB Reports | Description |
 |:---|:---|:---|:---|:---|
+| `checkpoint_20261018_231114_fastapi_error_extraction_and_client_hardening` | 2026-10-18 23:11:14 IST | `e68b14d` | 165 rep / 270 rev | fastapi_error_extraction_and_client_hardening |
 | `checkpoint_20261018_142407_checkpoint_20261018_142331_phase_4_squad_waves_12_to_15_full_pass` | 2026-10-18 14:24:07 IST | `cebcc35` | 162 rep / 267 rev | checkpoint_20261018_142331_phase_4_squad_waves_12_to_15_full_pass |
 | `checkpoint_20261017_011023` | 2026-10-17 01:10:23 IST | `29d8a74` | 142 rep / 246 rev | Production Release Checkpoint |
 | `checkpoint_20261017_004936_Add_live_Gemini_spends_and_token_telemetry_monitor_to_admin_panel` | 2026-10-17 00:49:36 IST | `858b914` | 142 rep / 246 rev | Add live Gemini spends and token telemetry monitor to admin panel |
