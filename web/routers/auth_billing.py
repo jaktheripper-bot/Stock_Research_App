@@ -663,7 +663,9 @@ async def api_unsubscribe_notifications(request: Request, token: Optional[str] =
     is_html_request = "text/html" in accept_header
 
     if is_html_request:
-        email_display = subscriber["email"] if subscriber else param
+        import html as _html
+        raw_email_display = subscriber["email"] if subscriber else param
+        email_display = _html.escape(str(raw_email_display))
         resubscribe_url = f"/api/notifications/resubscribe?token={urllib.parse.quote(param)}"
         html = f"""<!DOCTYPE html>
 <html lang="en">
