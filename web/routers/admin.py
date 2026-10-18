@@ -132,9 +132,14 @@ def _get_client_ip(request: Request) -> str:
 
 
 def _is_local_dev_request(request: Request) -> bool:
-    """Checks whether request is from local dev machine and not production."""
-    host = request.url.hostname or ""
-    return (host in ("localhost", "127.0.0.1", "0.0.0.0", "testserver") or host.endswith(".local")) and os.getenv("ENVIRONMENT") != "production"
+    if os.getenv("ENVIRONMENT") == "production" or os.getenv("RENDER") == "true":
+        return False
+    client_ip = (request.client.host if request.client else "").strip()
+    forwarded = request.headers.get("x-forwarded-for", "").strip()
+    if forwarded or client_ip not in ("127.0.0.1", "::1", "testclient"):
+        return False
+    host = (request.url.hostname or "").lower()
+    return host in ("localhost", "127.0.0.1", "testserver")
 
 
 @router.get("/admin/login")

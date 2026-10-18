@@ -331,6 +331,72 @@ class TestAdminAuthSuite(unittest.TestCase):
         self.assertEqual(res_login.status_code, 303)
         self.assertIn("/admin?err=Invalid+admin+credentials", res_login.headers.get("location", ""))
 
+    def test_admin_dev_login_proxy_and_production_isolation(self):
+        """Verify _is_local_dev_request rejects X-Forwarded-For proxies, production, and Render environments."""
+        from web.routers.admin import _is_local_dev_request
+        from unittest.mock import patch, MagicMock
+
+        # 1. Dev login route rejects requests carrying X-Forwarded-For header
+        res_proxy = self.client.post(
+            "/admin/auth/dev-login",
+            data={"next_url": "/admin"},
+            headers={"X-Forwarded-For": "203.0.113.50"},
+            follow_redirects=False
+        )
+        self.assertEqual(res_proxy.status_code, 403)
+        self.assertIn("Direct dev login only allowed on local environments.", res_proxy.text)
+
+        # 2. Dev login route rejects in production environment
+        with patch.dict(os.environ, {"ENVIRONMENT": "production"}):
+            res_prod = self.client.post(
+                "/admin/auth/dev-login",
+                data={"next_url": "/admin"},
+                follow_redirects=False
+            )
+            self.assertEqual(res_prod.status_code, 403)
+
+        # 3. Dev login route rejects in Render environment
+        with patch.dict(os.environ, {"RENDER": "true"}):
+            res_render = self.client.post(
+                "/admin/auth/dev-login",
+                data={"next_url": "/admin"},
+                follow_redirects=False
+            )
+            self.assertEqual(res_render.status_code, 403)
+
+        # 4. Direct unit test of _is_local_dev_request matrix
+        # 4a. External client IP
+        mock_req = MagicMock()
+        mock_req.client.host = "198.51.100.1"
+        mock_req.headers = {}
+        mock_req.url.hostname = "localhost"
+        self.assertFalse(_is_local_dev_request(mock_req))
+
+        # 4b. Spoofed localhost host header with proxy header
+        mock_req = MagicMock()
+        mock_req.client.host = "127.0.0.1"
+        mock_req.headers = {"x-forwarded-for": "198.51.100.1"}
+        mock_req.url.hostname = "localhost"
+        self.assertFalse(_is_local_dev_request(mock_req))
+
+        # 4c. Non-local hostname
+        mock_req = MagicMock()
+        mock_req.client.host = "127.0.0.1"
+        mock_req.headers = {}
+        mock_req.url.hostname = "evil-domain.com"
+        self.assertFalse(_is_local_dev_request(mock_req))
+
+        # 4d. Legitimate direct local connection (127.0.0.1 and ::1)
+        mock_req = MagicMock()
+        mock_req.client.host = "127.0.0.1"
+        mock_req.headers = {}
+        mock_req.url.hostname = "localhost"
+        self.assertTrue(_is_local_dev_request(mock_req))
+
+        mock_req.client.host = "::1"
+        self.assertTrue(_is_local_dev_request(mock_req))
+
+
     
     
     
