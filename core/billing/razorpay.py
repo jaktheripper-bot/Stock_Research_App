@@ -192,46 +192,31 @@ def create_razorpay_order(
     }
 
 
-def verify_payment_signature(
-    order_id: str,
-    payment_id: str,
-    signature: str
-) -> bool:
-    """
-    Verifies HMAC-SHA256 signature using Razorpay SDK utility or cryptographic compare.
-    Formula: HMAC-SHA256(order_id + "|" + payment_id, secret) == signature
-    """
+def verify_payment_signature(order_id: str, payment_id: str, signature: str) -> bool:
+    """Cryptographically verifies the Razorpay HMAC-SHA256 payment signature."""
     if not order_id or not payment_id or not signature:
         return False
 
-    # In sandbox simulation mode, verify simulation token
+    is_prod = os.environ.get("ENVIRONMENT") == "production" or os.environ.get("RENDER") == "true"
+    is_testing = os.environ.get("TESTING") == "1"
+
+    _, key_secret, *_ = get_razorpay_keys()
     if order_id.startswith("order_sim_"):
+        if is_prod or key_secret or not is_testing:
+            logger.error("Blocked simulated order_id=%s in non-test/production environment.", order_id)
+            return False
         return signature.startswith("sig_sim_") or signature == "simulated_success"
 
-    key_id, key_secret, _ = get_razorpay_keys()
     if not key_secret:
+        logger.error("Cannot verify payment signature: RAZORPAY_KEY_SECRET is not configured.")
         return False
 
-    # 1. Try Razorpay SDK verify_payment_signature
-    client = get_razorpay_client()
-    if client:
-        try:
-            client.utility.verify_payment_signature({
-                "razorpay_order_id": order_id,
-                "razorpay_payment_id": payment_id,
-                "razorpay_signature": signature
-            })
-            return True
-        except Exception as sdk_err:
-            logger.debug("Razorpay SDK verify notice: %s. Falling back to HMAC.", sdk_err)
-
-    # 2. Raw HMAC-SHA256 cryptographic verification
     try:
         msg = f"{order_id}|{payment_id}".encode("utf-8")
         expected_sig = hmac.new(key_secret.encode("utf-8"), msg, hashlib.sha256).hexdigest()
-        return hmac.compare_digest(expected_sig, signature)
+        return hmac.compare_digest(expected_sig, signature.strip())
     except Exception as e:
-        logger.error(f"Signature verification exception: {e}")
+        logger.error("Signature verification exception: %s", e)
         return False
 
 

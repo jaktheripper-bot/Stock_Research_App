@@ -139,37 +139,53 @@ class TestPaymentIdempotencyReplayJourneys(unittest.TestCase):
             "plan_id": "single_pass"  # Adds 1 credit
         }
 
-        # First Verification Attempt (Legitimate user purchase)
-        resp1 = self.client.post("/api/billing/verify", json=replay_payload)
-        self.assertEqual(resp1.status_code, 200)
-        data1 = resp1.json()
-        self.assertTrue(data1.get("success"))
-        expected_balance = initial_balance + 1.0
-        self.assertEqual(data1.get("new_balance"), expected_balance)
-        self.assertEqual(get_user_credits_balance(self.user_id), expected_balance)
+        # Execute simulated replay attack with unconfigured keys (pure simulation mode)
+        with mock.patch("core.billing.razorpay.get_razorpay_keys", return_value=("", "", False)):
+            # First Verification Attempt (Legitimate user purchase)
+            resp1 = self.client.post("/api/billing/verify", json=replay_payload)
+            self.assertEqual(resp1.status_code, 200)
+            data1 = resp1.json()
+            self.assertTrue(data1.get("success"))
+            expected_balance = initial_balance + 1.0
+            self.assertEqual(data1.get("new_balance"), expected_balance)
+            self.assertEqual(get_user_credits_balance(self.user_id), expected_balance)
 
-        # Replay Attack 1: Exact duplicate replay to /api/billing/verify
-        resp2 = self.client.post("/api/billing/verify", json=replay_payload)
-        self.assertEqual(resp2.status_code, 200)
-        data2 = resp2.json()
-        self.assertTrue(data2.get("success"))
-        # Balance MUST NOT increment a second time
-        self.assertEqual(data2.get("new_balance"), expected_balance)
-        self.assertEqual(get_user_credits_balance(self.user_id), expected_balance)
+            # Replay Attack 1: Exact duplicate replay to /api/billing/verify
+            resp2 = self.client.post("/api/billing/verify", json=replay_payload)
+            self.assertEqual(resp2.status_code, 200)
+            data2 = resp2.json()
+            self.assertTrue(data2.get("success"))
+            # Balance MUST NOT increment a second time
+            self.assertEqual(data2.get("new_balance"), expected_balance)
+            self.assertEqual(get_user_credits_balance(self.user_id), expected_balance)
 
-        # Replay Attack 2: Exact duplicate replay to alias endpoint /api/verify-payment
-        resp3 = self.client.post("/api/verify-payment", json=replay_payload)
-        self.assertEqual(resp3.status_code, 200)
-        data3 = resp3.json()
-        self.assertTrue(data3.get("success"))
-        # Balance MUST STILL remain exactly the same
-        self.assertEqual(data3.get("new_balance"), expected_balance)
-        self.assertEqual(get_user_credits_balance(self.user_id), expected_balance)
+            # Replay Attack 2: Exact duplicate replay to alias endpoint /api/verify-payment
+            resp3 = self.client.post("/api/verify-payment", json=replay_payload)
+            self.assertEqual(resp3.status_code, 200)
+            data3 = resp3.json()
+            self.assertTrue(data3.get("success"))
+            # Balance MUST STILL remain exactly the same
+            self.assertEqual(data3.get("new_balance"), expected_balance)
+            self.assertEqual(get_user_credits_balance(self.user_id), expected_balance)
 
         # Empirical Database Audit: Ensure only ONE transaction record exists
         tx = get_credit_transaction_by_gateway_id(payment_id=payment_id)
         self.assertIsNotNone(tx)
         self.assertEqual(tx["gateway_payment_id"], payment_id)
+
+    def test_billing_verify_simulated_order_blocked_when_key_secret_configured(self):
+        """Verify that simulated order_sim_* payments are strictly rejected when key_secret exists."""
+        payload = {
+            "order_id": f"order_sim_blocked_{uuid.uuid4().hex[:8]}",
+            "payment_id": f"pay_sim_blocked_{uuid.uuid4().hex[:8]}",
+            "signature": "simulated_success",
+            "user_id": self.user_id,
+            "plan_id": "single_pass"
+        }
+        with mock.patch("core.billing.razorpay.get_razorpay_keys", return_value=("rzp_key", "rzp_secret", False)):
+            resp = self.client.post("/api/billing/verify", json=payload)
+            self.assertEqual(resp.status_code, 400)
+            self.assertIn("Payment signature verification failed", resp.text)
 
 
 # ==============================================================================

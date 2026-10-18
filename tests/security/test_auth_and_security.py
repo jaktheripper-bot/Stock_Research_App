@@ -586,6 +586,80 @@ class TestDatabaseDualBindingFailover(unittest.TestCase):
             if os.path.exists(temp_db_path):
                 os.remove(temp_db_path)
 
+# ==============================================================================
+# 5. Razorpay HMAC-SHA256 Signature Verification & Simulation Boundary
+# ==============================================================================
+class TestRazorpaySignatureVerification(unittest.TestCase):
+    def test_missing_or_empty_arguments(self):
+        from core.billing.razorpay import verify_payment_signature
+        self.assertFalse(verify_payment_signature("", "pay_123", "sig_123"))
+        self.assertFalse(verify_payment_signature("order_123", "", "sig_123"))
+        self.assertFalse(verify_payment_signature("order_123", "pay_123", ""))
+        self.assertFalse(verify_payment_signature(None, "pay_123", "sig_123"))
+
+    def test_simulated_orders_in_testing_environment(self):
+        from core.billing.razorpay import verify_payment_signature
+        with patch.dict(os.environ, {"TESTING": "1", "ENVIRONMENT": "development"}, clear=False):
+            with patch("core.billing.razorpay.get_razorpay_keys", return_value=("", "", False)):
+                self.assertTrue(verify_payment_signature("order_sim_123", "pay_sim_123", "sig_sim_abc"))
+                self.assertTrue(verify_payment_signature("order_sim_123", "pay_sim_123", "simulated_success"))
+                self.assertFalse(verify_payment_signature("order_sim_123", "pay_sim_123", "invalid_sig"))
+
+    def test_simulated_orders_blocked_in_production_or_render(self):
+        from core.billing.razorpay import verify_payment_signature
+        # Blocked in production
+        with patch.dict(os.environ, {"ENVIRONMENT": "production", "TESTING": "1"}, clear=False):
+            with patch("core.billing.razorpay.get_razorpay_keys", return_value=("", "", False)):
+                self.assertFalse(verify_payment_signature("order_sim_123", "pay_sim_123", "sig_sim_abc"))
+
+        # Blocked on Render
+        with patch.dict(os.environ, {"RENDER": "true", "TESTING": "1"}, clear=False):
+            with patch("core.billing.razorpay.get_razorpay_keys", return_value=("", "", False)):
+                self.assertFalse(verify_payment_signature("order_sim_123", "pay_sim_123", "sig_sim_abc"))
+
+    def test_simulated_orders_blocked_when_key_secret_configured(self):
+        from core.billing.razorpay import verify_payment_signature
+        with patch.dict(os.environ, {"TESTING": "1", "ENVIRONMENT": "development"}, clear=False):
+            with patch("core.billing.razorpay.get_razorpay_keys", return_value=("rzp_key", "rzp_secret", False)):
+                self.assertFalse(verify_payment_signature("order_sim_123", "pay_sim_123", "sig_sim_abc"))
+
+    def test_simulated_orders_blocked_outside_testing(self):
+        from core.billing.razorpay import verify_payment_signature
+        with patch.dict(os.environ, {"TESTING": "0", "ENVIRONMENT": "development"}, clear=False):
+            with patch("core.billing.razorpay.get_razorpay_keys", return_value=("", "", False)):
+                self.assertFalse(verify_payment_signature("order_sim_123", "pay_sim_123", "sig_sim_abc"))
+
+    def test_real_hmac_sha256_cryptographic_verification(self):
+        import hashlib
+        import hmac
+        from core.billing.razorpay import verify_payment_signature
+
+        order_id = "order_live_9876543210"
+        payment_id = "pay_live_1234567890"
+        mock_secret = "secret_key_moatnomics_test_2026"
+
+        msg = f"{order_id}|{payment_id}".encode("utf-8")
+        valid_sig = hmac.new(mock_secret.encode("utf-8"), msg, hashlib.sha256).hexdigest()
+
+        with patch("core.billing.razorpay.get_razorpay_keys", return_value=("rzp_live_key", mock_secret, True)):
+            # Valid signature passes
+            self.assertTrue(verify_payment_signature(order_id, payment_id, valid_sig))
+            self.assertTrue(verify_payment_signature(order_id, payment_id, f"  {valid_sig}  "))
+
+            # Tampered signature fails
+            self.assertFalse(verify_payment_signature(order_id, payment_id, "tampered_signature_hex"))
+
+            # Tampered payment_id fails
+            self.assertFalse(verify_payment_signature(order_id, "pay_live_other", valid_sig))
+
+            # Tampered order_id fails
+            self.assertFalse(verify_payment_signature("order_live_other", payment_id, valid_sig))
+
+    def test_real_order_fails_without_key_secret(self):
+        from core.billing.razorpay import verify_payment_signature
+        with patch("core.billing.razorpay.get_razorpay_keys", return_value=("", "", False)):
+            self.assertFalse(verify_payment_signature("order_real_123", "pay_real_123", "sig_123"))
+
 
 if __name__ == "__main__":
     unittest.main()
