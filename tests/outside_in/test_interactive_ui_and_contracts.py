@@ -163,6 +163,32 @@ class TestInteractiveUiAndDomContracts(unittest.TestCase):
                 f"Global modal element #{elem_id} referenced in main.js is missing from base.html"
             )
 
+    def test_etf_matrix_dom_bindings_and_sync_contract(self):
+        """
+        Verify that triggerAmfiSync() in etf_matrix.html references valid DOM elements
+        (#sync-amfi-btn, #sync-icon, #sync-text) and targets the active /api/admin/etfs/trigger-ingest route.
+        """
+        res = self.client.get("/etfs")
+        self.assertEqual(res.status_code, 200)
+        soup = BeautifulSoup(res.text, "html.parser")
+
+        btn = soup.find(id="sync-amfi-btn")
+        self.assertIsNotNone(btn, "Missing #sync-amfi-btn in /etfs")
+        self.assertIn("triggerAmfiSync()", btn.get("onclick", ""))
+
+        icon = soup.find(id="sync-icon")
+        self.assertIsNotNone(icon, "Missing #sync-icon in /etfs")
+
+        text = soup.find(id="sync-text")
+        self.assertIsNotNone(text, "Missing #sync-text in /etfs")
+
+        # Verify triggerAmfiSync function exists and references these elements
+        html_text = res.text
+        self.assertIn("async function triggerAmfiSync()", html_text)
+        self.assertIn("/api/admin/etfs/trigger-ingest", html_text)
+        self.assertIn("Admin Auth Required", html_text)
+        self.assertIn("res.json().catch", html_text)
+
     # =========================================================================
     # Pillar 3: Client-Side Fetch Contracts (Route Alignment)
     # =========================================================================

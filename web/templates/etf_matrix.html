@@ -387,15 +387,22 @@ async function triggerAmfiSync() {
 
   try {
     const res = await fetch('/api/admin/etfs/trigger-ingest', { method: 'POST' });
-    const json = await res.json();
-    if (json.status === 'SUCCESS') {
+    const json = await res.json().catch(() => ({}));
+    if (res.ok && json.status === 'SUCCESS') {
+      icon.style.animation = 'none';
       text.textContent = 'Synced!';
       setTimeout(() => { window.location.reload(); }, 600);
+    } else if (res.status === 401 || res.status === 403) {
+      icon.style.animation = 'none';
+      text.textContent = 'Admin Auth Required';
+      btn.disabled = false;
     } else {
+      icon.style.animation = 'none';
       text.textContent = 'Sync Failed';
       btn.disabled = false;
     }
   } catch (err) {
+    icon.style.animation = 'none';
     text.textContent = 'Sync Error';
     btn.disabled = false;
   }
