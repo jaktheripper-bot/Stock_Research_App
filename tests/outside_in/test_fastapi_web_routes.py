@@ -384,6 +384,21 @@ Detailed forensic analysis with exact page grounding to bseindia.com filings.
         self.assertIn("'-PRO", res_csv.text)
         self.assertIn("'\tUPI", res_csv.text)
 
+    def test_admin_get_client_ip_edge_headers_and_rightmost_hop(self):
+        from starlette.requests import Request
+        from web.routers.admin import _get_client_ip
+        # 1. cf-connecting-ip precedence
+        req_cf = Request({"type": "http", "method": "GET", "path": "/", "headers": [(b"cf-connecting-ip", b"203.0.113.1"), (b"x-forwarded-for", b"10.0.0.1, 10.0.0.2")]})
+        self.assertEqual(_get_client_ip(req_cf), "203.0.113.1")
+
+        # 2. true-client-ip precedence
+        req_true = Request({"type": "http", "method": "GET", "path": "/", "headers": [(b"true-client-ip", b"198.51.100.2")]})
+        self.assertEqual(_get_client_ip(req_true), "198.51.100.2")
+
+        # 3. rightmost X-Forwarded-For hop
+        req_xff = Request({"type": "http", "method": "GET", "path": "/", "headers": [(b"x-forwarded-for", b"spoofed.ip.1, 192.0.2.99")]})
+        self.assertEqual(_get_client_ip(req_xff), "192.0.2.99")
+
     def test_admin_logout(self):
         client = self._get_authenticated_admin_client()
         res_logout = client.get("/admin/logout", follow_redirects=False)

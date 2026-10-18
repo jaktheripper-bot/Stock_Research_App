@@ -125,10 +125,13 @@ class AdminCopilotExecuteRequest(BaseModel):
 # Local Dev & Environment Helpers
 # ==============================================================================
 def _get_client_ip(request: Request) -> str:
-    """Extract client IP address respecting X-Forwarded-For reverse proxy headers."""
+    """Extract client IP address from trusted edge headers or rightmost X-Forwarded-For hop."""
+    cf_ip = request.headers.get("cf-connecting-ip") or request.headers.get("true-client-ip")
+    if cf_ip:
+        return cf_ip.strip()
     forwarded = request.headers.get("x-forwarded-for")
     if forwarded:
-        return forwarded.split(",")[0].strip()
+        return forwarded.split(",")[-1].strip()
     return request.client.host if request.client else "unknown"
 
 
