@@ -10,14 +10,15 @@ from starlette.responses import Response
 class SecurityHeadersMiddleware(BaseHTTPMiddleware):
     async def dispatch(self, request: Request, call_next):
         response: Response = await call_next(request)
-        # Content Security Policy – restrict sources while permitting inline UI logic and CDNs
+        # Content Security Policy – restrict sources while permitting inline UI logic, CDNs, and Razorpay Checkout
         csp = (
             "default-src 'self'; "
-            "script-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net https://checkout.razorpay.com; "
+            "script-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net https://checkout.razorpay.com https://cdn.razorpay.com; "
             "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; "
             "font-src 'self' https://fonts.gstatic.com; "
             "img-src 'self' data: https:; "
-            "connect-src 'self' https://lapi.razorpay.com https://cdn.jsdelivr.net; "
+            "connect-src 'self' https://api.razorpay.com https://lumberjack.razorpay.com https://lapi.razorpay.com https://cdn.jsdelivr.net; "
+            "frame-src 'self' https://api.razorpay.com https://checkout.razorpay.com; "
             "frame-ancestors 'none';"
         )
         response.headers["Content-Security-Policy"] = csp
@@ -27,8 +28,8 @@ class SecurityHeadersMiddleware(BaseHTTPMiddleware):
         response.headers["Referrer-Policy"] = "no-referrer"
         # X-Content-Type-Options – nosniff
         response.headers["X-Content-Type-Options"] = "nosniff"
-        # Permissions-Policy – disable risky features
+        # Permissions-Policy – disable risky features while permitting Razorpay checkout payments
         response.headers["Permissions-Policy"] = (
-            "geolocation=(), microphone=(), camera=(), fullscreen=*, payment=()"
+            'geolocation=(), microphone=(), camera=(), fullscreen=*, payment=(self "https://api.razorpay.com" "https://checkout.razorpay.com")'
         )
         return response

@@ -74,6 +74,19 @@ Detailed forensic analysis with exact page grounding to bseindia.com filings.
         self.assertIn("Protect the Allocator.", res.text)
         self.assertIn("ZERO-HALLUCINATION DATA INTEGRITY", res.text)
 
+    def test_security_headers_middleware(self):
+        res = self.client.get("/")
+        self.assertEqual(res.status_code, 200)
+        self.assertIn("Content-Security-Policy", res.headers)
+        csp = res.headers["Content-Security-Policy"]
+        self.assertIn("https://checkout.razorpay.com", csp)
+        self.assertIn("https://cdn.razorpay.com", csp)
+        self.assertIn("frame-src 'self' https://api.razorpay.com https://checkout.razorpay.com", csp)
+        self.assertEqual(res.headers.get("Strict-Transport-Security"), "max-age=15552000; includeSubDomains; preload")
+        self.assertEqual(res.headers.get("Referrer-Policy"), "no-referrer")
+        self.assertEqual(res.headers.get("X-Content-Type-Options"), "nosniff")
+        self.assertIn('payment=(self "https://api.razorpay.com" "https://checkout.razorpay.com")', res.headers.get("Permissions-Policy", ""))
+
     def test_pricing_page(self):
         res = self.client.get("/pricing")
         self.assertEqual(res.status_code, 200)
