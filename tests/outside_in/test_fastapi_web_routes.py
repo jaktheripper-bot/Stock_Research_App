@@ -101,6 +101,54 @@ Detailed forensic analysis with exact page grounding to bseindia.com filings.
         self.assertNotIn("₹₹", res.text)
         self.assertNotIn("₹N/A", res.text)
         self.assertIn("₹1500.0", res.text)
+        self.assertNotIn("Peer Comparison Validation Notice:", res.text)
+
+    @patch("web.main.compare_two_companies")
+    def test_peer_comparison_validation_notice_identical_tickers(self, mock_compare):
+        async def fake_compare(a, b):
+            return {
+                "ticker_a": a,
+                "ticker_b": b,
+                "fund_a": {"current_price": 1500.0, "market_cap": 6000000000000.0, "pe_ratio": 24.5, "sector": "Technology"},
+                "fund_b": {"current_price": 1500.0, "market_cap": 6000000000000.0, "pe_ratio": 24.5, "sector": "Technology"},
+                "matrix_a": {},
+                "matrix_b": {},
+                "disparity": {"is_disparate": False, "warnings": []}
+            }
+        mock_compare.side_effect = fake_compare
+        res = self.client.get("/compare?a=INFY&b=INFY")
+        self.assertEqual(res.status_code, 200)
+        self.assertIn("alert alert-warning", res.text)
+        self.assertIn("Peer Comparison Validation Notice:", res.text)
+        self.assertIn("Cannot compare a company against itself (INFY)", res.text)
+
+    @patch("web.main.compare_two_companies")
+    def test_peer_comparison_validation_notice_custom_param(self, mock_compare):
+        async def fake_compare(a, b):
+            return {
+                "ticker_a": a,
+                "ticker_b": b,
+                "fund_a": {},
+                "fund_b": {},
+                "matrix_a": {},
+                "matrix_b": {},
+                "disparity": {"is_disparate": False, "warnings": []}
+            }
+        mock_compare.side_effect = fake_compare
+        res = self.client.get("/compare?a=INFY&b=TCS&compare_error=Exchange+circuit+breaker+active")
+        self.assertEqual(res.status_code, 200)
+        self.assertIn("alert alert-warning", res.text)
+        self.assertIn("Peer Comparison Validation Notice:", res.text)
+        self.assertIn("Exchange circuit breaker active", res.text)
+
+    @patch("web.main.compare_two_companies")
+    def test_peer_comparison_validation_notice_on_exception(self, mock_compare):
+        mock_compare.side_effect = RuntimeError("BSE gateway timeout")
+        res = self.client.get("/compare?a=INFY&b=TCS")
+        self.assertEqual(res.status_code, 200)
+        self.assertIn("alert alert-warning", res.text)
+        self.assertIn("Peer Comparison Validation Notice:", res.text)
+        self.assertIn("Unable to retrieve verified peer metrics for INFY vs TCS", res.text)
 
     @patch("web.main.get_stock_fundamentals")
     @patch("web.main.get_historical_prices")

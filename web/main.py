@@ -1161,18 +1161,26 @@ def dossier_page(request: Request, ticker: str):
 async def compare_page(
     request: Request,
     a: Optional[str] = "INFY",
-    b: Optional[str] = "TCS"
+    b: Optional[str] = "TCS",
+    compare_error: Optional[str] = None
 ):
     """Cross-company institutional peer comparison and 3-tier disparity diagnostic."""
-    clean_a = clean_ticker(a or "INFY")
-    clean_b = clean_ticker(b or "TCS")
+    clean_a = clean_ticker(a if a is not None else "INFY")
+    clean_b = clean_ticker(b if b is not None else "TCS")
     canonical_a = resolve_canonical_symbol(clean_a) or clean_a
     canonical_b = resolve_canonical_symbol(clean_b) or clean_b
+
+    error_msg = compare_error
+    if not clean_a or not clean_b:
+        error_msg = error_msg or "Please provide two valid stock ticker symbols to initiate peer comparison."
+    elif canonical_a == canonical_b:
+        error_msg = error_msg or f"Cannot compare a company against itself ({canonical_a}). Please select two distinct entities for peer comparison."
 
     try:
         comp_data = await compare_two_companies(canonical_a, canonical_b)
     except Exception as e:
         logger.error(f"Error comparing companies {canonical_a} vs {canonical_b}: {e}")
+        error_msg = error_msg or f"Unable to retrieve verified peer metrics for {canonical_a} vs {canonical_b}: {e}"
         comp_data = {
             "ticker_a": canonical_a,
             "ticker_b": canonical_b,
@@ -1196,6 +1204,7 @@ async def compare_page(
             "ticker_a": canonical_a,
             "ticker_b": canonical_b,
             "compared": True,
+            "compare_error": error_msg,
             "fund_a": comp_data.get("fund_a", {}),
             "fund_b": comp_data.get("fund_b", {}),
             "matrix_a": comp_data.get("matrix_a", {}),

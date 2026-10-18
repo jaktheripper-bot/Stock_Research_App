@@ -73,6 +73,12 @@
     </form>
   </div>
 
+  {% if compare_error %}
+  <div class="alert alert-warning" style="margin: 1.5rem 0; padding: 1.25rem; border-left: 4px solid #f59e0b; background: rgba(245, 158, 11, 0.08); border-radius: 8px;">
+      <strong>⚠️ Peer Comparison Validation Notice:</strong> {{ compare_error }}
+  </div>
+  {% endif %}
+
   {% if compared %}
   <!-- Comparison Result Header -->
   <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; flex-wrap: wrap; gap: 12px;">
