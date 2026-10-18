@@ -170,6 +170,28 @@ class TestWatermark(unittest.TestCase):
     def test_fails_open_on_bad_input(self):
         self.assertEqual(apply_pdf_watermark(b"not a pdf", "x"), b"not a pdf")
 
+    def test_pdf_chart_and_doc_tempfile_isolation(self):
+        import tempfile
+        import pandas as pd
+        from core.reporting.pdf import generate_pdf_chart_image, build_pdf_dossier
+        dates = pd.date_range("2026-01-01", periods=10, freq="D")
+        df = pd.DataFrame({
+            "Date": dates,
+            "Close": [100.0 + i for i in range(10)],
+            "SMA50": [95.0 + i for i in range(10)],
+            "Volume": [1000 + i * 10 for i in range(10)]
+        })
+        chart_path = generate_pdf_chart_image(df, "TESTTICKER")
+        self.assertIsNotNone(chart_path)
+        self.assertTrue(chart_path.startswith(tempfile.gettempdir()))
+        self.assertTrue(os.path.exists(chart_path))
+        self.assertGreater(os.path.getsize(chart_path), 0)
+        os.unlink(chart_path)
+
+        rep_text = "### 7-Pillar Qualitative Health Matrix:\n- Moat: Strong\n\n## Pillar 1: Moat\nClean balance sheet."
+        pdf_bytes = build_pdf_dossier(rep_text, "TESTTICKER", hist_df=df)
+        self.assertTrue(pdf_bytes.startswith(b"%PDF"))
+
 
 class TestEquityPdfPaywall(unittest.TestCase):
     def _download(self, headers=None):

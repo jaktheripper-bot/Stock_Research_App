@@ -4,6 +4,8 @@ import json
 import logging
 import os
 import re as re_mod
+import tempfile
+import uuid
 from datetime import datetime
 
 from analyzer import (
@@ -138,10 +140,10 @@ def generate_pdf_chart_image(df, ticker: str):
 
         plt.tight_layout()
         clean_name = re_mod.sub(r'[^a-zA-Z0-9]', '_', ticker)
-        local_img_path = f"_pdf_chart_{clean_name}.png"
-        plt.savefig(local_img_path, dpi=180, bbox_inches="tight")
+        out_path = os.path.join(tempfile.gettempdir(), f"_pdf_chart_{clean_name}_{uuid.uuid4().hex}.png")
+        plt.savefig(out_path, dpi=180, bbox_inches="tight")
         plt.close(fig)
-        return local_img_path
+        return out_path
     except Exception as e:
         logger.warning(f"Could not generate PDF momentum chart for {ticker}: {e}")
         return None
@@ -366,7 +368,7 @@ a {
         f"{footer_disclaimer}"
     )
 
-    out_name = f"_tmp_doc_{clean_name}.pdf"
+    out_name = os.path.join(tempfile.gettempdir(), f"_tmp_doc_{clean_name}_{uuid.uuid4().hex}.pdf")
     try:
         pdf = MarkdownPdf(toc_level=0)
         pdf.add_section(Section(full_md, root="."), user_css=user_css)
@@ -507,7 +509,7 @@ def generate_fund_dossier_pdf(
 > Mutual Fund investments are subject to market risks, read all scheme related documents carefully.
 """
     full_md = f"{header}\n\n{scorecard_md}\n\n{meta_table}\n\n---\n\n{narrative}\n\n{footer}"
-    out_name = f"_tmp_doc_mf_{clean_name}.pdf"
+    out_name = os.path.join(tempfile.gettempdir(), f"_tmp_doc_mf_{clean_name}_{uuid.uuid4().hex}.pdf")
     try:
         pdf = MarkdownPdf(toc_level=0)
         pdf.add_section(Section(full_md, root="."))
@@ -611,7 +613,7 @@ def generate_debt_dossier_pdf(
 > Fixed-income investments carry market, credit, and reinvestment risk. YTMs are subject to prevailing secondary market prices and issuer creditworthiness.
 """
     full_md = f"{header}\n\n{scorecard_md}\n\n{contagion_md}\n\n{primer_md}\n\n{pillars_md}\n\n{footer}"
-    out_name = f"_tmp_doc_debt_{clean_isin}.pdf"
+    out_name = os.path.join(tempfile.gettempdir(), f"_tmp_doc_debt_{clean_isin}_{uuid.uuid4().hex}.pdf")
     try:
         pdf = MarkdownPdf(toc_level=0)
         pdf.add_section(Section(full_md, root="."))
@@ -720,7 +722,7 @@ Under Indian tax laws, distributions from REITs and InvITs pass through three di
 > Real estate and infrastructure investments carry market, tenant, occupancy, and interest rate risks. Past cash distributions are not a guarantee of future yield.
 """
     full_md = f"{header}\n\n{scorecard_md}\n\n{tax_md}\n\n{primer_md}\n\n{inversion_md}\n\n{footer}"
-    out_name = f"_tmp_doc_reit_{clean_sym}.pdf"
+    out_name = os.path.join(tempfile.gettempdir(), f"_tmp_doc_reit_{clean_sym}_{uuid.uuid4().hex}.pdf")
     try:
         pdf = MarkdownPdf(toc_level=0)
         pdf.add_section(Section(full_md, root="."))
