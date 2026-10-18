@@ -17,22 +17,41 @@ class TestAdversarialAuditRemediations(unittest.TestCase):
 
     def test_crit01_admin_direct_verify_requires_secret_and_blocks_2fa_reset(self):
         """[CRIT-01] Verify unauthenticated caller cannot reset owner 2FA via direct-verify + ?reset=1."""
+        # Half 1: Unauthenticated direct-verify without ADMIN_PASSWORD must not issue admin_2fa_pending
         r1 = self.client.post(
             "/admin/auth/direct-verify",
             data={"email": "admin@moatnomics.com"},
             follow_redirects=False,
         )
-        # Once patched, unauthenticated direct-verify without ADMIN_PASSWORD must not issue admin_2fa_pending
-        if "admin_2fa_pending" in r1.cookies:
-            r2 = self.client.get(
-                "/admin/setup-2fa?reset=1",
-                cookies={"admin_2fa_pending": r1.cookies["admin_2fa_pending"]},
-                follow_redirects=False,
-            )
-            self.assertNotEqual(
-                r2.status_code, 200,
-                "CRITICAL: Unauthenticated caller was able to reset and view owner TOTP secret via ?reset=1!"
-            )
+        self.assertNotIn(
+            "admin_2fa_pending", r1.cookies,
+            "CRITICAL: Unauthenticated direct-verify issued admin_2fa_pending cookie without password!"
+        )
+
+        # Half 2: Even with a valid pending 2FA token for an enrolled admin, unauthenticated ?reset=1 is blocked
+        from web.common import _generate_pending_2fa_token
+        from core.db.admin import add_admin_user, set_admin_totp_secret, enable_admin_totp
+
+        admin_email = "owner_crit01@moatnomics.com"
+        add_admin_user(admin_email, role="admin", invited_by="system")
+        set_admin_totp_secret(admin_email, "JBSWY3DPEHPK3PXP")
+        enable_admin_totp(admin_email)
+
+        pending_token = _generate_pending_2fa_token(admin_email)
+        r2 = self.client.get(
+            "/admin/setup-2fa?reset=1",
+            cookies={"admin_2fa_pending": pending_token},
+            headers={"x-forwarded-for": "203.0.113.10"},
+            follow_redirects=False,
+        )
+        self.assertEqual(
+            r2.status_code, 303,
+            "CRITICAL: Enrolled admin 2FA reset allowed without active authentication session!"
+        )
+        self.assertTrue(
+            r2.headers.get("location", "").startswith("/admin/verify-2fa"),
+            f"Expected redirect to /admin/verify-2fa, got {r2.headers.get('location')}"
+        )
 
     def test_crit02_simulated_order_blocked_in_production_mode(self):
         """[CRIT-02] Verify order_sim_ / simulated_success is rejected when ENVIRONMENT=production."""
