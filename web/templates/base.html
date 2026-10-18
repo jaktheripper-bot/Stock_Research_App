@@ -405,30 +405,45 @@
 
       <form id="authForm" onsubmit="handleAuthFormSubmit(event)">
         <div id="authEmailGroup" style="margin-bottom: 14px;">
-          <label style="display: block; font-size: 13px; color: var(--text-secondary); margin-bottom: 6px;">Your Work or Personal Email:</label>
+          <label for="authEmailInput" style="display: block; font-size: 13px; color: var(--text-secondary); margin-bottom: 6px;">Your Work or Personal Email:</label>
           <input 
             type="email" 
             id="authEmailInput" 
+            name="email"
             required 
+            autocomplete="email"
+            autocorrect="off"
+            autocapitalize="off"
+            spellcheck="false"
+            aria-errormessage="authEmailError"
             placeholder="investor@example.com"
-            style="width: 100%; padding: 12px 14px; background: rgba(15, 23, 42, 0.8); border: 1px solid var(--border-color); border-radius: 8px; color: var(--text-primary); font-size: 14px; box-sizing: border-box;"
+            style="width: 100%; padding: 12px 14px; background: rgba(15, 23, 42, 0.8); border: 1px solid var(--border-color); border-radius: 8px; color: var(--text-primary); font-size: 16px; box-sizing: border-box;"
           >
+          <div id="authEmailError" class="field-error-msg">
+            <span aria-hidden="true">❌</span> Please enter a valid email address.
+          </div>
         </div>
 
         <div id="authOtpGroup" style="display: none; margin-bottom: 14px;">
           <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 6px;">
-            <label style="font-size: 13px; color: var(--text-secondary);">Enter 6-Digit Verification Code:</label>
+            <label for="authOtpInput" style="font-size: 13px; color: var(--text-secondary);">Enter 6-Digit Verification Code:</label>
             <button type="button" onclick="handleResendOtp()" style="background: none; border: none; color: var(--accent-cyan); font-size: 12px; cursor: pointer; text-decoration: underline;">Resend</button>
           </div>
           <input 
             type="text" 
             id="authOtpInput" 
+            name="otp"
+            inputmode="numeric"
+            autocomplete="one-time-code"
+            autocorrect="off"
+            autocapitalize="off"
+            spellcheck="false"
             maxlength="6" 
             pattern="\d{6}" 
             placeholder="123456"
             style="width: 100%; padding: 12px 14px; background: rgba(15, 23, 42, 0.8); border: 1px solid var(--border-color); border-radius: 8px; color: var(--text-primary); font-size: 18px; letter-spacing: 4px; text-align: center; box-sizing: border-box;"
           >
-          <div id="authOtpNotice" style="font-size: 11px; color: var(--accent-emerald); margin-top: 6px; display: none;"></div>
+          <div id="authOtpNotice" role="status" aria-live="polite" style="font-size: 11px; color: var(--accent-emerald); margin-top: 6px; display: none;"></div>
         </div>
 
         <button type="submit" id="authSubmitBtn" class="btn btn-primary" style="width: 100%; padding: 14px; font-size: 15px;">

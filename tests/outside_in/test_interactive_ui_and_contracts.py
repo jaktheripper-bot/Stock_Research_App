@@ -150,7 +150,10 @@ class TestInteractiveUiAndDomContracts(unittest.TestCase):
         js_code = main_js.read_text(encoding="utf-8")
 
         # Extract IDs used in openSignInModal / handleAuthFormSubmit / openCheckout
-        auth_ids = ["authModal", "authEmailInput", "authOtpInput", "authSubmitBtn", "closeAuthModalBtn"]
+        auth_ids = [
+            "authModal", "authForm", "authEmailGroup", "authEmailInput", "authEmailError",
+            "authOtpGroup", "authOtpInput", "authOtpNotice", "authSubmitBtn", "closeAuthModalBtn"
+        ]
         checkout_ids = ["checkoutModal", "modalPlanName", "modalPlanPrice", "modalConfirmBtn", "closeModalBtn"]
 
         res = self.client.get("/")
@@ -162,6 +165,27 @@ class TestInteractiveUiAndDomContracts(unittest.TestCase):
                 soup.find(id=elem_id),
                 f"Global modal element #{elem_id} referenced in main.js is missing from base.html"
             )
+
+        # Accessibility and modern form validation contract checks
+        email_input = soup.find(id="authEmailInput")
+        self.assertEqual(email_input.get("autocomplete"), "email")
+        self.assertEqual(email_input.get("aria-errormessage"), "authEmailError")
+        email_err = soup.find(id="authEmailError")
+        self.assertIn("field-error-msg", email_err.get("class", []))
+
+        otp_input = soup.find(id="authOtpInput")
+        self.assertEqual(otp_input.get("autocomplete"), "one-time-code")
+        self.assertEqual(otp_input.get("inputmode"), "numeric")
+
+        otp_notice = soup.find(id="authOtpNotice")
+        self.assertEqual(otp_notice.get("role"), "status")
+        self.assertEqual(otp_notice.get("aria-live"), "polite")
+
+        # Labels linked via for attribute
+        email_label = soup.find("label", attrs={"for": "authEmailInput"})
+        self.assertIsNotNone(email_label, "Missing label[for='authEmailInput'] in authModal")
+        otp_label = soup.find("label", attrs={"for": "authOtpInput"})
+        self.assertIsNotNone(otp_label, "Missing label[for='authOtpInput'] in authModal")
 
     def test_etf_matrix_dom_bindings_and_sync_contract(self):
         """
