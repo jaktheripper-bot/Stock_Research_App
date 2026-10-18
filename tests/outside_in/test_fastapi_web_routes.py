@@ -799,6 +799,30 @@ Detailed forensic analysis with exact page grounding to bseindia.com filings.
                                 self.assertIn("Did you mean: INFY, TCS?", detail.get("message", ""))
                                 self.assertEqual(detail.get("suggestions"), ["INFY", "TCS"])
 
+    def test_tax_calculator_page_resilience_and_clamping(self):
+        """Verify /calculator/tax parses strings safely, clamps bounds, and renders the matrix."""
+        # 1. Default request
+        r1 = self.client.get("/calculator/tax")
+        self.assertEqual(r1.status_code, 200)
+        self.assertIn("Post-Tax Purchasing Power Matrix", r1.text)
+        self.assertIn("Sovereign Gold Bond (SGB)", r1.text)
+        self.assertIn("Active Deflator: 5.0% Annual Inflation", r1.text)
+
+        # 2. Non-numeric string inputs fall back cleanly
+        r2 = self.client.get("/calculator/tax?tax_slab=invalid&inflation=also_invalid")
+        self.assertEqual(r2.status_code, 200)
+        self.assertIn("Active Deflator: 5.0% Annual Inflation", r2.text)
+
+        # 3. Clamping out-of-bound inputs
+        r3 = self.client.get("/calculator/tax?tax_slab=99.0&inflation=50.0")
+        self.assertEqual(r3.status_code, 200)
+        self.assertIn("Active Deflator: 25.0% Annual Inflation", r3.text)
+
+        # 4. Empty query parameters fall back safely
+        r4 = self.client.get("/calculator/tax?tax_slab=&inflation=")
+        self.assertEqual(r4.status_code, 200)
+        self.assertIn("Active Deflator: 5.0% Annual Inflation", r4.text)
+
 
 
 

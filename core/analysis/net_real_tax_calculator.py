@@ -81,7 +81,9 @@ def calculate_net_real_return(
 def compare_asset_classes_post_tax(
     marginal_tax_slab_pct: float = 30.0,
     holding_period_years: float = 3.0,
-    cpi_inflation_pct: float = DEFAULT_CPI_INFLATION
+    cpi_inflation_pct: float = DEFAULT_CPI_INFLATION,
+    inflation_pct: Optional[float] = None,
+    **kwargs
 ) -> List[Dict[str, Any]]:
     """
     Produces a multi-asset comparative matrix auditing net post-tax purchasing power across:
@@ -93,6 +95,8 @@ def compare_asset_classes_post_tax(
     6. Equity Index ETF / Mutual Fund (12.00% nominal)
     7. Debt Mutual Fund (7.20% nominal)
     """
+    if inflation_pct is not None:
+        cpi_inflation_pct = inflation_pct
     t_slab = max(0.0, min(100.0, _safe_float(marginal_tax_slab_pct, default=30.0))) / 100.0
     cpi_inf = _safe_float(cpi_inflation_pct, default=DEFAULT_CPI_INFLATION)
     inf = cpi_inf / 100.0
@@ -226,3 +230,22 @@ def compare_asset_classes_post_tax(
     ]
 
     return assets
+
+
+def calculate_post_tax_matrix(
+    marginal_tax_slab_pct: float = 30.0,
+    inflation_pct: float = DEFAULT_CPI_INFLATION,
+    holding_period_years: float = 3.0,
+    **kwargs
+) -> List[Dict[str, Any]]:
+    """
+    Computes comparative post-tax matrix across asset classes.
+    Standardized entry point for the Post-Tax Real Return Engine.
+    """
+    cpi = kwargs.get("cpi_inflation_pct", inflation_pct)
+    return compare_asset_classes_post_tax(
+        marginal_tax_slab_pct=marginal_tax_slab_pct,
+        holding_period_years=holding_period_years,
+        cpi_inflation_pct=cpi,
+        **kwargs
+    )

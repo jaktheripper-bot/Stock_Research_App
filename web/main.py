@@ -1678,26 +1678,44 @@ def etf_dossier_page(request: Request, symbol: str):
 
 
 @app.get("/calculator/tax", response_class=HTMLResponse)
-def tax_calculator_page(
+async def tax_calculator_page(
     request: Request,
-    tax_slab: float = Query(30.0),
-    inflation: float = Query(5.0)
+    tax_slab: Optional[str] = Query("30.0"),
+    inflation: Optional[str] = Query("5.0"),
 ):
-    """Net Real Post-Tax Return & Purchasing Power Calculator page."""
-    from core.analysis.net_real_tax_calculator import compare_asset_classes_post_tax
-    assets = compare_asset_classes_post_tax(
-        marginal_tax_slab_pct=tax_slab,
-        cpi_inflation_pct=inflation
+    """Render Post-Tax Real Return Matrix across Indian asset classes."""
+    try:
+        parsed_slab = float(tax_slab) if tax_slab not in (None, "") else 30.0
+    except (ValueError, TypeError):
+        parsed_slab = 30.0
+
+    try:
+        parsed_inflation = float(inflation) if inflation not in (None, "") else 5.0
+    except (ValueError, TypeError):
+        parsed_inflation = 5.0
+
+    # Clamp to realistic Indian statutory & macroeconomic bounds
+    clamped_slab = max(0.0, min(42.74, parsed_slab))
+    clamped_inflation = max(0.0, min(25.0, parsed_inflation))
+
+    from core.analysis.net_real_tax_calculator import calculate_post_tax_matrix
+    matrix = calculate_post_tax_matrix(
+        marginal_tax_slab_pct=clamped_slab,
+        inflation_pct=clamped_inflation,
     )
     return templates.TemplateResponse(
-        request=request,
-        name="tax_calculator.html",
-        context={
+        request,
+        "tax_calculator.html",
+        {
+            "request": request,
+            "matrix": matrix,
+            "assets": matrix,
+            "tax_slab": clamped_slab,
+            "current_slab": clamped_slab,
+            "inflation": clamped_inflation,
+            "current_inflation": clamped_inflation,
             "active_page": "tax_calculator",
-            "current_slab": tax_slab,
-            "current_inflation": inflation,
-            "assets": assets
-        }
+        },
     )
 
 
