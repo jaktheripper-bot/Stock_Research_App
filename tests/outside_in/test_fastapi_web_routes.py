@@ -358,6 +358,32 @@ Detailed forensic analysis with exact page grounding to bseindia.com filings.
         self.assertIn("Invoice Number,Date,Customer Email,Customer Name", res_csv.text)
         self.assertIn("Transaction_Register", res_csv.headers.get("content-disposition", ""))
 
+    @patch("web.routers.admin.get_all_billables")
+    def test_admin_tax_register_csv_formula_injection_prevention(self, mock_billables):
+        mock_billables.return_value = [
+            {
+                "invoice_number": "=1+1",
+                "date": "2026-10-18",
+                "customer_email": "+user@example.com",
+                "customer_name": "@AdminBoss",
+                "pack_type": "-PRO",
+                "payment_method": "\tUPI",
+                "amount_inr": 500.0,
+                "refund_amount_inr": 0.0,
+                "status": "success",
+                "gateway_order_id": "order_123",
+                "gateway_payment_id": "pay_123",
+            }
+        ]
+        client = self._get_authenticated_admin_client()
+        res_csv = client.get("/admin/export/tax-register")
+        self.assertEqual(res_csv.status_code, 200)
+        self.assertIn("'=1+1", res_csv.text)
+        self.assertIn("'+user@example.com", res_csv.text)
+        self.assertIn("'@AdminBoss", res_csv.text)
+        self.assertIn("'-PRO", res_csv.text)
+        self.assertIn("'\tUPI", res_csv.text)
+
     def test_admin_logout(self):
         client = self._get_authenticated_admin_client()
         res_logout = client.get("/admin/logout", follow_redirects=False)

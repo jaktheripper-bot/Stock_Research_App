@@ -1512,6 +1512,12 @@ async def admin_export_tax_register(request: Request):
     if not _is_admin_authenticated(request):
         raise HTTPException(status_code=403, detail="Admin authorization required.")
 
+    def _safe_csv_cell(val: Any) -> str:
+        s = str(val if val is not None else "")
+        if s.startswith(("=", "+", "-", "@", "\t", "\r")):
+            return f"'{s}"
+        return s
+
     billables = get_all_billables(status="success", limit=1000)
     output = io.StringIO()
     writer = csv.writer(output)
@@ -1525,18 +1531,18 @@ async def admin_export_tax_register(request: Request):
         refunded = float(b.get("refund_amount_inr", 0.0) or 0.0)
         net = max(0.0, gross - refunded)
         writer.writerow([
-            b.get("invoice_number"),
-            b.get("date"),
-            b.get("customer_email"),
-            b.get("customer_name"),
-            b.get("pack_type"),
-            b.get("payment_method", "Online (Razorpay UPI/Card)"),
+            _safe_csv_cell(b.get("invoice_number")),
+            _safe_csv_cell(b.get("date")),
+            _safe_csv_cell(b.get("customer_email")),
+            _safe_csv_cell(b.get("customer_name")),
+            _safe_csv_cell(b.get("pack_type")),
+            _safe_csv_cell(b.get("payment_method", "Online (Razorpay UPI/Card)")),
             f"{gross:.2f}",
             f"{refunded:.2f}",
             f"{net:.2f}",
-            b.get("status"),
-            b.get("gateway_order_id"),
-            b.get("gateway_payment_id")
+            _safe_csv_cell(b.get("status")),
+            _safe_csv_cell(b.get("gateway_order_id")),
+            _safe_csv_cell(b.get("gateway_payment_id"))
         ])
 
     csv_data = output.getvalue()
