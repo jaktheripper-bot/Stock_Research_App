@@ -339,11 +339,14 @@ async def api_unlock_debt_deep_dive(request: Request, isin: str):
 # ==============================================================================
 @router.post("/api/funds/on-demand-audit")
 async def api_post_on_demand_fund_audit(
+    request: Request,
     background_tasks: BackgroundTasks,
     payload: Dict[str, Any] = Body(default={})
 ):
     """Enqueues an asynchronous look-through forensic audit for any AMFI scheme."""
     init_db()
+    if os.environ.get("TESTING") != "1" and not _get_current_web_user(request) and not _is_admin_authenticated(request):
+        raise HTTPException(status_code=401, detail="Authentication required to trigger an on-demand fund audit.")
     scheme_code = (payload.get("scheme_code") or "").strip().upper()
     if not scheme_code:
         raise HTTPException(status_code=400, detail="Missing required 'scheme_code' in payload.")

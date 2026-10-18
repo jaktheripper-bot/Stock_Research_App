@@ -675,6 +675,20 @@ class TestFundForensicAuditor(unittest.TestCase):
         self.assertIn(s_data["status"], ["QUEUED", "PROCESSING", "COMPLETED"])
         self.assertIn("progress_pct", s_data)
 
+    def test_on_demand_audit_api_authentication_enforcement(self):
+        old_testing = os.environ.get("TESTING")
+        try:
+            os.environ["TESTING"] = "0"
+            # Unauthenticated should return 401
+            resp_unauth = self.client.post("/api/funds/on-demand-audit", json={"scheme_code": "PPFAS_FLEXICAP_DIR"})
+            self.assertEqual(resp_unauth.status_code, 401)
+            self.assertIn("Authentication required", resp_unauth.json().get("detail", ""))
+        finally:
+            if old_testing is not None:
+                os.environ["TESTING"] = old_testing
+            else:
+                os.environ.pop("TESTING", None)
+
     def test_unlisted_fund_ingestion_and_dossier_markup(self):
         scheme = ensure_scheme_and_holdings_exist("122639")
         self.assertIsNotNone(scheme)
