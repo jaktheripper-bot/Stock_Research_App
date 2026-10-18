@@ -103,6 +103,7 @@ class CopilotChatRequest(BaseModel):
     ticker: Optional[str] = None
     user_id: Optional[str] = None
     asset_type: Optional[str] = None
+    asset_class: Optional[str] = None
     section: Optional[str] = None
     section_label: Optional[str] = None
     section_data: Optional[Dict[str, Any]] = None
@@ -585,7 +586,19 @@ async def api_copilot_chat(payload: CopilotChatRequest, request: Request):
     from core.agents.copilot.forensic_desk import process_forensic_desk_turn
 
     web_user = _get_current_web_user(request)
-    deep_dive_unlocked = _deep_dive_unlocked_for_request(request, payload.ticker or "")
+    raw_asset_cls = (payload.asset_class or payload.asset_type or "EQUITY").strip().upper()
+    if raw_asset_cls in ("FUND", "MF"):
+        asset_cls = "MUTUAL_FUND"
+    elif raw_asset_cls in ("DEBT", "BOND", "NCD", "SDI"):
+        asset_cls = "CORPORATE_DEBT"
+    else:
+        asset_cls = raw_asset_cls
+
+    kind_map = {"MUTUAL_FUND": "FUND", "CORPORATE_DEBT": "DEBT", "REIT": "REIT"}
+    if asset_cls in kind_map:
+        deep_dive_unlocked = _asset_unlocked_for_request(request, kind_map[asset_cls], payload.ticker or "")
+    else:
+        deep_dive_unlocked = _deep_dive_unlocked_for_request(request, payload.ticker or "")
     trusted_user_id = web_user.get("id") if web_user else None
 
     tier = (web_user.get("subscription_tier") or "free").lower() if web_user else "free"
@@ -631,7 +644,7 @@ async def api_copilot_chat(payload: CopilotChatRequest, request: Request):
             user_message=payload.message,
             ticker=payload.ticker,
             user_id=trusted_user_id,
-            asset_type=payload.asset_type,
+            asset_type=payload.asset_class or payload.asset_type,
             section=payload.section,
             section_label=payload.section_label,
             section_data=payload.section_data,

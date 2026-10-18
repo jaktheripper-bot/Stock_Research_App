@@ -85,10 +85,12 @@ class TestEquityRedaction(unittest.TestCase):
 
 
 class TestCopilotRouteEntitlement(unittest.TestCase):
-    def _post(self, **kwargs):
+    def _post(self, body_override=None, **kwargs):
         from web.main import app
         client = TestClient(app)
         body = {"conversation_id": "c1", "message": "summarise", "ticker": "INFY", "user_id": "spoofed_paid_user"}
+        if body_override:
+            body.update(body_override)
         with mock.patch("core.agents.copilot.forensic_desk.process_forensic_desk_turn", new=mock.AsyncMock(return_value={"response": "ok"})) as turn:
             client.post("/api/copilot/chat", json=body, **kwargs)
         return turn.call_args.kwargs
@@ -116,6 +118,38 @@ class TestCopilotRouteEntitlement(unittest.TestCase):
              mock.patch("web.main.is_ticker_unlocked_for_user", return_value=False):
             kw = self._post()
         self.assertFalse(kw["deep_dive_unlocked"])
+
+    def test_signed_in_mutual_fund_unlock_checks_fund_key(self):
+        with mock.patch("web.main._get_current_web_user", return_value={"id": "u1"}), \
+             mock.patch("web.main.is_ticker_unlocked_for_user") as mock_chk:
+            mock_chk.side_effect = lambda uid, key: key == "FUND:120503"
+            kw = self._post(body_override={"ticker": "120503", "asset_class": "MUTUAL_FUND"})
+        self.assertTrue(kw["deep_dive_unlocked"])
+        mock_chk.assert_called_with("u1", "FUND:120503")
+
+    def test_signed_in_corporate_debt_unlock_checks_debt_key(self):
+        with mock.patch("web.main._get_current_web_user", return_value={"id": "u1"}), \
+             mock.patch("web.main.is_ticker_unlocked_for_user") as mock_chk:
+            mock_chk.side_effect = lambda uid, key: key == "DEBT:INE002A08018"
+            kw = self._post(body_override={"ticker": "INE002A08018", "asset_class": "CORPORATE_DEBT"})
+        self.assertTrue(kw["deep_dive_unlocked"])
+        mock_chk.assert_called_with("u1", "DEBT:INE002A08018")
+
+    def test_signed_in_reit_unlock_checks_reit_key(self):
+        with mock.patch("web.main._get_current_web_user", return_value={"id": "u1"}), \
+             mock.patch("web.main.is_ticker_unlocked_for_user") as mock_chk:
+            mock_chk.side_effect = lambda uid, key: key == "REIT:EMBASSY"
+            kw = self._post(body_override={"ticker": "EMBASSY", "asset_class": "REIT"})
+        self.assertTrue(kw["deep_dive_unlocked"])
+        mock_chk.assert_called_with("u1", "REIT:EMBASSY")
+
+    def test_signed_in_debt_fallback_from_asset_type(self):
+        with mock.patch("web.main._get_current_web_user", return_value={"id": "u1"}), \
+             mock.patch("web.main.is_ticker_unlocked_for_user") as mock_chk:
+            mock_chk.side_effect = lambda uid, key: key == "DEBT:INE002A08018"
+            kw = self._post(body_override={"ticker": "INE002A08018", "asset_type": "debt"})
+        self.assertTrue(kw["deep_dive_unlocked"])
+        mock_chk.assert_called_with("u1", "DEBT:INE002A08018")
 
 
 # ==============================================================================

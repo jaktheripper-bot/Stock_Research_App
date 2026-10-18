@@ -901,6 +901,7 @@ async function submitCopilotMessage() {
                 message: userMsg,
                 ticker: activeTicker,
                 asset_type: activeAssetType,
+                asset_class: activeAssetType ? (activeAssetType === "mutual_fund" ? "MUTUAL_FUND" : activeAssetType === "debt" ? "CORPORATE_DEBT" : activeAssetType.toUpperCase()) : "EQUITY",
                 section: activeSection,
                 section_label: activeSectionLabel
             })
