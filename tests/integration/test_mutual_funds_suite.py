@@ -7,9 +7,10 @@ Unifies:
 3. Curated Top 100 Institutional Universe & Look-Through Verification
 4. 7-Pillar Forensic Look-Through, Overlap Auditor & On-Demand Ingestion
 """
+import json
 import os
 import unittest
-from unittest.mock import patch
+from unittest.mock import patch, MagicMock
 from fastapi.testclient import TestClient
 
 os.environ["TESTING"] = "1"
@@ -717,6 +718,55 @@ class TestFundForensicAuditor(unittest.TestCase):
         self.assertIn("Deep-Dive Stock Forensic Audit Option", resp_dos.text)
         self.assertIn("Layer 1 Active (1 Credit)", resp_dos.text)
         self.assertIn("Initiate Deep-Dive Audit", resp_dos.text)
+
+    @patch("urllib.request.urlopen")
+    def test_ensure_scheme_via_mfapi_payload_parsing(self, mock_urlopen):
+        import uuid
+        from core.db.connection import get_db_connection
+
+        test_code = f"MFT_{uuid.uuid4().hex[:6].upper()}"
+        mock_resp = MagicMock()
+        mock_resp.read.return_value = json.dumps({
+            "meta": {
+                "scheme_name": "Quant Small Cap Fund - Growth",
+                "fund_house": "Quant Mutual Fund",
+                "scheme_category": "Small Cap Fund"
+            },
+            "data": [
+                {"date": "18-10-2026", "nav": "245.82"}
+            ]
+        }).encode("utf-8")
+        mock_resp.__enter__.return_value = mock_resp
+        mock_urlopen.return_value = mock_resp
+
+        try:
+            scheme = ensure_scheme_and_holdings_exist(test_code)
+            self.assertIsNotNone(scheme)
+            self.assertEqual(scheme["scheme_code"], test_code)
+            self.assertEqual(scheme["scheme_name"], "Quant Small Cap Fund - Growth")
+            self.assertEqual(scheme["nav"], 245.82)
+            self.assertEqual(scheme["metadata"].get("source"), "mfapi_on_demand")
+
+            # Verify call arguments (URL encoding, user agent, timeout, certifi context)
+            mock_urlopen.assert_called_once()
+            call_args, call_kwargs = mock_urlopen.call_args
+            req = call_args[0]
+            self.assertIn(f"https://api.mfapi.in/mf/{test_code}", req.full_url)
+            self.assertEqual(req.headers.get("User-agent"), "Mozilla/5.0")
+            self.assertEqual(call_kwargs.get("timeout"), 12)
+            self.assertIsNotNone(call_kwargs.get("context"))
+        finally:
+            conn = get_db_connection()
+            cur = conn.cursor()
+            try:
+                cur.execute("DELETE FROM mutual_fund_schemes WHERE scheme_code IN (?, '999888')", (test_code,))
+                cur.execute("DELETE FROM mutual_fund_holdings WHERE scheme_code IN (?, '999888')", (test_code,))
+                conn.commit()
+            except Exception:
+                pass
+            finally:
+                cur.close()
+                conn.close()
 
     def test_wrap_fund_dossier_with_collapsible_dimensions(self):
         sample_md = """# INSTITUTIONAL FORENSIC DOSSIER: Test Growth Fund

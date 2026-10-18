@@ -557,35 +557,48 @@ def ensure_scheme_and_holdings_exist(scheme_code: str) -> Optional[Dict[str, Any
     if not scheme:
         # Try fetching from public mfapi endpoint
         try:
+            import urllib.parse
             import urllib.request
-            req = urllib.request.Request(
-                f"https://api.mfapi.in/mf/{clean_code}",
-                headers={"User-Agent": "StockResearchApp/2.0"}
-            )
-            with urllib.request.urlopen(req, timeout=4) as resp:
-                data = json.loads(resp.read().decode())
-                meta = data.get("meta", {})
-                if meta:
-                    scheme_dict = {
-                        "scheme_code": clean_code,
-                        "scheme_name": meta.get("scheme_name", f"AMFI Scheme {clean_code}"),
-                        "fund_house": meta.get("fund_house", "Generic AMC"),
-                        "category": meta.get("scheme_category", "Flexi Cap Fund"),
-                        "broad_category": "EQUITY",
-                        "benchmark_index": "NIFTY 500 TRI",
-                        "aum_crores": 5000.0,
-                        "nav": float(data.get("data", [{}])[0].get("nav", 10.0)),
-                        "ter_direct_pct": 0.75,
-                        "ter_regular_pct": 1.50,
-                        "portfolio_turnover_ratio_pct": 25.0,
-                        "active_share_pct": 68.0,
-                        "risk_grade": "Very High",
-                        "fund_manager": "Senior Fund Manager",
-                        "last_portfolio_date": datetime.now(timezone.utc).strftime("%Y-%m-%d"),
-                        "metadata": {"source": "mfapi_on_demand"}
-                    }
-                    save_mutual_fund_scheme(scheme_dict)
-                    scheme = get_mutual_fund_scheme(clean_code)
+            import ssl
+            import certifi
+
+            encoded_code = urllib.parse.quote(clean_code, safe="")
+            url = f"https://api.mfapi.in/mf/{encoded_code}"
+            req = urllib.request.Request(url, headers={"User-Agent": "Mozilla/5.0"})
+            ssl_ctx = ssl.create_default_context(cafile=certifi.where())
+            with urllib.request.urlopen(req, timeout=12, context=ssl_ctx) as resp:
+                payload = json.loads(resp.read().decode("utf-8"))
+
+            meta = payload.get("meta", {}) if isinstance(payload, dict) else {}
+            if meta:
+                raw_nav_data = payload.get("data", [{}])
+                latest_nav = 10.0
+                if raw_nav_data and isinstance(raw_nav_data, list) and isinstance(raw_nav_data[0], dict):
+                    try:
+                        latest_nav = float(raw_nav_data[0].get("nav", 10.0))
+                    except (ValueError, TypeError):
+                        latest_nav = 10.0
+
+                scheme_dict = {
+                    "scheme_code": clean_code,
+                    "scheme_name": meta.get("scheme_name", f"AMFI Scheme {clean_code}"),
+                    "fund_house": meta.get("fund_house", "Generic AMC"),
+                    "category": meta.get("scheme_category", "Flexi Cap Fund"),
+                    "broad_category": "EQUITY",
+                    "benchmark_index": "NIFTY 500 TRI",
+                    "aum_crores": 5000.0,
+                    "nav": latest_nav,
+                    "ter_direct_pct": 0.75,
+                    "ter_regular_pct": 1.50,
+                    "portfolio_turnover_ratio_pct": 25.0,
+                    "active_share_pct": 68.0,
+                    "risk_grade": "Very High",
+                    "fund_manager": "Senior Fund Manager",
+                    "last_portfolio_date": datetime.now(timezone.utc).strftime("%Y-%m-%d"),
+                    "metadata": {"source": "mfapi_on_demand"}
+                }
+                save_mutual_fund_scheme(scheme_dict)
+                scheme = get_mutual_fund_scheme(clean_code)
         except Exception as e:
             logger.warning(f"Could not fetch from mfapi for {clean_code}: {e}")
 
