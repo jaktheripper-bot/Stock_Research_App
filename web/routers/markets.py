@@ -51,6 +51,7 @@ from core.analysis.fund_overlap_auditor import (
     create_async_fund_audit_task,
     run_async_fund_audit_job,
     get_fund_audit_task_status,
+    ensure_scheme_and_holdings_exist,
 )
 from core.db.telemetry import record_usage_event
 from web.common import (
@@ -355,10 +356,14 @@ async def api_post_on_demand_fund_audit(
     task_id = create_async_fund_audit_task(scheme_code, allow_deep_dive=allow_deep_dive)
     background_tasks.add_task(run_async_fund_audit_job, task_id, scheme_code, allow_deep_dive)
 
+    scheme_info = get_mutual_fund_scheme(scheme_code) or ensure_scheme_and_holdings_exist(scheme_code)
+    scheme_name = scheme_info.get("scheme_name") if scheme_info else None
+
     return {
         "success": True,
         "task_id": task_id,
         "scheme_code": scheme_code,
+        "scheme_name": scheme_name,
         "status": "QUEUED",
         "message": f"Forensic audit enqueued for {scheme_code}."
     }

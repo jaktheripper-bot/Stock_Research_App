@@ -13,6 +13,7 @@ os.environ["TESTING"] = "1"
 
 import unittest
 from fastapi.testclient import TestClient
+from bs4 import BeautifulSoup
 from web.main import app
 
 
@@ -564,6 +565,28 @@ Detailed forensic analysis with exact page grounding to bseindia.com filings.
         self.assertIn("Mutual Fund Look-Through & Fiduciary Screener", res.text)
         self.assertIn("Parag Parikh Flexi Cap Fund", res.text)
         self.assertIn("Active Share", res.text)
+
+        soup = BeautifulSoup(res.text, "html.parser")
+        fund_input = soup.find("input", {"id": "onDemandFundInput"})
+        self.assertIsNotNone(fund_input, "Expected #onDemandFundInput for live AMFI on-demand audit")
+        self.assertIn("AMFI Scheme Code", fund_input.get("placeholder", ""))
+
+        audit_btn = soup.find("button", {"id": "onDemandAuditBtn"})
+        self.assertIsNotNone(audit_btn, "Expected #onDemandAuditBtn button")
+        self.assertEqual(audit_btn.get("onclick"), "startOnDemandFundAudit()")
+
+        status_box = soup.find("div", {"id": "onDemandAuditStatus"})
+        self.assertIsNotNone(status_box, "Expected #onDemandAuditStatus status container")
+
+        spinner = soup.find(id="auditSpinner")
+        self.assertIsNotNone(spinner, "Expected #auditSpinner spinner element")
+
+        status_text = soup.find(id="auditStatusText")
+        self.assertIsNotNone(status_text, "Expected #auditStatusText status message element")
+
+        # Verify JS function presence
+        self.assertIn("async function startOnDemandFundAudit()", res.text)
+        self.assertIn("/api/funds/on-demand-audit", res.text)
 
     def test_fund_dossier_page(self):
         # 1. Test PPFAS Flexi Cap
