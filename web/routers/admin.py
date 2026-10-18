@@ -665,7 +665,7 @@ async def admin_purge_test_data(request: Request):
     """Purges synthetic test records across telemetry, tickets, and transactions."""
     admin_session = _is_admin_authenticated(request)
     if not admin_session:
-        raise HTTPException(status_code=401, detail="Unauthorized admin session.")
+        raise HTTPException(status_code=401, detail="Admin authentication required.")
 
     role = admin_session.get("role", "viewer")
     if role not in ("owner", "admin"):
@@ -1910,7 +1910,7 @@ def api_admin_traffic_flow(
 async def api_admin_digest_preview(request: Request, edition_date: Optional[str] = None):
     """Generates preview of today's Research Bouquet with recipient counters and HTML/Text previews."""
     if not _is_admin_authenticated(request):
-        raise HTTPException(status_code=401, detail="Unauthorized")
+        raise HTTPException(status_code=401, detail="Admin authentication required.")
 
     from core.analysis.research_bouquet import (
         compile_research_bouquet,
@@ -1953,7 +1953,7 @@ async def api_admin_digest_preview(request: Request, edition_date: Optional[str]
 async def api_admin_digest_dispatch_test(request: Request):
     """Dispatches a single test Research Bouquet to administrator email."""
     if not _is_admin_authenticated(request):
-        raise HTTPException(status_code=401, detail="Unauthorized")
+        raise HTTPException(status_code=401, detail="Admin authentication required.")
 
     from core.notify import dispatch_research_bouquet, get_admin_notification_email
 
@@ -1974,7 +1974,7 @@ async def api_admin_digest_dispatch_test(request: Request):
 async def api_admin_digest_broadcast(request: Request):
     """Broadcasts today's Research Bouquet to all eligible subscribers."""
     if not _is_admin_authenticated(request):
-        raise HTTPException(status_code=401, detail="Unauthorized")
+        raise HTTPException(status_code=401, detail="Admin authentication required.")
 
     from core.notify import dispatch_research_bouquet
 
@@ -1995,7 +1995,7 @@ async def api_admin_digest_broadcast(request: Request):
 async def api_admin_digest_history(request: Request, limit: int = 15):
     """Returns chronological digest dispatch logs."""
     if not _is_admin_authenticated(request):
-        raise HTTPException(status_code=401, detail="Unauthorized")
+        raise HTTPException(status_code=401, detail="Admin authentication required.")
 
     from core.db.digest import get_digest_dispatch_history
 

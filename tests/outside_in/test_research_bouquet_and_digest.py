@@ -156,9 +156,13 @@ class TestResearchBouquetAndDigest(unittest.TestCase):
 
     def test_05_admin_digest_preview_endpoint(self):
         """Validates GET /api/admin/digest/preview requires auth and returns complete preview payload."""
-        # Unauthenticated check
+        # Unauthenticated checks
         unauth_resp = self.client.get("/api/admin/digest/preview")
         self.assertEqual(unauth_resp.status_code, 401)
+        self.assertEqual(unauth_resp.json().get("detail"), "Admin authentication required.")
+        self.assertEqual(self.client.post("/api/admin/digest/dispatch-test").status_code, 401)
+        self.assertEqual(self.client.post("/api/admin/digest/broadcast").status_code, 401)
+        self.assertEqual(self.client.get("/api/admin/digest/history").status_code, 401)
 
         # Authenticated check
         self.client.cookies.set(ADMIN_COOKIE_NAME, self.admin_token)
