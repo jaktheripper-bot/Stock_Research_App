@@ -302,12 +302,6 @@ async def public_auth_callback(
             logger.error(f"Error exchanging public OAuth code: {e}")
 
     elif access_token:
-        claims = _extract_jwt_claims(access_token)
-        user_meta = claims.get("user_metadata") or {}
-        if claims.get("email") or user_meta.get("email"):
-            verified_email = claims.get("email") or user_meta.get("email")
-            user_name = user_meta.get("full_name") or user_meta.get("name") or claims.get("name")
-
         if sb_url and anon_key:
             try:
                 resp = requests.get(
@@ -317,10 +311,18 @@ async def public_auth_callback(
                 )
                 if resp.status_code == 200:
                     data = resp.json()
-                    verified_email = data.get("email") or verified_email
-                    user_name = data.get("user_metadata", {}).get("full_name") or data.get("user_metadata", {}).get("name") or user_name
+                    verified_email = data.get("email")
+                    user_name = data.get("user_metadata", {}).get("full_name") or data.get("user_metadata", {}).get("name")
             except Exception as e:
                 logger.debug(f"Notice fetching public user via token endpoint: {e}")
+
+        # Only allow synthetic JWT claim decoding inside automated test runs (TESTING=1)
+        if not verified_email and os.environ.get("TESTING") == "1":
+            claims = _extract_jwt_claims(access_token)
+            user_meta = claims.get("user_metadata") or {}
+            if claims.get("email") or user_meta.get("email"):
+                verified_email = claims.get("email") or user_meta.get("email")
+                user_name = user_meta.get("full_name") or user_meta.get("name") or claims.get("name")
 
     if not verified_email:
         return HTMLResponse(f"""
