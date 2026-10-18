@@ -209,6 +209,14 @@ class TestAiQosGovernorUnit(unittest.TestCase):
         for worker_id, _, text in results:
             self.assertEqual(text, synthetic_report)
 
+    def test_qos_governor_exception_fails_closed(self):
+        """When an unexpected exception occurs in authorize_llm_execution, it must log error and fail closed."""
+        from unittest.mock import patch
+        with patch("time.time", side_effect=RuntimeError("Database lock acquisition failure")):
+            ok, msg = authorize_llm_execution("USER_SYNTHESIS", user_email="test@moatnomics.com")
+            self.assertFalse(ok)
+            self.assertEqual(msg, "System busy verifying AI capacity limits. Please retry in a few seconds.")
+
 
 if __name__ == "__main__":
     unittest.main()

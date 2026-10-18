@@ -89,54 +89,58 @@ def authorize_llm_execution(
       - Lane 3 (USER_SYNTHESIS / USER_COPILOT): VIP Lane. Immune to daemon or bot spend;
         protected only by per-user hourly velocity caps against account compromise.
     """
-    now = time.time()
+    try:
+        now = time.time()
 
-    # Lane 1: Unauthenticated or Free-Tier Copilot -> Never invoke paid LLM
-    if actor_type == "ANON" or (actor_type == "USER_COPILOT" and not has_unlocked_dossier):
+        # Lane 1: Unauthenticated or Free-Tier Copilot -> Never invoke paid LLM
+        if actor_type == "ANON" or (actor_type == "USER_COPILOT" and not has_unlocked_dossier):
+            with _WINDOW_LOCK:
+                ip_ok = _prune_and_check(
+                    _IP_BURST_WINDOWS[client_ip or "anon_ip"],
+                    now,
+                    60.0,
+                    MAX_ANON_REQUESTS_PER_IP_MINUTE,
+                )
+            if not ip_ok:
+                return False, "RATE_LIMIT_IP_BURST"
+            return False, "FREE_TIER_DETERMINISTIC_ONLY"
+
+        # Lane 2: Background Cron / Watcher Daemons -> Isolated daily spend cap
+        if actor_type == "BACKGROUND_DAEMON":
+            spend = current_daemon_spend_usd if current_daemon_spend_usd > 0.0 else get_daemon_daily_spend_usd()
+            if spend >= MAX_DAEMON_DAILY_SPEND_USD:
+                return False, f"DAEMON_BUDGET_PAUSED (${spend:.2f} >= ${MAX_DAEMON_DAILY_SPEND_USD:.2f})"
+            return True, "DAEMON_AUTHORIZED"
+
+        # Lane 3: Paying / Unlocked Users (VIP Lane) -> Never degraded by daemon/bot activity
+        actor_key = (user_email or client_ip or "vip_user").strip().lower()
         with _WINDOW_LOCK:
-            ip_ok = _prune_and_check(
-                _IP_BURST_WINDOWS[client_ip or "anon_ip"],
-                now,
-                60.0,
-                MAX_ANON_REQUESTS_PER_IP_MINUTE,
-            )
-        if not ip_ok:
-            return False, "RATE_LIMIT_IP_BURST"
-        return False, "FREE_TIER_DETERMINISTIC_ONLY"
+            if actor_type == "USER_COPILOT":
+                ok = _prune_and_check(
+                    _USER_COPILOT_WINDOWS[actor_key],
+                    now,
+                    3600.0,
+                    MAX_COPILOT_TURNS_PER_USER_HOUR,
+                )
+                if not ok:
+                    return False, "USER_COPILOT_HOURLY_VELOCITY_CAP"
+                return True, "VIP_COPILOT_AUTHORIZED"
 
-    # Lane 2: Background Cron / Watcher Daemons -> Isolated daily spend cap
-    if actor_type == "BACKGROUND_DAEMON":
-        spend = current_daemon_spend_usd if current_daemon_spend_usd > 0.0 else get_daemon_daily_spend_usd()
-        if spend >= MAX_DAEMON_DAILY_SPEND_USD:
-            return False, f"DAEMON_BUDGET_PAUSED (${spend:.2f} >= ${MAX_DAEMON_DAILY_SPEND_USD:.2f})"
-        return True, "DAEMON_AUTHORIZED"
+            if actor_type == "USER_SYNTHESIS":
+                ok = _prune_and_check(
+                    _USER_SYNTHESIS_WINDOWS[actor_key],
+                    now,
+                    3600.0,
+                    MAX_SYNTHESIS_PER_USER_HOUR,
+                )
+                if not ok:
+                    return False, "USER_SYNTHESIS_HOURLY_VELOCITY_CAP"
+                return True, "VIP_SYNTHESIS_AUTHORIZED"
 
-    # Lane 3: Paying / Unlocked Users (VIP Lane) -> Never degraded by daemon/bot activity
-    actor_key = (user_email or client_ip or "vip_user").strip().lower()
-    with _WINDOW_LOCK:
-        if actor_type == "USER_COPILOT":
-            ok = _prune_and_check(
-                _USER_COPILOT_WINDOWS[actor_key],
-                now,
-                3600.0,
-                MAX_COPILOT_TURNS_PER_USER_HOUR,
-            )
-            if not ok:
-                return False, "USER_COPILOT_HOURLY_VELOCITY_CAP"
-            return True, "VIP_COPILOT_AUTHORIZED"
-
-        if actor_type == "USER_SYNTHESIS":
-            ok = _prune_and_check(
-                _USER_SYNTHESIS_WINDOWS[actor_key],
-                now,
-                3600.0,
-                MAX_SYNTHESIS_PER_USER_HOUR,
-            )
-            if not ok:
-                return False, "USER_SYNTHESIS_HOURLY_VELOCITY_CAP"
-            return True, "VIP_SYNTHESIS_AUTHORIZED"
-
-    return False, f"UNKNOWN_ACTOR_TYPE:{actor_type}"
+        return False, f"UNKNOWN_ACTOR_TYPE:{actor_type}"
+    except Exception as e:
+        logger.error(f"QoS Governor DB check error (failing closed): {e}")
+        return False, "System busy verifying AI capacity limits. Please retry in a few seconds."
 
 
 @contextmanager
