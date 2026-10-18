@@ -2192,4 +2192,187 @@ table.table-sticky thead th,
   border: 1px solid rgba(16, 185, 129, 0.28);
 }
 
+/* ==============================================================================
+   Modern Web Guidance Upgrades: Browser UI Theming, Dialogs, Toasts, Containment
+   ============================================================================== */
+
+:root {
+  color-scheme: dark;
+  accent-color: var(--accent-cyan);
+}
+
+/* 1. Typography: Balanced Headings & Orphan-Free Prose */
+h1, h2, h3, h4, .hero-title, .section-title, .ticker-title, .gated-title {
+  text-wrap: balance;
+}
+
+.dossier-prose p,
+.dossier-prose li,
+.dossier-prose blockquote,
+.policy-body p {
+  text-wrap: pretty;
+}
+
+/* 2. Native <dialog> Top-Layer & Scroll-Chaining Prevention */
+dialog.modal-dialog-native {
+  background: var(--bg-secondary);
+  color: var(--text-primary);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-lg);
+  width: min(90vw, 540px);
+  max-height: 85vh;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  padding: 32px;
+  box-shadow: 0 20px 50px rgba(0, 0, 0, 0.6);
+}
+
+dialog.modal-dialog-native:modal {
+  overscroll-behavior: contain;
+}
+
+dialog.modal-dialog-native::backdrop {
+  background: rgba(0, 0, 0, 0.75);
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+  overflow: hidden;
+  overscroll-behavior: contain;
+}
+
+/* Prevent scroll chaining on existing .modal-backdrop / .modal-dialog overlays */
+.modal-backdrop {
+  overscroll-behavior: contain;
+}
+
+.modal-dialog {
+  overscroll-behavior: contain;
+}
+
+/* 3. Top-Layer Persistent Toast Notifications (popover="manual") */
+.toast-stack {
+  position: fixed;
+  bottom: 24px;
+  left: 24px;
+  z-index: 9999;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  pointer-events: none;
+}
+
+.toast-popover[popover] {
+  position: fixed;
+  inset: auto auto 24px 24px;
+  margin: 0;
+  padding: 12px 16px;
+  border-radius: var(--radius-sm);
+  background: rgba(15, 23, 42, 0.96);
+  color: var(--text-primary);
+  border: 1px solid rgba(56, 189, 248, 0.4);
+  box-shadow: 0 12px 32px rgba(0, 0, 0, 0.55);
+  font-size: 13.5px;
+  font-weight: 600;
+  max-width: min(92vw, 420px);
+  pointer-events: auto;
+  transition: opacity 0.2s ease, transform 0.2s ease,
+              overlay 0.2s allow-discrete, display 0.2s allow-discrete;
+}
+
+.toast-popover[popover]:is(:popover-open, .\:popover-open) {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.toast-popover + .toast-popover {
+  margin-top: 0.75rem;
+}
+
+/* 4. Off-Screen Rendering Deferral & Layout Containment for Dense Directories */
+.directory-row-contain,
+.opportunity-card-contain,
+.etf-row,
+.msme-card {
+  content-visibility: auto;
+  contain-intrinsic-size: auto 180px;
+}
+
+@supports not (content-visibility: auto) {
+  .directory-row-contain,
+  .opportunity-card-contain,
+  .etf-row,
+  .msme-card {
+    contain: layout style paint;
+  }
+}
+
+/* 5. Post-Interaction Form Validation (:user-invalid / :user-valid) */
+input:user-invalid,
+textarea:user-invalid,
+select:user-invalid,
+input.user-invalid-fallback,
+textarea.user-invalid-fallback {
+  border-color: #ef4444 !important;
+  background-color: rgba(239, 68, 68, 0.08) !important;
+}
+
+input:user-valid,
+textarea:user-valid {
+  border-color: rgba(16, 185, 129, 0.6);
+}
+
+.field-error-msg {
+  display: none;
+  color: #f87171;
+  font-size: 12px;
+  margin-top: 4px;
+}
+
+input:user-invalid + .field-error-msg,
+input.user-invalid-fallback + .field-error-msg {
+  display: block;
+}
+
+/* 6. Soft-Edge Content Fade for Gated Paywall Previews */
+.gated-blur-content {
+  -webkit-mask-image: linear-gradient(to bottom, black 50%, transparent 100%);
+  mask-image: linear-gradient(to bottom, black 50%, transparent 100%);
+}
+
+/* 7. Accessible Indeterminate <progress> Spinner & Reduced-Motion Support */
+progress.loading-spinner:indeterminate {
+  --size: 20px;
+  --thickness: 2.5px;
+  --spinner-color: #38bdf8;
+  --track-color: rgba(148, 163, 184, 0.25);
+  --spinner-duration: 1.2s;
+  --_used-spinner-duration: var(--spinner-duration);
+  width: var(--size);
+  height: var(--size);
+  border-radius: 50%;
+  appearance: none;
+  border: 0;
+  background: conic-gradient(from 90deg, var(--spinner-color) 160deg, transparent 0) var(--track-color);
+  mask-image: radial-gradient(farthest-side, transparent calc(100% - var(--thickness)), black calc(100% - var(--thickness)));
+  -webkit-mask-image: radial-gradient(farthest-side, transparent calc(100% - var(--thickness)), black calc(100% - var(--thickness)));
+  animation: spin var(--_used-spinner-duration) linear infinite;
+}
+
+progress.loading-spinner:indeterminate::-webkit-progress-bar,
+progress.loading-spinner:indeterminate::-webkit-progress-value,
+progress.loading-spinner:indeterminate::-moz-progress-bar {
+  display: none;
+  background: none;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  progress.loading-spinner:indeterminate,
+  .spin-icon {
+    --_used-spinner-duration: 6s;
+    animation-duration: 6s !important;
+  }
+}
+
+
 

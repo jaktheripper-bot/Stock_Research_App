@@ -735,6 +735,27 @@ class TestCopilotUIAndSyntax(unittest.TestCase):
         self.assertIn("copilot-intro-feature-item", content)
         self.assertIn("copilot-chip-btn", content)
 
+    def test_modern_web_guidance_css_tokens_and_directives(self):
+        """Outside-in verification: Asserts style.css includes modern browser UI theming, dialogs, toasts, and containment."""
+        css_path = self.project_root / "web" / "static" / "css" / "style.css"
+        self.assertTrue(css_path.exists(), "style.css must exist")
+        content = css_path.read_text(encoding="utf-8")
+
+        self.assertIn("color-scheme: dark;", content)
+        self.assertIn("accent-color: var(--accent-cyan);", content)
+        self.assertIn("text-wrap: balance;", content)
+        self.assertIn("text-wrap: pretty;", content)
+        self.assertIn("dialog.modal-dialog-native", content)
+        self.assertIn("overscroll-behavior: contain;", content)
+        self.assertIn(".toast-popover[popover]", content)
+        self.assertIn("content-visibility: auto;", content)
+        self.assertIn("contain-intrinsic-size: auto 180px;", content)
+        self.assertIn("input:user-invalid", content)
+        self.assertIn("input:user-valid", content)
+        self.assertIn("mask-image: linear-gradient(to bottom, black 50%, transparent 100%);", content)
+        self.assertIn("progress.loading-spinner:indeterminate", content)
+        self.assertIn("prefers-reduced-motion: reduce", content)
+
     def test_equity_options_yield_distinct_responses(self):
         """Verifies that each option within the Forensic Intelligence Desk for Equities returns a unique, data-grounded response."""
         equity_prompts = [
