@@ -405,13 +405,21 @@ Detailed forensic analysis with exact page grounding to bseindia.com filings.
         self.assertEqual(res_act.status_code, 200)
         self.assertEqual(res_act.json().get("status"), "success")
 
-        # 5. /api/debt/ingest (validation error for short ISIN)
-        res_bad = self.client.post("/api/debt/ingest", json={"isin": "SHORT"})
+        # 5. /api/debt/ingest (unauthenticated request rejected with 401)
+        res_unauth = self.client.post("/api/debt/ingest", json={"isin": "INE999A08999"})
+        self.assertEqual(res_unauth.status_code, 401)
+
+        from web.common import _generate_admin_token, ADMIN_COOKIE_NAME
+        auth_client = TestClient(app)
+        auth_client.cookies.set(ADMIN_COOKIE_NAME, _generate_admin_token("admin@moatnomics.com", role="super_admin"))
+
+        # 5b. /api/debt/ingest (validation error for short ISIN)
+        res_bad = auth_client.post("/api/debt/ingest", json={"isin": "SHORT"})
         self.assertEqual(res_bad.status_code, 400)
 
         # 6. /api/debt/ingest (valid on-demand ISIN ingestion)
         test_isin = "INE999A08999"
-        res_ingest = self.client.post("/api/debt/ingest", json={
+        res_ingest = auth_client.post("/api/debt/ingest", json={
             "isin": test_isin,
             "ticker": "TESTCORP",
             "coupon_rate_pct": 9.20,
@@ -424,7 +432,7 @@ Detailed forensic analysis with exact page grounding to bseindia.com filings.
         self.assertEqual(ingest_data.get("redirect_url"), f"/debt/{test_isin}")
 
         # 7. /api/debt/ingest (re-ingest existing ISIN)
-        res_exist = self.client.post("/api/debt/ingest", json={"isin": test_isin})
+        res_exist = auth_client.post("/api/debt/ingest", json={"isin": test_isin})
         self.assertEqual(res_exist.status_code, 200)
         self.assertTrue(res_exist.json().get("already_exists"))
 

@@ -737,6 +737,9 @@ class TestWebAndApiEndpoints(unittest.TestCase):
         self.assertEqual(response.status_code, 404)
 
     def test_api_admin_trigger_ingest(self):
+        from web.common import _generate_admin_token, ADMIN_COOKIE_NAME
+        admin_token = _generate_admin_token("admin@moatnomics.com", role="super_admin")
+        self.client.cookies.set(ADMIN_COOKIE_NAME, admin_token)
         response = self.client.post("/api/admin/etfs/trigger-ingest")
         self.assertEqual(response.status_code, 200)
         data = response.json()

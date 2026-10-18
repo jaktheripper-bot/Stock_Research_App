@@ -191,6 +191,10 @@ def get_user_credits_balance(user_id: str) -> float:
     return float(user.get("credits_balance", 0.0)) if user else 0.0
 
 
+# Backward-compatible and shorthand alias
+get_user_credits = get_user_credits_balance
+
+
 class CreditDeductionResult(tuple):
     """
     Dual tuple/dict result for atomic credit deduction.
@@ -200,15 +204,16 @@ class CreditDeductionResult(tuple):
     - Evaluates boolean truthiness directly: bool(res) == res["success"]
     - Exports cleanly to dictionary: res.to_dict()
     """
-    def __new__(cls, success: bool, credits_balance: float, message: str, error: Optional[str] = None):
+    def __new__(cls, success: bool, credits_balance: float, message: str, error: Optional[str] = None, **kwargs):
         return super().__new__(cls, (bool(success), float(credits_balance), str(message)))
 
-    def __init__(self, success: bool, credits_balance: float, message: str, error: Optional[str] = None):
+    def __init__(self, success: bool, credits_balance: float, message: str, error: Optional[str] = None, **kwargs):
         self._dict = {
             "success": bool(success),
             "credits_balance": float(credits_balance),
             "message": str(message),
             "error": error if error is not None else (None if success else str(message)),
+            **kwargs,
         }
 
     def __getitem__(self, item):
@@ -240,9 +245,10 @@ class CreditDeductionResult(tuple):
 
 def deduct_user_credits(
     user_id: str,
-    ticker: str,
-    action_type: str,
-    amount: float = 1.0
+    ticker: Any = "GENERAL",
+    action_type: str = "DEEP_DIVE_UNLOCK",
+    amount: float = 1.0,
+    **kwargs
 ) -> CreditDeductionResult:
     """
     Atomically checks balance and deducts credits for an action.
@@ -253,6 +259,14 @@ def deduct_user_credits(
     """
     if not user_id:
         return CreditDeductionResult(False, 0.0, "Authentication required to perform this action.", error="AUTH_REQUIRED")
+
+    # Shorthand parameter handling: deduct_user_credits(user_id, amount, action_type)
+    if isinstance(ticker, (int, float)):
+        amount = float(ticker)
+        action_type = str(action_type or "CREDIT_DEDUCTION")
+        ticker = kwargs.get("ticker_symbol", "GENERAL")
+
+    clean_ticker = str(ticker or "GENERAL").strip().upper()
 
     init_db()
     conn = get_db_connection()
@@ -298,7 +312,7 @@ def deduct_user_credits(
                 INSERT INTO credit_usage_ledger (user_id, ticker, action_type, credits_consumed, balance_after)
                 VALUES ({p}, {p}, {p}, 0.0, {p});
                 """,
-                (clean_id, ticker.upper(), action_type, current_balance)
+                (clean_id, clean_ticker, action_type, current_balance)
             )
             conn.commit()
             return CreditDeductionResult(True, current_balance, "Action covered under active Pro subscription (0 credits consumed).")
@@ -353,10 +367,10 @@ def deduct_user_credits(
             INSERT INTO credit_usage_ledger (user_id, ticker, action_type, credits_consumed, balance_after)
             VALUES ({p}, {p}, {p}, {p}, {p});
             """,
-            (clean_id, ticker.upper(), action_type, cost, new_balance)
+            (clean_id, clean_ticker, action_type, cost, new_balance)
         )
         conn.commit()
-        logger.info(f"Deducted {cost} credits from {clean_id} for {action_type} on {ticker}. New balance: {new_balance}")
+        logger.info(f"Deducted {cost} credits from {clean_id} for {action_type} on {clean_ticker}. New balance: {new_balance}")
         return CreditDeductionResult(True, new_balance, f"Success: {cost:.2f} credit(s) consumed. Remaining balance: {new_balance:.1f}.")
     except Exception as e:
         logger.error(f"Error deducting credits for user {user_id}: {e}")
@@ -416,12 +430,14 @@ def get_credit_transaction_by_gateway_id(payment_id: Optional[str] = None, order
 def add_user_credits(
     user_id: str,
     amount_inr: float,
-    credits_added: float,
-    pack_type: str,
+    credits_added: Any = None,
+    pack_type: str = "DEFAULT",
     gateway_order_id: Optional[str] = None,
     gateway_payment_id: Optional[str] = None,
     status: str = "success",
-    invoice_number: Optional[str] = None
+    invoice_number: Optional[str] = None,
+    email: Optional[str] = None,
+    **kwargs
 ) -> Tuple[bool, float]:
     """
     Records a payment transaction and credits research units or upgrades the subscription tier.
@@ -431,10 +447,23 @@ def add_user_credits(
     if not user_id:
         return False, 0.0
 
+    # Flexible shorthand parameter handling:
+    # If caller passes add_user_credits(uid, credits, "pack_name", email=...)
+    if isinstance(credits_added, str):
+        pack_type = credits_added
+        credits_added = float(amount_inr)
+        amount_inr = 0.0
+    elif credits_added is None:
+        credits_added = float(amount_inr)
+        amount_inr = 0.0
+    else:
+        credits_added = float(credits_added)
+
     init_db()
     clean_id = str(user_id).strip()
     if not get_user_by_id(clean_id):
-        get_or_create_user(clean_id, f"{clean_id}@stockresearch.ai", "Guest Investor")
+        user_email = (email or f"{clean_id}@stockresearch.ai").strip().lower()
+        get_or_create_user(clean_id, user_email, "Guest Investor")
 
     conn = get_db_connection()
     cursor = conn.cursor()
@@ -1078,31 +1107,39 @@ def is_ticker_unlocked_for_user(user_id: str, ticker: str) -> bool:
 def unlock_ticker_for_user(
     user_id: str,
     ticker: str,
-    amount: float = 1.0
-) -> Tuple[bool, float, str]:
+    amount: float = 1.0,
+    cost: Optional[float] = None,
+    **kwargs
+) -> CreditDeductionResult:
     """
     Atomically deducts 1 credit and unlocks the institutional deep-dive tier for a ticker.
     Idempotent: if already unlocked, returns True immediately without deducting credits.
+    Returns CreditDeductionResult, unpacking cleanly as (success, new_balance, message)
+    and supporting dictionary access (e.g. r.get("success"), r.get("already_unlocked")).
     """
+    if cost is not None:
+        amount = float(cost)
+
     if not user_id:
-        return False, 0.0, "Authentication required to unlock institutional deep-dive."
+        return CreditDeductionResult(False, 0.0, "Authentication required to unlock institutional deep-dive.", error="AUTH_REQUIRED", already_unlocked=False)
 
     clean_id = str(user_id).strip()
     clean_ticker_sym = str(ticker).strip().upper()
 
     if is_ticker_unlocked_for_user(clean_id, clean_ticker_sym):
         current_bal = get_user_credits_balance(clean_id)
-        return True, current_bal, f"Institutional deep-dive for {clean_ticker_sym} is already unlocked."
+        return CreditDeductionResult(True, current_bal, f"Institutional deep-dive for {clean_ticker_sym} is already unlocked.", already_unlocked=True)
 
     # Deduct 1 credit atomically
-    ok, new_balance, msg = deduct_user_credits(
+    deduction = deduct_user_credits(
         user_id=clean_id,
         ticker=clean_ticker_sym,
         action_type="DEEP_DIVE_UNLOCK",
         amount=amount
     )
+    ok, new_balance, msg = deduction
     if not ok:
-        return False, new_balance, msg
+        return CreditDeductionResult(False, new_balance, msg, error="INSUFFICIENT_CREDITS", already_unlocked=False)
 
     # Record in user_unlocked_dossiers
     init_db()
@@ -1117,10 +1154,10 @@ def unlock_ticker_for_user(
         )
         conn.commit()
         logger.info(f"Recorded dossier unlock for user {clean_id} on {clean_ticker_sym}")
-        return True, new_balance, f"Successfully unlocked institutional deep-dive for {clean_ticker_sym}."
+        return CreditDeductionResult(True, new_balance, f"Successfully unlocked institutional deep-dive for {clean_ticker_sym}.", already_unlocked=False)
     except Exception as e:
         logger.error(f"Error recording user unlock dossier {clean_id}/{clean_ticker_sym}: {e}")
-        return True, new_balance, f"Successfully unlocked institutional deep-dive for {clean_ticker_sym}."
+        return CreditDeductionResult(True, new_balance, f"Successfully unlocked institutional deep-dive for {clean_ticker_sym}.", already_unlocked=False)
     finally:
         cursor.close()
         conn.close()

@@ -58,6 +58,8 @@ from web.common import (
     _validate_request_origin,
     _asset_unlocked_for_request,
     _unlock_asset_deep_dive,
+    _is_admin_authenticated,
+    _get_current_web_user,
 )
 
 logger = logging.getLogger("equity_research.web.markets")
@@ -218,9 +220,14 @@ def api_get_recent_rating_actions(limit: int = 50):
 
 
 @router.post("/api/debt/ingest")
-def api_ingest_debt_security(payload: IngestDebtRequest):
+def api_ingest_debt_security(request: Request, payload: IngestDebtRequest):
     """Public API: Ingest and analyze any corporate bond, NCD, or SDI by ISIN."""
     init_db()
+    if not _get_current_web_user(request) and not _is_admin_authenticated(request):
+        raise HTTPException(
+            status_code=401,
+            detail="Authentication required. Please sign in to ingest corporate debt securities."
+        )
     raw_isin = (payload.isin or "").strip().upper()
     if not raw_isin or len(raw_isin) != 12:
         raise HTTPException(
@@ -483,8 +490,10 @@ def api_get_fund_forensic_dossier(scheme_code: str, request: Request):
 
 
 @router.post("/api/admin/run-fund-audit")
-def api_admin_run_fund_audit(payload: Dict[str, Any] = Body(default={})):
+def api_admin_run_fund_audit(request: Request, payload: Dict[str, Any] = Body(default={})):
     """Triggers an autonomous daily forensic audit for a fund (or next in rotation)."""
+    if not _is_admin_authenticated(request):
+        raise HTTPException(status_code=403, detail="Admin authentication required.")
     init_db()
     scheme_code = payload.get("scheme_code")
     try:
@@ -569,8 +578,10 @@ def api_etf_detail(symbol: str):
 
 
 @router.post("/api/admin/etfs/trigger-ingest")
-def api_admin_trigger_etf_ingest():
+def api_admin_trigger_etf_ingest(request: Request):
     """Admin API: Triggers dynamic live synchronization of AMFI-listed ETF universe."""
+    if not _is_admin_authenticated(request):
+        raise HTTPException(status_code=403, detail="Admin authentication required.")
     from core.ingestion.etf_ingest import ingest_all_amfi_etfs
     init_db()
     result = ingest_all_amfi_etfs(force_refresh=True)
