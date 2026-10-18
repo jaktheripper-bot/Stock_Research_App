@@ -533,6 +533,85 @@
   animation: copilotFadeInUp 0.2s ease both;
 }
 
+.copilot-msg-bubble {
+  background: rgba(17, 24, 39, 0.92);
+  border: 1px solid rgba(56, 189, 248, 0.22);
+  border-radius: 14px 14px 14px 3px;
+  padding: 14px 16px;
+  color: #f1f5f9;
+  font-size: 0.88rem;
+  line-height: 1.6;
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.35);
+  word-break: break-word;
+}
+
+.copilot-msg-bubble p {
+  margin: 0 0 8px 0;
+}
+
+.copilot-msg-bubble p:last-child {
+  margin-bottom: 0;
+}
+
+.copilot-msg-bubble strong {
+  color: #38bdf8;
+  font-weight: 700;
+}
+
+.copilot-msg-bubble ul, .copilot-msg-bubble ol {
+  margin: 6px 0 10px 18px;
+  padding: 0;
+}
+
+.copilot-msg-bubble li {
+  margin-bottom: 4px;
+  color: #cbd5e1;
+}
+
+.copilot-guardrail-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  background: rgba(16, 185, 129, 0.12);
+  border: 1px solid rgba(16, 185, 129, 0.35);
+  color: #34d399;
+  font-size: 0.75rem;
+  font-weight: 700;
+  padding: 4px 10px;
+  border-radius: 9999px;
+  margin-bottom: 8px;
+  align-self: flex-start;
+  box-shadow: 0 2px 8px rgba(16, 185, 129, 0.15);
+}
+
+.copilot-citations {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+  margin-top: 8px;
+  font-size: 0.78rem;
+  color: #94a3b8;
+}
+
+.copilot-citations .cit-label {
+  font-weight: 700;
+  color: #64748b;
+  margin-right: 2px;
+}
+
+.copilot-citation-tag {
+  background: rgba(30, 41, 59, 0.85);
+  border: 1px solid rgba(148, 163, 184, 0.25);
+  color: #93c5fd;
+  padding: 2px 8px;
+  border-radius: 4px;
+  font-family: var(--font-mono, monospace);
+  font-size: 0.74rem;
+  line-height: 1.35;
+}
+
+
 /* --- Typing Wave Indicator --- */
 .copilot-thinking-card {
   align-self: flex-start;

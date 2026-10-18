@@ -543,6 +543,12 @@ function renderCopilotMarkdown(rawText) {
     return finalBlocks.join("\n");
 }
 
+function formatCopilotMarkdown(rawText) {
+    return renderCopilotMarkdown(rawText);
+}
+window.formatCopilotMarkdown = formatCopilotMarkdown;
+window.renderCopilotMarkdown = renderCopilotMarkdown;
+
 function formatCurrentTime() {
     const now = new Date();
     return now.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
@@ -925,10 +931,9 @@ async function submitCopilotMessage() {
     };
 
     try {
-        let resp;
         let data = {};
         try {
-            resp = await fetch('/api/copilot/chat', {
+            const resp = await fetch('/api/copilot/chat', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify(payload)
@@ -942,57 +947,54 @@ async function submitCopilotMessage() {
             }
 
             if (!resp.ok) {
-                const detailMsg = typeof data.detail === 'string'
+                const errMsg = typeof data.detail === 'string'
                     ? data.detail
-                    : (data.detail?.message || data.error || `Request failed (HTTP ${resp.status})`);
-                throw new Error(detailMsg);
+                    : (data.detail?.message || data.error || `Server error (${resp.status})`);
+                throw new Error(errMsg);
             }
         } finally {
             clearInterval(thinkingTimer);
         }
 
-        thinkingCard.remove();
-
-        const agentText = data.response || "No response generated.";
-        const formattedHtml = renderCopilotMarkdown(agentText);
-        const agentTime = formatCurrentTime();
-
-        const agentTurn = document.createElement("div");
-        agentTurn.className = "copilot-turn copilot-turn-agent";
-        
-        // Escape raw text for safe passing into copy handler via data attribute
-        const encodedRaw = encodeURIComponent(agentText);
-
-        agentTurn.innerHTML = `
-            <div class="copilot-bubble-agent">
-                <div class="copilot-bubble-header">
-                    <div class="copilot-bubble-header-left">
-                        <svg class="glyph" style="width: 12px; height: 12px;"><use href="#glyph-shield"></use></svg>
-                        <span>Forensic Intelligence Desk</span>
-                    </div>
-                    <button type="button" class="copilot-copy-btn" data-copilot-copy="${encodedRaw}" title="Copy analysis to clipboard">
-                        📋 Copy
-                    </button>
-                </div>
-                <div class="copilot-bubble-body">
-                    ${formattedHtml}
-                </div>
-            </div>
-            <div class="copilot-turn-meta">Forensic Intelligence Desk • ${agentTime}</div>
-        `;
-        if (data.unlock_required && typeof window.unlockAssetDeepDive === "function") {
-            const unlockBtn = document.createElement("button");
-            unlockBtn.type = "button";
-            unlockBtn.className = "btn btn-primary btn-sm";
-            unlockBtn.style.cssText = "margin-top: 10px; font-weight: 700; border-radius: 9999px; cursor: pointer;";
-            unlockBtn.textContent = "Unlock Deep Dive for 1 credit";
-            unlockBtn.addEventListener("click", function() {
-                window.unlockAssetDeepDive(data.unlock_required.asset_kind, data.unlock_required.asset_id);
-            });
-            agentTurn.querySelector(".copilot-bubble-body").appendChild(unlockBtn);
+        if (data.conversation_id) {
+            activeConversationId = data.conversation_id;
         }
-        container.appendChild(agentTurn);
-        container.scrollTop = container.scrollHeight;
+
+        const answerHtml = formatCopilotMarkdown(data.answer || data.response || "No response received from desk.");
+        const citations = data.citations || [];
+        let citHtml = '';
+        if (citations.length > 0) {
+            const badges = citations.map(c => `<span class="copilot-citation-tag">${escapeHtml(c)}</span>`).join('');
+            citHtml = `<div class="copilot-citations"><span class="cit-label">Sources:</span> ${badges}</div>`;
+        }
+
+        let guardHtml = '';
+        if (data.guardrail_triggered) {
+            guardHtml = `<div class="copilot-guardrail-badge">🛡️ SEBI Safe-Harbor Guardrail Applied</div>`;
+        }
+
+        thinkingEl.outerHTML = `
+            <div class="copilot-msg copilot-msg-assistant">
+                ${guardHtml}
+                <div class="copilot-msg-bubble">${answerHtml}</div>
+                ${citHtml}
+            </div>
+        `;
+
+        if (data.unlock_required && typeof window.unlockAssetDeepDive === "function") {
+            const lastMsg = container.querySelector(".copilot-msg-assistant:last-child .copilot-msg-bubble") || container.querySelector(".copilot-msg-assistant:last-child");
+            if (lastMsg) {
+                const unlockBtn = document.createElement("button");
+                unlockBtn.type = "button";
+                unlockBtn.className = "btn btn-primary btn-sm";
+                unlockBtn.style.cssText = "margin-top: 10px; font-weight: 700; border-radius: 9999px; cursor: pointer;";
+                unlockBtn.textContent = "Unlock Deep Dive for 1 credit";
+                unlockBtn.addEventListener("click", function() {
+                    window.unlockAssetDeepDive(data.unlock_required.asset_kind, data.unlock_required.asset_id);
+                });
+                lastMsg.appendChild(unlockBtn);
+            }
+        }
     } catch (e) {
         clearInterval(thinkingTimer);
         console.error('Copilot chat error:', e);

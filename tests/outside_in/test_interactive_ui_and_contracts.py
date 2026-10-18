@@ -700,10 +700,29 @@ class TestCopilotUIAndSyntax(unittest.TestCase):
             content,
             "copilot.js must unconditionally clear thinkingTimer in finally block"
         )
+        self.assertTrue(
+            'throw new Error(errMsg);' in content or 'throw new Error(detailMsg);' in content,
+            "copilot.js must throw structured error on non-200 responses"
+        )
         self.assertIn(
-            'throw new Error(detailMsg);',
+            'data.guardrail_triggered',
             content,
-            "copilot.js must throw structured detailMsg on non-200 responses"
+            "copilot.js must check data.guardrail_triggered for SEBI safe harbor notice"
+        )
+        self.assertIn(
+            'copilot-guardrail-badge',
+            content,
+            "copilot.js must render .copilot-guardrail-badge"
+        )
+        self.assertIn(
+            'copilot-citation-tag',
+            content,
+            "copilot.js must render .copilot-citation-tag for citations"
+        )
+        self.assertIn(
+            'formatCopilotMarkdown',
+            content,
+            "copilot.js must support formatCopilotMarkdown"
         )
 
     def test_copilot_modal_html_has_interactive_options(self):

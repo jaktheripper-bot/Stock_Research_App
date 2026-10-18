@@ -1596,7 +1596,10 @@ async def process_forensic_desk_turn(
         return {
             "conversation_id": conversation_id,
             "response": deflection,
-            "status": "REGULATORY_DEFLECTED"
+            "answer": deflection,
+            "status": "REGULATORY_DEFLECTED",
+            "guardrail_triggered": True,
+            "citations": ["SEBI (Research Analysts) Regulations, 2014"]
         }
 
     # 4b. Input Qualification Layer (intercepts gibberish/noise and handles polite greetings)
@@ -2125,5 +2128,8 @@ Recent Conversation History:
     return {
         "conversation_id": conversation_id,
         "response": full_reply,
-        "status": status
+        "answer": full_reply,
+        "status": status,
+        "guardrail_triggered": False,
+        "citations": [f"{clean_ticker} Regulatory Filings", "Statutory Disclosures"] if clean_ticker else []
     }

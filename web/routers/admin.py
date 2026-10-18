@@ -655,7 +655,15 @@ async def api_copilot_chat(payload: CopilotChatRequest, request: Request):
             unlock_checker=lambda kind, asset_id: _asset_unlocked_for_request(request, kind, asset_id),
             is_subscriber=is_subscriber
         )
-        return {"success": True, **res}
+        reply_text = res.get("response", "")
+        return {
+            "success": True,
+            "answer": res.get("answer") or reply_text,
+            "response": reply_text,
+            "citations": res.get("citations", []),
+            "guardrail_triggered": res.get("guardrail_triggered", False),
+            **res
+        }
     except Exception as e:
         logger.error(f"Error in api_copilot_chat: {e}", exc_info=True)
         return {
