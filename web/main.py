@@ -1176,21 +1176,40 @@ async def compare_page(
         error_msg = error_msg or "Please provide two valid stock ticker symbols to initiate peer comparison."
     elif canonical_a == canonical_b:
         error_msg = error_msg or f"Cannot compare a company against itself ({canonical_a}). Please select two distinct entities for peer comparison."
+    else:
+        # Verify both tickers are recognized BSE/NSE securities or archived dossiers before scraping
+        unrecognized = []
+        for sym in (canonical_a, canonical_b):
+            scrip = resolve_bse_scrip_code(sym)
+            has_rep = get_report_by_ticker_sync(sym)
+            if (not scrip or scrip == "N/A") and not has_rep:
+                unrecognized.append(sym)
+        if unrecognized:
+            suggestions = []
+            for u in unrecognized:
+                suggestions.extend(get_ticker_suggestions(u, limit=3))
+            hint = f" Did you mean: {', '.join(dict.fromkeys(suggestions))}?" if suggestions else ""
+            error_msg = (
+                f"Unrecognized or unlisted ticker symbol(s): {', '.join(unrecognized)}. "
+                f"Please select listed BSE/NSE companies for peer comparison.{hint}"
+            )
 
-    try:
-        comp_data = await compare_two_companies(canonical_a, canonical_b)
-    except Exception as e:
-        logger.error(f"Error comparing companies {canonical_a} vs {canonical_b}: {e}")
-        error_msg = error_msg or f"Unable to retrieve verified peer metrics for {canonical_a} vs {canonical_b}: {e}"
-        comp_data = {
-            "ticker_a": canonical_a,
-            "ticker_b": canonical_b,
-            "fund_a": {},
-            "fund_b": {},
-            "matrix_a": {},
-            "matrix_b": {},
-            "disparity": {"is_disparate": False, "warnings": []}
-        }
+    comp_data = {
+        "ticker_a": canonical_a,
+        "ticker_b": canonical_b,
+        "fund_a": {},
+        "fund_b": {},
+        "matrix_a": {},
+        "matrix_b": {},
+        "disparity": {"is_disparate": False, "warnings": []}
+    }
+
+    if not error_msg:
+        try:
+            comp_data = await compare_two_companies(canonical_a, canonical_b)
+        except Exception as e:
+            logger.error(f"Error comparing companies {canonical_a} vs {canonical_b}: {e}")
+            error_msg = f"Unable to retrieve verified peer metrics for {canonical_a} vs {canonical_b}: {e}"
 
     for f_key in ["fund_a", "fund_b"]:
         m = comp_data.get(f_key, {}).get("market_cap")
@@ -1231,14 +1250,14 @@ async def compare_page(
             "active_page": "compare",
             "ticker_a": canonical_a,
             "ticker_b": canonical_b,
-            "compared": True,
+            "compared": not bool(error_msg),
             "compare_error": error_msg,
             "comparison": comparison,
             "fund_a": comp_data.get("fund_a", {}),
             "fund_b": comp_data.get("fund_b", {}),
             "matrix_a": comp_data.get("matrix_a", {}),
             "matrix_b": comp_data.get("matrix_b", {}),
-            "disparity": comp_data.get("disparity", {"is_disparate": False, "warnings": []}),
+            "disparity": comp_data.get("disparity", {"is_disparate": False, "warnings": []})
         }
     )
 

@@ -168,6 +168,15 @@ Detailed forensic analysis with exact page grounding to bseindia.com filings.
         self.assertIn("Peer Comparison Validation Notice:", res.text)
         self.assertIn("Unable to retrieve verified peer metrics for INFY vs TCS", res.text)
 
+    @patch("web.main.compare_two_companies")
+    def test_peer_comparison_unrecognized_tickers_with_suggestions(self, mock_compare):
+        res = self.client.get("/compare?a=INFY&b=UNLISTEDFAKE123")
+        self.assertEqual(res.status_code, 200)
+        self.assertIn("alert alert-warning", res.text)
+        self.assertIn("Peer Comparison Validation Notice:", res.text)
+        self.assertIn("Unrecognized or unlisted ticker symbol(s): UNLISTEDFAKE123", res.text)
+        mock_compare.assert_not_called()
+
     @patch("web.main.get_stock_fundamentals")
     @patch("web.main.get_historical_prices")
     def test_dossier_infy_rendering_and_chart(self, mock_hist, mock_fund):
