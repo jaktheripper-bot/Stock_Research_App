@@ -92,6 +92,17 @@ Whenever authoring, refactoring, or maintaining scheduled pipelines, discovery f
 3. **No Test Scheduler Blindspots:** Schedulers must not be tested solely by checking if the app boots with `TESTING=1`. Tests must directly invoke the scheduler worker functions without mocks, asserting that database record counts increase or time-series timestamps advance.
 4. **Data Provenance & Freshness Badges:** Every rendered asset card or directory must explicitly display its data provenance and last-updated timestamp (`last_updated` / `edition_date`).
 
+## 8. Zero-Illusion Reality Verification & Forbidden Patterns (AST Gate)
 
+### 8.1 Mandatory Pre-Completion Verification Gate
+- Never claim a task, bug fix, or feature is complete based solely on `py_compile`, syntax checks, or mocked unit tests.
+- Before ending ANY turn that modifies `.py` files in `core/` or `web/`, you MUST execute:
+  `python3 scripts/verify_reality_audit.py`
+- If `verify_reality_audit.py` returns a non-zero exit code, you MUST fix all reported `[GATE-1]` through `[GATE-5]` failures before yielding back to the user.
 
-
+### 8.2 Forbidden Code Patterns (Enforced by AST Gate & CI Pipeline)
+- **No Auth Fallbacks:** Never create a session or log a user in inside a `catch`/`except` or non-200 fallback block.
+- **No Module-Level Session Globals:** Never store user identity in module-level variables (`_BARE_USER_SESSION`, `_BARE_AUTH_TOKEN`). Always use request-scoped `contextvars.ContextVar` or signed `HttpOnly` cookies.
+- **No Unverified TLS:** Never use `ssl._create_unverified_context()`; always use `ssl.create_default_context(cafile=certifi.where())`.
+- **No Silent Exception Swallowing:** Every `except Exception as e:` block in `core/` or `web/` must log via `logger.error(...)` or `logger.warning(...)` and never return fabricated financial/ESG metrics (`82/80/88`, `0.0% Pledged`, or synthetic `UDYAM-MH-26-*` entities).
+- **No Audit Gaming:** Never set or check `AUDIT_RECURSION_GUARD` to return hardcoded test counts or mock-pass statements.
