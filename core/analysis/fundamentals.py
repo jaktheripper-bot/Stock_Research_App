@@ -625,7 +625,8 @@ def get_historical_prices(ticker: str, period: str = "6mo"):
                 if hist is not None and not hist.empty and len(hist) > 5:
                     df = hist
                     break
-            except Exception:
+            except Exception as yf_err:
+                logger.debug(f"yfinance history fetch notice for {clean}{suffix}: {yf_err}")
                 continue
 
     if df.empty:

@@ -7,6 +7,9 @@ biases (Anchoring Bias, Confirmation Bias, Disposition Effect, and False Equival
 """
 
 from typing import Dict, Any, List, Optional, Tuple
+import logging
+
+logger = logging.getLogger(__name__)
 
 
 def calculate_52w_percentile(current_price: Any, low_52w: Any, high_52w: Any) -> Optional[float]:
@@ -51,7 +54,8 @@ def calculate_pe_percentile(current_pe: Any, revisions: List[Dict[str, Any]]) ->
                     hp = float(raw_pe)
                     if hp > 0:
                         historical_pes.append(hp)
-                except (ValueError, TypeError):
+                except (ValueError, TypeError) as parse_err:
+                    logger.debug("PE revision parse notice: %s", parse_err)
                     continue
 
         if not historical_pes:

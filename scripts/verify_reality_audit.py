@@ -256,6 +256,59 @@ class RealityAuditor:
         else:
             self.ok(gate, "format_citations_section() returns valid markdown citations")
 
+    # =========================================================================
+    # GATE 6: ZERO SILENT EXCEPTION SWALLOWING & CORTEX REACHABILITY
+    # =========================================================================
+    def run_gate_6_observability_and_wiring(self) -> None:
+        gate = "GATE-6:OBSERVABILITY"
+
+        # 6.1 Ban `except Exception:` blocks that simply `pass` or `continue` without logging
+        for py in find_py_files(["core", "web"]):
+            rel = str(py.relative_to(ROOT))
+            tree = ast.parse(py.read_text(encoding="utf-8"), filename=rel)
+            for node in ast.walk(tree):
+                if isinstance(node, ast.ExceptHandler):
+                    # Flag bare `except: pass` or `except Exception: pass`
+                    if len(node.body) == 1 and isinstance(node.body[0], (ast.Pass, ast.Continue)):
+                        self.fail(
+                            gate,
+                            f"{rel}:{node.lineno}",
+                            "Silent Exception Swallowing: Handler contains only pass/continue without logging telemetry.",
+                        )
+        self.ok(gate, "Zero silent exception handlers (pass/continue) across core/ and web/")
+
+        # 6.2 Cortex Reachability: Verify GarudaReflexEngine is imported and wired in bse_watcher.py
+        bse_watcher_path = ROOT / "core/agents/watchers/bse_watcher.py"
+        if bse_watcher_path.exists():
+            src = bse_watcher_path.read_text(encoding="utf-8")
+            if "GarudaReflexEngine" not in src or "GarudaReflexEngine.classify_announcement" not in src:
+                self.fail(
+                    gate,
+                    "core/agents/watchers/bse_watcher.py",
+                    "Orphaned Cortex Engine: GarudaReflexEngine is not actively wired into bse_watcher.py.",
+                )
+            else:
+                self.ok(gate, "GarudaReflexEngine actively wired into bse_watcher.py")
+
+        # 6.3 DRY Security Crypto: Verify duplicate generate_rfc6238_totp removed from angel_one.py
+        angel_path = ROOT / "core/ingestion/angel_one.py"
+        if angel_path.exists():
+            src = angel_path.read_text(encoding="utf-8")
+            if "def generate_rfc6238_totp" in src:
+                self.fail(
+                    gate,
+                    "core/ingestion/angel_one.py",
+                    "Duplicate Crypto Implementation: generate_rfc6238_totp duplicated in angel_one.py instead of importing canonical core.auth.totp.",
+                )
+            elif "from core.auth.totp import" not in src:
+                self.fail(
+                    gate,
+                    "core/ingestion/angel_one.py",
+                    "Missing Canonical TOTP Import: angel_one.py must import canonical TOTP generator from core.auth.totp.",
+                )
+            else:
+                self.ok(gate, "angel_one.py delegates TOTP generation to canonical core.auth.totp")
+
     def report(self) -> int:
         print("=" * 76)
         print("MOATNOMICS ZERO-ILLUSION REALITY & SECURITY AUDIT")
@@ -264,7 +317,7 @@ class RealityAuditor:
             print(f"  PASS  {msg}")
         print("-" * 76)
         if not self.failures:
-            print("ALL 5 REALITY GATES PASSED (0 vulnerabilities, 0 broken contracts).")
+            print("ALL 6 REALITY GATES PASSED (0 vulnerabilities, 0 broken contracts).")
             return 0
 
         print(f"AUDIT FAILED: {len(self.failures)} REAL ISSUE(S) DETECTED:\n")
@@ -281,4 +334,6 @@ if __name__ == "__main__":
     auditor.run_gate_3_sql_schema()
     auditor.run_gate_4_anti_potemkin()
     auditor.run_gate_5_behavioral()
+    auditor.run_gate_6_observability_and_wiring()
     sys.exit(auditor.report())
+

@@ -237,7 +237,8 @@ def stream_perplexity_fallback(prompt: str, system_prompt: str, collected_citati
                                 "uri": c_url,
                                 "source_type": "Perplexity Search Grounding"
                             })
-            except Exception:
+            except Exception as stream_err:
+                logger.debug(f"Perplexity streaming parse notice: {stream_err}")
                 continue
 
     if not yielded:

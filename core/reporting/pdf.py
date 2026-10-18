@@ -381,13 +381,13 @@ a {
         if os.path.exists(out_name):
             try:
                 os.unlink(out_name)
-            except OSError:
-                pass
+            except OSError as cleanup_err:
+                logger.debug("Cleanup notice for %s: %s", out_name, cleanup_err)
         if chart_filename and os.path.exists(chart_filename):
             try:
                 os.unlink(chart_filename)
-            except OSError:
-                pass
+            except OSError as cleanup_err:
+                logger.debug("Cleanup notice for %s: %s", chart_filename, cleanup_err)
 
 
 def apply_pdf_watermark(pdf_bytes: bytes, account_ref: str = "") -> bytes:
@@ -519,8 +519,8 @@ def generate_fund_dossier_pdf(
         if os.path.exists(out_name):
             try:
                 os.unlink(out_name)
-            except OSError:
-                pass
+            except OSError as cleanup_err:
+                logger.debug("Cleanup notice for %s: %s", out_name, cleanup_err)
 
 
 def generate_debt_dossier_pdf(
@@ -623,8 +623,8 @@ def generate_debt_dossier_pdf(
         if os.path.exists(out_name):
             try:
                 os.unlink(out_name)
-            except OSError:
-                pass
+            except OSError as cleanup_err:
+                logger.debug("Cleanup notice for %s: %s", out_name, cleanup_err)
 
 
 def generate_reit_dossier_pdf(
@@ -731,5 +731,5 @@ Under Indian tax laws, distributions from REITs and InvITs pass through three di
         if os.path.exists(out_name):
             try:
                 os.unlink(out_name)
-            except OSError:
-                pass
+            except OSError as cleanup_err:
+                logger.debug("Cleanup notice for %s: %s", out_name, cleanup_err)

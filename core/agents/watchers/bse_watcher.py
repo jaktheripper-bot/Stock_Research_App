@@ -11,6 +11,7 @@ from datetime import datetime, timezone
 from typing import Dict, Any, List
 
 from core.analysis.fundamentals import fetch_latest_bse_announcement, resolve_bse_scrip_code
+from core.cortex.garuda import GarudaReflexEngine
 from core.db.watchlist import get_watchlist
 from core.db.agent_sessions import record_autonomous_event
 
@@ -49,20 +50,31 @@ async def scan_watchlist_bse_announcements() -> List[Dict[str, Any]]:
             # Resolve 6-digit numeric BSE scrip code before calling fetch_latest_bse_announcement
             scrip_code = item.get("scrip_code") or resolve_bse_scrip_code(ticker) or ticker
             latest = await asyncio.to_thread(fetch_latest_bse_announcement, str(scrip_code))
-            if latest and any(w in latest.lower() for w in ["resignation", "pledge", "fraud", "litigation", "default", "merger", "acquisition"]):
-                summary = f"Material disclosure detected for {ticker}: {latest[:95]}... Autonomous re-audit dispatched."
-                event_id = record_autonomous_event(
-                    event_type="bse_material_filing",
-                    ticker=ticker,
-                    trigger_source="bse_watcher",
-                    action_taken="auto_reaudit_dispatched",
-                    summary=summary,
-                    metadata={"headline": latest}
+            if latest:
+                delta = GarudaReflexEngine.classify_announcement(ticker, latest)
+                is_material = delta.urgency in ["IMMEDIATE_REFRESH", "ROUTINE_PATCH"] or any(
+                    w in latest.lower() for w in ["resignation", "pledge", "fraud", "litigation", "default", "merger", "acquisition"]
                 )
-                events_triggered.append({"ticker": ticker, "event_id": event_id, "headline": latest})
-                logger.info(f"🚨 [BSE Watcher] {summary}")
-                # Launch background thesis re-check
-                asyncio.create_task(_recheck_equity_thesis_background(ticker, latest))
+                if is_material:
+                    summary = f"Material disclosure detected for {ticker} [Pillar {delta.target_pillar_id}: {delta.catalyst_type}]: {latest[:95]}... Autonomous re-audit dispatched."
+                    event_id = record_autonomous_event(
+                        event_type="bse_material_filing",
+                        ticker=ticker,
+                        trigger_source="bse_watcher",
+                        action_taken="auto_reaudit_dispatched",
+                        summary=summary,
+                        metadata={
+                            "headline": latest,
+                            "pillar_id": delta.target_pillar_id,
+                            "catalyst_type": delta.catalyst_type,
+                            "urgency": delta.urgency,
+                            "delta_snippet": delta.delta_snippet_md,
+                        }
+                    )
+                    events_triggered.append({"ticker": ticker, "event_id": event_id, "headline": latest, "delta": delta})
+                    logger.info(f"🚨 [BSE Watcher] {summary}")
+                    # Launch background thesis re-check
+                    asyncio.create_task(_recheck_equity_thesis_background(ticker, latest))
         except Exception as e:
             logger.warning(f"Error checking BSE filing for {ticker}: {e}")
 

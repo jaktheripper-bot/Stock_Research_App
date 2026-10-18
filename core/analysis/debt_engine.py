@@ -879,23 +879,23 @@ def evaluate_equity_cross_contagion(security: Dict[str, Any], fetch_live_fundame
     if meta.get("debt_to_equity") is not None:
         try:
             debt_to_equity = float(meta["debt_to_equity"])
-        except (ValueError, TypeError):
-            pass
+        except (ValueError, TypeError) as num_err:
+            logger.debug(f"debt_to_equity numeric parse notice: {num_err}")
     if meta.get("promoter_pledged_pct") is not None:
         try:
             promoter_pledge_pct = float(meta["promoter_pledged_pct"])
-        except (ValueError, TypeError):
-            pass
+        except (ValueError, TypeError) as num_err:
+            logger.debug(f"promoter_pledged_pct numeric parse notice: {num_err}")
     elif meta.get("pledged_promoter_holding") is not None:
         try:
             promoter_pledge_pct = float(meta["pledged_promoter_holding"])
-        except (ValueError, TypeError):
-            pass
+        except (ValueError, TypeError) as num_err:
+            logger.debug(f"pledged_promoter_holding numeric parse notice: {num_err}")
     if meta.get("piotroski_f_score") is not None:
         try:
             piotroski_f_score = int(meta["piotroski_f_score"])
-        except (ValueError, TypeError):
-            pass
+        except (ValueError, TypeError) as num_err:
+            logger.debug(f"piotroski_f_score numeric parse notice: {num_err}")
     if meta.get("governance_score") or meta.get("governance_posture"):
         governance_posture = meta.get("governance_score") or meta.get("governance_posture")
 

@@ -33,16 +33,16 @@ def generate_totp_secret(length_bytes: int = 20) -> str:
     return base64.b32encode(raw_bytes).decode("ascii").rstrip("=")
 
 
-def get_totp_code(secret: str, interval: int = 30, for_time: Optional[int] = None) -> str:
+def get_totp_code(secret: str, interval: int = 30, for_time: Optional[int] = None, digits: int = 6) -> str:
     """
-    Computes standard 6-digit TOTP code for the given secret at `for_time` (default: now).
+    Computes standard TOTP code for the given secret at `for_time` (default: now).
     """
     if for_time is None:
         for_time = int(time.time())
     counter = int(for_time // interval)
 
     # Pad unpadded base32 secret
-    clean_secret = secret.strip().upper()
+    clean_secret = secret.strip().replace(" ", "").upper()
     padding_needed = (8 - len(clean_secret) % 8) % 8
     padded_secret = clean_secret + ("=" * padding_needed)
 
@@ -63,8 +63,22 @@ def get_totp_code(secret: str, interval: int = 30, for_time: Optional[int] = Non
         | ((digest[offset + 2] & 0xFF) << 8)
         | (digest[offset + 3] & 0xFF)
     )
-    code = binary_val % 1_000_000
-    return str(code).zfill(6)
+    code = binary_val % (10 ** digits)
+    return str(code).zfill(digits)
+
+
+def generate_rfc6238_totp(secret: str, digits: int = 6, interval: int = 30) -> str:
+    """
+    RFC 6238 TOTP generator, delegating to canonical get_totp_code with error resilience.
+    """
+    if not secret or not isinstance(secret, str):
+        return ""
+    try:
+        return get_totp_code(secret, interval=interval, digits=digits)
+    except Exception as e:
+        logger.debug("RFC 6238 TOTP generation notice: %s", e)
+        return ""
+
 
 
 def verify_totp_code(secret: str, code: str, interval: int = 30, window: int = 1) -> bool:

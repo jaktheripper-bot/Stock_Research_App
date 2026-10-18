@@ -30,6 +30,7 @@ import requests
 import math
 
 from core.config import get_secret
+from core.auth.totp import generate_rfc6238_totp
 
 logger = logging.getLogger("equity_research.core.ingestion.angel_one")
 
@@ -46,40 +47,6 @@ def _candle_rate_wait() -> None:
         if wait > 0:
             time.sleep(wait)
         _candle_last_call = time.monotonic()
-
-
-
-def generate_rfc6238_totp(secret: str, digits: int = 6, interval: int = 30) -> str:
-    """
-    Generates a standard 6-digit Time-based One-Time Password (RFC 6238).
-    Pure Python standard library implementation with zero external dependencies.
-    Resilient to whitespace, lowercase characters, missing padding, and invalid inputs.
-    """
-    if not secret or not isinstance(secret, str):
-        return ""
-
-    try:
-        clean_secret = secret.strip().replace(" ", "").upper()
-        # Filter for valid base32 characters (A-Z, 2-7)
-        clean_secret = "".join(c for c in clean_secret if c in "ABCDEFGHIJKLMNOPQRSTUVWXYZ234567")
-        if not clean_secret:
-            return ""
-
-        # Add padding if required
-        missing_padding = len(clean_secret) % 8
-        if missing_padding:
-            clean_secret += "=" * (8 - missing_padding)
-
-        key = base64.b32decode(clean_secret)
-        counter = int(time.time() // interval)
-        msg = struct.pack(">Q", counter)
-        digest = hmac.new(key, msg, hashlib.sha1).digest()
-        offset = digest[-1] & 0x0F
-        code = (struct.unpack(">I", digest[offset:offset + 4])[0] & 0x7FFFFFFF) % (10 ** digits)
-        return str(code).zfill(digits)
-    except Exception as e:
-        logger.warning(f"RFC 6238 TOTP generation notice: {e}")
-        return ""
 
 
 class AngelOneGateway:

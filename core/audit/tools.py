@@ -398,7 +398,8 @@ def check_unlogged_blanket_exceptions() -> List[Dict[str, Any]]:
                 try:
                     src = fpath.read_text(encoding="utf-8")
                     tree = ast.parse(src, filename=str(fpath))
-                except Exception:
+                except Exception as parse_err:
+                    logger.debug(f"AST parse notice for {fpath}: {parse_err}")
                     continue
 
                 for node in ast.walk(tree):

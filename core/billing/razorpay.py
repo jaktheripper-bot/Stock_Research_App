@@ -222,9 +222,8 @@ def verify_payment_signature(
                 "razorpay_signature": signature
             })
             return True
-        except Exception:
-            # Fall through to raw HMAC compare
-            pass
+        except Exception as sdk_err:
+            logger.debug("Razorpay SDK verify notice: %s. Falling back to HMAC.", sdk_err)
 
     # 2. Raw HMAC-SHA256 cryptographic verification
     try:
