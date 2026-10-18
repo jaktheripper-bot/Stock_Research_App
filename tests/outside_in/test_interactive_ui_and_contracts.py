@@ -428,6 +428,56 @@ class TestFrontendClickWiringAndCredits(unittest.TestCase):
         self.assertIn("window.unlockDeepDive = async function", content)
         self.assertIn("/api/dossier/unlock/", content)
 
+    def test_extract_api_error_implementation_and_evaluation(self):
+        """Verifies that extractApiError is defined, exposed on window, and properly parses all FastAPI error variants."""
+        import subprocess
+        import json
+        import re
+
+        main_js_path = self.project_root / "web" / "static" / "js" / "main.js"
+        content = main_js_path.read_text(encoding="utf-8")
+        self.assertIn("function extractApiError", content)
+        self.assertIn("window.extractApiError = extractApiError", content)
+        self.assertIn("extractApiError(data", content)
+
+        # Extract the exact function implementation directly from main.js
+        pattern = r"(function extractApiError\([\s\S]*?^\})"
+        match = re.search(pattern, content, re.MULTILINE)
+        self.assertIsNotNone(match, "extractApiError must be declared in main.js")
+        fn_code = match.group(1)
+
+        # Empirically execute the exact function using Node.js
+        node_script = f"""
+        {fn_code}
+        const results = [
+            extractApiError({{ detail: 'String error' }}, 'fallback'),
+            extractApiError({{ detail: {{ message: 'Nested message error' }} }}, 'fallback'),
+            extractApiError({{ detail: {{ error: 'ERR_CODE_ONLY' }} }}, 'fallback'),
+            extractApiError({{ detail: [{{ loc: ['body', 'ticker'], msg: 'field required' }}] }}, 'fallback'),
+            extractApiError({{ message: 'Top-level message' }}, 'fallback'),
+            extractApiError({{ error: 'Top-level error' }}, 'fallback'),
+            extractApiError(null, 'Custom fallback'),
+            extractApiError({{}}, 'Custom fallback')
+        ];
+        console.log(JSON.stringify(results));
+        """
+        proc = subprocess.run(
+            ["node", "-e", node_script],
+            capture_output=True,
+            text=True,
+            check=True
+        )
+        res = json.loads(proc.stdout.strip())
+        self.assertEqual(res[0], "String error")
+        self.assertEqual(res[1], "Nested message error")
+        self.assertEqual(res[2], "ERR_CODE_ONLY")
+        self.assertEqual(res[3], "ticker: field required")
+        self.assertEqual(res[4], "Top-level message")
+        self.assertEqual(res[5], "Top-level error")
+        self.assertEqual(res[6], "Custom fallback")
+        self.assertEqual(res[7], "Custom fallback")
+
+
     def test_progressive_30s_fill_button_implemented_in_css_and_js(self):
         """Verifies that 30-second progressive fill loading animation tokens exist in CSS and JS."""
         style_css_path = self.project_root / "web" / "static" / "css" / "style.css"

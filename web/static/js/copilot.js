@@ -911,7 +911,9 @@ async function submitCopilotMessage() {
         thinkingCard.remove();
 
         if (!resp.ok) {
-            const errorMsg = data.detail || data.message || `Server returned HTTP ${resp.status}`;
+            const errorMsg = typeof window.extractApiError === 'function'
+                ? window.extractApiError(data, `Server returned HTTP ${resp.status}`)
+                : (data.detail || data.message || `Server returned HTTP ${resp.status}`);
             throw new Error(errorMsg);
         }
 

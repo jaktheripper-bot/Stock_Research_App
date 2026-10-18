@@ -713,9 +713,41 @@ window.hideEvaluationHUD = function() {
   }
 };
 
+/**
+ * Safely extract a human-readable string from FastAPI error responses
+ * (handles string `detail`, structured `{detail: {error, message}}` objects,
+ * validation error arrays, top-level `message`, and top-level `error`).
+ */
+function extractApiError(data, fallbackMessage = 'An unexpected error occurred.') {
+  if (!data) return fallbackMessage;
+  if (typeof data === 'string') return data;
+  if (typeof data.detail === 'string') return data.detail;
+  if (data.detail && typeof data.detail === 'object') {
+    if (Array.isArray(data.detail)) {
+      const msgs = data.detail
+        .map(d => {
+          if (!d) return '';
+          if (typeof d === 'string') return d;
+          if (d.msg) return `${d.loc ? d.loc.slice(-1)[0] + ': ' : ''}${d.msg}`;
+          return JSON.stringify(d);
+        })
+        .filter(Boolean);
+      if (msgs.length > 0) return msgs.join(', ');
+    }
+    if (typeof data.detail.message === 'string') return data.detail.message;
+    if (typeof data.detail.error === 'string') return data.detail.error;
+  }
+  if (typeof data.message === 'string') return data.message;
+  if (typeof data.error === 'string') return data.error;
+  return fallbackMessage;
+}
+window.extractApiError = extractApiError;
+
 window.synthesizeReport = async function(ticker, forceRefresh = false) {
+  if (!ticker) return;
+
   const user = getStoredUser();
-  if (!user) {
+  if (!user || !user.id) {
     alert('Please sign in first to generate institutional dossiers. You will receive 2 free research credits.');
     openSignInModal();
     return;
@@ -724,7 +756,11 @@ window.synthesizeReport = async function(ticker, forceRefresh = false) {
   const balance = parseFloat(user.credits_balance) || 0;
   if (balance < 1) {
     if (confirm(`You need at least 1 research credit to generate a new dossier.\n\nCurrent balance: ${balance} credits.\n\nWould you like to visit the Pricing page to top up credits?`)) {
-      window.location.href = '/pricing';
+      if (typeof openPricingModal === 'function') {
+        openPricingModal();
+      } else {
+        window.location.href = '/pricing';
+      }
     }
     return;
   }
@@ -734,8 +770,18 @@ window.synthesizeReport = async function(ticker, forceRefresh = false) {
     return;
   }
 
+  const buttons = document.querySelectorAll(`button[onclick*="synthesizeReport('${ticker}')"], #synthesizeBtn`);
+  const originalTexts = [];
+  buttons.forEach((btn, idx) => {
+    originalTexts[idx] = btn.innerHTML;
+    btn.disabled = true;
+    btn.innerHTML = `<span class="spinner-border spinner-border-sm" role="status" aria-hidden="true"></span> Synthesizing Dossier (15-30s)...`;
+  });
+
   // Show the institutional evaluation HUD with progressive timer & background info
-  window.showEvaluationHUD({ assetType: 'equity', ticker, customTitle: `Synthesizing Dossier: ${ticker}`, totalSec: 30 });
+  if (typeof window.showEvaluationHUD === 'function') {
+    window.showEvaluationHUD({ assetType: 'equity', ticker, customTitle: `Synthesizing Dossier: ${ticker}`, totalSec: 30 });
+  }
 
   try {
     const resp = await fetch('/api/synthesize', {
@@ -748,48 +794,72 @@ window.synthesizeReport = async function(ticker, forceRefresh = false) {
       })
     });
 
-    const data = await resp.json();
+    let data = {};
+    try {
+      data = await resp.json();
+    } catch (_) {
+      data = {};
+    }
 
-    if (resp.ok && data.success) {
-      window.hideEvaluationHUD();
+    if (typeof window.hideEvaluationHUD === 'function') window.hideEvaluationHUD();
 
-      // Update local credits atomically
-      if (data.new_balance !== undefined) {
-        user.credits_balance = data.new_balance;
+    if (resp.ok && (data.success || data.status === 'success')) {
+      // Update local credits atomically (supports new_balance and remaining_credits)
+      const newBal = typeof data.new_balance === 'number' ? data.new_balance : (typeof data.remaining_credits === 'number' ? data.remaining_credits : undefined);
+      if (typeof newBal === 'number') {
+        user.credits_balance = newBal;
+        user.credits = newBal;
         localStorage.setItem('sr_user', JSON.stringify(user));
         syncUserSession();
+        if (typeof updateNavAuthUI === 'function') updateNavAuthUI(user);
       }
 
       if (data.already_exists) {
-        alert('✅ ' + data.message);
+        alert('✅ ' + (data.message || `Dossier for ${ticker} is already available.`));
       } else {
-        alert('🎉 ' + data.message);
+        alert('🎉 ' + (data.message || `Dossier for ${ticker} synthesized successfully!`));
       }
 
       // Navigate directly to the newly generated dossier
-      window.location.href = data.dossier_url;
-    } else {
-      window.hideEvaluationHUD();
+      const targetUrl = data.dossier_url || data.redirect_url || `/dossier/${encodeURIComponent(ticker)}`;
+      window.location.href = targetUrl;
+      return;
+    }
 
-      const detail = data.detail || data.message || 'Synthesis failed.';
-      if (resp.status === 402) {
-        if (confirm(detail + '\n\nWould you like to purchase more credits?')) {
+    const errMsg = extractApiError(data, 'Synthesis failed. Please try again.');
+    if (resp.status === 402 || (data.detail && data.detail.error === 'INSUFFICIENT_CREDITS')) {
+      if (confirm(`${errMsg}\n\nWould you like to purchase more credits on the Pricing page?`)) {
+        if (typeof openPricingModal === 'function') {
+          openPricingModal();
+        } else {
           window.location.href = '/pricing';
         }
-      } else if (resp.status === 401) {
-        alert(detail);
-        openSignInModal();
-      } else {
-        alert('❌ ' + detail);
       }
+    } else if (resp.status === 401 || resp.status === 403) {
+      localStorage.removeItem('sr_user');
+      if (typeof updateNavAuthUI === 'function') updateNavAuthUI(null);
+      alert(errMsg || 'Your session has expired. Please sign in again.');
+      openSignInModal();
+    } else {
+      alert(`Synthesis Alert: ${errMsg}`);
+    }
 
-      // Refresh balance in background in case of refund
+    // Refresh balance in background in case of refund
+    if (typeof refreshUserBalance === 'function') {
       await refreshUserBalance(user);
     }
   } catch (err) {
-    window.hideEvaluationHUD();
-    alert('Synthesis Request Error: ' + err.message);
-    await refreshUserBalance(user);
+    if (typeof window.hideEvaluationHUD === 'function') window.hideEvaluationHUD();
+    console.error('Synthesis request failed:', err);
+    alert('Network error while communicating with the synthesis engine. Please try again.');
+    if (typeof refreshUserBalance === 'function') {
+      await refreshUserBalance(user);
+    }
+  } finally {
+    buttons.forEach((btn, idx) => {
+      btn.disabled = false;
+      if (originalTexts[idx]) btn.innerHTML = originalTexts[idx];
+    });
   }
 };
 
@@ -802,7 +872,7 @@ window.unlockDeepDive = async function(ticker) {
   if (!cleanTicker) return;
 
   const user = getStoredUser();
-  if (!user) {
+  if (!user || !user.id) {
     alert('Sign in required to unlock institutional deep dives. You will receive 2 free welcome research credits on registration.');
     openSignInModal();
     return;
@@ -811,13 +881,25 @@ window.unlockDeepDive = async function(ticker) {
   const balance = parseFloat(user.credits_balance) || 0;
   if (balance < 1) {
     if (confirm(`Unlocking the Institutional Deep-Dive (Forensic Accounting Ledger, Reverse DCF & Institutional PDF Export) requires 1 research credit.\n\nCurrent balance: ${balance} credits.\n\nWould you like to visit the Pricing page to top up credits?`)) {
-      window.location.href = '/pricing';
+      if (typeof openPricingModal === 'function') {
+        openPricingModal();
+      } else {
+        window.location.href = '/pricing';
+      }
     }
     return;
   }
 
   if (!confirm(`Unlock the full Institutional Deep-Dive for ${cleanTicker}?\n\nThis permanently unlocks Pillar 03 (Forensic Sieve), Pillar 05 (Reverse DCF Sandbox), and full PDF download for this equity.\n\nCost: 1 Research Credit\nCurrent Balance: ${balance} credits`)) {
     return;
+  }
+
+  const btn = document.getElementById('unlockDeepDiveBtn') || (typeof event !== 'undefined' && event?.currentTarget ? event.currentTarget : null);
+  let origHtml = '';
+  if (btn) {
+    origHtml = btn.innerHTML;
+    btn.disabled = true;
+    btn.innerHTML = '<span class="spinner-border spinner-border-sm" role="status" aria-hidden="true"></span> Unlocking Deep-Dive...';
   }
 
   if (typeof window.showEvaluationHUD === 'function') {
@@ -834,33 +916,55 @@ window.unlockDeepDive = async function(ticker) {
       })
     });
 
-    const data = await resp.json();
+    let data = {};
+    try {
+      data = await resp.json();
+    } catch (_) {
+      data = {};
+    }
+
     if (typeof window.hideEvaluationHUD === 'function') window.hideEvaluationHUD();
 
-    if (resp.ok && data.success) {
-      if (data.new_balance !== undefined) {
-        user.credits_balance = data.new_balance;
+    if (resp.ok && (data.success || data.status === 'success')) {
+      const newBal = typeof data.new_balance === 'number' ? data.new_balance : (typeof data.remaining_credits === 'number' ? data.remaining_credits : undefined);
+      if (typeof newBal === 'number') {
+        user.credits_balance = newBal;
+        user.credits = newBal;
         localStorage.setItem('sr_user', JSON.stringify(user));
         syncUserSession();
+        if (typeof updateNavAuthUI === 'function') updateNavAuthUI(user);
       }
-      alert(`🎉 ${data.message || `Institutional Deep-Dive for ${cleanTicker} unlocked successfully!`}\n\nRemaining Balance: ${data.new_balance} credits.`);
+      alert(`🎉 ${data.message || `Institutional Deep-Dive for ${cleanTicker} unlocked successfully!`}\n\nRemaining Balance: ${user.credits_balance} credits.`);
       window.location.reload();
-    } else {
-      const detail = data.detail || data.message || 'Unlock failed.';
-      if (resp.status === 402) {
-        if (confirm(`${detail}\n\nWould you like to purchase more credits on the Pricing page?`)) {
+      return;
+    }
+
+    const errMsg = extractApiError(data, 'Could not unlock Deep-Dive.');
+    if (resp.status === 402 || (data.detail && data.detail.error === 'INSUFFICIENT_CREDITS')) {
+      if (confirm(`${errMsg}\n\nWould you like to purchase more credits on the Pricing page?`)) {
+        if (typeof openPricingModal === 'function') {
+          openPricingModal();
+        } else {
           window.location.href = '/pricing';
         }
-      } else if (resp.status === 401) {
-        alert(detail);
-        openSignInModal();
-      } else {
-        alert('❌ ' + detail);
       }
+    } else if (resp.status === 401 || resp.status === 403) {
+      localStorage.removeItem('sr_user');
+      if (typeof updateNavAuthUI === 'function') updateNavAuthUI(null);
+      alert(errMsg || 'Your session has expired. Please sign in again.');
+      openSignInModal();
+    } else {
+      alert('❌ ' + errMsg);
     }
   } catch (err) {
     if (typeof window.hideEvaluationHUD === 'function') window.hideEvaluationHUD();
+    console.error('Unlock error:', err);
     alert('Network error while processing deep-dive unlock: ' + err.message);
+  } finally {
+    if (btn) {
+      btn.disabled = false;
+      if (origHtml) btn.innerHTML = origHtml;
+    }
   }
 };
 
@@ -871,7 +975,7 @@ window.unlockAssetDeepDive = async function(kind, assetId) {
   if (!cleanId || !['FUND', 'DEBT', 'REIT'].includes(cleanKind)) return;
 
   const user = getStoredUser();
-  if (!user) {
+  if (!user || !user.id) {
     alert('Sign in to unlock the Deep Dive. New accounts get 2 free welcome credits.');
     openSignInModal();
     return;
@@ -880,7 +984,11 @@ window.unlockAssetDeepDive = async function(kind, assetId) {
   const balance = parseFloat(user.credits_balance) || 0;
   if (balance < 1) {
     if (confirm(`The Deep Dive costs 1 research credit and your balance is ${balance}.\n\nOpen the Pricing page to top up?`)) {
-      window.location.href = '/pricing';
+      if (typeof openPricingModal === 'function') {
+        openPricingModal();
+      } else {
+        window.location.href = '/pricing';
+      }
     }
     return;
   }
@@ -890,36 +998,77 @@ window.unlockAssetDeepDive = async function(kind, assetId) {
     return;
   }
 
+  const btn = (typeof event !== 'undefined' && event?.currentTarget ? event.currentTarget : null) || document.getElementById(`btnUnlock${cleanKind}`);
+  let origHtml = '';
+  if (btn) {
+    origHtml = btn.innerHTML;
+    btn.disabled = true;
+    btn.innerHTML = '<span class="spinner-border spinner-border-sm" role="status" aria-hidden="true"></span> Unlocking...';
+  }
+
   if (typeof window.showEvaluationHUD === 'function') {
     window.showEvaluationHUD({ assetType: 'unlock', ticker: cleanId, totalSec: 15 });
   }
 
   const path = cleanKind === 'FUND' ? 'funds' : (cleanKind === 'REIT' ? 'reits' : 'debt');
   try {
-    const resp = await fetch(`/api/${path}/unlock/${encodeURIComponent(cleanId)}`, { method: 'POST' });
-    const data = await resp.json();
+    const resp = await fetch(`/api/${path}/unlock/${encodeURIComponent(cleanId)}`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ user_id: user.id })
+    });
+    let data = {};
+    try {
+      data = await resp.json();
+    } catch (_) {
+      data = {};
+    }
+
     if (typeof window.hideEvaluationHUD === 'function') window.hideEvaluationHUD();
 
-    if (resp.ok && data.success) {
-      if (data.new_balance !== undefined) {
-        user.credits_balance = data.new_balance;
+    if (resp.ok && (data.success || data.status === 'success')) {
+      const newBal = typeof data.new_balance === 'number' ? data.new_balance : (typeof data.remaining_credits === 'number' ? data.remaining_credits : undefined);
+      if (typeof newBal === 'number') {
+        user.credits_balance = newBal;
+        user.credits = newBal;
         localStorage.setItem('sr_user', JSON.stringify(user));
         syncUserSession();
+        if (typeof updateNavAuthUI === 'function') updateNavAuthUI(user);
       }
+      alert(`🎉 ${data.message || `Deep Dive unlocked for ${cleanId}!`}\n\nRemaining Balance: ${user.credits_balance} credits.`);
       window.location.reload();
-    } else if (resp.status === 402) {
-      if (confirm(`${data.detail || 'Not enough credits.'}\n\nOpen the Pricing page?`)) window.location.href = '/pricing';
-    } else if (resp.status === 401) {
-      alert(data.detail || 'Please sign in.');
+      return;
+    }
+
+    const errMsg = extractApiError(data, 'Could not unlock asset deep-dive.');
+    if (resp.status === 402 || (data.detail && data.detail.error === 'INSUFFICIENT_CREDITS')) {
+      if (confirm(`${errMsg}\n\nOpen the Pricing page?`)) {
+        if (typeof openPricingModal === 'function') {
+          openPricingModal();
+        } else {
+          window.location.href = '/pricing';
+        }
+      }
+    } else if (resp.status === 401 || resp.status === 403) {
+      localStorage.removeItem('sr_user');
+      if (typeof updateNavAuthUI === 'function') updateNavAuthUI(null);
+      alert(errMsg || 'Your session has expired. Please sign in again.');
       openSignInModal();
     } else {
-      alert(data.detail || 'Unlock failed.');
+      alert('❌ ' + errMsg);
     }
   } catch (err) {
     if (typeof window.hideEvaluationHUD === 'function') window.hideEvaluationHUD();
+    console.error('Asset unlock error:', err);
     alert('Network error while unlocking: ' + err.message);
+  } finally {
+    if (btn) {
+      btn.disabled = false;
+      if (origHtml) btn.innerHTML = origHtml;
+    }
   }
 };
+
 
 
 // ==============================================================================
@@ -1017,7 +1166,7 @@ window.handleAuthFormSubmit = async function(e) {
         }
         submitBtn.innerText = 'Verify & Claim 2 Credits →';
       } else {
-        alert('Authentication Error: ' + (data.detail || data.message || 'Could not send verification code.'));
+        alert('Authentication Error: ' + extractApiError(data, 'Could not send verification code.'));
       }
     } catch (err) {
       alert('Authentication Error: ' + err.message);
@@ -1061,7 +1210,7 @@ window.handleAuthFormSubmit = async function(e) {
         alert(`🎉 Welcome ${data.user.full_name}! You have received 2 free research credits.`);
         window.location.reload();
       } else {
-        alert('Verification Failed: ' + (data.detail || data.message || 'Invalid or expired code.'));
+        alert('Verification Failed: ' + extractApiError(data, 'Invalid or expired code.'));
       }
     } catch (err) {
       alert('Verification Failed: ' + err.message);
@@ -1094,7 +1243,7 @@ window.handleResendOtp = async function() {
       }
       alert('A fresh verification code has been dispatched.');
     } else {
-      alert('Notice: ' + (data.detail || data.message || 'Could not resend code.'));
+      alert('Notice: ' + extractApiError(data, 'Could not resend code.'));
     }
   } catch (err) {
     alert('Resend Error: ' + err.message);
@@ -1135,7 +1284,7 @@ window.handlePreMortemSubmit = async function(e, ticker) {
       }
       alert(`🔒 ${data.message}`);
     } else {
-      alert('Error: ' + (data.detail || data.message || 'Could not record.'));
+      alert('Error: ' + extractApiError(data, 'Could not record.'));
     }
   } catch (err) {
     alert('Error recording pre-mortem: ' + err.message);
@@ -1202,7 +1351,7 @@ window.handleThesisCheckpointSubmit = async function(e, ticker) {
       alert(`⚖️ ${data.message}`);
       window.closeThesisModal();
     } else {
-      alert('Error: ' + (data.detail || data.message || 'Could not record checkpoint.'));
+      alert('Error: ' + extractApiError(data, 'Could not record checkpoint.'));
     }
   } catch (err) {
     alert('Error recording thesis checkpoint: ' + err.message);
