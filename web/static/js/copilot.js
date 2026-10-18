@@ -681,9 +681,10 @@ function openCopilot(ticker, assetType, section, sectionLabel, initialPrompt) {
 
     if (modal) {
         modal.style.display = "flex";
-        // Force reflow for smooth CSS transition
         void modal.offsetWidth;
         modal.classList.add("copilot-open");
+        const mainEl = document.querySelector("main");
+        if (mainEl) mainEl.inert = true;
     }
 
     // Prepare and focus input with scroll protection
@@ -709,6 +710,8 @@ function openCopilot(ticker, assetType, section, sectionLabel, initialPrompt) {
 
 function closeCopilot() {
     const modal = document.getElementById("copilotModalBackdrop");
+    const mainEl = document.querySelector("main");
+    if (mainEl) mainEl.inert = false;
     if (modal) {
         modal.classList.remove("copilot-open");
         setTimeout(() => {
@@ -778,6 +781,10 @@ function handleCopilotInput(el) {
 function handleCopilotKeydown(event) {
     if (event.key === "Enter" && !event.shiftKey) {
         event.preventDefault();
+        // Block premature submission during IME composition (including Safari keyCode 229 quirk)
+        if (event.isComposing || event.keyCode === 229) {
+            return;
+        }
         submitCopilotMessage();
     }
 }

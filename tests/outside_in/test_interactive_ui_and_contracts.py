@@ -748,6 +748,21 @@ class TestCopilotUIAndSyntax(unittest.TestCase):
             content,
             "copilot.js must support formatCopilotMarkdown"
         )
+        self.assertIn(
+            'mainEl.inert = true;',
+            content,
+            "copilot.js must set mainEl.inert = true on modal open for background focus trapping"
+        )
+        self.assertIn(
+            'mainEl.inert = false;',
+            content,
+            "copilot.js must set mainEl.inert = false on closeCopilot"
+        )
+        self.assertIn(
+            'event.isComposing || event.keyCode === 229',
+            content,
+            "copilot.js handleCopilotKeydown must protect against premature IME composition submit"
+        )
 
     def test_copilot_modal_html_has_interactive_options(self):
         """Audits copilot_modal.html to verify markup has accessible, clickable option elements."""
