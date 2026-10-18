@@ -823,6 +823,19 @@ Detailed forensic analysis with exact page grounding to bseindia.com filings.
         self.assertEqual(r4.status_code, 200)
         self.assertIn("Active Deflator: 5.0% Annual Inflation", r4.text)
 
+        # 5. Outside-In DOM & attribute contract audit for #inflationInput
+        from bs4 import BeautifulSoup
+        soup = BeautifulSoup(r1.text, "html.parser")
+        inp = soup.find("input", id="inflationInput")
+        self.assertIsNotNone(inp, "Missing #inflationInput in rendered HTML")
+        self.assertEqual(inp.get("name"), "inflation")
+        self.assertEqual(inp.get("value"), "5.0")
+        self.assertEqual(inp.get("step"), "0.1")
+        self.assertEqual(inp.get("min"), "0")
+        self.assertEqual(inp.get("max"), "25")
+        self.assertTrue(inp.has_attr("required"))
+        self.assertIn("var(--border-subtle)", inp.get("style", ""))
+
 
 
 

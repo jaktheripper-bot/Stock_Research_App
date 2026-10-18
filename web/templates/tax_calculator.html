@@ -29,7 +29,7 @@
     <p class="dossier-provenance-subline">Statutory tax deductions modeled under Union Budget 2024-25 Finance Act amendments and MOSPI retail inflation deflators.</p>
 
     {% set active_slab = (tax_slab if tax_slab is defined and tax_slab is not none else current_slab)|default(30.0)|float %}
-    {% set active_inf = (inflation if inflation is defined and inflation is not none else current_inflation)|default(5.0)|float %}
+    {% set inflation = (inflation if inflation is defined and inflation is not none else current_inflation)|default(5.0)|float %}
     {% set active_matrix = (matrix if matrix is defined and matrix is not none else assets)|default([]) %}
 
     <!-- Interactive Tax Slab Selector Form -->
@@ -48,7 +48,8 @@
 
       <div>
         <label style="display: block; font-size: 12px; color: #94a3b8; text-transform: uppercase; font-weight: 700; margin-bottom: 6px;">MOSPI CPI Inflation Deflator (%):</label>
-        <input type="number" step="0.1" name="inflation" value="{{ active_inf }}" style="width: 140px; background: rgba(30, 41, 59, 0.8); border: 1px solid rgba(255, 255, 255, 0.2); color: #f8fafc; padding: 10px 14px; border-radius: 8px; font-size: 14px; font-weight: 700;">
+        <input type="number" id="inflationInput" name="inflation" value="{{ inflation }}" step="0.1" min="0" max="25" required
+               style="width:100%; padding:0.6rem; border-radius:6px; border:1px solid var(--border-subtle); background:var(--bg-secondary); color:var(--text-primary);">
       </div>
 
       <button type="submit" class="btn btn-primary" style="padding: 10px 20px;">
@@ -65,7 +66,7 @@
         <p style="font-size: 13px; color: #94a3b8; margin: 0;">Ranked from highest compounding purchasing power to highest wealth erosion.</p>
       </div>
       <div style="font-size: 13px; color: #38bdf8; font-weight: 700;">
-        Active Deflator: {{ active_inf }}% Annual Inflation
+        Active Deflator: {{ inflation }}% Annual Inflation
       </div>
     </div>
 
