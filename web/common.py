@@ -126,7 +126,7 @@ def resolve_app_base_url(request: Request) -> str:
 
 
 def _validate_request_origin(request: Request) -> bool:
-    """Validates state-mutating request origin against CSRF host whitelist."""
+    """Validates Origin/Referer headers on state-changing POST endpoints to mitigate CSRF."""
     origin = request.headers.get("origin")
     referer = request.headers.get("referer")
     target = origin or referer
@@ -135,9 +135,24 @@ def _validate_request_origin(request: Request) -> bool:
     try:
         parsed = urllib.parse.urlparse(target)
         host = (parsed.hostname or "").lower()
-        return host in ALLOWED_ORIGIN_HOSTS or host.endswith(".onrender.com")
+        req_host = ""
+        try:
+            req_host = (request.url.hostname or "").lower()
+        except Exception as e_host:
+            logger.debug("Request URL hostname resolution notice: %s", e_host)
+            host_header = request.headers.get("host", "")
+            req_host = (host_header.split(":")[0] if host_header else "").lower()
+        canonical_host = (urllib.parse.urlparse(os.environ.get("CANONICAL_DOMAIN", "")).hostname or "").lower()
+        allowed_hosts = {"localhost", "127.0.0.1", "0.0.0.0", "testserver", "moatnomics.com", "www.moatnomics.com"}
+        if req_host:
+            allowed_hosts.add(req_host)
+        if canonical_host:
+            allowed_hosts.add(canonical_host)
+        if host in allowed_hosts:
+            return True
+        return False
     except Exception as e:
-        logger.debug("Failed validating CSRF origin: %s", e)
+        logger.debug("Origin validation parse error: %s", e)
         return False
 
 

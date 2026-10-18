@@ -149,6 +149,7 @@ class TestMoatnomicsDomainConfig(unittest.TestCase):
         scope_root = {
             "type": "http",
             "method": "POST",
+            "path": "/",
             "headers": [
                 (b"origin", b"https://moatnomics.com"),
                 (b"host", b"moatnomics.com")
@@ -160,6 +161,7 @@ class TestMoatnomicsDomainConfig(unittest.TestCase):
         scope_www = {
             "type": "http",
             "method": "POST",
+            "path": "/discovery",
             "headers": [
                 (b"referer", b"https://www.moatnomics.com/discovery"),
                 (b"host", b"www.moatnomics.com")
