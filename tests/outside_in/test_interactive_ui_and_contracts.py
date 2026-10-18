@@ -477,6 +477,81 @@ class TestFrontendClickWiringAndCredits(unittest.TestCase):
         self.assertEqual(res[6], "Custom fallback")
         self.assertEqual(res[7], "Custom fallback")
 
+    def test_refresh_user_balance_and_update_nav_auth_ui_contracts(self):
+        """Verifies that refreshUserBalance handles 401/403/404 session invalidation and updateNavAuthUI updates DOM state."""
+        import subprocess
+        import json
+        import re
+
+        main_js_path = self.project_root / "web" / "static" / "js" / "main.js"
+        content = main_js_path.read_text(encoding="utf-8")
+        self.assertIn("function refreshUserBalance", content)
+        self.assertIn("window.refreshUserBalance = refreshUserBalance", content)
+        self.assertIn("function updateNavAuthUI", content)
+        self.assertIn("window.updateNavAuthUI = updateNavAuthUI", content)
+        self.assertIn("localStorage.removeItem('sr_user')", content)
+
+        # Extract refreshUserBalance and updateNavAuthUI implementations
+        pattern_refresh = r"(async function refreshUserBalance\([\s\S]*?^\})"
+        match_refresh = re.search(pattern_refresh, content, re.MULTILINE)
+        self.assertIsNotNone(match_refresh, "refreshUserBalance must be declared in main.js")
+
+        pattern_nav = r"(function updateNavAuthUI\([\s\S]*?^\})"
+        match_nav = re.search(pattern_nav, content, re.MULTILINE)
+        self.assertIsNotNone(match_nav, "updateNavAuthUI must be declared in main.js")
+
+        node_script = f"""
+        const mockStorage = {{}};
+        global.localStorage = {{
+            setItem: (k, v) => {{ mockStorage[k] = v; }},
+            getItem: (k) => mockStorage[k] || null,
+            removeItem: (k) => {{ delete mockStorage[k]; }}
+        }};
+
+        const navBtn = {{ innerText: '', innerHTML: '', classList: {{ remove: () => {{}}, add: () => {{}} }} }};
+        const modalBal = {{ innerText: '' }};
+        global.document = {{
+            getElementById: (id) => {{
+                if (id === 'navSignInBtn') return navBtn;
+                if (id === 'generateModalCreditsText') return modalBal;
+                return null;
+            }}
+        }};
+        global.getStoredUser = () => mockStorage['sr_user'] ? JSON.parse(mockStorage['sr_user']) : null;
+
+        {match_nav.group(1)}
+
+        // Test 1: updateNavAuthUI with valid user
+        updateNavAuthUI({{ id: 'usr_test', full_name: 'Test Allocator', credits_balance: 5.0 }});
+        const authedBtnText = navBtn.innerText;
+        const authedModalText = modalBal.innerText;
+
+        // Test 2: updateNavAuthUI with null (signed out)
+        updateNavAuthUI(null);
+        const signedOutBtnText = navBtn.innerHTML;
+        const signedOutModalText = modalBal.innerText;
+
+        console.log(JSON.stringify({{
+            authedBtn: authedBtnText,
+            authedModal: authedModalText,
+            signedOutBtn: signedOutBtnText,
+            signedOutModal: signedOutModalText
+        }}));
+        """
+        proc = subprocess.run(
+            ["node", "-e", node_script],
+            capture_output=True,
+            text=True,
+            check=True
+        )
+        res = json.loads(proc.stdout.strip())
+        self.assertIn("Test Allocator", res["authedBtn"])
+        self.assertIn("5 Credits", res["authedBtn"])
+        self.assertIn("5 Credits Available", res["authedModal"])
+        self.assertIn("Sign In / 2 Credits", res["signedOutBtn"])
+        self.assertIn("2 Free Credits on Sign In", res["signedOutModal"])
+
+
 
     def test_progressive_30s_fill_button_implemented_in_css_and_js(self):
         """Verifies that 30-second progressive fill loading animation tokens exist in CSS and JS."""

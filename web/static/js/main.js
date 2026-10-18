@@ -1653,32 +1653,59 @@ async function refreshUserBalance(user) {
     const resp = await fetch(`/api/user/${encodeURIComponent(user.id)}`);
     if (resp.ok) {
       const data = await resp.json();
-      if ((data.success || data.status === 'success') && data.user) {
-        localStorage.setItem('sr_user', JSON.stringify(data.user));
+      const freshUser = (data && data.user) ? data.user : data;
+      if (freshUser && (freshUser.id || freshUser.email)) {
+        localStorage.setItem('sr_user', JSON.stringify(freshUser));
+        updateNavAuthUI(freshUser);
         syncUserSession();
       }
+    } else if (resp.status === 401 || resp.status === 403 || resp.status === 404) {
+      // Session cookie expired or invalidated — clear stale client state
+      localStorage.removeItem('sr_user');
+      updateNavAuthUI(null);
+      syncUserSession();
     }
   } catch (err) {
-    console.error('Failed to refresh user balance:', err);
+    console.warn('Could not refresh user balance:', err);
   }
 }
+window.refreshUserBalance = refreshUserBalance;
 
-function syncUserSession() {
-  const user = getStoredUser();
+/**
+ * Updates navbar and modal authentication triggers based on current session.
+ */
+function updateNavAuthUI(user) {
   const navBtn = document.getElementById('navSignInBtn');
-  if (navBtn && user) {
-    const bal = user.credits_balance !== undefined ? user.credits_balance : 0;
-    navBtn.innerText = `👤 ${user.full_name || 'Account'} (${bal} Credits)`;
-    navBtn.classList.remove('btn-primary');
-    navBtn.classList.add('btn-secondary');
+  if (navBtn) {
+    if (user && user.id) {
+      const bal = user.credits_balance !== undefined ? user.credits_balance : (user.credits !== undefined ? user.credits : 0);
+      navBtn.innerText = `👤 ${user.full_name || 'Account'} (${bal} Credits)`;
+      navBtn.classList.remove('btn-primary');
+      navBtn.classList.add('btn-secondary');
+    } else {
+      navBtn.innerHTML = '<span>Sign In / 2 Credits</span>';
+      navBtn.classList.remove('btn-primary');
+      navBtn.classList.add('btn-secondary');
+    }
   }
 
   const modalBal = document.getElementById('generateModalCreditsText');
-  if (modalBal && user) {
-    const bal = user.credits_balance !== undefined ? user.credits_balance : 0;
-    modalBal.innerText = `${bal} Credits Available`;
+  if (modalBal) {
+    if (user && user.id) {
+      const bal = user.credits_balance !== undefined ? user.credits_balance : (user.credits !== undefined ? user.credits : 0);
+      modalBal.innerText = `${bal} Credits Available`;
+    } else {
+      modalBal.innerText = '2 Free Credits on Sign In';
+    }
   }
 }
+window.updateNavAuthUI = updateNavAuthUI;
+
+function syncUserSession() {
+  const user = getStoredUser();
+  updateNavAuthUI(user);
+}
+window.syncUserSession = syncUserSession;
 
 // ==============================================================================
 // 7. Responsive Navigation, Dropdown Sub-Tabs & Mobile Drawer
