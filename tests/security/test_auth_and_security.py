@@ -770,6 +770,85 @@ class TestDossierUnlockSessionAuth(unittest.TestCase):
                     self.assertEqual(data.get("new_balance"), 4.0)
 
 
+# ==============================================================================
+# 8. /api/v1/reports/{ticker} Developer API Key & Boundary Validation
+# ==============================================================================
+class TestApiV1DeveloperAuth(unittest.TestCase):
+    def setUp(self):
+        from web.main import app
+        from starlette.testclient import TestClient
+        self.client = TestClient(app)
+
+    def test_unauthenticated_request_rejected_401(self):
+        """Unauthenticated request to Developer API must return 401."""
+        resp = self.client.get("/api/v1/reports/INFY")
+        self.assertEqual(resp.status_code, 401)
+        self.assertIn("Valid API key required", resp.json().get("detail", ""))
+
+    def test_testing_mode_mock_dev_key_accepted(self):
+        """In testing mode (TESTING=1), sr_dev_* and usr_* keys are accepted."""
+        resp1 = self.client.get(
+            "/api/v1/reports/INFY",
+            headers={"Authorization": "Bearer sr_dev_unit_test_key_101"}
+        )
+        self.assertEqual(resp1.status_code, 200)
+        self.assertTrue(resp1.json()["success"])
+
+        resp2 = self.client.get(
+            "/api/v1/reports/INFY",
+            headers={"X-API-Key": "usr_test_client_key_202"}
+        )
+        self.assertEqual(resp2.status_code, 200)
+        self.assertTrue(resp2.json()["success"])
+
+    def test_testing_mode_invalid_key_rejected_401(self):
+        """In testing mode, random non-matching keys without sr_dev_/usr_ prefix return 401."""
+        resp = self.client.get(
+            "/api/v1/reports/INFY",
+            headers={"Authorization": "Bearer non_dev_random_key_999"}
+        )
+        self.assertEqual(resp.status_code, 401)
+
+    def test_production_mode_simulation_key_rejected_401(self):
+        """In production mode (TESTING=0), sr_dev_* simulation keys must be strictly rejected."""
+        orig_testing = os.environ.get("TESTING")
+        try:
+            os.environ["TESTING"] = "0"
+            resp = self.client.get(
+                "/api/v1/reports/INFY",
+                headers={"Authorization": "Bearer sr_dev_test_simulation_token"}
+            )
+            self.assertEqual(resp.status_code, 401)
+        finally:
+            if orig_testing is not None:
+                os.environ["TESTING"] = orig_testing
+            else:
+                os.environ.pop("TESTING", None)
+
+    def test_production_mode_expected_api_key_accepted(self):
+        """In production mode (TESTING=0), verified expected API key succeeds via timing-safe HMAC."""
+        orig_testing = os.environ.get("TESTING")
+        orig_admin_key = os.environ.get("ADMIN_API_KEY")
+        try:
+            os.environ["TESTING"] = "0"
+            os.environ["ADMIN_API_KEY"] = "prod_canonical_developer_key_456"
+            resp = self.client.get(
+                "/api/v1/reports/INFY",
+                headers={"Authorization": "Bearer prod_canonical_developer_key_456"}
+            )
+            self.assertEqual(resp.status_code, 200)
+            self.assertTrue(resp.json()["success"])
+        finally:
+            if orig_testing is not None:
+                os.environ["TESTING"] = orig_testing
+            else:
+                os.environ.pop("TESTING", None)
+            if orig_admin_key is not None:
+                os.environ["ADMIN_API_KEY"] = orig_admin_key
+            else:
+                os.environ.pop("ADMIN_API_KEY", None)
+
+
 if __name__ == "__main__":
     unittest.main()
 

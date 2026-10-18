@@ -1674,8 +1674,11 @@ Detailed forensic analysis grounded in bseindia.com filings.
         self.assertTrue(resp.content.startswith(b"%PDF"))
 
     def test_api_v1_get_report_success(self):
-        """Verify /api/v1/reports/{ticker} returns structured institutional JSON."""
-        resp = self.client.get("/api/v1/reports/INFY")
+        """Verify /api/v1/reports/{ticker} returns structured institutional JSON with valid auth."""
+        resp = self.client.get(
+            "/api/v1/reports/INFY",
+            headers={"Authorization": "Bearer sr_dev_test_token_12345"}
+        )
         self.assertEqual(resp.status_code, 200)
         data = resp.json()
         self.assertTrue(data["success"])
@@ -1691,30 +1694,71 @@ Detailed forensic analysis grounded in bseindia.com filings.
         self.assertEqual(resp.headers.get("cache-control"), "public, max-age=300")
 
     def test_api_v1_get_report_not_found(self):
-        """Verify /api/v1/reports/{ticker} returns 404 for missing ticker."""
-        resp = self.client.get("/api/v1/reports/NONEXISTENT_TICKER_99")
+        """Verify /api/v1/reports/{ticker} returns 404 for missing ticker with valid auth."""
+        resp = self.client.get(
+            "/api/v1/reports/NONEXISTENT_TICKER_99",
+            headers={"Authorization": "Bearer sr_dev_test_token_12345"}
+        )
         self.assertEqual(resp.status_code, 404)
         self.assertIn("not found", resp.json().get("detail", "").lower())
 
     def test_api_v1_authentication_enforcement(self):
-        """Verify /api/v1/reports/{ticker} rejects unauthenticated requests when not in testing bypass."""
-        # Temporarily disable TESTING mode to assert auth gate
-        os.environ["TESTING"] = "0"
+        """Verify /api/v1/reports/{ticker} rejects unauthenticated requests and enforces environment boundaries."""
+        orig_testing = os.environ.get("TESTING")
+        orig_admin_key = os.environ.get("ADMIN_API_KEY")
         try:
-            # Request without any headers
-            resp = self.client.get("/api/v1/reports/INFY")
-            self.assertEqual(resp.status_code, 401)
-            self.assertIn("Valid API key required", resp.json().get("detail", ""))
+            # 1. Unauthenticated in testing mode -> 401
+            resp_no_auth = self.client.get("/api/v1/reports/INFY")
+            self.assertEqual(resp_no_auth.status_code, 401)
 
-            # Request with valid Bearer token format
-            resp_auth = self.client.get(
+            # 2. Invalid mock key in testing mode -> 401
+            resp_bad_key = self.client.get(
+                "/api/v1/reports/INFY",
+                headers={"Authorization": "Bearer invalid_random_key_999"}
+            )
+            self.assertEqual(resp_bad_key.status_code, 401)
+
+            # 3. Valid dev key in testing mode -> 200
+            resp_dev_test = self.client.get(
                 "/api/v1/reports/INFY",
                 headers={"Authorization": "Bearer sr_dev_test_token_12345"}
             )
-            self.assertEqual(resp_auth.status_code, 200)
-            self.assertTrue(resp_auth.json()["success"])
+            self.assertEqual(resp_dev_test.status_code, 200)
+
+            # 4. Valid usr_ key via X-API-Key header in testing mode -> 200
+            resp_usr_test = self.client.get(
+                "/api/v1/reports/INFY",
+                headers={"X-API-Key": "usr_client_test_key_888"}
+            )
+            self.assertEqual(resp_usr_test.status_code, 200)
+
+            # 5. Disable testing mode to simulate production
+            os.environ["TESTING"] = "0"
+            os.environ["ADMIN_API_KEY"] = "prod_verified_admin_key_777"
+
+            # In production, sr_dev_* simulation keys must be strictly rejected
+            resp_dev_in_prod = self.client.get(
+                "/api/v1/reports/INFY",
+                headers={"Authorization": "Bearer sr_dev_test_token_12345"}
+            )
+            self.assertEqual(resp_dev_in_prod.status_code, 401)
+
+            # In production, valid expected_api_key must succeed via timing-safe HMAC
+            resp_prod_auth = self.client.get(
+                "/api/v1/reports/INFY",
+                headers={"Authorization": "Bearer prod_verified_admin_key_777"}
+            )
+            self.assertEqual(resp_prod_auth.status_code, 200)
+            self.assertTrue(resp_prod_auth.json()["success"])
         finally:
-            os.environ["TESTING"] = "1"
+            if orig_testing is not None:
+                os.environ["TESTING"] = orig_testing
+            else:
+                os.environ.pop("TESTING", None)
+            if orig_admin_key is not None:
+                os.environ["ADMIN_API_KEY"] = orig_admin_key
+            else:
+                os.environ.pop("ADMIN_API_KEY", None)
 
 
 

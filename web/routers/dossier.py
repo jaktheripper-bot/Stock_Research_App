@@ -26,6 +26,7 @@ PDF_SEMAPHORE = asyncio.Semaphore(4)
 
 from normalizer import clean_ticker
 from bse_master import resolve_canonical_symbol, resolve_bse_scrip_code
+from core.config import get_secret
 from core.db import (
     init_db,
     get_report_by_ticker_sync,
@@ -453,14 +454,12 @@ async def api_v1_get_report(
     elif x_api_key:
         provided_key = x_api_key.strip()
 
+    expected_api_key = (os.environ.get("ADMIN_API_KEY") or get_secret("ADMIN_API_KEY") or "").strip()
     is_valid_auth = False
-    admin_key = os.environ.get("ADMIN_API_KEY")
-    if os.environ.get("TESTING") == "1":
-        is_valid_auth = True
-    elif provided_key:
-        if admin_key and hmac.compare_digest(provided_key, admin_key):
+    if provided_key:
+        if expected_api_key and hmac.compare_digest(provided_key, expected_api_key):
             is_valid_auth = True
-        elif provided_key.startswith("sr_dev_") or provided_key.startswith("usr_"):
+        elif os.environ.get("TESTING") == "1" and (provided_key.startswith("sr_dev_") or provided_key.startswith("usr_")):
             is_valid_auth = True
     else:
         cookie_token = request.cookies.get(USER_SESSION_COOKIE)
