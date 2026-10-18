@@ -609,6 +609,7 @@ def init_db(force: bool = False):
                             subscription_tier TEXT DEFAULT 'free',
                             subscription_expires_at TIMESTAMPTZ,
                             created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
+                            updated_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
                             last_login_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP
                         );
                     ''')
@@ -656,6 +657,7 @@ def init_db(force: bool = False):
                             subscription_tier TEXT DEFAULT 'free',
                             subscription_expires_at DATETIME,
                             created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+                            updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
                             last_login_at DATETIME DEFAULT CURRENT_TIMESTAMP
                         );
                     ''')
@@ -1985,6 +1987,23 @@ def init_db(force: bool = False):
                     """)
                     cursor.execute("CREATE INDEX IF NOT EXISTS idx_distributed_job_locks_exp ON distributed_job_locks (expires_at);")
                     cursor.execute("INSERT INTO schema_migrations (version) VALUES (\'v031_distributed_job_locks\') ON CONFLICT DO NOTHING;")
+                conn.commit()
+
+            # Migration v032: User Accounts updated_at Column
+            if "v032_user_accounts_updated_at" not in applied:
+                logger.info("Applying schema migration: v032_user_accounts_updated_at...")
+                if supabase_url:
+                    cursor.execute("""
+                        ALTER TABLE user_accounts ADD COLUMN IF NOT EXISTS updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP;
+                        INSERT INTO schema_migrations (version) VALUES ('v032_user_accounts_updated_at') ON CONFLICT DO NOTHING;
+                    """)
+                else:
+                    try:
+                        cursor.execute("ALTER TABLE user_accounts ADD COLUMN updated_at DATETIME;")
+                        cursor.execute("UPDATE user_accounts SET updated_at = CURRENT_TIMESTAMP WHERE updated_at IS NULL;")
+                    except Exception as e:
+                        logger.debug("Migration v032 updated_at column notice: %s", e)
+                    cursor.execute("INSERT INTO schema_migrations (version) VALUES (\'v032_user_accounts_updated_at\') ON CONFLICT DO NOTHING;")
                 conn.commit()
 
             _DB_INITIALIZED = True

@@ -90,6 +90,7 @@ from core.db.settings import (
 )
 
 from core.db.users import (
+    CreditDeductionResult,
     get_or_create_user,
     get_user_by_id,
     get_user_by_email,
@@ -191,6 +192,7 @@ __all__ = [
     "get_system_setting",
     "set_system_setting",
     # users & monetization
+    "CreditDeductionResult",
     "get_or_create_user",
     "get_user_by_id",
     "get_user_by_email",

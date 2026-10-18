@@ -19,6 +19,7 @@ from core.db.connection import (
     get_placeholder,
     init_db,
     IST,
+    is_postgres_connection,
 )
 from core.db.reports import _format_timestamp
 
@@ -190,19 +191,68 @@ def get_user_credits_balance(user_id: str) -> float:
     return float(user.get("credits_balance", 0.0)) if user else 0.0
 
 
+class CreditDeductionResult(tuple):
+    """
+    Dual tuple/dict result for atomic credit deduction.
+    - Unpacks as 3-tuple: (success: bool, new_balance: float, message: str)
+    - Supports dictionary key access: res["success"], res["error"], res["credits_balance"], res["message"]
+    - Supports dictionary methods: res.get(...), res.keys(), res.values(), res.items()
+    - Evaluates boolean truthiness directly: bool(res) == res["success"]
+    - Exports cleanly to dictionary: res.to_dict()
+    """
+    def __new__(cls, success: bool, credits_balance: float, message: str, error: Optional[str] = None):
+        return super().__new__(cls, (bool(success), float(credits_balance), str(message)))
+
+    def __init__(self, success: bool, credits_balance: float, message: str, error: Optional[str] = None):
+        self._dict = {
+            "success": bool(success),
+            "credits_balance": float(credits_balance),
+            "message": str(message),
+            "error": error if error is not None else (None if success else str(message)),
+        }
+
+    def __getitem__(self, item):
+        if isinstance(item, str):
+            return self._dict[item]
+        return super().__getitem__(item)
+
+    def get(self, key, default=None):
+        return self._dict.get(key, default)
+
+    def __contains__(self, key):
+        return key in self._dict
+
+    def __bool__(self):
+        return bool(self._dict["success"])
+
+    def keys(self):
+        return self._dict.keys()
+
+    def values(self):
+        return self._dict.values()
+
+    def items(self):
+        return self._dict.items()
+
+    def to_dict(self) -> Dict[str, Any]:
+        return dict(self._dict)
+
+
 def deduct_user_credits(
     user_id: str,
     ticker: str,
     action_type: str,
     amount: float = 1.0
-) -> Tuple[bool, float, str]:
+) -> CreditDeductionResult:
     """
     Atomically checks balance and deducts credits for an action.
+    Guards against race conditions and double-spending across PostgreSQL and SQLite.
     Handles Pro subscription entitlements (e.g. unlimited surgical refreshes and PDF exports).
-    Returns (success: bool, new_balance: float, message: str).
+    Returns CreditDeductionResult, unpacking as (success: bool, new_balance: float, message: str)
+    and allowing dict access (res["success"], res["error"], res["credits_balance"]).
     """
     if not user_id:
-        return False, 0.0, "Authentication required to perform this action."
+        return CreditDeductionResult(False, 0.0, "Authentication required to perform this action.", error="AUTH_REQUIRED")
 
     init_db()
     conn = get_db_connection()
@@ -217,7 +267,7 @@ def deduct_user_credits(
         )
         row = cursor.fetchone()
         if not row:
-            return False, 0.0, "User account not found."
+            return CreditDeductionResult(False, 0.0, "User account not found.", error="USER_NOT_FOUND")
 
         current_balance = float(row[1] or 0.0)
         sub_tier = (row[2] or "free").lower()
@@ -251,18 +301,53 @@ def deduct_user_credits(
                 (clean_id, ticker.upper(), action_type, current_balance)
             )
             conn.commit()
-            return True, current_balance, "Action covered under active Pro subscription (0 credits consumed)."
+            return CreditDeductionResult(True, current_balance, "Action covered under active Pro subscription (0 credits consumed).")
 
         # Standard Credit Deduction Check
         cost = float(amount)
         if current_balance < cost:
-            return False, current_balance, f"Insufficient research credits ({current_balance:.1f} available, {cost:.2f} required). Please top up via UPI/Card."
+            return CreditDeductionResult(
+                False,
+                current_balance,
+                f"Insufficient research credits ({current_balance:.1f} available, {cost:.2f} required). Please top up via UPI/Card.",
+                error="INSUFFICIENT_CREDITS"
+            )
 
-        new_balance = round(current_balance - cost, 2)
-        cursor.execute(
-            f"UPDATE user_accounts SET credits_balance = {p} WHERE id = {p};",
-            (new_balance, clean_id)
-        )
+        now_iso = datetime.now(timezone.utc).isoformat()
+        use_pg = is_postgres_connection(conn)
+
+        if use_pg:
+            cursor.execute(
+                """
+                UPDATE user_accounts
+                SET credits_balance = ROUND((credits_balance - %s)::numeric, 2),
+                    updated_at = %s
+                WHERE id = %s AND credits_balance >= %s
+                RETURNING credits_balance
+                """,
+                (cost, now_iso, clean_id, cost),
+            )
+            updated_row = cursor.fetchone()
+            if not updated_row:
+                conn.rollback()
+                return CreditDeductionResult(False, current_balance, "INSUFFICIENT_CREDITS", error="INSUFFICIENT_CREDITS")
+            new_balance = float(updated_row[0])
+        else:
+            cursor.execute(
+                """
+                UPDATE user_accounts
+                SET credits_balance = ROUND(credits_balance - ?, 2),
+                    updated_at = ?
+                WHERE id = ? AND credits_balance >= ?
+                """,
+                (cost, now_iso, clean_id, cost),
+            )
+            if cursor.rowcount == 0:
+                conn.rollback()
+                return CreditDeductionResult(False, current_balance, "INSUFFICIENT_CREDITS", error="INSUFFICIENT_CREDITS")
+            cursor.execute("SELECT credits_balance FROM user_accounts WHERE id = ?", (clean_id,))
+            new_balance = float(cursor.fetchone()[0])
+
         cursor.execute(
             f"""
             INSERT INTO credit_usage_ledger (user_id, ticker, action_type, credits_consumed, balance_after)
@@ -272,14 +357,14 @@ def deduct_user_credits(
         )
         conn.commit()
         logger.info(f"Deducted {cost} credits from {clean_id} for {action_type} on {ticker}. New balance: {new_balance}")
-        return True, new_balance, f"Success: {cost:.2f} credit(s) consumed. Remaining balance: {new_balance:.1f}."
+        return CreditDeductionResult(True, new_balance, f"Success: {cost:.2f} credit(s) consumed. Remaining balance: {new_balance:.1f}.")
     except Exception as e:
         logger.error(f"Error deducting credits for user {user_id}: {e}")
         try:
             conn.rollback()
         except Exception as rb_err:
             logger.debug(f"Rollback failed: {rb_err}")
-        return False, 0.0, f"Database transaction error: {e}"
+        return CreditDeductionResult(False, 0.0, f"Database transaction error: {e}", error="DATABASE_ERROR")
     finally:
         cursor.close()
         conn.close()
