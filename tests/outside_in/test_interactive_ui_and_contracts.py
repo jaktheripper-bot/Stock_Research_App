@@ -795,6 +795,22 @@ class TestCopilotUIAndSyntax(unittest.TestCase):
         self.assertIn("progress.loading-spinner:indeterminate", content)
         self.assertIn("prefers-reduced-motion: reduce", content)
 
+    def test_modern_web_guidance_js_utilities(self):
+        """Outside-in verification: Asserts main.js includes showToast, initDialogLightDismiss, modal Escape handler, and user-invalid ARIA sync."""
+        js_path = self.project_root / "web" / "static" / "js" / "main.js"
+        self.assertTrue(js_path.exists(), "main.js must exist")
+        content = js_path.read_text(encoding="utf-8")
+
+        self.assertIn("window.showToast = function", content)
+        self.assertIn('toast.className = "toast-popover";', content)
+        self.assertIn('toast.setAttribute("popover", "manual");', content)
+        self.assertIn('toast.showPopover()', content)
+        self.assertIn("window.initDialogLightDismiss = function", content)
+        self.assertIn('"closedBy" in HTMLDialogElement.prototype', content)
+        self.assertIn('document.querySelectorAll(".modal-backdrop")', content)
+        self.assertIn("initUserInvalidAriaSync", content)
+        self.assertIn('el.setAttribute("aria-invalid", el.matches(":user-invalid") ? "true" : "false");', content)
+
     def test_equity_options_yield_distinct_responses(self):
         """Verifies that each option within the Forensic Intelligence Desk for Equities returns a unique, data-grounded response."""
         equity_prompts = [

@@ -2256,4 +2256,114 @@ document.addEventListener('DOMContentLoaded', () => {
   initDwellAndTransitionTelemetry();
 });
 
+/**
+ * 1. Top-Layer Non-Blocking Toast Notification (popover="manual")
+ * Replaces blocking window.alert() calls across the platform.
+ */
+window.showToast = function(message, variant = "info", durationMs = 4200) {
+  const toast = document.createElement("div");
+  toast.className = "toast-popover";
+  toast.setAttribute("popover", "manual");
+  toast.setAttribute("role", "status");
+  toast.setAttribute("aria-live", "polite");
+
+  const borderColors = {
+    info: "rgba(56, 189, 248, 0.45)",
+    success: "rgba(16, 185, 129, 0.55)",
+    warning: "rgba(245, 158, 11, 0.55)",
+    error: "rgba(239, 68, 68, 0.6)"
+  };
+  toast.style.borderColor = borderColors[variant] || borderColors.info;
+
+  const textSpan = document.createElement("span");
+  textSpan.textContent = String(message || "");
+
+  const closeBtn = document.createElement("button");
+  closeBtn.type = "button";
+  closeBtn.textContent = "✕";
+  closeBtn.setAttribute("aria-label", "Dismiss notification");
+  closeBtn.style.cssText = "background:none;border:none;color:#94a3b8;cursor:pointer;font-size:14px;padding:2px 6px;";
+
+  const dismiss = () => {
+    try {
+      if (typeof toast.hidePopover === "function") toast.hidePopover();
+    } catch (_) {}
+    toast.remove();
+  };
+  closeBtn.addEventListener("click", dismiss);
+
+  toast.append(textSpan, closeBtn);
+  document.body.appendChild(toast);
+
+  if (typeof toast.showPopover === "function") {
+    toast.showPopover();
+  } else {
+    toast.classList.add(":popover-open");
+  }
+
+  if (durationMs > 0) {
+    setTimeout(dismiss, durationMs);
+  }
+};
+
+/**
+ * 2. Native <dialog closedby="any"> Light-Dismiss Fallback
+ * Safely handles backdrop clicks in browsers without native `closedBy` support.
+ */
+window.initDialogLightDismiss = function(dialogEl) {
+  if (!dialogEl || ("closedBy" in HTMLDialogElement.prototype)) return;
+  dialogEl.addEventListener("click", (e) => {
+    if (e.target === dialogEl) {
+      const rect = dialogEl.getBoundingClientRect();
+      const clickedInDialog =
+        e.clientY >= rect.top &&
+        e.clientY <= rect.top + rect.height &&
+        e.clientX >= rect.left &&
+        e.clientX <= rect.left + rect.width;
+      if (!clickedInDialog) {
+        dialogEl.close();
+      }
+    }
+  });
+};
+
+/**
+ * 3. Universal Escape Key Handler for Legacy .modal-backdrop Overlays
+ * Ensures #ingestModalBackdrop on /debt and all page-local backdrops close on Escape.
+ */
+document.addEventListener("keydown", (e) => {
+  if (e.key !== "Escape") return;
+  document.querySelectorAll(".modal-backdrop").forEach((backdrop) => {
+    const isVisible =
+      backdrop.classList.contains("active") ||
+      backdrop.style.display === "flex" ||
+      backdrop.style.display === "block";
+    if (isVisible) {
+      backdrop.classList.remove("active");
+      if (backdrop.style.display) backdrop.style.display = "none";
+    }
+  });
+});
+
+/**
+ * 4. Sync ARIA `aria-invalid` with CSS `:user-invalid` after interaction
+ */
+(function initUserInvalidAriaSync() {
+  const syncAria = (el) => {
+    if (!el || typeof el.matches !== "function" || !("checkValidity" in el)) return;
+    try {
+      if (CSS.supports("selector(:user-invalid)")) {
+        el.setAttribute("aria-invalid", el.matches(":user-invalid") ? "true" : "false");
+      }
+    } catch (_) {}
+  };
+  document.addEventListener("blur", (e) => syncAria(e.target), true);
+  document.addEventListener("input", (e) => {
+    if (e.target && e.target.hasAttribute && e.target.hasAttribute("aria-invalid")) {
+      syncAria(e.target);
+    }
+  });
+})();
+
+
 
