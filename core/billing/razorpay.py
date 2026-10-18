@@ -256,6 +256,36 @@ def process_successful_payment(
     if not is_valid:
         return False, 0.0, "", "Payment signature verification failed. Transaction was not confirmed."
 
+    # Verify order-to-plan amount integrity against recorded order intent
+    intent = _ORDER_INTENT_CACHE.get(order_id)
+    if intent:
+        if int(intent.get("amount_paise", 0)) < int(plan["amount_paise"]):
+            logger.error(
+                "Payment amount mismatch for order %s: paid %s paise vs required %s paise for plan %s",
+                order_id, intent.get("amount_paise"), plan["amount_paise"], plan["id"]
+            )
+            return False, 0.0, "", "Order amount does not match the selected plan price."
+        if intent.get("plan_id") and intent["plan_id"] != plan["id"] and intent["plan_id"] != plan_id:
+            logger.error(
+                "Plan mismatch for order %s: created for %s, claimed %s",
+                order_id, intent.get("plan_id"), plan["id"]
+            )
+            return False, 0.0, "", "Order plan mismatch."
+    elif not order_id.startswith("order_sim_"):
+        client = get_razorpay_client()
+        if client:
+            try:
+                remote_order = client.order.fetch(order_id)
+                remote_amount = int(remote_order.get("amount", 0))
+                if remote_amount < int(plan["amount_paise"]):
+                    logger.error(
+                        "Remote Razorpay order %s amount %s < plan %s price %s",
+                        order_id, remote_amount, plan["id"], plan["amount_paise"]
+                    )
+                    return False, 0.0, "", "Verified payment amount is less than plan price."
+            except Exception as fetch_err:
+                logger.warning("Could not fetch remote order metadata for %s: %s", order_id, fetch_err)
+
     # Idempotency check: if transaction already processed, return existing confirmation
     from core.db.users import get_credit_transaction_by_gateway_id, get_user_credits_balance
     existing = get_credit_transaction_by_gateway_id(payment_id=payment_id, order_id=order_id)

@@ -23,6 +23,7 @@ PRICING_PACKS: Dict[str, Dict[str, Any]] = {
         "name": "Single Research Pass",
         "badge": "On-Demand",
         "amount_inr": 299,
+        "amount_paise": 29900,
         "credits": 1.0,
         "effective_per_stock": "₹299/dossier",
         "description": "Full institutional research dossier for 1 equity with PDF export.",
@@ -41,6 +42,7 @@ PRICING_PACKS: Dict[str, Dict[str, Any]] = {
         "name": "Analyst 3-Pack",
         "badge": "Most Popular",
         "amount_inr": 699,
+        "amount_paise": 69900,
         "credits": 3.0,
         "effective_per_stock": "₹233/dossier (22% savings)",
         "description": "Ideal for sector deep-dives and comparing top 3 peer contenders.",
@@ -59,6 +61,7 @@ PRICING_PACKS: Dict[str, Dict[str, Any]] = {
         "name": "Portfolio 10-Pack",
         "badge": "Best Value",
         "amount_inr": 1799,
+        "amount_paise": 179900,
         "credits": 10.0,
         "effective_per_stock": "₹180/dossier (40% savings)",
         "description": "Comprehensive institutional audit for an entire equity portfolio.",
@@ -77,6 +80,7 @@ PRICING_PACKS: Dict[str, Dict[str, Any]] = {
         "name": "Institutional Pro (Monthly)",
         "badge": "Pro Desk",
         "amount_inr": 999,
+        "amount_paise": 99900,
         "credits": 40.0,
         "billing_period": "month",
         "effective_per_stock": "₹25/stock (Active Tier)",
@@ -97,6 +101,7 @@ PRICING_PACKS: Dict[str, Dict[str, Any]] = {
         "name": "Institutional Pro (Annual)",
         "badge": "Annual VIP",
         "amount_inr": 8999,
+        "amount_paise": 899900,
         "credits": 500.0,
         "billing_period": "year",
         "effective_per_stock": "₹750/mo (25% annual discount)",
@@ -119,6 +124,7 @@ B2B_PACKS: Dict[str, Dict[str, Any]] = {
         "id": "b2b_50",
         "name": "Corporate 50-Pack",
         "amount_inr": 5999,
+        "amount_paise": 599900,
         "credits": 50.0,
         "effective_per_stock": "₹120/dossier",
         "target": "Family Offices & Small Advisory Teams"
@@ -127,6 +133,7 @@ B2B_PACKS: Dict[str, Dict[str, Any]] = {
         "id": "b2b_150",
         "name": "Enterprise 150-Pack",
         "amount_inr": 16999,
+        "amount_paise": 1699900,
         "credits": 150.0,
         "effective_per_stock": "₹113/dossier",
         "target": "Institutional Desks & Wealth Managers"
@@ -144,9 +151,15 @@ INVOICE_DISCLAIMER = MANDATORY_SEBI_DISCLAIMER
 def get_plan_by_id(plan_id: str) -> Dict[str, Any]:
     """Retrieves plan details by plan identifier."""
     if plan_id in PRICING_PACKS:
-        return PRICING_PACKS[plan_id]
+        p = dict(PRICING_PACKS[plan_id])
+        if "amount_paise" not in p:
+            p["amount_paise"] = int(p.get("amount_inr", 0) * 100)
+        return p
     if plan_id in B2B_PACKS:
-        return B2B_PACKS[plan_id]
+        p = dict(B2B_PACKS[plan_id])
+        if "amount_paise" not in p:
+            p["amount_paise"] = int(p.get("amount_inr", 0) * 100)
+        return p
     return {}
 
 
