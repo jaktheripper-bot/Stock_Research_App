@@ -801,12 +801,34 @@ function copyCopilotTurn(btn, contentText) {
     });
 }
 
+let isSubmitting = false;
+
+function scrollToBottom() {
+    const container = document.getElementById("copilotMessages");
+    if (container) {
+        container.scrollTop = container.scrollHeight;
+    }
+}
+
+function escapeHtml(str) {
+    if (!str) return "";
+    return String(str)
+        .replace(/&/g, "&amp;")
+        .replace(/</g, "&lt;")
+        .replace(/>/g, "&gt;")
+        .replace(/"/g, "&quot;")
+        .replace(/'/g, "&#039;");
+}
+
 async function submitCopilotMessage() {
     const input = document.getElementById("copilotInput");
     const sendBtn = document.getElementById("copilotSendBtn");
     const container = document.getElementById("copilotMessages");
 
+    if (isSubmitting) return;
     if (!input || !input.value.trim()) return;
+
+    isSubmitting = true;
     const userMsg = input.value.trim();
     input.value = "";
     handleCopilotInput(input);
@@ -830,11 +852,12 @@ async function submitCopilotMessage() {
         <div class="copilot-turn-meta">You • ${currentTime}</div>
     `;
     container.appendChild(userTurn);
-    container.scrollTop = container.scrollHeight;
+    scrollToBottom();
 
     // Append animated thinking wave indicator with live timer and dynamic background info
     const thinkingCard = document.createElement("div");
     thinkingCard.className = "copilot-thinking-card";
+    const thinkingEl = thinkingCard;
     
     let thinkingStages = [
         "Scanning verified filings & baseline disclosures...",
@@ -890,32 +913,45 @@ async function submitCopilotMessage() {
 
     sendBtn.disabled = true;
     sendBtn.classList.remove("active");
-    input.disabled = true;
+
+    const payload = {
+        conversation_id: activeConversationId,
+        message: userMsg,
+        ticker: activeTicker,
+        asset_type: activeAssetType,
+        asset_class: activeAssetType ? (activeAssetType === "mutual_fund" ? "MUTUAL_FUND" : activeAssetType === "debt" ? "CORPORATE_DEBT" : activeAssetType.toUpperCase()) : "EQUITY",
+        section: activeSection,
+        section_label: activeSectionLabel
+    };
 
     try {
-        const resp = await fetch("/api/copilot/chat", {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({
-                conversation_id: activeConversationId,
-                message: userMsg,
-                ticker: activeTicker,
-                asset_type: activeAssetType,
-                asset_class: activeAssetType ? (activeAssetType === "mutual_fund" ? "MUTUAL_FUND" : activeAssetType === "debt" ? "CORPORATE_DEBT" : activeAssetType.toUpperCase()) : "EQUITY",
-                section: activeSection,
-                section_label: activeSectionLabel
-            })
-        });
-        const data = await resp.json();
-        clearInterval(thinkingTimer);
-        thinkingCard.remove();
+        let resp;
+        let data = {};
+        try {
+            resp = await fetch('/api/copilot/chat', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(payload)
+            });
 
-        if (!resp.ok) {
-            const errorMsg = typeof window.extractApiError === 'function'
-                ? window.extractApiError(data, `Server returned HTTP ${resp.status}`)
-                : (data.detail || data.message || `Server returned HTTP ${resp.status}`);
-            throw new Error(errorMsg);
+            const rawText = await resp.text();
+            try {
+                data = rawText ? JSON.parse(rawText) : {};
+            } catch (_) {
+                data = { detail: rawText || `Server returned HTTP ${resp.status}` };
+            }
+
+            if (!resp.ok) {
+                const detailMsg = typeof data.detail === 'string'
+                    ? data.detail
+                    : (data.detail?.message || data.error || `Request failed (HTTP ${resp.status})`);
+                throw new Error(detailMsg);
+            }
+        } finally {
+            clearInterval(thinkingTimer);
         }
+
+        thinkingCard.remove();
 
         const agentText = data.response || "No response generated.";
         const formattedHtml = renderCopilotMarkdown(agentText);
@@ -958,21 +994,20 @@ async function submitCopilotMessage() {
         container.appendChild(agentTurn);
         container.scrollTop = container.scrollHeight;
     } catch (e) {
-        thinkingCard.remove();
-        const errTurn = document.createElement("div");
-        errTurn.className = "copilot-turn copilot-turn-agent";
-        errTurn.innerHTML = `
-            <div class="copilot-bubble-agent" style="border-color: rgba(239, 68, 68, 0.4); background: rgba(239, 68, 68, 0.08);">
-                <div style="color: #f87171; font-weight: 700; margin-bottom: 4px;">⚠️ Forensic Intelligence Desk Notice</div>
-                <div style="color: #fca5a5; font-size: 0.82rem;">The Forensic Intelligence Desk encountered a temporary connection issue. Please retry your inquiry or select a diagnostic chip below.</div>
+        clearInterval(thinkingTimer);
+        console.error('Copilot chat error:', e);
+        const safeReason = escapeHtml(e?.message || 'Unable to reach the Forensic Copilot service.');
+        thinkingEl.outerHTML = `
+            <div class="copilot-msg copilot-msg-assistant">
+                <div class="copilot-notice">
+                    <strong>⚠️ Copilot Notice:</strong> ${safeReason}
+                </div>
             </div>
         `;
-        container.appendChild(errTurn);
-        container.scrollTop = container.scrollHeight;
     } finally {
-        input.disabled = false;
-        handleCopilotInput(input);
-        input.focus();
+        isSubmitting = false;
+        if (sendBtn) sendBtn.disabled = false;
+        scrollToBottom();
     }
 }
 

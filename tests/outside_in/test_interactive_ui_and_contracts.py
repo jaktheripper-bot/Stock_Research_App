@@ -664,6 +664,21 @@ class TestCopilotUIAndSyntax(unittest.TestCase):
             content,
             "copilot.js delegated listener must decode prompt and trigger sendQuickPrompt"
         )
+        self.assertIn(
+            'rawText = await resp.text();',
+            content,
+            "copilot.js must read rawText before JSON parsing to guard against non-JSON error pages"
+        )
+        self.assertIn(
+            'clearInterval(thinkingTimer);',
+            content,
+            "copilot.js must unconditionally clear thinkingTimer in finally block"
+        )
+        self.assertIn(
+            'throw new Error(detailMsg);',
+            content,
+            "copilot.js must throw structured detailMsg on non-200 responses"
+        )
 
     def test_copilot_modal_html_has_interactive_options(self):
         """Audits copilot_modal.html to verify markup has accessible, clickable option elements."""

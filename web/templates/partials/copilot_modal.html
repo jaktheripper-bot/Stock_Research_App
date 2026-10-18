@@ -511,7 +511,7 @@
   white-space: nowrap;
 }
 
-.copilot-notice-box {
+.copilot-notice-box, .copilot-notice {
   background: rgba(245, 158, 11, 0.08);
   border-left: 3px solid #f59e0b;
   border-radius: 0 6px 6px 0;
@@ -519,6 +519,18 @@
   margin: 8px 0;
   font-size: 0.82rem;
   color: #fef3c7;
+}
+
+.copilot-msg {
+  display: flex;
+  flex-direction: column;
+  margin-bottom: 12px;
+}
+
+.copilot-msg-assistant {
+  align-self: flex-start;
+  max-width: 90%;
+  animation: copilotFadeInUp 0.2s ease both;
 }
 
 /* --- Typing Wave Indicator --- */
