@@ -1649,7 +1649,9 @@ async def process_forensic_desk_turn(
                 "promoter_pledge_exposure_pct": dossier.get("promoter_pledge_exposure_pct", 0.0),
                 "top_risky_holdings": dossier.get("top_risky_holdings", []),
                 "top_quality_holdings": dossier.get("top_quality_holdings", []),
-                "dossier_text": dossier.get("dossier_text", "")
+                "dossier_text": dossier.get("dossier_text", ""),
+                "forensic_dossier": dossier,
+                "forensic_dossier_text": dossier.get("dossier_text", "")
             })
 
         elif resolved_asset_class == "CORPORATE_DEBT":
@@ -1680,7 +1682,9 @@ async def process_forensic_desk_turn(
                     "posture_badge": posture.get("posture_badge"),
                     "contagion_radar_status": radar.get("radar_status"),
                     "contagion_risk_level": radar.get("risk_level"),
-                    "radar_summary": radar.get("radar_summary")
+                    "radar_summary": radar.get("radar_summary"),
+                    "credit_posture": posture,
+                    "rating_history": sec.get("rating_history", []) if isinstance(sec, dict) else []
                 })
 
         elif resolved_asset_class == "ETF":
@@ -1824,26 +1828,39 @@ async def process_forensic_desk_turn(
             except Exception as e:
                 logger.warning(f"Error grounding equity context for {clean_ticker}: {e}")
 
-    # 5b. Fund / debt deep-dive paywall (1 credit per scheme or security).
+    # 5b. Fund / debt / REIT deep-dive paywall (1 credit per scheme, security, or trust).
     # Entitlement is decided by the caller (server-side) via unlock_checker(kind, asset_id).
-    if resolved_asset_class in ("MUTUAL_FUND", "CORPORATE_DEBT"):
-        kind = "FUND" if resolved_asset_class == "MUTUAL_FUND" else "DEBT"
+    if resolved_asset_class in ("MUTUAL_FUND", "CORPORATE_DEBT", "REIT"):
+        kind = "FUND" if resolved_asset_class == "MUTUAL_FUND" else ("DEBT" if resolved_asset_class == "CORPORATE_DEBT" else "REIT")
         asset_id = (
-            context_data.get("scheme_code") if kind == "FUND" else context_data.get("isin")
+            context_data.get("scheme_code") if kind == "FUND" else (context_data.get("isin") if kind == "DEBT" else (context_data.get("symbol") or clean_ticker))
         ) or clean_ticker
         if unlock_checker is not None:
-            asset_unlocked = bool(unlock_checker(kind, asset_id))
-        else:
-            asset_unlocked = bool(deep_dive_unlocked)
-        context_data["deep_dive_locked"] = not asset_unlocked
-        context_data["section_data"] = (section_data or {}) if asset_unlocked else {}
-        if not asset_unlocked:
-            gated = MF_GATED_FIELDS if kind == "FUND" else DEBT_GATED_FIELDS
+            deep_dive_unlocked = bool(unlock_checker(kind, asset_id))
+        context_data["deep_dive_unlocked"] = bool(deep_dive_unlocked)
+        context_data["deep_dive_locked"] = not deep_dive_unlocked
+        context_data["section_data"] = (section_data or {}) if deep_dive_unlocked else {}
+        if not deep_dive_unlocked:
+            if resolved_asset_class == "MUTUAL_FUND":
+                context_data.pop("forensic_dossier_text", None)
+                fd = dict(context_data.get("forensic_dossier") or {})
+                fd.pop("dossier_text", None)
+                context_data["forensic_dossier"] = fd
+            elif resolved_asset_class == "CORPORATE_DEBT":
+                posture = dict(context_data.get("credit_posture") or {})
+                posture.pop("investment_thesis", None)
+                posture.pop("pillars", None)
+                context_data["credit_posture"] = posture
+                context_data["rating_history"] = []
+            elif resolved_asset_class == "REIT":
+                context_data["inversion_risks"] = []
+
+            gated = MF_GATED_FIELDS if kind == "FUND" else (DEBT_GATED_FIELDS if kind == "DEBT" else ())
             for field in gated:
                 context_data.pop(field, None)
             topic = detect_gated_topic(resolved_asset_class, section, user_message)
             if topic:
-                display = context_data.get("scheme_name") or context_data.get("instrument_name") or clean_ticker or "this asset"
+                display = context_data.get("scheme_name") or context_data.get("instrument_name") or context_data.get("name") or clean_ticker or "this asset"
                 notice = build_unlock_notice(resolved_asset_class, display, topic)
                 append_conversation_turn(conversation_id, "agent", notice)
                 return {
