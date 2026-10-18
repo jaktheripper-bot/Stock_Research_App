@@ -1196,6 +1196,33 @@ async def compare_page(
         if m:
             comp_data[f_key]["market_cap_str"] = format_inr(m)
 
+    comparison = comp_data.get("comparison")
+    if not comparison:
+        def _build_pillars(m):
+            if not isinstance(m, dict):
+                return {}
+            return {
+                "moat": m.get("moat") or m.get("Moat"),
+                "management": m.get("management") or m.get("Management") or m.get("CapitalAllocation") or m.get("capital_allocation"),
+                "financials": m.get("financials") or m.get("Financials") or m.get("BalanceSheet") or m.get("balance_sheet"),
+                "valuation": m.get("valuation") or m.get("Valuation"),
+                "macro": m.get("macro") or m.get("Macro"),
+                "forensic": m.get("forensic") or m.get("Forensic") or m.get("Governance") or m.get("governance"),
+                "diagnostic": m.get("diagnostic") or m.get("Diagnostic"),
+            }
+        comparison = {
+            "company_a": {
+                "ticker": canonical_a,
+                "fundamentals": comp_data.get("fund_a", {}),
+                "pillars": _build_pillars(comp_data.get("matrix_a", {}))
+            },
+            "company_b": {
+                "ticker": canonical_b,
+                "fundamentals": comp_data.get("fund_b", {}),
+                "pillars": _build_pillars(comp_data.get("matrix_b", {}))
+            }
+        }
+
     return templates.TemplateResponse(
         request=request,
         name="compare.html",
@@ -1205,6 +1232,7 @@ async def compare_page(
             "ticker_b": canonical_b,
             "compared": True,
             "compare_error": error_msg,
+            "comparison": comparison,
             "fund_a": comp_data.get("fund_a", {}),
             "fund_b": comp_data.get("fund_b", {}),
             "matrix_a": comp_data.get("matrix_a", {}),

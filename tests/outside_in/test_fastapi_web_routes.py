@@ -102,6 +102,10 @@ Detailed forensic analysis with exact page grounding to bseindia.com filings.
         self.assertNotIn("₹N/A", res.text)
         self.assertIn("₹1500.0", res.text)
         self.assertNotIn("Peer Comparison Validation Notice:", res.text)
+        self.assertIn("1. Business Moat &amp; Durability", res.text)
+        self.assertIn("6. Forensic &amp; Governance Hygiene", res.text)
+        self.assertIn("Strong", res.text)
+        self.assertIn("Stable", res.text)
 
     @patch("web.main.compare_two_companies")
     def test_peer_comparison_validation_notice_identical_tickers(self, mock_compare):

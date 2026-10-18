@@ -93,6 +93,22 @@ def evaluate_company_disparity(fund_a: dict, fund_b: dict) -> dict:
         "sec_b": sec_b or "N/A",
     }
 
+
+def build_comparison_pillars(matrix: dict) -> dict:
+    """Normalize extracted health matrix into standardized pillar dictionary."""
+    if not isinstance(matrix, dict):
+        return {}
+    return {
+        "moat": matrix.get("moat") or matrix.get("Moat"),
+        "management": matrix.get("management") or matrix.get("Management") or matrix.get("CapitalAllocation") or matrix.get("capital_allocation"),
+        "financials": matrix.get("financials") or matrix.get("Financials") or matrix.get("BalanceSheet") or matrix.get("balance_sheet"),
+        "valuation": matrix.get("valuation") or matrix.get("Valuation"),
+        "macro": matrix.get("macro") or matrix.get("Macro"),
+        "forensic": matrix.get("forensic") or matrix.get("Forensic") or matrix.get("Governance") or matrix.get("governance"),
+        "diagnostic": matrix.get("diagnostic") or matrix.get("Diagnostic"),
+    }
+
+
 async def compare_two_companies(ticker_a: str, ticker_b: str, progress_callback=None) -> dict:
     """
     Executes cross-company peer comparison with 3-tier disparity evaluation,
@@ -163,6 +179,19 @@ async def compare_two_companies(ticker_a: str, ticker_b: str, progress_callback=
 
     if progress_callback:
         progress_callback(1.0, "Synthesizing normalized side-by-side comparison matrix...")
+
+    comparison = {
+        "company_a": {
+            "ticker": resolved_a,
+            "fundamentals": fund_a,
+            "pillars": build_comparison_pillars(matrix_a),
+        },
+        "company_b": {
+            "ticker": resolved_b,
+            "fundamentals": fund_b,
+            "pillars": build_comparison_pillars(matrix_b),
+        }
+    }
     
     return {
         "ticker_a": resolved_a,
@@ -174,4 +203,5 @@ async def compare_two_companies(ticker_a: str, ticker_b: str, progress_callback=
         "matrix_a": matrix_a,
         "matrix_b": matrix_b,
         "disparity": disparity,
+        "comparison": comparison,
     }

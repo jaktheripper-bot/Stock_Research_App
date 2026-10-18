@@ -226,7 +226,7 @@
       <span class="badge" style="background: rgba(14, 165, 233, 0.15); color: var(--accent-cyan); font-size: 11px;">Qualitative Matrix</span>
     </div>
 
-    <table style="width: 100%; border-collapse: collapse; text-align: left; font-size: 13.5px;">
+    <table class="comparison-pillars-table" style="width: 100%; border-collapse: collapse; text-align: left; font-size: 13.5px;">
       <thead>
         <tr style="border-bottom: 1px solid var(--border-color); background: rgba(15, 23, 42, 0.9);">
           <th style="padding: 14px 24px; color: var(--text-muted); font-weight: 600; width: 34%;">Strategic Pillar</th>
@@ -235,41 +235,36 @@
         </tr>
       </thead>
       <tbody>
-        <tr>
-          <td style="padding: 14px 24px; font-weight: 600; color: var(--text-secondary);">1. Competitive Moat & Advantage</td>
-          <td style="padding: 14px 24px;"><span class="badge badge-cyan">{{ matrix_a.Moat|default('Moderate') }}</span></td>
-          <td style="padding: 14px 24px;"><span class="badge badge-emerald">{{ matrix_b.Moat|default('Moderate') }}</span></td>
-        </tr>
-        <tr style="background: rgba(30, 41, 59, 0.2);">
-          <td style="padding: 14px 24px; font-weight: 600; color: var(--text-secondary);">2. Capital Allocation & Reinvestment</td>
-          <td style="padding: 14px 24px;"><span class="badge badge-cyan">{{ matrix_a.CapitalAllocation|default('Disciplined') }}</span></td>
-          <td style="padding: 14px 24px;"><span class="badge badge-emerald">{{ matrix_b.CapitalAllocation|default('Disciplined') }}</span></td>
-        </tr>
-        <tr>
-          <td style="padding: 14px 24px; font-weight: 600; color: var(--text-secondary);">3. Valuation Multiple & Margin of Safety</td>
-          <td style="padding: 14px 24px;"><span class="badge badge-cyan">{{ matrix_a.Valuation|default('Fair') }}</span></td>
-          <td style="padding: 14px 24px;"><span class="badge badge-emerald">{{ matrix_b.Valuation|default('Fair') }}</span></td>
-        </tr>
-        <tr style="background: rgba(30, 41, 59, 0.2);">
-          <td style="padding: 14px 24px; font-weight: 600; color: var(--text-secondary);">4. Balance Sheet Leverage & Solvency</td>
-          <td style="padding: 14px 24px;"><span class="badge badge-cyan">{{ matrix_a.BalanceSheet|default('Resilient') }}</span></td>
-          <td style="padding: 14px 24px;"><span class="badge badge-emerald">{{ matrix_b.BalanceSheet|default('Resilient') }}</span></td>
-        </tr>
-        <tr>
-          <td style="padding: 14px 24px; font-weight: 600; color: var(--text-secondary);">5. Management Quality & Governance</td>
-          <td style="padding: 14px 24px;"><span class="badge badge-cyan">{{ matrix_a.Governance|default('Clean') }}</span></td>
-          <td style="padding: 14px 24px;"><span class="badge badge-emerald">{{ matrix_b.Governance|default('Clean') }}</span></td>
-        </tr>
-        <tr style="background: rgba(30, 41, 59, 0.2);">
-          <td style="padding: 14px 24px; font-weight: 600; color: var(--text-secondary);">6. Macro & Industry Headwinds</td>
-          <td style="padding: 14px 24px;"><span class="badge badge-cyan">{{ matrix_a.Macro|default('Neutral') }}</span></td>
-          <td style="padding: 14px 24px;"><span class="badge badge-emerald">{{ matrix_b.Macro|default('Neutral') }}</span></td>
-        </tr>
-        <tr>
-          <td style="padding: 14px 24px; font-weight: 600; color: var(--text-secondary);">7. Drop Diagnostic & Catalysts</td>
-          <td style="padding: 14px 24px;"><span class="badge badge-cyan">{{ matrix_a.Diagnostic|default('Neutral') }}</span></td>
-          <td style="padding: 14px 24px;"><span class="badge badge-emerald">{{ matrix_b.Diagnostic|default('Neutral') }}</span></td>
-        </tr>
+<tr>
+    <td><strong>1. Business Moat &amp; Durability</strong></td>
+    <td><span class="badge">{{ comparison.company_a.pillars.moat|default('Unrated') }}</span></td>
+    <td><span class="badge">{{ comparison.company_b.pillars.moat|default('Unrated') }}</span></td>
+</tr>
+<tr>
+    <td><strong>2. Management &amp; Capital Allocation</strong></td>
+    <td><span class="badge">{{ comparison.company_a.pillars.management|default('Unrated') }}</span></td>
+    <td><span class="badge">{{ comparison.company_b.pillars.management|default('Unrated') }}</span></td>
+</tr>
+<tr>
+    <td><strong>3. Financial Resilience &amp; Cash Flow</strong></td>
+    <td><span class="badge">{{ comparison.company_a.pillars.financials|default('Unrated') }}</span></td>
+    <td><span class="badge">{{ comparison.company_b.pillars.financials|default('Unrated') }}</span></td>
+</tr>
+<tr>
+    <td><strong>4. Valuation &amp; Margin of Safety</strong></td>
+    <td><span class="badge">{{ comparison.company_a.pillars.valuation|default('Unrated') }}</span></td>
+    <td><span class="badge">{{ comparison.company_b.pillars.valuation|default('Unrated') }}</span></td>
+</tr>
+<tr>
+    <td><strong>5. Macro &amp; Regulatory Sensitivity</strong></td>
+    <td><span class="badge">{{ comparison.company_a.pillars.macro|default('Unrated') }}</span></td>
+    <td><span class="badge">{{ comparison.company_b.pillars.macro|default('Unrated') }}</span></td>
+</tr>
+<tr>
+    <td><strong>6. Forensic &amp; Governance Hygiene</strong></td>
+    <td><span class="badge">{{ comparison.company_a.pillars.forensic|default('Unrated') }}</span></td>
+    <td><span class="badge">{{ comparison.company_b.pillars.forensic|default('Unrated') }}</span></td>
+</tr>
       </tbody>
     </table>
   </div>
