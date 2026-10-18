@@ -170,6 +170,14 @@ class TestMoatnomicsDomainConfig(unittest.TestCase):
         req_www = Request(scope_www)
         self.assertTrue(_validate_request_origin(req_www))
 
+    def test_cors_middleware_allowed_and_blocked_origins(self):
+        res_allowed = self.client.get("/robots.txt", headers={"Origin": "https://moatnomics.com"})
+        self.assertEqual(res_allowed.headers.get("access-control-allow-origin"), "https://moatnomics.com")
+        self.assertEqual(res_allowed.headers.get("access-control-allow-credentials"), "true")
+
+        res_blocked = self.client.get("/robots.txt", headers={"Origin": "https://attacker-evil.com"})
+        self.assertNotIn("access-control-allow-origin", res_blocked.headers)
+
     def test_robots_txt_specifies_moatnomics_sitemap(self):
         res = self.client.get("/robots.txt")
         self.assertEqual(res.status_code, 200)
