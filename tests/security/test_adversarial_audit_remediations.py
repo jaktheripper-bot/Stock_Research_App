@@ -107,13 +107,22 @@ class TestAdversarialAuditRemediations(unittest.TestCase):
 
     def test_high01_concurrent_credit_deduction_atomicity(self):
         """[HIGH-01] Verify 8 concurrent unlock calls with 1.0 credit only succeed once."""
+        from core.db.connection import get_db_connection, get_placeholder
+        from core.db.users import get_or_create_user
         race_uid = "usr_race_condition_test"
-        # Reset user to exactly 1.0 credit
-        add_user_credits(race_uid, 1.0, "race_seed", email="race@example.com")
-        current = get_user_credits(race_uid)
-        if current > 1.0:
-            from core.db.users import deduct_user_credits
-            deduct_user_credits(race_uid, current - 1.0, "normalize_to_1")
+
+        # Ensure user exists
+        get_or_create_user(race_uid, "race@example.com", "Race Test User")
+
+        # Clean prior race test unlocks and reset balance to exactly 1.0 credit
+        conn = get_db_connection()
+        c = conn.cursor()
+        p = get_placeholder()
+        c.execute(f"DELETE FROM user_unlocked_dossiers WHERE user_id = {p};", (race_uid,))
+        c.execute(f"DELETE FROM credit_usage_ledger WHERE user_id = {p};", (race_uid,))
+        c.execute(f"UPDATE user_accounts SET credits_balance = 1.0 WHERE id = {p};", (race_uid,))
+        conn.commit()
+        conn.close()
 
         tickers = [f"RACE_TICKER_{i}" for i in range(8)]
         with ThreadPoolExecutor(max_workers=8) as pool:

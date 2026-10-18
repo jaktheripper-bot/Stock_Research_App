@@ -769,11 +769,6 @@ async def admin_auth_callback(
             logger.error(f"Error exchanging OAuth code: {e}")
 
     elif access_token:
-        claims = _extract_jwt_claims(access_token)
-        user_meta = claims.get("user_metadata") or {}
-        if claims.get("email") or user_meta.get("email"):
-            verified_email = claims.get("email") or user_meta.get("email")
-
         if sb_url and anon_key:
             try:
                 resp = requests.get(
@@ -783,9 +778,16 @@ async def admin_auth_callback(
                 )
                 if resp.status_code == 200:
                     data = resp.json()
-                    verified_email = data.get("email") or verified_email
+                    verified_email = data.get("email")
             except Exception as e:
                 logger.debug(f"Notice fetching user via token endpoint: {e}")
+
+        # Only allow local unverified claim extraction in unit test mode (TESTING=1)
+        if not verified_email and os.environ.get("TESTING") == "1":
+            claims = _extract_jwt_claims(access_token)
+            user_meta = claims.get("user_metadata") or {}
+            if claims.get("email") or user_meta.get("email"):
+                verified_email = claims.get("email") or user_meta.get("email")
 
     if not verified_email:
         return HTMLResponse("""
