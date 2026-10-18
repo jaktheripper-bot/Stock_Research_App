@@ -9,6 +9,7 @@ Provides dual-bound (PostgreSQL/SQLite) atomic transactions for:
 """
 
 import time
+import uuid
 import logging
 from datetime import datetime, timezone, timedelta
 from typing import Dict, Any, List, Optional, Tuple
@@ -60,13 +61,13 @@ def get_or_create_user(
                 # First-time welcome grant
                 initial_credits = 2.0
                 cursor.execute(f"UPDATE user_accounts SET credits_balance = credits_balance + {p} WHERE id = {p};", (initial_credits, db_id))
-                tx_id = f"tx_welcome_{db_id[:12]}_{int(time.time())}"
+                tx_id = f"tx_welcome_{db_id[:12]}_{int(time.time())}_{uuid.uuid4().hex[:8]}"
                 cursor.execute(
                     f"""
                     INSERT INTO credit_transactions (id, user_id, customer_email, amount_inr, credits_added, payment_gateway, status, pack_type, invoice_number)
                     VALUES ({p}, {p}, {p}, 0.0, {p}, 'system_grant', 'success', 'WELCOME_GRANT', {p});
                     """,
-                    (tx_id, db_id, clean_email, initial_credits, f"INV-WELCOME-{int(time.time())}")
+                    (tx_id, db_id, clean_email, initial_credits, f"INV-WELCOME-{int(time.time())}-{uuid.uuid4().hex[:4].upper()}")
                 )
                 cursor.execute(
                     f"""
@@ -93,13 +94,13 @@ def get_or_create_user(
         )
 
         # Log welcome grant transaction
-        tx_id = f"tx_welcome_{clean_id[:12]}_{int(time.time())}"
+        tx_id = f"tx_welcome_{clean_id[:12]}_{int(time.time())}_{uuid.uuid4().hex[:8]}"
         cursor.execute(
             f"""
             INSERT INTO credit_transactions (id, user_id, customer_email, amount_inr, credits_added, payment_gateway, status, pack_type, invoice_number)
             VALUES ({p}, {p}, {p}, 0.0, {p}, 'system_grant', 'success', 'WELCOME_GRANT', {p});
             """,
-            (tx_id, clean_id, clean_email, initial_credits, f"INV-WELCOME-{int(time.time())}")
+            (tx_id, clean_id, clean_email, initial_credits, f"INV-WELCOME-{int(time.time())}-{uuid.uuid4().hex[:4].upper()}")
         )
 
         # Log initial ledger entry
@@ -232,7 +233,8 @@ def deduct_user_credits(
                     try:
                         exp_dt = datetime.fromisoformat(sub_expires.replace("Z", "+00:00"))
                         is_pro_active = exp_dt > now
-                    except Exception:
+                    except Exception as e:
+                        logger.debug("Failed parsing sub_expires in deduct_user_credits: %s", e)
                         is_pro_active = True
                 elif hasattr(sub_expires, "tzinfo"):
                     is_pro_active = sub_expires > now
@@ -283,6 +285,49 @@ def deduct_user_credits(
         conn.close()
 
 
+def get_credit_transaction_by_gateway_id(payment_id: Optional[str] = None, order_id: Optional[str] = None) -> Optional[Dict[str, Any]]:
+    """Returns an existing credit transaction record by gateway_payment_id or gateway_order_id."""
+    if not payment_id and not order_id:
+        return None
+    init_db()
+    conn = get_db_connection()
+    cursor = conn.cursor()
+    p = get_placeholder()
+    try:
+        clauses = []
+        params = []
+        if payment_id:
+            clauses.append(f"gateway_payment_id = {p}")
+            params.append(str(payment_id).strip())
+        if order_id:
+            clauses.append(f"gateway_order_id = {p}")
+            params.append(str(order_id).strip())
+        cursor.execute(
+            f"SELECT id, user_id, amount_inr, credits_added, status, invoice_number, gateway_order_id, gateway_payment_id "
+            f"FROM credit_transactions WHERE ({' OR '.join(clauses)}) AND status = 'success' LIMIT 1;",
+            tuple(params)
+        )
+        row = cursor.fetchone()
+        if row:
+            return {
+                "id": row[0],
+                "user_id": row[1],
+                "amount_inr": row[2],
+                "credits_added": row[3],
+                "status": row[4],
+                "invoice_number": row[5],
+                "gateway_order_id": row[6],
+                "gateway_payment_id": row[7]
+            }
+        return None
+    except Exception as e:
+        logger.error(f"Error fetching transaction by gateway id: {e}")
+        return None
+    finally:
+        cursor.close()
+        conn.close()
+
+
 def add_user_credits(
     user_id: str,
     amount_inr: float,
@@ -295,6 +340,7 @@ def add_user_credits(
 ) -> Tuple[bool, float]:
     """
     Records a payment transaction and credits research units or upgrades the subscription tier.
+    Enforces atomic idempotency so duplicate gateway_payment_id or gateway_order_id cannot double-credit.
     Returns (success: bool, new_balance: float).
     """
     if not user_id:
@@ -316,10 +362,34 @@ def add_user_credits(
             return False, 0.0
 
         current_balance = float(row[0] or 0.0)
+
+        # Atomic Idempotency Check: Reject replay of existing successful payment or order
+        if (gateway_payment_id or gateway_order_id) and status == "success":
+            conditions = []
+            params = []
+            if gateway_payment_id:
+                conditions.append(f"gateway_payment_id = {p}")
+                params.append(str(gateway_payment_id).strip())
+            if gateway_order_id:
+                conditions.append(f"gateway_order_id = {p}")
+                params.append(str(gateway_order_id).strip())
+            cursor.execute(
+                f"SELECT id, status, credits_added, invoice_number FROM credit_transactions WHERE ({' OR '.join(conditions)}) AND status = 'success';",
+                tuple(params)
+            )
+            existing_tx = cursor.fetchone()
+            if existing_tx:
+                logger.warning(
+                    f"Idempotent payment replay detected for user {clean_id}: "
+                    f"gateway_payment_id={gateway_payment_id}, gateway_order_id={gateway_order_id}. "
+                    f"Existing tx_id={existing_tx[0]}. Preserving current balance {current_balance}."
+                )
+                return True, current_balance
+
         credits_to_add = float(credits_added)
         new_balance = round(current_balance + credits_to_add, 2)
-        tx_id = f"tx_{int(time.time())}_{clean_id[:8]}"
-        inv_num = invoice_number or f"INV-{int(time.time())}"
+        tx_id = f"tx_{int(time.time())}_{clean_id[:8]}_{uuid.uuid4().hex[:6]}"
+        inv_num = invoice_number or f"INV-{int(time.time())}-{uuid.uuid4().hex[:4].upper()}"
 
         # Fetch user profile to enrich invoice
         cursor.execute(f"SELECT email, full_name FROM user_accounts WHERE id = {p};", (clean_id,))
@@ -356,7 +426,8 @@ def add_user_credits(
                 """,
                 (tx_id, clean_id, amt, credits_to_add, effective_gateway, gateway_order_id, gateway_payment_id, status, pack_type, inv_num, cust_email, cust_name, base_amt, gst_amt)
             )
-        except Exception:
+        except Exception as e:
+            logger.debug("Fallback inserting credit transaction without detailed invoice columns: %s", e)
             # Fallback for earlier schema if columns not yet committed
             cursor.execute(
                 f"""
@@ -845,7 +916,8 @@ def _format_user_record(row) -> Dict[str, Any]:
                 try:
                     exp_dt = datetime.fromisoformat(sub_expires.replace("Z", "+00:00"))
                     is_pro = exp_dt > now
-                except Exception:
+                except Exception as e:
+                    logger.debug("Failed parsing sub_expires in get_user_by_id: %s", e)
                     is_pro = True
             elif hasattr(sub_expires, "tzinfo"):
                 is_pro = sub_expires > now
@@ -954,16 +1026,10 @@ def unlock_ticker_for_user(
     p = get_placeholder()
 
     try:
-        if p == "%s":
-            cursor.execute(
-                f"INSERT INTO user_unlocked_dossiers (user_id, ticker) VALUES ({p}, {p}) ON CONFLICT (user_id, ticker) DO NOTHING;",
-                (clean_id, clean_ticker_sym)
-            )
-        else:
-            cursor.execute(
-                f"INSERT OR IGNORE INTO user_unlocked_dossiers (user_id, ticker) VALUES ({p}, {p});",
-                (clean_id, clean_ticker_sym)
-            )
+        cursor.execute(
+            f"INSERT INTO user_unlocked_dossiers (user_id, ticker) VALUES ({p}, {p}) ON CONFLICT (user_id, ticker) DO NOTHING;",
+            (clean_id, clean_ticker_sym)
+        )
         conn.commit()
         logger.info(f"Recorded dossier unlock for user {clean_id} on {clean_ticker_sym}")
         return True, new_balance, f"Successfully unlocked institutional deep-dive for {clean_ticker_sym}."

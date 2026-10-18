@@ -3,7 +3,7 @@ Supabase Authentication, Session Management, and Identity State Module.
 
 Handles:
 - Supabase Auth GoTrue REST endpoints (Google OAuth redirect, Magic Link / OTP dispatch, token exchange)
-- Streamlit session state binding for authenticated user profile and credit balances
+- ContextVar session state binding for authenticated user profile and credit balances
 - Safe query parameter parsing on OAuth/Magic Link callbacks
 - Frictionless guest-to-user conversion with 2 welcome credits
 """
@@ -28,8 +28,6 @@ logger = logging.getLogger("equity_research.core.auth")
 _user_session_var: contextvars.ContextVar[Optional[Dict[str, Any]]] = contextvars.ContextVar("user_session", default=None)
 _auth_token_var: contextvars.ContextVar[Optional[str]] = contextvars.ContextVar("auth_token", default=None)
 
-def _is_streamlit_running() -> bool:
-    return False
 
 def get_supabase_auth_config() -> Dict[str, str]:
     """

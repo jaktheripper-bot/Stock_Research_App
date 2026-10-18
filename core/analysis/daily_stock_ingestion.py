@@ -331,13 +331,27 @@ def synthesize_and_archive_stock_dossier(
     api_key = get_secret("GEMINI_API_KEY")
 
     if not skip_gemini and api_key and len(api_key.strip()) > 10:
-        try:
-            from core.analysis.dossier_report_synthesis import generate_stock_report
-            logger.info(f"Synthesizing Gemini 7-Pillar research dossier for daily ingestion: {ticker}...")
-            report_text = generate_stock_report(ticker)
-        except Exception as gem_err:
-            logger.warning(f"Live Gemini synthesis notice for {ticker}: {gem_err}. Falling back to deterministic institutional synthesis.")
-            report_text = ""
+        from core.billing.qos_governor import (
+            authorize_llm_execution,
+            get_daemon_daily_spend_usd,
+            record_daemon_spend_usd,
+        )
+        daemon_ok, daemon_msg = authorize_llm_execution(
+            actor_type="BACKGROUND_DAEMON",
+            current_daemon_spend_usd=get_daemon_daily_spend_usd(),
+        )
+        if not daemon_ok:
+            logger.info(f"Background daemon QoS pause for {ticker}: {daemon_msg}. Using deterministic institutional synthesis to protect VIP quota.")
+        else:
+            try:
+                from core.analysis.dossier_report_synthesis import generate_stock_report
+                logger.info(f"Synthesizing Gemini 7-Pillar research dossier for daily ingestion: {ticker}...")
+                report_text = generate_stock_report(ticker)
+                record_daemon_spend_usd(0.001)
+            except Exception as gem_err:
+                logger.warning(f"Live Gemini synthesis notice for {ticker}: {gem_err}. Falling back to deterministic institutional synthesis.")
+                report_text = ""
+
 
     # Fallback to deterministic synthesis if Gemini is skipped or unavailable
     if not report_text or len(report_text.strip()) < 500:
@@ -347,7 +361,8 @@ def synthesize_and_archive_stock_dossier(
         if not os.environ.get("TESTING") == "1" and scrip_code:
             try:
                 ann = fetch_latest_bse_announcement(scrip_code)
-            except Exception:
+            except Exception as e:
+                logger.warning(f"BSE announcement fetch notice for {scrip_code}: {e}")
                 ann = ""
         save_report_to_archive(
             stock_data=stock_data,

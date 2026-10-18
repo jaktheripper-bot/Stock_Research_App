@@ -776,69 +776,77 @@ def seed_default_msme_firms() -> int:
     """
     conn = get_db_connection()
     cur = conn.cursor()
-    use_pg = bool(get_supabase_url())
+    try:
+        use_pg = bool(get_supabase_url())
 
-    if use_pg:
-        sql = """
-            INSERT INTO msme_firms (
-                uin, name, sector_code, sector_name, city, state,
-                annual_turnover, employee_count, registration_date, source, last_updated
-            ) VALUES (
-                %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, now()
+        if use_pg:
+            sql = """
+                INSERT INTO msme_firms (
+                    uin, name, sector_code, sector_name, city, state,
+                    annual_turnover, employee_count, registration_date, source, last_updated
+                ) VALUES (
+                    %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, now()
+                )
+                ON CONFLICT (uin) DO UPDATE SET
+                    name = EXCLUDED.name,
+                    sector_code = EXCLUDED.sector_code,
+                    sector_name = EXCLUDED.sector_name,
+                    city = EXCLUDED.city,
+                    state = EXCLUDED.state,
+                    annual_turnover = EXCLUDED.annual_turnover,
+                    employee_count = EXCLUDED.employee_count,
+                    registration_date = EXCLUDED.registration_date,
+                    source = EXCLUDED.source,
+                    last_updated = now()
+            """
+        else:
+            sql = """
+                INSERT INTO msme_firms (
+                    uin, name, sector_code, sector_name, city, state,
+                    annual_turnover, employee_count, registration_date, source, last_updated
+                ) VALUES (
+                    ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, datetime('now')
+                )
+                ON CONFLICT(uin) DO UPDATE SET
+                    name = excluded.name,
+                    sector_code = excluded.sector_code,
+                    sector_name = excluded.sector_name,
+                    city = excluded.city,
+                    state = excluded.state,
+                    annual_turnover = excluded.annual_turnover,
+                    employee_count = excluded.employee_count,
+                    registration_date = excluded.registration_date,
+                    source = excluded.source,
+                    last_updated = datetime('now')
+            """
+
+        seeded = 0
+        for f in CANONICAL_MSME_FIRMS:
+            params = (
+                f["uin"],
+                f["name"],
+                f.get("sector_code"),
+                f.get("sector_name"),
+                f.get("city"),
+                f.get("state"),
+                float(f["annual_turnover"]) if f.get("annual_turnover") is not None else None,
+                int(f["employee_count"]) if f.get("employee_count") is not None else None,
+                f.get("registration_date"),
+                f.get("source", "Udyam Gazette / Open Registry"),
             )
-            ON CONFLICT (uin) DO UPDATE SET
-                name = EXCLUDED.name,
-                sector_code = EXCLUDED.sector_code,
-                sector_name = EXCLUDED.sector_name,
-                city = EXCLUDED.city,
-                state = EXCLUDED.state,
-                annual_turnover = EXCLUDED.annual_turnover,
-                employee_count = EXCLUDED.employee_count,
-                registration_date = EXCLUDED.registration_date,
-                source = EXCLUDED.source,
-                last_updated = now()
-        """
-    else:
-        sql = """
-            INSERT INTO msme_firms (
-                uin, name, sector_code, sector_name, city, state,
-                annual_turnover, employee_count, registration_date, source, last_updated
-            ) VALUES (
-                ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, datetime('now')
-            )
-            ON CONFLICT(uin) DO UPDATE SET
-                name = excluded.name,
-                sector_code = excluded.sector_code,
-                sector_name = excluded.sector_name,
-                city = excluded.city,
-                state = excluded.state,
-                annual_turnover = excluded.annual_turnover,
-                employee_count = excluded.employee_count,
-                registration_date = excluded.registration_date,
-                source = excluded.source,
-                last_updated = datetime('now')
-        """
+            cur.execute(sql, params)
+            seeded += 1
 
-    seeded = 0
-    for f in CANONICAL_MSME_FIRMS:
-        params = (
-            f["uin"],
-            f["name"],
-            f.get("sector_code"),
-            f.get("sector_name"),
-            f.get("city"),
-            f.get("state"),
-            float(f["annual_turnover"]) if f.get("annual_turnover") is not None else None,
-            int(f["employee_count"]) if f.get("employee_count") is not None else None,
-            f.get("registration_date"),
-            f.get("source", "Udyam Gazette / Open Registry"),
-        )
-        cur.execute(sql, params)
-        seeded += 1
-
-    conn.commit()
-    cur.close()
-    conn.close()
+        conn.commit()
+    finally:
+        try:
+            cur.close()
+        except Exception as e:
+            logger.debug(f"Cursor close notice: {e}")
+        try:
+            conn.close()
+        except Exception as e:
+            logger.debug(f"Connection close notice: {e}")
     logger.info("Successfully seeded %d canonical MSME benchmark records", seeded)
     return seeded
 
@@ -847,8 +855,16 @@ def get_active_msme_firms_count() -> int:
     """Returns the total number of firms in msme_firms."""
     conn = get_db_connection()
     cur = conn.cursor()
-    cur.execute("SELECT COUNT(*) FROM msme_firms")
-    count = cur.fetchone()[0]
-    cur.close()
-    conn.close()
-    return count
+    try:
+        cur.execute("SELECT COUNT(*) FROM msme_firms")
+        count = cur.fetchone()[0]
+        return count
+    finally:
+        try:
+            cur.close()
+        except Exception as e:
+            logger.debug(f"Cursor close notice: {e}")
+        try:
+            conn.close()
+        except Exception as e:
+            logger.debug(f"Connection close notice: {e}")

@@ -229,12 +229,14 @@ async def admin_dashboard(
 
     try:
         billables = get_all_billables(limit=100, exclude_tests=exclude_tests)
-    except Exception:
+    except Exception as e:
+        logger.warning("Error fetching billables in admin_dashboard: %s", e)
         billables = []
 
     try:
         user_analytics = get_user_usage_analytics(days=selected_days, start_date=parsed_start, end_date=parsed_end, limit=50, exclude_tests=exclude_tests)
-    except Exception:
+    except Exception as e:
+        logger.warning("Error fetching user usage analytics in admin_dashboard: %s", e)
         user_analytics = {
             "total_registered_users": 0, "active_users_in_period": 0,
             "signed_in_actions_count": 0, "guest_actions_count": 0,
@@ -255,7 +257,8 @@ async def admin_dashboard(
 
     try:
         session_journeys = get_session_journeys(days=selected_days, start_date=parsed_start, end_date=parsed_end, limit=25, exclude_tests=exclude_tests)
-    except Exception:
+    except Exception as e:
+        logger.warning("Error fetching session journeys in admin_dashboard: %s", e)
         session_journeys = []
 
     try:
@@ -273,7 +276,8 @@ async def admin_dashboard(
     try:
         from core.analysis.asset_scanner import get_asset_scan_runs
         asset_scans = get_asset_scan_runs(limit=30)
-    except Exception:
+    except Exception as e:
+        logger.warning("Error fetching asset scan runs in admin_dashboard: %s", e)
         asset_scans = []
 
     admin_user_credits = 0.0
@@ -283,7 +287,8 @@ async def admin_dashboard(
             u_acc = get_user_by_email(admin_profile["email"])
             if u_acc:
                 admin_user_credits = float(u_acc.get("credits_balance", 0.0))
-    except Exception:
+    except Exception as e:
+        logger.warning("Error fetching admin user credits in admin_dashboard: %s", e)
         admin_user_credits = 0.0
 
     ai_spends = {}
@@ -549,6 +554,40 @@ async def api_copilot_chat(payload: CopilotChatRequest, request: Request):
 
     tier = (web_user.get("subscription_tier") or "free").lower() if web_user else "free"
     is_subscriber = tier in ("pro_monthly", "pro_annual") or "pro" in tier or _is_admin_authenticated(request)
+
+    from core.billing.qos_governor import authorize_llm_execution
+    client_ip = request.client.host if request.client else ""
+    user_email = web_user.get("email", "") if web_user else (trusted_user_id or "")
+    has_unlocked = bool(deep_dive_unlocked or is_subscriber)
+    actor_type = "USER_COPILOT" if has_unlocked else "ANON"
+
+    authorized, qos_status = authorize_llm_execution(
+        actor_type=actor_type,
+        user_email=user_email,
+        client_ip=client_ip,
+        has_unlocked_dossier=has_unlocked
+    )
+    if qos_status == "RATE_LIMIT_IP_BURST":
+        return {
+            "success": False,
+            "conversation_id": payload.conversation_id or "default",
+            "response": (
+                "⚠️ **Rate Limit Exceeded:** Too many requests from your IP address (exceeded 30 requests/minute). "
+                "Please pause for a moment before querying the Forensic Desk again."
+            ),
+            "status": "RATE_LIMITED"
+        }
+    if qos_status == "USER_COPILOT_HOURLY_VELOCITY_CAP":
+        return {
+            "success": False,
+            "conversation_id": payload.conversation_id or "default",
+            "response": (
+                "⚠️ **Hourly Velocity Cap Reached:** You have reached the maximum allowed Forensic Desk turns for this hour "
+                "(40 turns/hr) to protect your account. Please resume shortly."
+            ),
+            "status": "VELOCITY_CAPPED"
+        }
+
 
     try:
         res = await process_forensic_desk_turn(
@@ -1321,7 +1360,8 @@ async def admin_grant_credits_endpoint(request: Request):
     if "application/json" in content_type:
         try:
             body = await request.json()
-        except Exception:
+        except Exception as e:
+            logger.debug("Failed parsing JSON body in admin_grant_credits_route: %s", e)
             body = {}
         user_identifier = body.get("user_email") or body.get("user_id") or ""
         credits_val = body.get("credits", 2.0)
@@ -1352,6 +1392,7 @@ async def admin_grant_credits_endpoint(request: Request):
         if credits_amount <= 0 or credits_amount > 1000.0:
             raise ValueError("Credits amount must be between 0.1 and 1000.0.")
     except Exception as e:
+        logger.warning("Invalid credits amount requested: %s", e)
         err_msg = f"Invalid credits amount: {e}"
         if is_ajax:
             return JSONResponse(status_code=400, content={"success": False, "error": err_msg})
@@ -1808,7 +1849,8 @@ def api_admin_traffic_flow(
         try:
             parsed_start = datetime.strptime(start_date.strip(), "%Y-%m-%d").date()
             parsed_end = datetime.strptime(end_date.strip(), "%Y-%m-%d").date()
-        except Exception:
+        except Exception as e:
+            logger.warning("Failed parsing date range for traffic flow (%s to %s): %s", start_date, end_date, e)
             parsed_start, parsed_end = None, None
 
     flow = get_traffic_flow_analytics(
@@ -1876,7 +1918,8 @@ async def api_admin_digest_dispatch_test(request: Request):
 
     try:
         body = await request.json()
-    except Exception:
+    except Exception as e:
+        logger.debug("Failed parsing json in digest dispatch-test: %s", e)
         body = {}
 
     target_email = (body.get("recipient_email") or get_admin_notification_email()).strip()
@@ -1896,7 +1939,8 @@ async def api_admin_digest_broadcast(request: Request):
 
     try:
         body = await request.json()
-    except Exception:
+    except Exception as e:
+        logger.debug("Failed parsing json in digest broadcast: %s", e)
         body = {}
 
     only_active_pro = bool(body.get("only_active_pro", False))

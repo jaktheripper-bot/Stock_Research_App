@@ -23,8 +23,17 @@ from core.db.connection import (
     get_supabase_url,
     get_placeholder,
     get_db_connection,
+    get_connection,
     get_db_path,
     init_db,
+)
+
+from core.db.distributed_lock import (
+    WORKER_ID,
+    ensure_lock_table_exists,
+    acquire_job_lease,
+    release_job_lease,
+    job_lease,
 )
 
 from core.db.compliance import (
@@ -216,4 +225,11 @@ __all__ = [
     "set_user_digest_subscription",
     "record_digest_dispatch",
     "get_digest_dispatch_history",
+    # distributed locks & job lease
+    "get_connection",
+    "WORKER_ID",
+    "ensure_lock_table_exists",
+    "acquire_job_lease",
+    "release_job_lease",
+    "job_lease",
 ]

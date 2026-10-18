@@ -52,69 +52,81 @@ def get_gemini_spends_summary() -> Dict[str, Any]:
     ai_audits_count = 0
     admin_copilot_turns = 0
 
+    conn = None
+    cursor = None
     try:
-        with get_db_connection() as conn:
-            cursor = conn.cursor()
-            is_pg = is_postgres_connection(conn)
+        conn = get_db_connection()
+        cursor = conn.cursor()
+        is_pg = is_postgres_connection(conn)
 
-            # 1. Stock Research Reports & Revisions
-            try:
-                cursor.execute("SELECT COUNT(*) FROM reports;")
-                row = cursor.fetchone()
-                if row:
-                    stock_reports_count = int(row[0] or 0)
-            except Exception as e:
-                logger.debug(f"AI spend telemetry: reports count query error: {e}")
+        # 1. Stock Research Reports & Revisions
+        try:
+            cursor.execute("SELECT COUNT(*) FROM reports;")
+            row = cursor.fetchone()
+            if row:
+                stock_reports_count = int(row[0] or 0)
+        except Exception as e:
+            logger.debug(f"AI spend telemetry: reports count query error: {e}")
 
-            try:
-                cursor.execute("SELECT COUNT(*) FROM report_revisions;")
-                row = cursor.fetchone()
-                if row:
-                    stock_revisions_count = int(row[0] or 0)
-            except Exception as e:
-                logger.debug(f"AI spend telemetry: report_revisions count query error: {e}")
+        try:
+            cursor.execute("SELECT COUNT(*) FROM report_revisions;")
+            row = cursor.fetchone()
+            if row:
+                stock_revisions_count = int(row[0] or 0)
+        except Exception as e:
+            logger.debug(f"AI spend telemetry: report_revisions count query error: {e}")
 
-            # 2. Mutual Fund Forensic Qualitative Dossiers
-            try:
-                cursor.execute("SELECT COUNT(*) FROM fund_forensic_dossiers;")
-                row = cursor.fetchone()
-                if row:
-                    mf_dossiers_count = int(row[0] or 0)
-            except Exception as e:
-                logger.debug(f"AI spend telemetry: fund_forensic_dossiers count query error: {e}")
+        # 2. Mutual Fund Forensic Qualitative Dossiers
+        try:
+            cursor.execute("SELECT COUNT(*) FROM fund_forensic_dossiers;")
+            row = cursor.fetchone()
+            if row:
+                mf_dossiers_count = int(row[0] or 0)
+        except Exception as e:
+            logger.debug(f"AI spend telemetry: fund_forensic_dossiers count query error: {e}")
 
-            # 3. Live Forensic Intelligence Desk (Genuine User Conversation Turns)
-            try:
-                if is_pg:
-                    cursor.execute("SELECT COUNT(*) FROM agent_conversation_turns WHERE conversation_id NOT LIKE '%TEST%';")
-                else:
-                    cursor.execute("SELECT COUNT(*) FROM agent_conversation_turns WHERE conversation_id NOT LIKE '%TEST%';")
-                row = cursor.fetchone()
-                if row:
-                    copilot_user_turns = int(row[0] or 0)
-            except Exception as e:
-                logger.warning(f"AI spend telemetry: agent_conversation_turns count query error: {e}")
+        # 3. Live Forensic Intelligence Desk (Genuine User Conversation Turns)
+        try:
+            if is_pg:
+                cursor.execute("SELECT COUNT(*) FROM agent_conversation_turns WHERE conversation_id NOT LIKE '%TEST%';")
+            else:
+                cursor.execute("SELECT COUNT(*) FROM agent_conversation_turns WHERE conversation_id NOT LIKE '%TEST%';")
+            row = cursor.fetchone()
+            if row:
+                copilot_user_turns = int(row[0] or 0)
+        except Exception as e:
+            logger.warning(f"AI spend telemetry: agent_conversation_turns count query error: {e}")
 
-            # 4. Project AI Audits with Google Gemini
-            try:
-                cursor.execute("SELECT COUNT(*) FROM project_audit_logs WHERE audit_engine LIKE '%antigravity%' OR audit_engine LIKE '%gemini%';")
-                row = cursor.fetchone()
-                if row:
-                    ai_audits_count = int(row[0] or 0)
-            except Exception as e:
-                logger.warning(f"AI spend telemetry: project_audit_logs query error: {e}")
+        # 4. Project AI Audits with Google Gemini
+        try:
+            cursor.execute("SELECT COUNT(*) FROM project_audit_logs WHERE audit_engine LIKE '%antigravity%' OR audit_engine LIKE '%gemini%';")
+            row = cursor.fetchone()
+            if row:
+                ai_audits_count = int(row[0] or 0)
+        except Exception as e:
+            logger.warning(f"AI spend telemetry: project_audit_logs query error: {e}")
 
-            # 5. Admin Copilot Actions
-            try:
-                cursor.execute("SELECT COUNT(*) FROM admin_audit_log WHERE action LIKE '%COPILOT%' OR details LIKE '%copilot%';")
-                row = cursor.fetchone()
-                if row:
-                    admin_copilot_turns = int(row[0] or 0)
-            except Exception as e:
-                logger.warning(f"AI spend telemetry: admin_audit_log query error: {e}")
-
+        # 5. Admin Copilot Actions
+        try:
+            cursor.execute("SELECT COUNT(*) FROM admin_audit_log WHERE action LIKE '%COPILOT%' OR details LIKE '%copilot%';")
+            row = cursor.fetchone()
+            if row:
+                admin_copilot_turns = int(row[0] or 0)
+        except Exception as e:
+            logger.warning(f"AI spend telemetry: admin_audit_log query error: {e}")
     except Exception as top_err:
         logger.warning(f"Error querying AI spend telemetry database: {top_err}")
+    finally:
+        if cursor:
+            try:
+                cursor.close()
+            except Exception as e:
+                logger.debug(f"Cursor close notice in ai_spends: {e}")
+        if conn:
+            try:
+                conn.close()
+            except Exception as e:
+                logger.debug(f"Connection close notice in ai_spends: {e}")
 
     # Compute Feature-by-Feature Tokens & USD/INR Costs
     # Total stock compilation runs = initial reports + revision updates

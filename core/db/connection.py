@@ -80,7 +80,8 @@ def is_postgres_connection(conn) -> bool:
         except Exception as e:
             logger.debug(f"Mogrify check cleanup note: {e}")
         return has_pg
-    except Exception:
+    except Exception as e:
+        logger.debug("Failed mogrify check on connection: %s", e)
         return False
 
 def _normalize_pg_dsn(dsn: str) -> str:
@@ -128,6 +129,11 @@ class _PooledConnectionProxy:
     def __exit__(self, exc_type, exc_val, exc_tb):
         self.close()
 
+from contextlib import contextmanager
+
+DB_POOL_MIN = int(os.environ.get("DB_POOL_MIN", "2"))
+DB_POOL_MAX = int(os.environ.get("DB_POOL_MAX", "20"))
+
 _PG_POOLS = {}
 _PG_POOL_LOCK = threading.Lock()
 
@@ -140,8 +146,8 @@ def _get_pg_pool(dsn: str):
                 import psycopg2.pool
                 # Enable TCP keepalive to improve connection reliability
                 _PG_POOLS[dsn] = psycopg2.pool.ThreadedConnectionPool(
-                    minconn=1,
-                    maxconn=300,
+                    minconn=DB_POOL_MIN,
+                    maxconn=DB_POOL_MAX,
                     dsn=dsn,
                     keepalives=1,
                     keepalives_idle=30,
@@ -222,10 +228,22 @@ def _get_raw_connection():
     conn = sqlite3.connect(db_path, timeout=30.0, check_same_thread=False)
     try:
         conn.execute("PRAGMA journal_mode=WAL;")
-        conn.execute("PRAGMA busy_timeout=30000;")
+        conn.execute("PRAGMA busy_timeout = 5000;")
     except Exception as e:
         logger.debug(f"SQLite PRAGMA configuration notice: {e}")
     return conn
+
+@contextmanager
+def get_db_context():
+    """Context manager ensuring safe acquisition and pool return inside a finally block."""
+    conn = get_db_connection()
+    try:
+        yield conn
+    finally:
+        try:
+            conn.close()
+        except Exception as e:
+            logger.debug(f"Failed closing connection in get_db_context: {e}")
 
 def get_db_connection():
     """Returns a pooled PostgreSQL connection or WAL-mode SQLite fallback connection."""
@@ -242,7 +260,7 @@ get_connection = get_db_connection
 
 
 def init_db(force: bool = False):
-    """Initializes tables and executes incremental schema migrations (v001 - v027)."""
+    """Initializes tables and executes incremental schema migrations (v001 - v031)."""
     global _DB_INITIALIZED, _INITIALIZED_DBS
 
     conn = _get_raw_connection()
@@ -422,7 +440,7 @@ def init_db(force: bool = False):
                     cursor.execute('CREATE INDEX IF NOT EXISTS idx_alert_events_ticker ON alert_events (ticker, timestamp DESC);')
                     cursor.execute('CREATE INDEX IF NOT EXISTS idx_alert_events_unread ON alert_events (is_read, timestamp DESC);')
                     cursor.execute('CREATE INDEX IF NOT EXISTS idx_report_revisions_ticker ON report_revisions (ticker);')
-                    cursor.execute("INSERT OR IGNORE INTO schema_migrations (version) VALUES ('v001_core_schema');")
+                    cursor.execute("INSERT INTO schema_migrations (version) VALUES (\'v001_core_schema\') ON CONFLICT DO NOTHING;")
                 conn.commit()
 
             # Migration v002: SEBI Compliance & Retention Audit Trail
@@ -451,7 +469,7 @@ def init_db(force: bool = False):
                         );
                     ''')
                     cursor.execute('CREATE INDEX IF NOT EXISTS idx_compliance_audit_ticker ON compliance_audit_log (ticker, timestamp DESC);')
-                    cursor.execute("INSERT OR IGNORE INTO schema_migrations (version) VALUES ('v002_compliance_audit_log');")
+                    cursor.execute("INSERT INTO schema_migrations (version) VALUES (\'v002_compliance_audit_log\') ON CONFLICT DO NOTHING;")
                 conn.commit()
 
             # Migration v003: Backend Site Usage Measurements & Telemetry Analytics
@@ -488,7 +506,7 @@ def init_db(force: bool = False):
                     cursor.execute('CREATE INDEX IF NOT EXISTS idx_site_usage_event_type ON site_usage_events (event_type, timestamp DESC);')
                     cursor.execute('CREATE INDEX IF NOT EXISTS idx_site_usage_ticker ON site_usage_events (ticker, timestamp DESC);')
                     cursor.execute('CREATE INDEX IF NOT EXISTS idx_site_usage_timestamp ON site_usage_events (timestamp DESC);')
-                    cursor.execute("INSERT OR IGNORE INTO schema_migrations (version) VALUES ('v003_site_usage_analytics');")
+                    cursor.execute("INSERT INTO schema_migrations (version) VALUES (\'v003_site_usage_analytics\') ON CONFLICT DO NOTHING;")
                 conn.commit()
 
             # Migration v004: Traffic Attribution, Visitor Demographics & Session Tracking
@@ -526,7 +544,7 @@ def init_db(force: bool = False):
                                 logger.debug(f"Column '{col}' migration notice: {e}")
                     cursor.execute('CREATE INDEX IF NOT EXISTS idx_site_usage_session ON site_usage_events (session_id, timestamp DESC);')
                     cursor.execute('CREATE INDEX IF NOT EXISTS idx_site_usage_source ON site_usage_events (traffic_source, timestamp DESC);')
-                    cursor.execute("INSERT OR IGNORE INTO schema_migrations (version) VALUES ('v004_traffic_attribution_and_session_tracking');")
+                    cursor.execute("INSERT INTO schema_migrations (version) VALUES (\'v004_traffic_attribution_and_session_tracking\') ON CONFLICT DO NOTHING;")
                 conn.commit()
 
             # Migration v005: System Settings & Dynamic Configuration
@@ -549,7 +567,7 @@ def init_db(force: bool = False):
                             updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
                         );
                     ''')
-                    cursor.execute("INSERT OR IGNORE INTO schema_migrations (version) VALUES ('v005_system_settings');")
+                    cursor.execute("INSERT INTO schema_migrations (version) VALUES (\'v005_system_settings\') ON CONFLICT DO NOTHING;")
                 conn.commit()
 
             # Migration v006: Visual Source Attribution & Footnote Citations Engine
@@ -574,7 +592,7 @@ def init_db(force: bool = False):
                             cursor.execute("ALTER TABLE report_revisions ADD COLUMN citations_json TEXT;")
                         except Exception as e:
                             logger.debug("Migration v006 report_revisions column citations_json notice: %s", e)
-                    cursor.execute("INSERT OR IGNORE INTO schema_migrations (version) VALUES ('v006_report_citations');")
+                    cursor.execute("INSERT INTO schema_migrations (version) VALUES (\'v006_report_citations\') ON CONFLICT DO NOTHING;")
                 conn.commit()
 
             # Migration v007: User Accounts, Credits, Transactions & Usage Ledger
@@ -673,7 +691,7 @@ def init_db(force: bool = False):
                     ''')
                     cursor.execute('CREATE INDEX IF NOT EXISTS idx_credit_usage_user ON credit_usage_ledger (user_id, created_at DESC);')
                     cursor.execute('CREATE INDEX IF NOT EXISTS idx_credit_usage_ticker ON credit_usage_ledger (ticker, created_at DESC);')
-                    cursor.execute("INSERT OR IGNORE INTO schema_migrations (version) VALUES ('v007_user_accounts_and_credits');")
+                    cursor.execute("INSERT INTO schema_migrations (version) VALUES (\'v007_user_accounts_and_credits\') ON CONFLICT DO NOTHING;")
                 conn.commit()
 
             # Migration v008: Morning Discovery Reel & Under-the-Radar Cohort
@@ -726,7 +744,7 @@ def init_db(force: bool = False):
                     ''')
                     cursor.execute('CREATE INDEX IF NOT EXISTS idx_discovery_reel_edition ON discovery_reel (edition_date, is_active);')
                     cursor.execute('CREATE INDEX IF NOT EXISTS idx_discovery_reel_ticker ON discovery_reel (ticker);')
-                    cursor.execute("INSERT OR IGNORE INTO schema_migrations (version) VALUES ('v008_discovery_reel');")
+                    cursor.execute("INSERT INTO schema_migrations (version) VALUES (\'v008_discovery_reel\') ON CONFLICT DO NOTHING;")
                 conn.commit()
 
             # Migration v009: Support Tickets, User Grievances & Redressal Ledger
@@ -771,7 +789,7 @@ def init_db(force: bool = False):
                     ''')
                     cursor.execute('CREATE INDEX IF NOT EXISTS idx_support_tickets_status ON support_tickets (status, created_at DESC);')
                     cursor.execute('CREATE INDEX IF NOT EXISTS idx_support_tickets_email ON support_tickets (user_email);')
-                    cursor.execute("INSERT OR IGNORE INTO schema_migrations (version) VALUES ('v009_support_tickets_and_feedback');")
+                    cursor.execute("INSERT INTO schema_migrations (version) VALUES (\'v009_support_tickets_and_feedback\') ON CONFLICT DO NOTHING;")
                 conn.commit()
 
             # Migration v010: User Usage Attribution & Billables Audit Ledger
@@ -823,7 +841,7 @@ def init_db(force: bool = False):
                         cursor.execute("CREATE INDEX IF NOT EXISTS idx_credit_transactions_invoice ON credit_transactions (invoice_number);")
                     except Exception as e:
                         logger.debug("Migration v010 index creation notice: %s", e)
-                    cursor.execute("INSERT OR IGNORE INTO schema_migrations (version) VALUES ('v010_user_usage_and_billables_audit');")
+                    cursor.execute("INSERT INTO schema_migrations (version) VALUES (\'v010_user_usage_and_billables_audit\') ON CONFLICT DO NOTHING;")
                 conn.commit()
 
             # Migration v011: MSME Firms table
@@ -866,7 +884,7 @@ def init_db(force: bool = False):
                     """)
                     cursor.execute("CREATE INDEX IF NOT EXISTS idx_msme_sector ON msme_firms(sector_name);")
                     cursor.execute("CREATE INDEX IF NOT EXISTS idx_msme_state ON msme_firms(state);")
-                    cursor.execute("INSERT OR IGNORE INTO schema_migrations (version) VALUES ('v011_msme_firms');")
+                    cursor.execute("INSERT INTO schema_migrations (version) VALUES (\'v011_msme_firms\') ON CONFLICT DO NOTHING;")
                 conn.commit()
 
             # Migration v012: Corporate Debt Securities and Credit Rating Events
@@ -980,7 +998,7 @@ def init_db(force: bool = False):
                     cursor.execute("CREATE INDEX IF NOT EXISTS idx_rating_isin ON credit_rating_events(isin);")
                     cursor.execute("CREATE INDEX IF NOT EXISTS idx_rating_ticker ON credit_rating_events(ticker);")
                     cursor.execute("CREATE INDEX IF NOT EXISTS idx_rating_date ON credit_rating_events(event_date);")
-                    cursor.execute("INSERT OR IGNORE INTO schema_migrations (version) VALUES ('v012_corporate_debt_and_credit_ratings');")
+                    cursor.execute("INSERT INTO schema_migrations (version) VALUES (\'v012_corporate_debt_and_credit_ratings\') ON CONFLICT DO NOTHING;")
                 conn.commit()
 
             # Migration v013: Mutual Fund Schemes and Granular Holdings Portfolio
@@ -1074,7 +1092,7 @@ def init_db(force: bool = False):
                     cursor.execute("CREATE INDEX IF NOT EXISTS idx_mf_holdings_scheme ON mutual_fund_holdings(scheme_code);")
                     cursor.execute("CREATE INDEX IF NOT EXISTS idx_mf_holdings_ident ON mutual_fund_holdings(identifier);")
                     cursor.execute("CREATE INDEX IF NOT EXISTS idx_mf_holdings_type ON mutual_fund_holdings(holding_type);")
-                    cursor.execute("INSERT OR IGNORE INTO schema_migrations (version) VALUES ('v013_mutual_fund_schemes_and_portfolios');")
+                    cursor.execute("INSERT INTO schema_migrations (version) VALUES (\'v013_mutual_fund_schemes_and_portfolios\') ON CONFLICT DO NOTHING;")
                 conn.commit()
 
             # Migration v014: Administrator Whitelist, Roles & Immutable Audit Trail
@@ -1144,10 +1162,11 @@ def init_db(force: bool = False):
                     cursor.execute("CREATE INDEX IF NOT EXISTS idx_admin_audit_created ON admin_audit_log(created_at DESC);")
                     cursor.execute("CREATE INDEX IF NOT EXISTS idx_admin_audit_email ON admin_audit_log(admin_email);")
                     cursor.execute("""
-                        INSERT OR IGNORE INTO admin_users (id, email, role, totp_enabled)
-                        VALUES ('adm_owner_primary', 'admin@moatnomics.com', 'owner', 0);
+                        INSERT INTO admin_users (id, email, role, totp_enabled)
+                        VALUES ('adm_owner_primary', 'admin@moatnomics.com', 'owner', 0)
+                        ON CONFLICT (email) DO NOTHING;
                     """)
-                    cursor.execute("INSERT OR IGNORE INTO schema_migrations (version) VALUES ('v014_admin_users_and_audit_trail');")
+                    cursor.execute("INSERT INTO schema_migrations (version) VALUES (\'v014_admin_users_and_audit_trail\') ON CONFLICT DO NOTHING;")
                 conn.commit()
 
             # Migration v015: Always-On Asset Scan Runs & Multi-Asset Audit Ledger
@@ -1192,7 +1211,7 @@ def init_db(force: bool = False):
                         );
                     """)
                     cursor.execute("CREATE INDEX IF NOT EXISTS idx_scan_runs_type ON asset_scan_runs(scan_type, started_at DESC);")
-                    cursor.execute("INSERT OR IGNORE INTO schema_migrations (version) VALUES ('v015_asset_scan_runs');")
+                    cursor.execute("INSERT INTO schema_migrations (version) VALUES (\'v015_asset_scan_runs\') ON CONFLICT DO NOTHING;")
                 conn.commit()
 
             # Migration v016: Sovereign benchmarks and ETF matrix (Priority 3)
@@ -1261,7 +1280,7 @@ def init_db(force: bool = False):
                             updated_at TEXT DEFAULT (datetime('now'))
                         );
                     """)
-                    cursor.execute("INSERT OR IGNORE INTO schema_migrations (version) VALUES ('v016_sovereign_benchmarks_and_etfs');")
+                    cursor.execute("INSERT INTO schema_migrations (version) VALUES (\'v016_sovereign_benchmarks_and_etfs\') ON CONFLICT DO NOTHING;")
                 conn.commit()
 
             # Migration v017: SM REITs, InvITs, and SGB tranches (Priority 4)
@@ -1342,7 +1361,7 @@ def init_db(force: bool = False):
                             updated_at TEXT DEFAULT (datetime('now'))
                         );
                     """)
-                    cursor.execute("INSERT OR IGNORE INTO schema_migrations (version) VALUES ('v017_sm_reits_invits_and_sgb');")
+                    cursor.execute("INSERT INTO schema_migrations (version) VALUES (\'v017_sm_reits_invits_and_sgb\') ON CONFLICT DO NOTHING;")
                 conn.commit()
 
             # Migration v018: Retail alternative yield & shadow banking safety radar (Priority 5)
@@ -1389,7 +1408,7 @@ def init_db(force: bool = False):
                             updated_at TEXT DEFAULT (datetime('now'))
                         );
                     """)
-                    cursor.execute("INSERT OR IGNORE INTO schema_migrations (version) VALUES ('v018_retail_safety_radar');")
+                    cursor.execute("INSERT INTO schema_migrations (version) VALUES (\'v018_retail_safety_radar\') ON CONFLICT DO NOTHING;")
                 conn.commit()
 
             # Migration v019: Email OTP authentication
@@ -1416,7 +1435,7 @@ def init_db(force: bool = False):
                             created_at TEXT DEFAULT (datetime('now'))
                         );
                     """)
-                    cursor.execute("INSERT OR IGNORE INTO schema_migrations (version) VALUES ('v019_auth_otps');")
+                    cursor.execute("INSERT INTO schema_migrations (version) VALUES (\'v019_auth_otps\') ON CONFLICT DO NOTHING;")
                 conn.commit()
 
             # Migration v020: Sovereign SDL fiscal spreads, macro policy corridor & curve history
@@ -1493,7 +1512,7 @@ def init_db(force: bool = False):
                             UNIQUE(snapshot_key, tenor_label)
                         );
                     """)
-                    cursor.execute("INSERT OR IGNORE INTO schema_migrations (version) VALUES ('v020_sovereign_sdl_and_macro_rates');")
+                    cursor.execute("INSERT INTO schema_migrations (version) VALUES (\'v020_sovereign_sdl_and_macro_rates\') ON CONFLICT DO NOTHING;")
                 conn.commit()
 
             # Migration v021: Mutual Fund 7-Pillar Forensic Look-Through Dossiers
@@ -1538,7 +1557,7 @@ def init_db(force: bool = False):
                         );
                     """)
                     cursor.execute("CREATE INDEX IF NOT EXISTS idx_fund_dossier_code ON fund_forensic_dossiers(scheme_code);")
-                    cursor.execute("INSERT OR IGNORE INTO schema_migrations (version) VALUES ('v021_fund_forensic_dossiers');")
+                    cursor.execute("INSERT INTO schema_migrations (version) VALUES (\'v021_fund_forensic_dossiers\') ON CONFLICT DO NOTHING;")
                 conn.commit()
 
             # Migration v022: Autonomous Project-Wide System Audit Logs (google-antigravity-sdk)
@@ -1595,7 +1614,7 @@ def init_db(force: bool = False):
                     """)
                     cursor.execute("CREATE INDEX IF NOT EXISTS idx_audit_log_id ON project_audit_logs(audit_id);")
                     cursor.execute("CREATE INDEX IF NOT EXISTS idx_audit_created_at ON project_audit_logs(created_at DESC);")
-                    cursor.execute("INSERT OR IGNORE INTO schema_migrations (version) VALUES ('v022_project_audit_logs');")
+                    cursor.execute("INSERT INTO schema_migrations (version) VALUES (\'v022_project_audit_logs\') ON CONFLICT DO NOTHING;")
                 conn.commit()
 
             # Migration v023: Sitewide Autonomous Agent Conversations & Turn Transcripts
@@ -1659,7 +1678,7 @@ def init_db(force: bool = False):
                         );
                     """)
                     cursor.execute("CREATE INDEX IF NOT EXISTS idx_agent_turns_conv ON agent_conversation_turns(conversation_id);")
-                    cursor.execute("INSERT OR IGNORE INTO schema_migrations (version) VALUES ('v023_agent_transcripts_and_sessions');")
+                    cursor.execute("INSERT INTO schema_migrations (version) VALUES (\'v023_agent_transcripts_and_sessions\') ON CONFLICT DO NOTHING;")
                 conn.commit()
 
             # Migration v024: Autonomous Proactive Event & Watcher Ledger
@@ -1702,7 +1721,7 @@ def init_db(force: bool = False):
                     cursor.execute("CREATE INDEX IF NOT EXISTS idx_event_ledger_type ON autonomous_event_ledger(event_type);")
                     cursor.execute("CREATE INDEX IF NOT EXISTS idx_event_ledger_ticker ON autonomous_event_ledger(ticker);")
                     cursor.execute("CREATE INDEX IF NOT EXISTS idx_event_ledger_created ON autonomous_event_ledger(created_at DESC);")
-                    cursor.execute("INSERT OR IGNORE INTO schema_migrations (version) VALUES ('v024_autonomous_event_ledger');")
+                    cursor.execute("INSERT INTO schema_migrations (version) VALUES (\'v024_autonomous_event_ledger\') ON CONFLICT DO NOTHING;")
                 conn.commit()
 
             # Migration v025: Landing Pages & Route Telemetry
@@ -1723,7 +1742,7 @@ def init_db(force: bool = False):
                         cursor.execute("CREATE INDEX IF NOT EXISTS idx_site_usage_landing ON site_usage_events (landing_page, timestamp DESC);")
                     except Exception as e:
                         logger.debug("Migration v025 index notice: %s", e)
-                    cursor.execute("INSERT OR IGNORE INTO schema_migrations (version) VALUES ('v025_landing_pages_telemetry');")
+                    cursor.execute("INSERT INTO schema_migrations (version) VALUES (\'v025_landing_pages_telemetry\') ON CONFLICT DO NOTHING;")
                 conn.commit()
 
             # Migration v026: User Unlocked Dossiers (Tiered Institutional Paywall)
@@ -1752,7 +1771,7 @@ def init_db(force: bool = False):
                         );
                     """)
                     cursor.execute("CREATE INDEX IF NOT EXISTS idx_unlocked_dossiers_user ON user_unlocked_dossiers (user_id, ticker);")
-                    cursor.execute("INSERT OR IGNORE INTO schema_migrations (version) VALUES ('v026_user_unlocked_dossiers');")
+                    cursor.execute("INSERT INTO schema_migrations (version) VALUES (\'v026_user_unlocked_dossiers\') ON CONFLICT DO NOTHING;")
                 conn.commit()
 
             # Migration v027: Localized Fundamentals Cache for Peer Comparison & Fast-Path Resolution
@@ -1807,7 +1826,7 @@ def init_db(force: bool = False):
                         );
                     """)
                     cursor.execute("CREATE INDEX IF NOT EXISTS idx_cached_fundamentals_ticker ON cached_fundamentals (ticker);")
-                    cursor.execute("INSERT OR IGNORE INTO schema_migrations (version) VALUES ('v027_cached_fundamentals');")
+                    cursor.execute("INSERT INTO schema_migrations (version) VALUES (\'v027_cached_fundamentals\') ON CONFLICT DO NOTHING;")
                 conn.commit()
 
             # Migration v028: National ETF Matrix Expansion (120+ AMFI ETFs & Full Universe)
@@ -1843,7 +1862,7 @@ def init_db(force: bool = False):
                         cursor.execute("CREATE INDEX IF NOT EXISTS idx_etf_matrix_aum ON etf_matrix (aum_crores DESC);")
                     except Exception as e:
                         logger.debug("Migration v028 aum index notice: %s", e)
-                    cursor.execute("INSERT OR IGNORE INTO schema_migrations (version) VALUES ('v028_etf_matrix_expansion');")
+                    cursor.execute("INSERT INTO schema_migrations (version) VALUES (\'v028_etf_matrix_expansion\') ON CONFLICT DO NOTHING;")
                 conn.commit()
 
             # Migration v029: Service Inbox & Support Ticket Responses
@@ -1878,7 +1897,7 @@ def init_db(force: bool = False):
                         );
                     """)
                     cursor.execute("CREATE INDEX IF NOT EXISTS idx_ticket_responses_tid ON ticket_responses (ticket_id, created_at ASC);")
-                    cursor.execute("INSERT OR IGNORE INTO schema_migrations (version) VALUES ('v029_ticket_responses_and_service_inbox');")
+                    cursor.execute("INSERT INTO schema_migrations (version) VALUES (\'v029_ticket_responses_and_service_inbox\') ON CONFLICT DO NOTHING;")
                 conn.commit()
 
             # Migration v030: Research Bouquet & Digest Subscriptions
@@ -1938,7 +1957,34 @@ def init_db(force: bool = False):
                     cursor.execute("CREATE INDEX IF NOT EXISTS idx_user_accounts_digest_sub ON user_accounts (is_digest_subscribed, is_subscriber);")
                     cursor.execute("CREATE INDEX IF NOT EXISTS idx_user_accounts_unsub_token ON user_accounts (digest_unsubscribe_token);")
                     cursor.execute("CREATE INDEX IF NOT EXISTS idx_digest_dispatches_date ON digest_dispatches (edition_date, created_at DESC);")
-                    cursor.execute("INSERT OR IGNORE INTO schema_migrations (version) VALUES ('v030_research_bouquet_and_digest_subscriptions');")
+                    cursor.execute("INSERT INTO schema_migrations (version) VALUES (\'v030_research_bouquet_and_digest_subscriptions\') ON CONFLICT DO NOTHING;")
+                conn.commit()
+
+            # Migration v031: Multi-Worker Distributed Job Lease Lock
+            if "v031_distributed_job_locks" not in applied:
+                logger.info("Applying schema migration: v031_distributed_job_locks...")
+                if supabase_url:
+                    cursor.execute("""
+                        CREATE TABLE IF NOT EXISTS distributed_job_locks (
+                            job_name VARCHAR(128) PRIMARY KEY,
+                            locked_by VARCHAR(255) NOT NULL,
+                            locked_at TIMESTAMP WITH TIME ZONE NOT NULL,
+                            expires_at TIMESTAMP WITH TIME ZONE NOT NULL
+                        );
+                        CREATE INDEX IF NOT EXISTS idx_distributed_job_locks_exp ON distributed_job_locks (expires_at);
+                        INSERT INTO schema_migrations (version) VALUES ('v031_distributed_job_locks') ON CONFLICT DO NOTHING;
+                    """)
+                else:
+                    cursor.execute("""
+                        CREATE TABLE IF NOT EXISTS distributed_job_locks (
+                            job_name TEXT PRIMARY KEY,
+                            locked_by TEXT NOT NULL,
+                            locked_at TIMESTAMP NOT NULL,
+                            expires_at TIMESTAMP NOT NULL
+                        );
+                    """)
+                    cursor.execute("CREATE INDEX IF NOT EXISTS idx_distributed_job_locks_exp ON distributed_job_locks (expires_at);")
+                    cursor.execute("INSERT INTO schema_migrations (version) VALUES (\'v031_distributed_job_locks\') ON CONFLICT DO NOTHING;")
                 conn.commit()
 
             _DB_INITIALIZED = True

@@ -787,14 +787,16 @@ def build_reit_deterministic_response(
     elif any(k in msg for k in ["post-tax yield", "across tax slabs", "across slabs", "all slabs", "0%, 10%", "tax slabs", "net in-hand yield", "in-hand return", "tax slab"]):
         slabs = tax.get("tax_slabs", [])
         rows_md = ""
-        for s in slabs:
-            slab_lbl = s.get("slab_label") or f"{s.get('slab_pct', 0)}% Slab"
-            rows_md += f"| **{slab_lbl}** | **{s.get('net_yield_pct')}%** | {s.get('tax_drag_bps')} bps | {s.get('annual_income_formatted', 'N/A')} | {s.get('tax_shield_efficiency_pct')}% |\n"
+        if slabs:
+            for s in slabs:
+                slab_lbl = s.get("slab_label") or f"{s.get('slab_pct', 0)}% Slab"
+                rows_md += f"| **{slab_lbl}** | **{s.get('net_yield_pct')}%** | {s.get('tax_drag_bps')} bps | {s.get('annual_income_formatted', 'N/A')} | {s.get('tax_shield_efficiency_pct')}% |\n"
 
         if not rows_md:
             try:
                 base_y = float(str(yield_fmt).replace('%', '').strip())
-            except Exception:
+            except Exception as e:
+                logger.warning(f"Yield parsing notice in tax simulation: {e}")
                 base_y = 8.0
             rows_md = (
                 f"| **0% (Exempt)** | **{base_y}%** | 0 bps | ₹{int(base_y * 10000):,} | 100% |\n"
@@ -1861,6 +1863,23 @@ async def process_forensic_desk_turn(
 
     # Credit burn protection: limit LLM generative synthesis to paid/unlocked reports or subscribers
     has_llm_entitlement = bool(deep_dive_unlocked or is_subscriber)
+    from core.billing.qos_governor import authorize_llm_execution
+    actor_type = "USER_COPILOT" if has_llm_entitlement else "ANON"
+    qos_auth, qos_reason = authorize_llm_execution(
+        actor_type=actor_type,
+        user_email=user_id or "",
+        has_unlocked_dossier=has_llm_entitlement
+    )
+    if not qos_auth and qos_reason == "USER_COPILOT_HOURLY_VELOCITY_CAP":
+        return {
+            "conversation_id": conversation_id,
+            "response": (
+                "⚠️ **Hourly Velocity Cap Reached:** You have reached the maximum allowed Forensic Desk turns for this hour "
+                "(40 turns/hr) to protect your account. Please resume shortly."
+            ),
+            "status": "VELOCITY_CAPPED"
+        }
+
 
     if not has_llm_entitlement:
         asset_cls = context_data.get("asset_class", "EQUITY")

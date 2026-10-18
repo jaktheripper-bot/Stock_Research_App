@@ -18,7 +18,8 @@ def get_admin_emails() -> set[str]:
         emails = {u.get("email", "").strip().lower() for u in users if u.get("email")}
         emails.update(get_authorized_bootstrap_emails())
         return emails
-    except Exception:
+    except Exception as e:
+        logger.debug("Failed fetching admin emails: %s", e)
         return {"admin@moatnomics.com"}
 
 
@@ -30,7 +31,8 @@ def get_admin_user_ids() -> set[str]:
         ids = {u.get("id", "").strip() for u in users if u.get("id")}
         ids.update({"adm_owner_lyndon", "admin", "test_admin"})
         return ids
-    except Exception:
+    except Exception as e:
+        logger.debug("Failed fetching admin user IDs: %s", e)
         return {"adm_owner_lyndon", "admin", "test_admin"}
 
 
@@ -241,7 +243,8 @@ def compute_page_dwell_and_visit_tree(all_events: list) -> dict:
         if det_raw:
             try:
                 det = json.loads(det_raw) if isinstance(det_raw, str) else det_raw
-            except Exception:
+            except Exception as e:
+                logger.debug("Failed parsing det_raw json: %s", e)
                 det = {}
 
         if not p and det:
@@ -483,7 +486,8 @@ def record_usage_event(
                 session_id, traffic_source, referrer, country, device_type, browser, os,
                 user_id, user_email, resolved_lp
             ))
-        except Exception:
+        except Exception as e:
+            logger.debug("Fallback inserting usage event without landing_page: %s", e)
             try:
                 # Fallback without landing_page column
                 query_fallback_user = f'''
@@ -501,7 +505,8 @@ def record_usage_event(
                     session_id, traffic_source, referrer, country, device_type, browser, os,
                     user_id, user_email
                 ))
-            except Exception:
+            except Exception as e:
+                logger.debug("Fallback inserting usage event without user columns: %s", e)
                 try:
                     # Fallback for earlier schema if user columns not yet committed
                     query_fallback_session = f'''
@@ -516,7 +521,8 @@ def record_usage_event(
                         event_type, clean_t, latency_ms, cost_saved_usd, details_json,
                         session_id, traffic_source, referrer, country, device_type, browser, os
                     ))
-                except Exception:
+                except Exception as e:
+                    logger.debug("Fallback inserting usage event with basic columns: %s", e)
                     query_fallback = f'''
                         INSERT INTO site_usage_events (event_type, ticker, latency_ms, cost_saved_usd, details)
                         VALUES ({placeholder}, {placeholder}, {placeholder}, {placeholder}, {placeholder})
@@ -712,7 +718,8 @@ def get_site_usage_summary(days: int = None, start_date = None, end_date = None,
             ''')
             row = cursor.fetchone()
             summary["unique_sessions"] = int(row[0]) if row and row[0] is not None else 0
-        except Exception:
+        except Exception as e:
+            logger.debug("Failed querying unique sessions count: %s", e)
             summary["unique_sessions"] = 0
 
         # 3. Top Searched Equities
@@ -743,7 +750,8 @@ def get_site_usage_summary(days: int = None, start_date = None, end_date = None,
                  "percentage": round((row[1] / total_src) * 100.0, 1)}
                 for row in src_rows
             ]
-        except Exception:
+        except Exception as e:
+            logger.debug("Failed querying traffic sources: %s", e)
             summary["traffic_sources"] = []
 
         # 5. Top Referring URLs
@@ -757,7 +765,8 @@ def get_site_usage_summary(days: int = None, start_date = None, end_date = None,
                 LIMIT 8
             ''')
             summary["top_referrers"] = [{"referrer": row[0], "count": int(row[1])} for row in cursor.fetchall()]
-        except Exception:
+        except Exception as e:
+            logger.debug("Failed querying top referrers: %s", e)
             summary["top_referrers"] = []
 
         # 5b. Top Landing Pages (Entry Points) & Visited Routes
@@ -770,7 +779,8 @@ def get_site_usage_summary(days: int = None, start_date = None, end_date = None,
                     ORDER BY timestamp ASC
                 ''')
                 all_events = cursor.fetchall()
-            except Exception:
+            except Exception as e:
+                logger.debug("Failed querying landing pages with landing_page column, falling back: %s", e)
                 cursor.execute(f'''
                     SELECT id, session_id, '', details, ticker, event_type, timestamp
                     FROM site_usage_events
@@ -876,7 +886,8 @@ def get_site_usage_summary(days: int = None, start_date = None, end_date = None,
                 LIMIT 8
             ''')
             summary["geographic_distribution"] = [{"country": row[0], "count": int(row[1])} for row in cursor.fetchall()]
-        except Exception:
+        except Exception as e:
+            logger.debug("Failed querying geographic distribution: %s", e)
             summary["geographic_distribution"] = []
 
         # 7. Device Types, Browsers, and OS
@@ -935,7 +946,8 @@ def get_site_usage_summary(days: int = None, start_date = None, end_date = None,
                     "country": row[7],
                     "device": row[8],
                 })
-        except Exception:
+        except Exception as e:
+            logger.debug("Failed querying recent events with rich columns, falling back: %s", e)
             # Fallback if new columns not yet queried
             cursor.execute(f'''
                 SELECT event_type, ticker, latency_ms, cost_saved_usd, timestamp
@@ -985,7 +997,8 @@ def get_traffic_flow_analytics(days: int = None, start_date = None, end_date = N
                 ORDER BY timestamp ASC
             ''')
             all_events = cursor.fetchall()
-        except Exception:
+        except Exception as e:
+            logger.debug("Failed querying all events with landing_page column, falling back: %s", e)
             cursor.execute(f'''
                 SELECT id, session_id, '', details, ticker, event_type, timestamp
                 FROM site_usage_events
@@ -1053,7 +1066,8 @@ def get_session_journeys(days: int = None, start_date = None, end_date = None, l
                     ORDER BY timestamp ASC
                 ''', (sess_id,))
                 sess_events = cursor.fetchall()
-            except Exception:
+            except Exception as e:
+                logger.debug("Failed querying session events with landing_page, falling back: %s", e)
                 cursor.execute(f'''
                     SELECT event_type, ticker, timestamp, '', details
                     FROM site_usage_events

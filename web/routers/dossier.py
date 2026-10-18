@@ -13,12 +13,16 @@ import re
 import json
 import logging
 import hmac
+import asyncio
 from datetime import datetime, timezone
 from typing import Optional, List, Dict, Any
 from pydantic import BaseModel
 
 from fastapi import APIRouter, Request, Response, HTTPException, Header
 from fastapi.responses import JSONResponse
+from starlette.concurrency import run_in_threadpool
+
+PDF_SEMAPHORE = asyncio.Semaphore(4)
 
 from normalizer import clean_ticker
 from bse_master import resolve_canonical_symbol, resolve_bse_scrip_code
@@ -72,7 +76,7 @@ class UnlockDossierRequest(BaseModel):
 # Dossier Synthesis & Status Endpoints
 # ==============================================================================
 @router.post("/api/synthesize")
-async def api_synthesize(payload: SynthesizeRequest):
+async def api_synthesize(payload: SynthesizeRequest, request: Request):
     """
     Deducts 1 credit from user balance and triggers a full 7-pillar AI synthesis.
     Returns the generated dossier URL on success.
@@ -98,12 +102,29 @@ async def api_synthesize(payload: SynthesizeRequest):
             "message": f"An existing dossier for {canonical} is already available. No credits were deducted."
         })
 
+    web_user = _get_current_web_user(request)
+    from core.billing.qos_governor import authorize_llm_execution
+    client_ip = request.client.host if request.client else ""
+    user_email = web_user.get("email", "") if web_user else (getattr(payload, "user_email", "") or clean_uid)
+    synth_auth, synth_reason = authorize_llm_execution(
+        actor_type="USER_SYNTHESIS",
+        user_email=user_email,
+        client_ip=client_ip
+    )
+    if not synth_auth:
+        raise HTTPException(
+            status_code=429,
+            detail="Hourly synthesis velocity cap reached (maximum 20 reports/hour per user) to protect account quota. Please retry later."
+        )
+
     ok, new_balance, msg = deduct_user_credits(
+
         user_id=clean_uid,
         ticker=canonical,
         action_type="FULL_SYNTHESIS",
         amount=1.0
     )
+
     if not ok:
         raise HTTPException(status_code=402, detail=msg)
 
@@ -273,7 +294,8 @@ async def api_download_pdf(
     if not citations and rep.get("citations_json"):
         try:
             citations = json.loads(rep.get("citations_json"))
-        except Exception:
+        except Exception as e:
+            logger.debug("Failed parsing citations_json in export_dossier_pdf: %s", e)
             citations = []
 
     scrip_code = rep.get("scrip_code") or resolve_bse_scrip_code(clean_t)
@@ -290,15 +312,17 @@ async def api_download_pdf(
         report_text_for_pdf = redact_gated_pillars(report_text_for_pdf, notice=PDF_LOCKED_NOTICE)
 
     from core.reporting.pdf import generate_report_pdf, apply_pdf_watermark
-    pdf_bytes = generate_report_pdf(
-        clean_t,
-        report_text_for_pdf,
-        hist_df=df_hist,
-        citations=citations,
-        scrip_code=scrip_code,
-        branding=branding
-    )
-    pdf_bytes = apply_pdf_watermark(pdf_bytes, _pdf_account_ref(request))
+    async with PDF_SEMAPHORE:
+        pdf_bytes = await run_in_threadpool(
+            generate_report_pdf,
+            clean_t,
+            report_text_for_pdf,
+            hist_df=df_hist,
+            citations=citations,
+            scrip_code=scrip_code,
+            branding=branding
+        )
+        pdf_bytes = await run_in_threadpool(apply_pdf_watermark, pdf_bytes, _pdf_account_ref(request))
 
     date_slug = datetime.now(IST).strftime("%d-%m-%Y")
     clean_firm = re.sub(r'[^a-zA-Z0-9]', '_', firm_name) + "_" if firm_name else ""
@@ -323,11 +347,13 @@ async def api_download_fund_pdf(scheme_code: str, request: Request):
         raise HTTPException(status_code=404, detail=f"Scheme '{clean_code}' not found.")
 
     dossier = get_fund_forensic_dossier(clean_code) or {}
-    pdf_bytes = generate_fund_dossier_pdf(
-        clean_code, dossier, scheme,
-        deep_dive_unlocked=_asset_unlocked_for_request(request, "FUND", clean_code)
-    )
-    pdf_bytes = apply_pdf_watermark(pdf_bytes, _pdf_account_ref(request))
+    async with PDF_SEMAPHORE:
+        pdf_bytes = await run_in_threadpool(
+            generate_fund_dossier_pdf,
+            clean_code, dossier, scheme,
+            deep_dive_unlocked=_asset_unlocked_for_request(request, "FUND", clean_code)
+        )
+        pdf_bytes = await run_in_threadpool(apply_pdf_watermark, pdf_bytes, _pdf_account_ref(request))
     filename = f"Fund_Dossier_{clean_code}_{datetime.now(IST).strftime('%d-%m-%Y')}.pdf"
 
     return Response(
@@ -350,11 +376,13 @@ async def api_download_debt_pdf(isin: str, request: Request):
         raise HTTPException(status_code=404, detail=f"Debt security with ISIN '{clean_isin}' not found.")
 
     posture = evaluate_5_pillar_credit_posture(sec)
-    pdf_bytes = generate_debt_dossier_pdf(
-        clean_isin, posture, sec,
-        deep_dive_unlocked=_asset_unlocked_for_request(request, "DEBT", clean_isin)
-    )
-    pdf_bytes = apply_pdf_watermark(pdf_bytes, _pdf_account_ref(request))
+    async with PDF_SEMAPHORE:
+        pdf_bytes = await run_in_threadpool(
+            generate_debt_dossier_pdf,
+            clean_isin, posture, sec,
+            deep_dive_unlocked=_asset_unlocked_for_request(request, "DEBT", clean_isin)
+        )
+        pdf_bytes = await run_in_threadpool(apply_pdf_watermark, pdf_bytes, _pdf_account_ref(request))
     filename = f"Debt_Credit_Dossier_{clean_isin}_{datetime.now(IST).strftime('%d-%m-%Y')}.pdf"
 
     return Response(
@@ -376,8 +404,12 @@ async def api_download_reit_pdf(symbol: str, request: Request):
         raise HTTPException(status_code=404, detail=f"REIT or InvIT with symbol '{clean_sym}' not found.")
 
     is_unlocked = _asset_unlocked_for_request(request, "REIT", clean_sym)
-    pdf_bytes = generate_reit_dossier_pdf(clean_sym, reit, deep_dive_unlocked=is_unlocked)
-    pdf_bytes = apply_pdf_watermark(pdf_bytes, _pdf_account_ref(request))
+    async with PDF_SEMAPHORE:
+        pdf_bytes = await run_in_threadpool(
+            generate_reit_dossier_pdf,
+            clean_sym, reit, deep_dive_unlocked=is_unlocked
+        )
+        pdf_bytes = await run_in_threadpool(apply_pdf_watermark, pdf_bytes, _pdf_account_ref(request))
     filename = f"REIT_Dossier_{clean_sym}_{datetime.now(IST).strftime('%d-%m-%Y')}.pdf"
 
     return Response(

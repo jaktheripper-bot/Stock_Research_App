@@ -126,6 +126,7 @@ def tool_run_test_suite() -> Dict[str, Any]:
             "summary": "Test execution timed out after 180s."
         }
     except Exception as e:
+        logger.error(f"Failed to execute test runner: {e}")
         return {
             "status": "ERROR",
             "total_tests": 0,
@@ -203,6 +204,7 @@ def tool_probe_web_endpoints(base_url: Optional[str] = None) -> Dict[str, Any]:
                 "healthy": is_healthy
             })
         except Exception as e:
+            logger.warning("Failed probing endpoint %s: %s", path, e)
             results.append({
                 "path": path,
                 "name": name,

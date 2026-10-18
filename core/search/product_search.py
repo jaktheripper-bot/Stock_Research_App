@@ -80,6 +80,8 @@ def search_equities(query: str, limit: int = 10) -> List[Dict[str, Any]]:
                 return matches
 
     # 2. Match against existing reports database
+    conn = None
+    cursor = None
     try:
         init_db()
         conn = get_db_connection()
@@ -118,10 +120,19 @@ def search_equities(query: str, limit: int = 10) -> List[Dict[str, Any]]:
                 seen.add(t)
                 if len(matches) >= limit:
                     break
-        cursor.close()
-        conn.close()
     except Exception as e:
         logger.debug(f"Reports search notice: {e}")
+    finally:
+        if cursor:
+            try:
+                cursor.close()
+            except Exception as e:
+                logger.debug(f"Cursor close notice in search_equities: {e}")
+        if conn:
+            try:
+                conn.close()
+            except Exception as e:
+                logger.debug(f"Connection close notice in search_equities: {e}")
 
     return matches[:limit]
 
@@ -132,6 +143,8 @@ def search_mutual_funds(query: str, limit: int = 10) -> List[Dict[str, Any]]:
     matches = []
 
     # 1. Search local mutual_fund_schemes table
+    conn = None
+    cursor = None
     try:
         init_db()
         conn = get_db_connection()
@@ -169,10 +182,19 @@ def search_mutual_funds(query: str, limit: int = 10) -> List[Dict[str, Any]]:
                     "aum": f"₹{aum_val:,.0f} Cr" if aum_val > 0 else "N/A"
                 }
             })
-        cursor.close()
-        conn.close()
     except Exception as e:
         logger.debug(f"Local mutual funds search notice: {e}")
+    finally:
+        if cursor:
+            try:
+                cursor.close()
+            except Exception as e:
+                logger.debug(f"Cursor close notice in search_mutual_funds: {e}")
+        if conn:
+            try:
+                conn.close()
+            except Exception as e:
+                logger.debug(f"Connection close notice in search_mutual_funds: {e}")
 
     # 2. If fewer than 3 local matches, dynamically search the master AMFI directory
     if len(matches) < 3:
@@ -211,6 +233,8 @@ def search_debt_securities(query: str, limit: int = 10) -> List[Dict[str, Any]]:
     clean_q = query.strip().lower()
     matches = []
 
+    conn = None
+    cursor = None
     try:
         init_db()
         conn = get_db_connection()
@@ -257,10 +281,19 @@ def search_debt_securities(query: str, limit: int = 10) -> List[Dict[str, Any]]:
                     "ytm": f"{ytm_val}%"
                 }
             })
-        cursor.close()
-        conn.close()
     except Exception as e:
         logger.debug(f"Debt securities search notice: {e}")
+    finally:
+        if cursor:
+            try:
+                cursor.close()
+            except Exception as e:
+                logger.debug(f"Cursor close notice in search_debt_securities: {e}")
+        if conn:
+            try:
+                conn.close()
+            except Exception as e:
+                logger.debug(f"Connection close notice in search_debt_securities: {e}")
 
     return matches[:limit]
 

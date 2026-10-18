@@ -5,6 +5,7 @@ All endpoints use the project's `json_response_with_cache` helper for server‑s
 Supports dual bindings for SQLite and PostgreSQL.
 """
 
+import logging
 from fastapi import APIRouter, HTTPException, Query
 from fastapi.responses import JSONResponse
 from typing import Optional, List, Dict, Any
@@ -12,6 +13,7 @@ from typing import Optional, List, Dict, Any
 from core.db.connection import get_db_connection, get_supabase_url
 from core.msme.utils import build_search_query, paginate, classify_msme_tier
 
+logger = logging.getLogger(__name__)
 router = APIRouter()
 
 
@@ -34,34 +36,40 @@ def get_msme_stats():
     """Returns aggregated MSME registry intelligence and classification metrics."""
     conn = get_db_connection()
     cur = conn.cursor()
+    try:
+        cur.execute("SELECT COUNT(*), COALESCE(SUM(annual_turnover), 0), COUNT(DISTINCT state) FROM msme_firms")
+        row = cur.fetchone()
+        total_firms = row[0] if row else 0
+        total_turnover = round(float(row[1]), 2) if row and row[1] else 0.0
+        states_count = row[2] if row else 0
 
-    cur.execute("SELECT COUNT(*), COALESCE(SUM(annual_turnover), 0), COUNT(DISTINCT state) FROM msme_firms")
-    row = cur.fetchone()
-    total_firms = row[0] if row else 0
-    total_turnover = round(float(row[1]), 2) if row and row[1] else 0.0
-    states_count = row[2] if row else 0
+        cur.execute("SELECT COUNT(*) FROM msme_firms WHERE annual_turnover < 5.0 OR annual_turnover IS NULL")
+        micro_count = cur.fetchone()[0]
 
-    cur.execute("SELECT COUNT(*) FROM msme_firms WHERE annual_turnover < 5.0 OR annual_turnover IS NULL")
-    micro_count = cur.fetchone()[0]
+        cur.execute("SELECT COUNT(*) FROM msme_firms WHERE annual_turnover >= 5.0 AND annual_turnover < 50.0")
+        small_count = cur.fetchone()[0]
 
-    cur.execute("SELECT COUNT(*) FROM msme_firms WHERE annual_turnover >= 5.0 AND annual_turnover < 50.0")
-    small_count = cur.fetchone()[0]
+        cur.execute("SELECT COUNT(*) FROM msme_firms WHERE annual_turnover >= 50.0")
+        medium_count = cur.fetchone()[0]
 
-    cur.execute("SELECT COUNT(*) FROM msme_firms WHERE annual_turnover >= 50.0")
-    medium_count = cur.fetchone()[0]
-
-    cur.execute("""
-        SELECT sector_name, COUNT(*) as cnt
-        FROM msme_firms
-        WHERE sector_name IS NOT NULL AND sector_name != ''
-        GROUP BY sector_name
-        ORDER BY cnt DESC
-        LIMIT 6
-    """)
-    top_sectors = [{"sector": r[0], "count": r[1]} for r in cur.fetchall()]
-
-    cur.close()
-    conn.close()
+        cur.execute("""
+            SELECT sector_name, COUNT(*) as cnt
+            FROM msme_firms
+            WHERE sector_name IS NOT NULL AND sector_name != ''
+            GROUP BY sector_name
+            ORDER BY cnt DESC
+            LIMIT 6
+        """)
+        top_sectors = [{"sector": r[0], "count": r[1]} for r in cur.fetchall()]
+    finally:
+        try:
+            cur.close()
+        except Exception as e:
+            logger.debug(f"Cursor close notice: {e}")
+        try:
+            conn.close()
+        except Exception as e:
+            logger.debug(f"Connection close notice: {e}")
 
     payload = {
         "total_firms": total_firms,
@@ -80,16 +88,24 @@ def get_msme_sectors():
     """Returns distinct sector names with enterprise counts."""
     conn = get_db_connection()
     cur = conn.cursor()
-    cur.execute("""
-        SELECT sector_name, COUNT(*) as cnt
-        FROM msme_firms
-        WHERE sector_name IS NOT NULL AND sector_name != ''
-        GROUP BY sector_name
-        ORDER BY cnt DESC, sector_name ASC
-    """)
-    sectors = [{"sector": r[0], "count": r[1]} for r in cur.fetchall()]
-    cur.close()
-    conn.close()
+    try:
+        cur.execute("""
+            SELECT sector_name, COUNT(*) as cnt
+            FROM msme_firms
+            WHERE sector_name IS NOT NULL AND sector_name != ''
+            GROUP BY sector_name
+            ORDER BY cnt DESC, sector_name ASC
+        """)
+        sectors = [{"sector": r[0], "count": r[1]} for r in cur.fetchall()]
+    finally:
+        try:
+            cur.close()
+        except Exception as e:
+            logger.debug(f"Cursor close notice: {e}")
+        try:
+            conn.close()
+        except Exception as e:
+            logger.debug(f"Connection close notice: {e}")
     return json_response_with_cache({"sectors": sectors}, ttl_seconds=600)
 
 
@@ -98,16 +114,24 @@ def get_msme_states():
     """Returns distinct states with enterprise counts."""
     conn = get_db_connection()
     cur = conn.cursor()
-    cur.execute("""
-        SELECT state, COUNT(*) as cnt
-        FROM msme_firms
-        WHERE state IS NOT NULL AND state != ''
-        GROUP BY state
-        ORDER BY cnt DESC, state ASC
-    """)
-    states = [{"state": r[0], "count": r[1]} for r in cur.fetchall()]
-    cur.close()
-    conn.close()
+    try:
+        cur.execute("""
+            SELECT state, COUNT(*) as cnt
+            FROM msme_firms
+            WHERE state IS NOT NULL AND state != ''
+            GROUP BY state
+            ORDER BY cnt DESC, state ASC
+        """)
+        states = [{"state": r[0], "count": r[1]} for r in cur.fetchall()]
+    finally:
+        try:
+            cur.close()
+        except Exception as e:
+            logger.debug(f"Cursor close notice: {e}")
+        try:
+            conn.close()
+        except Exception as e:
+            logger.debug(f"Connection close notice: {e}")
     return json_response_with_cache({"states": states}, ttl_seconds=600)
 
 
@@ -123,31 +147,39 @@ def search_msme(
     """Searches MSME firms with filters, pagination, and classification tiers."""
     conn = get_db_connection()
     cur = conn.cursor()
-    use_pg = bool(get_supabase_url())
-    placeholder = "%s" if use_pg else "?"
+    try:
+        use_pg = bool(get_supabase_url())
+        placeholder = "%s" if use_pg else "?"
 
-    where, values = build_search_query(
-        {"q": q, "sector": sector, "state": state, "tier": tier},
-        placeholder=placeholder
-    )
-    limit, offset = paginate(size, page)
+        where, values = build_search_query(
+            {"q": q, "sector": sector, "state": state, "tier": tier},
+            placeholder=placeholder
+        )
+        limit, offset = paginate(size, page)
 
-    sql = f"""
-        SELECT uin, name, sector_name, city, state, annual_turnover,
-               employee_count, registration_date, source
-        FROM msme_firms
-        WHERE {where}
-        ORDER BY annual_turnover DESC, name ASC
-        LIMIT {placeholder} OFFSET {placeholder}
-    """
-    cur.execute(sql, (*values, limit, offset))
-    rows = cur.fetchall()
+        sql = f"""
+            SELECT uin, name, sector_name, city, state, annual_turnover,
+                   employee_count, registration_date, source
+            FROM msme_firms
+            WHERE {where}
+            ORDER BY annual_turnover DESC, name ASC
+            LIMIT {placeholder} OFFSET {placeholder}
+        """
+        cur.execute(sql, (*values, limit, offset))
+        rows = cur.fetchall()
 
-    count_sql = f"SELECT COUNT(*) FROM msme_firms WHERE {where}"
-    cur.execute(count_sql, values)
-    total = cur.fetchone()[0]
-    cur.close()
-    conn.close()
+        count_sql = f"SELECT COUNT(*) FROM msme_firms WHERE {where}"
+        cur.execute(count_sql, values)
+        total = cur.fetchone()[0]
+    finally:
+        try:
+            cur.close()
+        except Exception as e:
+            logger.debug(f"Cursor close notice: {e}")
+        try:
+            conn.close()
+        except Exception as e:
+            logger.debug(f"Connection close notice: {e}")
 
     results = []
     for r in rows:
@@ -182,19 +214,27 @@ def get_msme_detail(uin: str) -> Optional[Dict[str, Any]]:
     """Retrieves single MSME firm and computes complete forensic analysis dossier."""
     conn = get_db_connection()
     cur = conn.cursor()
-    use_pg = bool(get_supabase_url())
-    placeholder = "%s" if use_pg else "?"
+    try:
+        use_pg = bool(get_supabase_url())
+        placeholder = "%s" if use_pg else "?"
 
-    sql = f"""
-        SELECT uin, name, sector_code, sector_name, city, state, annual_turnover,
-               employee_count, registration_date, source, last_updated
-        FROM msme_firms
-        WHERE UPPER(uin) = {placeholder}
-    """
-    cur.execute(sql, (uin.strip().upper(),))
-    row = cur.fetchone()
-    cur.close()
-    conn.close()
+        sql = f"""
+            SELECT uin, name, sector_code, sector_name, city, state, annual_turnover,
+                   employee_count, registration_date, source, last_updated
+            FROM msme_firms
+            WHERE UPPER(uin) = {placeholder}
+        """
+        cur.execute(sql, (uin.strip().upper(),))
+        row = cur.fetchone()
+    finally:
+        try:
+            cur.close()
+        except Exception as e:
+            logger.debug(f"Cursor close notice: {e}")
+        try:
+            conn.close()
+        except Exception as e:
+            logger.debug(f"Connection close notice: {e}")
 
     if not row:
         return None

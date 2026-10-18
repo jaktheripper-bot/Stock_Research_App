@@ -38,7 +38,8 @@ def clean_dict_row(cursor, row: Any) -> Dict[str, Any]:
     if "metadata_json" in d and isinstance(d["metadata_json"], str):
         try:
             d["metadata"] = json.loads(d["metadata_json"])
-        except Exception:
+        except Exception as e:
+            logger.debug("Failed parsing metadata_json in mutual_funds: %s", e)
             d["metadata"] = {}
     return d
 
@@ -296,7 +297,8 @@ def get_scheme_holdings(scheme_code: str) -> List[Dict[str, Any]]:
             if "instrument_details" in r and isinstance(r["instrument_details"], str):
                 try:
                     r["details"] = json.loads(r["instrument_details"])
-                except Exception:
+                except Exception as e:
+                    logger.debug("Failed parsing instrument_details in mutual_funds: %s", e)
                     r["details"] = {}
             else:
                 r["details"] = {}
@@ -5006,12 +5008,14 @@ def get_fund_forensic_dossier(scheme_code: str) -> Optional[Dict[str, Any]]:
         if "top_risky_holdings_json" in res and res["top_risky_holdings_json"]:
             try:
                 res["top_risky_holdings"] = json.loads(res["top_risky_holdings_json"])
-            except Exception:
+            except Exception as e:
+                logger.debug("Failed parsing top_risky_holdings_json: %s", e)
                 res["top_risky_holdings"] = []
         if "top_quality_holdings_json" in res and res["top_quality_holdings_json"]:
             try:
                 res["top_quality_holdings"] = json.loads(res["top_quality_holdings_json"])
-            except Exception:
+            except Exception as e:
+                logger.debug("Failed parsing top_quality_holdings_json: %s", e)
                 res["top_quality_holdings"] = []
         return res
     except Exception as e:
@@ -5045,12 +5049,14 @@ def get_featured_daily_fund_dossier() -> Optional[Dict[str, Any]]:
         if "top_risky_holdings_json" in res and res["top_risky_holdings_json"]:
             try:
                 res["top_risky_holdings"] = json.loads(res["top_risky_holdings_json"])
-            except Exception:
+            except Exception as e:
+                logger.debug("Failed parsing featured top_risky_holdings_json: %s", e)
                 res["top_risky_holdings"] = []
         if "top_quality_holdings_json" in res and res["top_quality_holdings_json"]:
             try:
                 res["top_quality_holdings"] = json.loads(res["top_quality_holdings_json"])
-            except Exception:
+            except Exception as e:
+                logger.debug("Failed parsing featured top_quality_holdings_json: %s", e)
                 res["top_quality_holdings"] = []
         return res
     except Exception as e:

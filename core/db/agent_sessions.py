@@ -39,12 +39,14 @@ def clean_row(cursor, row: Any) -> Dict[str, Any]:
     if "tool_calls_json" in d and isinstance(d["tool_calls_json"], str):
         try:
             d["tool_calls"] = json.loads(d["tool_calls_json"])
-        except Exception:
+        except Exception as e:
+            logger.debug("Failed parsing tool_calls_json: %s", e)
             d["tool_calls"] = []
     if "metadata_json" in d and isinstance(d["metadata_json"], str):
         try:
             d["metadata"] = json.loads(d["metadata_json"])
-        except Exception:
+        except Exception as e:
+            logger.debug("Failed parsing metadata_json: %s", e)
             d["metadata"] = {}
 
     return d

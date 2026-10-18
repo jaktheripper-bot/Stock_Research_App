@@ -44,7 +44,8 @@ def clean_audit_row(cursor, row: Any) -> Dict[str, Any]:
         if json_field in d and isinstance(d[json_field], str):
             try:
                 d[target_field] = json.loads(d[json_field])
-            except Exception:
+            except Exception as e:
+                logger.debug("Failed parsing %s: %s", json_field, e)
                 d[target_field] = [] if "s" in target_field else {}
         elif target_field not in d:
             d[target_field] = [] if "s" in target_field else {}
@@ -110,13 +111,30 @@ def save_project_audit_log(audit: Dict[str, Any]) -> bool:
             ))
         else:
             query = """
-                INSERT OR REPLACE INTO project_audit_logs (
+                INSERT INTO project_audit_logs (
                     audit_id, overall_score, strategy_score, implementation_score, uiux_score,
                     status, tests_total, tests_passed, tests_failed,
                     endpoints_checked, endpoints_healthy,
                     critical_violations_json, recommendations_json, pillar_breakdown_json,
                     full_markdown_report, audit_engine, created_at
-                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, datetime('now'));
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, datetime('now'))
+                ON CONFLICT (audit_id) DO UPDATE SET
+                    overall_score = EXCLUDED.overall_score,
+                    strategy_score = EXCLUDED.strategy_score,
+                    implementation_score = EXCLUDED.implementation_score,
+                    uiux_score = EXCLUDED.uiux_score,
+                    status = EXCLUDED.status,
+                    tests_total = EXCLUDED.tests_total,
+                    tests_passed = EXCLUDED.tests_passed,
+                    tests_failed = EXCLUDED.tests_failed,
+                    endpoints_checked = EXCLUDED.endpoints_checked,
+                    endpoints_healthy = EXCLUDED.endpoints_healthy,
+                    critical_violations_json = EXCLUDED.critical_violations_json,
+                    recommendations_json = EXCLUDED.recommendations_json,
+                    pillar_breakdown_json = EXCLUDED.pillar_breakdown_json,
+                    full_markdown_report = EXCLUDED.full_markdown_report,
+                    audit_engine = EXCLUDED.audit_engine,
+                    created_at = datetime('now');
             """
             cursor.execute(query, (
                 audit.get("audit_id"),

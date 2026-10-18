@@ -98,70 +98,78 @@ def upsert_firms(rows: List[Dict[str, Any]]) -> int:
 
     conn = get_db_connection()
     cur = conn.cursor()
-    use_pg = bool(get_supabase_url())
+    try:
+        use_pg = bool(get_supabase_url())
 
-    if use_pg:
-        sql = """
-            INSERT INTO msme_firms (
-                uin, name, sector_code, sector_name, city, state,
-                annual_turnover, employee_count, registration_date, source, last_updated
-            ) VALUES (
-                %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, now()
-            )
-            ON CONFLICT (uin) DO UPDATE SET
-                name=EXCLUDED.name,
-                sector_code=EXCLUDED.sector_code,
-                sector_name=EXCLUDED.sector_name,
-                city=EXCLUDED.city,
-                state=EXCLUDED.state,
-                annual_turnover=EXCLUDED.annual_turnover,
-                employee_count=EXCLUDED.employee_count,
-                registration_date=EXCLUDED.registration_date,
-                source=EXCLUDED.source,
-                last_updated=now()
-        """
-    else:
-        sql = """
-            INSERT INTO msme_firms (
-                uin, name, sector_code, sector_name, city, state,
-                annual_turnover, employee_count, registration_date, source, last_updated
-            ) VALUES (
-                ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, datetime('now')
-            )
-            ON CONFLICT(uin) DO UPDATE SET
-                name=excluded.name,
-                sector_code=excluded.sector_code,
-                sector_name=excluded.sector_name,
-                city=excluded.city,
-                state=excluded.state,
-                annual_turnover=excluded.annual_turnover,
-                employee_count=excluded.employee_count,
-                registration_date=excluded.registration_date,
-                source=excluded.source,
-                last_updated=datetime('now')
-        """
+        if use_pg:
+            sql = """
+                INSERT INTO msme_firms (
+                    uin, name, sector_code, sector_name, city, state,
+                    annual_turnover, employee_count, registration_date, source, last_updated
+                ) VALUES (
+                    %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, now()
+                )
+                ON CONFLICT (uin) DO UPDATE SET
+                    name=EXCLUDED.name,
+                    sector_code=EXCLUDED.sector_code,
+                    sector_name=EXCLUDED.sector_name,
+                    city=EXCLUDED.city,
+                    state=EXCLUDED.state,
+                    annual_turnover=EXCLUDED.annual_turnover,
+                    employee_count=EXCLUDED.employee_count,
+                    registration_date=EXCLUDED.registration_date,
+                    source=EXCLUDED.source,
+                    last_updated=now()
+            """
+        else:
+            sql = """
+                INSERT INTO msme_firms (
+                    uin, name, sector_code, sector_name, city, state,
+                    annual_turnover, employee_count, registration_date, source, last_updated
+                ) VALUES (
+                    ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, datetime('now')
+                )
+                ON CONFLICT(uin) DO UPDATE SET
+                    name=excluded.name,
+                    sector_code=excluded.sector_code,
+                    sector_name=excluded.sector_name,
+                    city=excluded.city,
+                    state=excluded.state,
+                    annual_turnover=excluded.annual_turnover,
+                    employee_count=excluded.employee_count,
+                    registration_date=excluded.registration_date,
+                    source=excluded.source,
+                    last_updated=datetime('now')
+            """
 
-    count = 0
-    for rec in rows:
-        cur.execute(
-            sql,
-            (
-                rec.get("uin"),
-                rec.get("name"),
-                rec.get("sector_code"),
-                rec.get("sector_name"),
-                rec.get("city"),
-                rec.get("state"),
-                rec.get("annual_turnover"),
-                rec.get("employee_count"),
-                rec.get("registration_date"),
-                rec.get("source", "Udyam Gazette / Open Registry"),
-            ),
-        )
-        count += 1
-    conn.commit()
-    cur.close()
-    conn.close()
+        count = 0
+        for rec in rows:
+            cur.execute(
+                sql,
+                (
+                    rec.get("uin"),
+                    rec.get("name"),
+                    rec.get("sector_code"),
+                    rec.get("sector_name"),
+                    rec.get("city"),
+                    rec.get("state"),
+                    rec.get("annual_turnover"),
+                    rec.get("employee_count"),
+                    rec.get("registration_date"),
+                    rec.get("source", "Udyam Gazette / Open Registry"),
+                ),
+            )
+            count += 1
+        conn.commit()
+    finally:
+        try:
+            cur.close()
+        except Exception as e:
+            logger.debug(f"Cursor close notice: {e}")
+        try:
+            conn.close()
+        except Exception as e:
+            logger.debug(f"Connection close notice: {e}")
     logger.info("Upserted %d MSME records", count)
     return count
 

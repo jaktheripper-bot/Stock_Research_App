@@ -55,7 +55,8 @@ def clean_dict_row(cursor, row: Any) -> Dict[str, Any]:
     if "metadata_json" in d and isinstance(d["metadata_json"], str):
         try:
             d["metadata"] = json.loads(d["metadata_json"])
-        except Exception:
+        except Exception as e:
+            logger.debug("Failed parsing metadata_json in debt security: %s", e)
             d["metadata"] = {}
     return d
 

@@ -28,7 +28,8 @@ import unittest
 from unittest.mock import MagicMock, patch
 
 from core.analysis import fundamentals as fnd
-from core.ingestion.angel_one import AngelOneGateway, generate_rfc6238_totp
+from core.ingestion.angel_one import AngelOneGateway
+from core.auth.totp import generate_rfc6238_totp
 from web.main import _build_local_qr_data_uri
 
 ROOT = Path(__file__).resolve().parent.parent.parent

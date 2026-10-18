@@ -181,7 +181,8 @@ def get_active_discovery_reel(
             if r[13]:
                 try:
                     metrics_dict = json.loads(r[13])
-                except Exception:
+                except Exception as e:
+                    logger.debug("Failed parsing metrics_dict json in discovery reel: %s", e)
                     metrics_dict = {}
 
             results.append({

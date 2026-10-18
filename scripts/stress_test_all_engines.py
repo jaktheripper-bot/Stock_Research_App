@@ -35,7 +35,8 @@ print("=" * 80)
 # 1. Angel One Gateway
 # -------------------------------------------------------------------------
 print("\n--- 1. Testing AngelOneGateway ---")
-from core.ingestion.angel_one import AngelOneGateway, generate_rfc6238_totp
+from core.ingestion.angel_one import AngelOneGateway
+from core.auth.totp import generate_rfc6238_totp
 
 test_totp_cases = [
     ("None secret", None),

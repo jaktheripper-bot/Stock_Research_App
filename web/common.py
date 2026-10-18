@@ -136,7 +136,8 @@ def _validate_request_origin(request: Request) -> bool:
         parsed = urllib.parse.urlparse(target)
         host = (parsed.hostname or "").lower()
         return host in ALLOWED_ORIGIN_HOSTS or host.endswith(".onrender.com")
-    except Exception:
+    except Exception as e:
+        logger.debug("Failed validating CSRF origin: %s", e)
         return False
 
 
@@ -170,7 +171,8 @@ def _validate_user_session_token(token: Optional[str]) -> Optional[Dict[str, Any
         if datetime.now(timezone.utc).timestamp() - ts < 2592000:
             return payload
         return None
-    except Exception:
+    except Exception as e:
+        logger.debug("Failed validating user session token: %s", e)
         return None
 
 
@@ -222,7 +224,8 @@ def _validate_admin_token(token: Optional[str]) -> Optional[Dict[str, Any]]:
         if datetime.now(timezone.utc).timestamp() - ts < 86400:
             return payload
         return None
-    except Exception:
+    except Exception as e:
+        logger.debug("Failed validating admin token: %s", e)
         return None
 
 
@@ -259,7 +262,8 @@ def _validate_pending_2fa_token(token: Optional[str]) -> Optional[str]:
         if datetime.now(timezone.utc).timestamp() - ts < 900:
             return data.get("pending_email")
         return None
-    except Exception:
+    except Exception as e:
+        logger.debug("Failed validating pending 2fa token: %s", e)
         return None
 
 
@@ -286,7 +290,8 @@ def _is_user_subscribed(user: Optional[Dict[str, Any]]) -> bool:
             try:
                 exp_dt = datetime.fromisoformat(exp.replace("Z", "+00:00"))
                 return exp_dt > now
-            except Exception:
+            except Exception as e:
+                logger.debug("Failed parsing subscription_expires_at in _is_user_subscribed: %s", e)
                 return True
         elif hasattr(exp, "tzinfo"):
             return exp > now

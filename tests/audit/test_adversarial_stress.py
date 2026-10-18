@@ -10,7 +10,8 @@ import unittest
 import math
 from typing import Dict, Any, List
 
-from core.ingestion.angel_one import AngelOneGateway, generate_rfc6238_totp
+from core.ingestion.angel_one import AngelOneGateway
+from core.auth.totp import generate_rfc6238_totp
 from core.cortex.garuda import GarudaReflexEngine
 from core.cortex.varan import VaranEngine
 from core.cortex.sutra import SutraLookThroughEngine

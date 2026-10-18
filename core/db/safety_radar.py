@@ -274,7 +274,8 @@ def get_all_safety_radar_products(category: Optional[str] = None) -> List[Dict[s
             if r[13]:
                 try:
                     mat = json.loads(r[13])
-                except Exception:
+                except Exception as e:
+                    logger.debug("Failed parsing safety radar JSON: %s", e)
                     mat = {}
 
             results.append({

@@ -70,6 +70,7 @@ class SetuMatrixResult:
     anomalies: List[CapitalStructureAnomaly] = field(default_factory=list)
     institutional_mf_velocity_score: float = 50.0  # 0 to 100
     summary: str = ""
+    equity_over_debt_spread_bps: float = 0.0
 
 
 class SetuMatrixEngine:
@@ -227,4 +228,37 @@ class SetuMatrixEngine:
             anomalies=anomalies,
             institutional_mf_velocity_score=round(mf_score, 1),
             summary=summary,
+            equity_over_debt_spread_bps=seniority_spread_bps,
+        )
+
+    def evaluate_capital_structure(
+        self,
+        ticker: str,
+        market_cap_cr: float,
+        trailing_fcf_cr: float,
+        senior_ncd_ytm_pct: float,
+        sovereign_10y_ytm_pct: float = DEFAULT_GSEC_10Y,
+        debt_credit_rating: str = "AAA",
+        tax_slab_pct: float = 30.0,
+        mutual_fund_net_flow_cr: float = 0.0,
+        promoter_pledge_pct: float = 0.0,
+    ) -> SetuMatrixResult:
+        """
+        Calculates cross-asset seniority yield spread and capital structure posture.
+        Computes equity FCF yield: (trailing_fcf_cr / market_cap_cr) * 100.
+        Calculates equity over debt spread in basis points: (equity_fcf_yield - senior_ncd_ytm_pct) * 100.
+        """
+        mcap = _safe_float(market_cap_cr, default=0.0)
+        fcf = _safe_float(trailing_fcf_cr, default=0.0)
+        equity_fcf_yield = (fcf / mcap * 100.0) if mcap > 0 else 0.0
+
+        return self.evaluate(
+            symbol=ticker,
+            equity_fcf_yield_pct=equity_fcf_yield,
+            senior_debt_ytm_pct=senior_ncd_ytm_pct,
+            debt_credit_rating=debt_credit_rating,
+            gsec_10y_yield_pct=sovereign_10y_ytm_pct,
+            mutual_fund_net_flow_cr=mutual_fund_net_flow_cr,
+            promoter_pledge_pct=promoter_pledge_pct,
+            tax_slab_pct=tax_slab_pct,
         )

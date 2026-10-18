@@ -71,7 +71,8 @@ def calculate_pe_percentile(current_pe: Any, revisions: List[Dict[str, Any]]) ->
         equal_count = sum(1 for p in historical_pes if p == pe_val)
         percentile = (less_count + 0.5 * equal_count) / len(historical_pes) * 100.0
         return round(max(0.0, min(100.0, percentile)), 1)
-    except Exception:
+    except Exception as e:
+        logger.warning("Error calculating PE percentile: %s", e)
         return None
 
 

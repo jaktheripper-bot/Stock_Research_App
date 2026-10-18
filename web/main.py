@@ -204,40 +204,78 @@ from web.common import (
 async def run_daily_discovery_scheduler():
     """
     Automated background BSE surveillance and screening scheduler:
-    Initiates automatic crawling & screening of BSE listed companies at 09:00 AM IST daily.
+    Coordinates scheduled tasks across multi-worker deployments using distributed job leases:
+    - 08:30 AM IST: Daily 15-stock ingestion & mutual fund look-through saturation
+    - 08:45 AM IST: Discovery Reel morning screening (500+ scrips)
+    - 09:00 AM IST: Daily unlisted MSME cohort ingestion & Research Bouquet dispatch
     """
-    logger.info("🌅 [Discovery Scheduler] Background BSE surveillance crawler initiated.")
+    logger.info("🌅 [Discovery Scheduler] Background BSE surveillance crawler & morning scheduler initiated.")
     last_stock_run_date = None
+    last_discovery_run_date = None
     last_msme_run_date = None
+    last_bouquet_run_date = None
 
     try:
         now = datetime.now(IST)
         today_str = now.strftime("%Y-%m-%d")
         from core.analysis.daily_stock_ingestion import ingest_daily_stock_cohort
         from core.msme.daily_ingest import ingest_daily_msme_cohort
+        from core.agents.watchers.discovery_watcher import execute_discovery_screening
+        from core.notify import dispatch_research_bouquet
+        from core.db.distributed_lock import job_lease
 
         loop = asyncio.get_running_loop()
         is_past_830 = (now.hour > 8) or (now.hour == 8 and now.minute >= 30)
+        is_past_845 = (now.hour > 8) or (now.hour == 8 and now.minute >= 45)
         is_past_900 = now.hour >= 9
 
         if is_past_830:
-            logger.info(f"🌅 [Discovery Scheduler] Past 08:30 AM IST on boot for {today_str}. Triggering daily 15-stock ingestion...")
-            await loop.run_in_executor(None, ingest_daily_stock_cohort, today_str, 15, False)
-            logger.info(f"🌅 [Discovery Scheduler] 15-stock ingestion & mutual fund look-through re-audit completed for {today_str}.")
+            with job_lease(f"mf_stock_ingest_{today_str}", ttl_seconds=7200, release_on_exit=False) as acquired:
+                if acquired:
+                    logger.info(f"🌅 [Discovery Scheduler] Past 08:30 AM IST on boot for {today_str}. Acquired lease. Triggering daily 15-stock ingestion...")
+                    await loop.run_in_executor(None, ingest_daily_stock_cohort, today_str, 15, False)
+                    logger.info(f"🌅 [Discovery Scheduler] 15-stock ingestion & mutual fund look-through re-audit completed for {today_str}.")
+                else:
+                    logger.info(f"🌅 [Discovery Scheduler] Lease for mf_stock_ingest_{today_str} held by another worker. Skipping boot ingestion.")
             last_stock_run_date = today_str
 
+            if is_past_845:
+                with job_lease(f"discovery_reel_{today_str}", ttl_seconds=7200, release_on_exit=False) as acquired:
+                    if acquired:
+                        logger.info(f"🌅 [Discovery Watcher] Past 08:45 AM IST on boot for {today_str}. Acquired lease. Running discovery screening...")
+                        await execute_discovery_screening()
+                        logger.info(f"🌅 [Discovery Watcher] Boot discovery screening completed for {today_str}.")
+                    else:
+                        logger.info(f"🌅 [Discovery Watcher] Lease for discovery_reel_{today_str} held by another worker. Skipping boot screening.")
+                last_discovery_run_date = today_str
+
             if is_past_900:
-                logger.info(f"🏭 [Discovery Scheduler] Past 09:00 AM IST on boot for {today_str}. Triggering daily MSME cohort ingestion...")
-                await loop.run_in_executor(None, ingest_daily_msme_cohort, today_str, 15)
-                logger.info(f"🏭 [Discovery Scheduler] MSME cohort ingestion completed for {today_str}.")
+                with job_lease(f"msme_daily_ingest_{today_str}", ttl_seconds=7200, release_on_exit=False) as acquired:
+                    if acquired:
+                        logger.info(f"🏭 [Discovery Scheduler] Past 09:00 AM IST on boot for {today_str}. Acquired lease. Triggering daily MSME cohort ingestion...")
+                        await loop.run_in_executor(None, ingest_daily_msme_cohort, today_str, 15)
+                        logger.info(f"🏭 [Discovery Scheduler] MSME cohort ingestion completed for {today_str}.")
+                    else:
+                        logger.info(f"🏭 [Discovery Scheduler] Lease for msme_daily_ingest_{today_str} held by another worker. Skipping boot MSME ingest.")
                 last_msme_run_date = today_str
+
+                with job_lease(f"morning_bouquet_{today_str}", ttl_seconds=7200, release_on_exit=False) as acquired:
+                    if acquired:
+                        logger.info(f"📬 [Research Bouquet] Past 09:00 AM IST on boot for {today_str}. Acquired lease. Dispatching morning bouquet...")
+                        await loop.run_in_executor(None, dispatch_research_bouquet, today_str, None, False)
+                        logger.info(f"📬 [Research Bouquet] Morning bouquet dispatch completed for {today_str}.")
+                    else:
+                        logger.info(f"📬 [Research Bouquet] Lease for morning_bouquet_{today_str} held by another worker. Skipping boot bouquet dispatch.")
+                last_bouquet_run_date = today_str
         else:
             from core.db.discovery import get_active_discovery_reel
             active_existing = [x for x in get_active_discovery_reel(exclude_tests=True, allow_fallback=True)]
             if not active_existing:
                 yesterday_str = (now - timedelta(days=1)).strftime("%Y-%m-%d")
-                logger.info(f"🌅 [Discovery Scheduler] No active historical editions found. Bootstrapping baseline edition ({yesterday_str})...")
-                await loop.run_in_executor(None, ingest_daily_stock_cohort, yesterday_str, 15, False)
+                with job_lease(f"mf_stock_ingest_bootstrap_{yesterday_str}", ttl_seconds=7200, release_on_exit=False) as acquired:
+                    if acquired:
+                        logger.info(f"🌅 [Discovery Scheduler] No active historical editions found. Acquired lease. Bootstrapping baseline edition ({yesterday_str})...")
+                        await loop.run_in_executor(None, ingest_daily_stock_cohort, yesterday_str, 15, False)
     except Exception as boot_err:
         logger.warning(f"🌅 [Discovery Scheduler] Catch-up check notice: {boot_err}")
 
@@ -247,22 +285,58 @@ async def run_daily_discovery_scheduler():
             now = datetime.now(IST)
             today_str = now.strftime("%Y-%m-%d")
             is_past_830 = (now.hour > 8) or (now.hour == 8 and now.minute >= 30)
+            is_past_845 = (now.hour > 8) or (now.hour == 8 and now.minute >= 45)
             is_past_900 = now.hour >= 9
             loop = asyncio.get_running_loop()
+            from core.db.distributed_lock import job_lease
 
+            # 1. 08:30 AM MF Priority Stock Ingest
             if is_past_830 and last_stock_run_date != today_str:
                 from core.analysis.daily_stock_ingestion import ingest_daily_stock_cohort
-                logger.info(f"🌅 [Discovery Scheduler] 08:30 AM IST trigger reached for {today_str}. Running daily 15-stock ingestion...")
-                await loop.run_in_executor(None, ingest_daily_stock_cohort, today_str, 15, False)
-                logger.info(f"🌅 [Discovery Scheduler] Daily 15-stock ingestion & mutual fund look-through re-audit completed for {today_str}.")
+                with job_lease(f"mf_stock_ingest_{today_str}", ttl_seconds=7200, release_on_exit=False) as acquired:
+                    if acquired:
+                        logger.info(f"🌅 [Discovery Scheduler] 08:30 AM IST trigger reached for {today_str}. Acquired lease. Running daily 15-stock ingestion...")
+                        await loop.run_in_executor(None, ingest_daily_stock_cohort, today_str, 15, False)
+                        logger.info(f"🌅 [Discovery Scheduler] Daily 15-stock ingestion & mutual fund look-through re-audit completed for {today_str}.")
+                    else:
+                        logger.info(f"🌅 [Discovery Scheduler] Lease for mf_stock_ingest_{today_str} held by another worker. Skipping.")
                 last_stock_run_date = today_str
 
+            # 2. 08:45 AM Discovery Reel Screening
+            if is_past_845 and last_discovery_run_date != today_str:
+                from core.agents.watchers.discovery_watcher import execute_discovery_screening
+                with job_lease(f"discovery_reel_{today_str}", ttl_seconds=7200, release_on_exit=False) as acquired:
+                    if acquired:
+                        logger.info(f"🌅 [Discovery Watcher] 08:45 AM IST trigger reached for {today_str}. Acquired lease. Running discovery screening...")
+                        await execute_discovery_screening()
+                        logger.info(f"🌅 [Discovery Watcher] Daily 08:45 AM discovery reel screening completed for {today_str}.")
+                    else:
+                        logger.info(f"🌅 [Discovery Watcher] Lease for discovery_reel_{today_str} held by another worker. Skipping.")
+                last_discovery_run_date = today_str
+
+            # 3. 09:00 AM MSME Ingestion
             if is_past_900 and last_msme_run_date != today_str:
                 from core.msme.daily_ingest import ingest_daily_msme_cohort
-                logger.info(f"🏭 [MSME Ingest] 09:00 AM IST trigger reached for {today_str}. Running daily MSME cohort ingestion...")
-                await loop.run_in_executor(None, ingest_daily_msme_cohort, today_str, 15)
-                logger.info(f"🏭 [MSME Ingest] 09:00 AM IST unlisted MSME cohort ingestion completed for {today_str}.")
+                with job_lease(f"msme_daily_ingest_{today_str}", ttl_seconds=7200, release_on_exit=False) as acquired:
+                    if acquired:
+                        logger.info(f"🏭 [MSME Ingest] 09:00 AM IST trigger reached for {today_str}. Acquired lease. Running daily MSME cohort ingestion...")
+                        await loop.run_in_executor(None, ingest_daily_msme_cohort, today_str, 15)
+                        logger.info(f"🏭 [MSME Ingest] 09:00 AM IST unlisted MSME cohort ingestion completed for {today_str}.")
+                    else:
+                        logger.info(f"🏭 [MSME Ingest] Lease for msme_daily_ingest_{today_str} held by another worker. Skipping.")
                 last_msme_run_date = today_str
+
+            # 4. 09:00 AM Research Bouquet Morning Dispatch
+            if is_past_900 and last_bouquet_run_date != today_str:
+                from core.notify import dispatch_research_bouquet
+                with job_lease(f"morning_bouquet_{today_str}", ttl_seconds=7200, release_on_exit=False) as acquired:
+                    if acquired:
+                        logger.info(f"📬 [Research Bouquet] 09:00 AM IST trigger reached for {today_str}. Acquired lease. Dispatching morning bouquet...")
+                        await loop.run_in_executor(None, dispatch_research_bouquet, today_str, None, False)
+                        logger.info(f"📬 [Research Bouquet] 09:00 AM IST morning bouquet dispatch completed for {today_str}.")
+                    else:
+                        logger.info(f"📬 [Research Bouquet] Lease for morning_bouquet_{today_str} held by another worker. Skipping.")
+                last_bouquet_run_date = today_str
         except asyncio.CancelledError:
             logger.info("🌅 [Discovery Scheduler] Background scheduler cancelled.")
             break
@@ -894,7 +968,8 @@ def dossier_page(request: Request, ticker: str):
     if not citations and rep.get("citations_json"):
         try:
             citations = json.loads(rep.get("citations_json"))
-        except Exception:
+        except Exception as e:
+            logger.debug("Failed parsing citations_json in stock_dossier: %s", e)
             citations = []
     if not citations and raw_md:
         citations = extract_citations_from_report(raw_md)
@@ -1162,7 +1237,8 @@ def debt_directory_page(
     try:
         curve_analytics = get_sovereign_curve_analytics()
         benchmark_10y = f"{curve_analytics.get('benchmark_10y_gsec', 7.12):.2f}"
-    except Exception:
+    except Exception as e:
+        logger.warning("Failed getting sovereign curve analytics: %s", e)
         benchmark_10y = "7.12"
 
     last_scans = get_asset_scan_runs(limit=1)
@@ -1598,48 +1674,55 @@ def msme_directory_page(
     from core.db.connection import get_db_connection, get_supabase_url
     conn = get_db_connection()
     cur = conn.cursor()
-    use_pg = bool(get_supabase_url())
-    placeholder = "%s" if use_pg else "?"
+    try:
+        use_pg = bool(get_supabase_url())
+        placeholder = "%s" if use_pg else "?"
 
-    where, values = build_search_query(
-        {"q": q, "sector": sector, "state": state, "tier": tier},
-        placeholder=placeholder
-    )
+        where, values = build_search_query(
+            {"q": q, "sector": sector, "state": state, "tier": tier},
+            placeholder=placeholder
+        )
 
-    sql = f"""
-        SELECT uin, name, sector_name, city, state, annual_turnover,
-               employee_count, registration_date, source
-        FROM msme_firms
-        WHERE {where}
-        ORDER BY annual_turnover DESC, name ASC
-        LIMIT 100
-    """
-    cur.execute(sql, values)
-    rows = cur.fetchall()
+        sql = f"""
+            SELECT uin, name, sector_name, city, state, annual_turnover,
+                   employee_count, registration_date, source
+            FROM msme_firms
+            WHERE {where}
+            ORDER BY annual_turnover DESC, name ASC
+            LIMIT 100
+        """
+        cur.execute(sql, values)
+        rows = cur.fetchall()
 
-    cur.execute("SELECT COUNT(*), COALESCE(SUM(annual_turnover), 0), COUNT(DISTINCT state) FROM msme_firms")
-    stat_row = cur.fetchone()
-    total_firms = stat_row[0] if stat_row else 0
-    total_turnover = round(float(stat_row[1]), 1) if stat_row and stat_row[1] else 0.0
-    states_count = stat_row[2] if stat_row else 0
+        cur.execute("SELECT COUNT(*), COALESCE(SUM(annual_turnover), 0), COUNT(DISTINCT state) FROM msme_firms")
+        stat_row = cur.fetchone()
+        total_firms = stat_row[0] if stat_row else 0
+        total_turnover = round(float(stat_row[1]), 1) if stat_row and stat_row[1] else 0.0
+        states_count = stat_row[2] if stat_row else 0
 
-    cur.execute("SELECT COUNT(*) FROM msme_firms WHERE annual_turnover < 5.0 OR annual_turnover IS NULL")
-    micro_count = cur.fetchone()[0]
+        cur.execute("SELECT COUNT(*) FROM msme_firms WHERE annual_turnover < 5.0 OR annual_turnover IS NULL")
+        micro_count = cur.fetchone()[0]
 
-    cur.execute("SELECT COUNT(*) FROM msme_firms WHERE annual_turnover >= 5.0 AND annual_turnover < 50.0")
-    small_count = cur.fetchone()[0]
+        cur.execute("SELECT COUNT(*) FROM msme_firms WHERE annual_turnover >= 5.0 AND annual_turnover < 50.0")
+        small_count = cur.fetchone()[0]
 
-    cur.execute("SELECT COUNT(*) FROM msme_firms WHERE annual_turnover >= 50.0")
-    medium_count = cur.fetchone()[0]
+        cur.execute("SELECT COUNT(*) FROM msme_firms WHERE annual_turnover >= 50.0")
+        medium_count = cur.fetchone()[0]
 
-    cur.execute("SELECT DISTINCT sector_name FROM msme_firms WHERE sector_name IS NOT NULL AND sector_name != '' ORDER BY sector_name ASC")
-    sectors = [r[0] for r in cur.fetchall()]
+        cur.execute("SELECT DISTINCT sector_name FROM msme_firms WHERE sector_name IS NOT NULL AND sector_name != '' ORDER BY sector_name ASC")
+        sectors = [r[0] for r in cur.fetchall()]
 
-    cur.execute("SELECT DISTINCT state FROM msme_firms WHERE state IS NOT NULL AND state != '' ORDER BY state ASC")
-    states = [r[0] for r in cur.fetchall()]
-
-    cur.close()
-    conn.close()
+        cur.execute("SELECT DISTINCT state FROM msme_firms WHERE state IS NOT NULL AND state != '' ORDER BY state ASC")
+        states = [r[0] for r in cur.fetchall()]
+    finally:
+        try:
+            cur.close()
+        except Exception as e:
+            logger.debug(f"Cursor close notice in msme_directory_page: {e}")
+        try:
+            conn.close()
+        except Exception as e:
+            logger.debug(f"Connection close notice in msme_directory_page: {e}")
 
     firms = []
     for r in rows:
@@ -1984,7 +2067,8 @@ async def sitemap_xml():
                     else:
                         dt = raw_ts
                     lastmod_date = dt.astimezone(timezone.utc).strftime("%Y-%m-%d")
-                except Exception:
+                except Exception as e:
+                    logger.debug("Failed parsing raw_ts for sitemap: %s", e)
                     lastmod_date = now_iso
             else:
                 lastmod_date = now_iso
@@ -2033,13 +2117,21 @@ async def sitemap_xml():
         from core.db.connection import get_db_connection
         conn = get_db_connection()
         cur = conn.cursor()
-        cur.execute("SELECT uin FROM msme_firms LIMIT 100")
-        for (m_uin,) in cur.fetchall():
-            xml_lines.append(
-                f'  <url><loc>{base_url}/msme/{m_uin}</loc><lastmod>{now_iso}</lastmod><changefreq>monthly</changefreq><priority>0.7</priority></url>'
-            )
-        cur.close()
-        conn.close()
+        try:
+            cur.execute("SELECT uin FROM msme_firms LIMIT 100")
+            for (m_uin,) in cur.fetchall():
+                xml_lines.append(
+                    f'  <url><loc>{base_url}/msme/{m_uin}</loc><lastmod>{now_iso}</lastmod><changefreq>monthly</changefreq><priority>0.7</priority></url>'
+                )
+        finally:
+            try:
+                cur.close()
+            except Exception as e:
+                logger.debug(f"Cursor close notice in sitemap_xml: {e}")
+            try:
+                conn.close()
+            except Exception as e:
+                logger.debug(f"Connection close notice in sitemap_xml: {e}")
     except Exception as msme_sitemap_err:
         logger.debug(f"Sitemap MSME append notice: {msme_sitemap_err}")
 

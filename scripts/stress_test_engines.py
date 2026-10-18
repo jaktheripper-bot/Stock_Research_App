@@ -25,7 +25,8 @@ ROOT_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 if ROOT_DIR not in sys.path:
     sys.path.insert(0, ROOT_DIR)
 
-from core.ingestion.angel_one import AngelOneGateway, generate_rfc6238_totp
+from core.ingestion.angel_one import AngelOneGateway
+from core.auth.totp import generate_rfc6238_totp
 from core.cortex import (
     ChanakyaGate,
     VaranEngine,

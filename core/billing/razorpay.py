@@ -245,6 +245,7 @@ def process_successful_payment(
     """
     Validates payment signature, grants credits or upgrades subscription tier,
     and returns (success, new_balance, invoice_number, message).
+    Enforces atomic idempotency so replay attacks return current balance without duplicate credits.
     """
     plan = get_plan_by_id(plan_id)
     if not plan:
@@ -253,6 +254,18 @@ def process_successful_payment(
     is_valid = verify_payment_signature(order_id, payment_id, signature)
     if not is_valid:
         return False, 0.0, "", "Payment signature verification failed. Transaction was not confirmed."
+
+    # Idempotency check: if transaction already processed, return existing confirmation
+    from core.db.users import get_credit_transaction_by_gateway_id, get_user_credits_balance
+    existing = get_credit_transaction_by_gateway_id(payment_id=payment_id, order_id=order_id)
+    if existing:
+        current_bal = get_user_credits_balance(user_id)
+        existing_inv = existing.get("invoice_number") or ""
+        logger.info(
+            f"Payment {payment_id} (order: {order_id}) already processed (idempotent replay). "
+            f"User {user_id} balance preserved at {current_bal}."
+        )
+        return True, current_bal, existing_inv, "Payment already processed (idempotent replay). Balance preserved."
 
     inv_number = f"INV-{time.strftime('%Y%m')}-{int(time.time()) % 100000:05d}"
     success, new_balance = add_user_credits(

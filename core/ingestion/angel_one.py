@@ -30,7 +30,7 @@ import requests
 import math
 
 from core.config import get_secret
-from core.auth.totp import generate_rfc6238_totp
+from core.auth.totp import get_totp_code
 
 logger = logging.getLogger("equity_research.core.ingestion.angel_one")
 
@@ -112,12 +112,14 @@ class AngelOneGateway:
                     if "ip" in text:
                         try:
                             detected_ip = resp.json().get("ip") or text
-                        except Exception:
+                        except Exception as e:
+                            logger.debug("Failed to parse IP json response: %s", e)
                             detected_ip = text
                     else:
                         detected_ip = text
                     break
             except Exception as e:
+                logger.warning("Failed probing outbound IP endpoint %s: %s", endpoint, e)
                 error_msg = str(e)
                 continue
 
@@ -179,7 +181,7 @@ class AngelOneGateway:
             totp_key = (get_secret("ANGEL_TOTP_KEY") or os.environ.get("ANGEL_TOTP_KEY", "")).strip()
 
             try:
-                totp_code = generate_rfc6238_totp(totp_key)
+                totp_code = get_totp_code(totp_key)
             except Exception as e:
                 logger.error(f"Failed to generate RFC 6238 TOTP for Angel One: {e}")
                 cls._last_auth_failure_time = time.time()

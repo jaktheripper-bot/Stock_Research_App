@@ -278,6 +278,7 @@ def ingest_top_funds(
         try:
             sheets = parse_workbook(data)
         except Exception as e:
+            logger.warning("Unparseable workbook for %s: %s", key, e)
             amc_status[key] = f"unparseable workbook: {e}"
             workbook_cache[key] = None
             return None

@@ -654,7 +654,8 @@ def generate_reit_dossier_pdf(
     if isinstance(details, str):
         try:
             details = json.loads(details)
-        except Exception:
+        except Exception as e:
+            logger.warning("Failed to parse REIT details JSON: %s", e)
             details = {}
 
     header = f"""# Real Asset Research Dossier: {name} ({symbol})

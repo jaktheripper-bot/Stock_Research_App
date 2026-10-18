@@ -965,7 +965,8 @@ def get_all_reits_and_invits(structure_type: Optional[str] = None) -> List[Dict[
             if r[14]:
                 try:
                     det = json.loads(r[14])
-                except Exception:
+                except Exception as e:
+                    logger.debug("Failed parsing REIT details json: %s", e)
                     det = {}
 
             results.append({

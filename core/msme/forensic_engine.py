@@ -372,6 +372,46 @@ def compute_msme_forensic_dossier(firm_data: Dict[str, Any]) -> Dict[str, Any]:
         moat_color = "#f59e0b"
         moat_badge = "Developing Moat"
 
+    # Partition verified Udyam attributes from sector benchmark medians
+    verified_udyam_attributes = {
+        "uin": uin,
+        "name": name,
+        "sector_name": sector_name,
+        "city": city,
+        "state": state,
+        "annual_turnover": turnover,
+        "employee_count": employees,
+        "registration_date": reg_date,
+        "source": firm_data.get("source") or "Udyam Gazette / Open Registry",
+        "data_provenance": "Verified Statutory Udyam Registration (Ministry of MSME)",
+    }
+
+    sector_forensic_benchmarks = {
+        "cluster_type": bench["cluster_type"],
+        "dso_median_days": bench["dso_days"],
+        "dio_median_days": bench["dio_days"],
+        "dpo_median_days": bench["dpo_days"],
+        "net_ccc_median_days": bench["dso_days"] + bench["dio_days"] - bench["dpo_days"],
+        "ebitda_margin_median_pct": bench["ebitda_margin_pct"],
+        "depr_median_pct": bench["depr_pct"],
+        "debt_to_turnover_median": bench["debt_to_turnover"],
+        "interest_rate_median_pct": bench["interest_rate_pct"],
+        "capex_barrier": bench["capex_barrier"],
+        "growth_catalysts": bench["growth_catalysts"],
+        "fragility_vectors": bench["fragility_vectors"],
+    }
+
+    sector_offtake_universe = [
+        {
+            "ticker": b["ticker"],
+            "name": b["name"],
+            "role": b["role"],
+            "verified_by_filing": b.get("verified_by_filing", False),
+            "offtake_category": "Sector Offtake Universe",
+        }
+        for b in listed_buyers
+    ]
+
     # Assemble comprehensive forensic dossier payload
     return {
         "uin": uin,
@@ -384,6 +424,8 @@ def compute_msme_forensic_dossier(firm_data: Dict[str, Any]) -> Dict[str, Any]:
         "registration_date": reg_date,
         "source": firm_data.get("source") or "Udyam Gazette / Open Registry",
         "tier": "Medium" if turnover >= 50.0 else ("Small" if turnover >= 5.0 else "Micro"),
+        "verified_udyam_attributes": verified_udyam_attributes,
+        "sector_forensic_benchmarks": sector_forensic_benchmarks,
         
         # Pillar 1
         "pillar_1_working_capital": {
@@ -399,13 +441,15 @@ def compute_msme_forensic_dossier(firm_data: Dict[str, Any]) -> Dict[str, Any]:
             "summary": ccc_summary
         },
 
-        # Pillar 2
+        # Pillar 2: Sector Offtake Universe (Listed Equities)
         "pillar_2_supply_chain": {
             "oem_supplier_tier": oem_supplier_tier,
             "tier_description": tier_desc,
             "cluster_type": bench["cluster_type"],
             "capex_barrier": bench["capex_barrier"],
-            "listed_buyers": listed_buyers
+            "sector_offtake_universe": sector_offtake_universe,
+            "listed_buyers": sector_offtake_universe,
+            "offtake_universe_note": "Unverified by direct public filing unless tagged as Filing Verified."
         },
 
         # Pillar 3

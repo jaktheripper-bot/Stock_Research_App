@@ -45,6 +45,7 @@ def tool_get_equity_fundamentals(ticker: str) -> str:
         }
         return json.dumps(res, indent=2)
     except Exception as e:
+        logger.warning(f"tool_get_equity_fundamentals failed for {clean}: {e}")
         return json.dumps({"error": f"Failed to retrieve fundamentals: {str(e)}", "ticker": clean})
 
 
@@ -62,6 +63,7 @@ def tool_get_recent_bse_disclosures(ticker: str) -> str:
             "latest_bse_filing": headline or "No recent material exchange filing found within 14 days."
         }, indent=2)
     except Exception as e:
+        logger.warning(f"tool_get_recent_bse_disclosures failed for {clean}: {e}")
         return json.dumps({"error": f"Failed to fetch BSE filings: {str(e)}", "ticker": clean})
 
 
@@ -90,6 +92,7 @@ def tool_calculate_reverse_dcf(ticker: str, wacc: float = 11.5, terminal_growth:
             "valuation_posture": "Stretched" if pe > 35 else ("Undervalued" if pe < 18 else "Fair")
         }, indent=2)
     except Exception as e:
+        logger.warning(f"tool_calculate_reverse_dcf failed for {clean}: {e}")
         return json.dumps({"error": f"Reverse DCF computation failed: {str(e)}", "ticker": clean})
 
 
@@ -118,6 +121,7 @@ def tool_get_fund_holdings(scheme_code: str) -> str:
             ]
         }, indent=2)
     except Exception as e:
+        logger.warning(f"tool_get_fund_holdings failed for {clean}: {e}")
         return json.dumps({"error": f"Failed to retrieve fund holdings: {str(e)}", "scheme_code": clean})
 
 
@@ -144,6 +148,7 @@ def tool_get_debt_offering_metrics(isin: str) -> str:
             "counterparty_risk": sec.get("counterparty_risk", "Low")
         }, indent=2)
     except Exception as e:
+        logger.warning(f"tool_get_debt_offering_metrics failed for {clean}: {e}")
         return json.dumps({"error": f"Failed to retrieve debt metrics: {str(e)}", "isin": clean})
 
 
@@ -170,6 +175,7 @@ def tool_get_reit_compliance(symbol: str) -> str:
             "sebi_reit_compliant": True
         }, indent=2)
     except Exception as e:
+        logger.warning(f"tool_get_reit_compliance failed for {clean}: {e}")
         return json.dumps({"error": f"Failed to retrieve REIT metrics: {str(e)}", "symbol": clean})
 
 
@@ -189,4 +195,5 @@ def tool_get_sovereign_curve_spreads() -> str:
             "monetary_policy_stance": "Neutral / Inverted" if curve_slope_bps < 20 else "Normal Upward Sloping"
         }, indent=2)
     except Exception as e:
+        logger.warning(f"tool_get_sovereign_curve_spreads failed: {e}")
         return json.dumps({"error": f"Failed to retrieve sovereign benchmarks: {str(e)}"})

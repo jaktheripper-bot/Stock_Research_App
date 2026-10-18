@@ -125,11 +125,11 @@ def get_admin_user(email: str) -> Optional[Dict[str, Any]]:
                         """,
                         (admin_id, clean_email)
                     )
-                else:
                     cursor.execute(
                         f"""
-                        INSERT OR IGNORE INTO admin_users (id, email, role, totp_enabled)
-                        VALUES ({p}, {p}, 'owner', 0);
+                        INSERT INTO admin_users (id, email, role, totp_enabled)
+                        VALUES ({p}, {p}, 'owner', 0)
+                        ON CONFLICT (email) DO NOTHING;
                         """,
                         (admin_id, clean_email)
                     )
@@ -299,16 +299,11 @@ def update_admin_role(email: str, new_role: str, requesting_email: str) -> Tuple
     supabase_url = get_supabase_url()
 
     try:
-        if supabase_url:
-            cursor.execute(
-                f"UPDATE admin_users SET role = {p}, updated_at = now() WHERE LOWER(email) = LOWER({p});",
-                (clean_role, clean_email)
-            )
-        else:
-            cursor.execute(
-                f"UPDATE admin_users SET role = {p}, updated_at = datetime('now') WHERE LOWER(email) = LOWER({p});",
-                (clean_role, clean_email)
-            )
+        now_ts = datetime.now(timezone.utc).isoformat()
+        cursor.execute(
+            f"UPDATE admin_users SET role = {p}, updated_at = {p} WHERE LOWER(email) = LOWER({p});",
+            (clean_role, now_ts, clean_email)
+        )
         conn.commit()
         return True, f"Updated role for '{clean_email}' to '{clean_role}'."
     except Exception as e:
@@ -360,16 +355,12 @@ def enable_admin_totp(email: str) -> bool:
     supabase_url = get_supabase_url()
 
     try:
-        if supabase_url:
-            cursor.execute(
-                f"UPDATE admin_users SET totp_enabled = TRUE, updated_at = now() WHERE LOWER(email) = LOWER({p});",
-                (clean_email,)
-            )
-        else:
-            cursor.execute(
-                f"UPDATE admin_users SET totp_enabled = 1, updated_at = datetime('now') WHERE LOWER(email) = LOWER({p});",
-                (clean_email,)
-            )
+        now_ts = datetime.now(timezone.utc).isoformat()
+        totp_flag = True if supabase_url else 1
+        cursor.execute(
+            f"UPDATE admin_users SET totp_enabled = {p}, updated_at = {p} WHERE LOWER(email) = LOWER({p});",
+            (totp_flag, now_ts, clean_email)
+        )
         conn.commit()
         return True
     except Exception as e:
@@ -391,19 +382,13 @@ def update_admin_last_login(email: str):
     cursor = conn.cursor()
     p = get_placeholder()
     clean_email = email.strip().lower()
-    supabase_url = get_supabase_url()
 
     try:
-        if supabase_url:
-            cursor.execute(
-                f"UPDATE admin_users SET last_login_at = now() WHERE LOWER(email) = LOWER({p});",
-                (clean_email,)
-            )
-        else:
-            cursor.execute(
-                f"UPDATE admin_users SET last_login_at = datetime('now') WHERE LOWER(email) = LOWER({p});",
-                (clean_email,)
-            )
+        now_ts = datetime.now(timezone.utc).isoformat()
+        cursor.execute(
+            f"UPDATE admin_users SET last_login_at = {p} WHERE LOWER(email) = LOWER({p});",
+            (now_ts, clean_email)
+        )
         conn.commit()
     except Exception as e:
         logger.warning(f"Error recording last login for '{clean_email}': {e}")
@@ -480,7 +465,8 @@ def get_admin_audit_logs(limit: int = 100) -> List[Dict[str, Any]]:
             if d.get("details"):
                 try:
                     d["details_parsed"] = json.loads(d["details"])
-                except Exception:
+                except Exception as e:
+                    logger.debug("Failed parsing admin audit log details json: %s", e)
                     d["details_parsed"] = {}
             items.append(d)
         return items
@@ -605,6 +591,7 @@ def admin_grant_user_credits(
                 (user_id, clean_ticker or "PLATFORM", pack_type, new_balance)
             )
         else:
+            now_ts = datetime.now(timezone.utc).isoformat()
             cursor.execute(
                 f"""
                 INSERT INTO credit_transactions (
@@ -612,9 +599,9 @@ def admin_grant_user_credits(
                     payment_gateway, gateway_order_id, gateway_payment_id, status, pack_type,
                     invoice_number, base_amount_inr, tax_gst_inr, sac_code, created_at
                 )
-                VALUES ({p}, {p}, {p}, {p}, 0.0, {p}, 'admin_grant', {p}, {p}, 'success', {p}, {p}, 0.0, 0.0, '', datetime('now'));
+                VALUES ({p}, {p}, {p}, {p}, 0.0, {p}, 'admin_grant', {p}, {p}, 'success', {p}, {p}, 0.0, 0.0, '', {p});
                 """,
-                (tx_id, user_id, user_email, user_name, credits_val, clean_ticket or "ADMIN_GRANT", f"grant_by_{clean_admin}", pack_type, inv_num)
+                (tx_id, user_id, user_email, user_name, credits_val, clean_ticket or "ADMIN_GRANT", f"grant_by_{clean_admin}", pack_type, inv_num, now_ts)
             )
             # Insert into credit_usage_ledger
             cursor.execute(
@@ -673,16 +660,11 @@ def admin_grant_user_credits(
                 new_notes = f"{prev_notes}\n{remedy_text} {admin_note}".strip() if prev_notes else f"{remedy_text} {admin_note}".strip()
                 final_status = "resolved" if resolve_ticket else curr_status
 
-                if supabase_url:
-                    cursor.execute(
-                        f"UPDATE support_tickets SET status = {p}, admin_notes = {p}, updated_at = now() WHERE ticket_id = {p};",
-                        (final_status, new_notes, clean_ticket)
-                    )
-                else:
-                    cursor.execute(
-                        f"UPDATE support_tickets SET status = {p}, admin_notes = {p}, updated_at = datetime('now') WHERE ticket_id = {p};",
-                        (final_status, new_notes, clean_ticket)
-                    )
+                now_ts = datetime.now(timezone.utc).isoformat()
+                cursor.execute(
+                    f"UPDATE support_tickets SET status = {p}, admin_notes = {p}, updated_at = {p} WHERE ticket_id = {p};",
+                    (final_status, new_notes, now_ts, clean_ticket)
+                )
 
         conn.commit()
         logger.info(f"Admin '{clean_admin}' successfully granted {credits_val} credits to {user_email} (New balance: {new_balance})")

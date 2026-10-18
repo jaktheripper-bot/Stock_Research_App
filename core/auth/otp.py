@@ -183,7 +183,8 @@ def verify_email_otp(email: str, code: str) -> Tuple[bool, str]:
                     exp_dt = exp_dt.replace(tzinfo=timezone.utc)
                 if now_utc > exp_dt:
                     is_expired = True
-            except Exception:
+            except Exception as e:
+                logger.warning("Error parsing OTP expires_at timestamp '%s': %s", expires_at, e)
                 is_expired = False
         elif isinstance(expires_at, datetime):
             exp_dt = expires_at if expires_at.tzinfo else expires_at.replace(tzinfo=timezone.utc)
@@ -214,13 +215,24 @@ def verify_email_otp(email: str, code: str) -> Tuple[bool, str]:
 
 def _delete_otp(email: str):
     """Purges OTP record after successful use or invalidation."""
+    conn = None
+    cursor = None
     try:
         conn = get_db_connection()
         cursor = conn.cursor()
         p = get_placeholder()
         cursor.execute(f"DELETE FROM auth_otps WHERE email = {p};", (email,))
         conn.commit()
-        cursor.close()
-        conn.close()
     except Exception as e:
         logger.warning(f"Error deleting OTP for {email}: {e}")
+    finally:
+        if cursor:
+            try:
+                cursor.close()
+            except Exception as e:
+                logger.debug(f"Cursor close notice in _delete_otp: {e}")
+        if conn:
+            try:
+                conn.close()
+            except Exception as e:
+                logger.debug(f"Connection close notice in _delete_otp: {e}")

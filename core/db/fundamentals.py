@@ -274,13 +274,15 @@ def save_cached_fundamentals(ticker: str, data: Dict[str, Any]) -> None:
     curr_price = data.get("current_price")
     try:
         curr_price = float(str(curr_price).replace(",", "").strip()) if curr_price not in [None, "N/A", ""] else None
-    except Exception:
+    except Exception as e:
+        logger.debug("Failed parsing curr_price: %s", e)
         curr_price = None
 
     market_cap = data.get("market_cap")
     try:
         market_cap = float(str(market_cap).replace(",", "").strip()) if market_cap not in [None, "N/A", ""] else None
-    except Exception:
+    except Exception as e:
+        logger.debug("Failed parsing market_cap: %s", e)
         market_cap = None
 
     pe_ratio = str(data.get("pe_ratio", "N/A"))
@@ -291,37 +293,43 @@ def save_cached_fundamentals(ticker: str, data: Dict[str, Any]) -> None:
     roce = data.get("roce") or data.get("roce_pct")
     try:
         roce = float(str(roce).replace("%", "").strip()) if roce not in [None, "N/A", ""] else None
-    except Exception:
+    except Exception as e:
+        logger.debug("Failed parsing roce: %s", e)
         roce = None
 
     roe = data.get("roe")
     try:
         roe = float(str(roe).replace("%", "").strip()) if roe not in [None, "N/A", ""] else None
-    except Exception:
+    except Exception as e:
+        logger.debug("Failed parsing roe: %s", e)
         roe = None
 
     opm = data.get("operating_margin") or data.get("opm")
     try:
         opm = float(str(opm).replace("%", "").strip()) if opm not in [None, "N/A", ""] else None
-    except Exception:
+    except Exception as e:
+        logger.debug("Failed parsing opm: %s", e)
         opm = None
 
     de = data.get("debt_to_equity")
     try:
         de = float(str(de).strip()) if de not in [None, "N/A", ""] else None
-    except Exception:
+    except Exception as e:
+        logger.debug("Failed parsing de: %s", e)
         de = None
 
     h52 = data.get("fifty_two_week_high") or data.get("52w_high")
     try:
         h52 = float(str(h52).replace(",", "").replace("₹", "").strip()) if h52 not in [None, "N/A", ""] else None
-    except Exception:
+    except Exception as e:
+        logger.debug("Failed parsing h52: %s", e)
         h52 = None
 
     l52 = data.get("fifty_two_week_low") or data.get("52w_low")
     try:
         l52 = float(str(l52).replace(",", "").replace("₹", "").strip()) if l52 not in [None, "N/A", ""] else None
-    except Exception:
+    except Exception as e:
+        logger.debug("Failed parsing l52: %s", e)
         l52 = None
 
     source = data.get("source") or "LOCAL_DB_HARMONIZED"

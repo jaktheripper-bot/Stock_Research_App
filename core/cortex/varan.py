@@ -112,7 +112,8 @@ class VaranEngine:
             return None
         try:
             return round(((e_val / s_val) ** (1.0 / years) - 1.0) * 100.0, 2)
-        except Exception:
+        except Exception as e:
+            logger.debug("Error computing CAGR (start=%s, end=%s, years=%s): %s", start_val, end_val, years, e)
             return None
 
     @classmethod

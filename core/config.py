@@ -4,8 +4,7 @@ Centralized Configuration & Secrets Ingestion Engine.
 Provides zero-dependency, runtime-agnostic configuration resolution:
 1. Environment variables (os.environ) - primary for Render, Docker, CI/CD
 2. .env file via python-dotenv if installed
-3. Local secrets.toml or .streamlit/secrets.toml using standard library tomllib (Python 3.11+)
-   without requiring Streamlit to be installed or initialized.
+3. Local secrets.toml using standard library tomllib (Python 3.11+).
 """
 
 import os
@@ -34,7 +33,6 @@ def _load_local_secrets() -> dict:
     secrets = {}
     base_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
     candidate_paths = [
-        os.path.join(base_dir, ".streamlit", "secrets.toml"),
         os.path.join(base_dir, "secrets.toml"),
     ]
 

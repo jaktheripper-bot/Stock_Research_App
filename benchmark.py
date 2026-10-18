@@ -8,10 +8,6 @@ Enforces performance budgets to prevent latency regressions in future builds.
 import os
 import sys
 import time
-
-# Ensure bare-mode streamlit logs don't pollute output
-os.environ["STREAMLIT_LOG_LEVEL"] = "error"
-
 def run_benchmarks():
     print("\n=======================================================")
     print("   STOCK RESEARCH APP - LATENCY & SPEED BENCHMARK")

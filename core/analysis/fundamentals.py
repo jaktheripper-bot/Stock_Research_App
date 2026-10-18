@@ -32,6 +32,96 @@ def suppress_yfinance_noise():
             if err and "403" not in err and "delisted" not in err and "Expecting value" not in err and "not allowed by policy" not in err:
                 logger.debug(f"yfinance notice: {err}")
 
+
+class YFinanceCircuitBreaker:
+    """
+    Circuit breaker protecting the application against yfinance outages, IP rate-limits,
+    and HTML/empty responses that trigger unhandled JSONDecodeError.
+    """
+    def __init__(self, failure_threshold: int = 3, cooldown_seconds: float = 60.0):
+        self.failure_threshold = failure_threshold
+        self.cooldown_seconds = cooldown_seconds
+        self.failure_count = 0
+        self.last_failure_time = 0.0
+        self._lock = threading.Lock()
+
+    def record_success(self) -> None:
+        with self._lock:
+            self.failure_count = 0
+
+    def record_failure(self, err: Any = None) -> None:
+        with self._lock:
+            self.failure_count += 1
+            self.last_failure_time = time.monotonic()
+            logger.warning(
+                f"yfinance circuit breaker failure recorded ({self.failure_count}/{self.failure_threshold}): {err}"
+            )
+
+    def is_available(self) -> bool:
+        with self._lock:
+            if self.failure_count < self.failure_threshold:
+                return True
+            elapsed = time.monotonic() - self.last_failure_time
+            if elapsed >= self.cooldown_seconds:
+                logger.info("yfinance circuit breaker entering half-open state after cooldown.")
+                return True
+            return False
+
+
+_yf_circuit_breaker = YFinanceCircuitBreaker()
+_yf_session = None
+_yf_session_lock = threading.Lock()
+
+
+def get_hardened_yfinance_session() -> requests.Session:
+    """Returns a requests.Session configured with standard desktop browser User-Agent."""
+    global _yf_session
+    with _yf_session_lock:
+        if _yf_session is None:
+            sess = requests.Session()
+            sess.headers.update({
+                "User-Agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36",
+                "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
+                "Accept-Language": "en-US,en;q=0.9",
+            })
+            _yf_session = sess
+        return _yf_session
+
+
+def get_hardened_yfinance_ticker(symbol: str) -> yf.Ticker:
+    """Returns a yfinance.Ticker instance configured with the hardened browser User-Agent session."""
+    session = get_hardened_yfinance_session()
+    return yf.Ticker(symbol, session=session)
+
+
+def safe_fetch_yfinance_info(symbol: str) -> dict:
+    """
+    Safely retrieves yfinance ticker.info with circuit breaker protection and
+    defense against empty responses / JSONDecodeError.
+    """
+    import json
+    if not _yf_circuit_breaker.is_available():
+        logger.warning(f"yfinance circuit breaker is OPEN. Skipping info fetch for {symbol}.")
+        return {}
+
+    try:
+        with suppress_yfinance_noise():
+            ticker = get_hardened_yfinance_ticker(symbol)
+            info = ticker.info
+            if not info or not isinstance(info, dict):
+                _yf_circuit_breaker.record_failure(ValueError("Empty or non-dict info received"))
+                return {}
+            _yf_circuit_breaker.record_success()
+            return info
+    except (json.decoder.JSONDecodeError, requests.RequestException) as net_err:
+        _yf_circuit_breaker.record_failure(net_err)
+        logger.warning(f"yfinance network/JSON decode notice for {symbol}: {net_err}")
+        return {}
+    except Exception as yf_err:
+        _yf_circuit_breaker.record_failure(yf_err)
+        logger.warning(f"yfinance general fetch notice for {symbol}: {yf_err}")
+        return {}
+
 def ttl_cache(ttl_seconds: int = 300, maxsize: int = 128):
     """Thread-safe in-memory TTL and LRU cache for external market data requests."""
     def decorator(fn):
@@ -53,7 +143,8 @@ def ttl_cache(ttl_seconds: int = 300, maxsize: int = 128):
                     try:
                         oldest = min(cache.keys(), key=lambda k: cache[k][1])
                         cache.pop(oldest, None)
-                    except Exception:
+                    except Exception as pop_err:
+                        logger.warning(f"TTL cache eviction reset notice: {pop_err}")
                         cache.clear()
                 cache[key] = (res, now + ttl_seconds)
             return res
@@ -109,12 +200,7 @@ def enrich_fundamentals(ticker: str, data: dict) -> dict:
         # missing fields as 'N/A' (Not disclosed) rather than pulling third-party data.
         info = {}
         if yfinance_fallback_enabled():
-            with suppress_yfinance_noise():
-                try:
-                    info = yf.Ticker(yf_ticker).info or {}
-                except Exception as yf_err:
-                    logger.debug(f"yfinance info fetch notice for {yf_ticker}: {yf_err}")
-                    info = {}
+            info = safe_fetch_yfinance_info(yf_ticker)
 
         # Trailing P/E
         if data.get("pe_ratio") in [None, "N/A", "-", "", 0, "0"]:
@@ -275,17 +361,19 @@ def resolve_pe_with_failsafes(ticker: str, scrip: str = "") -> str:
             logger.debug(f"BSE ComHeader direct P/E fetch notice: {e}")
 
     # Tier 2: Fast single-symbol yfinance check (using fast_info) - only when explicitly enabled
-    if yfinance_fallback_enabled():
+    if yfinance_fallback_enabled() and _yf_circuit_breaker.is_available():
         try:
             sym = f"{clean}.BO" if clean.isdigit() else f"{clean}.NS"
             with suppress_yfinance_noise():
-                tk = yf.Ticker(sym)
+                tk = get_hardened_yfinance_ticker(sym)
                 fast = getattr(tk, "fast_info", None)
                 pe = getattr(fast, "pe", None) or getattr(fast, "trailing_pe", None)
             if pe and float(pe) > 0:
+                _yf_circuit_breaker.record_success()
                 return f"{float(pe):.2f}"
         except Exception as e:
-            logger.debug(f"P/E resolution via yfinance failed: {e}")
+            _yf_circuit_breaker.record_failure(e)
+            logger.warning(f"P/E resolution via yfinance failed for {clean}: {e}")
 
     return "N/A"
 
@@ -336,7 +424,8 @@ def fetch_bse_exchange_data(query: str) -> dict:
 
     try:
         curr_p = float(str(q.get("currentValue", "0.00")).replace(",", "").strip())
-    except Exception:
+    except Exception as e:
+        logger.warning(f"BSE currentValue float parse notice for {query}: {e}")
         curr_p = 0.0
 
     return {
@@ -475,16 +564,18 @@ def get_stock_fundamentals(query: str) -> dict:
         candidate_symbols = [primary_sym]
         if primary_sym.endswith(".NS"):
             candidate_symbols.append(f"{canonical}.BO")
-        if not yfinance_fallback_enabled():
+        if not yfinance_fallback_enabled() or not _yf_circuit_breaker.is_available():
             candidate_symbols = []
 
         for sym in candidate_symbols:
             try:
                 with suppress_yfinance_noise():
-                    t = yf.Ticker(sym)
+                    t = get_hardened_yfinance_ticker(sym)
                     fast = getattr(t, "fast_info", None)
                     price = getattr(fast, "last_price", None)
-            except Exception:
+            except Exception as quote_err:
+                _yf_circuit_breaker.record_failure(quote_err)
+                logger.warning(f"Fast gateway yfinance quote notice for {sym}: {quote_err}")
                 price = None
             if price and float(price) > 0:
                 mcap = getattr(fast, "market_cap", None) or "N/A"
@@ -615,18 +706,20 @@ def get_historical_prices(ticker: str, period: str = "6mo"):
         logger.debug(f"Angel One historical candles notice for {clean}: {angel_err}")
 
     # Last resort (opt-in only): unofficial yfinance history
-    if df.empty and yfinance_fallback_enabled():
+    if df.empty and yfinance_fallback_enabled() and _yf_circuit_breaker.is_available():
         for suffix in [".BO", ".NS"]:
             try:
                 sym = f"{clean}{suffix}"
                 with suppress_yfinance_noise():
-                    t = yf.Ticker(sym)
+                    t = get_hardened_yfinance_ticker(sym)
                     hist = t.history(period=period)
                 if hist is not None and not hist.empty and len(hist) > 5:
                     df = hist
+                    _yf_circuit_breaker.record_success()
                     break
             except Exception as yf_err:
-                logger.debug(f"yfinance history fetch notice for {clean}{suffix}: {yf_err}")
+                _yf_circuit_breaker.record_failure(yf_err)
+                logger.warning(f"yfinance history fetch notice for {clean}{suffix}: {yf_err}")
                 continue
 
     if df.empty:

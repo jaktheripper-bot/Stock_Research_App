@@ -179,6 +179,7 @@ def stream_genai_with_fallback(client, prompt: str, system_prompt: str, on_statu
                         yield extracted_text
                 return
             except Exception as e:
+                logger.warning(f"Gemini grounded search attempt notice: {e}")
                 last_error = e
                 err_str = str(e)
                 if any(code in err_str for code in ["429", "RESOURCE_EXHAUSTED", "503", "UNAVAILABLE"]):
@@ -308,6 +309,7 @@ def stream_stock_report(ticker: str, language: str = "English (India)", stock_da
             report_accumulator.append(chunk)
             yield chunk
     except Exception as gemini_err:
+        logger.warning(f"Gemini streaming synthesis failed: {gemini_err}")
         notice_p = "\n\n> ⚠️ **Gemini Grounding Unavailable. Rerouting to Perplexity Agent API...**\n\n"
         report_accumulator.append(notice_p)
         yield notice_p
@@ -318,6 +320,7 @@ def stream_stock_report(ticker: str, language: str = "English (India)", stock_da
                 report_accumulator.append(chunk)
                 yield chunk
         except Exception as p_err:
+            logger.warning(f"Perplexity fallback synthesis failed: {p_err}")
             gem_err_msg = str(gemini_err)
             is_spend_cap = any(phrase in gem_err_msg for phrase in ["Spend cap breached", "PERMISSION_DENIED", "403", "quota"])
             if is_spend_cap:
@@ -341,6 +344,7 @@ def stream_stock_report(ticker: str, language: str = "English (India)", stock_da
                         report_accumulator.append(chunk)
                         yield chunk
                 except Exception as final_err:
+                    logger.error(f"Ungrounded synthesis fallback failed: {final_err}")
                     err_msg = f"\n\n> ❌ **Live Synthesis Failed:** {final_err}"
                     report_accumulator.append(err_msg)
                     yield err_msg
@@ -362,7 +366,8 @@ def stream_stock_report(ticker: str, language: str = "English (India)", stock_da
             note = f"\n\n> ⚠️ **Verification Audit Note:** {formatted_disc}"
             complete_text += note
             yield note
-    except Exception:
+    except Exception as verif_err:
+        logger.warning(f"Report verification audit notice: {verif_err}")
         passed = False
 
     # Check for failure indicators
@@ -391,7 +396,22 @@ def stream_stock_report(ticker: str, language: str = "English (India)", stock_da
             logger.error(f"Error archiving report for {stock_data.get('ticker')}: {e}")
 
 def generate_stock_report(ticker: str, language: str = "English (India)", use_grounding: bool = True) -> str:
-    chunks = []
-    for c in stream_stock_report(ticker, language, use_grounding=use_grounding):
-        chunks.append(c)
-    return "".join(chunks)
+    from core.billing.qos_governor import single_flight_ticker_lock
+    from core.db.reports import get_report_by_ticker
+
+    clean_ticker = (ticker or "UNKNOWN").strip().upper()
+    with single_flight_ticker_lock(clean_ticker):
+        # Coalescing check: if a concurrent synthesis for this ticker just completed,
+        # return the freshly cached report immediately to prevent duplicate LLM spend.
+        cached = get_report_by_ticker(clean_ticker)
+        if cached and cached.get("report_text"):
+            cached_text = cached.get("report_text", "")
+            if len(cached_text.strip()) >= 500 and "Live Synthesis Failed" not in cached_text:
+                logger.info(f"Single-flight coalescer: Reusing freshly synthesized cached report for {clean_ticker}")
+                return cached_text
+
+        chunks = []
+        for c in stream_stock_report(clean_ticker, language, use_grounding=use_grounding):
+            chunks.append(c)
+        return "".join(chunks)
+

@@ -28,7 +28,8 @@ def _format_timestamp(raw_ts) -> str:
         if hasattr(dt, "astimezone"):
             dt = dt.astimezone(IST)
         return dt.strftime("%d-%m-%Y %H:%M IST")
-    except Exception:
+    except Exception as e:
+        logger.debug("Failed formatting timestamp %s: %s", raw_ts, e)
         return str(raw_ts)
 
 def save_report_to_archive(stock_data: dict, report_text: str, announcement: str = "", revision_trigger: str = "", citations: list = None):
@@ -47,13 +48,15 @@ def save_report_to_archive(stock_data: dict, report_text: str, announcement: str
     curr_price = stock_data.get("current_price") or stock_data.get("currentValue") or 0.0
     try:
         curr_price = float(str(curr_price).replace(",", "").strip())
-    except Exception:
+    except Exception as e:
+        logger.debug("Failed parsing curr_price: %s", e)
         curr_price = 0.0
 
     mcap = stock_data.get("market_cap") or stock_data.get("marketCapFull") or 0.0
     try:
         mcap = float(str(mcap).replace(",", "").strip())
-    except Exception:
+    except Exception as e:
+        logger.debug("Failed parsing mcap: %s", e)
         mcap = 0.0
 
     pe = str(stock_data.get("pe_ratio", "N/A"))
@@ -223,7 +226,8 @@ def get_archived_reports(include_text: bool = False) -> list:
             if len(row) > 9 and row[9]:
                 try:
                     cit_data = json.loads(row[9])
-                except Exception:
+                except Exception as e:
+                    logger.debug("Failed parsing citations_json in get_archived_reports: %s", e)
                     cit_data = []
             if not cit_data and rep_text:
                 cit_data = extract_citations_from_report(rep_text)
@@ -273,7 +277,8 @@ def get_report_by_ticker(ticker: str) -> dict:
         if len(row) > 8 and row[8]:
             try:
                 cit_data = json.loads(row[8])
-            except Exception:
+            except Exception as e:
+                logger.debug("Failed parsing citations_json in get_report_by_ticker: %s", e)
                 cit_data = []
         if not cit_data and rep_text:
             cit_data = extract_citations_from_report(rep_text)
@@ -320,7 +325,8 @@ def get_report_revisions(ticker: str) -> list:
             if len(row) > 10 and row[10]:
                 try:
                     cit_data = json.loads(row[10])
-                except Exception:
+                except Exception as e:
+                    logger.debug("Failed parsing citations_json in get_report_revisions: %s", e)
                     cit_data = []
             if not cit_data and rep_text:
                 cit_data = extract_citations_from_report(rep_text)
@@ -371,7 +377,8 @@ def get_report_revisions(ticker: str) -> list:
                     if len(s_row) > 10 and s_row[10]:
                         try:
                             s_cit = json.loads(s_row[10])
-                        except Exception:
+                        except Exception as e:
+                            logger.debug("Failed parsing citations_json in self-healing revision: %s", e)
                             s_cit = []
                     if not s_cit and s_text:
                         s_cit = extract_citations_from_report(s_text)
@@ -547,39 +554,45 @@ def get_all_equities_directory_sync() -> list:
             # Parse CMP
             try:
                 cmp_float = float(str(cmp_val).replace(",", "").strip()) if cmp_val else 0.0
-            except Exception:
+            except Exception as e:
+                logger.debug("Failed parsing cmp_val: %s", e)
                 cmp_float = 0.0
 
             # Parse P/E
             try:
                 pe_float = float(str(pe_val).replace(",", "").strip())
                 pe_str = f"{pe_float:.1f}x"
-            except Exception:
+            except Exception as e:
+                logger.debug("Failed parsing pe_val: %s", e)
                 pe_float = None
                 pe_str = "N/A" if pe_val in [None, "N/A", ""] else str(pe_val)
 
             # Parse ROCE
             try:
                 roce_float = float(str(roce_val).replace("%", "").strip()) if roce_val is not None else None
-            except Exception:
+            except Exception as e:
+                logger.debug("Failed parsing roce_val: %s", e)
                 roce_float = None
 
             # Parse ROE
             try:
                 roe_float = float(str(roe_val).replace("%", "").strip()) if roe_val is not None else None
-            except Exception:
+            except Exception as e:
+                logger.debug("Failed parsing roe_val: %s", e)
                 roe_float = None
 
             # Parse D/E
             try:
                 de_float = float(str(de_val).replace("x", "").strip()) if de_val is not None else 0.0
-            except Exception:
+            except Exception as e:
+                logger.debug("Failed parsing de_val: %s", e)
                 de_float = 0.0
 
             # Parse OPM
             try:
                 opm_float = float(str(opm_val).replace("%", "").strip()) if opm_val is not None else None
-            except Exception:
+            except Exception as e:
+                logger.debug("Failed parsing opm_val: %s", e)
                 opm_float = None
 
             # Calculate recently inducted status (within last 48 hours)
@@ -597,7 +610,8 @@ def get_all_equities_directory_sync() -> list:
                         ts_dt = None
                     if ts_dt and (datetime.now(IST) - ts_dt.astimezone(IST)).total_seconds() < 48 * 3600:
                         is_recently_inducted = True
-                except Exception:
+                except Exception as e:
+                    logger.debug("Failed parsing raw_ts for recently inducted: %s", e)
                     is_recently_inducted = False
 
             equities.append({

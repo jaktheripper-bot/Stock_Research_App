@@ -279,7 +279,8 @@ def curate_morning_discovery_cohort(
     try:
         current_dt = datetime.strptime(edition_date, "%Y-%m-%d")
         yesterday_str = (current_dt - timedelta(days=1)).strftime("%Y-%m-%d")
-    except Exception:
+    except Exception as e:
+        logger.warning("Could not calculate yesterday's date for %s: %s", edition_date, e)
         yesterday_str = None
 
     try:

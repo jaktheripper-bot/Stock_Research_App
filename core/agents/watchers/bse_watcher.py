@@ -14,6 +14,7 @@ from core.analysis.fundamentals import fetch_latest_bse_announcement, resolve_bs
 from core.cortex.garuda import GarudaReflexEngine
 from core.db.watchlist import get_watchlist
 from core.db.agent_sessions import record_autonomous_event
+from core.db.distributed_lock import job_lease
 
 logger = logging.getLogger("equity_research.core.agents.watchers.bse")
 
@@ -37,6 +38,19 @@ async def _recheck_equity_thesis_background(ticker: str, headline: str):
         logger.warning(f"BSE watcher background synthesis notice for {ticker}: {e}")
 
 
+def invalidate_surgical_cache(ticker: str, pillar_id: Optional[int] = None) -> None:
+    """Invalidates cached dossiers and reports for the given ticker following material catalyst."""
+    try:
+        from core.db.reports import get_report_by_ticker, get_archived_reports
+        if hasattr(get_report_by_ticker, "cache_clear"):
+            get_report_by_ticker.cache_clear()
+        if hasattr(get_archived_reports, "cache_clear"):
+            get_archived_reports.cache_clear()
+        logger.info(f"⚡ Surgical cache invalidation executed for {ticker} (Pillar {pillar_id})")
+    except Exception as e:
+        logger.warning(f"Surgical cache invalidation warning for {ticker}: {e}")
+
+
 async def scan_watchlist_bse_announcements() -> List[Dict[str, Any]]:
     """Scans active watchlist scrips for new material BSE announcements (batched)."""
     watchlist = get_watchlist()[:10]
@@ -56,6 +70,8 @@ async def scan_watchlist_bse_announcements() -> List[Dict[str, Any]]:
                     w in latest.lower() for w in ["resignation", "pledge", "fraud", "litigation", "default", "merger", "acquisition"]
                 )
                 if is_material:
+                    # Trigger surgical cache invalidation for the affected pillar
+                    invalidate_surgical_cache(ticker, delta.target_pillar_id)
                     summary = f"Material disclosure detected for {ticker} [Pillar {delta.target_pillar_id}: {delta.catalyst_type}]: {latest[:95]}... Autonomous re-audit dispatched."
                     event_id = record_autonomous_event(
                         event_type="bse_material_filing",
@@ -88,7 +104,11 @@ async def run_bse_watcher_loop():
     await asyncio.sleep(60)
     while True:
         try:
-            await scan_watchlist_bse_announcements()
+            with job_lease("bse_watcher_loop", ttl_seconds=360, release_on_exit=True) as acquired:
+                if acquired:
+                    await scan_watchlist_bse_announcements()
+                else:
+                    logger.debug("📡 [BSE Watcher] Lease held by another worker. Skipping poll cycle.")
             await asyncio.sleep(300)
         except asyncio.CancelledError:
             logger.info("📡 [BSE Watcher] Watcher loop cancelled.")
