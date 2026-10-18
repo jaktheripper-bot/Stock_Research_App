@@ -241,6 +241,20 @@ class TestSetuMatrixEngine(unittest.TestCase):
         self.assertEqual(res.capital_posture_regime, "CREDIT_STRESS_DISLOCATION")
         self.assertTrue(any(a.anomaly_type == "CREDIT_SPREAD_BLOWOUT" for a in res.anomalies))
 
+    def test_sanitized_inputs_capital_structure_inversion(self):
+        # Passes None / non-numeric values to ensure sanitized fcf_yield, mf_flow, and pledge_val are evaluated safely
+        res = SetuMatrixEngine.evaluate(
+            symbol="NONE_PARAM_CO",
+            equity_fcf_yield_pct=None,
+            senior_debt_ytm_pct=7.9,
+            gsec_10y_yield_pct=7.05,
+            mutual_fund_net_flow_cr=None,
+            promoter_pledge_pct=None,
+        )
+        self.assertEqual(res.capital_posture_regime, "CAPITAL_STRUCTURE_INVERSION")
+        self.assertEqual(res.equity_fcf_yield_pct, 0.0)
+        self.assertTrue(any(a.anomaly_type == "CAPITAL_STRUCTURE_INVERSION" for a in res.anomalies))
+
 
 class TestGarudaReflexEngine(unittest.TestCase):
     def test_classifies_earnings_to_pillar_5(self):

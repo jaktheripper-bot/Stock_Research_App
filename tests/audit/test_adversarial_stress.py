@@ -232,6 +232,18 @@ class TestAdversarialEngineResilience(unittest.TestCase):
         res_nan = SetuMatrixEngine.evaluate("TCS", float("nan"), tax_slab_pct=-15.0)
         self.assertFalse(math.isnan(res_nan.equity_fcf_yield_pct))
 
+        # None inputs across all numerical parameters
+        res_none = SetuMatrixEngine.evaluate(
+            symbol=None,
+            equity_fcf_yield_pct=None,
+            mutual_fund_net_flow_cr=None,
+            promoter_pledge_pct=None,
+            debt_credit_rating=None,
+        )
+        self.assertEqual(res_none.symbol, "UNKNOWN")
+        self.assertEqual(res_none.equity_fcf_yield_pct, 0.0)
+        self.assertEqual(res_none.capital_posture_regime, "CAPITAL_STRUCTURE_INVERSION")
+
     # ----------------------------------------------------------------------
     # 11. Tax Calculator
     # ----------------------------------------------------------------------

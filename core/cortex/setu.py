@@ -164,14 +164,14 @@ class SetuMatrixEngine:
 
         anomalies: List[CapitalStructureAnomaly] = []
 
-        # 1. Capital Structure Inversion Check
-        if equity_fcf_yield_pct < senior_debt_ytm_pct:
+        # 1. Capital Structure Inversion Check (use sanitized fcf_yield, mf_flow, pledge_val)
+        if fcf_yield < senior_debt_ytm_pct:
             regime = "CAPITAL_STRUCTURE_INVERSION"
             anomalies.append(CapitalStructureAnomaly(
                 anomaly_type="CAPITAL_STRUCTURE_INVERSION",
                 severity="WARNING",
                 description=(
-                    f"Capital structure inversion: Common equity FCF yield ({equity_fcf_yield_pct:.2f}%) is "
+                    f"Capital structure inversion: Common equity FCF yield ({fcf_yield:.2f}%) is "
                     f"{abs(seniority_spread_bps):.0f} bps below senior secured debt ({senior_debt_ytm_pct:.2f}%). "
                     f"Residual risk is uncompensated relative to senior paper."
                 ),
@@ -192,22 +192,22 @@ class SetuMatrixEngine:
         # 2. Institutional Mutual Fund Flow Velocity
         # Standard score 50 (neutral), positive net flow increases score
         mf_score = 50.0
-        if mutual_fund_net_flow_cr > 100.0:
-            mf_score = min(100.0, 50.0 + (mutual_fund_net_flow_cr / 20.0))
-        elif mutual_fund_net_flow_cr < -50.0:
-            mf_score = max(0.0, 50.0 + (mutual_fund_net_flow_cr / 10.0))
+        if mf_flow > 100.0:
+            mf_score = min(100.0, 50.0 + (mf_flow / 20.0))
+        elif mf_flow < -50.0:
+            mf_score = max(0.0, 50.0 + (mf_flow / 10.0))
             anomalies.append(CapitalStructureAnomaly(
                 anomaly_type="DOMESTIC_INSTITUTIONAL_EXIT",
                 severity="WARNING",
-                description=f"Domestic institutional funds net sold ₹{abs(mutual_fund_net_flow_cr):.1f} Cr over the trailing period.",
+                description=f"Domestic institutional funds net sold ₹{abs(mf_flow):.1f} Cr over the trailing period.",
             ))
 
         # 3. Promoter Pledge Encumbrance
-        if promoter_pledge_pct > 25.0:
+        if pledge_val > 25.0:
             anomalies.append(CapitalStructureAnomaly(
                 anomaly_type="PROMOTER_ENCUMBRANCE_DRAG",
                 severity="CRITICAL",
-                description=f"Promoter pledge ({promoter_pledge_pct:.1f}%) risks capital structure margin liquidation.",
+                description=f"Promoter pledge ({pledge_val:.1f}%) risks capital structure margin liquidation.",
             ))
 
         summary = (
