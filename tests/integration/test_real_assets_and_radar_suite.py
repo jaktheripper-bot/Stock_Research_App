@@ -297,6 +297,8 @@ class TestRealAssetsAndRadarSuite(unittest.TestCase):
         self.assertIn("Sovereign Gold Bonds (SGB) Secondary Market Discount & Parity Scanner", html)
         self.assertIn("Section 115UA Real Asset Tax Waterfall", html)
         self.assertIn("EMBASSY", html)
+        self.assertIn("copilotModalBackdrop", html)
+        self.assertIn("Statutory Data Provenance:", html)
 
     def test_reits_web_page_structure_filter(self):
         resp = self.client.get("/reits?structure=SM_REIT")
