@@ -275,7 +275,8 @@ async def public_auth_callback(
 
     current_user = _get_current_web_user(request)
     if current_user and not code and not access_token:
-        dest_url = next if (next and next != "/") else "/"
+        raw_next = request.query_params.get("next") or "/"
+        dest_url = raw_next if (raw_next.startswith("/") and not raw_next.startswith("//")) else "/"
         return RedirectResponse(url=dest_url, status_code=303)
 
     cfg = get_supabase_auth_config()
@@ -356,28 +357,32 @@ async def public_auth_callback(
 
     token = _generate_user_session_token(user_id, clean_email)
     oauth_next_cookie = (request.cookies.get("oauth_next") or "").strip('"')
-    dest_url = next if (next and next != "/") else (oauth_next_cookie or "/")
-    if not dest_url.startswith("/"):
-        dest_url = "/"
+    import html as _html
+    raw_next = request.query_params.get("next") or oauth_next_cookie or "/"
+    dest_url = raw_next if (raw_next.startswith("/") and not raw_next.startswith("//")) else "/"
+    safe_name = _html.escape(str(full_name or ""))
+    safe_dest_html = _html.escape(dest_url, quote=True)
+    safe_dest_js = json.dumps(dest_url).replace("</", "<\\/")
+    safe_user_js = json.dumps(user).replace("</", "<\\/")
 
-    user_json = json.dumps(user)
     html_content = f"""
     <!DOCTYPE html>
     <html><head><meta charset="utf-8"><title>Authentication Successful</title></head>
     <body style="background:#0f172a;color:#f8fafc;font-family:sans-serif;display:flex;align-items:center;justify-content:center;height:100vh;">
         <div style="text-align:center;">
-            <h2>🎉 Welcome, {full_name}!</h2>
+            <h2>🎉 Welcome, {safe_name}!</h2>
             <p style="color:#94a3b8;">Redirecting to your research terminal...</p>
+            <noscript><meta http-equiv="refresh" content="1;url={safe_dest_html}"></noscript>
         </div>
         <script>
         try {{
-            const profile = {user_json};
+            const profile = {safe_user_js};
             localStorage.setItem('sr_user', JSON.stringify(profile));
         }} catch (e) {{
             console.error('Session sync error:', e);
         }}
         setTimeout(function() {{
-            window.location.replace('{dest_url}');
+            window.location.replace({safe_dest_js});
         }}, 300);
         </script>
     </body></html>

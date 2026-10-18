@@ -507,6 +507,28 @@ class TestRenderHardening(unittest.TestCase):
         self.assertEqual(r_authed.status_code, 303)
         self.assertEqual(r_authed.headers.get("location"), "/opportunities")
 
+        # 6. HTML and XSS sanitization on full_name
+        payload_xss = base64.urlsafe_b64encode(json.dumps({
+            "email": "xss_tester@example.com",
+            "user_metadata": {"full_name": "<script>alert('xss')</script>"}
+        }).encode()).decode().rstrip("=")
+        jwt_xss = f"header.{payload_xss}.sig"
+        r_xss = client.get(f"/auth/callback?access_token={jwt_xss}", follow_redirects=False)
+        self.assertEqual(r_xss.status_code, 200)
+        self.assertNotIn("<script>alert('xss')</script>", r_xss.text)
+        self.assertIn("&lt;script&gt;alert(&#x27;xss&#x27;)&lt;/script&gt;", r_xss.text)
+
+        # 7. Protocol-relative open redirect mitigation (//evil.com -> /)
+        r_open = client.get(f"/auth/callback?access_token={jwt_token}&next=//evil.com", follow_redirects=False)
+        self.assertEqual(r_open.status_code, 200)
+        self.assertIn('window.location.replace("/")', r_open.text)
+        self.assertNotIn("//evil.com", r_open.text)
+
+        # 8. Authenticated open redirect mitigation
+        r_open_auth = client.get("/auth/callback?next=//evil.com", cookies={"user_session_token": token_str}, follow_redirects=False)
+        self.assertEqual(r_open_auth.status_code, 303)
+        self.assertEqual(r_open_auth.headers.get("location"), "/")
+
 
 # ==============================================================================
 # 5. Database Dual-Binding & SQLite Transparent Failover
