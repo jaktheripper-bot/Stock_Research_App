@@ -584,6 +584,12 @@ Detailed forensic analysis with exact page grounding to bseindia.com filings.
         self.assertIn("100.0%", res_same.text)
         self.assertIn("IDENTICAL_SCHEME_SELECTED", res_same.text)
 
+        # Test insufficient holdings scheme selection in UI
+        res_empty = self.client.get("/funds/compare/overlap?scheme_a=UNKNOWN_SCHEME_A&scheme_b=UNKNOWN_SCHEME_B")
+        self.assertEqual(res_empty.status_code, 200)
+        self.assertIn("INSUFFICIENT_HOLDINGS_DATA", res_empty.text)
+        self.assertIn("Constituent holding weights are not available", res_empty.text)
+
     def test_fund_api_endpoints(self):
         # 1. /api/funds/schemes
         res_list = self.client.get("/api/funds/schemes")

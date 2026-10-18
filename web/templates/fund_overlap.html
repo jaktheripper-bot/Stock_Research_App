@@ -151,8 +151,12 @@
       </table>
     </div>
     {% else %}
-    <div style="padding: 24px; text-align: center; color: #64748b;">
-      No shared stock or bond holdings detected! These portfolios are 100% distinct.
+    <div style="padding: 2rem; text-align: center; color: var(--text-muted);">
+        {% if overlap_res.verdict == 'INSUFFICIENT_HOLDINGS_DATA' %}
+            ⚠️ Constituent holding weights are not available for one or both selected schemes. Please choose two active equity schemes from the selector above.
+        {% else %}
+            No shared stock or bond holdings detected! These portfolios are 100% distinct.
+        {% endif %}
     </div>
     {% endif %}
   </div>
