@@ -149,6 +149,7 @@ def create_razorpay_order(
                 order_data["key_id"] = key_id
                 order_data["is_simulated"] = False
                 order_data["plan"] = plan
+                _record_order_intent(order_data["id"], user_id, plan_id, amount_paise)
                 return order_data
             except Exception as e:
                 err_str = str(e)
@@ -173,6 +174,7 @@ def create_razorpay_order(
                 data["key_id"] = key_id
                 data["is_simulated"] = False
                 data["plan"] = plan
+                _record_order_intent(data["id"], user_id, plan_id, amount_paise)
                 return data
             elif resp.status_code == 401:
                 raise RazorpayAuthError("Razorpay authentication failed. Invalid API credentials.")
@@ -186,6 +188,7 @@ def create_razorpay_order(
 
     # Fallback Seamless Sandbox Simulation Order for Dev & Offline Testing
     simulated_order_id = f"order_sim_{int(time.time())}_{user_id[:6]}"
+    _record_order_intent(simulated_order_id, user_id, plan_id, amount_paise)
     return {
         "id": simulated_order_id,
         "order_id": simulated_order_id,
