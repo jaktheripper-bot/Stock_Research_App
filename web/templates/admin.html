@@ -546,13 +546,28 @@
           autofocus
         >
       </div>
+      <div style="text-align: left; margin-bottom: 14px;">
+        <label for="adminPassword" style="display: block; font-size: 12px; font-weight: 600; color: var(--text-secondary, #94a3b8); margin-bottom: 6px;">
+          Master Admin Password:
+        </label>
+        <input 
+          type="password" 
+          id="adminPassword" 
+          name="password" 
+          class="admin-input" 
+          style="width: 100%; box-sizing: border-box; padding: 10px; font-size: 13px;" 
+          placeholder="••••••••••••••••" 
+          required 
+          autocomplete="current-password"
+        >
+      </div>
       <button type="submit" class="btn btn-secondary" style="width: 100%; padding: 10px; font-size: 13px; font-weight: 600;">
-        Continue with Whitelisted Email →
+        Continue with Master Password & Email →
       </button>
     </form>
 
     <div style="margin-top: 20px; font-size: 11px; color: #64748b; line-height: 1.5;">
-      🔒 Zero-passcode architecture: Access strictly restricted to whitelisted accounts with active Google Authenticator TOTP verification.
+      🔒 Two-factor architecture: Access strictly restricted to whitelisted accounts with verified Master Admin Password and active Google Authenticator TOTP verification.
     </div>
   </div>
 

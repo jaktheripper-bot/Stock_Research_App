@@ -20,6 +20,7 @@ from web.main import app
 
 import os
 os.environ["TESTING"] = "1"
+os.environ.setdefault("ADMIN_PASSWORD", "test_admin_pwd_default")
 
 import unittest
 from unittest.mock import patch
@@ -264,8 +265,13 @@ Detailed forensic analysis with exact page grounding to bseindia.com filings.
     def _get_authenticated_admin_client(self):
         from core.db.admin import get_admin_user
         from core.auth.totp import get_totp_code
+        admin_pwd = os.environ.get("ADMIN_PASSWORD", "test_admin_pwd_default")
         client = TestClient(app)
-        res_verify = client.post("/admin/auth/direct-verify", data={"email": "lyndnpnto@gmail.com"}, follow_redirects=False)
+        res_verify = client.post(
+            "/admin/auth/direct-verify",
+            data={"email": "lyndnpnto@gmail.com", "password": admin_pwd},
+            follow_redirects=False
+        )
         pending_cookie = res_verify.cookies["admin_2fa_pending"]
         client.cookies.set("admin_2fa_pending", pending_cookie)
 
@@ -293,7 +299,12 @@ Detailed forensic analysis with exact page grounding to bseindia.com filings.
         self.assertIn("Sign In with Google", res.text)
 
     def test_admin_login_invalid_user(self):
-        res = self.client.post("/admin/auth/direct-verify", data={"email": "unauthorized_user@example.com"}, follow_redirects=False)
+        admin_pwd = os.environ.get("ADMIN_PASSWORD", "test_admin_pwd_default")
+        res = self.client.post(
+            "/admin/auth/direct-verify",
+            data={"email": "unauthorized_user@example.com", "password": admin_pwd},
+            follow_redirects=False
+        )
         self.assertEqual(res.status_code, 303)
         self.assertIn("err=", res.headers.get("location", ""))
 

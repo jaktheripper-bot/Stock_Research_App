@@ -17,6 +17,7 @@ import sys
 import io
 import csv
 import json
+import hmac
 import asyncio
 import logging
 import urllib.parse
@@ -45,6 +46,7 @@ from core.db import (
     get_ticket_by_id,
     IST,
 )
+from core.config import get_secret
 from core.notify import send_ticket_reply_email
 from core.auth.totp import generate_totp_secret, verify_totp_code, get_totp_uri
 from core.auth.supabase_auth import get_supabase_auth_config
@@ -121,10 +123,37 @@ class AdminCopilotExecuteRequest(BaseModel):
 # ==============================================================================
 # Local Dev & Environment Helpers
 # ==============================================================================
+def _get_client_ip(request: Request) -> str:
+    """Extract client IP address respecting X-Forwarded-For reverse proxy headers."""
+    forwarded = request.headers.get("x-forwarded-for")
+    if forwarded:
+        return forwarded.split(",")[0].strip()
+    return request.client.host if request.client else "unknown"
+
+
 def _is_local_dev_request(request: Request) -> bool:
     """Checks whether request is from local dev machine and not production."""
     host = request.url.hostname or ""
     return (host in ("localhost", "127.0.0.1", "0.0.0.0", "testserver") or host.endswith(".local")) and os.getenv("ENVIRONMENT") != "production"
+
+
+@router.get("/admin/login")
+async def admin_login_redirect(
+    request: Request,
+    error: Optional[str] = None,
+    err: Optional[str] = None,
+    next_url: Optional[str] = None,
+):
+    """Direct alias for admin authentication lockbox, redirecting cleanly to /admin."""
+    error_msg = error or err
+    params = []
+    if error_msg:
+        params.append(f"err={urllib.parse.quote_plus(error_msg)}")
+        params.append(f"error={urllib.parse.quote_plus(error_msg)}")
+    if next_url:
+        params.append(f"next_url={urllib.parse.quote_plus(next_url)}")
+    qs = f"?{'&'.join(params)}" if params else ""
+    return RedirectResponse(url=f"/admin{qs}", status_code=303)
 
 
 # ==============================================================================
@@ -139,8 +168,10 @@ async def admin_dashboard(
     end_date: Optional[str] = None,
     include_tests: int = 0,
     msg: Optional[str] = None,
-    err: Optional[str] = None
+    err: Optional[str] = None,
+    error: Optional[str] = None,
 ):
+    error_display = error or err
     admin_session = _is_admin_authenticated(request)
     if not admin_session:
         cfg = get_supabase_auth_config()
@@ -153,7 +184,7 @@ async def admin_dashboard(
             name="admin.html",
             context={
                 "authenticated": False,
-                "error": err,
+                "error": error_display,
                 "has_google_oauth": has_google_oauth,
                 "is_local_dev": is_local_dev,
                 "active_page": "admin",
@@ -832,40 +863,50 @@ async def admin_dev_login(request: Request, next_url: Optional[str] = Form(None)
 
 
 @router.post("/admin/auth/direct-verify")
-async def admin_direct_verify(request: Request, email: str = Form(...), next_url: Optional[str] = Form(None)):
-    """Direct sign-in entry for whitelisted admins while external OAuth is configured."""
-    clean_email = (email or "").strip().lower()
-    admin = get_admin_user(clean_email)
-    client_ip = request.headers.get("x-forwarded-for") or (request.client.host if request.client else "unknown")
-    ua = request.headers.get("user-agent")
+async def admin_auth_direct_verify(
+    request: Request,
+    email: str = Form(...),
+    password: str = Form(""),
+    next_url: Optional[str] = Form(None),
+):
+    """Requires valid ADMIN_PASSWORD before issuing a 2FA pending token."""
+    clean_email = email.strip().lower()
+    client_ip = _get_client_ip(request)
+    expected_pwd = (os.environ.get("ADMIN_PASSWORD") or get_secret("ADMIN_PASSWORD") or "").strip()
+    if not expected_pwd or not password or not hmac.compare_digest(password.strip(), expected_pwd):
+        record_admin_audit(clean_email or "anonymous", "DIRECT_VERIFY_REJECTED", "Invalid admin password", client_ip)
+        err_url = "/admin/login?error=Invalid+admin+credentials&err=Invalid+admin+credentials"
+        if next_url and next_url.startswith("/admin"):
+            err_url += f"&next_url={urllib.parse.quote(next_url)}"
+        return RedirectResponse(url=err_url, status_code=303)
 
-    if not admin or not admin.get("email"):
-        logger.warning(f"Admin direct verify rejected for '{clean_email}' (record: {admin})")
-        record_admin_audit(
-            clean_email,
-            "unauthorized_admin_direct_attempt",
-            details={"reason": "Email not on whitelist"},
-            ip_address=client_ip,
-            user_agent=ua
-        )
-        return RedirectResponse(
-            url=f"/admin?err=Access+Denied:+Email+'{clean_email}'+is+not+on+the+administrator+whitelist.",
-            status_code=303
-        )
+    admin_user = get_admin_user(clean_email)
+    if not admin_user or not admin_user.get("is_active"):
+        record_admin_audit(clean_email, "DIRECT_VERIFY_DENIED", "Unauthorized email attempt", client_ip)
+        err_url = "/admin/login?error=Access+Denied&err=Access+Denied"
+        if next_url and next_url.startswith("/admin"):
+            err_url += f"&next_url={urllib.parse.quote(next_url)}"
+        return RedirectResponse(url=err_url, status_code=303)
 
     pending_token = _generate_pending_2fa_token(clean_email)
-    next_step = "/admin/verify-2fa" if admin.get("totp_enabled") else "/admin/setup-2fa"
+    has_totp = bool(admin_user.get("totp_secret") or admin_user.get("totp_enabled"))
+    target = "/admin/verify-2fa" if has_totp else "/admin/setup-2fa"
     if next_url and next_url.startswith("/admin"):
-        next_step += f"?next={urllib.parse.quote(next_url)}"
-    resp = RedirectResponse(url=next_step, status_code=303)
+        target += f"?next={urllib.parse.quote(next_url)}"
+
+    resp = RedirectResponse(url=target, status_code=303)
     resp.set_cookie(
-        key=ADMIN_2FA_PENDING_COOKIE,
+        key="admin_2fa_pending",
         value=pending_token,
         httponly=True,
+        max_age=600,
         samesite="lax",
-        max_age=900
+        secure=True if (request.url.scheme == "https" or os.environ.get("ENVIRONMENT") == "production") else False,
     )
     return resp
+
+# Backward-compatibility alias
+admin_direct_verify = admin_auth_direct_verify
 
 
 @router.get("/admin/setup-2fa", response_class=HTMLResponse)

@@ -94,6 +94,7 @@ def get_admin_user(email: str) -> Optional[Dict[str, Any]]:
             if row:
                 res = _clean_dict_row(cursor, row, STANDARD_ADMIN_COLUMNS)
                 if res and res.get("email"):
+                    res.setdefault("is_active", True)
                     return res
         finally:
             cursor.close()
@@ -148,6 +149,7 @@ def get_admin_user(email: str) -> Optional[Dict[str, Any]]:
                 if r:
                     persisted_res = _clean_dict_row(cursor, r, STANDARD_ADMIN_COLUMNS)
                     if persisted_res and persisted_res.get("email"):
+                        persisted_res.setdefault("is_active", True)
                         return persisted_res
             finally:
                 cursor.close()
@@ -162,6 +164,7 @@ def get_admin_user(email: str) -> Optional[Dict[str, Any]]:
             "role": "owner",
             "totp_secret": None,
             "totp_enabled": 0,
+            "is_active": True,
             "invited_by": None,
             "created_at": now_iso,
             "updated_at": now_iso,
@@ -407,6 +410,16 @@ def record_admin_audit(
     user_agent: Optional[str] = None
 ) -> bool:
     """Appends an immutable audit event to admin_audit_log."""
+    # Gracefully normalize if called positionally as record_admin_audit(email, action, reason, ip)
+    if ip_address is None and target_id and (
+        "." in str(target_id) or ":" in str(target_id) or str(target_id).lower() in ("unknown", "testclient", "localhost", "127.0.0.1")
+    ):
+        ip_address = target_id
+        target_id = admin_email
+        if details is None and target_type:
+            details = {"reason": target_type}
+            target_type = "auth"
+
     init_db()
     conn = get_db_connection()
     cursor = conn.cursor()

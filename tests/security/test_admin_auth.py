@@ -17,6 +17,8 @@ from web.main import app, ADMIN_COOKIE_NAME, ADMIN_2FA_PENDING_COOKIE, _generate
 
 class TestAdminAuthSuite(unittest.TestCase):
     def setUp(self):
+        os.environ["ADMIN_PASSWORD"] = "test_admin_auth_pwd_2026"
+        self.admin_pwd = "test_admin_auth_pwd_2026"
         self.client = TestClient(app)
 
     
@@ -123,7 +125,11 @@ class TestAdminAuthSuite(unittest.TestCase):
         self.assertIn("Sign In with Google", res.text)
     
         # 2. Direct verify initiation for whitelisted owner
-        res2 = self.client.post("/admin/auth/direct-verify", data={"email": "lyndnpnto@gmail.com"}, follow_redirects=False)
+        res2 = self.client.post(
+            "/admin/auth/direct-verify",
+            data={"email": "lyndnpnto@gmail.com", "password": self.admin_pwd},
+            follow_redirects=False
+        )
         self.assertEqual(res2.status_code, 303)
         self.assertIn(ADMIN_2FA_PENDING_COOKIE, res2.cookies)
     
@@ -222,12 +228,20 @@ class TestAdminAuthSuite(unittest.TestCase):
         self.assertIsNone(unauth)
     
         # 3. Direct verify initiation succeeds for owner email
-        res1 = self.client.post("/admin/auth/direct-verify", data={"email": "lyndnpnto@gmail.com"}, follow_redirects=False)
+        res1 = self.client.post(
+            "/admin/auth/direct-verify",
+            data={"email": "lyndnpnto@gmail.com", "password": self.admin_pwd},
+            follow_redirects=False
+        )
         self.assertEqual(res1.status_code, 303)
         self.assertIn(ADMIN_2FA_PENDING_COOKIE, res1.cookies)
     
         # 4. Direct verify fails for unauthorized email
-        res3 = self.client.post("/admin/auth/direct-verify", data={"email": "unauthorized_stranger@example.com"}, follow_redirects=False)
+        res3 = self.client.post(
+            "/admin/auth/direct-verify",
+            data={"email": "unauthorized_stranger@example.com", "password": self.admin_pwd},
+            follow_redirects=False
+        )
         self.assertEqual(res3.status_code, 303)
         self.assertIn("Access+Denied", res3.headers["location"])
     
@@ -256,7 +270,11 @@ class TestAdminAuthSuite(unittest.TestCase):
     def test_admin_2fa_local_bypass_code_and_next_url(self):
         """Verify 000000 bypass on localhost preserves next_url destination."""
         # 1. Direct verify with next_url
-        res_init = self.client.post("/admin/auth/direct-verify", data={"email": "lyndnpnto@gmail.com", "next_url": "/admin?tab=tickets"}, follow_redirects=False)
+        res_init = self.client.post(
+            "/admin/auth/direct-verify",
+            data={"email": "lyndnpnto@gmail.com", "password": self.admin_pwd, "next_url": "/admin?tab=tickets"},
+            follow_redirects=False
+        )
         self.assertEqual(res_init.status_code, 303)
         self.assertIn("/admin/verify-2fa?next=", res_init.headers["location"])
         pending_cookie = res_init.cookies[ADMIN_2FA_PENDING_COOKIE]
@@ -271,6 +289,48 @@ class TestAdminAuthSuite(unittest.TestCase):
         self.assertEqual(res_verify.status_code, 303)
         self.assertEqual(res_verify.headers.get("location"), "/admin?tab=tickets")
         self.assertIn(ADMIN_COOKIE_NAME, res_verify.cookies)
+
+    def test_admin_direct_verify_password_enforcement_and_alias(self):
+        """Verify strict timing-safe ADMIN_PASSWORD enforcement and /admin/login alias."""
+        # 1. Reject invalid password
+        res_bad = self.client.post(
+            "/admin/auth/direct-verify",
+            data={"email": "lyndnpnto@gmail.com", "password": "wrong_password_attempt"},
+            follow_redirects=False
+        )
+        self.assertEqual(res_bad.status_code, 303)
+        self.assertIn("Invalid+admin+credentials", res_bad.headers.get("location", ""))
+        self.assertNotIn("admin_2fa_pending", res_bad.cookies)
+
+        # 2. Reject empty password
+        res_empty = self.client.post(
+            "/admin/auth/direct-verify",
+            data={"email": "lyndnpnto@gmail.com", "password": ""},
+            follow_redirects=False
+        )
+        self.assertEqual(res_empty.status_code, 303)
+        self.assertIn("Invalid+admin+credentials", res_empty.headers.get("location", ""))
+        self.assertNotIn("admin_2fa_pending", res_empty.cookies)
+
+        # 3. Reject when ADMIN_PASSWORD is unset in environment
+        old_pwd = os.environ.pop("ADMIN_PASSWORD", None)
+        try:
+            res_unset = self.client.post(
+                "/admin/auth/direct-verify",
+                data={"email": "lyndnpnto@gmail.com", "password": "any"},
+                follow_redirects=False
+            )
+            self.assertEqual(res_unset.status_code, 303)
+            self.assertIn("Invalid+admin+credentials", res_unset.headers.get("location", ""))
+        finally:
+            if old_pwd:
+                os.environ["ADMIN_PASSWORD"] = old_pwd
+
+        # 4. /admin/login redirect alias preserving error params
+        res_login = self.client.get("/admin/login?error=Invalid+admin+credentials", follow_redirects=False)
+        self.assertEqual(res_login.status_code, 303)
+        self.assertIn("/admin?err=Invalid+admin+credentials", res_login.headers.get("location", ""))
+
     
     
     
