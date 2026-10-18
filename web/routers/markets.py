@@ -78,7 +78,9 @@ class IngestDebtRequest(BaseModel):
     isin: str
     ticker: Optional[str] = None
     instrument_name: Optional[str] = None
+    issuer_name: Optional[str] = None
     coupon_rate_pct: Optional[float] = None
+    coupon_rate: Optional[float] = None
     maturity_date: Optional[str] = None
     seniority_tier: Optional[str] = "SENIOR_SECURED"
     credit_rating: Optional[str] = "CRISIL AAA"
@@ -258,14 +260,32 @@ def api_ingest_debt_security(request: Request, payload: IngestDebtRequest):
             "INE087H": "PIRAMAL"
         }
         matched_prefix = next((p for p in isin_prefix_map if raw_isin.startswith(p)), None)
-        ticker = isin_prefix_map[matched_prefix] if matched_prefix else f"CORP_{raw_isin[3:7]}"
+        if matched_prefix:
+            ticker = isin_prefix_map[matched_prefix]
+        elif payload.issuer_name:
+            words = [w for w in payload.issuer_name.replace("Limited", "").replace("Ltd", "").replace("LTD", "").replace("LIMITED", "").split() if w]
+            ticker = words[0].upper() if words else f"CORP_{raw_isin[3:7]}"
+        else:
+            ticker = f"CORP_{raw_isin[3:7]}"
 
-    name = payload.instrument_name or f"{ticker} Fixed-Income Security ({raw_isin})"
-    coupon = float(payload.coupon_rate_pct if payload.coupon_rate_pct is not None else 8.50)
+    name = payload.issuer_name or payload.instrument_name or f"{ticker} Fixed-Income Security ({raw_isin})"
+    effective_coupon = payload.coupon_rate if payload.coupon_rate is not None else payload.coupon_rate_pct
+    coupon = float(effective_coupon if effective_coupon is not None else 8.50)
     now_dt = datetime.now()
     mat_date = payload.maturity_date or f"{now_dt.year + 3}-{now_dt.month:02d}-{now_dt.day:02d}"
     face_val = float(payload.face_value or 10000.0)
     price = float(payload.last_traded_price or face_val)
+
+    credit_rating = (payload.credit_rating or "CRISIL AAA").strip()
+    credit_agency = payload.credit_rating_agency
+    if not credit_agency and credit_rating:
+        first_word = credit_rating.split()[0].upper()
+        if first_word in ("CRISIL", "ICRA", "CARE", "IND", "BRICKWORK", "ACUITE"):
+            credit_agency = first_word
+        else:
+            credit_agency = "CRISIL"
+    else:
+        credit_agency = credit_agency or "CRISIL"
 
     from core.analysis.debt_catalogue import ingest_collated_security
     raw_sec = {
@@ -279,8 +299,8 @@ def api_ingest_debt_security(request: Request, payload: IngestDebtRequest):
         "coupon_frequency": (payload.coupon_frequency or "ANNUAL").upper(),
         "issue_date": now_dt.strftime("%Y-%m-%d"),
         "maturity_date": mat_date,
-        "credit_rating": payload.credit_rating or "CRISIL AAA",
-        "credit_rating_agency": payload.credit_rating_agency or "CRISIL",
+        "credit_rating": credit_rating,
+        "credit_rating_agency": credit_agency,
         "asset_cover_ratio": 1.25,
         "is_listed": True,
         "exchange": "BSE",
@@ -303,9 +323,15 @@ def api_ingest_debt_security(request: Request, payload: IngestDebtRequest):
         }
     }
 
+    rating_symbol = credit_rating
+    for pfx in ("CRISIL ", "ICRA ", "CARE ", "IND ", "BRICKWORK ", "ACUITE "):
+        if rating_symbol.startswith(pfx):
+            rating_symbol = rating_symbol[len(pfx):]
+            break
+
     rating_event = [{
-        "rating_agency": payload.credit_rating_agency or "CRISIL",
-        "rating_symbol": (payload.credit_rating or "AAA").replace("CRISIL ", "").replace("ICRA ", "").replace("CARE ", "").strip(),
+        "rating_agency": credit_agency,
+        "rating_symbol": rating_symbol.strip(),
         "outlook": "STABLE",
         "action_type": "AFFIRMED",
         "event_date": now_dt.strftime("%Y-%m-%d"),

@@ -67,7 +67,7 @@
       <a href="/opportunities" class="btn btn-secondary btn-sm" style="display: inline-flex; align-items: center; gap: 6px; border-radius: 8px; font-weight: 700; border-color: rgba(14, 165, 233, 0.4); color: #38bdf8;">
         <span>🎯</span> Opportunity Terminal
       </a>
-      <button id="openIngestModalBtn" onclick="openIngestModal()" class="btn btn-primary btn-sm" style="display: inline-flex; align-items: center; gap: 6px; border-radius: 8px; font-weight: 700; box-shadow: 0 4px 14px rgba(14, 165, 233, 0.25); cursor: pointer;">
+      <button id="openIngestModalBtn" onclick="openIngestDebtModal()" class="btn btn-primary btn-sm" style="display: inline-flex; align-items: center; gap: 6px; border-radius: 8px; font-weight: 700; box-shadow: 0 4px 14px rgba(14, 165, 233, 0.25); cursor: pointer;">
         <span>➕</span> Ingest / Analyze New ISIN
       </button>
     </div>
@@ -157,51 +157,56 @@
           </span>
         </div>
       </div>
-      <button onclick="closeIngestModal()" style="background: none; border: none; color: #94a3b8; font-size: 20px; cursor: pointer; padding: 4px; line-height: 1;">✕</button>
+      <button type="button" onclick="closeIngestDebtModal()" style="background: none; border: none; color: #94a3b8; font-size: 20px; cursor: pointer; padding: 4px; line-height: 1;">✕</button>
     </div>
 
     <!-- Body Form -->
     <form id="ingestDebtForm" onsubmit="handleIngestDebtSubmit(event)" style="padding: 24px;">
       <div style="margin-bottom: 16px;">
-        <label for="ingestIsinInput" style="display: block; font-size: 12px; font-weight: 700; color: #94a3b8; margin-bottom: 6px; text-transform: uppercase; letter-spacing: 0.05em;">
+        <label for="ingestIsin" style="display: block; font-size: 12px; font-weight: 700; color: #94a3b8; margin-bottom: 6px; text-transform: uppercase; letter-spacing: 0.05em;">
           12-Character ISIN <span style="color: #ef4444;">*</span>
         </label>
-        <input type="text" id="ingestIsinInput" required maxlength="12" placeholder="e.g. INE002A08012 or INF..." style="width: 100%; padding: 12px 14px; background: rgba(15, 23, 42, 0.7); border: 1px solid var(--border-color, rgba(255,255,255,0.15)); border-radius: 8px; color: #f8fafc; font-family: var(--font-mono, monospace); font-size: 14px; letter-spacing: 0.05em; text-transform: uppercase; box-sizing: border-box;" oninput="this.value = this.value.toUpperCase()" />
-        <span style="font-size: 11px; color: #64748b; margin-top: 4px; display: block;">Indian International Securities Identification Number.</span>
+        <input type="text" id="ingestIsin" name="isin" required maxlength="12" placeholder="e.g. INE002A08534" style="width: 100%; padding: 12px 14px; background: rgba(15, 23, 42, 0.7); border: 1px solid var(--border-color, rgba(255,255,255,0.15)); border-radius: 8px; color: #f8fafc; font-family: var(--font-mono, monospace); font-size: 14px; letter-spacing: 0.05em; text-transform: uppercase; box-sizing: border-box;" oninput="this.value = this.value.toUpperCase()" />
+        <span style="font-size: 11px; color: #64748b; margin-top: 4px; display: block;">Indian International Securities Identification Number starting with 'IN'.</span>
+      </div>
+
+      <div style="margin-bottom: 16px;">
+        <label for="ingestIssuer" style="display: block; font-size: 11px; font-weight: 700; color: #94a3b8; margin-bottom: 6px; text-transform: uppercase;">
+          Issuer Name <span style="color: #ef4444;">*</span>
+        </label>
+        <input type="text" id="ingestIssuer" name="issuer_name" required placeholder="e.g. Reliance Industries Limited" style="width: 100%; padding: 10px 12px; background: rgba(15, 23, 42, 0.7); border: 1px solid var(--border-color, rgba(255,255,255,0.15)); border-radius: 8px; color: #f8fafc; font-size: 13px; box-sizing: border-box;" />
       </div>
 
       <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-bottom: 16px;">
         <div>
-          <label for="ingestTickerInput" style="display: block; font-size: 11px; font-weight: 700; color: #94a3b8; margin-bottom: 6px; text-transform: uppercase;">
-            Issuer / Ticker (Optional)
+          <label for="ingestRating" style="display: block; font-size: 11px; font-weight: 700; color: #94a3b8; margin-bottom: 6px; text-transform: uppercase;">
+            Credit Rating <span style="color: #ef4444;">*</span>
           </label>
-          <input type="text" id="ingestTickerInput" placeholder="Auto-detected if blank" style="width: 100%; padding: 10px 12px; background: rgba(15, 23, 42, 0.7); border: 1px solid var(--border-color, rgba(255,255,255,0.15)); border-radius: 8px; color: #f8fafc; font-size: 13px; box-sizing: border-box;" />
+          <select id="ingestRating" name="credit_rating" style="width: 100%; padding: 10px 12px; background: rgba(15, 23, 42, 0.7); border: 1px solid var(--border-color, rgba(255,255,255,0.15)); border-radius: 8px; color: #f8fafc; font-size: 13px; box-sizing: border-box;">
+            <option value="CRISIL AAA" selected>CRISIL AAA (Highest Safety)</option>
+            <option value="ICRA AAA">ICRA AAA (Highest Safety)</option>
+            <option value="CARE AAA">CARE AAA (Highest Safety)</option>
+            <option value="CRISIL AA+">CRISIL AA+ (High Safety)</option>
+            <option value="ICRA AA+">ICRA AA+ (High Safety)</option>
+            <option value="CARE AA+">CARE AA+ (High Safety)</option>
+            <option value="CRISIL AA">CRISIL AA (High Safety)</option>
+            <option value="CRISIL A+">CRISIL A+ (Adequate Safety)</option>
+            <option value="CRISIL BBB">CRISIL BBB (Moderate Safety)</option>
+          </select>
         </div>
         <div>
-          <label for="ingestCouponInput" style="display: block; font-size: 11px; font-weight: 700; color: #94a3b8; margin-bottom: 6px; text-transform: uppercase;">
-            Coupon Rate % (Optional)
+          <label for="ingestCoupon" style="display: block; font-size: 11px; font-weight: 700; color: #94a3b8; margin-bottom: 6px; text-transform: uppercase;">
+            Coupon Rate % <span style="color: #ef4444;">*</span>
           </label>
-          <input type="number" step="0.01" id="ingestCouponInput" placeholder="e.g. 8.50" style="width: 100%; padding: 10px 12px; background: rgba(15, 23, 42, 0.7); border: 1px solid var(--border-color, rgba(255,255,255,0.15)); border-radius: 8px; color: #f8fafc; font-size: 13px; box-sizing: border-box;" />
+          <input type="number" step="0.01" id="ingestCoupon" name="coupon_rate" required placeholder="e.g. 8.50" min="0" max="30" style="width: 100%; padding: 10px 12px; background: rgba(15, 23, 42, 0.7); border: 1px solid var(--border-color, rgba(255,255,255,0.15)); border-radius: 8px; color: #f8fafc; font-size: 13px; box-sizing: border-box;" />
         </div>
       </div>
 
-      <div style="margin-bottom: 20px;">
-        <label for="ingestSenioritySelect" style="display: block; font-size: 11px; font-weight: 700; color: #94a3b8; margin-bottom: 6px; text-transform: uppercase;">
-          Seniority Waterfall Tier
-        </label>
-        <select id="ingestSenioritySelect" style="width: 100%; padding: 10px 12px; background: rgba(15, 23, 42, 0.7); border: 1px solid var(--border-color, rgba(255,255,255,0.15)); border-radius: 8px; color: #f8fafc; font-size: 13px; box-sizing: border-box;">
-          <option value="SENIOR_SECURED">Senior Secured (Tangible Asset Cover)</option>
-          <option value="SUBORDINATED_TIER_2">Banking Tier-II Subordinated</option>
-          <option value="PERPETUAL_AT1">Additional Tier-1 (AT1 Perpetual)</option>
-          <option value="UNSECURED">Senior Unsecured</option>
-        </select>
-      </div>
-
-      <div id="ingestStatusMsg" style="display: none; padding: 10px 14px; border-radius: 8px; font-size: 12.5px; margin-bottom: 16px;"></div>
+      <div id="ingestDebtError" style="display: none; padding: 10px 14px; border-radius: 8px; font-size: 12.5px; margin-bottom: 16px; background: rgba(239, 68, 68, 0.15); color: #ef4444; border-left: 3px solid #ef4444;"></div>
 
       <div style="display: flex; justify-content: flex-end; gap: 10px;">
-        <button type="button" onclick="closeIngestModal()" class="btn btn-secondary btn-sm" style="padding: 10px 18px;">Cancel</button>
-        <button type="submit" id="ingestSubmitBtn" class="btn btn-primary btn-sm" style="padding: 10px 22px; font-weight: 700; cursor: pointer;">
+        <button type="button" onclick="closeIngestDebtModal()" class="btn btn-secondary btn-sm" style="padding: 10px 18px;">Cancel</button>
+        <button type="submit" id="ingestDebtSubmitBtn" class="btn btn-primary btn-sm" style="padding: 10px 22px; font-weight: 700; cursor: pointer;">
           <span>🚀 Run Credit & Solvency Audit</span>
         </button>
       </div>
@@ -210,77 +215,92 @@
 </div>
 
 <script>
-function openIngestModal() {
+function openIngestDebtModal() {
   const modal = document.getElementById('ingestModalBackdrop');
   if (modal) {
     modal.style.display = 'flex';
-    document.getElementById('ingestIsinInput').focus();
+    const isinEl = document.getElementById('ingestIsin');
+    if (isinEl) isinEl.focus();
   }
 }
-function closeIngestModal() {
+function closeIngestDebtModal() {
   const modal = document.getElementById('ingestModalBackdrop');
   if (modal) modal.style.display = 'none';
 }
+const openIngestModal = openIngestDebtModal;
+const closeIngestModal = closeIngestDebtModal;
+
 // Dismiss on clicking backdrop
 window.addEventListener('click', function(e) {
   const modal = document.getElementById('ingestModalBackdrop');
-  if (e.target === modal) closeIngestModal();
+  if (e.target === modal) closeIngestDebtModal();
 });
 
 async function handleIngestDebtSubmit(e) {
-  e.preventDefault();
-  const isin = document.getElementById('ingestIsinInput').value.trim().toUpperCase();
-  const ticker = document.getElementById('ingestTickerInput').value.trim().toUpperCase();
-  const coupon = document.getElementById('ingestCouponInput').value;
-  const seniority = document.getElementById('ingestSenioritySelect').value;
-  const btn = document.getElementById('ingestSubmitBtn');
-  const statusBox = document.getElementById('ingestStatusMsg');
+    e.preventDefault();
+    const isin = document.getElementById('ingestIsin').value.trim().toUpperCase();
+    const name = document.getElementById('ingestIssuer').value.trim();
+    const rating = document.getElementById('ingestRating').value;
+    const coupon = parseFloat(document.getElementById('ingestCoupon').value);
+    const errEl = document.getElementById('ingestDebtError');
+    const btn = document.getElementById('ingestDebtSubmitBtn');
 
-  if (isin.length !== 12) {
-    statusBox.style.display = 'block';
-    statusBox.style.background = 'rgba(239, 68, 68, 0.15)';
-    statusBox.style.color = '#ef4444';
-    statusBox.textContent = 'ISIN must be exactly 12 alphanumeric characters.';
-    return;
-  }
-
-  btn.disabled = true;
-  btn.innerHTML = '<span>⏳ Ingesting & Analyzing...</span>';
-  statusBox.style.display = 'block';
-  statusBox.style.background = 'rgba(14, 165, 233, 0.15)';
-  statusBox.style.color = '#38bdf8';
-  statusBox.textContent = 'Calculating credit metrics, YTM, and duration...';
-
-  try {
-    const payload = {
-      isin: isin,
-      ticker: ticker || null,
-      coupon_rate_pct: coupon ? parseFloat(coupon) : null,
-      seniority_tier: seniority
-    };
-    const res = await fetch('/api/debt/ingest', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(payload)
-    });
-    const data = await res.json();
-    if (res.ok && data.status === 'success') {
-      statusBox.style.background = 'rgba(16, 185, 129, 0.15)';
-      statusBox.style.color = '#10b981';
-      statusBox.textContent = '✓ Successfully audited! Opening credit dossier...';
-      setTimeout(() => {
-        window.location.href = data.redirect_url;
-      }, 400);
-    } else {
-      throw new Error(data.detail || data.message || 'Ingestion failed');
+    if (!/^IN[A-Z0-9]{10}$/.test(isin)) {
+        errEl.textContent = "Please enter a valid 12-character Indian ISIN starting with 'IN' (e.g., INE002A08534).";
+        errEl.style.display = 'block';
+        return;
     }
-  } catch (err) {
-    btn.disabled = false;
-    btn.innerHTML = '<span>🚀 Run Credit & Solvency Audit</span>';
-    statusBox.style.background = 'rgba(239, 68, 68, 0.15)';
-    statusBox.style.color = '#ef4444';
-    statusBox.textContent = err.message;
-  }
+    if (!name || name.length < 3) {
+        errEl.textContent = "Please enter a valid Issuer Name (at least 3 characters).";
+        errEl.style.display = 'block';
+        return;
+    }
+    if (isNaN(coupon) || coupon < 0 || coupon > 30) {
+        errEl.textContent = "Please enter a realistic annual coupon rate between 0% and 30%.";
+        errEl.style.display = 'block';
+        return;
+    }
+
+    errEl.style.display = 'none';
+    const origText = btn.textContent;
+    btn.disabled = true;
+    btn.textContent = 'Synthesizing Bond Scorecard...';
+
+    try {
+        const res = await fetch('/api/debt/ingest', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                isin: isin,
+                issuer_name: name,
+                credit_rating: rating,
+                coupon_rate: coupon
+            })
+        });
+        const data = await res.json().catch(() => ({}));
+
+        if (res.status === 401 || res.status === 403) {
+            localStorage.removeItem('sr_user');
+            if (typeof updateNavAuthUI === 'function') updateNavAuthUI(null);
+            closeIngestDebtModal();
+            if (typeof openSignInModal === 'function') openSignInModal();
+            return;
+        }
+
+        if (!res.ok) {
+            const msg = typeof data.detail === 'string'
+                ? data.detail
+                : (data.detail?.message || data.error || 'Failed to ingest bond ISIN.');
+            throw new Error(msg);
+        }
+
+        window.location.href = `/debt/${encodeURIComponent(data.isin || isin)}`;
+    } catch (err) {
+        errEl.textContent = err.message;
+        errEl.style.display = 'block';
+        btn.disabled = false;
+        btn.textContent = origText;
+    }
 }
 </script>
 {% endblock %}

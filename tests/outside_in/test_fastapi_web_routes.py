@@ -480,6 +480,17 @@ Detailed forensic analysis with exact page grounding to bseindia.com filings.
         self.assertIn("SEBI ₹10,000 Face Value", res.text)
         self.assertIn("RELIANCE", res.text)
         self.assertIn("5-Pillar Credit & Solvency Matrix", res.text)
+        # Outside-in DOM & JS wiring contracts
+        self.assertIn('id="ingestDebtForm"', res.text)
+        self.assertIn('id="ingestIsin"', res.text)
+        self.assertIn('id="ingestIssuer"', res.text)
+        self.assertIn('id="ingestRating"', res.text)
+        self.assertIn('id="ingestCoupon"', res.text)
+        self.assertIn('id="ingestDebtError"', res.text)
+        self.assertIn('id="ingestDebtSubmitBtn"', res.text)
+        self.assertIn("handleIngestDebtSubmit", res.text)
+        self.assertIn("openIngestDebtModal", res.text)
+        self.assertIn("closeIngestDebtModal", res.text)
 
     def test_debt_dossier_page(self):
         res = self.client.get("/debt/INE002A08012")
@@ -531,8 +542,9 @@ Detailed forensic analysis with exact page grounding to bseindia.com filings.
         test_isin = "INE999A08999"
         res_ingest = auth_client.post("/api/debt/ingest", json={
             "isin": test_isin,
-            "ticker": "TESTCORP",
-            "coupon_rate_pct": 9.20,
+            "issuer_name": "Test Corporation Limited",
+            "credit_rating": "CRISIL AAA",
+            "coupon_rate": 9.20,
             "seniority_tier": "SENIOR_SECURED"
         })
         self.assertEqual(res_ingest.status_code, 200)
