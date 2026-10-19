@@ -1341,5 +1341,62 @@ class TestCompetitiveEnhancements(unittest.TestCase):
         self.assertNotIn("{%", sandbox_str, "Unrendered Jinja directive detected in #reverseDcfSandbox")
 
 
+    def test_interactive_mf_fee_drag_simulator_contracts(self):
+        """
+        [Rule 6 Outside-In UI Contract Test]
+        Validates the Interactive 20-Year Direct vs. Regular Fee-Drag Simulator:
+        1. Container presence (#mfFeeDragSimulator).
+        2. All 3 interactive range sliders (#mfCorpusSlider, #mfHorizonSlider, #mfCagrSlider) with oninput handler.
+        3. All label and simulated output elements exist (#mfCorpusLabel, #mfHorizonLabel, #mfCagrLabel, #mfDirectFinalVal, #mfRegularFinalVal, #mfDragLossVal, #mfDragPctSub).
+        4. Inline script defines recalcMfFeeDrag function with valid numeric JSON embeddings.
+        5. Zero unrendered Jinja tags ({{ or {%) leak into markup.
+        """
+        from bs4 import BeautifulSoup
+        resp = self.client.get("/funds/PPFAS_FLEXICAP_DIR")
+        self.assertEqual(resp.status_code, 200)
+
+        soup = BeautifulSoup(resp.text, "html.parser")
+        sim = soup.find(id="mfFeeDragSimulator")
+        self.assertIsNotNone(sim, "#mfFeeDragSimulator must be present in fund dossier")
+
+        # Verify Sliders
+        corpus_slider = sim.find("input", id="mfCorpusSlider")
+        horizon_slider = sim.find("input", id="mfHorizonSlider")
+        cagr_slider = sim.find("input", id="mfCagrSlider")
+
+        self.assertIsNotNone(corpus_slider)
+        self.assertEqual(corpus_slider.get("type"), "range")
+        self.assertEqual(corpus_slider.get("oninput"), "recalcMfFeeDrag()")
+
+        self.assertIsNotNone(horizon_slider)
+        self.assertEqual(horizon_slider.get("type"), "range")
+        self.assertEqual(horizon_slider.get("oninput"), "recalcMfFeeDrag()")
+
+        self.assertIsNotNone(cagr_slider)
+        self.assertEqual(cagr_slider.get("type"), "range")
+        self.assertEqual(cagr_slider.get("oninput"), "recalcMfFeeDrag()")
+
+        # Verify Output and Label Elements
+        self.assertIsNotNone(sim.find(id="mfCorpusLabel"))
+        self.assertIsNotNone(sim.find(id="mfHorizonLabel"))
+        self.assertIsNotNone(sim.find(id="mfCagrLabel"))
+        self.assertIsNotNone(sim.find(id="mfDirectFinalVal"))
+        self.assertIsNotNone(sim.find(id="mfRegularFinalVal"))
+        self.assertIsNotNone(sim.find(id="mfDragLossVal"))
+        self.assertIsNotNone(sim.find(id="mfDragPctSub"))
+
+        # Verify JS Wiring
+        scripts = [s.string for s in soup.find_all("script") if s.string and "recalcMfFeeDrag" in s.string]
+        self.assertEqual(len(scripts), 1, "Exactly one script defining recalcMfFeeDrag must be rendered")
+        self.assertIn("function recalcMfFeeDrag()", scripts[0])
+        self.assertIn("mfCorpusSlider", scripts[0])
+        self.assertIn("mfDragLossVal", scripts[0])
+
+        # Verify Zero Jinja Leaks in rendered simulator
+        sim_str = str(sim)
+        self.assertNotIn("{{", sim_str, "Unrendered Jinja tag detected in #mfFeeDragSimulator")
+        self.assertNotIn("{%", sim_str, "Unrendered Jinja directive detected in #mfFeeDragSimulator")
+
+
 if __name__ == "__main__":
     unittest.main()

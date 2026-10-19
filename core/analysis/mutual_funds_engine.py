@@ -426,7 +426,11 @@ def calculate_fee_drag(
             "wealth_lost_pct": round(loss_pct, 1)
         })
 
-    ten_year_loss = schedule[1]["wealth_lost_inr"]
+    ten_year_row = next((item for item in schedule if item["years"] == 10), schedule[1])
+    ten_year_loss = ten_year_row["wealth_lost_inr"]
+    final_dir_10y = ten_year_row["direct_corpus"]
+    final_reg_10y = ten_year_row["regular_corpus"]
+    loss_pct_principal_10y = round((ten_year_loss / p0) * 100.0, 1) if p0 > 0 else 0.0
 
     return {
         "initial_investment_inr": p0,
@@ -436,6 +440,10 @@ def calculate_fee_drag(
         "assumed_gross_return_pct": assumed_gross_return_pct,
         "schedule": schedule,
         "loss_10y_inr": ten_year_loss,
+        "final_direct_value": final_dir_10y,
+        "final_regular_value": final_reg_10y,
+        "wealth_lost_to_commissions": ten_year_loss,
+        "wealth_lost_pct_of_principal": loss_pct_principal_10y,
         "summary": f"A ₹{initial_investment_lakhs} Lakh investment loses ₹{ten_year_loss:,.0f} over 10 years purely to distributor commissions in the Regular plan."
     }
 
@@ -661,7 +669,8 @@ def evaluate_mutual_fund_comprehensive(
     fee_drag_res = calculate_fee_drag(
         ter_direct_pct=float(scheme.get("ter_direct_pct", 0.7)),
         ter_regular_pct=float(scheme.get("ter_regular_pct", 1.5)),
-        initial_investment_lakhs=10.0
+        initial_investment_lakhs=10.0,
+        assumed_gross_return_pct=12.5
     )
 
     # Pillar 3 & 4: Risk & Capture Metrics
