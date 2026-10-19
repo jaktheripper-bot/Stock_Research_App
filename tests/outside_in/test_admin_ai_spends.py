@@ -96,6 +96,27 @@ class TestAiSpendsApiEndpoint(unittest.TestCase):
         self.assertIn("total_tokens", spends)
         self.assertIn("features", spends)
 
+    def test_unauthenticated_provider_constraints_rejected(self):
+        resp = self.client.get("/api/admin/provider-constraints")
+        self.assertIn(resp.status_code, [401, 403], "Unauthenticated provider constraints request must be rejected.")
+
+    def test_authenticated_admin_retrieves_provider_constraints_json(self):
+        admin_token = _generate_admin_token("lyndnpnto@gmail.com", "owner")
+        self.client.cookies.set(ADMIN_COOKIE_NAME, admin_token)
+
+        resp = self.client.get("/api/admin/provider-constraints")
+        self.assertEqual(resp.status_code, 200)
+
+        data = resp.json()
+        self.assertTrue(data.get("success"))
+        self.assertIn("provider_constraints", data)
+        constraints = data["provider_constraints"]
+        self.assertIn("providers", constraints)
+        self.assertIn("healthy_count", constraints)
+        self.assertIn("total_count", constraints)
+        self.assertEqual(len(constraints["providers"]), constraints["total_count"])
+        self.assertGreaterEqual(len(constraints["providers"]), 6)
+
 
 class TestAiSpendsAdminUiOutsideIn(unittest.TestCase):
     """Outside-in contract testing for /admin?tab=ai-spends DOM rendering."""
@@ -122,7 +143,13 @@ class TestAiSpendsAdminUiOutsideIn(unittest.TestCase):
         self.assertIsNotNone(tab_pane, "Missing tab pane #tab-ai-spends")
         self.assertIn("active", tab_pane.get("class", []))
 
-        # 3. KPI Elements Binding Contract
+        # 3. Provider Constraints & Quotas Monitor Card Contract
+        constraints_card = soup.find("div", id="cardProviderConstraints")
+        self.assertIsNotNone(constraints_card, "Missing #cardProviderConstraints in #tab-ai-spends")
+        self.assertIn("Subscribed Service Provider Quotas", constraints_card.text)
+        self.assertIn("Providers Healthy", constraints_card.text)
+
+        # 4. KPI Elements Binding Contract
         cost_el = soup.find("div", id="aiKpiTotalCostUsd")
         self.assertIsNotNone(cost_el, "Missing KPI element #aiKpiTotalCostUsd")
         self.assertIn("USD", cost_el.text)
@@ -130,13 +157,13 @@ class TestAiSpendsAdminUiOutsideIn(unittest.TestCase):
         tokens_el = soup.find("div", id="aiKpiTotalTokens")
         self.assertIsNotNone(tokens_el, "Missing KPI element #aiKpiTotalTokens")
 
-        # 4. Refresh Button Tactile Contract
+        # 5. Refresh Button Tactile Contract
         refresh_btn = soup.find("button", id="btnRefreshAiSpends")
         self.assertIsNotNone(refresh_btn, "Missing refresh button #btnRefreshAiSpends")
         self.assertIn("btn", refresh_btn.get("class", []))
         self.assertIn("refreshAiSpends()", refresh_btn.get("onclick", ""))
 
-        # 5. Table & Rows Rendering Contract
+        # 6. Table & Rows Rendering Contract
         table = soup.find("table", id="tableAiSpends")
         self.assertIsNotNone(table, "Missing table #tableAiSpends")
         tbody = soup.find("tbody", id="tbodyAiSpends")
@@ -144,10 +171,12 @@ class TestAiSpendsAdminUiOutsideIn(unittest.TestCase):
         rows = tbody.find_all("tr")
         self.assertGreaterEqual(len(rows), 5, "Expected at least 5 feature spend rows.")
 
-        # 6. Template Hygiene: Zero Unrendered Jinja Leaks
+        # 7. Template Hygiene: Zero Unrendered Jinja Leaks
         html_str = resp.text
         self.assertNotIn("{{ ai_spends", html_str)
         self.assertNotIn("{% for feat in ai_spends", html_str)
+        self.assertNotIn("{{ provider_constraints", html_str)
+        self.assertNotIn("{% for p in provider_constraints", html_str)
 
     def test_admin_audit_mirrors_ai_spends_tab_link(self):
         resp = self.client.get("/admin/audit")

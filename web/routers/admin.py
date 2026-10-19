@@ -355,7 +355,13 @@ async def admin_dashboard(
         }
     except Exception as dig_err:
         logger.debug(f"Error compiling digest summary for admin view: {dig_err}")
-        digest_summary = {}
+    provider_constraints = {}
+    try:
+        from core.analytics.provider_quotas import get_all_provider_constraints
+        provider_constraints = get_all_provider_constraints()
+    except Exception as pc_err:
+        logger.warning(f"Error compiling provider constraints summary: {pc_err}")
+        provider_constraints = {"providers": [], "healthy_count": 0, "total_count": 0}
 
     return templates.TemplateResponse(
         request=request,
@@ -385,6 +391,7 @@ async def admin_dashboard(
             "seo_summary": seo_summary,
             "ai_spends": ai_spends,
             "digest_summary": digest_summary,
+            "provider_constraints": provider_constraints,
             "active_page": "admin"
         }
     )
@@ -1912,6 +1919,25 @@ def api_admin_ai_spends(request: Request):
     return JSONResponse(status_code=200, content={
         "success": True,
         "spends": spends
+    })
+
+
+@router.get("/api/admin/provider-constraints")
+def api_admin_provider_constraints(request: Request):
+    """
+    Returns unified real-time external service provider quota, rate-limit,
+    and constraint monitoring data.
+    Requires administrator authentication.
+    """
+    admin_session = _is_admin_authenticated(request)
+    if not admin_session:
+        raise HTTPException(status_code=403, detail="Admin authorization required.")
+
+    from core.analytics.provider_quotas import get_all_provider_constraints
+    constraints = get_all_provider_constraints()
+    return JSONResponse(status_code=200, content={
+        "success": True,
+        "provider_constraints": constraints
     })
 
 

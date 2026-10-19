@@ -187,6 +187,8 @@ def get_db_path() -> str:
         return os.environ.get("TEST_DB_PATH", "test_reports.db")
     return os.environ.get("DB_PATH", "reports.db")
 
+DB_NAME = "reports.db"
+
 def _get_raw_connection():
     """Returns an unwrapped direct PostgreSQL or SQLite connection with automatic dual-binding failover."""
     global _PG_AVAILABLE, _PG_LAST_FAIL

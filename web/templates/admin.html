@@ -2036,6 +2036,53 @@
       </div>
     </div>
 
+    <!-- Subscribed Service Provider Quotas & Constraints Monitor -->
+    {% if provider_constraints and provider_constraints.providers %}
+    <div class="admin-card" style="margin-bottom: 24px;" id="cardProviderConstraints">
+      <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px; flex-wrap: wrap; gap: 10px;">
+        <div>
+          <h3 style="margin: 0; font-size: 16px; font-weight: 800; color: #f8fafc; display: flex; align-items: center; gap: 8px;">
+            <span>📡</span> Subscribed Service Provider Quotas &amp; Constraints
+          </h3>
+          <p style="margin: 4px 0 0; font-size: 12.5px; color: #94a3b8;">
+            Single-pane surveillance of storage limits, rate-limit ceilings, email caps, and runtime memory across all external providers.
+          </p>
+        </div>
+        <span class="status-pill success" style="font-size: 11.5px;">
+          {{ provider_constraints.healthy_count }} / {{ provider_constraints.total_count }} Providers Healthy
+        </span>
+      </div>
+
+      <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 16px;">
+        {% for p in provider_constraints.providers %}
+        <div style="background: rgba(15, 23, 42, 0.75); border: 1px solid rgba(255,255,255,0.08); border-radius: 10px; padding: 16px;">
+          <div style="display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 8px;">
+            <div>
+              <span style="font-size: 10.5px; font-weight: 700; color: #38bdf8; text-transform: uppercase;">{{ p.category }}</span>
+              <div style="font-size: 14px; font-weight: 800; color: #f8fafc; margin-top: 2px;">{{ p.name }}</div>
+            </div>
+            <span class="status-pill {% if p.status == 'HEALTHY' %}success{% elif p.status == 'WARNING' %}warning{% else %}closed{% endif %}" style="font-size: 10.5px;">
+              {{ p.status }}
+            </span>
+          </div>
+
+          <div style="display: flex; justify-content: space-between; align-items: baseline; margin: 10px 0 6px;">
+            <span class="mono" style="font-size: 15px; font-weight: 800; color: #e2e8f0;">{{ p.primary_metric }}</span>
+            <span class="mono" style="font-size: 11.5px; color: #94a3b8;">{{ p.utilization_pct }}%</span>
+          </div>
+
+          <div style="width: 100%; height: 6px; background: rgba(30, 41, 59, 0.9); border-radius: 999px; overflow: hidden; margin-bottom: 10px;">
+            <div style="width: {{ p.utilization_pct }}%; height: 100%; background: {% if p.utilization_pct > 80 %}#ef4444{% elif p.utilization_pct > 60 %}#f59e0b{% else %}#10b981{% endif %};"></div>
+          </div>
+
+          <div style="font-size: 11.5px; color: #cbd5e1; margin-bottom: 4px;">{{ p.secondary_metric }}</div>
+          <div style="font-size: 11px; color: #64748b; line-height: 1.4;">{{ p.constraint_note }}</div>
+        </div>
+        {% endfor %}
+      </div>
+    </div>
+    {% endif %}
+
     <!-- AI Spends Top KPI Cards -->
     <div class="kpi-grid" style="grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); margin-bottom: 24px;">
       <div class="kpi-card" style="border-left: 3px solid #38bdf8;">
