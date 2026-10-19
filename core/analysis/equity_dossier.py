@@ -173,6 +173,22 @@ def compile_equity_dossier(
     except Exception as e:
         logger.debug(f"SetuMatrixEngine evaluation notice for {ticker}: {e}")
 
+    # 10. Epistemic Ledger & Falsification Triggers
+    epistemic_ledger = None
+    try:
+        from core.analysis.epistemic_schema import build_equity_epistemic_ledger
+        epistemic_ledger = build_equity_epistemic_ledger(
+            ticker=ticker,
+            stock_data=fundamentals,
+            equity_intel={
+                "sector_intelligence": sector_data,
+                "forensic_intelligence": forensic_data,
+                "valuation_radar": valuation_data,
+            }
+        )
+    except Exception as e:
+        logger.debug(f"Epistemic ledger compilation notice for {ticker}: {e}")
+
     return {
         "ticker": ticker,
         "composite_score": composite_score,
@@ -185,4 +201,5 @@ def compile_equity_dossier(
         "bull_bear_thesis": bull_bear_data,
         "varan_delta_packet": varan_packet,
         "setu_capital_matrix": setu_matrix,
+        "epistemic_ledger": epistemic_ledger,
     }

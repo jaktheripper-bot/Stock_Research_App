@@ -13,6 +13,7 @@ from core.db import save_report_to_archive
 from core.analysis.exceptions import PipelineError
 from core.analysis.parser import format_citations_section
 from core.analysis.fundamentals import get_stock_fundamentals, fetch_latest_bse_announcement
+from core.analysis.epistemic_schema import EPISTEMIC_PROMPT_DIRECTIVE
 from screener import pass_pre_screening_gates
 from checker import verify_stock_report
 
@@ -55,6 +56,7 @@ Tabulate the ESG analysis strictly using the following Markdown table format:
 | **Social** | [Score] | [Labor, community impact] |
 | **Governance** | [Score] | [Board independence, transparency] |
 
+{EPISTEMIC_PROMPT_DIRECTIVE}
 
 CRITICAL COMPLIANCE DIRECTIVE: Strictly avoid providing any conclusions, forward-looking advice, actionable investment guidance, Buy/Sell/Hold verdicts, investment recommendations, portfolio allocation advice, target prices, trade execution signals, or portfolio roadmaps. The research report concludes strictly after Pillar 7. All analysis must remain purely descriptive, factual, and diagnostic under SEBI Safe Harbor principles."""
 

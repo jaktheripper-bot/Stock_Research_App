@@ -206,6 +206,19 @@ Every generated equity dossier structures its narrative strictly across 7 statut
      * *Governance (0-100):* Board independence, statutory compliance, audit qualifications.
    * *Compliance Boundary:* All narrative generation strictly concludes after Pillar 7. Zero buy/sell/hold ratings, target prices, or portfolio recommendations.
 
+#### Part A.1: Institutional Epistemic Separation & Falsification Engine (`core/analysis/epistemic_schema.py`)
+Across all 7 pillars, the research synthesis engine enforces three non-negotiable standards:
+1. **Source-Passage Attribution:** Links every material claim to verified statutory filings, filing dates, and verbatim or structured figures.
+2. **4-Tier Epistemic Separation Badges:**
+   * `[VERIFIED FACT]` — Statutory exchange filings (BSE/NSE/AMFI/Udyam/SEBI), official board meeting outcomes, or audited financials.
+   * `[CALCULATED METRIC]` — Deterministic mathematical output (ratios, valuations, duration, DCF models).
+   * `[MODEL INTERPRETATION]` — Analytical regime classification, qualitative moat durability, or drop diagnostic inferences.
+   * `[UNRESOLVED UNCERTAINTY]` — Missing disclosures, unlisted subsidiary opacity, or forward contingencies.
+3. **Mandatory Falsification Protocol:** Every pillar concludes with `#### Falsification & Thesis-Revision Triggers`:
+   * *What Contradicts This Conclusion:* Specific disconfirming empirical evidence challenging the pillar thesis.
+   * *Evidence That Forces a Revision:* Quantitative threshold targets in upcoming quarterly/annual filings (e.g. RoCE dropping below $X\%$, promoter pledge crossing $Y\%$) that mandate a thesis downgrade.
+4. **Structured 5-Part Epistemic Ledger:** `build_equity_epistemic_ledger()` and polymorphic `build_multi_asset_epistemic_ledger()` construct machine-readable attribution ledgers for APIs, dossiers, and copilot contexts.
+
 ---
 
 #### Part B: Institutional Cockpit & Cortex Engines

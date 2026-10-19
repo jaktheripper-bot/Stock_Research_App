@@ -72,6 +72,14 @@ from core.analysis.stock_discovery import (
     curate_morning_discovery_cohort,
 )
 
+from core.analysis.epistemic_schema import (
+    EPISTEMIC_PROMPT_DIRECTIVE,
+    build_equity_epistemic_ledger,
+    extract_epistemic_badges,
+    extract_falsification_triggers,
+    build_multi_asset_epistemic_ledger,
+)
+
 __all__ = [
     # exceptions
     "PipelineError",
@@ -118,4 +126,10 @@ __all__ = [
     "CANDIDATE_UNIVERSE",
     "evaluate_under_the_radar_candidate",
     "curate_morning_discovery_cohort",
+    # epistemic schema & falsification
+    "EPISTEMIC_PROMPT_DIRECTIVE",
+    "build_equity_epistemic_ledger",
+    "extract_epistemic_badges",
+    "extract_falsification_triggers",
+    "build_multi_asset_epistemic_ledger",
 ]
