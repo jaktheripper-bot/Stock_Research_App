@@ -190,6 +190,9 @@ class TestEquityUpgrades(unittest.TestCase):
         self.assertIn("models", res)
         self.assertIn("dcf_model", res["models"])
         self.assertIn("historical_pe_model", res["models"])
+        self.assertIn("inputs", res)
+        self.assertIn("implied_fcf_growth_pct", res["inputs"])
+        self.assertGreater(res["inputs"]["implied_fcf_growth_pct"], 0.0)
 
     def test_bull_bear_thesis_generation(self):
         fund = {
@@ -252,9 +255,12 @@ class TestEquityUpgrades(unittest.TestCase):
         self.assertEqual(res["status"], "UNAVAILABLE")
         self.assertEqual(res["fair_value"], 0.0)
         self.assertEqual(res["regime"], "DATA_UNAVAILABLE")
+        self.assertIn("inputs", res)
+        self.assertEqual(res["inputs"]["implied_fcf_growth_pct"], 0.0)
 
         res2 = compute_valuation_radar(current_price=100.0, pe_ratio=0.0, eps=None)
         self.assertEqual(res2["status"], "UNAVAILABLE")
+        self.assertIn("inputs", res2)
 
     def test_chanakya_market_cap_inr_no_false_shell_flag(self):
         fund = {

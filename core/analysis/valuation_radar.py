@@ -59,6 +59,14 @@ def compute_valuation_radar(
             "badge_label": "Valuation Not Available",
             "badge_color": "#64748b",
             "summary": "Fundamental earnings or price data is not disclosed or currently negative, precluding intrinsic multiple modeling.",
+            "inputs": {
+                "normalized_eps": 0.0,
+                "initial_growth_pct": 0.0,
+                "discount_rate_pct": round(_safe_float(discount_rate, default=0.11) * 100.0, 1),
+                "terminal_growth_pct": round(_safe_float(terminal_growth_rate, default=0.045) * 100.0, 1),
+                "historical_median_pe": 0.0,
+                "implied_fcf_growth_pct": 0.0,
+            },
             "models": {}
         }
 
@@ -152,6 +160,27 @@ def compute_valuation_radar(
         badge_color = "#ef4444"
         summary = f"Trading at an elevated {abs(margin_of_safety)}% premium above intrinsic earnings power value. Heightened multiple-contraction risk."
 
+    g_rate = growth_rate
+
+    # Reverse-solve implied 10Y growth rate required to justify current_price at discount_rate
+    implied_g = 0.0
+    if s_eps > 0 and current_price > 0:
+        low_g, high_g = -0.20, 0.45
+        for _ in range(32):
+            mid_g = (low_g + high_g) / 2.0
+            pv_s1 = 0.0
+            proj = s_eps
+            for yr in range(1, 6):
+                proj *= (1.0 + mid_g)
+                pv_s1 += proj / ((1.0 + disc_rate) ** yr)
+            tv = (proj * (1.0 + term_rate)) / max(0.02, (disc_rate - term_rate))
+            pv_tv = tv / ((1.0 + disc_rate) ** 5)
+            if (pv_s1 + pv_tv) < current_price:
+                low_g = mid_g
+            else:
+                high_g = mid_g
+        implied_g = round(((low_g + high_g) / 2.0) * 100.0, 1)
+
     return {
         "status": "COMPUTED",
         "current_price": current_price,
@@ -163,6 +192,14 @@ def compute_valuation_radar(
         "badge_label": badge_label,
         "badge_color": badge_color,
         "summary": summary,
+        "inputs": {
+            "normalized_eps": round(s_eps, 2),
+            "initial_growth_pct": round(g_rate * 100.0, 1),
+            "discount_rate_pct": round(discount_rate * 100.0, 1),
+            "terminal_growth_pct": round(terminal_growth_rate * 100.0, 1),
+            "historical_median_pe": round(med_pe, 1),
+            "implied_fcf_growth_pct": implied_g,
+        },
         "models": {
             "historical_pe_model": {
                 "name": "Historical P/E Median Model",
