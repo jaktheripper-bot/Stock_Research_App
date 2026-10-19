@@ -157,14 +157,24 @@ def _validate_request_origin(request: Request) -> bool:
 
 
 def _get_user_signing_key() -> bytes:
-    key = os.environ.get("SECRET_KEY") or get_secret("SECRET_KEY") or os.environ.get("ADMIN_API_KEY") or get_secret("ADMIN_API_KEY") or "stock_research_user_session_salt_2026"
-    return key.encode("utf-8")
+    key = (
+        os.environ.get("SECRET_KEY")
+        or get_secret("SECRET_KEY")
+        or os.environ.get("ADMIN_API_KEY")
+        or get_secret("ADMIN_API_KEY")
+        or os.environ.get("SUPABASE_SERVICE_ROLE_KEY")
+        or get_secret("SUPABASE_SERVICE_ROLE_KEY")
+        or os.environ.get("SUPABASE_DB_URL")
+        or get_secret("SUPABASE_DB_URL")
+        or "stock_research_user_session_salt_2026"
+    )
+    return hashlib.sha256(f"user_session:{key}".encode("utf-8")).digest()
 
 
 def _generate_user_session_token(user_id: str, email: str) -> str:
     secret = _get_user_signing_key()
     now_ts = int(datetime.now(timezone.utc).timestamp())
-    data = json.dumps({"user_id": user_id, "email": email.strip().lower(), "ts": now_ts})
+    data = json.dumps({"user_id": user_id, "email": email.strip().lower(), "purpose": "user_session", "ts": now_ts})
     payload_b64 = base64.urlsafe_b64encode(data.encode("utf-8")).decode("utf-8")
     sig = hmac.new(secret, payload_b64.encode("utf-8"), hashlib.sha256).hexdigest()
     return f"{payload_b64}.{sig}"
@@ -181,6 +191,8 @@ def _validate_user_session_token(token: Optional[str]) -> Optional[Dict[str, Any
             return None
         data_str = base64.urlsafe_b64decode(payload_b64.encode("utf-8")).decode("utf-8")
         payload = json.loads(data_str)
+        if not isinstance(payload, dict) or not payload.get("email") or payload.get("pending_email"):
+            return None
         ts = payload.get("ts", 0)
         # Valid for 30 days
         if datetime.now(timezone.utc).timestamp() - ts < 2592000:
@@ -209,15 +221,25 @@ def _get_current_web_user(request: Request) -> Optional[Dict[str, Any]]:
     return None
 
 
-def _get_admin_signing_key() -> bytes:
-    key = os.environ.get("ADMIN_API_KEY") or os.environ.get("SUPABASE_SERVICE_ROLE_KEY") or "stock_research_admin_master_secret_2026"
-    return key.encode("utf-8")
+def _get_admin_signing_key(purpose: str = "admin_session") -> bytes:
+    key = (
+        os.environ.get("ADMIN_API_KEY")
+        or get_secret("ADMIN_API_KEY")
+        or os.environ.get("SUPABASE_SERVICE_ROLE_KEY")
+        or get_secret("SUPABASE_SERVICE_ROLE_KEY")
+        or os.environ.get("SECRET_KEY")
+        or get_secret("SECRET_KEY")
+        or os.environ.get("SUPABASE_DB_URL")
+        or get_secret("SUPABASE_DB_URL")
+        or "stock_research_admin_master_secret_2026"
+    )
+    return hashlib.sha256(f"{purpose}:{key}".encode("utf-8")).digest()
 
 
 def _generate_admin_token(email: str, role: str = "super_admin") -> str:
-    secret = _get_admin_signing_key()
+    secret = _get_admin_signing_key("admin_session")
     now_ts = int(datetime.now(timezone.utc).timestamp())
-    data = json.dumps({"email": email.strip().lower(), "role": role, "ts": now_ts})
+    data = json.dumps({"email": email.strip().lower(), "role": role, "purpose": "admin_session", "ts": now_ts})
     payload_b64 = base64.urlsafe_b64encode(data.encode("utf-8")).decode("utf-8")
     sig = hmac.new(secret, payload_b64.encode("utf-8"), hashlib.sha256).hexdigest()
     return f"{payload_b64}.{sig}"
@@ -228,12 +250,20 @@ def _validate_admin_token(token: Optional[str]) -> Optional[Dict[str, Any]]:
         return None
     try:
         payload_b64, sig = token.rsplit(".", 1)
-        secret = _get_admin_signing_key()
+        secret = _get_admin_signing_key("admin_session")
         expected_sig = hmac.new(secret, payload_b64.encode("utf-8"), hashlib.sha256).hexdigest()
         if not hmac.compare_digest(sig, expected_sig):
             return None
         data_str = base64.urlsafe_b64decode(payload_b64.encode("utf-8")).decode("utf-8")
         payload = json.loads(data_str)
+        # Prevent token confusion: reject pending_2fa tokens or tokens without verified admin email
+        if (
+            not isinstance(payload, dict)
+            or not payload.get("email")
+            or payload.get("pending_email")
+            or payload.get("purpose", "admin_session") != "admin_session"
+        ):
+            return None
         ts = payload.get("ts", 0)
         # Valid for 24 hours
         if datetime.now(timezone.utc).timestamp() - ts < 86400:
@@ -254,9 +284,9 @@ def _is_admin_authenticated(request: Request) -> Optional[Dict[str, Any]]:
 
 
 def _generate_pending_2fa_token(email: str) -> str:
-    secret = _get_admin_signing_key()
+    secret = _get_admin_signing_key("admin_2fa_pending")
     now_ts = int(datetime.now(timezone.utc).timestamp())
-    data = json.dumps({"pending_email": email.strip().lower(), "ts": now_ts})
+    data = json.dumps({"pending_email": email.strip().lower(), "purpose": "admin_2fa_pending", "ts": now_ts})
     payload_b64 = base64.urlsafe_b64encode(data.encode("utf-8")).decode("utf-8")
     sig = hmac.new(secret, payload_b64.encode("utf-8"), hashlib.sha256).hexdigest()
     return f"{payload_b64}.{sig}"
@@ -267,11 +297,13 @@ def _validate_pending_2fa_token(token: Optional[str]) -> Optional[str]:
         return None
     try:
         payload_b64, sig = token.rsplit(".", 1)
-        secret = _get_admin_signing_key()
+        secret = _get_admin_signing_key("admin_2fa_pending")
         expected_sig = hmac.new(secret, payload_b64.encode("utf-8"), hashlib.sha256).hexdigest()
         if not hmac.compare_digest(sig, expected_sig):
             return None
         data = json.loads(base64.urlsafe_b64decode(payload_b64.encode("utf-8")).decode("utf-8"))
+        if not isinstance(data, dict) or data.get("purpose", "admin_2fa_pending") != "admin_2fa_pending":
+            return None
         ts = data.get("ts", 0)
         # Valid for 15 minutes
         if datetime.now(timezone.utc).timestamp() - ts < 900:

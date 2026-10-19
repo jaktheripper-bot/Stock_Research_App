@@ -2026,6 +2026,9 @@ async def contact_page(
     )
 
 
+_CONTACT_RATE_BUCKETS: Dict[str, List[float]] = {}
+
+
 @app.post("/contact", response_class=HTMLResponse)
 async def submit_contact_ticket(
     request: Request,
@@ -2037,11 +2040,15 @@ async def submit_contact_ticket(
     category: Optional[str] = Form("general")
 ):
     """Processes user complaint/support ticket, logs to audit ledger, and alerts admin."""
-    clean_email = str(user_email).strip().lower()
-    clean_subj = str(subject).strip()
-    clean_msg = str(message).strip()
-    clean_name = str(user_name or "").strip()
-    clean_cat = str(category or "general").strip().lower()
+    import time as _time
+    clean_email = str(user_email).strip().lower()[:160]
+    clean_subj = str(subject).strip()[:250]
+    clean_msg = str(message).strip()[:5000]
+    clean_name = str(user_name or "").strip()[:100]
+    clean_cat = str(category or "general").strip().lower()[:40]
+
+    if not _validate_request_origin(request):
+        raise HTTPException(status_code=403, detail="Cross-origin request rejected.")
 
     if not clean_email or "@" not in clean_email or not clean_subj or not clean_msg:
         return templates.TemplateResponse(
@@ -2057,6 +2064,29 @@ async def submit_contact_ticket(
                 "form_cat": clean_cat,
             }
         )
+
+    if os.environ.get("TESTING") != "1":
+        client_ip = (request.headers.get("x-forwarded-for") or (request.client.host if request.client else "unknown")).split(",")[0].strip()
+        rate_key = f"{client_ip}:{clean_email}"
+        now_ts = _time.time()
+        window_hits = [ts for ts in _CONTACT_RATE_BUCKETS.get(rate_key, []) if (now_ts - ts) < 600]
+        if len(window_hits) >= 5:
+            return templates.TemplateResponse(
+                request=request,
+                name="contact.html",
+                context={
+                    "active_page": "contact",
+                    "error_msg": "Too many support requests submitted recently. Please wait a few minutes before submitting another ticket.",
+                    "form_name": clean_name,
+                    "form_email": clean_email,
+                    "form_subj": clean_subj,
+                    "form_msg": clean_msg,
+                    "form_cat": clean_cat,
+                },
+                status_code=429,
+            )
+        window_hits.append(now_ts)
+        _CONTACT_RATE_BUCKETS[rate_key] = window_hits
 
     res = create_support_ticket(
         user_email=clean_email,
@@ -2307,3 +2337,19 @@ async def robots_txt():
         f"Sitemap: {base_url}/sitemap.xml\n"
     )
     return Response(content=content, media_type="text/plain")
+
+
+@app.get("/.well-known/security.txt", response_class=Response)
+@app.get("/security.txt", response_class=Response)
+async def security_txt():
+    """RFC 9116 Vulnerability Disclosure Policy pointing strictly to the on-site support desk."""
+    base_url = (os.environ.get("CANONICAL_DOMAIN") or "https://moatnomics.com").rstrip("/")
+    expires_iso = (datetime.now(timezone.utc) + timedelta(days=365)).strftime("%Y-%m-%dT00:00:00.000Z")
+    content = (
+        f"Contact: {base_url}/contact\n"
+        f"Expires: {expires_iso}\n"
+        "Preferred-Languages: en\n"
+        f"Canonical: {base_url}/.well-known/security.txt\n"
+        f"Policy: {base_url}/terms\n"
+    )
+    return Response(content=content, media_type="text/plain; charset=utf-8")

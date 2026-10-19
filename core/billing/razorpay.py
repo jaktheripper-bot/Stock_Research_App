@@ -256,7 +256,7 @@ def process_successful_payment(
     if not is_valid:
         return False, 0.0, "", "Payment signature verification failed. Transaction was not confirmed."
 
-    # Verify order-to-plan amount integrity against recorded order intent
+    # Verify order-to-plan amount and user integrity against recorded order intent
     intent = _ORDER_INTENT_CACHE.get(order_id)
     if intent:
         if int(intent.get("amount_paise", 0)) < int(plan["amount_paise"]):
@@ -271,20 +271,60 @@ def process_successful_payment(
                 order_id, intent.get("plan_id"), plan["id"]
             )
             return False, 0.0, "", "Order plan mismatch."
+        intent_uid = intent.get("user_id")
+        if (
+            intent_uid
+            and intent_uid != "guest_web_user"
+            and user_id
+            and user_id != "guest_web_user"
+            and intent_uid != user_id
+        ):
+            logger.error(
+                "Order user mismatch for order %s: created for %s, claimed by %s",
+                order_id, intent_uid, user_id
+            )
+            return False, 0.0, "", "Order belongs to a different user session."
     elif not order_id.startswith("order_sim_"):
+        remote_order = None
         client = get_razorpay_client()
         if client:
             try:
                 remote_order = client.order.fetch(order_id)
-                remote_amount = int(remote_order.get("amount", 0))
-                if remote_amount < int(plan["amount_paise"]):
-                    logger.error(
-                        "Remote Razorpay order %s amount %s < plan %s price %s",
-                        order_id, remote_amount, plan["id"], plan["amount_paise"]
-                    )
-                    return False, 0.0, "", "Verified payment amount is less than plan price."
             except Exception as fetch_err:
-                logger.warning("Could not fetch remote order metadata for %s: %s", order_id, fetch_err)
+                logger.warning("Could not fetch remote order metadata via SDK for %s: %s", order_id, fetch_err)
+        if remote_order is None and os.environ.get("TESTING") != "1":
+            key_id, key_secret, _ = get_razorpay_keys()
+            if key_id and key_secret:
+                try:
+                    r_ord = requests.get(
+                        f"https://api.razorpay.com/v1/orders/{order_id}",
+                        auth=(key_id, key_secret),
+                        timeout=8,
+                    )
+                    if r_ord.status_code == 200:
+                        remote_order = r_ord.json()
+                except Exception as rest_err:
+                    logger.warning("Could not fetch remote order metadata via REST for %s: %s", order_id, rest_err)
+
+        if isinstance(remote_order, dict):
+            remote_amount = int(remote_order.get("amount", 0))
+            if remote_amount < int(plan["amount_paise"]):
+                logger.error(
+                    "Remote Razorpay order %s amount %s < plan %s price %s",
+                    order_id, remote_amount, plan["id"], plan["amount_paise"]
+                )
+                return False, 0.0, "", "Verified payment amount is less than plan price."
+            notes = remote_order.get("notes") or {}
+            note_plan = notes.get("plan_id")
+            if note_plan and note_plan != "custom" and note_plan != plan["id"] and note_plan != plan_id:
+                logger.error(
+                    "Remote Razorpay order %s plan_id %s != claimed %s",
+                    order_id, note_plan, plan["id"]
+                )
+                return False, 0.0, "", "Verified order plan does not match claimed plan."
+        elif os.environ.get("TESTING") != "1":
+            logger.error("Fail-closed: unable to verify remote Razorpay order %s metadata.", order_id)
+            return False, 0.0, "", "Could not verify order metadata with payment gateway."
 
     # Idempotency check: if transaction already processed, return existing confirmation
     from core.db.users import get_credit_transaction_by_gateway_id, get_user_credits_balance
@@ -327,15 +367,21 @@ def generate_invoice_html(
     """
     Generates a formal, printable HTML invoice receipt complying with Indian IT service rules.
     """
+    import html as _html
+    safe_inv = _html.escape(str(invoice_number or ""))
+    safe_email = _html.escape(str(user_email or ""))
+    safe_plan = _html.escape(str(plan_name or ""))
+    safe_pay = _html.escape(str(payment_id or ""))
+    safe_date = _html.escape(str(date_str or ""))
     tax_amount = 0.0
-    base_amount = round(amount_inr, 2)
+    base_amount = round(float(amount_inr), 2)
 
     return f"""
     <!DOCTYPE html>
     <html>
     <head>
         <meta charset="utf-8">
-        <title>Receipt {invoice_number}</title>
+        <title>Receipt {safe_inv}</title>
         <style>
             body {{ font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; margin: 40px; color: #1e293b; }}
             .header {{ display: flex; justify-content: space-between; border-bottom: 2px solid #e2e8f0; padding-bottom: 20px; }}
@@ -356,10 +402,10 @@ def generate_invoice_html(
             </div>
             <div class="meta">
                 <div style="font-size: 16px; font-weight: 700; color: #0f172a;">PAYMENT RECEIPT</div>
-                <div>Receipt #: {invoice_number}</div>
-                <div>Date: {date_str}</div>
-                <div>Payment ID: {payment_id}</div>
-                <div>Billed To: {user_email}</div>
+                <div>Receipt #: {safe_inv}</div>
+                <div>Date: {safe_date}</div>
+                <div>Payment ID: {safe_pay}</div>
+                <div>Billed To: {safe_email}</div>
             </div>
         </div>
 
@@ -376,17 +422,17 @@ def generate_invoice_html(
             <tbody>
                 <tr>
                     <td>
-                        <strong>{plan_name}</strong><br>
+                        <strong>{safe_plan}</strong><br>
                         <span style="font-size: 12px; color: #64748b;">{INVOICE_SERVICE_DESCRIPTION}</span>
                     </td>
-                    <td>{credits_added:.1f} Credits</td>
+                    <td>{float(credits_added):.1f} Credits</td>
                     <td>₹{base_amount:.2f}</td>
                     <td>₹{tax_amount:.2f}</td>
-                    <td>₹{amount_inr:.2f}</td>
+                    <td>₹{float(amount_inr):.2f}</td>
                 </tr>
                 <tr class="total-row">
                     <td colspan="4" style="text-align: right;">Total Paid:</td>
-                    <td>₹{amount_inr:.2f}</td>
+                    <td>₹{float(amount_inr):.2f}</td>
                 </tr>
             </tbody>
         </table>

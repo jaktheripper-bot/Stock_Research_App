@@ -225,17 +225,20 @@ def api_get_recent_rating_actions(limit: int = 50):
 @router.post("/api/debt/ingest")
 def api_ingest_debt_security(request: Request, payload: IngestDebtRequest):
     """Public API: Ingest and analyze any corporate bond, NCD, or SDI by ISIN."""
+    import re
     init_db()
+    if not _validate_request_origin(request):
+        raise HTTPException(status_code=403, detail="Cross-origin request rejected.")
     if not _get_current_web_user(request) and not _is_admin_authenticated(request):
         raise HTTPException(
             status_code=401,
             detail="Authentication required. Please sign in to ingest corporate debt securities."
         )
     raw_isin = (payload.isin or "").strip().upper()
-    if not raw_isin or len(raw_isin) != 12:
+    if not raw_isin or not re.match(r"^IN[A-Z0-9]{10}$", raw_isin):
         raise HTTPException(
             status_code=400,
-            detail="Invalid ISIN. Indian ISINs must be exactly 12 alphanumeric characters (e.g., INE002A08012)."
+            detail="Invalid ISIN. Indian ISINs must be 12 alphanumeric characters starting with 'IN' (e.g., INE002A08012)."
         )
 
     existing = get_debt_security_by_isin(raw_isin)
@@ -248,7 +251,12 @@ def api_ingest_debt_security(request: Request, payload: IngestDebtRequest):
             "already_exists": True
         }
 
-    ticker = (payload.ticker or "").strip().upper()
+    def _strip_tags(val: Optional[str]) -> str:
+        return re.sub(r"[<>\"'`]", "", str(val or "")).strip()
+
+    clean_issuer = _strip_tags(payload.issuer_name)[:120]
+    clean_instr = _strip_tags(payload.instrument_name)[:160]
+    ticker = re.sub(r"[^A-Z0-9_-]", "", (payload.ticker or "").strip().upper())[:24]
     if not ticker:
         isin_prefix_map = {
             "INE002A": "RELIANCE", "INE306N": "TATACAP", "INE121A": "CHOLAFIN",
@@ -262,22 +270,28 @@ def api_ingest_debt_security(request: Request, payload: IngestDebtRequest):
         matched_prefix = next((p for p in isin_prefix_map if raw_isin.startswith(p)), None)
         if matched_prefix:
             ticker = isin_prefix_map[matched_prefix]
-        elif payload.issuer_name:
-            words = [w for w in payload.issuer_name.replace("Limited", "").replace("Ltd", "").replace("LTD", "").replace("LIMITED", "").split() if w]
-            ticker = words[0].upper() if words else f"CORP_{raw_isin[3:7]}"
+        elif clean_issuer:
+            words = [w for w in clean_issuer.replace("Limited", "").replace("Ltd", "").replace("LTD", "").replace("LIMITED", "").split() if w]
+            ticker = re.sub(r"[^A-Z0-9_-]", "", words[0].upper())[:24] if words else f"CORP_{raw_isin[3:7]}"
         else:
             ticker = f"CORP_{raw_isin[3:7]}"
 
-    name = payload.issuer_name or payload.instrument_name or f"{ticker} Fixed-Income Security ({raw_isin})"
+    name = clean_issuer or clean_instr or f"{ticker} Fixed-Income Security ({raw_isin})"
     effective_coupon = payload.coupon_rate if payload.coupon_rate is not None else payload.coupon_rate_pct
     coupon = float(effective_coupon if effective_coupon is not None else 8.50)
+    if coupon < 0.0 or coupon > 30.0:
+        raise HTTPException(status_code=400, detail="Coupon rate must be between 0.0% and 30.0%.")
     now_dt = datetime.now()
-    mat_date = payload.maturity_date or f"{now_dt.year + 3}-{now_dt.month:02d}-{now_dt.day:02d}"
+    mat_date = _strip_tags(payload.maturity_date)[:16] or f"{now_dt.year + 3}-{now_dt.month:02d}-{now_dt.day:02d}"
     face_val = float(payload.face_value or 10000.0)
+    if face_val < 100.0 or face_val > 100000000.0:
+        raise HTTPException(status_code=400, detail="Face value must be between ₹100 and ₹10,00,00,000.")
     price = float(payload.last_traded_price or face_val)
+    if price <= 0.0:
+        raise HTTPException(status_code=400, detail="Last traded price must be positive.")
 
-    credit_rating = (payload.credit_rating or "CRISIL AAA").strip()
-    credit_agency = payload.credit_rating_agency
+    credit_rating = (_strip_tags(payload.credit_rating) or "CRISIL AAA")[:32]
+    credit_agency = _strip_tags(payload.credit_rating_agency)[:24]
     if not credit_agency and credit_rating:
         first_word = credit_rating.split()[0].upper()
         if first_word in ("CRISIL", "ICRA", "CARE", "IND", "BRICKWORK", "ACUITE"):
@@ -511,6 +525,9 @@ def api_get_fund_forensic_dossier(scheme_code: str, request: Request):
     clean = scheme_code.strip().upper()
     dossier = get_fund_forensic_dossier(clean)
     if not dossier:
+        is_authed = bool(_get_current_web_user(request) or _is_admin_authenticated(request))
+        if not is_authed and os.environ.get("TESTING") != "1" and not get_mutual_fund_scheme(clean):
+            raise HTTPException(status_code=404, detail=f"Forensic dossier not available for {clean}.")
         try:
             dossier = audit_single_fund_daily(clean)
         except Exception as e:

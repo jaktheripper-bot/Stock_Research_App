@@ -164,6 +164,84 @@ class TestAdversarialAuditRemediations(unittest.TestCase):
         )
         self.assertEqual(res.symbol, "TCS")
 
+    def test_crit06_admin_pending_2fa_cookie_cannot_substitute_for_admin_session(self):
+        """[CRIT-06] Verify admin_2fa_pending token cannot be substituted into admin_session cookie to bypass TOTP."""
+        from web.common import _generate_pending_2fa_token, _validate_admin_token
+
+        pending_tok = _generate_pending_2fa_token("admin@moatnomics.com")
+        self.assertIsNone(
+            _validate_admin_token(pending_tok),
+            "CRITICAL: _validate_admin_token accepted an admin_2fa_pending token (2FA bypass via cookie substitution)!"
+        )
+        resp = self.client.post(
+            "/api/admin/run-fund-audit",
+            json={},
+            cookies={"admin_session": pending_tok},
+        )
+        self.assertIn(resp.status_code, (401, 403))
+
+    def test_high02_cross_user_order_intent_and_invoice_xss_escaping(self):
+        """[HIGH-02] Verify one user cannot claim another user's Razorpay order intent and invoice HTML escapes XSS."""
+        from core.billing.razorpay import _record_order_intent, process_successful_payment, generate_invoice_html
+
+        _record_order_intent("order_sim_alice_999", "usr_alice", "single_pass", 19900)
+        ok, _, _, msg = process_successful_payment(
+            user_id="usr_bob",
+            plan_id="single_pass",
+            order_id="order_sim_alice_999",
+            payment_id="pay_sim_999",
+            signature="simulated_success",
+        )
+        self.assertFalse(ok, f"HIGH: usr_bob claimed usr_alice's order_id! msg={msg}")
+
+        inv_html = generate_invoice_html(
+            invoice_number="INV-<script>alert(1)</script>",
+            user_email="<img src=x onerror=alert(1)>@example.com",
+            plan_name="<b>Single Pass</b>",
+            amount_inr=199.0,
+            credits_added=1.0,
+            payment_id="pay_<script>",
+            date_str="2026-10-19",
+        )
+        self.assertNotIn("<script>", inv_html)
+        self.assertNotIn("<img src=x", inv_html)
+        self.assertIn("&lt;script&gt;", inv_html)
+
+    def test_high03_debt_ingest_blocks_invalid_isin_and_coupon_bounds(self):
+        """[HIGH-03] Verify /api/debt/ingest enforces Indian ISIN prefix and coupon sanity bounds."""
+        from web.common import _generate_user_session_token
+        from core.db.users import get_or_create_user
+
+        get_or_create_user("usr_pentest_debt", "pentest@example.com", "Rahul Sharma")
+        tok = _generate_user_session_token("usr_pentest_debt", "pentest@example.com")
+
+        # 1. Invalid ISIN prefix (not starting with IN)
+        r_bad_isin = self.client.post(
+            "/api/debt/ingest",
+            json={"isin": "XX0000000001", "coupon_rate": 8.5},
+            cookies={"user_session_token": tok},
+        )
+        self.assertEqual(r_bad_isin.status_code, 400)
+
+        # 2. Out-of-bounds coupon (> 30%)
+        r_bad_coupon = self.client.post(
+            "/api/debt/ingest",
+            json={"isin": "INE999Z08011", "coupon_rate": 999.0},
+            cookies={"user_session_token": tok},
+        )
+        self.assertEqual(r_bad_coupon.status_code, 400)
+
+    def test_med04_rfc9116_security_txt_endpoint_and_zero_email_hygiene(self):
+        """[MED-04] Verify /.well-known/security.txt and /security.txt conform to RFC 9116 and Directive 2."""
+        for path in ("/.well-known/security.txt", "/security.txt"):
+            r = self.client.get(path)
+            self.assertEqual(r.status_code, 200)
+            self.assertIn("Contact: https://moatnomics.com/contact", r.text)
+            self.assertIn("Expires:", r.text)
+            self.assertIn("Canonical: https://moatnomics.com/.well-known/security.txt", r.text)
+            self.assertNotIn("@", r.text, "Directive 2 violation: email address exposed in security.txt")
+
 
 if __name__ == "__main__":
     unittest.main()
+
