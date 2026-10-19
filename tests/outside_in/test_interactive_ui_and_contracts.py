@@ -1285,5 +1285,61 @@ class TestCompetitiveEnhancements(unittest.TestCase):
 
 
 
+    def test_interactive_reverse_dcf_sandbox_contracts(self):
+        """
+        [Rule 6 Outside-In UI Contract Test]
+        Validates the Interactive Pillar 05 Reverse DCF & 3-Model Valuation Sandbox:
+        1. Container presence (#reverseDcfSandbox).
+        2. All 3 interactive range sliders (#dcfGrowthSlider, #dcfWaccSlider, #dcfTermSlider) with oninput handler.
+        3. All simulated output and value indicator elements exist (#dcfGrowthVal, #dcfWaccVal, #dcfTermVal, #dcfSimFairValue, #dcfSimMos, #dcfSimVerdictBar).
+        4. Inline script defines recalcDcfSandbox function with valid numeric JSON embeddings.
+        5. Zero unrendered Jinja tags ({{ or {%) leak into markup.
+        """
+        from bs4 import BeautifulSoup
+        resp = self.client.get("/dossier/INFY")
+        self.assertEqual(resp.status_code, 200)
+
+        soup = BeautifulSoup(resp.text, "html.parser")
+        sandbox = soup.find(id="reverseDcfSandbox")
+        self.assertIsNotNone(sandbox, "#reverseDcfSandbox must be present when valuation_radar is COMPUTED")
+
+        # Verify Sliders
+        growth_slider = sandbox.find("input", id="dcfGrowthSlider")
+        wacc_slider = sandbox.find("input", id="dcfWaccSlider")
+        term_slider = sandbox.find("input", id="dcfTermSlider")
+
+        self.assertIsNotNone(growth_slider)
+        self.assertEqual(growth_slider.get("type"), "range")
+        self.assertEqual(growth_slider.get("oninput"), "recalcDcfSandbox()")
+
+        self.assertIsNotNone(wacc_slider)
+        self.assertEqual(wacc_slider.get("type"), "range")
+        self.assertEqual(wacc_slider.get("oninput"), "recalcDcfSandbox()")
+
+        self.assertIsNotNone(term_slider)
+        self.assertEqual(term_slider.get("type"), "range")
+        self.assertEqual(term_slider.get("oninput"), "recalcDcfSandbox()")
+
+        # Verify Output Elements
+        self.assertIsNotNone(sandbox.find(id="dcfGrowthVal"))
+        self.assertIsNotNone(sandbox.find(id="dcfWaccVal"))
+        self.assertIsNotNone(sandbox.find(id="dcfTermVal"))
+        self.assertIsNotNone(sandbox.find(id="dcfSimFairValue"))
+        self.assertIsNotNone(sandbox.find(id="dcfSimMos"))
+        self.assertIsNotNone(sandbox.find(id="dcfSimVerdictBar"))
+
+        # Verify JS Wiring
+        scripts = [s.string for s in soup.find_all("script") if s.string and "recalcDcfSandbox" in s.string]
+        self.assertEqual(len(scripts), 1, "Exactly one script defining recalcDcfSandbox must be rendered")
+        self.assertIn("function recalcDcfSandbox()", scripts[0])
+        self.assertIn("dcfGrowthSlider", scripts[0])
+        self.assertIn("dcfSimFairValue", scripts[0])
+
+        # Verify Zero Jinja Leaks in rendered sandbox
+        sandbox_str = str(sandbox)
+        self.assertNotIn("{{", sandbox_str, "Unrendered Jinja tag detected in #reverseDcfSandbox")
+        self.assertNotIn("{%", sandbox_str, "Unrendered Jinja directive detected in #reverseDcfSandbox")
+
+
 if __name__ == "__main__":
     unittest.main()

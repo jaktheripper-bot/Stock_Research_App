@@ -307,6 +307,117 @@
 
       </div>
 
+      {% if equity_intel.valuation_radar and equity_intel.valuation_radar.status == 'COMPUTED' %}
+      <!-- Interactive Pillar 05 Reverse DCF & 3-Model Valuation Sandbox -->
+      <div id="reverseDcfSandbox" style="background: rgba(15, 23, 42, 0.78); border: 1px solid rgba(56, 189, 248, 0.25); border-radius: 12px; padding: 18px 20px; margin-bottom: 22px;">
+        <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 10px; margin-bottom: 14px; border-bottom: 1px solid rgba(255,255,255,0.06); padding-bottom: 10px;">
+          <div>
+            <span style="font-size: 11px; font-weight: 800; color: #38bdf8; text-transform: uppercase; letter-spacing: 0.05em;">⚡ Interactive Pillar 05 Valuation Sandbox</span>
+            <h4 style="margin: 2px 0 0; font-size: 15px; font-weight: 800; color: #f8fafc;">Reverse DCF &amp; Multi-Model Margin of Safety Stress-Tester</h4>
+          </div>
+          <div style="display: flex; align-items: center; gap: 8px;">
+            <span style="font-size: 12px; color: #94a3b8;">Market Implied Growth at CMP (₹{{ "{:,.2f}".format(equity_intel.valuation_radar.current_price) }}):</span>
+            <strong class="tnum" style="font-size: 13px; color: #fbbf24; background: rgba(245, 158, 11, 0.14); border: 1px solid rgba(245, 158, 11, 0.3); padding: 2px 8px; border-radius: 6px;">
+              {{ equity_intel.valuation_radar.inputs.implied_fcf_growth_pct|default(12.0) }}% CAGR
+            </strong>
+          </div>
+        </div>
+
+        <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap: 18px; align-items: center;">
+          <!-- Sliders Column -->
+          <div style="display: flex; flex-direction: column; gap: 12px;">
+            <div>
+              <div style="display: flex; justify-content: space-between; font-size: 12px; margin-bottom: 4px;">
+                <label for="dcfGrowthSlider" style="color: #cbd5e1; font-weight: 600;">Stage-1 Growth Rate (5Y CAGR)</label>
+                <strong id="dcfGrowthVal" class="tnum" style="color: #38bdf8;">{{ equity_intel.valuation_radar.inputs.initial_growth_pct|default(12.0) }}%</strong>
+              </div>
+              <input id="dcfGrowthSlider" type="range" min="0" max="35" step="0.5" value="{{ equity_intel.valuation_radar.inputs.initial_growth_pct|default(12.0) }}" oninput="recalcDcfSandbox()" style="width: 100%;">
+            </div>
+
+            <div>
+              <div style="display: flex; justify-content: space-between; font-size: 12px; margin-bottom: 4px;">
+                <label for="dcfWaccSlider" style="color: #cbd5e1; font-weight: 600;">Cost of Equity / WACC Hurdle</label>
+                <strong id="dcfWaccVal" class="tnum" style="color: #38bdf8;">{{ equity_intel.valuation_radar.inputs.discount_rate_pct|default(11.0) }}%</strong>
+              </div>
+              <input id="dcfWaccSlider" type="range" min="8" max="16" step="0.25" value="{{ equity_intel.valuation_radar.inputs.discount_rate_pct|default(11.0) }}" oninput="recalcDcfSandbox()" style="width: 100%;">
+            </div>
+
+            <div>
+              <div style="display: flex; justify-content: space-between; font-size: 12px; margin-bottom: 4px;">
+                <label for="dcfTermSlider" style="color: #cbd5e1; font-weight: 600;">Terminal Perpetual Growth</label>
+                <strong id="dcfTermVal" class="tnum" style="color: #38bdf8;">{{ equity_intel.valuation_radar.inputs.terminal_growth_pct|default(4.5) }}%</strong>
+              </div>
+              <input id="dcfTermSlider" type="range" min="2" max="6.5" step="0.25" value="{{ equity_intel.valuation_radar.inputs.terminal_growth_pct|default(4.5) }}" oninput="recalcDcfSandbox()" style="width: 100%;">
+            </div>
+          </div>
+
+          <!-- Live Output Card -->
+          <div style="background: rgba(2, 6, 23, 0.65); border: 1px solid rgba(255,255,255,0.08); border-radius: 10px; padding: 16px;">
+            <div style="display: flex; justify-content: space-between; align-items: baseline; margin-bottom: 10px;">
+              <div>
+                <div style="font-size: 11px; color: #94a3b8; text-transform: uppercase; font-weight: 700;">Simulated Intrinsic Value</div>
+                <div id="dcfSimFairValue" class="tnum" style="font-size: 26px; font-weight: 800; color: #f8fafc;">
+                  ₹{{ "{:,.2f}".format(equity_intel.valuation_radar.fair_value) }}
+                </div>
+              </div>
+              <div style="text-align: right;">
+                <div style="font-size: 11px; color: #94a3b8; text-transform: uppercase; font-weight: 700;">Simulated Margin of Safety</div>
+                <div id="dcfSimMos" class="tnum" style="font-size: 20px; font-weight: 800; color: {{ equity_intel.valuation_radar.badge_color }};">
+                  {% if equity_intel.valuation_radar.margin_of_safety_pct >= 0 %}+{% endif %}{{ equity_intel.valuation_radar.margin_of_safety_pct }}%
+                </div>
+              </div>
+            </div>
+            <div id="dcfSimVerdictBar" style="font-size: 12px; color: #cbd5e1; padding-top: 8px; border-top: 1px solid rgba(255,255,255,0.06);">
+              {{ equity_intel.valuation_radar.summary }}
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <script>
+      function recalcDcfSandbox() {
+        const cmp = {{ equity_intel.valuation_radar.current_price|default(0)|tojson }};
+        const baseEps = {{ equity_intel.valuation_radar.inputs.normalized_eps|default(10)|tojson }};
+        const peModelFv = {{ equity_intel.valuation_radar.models.historical_pe_model.fair_value|default(0)|tojson }};
+        const epvModelFv = {{ equity_intel.valuation_radar.models.epv_model.fair_value|default(0)|tojson }};
+
+        const g = parseFloat(document.getElementById('dcfGrowthSlider').value) / 100.0;
+        const wacc = parseFloat(document.getElementById('dcfWaccSlider').value) / 100.0;
+        const tg = parseFloat(document.getElementById('dcfTermSlider').value) / 100.0;
+
+        document.getElementById('dcfGrowthVal').textContent = (g * 100).toFixed(1) + '%';
+        document.getElementById('dcfWaccVal').textContent = (wacc * 100).toFixed(2) + '%';
+        document.getElementById('dcfTermVal').textContent = (tg * 100).toFixed(2) + '%';
+
+        let pvStage1 = 0;
+        let proj = baseEps;
+        for (let yr = 1; yr <= 5; yr++) {
+          proj *= (1 + g);
+          pvStage1 += proj / Math.pow(1 + wacc, yr);
+        }
+        const spread = Math.max(0.02, wacc - tg);
+        const tv = (proj * (1 + tg)) / spread;
+        const dcfFv = pvStage1 + (tv / Math.pow(1 + wacc, 5));
+
+        const compositeFv = (peModelFv * 0.40) + (dcfFv * 0.40) + (epvModelFv * 0.20);
+        const mos = cmp > 0 ? ((compositeFv - cmp) / cmp) * 100.0 : 0.0;
+
+        const fvEl = document.getElementById('dcfSimFairValue');
+        const mosEl = document.getElementById('dcfSimMos');
+        const verdictEl = document.getElementById('dcfSimVerdictBar');
+
+        if (fvEl) fvEl.textContent = '₹' + compositeFv.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+        if (mosEl) {
+          mosEl.textContent = (mos >= 0 ? '+' : '') + mos.toFixed(1) + '%';
+          mosEl.style.color = mos >= 10 ? '#10b981' : (mos >= -10 ? '#fbbf24' : '#ef4444');
+        }
+        if (verdictEl) {
+          verdictEl.textContent = `2-Stage DCF Value: ₹${dcfFv.toFixed(2)} | Historical P/E Value: ₹${peModelFv.toFixed(2)} | Graham EPV Floor: ₹${epvModelFv.toFixed(2)}`;
+        }
+      }
+      </script>
+      {% endif %}
+
       <!-- 60-Second "Bull vs. Bear" Structural Thesis Box -->
       {% if equity_intel.bull_bear_thesis %}
       <div style="border-top: 1px solid rgba(255,255,255,0.08); padding-top: 18px;">
