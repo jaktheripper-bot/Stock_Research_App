@@ -335,8 +335,8 @@
     </div>
 
     <!-- Institutional Constituent Deep-Dive Confirmation Modal -->
-    <div id="deepDiveModal" style="display: none; position: fixed; inset: 0; background: rgba(10, 15, 29, 0.85); backdrop-filter: blur(10px); z-index: 9999; align-items: center; justify-content: center; padding: 20px;">
-      <div style="background: #0f172a; border: 1px solid rgba(168, 85, 247, 0.4); border-radius: 16px; max-width: 540px; width: 100%; box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.7); overflow: hidden; animation: fadeInModal 0.2s ease-out;">
+    <div id="deepDiveModal" class="modal-backdrop" onclick="if(event.target===this) closeDeepDiveModal()" style="display: none; position: fixed; inset: 0; background: rgba(10, 15, 29, 0.85); backdrop-filter: blur(10px); z-index: 9999; align-items: center; justify-content: center; padding: 20px;">
+      <div class="modal-dialog" style="background: #0f172a; border: 1px solid rgba(168, 85, 247, 0.4); border-radius: 16px; max-width: 540px; width: 100%; box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.7); overflow: hidden; animation: fadeInModal 0.2s ease-out;">
         <!-- Modal Header -->
         <div style="background: linear-gradient(135deg, rgba(147, 51, 234, 0.2) 0%, rgba(30, 41, 59, 0.6) 100%); padding: 20px 24px; border-bottom: 1px solid rgba(255, 255, 255, 0.08); display: flex; justify-content: space-between; align-items: center;">
           <div style="display: flex; align-items: center; gap: 10px;">

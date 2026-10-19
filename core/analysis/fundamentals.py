@@ -474,6 +474,14 @@ def _enrich_with_cached_db_fundamentals(res_dict: dict, symbol: str) -> dict:
                 res_dict["sector"] = cached["sector"]
             if res_dict.get("industry") in [None, "N/A", "", "Diversified"] and cached.get("industry"):
                 res_dict["industry"] = cached["industry"]
+            if res_dict.get("market_cap") in [None, "N/A", "", 0, "0"] and cached.get("market_cap") not in [None, "N/A", "", 0, "0"]:
+                res_dict["market_cap"] = cached["market_cap"]
+            if res_dict.get("pe_ratio") in [None, "N/A", "", "Fair", 0, 0.0, "0"]:
+                c_pe = cached.get("pe_ratio")
+                if c_pe not in [None, "N/A", "", "Fair", 0, 0.0, "0"]:
+                    res_dict["pe_ratio"] = c_pe
+                elif cached.get("forward_pe") not in [None, "N/A", "", "Fair", 0, 0.0, "0"]:
+                    res_dict["pe_ratio"] = cached["forward_pe"]
     except Exception as e:
         logger.debug(f"Cached fundamentals blend notice for {symbol}: {e}")
 
@@ -529,7 +537,7 @@ def get_stock_fundamentals(query: str) -> dict:
                     "sector": "General Industry",
                     "industry": "Diversified",
                     "market_cap": "N/A",
-                    "pe_ratio": "Fair",
+                    "pe_ratio": resolve_pe_with_failsafes(canonical or clean, scrip or ""),
                     "current_price": round(float(quote["ltp"]), 2),
                     "52w_high": round(float(quote.get("52w_high", 0)), 2),
                     "52w_low": round(float(quote.get("52w_low", 0)), 2),

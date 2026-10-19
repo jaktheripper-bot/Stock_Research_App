@@ -16,7 +16,7 @@ import logging
 from core.analysis.sector_scoring import evaluate_sector_fundamentals
 from core.analysis.institutional_flow import analyze_institutional_flow
 from core.analysis.forensic_sieve import evaluate_forensic_sieve
-from core.analysis.valuation_radar import compute_valuation_radar
+from core.analysis.valuation_radar import compute_valuation_radar, _safe_float
 from core.analysis.dossier_bull_bear import synthesize_bull_bear_thesis
 from core.ingestion.angel_one import AngelOneGateway
 
@@ -64,13 +64,13 @@ def compile_equity_dossier(
         fundamentals.get("base_price") or 
         0.0
     )
-    current_price = float(raw_price) if raw_price is not None else 0.0
+    current_price = _safe_float(raw_price, 0.0)
     
     raw_pe = fundamentals.get("pe_ratio")
-    pe_ratio = float(raw_pe) if raw_pe is not None else 0.0
+    pe_ratio = _safe_float(raw_pe, 0.0) or _safe_float(fundamentals.get("forward_pe"), 0.0)
 
     raw_growth = fundamentals.get("sales_growth_3y")
-    sales_growth = float(raw_growth) if raw_growth is not None else None
+    sales_growth = _safe_float(raw_growth, 12.0) if raw_growth is not None else None
     
     valuation_data = compute_valuation_radar(
         current_price=current_price,

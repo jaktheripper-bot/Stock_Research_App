@@ -264,7 +264,7 @@
 <script>
 let currentAuditTaskId = null;
 let currentAuditScheme = null;
-let pollTimer = null;
+let auditPollTimer = null;
 let notificationRequested = false;
 
 function requestAuditDesktopNotification() {
@@ -285,19 +285,16 @@ function requestAuditDesktopNotification() {
   });
 }
 
-let currentAuditScheme = null;
-let currentAuditTaskId = null;
-let auditPollTimer = null;
-
 async function startOnDemandFundAudit() {
-  const input = document.getElementById("onDemandSchemeInput") || document.getElementById("onDemandFundInput");
+  const input = document.getElementById("onDemandFundInput");
   const schemeCode = (input ? input.value : "").trim();
   if (!schemeCode) {
     alert("Please enter a valid AMFI Scheme Code or Scheme Name.");
     return;
   }
 
-  const box = document.getElementById("auditProgressBox") || document.getElementById("onDemandAuditStatus");
+  const statusOuter = document.getElementById("onDemandAuditStatus");
+  const box = document.getElementById("auditProgressBox") || statusOuter;
   const bar = document.getElementById("auditProgressBar");
   const pct = document.getElementById("auditProgressPct");
   const msg = document.getElementById("auditStatusMsg") || document.getElementById("auditStatusText");
@@ -306,6 +303,7 @@ async function startOnDemandFundAudit() {
   const btn = document.getElementById("onDemandAuditBtn");
 
   if (btn) btn.disabled = true;
+  if (statusOuter) statusOuter.style.display = "block";
   if (box) box.style.display = "block";
   if (bar) bar.style.width = "15%";
   if (pct) pct.innerText = "15%";

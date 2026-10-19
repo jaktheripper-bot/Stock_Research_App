@@ -1132,6 +1132,11 @@ window.openSignInModal = function() {
   if (modal) modal.classList.add('active');
 };
 
+window.closeSignInModal = function() {
+  const modal = document.getElementById('authModal');
+  if (modal) modal.classList.remove('active');
+};
+
 let _authOtpRequested = false;
 
 window.handleAuthFormSubmit = async function(e) {
@@ -2403,6 +2408,16 @@ document.addEventListener("keydown", (e) => {
       if (backdrop.style.display) backdrop.style.display = "none";
     }
   });
+});
+
+document.addEventListener("click", (e) => {
+  const target = e.target;
+  if (target && target.classList && target.classList.contains("modal-backdrop") && target.id !== "synthesizingOverlay") {
+    target.classList.remove("active");
+    if (target.style.display && target.style.display !== "none") {
+      target.style.display = "none";
+    }
+  }
 });
 
 /**

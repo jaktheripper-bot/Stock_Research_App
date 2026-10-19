@@ -60,6 +60,19 @@ class ForensicAuditResult:
         return asdict(self)
 
 
+def _safe_float(val: Any, default: float = 0.0) -> float:
+    if val is None:
+        return default
+    try:
+        cleaned = str(val).replace(",", "").replace("₹", "").replace("%", "").strip()
+        if not cleaned or cleaned.upper() in ("N/A", "NONE", "NULL", "-", "FAIR", "NAN"):
+            return default
+        return float(cleaned)
+    except Exception as err:
+        logger.debug(f"forensic_squad float coercion notice for {val!r}: {err}")
+        return default
+
+
 def tool_get_fundamentals(ticker: str) -> str:
     """Retrieves verified quantitative fundamentals, valuation ratios, and balance sheet metrics."""
     clean_sym = ticker.strip().upper()
@@ -69,7 +82,7 @@ def tool_get_fundamentals(ticker: str) -> str:
             "ticker": clean_sym,
             "company_name": data.get("company_name", clean_sym),
             "current_price": data.get("current_price"),
-            "market_cap_cr": round(float(data.get("market_cap", 0)) / 10000000, 2),
+            "market_cap_cr": round(_safe_float(data.get("market_cap"), 0.0) / 10000000, 2),
             "pe_ratio": data.get("pe_ratio"),
             "pb_ratio": data.get("pb_ratio"),
             "roce_pct": data.get("roce"),
@@ -110,12 +123,12 @@ def tool_compute_forensic_signals(ticker: str) -> str:
     clean_sym = ticker.strip().upper()
     try:
         data = get_stock_fundamentals(clean_sym)
-        de = float(data.get("debt_to_equity") or 0.5)
-        pledge = float(data.get("pledged_promoter_holding") or 0.0)
-        roce = float(data.get("roce") or 15.0)
-        pe = float(data.get("pe_ratio") or 25.0)
+        de = _safe_float(data.get("debt_to_equity"), 0.5)
+        pledge = _safe_float(data.get("pledged_promoter_holding"), 0.0)
+        roce = _safe_float(data.get("roce"), 15.0)
+        pe = _safe_float(data.get("pe_ratio"), 25.0)
         
-        accrual_risk = "LOW" if (data.get("fcf_cr") or 100) > 0 else "ELEVATED"
+        accrual_risk = "LOW" if _safe_float(data.get("fcf_cr"), 100.0) > 0 else "ELEVATED"
         solvency_posture = "SAFE_ZONE" if de < 1.0 else ("GREY_ZONE" if de < 2.0 else "DISTRESS_ZONE")
         governance_flag = "CLEAN" if pledge < 5.0 else ("WATCHLIST" if pledge < 20.0 else "CRITICAL_FLAG")
         
@@ -139,10 +152,10 @@ def run_deterministic_forensic_fallback(ticker: str) -> ForensicAuditResult:
     clean_sym = ticker.strip().upper()
     data = get_stock_fundamentals(clean_sym)
     
-    de = float(data.get("debt_to_equity") or 0.4)
-    pledge = float(data.get("pledged_promoter_holding") or 0.0)
-    roce = float(data.get("roce") or 18.0)
-    pe = float(data.get("pe_ratio") or 24.0)
+    de = _safe_float(data.get("debt_to_equity"), 0.4)
+    pledge = _safe_float(data.get("pledged_promoter_holding"), 0.0)
+    roce = _safe_float(data.get("roce"), 18.0)
+    pe = _safe_float(data.get("pe_ratio"), 24.0)
     
     score = 100.0
     if de > 1.5:

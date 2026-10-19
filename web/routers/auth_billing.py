@@ -410,7 +410,7 @@ async def api_auth_me(request: Request):
     """Returns the currently authenticated user profile from session cookie or Authorization header."""
     user = _get_current_web_user(request)
     if not user:
-        raise HTTPException(status_code=401, detail="Not authenticated.")
+        return JSONResponse(content={"authenticated": False, "user": None})
     return JSONResponse(content={"authenticated": True, "user": user})
 
 

@@ -13,7 +13,7 @@ class SecurityHeadersMiddleware(BaseHTTPMiddleware):
             "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; "
             "font-src 'self' https://fonts.gstatic.com; "
             "img-src 'self' data: https:; "
-            "connect-src 'self' https://lapi.razorpay.com https://api.razorpay.com https://checkout.razorpay.com https://cdn.razorpay.com https://cdn.jsdelivr.net; "
+            "connect-src 'self' https://lapi.razorpay.com https://api.razorpay.com https://checkout.razorpay.com https://cdn.razorpay.com https://lumberjack.razorpay.com https://cdn.jsdelivr.net; "
             "frame-src 'self' https://api.razorpay.com https://checkout.razorpay.com; "
             "object-src 'none'; "
             "base-uri 'self'; "

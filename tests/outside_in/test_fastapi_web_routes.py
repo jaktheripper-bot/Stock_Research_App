@@ -2184,5 +2184,127 @@ class TestSlowAPIRateLimiter(unittest.TestCase):
         self.assertEqual(r3.text, "Rate limit exceeded")
 
 
+class TestInteractiveUiContracts(unittest.TestCase):
+    """Outside-in UI-to-code contracts for inline JS lexical scope, Copilot bundle loading, and modal dismissal."""
+
+    @classmethod
+    def setUpClass(cls):
+        from web.common import _generate_admin_token, ADMIN_COOKIE_NAME
+        cls.client = TestClient(app)
+        cls.admin_cookie_name = ADMIN_COOKIE_NAME
+        cls.admin_token = _generate_admin_token("owner@moatnomics.com", "owner")
+
+    def test_combined_inline_js_lexical_syntax_across_all_routes(self):
+        """Every route's combined inline <script> blocks must parse cleanly with zero duplicate let/const SyntaxErrors."""
+        import shutil
+        import subprocess
+        import tempfile
+
+        node_bin = shutil.which("node")
+        routes = [
+            "/", "/equities", "/dossier/INFY", "/funds", "/funds/compare/overlap",
+            "/funds/PPFAS_FLEXICAP_DIR", "/debt", "/debt/IN901SDI0012",
+            "/reits", "/reits/EMBASSY", "/etfs", "/etfs/NIFTYBEES",
+            "/sovereign", "/msme", "/msme/UDYAM-AP-03-0045619",
+            "/opportunities", "/discovery", "/safety-radar",
+            "/compare?a=INFY&b=TCS", "/calculator/tax", "/pricing", "/contact",
+            "/admin", "/admin/audit"
+        ]
+        self.client.cookies.set(self.admin_cookie_name, self.admin_token)
+        try:
+            for route in routes:
+                resp = self.client.get(route)
+                self.assertEqual(resp.status_code, 200, f"Route {route} failed with {resp.status_code}")
+                soup = BeautifulSoup(resp.text, "html.parser")
+                inline_scripts = []
+                for s in soup.find_all("script"):
+                    stype = (s.get("type") or "").strip().lower()
+                    if not s.get("src") and s.string and stype in ("", "text/javascript", "application/javascript"):
+                        inline_scripts.append(s.string)
+                combined_js = "\n;\n".join(inline_scripts)
+                if node_bin and combined_js.strip():
+                    with tempfile.NamedTemporaryFile("w", suffix=".js", delete=False) as tf:
+                        tf.write(combined_js)
+                        tf_path = tf.name
+                    try:
+                        proc = subprocess.run([node_bin, "--check", tf_path], capture_output=True, text=True)
+                        self.assertEqual(
+                            proc.returncode, 0,
+                            f"Inline JS SyntaxError on {route}:\n{proc.stderr}"
+                        )
+                    finally:
+                        if os.path.exists(tf_path):
+                            os.unlink(tf_path)
+        finally:
+            self.client.cookies.clear()
+
+    def test_fund_directory_on_demand_audit_dom_and_visibility_contract(self):
+        """Verifies /funds on-demand audit script has zero duplicate let declarations and reveals #onDemandAuditStatus."""
+        resp = self.client.get("/funds")
+        self.assertEqual(resp.status_code, 200)
+        html = resp.text
+        self.assertEqual(html.count("let currentAuditScheme"), 1)
+        self.assertEqual(html.count("let currentAuditTaskId"), 1)
+        self.assertIn('document.getElementById("onDemandAuditStatus")', html)
+        self.assertIn('statusOuter.style.display = "block"', html)
+
+    def test_every_page_with_copilot_modal_loads_copilot_js_bundle(self):
+        """Every page rendering #copilotModalBackdrop or openCopilot() triggers must load /static/js/copilot.js."""
+        routes_with_copilot = [
+            "/dossier/INFY",
+            "/funds/PPFAS_FLEXICAP_DIR",
+            "/debt/IN901SDI0012",
+            "/reits",
+            "/reits/EMBASSY",
+            "/opportunities",
+        ]
+        for route in routes_with_copilot:
+            resp = self.client.get(route)
+            self.assertEqual(resp.status_code, 200, f"Route {route} failed")
+            soup = BeautifulSoup(resp.text, "html.parser")
+            self.assertIsNotNone(
+                soup.find(id="copilotModalBackdrop"),
+                f"{route} is missing #copilotModalBackdrop partial"
+            )
+            script_srcs = [s.get("src", "") for s in soup.find_all("script") if s.get("src")]
+            self.assertTrue(
+                any("/static/js/copilot.js" in src for src in script_srcs),
+                f"{route} renders #copilotModalBackdrop / openCopilot() but omits /static/js/copilot.js"
+            )
+
+    def test_all_page_modals_adhere_to_backdrop_dialog_and_dismiss_contract(self):
+        """Verifies standardized .modal-backdrop and .modal-dialog classes across interactive modals."""
+        self.client.cookies.set(self.admin_cookie_name, self.admin_token)
+        try:
+            modal_expectations = [
+                ("/", "authModal"),
+                ("/", "checkoutModal"),
+                ("/", "surveillanceModal"),
+                ("/debt", "ingestModalBackdrop"),
+                ("/dossier/INFY", "thesisModalBackdrop"),
+                ("/etfs", "etf-modal"),
+                ("/opportunities", "arbitrageModal"),
+                ("/msme", "msmeModal"),
+            ]
+            for route, modal_id in modal_expectations:
+                resp = self.client.get(route)
+                self.assertEqual(resp.status_code, 200)
+                soup = BeautifulSoup(resp.text, "html.parser")
+                modal_el = soup.find(id=modal_id)
+                self.assertIsNotNone(modal_el, f"Modal #{modal_id} missing on {route}")
+                classes = modal_el.get("class") or []
+                self.assertIn(
+                    "modal-backdrop", classes,
+                    f"Modal #{modal_id} on {route} must have class 'modal-backdrop'"
+                )
+                dialog_el = modal_el.find(class_="modal-dialog")
+                self.assertIsNotNone(
+                    dialog_el,
+                    f"Modal #{modal_id} on {route} must contain a '.modal-dialog' child"
+                )
+        finally:
+            self.client.cookies.clear()
+
+
 if __name__ == "__main__":
     unittest.main()

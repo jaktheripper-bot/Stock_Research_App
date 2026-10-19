@@ -752,7 +752,7 @@
       <span style="font-size: 20px; font-weight: 800; color: #f8fafc; margin-top: 4px;" class="tnum">{{ open_tickets_count | default(0) }} Open</span>
       <span style="font-size: 11px; color: #94a3b8; margin-top: 2px;">{{ (support_tickets | length) if support_tickets else 0 }} total tickets → Respond Now</span>
     </button>
-    <button type="button" class="btn btn-secondary" onclick="showTab('catalog')" style="display: flex; flex-direction: column; align-items: flex-start; text-align: left; padding: 14px 16px; background: rgba(56, 189, 248, 0.08); border: 1px solid rgba(56, 189, 248, 0.28); border-radius: 10px; cursor: pointer;">
+    <button type="button" class="btn btn-secondary" onclick="showTab('assets')" style="display: flex; flex-direction: column; align-items: flex-start; text-align: left; padding: 14px 16px; background: rgba(56, 189, 248, 0.08); border: 1px solid rgba(56, 189, 248, 0.28); border-radius: 10px; cursor: pointer;">
       <span style="font-size: 11px; font-weight: 800; color: #7dd3fc; text-transform: uppercase; letter-spacing: 0.05em;">3. Data & Provider Health</span>
       <span style="font-size: 20px; font-weight: 800; color: #34d399; margin-top: 4px;" class="tnum">{{ provider_constraints.healthy_count | default(0) if provider_constraints else 0 }} / {{ provider_constraints.total_count | default(0) if provider_constraints else 0 }} Healthy</span>
       <span style="font-size: 11px; color: #94a3b8; margin-top: 2px;">Multi-Asset Catalog & Schedulers → Inspect</span>
@@ -2958,9 +2958,7 @@
     const modal = document.getElementById(id);
     if (!modal) return;
     modal.style.display = 'flex';
-    requestAnimationFrame(() => {
-      modal.classList.add('active');
-    });
+    modal.classList.add('active');
   }
 
   function closeAdminModal(id) {

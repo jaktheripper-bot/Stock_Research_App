@@ -100,7 +100,8 @@ def save_discovery_reel(items: List[Dict[str, Any]], edition_date: Optional[str]
 def get_active_discovery_reel(
     edition_date: Optional[str] = None,
     exclude_tests: Optional[bool] = None,
-    allow_fallback: bool = True
+    allow_fallback: bool = True,
+    limit: Optional[int] = None,
 ) -> List[Dict[str, Any]]:
     """
     Retrieves the active morning discovery reel for a given edition date.
@@ -203,6 +204,8 @@ def get_active_discovery_reel(
                 "formatted_date": _format_timestamp(r[14]),
             })
 
+        if limit is not None and limit > 0:
+            return results[:limit]
         return results
     except Exception as e:
         logger.error(f"Error fetching active discovery reel: {e}")

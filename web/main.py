@@ -1116,7 +1116,15 @@ def dossier_page(request: Request, ticker: str):
     # Phase 1 Upgrade: Institutional Equity Intelligence (Sector, Flow, Forensics, Valuation Radar, Bull/Bear)
     equity_intel = None
     try:
-        from core.analysis.equity_dossier import compile_equity_dossier
+        from core.analysis.equity_dossier import compile_equity_dossier, _safe_float
+        if price_val is not None and _safe_float(fund.get("current_price"), 0.0) <= 0:
+            parsed_price = _safe_float(str(price_val).replace("₹", ""), 0.0)
+            if parsed_price > 0:
+                fund["current_price"] = parsed_price
+        if pe_val is not None and _safe_float(fund.get("pe_ratio"), 0.0) <= 0:
+            parsed_pe = _safe_float(str(pe_val).replace("x", ""), 0.0)
+            if parsed_pe > 0:
+                fund["pe_ratio"] = parsed_pe
         equity_intel = compile_equity_dossier(
             ticker=canonical,
             fundamentals=fund,

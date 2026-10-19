@@ -808,8 +808,8 @@
 </div>
 
 <!-- Interactive Thesis Violation & Sunk Cost Intervention Modal -->
-<div id="thesisModalBackdrop" style="display: none; position: fixed; inset: 0; background: rgba(15, 23, 42, 0.85); backdrop-filter: blur(6px); z-index: 9999; align-items: center; justify-content: center; padding: 20px;">
-  <div id="thesisModal" style="background: #0f172a; border: 1px solid rgba(245, 158, 11, 0.4); border-radius: 12px; width: 100%; max-width: 560px; box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.7); overflow: hidden;">
+<div id="thesisModalBackdrop" class="modal-backdrop" onclick="if(event.target===this) closeThesisModal()" style="display: none; position: fixed; inset: 0; background: rgba(15, 23, 42, 0.85); backdrop-filter: blur(6px); z-index: 9999; align-items: center; justify-content: center; padding: 20px;">
+  <div id="thesisModalDialog" class="modal-dialog" style="background: #0f172a; border: 1px solid rgba(245, 158, 11, 0.4); border-radius: 12px; width: 100%; max-width: 560px; box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.7); overflow: hidden;">
     <!-- Modal Header -->
     <div style="background: rgba(30, 41, 59, 0.8); border-bottom: 1px solid rgba(245, 158, 11, 0.25); padding: 18px 24px; display: flex; align-items: center; justify-content: space-between;">
       <div style="display: flex; align-items: center; gap: 10px;">
