@@ -390,7 +390,7 @@ Detailed forensic analysis with exact page grounding to bseindia.com filings.
             self.assertIn(tid, res_lookup_ok.text)
             self.assertIn("Question regarding DCF hurdle rate", res_lookup_ok.text)
             self.assertIn("Can you explain the terminal growth rate assumption?", res_lookup_ok.text)
-            self.assertIn("Post a Follow-Up Reply", res_lookup_ok.text)
+            self.assertIn("Post Follow-Up Reply", res_lookup_ok.text)
 
             # Template Hygiene check on rendered lookup HTML
             soup = BeautifulSoup(res_lookup_ok.text, "html.parser")
@@ -417,7 +417,7 @@ Detailed forensic analysis with exact page grounding to bseindia.com filings.
             self.assertEqual(res_reply_ok.status_code, 200)
             self.assertIn(tid, res_reply_ok.text)
             self.assertIn("Here is additional context regarding the terminal value.", res_reply_ok.text)
-            self.assertIn("Conversation History", res_reply_ok.text)
+            self.assertIn("Post Follow-Up Reply", res_reply_ok.text)
 
             # 6. Verify resolved ticket gets re-opened upon follow-up reply
             update_ticket_status(tid, "RESOLVED", "Initial query resolved by desk.")
