@@ -10,7 +10,7 @@
 
 | Checkpoint Tag | IST Timestamp | Commit | DB Reports | Description |
 |:---|:---|:---|:---|:---|
-| `checkpoint_20261019_083754_epistemic_separation_and_falsification_engine` | 2026-10-19 08:37:54 IST | `e03afb8` | 166 rep / 271 rev | epistemic_separation_and_falsification_engine |
+| `checkpoint_20261019_083754_epistemic_separation_and_falsification_engine` | 2026-10-19 08:37:54 IST | `240a18e` | 166 rep / 271 rev | epistemic_separation_and_falsification_engine |
 | `checkpoint_20261019_082734_dynamic_entity_override_and_local_dossier_index` | 2026-10-19 08:27:34 IST | `53756e2` | 166 rep / 271 rev | dynamic_entity_override_and_local_dossier_index |
 | `checkpoint_20261019_081634_check_input_qualification_boolean_overloads_and_ast_gate` | 2026-10-19 08:16:34 IST | `39a1ea5` | 166 rep / 271 rev | check_input_qualification_boolean_overloads_and_ast_gate |
 | `checkpoint_20261019_080935_word_boundary_sebi_filter_and_contextual_qualification` | 2026-10-19 08:09:35 IST | `6bd1f6a` | 166 rep / 271 rev | word_boundary_sebi_filter_and_contextual_qualification |
