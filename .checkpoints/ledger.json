@@ -1486,5 +1486,21 @@
       "revision_count": 274
     },
     "preflight_passed": true
+  },
+  {
+    "tag": "checkpoint_20261019_091033_mf_fee_drag_simulator",
+    "timestamp": "2026-10-19 09:10:33 IST",
+    "commit_sha": "8f58ba9cbc04ba957ba90694f89359f7ba68611e",
+    "branch": "main",
+    "description": "mf_fee_drag_simulator",
+    "database": {
+      "exists": true,
+      "filename": "reports_checkpoint_20261019_091033_mf_fee_drag_simulator.db",
+      "path": ".checkpoints/reports_checkpoint_20261019_091033_mf_fee_drag_simulator.db",
+      "size_bytes": 18968576,
+      "report_count": 166,
+      "revision_count": 274
+    },
+    "preflight_passed": true
   }
 ]
