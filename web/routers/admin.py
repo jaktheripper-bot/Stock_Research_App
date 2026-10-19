@@ -67,6 +67,8 @@ from core.db.telemetry import purge_test_telemetry
 from web.common import (
     templates,
     resolve_app_base_url,
+    _validate_request_origin,
+    _get_client_ip,
     _get_current_web_user,
     _is_admin_authenticated,
     _generate_admin_token,
@@ -87,6 +89,16 @@ logger = logging.getLogger("equity_research.web.admin")
 router = APIRouter(tags=["admin"])
 
 _ACTIVE_PROJECT_AUDITS: Dict[str, Dict[str, Any]] = {}
+_ADMIN_2FA_ATTEMPTS: Dict[str, List[float]] = {}
+
+
+def _verify_admin_api_key(x_admin_key: Optional[str]) -> bool:
+    """Timing-safe comparison of X-Admin-Key against ADMIN_API_KEY."""
+    admin_secret = (os.environ.get("ADMIN_API_KEY") or "").strip()
+    candidate = (x_admin_key or "").strip()
+    if not admin_secret or not candidate:
+        return False
+    return hmac.compare_digest(candidate.encode("utf-8"), admin_secret.encode("utf-8"))
 
 
 # ==============================================================================
@@ -124,17 +136,6 @@ class AdminCopilotExecuteRequest(BaseModel):
 # ==============================================================================
 # Local Dev & Environment Helpers
 # ==============================================================================
-def _get_client_ip(request: Request) -> str:
-    """Extract client IP address from trusted edge headers or rightmost X-Forwarded-For hop."""
-    cf_ip = request.headers.get("cf-connecting-ip") or request.headers.get("true-client-ip")
-    if cf_ip:
-        return cf_ip.strip()
-    forwarded = request.headers.get("x-forwarded-for")
-    if forwarded:
-        return forwarded.split(",")[-1].strip()
-    return request.client.host if request.client else "unknown"
-
-
 def _is_local_dev_request(request: Request) -> bool:
     if os.getenv("ENVIRONMENT") == "production" or os.getenv("RENDER") == "true":
         return False
@@ -448,10 +449,11 @@ async def api_admin_run_project_audit(
 ):
     """Triggers an autonomous project-wide audit across Strategy, Implementation, and UI/UX."""
     init_db()
+    if not _validate_request_origin(request):
+        raise HTTPException(status_code=403, detail="Cross-origin request rejected.")
     is_testing = os.environ.get("TESTING") == "1" or "pytest" in sys.modules
-    admin_secret = os.environ.get("ADMIN_API_KEY", "")
     admin_session = _is_admin_authenticated(request)
-    if not (is_testing or admin_session or (admin_secret and x_admin_key == admin_secret)):
+    if not (is_testing or admin_session or _verify_admin_api_key(x_admin_key)):
         raise HTTPException(status_code=403, detail="Unauthorized: Admin access required.")
 
     from core.audit.project_auditor import audit_project_full
@@ -513,9 +515,8 @@ def api_admin_project_audit_status(
     """Returns real-time progress and completion status for an asynchronous project audit."""
     init_db()
     is_testing = os.environ.get("TESTING") == "1" or "pytest" in sys.modules
-    admin_secret = os.environ.get("ADMIN_API_KEY", "")
     admin_session = _is_admin_authenticated(request)
-    if not (is_testing or admin_session or (admin_secret and x_admin_key == admin_secret)):
+    if not (is_testing or admin_session or _verify_admin_api_key(x_admin_key)):
         raise HTTPException(status_code=403, detail="Unauthorized: Admin access required.")
 
     task = _ACTIVE_PROJECT_AUDITS.get(audit_id)
@@ -552,9 +553,8 @@ def api_admin_get_audit_logs(
     """Retrieves past project audit run logs for executive telemetry."""
     init_db()
     is_testing = os.environ.get("TESTING") == "1" or "pytest" in sys.modules
-    admin_secret = os.environ.get("ADMIN_API_KEY", "")
     admin_session = _is_admin_authenticated(request)
-    if not (is_testing or admin_session or (admin_secret and x_admin_key == admin_secret)):
+    if not (is_testing or admin_session or _verify_admin_api_key(x_admin_key)):
         raise HTTPException(status_code=403, detail="Unauthorized: Admin access required.")
 
     from core.db.audit_logs import get_project_audit_history
@@ -593,9 +593,13 @@ def api_get_autonomous_events(limit: int = Query(15, ge=1, le=50)):
 async def api_copilot_chat(payload: CopilotChatRequest, request: Request):
     """Interactive Forensic Intelligence Desk dialogue endpoint with multi-asset and section context."""
     init_db()
+    if not _validate_request_origin(request):
+        raise HTTPException(status_code=403, detail="Cross-origin request rejected.")
     from core.agents.copilot.forensic_desk import process_forensic_desk_turn
+    from core.db.agent_sessions import get_agent_conversation
 
     web_user = _get_current_web_user(request)
+    is_admin = bool(_is_admin_authenticated(request))
     raw_asset_cls = (payload.asset_class or payload.asset_type or "EQUITY").strip().upper()
     if raw_asset_cls in ("FUND", "MF"):
         asset_cls = "MUTUAL_FUND"
@@ -612,10 +616,25 @@ async def api_copilot_chat(payload: CopilotChatRequest, request: Request):
     trusted_user_id = web_user.get("id") if web_user else None
 
     tier = (web_user.get("subscription_tier") or "free").lower() if web_user else "free"
-    is_subscriber = tier in ("pro_monthly", "pro_annual") or "pro" in tier or _is_admin_authenticated(request)
+    is_subscriber = tier in ("pro_monthly", "pro_annual") or "pro" in tier or is_admin
 
     from core.billing.qos_governor import authorize_llm_execution
-    client_ip = request.client.host if request.client else ""
+    client_ip = _get_client_ip(request)
+    raw_conv_id = (payload.conversation_id or "").strip()
+    if not raw_conv_id or raw_conv_id.lower() == "default":
+        if trusted_user_id:
+            effective_conv_id = f"CONV-USER-{hashlib.sha256(str(trusted_user_id).encode('utf-8')).hexdigest()[:16]}"
+        else:
+            effective_conv_id = f"CONV-ANON-{hashlib.sha256(client_ip.encode('utf-8')).hexdigest()[:16]}"
+    else:
+        effective_conv_id = raw_conv_id
+
+    existing_conv = get_agent_conversation(effective_conv_id)
+    if existing_conv and existing_conv.get("user_id"):
+        owner_uid = str(existing_conv.get("user_id")).strip()
+        if not is_admin and owner_uid != str(trusted_user_id or "").strip():
+            raise HTTPException(status_code=403, detail="Unauthorized access to conversation.")
+
     user_email = web_user.get("email", "") if web_user else (trusted_user_id or "")
     has_unlocked = bool(deep_dive_unlocked or is_subscriber)
     actor_type = "USER_COPILOT" if has_unlocked else "ANON"
@@ -629,7 +648,7 @@ async def api_copilot_chat(payload: CopilotChatRequest, request: Request):
     if qos_status == "RATE_LIMIT_IP_BURST":
         return {
             "success": False,
-            "conversation_id": payload.conversation_id or "default",
+            "conversation_id": effective_conv_id,
             "response": (
                 "⚠️ **Rate Limit Exceeded:** Too many requests from your IP address (exceeded 30 requests/minute). "
                 "Please pause for a moment before querying the Forensic Desk again."
@@ -639,7 +658,7 @@ async def api_copilot_chat(payload: CopilotChatRequest, request: Request):
     if qos_status == "USER_COPILOT_HOURLY_VELOCITY_CAP":
         return {
             "success": False,
-            "conversation_id": payload.conversation_id or "default",
+            "conversation_id": effective_conv_id,
             "response": (
                 "⚠️ **Hourly Velocity Cap Reached:** You have reached the maximum allowed Forensic Desk turns for this hour "
                 "(40 turns/hr) to protect your account. Please resume shortly."
@@ -650,7 +669,7 @@ async def api_copilot_chat(payload: CopilotChatRequest, request: Request):
 
     try:
         res = await process_forensic_desk_turn(
-            conversation_id=payload.conversation_id,
+            conversation_id=effective_conv_id,
             user_message=payload.message,
             ticker=payload.ticker,
             user_id=trusted_user_id,
@@ -675,7 +694,7 @@ async def api_copilot_chat(payload: CopilotChatRequest, request: Request):
         logger.error(f"Error in api_copilot_chat: {e}", exc_info=True)
         return {
             "success": True,
-            "conversation_id": payload.conversation_id or "default",
+            "conversation_id": effective_conv_id,
             "response": (
                 "⚡ **Forensic Desk Notice:** The analytical engine experienced a brief latency interruption while processing this inquiry. "
                 "All deterministic forensic data feeds remain online. Please re-submit your prompt or select one of the diagnostic queries below."
@@ -685,11 +704,21 @@ async def api_copilot_chat(payload: CopilotChatRequest, request: Request):
 
 
 @router.get("/api/copilot/history")
-def api_copilot_history(conversation_id: str):
-    """Retrieves chronological dialogue turns for a copilot session."""
+def api_copilot_history(conversation_id: str, request: Request):
+    """Retrieves chronological dialogue turns for a copilot session with session ownership validation."""
     init_db()
-    from core.db.agent_sessions import get_conversation_turns
-    turns = get_conversation_turns(conversation_id=conversation_id, limit=50)
+    clean_conv_id = (conversation_id or "").strip()
+    is_admin = bool(_is_admin_authenticated(request))
+    if (not clean_conv_id or clean_conv_id.lower() == "default") and not is_admin:
+        raise HTTPException(status_code=403, detail="Unauthorized access to shared conversation history.")
+    from core.db.agent_sessions import get_agent_conversation, get_conversation_turns
+    conv = get_agent_conversation(clean_conv_id)
+    if conv and conv.get("user_id"):
+        web_user = _get_current_web_user(request)
+        caller_uid = str(web_user.get("id", "")).strip() if web_user else ""
+        if not is_admin and caller_uid != str(conv.get("user_id", "")).strip():
+            raise HTTPException(status_code=403, detail="Unauthorized access to conversation history.")
+    turns = get_conversation_turns(conversation_id=clean_conv_id, limit=50)
     return {"success": True, "turns": turns}
 
 
@@ -699,6 +728,8 @@ def api_copilot_history(conversation_id: str):
 @router.post("/admin/telemetry/purge-test-data")
 async def admin_purge_test_data(request: Request):
     """Purges synthetic test records across telemetry, tickets, and transactions."""
+    if not _validate_request_origin(request):
+        raise HTTPException(status_code=403, detail="Cross-origin request rejected.")
     admin_session = _is_admin_authenticated(request)
     if not admin_session:
         raise HTTPException(status_code=401, detail="Admin authentication required.")
@@ -707,9 +738,7 @@ async def admin_purge_test_data(request: Request):
     if role not in ("owner", "admin"):
         raise HTTPException(status_code=403, detail="Forbidden. Only owners and administrators can purge test data.")
 
-    client_ip = request.headers.get("x-forwarded-for") or (request.client.host if request.client else "unknown")
-    if client_ip and "," in client_ip:
-        client_ip = client_ip.split(",")[0].strip()
+    client_ip = _get_client_ip(request)
 
     return_tab = None
     try:
@@ -991,10 +1020,10 @@ async def admin_setup_2fa_view(request: Request, err: Optional[str] = None, next
     has_active_totp = bool(secret and admin.get("totp_enabled"))
     force_reset = request.query_params.get("reset") == "1"
 
-    # Block unauthenticated 2FA secret overwrite when TOTP is already enrolled
-    if has_active_totp and force_reset and not (admin_session or _is_local_dev_request(request)):
+    # Block unauthenticated 2FA secret disclosure or overwrite when TOTP is already enrolled
+    if has_active_totp and not (admin_session or _is_local_dev_request(request)):
         return RedirectResponse(
-            url="/admin/verify-2fa?err=2FA+is+already+active.+Please+sign+in+before+resetting.",
+            url="/admin/verify-2fa?err=2FA+is+already+active.+Please+sign+in+before+viewing+or+resetting+2FA.",
             status_code=303
         )
 
@@ -1024,7 +1053,10 @@ async def admin_setup_2fa_view(request: Request, err: Optional[str] = None, next
 
 @router.post("/admin/setup-2fa")
 async def admin_setup_2fa_post(request: Request, code: str = Form(...), next_url: Optional[str] = Form(None)):
+    if not _validate_request_origin(request):
+        raise HTTPException(status_code=403, detail="Cross-origin request rejected.")
     pending_token = request.cookies.get(ADMIN_2FA_PENDING_COOKIE)
+    admin_session = _is_admin_authenticated(request)
     email = _validate_pending_2fa_token(pending_token)
     if not email:
         return RedirectResponse(url="/admin?err=Session+expired.+Please+sign+in+again.", status_code=303)
@@ -1035,8 +1067,10 @@ async def admin_setup_2fa_post(request: Request, code: str = Form(...), next_url
 
     secret = admin.get("totp_secret")
     is_local_dev = _is_local_dev_request(request)
+    if admin.get("totp_enabled") and not (admin_session or is_local_dev):
+        return RedirectResponse(url="/admin/verify-2fa?err=2FA+is+already+active.", status_code=303)
 
-    if not (verify_totp_code(secret, code, window=4) or (is_local_dev and code.strip() == "000000")):
+    if not (verify_totp_code(secret, code, window=1) or (is_local_dev and code.strip() == "000000")):
         err_url = "/admin/setup-2fa?err=Invalid+6-digit+code.+Please+check+your+authenticator+app."
         if next_url and next_url.startswith("/admin"):
             err_url += f"&next={urllib.parse.quote(next_url)}"
@@ -1044,7 +1078,7 @@ async def admin_setup_2fa_post(request: Request, code: str = Form(...), next_url
 
     enable_admin_totp(email)
     update_admin_last_login(email)
-    client_ip = request.headers.get("x-forwarded-for") or (request.client.host if request.client else "unknown")
+    client_ip = _get_client_ip(request)
     ua = request.headers.get("user-agent")
 
     record_admin_audit(
@@ -1090,6 +1124,9 @@ async def admin_verify_2fa_view(request: Request, err: Optional[str] = None, nex
 
 @router.post("/admin/verify-2fa")
 async def admin_verify_2fa_post(request: Request, code: str = Form(...), next_url: Optional[str] = Form(None)):
+    import time as _time
+    if not _validate_request_origin(request):
+        raise HTTPException(status_code=403, detail="Cross-origin request rejected.")
     pending_token = request.cookies.get(ADMIN_2FA_PENDING_COOKIE)
     email = _validate_pending_2fa_token(pending_token)
     if not email:
@@ -1099,13 +1136,35 @@ async def admin_verify_2fa_post(request: Request, code: str = Form(...), next_ur
     if not admin or not admin.get("totp_secret"):
         return RedirectResponse(url="/admin/setup-2fa", status_code=303)
 
-    client_ip = request.headers.get("x-forwarded-for") or (request.client.host if request.client else "unknown")
+    client_ip = _get_client_ip(request)
     ua = request.headers.get("user-agent")
     is_local_dev = _is_local_dev_request(request)
 
-    valid_code = verify_totp_code(admin["totp_secret"], code, window=4) or (is_local_dev and code.strip() == "000000")
+    rate_key = f"{client_ip}:{email.strip().lower()}"
+    now_ts = _time.time()
+    recent_failures = [ts for ts in _ADMIN_2FA_ATTEMPTS.get(rate_key, []) if (now_ts - ts) < 600]
+    if len(recent_failures) >= 5:
+        record_admin_audit(
+            email,
+            "login_2fa_rate_limited",
+            target_type="admin_user",
+            target_id=email,
+            details={"reason": "Exceeded 5 failed TOTP attempts in 10 minutes"},
+            ip_address=client_ip,
+            user_agent=ua
+        )
+        lock_resp = Response(
+            content="Too many failed 2FA attempts. Session revoked; please wait 10 minutes before retrying.",
+            status_code=429
+        )
+        lock_resp.delete_cookie(key=ADMIN_2FA_PENDING_COOKIE)
+        return lock_resp
+
+    valid_code = verify_totp_code(admin["totp_secret"], code, window=1) or (is_local_dev and code.strip() == "000000")
 
     if not valid_code:
+        recent_failures.append(now_ts)
+        _ADMIN_2FA_ATTEMPTS[rate_key] = recent_failures
         record_admin_audit(
             email,
             "login_2fa_failed",
@@ -1120,6 +1179,7 @@ async def admin_verify_2fa_post(request: Request, code: str = Form(...), next_ur
             redirect_err += f"&next={urllib.parse.quote(next_url)}"
         return RedirectResponse(url=redirect_err, status_code=303)
 
+    _ADMIN_2FA_ATTEMPTS.pop(rate_key, None)
     update_admin_last_login(email)
     record_admin_audit(
         email,
@@ -1144,7 +1204,7 @@ async def admin_verify_2fa_post(request: Request, code: str = Form(...), next_ur
 async def admin_logout(request: Request):
     admin_session = _is_admin_authenticated(request)
     if admin_session:
-        client_ip = request.headers.get("x-forwarded-for") or (request.client.host if request.client else "unknown")
+        client_ip = _get_client_ip(request)
         record_admin_audit(
             admin_session.get("email"),
             "admin_logout",
@@ -1166,6 +1226,8 @@ async def admin_team_add(
     email: str = Form(...),
     role: str = Form("admin")
 ):
+    if not _validate_request_origin(request):
+        raise HTTPException(status_code=403, detail="Cross-origin request rejected.")
     admin_session = _is_admin_authenticated(request)
     if not admin_session:
         raise HTTPException(status_code=403, detail="Admin authorization required.")
@@ -1175,7 +1237,7 @@ async def admin_team_add(
 
     current_email = admin_session.get("email")
     ok, msg = add_admin_user(email, role, invited_by=current_email)
-    client_ip = request.headers.get("x-forwarded-for") or (request.client.host if request.client else "unknown")
+    client_ip = _get_client_ip(request)
 
     if ok:
         record_admin_audit(
@@ -1195,6 +1257,8 @@ async def admin_team_remove(
     request: Request,
     email: str = Form(...)
 ):
+    if not _validate_request_origin(request):
+        raise HTTPException(status_code=403, detail="Cross-origin request rejected.")
     admin_session = _is_admin_authenticated(request)
     if not admin_session:
         raise HTTPException(status_code=403, detail="Admin authorization required.")
@@ -1204,7 +1268,7 @@ async def admin_team_remove(
 
     current_email = admin_session.get("email")
     ok, msg = remove_admin_user(email, requesting_email=current_email)
-    client_ip = request.headers.get("x-forwarded-for") or (request.client.host if request.client else "unknown")
+    client_ip = _get_client_ip(request)
 
     if ok:
         record_admin_audit(
@@ -1224,6 +1288,8 @@ async def admin_team_role(
     email: str = Form(...),
     new_role: str = Form(...)
 ):
+    if not _validate_request_origin(request):
+        raise HTTPException(status_code=403, detail="Cross-origin request rejected.")
     admin_session = _is_admin_authenticated(request)
     if not admin_session:
         raise HTTPException(status_code=403, detail="Admin authorization required.")
@@ -1233,7 +1299,7 @@ async def admin_team_role(
 
     current_email = admin_session.get("email")
     ok, msg = update_admin_role(email, new_role, requesting_email=current_email)
-    client_ip = request.headers.get("x-forwarded-for") or (request.client.host if request.client else "unknown")
+    client_ip = _get_client_ip(request)
 
     if ok:
         record_admin_audit(
@@ -1255,13 +1321,15 @@ async def admin_update_ticket(
     status: str = Form(...),
     admin_notes: Optional[str] = Form(None)
 ):
+    if not _validate_request_origin(request):
+        raise HTTPException(status_code=403, detail="Cross-origin request rejected.")
     admin_session = _is_admin_authenticated(request)
     if not admin_session:
         raise HTTPException(status_code=403, detail="Admin authorization required.")
 
     ok = update_ticket_status(ticket_id, status, admin_notes)
     current_email = admin_session.get("email")
-    client_ip = request.headers.get("x-forwarded-for") or (request.client.host if request.client else "unknown")
+    client_ip = _get_client_ip(request)
 
     if ok:
         record_admin_audit(
@@ -1312,6 +1380,8 @@ async def admin_reply_ticket(
     Submits a response to a support ticket, updates ticket status, logs the message thread,
     optionally grants remedial credits, and dispatches an email notification to the user's email address.
     """
+    if not _validate_request_origin(request):
+        raise HTTPException(status_code=403, detail="Cross-origin request rejected.")
     admin_session = _is_admin_authenticated(request)
     if not admin_session:
         raise HTTPException(status_code=403, detail="Admin authorization required.")
@@ -1330,7 +1400,7 @@ async def admin_reply_ticket(
 
     admin_email = admin_session.get("email", "support@moatnomics.com")
     admin_name = "Moatnomics Service Desk"
-    client_ip = request.headers.get("x-forwarded-for") or (request.client.host if request.client else "unknown")
+    client_ip = _get_client_ip(request)
 
     # 1. Determine email dispatch
     should_email = dispatch_email in ("on", "true", "1", True)
@@ -1456,12 +1526,14 @@ async def admin_process_refund(
     user_email: str = Form(...),
     reason: Optional[str] = Form("Customer request")
 ):
+    if not _validate_request_origin(request):
+        raise HTTPException(status_code=403, detail="Cross-origin request rejected.")
     admin_session = _is_admin_authenticated(request)
     if not admin_session:
         raise HTTPException(status_code=403, detail="Admin authorization required.")
 
     current_email = admin_session.get("email")
-    client_ip = request.headers.get("x-forwarded-for") or (request.client.host if request.client else "unknown")
+    client_ip = _get_client_ip(request)
 
     res = process_refund(gateway_order_id=order_id, user_email=user_email, reason=reason)
     if res.get("success"):
@@ -1493,6 +1565,8 @@ async def admin_grant_credits_endpoint(request: Request):
     Administrative endpoint to directly allocate remedial or goodwill research credits
     to user accounts, compensating for failed synthesis or resolving grievances.
     """
+    if not _validate_request_origin(request):
+        raise HTTPException(status_code=403, detail="Cross-origin request rejected.")
     admin_session = _is_admin_authenticated(request)
     if not admin_session:
         accept_header = request.headers.get("accept", "")
@@ -1543,7 +1617,7 @@ async def admin_grant_credits_endpoint(request: Request):
             return JSONResponse(status_code=400, content={"success": False, "error": err_msg})
         return RedirectResponse(url=f"/admin?tab={tab}&err={urllib.parse.quote_plus(err_msg)}", status_code=303)
 
-    client_ip = request.headers.get("x-forwarded-for") or (request.client.host if request.client else "unknown")
+    client_ip = _get_client_ip(request)
     user_agent = request.headers.get("user-agent", "")
     admin_email = admin_session.get("email", "admin")
 
@@ -1641,13 +1715,10 @@ async def api_run_discovery(
     force: bool = False
 ):
     """Triggers the Morning Discovery Reel screening and dossier synthesis worker."""
+    if not _validate_request_origin(request):
+        raise HTTPException(status_code=403, detail="Cross-origin request rejected.")
     is_testing = os.environ.get("TESTING") == "1" or "pytest" in sys.modules
-    admin_secret = os.environ.get("ADMIN_API_KEY", "")
-    is_authed = is_testing
-    if admin_secret and x_admin_key == admin_secret:
-        is_authed = True
-    elif _is_admin_authenticated(request):
-        is_authed = True
+    is_authed = is_testing or _verify_admin_api_key(x_admin_key) or bool(_is_admin_authenticated(request))
 
     if not is_authed:
         raise HTTPException(status_code=403, detail="Unauthorized admin access.")
@@ -1668,12 +1739,9 @@ async def api_run_msme_daily_ingest(
     count: int = 15,
     edition_date: Optional[str] = None
 ):
-    admin_secret = os.environ.get("ADMIN_API_KEY", "")
-    is_authed = False
-    if admin_secret and x_admin_key == admin_secret:
-        is_authed = True
-    elif _is_admin_authenticated(request):
-        is_authed = True
+    if not _validate_request_origin(request):
+        raise HTTPException(status_code=403, detail="Cross-origin request rejected.")
+    is_authed = _verify_admin_api_key(x_admin_key) or bool(_is_admin_authenticated(request))
 
     if not is_authed:
         raise HTTPException(status_code=403, detail="Unauthorized admin access.")
@@ -1689,6 +1757,8 @@ async def api_run_msme_daily_ingest(
 @router.post("/admin/assets/trigger-scan")
 async def admin_trigger_scan_form(request: Request):
     """Admin UI action: Trigger full AMFI and Debt asset surveillance scan."""
+    if not _validate_request_origin(request):
+        raise HTTPException(status_code=403, detail="Cross-origin request rejected.")
     if not _is_admin_authenticated(request):
         raise HTTPException(status_code=403, detail="Admin authorization required.")
 
@@ -1705,12 +1775,9 @@ async def api_admin_trigger_asset_scan(
     x_admin_key: Optional[str] = Header(None)
 ):
     """Admin API: Trigger asset surveillance scan across mutual funds and debt securities."""
-    admin_secret = os.environ.get("ADMIN_API_KEY", "")
-    is_authed = False
-    if admin_secret and x_admin_key == admin_secret:
-        is_authed = True
-    elif _is_admin_authenticated(request):
-        is_authed = True
+    if not _validate_request_origin(request):
+        raise HTTPException(status_code=403, detail="Cross-origin request rejected.")
+    is_authed = _verify_admin_api_key(x_admin_key) or bool(_is_admin_authenticated(request))
 
     if not is_authed:
         raise HTTPException(status_code=403, detail="Unauthorized admin access.")
@@ -1731,12 +1798,9 @@ async def api_admin_sync_amfi(
     x_admin_key: Optional[str] = Header(None)
 ):
     """Admin API: Trigger on-demand AMFI daily NAV synchronization."""
-    admin_secret = os.environ.get("ADMIN_API_KEY", "")
-    is_authed = False
-    if admin_secret and x_admin_key == admin_secret:
-        is_authed = True
-    elif _is_admin_authenticated(request):
-        is_authed = True
+    if not _validate_request_origin(request):
+        raise HTTPException(status_code=403, detail="Cross-origin request rejected.")
+    is_authed = _verify_admin_api_key(x_admin_key) or bool(_is_admin_authenticated(request))
 
     if not is_authed:
         raise HTTPException(status_code=403, detail="Unauthorized admin access.")
@@ -1757,12 +1821,7 @@ async def api_admin_get_scan_runs(
     x_admin_key: Optional[str] = Header(None)
 ):
     """Admin API: Query historical immutable asset scan ledger records."""
-    admin_secret = os.environ.get("ADMIN_API_KEY", "")
-    is_authed = False
-    if admin_secret and x_admin_key == admin_secret:
-        is_authed = True
-    elif _is_admin_authenticated(request):
-        is_authed = True
+    is_authed = _verify_admin_api_key(x_admin_key) or bool(_is_admin_authenticated(request))
 
     if not is_authed:
         raise HTTPException(status_code=403, detail="Unauthorized admin access.")
@@ -1783,11 +1842,12 @@ async def api_admin_refresh_sovereign(
     x_admin_key: Optional[str] = Header(None)
 ):
     """Admin API: Trigger on-demand sovereign benchmarks & SDL yield curve synchronization."""
-    admin_secret = os.environ.get("ADMIN_API_KEY", "")
+    if not _validate_request_origin(request):
+        raise HTTPException(status_code=403, detail="Cross-origin request rejected.")
     admin_user = _is_admin_authenticated(request)
     is_authed = False
     admin_email = "api_key_system"
-    if admin_secret and x_admin_key == admin_secret:
+    if _verify_admin_api_key(x_admin_key):
         is_authed = True
     elif admin_user:
         is_authed = True
@@ -1819,11 +1879,12 @@ async def api_admin_run_asset_scan(
     x_admin_key: Optional[str] = Header(None)
 ):
     """Admin API: Dispatches an immediate multi-asset surveillance scan (MFs, Corporate Debt)."""
-    admin_secret = os.environ.get("ADMIN_API_KEY", "")
+    if not _validate_request_origin(request):
+        raise HTTPException(status_code=403, detail="Cross-origin request rejected.")
     admin_user = _is_admin_authenticated(request)
     is_authed = False
     admin_email = "api_key_system"
-    if admin_secret and x_admin_key == admin_secret:
+    if _verify_admin_api_key(x_admin_key):
         is_authed = True
     elif admin_user:
         is_authed = True
@@ -1860,6 +1921,8 @@ async def api_admin_copilot_chat(
     Interactive Q&A and operational orchestration endpoint for the Admin Copilot.
     Requires active administrator authentication.
     """
+    if not _validate_request_origin(request):
+        raise HTTPException(status_code=403, detail="Cross-origin request rejected.")
     admin_session = _is_admin_authenticated(request)
     if not admin_session:
         raise HTTPException(status_code=403, detail="Admin authorization required.")
@@ -1888,13 +1951,13 @@ async def api_admin_copilot_execute(
     Executes a confirmed administrative action proposal after the administrator
     has reviewed the action card and explicitly clicked 'Confirm & Execute'.
     """
+    if not _validate_request_origin(request):
+        raise HTTPException(status_code=403, detail="Cross-origin request rejected.")
     admin_session = _is_admin_authenticated(request)
     if not admin_session:
         raise HTTPException(status_code=403, detail="Admin authorization required.")
 
-    client_ip = request.headers.get("x-forwarded-for") or (request.client.host if request.client else "unknown")
-    if client_ip and "," in client_ip:
-        client_ip = client_ip.split(",")[0].strip()
+    client_ip = _get_client_ip(request)
     user_agent = request.headers.get("user-agent", "")
 
     result = execute_confirmed_admin_action(
@@ -1919,6 +1982,8 @@ async def api_admin_run_daily_stock_ingest(
     Triggers the Daily 08:30 AM 15-Stock Ingestion & Mutual Fund Look-Through Re-Audit.
     Requires administrator authentication.
     """
+    if not _validate_request_origin(request):
+        raise HTTPException(status_code=403, detail="Cross-origin request rejected.")
     admin_session = _is_admin_authenticated(request)
     if not admin_session:
         raise HTTPException(status_code=403, detail="Admin authorization required.")
@@ -2081,6 +2146,8 @@ async def api_admin_digest_preview(request: Request, edition_date: Optional[str]
 @router.post("/api/admin/digest/dispatch-test")
 async def api_admin_digest_dispatch_test(request: Request):
     """Dispatches a single test Research Bouquet to administrator email."""
+    if not _validate_request_origin(request):
+        raise HTTPException(status_code=403, detail="Cross-origin request rejected.")
     if not _is_admin_authenticated(request):
         raise HTTPException(status_code=401, detail="Admin authentication required.")
 
@@ -2102,6 +2169,8 @@ async def api_admin_digest_dispatch_test(request: Request):
 @router.post("/api/admin/digest/broadcast")
 async def api_admin_digest_broadcast(request: Request):
     """Broadcasts today's Research Bouquet to all eligible subscribers."""
+    if not _validate_request_origin(request):
+        raise HTTPException(status_code=403, detail="Cross-origin request rejected.")
     if not _is_admin_authenticated(request):
         raise HTTPException(status_code=401, detail="Admin authentication required.")
 

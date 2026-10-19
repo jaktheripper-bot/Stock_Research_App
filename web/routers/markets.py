@@ -14,6 +14,7 @@ Provides:
 """
 
 import os
+import re
 import logging
 from datetime import datetime
 from typing import Optional, List, Dict, Any
@@ -386,11 +387,15 @@ async def api_post_on_demand_fund_audit(
 ):
     """Enqueues an asynchronous look-through forensic audit for any AMFI scheme."""
     init_db()
+    if not _validate_request_origin(request):
+        raise HTTPException(status_code=403, detail="Cross-origin request rejected.")
     if os.environ.get("TESTING") != "1" and not _get_current_web_user(request) and not _is_admin_authenticated(request):
         raise HTTPException(status_code=401, detail="Authentication required to trigger an on-demand fund audit.")
     scheme_code = (payload.get("scheme_code") or "").strip().upper()
     if not scheme_code:
         raise HTTPException(status_code=400, detail="Missing required 'scheme_code' in payload.")
+    if len(scheme_code) > 40 or not re.match(r"^[A-Z0-9_\-]+$", scheme_code):
+        raise HTTPException(status_code=400, detail="Invalid 'scheme_code' format.")
     allow_deep_dive = bool(payload.get("allow_deep_dive", False))
 
     task_id = create_async_fund_audit_task(scheme_code, allow_deep_dive=allow_deep_dive)
@@ -424,6 +429,19 @@ def api_get_fund_deep_dive_quote(scheme_code: str):
     """Returns token credit cost breakdown: Layer 1 (1 credit) vs Layer 2 Deep Dive."""
     init_db()
     clean = scheme_code.strip().upper()
+    if not clean or len(clean) > 40 or not re.match(r"^[A-Z0-9_\-]+$", clean):
+        raise HTTPException(status_code=400, detail="Invalid scheme code format.")
+    scheme = get_mutual_fund_scheme(clean)
+    if not scheme:
+        from core.ingestion.amfi import search_amfi_master_directory, save_mutual_fund_scheme
+        amfi_matches = search_amfi_master_directory(clean, limit=5)
+        for m in amfi_matches:
+            if str(m.get("scheme_code", "")).strip().upper() == clean:
+                save_mutual_fund_scheme(m)
+                scheme = get_mutual_fund_scheme(clean) or m
+                break
+    if not scheme:
+        raise HTTPException(status_code=404, detail=f"Mutual fund scheme '{clean}' not found.")
     try:
         return calculate_deep_dive_credit_cost(clean)
     except Exception as e:

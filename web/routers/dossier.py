@@ -45,6 +45,8 @@ from core.analysis.dossier_report_synthesis import generate_stock_report
 
 from web.common import (
     json_response_with_cache,
+    _validate_request_origin,
+    _get_client_ip,
     _get_current_web_user,
     _is_admin_authenticated,
     _deep_dive_unlocked_for_request,
@@ -80,6 +82,8 @@ class UnlockDossierRequest(BaseModel):
 @router.post("/api/synthesize")
 async def synthesize_report(request: Request, payload: SynthesizeRequest):
     """Requires a verified session cookie; ignores unverified client-supplied user_id."""
+    if not _validate_request_origin(request):
+        raise HTTPException(status_code=403, detail="Cross-origin request rejected.")
     web_user = _get_current_web_user(request)
     is_admin = _is_admin_authenticated(request)
     if not web_user and not is_admin:
@@ -124,7 +128,7 @@ async def synthesize_report(request: Request, payload: SynthesizeRequest):
         })
 
     from core.billing.qos_governor import authorize_llm_execution
-    client_ip = request.client.host if request.client else ""
+    client_ip = _get_client_ip(request)
     user_email = web_user.get("email", "") if web_user else "admin_console"
     synth_auth, synth_reason = authorize_llm_execution(
         actor_type="USER_SYNTHESIS",
@@ -194,6 +198,8 @@ async def api_unlock_dossier(
     Consumes 1 credit and permanently unlocks the institutional deep-dive tier
     (Forensic Accounting Ledger, Reverse DCF Sandbox & Thesis Drift Migrations) for this equity.
     """
+    if not _validate_request_origin(request):
+        raise HTTPException(status_code=403, detail="Cross-origin request rejected.")
     clean_t = clean_ticker(ticker)
     if not clean_t or not any(c.isalnum() for c in clean_t):
         raise HTTPException(status_code=400, detail="Invalid ticker symbol.")

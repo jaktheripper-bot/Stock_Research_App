@@ -156,6 +156,20 @@ def _validate_request_origin(request: Request) -> bool:
         return False
 
 
+def _get_client_ip(request: Request) -> str:
+    """Safely extracts client IP behind reverse proxy (Render/Cloudflare) using rightmost XFF hop."""
+    cf_ip = (request.headers.get("cf-connecting-ip") or request.headers.get("true-client-ip") or "").strip()
+    if cf_ip:
+        return cf_ip
+    xff = request.headers.get("x-forwarded-for", "").strip()
+    if xff:
+        hops = [h.strip() for h in xff.split(",") if h.strip()]
+        if hops:
+            return hops[-1]
+    return request.client.host if request.client else "unknown"
+
+
+
 def _get_user_signing_key() -> bytes:
     key = (
         os.environ.get("SECRET_KEY")
@@ -448,6 +462,8 @@ def _asset_unlocked_for_request(request: Request, kind: str, asset_id: str) -> b
 
 def _unlock_asset_deep_dive(request: Request, kind: str, asset_id: str, label: str):
     """Charges 1 credit (idempotent) and records the unlock for a fund scheme or debt security."""
+    if not _validate_request_origin(request):
+        raise HTTPException(status_code=403, detail="Cross-origin request rejected.")
     get_user_fn = _get_override_fn("web.main", "_get_current_web_user", _get_current_web_user)
     web_user = get_user_fn(request)
     if not web_user:

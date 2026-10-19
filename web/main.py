@@ -172,6 +172,7 @@ from web.common import (
     json_response_with_cache,
     resolve_app_base_url,
     _validate_request_origin,
+    _get_client_ip,
     _get_user_signing_key,
     _generate_user_session_token,
     _validate_user_session_token,
@@ -2066,7 +2067,7 @@ async def submit_contact_ticket(
         )
 
     if os.environ.get("TESTING") != "1":
-        client_ip = (request.headers.get("x-forwarded-for") or (request.client.host if request.client else "unknown")).split(",")[0].strip()
+        client_ip = _get_client_ip(request)
         rate_key = f"{client_ip}:{clean_email}"
         now_ts = _time.time()
         window_hits = [ts for ts in _CONTACT_RATE_BUCKETS.get(rate_key, []) if (now_ts - ts) < 600]
@@ -2138,11 +2139,13 @@ async def user_reply_to_support_ticket(
     reply_message: str = Form(...),
 ):
     """Allows a user to post a follow-up reply directly onto their support ticket thread."""
+    if not _validate_request_origin(request):
+        raise HTTPException(status_code=403, detail="Cross-origin request rejected.")
     init_db()
     from core.db import get_ticket_by_id, add_ticket_response, update_ticket_status
-    clean_tid = str(ticket_id or "").strip().upper()
-    clean_em = str(user_email or "").strip().lower()
-    clean_msg = str(reply_message or "").strip()
+    clean_tid = str(ticket_id or "").strip().upper()[:40]
+    clean_em = str(user_email or "").strip().lower()[:160]
+    clean_msg = str(reply_message or "").strip()[:5000]
 
     t_obj = get_ticket_by_id(clean_tid)
     if not t_obj or str(t_obj.get("user_email", "")).strip().lower() != clean_em:

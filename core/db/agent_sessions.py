@@ -52,6 +52,26 @@ def clean_row(cursor, row: Any) -> Dict[str, Any]:
     return d
 
 
+def get_agent_conversation(conversation_id: str) -> Optional[Dict[str, Any]]:
+    """Retrieves an existing conversation record by ID without creating a new row."""
+    if not conversation_id:
+        return None
+    conn = get_db_connection()
+    cursor = conn.cursor()
+    use_pg = is_postgres_connection(conn)
+    try:
+        placeholder = "%s" if use_pg else "?"
+        cursor.execute(f"SELECT * FROM agent_conversations WHERE conversation_id = {placeholder};", (conversation_id,))
+        row = cursor.fetchone()
+        return clean_row(cursor, row) if row else None
+    except Exception as e:
+        logger.debug("Failed fetching agent conversation %s: %s", conversation_id, e)
+        return None
+    finally:
+        cursor.close()
+        conn.close()
+
+
 def create_or_get_agent_conversation(
     conversation_id: str,
     user_id: Optional[str] = None,
