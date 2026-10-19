@@ -1371,16 +1371,19 @@ def purge_test_telemetry() -> dict:
         """)
         purged_counts["events_purged"] = cursor.rowcount if cursor.rowcount and cursor.rowcount > 0 else 0
 
-        # 2. Purge test support_tickets
+        # 2. Purge test and automated bot/spam support_tickets
         try:
             cursor.execute("""
                 DELETE FROM support_tickets
                 WHERE user_email LIKE '%@example.com'
                    OR user_email LIKE '%@test.com'
                    OR user_email LIKE '%@pytest.com'
+                   OR user_email LIKE '%@domain.org'
+                   OR user_email LIKE '%@nolettersbox.com'
                    OR user_email LIKE 'test_%'
                    OR ticket_id LIKE 'TKT-TEST-%'
-                   OR subject LIKE '%[TEST]%';
+                   OR subject LIKE '%[TEST]%'
+                   OR (LENGTH(TRIM(message)) >= 16 AND TRIM(message) NOT LIKE '% %');
             """)
             purged_counts["tickets_purged"] = cursor.rowcount if cursor.rowcount and cursor.rowcount > 0 else 0
         except Exception as te:

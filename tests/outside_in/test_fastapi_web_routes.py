@@ -1507,10 +1507,40 @@ class TestComparisonAndTelemetry(unittest.TestCase):
             self.assertEqual(real_tx["nature"], "VERIFIED_PAID")
 
             welcome_tx = next(b for b in billables if b["id"] == "tx_welcome_test_1")
-            self.assertEqual(welcome_tx["nature"], "FREE_GRANT")
+            # Insert test support tickets to verify bot/spam purge criteria
+            cursor.execute(
+                f"""
+                INSERT INTO support_tickets (ticket_id, user_email, user_name, category, subject, message, status, source)
+                VALUES ({p}, {p}, 'Spammer', 'general', 'Promo', 'Regular words with spaces', 'open', 'web_contact');
+                """,
+                ("TKT-SPAM-NOLETTERS", "spammer@nolettersbox.com")
+            )
+            cursor.execute(
+                f"""
+                INSERT INTO support_tickets (ticket_id, user_email, user_name, category, subject, message, status, source)
+                VALUES ({p}, {p}, 'Scanner', 'general', 'Probe', 'Regular words with spaces', 'open', 'web_contact');
+                """,
+                ("TKT-SPAM-DOMAINORG", "scanner@domain.org")
+            )
+            cursor.execute(
+                f"""
+                INSERT INTO support_tickets (ticket_id, user_email, user_name, category, subject, message, status, source)
+                VALUES ({p}, {p}, 'Bot', 'general', 'Scanner Payload', 'NARTYTRYUT802262NERTHRRTH', 'open', 'web_contact');
+                """,
+                ("TKT-SPAM-GIBBERISH", "scanner@anydomain.net")
+            )
+            cursor.execute(
+                f"""
+                INSERT INTO support_tickets (ticket_id, user_email, user_name, category, subject, message, status, source)
+                VALUES ({p}, {p}, 'Investor', 'general', 'Legitimate Inquiry', 'Could you please check my subscription status?', 'open', 'web_contact');
+                """,
+                ("TKT-REAL-GENUINE", "real.investor@legitmail.com")
+            )
+            conn.commit()
 
             counts = purge_test_telemetry()
             self.assertGreaterEqual(counts.get("transactions_purged", 0), 1)
+            self.assertGreaterEqual(counts.get("tickets_purged", 0), 3)
 
             cursor.execute("SELECT id FROM credit_transactions WHERE id IN ('tx_real_test_1', 'tx_welcome_test_1', 'tx_sim_test_1');")
             remaining = [r[0] for r in cursor.fetchall()]
@@ -1518,8 +1548,16 @@ class TestComparisonAndTelemetry(unittest.TestCase):
             self.assertIn("tx_welcome_test_1", remaining)
             self.assertNotIn("tx_sim_test_1", remaining)
 
+            cursor.execute("SELECT ticket_id FROM support_tickets WHERE ticket_id IN ('TKT-SPAM-NOLETTERS', 'TKT-SPAM-DOMAINORG', 'TKT-SPAM-GIBBERISH', 'TKT-REAL-GENUINE');")
+            remaining_tickets = [r[0] for r in cursor.fetchall()]
+            self.assertNotIn("TKT-SPAM-NOLETTERS", remaining_tickets)
+            self.assertNotIn("TKT-SPAM-DOMAINORG", remaining_tickets)
+            self.assertNotIn("TKT-SPAM-GIBBERISH", remaining_tickets)
+            self.assertIn("TKT-REAL-GENUINE", remaining_tickets)
+
         finally:
             cursor.execute("DELETE FROM credit_transactions WHERE id IN ('tx_real_test_1', 'tx_welcome_test_1', 'tx_sim_test_1');")
+            cursor.execute("DELETE FROM support_tickets WHERE ticket_id IN ('TKT-SPAM-NOLETTERS', 'TKT-SPAM-DOMAINORG', 'TKT-SPAM-GIBBERISH', 'TKT-REAL-GENUINE');")
             conn.commit()
             cursor.close()
             conn.close()
