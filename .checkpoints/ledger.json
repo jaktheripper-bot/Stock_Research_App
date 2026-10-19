@@ -1550,5 +1550,21 @@
       "revision_count": 274
     },
     "preflight_passed": true
+  },
+  {
+    "tag": "checkpoint_20261019_092951_telemetry_recent_events_timestamp_field",
+    "timestamp": "2026-10-19 09:29:51 IST",
+    "commit_sha": "99fd700fb2a4838c5f428b0b4e7b8cb1fb85ae20",
+    "branch": "main",
+    "description": "telemetry_recent_events_timestamp_field",
+    "database": {
+      "exists": true,
+      "filename": "reports_checkpoint_20261019_092951_telemetry_recent_events_timestamp_field.db",
+      "path": ".checkpoints/reports_checkpoint_20261019_092951_telemetry_recent_events_timestamp_field.db",
+      "size_bytes": 18984960,
+      "report_count": 166,
+      "revision_count": 274
+    },
+    "preflight_passed": true
   }
 ]
