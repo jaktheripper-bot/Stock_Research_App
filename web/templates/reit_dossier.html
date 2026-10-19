@@ -512,73 +512,14 @@
   window.__CURRENT_ASSET_TYPE = "reit";
 
   // Reactive Tax Waterfall Client-Side Logic
-  const TAX_SLABS_DATA = {{ tax_waterfall.slabs | tojson }};
-  const REIT_GROSS_YIELD = {{ reit.distribution_yield_pct | default(7.5) | tojson }};
-  const REIT_ROC_PCT = {{ tax_waterfall.return_of_capital_pct | default(0) | tojson }};
-  let currentActiveSlabRate = 30.0;
-
-  function recalcReitCorpusWaterfall() {
-    const corpusSlider = document.getElementById('reitCorpusSlider');
-    const yearsSlider = document.getElementById('reitYearsSlider');
-    const corpusValEl = document.getElementById('reitCorpusVal');
-    const yearsValEl = document.getElementById('reitYearsVal');
-    const trackerBar = document.getElementById('reitSec56TrackerBar');
-
-    if (!corpusSlider || !yearsSlider) return;
-
-    const corpus = parseFloat(corpusSlider.value);
-    const years = parseInt(yearsSlider.value, 10);
-
-    if (corpusValEl) {
-      corpusValEl.textContent = '₹' + Math.round(corpus).toLocaleString('en-IN');
-    }
-    if (yearsValEl) {
-      yearsValEl.textContent = years + (years === 1 ? ' Year' : ' Years');
-    }
-
-    const slab = TAX_SLABS_DATA.find(s => Math.abs(s.slab_rate_pct - currentActiveSlabRate) < 0.1) || TAX_SLABS_DATA[3] || { net_post_tax_yield_pct: REIT_GROSS_YIELD };
-    const netYieldPct = slab.net_post_tax_yield_pct;
-
-    const annualGross = corpus * (REIT_GROSS_YIELD / 100.0);
-    const annualNet = corpus * (netYieldPct / 100.0);
-    const totalNetCash = annualNet * years;
-
-    const annualRoc = annualGross * (REIT_ROC_PCT / 100.0);
-    const cumulativeRoc = annualRoc * years;
-    const remainingCostBasis = Math.max(0, corpus - cumulativeRoc);
-    const amortizedPct = Math.min(100, (cumulativeRoc / corpus) * 100.0);
-    const excessSpecifiedSum = Math.max(0, cumulativeRoc - corpus);
-
-    if (trackerBar) {
-      let sec56StatusHtml = '';
-      if (excessSpecifiedSum > 0) {
-        sec56StatusHtml = `<span style="color: #f87171; font-weight: 700;">⚠️ Sec 56(2)(xii) Triggered:</span> Cumulative RoC (₹${Math.round(cumulativeRoc).toLocaleString('en-IN')}) has completely amortized the initial acquisition cost. The excess <strong>₹${Math.round(excessSpecifiedSum).toLocaleString('en-IN')}</strong> is classified as 'Specified Sum' and taxable at marginal slab (${currentActiveSlabRate}%).`;
-      } else {
-        sec56StatusHtml = `<span style="color: #34d399; font-weight: 700;">✓ Sec 56(2)(xii) Safe Harbor:</span> Cumulative RoC of ₹${Math.round(cumulativeRoc).toLocaleString('en-IN')} (${amortizedPct.toFixed(1)}% amortized) reduces acquisition cost basis from ₹${Math.round(corpus).toLocaleString('en-IN')} to <strong style="color: #38bdf8;">₹${Math.round(remainingCostBasis).toLocaleString('en-IN')}</strong>. Fully tax-exempt until cost basis reaches zero.`;
-      }
-
-      trackerBar.innerHTML = `
-        <div style="display: flex; justify-content: space-between; align-items: baseline; flex-wrap: wrap; gap: 8px; margin-bottom: 6px;">
-          <div>
-            <span style="color: #94a3b8; font-size: 11px; text-transform: uppercase; font-weight: 700;">Annual In-Hand Cash Flow:</span>
-            <strong style="color: #10b981; font-size: 15px; margin-left: 6px;" class="tnum">₹${Math.round(annualNet).toLocaleString('en-IN')}/year</strong>
-            <span style="color: #64748b; font-size: 11.5px; margin-left: 4px;">(${netYieldPct}% post-tax yield at ${currentActiveSlabRate}% slab)</span>
-          </div>
-          <div>
-            <span style="color: #94a3b8; font-size: 11px; text-transform: uppercase; font-weight: 700;">${years}Y Cumulative Cash:</span>
-            <strong style="color: #38bdf8; font-size: 15px; margin-left: 6px;" class="tnum">₹${Math.round(totalNetCash).toLocaleString('en-IN')}</strong>
-          </div>
-        </div>
-        <div style="font-size: 12px; line-height: 1.5; border-top: 1px solid rgba(255,255,255,0.06); padding-top: 6px;">
-          ${sec56StatusHtml}
-        </div>
-      `;
-    }
-  }
+  const TAX_SLABS = {{ tax_waterfall.slabs | tojson }};
+  const TAX_SLABS_DATA = TAX_SLABS;
 
   function selectTaxSlab(slabRate) {
-    currentActiveSlabRate = slabRate;
-    const slab = TAX_SLABS_DATA.find(s => Math.abs(s.slab_rate_pct - slabRate) < 0.1);
+    if (typeof activeReitSlabRate !== 'undefined') {
+      activeReitSlabRate = slabRate;
+    }
+    const slab = TAX_SLABS.find(s => Math.abs(s.slab_rate_pct - slabRate) < 0.1);
     if (!slab) return;
 
     // Update active button styling
@@ -616,7 +557,35 @@
       indicatorEl.textContent = `Active: ${slabRate}% (${desc})`;
     }
 
-    recalcReitCorpusWaterfall();
+    if (typeof recalcReitCorpusWaterfall === 'function') {
+      recalcReitCorpusWaterfall();
+    }
+  }
+
+  let activeReitSlabRate = 30.0;
+  const GROSS_YIELD_PCT = {{ reit.distribution_yield_pct|default(6.5)|tojson }};
+  const ROC_SPLIT_PCT = {{ reit.tax_ReturnOfCapital_pct|default(40.0)|tojson }};
+
+  function recalcReitCorpusWaterfall() {
+    const slab = TAX_SLABS.find(s => Number(s.slab_rate_pct) === Number(activeReitSlabRate)) || TAX_SLABS[3] || TAX_SLABS[0];
+    const corpusEl = document.getElementById('reitCorpusSlider');
+    const yrsEl = document.getElementById('reitYearsSlider');
+    if (!corpusEl || !yrsEl || !slab) return;
+
+    const corpus = parseFloat(corpusEl.value);
+    const years = parseInt(yrsEl.value, 10);
+    document.getElementById('reitCorpusVal').textContent = '₹' + Math.round(corpus).toLocaleString('en-IN');
+    document.getElementById('reitYearsVal').textContent = years + (years === 1 ? ' Year' : ' Years');
+
+    const netCashYr = corpus * (slab.net_post_tax_yield_pct / 100.0);
+    const annualRoc = corpus * (GROSS_YIELD_PCT / 100.0) * (ROC_SPLIT_PCT / 100.0);
+    const cumRoc = annualRoc * years;
+    const adjCostBasis = Math.max(0, corpus - cumRoc);
+
+    const tracker = document.getElementById('reitSec56TrackerBar');
+    if (tracker) {
+      tracker.innerHTML = `💧 <strong>Annual Post-Tax In-Hand Distribution (${activeReitSlabRate}% Slab):</strong> <span class="tnum" style="color:#10b981;font-weight:800;">₹${Math.round(netCashYr).toLocaleString('en-IN')}/yr</span> • <strong>Cumulative Tax-Free ROC (${years}Y):</strong> <span class="tnum" style="color:#38bdf8;">₹${Math.round(cumRoc).toLocaleString('en-IN')}</span> • <strong>Adjusted Sec 56(2)(xii) Cost Basis:</strong> <span class="tnum">₹${Math.round(adjCostBasis).toLocaleString('en-IN')}</span>`;
+    }
   }
 
   // Set default button styling on load

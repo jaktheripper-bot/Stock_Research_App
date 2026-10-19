@@ -344,6 +344,7 @@ def get_reit_detail(symbol: str) -> Optional[Dict[str, Any]]:
             "discount_label": f"{abs(disc):.2f}% {'Discount to NAV' if disc < 0 else ('Premium to NAV' if disc > 0 else 'Par Alignment')}",
             "distribution_yield_pct": gross_yield,
             "distribution_yield_formatted": f"{gross_yield:.2f}%",
+            "tax_ReturnOfCapital_pct": amrt_pct,
             "occupancy_pct": occ,
             "ndcf_payout_purity_pct": ndcf_purity,
             "ltv_ratio_pct": ltv,
