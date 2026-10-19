@@ -14,6 +14,7 @@ import yfinance as yf
 from bsedata.bse import BSE
 from normalizer import clean_ticker
 from bse_master import resolve_bse_scrip_code, resolve_canonical_symbol
+from typing import Any, Dict, List, Optional, Tuple, Union
 from core.analysis.exceptions import ExchangeDataFetchError
 from core.config import get_secret, yfinance_fallback_enabled
 

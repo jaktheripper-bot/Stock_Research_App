@@ -26,7 +26,7 @@ except ImportError:
             self.tools = tools
 
     class Agent:
-        def __init__(self, name: str, model: str, system_prompt: str, subagents: List[SubAgent], tools: List[Any]):
+        def __init__(self, name: str, model: str, system_prompt: str, subagents: List["SubAgent"], tools: List[Any]):
             self.name = name
             self.model = model
             self.system_prompt = system_prompt

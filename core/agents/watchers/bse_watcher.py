@@ -8,7 +8,7 @@ records the event in `autonomous_event_ledger` and triggers an automated re-audi
 import asyncio
 import logging
 from datetime import datetime, timezone
-from typing import Dict, Any, List
+from typing import Dict, Any, List, Optional
 
 from core.analysis.fundamentals import fetch_latest_bse_announcement, resolve_bse_scrip_code
 from core.cortex.garuda import GarudaReflexEngine

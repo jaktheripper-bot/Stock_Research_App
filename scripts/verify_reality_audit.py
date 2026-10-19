@@ -150,7 +150,28 @@ class RealityAuditor:
                             self.fail(gate, f"{rel}:{node.lineno}",
                                       f"Function '{node.name}' annotated '-> {ret_ann}' has no return value (returns None).")
 
-        # 2.4 Verify `process_refund` call sites match `core.db.users.process_refund` signature
+            # 2.4 Check for typing annotations used without importing from typing
+            common_typing_names = {"Any", "Optional", "List", "Dict", "Tuple", "Union", "Set", "Callable", "Iterable", "Sequence", "Mapping"}
+            for node in ast.walk(tree):
+                if isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef)):
+                    if node.returns:
+                        for sub in ast.walk(node.returns):
+                            if isinstance(sub, ast.Name) and sub.id in common_typing_names and sub.id not in top_imports:
+                                self.fail(gate, f"{rel}:{node.lineno}",
+                                          f"NameError on Python <=3.12: '{sub.id}' used in return annotation on '{node.name}' but never imported from typing.")
+                    for arg in node.args.args + node.args.kwonlyargs:
+                        if arg.annotation:
+                            for sub in ast.walk(arg.annotation):
+                                if isinstance(sub, ast.Name) and sub.id in common_typing_names and sub.id not in top_imports:
+                                    self.fail(gate, f"{rel}:{node.lineno}",
+                                              f"NameError on Python <=3.12: '{sub.id}' used in argument '{arg.arg}' on '{node.name}' but never imported from typing.")
+                elif isinstance(node, ast.AnnAssign) and node.annotation:
+                    for sub in ast.walk(node.annotation):
+                        if isinstance(sub, ast.Name) and sub.id in common_typing_names and sub.id not in top_imports:
+                            self.fail(gate, f"{rel}:{node.lineno}",
+                                      f"NameError on Python <=3.12: '{sub.id}' used in type annotation but never imported from typing.")
+
+        # 2.5 Verify `process_refund` call sites match `core.db.users.process_refund` signature
         from core.db.users import process_refund
         sig = inspect.signature(process_refund)
         valid_params = set(sig.parameters.keys())
