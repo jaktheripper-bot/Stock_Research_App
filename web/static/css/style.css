@@ -691,6 +691,42 @@ section.stats-strip {
   font-weight: 500;
 }
 
+/* Plain-language trust cards (homepage) */
+.trust-head {
+  margin-bottom: 32px;
+}
+
+.trust-head .section-sub {
+  max-width: 640px;
+  margin: 0 auto;
+}
+
+.trust-grid {
+  grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+}
+
+.trust-card {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 24px;
+}
+
+.trust-title {
+  font-size: 16px;
+  font-weight: 700;
+  color: var(--text-primary);
+  letter-spacing: -0.01em;
+  margin: 0;
+}
+
+.trust-desc {
+  font-size: 14px;
+  line-height: 1.6;
+  color: var(--text-secondary);
+  margin: 0;
+}
+
 /* ==============================================================================
    7-Pillar Overview Grid
    ============================================================================== */

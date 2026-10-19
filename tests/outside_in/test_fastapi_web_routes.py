@@ -72,7 +72,11 @@ Detailed forensic analysis with exact page grounding to bseindia.com filings.
         self.assertEqual(res.status_code, 200)
         self.assertIn("Audit the Asset.", res.text)
         self.assertIn("Protect the Allocator.", res.text)
-        self.assertIn("ZERO-HALLUCINATION DATA INTEGRITY", res.text)
+        self.assertIn("EVIDENCE-LED INVESTMENT RESEARCH", res.text)
+        self.assertIn("Four things we promise every reader", res.text)
+        self.assertIn("We never tell you to buy or sell", res.text)
+        self.assertIn("Multi-asset investment research", res.text)
+        self.assertNotIn("ZERO-HALLUCINATION", res.text.upper())
 
     def test_security_headers_middleware(self):
         res = self.client.get("/")

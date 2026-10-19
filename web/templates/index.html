@@ -6,9 +6,9 @@
 <section class="hero">
   <div class="container">
     <div class="hero-badge">
-      <span><svg class="glyph"><use href="#glyph-zap"></use></svg> ZERO-HALLUCINATION DATA INTEGRITY</span>
+      <span><svg class="glyph"><use href="#glyph-search"></use></svg> EVIDENCE-LED INVESTMENT RESEARCH</span>
       <span>•</span>
-      <span>SEBI NON-ADVISORY SAFE HARBOR</span>
+      <span>NOT INVESTMENT ADVICE</span>
     </div>
 
     <h1 class="hero-title">
@@ -17,7 +17,7 @@
     </h1>
 
     <p class="hero-sub">
-      Dual-Mandate fundamental intelligence: We audit the economic moat of the asset, while constructing a cognitive moat for the investor against market noise, narrative seduction, and behavioral bias.
+      Independent research on Indian stocks, mutual funds and corporate bonds. See what the numbers mean, what could go wrong, and what to check before you invest.
     </p>
 
     <!-- Interactive Stock Search -->
@@ -30,17 +30,17 @@
             id="mainSearchInput" 
             name="q" 
             class="search-input" 
-            placeholder="Search any BSE/NSE stock (e.g. INFY, TCS, RELIANCE)..." 
+            placeholder="Search a stock, mutual fund or bond (e.g. INFY, Parag Parikh, HDFC)..." 
             autocomplete="off"
             required
           >
-          <button type="submit" class="btn btn-primary btn-sm">Research Stock</button>
+          <button type="submit" class="btn btn-primary btn-sm">Search</button>
         </div>
       </form>
       <div id="searchSuggestions" class="search-suggestions" style="display: none;"></div>
 
       <div class="quick-chips">
-        <span>Trending Dossiers:</span>
+        <span>Popular stock reports:</span>
         <a href="/dossier/INFY" class="chip">INFY</a>
         <a href="/dossier/TCS" class="chip">TCS</a>
         <a href="/dossier/RELIANCE" class="chip">RELIANCE</a>
@@ -52,25 +52,34 @@
   </div>
 </section>
 
-<!-- Trust Metrics Strip -->
-<section class="stats-strip">
+<!-- Why You Can Trust What You Read (plain-language commitments; each claim is backed by live product behaviour) -->
+<section class="stats-strip trust-strip" aria-labelledby="trustHeading">
   <div class="container">
-    <div class="stats-grid">
-      <div class="stat-card">
-        <div class="stat-num">BSE &amp; NSE</div>
-        <div class="stat-label">Verified Institutional Dossiers</div>
+    <div class="section-head trust-head">
+      <div class="section-tag">Why you can trust our research</div>
+      <h2 id="trustHeading" class="section-title">Four things we promise every reader</h2>
+      <p class="section-sub">Investment information is everywhere. What is harder to find is context you can check for yourself. Here is how we try to provide it.</p>
+    </div>
+    <div class="stats-grid trust-grid">
+      <div class="stat-card trust-card">
+        <div class="pillar-icon"><svg class="glyph"><use href="#glyph-search"></use></svg></div>
+        <h3 class="trust-title">We start from public records</h3>
+        <p class="trust-desc">Reports are built from company filings and exchange data, not tips, rumours or management claims. You can check the same sources yourself.</p>
       </div>
-      <div class="stat-card">
-        <div class="stat-num tnum">100%</div>
-        <div class="stat-label">Zero-Hallucination Exchange Quotes</div>
+      <div class="stat-card trust-card">
+        <div class="pillar-icon"><svg class="glyph"><use href="#glyph-scale"></use></svg></div>
+        <h3 class="trust-title">We show the risks, not just the pitch</h3>
+        <p class="trust-desc">Every stock report covers seven areas, including debt, cash flow, valuation and governance, so strengths are read alongside what could go wrong.</p>
       </div>
-      <div class="stat-card">
-        <div class="stat-num">01–07</div>
-        <div class="stat-label">Core Forensic Diagnostic Checks</div>
+      <div class="stat-card trust-card">
+        <div class="pillar-icon"><svg class="glyph"><use href="#glyph-shield"></use></svg></div>
+        <h3 class="trust-title">We never tell you to buy or sell</h3>
+        <p class="trust-desc">Our reports describe what the evidence shows. They are research, not investment advice, and the decision always stays with you.</p>
       </div>
-      <div class="stat-card">
-        <div class="stat-num tnum">₹0.00</div>
-        <div class="stat-label">Free Archival Reads & Exchange Quotes</div>
+      <div class="stat-card trust-card">
+        <div class="pillar-icon"><svg class="glyph"><use href="#glyph-coin"></use></svg></div>
+        <h3 class="trust-title">Reading is free, and readers pay us</h3>
+        <p class="trust-desc">Existing reports and exchange quotes are free to read. Credits are used only when you ask for a fresh report, which is how we are funded.</p>
       </div>
     </div>
   </div>
