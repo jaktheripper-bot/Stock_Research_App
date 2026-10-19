@@ -749,6 +749,21 @@ class TestCopilotUIAndSyntax(unittest.TestCase):
             "copilot.js must support formatCopilotMarkdown"
         )
         self.assertIn(
+            'document.body.appendChild(modal);',
+            content,
+            "copilot.js must hoist #copilotModalBackdrop to document.body outside <main>"
+        )
+        self.assertIn(
+            '!mainEl.contains(modal)',
+            content,
+            "copilot.js must guard mainEl.inert = true with !mainEl.contains(modal) to prevent self-lockout"
+        )
+        self.assertIn(
+            'modal.inert = false;',
+            content,
+            "copilot.js must explicitly keep #copilotModalBackdrop non-inert"
+        )
+        self.assertIn(
             'mainEl.inert = true;',
             content,
             "copilot.js must set mainEl.inert = true on modal open for background focus trapping"

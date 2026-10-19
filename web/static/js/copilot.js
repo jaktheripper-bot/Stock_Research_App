@@ -718,20 +718,32 @@ function openCopilot(ticker, assetType, section, sectionLabel, initialPrompt) {
     if (panel) panel.scrollTop = 0;
 
     if (modal) {
+        if (modal.parentElement !== document.body) {
+            document.body.appendChild(modal);
+        }
+        modal.inert = false;
+        modal.removeAttribute("inert");
         modal.style.display = "flex";
         void modal.offsetWidth;
         modal.classList.add("copilot-open");
         const mainEl = document.querySelector("main");
-        if (mainEl) mainEl.inert = true;
+        if (mainEl && !mainEl.contains(modal)) {
+            mainEl.inert = true;
+        }
     }
 
-    // Prepare and focus input with scroll protection
+    // Prepare and focus input synchronously (required for mobile virtual keyboard) + post-transition fallback
     const input = document.getElementById("copilotInput");
     if (input) {
         if (initialPrompt) {
             input.value = initialPrompt;
         }
         handleCopilotInput(input);
+        try {
+            input.focus({ preventScroll: true });
+        } catch (e) {
+            input.focus();
+        }
         setTimeout(() => {
             if (container) container.scrollTop = 0;
             if (panel) panel.scrollTop = 0;
@@ -749,7 +761,10 @@ function openCopilot(ticker, assetType, section, sectionLabel, initialPrompt) {
 function closeCopilot() {
     const modal = document.getElementById("copilotModalBackdrop");
     const mainEl = document.querySelector("main");
-    if (mainEl) mainEl.inert = false;
+    if (mainEl) {
+        mainEl.inert = false;
+        mainEl.removeAttribute("inert");
+    }
     if (modal) {
         modal.classList.remove("copilot-open");
         setTimeout(() => {
@@ -1145,4 +1160,19 @@ window.sendQuickPrompt = sendQuickPrompt;
 window.copyCopilotTurn = copyCopilotTurn;
 window.submitCopilotMessage = submitCopilotMessage;
 
-
+// Hoist Copilot Modal & Floating Dock out of <main> to document.body so <main inert> never locks out the drawer
+function hoistCopilotToBody() {
+    const modal = document.getElementById("copilotModalBackdrop");
+    if (modal && modal.parentElement !== document.body) {
+        document.body.appendChild(modal);
+    }
+    const fab = document.getElementById("forensicDeskFloatingDock");
+    if (fab && fab.parentElement !== document.body) {
+        document.body.appendChild(fab);
+    }
+}
+if (document.readyState === "loading") {
+    document.addEventListener("DOMContentLoaded", hoistCopilotToBody);
+} else {
+    hoistCopilotToBody();
+}
