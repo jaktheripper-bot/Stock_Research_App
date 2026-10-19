@@ -856,7 +856,8 @@ class TestCopilotUIAndSyntax(unittest.TestCase):
         self.assertEqual(len(distinct_responses), 4, "All 4 equity options must produce completely distinct diagnostic analyses!")
 
         self.assertIn("Pre-Mortem Inversion Analysis", responses["pre_mortem"])
-        self.assertIn("Charlie Munger", responses["pre_mortem"])
+        self.assertIn("Pre-Mortem Inversion", responses["pre_mortem"])
+        self.assertIn("assume the investment thesis disappoints", responses["pre_mortem"])
         self.assertIn("Reverse DCF Valuation & Implied Growth Deconstruction", responses["reverse_dcf"])
         self.assertIn("Current Market Price (CMP)", responses["reverse_dcf"])
         self.assertIn("Implied FCF Growth Priced In", responses["reverse_dcf"])
@@ -892,7 +893,7 @@ class TestCopilotUIAndSyntax(unittest.TestCase):
         self.assertIn("Weighted Moat & Quality Diagnostic", responses["moat"])
         self.assertIn("Look-Through Accounting Risk (ASRI) Diagnostic", responses["asri"])
         self.assertIn("Active Share & Closet Indexing Diagnostic", responses["active_share"])
-        self.assertIn("Intermediary Fee Drag & Wealth Destruction Audit", responses["fee_drag"])
+        self.assertIn("Intermediary Fee Drag & Compounding Cost Audit", responses["fee_drag"])
 
     def test_debt_options_yield_distinct_responses(self):
         """Verifies that each option within the Credit & Solvency Intelligence Desk returns a unique response."""

@@ -655,7 +655,9 @@ class TestMoatnomicsBrandHouse(unittest.TestCase):
 
         # 2. Valuation Radar summary separates business quality from valuation
         vr = compute_valuation_radar(current_price=2000.0, pe_ratio=42.0, eps=47.6, sales_growth_3y=12.0)
-        self.assertIn("leaves less room for execution to disappoint", vr["summary"])
+        self.assertIn("creating valuation sensitivity if growth or margins moderate", vr["summary"])
+        vr_prem = compute_valuation_radar(current_price=1050.0, pe_ratio=42.0, eps=47.6, sales_growth_3y=12.0)
+        self.assertIn("leaves less room for execution to disappoint", vr_prem["summary"])
 
         # 3. Deterministic 7-Pillar Equity Report includes epistemic tags & falsification triggers
         rep_md = generate_deterministic_7pillar_report(
