@@ -1994,12 +1994,35 @@ async def refund_policy_page(request: Request):
 
 
 @app.get("/contact", response_class=HTMLResponse)
-async def contact_page(request: Request):
-    """Interactive Support Desk, Complaints, and Statutory Grievance Redressal page."""
+async def contact_page(
+    request: Request,
+    ticket_id: Optional[str] = Query(None),
+    email: Optional[str] = Query(None),
+):
+    """Interactive Support Desk, Complaints, and Two-Way Ticket Status Lookup page."""
+    init_db()
+    tracked_ticket = None
+    lookup_error = None
+    if ticket_id and email:
+        from core.db import get_ticket_by_id
+        clean_tid = ticket_id.strip().upper()
+        clean_em = email.strip().lower()
+        t_obj = get_ticket_by_id(clean_tid)
+        if t_obj and str(t_obj.get("user_email", "")).strip().lower() == clean_em:
+            tracked_ticket = t_obj
+        else:
+            lookup_error = f"No matching ticket found for ID '{clean_tid}' and email '{clean_em}'."
+
     return templates.TemplateResponse(
         request=request,
         name="contact.html",
-        context={"active_page": "contact"}
+        context={
+            "active_page": "contact",
+            "tracked_ticket": tracked_ticket,
+            "lookup_error": lookup_error,
+            "lookup_ticket_id": (ticket_id or "").strip().upper(),
+            "lookup_email": (email or "").strip().lower(),
+        }
     )
 
 
@@ -2073,6 +2096,57 @@ async def submit_contact_ticket(
         context={
             "active_page": "contact",
             "success_ticket": res,
+        }
+    )
+
+
+@app.post("/contact/reply", response_class=HTMLResponse)
+async def user_reply_to_support_ticket(
+    request: Request,
+    ticket_id: str = Form(...),
+    user_email: str = Form(...),
+    reply_message: str = Form(...),
+):
+    """Allows a user to post a follow-up reply directly onto their support ticket thread."""
+    init_db()
+    from core.db import get_ticket_by_id, add_ticket_response, update_ticket_status
+    clean_tid = str(ticket_id or "").strip().upper()
+    clean_em = str(user_email or "").strip().lower()
+    clean_msg = str(reply_message or "").strip()
+
+    t_obj = get_ticket_by_id(clean_tid)
+    if not t_obj or str(t_obj.get("user_email", "")).strip().lower() != clean_em:
+        return templates.TemplateResponse(
+            request=request,
+            name="contact.html",
+            context={
+                "active_page": "contact",
+                "lookup_error": "Could not verify ticket ownership. Please check your Ticket ID and Email.",
+                "lookup_ticket_id": clean_tid,
+                "lookup_email": clean_em,
+            }
+        )
+
+    if clean_msg:
+        add_ticket_response(
+            ticket_id=clean_tid,
+            responder_email=clean_em,
+            responder_role="user",
+            message=clean_msg,
+            email_sent=False
+        )
+        if str(t_obj.get("status", "")).upper() in ("RESOLVED", "CLOSED"):
+            update_ticket_status(clean_tid, "IN_PROGRESS", "Re-opened by user follow-up reply on /contact.")
+
+    updated_ticket = get_ticket_by_id(clean_tid)
+    return templates.TemplateResponse(
+        request=request,
+        name="contact.html",
+        context={
+            "active_page": "contact",
+            "tracked_ticket": updated_ticket,
+            "lookup_ticket_id": clean_tid,
+            "lookup_email": clean_em,
         }
     )
 

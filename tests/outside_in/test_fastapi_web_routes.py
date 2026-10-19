@@ -362,6 +362,88 @@ Detailed forensic analysis with exact page grounding to bseindia.com filings.
         self.assertIn("Ticket Registered Successfully", res_post.text)
         self.assertIn("TKT-", res_post.text)
 
+    def test_contact_page_ticket_lookup_and_user_reply(self):
+        from core.db import create_support_ticket, get_ticket_by_id, update_ticket_status
+        from core.db.connection import get_db_connection, get_placeholder
+
+        # 1. Non-matching ticket lookup returns diagnostic error
+        res_lookup_fail = self.client.get("/contact?ticket_id=TKT-NONEXISTENT&email=nobody@example.com")
+        self.assertEqual(res_lookup_fail.status_code, 200)
+        self.assertIn("No matching ticket found", res_lookup_fail.text)
+
+        # 2. Create test ticket and look up successfully
+        t_res = create_support_ticket(
+            user_email="two_way_investor@example.com",
+            user_name="Two-Way Tester",
+            subject="Question regarding DCF hurdle rate",
+            message="Can you explain the terminal growth rate assumption?",
+            category="general",
+            source="web_contact_form"
+        )
+        self.assertTrue(t_res.get("success"))
+        tid = t_res["ticket_id"]
+
+        try:
+            # 3. Successful lookup renders ticket and original inquiry
+            res_lookup_ok = self.client.get(f"/contact?ticket_id={tid}&email=two_way_investor@example.com")
+            self.assertEqual(res_lookup_ok.status_code, 200)
+            self.assertIn(tid, res_lookup_ok.text)
+            self.assertIn("Question regarding DCF hurdle rate", res_lookup_ok.text)
+            self.assertIn("Can you explain the terminal growth rate assumption?", res_lookup_ok.text)
+            self.assertIn("Post a Follow-Up Reply", res_lookup_ok.text)
+
+            # Template Hygiene check on rendered lookup HTML
+            soup = BeautifulSoup(res_lookup_ok.text, "html.parser")
+            for tag in soup.find_all(True):
+                for attr_name, attr_val in tag.attrs.items():
+                    val_str = " ".join(attr_val) if isinstance(attr_val, list) else str(attr_val)
+                    self.assertNotIn("{{", val_str, f"Unrendered Jinja in <{tag.name} {attr_name}='{val_str}'>")
+
+            # 4. Reply with mismatched email fails ownership verification
+            res_reply_fail = self.client.post("/contact/reply", data={
+                "ticket_id": tid,
+                "user_email": "imposter@example.com",
+                "reply_message": "Unauthorized reply attempt."
+            })
+            self.assertEqual(res_reply_fail.status_code, 200)
+            self.assertIn("Could not verify ticket ownership", res_reply_fail.text)
+
+            # 5. Valid user follow-up reply appends to conversation thread
+            res_reply_ok = self.client.post("/contact/reply", data={
+                "ticket_id": tid,
+                "user_email": "two_way_investor@example.com",
+                "reply_message": "Here is additional context regarding the terminal value."
+            })
+            self.assertEqual(res_reply_ok.status_code, 200)
+            self.assertIn(tid, res_reply_ok.text)
+            self.assertIn("Here is additional context regarding the terminal value.", res_reply_ok.text)
+            self.assertIn("Conversation History", res_reply_ok.text)
+
+            # 6. Verify resolved ticket gets re-opened upon follow-up reply
+            update_ticket_status(tid, "RESOLVED", "Initial query resolved by desk.")
+            t_resolved = get_ticket_by_id(tid)
+            self.assertEqual(t_resolved["status"], "resolved")
+
+            res_reopen = self.client.post("/contact/reply", data={
+                "ticket_id": tid,
+                "user_email": "two_way_investor@example.com",
+                "reply_message": "Re-opening ticket: I need clarification on discount rates."
+            })
+            self.assertEqual(res_reopen.status_code, 200)
+            t_reopened = get_ticket_by_id(tid)
+            self.assertEqual(t_reopened["status"], "in_progress")
+            self.assertIn("Re-opened by user follow-up", t_reopened.get("admin_notes", ""))
+
+        finally:
+            conn = get_db_connection()
+            c = conn.cursor()
+            p = get_placeholder()
+            c.execute(f"DELETE FROM ticket_responses WHERE ticket_id = {p}", (tid,))
+            c.execute(f"DELETE FROM support_tickets WHERE ticket_id = {p}", (tid,))
+            conn.commit()
+            c.close()
+            conn.close()
+
     def test_seo_robots_and_sitemap(self):
         res_robots = self.client.get("/robots.txt")
         self.assertEqual(res_robots.status_code, 200)

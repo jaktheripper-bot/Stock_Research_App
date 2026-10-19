@@ -37,9 +37,12 @@
         <div style="font-size: 14px; color: var(--text-primary); margin-bottom: 10px;">
           Reference ID: <strong class="tnum" style="background: rgba(15, 23, 42, 0.6); padding: 2px 8px; border-radius: 4px; color: var(--accent-cyan);">{{ success_ticket.ticket_id }}</strong>
         </div>
-        <p style="font-size: 13px; color: var(--text-secondary); line-height: 1.5; margin: 0;">
+        <p style="font-size: 13px; color: var(--text-secondary); line-height: 1.5; margin: 0 0 10px 0;">
           A notification has been dispatched to our operations team. A confirmation has been logged for <strong>{{ success_ticket.user_email }}</strong>. We will review and respond within 24 hours.
         </p>
+        <a href="/contact?ticket_id={{ success_ticket.ticket_id }}&email={{ success_ticket.user_email }}" class="btn btn-secondary btn-sm" style="display: inline-flex; align-items: center; gap: 6px; font-size: 12px; font-weight: 600;">
+          <span>🔍 Track Ticket Status Live →</span>
+        </a>
       </div>
       {% endif %}
 
@@ -99,6 +102,114 @@
 
     <!-- Direct Administration Desk & Ticket Review Information -->
     <div>
+      <!-- Two-Way Support Ticket Status & Thread Tracker -->
+      <div style="background: rgba(30, 41, 59, 0.7); border: 1px solid var(--border-color); border-radius: var(--radius-lg); padding: 24px; margin-bottom: 24px; backdrop-filter: blur(12px);">
+        <h4 style="font-size: 16px; font-weight: 700; color: var(--text-primary); margin-bottom: 8px; display: flex; align-items: center; gap: 8px;">
+          <span>🔍</span> Track Existing Ticket
+        </h4>
+        <p style="font-size: 12px; color: var(--text-secondary); margin-bottom: 16px; line-height: 1.5;">
+          Look up an existing ticket, review desk replies, and communicate directly with operations.
+        </p>
+
+        {% if lookup_error %}
+        <div style="background: rgba(239, 68, 68, 0.12); border: 1px solid #ef4444; border-radius: 6px; padding: 12px; margin-bottom: 16px; font-size: 12px; color: #fca5a5;">
+          ❌ {{ lookup_error }}
+        </div>
+        {% endif %}
+
+        <form action="/contact" method="GET" style="margin-bottom: {% if tracked_ticket %}20px{% else %}0{% endif %};">
+          <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-bottom: 10px;">
+            <div>
+              <label for="lookupTicketId" style="display: block; font-size: 11px; font-weight: 600; color: var(--text-secondary); margin-bottom: 4px;">
+                Ticket Reference ID
+              </label>
+              <input type="text" id="lookupTicketId" name="ticket_id" required placeholder="TKT-..." style="width: 100%; padding: 8px 10px; background: rgba(15, 23, 42, 0.6); border: 1px solid var(--border-color); border-radius: 6px; color: var(--text-primary); font-size: 13px;" value="{{ lookup_ticket_id|default('') }}">
+            </div>
+            <div>
+              <label for="lookupEmail" style="display: block; font-size: 11px; font-weight: 600; color: var(--text-secondary); margin-bottom: 4px;">
+                Registered Email
+              </label>
+              <input type="email" id="lookupEmail" name="email" required autocomplete="email" placeholder="you@domain.com" style="width: 100%; padding: 8px 10px; background: rgba(15, 23, 42, 0.6); border: 1px solid var(--border-color); border-radius: 6px; color: var(--text-primary); font-size: 13px;" value="{{ lookup_email|default('') }}">
+            </div>
+          </div>
+          <button type="submit" class="btn btn-secondary btn-sm" style="width: 100%; padding: 10px; font-size: 13px; font-weight: 600; display: flex; justify-content: center; align-items: center; gap: 6px;">
+            <span>🔍 Check Status & Thread</span>
+          </button>
+        </form>
+
+        {% if tracked_ticket %}
+        <!-- Active Tracked Ticket Details & Response Thread -->
+        <div style="margin-top: 18px; border-top: 1px solid rgba(255, 255, 255, 0.08); padding-top: 16px;">
+          <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px; flex-wrap: wrap; gap: 6px;">
+            <span class="mono" style="font-size: 13px; font-weight: 700; color: var(--accent-cyan); background: rgba(14, 165, 233, 0.12); padding: 2px 8px; border-radius: 4px; border: 1px solid rgba(14, 165, 233, 0.3);">
+              {{ tracked_ticket.ticket_id }}
+            </span>
+            {% set st = (tracked_ticket.status|default('open'))|lower %}
+            {% if st in ['resolved', 'closed'] %}
+            <span style="font-size: 11px; font-weight: 700; padding: 2px 8px; border-radius: 4px; background: rgba(16, 185, 129, 0.15); color: #34d399; border: 1px solid rgba(16, 185, 129, 0.3);">
+              ✓ {{ tracked_ticket.status|upper }}
+            </span>
+            {% elif st in ['in_progress', 'investigating'] %}
+            <span style="font-size: 11px; font-weight: 700; padding: 2px 8px; border-radius: 4px; background: rgba(59, 130, 246, 0.15); color: #60a5fa; border: 1px solid rgba(59, 130, 246, 0.3);">
+              ⏳ {{ tracked_ticket.status|upper }}
+            </span>
+            {% else %}
+            <span style="font-size: 11px; font-weight: 700; padding: 2px 8px; border-radius: 4px; background: rgba(234, 179, 8, 0.15); color: #facc15; border: 1px solid rgba(234, 179, 8, 0.3);">
+              ● {{ tracked_ticket.status|upper }}
+            </span>
+            {% endif %}
+          </div>
+
+          <div style="font-size: 13px; font-weight: 600; color: var(--text-primary); margin-bottom: 4px;">
+            {{ tracked_ticket.subject }}
+          </div>
+          <div style="font-size: 11px; color: var(--text-muted); margin-bottom: 12px;">
+            Created: {{ tracked_ticket.created_at }} | Category: {{ tracked_ticket.category|capitalize }}
+          </div>
+
+          <div style="background: rgba(15, 23, 42, 0.6); border: 1px solid rgba(255, 255, 255, 0.06); border-radius: 6px; padding: 12px; margin-bottom: 14px; font-size: 12px; line-height: 1.5; color: var(--text-secondary);">
+            <div style="font-weight: 600; font-size: 11px; color: var(--text-muted); margin-bottom: 4px;">Original Inquiry:</div>
+            {{ tracked_ticket.message }}
+          </div>
+
+          <!-- Chronological Responses Thread -->
+          {% if tracked_ticket.responses and tracked_ticket.responses|length > 0 %}
+          <div style="margin-bottom: 16px;">
+            <div style="font-size: 12px; font-weight: 700; color: var(--text-primary); margin-bottom: 8px;">
+              💬 Conversation History ({{ tracked_ticket.responses|length }})
+            </div>
+            <div style="display: flex; flex-direction: column; gap: 8px;">
+              {% for resp in tracked_ticket.responses %}
+              <div style="background: {% if resp.sender_type == 'admin' %}rgba(14, 165, 233, 0.08){% else %}rgba(15, 23, 42, 0.5){% endif %}; border: 1px solid {% if resp.sender_type == 'admin' %}rgba(14, 165, 233, 0.25){% else %}rgba(255, 255, 255, 0.06){% endif %}; border-radius: 6px; padding: 10px 12px; font-size: 12px; line-height: 1.5;">
+                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 4px; font-size: 11px;">
+                  <strong style="color: {% if resp.sender_type == 'admin' %}#38bdf8{% else %}#94a3b8{% endif %};">
+                    {% if resp.sender_type == 'admin' %}🛡️ Support Desk{% else %}👤 You{% endif %}
+                  </strong>
+                  <span class="mono" style="color: var(--text-muted); font-size: 10px;">{{ resp.created_at }}</span>
+                </div>
+                <div style="color: var(--text-primary); white-space: pre-wrap;">{{ resp.message }}</div>
+              </div>
+              {% endfor %}
+            </div>
+          </div>
+          {% endif %}
+
+          <!-- Post Follow-Up Reply Form -->
+          <form action="/contact/reply" method="POST" style="background: rgba(15, 23, 42, 0.4); border: 1px solid rgba(255, 255, 255, 0.06); border-radius: 6px; padding: 12px;">
+            <input type="hidden" name="ticket_id" value="{{ tracked_ticket.ticket_id }}">
+            <input type="hidden" name="user_email" value="{{ tracked_ticket.user_email }}">
+            <label for="replyMessage" style="display: block; font-size: 12px; font-weight: 600; color: var(--text-primary); margin-bottom: 6px;">
+              Post a Follow-Up Reply
+            </label>
+            <textarea id="replyMessage" name="reply_message" required rows="3" placeholder="Provide additional details or response..." style="width: 100%; padding: 8px 10px; background: rgba(15, 23, 42, 0.8); border: 1px solid var(--border-color); border-radius: 6px; color: var(--text-primary); font-size: 13px; line-height: 1.4; resize: vertical; margin-bottom: 8px;"></textarea>
+            <button type="submit" class="btn btn-primary btn-sm" style="width: 100%; padding: 8px; font-size: 12px; font-weight: 700; display: flex; justify-content: center; align-items: center; gap: 6px;">
+              <span>📨 Send Reply</span>
+            </button>
+          </form>
+        </div>
+        {% endif %}
+      </div>
+
       <div style="background: rgba(15, 23, 42, 0.6); border: 1px solid var(--border-color); border-radius: var(--radius-md); padding: 24px; margin-bottom: 24px;">
         <h4 style="font-size: 16px; font-weight: 700; color: var(--text-primary); margin-bottom: 14px; display: flex; align-items: center; gap: 8px;">
           <span>💬</span> Admin Desk Review

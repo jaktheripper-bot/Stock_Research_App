@@ -138,14 +138,19 @@ def get_support_tickets(status: str = None, limit: int = 50, exclude_tests: bool
 
 def add_ticket_response(
     ticket_id: str,
-    message: str,
+    message: str = "",
     sender_email: Optional[str] = None,
     sender_name: str = "Support Desk",
     sender_type: str = "admin",
-    email_dispatched: bool = False
+    email_dispatched: bool = False,
+    responder_email: Optional[str] = None,
+    responder_role: Optional[str] = None,
+    email_sent: Optional[bool] = None,
+    **kwargs: Any
 ) -> dict:
     """
     Records an outgoing or incoming response to a support ticket.
+    Supports canonical sender_* and aliased responder_* parameters.
     """
     init_db()
     conn = get_db_connection()
@@ -154,10 +159,20 @@ def add_ticket_response(
 
     clean_tid = str(ticket_id or "").strip()
     clean_msg = str(message or "").strip()
-    clean_sender_email = str(sender_email or "").strip().lower() if sender_email else None
-    clean_sender_name = str(sender_name or "Support Desk").strip()
-    clean_sender_type = str(sender_type or "admin").strip().lower()
-    disp_val = True if email_dispatched else False
+
+    effective_email = sender_email if sender_email is not None else responder_email
+    clean_sender_email = str(effective_email).strip().lower() if effective_email else None
+
+    effective_type = responder_role if responder_role is not None else sender_type
+    clean_sender_type = str(effective_type or "admin").strip().lower()
+
+    if clean_sender_type == "user" and sender_name == "Support Desk":
+        clean_sender_name = "User / Ticket Owner"
+    else:
+        clean_sender_name = str(sender_name or "Support Desk").strip()
+
+    effective_sent = email_sent if email_sent is not None else email_dispatched
+    disp_val = True if effective_sent else False
 
     try:
         query = f'''
