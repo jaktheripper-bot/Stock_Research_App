@@ -590,34 +590,34 @@ def build_mutual_fund_deterministic_response(
             if ter_dir != "N/A" and ter_reg != "N/A":
                 spread = round((float(ter_reg) - float(ter_dir)) * 100, 1)
                 if spread >= 75:
-                    findings.append(f"**Severe Distributor Fee Drag ({spread} bps/yr):** The Regular plan extracts a significant commission spread, destroying ~20%+ ending wealth over 20 years.")
+                    findings.append(f"**Recurring Distribution Fee Spread ({spread} bps/yr):** The Regular plan carries a sizable annual commission spread over the Direct plan, reducing 20-year terminal value by ~20%+ for an identical underlying portfolio.")
         except Exception as e:
             logger.debug(f"Fee drag calculation parse notice: {e}")
 
         if isinstance(as_pct, (int, float)) and as_pct < 60:
-            findings.append(f"**Closet Indexing Drift (Active Share {as_pct}%):** The portfolio substantially hugs the benchmark while charging active management fees.")
+            findings.append(f"**Low Active Differentiation (Active Share {as_pct}%):** The portfolio tracks its benchmark closely while charging an active management fee.")
 
         if not locked and isinstance(asri, (int, float)) and asri > 25:
-            findings.append(f"**Elevated Look-Through Accounting Stress (ASRI {asri}%):** Underlying holdings exhibit high accounting risk or elevated promoter pledging.")
+            findings.append(f"**Elevated Look-Through Accounting Stress (ASRI {asri}%):** Underlying holdings show higher balance sheet leverage or governance watchpoints.")
 
         if not findings:
-            findings.append(f"**Fee Drag Compounding:** Direct TER ({ter_dir}%) vs Regular TER ({ter_reg}%) represents unrecovered distributor fee leakage.")
-            findings.append(f"**Portfolio Concentration:** Top holdings dictate over 40% of risk exposure, requiring continuous tracking.")
+            findings.append(f"**Recurring Fee Differential:** Direct TER ({ter_dir}%) vs Regular TER ({ter_reg}%) represents a predictable annual cost difference for the same underlying basket.")
+            findings.append(f"**Top-10 Concentration:** Top holdings drive over 40% of portfolio variance, meaning scheme performance depends heavily on cash conversion in its largest positions.")
 
         points = "\n\n".join([f"{i+1}. {f}" for i, f in enumerate(findings[:3])])
         return (
             f"**Key Look-Through Surprises & Red Flags for {name}:**\n\n"
             f"{points}\n\n"
-            f"Would you like to examine intermediary fee drag or inspect constituent quality next?"
+            f"Would you like to examine the Direct-vs-Regular fee spread or inspect constituent quality next?"
         )
 
     # Open-Ended Inquiry: Bear Thesis
     elif any(k in msg for k in ["bear thesis", "bear case", "bearish", "downside case", "why avoid"]):
         return (
             f"**Institutional Bear Thesis for {name}:**\n\n"
-            f"1. **Intermediary Fee Drag & Wealth Drag:** Over long cycles, distributor commission spreads deplete net returns compared to low-cost direct or index strategies.\n"
-            f"2. **Style Drift & Benchmark Hugging:** High cash balances or closet-indexing can cause underperformance during sharp bull market rallies.\n"
-            f"3. **Look-Through Valuation Squeeze:** If underlying mega-caps experience earnings de-rating, downside capture can spike beyond benchmark levels.\n\n"
+            f"1. **Compounding Fee Drag:** Over multi-year cycles, Regular-plan distribution commissions reduce net investor returns relative to Direct or low-cost index alternatives.\n"
+            f"2. **Benchmark Overlap & Style Drift:** Elevated cash buffers or low active share can limit upside participation when narrow index rallies occur.\n"
+            f"3. **Look-Through Valuation Sensitivity:** When top holdings trade at demanding multiples, even modest earnings disappointments can weigh on scheme NAV.\n\n"
             f"Would you like to check active share or evaluate downside capture next?"
         )
 
@@ -627,9 +627,9 @@ def build_mutual_fund_deterministic_response(
         health = context_data.get("composite_health_score", "N/A")
         return (
             f"**Institutional Bull Thesis for {name}:**\n\n"
-            f"1. **High-Conviction Moat Allocations:** Portfolio is anchored in structural compounders (Composite Health {health}/100).\n"
-            f"2. **Disciplined Risk-Adjusted Management:** Active allocation aims to curb downside capture while participating in secular upswings.\n"
-            f"3. **Diversified Operational Leverage:** Cross-sector diversification shields the portfolio against single-stock governance shocks.\n\n"
+            f"1. **Quality-Anchored Equity Sleeve:** The portfolio is weighted toward cash-generative businesses (Composite Health {health}/100).\n"
+            f"2. **Measured Drawdown Discipline:** Position sizing and liquidity buffers aim to moderate downside capture across market cycles.\n"
+            f"3. **Cross-Sector Diversification:** Broad sector allocation reduces reliance on any single company's capital-allocation cycle.\n\n"
             f"Would you like to review constituent holdings or examine the fee audit?"
         )
 
@@ -643,41 +643,39 @@ def build_mutual_fund_deterministic_response(
         except Exception as spread_err:
             logger.debug("Spread calculation notice: %s", spread_err)
         return (
-            f"**Intermediary Fee Drag & Wealth Destruction Audit for {name}:**\n\n"
+            f"**Intermediary Fee Drag & Compounding Cost Audit for {name}:**\n\n"
             f"- Direct Plan TER: {ter_dir}%\n"
             f"- Regular Plan TER: {ter_reg}%\n"
             f"- Distributor Commission Spread: {spread_bps}\n\n"
-            "**Fiduciary Impact:** Over a 15–25 year compounding horizon, this distributor spread extracts "
-            "between 15% and 25% of the total ending corpus value in non-value-add commissions. "
-            "Switching to the Direct plan preserves 100% of compounding power without altering portfolio risk.\n\n"
+            "**Analytical Implication:** Both plans hold the exact same underlying portfolio, yet over a 15–25 year horizon the annual distribution spread reduces terminal corpus value by roughly 15% to 25%. "
+            "Evaluating the Direct plan isolates manager skill from intermediary distribution cost.\n\n"
             "Would you like to examine look-through constituent quality or active share next?"
         )
     elif sec in ["active_share", "diversification"] or any(k in msg for k in ["active share", "closet", "index", "hugging", "benchmark", "style drift"]):
         as_pct = context_data.get("active_share_pct", "N/A")
         benchmark = context_data.get("benchmark_index", "Benchmark")
-        verdict = "High-Conviction Active Management" if isinstance(as_pct, (int, float)) and as_pct >= 60 else "Potential Closet Indexer / Benchmark Hugger"
+        verdict = "Differentiated Active Positioning" if isinstance(as_pct, (int, float)) and as_pct >= 60 else "High Benchmark Overlap (Closet-Indexing Watch)"
         return (
             f"**Active Share & Closet Indexing Diagnostic for {name}:**\n\n"
             f"- Active Share: {as_pct}%\n"
             f"- Benchmark Index: {benchmark}\n"
             f"- Diagnostic Assessment: **{verdict}**\n\n"
-            "**Fiduciary Impact:** Active Share measures the percentage of portfolio holdings that differ from the benchmark index. "
-            "A fund with Active Share below 60% is essentially charging active management fees while hugging the benchmark, "
-            "which mathematically guarantees long-term net-of-fee underperformance.\n\n"
+            "**Analytical Implication:** Active Share measures the share of portfolio weights that differ from the benchmark index. "
+            "When Active Share sits below 60%, the portfolio closely mirrors its benchmark while charging active fees, making net-of-fee outperformance harder to sustain.\n\n"
             "Would you like to drill into the top constituent holdings or portfolio concentration?"
         )
     elif not locked and (sec in ["asri_solvency", "accounting_risk"] or any(k in msg for k in ["asri", "accounting risk", "pledg", "risky", "high-risk", "stress index"])):
         asri = context_data.get("accounting_risk_index", "N/A")
         pledge = context_data.get("promoter_pledge_exposure_pct", 0.0)
         risky = context_data.get("top_risky_holdings", [])
-        risky_str = ", ".join([f"{h.get('name', h.get('identifier', 'Unknown'))} ({h.get('weight_pct', 0)}%)" for h in risky]) if risky else "Zero elevated leverage or governance red flags"
+        risky_str = ", ".join([f"{h.get('name', h.get('identifier', 'Unknown'))} ({h.get('weight_pct', 0)}%)" for h in risky]) if risky else "Zero elevated leverage or governance watchpoints"
         return (
             f"**Look-Through Accounting Risk (ASRI) Diagnostic for {name}:**\n\n"
             f"- Portfolio Accounting Risk Index (ASRI): {asri}%\n"
             f"- Promoter Pledge Exposure: {pledge}%\n"
             f"- Constituents on Solvency Watchlist: {risky_str}\n\n"
-            "**Fiduciary Impact:** Look-through ASRI computes the capital-weighted accounting stress across underlying companies, "
-            "screening for aggressive revenue recognition, Beneish M-score flags, and high promoter pledge encumbrances.\n\n"
+            "**Analytical Implication:** Look-through ASRI aggregates capital-weighted balance sheet and accrual risk across underlying holdings, "
+            "highlighting where working-capital stretch, Beneish M-Score flags, or promoter pledges warrant closer inspection.\n\n"
             "Which underlying holding would you like to inspect in detail?"
         )
     elif not locked and (sec in ["moat_index", "quality"] or any(k in msg for k in ["moat", "quality", "compounder", "pricing power", "economic moat"])):
@@ -689,9 +687,9 @@ def build_mutual_fund_deterministic_response(
             f"**Weighted Moat & Quality Diagnostic for {name}:**\n\n"
             f"- Weighted Moat Score: {moat}/100\n"
             f"- Composite Health Score: {comp}/100\n"
-            f"- Core Fortress Moat Allocations: {qual_str}\n\n"
-            "**Fiduciary Impact:** The Weighted Moat Index measures structural pricing power, high ROIC persistence, "
-            "and market share protection across the underlying constituent companies.\n\n"
+            f"- Core Compounder Allocations: {qual_str}\n\n"
+            "**Analytical Implication:** The Weighted Moat Index reflects return-on-capital durability and pricing discipline across the underlying equity holdings. "
+            "Even when constituent quality is high, future fund returns still depend on the valuation multiples paid for those holdings.\n\n"
             "Would you like to examine valuation margins or downside capture next?"
         )
     elif not locked and (sec == "margin_of_safety" or any(k in msg for k in ["margin of safety", "dcf", "intrinsic", "discount", "premium"])):
@@ -700,8 +698,7 @@ def build_mutual_fund_deterministic_response(
             f"**Weighted Margin of Safety (DCF) Diagnostic for {name}:**\n\n"
             f"- Weighted Portfolio Margin of Safety: {mos}%\n"
             f"- Category: {context_data.get('category', 'Equity Scheme')}\n\n"
-            "**Fiduciary Impact:** This metric aggregates the intrinsic value discounts/premiums across all underlying "
-            "equity constituents based on verified institutional DCF models in reports.db.\n\n"
+            "**Analytical Implication:** This metric aggregates the capital-weighted discount or premium to conservative DCF fair value across the fund's underlying equity holdings, separating business quality from portfolio valuation.\n\n"
             "Would you like to examine constituent holdings or fee drag next?"
         )
     elif sec in ["holdings", "dual_sleeve"] or any(k in msg for k in ["holding", "allocation", "sleeve", "portfolio", "concentration", "top 10"]):
@@ -710,7 +707,7 @@ def build_mutual_fund_deterministic_response(
         aum = context_data.get("aum_crores", "N/A")
         watch_lines = (
             "" if locked else
-            f"- Fortress Moat Allocations: {len(quality)} tracked core holdings\n"
+            f"- Core Quality Allocations: {len(quality)} tracked holdings\n"
             f"- Solvency Watchlist Allocations: {len(risky)} flagged holdings\n"
         )
         return (
@@ -718,7 +715,7 @@ def build_mutual_fund_deterministic_response(
             f"- Category: {context_data.get('category', 'Equity Scheme')}\n"
             f"- AUM: ₹{aum} Cr\n"
             f"{watch_lines}\n"
-            "**Look-Through Framework:** Each constituent stock is individually evaluated via our 7-Pillar Equity Forensic Engine.\n\n"
+            "**Look-Through Framework:** Each constituent stock is individually evaluated across our 7-Pillar Equity Forensic Engine.\n\n"
             "Would you like to analyze a specific holding or check active share?"
         )
     elif sec == "downside_capture" or any(k in msg for k in ["downside", "capture", "sortino", "drawdown", "upside capture", "bear market"]):
@@ -727,8 +724,7 @@ def build_mutual_fund_deterministic_response(
             f"- Composite Health Score: {context_data.get('composite_health_score', 'N/A')}/100\n"
             f"- Category: {context_data.get('category', 'Equity Scheme')}\n"
             f"- Benchmark: {context_data.get('benchmark_index', 'Benchmark')}\n\n"
-            "**Fiduciary Impact:** Asymmetrical compounding relies on low downside capture (≤ 75% of benchmark drawdowns) "
-            "combined with healthy upside participation to produce superior risk-adjusted alpha over full market cycles.\n\n"
+            "**Analytical Implication:** Long-term compounding in active funds depends heavily on limiting drawdowns during market corrections while retaining reasonable participation in recoveries.\n\n"
             "Would you like to inspect active share or fee drag next?"
         )
     elif not locked and (sec == "dossier_narrative" or any(k in msg for k in ["narrative", "audit", "summary", "qualitative", "findings"])):
@@ -784,14 +780,14 @@ def build_debt_deterministic_response(
         findings = []
 
         if not locked and radar_status in ["ELEVATED", "HIGH", "CRITICAL"]:
-            findings.append(f"**Credit Contagion Risk ({radar_status}):** Group leverage or parent equity distress creates cross-default spillover risks.")
+            findings.append(f"**Credit Contagion Risk ({radar_status}):** Group leverage or parent equity stress creates potential cross-default spillover risk.")
 
         if tier in ["SUBORDINATED", "UNSECURED", "MEZZANINE"]:
             findings.append(f"**Subordinated Seniority Tier ({tier}):** In a corporate resolution or liquidation, recovery priority sits behind senior secured creditors.")
 
         if not findings:
-            findings.append(f"**Liquidation Hierarchy Sensitivity:** Recovery is strictly contingent on asset charge coverage and covenant enforcement under IBC priority.")
-            findings.append(f"**Refinancing Liquidity:** Duration and yield sensitivity must be monitored against macro interest rate cycles.")
+            findings.append(f"**Yield vs. Credit Trade-Off:** A higher yield compensates for credit and secondary-liquidity risk; recovery ultimately depends on asset-charge coverage and IBC seniority.")
+            findings.append(f"**Duration & Refinancing Sensitivity:** Mark-to-market pricing and issuer rollover costs remain sensitive to benchmark interest-rate shifts.")
 
         points = "\n\n".join([f"{i+1}. {f}" for i, f in enumerate(findings[:3])])
         return (
@@ -804,9 +800,9 @@ def build_debt_deterministic_response(
     elif any(k in msg for k in ["bear thesis", "bear case", "bearish", "downside case", "default risk", "why avoid"]):
         return (
             f"**Institutional Bear Thesis for {name}:**\n\n"
-            f"1. **Subordinated Recovery & Haircuts:** Subordinated tranches face severe recovery haircuts if liquidation value falls below secured debt claims.\n"
-            f"2. **Cross-Default & Parent Contagion:** Systemic group obligations or parent entity debt stress could trigger covenant acceleration.\n"
-            f"3. **Refinancing Headwinds:** Rising benchmark yields and tighter liquidity could impair issuer rollover capabilities.\n\n"
+            f"1. **Seniority & Recovery Haircuts:** Unsecured or subordinated tranches face steeper recovery haircuts if liquidation proceeds fall short of senior secured claims.\n"
+            f"2. **Cross-Default & Group Contagion:** Parent-level leverage or working-capital stress can spill over into debt-service coverage.\n"
+            f"3. **Secondary Liquidity & Refinancing Friction:** Exchange RFQ liquidity for corporate bonds is thinner than equity markets, creating bid-ask friction if exiting before maturity.\n\n"
             f"Would you like to review covenant headroom or check the Credit Contagion Radar?"
         )
 
@@ -814,9 +810,9 @@ def build_debt_deterministic_response(
     elif any(k in msg for k in ["bull thesis", "bull case", "bullish", "upside case", "why invest"]):
         return (
             f"**Institutional Credit Quality Case for {name}:**\n\n"
-            f"1. **Senior Secured Status:** Protected by a first pari-passu charge over tangible corporate assets.\n"
-            f"2. **Covenant Cushion:** DSCR and interest coverage maintain adequate headroom against stress thresholds.\n"
-            f"3. **Attractive Risk-Adjusted Yield:** Yield-to-maturity provides healthy spread over sovereign G-Sec benchmarks.\n\n"
+            f"1. **Senior Secured Priority:** Backed by a registered charge over tangible assets or receivables under IBC hierarchy.\n"
+            f"2. **Covenant Headroom:** Operating cash flow and DSCR buffers currently cover scheduled coupon and principal obligations.\n"
+            f"3. **Contracted Yield Spread:** Provides a defined yield spread over sovereign G-Sec benchmarks for hold-to-maturity allocators.\n\n"
             f"Would you like to review recovery seniority or duration profile next?"
         )
 
@@ -826,7 +822,7 @@ def build_debt_deterministic_response(
             f"- Credit Rating: {context_data.get('credit_rating', 'N/A')}\n"
             f"- Seniority Tier: {context_data.get('seniority_tier', 'N/A')}\n"
             f"- Posture Badge: {context_data.get('posture_badge', 'N/A')}\n\n"
-            "**Solvency Assessment:** Evaluates underlying asset encumbrance, security charge, and DSCR headroom against covenant thresholds.\n\n"
+            "**Solvency Assessment:** Evaluates underlying collateral encumbrance, security charge registration, and DSCR cushion against indenture covenants.\n\n"
             "Would you like to examine the Credit Contagion Radar or duration profile?"
         )
     elif not locked and (sec in ["contagion", "radar"] or any(k in msg for k in ["contagion", "radar", "group", "systemic", "cross-default", "parent"])):
@@ -834,7 +830,7 @@ def build_debt_deterministic_response(
             f"**Credit Contagion Radar Analysis for {name}:**\n\n"
             f"- Status: {context_data.get('contagion_radar_status', 'N/A')} ({context_data.get('contagion_risk_level', 'N/A')})\n"
             f"- Issuer/Group Summary: {context_data.get('radar_summary', 'N/A')}\n\n"
-            "**Fiduciary Impact:** Monitors cross-default triggers, parent-subsidiary guarantees, and systemic group leverage.\n\n"
+            "**Analytical Implication:** Tracks cross-default clauses, parent-subsidiary guarantees, and parent equity pledge/leverage signals.\n\n"
             "Would you like to review recovery seniority or YTM profile?"
         )
     elif sec in ["seniority", "recovery"] or any(k in msg for k in ["seniority", "recovery", "liquidation", "tier", "recourse"]):
@@ -842,8 +838,8 @@ def build_debt_deterministic_response(
             f"**Recovery Seniority & Liquidation Hierarchy for {name}:**\n\n"
             f"- Seniority Tier: **{context_data.get('seniority_tier', 'SENIOR_SECURED')}**\n"
             f"- Credit Rating: {context_data.get('credit_rating', 'N/A')}\n"
-            f"- Asset Charge: First pari-passu charge over tangible corporate assets\n\n"
-            "**Resolution Protection:** Under IBC statutory priority, Senior Secured claims are satisfied before subordinate or mezzanine debt holders.\n\n"
+            f"- Asset Charge: First pari-passu charge over designated corporate assets\n\n"
+            "**Resolution Protection:** Under IBC statutory priority, Senior Secured claims rank ahead of unsecured and subordinated debt holders during resolution.\n\n"
             "Would you like to evaluate covenant headroom or duration sensitivity?"
         )
     else:
@@ -1339,14 +1335,14 @@ def build_equity_deterministic_response(
                 g_val = float(implied_growth)
                 if g_val > 15.0:
                     anomalies.append(
-                        f"**Aggressive Reverse DCF Implied Growth ({implied_growth}% p.a.):** "
-                        f"At CMP ₹{cmp_display}, the market is pricing in heroic annual FCF compounding over the next 10 years, "
-                        f"leaving negligible margin of safety for execution missteps or cyclical contractions."
+                        f"**Demanding Reverse DCF Implied Growth ({implied_growth}% p.a.):** "
+                        f"At CMP ₹{cmp_display}, the market is pricing in sustained {implied_growth}% annual FCF compounding over the next decade, "
+                        f"leaving limited room for working-capital stretch or cyclical volume slowdowns."
                     )
                 elif g_val < 8.0:
                     anomalies.append(
-                        f"**Depressed Valuation Growth Pricing ({implied_growth}% p.a.):** "
-                        f"The market is pricing in near-terminal stagnation, creating favorable valuation asymmetry if earnings match historical baselines."
+                        f"**Conservative Implied Growth Pricing ({implied_growth}% p.a.):** "
+                        f"At CMP ₹{cmp_display}, the market is pricing in modest cash-flow expansion, creating a wider valuation buffer if operating execution holds steady."
                     )
             except Exception as e:
                 logger.debug(f"Implied growth parse notice: {e}")
@@ -1356,13 +1352,13 @@ def build_equity_deterministic_response(
             pe_float = float(pe_val)
             if pe_float > 45.0:
                 anomalies.append(
-                    f"**Elevated Multiple Exposure ({pe_display}):** "
-                    f"Trading at an institutional premium that requires sustained 20%+ earnings execution to prevent sharp multiple compression."
+                    f"**Demanding Multiple Exposure ({pe_display}):** "
+                    f"The competitive position may be credible, but a {pe_display} multiple leaves little room for quarterly earnings or margin conversion to disappoint."
                 )
             elif pe_float < 12.0 and pe_float > 0:
                 anomalies.append(
-                    f"**Deep Value Multiple Compression ({pe_display}):** "
-                    f"Trading at a steep discount to historical median multiples, signaling market pessimism."
+                    f"**Discounted Earnings Multiple ({pe_display}):** "
+                    f"Trades below historical median multiples; the key question is whether market skepticism reflects temporary cyclicality or structural margin erosion."
                 )
         except Exception as e:
             logger.debug(f"PE ratio parse notice: {e}")
@@ -1370,37 +1366,37 @@ def build_equity_deterministic_response(
         # Check Matrix Postures
         macro = matrix.get("Macro", "Headwinds")
         if macro in ["Headwinds", "Cyclical Downside"]:
-            anomalies.append(f"**Macroeconomic Friction:** Macro posture is flagged under **{macro}**, creating top-line margin resistance.")
+            anomalies.append(f"**Macroeconomic Friction:** Macro posture is flagged under **{macro}**, creating top-line demand and margin headwinds.")
 
         gov = matrix.get("Governance", "Clean")
         if gov not in ["Clean", "Exemplary"]:
-            anomalies.append(f"**Governance Scepticism:** Governance audit posture is flagged as **{gov}**.")
+            anomalies.append(f"**Governance Watchpoint:** Governance audit posture is flagged as **{gov}**.")
 
         diag = matrix.get("Diagnostic", "Temporary")
         if diag == "Structural":
-            anomalies.append(f"**Structural Impairment Risk:** Pillar 04 diagnostic identifies recent price weakness as **Structural** rather than temporary mean-reversion.")
+            anomalies.append(f"**Structural Margin Watch:** Pillar 04 diagnostic classifies recent operating pressure as **Structural** rather than temporary mean-reversion.")
 
         solv = matrix.get("BalanceSheet", "Debt-Free")
         if solv in ["Leveraged", "Stressed", "Refinancing Risk"]:
             anomalies.append(f"**Balance Sheet Gearing:** Solvency posture is classified as **{solv}**.")
 
-        # Default fallback highlights if all metrics are pristine
+        # Default fallback highlights if all metrics are clean
         if not anomalies:
             anomalies.append(
-                f"**Valuation Asymmetry:** Even with pristine governance ({matrix.get('Governance', 'Clean')}) "
-                f"and balance sheet solvency ({matrix.get('BalanceSheet', 'Debt-Free')}), CMP ₹{cmp_display} leaves little room for operating margin decay."
+                f"**Quality vs. Valuation Trade-Off:** Governance ({matrix.get('Governance', 'Clean')}) "
+                f"and balance sheet solvency ({matrix.get('BalanceSheet', 'Debt-Free')}) remain constructive, so the investment case at CMP ₹{cmp_display} rests on whether cash conversion keeps pace with the valuation multiple."
             )
             anomalies.append(
-                f"**Operating Leverage Vulnerability:** If raw material or wage inflation compresses margins by >200 bps, trailing ROIC could decouple from historical compounding rates."
+                f"**Operating Margin Sensitivity:** If input costs or receivable days stretch by >150–200 bps, incremental return on invested capital (ROIC) could moderate from historical averages."
             )
 
         anomaly_points = "\n\n".join([f"{i+1}. {item}" for i, item in enumerate(anomalies[:3])])
 
         return (
             f"**Key Forensic Surprises & Structural Red Flags for {name} ({company_name}):**\n\n"
-            f"Our 7-pillar forensic audit revealed the following critical friction points:\n\n"
+            f"Our 7-pillar forensic audit highlights the following analytical watchpoints:\n\n"
             f"{anomaly_points}\n\n"
-            f"**Next Step:** Would you like to review the full Pre-Mortem Inversion analysis, or deconstruct the Reverse DCF cash flow drivers?"
+            f"**Next Question:** Would you like to review the Pre-Mortem Inversion scenarios, or unpack the Reverse DCF cash-flow assumptions?"
         )
 
     # 0c. Open-Ended Inquiry: Bear Thesis
@@ -1415,16 +1411,16 @@ def build_equity_deterministic_response(
 
         return (
             f"**Institutional Bear Thesis Summary for {name} ({company_name}):**\n\n"
-            f"The core downside arguments and thesis destruction vectors center on 3 pillars:\n\n"
-            f"1. **Valuation Multiple De-Rating & Expectations Treadmill:**\n"
-            f"   - Trading {pe_str}, pricing in ~{implied_growth}% annual FCF growth over 10 years.\n"
-            f"   - Any deceleration in top-line growth or earnings miss risks triggering sharp P/E mean-reversion.\n\n"
-            f"2. **Margin Compression & Competitive Erosion:**\n"
-            f"   - Under macro posture **{macro}**, industry pricing power faces resistance.\n"
-            f"   - Inability to pass through cost escalations could structurally compress operating margins by 150–250 bps.\n\n"
-            f"3. **Capital Allocation & Reinvestment Friction:**\n"
-            f"   - Even with balance sheet posture **{bs_status}**, non-core diversification or delayed cash conversion would erode return on capital (ROCE/ROIC).\n\n"
-            f"**Thesis Invalidation:** If revenue CAGR exceeds hurdle rates while gross margins expand, the bear case is invalidated.\n\n"
+            f"Separating business quality from valuation, the primary downside risks center on three areas:\n\n"
+            f"1. **Valuation Multiple De-Rating & Implied Growth Hurdle:**\n"
+            f"   - Trading {pe_str}, the current price embeds ~{implied_growth}% annual FCF growth over 10 years.\n"
+            f"   - If revenue growth or cash conversion moderates, the multiple has room to compress even if the franchise remains intact.\n\n"
+            f"2. **Margin & Pricing Pass-Through Friction:**\n"
+            f"   - Under macro posture **{macro}**, passing input-cost inflation through to customers becomes harder.\n"
+            f"   - A 150–250 bps compression in operating margins would weigh on earnings compounding.\n\n"
+            f"3. **Working Capital & Reinvestment Discipline:**\n"
+            f"   - While balance sheet posture is **{bs_status}**, slower receivable collection or lower-return capex would dilute incremental ROCE.\n\n"
+            f"**What Would Change This View:** Sustained revenue growth above the implied hurdle alongside stable CFO-to-EBITDA conversion.\n\n"
             f"Would you like to examine Reverse DCF implied growth rates or review the bull case?"
         )
 
@@ -1440,15 +1436,15 @@ def build_equity_deterministic_response(
 
         return (
             f"**Institutional Bull Thesis & Structural Strengths for {name} ({company_name}):**\n\n"
-            f"The primary positive fundamental attributes and compounding catalysts center on 3 pillars:\n\n"
-            f"1. **Fortress Competitive Moat ({moat_status}):**\n"
-            f"   - Structural pricing power, client switching friction, and specialized niche positioning protect long-term margins.\n\n"
-            f"2. **Pristine Balance Sheet & Governance ({bs_status} • {gov_status}):**\n"
-            f"   - Minimal debt gearing and unencumbered promoter holdings provide counter-cyclical capital allocation resilience.\n\n"
-            f"3. **Compounding Return on Capital:**\n"
-            f"   - Generates free cash flow in excess of cost of capital (WACC 12%), enabling disciplined internal reinvestment.\n\n"
-            f"**Thesis Invalidation:** If ROCE falls below 15% or promoter pledging rises, the quality compounding thesis deteriorates.\n\n"
-            f"Would you like to review the bear thesis failure modes or audit governance red flags?"
+            f"The constructive case for the underlying business rests on three structural drivers:\n\n"
+            f"1. **Durable Competitive Moat ({moat_status}):**\n"
+            f"   - Customer switching costs, vendor qualification barriers, and scale efficiencies help defend operating margins across cycles.\n\n"
+            f"2. **Balance Sheet & Governance Discipline ({bs_status} • {gov_status}):**\n"
+            f"   - Contained leverage and unencumbered promoter holdings allow the business to fund growth internally without refinancing stress.\n\n"
+            f"3. **Return on Capital Above Hurdle Rate:**\n"
+            f"   - Generates operating returns above its cost of capital (~12% WACC), allowing retained earnings to compound intrinsic value.\n\n"
+            f"**What Would Falsify This View:** ROCE slipping below 15%, deteriorating CFO-to-EBITDA conversion, or the emergence of promoter share pledging.\n\n"
+            f"Would you like to review the bear thesis failure modes or audit governance disclosures?"
         )
 
     # 0e. Open-Ended Inquiry: Where to begin / Research roadmap
@@ -1458,10 +1454,10 @@ def build_equity_deterministic_response(
     ]):
         return (
             f"**Recommended Forensic Research Roadmap for {name} ({company_name}):**\n\n"
-            f"To evaluate {name} objectively, institutional analysts recommend triaging these 3 critical dimensions:\n\n"
-            f"1. **Step 1: Check Reverse DCF Expectations:** CMP ₹{cmp_display} ({pe_display} P/E). Unpack whether current valuation prices in realistic or aggressive cash flow compounding.\n"
-            f"2. **Step 2: Run Pre-Mortem Inversion:** Stress-test systemic thesis failure modes — what could cause a 60%+ permanent impairment of capital over the next 3 years?\n"
-            f"3. **Step 3: Audit Governance & Solvency:** Verify that promoter pledging is 0.0%, debt-to-equity is prudential, and statutory auditor oversight is clean.\n\n"
+            f"A disciplined way to evaluate {name} is to separate business quality from implied market expectations across three steps:\n\n"
+            f"1. **Step 1: Unpack Reverse DCF Expectations:** At CMP ₹{cmp_display} ({pe_display} P/E), check what annual free-cash-flow growth rate is already priced in.\n"
+            f"2. **Step 2: Run Pre-Mortem Inversion:** Ask what specific operational or capital-allocation missteps could impair capital over a 3-year window.\n"
+            f"3. **Step 3: Verify Cash Conversion & Governance:** Confirm that promoter pledging is 0.0%, leverage is contained, and reported profits convert into operating cash flow.\n\n"
             f"Which diagnostic vector would you like to explore first?"
         )
 
@@ -1472,13 +1468,13 @@ def build_equity_deterministic_response(
     ]):
         return (
             f"**Forensic Intelligence Desk Active:**\n\n"
-            f"The desk is fully operational and analyzing **{name} ({company_name})**.\n\n"
+            f"The desk is ready and grounded on **{name} ({company_name})**.\n\n"
             f"You can ask any specific question about {name}, or choose one of these core diagnostic workflows:\n\n"
-            f"1. **💀 Pre-Mortem Inversion:** Stress-test thesis destruction vectors and catastrophic failure modes.\n"
+            f"1. **💀 Pre-Mortem Inversion:** Stress-test thesis failure modes and what would break the investment case.\n"
             f"2. **📉 Reverse DCF Implied Growth:** Unpack the annual FCF growth priced into CMP ₹{cmp_display}.\n"
-            f"3. **🚩 Governance & Pledging:** Audit promoter pledge encumbrances and SEBI LODR filings.\n"
-            f"4. **🛡️ Balance Sheet Solvency:** Review Altman Z-Score, leverage headroom, and liquidity cushions.\n"
-            f"5. **💥 What Shocked You:** Summarize the most significant red flags or valuation anomalies."
+            f"3. **🚩 Governance & Pledging:** Audit promoter pledge disclosures and SEBI LODR filings.\n"
+            f"4. **🛡️ Balance Sheet Solvency:** Review Altman Z-Score, leverage headroom, and working-capital conversion.\n"
+            f"5. **💥 What Stood Out:** Summarize the primary forensic watchpoints or valuation trade-offs."
         )
 
     # 0g. Zero-Token Local Pillar & Metric Retriever ($0 Gemini cost)
@@ -1501,20 +1497,17 @@ def build_equity_deterministic_response(
 
         return (
             f"**Pre-Mortem Inversion Analysis for {name} ({company_name}):**\n"
-            f"*Behavioral Model: Charlie Munger Pre-Mortem Inversion (\"Invert, always invert. Assume catastrophic failure, then reason backwards.\")*\n\n"
-            f"To counter Narrative Seduction and Confirmation Bias, assume we are 3 years in the future and an investment in {name} has resulted in a 60%+ permanent destruction of capital. What systemic failure modes caused this outcome?\n\n"
-            f"1. **Vector 1: Pricing Power Decay & Margin Compression**\n"
-            f"   - *Vulnerability:* If contractual pricing or operating leverage erodes, operating margins could compress by >250 bps across major delivery accounts.\n"
-            f"   - *Current Health Posture:* Moat rated **{matrix.get('Moat', 'Wide')}**, Macro context rated **{macro_posture}**.\n"
-            f"   - *Early Invalidation Warning:* Two consecutive quarters of contracting gross margins or client project volume deferrals.\n\n"
-            f"2. **Vector 2: Structural Multiple De-Rating & Growth Decoupling**\n"
-            f"   - *Vulnerability:* Currently trading at {pe_display} trailing P/E. If earnings growth slows below the cost of capital (12%), the valuation multiple could mean-revert toward single digits.\n"
-            f"   - *Early Invalidation Warning:* 3-year revenue growth falling below sector peers or failure to convert pipeline awards into billed revenue.\n\n"
-            f"3. **Vector 3: Capital Allocation & Governance Breach**\n"
-            f"   - *Vulnerability:* Balance Sheet is currently rated **{bs_posture}** with **{cap_posture}** capital deployment. Large debt-fueled acquisitions or promoter capital extraction would invalidate the quality thesis.\n"
-            f"   - *Early Invalidation Warning:* Promoter pledging rising above 0.0% or uncharacteristic cash burn into non-core initiatives.\n\n"
-            f"**Pre-Mortem Thesis Invalidation Thresholds:**\n"
-            f"- If Debt-to-Equity rises above 0.5x, or ROCE drops below 15.0%, the qualitative compounding thesis is structurally compromised.\n\n"
+            f"*Analytical Method: Pre-Mortem Inversion — assume the investment thesis disappoints over the next 3 years and work backward to identify the most plausible causes.*\n\n"
+            f"1. **Vector 1: Pricing Power & Margin Compression**\n"
+            f"   - *Mechanism:* If input costs rise faster than customer price realizations, operating margins could compress by >200–250 bps across core segments.\n"
+            f"   - *Current Posture:* Moat rated **{matrix.get('Moat', 'Wide')}**, Macro context rated **{macro_posture}**.\n"
+            f"   - *Falsification Trigger:* Two consecutive quarters of contracting gross margins alongside rising receivable days (DSO).\n\n"
+            f"2. **Vector 2: Multiple Compression vs. Implied Growth**\n"
+            f"   - *Mechanism:* At {pe_display} trailing P/E, the valuation assumes steady execution. If earnings growth slows toward or below the cost of capital (~12%), the multiple can de-rate even without balance sheet distress.\n"
+            f"   - *Falsification Trigger:* 3-year revenue CAGR slowing below sector peers or order backlog conversion lagging historical norms.\n\n"
+            f"3. **Vector 3: Capital Allocation & Cash-Conversion Drift**\n"
+            f"   - *Mechanism:* Balance Sheet is currently rated **{bs_posture}** with **{cap_posture}** capital deployment. Unrelated diversification or working-capital lockup would dilute return on capital.\n"
+            f"   - *Falsification Trigger:* Promoter pledging rising above 0.0%, Debt-to-Equity exceeding 0.5x, or ROCE dropping below 15.0%.\n\n"
             f"Would you like to examine Reverse DCF implied growth rates or audit the governance ledger next?"
         )
 
@@ -1527,14 +1520,14 @@ def build_equity_deterministic_response(
         growth_float = float(implied_growth) if isinstance(implied_growth, (int, float)) or (isinstance(implied_growth, str) and implied_growth.replace('.', '', 1).isdigit()) else 9.0
 
         if growth_float <= 10.0:
-            growth_interpretation = "conservative, modest terminal expansion expectations"
-            verdict = "Significant Margin of Safety relative to high-quality compounding history"
+            growth_interpretation = "measured, conservative cash-flow expansion expectations"
+            verdict = "Offers a valuation buffer if the business sustains historical return on capital"
         elif growth_float <= 18.0:
-            growth_interpretation = "moderate secular growth execution"
-            verdict = "Fairly valued; compounding matches underlying earnings growth"
+            growth_interpretation = "steady mid-teens compounding expectations"
+            verdict = "Reasonably aligned with fundamentals; future returns will track earnings and cash-conversion execution"
         else:
-            growth_interpretation = "aggressive, heroic expectations"
-            verdict = "Priced for perfection; vulnerable to severe multiple compression on any earnings miss"
+            growth_interpretation = "demanding multi-year growth expectations"
+            verdict = "The business may be high quality, but the valuation leaves limited room for execution slippage"
 
         return (
             f"**Reverse DCF Valuation & Implied Growth Deconstruction for {name}:**\n\n"
@@ -1544,11 +1537,11 @@ def build_equity_deterministic_response(
             f"- **Implied FCF Growth Priced In:** **{implied_growth}% p.a.** over next 10 years\n"
             f"- **Benchmark Hurdle Rate (WACC):** {hurdle_rate}% p.a.\n"
             f"- **Qualitative Valuation Posture:** **{val_status}**\n\n"
-            f"**Inversion Takeaway:**\n"
-            f"Reverse DCF unpacks the expectations currently priced into {name} by Mr. Market. "
+            f"**Implication:**\n"
+            f"Instead of guessing a single target price, Reverse DCF asks what the current price requires you to believe. "
             f"At **{implied_growth}% implied FCF growth**, the market is pricing in {growth_interpretation}. "
             f"Assessment: **{verdict}**.\n\n"
-            f"Would you like to review balance sheet solvency or audit governance red flags?"
+            f"Would you like to review balance sheet solvency or audit governance disclosures?"
         )
 
     # 3. Governance Forensic & Promoter Pledging Check
@@ -1575,11 +1568,11 @@ def build_equity_deterministic_response(
             f"- **Governance Posture:** **{gov_status}**\n"
             f"- **Promoter Share Pledging:** {pledge_str}\n"
             f"- **Promoter / Founder Holding:** Stable statutory ownership; professional executive management\n"
-            f"- **Auditor Oversight:** Clean statutory audit opinion; zero adverse qualification remarks or mid-term resignations under SEBI LODR Reg 30\n"
-            f"- **Beneish M-Score Accrual Check:** Low probability of earnings manipulation. Cash flow from operations tracks net reported profits with healthy cash conversion\n"
-            f"- **Related-Party Scrubbing:** No aggressive related-party loans, off-balance sheet guarantees, or inter-corporate cash diversions detected\n\n"
-            f"**Forensic Sceptic Verdict:**\n"
-            f"Institutional governance hygiene verified clean. Capital structure is unencumbered by promoter pledging.\n\n"
+            f"- **Auditor Oversight:** Unqualified statutory audit opinion; zero mid-term resignations under SEBI LODR Reg 30\n"
+            f"- **Accrual & Cash-Conversion Check:** Operating cash flow tracks reported net profit without abnormal receivable buildup\n"
+            f"- **Related-Party Scrubbing:** No material off-balance-sheet guarantees or non-operating inter-corporate loans flagged\n\n"
+            f"**Analytical Takeaway:**\n"
+            f"Statutory governance disclosures remain clean and promoter equity is unencumbered. The ongoing watchpoint is whether incremental profits continue converting into free cash flow.\n\n"
             f"Would you like to inspect balance sheet solvency or run Pre-Mortem Inversion?"
         )
 
@@ -1588,18 +1581,18 @@ def build_equity_deterministic_response(
         bs_status = matrix.get("BalanceSheet", "Debt-Free")
         cap_status = matrix.get("CapitalAllocation", "Disciplined")
         linked_debt = context_data.get("linked_debt", [])
-        debt_summary = f"{len(linked_debt)} listed NCD tranches monitored" if linked_debt else "Zero external corporate debentures; completely equity-funded"
+        debt_summary = f"{len(linked_debt)} listed NCD tranches monitored" if linked_debt else "Zero external listed debentures; primarily equity-funded"
 
         return (
             f"**Balance Sheet Solvency & Liquidity Diagnostic for {name}:**\n\n"
             f"- **Balance Sheet Posture:** **{bs_status}**\n"
             f"- **Capital Allocation:** **{cap_status}**\n"
-            f"- **Gearing / Leverage:** Debt/Equity ratio well below the 0.5x prudential threshold\n"
-            f"- **Altman Z-Score Solvency Zone:** **Safe Zone (Z > 3.0)** — negligible probability of financial distress over a 24-month horizon\n"
-            f"- **Surplus Cash & Liquidity:** Strong liquid reserve cushion easily exceeding short-term working capital liabilities\n"
+            f"- **Gearing / Leverage:** Debt/Equity ratio remains below the 0.5x prudential threshold\n"
+            f"- **Altman Z-Score Solvency Zone:** **Safe Zone (Z > 3.0)** — low near-term balance-sheet distress risk\n"
+            f"- **Liquidity Cushion:** Liquid reserves comfortably cover near-term working-capital obligations\n"
             f"- **Capital Structure Linkage:** {debt_summary}\n\n"
-            f"**Solvency Assessment:**\n"
-            f"The business commands a fortress balance sheet capable of withstanding prolonged macroeconomic contractions without refinancing distress.\n\n"
+            f"**Analytical Takeaway:**\n"
+            f"Conservative leverage limits refinancing vulnerability during interest-rate tightening cycles, allowing management to fund capex from internal accruals.\n\n"
             f"Would you like to examine economic moat endurance or implied Reverse DCF growth next?"
         )
 
@@ -1612,12 +1605,12 @@ def build_equity_deterministic_response(
             f"**Economic Moat & Capital Allocation Audit for {name}:**\n\n"
             f"- **Economic Moat Rating:** **{moat_status}**\n"
             f"- **Capital Allocation Posture:** **{cap_status}**\n"
-            f"- **Return on Capital Endurance:** Structural return on capital comfortably exceeds the 12.0% statutory cost of capital hurdle\n"
-            f"- **Pricing Power & Switching Costs:** Established client relationships, mission-critical workflow integrations, and high replacement friction defend market share\n"
-            f"- **Reinvestment Purity:** Free cash flow is disciplinedly retained for high-return internal compounding or distributed to shareholders via dividends\n\n"
-            f"**Quality Compounder Takeaway:**\n"
-            f"The competitive moat is structurally intact with disciplined capital reinvestment.\n\n"
-            f"Would you like to stress-test implied growth via Reverse DCF or evaluate governance risks?"
+            f"- **Return on Capital vs. WACC:** Operating return on capital exceeds the 12.0% cost-of-capital hurdle\n"
+            f"- **Competitive Drivers:** Customer switching friction, workflow integration, and scale advantages support margin stability\n"
+            f"- **Reinvestment Discipline:** Free cash flow is directed toward core capacity and shareholder distributions rather than unrelated acquisitions\n\n"
+            f"**Analytical Takeaway:**\n"
+            f"The competitive position remains credible; the key question is whether incremental capital deployed over the next cycle earns returns comparable to historical averages.\n\n"
+            f"Would you like to stress-test implied growth via Reverse DCF or evaluate governance disclosures?"
         )
 
     # 6. Technical & 50-DMA Trend Architecture

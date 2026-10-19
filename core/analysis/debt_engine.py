@@ -708,23 +708,23 @@ def generate_executive_primer(
     mat_date = security.get("maturity_date", "")
 
     primer_text = (
-        f"You are viewing an institutional research audit of **{inst_name}**. "
-        f"This is a **{tier}** fixed-income security with an annualized yield to maturity (YTM) of **{ytm:.2f}%**. "
-        f"It pays a contractually guaranteed coupon of **{coupon:.2f}% {freq}**, maturing on **{mat_date}**."
+        f"You are viewing a fixed-income credit audit of **{inst_name}**. "
+        f"This is a **{tier}** debt instrument priced at an annualized yield to maturity (YTM) of **{ytm:.2f}%**, "
+        f"paying a contracted coupon of **{coupon:.2f}% ({freq})** through maturity on **{mat_date}**."
     )
 
     comparison_fd = (
-        f"Compared to traditional 3-year State Bank of India (SBI) Fixed Deposits paying ~7.10%, "
-        f"this instrument offers an annualized return premium of **+{ytm - 7.10:.2f}% ({round((ytm - 7.10)*100)} bps)**. "
-        f"In return for this higher yield, you assume corporate credit risk rather than sovereign deposit insurance."
+        f"Compared to a 3-year State Bank of India (SBI) Fixed Deposit (~7.10%), "
+        f"this instrument offers an annualized yield spread of **+{ytm - 7.10:.2f}% ({round((ytm - 7.10)*100)} bps)**. "
+        f"A higher yield may compensate you for taking corporate credit and secondary-liquidity risk; it does not automatically make the bond more attractive."
     )
 
     return {
         "title": "What Am I Looking At?",
         "summary": primer_text,
         "fd_comparison": comparison_fd,
-        "contractual_certainty": "Fixed contractual cash flows (unlike equities where dividend payouts and stock prices fluctuate).",
-        "primary_risks": "Issuer credit solvency, liquidity/lock-in until maturity, and interest rate cycle shifts."
+        "contractual_certainty": "Contracted coupon and principal schedule, subject to issuer solvency and covenant compliance.",
+        "primary_risks": "Issuer credit solvency, secondary-market bid-ask illiquidity before maturity, and interest-rate duration shifts."
     }
 
 
@@ -736,20 +736,20 @@ def generate_investment_thesis(security: Dict[str, Any], posture: Dict[str, Any]
     ytm = security.get("ytm_pct", 8.5)
 
     good = meta.get("the_good") or [
-        f"Attractive Contractual Yield: {ytm:.2f}% YTM provides significant yield enhancement over bank fixed deposits and sovereign G-Secs.",
-        f"High Capital Seniority: {tier.replace('_', ' ').title()} rank grants priority claim over assets under IBC liquidation proceedings.",
-        f"Institutional Rating Stability: {rating} investment-grade rating backed by reputable credit rating agency audits."
+        f"Contracted Yield Spread: At {ytm:.2f}% YTM, the instrument offers a measurable spread over bank fixed deposits and sovereign G-Secs for hold-to-maturity allocators.",
+        f"Capital Structure Seniority: {tier.replace('_', ' ').title()} ranking establishes priority claim over encumbered collateral under IBC resolution hierarchies.",
+        f"Credit Rating Baseline: Carries an active {rating} credit rating, subject to ongoing periodic surveillance by registered rating agencies."
     ]
 
     bad = meta.get("the_bad") or [
-        "Secondary Market Illiquidity: Corporate bonds in India trade on exchange RFQ platforms with modest retail trading volume; early exit before maturity may incur a bid-ask penalty.",
-        "Tax Inefficiency: Interest and capital gains are taxed at your marginal slab rate, diminishing net real returns for high-bracket investors.",
-        "Macroeconomic Duration Risk: If RBI tightens monetary policy, mark-to-market valuations can experience temporary paper drawdowns."
+        "Secondary Market Liquidity Friction: Corporate bonds on Indian exchange RFQ platforms trade with wider bid-ask spreads than equities; exiting prior to maturity can reduce realized yield.",
+        "Marginal Tax Drag: Coupon receipts are taxed at the investor's marginal income-tax slab, compressing net post-tax real return for higher tax brackets.",
+        "Duration Sensitivity: If benchmark yields rise, mark-to-market secondary prices will adjust downward in proportion to modified duration."
     ]
 
     ugly = meta.get("the_ugly") or [
-        "Downside Default Scenario: In a severe credit crisis (e.g. 2018 IL&FS/DHFL contagion), asset recovery under NCLT court proceedings can take 18–36 months to resolve.",
-        "Asset Quality Degradation: Sharp macroeconomic stress in borrower segments could strain cash flow coverage and trigger credit rating downgrades."
+        "Resolution Timeline Under Stress: In a credit default scenario, recovery through NCLT/IBC proceedings typically spans 18–36 months, tying up capital even for secured claims.",
+        "Cash-Flow Coverage Compression: A sharper-than-expected rise in borrower delinquencies or funding costs would narrow DSCR headroom and risk rating migration."
     ]
 
     return {

@@ -392,9 +392,17 @@ To maintain Zero-Hallucination integrity and prevent misleading investors with u
     risky_names = ", ".join([h["name"] for h in metrics.get("top_risky_holdings", [])]) or "None detected"
     quality_names = ", ".join([h["name"] for h in metrics.get("top_quality_holdings", [])]) or "Broad Core Diversified"
 
+    try:
+        from core.brand.moatnomics_house import get_system_prompt_context
+        brand_house_ctx = get_system_prompt_context(content_type="research_dossiers")
+    except Exception as brand_err:
+        logger.debug(f"Brand house context load notice in fund_overlap_auditor: {brand_err}")
+        brand_house_ctx = ""
+
     sys_prompt = (
-        "You are the Chief Investment & Forensic Audit Officer at an institutional sovereign endowment. "
-        "Write an exhaustive, analytical, zero-condescension Forensic Portfolio Dossier for this mutual fund scheme. "
+        f"{brand_house_ctx}\n\n"
+        "You are the Chief Investment & Forensic Audit Officer at Moatnomics. "
+        "Write an analytical, zero-condescension Forensic Portfolio Dossier for this mutual fund scheme following the Moatnomics editorial method (Context -> Evidence -> Implication -> Next question). "
         "Strictly avoid patronizing prose, generic fluff, and forward-looking Buy/Sell/Hold verdicts. "
         "Focus on fiduciary integrity, accounting manipulation risk (ASRI), true active management, and DCF intrinsic margin of safety. "
         "Follow the prescribed Markdown structure strictly."
@@ -427,7 +435,7 @@ Detail the liquidity bottleneck and sector concentration fault lines if liquidit
 
     gen_text = ""
     api_key = get_secret("GEMINI_API_KEY")
-    if api_key:
+    if api_key and os.environ.get("TESTING") != "1":
         try:
             client = genai.Client(api_key=api_key)
             model_name = get_surgical_flash_model(client)
@@ -447,42 +455,41 @@ Detail the liquidity bottleneck and sector concentration fault lines if liquidit
     # High-Reliability Algorithmic Synthesis Fallback
     if not gen_text:
         as_verdict = (
-            f"With an Active Share of {as_val:.1f}%, the portfolio demonstrates genuine active conviction against {bench}, "
-            f"justifying its active fee structure." if as_val >= 60.0 else
-            f"With an Active Share of {as_val:.1f}%, the portfolio exhibits significant benchmark tracking drift, "
-            f"raising closet indexing surveillance warnings against {bench}."
+            f"With an Active Share of {as_val:.1f}% `[CALCULATED METRIC]`, the portfolio diverges meaningfully from {bench}, "
+            f"providing a clearer basis for its active fee structure." if as_val >= 60.0 else
+            f"With an Active Share of {as_val:.1f}% `[CALCULATED METRIC]`, the portfolio tracks {bench} closely, "
+            f"raising the question of whether active management fees are compensated by sufficient differentiation."
         )
 
         asri_verdict = (
-            f"The fund maintains exceptional accounting discipline with an Accounting & Solvency Risk Index (ASRI) of {asri:.1f}%. "
-            f"Negligible capital is exposed to entities exhibiting Beneish M-Score anomalies or excessive financial leverage." if asri <= 5.0 else
-            f"The fund carries an elevated ASRI of {asri:.1f}%, indicating that a meaningful sleeve of capital is deployed into entities "
-            f"with aggressive balance sheet debt or corporate governance caution flags (e.g. {risky_names})."
+            f"The portfolio carries a low Accounting & Solvency Risk Index (ASRI) of {asri:.1f}% `[CALCULATED METRIC]`, "
+            f"with minimal capital allocated to businesses showing working-capital stretch or elevated balance sheet leverage." if asri <= 5.0 else
+            f"The portfolio carries an ASRI of {asri:.1f}% `[CALCULATED METRIC]`, indicating that a noticeable share of capital is allocated to businesses "
+            f"with higher balance sheet leverage or governance watchpoints (including {risky_names})."
         )
 
         mos_verdict = (
-            f"The portfolio is positioned with an aggregate Margin of Safety of +{mos:.1f}% relative to conservative DCF intrinsic values, "
-            f"anchored by high-moat franchises such as {quality_names}." if mos >= 0.0 else
-            f"The aggregate portfolio operates at a -{abs(mos):.1f}% Margin of Safety deficit against intrinsic DCF valuations, reflecting "
-            f"growth-multiple expansion and heightened valuation sensitivity during broader market drawdowns."
+            f"On a look-through basis, the portfolio trades at an aggregate Margin of Safety of +{mos:.1f}% `[CALCULATED METRIC]` relative to conservative DCF fair values, "
+            f"supported by cash-generative franchises such as {quality_names}." if mos >= 0.0 else
+            f"Separating constituent quality from valuation: while core holdings ({quality_names}) remain operationally credible, the portfolio trades at a -{abs(mos):.1f}% `[CALCULATED METRIC]` Margin of Safety premium to conservative DCF fair values, leaving less room for earnings disappointments."
         )
 
         gen_text = f"""# INSTITUTIONAL FORENSIC DOSSIER: {scheme_name}
 
 ## 1. Mandate Integrity vs Ground Reality (Active Share & Style Drift)
-{as_verdict} At an operating AUM of ₹{aum:,.0f} Cr, portfolio turnover stands at {ptr:.1f}%, demonstrating measured portfolio tenure without speculative churn leakage. The equity allocation is systematically concentrated in core compounders while maintaining required category fidelity.
+{as_verdict} At an operating AUM of ₹{aum:,.0f} Cr `[VERIFIED FACT]`, annual portfolio turnover stands at {ptr:.1f}% `[CALCULATED METRIC]`, indicating measured holding periods rather than high-frequency churn. The key question for allocators is whether position sizing remains nimble as asset scale expands.
 
 ## 2. Forensic Solvency & Accounting Fragility (ASRI Analysis)
-{asri_verdict} Capital exposed to promoter share pledging remains tightly circumscribed at {pledge:.1f}%. Constituent debt holdings and working capital cycles among the top holdings exhibit stable cash conversion without evidence of aggressive revenue recognition.
+{asri_verdict} Look-through exposure to promoter share pledging stands at {pledge:.1f}% `[CALCULATED METRIC]`. Across the top holdings, operating cash conversion tracks reported earnings without widespread accrual divergence `[MODEL INTERPRETATION]`.
 
 ## 3. Economic Moat & Intrinsic Margin of Safety (DCF Capital Moat)
-The weighted Economic Moat Index measures {moat:.1f} out of 100, reflecting strong pricing power and high Return on Capital Employed (ROCE) across the equity sleeve. {mos_verdict}
+The capital-weighted Economic Moat Index measures {moat:.1f} out of 100 `[CALCULATED METRIC]`, reflecting durable return on capital and pricing discipline across the core equity sleeve. {mos_verdict}
 
 ## 4. Manager Fee Justification vs Passive Index Drag
-The Direct Plan TER of {ter_dir:.2f}% contrasts with the Regular Plan TER of {ter_reg:.2f}%, representing an intermediary commission leakage of {round((ter_reg - ter_dir)*100, 0):.0f} basis points annually. Over a 15-year compounding trajectory on an initial ₹10 Lakh corpus, this intermediary drag destroys approximately ₹4.5 Lakhs to ₹7.2 Lakhs in net investor wealth, underscoring the imperative of Direct Plan execution.
+The Direct Plan TER of {ter_dir:.2f}% `[VERIFIED FACT]` compares with a Regular Plan TER of {ter_reg:.2f}% `[VERIFIED FACT]`, creating an annual distribution cost spread of {round((ter_reg - ter_dir)*100, 0):.0f} basis points `[CALCULATED METRIC]`. Over a 15-year compounding horizon on a ₹10 Lakh allocation, that recurring fee differential reduces terminal value by roughly ₹4.5 Lakhs to ₹7.2 Lakhs `[MODEL INTERPRETATION]`—a predictable cost drag that compounds regardless of market direction.
 
 ## 5. Pre-Mortem Scenario: What Breaks in a Severe Market Stress Test?
-In a severe liquidity shock or 25% broad market correction, redemption friction would concentrate primarily in the mid/small-cap sleeve ({risky_names}). The manager's liquid cash and TREPS reserve of approximately {100.0 - metrics.get('equity_coverage_pct', 85.0):.1f}% provides immediate liquidity insulation, preventing fire-sale contagion of core fortress assets.
+In a 25–30% market drawdown accompanied by tighter secondary liquidity, redemption pressure would test the less liquid mid- and small-cap holdings ({risky_names}) first `[MODEL INTERPRETATION]`. The scheme's liquid cash and TREPS buffer of approximately {100.0 - metrics.get('equity_coverage_pct', 85.0):.1f}% `[CALCULATED METRIC]` provides an initial cushion to meet redemptions before core equity positions need to be trimmed at distressed prices.
 """
 
     return gen_text

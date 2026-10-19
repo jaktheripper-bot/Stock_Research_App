@@ -83,26 +83,26 @@ def synthesize_bull_bear_thesis(
             metric_str = " and ".join(filter(None, [roce_str, roe_str]))
             bull_points.append({
                 "pillar": "Capital Productivity",
-                "title": "High-Tier Capital Efficiency",
-                "detail": f"Generates an exceptional {metric_str}, indicating disciplined capital reinvestment and sustainable competitive advantage."
+                "title": "Sustained Return on Capital",
+                "detail": f"Generates {metric_str}, indicating disciplined capital reinvestment above the hurdle cost of capital. The key question is whether incremental capital deployed continues to earn comparable returns."
             })
         elif c_roce >= 14.0:
             bull_points.append({
                 "pillar": "Capital Productivity",
                 "title": "Consistent Capital Returns",
-                "detail": f"Delivers {c_roce:.1f}% ROCE comfortably above the corporate cost of capital, sustaining balance sheet stability."
+                "detail": f"Delivers {c_roce:.1f}% ROCE above the corporate cost of capital, supporting self-funded reinvestment without balance sheet strain."
             })
         else:
             bull_points.append({
                 "pillar": "Capital Productivity",
-                "title": "Asset Re-Rating Potential",
-                "detail": f"Operating efficiency turnaround underway; capital reinvestment cycle positioned to expand asset turnover."
+                "title": "Operating Efficiency Turnaround",
+                "detail": "Capital reinvestment cycle is positioned to improve asset turnover, though sustained cash conversion remains the primary proof point."
             })
     else:
         bull_points.append({
             "pillar": "Franchise Presence",
-            "title": f"Established Market Presence",
-            "detail": f"Established operating franchise in the {sector_name} sector with ongoing enterprise contracts."
+            "title": "Established Market Presence",
+            "detail": f"Established operating franchise in the {sector_name} sector with recurring enterprise relationships."
         })
 
     # 2. Solvency & Balance Sheet Cushion
@@ -110,26 +110,26 @@ def synthesize_bull_bear_thesis(
         if de <= 0.15:
             bull_points.append({
                 "pillar": "Balance Sheet Quality",
-                "title": "Virtually Debt-Free Structure",
-                "detail": f"Pristine solvency with a debt-to-equity ratio of {de:.2f}, insulating the company against interest rate cycles and liquidity contractions."
+                "title": "Low-Leverage Balance Sheet",
+                "detail": f"Operates with a debt-to-equity ratio of {de:.2f}, limiting refinancing exposure across rate cycles and preserving operating cash flow for internal reinvestment."
             })
         elif de <= 0.50:
             bull_points.append({
                 "pillar": "Balance Sheet Quality",
                 "title": "Conservative Leverage Cushion",
-                "detail": f"Prudent debt burden ({de:.2f} D/E) well within industry safety guidelines, providing financial flexibility for ongoing expansion."
+                "detail": f"Maintains a measured debt burden ({de:.2f} D/E) within prudential limits, keeping fixed interest charges manageable if demand softens."
             })
         else:
             bull_points.append({
                 "pillar": "Balance Sheet Quality",
-                "title": "Operational Cash Flow Backstop",
-                "detail": f"Debt servicing sustained by operational cash flow visibility and long-term banking relationships."
+                "title": "Operational Cash Flow Coverage",
+                "detail": "Debt servicing is supported by recurring operating cash flows and established banking lines, provided working-capital cycles remain contained."
             })
     else:
         bull_points.append({
             "pillar": "Balance Sheet Quality",
             "title": "Capital Structure Stability",
-            "detail": "Supported by institutional equity base and statutory banking credit lines."
+            "detail": "Supported by an institutional equity base and committed working-capital credit lines."
         })
 
     # 3. Growth & Market Valuation
@@ -144,20 +144,20 @@ def synthesize_bull_bear_thesis(
     if mos > 10.0:
         bull_points.append({
             "pillar": "Valuation & Flow",
-            "title": "Defensive Margin of Safety",
-            "detail": f"Trades at a {mos:.1f}% discount to intrinsic fair value (₹{fair_val:,.2f}), offering downside valuation protection."
+            "title": "Valuation Buffer vs. Fair Value",
+            "detail": f"Trades at a {mos:.1f}% discount to triangulated fair value (₹{fair_val:,.2f}), providing a wider margin of safety if near-term earnings moderate."
         })
     elif "ACCUMULATION" in flow_regime:
         bull_points.append({
             "pillar": "Institutional Flow",
             "title": "Exchange Depth Accumulation",
-            "detail": "Live exchange order book reflects institutional accumulation pressure on primary bid tiers."
+            "detail": "Order-book depth shows steady institutional bid support absorbing secondary market supply."
         })
     else:
         bull_points.append({
             "pillar": "Industry Tailwinds",
-            "title": f"Structural {sector_name} Momentum",
-            "detail": f"Supported by multi-year secular tailwinds and domestic capital expenditure expansion across {sector_name.lower()}."
+            "title": f"{sector_name} Demand Visibility",
+            "detail": f"Supported by ongoing domestic capital expenditure and sector formalization across {sector_name.lower()}, subject to disciplined working-capital conversion."
         })
 
     # ----------------------------------------------------
@@ -167,26 +167,26 @@ def synthesize_bull_bear_thesis(
     if pe is not None and pe >= 45.0:
         bear_points.append({
             "pillar": "Valuation Multiples",
-            "title": "Priced for Flawless Execution",
-            "detail": f"Trailing P/E of {pe:.1f}x trades at a substantial premium above historical median, exposing the stock to sharp multiple-contraction if quarterly growth moderates."
+            "title": "Narrow Room for Execution Slippage",
+            "detail": f"The competitive position remains credible, but a trailing P/E of {pe:.1f}x leaves little room for revenue growth or cash conversion to disappoint."
         })
     elif pe is not None and pe >= 30.0:
         bear_points.append({
             "pillar": "Valuation Multiples",
-            "title": "Full Valuation Band",
-            "detail": f"Current multiple of {pe:.1f}x leaves limited margin of safety for operational hiccups or cost inflation."
+            "title": "Demanding Implied Expectations",
+            "detail": f"At {pe:.1f}x trailing earnings, the market already prices in steady margin execution; any cost inflation or volume delay risks multiple compression."
         })
     elif mos < -25.0:
         bear_points.append({
             "pillar": "Valuation Multiples",
-            "title": "Premium to Intrinsic Value",
-            "detail": f"Trades at a {abs(mos):.1f}% premium above triangulated intrinsic fair value, requiring sustained quarterly growth."
+            "title": "Premium to Triangulated Fair Value",
+            "detail": f"Trades at a {abs(mos):.1f}% premium to conservative DCF fair value, meaning future returns depend heavily on sustained earnings compounding."
         })
     else:
         bear_points.append({
             "pillar": "Macro Risk",
-            "title": "Cyclical Growth Sensitivity",
-            "detail": "Vulnerable to intermediate macro-economic demand slowdowns and raw material price volatility."
+            "title": "Cyclical Demand & Input Sensitivity",
+            "detail": "Exposed to intermediate demand slowdowns and raw-material cost swings if pricing pass-through lags by more than one to two quarters."
         })
 
     # 2. Forensic / Governance Risks
@@ -194,20 +194,20 @@ def synthesize_bull_bear_thesis(
     if flags:
         bear_points.append({
             "pillar": "Governance / Accounting",
-            "title": "Surveillance Flags Identified",
-            "detail": f"Forensic sieve flagged: {'; '.join(str(f) for f in flags[:2])}. Requires monitoring of cash flow realization."
+            "title": "Accounting & Cash-Conversion Watchpoints",
+            "detail": f"Forensic screening flagged: {'; '.join(str(f) for f in flags[:2])}. Investors should track whether reported profits convert cleanly into operating cash flow."
         })
     elif de is not None and de > 0.60:
         bear_points.append({
             "pillar": "Capital Structure",
-            "title": "Leverage Sensitivity",
-            "detail": f"Elevated leverage ratio ({de:.2f} D/E) requires consistent operating cash flows to maintain interest coverage."
+            "title": "Leverage & Refinancing Sensitivity",
+            "detail": f"A debt-to-equity ratio of {de:.2f} increases sensitivity to borrowing costs; slower receivable collection would tighten interest coverage."
         })
     else:
         bear_points.append({
             "pillar": "Competitive Pressures",
-            "title": "Intensifying Industry Competition",
-            "detail": "Threat of capacity additions from domestic peers and potential gross margin pressure from unorganized entrants."
+            "title": "Industry Capacity & Pricing Discipline",
+            "detail": "New capacity additions from peers or aggressive pricing by entrants could test gross-margin stability over the medium term."
         })
 
 
@@ -216,20 +216,20 @@ def synthesize_bull_bear_thesis(
     if "DISTRIBUTION" in str(fl_dict.get("flow_regime") or ""):
         bear_points.append({
             "pillar": "Order Book Dynamics",
-            "title": "Sell-Side Supply Overhang",
-            "detail": "Exchange Level-2 depth indicates heavy ask-side volume capping intermediate upside momentum."
+            "title": "Secondary Supply Overhang",
+            "detail": "Exchange Level-2 depth shows persistent ask-side supply that may weigh on near-term price discovery."
         })
     elif lc_buffer <= 4.0:
         bear_points.append({
             "pillar": "Liquidity Volatility",
             "title": "Proximity to Lower Circuit Band",
-            "detail": f"Stock is within {lc_buffer:.1f}% of its daily exchange lower circuit freeze."
+            "detail": f"Trades within {lc_buffer:.1f}% of its daily exchange lower-circuit band, heightening execution slippage during volatile sessions."
         })
     else:
         bear_points.append({
             "pillar": "Execution Risk",
-            "title": "Working Capital & Reinvestment Cycles",
-            "detail": "Capital allocation discipline depends on timely commissioning of ongoing expansion projects without cost overruns."
+            "title": "Working Capital & Capex Conversion",
+            "detail": "The investment case depends on converting incremental capital expenditure and receivables into free cash flow without stretching the cash conversion cycle."
         })
 
     return {

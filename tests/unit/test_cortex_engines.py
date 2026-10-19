@@ -633,5 +633,76 @@ class TestMoatnomicsBrandHouse(unittest.TestCase):
         self.assertIs(get_system_prompt_context, exported_context_fn)
         self.assertIs(get_content_framework_brief, exported_brief_fn)
 
+    def test_multi_asset_dossier_tonality_alignment(self):
+        import os
+        os.environ["TESTING"] = "1"
+        from core.analysis.dossier_bull_bear import synthesize_bull_bear_thesis
+        from core.analysis.valuation_radar import compute_valuation_radar
+        from core.analysis.daily_stock_ingestion import generate_deterministic_7pillar_report
+        from core.analysis.fund_overlap_auditor import synthesize_fund_forensic_narrative
+        from core.analysis.debt_engine import generate_executive_primer
+        from core.msme.forensic_engine import compute_msme_forensic_dossier
+
+        # 1. Equity Bull/Bear Thesis separates quality from valuation
+        bb = synthesize_bull_bear_thesis(
+            ticker="INFY",
+            fundamentals={"roce": 28.0, "roe": 24.0, "debt_to_equity": 0.08, "pe_ratio": 48.0},
+        )
+        bull_titles = [p["title"] for p in bb["bull_thesis"]]
+        bear_details = " ".join(p["detail"] for p in bb["bear_thesis"])
+        self.assertIn("Sustained Return on Capital", bull_titles)
+        self.assertIn("competitive position remains credible", bear_details)
+
+        # 2. Valuation Radar summary separates business quality from valuation
+        vr = compute_valuation_radar(current_price=2000.0, pe_ratio=42.0, eps=47.6, sales_growth_3y=12.0)
+        self.assertIn("leaves less room for execution to disappoint", vr["summary"])
+
+        # 3. Deterministic 7-Pillar Equity Report includes epistemic tags & falsification triggers
+        rep_md = generate_deterministic_7pillar_report(
+            {"ticker": "INFY", "short_name": "Infosys Ltd", "current_price": 1500.0, "pe_ratio": "25.0"},
+            {"scheme_count": 12, "default_roce": 26.0, "default_de": 0.05},
+        )
+        self.assertIn("[VERIFIED FACT]", rep_md)
+        self.assertIn("[CALCULATED METRIC]", rep_md)
+        self.assertIn("Falsification & Thesis-Revision Triggers", rep_md)
+
+        # 4. Mutual Fund Dossier narrative uses calm trade-off language
+        mf_md = synthesize_fund_forensic_narrative(
+            {
+                "active_share_pct": 68.0,
+                "weighted_moat_score": 76.0,
+                "accounting_risk_index": 3.5,
+                "margin_of_safety_pct": -8.0,
+                "promoter_pledge_exposure_pct": 0.5,
+                "portfolio_turnover_ratio_pct": 22.0,
+                "benchmark_index": "NIFTY 500 TRI",
+                "top_risky_holdings": [],
+                "top_quality_holdings": [{"name": "Infosys Ltd"}],
+            },
+            {
+                "scheme_code": "TEST_MF_01",
+                "scheme_name": "Test Flexi Cap Fund",
+                "category": "Flexi Cap",
+                "aum_crores": 12000.0,
+                "ter_direct_pct": 0.65,
+                "ter_regular_pct": 1.65,
+            },
+        )
+        self.assertIn("Separating constituent quality from valuation", mf_md)
+        self.assertIn("reduces terminal value by roughly", mf_md)
+
+        # 5. Corporate Debt Executive Primer explicitly frames higher yield vs credit/liquidity risk
+        debt_primer = generate_executive_primer(
+            {"instrument_name": "Test Corp 9.25% NCD", "coupon_rate_pct": 9.25, "ytm_pct": 9.25, "seniority_tier": "SENIOR_SECURED", "maturity_date": "2028-06-30"},
+            {},
+            {},
+        )
+        self.assertIn("does not automatically make the bond more attractive", debt_primer["fd_comparison"])
+
+        # 6. MSME Forensic Dossier uses measured cash-conversion language
+        msme = compute_msme_forensic_dossier({"uin": "UDYAM-MH-01-0000001", "name": "Test Precision Ltd", "sector_name": "Food Processing", "annual_turnover": 60.0})
+        self.assertIn("Cash Conversion", msme["pillar_1_working_capital"]["summary"])
+
+
 if __name__ == "__main__":
     unittest.main()

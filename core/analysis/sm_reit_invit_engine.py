@@ -259,35 +259,34 @@ def get_reit_detail(symbol: str) -> Optional[Dict[str, Any]]:
             "category": "Interest Rate & Cap Rate Sensitivity",
             "severity": "MODERATE" if ltv > 25.0 else "LOW",
             "thesis": (
-                f"Floating rate debt accounts for ~32% of borrowings at an average cost of 7.85%. "
-                f"A 50 bps shift in benchmark rates would impact NDCF by ~1.2% p.a., with cap-rate expansion "
-                f"posing modest valuation pressure on exit NAV."
+                f"Floating-rate debt accounts for ~32% of borrowings at an average cost of 7.85%. "
+                f"A 50 bps upward shift in benchmark borrowing rates trims annualized NDCF by ~1.2%, while any accompanying "
+                f"cap-rate expansion weighs on appraised NAV even if physical occupancy holds steady."
             )
         },
         {
             "category": "Tenant Expiry & Vacancy Drift Risk",
             "severity": "LOW" if wale >= 6.0 else "MODERATE",
             "thesis": (
-                f"Portfolio WALE stands at {wale} years with committed occupancy of {occ}%. "
-                f"Top anchor counterparties hold institutional credit profiles; however, lease expirations "
-                f"over the next 24 months require active asset management to prevent re-leasing vacancy drag."
+                f"Portfolio WALE stands at {wale} years with committed occupancy at {occ}%. "
+                f"While anchor counterparties carry investment-grade profiles, lease rollovers over the next 24 months "
+                f"depend on timely re-leasing to avoid fit-out downtime and net operating income (NOI) drag."
             )
         },
         {
             "category": "Sponsor Governance & ROFO Injection Risk",
             "severity": "LOW",
             "thesis": (
-                f"Sponsor holds {sponsor_holding}% skin-in-the-game. Asset acquisitions from sponsor pipeline "
-                f"are subject to mandatory independent valuer fairness opinions and unitholder approval thresholds."
+                f"The sponsor retains a {sponsor_holding}% unit holding. Future Right of First Offer (ROFO) asset drop-downs "
+                f"must be evaluated on whether acquisition cap rates are genuinely accretive to unitholder DPU after debt financing."
             )
         },
         {
             "category": "Regulatory & Section 115UA Tax Friction",
             "severity": "CONTAINED",
             "thesis": (
-                f"Post-Finance Act 2023, distributions categorized as repayment of debt are tax-exempt up to the "
-                f"investor's initial cost of acquisition. Cumulative distributions exceeding issue price are taxed as "
-                f"'Specified Sum' under Section 56(2)(xii)."
+                f"Under Finance Act 2023 (Section 56(2)(xii)), return-of-capital distributions reduce the unitholder's cost basis "
+                f"and become taxable as a 'Specified Sum' once cumulative amortizations exceed the initial acquisition price."
             )
         }
     ]

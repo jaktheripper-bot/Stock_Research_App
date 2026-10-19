@@ -138,27 +138,27 @@ def compute_valuation_radar(
         regime = "DEEP_DISCOUNT"
         badge_label = f"Deep Margin of Safety (+{margin_of_safety}%)"
         badge_color = "#10b981"
-        summary = f"Trading at a substantial {margin_of_safety}% discount to conservative intrinsic fair value of ₹{composite_fair_value:,.2f}."
+        summary = f"Trades at a {margin_of_safety}% discount to triangulated fair value (₹{composite_fair_value:,.2f}), offering a meaningful valuation buffer if operating fundamentals hold."
     elif margin_of_safety >= 10.0:
         regime = "ATTRACTIVE_DISCOUNT"
         badge_label = f"Margin of Safety (+{margin_of_safety}%)"
         badge_color = "#38bdf8"
-        summary = f"Trading at an attractive {margin_of_safety}% discount to fair value of ₹{composite_fair_value:,.2f}."
+        summary = f"Trades at a {margin_of_safety}% discount to triangulated fair value (₹{composite_fair_value:,.2f}), leaving room for steady compounding without relying on multiple expansion."
     elif margin_of_safety >= -10.0:
         regime = "FAIR_VALUE"
         badge_label = f"Fair Value (Spread {margin_of_safety}%)"
         badge_color = "#fbbf24"
-        summary = f"Trading within normal fair value band (₹{min_range:,.2f} to ₹{max_range:,.2f})."
+        summary = f"Trades within the triangulated fair-value band (₹{min_range:,.2f} to ₹{max_range:,.2f}), where returns will track underlying earnings and cash-flow execution."
     elif margin_of_safety >= -30.0:
         regime = "PREMIUM_VALUATION"
         badge_label = f"Growth Premium ({margin_of_safety}%)"
         badge_color = "#f97316"
-        summary = f"Trading at a {abs(margin_of_safety)}% premium above conservative DCF fair value. Requires sustained execution."
+        summary = f"Trades at a {abs(margin_of_safety)}% premium to conservative DCF fair value; the business quality may be credible, but the valuation leaves less room for execution to disappoint."
     else:
         regime = "ELEVATED_VALUATION_RISK"
         badge_label = f"Stretched Valuation ({margin_of_safety}%)"
         badge_color = "#ef4444"
-        summary = f"Trading at an elevated {abs(margin_of_safety)}% premium above intrinsic earnings power value. Heightened multiple-contraction risk."
+        summary = f"Trades at an elevated {abs(margin_of_safety)}% premium to intrinsic earnings power value, creating valuation sensitivity if growth or margins moderate."
 
     g_rate = growth_rate
 

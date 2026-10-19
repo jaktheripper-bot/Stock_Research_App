@@ -267,22 +267,22 @@ def compute_msme_forensic_dossier(firm_data: Dict[str, Any]) -> Dict[str, Any]:
         ccc_stress_level = "Low Stress"
         ccc_stress_color = "#10b981"
         ccc_badge_class = "safe"
-        ccc_summary = "Fortress Cash Conversion. Receivables turn over quickly with disciplined inventory management."
+        ccc_summary = "Disciplined Cash Conversion. Receivables and inventory turn over within 45 days, limiting reliance on short-term working-capital borrowings."
     elif net_ccc <= 75:
         ccc_stress_level = "Moderate"
         ccc_stress_color = "#38bdf8"
         ccc_badge_class = "neutral"
-        ccc_summary = "Healthy Working Capital Rhythm. Standard operating cycle aligned with tier-1 industrial supply chains."
+        ccc_summary = "Balanced Working Capital Cycle. Cash conversion tracks standard B2B settlement schedules across tier-1 industrial supply chains."
     elif net_ccc <= 100:
         ccc_stress_level = "Elevated Stretch"
         ccc_stress_color = "#f59e0b"
         ccc_badge_class = "warning"
-        ccc_summary = "Elongated Working Capital Cycle. Receivables stretch beyond 60 days, requiring active overdraft buffers."
+        ccc_summary = "Elongated Working Capital Cycle. Receivable collection extends beyond 60 days, requiring working-capital credit lines to bridge operating cash flow."
     else:
         ccc_stress_level = "Severe Working Capital Drag"
         ccc_stress_color = "#ef4444"
         ccc_badge_class = "danger"
-        ccc_summary = "Critical Cash Lockup. Lengthy batch processing and customer payment delays strain short-term liquidity."
+        ccc_summary = "Extended Cash Conversion Drag. Multi-stage batch processing and delayed buyer settlements tie up operating liquidity."
 
     # --------------------------------------------------------------------------
     # Pillar 2: Listed Corporate Supply-Chain Linkage
@@ -290,13 +290,13 @@ def compute_msme_forensic_dossier(firm_data: Dict[str, Any]) -> Dict[str, Any]:
     listed_buyers = bench["listed_buyers"]
     if turnover >= 50.0:
         oem_supplier_tier = "Tier-1 Direct OEM Supplier"
-        tier_desc = "Direct primary vendor delivering critical sub-assemblies to anchor listed conglomerates."
+        tier_desc = "Direct vendor supplying sub-assemblies to listed OEMs, where switching costs are supported by multi-year qualification audits."
     elif turnover >= 15.0:
         oem_supplier_tier = "Tier-2 Specialized Vendor"
-        tier_desc = "Precision manufacturing specialist supplying tier-1 systems integrators and listed OEMs."
+        tier_desc = "Specialized component manufacturer supplying tier-1 systems integrators and listed industrial buyers."
     else:
         oem_supplier_tier = "Tier-3 Ancillary Workshop"
-        tier_desc = "Specialized contract machine shop providing precision components and tooling support."
+        tier_desc = "Contract machining and tooling supplier whose bargaining power depends on local industrial cluster utilization."
 
     # --------------------------------------------------------------------------
     # Pillar 3: Solvency, Operating Margins & TReDS Liquidity Risk
@@ -330,15 +330,15 @@ def compute_msme_forensic_dossier(firm_data: Dict[str, Any]) -> Dict[str, Any]:
     if turnover >= 50.0 and icr >= 3.0:
         treds_grade = "Tier A (High Institutional Discounting Rate)"
         treds_discount_cost = "~7.5% - 8.2% p.a."
-        treds_liquidity_desc = "Prime receivable profile on RXIL / M1xchange with rapid non-recourse bank bidding."
+        treds_liquidity_desc = "Qualifies for competitive non-recourse invoice discounting on RXIL / M1xchange against accepted listed-buyer invoices."
     elif turnover >= 15.0:
         treds_grade = "Tier B (Standard Factoring Corridor)"
         treds_discount_cost = "~8.5% - 9.5% p.a."
-        treds_liquidity_desc = "Consistent institutional invoice discounting against approved listed corporate buyer acceptances."
+        treds_liquidity_desc = "Accesses standard invoice discounting against approved corporate buyer acceptances, moderating working-capital funding costs."
     else:
         treds_grade = "Tier C (Collateral-Dependent / Recourse Factoring)"
         treds_discount_cost = "~10.0% - 11.5% p.a."
-        treds_liquidity_desc = "Subject to secondary buyer credit validation and selective invoice discounting lines."
+        treds_liquidity_desc = "Higher financing spread on working-capital lines; liquidity depends on timely buyer invoice acceptance under MSMED Act Section 15."
 
     # --------------------------------------------------------------------------
     # Pillar 4: Cluster Density & Capital Replacement Moat Score (0–100)
