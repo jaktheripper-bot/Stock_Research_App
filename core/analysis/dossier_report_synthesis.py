@@ -21,7 +21,7 @@ logger = logging.getLogger("equity_research.core.analysis.dossier_report_synthes
 
 def get_system_prompt(ticker: str, language: str) -> str:
     lang_rule = "The report must be entirely in English (India) using British/Indian spelling." if language == "English (India)" else f"The report must be fully translated into {language} without omitting technical rigor."
-    return f"""You are an institutional equity research analyst. Write a comprehensive research report for {ticker}.
+    base_prompt = f"""You are an institutional equity research analyst. Write a comprehensive research report for {ticker}.
 {lang_rule}
 
 ### Health Matrix
@@ -56,9 +56,9 @@ Tabulate the ESG analysis strictly using the following Markdown table format:
 | **Social** | [Score] | [Labor, community impact] |
 | **Governance** | [Score] | [Board independence, transparency] |
 
-{EPISTEMIC_PROMPT_DIRECTIVE}
-
 CRITICAL COMPLIANCE DIRECTIVE: Strictly avoid providing any conclusions, forward-looking advice, actionable investment guidance, Buy/Sell/Hold verdicts, investment recommendations, portfolio allocation advice, target prices, trade execution signals, or portfolio roadmaps. The research report concludes strictly after Pillar 7. All analysis must remain purely descriptive, factual, and diagnostic under SEBI Safe Harbor principles."""
+
+    return base_prompt + "\n\n" + EPISTEMIC_PROMPT_DIRECTIVE
 
 _DISCOVERED_MODELS_CACHE = {"models": [], "timestamp": 0}
 
