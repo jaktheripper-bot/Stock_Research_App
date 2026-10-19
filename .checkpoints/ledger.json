@@ -1406,5 +1406,21 @@
       "revision_count": 271
     },
     "preflight_passed": true
+  },
+  {
+    "tag": "checkpoint_20261019_082734_dynamic_entity_override_and_local_dossier_index",
+    "timestamp": "2026-10-19 08:27:34 IST",
+    "commit_sha": "53756e2dc71d59b0c676d2f4d05a7dd5d9e45990",
+    "branch": "main",
+    "description": "dynamic_entity_override_and_local_dossier_index",
+    "database": {
+      "exists": true,
+      "filename": "reports_checkpoint_20261019_082734_dynamic_entity_override_and_local_dossier_index.db",
+      "path": ".checkpoints/reports_checkpoint_20261019_082734_dynamic_entity_override_and_local_dossier_index.db",
+      "size_bytes": 18944000,
+      "report_count": 166,
+      "revision_count": 271
+    },
+    "preflight_passed": true
   }
 ]
