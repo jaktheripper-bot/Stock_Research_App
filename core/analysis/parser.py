@@ -55,18 +55,51 @@ def remove_health_matrix_text(text: str) -> str:
 
 def strip_conclusion_sections(text: str) -> str:
     """
-    Strips conclusion, monitorables, recommendations, and actionable guidance sections
-    for strict SEBI Safe Harbor compliance.
+    Removes trailing standalone 'Conclusion' or 'Final Verdict' summary sections
+    while strictly preserving 'Falsification & Thesis-Revision Triggers' and
+    'What Contradicts This Conclusion' blocks inside pillars.
     """
-    if not text or not isinstance(text, str):
+    if not text:
         return ""
-    conclusion_pattern = r'(?im)^\s*#*\s*(?:\d+[\.:\)]\s*)?(?:Conclusion|Key Monitorables|Actionable Guidance|Diagnostic Synthesis|Recommendation|Target Price|Investment Summary\b|Outlook & Recommendation|Strategic Portfolio Roadmap|निष्कर्ष|कार्रवाई योग्य मार्गदर्शन)'
-    parts = re.split(conclusion_pattern, text)
-    cleaned = parts[0] if len(parts) > 1 else text
+    pattern = re.compile(
+        r'(?im)^\s*#*\s*(?:\d+[\.:\)]\s*)?'
+        r'(?!.*(?:Falsification|Contradict|Revision\s+Trigger))'
+        r'(?:Conclusion|Final\s+Verdict|Overall\s+Summary|Summary\s+&\s+Conclusion|Key\s+Monitorables|Actionable\s+Guidance|Diagnostic\s+Synthesis|Recommendation|Target\s+Price|Investment\s+Summary\b|Outlook\s+&\s+Recommendation|Strategic\s+Portfolio\s+Roadmap|निष्कर्ष|कार्रवाई\s+योग्य\s+मार्गदर्शन)\b.*$'
+    )
+    parts = pattern.split(text)
+    cleaned = parts[0].strip() if parts else text
     cleaned = re.sub(r'(?im)^\s*(?:#+|\*\*|__)?\s*VERDICT\s*:\s*(?:BUY|HOLD|SELL|AVOID)\b[^\n]*\n*', '', cleaned)
     cleaned = re.sub(r'(?im)^[ \t]*[-*•]\s*(?:Verdict|Rating|Recommendation)\s*:\s*(?:BUY|HOLD|SELL|AVOID)\b[^\n]*\n*', '', cleaned)
     cleaned = re.sub(r'\n*---\s*$', '', cleaned.rstrip())
     return cleaned.strip()
+
+
+def render_epistemic_badges_html(html_text: str) -> str:
+    """Converts [VERIFIED FACT], [CALCULATED METRIC], [MODEL INTERPRETATION], and [UNRESOLVED UNCERTAINTY] tags into styled pills."""
+    if not html_text:
+        return html_text
+    replacements = [
+        (
+            r"\[VERIFIED FACT([^\]]*)\]",
+            r'<span class="badge" style="background:rgba(16,185,129,0.14);color:#34d399;border:1px solid rgba(16,185,129,0.35);font-size:11px;font-weight:700;padding:2px 7px;border-radius:4px;margin-right:4px;">✓ VERIFIED FACT\1</span>'
+        ),
+        (
+            r"\[CALCULATED METRIC([^\]]*)\]",
+            r'<span class="badge" style="background:rgba(56,189,248,0.14);color:#38bdf8;border:1px solid rgba(56,189,248,0.35);font-size:11px;font-weight:700;padding:2px 7px;border-radius:4px;margin-right:4px;">∑ CALCULATED METRIC\1</span>'
+        ),
+        (
+            r"\[MODEL INTERPRETATION([^\]]*)\]",
+            r'<span class="badge" style="background:rgba(168,85,247,0.14);color:#c084fc;border:1px solid rgba(168,85,247,0.35);font-size:11px;font-weight:700;padding:2px 7px;border-radius:4px;margin-right:4px;">🧠 MODEL INTERPRETATION\1</span>'
+        ),
+        (
+            r"\[UNRESOLVED UNCERTAINTY([^\]]*)\]",
+            r'<span class="badge" style="background:rgba(245,158,11,0.14);color:#fbbf24;border:1px solid rgba(245,158,11,0.35);font-size:11px;font-weight:700;padding:2px 7px;border-radius:4px;margin-right:4px;">❓ UNRESOLVED UNCERTAINTY\1</span>'
+        ),
+    ]
+    out = html_text
+    for pat, rep in replacements:
+        out = re.sub(pat, rep, out, flags=re.IGNORECASE)
+    return out
 
 def format_citations_section(citations: list[dict], stock_data: dict = None) -> str:
     """
@@ -210,7 +243,7 @@ def wrap_html_with_collapsible_pillars(
         )
         splits = pattern.split(html_content)
         if len(splits) < 5:
-            return html_content
+            return render_epistemic_badges_html(html_content)
 
     output_parts = [splits[0]]
     i = 1
@@ -367,7 +400,7 @@ def wrap_html_with_collapsible_pillars(
         output_parts.append(card)
         i += 4
 
-    return "\n".join(output_parts)
+    return render_epistemic_badges_html("\n".join(output_parts))
 
 
 # ==============================================================================
@@ -452,7 +485,7 @@ def wrap_fund_dossier_with_collapsible_dimensions(
     splits = pattern.split(html_content)
     if len(splits) < 5:
         # Fallback if no numbered dimensions matched: wrap in prose container
-        return f'<div class="dossier-prose">{html_content}</div>'
+        return render_epistemic_badges_html(f'<div class="dossier-prose">{html_content}</div>')
 
     # Clean lead-in content before Dimension 1 (remove redundant H1 and horizontal rules)
     clean_intro = re.sub(r'<h1[^>]*>.*?</h1>', '', splits[0], flags=re.IGNORECASE).strip()
@@ -519,7 +552,7 @@ def wrap_fund_dossier_with_collapsible_dimensions(
         output_parts.append(card)
         i += 4
 
-    return "\n".join(output_parts)
+    return render_epistemic_badges_html("\n".join(output_parts))
 
 
 def compare_revisions(rev_a: dict, rev_b: dict) -> dict:

@@ -14,6 +14,7 @@ from core.analysis import (
     extract_health_matrix,
     remove_health_matrix_text,
     strip_conclusion_sections,
+    render_epistemic_badges_html,
     format_citations_section,
     compare_revisions,
     enrich_fundamentals,

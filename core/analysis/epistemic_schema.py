@@ -21,6 +21,8 @@ import re
 from typing import Dict, Any, List, Optional, Tuple
 from datetime import datetime
 
+from core.analysis.parser import render_epistemic_badges_html, strip_conclusion_sections
+
 
 EPISTEMIC_PROMPT_DIRECTIVE = """
 ### MANDATORY EPISTEMIC SEPARATION, SOURCE ATTRIBUTION & FALSIFICATION PROTOCOL
@@ -315,3 +317,14 @@ def build_multi_asset_epistemic_ledger(
         equity_intel=ctx,
         formatted_date=formatted_date
     )
+
+
+__all__ = [
+    "EPISTEMIC_PROMPT_DIRECTIVE",
+    "build_equity_epistemic_ledger",
+    "extract_epistemic_badges",
+    "extract_falsification_triggers",
+    "build_multi_asset_epistemic_ledger",
+    "render_epistemic_badges_html",
+    "strip_conclusion_sections",
+]

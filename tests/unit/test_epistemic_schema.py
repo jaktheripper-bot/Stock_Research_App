@@ -18,7 +18,10 @@ from core.analysis.epistemic_schema import (
     extract_epistemic_badges,
     extract_falsification_triggers,
     build_multi_asset_epistemic_ledger,
+    render_epistemic_badges_html,
+    strip_conclusion_sections,
 )
+from core.analysis.parser import wrap_html_with_collapsible_pillars
 from core.analysis.dossier_report_synthesis import get_system_prompt
 from core.analysis.equity_dossier import compile_equity_dossier
 
@@ -212,6 +215,92 @@ Wide moat secured by patents.
         self.assertIn("verified_facts", ledger)
         self.assertIn("calculated_metrics", ledger)
         self.assertIn("falsification_triggers", ledger)
+
+    def test_strip_conclusion_sections_preserves_falsification_and_contradicts(self):
+        """Verifies that strip_conclusion_sections strips trailing conclusions while strictly preserving falsification triggers."""
+        # 1. Empty/None handling
+        self.assertEqual(strip_conclusion_sections(""), "")
+        self.assertEqual(strip_conclusion_sections(None), "")
+
+        # 2. Pillar with What Contradicts This Conclusion and Falsification Triggers followed by Conclusion
+        sample_report = (
+            "## Pillar 1: Moat & Market Architecture\n"
+            "- Core moat is defensible via high switching costs.\n"
+            "- [VERIFIED FACT (FY25 AR)] Operating margins expanded 180 bps.\n"
+            "* **What Contradicts This Conclusion:** Raw material inflation exceeding 15% YoY.\n"
+            "#### Falsification & Thesis-Revision Triggers:\n"
+            "1. Operating margin drops below 14%.\n"
+            "2. Debtor days increase > 25 days.\n\n"
+            "## Conclusion & Final Verdict\n"
+            "The stock is poised for long-term compounding.\n"
+            "VERDICT: BUY"
+        )
+        cleaned = strip_conclusion_sections(sample_report)
+        self.assertIn("What Contradicts This Conclusion", cleaned)
+        self.assertIn("Falsification & Thesis-Revision Triggers", cleaned)
+        self.assertIn("Debtor days increase > 25 days", cleaned)
+        self.assertNotIn("## Conclusion & Final Verdict", cleaned)
+        self.assertNotIn("poised for long-term compounding", cleaned)
+        self.assertNotIn("VERDICT: BUY", cleaned)
+
+        # 3. Text without conclusion should remain intact
+        non_concl = (
+            "## Pillar 1: Macro\n"
+            "* **What Contradicts This Conclusion:** Rate hikes.\n"
+            "#### Falsification & Thesis-Revision Triggers:\n"
+            "1. CPI > 7%"
+        )
+        self.assertEqual(strip_conclusion_sections(non_concl), non_concl)
+
+    def test_render_epistemic_badges_html(self):
+        """Verifies that render_epistemic_badges_html converts epistemic tags into styled HTML pills."""
+        # 1. Empty / None handling
+        self.assertEqual(render_epistemic_badges_html(""), "")
+        self.assertIsNone(render_epistemic_badges_html(None))
+
+        # 2. Convert all 4 badge types with metadata passages
+        html_input = (
+            "<p>[VERIFIED FACT — BSE Audited FY25/Q3: Revenue stood at ₹4,500 Cr]</p>\n"
+            "<p>[CALCULATED METRIC: RoCE = 24.8% (2-Stage DCF Intrinsic Value ₹1,650)]</p>\n"
+            "<p>[MODEL INTERPRETATION: Specialty chemical moat protected by proprietary formulation patents]</p>\n"
+            "<p>[UNRESOLVED UNCERTAINTY: Outcome of pending USFDA inspection at Unit-II facility]</p>"
+        )
+        rendered = render_epistemic_badges_html(html_input)
+
+        # Check badge classes, icons, colors, and content
+        self.assertIn("✓ VERIFIED FACT — BSE Audited FY25/Q3: Revenue stood at ₹4,500 Cr", rendered)
+        self.assertIn("∑ CALCULATED METRIC: RoCE = 24.8%", rendered)
+        self.assertIn("🧠 MODEL INTERPRETATION: Specialty chemical moat", rendered)
+        self.assertIn("❓ UNRESOLVED UNCERTAINTY: Outcome of pending USFDA inspection", rendered)
+        self.assertIn("color:#34d399", rendered)
+        self.assertIn("color:#38bdf8", rendered)
+        self.assertIn("color:#c084fc", rendered)
+        self.assertIn("color:#fbbf24", rendered)
+
+    def test_wrap_html_with_collapsible_pillars_renders_badges(self):
+        """Verifies that wrap_html_with_collapsible_pillars passes body content through render_epistemic_badges_html."""
+        sample_html = """
+<h1>Executive Summary</h1>
+<h2>Pillar 1: Macro-Economic Overlays</h2>
+<p>[VERIFIED FACT (BSE)] Inflation steady at 4.2%.</p>
+<h2>Pillar 2: Industry Dynamics & Moat</h2>
+<p>[CALCULATED METRIC: Market share 34.2%].</p>
+<h2>Pillar 3: Promoter Quality & Forensic Health</h2>
+<p>[MODEL INTERPRETATION: Clean governance with zero pledging].</p>
+<h2>Pillar 4: The Drop Diagnostic</h2>
+<p>[UNRESOLVED UNCERTAINTY: Pending arbitration at NCLT].</p>
+<h2>Pillar 5: Valuation & Margin of Safety</h2>
+<p>Fair value assessment.</p>
+<h2>Pillar 6: Technical & Momentum Overlay</h2>
+<p>Trading above 50-DMA.</p>
+<h2>Pillar 7: ESG Impact Scorecard</h2>
+<p>BRSR Core compliant.</p>
+"""
+        wrapped = wrap_html_with_collapsible_pillars(sample_html, scrip_code="500209", ticker="INFY")
+        self.assertIn("✓ VERIFIED FACT", wrapped)
+        self.assertIn("∑ CALCULATED METRIC", wrapped)
+        self.assertIn("🧠 MODEL INTERPRETATION", wrapped)
+        self.assertIn("❓ UNRESOLVED UNCERTAINTY", wrapped)
 
 
 if __name__ == "__main__":

@@ -22,6 +22,7 @@ from core.analysis.parser import (
     strip_conclusion_sections,
     format_citations_section,
     compare_revisions,
+    render_epistemic_badges_html,
 )
 
 from core.analysis.fundamentals import (
@@ -91,6 +92,7 @@ __all__ = [
     "strip_conclusion_sections",
     "format_citations_section",
     "compare_revisions",
+    "render_epistemic_badges_html",
     # fundamentals
     "enrich_fundamentals",
     "resolve_pe_with_failsafes",
