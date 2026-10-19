@@ -21,6 +21,8 @@ from core.db.telemetry import (
     format_duration,
     get_traffic_flow_analytics,
     get_site_usage_summary,
+    get_session_journeys,
+    _parse_event_ts,
 )
 from web.common import _generate_admin_token, ADMIN_COOKIE_NAME
 
@@ -110,6 +112,53 @@ class TestTrafficFlowAnalyticsEngine(unittest.TestCase):
             self.assertIn("formatted_time", ev)
             self.assertIn("traffic_source", ev)
             self.assertIn("source", ev)
+
+    def test_parse_event_ts(self):
+        self.assertIsNone(_parse_event_ts(None))
+        self.assertIsNone(_parse_event_ts(""))
+        self.assertIsNone(_parse_event_ts("invalid_ts_format"))
+        dt = datetime(2026, 10, 19, 10, 30, 45)
+        self.assertEqual(_parse_event_ts(dt), dt)
+        self.assertEqual(_parse_event_ts("2026-10-19 10:30:45"), dt)
+        self.assertEqual(_parse_event_ts("2026-10-19T10:30:45.999999"), dt)
+
+    def test_session_journeys_duration_and_steps(self):
+        from core.db.connection import get_db_connection, get_placeholder
+        sess_id = "sess_duration_test_ outside_in"
+        conn = get_db_connection()
+        c = conn.cursor()
+        p = get_placeholder()
+        t0 = datetime(2026, 10, 19, 8, 0, 0)
+        t1 = t0 + timedelta(seconds=42)
+        try:
+            c.execute(f"""
+                INSERT INTO site_usage_events (session_id, event_type, ticker, timestamp, landing_page, traffic_source)
+                VALUES ({p}, {p}, {p}, {p}, {p}, {p})
+            """, (sess_id, "PAGE_VIEW", "APP", t0, "/funds", "Google Search"))
+            c.execute(f"""
+                INSERT INTO site_usage_events (session_id, event_type, ticker, timestamp, landing_page, traffic_source)
+                VALUES ({p}, {p}, {p}, {p}, {p}, {p})
+            """, (sess_id, "DOSSIER_VIEW", "INFY", t1, "/dossier/INFY", "Google Search"))
+            conn.commit()
+
+            journeys = get_session_journeys(days=365, limit=50, exclude_tests=False)
+            test_j = next((j for j in journeys if j["session_id"] == sess_id), None)
+            self.assertIsNotNone(test_j, "Test session journey not found")
+            self.assertEqual(test_j["landing_page"], "/funds")
+            self.assertEqual(test_j["started_at"], test_j["start_time"])
+            self.assertEqual(test_j["duration_seconds"], 42)
+            self.assertEqual(test_j["formatted_duration"], "42s")
+            self.assertEqual(test_j["steps"], test_j["events"])
+            self.assertEqual(len(test_j["steps"]), 2)
+            self.assertEqual(test_j["steps"][0]["delta_sec"], 0)
+            self.assertEqual(test_j["steps"][0]["ticker"], "")  # 'APP' was filtered out
+            self.assertEqual(test_j["steps"][1]["delta_sec"], 42)
+            self.assertEqual(test_j["steps"][1]["ticker"], "INFY")
+        finally:
+            c.execute(f"DELETE FROM site_usage_events WHERE session_id = {p}", (sess_id,))
+            conn.commit()
+            c.close()
+            conn.close()
 
 
 class TestTrafficFlowApiEndpoint(unittest.TestCase):

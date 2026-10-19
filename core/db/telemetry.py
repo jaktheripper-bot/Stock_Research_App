@@ -207,6 +207,20 @@ def format_duration(seconds: float) -> str:
     return f"{hrs}h {rem_m:02d}m"
 
 
+def _parse_event_ts(ev_ts):
+    """Safely parses timestamp string or datetime object to datetime instance."""
+    if not ev_ts:
+        return None
+    if isinstance(ev_ts, datetime):
+        return ev_ts
+    try:
+        s_ts = str(ev_ts).strip().replace("T", " ")[:19]
+        return datetime.strptime(s_ts, "%Y-%m-%d %H:%M:%S")
+    except Exception as ts_err:
+        logger.debug("Timestamp parse notice: %s", ts_err)
+        return None
+
+
 def _estimate_default_dwell(path: str) -> float:
     """Estimated default dwell time for terminal visits without subsequent events."""
     p = (path or "").lower()
@@ -268,13 +282,7 @@ def compute_page_dwell_and_visit_tree(all_events: list) -> dict:
         if len(p) > 1 and p.endswith("/"):
             p = p.rstrip("/")
 
-        ts = None
-        if ts_raw:
-            try:
-                s_ts = str(ts_raw).strip().replace("T", " ")[:19]
-                ts = datetime.strptime(s_ts, "%Y-%m-%d %H:%M:%S")
-            except Exception as ts_err:
-                logger.debug("Timestamp parse notice: %s", ts_err)
+        ts = _parse_event_ts(ts_raw)
 
         if effective_sess not in session_events:
             session_events[effective_sess] = []
@@ -1085,8 +1093,20 @@ def get_session_journeys(days: int = None, start_date = None, end_date = None, l
             events = []
             session_landing_page = "/"
             first_event = True
+            first_dt = None
+            prev_dt = None
+
             for ev in sess_events:
                 ev_type, ev_ticker, ev_ts, ev_lp, ev_det = ev
+                cur_dt = _parse_event_ts(ev_ts)
+                if first_dt is None and cur_dt is not None:
+                    first_dt = cur_dt
+
+                delta_sec = 0
+                if prev_dt is not None and cur_dt is not None:
+                    delta_sec = max(0, min(int((cur_dt - prev_dt).total_seconds()), 1800))
+                prev_dt = cur_dt or prev_dt
+
                 if first_event:
                     first_event = False
                     p = str(ev_lp).strip() if ev_lp else ""
@@ -1114,12 +1134,22 @@ def get_session_journeys(days: int = None, start_date = None, end_date = None, l
 
                 events.append({
                     "event_type": ev_type,
-                    "ticker": ev_ticker or "",
-                    "timestamp": _format_timestamp(ev_ts)
+                    "ticker": ev_ticker if (ev_ticker and str(ev_ticker).upper() != "APP") else "",
+                    "timestamp": _format_timestamp(ev_ts),
+                    "delta_sec": delta_sec,
                 })
+
+            total_dur = 0
+            if first_dt is not None and prev_dt is not None and prev_dt >= first_dt:
+                total_dur = int((prev_dt - first_dt).total_seconds())
+
+            formatted_start = _format_timestamp(start_ts)
             journeys.append({
                 "session_id": sess_id,
-                "start_time": _format_timestamp(start_ts),
+                "start_time": formatted_start,
+                "started_at": formatted_start,
+                "duration_seconds": total_dur,
+                "formatted_duration": format_duration(total_dur),
                 "traffic_source": source or "Direct / Bookmark",
                 "referrer": ref or "Direct",
                 "country": country or "IN",
@@ -1127,7 +1157,8 @@ def get_session_journeys(days: int = None, start_date = None, end_date = None, l
                 "browser": browser or "Unknown",
                 "action_count": count,
                 "landing_page": session_landing_page,
-                "events": events
+                "events": events,
+                "steps": events,
             })
     except Exception as e:
         logger.error(f"Error fetching session journeys: {e}")
