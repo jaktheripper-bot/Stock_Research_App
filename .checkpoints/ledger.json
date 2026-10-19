@@ -1470,5 +1470,21 @@
       "revision_count": 274
     },
     "preflight_passed": true
+  },
+  {
+    "tag": "checkpoint_20261019_090343_interactive_reverse_dcf_sandbox",
+    "timestamp": "2026-10-19 09:03:43 IST",
+    "commit_sha": "23d4df59fedf3a1b298c146412a479d0c090efc2",
+    "branch": "main",
+    "description": "interactive_reverse_dcf_sandbox",
+    "database": {
+      "exists": true,
+      "filename": "reports_checkpoint_20261019_090343_interactive_reverse_dcf_sandbox.db",
+      "path": ".checkpoints/reports_checkpoint_20261019_090343_interactive_reverse_dcf_sandbox.db",
+      "size_bytes": 18968576,
+      "report_count": 166,
+      "revision_count": 274
+    },
+    "preflight_passed": true
   }
 ]
