@@ -42,11 +42,36 @@ logger = logging.getLogger("equity_research.core.agents.copilot")
 
 # Forbidden retail advisory terms to intercept
 FORBIDDEN_QUERY_PATTERNS = [
-    "should i buy", "should i sell", "is this a buy", "target price",
-    "will it double", "price prediction", "multibagger", "tip",
-    "strong buy", "strong sell", "buy rating", "sell rating",
-    "buy or sell", "investment recommendation"
+    "should i buy", "should i sell", "should i hold", "should i invest",
+    "can i buy", "can i sell", "is it a good buy", "is this a buy",
+    "good time to buy", "good time to enter", "target price", "price target",
+    "stock tip", "multibagger", "intraday", "tomorrow target", "stop loss",
+    "stoploss", "entry price", "exit price", "buy call", "sell call",
+    "recommend me", "which stock to buy", "best stock to buy",
+    "guaranteed return", "jackpot stock", "sure shot", "strong buy",
+    "strong sell", "buy rating", "sell rating", "buy or sell",
+    "investment recommendation", "price prediction", "will it double"
 ]
+
+_FORBIDDEN_WORD_BOUNDARY_RE = re.compile(
+    r"\b(?:"
+    r"should\s+i\s+(?:buy|sell|hold|invest|enter|exit|accumulate|book\s+profit)|"
+    r"can\s+i\s+(?:buy|sell|enter|accumulate)|"
+    r"is\s+(?:it|this)\s+(?:a\s+)?(?:good|strong)\s+(?:buy|investment|entry)|"
+    r"is\s+this\s+stock\s+a\s+(?:good|strong)\s+buy|"
+    r"good\s+time\s+to\s+(?:buy|sell|enter|invest)|"
+    r"strong\s+(?:buy|sell)|buy\s+rating|sell\s+rating|buy\s+or\s+sell|investment\s+recommendation|"
+    r"target\s+price|price\s+target|tomorrow\s+target|"
+    r"stock\s+tips?|give\s+me\s+a?\s*tips?|buy\s+tips?|intraday\s+tips?|"
+    r"multibaggers?|intraday\s+(?:call|trade|pick)|"
+    r"stop\s*loss|stoploss|entry\s+price|exit\s+price|buy\s+call|sell\s+call|"
+    r"which\s+(?:stock|fund|etf|reit)\s+to\s+buy|"
+    r"best\s+(?:stock|fund|etf|reit)\s+to\s+buy|"
+    r"recommend\s+me|"
+    r"guaranteed\s+returns?|jackpot\s+stocks?|sure\s+shot"
+    r")\b",
+    re.IGNORECASE,
+)
 
 # Whitelist of common financial/market acronyms and short words
 FINANCIAL_ACRONYMS = {
@@ -54,7 +79,8 @@ FINANCIAL_ACRONYMS = {
     "dcf", "ncd", "sdi", "ytm", "amc", "aum", "nav", "ter", "cagr", "roic", "roce",
     "ebitda", "ebit", "eps", "fcf", "d/e", "wacc", "bse", "nse", "sebi", "lodr",
     "fldg", "isin", "cmp", "mcap", "asri", "cr", "lac", "lacs", "crore", "crores",
-    "tcs", "itc", "lt", "sbi", "ril", "hul", "infy", "hdfc", "icici", "kotak"
+    "tcs", "itc", "lt", "sbi", "ril", "hul", "infy", "hdfc", "icici", "kotak",
+    "bps", "yr", "yrs", "vs", "roe", "npm", "opm", "ltv", "wale", "ndcf", "sgb", "gsec"
 }
 
 # Common keyboard mash sequences
@@ -186,6 +212,74 @@ def _build_greeting_response(ticker: Optional[str], company_name: Optional[str],
         )
 
 
+def is_input_qualified(user_message: str) -> bool:
+    """
+    Validates whether the user input is a coherent financial/analytical question
+    without falsely rejecting numbers (10000, 50000), financial shorthand (ROE?, bps),
+    or comparative ticker prompts.
+    """
+    if not user_message or not isinstance(user_message, str):
+        return False
+
+    cleaned = user_message.strip()
+    if len(cleaned) < 2:
+        return False
+
+    lower_msg = cleaned.lower()
+    if lower_msg in SPAM_NOISE_TOKENS or lower_msg in GREETING_TOKENS:
+        return False
+
+    # Reject pure punctuation/emojis with no alphanumeric characters
+    alnum_chars = [c for c in lower_msg if c.isalnum()]
+    if not alnum_chars:
+        return False
+
+    # Reject explicit keyboard mash sequences
+    alpha_only = "".join(c for c in lower_msg if c.isalpha())
+    for seq in KEYBOARD_SMASH_SEQS:
+        if seq in alpha_only and len(alpha_only) <= 12:
+            return False
+
+    # Reject single-character repetition (e.g. "aaaaaa", "1111111")
+    if len(set(alnum_chars)) == 1 and len(alnum_chars) >= 4:
+        return False
+
+    tokens = re.findall(r"[a-zA-Z0-9%/\.\-]+", lower_msg)
+    if not tokens:
+        return False
+
+    if all(t in SPAM_NOISE_TOKENS or t in GREETING_TOKENS for t in tokens):
+        return False
+
+    # If the prompt contains any known financial acronym or valid English/Hindi vowel structure, allow it
+    vowels = set("aeiouy")
+    valid_word_count = 0
+    for tok in tokens:
+        clean_tok = tok.strip(".,?!:;()[]{}\"'₹$%")
+        if not clean_tok:
+            continue
+        if clean_tok in FINANCIAL_ACRONYMS or clean_tok in {"bps", "yr", "yrs", "vs", "roe", "npm", "opm", "ltv", "wale", "ndcf", "sgb", "gsec"}:
+            valid_word_count += 1
+            continue
+        # Numbers with context (e.g., 10000, 30%, 10y, 5l) count when paired with words
+        if any(c.isdigit() for c in clean_tok) and len(tokens) >= 2:
+            valid_word_count += 1
+            continue
+        if any(c in vowels for c in clean_tok) and len(clean_tok) >= 2:
+            # Guard against 7+ consecutive consonants
+            if not re.search(r"[bcdfghjklmnpqrstvwxz]{6,}", clean_tok):
+                valid_word_count += 1
+
+    return valid_word_count >= 1
+
+
+def detect_forbidden_intent(user_message: str) -> bool:
+    """Word-boundary SEBI Safe Harbor check that never false-positives on 'multiple', 'stipend', or 'typical'."""
+    if not user_message:
+        return False
+    return bool(_FORBIDDEN_WORD_BOUNDARY_RE.search(user_message))
+
+
 def check_input_qualification(
     message: str,
     asset_class: str = "EQUITY",
@@ -194,8 +288,9 @@ def check_input_qualification(
 ) -> Optional[Dict[str, str]]:
     """
     Input Qualification Layer:
-    Detects gibberish, noise, spam, and non-financial empty queries,
-    or pure greetings, guiding the user rather than dumping canned financial overviews.
+    Validates whether the user input is a coherent financial/analytical question
+    without falsely rejecting numbers (10000, 50000), financial shorthand (ROE?, bps),
+    or comparative ticker prompts. Handles polite greetings with onboarding guidance.
     Returns None if the message is qualified.
     Returns dict {"status": "...", "response": "..."} if intercepted.
     """
@@ -217,115 +312,60 @@ def check_input_qualification(
             "response": _build_greeting_response(ticker, company_name, asset_class)
         }
 
-    # 2. Punctuation / Symbol Only Noise (e.g. "???", "!#$%", "....")
-    clean_alnum = re.sub(r"[^a-z0-9\s]", "", lowered).strip()
-    if not clean_alnum:
+    # 2. Input qualification check via is_input_qualified
+    if not is_input_qualified(raw):
         return {
             "status": "INPUT_UNQUALIFIED",
             "response": _build_unqualified_response(ticker, company_name, asset_class)
         }
-
-    # 3. Ultra-short noise (< 3 chars) not in financial acronyms
-    if len(clean_alnum) < 3 and clean_alnum not in FINANCIAL_ACRONYMS:
-        return {
-            "status": "INPUT_UNQUALIFIED",
-            "response": _build_unqualified_response(ticker, company_name, asset_class)
-        }
-
-    # 4. Repeated character smash (e.g. "aaaaa", "zzzzzz", "111111")
-    if re.search(r"(.)\1{3,}", lowered):
-        # Exclude legitimate numbers or periods like "..."
-        if not re.search(r"^\d+$", clean_alnum) and not lowered.startswith("..."):
-            return {
-                "status": "INPUT_UNQUALIFIED",
-                "response": _build_unqualified_response(ticker, company_name, asset_class)
-            }
-
-    # 5. Token-level Gibberish Checks
-    for token in clean_alnum.split():
-        # A. Explicit spam/noise token
-        if token in SPAM_NOISE_TOKENS:
-            return {
-                "status": "INPUT_UNQUALIFIED",
-                "response": _build_unqualified_response(ticker, company_name, asset_class)
-            }
-
-        # B. Keyboard smash run
-        if any(smash in token for smash in KEYBOARD_SMASH_SEQS):
-            return {
-                "status": "INPUT_UNQUALIFIED",
-                "response": _build_unqualified_response(ticker, company_name, asset_class)
-            }
-
-        # C. Pure numbers without financial units (e.g. "1234567")
-        if token.isdigit() and len(token) >= 5 and token != (ticker or "").lower():
-            return {
-                "status": "INPUT_UNQUALIFIED",
-                "response": _build_unqualified_response(ticker, company_name, asset_class)
-            }
-
-        # D. Consonant cluster >= 5 chars without vowels (a, e, i, o, u, y)
-        if len(token) >= 5 and not any(v in token for v in "aeiouy") and token not in FINANCIAL_ACRONYMS:
-            return {
-                "status": "INPUT_UNQUALIFIED",
-                "response": _build_unqualified_response(ticker, company_name, asset_class)
-            }
-
-        # E. Low unique character entropy (e.g. "abababab" or "qwqwqw")
-        if len(token) >= 6 and (len(set(token)) / len(token)) < 0.35:
-            return {
-                "status": "INPUT_UNQUALIFIED",
-                "response": _build_unqualified_response(ticker, company_name, asset_class)
-            }
 
     return None
 
 
 def check_non_advisory_compliance(message: str, asset_class: str = "EQUITY") -> Optional[str]:
     """Intercepts retail advisory queries and returns mandatory regulatory deflection tailored to asset class."""
-    lowered = (message or "").lower()
-    for pat in FORBIDDEN_QUERY_PATTERNS:
-        if pat in lowered:
-            if asset_class == "MUTUAL_FUND":
-                return (
-                    "**SEBI Regulatory Non-Advisory Notice:**\n\n"
-                    "Under SEBI Research Analyst Regulations 2014 Section 2(u), the Forensic Intelligence Desk operates "
-                    "strictly as an institutional software diagnostic utility and is prohibited from providing personalized investment advice, "
-                    "fund recommendations, or Buy/Sell/Switch calls.\n\n"
-                    "I can, however, provide an objective **Look-Through Forensic Breakdown** of the fund's Weighted Moat Index, "
-                    "Look-Through ASRI Accounting Risk, Active Share vs Benchmark, and Direct vs Regular Distributor Fee Drag. "
-                    "Which diagnostic area would you like to explore?"
-                )
-            elif asset_class == "CORPORATE_DEBT":
-                return (
-                    "**SEBI Regulatory Non-Advisory Notice:**\n\n"
-                    "Under SEBI Research Analyst Regulations 2014 Section 2(u), the Forensic Intelligence Desk operates "
-                    "strictly as an institutional software diagnostic utility and is prohibited from providing personalized investment advice, "
-                    "credit buy/sell ratings, or investment calls.\n\n"
-                    "I can, however, provide an objective evaluation of the issuer's **Asset Coverage Ratio (ACR)**, "
-                    "Recovery Seniority in liquidation, DSCR covenant headroom, and Credit Contagion Radar posture. "
-                    "Which diagnostic area would you like to explore?"
-                )
-            elif asset_class == "REIT":
-                return (
-                    "**SEBI Regulatory Non-Advisory Notice:**\n\n"
-                    "Under SEBI Research Analyst Regulations 2014 Section 2(u), the Forensic Intelligence Desk operates "
-                    "strictly as an institutional software diagnostic utility and is prohibited from providing personalized investment advice, "
-                    "distribution return guarantees, or Buy/Sell/Hold verdicts.\n\n"
-                    "I can, however, provide an objective evaluation of the trust's **Section 115UA Tax Waterfall**, "
-                    "Net Distributable Cash Flow (NDCF) Payout Purity, portfolio WALE, and Pre-Mortem Inversion risk factors. "
-                    "Which diagnostic area would you like to explore?"
-                )
-            else:
-                return (
-                    "**SEBI Regulatory Non-Advisory Notice:**\n\n"
-                    "Under SEBI Research Analyst Regulations 2014 Section 2(u), the Forensic Intelligence Desk operates "
-                    "strictly as a software diagnostic utility and is prohibited from providing personalized investment advice, "
-                    "price targets, or Buy/Sell/Hold verdicts.\n\n"
-                    "I can, however, provide an objective **Pre-Mortem Inversion Analysis** or break down the company's "
-                    "Margin of Safety, Balance Sheet Solvency, and Reverse DCF implied growth rates. Which diagnostic area would you like to explore?"
-                )
-    return None
+    if not detect_forbidden_intent(message):
+        return None
+
+    if asset_class == "MUTUAL_FUND":
+        return (
+            "**SEBI Regulatory Non-Advisory Notice:**\n\n"
+            "Under SEBI Research Analyst Regulations 2014 Section 2(u), the Forensic Intelligence Desk operates "
+            "strictly as an institutional software diagnostic utility and is prohibited from providing personalized investment advice, "
+            "fund recommendations, or Buy/Sell/Switch calls.\n\n"
+            "I can, however, provide an objective **Look-Through Forensic Breakdown** of the fund's Weighted Moat Index, "
+            "Look-Through ASRI Accounting Risk, Active Share vs Benchmark, and Direct vs Regular Distributor Fee Drag. "
+            "Which diagnostic area would you like to explore?"
+        )
+    elif asset_class == "CORPORATE_DEBT":
+        return (
+            "**SEBI Regulatory Non-Advisory Notice:**\n\n"
+            "Under SEBI Research Analyst Regulations 2014 Section 2(u), the Forensic Intelligence Desk operates "
+            "strictly as an institutional software diagnostic utility and is prohibited from providing personalized investment advice, "
+            "credit buy/sell ratings, or investment calls.\n\n"
+            "I can, however, provide an objective evaluation of the issuer's **Asset Coverage Ratio (ACR)**, "
+            "Recovery Seniority in liquidation, DSCR covenant headroom, and Credit Contagion Radar posture. "
+            "Which diagnostic area would you like to explore?"
+        )
+    elif asset_class == "REIT":
+        return (
+            "**SEBI Regulatory Non-Advisory Notice:**\n\n"
+            "Under SEBI Research Analyst Regulations 2014 Section 2(u), the Forensic Intelligence Desk operates "
+            "strictly as an institutional software diagnostic utility and is prohibited from providing personalized investment advice, "
+            "distribution return guarantees, or Buy/Sell/Hold verdicts.\n\n"
+            "I can, however, provide an objective evaluation of the trust's **Section 115UA Tax Waterfall**, "
+            "Net Distributable Cash Flow (NDCF) Payout Purity, portfolio WALE, and Pre-Mortem Inversion risk factors. "
+            "Which diagnostic area would you like to explore?"
+        )
+    else:
+        return (
+            "**SEBI Regulatory Non-Advisory Notice:**\n\n"
+            "Under SEBI Research Analyst Regulations 2014 Section 2(u), the Forensic Intelligence Desk operates "
+            "strictly as a software diagnostic utility and is prohibited from providing personalized investment advice, "
+            "price targets, or Buy/Sell/Hold verdicts.\n\n"
+            "I can, however, provide an objective **Pre-Mortem Inversion Analysis** or break down the company's "
+            "Margin of Safety, Balance Sheet Solvency, and Reverse DCF implied growth rates. Which diagnostic area would you like to explore?"
+        )
 
 
 def build_mutual_fund_deterministic_response(

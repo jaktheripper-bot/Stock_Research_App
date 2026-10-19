@@ -27,6 +27,8 @@ from fastapi.testclient import TestClient
 from web.main import app, init_db
 from core.agents.copilot.forensic_desk import (
     check_input_qualification,
+    is_input_qualified,
+    detect_forbidden_intent,
     process_forensic_desk_turn
 )
 
@@ -88,6 +90,23 @@ class TestForensicDeskEnhancements(unittest.TestCase):
         for sample in valid_samples:
             intercept = check_input_qualification(sample, asset_class="EQUITY", ticker="INFY")
             self.assertIsNone(intercept, f"Valid query '{sample}' should not be intercepted as gibberish.")
+
+    def test_input_qualification_contextual_numbers_and_shorthand(self):
+        """Verifies numbers with context (10000, 50000 cr) and shorthands (bps, ROE?, WALE, LTV) are allowed."""
+        valid_contextual_samples = [
+            "invest 10000 in reliance",
+            "what is 50000 cr mcap?",
+            "ROE?",
+            "150 bps spread",
+            "WALE",
+            "LTV",
+            "NDCF",
+            "30% tax slab"
+        ]
+        for sample in valid_contextual_samples:
+            self.assertTrue(is_input_qualified(sample), f"'{sample}' should be qualified.")
+            intercept = check_input_qualification(sample, asset_class="EQUITY", ticker="INFY")
+            self.assertIsNone(intercept, f"Valid contextual query '{sample}' should not be intercepted.")
 
     def test_equity_open_ended_what_shocked_you(self):
         """Verifies that 'what shocked you?' yields real contextual anomalies, not a canned menu."""
@@ -847,6 +866,33 @@ class TestSitewideAgents(unittest.TestCase):
 
         clean = check_non_advisory_compliance("Explain the ROCE trend over 3 years")
         self.assertIsNone(clean)
+
+    def test_detect_forbidden_intent_word_boundary_isolation(self):
+        """Verifies word boundaries prevent false positives on words like 'multiple', 'stipend', 'typical'."""
+        false_positive_candidates = [
+            "explain the PE multiple",
+            "what is the typical debt to equity ratio?",
+            "stipend expenses in employee costs",
+            "participating preference shares"
+        ]
+        for query in false_positive_candidates:
+            self.assertFalse(detect_forbidden_intent(query), f"'{query}' should NOT trigger forbidden intent.")
+            self.assertIsNone(check_non_advisory_compliance(query))
+
+        true_positives = [
+            "stop loss for reliance",
+            "give me a guaranteed return",
+            "what is a sure shot stock?",
+            "today intraday pick",
+            "tomorrow target price",
+            "which stock to buy",
+            "best fund to buy",
+            "should i invest in hdfc",
+            "is it a good buy"
+        ]
+        for query in true_positives:
+            self.assertTrue(detect_forbidden_intent(query), f"'{query}' MUST trigger forbidden intent.")
+            self.assertIsNotNone(check_non_advisory_compliance(query))
 
     def test_copilot_turn_and_api(self):
         """Verifies Copilot chat processing and REST endpoints."""
