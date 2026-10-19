@@ -10,7 +10,7 @@
 
 | Checkpoint Tag | IST Timestamp | Commit | DB Reports | Description |
 |:---|:---|:---|:---|:---|
-| `checkpoint_20261019_080935_word_boundary_sebi_filter_and_contextual_qualification` | 2026-10-19 08:09:35 IST | `ec53f75` | 166 rep / 271 rev | word_boundary_sebi_filter_and_contextual_qualification |
+| `checkpoint_20261019_080935_word_boundary_sebi_filter_and_contextual_qualification` | 2026-10-19 08:09:35 IST | `6bd1f6a` | 166 rep / 271 rev | word_boundary_sebi_filter_and_contextual_qualification |
 | `checkpoint_20261019_075802_fix_python_311_typing_annotations_and_ast_gate` | 2026-10-19 07:58:02 IST | `c919867` | 166 rep / 271 rev | fix_python_311_typing_annotations_and_ast_gate |
 | `checkpoint_20261018_231114_fastapi_error_extraction_and_client_hardening` | 2026-10-18 23:11:14 IST | `5029cbf` | 165 rep / 270 rev | fastapi_error_extraction_and_client_hardening |
 | `checkpoint_20261018_142407_checkpoint_20261018_142331_phase_4_squad_waves_12_to_15_full_pass` | 2026-10-18 14:24:07 IST | `cebcc35` | 162 rep / 267 rev | checkpoint_20261018_142331_phase_4_squad_waves_12_to_15_full_pass |

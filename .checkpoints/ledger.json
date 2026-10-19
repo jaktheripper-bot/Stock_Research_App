@@ -1374,5 +1374,21 @@
       "revision_count": 271
     },
     "preflight_passed": true
+  },
+  {
+    "tag": "checkpoint_20261019_080935_word_boundary_sebi_filter_and_contextual_qualification",
+    "timestamp": "2026-10-19 08:09:35 IST",
+    "commit_sha": "6bd1f6a8941848eece824264ff53f0c1c2378077",
+    "branch": "main",
+    "description": "word_boundary_sebi_filter_and_contextual_qualification",
+    "database": {
+      "exists": true,
+      "filename": "reports_checkpoint_20261019_080935_word_boundary_sebi_filter_and_contextual_qualification.db",
+      "path": ".checkpoints/reports_checkpoint_20261019_080935_word_boundary_sebi_filter_and_contextual_qualification.db",
+      "size_bytes": 18931712,
+      "report_count": 166,
+      "revision_count": 271
+    },
+    "preflight_passed": true
   }
 ]
