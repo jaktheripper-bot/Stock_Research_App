@@ -139,6 +139,14 @@ class RealityAuditor:
             # 2.3 Check functions annotated with `-> str` or `-> List` that have NO return statement
             for node in ast.walk(tree):
                 if isinstance(node, ast.FunctionDef) and node.returns is not None:
+                    # Skip typing @overload stubs or @abstractmethod declarations
+                    is_stub = any(
+                        (isinstance(d, ast.Name) and d.id in {"overload", "abstractmethod"})
+                        or (isinstance(d, ast.Attribute) and d.attr in {"overload", "abstractmethod"})
+                        for d in node.decorator_list
+                    )
+                    if is_stub:
+                        continue
                     ret_ann = ast.unparse(node.returns) if hasattr(ast, "unparse") else ""
                     if ret_ann and "None" not in ret_ann:
                         has_non_empty_return = any(

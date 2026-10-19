@@ -104,9 +104,14 @@ class TestForensicDeskEnhancements(unittest.TestCase):
             "30% tax slab"
         ]
         for sample in valid_contextual_samples:
-            self.assertTrue(is_input_qualified(sample), f"'{sample}' should be qualified.")
+            self.assertTrue(is_input_qualified(sample), f"'{sample}' should be qualified via is_input_qualified.")
+            self.assertTrue(check_input_qualification(sample), f"'{sample}' should be qualified via boolean check_input_qualification.")
             intercept = check_input_qualification(sample, asset_class="EQUITY", ticker="INFY")
             self.assertIsNone(intercept, f"Valid contextual query '{sample}' should not be intercepted.")
+
+        # Test single-argument boolean check for invalid / greeting input
+        for sample in ["asdfghjkl", "blahblah", "hi", "hello", "", "12345678"]:
+            self.assertFalse(check_input_qualification(sample), f"'{sample}' should return False via boolean check_input_qualification.")
 
     def test_equity_open_ended_what_shocked_you(self):
         """Verifies that 'what shocked you?' yields real contextual anomalies, not a canned menu."""

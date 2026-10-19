@@ -13,7 +13,7 @@ import json
 import re
 import logging
 import asyncio
-from typing import Dict, Any, List, Optional
+from typing import Dict, Any, List, Optional, Union, overload
 
 try:
     from google.antigravity import types
@@ -280,25 +280,50 @@ def detect_forbidden_intent(user_message: str) -> bool:
     return bool(_FORBIDDEN_WORD_BOUNDARY_RE.search(user_message))
 
 
+@overload
+def check_input_qualification(user_message: str) -> bool: ...
+
+@overload
 def check_input_qualification(
-    message: str,
+    user_message: Optional[str] = None,
     asset_class: str = "EQUITY",
     ticker: Optional[str] = None,
-    company_name: Optional[str] = None
-) -> Optional[Dict[str, str]]:
+    company_name: Optional[str] = None,
+    *,
+    message: Optional[str] = None
+) -> Optional[Dict[str, str]]: ...
+
+def check_input_qualification(
+    user_message: Optional[str] = None,
+    asset_class: Optional[str] = None,
+    ticker: Optional[str] = None,
+    company_name: Optional[str] = None,
+    *,
+    message: Optional[str] = None
+) -> Any:
     """
-    Input Qualification Layer:
     Validates whether the user input is a coherent financial/analytical question
     without falsely rejecting numbers (10000, 50000), financial shorthand (ROE?, bps),
-    or comparative ticker prompts. Handles polite greetings with onboarding guidance.
-    Returns None if the message is qualified.
-    Returns dict {"status": "...", "response": "..."} if intercepted.
+    or comparative ticker prompts.
+
+    Signature Overloads:
+    1. Boolean validator: `check_input_qualification(user_message: str) -> bool`
+       Returns True if qualified, False otherwise (including greetings, noise, and gibberish).
+    2. Desk Interception: `check_input_qualification(message, asset_class="EQUITY", ...) -> Optional[Dict[str, str]]`
+       Returns None if qualified, or a dict {"status": ..., "response": ...} if intercepted.
     """
-    raw = (message or "").strip()
+    target_msg = user_message if user_message is not None else message
+
+    # If called as a standalone query validator (no desk context provided), return boolean qualification
+    if asset_class is None and ticker is None and company_name is None:
+        return is_input_qualified(target_msg) if target_msg is not None else False
+
+    # Desk Interception Mode
+    raw = (target_msg or "").strip()
     if not raw:
         return {
             "status": "INPUT_UNQUALIFIED",
-            "response": _build_unqualified_response(ticker, company_name, asset_class)
+            "response": _build_unqualified_response(ticker, company_name, asset_class or "EQUITY")
         }
 
     lowered = raw.lower()
@@ -309,14 +334,14 @@ def check_input_qualification(
     if lowered in GREETING_TOKENS or (words and len(words) <= 2 and all(w in GREETING_TOKENS for w in words)):
         return {
             "status": "GREETING",
-            "response": _build_greeting_response(ticker, company_name, asset_class)
+            "response": _build_greeting_response(ticker, company_name, asset_class or "EQUITY")
         }
 
     # 2. Input qualification check via is_input_qualified
     if not is_input_qualified(raw):
         return {
             "status": "INPUT_UNQUALIFIED",
-            "response": _build_unqualified_response(ticker, company_name, asset_class)
+            "response": _build_unqualified_response(ticker, company_name, asset_class or "EQUITY")
         }
 
     return None
