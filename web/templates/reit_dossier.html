@@ -245,6 +245,29 @@
       </div>
     </div>
 
+    <!-- Interactive Corpus & Finance Act 2023 Sec 56(2)(xii) Cost-Basis Amortization Simulator -->
+    <div id="reitSec56Simulator" style="background: rgba(15, 23, 42, 0.75); border: 1px solid rgba(56, 189, 248, 0.22); border-radius: 10px; padding: 16px; margin-bottom: 16px;">
+      <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 16px; margin-bottom: 12px;">
+        <div>
+          <div style="display: flex; justify-content: space-between; font-size: 12px; margin-bottom: 4px;">
+            <label for="reitCorpusSlider" style="color: #cbd5e1; font-weight: 600;">Unitholder Allocation Corpus</label>
+            <strong id="reitCorpusVal" class="tnum" style="color: #38bdf8;">₹10,00,000</strong>
+          </div>
+          <input id="reitCorpusSlider" type="range" min="100000" max="50000000" step="100000" value="1000000" oninput="recalcReitCorpusWaterfall()" style="width: 100%;">
+        </div>
+        <div>
+          <div style="display: flex; justify-content: space-between; font-size: 12px; margin-bottom: 4px;">
+            <label for="reitYearsSlider" style="color: #cbd5e1; font-weight: 600;">Holding Period (Sec 56(2)(xii) Amortization)</label>
+            <strong id="reitYearsVal" class="tnum" style="color: #38bdf8;">5 Years</strong>
+          </div>
+          <input id="reitYearsSlider" type="range" min="1" max="20" step="1" value="5" oninput="recalcReitCorpusWaterfall()" style="width: 100%;">
+        </div>
+      </div>
+      <div id="reitSec56TrackerBar" style="font-size: 12.5px; color: #e2e8f0; background: rgba(2, 6, 23, 0.6); padding: 10px 14px; border-radius: 8px; border-left: 3px solid #10b981;">
+        Calculating post-tax annual cash distribution and Section 56(2)(xii) cost-basis adjustment...
+      </div>
+    </div>
+
     <!-- Statutory Section 115UA & Finance Act 2023 Rules Box -->
     <div style="background: rgba(30, 41, 59, 0.4); border: 1px solid rgba(255, 255, 255, 0.06); border-radius: 10px; padding: 16px; font-size: 12.5px; color: #cbd5e1; line-height: 1.6;">
       <strong style="color: #38bdf8;">Statutory Tax Mechanics (Section 115UA & Finance Act 2023):</strong>
@@ -490,8 +513,71 @@
 
   // Reactive Tax Waterfall Client-Side Logic
   const TAX_SLABS_DATA = {{ tax_waterfall.slabs | tojson }};
+  const REIT_GROSS_YIELD = {{ reit.distribution_yield_pct | default(7.5) | tojson }};
+  const REIT_ROC_PCT = {{ tax_waterfall.return_of_capital_pct | default(0) | tojson }};
+  let currentActiveSlabRate = 30.0;
+
+  function recalcReitCorpusWaterfall() {
+    const corpusSlider = document.getElementById('reitCorpusSlider');
+    const yearsSlider = document.getElementById('reitYearsSlider');
+    const corpusValEl = document.getElementById('reitCorpusVal');
+    const yearsValEl = document.getElementById('reitYearsVal');
+    const trackerBar = document.getElementById('reitSec56TrackerBar');
+
+    if (!corpusSlider || !yearsSlider) return;
+
+    const corpus = parseFloat(corpusSlider.value);
+    const years = parseInt(yearsSlider.value, 10);
+
+    if (corpusValEl) {
+      corpusValEl.textContent = '₹' + Math.round(corpus).toLocaleString('en-IN');
+    }
+    if (yearsValEl) {
+      yearsValEl.textContent = years + (years === 1 ? ' Year' : ' Years');
+    }
+
+    const slab = TAX_SLABS_DATA.find(s => Math.abs(s.slab_rate_pct - currentActiveSlabRate) < 0.1) || TAX_SLABS_DATA[3] || { net_post_tax_yield_pct: REIT_GROSS_YIELD };
+    const netYieldPct = slab.net_post_tax_yield_pct;
+
+    const annualGross = corpus * (REIT_GROSS_YIELD / 100.0);
+    const annualNet = corpus * (netYieldPct / 100.0);
+    const totalNetCash = annualNet * years;
+
+    const annualRoc = annualGross * (REIT_ROC_PCT / 100.0);
+    const cumulativeRoc = annualRoc * years;
+    const remainingCostBasis = Math.max(0, corpus - cumulativeRoc);
+    const amortizedPct = Math.min(100, (cumulativeRoc / corpus) * 100.0);
+    const excessSpecifiedSum = Math.max(0, cumulativeRoc - corpus);
+
+    if (trackerBar) {
+      let sec56StatusHtml = '';
+      if (excessSpecifiedSum > 0) {
+        sec56StatusHtml = `<span style="color: #f87171; font-weight: 700;">⚠️ Sec 56(2)(xii) Triggered:</span> Cumulative RoC (₹${Math.round(cumulativeRoc).toLocaleString('en-IN')}) has completely amortized the initial acquisition cost. The excess <strong>₹${Math.round(excessSpecifiedSum).toLocaleString('en-IN')}</strong> is classified as 'Specified Sum' and taxable at marginal slab (${currentActiveSlabRate}%).`;
+      } else {
+        sec56StatusHtml = `<span style="color: #34d399; font-weight: 700;">✓ Sec 56(2)(xii) Safe Harbor:</span> Cumulative RoC of ₹${Math.round(cumulativeRoc).toLocaleString('en-IN')} (${amortizedPct.toFixed(1)}% amortized) reduces acquisition cost basis from ₹${Math.round(corpus).toLocaleString('en-IN')} to <strong style="color: #38bdf8;">₹${Math.round(remainingCostBasis).toLocaleString('en-IN')}</strong>. Fully tax-exempt until cost basis reaches zero.`;
+      }
+
+      trackerBar.innerHTML = `
+        <div style="display: flex; justify-content: space-between; align-items: baseline; flex-wrap: wrap; gap: 8px; margin-bottom: 6px;">
+          <div>
+            <span style="color: #94a3b8; font-size: 11px; text-transform: uppercase; font-weight: 700;">Annual In-Hand Cash Flow:</span>
+            <strong style="color: #10b981; font-size: 15px; margin-left: 6px;" class="tnum">₹${Math.round(annualNet).toLocaleString('en-IN')}/year</strong>
+            <span style="color: #64748b; font-size: 11.5px; margin-left: 4px;">(${netYieldPct}% post-tax yield at ${currentActiveSlabRate}% slab)</span>
+          </div>
+          <div>
+            <span style="color: #94a3b8; font-size: 11px; text-transform: uppercase; font-weight: 700;">${years}Y Cumulative Cash:</span>
+            <strong style="color: #38bdf8; font-size: 15px; margin-left: 6px;" class="tnum">₹${Math.round(totalNetCash).toLocaleString('en-IN')}</strong>
+          </div>
+        </div>
+        <div style="font-size: 12px; line-height: 1.5; border-top: 1px solid rgba(255,255,255,0.06); padding-top: 6px;">
+          ${sec56StatusHtml}
+        </div>
+      `;
+    }
+  }
 
   function selectTaxSlab(slabRate) {
+    currentActiveSlabRate = slabRate;
     const slab = TAX_SLABS_DATA.find(s => Math.abs(s.slab_rate_pct - slabRate) < 0.1);
     if (!slab) return;
 
@@ -529,6 +615,8 @@
       let desc = slabRate === 0 ? 'Exempt / Low Income' : (slabRate === 30 ? 'Standard Slab' : (slabRate === 39 ? 'HNI / Surcharge' : slabRate + '% Slab'));
       indicatorEl.textContent = `Active: ${slabRate}% (${desc})`;
     }
+
+    recalcReitCorpusWaterfall();
   }
 
   // Set default button styling on load

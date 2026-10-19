@@ -1397,6 +1397,55 @@ class TestCompetitiveEnhancements(unittest.TestCase):
         self.assertNotIn("{{", sim_str, "Unrendered Jinja tag detected in #mfFeeDragSimulator")
         self.assertNotIn("{%", sim_str, "Unrendered Jinja directive detected in #mfFeeDragSimulator")
 
+    def test_interactive_reit_sec56_cost_basis_simulator_contracts(self):
+        """
+        Verify the Interactive Corpus & Sec 56(2)(xii) Cost-Basis Amortization Simulator:
+        1. #reitSec56Simulator container is rendered in REIT dossier.
+        2. Both range sliders (#reitCorpusSlider and #reitYearsSlider) are present with oninput="recalcReitCorpusWaterfall()".
+        3. All label and output tracker elements exist (#reitCorpusVal, #reitYearsVal, #reitSec56TrackerBar).
+        4. Inline script defines recalcReitCorpusWaterfall function with reactive slab updates.
+        5. Zero unrendered Jinja tags ({{ or {%) leak into markup.
+        """
+        from bs4 import BeautifulSoup
+        for sym in ["EMBASSY", "PROPSHARE", "PGINVIT"]:
+            resp = self.client.get(f"/reits/{sym}")
+            self.assertEqual(resp.status_code, 200, f"Failed for /reits/{sym}")
+
+            soup = BeautifulSoup(resp.text, "html.parser")
+            sim = soup.find(id="reitSec56Simulator")
+            self.assertIsNotNone(sim, f"#reitSec56Simulator must be present in /reits/{sym}")
+
+            # Verify Sliders
+            corpus_slider = sim.find("input", id="reitCorpusSlider")
+            years_slider = sim.find("input", id="reitYearsSlider")
+
+            self.assertIsNotNone(corpus_slider)
+            self.assertEqual(corpus_slider.get("type"), "range")
+            self.assertEqual(corpus_slider.get("oninput"), "recalcReitCorpusWaterfall()")
+
+            self.assertIsNotNone(years_slider)
+            self.assertEqual(years_slider.get("type"), "range")
+            self.assertEqual(years_slider.get("oninput"), "recalcReitCorpusWaterfall()")
+
+            # Verify Output and Label Elements
+            self.assertIsNotNone(sim.find(id="reitCorpusVal"))
+            self.assertIsNotNone(sim.find(id="reitYearsVal"))
+            self.assertIsNotNone(sim.find(id="reitSec56TrackerBar"))
+
+            # Verify JS Wiring
+            scripts = [s.string for s in soup.find_all("script") if s.string and "recalcReitCorpusWaterfall" in s.string]
+            self.assertEqual(len(scripts), 1, "Exactly one script defining recalcReitCorpusWaterfall must be rendered")
+            self.assertIn("function recalcReitCorpusWaterfall()", scripts[0])
+            self.assertIn("reitCorpusSlider", scripts[0])
+            self.assertIn("reitYearsSlider", scripts[0])
+            self.assertIn("reitSec56TrackerBar", scripts[0])
+            self.assertIn("selectTaxSlab", scripts[0])
+
+            # Verify Zero Jinja Leaks in rendered simulator
+            sim_str = str(sim)
+            self.assertNotIn("{{", sim_str, f"Unrendered Jinja tag detected in #reitSec56Simulator for {sym}")
+            self.assertNotIn("{%", sim_str, f"Unrendered Jinja directive detected in #reitSec56Simulator for {sym}")
+
 
 if __name__ == "__main__":
     unittest.main()
