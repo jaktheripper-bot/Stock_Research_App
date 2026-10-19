@@ -1,6 +1,6 @@
 # Production Release Checkpoints & Disaster Recovery Ledger
-**Last Checkpoint:** 2026-10-19 09:03:43 IST  
-**Total Verified Rollback Points:** 93  
+**Last Checkpoint:** 2026-10-19 09:10:33 IST  
+**Total Verified Rollback Points:** 94  
 
 > [!NOTE]
 > These checkpoints represent byte-for-byte verified working releases that passed the 4-tier pre-flight audit.
@@ -10,6 +10,7 @@
 
 | Checkpoint Tag | IST Timestamp | Commit | DB Reports | Description |
 |:---|:---|:---|:---|:---|
+| `checkpoint_20261019_091033_mf_fee_drag_simulator` | 2026-10-19 09:10:33 IST | `9acb4f0` | 166 rep / 274 rev | mf_fee_drag_simulator |
 | `checkpoint_20261019_090343_interactive_reverse_dcf_sandbox` | 2026-10-19 09:03:43 IST | `23d4df5` | 166 rep / 274 rev | interactive_reverse_dcf_sandbox |
 | `checkpoint_20261019_085548_reverse_dcf_implied_growth_solver` | 2026-10-19 08:55:48 IST | `483cf1f` | 166 rep / 274 rev | reverse_dcf_implied_growth_solver |
 | `checkpoint_20261019_084816_epistemic_badges_and_conclusion_stripper` | 2026-10-19 08:48:16 IST | `d84c64e` | 166 rep / 271 rev | epistemic_badges_and_conclusion_stripper |
