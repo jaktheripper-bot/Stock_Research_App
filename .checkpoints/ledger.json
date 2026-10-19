@@ -1438,5 +1438,21 @@
       "revision_count": 271
     },
     "preflight_passed": true
+  },
+  {
+    "tag": "checkpoint_20261019_084816_epistemic_badges_and_conclusion_stripper",
+    "timestamp": "2026-10-19 08:48:16 IST",
+    "commit_sha": "d84c64e1480d9282baa044678c3322a4b6e3b68e",
+    "branch": "main",
+    "description": "epistemic_badges_and_conclusion_stripper",
+    "database": {
+      "exists": true,
+      "filename": "reports_checkpoint_20261019_084816_epistemic_badges_and_conclusion_stripper.db",
+      "path": ".checkpoints/reports_checkpoint_20261019_084816_epistemic_badges_and_conclusion_stripper.db",
+      "size_bytes": 18948096,
+      "report_count": 166,
+      "revision_count": 271
+    },
+    "preflight_passed": true
   }
 ]
