@@ -516,9 +516,6 @@
   const TAX_SLABS_DATA = TAX_SLABS;
 
   function selectTaxSlab(slabRate) {
-    if (typeof activeReitSlabRate !== 'undefined') {
-      activeReitSlabRate = slabRate;
-    }
     const slab = TAX_SLABS.find(s => Math.abs(s.slab_rate_pct - slabRate) < 0.1);
     if (!slab) return;
 
@@ -557,9 +554,8 @@
       indicatorEl.textContent = `Active: ${slabRate}% (${desc})`;
     }
 
-    if (typeof recalcReitCorpusWaterfall === 'function') {
-      recalcReitCorpusWaterfall();
-    }
+    activeReitSlabRate = slabRate;
+    recalcReitCorpusWaterfall();
   }
 
   let activeReitSlabRate = 30.0;
