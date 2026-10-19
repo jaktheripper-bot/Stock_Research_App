@@ -29,7 +29,9 @@ from core.agents.copilot.forensic_desk import (
     check_input_qualification,
     is_input_qualified,
     detect_forbidden_intent,
-    process_forensic_desk_turn
+    process_forensic_desk_turn,
+    _resolve_dynamic_entity_override,
+    _answer_from_local_dossier_index
 )
 
 
@@ -257,6 +259,116 @@ class TestForensicDeskEnhancements(unittest.TestCase):
         self.assertEqual(data.get("status"), "GREETING")
         self.assertIn("Welcome to the Forensic Intelligence Desk", data.get("response"))
 
+
+    def test_resolve_dynamic_entity_override(self):
+        """Verifies mid-conversation ticker switching across uppercase tokens and natural language phrases."""
+        # 1. Uppercase token override
+        new_ticker, asset = _resolve_dynamic_entity_override("What about INFY?", "TCS", "EQUITY")
+        self.assertEqual(new_ticker, "INFY")
+        self.assertEqual(asset, "EQUITY")
+
+        # 2. Lowercase natural language override
+        new_ticker, asset = _resolve_dynamic_entity_override("switch to Infosys", "TCS", "EQUITY")
+        self.assertEqual(new_ticker, "INFY")
+        self.assertEqual(asset, "EQUITY")
+
+        # 3. Stopword preservation (no false switch on acronyms or verbs)
+        for non_ticker_query in ["What is the PE ratio?", "Explain the DCF model", "Where should we start?", "Check the balance sheet"]:
+            curr_t, curr_a = _resolve_dynamic_entity_override(non_ticker_query, "TCS", "EQUITY")
+            self.assertEqual(curr_t, "TCS", f"Query '{non_ticker_query}' should NOT override ticker.")
+            self.assertEqual(curr_a, "EQUITY")
+
+        # 4. Empty or missing message
+        curr_t, curr_a = _resolve_dynamic_entity_override("", "TCS", "EQUITY")
+        self.assertEqual(curr_t, "TCS")
+
+    def test_answer_from_local_dossier_index(self):
+        """Verifies zero-token local pillar and valuation radar metric retrieval for equities."""
+        mock_report = {
+            "ticker": "INFY",
+            "company_name": "Infosys Ltd",
+            "baseline_price": 1500.0,
+            "baseline_pe": 25.0,
+            "report_text": """
+# Institutional Equity Research Report: Infosys Ltd (INFY)
+
+## Pillar 01: Macro & Regulatory Exposure
+Macroeconomic environment remains resilient across North America and Europe. RBI policies and currency movements support exports.
+
+## Pillar 02: Competitive Moat & Industry Positioning
+Infosys possesses a Wide economic moat anchored in high client switching costs, proprietary delivery platforms, and specialized digital transformation capabilities.
+
+## Pillar 03: Promoter Quality & Fundamental Health
+Clean corporate governance with unencumbered promoter holdings and conservative capital allocation.
+
+## Pillar 04: Earnings & Margin Diagnostic
+Operating margins remain protected within the 21.0% to 23.0% band. Margin compression in recent quarters reflects transitory wage hikes rather than structural impairment.
+
+## Pillar 05: Valuation & Margin of Safety
+Trading at a trailing P/E of 25.0x against historical 5-year median of 27.5x, offering favorable risk-reward asymmetry and margin of safety.
+
+## Pillar 06: Technical & Momentum Overlay
+Consolidating above 200-day exponential moving average.
+
+## Pillar 07: SEBI BRSR & ESG Scorecard
+Ranked in top decile of ESG and BRSR disclosure transparency with zero major regulatory non-compliance citations.
+"""
+        }
+        fund = {"current_price": 1500.0, "pe_ratio": 25.0, "eps": 60.0, "short_name": "Infosys Ltd"}
+
+        # 1. Valuation multiples / P/E query
+        ans_val = _answer_from_local_dossier_index("INFY", "EQUITY", "what is the PE ratio and valuation multiple?", mock_report, fund)
+        self.assertIsNotNone(ans_val)
+        self.assertIn("Valuation & Multiples Diagnostic", ans_val)
+        self.assertIn("Current Market Price", ans_val)
+        self.assertIn("Pillar 05", ans_val)
+
+        # 2. Business model & moat query
+        ans_moat = _answer_from_local_dossier_index("INFY", "EQUITY", "explain the business model and competitive moat", mock_report, fund)
+        self.assertIsNotNone(ans_moat)
+        self.assertIn("Competitive Moat & Industry Positioning", ans_moat)
+        self.assertIn("Pillar 02", ans_moat)
+
+        # 3. Earnings & margins query
+        ans_earn = _answer_from_local_dossier_index("INFY", "EQUITY", "how are quarterly earnings and margins?", mock_report, fund)
+        self.assertIsNotNone(ans_earn)
+        self.assertIn("Earnings & Margin Diagnostic", ans_earn)
+        self.assertIn("Pillar 04", ans_earn)
+
+        # 4. Macro query
+        ans_macro = _answer_from_local_dossier_index("INFY", "EQUITY", "what are the macro and tariff risks?", mock_report, fund)
+        self.assertIsNotNone(ans_macro)
+        self.assertIn("Macro & Regulatory Exposure", ans_macro)
+        self.assertIn("Pillar 01", ans_macro)
+
+        # 5. ESG query
+        ans_esg = _answer_from_local_dossier_index("INFY", "EQUITY", "what is the ESG / BRSR score?", mock_report, fund)
+        self.assertIsNotNone(ans_esg)
+        self.assertIn("SEBI BRSR & ESG Scorecard", ans_esg)
+        self.assertIn("Pillar 07", ans_esg)
+
+        # 6. Unmatched query or non-equity asset class returns None
+        self.assertIsNone(_answer_from_local_dossier_index("INFY", "MUTUAL_FUND", "what is the PE ratio?", mock_report, fund))
+        self.assertIsNone(_answer_from_local_dossier_index("INFY", "EQUITY", "unmatched random prompt", mock_report, fund))
+        self.assertIsNone(_answer_from_local_dossier_index(None, "EQUITY", "what is the PE ratio?", mock_report, fund))
+
+    def test_copilot_turn_with_dynamic_entity_override(self):
+        """Verifies end-to-end Copilot turn switches entity seamlessly mid-conversation."""
+        async def _run():
+            res = await process_forensic_desk_turn(
+                conversation_id="TEST-COPILOT-DYNAMIC-OVERRIDE",
+                user_message="What about INFY? What is its PE multiple?",
+                ticker="TCS",
+                asset_type="equity",
+                deep_dive_unlocked=False
+            )
+            self.assertEqual(res["status"], "DETERMINISTIC_FALLBACK")
+            resp = res["response"]
+            self.assertIn("INFY", resp)
+            self.assertIn("Valuation & Multiples Diagnostic", resp)
+            self.assertIn("Free Tier", resp)
+
+        asyncio.run(_run())
 
     def test_llm_route_generative_synthesis_when_entitled(self):
         """Verifies that entitled users on main successfully route through Gemini LLM synthesis."""

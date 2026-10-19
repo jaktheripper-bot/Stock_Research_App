@@ -13,7 +13,7 @@ import json
 import re
 import logging
 import asyncio
-from typing import Dict, Any, List, Optional, Union, overload
+from typing import Dict, Any, List, Optional, Union, overload, Tuple
 
 try:
     from google.antigravity import types
@@ -391,6 +391,175 @@ def check_non_advisory_compliance(message: str, asset_class: str = "EQUITY") -> 
             "I can, however, provide an objective **Pre-Mortem Inversion Analysis** or break down the company's "
             "Margin of Safety, Balance Sheet Solvency, and Reverse DCF implied growth rates. Which diagnostic area would you like to explore?"
         )
+
+
+def _resolve_dynamic_entity_override(
+    user_message: str,
+    current_ticker: Optional[str],
+    current_asset_class: str
+) -> Tuple[Optional[str], str]:
+    """
+    Detects if the user explicitly asks about a different ticker or scheme mid-conversation
+    (e.g. 'What about INFY?' or 'Compare with HDFCBANK') and switches context seamlessly.
+    """
+    if not user_message:
+        return current_ticker, current_asset_class
+
+    from bse_master import resolve_canonical_symbol
+    # Check explicit uppercase ticker tokens or 'about <TICKER>' / 'for <TICKER>'
+    candidates = re.findall(r"\b([A-Z]{2,12})\b", user_message)
+    stopwords = {
+        "PE", "PB", "EV", "ROE", "ROCE", "DCF", "FCF", "CMP", "NAV", "TER", "AUM", "YTM",
+        "ACR", "DSCR", "LTV", "WALE", "NDCF", "SEBI", "BSE", "NSE", "INR", "USD", "ETF",
+        "REIT", "ASRI", "CAG", "CAGR", "EBITDA", "EBIT", "EPS", "WHAT", "HOW", "WHY",
+        "DOES", "THIS", "THE", "AND", "FOR", "WITH", "ABOUT", "CAN", "YOU", "ARE", "NOT"
+    }
+    for cand in candidates:
+        if cand in stopwords:
+            continue
+        resolved = resolve_canonical_symbol(cand)
+        if resolved and resolved.upper() != (current_ticker or "").upper():
+            from core.db.reports import get_report_by_ticker_sync
+            if get_report_by_ticker_sync(resolved):
+                return resolved.upper(), "EQUITY"
+
+    # Also check lowercase company mentions in pattern "what about <name>" or "switch to <name>"
+    m = re.search(r"(?:what\s+about|how\s+about|switch\s+to|check|analyze|audit)\s+([a-zA-Z0-9&\s]{3,25})", user_message, re.IGNORECASE)
+    if m:
+        phrase = m.group(1).strip(" ?!.,")
+        resolved = resolve_canonical_symbol(phrase)
+        if resolved:
+            from core.db.reports import get_report_by_ticker_sync
+            if get_report_by_ticker_sync(resolved):
+                return resolved.upper(), "EQUITY"
+
+    return current_ticker, current_asset_class
+
+
+def _answer_from_local_dossier_index(
+    ticker: Optional[str],
+    asset_class: str,
+    user_message: str,
+    report_data: Optional[Dict[str, Any]],
+    fundamentals: Optional[Dict[str, Any]]
+) -> Optional[str]:
+    """
+    Zero-Token Local Pillar & Metric Retriever ($0 Gemini cost).
+    Matches natural-language questions (business model, moat, competitors, earnings,
+    margins, valuation multiples, capital allocation, ESG) to the exact cached Pillar
+    and live fundamentals from reports.db + compute_valuation_radar().
+    """
+    if not ticker or asset_class != "EQUITY" or not report_data:
+        return None
+
+    q = (user_message or "").lower()
+    report_text = report_data.get("report_text") or ""
+    if not report_text:
+        return None
+
+    from core.analysis.parser import extract_health_matrix
+    from core.analysis.valuation_radar import compute_valuation_radar
+
+    fund = fundamentals or {}
+    company_name = report_data.get("company_name") or fund.get("short_name") or ticker
+    price = fund.get("current_price") or report_data.get("baseline_price") or 0.0
+    pe = fund.get("pe_ratio") or report_data.get("baseline_pe") or 0.0
+    eps = fund.get("eps") or 0.0
+    sales_g = fund.get("sales_growth") or 12.0
+    bvps = fund.get("book_value") or 0.0
+    matrix = extract_health_matrix(report_text)
+
+    # Safe numeric coercion
+    def _safe_float(v: Any, default: float = 0.0) -> float:
+        if v is None:
+            return default
+        try:
+            return float(str(v).replace(",", "").strip())
+        except (ValueError, TypeError):
+            return default
+
+    safe_price = _safe_float(price)
+    safe_pe = _safe_float(pe)
+    safe_eps = _safe_float(eps)
+    safe_sales_g = _safe_float(sales_g, 12.0)
+    safe_bvps = _safe_float(bvps)
+
+    # Extract individual pillars from markdown
+    pillars: Dict[int, str] = {}
+    for m in re.finditer(r"(?im)^##+\s*Pillar\s*0?([1-7])\s*[:\.\-]\s*([^\n]+)\n(.*?)(?=^##+\s*Pillar\s*0?[1-7]|\Z)", report_text, re.DOTALL):
+        p_idx = int(m.group(1))
+        p_title = m.group(2).strip()
+        p_body = m.group(3).strip()
+        # Take first 2 substantive paragraphs
+        paras = [p.strip() for p in re.split(r"\n\s*\n", p_body) if p.strip() and not p.strip().startswith("|")]
+        pillars[p_idx] = f"**Pillar 0{p_idx} — {p_title}**\n\n" + "\n\n".join(paras[:2])
+
+    # 1. Valuation Multiples / P/E / Fair Value / Margin of Safety
+    if any(k in q for k in ["multiple", "p/e", "pe ratio", "ev/ebitda", "fair value", "intrinsic", "overvalued", "undervalued", "cheap", "expensive", "margin of safety", "valuation"]):
+        radar = compute_valuation_radar(
+            current_price=safe_price,
+            pe_ratio=safe_pe,
+            eps=safe_eps,
+            sales_growth_3y=safe_sales_g,
+            book_value_per_share=safe_bvps,
+        )
+        p5_excerpt = pillars.get(5, "")
+        fv = radar.get("fair_value", 0.0)
+        mos = radar.get("margin_of_safety_pct", 0.0)
+        imp_g = radar.get("inputs", {}).get("implied_fcf_growth_pct", 11.5)
+        return (
+            f"📊 **Valuation & Multiples Diagnostic — {company_name} (`{ticker}`)**\n\n"
+            f"| Valuation Metric | Audited Value | Institutional Benchmark / Regime |\n"
+            f"| :--- | :--- | :--- |\n"
+            f"| **Current Market Price (CMP)** | `₹{safe_price:,.2f}` | Live / Cached Exchange Quote |\n"
+            f"| **Trailing P/E Multiple** | `{pe}x` | Verdict: **{matrix.get('Valuation', 'Fair')}** |\n"
+            f"| **Composite Intrinsic Value** | `₹{fv:,.2f}` | Range: `₹{radar.get('range_low', 0):,.2f}` – `₹{radar.get('range_high', 0):,.2f}` |\n"
+            f"| **Margin of Safety** | `{mos:+.1f}%` | **{radar.get('badge_label', 'Fair Value')}** |\n"
+            f"| **Reverse-DCF Implied 10Y Growth** | `{imp_g:.1f}% CAGR` | At 11.0% WACC hurdle & 4.5% terminal growth |\n\n"
+            f"{p5_excerpt}\n\n"
+            f"*SEBI Safe Harbor: Factual valuation triangulation from audited filings; not a buy/sell recommendation.*"
+        )
+
+    # 2. Business Model / Moat / Competitors / Pricing Power (Pillar 2)
+    if any(k in q for k in ["business model", "make money", "revenue stream", "competitor", "competition", "moat", "pricing power", "market share", "industry"]):
+        if 2 in pillars:
+            return (
+                f"🏰 **Competitive Moat & Industry Positioning — {company_name} (`{ticker}`)**\n"
+                f"- **Moat Rating:** `{matrix.get('Moat', 'Moderate')}` | **Macro Posture:** `{matrix.get('Macro', 'Neutral')}`\n\n"
+                f"{pillars[2]}\n\n"
+                f"*Source: Audited Equity Dossier Pillar 02 (`reports.db`).*"
+            )
+
+    # 3. Earnings / Revenue Drop / Margins / Operational Diagnostic (Pillar 4)
+    if any(k in q for k in ["revenue", "margin", "profit", "earnings", "quarter", "q1", "q2", "q3", "q4", "drop", "slowdown", "temporary", "structural", "growth"]):
+        if 4 in pillars:
+            return (
+                f"🔬 **Earnings & Margin Diagnostic — {company_name} (`{ticker}`)**\n"
+                f"- **Drop Diagnostic:** `{matrix.get('Diagnostic', 'Neutral')}` | **Capital Allocation:** `{matrix.get('CapitalAllocation', 'Disciplined')}`\n\n"
+                f"{pillars[4]}\n\n"
+                f"*Source: Audited Equity Dossier Pillar 04 (`reports.db`).*"
+            )
+
+    # 4. Macro / Geopolitical / Regulatory / Tariffs (Pillar 1)
+    if any(k in q for k in ["macro", "tariff", "export", "import", "currency", "rbi", "interest rate", "inflation", "geopolit", "regulation"]):
+        if 1 in pillars:
+            return (
+                f"🌐 **Macro & Regulatory Exposure — {company_name} (`{ticker}`)**\n"
+                f"- **Macro Verdict:** `{matrix.get('Macro', 'Neutral')}`\n\n"
+                f"{pillars[1]}\n\n"
+                f"*Source: Audited Equity Dossier Pillar 01 (`reports.db`).*"
+            )
+
+    # 5. ESG / Sustainability / BRSR (Pillar 7)
+    if any(k in q for k in ["esg", "brsr", "carbon", "environment", "sustainability", "social"]):
+        if 7 in pillars:
+            return (
+                f"🌱 **SEBI BRSR & ESG Scorecard — {company_name} (`{ticker}`)**\n\n"
+                f"{pillars[7]}\n\n"
+                f"*Source: Audited Equity Dossier Pillar 07 (`reports.db`).*"
+            )
+
+    return None
 
 
 def build_mutual_fund_deterministic_response(
@@ -1312,6 +1481,17 @@ def build_equity_deterministic_response(
             f"5. **💥 What Shocked You:** Summarize the most significant red flags or valuation anomalies."
         )
 
+    # 0g. Zero-Token Local Pillar & Metric Retriever ($0 Gemini cost)
+    local_retrieval = _answer_from_local_dossier_index(
+        ticker=ticker,
+        asset_class="EQUITY",
+        user_message=user_message,
+        report_data=context_data.get("report_data") or context_data,
+        fundamentals=fund
+    )
+    if local_retrieval:
+        return local_retrieval
+
     # 1. Pre-Mortem Inversion / Failure Modes / Thesis Destruction
     if sec in ["pre_mortem", "risks", "inversion"] or any(k in msg for k in ["pre-mortem", "inversion", "failure mode", "destroy", "risk", "threat", "vulnerabilit", "worst case", "bear case", "downside"]):
         macro_posture = matrix.get("Macro", "Headwinds")
@@ -1654,6 +1834,16 @@ async def process_forensic_desk_turn(
         else:
             resolved_asset_class = "EQUITY"
 
+    # 3b. Dynamic mid-conversation entity override detection
+    override_ticker, override_asset_class = _resolve_dynamic_entity_override(
+        user_message=user_message,
+        current_ticker=clean_ticker,
+        current_asset_class=resolved_asset_class
+    )
+    if override_ticker:
+        clean_ticker = override_ticker
+        resolved_asset_class = override_asset_class
+
     # 4. Regulatory Compliance Filter with Asset-Class Precision
     deflection = check_non_advisory_compliance(user_message, asset_class=resolved_asset_class)
     if deflection:
@@ -1886,6 +2076,7 @@ async def process_forensic_desk_turn(
                     "market_cap_str": mcap_str,
                     "health_matrix": matrix,
                     "report_text": rep.get("report_text", "") if deep_dive_unlocked else redact_gated_pillars(rep.get("report_text", "")),
+                    "report_data": rep,
                     "citations_count": len(rep.get("citations") or []),
                     # Reverse DCF is Pillar 05 (valuation) content, so it is gated too
                     "reverse_dcf": dcf_dict if deep_dive_unlocked else {},
