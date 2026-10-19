@@ -733,16 +733,29 @@ async def admin_purge_test_data(request: Request):
 
 
 @router.get("/admin/auth/google")
-async def admin_auth_google(request: Request):
+async def admin_auth_google(request: Request, next: Optional[str] = None):
     """Initiates Google OAuth for Admin Portal via Supabase GoTrue."""
     base_url = resolve_app_base_url(request)
     redirect_target = f"{base_url}/admin/auth/callback"
+    if next and next.startswith("/admin"):
+        redirect_target += f"?next={urllib.parse.quote(next)}"
     cfg = get_supabase_auth_config()
     sb_url = cfg.get("url")
 
     if sb_url:
         oauth_url = f"{sb_url}/auth/v1/authorize?provider=google&redirect_to={urllib.parse.quote(redirect_target)}"
-        return RedirectResponse(url=oauth_url, status_code=303)
+        resp = RedirectResponse(url=oauth_url, status_code=303)
+        is_secure = base_url.startswith("https://")
+        resp.set_cookie(
+            key="oauth_admin_intent",
+            value=next if (next and next.startswith("/admin")) else "/admin",
+            max_age=600,
+            httponly=False,
+            samesite="lax",
+            secure=is_secure,
+            path="/"
+        )
+        return resp
     return RedirectResponse(
         url="/admin?err=Supabase+Google+OAuth+not+yet+configured.+Use+direct+verification+or+consult+setup+guide.",
         status_code=303
@@ -760,11 +773,15 @@ async def admin_auth_callback(
     if oauth_err:
         clean_err = oauth_err.replace("+", " ")
         logger.warning(f"Admin Google OAuth redirect error received: {clean_err}")
-        return RedirectResponse(url=f"/admin?err={urllib.parse.quote(clean_err)}", status_code=303)
+        resp = RedirectResponse(url=f"/admin?err={urllib.parse.quote(clean_err)}", status_code=303)
+        resp.delete_cookie("oauth_admin_intent", path="/")
+        return resp
 
     admin_session = _is_admin_authenticated(request)
     if admin_session and not code and not access_token:
-        return RedirectResponse(url="/admin", status_code=303)
+        resp = RedirectResponse(url="/admin", status_code=303)
+        resp.delete_cookie("oauth_admin_intent", path="/")
+        return resp
 
     cfg = get_supabase_auth_config()
     sb_url = cfg.get("url")
@@ -849,14 +866,16 @@ async def admin_auth_callback(
             ip_address=client_ip,
             user_agent=ua
         )
-        return RedirectResponse(
+        resp = RedirectResponse(
             url=f"/admin?err=Access+Denied:+Google+account+'{clean_email}'+is+not+an+authorized+administrator.+Contact+the+owner.",
             status_code=303
         )
+        resp.delete_cookie("oauth_admin_intent", path="/")
+        return resp
 
     pending_token = _generate_pending_2fa_token(clean_email)
     next_step = "/admin/verify-2fa" if admin.get("totp_enabled") else "/admin/setup-2fa"
-    req_next = request.query_params.get("next")
+    req_next = request.query_params.get("next") or (request.cookies.get("oauth_admin_intent") or "").strip('"')
     if req_next and req_next.startswith("/admin"):
         next_step += f"?next={urllib.parse.quote(req_next)}"
     resp = RedirectResponse(url=next_step, status_code=303)
@@ -867,7 +886,9 @@ async def admin_auth_callback(
         samesite="lax",
         max_age=900
     )
+    resp.delete_cookie("oauth_admin_intent", path="/")
     return resp
+
 
 
 @router.post("/admin/auth/dev-login")
@@ -907,11 +928,25 @@ async def admin_auth_direct_verify(
     password: str = Form(""),
     next_url: Optional[str] = Form(None),
 ):
-    """Requires valid ADMIN_PASSWORD before issuing a 2FA pending token."""
+    """Requires valid ADMIN_PASSWORD or verified 6-digit Email OTP before issuing a 2FA pending token."""
     clean_email = email.strip().lower()
     client_ip = _get_client_ip(request)
-    expected_pwd = (os.environ.get("ADMIN_PASSWORD") or get_secret("ADMIN_PASSWORD") or "").strip()
-    if not expected_pwd or not password or not hmac.compare_digest(password.strip(), expected_pwd):
+    clean_pwd = (password or "").strip()
+    expected_pwd = (
+        os.environ.get("ADMIN_PASSWORD")
+        if os.environ.get("TESTING") == "1"
+        else (os.environ.get("ADMIN_PASSWORD") or get_secret("ADMIN_PASSWORD"))
+    )
+    expected_pwd = (expected_pwd or "").strip()
+
+    pwd_matched = bool(expected_pwd and clean_pwd and hmac.compare_digest(clean_pwd, expected_pwd))
+    otp_matched = False
+    if not pwd_matched and len(clean_pwd) == 6 and clean_pwd.isdigit() and os.environ.get("TESTING") != "1":
+        from core.auth.otp import verify_email_otp
+        otp_ok, _ = verify_email_otp(clean_email, clean_pwd)
+        otp_matched = bool(otp_ok)
+
+    if not (pwd_matched or otp_matched):
         record_admin_audit(clean_email or "anonymous", "DIRECT_VERIFY_REJECTED", "Invalid admin password", client_ip)
         err_url = "/admin/login?error=Invalid+admin+credentials&err=Invalid+admin+credentials"
         if next_url and next_url.startswith("/admin"):

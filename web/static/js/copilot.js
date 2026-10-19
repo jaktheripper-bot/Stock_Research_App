@@ -540,7 +540,45 @@ function renderCopilotMarkdown(rawText) {
         }
     }
 
-    return finalBlocks.join("\n");
+    const joinedHtml = finalBlocks.join("\n");
+    const lowerRaw = String(rawText || "").toLowerCase();
+    let microWidgetHtml = "";
+
+    if ((lowerRaw.includes("reverse dcf") || lowerRaw.includes("wacc") || lowerRaw.includes("intrinsic value")) && !lowerRaw.includes("copilot-micro-dcf")) {
+        const uid = "dcf_" + Math.random().toString(36).substring(2, 7);
+        microWidgetHtml = `
+        <div class="copilot-micro-dcf" style="margin-top:12px;padding:12px;background:rgba(15,23,42,0.85);border:1px solid rgba(56,189,248,0.3);border-radius:10px;">
+          <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;">
+            <span style="font-size:11px;font-weight:800;color:#38bdf8;text-transform:uppercase;letter-spacing:0.05em;">⚡ Interactive Reverse DCF Stress Sandbox</span>
+            <span id="${uid}_out" style="font-size:12px;font-weight:800;color:#34d399;font-variant-numeric:tabular-nums;">Fair Multiple: 21.8x</span>
+          </div>
+          <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;font-size:11px;color:#cbd5e1;">
+            <label style="display:flex;flex-direction:column;gap:3px;">
+              <span>10Y FCF CAGR (<strong id="${uid}_glbl">14%</strong>)</span>
+              <input type="range" min="4" max="28" step="1" value="14" oninput="(function(el){var g=parseFloat(el.value),w=parseFloat(document.getElementById('${uid}_w').value);document.getElementById('${uid}_glbl').textContent=g+'%';var mult=Math.max(8,Math.min(45,(1+g/100)*15/(Math.max(0.05,w/100-0.04))*0.11)).toFixed(1);document.getElementById('${uid}_out').textContent='Fair Multiple: '+mult+'x';})(this)">
+            </label>
+            <label style="display:flex;flex-direction:column;gap:3px;">
+              <span>WACC Hurdle (<strong id="${uid}_wlbl">12.0%</strong>)</span>
+              <input id="${uid}_w" type="range" min="9" max="16" step="0.5" value="12" oninput="(function(el){var w=parseFloat(el.value),g=parseFloat(el.parentNode.parentNode.querySelector('input').value);document.getElementById('${uid}_wlbl').textContent=w.toFixed(1)+'%';var mult=Math.max(8,Math.min(45,(1+g/100)*15/(Math.max(0.05,w/100-0.04))*0.11)).toFixed(1);document.getElementById('${uid}_out').textContent='Fair Multiple: '+mult+'x';})(this)">
+            </label>
+          </div>
+        </div>`;
+    } else if ((lowerRaw.includes("fee drag") || lowerRaw.includes("expense ratio") || lowerRaw.includes("ter")) && !lowerRaw.includes("copilot-micro-ter")) {
+        const uid = "ter_" + Math.random().toString(36).substring(2, 7);
+        microWidgetHtml = `
+        <div class="copilot-micro-ter" style="margin-top:12px;padding:12px;background:rgba(15,23,42,0.85);border:1px solid rgba(16,185,129,0.3);border-radius:10px;">
+          <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;">
+            <span style="font-size:11px;font-weight:800;color:#34d399;text-transform:uppercase;letter-spacing:0.05em;">💸 20Y Direct vs Regular Fee Drag</span>
+            <span id="${uid}_out" style="font-size:12px;font-weight:800;color:#f87171;font-variant-numeric:tabular-nums;">Comm. Loss: ₹14.2L</span>
+          </div>
+          <label style="display:flex;flex-direction:column;gap:4px;font-size:11px;color:#cbd5e1;">
+            <span>Initial Corpus: <strong id="${uid}_clbl">₹10 Lakhs</strong> (at 110 bps TER spread, 12% CAGR)</span>
+            <input type="range" min="1" max="100" step="1" value="10" oninput="(function(el){var c=parseFloat(el.value);document.getElementById('${uid}_clbl').textContent='₹'+c+' Lakhs';var loss=(c*(Math.pow(1.114,20)-Math.pow(1.103,20))).toFixed(1);document.getElementById('${uid}_out').textContent='Comm. Loss: ₹'+loss+'L';})(this)">
+          </label>
+        </div>`;
+    }
+
+    return joinedHtml + microWidgetHtml;
 }
 
 function formatCopilotMarkdown(rawText) {

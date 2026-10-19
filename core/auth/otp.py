@@ -22,7 +22,9 @@ import logging
 from datetime import datetime, timezone, timedelta
 from typing import Tuple, Optional, Dict, Any
 
-from core.db.connection import get_db_connection, get_supabase_url, get_placeholder
+from core.config import get_secret
+from core.db.connection import get_db_connection, is_postgres_connection
+from core.notify import send_otp_email
 
 logger = logging.getLogger("equity_research.core.auth.otp")
 
@@ -30,28 +32,35 @@ OTP_TTL_MINUTES = 10
 MAX_VERIFICATION_ATTEMPTS = 5
 RESEND_COOLDOWN_SECONDS = 60
 
-OTP_HMAC_SECRET = (
-    os.environ.get("OTP_HMAC_SECRET") or
-    os.environ.get("SECRET_KEY") or
-    os.environ.get("ADMIN_API_KEY") or
-    hashlib.sha256(f"moatnomics_otp_{os.getpid()}".encode()).hexdigest()
-).encode("utf-8")
+
+def _resolve_otp_secret() -> bytes:
+    """Resolves a deterministic cross-worker HMAC secret (never using os.getpid())."""
+    raw = (
+        os.environ.get("OTP_HMAC_SECRET")
+        or get_secret("OTP_HMAC_SECRET")
+        or os.environ.get("SECRET_KEY")
+        or get_secret("SECRET_KEY")
+        or os.environ.get("ADMIN_API_KEY")
+        or get_secret("ADMIN_API_KEY")
+        or os.environ.get("SUPABASE_SERVICE_ROLE_KEY")
+        or get_secret("SUPABASE_SERVICE_ROLE_KEY")
+        or "moatnomics_deterministic_otp_hmac_salt_2026"
+    )
+    return str(raw).strip().encode("utf-8")
+
+
+OTP_HMAC_SECRET = _resolve_otp_secret()
 
 
 def _hash_otp(email: str, code: str) -> str:
-    secret = (
-        os.environ.get("OTP_HMAC_SECRET") or
-        os.environ.get("SECRET_KEY") or
-        os.environ.get("ADMIN_API_KEY") or
-        hashlib.sha256(f"moatnomics_otp_{os.getpid()}".encode()).hexdigest()
-    ).encode("utf-8")
+    secret = _resolve_otp_secret()
     payload = f"{email.strip().lower()}:{code.strip()}".encode("utf-8")
     return hmac.new(secret, payload, hashlib.sha256).hexdigest()
 
 
 def create_email_otp(email: str) -> Tuple[bool, str, Optional[str]]:
     """
-    Generates and persists a fresh 6-digit OTP for the given email.
+    Generates, persists, and dispatches a fresh 6-digit OTP for the given email.
     Returns:
         (success, message, code_or_none)
         In development/testing, returns code to facilitate mock testing.
@@ -61,9 +70,9 @@ def create_email_otp(email: str) -> Tuple[bool, str, Optional[str]]:
         return False, "Please provide a valid email address.", None
 
     conn = get_db_connection()
+    is_pg = is_postgres_connection(conn)
+    p = "%s" if is_pg else "?"
     cursor = conn.cursor()
-    p = get_placeholder()
-    is_pg = bool(get_supabase_url())
     now_utc = datetime.now(timezone.utc)
     expires_at = now_utc + timedelta(minutes=OTP_TTL_MINUTES)
 
@@ -129,6 +138,10 @@ def create_email_otp(email: str) -> Tuple[bool, str, Optional[str]]:
 
         conn.commit()
         logger.info(f"Generated secure OTP for {clean_email}")
+
+        if os.environ.get("TESTING") != "1":
+            send_otp_email(clean_email, code, ttl_minutes=OTP_TTL_MINUTES)
+
         return True, "Verification code sent successfully to your email.", code
     except Exception as e:
         logger.error(f"Error saving OTP for {clean_email}: {e}")
@@ -152,8 +165,9 @@ def verify_email_otp(email: str, code: str) -> Tuple[bool, str]:
         return False, "Email and verification code are required."
 
     conn = get_db_connection()
+    is_pg = is_postgres_connection(conn)
+    p = "%s" if is_pg else "?"
     cursor = conn.cursor()
-    p = get_placeholder()
     now_utc = datetime.now(timezone.utc)
 
     try:
@@ -219,8 +233,9 @@ def _delete_otp(email: str):
     cursor = None
     try:
         conn = get_db_connection()
+        is_pg = is_postgres_connection(conn)
+        p = "%s" if is_pg else "?"
         cursor = conn.cursor()
-        p = get_placeholder()
         cursor.execute(f"DELETE FROM auth_otps WHERE email = {p};", (email,))
         conn.commit()
     except Exception as e:
@@ -236,3 +251,4 @@ def _delete_otp(email: str):
                 conn.close()
             except Exception as e:
                 logger.debug(f"Connection close notice in _delete_otp: {e}")
+

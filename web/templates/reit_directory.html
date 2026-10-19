@@ -68,6 +68,73 @@
     </div>
   </div>
 
+  <!-- Interactive Section 115UA Post-Tax Cashflow Waterfall Simulator -->
+  <div id="sec115uaInteractiveCard" class="card" style="padding: 20px 24px; margin-bottom: 24px; background: linear-gradient(145deg, rgba(15, 23, 42, 0.92), rgba(2, 6, 23, 0.96)); border: 1px solid rgba(56, 189, 248, 0.28); border-radius: 14px;">
+    <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 14px; margin-bottom: 14px;">
+      <div>
+        <span style="font-size: 11px; font-weight: 800; color: #38bdf8; text-transform: uppercase; letter-spacing: 0.06em;">⚡ Generative UI Sandbox • Section 115UA Pass-Through Tax Shield</span>
+        <h3 style="font-size: 17px; font-weight: 800; color: #f8fafc; margin: 4px 0 0 0;">Interactive Post-Tax Distribution & In-Hand Cashflow Simulator</h3>
+      </div>
+      <div style="display: flex; align-items: center; gap: 12px; flex-wrap: wrap;">
+        <label style="font-size: 12px; color: #94a3b8; font-weight: 600; display: flex; align-items: center; gap: 6px;">
+          Tax Slab:
+          <select id="reitTaxSlabSelect" onchange="window.updateReit115uaSandbox()" style="background: #0f172a; color: #f8fafc; border: 1px solid #334155; border-radius: 8px; padding: 6px 10px; font-size: 12.5px; font-weight: 700;">
+            <option value="0">0% (Up to ₹12L Rebate / HUF)</option>
+            <option value="0.208">20.8% (Middle Slab + Cess)</option>
+            <option value="0.312" selected>31.2% (30% Slab + 4% Cess)</option>
+            <option value="0.39">39.0% (HNI Peak Surcharge)</option>
+          </select>
+        </label>
+        <label style="font-size: 12px; color: #94a3b8; font-weight: 600; display: flex; align-items: center; gap: 8px;">
+          Allocation: <strong id="reitCorpusVal" style="color: #38bdf8;" class="tnum">₹25 Lakhs</strong>
+          <input id="reitCorpusSlider" type="range" min="5" max="200" step="5" value="25" oninput="window.updateReit115uaSandbox()" style="width: 120px; accent-color: #38bdf8;">
+        </label>
+      </div>
+    </div>
+    <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(190px, 1fr)); gap: 12px;">
+      <div style="background: rgba(15, 23, 42, 0.7); border: 1px solid rgba(255,255,255,0.07); border-radius: 10px; padding: 12px;">
+        <div style="font-size: 11px; color: #94a3b8;">Gross Annual DPU (@ 7.4% Avg)</div>
+        <div id="reitGrossCash" style="font-size: 18px; font-weight: 800; color: #f8fafc; margin-top: 4px;" class="tnum">₹1,85,000 / yr</div>
+      </div>
+      <div style="background: rgba(16, 185, 129, 0.08); border: 1px solid rgba(16, 185, 129, 0.25); border-radius: 10px; padding: 12px;">
+        <div style="font-size: 11px; color: #6ee7b7;">Net Post-Tax REIT Cashflow</div>
+        <div id="reitNetCash" style="font-size: 18px; font-weight: 800; color: #34d399; margin-top: 4px;" class="tnum">₹1,64,798 / yr (6.59%)</div>
+      </div>
+      <div style="background: rgba(239, 68, 68, 0.08); border: 1px solid rgba(239, 68, 68, 0.22); border-radius: 10px; padding: 12px;">
+        <div style="font-size: 11px; color: #fca5a5;">Equivalent 7.25% Bank FD Post-Tax</div>
+        <div id="reitFdNetCash" style="font-size: 18px; font-weight: 800; color: #f87171; margin-top: 4px;" class="tnum">₹1,24,700 / yr (4.99%)</div>
+      </div>
+      <div style="background: rgba(56, 189, 248, 0.1); border: 1px solid rgba(56, 189, 248, 0.3); border-radius: 10px; padding: 12px;">
+        <div style="font-size: 11px; color: #7dd3fc;">Annual Sec 115UA Alpha vs FD</div>
+        <div id="reitTaxAlpha" style="font-size: 18px; font-weight: 800; color: #38bdf8; margin-top: 4px;" class="tnum">+₹40,098 / yr (+160 bps)</div>
+      </div>
+    </div>
+    <script>
+      window.updateReit115uaSandbox = function() {
+        var slab = parseFloat(document.getElementById('reitTaxSlabSelect')?.value || '0.312');
+        var corpusLakhs = parseFloat(document.getElementById('reitCorpusSlider')?.value || '25');
+        var corpusInr = corpusLakhs * 100000;
+        var grossYield = 0.074;
+        var taxableShare = 0.35; // Avg 35% Interest (taxable), 65% Exempt Dividend + Sec 56(2)(xii) RoC
+        var grossCash = corpusInr * grossYield;
+        var reitTax = grossCash * taxableShare * slab;
+        var netReit = grossCash - reitTax;
+        var netReitPct = (netReit / corpusInr) * 100;
+        var fdGross = corpusInr * 0.0725;
+        var fdNet = fdGross * (1 - slab);
+        var fdNetPct = (fdNet / corpusInr) * 100;
+        var alphaInr = netReit - fdNet;
+        var alphaBps = Math.round((netReitPct - fdNetPct) * 100);
+        var fmt = function(n) { return '₹' + Math.round(n).toLocaleString('en-IN'); };
+        document.getElementById('reitCorpusVal').textContent = '₹' + corpusLakhs + ' Lakhs';
+        document.getElementById('reitGrossCash').textContent = fmt(grossCash) + ' / yr';
+        document.getElementById('reitNetCash').textContent = fmt(netReit) + ' / yr (' + netReitPct.toFixed(2) + '%)';
+        document.getElementById('reitFdNetCash').textContent = fmt(fdNet) + ' / yr (' + fdNetPct.toFixed(2) + '%)';
+        document.getElementById('reitTaxAlpha').textContent = (alphaInr >= 0 ? '+' : '') + fmt(alphaInr) + ' / yr (+' + alphaBps + ' bps)';
+      };
+    </script>
+  </div>
+
   <!-- Structural Comparison Matrix -->
   <div id="structuralComparison" class="card" style="padding: 24px; margin-bottom: 28px;">
     <div style="display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 18px; flex-wrap: wrap; gap: 12px;">

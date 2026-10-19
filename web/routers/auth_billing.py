@@ -267,6 +267,13 @@ async def public_auth_callback(
     next: Optional[str] = "/"
 ):
     """Processes Google OAuth callback for public users, sets session cookie and localStorage."""
+    admin_intent = (request.cookies.get("oauth_admin_intent") or "").strip('"')
+    if admin_intent and (code or access_token):
+        qs = urllib.parse.urlencode({k: v for k, v in [("code", code), ("access_token", access_token), ("next", admin_intent)] if v})
+        resp = RedirectResponse(url=f"/admin/auth/callback?{qs}", status_code=303)
+        resp.delete_cookie("oauth_admin_intent", path="/")
+        return resp
+
     oauth_err = request.query_params.get("error_description") or request.query_params.get("error")
     if oauth_err:
         clean_err = oauth_err.replace("+", " ")

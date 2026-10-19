@@ -472,3 +472,52 @@ def dispatch_research_bouquet(
         "edition_date": bouquet["edition_date"],
         "subject": bouquet["subject"]
     }
+
+
+def send_otp_email(recipient_email: str, code: str, ttl_minutes: int = 10) -> bool:
+    """
+    Dispatches a 6-digit login verification code via Resend API or SMTP.
+    Returns True if delivered via live email provider, False if running in local/mock mode.
+    """
+    clean_to = (recipient_email or "").strip().lower()
+    if not clean_to:
+        return False
+
+    sender_email = (
+        _get_cfg("SMTP_FROM")
+        or _get_cfg("RESEND_FROM")
+        or _get_cfg("SMTP_USER")
+        or "Moatnomics Service Desk <desk@moatnomics.com>"
+    )
+    subject = f"{code} is your Moatnomics verification code"
+    text_body = (
+        f"Moatnomics Institutional Research Terminal\n\n"
+        f"Your 6-digit sign-in verification code is: {code}\n\n"
+        f"This code expires in {ttl_minutes} minutes. If you did not request this code, please ignore this email.\n"
+    )
+    html_body = f"""
+    <div style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; max-width: 480px; margin: 0 auto; padding: 28px; background: #0f172a; color: #f8fafc; border-radius: 12px; border: 1px solid #1e293b;">
+        <div style="font-size: 12px; font-weight: 700; color: #38bdf8; text-transform: uppercase; letter-spacing: 0.08em; margin-bottom: 8px;">
+            Moatnomics Authentication Gate
+        </div>
+        <h2 style="margin: 0 0 12px; font-size: 20px; color: #f8fafc;">Your Sign-In Verification Code</h2>
+        <p style="font-size: 14px; color: #94a3b8; line-height: 1.5; margin-bottom: 20px;">
+            Enter the 6-digit verification code below to complete your sign-in:
+        </p>
+        <div style="background: #020617; border: 1px solid rgba(56, 189, 248, 0.35); border-radius: 10px; padding: 18px; text-align: center; font-family: monospace; font-size: 32px; font-weight: 800; letter-spacing: 8px; color: #38bdf8; margin-bottom: 20px;">
+            {code}
+        </div>
+        <p style="font-size: 12px; color: #64748b; margin: 0;">
+            Valid for {ttl_minutes} minutes. Single-use only.
+        </p>
+    </div>
+    """
+
+    if _get_cfg("RESEND_API_KEY"):
+        return _dispatch_via_resend(sender_email, clean_to, subject, text_body, html=html_body)
+
+    if _get_cfg("SMTP_HOST") and _get_cfg("SMTP_USER") and _get_cfg("SMTP_PASSWORD"):
+        return _dispatch_via_smtp(sender_email, clean_to, subject, text_body, html=html_body)
+
+    logger.info("OTP generated for %s (no external email provider configured)", clean_to)
+    return False

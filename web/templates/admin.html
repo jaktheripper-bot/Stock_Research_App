@@ -547,29 +547,91 @@
         >
       </div>
       <div style="text-align: left; margin-bottom: 14px;">
-        <label for="adminPassword" style="display: block; font-size: 12px; font-weight: 600; color: var(--text-secondary, #94a3b8); margin-bottom: 6px;">
-          Master Admin Password:
-        </label>
+        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 6px;">
+          <label for="adminPassword" style="font-size: 12px; font-weight: 600; color: var(--text-secondary, #94a3b8);">
+            Master Password or 6-Digit Email Code:
+          </label>
+          <button type="button" id="sendAdminOtpBtn" class="btn btn-secondary" onclick="sendAdminLoginOtp()" style="padding: 3px 8px; font-size: 11px; font-weight: 700; color: #38bdf8; background: rgba(14, 165, 233, 0.12); border: 1px solid rgba(56, 189, 248, 0.3); border-radius: 6px; cursor: pointer;">
+            Send 6-Digit Code to Email
+          </button>
+        </div>
         <input 
           type="password" 
           id="adminPassword" 
           name="password" 
           class="admin-input" 
           style="width: 100%; box-sizing: border-box; padding: 10px; font-size: 13px;" 
-          placeholder="••••••••••••••••" 
+          placeholder="Enter Master Password or 6-digit email code" 
           required 
           autocomplete="current-password"
         >
+        <div id="adminOtpStatus" role="status" aria-live="polite" style="display: none; font-size: 11.5px; color: #34d399; margin-top: 6px;"></div>
       </div>
       <button type="submit" class="btn btn-secondary" style="width: 100%; padding: 10px; font-size: 13px; font-weight: 600;">
-        Continue with Master Password & Email →
+        Continue with Master Password / Email Code →
       </button>
     </form>
 
     <div style="margin-top: 20px; font-size: 11px; color: #64748b; line-height: 1.5;">
-      🔒 Two-factor architecture: Access strictly restricted to whitelisted accounts with verified Master Admin Password and active Google Authenticator TOTP verification.
+      🔒 Two-factor architecture: Access strictly restricted to whitelisted accounts with verified Master Admin Password (or Email OTP) and active Google Authenticator TOTP verification.
     </div>
   </div>
+  <script>
+  window.sendAdminLoginOtp = async function() {
+    const emailEl = document.getElementById('adminEmail');
+    const pwdEl = document.getElementById('adminPassword');
+    const btnEl = document.getElementById('sendAdminOtpBtn');
+    const statusEl = document.getElementById('adminOtpStatus');
+    const email = (emailEl && emailEl.value || '').trim().toLowerCase();
+    if (!email || !email.includes('@')) {
+      alert('Please enter your whitelisted admin email first.');
+      if (emailEl) emailEl.focus();
+      return;
+    }
+    if (btnEl) {
+      btnEl.disabled = true;
+      btnEl.textContent = 'Sending...';
+    }
+    try {
+      const resp = await fetch('/api/auth/send-otp', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email: email })
+      });
+      const data = await resp.json();
+      if (resp.ok && data.success) {
+        if (pwdEl) {
+          pwdEl.type = 'text';
+          pwdEl.placeholder = 'Enter 6-digit verification code from email';
+          pwdEl.focus();
+          if (data.test_code) pwdEl.value = data.test_code;
+        }
+        if (statusEl) {
+          statusEl.style.display = 'block';
+          statusEl.style.color = '#34d399';
+          statusEl.textContent = '📬 6-digit verification code sent to ' + email + '. Enter it above to continue.';
+        }
+      } else {
+        if (statusEl) {
+          statusEl.style.display = 'block';
+          statusEl.style.color = '#f87171';
+          statusEl.textContent = '❌ ' + (data.detail || data.message || 'Could not send verification code.');
+        }
+      }
+    } catch (e) {
+      if (statusEl) {
+        statusEl.style.display = 'block';
+        statusEl.style.color = '#f87171';
+        statusEl.textContent = '❌ Network error: ' + e.message;
+      }
+    } finally {
+      if (btnEl) {
+        btnEl.disabled = false;
+        btnEl.textContent = 'Resend 6-Digit Code';
+      }
+    }
+  };
+  </script>
 
 {% else %}
   <!-- Authenticated Admin Dashboard -->
@@ -676,6 +738,30 @@
       <div class="kpi-value">{{ summary.pdf_downloads }}</div>
       <div class="kpi-delta">Institutional Research Reports</div>
     </div>
+  </div>
+
+  <!-- Executive Command Overview (4-Card Action Strip) -->
+  <div id="adminExecutiveOverview" style="display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 12px; margin-bottom: 18px;">
+    <button type="button" class="btn btn-secondary" onclick="showTab('billables')" style="display: flex; flex-direction: column; align-items: flex-start; text-align: left; padding: 14px 16px; background: rgba(16, 185, 129, 0.08); border: 1px solid rgba(16, 185, 129, 0.28); border-radius: 10px; cursor: pointer;">
+      <span style="font-size: 11px; font-weight: 800; color: #6ee7b7; text-transform: uppercase; letter-spacing: 0.05em;">1. Net Revenue & Credits</span>
+      <span style="font-size: 20px; font-weight: 800; color: #f8fafc; margin-top: 4px;" class="tnum">₹{{ "{:,.0f}".format(billables.financials.net_retained_revenue_inr | default(0)) if billables and billables.financials else "0" }}</span>
+      <span style="font-size: 11px; color: #94a3b8; margin-top: 2px;">{{ billables.financials.paid_orders_count | default(0) if billables and billables.financials else 0 }} settled orders → View Ledger</span>
+    </button>
+    <button type="button" class="btn btn-secondary" onclick="showTab('tickets')" style="display: flex; flex-direction: column; align-items: flex-start; text-align: left; padding: 14px 16px; background: rgba(245, 158, 11, 0.08); border: 1px solid rgba(245, 158, 11, 0.28); border-radius: 10px; cursor: pointer;">
+      <span style="font-size: 11px; font-weight: 800; color: #fcd34d; text-transform: uppercase; letter-spacing: 0.05em;">2. Unresolved Support Inbox</span>
+      <span style="font-size: 20px; font-weight: 800; color: #f8fafc; margin-top: 4px;" class="tnum">{{ open_tickets_count | default(0) }} Open</span>
+      <span style="font-size: 11px; color: #94a3b8; margin-top: 2px;">{{ (support_tickets | length) if support_tickets else 0 }} total tickets → Respond Now</span>
+    </button>
+    <button type="button" class="btn btn-secondary" onclick="showTab('catalog')" style="display: flex; flex-direction: column; align-items: flex-start; text-align: left; padding: 14px 16px; background: rgba(56, 189, 248, 0.08); border: 1px solid rgba(56, 189, 248, 0.28); border-radius: 10px; cursor: pointer;">
+      <span style="font-size: 11px; font-weight: 800; color: #7dd3fc; text-transform: uppercase; letter-spacing: 0.05em;">3. Data & Provider Health</span>
+      <span style="font-size: 20px; font-weight: 800; color: #34d399; margin-top: 4px;" class="tnum">{{ provider_constraints.healthy_count | default(0) if provider_constraints else 0 }} / {{ provider_constraints.total_count | default(0) if provider_constraints else 0 }} Healthy</span>
+      <span style="font-size: 11px; color: #94a3b8; margin-top: 2px;">Multi-Asset Catalog & Schedulers → Inspect</span>
+    </button>
+    <button type="button" class="btn btn-secondary" onclick="showTab('users')" style="display: flex; flex-direction: column; align-items: flex-start; text-align: left; padding: 14px 16px; background: rgba(168, 85, 247, 0.08); border: 1px solid rgba(168, 85, 247, 0.28); border-radius: 10px; cursor: pointer;">
+      <span style="font-size: 11px; font-weight: 800; color: #d8b4fe; text-transform: uppercase; letter-spacing: 0.05em;">4. Active Allocators & Compute</span>
+      <span style="font-size: 20px; font-weight: 800; color: #f8fafc; margin-top: 4px;" class="tnum">{{ summary.unique_sessions | default(0) if summary else 0 }} Sessions</span>
+      <span style="font-size: 11px; color: #94a3b8; margin-top: 2px;">{{ "%.1f"|format(summary.cache_efficiency_pct | default(0)) if summary else "0.0" }}% Cache Hit Rate → Manage Users</span>
+    </button>
   </div>
 
   <!-- Navigation Tabs -->

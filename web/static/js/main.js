@@ -10,8 +10,12 @@
       const hashParams = new URLSearchParams(window.location.hash.substring(1));
       const accessToken = hashParams.get('access_token');
       const err = hashParams.get('error_description') || hashParams.get('error');
-      const isAdmin = window.location.pathname.startsWith('/admin');
+      const hasAdminCookie = document.cookie.split(';').some(c => c.trim().startsWith('oauth_admin_intent='));
+      const isAdmin = window.location.pathname.startsWith('/admin') || hasAdminCookie;
       if (accessToken) {
+        if (hasAdminCookie) {
+          document.cookie = 'oauth_admin_intent=; Max-Age=0; path=/';
+        }
         const callbackUrl = isAdmin ? '/admin/auth/callback' : '/auth/callback';
         window.location.replace(callbackUrl + '?access_token=' + encodeURIComponent(accessToken));
       } else if (err) {
@@ -23,6 +27,7 @@
     }
   }
 })();
+
 
 document.addEventListener('DOMContentLoaded', () => {
   initSearchAutocomplete();
@@ -1251,6 +1256,59 @@ window.handleResendOtp = async function() {
 };
 
 window.handleSignInSubmit = window.handleAuthFormSubmit;
+
+window.sendAdminLoginOtp = window.sendAdminLoginOtp || async function() {
+  const emailEl = document.getElementById('adminEmail');
+  const pwdEl = document.getElementById('adminPassword');
+  const btnEl = document.getElementById('sendAdminOtpBtn');
+  const statusEl = document.getElementById('adminOtpStatus');
+  const email = (emailEl && emailEl.value || '').trim().toLowerCase();
+  if (!email || !email.includes('@')) {
+    alert('Please enter your whitelisted admin email first.');
+    if (emailEl) emailEl.focus();
+    return;
+  }
+  if (btnEl) {
+    btnEl.disabled = true;
+    btnEl.textContent = 'Sending...';
+  }
+  try {
+    const resp = await fetch('/api/auth/send-otp', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ email: email })
+    });
+    const data = await resp.json();
+    if (resp.ok && data.success) {
+      if (pwdEl) {
+        pwdEl.type = 'text';
+        pwdEl.placeholder = 'Enter 6-digit verification code from email';
+        pwdEl.focus();
+        if (data.test_code) pwdEl.value = data.test_code;
+      }
+      if (statusEl) {
+        statusEl.style.display = 'block';
+        statusEl.style.color = '#34d399';
+        statusEl.textContent = '📬 6-digit verification code sent to ' + email + '. Enter it above to continue.';
+      }
+    } else if (statusEl) {
+      statusEl.style.display = 'block';
+      statusEl.style.color = '#f87171';
+      statusEl.textContent = '❌ ' + (data.detail || data.message || 'Could not send verification code.');
+    }
+  } catch (e) {
+    if (statusEl) {
+      statusEl.style.display = 'block';
+      statusEl.style.color = '#f87171';
+      statusEl.textContent = '❌ Network error: ' + e.message;
+    }
+  } finally {
+    if (btnEl) {
+      btnEl.disabled = false;
+      btnEl.textContent = 'Resend 6-Digit Code';
+    }
+  }
+};
 
 window.handlePreMortemSubmit = async function(e, ticker) {
   if (e) e.preventDefault();
