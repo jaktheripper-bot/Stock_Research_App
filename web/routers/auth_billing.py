@@ -20,7 +20,7 @@ from fastapi import APIRouter, Request, HTTPException
 from fastapi.responses import HTMLResponse, RedirectResponse, JSONResponse
 
 from core.auth.otp import create_email_otp, verify_email_otp
-from core.auth.supabase_auth import get_supabase_auth_config
+from core.auth.supabase_auth import get_supabase_auth_config, verify_supabase_access_token
 from core.db import get_or_create_user, get_user_by_id
 from core.db.telemetry import (
     record_usage_event,
@@ -309,21 +309,7 @@ async def public_auth_callback(
             logger.error(f"Error exchanging public OAuth code: {e}")
 
     elif access_token:
-        if sb_url and anon_key:
-            try:
-                resp = requests.get(
-                    f"{sb_url}/auth/v1/user",
-                    headers={"Authorization": f"Bearer {access_token}", "apikey": anon_key},
-                    timeout=8
-                )
-                if resp.status_code == 200:
-                    data = resp.json()
-                    verified_email = data.get("email")
-                    user_name = data.get("user_metadata", {}).get("full_name") or data.get("user_metadata", {}).get("name")
-            except Exception as e:
-                logger.debug(f"Notice fetching public user via token endpoint: {e}")
-
-        # Only allow synthetic JWT claim decoding inside automated test runs (TESTING=1)
+        verified_email, user_name = verify_supabase_access_token(access_token)
         if not verified_email and os.environ.get("TESTING") == "1":
             claims = _extract_jwt_claims(access_token)
             user_meta = claims.get("user_metadata") or {}
@@ -332,6 +318,12 @@ async def public_auth_callback(
                 user_name = user_meta.get("full_name") or user_meta.get("name") or claims.get("name")
 
     if not verified_email:
+        if access_token or code:
+            logger.warning("Public OAuth callback received token/code that failed verification.")
+            return RedirectResponse(
+                url="/?err=Authentication+verification+failed.+Please+try+signing+in+again.",
+                status_code=303,
+            )
         return HTMLResponse(f"""
         <!DOCTYPE html>
         <html><head><meta charset="utf-8"><title>Verifying Identity...</title></head>
@@ -346,14 +338,14 @@ async def public_auth_callback(
                 const token = params.get('access_token');
                 const err = params.get('error_description') || params.get('error');
                 if (token) {{
-                    window.location.href = '/auth/callback?access_token=' + encodeURIComponent(token) + '&next=' + encodeURIComponent('{next or "/"}');
+                    window.location.replace('/auth/callback?access_token=' + encodeURIComponent(token) + '&next=' + encodeURIComponent('{next or "/"}'));
                 }} else if (err) {{
-                    window.location.href = '/?err=' + encodeURIComponent(err);
+                    window.location.replace('/?err=' + encodeURIComponent(err));
                 }} else {{
-                    window.location.href = '/?err=Authentication+failed';
+                    window.location.replace('/?err=Authentication+failed');
                 }}
             }} else {{
-                window.location.href = '/?err=Authentication+session+expired+or+cancelled';
+                window.location.replace('/?err=Authentication+session+expired+or+cancelled');
             }}
             </script>
         </body></html>

@@ -7,6 +7,7 @@ Exposes Supabase authentication, session handling, and OAuth/Magic link utilitie
 from core.auth.supabase_auth import (
     get_supabase_auth_config,
     get_google_oauth_url,
+    verify_supabase_access_token,
     send_magic_link,
     set_session_user,
     get_current_user,
@@ -19,6 +20,7 @@ from core.auth.supabase_auth import (
 __all__ = [
     "get_supabase_auth_config",
     "get_google_oauth_url",
+    "verify_supabase_access_token",
     "send_magic_link",
     "set_session_user",
     "get_current_user",

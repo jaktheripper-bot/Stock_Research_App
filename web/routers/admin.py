@@ -49,7 +49,7 @@ from core.db import (
 from core.config import get_secret
 from core.notify import send_ticket_reply_email
 from core.auth.totp import generate_totp_secret, verify_totp_code, get_totp_uri
-from core.auth.supabase_auth import get_supabase_auth_config
+from core.auth.supabase_auth import get_supabase_auth_config, verify_supabase_access_token
 from core.db.admin import (
     get_admin_user,
     list_admin_users,
@@ -804,20 +804,7 @@ async def admin_auth_callback(
             logger.error(f"Error exchanging OAuth code: {e}")
 
     elif access_token:
-        if sb_url and anon_key:
-            try:
-                resp = requests.get(
-                    f"{sb_url}/auth/v1/user",
-                    headers={"Authorization": f"Bearer {access_token}", "apikey": anon_key},
-                    timeout=8
-                )
-                if resp.status_code == 200:
-                    data = resp.json()
-                    verified_email = data.get("email")
-            except Exception as e:
-                logger.debug(f"Notice fetching user via token endpoint: {e}")
-
-        # Only allow local unverified claim extraction in unit test mode (TESTING=1)
+        verified_email, _ = verify_supabase_access_token(access_token)
         if not verified_email and os.environ.get("TESTING") == "1":
             claims = _extract_jwt_claims(access_token)
             user_meta = claims.get("user_metadata") or {}
@@ -825,6 +812,12 @@ async def admin_auth_callback(
                 verified_email = claims.get("email") or user_meta.get("email")
 
     if not verified_email:
+        if access_token or code:
+            logger.warning("Admin OAuth callback received token/code that failed verification.")
+            return RedirectResponse(
+                url="/admin?err=Authentication+verification+failed.+Please+try+signing+in+again.",
+                status_code=303,
+            )
         return HTMLResponse("""
         <!DOCTYPE html>
         <html><head><meta charset="utf-8"><title>Verifying Identity...</title></head>
@@ -839,14 +832,14 @@ async def admin_auth_callback(
                 const token = params.get('access_token');
                 const err = params.get('error_description') || params.get('error');
                 if (token) {
-                    window.location.href = '/admin/auth/callback?access_token=' + encodeURIComponent(token);
+                    window.location.replace('/admin/auth/callback?access_token=' + encodeURIComponent(token));
                 } else if (err) {
-                    window.location.href = '/admin?err=' + encodeURIComponent(err);
+                    window.location.replace('/admin?err=' + encodeURIComponent(err));
                 } else {
-                    window.location.href = '/admin?err=Authentication+failed:+no+token';
+                    window.location.replace('/admin?err=Authentication+failed:+no+token');
                 }
             } else {
-                window.location.href = '/admin?err=Authentication+session+expired+or+cancelled';
+                window.location.replace('/admin?err=Authentication+session+expired+or+cancelled');
             }
             </script>
         </body></html>

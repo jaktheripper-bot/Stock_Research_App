@@ -529,6 +529,65 @@ class TestRenderHardening(unittest.TestCase):
         self.assertEqual(r_open_auth.status_code, 303)
         self.assertEqual(r_open_auth.headers.get("location"), "/")
 
+    def test_es256_jwks_verification_and_sql_fallback_url_resolution(self):
+        import base64
+        import json
+        import time
+        from cryptography.hazmat.primitives.asymmetric import ec
+        from cryptography.hazmat.primitives.asymmetric.utils import decode_dss_signature
+        from cryptography.hazmat.primitives import hashes
+        import core.auth.supabase_auth as sb_auth
+
+        # Generate ephemeral EC P-256 keypair and populate _JWKS_CACHE
+        priv_key = ec.generate_private_key(ec.SECP256R1())
+        pub_nums = priv_key.public_key().public_numbers()
+        x_b64 = base64.urlsafe_b64encode(pub_nums.x.to_bytes(32, "big")).decode().rstrip("=")
+        y_b64 = base64.urlsafe_b64encode(pub_nums.y.to_bytes(32, "big")).decode().rstrip("=")
+
+        jwk_entry = {
+            "kty": "EC",
+            "crv": "P-256",
+            "alg": "ES256",
+            "kid": "test-kid-es256",
+            "x": x_b64,
+            "y": y_b64,
+        }
+        sb_auth._JWKS_CACHE["keys"] = [jwk_entry]
+        sb_auth._JWKS_CACHE["fetched_at"] = time.time()
+        sb_auth._JWKS_CACHE["url"] = "https://omswdxrtzrvlszkidssh.supabase.co"
+
+        header_b64 = base64.urlsafe_b64encode(
+            json.dumps({"alg": "ES256", "kid": "test-kid-es256", "typ": "JWT"}).encode()
+        ).decode().rstrip("=")
+        payload_b64 = base64.urlsafe_b64encode(
+            json.dumps({
+                "email": "es256_verified@moatnomics.com",
+                "exp": int(time.time()) + 3600,
+                "user_metadata": {"full_name": "Rahul Sharma"},
+            }).encode()
+        ).decode().rstrip("=")
+
+        signing_input = f"{header_b64}.{payload_b64}".encode("ascii")
+        der_sig = priv_key.sign(signing_input, ec.ECDSA(hashes.SHA256()))
+        r_int, s_int = decode_dss_signature(der_sig)
+        raw_sig = r_int.to_bytes(32, "big") + s_int.to_bytes(32, "big")
+        sig_b64 = base64.urlsafe_b64encode(raw_sig).decode().rstrip("=")
+
+        valid_es256_jwt = f"{header_b64}.{payload_b64}.{sig_b64}"
+        tampered_es256_jwt = f"{header_b64}.{payload_b64}." + base64.urlsafe_b64encode(b"\x01" * 64).decode().rstrip("=")
+
+        # Verify in non-test (production) mode with empty SUPABASE_ANON_KEY
+        with patch.dict(os.environ, {"TESTING": "0", "SUPABASE_ANON_KEY": ""}):
+            email, name = sb_auth.verify_supabase_access_token(valid_es256_jwt)
+            self.assertEqual(email, "es256_verified@moatnomics.com")
+            self.assertEqual(name, "Rahul Sharma")
+
+            # Tampered signature must be rejected in production mode
+            with patch("core.auth.supabase_auth.requests.get") as mock_get:
+                mock_get.return_value.status_code = 401
+                bad_email, _ = sb_auth.verify_supabase_access_token(tampered_es256_jwt)
+                self.assertIsNone(bad_email)
+
 
 # ==============================================================================
 # 5. Database Dual-Binding & SQLite Transparent Failover
