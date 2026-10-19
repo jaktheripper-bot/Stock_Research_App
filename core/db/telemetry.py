@@ -935,14 +935,17 @@ def get_site_usage_summary(days: int = None, start_date = None, end_date = None,
                 LIMIT 50
             ''')
             for row in cursor.fetchall():
+                fmt_ts = _format_timestamp(row[4])
                 summary["recent_events"].append({
                     "event_type": row[0],
                     "ticker": row[1] or "-",
                     "latency_ms": round(float(row[2] or 0), 1),
                     "cost_saved_usd": round(float(row[3] or 0), 3),
-                    "formatted_time": _format_timestamp(row[4]),
+                    "formatted_time": fmt_ts,
+                    "timestamp": fmt_ts,
                     "session_id": str(row[5])[:10],
                     "source": row[6],
+                    "traffic_source": row[6],
                     "country": row[7],
                     "device": row[8],
                 })
@@ -957,14 +960,17 @@ def get_site_usage_summary(days: int = None, start_date = None, end_date = None,
                 LIMIT 20
             ''')
             for row in cursor.fetchall():
+                fmt_ts = _format_timestamp(row[4])
                 summary["recent_events"].append({
                     "event_type": row[0],
                     "ticker": row[1] or "-",
                     "latency_ms": round(float(row[2] or 0), 1),
                     "cost_saved_usd": round(float(row[3] or 0), 3),
-                    "formatted_time": _format_timestamp(row[4]),
+                    "formatted_time": fmt_ts,
+                    "timestamp": fmt_ts,
                     "session_id": "-",
                     "source": "Unrecorded",
+                    "traffic_source": "Unrecorded",
                     "country": "Unknown",
                     "device": "Unknown",
                 })

@@ -104,6 +104,12 @@ class TestTrafficFlowAnalyticsEngine(unittest.TestCase):
         self.assertIn("formatted_overall_avg_dwell", summary)
         self.assertIn("total_dwell_hours", summary)
         self.assertIn("total_navigation_transitions", summary)
+        self.assertIn("recent_events", summary)
+        for ev in summary["recent_events"][:5]:
+            self.assertIn("timestamp", ev)
+            self.assertIn("formatted_time", ev)
+            self.assertIn("traffic_source", ev)
+            self.assertIn("source", ev)
 
 
 class TestTrafficFlowApiEndpoint(unittest.TestCase):
