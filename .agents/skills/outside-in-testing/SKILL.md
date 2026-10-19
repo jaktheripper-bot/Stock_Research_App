@@ -112,6 +112,8 @@ def assert_fetch_routes_registered(html_content: str, app):
 
 ### 5. Viewport Centering & CSS Architecture
 - Modals must be placed directly under `<body>` or at root container level, outside of scrollable tables, cards, or `overflow: hidden` wrappers.
+- **Inert Ancestor Lockout Prevention:** Never set `mainEl.inert = true` or `aria-hidden="true"` on `<main>` if the modal/drawer (`#copilotModalBackdrop`, etc.) is rendered inside `{% block content %}` (`<main>`). Always hoist modals to `document.body` (`if (modal.parentElement !== document.body) document.body.appendChild(modal)`) and guard with `if (mainEl && !mainEl.contains(modal)) mainEl.inert = true`.
+- **Mobile Virtual Keyboard Contract:** Modal inputs and textareas must have `font-size: 16px` (`1rem`) and call `input.focus({ preventScroll: true })` synchronously inside the click handler tick (mobile browsers ignore asynchronous `setTimeout` focus calls for opening the virtual keyboard).
 - Modals must implement standard `.modal-backdrop` and `.modal-dialog` structure:
   - `position: fixed; top: 0; left: 0; width: 100%; height: 100%`.
   - `display: flex; align-items: center; justify-content: center; z-index: 1000`.
@@ -164,6 +166,26 @@ Never test scheduled pipelines or time-series features solely with static fixtur
 3. **Data Provenance & Freshness Assertion:**
    Assert that every rendered table, card, or directory includes a visible date stamp or provenance tag showing when the record was published or ingested.
 
+### 9. Real-Browser Pointer Hit-Testing (No `page.evaluate()` Bypasses)
+Never validate interactive drawers, modals, or buttons in Playwright/Chrome by calling `page.evaluate("openCopilot()")` or `page.evaluate("closeCopilot()")`. Direct JS calls bypass browser hit-testing and miss `[inert]` self-lockouts, `pointer-events: none`, and overlapping z-index traps.
+Always execute real pointer clicks and verify focus + non-inert state:
+```python
+page.locator("#forensicDeskFloatingDock").click(timeout=5000)
+page.locator("#copilotInput").click(timeout=5000)
+page.keyboard.type("Test query")
+state = page.evaluate("""() => {
+    const bd = document.getElementById('copilotModalBackdrop');
+    const inp = document.getElementById('copilotInput');
+    return {
+        portaledToBody: !!(bd && bd.parentElement === document.body),
+        notInert: !!(bd && !bd.closest('[inert]')),
+        inputFocused: document.activeElement === inp,
+    };
+}""")
+assert state["portaledToBody"] and state["notInert"] and state["inputFocused"]
+page.locator("#copilotCloseBtn").click(timeout=5000)
+```
+
 ---
 
 ## When to Run Outside-In Tests
@@ -175,5 +197,6 @@ Never test scheduled pipelines or time-series features solely with static fixtur
 3. **When Modifying Any Scheduled Job or Ingestion Engine:**
    Ensure time-series rotation and unmocked database incrementation pass Pillar 8.
 4. **During Headless / Browser Subagent Verification:**
-   Verify visual centering, click events, progress spinner, and modal appearance via screenshots or DOM inspection before declaring completion.
+   Verify visual centering, real pointer click events, mobile keyboard focus, progress spinner, and modal dismissal via real pointer hit-testing before declaring completion.
+
 

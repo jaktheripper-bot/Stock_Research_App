@@ -835,6 +835,41 @@ class RealityAuditor:
             pass
         self.ok(gate, "single_flight_ticker_lock() context manager verified")
 
+    # =========================================================================
+    # GATE 12: UI INERT ANCESTOR GUARD & MOBILE KEYBOARD HYGIENE (WAVE 16)
+    # =========================================================================
+    def run_gate_12_ui_inert_and_modal_safety(self) -> None:
+        gate = "GATE-12:UI-INERT-AND-MODAL-SAFETY"
+        copilot_js = ROOT / "web/static/js/copilot.js"
+        copilot_modal = ROOT / "web/templates/partials/copilot_modal.html"
+
+        if not copilot_js.exists() or not copilot_modal.exists():
+            self.fail(gate, "web/static/js/copilot.js", "Missing copilot.js or copilot_modal.html")
+            return
+
+        js_src = copilot_js.read_text(encoding="utf-8")
+        modal_src = copilot_modal.read_text(encoding="utf-8")
+
+        # 12.1 Ensure #copilotModalBackdrop is portaled to document.body and guarded by !mainEl.contains(modal)
+        if "document.body.appendChild(modal)" not in js_src or "!mainEl.contains(modal)" not in js_src or "modal.inert = false" not in js_src:
+            self.fail(
+                gate,
+                "web/static/js/copilot.js",
+                "INERT SELF-LOCKOUT RISK: copilot.js must portal #copilotModalBackdrop to document.body and guard mainEl.inert = true with !mainEl.contains(modal)."
+            )
+        else:
+            self.ok(gate, "Forensic Desk modal portaled to document.body with !mainEl.contains(modal) inert guard")
+
+        # 12.2 Ensure mobile virtual keyboard 16px font-size and explicit close button ID
+        if "font-size: 16px;" not in modal_src or 'id="copilotCloseBtn"' not in modal_src:
+            self.fail(
+                gate,
+                "web/templates/partials/copilot_modal.html",
+                "MOBILE KEYBOARD/CLOSE HYGIENE: .copilot-textarea must use font-size: 16px and close button must have id='copilotCloseBtn'."
+            )
+        else:
+            self.ok(gate, "Forensic Desk mobile 16px input hygiene and #copilotCloseBtn contract verified")
+
     def report(self) -> int:
         print("=" * 76)
         print("MOATNOMICS ZERO-ILLUSION REALITY & SECURITY AUDIT")
@@ -843,7 +878,7 @@ class RealityAuditor:
             print(f"  PASS  {msg}")
         print("-" * 76)
         if not self.failures:
-            print("ALL 11 REALITY GATES PASSED (0 vulnerabilities, 0 broken contracts).")
+            print("ALL 12 REALITY GATES PASSED (0 vulnerabilities, 0 broken contracts).")
             return 0
 
         print(f"AUDIT FAILED: {len(self.failures)} REAL ISSUE(S) DETECTED:\n")
@@ -866,5 +901,7 @@ if __name__ == "__main__":
     auditor.run_gate_9_dialect_and_locks()
     auditor.run_gate_10_quant_invariants()
     auditor.run_gate_11_ai_qos_isolation()
+    auditor.run_gate_12_ui_inert_and_modal_safety()
     sys.exit(auditor.report())
+
 

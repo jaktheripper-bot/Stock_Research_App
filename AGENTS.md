@@ -72,16 +72,20 @@ Whenever authoring, refactoring, or verifying web pages, modals, buttons, or int
 3. **DOM Element Binding Contracts (Zero Null References):**
    - Every `document.getElementById('xyz')` queried by client scripts must be statically verified or runtime-asserted against the target rendered DOM.
    - Forbid tests that pass HTTP 200 while client-side scripts throw runtime `TypeError: Cannot set property 'innerText' of null`.
-4. **Modal Centering & Viewport Architecture:**
-   - Every modal MUST adhere to the standardized `.modal-backdrop` and `.modal-dialog` contract.
-   - Modals must NEVER be nested inside containers with `overflow: hidden`, `overflow-x: auto`, or relative layout traps that clip them outside the viewport upon scrolling.
-   - Every modal MUST include a functional close button, backdrop-click dismissal, and `Escape` key listener.
+4. **Modal Centering, Top-Layer Portaling & Inert Ancestor Guard:**
+   - Every modal MUST adhere to the standardized `.modal-backdrop` and `.modal-dialog` contract and reside directly under `<body>` (outside `<main>`), or dynamically hoist itself via `document.body.appendChild(modal)` on load/open.
+   - Modals must NEVER be nested inside containers with `overflow: hidden`, `overflow-x: auto`, `contain: layout/paint`, or any ancestor that sets `.inert = true` or `aria-hidden="true"` (`if (mainEl && !mainEl.contains(modal)) mainEl.inert = true`). Setting `.inert = true` on an ancestor of an open modal locks out all pointer/touch events and traps the user.
+   - Every modal with a text input/textarea MUST call `.focus({ preventScroll: true })` synchronously within the user click gesture tick (never solely inside `setTimeout`, which drops the mobile virtual keyboard gesture token) and enforce `font-size >= 16px` (`1rem`).
+   - Every modal MUST include a functional close button (`type="button"`), backdrop-click dismissal, and `Escape` key listener.
 5. **Client-Side API Route Contracts:**
    - Every AJAX `fetch('/api/...')` target in JavaScript or inline scripts must be cross-referenced against active, registered FastAPI server routes with valid parameter payloads.
 6. **Substantive Analytical Depth (Value Covenant):**
    - Interactive modals, deep-dive cards, and analytical drawers must render genuine domain intelligence (credit risk ratios, working capital cycles, benchmark deltas, moat scores, failure mode alerts), never trivial data echoes or hollow placeholder text.
 7. **Template Attribute & Rendering Hygiene:**
    - Rendered HTML must be audited with BeautifulSoup to assert zero unrendered Jinja expressions (`{{` or `{%`) leak into `href`, `onclick`, `id`, `class`, or `data-*` attributes.
+8. **Real Pointer Hit-Testing in Browser Audits (Zero `page.evaluate()` Bypasses):**
+   - When verifying modals, drawers, inputs, or buttons in Chrome/Playwright, NEVER use `page.evaluate(() => openModal())` or `page.evaluate(() => closeModal())` to simulate user interaction. Direct JS invocation bypasses browser hit-testing (`[inert]`, `pointer-events: none`, z-index obscuration, off-screen clipping).
+   - Always use real Playwright pointer/keyboard actions (`page.locator(trigger).click()`, `page.locator(input).click()`, `page.keyboard.type(...)`, `page.locator(closeBtn).click()`) and assert `document.activeElement === input` and `!modal.closest('[inert]')`.
 
 ## 7. Anti-Staleness & Data Freshness Invariant (Zero Static Facades)
 **If the platform's mission is asset discovery and shielding allocators from bad data, stale data is a catastrophic failure mode.**
@@ -96,9 +100,9 @@ Whenever authoring, refactoring, or maintaining scheduled pipelines, discovery f
 
 ### 8.1 Mandatory Pre-Completion Verification Gate
 - Never claim a task, bug fix, or feature is complete based solely on `py_compile`, syntax checks, or mocked unit tests.
-- Before ending ANY turn that modifies `.py` files in `core/` or `web/`, you MUST execute:
+- Before ending ANY turn that modifies `.py`, `.js`, `.html`, or `.css` files in `core/` or `web/`, you MUST execute:
   `python3 scripts/verify_reality_audit.py`
-- If `verify_reality_audit.py` returns a non-zero exit code, you MUST fix all reported `[GATE-1]` through `[GATE-5]` failures before yielding back to the user.
+- If `verify_reality_audit.py` returns a non-zero exit code, you MUST fix all reported `[GATE-1]` through `[GATE-12]` failures before yielding back to the user.
 
 ### 8.2 Forbidden Code Patterns (Enforced by AST Gate & CI Pipeline)
 - **No Auth Fallbacks:** Never create a session or log a user in inside a `catch`/`except` or non-200 fallback block.
