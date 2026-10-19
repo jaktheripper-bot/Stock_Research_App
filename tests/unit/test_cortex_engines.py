@@ -568,13 +568,29 @@ class TestAnvikCortexEngineComposite(unittest.TestCase):
         )
         self.assertEqual(eval_res.conviction_quadrant, "HIGH_RISK_DEFICIT")
         self.assertIn("Forensic governance red flags preclude institutional conviction", eval_res.executive_verdict)
-from core.brand.moatnomics_house import MOATNOMICS_BRAND_HOUSE, get_system_prompt_context
-from core.brand import MOATNOMICS_BRAND_HOUSE as EXPORTED_HOUSE, get_system_prompt_context as exported_context_fn
+from core.brand.moatnomics_house import (
+    MOATNOMICS_BRAND_HOUSE,
+    MASTER_AI_PROMPT,
+    get_system_prompt_context,
+    get_content_framework_brief,
+)
+from core.brand import (
+    MOATNOMICS_BRAND_HOUSE as EXPORTED_HOUSE,
+    MASTER_AI_PROMPT as EXPORTED_MASTER_PROMPT,
+    get_system_prompt_context as exported_context_fn,
+    get_content_framework_brief as exported_brief_fn,
+)
 
 class TestMoatnomicsBrandHouse(unittest.TestCase):
     def test_brand_house_structure(self):
         self.assertEqual(MOATNOMICS_BRAND_HOUSE["brand_name"], "Moatnomics")
         self.assertEqual(MOATNOMICS_BRAND_HOUSE["tagline"], "Audit the Asset. Protect the Allocator.")
+        self.assertEqual(MOATNOMICS_BRAND_HOUSE["creative_territory"], "Less noise, more nuance.")
+        self.assertEqual(MOATNOMICS_BRAND_HOUSE["category_descriptor"], "Multi-asset investment research")
+        self.assertEqual(
+            MOATNOMICS_BRAND_HOUSE["core_promise"],
+            "Understand the evidence. Examine the trade-offs. Know what deserves a closer look.",
+        )
         self.assertIn("Dual-Mandate", MOATNOMICS_BRAND_HOUSE["core_philosophy"])
         self.assertIn("Clinical, objective, empirical", MOATNOMICS_BRAND_HOUSE["tone_and_voice"])
         self.assertIn("NEVER output prescriptive advice", MOATNOMICS_BRAND_HOUSE["sebi_safe_harbor_rules"])
@@ -585,17 +601,37 @@ class TestMoatnomicsBrandHouse(unittest.TestCase):
         self.assertEqual(MOATNOMICS_BRAND_HOUSE["taxonomy"]["Funds"], "Moatnomics Funds")
         self.assertEqual(MOATNOMICS_BRAND_HOUSE["taxonomy"]["Debt"], "Moatnomics Yield")
 
+        # Verify 4 Brand Behaviours, 5 Personality Traits, Editorial Method, Epistemic Tiers, and 4 Franchises
+        self.assertEqual(len(MOATNOMICS_BRAND_HOUSE["brand_behaviours"]), 4)
+        self.assertEqual(len(MOATNOMICS_BRAND_HOUSE["personality_traits"]), 5)
+        self.assertEqual(len(MOATNOMICS_BRAND_HOUSE["editorial_method"]["stages"]), 4)
+        self.assertEqual(len(MOATNOMICS_BRAND_HOUSE["editorial_method"]["six_point_quality_gate"]), 6)
+        self.assertEqual(
+            MOATNOMICS_BRAND_HOUSE["epistemic_tiers"],
+            ["VERIFIED FACT", "CALCULATION", "INTERPRETATION", "ASSUMPTION", "UNCERTAINTY"],
+        )
+        self.assertEqual(len(MOATNOMICS_BRAND_HOUSE["editorial_franchises"]), 4)
+        self.assertEqual(len(MOATNOMICS_BRAND_HOUSE["content_frameworks"]), 8)
+
     def test_system_prompt_context_compilation(self):
         ctx = get_system_prompt_context()
         self.assertIsInstance(ctx, str)
         self.assertIn("You represent Moatnomics", ctx)
+        self.assertIn("Less noise, more nuance.", ctx)
         self.assertIn("Dual-Mandate", ctx)
         self.assertIn("NEVER output prescriptive advice", ctx)
+        self.assertIn("RESEARCH INTEGRITY", ctx)
+
+        dossier_ctx = get_system_prompt_context(content_type="research_dossiers")
+        self.assertIn("CONTENT TYPE FRAMEWORK (RESEARCH_DOSSIERS", dossier_ctx)
+        self.assertIn("Countercase:", dossier_ctx)
+        self.assertEqual(get_content_framework_brief("non_existent_type"), "")
 
     def test_package_exports(self):
         self.assertIs(MOATNOMICS_BRAND_HOUSE, EXPORTED_HOUSE)
+        self.assertIs(MASTER_AI_PROMPT, EXPORTED_MASTER_PROMPT)
         self.assertIs(get_system_prompt_context, exported_context_fn)
+        self.assertIs(get_content_framework_brief, exported_brief_fn)
 
 if __name__ == "__main__":
     unittest.main()
-

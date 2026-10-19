@@ -14,6 +14,7 @@ from core.analysis.exceptions import PipelineError
 from core.analysis.parser import format_citations_section
 from core.analysis.fundamentals import get_stock_fundamentals, fetch_latest_bse_announcement
 from core.analysis.epistemic_schema import EPISTEMIC_PROMPT_DIRECTIVE
+from core.brand.moatnomics_house import get_system_prompt_context
 from screener import pass_pre_screening_gates
 from checker import verify_stock_report
 
@@ -58,7 +59,8 @@ Tabulate the ESG analysis strictly using the following Markdown table format:
 
 CRITICAL COMPLIANCE DIRECTIVE: Strictly avoid providing any conclusions, forward-looking advice, actionable investment guidance, Buy/Sell/Hold verdicts, investment recommendations, portfolio allocation advice, target prices, trade execution signals, or portfolio roadmaps. The research report concludes strictly after Pillar 7. All analysis must remain purely descriptive, factual, and diagnostic under SEBI Safe Harbor principles."""
 
-    return base_prompt + "\n\n" + EPISTEMIC_PROMPT_DIRECTIVE
+    brand_context = get_system_prompt_context(content_type="research_dossiers").strip()
+    return base_prompt + "\n\n" + brand_context + "\n\n" + EPISTEMIC_PROMPT_DIRECTIVE
 
 _DISCOVERED_MODELS_CACHE = {"models": [], "timestamp": 0}
 
