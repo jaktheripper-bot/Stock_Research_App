@@ -2037,6 +2037,28 @@ async def contact_page(
 
 _CONTACT_RATE_BUCKETS: Dict[str, List[float]] = {}
 
+_DISPOSABLE_EMAIL_DOMAINS = {
+    "nolettersbox.com", "mailinator.com", "guerrillamail.com", "tempmail.com",
+    "10minutemail.com", "yopmail.com", "trashmail.com", "sharklasers.com",
+}
+
+
+def _is_bot_gibberish_ticket(name: str, subject: str, message: str) -> bool:
+    """Detects automated scanner payloads (e.g. NARTYTRYUT802262NERTHRRTH / MERTYHR802262MAVNGHJTH)."""
+    # 1. Message or subject is a single unbroken 16+ char alphanumeric token with no spaces
+    if (" " not in message and len(message) >= 16 and message.isalnum()) or (
+        " " not in subject and len(subject) >= 16 and subject.isalnum()
+    ):
+        return True
+    # 2. Shared 5+ digit correlation token injected across name, subject, and message
+    import re as _re
+    name_digits = set(_re.findall(r"\d{5,}", name))
+    subj_digits = set(_re.findall(r"\d{5,}", subject))
+    msg_digits = set(_re.findall(r"\d{5,}", message))
+    if name_digits and (name_digits & subj_digits) and (name_digits & msg_digits):
+        return True
+    return False
+
 
 @app.post("/contact", response_class=HTMLResponse)
 async def submit_contact_ticket(
@@ -2047,7 +2069,7 @@ async def submit_contact_ticket(
     message: str = Form(...),
     user_name: Optional[str] = Form(""),
     category: Optional[str] = Form("general"),
-    website_url: Optional[str] = Form(None)
+    website_url: Optional[str] = Form(""),
 ):
     """Processes user complaint/support ticket, logs to audit ledger, and alerts admin."""
     import time as _time
@@ -2056,23 +2078,33 @@ async def submit_contact_ticket(
     clean_msg = str(message).strip()[:5000]
     clean_name = str(user_name or "").strip()[:100]
     clean_cat = str(category or "general").strip().lower()[:40]
+    email_domain = clean_email.split("@")[-1] if "@" in clean_email else ""
 
     if not _validate_request_origin(request):
         raise HTTPException(status_code=403, detail="Cross-origin request rejected.")
 
-    # Anti-bot honeypot check: if hidden website_url is populated, reject bot submission gracefully
-    if website_url and str(website_url).strip():
-        logger.warning(f"Spam bot detected on /contact honeypot: {clean_email} (website_url='{str(website_url)[:50]}')")
+    # Silent honeypot & bot-gibberish rejection
+    if (
+        str(website_url or "").strip()
+        or email_domain in _DISPOSABLE_EMAIL_DOMAINS
+        or _is_bot_gibberish_ticket(clean_name, clean_subj, clean_msg)
+    ):
+        logger.warning(
+            f"Spam/bot ticket rejected on /contact: {clean_email} (domain='{email_domain}', honeypot='{str(website_url or '')[:50]}')"
+        )
         return templates.TemplateResponse(
             request=request,
             name="contact.html",
             context={
                 "active_page": "contact",
-                "success_ticket": {
-                    "ticket_id": "TKT-TRAPPED",
-                    "user_email": clean_email,
-                }
-            }
+                "error_msg": "Please provide a valid email address and a clear, multi-word description of your inquiry.",
+                "form_name": clean_name,
+                "form_email": clean_email,
+                "form_subj": clean_subj,
+                "form_msg": clean_msg,
+                "form_cat": clean_cat,
+            },
+            status_code=400,
         )
 
     if not clean_email or "@" not in clean_email or not clean_subj or not clean_msg:

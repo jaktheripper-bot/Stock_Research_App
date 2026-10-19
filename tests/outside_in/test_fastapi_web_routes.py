@@ -372,18 +372,54 @@ Detailed forensic analysis with exact page grounding to bseindia.com filings.
         self.assertIn("Ticket Registered Successfully", res_post.text)
         self.assertIn("TKT-", res_post.text)
 
-        # 3. POST /contact with populated honeypot triggers silent bot mitigation
+        # 3. POST /contact with populated honeypot triggers 400 rejection
         bot_post_data = {
             "user_name": "Spam Bot",
             "user_email": "bot@spammer.org",
             "category": "general",
-            "subject": "Buy cheap viagra",
+            "subject": "Buy cheap stuff",
             "message": "Spam link spam link",
             "website_url": "http://spambot-malicious-domain.com"
         }
         res_bot = self.client.post("/contact", data=bot_post_data)
-        self.assertEqual(res_bot.status_code, 200)
-        self.assertIn("TKT-TRAPPED", res_bot.text)
+        self.assertEqual(res_bot.status_code, 400)
+        self.assertIn("Please provide a valid email address and a clear, multi-word description", res_bot.text)
+
+        # 4. POST /contact with disposable email domain triggers 400 rejection
+        disposable_post_data = {
+            "user_name": "Temp User",
+            "user_email": "anonymous@mailinator.com",
+            "category": "general",
+            "subject": "Checking something",
+            "message": "This is a message from a disposable address."
+        }
+        res_disp = self.client.post("/contact", data=disposable_post_data)
+        self.assertEqual(res_disp.status_code, 400)
+        self.assertIn("Please provide a valid email address and a clear, multi-word description", res_disp.text)
+
+        # 5. POST /contact with bot scanner gibberish (single unbroken 16+ alphanumeric token) triggers 400 rejection
+        gibberish_post_data = {
+            "user_name": "Scanner",
+            "user_email": "scanner@legitlookingdomain.org",
+            "category": "general",
+            "subject": "NARTYTRYUT802262NERTHRRTH",
+            "message": "MERTYHR802262MAVNGHJTH"
+        }
+        res_gibberish = self.client.post("/contact", data=gibberish_post_data)
+        self.assertEqual(res_gibberish.status_code, 400)
+        self.assertIn("Please provide a valid email address and a clear, multi-word description", res_gibberish.text)
+
+        # 6. POST /contact with shared 5+ digit correlation token across name, subject, and message triggers 400 rejection
+        correlated_bot_data = {
+            "user_name": "Bot_987654_User",
+            "user_email": "probe@sometestingdomain.io",
+            "category": "general",
+            "subject": "Inquiry regarding token 987654 status",
+            "message": "This is inquiry payload with 987654 injected."
+        }
+        res_corr = self.client.post("/contact", data=correlated_bot_data)
+        self.assertEqual(res_corr.status_code, 400)
+        self.assertIn("Please provide a valid email address and a clear, multi-word description", res_corr.text)
 
     def test_contact_page_ticket_lookup_and_user_reply(self):
         from core.db import create_support_ticket, get_ticket_by_id, update_ticket_status
