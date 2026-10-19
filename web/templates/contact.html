@@ -94,6 +94,12 @@
           <textarea id="contactMessage" name="message" required rows="5" placeholder="Please describe the issue in detail, including order ID, ticker symbol, or timestamps if applicable..." style="width: 100%; padding: 12px 14px; background: rgba(15, 23, 42, 0.6); border: 1px solid var(--border-color); border-radius: 6px; color: var(--text-primary); font-size: 16px; resize: vertical; line-height: 1.5;">{{ form_msg|default('') }}</textarea>
         </div>
 
+        <!-- Anti-Bot Honeypot (Hidden from humans & screen readers; auto-filled by spam bots) -->
+        <div style="position: absolute; left: -9999px; width: 1px; height: 1px; overflow: hidden;" aria-hidden="true">
+          <label for="contactWebsiteUrl">Website</label>
+          <input type="text" id="contactWebsiteUrl" name="website_url" tabindex="-1" autocomplete="off" value="">
+        </div>
+
         <button type="submit" class="btn btn-primary" style="width: 100%; padding: 14px; font-size: 15px; font-weight: 700; display: flex; justify-content: center; align-items: center; gap: 8px;">
           <span>📨 Send Support Ticket</span>
         </button>

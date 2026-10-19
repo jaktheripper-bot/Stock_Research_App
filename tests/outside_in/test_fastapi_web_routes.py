@@ -353,6 +353,12 @@ Detailed forensic analysis with exact page grounding to bseindia.com filings.
         name_input = soup.find(id="contactUserName")
         self.assertEqual(name_input.get("autocomplete"), "name")
 
+        # Verify anti-bot honeypot DOM presence and accessibility hygiene
+        honeypot_input = soup.find(id="contactWebsiteUrl")
+        self.assertIsNotNone(honeypot_input, "Missing anti-bot honeypot #contactWebsiteUrl in /contact form")
+        self.assertEqual(honeypot_input.get("tabindex"), "-1")
+        self.assertIsNotNone(soup.find("label", attrs={"for": "contactWebsiteUrl"}))
+
         # 2. POST /contact creates ticket and dispatches alert
         post_data = {
             "user_name": "Test Investor",
@@ -365,6 +371,19 @@ Detailed forensic analysis with exact page grounding to bseindia.com filings.
         self.assertEqual(res_post.status_code, 200)
         self.assertIn("Ticket Registered Successfully", res_post.text)
         self.assertIn("TKT-", res_post.text)
+
+        # 3. POST /contact with populated honeypot triggers silent bot mitigation
+        bot_post_data = {
+            "user_name": "Spam Bot",
+            "user_email": "bot@spammer.org",
+            "category": "general",
+            "subject": "Buy cheap viagra",
+            "message": "Spam link spam link",
+            "website_url": "http://spambot-malicious-domain.com"
+        }
+        res_bot = self.client.post("/contact", data=bot_post_data)
+        self.assertEqual(res_bot.status_code, 200)
+        self.assertIn("TKT-TRAPPED", res_bot.text)
 
     def test_contact_page_ticket_lookup_and_user_reply(self):
         from core.db import create_support_ticket, get_ticket_by_id, update_ticket_status

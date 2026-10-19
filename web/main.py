@@ -2046,7 +2046,8 @@ async def submit_contact_ticket(
     subject: str = Form(...),
     message: str = Form(...),
     user_name: Optional[str] = Form(""),
-    category: Optional[str] = Form("general")
+    category: Optional[str] = Form("general"),
+    website_url: Optional[str] = Form(None)
 ):
     """Processes user complaint/support ticket, logs to audit ledger, and alerts admin."""
     import time as _time
@@ -2058,6 +2059,21 @@ async def submit_contact_ticket(
 
     if not _validate_request_origin(request):
         raise HTTPException(status_code=403, detail="Cross-origin request rejected.")
+
+    # Anti-bot honeypot check: if hidden website_url is populated, reject bot submission gracefully
+    if website_url and str(website_url).strip():
+        logger.warning(f"Spam bot detected on /contact honeypot: {clean_email} (website_url='{str(website_url)[:50]}')")
+        return templates.TemplateResponse(
+            request=request,
+            name="contact.html",
+            context={
+                "active_page": "contact",
+                "success_ticket": {
+                    "ticket_id": "TKT-TRAPPED",
+                    "user_email": clean_email,
+                }
+            }
+        )
 
     if not clean_email or "@" not in clean_email or not clean_subj or not clean_msg:
         return templates.TemplateResponse(
