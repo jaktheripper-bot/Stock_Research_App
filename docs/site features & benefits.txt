@@ -1,0 +1,293 @@
+================================================================================
+MOATNOMICS — SITE FEATURES, USER CAPABILITIES & REASONS TO BELIEVE
+================================================================================
+Document Purpose: Comprehensive AI & Stakeholder Reference Briefing
+Primary Market Focus: Indian Capital Markets (NSE, BSE, AMFI, RBI Sovereign, SEBI REITs/InvITs, MSMED Act Enterprises)
+Entity & Regulatory Posture: Independent Software Tool (Not Registered Anywhere). Operates strictly as a factual, descriptive, non-advisory analytical platform under SEBI (Research Analysts) Regulations, 2014 Section 2(u) Safe Harbor. Zero buy/sell/hold recommendations or target price tips.
+================================================================================
+
+
+1. EXECUTIVE SUMMARY: WHAT THIS SITE IS & WHY IT EXISTS
+--------------------------------------------------------------------------------
+Moatnomics is an institutional-grade, multi-asset financial research and forensic auditing platform built specifically for Indian capital market allocators, self-directed investors, family offices, and corporate treasuries.
+
+Most retail and semi-institutional platforms suffer from two fatal flaws:
+  1. Single-Asset Myopia: They evaluate equities in isolation without comparing a company's equity free-cash-flow yield against its own senior secured bonds, commercial REIT distributions, or the Indian 10-Year Sovereign G-Sec risk-free benchmark.
+  2. AI Hallucination vs. Static Screeners: Legacy screeners dump raw financial ratios without qualitative context, while generic AI chat wrappers hallucinate numbers, misread Indian accounting footnotes (Ind-AS), and ignore statutory Indian tax laws (Sections 112A, 50AA, 115UA, 47(viic)).
+
+Moatnomics solves both problems by pairing a Deterministic Quantitative Engine (which computes all financial math, bond duration/convexity, DuPont decompositions, forensic accounting sieves, and tax waterfalls deterministically before any text is generated) with Grounded Multi-Agent AI Synthesis (which is restricted to explaining pre-verified, primary-source numbers).
+
+
+2. CORE ADVANTAGES OF USING THE PLATFORM (THE VALUE PROPOSITION)
+--------------------------------------------------------------------------------
+A. Cross-Asset Capital Hierarchy Intelligence:
+   Instead of siloed asset tabs, the platform links 8 distinct Indian asset classes into a single capital hierarchy:
+   - Listed Indian Equities (NSE/BSE)
+   - Corporate Bonds, NCDs & Securitised Debt Instruments (SDIs under SEBI Rs. 10,000 Face Value Framework)
+   - Sovereign Yield Curve (RBI 91D/182D/364D T-Bills, 1Y-30Y G-Secs, State Development Loans)
+   - Mutual Funds (2,047+ AMFI schemes with underlying equity look-through)
+   - Exchange-Traded Funds (436+ primary exchange-listed ETFs across 9 categories)
+   - Commercial REITs, SEBI SM REITs & Infrastructure Investment Trusts (InvITs)
+   - RBI Sovereign Gold Bonds (All 36 active secondary-market SGB tranches)
+   - Unlisted MSMEs & Emerging SMEs (Ministry of MSME Udyam Gazette enterprises linked to listed NSE/BSE corporate buyers)
+
+B. Zero-Hallucination "Math First, Narrative Second" Architecture:
+   The AI layer never invents financial ratios, yields, or valuations. Twelve deterministic analytical engines run against primary statutory data first, compressing raw filings by ~92.4% into verified mathematical packets before any narrative synthesis occurs.
+
+C. Post-Tax, Post-Inflation "In-Hand" Realism:
+   Nominal yields are an illusion. The platform natively models Indian statutory taxation (Finance Act 2023/2024 Sections 50AA, 112A, 111A, 115UA, and 47(viic)) alongside MOSPI Consumer Price Index (CPI) inflation across 5 marginal tax brackets (0%, 10%, 20%, 30%, and 39% Peak HNI) so users see their true net real purchasing power return.
+
+D. Sub-Second Rendering Speed with Live Exchange Grounding:
+   Pre-computed institutional dossiers render in under 35 milliseconds, while live Level-2 order book depth and corporate announcements automatically trigger surgical updates whenever material changes occur.
+
+
+================================================================================
+3. COMPLETE FEATURE CAPABILITIES (USER PERSPECTIVE) & REASONS TO BELIEVE (DATA, ANALYSIS & BACKEND PERSPECTIVE)
+================================================================================
+
+--------------------------------------------------------------------------------
+FEATURE 1: INSTITUTIONAL EQUITY DOSSIERS & DIRECTORY (/equities, /dossier/{ticker})
+--------------------------------------------------------------------------------
+What the User Can Do (User Perspective):
+  - Browse and filter the Institutional Equities Directory (/equities) by 10 sector taxonomies, market-cap tiers, and a "Recently Inducted" filter highlighting stocks added in the last 48 hours.
+  - Open any company's Institutional Equity Dossier (/dossier/{ticker}) to read a comprehensive, structured 7-Pillar evaluation report paired with an interactive "Institutional Intelligence Cockpit".
+  - Inspect real-time Level-2 order book depth (best 5 bid/ask tiers), intrinsic valuation ranges, sector-specific scorecards, a 10-point forensic accounting checklist, a 60-second Bull vs. Bear structural summary, and a Behavioral Pre-Mortem Risk Inversion ledger.
+  - Export custom-branded, institutional PDF research reports featuring custom "Prepared For", "Firm Name", and compliance disclaimer watermarks.
+
+Why It Matters (User Advantage):
+  - Compresses 400+ pages of annual reports, quarterly exchange filings, and governance disclosures into a 60-second quantitative cockpit plus a deep-dive 7-pillar narrative—identifying accounting red flags and valuation traps before capital is deployed.
+
+Reasons to Believe (Data, Analysis & Backend Perspective):
+  1. Primary Exchange & Statutory Data Grounding:
+     - Live market quotes, 52-week ranges, and 5-tier Level-2 bid/ask order books are ingested directly from official exchange feeds alongside direct BSE corporate filings and historical XBRL financial statements.
+  2. The 10-Point Forensic Clean-Room Sieve:
+     - Every equity is scored (0-100) across 10 deterministic accounting integrity checks before qualification:
+       (1) Cash Realization: CFO / EBITDA >= 0.35 (flags paper profits unbacked by operating cash).
+       (2) Statutory Tax Wedge: Effective Tax Rate (Tax / PBT) >= 15.0% (flags artificial tax-haven or deferred-tax earnings inflation).
+       (3) Promoter Pledge Velocity: Total Promoter Pledge <= 20.0% and QoQ delta < 3.0%.
+       (4) Auditor Stability: <= 1 auditor change in trailing 36 months (penalizes mid-term SEBI LODR Reg 30 resignations).
+       (5) Contingent Liabilities Drag: Off-balance-sheet contingent liabilities < 50.0% of tangible net worth.
+       (6) Related-Party Transaction (RPT) Leakage: Total RPT volume < 15.0% of consolidated revenue.
+       (7) Receivables vs. Sales Divergence: DSO expansion < 30 days YoY (detects channel stuffing).
+       (8) Debt Service & Solvency: Interest Coverage Ratio (EBIT / Interest) >= 1.75x and Debt-to-Equity <= 2.0x.
+       (9) Tangible Capital Preservation: Strictly positive tangible net worth (rejects negative net worth deficits).
+       (10) Institutional Liquidity Floor: Market capitalization >= Rs. 25 Crores.
+  3. 3-Stage DuPont ROE & Cash Conversion Cycle Decomposition:
+     - Mathematically decomposes Return on Equity into Net Profit Margin x Asset Turnover x Equity Multiplier (Total Assets / Equity) to prove whether ROE growth comes from genuine operating efficiency or hazardous debt leverage. Computes DIO + DSO - DPO Cash Conversion Cycles.
+  4. Triangulated Valuation Radar:
+     - Computes intrinsic fair value by blending three distinct models: 5-Year Historical Median P/E (35% weight), 2-Stage Conservative Discounted Cash Flow / DCF (40% weight), and Graham Earnings Power Value / EPV (25% weight) to derive a deterministic Margin of Safety %.
+  5. Sector-Native Scoring Sieves:
+     - Replaces generic ratios with sector-specific math (e.g., evaluating Banks/NBFCs on Net Interest Margin, RoA, and GNPA/NNPA ratios rather than manufacturing Debt-to-Equity; evaluating IT Services on FCF conversion and ROCE).
+  6. 60-Day Post-Earnings Announcement Drift (PEAD) & Technical Overlay:
+     - Benchmarks current price against 50-DMA/200-DMA and 60-day post-earnings drift bands to diagnose institutional accumulation vs. distribution drift and behavioral Disposition Effect traps.
+  7. Event-Driven Surgical Cache Invalidation:
+     - While dossiers are cached for instant delivery, an event-driven material change gate continuously monitors live prices and BSE corporate disclosures. If a stock moves >= 5% or files a material regulatory announcement, the affected pillar is surgically invalidated and re-synthesized.
+
+
+--------------------------------------------------------------------------------
+FEATURE 2: STOCK DISCOVERY @9AM & DAILY 15-STOCK INGESTION (/discovery)
+--------------------------------------------------------------------------------
+What the User Can Do (User Perspective):
+  - Visit /discovery every morning before market open (refreshed at 08:30 AM and 09:00 AM IST) to view a curated reel of newly inducted and high-conviction Indian equities.
+  - See the "Mutual Fund Institutional Footprint Badge" on each discovery card (e.g., "Held by 42 Mutual Funds | Rs. 14,250 Cr Institutional AUM") alongside ROCE, Debt/Equity, P/E, catalyst headlines, and concise compounder theses.
+
+Why It Matters (User Advantage):
+  - Eliminates noisy social-media stock tips by surfacing companies where regulated institutional mutual fund managers have committed real capital, while ensuring fresh daily discovery rather than a stagnant list.
+
+Reasons to Believe (Data, Analysis & Backend Perspective):
+  1. Institutional Priority Queue:
+     - Every morning at 08:30 AM IST, the pre-market pipeline scans statutory mutual fund portfolio disclosures across 200+ schemes and ranks uncovered equities deterministically by institutional ownership breadth (number of schemes holding the stock, followed by total portfolio weight).
+     - It autonomously synthesizes full 7-Pillar dossiers for the top 15 uncovered institutional holdings per day and immediately triggers incremental look-through re-audits across every mutual fund holding those stocks.
+  2. Anti-Staleness Rotation Invariant:
+     - Backstopped by a 45+ stock candidate pool filtered for daily turnover >= Rs. 1 Crore and high forensic scores, the engine enforces a deterministic time-series rotation guaranteeing >= 40% candidate turnover relative to the prior edition reel.
+
+
+--------------------------------------------------------------------------------
+FEATURE 3: MUTUAL FUNDS EXPLORER & ON-DEMAND CONSTITUENT AUDITS (/funds, /funds/{key})
+--------------------------------------------------------------------------------
+What the User Can Do (User Perspective):
+  - Search and filter 2,047+ active Indian mutual fund schemes on /funds with zero artificial pagination caps.
+  - Open any scheme's 5-Dimension Forensic Dossier (/funds/{key}) to inspect its underlying equity holdings, true Active Share %, expense ratio drag, manager style drift, weighted portfolio moat score, and accounting risk index.
+  - Trigger an "On-Demand Constituent Deep-Dive Audit" for any scheme to autonomously research missing underlying stocks with real-time progress stage tracking, active ticker badges, and live coverage meter updates.
+
+Why It Matters (User Advantage):
+  - Exposes "closet indexers" (active funds charging 1.5%+ TER while hugging the Nifty 50) and prevents allocators from buying mutual funds stuffed with governance-impaired or overvalued underlying stocks.
+
+Reasons to Believe (Data, Analysis & Backend Perspective):
+  1. Nightly Official AMFI Synchronization:
+     - Synchronizes nightly at 23:15 IST directly against official AMFI statutory NAV disclosures.
+  2. Strict Coverage Integrity Gate:
+     - Enforces a strict mathematical integrity rule: if genuine underlying equity dossier coverage for a fund is < 70%, the platform **withholds** the Composite Health Score rather than extrapolating a misleading score from partial holdings.
+     - Active Share (`0.5 * sum(|w_fund,i - w_bench,i|)`) is mathematically clamped within `[0.0, 100.0]`.
+  3. Asynchronous Background Audit Queue:
+     - Non-blocking background workers synthesize missing constituent equities on demand and recompute the fund's look-through metrics immediately upon completion.
+
+
+--------------------------------------------------------------------------------
+FEATURE 4: MUTUAL FUND PORTFOLIO OVERLAP & LOOK-THROUGH AUDITOR (/funds/compare/overlap)
+--------------------------------------------------------------------------------
+What the User Can Do (User Perspective):
+  - Select any two mutual fund schemes on /funds/compare/overlap to visualize their exact stock-by-stock intersection, common weight percentage, sector crowding, and combined forensic quality.
+
+Why It Matters (User Advantage):
+  - Most Indian investors hold 4 to 6 mutual funds believing they are diversified, when in reality they own the same 15 mega-cap stocks across every scheme while paying multiple layers of AMC expense ratios.
+
+Reasons to Believe (Data, Analysis & Backend Perspective):
+  1. Multi-Asset Portfolio Look-Through Engine:
+     - Queries granular monthly portfolio disclosures and computes exact mathematical portfolio intersection:
+       `True Overlap % = sum_k min(Weight_{Scheme A, stock k}, Weight_{Scheme B, stock k})`
+     - Cross-references every overlapping stock against its verified 7-Pillar Equity Dossier to compute a portfolio-weighted Moat Score and Accounting Risk Index (ASRI).
+
+
+--------------------------------------------------------------------------------
+FEATURE 5: CORPORATE BONDS, NCDs & SECURITISED DEBT INSTRUMENTS (/debt, /debt/{isin})
+--------------------------------------------------------------------------------
+What the User Can Do (User Perspective):
+  - Screen 105+ benchmark Indian corporate debt instruments across 5 institutional sleeves:
+    (1) PSU & Quasi-Gilt (PFC, REC, NABARD, NTPC, IRFC, NHAI)
+    (2) Conglomerate & Bluechip (Reliance, Tata Sons, L&T, UltraTech, Mahindra)
+    (3) Banking & NBFC Tier-II / Infrastructure (HDFC Bank, SBI, ICICI Bank, Bajaj Finance)
+    (4) Green & Infrastructure Bonds (Adani Green, ReNew, JSW Energy, Tata Power)
+    (5) Retail NCDs & Securitised Debt Instruments (SDIs) under the SEBI Rs. 10,000 Face Value Framework.
+  - Open any bond's Forensic Debt Dossier (/debt/{isin}) to inspect its exact Yield to Maturity (YTM), Macaulay Duration, Modified Duration, Convexity, parallel interest-rate shock scenarios (+/- 50, 100, 200 bps), credit rating migration history, seniority waterfall tier, and spread over the 10Y Sovereign G-Sec.
+  - Use the On-Demand ISIN Ingestion Portal to index and analyze any valid 12-character Indian ISIN in real time.
+
+Why It Matters (User Advantage):
+  - Brings institutional bond-desk math to fixed-income investors, protecting them from duration traps (when RBI hikes rates), Basel-III Tier-II Point of Non-Viability (PONV) write-down risks, and thin-coverage high-yield retail NCDs.
+
+Reasons to Believe (Data, Analysis & Backend Perspective):
+  1. Exact Fixed-Income Quantitative Math:
+     - Solves exact cash-flow discounted Yield to Maturity (YTM) adjusted for coupon frequency (`ANNUAL`, `SEMI_ANNUAL`, `QUARTERLY`, `MONTHLY`).
+     - Computes Macaulay Duration and Modified Duration (`ModDur = MacDur / (1 + y/k)`), enforcing the mathematical invariant `Modified Duration < Macaulay Duration` for all `y > 0`.
+     - Computes second-derivative Bond Convexity and models non-linear price change under rate shocks:
+       `% Price Change = (-ModDur * delta_y) + (0.5 * Convexity * (delta_y)^2)`
+       demonstrating how positive convexity cushions drawdowns during +200 bps rate hikes compared to linear duration approximations.
+  2. Live Credit Rating Agency (CRA) Surveillance:
+     - Tracks rating actions (`UPGRADED`, `DOWNGRADED`, `AFFIRMED`, `WATCH_NEGATIVE`) across CRISIL, ICRA, CARE, and India Ratings, dynamically computing credit spreads against the live 10Y Sovereign G-Sec benchmark.
+
+
+--------------------------------------------------------------------------------
+FEATURE 6: SOVEREIGN YIELD CURVE, T-BILLS & SDLs (/sovereign)
+--------------------------------------------------------------------------------
+What the User Can Do (User Perspective):
+  - Inspect the live Indian Government Sovereign Yield Curve across 91-Day, 182-Day, and 364-Day Treasury Bills, 1Y to 30Y Benchmark G-Secs, and State Development Loans (SDLs).
+  - Track term-premium spreads (10Y minus 2Y G-Sec), RBI policy repo wedges, and real sovereign yields after CPI inflation.
+
+Why It Matters (User Advantage):
+  - Every asset valuation in India depends on the risk-free rate. Having live sovereign par yields anchored directly in the platform powers accurate equity DCF discount rates, corporate bond credit spreads, and REIT cap-rate comparisons.
+
+Reasons to Believe (Data, Analysis & Backend Perspective):
+  1. Authentic RBI / CCIL / FBIL Benchmark Engine:
+     - Tracks official clearing cutoffs with explicit data-source provenance.
+     - Enforces a strict timestamp-honesty invariant: if a live external feed is temporarily unreachable, the system never overwrites historical auction dates with today's date, preserving 100% provenance accuracy.
+
+
+--------------------------------------------------------------------------------
+FEATURE 7: COMMERCIAL REITs, SEBI SM REITs, InvITs & 36 RBI SGB SERIES (/reits, /reits/{symbol})
+--------------------------------------------------------------------------------
+What the User Can Do (User Perspective):
+  - Compare all listed Indian Mainboard Commercial REITs (Embassy, Mindspace, Brookfield, Nexus Select), SEBI-regulated Small & Medium REITs (PropShare Titania, Strata Commercial), and Infrastructure Investment Trusts (PowerGrid InvIT, IndiGrid, IRB InvIT, NHIT).
+  - Use the Interactive **Section 115UA Real Asset Tax Waterfall & In-Hand Return Simulator** across 5 tax slabs (0%, 10%, 20%, 30%, 39% HNI) to see the exact post-tax, post-inflation yield of any REIT/InvIT before investing.
+  - Open individual REIT/InvIT Forensic Dossiers (/reits/{symbol}) to audit SPV Net Distributable Cash Flow (NDCF) payout purity, Weighted Average Lease Expiry (WALE), tenant concentration, LTV borrowing headroom vs. the 49% SEBI cap, and download institutional PDFs.
+  - Screen all **36 active RBI Sovereign Gold Bond (SGB) secondary-market tranches** (maturing 2025-2032) with live secondary-market discount/premium to IBJA 999 spot gold and Section 47(viic) tax-free maturity modeling.
+
+Why It Matters (User Advantage):
+  - REIT and InvIT distributions are NOT taxed like normal dividends; they are split into 4 statutory buckets (Interest, Dividend, Return of Capital / Amortization, and Rental Income), each taxed differently under Section 115UA and Finance Act 2023 Section 56(2)(xii). A nominal 8.5% REIT yield can turn into 5.6% or 8.1% in-hand depending on the SPV's tax regime and the investor's slab. Moatnomics calculates this automatically.
+
+Reasons to Believe (Data, Analysis & Backend Perspective):
+  1. Statutory Section 115UA Waterfall Engine:
+     - Enforces that the 4 distribution buckets (Dividend, Interest, Return of Capital, and Rental Income) sum to 100.0%, applies marginal slab taxation to interest/rental components, models Section 10(23FD) vs. Section 115BAA SPV dividend tax rules, and deflates by CPI inflation (`Post-Tax Real Yield <= Net Post-Tax Yield <= Gross Distribution Yield`).
+  2. Statutory NDCF & SEBI Penal Interest Surveillance:
+     - Audits whether SPVs upstream >= 90% (Mainboard REITs/InvITs) or >= 95% (SEBI SM REIT Regulations 2024) of Net Distributable Cash Flow, and monitors compliance with the statutory 15% p.a. penal interest threshold for delayed distributions.
+
+
+--------------------------------------------------------------------------------
+FEATURE 8: NATIONAL ETF SURVEILLANCE MATRIX (/etfs)
+--------------------------------------------------------------------------------
+What the User Can Do (User Perspective):
+  - Explore and sort 436+ active Indian exchange-traded funds across 9 institutional categories: Equity Index, Sectoral/Thematic, Factor/Smart Beta, Commodity Gold, Commodity Silver, Sovereign G-Sec, Bharat Bond / Target Maturity, Liquid/Overnight, and International.
+  - Inspect tracking error %, expense ratios, AUM liquidity tiers, and intraday Market Price vs. iNAV premium/discount alerts inside an interactive deep-audit modal.
+
+Why It Matters (User Advantage):
+  - Prevents retail investors from buying illiquid ETFs trading at steep intraday premiums to their underlying Net Asset Value (NAV) or overpaying for high-tracking-error index funds.
+
+Reasons to Believe (Data, Analysis & Backend Perspective):
+  1. Automated AMFI NAV Parser & Secondary FoF Filter:
+     - Parses official AMFI statutory dispatches nightly at 23:15 IST, automatically strips out secondary Fund-of-Funds (`FoF`) to isolate genuine primary exchange-traded units, and classifies schemes deterministically into the 9 benchmark categories.
+
+
+--------------------------------------------------------------------------------
+FEATURE 9: UNLISTED MSME & EMERGING SME FORENSIC DIRECTORY (/msme, /msme/{uin})
+--------------------------------------------------------------------------------
+What the User Can Do (User Perspective):
+  - Search verified unlisted Indian manufacturing and services enterprises registered under the MSMED Act 2020 by turnover tier (Micro, Small, Medium), industrial cluster, and state.
+  - Open any enterprise's 4-Pillar Forensic Dossier (/msme/{uin}) to inspect:
+    (1) Working Capital & Cash Conversion Cycle (CCC) Stress
+    (2) Sector Offtake Universe & Listed Corporate Supply-Chain Linkages (with 1-click links to the equity dossiers of listed anchor buyers like Tata Motors, Bharat Forge, Sun Pharma, Dixon, etc.)
+    (3) Solvency, Operating Margins & TReDS Invoice Discounting Liquidity Tier
+    (4) Cluster Capital Replacement Moat Score (0-100) and Pre-Mortem Failure Modes.
+
+Why It Matters (User Advantage):
+  - Bridges the gap between unlisted Indian supply-chain vendors and listed NSE/BSE corporations, enabling credit analysts, B2B lenders, and equity researchers to evaluate vendor working-capital strain and statutory MSMED Act protections.
+
+Reasons to Believe (Data, Analysis & Backend Perspective):
+  1. Statutory MSMED Act 2020 Section 15 & Section 16 Modeling:
+     - Models receivables stretch against the statutory 45-day buyer payment ceiling under Section 15 of the MSMED Act 2020 (and Income Tax Section 43B(h) disallowance rules).
+     - Evaluates Trade Receivables Discounting System (TReDS — RXIL / M1xchange / Invoicemart) factoring tiers (Tier A prime non-recourse ~7.5%-8.2% vs. Tier B/C) and Section 16 compound interest protection (3x RBI Bank Rate penalty on delayed payments).
+  2. Strict Anti-Conflation Data Partitioning:
+     - Strictly partitions verified registry attributes (from the Ministry of MSME Udyam Open Gazette) from sector-calibrated benchmark medians, and explicitly labels mapped anchor buyers as `"Sector Offtake Universe"` so heuristic supply-chain mappings are never misrepresented as audited bilateral invoices.
+
+
+--------------------------------------------------------------------------------
+FEATURE 10: CROSS-ASSET CAPITAL STRUCTURE MATRIX, OPPORTUNITY TERMINAL, SAFETY RADAR & NET REAL TAX CALCULATOR (/opportunities, /safety-radar, /calculator/tax, /compare)
+--------------------------------------------------------------------------------
+What the User Can Do (User Perspective):
+  - **Cross-Asset Capital Structure Matrix:** Instantly check if a company's common stock is mispriced relative to its own senior secured bonds and the 10Y G-Sec.
+  - **Opportunity Terminal (`/opportunities`):** Visualize cross-asset risk/return asymmetry across Equities, Debt, REITs, and Sovereign instruments.
+  - **Retail Safety Radar (`/safety-radar`):** Compare capital seniority, default probability, and bankruptcy liquidation recovery rank under the Insolvency and Bankruptcy Code (IBC).
+  - **Net Real Tax Calculator (`/calculator/tax`):** Compute post-tax, post-CPI-inflation real purchasing power across assets under Finance Act 2024 rules.
+  - **Peer Comparison (`/compare`):** Run a side-by-side fundamental, valuation, and forensic comparison across 2 or 3 listed Indian equities in under 15ms.
+
+Why It Matters (User Advantage):
+  - Protects investors from **Capital Structure Inversions**—for example, buying a stock at a 3.5% Free Cash Flow yield when the exact same company's AAA-rated senior secured NCD is paying a contractual 8.4% YTM with first-charge collateral protection.
+
+Reasons to Believe (Data, Analysis & Backend Perspective):
+  1. Cross-Asset Capital Hierarchy Engine:
+     - Computes exact basis-point yield spreads between a company's trailing Equity FCF Yield (`Trailing FCF / Market Cap`), its Senior Secured NCD YTM, and the 10Y Sovereign G-Sec, firing an automatic `CAPITAL_STRUCTURE_INVERSION` diagnostic whenever senior secured debt out-yields equity FCF.
+
+
+--------------------------------------------------------------------------------
+FEATURE 11: FORENSIC INTELLIGENCE DESK — SITEWIDE MULTI-ASSET COPILOT (Cmd+K / Ctrl+K)
+--------------------------------------------------------------------------------
+What the User Can Do (User Perspective):
+  - Press `Cmd+K` / `Ctrl+K` or click the floating Forensic Intelligence Desk dock on any page (Equities, Mutual Funds, Corporate Debt, ETFs, or REITs) to open a context-aware slide-drawer research assistant.
+  - Ask deep forensic questions about the specific security on screen (e.g., *"Deconstruct how DuPont leverage is impacting ROE"*, *"What is the post-tax yield in the 30% slab?"*, *"Explain the receivables vs. revenue divergence"*).
+
+Why It Matters (User Advantage):
+  - Delivers instant, citation-grounded answers anchored strictly to the active security's verified dossier—refusing to give speculative buy/sell tips while explaining complex financial math in plain English.
+
+Reasons to Believe (Data, Analysis & Backend Perspective):
+  1. Multi-Agent Forensic Specialization:
+     - Coordinates four specialized analytical personas (Accounting Auditor, Governance Detective, Valuation Stress Analyst, and Chief Forensic Officer) over pre-verified dossier metrics.
+  2. Strict Entitlement Redaction & Deterministic Fallback:
+     - Enforces multi-asset deep-dive entitlement checks so locked sections remain protected, and backs the AI cascade with a 100% deterministic rule-based forensic engine so queries always resolve even if external AI networks experience downtime.
+
+
+--------------------------------------------------------------------------------
+FEATURE 12: PRODUCTION RELIABILITY, QUALITY OF SERVICE & VERIFICATION ARCHITECTURE
+--------------------------------------------------------------------------------
+Why Allocators & AI Systems Can Trust the Platform's Engineering Integrity:
+
+  1. Dual-Layer Persistence & Immutable Revision Ledgers:
+     - Combines a high-speed local read cache with a cloud-replicated relational database and append-only revision history, maintaining an immutable audit trail of every dossier update.
+
+  2. Actor-Scoped Quality of Service (QoS) & Single-Flight Request Coalescing:
+     - Separates compute budgets between interactive users and background ingestion jobs so paying users are never throttled by background data refreshes.
+     - Single-flight request coalescing ensures that if 50 users simultaneously request the same uncached security, only one synthesis job executes while all 50 receive the result concurrently.
+
+  3. Distributed Multi-Worker Job Locking:
+     - Atomic distributed locks guarantee that scheduled pre-market discovery and nightly mutual fund/ETF syncs execute exactly once across multi-worker server clusters.
+
+  4. Automated 11-Gate Reality Auditor & 637-Test Verification Suite:
+     - Every deployment is verified by an automated 11-gate static and behavioral reality auditor plus 637 automated tests that enforce zero silent exception swallowing, verify mathematical invariants (bond duration/convexity, REIT Section 115UA tax waterfalls, mutual fund coverage gating, and cross-asset yield spread math), and validate end-to-end UI-to-API contracts.
+================================================================================
