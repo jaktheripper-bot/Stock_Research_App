@@ -2646,6 +2646,7 @@
       <!-- Response Form -->
       <form method="POST" id="ticketReplyForm" onsubmit="handleTicketReplySubmit(event)" style="flex-shrink: 0;">
         <input type="hidden" name="tab" value="tickets">
+        <input type="hidden" name="ticket_id" id="replyModalTicketIdInput" value="">
 
         <!-- Quick Template Chips -->
         <div style="display: flex; gap: 6px; margin-bottom: 8px; flex-wrap: wrap; align-items: center;">
@@ -2718,6 +2719,8 @@
     document.getElementById('replyModalThreadList').innerHTML = '<div style="font-size: 12px; color: #94a3b8; text-align: center; padding: 12px;">Loading thread...</div>';
     document.getElementById('ticketReplyMessage').value = '';
     document.getElementById('replyRemedialCredits').value = '0.0';
+    const tidInput = document.getElementById('replyModalTicketIdInput');
+    if (tidInput) tidInput.value = ticketId;
     document.getElementById('ticketReplyForm').action = `/admin/tickets/${ticketId}/reply`;
 
     openAdminModal('adminTicketReplyModal');
@@ -2828,12 +2831,41 @@
     }
   }
 
-  function handleTicketReplySubmit(e) {
+  async function handleTicketReplySubmit(e) {
+    e.preventDefault();
+    const form = e.target;
     const btn = document.getElementById('replySubmitBtn');
+    const origText = btn ? btn.innerHTML : '📨 Send Response & Update Ticket';
     if (btn) {
       btn.disabled = true;
-      btn.innerHTML = '<span class="status-dot-pulse"></span> Sending & Dispatching Email...';
+      btn.innerHTML = '⏳ Dispatching Response...';
     }
+    try {
+      const formData = new FormData(form);
+      const resp = await fetch('/api/admin/tickets/reply', {
+        method: 'POST',
+        body: formData,
+        headers: { 'Accept': 'application/json' }
+      });
+      const res = await resp.json();
+      if (resp.ok && res.success) {
+        form.reset();
+        await openTicketReplyModal(res.ticket_id);
+        if (window.showToast) {
+          window.showToast(`Reply recorded on ${res.ticket_id} (${res.email_status_text || 'Saved to thread'})`, 'success');
+        }
+      } else {
+        alert('Failed to send reply: ' + (res.error || res.detail || 'Unknown error'));
+      }
+    } catch (err) {
+      alert('Network error sending ticket reply: ' + err.message);
+    } finally {
+      if (btn) {
+        btn.disabled = false;
+        btn.innerHTML = origText;
+      }
+    }
+    return false;
   }
 
   function openAdminModal(id) {

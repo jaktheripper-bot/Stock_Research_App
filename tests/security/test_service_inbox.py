@@ -221,6 +221,47 @@ class TestServiceInboxAndEmailReply(unittest.TestCase):
         self.assertEqual(action_res["ticket_id"], self.ticket_id)
         mock_send_email.assert_called_once()
 
+    @patch("web.routers.admin._is_admin_authenticated")
+    @patch("web.routers.admin.send_ticket_reply_email", return_value=True)
+    def test_api_admin_reply_ticket_endpoint(self, mock_send_email, mock_auth):
+        """Test AJAX JSON POST /api/admin/tickets/reply endpoint."""
+        mock_auth.return_value = {
+            "email": "owner@moatnomics.com",
+            "role": "owner"
+        }
+
+        # 1. Post reply via AJAX alias endpoint
+        reply_resp = self.client.post(
+            "/api/admin/tickets/reply",
+            headers={"Accept": "application/json"},
+            data={
+                "ticket_id": self.ticket_id,
+                "reply_message": "Updated terminal growth assumption via AJAX API.",
+                "status": "resolved",
+                "dispatch_email": "on",
+                "grant_remedial_credits": "1.0"
+            }
+        )
+        self.assertEqual(reply_resp.status_code, 200)
+        reply_json = reply_resp.json()
+        self.assertTrue(reply_json["success"])
+        self.assertEqual(reply_json["ticket_id"], self.ticket_id)
+        self.assertEqual(reply_json["new_status"], "resolved")
+        self.assertTrue(reply_json.get("email_status_text"))
+
+        # 2. Assert ticket in DB has response
+        ticket_after = get_ticket_by_id(self.ticket_id, include_responses=True)
+        self.assertEqual(ticket_after["status"], "resolved")
+        self.assertTrue(any("terminal growth" in r["message"] for r in ticket_after["responses"]))
+
+        # 3. Missing ticket_id returns 400
+        bad_resp = self.client.post(
+            "/api/admin/tickets/reply",
+            headers={"Accept": "application/json"},
+            data={"reply_message": "Missing ticket id"}
+        )
+        self.assertEqual(bad_resp.status_code, 400)
+
 
 if __name__ == "__main__":
     unittest.main()

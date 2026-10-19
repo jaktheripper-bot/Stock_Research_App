@@ -1292,9 +1292,12 @@ async def admin_reply_ticket(
     if not ticket:
         raise HTTPException(status_code=404, detail="Ticket not found.")
 
+    is_ajax = request.headers.get("x-requested-with") == "XMLHttpRequest" or "application/json" in request.headers.get("accept", "") or request.url.path.startswith("/api/")
     clean_reply = str(reply_message or "").strip()
     if not clean_reply:
         err_msg = "Reply message cannot be empty."
+        if is_ajax:
+            return JSONResponse(status_code=400, content={"success": False, "error": err_msg})
         return RedirectResponse(url=f"/admin?tab=tickets&err={urllib.parse.quote_plus(err_msg)}", status_code=303)
 
     admin_email = admin_session.get("email", "support@moatnomics.com")
@@ -1391,6 +1394,31 @@ async def admin_reply_ticket(
     if credits_granted > 0:
         msg += f"+(+{credits_granted}+credits+granted)"
     return RedirectResponse(url=f"/admin?tab=tickets&msg={msg}", status_code=303)
+ 
+ 
+@router.post("/api/admin/tickets/reply")
+async def api_admin_reply_ticket(
+    request: Request,
+    ticket_id: Optional[str] = Form(None),
+    reply_message: str = Form(...),
+    status: Optional[str] = Form("resolved"),
+    dispatch_email: Optional[str] = Form("on"),
+    grant_remedial_credits: Optional[float] = Form(0.0),
+    admin_notes: Optional[str] = Form(None)
+):
+    """AJAX JSON endpoint for replying to a support ticket from Admin Console."""
+    clean_tid = str(ticket_id or request.query_params.get("ticket_id") or "").strip().upper()
+    if not clean_tid:
+        raise HTTPException(status_code=400, detail="ticket_id is required.")
+    return await admin_reply_ticket(
+        ticket_id=clean_tid,
+        request=request,
+        reply_message=reply_message,
+        status=status,
+        dispatch_email=dispatch_email,
+        grant_remedial_credits=grant_remedial_credits,
+        admin_notes=admin_notes
+    )
 
 
 @router.post("/admin/refund")
