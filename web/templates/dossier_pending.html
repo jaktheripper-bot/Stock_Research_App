@@ -65,8 +65,8 @@
         </p>
       </div>
       {% if scrip_code and scrip_code != 'N/A' %}
-          <button id="synthesizeBtn" class="btn btn-primary" style="text-align: center; width: 100%;" onclick="synthesizeReport('{{ ticker }}')">
-              ⚡ Synthesize Forensic Dossier (1 Credit)
+          <button id="synthesizeBtn" class="btn btn-primary" style="text-align: center; width: 100%; display: inline-flex; justify-content: center; align-items: center; gap: 6px;" onclick="synthesizeReport('{{ ticker }}')">
+              <svg class="glyph" style="width: 14px; height: 14px;"><use href="#glyph-zap"></use></svg> Synthesize Forensic Dossier (1 Credit)
           </button>
       {% else %}
           <button id="synthesizeBtn" class="btn btn-secondary" style="text-align: center; width: 100%;" disabled title="Ticker not found in BSE/NSE scrip master">

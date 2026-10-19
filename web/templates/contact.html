@@ -41,7 +41,7 @@
           A notification has been dispatched to our operations team. A confirmation has been logged for <strong>{{ success_ticket.user_email }}</strong>. We will review and respond within 24 hours.
         </p>
         <a href="/contact?ticket_id={{ success_ticket.ticket_id }}&email={{ success_ticket.user_email }}" class="btn btn-secondary btn-sm" style="display: inline-flex; align-items: center; gap: 6px; font-size: 12px; font-weight: 600;">
-          <span>🔍 Track Ticket Status Live →</span>
+          <svg class="glyph" style="width: 13px; height: 13px;"><use href="#glyph-search"></use></svg> <span>Track Ticket Status Live →</span>
         </a>
       </div>
       {% endif %}
@@ -141,7 +141,7 @@
             {% for resp in tracked_ticket.responses %}
             <div style="background: {% if resp.responder_role == 'user' %}rgba(30, 41, 59, 0.55){% else %}rgba(14, 165, 233, 0.12){% endif %}; border-left: 3px solid {% if resp.responder_role == 'user' %}#64748b{% else %}#38bdf8{% endif %}; border-radius: 6px; padding: 10px 12px; font-size: 12.5px; color: #f1f5f9;">
               <div style="font-size: 11px; color: #38bdf8; font-weight: 700; margin-bottom: 4px;">
-                {% if resp.responder_role == 'user' %}You{% else %}🛡️ Moatnomics Support Desk{% endif %} • {{ resp.created_at }}
+                {% if resp.responder_role == 'user' %}You{% else %}<svg class="glyph" style="width: 12px; height: 12px; vertical-align: -1px;"><use href="#glyph-shield"></use></svg> Moatnomics Support Desk{% endif %} • {{ resp.created_at }}
               </div>
               {{ resp.message }}
             </div>

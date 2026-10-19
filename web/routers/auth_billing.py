@@ -434,14 +434,26 @@ async def api_create_order(payload: OrderRequest, request: Request):
     if not _validate_request_origin(request):
         raise HTTPException(status_code=403, detail="Cross-origin request rejected.")
 
+    web_user = _get_current_web_user(request)
+    eff_user_id = (
+        payload.user_id
+        if (payload.user_id and payload.user_id != "guest_web_user")
+        else ((web_user.get("id") if web_user else None) or "guest_web_user")
+    )
+    eff_email = (
+        payload.email
+        if payload.email
+        else ((web_user.get("email") if web_user else None) or "investor@example.com")
+    )
+
     try:
         order = create_razorpay_order(
             plan_id=payload.plan_id,
             amount_paise=payload.amount,
             currency=payload.currency or "INR",
             receipt=payload.receipt,
-            user_id=payload.user_id or "guest_web_user",
-            user_email=payload.email or "investor@example.com"
+            user_id=eff_user_id,
+            user_email=eff_email
         )
         return json_response_with_cache({
             "order_id": order.get("order_id") or order.get("id"),
@@ -488,9 +500,16 @@ async def api_verify_payment(payload: VerifyPaymentRequest, request: Request):
             detail="Missing required payment verification fields (order_id, payment_id, signature)."
         )
 
+    web_user = _get_current_web_user(request)
+    eff_user_id = (
+        payload.user_id
+        if (payload.user_id and payload.user_id != "guest_web_user")
+        else ((web_user.get("id") if web_user else None) or "guest_web_user")
+    )
+
     try:
         ok, new_bal, inv_num, msg = process_successful_payment(
-            user_id=payload.user_id or "guest_web_user",
+            user_id=eff_user_id,
             plan_id=payload.plan_id or "single_pass",
             order_id=eff_order_id,
             payment_id=eff_payment_id,
@@ -504,7 +523,7 @@ async def api_verify_payment(payload: VerifyPaymentRequest, request: Request):
 
         record_usage_event(
             event_type="purchase_success",
-            user_id=payload.user_id,
+            user_id=eff_user_id,
             details={"plan_id": payload.plan_id, "payment_id": eff_payment_id, "invoice": inv_num}
         )
 

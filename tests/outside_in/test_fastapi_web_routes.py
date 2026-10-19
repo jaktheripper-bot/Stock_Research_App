@@ -244,7 +244,7 @@ Detailed forensic analysis with exact page grounding to bseindia.com filings.
         res_listed = self.client.get("/dossier/ABB")
         self.assertEqual(res_listed.status_code, 200)
         self.assertIn('id="synthesizeBtn"', res_listed.text)
-        self.assertIn("⚡ Synthesize Forensic Dossier (1 Credit)", res_listed.text)
+        self.assertIn("Synthesize Forensic Dossier (1 Credit)", res_listed.text)
         self.assertIn("onclick=\"synthesizeReport('ABB')\"", res_listed.text)
 
     def test_pillar_links_never_borrow_another_company_scrip(self):

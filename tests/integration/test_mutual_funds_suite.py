@@ -719,8 +719,9 @@ class TestFundForensicAuditor(unittest.TestCase):
         self.assertIn("Layer 1 Active (1 Credit)", resp_dos.text)
         self.assertIn("Initiate Deep-Dive Audit", resp_dos.text)
 
+    @patch("core.ingestion.amfi.search_amfi_master_directory", return_value=[])
     @patch("urllib.request.urlopen")
-    def test_ensure_scheme_via_mfapi_payload_parsing(self, mock_urlopen):
+    def test_ensure_scheme_via_mfapi_payload_parsing(self, mock_urlopen, _mock_amfi):
         import uuid
         from core.db.connection import get_db_connection
 

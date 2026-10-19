@@ -447,14 +447,16 @@ window.openCheckout = function(planId, planName, amountInr, credits) {
       confirmBtn.innerText = 'Initializing Razorpay Checkout...';
 
       try {
-        const currentUser = getStoredUser();
+        const activeUser = getStoredUser() || storedUser;
+        const effectiveUserId = (activeUser && activeUser.id) ? activeUser.id : 'guest_web_user';
+        const effectiveUserEmail = (activeUser && activeUser.email) ? activeUser.email : '';
         const resp = await fetch('/api/create-order', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
             plan_id: planId,
-            user_id: currentUser ? currentUser.id : getTelemetrySessionId(),
-            email: currentUser ? currentUser.email : ''
+            user_id: effectiveUserId,
+            email: effectiveUserEmail
           })
         });
         
@@ -476,12 +478,12 @@ window.openCheckout = function(planId, planName, amountInr, credits) {
               payment_id: simPayId,
               signature: 'sig_sim_' + (orderData.order_id || orderData.id) + '_' + simPayId,
               plan_id: planId,
-              user_id: storedUser ? storedUser.id : 'guest_web_user'
+              user_id: effectiveUserId
             })
           });
           const verifyResult = await verifyResp.json();
           if (verifyResp.ok && verifyResult.success) {
-            let user = getStoredUser();
+            let user = getStoredUser() || activeUser;
             if (user) {
               user.credits_balance = verifyResult.new_balance !== undefined ? verifyResult.new_balance : ((parseFloat(user.credits_balance) || 0) + parseFloat(credits));
               localStorage.setItem('sr_user', JSON.stringify(user));
@@ -504,9 +506,9 @@ window.openCheckout = function(planId, planName, amountInr, credits) {
             description: planName + ' — Computational Research Credits',
             order_id: orderData.order_id || orderData.id,
             prefill: {
-              name: (storedUser && storedUser.full_name) ? storedUser.full_name : 'Test Investor',
-              email: (storedUser && storedUser.email) ? storedUser.email : 'investor@moatnomics.com',
-              contact: (storedUser && storedUser.phone) ? storedUser.phone : '9820098200'
+              name: (activeUser && activeUser.full_name) ? activeUser.full_name : 'Test Investor',
+              email: effectiveUserEmail || 'investor@moatnomics.com',
+              contact: (activeUser && activeUser.phone) ? activeUser.phone : '9820098200'
             },
             theme: {
               color: '#0ea5e9'
@@ -522,7 +524,7 @@ window.openCheckout = function(planId, planName, amountInr, credits) {
                     payment_id: response.razorpay_payment_id,
                     signature: response.razorpay_signature,
                     plan_id: planId,
-                    user_id: storedUser ? storedUser.id : 'guest_web_user'
+                    user_id: effectiveUserId
                   })
                 });
                 const verifyResult = await verifyResp.json();
