@@ -4,9 +4,9 @@
 {% block meta_description %}Unified institutional search across Indian listed equities, AMFI mutual fund schemes, and BSE/NSE corporate debt securities.{% endblock %}
 
 {% block content %}
-<div class="container py-8">
+<div class="container py-8" data-asset-class="equities">
   <!-- Search Hero Header -->
-  <div style="background: linear-gradient(135deg, rgba(30, 41, 59, 0.7) 0%, rgba(15, 23, 42, 0.9) 100%); border: 1px solid rgba(255, 255, 255, 0.1); border-radius: 16px; padding: 32px; margin-bottom: 28px;">
+  <div class="hero-portal-banner" style="background: linear-gradient(135deg, rgba(30, 41, 59, 0.7) 0%, rgba(15, 23, 42, 0.9) 100%); border: 1px solid rgba(255, 255, 255, 0.1); border-radius: 16px; padding: 32px; margin-bottom: 28px;">
     <div style="display: inline-flex; align-items: center; gap: 8px; background: rgba(14, 165, 233, 0.15); border: 1px solid rgba(14, 165, 233, 0.3); border-radius: 9999px; padding: 4px 12px; margin-bottom: 16px;">
       <span style="width: 8px; height: 8px; border-radius: 50%; background: #0ea5e9;"></span>
       <span style="font-size: 12px; font-weight: 700; color: #38bdf8; text-transform: uppercase; letter-spacing: 0.05em;">Multi-Asset Omni Search</span>
@@ -38,7 +38,7 @@
       All Categories ({{ search_results.total_matches }})
     </a>
     <a href="/search?q={{ query }}&type=EQUITY" class="btn btn-sm {% if selected_type == 'EQUITY' %}btn-primary{% else %}btn-secondary{% endif %}" style="border-radius: 9999px;">
-      📈 Stocks ({{ search_results.categories.equities|length }})
+      <svg class="glyph"><use href="#icon-markets"></use></svg> Stocks ({{ search_results.categories.equities|length }})
     </a>
     <a href="/search?q={{ query }}&type=MUTUAL_FUND" class="btn btn-sm {% if selected_type == 'MUTUAL_FUND' %}btn-primary{% else %}btn-secondary{% endif %}" style="border-radius: 9999px;">
       <svg class="glyph"><use href="#glyph-chart"></use></svg> Mutual Funds ({{ search_results.categories.mutual_funds|length }})
@@ -51,7 +51,7 @@
   <!-- Search Results Sections -->
   {% if search_results.total_matches == 0 %}
   <div style="background: rgba(30, 41, 59, 0.4); border: 1px solid rgba(255, 255, 255, 0.08); border-radius: 12px; padding: 48px; text-align: center;">
-    <div style="font-size: 48px; margin-bottom: 16px;"><svg class="glyph"><use href="#glyph-search"></use></svg></div>
+    <div style="font-size: 48px; margin-bottom: 16px;"><svg class="glyph" style="width: 48px; height: 48px;"><use href="#icon-state-empty-search"></use></svg></div>
     <h3 style="font-size: 18px; font-weight: 700; color: #f8fafc; margin-bottom: 8px;">No matching investment products found</h3>
     <p style="font-size: 14px; color: #94a3b8; max-width: 500px; margin: 0 auto 20px;">
       We couldn't find any equities, mutual fund schemes, or debt securities matching "<strong>{{ query }}</strong>". Try searching with a broader keyword, ticker symbol, or AMFI scheme code.
@@ -65,7 +65,7 @@
   <div style="margin-bottom: 32px;">
     <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 14px;">
       <h2 style="font-size: 18px; font-weight: 700; color: #f8fafc; display: flex; align-items: center; gap: 8px;">
-        <span>📈</span> Listed Equities & Stocks ({{ search_results.categories.equities|length }})
+        <span><svg class="glyph"><use href="#icon-markets"></use></svg></span> Listed Equities & Stocks ({{ search_results.categories.equities|length }})
       </h2>
     </div>
     <div style="display: grid; grid-template-columns: repeat(auto-fill, minmax(320px, 1fr)); gap: 14px;">
@@ -145,7 +145,7 @@
   <!-- Initial Explore Prompt -->
   <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 20px;">
     <div style="background: rgba(30, 41, 59, 0.4); border: 1px solid rgba(255, 255, 255, 0.08); border-radius: 14px; padding: 24px;">
-      <div style="font-size: 28px; margin-bottom: 12px;">📈</div>
+      <div style="font-size: 28px; margin-bottom: 12px;"><svg class="glyph" style="width: 28px; height: 28px;"><use href="#icon-markets"></use></svg></div>
       <h3 style="font-size: 17px; font-weight: 700; color: #f8fafc; margin-bottom: 8px;">Public Listed Equities</h3>
       <p style="font-size: 13px; color: #94a3b8; line-height: 1.5; margin-bottom: 16px;">
         7-Pillar zero-hallucination institutional research dossiers for NIFTY 50, NIFTY 500, and mid/small-cap companies.

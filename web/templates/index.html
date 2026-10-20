@@ -259,9 +259,10 @@
             All Reports
           </button>
           {% if sector_options %}
+          {% set sector_svg_map = {'IT_TECH': 'icon-sector-technology', 'BFSI': 'icon-sector-financials', 'HEALTHCARE_PHARMA': 'icon-sector-healthcare', 'CAPITAL_GOODS_INFRA': 'icon-sector-capital-goods', 'AUTOMOTIVE': 'icon-sector-automotive', 'CONSUMER_FMCG': 'icon-sector-consumer', 'CHEMICALS_MATERIALS': 'icon-sector-chemicals', 'COMMODITIES_ENERGY': 'icon-sector-energy', 'EMS_DEFENCE': 'icon-sector-defence', 'DIVERSIFIED': 'icon-sector-diversified'} %}
           {% for s_slug, s_info in sector_options.items() %}
           <button type="button" class="btn btn-sm btn-secondary home-sector-btn" data-sector="{{ s_slug }}" onclick="selectHomeSector('{{ s_slug }}', this)" style="border-radius: 9999px; white-space: nowrap;">
-            {{ s_info[1] }} {{ s_info[0] }}
+            <svg class="glyph" style="width: 14px; height: 14px; vertical-align: -2px;"><use href="#{{ sector_svg_map.get(s_slug, 'icon-sector-diversified') }}"></use></svg> {{ s_info[0] }}
           </button>
           {% endfor %}
           {% endif %}
@@ -301,7 +302,7 @@
           <!-- Badges Bar -->
           <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px;">
             <span style="font-size: 11px; font-weight: 700; color: #38bdf8; background: rgba(14, 165, 233, 0.12); padding: 3px 8px; border-radius: 6px; text-transform: uppercase;">
-              {{ eq.sector_icon|default('📈') }} {{ eq.sector|default('Equities') }}
+              <svg class="glyph" style="width: 13px; height: 13px; vertical-align: -2px;"><use href="#{{ eq.sector_svg_id|default('icon-sector-diversified') }}"></use></svg> {{ eq.sector|default('Equities') }}
             </span>
             <div style="display: flex; gap: 6px;">
               {% if eq.market_cap_tier %}
@@ -386,7 +387,7 @@
 
     <!-- Empty State for Filter/Search Zero Matches -->
     <div id="homeStockEmptyState" style="display: none; background: rgba(30, 41, 59, 0.4); border: 1px dashed rgba(255, 255, 255, 0.15); border-radius: 14px; padding: 40px 20px; text-align: center; margin-top: 16px;">
-      <div style="font-size: 36px; margin-bottom: 12px;"><svg class="glyph"><use href="#glyph-search"></use></svg></div>
+      <div style="font-size: 36px; margin-bottom: 12px;"><svg class="glyph" style="width: 36px; height: 36px;"><use href="#icon-state-empty-search"></use></svg></div>
       <h3 style="font-size: 18px; font-weight: 700; color: #f8fafc; margin-bottom: 6px;">No Stock Reports Match Your Filter</h3>
       <p style="font-size: 13.5px; color: #94a3b8; max-width: 440px; margin: 0 auto 16px auto;">
         We couldn't find any audited equities matching your active search or sector.
@@ -535,7 +536,7 @@
       <div class="plan-card">
         <span class="plan-name">Single Research Pass</span>
         <div class="plan-price">₹299</div>
-        <div class="plan-credits"><svg class="glyph"><use href="#glyph-coin"></use></svg> 1 Full Research Credit</div>
+        <div class="plan-credits"><svg class="glyph"><use href="#icon-tier-single"></use></svg> 1 Full Research Credit</div>
         <p class="plan-desc">Deep-dive into any single BSE/NSE equity with full AI reasoning.</p>
         <ul class="plan-features">
           <li>1 Full 7-Pillar AI Synthesis</li>
@@ -554,7 +555,7 @@
         <span class="plan-badge">Most Popular</span>
         <span class="plan-name">Analyst 3-Pack</span>
         <div class="plan-price">₹699</div>
-        <div class="plan-credits"><svg class="glyph"><use href="#glyph-coin"></use></svg> 3 Research Credits (₹233/stock)</div>
+        <div class="plan-credits"><svg class="glyph"><use href="#icon-tier-3pack"></use></svg> 3 Research Credits (₹233/stock)</div>
         <p class="plan-desc">Ideal for evaluating peer contenders and comparing top 3 industry leaders.</p>
         <ul class="plan-features">
           <li>3 Full 7-Pillar Syntheses</li>
@@ -572,7 +573,7 @@
       <div class="plan-card">
         <span class="plan-name">Portfolio 10-Pack</span>
         <div class="plan-price">₹1,799</div>
-        <div class="plan-credits"><svg class="glyph"><use href="#glyph-coin"></use></svg> 10 Research Credits (₹180/stock)</div>
+        <div class="plan-credits"><svg class="glyph"><use href="#icon-tier-10pack"></use></svg> 10 Research Credits (₹180/stock)</div>
         <p class="plan-desc">Comprehensive institutional audit for an entire equity portfolio.</p>
         <ul class="plan-features">
           <li>10 Full 7-Pillar Syntheses</li>
@@ -590,7 +591,7 @@
       <div class="plan-card">
         <span class="plan-name">Pro Desk (Monthly)</span>
         <div class="plan-price">₹999 <span class="cycle">/month</span></div>
-        <div class="plan-credits">⭐ 40 Syntheses / mo</div>
+        <div class="plan-credits"><svg class="glyph"><use href="#icon-tier-pro"></use></svg> 40 Syntheses / mo</div>
         <p class="plan-desc">Continuous surveillance engine for full-time investors and advisors.</p>
         <ul class="plan-features">
           <li>40 Fresh Syntheses / month</li>

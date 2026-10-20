@@ -461,13 +461,13 @@ SECTOR_SVG_IDS = {
     "IT_TECH": "icon-sector-technology",
     "BFSI": "icon-sector-financials",
     "HEALTHCARE_PHARMA": "icon-sector-healthcare",
-    "CAPITAL_GOODS_INFRA": "icon-sector-industrials",
-    "AUTOMOTIVE": "icon-sector-industrials",
+    "CAPITAL_GOODS_INFRA": "icon-sector-capital-goods",
+    "AUTOMOTIVE": "icon-sector-automotive",
     "CONSUMER_FMCG": "icon-sector-consumer",
-    "CHEMICALS_MATERIALS": "icon-sector-industrials",
+    "CHEMICALS_MATERIALS": "icon-sector-chemicals",
     "COMMODITIES_ENERGY": "icon-sector-energy",
-    "EMS_DEFENCE": "icon-sector-industrials",
-    "DIVERSIFIED": "icon-sector-industrials",
+    "EMS_DEFENCE": "icon-sector-defence",
+    "DIVERSIFIED": "icon-sector-diversified",
 }
 
 

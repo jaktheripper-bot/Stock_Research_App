@@ -6,9 +6,9 @@
 {% block og_desc %}Institutional discovery replacing flat tabular lists with Bento deal cards, spread heatmaps, risk-return frontiers, and persistent cross-asset arbitrage pinning.{% endblock %}
 
 {% block content %}
-<div class="container py-8">
+<div class="container py-8" data-asset-class="equities">
   <!-- Top Hero Terminal Header -->
-  <div style="background: linear-gradient(135deg, rgba(30, 41, 59, 0.75) 0%, rgba(15, 23, 42, 0.95) 100%); border: 1px solid rgba(255, 255, 255, 0.12); border-radius: 16px; padding: 32px; margin-bottom: 28px; position: relative; overflow: hidden; box-shadow: 0 10px 30px rgba(0, 0, 0, 0.3);">
+  <div class="hero-portal-banner" style="background: linear-gradient(135deg, rgba(30, 41, 59, 0.75) 0%, rgba(15, 23, 42, 0.95) 100%); border: 1px solid rgba(255, 255, 255, 0.12); border-radius: 16px; padding: 32px; margin-bottom: 28px; position: relative; overflow: hidden; box-shadow: 0 10px 30px rgba(0, 0, 0, 0.3);">
     <div style="position: absolute; top: -60px; right: -60px; width: 220px; height: 220px; background: radial-gradient(circle, rgba(14, 165, 233, 0.18) 0%, transparent 70%); pointer-events: none;"></div>
     
     <div style="display: flex; justify-content: space-between; align-items: flex-start; flex-wrap: wrap; gap: 16px; margin-bottom: 16px;">
@@ -69,19 +69,19 @@
   <!-- Scenario Playbook Filter Bar (Phase 3) -->
   <div style="display: flex; gap: 8px; overflow-x: auto; padding-bottom: 12px; margin-bottom: 20px;">
     <button class="btn btn-sm persona-btn btn-primary" onclick="setPersonaFilter('')" data-persona="">
-      🌐 All Offerings ({{ summary.total_items }})
+      <svg class="glyph"><use href="#icon-multi-asset"></use></svg> All Offerings ({{ summary.total_items }})
     </button>
     <button class="btn btn-sm persona-btn btn-secondary" onclick="setPersonaFilter('capital_preservation')" data-persona="capital_preservation">
       <svg class="glyph"><use href="#glyph-shield"></use></svg> Capital Preservation (Real Return > 0%)
     </button>
     <button class="btn btn-sm persona-btn btn-secondary" onclick="setPersonaFilter('quarterly_cashflow')" data-persona="quarterly_cashflow">
-      💰 Maximum Cash Flow (Quarterly Payouts)
+      <svg class="glyph"><use href="#icon-valuation"></use></svg> Maximum Cash Flow (Quarterly Payouts)
     </button>
     <button class="btn btn-sm persona-btn btn-secondary" onclick="setPersonaFilter('hni_real_assets')" data-persona="hni_real_assets">
-      🏢 HNI Commercial Real Assets (₹10L+)
+      <svg class="glyph"><use href="#icon-sector-realestate"></use></svg> HNI Commercial Real Assets (₹10L+)
     </button>
     <button class="btn btn-sm persona-btn btn-secondary" onclick="setPersonaFilter('compounding')" data-persona="compounding">
-      🚀 Asymmetric Upside (Compounding Engine)
+      <svg class="glyph"><use href="#icon-markets"></use></svg> Asymmetric Upside (Compounding Engine)
     </button>
   </div>
 

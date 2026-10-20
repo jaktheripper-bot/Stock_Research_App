@@ -281,17 +281,17 @@ Moatnomics Service Desk
 <head>
   <meta charset="utf-8">
   <style>
-    body {{ font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; line-height: 1.6; color: #1e293b; background-color: #f8fafc; margin: 0; padding: 24px; }}
-    .container {{ max-width: 600px; margin: 0 auto; background: #ffffff; border-radius: 8px; border: 1px solid #e2e8f0; overflow: hidden; }}
-    .header {{ background: #0b1329; color: #ffffff; padding: 20px 24px; border-bottom: 2px solid #0ea5e9; }}
-    .header h2 {{ margin: 0; font-size: 18px; font-weight: 700; letter-spacing: -0.01em; color: #ffffff; }}
-    .header p {{ margin: 4px 0 0; font-size: 12px; color: #94a3b8; }}
+    body {{ font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; line-height: 1.6; color: #282F33; background-color: #F7F5EE; margin: 0; padding: 24px; }}
+    .container {{ max-width: 600px; margin: 0 auto; background: #ffffff; border-radius: 8px; border: 1px solid #D9E3E8; overflow: hidden; }}
+    .header {{ background: #0E3D32; color: #F7F5EE; padding: 20px 24px; border-bottom: 3px solid #7DA77A; }}
+    .header h2 {{ margin: 0; font-family: 'Playfair Display', Georgia, serif; font-size: 18px; font-weight: 700; letter-spacing: -0.01em; color: #F7F5EE; }}
+    .header p {{ margin: 4px 0 0; font-size: 12px; color: #D9E3E8; }}
     .content {{ padding: 24px; }}
-    .reply-box {{ background: #f0fdf4; border-left: 4px solid #10b981; padding: 16px; border-radius: 4px; font-size: 15px; color: #0f172a; margin: 16px 0; white-space: pre-wrap; }}
-    .original-quote {{ background: #f8fafc; border-left: 4px solid #cbd5e1; padding: 14px; font-size: 13px; color: #64748b; margin-top: 20px; border-radius: 4px; }}
-    .footer {{ background: #f1f5f9; padding: 16px 24px; font-size: 12px; color: #64748b; border-top: 1px solid #e2e8f0; text-align: center; }}
-    .footer a {{ color: #0284c7; text-decoration: none; }}
-    .badge {{ display: inline-block; background: #e0f2fe; color: #0369a1; padding: 2px 8px; border-radius: 4px; font-size: 11px; font-weight: 600; }}
+    .reply-box {{ background: #F7F5EE; border-left: 4px solid #0E3D32; padding: 16px; border-radius: 4px; font-size: 15px; color: #0B2337; margin: 16px 0; white-space: pre-wrap; }}
+    .original-quote {{ background: #F7F5EE; border-left: 4px solid #7DA77A; padding: 14px; font-size: 13px; color: #282F33; margin-top: 20px; border-radius: 4px; }}
+    .footer {{ background: #F7F5EE; padding: 16px 24px; font-size: 12px; color: #282F33; border-top: 1px solid #D9E3E8; text-align: center; }}
+    .footer a {{ color: #0E3D32; text-decoration: none; }}
+    .badge {{ display: inline-block; background: #0B2337; color: #C7E268; padding: 2px 8px; border-radius: 4px; font-size: 11px; font-weight: 600; }}
   </style>
 </head>
 <body>
@@ -307,11 +307,11 @@ Moatnomics Service Desk
       <div class="reply-box">{reply_message}</div>
       
       <div class="original-quote">
-        <p style="margin: 0 0 6px 0; font-weight: 600; color: #475569;">In reference to your message ({ticket.get('created_at', 'recently')}):</p>
+        <p style="margin: 0 0 6px 0; font-weight: 600; color: #0B2337;">In reference to your message ({ticket.get('created_at', 'recently')}):</p>
         <p style="margin: 0; font-style: italic;">"{ticket.get('message', '').strip()}"</p>
       </div>
 
-      <p style="margin-top: 24px; font-size: 14px;">If you have any further questions or require additional details, you can connect with us directly via the <a href="https://moatnomics.com/contact" style="color: #0284c7; font-weight: 600;">Feedback & Grievances Desk</a>.</p>
+      <p style="margin-top: 24px; font-size: 14px;">If you have any further questions or require additional details, you can connect with us directly via the <a href="https://moatnomics.com/contact" style="color: #0E3D32; font-weight: 600;">Feedback & Grievances Desk</a>.</p>
     </div>
     <div class="footer">
       <p style="margin: 0 0 4px 0;">Moatnomics &bull; Independent Quantitative Equity & Asset Intelligence</p>
@@ -496,18 +496,18 @@ def send_otp_email(recipient_email: str, code: str, ttl_minutes: int = 10) -> bo
         f"This code expires in {ttl_minutes} minutes. If you did not request this code, please ignore this email.\n"
     )
     html_body = f"""
-    <div style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; max-width: 480px; margin: 0 auto; padding: 28px; background: #0f172a; color: #f8fafc; border-radius: 12px; border: 1px solid #1e293b;">
-        <div style="font-size: 12px; font-weight: 700; color: #38bdf8; text-transform: uppercase; letter-spacing: 0.08em; margin-bottom: 8px;">
+    <div style="font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; max-width: 480px; margin: 0 auto; padding: 28px; background: #0B2337; color: #F7F5EE; border-radius: 12px; border: 1px solid #0E3D32;">
+        <div style="font-size: 12px; font-weight: 700; color: #7DA77A; text-transform: uppercase; letter-spacing: 0.08em; margin-bottom: 8px;">
             Moatnomics Authentication Gate
         </div>
-        <h2 style="margin: 0 0 12px; font-size: 20px; color: #f8fafc;">Your Sign-In Verification Code</h2>
-        <p style="font-size: 14px; color: #94a3b8; line-height: 1.5; margin-bottom: 20px;">
+        <h2 style="margin: 0 0 12px; font-family: 'Playfair Display', Georgia, serif; font-size: 20px; color: #F7F5EE;">Your Sign-In Verification Code</h2>
+        <p style="font-size: 14px; color: #D9E3E8; line-height: 1.5; margin-bottom: 20px;">
             Enter the 6-digit verification code below to complete your sign-in:
         </p>
-        <div style="background: #020617; border: 1px solid rgba(56, 189, 248, 0.35); border-radius: 10px; padding: 18px; text-align: center; font-family: monospace; font-size: 32px; font-weight: 800; letter-spacing: 8px; color: #38bdf8; margin-bottom: 20px;">
+        <div style="background: #0E3D32; border: 1px solid rgba(199, 226, 104, 0.45); border-radius: 10px; padding: 18px; text-align: center; font-family: 'JetBrains Mono', monospace; font-size: 32px; font-weight: 800; letter-spacing: 8px; color: #C7E268; margin-bottom: 20px;">
             {code}
         </div>
-        <p style="font-size: 12px; color: #64748b; margin: 0;">
+        <p style="font-size: 12px; color: #7DA77A; margin: 0;">
             Valid for {ttl_minutes} minutes. Single-use only.
         </p>
     </div>

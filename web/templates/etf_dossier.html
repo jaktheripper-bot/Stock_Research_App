@@ -6,7 +6,7 @@
 {% block og_desc %}Live tracking error, secondary market spread, and Fair NAV arbitrage matrix for {{ etf.symbol }}.{% endblock %}
 
 {% block content %}
-<div class="container py-8">
+<div class="container py-8" id="dossierReadingContainer" data-asset-class="etfs">
   <!-- Breadcrumbs -->
   <div style="font-size: 13px; color: #64748b; margin-bottom: 20px; display: flex; align-items: center; gap: 8px;">
     <a href="/" style="color: #94a3b8; text-decoration: none;">Home</a>
@@ -17,7 +17,7 @@
   </div>
 
   <!-- Header Banner -->
-  <div style="background: linear-gradient(135deg, rgba(30, 41, 59, 0.8) 0%, rgba(15, 23, 42, 0.95) 100%); border: 1px solid rgba(255, 255, 255, 0.1); border-radius: 16px; padding: 28px; margin-bottom: 24px; position: relative; overflow: hidden;">
+  <div class="dossier-masthead-v2" style="background: linear-gradient(135deg, rgba(30, 41, 59, 0.8) 0%, rgba(15, 23, 42, 0.95) 100%); border: 1px solid rgba(255, 255, 255, 0.1); border-radius: 16px; padding: 28px; margin-bottom: 24px; position: relative; overflow: hidden;">
     <div style="display: flex; justify-content: space-between; align-items: flex-start; flex-wrap: wrap; gap: 16px;">
       <div>
         <!-- Badges -->
@@ -67,6 +67,9 @@
           <a href="/etfs" class="btn btn-sm btn-secondary" style="text-decoration: none; font-size: 12px; font-weight: 600;">
             ← Back to National Matrix
           </a>
+          <button type="button" id="dossierReadingToggleBtn" onclick="toggleDossierReadingMode()" class="btn btn-secondary btn-sm theme-toggle-btn" title="Toggle Warm Ivory Reading Surface" aria-label="Toggle Warm Ivory Reading Surface" aria-pressed="false">
+            <svg class="glyph" style="width: 14px; height: 14px;"><use href="#icon-theme-sun"></use></svg>
+          </button>
         </div>
       </div>
 

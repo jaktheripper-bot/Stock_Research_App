@@ -199,23 +199,23 @@ def render_bouquet_html(bouquet: Dict[str, Any], subscriber: Optional[Dict[str, 
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>{bouquet.get('subject')}</title>
   <style>
-    body {{ font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; line-height: 1.6; color: #1e293b; background-color: #f1f5f9; margin: 0; padding: 16px; }}
-    .wrapper {{ max-width: 620px; margin: 0 auto; background: #f8fafc; border-radius: 10px; border: 1px solid #cbd5e1; overflow: hidden; }}
-    .header {{ background: #0b1329; color: #ffffff; padding: 24px; border-bottom: 3px solid #0ea5e9; text-align: left; }}
-    .header h1 {{ margin: 0; font-size: 20px; font-weight: 800; letter-spacing: -0.01em; color: #ffffff; }}
-    .header p {{ margin: 4px 0 0; font-size: 12px; color: #94a3b8; }}
+    body {{ font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; line-height: 1.6; color: #282F33; background-color: #F7F5EE; margin: 0; padding: 16px; }}
+    .wrapper {{ max-width: 620px; margin: 0 auto; background: #F7F5EE; border-radius: 10px; border: 1px solid #D9E3E8; overflow: hidden; }}
+    .header {{ background: #0E3D32; color: #F7F5EE; padding: 24px; border-bottom: 3px solid #7DA77A; text-align: left; }}
+    .header h1 {{ margin: 0; font-family: 'Playfair Display', Georgia, serif; font-size: 20px; font-weight: 800; letter-spacing: -0.01em; color: #F7F5EE; }}
+    .header p {{ margin: 4px 0 0; font-size: 12px; color: #D9E3E8; }}
     .content {{ padding: 24px; }}
-    .section-title {{ font-size: 13px; font-weight: 800; color: #475569; text-transform: uppercase; letter-spacing: 0.05em; margin: 20px 0 10px 0; display: flex; align-items: center; gap: 6px; }}
-    .card {{ background: #ffffff; border: 1px solid #e2e8f0; border-radius: 8px; padding: 16px; margin-bottom: 14px; }}
-    .footer {{ background: #e2e8f0; padding: 20px 24px; font-size: 11.5px; color: #64748b; border-top: 1px solid #cbd5e1; text-align: center; line-height: 1.5; }}
-    .footer a {{ color: #0284c7; text-decoration: underline; }}
-    .pill {{ display: inline-block; background: #e2e8f0; color: #334155; padding: 2px 8px; border-radius: 4px; font-size: 11px; font-weight: 600; }}
+    .section-title {{ font-size: 13px; font-weight: 800; color: #0B2337; text-transform: uppercase; letter-spacing: 0.05em; margin: 20px 0 10px 0; display: flex; align-items: center; gap: 6px; }}
+    .card {{ background: #ffffff; border: 1px solid #D9E3E8; border-radius: 8px; padding: 16px; margin-bottom: 14px; }}
+    .footer {{ background: #D9E3E8; padding: 20px 24px; font-size: 11.5px; color: #282F33; border-top: 1px solid #7DA77A; text-align: center; line-height: 1.5; }}
+    .footer a {{ color: #0E3D32; text-decoration: underline; }}
+    .pill {{ display: inline-block; background: #D9E3E8; color: #0B2337; padding: 2px 8px; border-radius: 4px; font-size: 11px; font-weight: 600; }}
   </style>
 </head>
 <body>
   <div class="wrapper">
     <div class="header">
-      <div style="font-size: 11px; text-transform: uppercase; letter-spacing: 0.1em; color: #38bdf8; font-weight: 700; margin-bottom: 4px;">
+      <div style="font-size: 11px; text-transform: uppercase; letter-spacing: 0.1em; color: #C7E268; font-weight: 700; margin-bottom: 4px;">
         Daily Research Bouquet &bull; Multi-Asset Intelligence
       </div>
       <h1>MOATNOMICS RESEARCH</h1>

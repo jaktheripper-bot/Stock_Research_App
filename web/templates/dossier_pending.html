@@ -4,10 +4,10 @@
 {% block meta_desc %}Real-time status and compilation queue for {{ display_ticker }} ({{ company_name }}). Ingested from verified BSE exchange disclosures.{% endblock %}
 
 {% block content %}
-<div class="container" style="max-width: 960px; margin: 40px auto;">
+<div class="container" data-asset-class="equities" style="max-width: 960px; margin: 40px auto;">
   
   <!-- Header Card -->
-  <div style="background: rgba(30, 41, 59, 0.7); border: 1px solid var(--border-color); border-radius: var(--radius-lg); padding: 32px; backdrop-filter: blur(12px); margin-bottom: 30px;">
+  <div class="hero-portal-banner" style="background: rgba(30, 41, 59, 0.7); border: 1px solid var(--border-color); border-radius: var(--radius-lg); padding: 32px; backdrop-filter: blur(12px); margin-bottom: 30px;">
     <div style="display: flex; justify-content: space-between; align-items: flex-start; flex-wrap: wrap; gap: 16px;">
       <div>
         <div style="display: inline-flex; align-items: center; gap: 8px; background: rgba(245, 158, 11, 0.15); border: 1px solid rgba(245, 158, 11, 0.4); padding: 4px 12px; border-radius: 20px; font-size: 12px; font-weight: 700; color: #fbbf24; margin-bottom: 12px;">
@@ -45,7 +45,7 @@
   <div style="display: grid; grid-template-columns: 3fr 2fr; gap: 24px; margin-bottom: 40px;">
     <div style="background: rgba(15, 23, 42, 0.6); border: 1px solid var(--border-color); border-radius: var(--radius-md); padding: 24px;">
       <h3 style="font-size: 18px; font-weight: 700; margin-bottom: 14px; color: var(--text-primary); display: flex; align-items: center; gap: 8px;">
-        <span><svg class="glyph"><use href="#glyph-search"></use></svg></span> Why is this dossier pending?
+        <span><svg class="glyph"><use href="#icon-state-dossier-pending"></use></svg></span> Why is this dossier pending?
       </h3>
       <p style="color: var(--text-secondary); line-height: 1.6; font-size: 14px; margin-bottom: 16px;">
         Our repository maintains zero-hallucination standards. Rather than serving synthetic AI estimates, each institutional thesis requires live ingestion of verified BSE financial statements, corporate governance filings, and multi-scenario valuation models.

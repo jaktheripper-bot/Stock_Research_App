@@ -1504,10 +1504,11 @@ class TestCompetitiveEnhancements(unittest.TestCase):
             self.assertEqual(r.status_code, 200)
             self.assertIn(f'data-asset-class="{expected_ac}"', r.text)
 
-        # Check dossier reading mode toggle & masthead framing across dossiers
+        # Check dossier reading mode toggle & masthead framing across all 6 dossiers
         for route, expected_ac in [
             ("/dossier/INFY", "equities"),
             ("/funds/PPFAS_FLEXICAP_DIR", "funds"),
+            ("/etfs/NIFTYBEES", "etfs"),
             ("/debt/INE002A08012", "debt"),
             ("/reits/EMBASSY", "reits"),
             ("/msme/UDYAM-MH-26-0012480", "msme"),
@@ -1519,6 +1520,25 @@ class TestCompetitiveEnhancements(unittest.TestCase):
             self.assertIsNotNone(s.find(id="dossierReadingToggleBtn"), f"Missing #dossierReadingToggleBtn on {route}")
             self.assertIsNotNone(s.find(class_="dossier-masthead-v2"), f"Missing .dossier-masthead-v2 on {route}")
             self.assertIn(f'data-asset-class="{expected_ac}"', r.text)
+
+        # Check Track 1 secondary utility pages, sector/tier SVG symbols, and WebP portal plates
+        for sym_id in [
+            "icon-sector-technology", "icon-sector-financials", "icon-sector-healthcare",
+            "icon-sector-capital-goods", "icon-sector-automotive", "icon-sector-consumer",
+            "icon-sector-chemicals", "icon-sector-energy", "icon-sector-defence", "icon-sector-diversified",
+            "icon-tier-single", "icon-tier-3pack", "icon-tier-10pack", "icon-tier-pro",
+            "icon-state-vault-locked", "icon-state-dossier-pending", "icon-state-empty-search",
+        ]:
+            self.assertIsNotNone(soup_home.find(id=sym_id), f"Missing SVG symbol #{sym_id} in base.html")
+
+        for sec_route in ["/pricing", "/opportunities", "/safety-radar", "/compare", "/calculator/tax", "/search"]:
+            r_sec = self.client.get(sec_route)
+            self.assertEqual(r_sec.status_code, 200)
+            self.assertIn("hero-portal-banner", r_sec.text, f"Missing .hero-portal-banner on {sec_route}")
+
+        import pathlib
+        self.assertEqual(len(list(pathlib.Path("web/static/img/brand").glob("portal-*.webp"))), 4)
+        self.assertEqual(len(list(pathlib.Path("web/static/img/heroes").glob("hero-*.webp"))), 13)
 
 
 if __name__ == "__main__":
