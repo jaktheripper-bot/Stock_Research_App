@@ -1,7 +1,7 @@
 {% extends "base.html" %}
 
-{% block title %}{{ ticker }} ({{ short_name }}) Institutional Equity Dossier | Moatnomics{% endblock %}
-{% block meta_desc %}Comprehensive 7-pillar qualitative equity thesis and valuation matrix for {{ ticker }} ({{ short_name }}). Ingested from verified exchange filings and cross-checked with institutional market data feeds.{% endblock %}
+{% block title %}{{ ticker }} ({{ short_name }}) Equity Dossier | Moatnomics{% endblock %}
+{% block meta_desc %}Comprehensive 7-pillar qualitative equity thesis and valuation matrix for {{ ticker }} ({{ short_name }}). Ingested from verified exchange filings and cross-checked with market data feeds.{% endblock %}
 
 {% block content %}
 <div class="container">
@@ -23,7 +23,7 @@
             </a>
           </div>
           <div class="dossier-provenance-subline">
-            Data sourced directly from statutory exchange filings and cross‑checked against institutional market feeds.
+            Data sourced directly from statutory exchange filings and cross‑checked against market feeds.
           </div>
         </div>
 
@@ -39,29 +39,29 @@
           <button id="btnShareDossier" onclick="shareCurrentPage('dossier')" class="btn btn-secondary btn-sm" title="Copy or share a link to this report" aria-label="Share this report">
             <span>🔗</span> Share
           </button>
-          <button onclick="openCopilot('{{ ticker }}', 'equity')" class="btn btn-hero-ai btn-sm" title="Launch Forensic Intelligence Desk (Shortcut: ⌘K or /)">
-            <svg class="glyph"><use href="#glyph-shield"></use></svg> Forensic Desk
+          <button onclick="openCopilot('{{ ticker }}', 'equity')" class="btn btn-hero-ai btn-sm" title="Open Research Desk (Shortcut: ⌘K or /)">
+            <svg class="glyph"><use href="#glyph-shield"></use></svg> Research Desk
           </button>
           <button id="btnOpenThesisTop" onclick="openThesisModal()" class="btn btn-secondary btn-sm" style="font-weight: 700; border-color: rgba(245, 158, 11, 0.4); color: #fbbf24;">
             <svg class="glyph"><use href="#glyph-scale"></use></svg> Thesis Checkpoint
           </button>
           {% if is_deep_dive_unlocked %}
           <span class="badge badge-emerald">
-            <span class="status-dot status-dot-emerald"></span> 🔓 Institutional Unlocked
+            <span class="status-dot status-dot-emerald"></span> 🔓 Unlocked
           </span>
           <a href="/api/pdf/{{ ticker }}" class="btn btn-primary btn-sm" download>
-            📄 Download Institutional PDF
+            📄 Download PDF Report
           </a>
           {% else %}
           <button onclick="unlockDeepDive('{{ ticker }}')" class="btn btn-primary btn-sm">
             <span>🔓</span> Unlock Deep-Dive (1 Credit)
           </button>
-          <button onclick="unlockDeepDive('{{ ticker }}')" class="btn btn-secondary btn-sm" title="Unlock required to download full institutional PDF with forensic accounting schedules">
+          <button onclick="unlockDeepDive('{{ ticker }}')" class="btn btn-secondary btn-sm" title="Unlock required to download full PDF report with forensic accounting schedules">
             📄 Download PDF (Locked)
           </button>
           {% endif %}
           <button onclick="synthesizeReport('{{ ticker }}', true)" class="btn btn-secondary btn-sm">
-            🔄 Refresh / Synthesize
+            🔄 Refresh / Generate
           </button>
         </div>
       </div>
@@ -81,7 +81,7 @@
         <div class="kpi-card">
           <div class="kpi-label">Market Capitalization</div>
           <div class="kpi-val tnum">{{ market_cap_str|default('N/A') }}</div>
-          <div style="font-size: 11.5px; color: var(--text-muted); margin-top: 4px;">Institutional Free-Float</div>
+          <div style="font-size: 11.5px; color: var(--text-muted); margin-top: 4px;">Free-Float</div>
         </div>
         <div class="kpi-card">
           <div class="kpi-label">BSE Scrip Code</div>
@@ -123,8 +123,8 @@
           <div style="font-size: 12px; font-weight: 700; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.05em;">
             Qualitative Health Matrix (01–07):
           </div>
-          <button onclick="openCopilot('{{ ticker }}', 'equity', 'solvency', 'Qualitative Health Matrix', 'Assess the 7-pillar qualitative health matrix and balance sheet resilience for {{ ticker }}')" class="btn btn-secondary btn-sm" style="font-size: 11px; padding: 3px 10px;" title="Audit qualitative matrix with Forensic Intelligence Desk">
-            <svg class="glyph"><use href="#glyph-zap"></use></svg> Forensic Desk
+          <button onclick="openCopilot('{{ ticker }}', 'equity', 'solvency', 'Qualitative Health Matrix', 'Assess the 7-pillar qualitative health matrix and balance sheet resilience for {{ ticker }}')" class="btn btn-secondary btn-sm" style="font-size: 11px; padding: 3px 10px;" title="Audit qualitative matrix with Research Desk">
+            <svg class="glyph"><use href="#glyph-zap"></use></svg> Research Desk
           </button>
         </div>
         <div style="display: flex; gap: 10px; flex-wrap: wrap;">
@@ -146,7 +146,7 @@
           <span style="font-size: 16px;"><svg class="glyph"><use href="#glyph-shield"></use></svg></span>
           <span>
             <strong style="color: #38bdf8;">Verified Regulatory Grounding:</strong>
-            Synthesized from <strong>{{ citations|length }} primary sources</strong>, including statutory BSE filings, shareholding patterns, and official disclosures.
+            Compiled from <strong>{{ citations|length }} primary sources</strong>, including statutory BSE filings, shareholding patterns, and official disclosures.
           </span>
         </div>
         <a href="#citations" class="btn btn-secondary btn-sm" style="font-size: 12px; padding: 6px 14px; text-decoration: none;">
@@ -156,7 +156,7 @@
       {% endif %}
     </div>
 
-    <!-- Institutional Equity Intelligence Cockpit (Category 1 Upgrade) -->
+    <!-- Equity Research Cockpit (Category 1 Upgrade) -->
     {% if equity_intel %}
     <div style="margin-bottom: 30px; background: rgba(15, 23, 42, 0.85); border: 1px solid rgba(56, 189, 248, 0.25); border-radius: var(--radius-md); padding: 22px; backdrop-filter: blur(12px); box-shadow: 0 8px 32px rgba(0,0,0,0.3);">
       
@@ -164,7 +164,7 @@
       <div style="display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid rgba(255,255,255,0.08); padding-bottom: 16px; margin-bottom: 20px; flex-wrap: wrap; gap: 14px;">
         <div>
           <div style="font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.08em; color: #38bdf8; display: flex; align-items: center; gap: 6px;">
-            <svg class="glyph"><use href="#glyph-zap"></use></svg> Institutional Intelligence Cockpit
+            <svg class="glyph"><use href="#glyph-zap"></use></svg> Research Cockpit
           </div>
           <div style="font-size: 20px; font-weight: 800; color: #f8fafc; margin-top: 4px;">
             {{ equity_intel.sector_intelligence.sector_display_name }} Diagnostic Profile
@@ -219,10 +219,10 @@
           </div>
         </div>
 
-        <!-- Forensic Pillar -->
+        <!-- Accounting Pillar -->
         <div style="background: rgba(30, 41, 59, 0.5); border: 1px solid rgba(255,255,255,0.06); border-radius: 8px; padding: 12px 14px;">
           <div style="display: flex; justify-content: space-between; align-items: center;">
-            <span style="font-size: 11px; color: var(--text-muted); font-weight: 600;">360° FORENSIC AUDIT</span>
+            <span style="font-size: 11px; color: var(--text-muted); font-weight: 600;">360° ACCOUNTING CHECK</span>
             <span style="font-size: 12px; font-weight: 800; color: {{ equity_intel.forensic_intelligence.badge_color }};">{{ equity_intel.forensic_intelligence.passed_count }}/{{ equity_intel.forensic_intelligence.total_checks }} Passed</span>
           </div>
           <div style="font-size: 13.5px; font-weight: 700; color: {{ equity_intel.forensic_intelligence.badge_color }}; margin-top: 4px;">
@@ -482,20 +482,20 @@
     </div>
     {% endif %}
 
-    <!-- Multi-Quarter Thesis Drift Surveillance Card (Hoisted Above Report) -->
+    <!-- Multi-Quarter Thesis Drift Monitoring Card (Hoisted Above Report) -->
     {% if diff %}
     <div style="margin-bottom: 30px; background: rgba(15, 23, 42, 0.9); border: 1px solid rgba(14, 165, 233, 0.35); border-radius: var(--radius-md); padding: 22px;">
       <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 14px; flex-wrap: wrap; gap: 10px;">
         <div style="display: flex; align-items: center; gap: 10px;">
           <span style="font-size: 20px;">📈</span>
           <h3 style="margin: 0; font-size: 17px; font-weight: 800; color: var(--text-primary);">
-            Multi-Quarter Thesis Drift Surveillance
+            Multi-Quarter Thesis Drift Monitoring
           </h3>
           <span class="badge" style="background: rgba(14, 165, 233, 0.2); color: var(--accent-cyan); font-size: 11px;">
             State A ({{ diff.state_a_date }}) ➔ State B ({{ diff.state_b_date }})
           </span>
         </div>
-        <span class="badge badge-emerald" style="font-size: 11px;">Surveillance Active</span>
+        <span class="badge badge-emerald" style="font-size: 11px;">Monitoring Active</span>
       </div>
 
       <!-- Value Trap Warning Banner -->
@@ -528,7 +528,7 @@
     </div>
     {% elif revisions_count == 1 %}
     <div style="margin-bottom: 24px; padding: 12px 16px; background: rgba(30, 41, 59, 0.35); border-radius: 8px; border: 1px solid var(--border-color); font-size: 12.5px; color: var(--text-muted); display: flex; align-items: center; justify-content: space-between;">
-      <span>ℹ️ <strong>Surveillance Active:</strong> Differential revision tracking will automatically highlight thesis drift upon subsequent quarterly earnings filings or material price shifts (≥5%).</span>
+      <span>ℹ️ <strong>Monitoring Active:</strong> Differential revision tracking will automatically highlight thesis drift upon subsequent quarterly earnings filings or material price shifts (≥5%).</span>
       <span class="badge" style="background: rgba(14, 165, 233, 0.15); color: var(--accent-cyan); font-size: 11px;">1 Snapshot Archived</span>
     </div>
     {% endif %}
@@ -622,7 +622,7 @@
       <div style="display: flex; align-items: center; gap: 10px;">
         <span style="font-size: 18px;">📑</span>
         <div>
-          <strong style="font-size: 14px; color: var(--text-primary); display: block;">Institutional Forensic Research (01–07)</strong>
+          <strong style="font-size: 14px; color: var(--text-primary); display: block;">Seven-Area Research (01–07)</strong>
           <span style="font-size: 11px; color: var(--text-muted);">Every metric and finding grounded in verified BSE regulatory filings</span>
         </div>
       </div>
@@ -714,13 +714,13 @@
     </div>
     {% endif %}
 
-    <!-- Charlie Munger Pre-Mortem Inversion Engine (Anti-Thesis Module) -->
+    <!-- Countercase Stress Test: What Could Go Wrong (Anti-Thesis Module) -->
     <div id="premortem" style="margin-top: 40px; background: rgba(15, 23, 42, 0.95); border: 1px solid rgba(245, 158, 11, 0.3); border-radius: var(--radius-md); padding: 24px;">
       <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px; flex-wrap: wrap; gap: 8px;">
         <div style="display: flex; align-items: center; gap: 10px;">
           <span style="font-size: 22px;"><svg class="glyph"><use href="#glyph-zap"></use></svg></span>
           <h3 style="margin: 0; font-size: 17px; font-weight: 800; color: var(--text-primary);">
-            Pre-Mortem Inversion Engine (Charlie Munger Anti-Thesis)
+            Countercase Stress Test: What Could Go Wrong
           </h3>
         </div>
         <span class="badge" style="background: rgba(245, 158, 11, 0.15); color: #fbbf24; font-size: 11px;">Behavioral De-Biasing</span>
@@ -755,7 +755,7 @@
         <div style="display: flex; justify-content: space-between; align-items: center;">
           <span id="premortemStatus" style="font-size: 12px; color: var(--accent-emerald);"></span>
           <button type="submit" id="btnCommitPremortem" class="btn btn-secondary btn-sm" style="font-weight: 700;">
-            🔒 Commit Pre-Mortem to Audit Ledger
+            🔒 Save Countercase to Audit Ledger
           </button>
         </div>
       </form>
@@ -772,7 +772,7 @@
               Verified Regulatory Sources & Primary Footnote Citations
             </h3>
             <span style="font-size: 12px; color: var(--accent-cyan); font-weight: 600;">
-              {{ citations|length }} Institutional Documents Grounded Under SEBI Safe-Harbor Standards
+              {{ citations|length }} Documents Grounded Under SEBI Safe-Harbor Standards
             </span>
           </div>
         </div>
@@ -780,7 +780,7 @@
       </div>
 
       <p style="font-size: 13px; color: var(--text-secondary); margin-bottom: 20px; line-height: 1.6;">
-        All corporate disclosures, audited financials, related-party metrics, shareholding patterns, and governance findings above were synthesized strictly from the following official public filings and verified regulatory repositories:
+        All corporate disclosures, audited financials, related-party metrics, shareholding patterns, and governance findings above were compiled strictly from the following official public filings and verified regulatory repositories:
       </p>
 
       <ul class="citations-list" style="list-style: none; padding: 0; margin: 0; display: flex; flex-direction: column; gap: 10px;">

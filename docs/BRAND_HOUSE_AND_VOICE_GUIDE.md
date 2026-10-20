@@ -7,6 +7,20 @@
 
 ---
 
+## Voice Decisions (recorded 20 October 2026)
+
+| Decision | Outcome |
+| :--- | :--- |
+| **Tagline** | **"Less noise, more nuance."** is the only public tagline. *"Audit the Asset. Protect the Allocator."* is retired. The site and `core/brand/moatnomics_house.py` still carry it until Copy Wave 3a lands |
+| **Tagline status** | Working tagline, not market-validated (see `VISUAL_IDENTITY_AND_MOTION_GUIDE.md` §1, §17) |
+| **Brand name** | Closed. No naming, pronunciation or trademark workstream |
+| **Regulatory wording** | Any term that could contradict SEBI wording rules (e.g. *Fiduciary*, *Recommendation*, *zero-hallucination*, user-facing *Surveillance*) is replaced with a similar-meaning, neutral term |
+| **Languages** | English (India) first, then Hindi. Per-language voice rules and string catalogues are backend work, scheduled after English copy is stable |
+| **Terminology** | *Institutional* only for facts; *Forensic* only for real accounting checks (the desk becomes *Research Desk*); *report* in actions and nav, *dossier* as the long-form style name |
+| **Order of work** | Public site copy, then reports, then backend |
+
+---
+
 ## How to Use This Document
 
 This playbook translates the Moatnomics positioning into a practical system for brand decisions, content creation, and AI-assisted writing. It is a working strategy, not a claim that the positioning or tagline has already been validated with customers.
@@ -25,7 +39,7 @@ This playbook translates the Moatnomics positioning into a practical system for 
 | :--- | :--- |
 | **Brand** | **MOATNOMICS** |
 | **Primary Creative Territory** | *Less noise, more nuance.* |
-| **Dual-Mandate Operational Tagline** | *Audit the Asset. Protect the Allocator.* |
+| **Operational Tagline** | *Retired 20 Oct 2026 — see Voice Decisions. "Less noise, more nuance." is the single public line* |
 | **Category Descriptor** | Multi-asset investment research |
 | **Core Brand Promise** | *Understand the evidence. Examine the trade-offs. Know what deserves a closer look.* |
 

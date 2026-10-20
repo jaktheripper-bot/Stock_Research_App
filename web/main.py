@@ -1,7 +1,7 @@
 """
 Moatnomics - FastAPI Web Application.
 
-High-performance Server-Side Rendered (SSR) institutional equity research portal.
+High-performance Server-Side Rendered (SSR) equity research portal.
 Provides:
 - Razorpay-compliant public landing page & mandatory legal policies
 - Zero-latency crawlable dossier URLs for Google SEO & GEO answer engines
@@ -205,13 +205,13 @@ from web.common import (
 # ==============================================================================
 async def run_daily_discovery_scheduler():
     """
-    Automated background BSE surveillance and screening scheduler:
+    Automated background BSE monitoring and screening scheduler:
     Coordinates scheduled tasks across multi-worker deployments using distributed job leases:
     - 08:30 AM IST: Daily 15-stock ingestion & mutual fund look-through saturation
     - 08:45 AM IST: Discovery Reel morning screening (500+ scrips)
     - 09:00 AM IST: Daily unlisted MSME cohort ingestion & Research Bouquet dispatch
     """
-    logger.info("🌅 [Discovery Scheduler] Background BSE surveillance crawler & morning scheduler initiated.")
+    logger.info("🌅 [Discovery Scheduler] Background BSE monitoring crawler & morning scheduler initiated.")
     last_stock_run_date = None
     last_discovery_run_date = None
     last_msme_run_date = None
@@ -356,11 +356,11 @@ async def run_daily_discovery_scheduler():
 
 
 async def run_daily_amfi_scheduler():
-    """Automated background Multi-Asset Surveillance & AMFI Synchronization Scheduler.
+    """Automated background Multi-Asset Monitoring & AMFI Synchronization Scheduler.
     Runs catch-up initialization at boot, and executes full multi-asset pipeline nightly at 23:15 IST:
     1. AMFI Daily NAV Feed & Scheme Master Ingestion (Mutual Funds)
     2. National ETF Matrix Ingestion (all 436 AMFI ETFs across 9 categories)
-    3. Always-On Multi-Asset Surveillance Scan (MF drift + Corporate Debt maturities/CRA watches)
+    3. Always-On Multi-Asset Monitoring Scan (MF drift + Corporate Debt maturities/CRA watches)
     4. Sovereign Risk-Free Benchmarks & SDL Yield Curve Synchronization
     """
     logger.info("📊 [AMFI & Multi-Asset Scheduler] Background synchronizer initiated.")
@@ -386,7 +386,7 @@ async def run_daily_amfi_scheduler():
         # 2. Sovereign Benchmarks Boot Check: Ensure sovereign benchmarks are primed
         await loop.run_in_executor(None, refresh_daily_sovereign_benchmarks, today_str)
 
-        # 3. Multi-Asset Surveillance & AMFI Catch-Up Check:
+        # 3. Multi-Asset Monitoring & AMFI Catch-Up Check:
         # Runs if past 23:15 IST without today's scan OR if the last scan is older than yesterday
         from core.ingestion.amfi import ingest_amfi_daily_feed
         yesterday_str = (now - timedelta(days=1)).strftime("%Y-%m-%d")
@@ -442,7 +442,7 @@ async def run_daily_amfi_scheduler():
                 metadata=etf_res
             )
 
-            # 3. Multi-Asset Surveillance Scan (MF drift + Corporate Debt maturities/downgrade watches)
+            # 3. Multi-Asset Monitoring Scan (MF drift + Corporate Debt maturities/downgrade watches)
             scan_res = await loop.run_in_executor(None, run_comprehensive_asset_scan, "ALL_ASSETS", "nightly_cron")
             record_autonomous_event(
                 event_type="MULTI_ASSET_SURVEILLANCE_SCAN",
@@ -475,8 +475,8 @@ async def run_daily_amfi_scheduler():
 
 
 async def run_daily_fund_audit_scheduler():
-    """Automated background Mutual Fund Forensic Auditor (runs daily at 23:30 IST with boot catch-up)."""
-    logger.info("🔍 [Fund Audit Scheduler] Background mutual fund forensic auditor initiated.")
+    """Automated background Mutual Fund Accounting Checkor (runs daily at 23:30 IST with boot catch-up)."""
+    logger.info("🔍 [Fund Audit Scheduler] Background mutual fund accounting checkor initiated.")
     try:
         from core.analysis.fund_overlap_auditor import audit_single_fund_daily
         from core.db.connection import get_db_connection
@@ -508,7 +508,7 @@ async def run_daily_fund_audit_scheduler():
             logger.info(f"🔍 [Fund Audit Scheduler] Next fund audit scheduled in {wait_seconds/3600:.2f} hours (at {target.strftime('%Y-%m-%d %H:%M:%S IST')}).")
             await asyncio.sleep(wait_seconds)
 
-            logger.info("🔍 [Fund Audit Scheduler] Executing scheduled nightly mutual fund forensic audit...")
+            logger.info("🔍 [Fund Audit Scheduler] Executing scheduled nightly mutual fund accounting check...")
             from core.analysis.fund_overlap_auditor import audit_single_fund_daily
             from core.db.agent_sessions import record_autonomous_event
             loop = asyncio.get_running_loop()
@@ -528,7 +528,7 @@ async def run_daily_fund_audit_scheduler():
                         "margin_of_safety_pct": res.get("margin_of_safety_pct")
                     }
                 )
-            logger.info(f"🔍 [Fund Audit Scheduler] Nightly fund forensic audit completed for {res.get('scheme_code')}.")
+            logger.info(f"🔍 [Fund Audit Scheduler] Nightly fund accounting check completed for {res.get('scheme_code')}.")
         except asyncio.CancelledError:
             logger.info("🔍 [Fund Audit Scheduler] Background fund audit scheduler cancelled.")
             break
@@ -661,7 +661,7 @@ async def lifespan(app: FastAPI):
 
 app = FastAPI(
     title="Moatnomics",
-    description="Dual-Mandate Fundamental Research Platform: Audit the Asset, Protect the Allocator",
+    description="Multi-asset investment research. Less noise, more nuance.",
     version="2.0.0",
     lifespan=lifespan
 )
@@ -1033,7 +1033,7 @@ def dossier_page(request: Request, ticker: str):
     # Strip redundant Health Matrix markdown list so only top colored badge pills appear
     prose_md = remove_health_matrix_text(prose_md)
 
-    # Determine institutional deep-dive unlock status (Pillars 03 & 05 + Thesis Drift)
+    # Determine deep-dive unlock status (Pillars 03 & 05 + Thesis Drift)
     web_user = _get_current_web_user(request)
     is_deep_dive_unlocked = False
     if _is_admin_authenticated(request):
@@ -1063,7 +1063,7 @@ def dossier_page(request: Request, ticker: str):
     # 7-Pillar Health Matrix
     matrix = extract_health_matrix(raw_md)
 
-    # Multi-Quarter Revisions & Thesis Drift Surveillance
+    # Multi-Quarter Revisions & Thesis Drift Monitoring
     revisions = get_report_revisions(canonical) or []
     diff_data = None
     if len(revisions) >= 2:
@@ -1121,7 +1121,7 @@ def dossier_page(request: Request, ticker: str):
                 if diff_pct >= 0:
                     trend_badge = f"+{diff_pct:.1f}% vs 50-DMA"
                     trend_status = "bullish"
-                    trend_inference = f"Trading {trend_badge}. Momentum remains constructive above the 50-day institutional accumulation trendline."
+                    trend_inference = f"Trading {trend_badge}. Momentum remains constructive above the 50-day accumulation trendline."
                 else:
                     trend_badge = f"{diff_pct:.1f}% vs 50-DMA"
                     trend_status = "bearish"
@@ -1153,7 +1153,7 @@ def dossier_page(request: Request, ticker: str):
     except Exception as e:
         logger.debug(f"Linked debt query notice for {canonical}: {e}")
 
-    # Phase 1 Upgrade: Institutional Equity Intelligence (Sector, Flow, Forensics, Valuation Radar, Bull/Bear)
+    # Phase 1 Upgrade: Equity Intelligence (Sector, Flow, Forensics, Valuation Radar, Bull/Bear)
     equity_intel = None
     try:
         from core.analysis.equity_dossier import compile_equity_dossier, _safe_float
@@ -1225,7 +1225,7 @@ async def compare_page(
     b: Optional[str] = "TCS",
     compare_error: Optional[str] = None
 ):
-    """Cross-company institutional peer comparison and 3-tier disparity diagnostic."""
+    """Cross-company peer comparison and 3-tier disparity diagnostic."""
     clean_a = clean_ticker(a if a is not None else "INFY")
     clean_b = clean_ticker(b if b is not None else "TCS")
     canonical_a = resolve_canonical_symbol(clean_a) or clean_a
@@ -1457,7 +1457,7 @@ def equities_directory_page(
     market_cap: Optional[str] = None,
     sort: Optional[str] = "mcap_desc",
 ):
-    """Institutional Equities Directory & Screener."""
+    """Equities Directory & Screener."""
     init_db()
     all_equities = get_all_equities_directory_sync()
     total_equities = len(all_equities)
@@ -1635,7 +1635,7 @@ def fund_overlap_page(
 
 @app.get("/funds/{scheme_code}", response_class=HTMLResponse)
 def fund_dossier_page(request: Request, scheme_code: str):
-    """Institutional 6-Pillar Mutual Fund Look-Through Dossier & Forensic Synthesis."""
+    """6-Pillar Mutual Fund Look-Through Dossier & Report Generation."""
     init_db()
     clean_code = scheme_code.strip().upper()
     scheme = get_mutual_fund_scheme(clean_code)
@@ -1657,7 +1657,7 @@ def fund_dossier_page(request: Request, scheme_code: str):
         try:
             forensic_dossier = audit_single_fund_daily(clean_code)
         except Exception as e:
-            logger.warning(f"Could not synthesize full forensic dossier on-demand for {clean_code}: {e}")
+            logger.warning(f"Could not generate full report on-demand for {clean_code}: {e}")
 
     is_deep_dive_unlocked = _asset_unlocked_for_request(request, "FUND", clean_code)
     forensic_locked = False
@@ -1740,7 +1740,7 @@ def etfs_page(
     q: Optional[str] = Query(None),
     sort_by: Optional[str] = Query(None)
 ):
-    """National ETF Matrix & Tracking Error Surveillance page."""
+    """National ETF Matrix & Tracking Error Monitoring page."""
     from core.analysis.etf_matrix_engine import evaluate_etf_matrix
     init_db()
     matrix_data = evaluate_etf_matrix(category=category, query=q, sort_by=sort_by)
@@ -1759,7 +1759,7 @@ def etfs_page(
 
 @app.get("/etfs/{symbol}", response_class=HTMLResponse)
 def etf_dossier_page(request: Request, symbol: str):
-    """Institutional ETF Dossier with live premium/discount tracking and arbitrage surveillance."""
+    """ETF Dossier with live premium/discount tracking and arbitrage monitoring."""
     from core.analysis.etf_matrix_engine import get_etf_detail
     init_db()
     clean_sym = symbol.strip().upper()
@@ -1938,7 +1938,7 @@ def msme_directory_page(
 
 @app.get("/msme/{uin}", response_class=HTMLResponse)
 def msme_dossier_page(request: Request, uin: str):
-    """Institutional 4-Pillar Forensic Dossier for an Unlisted MSME / Emerging SME."""
+    """4-Pillar Report for an Unlisted MSME / Emerging SME."""
     init_db()
     from core.msme.router import get_msme_detail
     dossier = get_msme_detail(uin)
@@ -1978,7 +1978,7 @@ def reits_page(request: Request, structure: Optional[str] = Query(None)):
 
 @app.get("/reits/{symbol}", response_class=HTMLResponse)
 def reit_dossier_page(request: Request, symbol: str):
-    """Institutional REIT & InvIT Dossier with Sec 115UA tax waterfall and NDCF payout purity."""
+    """REIT & InvIT Dossier with Sec 115UA tax waterfall and NDCF payout purity."""
     from core.analysis.sm_reit_invit_engine import get_reit_detail
     init_db()
     clean_sym = symbol.strip().upper()

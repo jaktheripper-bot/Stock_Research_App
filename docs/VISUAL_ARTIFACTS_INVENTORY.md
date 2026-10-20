@@ -5,6 +5,15 @@
 > - **Reference Board B (`ref_b_logo_system_and_explorations.png`):** Minimum size / clear space mechanics and later explorations (*do not replace the dimensional split-arch with the perfect-semicircle revision*).
 > - **Reference Board C (`ref_c_cross_channel_styleboard.png`):** Canonical 12-icon `24×24px` (`1.75–2px` stroke) vector system, mobile/desktop UI applications, report cover, social cards, and video storyboard.
 
+> [!IMPORTANT]
+> **Status on `main` @ `9aee965` (verified 20 Oct 2026).** Rows below still read "currently missing" or list emoji placeholders; they were written before commits `2b206e0`, `b413ed6` and `9aee965`. Actual state:
+> - **Done, inlined as `<symbol>` sprites in `web/templates/base.html`:** flat/dimensional portal marks, 12 nav icons, 7 pillars, sector icons, 4 pricing tiers, 3 state diagrams (`vault-locked`, `dossier-pending`, `empty-search`), theme and reading-surface icons. The standalone `.svg` files under `img/nav|pillars|sectors|pricing` are not referenced by path.
+> - **Files present, not wired into any template or CSS:** the 13 `img/heroes/hero-*.webp` banners, the 4 `img/brand/portal-*.webp` plates, `img/brand/og-default.png`, `img/brand/apple-touch-icon.png`.
+> - **Not done:** `og:image` / `twitter:image` meta, `apple-touch-icon` link. Both are scheduled for Copy Wave 3a.
+> - **Unreferenced files:** `img/ui/copilot-*.svg`, `img/ui/hud-*.svg` (the Research Desk uses sprite icons and, in `copilot.js`, some raw emojis).
+> - **Cleanup pending:** legacy `glyph-castle` symbol (`base.html:110`) is defined but unused.
+> - **Naming:** asset names containing off-voice terms (`hud-surveillance-satellite`, `copilot-premortem`, `copilot-bear-thesis`) are renamed with their matching copy wave, if they are ever wired up.
+
 ---
 
 ## 0. v2.0 Production Guardrails Before Generating Any Visuals

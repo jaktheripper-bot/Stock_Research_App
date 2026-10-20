@@ -1,9 +1,9 @@
 {% extends "base.html" %}
 
-{% block title %}{{ dossier.name }} ({{ dossier.uin }}) | Unlisted MSME Forensic Dossier{% endblock %}
-{% block meta_desc %}Institutional 4-pillar forensic dossier for {{ dossier.name }} under the MSMED Act 2020. Evaluates working capital stress, cash conversion cycle, listed corporate supply-chain linkages, and TReDS solvency risk.{% endblock %}
-{% block og_title %}{{ dossier.name }} | Moatnomics MSME Forensic Intelligence{% endblock %}
-{% block og_desc %}Unlisted forensic analysis: Working capital cycle, listed corporate OEM buyers, ICR solvency, and capital replacement moat.{% endblock %}
+{% block title %}{{ dossier.name }} ({{ dossier.uin }}) | Unlisted MSME Report{% endblock %}
+{% block meta_desc %}4-pillar report for {{ dossier.name }} under the MSMED Act 2020. Evaluates working capital stress, cash conversion cycle, listed corporate supply-chain linkages, and TReDS solvency risk.{% endblock %}
+{% block og_title %}{{ dossier.name }} | Moatnomics MSME Research{% endblock %}
+{% block og_desc %}Unlisted analysis: Working capital cycle, listed corporate OEM buyers, ICR solvency, and capital replacement moat.{% endblock %}
 
 {% block content %}
 <div id="dossierReadingContainer" class="container py-8" data-asset-class="msme">
@@ -67,7 +67,7 @@
       <!-- Moat Scorecard Widget -->
       <div style="background: rgba(15, 23, 42, 0.85); border: 1px solid rgba(255, 255, 255, 0.12); border-radius: 12px; padding: 16px 22px; text-align: right; min-width: 200px;">
         <div style="font-size: 11px; text-transform: uppercase; color: var(--text-muted); font-weight: 700; margin-bottom: 4px;">
-          Forensic Moat Score
+          Moat Score
         </div>
         <div style="font-size: 32px; font-weight: 800; color: {{ dossier.pillar_4_moat.moat_color }}; line-height: 1;">
           {{ dossier.pillar_4_moat.moat_score }}<span style="font-size: 16px; color: var(--text-muted); font-weight: 600;">/100</span>
@@ -106,7 +106,7 @@
     </div>
   </div>
 
-  <!-- 4-Pillar Detailed Forensic Grid -->
+  <!-- 4-Pillar Detailed Grid -->
   <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 24px; margin-bottom: 32px;">
 
     <!-- Pillar 1: Working Capital & CCC -->
@@ -158,7 +158,7 @@
       </div>
 
       <p style="font-size: 13px; color: var(--text-secondary); margin-bottom: 14px;">
-        Operating in the <strong>{{ dossier.pillar_2_supply_chain.cluster_type }}</strong> corridor. The following listed NSE/BSE institutional equities constitute the <strong>Sector Offtake Universe</strong> (potential procurement anchors unverified by direct public filing unless certified):
+        Operating in the <strong>{{ dossier.pillar_2_supply_chain.cluster_type }}</strong> corridor. The following listed NSE/BSE equities constitute the <strong>Sector Offtake Universe</strong> (potential procurement anchors unverified by direct public filing unless certified):
       </p>
 
       <div style="display: flex; flex-direction: column; gap: 10px; margin-bottom: 16px;">
@@ -234,7 +234,7 @@
       <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 16px;">
         <h2 style="font-size: 17px; font-weight: 800; color: #f8fafc; display: flex; align-items: center; gap: 8px;">
           <span style="color: var(--accent-cyan); font-family: monospace;">04.</span>
-          Cluster Moat & Pre-Mortem Inversion
+          Cluster Moat & Countercase
         </h2>
         <span style="font-size: 11px; font-weight: 700; color: {{ dossier.pillar_4_moat.moat_color }}; background: rgba(255,255,255,0.06); padding: 3px 8px; border-radius: 4px;">
           {{ dossier.pillar_4_moat.moat_badge }}
@@ -256,7 +256,7 @@
       <!-- Fragility Vectors -->
       <div>
         <div style="font-size: 12px; font-weight: 700; color: #ef4444; text-transform: uppercase; margin-bottom: 6px;">
-          ▼ Pre-Mortem Fragility & Failure Modes:
+          ▼ Countercase: Fragility & Failure Modes:
         </div>
         <ul style="margin: 0; padding-left: 18px; font-size: 12.5px; color: var(--text-secondary); line-height: 1.55;">
           {% for frag in dossier.pillar_4_moat.fragility_vectors %}

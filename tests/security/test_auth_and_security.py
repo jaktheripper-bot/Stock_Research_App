@@ -761,7 +761,7 @@ class TestSynthesizeSessionAuth(unittest.TestCase):
         self.assertEqual(resp.status_code, 401)
         data = resp.json().get("detail", {})
         self.assertEqual(data.get("error"), "AUTHENTICATION_REQUIRED")
-        self.assertIn("Please sign in to synthesize a dossier", data.get("message", ""))
+        self.assertIn("Please sign in to generate a dossier", data.get("message", ""))
 
     def test_synthesize_ignores_client_supplied_user_id(self):
         """The endpoint must ignore client-supplied user_id and strictly resolve from verified session."""

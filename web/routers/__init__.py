@@ -1,4 +1,4 @@
-"""FastAPI modular routers package for Stock Research App."""
+"""FastAPI modular routers package for Moatnomics."""
 
 from web.routers.auth_billing import router as auth_billing_router
 from web.routers.dossier import router as dossier_router

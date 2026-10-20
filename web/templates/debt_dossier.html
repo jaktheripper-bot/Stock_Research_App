@@ -1,7 +1,7 @@
 {% extends "base.html" %}
 
 {% block title %}{{ posture.ticker }} - {{ posture.instrument_name }} | 5-Pillar Credit Dossier{% endblock %}
-{% block meta_description %}Institutional 5-Pillar credit analysis, YTM, duration risk, seniority waterfall, rate shock sensitivity, and executive investment thesis for {{ posture.instrument_name }} ({{ posture.isin }}).{% endblock %}
+{% block meta_description %}5-Pillar credit analysis, YTM, duration risk, seniority waterfall, rate shock sensitivity, and executive investment thesis for {{ posture.instrument_name }} ({{ posture.isin }}).{% endblock %}
 
 {% block content %}
 <div id="dossierReadingContainer" class="container py-8" data-asset-class="debt" style="max-width: 1200px; margin: 0 auto; padding: 24px 16px;">
@@ -43,7 +43,7 @@
           <span class="dossier-meta-sep">•</span>
           <span class="badge badge-emerald"><span class="status-dot status-dot-emerald"></span> Verified BSE Debt / SEBI Feed</span>
           <span class="dossier-meta-sep">•</span>
-          <span class="badge badge-cyan" title="Audited credit rating surveillance and recovery waterfall">
+          <span class="badge badge-cyan" title="Audited credit rating monitoring and recovery waterfall">
             <span>📎</span> <span>SEBI Statutory Seniority Waterfall</span>
           </span>
         </div>
@@ -69,8 +69,8 @@
           <button id="dossierReadingToggleBtn" type="button" onclick="toggleDossierReadingMode()" class="btn btn-secondary btn-sm" title="Toggle Warm Ivory Reading Surface" aria-label="Toggle Warm Ivory Reading Surface" aria-pressed="false">
             <svg class="glyph"><use href="#icon-reading-surface"></use></svg>
           </button>
-          <button onclick="openCopilot('{{ posture.ticker or posture.isin }}', 'debt')" class="btn btn-hero-ai btn-sm" title="Launch Forensic Intelligence Desk (Shortcut: ⌘K or /)">
-            <svg class="glyph"><use href="#glyph-shield"></use></svg> Forensic Desk
+          <button onclick="openCopilot('{{ posture.ticker or posture.isin }}', 'debt')" class="btn btn-hero-ai btn-sm" title="Open Research Desk (Shortcut: ⌘K or /)">
+            <svg class="glyph"><use href="#glyph-shield"></use></svg> Research Desk
           </button>
           <a href="/api/pdf/debt/{{ posture.isin }}" class="btn btn-sm btn-secondary" style="text-decoration: none; font-size: 12px; font-weight: 600;">
             📄 Export PDF
@@ -186,7 +186,7 @@
       </div>
       <div style="display: flex; align-items: center; gap: 8px;">
         <button onclick="openCopilot('{{ posture.ticker or posture.isin }}', 'debt', 'contagion', 'Credit Contagion Radar', 'What does the Credit Contagion Radar say about systemic risks for this issuer?')" class="btn btn-secondary btn-sm" style="font-weight: 600; font-size: 11px; padding: 4px 10px; cursor: pointer; display: inline-flex; align-items: center; gap: 4px;">
-          <svg class="glyph"><use href="#glyph-zap"></use></svg> Forensic Desk
+          <svg class="glyph"><use href="#glyph-zap"></use></svg> Research Desk
         </button>
         <div style="display: inline-flex; align-items: center; gap: 6px; padding: 6px 14px; border-radius: 9999px; background: rgba(255, 255, 255, 0.05); border: 1px solid {{ posture.credit_contagion_radar.badge_color }};">
           <span style="width: 8px; height: 8px; border-radius: 50%; background: {{ posture.credit_contagion_radar.badge_color }};"></span>
@@ -214,7 +214,7 @@
     {% if posture.credit_contagion_radar.equity_ticker %}
     <div style="margin-top: 14px; display: flex; justify-content: flex-end;">
       <a href="/dossier/{{ posture.credit_contagion_radar.equity_ticker }}" class="btn btn-sm btn-secondary" style="font-size: 12px; font-weight: 600; border-radius: 9999px; text-decoration: none; display: inline-flex; align-items: center; gap: 6px; padding: 6px 14px; background: rgba(15, 23, 42, 0.6); border: 1px solid rgba(255, 255, 255, 0.15); color: #38bdf8;">
-        <span>📈</span> View Parent Equity Forensic Dossier ({{ posture.credit_contagion_radar.equity_ticker }}) &rarr;
+        <span>📈</span> View Parent Equity Report ({{ posture.credit_contagion_radar.equity_ticker }}) &rarr;
       </a>
     </div>
     {% endif %}
@@ -250,7 +250,7 @@
         <strong style="color: #38bdf8;">📘 What This Tests:</strong> {{ posture.pillars.p1_credit_quality.educational_overview }}
       </div>
 
-      <!-- Institutional Narrative -->
+      <!-- Narrative -->
       <div style="font-size: 14px; color: #cbd5e1; line-height: 1.6; margin-bottom: 14px;">
         {{ posture.pillars.p1_credit_quality.institutional_analysis }}
       </div>
@@ -333,7 +333,7 @@
     {% else %}
     {% set lock_title = 'Credit Contagion Radar, Cash Flow Solvency and Recovery Reality' %}
     {% set lock_blurb = 'The free report covers rating, seniority, duration and yield. The Deep Dive adds the parts that show how this issuer behaves under stress.' %}
-    {% set lock_points = ['Credit Contagion Radar: how parent-equity distress and group leverage could spill over', 'Pillar 03: interest cover, DSCR and leverage against covenant thresholds', 'Pillar 05: realistic recovery, FLDG buffers and bankruptcy remoteness', 'Ask the Forensic Desk about all three'] %}
+    {% set lock_points = ['Credit Contagion Radar: how parent-equity distress and group leverage could spill over', 'Pillar 03: interest cover, DSCR and leverage against covenant thresholds', 'Pillar 05: realistic recovery, FLDG buffers and bankruptcy remoteness', 'Ask the Research Desk about all three'] %}
     {% include "partials/asset_unlock_card.html" %}
     {% endif %}
 

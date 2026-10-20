@@ -1063,7 +1063,7 @@ async def admin_setup_2fa_view(request: Request, err: Optional[str] = None, next
         secret = generate_totp_secret()
         set_admin_totp_secret(email, secret)
 
-    totp_uri = get_totp_uri(secret, email, issuer="Stock Research App")
+    totp_uri = get_totp_uri(secret, email, issuer="Moatnomics")
     qr_img_url = _build_local_qr_data_uri(totp_uri)
     is_local_dev = _is_local_dev_request(request)
 

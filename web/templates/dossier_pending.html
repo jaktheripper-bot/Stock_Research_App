@@ -1,6 +1,6 @@
 {% extends "base.html" %}
 
-{% block title %}{{ display_ticker }} ({{ company_name }}) — Institutional Dossier Status | Moatnomics{% endblock %}
+{% block title %}{{ display_ticker }} ({{ company_name }}) — Stock Report Status | Moatnomics{% endblock %}
 {% block meta_desc %}Real-time status and compilation queue for {{ display_ticker }} ({{ company_name }}). Ingested from verified BSE exchange disclosures.{% endblock %}
 
 {% block content %}
@@ -11,7 +11,7 @@
     <div style="display: flex; justify-content: space-between; align-items: flex-start; flex-wrap: wrap; gap: 16px;">
       <div>
         <div style="display: inline-flex; align-items: center; gap: 8px; background: rgba(245, 158, 11, 0.15); border: 1px solid rgba(245, 158, 11, 0.4); padding: 4px 12px; border-radius: 20px; font-size: 12px; font-weight: 700; color: #fbbf24; margin-bottom: 12px;">
-          <span>⏳ PENDING INSTITUTIONAL COMPILATION</span>
+          <span>⏳ PENDING COMPILATION</span>
         </div>
         <h1 style="font-size: 32px; font-weight: 800; color: var(--text-primary); margin-bottom: 8px;">
           {{ display_ticker }} <span style="font-size: 20px; font-weight: 500; color: var(--text-secondary);">({{ company_name }})</span>
@@ -34,7 +34,7 @@
       <div style="display: flex; gap: 10px;">
         {% if scrip_code and scrip_code != 'N/A' %}
         <button onclick="synthesizeReport('{{ ticker }}')" class="btn btn-primary btn-sm">
-          <svg class="glyph"><use href="#glyph-zap"></use></svg> Synthesize Dossier (1 Credit)
+          <svg class="glyph"><use href="#glyph-zap"></use></svg> Generate Dossier (1 Credit)
         </button>
         {% endif %}
       </div>
@@ -48,10 +48,10 @@
         <span><svg class="glyph"><use href="#icon-state-dossier-pending"></use></svg></span> Why is this dossier pending?
       </h3>
       <p style="color: var(--text-secondary); line-height: 1.6; font-size: 14px; margin-bottom: 16px;">
-        Our repository maintains zero-hallucination standards. Rather than serving synthetic AI estimates, each institutional thesis requires live ingestion of verified BSE financial statements, corporate governance filings, and multi-scenario valuation models.
+        Moatnomics builds each report on demand from exchange filings, with sources and calculations you can check, instead of pre-filling summaries nobody has reviewed. A report needs the latest BSE financial statements, governance filings and valuation scenarios.
       </p>
       <div style="background: rgba(14, 165, 233, 0.08); border-left: 3px solid var(--accent-cyan); padding: 12px 16px; border-radius: 6px; font-size: 13px; color: var(--text-secondary);">
-        <strong>Available on-demand:</strong> Sign in with Supabase Auth or claim your <strong>2 Free Welcome Credits</strong> to execute a fresh institutional synthesis for <strong>{{ display_ticker }}</strong>.
+        <strong>Available on-demand:</strong> Sign in with Supabase Auth or claim your <strong>2 Free Welcome Credits</strong> to generate a fresh report for <strong>{{ display_ticker }}</strong>.
       </div>
     </div>
 
@@ -61,16 +61,16 @@
           Generate This Dossier
         </h4>
         <p style="font-size: 13px; color: var(--text-muted); line-height: 1.5; margin-bottom: 16px;">
-          Includes institutional PDF report export, exchange footnote citations, and multi-scenario DCF valuation.
+          Includes PDF report export, exchange footnote citations, and multi-scenario DCF valuation.
         </p>
       </div>
       {% if scrip_code and scrip_code != 'N/A' %}
           <button id="synthesizeBtn" class="btn btn-primary" style="text-align: center; width: 100%; display: inline-flex; justify-content: center; align-items: center; gap: 6px;" onclick="synthesizeReport('{{ ticker }}')">
-              <svg class="glyph" style="width: 14px; height: 14px;"><use href="#glyph-zap"></use></svg> Synthesize Forensic Dossier (1 Credit)
+              <svg class="glyph" style="width: 14px; height: 14px;"><use href="#glyph-zap"></use></svg> Generate Stock Report (1 Credit)
           </button>
       {% else %}
           <button id="synthesizeBtn" class="btn btn-secondary" style="text-align: center; width: 100%;" disabled title="Ticker not found in BSE/NSE scrip master">
-              🚫 Unlisted / Unrecognized Ticker (Cannot Synthesize)
+              🚫 Unlisted / Unrecognized Ticker (Cannot Generate)
           </button>
           <p style="margin-top: 0.75rem; color: var(--text-muted); font-size: 0.9rem;">
               <strong>{{ ticker }}</strong> could not be matched to a listed BSE or NSE security. Please select one of the suggested scrips below or search the directory.

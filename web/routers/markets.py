@@ -2,14 +2,14 @@
 
 Provides:
 - Corporate Debt & SDI directories, rating histories, and ISIN ingestion
-- AMFI Mutual Fund Look-Through, portfolio overlap, and forensic audit pipelines
+- AMFI Mutual Fund Look-Through, portfolio overlap, and accounting check pipelines
 - Sovereign Gold Bonds (SGB), Yield Curves, SDL cut-offs, and Macro Corridors
 - National ETF Matrix with premium/discount tracking and real tax calculators
 - REITs, SM REITs & InvITs Sec 115UA tax waterfall simulation
 - Normalized Cross-Asset Opportunity Terminal & Arbitrage Scanner
 - Shadow-banking Retail Safety Radar
 - Cortex Analytical Engines: Chanakya, Setu, Garuda, and Sutra Look-Through
-- Pre-Mortem counter-theses and Thesis Checkpoints
+- Countercase counter-theses and Thesis Checkpoints
 - Real-time ticker autocomplete suggestion gateway
 """
 
@@ -326,13 +326,13 @@ def api_ingest_debt_security(request: Request, payload: IngestDebtRequest):
         "metadata": {
             "sector": "Corporate Fixed Income",
             "promoter_group": f"{ticker} Group",
-            "issuer_overview": f"Institutional fixed-income security indexed via on-demand ISIN audit for {raw_isin}.",
+            "issuer_overview": f"Fixed-income security indexed via on-demand ISIN audit for {raw_isin}.",
             "collateral_type": "Registered charge on standard assets",
             "the_good": [
                 "Listed and tracked under SEBI ₹10,000 face value framework.",
                 f"Contractual coupon rate of {coupon:.2f}%."
             ],
-            "the_bad": ["Requires ongoing surveillance against issuer credit and liquidity cycles."],
+            "the_bad": ["Requires ongoing monitoring against issuer credit and liquidity cycles."],
             "the_ugly": ["Seniority waterfall risk in unexpected restructuring proceedings."],
             "collated_sources": ["User Ingestion Portal", "BSE Debt Market"]
         }
@@ -385,7 +385,7 @@ async def api_post_on_demand_fund_audit(
     background_tasks: BackgroundTasks,
     payload: Dict[str, Any] = Body(default={})
 ):
-    """Enqueues an asynchronous look-through forensic audit for any AMFI scheme."""
+    """Enqueues an asynchronous look-through accounting check for any AMFI scheme."""
     init_db()
     if not _validate_request_origin(request):
         raise HTTPException(status_code=403, detail="Cross-origin request rejected.")
@@ -410,7 +410,7 @@ async def api_post_on_demand_fund_audit(
         "scheme_code": scheme_code,
         "scheme_name": scheme_name,
         "status": "QUEUED",
-        "message": f"Forensic audit enqueued for {scheme_code}."
+        "message": f"Accounting check enqueued for {scheme_code}."
     }
 
 
@@ -538,18 +538,18 @@ def api_get_funds_holding_security(identifier: str):
 
 @router.get("/api/funds/dossier/{scheme_code}")
 def api_get_fund_forensic_dossier(scheme_code: str, request: Request):
-    """Returns the 7-pillar forensic look-through dossier; locked users only get the free headline fields."""
+    """Returns the 7-pillar look-through dossier; locked users only get the free headline fields."""
     init_db()
     clean = scheme_code.strip().upper()
     dossier = get_fund_forensic_dossier(clean)
     if not dossier:
         is_authed = bool(_get_current_web_user(request) or _is_admin_authenticated(request))
         if not is_authed and os.environ.get("TESTING") != "1" and not get_mutual_fund_scheme(clean):
-            raise HTTPException(status_code=404, detail=f"Forensic dossier not available for {clean}.")
+            raise HTTPException(status_code=404, detail=f"Report not available for {clean}.")
         try:
             dossier = audit_single_fund_daily(clean)
         except Exception as e:
-            raise HTTPException(status_code=404, detail=f"Forensic dossier not available for {clean}: {e}")
+            raise HTTPException(status_code=404, detail=f"Report not available for {clean}: {e}")
     if not _asset_unlocked_for_request(request, "FUND", clean):
         free = {k: dossier.get(k) for k in FUND_FREE_DOSSIER_KEYS if k in dossier}
         free["deep_dive_locked"] = True
@@ -560,7 +560,7 @@ def api_get_fund_forensic_dossier(scheme_code: str, request: Request):
 
 @router.post("/api/admin/run-fund-audit")
 def api_admin_run_fund_audit(request: Request, payload: Dict[str, Any] = Body(default={})):
-    """Triggers an autonomous daily forensic audit for a fund (or next in rotation)."""
+    """Triggers an autonomous daily accounting check for a fund (or next in rotation)."""
     if not _is_admin_authenticated(request):
         raise HTTPException(status_code=403, detail="Admin authentication required.")
     init_db()
@@ -637,7 +637,7 @@ def api_etfs_matrix(
 
 @router.get("/api/etfs/{symbol}")
 def api_etf_detail(symbol: str):
-    """Public API: Single ETF deep audit with category peers and forensic arbitrage spread."""
+    """Public API: Single ETF deep audit with category peers and arbitrage spread."""
     from core.analysis.etf_matrix_engine import get_etf_detail
     init_db()
     data = get_etf_detail(symbol)
@@ -774,7 +774,7 @@ def api_safety_radar(category: Optional[str] = None):
 @router.get("/api/cortex/forensic-sieve/{ticker}")
 @router.get("/api/cortex/chanakya/{ticker}")
 def api_cortex_forensic_sieve(ticker: str, mode: str = "SOFT"):
-    """Public API: 10-Point Deterministic Forensic Screening Audit."""
+    """Public API: 10-Point Deterministic Accounting Screening Audit."""
     from core.cortex import ChanakyaGate
     from core.db import get_report_by_ticker_sync
     from dataclasses import asdict
@@ -842,11 +842,11 @@ api_cortex_sutra_audit = api_cortex_portfolio_look_through
 
 
 # ==============================================================================
-# Pre-Mortem & Thesis Checkpoints
+# Countercase & Thesis Checkpoints
 # ==============================================================================
 @router.post("/api/premortem")
 async def api_premortem(payload: PreMortemRequest, request: Request):
-    """Commits a Charlie Munger Pre-Mortem counter-thesis to the audit ledger."""
+    """Commits a Countercase counter-thesis to the audit ledger."""
     if not _validate_request_origin(request):
         raise HTTPException(status_code=403, detail="Cross-origin request rejected.")
 
@@ -866,7 +866,7 @@ async def api_premortem(payload: PreMortemRequest, request: Request):
     )
     return json_response_with_cache({
         "success": True,
-        "message": f"🔒 Pre-Mortem counter-thesis committed to decision ledger for {clean_t}!"
+        "message": f"🔒 Countercase counter-thesis committed to decision ledger for {clean_t}!"
     })
 
 

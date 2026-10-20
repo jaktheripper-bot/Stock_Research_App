@@ -14,7 +14,7 @@
           <div class="hero-badge" style="background: rgba(245, 158, 11, 0.15); border: 1px solid rgba(245, 158, 11, 0.4); color: #fbbf24; display: inline-flex; align-items: center; gap: 8px;">
             <span>📅 YESTERDAY'S 9:00 AM EDITION</span>
             <span>•</span>
-            <span>INSTITUTIONAL QUALITY SURVEILLANCE</span>
+            <span>QUALITY SCREEN</span>
             {% if not is_past_9am %}
             <span>•</span>
             <span id="countdownBadge">⏳ NEXT EDITION IN {{ "%02d"|format(hours_until_9am) }}H {{ "%02d"|format(mins_until_9am) }}M (09:00 AM IST)</span>
@@ -24,7 +24,7 @@
           <div class="hero-badge" style="background: rgba(14, 165, 233, 0.15); border: 1px solid rgba(14, 165, 233, 0.4); color: var(--accent-cyan); display: inline-flex; align-items: center; gap: 8px;">
             <span>🌅 TODAY'S 9:00 AM LIVE EDITION</span>
             <span>•</span>
-            <span>INSTITUTIONAL QUALITY SURVEILLANCE</span>
+            <span>QUALITY SCREEN</span>
             <span>•</span>
             {% if can_access_today %}
             <span>👑 PRO SUBSCRIBER ACCESS</span>
@@ -36,7 +36,7 @@
           <div class="hero-badge" style="display: inline-flex; align-items: center; gap: 8px;">
             <span>📅 ARCHIVE EDITION ({{ current_edition }})</span>
             <span>•</span>
-            <span>INSTITUTIONAL QUALITY SURVEILLANCE</span>
+            <span>QUALITY SCREEN</span>
           </div>
           {% endif %}
         </div>
@@ -46,7 +46,7 @@
         </h1>
         <p style="font-size: 15px; color: var(--text-secondary); max-width: 720px; line-height: 1.6; margin: 0;">
           Curated and released every morning at <strong>9:00 AM IST</strong> from official BSE regulatory disclosures and audited filings. 
-          10–15 under-the-radar Indian companies across diverse sectors commanding high return on capital (ROCE &ge; 15%), conservative solvency (D/E &le; 0.6), and negligible institutional sell-side coverage.
+          10–15 under-the-radar Indian companies across diverse sectors commanding high return on capital (ROCE &ge; 15%), conservative solvency (D/E &le; 0.6), and negligible sell-side coverage.
         </p>
 
         <!-- Evaluated Metadata Strip & Provenance Info -->
@@ -101,10 +101,10 @@
       Today's 9:00 AM Edition is Reserved for Subscribed Members
     </h2>
     <p style="font-size: 14px; color: var(--text-secondary); max-width: 620px; margin: 0 auto 18px auto; line-height: 1.5;">
-      Get instant real-time access to today's 12 screened BSE high-ROCE equities, institutional qualitative compounding theses, and immediate regulatory catalyst alerts.
+      Get instant real-time access to today's 12 screened BSE high-ROCE equities, qualitative compounding theses, and immediate regulatory catalyst alerts.
     </p>
     <div style="display: flex; justify-content: center; gap: 12px; flex-wrap: wrap;">
-      <a href="/pricing" class="btn btn-primary" style="font-weight: 700; padding: 10px 24px;">Subscribe to Institutional Pro (₹999/mo) →</a>
+      <a href="/pricing" class="btn btn-primary" style="font-weight: 700; padding: 10px 24px;">Subscribe to Pro (₹999/mo) →</a>
       <a href="/discovery?edition={{ yesterday_date }}" class="btn btn-secondary" style="font-weight: 600; padding: 10px 20px;">View Yesterday's 9:00 AM Archive (Free)</a>
     </div>
   </div>
@@ -206,7 +206,7 @@
           </div>
         </div>
 
-        <!-- Mutual Fund Institutional Footprint Badge -->
+        <!-- Mutual Fund Footprint Badge -->
         {% if item.key_metrics and item.key_metrics.scheme_count %}
         <div style="background: rgba(99, 102, 241, 0.12); border: 1px solid rgba(99, 102, 241, 0.35); border-radius: 8px; padding: 8px 12px; margin-bottom: 14px; display: flex; align-items: center; justify-content: space-between;">
           <div style="display: flex; align-items: center; gap: 6px;">

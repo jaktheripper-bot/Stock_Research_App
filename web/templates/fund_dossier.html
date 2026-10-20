@@ -1,7 +1,7 @@
 {% extends "base.html" %}
 
-{% block title %}{{ scheme.scheme_name }} | Institutional 6-Pillar Look-Through Dossier{% endblock %}
-{% block meta_description %}Deep institutional look-through analysis of {{ scheme.scheme_name }}. Constituent stock & bond decomposition, Active Share closet-indexing check, and 10-year Direct vs Regular fee drag analysis.{% endblock %}
+{% block title %}{{ scheme.scheme_name }} | 6-Pillar Look-Through Dossier{% endblock %}
+{% block meta_description %}Deep look-through analysis of {{ scheme.scheme_name }}. Constituent stock & bond decomposition, Active Share closet-indexing check, and 10-year Direct vs Regular fee drag analysis.{% endblock %}
 
 {% block content %}
 <div id="dossierReadingContainer" class="container py-8" data-asset-class="funds">
@@ -60,8 +60,8 @@
           <button id="dossierReadingToggleBtn" type="button" onclick="toggleDossierReadingMode()" class="btn btn-secondary btn-sm" title="Toggle Warm Ivory Reading Surface" aria-label="Toggle Warm Ivory Reading Surface" aria-pressed="false">
             <svg class="glyph"><use href="#icon-reading-surface"></use></svg>
           </button>
-          <button onclick="openCopilot('{{ scheme.scheme_code }}', 'mutual_fund')" class="btn btn-hero-ai btn-sm" title="Launch Forensic Intelligence Desk (Shortcut: ⌘K or /)">
-            <svg class="glyph"><use href="#glyph-shield"></use></svg> Forensic Desk
+          <button onclick="openCopilot('{{ scheme.scheme_code }}', 'mutual_fund')" class="btn btn-hero-ai btn-sm" title="Open Research Desk (Shortcut: ⌘K or /)">
+            <svg class="glyph"><use href="#glyph-shield"></use></svg> Research Desk
           </button>
           <a href="/api/pdf/fund/{{ scheme.scheme_code }}" class="btn btn-sm btn-secondary" style="text-decoration: none; font-size: 12px; font-weight: 600;">
             📄 Export PDF Dossier
@@ -91,17 +91,17 @@
     </div>
   </div>
 
-  <!-- Honest Fiduciary Banner (When Constituent Coverage < 70%) -->
+  <!-- Portfolio Coverage Banner (When Constituent Coverage < 70%) -->
   {% if not lookthrough.has_sufficient_coverage %}
   <div style="background: rgba(245, 158, 11, 0.1); border: 1px solid rgba(245, 158, 11, 0.35); border-left: 4px solid #f59e0b; border-radius: 12px; padding: 18px 22px; margin-bottom: 24px; display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 14px;">
     <div style="display: flex; align-items: center; gap: 12px;">
       <span style="font-size: 26px;"><svg class="glyph"><use href="#glyph-shield"></use></svg></span>
       <div>
         <div style="font-weight: 800; color: #fbbf24; font-size: 15px; margin-bottom: 3px;">
-          Look-Through Forensic Audit pending underlying constituent coverage. Full holdings breakdown available below.
+          Look-Through Accounting Check pending underlying constituent coverage. Full holdings breakdown available below.
         </div>
         <div style="font-size: 12.5px; color: #cbd5e1; line-height: 1.5;">
-          Under SEBI RA 2014 Sec. 2(u) non-advisory standards, we strictly require verified 7-pillar institutional research on ≥70% of equity holdings (currently {{ lookthrough.genuine_coverage_pct|default(0.0) }}%) before issuing quantitative composite scores or qualitative AI audit narratives.
+          Under SEBI RA 2014 Sec. 2(u) non-advisory standards, we strictly require verified 7-pillar research on ≥70% of equity holdings (currently {{ lookthrough.genuine_coverage_pct|default(0.0) }}%) before issuing quantitative composite scores or qualitative AI audit narratives.
         </div>
       </div>
     </div>
@@ -111,11 +111,11 @@
   </div>
   {% endif %}
 
-  <!-- Fiduciary Warnings Banner (if any) -->
+  <!-- Portfolio Warnings Banner (if any) -->
   {% if lookthrough.warnings %}
   <div style="background: rgba(239, 68, 68, 0.1); border: 1px solid rgba(239, 68, 68, 0.3); border-radius: 12px; padding: 16px 20px; margin-bottom: 24px;">
     <div style="display: flex; align-items: center; gap: 8px; color: #ef4444; font-weight: 700; font-size: 14px; margin-bottom: 8px;">
-      <span>⚠️</span> Fiduciary Surveillance Alerts Triggered ({{ lookthrough.warnings|length }})
+      <span>⚠️</span> Portfolio Monitoring Alerts Triggered ({{ lookthrough.warnings|length }})
     </div>
     <ul style="margin: 0; padding-left: 20px; color: #fca5a5; font-size: 13px; line-height: 1.5;">
       {% for w in lookthrough.warnings %}
@@ -125,7 +125,7 @@
   </div>
   {% endif %}
 
-  <!-- Institutional 7-Pillar Forensic Look-Through Workspace -->
+  <!-- 7-Pillar Look-Through Workspace -->
   {% if forensic_dossier %}
   <div style="background: linear-gradient(135deg, rgba(30, 27, 75, 0.45) 0%, rgba(15, 23, 42, 0.85) 100%); border: 1px solid rgba(168, 85, 247, 0.3); border-radius: 16px; padding: 24px; margin-bottom: 24px; box-shadow: 0 8px 24px rgba(0, 0, 0, 0.3);">
     <div style="display: flex; justify-content: space-between; align-items: flex-start; flex-wrap: wrap; gap: 12px; margin-bottom: 18px;">
@@ -135,15 +135,15 @@
           <span style="font-size: 12px; font-weight: 700; color: #e9d5ff; text-transform: uppercase;">7-Pillar Equity Look-Through Synthesis</span>
         </div>
         <h2 style="font-size: 20px; font-weight: 800; color: #f8fafc; margin: 0;">
-          Constituent Forensic Metrics & Solvency Look-Through
+          Constituent Accounting Metrics & Solvency Look-Through
         </h2>
         <div style="font-size: 13.5px; color: #94a3b8; margin-top: 4px;">
-          Aggregated directly from verified 7-pillar institutional stock dossiers in reports.db.
+          Aggregated directly from verified 7-pillar stock dossiers in reports.db.
         </div>
       </div>
       <div style="display: flex; gap: 8px; align-items: center; flex-wrap: wrap;">
         <button onclick="openCopilot('{{ scheme.scheme_code }}', 'mutual_fund', 'lookthrough_metrics', 'Look-Through Metrics', 'Audit the 7-pillar look-through metrics for this fund')" class="btn btn-hero-ai btn-sm" style="font-weight: 700; font-size: 12.5px; padding: 6px 14px; display: inline-flex; align-items: center; gap: 5px; cursor: pointer;">
-          <svg class="glyph"><use href="#glyph-zap"></use></svg> Forensic Desk
+          <svg class="glyph"><use href="#glyph-zap"></use></svg> Research Desk
         </button>
         <button id="btnReauditFund" onclick="triggerFundReaudit('{{ scheme.scheme_code }}')" class="btn btn-sm btn-outline-primary" style="display: inline-flex; align-items: center; gap: 6px; border-radius: 9999px; font-weight: 600; font-size: 12.5px; padding: 6px 14px;">
           <span>🔄</span> Re-Audit Look-Through
@@ -152,7 +152,7 @@
     </div>
 
     {% if lookthrough.has_sufficient_coverage %}
-    <!-- 4-Card Forensic Meter Strip -->
+    <!-- 4-Card Accounting Meter Strip -->
     <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 200px), 1fr)); gap: 14px; margin-bottom: 20px;">
       <div style="background: rgba(15, 23, 42, 0.7); border: 1px solid rgba(255, 255, 255, 0.08); border-radius: 12px; padding: 16px; display: flex; flex-direction: column; justify-content: space-between;">
         <div>
@@ -172,7 +172,7 @@
             {{ forensic_dossier.accounting_risk_index }}%
           </div>
           <div style="font-size: 12px; color: {% if forensic_dossier.accounting_risk_index <= 5.0 %}#10b981{% else %}#ef4444{% endif %}; font-weight: 600;">
-            {% if forensic_dossier.accounting_risk_index <= 5.0 %}Institutional Prudence{% elif forensic_dossier.accounting_risk_index <= 15.0 %}Moderate Leverage{% else %}Fiduciary Fragility Warning{% endif %}
+            {% if forensic_dossier.accounting_risk_index <= 5.0 %}Conservative Accounting{% elif forensic_dossier.accounting_risk_index <= 15.0 %}Moderate Leverage{% else %}Accounting Risk Flag{% endif %}
           </div>
         </div>
         <button onclick="openCopilot('{{ scheme.scheme_code }}', 'mutual_fund', 'asri_solvency', 'Accounting Risk (ASRI)', 'Which constituent holdings drive the ASRI accounting risk in this fund?')" style="margin-top: 10px; background: none; border: none; color: #38bdf8; font-size: 12px; font-weight: 600; cursor: pointer; padding: 0; text-align: left; display: inline-flex; align-items: center; gap: 3px;">
@@ -231,7 +231,7 @@
       <!-- Solvency Watchlist -->
       <div style="background: rgba(15, 23, 42, 0.5); border: 1px solid rgba(255, 255, 255, 0.05); border-radius: 10px; padding: 14px;">
         <div style="font-size: 12px; font-weight: 700; color: #f59e0b; margin-bottom: 8px; display: flex; align-items: center; gap: 6px;">
-          <span>⚠️</span> Forensic Solvency & Valuation Watchlist
+          <span>⚠️</span> Solvency & Valuation Watchlist
         </div>
         <div style="display: flex; flex-direction: column; gap: 6px;">
           {% for r in forensic_dossier.top_risky_holdings %}
@@ -253,7 +253,7 @@
       <div style="display: flex; align-items: center; gap: 10px; margin-bottom: 8px;">
         <span style="font-size: 20px;">⏸️</span>
         <h3 style="font-size: 15px; font-weight: 700; color: #e2e8f0; margin: 0;">
-          Forensic Look-Through Meters Paused Pending Research Coverage
+          Look-Through Meters Paused Pending Research Coverage
         </h3>
       </div>
       <p style="font-size: 13.5px; color: #94a3b8; margin: 0; line-height: 1.6;">
@@ -269,7 +269,7 @@
         <div style="flex: 1; min-width: 280px;">
           <div style="display: flex; align-items: center; gap: 8px; margin-bottom: 4px; flex-wrap: wrap;">
             <span style="font-size: 16px;">🔬</span>
-            <span style="font-size: 14px; font-weight: 800; color: #f8fafc; letter-spacing: -0.01em;">Deep-Dive Stock Forensic Audit Option</span>
+            <span style="font-size: 14px; font-weight: 800; color: #f8fafc; letter-spacing: -0.01em;">Deep-Dive Stock Accounting Check Option</span>
             <span style="font-size: 11px; padding: 2px 8px; border-radius: 9999px; background: rgba(16, 185, 129, 0.15); color: #10b981; font-weight: 700; border: 1px solid rgba(16, 185, 129, 0.3);">Layer 1 Active (1 Credit)</span>
             {% if credit_quote.uncached_count == 0 %}
             <span style="font-size: 11px; padding: 2px 8px; border-radius: 9999px; background: rgba(16, 185, 129, 0.15); color: #10b981; font-weight: 700; border: 1px solid rgba(16, 185, 129, 0.3);">✓ 100% Constituent Coverage Active</span>
@@ -279,7 +279,7 @@
           </div>
           <p style="font-size: 13px; color: #94a3b8; margin: 0; line-height: 1.5;">
             {% if credit_quote.uncached_count == 0 %}
-            <strong>All {{ credit_quote.equity_holdings_count }} equity constituents</strong> have verified 7-pillar dossiers in reports.db (100% portfolio weight). Full look-through meters and forensic narrative are active.
+            <strong>All {{ credit_quote.equity_holdings_count }} equity constituents</strong> have verified 7-pillar dossiers in reports.db (100% portfolio weight). Full look-through meters and accounting narrative are active.
             {% else %}
             <strong>{{ credit_quote.cached_count }}</strong> of {{ credit_quote.equity_holdings_count }} equity constituents have full 7-pillar dossiers in reports.db ({{ credit_quote.cached_weight_pct }}% weight). 
             <strong style="color: #c084fc;">{{ credit_quote.uncached_count }} stocks</strong> ({{ credit_quote.uncached_weight_pct }}% weight) are currently evaluated via deterministic fundamental ratios.
@@ -345,7 +345,7 @@
       </div>
     </div>
 
-    <!-- Institutional Constituent Deep-Dive Confirmation Modal -->
+    <!-- Constituent Deep-Dive Confirmation Modal -->
     <div id="deepDiveModal" class="modal-backdrop" onclick="if(event.target===this) closeDeepDiveModal()" style="display: none; position: fixed; inset: 0; background: rgba(10, 15, 29, 0.85); backdrop-filter: blur(10px); z-index: 9999; align-items: center; justify-content: center; padding: 20px;">
       <div class="modal-dialog" style="background: #0f172a; border: 1px solid rgba(168, 85, 247, 0.4); border-radius: 16px; max-width: 540px; width: 100%; box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.7); overflow: hidden; animation: fadeInModal 0.2s ease-out;">
         <!-- Modal Header -->
@@ -369,7 +369,7 @@
         <!-- Modal Body -->
         <div style="padding: 24px;">
           <p style="font-size: 13.5px; color: #cbd5e1; line-height: 1.6; margin: 0 0 16px 0;">
-            You are about to execute an in-depth forensic look-through audit across all uncached constituent equities in <strong>{{ scheme.scheme_name }}</strong>.
+            You are about to execute an in-depth look-through audit across all uncached constituent equities in <strong>{{ scheme.scheme_name }}</strong>.
           </p>
 
           <!-- Scope Breakdown Grid -->
@@ -427,7 +427,7 @@
   {% elif forensic_locked %}
   {% set lock_title = 'Look-Through Forensics & Audit Narrative' %}
   {% set lock_blurb = 'The free report already shows fees, active share, holdings and the headline health score. The Deep Dive opens up what sits underneath the portfolio.' %}
-  {% set lock_points = ['Weighted moat score and the top compounder holdings', 'Look-through accounting risk (ASRI) and promoter pledge exposure, with the flagged holdings named', 'Weighted margin of safety: is the portfolio at a DCF discount or premium', 'The written 7-pillar audit narrative, and the Forensic Desk can answer questions on all of it'] %}
+  {% set lock_points = ['Weighted moat score and the top compounder holdings', 'Look-through accounting risk (ASRI) and promoter pledge exposure, with the flagged holdings named', 'Weighted margin of safety: is the portfolio at a DCF discount or premium', 'The written 7-pillar audit narrative, and the Research Desk can answer questions on all of it'] %}
   {% include "partials/asset_unlock_card.html" %}
   {% endif %}
 
@@ -442,13 +442,13 @@
             01: Dual-Sleeve Constituent Decomposition
           </h2>
           <div style="font-size: 13px; color: #64748b;">
-            Equity holdings evaluated via Forensic Equity Engine; Debt/bonds evaluated via Credit & Solvency Engine.
+            Equity holdings evaluated via Equity Engine; Debt/bonds evaluated via Credit & Solvency Engine.
           </div>
         </div>
         <!-- Sleeve Weight Tags & Copilot Trigger -->
         <div style="display: flex; gap: 8px; font-size: 12px; font-weight: 600; align-items: center; flex-wrap: wrap;">
           <button onclick="openCopilot('{{ scheme.scheme_code }}', 'mutual_fund', 'holdings', 'Constituent Holdings', 'Analyze the dual-sleeve constituent allocation and top holdings of this fund')" class="btn btn-secondary btn-sm" style="font-weight: 600; font-size: 11px; padding: 3px 10px; cursor: pointer; display: inline-flex; align-items: center; gap: 4px;">
-            <svg class="glyph"><use href="#glyph-zap"></use></svg> Forensic Desk
+            <svg class="glyph"><use href="#glyph-zap"></use></svg> Research Desk
           </button>
           <span style="background: rgba(14, 165, 233, 0.15); color: #38bdf8; padding: 4px 10px; border-radius: 6px;">
             Equity: {{ lookthrough.sleeve_breakdown.equity_weight_pct }}% (Score: {{ lookthrough.sleeve_breakdown.equity_sleeve_score }})
@@ -521,7 +521,7 @@
             02: True Diversification & Active Share
           </h2>
           <button onclick="openCopilot('{{ scheme.scheme_code }}', 'mutual_fund', 'active_share', 'Active Share & Closet Indexing', 'Is this fund exhibiting benchmark hugging or closet indexing based on its Active Share?')" class="btn btn-secondary btn-sm" style="font-weight: 600; font-size: 11px; padding: 3px 10px; cursor: pointer; display: inline-flex; align-items: center; gap: 4px;">
-            <svg class="glyph"><use href="#glyph-zap"></use></svg> Forensic Desk
+            <svg class="glyph"><use href="#glyph-zap"></use></svg> Research Desk
           </button>
         </div>
         <div style="font-size: 12.5px; color: #64748b; margin-bottom: 16px;">
@@ -557,7 +557,7 @@
             03 & 04: Risk-Adjusted Alpha & Downside Capture
           </h2>
           <button onclick="openCopilot('{{ scheme.scheme_code }}', 'mutual_fund', 'downside_capture', 'Downside Capture & Risk Alpha', 'How does this fund perform during market drawdowns based on its Downside Capture and Sortino ratio?')" class="btn btn-secondary btn-sm" style="font-weight: 600; font-size: 11px; padding: 3px 10px; cursor: pointer; display: inline-flex; align-items: center; gap: 4px;">
-            <svg class="glyph"><use href="#glyph-zap"></use></svg> Forensic Desk
+            <svg class="glyph"><use href="#glyph-zap"></use></svg> Research Desk
           </button>
         </div>
         <div style="font-size: 12.5px; color: #64748b; margin-bottom: 16px;">
@@ -602,16 +602,16 @@
       </div>
     </div>
 
-    <!-- Workspace 4: Intermediary Fee Drag & Wealth Destruction (Pillar 5) -->
+    <!-- Workspace 4: Direct vs Regular Plan Expense Drag (Pillar 5) -->
     <div style="background: rgba(30, 41, 59, 0.4); border: 1px solid rgba(255, 255, 255, 0.08); border-radius: 14px; padding: 24px;">
       <div style="display: flex; justify-content: space-between; align-items: flex-start; flex-wrap: wrap; gap: 12px; margin-bottom: 16px;">
         <div>
           <div style="display: flex; align-items: center; gap: 10px; flex-wrap: wrap;">
             <h2 style="font-size: 18px; font-weight: 700; color: #f8fafc; margin: 0;">
-              05: Intermediary Fee Drag & Wealth Destruction
+              05: Direct vs Regular Plan Expense Drag
             </h2>
-            <button onclick="openCopilot('{{ scheme.scheme_code }}', 'mutual_fund', 'fee_drag', 'Intermediary Fee Drag', 'Analyze the direct vs regular plan fee drag and compounded wealth lost over time')" class="btn btn-secondary btn-sm" style="font-weight: 600; font-size: 11px; padding: 3px 10px; cursor: pointer; display: inline-flex; align-items: center; gap: 4px;">
-              <svg class="glyph"><use href="#glyph-zap"></use></svg> Forensic Desk
+            <button onclick="openCopilot('{{ scheme.scheme_code }}', 'mutual_fund', 'fee_drag', 'Intermediary Fee Drag', 'Analyze the direct vs regular plan fee drag and compounded cost over time')" class="btn btn-secondary btn-sm" style="font-weight: 600; font-size: 11px; padding: 3px 10px; cursor: pointer; display: inline-flex; align-items: center; gap: 4px;">
+              <svg class="glyph"><use href="#glyph-zap"></use></svg> Research Desk
             </button>
           </div>
           <div style="font-size: 13px; color: #64748b; margin-top: 4px;">
@@ -666,7 +666,7 @@
           </div>
 
           <div style="background: rgba(239, 68, 68, 0.12); border: 1px solid rgba(239, 68, 68, 0.35); border-radius: 10px; padding: 14px;">
-            <div style="font-size: 11px; color: #f87171; font-weight: 700; text-transform: uppercase;">Wealth Siphoned by Trail Commission</div>
+            <div style="font-size: 11px; color: #f87171; font-weight: 700; text-transform: uppercase;">Cost of Trail Commission</div>
             <div id="mfDragLossVal" class="tnum" style="font-size: 22px; font-weight: 800; color: #ef4444; margin-top: 4px;">-₹{{ "{:,.0f}".format(fee_drag.wealth_lost_to_commissions|default(0)) }}</div>
             <div id="mfDragPctSub" style="font-size: 11.5px; color: #fca5a5; margin-top: 2px;">{{ fee_drag.wealth_lost_pct_of_principal|default(0.0) }}% of initial principal</div>
           </div>
@@ -705,7 +705,7 @@
               <th style="padding: 12px 16px; color: #94a3b8; font-weight: 600;">Time Horizon</th>
               <th style="padding: 12px 16px; color: #94a3b8; font-weight: 600;">Direct Plan Value (Net)</th>
               <th style="padding: 12px 16px; color: #94a3b8; font-weight: 600;">Regular Plan Value (Net)</th>
-              <th style="padding: 12px 16px; color: #94a3b8; font-weight: 600;">Cumulative Wealth Lost</th>
+              <th style="padding: 12px 16px; color: #94a3b8; font-weight: 600;">Cumulative Commission Cost</th>
               <th style="padding: 12px 16px; color: #94a3b8; font-weight: 600;">Percentage Corpus Destroyed</th>
             </tr>
           </thead>
@@ -724,11 +724,11 @@
       </div>
 
       <p style="font-size: 13px; color: #fca5a5; line-height: 1.5; margin: 0;">
-        💡 <strong>Fiduciary Takeaway:</strong> {{ fee_drag.summary }}
+        💡 <strong>Key Takeaway:</strong> {{ fee_drag.summary }}
       </p>
     </div>
 
-    <!-- Workspace 6: Institutional Forensic AI Audit Dossier Narrative -->
+    <!-- Workspace 6:  AI Audit Dossier Narrative -->
     {% if forensic_dossier and forensic_dossier.dossier_text %}
     {% if lookthrough.has_sufficient_coverage %}
     <div style="background: rgba(30, 41, 59, 0.4); border: 1px solid rgba(168, 85, 247, 0.25); border-radius: 14px; padding: 26px;">
@@ -736,14 +736,14 @@
         <div style="display: flex; align-items: center; gap: 10px; flex-wrap: wrap;">
           <div>
             <h2 style="font-size: 18px; font-weight: 700; color: #f8fafc; margin: 0;">
-              06: Institutional Forensic Qualitative Audit Dossier
+              06: Qualitative Audit Dossier
             </h2>
             <div style="font-size: 13px; color: #94a3b8; margin-top: 2px;">
-              Synthesized by Chief Forensic Officer grounded in 7-pillar look-through data.
+              Generated by the Moatnomics Research Desk from 7-pillar look-through data.
             </div>
           </div>
-          <button onclick="openCopilot('{{ scheme.scheme_code }}', 'mutual_fund', 'dossier_narrative', 'Forensic Audit Narrative', 'Synthesize the key fiduciary findings and qualitative red flags from the audit narrative')" class="btn btn-secondary btn-sm" style="font-weight: 600; font-size: 11px; padding: 3px 10px; cursor: pointer; display: inline-flex; align-items: center; gap: 4px;">
-            <svg class="glyph"><use href="#glyph-zap"></use></svg> Forensic Desk
+          <button onclick="openCopilot('{{ scheme.scheme_code }}', 'mutual_fund', 'dossier_narrative', 'Accounting Check Narrative', 'Summarize the key findings and qualitative red flags from the audit narrative')" class="btn btn-secondary btn-sm" style="font-weight: 600; font-size: 11px; padding: 3px 10px; cursor: pointer; display: inline-flex; align-items: center; gap: 4px;">
+            <svg class="glyph"><use href="#glyph-zap"></use></svg> Research Desk
           </button>
         </div>
         <span style="font-size: 11px; font-weight: 600; color: #c084fc; background: rgba(168, 85, 247, 0.15); border: 1px solid rgba(168, 85, 247, 0.3); padding: 4px 10px; border-radius: 6px;">
@@ -756,7 +756,7 @@
         <div style="display: flex; align-items: center; gap: 10px;">
           <span style="font-size: 18px;">📑</span>
           <div>
-            <strong style="font-size: 14px; color: var(--text-primary); display: block;">Institutional Forensic Dimensions (01–05)</strong>
+            <strong style="font-size: 14px; color: var(--text-primary); display: block;"> Dimensions (01–05)</strong>
             <span style="font-size: 11px; color: var(--text-muted);">Every qualitative thesis grounded in look-through portfolio forensics and AMFI/SEBI disclosures</span>
           </div>
         </div>
@@ -776,12 +776,12 @@
       </div>
     </div>
     {% else %}
-    <!-- Fiduciary Notice Card for Workspace 06 -->
+    <!-- Coverage Notice Card for Workspace 06 -->
     <div style="background: rgba(30, 41, 59, 0.3); border: 1px dashed rgba(148, 163, 184, 0.25); border-radius: 14px; padding: 22px;">
       <div style="display: flex; align-items: center; gap: 10px; margin-bottom: 8px;">
         <span style="font-size: 18px;"><svg class="glyph"><use href="#glyph-shield"></use></svg></span>
         <h3 style="font-size: 15px; font-weight: 700; color: #cbd5e1; margin: 0;">
-          06: Institutional Forensic Qualitative Audit Dossier (Coverage Pending)
+          06: Qualitative Audit Dossier (Coverage Pending)
         </h3>
       </div>
       <div class="dossier-prose">

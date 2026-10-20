@@ -1,28 +1,28 @@
 {% extends "base.html" %}
 
-{% block title %}Institutional Equities Directory | Moatnomics{% endblock %}
-{% block meta_desc %}Institutional research directory of verified Indian equities. Inspect 7-pillar scorecards, reverse DCF margin of safety, and forensic DuPont ledgers grounded in official BSE/NSE corporate filings.{% endblock %}
-{% block og_title %}Institutional Equities Directory | Moatnomics{% endblock %}
+{% block title %}Equities Directory | Moatnomics{% endblock %}
+{% block meta_desc %}Research directory of verified Indian equities. Inspect 7-pillar scorecards, reverse DCF margin of safety, and DuPont ledgers grounded in official BSE/NSE corporate filings.{% endblock %}
+{% block og_title %}Equities Directory | Moatnomics{% endblock %}
 {% block og_desc %}Inspect verified 7-Pillar scorecards, reverse DCF margin of safety, and forensic accounting ledgers across monitored Indian equities.{% endblock %}
 
 {% block content %}
 <div class="container py-8" data-asset-class="equities">
-  <!-- Hero Section (Matches Fiduciary Stature of /funds) -->
+  <!-- Hero Section (Matches /funds) -->
   <div class="hero-portal-banner asset-card-accent" style="background: linear-gradient(135deg, rgba(30, 41, 59, 0.75) 0%, rgba(15, 23, 42, 0.95) 100%); border: 1px solid rgba(255, 255, 255, 0.1); border-radius: 16px; padding: 32px; margin-bottom: 32px; position: relative; overflow: hidden;">
     <div style="position: absolute; top: -50px; right: -50px; width: 220px; height: 220px; background: radial-gradient(circle, rgba(14, 165, 233, 0.15) 0%, transparent 70%); pointer-events: none;"></div>
     
     <div style="display: inline-flex; align-items: center; gap: 8px; background: rgba(14, 165, 233, 0.15); border: 1px solid rgba(14, 165, 233, 0.35); border-radius: 9999px; padding: 4px 12px; margin-bottom: 16px;">
       <span style="width: 8px; height: 8px; border-radius: 50%; background: var(--accent-cyan, #0ea5e9);"></span>
-      <span style="font-size: 12px; font-weight: 700; color: #38bdf8; text-transform: uppercase; letter-spacing: 0.05em;">Equities & Institutional Dossiers • 7-Pillar Forensic Engine</span>
+      <span style="font-size: 12px; font-weight: 700; color: #38bdf8; text-transform: uppercase; letter-spacing: 0.05em;">Equities & Stock Reports • 7-Pillar Research Engine</span>
     </div>
 
     <h1 style="font-size: 32px; font-weight: 800; color: #f8fafc; margin-bottom: 12px; letter-spacing: -0.02em;">
-      Institutional Equities Directory
+      Equities Directory
     </h1>
     <p style="font-size: 15px; color: #94a3b8; max-width: 840px; line-height: 1.6; margin-bottom: 24px;">
-      Exhaustive institutional equity research repository covering verified Indian equities. 
+      Exhaustive equity research repository covering verified Indian equities. 
       Every dossier is grounded in primary exchange filings (BSE/NSE), featuring 7-Pillar health scorecards, reverse DCF implied growth rates, 
-      DuPont ROE decompositions, and promoter pledging surveillance.
+      DuPont ROE decompositions, and promoter pledging monitoring.
     </p>
 
     <!-- Top KPI Grid -->
@@ -53,7 +53,7 @@
       <div style="flex: 1; min-width: 300px;">
         <div style="display: inline-flex; align-items: center; gap: 8px; background: rgba(14, 165, 233, 0.15); border: 1px solid rgba(14, 165, 233, 0.3); border-radius: 9999px; padding: 4px 12px; margin-bottom: 12px;">
           <span style="display: inline-block; width: 8px; height: 8px; border-radius: 50%; background: #38bdf8; box-shadow: 0 0 8px #38bdf8;"></span>
-          <span style="font-size: 11px; font-weight: 800; color: #bae6fd; text-transform: uppercase; letter-spacing: 0.05em;">Featured Institutional Equity Spotlight • 7-Pillar Dossier</span>
+          <span style="font-size: 11px; font-weight: 800; color: #bae6fd; text-transform: uppercase; letter-spacing: 0.05em;">Featured Equity Spotlight • 7-Pillar Dossier</span>
         </div>
         
         <div style="display: flex; align-items: baseline; gap: 12px; margin-bottom: 6px;">
@@ -67,7 +67,7 @@
         </div>
         
         <div style="font-size: 14px; color: #94a3b8; margin-bottom: 16px;">
-          {{ featured_equity.name }} • {{ featured_equity.sector }} • Market Cap: {{ featured_equity.formatted_mcap }} • {{ featured_equity.revision_count }} Institutional Revisions
+          {{ featured_equity.name }} • {{ featured_equity.sector }} • Market Cap: {{ featured_equity.formatted_mcap }} • {{ featured_equity.revision_count }} Revisions
         </div>
 
         <!-- 5-Metric Spotlight Strip -->
@@ -96,7 +96,7 @@
 
         <div style="display: flex; gap: 10px; align-items: center; flex-wrap: wrap;">
           <a href="/dossier/{{ featured_equity.ticker }}" class="btn btn-primary btn-sm" style="font-weight: 700; border-radius: 8px; padding: 8px 20px;">
-            Inspect Full Institutional Dossier →
+            Inspect Full Stock Report →
           </a>
           <span style="font-size: 12px; color: #64748b;">
             Last Evaluated: {{ featured_equity.formatted_date }}
@@ -187,7 +187,7 @@
   <!-- Active Results Count Header -->
   <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px;">
     <div style="font-size: 14px; font-weight: 600; color: #94a3b8;">
-      Showing <strong style="color: #f8fafc;">{{ equities|length }}</strong> of {{ total_equities }} Institutional Equities
+      Showing <strong style="color: #f8fafc;">{{ equities|length }}</strong> of {{ total_equities }} Equities
       {% if query %}<span style="color: var(--accent-cyan);">matching "{{ query }}"</span>{% endif %}
       {% if current_sector %}<span style="color: #c084fc;">in {{ sector_options.get(current_sector, [current_sector])[0] }}</span>{% endif %}
     </div>
@@ -299,7 +299,7 @@
     <div style="margin-bottom: 16px; display: inline-flex; align-items: center; justify-content: center; width: 56px; height: 56px; border-radius: 50%; background: rgba(56, 189, 248, 0.1); border: 1px solid rgba(56, 189, 248, 0.2); color: #38bdf8;">
       <svg class="glyph" style="width: 28px; height: 28px;"><use href="#icon-state-empty-search"></use></svg>
     </div>
-    <h3 style="font-size: 20px; font-weight: 700; color: #f8fafc; margin-bottom: 8px;">No Institutional Equities Match Your Criteria</h3>
+    <h3 style="font-size: 20px; font-weight: 700; color: #f8fafc; margin-bottom: 8px;">No Equities Match Your Criteria</h3>
     <p style="font-size: 14px; color: #94a3b8; max-width: 480px; margin: 0 auto 20px auto; line-height: 1.5;">
       We couldn't find any audited equities matching "{{ query or current_sector or current_tier }}". Try broadening your search or resetting active filters.
     </p>
@@ -309,7 +309,7 @@
   </div>
   {% endif %}
 
-  <!-- Institutional Disclaimer Footer -->
+  <!-- Disclaimer Footer -->
   <div style="margin-top: 48px; padding-top: 24px; border-top: 1px solid rgba(255, 255, 255, 0.08); font-size: 12px; color: #64748b; line-height: 1.5;">
     <p style="margin-bottom: 8px;">
       <strong>Statutory Regulatory Disclosure:</strong> Moatnomics is an independent software tool and research analytical engine. 

@@ -645,7 +645,7 @@ class TestFundForensicAuditor(unittest.TestCase):
     def test_web_routes_and_api(self):
         resp = self.client.get("/funds")
         self.assertEqual(resp.status_code, 200)
-        self.assertIn("Featured Daily Forensic", resp.text)
+        self.assertIn("Featured Daily Fund Report", resp.text)
 
         resp_dos = self.client.get("/funds/PPFAS_FLEXICAP_DIR", headers={"x-unlock-preview": "1"})
         self.assertEqual(resp_dos.status_code, 200)
@@ -715,7 +715,7 @@ class TestFundForensicAuditor(unittest.TestCase):
 
         resp_dos = self.client.get("/funds/PPFAS_FLEXICAP_DIR", headers={"x-unlock-preview": "1"})
         self.assertEqual(resp_dos.status_code, 200)
-        self.assertIn("Deep-Dive Stock Forensic Audit Option", resp_dos.text)
+        self.assertIn("Deep-Dive Stock Accounting Check Option", resp_dos.text)
         self.assertIn("Layer 1 Active (1 Credit)", resp_dos.text)
         self.assertIn("Initiate Deep-Dive Audit", resp_dos.text)
 

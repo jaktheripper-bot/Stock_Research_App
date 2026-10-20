@@ -103,7 +103,7 @@ def render_epistemic_badges_html(html_text: str) -> str:
 
 def format_citations_section(citations: list[dict], stock_data: dict = None) -> str:
     """
-    Formats a structured list of citations into an institutional Sell-Side footnotes block.
+    Formats a structured list of citations into a Sell-Side footnotes block.
     Deduplicates URLs and displays clean attribution labels and source types.
     """
     if not citations:
@@ -208,10 +208,10 @@ def wrap_html_with_collapsible_pillars(
     Transforms flat <h2>Pillar X: ...</h2> sections into interactive, mobile-optimized
     <details class="pillar-accordion" open> blocks with exact verified BSE filing hyperlinks.
     
-    Tiered Institutional Architecture:
+    Tiered Architecture:
     - Free Tier: Pillars 01, 02, 04, 06, 07 are un-gated and fully readable.
-    - Institutional Deep-Dive Tier: Pillar 03 (Forensic Ledger) and Pillar 05 (Reverse DCF Sandbox)
-      display a teaser paragraph followed by an institutional frosted-glass paywall overlay
+    - Deep-Dive Tier: Pillar 03 (Accounting Ledger) and Pillar 05 (Reverse DCF Sandbox)
+      display a teaser paragraph followed by a frosted-glass paywall overlay
       when is_deep_dive_unlocked is False.
     """
     if not html_content:
@@ -264,15 +264,15 @@ def wrap_html_with_collapsible_pillars(
         name = meta["name"]
         clean_title = raw_title or meta.get("standard_title", f"Pillar {p_num:02d}")
 
-        # Tiered Institutional Gating Logic for Pillars 03 & 05
+        # Tiered Gating Logic for Pillars 03 & 05
         status_pill_html = ""
         rendered_body = body_content
 
         if p_num in (3, 5):
             if is_deep_dive_unlocked:
-                status_pill_html = '<span class="badge badge-emerald" style="font-size: 11px;">🔓 Institutional Unlocked</span>'
+                status_pill_html = '<span class="badge badge-emerald" style="font-size: 11px;">🔓 Unlocked</span>'
             else:
-                status_pill_html = '<span class="badge" style="background: rgba(245, 158, 11, 0.15); color: #fbbf24; border: 1px solid rgba(245, 158, 11, 0.3); font-size: 11px;">🔒 Institutional Gated (1 Credit)</span>'
+                status_pill_html = '<span class="badge" style="background: rgba(245, 158, 11, 0.15); color: #fbbf24; border: 1px solid rgba(245, 158, 11, 0.3); font-size: 11px;">🔒 Gated (1 Credit)</span>'
                 
                 # Split body into introductory teaser paragraph and locked remainder
                 teaser = ""
@@ -295,7 +295,7 @@ def wrap_html_with_collapsible_pillars(
   </div>
   <div class="gated-paywall-overlay">
     <div class="gated-badge">
-      🔒 Institutional Forensic Audit
+      🔒 Accounting Check
     </div>
     <h4 class="gated-title">
       Balance Sheet & Forensic Accounting Ledger
@@ -311,7 +311,7 @@ def wrap_html_with_collapsible_pillars(
     </div>
     <div class="gated-action-row">
       <button type="button" class="btn btn-primary" onclick="unlockDeepDive('{t_clean}')">
-        <span>🔓</span> Unlock Full Forensic Ledger (1 Credit)
+        <span>🔓</span> Unlock Full Accounting Ledger (1 Credit)
       </button>
     </div>
     <div class="gated-subtext">
@@ -415,7 +415,7 @@ def wrap_html_with_collapsible_pillars(
 
 
 # ==============================================================================
-# Mutual Fund Forensic Qualitative Audit Dimension Metadata & Parser
+# Mutual Fund Qualitative Accounting Review Dimension Metadata & Parser
 # ==============================================================================
 FUND_DIMENSION_METADATA = {
     1: {
@@ -428,7 +428,7 @@ FUND_DIMENSION_METADATA = {
         "doc_label": "AMFI Portfolio",
     },
     2: {
-        "standard_title": "Forensic Solvency & Accounting Fragility (ASRI Analysis)",
+        "standard_title": "Solvency & Accounting Fragility (ASRI Analysis)",
         "badge_label": "02",
         "category": "ASRI & SOLVENCY",
         "citation_source": "Constituent MCA / BSE Audited Balance Sheets & Beneish M-Score Audits",
@@ -440,7 +440,7 @@ FUND_DIMENSION_METADATA = {
         "standard_title": "Economic Moat & Intrinsic Margin of Safety (DCF Capital Moat)",
         "badge_label": "03",
         "category": "MOAT & INTRINSIC VALUATION",
-        "citation_source": "Institutional DCF Valuation Engine & ROCE Durability Framework",
+        "citation_source": "Moatnomics DCF Valuation Engine & ROCE Durability Framework",
         "citation_desc": "Portfolio weighted Economic Moat Index, pricing power durability, and intrinsic DCF margin of safety headroom.",
         "doc_url": "https://www.amfiindia.com/",
         "doc_label": "Valuation Model",
@@ -450,12 +450,12 @@ FUND_DIMENSION_METADATA = {
         "badge_label": "04",
         "category": "TER & FEE LEAKAGE",
         "citation_source": "AMFI Statutory TER Disclosures & SEBI (Mutual Funds) Regulations",
-        "citation_desc": "Direct vs Regular expense differential analysis and compounded intermediary wealth destruction schedule.",
+        "citation_desc": "Direct vs Regular expense differential analysis and compounded intermediary cost schedule.",
         "doc_url": "https://www.amfiindia.com/research-information/ter-of-mutual-fund-schemes",
         "doc_label": "AMFI TER Portal",
     },
     5: {
-        "standard_title": "Pre-Mortem Scenario: Liquidity Stress & Market Shocks",
+        "standard_title": "Countercase Scenario: Liquidity Stress & Market Shocks",
         "badge_label": "05",
         "category": "STRESS TEST & LIQUIDITY",
         "citation_source": "SEBI Liquidity Risk Management Framework & Stress Testing Mandates",
@@ -473,7 +473,7 @@ def wrap_fund_dossier_with_collapsible_dimensions(
 ) -> str:
     """
     Transforms flat mutual fund qualitative audit markdown/HTML narrative into interactive,
-    institutional <details class="pillar-accordion" open> blocks with regulatory citations,
+    <details class="pillar-accordion" open> blocks with regulatory citations,
     dimensional badge headers, and editorial prose styling matching the stock evaluation reports.
     """
     if not dossier_text:
@@ -520,7 +520,7 @@ def wrap_fund_dossier_with_collapsible_dimensions(
         meta = FUND_DIMENSION_METADATA.get(d_num, {
             "standard_title": raw_title or f"Dimension {d_num:02d}",
             "badge_label": f"{d_num:02d}",
-            "category": "FORENSIC QUALITATIVE AUDIT",
+            "category": "QUALITATIVE ACCOUNTING REVIEW",
             "citation_source": "AMFI Regulatory Filings & Portfolio Disclosures",
             "citation_desc": "Statutory disclosure grounded under SEBI (Mutual Funds) Regulations.",
             "doc_url": "https://www.amfiindia.com/",
@@ -528,7 +528,7 @@ def wrap_fund_dossier_with_collapsible_dimensions(
         })
 
         clean_title = raw_title or meta.get("standard_title", f"Dimension {d_num:02d}")
-        category = meta.get("category", "FORENSIC QUALITATIVE AUDIT")
+        category = meta.get("category", "QUALITATIVE ACCOUNTING REVIEW")
         citation_source = meta.get("citation_source", "AMFI Regulatory Filings")
         citation_desc = meta.get("citation_desc", "")
         doc_url = meta.get("doc_url", "https://www.amfiindia.com/")

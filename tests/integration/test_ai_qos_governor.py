@@ -239,7 +239,7 @@ class TestAiQosGovernor(unittest.TestCase):
                 json={"ticker": "INFY", "user_id": email, "force_refresh": True}
             )
             self.assertEqual(resp.status_code, 429)
-            self.assertIn("Hourly synthesis velocity cap reached", resp.json().get("detail", ""))
+            self.assertIn("Hourly report generation limit reached", resp.json().get("detail", ""))
 
 
 

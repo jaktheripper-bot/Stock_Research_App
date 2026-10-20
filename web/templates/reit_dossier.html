@@ -1,8 +1,8 @@
 {% extends "base.html" %}
 
-{% block title %}{{ reit.symbol }} | Institutional REIT & InvIT Cash Flow Dossier{% endblock %}
-{% block meta_desc %}Institutional cash flow audit of {{ reit.name }} ({{ reit.symbol }}). Section 115UA tax waterfall across marginal slabs, statutory NDCF payout purity, portfolio WALE, and Pre-Mortem Inversion.{% endblock %}
-{% block og_title %}{{ reit.symbol }} — {{ reit.name }} | Institutional REIT Dossier{% endblock %}
+{% block title %}{{ reit.symbol }} | REIT & InvIT Cash Flow Dossier{% endblock %}
+{% block meta_desc %}Cash flow audit of {{ reit.name }} ({{ reit.symbol }}). Section 115UA tax waterfall across marginal slabs, statutory NDCF payout purity, portfolio WALE, and Countercase.{% endblock %}
+{% block og_title %}{{ reit.symbol }} — {{ reit.name }} | REIT Dossier{% endblock %}
 {% block og_desc %}Section 115UA tax distribution breakdown, NDCF payout purity, and portfolio WALE audit for {{ reit.symbol }}.{% endblock %}
 
 {% block content %}
@@ -70,21 +70,21 @@
           <button id="dossierReadingToggleBtn" type="button" onclick="toggleDossierReadingMode()" class="btn btn-secondary btn-sm" title="Toggle Warm Ivory Reading Surface" aria-label="Toggle Warm Ivory Reading Surface" aria-pressed="false">
             <svg class="glyph"><use href="#icon-reading-surface"></use></svg>
           </button>
-          <button onclick="openCopilot('{{ reit.symbol }}', 'reit')" class="btn btn-hero-ai btn-sm" title="Launch Forensic Intelligence Desk (Shortcut: ⌘K or /)">
-            <svg class="glyph"><use href="#glyph-shield"></use></svg> Forensic Desk
+          <button onclick="openCopilot('{{ reit.symbol }}', 'reit')" class="btn btn-hero-ai btn-sm" title="Open Research Desk (Shortcut: ⌘K or /)">
+            <svg class="glyph"><use href="#glyph-shield"></use></svg> Research Desk
           </button>
           {% if is_deep_dive_unlocked %}
           <span class="badge badge-emerald">
-            <span class="status-dot status-dot-emerald"></span> 🔓 Institutional Unlocked
+            <span class="status-dot status-dot-emerald"></span> 🔓 Unlocked
           </span>
-          <a href="/api/pdf/reit/{{ reit.symbol }}" class="btn btn-primary btn-sm" download title="Download Full Institutional PDF Dossier">
-            📄 Download Institutional PDF
+          <a href="/api/pdf/reit/{{ reit.symbol }}" class="btn btn-primary btn-sm" download title="Download Full PDF Report Dossier">
+            📄 Download PDF Report
           </a>
           {% else %}
           <button type="button" onclick="unlockAssetDeepDive('REIT', '{{ reit.symbol }}')" class="btn btn-primary btn-sm">
             <span>🔓</span> Unlock Deep-Dive (1 Credit)
           </button>
-          <button type="button" onclick="unlockAssetDeepDive('REIT', '{{ reit.symbol }}')" class="btn btn-secondary btn-sm" title="Unlock required to download full institutional PDF with Pre-Mortem Inversion schedules">
+          <button type="button" onclick="unlockAssetDeepDive('REIT', '{{ reit.symbol }}')" class="btn btn-secondary btn-sm" title="Unlock required to download full PDF report with Countercase schedules">
             📄 Download PDF (Locked)
           </button>
           {% endif %}
@@ -291,7 +291,7 @@
     <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px; flex-wrap: wrap; gap: 10px;">
       <div>
         <div style="font-size: 12px; font-weight: 700; color: #10b981; text-transform: uppercase; letter-spacing: 0.05em;">Pillar 2: Statutory Distribution Mandate</div>
-        <h2 style="font-size: 20px; font-weight: 800; color: #f8fafc; margin-top: 2px;">NDCF Payout Purity & Penal Clause Surveillance</h2>
+        <h2 style="font-size: 20px; font-weight: 800; color: #f8fafc; margin-top: 2px;">NDCF Payout Purity & Penal Clause Monitoring</h2>
       </div>
       <button onclick="openCopilot('{{ reit.symbol }}', 'reit', 'ndcf_purity', 'NDCF Payout Purity', 'Audit the NDCF payout purity and SEBI 15% penal interest clause compliance for {{ reit.symbol }}')" class="btn btn-secondary btn-sm" style="font-size: 12px; font-weight: 600; display: inline-flex; align-items: center; gap: 6px;">
         <svg class="glyph"><use href="#glyph-shield"></use></svg> Audit NDCF with Desk
@@ -402,15 +402,15 @@
     </div>
   </div>
 
-  <!-- Section 4: Pre-Mortem Inversion & Downside Risk Ledger -->
+  <!-- Section 4: Countercase & Downside Risk Ledger -->
   {% if is_deep_dive_unlocked %}
   <div class="card" style="background: rgba(15, 23, 42, 0.7); border: 1px solid rgba(255, 255, 255, 0.1); border-radius: 14px; padding: 24px; margin-bottom: 24px;">
     <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px; flex-wrap: wrap; gap: 10px;">
       <div>
-        <div style="font-size: 12px; font-weight: 700; color: #f59e0b; text-transform: uppercase; letter-spacing: 0.05em;">Pillar 4: Behavioral Pre-Mortem Inversion</div>
+        <div style="font-size: 12px; font-weight: 700; color: #f59e0b; text-transform: uppercase; letter-spacing: 0.05em;">Pillar 4: Countercase</div>
         <h2 style="font-size: 20px; font-weight: 800; color: #f8fafc; margin-top: 2px;">Structural Failure Modes & Downside Vulnerabilities</h2>
       </div>
-      <button onclick="openCopilot('{{ reit.symbol }}', 'reit', 'inversion', 'Pre-Mortem Inversion', 'Synthesize the bear thesis and top 3 failure modes for holding {{ reit.symbol }}')" class="btn btn-secondary btn-sm" style="font-size: 12px; font-weight: 600; display: inline-flex; align-items: center; gap: 6px;">
+      <button onclick="openCopilot('{{ reit.symbol }}', 'reit', 'inversion', 'Countercase', 'Summarize the bear thesis and top 3 failure modes for holding {{ reit.symbol }}')" class="btn btn-secondary btn-sm" style="font-size: 12px; font-weight: 600; display: inline-flex; align-items: center; gap: 6px;">
         <svg class="glyph"><use href="#glyph-shield"></use></svg> Challenge Thesis
       </button>
     </div>
@@ -432,12 +432,12 @@
     </div>
   </div>
   {% else %}
-  {% set lock_title = 'Behavioral Pre-Mortem Inversion Risk Ledger & Structural Failure Modes' %}
-  {% set lock_blurb = 'The free dossier covers Appraised NAV, Section 115UA Tax Waterfall, NDCF Payout Purity, Portfolio Scale/WALE, and Category Peer Benchmarking. The Deep Dive unlocks the institutional bear thesis and failure mode analysis.' %}
+  {% set lock_title = 'Countercase Risk Ledger & Structural Failure Modes' %}
+  {% set lock_blurb = 'The free dossier covers Appraised NAV, Section 115UA Tax Waterfall, NDCF Payout Purity, Portfolio Scale/WALE, and Category Peer Benchmarking. The Deep Dive unlocks the bear thesis and failure mode analysis.' %}
   {% set lock_points = [
     'Pillar 4: Structural Failure Modes covering Cap Rate / Interest Rate Sensitivity, Tenant Vacancy Drift, and Sponsor ROFO Governance',
-    'Comprehensive Institutional PDF Download with unwatermarked financial schedules',
-    'Full Forensic Intelligence Desk Copilot interrogation for this trust'
+    'Comprehensive PDF Report Download with unwatermarked financial schedules',
+    'Full Research Desk Copilot interrogation for this trust'
   ] %}
   {% set unlock_kind = 'REIT' %}
   {% set unlock_id = reit.symbol %}

@@ -6,10 +6,10 @@ Approved Option 2 (+30% markup) unit economics and deliverables.
 
 from typing import Dict, Any, List
 
-# Computational credit action cost schedule
+# Research credit action cost schedule
 ACTION_COSTS: Dict[str, float] = {
-    "LIVE_SYNTHESIS": 1.0,      # Full 7-pillar institutional synthesis + valuation + PDF
-    "DEEP_DIVE_UNLOCK": 1.0,    # Unlocks Forensic Ledger, Reverse DCF Sandbox & Thesis Drift
+    "LIVE_SYNTHESIS": 1.0,      # Full 7-pillar synthesis + valuation + PDF
+    "DEEP_DIVE_UNLOCK": 1.0,    # Unlocks Accounting Ledger, Reverse DCF Sandbox & Thesis Drift
     "SURGICAL_REFRESH": 0.25,   # Pillars 5 & 6 announcement incremental delta (Free for Pro)
     "PDF_EXPORT": 0.0,          # Free for active and archived reports
     "ARCHIVE_READ": 0.0,        # Free archival retrieval
@@ -26,11 +26,11 @@ PRICING_PACKS: Dict[str, Dict[str, Any]] = {
         "amount_paise": 29900,
         "credits": 1.0,
         "effective_per_stock": "₹299/dossier",
-        "description": "Full institutional research dossier for 1 equity with PDF export.",
+        "description": "Full research dossier for 1 equity with PDF export.",
         "features": [
-            "1 Full 7-Pillar Institutional Synthesis",
+            "1 Full 7-Pillar Stock Report",
             "Multi-Scenario DCF & Multiples Valuation",
-            "Institutional PDF Report Export",
+            "PDF Report Export",
             "Full Exchange Source Footnotes & Citations",
             "Never expires"
         ],
@@ -47,9 +47,9 @@ PRICING_PACKS: Dict[str, Dict[str, Any]] = {
         "effective_per_stock": "₹233/dossier (22% savings)",
         "description": "Ideal for sector deep-dives and comparing top 3 peer contenders.",
         "features": [
-            "3 Full 7-Pillar Syntheses",
-            "Surgical Announcement Refreshes",
-            "Multi-Quarter Thesis Drift Surveillance",
+            "3 Full 7-Pillar Stock Reports",
+            "Price & Filing Updates",
+            "Multi-Quarter Thesis Drift Monitoring",
             "Unlimited PDF Downloads",
             "Never expires"
         ],
@@ -64,11 +64,11 @@ PRICING_PACKS: Dict[str, Dict[str, Any]] = {
         "amount_paise": 179900,
         "credits": 10.0,
         "effective_per_stock": "₹180/dossier (40% savings)",
-        "description": "Comprehensive institutional audit for an entire equity portfolio.",
+        "description": "Comprehensive audit for an entire equity portfolio.",
         "features": [
-            "10 Full 7-Pillar Syntheses",
-            "10 Watched Equities in Real-Time Surveillance",
-            "Priority AI Synthesis Pipeline",
+            "10 Full 7-Pillar Stock Reports",
+            "10 Watched Equities in Real-Time Monitoring",
+            "Priority Report Generation",
             "Complete Audit Ledgers & Revisions",
             "Never expires"
         ],
@@ -77,19 +77,19 @@ PRICING_PACKS: Dict[str, Dict[str, Any]] = {
     },
     "pro_monthly": {
         "id": "pro_monthly",
-        "name": "Institutional Pro (Monthly)",
+        "name": "Pro (Monthly)",
         "badge": "Pro Desk",
         "amount_inr": 999,
         "amount_paise": 99900,
         "credits": 40.0,
         "billing_period": "month",
         "effective_per_stock": "₹25/stock (Active Tier)",
-        "description": "Continuous surveillance engine for full-time investors and advisors.",
+        "description": "Continuous monitoring engine for full-time investors and advisors.",
         "features": [
-            "40 Fresh 7-Pillar Syntheses / month",
-            "Unlimited Surgical Updates (0 credits)",
-            "50 Watched Equities in Real-Time Surveillance",
-            "Unlimited Institutional PDF Exports",
+            "40 Fresh 7-Pillar Stock Reports / month",
+            "Unlimited Price & Filing Updates (0 credits)",
+            "50 Watched Equities in Real-Time Monitoring",
+            "Unlimited PDF Report Exports",
             "Telegram & WhatsApp Alert Feeds",
             "Auto-renews monthly, cancel anytime"
         ],
@@ -98,17 +98,17 @@ PRICING_PACKS: Dict[str, Dict[str, Any]] = {
     },
     "pro_annual": {
         "id": "pro_annual",
-        "name": "Institutional Pro (Annual)",
+        "name": "Pro (Annual)",
         "badge": "Annual VIP",
         "amount_inr": 8999,
         "amount_paise": 899900,
         "credits": 500.0,
         "billing_period": "year",
         "effective_per_stock": "₹750/mo (25% annual discount)",
-        "description": "Maximum institutional power for high-conviction equity portfolios.",
+        "description": "Maximum power for high-conviction equity portfolios.",
         "features": [
-            "500 Fresh 7-Pillar Syntheses / year",
-            "Unlimited Surgical Updates (0 credits)",
+            "500 Fresh 7-Pillar Stock Reports / year",
+            "Unlimited Price & Filing Updates (0 credits)",
             "Uncapped Watchlist Equities",
             "Dedicated API Webhook & Headless Export Access",
             "Priority VIP Processing Pipeline"
@@ -118,7 +118,7 @@ PRICING_PACKS: Dict[str, Dict[str, Any]] = {
     },
 }
 
-# Enterprise & Bulk Institutional Packs
+# Enterprise & Bulk Packs
 B2B_PACKS: Dict[str, Dict[str, Any]] = {
     "b2b_50": {
         "id": "b2b_50",
@@ -136,14 +136,14 @@ B2B_PACKS: Dict[str, Dict[str, Any]] = {
         "amount_paise": 1699900,
         "credits": 150.0,
         "effective_per_stock": "₹113/dossier",
-        "target": "Institutional Desks & Wealth Managers"
+        "target": "Desks & Wealth Managers"
     },
 }
 
 from core.db.compliance import MANDATORY_SEBI_DISCLAIMER
 
 # Invoice Metadata
-INVOICE_SERVICE_DESCRIPTION = "Financial Research Synthesis Software Utility — Computational Research Credits"
+INVOICE_SERVICE_DESCRIPTION = "Financial Research Synthesis Software Utility — Research Credits"
 INVOICE_SAC_CODE = ""
 INVOICE_DISCLAIMER = MANDATORY_SEBI_DISCLAIMER
 

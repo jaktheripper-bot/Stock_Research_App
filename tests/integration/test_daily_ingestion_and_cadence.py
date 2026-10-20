@@ -492,7 +492,7 @@ class TestDailyCadenceAndRotation(unittest.TestCase):
         debt_page = client.get("/debt")
         self.assertEqual(debt_page.status_code, 200)
         self.assertIn("Benchmark 10Y G-Sec", debt_page.text)
-        self.assertIn("CRA Surveillance", debt_page.text)
+        self.assertIn("CRA Monitoring", debt_page.text)
 
     def test_mutual_funds_directory_dynamic_expansion(self):
         """Validates that Mutual Funds query and directory render without artificial limit constraints."""

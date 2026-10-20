@@ -356,7 +356,7 @@ class TestPagesAndApis(unittest.TestCase):
         text = self.client.get(f"/funds/{FUND}").text
         self.assertIn("Unlock for 1 credit", text)
         self.assertNotIn("Weighted Moat Index", text)
-        self.assertNotIn("Deep-Dive Stock Forensic Audit Option", text)
+        self.assertNotIn("Deep-Dive Stock Accounting Check Option", text)
 
     def test_unlocked_fund_page_shows_full_content(self):
         text = self.client.get(f"/funds/{FUND}", headers=UNLOCK).text
@@ -490,10 +490,10 @@ class TestFundAndDebtPdfPaywall(unittest.TestCase):
         from core.db.reits import get_reit_by_symbol
         reit = get_reit_by_symbol("EMBASSY")
         locked = _pdf_text(generate_reit_dossier_pdf("EMBASSY", reit, deep_dive_unlocked=False))
-        self.assertIn("Institutional Deep-Dive Section", locked)
+        self.assertIn("Deep-Dive Section", locked)
         self.assertNotIn("Pillar 4.1 (Cap Rate", locked)
         full = _pdf_text(generate_reit_dossier_pdf("EMBASSY", reit, deep_dive_unlocked=True))
-        self.assertIn("Behavioral Pre-Mortem Inversion Risk Ledger", full)
+        self.assertIn("Countercase Risk Ledger", full)
         self.assertIn("Pillar 4.1 (Cap Rate", full)
 
 
@@ -508,13 +508,13 @@ class TestReitPaywallAndUnlock(unittest.TestCase):
         self.assertEqual(resp.status_code, 200)
         self.assertIn("Unlock Deep-Dive (1 Credit)", resp.text)
         self.assertIn("Download PDF (Locked)", resp.text)
-        self.assertIn("Behavioral Pre-Mortem Inversion Risk Ledger", resp.text)
+        self.assertIn("Countercase Risk Ledger", resp.text)
 
     def test_reit_dossier_shows_unlocked_when_unlocked(self):
         resp = self.client.get("/reits/EMBASSY", headers=UNLOCK)
         self.assertEqual(resp.status_code, 200)
-        self.assertIn("Institutional Unlocked", resp.text)
-        self.assertIn("Download Institutional PDF", resp.text)
+        self.assertIn("Unlocked", resp.text)
+        self.assertIn("Download PDF Report", resp.text)
         self.assertIn("Structural Failure Modes", resp.text)
 
     def test_reit_unlock_endpoint_requires_auth(self):

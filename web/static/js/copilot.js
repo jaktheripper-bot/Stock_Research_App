@@ -1,6 +1,5 @@
 /**
- * Forensic Intelligence Desk Frontend Controller (v2.0).
- * Institutional Forensic Intelligence Architecture.
+ * Research Desk Frontend Controller (v2.0).
  * Supports Multi-Asset Dispatch across Fundamental Equities, Mutual Funds, and Corporate Debt,
  * with Deep Section Contextual Awareness, Smooth Slide-In Transitions, and SEBI Safe Harbor Guardrails.
  */
@@ -11,21 +10,30 @@ let activeAssetType = "equity";
 let activeSection = null;
 let activeSectionLabel = "";
 
+/**
+ * Brand-approved icon renderer: draws a monochrome sprite symbol defined in base.html
+ * (Visual Identity v2.0, Section 7) instead of a raw OS emoji. Unknown ids fall back to the Insights icon.
+ */
+function brandGlyph(iconId) {
+    const id = /^icon-[a-z0-9-]+$/.test(iconId || "") ? iconId : "icon-insights";
+    return `<svg class="glyph" aria-hidden="true" focusable="false" style="width:1em;height:1em;vertical-align:-0.125em;"><use href="#${id}"></use></svg>`;
+}
+
 const COPILOT_CONFIGS = {
     equity: {
-        headerTitle: "Forensic Intelligence Desk",
+        headerTitle: "Research Desk",
         assetBadge: "Fundamental Equity Intelligence",
-        introText: (ticker) => `Welcome to the <strong>Forensic Intelligence Desk</strong>. I can assist in stress-testing your investment thesis on <strong>${ticker || 'the selected equity'}</strong>, deriving implied growth rates via Reverse DCF, or running a <strong>Pre-Mortem Inversion analysis</strong>.`,
+        introText: (ticker) => `Welcome to the <strong>Research Desk</strong>. I can assist in stress-testing your investment thesis on <strong>${ticker || 'the selected equity'}</strong>, deriving implied growth rates via Reverse DCF, or running a <strong>countercase analysis</strong>.`,
         features: [
-            { icon: "💀", title: "Pre-Mortem Inversion", desc: "Expose failure modes & thesis destruction risks", prompt: "Run Pre-Mortem Inversion analysis on this stock: what failure modes could destroy shareholder value?" },
-            { icon: "📉", title: "Reverse DCF Growth", desc: "Deconstruct implied growth priced into current CMP", prompt: "What implied growth rate is priced into current CMP based on Reverse DCF?" },
-            { icon: "🚩", title: "Governance Forensic", desc: "Audit promoter pledging & related-party transactions", prompt: "Are there any promoter pledging or corporate governance red flags in recent disclosures?" }
+            { icon: "icon-compare", title: "Countercase", desc: "Expose failure modes & thesis risks", prompt: "Run a countercase analysis on this stock: what failure modes could destroy shareholder value?" },
+            { icon: "icon-valuation", title: "Reverse DCF Growth", desc: "Deconstruct implied growth priced into current CMP", prompt: "What implied growth rate is priced into current CMP based on Reverse DCF?" },
+            { icon: "icon-doc", title: "Governance Check", desc: "Audit promoter pledging & related-party transactions", prompt: "Are there any promoter pledging or corporate governance red flags in recent disclosures?" }
         ],
         chips: [
-            { label: "💀 Pre-Mortem Inversion", prompt: "Run Pre-Mortem Inversion analysis on this stock: what failure modes could destroy shareholder value?" },
-            { label: "📉 Reverse DCF Implied Growth", prompt: "What implied growth rate is priced into current CMP based on Reverse DCF?" },
-            { label: "🚩 Governance & Pledging Check", prompt: "Are there any promoter pledging or corporate governance red flags in recent disclosures?" },
-            { label: "🛡️ Balance Sheet Solvency", prompt: "Evaluate balance sheet solvency, Altman Z-Score, and leverage ratios for this company." }
+            { icon: "icon-compare", label: "Countercase", prompt: "Run a countercase analysis on this stock: what failure modes could destroy shareholder value?" },
+            { icon: "icon-valuation", label: "Reverse DCF Implied Growth", prompt: "What implied growth rate is priced into current CMP based on Reverse DCF?" },
+            { icon: "icon-doc", label: "Governance & Pledging Check", prompt: "Are there any promoter pledging or corporate governance red flags in recent disclosures?" },
+            { icon: "icon-risk", label: "Balance Sheet Solvency", prompt: "Evaluate balance sheet solvency, Altman Z-Score, and leverage ratios for this company." }
         ]
     },
     mutual_fund: {
@@ -33,15 +41,15 @@ const COPILOT_CONFIGS = {
         assetBadge: "Mutual Fund Intelligence",
         introText: (ticker) => `Welcome to the <strong>Fund Look-Through Intelligence Desk</strong>. I evaluate underlying constituent quality, weighted moat endurance, look-through ASRI accounting stress, active share vs benchmark, and <strong>direct vs regular intermediary fee drag</strong> for <strong>${ticker || 'this scheme'}</strong>.`,
         features: [
-            { icon: "🏰", title: "Weighted Moat Index", desc: "Constituent economic moat distribution & quality", prompt: "Evaluate the constituent moat distribution and overall portfolio quality for this fund." },
-            { icon: "💸", title: "Intermediary Fee Drag", desc: "20-yr compounded wealth lost to distributor commissions", prompt: "What is the 20-year compounded fee drag and wealth lost to distributor commissions for this fund?" },
-            { icon: "🧭", title: "Active Share & Style Drift", desc: "Audit closet indexing and benchmark hugging", prompt: "Audit the active share and check if this fund is exhibiting benchmark hugging or style drift." }
+            { icon: "icon-pillar-01", title: "Weighted Moat Index", desc: "Constituent economic moat distribution & quality", prompt: "Evaluate the constituent moat distribution and overall portfolio quality for this fund." },
+            { icon: "icon-valuation", title: "Intermediary Fee Drag", desc: "20-yr compounded cost of distributor commissions", prompt: "What is the 20-year compounded fee drag and cost of distributor commissions for this fund?" },
+            { icon: "icon-portfolio", title: "Active Share & Style Drift", desc: "Audit closet indexing and benchmark hugging", prompt: "Audit the active share and check if this fund is exhibiting benchmark hugging or style drift." }
         ],
         chips: [
-            { label: "🛡️ Moat & Quality Score", prompt: "Evaluate the constituent moat distribution and overall portfolio quality for this fund." },
-            { label: "⚠️ High-Risk Holdings", prompt: "Which underlying constituent holdings carry the highest accounting risk or lowest health score?" },
-            { label: "🧭 Style Drift & Active Share", prompt: "Audit the active share and check if this fund is exhibiting benchmark hugging or style drift." },
-            { label: "💸 Intermediary Fee Drag", prompt: "What is the 20-year compounded fee drag and wealth lost to distributor commissions for this fund?" }
+            { icon: "icon-risk", label: "Moat & Quality Score", prompt: "Evaluate the constituent moat distribution and overall portfolio quality for this fund." },
+            { icon: "icon-alerts", label: "High-Risk Holdings", prompt: "Which underlying constituent holdings carry the highest accounting risk or lowest health score?" },
+            { icon: "icon-portfolio", label: "Style Drift & Active Share", prompt: "Audit the active share and check if this fund is exhibiting benchmark hugging or style drift." },
+            { icon: "icon-valuation", label: "Intermediary Fee Drag", prompt: "What is the 20-year compounded fee drag and cost of distributor commissions for this fund?" }
         ]
     },
     debt: {
@@ -49,14 +57,14 @@ const COPILOT_CONFIGS = {
         assetBadge: "Fixed Income & SDI Solvency",
         introText: (ticker) => `Welcome to the <strong>Credit & Solvency Intelligence Desk</strong>. I can stress-test Asset Coverage Ratios (ACR), recovery seniority in liquidation, DSCR covenant headroom, and <strong>credit contagion risk</strong> for <strong>${ticker || 'this security'}</strong>.`,
         features: [
-            { icon: "🛡️", title: "Asset Coverage & Covenants", desc: "Stress-test ACR and DSCR covenant headroom", prompt: "Stress-test the Asset Coverage Ratio (ACR) and DSCR covenant headroom for this instrument." },
-            { icon: "⚖️", title: "Recovery Seniority Tier", desc: "Evaluate recovery seniority & liquidation hierarchy", prompt: "Evaluate recovery seniority and investor recourse in a stressed debt restructuring or liquidation." },
-            { icon: "📡", title: "Credit Contagion Radar", desc: "Analyze parent group linkages and contagion risk", prompt: "What does the Credit Contagion Radar say about the parent group and systemic risks for this issuer?" }
+            { icon: "icon-risk", title: "Asset Coverage & Covenants", desc: "Stress-test ACR and DSCR covenant headroom", prompt: "Stress-test the Asset Coverage Ratio (ACR) and DSCR covenant headroom for this instrument." },
+            { icon: "icon-valuation", title: "Recovery Seniority Tier", desc: "Evaluate recovery seniority & liquidation hierarchy", prompt: "Evaluate recovery seniority and investor recourse in a stressed debt restructuring or liquidation." },
+            { icon: "icon-radar", title: "Credit Contagion Radar", desc: "Analyze parent group linkages and contagion risk", prompt: "What does the Credit Contagion Radar say about the parent group and systemic risks for this issuer?" }
         ],
         chips: [
-            { label: "🛡️ Asset Coverage & Covenants", prompt: "Stress-test the Asset Coverage Ratio (ACR) and DSCR covenant headroom for this instrument." },
-            { label: "⚖️ Recovery Seniority Tier", prompt: "Evaluate recovery seniority and investor recourse in a stressed debt restructuring or liquidation." },
-            { label: "📡 Credit Contagion Radar", prompt: "What does the Credit Contagion Radar say about the parent group and systemic risks for this issuer?" }
+            { icon: "icon-risk", label: "Asset Coverage & Covenants", prompt: "Stress-test the Asset Coverage Ratio (ACR) and DSCR covenant headroom for this instrument." },
+            { icon: "icon-valuation", label: "Recovery Seniority Tier", prompt: "Evaluate recovery seniority and investor recourse in a stressed debt restructuring or liquidation." },
+            { icon: "icon-radar", label: "Credit Contagion Radar", prompt: "What does the Credit Contagion Radar say about the parent group and systemic risks for this issuer?" }
         ]
     },
     etf: {
@@ -64,33 +72,33 @@ const COPILOT_CONFIGS = {
         assetBadge: "ETF Arbitrage & Tracking Intelligence",
         introText: (ticker) => `Welcome to the <strong>ETF & Arbitrage Intelligence Desk</strong>. I evaluate secondary market pricing vs Fair NAV, 1-year tracking error fidelity, expense ratio drag, and <strong>Authorized Participant creation/redemption arbitrage</strong> for <strong>${ticker || 'this ETF'}</strong>.`,
         features: [
-            { icon: "⚖️", title: "Arbitrage & Fair Value", desc: "Audit CMP vs statutory Fair NAV premium/discount", prompt: "Evaluate the secondary market premium/discount spread and arbitrage corridor for this ETF." },
-            { icon: "🎯", title: "Tracking Error Fidelity", desc: "1Y annualized deviation vs benchmark index TRI", prompt: "Audit the 1-year annualized tracking error and replication fidelity for this ETF." },
-            { icon: "🌊", title: "Liquidity Depth & Impact", desc: "Analyze daily volume, turnover, and bid-ask spread proxy", prompt: "What is the secondary market liquidity depth, average daily volume, and impact cost for this ETF?" }
+            { icon: "icon-valuation", title: "Arbitrage & Fair Value", desc: "Audit CMP vs statutory Fair NAV premium/discount", prompt: "Evaluate the secondary market premium/discount spread and arbitrage corridor for this ETF." },
+            { icon: "icon-screen", title: "Tracking Error Fidelity", desc: "1Y annualized deviation vs benchmark index TRI", prompt: "Audit the 1-year annualized tracking error and replication fidelity for this ETF." },
+            { icon: "icon-markets", title: "Liquidity Depth & Impact", desc: "Analyze daily volume, turnover, and bid-ask spread proxy", prompt: "What is the secondary market liquidity depth, average daily volume, and impact cost for this ETF?" }
         ],
         chips: [
-            { label: "⚖️ Arbitrage & Premium Spread", prompt: "Evaluate the secondary market premium/discount spread and arbitrage corridor for this ETF." },
-            { label: "🎯 1Y Tracking Error", prompt: "Audit the 1-year annualized tracking error and replication fidelity for this ETF." },
-            { label: "💸 TER Fee Drag vs Peers", prompt: "Compare the expense ratio (TER) and 10-year fee drag of this ETF against category peers." },
-            { label: "🌊 Liquidity Depth", prompt: "What is the secondary market liquidity depth, average daily volume, and impact cost for this ETF?" },
-            { label: "💀 Inversion & AP Risk", prompt: "Synthesize the bear thesis and Authorized Participant withdrawal risks during high market volatility." }
+            { icon: "icon-valuation", label: "Arbitrage & Premium Spread", prompt: "Evaluate the secondary market premium/discount spread and arbitrage corridor for this ETF." },
+            { icon: "icon-screen", label: "1Y Tracking Error", prompt: "Audit the 1-year annualized tracking error and replication fidelity for this ETF." },
+            { icon: "icon-valuation", label: "TER Fee Drag vs Peers", prompt: "Compare the expense ratio (TER) and 10-year fee drag of this ETF against category peers." },
+            { icon: "icon-markets", label: "Liquidity Depth", prompt: "What is the secondary market liquidity depth, average daily volume, and impact cost for this ETF?" },
+            { icon: "icon-compare", label: "Countercase & AP Risk", prompt: "Summarize the bear thesis and Authorized Participant withdrawal risks during high market volatility." }
         ]
     },
     reit: {
         headerTitle: "REIT & InvIT Cash Flow Desk",
         assetBadge: "REIT & InvIT Cash Flow",
-        introText: (ticker) => `Welcome to the <strong>REIT & InvIT Cash Flow Desk</strong>. I evaluate Section 115UA tax waterfalls (Interest, Dividend, Return of Capital, Rental), statutory <strong>NDCF payout purity</strong> (≥90% Mainboard, ≥95% SM REIT), WALE & tenant concentration, and <strong>Pre-Mortem Inversion risk</strong> for <strong>${ticker || 'this Trust'}</strong>.`,
+        introText: (ticker) => `Welcome to the <strong>REIT & InvIT Cash Flow Desk</strong>. I evaluate Section 115UA tax waterfalls (Interest, Dividend, Return of Capital, Rental), statutory <strong>NDCF payout purity</strong> (≥90% Mainboard, ≥95% SM REIT), WALE & tenant concentration, and <strong>Countercase risk</strong> for <strong>${ticker || 'this Trust'}</strong>.`,
         features: [
-            { icon: "🏛️", title: "Sec 115UA Tax Waterfall", desc: "Audit distribution components & net post-tax yield", prompt: "Evaluate the Section 115UA tax distribution waterfall and net post-tax yield across tax slabs for this REIT/InvIT." },
-            { icon: "💧", title: "NDCF Payout Purity", desc: "Audit statutory distribution vs SEBI 15% penal threshold", prompt: "Analyze the NDCF payout purity, cash conversion, and SEBI compliance for this trust." },
-            { icon: "🏢", title: "Portfolio Scale & WALE", desc: "Evaluate portfolio occupancy, lease expiry, and tenant risk", prompt: "Evaluate the portfolio scale, Weighted Average Lease Expiry (WALE), and top tenant concentration." }
+            { icon: "icon-multi-asset", title: "Sec 115UA Tax Waterfall", desc: "Audit distribution components & net post-tax yield", prompt: "Evaluate the Section 115UA tax distribution waterfall and net post-tax yield across tax slabs for this REIT/InvIT." },
+            { icon: "icon-markets", title: "NDCF Payout Purity", desc: "Audit statutory distribution vs SEBI 15% penal threshold", prompt: "Analyze the NDCF payout purity, cash conversion, and SEBI compliance for this trust." },
+            { icon: "icon-multi-asset", title: "Portfolio Scale & WALE", desc: "Evaluate portfolio occupancy, lease expiry, and tenant risk", prompt: "Evaluate the portfolio scale, Weighted Average Lease Expiry (WALE), and top tenant concentration." }
         ],
         chips: [
-            { label: "🏛️ Sec 115UA Tax Waterfall", prompt: "Evaluate the Section 115UA tax distribution waterfall and net post-tax yield across tax slabs for this REIT/InvIT." },
-            { label: "💧 NDCF Payout Purity", prompt: "Analyze the NDCF payout purity, cash conversion, and SEBI compliance for this trust." },
-            { label: "🏢 Portfolio WALE & Tenants", prompt: "Evaluate the portfolio scale, Weighted Average Lease Expiry (WALE), and top tenant concentration." },
-            { label: "⚡ Leverage & LTV Headroom", prompt: "What is the leverage LTV vs SEBI 49% statutory cap and interest coverage headroom?" },
-            { label: "💀 Inversion & Refinancing Risk", prompt: "Synthesize the bear thesis, refinancing risks, and tenant vacancy shocks under Pre-Mortem Inversion." }
+            { icon: "icon-multi-asset", label: "Sec 115UA Tax Waterfall", prompt: "Evaluate the Section 115UA tax distribution waterfall and net post-tax yield across tax slabs for this REIT/InvIT." },
+            { icon: "icon-markets", label: "NDCF Payout Purity", prompt: "Analyze the NDCF payout purity, cash conversion, and SEBI compliance for this trust." },
+            { icon: "icon-multi-asset", label: "Portfolio WALE & Tenants", prompt: "Evaluate the portfolio scale, Weighted Average Lease Expiry (WALE), and top tenant concentration." },
+            { icon: "icon-insights", label: "Leverage & LTV Headroom", prompt: "What is the leverage LTV vs SEBI 49% statutory cap and interest coverage headroom?" },
+            { icon: "icon-compare", label: "Countercase & Refinancing Risk", prompt: "Summarize the bear thesis, refinancing risks, and tenant vacancy shocks under Countercase." }
         ]
     }
 };
@@ -98,110 +106,110 @@ const COPILOT_CONFIGS = {
 const SECTION_CHIPS = {
     reit: {
         tax_waterfall: [
-            { label: "🏛️ Sec 115UA Post-Tax Yield", prompt: "Break down the post-tax yield across the 0%, 10%, 20%, 30%, and 39% tax slabs for this REIT/InvIT." },
-            { label: "💸 ROC Tax Treatment", prompt: "Explain the tax treatment of Return of Capital (Amortization) and Section 56(2)(xii) specified sum threshold." },
-            { label: "⚖️ Dividend SPV Tax Exemption", prompt: "Is the dividend component exempt or taxable in unitholder hands based on SPV Sec 115BAA status?" }
+            { icon: "icon-multi-asset", label: "Sec 115UA Post-Tax Yield", prompt: "Break down the post-tax yield across the 0%, 10%, 20%, 30%, and 39% tax slabs for this REIT/InvIT." },
+            { icon: "icon-valuation", label: "ROC Tax Treatment", prompt: "Explain the tax treatment of Return of Capital (Amortization) and Section 56(2)(xii) specified sum threshold." },
+            { icon: "icon-valuation", label: "Dividend SPV Tax Exemption", prompt: "Is the dividend component exempt or taxable in unitholder hands based on SPV Sec 115BAA status?" }
         ],
         ndcf_purity: [
-            { label: "💧 NDCF Distribution Purity", prompt: "Audit the NDCF payout purity against SEBI's statutory mandate (≥90% for Mainboard, ≥95% for SM REIT)." },
-            { label: "⚠️ SEBI 15% Penal Clause", prompt: "Does this trust risk the SEBI 15% penal interest rate for delayed distributions?" },
-            { label: "📉 Free Cash Flow vs NDCF", prompt: "Analyze the spread between accounting Net Distributable Cash Flow and true operating free cash flow." }
+            { icon: "icon-markets", label: "NDCF Distribution Purity", prompt: "Audit the NDCF payout purity against SEBI's statutory mandate (≥90% for Mainboard, ≥95% for SM REIT)." },
+            { icon: "icon-alerts", label: "SEBI 15% Penal Clause", prompt: "Does this trust risk the SEBI 15% penal interest rate for delayed distributions?" },
+            { icon: "icon-valuation", label: "Free Cash Flow vs NDCF", prompt: "Analyze the spread between accounting Net Distributable Cash Flow and true operating free cash flow." }
         ],
         portfolio_wale: [
-            { label: "🏢 Lease Expiry Schedule", prompt: "Analyze the lease expiry concentration and renewal risk over the next 3 years." },
-            { label: "🎯 Top 3 Tenant Concentration", prompt: "How vulnerable is distribution cash flow if the top 3 tenants vacate or downsize?" },
-            { label: "📐 Occupancy & Mark-to-Market", prompt: "Evaluate current physical occupancy and mark-to-market rental escalation headroom." }
+            { icon: "icon-multi-asset", label: "Lease Expiry Schedule", prompt: "Analyze the lease expiry concentration and renewal risk over the next 3 years." },
+            { icon: "icon-screen", label: "Top 3 Tenant Concentration", prompt: "How vulnerable is distribution cash flow if the top 3 tenants vacate or downsize?" },
+            { icon: "icon-valuation", label: "Occupancy & Mark-to-Market", prompt: "Evaluate current physical occupancy and mark-to-market rental escalation headroom." }
         ],
         inversion: [
-            { label: "💀 Inversion Failure Modes", prompt: "What structural failure modes or macro shocks could permanently impair distributions for this REIT/InvIT?" },
-            { label: "⚡ Interest Rate Sensitivity", prompt: "How does a 150 bps rise in benchmark bond yields impact the unit price and NAV cap rate?" }
+            { icon: "icon-compare", label: "Inversion Failure Modes", prompt: "What structural failure modes or macro shocks could permanently impair distributions for this REIT/InvIT?" },
+            { icon: "icon-insights", label: "Interest Rate Sensitivity", prompt: "How does a 150 bps rise in benchmark bond yields impact the unit price and NAV cap rate?" }
         ]
     },
     mutual_fund: {
         fee_drag: [
-            { label: "💸 20-Yr Compounded Drag", prompt: "What is the 20-year compounded fee drag and total wealth lost between Direct and Regular plans for this fund?" },
-            { label: "📉 TER Spread Analysis", prompt: "Analyze the distributor commission spread (bps/year) and why direct plans protect compounding." },
-            { label: "⚖️ Fiduciary Takeaway", prompt: "What is the fiduciary takeaway regarding the expense ratio and distributor commissions?" }
+            { icon: "icon-valuation", label: "20-Yr Compounded Drag", prompt: "What is the 20-year compounded fee drag and total cost difference between Direct and Regular plans for this fund?" },
+            { icon: "icon-valuation", label: "TER Spread Analysis", prompt: "Analyze the distributor commission spread (bps/year) and why direct plans protect compounding." },
+            { icon: "icon-valuation", label: "Key Takeaway", prompt: "What is the key takeaway regarding the expense ratio and distributor commissions?" }
         ],
         active_share: [
-            { label: "🧭 Closet Indexing Check", prompt: "Is this fund exhibiting benchmark hugging or closet indexing based on its Active Share?" },
-            { label: "📊 Active Share vs Benchmark", prompt: "Evaluate the Active Share score and concentration vs benchmark index." },
-            { label: "⚠️ Style Drift Diagnostic", prompt: "Check if this fund is drifting away from its stated mandate or category style." }
+            { icon: "icon-portfolio", label: "Closet Indexing Check", prompt: "Is this fund exhibiting benchmark hugging or closet indexing based on its Active Share?" },
+            { icon: "icon-portfolio", label: "Active Share vs Benchmark", prompt: "Evaluate the Active Share score and concentration vs benchmark index." },
+            { icon: "icon-alerts", label: "Style Drift Diagnostic", prompt: "Check if this fund is drifting away from its stated mandate or category style." }
         ],
         asri_solvency: [
-            { label: "⚠️ High-Risk Constituents", prompt: "Which underlying constituent holdings carry the highest accounting risk or lowest health score?" },
-            { label: "🚩 Promoter Pledging Check", prompt: "Are any constituent companies flagged for elevated promoter pledging or governance risks?" },
-            { label: "🛡️ Look-Through ASRI", prompt: "Evaluate the portfolio-wide Accounting Stress & Risk Index (ASRI)." }
+            { icon: "icon-alerts", label: "High-Risk Constituents", prompt: "Which underlying constituent holdings carry the highest accounting risk or lowest health score?" },
+            { icon: "icon-doc", label: "Promoter Pledging Check", prompt: "Are any constituent companies flagged for elevated promoter pledging or governance risks?" },
+            { icon: "icon-risk", label: "Look-Through ASRI", prompt: "Evaluate the portfolio-wide Accounting Stress & Risk Index (ASRI)." }
         ],
         moat_index: [
-            { label: "🏰 Weighted Moat Breakdown", prompt: "Break down the fund's Weighted Moat Index and proportion of Wide vs Narrow Moat businesses." },
-            { label: "⭐ Core Compounders", prompt: "Which top holdings contribute the strongest structural economic moats?" },
-            { label: "🛡️ Pricing Power Endurance", prompt: "Evaluate the pricing power and return on capital endurance of the underlying portfolio." }
+            { icon: "icon-pillar-01", label: "Weighted Moat Breakdown", prompt: "Break down the fund's Weighted Moat Index and proportion of Wide vs Narrow Moat businesses." },
+            { icon: "icon-insights", label: "Core Compounders", prompt: "Which top holdings contribute the strongest structural economic moats?" },
+            { icon: "icon-risk", label: "Pricing Power Endurance", prompt: "Evaluate the pricing power and return on capital endurance of the underlying portfolio." }
         ],
         margin_of_safety: [
-            { label: "📐 Weighted MoS (DCF)", prompt: "What is the weighted Margin of Safety across the portfolio based on DCF models?" },
-            { label: "🏷️ Intrinsic Valuation Gap", prompt: "Are the top constituent holdings trading at a discount or premium to intrinsic value?" }
+            { icon: "icon-valuation", label: "Weighted MoS (DCF)", prompt: "What is the weighted Margin of Safety across the portfolio based on DCF models?" },
+            { icon: "icon-valuation", label: "Intrinsic Valuation Gap", prompt: "Are the top constituent holdings trading at a discount or premium to intrinsic value?" }
         ],
         promoter_pledge: [
-            { label: "🚩 Promoter Pledge Exposure", prompt: "What percentage of fund capital is allocated to companies with elevated promoter pledge levels?" },
-            { label: "🔍 Governance Watchlist", prompt: "Identify any holdings with related-party transactions or accounting friction." }
+            { icon: "icon-doc", label: "Promoter Pledge Exposure", prompt: "What percentage of fund capital is allocated to companies with elevated promoter pledge levels?" },
+            { icon: "icon-research", label: "Governance Watchlist", prompt: "Identify any holdings with related-party transactions or accounting friction." }
         ],
         holdings: [
-            { label: "📊 Dual-Sleeve Allocation", prompt: "Analyze the equity vs debt vs cash allocation and portfolio concentration." },
-            { label: "🎯 Top 10 Concentration", prompt: "Evaluate the concentration risk of the top 10 constituent holdings." },
-            { label: "🌐 Sector & Asset Distribution", prompt: "Break down the sector allocation and asset weights across the fund." }
+            { icon: "icon-portfolio", label: "Dual-Sleeve Allocation", prompt: "Analyze the equity vs debt vs cash allocation and portfolio concentration." },
+            { icon: "icon-screen", label: "Top 10 Concentration", prompt: "Evaluate the concentration risk of the top 10 constituent holdings." },
+            { icon: "icon-multi-asset", label: "Sector & Asset Distribution", prompt: "Break down the sector allocation and asset weights across the fund." }
         ],
         downside_capture: [
-            { label: "🛡️ Bear Market Resilience", prompt: "How does this fund perform during market drawdowns based on its Downside Capture ratio?" },
-            { label: "📈 Capture Spread & Alpha", prompt: "Explain the spread between Upside Capture and Downside Capture ratios." },
-            { label: "⚖️ Sortino & Momentum", prompt: "Interpret the Sortino ratio and Hurst exponent momentum metric for this fund." }
+            { icon: "icon-risk", label: "Bear Market Resilience", prompt: "How does this fund perform during market drawdowns based on its Downside Capture ratio?" },
+            { icon: "icon-markets", label: "Capture Spread & Alpha", prompt: "Explain the spread between Upside Capture and Downside Capture ratios." },
+            { icon: "icon-valuation", label: "Sortino & Momentum", prompt: "Interpret the Sortino ratio and Hurst exponent momentum metric for this fund." }
         ],
         dossier_narrative: [
-            { label: "📝 Summarize AI Audit", prompt: "Synthesize the key findings, strengths, and vulnerabilities from the forensic audit narrative." },
-            { label: "🚨 Critical Red Flags", prompt: "Highlight any fiduciary concerns or governance warnings identified in the qualitative audit." }
+            { icon: "icon-doc", label: "Summarize AI Audit", prompt: "Summarize the key findings, strengths, and vulnerabilities from the accounting check narrative." },
+            { icon: "icon-alerts", label: "Critical Red Flags", prompt: "Highlight any governance concerns or governance warnings identified in the qualitative audit." }
         ],
         lookthrough_metrics: [
-            { label: "🔬 7-Pillar Overview", prompt: "Provide an institutional overview of the fund's 7-pillar look-through metrics." },
-            { label: "🛡️ Moat vs Solvency Spread", prompt: "Compare the fund's Weighted Moat Index against its Look-Through ASRI accounting risk." }
+            { icon: "icon-research", label: "7-Pillar Overview", prompt: "Provide an overview of the fund's 7-pillar look-through metrics." },
+            { icon: "icon-risk", label: "Moat vs Solvency Spread", prompt: "Compare the fund's Weighted Moat Index against its Look-Through ASRI accounting risk." }
         ]
     },
     equity: {
         reverse_dcf: [
-            { label: "📉 Implied Growth Priced In", prompt: "What implied growth rate is priced into current CMP based on Reverse DCF?" },
-            { label: "🎯 Hurdle Rate Sensitivity", prompt: "How sensitive is the Reverse DCF valuation to hurdle rate assumptions?" }
+            { icon: "icon-valuation", label: "Implied Growth Priced In", prompt: "What implied growth rate is priced into current CMP based on Reverse DCF?" },
+            { icon: "icon-screen", label: "Hurdle Rate Sensitivity", prompt: "How sensitive is the Reverse DCF valuation to hurdle rate assumptions?" }
         ],
         solvency: [
-            { label: "🛡️ Balance Sheet Solvency", prompt: "Evaluate balance sheet solvency, Altman Z-Score, and leverage ratios." },
-            { label: "🚩 Beneish M-Score Check", prompt: "Are there any forensic accounting or earnings manipulation red flags?" }
+            { icon: "icon-risk", label: "Balance Sheet Solvency", prompt: "Evaluate balance sheet solvency, Altman Z-Score, and leverage ratios." },
+            { icon: "icon-doc", label: "Beneish M-Score Check", prompt: "Are there any forensic accounting or earnings manipulation red flags?" }
         ],
         pre_mortem: [
-            { label: "💀 Thesis Failure Modes", prompt: "Run Pre-Mortem Inversion analysis on this stock: what failure modes could destroy shareholder value?" },
-            { label: "⚠️ Structural Vulnerabilities", prompt: "Identify the top 3 structural risks that could permanently impair business earnings." }
+            { icon: "icon-compare", label: "Thesis Failure Modes", prompt: "Run a countercase analysis on this stock: what failure modes could destroy shareholder value?" },
+            { icon: "icon-alerts", label: "Structural Vulnerabilities", prompt: "Identify the top 3 structural risks that could permanently impair business earnings." }
         ]
     },
     debt: {
         covenants: [
-            { label: "🛡️ Asset Coverage (ACR)", prompt: "Stress-test the Asset Coverage Ratio (ACR) and DSCR covenant headroom for this instrument." },
-            { label: "⚖️ Recovery Seniority Tier", prompt: "Evaluate recovery seniority and investor recourse in a stressed debt restructuring or liquidation." }
+            { icon: "icon-risk", label: "Asset Coverage (ACR)", prompt: "Stress-test the Asset Coverage Ratio (ACR) and DSCR covenant headroom for this instrument." },
+            { icon: "icon-valuation", label: "Recovery Seniority Tier", prompt: "Evaluate recovery seniority and investor recourse in a stressed debt restructuring or liquidation." }
         ],
         contagion: [
-            { label: "📡 Credit Contagion Radar", prompt: "What does the Credit Contagion Radar say about the parent group and systemic risks for this issuer?" },
-            { label: "🚨 Cross-Default Risks", prompt: "Are there any cross-default triggers or related-party exposure in the group structure?" }
+            { icon: "icon-radar", label: "Credit Contagion Radar", prompt: "What does the Credit Contagion Radar say about the parent group and systemic risks for this issuer?" },
+            { icon: "icon-alerts", label: "Cross-Default Risks", prompt: "Are there any cross-default triggers or related-party exposure in the group structure?" }
         ]
     },
     etf: {
         arbitrage: [
-            { label: "⚖️ Fair NAV Spread", prompt: "What is the current premium or discount percentage over Fair NAV and is retail paying an impact surcharge?" },
-            { label: "🏦 AP Creation Incentives", prompt: "How do Authorized Participants arbitrage this spread via creation/redemption baskets?" },
-            { label: "🎯 Retail Limit Order Strategy", prompt: "What execution strategy should retail investors use to minimize slippage on this ETF?" }
+            { icon: "icon-valuation", label: "Fair NAV Spread", prompt: "What is the current premium or discount percentage over Fair NAV and is retail paying an impact surcharge?" },
+            { icon: "icon-multi-asset", label: "AP Creation Incentives", prompt: "How do Authorized Participants arbitrage this spread via creation/redemption baskets?" },
+            { icon: "icon-screen", label: "Retail Limit Order Strategy", prompt: "What execution strategy should retail investors use to minimize slippage on this ETF?" }
         ],
         tracking_error: [
-            { label: "🎯 1Y Tracking Error", prompt: "How does the 1-year tracking error compare to the institutional benchmark standard?" },
-            { label: "💸 Drag Sources", prompt: "What portion of tracking error comes from TER, cash drag, and dividend reinvestment latency?" }
+            { icon: "icon-screen", label: "1Y Tracking Error", prompt: "How does the 1-year tracking error compare to the benchmark standard?" },
+            { icon: "icon-valuation", label: "Drag Sources", prompt: "What portion of tracking error comes from TER, cash drag, and dividend reinvestment latency?" }
         ],
         peers: [
-            { label: "📊 Compare with Peers", prompt: "Compare this ETF against its category peers on TER, tracking error, and liquidity depth." },
-            { label: "🏆 Cheapest in Category", prompt: "Is this ETF the most cost-efficient vehicle in its category?" }
+            { icon: "icon-portfolio", label: "Compare with Peers", prompt: "Compare this ETF against its category peers on TER, tracking error, and liquidity depth." },
+            { icon: "icon-insights", label: "Cheapest in Category", prompt: "Is this ETF the most cost-efficient vehicle in its category?" }
         ],
     }
 };
@@ -210,164 +218,164 @@ const SECTION_METADATA = {
     reit: {
         tax_waterfall: {
             headerTitle: "Sec 115UA Tax Waterfall Desk",
-            introHeadline: "🏛️ Sec 115UA Tax Waterfall Workspace",
+            introHeadline: "Sec 115UA Tax Waterfall Workspace",
             introText: (ticker) => `Auditing composite cash distribution streams for <strong>${ticker || 'this Trust'}</strong> across Section 115UA components (Interest, Dividend, Return of Capital, and Rental). Post-tax yield simulations calculate exact in-hand realizations across marginal personal tax slabs (0% to 39%).`,
             features: [
-                { icon: "🏛️", title: "5-Slab Post-Tax Yield Simulation", desc: "Comparative yield table across 0%, 10%, 20%, 30%, and 39% tax slabs with tax drag (bps)", prompt: "Break down the post-tax yield across the 0%, 10%, 20%, 30%, and 39% tax slabs for this REIT/InvIT." },
-                { icon: "💸", title: "Return of Capital & Sec 56(2)(xii)", desc: "Tax-free amortization rules, acquisition cost reduction & specified sum threshold", prompt: "Explain the tax treatment of Return of Capital (Amortization) and Section 56(2)(xii) specified sum threshold." },
-                { icon: "⚖️", title: "SPV Dividend Pass-Through Status", desc: "Section 10(23FD) tax-free dividend status vs Section 115BAA corporate tax regime", prompt: "Is the dividend component exempt or taxable in unitholder hands based on SPV Sec 115BAA status?" }
+                { icon: "icon-multi-asset", title: "5-Slab Post-Tax Yield Simulation", desc: "Comparative yield table across 0%, 10%, 20%, 30%, and 39% tax slabs with tax drag (bps)", prompt: "Break down the post-tax yield across the 0%, 10%, 20%, 30%, and 39% tax slabs for this REIT/InvIT." },
+                { icon: "icon-valuation", title: "Return of Capital & Sec 56(2)(xii)", desc: "Tax-free amortization rules, acquisition cost reduction & specified sum threshold", prompt: "Explain the tax treatment of Return of Capital (Amortization) and Section 56(2)(xii) specified sum threshold." },
+                { icon: "icon-valuation", title: "SPV Dividend Pass-Through Status", desc: "Section 10(23FD) tax-free dividend status vs Section 115BAA corporate tax regime", prompt: "Is the dividend component exempt or taxable in unitholder hands based on SPV Sec 115BAA status?" }
             ]
         },
         ndcf_purity: {
             headerTitle: "NDCF Payout Purity & Capital Discipline Desk",
-            introHeadline: "💧 NDCF Payout Purity Workspace",
+            introHeadline: "NDCF Payout Purity Workspace",
             introText: (ticker) => `Auditing statutory upstreaming discipline and cash conversion for <strong>${ticker || 'this Trust'}</strong> against SEBI mandates (≥90% Mainboard, ≥95% SM REIT). Cross-checking free operating cash flow vs accounting NDCF and verifying the <strong>SEBI 15% p.a. penal interest clause</strong> for delayed distributions.`,
             features: [
-                { icon: "💧", title: "Statutory NDCF Payout Purity", desc: "Audit distribution purity against SEBI mandate (≥90% Mainboard, ≥95% SM REIT)", prompt: "Audit the NDCF payout purity against SEBI's statutory mandate (≥90% for Mainboard, ≥95% for SM REIT)." },
-                { icon: "⚠️", title: "SEBI 15% Penal Clause Audit", desc: "Manager personal liability & statutory compliance track record", prompt: "Does this trust risk the SEBI 15% penal interest rate for delayed distributions?" },
-                { icon: "📉", title: "Operating FCF vs Accounting NDCF", desc: "Audit capex reserves, debt servicing deductions & cash conversion", prompt: "Analyze the spread between accounting Net Distributable Cash Flow and true operating free cash flow." }
+                { icon: "icon-markets", title: "Statutory NDCF Payout Purity", desc: "Audit distribution purity against SEBI mandate (≥90% Mainboard, ≥95% SM REIT)", prompt: "Audit the NDCF payout purity against SEBI's statutory mandate (≥90% for Mainboard, ≥95% for SM REIT)." },
+                { icon: "icon-alerts", title: "SEBI 15% Penal Clause Audit", desc: "Manager personal liability & statutory compliance track record", prompt: "Does this trust risk the SEBI 15% penal interest rate for delayed distributions?" },
+                { icon: "icon-valuation", title: "Operating FCF vs Accounting NDCF", desc: "Audit capex reserves, debt servicing deductions & cash conversion", prompt: "Analyze the spread between accounting Net Distributable Cash Flow and true operating free cash flow." }
             ]
         },
         portfolio_wale: {
             headerTitle: "Portfolio WALE & Tenant Concentration Desk",
-            introHeadline: "🏢 Portfolio Scale, WALE & Solvency Workspace",
+            introHeadline: "Portfolio Scale, WALE & Solvency Workspace",
             introText: (ticker) => `Auditing physical occupancy, Weighted Average Lease Expiry (WALE), and anchor counterparty concentration for <strong>${ticker || 'this Trust'}</strong>. Evaluating debt maturity profiles, cost of debt, and statutory borrowing headroom under the SEBI 49% LTV ceiling.`,
             features: [
-                { icon: "🏢", title: "Lease Expiry & Renewals Pipeline", desc: "Next 3-year expiry concentration, WALE & contractual rental escalations", prompt: "Analyze the lease expiry concentration and renewal risk over the next 3 years." },
-                { icon: "🎯", title: "Top Tenant Counterparty Concentration", desc: "Fortune 500 / GCC exposure, fit-out switching costs & vacancy resilience", prompt: "How vulnerable is distribution cash flow if the top 3 tenants vacate or downsize?" },
-                { icon: "⚡", title: "LTV Borrowing Headroom & Debt Mix", desc: "Net LTV vs SEBI 49% cap, cost of debt & fixed vs floating maturity mix", prompt: "What is the leverage LTV vs SEBI 49% statutory cap and interest coverage headroom?" }
+                { icon: "icon-multi-asset", title: "Lease Expiry & Renewals Pipeline", desc: "Next 3-year expiry concentration, WALE & contractual rental escalations", prompt: "Analyze the lease expiry concentration and renewal risk over the next 3 years." },
+                { icon: "icon-screen", title: "Top Tenant Counterparty Concentration", desc: "Fortune 500 / GCC exposure, fit-out switching costs & vacancy resilience", prompt: "How vulnerable is distribution cash flow if the top 3 tenants vacate or downsize?" },
+                { icon: "icon-insights", title: "LTV Borrowing Headroom & Debt Mix", desc: "Net LTV vs SEBI 49% cap, cost of debt & fixed vs floating maturity mix", prompt: "What is the leverage LTV vs SEBI 49% statutory cap and interest coverage headroom?" }
             ]
         },
         inversion: {
-            headerTitle: "Pre-Mortem Inversion & Stress Desk",
-            introHeadline: "💀 Pre-Mortem Inversion & Risk Ledger",
-            introText: (ticker) => `Conducting adversarial Pre-Mortem Inversion on <strong>${ticker || 'this Trust'}</strong>. Stress-testing distribution resilience against +150 bps interest rate hikes, tenant vacancy bunching, cap rate expansion NAV shocks, and sponsor pipeline conflicts.`,
+            headerTitle: "Countercase & Stress Desk",
+            introHeadline: "Countercase & Risk Ledger",
+            introText: (ticker) => `Conducting adversarial Countercase on <strong>${ticker || 'this Trust'}</strong>. Stress-testing distribution resilience against +150 bps interest rate hikes, tenant vacancy bunching, cap rate expansion NAV shocks, and sponsor pipeline conflicts.`,
             features: [
-                { icon: "💀", title: "Structural Failure Modes Ledger", desc: "Pre-Mortem synthesis of macro, operational, and regulatory disruption vectors", prompt: "What structural failure modes or macro shocks could permanently impair distributions for this REIT/InvIT?" },
-                { icon: "⚡", title: "+150 bps Interest Rate Shock", desc: "Stress-testing floating debt servicing, cap-rate expansion & NAV sensitivity", prompt: "How does a 150 bps rise in benchmark bond yields impact the unit price and NAV cap rate?" },
-                { icon: "🤝", title: "Sponsor ROFO Pipeline Governance", desc: "Skin-in-the-game percentage, RPT unitholder voting & independent valuations", prompt: "Audit the sponsor governance, skin-in-the-game, and ROFO asset acquisition pipeline." }
+                { icon: "icon-compare", title: "Structural Failure Modes Ledger", desc: "Countercase analysis of macro, operational, and regulatory disruption vectors", prompt: "What structural failure modes or macro shocks could permanently impair distributions for this REIT/InvIT?" },
+                { icon: "icon-insights", title: "+150 bps Interest Rate Shock", desc: "Stress-testing floating debt servicing, cap-rate expansion & NAV sensitivity", prompt: "How does a 150 bps rise in benchmark bond yields impact the unit price and NAV cap rate?" },
+                { icon: "icon-compare", title: "Sponsor ROFO Pipeline Governance", desc: "Skin-in-the-game percentage, RPT unitholder voting & independent valuations", prompt: "Audit the sponsor governance, skin-in-the-game, and ROFO asset acquisition pipeline." }
             ]
         }
     },
     mutual_fund: {
         fee_drag: {
-            headerTitle: "Intermediary Fee Drag & Wealth Desk",
-            introHeadline: "💸 Intermediary Fee Drag Workspace",
+            headerTitle: "Intermediary Fee Drag Desk",
+            introHeadline: "Intermediary Fee Drag Workspace",
             introText: (ticker) => `Auditing the 20-year compounded fee drag and distributor commission spread between Direct and Regular plans for <strong>${ticker || 'this Fund'}</strong>.`,
             features: [
-                { icon: "💸", title: "20-Yr Compounded Fee Drag", desc: "Calculate wealth destroyed by distributor commissions over 20 years", prompt: "What is the 20-year compounded fee drag and total wealth lost between Direct and Regular plans for this fund?" },
-                { icon: "📉", title: "Distributor Commission Spread", desc: "Analyze the bps/year expense ratio difference between Direct and Regular plans", prompt: "Analyze the distributor commission spread (bps/year) and why direct plans protect compounding." },
-                { icon: "⚖️", title: "Fiduciary Compounding Verdict", desc: "Long-term compounding preservation via commission-free investing", prompt: "What is the fiduciary takeaway regarding the expense ratio and distributor commissions?" }
+                { icon: "icon-valuation", title: "20-Yr Compounded Fee Drag", desc: "Calculate the cumulative cost of distributor commissions over 20 years", prompt: "What is the 20-year compounded fee drag and total cost difference between Direct and Regular plans for this fund?" },
+                { icon: "icon-valuation", title: "Distributor Commission Spread", desc: "Analyze the bps/year expense ratio difference between Direct and Regular plans", prompt: "Analyze the distributor commission spread (bps/year) and why direct plans protect compounding." },
+                { icon: "icon-valuation", title: "Long-Term Compounding Takeaway", desc: "Long-term compounding preservation via commission-free investing", prompt: "What is the key takeaway regarding the expense ratio and distributor commissions?" }
             ]
         },
         active_share: {
             headerTitle: "Active Share & Closet Indexing Desk",
-            introHeadline: "🧭 Active Share & Style Drift Workspace",
+            introHeadline: "Active Share & Style Drift Workspace",
             introText: (ticker) => `Auditing portfolio non-overlap against the benchmark index to expose closet indexing and style drift for <strong>${ticker || 'this Fund'}</strong>.`,
             features: [
-                { icon: "🧭", title: "Closet Indexing Check", desc: "Audit whether active fees are charged for benchmark hugging", prompt: "Is this fund exhibiting benchmark hugging or closet indexing based on its Active Share?" },
-                { icon: "📊", title: "Active Share vs Benchmark", desc: "Quantitative non-overlap percentage against benchmark index", prompt: "Evaluate the Active Share score and concentration vs benchmark index." },
-                { icon: "⚠️", title: "Style Drift Diagnostic", desc: "Check for market-cap drift or divergence from stated mandate", prompt: "Check if this fund is drifting away from its stated mandate or category style." }
+                { icon: "icon-portfolio", title: "Closet Indexing Check", desc: "Audit whether active fees are charged for benchmark hugging", prompt: "Is this fund exhibiting benchmark hugging or closet indexing based on its Active Share?" },
+                { icon: "icon-portfolio", title: "Active Share vs Benchmark", desc: "Quantitative non-overlap percentage against benchmark index", prompt: "Evaluate the Active Share score and concentration vs benchmark index." },
+                { icon: "icon-alerts", title: "Style Drift Diagnostic", desc: "Check for market-cap drift or divergence from stated mandate", prompt: "Check if this fund is drifting away from its stated mandate or category style." }
             ]
         },
         asri_solvency: {
             headerTitle: "Accounting Risk (ASRI) Desk",
-            introHeadline: "🛡️ Look-Through Accounting Stress Workspace",
+            introHeadline: "Look-Through Accounting Stress Workspace",
             introText: (ticker) => `Evaluating capital-weighted accounting stress, aggressive revenue recognition, and promoter pledging across underlying holdings of <strong>${ticker || 'this Fund'}</strong>.`,
             features: [
-                { icon: "⚠️", title: "High-Risk Constituents Watchlist", desc: "Constituent holdings carrying elevated accounting or leverage stress", prompt: "Which underlying constituent holdings carry the highest accounting risk or lowest health score?" },
-                { icon: "🚩", title: "Promoter Pledging Exposure", desc: "Audit promoter pledge encumbrances across constituent portfolio companies", prompt: "Are any constituent companies flagged for elevated promoter pledging or governance risks?" },
-                { icon: "🛡️", title: "Portfolio-Wide ASRI Metric", desc: "Aggregated Accounting Stress & Risk Index across all underlying holdings", prompt: "Evaluate the portfolio-wide Accounting Stress & Risk Index (ASRI)." }
+                { icon: "icon-alerts", title: "High-Risk Constituents Watchlist", desc: "Constituent holdings carrying elevated accounting or leverage stress", prompt: "Which underlying constituent holdings carry the highest accounting risk or lowest health score?" },
+                { icon: "icon-doc", title: "Promoter Pledging Exposure", desc: "Audit promoter pledge encumbrances across constituent portfolio companies", prompt: "Are any constituent companies flagged for elevated promoter pledging or governance risks?" },
+                { icon: "icon-risk", title: "Portfolio-Wide ASRI Metric", desc: "Aggregated Accounting Stress & Risk Index across all underlying holdings", prompt: "Evaluate the portfolio-wide Accounting Stress & Risk Index (ASRI)." }
             ]
         },
         moat_index: {
             headerTitle: "Weighted Moat & Quality Endurance Desk",
-            introHeadline: "🏰 Weighted Moat Quality Workspace",
+            introHeadline: "Weighted Moat Quality Workspace",
             introText: (ticker) => `Auditing structural competitive advantages, pricing power, and return on capital persistence across constituent holdings for <strong>${ticker || 'this Fund'}</strong>.`,
             features: [
-                { icon: "🏰", title: "Weighted Moat Breakdown", desc: "Proportion of Wide vs Narrow Moat businesses in the portfolio", prompt: "Break down the fund's Weighted Moat Index and proportion of Wide vs Narrow Moat businesses." },
-                { icon: "⭐", title: "Core Fortress Compounders", desc: "Top holdings contributing structural economic moats", prompt: "Which top holdings contribute the strongest structural economic moats?" },
-                { icon: "🛡️", title: "Pricing Power Endurance", desc: "Long-term pricing power and ROIC endurance of underlying holdings", prompt: "Evaluate the pricing power and return on capital endurance of the underlying portfolio." }
+                { icon: "icon-pillar-01", title: "Weighted Moat Breakdown", desc: "Proportion of Wide vs Narrow Moat businesses in the portfolio", prompt: "Break down the fund's Weighted Moat Index and proportion of Wide vs Narrow Moat businesses." },
+                { icon: "icon-insights", title: "Core Fortress Compounders", desc: "Top holdings contributing structural economic moats", prompt: "Which top holdings contribute the strongest structural economic moats?" },
+                { icon: "icon-risk", title: "Pricing Power Endurance", desc: "Long-term pricing power and ROIC endurance of underlying holdings", prompt: "Evaluate the pricing power and return on capital endurance of the underlying portfolio." }
             ]
         },
         holdings: {
             headerTitle: "Constituent Holdings & Allocation Desk",
-            introHeadline: "📊 Dual-Sleeve Allocation Workspace",
+            introHeadline: "Dual-Sleeve Allocation Workspace",
             introText: (ticker) => `Auditing equity vs debt vs cash sleeves and top 10 portfolio concentration for <strong>${ticker || 'this Fund'}</strong>.`,
             features: [
-                { icon: "📊", title: "Dual-Sleeve Asset Mix", desc: "Asset weights and cash deployment across sleeves", prompt: "Analyze the equity vs debt vs cash allocation and portfolio concentration." },
-                { icon: "🎯", title: "Top 10 Concentration Risk", desc: "Single-stock risk across the top 10 constituent holdings", prompt: "Evaluate the concentration risk of the top 10 constituent holdings." },
-                { icon: "🌐", title: "Sector Allocation Distribution", desc: "Sector exposure breakdown against category averages", prompt: "Break down the sector allocation and asset weights across the fund." }
+                { icon: "icon-portfolio", title: "Dual-Sleeve Asset Mix", desc: "Asset weights and cash deployment across sleeves", prompt: "Analyze the equity vs debt vs cash allocation and portfolio concentration." },
+                { icon: "icon-screen", title: "Top 10 Concentration Risk", desc: "Single-stock risk across the top 10 constituent holdings", prompt: "Evaluate the concentration risk of the top 10 constituent holdings." },
+                { icon: "icon-multi-asset", title: "Sector Allocation Distribution", desc: "Sector exposure breakdown against category averages", prompt: "Break down the sector allocation and asset weights across the fund." }
             ]
         }
     },
     equity: {
         solvency: {
             headerTitle: "Balance Sheet Solvency & Health Desk",
-            introHeadline: "🛡️ Solvency & Health Matrix Workspace",
+            introHeadline: "Solvency & Health Matrix Workspace",
             introText: (ticker) => `Evaluating Altman Z-Score, leverage ratios, and balance sheet resilience under macroeconomic stress for <strong>${ticker || 'this equity'}</strong>.`,
             features: [
-                { icon: "🛡️", title: "Balance Sheet Solvency", desc: "Audit Altman Z-Score, net debt/EBITDA, and current ratio", prompt: "Evaluate balance sheet solvency, Altman Z-Score, and leverage ratios for this company." },
-                { icon: "🚩", title: "Beneish M-Score Audit", desc: "Forensic accounting screening for aggressive accruals", prompt: "Are there any forensic accounting or earnings manipulation red flags?" },
-                { icon: "🚩", title: "Promoter Pledging Check", desc: "Audit promoter pledge encumbrances and ownership stability", prompt: "Are there any promoter pledging or corporate governance red flags in recent disclosures?" }
+                { icon: "icon-risk", title: "Balance Sheet Solvency", desc: "Audit Altman Z-Score, net debt/EBITDA, and current ratio", prompt: "Evaluate balance sheet solvency, Altman Z-Score, and leverage ratios for this company." },
+                { icon: "icon-doc", title: "Beneish M-Score Audit", desc: "Forensic accounting screening for aggressive accruals", prompt: "Are there any forensic accounting or earnings manipulation red flags?" },
+                { icon: "icon-doc", title: "Promoter Pledging Check", desc: "Audit promoter pledge encumbrances and ownership stability", prompt: "Are there any promoter pledging or corporate governance red flags in recent disclosures?" }
             ]
         },
         reverse_dcf: {
             headerTitle: "Reverse DCF Implied Growth Desk",
-            introHeadline: "📉 Reverse DCF Implied Growth Workspace",
+            introHeadline: "Reverse DCF Implied Growth Workspace",
             introText: (ticker) => `Deconstructing market price to calculate what annual FCF growth is currently priced into CMP for <strong>${ticker || 'this equity'}</strong>.`,
             features: [
-                { icon: "📉", title: "Implied FCF Growth Priced In", desc: "Calculate implied growth rate priced into current CMP", prompt: "What implied growth rate is priced into current CMP based on Reverse DCF?" },
-                { icon: "🎯", title: "Hurdle Rate Sensitivity", desc: "Sensitivity analysis across 10%, 12%, and 15% discount rates", prompt: "How sensitive is the Reverse DCF valuation to hurdle rate assumptions?" }
+                { icon: "icon-valuation", title: "Implied FCF Growth Priced In", desc: "Calculate implied growth rate priced into current CMP", prompt: "What implied growth rate is priced into current CMP based on Reverse DCF?" },
+                { icon: "icon-screen", title: "Hurdle Rate Sensitivity", desc: "Sensitivity analysis across 10%, 12%, and 15% discount rates", prompt: "How sensitive is the Reverse DCF valuation to hurdle rate assumptions?" }
             ]
         },
         pre_mortem: {
-            headerTitle: "Pre-Mortem Inversion & Failure Modes Desk",
-            introHeadline: "💀 Pre-Mortem Inversion Workspace",
-            introText: (ticker) => `Applying Charlie Munger's inversion principle to expose structural failure modes and thesis destruction risks for <strong>${ticker || 'this equity'}</strong>.`,
+            headerTitle: "Countercase & Failure Modes Desk",
+            introHeadline: "Countercase Workspace",
+            introText: (ticker) => `Reasoning backward from failure to expose structural failure modes and thesis risks for <strong>${ticker || 'this equity'}</strong>.`,
             features: [
-                { icon: "💀", title: "Thesis Destruction Failure Modes", desc: "Expose top operational and regulatory risks that destroy shareholder value", prompt: "Run Pre-Mortem Inversion analysis on this stock: what failure modes could destroy shareholder value?" },
-                { icon: "⚠️", title: "Structural Vulnerabilities", desc: "Identify top 3 structural risks that could permanently impair earnings", prompt: "Identify the top 3 structural risks that could permanently impair business earnings." }
+                { icon: "icon-compare", title: "Key Risks & Assumptions That Could Fail", desc: "Expose top operational and regulatory risks that destroy shareholder value", prompt: "Run a countercase analysis on this stock: what failure modes could destroy shareholder value?" },
+                { icon: "icon-alerts", title: "Structural Vulnerabilities", desc: "Identify top 3 structural risks that could permanently impair earnings", prompt: "Identify the top 3 structural risks that could permanently impair business earnings." }
             ]
         }
     },
     debt: {
         covenants: {
             headerTitle: "Asset Coverage & Covenants Desk",
-            introHeadline: "🛡️ Asset Coverage & Covenants Workspace",
+            introHeadline: "Asset Coverage & Covenants Workspace",
             introText: (ticker) => `Stress-testing Asset Coverage Ratios (ACR), DSCR headroom, and security charge integrity for <strong>${ticker || 'this instrument'}</strong>.`,
             features: [
-                { icon: "🛡️", title: "Asset Coverage Ratio (ACR)", desc: "Stress-test security charge cover against stressed valuation", prompt: "Stress-test the Asset Coverage Ratio (ACR) and DSCR covenant headroom for this instrument." },
-                { icon: "⚖️", title: "Recovery Seniority Hierarchy", desc: "Evaluate IBC liquidation priority and unencumbered asset pool", prompt: "Evaluate recovery seniority and investor recourse in a stressed debt restructuring or liquidation." }
+                { icon: "icon-risk", title: "Asset Coverage Ratio (ACR)", desc: "Stress-test security charge cover against stressed valuation", prompt: "Stress-test the Asset Coverage Ratio (ACR) and DSCR covenant headroom for this instrument." },
+                { icon: "icon-valuation", title: "Recovery Seniority Hierarchy", desc: "Evaluate IBC liquidation priority and unencumbered asset pool", prompt: "Evaluate recovery seniority and investor recourse in a stressed debt restructuring or liquidation." }
             ]
         },
         contagion: {
             headerTitle: "Credit Contagion & Group Solvency Desk",
-            introHeadline: "📡 Credit Contagion Radar Workspace",
+            introHeadline: "Credit Contagion Radar Workspace",
             introText: (ticker) => `Monitoring parent-group leverage, cross-default triggers, and systemic equity contagion for <strong>${ticker || 'this issuer'}</strong>.`,
             features: [
-                { icon: "📡", title: "Credit Contagion Radar", desc: "Analyze parent entity leverage and cross-default covenants", prompt: "What does the Credit Contagion Radar say about the parent group and systemic risks for this issuer?" },
-                { icon: "🚨", title: "Cross-Default Trigger Analysis", desc: "Audit group-level debt acceleration clauses and encumbrances", prompt: "Are there any cross-default triggers or related-party exposure in the group structure?" }
+                { icon: "icon-radar", title: "Credit Contagion Radar", desc: "Analyze parent entity leverage and cross-default covenants", prompt: "What does the Credit Contagion Radar say about the parent group and systemic risks for this issuer?" },
+                { icon: "icon-alerts", title: "Cross-Default Trigger Analysis", desc: "Audit group-level debt acceleration clauses and encumbrances", prompt: "Are there any cross-default triggers or related-party exposure in the group structure?" }
             ]
         }
     },
     etf: {
         arbitrage: {
             headerTitle: "Arbitrage & Fair NAV Corridor Desk",
-            introHeadline: "⚖️ Arbitrage Spread & Fair NAV Workspace",
+            introHeadline: "Arbitrage Spread & Fair NAV Workspace",
             introText: (ticker) => `Auditing secondary market premium/discount spreads vs Fair NAV and Authorized Participant basket incentives for <strong>${ticker || 'this ETF'}</strong>.`,
             features: [
-                { icon: "⚖️", title: "Arbitrage & Fair NAV Spread", desc: "Audit CMP vs statutory Fair NAV premium/discount", prompt: "Evaluate the secondary market premium/discount spread and arbitrage corridor for this ETF." },
-                { icon: "🏦", title: "AP Creation/Redemption Arbitrage", desc: "How Authorized Participants keep CMP aligned with iNAV", prompt: "How do Authorized Participants arbitrage this spread via creation/redemption baskets?" }
+                { icon: "icon-valuation", title: "Arbitrage & Fair NAV Spread", desc: "Audit CMP vs statutory Fair NAV premium/discount", prompt: "Evaluate the secondary market premium/discount spread and arbitrage corridor for this ETF." },
+                { icon: "icon-multi-asset", title: "AP Creation/Redemption Arbitrage", desc: "How Authorized Participants keep CMP aligned with iNAV", prompt: "How do Authorized Participants arbitrage this spread via creation/redemption baskets?" }
             ]
         },
         tracking_error: {
             headerTitle: "Tracking Error & Replication Desk",
-            introHeadline: "🎯 Tracking Error & Replication Workspace",
+            introHeadline: "Tracking Error & Replication Workspace",
             introText: (ticker) => `Auditing 1-year annualized tracking error, cash drag, and replication fidelity vs benchmark index for <strong>${ticker || 'this ETF'}</strong>.`,
             features: [
-                { icon: "🎯", title: "1Y Tracking Error Fidelity", desc: "1-year annualized tracking error vs benchmark index", prompt: "Audit the 1-year annualized tracking error and replication fidelity for this ETF." },
-                { icon: "💸", title: "Drag Attribution Breakdown", desc: "Attribute tracking error to TER, cash drag, and dividend lag", prompt: "What portion of tracking error comes from TER, cash drag, and dividend reinvestment latency?" }
+                { icon: "icon-screen", title: "1Y Tracking Error Fidelity", desc: "1-year annualized tracking error vs benchmark index", prompt: "Audit the 1-year annualized tracking error and replication fidelity for this ETF." },
+                { icon: "icon-valuation", title: "Drag Attribution Breakdown", desc: "Attribute tracking error to TER, cash drag, and dividend lag", prompt: "What portion of tracking error comes from TER, cash drag, and dividend reinvestment latency?" }
             ]
         }
     }
@@ -399,7 +407,7 @@ function detectAssetType(ticker) {
 }
 
 /**
- * Lightweight, safe markdown formatter for forensic copilot analysis responses.
+ * Lightweight, safe markdown formatter for Research Desk analysis responses.
  * Escapes raw HTML to prevent injection and turns markdown elements into rich UI tokens.
  */
 function renderCopilotMarkdown(rawText) {
@@ -549,7 +557,7 @@ function renderCopilotMarkdown(rawText) {
         microWidgetHtml = `
         <div class="copilot-micro-dcf" style="margin-top:12px;padding:12px;background:rgba(15,23,42,0.85);border:1px solid rgba(56,189,248,0.3);border-radius:10px;">
           <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;">
-            <span style="font-size:11px;font-weight:800;color:#38bdf8;text-transform:uppercase;letter-spacing:0.05em;">⚡ Interactive Reverse DCF Stress Sandbox</span>
+            <span style="font-size:11px;font-weight:800;color:#38bdf8;text-transform:uppercase;letter-spacing:0.05em;">${brandGlyph("icon-insights")} Interactive Reverse DCF Stress Sandbox</span>
             <span id="${uid}_out" style="font-size:12px;font-weight:800;color:#34d399;font-variant-numeric:tabular-nums;">Fair Multiple: 21.8x</span>
           </div>
           <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;font-size:11px;color:#cbd5e1;">
@@ -568,7 +576,7 @@ function renderCopilotMarkdown(rawText) {
         microWidgetHtml = `
         <div class="copilot-micro-ter" style="margin-top:12px;padding:12px;background:rgba(15,23,42,0.85);border:1px solid rgba(16,185,129,0.3);border-radius:10px;">
           <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;">
-            <span style="font-size:11px;font-weight:800;color:#34d399;text-transform:uppercase;letter-spacing:0.05em;">💸 20Y Direct vs Regular Fee Drag</span>
+            <span style="font-size:11px;font-weight:800;color:#34d399;text-transform:uppercase;letter-spacing:0.05em;">${brandGlyph("icon-valuation")} 20Y Direct vs Regular Fee Drag</span>
             <span id="${uid}_out" style="font-size:12px;font-weight:800;color:#f87171;font-variant-numeric:tabular-nums;">Comm. Loss: ₹14.2L</span>
           </div>
           <label style="display:flex;flex-direction:column;gap:4px;font-size:11px;color:#cbd5e1;">
@@ -606,7 +614,7 @@ function renderIntroWelcomeCard(cfg, ticker, section, sectionLabel) {
 
     let html = `
         <div class="copilot-intro-headline">
-          <span>🧠</span> ${headline}
+          <span>${brandGlyph("icon-insights")}</span> ${headline}
         </div>
         <div style="color: #cbd5e1; font-size: 0.88rem; line-height: 1.55;">
           ${descHtml}
@@ -616,7 +624,7 @@ function renderIntroWelcomeCard(cfg, ticker, section, sectionLabel) {
     if (sectionLabel) {
         html += `
             <div style="margin-top: 10px; padding: 8px 12px; background: rgba(168, 85, 247, 0.12); border: 1px solid rgba(168, 85, 247, 0.35); border-radius: 8px; font-size: 0.8rem; color: #d8b4fe; display: flex; align-items: center; gap: 6px;">
-                <span>📍</span> <span><strong>Focused Workspace:</strong> ${sectionLabel}. Diagnostic tools and queries below are calibrated directly to this section.</span>
+                <span>${brandGlyph("icon-watchlist")}</span> <span><strong>Focused Workspace:</strong> ${sectionLabel}. Diagnostic tools and queries below are calibrated directly to this section.</span>
             </div>
         `;
     }
@@ -626,7 +634,7 @@ function renderIntroWelcomeCard(cfg, ticker, section, sectionLabel) {
         featuresList.forEach(f => {
             html += `
                 <div class="copilot-intro-feature-item" data-copilot-prompt="${encodeURIComponent(f.prompt)}" role="button" tabindex="0">
-                    <span style="font-size: 1.1rem; pointer-events: none;">${f.icon}</span>
+                    <span style="font-size: 1.1rem; pointer-events: none;">${brandGlyph(f.icon)}</span>
                     <div style="pointer-events: none;">
                         <div style="font-weight: 700; color: #f8fafc; font-size: 0.90rem;">${f.title}</div>
                         <div style="color: #94a3b8; font-size: 0.82rem; line-height: 1.4; margin-top: 2px;">${f.desc}</div>
@@ -682,7 +690,8 @@ function openCopilot(ticker, assetType, section, sectionLabel, initialPrompt) {
     const sectionBadgeEl = document.getElementById("copilotSectionBadge");
     if (sectionBadgeEl) {
         if (activeSectionLabel) {
-            sectionBadgeEl.textContent = `📍 ${activeSectionLabel}`;
+            sectionBadgeEl.innerHTML = brandGlyph("icon-watchlist") + " ";
+            sectionBadgeEl.appendChild(document.createTextNode(activeSectionLabel));
             sectionBadgeEl.style.display = "inline-flex";
         } else {
             sectionBadgeEl.style.display = "none";
@@ -704,7 +713,7 @@ function openCopilot(ticker, assetType, section, sectionLabel, initialPrompt) {
 
         chipsContainer.innerHTML = chipsToRender.map(chip => `
             <button type="button" class="copilot-chip-btn" data-copilot-prompt="${encodeURIComponent(chip.prompt)}">
-                ${chip.label}
+                ${chip.icon ? brandGlyph(chip.icon) + " " : ""}${chip.label}
             </button>
         `).join("");
     }
@@ -856,7 +865,7 @@ function copyCopilotTurn(btn, contentText) {
     if (!navigator.clipboard || !contentText) return;
     navigator.clipboard.writeText(contentText).then(() => {
         const origText = btn.innerHTML;
-        btn.innerHTML = `✓ Copied`;
+        btn.innerHTML = `Copied`;
         btn.style.color = "#38bdf8";
         setTimeout(() => {
             btn.innerHTML = origText;
@@ -927,23 +936,23 @@ async function submitCopilotMessage() {
     
     let thinkingStages = [
         "Scanning verified filings & baseline disclosures...",
-        "Stress-testing thesis against 7-pillar forensic framework...",
+        "Stress-testing thesis against 7-pillar accounting framework...",
         "Evaluating capital allocation & Reverse DCF hurdles...",
-        "Synthesizing institutional diagnosis & Pre-Mortem failure modes..."
+        "Generating diagnosis & Countercase failure modes..."
     ];
     if (activeAssetType === "mutual_fund") {
         thinkingStages = [
             "Scanning AMFI portfolio disclosures & constituent weights...",
             "Evaluating Active Share, closet indexing & 10Y fee drag...",
             "Auditing ASRI accounting stress across underlying holdings...",
-            "Synthesizing look-through portfolio health verdict..."
+            "Generating look-through portfolio health verdict..."
         ];
     } else if (activeAssetType === "debt") {
         thinkingStages = [
             "Inspecting BSE Debt registry & credit rating rationales...",
             "Calculating YTM, Macaulay Duration & interest rate shock...",
             "Auditing statutory recovery seniority & equity contagion...",
-            "Formulating institutional solvency diagnosis..."
+            "Formulating solvency diagnosis..."
         ];
     }
 
@@ -1030,7 +1039,7 @@ async function submitCopilotMessage() {
 
         let guardHtml = '';
         if (data.guardrail_triggered) {
-            guardHtml = `<div class="copilot-guardrail-badge">🛡️ SEBI Safe-Harbor Guardrail Applied</div>`;
+            guardHtml = `<div class="copilot-guardrail-badge">${brandGlyph("icon-risk")} SEBI Safe-Harbor Guardrail Applied</div>`;
         }
 
         thinkingEl.outerHTML = `
@@ -1058,11 +1067,11 @@ async function submitCopilotMessage() {
     } catch (e) {
         clearInterval(thinkingTimer);
         console.error('Copilot chat error:', e);
-        const safeReason = escapeHtml(e?.message || 'Unable to reach the Forensic Copilot service.');
+        const safeReason = escapeHtml(e?.message || 'Unable to reach the Research Desk service.');
         thinkingEl.outerHTML = `
             <div class="copilot-msg copilot-msg-assistant">
                 <div class="copilot-notice">
-                    <strong>⚠️ Copilot Notice:</strong> ${safeReason}
+                    <strong>${brandGlyph("icon-alerts")} Copilot Notice:</strong> ${safeReason}
                 </div>
             </div>
         `;

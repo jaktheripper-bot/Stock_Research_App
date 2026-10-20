@@ -73,7 +73,7 @@
           </label>
           <select id="contactCategory" name="category" style="width: 100%; padding: 12px 14px; background: #0f172a; border: 1px solid var(--border-color); border-radius: 6px; color: var(--text-primary); font-size: 16px;">
             <option value="billing" {% if form_cat == 'billing' %}selected{% endif %}>💳 Billing / Payment Dispute / Refund</option>
-            <option value="synthesis" {% if form_cat == 'synthesis' %}selected{% endif %}>Synthesis Failure / Ingestion Issue</option>
+            <option value="synthesis" {% if form_cat == 'synthesis' %}selected{% endif %}>Report Generation / Data Issue</option>
             <option value="bug" {% if form_cat == 'bug' %}selected{% endif %}>🐛 Bug Report / Platform Technical Issue</option>
             <option value="grievance" {% if form_cat == 'grievance' %}selected{% endif %}>Statutory Grievance / Compliance</option>
             <option value="general" {% if not form_cat or form_cat == 'general' %}selected{% endif %}>💬 General Inquiry / Feedback</option>

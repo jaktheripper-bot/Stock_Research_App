@@ -1,7 +1,7 @@
 {% extends "base.html" %}
 
 {% block title %}Peer Comparison: {{ ticker_a }} vs {{ ticker_b }} | Moatnomics{% endblock %}
-{% block meta_desc %}Side-by-side institutional peer comparison and 3-tier disparity diagnostic between {{ ticker_a }} and {{ ticker_b }}. Grounded in verified BSE filings.{% endblock %}
+{% block meta_desc %}Side-by-side peer comparison and 3-tier disparity diagnostic between {{ ticker_a }} and {{ ticker_b }}. Grounded in verified BSE filings.{% endblock %}
 
 {% block content %}
 <div class="container" data-asset-class="equities" style="max-width: 1100px; margin: 30px auto;">
@@ -9,7 +9,7 @@
   <!-- Header Title -->
   <div class="hero-portal-banner" style="margin-bottom: 28px; padding: 24px; border-radius: 16px;">
     <div style="display: inline-flex; align-items: center; gap: 8px; background: rgba(14, 165, 233, 0.12); border: 1px solid rgba(14, 165, 233, 0.3); padding: 4px 14px; border-radius: 999px; font-size: 12px; font-weight: 700; color: var(--accent-cyan); margin-bottom: 12px;">
-      <span><svg class="glyph"><use href="#glyph-scale"></use></svg> PEER COMPARISON • INSTITUTIONAL COMPARATOR</span>
+      <span><svg class="glyph"><use href="#glyph-scale"></use></svg> PEER COMPARISON</span>
     </div>
     <h1 style="font-size: 32px; font-weight: 800; color: var(--text-primary); margin-bottom: 8px; letter-spacing: -0.02em;">
       Cross-Company Peer Comparator & Disparity Diagnostic
@@ -107,7 +107,7 @@
   <div style="background: rgba(244, 63, 94, 0.08); border-left: 4px solid var(--accent-rose); border-radius: var(--radius-sm); padding: 18px 20px; margin-bottom: 24px;">
     <div style="display: flex; align-items: center; gap: 8px; font-weight: 800; color: var(--accent-rose); font-size: 14px; margin-bottom: 8px;">
       <span>⚠️</span>
-      <span>Institutional Disparity Gate Warning (False Equivalence Detected)</span>
+      <span>Comparability Warning (False Equivalence Detected)</span>
     </div>
     <ul style="margin: 0; padding-left: 20px; font-size: 13.5px; color: var(--text-secondary); line-height: 1.6;">
       {% for w in disparity.warnings %}
@@ -121,7 +121,7 @@
   {% else %}
   <div style="background: rgba(16, 185, 129, 0.08); border-left: 4px solid var(--accent-emerald); border-radius: var(--radius-sm); padding: 14px 18px; margin-bottom: 24px; font-size: 13.5px; color: var(--accent-emerald); display: flex; align-items: center; gap: 8px;">
     <span>✅</span>
-    <span><strong>Peer Alignment Verified:</strong> Both assets operate within aligned business domains and capital structure bounds. Direct comparative synthesis is valid.</span>
+    <span><strong>Peer Alignment Verified:</strong> Both assets operate within aligned business domains and capital structure bounds. A direct comparison is valid.</span>
   </div>
   {% endif %}
 
@@ -261,7 +261,7 @@
     <td><span class="badge">{{ comparison.company_b.pillars.macro|default('Unrated') }}</span></td>
 </tr>
 <tr>
-    <td><strong>6. Forensic &amp; Governance Hygiene</strong></td>
+    <td><strong>6. Accounting &amp; Governance Quality</strong></td>
     <td><span class="badge">{{ comparison.company_a.pillars.forensic|default('Unrated') }}</span></td>
     <td><span class="badge">{{ comparison.company_b.pillars.forensic|default('Unrated') }}</span></td>
 </tr>

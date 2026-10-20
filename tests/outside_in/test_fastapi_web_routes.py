@@ -72,8 +72,8 @@ Detailed forensic analysis with exact page grounding to bseindia.com filings.
     def test_home_page(self):
         res = self.client.get("/")
         self.assertEqual(res.status_code, 200)
-        self.assertIn("Audit the Asset.", res.text)
-        self.assertIn("Protect the Allocator.", res.text)
+        self.assertIn("Less noise,", res.text)
+        self.assertIn("more nuance.", res.text)
         self.assertIn("EVIDENCE-LED INVESTMENT RESEARCH", res.text)
         self.assertIn("Four things we promise every reader", res.text)
         self.assertIn("We never tell you to buy or sell", res.text)
@@ -131,7 +131,7 @@ Detailed forensic analysis with exact page grounding to bseindia.com filings.
         self.assertIn("₹1500.0", res.text)
         self.assertNotIn("Peer Comparison Validation Notice:", res.text)
         self.assertIn("1. Business Moat &amp; Durability", res.text)
-        self.assertIn("6. Forensic &amp; Governance Hygiene", res.text)
+        self.assertIn("6. Accounting &amp; Governance Quality", res.text)
         self.assertIn("Strong", res.text)
         self.assertIn("Stable", res.text)
 
@@ -242,7 +242,7 @@ Detailed forensic analysis with exact page grounding to bseindia.com filings.
         res_unlisted = self.client.get("/dossier/UNLISTEDFAKE123")
         self.assertEqual(res_unlisted.status_code, 200)
         self.assertIn('id="synthesizeBtn"', res_unlisted.text)
-        self.assertIn("🚫 Unlisted / Unrecognized Ticker (Cannot Synthesize)", res_unlisted.text)
+        self.assertIn("🚫 Unlisted / Unrecognized Ticker (Cannot Generate)", res_unlisted.text)
         self.assertIn("could not be matched to a listed BSE or NSE security", res_unlisted.text)
         self.assertIn("disabled", res_unlisted.text)
 
@@ -250,7 +250,7 @@ Detailed forensic analysis with exact page grounding to bseindia.com filings.
         res_listed = self.client.get("/dossier/ABB")
         self.assertEqual(res_listed.status_code, 200)
         self.assertIn('id="synthesizeBtn"', res_listed.text)
-        self.assertIn("Synthesize Forensic Dossier (1 Credit)", res_listed.text)
+        self.assertIn("Generate Stock Report (1 Credit)", res_listed.text)
         self.assertIn("onclick=\"synthesizeReport('ABB')\"", res_listed.text)
 
     def test_pillar_links_never_borrow_another_company_scrip(self):
@@ -272,7 +272,7 @@ Detailed forensic analysis with exact page grounding to bseindia.com filings.
         res = self.client.get("/discovery")
         self.assertEqual(res.status_code, 200)
         self.assertIn("Stock Discovery @9AM", res.text)
-        self.assertIn("INSTITUTIONAL QUALITY SURVEILLANCE", res.text)
+        self.assertIn("QUALITY SCREEN", res.text)
         self.assertIn("Mandatory SEBI Safe-Harbor Disclosure", res.text)
 
     def test_discovery_db_repository(self):
@@ -312,9 +312,9 @@ Detailed forensic analysis with exact page grounding to bseindia.com filings.
     def test_primary_public_routes_parameterized(self):
         """Verifies primary public SSR view routes respond 200 with required keyword integrity."""
         primary_routes = [
-            ("/", "Audit the Asset."),
+            ("/", "Less noise,"),
             ("/discovery", "Stock Discovery @9AM"),
-            ("/equities", "Institutional Equities"),
+            ("/equities", "Equities Directory"),
             ("/funds", "Mutual Fund Look-Through"),
             ("/debt", "Corporate Debt"),
             ("/reits", "REITs & InvITs"),
@@ -787,7 +787,7 @@ Detailed forensic analysis with exact page grounding to bseindia.com filings.
     def test_fund_directory_page(self):
         res = self.client.get("/funds")
         self.assertEqual(res.status_code, 200)
-        self.assertIn("Mutual Fund Look-Through & Fiduciary Screener", res.text)
+        self.assertIn("Mutual Fund Look-Through Screener", res.text)
         self.assertIn("Parag Parikh Flexi Cap Fund", res.text)
         self.assertIn("Active Share", res.text)
 
@@ -827,7 +827,7 @@ Detailed forensic analysis with exact page grounding to bseindia.com filings.
         self.assertIn("Parag Parikh Flexi Cap Fund", res.text)
         self.assertIn("01: Dual-Sleeve Constituent Decomposition", res.text)
         self.assertIn("02: True Diversification & Active Share", res.text)
-        self.assertIn("05: Intermediary Fee Drag & Wealth Destruction", res.text)
+        self.assertIn("05: Direct vs Regular Plan Expense Drag", res.text)
 
         # 2. Test HDFC Mid-Cap (catches non-researched holding scores)
         res_hdfc = self.client.get("/funds/HDFC_MIDCAP_DIR")
@@ -976,7 +976,7 @@ Detailed forensic analysis with exact page grounding to bseindia.com filings.
         # 2. Test /equities default load
         res = self.client.get("/equities")
         self.assertEqual(res.status_code, 200)
-        self.assertIn("Institutional Equities Directory", res.text)
+        self.assertIn("Equities Directory", res.text)
         self.assertIn("Monitored Equities", res.text)
         self.assertIn("INFY", res.text)
 

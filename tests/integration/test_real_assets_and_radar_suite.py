@@ -376,13 +376,13 @@ class TestRealAssetsAndRadarSuite(unittest.TestCase):
             self.assertIn("NDCF Payout Purity", resp.text)
             self.assertIn("Pillar 1: Tax Architecture", resp.text)
             self.assertIn("Unlock Deep-Dive (1 Credit)", resp.text)
-            self.assertIn("Behavioral Pre-Mortem Inversion Risk Ledger", resp.text)
+            self.assertIn("Countercase Risk Ledger", resp.text)
 
             # Unlocked Deep-Dive view (via Pro / credit / preview header)
             resp_unlocked = self.client.get(f"/reits/{sym}", headers={"x-unlock-preview": "1"})
             self.assertEqual(resp_unlocked.status_code, 200)
-            self.assertIn("Pillar 4: Behavioral Pre-Mortem Inversion", resp_unlocked.text)
-            self.assertIn("Institutional Unlocked", resp_unlocked.text)
+            self.assertIn("Pillar 4: Countercase", resp_unlocked.text)
+            self.assertIn("Unlocked", resp_unlocked.text)
 
     def test_reit_dossier_legacy_alias_resolution(self):
         """Verify backward-compatible resolution of legacy synthetic symbols to genuine entities."""

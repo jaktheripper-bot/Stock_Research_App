@@ -74,7 +74,7 @@ def calculate_net_real_return(
         "cpi_inflation_pct": round(cpi_pct, 2),
         "net_real_return_pct": round(real_return * 100.0, 2),
         "tax_drag_pct": round(tax_drag_pct, 2),
-        "purchasing_power_verdict": "Wealth Compounding" if real_return > 0.015 else ("Capital Preserved" if real_return >= 0 else "Wealth Destruction (Negative Real Yield)")
+        "purchasing_power_verdict": "Real Growth" if real_return > 0.015 else ("Capital Preserved" if real_return >= 0 else "Negative Real Return")
     }
 
 
@@ -158,7 +158,7 @@ def compare_asset_classes_post_tax(
             "effective_tax_rate_pct": round(((sgb_nom - sgb_post) / sgb_nom) * 100, 1),
             "post_tax_yield_pct": round(sgb_post, 2),
             "net_real_return_pct": round(sgb_real * 100.0, 2),
-            "purchasing_power_verdict": "Maximum Wealth Compounding (Zero Tax Drag on Gold)",
+            "purchasing_power_verdict": "Strongest Real Return (No Tax Drag on Gold)",
             "rank": 1
         },
         {
@@ -202,7 +202,7 @@ def compare_asset_classes_post_tax(
             "effective_tax_rate_pct": marginal_tax_slab_pct,
             "post_tax_yield_pct": round(gsec_post, 2),
             "net_real_return_pct": round(gsec_real * 100.0, 2),
-            "purchasing_power_verdict": "Marginal Wealth Destruction (Negative Real Yield for 30%+ slab)",
+            "purchasing_power_verdict": "Negative Real Return for the 30%+ slab",
             "rank": 5
         },
         {

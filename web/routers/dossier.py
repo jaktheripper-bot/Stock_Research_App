@@ -1,9 +1,9 @@
-"""Institutional Equity Dossier, Synthesis, and PDF Export Router.
+"""Equity Dossier, Synthesis, and PDF Export Router.
 
 Provides:
 - Synchronous 7-pillar AI research synthesis with automated credit rollback on failure
 - Ticker-level deep dive unlocking and session entitlement verification
-- High-performance Category 1 institutional intelligence payload generation
+- High-performance Category 1 intelligence payload generation
 - Branded PDF research dossier compilation with watermarking & paywall gating
 - Public Developer API v1 for programmatic equity research ingestion
 """
@@ -77,7 +77,7 @@ class UnlockDossierRequest(BaseModel):
 
 
 # ==============================================================================
-# Dossier Synthesis & Status Endpoints
+# Report Generation & Status Endpoints
 # ==============================================================================
 @router.post("/api/synthesize")
 async def synthesize_report(request: Request, payload: SynthesizeRequest):
@@ -89,7 +89,7 @@ async def synthesize_report(request: Request, payload: SynthesizeRequest):
     if not web_user and not is_admin:
         raise HTTPException(
             status_code=401,
-            detail={"error": "AUTHENTICATION_REQUIRED", "message": "Please sign in to synthesize a dossier."}
+            detail={"error": "AUTHENTICATION_REQUIRED", "message": "Please sign in to generate a dossier."}
         )
     clean_uid = web_user["id"] if web_user else "admin_console"
 
@@ -138,7 +138,7 @@ async def synthesize_report(request: Request, payload: SynthesizeRequest):
     if not synth_auth:
         raise HTTPException(
             status_code=429,
-            detail="Hourly synthesis velocity cap reached (maximum 20 reports/hour per user) to protect account quota. Please retry later."
+            detail="Hourly report generation limit reached (maximum 20 reports/hour per user) to protect account quota. Please retry later."
         )
 
     if not is_admin:
@@ -156,7 +156,7 @@ async def synthesize_report(request: Request, payload: SynthesizeRequest):
     try:
         report_text = generate_stock_report(canonical)
     except Exception as e:
-        logger.error(f"Synthesis failed for {canonical}: {e}")
+        logger.error(f"Report generation failed for {canonical}: {e}")
         if not is_admin and web_user:
             add_user_credits(clean_uid, 0.0, 1.0, pack_type="REFUND_FAILED_SYNTHESIS")
             refunded_bal = get_user_credits_balance(clean_uid)
@@ -170,9 +170,9 @@ async def synthesize_report(request: Request, payload: SynthesizeRequest):
         if not is_admin and web_user:
             add_user_credits(clean_uid, 0.0, 1.0, pack_type="REFUND_FAILED_SYNTHESIS")
             refunded_bal = get_user_credits_balance(clean_uid)
-            detail_msg = f"Synthesis could not verify report archiving for {canonical}. Your credit has been automatically refunded (balance: {refunded_bal:.1f} credits)."
+            detail_msg = f"Report generation could not verify report archiving for {canonical}. Your credit has been automatically refunded (balance: {refunded_bal:.1f} credits)."
         else:
-            detail_msg = f"Synthesis could not verify report archiving for {canonical}."
+            detail_msg = f"Report generation could not verify report archiving for {canonical}."
         raise HTTPException(status_code=500, detail=detail_msg)
 
     return json_response_with_cache({
@@ -181,7 +181,7 @@ async def synthesize_report(request: Request, payload: SynthesizeRequest):
         "ticker": canonical,
         "dossier_url": f"/dossier/{canonical}",
         "new_balance": new_balance,
-        "message": f"Dossier for {canonical} synthesized successfully! 1 credit deducted." if not is_admin else f"Dossier for {canonical} synthesized successfully via Admin Console!"
+        "message": f"Dossier for {canonical} compiled successfully! 1 credit deducted." if not is_admin else f"Dossier for {canonical} compiled successfully via Admin Console!"
     })
 
 
@@ -195,7 +195,7 @@ async def api_unlock_dossier(
     payload: Optional[UnlockDossierRequest] = None
 ):
     """
-    Consumes 1 credit and permanently unlocks the institutional deep-dive tier
+    Consumes 1 credit and permanently unlocks the deep-dive tier
     (Forensic Accounting Ledger, Reverse DCF Sandbox & Thesis Drift Migrations) for this equity.
     """
     if not _validate_request_origin(request):
@@ -267,8 +267,8 @@ async def api_dossier_status(request: Request, ticker: str):
 @router.get("/api/dossier/intel/{ticker}")
 async def api_dossier_intel(ticker: str):
     """
-    Returns comprehensive Category 1 institutional equity intelligence:
-    Sector-native metrics, exchange level-2 depth, 360 forensic sieve, valuation radar, and bull/bear thesis.
+    Returns comprehensive Category 1 equity intelligence:
+    Sector-native metrics, exchange level-2 depth, 360-degree accounting check, valuation radar, and bull/bear thesis.
     """
     clean_t = clean_ticker(ticker)
     if not clean_t:
@@ -374,7 +374,7 @@ async def api_download_pdf(
 
 @router.get("/api/pdf/fund/{scheme_code}")
 async def api_download_fund_pdf(scheme_code: str, request: Request):
-    """Generates and serves downloadable institutional PDF look-through dossier for a Mutual Fund."""
+    """Generates and serves downloadable PDF report look-through dossier for a Mutual Fund."""
     clean_code = scheme_code.strip()
     from core.db.mutual_funds import get_mutual_fund_scheme, get_fund_forensic_dossier
     from core.reporting.pdf import generate_fund_dossier_pdf, apply_pdf_watermark
@@ -402,7 +402,7 @@ async def api_download_fund_pdf(scheme_code: str, request: Request):
 
 @router.get("/api/pdf/debt/{isin}")
 async def api_download_debt_pdf(isin: str, request: Request):
-    """Generates and serves downloadable institutional PDF credit dossier for a Corporate Debt security."""
+    """Generates and serves downloadable PDF report credit dossier for a Corporate Debt security."""
     clean_isin = isin.strip().upper()
     from core.db.debt import get_debt_security_by_isin
     from core.analysis.debt_engine import evaluate_5_pillar_credit_posture
@@ -431,7 +431,7 @@ async def api_download_debt_pdf(isin: str, request: Request):
 
 @router.get("/api/pdf/reit/{symbol}")
 async def api_download_reit_pdf(symbol: str, request: Request):
-    """Generates and serves downloadable institutional PDF research dossier for a REIT or InvIT."""
+    """Generates and serves downloadable PDF report research dossier for a REIT or InvIT."""
     clean_sym = symbol.strip().upper()
     from core.db.reits import get_reit_by_symbol
     from core.reporting.pdf import generate_reit_dossier_pdf, apply_pdf_watermark
@@ -458,7 +458,7 @@ async def api_download_reit_pdf(symbol: str, request: Request):
 
 @router.get("/api/pdf/msme/{uin}")
 async def api_download_msme_pdf(uin: str, request: Request):
-    """Generates and serves downloadable institutional 4-pillar PDF forensic dossier for an unlisted MSME."""
+    """Generates and serves downloadable 4-pillar PDF report for an unlisted MSME."""
     clean_uin = uin.strip().upper()
     from core.msme.router import get_msme_detail
     from core.reporting.pdf import generate_msme_dossier_pdf, apply_pdf_watermark
@@ -503,7 +503,7 @@ async def api_v1_get_report(
     x_api_key: Optional[str] = Header(None)
 ):
     """
-    Public Developer API v1: Institutional Equity Research Report Endpoint.
+    Public Developer API v1: Equity Research Report Endpoint.
     Authenticates via Bearer Token or X-API-Key header.
     Returns structured JSON with 7-pillar matrix, deterministic technicals,
     PEAD drift projections, primary source citations, and regulatory grounding.

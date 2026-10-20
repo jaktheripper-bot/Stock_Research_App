@@ -6,6 +6,9 @@
 > - **Visual Operating Rules:** *"Nuance should make decisions clearer, not make the reader work harder."* & *"Make the evidence easier to understand, not easier to believe."*
 > - **Canonical References:** [`docs/BRAND_HOUSE_AND_VOICE_GUIDE.md`](file:///Users/lyndonpinto/Documents/Stock_Research_App/docs/BRAND_HOUSE_AND_VOICE_GUIDE.md), [`docs/VISUAL_IDENTITY_AND_MOTION_GUIDE.md`](file:///Users/lyndonpinto/Documents/Stock_Research_App/docs/VISUAL_IDENTITY_AND_MOTION_GUIDE.md), [`docs/VISUAL_ARTIFACTS_INVENTORY.md`](file:///Users/lyndonpinto/Documents/Stock_Research_App/docs/VISUAL_ARTIFACTS_INVENTORY.md), and [`docs/BRAND_COPY_INVENTORY.md`](file:///Users/lyndonpinto/Documents/Stock_Research_App/docs/BRAND_COPY_INVENTORY.md).
 
+> [!NOTE]
+> **Status (20 Oct 2026, `main` @ `9aee965`):** Waves 1–5 shipped as the commits `613a71f`, `2b206e0`, `b413ed6` and `9aee965`. Still open: `og:image`/apple-touch wiring, referencing the hero and portal-plate files, and the copy rewrite (Decision #6), now tracked as *Track 3 — Language & Voice* (site copy first, then reports, then backend). The tagline decision (single tagline) is in `BRAND_HOUSE_AND_VOICE_GUIDE.md` → *Voice Decisions*.
+
 ---
 
 ## 1. Locked Architectural Decisions (From Interview)
@@ -74,7 +77,7 @@ flowchart TD
 
 ### Wave 4: All 5 Web Dossiers, Zero-Token Presentation Formatter & 6-Part Chart Anatomy
 1. **Unified Dossier Masthead & Warm Ivory Reading Mode**
-2. **Zero-Token Dossier Presentation Formatter (`core/reporting/editorial_formatter.py`)**
+2. **Zero-Token Dossier Presentation Formatter** (implemented in `core/analysis/parser.py` and `core/analysis/equity_dossier.py`; `core/reporting/editorial_formatter.py` was never created)
 3. **Canonical 6-Part Chart Anatomy Wrapper**
 4. **Research Desk (`copilot_modal.html` & `copilot.js`) Brand House Alignment**
 

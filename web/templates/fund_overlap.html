@@ -1,7 +1,7 @@
 {% extends "base.html" %}
 
-{% block title %}Mutual Fund True Diversification & Overlap Diagnostic | Institutional Research{% endblock %}
-{% block meta_description %}Institutional portfolio overlap tool. Compute pairwise holding duplication across mutual funds to expose illusory diversification and avoid double fees on identical stock/bond portfolios.{% endblock %}
+{% block title %}Mutual Fund True Diversification & Overlap Diagnostic | Research{% endblock %}
+{% block meta_description %}Portfolio overlap tool. Compute pairwise holding duplication across mutual funds to expose illusory diversification and avoid double fees on identical stock/bond portfolios.{% endblock %}
 
 {% block content %}
 <div class="container py-8" data-asset-class="funds">
@@ -103,7 +103,7 @@
     <!-- Diagnostic Verdict Notice -->
     <div style="background: rgba(15, 23, 42, 0.6); border-radius: 10px; padding: 14px 18px; border: 1px solid rgba(255, 255, 255, 0.05); margin-bottom: 20px;">
       <div style="font-size: 14px; color: #e2e8f0; line-height: 1.5;">
-        💡 <strong>Fiduciary Recommendation:</strong> {{ overlap_res.verdict_text|default(overlap_res.recommendation) }}
+        💡 <strong>What the Overlap Shows:</strong> {{ overlap_res.verdict_text|default(overlap_res.recommendation) }}
       </div>
     </div>
 

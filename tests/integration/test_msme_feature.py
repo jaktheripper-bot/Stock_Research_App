@@ -233,11 +233,11 @@ class TestMsmeFeatureSuite(unittest.TestCase):
         self.assertIn("03.", html)
         self.assertIn("Solvency, Margins & TReDS Liquidity", html)
         self.assertIn("04.", html)
-        self.assertIn("Cluster Moat & Pre-Mortem Inversion", html)
+        self.assertIn("Cluster Moat & Countercase", html)
 
         # Verify listed buyer links to equity dossiers
         self.assertIn('href="/dossier/TATAMOTORS"', html)
-        self.assertIn("Forensic Moat Score", html)
+        self.assertIn("Moat Score", html)
 
         # 404 for non-existent enterprise
         res_404 = self.client.get("/msme/UDYAM-FAKE-00-0000000")

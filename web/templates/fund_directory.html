@@ -1,8 +1,8 @@
 {% extends "base.html" %}
 
-{% block title %}Mutual Fund Look-Through Screener & Fiduciary Engine | Moatnomics{% endblock %}
-{% block meta_desc %}Institutional 6-Pillar Mutual Fund Look-Through Engine. Unbundle equity and debt sleeves, expose closet indexing via Active Share, analyze direct vs regular TER wealth destruction, and audit true portfolio overlap.{% endblock %}
-{% block og_title %}Mutual Fund Look-Through Screener & Fiduciary Engine | Moatnomics{% endblock %}
+{% block title %}Mutual Fund Look-Through Screener | Moatnomics{% endblock %}
+{% block meta_desc %}6-Pillar Mutual Fund Look-Through Engine. Unbundle equity and debt sleeves, expose closet indexing via Active Share, analyze direct vs regular TER cost, and audit true portfolio overlap.{% endblock %}
+{% block og_title %}Mutual Fund Look-Through Screener | Moatnomics{% endblock %}
 {% block og_desc %}Unbundle equity and debt sleeves, expose closet indexing via Active Share, and audit true portfolio overlap.{% endblock %}
 
 {% block content %}
@@ -17,10 +17,10 @@
     </div>
 
     <h1 style="font-size: 32px; font-weight: 800; color: #f8fafc; margin-bottom: 12px; letter-spacing: -0.02em;">
-      Mutual Fund Look-Through & Fiduciary Screener
+      Mutual Fund Look-Through Screener
     </h1>
     <p style="font-size: 15px; color: #94a3b8; max-width: 820px; line-height: 1.6; margin-bottom: 24px;">
-      Never evaluate mutual funds as opaque past-performance black boxes. Our <strong>6-Pillar Fiduciary Look-Through Engine</strong> decomposes portfolios into granular equity (7-Pillar) and debt (5-Pillar) constituents, unmasks closet indexing via Active Share, quantifies 10-year Direct vs Regular commission loss, and alerts against AUM capacity traps.
+      Never evaluate mutual funds as opaque past-performance black boxes. Our <strong>6-Pillar Look-Through Analysis</strong> decomposes portfolios into granular equity (7-Pillar) and debt (5-Pillar) constituents, unmasks closet indexing via Active Share, quantifies 10-year Direct vs Regular commission loss, and alerts against AUM capacity traps.
     </p>
 
     <!-- Top KPI Grid -->
@@ -44,14 +44,14 @@
     </div>
   </div>
 
-  <!-- Featured Daily Forensic Fund Audit Hero Banner -->
+  <!-- Featured Daily Fund Report Hero Banner -->
   {% if featured_fund %}
   <div style="background: linear-gradient(135deg, rgba(30, 27, 75, 0.7) 0%, rgba(15, 23, 42, 0.95) 100%); border: 1px solid rgba(168, 85, 247, 0.35); border-radius: 16px; padding: 26px; margin-bottom: 28px; box-shadow: 0 10px 30px rgba(0, 0, 0, 0.35); position: relative;">
     <div style="display: flex; justify-content: space-between; align-items: flex-start; flex-wrap: wrap; gap: 16px;">
       <div style="flex: 1; min-width: 300px;">
         <div style="display: inline-flex; align-items: center; gap: 8px; background: rgba(168, 85, 247, 0.2); border: 1px solid rgba(168, 85, 247, 0.4); border-radius: 9999px; padding: 4px 12px; margin-bottom: 12px;">
           <span style="display: inline-block; width: 8px; height: 8px; border-radius: 50%; background: #c084fc; box-shadow: 0 0 8px #c084fc;"></span>
-          <span style="font-size: 11px; font-weight: 800; color: #e9d5ff; text-transform: uppercase; letter-spacing: 0.05em;">Featured Daily Forensic Fund Audit • 7-Pillar Look-Through</span>
+          <span style="font-size: 11px; font-weight: 800; color: #e9d5ff; text-transform: uppercase; letter-spacing: 0.05em;">Featured Daily Fund Report • 7-Pillar Look-Through</span>
         </div>
         <h2 style="font-size: 24px; font-weight: 800; color: #f8fafc; margin-bottom: 6px;">
           <a href="/funds/{{ featured_fund.scheme_code }}" style="color: inherit; text-decoration: none;">
@@ -62,7 +62,7 @@
           {{ featured_fund.fund_house }} • {{ featured_fund.category }} • Benchmark: {{ featured_fund.benchmark_index }} • AUM: ₹{{ "{:,.0f}".format(featured_fund.aum_crores) }} Cr
         </div>
 
-        <!-- 5-Metric Forensic Look-Through Strip -->
+        <!-- 5-Metric Look-Through Strip -->
         <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(130px, 1fr)); gap: 10px; margin-bottom: 16px;">
           <div style="background: rgba(15, 23, 42, 0.7); border: 1px solid rgba(255, 255, 255, 0.08); border-radius: 10px; padding: 10px 14px;">
             <div style="font-size: 10px; color: #94a3b8; text-transform: uppercase; font-weight: 600;">Composite Health</div>
@@ -88,10 +88,10 @@
 
         <div style="display: flex; gap: 10px; align-items: center; flex-wrap: wrap;">
           <a href="/funds/{{ featured_fund.scheme_code }}" class="btn btn-primary btn-sm" style="font-weight: 700; border-radius: 8px; padding: 8px 18px;">
-            Read Institutional Forensic Dossier →
+            Read Stock Report →
           </a>
           <span style="font-size: 12px; color: #64748b;">
-            Audited by Chief Forensic Officer • {{ (featured_fund.last_audited_at|string)[:16] }}
+            Generated by the Moatnomics Research Desk • {{ (featured_fund.last_audited_at|string)[:16] }}
           </span>
         </div>
       </div>
@@ -109,7 +109,7 @@
         </div>
         <h3 style="font-size: 16px; font-weight: 800; color: #f8fafc; margin: 0 0 4px 0;">Audit Any Scheme Outside Top 50</h3>
         <p style="font-size: 13px; color: #94a3b8; margin: 0; line-height: 1.4;">
-          Enter any AMFI Scheme Code or unlisted fund to dynamically unbundle holdings, score constituent moats, and synthesize an institutional forensic dossier.
+          Enter any AMFI Scheme Code or unlisted fund to dynamically unbundle holdings, score constituent moats, and generate a report.
         </p>
       </div>
 
@@ -419,7 +419,7 @@ function pollAuditStatus(taskId) {
         if (btn) btn.disabled = false;
         if (msg) {
           msg.style.color = "#ef4444";
-          msg.innerText = `Audit Error: ${task.error || task.message || "Failed to synthesize fund dossier."}`;
+          msg.innerText = `Audit Error: ${task.error || task.message || "Failed to generate fund dossier."}`;
         }
       }
     } catch (e) {

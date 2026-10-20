@@ -557,7 +557,7 @@ nav.main-nav {
   text-decoration: none;
 }
 
-/* Standout Hero Action for Forensic Intelligence Desk */
+/* Standout Hero Action for Research Desk */
 .btn-hero-ai {
   background: linear-gradient(135deg, rgba(14, 61, 50, 0.65) 0%, rgba(31, 111, 84, 0.45) 100%);
   border: 1px solid rgba(199, 226, 104, 0.6);
@@ -1681,7 +1681,7 @@ details.pillar-accordion[open] .pillar-chevron {
   font-weight: 600;
 }
 
-/* --- Floating Hero Dock: Forensic Intelligence Desk --- */
+/* --- Floating Hero Dock: Research Desk --- */
 .forensic-desk-fab {
   position: fixed;
   bottom: 24px;

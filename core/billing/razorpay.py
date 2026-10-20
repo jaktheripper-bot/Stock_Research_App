@@ -398,7 +398,7 @@ def generate_invoice_html(
         <div class="header">
             <div>
                 <div class="brand">MOATNOMICS</div>
-                <div style="font-size: 12px; color: #64748b; margin-top: 4px;">Institutional Equity Thesis & Drift Surveillance</div>
+                <div style="font-size: 12px; color: #64748b; margin-top: 4px;">Equity Thesis & Drift Monitoring</div>
             </div>
             <div class="meta">
                 <div style="font-size: 16px; font-weight: 700; color: #0f172a;">PAYMENT RECEIPT</div>

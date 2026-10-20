@@ -491,7 +491,7 @@ def send_otp_email(recipient_email: str, code: str, ttl_minutes: int = 10) -> bo
     )
     subject = f"{code} is your Moatnomics verification code"
     text_body = (
-        f"Moatnomics Institutional Research Terminal\n\n"
+        f"Moatnomics Research Terminal\n\n"
         f"Your 6-digit sign-in verification code is: {code}\n\n"
         f"This code expires in {ttl_minutes} minutes. If you did not request this code, please ignore this email.\n"
     )

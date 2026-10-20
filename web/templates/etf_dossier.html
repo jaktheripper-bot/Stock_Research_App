@@ -1,8 +1,8 @@
 {% extends "base.html" %}
 
-{% block title %}{{ etf.symbol }} | ETF Institutional Dossier & Arbitrage Surveillance{% endblock %}
-{% block meta_desc %}Institutional ETF audit of {{ etf.scheme_name }} ({{ etf.symbol }}). Live market CMP vs statutory Fair NAV arbitrage spread, 1-year tracking error fidelity, and category peer comparison.{% endblock %}
-{% block og_title %}{{ etf.symbol }} — {{ etf.scheme_name }} | Institutional ETF Dossier{% endblock %}
+{% block title %}{{ etf.symbol }} | ETF Stock Report & Arbitrage Monitoring{% endblock %}
+{% block meta_desc %}ETF audit of {{ etf.scheme_name }} ({{ etf.symbol }}). Live market CMP vs statutory Fair NAV arbitrage spread, 1-year tracking error fidelity, and category peer comparison.{% endblock %}
+{% block og_title %}{{ etf.symbol }} — {{ etf.scheme_name }} | ETF Dossier{% endblock %}
 {% block og_desc %}Live tracking error, secondary market spread, and Fair NAV arbitrage matrix for {{ etf.symbol }}.{% endblock %}
 
 {% block content %}
@@ -61,8 +61,8 @@
 
         <!-- Action Buttons -->
         <div style="display: flex; gap: 10px; margin-top: 16px; flex-wrap: wrap;">
-          <button onclick="openCopilot('{{ etf.symbol }}', 'etf')" class="btn btn-hero-ai btn-sm" title="Launch Forensic Intelligence Desk (Shortcut: ⌘K or /)">
-            <svg class="glyph"><use href="#glyph-shield"></use></svg> Forensic Desk
+          <button onclick="openCopilot('{{ etf.symbol }}', 'etf')" class="btn btn-hero-ai btn-sm" title="Open Research Desk (Shortcut: ⌘K or /)">
+            <svg class="glyph"><use href="#glyph-shield"></use></svg> Research Desk
           </button>
           <a href="/etfs" class="btn btn-sm btn-secondary" style="text-decoration: none; font-size: 12px; font-weight: 600;">
             ← Back to National Matrix
@@ -120,7 +120,7 @@
     <div style="background: rgba(15, 23, 42, 0.6); border: 1px solid rgba(255, 255, 255, 0.08); border-radius: 12px; padding: 16px;">
       <div style="font-size: 11.5px; color: #64748b; text-transform: uppercase; font-weight: 600; margin-bottom: 4px;">Total Scheme AUM</div>
       <div style="font-size: 24px; font-weight: 800; color: #f8fafc;" class="tnum">{{ aum_formatted }}</div>
-      <div style="font-size: 11px; color: #94a3b8; margin-top: 2px;">Institutional Pool Size</div>
+      <div style="font-size: 11px; color: #94a3b8; margin-top: 2px;">Pool Size</div>
     </div>
     <div style="background: rgba(15, 23, 42, 0.6); border: 1px solid rgba(255, 255, 255, 0.08); border-radius: 12px; padding: 16px;">
       <div style="font-size: 11.5px; color: #64748b; text-transform: uppercase; font-weight: 600; margin-bottom: 4px;">Liquidity Tier</div>
@@ -136,7 +136,7 @@
     <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px; flex-wrap: wrap; gap: 10px;">
       <div>
         <div style="font-size: 12px; font-weight: 700; color: #38bdf8; text-transform: uppercase; letter-spacing: 0.05em;">Pillar 1: Secondary Market Arbitrage</div>
-        <h2 style="font-size: 20px; font-weight: 800; color: #f8fafc; margin-top: 2px;">Live Premium / Discount Surveillance</h2>
+        <h2 style="font-size: 20px; font-weight: 800; color: #f8fafc; margin-top: 2px;">Live Premium / Discount Monitoring</h2>
       </div>
       <button onclick="openCopilot('{{ etf.symbol }}', 'etf', 'arbitrage', 'Arbitrage Spread', 'Audit the secondary market arbitrage spread and fair value premium for {{ etf.symbol }}')" class="btn btn-secondary btn-sm" style="font-size: 12px; font-weight: 600; display: inline-flex; align-items: center; gap: 6px;">
         <svg class="glyph"><use href="#glyph-shield"></use></svg> Audit Arbitrage with Desk
@@ -317,14 +317,14 @@
     {% endif %}
   </div>
 
-  <!-- Section 4: Pre-Mortem Inversion & Structural Risk Ledger -->
+  <!-- Section 4: Countercase & Structural Risk Ledger -->
   <div class="card" style="background: rgba(15, 23, 42, 0.7); border: 1px solid rgba(255, 255, 255, 0.1); border-radius: 14px; padding: 24px; margin-bottom: 24px;">
     <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px; flex-wrap: wrap; gap: 10px;">
       <div>
-        <div style="font-size: 12px; font-weight: 700; color: #f59e0b; text-transform: uppercase; letter-spacing: 0.05em;">Pillar 4: Behavioral Pre-Mortem Inversion</div>
+        <div style="font-size: 12px; font-weight: 700; color: #f59e0b; text-transform: uppercase; letter-spacing: 0.05em;">Pillar 4: Countercase</div>
         <h2 style="font-size: 20px; font-weight: 800; color: #f8fafc; margin-top: 2px;">Structural Failure Modes & Risk Monitorables</h2>
       </div>
-      <button onclick="openCopilot('{{ etf.symbol }}', 'etf', 'inversion', 'Pre-Mortem Inversion', 'Synthesize the bear thesis and top 3 failure modes for holding {{ etf.symbol }}')" class="btn btn-secondary btn-sm" style="font-size: 12px; font-weight: 600; display: inline-flex; align-items: center; gap: 6px;">
+      <button onclick="openCopilot('{{ etf.symbol }}', 'etf', 'inversion', 'Countercase', 'Summarize the bear thesis and top 3 failure modes for holding {{ etf.symbol }}')" class="btn btn-secondary btn-sm" style="font-size: 12px; font-weight: 600; display: inline-flex; align-items: center; gap: 6px;">
         <svg class="glyph"><use href="#glyph-shield"></use></svg> Challenge Thesis
       </button>
     </div>

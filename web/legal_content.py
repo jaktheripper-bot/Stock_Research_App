@@ -13,10 +13,10 @@ POLICIES = {
     "terms": {
         "title": "Terms and Conditions",
         "last_updated": "October 2026",
-        "description": "Terms governing the use of the Stock Research App and computational research synthesis services.",
+        "description": "Terms governing the use of Moatnomics and computational research synthesis services.",
         "content_html": """
         <h3>1. Acceptance of Terms</h3>
-        <p>By accessing or using the Stock Research App (the "Platform", "Service"), you agree to be bound by these Terms and Conditions. If you do not agree with any part of these terms, you must refrain from using the Service.</p>
+        <p>By accessing or using Moatnomics (the "Platform", "Service"), you agree to be bound by these Terms and Conditions. If you do not agree with any part of these terms, you must refrain from using the Service.</p>
 
         <h3>2. Description of Service</h3>
         <p>The Platform provides an automated, computational financial research synthesis software utility. The Platform aggregates publicly available exchange filings from the Bombay Stock Exchange (BSE) and National Stock Exchange (NSE), computes algorithmic financial ratios, and formats educational 7-pillar qualitative research dossiers using artificial intelligence.</p>
@@ -26,7 +26,7 @@ POLICIES = {
         <p>Neither the Platform nor its operators are registered as Research Analysts under the SEBI (Research Analysts) Regulations, 2014, nor as Investment Advisers under SEBI (Investment Advisers) Regulations, 2013. All data, scores, qualitative pillar matrices, and syntheses are for informational, computational, and educational purposes only. You are solely responsible for conducting independent due diligence and consulting a SEBI-registered financial advisor before making any financial investment decisions.</p>
 
         <h3>4. User Accounts and Research Credits</h3>
-        <p>Access to automated live AI syntheses requires computational research credits or an active Pro subscription. Credits are non-transferable, possess no cash surrender value, and represent consumption units of server processing compute.</p>
+        <p>Access to automated live AI syntheses requires research credits or an active Pro subscription. Credits are non-transferable, possess no cash surrender value, and represent consumption units of server processing compute.</p>
 
         <h3>5. Intellectual Property</h3>
         <p>All software architecture, algorithms, user interfaces, branding, and aggregated analysis formats are the intellectual property of the Platform operator. Users may download and print individual research reports for personal, non-commercial educational use. Reports, including any content unlocked with credits, may not be resold, republished, shared in bulk, or redistributed. Downloaded PDFs carry a personal-use notice and, when you are signed in, an anonymous account reference.</p>
@@ -89,7 +89,7 @@ POLICIES = {
         "description": "Clear rules regarding credit purchases, cancellations, and refunds.",
         "content_html": """
         <h3>1. Nature of the Product (Digital Software Utility)</h3>
-        <p>The Stock Research App provides on-demand computational research synthesis credits and subscription memberships. Credits power live server processing and AI inference against public exchange filings.</p>
+        <p>Moatnomics provides on-demand research credits and subscription memberships. Credits power live server processing and AI inference against public exchange filings.</p>
 
         <h3>2. 7-Day Refund Policy for Unused Credits</h3>
         <p>We want you to be completely satisfied with our platform:</p>
@@ -100,7 +100,7 @@ POLICIES = {
         </ul>
 
         <h3>3. Consumed Research Credits</h3>
-        <p>Once a research credit has been consumed to execute a fresh live 7-pillar AI synthesis and the report has been generated, that specific computational unit is deemed consumed and is non-refundable, as server processing and API compute costs have already been incurred on your behalf.</p>
+        <p>Once a research credit has been consumed to execute a fresh live 7-pillar report and the report has been generated, that specific credit is deemed consumed and is non-refundable, as server processing and API compute costs have already been incurred on your behalf.</p>
 
         <h3>4. Pro Subscriptions & Cancellations</h3>
         <ul>
@@ -118,7 +118,7 @@ POLICIES = {
         "description": "Official business contact information, support hours, and grievance redressal.",
         "content_html": """
         <h3>Get in Touch</h3>
-        <p>We are here to assist with any questions regarding research credits, institutional access, technical support, or billing queries.</p>
+        <p>We are here to assist with any questions regarding research credits, access, technical support, or billing queries.</p>
 
         <div style="background: rgba(14, 165, 233, 0.08); border-left: 4px solid #0284c7; padding: 16px; border-radius: 6px; margin: 20px 0;">
             <p style="margin: 0 0 8px 0;"><strong>💬 Administration Review:</strong> All user inquiries, suggestions, and feedback are submitted via our online form and reviewed directly from our administration console.</p>
@@ -138,7 +138,7 @@ POLICIES = {
         "description": "Instant digital delivery policy for software research credits and analytical dossiers.",
         "content_html": """
         <h3>1. Digital Software Products & Services</h3>
-        <p>All items sold on the Stock Research App (Computational Research Credits, Analyst Packs, Pro Memberships, and Institutional Dossiers) are <strong>purely digital software services</strong>.</p>
+        <p>All items sold on Moatnomics (Research Credits, Analyst Packs, Pro Memberships, and Stock Reports) are <strong>purely digital software services</strong>.</p>
 
         <h3>2. Delivery Mechanism and Timelines</h3>
         <ul>
@@ -168,7 +168,7 @@ POLICIES = {
         <ul>
             <li><strong>No Individual Financial Profiling:</strong> We do not assess your personal risk tolerance, financial goals, or asset allocation.</li>
             <li><strong>No Performance Guarantees:</strong> Past financial metrics or historical valuation multiples do not guarantee future stock performance.</li>
-            <li><strong>Algorithmic & AI Ingestion:</strong> Qualitative health matrix assessments are synthesized using computational reasoning from public filings. Users must independently verify all filings on <a href="https://www.bseindia.com" target="_blank" rel="noopener">bseindia.com</a>.</li>
+            <li><strong>Algorithmic & AI Ingestion:</strong> Qualitative health matrix assessments are compiled using computational reasoning from public filings. Users must independently verify all filings on <a href="https://www.bseindia.com" target="_blank" rel="noopener">bseindia.com</a>.</li>
             <li><strong>Consult a Professional:</strong> Always consult an independent SEBI-registered investment advisor or licensed financial professional before committing capital to Indian equity markets.</li>
         </ul>
         """
