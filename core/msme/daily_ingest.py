@@ -579,6 +579,188 @@ DAILY_MSME_CATALOG: List[Dict[str, Any]] = [
         "employee_count": 242,
         "registration_date": "2020-12-12",
         "source": "Udyam Gazette / Daily 9AM Ingestion"
+    },
+
+    # --- Cohort Batch 4: Specialized Manufacturing & Cleantech Supply Chains ---
+    {
+        "uin": "UDYAM-MH-15-0092184",
+        "name": "Aurangabad EV Traction Motor Stators & Laminations Pvt Ltd",
+        "sector_code": "2710",
+        "sector_name": "auto_components",
+        "city": "Chhatrapati Sambhajinagar",
+        "state": "Maharashtra",
+        "annual_turnover": 84.5,
+        "employee_count": 182,
+        "registration_date": "2021-04-12",
+        "source": "Udyam Gazette / Daily 9AM Ingestion"
+    },
+    {
+        "uin": "UDYAM-GJ-06-0041298",
+        "name": "Vadodara High-Voltage Transformer Bushings & Insulators",
+        "sector_code": "2710",
+        "sector_name": "industrial_machinery",
+        "city": "Vadodara",
+        "state": "Gujarat",
+        "annual_turnover": 118.2,
+        "employee_count": 255,
+        "registration_date": "2020-11-18",
+        "source": "Udyam Gazette / Daily 9AM Ingestion"
+    },
+    {
+        "uin": "UDYAM-TN-08-0063912",
+        "name": "Ambattur CNC Aerospace Titanium Fasteners & Studs",
+        "sector_code": "2599",
+        "sector_name": "auto_components",
+        "city": "Chennai",
+        "state": "Tamil Nadu",
+        "annual_turnover": 64.0,
+        "employee_count": 148,
+        "registration_date": "2021-07-09",
+        "source": "Udyam Gazette / Daily 9AM Ingestion"
+    },
+    {
+        "uin": "UDYAM-KA-09-0052817",
+        "name": "Mysuru Medical Grade Silicone Extrusions & Catheter Tubing",
+        "sector_code": "2219",
+        "sector_name": "pharma_apis",
+        "city": "Mysuru",
+        "state": "Karnataka",
+        "annual_turnover": 49.5,
+        "employee_count": 122,
+        "registration_date": "2022-01-25",
+        "source": "Udyam Gazette / Daily 9AM Ingestion"
+    },
+    {
+        "uin": "UDYAM-TS-04-0078419",
+        "name": "Medchal Peptide Intermediates & Chiral Building Blocks",
+        "sector_code": "2100",
+        "sector_name": "pharma_apis",
+        "city": "Medchal",
+        "state": "Telangana",
+        "annual_turnover": 136.0,
+        "employee_count": 280,
+        "registration_date": "2020-09-30",
+        "source": "Udyam Gazette / Daily 9AM Ingestion"
+    },
+    {
+        "uin": "UDYAM-HR-03-0047182",
+        "name": "Panipat Recycled Technical Geotextiles & Non-Woven Felts",
+        "sector_code": "1399",
+        "sector_name": "textiles_apparel",
+        "city": "Panipat",
+        "state": "Haryana",
+        "annual_turnover": 72.4,
+        "employee_count": 195,
+        "registration_date": "2021-03-14",
+        "source": "Udyam Gazette / Daily 9AM Ingestion"
+    },
+    {
+        "uin": "UDYAM-GJ-19-0089314",
+        "name": "Morbi Technical Ceramic Substrates & Kiln Rollers",
+        "sector_code": "2393",
+        "sector_name": "industrial_machinery",
+        "city": "Morbi",
+        "state": "Gujarat",
+        "annual_turnover": 93.8,
+        "employee_count": 210,
+        "registration_date": "2021-06-21",
+        "source": "Udyam Gazette / Daily 9AM Ingestion"
+    },
+    {
+        "uin": "UDYAM-PB-01-0031948",
+        "name": "Amritsar Freeze-Dried Culinary Herbs & Oleoresins",
+        "sector_code": "1030",
+        "sector_name": "agro_food_processing",
+        "city": "Amritsar",
+        "state": "Punjab",
+        "annual_turnover": 41.2,
+        "employee_count": 108,
+        "registration_date": "2022-02-19",
+        "source": "Udyam Gazette / Daily 9AM Ingestion"
+    },
+    {
+        "uin": "UDYAM-AP-07-0065192",
+        "name": "Visakhapatnam Marine Cryogenic Valves & Pressure Vessels",
+        "sector_code": "2813",
+        "sector_name": "industrial_machinery",
+        "city": "Visakhapatnam",
+        "state": "Andhra Pradesh",
+        "annual_turnover": 104.6,
+        "employee_count": 228,
+        "registration_date": "2020-12-03",
+        "source": "Udyam Gazette / Daily 9AM Ingestion"
+    },
+    {
+        "uin": "UDYAM-UP-09-0054823",
+        "name": "Greater Noida Li-Ion Battery Management PCBs & Telematics",
+        "sector_code": "2610",
+        "sector_name": "electronics_iot",
+        "city": "Gautam Buddha Nagar",
+        "state": "Uttar Pradesh",
+        "annual_turnover": 88.9,
+        "employee_count": 186,
+        "registration_date": "2021-10-08",
+        "source": "Udyam Gazette / Daily 9AM Ingestion"
+    },
+    {
+        "uin": "UDYAM-MH-28-0071235",
+        "name": "Kolhapur Spheroidal Graphite Cast Iron Axle Housings",
+        "sector_code": "2431",
+        "sector_name": "auto_components",
+        "city": "Kolhapur",
+        "state": "Maharashtra",
+        "annual_turnover": 124.0,
+        "employee_count": 290,
+        "registration_date": "2020-08-17",
+        "source": "Udyam Gazette / Daily 9AM Ingestion"
+    },
+    {
+        "uin": "UDYAM-TN-15-0048912",
+        "name": "Madurai High-Tenacity Industrial Conveyor Belting Fabrics",
+        "sector_code": "1399",
+        "sector_name": "textiles_apparel",
+        "city": "Madurai",
+        "state": "Tamil Nadu",
+        "annual_turnover": 57.6,
+        "employee_count": 154,
+        "registration_date": "2021-05-27",
+        "source": "Udyam Gazette / Daily 9AM Ingestion"
+    },
+    {
+        "uin": "UDYAM-KA-14-0062381",
+        "name": "Mangaluru Specialty Cashew Nut Shell Liquid & Cardanol Resins",
+        "sector_code": "2011",
+        "sector_name": "agro_food_processing",
+        "city": "Mangaluru",
+        "state": "Karnataka",
+        "annual_turnover": 46.8,
+        "employee_count": 116,
+        "registration_date": "2021-11-04",
+        "source": "Udyam Gazette / Daily 9AM Ingestion"
+    },
+    {
+        "uin": "UDYAM-RJ-08-0053194",
+        "name": "Kota Precision Quartz Glassware & Solar Wafer Boats",
+        "sector_code": "2310",
+        "sector_name": "electronics_iot",
+        "city": "Kota",
+        "state": "Rajasthan",
+        "annual_turnover": 69.2,
+        "employee_count": 142,
+        "registration_date": "2022-04-02",
+        "source": "Udyam Gazette / Daily 9AM Ingestion"
+    },
+    {
+        "uin": "UDYAM-MP-09-0074821",
+        "name": "Dewas Heavy Duty Planetary Gearboxes & Winch Drives",
+        "sector_code": "2814",
+        "sector_name": "industrial_machinery",
+        "city": "Dewas",
+        "state": "Madhya Pradesh",
+        "annual_turnover": 96.5,
+        "employee_count": 215,
+        "registration_date": "2021-02-11",
+        "source": "Udyam Gazette / Daily 9AM Ingestion"
     }
 ]
 

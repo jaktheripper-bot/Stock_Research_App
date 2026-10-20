@@ -196,6 +196,9 @@ class TestAiQosGovernor(unittest.TestCase):
         cached_returns = [r for r in results if r[1] == "CACHED"]
         self.assertEqual(len(cached_returns), 4)
 
+        from core.db.telemetry import purge_test_telemetry
+        purge_test_telemetry()
+
     def test_05_api_copilot_chat_ip_burst_and_velocity_cap(self):
         """Outside-In: /api/copilot/chat responds with RATE_LIMITED on IP burst and VELOCITY_CAPPED on cap."""
         client = TestClient(app)

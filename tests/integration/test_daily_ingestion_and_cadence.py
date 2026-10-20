@@ -281,8 +281,8 @@ class TestDailyCadenceAndRotation(unittest.TestCase):
         try:
             conn = get_db_connection()
             cur = conn.cursor()
-            cur.execute("DELETE FROM msme_firms WHERE source LIKE '%(2026-10-25)%' OR source LIKE '%(2026-10-26)%';")
-            cur.execute("DELETE FROM discovery_reel WHERE edition_date IN ('2026-10-20', '2026-10-21');")
+            cur.execute("DELETE FROM msme_firms WHERE source LIKE '%(2099-12-25)%' OR source LIKE '%(2099-12-26)%' OR source LIKE '%(2026-10-25)%' OR source LIKE '%(2026-10-26)%';")
+            cur.execute("DELETE FROM discovery_reel WHERE edition_date IN ('2099-12-20', '2099-12-21', '2026-10-21');")
             conn.commit()
             cur.close()
             conn.close()
@@ -292,7 +292,7 @@ class TestDailyCadenceAndRotation(unittest.TestCase):
     def test_msme_daily_cohort_ingestion_and_idempotency(self):
         """Validates that daily MSME ingestion brings in fresh firms and is idempotent."""
         initial_total = get_active_msme_firms_count()
-        test_edition_date = "2026-10-25"
+        test_edition_date = "2099-12-25"
 
         # Ingest 15 new MSMEs for test edition date
         added = ingest_daily_msme_cohort(edition_date=test_edition_date, count=15)
@@ -329,8 +329,8 @@ class TestDailyCadenceAndRotation(unittest.TestCase):
 
     def test_stock_discovery_time_series_rotation_contract(self):
         """Validates that Morning Discovery Reel rotates >= 40% of candidates across consecutive editions."""
-        edition_day1 = "2026-10-20"
-        edition_day2 = "2026-10-21"
+        edition_day1 = "2099-12-20"
+        edition_day2 = "2099-12-21"
 
         # Curate and persist Day 1 cohort
         cohort_day1 = curate_morning_discovery_cohort(target_count=12, edition_date=edition_day1)
@@ -374,14 +374,14 @@ class TestDailyCadenceAndRotation(unittest.TestCase):
         client = TestClient(app)
 
         # 1. Unauthenticated request must receive 403 Forbidden
-        unauth_res = client.post("/api/admin/msme/run-daily-ingest?count=15&edition_date=2026-10-26")
+        unauth_res = client.post("/api/admin/msme/run-daily-ingest?count=15&edition_date=2099-12-26")
         self.assertEqual(unauth_res.status_code, 403)
 
         # 2. Authenticated admin request must receive 200 OK
         token = _generate_admin_token("admin@research.internal", "admin")
         client.cookies.set(ADMIN_COOKIE_NAME, token)
 
-        res = client.post("/api/admin/msme/run-daily-ingest?count=15&edition_date=2026-10-26")
+        res = client.post("/api/admin/msme/run-daily-ingest?count=15&edition_date=2099-12-26")
         self.assertEqual(res.status_code, 200)
         data = res.json()
         self.assertEqual(data.get("status"), "initiated")

@@ -66,6 +66,8 @@ Detailed forensic analysis with exact page grounding to bseindia.com filings.
     @classmethod
     def tearDownClass(cls):
         cls._cm.__exit__(None, None, None)
+        from core.db.telemetry import purge_test_telemetry
+        purge_test_telemetry()
 
     def test_home_page(self):
         res = self.client.get("/")
@@ -1681,6 +1683,8 @@ The stock price has experienced downward pressure from its 52-week high of INR 3
     @classmethod
     def tearDownClass(cls):
         cls._cm.__exit__(None, None, None)
+        from core.db.telemetry import purge_test_telemetry
+        purge_test_telemetry()
 
     def test_extract_fundamentals_from_report_text(self):
         sample_report = """
@@ -2114,6 +2118,8 @@ Detailed forensic analysis grounded in bseindia.com filings.
 
     def test_branded_pdf_generation(self):
         """Verify that custom advisory branding is rendered into PDF binary."""
+        from core.db.telemetry import purge_test_telemetry
+        purge_test_telemetry()
         branding = {
             "firm_name": "Apex Wealth Advisory",
             "advisor_reg_no": "INA000012345",

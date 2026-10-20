@@ -209,6 +209,9 @@ class TestAiQosGovernorUnit(unittest.TestCase):
         for worker_id, _, text in results:
             self.assertEqual(text, synthetic_report)
 
+        from core.db.telemetry import purge_test_telemetry
+        purge_test_telemetry()
+
     def test_qos_governor_exception_fails_closed(self):
         """When an unexpected exception occurs in authorize_llm_execution, it must log error and fail closed."""
         from unittest.mock import patch

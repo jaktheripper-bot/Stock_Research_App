@@ -1456,6 +1456,8 @@ def purge_test_telemetry() -> dict:
                 WHERE ticker LIKE 'COAL_%'
                    OR ticker LIKE 'UNITCOAL_%'
                    OR ticker = 'COALESCE_TEST'
+                   OR ticker LIKE 'TEST_%'
+                   OR ticker IN ('TESTCORP', 'TESTPEER', 'ZZTESTONLY')
                    OR short_name = 'Coalesce Test Ltd';
             """)
             purged_counts["test_reports_purged"] = cursor.rowcount if cursor.rowcount and cursor.rowcount > 0 else 0
@@ -1463,7 +1465,63 @@ def purge_test_telemetry() -> dict:
                 DELETE FROM report_revisions
                 WHERE ticker LIKE 'COAL_%'
                    OR ticker LIKE 'UNITCOAL_%'
-                   OR ticker = 'COALESCE_TEST';
+                   OR ticker = 'COALESCE_TEST'
+                   OR ticker LIKE 'TEST_%'
+                   OR ticker IN ('TESTCORP', 'TESTPEER', 'ZZTESTONLY');
+            """)
+            # If a test suite overwrote INFY or TCS with a short test stub (<2000 chars), restore the full institutional revision
+            p = "%s" if get_supabase_url() else "?"
+            for canonical_ticker in ("INFY", "TCS"):
+                cursor.execute(
+                    f"SELECT report_text, baseline_price, baseline_pe, baseline_mcap FROM report_revisions WHERE ticker = {p} AND LENGTH(report_text) > 5000 ORDER BY LENGTH(report_text) DESC, id DESC LIMIT 1;",
+                    (canonical_ticker,)
+                )
+                full_rev = cursor.fetchone()
+                if full_rev and full_rev[0]:
+                    cursor.execute(
+                        f"UPDATE reports SET report_text = {p} WHERE ticker = {p} AND LENGTH(report_text) < 2500;",
+                        (full_rev[0], canonical_ticker)
+                    )
+                    cursor.execute(
+                        f"DELETE FROM report_revisions WHERE ticker = {p} AND LENGTH(report_text) < 2500;",
+                        (canonical_ticker,)
+                    )
+            cursor.execute("""
+                DELETE FROM discovery_reel
+                WHERE ticker = 'TESTCORP'
+                   OR ticker LIKE 'TEST_%'
+                   OR company_name = 'Test Diagnostics Corp'
+                   OR edition_date >= '2099-01-01';
+            """)
+            cursor.execute("""
+                DELETE FROM cached_fundamentals
+                WHERE ticker LIKE 'COAL_%'
+                   OR ticker LIKE 'UNITCOAL_%'
+                   OR ticker = 'COALESCE_TEST'
+                   OR ticker LIKE 'TEST_%'
+                   OR ticker IN ('TESTCORP', 'TESTPEER', 'ZZTESTONLY')
+                   OR source = 'UNIT_TEST';
+            """)
+            cursor.execute("""
+                DELETE FROM compliance_audit_log
+                WHERE ticker LIKE 'COAL_%'
+                   OR ticker LIKE 'UNITCOAL_%'
+                   OR ticker = 'COALESCE_TEST'
+                   OR ticker LIKE 'TEST_%'
+                   OR ticker IN ('TESTCORP', 'TESTPEER', 'ZZTESTONLY');
+            """)
+            cursor.execute("""
+                DELETE FROM autonomous_event_ledger
+                WHERE ticker LIKE 'TEST_%'
+                   OR trigger_source LIKE '%TEST%'
+                   OR summary LIKE '%2026-10-25%'
+                   OR summary LIKE '%2026-10-26%'
+                   OR summary LIKE '%2026-10-27%'
+                   OR summary LIKE '%2099-%';
+            """)
+            cursor.execute("""
+                DELETE FROM asset_scan_runs
+                WHERE triggered_by = 'unit_test_suite';
             """)
         except Exception as rpe:
             logger.warning(f"Test reports purge notice: {rpe}")

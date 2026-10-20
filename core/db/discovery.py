@@ -32,17 +32,11 @@ def save_discovery_reel(items: List[Dict[str, Any]], edition_date: Optional[str]
 
     saved_count = 0
     try:
-        # Mark previous items for this edition date as inactive
-        if is_pg:
-            cursor.execute(
-                f"UPDATE discovery_reel SET is_active = FALSE WHERE edition_date = {placeholder};",
-                (edition_date,)
-            )
-        else:
-            cursor.execute(
-                f"UPDATE discovery_reel SET is_active = 0 WHERE edition_date = {placeholder};",
-                (edition_date,)
-            )
+        # Remove previous items for this edition date so re-runs stay idempotent without accumulating inactive duplicates
+        cursor.execute(
+            f"DELETE FROM discovery_reel WHERE edition_date = {placeholder};",
+            (edition_date,)
+        )
 
         insert_sql = f"""
             INSERT INTO discovery_reel (

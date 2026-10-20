@@ -508,7 +508,7 @@ def audit_single_fund_daily(
 
     logger.info(f"Initiating autonomous forensic look-through audit for scheme: {scheme_code}")
 
-    scheme = get_mutual_fund_scheme(scheme_code)
+    scheme = ensure_scheme_and_holdings_exist(scheme_code)
     if not scheme:
         raise ValueError(f"Scheme not found in database: {scheme_code}")
 

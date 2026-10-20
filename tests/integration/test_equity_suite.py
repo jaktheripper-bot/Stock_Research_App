@@ -353,7 +353,7 @@ class TestSurgicalReportUpdates(unittest.TestCase):
             "baseline_price": 1000.0,
         }
         stock_data = {
-            "ticker": "INFY",
+            "ticker": "TEST_SURGICAL_INFY",
             "short_name": "Infosys Ltd",
             "current_price": 1100.0,
             "pe_ratio": "25.0",
@@ -361,11 +361,15 @@ class TestSurgicalReportUpdates(unittest.TestCase):
             "fifty_two_week_high": 1200.0,
             "fifty_two_week_low": 900.0,
         }
-        spliced = execute_surgical_pillar_update("INFY", cached, stock_data)
-        self.assertIn("## Pillar 5: Valuation & Margin of Safety", spliced)
-        self.assertIn("## Pillar 6: Technical & Momentum Overlay", spliced)
-        self.assertIn("Pillar 1: Macro-Economic", spliced)
-        self.assertIn("₹1100.00", spliced)
+        try:
+            spliced = execute_surgical_pillar_update("TEST_SURGICAL_INFY", cached, stock_data)
+            self.assertIn("## Pillar 5: Valuation & Margin of Safety", spliced)
+            self.assertIn("## Pillar 6: Technical & Momentum Overlay", spliced)
+            self.assertIn("Pillar 1: Macro-Economic", spliced)
+            self.assertIn("₹1100.00", spliced)
+        finally:
+            from core.db.telemetry import purge_test_telemetry
+            purge_test_telemetry()
 
 
 if __name__ == "__main__":
