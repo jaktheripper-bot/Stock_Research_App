@@ -215,7 +215,8 @@ def _build_greeting_response(ticker: Optional[str], company_name: Optional[str],
 def is_input_qualified(user_message: str) -> bool:
     """
     Validates whether the user input is a coherent financial/analytical question
-    without falsely rejecting numbers (10000, 50000), financial shorthand (ROE?, bps),
+    or conversational/numeric follow-up slot ("10000", "30%", "10y", "5L", "yes", "why?")
+    without falsely rejecting numbers, financial shorthand (ROE?, bps),
     or comparative ticker prompts.
     """
     if not user_message or not isinstance(user_message, str):
@@ -234,37 +235,55 @@ def is_input_qualified(user_message: str) -> bool:
     if not alnum_chars:
         return False
 
-    # Reject explicit keyboard mash sequences
+    # Reject explicit keyboard mash sequences (alpha or sequential digit runs like 12345678)
     alpha_only = "".join(c for c in lower_msg if c.isalpha())
     for seq in KEYBOARD_SMASH_SEQS:
         if seq in alpha_only and len(alpha_only) <= 12:
             return False
 
+    digits_only = "".join(c for c in lower_msg if c.isdigit())
+    if digits_only and any(seq in digits_only for seq in ("123456", "234567", "345678", "456789", "987654", "876543")):
+        return False
+
     # Reject single-character repetition (e.g. "aaaaaa", "1111111")
     if len(set(alnum_chars)) == 1 and len(alnum_chars) >= 4:
         return False
 
-    tokens = re.findall(r"[a-zA-Z0-9%/\.\-]+", lower_msg)
+    tokens = re.findall(r"[a-zA-Z0-9%/\.\-₹$]+", lower_msg)
     if not tokens:
         return False
 
     if all(t in SPAM_NOISE_TOKENS or t in GREETING_TOKENS for t in tokens):
         return False
 
-    # If the prompt contains any known financial acronym or valid English/Hindi vowel structure, allow it
+    # If the prompt contains any known financial acronym, numeric slot (10000, 30%, 10y, 5L),
+    # or valid English/Hindi vowel structure, allow it
     vowels = set("aeiouy")
     valid_word_count = 0
     for tok in tokens:
-        clean_tok = tok.strip(".,?!:;()[]{}\"'₹$%")
+        raw_tok = tok.strip(".,?!:;()[]{}\"'")
+        clean_tok = raw_tok.strip("₹$%")
         if not clean_tok:
             continue
-        if clean_tok in FINANCIAL_ACRONYMS or clean_tok in {"bps", "yr", "yrs", "vs", "roe", "npm", "opm", "ltv", "wale", "ndcf", "sgb", "gsec"}:
+        if clean_tok in FINANCIAL_ACRONYMS or clean_tok in {
+            "bps", "yr", "yrs", "vs", "roe", "npm", "opm", "ltv", "wale", "ndcf", "sgb", "gsec",
+            "yes", "no", "ok", "okay", "sure", "why", "how", "more", "next", "both"
+        }:
             valid_word_count += 1
             continue
-        # Numbers with context (e.g., 10000, 30%, 10y, 5l) count when paired with words
-        if any(c.isdigit() for c in clean_tok) and len(tokens) >= 2:
-            valid_word_count += 1
-            continue
+        # Standalone or contextual numeric / financial unit tokens:
+        # e.g. "10000", "50,000", "30%", "12.5%", "10y", "15yr", "5l", "10cr", "25x", "150bps"
+        if any(c.isdigit() for c in raw_tok):
+            if len(tokens) >= 2:
+                valid_word_count += 1
+                continue
+            # Single-token numeric follow-up: allow percentages, horizons, shorthand units, or realistic numbers
+            if re.match(
+                r"^[₹$]?\d+(?:,\d+)*(?:\.\d+)?(?:\s*(?:%|y|yr|yrs|l|lac|lakh|lakhs|cr|crore|crores|k|m|b|x|bps))?$",
+                raw_tok
+            ):
+                valid_word_count += 1
+                continue
         if any(c in vowels for c in clean_tok) and len(clean_tok) >= 2:
             # Guard against 7+ consecutive consonants
             if not re.search(r"[bcdfghjklmnpqrstvwxz]{6,}", clean_tok):
@@ -424,14 +443,22 @@ def _resolve_dynamic_entity_override(
                 return resolved.upper(), "EQUITY"
 
     # Also check lowercase company mentions in pattern "what about <name>" or "switch to <name>"
-    m = re.search(r"(?:what\s+about|how\s+about|switch\s+to|check|analyze|audit)\s+([a-zA-Z0-9&\s]{3,25})", user_message, re.IGNORECASE)
+    m = re.search(r"(?:what\s+about|how\s+about|switch\s+to|check|analyze|audit)\s+([a-zA-Z0-9&\s]{2,25})", user_message, re.IGNORECASE)
     if m:
         phrase = m.group(1).strip(" ?!.,")
-        resolved = resolve_canonical_symbol(phrase)
-        if resolved:
-            from core.db.reports import get_report_by_ticker_sync
-            if get_report_by_ticker_sync(resolved):
-                return resolved.upper(), "EQUITY"
+        phrase_low = phrase.lower()
+        non_entity_prefixes = ("the ", "its ", "this ", "their ", "our ", "my ", "for ", "if ", "how ", "whether ")
+        non_entity_terms = (
+            "active share", "fee drag", "balance sheet", "reverse dcf", "pre-mortem", "premortem",
+            "governance", "solvency", "moat", "valuation", "covenant", "waterfall", "tracking error",
+            "Closet indexing", "closet", "pledge", "pledging", "yield", "margin", "holdings", "portfolio"
+        )
+        if not phrase_low.startswith(non_entity_prefixes) and not any(t.lower() in phrase_low for t in non_entity_terms):
+            resolved = resolve_canonical_symbol(phrase)
+            if resolved and resolved.upper() not in stopwords and len(resolved) <= 15 and " " not in resolved:
+                from core.db.reports import get_report_by_ticker_sync
+                if get_report_by_ticker_sync(resolved):
+                    return resolved.upper(), "EQUITY"
 
     return current_ticker, current_asset_class
 
@@ -455,6 +482,21 @@ def _answer_from_local_dossier_index(
     q = (user_message or "").lower()
     report_text = report_data.get("report_text") or ""
     if not report_text:
+        return None
+
+    # Defer specialized Forensic Desk workflows (Reverse DCF, Pre-Mortem Inversion,
+    # Beneish/Governance Forensics, Altman Solvency) to their dedicated builders
+    # so generic keywords like "growth", "earnings", "structural", or "valuation"
+    # do not hijack quick-chip or section-anchored prompts into Pillar 04 / Pillar 05 excerpts.
+    if any(k in q for k in [
+        "reverse dcf", "implied growth", "fcf growth", "implied fcf", "dcf",
+        "priced in", "pricing in", "hurdle rate",
+        "pre-mortem", "premortem", "inversion", "failure mode", "destroy shareholder",
+        "permanently impair", "structural risk", "structural vulnerabilit",
+        "beneish", "m-score", "manipulation", "forensic accounting",
+        "promoter", "pledg", "related-party", "auditor", "governance",
+        "solvency", "altman", "z-score"
+    ]):
         return None
 
     from core.analysis.parser import extract_health_matrix
@@ -562,6 +604,522 @@ def _answer_from_local_dossier_index(
     return None
 
 
+def _extract_numeric_and_dialogue_slots(
+    user_message: str,
+    history_turns: Optional[List[Dict[str, Any]]] = None
+) -> Dict[str, Any]:
+    """
+    Multi-Turn Dialogue State & Quantitative Slot Extractor.
+    Extracts user-supplied numbers (corpus_inr, horizon_years, pct_value) from both
+    standalone follow-up replies ("10000", "30%", "10y", "5L") and explicit what-if
+    queries ("invest 50,000 for 10 years at 14%"), merging prior turn context.
+    """
+    raw = (user_message or "").strip()
+    low = raw.lower()
+    words = re.findall(r"[a-zA-Z0-9%/\.\-₹$]+", low)
+
+    # Guard against intercepting standard preset quick-chip prompts
+    preset_markers = (
+        "0%, 10%, 20%, 30%, and 39%",
+        "15% penal",
+        "next 3 years",
+        "top 3 tenant",
+        "top 3 structural",
+        "top 10 ",
+        "150 bps rise",
+        "49% statutory",
+        "20-year compounded fee drag",
+        "1-year annualized tracking error",
+        "10-year fee drag",
+        "50-dma",
+        "section 115ua",
+        "56(2)(xii)",
+        "10(23fd)",
+        "115baa",
+        "7-pillar",
+    )
+    if any(pm in low for pm in preset_markers):
+        return {"is_numeric_followup": False}
+
+    corpus_inr: Optional[float] = None
+    horizon_years: Optional[int] = None
+    pct_value: Optional[float] = None
+
+    # 1. Extract percentage / rate (e.g. "30%", "12.5%", "14 percent")
+    m_pct = re.search(r"(\d+(?:\.\d+)?)\s*(?:%|(?:pct|percent)\b)", low)
+    if m_pct:
+        try:
+            pct_value = float(m_pct.group(1))
+        except ValueError:
+            pass
+
+    # 2. Extract horizon in years (e.g. "10y", "15yr", "10 years", "5 yrs")
+    m_yr = re.search(r"\b(\d{1,2})\s*(?:y|yr|yrs|year|years)\b", low)
+    if m_yr:
+        try:
+            yr_cand = int(m_yr.group(1))
+            if 1 <= yr_cand <= 50:
+                horizon_years = yr_cand
+        except ValueError:
+            pass
+
+    # 3. Extract Indian / standard currency corpus (e.g. "5L", "10 lakhs", "2Cr", "₹50,000", "10000")
+    m_unit = re.search(
+        r"(?:₹|rs\.?\s*|inr\s*)?(\d+(?:,\d+)*(?:\.\d+)?)\s*(cr|crore|crores|l|lac|lakh|lakhs|k|thousand)\b",
+        low
+    )
+    if m_unit:
+        try:
+            base_num = float(m_unit.group(1).replace(",", ""))
+            unit = m_unit.group(2)
+            if unit in ("cr", "crore", "crores"):
+                corpus_inr = base_num * 1_00_00_000.0
+            elif unit in ("l", "lac", "lakh", "lakhs"):
+                corpus_inr = base_num * 1_00_000.0
+            elif unit in ("k", "thousand"):
+                corpus_inr = base_num * 1_000.0
+        except ValueError:
+            pass
+
+    if corpus_inr is None:
+        # Look for standalone or currency-prefixed number >= 500 (e.g. "10000", "50,000", "₹25000")
+        for m_num in re.finditer(r"(?:₹|rs\.?\s*|inr\s*)?(\d[\d,]{2,12}(?:\.\d+)?)\b", low):
+            span_start, span_end = m_num.span()
+            after = low[span_end:span_end + 8]
+            if re.match(r"^\s*(?:%|(?:pct|percent|y|yr|yrs|year|years|bps|x)\b)", after):
+                continue
+            try:
+                val = float(m_num.group(1).replace(",", ""))
+                if val >= 500:
+                    corpus_inr = val
+                    break
+            except ValueError:
+                continue
+
+    has_any_slot = (corpus_inr is not None) or (horizon_years is not None) or (pct_value is not None)
+    if not has_any_slot:
+        return {"is_numeric_followup": False}
+
+    # Carry forward slots from prior user turns in the same conversation if missing
+    if history_turns:
+        for t in reversed(history_turns):
+            if t.get("sender_role") == "user":
+                prev_txt = (t.get("content") or "").strip()
+                if prev_txt and prev_txt.lower() != low:
+                    prev_slots = _extract_numeric_and_dialogue_slots(prev_txt, history_turns=None)
+                    if corpus_inr is None and prev_slots.get("corpus_inr"):
+                        corpus_inr = prev_slots["corpus_inr"]
+                    if horizon_years is None and prev_slots.get("horizon_years"):
+                        horizon_years = prev_slots["horizon_years"]
+                    if pct_value is None and prev_slots.get("pct_value"):
+                        pct_value = prev_slots["pct_value"]
+
+    is_short_slot_reply = len(words) <= 4 and has_any_slot
+    is_explicit_sim_query = has_any_slot and any(
+        kw in low for kw in (
+            "invest ", "investing ", "allocate ", "simulate ", "what if ", "suppose ",
+            "assume ", "assuming ", "corpus", "lumpsum", "calculate for", "at ", "over "
+        )
+    )
+
+    if not (is_short_slot_reply or is_explicit_sim_query):
+        return {"is_numeric_followup": False}
+
+    return {
+        "is_numeric_followup": True,
+        "corpus_inr": corpus_inr,
+        "horizon_years": horizon_years,
+        "pct_value": pct_value,
+    }
+
+
+def _run_parameterized_slot_calculator(
+    asset_class: str,
+    context_data: Dict[str, Any],
+    section: Optional[str],
+    ticker: str,
+    user_message: str,
+    history: Optional[list] = None,
+) -> Optional[str]:
+    """
+    Executes live, deterministic Python financial math when the user provides a
+    numeric follow-up ("10000", "30%", "10y", "5L") or custom What-If simulation.
+    """
+    history_turns = history if history is not None else (context_data.get("conversation_history") or [])
+    slots = _extract_numeric_and_dialogue_slots(user_message, history_turns=history_turns)
+    if not slots.get("is_numeric_followup"):
+        return None
+
+    corpus = float(slots.get("corpus_inr") or 100_000.0)
+    years = int(slots.get("horizon_years") or 10)
+    pct = slots.get("pct_value")
+    low = (user_message or "").lower()
+
+    if asset_class == "MUTUAL_FUND":
+        name = context_data.get("scheme_name") or ticker or "Mutual Fund Scheme"
+        try:
+            ter_dir = float(context_data.get("ter_direct_pct") or 0.65)
+        except (ValueError, TypeError):
+            ter_dir = 0.65
+        try:
+            ter_reg = float(context_data.get("ter_regular_pct") or max(ter_dir + 0.85, 1.50))
+        except (ValueError, TypeError):
+            ter_reg = max(ter_dir + 0.85, 1.50)
+        if ter_reg <= ter_dir:
+            ter_reg = round(ter_dir + 0.85, 2)
+
+        cagr = float(pct) if (pct is not None and 4.0 <= float(pct) <= 35.0) else 12.5
+        net_dir = max((cagr - ter_dir) / 100.0, 0.01)
+        net_reg = max((cagr - ter_reg) / 100.0, 0.005)
+        fv_dir = corpus * ((1.0 + net_dir) ** years)
+        fv_reg = corpus * ((1.0 + net_reg) ** years)
+        drag_loss = max(fv_dir - fv_reg, 0.0)
+        drag_pct_principal = (drag_loss / corpus) * 100.0 if corpus > 0 else 0.0
+        spread_bps = round((ter_reg - ter_dir) * 100.0, 1)
+
+        return (
+            f"🧮 **Live Parameterized Fee-Drag & Compounding Simulation — {name}:**\n\n"
+            f"- **Simulated Lumpsum Corpus:** `₹{corpus:,.0f}`\n"
+            f"- **Compounding Horizon:** `{years} Years`\n"
+            f"- **Assumed Gross Portfolio CAGR:** `{cagr:.1f}% p.a.`\n"
+            f"- **Direct vs. Regular TER:** `{ter_dir:.2f}%` vs. `{ter_reg:.2f}%` (`{spread_bps} bps/yr` trail spread)\n\n"
+            f"| Plan Variant | Net Annualized Return | Projected `{years}Y` Maturity Corpus | Cumulative Trail Fee Drag |\n"
+            f"| :--- | :--- | :--- | :--- |\n"
+            f"| **Direct Plan** | `{net_dir * 100:.2f}% p.a.` | **`₹{fv_dir:,.0f}`** | `₹0` (Benchmark) |\n"
+            f"| **Regular Plan** | `{net_reg * 100:.2f}% p.a.` | `₹{fv_reg:,.0f}` | **`-₹{drag_loss:,.0f}`** (`{drag_pct_principal:.1f}%` of initial capital) |\n\n"
+            f"**Analytical Takeaway:** On a `₹{corpus:,.0f}` allocation held for `{years} years` at `{cagr:.1f}%` gross CAGR, "
+            f"the `{spread_bps} bps` annual distributor commission compounds into **`₹{drag_loss:,.0f}`** in lost terminal wealth. "
+            f"You can reply with any other amount (e.g. `5L`, `25000`), horizon (`15y`), or return rate (`14%`) to re-run."
+        )
+
+    if asset_class == "REIT":
+        name = context_data.get("name") or ticker or "REIT / InvIT"
+        try:
+            gross_yield = float(context_data.get("distribution_yield_pct") or 7.2)
+        except (ValueError, TypeError):
+            gross_yield = 7.2
+        if gross_yield <= 0:
+            gross_yield = 7.2
+
+        slab = float(pct) if (pct is not None and 0.0 <= float(pct) <= 45.0) else 30.0
+        tax_wf = context_data.get("tax_waterfall") or {}
+        breakdown = tax_wf.get("component_breakdown") or {}
+        int_share = float(breakdown.get("interest_pct", 55.0)) / 100.0
+        div_share = float(breakdown.get("dividend_pct", 15.0)) / 100.0
+        roc_share = float(breakdown.get("return_of_capital_pct", 25.0)) / 100.0
+        rent_share = max(0.0, 1.0 - (int_share + div_share + roc_share))
+
+        # Interest & rental taxed at marginal slab; ROC & exempt SPV dividend tax-free until cost basis exhausted
+        taxable_fraction = int_share + rent_share
+        effective_tax_drag = taxable_fraction * (slab / 100.0)
+        net_yield = gross_yield * (1.0 - effective_tax_drag)
+        annual_gross_cash = corpus * (gross_yield / 100.0)
+        annual_net_cash = corpus * (net_yield / 100.0)
+        annual_roc = annual_gross_cash * roc_share
+        cum_net_cash = annual_net_cash * years
+        cum_roc = annual_roc * years
+        rem_cost_basis = max(0.0, corpus - cum_roc)
+
+        return (
+            f"🧮 **Live Section 115UA Cash-Flow & Sec 56(2)(xii) Amortization Simulation — {name} (`{ticker}`):**\n\n"
+            f"- **Simulated Allocation Corpus:** `₹{corpus:,.0f}`\n"
+            f"- **Holding Horizon:** `{years} Years`\n"
+            f"- **Investor Marginal Tax Slab:** `{slab:.1f}%`\n"
+            f"- **Gross vs. Post-Tax Distribution Yield:** `{gross_yield:.2f}%` Gross → **`{net_yield:.2f}%` Net Post-Tax**\n\n"
+            f"| Cash-Flow & Tax Metric | Annual Figure | `{years}`-Year Cumulative Total |\n"
+            f"| :--- | :--- | :--- |\n"
+            f"| **Gross Distribution Cash Flow** | `₹{annual_gross_cash:,.0f} / yr` | `₹{annual_gross_cash * years:,.0f}` |\n"
+            f"| **Post-Tax In-Hand Distribution (`{slab:.0f}%` Slab)** | **`₹{annual_net_cash:,.0f} / yr`** | **`₹{cum_net_cash:,.0f}`** |\n"
+            f"| **Tax-Free Return of Capital (ROC Amortization)** | `₹{annual_roc:,.0f} / yr` | `₹{cum_roc:,.0f}` |\n"
+            f"| **Remaining Sec 56(2)(xii) Acquisition Cost Basis** | — | **`₹{rem_cost_basis:,.0f}`** |\n\n"
+            f"**Analytical Takeaway:** Over `{years} years` on a `₹{corpus:,.0f}` allocation at the `{slab:.0f}%` tax slab, you collect **`₹{cum_net_cash:,.0f}`** "
+            f"in net post-tax cash distributions while your acquisition cost basis steps down to `₹{rem_cost_basis:,.0f}` under Section 56(2)(xii). "
+            f"Reply with any other corpus (`10L`), horizon (`15y`), or tax slab (`20%`, `39%`) to re-simulate."
+        )
+
+    if asset_class == "CORPORATE_DEBT":
+        name = context_data.get("instrument_name") or ticker or "Corporate Debt Security"
+        try:
+            ytm = float(context_data.get("ytm_pct") or context_data.get("coupon_rate_pct") or 9.25)
+        except (ValueError, TypeError):
+            ytm = 9.25
+        try:
+            dur = float(context_data.get("macaulay_duration_years") or 3.5)
+        except (ValueError, TypeError):
+            dur = 3.5
+
+        slab = float(pct) if (pct is not None and 0.0 <= float(pct) <= 45.0) else 30.0
+        net_ytm = ytm * (1.0 - (slab / 100.0))
+        annual_gross = corpus * (ytm / 100.0)
+        annual_net = corpus * (net_ytm / 100.0)
+        cum_net = annual_net * years
+
+        return (
+            f"🧮 **Live Fixed-Income Cash-Flow & Post-Tax Yield Simulation — {name} (`{ticker}`):**\n\n"
+            f"- **Simulated Bond Allocation:** `₹{corpus:,.0f}`\n"
+            f"- **Holding Period:** `{years} Years` (Macaulay Duration: `{dur:.2f} yrs`)\n"
+            f"- **Pre-Tax YTM / Coupon:** `{ytm:.2f}% p.a.`\n"
+            f"- **Post-Tax Realized Yield (`{slab:.0f}%` Slab):** **`{net_ytm:.2f}% p.a.`**\n"
+            f"- **Annual Net Interest In-Hand:** **`₹{annual_net:,.0f} / yr`** (`₹{annual_gross:,.0f}` pre-tax)\n"
+            f"- **Cumulative `{years}Y` Post-Tax Interest:** **`₹{cum_net:,.0f}`** (+ `₹{corpus:,.0f}` principal redemption at maturity)\n\n"
+            f"Reply with a different allocation (`5L`), tax slab (`20%`), or duration horizon (`5y`) to adjust."
+        )
+
+    # Default: EQUITY Live Reverse-DCF & Capital Allocation Simulation
+    company_name = context_data.get("company_name") or ticker or "Equity Security"
+    fund = context_data.get("fundamentals") or {}
+    dcf = context_data.get("reverse_dcf") or {}
+    raw_cmp = context_data.get("cmp") or context_data.get("baseline_price") or fund.get("current_price") or 1000.0
+    raw_pe = context_data.get("pe_ratio") or context_data.get("baseline_pe") or fund.get("pe_ratio") or 25.0
+    try:
+        cmp_f = float(str(raw_cmp).replace(",", "").strip())
+        if cmp_f <= 0:
+            cmp_f = 1000.0
+    except (ValueError, TypeError):
+        cmp_f = 1000.0
+    try:
+        pe_f = float(str(raw_pe).replace(",", "").strip())
+        if pe_f <= 0:
+            pe_f = 25.0
+    except (ValueError, TypeError):
+        pe_f = 25.0
+
+    base_wacc = float(dcf.get("assumed_wacc_pct") or 11.5)
+    term_g = float(dcf.get("terminal_growth_pct") or 5.0)
+    market_implied_g = float(dcf.get("implied_growth_priced_in_pct") or max(round((pe_f * (base_wacc - term_g) / 10.0), 2), 8.0))
+
+    # Determine whether user-supplied percentage is WACC/hurdle or target growth
+    if pct is not None and any(k in low for k in ("wacc", "hurdle", "discount")):
+        sim_wacc = max(float(pct), term_g + 1.5)
+        sim_g = max(round((pe_f * (sim_wacc - term_g) / 10.0), 2), 0.0)
+    elif pct is not None:
+        sim_wacc = base_wacc
+        sim_g = float(pct)
+    else:
+        sim_wacc = base_wacc
+        sim_g = market_implied_g
+
+    shares = corpus / cmp_f if cmp_f > 0 else 0.0
+    eps_est = cmp_f / pe_f if pe_f > 0 else 0.0
+    initial_earnings_share = shares * eps_est
+    compounded_at_sim = corpus * ((1.0 + (sim_g / 100.0)) ** years)
+    compounded_at_implied = corpus * ((1.0 + (market_implied_g / 100.0)) ** years)
+    fair_pe_at_sim_g = round((sim_g * 10.0) / max(sim_wacc - term_g, 2.0), 1)
+    implied_fair_price = round(eps_est * fair_pe_at_sim_g, 2) if eps_est > 0 else cmp_f
+    mos_pct = round(((implied_fair_price - cmp_f) / cmp_f) * 100.0, 1) if cmp_f > 0 else 0.0
+
+    return (
+        f"🧮 **Live Parameterized Reverse-DCF & Allocation Simulation — {company_name} (`{ticker}`):**\n\n"
+        f"- **Simulated Capital Allocation:** `₹{corpus:,.0f}` (`{shares:,.2f} shares` at CMP `₹{cmp_f:,.2f}`)\n"
+        f"- **Compounding Horizon:** `{years} Years` | **Trailing P/E:** `{pe_f:.2f}x` (Est. EPS `₹{eps_est:,.2f}`)\n"
+        f"- **Market-Implied 10Y FCF Growth at CMP:** `{market_implied_g:.2f}% p.a.` (at `{base_wacc:.1f}%` WACC)\n"
+        f"- **Simulated Growth / Hurdle Input:** `{sim_g:.2f}% CAGR` at `{sim_wacc:.1f}% WACC`\n\n"
+        f"| Scenario / Metric | Implied Valuation / Multiple | Projected `{years}Y` Capital Value (on `₹{corpus:,.0f}`) |\n"
+        f"| :--- | :--- | :--- |\n"
+        f"| **Market-Implied Baseline (`{market_implied_g:.1f}%` CAGR)** | `₹{cmp_f:,.2f}` (`{pe_f:.1f}x` P/E) | `₹{compounded_at_implied:,.0f}` (Assuming constant multiple) |\n"
+        f"| **Simulated Scenario (`{sim_g:.1f}%` CAGR @ `{sim_wacc:.1f}%` WACC)** | **`₹{implied_fair_price:,.2f}`** (`{fair_pe_at_sim_g:.1f}x` Fair P/E • `{mos_pct:+.1f}%` vs CMP) | **`₹{compounded_at_sim:,.0f}`** (Look-through earnings `₹{initial_earnings_share * ((1.0 + sim_g / 100.0) ** years):,.0f}/yr`) |\n\n"
+        f"**Analytical Implication:** At `{sim_g:.1f}%` annual cash-flow compounding and a `{sim_wacc:.1f}%` discount rate, "
+        f"model fair value stands at **`₹{implied_fair_price:,.2f}`** (`{mos_pct:+.1f}%` relative to CMP `₹{cmp_f:,.2f}`). "
+        f"You can reply with any other amount (`50000`, `5L`), growth rate (`15%`), WACC (`13% wacc`), or horizon (`15y`) to stress-test further."
+    )
+
+
+def _resolve_elliptical_followup(user_message: str, history: Optional[list] = None) -> str:
+    """
+    Expands short conversational follow-ups ("yes", "sure", "ok", "next", "both", "elaborate")
+    into the concrete analytical topic offered at the end of the previous assistant turn.
+    """
+    raw = (user_message or "").strip()
+    low = raw.lower().rstrip("?.! ")
+    if not history:
+        return raw
+
+    is_affirmation = low in {
+        "yes", "yeah", "yep", "sure", "ok", "okay", "please", "go ahead",
+        "next", "continue", "both", "first one", "second one"
+    }
+    if not is_affirmation:
+        return raw
+
+    last_agent = ""
+    for t in reversed(history):
+        if t.get("sender_role") == "agent":
+            last_agent = (t.get("content") or "")
+            break
+    if not last_agent:
+        return raw
+
+    # Look at the closing question line from the previous assistant turn
+    lines = [ln.strip() for ln in last_agent.splitlines() if "?" in ln]
+    closing_q = (lines[-1] if lines else last_agent[-250:]).lower()
+    headline = (last_agent.splitlines()[0] if last_agent.splitlines() else "").lower()
+
+    if "balance sheet solvency" in closing_q and "solvency" not in headline:
+        return "Evaluate balance sheet solvency and Altman Z-Score"
+    if "governance" in closing_q and "governance" not in headline:
+        return "Audit corporate governance and promoter pledging disclosures"
+    if "reverse dcf" in closing_q and "reverse dcf" not in headline:
+        return "What implied growth rate is priced into current CMP based on Reverse DCF?"
+    if "pre-mortem" in closing_q and "pre-mortem" not in headline:
+        return "Run Pre-Mortem Inversion analysis on this stock"
+    if "active share" in closing_q and "active share" not in headline:
+        return "Audit the active share and benchmark overlap"
+    if "fee" in closing_q and "fee drag" not in headline:
+        return "What is the 20-year compounded fee drag between Direct and Regular plans?"
+    if ("constituent" in closing_q or "holding" in closing_q) and "holding" not in headline:
+        return "Review top constituent holdings and asset allocation"
+    if "downside capture" in closing_q and "downside" not in headline:
+        return "Evaluate downside capture and risk-adjusted alpha"
+    if "covenant" in closing_q and "covenant" not in headline:
+        return "Evaluate asset coverage and covenant headroom"
+    if "seniority" in closing_q and "seniority" not in headline:
+        return "Evaluate recovery seniority and liquidation hierarchy"
+    if "contagion" in closing_q and "contagion" not in headline:
+        return "Check the Credit Contagion Radar"
+    return raw
+
+
+def _retrieve_relevant_dossier_passages(
+    user_message: str,
+    context_data: Dict[str, Any],
+    ticker: str,
+    asset_class: str = "EQUITY"
+) -> Optional[str]:
+    """
+    Lexical / BM25-style Dossier Passage Retriever & Conversational Follow-Up Resolver.
+    Ensures specific free-form questions ("how is working capital?", "what are the falsification triggers?",
+    "tell me about capex", "why?", "elaborate") retrieve exact grounded paragraphs from the dossier
+    rather than repeating a static fallback menu.
+    """
+    raw = (user_message or "").strip()
+    if not raw:
+        return None
+    low = raw.lower()
+
+    # Collect dossier text across asset classes
+    doc_text = ""
+    if asset_class == "EQUITY":
+        rep = context_data.get("report_data") or {}
+        doc_text = context_data.get("report_text") or rep.get("report_text") or ""
+    elif asset_class == "MUTUAL_FUND":
+        if not context_data.get("deep_dive_locked"):
+            doc_text = context_data.get("dossier_text") or context_data.get("forensic_dossier_text") or ""
+    elif asset_class == "CORPORATE_DEBT":
+        if not context_data.get("deep_dive_locked"):
+            posture = context_data.get("credit_posture") or {}
+            thesis_raw = posture.get("investment_thesis") or ""
+            if isinstance(thesis_raw, dict):
+                thesis = "\n".join(f"{tk}: {tv}" for tk, tv in thesis_raw.items() if tv)
+            else:
+                thesis = str(thesis_raw)
+            pillars_dict = posture.get("pillars") or {}
+            pillar_lines = []
+            if isinstance(pillars_dict, dict):
+                for k, v in pillars_dict.items():
+                    if isinstance(v, dict):
+                        v_str = "\n".join(f"{vk}: {vv}" for vk, vv in v.items() if vv)
+                    else:
+                        v_str = str(v or "")
+                    if v_str.strip():
+                        pillar_lines.append(f"### {k}\n{v_str}")
+            doc_text = "\n\n".join([p for p in [thesis] + pillar_lines if p.strip()]).strip()
+
+    # Check if this is an elliptical follow-up ("yes", "sure", "elaborate", "tell me more", "why?")
+    history_turns = context_data.get("conversation_history") or []
+    is_ellipsis = low in {
+        "yes", "sure", "ok", "okay", "please", "go ahead", "elaborate",
+        "tell me more", "explain more", "more details", "why", "why?", "how", "how?", "next", "continue"
+    } or bool(re.match(r"^(?:yes|sure|ok|please|tell me more|elaborate)\b", low) and len(low.split()) <= 5)
+
+    if is_ellipsis and history_turns:
+        # Inspect last assistant message to see what follow-up was offered
+        last_agent_msg = ""
+        for t in reversed(history_turns):
+            if t.get("sender_role") == "agent":
+                last_agent_msg = (t.get("content") or "").lower()
+                break
+        if last_agent_msg:
+            if "solvency" in last_agent_msg and "Balance Sheet Solvency" not in last_agent_msg[:120]:
+                low = "balance sheet solvency altman z-score working capital"
+            elif "governance" in last_agent_msg and "Governance Audit" not in last_agent_msg[:120]:
+                low = "governance promoter pledging auditor related party"
+            elif "reverse dcf" in last_agent_msg and "Reverse DCF Valuation" not in last_agent_msg[:120]:
+                low = "reverse dcf implied growth valuation margin of safety"
+            elif "pre-mortem" in last_agent_msg and "Pre-Mortem Inversion Analysis" not in last_agent_msg[:120]:
+                low = "pre-mortem inversion failure modes downside risks"
+
+    if not doc_text:
+        return None
+
+    stopwords = {
+        "what", "how", "why", "when", "where", "which", "who", "whom", "whose",
+        "is", "are", "was", "were", "be", "been", "being", "have", "has", "had",
+        "do", "does", "did", "can", "could", "should", "would", "will", "shall",
+        "the", "and", "for", "with", "about", "into", "from", "that", "this",
+        "these", "those", "stock", "company", "fund", "scheme", "bond", "trust",
+        "reit", "etf", "tell", "me", "explain", "show", "give", "analyze", "audit",
+        "check", "evaluate", "review", "please", "any", "there", "their", "its",
+        "section", "metric", "metrics", "pillar", "dimension", "overview", "details",
+        (ticker or "").lower()
+    }
+    query_tokens = [
+        tok for tok in re.findall(r"[a-zA-Z]{3,}", low)
+        if tok not in stopwords
+    ]
+    if not query_tokens:
+        return None
+
+    # Split dossier into sections and paragraphs
+    blocks: List[Tuple[str, str, int]] = []
+    current_heading = "Dossier Analysis"
+    for raw_para in re.split(r"\n\s*\n", doc_text):
+        p = raw_para.strip()
+        if not p:
+            continue
+        if p.startswith("#"):
+            lines = p.splitlines()
+            current_heading = lines[0].lstrip("#").strip()
+            body = "\n".join(lines[1:]).strip()
+            if not body:
+                continue
+            p = body
+        if len(p) < 35 or p.startswith("[Institutional deep-dive pillar locked"):
+            continue
+        p_low = p.lower()
+        h_low = current_heading.lower()
+        score = 0
+        for qt in set(query_tokens):
+            if qt in p_low:
+                score += 3 + min(p_low.count(qt), 3)
+            if qt in h_low:
+                score += 4
+        if score > 0:
+            blocks.append((current_heading, p, score))
+
+    if not blocks:
+        return None
+
+    blocks.sort(key=lambda item: item[2], reverse=True)
+    top_blocks = blocks[:2]
+    if top_blocks[0][2] < 3:
+        return None
+
+    display_name = (
+        context_data.get("company_name")
+        or context_data.get("scheme_name")
+        or context_data.get("instrument_name")
+        or ticker
+    )
+    passages_md = "\n\n".join([f"**{h}:**\n{b}" for h, b, _ in top_blocks])
+    return (
+        f"🔎 **Targeted Dossier Retrieval for {display_name} (`{ticker}`):**\n\n"
+        f"{passages_md}\n\n"
+        f"*Source: Verified Dossier Text (`reports.db`) — matched to your query on `{', '.join(dict.fromkeys(query_tokens[:4]))}`.*\n\n"
+        f"Would you like to stress-test these figures with a custom number (e.g. `10000`, `15%`, `10y`) or drill into another section?"
+    )
+
+
+
 def build_mutual_fund_deterministic_response(
     context_data: Dict[str, Any],
     section: Optional[str],
@@ -573,10 +1131,47 @@ def build_mutual_fund_deterministic_response(
     sec = (section or "").lower().strip()
     msg = (user_message or "").lower().strip()
     locked = bool(context_data.get("deep_dive_locked"))
+    history = context_data.get("conversation_history") or []
+
+    # 0. Interactive Parameterized Calculator & Conversational Continuation Slot Engine
+    calc_reply = _run_parameterized_slot_calculator(
+        context_data=context_data,
+        asset_class="MUTUAL_FUND",
+        section=sec,
+        ticker=ticker,
+        user_message=user_message,
+        history=history,
+    )
+    if calc_reply:
+        return calc_reply
+
+    resolved_msg = _resolve_elliptical_followup(user_message, history)
+    msg = resolved_msg.lower().strip()
+
+    # 1. Explicit Message Keyword Intents (Always take precedence over sticky `sec`)
+    has_explicit_msg_topic = any(k in msg for k in [
+        "fee drag", "direct", "regular", "ter", "commission", "expense ratio", "wealth lost", "drag",
+        "active share", "closet", "index", "hugging", "benchmark", "style drift",
+        "asri", "accounting risk", "accounting", "pledg", "risky", "high-risk", "stress index",
+        "moat", "quality", "compounder", "pricing power", "economic moat",
+        "margin of safety", "dcf", "intrinsic", "discount", "premium",
+        "holding", "allocation", "sleeve", "portfolio", "concentration", "top 10",
+        "downside", "capture", "sortino", "drawdown", "upside capture", "bear market",
+        "narrative", "audit", "summary", "qualitative", "findings"
+    ])
+
+    if not has_explicit_msg_topic and not locked:
+        passage_hit = _retrieve_relevant_dossier_passages(
+            context_data=context_data,
+            asset_class="MUTUAL_FUND",
+            ticker=ticker,
+            user_message=resolved_msg,
+        )
+        if passage_hit:
+            return passage_hit
 
     # Open-Ended Inquiry: "What shocked you?" / Surprises / Red Flags
-    is_specific_mf_topic = bool(sec) or any(k in msg for k in ["fee drag", "direct", "regular", "ter", "commission", "expense ratio", "active share", "closet", "index", "hugging", "benchmark", "asri", "accounting risk", "pledg", "moat", "quality", "margin of safety", "dcf", "holding", "allocation", "downside"])
-    if not is_specific_mf_topic and any(k in msg for k in [
+    if not has_explicit_msg_topic and any(k in msg for k in [
         "what shocked you", "shocked", "shocking", "surprise", "surprised",
         "red flag", "red flags", "anomaly", "anomalies", "stand out", "stood out"
     ]):
@@ -612,7 +1207,7 @@ def build_mutual_fund_deterministic_response(
         )
 
     # Open-Ended Inquiry: Bear Thesis
-    elif any(k in msg for k in ["bear thesis", "bear case", "bearish", "downside case", "why avoid"]):
+    if any(k in msg for k in ["bear thesis", "bear case", "bearish", "downside case", "why avoid"]):
         return (
             f"**Institutional Bear Thesis for {name}:**\n\n"
             f"1. **Compounding Fee Drag:** Over multi-year cycles, Regular-plan distribution commissions reduce net investor returns relative to Direct or low-cost index alternatives.\n"
@@ -622,8 +1217,7 @@ def build_mutual_fund_deterministic_response(
         )
 
     # Open-Ended Inquiry: Bull Thesis
-    elif any(k in msg for k in ["bull thesis", "bull case", "bullish", "upside case", "why invest"]):
-        moat = context_data.get("weighted_moat_score", "N/A")
+    if any(k in msg for k in ["bull thesis", "bull case", "bullish", "upside case", "why invest"]):
         health = context_data.get("composite_health_score", "N/A")
         return (
             f"**Institutional Bull Thesis for {name}:**\n\n"
@@ -633,7 +1227,8 @@ def build_mutual_fund_deterministic_response(
             f"Would you like to review constituent holdings or examine the fee audit?"
         )
 
-    elif sec == "fee_drag" or any(k in msg for k in ["fee drag", "direct", "regular", "ter", "commission", "expense ratio", "wealth lost", "drag"]):
+    # Topic 1: Fee Drag (evaluated by message keywords first, or fallback `sec` when no other topic is in `msg`)
+    if any(k in msg for k in ["fee drag", "direct", "regular", "ter", "commission", "expense ratio", "wealth lost", "drag"]) or (not has_explicit_msg_topic and sec == "fee_drag"):
         ter_dir = context_data.get("ter_direct_pct", "N/A")
         ter_reg = context_data.get("ter_regular_pct", "N/A")
         spread_bps = "N/A"
@@ -649,9 +1244,9 @@ def build_mutual_fund_deterministic_response(
             f"- Distributor Commission Spread: {spread_bps}\n\n"
             "**Analytical Implication:** Both plans hold the exact same underlying portfolio, yet over a 15–25 year horizon the annual distribution spread reduces terminal corpus value by roughly 15% to 25%. "
             "Evaluating the Direct plan isolates manager skill from intermediary distribution cost.\n\n"
-            "Would you like to examine look-through constituent quality or active share next?"
+            "💡 *Tip: Type any investment amount (e.g. `10000`, `5L`) or horizon (`15y`) to compute exact Direct vs. Regular terminal wealth.*"
         )
-    elif sec in ["active_share", "diversification"] or any(k in msg for k in ["active share", "closet", "index", "hugging", "benchmark", "style drift"]):
+    elif any(k in msg for k in ["active share", "closet", "index", "hugging", "benchmark", "style drift"]) or (not has_explicit_msg_topic and sec in ["active_share", "diversification"]):
         as_pct = context_data.get("active_share_pct", "N/A")
         benchmark = context_data.get("benchmark_index", "Benchmark")
         verdict = "Differentiated Active Positioning" if isinstance(as_pct, (int, float)) and as_pct >= 60 else "High Benchmark Overlap (Closet-Indexing Watch)"
@@ -664,7 +1259,7 @@ def build_mutual_fund_deterministic_response(
             "When Active Share sits below 60%, the portfolio closely mirrors its benchmark while charging active fees, making net-of-fee outperformance harder to sustain.\n\n"
             "Would you like to drill into the top constituent holdings or portfolio concentration?"
         )
-    elif not locked and (sec in ["asri_solvency", "accounting_risk"] or any(k in msg for k in ["asri", "accounting risk", "pledg", "risky", "high-risk", "stress index"])):
+    elif not locked and (any(k in msg for k in ["asri", "accounting risk", "accounting", "pledg", "risky", "high-risk", "stress index"]) or (not has_explicit_msg_topic and sec in ["asri_solvency", "accounting_risk", "promoter_pledge"])):
         asri = context_data.get("accounting_risk_index", "N/A")
         pledge = context_data.get("promoter_pledge_exposure_pct", 0.0)
         risky = context_data.get("top_risky_holdings", [])
@@ -678,7 +1273,7 @@ def build_mutual_fund_deterministic_response(
             "highlighting where working-capital stretch, Beneish M-Score flags, or promoter pledges warrant closer inspection.\n\n"
             "Which underlying holding would you like to inspect in detail?"
         )
-    elif not locked and (sec in ["moat_index", "quality"] or any(k in msg for k in ["moat", "quality", "compounder", "pricing power", "economic moat"])):
+    elif not locked and (any(k in msg for k in ["moat", "quality", "compounder", "pricing power", "economic moat"]) or (not has_explicit_msg_topic and sec in ["moat_index", "quality"])):
         moat = context_data.get("weighted_moat_score", "N/A")
         comp = context_data.get("composite_health_score", "N/A")
         quality = context_data.get("top_quality_holdings", [])
@@ -692,7 +1287,7 @@ def build_mutual_fund_deterministic_response(
             "Even when constituent quality is high, future fund returns still depend on the valuation multiples paid for those holdings.\n\n"
             "Would you like to examine valuation margins or downside capture next?"
         )
-    elif not locked and (sec == "margin_of_safety" or any(k in msg for k in ["margin of safety", "dcf", "intrinsic", "discount", "premium"])):
+    elif not locked and (any(k in msg for k in ["margin of safety", "dcf", "intrinsic", "discount", "premium"]) or (not has_explicit_msg_topic and sec == "margin_of_safety")):
         mos = context_data.get("margin_of_safety_pct", "N/A")
         return (
             f"**Weighted Margin of Safety (DCF) Diagnostic for {name}:**\n\n"
@@ -701,7 +1296,7 @@ def build_mutual_fund_deterministic_response(
             "**Analytical Implication:** This metric aggregates the capital-weighted discount or premium to conservative DCF fair value across the fund's underlying equity holdings, separating business quality from portfolio valuation.\n\n"
             "Would you like to examine constituent holdings or fee drag next?"
         )
-    elif sec in ["holdings", "dual_sleeve"] or any(k in msg for k in ["holding", "allocation", "sleeve", "portfolio", "concentration", "top 10"]):
+    elif any(k in msg for k in ["holding", "allocation", "sleeve", "portfolio", "concentration", "top 10"]) or (not has_explicit_msg_topic and sec in ["holdings", "dual_sleeve"]):
         risky = context_data.get("top_risky_holdings", [])
         quality = context_data.get("top_quality_holdings", [])
         aum = context_data.get("aum_crores", "N/A")
@@ -718,7 +1313,7 @@ def build_mutual_fund_deterministic_response(
             "**Look-Through Framework:** Each constituent stock is individually evaluated across our 7-Pillar Equity Forensic Engine.\n\n"
             "Would you like to analyze a specific holding or check active share?"
         )
-    elif sec == "downside_capture" or any(k in msg for k in ["downside", "capture", "sortino", "drawdown", "upside capture", "bear market"]):
+    elif any(k in msg for k in ["downside", "capture", "sortino", "drawdown", "upside capture", "bear market"]) or (not has_explicit_msg_topic and sec == "downside_capture"):
         return (
             f"**Risk-Adjusted Alpha & Downside Capture Diagnostic for {name}:**\n\n"
             f"- Composite Health Score: {context_data.get('composite_health_score', 'N/A')}/100\n"
@@ -727,7 +1322,7 @@ def build_mutual_fund_deterministic_response(
             "**Analytical Implication:** Long-term compounding in active funds depends heavily on limiting drawdowns during market corrections while retaining reasonable participation in recoveries.\n\n"
             "Would you like to inspect active share or fee drag next?"
         )
-    elif not locked and (sec == "dossier_narrative" or any(k in msg for k in ["narrative", "audit", "summary", "qualitative", "findings"])):
+    elif not locked and (any(k in msg for k in ["narrative", "audit", "summary", "qualitative", "findings"]) or (not has_explicit_msg_topic and sec in ["dossier_narrative", "lookthrough_metrics"])):
         dossier_text = context_data.get("dossier_text", "")
         summary_snip = (dossier_text[:350] + "...") if len(dossier_text) > 350 else dossier_text
         return (
@@ -737,24 +1332,35 @@ def build_mutual_fund_deterministic_response(
             f"- Weighted Moat Score: {context_data.get('weighted_moat_score', 'N/A')}/100\n\n"
             "Which qualitative audit finding would you like to explore?"
         )
-    else:
-        # Default Mutual Fund Look-Through Summary
-        aum = context_data.get("aum_crores", "N/A")
-        deep_lines = (
-            "- Moat, accounting-risk and margin-of-safety scores: 🔒 part of the Deep Dive (1 credit)\n"
-            if locked else
-            f"- Weighted Moat Score: {context_data.get('weighted_moat_score', 'N/A')}/100\n"
-            f"- Look-Through Accounting Risk Index (ASRI): {context_data.get('accounting_risk_index', 'N/A')}%\n"
-            f"- Weighted Margin of Safety: {context_data.get('margin_of_safety_pct', 'N/A')}%\n"
+
+    # Passage-level retrieval for free-form questions before falling back to generic overview
+    if not locked:
+        passage_hit = _retrieve_relevant_dossier_passages(
+            context_data=context_data,
+            asset_class="MUTUAL_FUND",
+            ticker=ticker,
+            user_message=user_message,
         )
-        return (
-            f"**Forensic Look-Through Summary for {name}:**\n\n"
-            f"- Composite Health Score: {context_data.get('composite_health_score', 'N/A')}/100\n"
-            f"{deep_lines}"
-            f"- Active Share: {context_data.get('active_share_pct', 'N/A')}%\n"
-            f"- AUM: ₹{aum} Cr\n\n"
-            "What specific look-through metric, constituent holding, or fee drag area would you like to investigate?"
-        )
+        if passage_hit:
+            return passage_hit
+
+    # Default Mutual Fund Look-Through Summary
+    aum = context_data.get("aum_crores", "N/A")
+    deep_lines = (
+        "- Moat, accounting-risk and margin-of-safety scores: 🔒 part of the Deep Dive (1 credit)\n"
+        if locked else
+        f"- Weighted Moat Score: {context_data.get('weighted_moat_score', 'N/A')}/100\n"
+        f"- Look-Through Accounting Risk Index (ASRI): {context_data.get('accounting_risk_index', 'N/A')}%\n"
+        f"- Weighted Margin of Safety: {context_data.get('margin_of_safety_pct', 'N/A')}%\n"
+    )
+    return (
+        f"**Forensic Look-Through Summary for {name}:**\n\n"
+        f"- Composite Health Score: {context_data.get('composite_health_score', 'N/A')}/100\n"
+        f"{deep_lines}"
+        f"- Active Share: {context_data.get('active_share_pct', 'N/A')}%\n"
+        f"- AUM: ₹{aum} Cr\n\n"
+        "What specific look-through metric, constituent holding, or fee drag area would you like to investigate?"
+    )
 
 
 def build_debt_deterministic_response(
@@ -768,10 +1374,42 @@ def build_debt_deterministic_response(
     sec = (section or "").lower().strip()
     msg = (user_message or "").lower().strip()
     locked = bool(context_data.get("deep_dive_locked"))
+    history = context_data.get("conversation_history") or []
+
+    # 0. Interactive Parameterized Calculator & Conversational Continuation Slot Engine
+    calc_reply = _run_parameterized_slot_calculator(
+        context_data=context_data,
+        asset_class="CORPORATE_DEBT",
+        section=sec,
+        ticker=ticker,
+        user_message=user_message,
+        history=history,
+    )
+    if calc_reply:
+        return calc_reply
+
+    resolved_msg = _resolve_elliptical_followup(user_message, history)
+    msg = resolved_msg.lower().strip()
+
+    has_explicit_debt_msg = any(k in msg for k in [
+        "covenant", "acr", "asset coverage", "coverage", "dscr", "headroom",
+        "contagion", "radar", "group", "systemic", "cross-default", "parent",
+        "seniority", "recovery", "liquidation", "tier", "recourse",
+        "ytm", "duration"
+    ])
+
+    if not has_explicit_debt_msg and not locked:
+        passage_hit = _retrieve_relevant_dossier_passages(
+            context_data=context_data,
+            asset_class="CORPORATE_DEBT",
+            ticker=ticker,
+            user_message=resolved_msg,
+        )
+        if passage_hit:
+            return passage_hit
 
     # Open-Ended Inquiry: "What shocked you?" / Surprises / Red Flags
-    is_specific_debt_topic = bool(sec) or any(k in msg for k in ["covenant", "acr", "asset coverage", "coverage", "dscr", "headroom", "contagion", "radar", "cross-default", "seniority", "recovery", "liquidation", "ytm", "duration"])
-    if not is_specific_debt_topic and any(k in msg for k in [
+    if not has_explicit_debt_msg and any(k in msg for k in [
         "what shocked you", "shocked", "shocking", "surprise", "surprised",
         "red flag", "red flags", "anomaly", "anomalies", "stand out", "stood out"
     ]):
@@ -797,7 +1435,7 @@ def build_debt_deterministic_response(
         )
 
     # Open-Ended Inquiry: Bear Thesis
-    elif any(k in msg for k in ["bear thesis", "bear case", "bearish", "downside case", "default risk", "why avoid"]):
+    if any(k in msg for k in ["bear thesis", "bear case", "bearish", "downside case", "default risk", "why avoid"]):
         return (
             f"**Institutional Bear Thesis for {name}:**\n\n"
             f"1. **Seniority & Recovery Haircuts:** Unsecured or subordinated tranches face steeper recovery haircuts if liquidation proceeds fall short of senior secured claims.\n"
@@ -807,7 +1445,7 @@ def build_debt_deterministic_response(
         )
 
     # Open-Ended Inquiry: Bull Thesis
-    elif any(k in msg for k in ["bull thesis", "bull case", "bullish", "upside case", "why invest"]):
+    if any(k in msg for k in ["bull thesis", "bull case", "bullish", "upside case", "why invest"]):
         return (
             f"**Institutional Credit Quality Case for {name}:**\n\n"
             f"1. **Senior Secured Priority:** Backed by a registered charge over tangible assets or receivables under IBC hierarchy.\n"
@@ -816,24 +1454,8 @@ def build_debt_deterministic_response(
             f"Would you like to review recovery seniority or duration profile next?"
         )
 
-    elif sec in ["covenants", "asset_coverage"] or any(k in msg for k in ["covenant", "acr", "asset coverage", "coverage", "dscr", "headroom"]):
-        return (
-            f"**Asset Coverage & Covenant Headroom for {name}:**\n\n"
-            f"- Credit Rating: {context_data.get('credit_rating', 'N/A')}\n"
-            f"- Seniority Tier: {context_data.get('seniority_tier', 'N/A')}\n"
-            f"- Posture Badge: {context_data.get('posture_badge', 'N/A')}\n\n"
-            "**Solvency Assessment:** Evaluates underlying collateral encumbrance, security charge registration, and DSCR cushion against indenture covenants.\n\n"
-            "Would you like to examine the Credit Contagion Radar or duration profile?"
-        )
-    elif not locked and (sec in ["contagion", "radar"] or any(k in msg for k in ["contagion", "radar", "group", "systemic", "cross-default", "parent"])):
-        return (
-            f"**Credit Contagion Radar Analysis for {name}:**\n\n"
-            f"- Status: {context_data.get('contagion_radar_status', 'N/A')} ({context_data.get('contagion_risk_level', 'N/A')})\n"
-            f"- Issuer/Group Summary: {context_data.get('radar_summary', 'N/A')}\n\n"
-            "**Analytical Implication:** Tracks cross-default clauses, parent-subsidiary guarantees, and parent equity pledge/leverage signals.\n\n"
-            "Would you like to review recovery seniority or YTM profile?"
-        )
-    elif sec in ["seniority", "recovery"] or any(k in msg for k in ["seniority", "recovery", "liquidation", "tier", "recourse"]):
+    # Evaluate explicit message keywords first, then section fallbacks
+    if any(k in msg for k in ["seniority", "recovery", "liquidation", "tier", "recourse"]) or (not has_explicit_debt_msg and sec in ["seniority", "recovery"]):
         return (
             f"**Recovery Seniority & Liquidation Hierarchy for {name}:**\n\n"
             f"- Seniority Tier: **{context_data.get('seniority_tier', 'SENIOR_SECURED')}**\n"
@@ -842,23 +1464,50 @@ def build_debt_deterministic_response(
             "**Resolution Protection:** Under IBC statutory priority, Senior Secured claims rank ahead of unsecured and subordinated debt holders during resolution.\n\n"
             "Would you like to evaluate covenant headroom or duration sensitivity?"
         )
-    else:
-        if locked:
-            radar_lines = "- Credit Contagion Radar: 🔒 part of the Deep Dive (1 credit)\n\n"
-        else:
-            radar_lines = (
-                f"- Credit Contagion Radar: {context_data.get('contagion_radar_status', 'N/A')} ({context_data.get('contagion_risk_level', 'N/A')})\n\n"
-                f"> {context_data.get('radar_summary', '')}\n\n"
-            )
+    elif not locked and (any(k in msg for k in ["contagion", "radar", "group", "systemic", "cross-default", "parent"]) or (not has_explicit_debt_msg and sec in ["contagion", "radar"])):
         return (
-            f"**Credit & Solvency Summary for {name}:**\n\n"
-            f"- Credit Rating: {context_data.get('credit_rating', 'N/A')}\n"
-            f"- YTM: {context_data.get('ytm_pct', 'N/A')}%\n"
-            f"- Duration: {context_data.get('macaulay_duration_years', 'N/A')} yrs\n"
-            f"- Seniority: {context_data.get('seniority_tier', 'N/A')}\n"
-            f"{radar_lines}"
-            "What specific solvency or capital hierarchy pillar would you like to drill into?"
+            f"**Credit Contagion Radar Analysis for {name}:**\n\n"
+            f"- Status: {context_data.get('contagion_radar_status', 'N/A')} ({context_data.get('contagion_risk_level', 'N/A')})\n"
+            f"- Issuer/Group Summary: {context_data.get('radar_summary', 'N/A')}\n\n"
+            "**Analytical Implication:** Tracks cross-default clauses, parent-subsidiary guarantees, and parent equity pledge/leverage signals.\n\n"
+            "Would you like to review recovery seniority or YTM profile?"
         )
+    elif any(k in msg for k in ["covenant", "acr", "asset coverage", "coverage", "dscr", "headroom"]) or (not has_explicit_debt_msg and sec in ["covenants", "asset_coverage"]):
+        return (
+            f"**Asset Coverage & Covenant Headroom for {name}:**\n\n"
+            f"- Credit Rating: {context_data.get('credit_rating', 'N/A')}\n"
+            f"- Seniority Tier: {context_data.get('seniority_tier', 'N/A')}\n"
+            f"- Posture Badge: {context_data.get('posture_badge', 'N/A')}\n\n"
+            "**Solvency Assessment:** Evaluates underlying collateral encumbrance, security charge registration, and DSCR cushion against indenture covenants.\n\n"
+            "Would you like to examine the Credit Contagion Radar or duration profile?"
+        )
+
+    if not locked:
+        passage_hit = _retrieve_relevant_dossier_passages(
+            context_data=context_data,
+            asset_class="CORPORATE_DEBT",
+            ticker=ticker,
+            user_message=user_message,
+        )
+        if passage_hit:
+            return passage_hit
+
+    if locked:
+        radar_lines = "- Credit Contagion Radar: 🔒 part of the Deep Dive (1 credit)\n\n"
+    else:
+        radar_lines = (
+            f"- Credit Contagion Radar: {context_data.get('contagion_radar_status', 'N/A')} ({context_data.get('contagion_risk_level', 'N/A')})\n\n"
+            f"> {context_data.get('radar_summary', '')}\n\n"
+        )
+    return (
+        f"**Credit & Solvency Summary for {name}:**\n\n"
+        f"- Credit Rating: {context_data.get('credit_rating', 'N/A')}\n"
+        f"- YTM: {context_data.get('ytm_pct', 'N/A')}%\n"
+        f"- Duration: {context_data.get('macaulay_duration_years', 'N/A')} yrs\n"
+        f"- Seniority: {context_data.get('seniority_tier', 'N/A')}\n"
+        f"{radar_lines}"
+        "💡 *Tip: Type any principal amount (e.g. `10000`, `5L`) or tax slab (`30%`) to calculate exact post-tax coupon cash flows.*"
+    )
 
 
 def build_etf_deterministic_response(
@@ -872,6 +1521,18 @@ def build_etf_deterministic_response(
     clean_sym = symbol or context_data.get("symbol", "ETF")
     sec = (section or "").lower().strip()
     msg = (user_message or "").lower().strip()
+    history = context_data.get("conversation_history") or []
+
+    calc_reply = _run_parameterized_slot_calculator(
+        context_data=context_data,
+        asset_class="ETF",
+        section=sec,
+        ticker=clean_sym,
+        user_message=user_message,
+        history=history,
+    )
+    if calc_reply:
+        return calc_reply
 
     pd = context_data.get("premium_discount_pct", 0.0)
     te = context_data.get("tracking_error_1y", 0.05)
@@ -962,6 +1623,18 @@ def build_reit_deterministic_response(
     clean_sym = symbol or reit_info.get("symbol") or "REIT"
     sec = (section or "").lower().strip()
     msg = (user_message or "").lower().strip()
+    history = context_data.get("conversation_history") or []
+
+    calc_reply = _run_parameterized_slot_calculator(
+        context_data=context_data,
+        asset_class="REIT",
+        section=sec,
+        ticker=clean_sym,
+        user_message=user_message,
+        history=history,
+    )
+    if calc_reply:
+        return calc_reply
 
     tax = context_data.get("tax_waterfall", {})
     ndcf = context_data.get("ndcf_audit", {})
@@ -1314,8 +1987,24 @@ def build_equity_deterministic_response(
             f"(to inspect what annual FCF growth CMP ₹{cmp_display} is pricing in) or analyze the **Pre-Mortem Inversion** vectors."
         )
 
+    # 0a. Interactive Parameterized Calculator & Conversational Continuation Slot Engine
+    history = context_data.get("conversation_history") or []
+    calc_reply = _run_parameterized_slot_calculator(
+        context_data=context_data,
+        asset_class="EQUITY",
+        section=sec,
+        ticker=ticker,
+        user_message=user_message,
+        history=history,
+    )
+    if calc_reply:
+        return calc_reply
+
+    resolved_msg = _resolve_elliptical_followup(user_message, history)
+    msg = resolved_msg.lower().strip()
+
     # 0b. Open-Ended Inquiry: "What shocked you?" / Surprises / Red Flags / Anomalies
-    is_specific_pillar_query = bool(sec) or any(k in msg for k in [
+    is_specific_pillar_query = any(k in msg for k in [
         "governance", "pledg", "promoter", "beneish", "m-score", "auditor", "resignation", "related-party",
         "reverse dcf", "implied growth", "hurdle rate", "fair value", "intrinsic",
         "solvency", "altman", "z-score", "balance sheet", "leverage",
@@ -1477,21 +2166,86 @@ def build_equity_deterministic_response(
             f"5. **💥 What Stood Out:** Summarize the primary forensic watchpoints or valuation trade-offs."
         )
 
-    # 0g. Zero-Token Local Pillar & Metric Retriever ($0 Gemini cost)
-    local_retrieval = _answer_from_local_dossier_index(
-        ticker=ticker,
-        asset_class="EQUITY",
-        user_message=user_message,
-        report_data=context_data.get("report_data") or context_data,
-        fundamentals=fund
+    # Evaluate explicit message keywords first so sticky `sec` never traps follow-up turns
+    msg_matches_reverse_dcf = any(
+        k in msg for k in [
+            "reverse dcf", "implied growth", "fcf growth", "implied fcf",
+            "priced in", "pricing in", "dcf", "hurdle rate",
+            "valuation", "cmp", "fair value", "intrinsic", "pe ratio", "multiple", "margin of safety"
+        ]
+    ) and not any(k in msg for k in ["pre-mortem", "premortem", "inversion"])
+    msg_matches_pre_mortem = any(
+        k in msg for k in [
+            "pre-mortem", "premortem", "inversion", "failure mode",
+            "destroy", "risk", "threat", "vulnerabilit", "worst case"
+        ]
+    ) and not msg_matches_reverse_dcf
+    msg_matches_governance = any(
+        k in msg for k in [
+            "governance", "pledg", "promoter", "red flag", "beneish",
+            "m-score", "manipulation", "related-party", "auditor", "resignation", "qualif", "accounting"
+        ]
     )
-    if local_retrieval:
-        return local_retrieval
+    msg_matches_solvency = any(
+        k in msg for k in [
+            "solvency", "altman", "z-score", "balance sheet", "debt",
+            "leverage", "liquidity", "d/e", "interest coverage", "headroom", "cash"
+        ]
+    ) and not msg_matches_governance
+    msg_matches_moat = any(
+        k in msg for k in [
+            "moat", "competitive", "pricing power", "roce", "roic",
+            "capital allocation", "reinvestment", "market share"
+        ]
+    )
+    msg_matches_momentum = any(
+        k in msg for k in [
+            "momentum", "50-dma", "50 dma", "dma", "technical", "moving average",
+            "chart", "price action", "price trend", "drop diagnostic", "structural drop"
+        ]
+    )
+    msg_matches_contagion = any(
+        k in msg for k in [
+            "contagion", "bond", "ncd", "debenture", "seniority", "credit rating"
+        ]
+    )
+
+    has_any_explicit_equity_msg = (
+        msg_matches_reverse_dcf
+        or msg_matches_pre_mortem
+        or msg_matches_governance
+        or msg_matches_solvency
+        or msg_matches_moat
+        or msg_matches_momentum
+        or msg_matches_contagion
+    )
+
+    # 0g. Zero-Token Local Pillar Index & Passage Retriever ($0 Gemini cost)
+    # Runs whenever `not sec` OR when `user_message` asks a specific question outside the 7 preset keyword buckets
+    if not sec or not has_any_explicit_equity_msg:
+        local_retrieval = _answer_from_local_dossier_index(
+            ticker=ticker,
+            asset_class="EQUITY",
+            user_message=resolved_msg,
+            report_data=context_data.get("report_data") or context_data,
+            fundamentals=fund
+        )
+        if local_retrieval:
+            return local_retrieval
+
+    if not has_any_explicit_equity_msg:
+        passage_hit = _retrieve_relevant_dossier_passages(
+            context_data=context_data,
+            asset_class="EQUITY",
+            ticker=ticker,
+            user_message=resolved_msg,
+        )
+        if passage_hit:
+            return passage_hit
 
     # 1. Pre-Mortem Inversion / Failure Modes / Thesis Destruction
-    if sec in ["pre_mortem", "risks", "inversion"] or any(k in msg for k in ["pre-mortem", "inversion", "failure mode", "destroy", "risk", "threat", "vulnerabilit", "worst case", "bear case", "downside"]):
+    if msg_matches_pre_mortem or (not has_any_explicit_equity_msg and sec in ["pre_mortem", "risks", "inversion"]):
         macro_posture = matrix.get("Macro", "Headwinds")
-        diag_posture = matrix.get("Diagnostic", "Temporary")
         bs_posture = matrix.get("BalanceSheet", "Debt-Free")
         cap_posture = matrix.get("CapitalAllocation", "Disciplined")
 
@@ -1512,9 +2266,9 @@ def build_equity_deterministic_response(
         )
 
     # 2. Reverse DCF Implied Growth & Valuation Sandbox
-    elif sec in ["reverse_dcf", "valuation", "margin_of_safety"] or any(k in msg for k in ["reverse dcf", "implied growth", "priced in", "dcf", "valuation", "cmp", "fair value", "intrinsic", "hurdle rate", "pe ratio", "multiple", "margin of safety"]):
+    elif msg_matches_reverse_dcf or (not has_any_explicit_equity_msg and sec in ["reverse_dcf", "valuation", "margin_of_safety"]):
         implied_growth = dcf.get("implied_growth_priced_in_pct") or "9.07"
-        hurdle_rate = dcf.get("hurdle_rate_pct") or "12.0"
+        hurdle_rate = dcf.get("hurdle_rate_pct") or dcf.get("assumed_wacc_pct") or "12.0"
         val_status = matrix.get("Valuation", "Undervalued")
 
         growth_float = float(implied_growth) if isinstance(implied_growth, (int, float)) or (isinstance(implied_growth, str) and implied_growth.replace('.', '', 1).isdigit()) else 9.0
@@ -1541,11 +2295,11 @@ def build_equity_deterministic_response(
             f"Instead of guessing a single target price, Reverse DCF asks what the current price requires you to believe. "
             f"At **{implied_growth}% implied FCF growth**, the market is pricing in {growth_interpretation}. "
             f"Assessment: **{verdict}**.\n\n"
-            f"Would you like to review balance sheet solvency or audit governance disclosures?"
+            f"💡 *Tip: Reply with any custom hurdle rate (e.g. `13%`), horizon (`15y`), or capital amount (`10000`) to re-compute this Reverse DCF live.*"
         )
 
     # 3. Governance Forensic & Promoter Pledging Check
-    elif sec in ["governance", "forensics", "promoter_pledge"] or any(k in msg for k in ["governance", "pledg", "promoter", "red flag", "beneish", "m-score", "manipulation", "related-party", "auditor", "resignation", "qualif", "accounting"]):
+    elif msg_matches_governance or (not has_any_explicit_equity_msg and sec in ["governance", "forensics", "promoter_pledge"]):
         gov_status = matrix.get("Governance", "Clean")
         citations_count = context_data.get("citations_count", 0)
         citations_str = f"verified across {citations_count} BSE regulatory disclosures" if citations_count else "grounded in verified exchange disclosures"
@@ -1577,7 +2331,7 @@ def build_equity_deterministic_response(
         )
 
     # 4. Balance Sheet Solvency & Leverage Diagnostic
-    elif sec in ["solvency", "balance_sheet", "leverage"] or any(k in msg for k in ["solvency", "altman", "z-score", "balance sheet", "debt", "leverage", "liquidity", "d/e", "interest coverage", "headroom", "cash"]):
+    elif msg_matches_solvency or (not has_any_explicit_equity_msg and sec in ["solvency", "balance_sheet", "leverage"]):
         bs_status = matrix.get("BalanceSheet", "Debt-Free")
         cap_status = matrix.get("CapitalAllocation", "Disciplined")
         linked_debt = context_data.get("linked_debt", [])
@@ -1597,7 +2351,7 @@ def build_equity_deterministic_response(
         )
 
     # 5. Economic Moat & Capital Allocation
-    elif sec in ["moat", "capital_allocation", "quality"] or any(k in msg for k in ["moat", "competitive", "pricing power", "roce", "roic", "capital allocation", "reinvestment", "market share"]):
+    elif msg_matches_moat or (not has_any_explicit_equity_msg and sec in ["moat", "capital_allocation", "quality"]):
         moat_status = matrix.get("Moat", "Wide")
         cap_status = matrix.get("CapitalAllocation", "Disciplined")
 
@@ -1614,7 +2368,7 @@ def build_equity_deterministic_response(
         )
 
     # 6. Technical & 50-DMA Trend Architecture
-    elif sec in ["momentum", "technical"] or any(k in msg for k in ["momentum", "50-dma", "trend", "technical", "moving average", "chart", "price action"]):
+    elif msg_matches_momentum or (not has_any_explicit_equity_msg and sec in ["momentum", "technical"]):
         diag_status = matrix.get("Diagnostic", "Temporary")
         macro_status = matrix.get("Macro", "Headwinds")
 
@@ -1630,7 +2384,7 @@ def build_equity_deterministic_response(
         )
 
     # 7. Credit Contagion & Capital Structure Bridge
-    elif sec in ["contagion", "capital_structure", "debt"] or any(k in msg for k in ["contagion", "bond", "ncd", "debenture", "seniority", "credit rating"]):
+    elif msg_matches_contagion or (not has_any_explicit_equity_msg and sec in ["contagion", "capital_structure", "debt"]):
         linked_debt = context_data.get("linked_debt", [])
         contagion = context_data.get("contagion_alert")
         radar_label = contagion.get("radar_label", "Clean Cross-Asset Alignment") if contagion else "Clean"
@@ -1644,23 +2398,32 @@ def build_equity_deterministic_response(
             f"Would you like to examine governance red flags or evaluate balance sheet solvency?"
         )
 
-    # Default Multi-Pillar Diagnostic Overview
-    else:
-        moat_status = matrix.get("Moat", "Wide")
-        gov_status = matrix.get("Governance", "Clean")
-        bs_status = matrix.get("BalanceSheet", "Debt-Free")
-        val_status = matrix.get("Valuation", "Undervalued")
+    # 8. Targeted Passage-Level Dossier Retrieval for Free-Form Inquiries
+    passage_hit = _retrieve_relevant_dossier_passages(
+        context_data=context_data,
+        asset_class="EQUITY",
+        ticker=ticker,
+        user_message=user_message,
+    )
+    if passage_hit:
+        return passage_hit
 
-        return (
-            f"**Diagnostic Research Overview for {name} ({company_name}):**\n\n"
-            f"- **Current Quote (CMP):** ₹{cmp_display} • **P/E:** {pe_display} • **MCAP:** {mcap_str}\n"
-            f"- **7-Pillar Health Posture:** Moat **{moat_status}** • Governance **{gov_status}** • Solvency **{bs_status}** • Valuation **{val_status}**\n\n"
-            f"**Select a forensic diagnostic pillar to drill into:**\n\n"
-            f"1. **💀 Pre-Mortem Inversion:** Stress-test thesis destruction vectors and worst-case failure modes.\n"
-            f"2. **📉 Reverse DCF Implied Growth:** Unpack what annual FCF growth the current CMP is pricing in.\n"
-            f"3. **🚩 Governance & Pledging:** Audit promoter pledge encumbrances and SEBI LODR disclosures.\n"
-            f"4. **🛡️ Balance Sheet Solvency:** Evaluate leverage headroom, liquidity buffers, and Altman Z-Score."
-        )
+    # Default Multi-Pillar Diagnostic Overview
+    moat_status = matrix.get("Moat", "Wide")
+    gov_status = matrix.get("Governance", "Clean")
+    bs_status = matrix.get("BalanceSheet", "Debt-Free")
+    val_status = matrix.get("Valuation", "Undervalued")
+
+    return (
+        f"**Diagnostic Research Overview for {name} ({company_name}):**\n\n"
+        f"- **Current Quote (CMP):** ₹{cmp_display} • **P/E:** {pe_display} • **MCAP:** {mcap_str}\n"
+        f"- **7-Pillar Health Posture:** Moat **{moat_status}** • Governance **{gov_status}** • Solvency **{bs_status}** • Valuation **{val_status}**\n\n"
+        f"**Select a forensic diagnostic pillar to drill into:**\n\n"
+        f"1. **💀 Pre-Mortem Inversion:** Stress-test thesis destruction vectors and worst-case failure modes.\n"
+        f"2. **📉 Reverse DCF Implied Growth:** Unpack what annual FCF growth the current CMP is pricing in.\n"
+        f"3. **🚩 Governance & Pledging:** Audit promoter pledge encumbrances and SEBI LODR disclosures.\n"
+        f"4. **🛡️ Balance Sheet Solvency:** Evaluate leverage headroom, liquidity buffers, and Altman Z-Score."
+    )
 
 
 GATED_PILLARS = (3, 5)
@@ -1741,12 +2504,30 @@ _GATED_TOPICS = {
 _ASSET_NOUN = {"MUTUAL_FUND": "scheme", "CORPORATE_DEBT": "security"}
 
 
+_FREE_TOPIC_KEYWORDS = {
+    "MUTUAL_FUND": [
+        "fee drag", "direct", "regular", "ter", "commission", "expense ratio", "wealth lost", "drag",
+        "active share", "closet", "index", "hugging", "benchmark", "style drift",
+        "holding", "allocation", "sleeve", "portfolio", "concentration", "top 10",
+        "downside", "capture", "sortino", "drawdown", "upside capture", "bear market", "aum",
+    ],
+    "CORPORATE_DEBT": [
+        "ytm", "yield", "duration", "macaulay", "seniority", "recovery", "liquidation", "tier", "recourse",
+        "credit rating", "coupon", "covenant", "acr", "asset coverage",
+    ],
+}
+
+
 def detect_gated_topic(asset_class: str, section: Optional[str], user_message: str):
     """Returns (label, blurb) when the turn targets a locked deep-dive topic, else None."""
     sec = (section or "").lower().strip()
     msg = (user_message or "").lower()
+    free_kws = _FREE_TOPIC_KEYWORDS.get(asset_class, [])
+    is_explicit_free_msg = any(fk in msg for fk in free_kws)
     for label, blurb, sections, keywords in _GATED_TOPICS.get(asset_class, []):
-        if sec in sections or any(k in msg for k in keywords):
+        if any(k in msg for k in keywords):
+            return label, blurb
+        if sec in sections and not is_explicit_free_msg:
             return label, blurb
     return None
 
@@ -2124,7 +2905,21 @@ async def process_forensic_desk_turn(
 
     # 6. Cognitive AI Response Synthesis & Tier Entitlement Guard
     history = get_conversation_turns(conversation_id, limit=6)
-    history_str = "\n".join([f"{t['sender_role'].upper()}: {t['content']}" for t in history[:-1]])
+    prior_turns = history[:-1]
+    context_data["conversation_history"] = prior_turns
+    history_str = "\n".join([f"{t['sender_role'].upper()}: {t['content']}" for t in prior_turns])
+
+    # Pre-compute any live parameterized slot math so both deterministic and LLM modes ground on exact figures
+    precomputed_slot_math = _run_parameterized_slot_calculator(
+        context_data=context_data,
+        asset_class=resolved_asset_class,
+        section=section,
+        ticker=clean_ticker,
+        user_message=user_message,
+        history=prior_turns,
+    )
+    if precomputed_slot_math:
+        context_data["live_parameterized_calculation"] = precomputed_slot_math
 
     from google.genai import Client, types as genai_types
     api_key = get_secret("GEMINI_API_KEY")
@@ -2314,7 +3109,17 @@ Recent Conversation History:
     try:
         client = Client(api_key=api_key)
         agent_reply = None
-        for model_name in ["gemini-3.8-flash", "gemini-3.5-flash-lite", "gemini-3.1-flash-lite"]:
+        candidate_models = ["gemini-3.8-flash", "gemini-3.5-flash-lite", "gemini-3.1-flash-lite"]
+        try:
+            from core.analysis import get_latest_flash_models
+            discovered = get_latest_flash_models(client) or []
+            for m_id in discovered:
+                if m_id not in candidate_models:
+                    candidate_models.append(m_id)
+        except Exception as disc_err:
+            logger.debug(f"Flash model discovery notice: {disc_err}")
+
+        for model_name in candidate_models:
             try:
                 resp = await asyncio.wait_for(
                     client.aio.models.generate_content(
@@ -2350,6 +3155,10 @@ Recent Conversation History:
                 agent_reply = build_mutual_fund_deterministic_response(context_data, section, clean_ticker, user_message)
             elif asset_cls == "CORPORATE_DEBT":
                 agent_reply = build_debt_deterministic_response(context_data, section, clean_ticker, user_message)
+            elif asset_cls == "ETF":
+                agent_reply = build_etf_deterministic_response(context_data, section, clean_ticker, user_message)
+            elif asset_cls == "REIT":
+                agent_reply = build_reit_deterministic_response(context_data, section, clean_ticker, user_message)
             else:
                 agent_reply = build_equity_deterministic_response(context_data, section, clean_ticker, user_message)
         except Exception as builder_err:

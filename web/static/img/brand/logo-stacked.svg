@@ -1,0 +1,11 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 220 140" fill="none" role="img" aria-label="Moatnomics Stacked Lockup">
+  <g transform="translate(78, 8)">
+    <path d="M12 54V28C12 17.5 19.8 9.2 29 8.2V19.5C23.6 20.4 19.5 24.8 19.5 30.5V54H12Z" fill="#7DA77A"/>
+    <path d="M52 54V28C52 17.5 44.2 9.2 35 8.2V19.5C40.4 20.4 44.5 24.8 44.5 30.5V54H52Z" fill="#7DA77A"/>
+    <path d="M19.5 30.5C19.5 24.8 23.6 20.4 29 19.5V48.5L19.5 54V30.5Z" fill="#0E3D32"/>
+    <path d="M44.5 30.5C44.5 24.8 40.4 20.4 35 19.5V48.5L44.5 54V30.5Z" fill="#1F6F54"/>
+    <polygon points="32,4 34.4,8.5 34.4,55.5 32,60 29.6,55.5 29.6,8.5" fill="#C7E268"/>
+  </g>
+  <text x="110" y="98" text-anchor="middle" fill="#F7F5EE" font-family="'Playfair Display', Georgia, serif" font-size="24" font-weight="700">Moatnomics</text>
+  <text x="110" y="118" text-anchor="middle" fill="#D9E3E8" font-family="'Inter', sans-serif" font-size="11.5" font-weight="500">Less noise, more nuance.</text>
+</svg>

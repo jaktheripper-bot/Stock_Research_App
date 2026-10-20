@@ -36,6 +36,7 @@ document.addEventListener('DOMContentLoaded', () => {
   initAuthModal();
   initNavigationDropdowns();
   initPricingCurrency();
+  initThemeToggle();
 });
 
 // ==============================================================================
@@ -2523,6 +2524,69 @@ document.querySelectorAll('[hidden="until-found"]').forEach((panel) => {
     if (trigger) trigger.setAttribute("aria-expanded", "true");
   });
 });
+
+/**
+ * 6. Dual-Theme Architecture (Institutional Dark & Editorial Warm Ivory)
+ */
+function syncThemeToggleUI(theme) {
+  const btn = document.getElementById("themeToggleBtn");
+  if (!btn) return;
+  const isLight = theme === "light";
+  btn.setAttribute("aria-pressed", isLight ? "true" : "false");
+  const iconUse = btn.querySelector("use");
+  if (iconUse) {
+    iconUse.setAttribute("href", isLight ? "#icon-theme-moon" : "#icon-theme-sun");
+  }
+}
+
+function initThemeToggle() {
+  try {
+    const saved = localStorage.getItem("moatnomics_theme");
+    const theme = saved === "light" ? "light" : "dark";
+    document.documentElement.dataset.theme = theme;
+    syncThemeToggleUI(theme);
+
+    const savedReading = localStorage.getItem("moatnomics_dossier_ivory");
+    const dossierWrap = document.getElementById("dossierReadingContainer");
+    const readingBtn = document.getElementById("dossierReadingToggleBtn");
+    if (dossierWrap && savedReading === "1") {
+      dossierWrap.classList.add("dossier-ivory-surface");
+      if (readingBtn) {
+        readingBtn.setAttribute("aria-pressed", "true");
+      }
+    }
+  } catch (e) {
+    console.warn("Theme initialization storage notice:", e);
+  }
+}
+
+window.toggleSiteTheme = function () {
+  const current = document.documentElement.dataset.theme === "light" ? "light" : "dark";
+  const next = current === "light" ? "dark" : "light";
+  document.documentElement.dataset.theme = next;
+  try {
+    localStorage.setItem("moatnomics_theme", next);
+  } catch (e) {
+    console.warn("Could not persist theme preference:", e);
+  }
+  syncThemeToggleUI(next);
+};
+
+window.toggleDossierReadingMode = function () {
+  const dossierWrap = document.getElementById("dossierReadingContainer");
+  const readingBtn = document.getElementById("dossierReadingToggleBtn");
+  if (!dossierWrap) return;
+  const isIvory = dossierWrap.classList.toggle("dossier-ivory-surface");
+  if (readingBtn) {
+    readingBtn.setAttribute("aria-pressed", isIvory ? "true" : "false");
+  }
+  try {
+    localStorage.setItem("moatnomics_dossier_ivory", isIvory ? "1" : "0");
+  } catch (e) {
+    console.warn("Could not persist dossier reading surface preference:", e);
+  }
+};
+
 
 
 

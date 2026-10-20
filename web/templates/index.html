@@ -3,7 +3,7 @@
 {% block title %}Moatnomics | Audit the Asset. Protect the Allocator.{% endblock %}
 
 {% block content %}
-<section class="hero">
+<section class="hero hero-portal-banner" data-asset-class="equities">
   <div class="container">
     <div class="hero-badge">
       <span><svg class="glyph"><use href="#glyph-search"></use></svg> EVIDENCE-LED INVESTMENT RESEARCH</span>
@@ -98,37 +98,37 @@
 
     <div class="pillars-grid">
       <div class="pillar-card">
-        <div class="pillar-icon"><svg class="glyph"><use href="#glyph-castle"></use></svg></div>
+        <div class="pillar-icon"><svg class="glyph"><use href="#icon-pillar-01"></use></svg></div>
         <h3 class="pillar-title">01. Business Model & Moat</h3>
         <p class="pillar-desc">Evaluates pricing power, switching costs, network effects, and durability against low-cost disruptors.</p>
       </div>
       <div class="pillar-card">
-        <div class="pillar-icon"><svg class="glyph"><use href="#glyph-scale"></use></svg></div>
+        <div class="pillar-icon"><svg class="glyph"><use href="#icon-pillar-02"></use></svg></div>
         <h3 class="pillar-title">02. Capital Allocation</h3>
         <p class="pillar-desc">Audits ROCE, ROE, reinvestment rates, dividend policy, and management stewardship of shareholder funds.</p>
       </div>
       <div class="pillar-card">
-        <div class="pillar-icon"><svg class="glyph"><use href="#glyph-chart"></use></svg></div>
+        <div class="pillar-icon"><svg class="glyph"><use href="#icon-pillar-03"></use></svg></div>
         <h3 class="pillar-title">03. Financial Health & Solvency</h3>
         <p class="pillar-desc">Debt-to-equity ratios, interest coverage cushions, operating cash flow quality, and working capital traps.</p>
       </div>
       <div class="pillar-card">
-        <div class="pillar-icon">🌱</div>
+        <div class="pillar-icon"><svg class="glyph"><use href="#icon-pillar-04"></use></svg></div>
         <h3 class="pillar-title">04. Growth Drivers & Industry</h3>
         <p class="pillar-desc">Total addressable market (TAM), sectoral tailwinds, regulatory barriers to entry, and volume visibility.</p>
       </div>
       <div class="pillar-card">
-        <div class="pillar-icon">🏷️</div>
+        <div class="pillar-icon"><svg class="glyph"><use href="#icon-pillar-05"></use></svg></div>
         <h3 class="pillar-title">05. Valuation & Margin of Safety</h3>
         <p class="pillar-desc">Trailing & Forward P/E multiples, EV/EBITDA bands, multi-scenario DCF estimates, and historical quartiles.</p>
       </div>
       <div class="pillar-card">
-        <div class="pillar-icon">📈</div>
+        <div class="pillar-icon"><svg class="glyph"><use href="#icon-pillar-06"></use></svg></div>
         <h3 class="pillar-title">06. Technicals & Momentum</h3>
         <p class="pillar-desc">52-week price range percentiles, 50-DMA trend lines, relative volume expansion, and moving averages.</p>
       </div>
       <div class="pillar-card">
-        <div class="pillar-icon"><svg class="glyph"><use href="#glyph-shield"></use></svg></div>
+        <div class="pillar-icon"><svg class="glyph"><use href="#icon-pillar-07"></use></svg></div>
         <h3 class="pillar-title">07. Governance & Forensic Cleanliness</h3>
         <p class="pillar-desc">Related party transactions, promoter share pledging, auditor qualification records, and insider SAST filings.</p>
       </div>
@@ -287,7 +287,8 @@
       {% set display_list = all_equities if all_equities else featured_reports %}
       {% for eq in display_list %}
       <div 
-        class="home-stock-card" 
+        class="home-stock-card asset-card-accent" 
+        data-asset-class="equities"
         data-ticker="{{ eq.ticker|lower }}" 
         data-name="{{ (eq.name|default(eq.short_name)|default(eq.ticker))|lower }}" 
         data-sector="{{ eq.sector_slug|default('DIVERSIFIED') }}" 

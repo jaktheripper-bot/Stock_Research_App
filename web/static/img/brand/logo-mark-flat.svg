@@ -1,0 +1,8 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" role="img" aria-label="Moatnomics Perspective Portal Mark">
+  <!-- Flat Small-Size Derivative (16px-24px UI Chrome & Monochrome Stamp) -->
+  <path d="M4 20V10.5C4 6.5 7 3.4 10.5 3V7.2C8.6 7.6 7.2 9.2 7.2 11.2V20H4Z" fill="#7DA77A"/>
+  <path d="M20 20V10.5C20 6.5 17 3.4 13.5 3V7.2C15.4 7.6 16.8 9.2 16.8 11.2V20H20Z" fill="#7DA77A"/>
+  <path d="M7.2 11.2L10.5 9.2V18L7.2 20V11.2Z" fill="#0E3D32"/>
+  <path d="M16.8 11.2L13.5 9.2V18L16.8 20V11.2Z" fill="#1F6F54"/>
+  <rect x="11.1" y="1.5" width="1.8" height="21" rx="0.9" fill="#C7E268"/>
+</svg>

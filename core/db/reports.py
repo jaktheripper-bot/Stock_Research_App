@@ -457,6 +457,19 @@ SECTOR_TAXONOMY = {
     "DIVERSIFIED": ("Diversified Industrials", "🏭"),
 }
 
+SECTOR_SVG_IDS = {
+    "IT_TECH": "icon-sector-technology",
+    "BFSI": "icon-sector-financials",
+    "HEALTHCARE_PHARMA": "icon-sector-healthcare",
+    "CAPITAL_GOODS_INFRA": "icon-sector-industrials",
+    "AUTOMOTIVE": "icon-sector-industrials",
+    "CONSUMER_FMCG": "icon-sector-consumer",
+    "CHEMICALS_MATERIALS": "icon-sector-industrials",
+    "COMMODITIES_ENERGY": "icon-sector-energy",
+    "EMS_DEFENCE": "icon-sector-industrials",
+    "DIVERSIFIED": "icon-sector-industrials",
+}
+
 
 def resolve_equity_sector(ticker: str, name: str, cached_sec: str = None) -> str:
     """Classifies an equity into standard sector taxonomies."""
@@ -540,6 +553,7 @@ def get_all_equities_directory_sync() -> list:
             # Resolve Sector
             sec_slug = resolve_equity_sector(ticker, name, cached_sec)
             sec_label, sec_icon = SECTOR_TAXONOMY.get(sec_slug, ("Diversified Industrials", "🏭"))
+            sec_svg_id = SECTOR_SVG_IDS.get(sec_slug, "icon-sector-industrials")
 
             # Market Cap in Crores
             mcap_cr = round(float(mcap_val) / 1e7, 1) if mcap_val else 0.0
@@ -623,6 +637,7 @@ def get_all_equities_directory_sync() -> list:
                 "sector": sec_label,
                 "sector_slug": sec_slug,
                 "sector_icon": sec_icon,
+                "sector_svg_id": sec_svg_id,
                 "industry": ind,
                 "current_price": cmp_float,
                 "formatted_price": f"₹{cmp_float:,.2f}" if cmp_float > 0 else "N/A",

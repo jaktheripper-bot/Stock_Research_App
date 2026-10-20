@@ -352,6 +352,201 @@ Ranked in top decile of ESG and BRSR disclosure transparency with zero major reg
         self.assertIsNone(_answer_from_local_dossier_index("INFY", "EQUITY", "unmatched random prompt", mock_report, fund))
         self.assertIsNone(_answer_from_local_dossier_index(None, "EQUITY", "what is the PE ratio?", mock_report, fund))
 
+    def test_reverse_dcf_and_quick_chips_not_hijacked_by_pillar_04(self):
+        """Regression test (WS1.4): Reverse DCF Implied Growth and quick-chips must not get hijacked by Pillar 04."""
+        from unittest.mock import patch
+        from core.agents.copilot.forensic_desk import build_equity_deterministic_response
+
+        mock_7pillar_report = {
+            "ticker": "INFY",
+            "short_name": "Infosys Ltd",
+            "company_name": "Infosys Ltd",
+            "baseline_price": 1500.0,
+            "baseline_pe": 25.0,
+            "baseline_mcap": 620000.0,
+            "report_text": (
+                "## Pillar 01: Macro & Regulatory Exposure\nMacro context.\n\n"
+                "## Pillar 02: Competitive Moat & Industry Positioning\nWide moat.\n\n"
+                "## Pillar 03: Promoter Quality & Fundamental Health\nClean governance.\n\n"
+                "## Pillar 04: Earnings & Margin Diagnostic\nOperating margins are 21%.\n\n"
+                "## Pillar 05: Valuation & Margin of Safety\nTrading at 25x P/E.\n\n"
+                "## Pillar 06: Technical & Momentum Overlay\nAbove 50-DMA.\n\n"
+                "## Pillar 07: SEBI BRSR & ESG Scorecard\nTop decile BRSR.\n"
+            ),
+        }
+        fund = {"current_price": 1500.0, "pe_ratio": 25.0, "eps": 60.0, "short_name": "Infosys Ltd"}
+
+        # 1. Local dossier index must return None (deferring to dedicated Reverse DCF / Forensic builders)
+        for chip_prompt in [
+            "What implied growth rate is priced into current CMP based on Reverse DCF?",
+            "What implied FCF growth rate is currently priced into the stock's Reverse DCF?",
+            "How sensitive is the Reverse DCF valuation to hurdle rate assumptions?",
+            "Are there any forensic accounting or earnings manipulation red flags?",
+            "Identify the top 3 structural risks that could permanently impair business earnings.",
+        ]:
+            self.assertIsNone(
+                _answer_from_local_dossier_index("INFY", "EQUITY", chip_prompt, mock_7pillar_report, fund),
+                f"Local dossier index hijacked specialized prompt: '{chip_prompt}'"
+            )
+
+        # 2. Full process_forensic_desk_turn with 7-pillar report in DB must route Reverse DCF chip to Reverse DCF
+        async def _run():
+            with patch("core.db.reports.get_report_by_ticker_sync", return_value=mock_7pillar_report):
+                # With explicit section="reverse_dcf"
+                res_chip = await process_forensic_desk_turn(
+                    conversation_id="TEST-WS14-CHIP",
+                    user_message="What implied growth rate is priced into current CMP based on Reverse DCF?",
+                    ticker="INFY",
+                    asset_type="equity",
+                    section="reverse_dcf",
+                    deep_dive_unlocked=True,
+                )
+                self.assertIn("Reverse DCF Valuation & Implied Growth Deconstruction", res_chip["response"])
+                self.assertIn("Implied FCF Growth Priced In", res_chip["response"])
+                self.assertNotIn("Earnings & Margin Diagnostic", res_chip["response"])
+
+                # Without section parameter (natural-language Reverse DCF question)
+                res_nl = await process_forensic_desk_turn(
+                    conversation_id="TEST-WS14-NL",
+                    user_message="What implied FCF growth rate is currently priced into the stock's Reverse DCF?",
+                    ticker="INFY",
+                    asset_type="equity",
+                    deep_dive_unlocked=False,
+                )
+                self.assertIn("Reverse DCF Valuation & Implied Growth Deconstruction", res_nl["response"])
+                self.assertNotIn("Earnings & Margin Diagnostic", res_nl["response"])
+
+                # Hurdle rate sensitivity chip
+                res_hurdle = await process_forensic_desk_turn(
+                    conversation_id="TEST-WS14-HURDLE",
+                    user_message="How sensitive is the Reverse DCF valuation to hurdle rate assumptions?",
+                    ticker="INFY",
+                    asset_type="equity",
+                    section="reverse_dcf",
+                    deep_dive_unlocked=True,
+                )
+                self.assertIn("Reverse DCF Valuation & Implied Growth Deconstruction", res_hurdle["response"])
+                self.assertNotIn("Valuation & Multiples Diagnostic", res_hurdle["response"])
+
+        asyncio.run(_run())
+
+    def test_single_number_and_conversational_followups_not_rejected(self):
+        """Verifies single-number follow-ups ('10000', '30%', '10y', '5L') and conversational replies pass qualification while digit mash fails."""
+        for valid_input in ["10000", "50,000", "30%", "12.5%", "10y", "15yr", "5L", "10Cr", "₹25,000", "yes", "sure", "ok", "why?", "elaborate"]:
+            self.assertTrue(
+                is_input_qualified(valid_input),
+                f"Expected '{valid_input}' to be qualified as a valid follow-up",
+            )
+            self.assertIsNone(
+                check_input_qualification(valid_input, "EQUITY", "INFY"),
+                f"Expected '{valid_input}' not to be intercepted as gibberish",
+            )
+
+        for invalid_mash in ["12345678", "123456789", "1111111", "asdfghjkl", "zzzzzzzz"]:
+            self.assertFalse(
+                is_input_qualified(invalid_mash),
+                f"Expected '{invalid_mash}' to be rejected as gibberish",
+            )
+
+    def test_multi_turn_parameterized_calculator_and_sticky_section_escape(self):
+        """Verifies multi-turn numeric simulations ('10000', '15%', '15y'), sticky section override, and passage retrieval."""
+        sample_report = {
+            "report_text": (
+                "### Pillar 01: Historical Scars & Management Governance\n"
+                "Management has maintained zero promoter share pledging.\n\n"
+                "### Pillar 03: Balance Sheet & Cash Flow Forensics\n"
+                "Working capital cycle improved by 14 days as receivable days (DSO) tightened from 68 to 54 days and inventory turnover accelerated.\n\n"
+                "### Pillar 05: Valuation & Reverse DCF\n"
+                "Current market price implies 11.2% annual FCF compounding over 10 years.\n"
+            ),
+            "baseline_price": 1500.0,
+            "baseline_pe": 24.0,
+            "baseline_mcap": 6200000000000,
+            "short_name": "Infosys Ltd",
+            "citations": [{"title": "Filing"}],
+        }
+        sample_fund = {"current_price": 1500.0, "pe_ratio": 24.0, "promoter_pledge_pct": 0.0}
+
+        async def _run():
+            with patch("core.db.reports.get_report_by_ticker_sync", return_value=sample_report), \
+                 patch("core.db.fundamentals.get_cached_fundamentals", return_value=sample_fund):
+                conv_id = "TEST-WS3-INTERACTIVE-FLOW"
+
+                # Turn 1: User clicks Reverse DCF quick chip (sets section='reverse_dcf')
+                t1 = await process_forensic_desk_turn(
+                    conversation_id=conv_id,
+                    user_message="What implied growth rate is priced into current CMP based on Reverse DCF?",
+                    ticker="INFY",
+                    asset_type="equity",
+                    section="reverse_dcf",
+                    deep_dive_unlocked=True,
+                )
+                self.assertIn("Reverse DCF Valuation & Implied Growth Deconstruction", t1["response"])
+
+                # Turn 2: User replies with single number "10000" (section='reverse_dcf' remains sticky)
+                t2 = await process_forensic_desk_turn(
+                    conversation_id=conv_id,
+                    user_message="10000",
+                    ticker="INFY",
+                    asset_type="equity",
+                    section="reverse_dcf",
+                    deep_dive_unlocked=True,
+                )
+                self.assertNotEqual(t2.get("status"), "INPUT_UNQUALIFIED")
+                self.assertIn("Live Parameterized Reverse-DCF & Allocation Simulation", t2["response"])
+                self.assertIn("₹10,000", t2["response"])
+
+                # Turn 3: User replies with "15%" — carries forward ₹10,000 from Turn 2 and re-computes at 15.0% CAGR
+                t3 = await process_forensic_desk_turn(
+                    conversation_id=conv_id,
+                    user_message="15%",
+                    ticker="INFY",
+                    asset_type="equity",
+                    section="reverse_dcf",
+                    deep_dive_unlocked=True,
+                )
+                self.assertIn("Live Parameterized Reverse-DCF & Allocation Simulation", t3["response"])
+                self.assertIn("₹10,000", t3["response"])
+                self.assertIn("15.0%", t3["response"])
+
+                # Turn 4: Sticky section ('pre_mortem') does NOT hijack an explicit question about working capital / receivables
+                t4 = await process_forensic_desk_turn(
+                    conversation_id=conv_id,
+                    user_message="How are receivable days and inventory turnover trending?",
+                    ticker="INFY",
+                    asset_type="equity",
+                    section="pre_mortem",
+                    deep_dive_unlocked=True,
+                )
+                self.assertNotIn("Pre-Mortem Inversion Analysis", t4["response"])
+                self.assertIn("receivable days (DSO) tightened from 68 to 54 days", t4["response"])
+
+                # Turn 5: Mutual Fund single-number follow-up ("10000") computes live Direct vs Regular fee drag
+                mf_t1 = await process_forensic_desk_turn(
+                    conversation_id="TEST-WS3-MF-FLOW",
+                    user_message="10000",
+                    ticker="122639",
+                    asset_type="mutual_fund",
+                    section="fee_drag",
+                    deep_dive_unlocked=True,
+                )
+                self.assertIn("Live Parameterized Fee-Drag & Compounding Simulation", mf_t1["response"])
+                self.assertIn("₹10,000", mf_t1["response"])
+
+                # Turn 6: Mutual Fund sticky section ('fee_drag') does NOT trap a question about Active Share
+                mf_t2 = await process_forensic_desk_turn(
+                    conversation_id="TEST-WS3-MF-FLOW",
+                    user_message="Audit the active share and check for closet indexing",
+                    ticker="122639",
+                    asset_type="mutual_fund",
+                    section="fee_drag",
+                    deep_dive_unlocked=True,
+                )
+                self.assertIn("Active Share & Closet Indexing Diagnostic", mf_t2["response"])
+                self.assertNotIn("Intermediary Fee Drag & Compounding Cost Audit", mf_t2["response"])
+
+        asyncio.run(_run())
+
     def test_copilot_turn_with_dynamic_entity_override(self):
         """Verifies end-to-end Copilot turn switches entity seamlessly mid-conversation."""
         async def _run():

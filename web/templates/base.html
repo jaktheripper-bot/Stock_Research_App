@@ -3,6 +3,8 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, minimum-scale=1.0">
+  <meta name="color-scheme" content="dark light">
+  <script>(function(){try{var s=localStorage.getItem('moatnomics_theme');document.documentElement.dataset.theme=(s==='light')?'light':'dark';}catch(e){}})();</script>
   <title>{% block title %}Moatnomics | Audit the Asset. Protect the Allocator.{% endblock %}</title>
   <meta name="description" content="{% block meta_desc %}Moatnomics is independent research on Indian stocks, mutual funds and corporate bonds. See the evidence, the risks and what to check before you invest.{% endblock %}">
   {% if canonical_for is defined and request is defined and request %}{% set _canon = canonical_for(request) %}{% if _canon %}
@@ -17,11 +19,14 @@
   <meta property="og:description" content="{% block og_desc %}Moatnomics is independent research on Indian stocks, mutual funds and corporate bonds. See the evidence, the risks and what to check before you invest.{% endblock %}">
   <meta name="twitter:card" content="summary_large_image">
   
-  <!-- Favicon & Stylesheet -->
-  <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><rect width='100' height='100' rx='20' fill='%230ea5e9'/><path d='M20 80h60M30 80V35l10-10 10 10v10h10V25l10-10 10 10v55' stroke='%23020617' stroke-width='8' fill='none' stroke-linecap='round'/></svg>">
-  <link rel="preload" href="/static/css/style.css?v=20261019_2356" as="style" onload="this.rel='stylesheet'">
-  <link rel="preload" href="/static/js/main.js?v=20261019_1900" as="script">
-  <link rel="stylesheet" href="/static/css/style.css?v=20261019_2356">
+  <!-- Favicon, Typography & Stylesheet -->
+  <link rel="icon" type="image/svg+xml" href="/static/img/brand/favicon.svg">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600;700&family=Playfair+Display:ital,wght@0,600;0,700;1,400&display=swap" rel="stylesheet">
+  <link rel="preload" href="/static/css/style.css?v=20261020_0200" as="style" onload="this.rel='stylesheet'">
+  <link rel="preload" href="/static/js/main.js?v=20261020_0200" as="script">
+  <link rel="stylesheet" href="/static/css/style.css?v=20261020_0200">
 
   <!-- Schema.org Structured Data -->
   <script type="application/ld+json">
@@ -118,6 +123,144 @@
         <line x1="2" y1="12" x2="22" y2="12" stroke="currentColor" stroke-width="2"/>
         <path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z" fill="none" stroke="currentColor" stroke-width="2"/>
       </symbol>
+
+      <!-- Moatnomics v2.0 Primary Brand Mark: "The Perspective Portal" -->
+      <symbol id="logo-perspective-portal" viewBox="0 0 64 64">
+        <path d="M 10 54 V 10 H 54 V 54" fill="none" stroke="#0E3D32" stroke-width="5.5" stroke-linecap="square" stroke-linejoin="miter"/>
+        <path d="M 18 54 V 28 A 14 14 0 0 1 46 28 V 54" fill="none" stroke="#7DA77A" stroke-width="4" stroke-linecap="square"/>
+        <path d="M 32 24 L 22 54 M 32 24 L 42 54" fill="none" stroke="#C7E268" stroke-width="2.5" stroke-linecap="round"/>
+        <circle cx="32" cy="24" r="3.5" fill="#C7E268"/>
+      </symbol>
+      <symbol id="logo-perspective-portal-flat" viewBox="0 0 64 64">
+        <path d="M 10 54 V 10 H 54 V 54" fill="none" stroke="currentColor" stroke-width="5.5" stroke-linecap="square" stroke-linejoin="miter"/>
+        <path d="M 18 54 V 28 A 14 14 0 0 1 46 28 V 54" fill="none" stroke="currentColor" stroke-width="4" stroke-linecap="square"/>
+        <circle cx="32" cy="24" r="3.5" fill="currentColor"/>
+      </symbol>
+
+      <!-- Canonical 12-Icon Vector System (24x24px, 1.85px stroke) -->
+      <symbol id="icon-research" viewBox="0 0 24 24">
+        <path d="M4 19V6a2 2 0 0 1 2-2h9l5 5v10a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2Z" fill="none" stroke="currentColor" stroke-width="1.85"/>
+        <circle cx="11" cy="12" r="3" fill="none" stroke="currentColor" stroke-width="1.85"/>
+        <path d="m13.5 14.5 2.5 2.5" fill="none" stroke="currentColor" stroke-width="1.85" stroke-linecap="round"/>
+      </symbol>
+      <symbol id="icon-markets" viewBox="0 0 24 24">
+        <path d="M3 19h18" fill="none" stroke="currentColor" stroke-width="1.85" stroke-linecap="round"/>
+        <path d="m5 15 4-4 3 3 7-7" fill="none" stroke="currentColor" stroke-width="1.85" stroke-linecap="round" stroke-linejoin="round"/>
+        <path d="M15 7h4v4" fill="none" stroke="currentColor" stroke-width="1.85" stroke-linecap="round" stroke-linejoin="round"/>
+      </symbol>
+      <symbol id="icon-compare" viewBox="0 0 24 24">
+        <rect x="3" y="4" width="7" height="16" rx="1.5" fill="none" stroke="currentColor" stroke-width="1.85"/>
+        <rect x="14" y="4" width="7" height="16" rx="1.5" fill="none" stroke="currentColor" stroke-width="1.85"/>
+        <path d="M10 10h4M10 14h4" fill="none" stroke="currentColor" stroke-width="1.85" stroke-linecap="round"/>
+      </symbol>
+      <symbol id="icon-watchlist" viewBox="0 0 24 24">
+        <path d="M6 4h12a1 1 0 0 1 1 1v15l-7-4-7 4V5a1 1 0 0 1 1-1Z" fill="none" stroke="currentColor" stroke-width="1.85" stroke-linejoin="round"/>
+        <circle cx="12" cy="10" r="2" fill="none" stroke="currentColor" stroke-width="1.85"/>
+      </symbol>
+      <symbol id="icon-insights" viewBox="0 0 24 24">
+        <path d="M4 18h16" fill="none" stroke="currentColor" stroke-width="1.85" stroke-linecap="round"/>
+        <path d="M6 18v-4a6 6 0 0 1 12 0v4" fill="none" stroke="currentColor" stroke-width="1.85"/>
+        <path d="M12 6V4M6.3 8.3 4.9 6.9M17.7 8.3l1.4-1.4" fill="none" stroke="currentColor" stroke-width="1.85" stroke-linecap="round"/>
+      </symbol>
+      <symbol id="icon-portfolio" viewBox="0 0 24 24">
+        <rect x="3" y="3" width="8" height="8" rx="1.5" fill="none" stroke="currentColor" stroke-width="1.85"/>
+        <rect x="13" y="3" width="8" height="5" rx="1.5" fill="none" stroke="currentColor" stroke-width="1.85"/>
+        <rect x="13" y="10" width="8" height="11" rx="1.5" fill="none" stroke="currentColor" stroke-width="1.85"/>
+        <rect x="3" y="13" width="8" height="8" rx="1.5" fill="none" stroke="currentColor" stroke-width="1.85"/>
+      </symbol>
+      <symbol id="icon-risk" viewBox="0 0 24 24">
+        <path d="M12 3 4 6.5v5.5c0 5 3.5 8.5 8 10 4.5-1.5 8-5 8-10V6.5L12 3Z" fill="none" stroke="currentColor" stroke-width="1.85" stroke-linejoin="round"/>
+        <path d="M12 8v5" fill="none" stroke="currentColor" stroke-width="1.85" stroke-linecap="round"/>
+        <circle cx="12" cy="16" r="1" fill="currentColor"/>
+      </symbol>
+      <symbol id="icon-valuation" viewBox="0 0 24 24">
+        <path d="M12 4v16M5 20h14" fill="none" stroke="currentColor" stroke-width="1.85" stroke-linecap="round"/>
+        <path d="M4 8h16" fill="none" stroke="currentColor" stroke-width="1.85" stroke-linecap="round"/>
+        <path d="m6 8-2 5h4l-2-5ZM18 8l-2 5h4l-2-5Z" fill="none" stroke="currentColor" stroke-width="1.85" stroke-linejoin="round"/>
+      </symbol>
+      <symbol id="icon-multi-asset" viewBox="0 0 24 24">
+        <path d="M4 20V8a2 2 0 0 1 2-2h12a2 2 0 0 1 2 2v12" fill="none" stroke="currentColor" stroke-width="1.85"/>
+        <path d="M8 20v-7a4 4 0 0 1 8 0v7" fill="none" stroke="currentColor" stroke-width="1.85"/>
+        <path d="M2 20h20" fill="none" stroke="currentColor" stroke-width="1.85" stroke-linecap="round"/>
+      </symbol>
+      <symbol id="icon-screen" viewBox="0 0 24 24">
+        <path d="M4 6h16M7 12h10M10 18h4" fill="none" stroke="currentColor" stroke-width="1.85" stroke-linecap="round"/>
+        <circle cx="9" cy="6" r="2" fill="none" stroke="currentColor" stroke-width="1.85"/>
+        <circle cx="15" cy="12" r="2" fill="none" stroke="currentColor" stroke-width="1.85"/>
+      </symbol>
+      <symbol id="icon-alerts" viewBox="0 0 24 24">
+        <path d="M6 16V10a6 6 0 0 1 12 0v6l2 2H4l2-2Z" fill="none" stroke="currentColor" stroke-width="1.85" stroke-linejoin="round"/>
+        <path d="M10 20a2 2 0 0 0 4 0" fill="none" stroke="currentColor" stroke-width="1.85" stroke-linecap="round"/>
+      </symbol>
+      <symbol id="icon-download" viewBox="0 0 24 24">
+        <path d="M12 4v11m0 0-4-4m4 4 4-4" fill="none" stroke="currentColor" stroke-width="1.85" stroke-linecap="round" stroke-linejoin="round"/>
+        <path d="M4 17v2a1 1 0 0 0 1 1h14a1 1 0 0 0 1-1v-2" fill="none" stroke="currentColor" stroke-width="1.85" stroke-linecap="round"/>
+      </symbol>
+
+      <!-- 7 Pillar Diagnostic Icons -->
+      <symbol id="icon-pillar-01" viewBox="0 0 24 24">
+        <path d="M3 20h18M5 20V9l7-5 7 5v11" fill="none" stroke="currentColor" stroke-width="1.85" stroke-linejoin="round"/>
+        <path d="M9 20v-6a3 3 0 0 1 6 0v6" fill="none" stroke="currentColor" stroke-width="1.85"/>
+      </symbol>
+      <symbol id="icon-pillar-02" viewBox="0 0 24 24">
+        <rect x="4" y="4" width="16" height="16" rx="2" fill="none" stroke="currentColor" stroke-width="1.85"/>
+        <path d="M8 15V11M12 15V8M16 15v-3" fill="none" stroke="currentColor" stroke-width="1.85" stroke-linecap="round"/>
+      </symbol>
+      <symbol id="icon-pillar-03" viewBox="0 0 24 24">
+        <circle cx="12" cy="12" r="8" fill="none" stroke="currentColor" stroke-width="1.85"/>
+        <path d="M12 8v4l3 2" fill="none" stroke="currentColor" stroke-width="1.85" stroke-linecap="round"/>
+      </symbol>
+      <symbol id="icon-pillar-04" viewBox="0 0 24 24">
+        <path d="M4 18h16M6 15l4-4 3 3 5-6" fill="none" stroke="currentColor" stroke-width="1.85" stroke-linecap="round" stroke-linejoin="round"/>
+      </symbol>
+      <symbol id="icon-pillar-05" viewBox="0 0 24 24">
+        <circle cx="12" cy="12" r="8" fill="none" stroke="currentColor" stroke-width="1.85"/>
+        <circle cx="12" cy="12" r="3" fill="none" stroke="currentColor" stroke-width="1.85"/>
+      </symbol>
+      <symbol id="icon-pillar-06" viewBox="0 0 24 24">
+        <path d="m12 4 9 15H3L12 4Z" fill="none" stroke="currentColor" stroke-width="1.85" stroke-linejoin="round"/>
+        <path d="M12 10v4" fill="none" stroke="currentColor" stroke-width="1.85" stroke-linecap="round"/>
+      </symbol>
+      <symbol id="icon-pillar-07" viewBox="0 0 24 24">
+        <path d="M4 12h4l2.5-6 3 12 2.5-6H20" fill="none" stroke="currentColor" stroke-width="1.85" stroke-linecap="round" stroke-linejoin="round"/>
+      </symbol>
+
+      <!-- Sector & Utility Vector Icons -->
+      <symbol id="icon-sector-realestate" viewBox="0 0 24 24">
+        <path d="M4 20V5a1 1 0 0 1 1-1h9a1 1 0 0 1 1 1v15M15 10h4a1 1 0 0 1 1 1v9M2 20h20" fill="none" stroke="currentColor" stroke-width="1.85" stroke-linecap="round"/>
+        <path d="M8 8h3M8 12h3M8 16h3" fill="none" stroke="currentColor" stroke-width="1.85" stroke-linecap="round"/>
+      </symbol>
+      <symbol id="icon-sector-industrials" viewBox="0 0 24 24">
+        <path d="M3 20V10l6 4V10l6 4V6h6v14H3Z" fill="none" stroke="currentColor" stroke-width="1.85" stroke-linejoin="round"/>
+      </symbol>
+      <symbol id="icon-support" viewBox="0 0 24 24">
+        <path d="M4 13v-1a8 8 0 0 1 16 0v1" fill="none" stroke="currentColor" stroke-width="1.85"/>
+        <rect x="3" y="13" width="4" height="6" rx="1.5" fill="none" stroke="currentColor" stroke-width="1.85"/>
+        <rect x="17" y="13" width="4" height="6" rx="1.5" fill="none" stroke="currentColor" stroke-width="1.85"/>
+      </symbol>
+      <symbol id="icon-doc" viewBox="0 0 24 24">
+        <path d="M6 3h9l4 4v13a1 1 0 0 1-1 1H6a1 1 0 0 1-1-1V4a1 1 0 0 1 1-1Z" fill="none" stroke="currentColor" stroke-width="1.85"/>
+        <path d="M9 12h6M9 16h6M9 8h3" fill="none" stroke="currentColor" stroke-width="1.85" stroke-linecap="round"/>
+      </symbol>
+      <symbol id="icon-lock" viewBox="0 0 24 24">
+        <rect x="5" y="11" width="14" height="9" rx="2" fill="none" stroke="currentColor" stroke-width="1.85"/>
+        <path d="M8 11V7a4 4 0 0 1 8 0v4" fill="none" stroke="currentColor" stroke-width="1.85"/>
+      </symbol>
+      <symbol id="icon-radar" viewBox="0 0 24 24">
+        <circle cx="12" cy="12" r="9" fill="none" stroke="currentColor" stroke-width="1.85"/>
+        <circle cx="12" cy="12" r="5" fill="none" stroke="currentColor" stroke-width="1.85"/>
+        <path d="m12 12 6-6" fill="none" stroke="currentColor" stroke-width="1.85" stroke-linecap="round"/>
+      </symbol>
+      <symbol id="icon-theme-sun" viewBox="0 0 24 24">
+        <circle cx="12" cy="12" r="4" fill="none" stroke="currentColor" stroke-width="1.85"/>
+        <path d="M12 3v2m0 14v2M3 12h2m14 0h2m-2.6-6.4-1.4 1.4M7 17l-1.4 1.4m0-12.8L7 7m10 10 1.4 1.4" fill="none" stroke="currentColor" stroke-width="1.85" stroke-linecap="round"/>
+      </symbol>
+      <symbol id="icon-theme-moon" viewBox="0 0 24 24">
+        <path d="M20 14.5A8.5 8.5 0 0 1 9.5 4a8.5 8.5 0 1 0 10.5 10.5Z" fill="none" stroke="currentColor" stroke-width="1.85" stroke-linejoin="round"/>
+      </symbol>
+      <symbol id="icon-reading-surface" viewBox="0 0 24 24">
+        <path d="M4 5.5A2.5 2.5 0 0 1 6.5 3H12v16H6.5A2.5 2.5 0 0 0 4 21.5V5.5Zm16 0A2.5 2.5 0 0 0 17.5 3H12v16h5.5a2.5 2.5 0 0 1 2.5 2.5V5.5Z" fill="none" stroke="currentColor" stroke-width="1.85" stroke-linejoin="round"/>
+      </symbol>
     </defs>
   </svg>
 
@@ -127,7 +270,7 @@
       <div class="nav-wrap">
         <a href="/" class="brand-link">
           <div class="brand-logo">
-            <svg class="glyph" style="width: 22px; height: 22px; color: #020617; stroke: currentColor;"><use href="#glyph-castle"></use></svg>
+            <svg viewBox="0 0 64 64" style="width: 28px; height: 28px;" aria-hidden="true"><use href="#logo-perspective-portal"></use></svg>
           </div>
           <div class="brand-text-block">
             <span class="brand-text">MOAT<span style="color: var(--accent-cyan);">NOMICS</span></span>
@@ -150,7 +293,7 @@
             </button>
             <div class="dropdown-menu" role="menu" aria-labelledby="marketsDropdownBtn">
               <a href="/equities" class="dropdown-item {% if active_page == 'equities' %}active{% endif %}" role="menuitem">
-                <div class="dropdown-icon">📈</div>
+                <div class="dropdown-icon"><svg class="glyph"><use href="#icon-markets"></use></svg></div>
                 <div class="dropdown-content">
                   <div class="dropdown-title">Stock Reports & Equities</div>
                   <div class="dropdown-desc">All verified BSE & NSE institutional dossiers & screener</div>
@@ -164,7 +307,7 @@
                 </div>
               </a>
               <a href="/etfs" class="dropdown-item {% if active_page == 'etfs' %}active{% endif %}" role="menuitem">
-                <div class="dropdown-icon">🌐</div>
+                <div class="dropdown-icon"><svg class="glyph"><use href="#glyph-globe"></use></svg></div>
                 <div class="dropdown-content">
                   <div class="dropdown-title">National ETF Matrix</div>
                   <div class="dropdown-desc">NAV premium/discount, tracking error & liquidity depth</div>
@@ -186,7 +329,7 @@
                 </div>
               </a>
               <a href="/reits" class="dropdown-item {% if active_page == 'reits' %}active{% endif %}" role="menuitem">
-                <div class="dropdown-icon">🏢</div>
+                <div class="dropdown-icon"><svg class="glyph"><use href="#icon-sector-realestate"></use></svg></div>
                 <div class="dropdown-content">
                   <div class="dropdown-title">SM REITs, InvITs & SGBs</div>
                   <div class="dropdown-desc">Fractional real estate, NDCF purity & gold parity</div>
@@ -194,14 +337,14 @@
               </a>
               <div class="dropdown-divider"></div>
               <a href="/opportunities" class="dropdown-item {% if active_page == 'opportunities' %}active{% endif %}" role="menuitem">
-                <div class="dropdown-icon">🎯</div>
+                <div class="dropdown-icon"><svg class="glyph"><use href="#icon-pillar-05"></use></svg></div>
                 <div class="dropdown-content">
                   <div class="dropdown-title">Opportunity Terminal</div>
                   <div class="dropdown-desc">Cross-asset discovery, spread heatmap & risk-yield frontier</div>
                 </div>
               </a>
               <a href="/msme" class="dropdown-item {% if active_page == 'msme' %}active{% endif %}" role="menuitem">
-                <div class="dropdown-icon">🏭</div>
+                <div class="dropdown-icon"><svg class="glyph"><use href="#icon-sector-industrials"></use></svg></div>
                 <div class="dropdown-content">
                   <div class="dropdown-title">Unlisted MSMEs & SMEs</div>
                   <div class="dropdown-desc">Udyam registry, industrial clusters & turnover tiers</div>
@@ -220,7 +363,7 @@
             </button>
             <div class="dropdown-menu" role="menu" aria-labelledby="toolsDropdownBtn">
               <a href="/discovery" class="dropdown-item {% if active_page == 'discovery' %}active{% endif %}" role="menuitem">
-                <div class="dropdown-icon">🌅</div>
+                <div class="dropdown-icon"><svg class="glyph"><use href="#icon-insights"></use></svg></div>
                 <div class="dropdown-content">
                   <div class="dropdown-title">Morning Discovery @9AM</div>
                   <div class="dropdown-desc">Daily screening of under-the-radar BSE equities</div>
@@ -234,7 +377,7 @@
                 </div>
               </a>
               <a href="/calculator/tax" class="dropdown-item {% if active_page == 'tax_calculator' %}active{% endif %}" role="menuitem">
-                <div class="dropdown-icon">🧮</div>
+                <div class="dropdown-icon"><svg class="glyph"><use href="#icon-valuation"></use></svg></div>
                 <div class="dropdown-content">
                   <div class="dropdown-title">Net Real Tax Calculator</div>
                   <div class="dropdown-desc">Post-tax returns deflated by MOSPI CPI inflation</div>
@@ -272,7 +415,7 @@
             </button>
             <div class="dropdown-menu dropdown-menu-right" role="menu" aria-labelledby="govDropdownBtn">
               <a href="/contact" class="dropdown-item {% if active_page == 'contact' %}active{% endif %}" role="menuitem">
-                <div class="dropdown-icon">🎧</div>
+                <div class="dropdown-icon"><svg class="glyph"><use href="#icon-support"></use></svg></div>
                 <div class="dropdown-content">
                   <div class="dropdown-title">Support & Grievances</div>
                   <div class="dropdown-desc">Investor redressal, ticket desk & SEBI SCORES</div>
@@ -287,14 +430,14 @@
               </a>
               <div class="dropdown-divider"></div>
               <a href="/terms" class="dropdown-item {% if active_page == 'terms' %}active{% endif %}" role="menuitem">
-                <div class="dropdown-icon">📑</div>
+                <div class="dropdown-icon"><svg class="glyph"><use href="#icon-doc"></use></svg></div>
                 <div class="dropdown-content">
                   <div class="dropdown-title">Terms of Service</div>
                   <div class="dropdown-desc">Computational credit rules & platform usage</div>
                 </div>
               </a>
               <a href="/privacy" class="dropdown-item {% if active_page == 'privacy' %}active{% endif %}" role="menuitem">
-                <div class="dropdown-icon">🔒</div>
+                <div class="dropdown-icon"><svg class="glyph"><use href="#icon-lock"></use></svg></div>
                 <div class="dropdown-content">
                   <div class="dropdown-title">Privacy Policy</div>
                   <div class="dropdown-desc">256-bit encryption & zero data monetization</div>
@@ -305,6 +448,9 @@
         </nav>
 
         <div class="nav-actions">
+          <button id="themeToggleBtn" type="button" class="btn btn-secondary btn-sm theme-toggle-btn" onclick="toggleSiteTheme()" aria-label="Toggle Light/Dark Theme" aria-pressed="false" title="Toggle Theme">
+            <svg class="glyph" style="width: 16px; height: 16px;"><use href="#icon-theme-sun"></use></svg>
+          </button>
           <button id="navSignInBtn" class="btn btn-secondary btn-sm" onclick="openSignInModal()">
             <span>Sign In / 2 Credits</span>
           </button>
@@ -504,14 +650,19 @@
 
   <!-- Global Forensic Evaluation & Progressive Timer HUD -->
   <div id="synthesizingOverlay" class="modal-backdrop">
-    <div class="modal-dialog" style="max-width: 520px; text-align: center; padding: 36px 28px; background: rgba(15, 23, 42, 0.95); border: 1px solid rgba(14, 165, 233, 0.3); box-shadow: 0 25px 60px rgba(0, 0, 0, 0.6), 0 0 40px rgba(14, 165, 233, 0.15); position: relative;">
+    <div class="modal-dialog" style="max-width: 520px; text-align: center; padding: 36px 28px; background: rgba(11, 35, 55, 0.96); border: 1px solid rgba(125, 167, 122, 0.35); box-shadow: 0 25px 60px rgba(0, 0, 0, 0.6), 0 0 40px rgba(14, 61, 50, 0.25); position: relative;">
       <button type="button" onclick="window.hideEvaluationHUD()" style="position: absolute; top: 14px; right: 14px; background: rgba(255, 255, 255, 0.08); border: none; color: #94a3b8; font-size: 14px; width: 28px; height: 28px; border-radius: 50%; cursor: pointer; display: flex; align-items: center; justify-content: center; transition: all 0.2s;" title="Dismiss HUD" onmouseover="this.style.color='#f8fafc'; this.style.background='rgba(255, 255, 255, 0.16)';" onmouseout="this.style.color='#94a3b8'; this.style.background='rgba(255, 255, 255, 0.08)';">✕</button>
-      <div style="width: 54px; height: 54px; margin: 0 auto 16px; display: flex; align-items: center; justify-content: center; border-radius: 50%; background: rgba(14, 165, 233, 0.12); border: 1px solid rgba(14, 165, 233, 0.35);">
-        <svg class="glyph" style="width: 26px; height: 26px; color: #38bdf8; animation: spin 2s linear infinite;"><use href="#glyph-shield"></use></svg>
+      <div style="width: 56px; height: 56px; margin: 0 auto 16px; display: flex; align-items: center; justify-content: center; border-radius: 14px; background: rgba(14, 61, 50, 0.35); border: 1px solid rgba(199, 226, 104, 0.35);">
+        <svg class="portal-reveal-mark" viewBox="0 0 64 64" style="width: 34px; height: 34px;" aria-hidden="true">
+          <path class="portal-frame" d="M 10 54 V 10 H 54 V 54" fill="none" stroke="#0E3D32" stroke-width="5" stroke-linecap="square"/>
+          <path class="portal-arch" d="M 18 54 V 28 A 14 14 0 0 1 46 28 V 54" fill="none" stroke="#7DA77A" stroke-width="4"/>
+          <path class="portal-rays" d="M 32 24 L 22 54 M 32 24 L 42 54" fill="none" stroke="#C7E268" stroke-width="2.5"/>
+          <circle class="portal-horizon" cx="32" cy="24" r="3.5" fill="#C7E268"/>
+        </svg>
       </div>
 
       <div style="margin-bottom: 8px;">
-        <span id="overlayAssetBadge" style="display: inline-flex; align-items: center; gap: 6px; padding: 3px 10px; border-radius: 9999px; background: rgba(14, 165, 233, 0.15); border: 1px solid rgba(14, 165, 233, 0.3); font-size: 11px; font-weight: 700; color: #38bdf8; text-transform: uppercase;">
+        <span id="overlayAssetBadge" style="display: inline-flex; align-items: center; gap: 6px; padding: 3px 10px; border-radius: 9999px; background: rgba(14, 61, 50, 0.35); border: 1px solid rgba(125, 167, 122, 0.4); font-size: 11px; font-weight: 700; color: var(--brand-lime); text-transform: uppercase;">
           Forensic Intelligence Engine
         </span>
       </div>
@@ -524,16 +675,16 @@
       </p>
 
       <!-- Institutional 30-Second Progressive Fill Track -->
-      <div style="background: rgba(15, 23, 42, 0.8); border: 1px solid rgba(255, 255, 255, 0.12); border-radius: 9999px; height: 10px; overflow: hidden; margin-bottom: 10px; position: relative;">
-        <div id="overlayProgressBar" style="width: 0%; height: 100%; background: linear-gradient(90deg, #0ea5e9 0%, #38bdf8 50%, #10b981 100%); border-radius: 9999px; transition: width 0.3s ease-out;"></div>
+      <div style="background: rgba(11, 35, 55, 0.85); border: 1px solid rgba(217, 227, 232, 0.14); border-radius: 9999px; height: 10px; overflow: hidden; margin-bottom: 10px; position: relative;">
+        <div id="overlayProgressBar" style="width: 0%; height: 100%; background: linear-gradient(90deg, #0E3D32 0%, #7DA77A 55%, #C7E268 100%); border-radius: 9999px; transition: width 0.3s ease-out;"></div>
       </div>
 
       <div style="display: flex; justify-content: space-between; align-items: center; font-size: 12px; color: var(--text-muted); margin-bottom: 16px; font-variant-numeric: tabular-nums;">
         <span id="overlayProgressStage" style="font-weight: 600; color: #cbd5e1;">Step 1/4: Ingesting BSE Filings</span>
-        <span id="overlayProgressTime" style="font-weight: 700; color: #38bdf8; font-family: monospace;">0s / ~30s</span>
+        <span id="overlayProgressTime" style="font-weight: 700; color: var(--brand-lime); font-family: var(--font-mono);">0s / ~30s</span>
       </div>
 
-      <div style="background: rgba(14, 165, 233, 0.08); border: 1px solid rgba(14, 165, 233, 0.2); border-radius: 8px; padding: 10px 14px; font-size: 12px; color: var(--accent-cyan); display: flex; align-items: center; justify-content: center; gap: 6px;">
+      <div style="background: rgba(14, 61, 50, 0.25); border: 1px solid rgba(125, 167, 122, 0.25); border-radius: 8px; padding: 10px 14px; font-size: 12px; color: var(--accent-cyan); display: flex; align-items: center; justify-content: center; gap: 6px;">
         <span>⏳</span> <span id="overlayCalloutText">Live analytical pipeline active. Average compilation time: ~20–30s.</span>
       </div>
     </div>
@@ -549,8 +700,8 @@
         <span style="font-size: 11.5px; font-weight: 700; color: #34d399; text-transform: uppercase;">Surveillance Engine • Active Daemons</span>
       </div>
 
-      <h2 style="font-size: 22px; font-weight: 800; color: #f8fafc; margin-bottom: 6px;">
-        🛰️ Autonomous Surveillance Feed
+      <h2 style="font-size: 22px; font-weight: 800; color: #f8fafc; margin-bottom: 6px; display: flex; align-items: center; gap: 8px;">
+        <svg class="glyph" style="width: 22px; height: 22px; color: var(--brand-lime);"><use href="#icon-radar"></use></svg> Autonomous Surveillance Feed
       </h2>
       <p style="font-size: 13.5px; color: #94a3b8; line-height: 1.5; margin-bottom: 20px;">
         Background daemons continuously monitor official exchange filings, AMFI NAV updates, and fund portfolio movements so your research stays fresh without surprises.
@@ -602,7 +753,7 @@
         <div class="footer-brand">
           <div style="display: flex; align-items: center; gap: 10px; margin-bottom: 12px;">
             <div class="brand-logo" style="width: 32px; height: 32px;">
-              <svg class="glyph" style="width: 18px; height: 18px; color: #020617; stroke: currentColor;"><use href="#glyph-castle"></use></svg>
+              <svg viewBox="0 0 64 64" style="width: 22px; height: 22px;" aria-hidden="true"><use href="#logo-perspective-portal"></use></svg>
             </div>
             <span style="font-weight: 800; font-size: 18px; color: var(--text-primary); letter-spacing: -0.02em;">MOAT<span style="color: var(--accent-cyan);">NOMICS</span></span>
           </div>

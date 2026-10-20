@@ -4,7 +4,7 @@
 {% block meta_description %}Institutional portfolio overlap tool. Compute pairwise holding duplication across mutual funds to expose illusory diversification and avoid double fees on identical stock/bond portfolios.{% endblock %}
 
 {% block content %}
-<div class="container py-8">
+<div class="container py-8" data-asset-class="funds">
   <!-- Breadcrumbs -->
   <div style="font-size: 13px; color: #64748b; margin-bottom: 20px; display: flex; align-items: center; gap: 8px;">
     <a href="/" style="color: #94a3b8; text-decoration: none;">Home</a>
@@ -15,7 +15,7 @@
   </div>
 
   <!-- Hero Header -->
-  <div style="background: linear-gradient(135deg, rgba(30, 41, 59, 0.7) 0%, rgba(15, 23, 42, 0.9) 100%); border: 1px solid rgba(255, 255, 255, 0.1); border-radius: 16px; padding: 28px; margin-bottom: 28px;">
+  <div class="hero-portal-banner asset-card-accent" style="background: linear-gradient(135deg, rgba(30, 41, 59, 0.7) 0%, rgba(15, 23, 42, 0.9) 100%); border: 1px solid rgba(255, 255, 255, 0.1); border-radius: 16px; padding: 28px; margin-bottom: 28px;">
     <div style="display: inline-flex; align-items: center; gap: 8px; background: rgba(16, 185, 129, 0.15); border: 1px solid rgba(16, 185, 129, 0.3); border-radius: 9999px; padding: 4px 12px; margin-bottom: 12px;">
       <span style="width: 8px; height: 8px; border-radius: 50%; background: #10b981;"></span>
       <span style="font-size: 12px; font-weight: 700; color: #34d399; text-transform: uppercase; letter-spacing: 0.05em;">True Diversification Engine</span>
