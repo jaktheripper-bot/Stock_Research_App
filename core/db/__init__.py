@@ -123,6 +123,10 @@ from core.db.support import (
     add_ticket_response,
     get_ticket_responses,
     get_ticket_by_id,
+    ensure_canned_responses_table,
+    get_canned_responses,
+    save_canned_response,
+    delete_canned_response,
 )
 
 from core.db.fundamentals import (
@@ -219,6 +223,10 @@ __all__ = [
     "add_ticket_response",
     "get_ticket_responses",
     "get_ticket_by_id",
+    "ensure_canned_responses_table",
+    "get_canned_responses",
+    "save_canned_response",
+    "delete_canned_response",
     # fundamentals cache
     "get_cached_fundamentals",
     "save_cached_fundamentals",

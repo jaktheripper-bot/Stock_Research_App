@@ -736,3 +736,116 @@ Under Indian tax laws, distributions from REITs and InvITs pass through three di
                 os.unlink(out_name)
             except OSError as cleanup_err:
                 logger.debug("Cleanup notice for %s: %s", out_name, cleanup_err)
+
+
+def generate_msme_dossier_pdf(
+    uin: str,
+    dossier: dict,
+    branding: dict = None,
+    deep_dive_unlocked: bool = True
+) -> bytes:
+    """Compiles institutional 4-pillar forensic PDF dossier for an unlisted Indian MSME enterprise."""
+    from markdown_pdf import MarkdownPdf, Section
+    now_str = datetime.now(IST).strftime("%d %B %Y, %I:%M %p IST")
+    clean_uin = re_mod.sub(r'[^a-zA-Z0-9_-]', '', uin)
+    doc_id = f"MSME-{clean_uin[-8:]}-{datetime.now(IST).strftime('%Y%m%d%H%M')}"
+
+    name = dossier.get("name", uin)
+    tier = dossier.get("tier", "Enterprise")
+    sector = (dossier.get("sector") or "general_manufacturing").replace("_", " ").title()
+    city = dossier.get("city", "District")
+    state = dossier.get("state", "India")
+    turnover = float(dossier.get("annual_turnover") or 0.0)
+    employees = int(dossier.get("employee_count") or 0)
+    reg_date = dossier.get("registration_date", "N/A")
+    source = dossier.get("source", "Udyam Gazette / Open Registry")
+
+    p1 = dossier.get("pillar_1_working_capital") or {}
+    p2 = dossier.get("pillar_2_supply_chain") or {}
+    p3 = dossier.get("pillar_3_solvency") or {}
+    p4 = dossier.get("pillar_4_moat") or {}
+
+    moat_score = p4.get("moat_score", 50)
+    moat_tier = p4.get("moat_tier", "Core Industrial Specialist")
+    moat_badge = p4.get("moat_badge", "Moderate Moat")
+
+    header = f"""# Unlisted MSME Forensic Dossier: {name}
+> **Statutory UIN:** `{uin}` | **MSMED Act 2020 Tier:** `{tier} Enterprise` | **Document ID:** `{doc_id}`  
+> **Industrial Cluster:** {city}, {state} ({sector}) | **Compilation Timestamp:** {now_str}  
+> **Data Provenance:** {source} (Registered: {reg_date}) & Sector-Calibrated Industrial Benchmarks.
+"""
+
+    scorecard_md = f"""### Executive 4-Pillar Forensic Scorecard
+| Forensic Dimension | Reported / Computed Metric | Classification / Status |
+| :--- | :--- | :--- |
+| **Forensic Moat Score** | **{moat_score} / 100** | **{moat_badge} ({moat_tier})** |
+| **Annual Turnover** | **₹{turnover:,.2f} Cr** | {tier} Tier (~₹{float(p1.get('daily_sales_cr') or 0.0):,.2f} Cr/day) |
+| **Cash Conversion Cycle (CCC)** | **{p1.get('net_ccc_days', 0)} Days** | **{p1.get('stress_level', 'Moderate')}** (DSO {p1.get('dso_days', 0)}d + DIO {p1.get('dio_days', 0)}d - DPO {p1.get('dpo_days', 0)}d) |
+| **Working Capital Requirement** | **₹{float(p1.get('working_capital_req_cr') or 0.0):,.2f} Cr** | Operational Funding Requirement |
+| **Interest Coverage Ratio (ICR)** | **{p3.get('interest_coverage_ratio', 3.5)}x** | **{p3.get('icr_health', 'Stable')}** (EBITDA Margin: {p3.get('ebitda_margin_pct', 12.0)}%) |
+| **TReDS Discounting Grade** | **{p3.get('treds_grade', 'Tier B')}** | Expected Cost: {p3.get('treds_discount_cost', '~8.5% p.a.')} |
+| **Workforce & Productivity** | **{employees} Staff** | ₹{p4.get('rev_per_emp_lakhs', 0.0)} Lakhs Turnover / Employee |
+"""
+
+    buyers = p2.get("listed_buyers") or []
+    buyers_lines = "\n".join(
+        f"- **{b.get('name', b.get('ticker'))} (`{b.get('ticker')}`):** {b.get('role', 'Supply Chain Offtake')}"
+        for b in buyers
+    ) or "- Regional Industrial OEM Offtake Network"
+
+    pillars_md = f"""### 4-Pillar Forensic Teardown
+#### Pillar 01: Working Capital & Cash Conversion Cycle
+{p1.get('summary', '')}
+
+#### Pillar 02: Listed Corporate Supply-Chain Linkages ({p2.get('oem_supplier_tier', 'OEM Supplier')})
+- **Cluster Archetype:** {p2.get('cluster_type', 'Industrial Corridor')}
+- **Capital Replacement Barrier:** {p2.get('capex_barrier', 'Moderate')}
+- **Sector Offtake Universe (Listed Equities):**
+{buyers_lines}
+
+#### Pillar 03: Solvency, Operating Margins & TReDS Liquidity
+- **Estimated Operating EBITDA:** ₹{p3.get('estimated_ebitda_cr', 0.0)} Cr ({p3.get('ebitda_margin_pct', 0.0)}% margin)
+- **Estimated Debt & Interest Burden:** Debt ~₹{p3.get('estimated_debt_cr', 0.0)} Cr | Annual Interest ~₹{p3.get('estimated_interest_cr', 0.0)} Cr
+- **TReDS Assessment:** {p3.get('treds_liquidity_desc', '')}
+- **Statutory Protection:** {p3.get('msmed_act_section_16_protection', '')}
+"""
+
+    catalysts = "\n".join(f"- {c}" for c in (p4.get("growth_catalysts") or []))
+    fragilities = "\n".join(f"- {f}" for f in (p4.get("fragility_vectors") or []))
+
+    if deep_dive_unlocked:
+        moat_md = f"""#### Pillar 04: Cluster Moat & Pre-Mortem Fragility Vectors
+**Structural Growth Catalysts:**
+{catalysts}
+
+**Pre-Mortem Fragility & Risk Vectors:**
+{fragilities}
+"""
+    else:
+        moat_md = """#### Pillar 04: Cluster Moat & Pre-Mortem Fragility Vectors (Locked)
+> *Unlock this enterprise dossier on the website to include the full Pre-Mortem Fragility Risk Vectors in your PDF.*
+"""
+
+    footer = f"""
+---
+### Statutory Regulatory Disclaimers & Provenance Notice
+> **SEBI Safe-Harbor (Section 2(u) RA Regulations 2014) & MSMED Act 2020 Notice:**  
+> *{MANDATORY_SEBI_DISCLAIMER}*  
+> 
+> Enterprise records are grounded in open gazette disclosures from the Udyam Registration Portal under the Ministry of Micro, Small and Medium Enterprises. Working capital cycles, TReDS solvency ratios, and sector offtake linkages are computed using sector-calibrated industrial benchmarks for informational research only.
+"""
+    full_md = f"{header}\n\n{scorecard_md}\n\n{pillars_md}\n\n{moat_md}\n\n{footer}"
+    out_name = os.path.join(tempfile.gettempdir(), f"_tmp_doc_msme_{clean_uin}_{uuid.uuid4().hex}.pdf")
+    try:
+        pdf = MarkdownPdf(toc_level=0)
+        pdf.add_section(Section(full_md, root="."))
+        pdf.save(out_name)
+        with open(out_name, "rb") as f:
+            pdf_bytes = f.read()
+        return pdf_bytes
+    finally:
+        if os.path.exists(out_name):
+            try:
+                os.unlink(out_name)
+            except OSError as cleanup_err:
+                logger.debug("Cleanup notice for %s: %s", out_name, cleanup_err)

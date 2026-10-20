@@ -749,7 +749,7 @@
     </button>
     <button type="button" class="btn btn-secondary" onclick="showTab('tickets')" style="display: flex; flex-direction: column; align-items: flex-start; text-align: left; padding: 14px 16px; background: rgba(245, 158, 11, 0.08); border: 1px solid rgba(245, 158, 11, 0.28); border-radius: 10px; cursor: pointer;">
       <span style="font-size: 11px; font-weight: 800; color: #fcd34d; text-transform: uppercase; letter-spacing: 0.05em;">2. Unresolved Support Inbox</span>
-      <span style="font-size: 20px; font-weight: 800; color: #f8fafc; margin-top: 4px;" class="tnum">{{ open_tickets_count | default(0) }} Open</span>
+      <span id="execOverviewOpenTicketsCount" style="font-size: 20px; font-weight: 800; color: #f8fafc; margin-top: 4px;" class="tnum">{{ open_tickets_count | default(0) }} Open</span>
       <span style="font-size: 11px; color: #94a3b8; margin-top: 2px;">{{ (support_tickets | length) if support_tickets else 0 }} total tickets → Respond Now</span>
     </button>
     <button type="button" class="btn btn-secondary" onclick="showTab('assets')" style="display: flex; flex-direction: column; align-items: flex-start; text-align: left; padding: 14px 16px; background: rgba(56, 189, 248, 0.08); border: 1px solid rgba(56, 189, 248, 0.28); border-radius: 10px; cursor: pointer;">
@@ -774,9 +774,7 @@
     </button>
     <button class="admin-tab-btn {% if active_tab == 'tickets' %}active{% endif %}" data-tab="tickets" onclick="showTab('tickets')">
       📩 Service Inbox & Tickets
-      {% if open_tickets_count > 0 %}
-      <span class="admin-tab-badge">{{ open_tickets_count }}</span>
-      {% endif %}
+      <span id="adminNavTabTicketsBadge" class="admin-tab-badge" style="{% if not open_tickets_count or open_tickets_count <= 0 %}display: none;{% endif %}">{{ open_tickets_count | default(0) }}</span>
     </button>
     <button class="admin-tab-btn {% if active_tab == 'traffic' %}active{% endif %}" data-tab="traffic" onclick="showTab('traffic')">
       🌐 Traffic & Landing Pages
@@ -1012,39 +1010,44 @@
 
   <!-- TAB 3: Support Grievances & Tickets -->
   <div id="tab-tickets" class="admin-tab-pane {% if active_tab == 'tickets' %}active{% endif %}">
-    <div class="admin-card">
+    {% set active_tickets_list = active_support_tickets if active_support_tickets is defined else (support_tickets | selectattr('status', 'in', ['open', 'in_progress']) | list) %}
+    {% set archived_tickets_list = archived_support_tickets if archived_support_tickets is defined else (support_tickets | selectattr('status', 'in', ['resolved', 'closed']) | list) %}
+
+    <!-- SECTION A: Active Service Inbox (Open & In-Progress Only) -->
+    <div class="admin-card" id="activeTicketsCard" style="margin-bottom: 24px;">
       <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px; flex-wrap: wrap; gap: 12px;">
         <div>
           <h3 style="margin: 0; font-size: 16px; font-weight: 700; display: flex; align-items: center; gap: 8px;">
-            <span>📩</span> Service Inbox & User Inquiries
+            <span>📩</span> Active Service Inbox &amp; User Inquiries
           </h3>
           <p style="margin: 4px 0 0; font-size: 12px; color: var(--text-secondary, #94a3b8);">
-            Review inbound user inquiries, view full message history, and email responses directly to users' registered mail IDs.
+            Displays only open and in-progress tickets requiring action. Click any status badge to cycle status or select a new state—updates apply immediately without reloading.
           </p>
         </div>
-        <div style="display: flex; align-items: center; gap: 10px;">
-          <span class="status-pill {% if open_tickets_count > 0 %}open{% else %}success{% endif %}">
+        <div style="display: flex; align-items: center; gap: 10px; flex-wrap: wrap;">
+          <input type="search" id="activeInboxSearchInput" class="admin-input" placeholder="Filter active inbox..." oninput="filterActiveTicketsClientSide()" style="font-size: 16px; padding: 5px 10px; min-width: 190px;">
+          <span id="activeInboxCountPill" class="status-pill {% if open_tickets_count > 0 %}open{% else %}success{% endif %}">
             {{ open_tickets_count }} Unresolved Tickets
           </span>
         </div>
       </div>
 
       <div class="admin-table-wrap">
-        <table class="admin-table">
+        <table class="admin-table" id="activeTicketsTable">
           <thead>
             <tr>
               <th>Ticket ID</th>
               <th>Created</th>
               <th>User</th>
               <th>Category</th>
-              <th>Subject & Inquiry</th>
-              <th>Status</th>
+              <th>Subject &amp; Inquiry</th>
+              <th>Status (Click to Toggle)</th>
               <th>Service Actions</th>
             </tr>
           </thead>
-          <tbody>
-            {% for t in support_tickets %}
-            <tr>
+          <tbody id="activeTicketsTableBody">
+            {% for t in active_tickets_list %}
+            <tr id="ticket-row-{{ t.ticket_id }}" data-ticket-id="{{ t.ticket_id }}" data-status="{{ t.status }}" data-category="{{ t.category }}" data-email="{{ t.user_email }}" data-name="{{ t.user_name or 'User' }}" data-created="{{ t.created_at_raw or t.created_at }}">
               <td class="mono" style="font-weight: 700; color: var(--accent-cyan, #0ea5e9);">{{ t.ticket_id }}</td>
               <td class="mono" style="font-size: 11px;">{{ t.created_at }}</td>
               <td>
@@ -1052,49 +1055,171 @@
                 <div style="font-size: 11px; color: var(--text-secondary, #94a3b8);">{{ t.user_email }}</div>
               </td>
               <td><span class="status-pill closed">{{ t.category }}</span></td>
-              <td style="max-width: 320px;">
+              <td style="max-width: 340px;">
                 <div style="font-weight: 600; margin-bottom: 4px;">{{ t.subject }}</div>
                 <div style="font-size: 12px; color: var(--text-secondary, #94a3b8); white-space: pre-wrap;">{{ t.message }}</div>
-                {% if t.responses and t.responses|length > 0 %}
-                <div style="margin-top: 6px; font-size: 11px; color: #38bdf8; background: rgba(14, 165, 233, 0.1); padding: 3px 8px; border-radius: 4px; display: inline-flex; align-items: center; gap: 4px;">
-                  <svg class="glyph" style="width: 12px; height: 12px;"><use href="#glyph-mail"></use></svg> {{ t.responses|length }} response(s) sent
+                <div id="ticket-resp-wrap-{{ t.ticket_id }}" style="margin-top: 6px; {% if not (t.responses and t.responses|length > 0) %}display: none;{% endif %}">
+                  <span style="font-size: 11px; color: #38bdf8; background: rgba(14, 165, 233, 0.1); padding: 3px 8px; border-radius: 4px; display: inline-flex; align-items: center; gap: 4px;">
+                    <svg class="glyph" style="width: 12px; height: 12px;"><use href="#glyph-mail"></use></svg>
+                    <span id="ticket-resp-count-{{ t.ticket_id }}">{{ t.responses|length if t.responses else 0 }}</span> response(s) sent
+                  </span>
                 </div>
-                {% endif %}
-                {% if t.admin_notes %}
-                <div style="margin-top: 6px; font-size: 11px; color: #a5b4fc; background: rgba(99, 102, 241, 0.1); padding: 4px 8px; border-radius: 4px;">
-                  Note: {{ t.admin_notes }}
+                <div id="ticket-notes-wrap-{{ t.ticket_id }}" style="margin-top: 6px; font-size: 11px; color: #a5b4fc; background: rgba(99, 102, 241, 0.1); padding: 4px 8px; border-radius: 4px; {% if not t.admin_notes %}display: none;{% endif %}">
+                  Note: <span id="ticket-notes-text-{{ t.ticket_id }}">{{ t.admin_notes }}</span>
                 </div>
-                {% endif %}
               </td>
               <td>
-                <span class="status-pill {{ t.status }}">{{ t.status }}</span>
+                <button type="button" id="ticket-status-pill-{{ t.ticket_id }}" class="btn btn-secondary btn-sm status-pill {{ t.status }}" onclick="cycleTicketStatus('{{ t.ticket_id }}')" style="cursor: pointer; border: 1px solid rgba(255,255,255,0.16); display: inline-flex; align-items: center; gap: 5px; font-weight: 700;" title="Click to toggle to next status without reloading (Open → In Progress → Resolved)">
+                  <span id="ticket-status-text-{{ t.ticket_id }}">{{ t.status }}</span>
+                  <span style="font-size: 10px; opacity: 0.8;">↻</span>
+                </button>
               </td>
               <td>
                 <div style="display: flex; flex-direction: column; gap: 6px;">
                   <button type="button" class="btn btn-primary btn-sm" onclick="openTicketReplyModal('{{ t.ticket_id }}')" style="padding: 5px 10px; font-size: 11.5px; font-weight: 700; display: inline-flex; align-items: center; justify-content: center; gap: 6px; cursor: pointer;" title="Reply to inquiry and trigger email dispatch to {{ t.user_email }}">
-                    <svg class="glyph" style="width: 13px; height: 13px;"><use href="#glyph-mail"></use></svg> Reply & Email
+                    <svg class="glyph" style="width: 13px; height: 13px;"><use href="#glyph-mail"></use></svg> Reply &amp; Email
                   </button>
-                  <form method="POST" action="/admin/tickets/{{ t.ticket_id }}/status" style="display: flex; gap: 4px; align-items: center;">
-                    <select name="status" class="admin-select" style="padding: 3px 6px; font-size: 11px;">
+                  <form method="POST" action="/admin/tickets/{{ t.ticket_id }}/status" onsubmit="return handleInlineTicketStatusSubmit(event, '{{ t.ticket_id }}')" style="display: flex; gap: 4px; align-items: center;">
+                    <select name="status" id="ticket-status-select-{{ t.ticket_id }}" class="admin-select" onchange="updateTicketStatusAjax('{{ t.ticket_id }}', this.value)" style="padding: 3px 6px; font-size: 11px;">
                       <option value="open" {% if t.status == 'open' %}selected{% endif %}>Open</option>
                       <option value="in_progress" {% if t.status == 'in_progress' %}selected{% endif %}>In Progress</option>
                       <option value="resolved" {% if t.status == 'resolved' %}selected{% endif %}>Resolved</option>
                       <option value="closed" {% if t.status == 'closed' %}selected{% endif %}>Closed</option>
                     </select>
-                    <button type="submit" class="btn btn-secondary btn-sm" style="padding: 3px 6px; font-size: 10px;">
+                    <button type="submit" id="ticket-status-btn-{{ t.ticket_id }}" class="btn btn-secondary btn-sm" style="padding: 3px 6px; font-size: 10px; cursor: pointer;">
                       Update
                     </button>
                   </form>
-                  <button type="button" class="btn btn-secondary btn-sm" onclick="openGrantCreditsModal('{{ t.user_email }}', '{{ t.ticket_id }}', 'TASK_REMEDY', '')" style="padding: 4px 8px; font-size: 11px; color: #f59e0b; border-color: rgba(245, 158, 11, 0.4); background: rgba(245, 158, 11, 0.08); display: inline-flex; align-items: center; justify-content: center; gap: 4px; cursor: pointer;" title="Grant remedial credits & resolve grievance">
+                  <button type="button" class="btn btn-secondary btn-sm" onclick="openGrantCreditsModal('{{ t.user_email }}', '{{ t.ticket_id }}', 'TASK_REMEDY', '')" style="padding: 4px 8px; font-size: 11px; color: #f59e0b; border-color: rgba(245, 158, 11, 0.4); background: rgba(245, 158, 11, 0.08); display: inline-flex; align-items: center; justify-content: center; gap: 4px; cursor: pointer;" title="Grant remedial credits &amp; resolve grievance">
                     <svg class="glyph"><use href="#glyph-zap"></use></svg> Remedial Credits
                   </button>
                 </div>
               </td>
             </tr>
             {% else %}
-            <tr>
+            <tr id="activeTicketsEmptyRow">
               <td colspan="7" style="text-align: center; color: var(--text-secondary, #94a3b8); padding: 30px;">
-                No support tickets found. All investor inquiries and grievances resolved!
+                🎉 Active Service Inbox is clear! All pending investor inquiries have been resolved or archived below.
+              </td>
+            </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    </div>
+
+    <!-- SECTION B: Resolved & Closed Ticket Archive (Searchable, Sortable, Referenceable) -->
+    <div class="admin-card" id="archivedTicketsCard" style="border-top: 2px solid rgba(148, 163, 184, 0.25);">
+      <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 14px; flex-wrap: wrap; gap: 12px;">
+        <div>
+          <h3 style="margin: 0; font-size: 16px; font-weight: 700; display: flex; align-items: center; gap: 8px;">
+            <span>🗄️</span> Resolved &amp; Closed Ticket Archive
+          </h3>
+          <p style="margin: 4px 0 0; font-size: 12px; color: var(--text-secondary, #94a3b8);">
+            Search, sort, and reference completed support threads. Tickets resolved or closed in the Active Inbox automatically move here.
+          </p>
+        </div>
+        <div style="display: flex; align-items: center; gap: 8px;">
+          <span id="archivedInboxCountPill" class="status-pill closed">
+            {{ archived_tickets_list | length }} Archived Tickets
+          </span>
+        </div>
+      </div>
+
+      <!-- Archive Search, Filter & Sort Controls -->
+      <div style="display: flex; gap: 10px; margin-bottom: 16px; flex-wrap: wrap; align-items: center; background: rgba(15, 23, 42, 0.55); padding: 12px; border-radius: 8px; border: 1px solid rgba(255, 255, 255, 0.06);">
+        <input type="search" id="archiveSearchInput" class="admin-input" placeholder="Search archive by Ticket ID, email, user name, subject, message, or reply..." oninput="debounceArchiveSearch()" style="flex: 2; min-width: 240px; font-size: 16px; padding: 7px 12px;">
+        <select id="archiveStatusFilter" class="admin-select" onchange="fetchArchivedTickets()" style="font-size: 12px; padding: 7px 10px;">
+          <option value="archived" selected>All Archived (Resolved &amp; Closed)</option>
+          <option value="resolved">Resolved Only</option>
+          <option value="closed">Closed Only</option>
+        </select>
+        <select id="archiveCategoryFilter" class="admin-select" onchange="fetchArchivedTickets()" style="font-size: 12px; padding: 7px 10px;">
+          <option value="all" selected>All Categories</option>
+          <option value="general">General</option>
+          <option value="billing">Billing</option>
+          <option value="technical">Technical</option>
+          <option value="grievance">Grievance</option>
+          <option value="feedback">Feedback</option>
+        </select>
+        <select id="archiveSortSelect" class="admin-select" onchange="fetchArchivedTickets()" style="font-size: 12px; padding: 7px 10px;">
+          <option value="newest" selected>Sort: Newest First</option>
+          <option value="oldest">Sort: Oldest First</option>
+          <option value="ticket_id">Sort: Ticket ID (A–Z)</option>
+          <option value="email">Sort: User Email (A–Z)</option>
+          <option value="category">Sort: Category</option>
+          <option value="status">Sort: Status</option>
+        </select>
+        <button type="button" class="btn btn-secondary btn-sm" onclick="fetchArchivedTickets()" style="padding: 7px 12px; font-size: 12px; cursor: pointer;">
+          🔎 Search &amp; Sort
+        </button>
+      </div>
+
+      <div class="admin-table-wrap">
+        <table class="admin-table" id="archivedTicketsTable">
+          <thead>
+            <tr>
+              <th>Ticket ID</th>
+              <th>Created</th>
+              <th>User</th>
+              <th>Category</th>
+              <th>Subject &amp; Resolution Summary</th>
+              <th>Archive Status</th>
+              <th>Reference &amp; Re-Open</th>
+            </tr>
+          </thead>
+          <tbody id="archivedTicketsTableBody">
+            {% for t in archived_tickets_list %}
+            <tr id="ticket-row-{{ t.ticket_id }}" data-ticket-id="{{ t.ticket_id }}" data-status="{{ t.status }}" data-category="{{ t.category }}" data-email="{{ t.user_email }}" data-name="{{ t.user_name or 'User' }}" data-created="{{ t.created_at_raw or t.created_at }}">
+              <td class="mono" style="font-weight: 700; color: var(--accent-cyan, #0ea5e9);">{{ t.ticket_id }}</td>
+              <td class="mono" style="font-size: 11px;">{{ t.created_at }}</td>
+              <td>
+                <div style="font-weight: 600;">{{ t.user_name or 'User' }}</div>
+                <div style="font-size: 11px; color: var(--text-secondary, #94a3b8);">{{ t.user_email }}</div>
+              </td>
+              <td><span class="status-pill closed">{{ t.category }}</span></td>
+              <td style="max-width: 340px;">
+                <div style="font-weight: 600; margin-bottom: 4px;">{{ t.subject }}</div>
+                <div style="font-size: 12px; color: var(--text-secondary, #94a3b8); white-space: pre-wrap;">{{ t.message }}</div>
+                <div id="ticket-resp-wrap-{{ t.ticket_id }}" style="margin-top: 6px; {% if not (t.responses and t.responses|length > 0) %}display: none;{% endif %}">
+                  <span style="font-size: 11px; color: #38bdf8; background: rgba(14, 165, 233, 0.1); padding: 3px 8px; border-radius: 4px; display: inline-flex; align-items: center; gap: 4px;">
+                    <svg class="glyph" style="width: 12px; height: 12px;"><use href="#glyph-mail"></use></svg>
+                    <span id="ticket-resp-count-{{ t.ticket_id }}">{{ t.responses|length if t.responses else 0 }}</span> response(s) sent
+                  </span>
+                </div>
+                <div id="ticket-notes-wrap-{{ t.ticket_id }}" style="margin-top: 6px; font-size: 11px; color: #a5b4fc; background: rgba(99, 102, 241, 0.1); padding: 4px 8px; border-radius: 4px; {% if not t.admin_notes %}display: none;{% endif %}">
+                  Note: <span id="ticket-notes-text-{{ t.ticket_id }}">{{ t.admin_notes }}</span>
+                </div>
+              </td>
+              <td>
+                <button type="button" id="ticket-status-pill-{{ t.ticket_id }}" class="btn btn-secondary btn-sm status-pill {{ t.status }}" onclick="cycleTicketStatus('{{ t.ticket_id }}')" style="cursor: pointer; border: 1px solid rgba(255,255,255,0.16); display: inline-flex; align-items: center; gap: 5px; font-weight: 700;" title="Click to toggle status without reloading">
+                  <span id="ticket-status-text-{{ t.ticket_id }}">{{ t.status }}</span>
+                  <span style="font-size: 10px; opacity: 0.8;">↻</span>
+                </button>
+              </td>
+              <td>
+                <div style="display: flex; flex-direction: column; gap: 6px;">
+                  <button type="button" class="btn btn-secondary btn-sm" onclick="openTicketReplyModal('{{ t.ticket_id }}')" style="padding: 5px 10px; font-size: 11.5px; font-weight: 700; color: #38bdf8; border-color: rgba(56, 189, 248, 0.35); display: inline-flex; align-items: center; justify-content: center; gap: 6px; cursor: pointer;" title="View full thread history or send follow-up email">
+                    <svg class="glyph" style="width: 13px; height: 13px;"><use href="#glyph-mail"></use></svg> View Thread / Reply
+                  </button>
+                  <form method="POST" action="/admin/tickets/{{ t.ticket_id }}/status" onsubmit="return handleInlineTicketStatusSubmit(event, '{{ t.ticket_id }}')" style="display: flex; gap: 4px; align-items: center;">
+                    <select name="status" id="ticket-status-select-{{ t.ticket_id }}" class="admin-select" onchange="updateTicketStatusAjax('{{ t.ticket_id }}', this.value)" style="padding: 3px 6px; font-size: 11px;">
+                      <option value="open" {% if t.status == 'open' %}selected{% endif %}>Re-Open (Active)</option>
+                      <option value="in_progress" {% if t.status == 'in_progress' %}selected{% endif %}>In Progress</option>
+                      <option value="resolved" {% if t.status == 'resolved' %}selected{% endif %}>Resolved</option>
+                      <option value="closed" {% if t.status == 'closed' %}selected{% endif %}>Closed</option>
+                    </select>
+                    <button type="submit" id="ticket-status-btn-{{ t.ticket_id }}" class="btn btn-secondary btn-sm" style="padding: 3px 6px; font-size: 10px; cursor: pointer;">
+                      Update
+                    </button>
+                  </form>
+                </div>
+              </td>
+            </tr>
+            {% else %}
+            <tr id="archivedTicketsEmptyRow">
+              <td colspan="7" style="text-align: center; color: var(--text-secondary, #94a3b8); padding: 26px;">
+                No archived (resolved or closed) tickets match the current filter.
               </td>
             </tr>
             {% endfor %}
@@ -2693,7 +2818,7 @@
 
   <!-- Service Inbox Direct Ticket Reply & Email Modal -->
   <div id="adminTicketReplyModal" class="modal-backdrop" style="display: none; align-items: center; justify-content: center; z-index: 9999;">
-    <div class="modal-dialog" style="max-width: 640px; width: 92%; max-height: 90vh; display: flex; flex-direction: column; background: var(--bg-card, #131722); border-radius: 12px; padding: 24px; border: 1px solid rgba(14, 165, 233, 0.4); box-shadow: 0 20px 45px rgba(0, 0, 0, 0.75); overflow: hidden;">
+    <div class="modal-dialog" style="max-width: 680px; width: 94%; max-height: 92vh; display: flex; flex-direction: column; background: var(--bg-card, #131722); border-radius: 12px; padding: 22px 24px; border: 1px solid rgba(14, 165, 233, 0.4); box-shadow: 0 20px 45px rgba(0, 0, 0, 0.75); overflow: hidden;">
       <!-- Header -->
       <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px; flex-shrink: 0;">
         <h3 style="margin: 0; font-size: 17px; font-weight: 800; display: flex; align-items: center; gap: 8px;">
@@ -2716,13 +2841,13 @@
           </div>
         </div>
         <div style="font-weight: 600; color: #38bdf8; margin-bottom: 4px;" id="replyModalSubject">Subject</div>
-        <div style="font-size: 12px; color: #cbd5e1; max-height: 80px; overflow-y: auto; background: rgba(0,0,0,0.25); padding: 8px; border-radius: 4px; white-space: pre-wrap;" id="replyModalMessage">Message</div>
+        <div style="font-size: 12px; color: #cbd5e1; max-height: 75px; overflow-y: auto; background: rgba(0,0,0,0.25); padding: 8px; border-radius: 4px; white-space: pre-wrap;" id="replyModalMessage">Message</div>
       </div>
 
       <!-- Scrollable Message & Responses Thread -->
-      <div style="flex-grow: 1; overflow-y: auto; max-height: 200px; margin-bottom: 14px; padding-right: 4px;">
+      <div style="flex-grow: 1; overflow-y: auto; max-height: 175px; margin-bottom: 12px; padding-right: 4px;">
         <div style="font-size: 11px; text-transform: uppercase; font-weight: 700; color: #94a3b8; margin-bottom: 8px; letter-spacing: 0.05em;">
-          Conversation History & Responses (<span id="replyModalThreadCount">0</span>)
+          Conversation History &amp; Responses (<span id="replyModalThreadCount">0</span>)
         </div>
         <div id="replyModalThreadList" style="display: flex; flex-direction: column; gap: 8px;">
           <div style="font-size: 12px; color: #94a3b8; font-style: italic; padding: 10px; text-align: center;">No previous responses sent yet.</div>
@@ -2734,39 +2859,79 @@
         <input type="hidden" name="tab" value="tickets">
         <input type="hidden" name="ticket_id" id="replyModalTicketIdInput" value="">
 
-        <!-- Quick Template Chips -->
-        <div style="display: flex; gap: 6px; margin-bottom: 8px; flex-wrap: wrap; align-items: center;">
-          <span style="font-size: 11px; color: #94a3b8; font-weight: 600;">Quick Responses:</span>
-          <button type="button" onclick="insertReplyTemplate('investigating')" class="btn btn-secondary btn-sm" style="padding: 2px 7px; font-size: 10px;">📋 Investigating</button>
-          <button type="button" onclick="insertReplyTemplate('resolved')" class="btn btn-secondary btn-sm" style="padding: 2px 7px; font-size: 10px; color: #10b981; border-color: rgba(16, 185, 129, 0.4);">✅ Resolved</button>
-          <button type="button" onclick="insertReplyTemplate('credits')" class="btn btn-secondary btn-sm" style="padding: 2px 7px; font-size: 10px; color: #f59e0b; border-color: rgba(245, 158, 11, 0.4);">🎁 +2 Credits</button>
-          <button type="button" onclick="insertReplyTemplate('clarification')" class="btn btn-secondary btn-sm" style="padding: 2px 7px; font-size: 10px;">❓ Clarification</button>
+        <!-- Quick & Saved Canned Response Chips -->
+        <div style="display: flex; justify-content: space-between; align-items: center; gap: 6px; margin-bottom: 6px; flex-wrap: wrap;">
+          <div style="display: flex; gap: 5px; flex-wrap: wrap; align-items: center;">
+            <span style="font-size: 11px; color: #94a3b8; font-weight: 600;">Canned Responses:</span>
+            <button type="button" onclick="insertReplyTemplate('investigating')" class="btn btn-secondary btn-sm" style="padding: 2px 7px; font-size: 10px; cursor: pointer;">📋 Investigating</button>
+            <button type="button" onclick="insertReplyTemplate('resolved')" class="btn btn-secondary btn-sm" style="padding: 2px 7px; font-size: 10px; color: #10b981; border-color: rgba(16, 185, 129, 0.4); cursor: pointer;">✅ Resolved</button>
+            <button type="button" onclick="insertReplyTemplate('credits')" class="btn btn-secondary btn-sm" style="padding: 2px 7px; font-size: 10px; color: #f59e0b; border-color: rgba(245, 158, 11, 0.4); cursor: pointer;">🎁 +2 Credits</button>
+            <button type="button" onclick="insertReplyTemplate('clarification')" class="btn btn-secondary btn-sm" style="padding: 2px 7px; font-size: 10px; cursor: pointer;">❓ Clarification</button>
+            <span id="savedCannedResponsesList" style="display: inline-flex; gap: 5px; flex-wrap: wrap; align-items: center;"></span>
+          </div>
+          <button type="button" id="btnToggleSaveCanned" onclick="toggleSaveCannedResponseBar()" class="btn btn-secondary btn-sm" style="padding: 2px 8px; font-size: 10.5px; color: #38bdf8; border-color: rgba(56, 189, 248, 0.35); cursor: pointer;" title="Save your current reply draft as a reusable canned response">
+            💾 + Save Draft as Canned
+          </button>
         </div>
 
-        <div style="margin-bottom: 10px;">
-          <textarea name="reply_message" id="ticketReplyMessage" class="admin-input" style="width: 100%; box-sizing: border-box; height: 85px; resize: vertical; font-size: 13px; line-height: 1.5;" required placeholder="Type direct email response to the user..."></textarea>
+        <!-- Collapsible Save New Canned Response Bar -->
+        <div id="saveCannedResponseBar" style="display: none; gap: 8px; align-items: center; margin-bottom: 8px; background: rgba(14, 165, 233, 0.08); border: 1px solid rgba(14, 165, 233, 0.25); padding: 8px 10px; border-radius: 6px; flex-wrap: wrap;">
+          <input type="text" id="cannedResponseTitleInput" class="admin-input" placeholder="Template title (e.g., Refund Processed, Data Sync Fixed)..." style="flex: 1; min-width: 180px; font-size: 16px; padding: 5px 10px;">
+          <button type="button" id="btnSaveCannedConfirm" onclick="saveCurrentDraftAsCannedResponse()" class="btn btn-primary btn-sm" style="padding: 5px 12px; font-size: 11px; font-weight: 700; cursor: pointer;">
+            💾 Save Template
+          </button>
+          <button type="button" onclick="toggleSaveCannedResponseBar(false)" class="btn btn-secondary btn-sm" style="padding: 5px 8px; font-size: 11px; cursor: pointer;">
+            Cancel
+          </button>
         </div>
 
-        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-bottom: 10px;">
+        <!-- Inbuilt Spell & Proofread Check Toolbar -->
+        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 4px; flex-wrap: wrap; gap: 6px;">
+          <span id="spellCheckStatusBadge" style="font-size: 11px; color: #34d399; font-weight: 600;">
+            ✓ Inbuilt Spell &amp; Grammar Check Active
+          </span>
+          <div style="display: flex; gap: 6px; align-items: center;">
+            <button type="button" id="btnRunSpellCheck" onclick="runInbuiltSpellCheck(true)" class="btn btn-secondary btn-sm" style="padding: 2px 8px; font-size: 10.5px; color: #cbd5e1; cursor: pointer;">
+              🔎 Spell &amp; Grammar Check
+            </button>
+            <button type="button" id="btnFixAllSpellIssues" onclick="applyAllSpellCheckFixes()" class="btn btn-secondary btn-sm" style="display: none; padding: 2px 8px; font-size: 10.5px; color: #10b981; border-color: rgba(16, 185, 129, 0.45); background: rgba(16, 185, 129, 0.1); cursor: pointer;">
+              ✨ Fix All (<span id="spellFixAllCount">0</span>)
+            </button>
+          </div>
+        </div>
+
+        <div style="margin-bottom: 8px;">
+          <textarea name="reply_message" id="ticketReplyMessage" class="admin-input" spellcheck="true" lang="en" autocorrect="on" autocapitalize="sentences" oninput="scheduleLiveSpellCheck()" style="width: 100%; box-sizing: border-box; height: 90px; resize: vertical; font-size: 16px; line-height: 1.5;" required placeholder="Type direct email response to the user..."></textarea>
+        </div>
+
+        <!-- Interactive Spell Check Suggestion Tray -->
+        <div id="replySpellCheckTray" style="display: none; margin-bottom: 10px; padding: 8px 10px; border-radius: 6px; background: rgba(245, 158, 11, 0.1); border: 1px solid rgba(245, 158, 11, 0.3); font-size: 11.5px;"></div>
+
+        <div style="display: grid; grid-template-columns: 1.25fr 0.75fr; gap: 10px; margin-bottom: 10px;">
           <div>
-            <label style="display: block; font-size: 11px; margin-bottom: 4px; color: #94a3b8; font-weight: 600;">Update Ticket Status</label>
-            <select name="status" id="replyTicketStatus" class="admin-select" style="width: 100%; box-sizing: border-box; font-size: 12px; padding: 6px 8px;">
-              <option value="resolved" selected>Resolved (Recommended)</option>
-              <option value="in_progress">In Progress</option>
-              <option value="open">Keep Open</option>
-              <option value="closed">Closed</option>
-            </select>
+            <label style="display: block; font-size: 11px; margin-bottom: 4px; color: #94a3b8; font-weight: 600;">Ticket Status (Applies on Send or Click Apply)</label>
+            <div style="display: flex; gap: 6px; align-items: center;">
+              <select name="status" id="replyTicketStatus" class="admin-select" style="flex: 1; box-sizing: border-box; font-size: 12px; padding: 6px 8px;">
+                <option value="open">Open (Needs Action)</option>
+                <option value="in_progress">In Progress</option>
+                <option value="resolved" selected>Resolved (Move to Archive)</option>
+                <option value="closed">Closed (Move to Archive)</option>
+              </select>
+              <button type="button" id="btnModalQuickStatusApply" onclick="applyModalStatusImmediately()" class="btn btn-secondary btn-sm" style="padding: 6px 10px; font-size: 11px; white-space: nowrap; cursor: pointer;" title="Update ticket status immediately without sending an email">
+                Apply Status Only
+              </button>
+            </div>
           </div>
           <div>
             <label style="display: block; font-size: 11px; margin-bottom: 4px; color: #94a3b8; font-weight: 600;">Remedial Credits (Optional)</label>
-            <input type="number" step="any" min="0" max="100" name="grant_remedial_credits" id="replyRemedialCredits" value="0.0" class="admin-input" style="width: 100%; box-sizing: border-box; font-size: 12px; padding: 6px 8px;" placeholder="0.0">
+            <input type="number" step="any" min="0" max="100" name="grant_remedial_credits" id="replyRemedialCredits" value="0.0" class="admin-input" style="width: 100%; box-sizing: border-box; font-size: 16px; padding: 5px 8px;" placeholder="0.0">
           </div>
         </div>
 
         <!-- Outgoing Email Service Status Banner -->
-        <div id="replyEmailServiceBanner" style="display: none; margin-bottom: 12px; padding: 10px 14px; border-radius: 6px; font-size: 12px; line-height: 1.5;"></div>
+        <div id="replyEmailServiceBanner" style="display: none; margin-bottom: 10px; padding: 10px 14px; border-radius: 6px; font-size: 12px; line-height: 1.5;"></div>
 
-        <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 14px; background: rgba(14, 165, 233, 0.08); padding: 8px 12px; border-radius: 6px; border: 1px solid rgba(14, 165, 233, 0.2);">
+        <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 12px; background: rgba(14, 165, 233, 0.08); padding: 8px 12px; border-radius: 6px; border: 1px solid rgba(14, 165, 233, 0.2);">
           <label style="display: flex; align-items: center; gap: 8px; font-size: 12px; color: #e2e8f0; cursor: pointer; user-select: none; margin: 0;">
             <input type="checkbox" name="dispatch_email" id="replyDispatchEmail" value="on" checked style="cursor: pointer;">
             <span>Trigger outgoing email notification to user (<strong id="replyDispatchEmailLabel">user</strong>)</span>
@@ -2776,10 +2941,10 @@
 
         <div style="display: flex; gap: 10px; justify-content: flex-end;">
           <button type="button" onclick="closeTicketReplyModal()" class="btn btn-secondary" style="padding: 8px 16px; font-size: 13px;">
-            Cancel
+            Close
           </button>
-          <button type="submit" id="replySubmitBtn" class="btn btn-primary" style="padding: 8px 18px; font-size: 13px; font-weight: 700; background: #0ea5e9; border-color: #0ea5e9; display: inline-flex; align-items: center; gap: 6px;">
-            <svg class="glyph"><use href="#glyph-mail"></use></svg> Send Response & Email User
+          <button type="submit" id="replySubmitBtn" class="btn btn-primary" style="padding: 8px 18px; font-size: 13px; font-weight: 700; background: #0ea5e9; border-color: #0ea5e9; display: inline-flex; align-items: center; gap: 6px; cursor: pointer;">
+            <svg class="glyph"><use href="#glyph-mail"></use></svg> Send Response &amp; Update Status
           </button>
         </div>
       </form>
@@ -2788,10 +2953,424 @@
 
   <script>
   let currentReplyTicket = null;
+  let adminCannedResponses = {{ (canned_responses if canned_responses is defined else []) | tojson }};
+  let liveSpellCheckTimer = null;
+  let detectedSpellCheckIssues = [];
+  let archiveSearchTimer = null;
 
-  async function openTicketReplyModal(ticketId) {
+  function escapeHtmlText(str) {
+    return String(str == null ? '' : str)
+      .replace(/&/g, '&amp;')
+      .replace(/</g, '&lt;')
+      .replace(/>/g, '&gt;')
+      .replace(/"/g, '&quot;')
+      .replace(/'/g, '&#39;');
+  }
+
+  function renderCannedResponsesBar() {
+    const container = document.getElementById('savedCannedResponsesList');
+    if (!container) return;
+    if (!Array.isArray(adminCannedResponses) || adminCannedResponses.length === 0) {
+      container.innerHTML = '';
+      return;
+    }
+    // Render custom saved responses (and any non-duplicate system templates)
+    const customItems = adminCannedResponses.filter(item => !item.is_system);
+    container.innerHTML = customItems.map(item => `
+      <span style="display: inline-flex; align-items: center; background: rgba(56, 189, 248, 0.12); border: 1px solid rgba(56, 189, 248, 0.35); border-radius: 5px; overflow: hidden;">
+        <button type="button" onclick="insertSavedCannedResponse(${Number(item.id)})" class="btn btn-secondary btn-sm" style="padding: 2px 7px; font-size: 10px; color: #38bdf8; border: none; background: transparent; cursor: pointer;" title="Insert saved template (${escapeHtmlText(item.target_status || 'resolved')})">
+          📌 ${escapeHtmlText(item.title)}
+        </button>
+        <button type="button" onclick="deleteSavedCannedResponse(event, ${Number(item.id)})" class="btn btn-secondary btn-sm" style="padding: 2px 5px; font-size: 10px; color: #f87171; border: none; border-left: 1px solid rgba(56, 189, 248, 0.25); background: transparent; cursor: pointer;" title="Delete saved template">
+          &times;
+        </button>
+      </span>
+    `).join('');
+  }
+
+  async function refreshCannedResponsesFromServer() {
+    try {
+      const resp = await fetch('/api/admin/tickets/canned-responses', {
+        headers: { 'Accept': 'application/json' }
+      });
+      if (!resp.ok) return;
+      const data = await resp.json();
+      if (data && Array.isArray(data.canned_responses)) {
+        adminCannedResponses = data.canned_responses;
+        renderCannedResponsesBar();
+      }
+    } catch (err) {
+      console.error('Failed loading canned responses:', err);
+    }
+  }
+
+  function toggleSaveCannedResponseBar(forceState) {
+    const bar = document.getElementById('saveCannedResponseBar');
+    const titleInput = document.getElementById('cannedResponseTitleInput');
+    if (!bar) return;
+    const show = typeof forceState === 'boolean' ? forceState : (bar.style.display === 'none' || !bar.style.display);
+    bar.style.display = show ? 'flex' : 'none';
+    if (show && titleInput) {
+      titleInput.focus({ preventScroll: true });
+    }
+  }
+
+  async function saveCurrentDraftAsCannedResponse() {
+    const titleInput = document.getElementById('cannedResponseTitleInput');
+    const msgInput = document.getElementById('ticketReplyMessage');
+    const statusSelect = document.getElementById('replyTicketStatus');
+    const creditsInput = document.getElementById('replyRemedialCredits');
+    const btn = document.getElementById('btnSaveCannedConfirm');
+
+    const title = titleInput ? titleInput.value.trim() : '';
+    const body = msgInput ? msgInput.value.trim() : '';
+    const targetStatus = statusSelect ? statusSelect.value : 'resolved';
+    const defaultCredits = creditsInput ? parseFloat(creditsInput.value || '0') : 0.0;
+
+    if (!title) {
+      alert('Please enter a short title for this canned response.');
+      if (titleInput) titleInput.focus({ preventScroll: true });
+      return;
+    }
+    if (!body) {
+      alert('Please type a response message in the reply box first before saving as a template.');
+      if (msgInput) msgInput.focus({ preventScroll: true });
+      return;
+    }
+
+    if (btn) {
+      btn.disabled = true;
+      btn.innerText = 'Saving...';
+    }
+    try {
+      const resp = await fetch('/api/admin/tickets/canned-responses', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Accept': 'application/json',
+          'X-Requested-With': 'XMLHttpRequest'
+        },
+        body: JSON.stringify({
+          title: title,
+          body: body,
+          target_status: targetStatus,
+          default_credits: defaultCredits,
+          category: (currentReplyTicket && currentReplyTicket.category) ? currentReplyTicket.category : 'general'
+        })
+      });
+      const data = await resp.json();
+      if (resp.ok && data.success) {
+        if (Array.isArray(data.canned_responses)) {
+          adminCannedResponses = data.canned_responses;
+        }
+        renderCannedResponsesBar();
+        if (titleInput) titleInput.value = '';
+        toggleSaveCannedResponseBar(false);
+        if (window.showToast) {
+          window.showToast(`Saved canned response "${title}"`, 'success');
+        }
+      } else {
+        alert('Could not save canned response: ' + (data.error || data.detail || 'Unknown error'));
+      }
+    } catch (err) {
+      alert('Network error saving canned response: ' + err.message);
+    } finally {
+      if (btn) {
+        btn.disabled = false;
+        btn.innerText = '💾 Save Template';
+      }
+    }
+  }
+
+  async function deleteSavedCannedResponse(e, responseId) {
+    if (e) e.stopPropagation();
+    try {
+      const resp = await fetch(`/api/admin/tickets/canned-responses/${responseId}`, {
+        method: 'DELETE',
+        headers: {
+          'Accept': 'application/json',
+          'X-Requested-With': 'XMLHttpRequest'
+        }
+      });
+      const data = await resp.json();
+      if (resp.ok && data.success) {
+        if (Array.isArray(data.canned_responses)) {
+          adminCannedResponses = data.canned_responses;
+        } else {
+          adminCannedResponses = adminCannedResponses.filter(x => Number(x.id) !== Number(responseId));
+        }
+        renderCannedResponsesBar();
+        if (window.showToast) {
+          window.showToast('Canned response removed.', 'info');
+        }
+      }
+    } catch (err) {
+      console.error('Error deleting canned response:', err);
+    }
+  }
+
+  function insertSavedCannedResponse(responseId) {
+    const item = (adminCannedResponses || []).find(x => Number(x.id) === Number(responseId));
+    if (!item) return;
+    const input = document.getElementById('ticketReplyMessage');
+    const statusSelect = document.getElementById('replyTicketStatus');
+    const creditsInput = document.getElementById('replyRemedialCredits');
+    const userName = (currentReplyTicket && currentReplyTicket.user_name) ? currentReplyTicket.user_name : 'there';
+
+    if (input) {
+      let text = String(item.body || '');
+      text = text.replace(/\{\{\s*user_name\s*\}\}/gi, userName);
+      input.value = text;
+      input.focus({ preventScroll: true });
+      runInbuiltSpellCheck(false);
+    }
+    if (statusSelect && item.target_status) {
+      statusSelect.value = String(item.target_status).toLowerCase();
+    }
+    if (creditsInput && item.default_credits != null) {
+      creditsInput.value = Number(item.default_credits).toFixed(1);
+    }
+  }
+
+  // ============================================================================
+  // INBUILT SPELL & PROOFREAD CHECKER
+  // ============================================================================
+  const SPELLCHECK_TYPO_DICTIONARY = {
+    'teh': 'the',
+    'recieve': 'receive',
+    'recieved': 'received',
+    'recieving': 'receiving',
+    'seperate': 'separate',
+    'seperated': 'separated',
+    'occured': 'occurred',
+    'occuring': 'occurring',
+    'accomodate': 'accommodate',
+    'definately': 'definitely',
+    'definatly': 'definitely',
+    'inconvience': 'inconvenience',
+    'inconveniance': 'inconvenience',
+    'apologze': 'apologize',
+    'apologise': 'apologize',
+    'resolvedd': 'resolved',
+    'credts': 'credits',
+    'accout': 'account',
+    'acount': 'account',
+    'transacton': 'transaction',
+    'maintenence': 'maintenance',
+    'immediatly': 'immediately',
+    'imediatly': 'immediately',
+    'succesfully': 'successfully',
+    'successfull': 'successful',
+    'reconcilation': 'reconciliation',
+    'priviledge': 'privilege',
+    'wierd': 'weird',
+    'untill': 'until',
+    'acheive': 'achieve',
+    'adress': 'address',
+    'beggining': 'beginning',
+    'beleive': 'believe',
+    'buisness': 'business',
+    'calender': 'calendar',
+    'collegue': 'colleague',
+    'concious': 'conscious',
+    'disapoint': 'disappoint',
+    'embarass': 'embarrass',
+    'enviroment': 'environment',
+    'existance': 'existence',
+    'foriegn': 'foreign',
+    'freind': 'friend',
+    'goverment': 'government',
+    'garantee': 'guarantee',
+    'independant': 'independent',
+    'knowlege': 'knowledge',
+    'neccessary': 'necessary',
+    'necesary': 'necessary',
+    'noticable': 'noticeable',
+    'occassion': 'occasion',
+    'persistant': 'persistent',
+    'posession': 'possession',
+    'prefered': 'preferred',
+    'recomend': 'recommend',
+    'reccomend': 'recommend',
+    'refered': 'referred',
+    'relevent': 'relevant',
+    'tommorow': 'tomorrow',
+    'tomorow': 'tomorrow',
+    'truely': 'truly',
+    'unfortunatly': 'unfortunately',
+    'portfolo': 'portfolio',
+    'divident': 'dividend',
+    'equites': 'equities',
+    'subcription': 'subscription',
+    'paymnet': 'payment',
+    'refnd': 'refund',
+    'grievnace': 'grievance',
+    'provisoned': 'provisioned',
+    'verfication': 'verification',
+    'dont': "don't",
+    'cant': "can't",
+    'wont': "won't",
+    'didnt': "didn't",
+    'doesnt': "doesn't",
+    'isnt': "isn't",
+    'wasnt': "wasn't",
+    'hasnt': "hasn't",
+    'havent': "haven't",
+    'wouldnt': "wouldn't",
+    'couldnt': "couldn't",
+    'shouldnt': "shouldn't",
+    'im': "I'm",
+    'ive': "I've",
+    'thier': 'their',
+    'pls': 'please',
+    'plz': 'please',
+    'u': 'you',
+    'ur': 'your'
+  };
+
+  function scheduleLiveSpellCheck() {
+    if (liveSpellCheckTimer) clearTimeout(liveSpellCheckTimer);
+    liveSpellCheckTimer = setTimeout(() => {
+      runInbuiltSpellCheck(false);
+    }, 280);
+  }
+
+  function runInbuiltSpellCheck(manualTrigger) {
+    const input = document.getElementById('ticketReplyMessage');
+    const tray = document.getElementById('replySpellCheckTray');
+    const badge = document.getElementById('spellCheckStatusBadge');
+    const fixAllBtn = document.getElementById('btnFixAllSpellIssues');
+    const fixAllCount = document.getElementById('spellFixAllCount');
+    if (!input || !tray || !badge) return [];
+
+    const text = input.value || '';
+    const issues = [];
+
+    if (!text.trim()) {
+      detectedSpellCheckIssues = [];
+      tray.style.display = 'none';
+      if (fixAllBtn) fixAllBtn.style.display = 'none';
+      badge.innerHTML = '✓ Inbuilt Spell &amp; Grammar Check Active';
+      badge.style.color = '#34d399';
+      return issues;
+    }
+
+    // 1. Check word typos & standalone lowercase "i"
+    const wordRegex = /\b([A-Za-z']+)\b/g;
+    let match;
+    while ((match = wordRegex.exec(text)) !== null) {
+      const word = match[1];
+      const lower = word.toLowerCase();
+      if (word === 'i') {
+        issues.push({
+          start: match.index,
+          end: match.index + word.length,
+          original: word,
+          replacement: 'I',
+          reason: 'Capitalize pronoun "I"'
+        });
+      } else if (Object.prototype.hasOwnProperty.call(SPELLCHECK_TYPO_DICTIONARY, lower)) {
+        let repl = SPELLCHECK_TYPO_DICTIONARY[lower];
+        if (word[0] === word[0].toUpperCase() && word[0] !== word[0].toLowerCase()) {
+          repl = repl.charAt(0).toUpperCase() + repl.slice(1);
+        }
+        if (word !== repl) {
+          issues.push({
+            start: match.index,
+            end: match.index + word.length,
+            original: word,
+            replacement: repl,
+            reason: 'Spelling / contraction fix'
+          });
+        }
+      }
+    }
+
+    // 2. Check doubled words (e.g. "the the", "is is")
+    const doubleWordRegex = /\b([A-Za-z]{2,})\s+\1\b/gi;
+    while ((match = doubleWordRegex.exec(text)) !== null) {
+      issues.push({
+        start: match.index,
+        end: match.index + match[0].length,
+        original: match[0],
+        replacement: match[1],
+        reason: 'Repeated word'
+      });
+    }
+
+    // Sort issues by start index
+    issues.sort((a, b) => a.start - b.start);
+    detectedSpellCheckIssues = issues;
+
+    if (issues.length === 0) {
+      tray.style.display = 'none';
+      if (fixAllBtn) fixAllBtn.style.display = 'none';
+      badge.innerHTML = manualTrigger
+        ? '✓ No spelling or grammar issues detected!'
+        : '✓ Spell &amp; Grammar Check: Clean';
+      badge.style.color = '#34d399';
+    } else {
+      badge.innerHTML = `⚠️ ${issues.length} suggestion${issues.length > 1 ? 's' : ''} found`;
+      badge.style.color = '#fbbf24';
+      if (fixAllBtn && fixAllCount) {
+        fixAllCount.innerText = String(issues.length);
+        fixAllBtn.style.display = 'inline-flex';
+      }
+      tray.style.display = 'block';
+      tray.innerHTML = `
+        <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 6px;">
+          <strong style="color: #fbbf24;">🔎 Proofreading Suggestions (Click to apply):</strong>
+          <span style="font-size: 10.5px; color: #94a3b8;">Native browser spellcheck is also active</span>
+        </div>
+        <div style="display: flex; gap: 6px; flex-wrap: wrap;">
+          ${issues.map((iss, idx) => `
+            <button type="button" onclick="applySingleSpellFix(${idx})" class="btn btn-secondary btn-sm" style="padding: 3px 8px; font-size: 11px; background: rgba(15, 23, 42, 0.85); border: 1px solid rgba(245, 158, 11, 0.4); color: #f8fafc; cursor: pointer;">
+              <span style="text-decoration: line-through; color: #f87171;">${escapeHtmlText(iss.original)}</span>
+              <span style="color: #94a3b8; margin: 0 3px;">→</span>
+              <strong style="color: #34d399;">${escapeHtmlText(iss.replacement)}</strong>
+            </button>
+          `).join('')}
+        </div>
+      `;
+    }
+    return issues;
+  }
+
+  function applySingleSpellFix(issueIndex) {
+    const input = document.getElementById('ticketReplyMessage');
+    if (!input || !detectedSpellCheckIssues[issueIndex]) return;
+    const iss = detectedSpellCheckIssues[issueIndex];
+    const current = input.value || '';
+    input.value = current.slice(0, iss.start) + iss.replacement + current.slice(iss.end);
+    input.focus({ preventScroll: true });
+    runInbuiltSpellCheck(true);
+  }
+
+  function applyAllSpellCheckFixes() {
+    const input = document.getElementById('ticketReplyMessage');
+    if (!input || !detectedSpellCheckIssues || detectedSpellCheckIssues.length === 0) return;
+    let text = input.value || '';
+    // Apply from right to left so indices remain valid
+    const sortedDesc = [...detectedSpellCheckIssues].sort((a, b) => b.start - a.start);
+    for (const iss of sortedDesc) {
+      text = text.slice(0, iss.start) + iss.replacement + text.slice(iss.end);
+    }
+    input.value = text;
+    input.focus({ preventScroll: true });
+    runInbuiltSpellCheck(true);
+    if (window.showToast) {
+      window.showToast('Applied all spelling & proofreading fixes.', 'success');
+    }
+  }
+
+  // ============================================================================
+  // TICKET REPLY MODAL & STATUS SYNC
+  // ============================================================================
+  async function openTicketReplyModal(ticketId, preserveStatusOverride) {
     const modal = document.getElementById('adminTicketReplyModal');
     if (!modal) return;
+
+    renderCannedResponsesBar();
 
     // Reset fields
     document.getElementById('replyModalTicketId').innerText = ticketId;
@@ -2803,16 +3382,24 @@
     document.getElementById('replyModalMessage').innerText = 'Loading ticket details...';
     document.getElementById('replyModalThreadCount').innerText = '0';
     document.getElementById('replyModalThreadList').innerHTML = '<div style="font-size: 12px; color: #94a3b8; text-align: center; padding: 12px;">Loading thread...</div>';
-    document.getElementById('ticketReplyMessage').value = '';
+    const msgInput = document.getElementById('ticketReplyMessage');
+    if (msgInput) msgInput.value = '';
     document.getElementById('replyRemedialCredits').value = '0.0';
     const tidInput = document.getElementById('replyModalTicketIdInput');
     if (tidInput) tidInput.value = ticketId;
     document.getElementById('ticketReplyForm').action = `/admin/tickets/${ticketId}/reply`;
+    runInbuiltSpellCheck(false);
 
     openAdminModal('adminTicketReplyModal');
+    // Synchronous focus within gesture tick (Rule 6.4 compliance)
+    if (msgInput) {
+      msgInput.focus({ preventScroll: true });
+    }
 
     try {
-      const resp = await fetch(`/api/admin/tickets/${ticketId}/thread`);
+      const resp = await fetch(`/api/admin/tickets/${encodeURIComponent(ticketId)}/thread`, {
+        headers: { 'Accept': 'application/json' }
+      });
       if (!resp.ok) {
         throw new Error('Failed to load ticket thread: ' + resp.statusText);
       }
@@ -2820,14 +3407,20 @@
       const t = data.ticket;
       currentReplyTicket = t;
 
+      const normStatus = String(preserveStatusOverride || t.status || 'open').toLowerCase().trim();
       document.getElementById('replyModalUserName').innerText = t.user_name || 'Investor';
       document.getElementById('replyModalUserEmail').innerText = t.user_email || '';
       document.getElementById('replyDispatchEmailLabel').innerText = t.user_email || 'user';
       document.getElementById('replyModalCategory').innerText = (t.category || 'general').toUpperCase();
-      document.getElementById('replyModalStatus').innerText = (t.status || 'open').toUpperCase();
-      document.getElementById('replyModalStatus').className = `status-pill ${t.status || 'open'}`;
+      document.getElementById('replyModalStatus').innerText = normStatus.toUpperCase();
+      document.getElementById('replyModalStatus').className = `status-pill ${normStatus}`;
       document.getElementById('replyModalSubject').innerText = t.subject || 'No subject';
       document.getElementById('replyModalMessage').innerText = t.message || '';
+
+      const statusSelect = document.getElementById('replyTicketStatus');
+      if (statusSelect) {
+        statusSelect.value = normStatus;
+      }
 
       // Email service configuration check & banner
       const banner = document.getElementById('replyEmailServiceBanner');
@@ -2863,23 +3456,18 @@
         threadList.innerHTML = responses.map(r => `
           <div style="background: rgba(15, 23, 42, 0.85); border-left: 3px solid #38bdf8; border-radius: 4px; padding: 10px 12px; font-size: 12.5px;">
             <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 4px; font-size: 11px;">
-              <span style="font-weight: 700; color: #38bdf8; display: inline-flex; align-items: center; gap: 4px;"><svg class="glyph" style="width: 12px; height: 12px;"><use href="#glyph-shield"></use></svg> ${r.sender_name || 'Moatnomics Desk'}</span>
+              <span style="font-weight: 700; color: #38bdf8; display: inline-flex; align-items: center; gap: 4px;"><svg class="glyph" style="width: 12px; height: 12px;"><use href="#glyph-shield"></use></svg> ${escapeHtmlText(r.sender_name || 'Support Desk')}</span>
               <div style="display: flex; align-items: center; gap: 8px;">
-                <span class="mono" style="color: #94a3b8;">${r.created_at}</span>
+                <span class="mono" style="color: #94a3b8;">${escapeHtmlText(r.created_at)}</span>
                 <span style="font-size: 10px; padding: 1px 5px; border-radius: 3px; background: ${r.email_dispatched ? 'rgba(16,185,129,0.15)' : 'rgba(245,158,11,0.15)'}; color: ${r.email_dispatched ? '#10b981' : '#f59e0b'};">
                   ${r.email_dispatched ? '✓ Email Delivered' : '⚠️ Unsent (Mock Logged)'}
                 </span>
               </div>
             </div>
-            <div style="color: #e2e8f0; line-height: 1.45; white-space: pre-wrap;">${r.message}</div>
+            <div style="color: #e2e8f0; line-height: 1.45; white-space: pre-wrap;">${escapeHtmlText(r.message)}</div>
           </div>
         `).join('');
       }
-
-      setTimeout(() => {
-        document.getElementById('ticketReplyMessage').focus();
-      }, 100);
-
     } catch (err) {
       console.error(err);
       document.getElementById('replyModalMessage').innerText = 'Error loading ticket thread: ' + err.message;
@@ -2888,6 +3476,33 @@
 
   function closeTicketReplyModal() {
     closeAdminModal('adminTicketReplyModal');
+  }
+
+  async function applyModalStatusImmediately() {
+    const tidInput = document.getElementById('replyModalTicketIdInput');
+    const statusSelect = document.getElementById('replyTicketStatus');
+    const btn = document.getElementById('btnModalQuickStatusApply');
+    const ticketId = tidInput ? tidInput.value : '';
+    const newStatus = statusSelect ? statusSelect.value : '';
+    if (!ticketId || !newStatus) return;
+
+    if (btn) {
+      btn.disabled = true;
+      btn.innerText = 'Saving...';
+    }
+    try {
+      await updateTicketStatusAjax(ticketId, newStatus);
+      const modalStatusBadge = document.getElementById('replyModalStatus');
+      if (modalStatusBadge) {
+        modalStatusBadge.innerText = newStatus.toUpperCase();
+        modalStatusBadge.className = `status-pill ${newStatus}`;
+      }
+    } finally {
+      if (btn) {
+        btn.disabled = false;
+        btn.innerText = 'Apply Status Only';
+      }
+    }
   }
 
   function insertReplyTemplate(type) {
@@ -2915,30 +3530,43 @@
       if (statusSelect) statusSelect.value = 'in_progress';
       if (creditsInput) creditsInput.value = '0.0';
     }
+    input.focus({ preventScroll: true });
+    runInbuiltSpellCheck(false);
   }
 
   async function handleTicketReplySubmit(e) {
     e.preventDefault();
     const form = e.target;
     const btn = document.getElementById('replySubmitBtn');
-    const origText = btn ? btn.innerHTML : '📨 Send Response & Update Ticket';
+    const statusSelect = document.getElementById('replyTicketStatus');
+    const chosenStatus = statusSelect ? statusSelect.value : 'resolved';
+    const origText = btn ? btn.innerHTML : 'Send Response & Update Status';
     if (btn) {
       btn.disabled = true;
       btn.innerHTML = '⏳ Dispatching Response...';
     }
     try {
       const formData = new FormData(form);
+      if (chosenStatus) {
+        formData.set('status', chosenStatus);
+      }
       const resp = await fetch('/api/admin/tickets/reply', {
         method: 'POST',
         body: formData,
-        headers: { 'Accept': 'application/json' }
+        headers: {
+          'Accept': 'application/json',
+          'X-Requested-With': 'XMLHttpRequest'
+        }
       });
       const res = await resp.json();
       if (resp.ok && res.success) {
-        form.reset();
-        await openTicketReplyModal(res.ticket_id);
+        const effectiveStatus = String(res.new_status || chosenStatus || 'resolved').toLowerCase().trim();
+        // Sync the underlying table row in Active Inbox / Archive immediately without reloading
+        syncTicketRowInDom(res.ticket_id, effectiveStatus, res.response_count, res.open_tickets_count, res.ticket);
+        // Reload modal thread while preserving the newly applied status
+        await openTicketReplyModal(res.ticket_id, effectiveStatus);
         if (window.showToast) {
-          window.showToast(`Reply recorded on ${res.ticket_id} (${res.email_status_text || 'Saved to thread'})`, 'success');
+          window.showToast(`Reply sent & ticket ${res.ticket_id} marked ${effectiveStatus.toUpperCase()}`, 'success');
         }
       } else {
         alert('Failed to send reply: ' + (res.error || res.detail || 'Unknown error'));
@@ -2954,9 +3582,324 @@
     return false;
   }
 
+  // ============================================================================
+  // NO-RELOAD AJAX STATUS TOGGLE & ACTIVE INBOX / ARCHIVE PARTITIONING
+  // ============================================================================
+  function cycleTicketStatus(ticketId) {
+    const row = document.getElementById(`ticket-row-${ticketId}`);
+    const selectEl = document.getElementById(`ticket-status-select-${ticketId}`);
+    const currentStatus = String(
+      (row && row.getAttribute('data-status')) ||
+      (selectEl && selectEl.value) ||
+      'open'
+    ).toLowerCase().trim();
+
+    const cycleOrder = {
+      'open': 'in_progress',
+      'in_progress': 'resolved',
+      'resolved': 'closed',
+      'closed': 'open'
+    };
+    const nextStatus = cycleOrder[currentStatus] || 'in_progress';
+    updateTicketStatusAjax(ticketId, nextStatus);
+  }
+
+  function handleInlineTicketStatusSubmit(e, ticketId) {
+    if (e) e.preventDefault();
+    const selectEl = document.getElementById(`ticket-status-select-${ticketId}`);
+    const newStatus = selectEl ? selectEl.value : 'open';
+    updateTicketStatusAjax(ticketId, newStatus);
+    return false;
+  }
+
+  async function updateTicketStatusAjax(ticketId, newStatus) {
+    const cleanStatus = String(newStatus || 'open').toLowerCase().trim();
+    const pillBtn = document.getElementById(`ticket-status-pill-${ticketId}`);
+    const updateBtn = document.getElementById(`ticket-status-btn-${ticketId}`);
+    if (pillBtn) pillBtn.style.opacity = '0.6';
+    if (updateBtn) {
+      updateBtn.disabled = true;
+      updateBtn.innerText = '...';
+    }
+
+    try {
+      const formData = new FormData();
+      formData.append('status', cleanStatus);
+      const resp = await fetch(`/api/admin/tickets/${encodeURIComponent(ticketId)}/status`, {
+        method: 'POST',
+        body: formData,
+        headers: {
+          'Accept': 'application/json',
+          'X-Requested-With': 'XMLHttpRequest'
+        }
+      });
+      const res = await resp.json();
+      if (resp.ok && res.success) {
+        const appliedStatus = String(res.new_status || cleanStatus).toLowerCase().trim();
+        syncTicketRowInDom(
+          ticketId,
+          appliedStatus,
+          res.ticket && res.ticket.responses ? res.ticket.responses.length : null,
+          res.open_tickets_count,
+          res.ticket
+        );
+        if (window.showToast) {
+          const dest = (appliedStatus === 'resolved' || appliedStatus === 'closed') ? ' (Moved to Archive)' : ' (Active Inbox)';
+          window.showToast(`Ticket ${ticketId} → ${appliedStatus.toUpperCase()}${dest}`, 'success');
+        }
+      } else {
+        alert('Failed to update status: ' + (res.error || res.detail || res.message || 'Unknown error'));
+      }
+    } catch (err) {
+      alert('Network error updating ticket status: ' + err.message);
+    } finally {
+      if (pillBtn) pillBtn.style.opacity = '1';
+      if (updateBtn) {
+        updateBtn.disabled = false;
+        updateBtn.innerText = 'Update';
+      }
+    }
+  }
+
+  function updateGlobalTicketCounters(openCountOverride) {
+    const activeBody = document.getElementById('activeTicketsTableBody');
+    const archiveBody = document.getElementById('archivedTicketsTableBody');
+
+    const activeRows = activeBody ? activeBody.querySelectorAll('tr[data-ticket-id]') : [];
+    const archiveRows = archiveBody ? archiveBody.querySelectorAll('tr[data-ticket-id]') : [];
+
+    const openCnt = (typeof openCountOverride === 'number' && !Number.isNaN(openCountOverride))
+      ? openCountOverride
+      : activeRows.length;
+
+    const activePill = document.getElementById('activeInboxCountPill');
+    if (activePill) {
+      activePill.innerText = `${openCnt} Unresolved Tickets`;
+      activePill.className = `status-pill ${openCnt > 0 ? 'open' : 'success'}`;
+    }
+
+    const archivePill = document.getElementById('archivedInboxCountPill');
+    if (archivePill) {
+      archivePill.innerText = `${archiveRows.length} Archived Tickets`;
+    }
+
+    const execCount = document.getElementById('execOverviewOpenTicketsCount');
+    if (execCount) {
+      execCount.innerText = `${openCnt} Open`;
+    }
+
+    const navBadge = document.getElementById('adminNavTabTicketsBadge');
+    if (navBadge) {
+      navBadge.innerText = String(openCnt);
+      navBadge.style.display = openCnt > 0 ? 'inline-flex' : 'none';
+    }
+
+    // Handle empty state placeholder rows
+    if (activeBody) {
+      let emptyActive = document.getElementById('activeTicketsEmptyRow');
+      if (activeRows.length === 0) {
+        if (!emptyActive) {
+          emptyActive = document.createElement('tr');
+          emptyActive.id = 'activeTicketsEmptyRow';
+          emptyActive.innerHTML = '<td colspan="7" style="text-align: center; color: var(--text-secondary, #94a3b8); padding: 30px;">🎉 Active Service Inbox is clear! All pending investor inquiries have been resolved or archived below.</td>';
+          activeBody.appendChild(emptyActive);
+        }
+      } else if (emptyActive) {
+        emptyActive.remove();
+      }
+    }
+
+    if (archiveBody) {
+      let emptyArch = document.getElementById('archivedTicketsEmptyRow');
+      if (archiveRows.length === 0) {
+        if (!emptyArch) {
+          emptyArch = document.createElement('tr');
+          emptyArch.id = 'archivedTicketsEmptyRow';
+          emptyArch.innerHTML = '<td colspan="7" style="text-align: center; color: var(--text-secondary, #94a3b8); padding: 26px;">No archived (resolved or closed) tickets match the current filter.</td>';
+          archiveBody.appendChild(emptyArch);
+        }
+      } else if (emptyArch) {
+        emptyArch.remove();
+      }
+    }
+  }
+
+  function syncTicketRowInDom(ticketId, newStatus, responseCount, openTicketsCount, ticketObj) {
+    const cleanStatus = String(newStatus || 'open').toLowerCase().trim();
+    const isArchived = (cleanStatus === 'resolved' || cleanStatus === 'closed');
+    const activeBody = document.getElementById('activeTicketsTableBody');
+    const archiveBody = document.getElementById('archivedTicketsTableBody');
+
+    let row = document.getElementById(`ticket-row-${ticketId}`);
+    if (!row && ticketObj && (activeBody || archiveBody)) {
+      const tempContainer = document.createElement('tbody');
+      tempContainer.innerHTML = buildTicketRowHtml(ticketObj);
+      row = tempContainer.firstElementChild;
+    }
+
+    if (row) {
+      row.setAttribute('data-status', cleanStatus);
+      const pillBtn = document.getElementById(`ticket-status-pill-${ticketId}`) || row.querySelector(`#ticket-status-pill-${ticketId}`);
+      if (pillBtn) {
+        pillBtn.className = `btn btn-secondary btn-sm status-pill ${cleanStatus}`;
+      }
+      const pillText = document.getElementById(`ticket-status-text-${ticketId}`) || row.querySelector(`#ticket-status-text-${ticketId}`);
+      if (pillText) {
+        pillText.innerText = cleanStatus;
+      }
+      const selectEl = document.getElementById(`ticket-status-select-${ticketId}`) || row.querySelector(`#ticket-status-select-${ticketId}`);
+      if (selectEl) {
+        selectEl.value = cleanStatus;
+      }
+      if (typeof responseCount === 'number' && responseCount > 0) {
+        const respWrap = document.getElementById(`ticket-resp-wrap-${ticketId}`) || row.querySelector(`#ticket-resp-wrap-${ticketId}`);
+        const respCntEl = document.getElementById(`ticket-resp-count-${ticketId}`) || row.querySelector(`#ticket-resp-count-${ticketId}`);
+        if (respWrap) respWrap.style.display = 'block';
+        if (respCntEl) respCntEl.innerText = String(responseCount);
+      }
+
+      const targetBody = isArchived ? archiveBody : activeBody;
+      if (targetBody && row.parentElement !== targetBody) {
+        targetBody.insertBefore(row, targetBody.firstChild);
+      }
+    }
+
+    updateGlobalTicketCounters(openTicketsCount);
+  }
+
+  function buildTicketRowHtml(t) {
+    const tid = escapeHtmlText(t.ticket_id);
+    const status = escapeHtmlText(String(t.status || 'open').toLowerCase().trim());
+    const isArchived = (status === 'resolved' || status === 'closed');
+    const respLen = Array.isArray(t.responses) ? t.responses.length : 0;
+    const hasNotes = Boolean(t.admin_notes && String(t.admin_notes).trim());
+
+    return `
+      <tr id="ticket-row-${tid}" data-ticket-id="${tid}" data-status="${status}" data-category="${escapeHtmlText(t.category || 'general')}" data-email="${escapeHtmlText(t.user_email || '')}" data-name="${escapeHtmlText(t.user_name || 'User')}" data-created="${escapeHtmlText(t.created_at_raw || t.created_at || '')}">
+        <td class="mono" style="font-weight: 700; color: var(--accent-cyan, #0ea5e9);">${tid}</td>
+        <td class="mono" style="font-size: 11px;">${escapeHtmlText(t.created_at || '')}</td>
+        <td>
+          <div style="font-weight: 600;">${escapeHtmlText(t.user_name || 'User')}</div>
+          <div style="font-size: 11px; color: var(--text-secondary, #94a3b8);">${escapeHtmlText(t.user_email || '')}</div>
+        </td>
+        <td><span class="status-pill closed">${escapeHtmlText(t.category || 'general')}</span></td>
+        <td style="max-width: 340px;">
+          <div style="font-weight: 600; margin-bottom: 4px;">${escapeHtmlText(t.subject || '')}</div>
+          <div style="font-size: 12px; color: var(--text-secondary, #94a3b8); white-space: pre-wrap;">${escapeHtmlText(t.message || '')}</div>
+          <div id="ticket-resp-wrap-${tid}" style="margin-top: 6px; ${respLen > 0 ? '' : 'display: none;'}">
+            <span style="font-size: 11px; color: #38bdf8; background: rgba(14, 165, 233, 0.1); padding: 3px 8px; border-radius: 4px; display: inline-flex; align-items: center; gap: 4px;">
+              <svg class="glyph" style="width: 12px; height: 12px;"><use href="#glyph-mail"></use></svg>
+              <span id="ticket-resp-count-${tid}">${respLen}</span> response(s) sent
+            </span>
+          </div>
+          <div id="ticket-notes-wrap-${tid}" style="margin-top: 6px; font-size: 11px; color: #a5b4fc; background: rgba(99, 102, 241, 0.1); padding: 4px 8px; border-radius: 4px; ${hasNotes ? '' : 'display: none;'}">
+            Note: <span id="ticket-notes-text-${tid}">${escapeHtmlText(t.admin_notes || '')}</span>
+          </div>
+        </td>
+        <td>
+          <button type="button" id="ticket-status-pill-${tid}" class="btn btn-secondary btn-sm status-pill ${status}" onclick="cycleTicketStatus('${tid}')" style="cursor: pointer; border: 1px solid rgba(255,255,255,0.16); display: inline-flex; align-items: center; gap: 5px; font-weight: 700;" title="Click to toggle status without reloading">
+            <span id="ticket-status-text-${tid}">${status}</span>
+            <span style="font-size: 10px; opacity: 0.8;">↻</span>
+          </button>
+        </td>
+        <td>
+          <div style="display: flex; flex-direction: column; gap: 6px;">
+            <button type="button" class="btn ${isArchived ? 'btn-secondary' : 'btn-primary'} btn-sm" onclick="openTicketReplyModal('${tid}')" style="padding: 5px 10px; font-size: 11.5px; font-weight: 700; ${isArchived ? 'color: #38bdf8; border-color: rgba(56, 189, 248, 0.35);' : ''} display: inline-flex; align-items: center; justify-content: center; gap: 6px; cursor: pointer;">
+              <svg class="glyph" style="width: 13px; height: 13px;"><use href="#glyph-mail"></use></svg> ${isArchived ? 'View Thread / Reply' : 'Reply &amp; Email'}
+            </button>
+            <form method="POST" action="/admin/tickets/${tid}/status" onsubmit="return handleInlineTicketStatusSubmit(event, '${tid}')" style="display: flex; gap: 4px; align-items: center;">
+              <select name="status" id="ticket-status-select-${tid}" class="admin-select" onchange="updateTicketStatusAjax('${tid}', this.value)" style="padding: 3px 6px; font-size: 11px;">
+                <option value="open" ${status === 'open' ? 'selected' : ''}>${isArchived ? 'Re-Open (Active)' : 'Open'}</option>
+                <option value="in_progress" ${status === 'in_progress' ? 'selected' : ''}>In Progress</option>
+                <option value="resolved" ${status === 'resolved' ? 'selected' : ''}>Resolved</option>
+                <option value="closed" ${status === 'closed' ? 'selected' : ''}>Closed</option>
+              </select>
+              <button type="submit" id="ticket-status-btn-${tid}" class="btn btn-secondary btn-sm" style="padding: 3px 6px; font-size: 10px; cursor: pointer;">
+                Update
+              </button>
+            </form>
+          </div>
+        </td>
+      </tr>
+    `;
+  }
+
+  function filterActiveTicketsClientSide() {
+    const qInput = document.getElementById('activeInboxSearchInput');
+    const q = (qInput ? qInput.value : '').toLowerCase().trim();
+    const activeBody = document.getElementById('activeTicketsTableBody');
+    if (!activeBody) return;
+    const rows = activeBody.querySelectorAll('tr[data-ticket-id]');
+    rows.forEach(r => {
+      const text = (r.innerText || '').toLowerCase();
+      r.style.display = (!q || text.includes(q)) ? '' : 'none';
+    });
+  }
+
+  function debounceArchiveSearch() {
+    if (archiveSearchTimer) clearTimeout(archiveSearchTimer);
+    archiveSearchTimer = setTimeout(() => {
+      fetchArchivedTickets();
+    }, 260);
+  }
+
+  async function fetchArchivedTickets() {
+    const q = (document.getElementById('archiveSearchInput')?.value || '').trim();
+    const status = document.getElementById('archiveStatusFilter')?.value || 'archived';
+    const category = document.getElementById('archiveCategoryFilter')?.value || 'all';
+    const sortBy = document.getElementById('archiveSortSelect')?.value || 'newest';
+    const archiveBody = document.getElementById('archivedTicketsTableBody');
+    if (!archiveBody) return;
+
+    try {
+      const params = new URLSearchParams({
+        status: status,
+        q: q,
+        category: category,
+        sort_by: sortBy,
+        limit: '200'
+      });
+      const resp = await fetch(`/api/admin/tickets/search?${params.toString()}`, {
+        headers: { 'Accept': 'application/json' }
+      });
+      if (!resp.ok) return;
+      const data = await resp.json();
+      if (data && data.success && Array.isArray(data.tickets)) {
+        if (data.tickets.length === 0) {
+          archiveBody.innerHTML = `
+            <tr id="archivedTicketsEmptyRow">
+              <td colspan="7" style="text-align: center; color: var(--text-secondary, #94a3b8); padding: 26px;">
+                No archived tickets found matching your search or filter criteria.
+              </td>
+            </tr>
+          `;
+        } else {
+          archiveBody.innerHTML = data.tickets.map(t => buildTicketRowHtml(t)).join('');
+        }
+        const archivePill = document.getElementById('archivedInboxCountPill');
+        if (archivePill) {
+          archivePill.innerText = `${data.tickets.length} Archived Tickets`;
+        }
+      }
+    } catch (err) {
+      console.error('Error searching archived tickets:', err);
+    }
+  }
+
   function openAdminModal(id) {
     const modal = document.getElementById(id);
     if (!modal) return;
+    if (modal.parentElement !== document.body) {
+      document.body.appendChild(modal);
+    }
+    if (!modal._backdropDismissWired) {
+      modal._backdropDismissWired = true;
+      modal.addEventListener('click', function(e) {
+        if (e.target === modal) {
+          closeAdminModal(id);
+        }
+      });
+    }
     modal.style.display = 'flex';
     modal.classList.add('active');
   }
@@ -2971,6 +3914,19 @@
       }
     }, 200);
   }
+
+  document.addEventListener('keydown', function(e) {
+    if (e.key === 'Escape') {
+      const openModals = document.querySelectorAll('.modal-backdrop.active');
+      openModals.forEach(m => {
+        if (m.id) closeAdminModal(m.id);
+      });
+    }
+  });
+
+  document.addEventListener('DOMContentLoaded', function() {
+    renderCannedResponsesBar();
+  });
 
   async function refreshAiSpends() {
     const btn = document.getElementById('btnRefreshAiSpends');

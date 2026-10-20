@@ -33,16 +33,16 @@
     <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 16px;">
       <div style="background: rgba(15, 23, 42, 0.7); border: 1px solid rgba(255, 255, 255, 0.08); border-radius: 12px; padding: 18px;">
         <div style="font-size: 12px; color: #64748b; text-transform: uppercase; font-weight: 600; margin-bottom: 4px;">Audited Schemes</div>
-        <div style="font-size: 26px; font-weight: 800; color: #f8fafc;" class="tnum">{{ data.total_schemes_audited }} Products</div>
+        <div style="font-size: 26px; font-weight: 800; color: #f8fafc;" class="tnum">{{ data.total_schemes_audited }} Product{{ '' if data.total_schemes_audited == 1 else 's' }}</div>
       </div>
       <div style="background: rgba(15, 23, 42, 0.7); border: 1px solid rgba(239, 68, 68, 0.2); border-radius: 12px; padding: 18px;">
         <div style="font-size: 12px; color: #f87171; text-transform: uppercase; font-weight: 600; margin-bottom: 4px;">High Danger Score (≥75)</div>
-        <div style="font-size: 26px; font-weight: 800; color: #ef4444;" class="tnum">{{ data.extreme_danger_count }} Schemes</div>
+        <div style="font-size: 26px; font-weight: 800; color: #ef4444;" class="tnum">{{ data.extreme_danger_count }} Scheme{{ '' if data.extreme_danger_count == 1 else 's' }}</div>
         <div style="font-size: 11px; color: #fca5a5; margin-top: 4px;">Severe Capital Impairment Risk</div>
       </div>
       <div style="background: rgba(15, 23, 42, 0.7); border: 1px solid rgba(245, 158, 11, 0.2); border-radius: 12px; padding: 18px;">
         <div style="font-size: 12px; color: #fbbf24; text-transform: uppercase; font-weight: 600; margin-bottom: 4px;">Unregulated Grey Zone</div>
-        <div style="font-size: 26px; font-weight: 800; color: #f59e0b;" class="tnum">{{ data.unregulated_count }} Products</div>
+        <div style="font-size: 26px; font-weight: 800; color: #f59e0b;" class="tnum">{{ data.unregulated_count }} Product{{ '' if data.unregulated_count == 1 else 's' }}</div>
         <div style="font-size: 11px; color: #fde68a; margin-top: 4px;">Zero SEBI / RBI / DICGC Recourse</div>
       </div>
       <div style="background: rgba(15, 23, 42, 0.7); border: 1px solid rgba(16, 185, 129, 0.2); border-radius: 12px; padding: 18px;">
@@ -59,14 +59,14 @@
     <div class="card" style="padding: 24px; border-left: 4px solid {% if p.danger_score >= 80 %}#ef4444{% elif p.danger_score >= 50 %}#f59e0b{% else %}#10b981{% endif %};">
       <div style="display: flex; justify-content: space-between; align-items: flex-start; flex-wrap: wrap; gap: 16px; margin-bottom: 16px;">
         <div>
-          <div style="display: flex; align-items: center; gap: 10px; margin-bottom: 6px;">
+          <div style="display: flex; align-items: center; gap: 10px; margin-bottom: 6px; flex-wrap: wrap;">
             <h2 style="font-size: 20px; font-weight: 800; color: #f8fafc; margin: 0;">{{ p.product_name }}</h2>
-            <span style="background: rgba(15, 23, 42, 0.8); border: 1px solid rgba(255, 255, 255, 0.1); color: #94a3b8; padding: 2px 8px; border-radius: 4px; font-size: 11px; font-weight: 700;">
-              {{ p.category }}
+            <span style="background: rgba(15, 23, 42, 0.8); border: 1px solid rgba(255, 255, 255, 0.1); color: #94a3b8; padding: 2px 8px; border-radius: 4px; font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.04em;">
+              {{ p.category|replace('_', ' ') }}
             </span>
           </div>
           <div style="font-size: 13px; color: #94a3b8;">
-            Regulatory Jurisdiction: <strong>{{ p.regulatory_status }}</strong> • Counterparty Risk: <strong>{{ p.counterparty_risk_level }}</strong>
+            Regulatory Jurisdiction: <strong style="color: #cbd5e1;">{{ p.regulatory_status|replace('_', ' ')|title }}</strong> • Counterparty Risk: <strong style="color: #cbd5e1;">{{ p.counterparty_risk_level|replace('_', ' ')|title }}</strong>
           </div>
         </div>
 

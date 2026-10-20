@@ -398,6 +398,187 @@ DAILY_MSME_CATALOG: List[Dict[str, Any]] = [
         "employee_count": 88,
         "registration_date": "2021-10-18",
         "source": "Udyam Gazette / Daily 9AM Ingestion"
+    },
+    # --- Cohort Batch 3: Defense, Forgings & Specialty Chemicals ---
+    {
+        "uin": "UDYAM-GJ-03-0098412",
+        "name": "Rajkot CNC Investment Castings & Turbocharger Impellers",
+        "sector_code": "2431",
+        "sector_name": "auto_components",
+        "city": "Rajkot",
+        "state": "Gujarat",
+        "annual_turnover": 64.2,
+        "employee_count": 152,
+        "registration_date": "2022-01-11",
+        "source": "Udyam Gazette / Daily 9AM Ingestion"
+    },
+    {
+        "uin": "UDYAM-MH-14-0087319",
+        "name": "Aurangabad Transmission Gears & Sintered Bushings",
+        "sector_code": "2930",
+        "sector_name": "auto_components",
+        "city": "Chhatrapati Sambhajinagar",
+        "state": "Maharashtra",
+        "annual_turnover": 91.5,
+        "employee_count": 205,
+        "registration_date": "2021-06-24",
+        "source": "Udyam Gazette / Daily 9AM Ingestion"
+    },
+    {
+        "uin": "UDYAM-TN-01-0074521",
+        "name": "Oragadam Stamped Chassis Assemblies & Weldments",
+        "sector_code": "2930",
+        "sector_name": "auto_components",
+        "city": "Kancheepuram",
+        "state": "Tamil Nadu",
+        "annual_turnover": 134.8,
+        "employee_count": 295,
+        "registration_date": "2020-11-03",
+        "source": "Udyam Gazette / Daily 9AM Ingestion"
+    },
+    {
+        "uin": "UDYAM-GJ-15-0089340",
+        "name": "Vapi Chlor-Alkali Derivatives & Specialty Esters",
+        "sector_code": "2011",
+        "sector_name": "pharma_apis",
+        "city": "Valsad",
+        "state": "Gujarat",
+        "annual_turnover": 104.2,
+        "employee_count": 225,
+        "registration_date": "2021-04-19",
+        "source": "Udyam Gazette / Daily 9AM Ingestion"
+    },
+    {
+        "uin": "UDYAM-KA-04-0065812",
+        "name": "Mysuru Medical Grade Silicone Extrusions & Catheters",
+        "sector_code": "2100",
+        "sector_name": "pharma_apis",
+        "city": "Mysuru",
+        "state": "Karnataka",
+        "annual_turnover": 47.6,
+        "employee_count": 118,
+        "registration_date": "2022-02-08",
+        "source": "Udyam Gazette / Daily 9AM Ingestion"
+    },
+    {
+        "uin": "UDYAM-TN-09-0053490",
+        "name": "Karur Technical Home Furnishings & Industrial Canvas",
+        "sector_code": "1392",
+        "sector_name": "textiles_apparel",
+        "city": "Karur",
+        "state": "Tamil Nadu",
+        "annual_turnover": 59.4,
+        "employee_count": 168,
+        "registration_date": "2021-07-22",
+        "source": "Udyam Gazette / Daily 9AM Ingestion"
+    },
+    {
+        "uin": "UDYAM-GJ-07-0061923",
+        "name": "Gandhinagar Smart Utility Meters & LoRaWAN Gateways",
+        "sector_code": "2651",
+        "sector_name": "electronics_iot",
+        "city": "Gandhinagar",
+        "state": "Gujarat",
+        "annual_turnover": 79.0,
+        "employee_count": 175,
+        "registration_date": "2022-05-02",
+        "source": "Udyam Gazette / Daily 9AM Ingestion"
+    },
+    {
+        "uin": "UDYAM-KA-01-0083415",
+        "name": "Electronic City Ruggedized Defense Avionics Harnesses",
+        "sector_code": "2610",
+        "sector_name": "electronics_iot",
+        "city": "Bengaluru",
+        "state": "Karnataka",
+        "annual_turnover": 112.0,
+        "employee_count": 235,
+        "registration_date": "2021-01-14",
+        "source": "Udyam Gazette / Daily 9AM Ingestion"
+    },
+    {
+        "uin": "UDYAM-MH-09-0049821",
+        "name": "Satara Cold-Forged Differential Pinions & Shafts",
+        "sector_code": "2591",
+        "sector_name": "industrial_machinery",
+        "city": "Satara",
+        "state": "Maharashtra",
+        "annual_turnover": 52.3,
+        "employee_count": 128,
+        "registration_date": "2021-09-17",
+        "source": "Udyam Gazette / Daily 9AM Ingestion"
+    },
+    {
+        "uin": "UDYAM-PB-06-0039481",
+        "name": "Mandi Gobindgarh Alloy Steel Bright Bars & Sections",
+        "sector_code": "2410",
+        "sector_name": "industrial_machinery",
+        "city": "Fatehgarh Sahib",
+        "state": "Punjab",
+        "annual_turnover": 148.5,
+        "employee_count": 265,
+        "registration_date": "2020-10-09",
+        "source": "Udyam Gazette / Daily 9AM Ingestion"
+    },
+    {
+        "uin": "UDYAM-KL-05-0071829",
+        "name": "Kochi Supercritical Spice Extracts & Nutraceutical Oils",
+        "sector_code": "1079",
+        "sector_name": "agro_food_processing",
+        "city": "Ernakulam",
+        "state": "Kerala",
+        "annual_turnover": 66.8,
+        "employee_count": 144,
+        "registration_date": "2021-08-29",
+        "source": "Udyam Gazette / Daily 9AM Ingestion"
+    },
+    {
+        "uin": "UDYAM-MP-04-0058912",
+        "name": "Indore Clean-Graded Soy Protein Isolates & Lecithin",
+        "sector_code": "1040",
+        "sector_name": "agro_food_processing",
+        "city": "Indore",
+        "state": "Madhya Pradesh",
+        "annual_turnover": 87.0,
+        "employee_count": 190,
+        "registration_date": "2021-05-11",
+        "source": "Udyam Gazette / Daily 9AM Ingestion"
+    },
+    {
+        "uin": "UDYAM-WB-06-0044129",
+        "name": "Howrah Heavy Ductile Iron Sluice Valves & Couplings",
+        "sector_code": "2814",
+        "sector_name": "industrial_machinery",
+        "city": "Howrah",
+        "state": "West Bengal",
+        "annual_turnover": 44.0,
+        "employee_count": 112,
+        "registration_date": "2022-03-04",
+        "source": "Udyam Gazette / Daily 9AM Ingestion"
+    },
+    {
+        "uin": "UDYAM-UP-14-0067291",
+        "name": "Moradabad Precision Brass Instrumentation Fittings",
+        "sector_code": "2599",
+        "sector_name": "industrial_machinery",
+        "city": "Moradabad",
+        "state": "Uttar Pradesh",
+        "annual_turnover": 34.5,
+        "employee_count": 94,
+        "registration_date": "2021-11-21",
+        "source": "Udyam Gazette / Daily 9AM Ingestion"
+    },
+    {
+        "uin": "UDYAM-RJ-14-0083910",
+        "name": "Bhiwadi High-Pressure Aluminum Die Cast Housings",
+        "sector_code": "2432",
+        "sector_name": "auto_components",
+        "city": "Alwar",
+        "state": "Rajasthan",
+        "annual_turnover": 109.4,
+        "employee_count": 242,
+        "registration_date": "2020-12-12",
+        "source": "Udyam Gazette / Daily 9AM Ingestion"
     }
 ]
 
@@ -405,6 +586,7 @@ DAILY_MSME_CATALOG: List[Dict[str, Any]] = [
 def ingest_daily_msme_cohort(edition_date: Optional[str] = None, count: int = 15) -> int:
     """
     Ingests 15 unlisted Indian MSMEs for the given edition date rotating across authentic catalog.
+    Prioritizes un-ingested UINs first so the directory grows before refreshing existing cohorts.
     Guarantees idempotency: will not insert duplicate records if run multiple times.
     Dual-database compatible for SQLite and PostgreSQL.
     """
@@ -413,24 +595,63 @@ def ingest_daily_msme_cohort(edition_date: Optional[str] = None, count: int = 15
 
     logger.info("🌅 [MSME Daily Ingest] Initiating morning 9:00 AM ingestion for edition %s (Count: %d)", edition_date, count)
     
-    # Select cohort items by rotating deterministically across authentic DAILY_MSME_CATALOG
     cat_len = len(DAILY_MSME_CATALOG)
     if cat_len == 0:
         return 0
-    date_hash = int(hashlib.md5(edition_date.encode()).hexdigest(), 16)
-    start_idx = (date_hash % max(1, cat_len // count)) * count if cat_len >= count else 0
-    cohort = []
-    for i in range(count):
-        raw_firm = DAILY_MSME_CATALOG[(start_idx + i) % cat_len]
-        cohort.append({
-            **raw_firm,
-            "registration_date": edition_date,
-            "source": f"Udyam Gazette / Daily 9AM Ingestion ({edition_date})"
-        })
 
     conn = get_db_connection()
     cur = conn.cursor()
     use_pg = bool(get_supabase_url())
+    placeholder = "%s" if use_pg else "?"
+
+    try:
+        cur.execute(
+            f"SELECT uin FROM msme_firms WHERE registration_date = {placeholder} OR source LIKE {placeholder}",
+            (edition_date, f"%({edition_date})%"),
+        )
+        edition_uins = [r[0] for r in cur.fetchall() if r and r[0]]
+        cur.execute("SELECT uin FROM msme_firms")
+        existing_uins = {r[0] for r in cur.fetchall() if r and r[0]}
+    except Exception as e:
+        logger.debug("MSME existing UIN lookup notice: %s", e)
+        edition_uins = []
+        existing_uins = set()
+
+    catalog_by_uin = {f["uin"]: f for f in DAILY_MSME_CATALOG}
+    date_hash = int(hashlib.md5(edition_date.encode()).hexdigest(), 16)
+    start_idx = (date_hash % max(1, cat_len // count)) * count if cat_len >= count else 0
+
+    cohort = []
+    # Idempotency: if this edition_date was already ingested, re-use the same edition cohort
+    for uin in edition_uins:
+        if uin in catalog_by_uin and len(cohort) < count:
+            cohort.append({
+                **catalog_by_uin[uin],
+                "registration_date": edition_date,
+                "source": f"Udyam Gazette / Daily 9AM Ingestion ({edition_date})"
+            })
+
+    if not cohort:
+        unseen_firms = [f for f in DAILY_MSME_CATALOG if f["uin"] not in existing_uins]
+        for f in unseen_firms[:count]:
+            cohort.append({
+                **f,
+                "registration_date": edition_date,
+                "source": f"Udyam Gazette / Daily 9AM Ingestion ({edition_date})"
+            })
+
+    i = 0
+    seen_cohort_uins = {f["uin"] for f in cohort}
+    while len(cohort) < count and i < cat_len:
+        raw_firm = DAILY_MSME_CATALOG[(start_idx + i) % cat_len]
+        i += 1
+        if raw_firm["uin"] not in seen_cohort_uins:
+            seen_cohort_uins.add(raw_firm["uin"])
+            cohort.append({
+                **raw_firm,
+                "registration_date": edition_date,
+                "source": f"Udyam Gazette / Daily 9AM Ingestion ({edition_date})"
+            })
 
     if use_pg:
         sql = """

@@ -259,6 +259,7 @@ class TestRealAssetsAndRadarSuite(unittest.TestCase):
     # ==========================================
 
     def test_safety_radar(self):
+        from core.db.safety_radar import seed_default_safety_radar_products
         high_risk = {
             "platform_name": "Gullak / SafeGold",
             "product_name": "Gold Yield 16% Leasing",
@@ -269,17 +270,21 @@ class TestRealAssetsAndRadarSuite(unittest.TestCase):
             "bankruptcy_remoteness": "NONE_PLATFORM_BALANCE_SHEET",
             "credit_rating": "UNRATED",
             "rbi_warning_ref": "RBI Advisory on Unregulated Gold Yield Schemes (2023)",
-            "safety_verdict": "CRITICAL DANGER: High risk of total capital loss upon jeweller default."
+            "safety_verdict": "CRITICAL DANGER: High risk of total capital loss upon jeweller default.",
+            "safe_alternative_recommendation": "Sovereign Gold Bonds (SGB) or SEBI-regulated Gold ETFs."
         }
-        save_alternative_yield_product(high_risk)
+        try:
+            save_alternative_yield_product(high_risk)
 
-        products = get_all_safety_radar_products()
-        self.assertGreaterEqual(len(products), 1)
+            products = get_all_safety_radar_products()
+            self.assertGreaterEqual(len(products), 6)
 
-        radar_audit = audit_alternative_yield_radar()
-        self.assertIn("total_schemes_audited", radar_audit)
-        self.assertIn("extreme_danger_count", radar_audit)
-        self.assertGreaterEqual(radar_audit["extreme_danger_count"], 1)
+            radar_audit = audit_alternative_yield_radar()
+            self.assertIn("total_schemes_audited", radar_audit)
+            self.assertIn("extreme_danger_count", radar_audit)
+            self.assertGreaterEqual(radar_audit["extreme_danger_count"], 1)
+        finally:
+            seed_default_safety_radar_products()
 
     # ==========================================
     # 6. FASTAPI WEB & REST API ENDPOINTS

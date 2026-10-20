@@ -359,6 +359,26 @@ Detailed forensic analysis with exact page grounding to bseindia.com filings.
         self.assertEqual(honeypot_input.get("tabindex"), "-1")
         self.assertIsNotNone(soup.find("label", attrs={"for": "contactWebsiteUrl"}))
 
+        # Verify tactile submit button, double-submit protection & JS wiring contracts
+        form_el = soup.find(id="contactTicketForm")
+        self.assertIsNotNone(form_el, "Missing #contactTicketForm in /contact form")
+        self.assertIn("handleContactTicketSubmit(event)", form_el.get("onsubmit", ""))
+        submit_btn = soup.find(id="contactSubmitBtn")
+        self.assertIsNotNone(submit_btn, "Missing #contactSubmitBtn in /contact form")
+        self.assertEqual(submit_btn.get("type"), "submit")
+        self.assertIn("btn", submit_btn.get("class", []))
+        self.assertIn("btn-primary", submit_btn.get("class", []))
+        self.assertIsNotNone(soup.find(id="contactSubmitBtnIcon"))
+        self.assertIsNotNone(soup.find(id="contactSubmitBtnText"))
+
+        main_js_res = self.client.get("/static/js/main.js")
+        self.assertEqual(main_js_res.status_code, 200)
+        main_js_content = main_js_res.text
+        self.assertIn("window.handleContactTicketSubmit = function", main_js_content)
+        self.assertIn("Sending Ticket...", main_js_content)
+        self.assertIn("_contactFormSubmitting = true", main_js_content)
+        self.assertIn("window.addEventListener('pageshow'", main_js_content)
+
         # 2. POST /contact creates ticket and dispatches alert
         post_data = {
             "user_name": "Test Investor",

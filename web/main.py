@@ -271,13 +271,21 @@ async def run_daily_discovery_scheduler():
                 last_bouquet_run_date = today_str
         else:
             from core.db.discovery import get_active_discovery_reel
-            active_existing = [x for x in get_active_discovery_reel(exclude_tests=True, allow_fallback=True)]
-            if not active_existing:
-                yesterday_str = (now - timedelta(days=1)).strftime("%Y-%m-%d")
+            yesterday_str = (now - timedelta(days=1)).strftime("%Y-%m-%d")
+            yesterday_existing = [
+                x for x in get_active_discovery_reel(
+                    edition_date=yesterday_str,
+                    exclude_tests=True,
+                    allow_fallback=False,
+                )
+            ]
+            if not yesterday_existing:
                 with job_lease(f"mf_stock_ingest_bootstrap_{yesterday_str}", ttl_seconds=7200, release_on_exit=False) as acquired:
                     if acquired:
-                        logger.info(f"🌅 [Discovery Scheduler] No active historical editions found. Acquired lease. Bootstrapping baseline edition ({yesterday_str})...")
+                        logger.info(f"🌅 [Discovery Scheduler] Prior-day edition ({yesterday_str}) missing on pre-08:30 boot. Running catch-up ingestion...")
                         await loop.run_in_executor(None, ingest_daily_stock_cohort, yesterday_str, 15, False)
+                        await execute_discovery_screening()
+                        await loop.run_in_executor(None, ingest_daily_msme_cohort, yesterday_str, 15)
     except Exception as boot_err:
         logger.warning(f"🌅 [Discovery Scheduler] Catch-up check notice: {boot_err}")
 
@@ -378,11 +386,16 @@ async def run_daily_amfi_scheduler():
         # 2. Sovereign Benchmarks Boot Check: Ensure sovereign benchmarks are primed
         await loop.run_in_executor(None, refresh_daily_sovereign_benchmarks, today_str)
 
-        # 3. Multi-Asset Surveillance Catch-Up Check: If boot is after 23:15 IST and no scan run today
+        # 3. Multi-Asset Surveillance & AMFI Catch-Up Check:
+        # Runs if past 23:15 IST without today's scan OR if the last scan is older than yesterday
+        from core.ingestion.amfi import ingest_amfi_daily_feed
+        yesterday_str = (now - timedelta(days=1)).strftime("%Y-%m-%d")
         recent_scans = get_asset_scan_runs(limit=1)
         last_scan_date = str(recent_scans[0].get("started_at", ""))[:10] if recent_scans else ""
-        if (now.hour > 23 or (now.hour == 23 and now.minute >= 15)) and last_scan_date != today_str:
-            logger.info("📊 [Asset Scan Catch-up] Past 23:15 IST and missing today's scan. Executing catch-up scan...")
+        is_past_2315 = (now.hour > 23) or (now.hour == 23 and now.minute >= 15)
+        if (is_past_2315 and last_scan_date != today_str) or (not last_scan_date or last_scan_date < yesterday_str):
+            logger.info(f"📊 [Asset Scan Catch-up] Last scan ({last_scan_date or 'none'}) stale on boot. Executing AMFI & multi-asset catch-up...")
+            await loop.run_in_executor(None, ingest_amfi_daily_feed, None, True)
             await loop.run_in_executor(None, run_comprehensive_asset_scan, "ALL_ASSETS", "catch_up_boot")
 
     except Exception as boot_err:
@@ -462,8 +475,29 @@ async def run_daily_amfi_scheduler():
 
 
 async def run_daily_fund_audit_scheduler():
-    """Automated background Mutual Fund Forensic Auditor (runs daily at 23:30 IST)."""
+    """Automated background Mutual Fund Forensic Auditor (runs daily at 23:30 IST with boot catch-up)."""
     logger.info("🔍 [Fund Audit Scheduler] Background mutual fund forensic auditor initiated.")
+    try:
+        from core.analysis.fund_overlap_auditor import audit_single_fund_daily
+        from core.db.connection import get_db_connection
+        now = datetime.now(IST)
+        yesterday_str = (now - timedelta(days=1)).strftime("%Y-%m-%d")
+        conn = get_db_connection()
+        cur = conn.cursor()
+        try:
+            cur.execute("SELECT MAX(last_audited_at) FROM fund_forensic_dossiers")
+            row = cur.fetchone()
+            last_audit_date = str(row[0] or "")[:10] if row else ""
+        finally:
+            cur.close()
+            conn.close()
+        if not last_audit_date or last_audit_date < yesterday_str:
+            logger.info(f"🔍 [Fund Audit Scheduler] Last fund audit ({last_audit_date or 'none'}) older than {yesterday_str}. Running catch-up audit...")
+            loop = asyncio.get_running_loop()
+            await loop.run_in_executor(None, audit_single_fund_daily, None, False)
+    except Exception as boot_err:
+        logger.warning(f"🔍 [Fund Audit Scheduler] Boot catch-up notice: {boot_err}")
+
     while True:
         try:
             now = datetime.now(IST)
@@ -581,6 +615,12 @@ async def lifespan(app: FastAPI):
             seed_default_msme_firms()
     except Exception as e:
         logger.warning(f"Initial MSME bootstrap seed skipped: {e}")
+
+    try:
+        from core.db.safety_radar import seed_default_safety_radar_products
+        seed_default_safety_radar_products()
+    except Exception as e:
+        logger.warning(f"Initial Safety Radar bootstrap seed skipped: {e}")
 
     is_testing = os.environ.get("TESTING") == "1" or "pytest" in sys.modules
     scheduler = None

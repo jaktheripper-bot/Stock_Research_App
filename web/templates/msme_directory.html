@@ -361,7 +361,7 @@
       <div style="font-size: 11.5px; color: var(--text-muted);">
         Statutory Source: <span id="modalSource" style="color: #cbd5e1;"></span>
       </div>
-      <div style="display: flex; gap: 10px;">
+      <div style="display: flex; gap: 10px; flex-wrap: wrap;">
         <button
           type="button"
           onclick="closeMsmeModal()"
@@ -370,6 +370,14 @@
         >
           Dismiss
         </button>
+        <a
+          id="modalExportPdfLink"
+          href="#"
+          class="btn btn-secondary"
+          style="padding: 8px 16px; border-radius: 8px; font-size: 13px; font-weight: 700; text-decoration: none; display: inline-flex; align-items: center; gap: 6px;"
+        >
+          <span>Export PDF</span>
+        </a>
         <a
           id="modalFullDossierLink"
           href="#"
@@ -471,9 +479,13 @@ async function inspectMsme(uin, btnElement) {
     const frags = moat.fragility_vectors || [];
     document.getElementById("modalFragilityVector").innerText = frags.length > 0 ? `Risk: ${frags[0]}` : '';
 
-    // Deep Link to standalone dossier
+    // Deep Link to standalone dossier & PDF export
     const fullLink = document.getElementById("modalFullDossierLink");
     fullLink.href = `/msme/${encodeURIComponent(data.uin)}`;
+    const pdfLink = document.getElementById("modalExportPdfLink");
+    if (pdfLink) {
+      pdfLink.href = `/api/pdf/msme/${encodeURIComponent(data.uin)}`;
+    }
 
     // Open Modal
     const modal = document.getElementById("msmeModal");

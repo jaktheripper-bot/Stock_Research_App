@@ -52,7 +52,7 @@
       </div>
       {% endif %}
 
-      <form action="/contact" method="POST">
+      <form id="contactTicketForm" action="/contact" method="POST" onsubmit="return handleContactTicketSubmit(event)">
         <div style="margin-bottom: 18px;">
           <label for="contactUserName" style="display: block; font-size: 13px; font-weight: 600; color: var(--text-secondary); margin-bottom: 6px;">
             Your Name (Optional)
@@ -100,8 +100,9 @@
           <input type="text" id="contactWebsiteUrl" name="website_url" tabindex="-1" autocomplete="off" value="">
         </div>
 
-        <button type="submit" class="btn btn-primary" style="width: 100%; padding: 14px; font-size: 15px; font-weight: 700; display: flex; justify-content: center; align-items: center; gap: 8px;">
-          <span>📨 Send Support Ticket</span>
+        <button type="submit" id="contactSubmitBtn" class="btn btn-primary" style="width: 100%; padding: 14px; font-size: 15px; font-weight: 700; display: flex; justify-content: center; align-items: center; gap: 8px; transition: all 0.2s ease;">
+          <span id="contactSubmitBtnIcon">📨</span>
+          <span id="contactSubmitBtnText">Send Support Ticket</span>
         </button>
       </form>
     </div>

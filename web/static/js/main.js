@@ -1428,6 +1428,66 @@ window.handleThesisCheckpointSubmit = async function(e, ticker) {
   }
 };
 
+// Contact Form Submission Tactile Feedback & Double-Submit Guard
+let _contactFormSubmitting = false;
+
+window.handleContactTicketSubmit = function(e) {
+  if (_contactFormSubmitting) {
+    if (e && typeof e.preventDefault === 'function') {
+      e.preventDefault();
+    }
+    return false;
+  }
+
+  const form = document.getElementById('contactTicketForm');
+  if (form && typeof form.checkValidity === 'function' && !form.checkValidity()) {
+    return true;
+  }
+
+  _contactFormSubmitting = true;
+
+  const btn = document.getElementById('contactSubmitBtn');
+  const btnIcon = document.getElementById('contactSubmitBtnIcon');
+  const btnText = document.getElementById('contactSubmitBtnText');
+
+  if (btnIcon) {
+    btnIcon.innerText = '⏳';
+  }
+  if (btnText) {
+    btnText.innerText = 'Sending Ticket...';
+  }
+  if (btn) {
+    btn.style.opacity = '0.75';
+    btn.style.cursor = 'not-allowed';
+    btn.style.pointerEvents = 'none';
+  }
+
+  setTimeout(function() {
+    if (btn) btn.disabled = true;
+  }, 10);
+
+  return true;
+};
+
+window.addEventListener('pageshow', function() {
+  _contactFormSubmitting = false;
+  const btn = document.getElementById('contactSubmitBtn');
+  const btnIcon = document.getElementById('contactSubmitBtnIcon');
+  const btnText = document.getElementById('contactSubmitBtnText');
+  if (btn) {
+    btn.disabled = false;
+    btn.style.opacity = '';
+    btn.style.cursor = '';
+    btn.style.pointerEvents = '';
+  }
+  if (btnIcon) {
+    btnIcon.innerText = '📨';
+  }
+  if (btnText) {
+    btnText.innerText = 'Send Support Ticket';
+  }
+});
+
 function getStoredUser() {
   try {
     const raw = localStorage.getItem('sr_user');

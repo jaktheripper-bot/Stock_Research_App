@@ -44,6 +44,9 @@ from core.db import (
     add_ticket_response,
     get_ticket_responses,
     get_ticket_by_id,
+    get_canned_responses,
+    save_canned_response,
+    delete_canned_response,
     IST,
 )
 from core.config import get_secret
@@ -285,10 +288,25 @@ async def admin_dashboard(
         }
 
     try:
-        support_tickets = get_support_tickets(limit=50, exclude_tests=exclude_tests)
+        support_tickets = get_support_tickets(limit=250, exclude_tests=exclude_tests)
     except Exception as ste:
         logger.error(f"Error fetching support tickets: {ste}")
         support_tickets = []
+
+    active_support_tickets = [
+        t for t in support_tickets
+        if (t.get("status") or "open").lower().strip() in ("open", "in_progress")
+    ]
+    archived_support_tickets = [
+        t for t in support_tickets
+        if (t.get("status") or "open").lower().strip() in ("resolved", "closed")
+    ]
+
+    try:
+        canned_responses = get_canned_responses()
+    except Exception as cre:
+        logger.error(f"Error fetching canned responses: {cre}")
+        canned_responses = []
 
     try:
         open_tickets_count = get_open_tickets_count(exclude_tests=exclude_tests)
@@ -387,6 +405,9 @@ async def admin_dashboard(
             "billables": billables,
             "user_analytics": user_analytics,
             "support_tickets": support_tickets,
+            "active_support_tickets": active_support_tickets,
+            "archived_support_tickets": archived_support_tickets,
+            "canned_responses": canned_responses,
             "open_tickets_count": open_tickets_count,
             "session_journeys": session_journeys,
             "seo_summary": seo_summary,
@@ -1315,10 +1336,11 @@ async def admin_team_role(
 
 
 @router.post("/admin/tickets/{ticket_id}/status")
+@router.post("/api/admin/tickets/{ticket_id}/status")
 async def admin_update_ticket(
     ticket_id: str,
     request: Request,
-    status: str = Form(...),
+    status: Optional[str] = Form(None),
     admin_notes: Optional[str] = Form(None)
 ):
     if not _validate_request_origin(request):
@@ -1327,7 +1349,23 @@ async def admin_update_ticket(
     if not admin_session:
         raise HTTPException(status_code=403, detail="Admin authorization required.")
 
-    ok = update_ticket_status(ticket_id, status, admin_notes)
+    status_val = status
+    notes_val = admin_notes
+    if status_val is None:
+        try:
+            body_json = await request.json()
+            if isinstance(body_json, dict):
+                status_val = body_json.get("status")
+                if notes_val is None:
+                    notes_val = body_json.get("admin_notes")
+        except Exception as json_err:
+            logger.debug("Ticket status update non-JSON fallback: %s", json_err)
+
+    clean_status = str(status_val or "open").strip().lower()
+    if clean_status not in ("open", "in_progress", "resolved", "closed"):
+        clean_status = "open"
+
+    ok = update_ticket_status(ticket_id, clean_status, notes_val)
     current_email = admin_session.get("email")
     client_ip = _get_client_ip(request)
 
@@ -1337,11 +1375,165 @@ async def admin_update_ticket(
             "update_ticket_status",
             target_type="ticket",
             target_id=ticket_id,
-            details={"new_status": status, "admin_notes": admin_notes},
+            details={"new_status": clean_status, "admin_notes": notes_val},
             ip_address=client_ip
         )
-    msg = f"Ticket+{ticket_id}+status+updated+to+{status}" if ok else "Failed+to+update+ticket"
+
+    is_ajax = (
+        request.headers.get("x-requested-with") == "XMLHttpRequest"
+        or "application/json" in request.headers.get("accept", "")
+        or "application/json" in request.headers.get("content-type", "")
+        or request.url.path.startswith("/api/")
+    )
+    if is_ajax:
+        updated_ticket = get_ticket_by_id(ticket_id, include_responses=True)
+        open_cnt = get_open_tickets_count(exclude_tests=True)
+        return JSONResponse(
+            status_code=200 if ok else 400,
+            content={
+                "success": bool(ok),
+                "ticket_id": ticket_id,
+                "new_status": clean_status,
+                "open_tickets_count": open_cnt,
+                "ticket": updated_ticket,
+                "message": f"Ticket {ticket_id} status updated to {clean_status.upper()}" if ok else "Failed to update ticket status"
+            }
+        )
+
+    msg = f"Ticket+{ticket_id}+status+updated+to+{clean_status}" if ok else "Failed+to+update+ticket"
     return RedirectResponse(url=f"/admin?tab=tickets&msg={msg}", status_code=303)
+
+
+@router.get("/api/admin/tickets/search")
+async def api_admin_search_tickets(
+    request: Request,
+    status: str = Query("archived"),
+    q: str = Query(""),
+    category: str = Query("all"),
+    sort_by: str = Query("newest"),
+    limit: int = Query(150, ge=1, le=500),
+    include_tests: int = Query(0)
+):
+    """Searches, filters, and sorts active or archived support tickets for the Admin Service Inbox."""
+    admin_session = _is_admin_authenticated(request)
+    if not admin_session:
+        raise HTTPException(status_code=403, detail="Admin authorization required.")
+
+    exclude_tests = (include_tests == 0)
+    tickets = get_support_tickets(
+        status=status,
+        limit=limit,
+        exclude_tests=exclude_tests,
+        search_query=q,
+        category=category,
+        sort_by=sort_by,
+    )
+    open_cnt = get_open_tickets_count(exclude_tests=exclude_tests)
+    return JSONResponse(
+        status_code=200,
+        content={
+            "success": True,
+            "tickets": tickets,
+            "count": len(tickets),
+            "open_tickets_count": open_cnt,
+        }
+    )
+
+
+@router.get("/api/admin/tickets/canned-responses")
+async def api_admin_list_canned_responses(request: Request):
+    """Returns all saved canned responses for the Admin Support Inbox."""
+    admin_session = _is_admin_authenticated(request)
+    if not admin_session:
+        raise HTTPException(status_code=403, detail="Admin authorization required.")
+    items = get_canned_responses()
+    return JSONResponse(status_code=200, content={"success": True, "canned_responses": items})
+
+
+@router.post("/api/admin/tickets/canned-responses")
+async def api_admin_save_canned_response(
+    request: Request,
+    title: Optional[str] = Form(None),
+    body: Optional[str] = Form(None),
+    target_status: Optional[str] = Form("resolved"),
+    default_credits: Optional[float] = Form(0.0),
+    category: Optional[str] = Form("general"),
+    response_id: Optional[int] = Form(None)
+):
+    """Creates or updates a reusable canned response template in the Admin Support Inbox."""
+    if not _validate_request_origin(request):
+        raise HTTPException(status_code=403, detail="Cross-origin request rejected.")
+    admin_session = _is_admin_authenticated(request)
+    if not admin_session:
+        raise HTTPException(status_code=403, detail="Admin authorization required.")
+
+    title_val = title
+    body_val = body
+    status_val = target_status
+    credits_val = default_credits
+    cat_val = category
+    rid_val = response_id
+
+    if title_val is None or body_val is None:
+        try:
+            payload = await request.json()
+            if isinstance(payload, dict):
+                title_val = payload.get("title", title_val)
+                body_val = payload.get("body", body_val)
+                status_val = payload.get("target_status", status_val)
+                credits_val = payload.get("default_credits", credits_val)
+                cat_val = payload.get("category", cat_val)
+                rid_val = payload.get("response_id", rid_val)
+        except Exception as json_err:
+            logger.debug("Save canned response JSON parse fallback: %s", json_err)
+
+    res = save_canned_response(
+        title=str(title_val or ""),
+        body=str(body_val or ""),
+        target_status=str(status_val or "resolved"),
+        default_credits=float(credits_val or 0.0),
+        category=str(cat_val or "general"),
+        created_by=admin_session.get("email", "admin"),
+        response_id=int(rid_val) if rid_val else None,
+    )
+    if not res.get("success"):
+        return JSONResponse(status_code=400, content=res)
+
+    record_admin_audit(
+        admin_session.get("email"),
+        "save_canned_response",
+        target_type="canned_response",
+        target_id=str(res.get("canned_response", {}).get("id", "")),
+        details={"title": title_val, "target_status": status_val},
+        ip_address=_get_client_ip(request),
+    )
+    res["canned_responses"] = get_canned_responses()
+    return JSONResponse(status_code=200, content=res)
+
+
+@router.delete("/api/admin/tickets/canned-responses/{response_id}")
+async def api_admin_delete_canned_response(response_id: int, request: Request):
+    """Deletes a saved canned response template by ID."""
+    if not _validate_request_origin(request):
+        raise HTTPException(status_code=403, detail="Cross-origin request rejected.")
+    admin_session = _is_admin_authenticated(request)
+    if not admin_session:
+        raise HTTPException(status_code=403, detail="Admin authorization required.")
+
+    res = delete_canned_response(response_id)
+    if not res.get("success"):
+        return JSONResponse(status_code=400, content=res)
+
+    record_admin_audit(
+        admin_session.get("email"),
+        "delete_canned_response",
+        target_type="canned_response",
+        target_id=str(response_id),
+        details={"deleted_id": response_id},
+        ip_address=_get_client_ip(request),
+    )
+    res["canned_responses"] = get_canned_responses()
+    return JSONResponse(status_code=200, content=res)
 
 
 @router.get("/api/admin/tickets/{ticket_id}/thread")
@@ -1390,7 +1582,12 @@ async def admin_reply_ticket(
     if not ticket:
         raise HTTPException(status_code=404, detail="Ticket not found.")
 
-    is_ajax = request.headers.get("x-requested-with") == "XMLHttpRequest" or "application/json" in request.headers.get("accept", "") or request.url.path.startswith("/api/")
+    canonical_tid = ticket.get("ticket_id") or ticket_id
+    is_ajax = (
+        request.headers.get("x-requested-with") == "XMLHttpRequest"
+        or "application/json" in request.headers.get("accept", "")
+        or request.url.path.startswith("/api/")
+    )
     clean_reply = str(reply_message or "").strip()
     if not clean_reply:
         err_msg = "Reply message cannot be empty."
@@ -1420,7 +1617,7 @@ async def admin_reply_ticket(
 
     # 2. Record response in database
     add_ticket_response(
-        ticket_id=ticket_id,
+        ticket_id=canonical_tid,
         message=clean_reply,
         sender_email=admin_email,
         sender_name=admin_name,
@@ -1430,8 +1627,10 @@ async def admin_reply_ticket(
 
     # 3. Update status and admin notes if provided
     new_status = str(status or ticket.get("status", "in_progress")).strip().lower()
-    combined_notes = admin_notes or ticket.get("admin_notes")
-    update_ticket_status(ticket_id, new_status, combined_notes)
+    if new_status not in ("open", "in_progress", "resolved", "closed"):
+        new_status = "in_progress"
+    combined_notes = admin_notes if admin_notes is not None else ticket.get("admin_notes")
+    update_ticket_status(canonical_tid, new_status, combined_notes)
 
     # 4. Handle optional remedial credits grant
     credits_granted = 0.0
@@ -1443,8 +1642,8 @@ async def admin_reply_ticket(
                 target_user_identifier=ticket.get("user_email"),
                 credits_amount=credits_val,
                 reason_code="TASK_REMEDY",
-                admin_note=f"Remedial grant from ticket response {ticket_id}",
-                ticket_id=ticket_id,
+                admin_note=f"Remedial grant from ticket response {canonical_tid}",
+                ticket_id=canonical_tid,
                 resolve_ticket=False,
                 auto_provision=True,
                 ip_address=client_ip
@@ -1458,7 +1657,7 @@ async def admin_reply_ticket(
         admin_email,
         "reply_support_ticket",
         target_type="ticket",
-        target_id=ticket_id,
+        target_id=canonical_tid,
         details={
             "recipient_email": ticket.get("user_email"),
             "new_status": new_status,
@@ -1472,16 +1671,21 @@ async def admin_reply_ticket(
     )
 
     # 6. Response handling (AJAX vs Form Redirect)
-    is_ajax = request.headers.get("x-requested-with") == "XMLHttpRequest" or "application/json" in request.headers.get("accept", "")
     if is_ajax:
+        updated_ticket = get_ticket_by_id(canonical_tid, include_responses=True)
+        open_cnt = get_open_tickets_count(exclude_tests=True)
+        resp_list = updated_ticket.get("responses", []) if updated_ticket else []
         return JSONResponse(status_code=200, content={
             "success": True,
-            "ticket_id": ticket_id,
+            "ticket_id": canonical_tid,
             "new_status": new_status,
+            "open_tickets_count": open_cnt,
+            "response_count": len(resp_list),
+            "ticket": updated_ticket,
             "email_dispatched": email_dispatched,
             "email_service_configured": email_configured,
             "email_status_text": email_status_text,
-            "message": f"Response recorded for {ticket.get('user_email')}. Outgoing Email: {email_status_text}."
+            "message": f"Response recorded for {ticket.get('user_email')} (Status: {new_status.upper()}). Outgoing Email: {email_status_text}."
         })
 
     msg = f"Response+recorded+for+{ticket.get('user_email')}"
@@ -1492,8 +1696,8 @@ async def admin_reply_ticket(
     if credits_granted > 0:
         msg += f"+(+{credits_granted}+credits+granted)"
     return RedirectResponse(url=f"/admin?tab=tickets&msg={msg}", status_code=303)
- 
- 
+
+
 @router.post("/api/admin/tickets/reply")
 async def api_admin_reply_ticket(
     request: Request,

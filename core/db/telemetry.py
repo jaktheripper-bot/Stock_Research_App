@@ -1439,6 +1439,35 @@ def purge_test_telemetry() -> dict:
         except Exception as le:
             logger.warning(f"Credit usage ledger purge notice: {le}")
 
+        # 6. Purge leaked test stubs from alternative_yield_products and reports
+        try:
+            cursor.execute("""
+                DELETE FROM alternative_yield_products
+                WHERE product_id = 'GULLAK___SAFEGOLD'
+                   OR product_name = 'Gold Yield 16% Leasing';
+            """)
+            purged_counts["safety_radar_stubs_purged"] = cursor.rowcount if cursor.rowcount and cursor.rowcount > 0 else 0
+        except Exception as sre:
+            logger.warning(f"Safety radar stub purge notice: {sre}")
+
+        try:
+            cursor.execute("""
+                DELETE FROM reports
+                WHERE ticker LIKE 'COAL_%'
+                   OR ticker LIKE 'UNITCOAL_%'
+                   OR ticker = 'COALESCE_TEST'
+                   OR short_name = 'Coalesce Test Ltd';
+            """)
+            purged_counts["test_reports_purged"] = cursor.rowcount if cursor.rowcount and cursor.rowcount > 0 else 0
+            cursor.execute("""
+                DELETE FROM report_revisions
+                WHERE ticker LIKE 'COAL_%'
+                   OR ticker LIKE 'UNITCOAL_%'
+                   OR ticker = 'COALESCE_TEST';
+            """)
+        except Exception as rpe:
+            logger.warning(f"Test reports purge notice: {rpe}")
+
         conn.commit()
     except Exception as e:
         logger.error(f"Error executing test data purge: {e}")

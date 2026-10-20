@@ -456,6 +456,42 @@ async def api_download_reit_pdf(symbol: str, request: Request):
     )
 
 
+@router.get("/api/pdf/msme/{uin}")
+async def api_download_msme_pdf(uin: str, request: Request):
+    """Generates and serves downloadable institutional 4-pillar PDF forensic dossier for an unlisted MSME."""
+    clean_uin = uin.strip().upper()
+    from core.msme.router import get_msme_detail
+    from core.reporting.pdf import generate_msme_dossier_pdf, apply_pdf_watermark
+
+    dossier = get_msme_detail(clean_uin)
+    if not dossier:
+        raise HTTPException(status_code=404, detail=f"MSME enterprise with UIN '{clean_uin}' not found.")
+
+    record_usage_event(
+        event_type="pdf_download",
+        ticker=clean_uin,
+        details={"action": "export_msme_pdf"}
+    )
+
+    is_unlocked = _asset_unlocked_for_request(request, "MSME", clean_uin)
+    async with PDF_SEMAPHORE:
+        pdf_bytes = await run_in_threadpool(
+            generate_msme_dossier_pdf,
+            clean_uin,
+            dossier,
+            deep_dive_unlocked=is_unlocked
+        )
+        pdf_bytes = await run_in_threadpool(apply_pdf_watermark, pdf_bytes, _pdf_account_ref(request))
+    safe_uin = re.sub(r'[^a-zA-Z0-9_-]', '_', clean_uin)
+    filename = f"MSME_Forensic_Dossier_{safe_uin}_{datetime.now(IST).strftime('%d-%m-%Y')}.pdf"
+
+    return Response(
+        content=pdf_bytes,
+        media_type="application/pdf",
+        headers={"Content-Disposition": f'attachment; filename="{filename}"'}
+    )
+
+
 # ==============================================================================
 # Public Developer API v1
 # ==============================================================================
