@@ -1382,10 +1382,17 @@ def purge_test_telemetry() -> dict:
                    OR user_email LIKE '%@nolettersbox.com'
                    OR user_email LIKE 'test_%'
                    OR ticket_id LIKE 'TKT-TEST-%'
+                   OR UPPER(ticket_id) = 'TKT-0F9A10CE'
                    OR subject LIKE '%[TEST]%'
                    OR (LENGTH(TRIM(message)) >= 16 AND TRIM(message) NOT LIKE '% %');
             """)
             purged_counts["tickets_purged"] = cursor.rowcount if cursor.rowcount and cursor.rowcount > 0 else 0
+            cursor.execute("""
+                DELETE FROM ticket_responses
+                WHERE UPPER(ticket_id) = 'TKT-0F9A10CE'
+                   OR ticket_id LIKE 'TKT-TEST-%'
+                   OR ticket_id NOT IN (SELECT ticket_id FROM support_tickets);
+            """)
         except Exception as te:
             logger.debug(f"Support tickets purge notice: {te}")
 

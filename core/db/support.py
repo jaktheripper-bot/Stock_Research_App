@@ -663,3 +663,39 @@ def delete_canned_response(response_id: int) -> Dict[str, Any]:
         cursor.close()
         conn.close()
 
+
+def delete_support_ticket(ticket_id: str) -> Dict[str, Any]:
+    """Permanently deletes a spam/invalid support ticket and its associated response thread."""
+    init_db()
+    conn = get_db_connection()
+    cursor = conn.cursor()
+    p = "%s" if is_postgres_connection(conn) else "?"
+    clean_tid = str(ticket_id or "").strip().upper()
+    if not clean_tid:
+        cursor.close()
+        conn.close()
+        return {"success": False, "error": "Ticket ID is required."}
+
+    try:
+        cursor.execute(f"DELETE FROM ticket_responses WHERE UPPER(ticket_id) = UPPER({p});", (clean_tid,))
+        cursor.execute(f"DELETE FROM support_tickets WHERE UPPER(ticket_id) = UPPER({p});", (clean_tid,))
+        deleted_rows = cursor.rowcount if cursor.rowcount and cursor.rowcount > 0 else 0
+        conn.commit()
+        return {
+            "success": True,
+            "ticket_id": clean_tid,
+            "deleted": deleted_rows > 0,
+            "deleted_count": deleted_rows,
+        }
+    except Exception as e:
+        logger.error("Error deleting support ticket %s: %s", clean_tid, e)
+        try:
+            conn.rollback()
+        except Exception as rb_err:
+            logger.debug("Delete support ticket rollback failed: %s", rb_err)
+        return {"success": False, "error": str(e)}
+    finally:
+        cursor.close()
+        conn.close()
+
+

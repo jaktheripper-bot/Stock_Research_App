@@ -2939,13 +2939,18 @@
           <span id="replyEmailStatusBadge" style="font-size: 11px; color: #38bdf8; font-weight: 600;">SMTP TLS</span>
         </div>
 
-        <div style="display: flex; gap: 10px; justify-content: flex-end;">
-          <button type="button" onclick="closeTicketReplyModal()" class="btn btn-secondary" style="padding: 8px 16px; font-size: 13px;">
-            Close
+        <div style="display: flex; gap: 10px; justify-content: space-between; align-items: center; flex-wrap: wrap;">
+          <button type="button" id="btnDeleteSpamTicket" onclick="deleteCurrentTicketAsSpam()" class="btn btn-secondary" style="padding: 8px 14px; font-size: 12.5px; font-weight: 700; color: #f87171; border-color: rgba(239, 68, 68, 0.4); background: rgba(239, 68, 68, 0.1); cursor: pointer;" title="Permanently delete this ticket as spam or invalid">
+            🗑️ Delete / Spam
           </button>
-          <button type="submit" id="replySubmitBtn" class="btn btn-primary" style="padding: 8px 18px; font-size: 13px; font-weight: 700; background: #0ea5e9; border-color: #0ea5e9; display: inline-flex; align-items: center; gap: 6px; cursor: pointer;">
-            <svg class="glyph"><use href="#glyph-mail"></use></svg> Send Response &amp; Update Status
-          </button>
+          <div style="display: flex; gap: 10px;">
+            <button type="button" onclick="closeTicketReplyModal()" class="btn btn-secondary" style="padding: 8px 16px; font-size: 13px;">
+              Close
+            </button>
+            <button type="submit" id="replySubmitBtn" class="btn btn-primary" style="padding: 8px 18px; font-size: 13px; font-weight: 700; background: #0ea5e9; border-color: #0ea5e9; display: inline-flex; align-items: center; gap: 6px; cursor: pointer;">
+              <svg class="glyph"><use href="#glyph-mail"></use></svg> Send Response &amp; Update Status
+            </button>
+          </div>
         </div>
       </form>
     </div>
@@ -3501,6 +3506,46 @@
       if (btn) {
         btn.disabled = false;
         btn.innerText = 'Apply Status Only';
+      }
+    }
+  }
+
+  async function deleteCurrentTicketAsSpam(ticketIdOverride) {
+    const tidInput = document.getElementById('replyModalTicketIdInput');
+    const ticketId = String(ticketIdOverride || (tidInput && tidInput.value) || '').trim();
+    if (!ticketId) return;
+
+    const btn = document.getElementById('btnDeleteSpamTicket');
+    if (btn) {
+      btn.disabled = true;
+      btn.innerText = 'Deleting...';
+    }
+    try {
+      const resp = await fetch(`/api/admin/tickets/${encodeURIComponent(ticketId)}/delete`, {
+        method: 'POST',
+        headers: {
+          'Accept': 'application/json',
+          'X-Requested-With': 'XMLHttpRequest'
+        }
+      });
+      const res = await resp.json();
+      if (resp.ok && res.success) {
+        const row = document.getElementById(`ticket-row-${ticketId}`);
+        if (row) row.remove();
+        refreshInboxAndArchiveCounts(res.open_tickets_count);
+        closeTicketReplyModal();
+        if (window.showToast) {
+          window.showToast(`Ticket ${ticketId} permanently removed as spam.`, 'info');
+        }
+      } else {
+        alert('Failed to delete ticket: ' + (res.error || res.detail || 'Unknown error'));
+      }
+    } catch (err) {
+      alert('Network error deleting ticket: ' + err.message);
+    } finally {
+      if (btn) {
+        btn.disabled = false;
+        btn.innerText = '🗑️ Delete / Spam';
       }
     }
   }

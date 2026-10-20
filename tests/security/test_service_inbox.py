@@ -440,11 +440,47 @@ class TestServiceInboxAndEmailReply(unittest.TestCase):
         self.assertIsNotNone(soup.find(id="cannedResponseTitleInput"))
         self.assertIsNotNone(soup.find(id="replySpellCheckTray"))
         self.assertIsNotNone(soup.find(id="btnRunSpellCheck"))
+        self.assertIsNotNone(soup.find(id="btnDeleteSpamTicket"))
+        self.assertIn("deleteCurrentTicketAsSpam", resp.text)
 
         reply_textarea = soup.find(id="ticketReplyMessage")
         self.assertIsNotNone(reply_textarea)
         self.assertEqual(reply_textarea.get("spellcheck"), "true")
         self.assertEqual(reply_textarea.get("lang"), "en")
+
+    @patch("web.routers.admin._is_admin_authenticated")
+    def test_delete_spam_ticket_endpoint_and_purge(self, mock_auth):
+        """Verify that POST /api/admin/tickets/{ticket_id}/delete and purge_test_telemetry remove spam tickets."""
+        from core.db.connection import get_db_connection, get_placeholder
+        from core.db.telemetry import purge_test_telemetry
+        mock_auth.return_value = {"email": "owner@moatnomics.com", "role": "owner"}
+
+        # 1. Delete via the Admin Delete / Spam endpoint
+        del_resp = self.client.post(
+            f"/api/admin/tickets/{self.ticket_id}/delete",
+            headers={"Accept": "application/json", "X-Requested-With": "XMLHttpRequest"},
+        )
+        self.assertEqual(del_resp.status_code, 200)
+        del_data = del_resp.json()
+        self.assertTrue(del_data["success"])
+        self.assertTrue(del_data["deleted"])
+        self.assertIsNone(get_ticket_by_id(self.ticket_id))
+
+        # 2. Seed TKT-0F9A10CE and verify purge_test_telemetry removes it
+        conn = get_db_connection()
+        cursor = conn.cursor()
+        p = get_placeholder()
+        cursor.execute(
+            f"INSERT INTO support_tickets (ticket_id, user_email, user_name, category, subject, message, status) VALUES ({p}, {p}, {p}, {p}, {p}, {p}, 'open')",
+            ("TKT-0F9A10CE", "spammer@nolettersbox.com", "NARTYTRYUT802262", "general", "MERTYHR802262", "MERTYHR802262MAVNGHJTH"),
+        )
+        conn.commit()
+        cursor.close()
+        conn.close()
+
+        purge_test_telemetry()
+        self.assertIsNone(get_ticket_by_id("TKT-0F9A10CE"))
+
 
 
 if __name__ == "__main__":

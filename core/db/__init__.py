@@ -127,6 +127,7 @@ from core.db.support import (
     get_canned_responses,
     save_canned_response,
     delete_canned_response,
+    delete_support_ticket,
 )
 
 from core.db.fundamentals import (
@@ -227,6 +228,7 @@ __all__ = [
     "get_canned_responses",
     "save_canned_response",
     "delete_canned_response",
+    "delete_support_ticket",
     # fundamentals cache
     "get_cached_fundamentals",
     "save_cached_fundamentals",

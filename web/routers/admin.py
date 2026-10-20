@@ -47,6 +47,7 @@ from core.db import (
     get_canned_responses,
     save_canned_response,
     delete_canned_response,
+    delete_support_ticket,
     IST,
 )
 from core.config import get_secret
@@ -1721,6 +1722,60 @@ async def api_admin_reply_ticket(
         grant_remedial_credits=grant_remedial_credits,
         admin_notes=admin_notes
     )
+
+
+@router.delete("/api/admin/tickets/{ticket_id}")
+@router.post("/api/admin/tickets/{ticket_id}/delete")
+@router.post("/admin/tickets/{ticket_id}/delete")
+async def api_admin_delete_ticket(ticket_id: str, request: Request):
+    """Permanently deletes a spam/invalid support ticket and its response thread."""
+    if not _validate_request_origin(request):
+        raise HTTPException(status_code=403, detail="Cross-origin request rejected.")
+    admin_session = _is_admin_authenticated(request)
+    if not admin_session:
+        raise HTTPException(status_code=403, detail="Admin authorization required.")
+
+    clean_tid = str(ticket_id or "").strip().upper()
+    if not clean_tid:
+        raise HTTPException(status_code=400, detail="ticket_id is required.")
+
+    ticket = get_ticket_by_id(clean_tid, include_responses=False)
+    del_res = delete_support_ticket(clean_tid)
+    admin_email = admin_session.get("email", "admin")
+    client_ip = _get_client_ip(request)
+
+    record_admin_audit(
+        admin_email,
+        "delete_support_ticket",
+        target_type="ticket",
+        target_id=clean_tid,
+        details={
+            "deleted": del_res.get("deleted", False),
+            "user_email": ticket.get("user_email") if ticket else None,
+            "subject": ticket.get("subject") if ticket else None,
+        },
+        ip_address=client_ip,
+    )
+
+    is_ajax = (
+        request.headers.get("x-requested-with") == "XMLHttpRequest"
+        or "application/json" in request.headers.get("accept", "")
+        or request.url.path.startswith("/api/")
+    )
+    if is_ajax:
+        open_cnt = get_open_tickets_count(exclude_tests=True)
+        return JSONResponse(
+            status_code=200,
+            content={
+                "success": bool(del_res.get("success")),
+                "ticket_id": clean_tid,
+                "deleted": bool(del_res.get("deleted")),
+                "open_tickets_count": open_cnt,
+                "message": f"Ticket {clean_tid} permanently removed as spam/invalid.",
+            },
+        )
+    return RedirectResponse(url=f"/admin?tab=tickets&msg=Ticket+{clean_tid}+deleted", status_code=303)
+
 
 
 @router.post("/admin/refund")
