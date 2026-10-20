@@ -1365,7 +1365,14 @@ window.handleCountercaseSubmit = async function(e, ticker) {
 window.openThesisModal = function() {
   const modal = document.getElementById('thesisModalBackdrop');
   if (modal) {
+    if (modal.parentElement !== document.body) {
+      document.body.appendChild(modal);
+    }
     modal.style.display = 'flex';
+    const rationaleEl = document.getElementById('thesisRationale');
+    if (rationaleEl) {
+      rationaleEl.focus({ preventScroll: true });
+    }
   }
 };
 

@@ -14,7 +14,8 @@
 
 ## 4. Modular Domain Architecture & Persistence Facade
 * **Modular `core/db/` Package:** Database operations are modularized into domain-specific modules adhering to Single Responsibility:
-  * `core/db/connection.py`: Thread-safe connection pooling (`_PooledConnectionProxy`), SQLite WAL fallback, dual schema migrations (v001–v006).
+  * `core/db/connection.py`: Thread-safe connection pooling (`_PooledConnectionProxy`), SQLite WAL fallback, dual schema migrations (v001–v034).
+  * `core/db/users.py`: User accounts, welcome grants, credit usage ledgers, dossier unlocks, and confidential user-scoped Countercase & Thesis Checkpoint persistence (`user_thesis_ledger`).
   * `core/db/compliance.py`: SEBI safe-harbor disclaimer and immutable compliance audit logging.
   * `core/db/reports.py`: Snapshot archiving, time-series differential revisions, and structured query retrieval.
   * `core/db/watchlist.py`: Watched scrips, automated surveillance scan timestamps, and tracking status.

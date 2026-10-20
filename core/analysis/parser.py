@@ -43,13 +43,18 @@ def extract_health_matrix(report_text: str) -> dict:
     return matrix
 
 def remove_health_matrix_text(text: str) -> str:
-    """Removes redundant markdown Health Matrix bullet blocks from presentation."""
+    """Removes redundant markdown Health Matrix bullet blocks and legacy provider failover notices from presentation."""
     if not text or not isinstance(text, str):
         return ""
     cleaned = re.sub(
         r'(?i)#*\s*Health Matrix\s*\n+(?:[ \t]*[-*•\d\.]+\s+[^\n]+\n*)+',
         '',
         text
+    )
+    cleaned = re.sub(
+        r'(?im)^[ \t]*>[ \t]*(?:⚠️|🔄|•)?[ \t]*\**(?:Gemini|Perplexity|Rerouting to Perplexity)[^\n]*\n*',
+        '',
+        cleaned
     )
     return cleaned.strip()
 
@@ -119,6 +124,8 @@ def format_citations_section(citations: list[dict], stock_data: dict = None) -> 
         uri = (c.get("uri") or c.get("url") or "").strip()
         title = (c.get("title") or "Exchange / Public Document").strip()
         stype = (c.get("source_type") or "Verified Grounding").strip()
+        if "perplexity" in stype.lower() or "gemini" in stype.lower():
+            stype = "Verified Web Grounding"
 
         # Clean title if domain-only
         if title.lower() == "bseindia.com":

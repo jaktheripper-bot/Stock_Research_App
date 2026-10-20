@@ -1221,3 +1221,93 @@ def get_user_unlocked_tickers(user_id: str) -> List[str]:
         cursor.close()
         conn.close()
 
+
+def save_user_thesis_entry(
+    user_id: str,
+    ticker: str,
+    entry_type: str,
+    failure_vector: str = "",
+    decision: str = "",
+    rationale: str = "",
+    current_price: float = 0.0
+) -> bool:
+    """
+    Saves or updates a confidential countercase or thesis checkpoint entry scoped strictly to a user_id and ticker.
+    """
+    clean_uid = str(user_id or "").strip()
+    clean_sym = str(ticker or "").strip().upper()
+    clean_type = str(entry_type or "").strip().upper()
+    if not clean_uid or clean_uid == "guest_web_user" or not clean_sym or not clean_type:
+        return False
+
+    init_db()
+    conn = get_db_connection()
+    cursor = conn.cursor()
+    p = get_placeholder()
+    try:
+        cursor.execute(
+            f"""
+            INSERT INTO user_thesis_ledger (user_id, ticker, entry_type, failure_vector, decision, rationale, current_price, updated_at)
+            VALUES ({p}, {p}, {p}, {p}, {p}, {p}, {p}, CURRENT_TIMESTAMP)
+            ON CONFLICT (user_id, ticker, entry_type) DO UPDATE SET
+                failure_vector = excluded.failure_vector,
+                decision = excluded.decision,
+                rationale = excluded.rationale,
+                current_price = excluded.current_price,
+                updated_at = CURRENT_TIMESTAMP;
+            """,
+            (clean_uid, clean_sym, clean_type, str(failure_vector or "").strip(), str(decision or "").strip(), str(rationale or "").strip(), float(current_price or 0.0))
+        )
+        conn.commit()
+        return True
+    except Exception as e:
+        logger.error(f"Error saving confidential thesis entry for {clean_uid}/{clean_sym}: {e}")
+        return False
+    finally:
+        cursor.close()
+        conn.close()
+
+
+def get_user_thesis_entries(user_id: str, ticker: str) -> Dict[str, Dict[str, Any]]:
+    """
+    Retrieves confidential thesis entries (COUNTERCASE, THESIS_CHECKPOINT) for the authenticated user and ticker.
+    Never returns entries for unauthenticated or guest users.
+    """
+    clean_uid = str(user_id or "").strip()
+    clean_sym = str(ticker or "").strip().upper()
+    if not clean_uid or clean_uid == "guest_web_user" or not clean_sym:
+        return {}
+
+    init_db()
+    conn = get_db_connection()
+    cursor = conn.cursor()
+    p = get_placeholder()
+    try:
+        cursor.execute(
+            f"""
+            SELECT entry_type, failure_vector, decision, rationale, current_price, updated_at
+            FROM user_thesis_ledger
+            WHERE user_id = {p} AND ticker = {p};
+            """,
+            (clean_uid, clean_sym)
+        )
+        out: Dict[str, Dict[str, Any]] = {}
+        for row in cursor.fetchall():
+            etype = str(row[0] or "").strip().upper()
+            out[etype] = {
+                "entry_type": etype,
+                "failure_vector": row[1] or "",
+                "decision": row[2] or "",
+                "rationale": row[3] or "",
+                "current_price": float(row[4] or 0.0),
+                "updated_at": str(row[5] or "")[:16],
+            }
+        return out
+    except Exception as e:
+        logger.error(f"Error fetching confidential thesis entries for {clean_uid}/{clean_sym}: {e}")
+        return {}
+    finally:
+        cursor.close()
+        conn.close()
+
+

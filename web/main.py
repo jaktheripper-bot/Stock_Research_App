@@ -1184,6 +1184,17 @@ def dossier_page(request: Request, ticker: str):
     except Exception as e:
         logger.debug(f"Equity dossier intelligence compilation notice for {canonical}: {e}")
 
+    user_countercase = None
+    user_thesis_checkpoint = None
+    if web_user and web_user.get("id"):
+        try:
+            from core.db.users import get_user_thesis_entries
+            saved_theses = get_user_thesis_entries(str(web_user["id"]), canonical)
+            user_countercase = saved_theses.get("COUNTERCASE")
+            user_thesis_checkpoint = saved_theses.get("THESIS_CHECKPOINT")
+        except Exception as e:
+            logger.debug(f"User thesis lookup notice for {canonical}: {e}")
+
     return templates.TemplateResponse(
         request=request,
         name="dossier.html",
@@ -1212,6 +1223,8 @@ def dossier_page(request: Request, ticker: str):
             "contagion_alert": contagion_alert,
             "is_deep_dive_unlocked": is_deep_dive_unlocked,
             "web_user": web_user,
+            "user_countercase": user_countercase,
+            "user_thesis_checkpoint": user_thesis_checkpoint,
             "equity_intel": equity_intel,
             "epistemic_ledger": equity_intel.get("epistemic_ledger") if equity_intel else None,
         }

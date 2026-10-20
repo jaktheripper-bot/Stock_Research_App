@@ -107,6 +107,8 @@ from core.db.users import (
     is_ticker_unlocked_for_user,
     unlock_ticker_for_user,
     get_user_unlocked_tickers,
+    save_user_thesis_entry,
+    get_user_thesis_entries,
 )
 
 from core.db.discovery import (
@@ -212,6 +214,8 @@ __all__ = [
     "is_ticker_unlocked_for_user",
     "unlock_ticker_for_user",
     "get_user_unlocked_tickers",
+    "save_user_thesis_entry",
+    "get_user_thesis_entries",
     # discovery reel
     "save_discovery_reel",
     "get_active_discovery_reel",

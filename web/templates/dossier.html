@@ -726,22 +726,28 @@
         <span class="badge" style="background: rgba(245, 158, 11, 0.15); color: #fbbf24; font-size: 11px;">Behavioral De-Biasing</span>
       </div>
 
-      <p style="font-size: 13px; color: var(--text-secondary); line-height: 1.5; margin-bottom: 16px;">
+      <p style="font-size: 13px; color: var(--text-secondary); line-height: 1.5; margin-bottom: 12px;">
         <strong>Force backward reasoning from a state of guaranteed failure:</strong> Identify what existential shock could invalidate this company's moat before cementing conviction to combat Narrative Seduction and Confirmation Bias.
       </p>
+
+      <div style="display: flex; align-items: center; gap: 8px; padding: 10px 14px; margin-bottom: 16px; background: rgba(16, 185, 129, 0.08); border: 1px solid rgba(16, 185, 129, 0.25); border-radius: 6px; font-size: 12.5px; color: #cbd5e1; line-height: 1.45;">
+        <span style="color: #34d399; flex-shrink: 0; display: inline-flex; align-items: center;"><svg class="glyph"><use href="#glyph-shield"></use></svg></span>
+        <span><strong style="color: #34d399;">Strictly Confidential:</strong> All theses are strictly confidential and can only be viewed by you when you log in.</span>
+      </div>
 
       <form id="countercaseForm" onsubmit="handleCountercaseSubmit(event, '{{ ticker }}')">
         <div style="margin-bottom: 14px;">
           <label style="display: block; font-size: 13px; font-weight: 600; color: var(--text-secondary); margin-bottom: 6px;">
             Primary Hypothetical Failure Vector:
           </label>
+          {% set saved_vec = user_countercase.failure_vector if user_countercase else '' %}
           <select id="countercaseVector" style="width: 100%; padding: 10px 14px; background: rgba(30, 41, 59, 0.8); border: 1px solid var(--border-color); border-radius: 6px; color: var(--text-primary); font-size: 13.5px;">
-            <option>Customer / Geographic Concentration Risk (e.g. Top 3 clients >35% revenue)</option>
-            <option>Regulatory / Policy Vulnerability (e.g. import tariffs, export duties, PLI scheme expiration)</option>
-            <option>Operating Margin Squeeze / Raw Material Inflation (e.g. >200 bps margin contraction)</option>
-            <option>Capital Misallocation / Debt-Fueled Acquisition</option>
-            <option>Technological Obsolescence / Moat Decay</option>
-            <option>Custom Operational Vulnerability...</option>
+            <option {% if saved_vec == 'Customer / Geographic Concentration Risk (e.g. Top 3 clients >35% revenue)' %}selected{% endif %}>Customer / Geographic Concentration Risk (e.g. Top 3 clients >35% revenue)</option>
+            <option {% if saved_vec == 'Regulatory / Policy Vulnerability (e.g. import tariffs, export duties, PLI scheme expiration)' %}selected{% endif %}>Regulatory / Policy Vulnerability (e.g. import tariffs, export duties, PLI scheme expiration)</option>
+            <option {% if saved_vec == 'Operating Margin Squeeze / Raw Material Inflation (e.g. >200 bps margin contraction)' %}selected{% endif %}>Operating Margin Squeeze / Raw Material Inflation (e.g. >200 bps margin contraction)</option>
+            <option {% if saved_vec == 'Capital Misallocation / Debt-Fueled Acquisition' %}selected{% endif %}>Capital Misallocation / Debt-Fueled Acquisition</option>
+            <option {% if saved_vec == 'Technological Obsolescence / Moat Decay' %}selected{% endif %}>Technological Obsolescence / Moat Decay</option>
+            <option {% if saved_vec == 'Custom Operational Vulnerability...' %}selected{% endif %}>Custom Operational Vulnerability...</option>
           </select>
         </div>
 
@@ -749,11 +755,11 @@
           <label style="display: block; font-size: 13px; font-weight: 600; color: var(--text-secondary); margin-bottom: 6px;">
             Analyst Anti-Thesis Rationale:
           </label>
-          <textarea id="countercaseNotes" rows="2" placeholder="Articulate specific operational failure scenarios (e.g., loss of principal client, margin compression)..." style="width: 100%; padding: 10px 14px; background: rgba(30, 41, 59, 0.8); border: 1px solid var(--border-color); border-radius: 6px; color: var(--text-primary); font-size: 13.5px; box-sizing: border-box;"></textarea>
+          <textarea id="countercaseNotes" rows="2" placeholder="Articulate specific operational failure scenarios (e.g., loss of principal client, margin compression)..." style="width: 100%; padding: 10px 14px; background: rgba(30, 41, 59, 0.8); border: 1px solid var(--border-color); border-radius: 6px; color: var(--text-primary); font-size: 13.5px; box-sizing: border-box;">{{ user_countercase.rationale if user_countercase else '' }}</textarea>
         </div>
 
-        <div style="display: flex; justify-content: space-between; align-items: center;">
-          <span id="countercaseStatus" style="font-size: 12px; color: var(--accent-emerald);"></span>
+        <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 10px;">
+          <span id="countercaseStatus" style="font-size: 12px; color: var(--accent-emerald);">{% if user_countercase %}🔒 Private countercase saved ({{ user_countercase.updated_at }}){% endif %}</span>
           <button type="submit" id="btnCommitCountercase" class="btn btn-secondary btn-sm" style="font-weight: 700;">
             🔒 Save Countercase to Audit Ledger
           </button>
@@ -837,12 +843,12 @@
           </span>
         </div>
       </div>
-      <button onclick="closeThesisModal()" style="background: none; border: none; color: #94a3b8; font-size: 20px; cursor: pointer; padding: 4px; line-height: 1;">✕</button>
+      <button type="button" onclick="closeThesisModal()" style="background: none; border: none; color: #94a3b8; font-size: 20px; cursor: pointer; padding: 4px; line-height: 1;">✕</button>
     </div>
 
     <!-- Modal Body -->
     <div style="padding: 24px;">
-      <div style="background: rgba(245, 158, 11, 0.08); border-left: 3px solid #f59e0b; padding: 12px 16px; border-radius: 4px; margin-bottom: 18px;">
+      <div style="background: rgba(245, 158, 11, 0.08); border-left: 3px solid #f59e0b; padding: 12px 16px; border-radius: 4px; margin-bottom: 14px;">
         <strong style="color: #f8fafc; font-size: 13.5px; display: block; margin-bottom: 4px;">
           The Core Behavioral Question:
         </strong>
@@ -851,8 +857,14 @@
         </p>
       </div>
 
+      <div style="display: flex; align-items: center; gap: 8px; padding: 10px 14px; margin-bottom: 16px; background: rgba(16, 185, 129, 0.08); border: 1px solid rgba(16, 185, 129, 0.25); border-radius: 6px; font-size: 12px; color: #cbd5e1; line-height: 1.45;">
+        <span style="color: #34d399; flex-shrink: 0; display: inline-flex; align-items: center;"><svg class="glyph"><use href="#glyph-shield"></use></svg></span>
+        <span><strong style="color: #34d399;">Strictly Confidential:</strong> All theses are strictly confidential and can only be viewed by you when you log in.</span>
+      </div>
+
       <form id="thesisCheckpointForm" onsubmit="handleThesisCheckpointSubmit(event, '{{ ticker }}')">
         <input type="hidden" id="thesisCurrentPrice" value="{{ current_price|default(0) }}" />
+        {% set saved_dec = user_thesis_checkpoint.decision if user_thesis_checkpoint else 'WOULD_BUY_TODAY' %}
 
         <div style="margin-bottom: 16px;">
           <label style="display: block; font-size: 12px; font-weight: 700; color: #94a3b8; margin-bottom: 8px; text-transform: uppercase; letter-spacing: 0.05em;">
@@ -860,7 +872,7 @@
           </label>
           <div style="display: flex; flex-direction: column; gap: 8px;">
             <label style="display: flex; align-items: flex-start; gap: 10px; background: rgba(30, 41, 59, 0.5); padding: 10px 14px; border-radius: 8px; border: 1px solid var(--border-color); cursor: pointer;">
-              <input type="radio" name="thesisDecision" value="WOULD_BUY_TODAY" checked style="margin-top: 3px;" />
+              <input type="radio" name="thesisDecision" value="WOULD_BUY_TODAY" {% if saved_dec == 'WOULD_BUY_TODAY' %}checked{% endif %} style="margin-top: 3px;" />
               <div>
                 <strong style="color: #34d399; font-size: 13px; display: block;">✅ Yes — Thesis Intact</strong>
                 <span style="font-size: 12px; color: #94a3b8;">Fundamentals, moat, and governance remain sound; valuation reflects margin of safety.</span>
@@ -868,7 +880,7 @@
             </label>
 
             <label style="display: flex; align-items: flex-start; gap: 10px; background: rgba(30, 41, 59, 0.5); padding: 10px 14px; border-radius: 8px; border: 1px solid var(--border-color); cursor: pointer;">
-              <input type="radio" name="thesisDecision" value="THESIS_BREACHED" style="margin-top: 3px;" />
+              <input type="radio" name="thesisDecision" value="THESIS_BREACHED" {% if saved_dec == 'THESIS_BREACHED' %}checked{% endif %} style="margin-top: 3px;" />
               <div>
                 <strong style="color: #fb7185; font-size: 13px; display: block;"><svg class="glyph"><use href="#glyph-alert"></use></svg> No — Thesis Breached (Capital Preservation)</strong>
                 <span style="font-size: 12px; color: #94a3b8;">Fundamental deterioration, governance red flag, or moat degradation requires reallocating capital.</span>
@@ -876,7 +888,7 @@
             </label>
 
             <label style="display: flex; align-items: flex-start; gap: 10px; background: rgba(30, 41, 59, 0.5); padding: 10px 14px; border-radius: 8px; border: 1px solid var(--border-color); cursor: pointer;">
-              <input type="radio" name="thesisDecision" value="UNDER_REVIEW" style="margin-top: 3px;" />
+              <input type="radio" name="thesisDecision" value="UNDER_REVIEW" {% if saved_dec == 'UNDER_REVIEW' %}checked{% endif %} style="margin-top: 3px;" />
               <div>
                 <strong style="color: #fbbf24; font-size: 13px; display: block;">⚠️ Caution — Under Review (Hold Gated)</strong>
                 <span style="font-size: 12px; color: #94a3b8;">Material regulatory or sector headwind; awaiting next quarterly disclosure before committing.</span>
@@ -889,11 +901,11 @@
           <label style="display: block; font-size: 12px; font-weight: 700; color: #94a3b8; margin-bottom: 6px; text-transform: uppercase; letter-spacing: 0.05em;">
             Analyst Objective Rationale (Mandatory)
           </label>
-          <textarea id="thesisRationale" required rows="3" placeholder="Articulate objective reasons devoid of purchase price anchoring (e.g. ROIC resilience, auditor report notes, capital expenditure cycle)..." style="width: 100%; padding: 10px 14px; background: rgba(30, 41, 59, 0.8); border: 1px solid var(--border-color); border-radius: 6px; color: var(--text-primary); font-size: 13px; box-sizing: border-box; line-height: 1.5;"></textarea>
+          <textarea id="thesisRationale" required rows="3" placeholder="Articulate objective reasons devoid of purchase price anchoring (e.g. ROIC resilience, auditor report notes, capital expenditure cycle)..." style="width: 100%; padding: 10px 14px; background: rgba(30, 41, 59, 0.8); border: 1px solid var(--border-color); border-radius: 6px; color: var(--text-primary); font-size: 16px; box-sizing: border-box; line-height: 1.5;">{{ user_thesis_checkpoint.rationale if user_thesis_checkpoint else '' }}</textarea>
         </div>
 
         <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 10px;">
-          <span id="thesisStatus" style="font-size: 12px; font-weight: 600;"></span>
+          <span id="thesisStatus" style="font-size: 12px; font-weight: 600; color: var(--accent-emerald);">{% if user_thesis_checkpoint %}🔒 Private checkpoint saved ({{ user_thesis_checkpoint.updated_at }}){% endif %}</span>
           <div style="display: flex; gap: 10px;">
             <button type="button" onclick="closeThesisModal()" class="btn btn-secondary btn-sm" style="padding: 7px 16px;">
               Cancel

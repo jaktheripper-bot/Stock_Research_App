@@ -2050,6 +2050,45 @@ def init_db(force: bool = False):
                     cursor.execute("INSERT INTO schema_migrations (version) VALUES (\'v033_credit_transactions_unique_payment_id\') ON CONFLICT DO NOTHING;")
                 conn.commit()
 
+            # Migration v034: Confidential User Thesis & Countercase Ledger
+            if "v034_user_thesis_ledger" not in applied:
+                logger.info("Applying schema migration: v034_user_thesis_ledger...")
+                if supabase_url:
+                    cursor.execute("""
+                        CREATE TABLE IF NOT EXISTS user_thesis_ledger (
+                            id SERIAL PRIMARY KEY,
+                            user_id VARCHAR(128) NOT NULL,
+                            ticker VARCHAR(64) NOT NULL,
+                            entry_type VARCHAR(32) NOT NULL,
+                            failure_vector TEXT DEFAULT '',
+                            decision VARCHAR(64) DEFAULT '',
+                            rationale TEXT NOT NULL DEFAULT '',
+                            current_price NUMERIC DEFAULT 0.0,
+                            updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+                            UNIQUE(user_id, ticker, entry_type)
+                        );
+                        CREATE INDEX IF NOT EXISTS idx_user_thesis_ledger_lookup ON user_thesis_ledger (user_id, ticker);
+                        INSERT INTO schema_migrations (version) VALUES ('v034_user_thesis_ledger') ON CONFLICT DO NOTHING;
+                    """)
+                else:
+                    cursor.execute("""
+                        CREATE TABLE IF NOT EXISTS user_thesis_ledger (
+                            id INTEGER PRIMARY KEY AUTOINCREMENT,
+                            user_id TEXT NOT NULL,
+                            ticker TEXT NOT NULL,
+                            entry_type TEXT NOT NULL,
+                            failure_vector TEXT DEFAULT '',
+                            decision TEXT DEFAULT '',
+                            rationale TEXT NOT NULL DEFAULT '',
+                            current_price REAL DEFAULT 0.0,
+                            updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                            UNIQUE(user_id, ticker, entry_type)
+                        );
+                    """)
+                    cursor.execute("CREATE INDEX IF NOT EXISTS idx_user_thesis_ledger_lookup ON user_thesis_ledger (user_id, ticker);")
+                    cursor.execute("INSERT INTO schema_migrations (version) VALUES (\'v034_user_thesis_ledger\') ON CONFLICT DO NOTHING;")
+                conn.commit()
+
             _DB_INITIALIZED = True
             _INITIALIZED_DBS.add(target_key)
         except Exception as e:

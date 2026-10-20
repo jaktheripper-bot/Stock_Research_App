@@ -847,7 +847,7 @@ api_cortex_sutra_audit = api_cortex_portfolio_look_through
 @router.post("/api/countercase")
 @router.post("/api/premortem", include_in_schema=False)  # legacy alias kept for cached clients
 async def api_countercase(payload: CountercaseRequest, request: Request):
-    """Saves a countercase (what could go wrong) to the audit ledger."""
+    """Saves a confidential countercase (what could go wrong) to the user's private audit ledger."""
     if not _validate_request_origin(request):
         raise HTTPException(status_code=403, detail="Cross-origin request rejected.")
 
@@ -855,25 +855,40 @@ async def api_countercase(payload: CountercaseRequest, request: Request):
     if not clean_t:
         raise HTTPException(status_code=400, detail="Invalid ticker symbol.")
 
+    from bse_master import resolve_canonical_symbol
+    from core.db.users import save_user_thesis_entry
+    canonical = resolve_canonical_symbol(clean_t) or clean_t
+    web_user = _get_current_web_user(request)
+    resolved_uid = str(web_user.get("id") if web_user and web_user.get("id") else (payload.user_id or "guest_web_user")).strip()
+
+    if resolved_uid and resolved_uid != "guest_web_user":
+        save_user_thesis_entry(
+            user_id=resolved_uid,
+            ticker=canonical,
+            entry_type="COUNTERCASE",
+            failure_vector=payload.failure_vector,
+            rationale=payload.anti_thesis_notes,
+        )
+
     record_usage_event(
         event_type="COUNTERCASE",
-        ticker=clean_t,
+        ticker=canonical,
         details={
             "failure_vector": payload.failure_vector,
             "anti_thesis_notes": payload.anti_thesis_notes,
-            "user_id": payload.user_id,
+            "user_id": resolved_uid,
         },
-        user_id=payload.user_id
+        user_id=resolved_uid
     )
     return json_response_with_cache({
         "success": True,
-        "message": f"🔒 Countercase counter-thesis committed to decision ledger for {clean_t}!"
+        "message": f"🔒 Countercase counter-thesis committed to your confidential decision ledger for {canonical}!"
     })
 
 
 @router.post("/api/thesis-checkpoint")
 async def api_thesis_checkpoint(payload: ThesisCheckpointRequest, request: Request):
-    """Commits an analyst 'Would you buy today?' thesis checkpoint to the audit ledger."""
+    """Commits a confidential analyst 'Would you buy today?' thesis checkpoint to the user's audit ledger."""
     if not _validate_request_origin(request):
         raise HTTPException(status_code=403, detail="Cross-origin request rejected.")
 
@@ -881,20 +896,36 @@ async def api_thesis_checkpoint(payload: ThesisCheckpointRequest, request: Reque
     if not clean_t:
         raise HTTPException(status_code=400, detail="Invalid ticker symbol.")
 
+    from bse_master import resolve_canonical_symbol
+    from core.db.users import save_user_thesis_entry
+    canonical = resolve_canonical_symbol(clean_t) or clean_t
+    web_user = _get_current_web_user(request)
+    resolved_uid = str(web_user.get("id") if web_user and web_user.get("id") else (payload.user_id or "guest_web_user")).strip()
+
+    if resolved_uid and resolved_uid != "guest_web_user":
+        save_user_thesis_entry(
+            user_id=resolved_uid,
+            ticker=canonical,
+            entry_type="THESIS_CHECKPOINT",
+            decision=payload.decision,
+            rationale=payload.rationale,
+            current_price=float(payload.current_price or 0.0),
+        )
+
     record_usage_event(
         event_type="THESIS_CHECKPOINT",
-        ticker=clean_t,
+        ticker=canonical,
         details={
             "decision": payload.decision,
             "rationale": payload.rationale,
             "current_price": payload.current_price,
-            "user_id": payload.user_id,
+            "user_id": resolved_uid,
         },
-        user_id=payload.user_id
+        user_id=resolved_uid
     )
     return json_response_with_cache({
         "success": True,
-        "message": f"⚖️ Thesis Checkpoint ('Would you buy today?') verdict committed for {clean_t}!"
+        "message": f"⚖️ Thesis Checkpoint ('Would you buy today?') verdict committed for {canonical}!"
     })
 
 

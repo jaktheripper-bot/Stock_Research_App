@@ -958,7 +958,7 @@ Detailed forensic analysis with exact page grounding to bseindia.com filings.
         res_invalid = self.client.post("/api/thesis-checkpoint", json={"ticker": "", "decision": "WOULD_BUY_TODAY", "rationale": "test"}, headers={"Origin": "http://testserver"})
         self.assertEqual(res_invalid.status_code, 400)
 
-        # 3. Test Dossier HTML contains Thesis Modal and trigger buttons
+        # 3. Test Dossier HTML contains Thesis Modal, trigger buttons, and Confidentiality Notice
         res_dossier = self.client.get("/dossier/INFY")
         self.assertEqual(res_dossier.status_code, 200)
         html = res_dossier.text
@@ -966,6 +966,54 @@ Detailed forensic analysis with exact page grounding to bseindia.com filings.
         self.assertIn("thesisModal", html)
         self.assertIn("Would You Buy Today?", html)
         self.assertIn("btnOpenThesisTop", html)
+        self.assertIn("All theses are strictly confidential and can only be viewed by you when you log in.", html)
+        # Guest (not logged in) must NOT see test_analyst_1's saved rationale
+        self.assertNotIn("Strong balance sheet with zero net debt and durable digital transformation moat.", html)
+
+        # 4. Save Countercase for test_analyst_1 and verify strict login-only visibility
+        cc_secret_note = "Confidential client concentration stress test for test_analyst_1 only."
+        res_cc = self.client.post(
+            "/api/countercase",
+            json={
+                "ticker": "INFY",
+                "failure_vector": "Technological Obsolescence / Moat Decay",
+                "anti_thesis_notes": cc_secret_note,
+                "user_id": "test_analyst_1",
+            },
+            headers={"Origin": "http://testserver"},
+        )
+        self.assertEqual(res_cc.status_code, 200)
+        self.assertNotIn(cc_secret_note, self.client.get("/dossier/INFY").text)
+
+        from web.common import USER_SESSION_COOKIE, _generate_user_session_token
+        from core.db.users import get_or_create_user
+        get_or_create_user("test_analyst_1", "analyst1@example.com", "Test Analyst 1")
+        get_or_create_user("test_analyst_2", "analyst2@example.com", "Test Analyst 2")
+        token_a = _generate_user_session_token("test_analyst_1", "analyst1@example.com")
+        token_b = _generate_user_session_token("test_analyst_2", "analyst2@example.com")
+
+        res_logged_in_a = self.client.get("/dossier/INFY", cookies={USER_SESSION_COOKIE: token_a})
+        self.assertEqual(res_logged_in_a.status_code, 200)
+        self.assertIn(cc_secret_note, res_logged_in_a.text)
+        self.assertIn("Strong balance sheet with zero net debt and durable digital transformation moat.", res_logged_in_a.text)
+
+        res_logged_in_b = self.client.get("/dossier/INFY", cookies={USER_SESSION_COOKIE: token_b})
+        self.assertEqual(res_logged_in_b.status_code, 200)
+        self.assertNotIn(cc_secret_note, res_logged_in_b.text)
+        self.assertNotIn("Strong balance sheet with zero net debt and durable digital transformation moat.", res_logged_in_b.text)
+
+        # 5. Verify parser strips any legacy Gemini/Perplexity failover banners from report markdown
+        from core.analysis.parser import remove_health_matrix_text
+        raw_with_leak = (
+            "> ⚠️ **Gemini Grounding Unavailable. Rerouting to Perplexity Agent API...**\n\n"
+            "> ⚠️ **Gemini Outage Detected.**\n"
+            "> 🔄 **Rerouting to Perplexity Sonar...**\n\n"
+            "## Pillar 1: Macro-Economic, Geopolitical & Environmental Overlays\nClean content."
+        )
+        cleaned_md = remove_health_matrix_text(raw_with_leak)
+        self.assertNotIn("Gemini", cleaned_md)
+        self.assertNotIn("Perplexity", cleaned_md)
+        self.assertIn("Pillar 1", cleaned_md)
 
     def test_equities_directory_page(self):
         # 1. Test canonical redirect from /stocks to /equities

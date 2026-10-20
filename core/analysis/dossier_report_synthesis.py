@@ -110,7 +110,7 @@ def stream_genai_with_fallback(client, prompt: str, system_prompt: str, on_statu
     last_error = None
     for model_name in models_to_try:
         if on_status:
-            on_status(f"⚡ Connected to model `{model_name}`...")
+            on_status("⚡ Initializing institutional synthesis engine...")
         for attempt in range(2):
             try:
                 sys_inst = system_prompt
@@ -240,7 +240,7 @@ def stream_perplexity_fallback(prompt: str, system_prompt: str, collected_citati
                             collected_citations.append({
                                 "title": c_url.split("//")[-1].split("/")[0],
                                 "uri": c_url,
-                                "source_type": "Perplexity Search Grounding"
+                                "source_type": "Verified Web Grounding"
                             })
             except Exception as stream_err:
                 logger.debug(f"Perplexity streaming parse notice: {stream_err}")
@@ -269,7 +269,7 @@ def stream_perplexity_fallback(prompt: str, system_prompt: str, collected_citati
                         collected_citations.append({
                             "title": c_url.split("//")[-1].split("/")[0],
                             "uri": c_url,
-                            "source_type": "Perplexity Search Grounding"
+                            "source_type": "Verified Web Grounding"
                         })
 
 def stream_gemini_ungrounded_bypass(client, prompt: str, system_prompt: str):
@@ -313,25 +313,21 @@ def stream_stock_report(ticker: str, language: str = "English (India)", stock_da
             report_accumulator.append(chunk)
             yield chunk
     except Exception as gemini_err:
-        logger.warning(f"Gemini streaming synthesis failed: {gemini_err}")
-        notice_p = "\n\n> ⚠️ **Gemini Grounding Unavailable. Rerouting to Perplexity Agent API...**\n\n"
-        report_accumulator.append(notice_p)
-        yield notice_p
+        logger.warning(f"Primary streaming synthesis failed: {gemini_err}")
         try:
             if on_status:
-                on_status("🔄 Failover: Querying Perplexity Agent API with search grounding...")
+                on_status("🔄 Switching to secondary search grounding channel...")
             for chunk in stream_perplexity_fallback(user_prompt, system_prompt, collected_citations=collected_citations):
                 report_accumulator.append(chunk)
                 yield chunk
         except Exception as p_err:
-            logger.warning(f"Perplexity fallback synthesis failed: {p_err}")
+            logger.warning(f"Secondary fallback synthesis failed: {p_err}")
             gem_err_msg = str(gemini_err)
             is_spend_cap = any(phrase in gem_err_msg for phrase in ["Spend cap breached", "PERMISSION_DENIED", "403", "quota"])
             if is_spend_cap:
                 err_msg = (
-                    f"\n\n> ❌ **Live Synthesis Failed:** Both primary and failover providers encountered errors.\n"
-                    f"> • **Gemini (Primary):** Google Cloud spend cap breached or permission denied.\n"
-                    f"> • **Perplexity (Failover):** {p_err}\n"
+                    "\n\n> ❌ **Live Synthesis Failed:** Grounded synthesis channels are temporarily unavailable. "
+                    "Please retry shortly.\n"
                 )
                 report_accumulator.append(err_msg)
                 yield err_msg
@@ -349,7 +345,7 @@ def stream_stock_report(ticker: str, language: str = "English (India)", stock_da
                         yield chunk
                 except Exception as final_err:
                     logger.error(f"Ungrounded synthesis fallback failed: {final_err}")
-                    err_msg = f"\n\n> ❌ **Live Synthesis Failed:** {final_err}"
+                    err_msg = "\n\n> ❌ **Live Synthesis Failed:** Unable to complete research synthesis at this time. Please retry shortly."
                     report_accumulator.append(err_msg)
                     yield err_msg
 

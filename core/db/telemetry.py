@@ -1548,7 +1548,7 @@ def purge_test_telemetry() -> dict:
         except Exception as ue:
             logger.warning(f"User accounts purge notice: {ue}")
 
-        # 5. Purge test credit_usage_ledger
+        # 5. Purge test credit_usage_ledger and user_thesis_ledger
         try:
             cursor.execute("""
                 DELETE FROM credit_usage_ledger
@@ -1557,6 +1557,12 @@ def purge_test_telemetry() -> dict:
                    OR user_id IN ('guest_web_user', 'test_user', 'testclient', 'test_admin');
             """)
             purged_counts["ledger_purged"] = cursor.rowcount if cursor.rowcount and cursor.rowcount > 0 else 0
+            cursor.execute("""
+                DELETE FROM user_thesis_ledger
+                WHERE user_id LIKE 'test_%'
+                   OR user_id LIKE 'usr_test_%'
+                   OR user_id IN ('guest_web_user', 'test_user', 'testclient', 'test_admin');
+            """)
         except Exception as le:
             logger.warning(f"Credit usage ledger purge notice: {le}")
 
