@@ -212,11 +212,12 @@ Detailed forensic analysis with exact page grounding to bseindia.com filings.
         html = res.text
 
         # 1. 7-pillar qualitative posture badges are present at top
-        self.assertIn("7-Pillar Qualitative Health Matrix:", html)
+        self.assertIn("Qualitative Health Matrix (01–07):", html)
         self.assertIn("Moat:", html)
 
-        # 2. Redundant raw markdown bullet list is stripped from prose body
+        # 2. Redundant raw markdown bullet list / table is stripped from prose body
         self.assertNotIn("<li>Macro: Headwinds</li>", html)
+        self.assertNotIn("7-Pillar Qualitative Health Matrix:", html)
 
         # 3. 6-Month Momentum & 50-DMA chart is rendered
         self.assertIn('id="momentumChart"', html)
@@ -1002,17 +1003,34 @@ Detailed forensic analysis with exact page grounding to bseindia.com filings.
         self.assertNotIn(cc_secret_note, res_logged_in_b.text)
         self.assertNotIn("Strong balance sheet with zero net debt and durable digital transformation moat.", res_logged_in_b.text)
 
-        # 5. Verify parser strips any legacy Gemini/Perplexity failover banners from report markdown
-        from core.analysis.parser import remove_health_matrix_text
+        # 5. Verify parser strips any legacy Gemini/Perplexity failover banners and table/bullet Health Matrix blocks
+        from core.analysis.parser import remove_health_matrix_text, extract_health_matrix
         raw_with_leak = (
             "> ⚠️ **Gemini Grounding Unavailable. Rerouting to Perplexity Agent API...**\n\n"
             "> ⚠️ **Gemini Outage Detected.**\n"
             "> 🔄 **Rerouting to Perplexity Sonar...**\n\n"
+            "### Health Matrix\n\n"
+            "| Factor | Assessment |\n"
+            "| --- | --- |\n"
+            "| Macro | Neutral |\n"
+            "| Moat | Moderate |\n"
+            "| Governance | Clean |\n"
+            "| Diagnostic | Neutral |\n"
+            "| Valuation | Stretched |\n"
+            "| Balance Sheet | Moderate Debt |\n"
+            "| Capital Allocation | Moderate |\n\n"
             "## Pillar 1: Macro-Economic, Geopolitical & Environmental Overlays\nClean content."
         )
+        parsed_mat = extract_health_matrix(raw_with_leak)
+        self.assertEqual(parsed_mat.get("Valuation"), "Stretched")
+        self.assertEqual(parsed_mat.get("BalanceSheet"), "Moderate Debt")
+        self.assertEqual(parsed_mat.get("CapitalAllocation"), "Moderate")
+        self.assertEqual(parsed_mat.get("Diagnostic"), "Neutral")
         cleaned_md = remove_health_matrix_text(raw_with_leak)
         self.assertNotIn("Gemini", cleaned_md)
         self.assertNotIn("Perplexity", cleaned_md)
+        self.assertNotIn("Health Matrix", cleaned_md)
+        self.assertNotIn("| Factor | Assessment |", cleaned_md)
         self.assertIn("Pillar 1", cleaned_md)
 
     def test_equities_directory_page(self):

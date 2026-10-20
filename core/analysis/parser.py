@@ -21,35 +21,41 @@ def extract_health_matrix(report_text: str) -> dict:
     }
 
     patterns = {
-        "Macro": r"(?i)(?:[-*•]|\d+\.)?\s*Macro\s*[:\-]?\s*\[?\s*(Stable|Headwinds|Neutral)\s*\]?",
-        "Moat": r"(?i)(?:[-*•]|\d+\.)?\s*Moat\s*[:\-]?\s*\[?\s*(Wide|Moderate|Narrow)\s*\]?",
-        "Governance": r"(?i)(?:[-*•]|\d+\.)?\s*Governance\s*[:\-]?\s*\[?\s*(Clean|Caution|High Risk)\s*\]?",
-        "Diagnostic": r"(?i)(?:[-*•]|\d+\.)?\s*Diagnostic\s*[:\-]?\s*\[?\s*(Temporary|Structural|Neutral|N/A)\s*\]?",
-        "Valuation": r"(?i)(?:[-*•]|\d+\.)?\s*Valuation\s*[:\-]?\s*\[?\s*(Undervalued|Fair|Stretched|Loss-Making)\s*\]?",
-        "BalanceSheet": r"(?i)(?:[-*•]|\d+\.)?\s*Balance\s*Sheet\s*[:\-]?\s*\[?\s*(Debt-Free|Moderate Debt|High Debt|Resilient)\s*\]?",
-        "CapitalAllocation": r"(?i)(?:[-*•]|\d+\.)?\s*Capital\s*Allocation\s*[:\-]?\s*\[?\s*(Disciplined|Moderate|Strained)\s*\]?"
+        "Macro": r"(?i)(?:[-*•|]|\d+\.)?\s*\**Macro\**\s*(?:[:\-|]+|\s+)\s*\[?\**(Stable|Headwinds|Neutral)\**\]?",
+        "Moat": r"(?i)(?:[-*•|]|\d+\.)?\s*\**Moat\**\s*(?:[:\-|]+|\s+)\s*\[?\**(Wide|Moderate|Narrow|Strong)\**\]?",
+        "Governance": r"(?i)(?:[-*•|]|\d+\.)?\s*\**Governance\**\s*(?:[:\-|]+|\s+)\s*\[?\**(Clean|Caution|High Risk)\**\]?",
+        "Diagnostic": r"(?i)(?:[-*•|]|\d+\.)?\s*\**Diagnostic\**\s*(?:[:\-|]+|\s+)\s*\[?\**(Temporary|Structural|Neutral|N/A)\**\]?",
+        "Valuation": r"(?i)(?:[-*•|]|\d+\.)?\s*\**Valuation\**\s*(?:[:\-|]+|\s+)\s*\[?\**(Undervalued|Fair|Stretched|Loss-Making)\**\]?",
+        "BalanceSheet": r"(?i)(?:[-*•|]|\d+\.)?\s*\**Balance\s*Sheet\**\s*(?:[:\-|]+|\s+)\s*\[?\**(Debt-Free|Moderate Debt|High Debt|Resilient)\**\]?",
+        "CapitalAllocation": r"(?i)(?:[-*•|]|\d+\.)?\s*\**Capital\s*Allocation\**\s*(?:[:\-|]+|\s+)\s*\[?\**(Disciplined|Moderate|Strained|Clean)\**\]?"
     }
 
     for key, pat in patterns.items():
         match = re.search(pat, clean)
         if match:
-            matrix[key] = match.group(1).strip().title()
+            val = match.group(1).strip()
+            matrix[key] = "N/A" if val.upper() == "N/A" else val.title()
 
     if matrix.get("CapitalAllocation") == "Disciplined":
-        ca_match = re.search(r"(?i)Capital\s*Allocation\s*[:\-]?\s*\[?\s*(Disciplined|Moderate|Strained)\s*\]?", clean)
+        ca_match = re.search(r"(?i)Capital\s*Allocation\s*(?:[:\-|]+|\s+)\s*\[?\**(Disciplined|Moderate|Strained|Clean)\**\]?", clean)
         if ca_match:
             matrix["CapitalAllocation"] = ca_match.group(1).strip().title()
 
     return matrix
 
 def remove_health_matrix_text(text: str) -> str:
-    """Removes redundant markdown Health Matrix bullet blocks and legacy provider failover notices from presentation."""
+    """Removes redundant markdown Health Matrix bullet/table blocks and legacy provider failover notices from presentation."""
     if not text or not isinstance(text, str):
         return ""
     cleaned = re.sub(
-        r'(?i)#*\s*Health Matrix\s*\n+(?:[ \t]*[-*•\d\.]+\s+[^\n]+\n*)+',
+        r'(?im)^[ \t]*(?:#+\s*|\*\*)[^\n]*Health\s+Matrix[^\n]*\n+(?:[ \t]*\n)*(?:[ \t]*(?:[-*•\d\.|]|\**(?:Factor|Macro|Moat|Governance|Management|Diagnostic|Valuation|Balance\s*Sheet|Solvency|Capital\s*Allocation)\**\s*[:\-|])[^\n]*\n*)+(?:[ \t]*---+[ \t]*\n*)?',
         '',
         text
+    )
+    cleaned = re.sub(
+        r'(?im)^[ \t]*\|\s*\**Factor\**\s*\|\s*\**Assessment\**\s*\|[^\n]*\n(?:[ \t]*\|[^\n]+\n*)+(?:[ \t]*---+[ \t]*\n*)?',
+        '',
+        cleaned
     )
     cleaned = re.sub(
         r'(?im)^[ \t]*>[ \t]*(?:\u26a0\ufe0f?|\U0001f504|•)?[ \t]*\**(?:Gemini|Perplexity|Rerouting to Perplexity)[^\n]*\n*',
