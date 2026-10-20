@@ -5,7 +5,7 @@ Verifies:
 2. Atomic deduction across valid balance states and ledger audit tracking.
 3. Insufficient credits rejection returning standardized INSUFFICIENT_CREDITS payload.
 4. Thread-safe concurrency: multi-threaded deduction prevents check-then-act double-spending.
-5. Pro subscription entitlement exemptions for surgical refreshes and PDF exports.
+5. Pro subscription entitlement exemptions for price & filing refreshes and PDF exports.
 6. Error handling and rollback for unauthenticated or non-existent user accounts.
 """
 
@@ -184,7 +184,7 @@ class TestCreditDeductionAtomic(unittest.TestCase):
         self.assertEqual(final_bal, 0.0)
 
     def test_pro_subscription_entitlements(self):
-        """Active Pro subscribers must have uncapped surgical refreshes and PDF exports."""
+        """Active Pro subscribers must have uncapped price & filing refreshes and PDF exports."""
         uid = f"usr_pro_{uuid.uuid4().hex[:8]}"
         email = f"{uid}@example.com"
         get_or_create_user(uid, email)
@@ -202,7 +202,7 @@ class TestCreditDeductionAtomic(unittest.TestCase):
         cursor.close()
         conn.close()
 
-        # Surgical refresh costs 0 for Pro
+        # Price & Filing refresh costs 0 for Pro
         res_sr = deduct_user_credits(uid, "HDFCBANK", "SURGICAL_REFRESH", 1.0)
         self.assertTrue(res_sr["success"])
         self.assertEqual(res_sr["credits_balance"], 2.0)

@@ -1,5 +1,5 @@
 """
-Authentication & User Identity Package for Stock Research App.
+Authentication & User Identity Package for Moatnomics.
 
 Exposes Supabase authentication, session handling, and OAuth/Magic link utilities.
 """

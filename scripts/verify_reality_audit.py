@@ -858,7 +858,7 @@ class RealityAuditor:
                 "INERT SELF-LOCKOUT RISK: copilot.js must portal #copilotModalBackdrop to document.body and guard mainEl.inert = true with !mainEl.contains(modal)."
             )
         else:
-            self.ok(gate, "Forensic Desk modal portaled to document.body with !mainEl.contains(modal) inert guard")
+            self.ok(gate, "Research Desk modal portaled to document.body with !mainEl.contains(modal) inert guard")
 
         # 12.2 Ensure mobile virtual keyboard 16px font-size and explicit close button ID
         if "font-size: 16px;" not in modal_src or 'id="copilotCloseBtn"' not in modal_src:
@@ -868,7 +868,7 @@ class RealityAuditor:
                 "MOBILE KEYBOARD/CLOSE HYGIENE: .copilot-textarea must use font-size: 16px and close button must have id='copilotCloseBtn'."
             )
         else:
-            self.ok(gate, "Forensic Desk mobile 16px input hygiene and #copilotCloseBtn contract verified")
+            self.ok(gate, "Research Desk mobile 16px input hygiene and #copilotCloseBtn contract verified")
 
     def report(self) -> int:
         print("=" * 76)

@@ -1,7 +1,7 @@
-"""Canonical Institutional Universe for Indian Exchange Traded Funds (ETFs).
+"""Canonical Universe for Indian Exchange Traded Funds (ETFs).
 
 Complies with SEBI (Mutual Funds) Regulations, 1996 for passive investment tracking.
-Contains 140+ benchmark ETFs spanning 9 essential institutional categories:
+Contains 140+ benchmark ETFs spanning 9 essential categories:
 1. EQUITY_INDEX (Broad Market: Nifty 50, Sensex, Next 50, Midcap 150, Smallcap 250, Nifty 500)
 2. EQUITY_SECTORAL (Nifty Bank, IT, Pharma, Auto, FMCG, Infra, Energy, Metal, CPSE, Bharat 22)
 3. EQUITY_FACTOR (Smart Beta: Momentum 30, Low Volatility 30, Quality 30, Alpha 50, Value 20)

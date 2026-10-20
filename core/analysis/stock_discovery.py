@@ -32,9 +32,9 @@ logger = logging.getLogger("equity_research.core.analysis.stock_discovery")
 # Curated pool of 45 high-quality under-the-radar candidates spanning 11 distinct sectors
 CANDIDATE_UNIVERSE = [
     # 1. Specialty Chemicals & Materials
-    {"ticker": "FINEORG", "canonical": "FINEORG", "scrip_code": "541557", "company_name": "Fine Organic Industries Ltd", "sector": "Specialty Chemicals", "roce": 26.4, "debt_to_equity": 0.01, "roe": 22.8, "sales_growth_3y": 18.5, "base_price": 4200.0, "base_mcap": 128_000_000_000, "default_thesis": "Global leader in oleochemical green additives with zero debt and consistent 25%+ ROCE, operating under the institutional radar."},
+    {"ticker": "FINEORG", "canonical": "FINEORG", "scrip_code": "541557", "company_name": "Fine Organic Industries Ltd", "sector": "Specialty Chemicals", "roce": 26.4, "debt_to_equity": 0.01, "roe": 22.8, "sales_growth_3y": 18.5, "base_price": 4200.0, "base_mcap": 128_000_000_000, "default_thesis": "Global leader in oleochemical green additives with zero debt and consistent 25%+ ROCE, operating under the radar."},
     {"ticker": "CLEAN", "canonical": "CLEAN", "scrip_code": "543318", "company_name": "Clean Science and Technology Ltd", "sector": "Specialty Chemicals", "roce": 31.2, "debt_to_equity": 0.00, "roe": 24.5, "sales_growth_3y": 16.2, "base_price": 799.80, "base_mcap": 85_000_000_000, "default_thesis": "Catalytic green-chemistry manufacturer commanding 40%+ operating margins with negative net debt and zero broker sell-side hype."},
-    {"ticker": "ROSSARI", "canonical": "ROSSARI", "scrip_code": "543213", "company_name": "Rossari Biotech Ltd", "sector": "Specialty Chemicals", "roce": 16.8, "debt_to_equity": 0.08, "roe": 14.2, "sales_growth_3y": 21.0, "base_price": 430.90, "base_mcap": 24_000_000_000, "default_thesis": "Customized specialty formulation provider scaling institutional FMCG and textile chemistries with minimal external leverage."},
+    {"ticker": "ROSSARI", "canonical": "ROSSARI", "scrip_code": "543213", "company_name": "Rossari Biotech Ltd", "sector": "Specialty Chemicals", "roce": 16.8, "debt_to_equity": 0.08, "roe": 14.2, "sales_growth_3y": 21.0, "base_price": 430.90, "base_mcap": 24_000_000_000, "default_thesis": "Customized specialty formulation provider scaling FMCG and textile chemistries with minimal external leverage."},
     {"ticker": "CARBORUNIV", "canonical": "CARBORUNIV", "scrip_code": "513375", "company_name": "Carborundum Universal Ltd", "sector": "Specialty Chemicals", "roce": 20.5, "debt_to_equity": 0.08, "roe": 16.2, "sales_growth_3y": 17.8, "base_price": 1280.0, "base_mcap": 240_000_000_000, "default_thesis": "Abrasives, ceramics, and electro-minerals compounder with steady export moat and debt-free solvency."},
     {"ticker": "AETHER", "canonical": "AETHER", "scrip_code": "543534", "company_name": "Aether Industries Ltd", "sector": "Specialty Chemicals", "roce": 17.4, "debt_to_equity": 0.12, "roe": 14.8, "sales_growth_3y": 24.1, "base_price": 820.0, "base_mcap": 105_000_000_000, "default_thesis": "Continuous flow chemistry pioneer scaling advanced intermediates with proprietary reaction tech."},
     {"ticker": "AMIORG", "canonical": "AMIORG", "scrip_code": "543349", "company_name": "Ami Organics Ltd", "sector": "Specialty Chemicals", "roce": 19.8, "debt_to_equity": 0.04, "roe": 16.5, "sales_growth_3y": 28.5, "base_price": 1350.0, "base_mcap": 55_000_000_000, "default_thesis": "Specialty pharma intermediates manufacturer expanding into semiconductor chemicals and electrolytes."},
@@ -209,7 +209,7 @@ def evaluate_under_the_radar_candidate(candidate: Dict[str, Any]) -> Optional[Di
     if de_float > 0.8:
         return None
 
-    # Phase 1: 10-Point Deterministic Forensic Screening Sieve
+    # Phase 1: 10-Point Deterministic Accounting Screening Sieve
     chanakya_res = ChanakyaGate.evaluate_from_dict(candidate, mode="STRICT")
     if not chanakya_res.overall_passed:
         logger.info(f"Forensic Clean-Room Sieve excluded candidate {canonical}: {chanakya_res.summary}")
@@ -227,7 +227,7 @@ def evaluate_under_the_radar_candidate(candidate: Dict[str, Any]) -> Optional[Di
 
     ria_thesis = candidate.get("default_thesis") or (
         f"High return on capital (ROCE {roce_float:.1f}%) paired with low leverage (D/E {de_float:.2f}) "
-        f"trading with negligible institutional sell-side coverage."
+        f"trading with negligible sell-side coverage."
     )
 
     return {

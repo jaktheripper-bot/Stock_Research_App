@@ -6,7 +6,7 @@ Usage:
     python scripts/ingest_mf_portfolios.py --dry-run               # parse + match, write nothing
     python scripts/ingest_mf_portfolios.py --target 150            # ingest into reports.db
     python scripts/ingest_mf_portfolios.py --amc nippon            # restrict to one AMC
-    python scripts/ingest_mf_portfolios.py --target 150 --audit    # also build forensic dossiers
+    python scripts/ingest_mf_portfolios.py --target 150 --audit    # also build reports
 
 For AMCs without a verified automated URL, download their latest monthly portfolio workbook
 and drop it in data/amc_portfolios/<amc_key>/ (keys are listed in core/ingestion/amc_sources.json).
@@ -33,7 +33,7 @@ def main() -> int:
     ap.add_argument("--target", type=int, default=150, help="number of funds to ingest (default 150)")
     ap.add_argument("--amc", action="append", help="restrict to AMC key (repeatable)")
     ap.add_argument("--dry-run", action="store_true", help="parse and match only; do not write to the DB")
-    ap.add_argument("--audit", action="store_true", help="run forensic look-through audit on ingested funds")
+    ap.add_argument("--audit", action="store_true", help="run look-through audit on ingested funds")
     ap.add_argument("--status", action="store_true", help="show AMC source status and exit")
     ap.add_argument("--json", action="store_true", help="print the full report as JSON")
     args = ap.parse_args()

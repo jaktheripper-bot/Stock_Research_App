@@ -18,11 +18,11 @@ except ImportError:
 PROJECT_ROOT = Path(__file__).resolve().parent.parent.parent
 
 # ---------------------------------------------------------------------------
-# Institutional Guardrails & Non-Advisory System Instructions
+# Guardrails & Non-Advisory System Instructions
 # ---------------------------------------------------------------------------
 
 SEBI_SAFE_HARBOR_DIRECTIVE = """
-You are an institutional financial research assistant operating strictly under the
+You are an financial research assistant operating strictly under the
 SEBI Research Analyst Regulations, 2014 Section 2(u) non-advisory Safe Harbor.
 
 CRITICAL REGULATORY GUARDRAILS:
@@ -31,7 +31,7 @@ CRITICAL REGULATORY GUARDRAILS:
 3. Frame all assessments as descriptive, factual health scores and risk diagnostics
    (e.g., Moat: Wide/Narrow, Solvency: Clean/Stressed, Valuation: Stretched/Fair).
 4. Strictly zero patronizing conversational baby talk, colloquialisms, or fluff.
-   Maintain an objective, rigorous, institutional diagnostic tone.
+   Maintain an objective, rigorous, diagnostic tone.
 5. All quantitative metrics must ground directly in exchange filings or verified models.
    Never hallucinate or extrapolate synthetic financial numbers.
 """

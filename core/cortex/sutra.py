@@ -3,12 +3,12 @@ Sutra Multi-Asset Portfolio Look-Through Engine
 =============================================
 Phase 5 Proprietary Architecture (Anvik Cortex Engine).
 
-An institutional portfolio concentration, duplicate overlap, and forensic de-risking engine that:
+An portfolio concentration, duplicate overlap, and forensic de-risking engine that:
 1. Ingests multi-asset investor portfolios (Direct Equities + Mutual Funds + REITs + Sovereign Bonds).
 2. Deconstructs mutual fund scheme portfolios down to underlying company holdings.
 3. Uncovers hidden single-stock concentration across direct holdings and indirect fund holdings:
    True Exposure(X) = Direct_Weight(X) + SUM(Fund_Weight(f) * Holding_Weight_in_f(X))
-4. Quantifies sector concentration risks, capital hierarchy seniority, and portfolio fiduciary health.
+4. Quantifies sector concentration risks, capital hierarchy seniority, and portfolio governance health.
 5. Emits non-advisory, descriptive de-risking diagnostics to eliminate redundant fund fees.
 """
 
@@ -119,7 +119,7 @@ class SutraLookThroughResult:
     sector_exposures: List[SectorExposure] = field(default_factory=list)
     capital_hierarchy: CapitalAllocationHierarchy = field(default_factory=lambda: CapitalAllocationHierarchy(0, 0, 0, 0, 0))
     hidden_overlap_alerts: List[str] = field(default_factory=list)
-    portfolio_fiduciary_health_score: float = 75.0
+    portfolio_governance_health_score: float = 75.0
     summary: str = ""
 
 
@@ -274,7 +274,7 @@ class SutraLookThroughEngine:
             equity_funds_pct=round((total_mf_val / total_portfolio_val) * 100.0, 2),
         )
 
-        # 5. Portfolio Fiduciary Health Score
+        # 5. Portfolio Governance Health Score
         health_score = 100.0
         for exp in exposures:
             if exp.concentration_flag == "CRITICAL_OVERWEIGHT":
@@ -290,7 +290,7 @@ class SutraLookThroughEngine:
             f"Portfolio Look-Through Audit: Analyzed ₹{total_portfolio_val:,.0f} across {len(safe_eq)} direct equities, "
             f"{len(safe_mf)} mutual funds, and {len(safe_fi)} fixed-income assets. "
             f"Top holding: {exposures[0].symbol if exposures else 'None'} ({exposures[0].total_exposure_pct if exposures else 0:.1f}%). "
-            f"Fiduciary Health Score: {health_score:.1f}/100. Alerts: {len(hidden_overlap_alerts)}."
+            f"Governance Health Score: {health_score:.1f}/100. Alerts: {len(hidden_overlap_alerts)}."
         )
 
         return SutraLookThroughResult(
@@ -299,6 +299,6 @@ class SutraLookThroughEngine:
             sector_exposures=sector_list,
             capital_hierarchy=hierarchy,
             hidden_overlap_alerts=hidden_overlap_alerts,
-            portfolio_fiduciary_health_score=round(health_score, 1),
+            portfolio_governance_health_score=round(health_score, 1),
             summary=summary,
         )

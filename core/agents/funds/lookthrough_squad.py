@@ -1,6 +1,6 @@
 """Autonomous Mutual Fund Look-Through Research Squad powered by Google Antigravity SDK.
 
-Aggregates company-level forensic dossiers from `reports.db` to derive:
+Aggregates company-level reports from `reports.db` to derive:
 - Weighted Economic Moat Index
 - Accounting & Solvency Risk Index (ASRI)
 - Portfolio Margin of Safety vs Intrinsic DCF

@@ -1,4 +1,4 @@
-"""Institutional Mutual Fund Look-Through & Forensic Dossier Engine.
+"""Mutual Fund Look-Through & Report Engine.
 
 Enforces statutory and quantitative mathematical invariants for Mutual Fund Dossiers:
 1. Withhold Composite Health Score (return None) whenever verified 7-pillar coverage < 70.0%.
@@ -39,7 +39,7 @@ def evaluate_fund_coverage_and_health(
     raw_composite_health_score: float,
     raw_active_share: float
 ) -> Tuple[Optional[float], float]:
-    """Applies institutional quantitative invariants to fund coverage and active share.
+    """Applies quantitative invariants to fund coverage and active share.
 
     Returns:
         (composite_health_score, clamped_active_share)
@@ -95,7 +95,7 @@ def compute_fund_forensic_lookthrough(scheme_code: str) -> Dict[str, Any]:
         data["health_score_withheld"] = True
         data["health_score_withheld_reason"] = (
             f"Verified 7-pillar equity research coverage is {genuine_cov:.1f}%, which is below "
-            f"the institutional minimum {MIN_VERIFIED_7PILLAR_COVERAGE_THRESHOLD}%. "
+            f"the minimum {MIN_VERIFIED_7PILLAR_COVERAGE_THRESHOLD}%. "
             f"Composite health score is withheld to prevent unverified proxy extrapolation."
         )
     else:

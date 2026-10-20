@@ -1,13 +1,13 @@
 """
 Core Analysis Package for Equity Research App.
 
-Modularized institutional equity analysis architecture divided into specialized submodules:
+Modularized equity analysis architecture divided into specialized submodules:
 - exceptions: Strict pipeline error hierarchy for diagnostics.
 - parser: Health matrix parsing, citations formatting, regulatory sanitization, and differential drift.
 - fundamentals: Primary BSE exchange fetching, yfinance fallback, and mathematical indicators.
 - engine: Dynamic Gemini Flash cascade, Perplexity failover, and streaming generation.
-- delta: Material change gating (>=5% price move, BSE announcements, >14 days) and surgical refresh.
-- comparator: Cross-company institutional peer comparison and 3-axis disparity diagnostics.
+- delta: Material change gating (>=5% price move, BSE announcements, >14 days) and price & filing refresh.
+- comparator: Cross-company peer comparison and 3-axis disparity diagnostics.
 """
 
 from core.analysis.exceptions import (
@@ -39,7 +39,7 @@ from core.analysis.fundamentals import (
 from core.analysis.dossier_report_synthesis import (
     get_system_prompt,
     get_latest_flash_models,
-    get_surgical_flash_model,
+    get_light_flash_model,
     stream_genai_with_fallback,
     stream_perplexity_fallback,
     stream_gemini_ungrounded_bypass,
@@ -51,7 +51,7 @@ from core.analysis.dossier_report_synthesis import (
 from core.analysis.delta import (
     evaluate_material_change,
     splice_report_pillars,
-    execute_surgical_pillar_update,
+    execute_pillar_update,
 )
 
 from core.analysis.peer_comparison import (
@@ -104,7 +104,7 @@ __all__ = [
     # engine
     "get_system_prompt",
     "get_latest_flash_models",
-    "get_surgical_flash_model",
+    "get_light_flash_model",
     "stream_genai_with_fallback",
     "stream_perplexity_fallback",
     "stream_gemini_ungrounded_bypass",
@@ -114,7 +114,7 @@ __all__ = [
     # delta
     "evaluate_material_change",
     "splice_report_pillars",
-    "execute_surgical_pillar_update",
+    "execute_pillar_update",
     # comparator
     "evaluate_company_disparity",
     "compare_two_companies",

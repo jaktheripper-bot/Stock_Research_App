@@ -2,7 +2,7 @@
 
 > **Reference Standard:** `docs/BRAND_HOUSE_AND_VOICE_GUIDE.md`
 > - **Creative Territory:** *Less noise, more nuance.*
-> - **Tagline:** *Less noise, more nuance.* is the only public tagline. *Audit the Asset. Protect the Allocator.* was retired on 20 Oct 2026 and is still on the site until Wave 3a.
+> - **Tagline:** *Less noise, more nuance.* is the only public tagline. *Audit the Asset. Protect the Allocator.* was retired on 20 Oct 2026 and removed from the site, brand code and AI prompts.
 > - **Category Descriptor:** *Multi-asset investment research*
 > - **Core Brand Promise:** *Understand the evidence. Examine the trade-offs. Know what deserves a closer look.*
 > - **Voice Guardrails:** Direct declarative sentences, plain English, calm analytical restraint. Avoid hype, dramatic phrasing (*"wealth destruction"*, *"what shocked you"*), robotic server jargon (*"computational processing tokens"*, *"surgical refreshes"*, *"synthesize"*), unsubstantiated absolutes (*"zero-hallucination"*), and regulatory landmines (*"fiduciary recommendation"*).
@@ -112,3 +112,22 @@ Each directory page needs a cohesive **Tag → H1 → Lead Paragraph (Context, E
 | 6.1 | **Pricing Page** (`pricing.html`) | `TRANSPARENT MONETIZATION`, `Choose the computational power you need...`, FAQ (`What is a Research Credit? Research credits are computational processing tokens...`) | Rewrite the hero lead, plan cards, Enterprise desk blurb, and FAQs in warm, plain English—explaining why reading is free and why generating a new report uses a credit. |
 | 6.2 | **Contact & Grievance Desk** (`contact.html`) | `We're Here to Help`, category cards (`Billing & Credits`, `Technical Issue`, `Research Feedback`, `Regulatory Grievance`), form labels | Already friendly; ensure form helper copy reinforces that readers can flag data discrepancies or challenge an analytical assumption in any report. |
 | 6.3 | **Legal & Policy Pages** (`policy.html` + policy dicts in `web/main.py`) | `/disclaimer`, `/terms`, `/privacy`, `/refund-policy`, `/shipping-policy` | Verify consistent use of **Moatnomics** (zero references to `Stock Research App`), non-registered independent software utility status (`AGENTS.md` §2), and plain-English clarity alongside statutory clauses. |
+
+---
+
+## 7. Status & Open Items (20 Oct 2026, Track 3 Phases 1-3)
+
+**Done:** priority-0 rows 0.1-0.9; meta/OG title, footer and homepage hero use the single tagline; `og:image` / `twitter:image` / `apple-touch-icon` wired and tested; unused `glyph-castle` removed; Research Desk renamed end to end (module `research_desk.py`, `process_research_desk_turn`, DOM ids, tests); Countercase, Governance Scoring Index and Monitoring Feed identifiers renamed to match the site; AI call sites carry the brand context (`delta.py` added); the 7 unreferenced `ui/copilot-*` and `ui/hud-*` icon files removed. `python3 scripts/audit_doc_line_refs.py` is the post-implementation reference audit.
+
+**Open (not done, and why):**
+
+| Item | State |
+|---|---|
+| Hero banners (`img/heroes/*.webp`) and portal plates (`img/brand/portal-*.webp`) are not referenced by any page | Needs a visual review in a browser (text contrast over the images). Not wired blind. |
+| Raw emojis outside `copilot.js` (public templates, `web/static/js/main.js`, `opportunity_terminal.js`, `web/main.py` messages, admin console) | About 300 remain, none replaced yet. Needs an emoji-to-sprite map per context. |
+| Stored values: `SURGICAL_REFRESH`, `FULL_SYNTHESIS` (credit/telemetry action types), contact category `synthesis`, existing `BSE Surveillance` alert rows | Deliberately not renamed: renaming needs a data migration. Display text already uses the new wording. |
+| API paths `/api/copilot/chat`, `/api/admin/*` scan routes | Unchanged by policy (Manual 4A). `/api/premortem` was renamed to `/api/countercase` with the old path kept as an alias. |
+| Generic engineering word *synthesis* in function and constant names (`synthesize_bull_bear_thesis`, `MAX_SYNTHESIS_PER_USER_HOUR`, ...) | Not user-visible; left as is. |
+| Legal pages still call the product a "computational financial research synthesis software utility" | Left: it is the legal characterisation of the service. Needs the owner's call before any change. |
+| Hindi voice rules and string catalogues; language parameter of `get_system_prompt()` | Deferred as agreed. |
+

@@ -253,7 +253,7 @@ def deduct_user_credits(
     """
     Atomically checks balance and deducts credits for an action.
     Guards against race conditions and double-spending across PostgreSQL and SQLite.
-    Handles Pro subscription entitlements (e.g. unlimited surgical refreshes and PDF exports).
+    Handles Pro subscription entitlements (e.g. unlimited price & filing refreshes and PDF exports).
     Returns CreditDeductionResult, unpacking as (success: bool, new_balance: float, message: str)
     and allowing dict access (res["success"], res["error"], res["credits_balance"]).
     """
@@ -305,7 +305,7 @@ def deduct_user_credits(
                 else:
                     is_pro_active = True
 
-        # Pro Tier Entitlements: Surgical updates & PDF exports are uncapped / free
+        # Pro Tier Entitlements: Price & Filing updates & PDF exports are uncapped / free
         if is_pro_active and action_type in ("SURGICAL_REFRESH", "PDF_EXPORT"):
             cursor.execute(
                 f"""
@@ -746,7 +746,7 @@ def get_all_billables(
 
 def get_revenue_analytics_summary(days: int = None, start_date = None, end_date = None, exclude_tests: bool = True) -> Dict[str, Any]:
     """
-    Computes institutional revenue summary, GST collected, returns/refunds,
+    Computes revenue summary, GST collected, returns/refunds,
     and circulating credit liabilities across a selectable time window.
     Strictly distinguishes genuine, bank-cleared revenue (Razorpay)
     from promotional welcome grants, free test tokens, and sandbox checkout simulations.
@@ -1148,7 +1148,7 @@ def unlock_ticker_for_user(
     **kwargs
 ) -> CreditDeductionResult:
     """
-    Atomically deducts 1 credit and unlocks the institutional deep-dive tier for a ticker.
+    Atomically deducts 1 credit and unlocks the deep-dive tier for a ticker.
     Idempotent: if already unlocked, returns True immediately without deducting credits.
     Returns CreditDeductionResult, unpacking cleanly as (success, new_balance, message)
     and supporting dictionary access (e.g. r.get("success"), r.get("already_unlocked")).
@@ -1157,14 +1157,14 @@ def unlock_ticker_for_user(
         amount = float(cost)
 
     if not user_id:
-        return CreditDeductionResult(False, 0.0, "Authentication required to unlock institutional deep-dive.", error="AUTH_REQUIRED", already_unlocked=False)
+        return CreditDeductionResult(False, 0.0, "Authentication required to unlock deep-dive.", error="AUTH_REQUIRED", already_unlocked=False)
 
     clean_id = str(user_id).strip()
     clean_ticker_sym = str(ticker).strip().upper()
 
     if is_ticker_unlocked_for_user(clean_id, clean_ticker_sym):
         current_bal = get_user_credits_balance(clean_id)
-        return CreditDeductionResult(True, current_bal, f"Institutional deep-dive for {clean_ticker_sym} is already unlocked.", already_unlocked=True)
+        return CreditDeductionResult(True, current_bal, f"Deep-dive for {clean_ticker_sym} is already unlocked.", already_unlocked=True)
 
     # Deduct 1 credit atomically
     deduction = deduct_user_credits(
@@ -1190,10 +1190,10 @@ def unlock_ticker_for_user(
         )
         conn.commit()
         logger.info(f"Recorded dossier unlock for user {clean_id} on {clean_ticker_sym}")
-        return CreditDeductionResult(True, new_balance, f"Successfully unlocked institutional deep-dive for {clean_ticker_sym}.", already_unlocked=False)
+        return CreditDeductionResult(True, new_balance, f"Successfully unlocked deep-dive for {clean_ticker_sym}.", already_unlocked=False)
     except Exception as e:
         logger.error(f"Error recording user unlock dossier {clean_id}/{clean_ticker_sym}: {e}")
-        return CreditDeductionResult(True, new_balance, f"Successfully unlocked institutional deep-dive for {clean_ticker_sym}.", already_unlocked=False)
+        return CreditDeductionResult(True, new_balance, f"Successfully unlocked deep-dive for {clean_ticker_sym}.", already_unlocked=False)
     finally:
         cursor.close()
         conn.close()

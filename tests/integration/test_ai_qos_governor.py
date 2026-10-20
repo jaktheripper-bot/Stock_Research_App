@@ -173,7 +173,7 @@ class TestAiQosGovernor(unittest.TestCase):
                     synthesis_call_count += 1
                 time.sleep(0.05)  # simulate LLM latency
 
-                # Save synthesized report to cache
+                # Save compiled report to cache
                 dummy_stock_data = {
                     "ticker": ticker,
                     "short_name": "Coalesce Test Ltd",

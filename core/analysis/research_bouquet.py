@@ -3,11 +3,11 @@ Research Bouquet & Morning Digest Compiler.
 
 Curates multi-asset intelligence across:
 - Today's under-the-radar equities from the 9:00 AM Morning Discovery Reel
-- Mutual Fund look-through forensic audits
+- Mutual Fund look-through accounting checks
 - 10Y Sovereign benchmark curve & corporate credit spreads
 - Unlisted MSME manufacturing champions
 
-Generates institutional HTML & Plain-Text emails with:
+Generates HTML & Plain-Text emails with:
 - Branded click tracking subdomain alignment (e.g. links.moatnomics.com)
 - Statutory SEBI non-advisory safe harbor disclosures
 - Statutory 1-click unsubscribe per IT Rules 2021 & anti-spam regulations
@@ -252,7 +252,7 @@ def render_bouquet_html(bouquet: Dict[str, Any], subscriber: Optional[Dict[str, 
 
       <!-- Section: Mutual Fund Look-Through -->
       <div class="section-title">
-        <span>🛡️</span> Mutual Fund Forensic Look-Through Spotlight
+        <span>🛡️</span> Mutual Fund Look-Through Spotlight
       </div>
       <div class="card">
         <div style="font-weight: 700; font-size: 13.5px; color: #0f172a; margin-bottom: 4px;">
@@ -269,7 +269,7 @@ def render_bouquet_html(bouquet: Dict[str, Any], subscriber: Optional[Dict[str, 
       <!-- Action Button -->
       <div style="text-align: center; margin: 28px 0 12px 0;">
         <a href="{build_tracked_link('/', token=token)}" style="background: #0ea5e9; color: #020617; font-weight: 800; font-size: 14px; text-decoration: none; padding: 12px 28px; border-radius: 8px; display: inline-block;">
-          Open Institutional Terminal &rarr;
+          Open Terminal &rarr;
         </a>
       </div>
     </div>
@@ -280,7 +280,7 @@ def render_bouquet_html(bouquet: Dict[str, Any], subscriber: Optional[Dict[str, 
         Moatnomics &bull; Quantitative Asset Intelligence & Solvency Auditing
       </p>
       <p style="margin: 0 0 10px 0; font-size: 10.5px; color: #94a3b8; line-height: 1.4;">
-        <strong>Regulatory Safe-Harbor Disclosure:</strong> Moatnomics is an independent financial technology analytics software tool. We are not registered anywhere as a corporate entity or broker, and do not provide SEBI-regulated investment advice or recommendations. All data is computed deterministically for institutional research and forensic screening only.
+        <strong>Regulatory Safe-Harbor Disclosure:</strong> Moatnomics is an independent financial technology analytics software tool. We are not registered anywhere as a corporate entity or broker, and do not provide SEBI-regulated investment advice or recommendations. All data is computed deterministically for research and forensic screening only.
       </p>
       <p style="margin: 0; font-size: 11px;">
         You received this email because your account is registered for Research Digest dispatches.<br>

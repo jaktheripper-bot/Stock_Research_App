@@ -135,7 +135,7 @@ def calculate_tax_waterfall(
 
 
 def assign_tenure_bucket(years: float) -> str:
-    """Categorizes maturity or duration into institutional tenure buckets."""
+    """Categorizes maturity or duration into tenure buckets."""
     if years <= 1.0:
         return "<1Y"
     elif years <= 3.0:
@@ -514,7 +514,7 @@ def get_normalized_opportunity_universe(
         else:
             items = [x for x in items if p_clean in [p.lower() for p in x.get("persona_tags", [])]]
 
-    # Sort descending by Net Real Yield as primary institutional benchmark
+    # Sort descending by Net Real Yield as primary benchmark
     items.sort(key=lambda x: x["net_yield_pct"], reverse=True)
     return items
 

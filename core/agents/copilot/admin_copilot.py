@@ -11,11 +11,11 @@ Provides:
   * Support grievance ticket status updates & resolution notes
   * Order refunds (Razorpay)
   * Synthetic test data purge
-  * Comprehensive AMFI & Debt asset surveillance scans
+  * Comprehensive AMFI & Debt asset monitoring scans
   * Autonomous project health audits
 - Google GenAI model cascade (`gemini-3.8-flash`, `gemini-3.5-flash-lite`, `gemini-3.1-flash-lite`)
   with strict deterministic fallback for offline/test environments.
-- Enforces institutional Moatnomics brand tone: clinical, objective, and surgical.
+- Enforces Moatnomics brand tone: clinical, objective and precise.
 ==============================================================================
 """
 
@@ -390,7 +390,7 @@ def tool_generate_data_driven_optimization_tips(kpis: Dict[str, Any]) -> str:
     tips.append(
         f"3. **Protect AI Unit Economics (`{cache_pct:.1f}%` Cache Hit Rate • `${cost_saved:,.2f}` Saved vs. `${total_ai_usd:.2f}` Total Gemini Spend):**\n"
         f"   - **Observed Data:** Cached serves save `~$0.015` per query; current cache efficiency is `{cache_pct:.1f}%`.\n"
-        f"   - **Actionable Playbook:** Pre-warm any newly trending ticker from {ticker_str} via the 08:45 AM discovery batch (`skip_gemini=False`) so peak daytime traffic hits SQLite/Postgres cache (`<15ms` TTFB, `$0.00` marginal LLM cost). Keep Free-Tier Forensic Desk turns routed through the 5-stage deterministic calculator and local pillar index."
+        f"   - **Actionable Playbook:** Pre-warm any newly trending ticker from {ticker_str} via the 08:45 AM discovery batch (`skip_gemini=False`) so peak daytime traffic hits SQLite/Postgres cache (`<15ms` TTFB, `$0.00` marginal LLM cost). Keep Free-Tier Research Desk turns routed through the 5-stage deterministic calculator and local pillar index."
     )
 
     # 4. Multi-Asset SEO Catalog & Freshness Tip
@@ -401,7 +401,7 @@ def tool_generate_data_driven_optimization_tips(kpis: Dict[str, Any]) -> str:
     tips.append(
         f"4. **Expand Long-Tail Multi-Asset Discovery (`{eq_cnt}` Equities • `{mf_cnt}` Mutual Funds • `{msme_cnt}` MSMEs • Latest Cohort `{disc_date}`):**\n"
         f"   - **Observed Data:** The catalog holds `{eq_cnt + mf_cnt + msme_cnt}` indexed dossiers across 3 asset classes.\n"
-        f"   - **Actionable Playbook:** Trigger `Sync AMFI Daily NAV Feed` and `Asset Surveillance Scan` prior to 09:00 AM IST market open so every scheme and equity card displays a same-day freshness badge, improving organic search click-through and allocator trust."
+        f"   - **Actionable Playbook:** Trigger `Sync AMFI Daily NAV Feed` and `Asset Monitoring Scan` prior to 09:00 AM IST market open so every scheme and equity card displays a same-day freshness badge, improving organic search click-through and allocator trust."
     )
 
     # 5. Service Desk & Infrastructure Quota Hygiene Tip
@@ -423,7 +423,7 @@ def tool_generate_data_driven_optimization_tips(kpis: Dict[str, Any]) -> str:
         + "\n\n".join(tips)
         + "\n\n**Instant Actions You Can Trigger Right Now:**\n"
         "- Type *\"Purge test telemetry\"* to scrub any synthetic test rows distorting bounce/conversion rates.\n"
-        "- Type *\"Trigger asset surveillance scan\"* or *\"Sync AMFI\"* to refresh catalog timestamps.\n"
+        "- Type *\"Trigger asset monitoring scan\"* or *\"Sync AMFI\"* to refresh catalog timestamps.\n"
         "- Type *\"Show provider quotas\"* or *\"Show open tickets\"* to drill into infrastructure or support queues."
     )
 
@@ -791,7 +791,7 @@ def execute_confirmed_admin_action(
             return {
                 "success": True,
                 "summary": res,
-                "message": f"Asset surveillance scan complete: {res.get('total_scanned', 0)} assets scanned ({res.get('new_assets', 0)} new, {res.get('changed_assets', 0)} updated)."
+                "message": f"Asset monitoring scan complete: {res.get('total_scanned', 0)} assets scanned ({res.get('new_assets', 0)} new, {res.get('changed_assets', 0)} updated)."
             }
         except Exception as e:
             logger.error(f"Asset scan error: {e}", exc_info=True)
@@ -1153,21 +1153,21 @@ def parse_deterministic_admin_query(
         )
         return reply, proposal
 
-    # 6. Action Intent: Asset Surveillance Scan / Sync AMFI
-    if any(k in msg for k in ["scan", "surveillance", "refresh assets", "sync amfi", "scan funds"]):
+    # 6. Action Intent: Asset Monitoring Scan / Sync AMFI
+    if any(k in msg for k in ["scan", "monitoring", "refresh assets", "sync amfi", "scan funds"]):
         action = AdminActionType.SYNC_AMFI if "amfi" in msg else AdminActionType.TRIGGER_ASSET_SCAN
-        title = "Sync AMFI Daily NAV Feed" if action == AdminActionType.SYNC_AMFI else "Trigger Comprehensive Asset Surveillance Scan"
+        title = "Sync AMFI Daily NAV Feed" if action == AdminActionType.SYNC_AMFI else "Trigger Comprehensive Asset Monitoring Scan"
         proposal = create_action_proposal(
             action_type=action,
             title=title,
             summary="Scan mutual fund portfolios, debt securities, and sovereign bond curves for portfolio shifts and fresh pricing.",
             payload={},
             impact_level="LOW",
-            impact_warning="Surveillance scan inspects live AMFI and NSE debt feeds and updates the local security catalog."
+            impact_warning="Monitoring scan inspects live AMFI and NSE debt feeds and updates the local security catalog."
         )
         reply = (
             f"📡 **Action Proposal Prepared: {title}**\n\n"
-            "Ready to trigger background asset surveillance.\n"
+            "Ready to trigger background asset monitoring.\n"
             "Click **Confirm & Execute** to start the scan."
         )
         return reply, proposal
@@ -1279,7 +1279,7 @@ def parse_deterministic_admin_query(
         tot_inr = float(spends.get("total_cost_inr") or 0.0)
         tot_tok = int(spends.get("total_tokens") or 0)
         return (
-            f"📡 **Subscribed Provider Quotas & AI Spend Surveillance ({q_data.get('healthy_count', 0)}/{q_data.get('total_count', 0)} Healthy):**\n\n"
+            f"📡 **Subscribed Provider Quotas & AI Spend Monitoring ({q_data.get('healthy_count', 0)}/{q_data.get('total_count', 0)} Healthy):**\n\n"
             f"{prov_lines}\n\n"
             f"🧠 **Cumulative Gemini Token & Spend Ledger:**\n"
             f"- **Total Estimated Spend:** **`${tot_usd:.4f} USD`** (`₹{tot_inr:,.2f} INR`)\n"
@@ -1418,7 +1418,7 @@ def parse_deterministic_admin_query(
     # Default Helpful Response
     return (
         "🤖 **Moatnomics Executive Admin Copilot**\n\n"
-        "I provide institutional diagnostics across live dashboard telemetry, provider quotas, user accounts, and support dockets, and coordinate 2-step administrative mutations:\n\n"
+        "I provide diagnostics across live dashboard telemetry, provider quotas, user accounts, and support dockets, and coordinate 2-step administrative mutations:\n\n"
         "**What you can ask me:**\n"
         "- 💡 *\"Give me data-driven tips and tricks to improve site metrics and conversion\"*\n"
         "- 📊 *\"What are our unique sessions and top routes this month?\"*\n"
@@ -1430,7 +1430,7 @@ def parse_deterministic_admin_query(
         "- 📨 *\"Reply to ticket TKT-7A4B2C: We have resolved your issue\"*\n"
         "- ✅ *\"Mark ticket TKT-7A4B2C as resolved\"*\n"
         "- 🧹 *\"Purge test telemetry and dummy tickets from the dashboard\"*\n"
-        "- 📡 *\"Trigger asset surveillance scan\"* or *\"Run project audit\"*",
+        "- 📡 *\"Trigger asset monitoring scan\"* or *\"Run project audit\"*",
         None
     )
 
@@ -1511,7 +1511,7 @@ async def process_admin_copilot_turn(
 
 ROLE: You are the Executive Administrator Copilot for {MOATNOMICS_BRAND_HOUSE['brand_name']}.
 You serve the platform owner and verified administrators.
-Your tone is clinical, objective, surgical, and empirical. Never use conversational filler, hype, or colloquialisms.
+Your tone is clinical, objective, precise and empirical. Never use conversational filler, hype, or colloquialisms.
 
 AUTHENTICATED ADMIN CONTEXT:
 - Email: {admin_user.get('email')}

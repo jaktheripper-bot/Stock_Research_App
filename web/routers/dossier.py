@@ -345,7 +345,7 @@ async def api_download_pdf(
 
     report_text_for_pdf = rep.get("report_text", "")
     if not _deep_dive_unlocked_for_request(request, clean_t):
-        from core.agents.copilot.forensic_desk import redact_gated_pillars
+        from core.agents.copilot.research_desk import redact_gated_pillars
         report_text_for_pdf = redact_gated_pillars(report_text_for_pdf, notice=PDF_LOCKED_NOTICE)
 
     from core.reporting.pdf import generate_report_pdf, apply_pdf_watermark

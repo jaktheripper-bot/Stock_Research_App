@@ -10,7 +10,7 @@ import sys
 import time
 def run_benchmarks():
     print("\n=======================================================")
-    print("   STOCK RESEARCH APP - LATENCY & SPEED BENCHMARK")
+    print("   MOATNOMICS - LATENCY & SPEED BENCHMARK")
     print("=======================================================")
     
     try:

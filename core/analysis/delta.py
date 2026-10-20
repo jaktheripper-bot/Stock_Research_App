@@ -1,4 +1,4 @@
-"""Delta evaluation engine: material change gating, self-healing cache checks, and surgical pillar updates."""
+"""Delta evaluation engine: material change gating, self-healing cache checks, and price & filing pillar updates."""
 
 import os
 import re
@@ -8,7 +8,8 @@ from google import genai
 
 from core.db import save_report_to_archive
 from core.analysis.fundamentals import fetch_latest_bse_announcement, compute_deterministic_technical_context
-from core.analysis.dossier_report_synthesis import get_surgical_flash_model
+from core.analysis.dossier_report_synthesis import get_light_flash_model
+from core.brand.moatnomics_house import get_system_prompt_context
 
 logger = logging.getLogger("equity_research.core.analysis.delta")
 
@@ -73,7 +74,7 @@ def evaluate_material_change(cached: dict, live_fund: dict, scrip_code: str) -> 
 
 def splice_report_pillars(original_text: str, updated_pillars: dict) -> str:
     """
-    Surgically replaces specified pillar sections in an institutional report.
+    Surgically replaces specified pillar sections in an report.
     updated_pillars: e.g. {5: "## Pillar 5: ...", 6: "## Pillar 6: ..."}
     Preserves all other pillars, headings, and formatting exactly.
     """
@@ -93,7 +94,7 @@ def splice_report_pillars(original_text: str, updated_pillars: dict) -> str:
             new_sections.append(s)
     return "".join(new_sections).strip()
 
-def execute_surgical_pillar_update(
+def execute_pillar_update(
     ticker: str,
     cached_report: dict,
     stock_data: dict,
@@ -123,7 +124,9 @@ def execute_surgical_pillar_update(
 
     lang_rule = "Write entirely in English (India)." if language == "English (India)" else f"Write in {language}."
 
-    sys_prompt = f"""You are an institutional equity research analyst operating under strict SEBI Safe Harbor guidelines.
+    brand_context = get_system_prompt_context(content_type="monitoring", include_master_prompt=False).strip()
+
+    sys_prompt = f"""You are the Moatnomics research desk, writing a thesis update under strict SEBI Safe Harbor guidelines.
 {lang_rule}
 Your task is to write updated, fact-based evaluations for ONLY Pillar 5 and Pillar 6 for {ticker}.
 Pillars 1 to 4 and Pillar 7 remain fundamentally valid and must NOT be reproduced.
@@ -140,7 +143,9 @@ Return strictly the two markdown sections:
 [Valuation analysis based on verified P/E and market cap]
 
 ## Pillar 6: Technical & Momentum Overlay
-[Technical analysis based on price relative to 50-DMA and 52-week range]"""
+[Technical analysis based on price relative to 50-DMA and 52-week range]
+
+{brand_context}"""
 
     user_prompt = f"""Company: {short_name} ({ticker})
 Verified Live Exchange Metrics:
@@ -159,9 +164,9 @@ Verified Live Exchange Metrics:
         api_key = get_secret("GEMINI_API_KEY")
         if api_key:
             client = genai.Client(api_key=api_key)
-            model_name = get_surgical_flash_model(client)
+            model_name = get_light_flash_model(client)
             if on_status:
-                on_status(f"⚡ Executing surgical Pillar 5 & 6 refresh via `{model_name}` (Zero Grounding Fee)...")
+                on_status(f"⚡ Executing price & filing Pillar 5 & 6 refresh via `{model_name}` (Zero Grounding Fee)...")
             chat = client.chats.create(
                 model=model_name,
                 config=genai.types.GenerateContentConfig(
@@ -178,7 +183,7 @@ Verified Live Exchange Metrics:
                 elif re.search(r"(?i)\bPillars?\s*6\b", sec):
                     p6_text = sec.strip()
     except Exception as e:
-        logger.warning(f"Gemini surgical generation notice ({e}). Falling back to deterministic Python synthesis.")
+        logger.warning(f"Gemini pillar update notice ({e}). Falling back to deterministic Python synthesis.")
 
     # High-Reliability Deterministic Python Fallback if LLM unavailable
     if not p5_text:
@@ -213,9 +218,9 @@ Verified Live Exchange Metrics:
             stock_data,
             spliced_text,
             announcement=ann,
-            revision_trigger=f"Surgical Valuation & Technicals Update (Live price ₹{price:.2f})"
+            revision_trigger=f"Price & Filing Valuation & Technicals Update (Live price ₹{price:.2f})"
         )
     except Exception as err:
-        logger.error(f"Error persisting surgical report update: {err}")
+        logger.error(f"Error persisting pillar report update: {err}")
 
     return spliced_text

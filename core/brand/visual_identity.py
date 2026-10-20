@@ -127,7 +127,7 @@ CANONICAL_ICONS_V2: Dict[str, Dict[str, str]] = {
     "valuation": {"symbol_id": "icon-valuation", "label": "Valuation & Cash Flows", "viewbox": "0 0 24 24"},
     "multi-asset": {"symbol_id": "icon-multi-asset", "label": "Multi-Asset Allocation", "viewbox": "0 0 24 24"},
     "screen": {"symbol_id": "icon-screen", "label": "Screener & Filters", "viewbox": "0 0 24 24"},
-    "alerts": {"symbol_id": "icon-alerts", "label": "Surveillance & Alerts", "viewbox": "0 0 24 24"},
+    "alerts": {"symbol_id": "icon-alerts", "label": "Monitoring & Alerts", "viewbox": "0 0 24 24"},
     "download": {"symbol_id": "icon-download", "label": "Export PDF Dossier", "viewbox": "0 0 24 24"},
 }
 

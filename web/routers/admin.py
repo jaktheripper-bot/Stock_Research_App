@@ -8,7 +8,7 @@ Provides:
 - Remedial User Credit allocation and Razorpay refunds
 - GSTR-1 Tax Register CSV exports
 - System-wide Autonomous Project Health & Multi-Pillar Audits
-- AMFI and Debt asset surveillance scans and scheduled worker dispatchers
+- AMFI and Debt asset monitoring scans and scheduled worker dispatchers
 - Forensic Intelligence Copilot chat dialogue and conversation history APIs
 """
 
@@ -623,11 +623,11 @@ def api_get_autonomous_events(limit: int = Query(15, ge=1, le=50)):
 # ==============================================================================
 @router.post("/api/copilot/chat")
 async def api_copilot_chat(payload: CopilotChatRequest, request: Request):
-    """Interactive Forensic Intelligence Desk dialogue endpoint with multi-asset and section context."""
+    """Interactive Research Desk dialogue endpoint with multi-asset and section context."""
     init_db()
     if not _validate_request_origin(request):
         raise HTTPException(status_code=403, detail="Cross-origin request rejected.")
-    from core.agents.copilot.forensic_desk import process_forensic_desk_turn
+    from core.agents.copilot.research_desk import process_research_desk_turn
     from core.db.agent_sessions import get_agent_conversation
 
     web_user = _get_current_web_user(request)
@@ -683,7 +683,7 @@ async def api_copilot_chat(payload: CopilotChatRequest, request: Request):
             "conversation_id": effective_conv_id,
             "response": (
                 "⚠️ **Rate Limit Exceeded:** Too many requests from your IP address (exceeded 30 requests/minute). "
-                "Please pause for a moment before querying the Forensic Desk again."
+                "Please pause for a moment before querying the Research Desk again."
             ),
             "status": "RATE_LIMITED"
         }
@@ -692,7 +692,7 @@ async def api_copilot_chat(payload: CopilotChatRequest, request: Request):
             "success": False,
             "conversation_id": effective_conv_id,
             "response": (
-                "⚠️ **Hourly Velocity Cap Reached:** You have reached the maximum allowed Forensic Desk turns for this hour "
+                "⚠️ **Hourly Velocity Cap Reached:** You have reached the maximum allowed Research Desk turns for this hour "
                 "(40 turns/hr) to protect your account. Please resume shortly."
             ),
             "status": "VELOCITY_CAPPED"
@@ -700,7 +700,7 @@ async def api_copilot_chat(payload: CopilotChatRequest, request: Request):
 
 
     try:
-        res = await process_forensic_desk_turn(
+        res = await process_research_desk_turn(
             conversation_id=effective_conv_id,
             user_message=payload.message,
             ticker=payload.ticker,
@@ -728,7 +728,7 @@ async def api_copilot_chat(payload: CopilotChatRequest, request: Request):
             "success": True,
             "conversation_id": effective_conv_id,
             "response": (
-                "⚡ **Forensic Desk Notice:** The analytical engine experienced a brief latency interruption while processing this inquiry. "
+                "⚡ **Research Desk Notice:** The analytical engine experienced a brief latency interruption while processing this inquiry. "
                 "All deterministic forensic data feeds remain online. Please re-submit your prompt or select one of the diagnostic queries below."
             ),
             "status": "RECOVERED"
@@ -2025,7 +2025,7 @@ async def api_run_msme_daily_ingest(
 
 @router.post("/admin/assets/trigger-scan")
 async def admin_trigger_scan_form(request: Request):
-    """Admin UI action: Trigger full AMFI and Debt asset surveillance scan."""
+    """Admin UI action: Trigger full AMFI and Debt asset monitoring scan."""
     if not _validate_request_origin(request):
         raise HTTPException(status_code=403, detail="Cross-origin request rejected.")
     if not _is_admin_authenticated(request):
@@ -2043,7 +2043,7 @@ async def api_admin_trigger_asset_scan(
     background_tasks: BackgroundTasks,
     x_admin_key: Optional[str] = Header(None)
 ):
-    """Admin API: Trigger asset surveillance scan across mutual funds and debt securities."""
+    """Admin API: Trigger asset monitoring scan across mutual funds and debt securities."""
     if not _validate_request_origin(request):
         raise HTTPException(status_code=403, detail="Cross-origin request rejected.")
     is_authed = _verify_admin_api_key(x_admin_key) or bool(_is_admin_authenticated(request))
@@ -2055,7 +2055,7 @@ async def api_admin_trigger_asset_scan(
     scan_summary = run_comprehensive_asset_scan()
     return json_response_with_cache({
         "status": "success",
-        "message": "Asset surveillance scan completed.",
+        "message": "Asset monitoring scan completed.",
         "summary": scan_summary
     })
 
@@ -2147,7 +2147,7 @@ async def api_admin_run_asset_scan(
     scan_type: str = Query("ALL_ASSETS"),
     x_admin_key: Optional[str] = Header(None)
 ):
-    """Admin API: Dispatches an immediate multi-asset surveillance scan (MFs, Corporate Debt)."""
+    """Admin API: Dispatches an immediate multi-asset monitoring scan (MFs, Corporate Debt)."""
     if not _validate_request_origin(request):
         raise HTTPException(status_code=403, detail="Cross-origin request rejected.")
     admin_user = _is_admin_authenticated(request)

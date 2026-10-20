@@ -1,4 +1,4 @@
-"""Data ingestion gateways and parsers for Stock Research App."""
+"""Data ingestion gateways and parsers for Moatnomics."""
 from core.ingestion.angel_one import AngelOneGateway
 from core.auth.totp import generate_rfc6238_totp
 from core.ingestion.amfi import ingest_amfi_daily_feed

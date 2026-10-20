@@ -1,8 +1,8 @@
 #!/usr/bin/env python3
-"""Daily Autonomous Mutual Fund Forensic Audit Worker.
+"""Daily Autonomous Mutual Fund Accounting Check Worker.
 
 Rotates through the curated mutual fund universe, executes deep 7-pillar portfolio
-look-through aggregation across constituent holdings, synthesizes institutional qualitative
+look-through aggregation across constituent holdings, synthesizes qualitative
 dossiers via Gemini AI / deterministic fallback, and archives results to reports.db.
 
 Usage:
@@ -43,7 +43,7 @@ logger = logging.getLogger("fund_audit_worker")
 
 
 def list_fund_audit_status():
-    """Prints table of mutual funds and their current forensic audit status."""
+    """Prints table of mutual funds and their current accounting check status."""
     init_db()
     funds = get_active_mutual_funds()
     print("\n" + "="*95)
@@ -73,7 +73,7 @@ def run_worker(scheme_code: Optional[str] = None, audit_all: bool = False):
 
     if audit_all:
         funds = get_active_mutual_funds()
-        logger.info(f"Running bulk forensic audit for all {len(funds)} funds...")
+        logger.info(f"Running bulk accounting check for all {len(funds)} funds...")
         for f in funds:
             code = f.get("scheme_code")
             try:
@@ -103,12 +103,12 @@ def run_worker(scheme_code: Optional[str] = None, audit_all: bool = False):
     print(f"Promoter Pledge Risk:   {res['promoter_pledge_exposure_pct']}%")
     print(f"Active Share vs Index:  {res['active_share_pct']}%")
     print("="*80)
-    print("\nSYNTHeSIZED INSTITUTIONAL FORENSIC DOSSIER PREVIEW:")
+    print("\nSYNTHeSIZED FORENSIC DOSSIER PREVIEW:")
     print(res["dossier_text"][:600] + "\n...\n")
 
 
 if __name__ == "__main__":
-    parser = argparse.ArgumentParser(description="Daily Mutual Fund Forensic Look-Through Audit Worker")
+    parser = argparse.ArgumentParser(description="Daily Mutual Fund Look-Through Audit Worker")
     parser.add_argument("--scheme", type=str, help="Specific scheme code to audit (e.g. PPFAS_FLEXICAP_DIR)")
     parser.add_argument("--next", action="store_true", help="Audit the next fund in the rotation queue")
     parser.add_argument("--list", action="store_true", help="List all funds and their audit status")

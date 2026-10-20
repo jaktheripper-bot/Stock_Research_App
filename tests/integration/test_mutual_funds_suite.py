@@ -4,8 +4,8 @@ Consolidated Mutual Funds & Look-Through Forensic Suite
 Unifies:
 1. Base Mutual Fund 6-Pillar Engine & Active Share Diagnostics
 2. Marquee Top 50 AMFI Schemes Expansion & Category Distribution
-3. Curated Top 100 Institutional Universe & Look-Through Verification
-4. 7-Pillar Forensic Look-Through, Overlap Auditor & On-Demand Ingestion
+3. Curated Top 100 Universe & Look-Through Verification
+4. 7-Pillar Look-Through, Overlap Auditor & On-Demand Ingestion
 """
 import json
 import os
@@ -357,7 +357,7 @@ class TestMutualFundTop50Expansion(unittest.TestCase):
 
 
 # ==============================================================================
-# 3. Top 100 Institutional Universe Expansion
+# 3. Top 100 Universe Expansion
 # ==============================================================================
 class TestMutualFundTop100Expansion(unittest.TestCase):
     @classmethod
@@ -547,7 +547,7 @@ class TestMutualFundTop200Expansion(unittest.TestCase):
 
 
 # ==============================================================================
-# 4. 7-Pillar Forensic Look-Through Engine & Auditor
+# 4. 7-Pillar Look-Through Engine & Auditor
 # ==============================================================================
 class TestFundForensicAuditor(unittest.TestCase):
     @classmethod
@@ -572,7 +572,7 @@ class TestFundForensicAuditor(unittest.TestCase):
 
     def test_health_matrix_parsing(self):
         sample_report = """
-# INSTITUTIONAL EQUITY RESEARCH: HDFCBANK
+# EQUITY RESEARCH: HDFCBANK
 
 ### Health Matrix
 - Macro: Stable
@@ -612,7 +612,7 @@ class TestFundForensicAuditor(unittest.TestCase):
     def test_dossier_persistence_and_featured_retrieval(self):
         mock_dossier = {
             "scheme_code": "PPFAS_FLEXICAP_DIR",
-            "dossier_text": "# TEST INSTITUTIONAL DOSSIER\nMandate integrity verified.",
+            "dossier_text": "# TEST DOSSIER\nMandate integrity verified.",
             "composite_health_score": 85.0,
             "weighted_moat_score": 86.5,
             "accounting_risk_index": 0.0,
@@ -770,12 +770,12 @@ class TestFundForensicAuditor(unittest.TestCase):
                 conn.close()
 
     def test_wrap_fund_dossier_with_collapsible_dimensions(self):
-        sample_md = """# INSTITUTIONAL FORENSIC DOSSIER: Test Growth Fund
+        sample_md = """# FORENSIC DOSSIER: Test Growth Fund
 
 ## 1. Mandate Integrity vs Ground Reality (Active Share & Style Drift)
 Active share is 72.4% with disciplined category fidelity.
 
-## 2. Forensic Solvency & Accounting Fragility (ASRI Analysis)
+## 2. Solvency & Accounting Fragility (ASRI Analysis)
 ASRI is 3.8% indicating high balance sheet durability.
 
 ## 3. Economic Moat & Intrinsic Margin of Safety (DCF Capital Moat)
@@ -784,7 +784,7 @@ Weighted Moat index stands at 78.5/100.
 ## 4. Manager Fee Justification vs Passive Index Drag
 Direct TER is 0.70% vs Regular TER of 1.55%.
 
-## 5. Pre-Mortem Scenario: What Breaks in a Severe Market Stress Test?
+## 5. Countercase Scenario: What Breaks in a Severe Market Stress Test?
 Cash reserve of 12% cushions against broad equity sell-offs.
 """
         html_out = wrap_fund_dossier_with_collapsible_dimensions(sample_md, "TEST_GROWTH", "Test Growth Fund")
@@ -801,12 +801,12 @@ Cash reserve of 12% cushions against broad equity sell-offs.
     def test_fund_dossier_workspace_06_accordion_formatting(self):
         mock_dossier = {
             "scheme_code": "PPFAS_FLEXICAP_DIR",
-            "dossier_text": """# INSTITUTIONAL FORENSIC DOSSIER: Parag Parikh Flexi Cap Fund
+            "dossier_text": """# FORENSIC DOSSIER: Parag Parikh Flexi Cap Fund
 
 ## 1. Mandate Integrity vs Ground Reality (Active Share & Style Drift)
 Active share is 72.4% with disciplined category fidelity.
 
-## 2. Forensic Solvency & Accounting Fragility (ASRI Analysis)
+## 2. Solvency & Accounting Fragility (ASRI Analysis)
 ASRI is 3.8% indicating high balance sheet durability.
 
 ## 3. Economic Moat & Intrinsic Margin of Safety (DCF Capital Moat)
@@ -815,7 +815,7 @@ Weighted Moat index stands at 78.5/100.
 ## 4. Manager Fee Justification vs Passive Index Drag
 Direct TER is 0.70% vs Regular TER of 1.55%.
 
-## 5. Pre-Mortem Scenario: What Breaks in a Severe Market Stress Test?
+## 5. Countercase Scenario: What Breaks in a Severe Market Stress Test?
 Cash reserve of 12% cushions against broad equity sell-offs.
 """,
             "composite_health_score": 85.0,
@@ -952,7 +952,7 @@ Cash reserve of 12% cushions against broad equity sell-offs.
             # Verify web page reflects unpaused state and modal markup
             resp = self.client.get(f"/funds/{scheme_code}", headers={"x-unlock-preview": "1"})
             self.assertEqual(resp.status_code, 200)
-            self.assertNotIn("Forensic Look-Through Meters Paused", resp.text)
+            self.assertNotIn("Look-Through Meters Paused", resp.text)
             self.assertIn("100% Constituent Coverage Active", resp.text)
             self.assertIn("deepDiveModal", resp.text)
             self.assertIn("deepDiveProgressBox", resp.text)

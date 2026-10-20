@@ -23,7 +23,7 @@ def evaluate_sgb_market() -> Dict[str, Any]:
     shortest_tranche = min(tranches, key=lambda x: x["maturity_date"]) if tranches else None
     longest_tranche = max(tranches, key=lambda x: x["maturity_date"]) if tranches else None
 
-    # Institutional Comparative Asset Matrix (SGB vs Gold ETF vs Physical Gold)
+    # Comparative Asset Matrix (SGB vs Gold ETF vs Physical Gold)
     asset_comparison = [
         {
             "dimension": "Acquisition Friction / Entry Pricing",
@@ -52,7 +52,7 @@ def evaluate_sgb_market() -> Dict[str, Any]:
     ]
 
     macro_takeaways = [
-        "SGB Supply Scarcity Window: Following the Union Budget 2024 gold import duty cut and suspension of primary issuances, secondary SGBs represent a finite, closed-ended institutional asset.",
+        "SGB Supply Scarcity Window: Following the Union Budget 2024 gold import duty cut and suspension of primary issuances, secondary SGBs represent a finite, closed-ended asset.",
         "Secondary Discount Liquidity Premium: Illiquidity in exchange cash segments creates systematic mispricings, allowing astute allocators to acquire pure sovereign gold below bullion market parity.",
         "Statutory Tax Exemption Shield: Section 47(viic) guarantees 100% exemption from capital gains tax upon redemption at maturity, generating an unreplicable 200+ bps annualized hurdle over Gold ETFs."
     ]

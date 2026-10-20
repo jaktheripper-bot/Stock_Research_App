@@ -318,12 +318,12 @@ for item in test_setu_cases:
 # -------------------------------------------------------------------------
 # 11. Anvik Cortex Engine (engine.py)
 # -------------------------------------------------------------------------
-print("\n--- 11. Testing Cortex Engine (DynamicStatutoryYieldWedge, ReverseDcf, PEAD, Fiduciary) ---")
+print("\n--- 11. Testing Cortex Engine (DynamicStatutoryYieldWedge, ReverseDcf, PEAD, Governance) ---")
 from core.cortex.engine import (
     DynamicStatutoryYieldWedge,
     ReverseDcfHurdleDeconstruct,
     PeadQuantDriftVelocity,
-    FiduciaryGovernanceScoringIndex,
+    GovernanceScoringIndex,
 )
 
 test_cortex_cases = [
@@ -334,7 +334,7 @@ test_cortex_cases = [
     ("ReverseDCF with negative FCF", ReverseDcfHurdleDeconstruct.evaluate, ("TEST", 1500.0, -25.0)),
     ("PEAD with zero volume and zero PAT", PeadQuantDriftVelocity.evaluate, ("TEST", 0.0, 0.0, 0.0, 0.0, 0.0)),
     ("PEAD with NaN PAT", PeadQuantDriftVelocity.evaluate, ("TEST", float("nan"), 100.0, 5000.0, 1000.0, 50.0)),
-    ("Fiduciary with extreme 100% RPT and pledge", FiduciaryGovernanceScoringIndex.evaluate, ("TEST", 100.0, 100.0, 50.0, 0.0, 200.0, True)),
+    ("Governance with extreme 100% RPT and pledge", GovernanceScoringIndex.evaluate, ("TEST", 100.0, 100.0, 50.0, 0.0, 200.0, True)),
 ]
 for name, fn, args in test_cortex_cases:
     try:

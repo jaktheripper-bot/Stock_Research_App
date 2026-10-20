@@ -7,7 +7,7 @@ Divided into specialized submodules:
 - compliance: SEBI safe-harbor audit logging and mandatory regulatory disclaimers.
 - reports: Research report snapshots, differential historical revisions, and full retrieval.
 - watchlist: Watched equities, scan timestamps, and tracking state.
-- alerts: Real-time surveillance events, notification badges, and user dismissals.
+- alerts: Real-time monitoring events, notification badges, and user dismissals.
 - telemetry: Site usage analytics, session journeys, and API credit savings tracking.
 - settings: Dynamic system configuration key-value store.
 """

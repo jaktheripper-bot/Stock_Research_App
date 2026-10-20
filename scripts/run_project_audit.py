@@ -35,7 +35,7 @@ async def main_async():
     if args.history:
         history = get_project_audit_history(limit=10)
         print("\n=========================================================================")
-        print("          STOCK RESEARCH APP — RECENT SYSTEM AUDIT HISTORY               ")
+        print("          MOATNOMICS — RECENT SYSTEM AUDIT HISTORY               ")
         print("=========================================================================")
         if not history:
             print("No audit history found in database.")

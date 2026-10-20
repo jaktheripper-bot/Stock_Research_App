@@ -75,6 +75,15 @@ def canonical_for(request: Request) -> str:
 templates.env.globals["canonical_for"] = canonical_for
 
 
+def site_asset_url(path: str) -> str:
+    """Absolute URL for a static asset (social cards need absolute URLs): configured domain + path."""
+    base = (os.environ.get("CANONICAL_DOMAIN") or "https://moatnomics.com").rstrip("/")
+    return f"{base}/{(path or '').lstrip('/')}"
+
+
+templates.env.globals["site_asset_url"] = site_asset_url
+
+
 def json_response_with_cache(data: dict, max_age: int = 3600) -> JSONResponse:
     """Returns JSONResponse with ETag and Cache-Control headers."""
     from fastapi.encoders import jsonable_encoder
@@ -426,7 +435,7 @@ def _pdf_account_ref(request: Request) -> str:
 
 
 PDF_LOCKED_NOTICE = (
-    "*Institutional deep-dive section. Unlock this ticker on the website (1 credit) "
+    "*Deep-dive section. Unlock this ticker on the website (1 credit) "
     "to include it in your PDF.*"
 )
 

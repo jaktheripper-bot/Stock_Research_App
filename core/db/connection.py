@@ -308,7 +308,7 @@ def init_db(force: bool = False):
             cursor.execute("SELECT version FROM schema_migrations;")
             applied = {row[0] for row in cursor.fetchall()}
 
-            # Migration v001: Core institutional schema
+            # Migration v001: Core schema
             if "v001_core_schema" not in applied:
                 logger.info("Applying schema migration: v001_core_schema...")
                 if supabase_url:
@@ -1529,7 +1529,7 @@ def init_db(force: bool = False):
                     cursor.execute("INSERT INTO schema_migrations (version) VALUES (\'v020_sovereign_sdl_and_macro_rates\') ON CONFLICT DO NOTHING;")
                 conn.commit()
 
-            # Migration v021: Mutual Fund 7-Pillar Forensic Look-Through Dossiers
+            # Migration v021: Mutual Fund 7-Pillar Look-Through Dossiers
             if "v021_fund_forensic_dossiers" not in applied:
                 logger.info("Applying schema migration: v021_fund_forensic_dossiers...")
                 if supabase_url:
@@ -1759,7 +1759,7 @@ def init_db(force: bool = False):
                     cursor.execute("INSERT INTO schema_migrations (version) VALUES (\'v025_landing_pages_telemetry\') ON CONFLICT DO NOTHING;")
                 conn.commit()
 
-            # Migration v026: User Unlocked Dossiers (Tiered Institutional Paywall)
+            # Migration v026: User Unlocked Dossiers (Tiered Paywall)
             if "v026_user_unlocked_dossiers" not in applied:
                 logger.info("Applying schema migration: v026_user_unlocked_dossiers...")
                 if supabase_url:

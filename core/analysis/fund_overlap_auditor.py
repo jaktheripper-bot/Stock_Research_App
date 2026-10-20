@@ -1,4 +1,4 @@
-"""Mutual Fund 7-Pillar Forensic Look-Through Engine & Autonomous Daily Auditor.
+"""Mutual Fund 7-Pillar Look-Through Engine & Autonomous Daily Auditor.
 
 Aggregates constituent equity stock dossiers from reports.db into portfolio-level
 forensic metrics:
@@ -7,7 +7,7 @@ forensic metrics:
 3. Portfolio Margin of Safety vs Intrinsic Value (Aggregated DCF intrinsic discount vs market froth)
 4. Promoter Pledging & Governance Risk Exposure (% capital in high-pledge promoters)
 5. True Active Share vs Benchmark & Closet Indexing Diagnostic
-6. AI-Powered Institutional Forensic Qualitative Dossier Synthesis
+6. AI-Powered Qualitative Report Generation
 """
 
 import json
@@ -39,7 +39,7 @@ from core.analysis.mutual_funds_engine import (
     EQUITY_HEALTH_DEFAULTS,
     BENCHMARK_PROXIES,
 )
-from core.analysis.dossier_report_synthesis import get_surgical_flash_model
+from core.analysis.dossier_report_synthesis import get_light_flash_model
 
 logger = logging.getLogger("equity_research.core.analysis.fund_overlap_auditor")
 
@@ -356,19 +356,19 @@ def compute_fund_forensic_lookthrough(scheme_code: str) -> Dict[str, Any]:
 
 
 def synthesize_fund_forensic_narrative(metrics: Dict[str, Any], scheme: Dict[str, Any]) -> str:
-    """Produces institutional forensic qualitative analysis via Gemini Flash or deterministic engine."""
+    """Produces forensic qualitative analysis via Gemini Flash or deterministic engine."""
     scheme_name = scheme.get("scheme_name", metrics.get("scheme_name", ""))
     scheme_code = metrics.get("scheme_code", "")
 
-    # Zero-Hallucination Gate: If coverage is below threshold, return honest fiduciary notice
+    # Source-Grounded Gate: If coverage is below threshold, return honest coverage notice
     if not metrics.get("has_sufficient_coverage", True):
         cov = metrics.get("genuine_coverage_pct", 0.0)
-        return f"""# 06: Institutional Forensic Qualitative Audit Dossier
+        return f"""# 06: Qualitative Audit Dossier
 
-**Fiduciary Notice under SEBI (Research Analysts) Regulations, 2014 Section 2(u):**
-The underlying equity constituent look-through coverage for **{scheme_name}** currently stands at **{cov}%**, which is below our strict institutional threshold of **70.0%**.
+**Coverage Notice (SEBI Research Analysts Regulations, 2014, Section 2(u)):**
+The underlying equity constituent look-through coverage for **{scheme_name}** currently stands at **{cov}%**, which is below our strict threshold of **70.0%**.
 
-To maintain Zero-Hallucination integrity and prevent misleading investors with unverified proxy assumptions:
+To maintain Source-Grounded integrity and prevent misleading investors with unverified proxy assumptions:
 1. **Composite Health Scoring & Qualitative Moat Narrative are temporarily paused** until verified 7-pillar company dossiers are compiled for the remaining constituents.
 2. **Statutory Non-Look-Through Analytics remain 100% active:**
    - Full disclosed constituent holdings table (equity, debt, TREPS).
@@ -401,14 +401,14 @@ To maintain Zero-Hallucination integrity and prevent misleading investors with u
 
     sys_prompt = (
         f"{brand_house_ctx}\n\n"
-        "You are the Chief Investment & Forensic Audit Officer at Moatnomics. "
+        "You are the Chief Investment & Accounting Check Officer at Moatnomics. "
         "Write an analytical, zero-condescension Forensic Portfolio Dossier for this mutual fund scheme following the Moatnomics editorial method (Context -> Evidence -> Implication -> Next question). "
         "Strictly avoid patronizing prose, generic fluff, and forward-looking Buy/Sell/Hold verdicts. "
-        "Focus on fiduciary integrity, accounting manipulation risk (ASRI), true active management, and DCF intrinsic margin of safety. "
+        "Focus on accounting integrity, accounting manipulation risk (ASRI), true active management, and DCF intrinsic margin of safety. "
         "Follow the prescribed Markdown structure strictly."
     )
 
-    user_prompt = f"""Generate an institutional forensic audit for:
+    user_prompt = f"""Generate an accounting check for:
 Scheme: {scheme_name} ({scheme_code})
 Category: {cat} | Benchmark: {bench}
 AUM: ₹{aum:,.0f} Cr | Direct TER: {ter_dir}% | Regular TER: {ter_reg}% | Turnover: {ptr}%
@@ -420,16 +420,16 @@ Top Forensic Risks / Leveraged Holdings: {risky_names}
 Top Economic Moat Compounders: {quality_names}
 
 Required Markdown Structure:
-# INSTITUTIONAL FORENSIC DOSSIER: {scheme_name}
+# FORENSIC DOSSIER: {scheme_name}
 ## 1. Mandate Integrity vs Ground Reality (Active Share & Style Drift)
 Analyze whether Active Share ({as_val}%) justifies the active expense ratio or indicates closet indexing. Evaluate AUM capacity drag at ₹{aum:,.0f} Cr.
-## 2. Forensic Solvency & Accounting Fragility (ASRI Analysis)
+## 2. Solvency & Accounting Fragility (ASRI Analysis)
 Analyze the Accounting & Solvency Risk Index ({asri}%) and promoter pledge exposure ({pledge}%). Dissect specific concerns in: {risky_names}.
 ## 3. Economic Moat & Intrinsic Margin of Safety (DCF Capital Moat)
 Evaluate portfolio moat score ({moat}/100) and weighted margin of safety ({mos}%). Contrast quality compounders ({quality_names}) against valuation froth.
 ## 4. Manager Fee Justification vs Passive Index Drag
 Audit the {round(ter_reg - ter_dir, 2)}% commission spread between Direct and Regular plans over a 15-year horizon.
-## 5. Pre-Mortem Scenario: What Breaks in a Severe Market Stress Test?
+## 5. Countercase Scenario: What Breaks in a Severe Market Stress Test?
 Detail the liquidity bottleneck and sector concentration fault lines if liquidity contracts by 30%.
 """
 
@@ -438,7 +438,7 @@ Detail the liquidity bottleneck and sector concentration fault lines if liquidit
     if api_key and os.environ.get("TESTING") != "1":
         try:
             client = genai.Client(api_key=api_key)
-            model_name = get_surgical_flash_model(client)
+            model_name = get_light_flash_model(client)
             chat = client.chats.create(
                 model=model_name,
                 config=genai.types.GenerateContentConfig(
@@ -450,7 +450,7 @@ Detail the liquidity bottleneck and sector concentration fault lines if liquidit
             if resp and resp.text:
                 gen_text = resp.text.strip()
         except Exception as e:
-            logger.warning(f"Gemini API narrative generation error ({e}). Proceeding to institutional algorithmic synthesis.")
+            logger.warning(f"Gemini API narrative generation error ({e}). Proceeding to algorithmic synthesis.")
 
     # High-Reliability Algorithmic Synthesis Fallback
     if not gen_text:
@@ -474,12 +474,12 @@ Detail the liquidity bottleneck and sector concentration fault lines if liquidit
             f"Separating constituent quality from valuation: while core holdings ({quality_names}) remain operationally credible, the portfolio trades at a -{abs(mos):.1f}% `[CALCULATED METRIC]` Margin of Safety premium to conservative DCF fair values, leaving less room for earnings disappointments."
         )
 
-        gen_text = f"""# INSTITUTIONAL FORENSIC DOSSIER: {scheme_name}
+        gen_text = f"""# FORENSIC DOSSIER: {scheme_name}
 
 ## 1. Mandate Integrity vs Ground Reality (Active Share & Style Drift)
 {as_verdict} At an operating AUM of ₹{aum:,.0f} Cr `[VERIFIED FACT]`, annual portfolio turnover stands at {ptr:.1f}% `[CALCULATED METRIC]`, indicating measured holding periods rather than high-frequency churn. The key question for allocators is whether position sizing remains nimble as asset scale expands.
 
-## 2. Forensic Solvency & Accounting Fragility (ASRI Analysis)
+## 2. Solvency & Accounting Fragility (ASRI Analysis)
 {asri_verdict} Look-through exposure to promoter share pledging stands at {pledge:.1f}% `[CALCULATED METRIC]`. Across the top holdings, operating cash conversion tracks reported earnings without widespread accrual divergence `[MODEL INTERPRETATION]`.
 
 ## 3. Economic Moat & Intrinsic Margin of Safety (DCF Capital Moat)
@@ -488,7 +488,7 @@ The capital-weighted Economic Moat Index measures {moat:.1f} out of 100 `[CALCUL
 ## 4. Manager Fee Justification vs Passive Index Drag
 The Direct Plan TER of {ter_dir:.2f}% `[VERIFIED FACT]` compares with a Regular Plan TER of {ter_reg:.2f}% `[VERIFIED FACT]`, creating an annual distribution cost spread of {round((ter_reg - ter_dir)*100, 0):.0f} basis points `[CALCULATED METRIC]`. Over a 15-year compounding horizon on a ₹10 Lakh allocation, that recurring fee differential reduces terminal value by roughly ₹4.5 Lakhs to ₹7.2 Lakhs `[MODEL INTERPRETATION]`—a predictable cost drag that compounds regardless of market direction.
 
-## 5. Pre-Mortem Scenario: What Breaks in a Severe Market Stress Test?
+## 5. Countercase Scenario: What Breaks in a Severe Market Stress Test?
 In a 25–30% market drawdown accompanied by tighter secondary liquidity, redemption pressure would test the less liquid mid- and small-cap holdings ({risky_names}) first `[MODEL INTERPRETATION]`. The scheme's liquid cash and TREPS buffer of approximately {100.0 - metrics.get('equity_coverage_pct', 85.0):.1f}% `[CALCULATED METRIC]` provides an initial cushion to meet redemptions before core equity positions need to be trimmed at distressed prices.
 """
 
@@ -499,14 +499,14 @@ def audit_single_fund_daily(
     scheme_code: Optional[str] = None,
     force_refresh_stocks: bool = False
 ) -> Dict[str, Any]:
-    """Autonomous rotation worker: audits one fund per day, synthesizing metrics and saving dossier."""
+    """Autonomous rotation worker: audits one fund per day, generating metrics and saving dossier."""
     if not scheme_code:
         next_fund = get_next_fund_for_daily_audit()
         if not next_fund:
             raise RuntimeError("No active mutual fund scheme available for daily audit.")
         scheme_code = next_fund["scheme_code"]
 
-    logger.info(f"Initiating autonomous forensic look-through audit for scheme: {scheme_code}")
+    logger.info(f"Initiating autonomous look-through audit for scheme: {scheme_code}")
 
     scheme = ensure_scheme_and_holdings_exist(scheme_code)
     if not scheme:
@@ -515,7 +515,7 @@ def audit_single_fund_daily(
     # Compute 7-pillar portfolio look-through metrics
     metrics = compute_fund_forensic_lookthrough(scheme_code)
 
-    # Synthesize institutional AI narrative
+    # Generate AI narrative
     dossier_narrative = synthesize_fund_forensic_narrative(metrics, scheme)
 
     # Package record for persistent database storage
@@ -535,9 +535,9 @@ def audit_single_fund_daily(
 
     saved = save_fund_forensic_dossier(dossier_record)
     if not saved:
-        logger.error(f"Failed to persist forensic dossier for {scheme_code}")
+        logger.error(f"Failed to persist report for {scheme_code}")
     else:
-        logger.info(f"Successfully archived forensic dossier for {scheme_code}")
+        logger.info(f"Successfully archived report for {scheme_code}")
 
     return {**metrics, "dossier_text": dossier_narrative, "saved": saved}
 
@@ -614,7 +614,7 @@ def ensure_scheme_and_holdings_exist(scheme_code: str) -> Optional[Dict[str, Any
         fallback_scheme = {
             "scheme_code": clean_code,
             "scheme_name": f"AMFI Scheme {clean_code}",
-            "fund_house": "Institutional AMC",
+            "fund_house": "AMC",
             "category": "Flexi Cap Fund",
             "broad_category": "EQUITY",
             "benchmark_index": "NIFTY 500 TRI",
@@ -635,7 +635,7 @@ def ensure_scheme_and_holdings_exist(scheme_code: str) -> Optional[Dict[str, Any
     # Verify holdings exist
     holdings = get_scheme_holdings(clean_code)
     if not holdings and scheme:
-        # Synthesize representative holdings using benchmark index proxy
+        # Generate representative holdings using benchmark index proxy
         bench_idx = scheme.get("benchmark_index", "NIFTY 500 TRI")
         proxy_holdings = BENCHMARK_PROXIES.get(bench_idx, BENCHMARK_PROXIES.get("NIFTY 500 TRI", {}))
         synthetic_holdings = []
@@ -730,7 +730,7 @@ FUND_AUDIT_TASKS: Dict[str, Dict[str, Any]] = {}
 
 
 def audit_and_archive_constituent_stock(ticker: str, holding_name: str = "", sector: str = "") -> bool:
-    """Evaluates an uncached mutual fund constituent stock, synthesizing and archiving a full 7-pillar dossier."""
+    """Evaluates an uncached mutual fund constituent stock, generating and archiving a full 7-pillar dossier."""
     clean_sym = ticker.strip().upper()
 
     # 1. Check if already researched
@@ -786,7 +786,7 @@ def audit_and_archive_constituent_stock(ticker: str, holding_name: str = "", sec
     pe_val = stock_data.get("pe_ratio", 24.5)
 
     report_md = f"""# DIAGNOSTIC SUMMARY & KEY TAKEAWAYS
-**Summary:** Institutional look-through constituent audit for {name_label} ({clean_sym}) establishing forensic quality, balance sheet durability, and capital allocation posture.
+**Summary:** look-through constituent audit for {name_label} ({clean_sym}) establishing forensic quality, balance sheet durability, and capital allocation posture.
 
 ### Health Matrix
 - Macro: Stable
@@ -814,16 +814,16 @@ Current price action reflects cyclical macroeconomic digestion rather than struc
 Trading at {pe_val}x trailing earnings against benchmark intrinsic discounted cash flow (DCF) thresholds. The stock exhibits a {val_grade.lower()} valuation posture with a calibrated margin of safety supporting risk-adjusted portfolio aggregation.
 
 ## Pillar 6: Technical & Momentum Overlay
-Price trend consolidates above long-term moving averages with steady institutional accumulation patterns. Relative strength index and volume delivery metrics demonstrate stable structural sponsorship.
+Price trend consolidates above long-term moving averages with steady accumulation patterns. Relative strength index and volume delivery metrics demonstrate stable structural sponsorship.
 
 ## Pillar 7: ESG Impact Scorecard
-Compliance with Business Responsibility and Sustainability Reporting (BRSR) directives is verified. Carbon transition preparedness, water management, human capital retention, and stakeholder alignment score within institutional tolerance limits.
+Compliance with Business Responsibility and Sustainability Reporting (BRSR) directives is verified. Carbon transition preparedness, water management, human capital retention, and stakeholder alignment score within tolerance limits.
 """
 
     save_report_to_archive(
         stock_data=stock_data,
         report_text=report_md,
-        announcement=f"Constituent look-through forensic audit archived for {clean_sym}.",
+        announcement=f"Constituent look-through accounting check archived for {clean_sym}.",
         revision_trigger="Mutual Fund Deep-Dive Constituent Audit"
     )
     get_report_by_ticker.cache_clear()
@@ -924,7 +924,7 @@ def run_async_fund_audit_job(task_id: str, scheme_code: str, allow_deep_dive: bo
                     FUND_AUDIT_TASKS[task_id]["completed_stocks"] = i + 1
                     FUND_AUDIT_TASKS[task_id]["stage"] = "CONSTITUENT_ARCHIVED"
                     FUND_AUDIT_TASKS[task_id]["stage_title"] = f"Constituent Archived [{i+1}/{total_uncached}]"
-                    FUND_AUDIT_TASKS[task_id]["message"] = f"Archived 7-pillar forensic dossier for {ticker} ({i+1}/{total_uncached})."
+                    FUND_AUDIT_TASKS[task_id]["message"] = f"Archived 7-pillar report for {ticker} ({i+1}/{total_uncached})."
 
             # Look-through aggregation stage
             FUND_AUDIT_TASKS[task_id]["progress_pct"] = 88
@@ -949,8 +949,8 @@ def run_async_fund_audit_job(task_id: str, scheme_code: str, allow_deep_dive: bo
 
         FUND_AUDIT_TASKS[task_id]["progress_pct"] = 95
         FUND_AUDIT_TASKS[task_id]["stage"] = "QUALITATIVE_SYNTHESIS"
-        FUND_AUDIT_TASKS[task_id]["stage_title"] = "Synthesizing Institutional Dossier"
-        FUND_AUDIT_TASKS[task_id]["message"] = "Synthesizing institutional qualitative dossier..."
+        FUND_AUDIT_TASKS[task_id]["stage_title"] = "Generating Stock Report"
+        FUND_AUDIT_TASKS[task_id]["message"] = "Generating qualitative dossier..."
         if not is_testing:
             time.sleep(0.8)
 

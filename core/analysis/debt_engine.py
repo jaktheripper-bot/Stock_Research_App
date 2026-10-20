@@ -1,6 +1,6 @@
-"""Institutional 5-Pillar Credit & Solvency Core Engine for Debt, NCDs, and SDIs.
+"""5-Pillar Credit & Solvency Core Engine for Debt, NCDs, and SDIs.
 
-Implements rigorous fixed-income mathematics, institutional credit risk evaluation,
+Implements rigorous fixed-income mathematics, credit risk evaluation,
 and narrative qualitative synthesis:
 - Cash flow projection by coupon frequency
 - Precise Yield-to-Maturity (YTM) solver
@@ -315,7 +315,7 @@ def evaluate_pillar_1_credit_quality(
     elif credit_spread_bps > 500:
         spread_warning = "Distressed Credit Alert: Yield spread >500 bps suggests severe market solvency skepticism."
 
-    # Institutional Narrative Synthesis
+    # Narrative Synthesis
     agency_rationale = meta.get("credit_rating_rationale") or (
         f"The {credit_rating} rating reflects strong parentage support, adequate capitalization, "
         f"and established franchise presence, offset by exposure to systemic credit cycles."
@@ -497,7 +497,7 @@ def evaluate_pillar_3_cash_flow_solvency(
     )
 
     institutional_analysis = (
-        f"Solvency analysis demonstrates robust operational buffers. Interest Coverage is {icr or 'adequate at institutional standards'}. "
+        f"Solvency analysis demonstrates robust operational buffers. Interest Coverage is {icr or 'adequate at standards'}. "
         f"Liquidity buffers and asset-liability matching (ALM) show positive cumulative mismatches across near-term buckets."
     )
 
@@ -663,11 +663,11 @@ def evaluate_pillar_5_recovery_and_pool_quality(
 
 
 # ==============================================================================
-# 4. Issuer Narrative & Executive Dossier Synthesis Core
+# 4. Issuer Narrative & Executive Report Generation Core
 # ==============================================================================
 
 def generate_issuer_profile(security: Dict[str, Any]) -> Dict[str, Any]:
-    """Extracts and synthesizes rich institutional profile of the debt issuer."""
+    """Extracts and synthesizes rich profile of the debt issuer."""
     meta = security.get("metadata", {})
     ticker = security.get("ticker", "DEBT").upper()
     inst_name = security.get("instrument_name", "")
@@ -683,9 +683,9 @@ def generate_issuer_profile(security: Dict[str, Any]) -> Dict[str, Any]:
         "issuer_name": inst_name.split()[0] + " " + inst_name.split()[1] if len(inst_name.split()) > 1 else ticker,
         "ticker": ticker,
         "sector": meta.get("sector") or "Diversified Financial Services (NBFC)",
-        "promoter_group": meta.get("promoter_group") or "Established Institutional Promoter Group",
+        "promoter_group": meta.get("promoter_group") or "Established Promoter Group",
         "description": overview,
-        "aum_cr": meta.get("aum_cr") or "Institutional Scale (₹10,000+ Cr)",
+        "aum_cr": meta.get("aum_cr") or "Scale (₹10,000+ Cr)",
         "gnpa_pct": meta.get("gnpa_pct", 1.8),
         "nnpa_pct": meta.get("nnpa_pct", 0.6),
         "crar_pct": meta.get("crar_pct", 19.5),
@@ -729,7 +729,7 @@ def generate_executive_primer(
 
 
 def generate_investment_thesis(security: Dict[str, Any], posture: Dict[str, Any]) -> Dict[str, Any]:
-    """Generates the institutional Executive Investment Thesis: The Good, The Bad, and The Ugly."""
+    """Generates the Executive Investment Thesis: The Good, The Bad, and The Ugly."""
     meta = security.get("metadata", {})
     tier = security.get("seniority_tier", "SENIOR_SECURED")
     rating = security.get("credit_rating", "AAA")
@@ -738,7 +738,7 @@ def generate_investment_thesis(security: Dict[str, Any], posture: Dict[str, Any]
     good = meta.get("the_good") or [
         f"Contracted Yield Spread: At {ytm:.2f}% YTM, the instrument offers a measurable spread over bank fixed deposits and sovereign G-Secs for hold-to-maturity allocators.",
         f"Capital Structure Seniority: {tier.replace('_', ' ').title()} ranking establishes priority claim over encumbered collateral under IBC resolution hierarchies.",
-        f"Credit Rating Baseline: Carries an active {rating} credit rating, subject to ongoing periodic surveillance by registered rating agencies."
+        f"Credit Rating Baseline: Carries an active {rating} credit rating, subject to ongoing periodic monitoring by registered rating agencies."
     ]
 
     bad = meta.get("the_bad") or [
@@ -766,7 +766,7 @@ def determine_retail_suitability(posture: Dict[str, Any], tax_drag: Dict[str, An
 
     if tier == "PERPETUAL_AT1":
         verdict = "NOT RECOMMENDED FOR RETAIL INVESTORS"
-        persona = "Institutional QIBs and High-Net-Worth Accredited Investors with high risk tolerance."
+        persona = "QIBs and High-Net-Worth Accredited Investors with high risk tolerance."
         max_alloc = "0% (Retail Investors should avoid Perpetual AT1 write-down instruments)."
     elif score >= 80.0:
         verdict = "SUITABLE FOR CONSERVATIVE CAPITAL PRESERVATION"
@@ -1008,7 +1008,7 @@ def evaluate_5_pillar_credit_posture(
     include_live_equity_contagion: bool = True
 ) -> Dict[str, Any]:
     """
-    Synthesizes the complete Institutional 5-Pillar Credit & Solvency Matrix,
+    Synthesizes the complete 5-Pillar Credit & Solvency Matrix,
     narrative teardown, executive investment thesis, tax schedule, and Credit Contagion Radar.
     """
     isin = security.get("isin", "").upper()
@@ -1066,7 +1066,7 @@ def evaluate_5_pillar_credit_posture(
 
     if composite_score >= 82.0:
         posture = "INSTITUTIONAL_PRIME"
-        posture_badge = "Institutional Prime (Highest Capital Safety)"
+        posture_badge = "Prime (Highest Capital Safety)"
         badge_color = "#10b981"
     elif composite_score >= 65.0:
         posture = "INVESTMENT_GRADE"

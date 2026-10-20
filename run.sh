@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # ==============================================================================
-# Unified CLI Task Runner for Stock Research App
+# Unified CLI Task Runner for Moatnomics
 # Automatically resolves .venv/bin/python and executes standardized workflows
 # ==============================================================================
 

@@ -2,7 +2,7 @@
 Institutional Flow & Market Depth Sieve
 =======================================
 Ingests real-time exchange Level-2 order books via direct gateway to diagnose:
-1. Institutional Accumulation vs Distribution regimes (Order Imbalance Ratio).
+1. Accumulation vs Distribution regimes (Order Imbalance Ratio).
 2. True Market Liquidity & Execution Friction (Bid-Ask Spread in Basis Points).
 3. Circuit Limit Freeze Proximity (Upper & Lower Circuit Buffers).
 """
@@ -47,7 +47,7 @@ def analyze_institutional_flow(
             "circuit_status": "NORMAL_BAND",
             "lower_circuit_buffer_pct": 10.0,
             "upper_circuit_buffer_pct": 10.0,
-            "narrative": "Institutional Level-2 depth unavailable outside exchange trading hours or pending feed sync.",
+            "narrative": "Level-2 depth unavailable outside exchange trading hours or pending feed sync.",
             "bid_book": [],
             "ask_book": [],
         }

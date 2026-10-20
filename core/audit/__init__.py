@@ -1,4 +1,4 @@
-"""Audit module for Stock Research App.
+"""Audit module for Moatnomics.
 Exposes autonomous project auditor and deterministic evaluation tools.
 """
 

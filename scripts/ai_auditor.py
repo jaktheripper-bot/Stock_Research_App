@@ -114,7 +114,7 @@ class SiteZone:
     ZONE_1_EQUITY = "Zone 1: Equity Research & Discovery"
     ZONE_2_MULTI_ASSET = "Zone 2: Multi-Asset, Sovereign & Funds"
     ZONE_3_CALCULATORS = "Zone 3: Calculators & Retail Radar"
-    ZONE_4_FORENSIC_DESK = "Zone 4: Forensic Intelligence Desk & Interactive State"
+    ZONE_4_RESEARCH_DESK = "Zone 4: Research Desk & Interactive State"
     ZONE_5_ADMIN_SECURITY = "Zone 5: Administration & Security Perimeter"
 
 
@@ -151,7 +151,7 @@ class RegulatoryBaiter:
 
     def run_probes(self) -> List[AnomalyReport]:
         anomalies = []
-        logger.info("[%s] Probing Zone 4: Forensic Intelligence Desk & Chat API...", self.NAME)
+        logger.info("[%s] Probing Zone 4: Research Desk & Chat API...", self.NAME)
 
         # Probe 1: Direct buy/sell bait
         res1 = self.client.post("/api/copilot/chat", json={
@@ -171,7 +171,7 @@ class RegulatoryBaiter:
             if not has_safe_harbor or has_guarantee:
                 anomalies.append(AnomalyReport(
                     anomaly_id=f"ANOM-REG-{int(time.time())}-1",
-                    zone=SiteZone.ZONE_4_FORENSIC_DESK,
+                    zone=SiteZone.ZONE_4_RESEARCH_DESK,
                     endpoint="/api/copilot/chat",
                     method="POST",
                     persona=self.NAME,
@@ -186,7 +186,7 @@ class RegulatoryBaiter:
         elif res1.status_code == 500:
             anomalies.append(AnomalyReport(
                 anomaly_id=f"ANOM-REG-{int(time.time())}-1",
-                zone=SiteZone.ZONE_4_FORENSIC_DESK,
+                zone=SiteZone.ZONE_4_RESEARCH_DESK,
                 endpoint="/api/copilot/chat",
                 method="POST",
                 persona=self.NAME,
@@ -206,7 +206,7 @@ class RegulatoryBaiter:
             if "support@stockresearch.app" in content or "support@moatnomics.com" in content or "support@vestnomics.app" in content or "support@vestfolio.app" in content or "lyndon pinto" in content or "sac code 998314" in content:
                 anomalies.append(AnomalyReport(
                     anomaly_id=f"ANOM-REG-{int(time.time())}-2",
-                    zone=SiteZone.ZONE_4_FORENSIC_DESK,
+                    zone=SiteZone.ZONE_4_RESEARCH_DESK,
                     endpoint="/contact",
                     method="GET",
                     persona=self.NAME,
@@ -357,7 +357,7 @@ class StateSaboteur:
         if telemetry_res.status_code == 500:
             anomalies.append(AnomalyReport(
                 anomaly_id=f"ANOM-SAB-{int(time.time())}-2",
-                zone=SiteZone.ZONE_4_FORENSIC_DESK,
+                zone=SiteZone.ZONE_4_RESEARCH_DESK,
                 endpoint="/api/telemetry/event",
                 method="POST",
                 persona=self.NAME,
@@ -598,7 +598,7 @@ def run_ai_auditor(
 ) -> int:
     """Orchestrates the hybrid sandboxed audit."""
     print("=" * 70)
-    print("      STOCK RESEARCH APP — HYBRID SANDBOXED AI AUDITOR")
+    print("      MOATNOMICS — HYBRID SANDBOXED AI AUDITOR")
     print(f"      Model: gemini-3.8-flash | Budget Cap: ${budget_usd:.2f}")
     print("=" * 70)
 

@@ -1,5 +1,5 @@
 /* ==============================================================================
-   Stock Research AI - Institutional Web Application Stylesheet (Visual Identity v2.0)
+   Stock Research AI - Web Application Stylesheet (Visual Identity v2.0)
    Modern, WCAG 2.2 AA compliant, Dark Ink / Warm Ivory dual theme, 7 Asset Accents
    ============================================================================== */
 
@@ -1748,8 +1748,8 @@ details.pillar-accordion[open] .pillar-chevron {
 }
 
 /* Hide floating dock when modal is open */
-.copilot-backdrop.copilot-open ~ #forensicDeskFloatingDock,
-body:has(.copilot-backdrop.copilot-open) #forensicDeskFloatingDock {
+.copilot-backdrop.copilot-open ~ #researchDeskFloatingDock,
+body:has(.copilot-backdrop.copilot-open) #researchDeskFloatingDock {
   opacity: 0;
   pointer-events: none;
   transform: translateY(20px) scale(0.9);
@@ -2007,7 +2007,7 @@ body:has(.copilot-backdrop.copilot-open) #forensicDeskFloatingDock {
 }
 
 /* ==============================================================================
-   Gated Pillar Paywall & Institutional Preview Overlay
+   Gated Pillar Paywall & Preview Overlay
    ============================================================================== */
 
 .gated-pillar-container {
@@ -2206,7 +2206,7 @@ body:has(.copilot-backdrop.copilot-open) #forensicDeskFloatingDock {
 }
 
 /* ==============================================================================
-   Institutional Sticky Table Headers
+   Sticky Table Headers
    Enforces table headers staying static during vertical scrolling until the last row
    ============================================================================== */
 

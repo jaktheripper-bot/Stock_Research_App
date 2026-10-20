@@ -8,7 +8,7 @@ and debentures across primary Indian exchange and SEBI-registered OBPP platforms
 4. IndiaBonds (indiabonds.com) - Corporate bond directory and CRA rating histories
 5. Grip Invest (gripinvest.in) - SDIs and high-yield fixed-income instruments
 
-Follows Zero-Hallucination and SEBI OBPP regulatory guidelines.
+Follows Source-Grounded and SEBI OBPP regulatory guidelines.
 """
 
 import json

@@ -160,7 +160,7 @@ Your strict file scope is:
 - core/reporting/pdf.py
 - core/analytics/ai_spends.py
 - core/analysis/daily_stock_ingestion.py
-- core/agents/copilot/forensic_desk.py
+- core/agents/copilot/research_desk.py
 - core/cortex/chanakya.py
 
 MANDATORY TASKS:
@@ -169,7 +169,7 @@ MANDATORY TASKS:
 3. `parser.py`: Add `return "\\n".join(lines)` at the end of `format_citations_section()`.
 4. `pdf.py`: Add `import json` at top of module.
 5. `ai_spends.py`: Fix SQL query on `admin_audit_log` from `action_type` to `action`.
-6. `daily_stock_ingestion.py` & `forensic_desk.py`: Strip leaked system prompt instructions (`"You are an institutional equity research analyst..."`) and hardcoded fake ESG/pledge scores from fallback strings.
+6. `daily_stock_ingestion.py` & `research_desk.py`: Strip leaked system prompt instructions (`"You are an institutional equity research analyst..."`) and hardcoded fake ESG/pledge scores from fallback strings.
 7. `chanakya.py`: Fix `evaluate_from_dict` return annotation to `ChanakyaVerdict` and default `mode="STRICT"`.
 
 EXIT CONDITION:

@@ -47,7 +47,7 @@ def audit_reit_portfolio(structure_type: Optional[str] = None) -> Dict[str, Any]
         else:
             if r["ndcf_payout_purity_pct"] < 90.0:
                 flagged_issues.append(
-                    f"{sym}: NDCF distribution payout {r['ndcf_payout_purity_pct']}% below institutional quality threshold."
+                    f"{sym}: NDCF distribution payout {r['ndcf_payout_purity_pct']}% below quality threshold."
                 )
             if r["ltv_ratio_pct"] > 49.0:
                 flagged_issues.append(
@@ -137,14 +137,14 @@ def simulate_reit_tax_waterfall(symbol: str, tax_slab_pct: float = 30.0) -> Dict
 
 
 def get_reit_detail(symbol: str) -> Optional[Dict[str, Any]]:
-    """Generates an exhaustive institutional dossier for a single REIT, SM REIT, or InvIT.
+    """Generates an exhaustive stock report for a single REIT, SM REIT, or InvIT.
 
     Includes:
     1. Base valuation, pricing, and discount-to-NAV spread.
     2. Multi-slab Section 115UA Tax Waterfall simulation (0%, 10%, 20%, 30%, 39% HNI).
     3. Net Distributable Cash Flow (NDCF) Payout Purity Audit with SEBI 15% penal interest clause.
     4. Portfolio asset quality, WALE, tenant credit ratings, geographic footprint, and LTV leverage.
-    5. Behavioral Pre-Mortem Inversion Risk Ledger (4 structural failure modes).
+    5. Countercase Risk Ledger (4 structural failure modes).
     6. Category peer comparison matrix.
     """
     reit = get_reit_by_symbol(symbol)
@@ -245,16 +245,16 @@ def get_reit_detail(symbol: str) -> Optional[Dict[str, Any]]:
     elif "lane_kms" in details:
         scale_formatted = f"{details['lane_kms']:,} Lane Kms"
     else:
-        scale_formatted = "Institutional Portfolio"
+        scale_formatted = "Portfolio"
 
     top_tenants = details.get("top_tenants")
     if not top_tenants and "sole_tenant" in details:
         top_tenants = [details["sole_tenant"]]
     elif not top_tenants:
-        top_tenants = ["Institutional Anchor Tenants", "Global Capability Centers (GCCs)", "Multinational Enterprises"]
+        top_tenants = ["Anchor Tenants", "Global Capability Centers (GCCs)", "Multinational Enterprises"]
 
-    # Pre-Mortem Inversion Risk Ledger
-    inversion_risks = [
+    # Countercase Risk Ledger
+    countercase_risks = [
         {
             "category": "Interest Rate & Cap Rate Sensitivity",
             "severity": "MODERATE" if ltv > 25.0 else "LOW",
@@ -352,7 +352,7 @@ def get_reit_detail(symbol: str) -> Optional[Dict[str, Any]]:
             "sebi_compliant": reit.get("sebi_compliant", True),
             "isin": details.get("isin", "N/A"),
             "exchange_codes": details.get("exchange_codes", {"NSE": canonical_sym}),
-            "sponsor": details.get("sponsor", "Institutional Sponsor"),
+            "sponsor": details.get("sponsor", "Sponsor"),
             "is_sm_reit": is_sm,
             "is_invit": is_invit,
             "min_investment_ticket": "₹10,00,000 (₹10 Lakhs)" if is_sm else "₹300 – ₹400 (1 Unit)"
@@ -374,7 +374,7 @@ def get_reit_detail(symbol: str) -> Optional[Dict[str, Any]]:
         "ndcf_audit": {
             "payout_purity_pct": ndcf_purity,
             "statutory_minimum_pct": 95.0 if is_sm else 90.0,
-            "purity_grade": "EXEMPLARY (100% NDCF)" if ndcf_purity >= 99.0 else "INSTITUTIONAL GRADE",
+            "purity_grade": "EXEMPLARY (100% NDCF)" if ndcf_purity >= 99.0 else "GRADE",
             "distribution_frequency": "Mandatory Quarterly Distribution (Within 15 days of declaration)",
             "penal_interest_clause": "Mandatory 15% p.a. penal interest payable by Investment Manager to unitholders for any delay beyond 15 working days.",
             "quarterly_dpu_history": dpu_history
@@ -397,7 +397,7 @@ def get_reit_detail(symbol: str) -> Optional[Dict[str, Any]]:
                 "fixed_vs_floating": "68% Fixed / 32% Floating"
             }
         },
-        "inversion_risks": inversion_risks,
+        "countercase_risks": countercase_risks,
         "peers": peers,
         "forensic_notes": [
             f"Statutory Yield Quality: {canonical_sym} generates a {gross_yield}% gross distribution yield backed by {ndcf_purity}% NDCF upstreaming purity.",

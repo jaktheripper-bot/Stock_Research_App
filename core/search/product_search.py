@@ -107,7 +107,7 @@ def search_equities(query: str, limit: int = 10) -> List[Dict[str, Any]]:
                     "product_type": "EQUITY",
                     "identifier": t,
                     "title": name,
-                    "subtitle": f"{t} • Institutional Equity Dossier",
+                    "subtitle": f"{t} • Equity Dossier",
                     "url": f"/dossier/{t}",
                     "badge": "Stock",
                     "badge_class": "badge-success",

@@ -29,7 +29,7 @@ from core.db import (
     get_user_credits_balance,
 )
 from core.db.users import get_credit_transaction_by_gateway_id
-from core.agents.copilot.forensic_desk import GATED_PILLAR_NOTICE
+from core.agents.copilot.research_desk import GATED_PILLAR_NOTICE
 
 EQUITY_FIXTURE_REPORT = (
     "## Pillar 1: Macro & Sovereign Yield Context\nIndia 10Y G-Sec benchmark is steady at 6.8%.\n\n"
@@ -94,7 +94,7 @@ class TestPaywallRedactionJourneys(unittest.TestCase):
                 "status": "COMPLETED"
             }
 
-        with mock.patch("core.agents.copilot.forensic_desk.process_forensic_desk_turn", side_effect=fake_turn):
+        with mock.patch("core.agents.copilot.research_desk.process_research_desk_turn", side_effect=fake_turn):
             payload = {
                 "conversation_id": "c_e2e_1",
                 "message": "Detail the cash flow solvency metrics",

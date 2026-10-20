@@ -307,7 +307,7 @@ class AngelOneGateway:
         sell_book: Optional[List[Dict[str, Any]]],
     ) -> Dict[str, Any]:
         """
-        Computes institutional order book depth analytics from 5-tier bid/ask books.
+        Computes order book depth analytics from 5-tier bid/ask books.
         Hardened against null books, missing price/quantity values, and type errors.
         """
         def _safe_float(v: Any) -> float:
@@ -527,7 +527,7 @@ class AngelOneGateway:
         if not quote_data:
             return ""
         imb = quote_data.get("order_imbalance_ratio", 0.0)
-        regime = "Institutional Accumulation" if imb > 0.20 else ("Distribution Pressure" if imb < -0.20 else "Balanced Depth")
+        regime = "Accumulation" if imb > 0.20 else ("Distribution Pressure" if imb < -0.20 else "Balanced Depth")
         badge_color = "🟢" if imb > 0.20 else ("🔴" if imb < -0.20 else "⚪")
         uc = quote_data.get("upper_circuit", 0.0)
         lc = quote_data.get("lower_circuit", 0.0)

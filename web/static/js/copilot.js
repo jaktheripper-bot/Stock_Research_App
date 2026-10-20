@@ -182,7 +182,7 @@ const SECTION_CHIPS = {
             { icon: "icon-risk", label: "Balance Sheet Solvency", prompt: "Evaluate balance sheet solvency, Altman Z-Score, and leverage ratios." },
             { icon: "icon-doc", label: "Beneish M-Score Check", prompt: "Are there any forensic accounting or earnings manipulation red flags?" }
         ],
-        pre_mortem: [
+        countercase: [
             { icon: "icon-compare", label: "Thesis Failure Modes", prompt: "Run a countercase analysis on this stock: what failure modes could destroy shareholder value?" },
             { icon: "icon-alerts", label: "Structural Vulnerabilities", prompt: "Identify the top 3 structural risks that could permanently impair business earnings." }
         ]
@@ -329,7 +329,7 @@ const SECTION_METADATA = {
                 { icon: "icon-screen", title: "Hurdle Rate Sensitivity", desc: "Sensitivity analysis across 10%, 12%, and 15% discount rates", prompt: "How sensitive is the Reverse DCF valuation to hurdle rate assumptions?" }
             ]
         },
-        pre_mortem: {
+        countercase: {
             headerTitle: "Countercase & Failure Modes Desk",
             introHeadline: "Countercase Workspace",
             introText: (ticker) => `Reasoning backward from failure to expose structural failure modes and thesis risks for <strong>${ticker || 'this equity'}</strong>.`,
@@ -1123,7 +1123,7 @@ document.addEventListener("keydown", function(e) {
     }
 });
 
-function toggleForensicDesk() {
+function toggleResearchDesk() {
     const modal = document.getElementById("copilotModalBackdrop");
     if (modal && (modal.classList.contains("copilot-open") || modal.style.display === "flex")) {
         closeCopilot();
@@ -1138,10 +1138,10 @@ function toggleForensicDesk() {
 document.addEventListener("keydown", function(e) {
     if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === "k") {
         e.preventDefault();
-        toggleForensicDesk();
+        toggleResearchDesk();
     } else if (e.key === "/" && !["INPUT", "TEXTAREA", "SELECT"].includes(document.activeElement?.tagName)) {
         e.preventDefault();
-        toggleForensicDesk();
+        toggleResearchDesk();
     }
 });
 
@@ -1158,9 +1158,9 @@ document.addEventListener("keydown", function(e) {
 // Ensure global functions are available on window
 window.openCopilot = openCopilot;
 window.closeCopilot = closeCopilot;
-window.openForensicDesk = openCopilot;
-window.closeForensicDesk = closeCopilot;
-window.toggleForensicDesk = toggleForensicDesk;
+window.openResearchDesk = openCopilot;
+window.closeResearchDesk = closeCopilot;
+window.toggleResearchDesk = toggleResearchDesk;
 window.resetCopilotChat = resetCopilotChat;
 window.handleCopilotBackdropClick = handleCopilotBackdropClick;
 window.handleCopilotInput = handleCopilotInput;
@@ -1175,7 +1175,7 @@ function hoistCopilotToBody() {
     if (modal && modal.parentElement !== document.body) {
         document.body.appendChild(modal);
     }
-    const fab = document.getElementById("forensicDeskFloatingDock");
+    const fab = document.getElementById("researchDeskFloatingDock");
     if (fab && fab.parentElement !== document.body) {
         document.body.appendChild(fab);
     }

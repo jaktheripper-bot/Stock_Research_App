@@ -79,7 +79,7 @@ DEFAULT_REITS_AND_INVITS = [
         "sponsor_holding_pct": 42.1,
         "sebi_compliant": True,
         "details_json": json.dumps({
-            "asset_class": "Institutional Grade-A Offices",
+            "asset_class": "Grade-A Offices",
             "subtype": "OFFICE_COMMERCIAL",
             "leasable_area_msf": 25.5,
             "top_tenants": ["TCS", "Cognizant", "RBS", "Barclays"],

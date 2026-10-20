@@ -25,7 +25,7 @@ from core.cortex import (
     DynamicStatutoryYieldWedge,
     ReverseDcfHurdleDeconstruct,
     PeadQuantDriftVelocity,
-    FiduciaryGovernanceScoringIndex,
+    GovernanceScoringIndex,
     AnvikCortexEngine,
 )
 
@@ -496,9 +496,9 @@ class TestPeadQuantDriftVelocity(unittest.TestCase):
         self.assertEqual(res.momentum_persistence_days, 5)
 
 
-class TestFiduciaryGovernanceScoringIndex(unittest.TestCase):
+class TestGovernanceScoringIndex(unittest.TestCase):
     def test_pristine_tier(self):
-        res = FiduciaryGovernanceScoringIndex.evaluate(
+        res = GovernanceScoringIndex.evaluate(
             symbol="TCS",
             rpt_revenue_ratio_pct=1.2,
             promoter_pledge_pct=0.0,
@@ -508,11 +508,11 @@ class TestFiduciaryGovernanceScoringIndex(unittest.TestCase):
             auditor_qualification_flag=False,
         )
         self.assertEqual(res.governance_tier, "TIER_1_PRISTINE")
-        self.assertGreaterEqual(res.fiduciary_score, 80.0)
+        self.assertGreaterEqual(res.governance_score, 80.0)
         self.assertEqual(len(res.flags), 0)
 
     def test_red_flag_deficit_tier(self):
-        res = FiduciaryGovernanceScoringIndex.evaluate(
+        res = GovernanceScoringIndex.evaluate(
             symbol="DUBIOUS_LTD",
             rpt_revenue_ratio_pct=28.5,
             promoter_pledge_pct=62.0,
@@ -522,7 +522,7 @@ class TestFiduciaryGovernanceScoringIndex(unittest.TestCase):
             auditor_qualification_flag=True,
         )
         self.assertEqual(res.governance_tier, "TIER_4_RED_FLAG_DEFICIT")
-        self.assertEqual(res.fiduciary_score, 0.0)
+        self.assertEqual(res.governance_score, 0.0)
         self.assertGreaterEqual(len(res.flags), 5)
 
 
@@ -567,7 +567,7 @@ class TestAnvikCortexEngineComposite(unittest.TestCase):
             auditor_qualification_flag=True,
         )
         self.assertEqual(eval_res.conviction_quadrant, "HIGH_RISK_DEFICIT")
-        self.assertIn("Forensic governance red flags preclude institutional conviction", eval_res.executive_verdict)
+        self.assertIn("Forensic governance red flags preclude conviction", eval_res.executive_verdict)
 from core.brand.moatnomics_house import (
     MOATNOMICS_BRAND_HOUSE,
     MASTER_AI_PROMPT,
@@ -584,14 +584,14 @@ from core.brand import (
 class TestMoatnomicsBrandHouse(unittest.TestCase):
     def test_brand_house_structure(self):
         self.assertEqual(MOATNOMICS_BRAND_HOUSE["brand_name"], "Moatnomics")
-        self.assertEqual(MOATNOMICS_BRAND_HOUSE["tagline"], "Audit the Asset. Protect the Allocator.")
+        self.assertEqual(MOATNOMICS_BRAND_HOUSE["tagline"], "Less noise, more nuance.")
         self.assertEqual(MOATNOMICS_BRAND_HOUSE["creative_territory"], "Less noise, more nuance.")
         self.assertEqual(MOATNOMICS_BRAND_HOUSE["category_descriptor"], "Multi-asset investment research")
         self.assertEqual(
             MOATNOMICS_BRAND_HOUSE["core_promise"],
             "Understand the evidence. Examine the trade-offs. Know what deserves a closer look.",
         )
-        self.assertIn("Dual-Mandate", MOATNOMICS_BRAND_HOUSE["core_philosophy"])
+        self.assertIn("multi-asset investment research", MOATNOMICS_BRAND_HOUSE["core_philosophy"].lower())
         self.assertIn("Clinical, objective, empirical", MOATNOMICS_BRAND_HOUSE["tone_and_voice"])
         self.assertIn("NEVER output prescriptive advice", MOATNOMICS_BRAND_HOUSE["sebi_safe_harbor_rules"])
         self.assertIsInstance(MOATNOMICS_BRAND_HOUSE["forbidden_vocabulary"], list)
@@ -618,7 +618,7 @@ class TestMoatnomicsBrandHouse(unittest.TestCase):
         self.assertIsInstance(ctx, str)
         self.assertIn("You represent Moatnomics", ctx)
         self.assertIn("Less noise, more nuance.", ctx)
-        self.assertIn("Dual-Mandate", ctx)
+        self.assertIn("multi-asset investment research", ctx.lower())
         self.assertIn("NEVER output prescriptive advice", ctx)
         self.assertIn("RESEARCH INTEGRITY", ctx)
 
@@ -701,7 +701,7 @@ class TestMoatnomicsBrandHouse(unittest.TestCase):
         )
         self.assertIn("does not automatically make the bond more attractive", debt_primer["fd_comparison"])
 
-        # 6. MSME Forensic Dossier uses measured cash-conversion language
+        # 6. MSME Report uses measured cash-conversion language
         msme = compute_msme_forensic_dossier({"uin": "UDYAM-MH-01-0000001", "name": "Test Precision Ltd", "sector_name": "Food Processing", "annual_turnover": 60.0})
         self.assertIn("Cash Conversion", msme["pillar_1_working_capital"]["summary"])
 

@@ -8,7 +8,7 @@ An on-demand cross-asset relational transmission engine that:
    - Senior Secured Corporate Debt / NCDs (Yield to Maturity & Seniority)
    - Indian Sovereign 10Y Benchmark G-Sec (7.05%)
    - Commercial Real Estate & Infrastructure Yields (REITs / InvITs)
-   - Institutional Mutual Fund Velocity & Net Delivery Concentration
+   - Mutual Fund Velocity & Net Delivery Concentration
 2. Computes Capital Seniority Spreads:
    - Equity FCF Yield vs Senior Debt YTM
    - Corporate Credit Spread vs Sovereign Risk-Free Benchmark
@@ -189,7 +189,7 @@ class SetuMatrixEngine:
         else:
             regime = "PRISTINE_CAPITAL_HIERARCHY"
 
-        # 2. Institutional Mutual Fund Flow Velocity
+        # 2. Mutual Fund Flow Velocity
         # Standard score 50 (neutral), positive net flow increases score
         mf_score = 50.0
         if mf_flow > 100.0:
@@ -199,7 +199,7 @@ class SetuMatrixEngine:
             anomalies.append(CapitalStructureAnomaly(
                 anomaly_type="DOMESTIC_INSTITUTIONAL_EXIT",
                 severity="WARNING",
-                description=f"Domestic institutional funds net sold ₹{abs(mf_flow):.1f} Cr over the trailing period.",
+                description=f"Domestic funds net sold ₹{abs(mf_flow):.1f} Cr over the trailing period.",
             ))
 
         # 3. Promoter Pledge Encumbrance

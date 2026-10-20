@@ -38,7 +38,7 @@ async def _recheck_equity_thesis_background(ticker: str, headline: str):
         logger.warning(f"BSE watcher background synthesis notice for {ticker}: {e}")
 
 
-def invalidate_surgical_cache(ticker: str, pillar_id: Optional[int] = None) -> None:
+def invalidate_pillar_cache(ticker: str, pillar_id: Optional[int] = None) -> None:
     """Invalidates cached dossiers and reports for the given ticker following material catalyst."""
     try:
         from core.db.reports import get_report_by_ticker, get_archived_reports
@@ -46,9 +46,9 @@ def invalidate_surgical_cache(ticker: str, pillar_id: Optional[int] = None) -> N
             get_report_by_ticker.cache_clear()
         if hasattr(get_archived_reports, "cache_clear"):
             get_archived_reports.cache_clear()
-        logger.info(f"⚡ Surgical cache invalidation executed for {ticker} (Pillar {pillar_id})")
+        logger.info(f"⚡ Pillar cache invalidation executed for {ticker} (Pillar {pillar_id})")
     except Exception as e:
-        logger.warning(f"Surgical cache invalidation warning for {ticker}: {e}")
+        logger.warning(f"Pillar cache invalidation warning for {ticker}: {e}")
 
 
 async def scan_watchlist_bse_announcements() -> List[Dict[str, Any]]:
@@ -70,8 +70,8 @@ async def scan_watchlist_bse_announcements() -> List[Dict[str, Any]]:
                     w in latest.lower() for w in ["resignation", "pledge", "fraud", "litigation", "default", "merger", "acquisition"]
                 )
                 if is_material:
-                    # Trigger surgical cache invalidation for the affected pillar
-                    invalidate_surgical_cache(ticker, delta.target_pillar_id)
+                    # Trigger pillar cache invalidation for the affected pillar
+                    invalidate_pillar_cache(ticker, delta.target_pillar_id)
                     summary = f"Material disclosure detected for {ticker} [Pillar {delta.target_pillar_id}: {delta.catalyst_type}]: {latest[:95]}... Autonomous re-audit dispatched."
                     event_id = record_autonomous_event(
                         event_type="bse_material_filing",

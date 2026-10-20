@@ -1,7 +1,7 @@
 """
 Anvik Cortex Engine
 ===================
-Proprietary Institutional Quantitative Architecture for Indian Financial Markets.
+Proprietary Quantitative Architecture for Indian Financial Markets.
 """
 
 from core.cortex.engine import (
@@ -11,8 +11,8 @@ from core.cortex.engine import (
     ReverseDcfHurdleResult,
     PeadQuantDriftVelocity,
     PeadDriftVelocityResult,
-    FiduciaryGovernanceScoringIndex,
-    FiduciaryGovernanceResult,
+    GovernanceScoringIndex,
+    GovernanceResult,
     AnvikCortexEngine,
     CortexCompositeEvaluation,
 )
@@ -55,8 +55,8 @@ __all__ = [
     "ReverseDcfHurdleResult",
     "PeadQuantDriftVelocity",
     "PeadDriftVelocityResult",
-    "FiduciaryGovernanceScoringIndex",
-    "FiduciaryGovernanceResult",
+    "GovernanceScoringIndex",
+    "GovernanceResult",
     "AnvikCortexEngine",
     "CortexCompositeEvaluation",
     # Phase 1: Chanakya

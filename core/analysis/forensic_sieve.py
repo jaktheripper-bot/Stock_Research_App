@@ -3,7 +3,7 @@ Unified 360° Forensic Health Sieve
 ===================================
 Synthesizes the Chanakya 10-Point Deterministic Clean-Room Filter, 
 accruals analysis, promoter pledge acceleration, and auditor stability
-into an authoritative institutional governance scorecard.
+into an authoritative governance scorecard.
 """
 
 from typing import Dict, Any, List, Optional
@@ -38,7 +38,7 @@ def evaluate_forensic_sieve(
     # 3. Classify traffic-light regime
     if status == "PRISTINE_CLEAN" and len(red_flags) == 0:
         verdict = "PRISTINE_CLEAN"
-        badge_label = "Clean Forensic Audit"
+        badge_label = "Clean Accounting Check"
         badge_color = "#10b981"
         summary = (
             f"Zero forensic or governance irregularities identified across 10 statutory accounting tests. "
@@ -50,7 +50,7 @@ def evaluate_forensic_sieve(
         badge_color = "#f59e0b"
         summary = (
             f"Minor accounting anomalies or working capital drag noted ({'; '.join(red_flags[:2])}). "
-            f"Maintain surveillance on cash flow conversion and debt covenants."
+            f"Maintain monitoring on cash flow conversion and debt covenants."
         )
     else:
         verdict = "ELEVATED_GOVERNANCE_RISK"
@@ -58,7 +58,7 @@ def evaluate_forensic_sieve(
         badge_color = "#ef4444"
         summary = (
             f"Multiple forensic warning signals triggered ({'; '.join(red_flags[:3])}). "
-            f"Warrants institutional caution regarding balance sheet quality and accounting transparency."
+            f"Warrants caution regarding balance sheet quality and accounting transparency."
         )
 
     # Granular check details

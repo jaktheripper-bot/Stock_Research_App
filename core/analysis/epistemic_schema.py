@@ -1,7 +1,7 @@
 """
 core/analysis/epistemic_schema.py
 ==============================================================================
-Institutional Epistemic Separation, Source-Passage Attribution & Falsification Engine.
+Epistemic Separation, Source-Passage Attribution & Falsification Engine.
 
 Enforces three non-negotiable standards across all Moatnomics report structures:
 1. Source-Passage Attribution: Links material claims to specific underlying sources,
@@ -172,7 +172,7 @@ def build_equity_epistemic_ledger(
             f"Sector & Moat Posture: {sector_intel.get('narrative', 'Evaluated against domestic capex and industry margin cycles.')}"
         ],
         "unresolved_uncertainties": [
-            "Intraday off-market institutional block crossovers and unannounced working-capital credit lines between quarterly Regulation 33 filings remain unobserved until statutory exchange publication.",
+            "Intraday off-market block crossovers and unannounced working-capital credit lines between quarterly Regulation 33 filings remain unobserved until statutory exchange publication.",
             "Forward DCF realization depends on management sustaining historical reinvestment efficiency across the next 4–8 quarters without dilutive equity raises."
         ],
         "falsification_triggers": {
@@ -338,7 +338,7 @@ def build_multi_asset_epistemic_ledger(
                     "claim": f"Statutory Bond Profile: Coupon {coupon}% | Rating {rating} | YTM {ytm}%",
                     "source": "BSE Debt Segment / CRISIL / ICRA Statutory Credit Rating Rationales",
                     "source_date": formatted_date,
-                    "passage": f"Statutory information memorandum and public credit rating surveillance letter for {issuer}."
+                    "passage": f"Statutory information memorandum and public credit rating monitoring letter for {issuer}."
                 }
             ],
             "calculated_metrics": [
@@ -364,7 +364,7 @@ def build_multi_asset_epistemic_ledger(
         }
         return _attach_ui_presentation_fields(
             ledger,
-            default_pillar_labels=["Pillar 01 & 03 — Solvency Headroom & Rating Surveillance"],
+            default_pillar_labels=["Pillar 01 & 03 — Solvency Headroom & Rating Monitoring"],
         )
 
     if ac in {"REIT", "INVIT"}:

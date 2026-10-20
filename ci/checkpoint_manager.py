@@ -3,7 +3,7 @@
 ci/checkpoint_manager.py
 ==============================================================================
 Production Release Checkpoint & Emergency Disaster Recovery Manager
-for Stock Research App
+for Moatnomics
 
 Features:
   1. Pre-flight Verification Gate: Ensures only 100% verified, operational
@@ -412,7 +412,7 @@ def rollback_to_checkpoint(target_tag: str = "", force: bool = False, restore_db
 
 
 def main():
-    parser = argparse.ArgumentParser(description="Stock Research App Checkpoint & Disaster Recovery Manager")
+    parser = argparse.ArgumentParser(description="Moatnomics Checkpoint & Disaster Recovery Manager")
     subparsers = parser.add_subparsers(dest="subcommand", help="Action to perform")
 
     # create

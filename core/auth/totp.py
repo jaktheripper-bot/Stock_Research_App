@@ -4,7 +4,7 @@ core/auth/totp.py
 Zero-Dependency RFC 6238 Time-Based One-Time Password (TOTP) Implementation
 Compatible with Google Authenticator, Authy, Apple Passwords & 1Password.
 
-Follows zero-hallucination, high-performance, and standard crypto standards:
+Follows source-grounded, high-performance, and standard crypto standards:
 - Base32 decoding/encoding (RFC 4648)
 - HMAC-SHA1 dynamic truncation (RFC 6238 / RFC 4226)
 - Configurable window (±1 step = 30 seconds drift tolerance)
@@ -106,7 +106,7 @@ def verify_totp_code(secret: str, code: str, interval: int = 30, window: int = 1
     return False
 
 
-def get_totp_uri(secret: str, account_email: str, issuer: str = "Stock Research App") -> str:
+def get_totp_uri(secret: str, account_email: str, issuer: str = "Moatnomics") -> str:
     """
     Builds the standard otpauth:// URI recognized by Google Authenticator and other 2FA apps.
     """

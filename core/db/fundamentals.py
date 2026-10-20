@@ -13,7 +13,7 @@ logger = logging.getLogger("equity_research.core.db.fundamentals")
 def extract_fundamentals_from_report_text(report_text: str, fallback_data: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
     """
     Deterministically extracts verified financial ratios, multiples, and price ranges
-    from institutional research report text (7-pillar narrative + health matrix).
+    from research report text (7-pillar narrative + health matrix).
     """
     res: Dict[str, Any] = {}
     if fallback_data:
@@ -169,7 +169,7 @@ def get_cached_fundamentals(ticker: str) -> Optional[Dict[str, Any]]:
                 "source": row[16] or "LOCAL_DB_HARMONIZED"
             }
 
-        # Check if missing key institutional metrics (ROCE, ROE, OPM, 52w range)
+        # Check if missing key metrics (ROCE, ROE, OPM, 52w range)
         has_essential = (
             result_dict.get("roce") is not None and
             result_dict.get("roe") is not None and
@@ -382,7 +382,7 @@ def save_cached_fundamentals(ticker: str, data: Dict[str, Any]) -> None:
 def sync_all_cached_fundamentals() -> int:
     """
     Scans all existing reports and discovery reel records in the database,
-    extracts institutional metrics, and populates cached_fundamentals.
+    extracts metrics, and populates cached_fundamentals.
     Returns the count of successfully synchronized equities.
     """
     init_db()

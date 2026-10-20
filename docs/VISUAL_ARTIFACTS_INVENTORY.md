@@ -10,7 +10,7 @@
 > - **Done, inlined as `<symbol>` sprites in `web/templates/base.html`:** flat/dimensional portal marks, 12 nav icons, 7 pillars, sector icons, 4 pricing tiers, 3 state diagrams (`vault-locked`, `dossier-pending`, `empty-search`), theme and reading-surface icons. The standalone `.svg` files under `img/nav|pillars|sectors|pricing` are not referenced by path.
 > - **Files present, not wired into any template or CSS:** the 13 `img/heroes/hero-*.webp` banners, the 4 `img/brand/portal-*.webp` plates, `img/brand/og-default.png`, `img/brand/apple-touch-icon.png`.
 > - **Not done:** `og:image` / `twitter:image` meta, `apple-touch-icon` link. Both are scheduled for Copy Wave 3a.
-> - **Unreferenced files:** `img/ui/copilot-*.svg`, `img/ui/hud-*.svg` (the Research Desk uses sprite icons and, in `copilot.js`, some raw emojis).
+> - **Removed 20 Oct 2026:** the unreferenced `img/ui/copilot-*.svg` and `img/ui/hud-*.svg` files (7 files). The Research Desk renders sprite icons through `brandGlyph()` in `copilot.js`; rows 6.1–6.7 below describe the original brief and are not shipped as files.
 > - **Cleanup pending:** legacy `glyph-castle` symbol (`base.html:110`) is defined but unused.
 > - **Naming:** asset names containing off-voice terms (`hud-surveillance-satellite`, `copilot-premortem`, `copilot-bear-thesis`) are renamed with their matching copy wave, if they are ever wired up.
 
@@ -131,6 +131,8 @@
 ---
 
 ## 6. Research Desk Modals, Empty States & Editorial Containers (`web/static/img/ui/` & `pricing/`)
+
+> **Status 20 Oct 2026:** rows 6.1–6.7 (Research Desk and HUD icon files) were removed as unreferenced; rows 6.8–6.10 ship as sprite symbols (`icon-state-*`), and 6.11 as `icon-tier-*`.
 
 > **v2.0 Rule (Section 3.3 & 7.5):** Avoid theatrical skulls (`💀`), cartoon bears (`🐻`), explosions (`💥`), or 3D gold coins (`#glyph-coin`) in the research interface. Use restrained geometric vector glyphs (`24×24px` or `48×48px`) in Ink Navy (`#0B2337`), Forest (`#0E3D32`), Sage (`#7DA77A`), and Ivory (`#F7F5EE`).
 

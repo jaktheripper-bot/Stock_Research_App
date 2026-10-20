@@ -1,5 +1,5 @@
 """
-Proof-of-Concept Multi-Agent Forensic Audit Module.
+Proof-of-Concept Multi-Agent Accounting Check Module.
 Consolidated into canonical core.agents.equity.forensic_squad.
 Maintains full backward compatibility for legacy imports.
 """

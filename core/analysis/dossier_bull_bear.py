@@ -1,7 +1,7 @@
 """
 Bull vs. Bear Thesis Synthesis Engine
 ======================================
-Produces a balanced, non-advisory institutional thesis briefing:
+Produces a balanced, non-advisory thesis briefing:
 - Top 3 Structural Tailwinds (Bull Case)
 - Top 3 Specific Vulnerabilities & Governance Risks (Bear Case)
 Grounded strictly in verified exchange filings, operating metrics, and balance sheet quality.
@@ -129,7 +129,7 @@ def synthesize_bull_bear_thesis(
         bull_points.append({
             "pillar": "Balance Sheet Quality",
             "title": "Capital Structure Stability",
-            "detail": "Supported by an institutional equity base and committed working-capital credit lines."
+            "detail": "Supported by an equity base and committed working-capital credit lines."
         })
 
     # 3. Growth & Market Valuation
@@ -151,7 +151,7 @@ def synthesize_bull_bear_thesis(
         bull_points.append({
             "pillar": "Institutional Flow",
             "title": "Exchange Depth Accumulation",
-            "detail": "Order-book depth shows steady institutional bid support absorbing secondary market supply."
+            "detail": "Order-book depth shows steady bid support absorbing secondary market supply."
         })
     else:
         bull_points.append({

@@ -268,7 +268,7 @@ class TestAiAuditorEngine(unittest.TestCase):
             SiteZone.ZONE_1_EQUITY,
             SiteZone.ZONE_2_MULTI_ASSET,
             SiteZone.ZONE_3_CALCULATORS,
-            SiteZone.ZONE_4_FORENSIC_DESK,
+            SiteZone.ZONE_4_RESEARCH_DESK,
             SiteZone.ZONE_5_ADMIN_SECURITY,
         ]
         self.assertEqual(len(set(zones)), 5)
@@ -347,10 +347,10 @@ class TestMoatnomicsBrandAuditorSubagent(unittest.TestCase):
         from core.audit import moatnomics_strategy_subagent
         self.assertIsNotNone(moatnomics_strategy_subagent)
         self.assertEqual(moatnomics_strategy_subagent.name, "moatnomics_brand_auditor")
-        self.assertIn("Moatnomics Dual-Mandate", moatnomics_strategy_subagent.description)
+        self.assertIn("Moatnomics Brand House", moatnomics_strategy_subagent.description)
         self.assertIn("SEBI Safe Harbor", moatnomics_strategy_subagent.description)
         self.assertIn("Chief Brand & Strategy Auditor for Moatnomics", moatnomics_strategy_subagent.system_instructions)
-        self.assertIn("Dual-Mandate", moatnomics_strategy_subagent.system_instructions)
+        self.assertIn("Less noise, more nuance.", moatnomics_strategy_subagent.system_instructions)
         self.assertIn("FATAL ERROR: Flag the use of any forbidden words", moatnomics_strategy_subagent.system_instructions)
         self.assertIn("Multibagger", moatnomics_strategy_subagent.system_instructions)
         self.assertIn("Moatnomics Copilot", moatnomics_strategy_subagent.system_instructions)

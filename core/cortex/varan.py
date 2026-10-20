@@ -6,7 +6,7 @@ Phase 2 Proprietary Architecture (Anvik Cortex Engine).
 A high-performance deterministic mathematical ledger compiler that:
 1. Ingests structured historical financial statements (P&L, Balance Sheet, Cash Flow).
 2. Computes all financial ratios, CAGRs, capital returns, and DuPont breakdowns deterministically.
-3. Compiles a compressed, zero-hallucination 'DeltaPacket' (~400-600 tokens) for LLM qualitative synthesis,
+3. Compiles a compressed, source-grounded 'DeltaPacket' (~400-600 tokens) for LLM qualitative synthesis,
    slashing token overhead by 90% and reducing synthesis latency to under 2 seconds.
 
 Mathematical Formulations:
@@ -220,7 +220,7 @@ class VaranEngine:
         currency: str = "INR_CR",
     ) -> VaranDeltaPacket:
         """
-        Ingests multi-year statements and compiles a deterministic zero-hallucination delta packet.
+        Ingests multi-year statements and compiles a deterministic source-grounded delta packet.
         Hardened against nulls, mismatched lists, strings, and missing balance sheet dicts.
         """
         clean_symbol = str(symbol or "UNKNOWN").upper().strip()
@@ -314,7 +314,7 @@ class VaranEngine:
             grade = "CAPITAL_DESTROYER"
 
 
-        # 7. Dense Zero-Hallucination JSON Packet (~500 tokens)
+        # 7. Dense Source-Grounded JSON Packet (~500 tokens)
         payload_dict = {
             "symbol": symbol,
             "period": reporting_period,

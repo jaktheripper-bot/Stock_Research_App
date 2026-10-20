@@ -687,7 +687,7 @@
   <div class="admin-header-bar">
     <div class="admin-title-group">
       <h1><svg class="glyph"><use href="#glyph-chart"></use></svg> Executive Telemetry & Site Usage Hub</h1>
-      <p>Live visitor acquisition, user behavior paths, cache efficiency, institutional billing, and support complaints.</p>
+      <p>Live visitor acquisition, user behavior paths, cache efficiency, billing, and support complaints.</p>
     </div>
 
     <div class="admin-controls-group">
@@ -783,7 +783,7 @@
     <div class="kpi-card">
       <div class="kpi-label">PDFs Exported <span>📄</span></div>
       <div class="kpi-value">{{ summary.pdf_downloads }}</div>
-      <div class="kpi-delta">Institutional Research Reports</div>
+      <div class="kpi-delta">Research Reports</div>
     </div>
   </div>
 
@@ -843,7 +843,7 @@
     </button>
     <button type="button" class="btn admin-hub-btn {% if current_hub == 'platform' %}active{% endif %}" data-hub="platform" onclick="showHub('platform')">
       <span class="admin-hub-title"><span>📡 4. Catalog &amp; AI Quotas</span></span>
-      <span class="admin-hub-sub">Asset Surveillance &amp; Gemini Spends</span>
+      <span class="admin-hub-sub">Asset Monitoring &amp; Gemini Spends</span>
     </button>
     <button type="button" class="btn admin-hub-btn {% if current_hub == 'governance' %}active{% endif %}" data-hub="governance" onclick="showHub('governance')">
       <span class="admin-hub-title"><span><svg class="glyph" style="width: 14px; height: 14px;"><use href="#glyph-shield"></use></svg> 5. Security &amp; Audit</span></span>
@@ -880,7 +880,7 @@
       🔎 SEO &amp; Search Visibility
     </button>
     <button class="admin-tab-btn {% if current_tab == 'assets' %}active{% endif %}" data-hub="platform" data-tab="assets" onclick="showTab('assets')" style="{% if current_hub != 'platform' %}display: none;{% endif %}">
-      📡 Asset Surveillance
+      📡 Asset Monitoring
     </button>
     <button class="admin-tab-btn {% if current_tab == 'ai-spends' %}active{% endif %}" data-hub="platform" data-tab="ai-spends" onclick="showTab('ai-spends')" style="{% if current_hub != 'platform' %}display: none;{% endif %}">
       🤖 Gemini Spends &amp; AI Costs
@@ -2259,13 +2259,13 @@
     </div>
   </div>
 
-  <!-- TAB 10: Multi-Asset Surveillance & Ingestion Engine -->
+  <!-- TAB 10: Multi-Asset Monitoring & Ingestion Engine -->
   <div id="tab-assets" class="admin-tab-pane {% if active_tab == 'assets' %}active{% endif %}">
     <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; flex-wrap: wrap; gap: 12px;">
       <div>
-        <h3 style="margin: 0; font-size: 18px; font-weight: 800;">📡 Multi-Asset Surveillance & Ingestion Engine</h3>
+        <h3 style="margin: 0; font-size: 18px; font-weight: 800;">📡 Multi-Asset Monitoring & Ingestion Engine</h3>
         <p style="color: var(--text-secondary, #94a3b8); font-size: 13px; margin: 4px 0 0 0;">
-          Automated daily diff surveillance across AMFI NAV feeds (~14,500 schemes) and Corporate Debt / NCD universe.
+          Automated daily diff monitoring across AMFI NAV feeds (~14,500 schemes) and Corporate Debt / NCD universe.
         </p>
       </div>
       <div>
@@ -2277,10 +2277,10 @@
       </div>
     </div>
 
-    <!-- Surveillance Stats -->
+    <!-- Monitoring Stats -->
     <div class="kpi-grid" style="grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); margin-bottom: 24px;">
       <div class="kpi-card">
-        <div class="kpi-label">Total Surveillance Runs</div>
+        <div class="kpi-label">Total Monitoring Runs</div>
         <div class="kpi-value">{{ asset_scans|length }}</div>
         <div class="kpi-sub">AMFI Daily + Debt Universe</div>
       </div>
@@ -2354,7 +2354,7 @@
           {% else %}
           <tr>
             <td colspan="9" style="text-align: center; color: var(--text-secondary, #94a3b8); padding: 30px;">
-              No asset surveillance runs recorded yet. Click "<svg class="glyph"><use href="#glyph-zap"></use></svg> Trigger Ingestion Scan Now" above to start the first scan.
+              No asset monitoring runs recorded yet. Click "<svg class="glyph"><use href="#glyph-zap"></use></svg> Trigger Ingestion Scan Now" above to start the first scan.
             </td>
           </tr>
           {% endfor %}
@@ -2393,7 +2393,7 @@
             <span>📡</span> Subscribed Service Provider Quotas &amp; Constraints
           </h3>
           <p style="margin: 4px 0 0; font-size: 12.5px; color: #94a3b8;">
-            Single-pane surveillance of storage limits, rate-limit ceilings, email caps, and runtime memory across all external providers.
+            Single-pane monitoring of storage limits, rate-limit ceilings, email caps, and runtime memory across all external providers.
           </p>
         </div>
         <span class="status-pill success" style="font-size: 11.5px;">
@@ -2738,7 +2738,7 @@
         Type: <strong>CNAME</strong> &bull; Name: <strong>links</strong> &bull; Target: <strong>mail.resend.com</strong> &bull; Proxy: <strong>DNS only (Grey Cloud)</strong>
       </div>
       <div style="font-size: 11.5px; color: #64748b; line-height: 1.5;">
-        Once active, Resend dynamically rewrites all article links to <code style="color: #cbd5e1;">https://links.moatnomics.com/r/...</code> before forwarding to the institutional terminal, tracking opens and click-through rates (CTR) with zero third-party domain flags.
+        Once active, Resend dynamically rewrites all article links to <code style="color: #cbd5e1;">https://links.moatnomics.com/r/...</code> before forwarding to the terminal, tracking opens and click-through rates (CTR) with zero third-party domain flags.
       </div>
     </div>
   </div>
@@ -4415,7 +4415,7 @@
       <div class="copilot-title">
         <span>🤖</span>
         <span>Executive Copilot</span>
-        <span class="copilot-badge">Dual-Mandate AI</span>
+        <span class="copilot-badge">Research Desk AI</span>
       </div>
       <button type="button" onclick="closeAdminCopilot()" style="background: none; border: none; color: #94a3b8; font-size: 18px; cursor: pointer; padding: 4px 8px; border-radius: 4px;" title="Close Copilot">
         ✕
@@ -4433,7 +4433,7 @@
       <button type="button" class="copilot-chip" onclick="handleQuickChip('What is our cache hit rate and estimated API savings?')"><svg class="glyph" style="width: 12px; height: 12px;"><use href="#glyph-zap"></use></svg> Cache Savings</button>
       <button type="button" class="copilot-chip" onclick="handleQuickChip('Who has admin access and is 2FA enabled?')">👥 Team Access</button>
       <button type="button" class="copilot-chip" onclick="handleQuickChip('Purge test telemetry and dummy tickets from the dashboard')">🧹 Purge Test Data</button>
-      <button type="button" class="copilot-chip" onclick="handleQuickChip('Trigger comprehensive asset surveillance scan')">📡 Scan Assets</button>
+      <button type="button" class="copilot-chip" onclick="handleQuickChip('Trigger comprehensive asset monitoring scan')">📡 Scan Assets</button>
     </div>
 
     <!-- Messages Container -->

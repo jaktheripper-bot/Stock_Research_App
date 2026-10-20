@@ -22,7 +22,7 @@ logger = logging.getLogger("equity_research.core.analysis.dossier_report_synthes
 
 def get_system_prompt(ticker: str, language: str) -> str:
     lang_rule = "The report must be entirely in English (India) using British/Indian spelling." if language == "English (India)" else f"The report must be fully translated into {language} without omitting technical rigor."
-    base_prompt = f"""You are an institutional equity research analyst. Write a comprehensive research report for {ticker}.
+    base_prompt = f"""You are an equity research analyst. Write a comprehensive research report for {ticker}.
 {lang_rule}
 
 ### Health Matrix
@@ -88,7 +88,7 @@ def get_latest_flash_models(client) -> list:
         logger.debug("Model discovery notice: %s", disc_err)
     return fallback
 
-def get_surgical_flash_model(client) -> str:
+def get_light_flash_model(client) -> str:
     """Returns the most cost-efficient flash model (e.g., flash-lite if available, else standard flash)."""
     try:
         discovered = get_latest_flash_models(client)
@@ -102,7 +102,7 @@ def get_surgical_flash_model(client) -> str:
         if discovered:
             return discovered[0]
     except Exception as surg_err:
-        logger.debug("Surgical model selection notice: %s", surg_err)
+        logger.debug("Light model selection notice: %s", surg_err)
     return "gemini-3.8-flash"
 
 def stream_genai_with_fallback(client, prompt: str, system_prompt: str, on_status=None, use_grounding: bool = True, collected_citations: list = None):
@@ -131,7 +131,7 @@ def stream_genai_with_fallback(client, prompt: str, system_prompt: str, on_statu
                     if use_grounding:
                         on_status("🔍 Grounding against official filings...")
                     else:
-                        on_status("⚡ Synthesizing with verified exchange metrics (Fast / Zero Search Fee)...")
+                        on_status("⚡ Generating with verified exchange metrics (Fast / Zero Search Fee)...")
 
                 for chunk in chat.send_message_stream(prompt):
                     extracted_text = None
@@ -338,7 +338,7 @@ def stream_stock_report(ticker: str, language: str = "English (India)", stock_da
             else:
                 notice_u = (
                     "\n\n> ⚠️ **Notice: Live Web Grounding Offline.**\n"
-                    "> Synthesizing thesis from core parametric intelligence.\n"
+                    "> Generating thesis from core parametric intelligence.\n"
                     "> *Note:* Exchange metrics are verified, but recent disclosures may be omitted.\n\n"
                 )
                 report_accumulator.append(notice_u)
@@ -411,7 +411,7 @@ def generate_stock_report(ticker: str, language: str = "English (India)", use_gr
         if cached and cached.get("report_text"):
             cached_text = cached.get("report_text", "")
             if len(cached_text.strip()) >= 500 and "Live Synthesis Failed" not in cached_text:
-                logger.info(f"Single-flight coalescer: Reusing freshly synthesized cached report for {clean_ticker}")
+                logger.info(f"Single-flight coalescer: Reusing freshly compiled cached report for {clean_ticker}")
                 return cached_text
 
         chunks = []

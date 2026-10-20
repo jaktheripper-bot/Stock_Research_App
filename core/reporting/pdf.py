@@ -705,14 +705,14 @@ Under Indian tax laws, distributions from REITs and InvITs pass through three di
 """
 
     if deep_dive_unlocked:
-        inversion_md = f"""### Countercase Risk Ledger
+        countercase_md = f"""### Countercase Risk Ledger
 - **Pillar 4.1 (Cap Rate & Interest Rate Sensitivity):** Shifts in RBI benchmark 10Y G-Sec yields directly impact property capitalization rates, valuation cushions, and refinancing costs.
 - **Pillar 4.2 (Tenant Vacancy & Expiry Concentration):** Lease expirations within 24–36 months create cash flow re-leasing latency and downtime risk.
 - **Pillar 4.3 (Sponsor ROFO & Asset Injection Conflict):** Pipeline asset transfers from sponsor balance sheets require independent trustee valuation audits to prevent dilutive acquisitions.
 - **Pillar 4.4 (Section 115UA Regulatory Tax Friction):** Finance Act 2023 taxation of 'Specified Sum' distributions above original issue price creates taxable amortization friction under Section 56(2)(xii).
 """
     else:
-        inversion_md = f"""### Countercase Risk Ledger (Locked)
+        countercase_md = f"""### Countercase Risk Ledger (Locked)
 > *Deep-Dive Section. Unlock this trust on the website (1 credit) to include the full Countercase Risk Ledger and structural failure mode analysis in your PDF.*
 """
 
@@ -724,7 +724,7 @@ Under Indian tax laws, distributions from REITs and InvITs pass through three di
 > 
 > Real estate and infrastructure investments carry market, tenant, occupancy, and interest rate risks. Past cash distributions are not a guarantee of future yield.
 """
-    full_md = f"{header}\n\n{scorecard_md}\n\n{tax_md}\n\n{primer_md}\n\n{inversion_md}\n\n{footer}"
+    full_md = f"{header}\n\n{scorecard_md}\n\n{tax_md}\n\n{primer_md}\n\n{countercase_md}\n\n{footer}"
     out_name = os.path.join(tempfile.gettempdir(), f"_tmp_doc_reit_{clean_sym}_{uuid.uuid4().hex}.pdf")
     try:
         pdf = MarkdownPdf(toc_level=0)

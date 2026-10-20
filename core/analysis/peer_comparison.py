@@ -11,7 +11,7 @@ logger = logging.getLogger("equity_research.core.analysis.peer_comparison")
 import asyncio
 def evaluate_company_disparity(fund_a: dict, fund_b: dict) -> dict:
     """
-    Evaluates cross-company disparity across the 3 institutional axes:
+    Evaluates cross-company disparity across the 3 axes:
     1. Sector / Business Model Disparity (e.g. Banks/NBFC vs SaaS)
     2. Lifecycle / Maturity Disparity (unprofitable/loss-making vs mature profitable)
     3. Scale & Capital Structure Divergence (>= 100x market cap divergence)
@@ -80,7 +80,7 @@ def evaluate_company_disparity(fund_a: dict, fund_b: dict) -> dict:
             scale_mismatch = True
             warnings.append(
                 f"Scale Disparity: Greater than {int(ratio)}x divergence in market capitalization. "
-                "Institutional float, liquidity dynamics, and capital structures are not directly comparable."
+                "Float, liquidity dynamics, and capital structures are not directly comparable."
             )
 
     return {
@@ -178,7 +178,7 @@ async def compare_two_companies(ticker_a: str, ticker_b: str, progress_callback=
     disparity = evaluate_company_disparity(fund_a, fund_b)
 
     if progress_callback:
-        progress_callback(1.0, "Synthesizing normalized side-by-side comparison matrix...")
+        progress_callback(1.0, "Generating normalized side-by-side comparison matrix...")
 
     comparison = {
         "company_a": {

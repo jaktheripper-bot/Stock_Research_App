@@ -64,7 +64,7 @@ def save_discovery_reel(items: List[Dict[str, Any]], edition_date: Optional[str]
             roce = item.get("roce_pct") or 0.0
             de = item.get("debt_to_equity") or 0.0
             sales_g = item.get("sales_growth_3y") or 0.0
-            ria_thesis = item.get("ria_thesis") or "High capital compounding profile with negligible institutional coverage."
+            ria_thesis = item.get("ria_thesis") or "High capital compounding profile with negligible coverage."
             catalyst = item.get("catalyst_headline") or "BSE Corporate Announcements"
             metrics_json = json.dumps(item.get("key_metrics") or {})
             is_active_val = True if is_pg else 1

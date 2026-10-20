@@ -3,7 +3,7 @@
 Complies with SEBI (Issue and Listing of Non-Convertible Securities) Regulations
 and the SEBI ₹10,000 Face Value Democratization Framework (July 2024 Amendments).
 
-Contains 130 benchmark corporate debt instruments spanning 5 essential institutional segments:
+Contains 130 benchmark corporate debt instruments spanning 5 essential segments:
 1. PSU & Sovereign-Backed Quasi-Gilt Bonds (25 instruments: PFC, REC, NTPC, NHAI, IRFC, IOCL, etc.)
 2. Marquee Conglomerates & Corporate Giants (25 instruments: RIL, Tata Motors, L&T, TCS, M&M, etc.)
 3. Premier Banking & Financial Institutions (Senior, Tier-II & Infra) (25 instruments: SBI, HDFC, ICICI, etc.)
@@ -666,7 +666,7 @@ CANONICAL_DEBT_UNIVERSE: List[Dict[str, Any]] = [
             "the_good": [
                         "100% sovereign union ownership",
                         "Zero credit risk on principal repayment",
-                        "High institutional demand"
+                        "High demand"
             ],
             "the_bad": [
                         "Spread over G-Sec is narrow (~38 bps)"
@@ -717,7 +717,7 @@ CANONICAL_DEBT_UNIVERSE: List[Dict[str, Any]] = [
             "the_good": [
                         "Sovereign pedigree",
                         "Excellent safety score",
-                        "Institutional liquidity"
+                        "Liquidity"
             ],
             "the_bad": [
                         "Post-tax returns heavily clipped by income tax"
@@ -972,7 +972,7 @@ CANONICAL_DEBT_UNIVERSE: List[Dict[str, Any]] = [
             "the_good": [
                         "Captive iron ore mines insulate raw material costs",
                         "Attractive 7.75% coupon offering yield pickup over pure utilities",
-                        "High institutional trading depth"
+                        "High trading depth"
             ],
             "the_bad": [
                         "Cyclical steel price exposure"
@@ -1026,7 +1026,7 @@ CANONICAL_DEBT_UNIVERSE: List[Dict[str, Any]] = [
                         "Strong operating cash flow generation"
             ],
             "the_bad": [
-                        "Low secondary trading volume due to institutional buy-and-hold"
+                        "Low secondary trading volume due to buy-and-hold"
             ],
             "the_ugly": [
                         "Global container trade recessions dampening EXIM volumes"
@@ -1982,7 +1982,7 @@ CANONICAL_DEBT_UNIVERSE: List[Dict[str, Any]] = [
         "modified_duration_years": 1.58,
         "metadata": {
             "sector": "FMCG, Paperboards & Agri-Business",
-            "promoter_group": "Diversified Institutional Shareholders / BAT",
+            "promoter_group": "Diversified Shareholders / BAT",
             "issuer_overview": "Leading FMCG enterprise in India with dominant market leadership in cigarettes, packaged foods (Aashirvaad, Sunfeast), and paperboards.",
             "collateral_type": "First charge on manufacturing facilities and logistics warehouses",
             "interest_coverage": 45.0,
@@ -2145,7 +2145,7 @@ CANONICAL_DEBT_UNIVERSE: List[Dict[str, Any]] = [
             "the_good": [
                         "Exempt from statutory CRR/SLR deductions",
                         "Pristine AAA credit quality",
-                        "Deep institutional trading liquidity"
+                        "Deep trading liquidity"
             ],
             "the_bad": [
                         "10-year maturity exposes investor to mark-to-market duration fluctuations"
@@ -2186,7 +2186,7 @@ CANONICAL_DEBT_UNIVERSE: List[Dict[str, Any]] = [
         "modified_duration_years": 4.23,
         "metadata": {
             "sector": "Private Sector Banking / D-SIB",
-            "promoter_group": "Institutional / Widely Held",
+            "promoter_group": "/ Widely Held",
             "issuer_overview": "Second largest private sector bank in India with industry-leading RoA (2.3%+) and low net NPAs.",
             "collateral_type": "Senior Unsecured Infrastructure Bond",
             "interest_coverage": 3.2,
@@ -2910,7 +2910,7 @@ CANONICAL_DEBT_UNIVERSE: List[Dict[str, Any]] = [
             "the_good": [
                         "High 8.95% coupon yield",
                         "25-year sovereign-backed SECI PPAs",
-                        "Strong institutional shareholders (CPPIB)"
+                        "Strong shareholders (CPPIB)"
             ],
             "the_bad": [
                         "High debt leverage typical of renewable project finance"
@@ -3829,7 +3829,7 @@ CANONICAL_DEBT_UNIVERSE: List[Dict[str, Any]] = [
             "the_good": [
                         "High 8.75% coupon for a senior banking instrument",
                         "Senior rank above subordinated debt",
-                        "Backing of SBI as largest institutional shareholder"
+                        "Backing of SBI as largest shareholder"
             ],
             "the_bad": [
                         "Operating profitability still stabilizing post-reconstruction"
@@ -3870,7 +3870,7 @@ CANONICAL_DEBT_UNIVERSE: List[Dict[str, Any]] = [
         "modified_duration_years": 4.43,
         "metadata": {
             "sector": "Private Commercial Banking / South-India Stronghold",
-            "promoter_group": "Institutional Shareholders",
+            "promoter_group": "Shareholders",
             "issuer_overview": "Old private sector bank with pan-India presence, dominant NRI remittance market share (>20%), and strong fintech lending partnerships.",
             "collateral_type": "Unsecured subordinated regulatory capital",
             "interest_coverage": 2.7,
@@ -4033,7 +4033,7 @@ CANONICAL_DEBT_UNIVERSE: List[Dict[str, Any]] = [
             "the_good": [
                         "Gold-standard governance and zero historical default track record",
                         "1.45x collateral cover registered with debenture trustee",
-                        "CRISIL AAA highest institutional credit rating"
+                        "CRISIL AAA highest credit rating"
             ],
             "the_bad": [
                         "Yield is tight over G-Sec benchmark"
@@ -4082,7 +4082,7 @@ CANONICAL_DEBT_UNIVERSE: List[Dict[str, Any]] = [
             "debt_to_equity": 6.9,
             "credit_rating_rationale": "Strategic sovereign parentage by LIC and rock-solid residential home loan collateral backing.",
             "the_good": [
-                        "Pristine LIC parentage provides institutional balance sheet safety",
+                        "Pristine LIC parentage provides balance sheet safety",
                         "CRISIL AAA rating with first floating charge on home loans",
                         "High liquidity on BSE/NSE debt platforms"
             ],
@@ -4236,7 +4236,7 @@ CANONICAL_DEBT_UNIVERSE: List[Dict[str, Any]] = [
             "credit_rating_rationale": "High retail portfolio granularity, strong liquidity backing from Fairfax India, and rapid post-regulatory normalization.",
             "the_good": [
                         "Attractive 8.95% coupon yield",
-                        "Fairfax India institutional backing",
+                        "Fairfax India backing",
                         "1.30x asset cover registered with IDBI Trusteeship"
             ],
             "the_bad": [
@@ -4338,7 +4338,7 @@ CANONICAL_DEBT_UNIVERSE: List[Dict[str, Any]] = [
             "credit_rating_rationale": "Pristine AAA credit rating underpinned by Tata Sons ownership and International Finance Corporation (IFC) partnership.",
             "the_good": [
                         "Pristine Tata parentage and IFC co-ownership",
-                        "CRISIL AAA highest institutional credit rating",
+                        "CRISIL AAA highest credit rating",
                         "100% certified Green Bond compliance"
             ],
             "the_bad": [
@@ -4590,10 +4590,10 @@ CANONICAL_DEBT_UNIVERSE: List[Dict[str, Any]] = [
             "interest_coverage": 3.4,
             "dscr": 1.8,
             "debt_to_equity": 2.1,
-            "credit_rating_rationale": "High toll growth across economic freight corridors, strong institutional backing from GIC and Ferrovial, and healthy cash cover.",
+            "credit_rating_rationale": "High toll growth across economic freight corridors, strong backing from GIC and Ferrovial, and healthy cash cover.",
             "the_good": [
                         "Toll revenues indexed annually to WPI inflation",
-                        "Strong foreign institutional partners (Ferrovial, GIC)",
+                        "Strong foreign partners (Ferrovial, GIC)",
                         "High 8.95% coupon with 1.40x asset cover"
             ],
             "the_bad": [
@@ -4949,7 +4949,7 @@ CANONICAL_DEBT_UNIVERSE: List[Dict[str, Any]] = [
             "debt_to_equity": 0.0,
             "credit_rating_rationale": "High 15% cash FLDG buffer deposited in escrow, vehicle GPS tracking, and daily escrow sweep of ride earnings.",
             "the_good": [
-                        "High 11.75% YTM for institutional-grade yield",
+                        "High 11.75% YTM",
                         "15% cash FLDG reserve",
                         "Daily revenue sweep into trustee escrow account"
             ],
@@ -5049,7 +5049,7 @@ CANONICAL_DEBT_UNIVERSE: List[Dict[str, Any]] = [
             "interest_coverage": 3.8,
             "dscr": 2.0,
             "debt_to_equity": 0.0,
-            "credit_rating_rationale": "High tenant stickiness, institutional Grade-A property location, and 12% cash FLDG reserve.",
+            "credit_rating_rationale": "High tenant stickiness, Grade-A property location, and 12% cash FLDG reserve.",
             "the_good": [
                         "High 11.50% YTM backed by prime commercial office real estate",
                         "12% cash FLDG buffer",
@@ -5151,7 +5151,7 @@ CANONICAL_DEBT_UNIVERSE: List[Dict[str, Any]] = [
             "interest_coverage": 2.7,
             "dscr": 1.6,
             "debt_to_equity": 2.8,
-            "credit_rating_rationale": "Strong capitalization (CRAR > 30%), marquee institutional backers (KKR, TRS), and seasoned retail loan portfolios.",
+            "credit_rating_rationale": "Strong capitalization (CRAR > 30%), marquee backers (KKR, TRS), and seasoned retail loan portfolios.",
             "the_good": [
                         "Democratized \u20b910,000 face value with high 9.85% coupon",
                         "Enormous 30%+ capital adequacy ratio",
@@ -5472,7 +5472,7 @@ CANONICAL_DEBT_UNIVERSE: List[Dict[str, Any]] = [
                                    'Equipment Repossession Friction: If a lessee defaults, '
                                    'reclaiming and liquidating industrial machinery can take '
                                    'several months.'],
-                    'the_good': [   'High 11.20% Net YTM: One of the highest institutional yields '
+                    'the_good': [   'High 11.20% Net YTM: One of the highest yields '
                                     'available under the SEBI ₹10,000 framework.',
                                     'Substantial 8% FLDG: Substantial cash cushion protects '
                                     'against lessee payment delays.',
@@ -5670,7 +5670,7 @@ CANONICAL_DEBT_UNIVERSE: List[Dict[str, Any]] = [
                                    'Tax drag on annual coupon payments'],
                     'the_good': [   'Pristine underwriting standards with Gross NPA consistently '
                                     'near 1.2%',
-                                    'CRISIL AAA highest institutional credit rating',
+                                    'CRISIL AAA highest credit rating',
                                     'Domestic Systemically Important Bank (D-SIB) status'],
                     'the_ugly': [   'Systemic regulatory invocation of PONV loss absorption '
                                     '(virtually zero historical precedent for HDFC)']},
@@ -5849,7 +5849,7 @@ CANONICAL_DEBT_UNIVERSE: List[Dict[str, Any]] = [
                                    'adequacy falls below regulatory limits, with zero catch-up '
                                    '(non-cumulative).'],
                     'the_good': [   'Very High Yield: 10.85% YTM provides superior cash flow for '
-                                    'accredited institutional risk capital.',
+                                    'accredited risk capital.',
                                     'Strong Capital Base: CRAR of 17.5% keeps bank well above '
                                     'minimum regulatory trigger levels.'],
                     'the_ugly': [   'Permanent Write-Off at PONV: Under RBI Basel III guidelines, '
@@ -5927,11 +5927,11 @@ CANONICAL_DEBT_UNIVERSE: List[Dict[str, Any]] = [
     'maturity_date': '2029-10-07',
     'metadata': {   'collated_sources': ['User Ingestion Portal', 'BSE Debt Market'],
                     'collateral_type': 'Registered charge on standard assets',
-                    'issuer_overview': 'Institutional fixed-income security indexed via on-demand '
+                    'issuer_overview': 'Fixed-income security indexed via on-demand '
                                        'ISIN audit for INE121A08999.',
                     'promoter_group': 'CHOLAFIN Group',
                     'sector': 'Corporate Fixed Income',
-                    'the_bad': [   'Requires ongoing surveillance against issuer credit and '
+                    'the_bad': [   'Requires ongoing monitoring against issuer credit and '
                                    'liquidity cycles.'],
                     'the_good': [   'Listed and tracked under SEBI ₹10,000 face value framework.',
                                     'Contractual coupon rate of 8.75%.'],
@@ -6182,7 +6182,7 @@ CANONICAL_DEBT_UNIVERSE: List[Dict[str, Any]] = [
                     'promoter_group': 'Muthoot M. George Family',
                     'roa_pct': 5.1,
                     'sector': 'Gold Loan NBFC',
-                    'the_bad': [   'Regulatory Surveillance: RBI norms on gold loan cash '
+                    'the_bad': [   'Regulatory Monitoring: RBI norms on gold loan cash '
                                    'disbursements and LTV caps introduce operational compliance '
                                    'sensitivity.',
                                    'Gold Price Sensitivity: A sustained crash in global gold '
@@ -6477,7 +6477,7 @@ CANONICAL_DEBT_UNIVERSE: List[Dict[str, Any]] = [
                     'the_bad': [   'Modest credit spread over G-Sec benchmark (~111 bps)',
                                    'Cyclical vulnerability in rural tractor financing'],
                     'the_good': [   'Pristine L&T parentage providing unmatched financial backing',
-                                    'CRISIL AAA highest institutional credit rating',
+                                    'CRISIL AAA highest credit rating',
                                     'Successful complete transition into a retail-focused lender'],
                     'the_ugly': [   'Severe sequential rural drought impairing farm equipment '
                                     'collection efficiency']},

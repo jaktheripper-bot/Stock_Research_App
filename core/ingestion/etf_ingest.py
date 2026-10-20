@@ -6,7 +6,7 @@ Endpoint: https://www.amfiindia.com/spages/NAVAll.txt
 Key capabilities:
 1. Dynamic ingestion and parsing of all active AMFI-listed ETFs across all 44+ AMCs.
 2. Filter out secondary Fund of Funds (FoF) to isolate genuine exchange-traded instruments.
-3. Categorization into 9 institutional asset categories:
+3. Categorization into 9 asset categories:
    - EQUITY_INDEX
    - EQUITY_SECTORAL
    - EQUITY_FACTOR
@@ -97,7 +97,7 @@ def fetch_amfi_nav_raw(force_refresh: bool = False, timeout_sec: int = 15) -> st
 
 
 def derive_etf_category(scheme_name: str, amfi_category: str = "") -> str:
-    """Classifies an ETF into one of the 9 institutional benchmark categories."""
+    """Classifies an ETF into one of the 9 benchmark categories."""
     name_upper = scheme_name.upper()
     cat_upper = amfi_category.upper()
 

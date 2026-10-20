@@ -1,8 +1,8 @@
-"""Interactive Forensic Intelligence Desk (Forensic Desk) powered by Google Antigravity SDK.
+"""Interactive Research Desk (Research Desk) powered by Google Antigravity SDK.
 
 Configured with `AgentBehavior.INTERACTIVE`:
 - Answers deep structural research questions about any stock, fund, or bond
-- Incorporates the Pre-Mortem Inversion Engine to counter behavioral biases
+- Incorporates the Countercase Stress Test to counter behavioral biases
 - Enforces strict SEBI Safe Harbor non-advisory guardrails
 - Records all conversational turns and tool traces into `agent_conversations`
 """
@@ -105,51 +105,51 @@ def _build_unqualified_response(ticker: Optional[str], company_name: Optional[st
     name = company_name or ticker or "this security"
     if asset_class == "MUTUAL_FUND":
         return (
-            f"🔍 **Input Not Recognized**\n\n"
+            f"**Input Not Recognized**\n\n"
             f"I couldn't identify a valid financial or analytical query in your message. "
-            f"The **Forensic Intelligence Desk** provides look-through portfolio diagnostics and fee audits for **{name}**.\n\n"
+            f"The **Research Desk** provides look-through portfolio diagnostics and fee audits for **{name}**.\n\n"
             f"**Here are a few high-conviction queries you can ask:**\n"
-            f"- 💥 *\"What shocked you or stood out during the fund audit?\"*\n"
-            f"- 💀 *\"Summarize the bear thesis and closet-indexing risks.\"*\n"
-            f"- 💸 *\"Explain the Direct vs Regular fee drag and commission compounding.\"*\n"
-            f"- 🛡️ *\"What is the Look-Through ASRI accounting risk of underlying holdings?\"*\n"
-            f"- 📊 *\"What is the fund's Active Share versus its benchmark?\"*"
+            f"- *\"What stood out during the fund audit?\"*\n"
+            f"- *\"Summarize the bear thesis and closet-indexing risks.\"*\n"
+            f"- *\"Explain the Direct vs Regular fee drag and commission compounding.\"*\n"
+            f"- *\"What is the Look-Through ASRI accounting risk of underlying holdings?\"*\n"
+            f"- *\"What is the fund's Active Share versus its benchmark?\"*"
         )
     elif asset_class == "CORPORATE_DEBT":
         return (
-            f"🔍 **Input Not Recognized**\n\n"
+            f"**Input Not Recognized**\n\n"
             f"I couldn't identify a valid credit or solvency query in your message. "
-            f"The **Forensic Intelligence Desk** evaluates capital structure recovery and credit contagion for **{name}**.\n\n"
+            f"The **Research Desk** evaluates capital structure recovery and credit contagion for **{name}**.\n\n"
             f"**Here are a few high-conviction queries you can ask:**\n"
-            f"- 💥 *\"What shocked you or stood out in the credit analysis?\"*\n"
-            f"- 💀 *\"Summarize the bear thesis and default vulnerability.\"*\n"
-            f"- 📡 *\"What is the Credit Contagion Radar posture for this issuer?\"*\n"
-            f"- 🛡️ *\"What is the Asset Coverage Ratio (ACR) and recovery seniority?\"*\n"
-            f"- 📉 *\"What is the DSCR covenant headroom under stress?\"*"
+            f"- *\"What stood out in the credit analysis?\"*\n"
+            f"- *\"Summarize the bear thesis and default vulnerability.\"*\n"
+            f"- *\"What is the Credit Contagion Radar posture for this issuer?\"*\n"
+            f"- *\"What is the Asset Coverage Ratio (ACR) and recovery seniority?\"*\n"
+            f"- *\"What is the DSCR covenant headroom under stress?\"*"
         )
     elif asset_class == "ETF":
         return (
-            f"🔍 **Input Not Recognized**\n\n"
+            f"**Input Not Recognized**\n\n"
             f"I couldn't identify a valid financial or analytical query in your message. "
-            f"The **Forensic Intelligence Desk** audits arbitrage spreads, tracking errors, and liquidity depth for **{name}**.\n\n"
+            f"The **Research Desk** audits arbitrage spreads, tracking errors, and liquidity depth for **{name}**.\n\n"
             f"**Here are a few high-conviction queries you can ask:**\n"
-            f"- ⚖️ *\"Is the current premium or discount an arbitrage opportunity or retail surcharge?\"*\n"
-            f"- 📊 *\"What is the 1-year tracking error and replication fidelity vs the benchmark?\"*\n"
-            f"- 💸 *\"How does the Total Expense Ratio (TER) compare against closest peer ETFs?\"*\n"
-            f"- 🌊 *\"What is the secondary market liquidity depth and average daily volume?\"*\n"
-            f"- 💀 *\"Summarize the bear thesis and Authorized Participant redemption risks.\"*"
+            f"- *\"Is the current premium or discount an arbitrage opportunity or retail surcharge?\"*\n"
+            f"- *\"What is the 1-year tracking error and replication fidelity vs the benchmark?\"*\n"
+            f"- *\"How does the Total Expense Ratio (TER) compare against closest peer ETFs?\"*\n"
+            f"- *\"What is the secondary market liquidity depth and average daily volume?\"*\n"
+            f"- *\"Summarize the bear thesis and Authorized Participant redemption risks.\"*"
         )
     else:
         return (
-            f"🔍 **Input Not Recognized**\n\n"
+            f"**Input Not Recognized**\n\n"
             f"I couldn't identify a valid financial or analytical query in your message. "
-            f"The **Forensic Intelligence Desk** analyzes structural risks, financial red flags, and valuation models for **{name}**.\n\n"
+            f"The **Research Desk** analyzes structural risks, financial red flags, and valuation models for **{name}**.\n\n"
             f"**Here are a few high-conviction queries you can ask:**\n"
-            f"- 💥 *\"What shocked you or stood out during the research?\"*\n"
-            f"- 💀 *\"Summarize the bear thesis and top failure modes.\"*\n"
-            f"- 📉 *\"What annual FCF growth is currently priced into CMP?\"*\n"
-            f"- 🚩 *\"Are there any promoter pledging or forensic accounting red flags?\"*\n"
-            f"- 🛡️ *\"How solvent is the balance sheet under macroeconomic stress?\"*"
+            f"- *\"What stood out during the research?\"*\n"
+            f"- *\"Summarize the bear thesis and top failure modes.\"*\n"
+            f"- *\"What annual FCF growth is currently priced into CMP?\"*\n"
+            f"- *\"Are there any promoter pledging or forensic accounting red flags?\"*\n"
+            f"- *\"How solvent is the balance sheet under macroeconomic stress?\"*"
         )
 
 
@@ -157,19 +157,19 @@ def _build_greeting_response(ticker: Optional[str], company_name: Optional[str],
     name = company_name or ticker or "this security"
     if asset_class == "MUTUAL_FUND":
         return (
-            f"👋 **Welcome to the Forensic Intelligence Desk for {name}.**\n\n"
-            f"I am your institutional look-through research engine, engineered to audit underlying constituent quality, "
-            f"measure closet-indexing drift, and calculate fee drag wealth destruction.\n\n"
+            f"**Welcome to the Research Desk for {name}.**\n\n"
+            f"I am your look-through research engine, engineered to audit underlying constituent quality, "
+            f"measure closet-indexing drift, and calculate fee drag cost.\n\n"
             f"**What would you like to explore?**\n"
-            f"- Ask open-ended questions like *\"What shocked you in this fund?\"* or *\"Summarize the bear thesis\"*.\n"
+            f"- Ask open-ended questions like *\"What stands out in this fund?\"* or *\"Summarize the bear thesis\"*.\n"
             f"- Audit the **distributor commission spread (TER drag)**.\n"
             f"- Check **Active Share** and style consistency against the benchmark index.\n"
             f"- Inspect look-through **accounting risk (ASRI)** across underlying holdings."
         )
     elif asset_class == "CORPORATE_DEBT":
         return (
-            f"👋 **Welcome to the Forensic Intelligence Desk for {name}.**\n\n"
-            f"I am your institutional fixed income research engine, engineered to stress-test credit solvency, "
+            f"**Welcome to the Research Desk for {name}.**\n\n"
+            f"I am your fixed income research engine, engineered to stress-test credit solvency, "
             f"monitor contagion triggers, and evaluate statutory recovery hierarchies.\n\n"
             f"**What would you like to explore?**\n"
             f"- Ask open-ended questions like *\"What stood out in the credit audit?\"* or *\"Summarize the bear thesis\"*.\n"
@@ -179,8 +179,8 @@ def _build_greeting_response(ticker: Optional[str], company_name: Optional[str],
         )
     elif asset_class == "ETF":
         return (
-            f"👋 **Welcome to the Forensic Intelligence Desk for {name}.**\n\n"
-            f"I am your institutional passive vehicle research engine, engineered to monitor secondary market arbitrage, "
+            f"**Welcome to the Research Desk for {name}.**\n\n"
+            f"I am your passive vehicle research engine, engineered to monitor secondary market arbitrage, "
             f"audit tracking error drag, and evaluate Authorized Participant liquidity depth.\n\n"
             f"**What would you like to explore?**\n"
             f"- Audit **exchange price vs Fair NAV arbitrage spreads**.\n"
@@ -190,22 +190,22 @@ def _build_greeting_response(ticker: Optional[str], company_name: Optional[str],
         )
     elif asset_class == "REIT":
         return (
-            f"👋 **Welcome to the Forensic Intelligence Desk for {name}.**\n\n"
-            f"I am your institutional real assets and infrastructure research engine, engineered to audit Section 115UA multi-component "
+            f"**Welcome to the Research Desk for {name}.**\n\n"
+            f"I am your real assets and infrastructure research engine, engineered to audit Section 115UA multi-component "
             f"distribution waterfalls, inspect Net Distributable Cash Flow (NDCF) payout purity, and stress-test portfolio lease rollovers.\n\n"
             f"**What would you like to explore?**\n"
             f"- Model the **Section 115UA tax waterfall** across 10%, 20%, 30%, and 39% slabs.\n"
             f"- Audit **Net Distributable Cash Flow (NDCF)** purity and 15% penal interest headroom.\n"
             f"- Inspect **portfolio WALE, tenant credit ratings, and LTV leverage** against the 49% cap.\n"
-            f"- Synthesize the **Pre-Mortem Inversion** bear thesis and refinancing vulnerabilities."
+            f"- Summarize the **Countercase** bear thesis and refinancing vulnerabilities."
         )
     else:
         return (
-            f"👋 **Welcome to the Forensic Intelligence Desk for {name}.**\n\n"
-            f"I am your institutional equity research engine, engineered to stress-test investment theses, "
+            f"**Welcome to the Research Desk for {name}.**\n\n"
+            f"I am your equity research engine, engineered to stress-test investment theses, "
             f"audit corporate governance disclosures, and unpack Reverse DCF expectations.\n\n"
             f"**What would you like to explore?**\n"
-            f"- Ask open-ended questions like *\"What shocked you during the research?\"* or *\"Summarize the bear thesis\"*.\n"
+            f"- Ask open-ended questions like *\"What stood out during the research?\"* or *\"Summarize the bear thesis\"*.\n"
             f"- Stress-test the **Reverse DCF** to see what annual FCF growth CMP is pricing in.\n"
             f"- Audit **promoter pledging** and forensic accounting disclosures under SEBI LODR.\n"
             f"- Evaluate **balance sheet solvency** and Altman Z-Score buffer."
@@ -374,8 +374,8 @@ def check_non_advisory_compliance(message: str, asset_class: str = "EQUITY") -> 
     if asset_class == "MUTUAL_FUND":
         return (
             "**SEBI Regulatory Non-Advisory Notice:**\n\n"
-            "Under SEBI Research Analyst Regulations 2014 Section 2(u), the Forensic Intelligence Desk operates "
-            "strictly as an institutional software diagnostic utility and is prohibited from providing personalized investment advice, "
+            "Under SEBI Research Analyst Regulations 2014 Section 2(u), the Research Desk operates "
+            "strictly as an software diagnostic utility and is prohibited from providing personalized investment advice, "
             "fund recommendations, or Buy/Sell/Switch calls.\n\n"
             "I can, however, provide an objective **Look-Through Forensic Breakdown** of the fund's Weighted Moat Index, "
             "Look-Through ASRI Accounting Risk, Active Share vs Benchmark, and Direct vs Regular Distributor Fee Drag. "
@@ -384,8 +384,8 @@ def check_non_advisory_compliance(message: str, asset_class: str = "EQUITY") -> 
     elif asset_class == "CORPORATE_DEBT":
         return (
             "**SEBI Regulatory Non-Advisory Notice:**\n\n"
-            "Under SEBI Research Analyst Regulations 2014 Section 2(u), the Forensic Intelligence Desk operates "
-            "strictly as an institutional software diagnostic utility and is prohibited from providing personalized investment advice, "
+            "Under SEBI Research Analyst Regulations 2014 Section 2(u), the Research Desk operates "
+            "strictly as an software diagnostic utility and is prohibited from providing personalized investment advice, "
             "credit buy/sell ratings, or investment calls.\n\n"
             "I can, however, provide an objective evaluation of the issuer's **Asset Coverage Ratio (ACR)**, "
             "Recovery Seniority in liquidation, DSCR covenant headroom, and Credit Contagion Radar posture. "
@@ -394,20 +394,20 @@ def check_non_advisory_compliance(message: str, asset_class: str = "EQUITY") -> 
     elif asset_class == "REIT":
         return (
             "**SEBI Regulatory Non-Advisory Notice:**\n\n"
-            "Under SEBI Research Analyst Regulations 2014 Section 2(u), the Forensic Intelligence Desk operates "
-            "strictly as an institutional software diagnostic utility and is prohibited from providing personalized investment advice, "
+            "Under SEBI Research Analyst Regulations 2014 Section 2(u), the Research Desk operates "
+            "strictly as an software diagnostic utility and is prohibited from providing personalized investment advice, "
             "distribution return guarantees, or Buy/Sell/Hold verdicts.\n\n"
             "I can, however, provide an objective evaluation of the trust's **Section 115UA Tax Waterfall**, "
-            "Net Distributable Cash Flow (NDCF) Payout Purity, portfolio WALE, and Pre-Mortem Inversion risk factors. "
+            "Net Distributable Cash Flow (NDCF) Payout Purity, portfolio WALE, and Countercase risk factors. "
             "Which diagnostic area would you like to explore?"
         )
     else:
         return (
             "**SEBI Regulatory Non-Advisory Notice:**\n\n"
-            "Under SEBI Research Analyst Regulations 2014 Section 2(u), the Forensic Intelligence Desk operates "
+            "Under SEBI Research Analyst Regulations 2014 Section 2(u), the Research Desk operates "
             "strictly as a software diagnostic utility and is prohibited from providing personalized investment advice, "
             "price targets, or Buy/Sell/Hold verdicts.\n\n"
-            "I can, however, provide an objective **Pre-Mortem Inversion Analysis** or break down the company's "
+            "I can, however, provide an objective **Countercase Analysis** or break down the company's "
             "Margin of Safety, Balance Sheet Solvency, and Reverse DCF implied growth rates. Which diagnostic area would you like to explore?"
         )
 
@@ -449,7 +449,7 @@ def _resolve_dynamic_entity_override(
         phrase_low = phrase.lower()
         non_entity_prefixes = ("the ", "its ", "this ", "their ", "our ", "my ", "for ", "if ", "how ", "whether ")
         non_entity_terms = (
-            "active share", "fee drag", "balance sheet", "reverse dcf", "pre-mortem", "premortem",
+            "active share", "fee drag", "balance sheet", "reverse dcf", "countercase", "pre-mortem", "premortem",
             "governance", "solvency", "moat", "valuation", "covenant", "waterfall", "tracking error",
             "Closet indexing", "closet", "pledge", "pledging", "yield", "margin", "holdings", "portfolio"
         )
@@ -484,14 +484,14 @@ def _answer_from_local_dossier_index(
     if not report_text:
         return None
 
-    # Defer specialized Forensic Desk workflows (Reverse DCF, Pre-Mortem Inversion,
+    # Defer specialized Research Desk workflows (Reverse DCF, Countercase,
     # Beneish/Governance Forensics, Altman Solvency) to their dedicated builders
     # so generic keywords like "growth", "earnings", "structural", or "valuation"
     # do not hijack quick-chip or section-anchored prompts into Pillar 04 / Pillar 05 excerpts.
     if any(k in q for k in [
         "reverse dcf", "implied growth", "fcf growth", "implied fcf", "dcf",
         "priced in", "pricing in", "hurdle rate",
-        "pre-mortem", "premortem", "inversion", "failure mode", "destroy shareholder",
+        "countercase", "counter-case", "pre-mortem", "premortem", "inversion", "failure mode", "destroy shareholder",
         "permanently impair", "structural risk", "structural vulnerabilit",
         "beneish", "m-score", "manipulation", "forensic accounting",
         "promoter", "pledg", "related-party", "auditor", "governance",
@@ -550,8 +550,8 @@ def _answer_from_local_dossier_index(
         mos = radar.get("margin_of_safety_pct", 0.0)
         imp_g = radar.get("inputs", {}).get("implied_fcf_growth_pct", 11.5)
         return (
-            f"📊 **Valuation & Multiples Diagnostic — {company_name} (`{ticker}`)**\n\n"
-            f"| Valuation Metric | Audited Value | Institutional Benchmark / Regime |\n"
+            f"**Valuation & Multiples Diagnostic — {company_name} (`{ticker}`)**\n\n"
+            f"| Valuation Metric | Audited Value | Benchmark / Regime |\n"
             f"| :--- | :--- | :--- |\n"
             f"| **Current Market Price (CMP)** | `₹{safe_price:,.2f}` | Live / Cached Exchange Quote |\n"
             f"| **Trailing P/E Multiple** | `{pe}x` | Verdict: **{matrix.get('Valuation', 'Fair')}** |\n"
@@ -566,7 +566,7 @@ def _answer_from_local_dossier_index(
     if any(k in q for k in ["business model", "make money", "revenue stream", "competitor", "competition", "moat", "pricing power", "market share", "industry"]):
         if 2 in pillars:
             return (
-                f"🏰 **Competitive Moat & Industry Positioning — {company_name} (`{ticker}`)**\n"
+                f"**Competitive Moat & Industry Positioning — {company_name} (`{ticker}`)**\n"
                 f"- **Moat Rating:** `{matrix.get('Moat', 'Moderate')}` | **Macro Posture:** `{matrix.get('Macro', 'Neutral')}`\n\n"
                 f"{pillars[2]}\n\n"
                 f"*Source: Audited Equity Dossier Pillar 02 (`reports.db`).*"
@@ -576,7 +576,7 @@ def _answer_from_local_dossier_index(
     if any(k in q for k in ["revenue", "margin", "profit", "earnings", "quarter", "q1", "q2", "q3", "q4", "drop", "slowdown", "temporary", "structural", "growth"]):
         if 4 in pillars:
             return (
-                f"🔬 **Earnings & Margin Diagnostic — {company_name} (`{ticker}`)**\n"
+                f"**Earnings & Margin Diagnostic — {company_name} (`{ticker}`)**\n"
                 f"- **Drop Diagnostic:** `{matrix.get('Diagnostic', 'Neutral')}` | **Capital Allocation:** `{matrix.get('CapitalAllocation', 'Disciplined')}`\n\n"
                 f"{pillars[4]}\n\n"
                 f"*Source: Audited Equity Dossier Pillar 04 (`reports.db`).*"
@@ -586,7 +586,7 @@ def _answer_from_local_dossier_index(
     if any(k in q for k in ["macro", "tariff", "export", "import", "currency", "rbi", "interest rate", "inflation", "geopolit", "regulation"]):
         if 1 in pillars:
             return (
-                f"🌐 **Macro & Regulatory Exposure — {company_name} (`{ticker}`)**\n"
+                f"**Macro & Regulatory Exposure — {company_name} (`{ticker}`)**\n"
                 f"- **Macro Verdict:** `{matrix.get('Macro', 'Neutral')}`\n\n"
                 f"{pillars[1]}\n\n"
                 f"*Source: Audited Equity Dossier Pillar 01 (`reports.db`).*"
@@ -596,7 +596,7 @@ def _answer_from_local_dossier_index(
     if any(k in q for k in ["esg", "brsr", "carbon", "environment", "sustainability", "social"]):
         if 7 in pillars:
             return (
-                f"🌱 **SEBI BRSR & ESG Scorecard — {company_name} (`{ticker}`)**\n\n"
+                f"**SEBI BRSR & ESG Scorecard — {company_name} (`{ticker}`)**\n\n"
                 f"{pillars[7]}\n\n"
                 f"*Source: Audited Equity Dossier Pillar 07 (`reports.db`).*"
             )
@@ -778,7 +778,7 @@ def _run_parameterized_slot_calculator(
         spread_bps = round((ter_reg - ter_dir) * 100.0, 1)
 
         return (
-            f"🧮 **Live Parameterized Fee-Drag & Compounding Simulation — {name}:**\n\n"
+            f"**Live Parameterized Fee-Drag & Compounding Simulation — {name}:**\n\n"
             f"- **Simulated Lumpsum Corpus:** `₹{corpus:,.0f}`\n"
             f"- **Compounding Horizon:** `{years} Years`\n"
             f"- **Assumed Gross Portfolio CAGR:** `{cagr:.1f}% p.a.`\n"
@@ -821,7 +821,7 @@ def _run_parameterized_slot_calculator(
         rem_cost_basis = max(0.0, corpus - cum_roc)
 
         return (
-            f"🧮 **Live Section 115UA Cash-Flow & Sec 56(2)(xii) Amortization Simulation — {name} (`{ticker}`):**\n\n"
+            f"**Live Section 115UA Cash-Flow & Sec 56(2)(xii) Amortization Simulation — {name} (`{ticker}`):**\n\n"
             f"- **Simulated Allocation Corpus:** `₹{corpus:,.0f}`\n"
             f"- **Holding Horizon:** `{years} Years`\n"
             f"- **Investor Marginal Tax Slab:** `{slab:.1f}%`\n"
@@ -855,7 +855,7 @@ def _run_parameterized_slot_calculator(
         cum_net = annual_net * years
 
         return (
-            f"🧮 **Live Fixed-Income Cash-Flow & Post-Tax Yield Simulation — {name} (`{ticker}`):**\n\n"
+            f"**Live Fixed-Income Cash-Flow & Post-Tax Yield Simulation — {name} (`{ticker}`):**\n\n"
             f"- **Simulated Bond Allocation:** `₹{corpus:,.0f}`\n"
             f"- **Holding Period:** `{years} Years` (Macaulay Duration: `{dur:.2f} yrs`)\n"
             f"- **Pre-Tax YTM / Coupon:** `{ytm:.2f}% p.a.`\n"
@@ -909,7 +909,7 @@ def _run_parameterized_slot_calculator(
     mos_pct = round(((implied_fair_price - cmp_f) / cmp_f) * 100.0, 1) if cmp_f > 0 else 0.0
 
     return (
-        f"🧮 **Live Parameterized Reverse-DCF & Allocation Simulation — {company_name} (`{ticker}`):**\n\n"
+        f"**Live Parameterized Reverse-DCF & Allocation Simulation — {company_name} (`{ticker}`):**\n\n"
         f"- **Simulated Capital Allocation:** `₹{corpus:,.0f}` (`{shares:,.2f} shares` at CMP `₹{cmp_f:,.2f}`)\n"
         f"- **Compounding Horizon:** `{years} Years` | **Trailing P/E:** `{pe_f:.2f}x` (Est. EPS `₹{eps_est:,.2f}`)\n"
         f"- **Market-Implied 10Y FCF Growth at CMP:** `{market_implied_g:.2f}% p.a.` (at `{base_wacc:.1f}%` WACC)\n"
@@ -960,8 +960,8 @@ def _resolve_elliptical_followup(user_message: str, history: Optional[list] = No
         return "Audit corporate governance and promoter pledging disclosures"
     if "reverse dcf" in closing_q and "reverse dcf" not in headline:
         return "What implied growth rate is priced into current CMP based on Reverse DCF?"
-    if "pre-mortem" in closing_q and "pre-mortem" not in headline:
-        return "Run Pre-Mortem Inversion analysis on this stock"
+    if ("countercase" in closing_q or "pre-mortem" in closing_q) and "countercase" not in headline and "pre-mortem" not in headline:
+        return "Run a countercase analysis on this stock"
     if "active share" in closing_q and "active share" not in headline:
         return "Audit the active share and benchmark overlap"
     if "fee" in closing_q and "fee drag" not in headline:
@@ -1045,8 +1045,8 @@ def _retrieve_relevant_dossier_passages(
                 low = "governance promoter pledging auditor related party"
             elif "reverse dcf" in last_agent_msg and "Reverse DCF Valuation" not in last_agent_msg[:120]:
                 low = "reverse dcf implied growth valuation margin of safety"
-            elif "pre-mortem" in last_agent_msg and "Pre-Mortem Inversion Analysis" not in last_agent_msg[:120]:
-                low = "pre-mortem inversion failure modes downside risks"
+            elif ("countercase" in last_agent_msg or "pre-mortem" in last_agent_msg) and "Countercase Analysis" not in last_agent_msg[:120]:
+                low = "countercase pre-mortem inversion failure modes downside risks"
 
     if not doc_text:
         return None
@@ -1083,7 +1083,7 @@ def _retrieve_relevant_dossier_passages(
             if not body:
                 continue
             p = body
-        if len(p) < 35 or p.startswith("[Institutional deep-dive pillar locked"):
+        if len(p) < 35 or p.startswith("[deep-dive pillar locked"):
             continue
         p_low = p.lower()
         h_low = current_heading.lower()
@@ -1112,7 +1112,7 @@ def _retrieve_relevant_dossier_passages(
     )
     passages_md = "\n\n".join([f"**{h}:**\n{b}" for h, b, _ in top_blocks])
     return (
-        f"🔎 **Targeted Dossier Retrieval for {display_name} (`{ticker}`):**\n\n"
+        f"**Targeted Dossier Retrieval for {display_name} (`{ticker}`):**\n\n"
         f"{passages_md}\n\n"
         f"*Source: Verified Dossier Text (`reports.db`) — matched to your query on `{', '.join(dict.fromkeys(query_tokens[:4]))}`.*\n\n"
         f"Would you like to stress-test these figures with a custom number (e.g. `10000`, `15%`, `10y`) or drill into another section?"
@@ -1209,7 +1209,7 @@ def build_mutual_fund_deterministic_response(
     # Open-Ended Inquiry: Bear Thesis
     if any(k in msg for k in ["bear thesis", "bear case", "bearish", "downside case", "why avoid"]):
         return (
-            f"**Institutional Bear Thesis for {name}:**\n\n"
+            f"**Bear Thesis for {name}:**\n\n"
             f"1. **Compounding Fee Drag:** Over multi-year cycles, Regular-plan distribution commissions reduce net investor returns relative to Direct or low-cost index alternatives.\n"
             f"2. **Benchmark Overlap & Style Drift:** Elevated cash buffers or low active share can limit upside participation when narrow index rallies occur.\n"
             f"3. **Look-Through Valuation Sensitivity:** When top holdings trade at demanding multiples, even modest earnings disappointments can weigh on scheme NAV.\n\n"
@@ -1220,7 +1220,7 @@ def build_mutual_fund_deterministic_response(
     if any(k in msg for k in ["bull thesis", "bull case", "bullish", "upside case", "why invest"]):
         health = context_data.get("composite_health_score", "N/A")
         return (
-            f"**Institutional Bull Thesis for {name}:**\n\n"
+            f"**Bull Thesis for {name}:**\n\n"
             f"1. **Quality-Anchored Equity Sleeve:** The portfolio is weighted toward cash-generative businesses (Composite Health {health}/100).\n"
             f"2. **Measured Drawdown Discipline:** Position sizing and liquidity buffers aim to moderate downside capture across market cycles.\n"
             f"3. **Cross-Sector Diversification:** Broad sector allocation reduces reliance on any single company's capital-allocation cycle.\n\n"
@@ -1244,7 +1244,7 @@ def build_mutual_fund_deterministic_response(
             f"- Distributor Commission Spread: {spread_bps}\n\n"
             "**Analytical Implication:** Both plans hold the exact same underlying portfolio, yet over a 15–25 year horizon the annual distribution spread reduces terminal corpus value by roughly 15% to 25%. "
             "Evaluating the Direct plan isolates manager skill from intermediary distribution cost.\n\n"
-            "💡 *Tip: Type any investment amount (e.g. `10000`, `5L`) or horizon (`15y`) to compute exact Direct vs. Regular terminal wealth.*"
+            "*Tip: Type any investment amount (e.g. `10000`, `5L`) or horizon (`15y`) to compute exact Direct vs. Regular terminal wealth.*"
         )
     elif any(k in msg for k in ["active share", "closet", "index", "hugging", "benchmark", "style drift"]) or (not has_explicit_msg_topic and sec in ["active_share", "diversification"]):
         as_pct = context_data.get("active_share_pct", "N/A")
@@ -1310,7 +1310,7 @@ def build_mutual_fund_deterministic_response(
             f"- Category: {context_data.get('category', 'Equity Scheme')}\n"
             f"- AUM: ₹{aum} Cr\n"
             f"{watch_lines}\n"
-            "**Look-Through Framework:** Each constituent stock is individually evaluated across our 7-Pillar Equity Forensic Engine.\n\n"
+            "**Look-Through Framework:** Each constituent stock is individually evaluated across our 7-Pillar Equity Research Engine.\n\n"
             "Would you like to analyze a specific holding or check active share?"
         )
     elif any(k in msg for k in ["downside", "capture", "sortino", "drawdown", "upside capture", "bear market"]) or (not has_explicit_msg_topic and sec == "downside_capture"):
@@ -1326,8 +1326,8 @@ def build_mutual_fund_deterministic_response(
         dossier_text = context_data.get("dossier_text", "")
         summary_snip = (dossier_text[:350] + "...") if len(dossier_text) > 350 else dossier_text
         return (
-            f"**Qualitative Forensic Audit Summary for {name}:**\n\n"
-            f"{summary_snip or 'Comprehensive 7-pillar institutional look-through audit completed.'}\n\n"
+            f"**Qualitative Accounting Check Summary for {name}:**\n\n"
+            f"{summary_snip or 'Comprehensive 7-pillar look-through audit completed.'}\n\n"
             f"- Composite Health Score: {context_data.get('composite_health_score', 'N/A')}/100\n"
             f"- Weighted Moat Score: {context_data.get('weighted_moat_score', 'N/A')}/100\n\n"
             "Which qualitative audit finding would you like to explore?"
@@ -1347,14 +1347,14 @@ def build_mutual_fund_deterministic_response(
     # Default Mutual Fund Look-Through Summary
     aum = context_data.get("aum_crores", "N/A")
     deep_lines = (
-        "- Moat, accounting-risk and margin-of-safety scores: 🔒 part of the Deep Dive (1 credit)\n"
+        "- Moat, accounting-risk and margin-of-safety scores: part of the Deep Dive (1 credit)\n"
         if locked else
         f"- Weighted Moat Score: {context_data.get('weighted_moat_score', 'N/A')}/100\n"
         f"- Look-Through Accounting Risk Index (ASRI): {context_data.get('accounting_risk_index', 'N/A')}%\n"
         f"- Weighted Margin of Safety: {context_data.get('margin_of_safety_pct', 'N/A')}%\n"
     )
     return (
-        f"**Forensic Look-Through Summary for {name}:**\n\n"
+        f"**Look-Through Summary for {name}:**\n\n"
         f"- Composite Health Score: {context_data.get('composite_health_score', 'N/A')}/100\n"
         f"{deep_lines}"
         f"- Active Share: {context_data.get('active_share_pct', 'N/A')}%\n"
@@ -1438,7 +1438,7 @@ def build_debt_deterministic_response(
     # Open-Ended Inquiry: Bear Thesis
     if any(k in msg for k in ["bear thesis", "bear case", "bearish", "downside case", "default risk", "why avoid"]):
         return (
-            f"**Institutional Bear Thesis for {name}:**\n\n"
+            f"**Bear Thesis for {name}:**\n\n"
             f"1. **Seniority & Recovery Haircuts:** Unsecured or subordinated tranches face steeper recovery haircuts if liquidation proceeds fall short of senior secured claims.\n"
             f"2. **Cross-Default & Group Contagion:** Parent-level leverage or working-capital stress can spill over into debt-service coverage.\n"
             f"3. **Secondary Liquidity & Refinancing Friction:** Exchange RFQ liquidity for corporate bonds is thinner than equity markets, creating bid-ask friction if exiting before maturity.\n\n"
@@ -1448,7 +1448,7 @@ def build_debt_deterministic_response(
     # Open-Ended Inquiry: Bull Thesis
     if any(k in msg for k in ["bull thesis", "bull case", "bullish", "upside case", "why invest"]):
         return (
-            f"**Institutional Credit Quality Case for {name}:**\n\n"
+            f"**Credit Quality Case for {name}:**\n\n"
             f"1. **Senior Secured Priority:** Backed by a registered charge over tangible assets or receivables under IBC hierarchy.\n"
             f"2. **Covenant Headroom:** Operating cash flow and DSCR buffers currently cover scheduled coupon and principal obligations.\n"
             f"3. **Contracted Yield Spread:** Provides a defined yield spread over sovereign G-Sec benchmarks for hold-to-maturity allocators.\n\n"
@@ -1494,7 +1494,7 @@ def build_debt_deterministic_response(
             return passage_hit
 
     if locked:
-        radar_lines = "- Credit Contagion Radar: 🔒 part of the Deep Dive (1 credit)\n\n"
+        radar_lines = "- Credit Contagion Radar: part of the Deep Dive (1 credit)\n\n"
     else:
         radar_lines = (
             f"- Credit Contagion Radar: {context_data.get('contagion_radar_status', 'N/A')} ({context_data.get('contagion_risk_level', 'N/A')})\n\n"
@@ -1507,7 +1507,7 @@ def build_debt_deterministic_response(
         f"- Duration: {context_data.get('macaulay_duration_years', 'N/A')} yrs\n"
         f"- Seniority: {context_data.get('seniority_tier', 'N/A')}\n"
         f"{radar_lines}"
-        "💡 *Tip: Type any principal amount (e.g. `10000`, `5L`) or tax slab (`30%`) to calculate exact post-tax coupon cash flows.*"
+        "*Tip: Type any principal amount (e.g. `10000`, `5L`) or tax slab (`30%`) to calculate exact post-tax coupon cash flows.*"
     )
 
 
@@ -1591,7 +1591,7 @@ def build_etf_deterministic_response(
     # Inquiry: Bear Thesis / Risks
     elif any(k in msg for k in ["bear thesis", "bear case", "bearish", "risks", "failure mode", "downside"]):
         return (
-            f"**Institutional Inversion & Bear Thesis for {name} ({clean_sym}):**\n\n"
+            f"**Countercase & Bear Thesis for {name} ({clean_sym}):**\n\n"
             f"1. **Market Maker Withdrawal Risk:** During high volatility or circuit limit halts in underlying constituents, Authorized Participants may widen spreads or halt arbitrage.\n"
             f"2. **Index Rebalancing Friction:** Semi-annual reconstitution of {benchmark} forces block trades that incur turnover drag within the fund's NAV.\n"
             f"3. **Long-Term Expense Ratio Drag:** At {ter:.2f}% TER, holding {clean_sym} over 10 years creates cumulative wealth drag vs the theoretical gross index.\n\n"
@@ -1601,7 +1601,7 @@ def build_etf_deterministic_response(
     # Default overview
     else:
         return (
-            f"**ETF Institutional Summary for {name} ({clean_sym}):**\n\n"
+            f"**ETF Summary for {name} ({clean_sym}):**\n\n"
             f"- **Benchmark:** {benchmark}\n"
             f"- **Market Price vs NAV:** ₹{lp:.2f} vs ₹{nav:.2f} ({pd:+.2f}% Spread)\n"
             f"- **1Y Tracking Error:** {te:.2f}%\n"
@@ -1681,7 +1681,7 @@ def build_reit_deterministic_response(
             f"  • **Dividends ({div_pct}%):** Passed through from SPVs (tax-free under Sec 10(23FD) or taxable under Sec 115BAA).\n"
             f"  • **Return of Capital / Amortization ({amrt_pct}%):** Received tax-free up to acquisition price; excess taxed under Section 56(2)(xii).\n"
             f"  • **Rental Income ({rent_pct}%):** Pure pass-through, taxed at marginal slab.\n\n"
-            f"📊 **Post-Tax Yield at 30% Marginal Slab:**\n"
+            f"**Post-Tax Yield at 30% Marginal Slab:**\n"
             f"- **Net In-Hand Yield:** **{net_y}%** (Effective Tax Drag: **{drag} bps**)\n"
             f"- **Estimated Net Annual Cash Flow on ₹10 Lakhs:** **{income_10l}**\n\n"
             f"Select any chip below to drill into specific tax slabs, Return of Capital rules, or SPV dividend exemptions."
@@ -1720,7 +1720,7 @@ def build_reit_deterministic_response(
             f"| Marginal Tax Slab | Net In-Hand Yield | Tax Drag (bps) | Net Annual Cash on ₹10L | Tax Shield Efficiency |\n"
             f"| :--- | :--- | :--- | :--- | :--- |\n"
             f"{rows_md}\n"
-            f"💡 **Fiduciary Tax Efficiency:** At the standard 30% HNI slab, {name} achieves a **{shield}% Tax Shield Efficiency**, delivering superior post-tax cash flows compared to fixed deposits or corporate bonds because **{round(amrt_pct + div_pct, 1)}%** of distributions bypass full marginal taxation."
+            f"**Governance Tax Efficiency:** At the standard 30% HNI slab, {name} achieves a **{shield}% Tax Shield Efficiency**, delivering superior post-tax cash flows compared to fixed deposits or corporate bonds because **{round(amrt_pct + div_pct, 1)}%** of distributions bypass full marginal taxation."
         )
 
     # 1B. Return of Capital (Amortization) & Sec 56(2)(xii) Specified Sum
@@ -1729,11 +1729,11 @@ def build_reit_deterministic_response(
             f"**Return of Capital (Amortization) & Section 56(2)(xii) Analysis for {name} ({clean_sym}):**\n\n"
             f"- **Return of Capital Component:** **{amrt_pct}%** of total distributions\n"
             f"- **Statutory Nature:** Characterized as 'Repayment of SPV Debt' upstreamed to the trust and distributed to unitholders.\n\n"
-            f"📜 **Statutory Tax Framework (Post-Finance Act 2023):**\n"
+            f"**Statutory Tax Framework (Post-Finance Act 2023):**\n"
             f"1. **Cost Base Reduction:** ROC is received **100% tax-free** upon distribution, but it reduces your original purchase price (acquisition cost) per unit.\n"
             f"2. **Section 56(2)(xii) 'Specified Sum' Clause:** Once cumulative ROC received exceeds your original unit cost, the excess is treated as a 'Specified Sum' and taxed under 'Income from Other Sources' at your marginal slab rate.\n"
             f"3. **Capital Gains Interaction:** If you sell units before the cost base reaches zero, the reduced cost base increases your Capital Gains (LTCG taxed at 12.5% under Section 112A for holding > 12 months).\n\n"
-            f"🛡️ **Strategic Implication:** For investors buying {clean_sym} at current levels, the ROC component functions as a zero-tax cash flow distribution for multiple years until your cost basis is exhausted."
+            f"**Strategic Implication:** For investors buying {clean_sym} at current levels, the ROC component functions as a zero-tax cash flow distribution for multiple years until your cost basis is exhausted."
         )
 
     # 1C. Dividend SPV Tax Status & Section 10(23FD)
@@ -1742,10 +1742,10 @@ def build_reit_deterministic_response(
             f"**SPV Dividend Tax Pass-Through Audit for {name} ({clean_sym}):**\n\n"
             f"- **Dividend Distribution Component:** **{div_pct}%** of total cash distributions\n"
             f"- **Governing Section:** Section 10(23FD) of the Income Tax Act, 1961.\n\n"
-            f"⚖️ **Dual Corporate Tax Regime Mechanics:**\n"
+            f"**Dual Corporate Tax Regime Mechanics:**\n"
             f"• **Exempt SPVs (Standard Corporate Tax):** If the asset-owning SPV did NOT opt for the Section 115BAA concessional 22% rate (retaining standard 25%/30% corporate tax), dividends distributed to unitholders are **100% TAX-FREE** in unitholder hands.\n"
             f"• **Taxable SPVs (Concessional Sec 115BAA):** If the SPV exercised the Section 115BAA 22% corporate tax option, dividends are taxable at the investor's marginal slab, subject to 10% TDS under Section 194LBA.\n\n"
-            f"🏛️ **Portfolio Status:** {name}'s underlying SPVs are structured to pass dividends under the Section 10(23FD) exemption to unitholders wherever feasible, preserving net cash compounding."
+            f"**Portfolio Status:** {name}'s underlying SPVs are structured to pass dividends under the Section 10(23FD) exemption to unitholders wherever feasible, preserving net cash compounding."
         )
 
     # 1D. Interest & Rental Streams Pass-Through
@@ -1754,10 +1754,10 @@ def build_reit_deterministic_response(
             f"**Interest & Rental Pass-Through Stream Audit for {name} ({clean_sym}):**\n\n"
             f"- **Interest Component:** **{int_pct}%** of distributions\n"
             f"- **Rental Component:** **{rent_pct}%** of distributions\n\n"
-            f"📋 **Tax Treatment & TDS Mandates:**\n"
+            f"**Tax Treatment & TDS Mandates:**\n"
             f"• **Marginal Slab Taxation:** Both interest and direct rental cash flows pass through the business trust untaxed at the trust level and are taxed directly in the hands of unitholders at their applicable marginal income tax slabs.\n"
             f"• **Statutory TDS (Section 194LBA):** The business trust deducts 10% TDS on interest distributions to resident unitholders (5% for non-residents / FPIs under Section 194LBA(2)), which can be adjusted against your annual income tax liability via Form 26AS / AIS.\n\n"
-            f"💡 **Takeaway:** Even with interest taxed at marginal slabs, the blended yield of {name} remains highly competitive due to the amortization and dividend tax shields."
+            f"**Takeaway:** Even with interest taxed at marginal slabs, the blended yield of {name} remains highly competitive due to the amortization and dividend tax shields."
         )
 
     # -------------------------------------------------------------------------
@@ -1768,8 +1768,8 @@ def build_reit_deterministic_response(
         return (
             f"**SEBI 15% p.a. Penal Interest Enforcement Audit for {name} ({clean_sym}):**\n\n"
             f"- **Statutory Enforcement Rule:** Under SEBI (Real Estate Investment Trusts) Regulations, 2014 Regulation 18(16), if distributions are not paid within **15 working days** of declaration, the Investment Manager is statutorily liable to pay interest to unitholders at **15% per annum** for the entire delayed period.\n"
-            f"- **Strict Fiduciary Shield:** This penal interest **MUST** be borne entirely by the Investment Manager from their own capital; it is strictly prohibited from being expensed or charged to trust assets or unitholder funds.\n\n"
-            f"🛡️ **Compliance Track Record:** {name} maintains a **100% on-time quarterly distribution track record** with zero historical penal clause invocations or SEBI distribution enforcement actions."
+            f"- **Strict Governance Shield:** This penal interest **MUST** be borne entirely by the Investment Manager from their own capital; it is strictly prohibited from being expensed or charged to trust assets or unitholder funds.\n\n"
+            f"**Compliance Track Record:** {name} maintains a **100% on-time quarterly distribution track record** with zero historical penal clause invocations or SEBI distribution enforcement actions."
         )
 
     # 2B. Specific: Free Cash Flow vs NDCF Spread
@@ -1778,16 +1778,16 @@ def build_reit_deterministic_response(
             f"**Net Distributable Cash Flow (NDCF) vs Operating Free Cash Flow (FCF) for {name} ({clean_sym}):**\n\n"
             f"- **Statutory Upstreaming Purity:** **{purity}%** of NDCF\n"
             f"- **Cash Conversion Efficiency:** ~{ndcf.get('cash_conversion_pct', 96.5)}% of operating cash converted to distributable reserves.\n\n"
-            f"🔍 **Key Adjustments Between Operating EBITDA and NDCF:**\n"
+            f"**Key Adjustments Between Operating EBITDA and NDCF:**\n"
             f"1. **Maintenance Capex Deductions:** Essential capital expenditures required to maintain Grade-A property standards are reserved before calculating distributable cash.\n"
             f"2. **Debt Service Reserves:** Contractual interest and principal repayments are serviced at the SPV level prior to upstreaming.\n"
             f"3. **Working Capital Normalization:** Security deposits and tenant fit-out accruals are normalized to ensure distributions represent true cash collections, not accounting accruals.\n\n"
-            f"💡 **Takeaway:** {name}'s distributions are 100% funded from organic tenant rental receipts, with zero reliance on debt drawdowns to fund distributions."
+            f"**Takeaway:** {name}'s distributions are 100% funded from organic tenant rental receipts, with zero reliance on debt drawdowns to fund distributions."
         )
 
     # 2C. Specific: Distribution Purity & Upstreaming Compliance
     elif any(k in msg for k in ["ndcf payout purity", "distribution purity", "upstreaming purity", "purity audit", "sebi compliance"]):
-        purity_grade = ndcf.get("purity_grade", "INSTITUTIONAL GRADE")
+        purity_grade = ndcf.get("purity_grade", "GRADE")
         statutory_min = "95% (SEBI SM REIT Framework)" if "SM" in reit_info.get("structure_type", "") else "90% (SEBI Mainboard Framework)"
 
         return (
@@ -1796,7 +1796,7 @@ def build_reit_deterministic_response(
             f"- **Statutory Minimum Requirement:** {statutory_min}\n"
             f"- **Payout Frequency:** Mandatory quarterly distribution schedule\n"
             f"- **Operating Cash Conversion:** ~{ndcf.get('cash_conversion_pct', 96.5)}%\n\n"
-            f"🏛️ **Fiduciary Upstreaming Integrity:** All operating revenues generated by the underlying commercial assets flow through SPV debt repayment, dividends, and interest into the trust escrow account with zero upstreaming friction."
+            f"**Governance Upstreaming Integrity:** All operating revenues generated by the underlying commercial assets flow through SPV debt repayment, dividends, and interest into the trust escrow account with zero upstreaming friction."
         )
 
     # -------------------------------------------------------------------------
@@ -1809,15 +1809,15 @@ def build_reit_deterministic_response(
             f"- **Weighted Average Lease Expiry (WALE):** **{wale} Years**\n"
             f"- **Portfolio Occupancy:** **{occ}%** Committed Physical Occupancy\n"
             f"- **Next 3-Year Expiry Concentration:** ~{round(max(5.0, 100 - (wale * 12.0)), 1)}% of total leasable area\n\n"
-            f"🏢 **Renewal Dynamics & Escalations:**\n"
-            f"• **Contractual Rental Escalations:** Standard institutional leases incorporate contractual escalations of **12% to 15% every 36 months** (equivalent to ~4–5% annual organic rental growth).\n"
+            f"**Renewal Dynamics & Escalations:**\n"
+            f"• **Contractual Rental Escalations:** Standard leases incorporate contractual escalations of **12% to 15% every 36 months** (equivalent to ~4–5% annual organic rental growth).\n"
             f"• **Mark-to-Market (MTM) Headroom:** Existing in-place rents reflect a favorable re-leasing spread against current micro-market asking rents, providing positive cash flow momentum upon contract renewals."
         )
 
     # 3B. Specific: Top Tenant Concentration & Counterparty Exposure
     elif any(k in msg for k in ["top 3 tenant", "tenant concentration", "top tenant", "vacate", "downsize", "anchor tenant", "tenants"]):
-        scale = portfolio.get("scale_formatted", "Institutional Portfolio")
-        top_tenants = portfolio.get("top_tenants", ["Institutional Counterparties"])
+        scale = portfolio.get("scale_formatted", "Portfolio")
+        top_tenants = portfolio.get("top_tenants", ["Counterparties"])
         tenants_str = ", ".join(top_tenants[:4]) if isinstance(top_tenants, list) else str(top_tenants)
 
         return (
@@ -1826,12 +1826,12 @@ def build_reit_deterministic_response(
             f"- **Anchor Tenants:** {tenants_str}\n"
             f"- **Top 3 Tenant Exposure:** High-conviction anchor counterparties account for a diversified share of Net Operating Income (NOI).\n"
             f"- **Counterparty Credit Risk Profile:** Primarily composed of Fortune 500 multinationals, Global Capability Centers (GCCs), and AAA-rated technology/BFSI enterprises.\n\n"
-            f"🛡️ **Downside Protection:** Tenants have deployed substantial capital expenditure into internal interior fit-outs (often ₹3,000–₹5,000/sqft), creating high operational friction and immense switching costs against premature vacation."
+            f"**Downside Protection:** Tenants have deployed substantial capital expenditure into internal interior fit-outs (often ₹3,000–₹5,000/sqft), creating high operational friction and immense switching costs against premature vacation."
         )
 
     # 3C. Specific: Leverage LTV & Debt Headroom vs SEBI 49% Cap
     elif any(k in msg for k in ["ltv", "leverage", "headroom", "statutory cap", "borrowing cost", "fixed vs floating", "debt mix"]):
-        scale = portfolio.get("scale_formatted", "Institutional Portfolio")
+        scale = portfolio.get("scale_formatted", "Portfolio")
         headroom = capital.get("ltv_headroom_pct", round(49.0 - ltv, 1))
         cost_debt = capital.get("cost_of_debt_pct", 7.85)
         debt_mix = capital.get("fixed_vs_floating", "68% Fixed / 32% Floating")
@@ -1843,11 +1843,11 @@ def build_reit_deterministic_response(
             f"- **Weighted Average Cost of Debt:** **{cost_debt}% p.a.**\n"
             f"- **Debt Maturity Profile:** {debt_mix}\n"
             f"- **Credit Rating:** CRISIL AAA / ICRA AAA (Stable)\n\n"
-            f"🏛️ **Solvency Appraisal:** Robust balance sheet with significant buffer against macro refinancing stress."
+            f"**Solvency Appraisal:** Robust balance sheet with significant buffer against macro refinancing stress."
         )
 
     # -------------------------------------------------------------------------
-    # 4. Pre-Mortem Inversion Sub-Intents
+    # 4. Countercase Sub-Intents
     # -------------------------------------------------------------------------
     # 4A. Specific: Interest Rate & Cap Rate Shock (150 bps)
     elif any(k in msg for k in ["150 bps", "rate hike", "interest rate shock", "cap rate sensitivity", "bond yield", "yield rise"]):
@@ -1857,7 +1857,7 @@ def build_reit_deterministic_response(
         return (
             f"**Interest Rate & Capitalization Rate Sensitivity Stress-Test for {name} ({clean_sym}):**\n\n"
             f"- **Borrowing Base:** Net LTV of **{ltv}%** at average borrowing cost of **{cost_debt}%** ({debt_mix}).\n\n"
-            f"⚡ **Simulation: +150 bps Benchmark Yield Spike:**\n"
+            f"**Simulation: +150 bps Benchmark Yield Spike:**\n"
             f"1. **Debt Servicing Cash Impact:** With ~32% floating rate exposure, a 150 bps spike increases debt servicing expenses, impacting annualized NDCF distribution yield by ~**18–24 bps**.\n"
             f"2. **Cap Rate Expansion Valuation Drag:** If real estate capitalization rates expand by 50 bps in response to higher sovereign yields, Appraised Gross Asset Value (GAV) decompresses by ~**5.5%**, compressing NAV per unit from {nav_fmt} to ~₹{round(float(reit_info.get('nav_per_unit', 100)) * 0.945, 1)}.\n"
             f"3. **Defensive Offset:** High portfolio WALE ({wale} years) and contractual 4-5% p.a. rental escalations provide an organic cash flow hedge that absorbs ~60% of borrowing rate expansion over 24 months."
@@ -1868,17 +1868,17 @@ def build_reit_deterministic_response(
         return (
             f"**Sponsor Governance & ROFO Asset Pipeline Audit for {name} ({clean_sym}):**\n\n"
             f"- **Sponsor Skin-in-the-Game:** **{sponsor_holding}%** unit holding, aligning sponsor economic interest with public unitholders.\n"
-            f"- **Right of First Offer (ROFO) Mechanism:** The sponsor grants the business trust a formal legal right of first refusal to acquire all institutional Grade-A developments before offering them to third-party bidders.\n\n"
-            f"⚖️ **Regulatory Governance Safeguards:**\n"
+            f"- **Right of First Offer (ROFO) Mechanism:** The sponsor grants the business trust a formal legal right of first refusal to acquire all Grade-A developments before offering them to third-party bidders.\n\n"
+            f"**Regulatory Governance Safeguards:**\n"
             f"• **Dual Independent Valuations:** Every sponsor asset acquisition requires two independent valuation reports from SEBI-registered valuers.\n"
             f"• **Related-Party Transaction (RPT) Voting:** Acquisitions from the sponsor require approval by an independent majority of unitholders, with the sponsor strictly excluded from voting.\n"
             f"• **Fairness Audit:** Ensures pipeline injections enhance DPU yield and don't dilute existing unitholder returns."
         )
 
-    # 4C. Pre-Mortem Inversion Structural Failure Modes
+    # 4C. Countercase Structural Failure Modes
     elif any(k in msg for k in ["failure mode", "bear thesis", "inversion failure", "macro shock", "destroy", "failure modes"]):
         return (
-            f"**Behavioral Pre-Mortem Inversion Risk Ledger for {name} ({clean_sym}):**\n\n"
+            f"**Countercase Risk Ledger for {name} ({clean_sym}):**\n\n"
             f"1. **Interest Rate & Cap Rate Repricing (Severity: {'MODERATE' if ltv > 25.0 else 'LOW'}):**\n"
             f"   Floating debt ({capital.get('fixed_vs_floating', '32% Floating')}) increases borrowing costs under tightening cycles, while cap-rate expansion creates valuation headwinds for NAV.\n\n"
             f"2. **Tenant Re-Leasing & Vacancy Bunching (Severity: {'LOW' if wale >= 6.0 else 'MODERATE'}):**\n"
@@ -1895,7 +1895,7 @@ def build_reit_deterministic_response(
 
     elif sec == "ndcf_purity":
         penal_clause = ndcf.get("penal_interest_clause", "SEBI mandates 15% p.a. penal interest payable by the Investment Manager for delayed distributions.")
-        purity_grade = ndcf.get("purity_grade", "INSTITUTIONAL GRADE")
+        purity_grade = ndcf.get("purity_grade", "GRADE")
 
         return (
             f"**Net Distributable Cash Flow (NDCF) Upstreaming Audit for {name} ({clean_sym}):**\n\n"
@@ -1903,12 +1903,12 @@ def build_reit_deterministic_response(
             f"- **Statutory Threshold:** Minimum 90% (Mainboard) / 95% (SM REIT) of net distributable cash flows must be paid out to unitholders.\n"
             f"- **Distribution Frequency:** Mandatory quarterly distribution schedule.\n"
             f"- **SEBI Penal Enforcement Clause:** {penal_clause}\n\n"
-            f"Secondary cash distribution quality is functioning at institutional standard with zero upstreaming leakages."
+            f"Secondary cash distribution quality is functioning at standard with zero upstreaming leakages."
         )
 
     elif sec == "portfolio_wale":
-        scale = portfolio.get("scale_formatted", "Institutional Portfolio")
-        top_tenants = portfolio.get("top_tenants", ["Institutional Counterparties"])
+        scale = portfolio.get("scale_formatted", "Portfolio")
+        top_tenants = portfolio.get("top_tenants", ["Counterparties"])
         tenants_str = ", ".join(top_tenants[:4]) if isinstance(top_tenants, list) else str(top_tenants)
         headroom = capital.get("ltv_headroom_pct", round(49.0 - ltv, 1))
         cost_debt = capital.get("cost_of_debt_pct", 7.85)
@@ -1920,15 +1920,15 @@ def build_reit_deterministic_response(
             f"- **Committed Portfolio Occupancy:** **{occ}%**\n"
             f"- **Weighted Average Lease Expiry (WALE):** **{wale} Years**\n"
             f"- **Anchor Tenants:** {tenants_str}\n\n"
-            f"🏛️ **Capital Structure & Debt Solvency:**\n"
+            f"**Capital Structure & Debt Solvency:**\n"
             f"- **Net Loan-to-Value (LTV):** **{ltv}%** (SEBI Statutory Cap: 49.0% | Headroom: **{headroom}%**)\n"
             f"- **Average Borrowing Cost:** {cost_debt}% p.a. ({debt_mix})\n"
             f"- **Credit Rating:** CRISIL AAA / ICRA AAA (Stable)"
         )
 
-    elif sec == "inversion":
+    elif sec in ("countercase", "inversion"):
         return (
-            f"**Pre-Mortem Inversion & Bear Thesis for {name} ({clean_sym}):**\n\n"
+            f"**Countercase & Bear Thesis for {name} ({clean_sym}):**\n\n"
             f"1. **Interest Rate & Cap Rate Repricing:** A 50 bps increase in benchmark borrowing rates impacts debt servicing, expanding capitalization rates and creating downward pressure on net asset value.\n"
             f"2. **Tenant Re-Leasing & Vacancy Bunching:** Although portfolio WALE is {wale} years, lease expiries across anchor tenants over the next 24 months require proactive re-leasing to avoid NOI compression.\n"
             f"3. **Sponsor ROFO Pipeline Conflict:** Future asset injections from the sponsor must be scrutinized for transfer pricing fairness and independent valuer integrity.\n"
@@ -1944,7 +1944,7 @@ def build_reit_deterministic_response(
         drag = def_slab.get("tax_drag_bps", "N/A")
 
         return (
-            f"**Institutional Real Asset Summary for {name} ({clean_sym}):**\n\n"
+            f"**Real Asset Summary for {name} ({clean_sym}):**\n\n"
             f"- **Structure:** {reit_info.get('structure_label', 'Real Asset')}\n"
             f"- **Market Price vs NAV:** {cp_fmt} vs {nav_fmt} ({disc_lbl})\n"
             f"- **Gross Distribution Yield:** **{yield_fmt}**\n"
@@ -1952,7 +1952,7 @@ def build_reit_deterministic_response(
             f"- **Portfolio Occupancy:** {occ}%\n"
             f"- **WALE:** {wale} Years | **LTV:** {ltv}%\n\n"
             f"Select any section or quick prompt below to begin your tailored audit.\n\n"
-            f"What specific area would you like to inspect: **Tax Waterfall (Sec 115UA)**, **NDCF Purity**, **Portfolio WALE**, or **Pre-Mortem Inversion**?"
+            f"What specific area would you like to inspect: **Tax Waterfall (Sec 115UA)**, **NDCF Purity**, **Portfolio WALE**, or **Countercase**?"
         )
 
 
@@ -1985,7 +1985,7 @@ def build_equity_deterministic_response(
             f"Under SEBI (Research Analysts) Regulations 2014 Section 2(u), this platform provides purely educational, diagnostic, and deterministic research. "
             f"We strictly do **not** provide buy/sell/hold recommendations, target prices, trade execution signals, or return guarantees.\n\n"
             f"To evaluate {name} objectively without narrative bias, you can review its **Reverse DCF Implied Growth** "
-            f"(to inspect what annual FCF growth CMP ₹{cmp_display} is pricing in) or analyze the **Pre-Mortem Inversion** vectors."
+            f"(to inspect what annual FCF growth CMP ₹{cmp_display} is pricing in) or analyze the **Countercase** vectors."
         )
 
     # 0a. Interactive Parameterized Calculator & Conversational Continuation Slot Engine
@@ -2084,9 +2084,9 @@ def build_equity_deterministic_response(
 
         return (
             f"**Key Forensic Surprises & Structural Red Flags for {name} ({company_name}):**\n\n"
-            f"Our 7-pillar forensic audit highlights the following analytical watchpoints:\n\n"
+            f"Our 7-pillar accounting check highlights the following analytical watchpoints:\n\n"
             f"{anomaly_points}\n\n"
-            f"**Next Question:** Would you like to review the Pre-Mortem Inversion scenarios, or unpack the Reverse DCF cash-flow assumptions?"
+            f"**Next Question:** Would you like to review the Countercase scenarios, or unpack the Reverse DCF cash-flow assumptions?"
         )
 
     # 0c. Open-Ended Inquiry: Bear Thesis
@@ -2100,7 +2100,7 @@ def build_equity_deterministic_response(
         macro = matrix.get("Macro", "Headwinds")
 
         return (
-            f"**Institutional Bear Thesis Summary for {name} ({company_name}):**\n\n"
+            f"**Bear Thesis Summary for {name} ({company_name}):**\n\n"
             f"Separating business quality from valuation, the primary downside risks center on three areas:\n\n"
             f"1. **Valuation Multiple De-Rating & Implied Growth Hurdle:**\n"
             f"   - Trading {pe_str}, the current price embeds ~{implied_growth}% annual FCF growth over 10 years.\n"
@@ -2125,7 +2125,7 @@ def build_equity_deterministic_response(
         bs_status = matrix.get("BalanceSheet", "Debt-Free")
 
         return (
-            f"**Institutional Bull Thesis & Structural Strengths for {name} ({company_name}):**\n\n"
+            f"**Bull Thesis & Structural Strengths for {name} ({company_name}):**\n\n"
             f"The constructive case for the underlying business rests on three structural drivers:\n\n"
             f"1. **Durable Competitive Moat ({moat_status}):**\n"
             f"   - Customer switching costs, vendor qualification barriers, and scale efficiencies help defend operating margins across cycles.\n\n"
@@ -2146,7 +2146,7 @@ def build_equity_deterministic_response(
             f"**Recommended Forensic Research Roadmap for {name} ({company_name}):**\n\n"
             f"A disciplined way to evaluate {name} is to separate business quality from implied market expectations across three steps:\n\n"
             f"1. **Step 1: Unpack Reverse DCF Expectations:** At CMP ₹{cmp_display} ({pe_display} P/E), check what annual free-cash-flow growth rate is already priced in.\n"
-            f"2. **Step 2: Run Pre-Mortem Inversion:** Ask what specific operational or capital-allocation missteps could impair capital over a 3-year window.\n"
+            f"2. **Step 2: Run Countercase:** Ask what specific operational or capital-allocation missteps could impair capital over a 3-year window.\n"
             f"3. **Step 3: Verify Cash Conversion & Governance:** Confirm that promoter pledging is 0.0%, leverage is contained, and reported profits convert into operating cash flow.\n\n"
             f"Which diagnostic vector would you like to explore first?"
         )
@@ -2157,14 +2157,14 @@ def build_equity_deterministic_response(
         "can you hear me", "hello?", "anybody there"
     ]):
         return (
-            f"**Forensic Intelligence Desk Active:**\n\n"
+            f"**Research Desk Active:**\n\n"
             f"The desk is ready and grounded on **{name} ({company_name})**.\n\n"
             f"You can ask any specific question about {name}, or choose one of these core diagnostic workflows:\n\n"
-            f"1. **💀 Pre-Mortem Inversion:** Stress-test thesis failure modes and what would break the investment case.\n"
-            f"2. **📉 Reverse DCF Implied Growth:** Unpack the annual FCF growth priced into CMP ₹{cmp_display}.\n"
-            f"3. **🚩 Governance & Pledging:** Audit promoter pledge disclosures and SEBI LODR filings.\n"
-            f"4. **🛡️ Balance Sheet Solvency:** Review Altman Z-Score, leverage headroom, and working-capital conversion.\n"
-            f"5. **💥 What Stood Out:** Summarize the primary forensic watchpoints or valuation trade-offs."
+            f"1. **Countercase:** Stress-test thesis failure modes and what would break the investment case.\n"
+            f"2. **Reverse DCF Implied Growth:** Unpack the annual FCF growth priced into CMP ₹{cmp_display}.\n"
+            f"3. **Governance & Pledging:** Audit promoter pledge disclosures and SEBI LODR filings.\n"
+            f"4. **Balance Sheet Solvency:** Review Altman Z-Score, leverage headroom, and working-capital conversion.\n"
+            f"5. **What Stood Out:** Summarize the primary forensic watchpoints or valuation trade-offs."
         )
 
     # Evaluate explicit message keywords first so sticky `sec` never traps follow-up turns
@@ -2174,10 +2174,10 @@ def build_equity_deterministic_response(
             "priced in", "pricing in", "dcf", "hurdle rate",
             "valuation", "cmp", "fair value", "intrinsic", "pe ratio", "multiple", "margin of safety"
         ]
-    ) and not any(k in msg for k in ["pre-mortem", "premortem", "inversion"])
-    msg_matches_pre_mortem = any(
+    ) and not any(k in msg for k in ["countercase", "pre-mortem", "premortem", "inversion"])
+    msg_matches_countercase = any(
         k in msg for k in [
-            "pre-mortem", "premortem", "inversion", "failure mode",
+            "countercase", "counter-case", "pre-mortem", "premortem", "inversion", "failure mode",
             "destroy", "risk", "threat", "vulnerabilit", "worst case"
         ]
     ) and not msg_matches_reverse_dcf
@@ -2214,7 +2214,7 @@ def build_equity_deterministic_response(
 
     has_any_explicit_equity_msg = (
         msg_matches_reverse_dcf
-        or msg_matches_pre_mortem
+        or msg_matches_countercase
         or msg_matches_governance
         or msg_matches_solvency
         or msg_matches_moat
@@ -2245,15 +2245,15 @@ def build_equity_deterministic_response(
         if passage_hit:
             return passage_hit
 
-    # 1. Pre-Mortem Inversion / Failure Modes / Thesis Destruction
-    if msg_matches_pre_mortem or (not has_any_explicit_equity_msg and sec in ["pre_mortem", "risks", "inversion"]):
+    # 1. Countercase / Failure Modes / Thesis Destruction
+    if msg_matches_countercase or (not has_any_explicit_equity_msg and sec in ["countercase", "pre_mortem", "risks", "inversion"]):
         macro_posture = matrix.get("Macro", "Headwinds")
         bs_posture = matrix.get("BalanceSheet", "Debt-Free")
         cap_posture = matrix.get("CapitalAllocation", "Disciplined")
 
         return (
-            f"**Pre-Mortem Inversion Analysis for {name} ({company_name}):**\n"
-            f"*Analytical Method: Pre-Mortem Inversion — assume the investment thesis disappoints over the next 3 years and work backward to identify the most plausible causes.*\n\n"
+            f"**Countercase Analysis for {name} ({company_name}):**\n"
+            f"*Analytical Method: Countercase — assume the investment thesis disappoints over the next 3 years and work backward to identify the most plausible causes.*\n\n"
             f"1. **Vector 1: Pricing Power & Margin Compression**\n"
             f"   - *Mechanism:* If input costs rise faster than customer price realizations, operating margins could compress by >200–250 bps across core segments.\n"
             f"   - *Current Posture:* Moat rated **{matrix.get('Moat', 'Wide')}**, Macro context rated **{macro_posture}**.\n"
@@ -2297,7 +2297,7 @@ def build_equity_deterministic_response(
             f"Instead of guessing a single target price, Reverse DCF asks what the current price requires you to believe. "
             f"At **{implied_growth}% implied FCF growth**, the market is pricing in {growth_interpretation}. "
             f"Assessment: **{verdict}**.\n\n"
-            f"💡 *Tip: Reply with any custom hurdle rate (e.g. `13%`), horizon (`15y`), or capital amount (`10000`) to re-compute this Reverse DCF live.*"
+            f"*Tip: Reply with any custom hurdle rate (e.g. `13%`), horizon (`15y`), or capital amount (`10000`) to re-compute this Reverse DCF live.*"
         )
 
     # 3. Governance Forensic & Promoter Pledging Check
@@ -2329,7 +2329,7 @@ def build_equity_deterministic_response(
             f"- **Related-Party Scrubbing:** No material off-balance-sheet guarantees or non-operating inter-corporate loans flagged\n\n"
             f"**Analytical Takeaway:**\n"
             f"Statutory governance disclosures remain clean and promoter equity is unencumbered. The ongoing watchpoint is whether incremental profits continue converting into free cash flow.\n\n"
-            f"Would you like to inspect balance sheet solvency or run Pre-Mortem Inversion?"
+            f"Would you like to inspect balance sheet solvency or run Countercase?"
         )
 
     # 4. Balance Sheet Solvency & Leverage Diagnostic
@@ -2420,17 +2420,17 @@ def build_equity_deterministic_response(
         f"**Diagnostic Research Overview for {name} ({company_name}):**\n\n"
         f"- **Current Quote (CMP):** ₹{cmp_display} • **P/E:** {pe_display} • **MCAP:** {mcap_str}\n"
         f"- **7-Pillar Health Posture:** Moat **{moat_status}** • Governance **{gov_status}** • Solvency **{bs_status}** • Valuation **{val_status}**\n\n"
-        f"**Select a forensic diagnostic pillar to drill into:**\n\n"
-        f"1. **💀 Pre-Mortem Inversion:** Stress-test thesis destruction vectors and worst-case failure modes.\n"
-        f"2. **📉 Reverse DCF Implied Growth:** Unpack what annual FCF growth the current CMP is pricing in.\n"
-        f"3. **🚩 Governance & Pledging:** Audit promoter pledge encumbrances and SEBI LODR disclosures.\n"
-        f"4. **🛡️ Balance Sheet Solvency:** Evaluate leverage headroom, liquidity buffers, and Altman Z-Score."
+        f"**Select a diagnostic pillar to drill into:**\n\n"
+        f"1. **Countercase:** Stress-test thesis destruction vectors and worst-case failure modes.\n"
+        f"2. **Reverse DCF Implied Growth:** Unpack what annual FCF growth the current CMP is pricing in.\n"
+        f"3. **Governance & Pledging:** Audit promoter pledge encumbrances and SEBI LODR disclosures.\n"
+        f"4. **Balance Sheet Solvency:** Evaluate leverage headroom, liquidity buffers, and Altman Z-Score."
     )
 
 
 GATED_PILLARS = (3, 5)
 GATED_PILLAR_NOTICE = (
-    "[Institutional deep-dive pillar locked. The user has not unlocked this ticker, so its contents "
+    "[deep-dive pillar locked. The user has not unlocked this ticker, so its contents "
     "must not be summarised, paraphrased or hinted at. Tell them it is available with 1 credit.]"
 )
 
@@ -2482,10 +2482,10 @@ _GATED_TOPICS = {
          "whether the portfolio trades at a DCF discount or premium",
          {"margin_of_safety"},
          ["margin of safety", "dcf", "intrinsic"]),
-        ("Forensic Audit Narrative",
+        ("Accounting Check Narrative",
          "the written 7-pillar audit findings for this scheme",
          {"dossier_narrative"},
-         ["forensic narrative", "qualitative", "audit findings", "findings"]),
+         ["accounting narrative", "qualitative", "audit findings", "findings"]),
     ],
     "CORPORATE_DEBT": [
         ("Credit Contagion Radar",
@@ -2544,7 +2544,7 @@ def build_unlock_notice(asset_class: str, name: str, topic) -> str:
         else "rating, yield, duration and seniority"
     )
     return (
-        f"🔒 **{label}** is part of the Deep Dive for {name}.\n\n"
+        f"**{label}** is part of the Deep Dive for {name}.\n\n"
         f"Unlocking shows {blurb}. It costs **1 credit**, is permanent for this {noun}, "
         f"and also unlocks the matching sections on the page. Use the **Unlock** button to continue.\n\n"
         f"Meanwhile I'm happy to go through the free parts: {free}."
@@ -2552,7 +2552,7 @@ def build_unlock_notice(asset_class: str, name: str, topic) -> str:
 
 
 
-async def process_forensic_desk_turn(
+async def process_research_desk_turn(
     conversation_id: str,
     user_message: str,
     ticker: Optional[str] = None,
@@ -2659,7 +2659,7 @@ async def process_forensic_desk_turn(
 
     if clean_ticker:
         if resolved_asset_class == "MUTUAL_FUND":
-            # Mutual Fund Scheme Forensic Look-Through Grounding
+            # Mutual Fund Scheme Look-Through Grounding
             from core.db.mutual_funds import get_mutual_fund_scheme, get_fund_forensic_dossier
             scheme = get_mutual_fund_scheme(clean_ticker)
             canonical_code = scheme.get("scheme_code") if scheme else clean_ticker
@@ -2746,7 +2746,7 @@ async def process_forensic_desk_turn(
                 "arbitrage_analysis": etf_data.get("arbitrage_analysis", {}),
                 "replication_audit": etf_data.get("replication_audit", {}),
                 "liquidity_audit": etf_data.get("liquidity_audit", {}),
-                "inversion_risks": etf_data.get("inversion_risks", []),
+                "countercase_risks": etf_data.get("countercase_risks", []),
                 "peers": [{"symbol": p.get("symbol"), "ter": p.get("expense_ratio_pct"), "te": p.get("tracking_error_1y"), "pd": p.get("premium_discount_pct")} for p in peers]
             })
 
@@ -2772,7 +2772,7 @@ async def process_forensic_desk_turn(
                 "tax_waterfall": reit_data.get("tax_waterfall", {}),
                 "ndcf_audit": reit_data.get("ndcf_audit", {}),
                 "portfolio_audit": reit_data.get("portfolio_audit", {}),
-                "inversion_risks": reit_data.get("inversion_risks", []),
+                "countercase_risks": reit_data.get("countercase_risks", []),
                 "peers": reit_data.get("peers", [])
             })
 
@@ -2888,7 +2888,7 @@ async def process_forensic_desk_turn(
                 context_data["credit_posture"] = posture
                 context_data["rating_history"] = []
             elif resolved_asset_class == "REIT":
-                context_data["inversion_risks"] = []
+                context_data["countercase_risks"] = []
 
             gated = MF_GATED_FIELDS if kind == "FUND" else (DEBT_GATED_FIELDS if kind == "DEBT" else ())
             for field in gated:
@@ -2940,7 +2940,7 @@ async def process_forensic_desk_turn(
         return {
             "conversation_id": conversation_id,
             "response": (
-                "⚠️ **Hourly Velocity Cap Reached:** You have reached the maximum allowed Forensic Desk turns for this hour "
+                "**Hourly Velocity Cap Reached:** You have reached the maximum allowed Research Desk turns for this hour "
                 "(40 turns/hr) to protect your account. Please resume shortly."
             ),
             "status": "VELOCITY_CAPPED"
@@ -2962,7 +2962,7 @@ async def process_forensic_desk_turn(
 
         tier_notice = (
             "\n\n---\n"
-            "⚡ **Desk Mode:** Deterministic Forensic Engine (Free Tier).\n"
+            "**Desk Mode:** Deterministic Research Engine (Free Tier).\n"
             "*Deep-dive generative synthesis is exclusive to Unlocked Reports (1 credit) and Pro Subscribers.*"
         )
         full_reply = base_reply + tier_notice
@@ -2991,8 +2991,8 @@ async def process_forensic_desk_turn(
 
         offline_notice = (
             "\n\n---\n"
-            "⚡ **Desk Mode:** Deterministic Forensic Engine (Standard Rule-Based Analysis).\n"
-            "*Your entitlement is verified (Unlocked/Pro); synthesizing via deterministic analytical models.*"
+            "**Desk Mode:** Deterministic Research Engine (Standard Rule-Based Analysis).\n"
+            "*Your entitlement is verified (Unlocked/Pro); generating via deterministic analytical models.*"
         )
         full_reply = fallback_msg + offline_notice
         try:
@@ -3015,7 +3015,7 @@ async def process_forensic_desk_turn(
             "  3. Active Share vs Benchmark, Closet Indexing, and Style Drift\n"
             "  4. Downside Capture vs Upside Capture spread & Sortino risk-adjusted alpha\n"
             "  5. Dual-sleeve asset allocation (Equity, Debt, Cash/TREPS) and portfolio concentration\n"
-            "  6. Intermediary Fee Drag (Direct vs Regular plan TER spread & compounded wealth destruction)\n"
+            "  6. Intermediary Fee Drag (Direct vs Regular plan TER spread & compounded cost)\n"
             "- If the user asks about individual stocks, evaluate them as underlying constituent holdings held by this fund.\n"
         )
     elif resolved_asset_class == "CORPORATE_DEBT":
@@ -3040,7 +3040,7 @@ async def process_forensic_desk_turn(
             "- Focus on Section 115UA multi-component pass-through distribution waterfalls (Interest, Dividend, Return of Capital, Rental).\n"
             "- Evaluate Net Distributable Cash Flow (NDCF) payout purity (>=95% for SM REIT, >=90% for Mainboard) and SEBI 15% penal interest enforcement.\n"
             "- Scrutinize portfolio WALE, tenant credit ratings, completed vs under-construction status, and LTV leverage against the statutory 49% cap.\n"
-            "- Apply Pre-Mortem Inversion to stress-test interest rate repricing, lease bunching, and sponsor ROFO asset pipeline conflicts.\n"
+            "- Apply Countercase to stress-test interest rate repricing, lease bunching, and sponsor ROFO asset pipeline conflicts.\n"
             "- Strictly enforce SEBI Research Analyst Regulations 2014 Section 2(u) non-advisory boundaries. Zero Buy/Sell/Hold calls.\n"
         )
     else:
@@ -3048,7 +3048,7 @@ async def process_forensic_desk_turn(
             "================================================================================\n"
             "CRITICAL ASSET DIRECTIVE: THIS IS A FUNDAMENTAL EQUITY SECURITY.\n"
             "- Evaluate company fundamentals, Reverse DCF implied growth rates, and forensic accounting solvency.\n"
-            "- When discussing risks, actively employ Pre-Mortem Inversion (identifying thesis failure modes).\n"
+            "- When discussing risks, actively employ Countercase (identifying thesis failure modes).\n"
         )
 
     if context_data.get("deep_dive_locked"):
@@ -3076,13 +3076,13 @@ async def process_forensic_desk_turn(
         "SYNTHESIS & OPEN-ENDED QUERY DIRECTIVES:\n"
         "- When asked open-ended or qualitative questions like 'what shocked you?', 'what stood out?',\n"
         "  or 'what are the biggest red flags?':\n"
-        "  Act as an institutional forensic research director / skeptical forensic auditor.\n"
+        "  Act as an forensic research director / skeptical accounting checkor.\n"
         "  Directly inspect the active security context, valuation metrics, and forensic checks.\n"
         "  Highlight the 2-3 most jarring or unexpected findings (e.g. heroic growth priced into Reverse DCF,\n"
         "  P/E multiple expansion vs decelerating earnings, promoter share pledges, or cash flow accrual divergences).\n"
         "  State specific data and ratios; never give evasive disclaimers or canned platitudes.\n"
-        "- When asked to 'summarize the bear thesis', synthesize the primary Pre-Mortem failure vectors and valuation compression triggers.\n"
-        "- When asked to 'summarize the bull thesis', synthesize the durable competitive moat advantages, ROIC persistence, and capital allocation.\n"
+        "- When asked to 'summarize the bear thesis', generate the primary Countercase failure vectors and valuation compression triggers.\n"
+        "- When asked to 'summarize the bull thesis', generate the durable competitive moat advantages, ROIC persistence, and capital allocation.\n"
         "- Always maintain objective, SEBI Section 2(u) non-advisory language without price targets or buy/sell recommendations.\n"
     )
 
@@ -3095,8 +3095,8 @@ async def process_forensic_desk_turn(
 
     system_prompt = f"""{SEBI_SAFE_HARBOR_DIRECTIVE}
 {brand_house_prompt}
-You are the Forensic Intelligence Desk (Forensic Desk) on Moatnomics.
-You assist allocators and research analysts in stress-testing investment theses across Equities, Mutual Funds, and Corporate Debt using our multi-asset forensic frameworks.
+You are the Research Desk (Research Desk) on Moatnomics.
+You assist allocators and research analysts in stress-testing investment theses across Equities, Mutual Funds, and Corporate Debt using our multi-asset accounting frameworks.
 
 {asset_instructions}
 {section_instructions}
@@ -3145,7 +3145,7 @@ Recent Conversation History:
 
         pro_notice = (
             "\n\n---\n"
-            "✨ **Desk Mode:** Institutional Generative Synthesis (Unlocked Deep Dive / Pro Tier)."
+            "**Desk Mode:** Generative Synthesis (Unlocked Deep Dive / Pro Tier)."
         )
         full_reply = agent_reply + pro_notice
         status = "COMPLETED"
@@ -3166,15 +3166,15 @@ Recent Conversation History:
         except Exception as builder_err:
             logger.error(f"Deterministic builder error: {builder_err}", exc_info=True)
             agent_reply = (
-                f"**Forensic Intelligence Desk Analysis for {clean_ticker or 'this security'}:**\n\n"
+                f"**Research Desk Analysis for {clean_ticker or 'this security'}:**\n\n"
                 "The analytical engine has compiled the fundamental baseline metrics from the research repository. "
-                "You can inspect the Pre-Mortem Inversion vectors, Reverse DCF implied growth hurdle, or governance checks via the quick prompt chips below."
+                "You can inspect the Countercase vectors, Reverse DCF implied growth hurdle, or governance checks via the quick prompt chips below."
             )
 
         fallback_notice = (
             "\n\n---\n"
-            "⚡ **Desk Mode:** Deterministic Forensic Engine (Analytical Fallback).\n"
-            "*Your entitlement is verified (Unlocked/Pro); synthesizing via deterministic analytical models.*"
+            "**Desk Mode:** Deterministic Research Engine (Analytical Fallback).\n"
+            "*Your entitlement is verified (Unlocked/Pro); generating via deterministic analytical models.*"
         )
         full_reply = agent_reply + fallback_notice
         status = "DETERMINISTIC_FALLBACK"

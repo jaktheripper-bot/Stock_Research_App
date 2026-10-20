@@ -441,7 +441,7 @@ def get_revision_by_id(rev_id: int) -> dict:
 
 
 # ==============================================================================
-# All Equities Institutional Directory
+# All Equities Directory
 # ==============================================================================
 
 SECTOR_TAXONOMY = {
@@ -498,7 +498,7 @@ def resolve_equity_sector(ticker: str, name: str, cached_sec: str = None) -> str
 
 def get_all_equities_directory_sync() -> list:
     """
-    Returns complete list of all 143 verified institutional equities joined with
+    Returns complete list of all 143 verified equities joined with
     cached fundamentals, sector taxonomy, market cap tiers, and revision metadata.
     """
     init_db()

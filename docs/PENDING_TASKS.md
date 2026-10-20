@@ -1,7 +1,7 @@
 # Platform Roadmap & Pending Tasks Register
-**Stock Research App — Institutional Multi-Asset Research Platform**  
+**Moatnomics — Multi-Asset Investment Research Platform**  
 *Document Target:* [`docs/PENDING_TASKS.md`](file:///Users/lyndonpinto/Documents/Stock_Research_App/docs/PENDING_TASKS.md)  
-*Last Updated:* 2026-10-17 00:10:00 IST  
+*Last Updated:* 2026-10-20 21:00:00 IST  
 
 ---
 
@@ -46,4 +46,14 @@
 ### 📱 Task 4: Mobile Brief Mode (Parked P3)
 - **Category:** Mobile Experience
 - **Status:** `Parked (Deferred pending user demand)`
-- **Details:** Compact, read-only "brief" response style for the Forensic Intelligence Desk on a mobile-first page (e.g. `/m`): 3–4 line headline score + top risk flag + link to the full desktop dossier, keeping strict SEBI non-advisory guardrails.
+- **Details:** Compact, read-only "brief" response style for the Research Desk on a mobile-first page (e.g. `/m`): 3–4 line headline score + top risk flag + link to the full desktop dossier, keeping strict SEBI non-advisory guardrails.
+
+### Task 5: Track 3 Language & Voice, Open Items
+- **Category:** Brand, Copy & Compliance wording
+- **Status:** `In Progress` (Phases 1-3 shipped 2026-10-20; items below are open)
+- **Details:**
+  1. Reference the hero banners (`img/heroes/*.webp`) and portal plates (`img/brand/portal-*.webp`) from their pages, after a browser review of text contrast.
+  2. Replace the remaining raw emojis outside `copilot.js` (public templates, `main.js`, `opportunity_terminal.js`, server messages in `web/main.py`, admin console) with sprite icons.
+  3. Decide whether to migrate stored values (`SURGICAL_REFRESH`, `FULL_SYNTHESIS`, contact category `synthesis`, existing `BSE Surveillance` alert rows) to the new wording; needs a data migration.
+  4. Owner decision on the legal characterisation "computational financial research synthesis software utility".
+  5. Hindi: per-language voice rules, string catalogues and the `language` parameter of `get_system_prompt()` (deferred).

@@ -1,4 +1,4 @@
-"""Unit tests for Institutional Epistemic Separation, Source-Passage Attribution & Falsification Engine.
+"""Unit tests for Epistemic Separation, Source-Passage Attribution & Falsification Engine.
 
 Tests:
 1. EPISTEMIC_PROMPT_DIRECTIVE contains 4 epistemic tiers and mandatory falsification triggers.

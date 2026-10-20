@@ -157,7 +157,7 @@ def classify_page_category(path: str) -> tuple[str, str]:
     if clean_p == "/funds":
         return "Mutual Fund Directory", "🏦"
     if clean_p.startswith("/funds/"):
-        return "Mutual Fund Forensic Dossier", "🏦"
+        return "Mutual Fund Report", "🏦"
     if clean_p == "/debt":
         return "Corporate Debt Directory", "📜"
     if clean_p.startswith("/debt/"):
@@ -171,7 +171,7 @@ def classify_page_category(path: str) -> tuple[str, str]:
     if clean_p.startswith("/opportunities"):
         return "Multi-Asset Terminal", "🎯"
     if clean_p.startswith("/reits"):
-        return "REITs & InvITs Surveillance", "🏢"
+        return "REITs & InvITs Monitoring", "🏢"
     if clean_p.startswith("/sovereign") or "curve" in clean_p:
         return "Sovereign Yield Curve", "🏛️"
     if clean_p.startswith("/safety-radar"):
@@ -721,7 +721,7 @@ def get_site_usage_summary(days: int = None, start_date = None, end_date = None,
         "total_actions": 0,
         "total_queries": 0,
         "cache_hits": 0,
-        "surgical_refreshes": 0,
+        "price_filing_updates": 0,
         "full_syntheses": 0,
         "cache_efficiency_pct": 0.0,
         "total_cost_saved_usd": 0.0,
@@ -771,7 +771,7 @@ def get_site_usage_summary(days: int = None, start_date = None, end_date = None,
             elif ev == "CACHE_HIT":
                 summary["cache_hits"] += count
             elif ev == "SURGICAL_REFRESH":
-                summary["surgical_refreshes"] += count
+                summary["price_filing_updates"] += count
             elif ev == "FULL_SYNTHESIS":
                 summary["full_syntheses"] += count
             elif ev == "PDF_DOWNLOAD":
@@ -781,10 +781,10 @@ def get_site_usage_summary(days: int = None, start_date = None, end_date = None,
             elif ev in ["WATCHLIST_ADD", "WATCHLIST_REMOVE", "WATCHLIST"]:
                 summary["watchlist_actions"] += count
 
-        effective_searches = max(summary["total_queries"], summary["cache_hits"] + summary["full_syntheses"] + summary["surgical_refreshes"])
+        effective_searches = max(summary["total_queries"], summary["cache_hits"] + summary["full_syntheses"] + summary["price_filing_updates"])
         summary["total_queries"] = effective_searches
         if effective_searches > 0:
-            free_served = summary["cache_hits"] + summary["surgical_refreshes"]
+            free_served = summary["cache_hits"] + summary["price_filing_updates"]
             summary["cache_efficiency_pct"] = round((free_served / effective_searches) * 100.0, 1)
 
         # 2. Unique Visitor Sessions
@@ -1590,7 +1590,7 @@ def purge_test_telemetry() -> dict:
                    OR ticker LIKE 'TEST_%'
                    OR ticker IN ('TESTCORP', 'TESTPEER', 'ZZTESTONLY');
             """)
-            # If a test suite overwrote INFY or TCS with a short test stub (<2000 chars), restore the full institutional revision
+            # If a test suite overwrote INFY or TCS with a short test stub (<2000 chars), restore the full revision
             p = "%s" if get_supabase_url() else "?"
             for canonical_ticker in ("INFY", "TCS"):
                 cursor.execute(

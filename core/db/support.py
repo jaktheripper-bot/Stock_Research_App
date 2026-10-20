@@ -447,7 +447,7 @@ DEFAULT_CANNED_RESPONSES = [
         "default_credits": 1.0,
         "body": (
             "Hello,\n\nWe noticed the report generation hiccup on your recent request. We have cleared the cache "
-            "and credited your account so you can trigger a fresh institutional-grade evaluation right away.\n\n"
+            "and credited your account so you can trigger a fresh evaluation right away.\n\n"
             "Warm regards,\nSupport & Operations Desk"
         ),
         "is_system": 1,

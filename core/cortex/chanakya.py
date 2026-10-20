@@ -6,7 +6,7 @@ Phase 1 Proprietary Architecture (Anvik Cortex Engine).
 A deterministic 10-point mathematical forensic sieve designed to:
 1. Screen out fundamentally uninvestable and forensic-deficit equities before expensive LLM synthesis.
 2. Slash downstream compute consumption in batch discovery screening pipelines.
-3. Provide non-exclusionary soft forensic diagnostic badges for human equity research dossiers.
+3. Provide non-exclusionary soft diagnostic badges for human equity research dossiers.
 
 The 10-Point Deterministic Forensic Checks:
 1. CFO to EBITDA Conversion Check (Operating Cash Quality)
@@ -342,7 +342,7 @@ class ChanakyaGate:
             p10 = False
             sev = "CRITICAL"
             critical_failures += 1
-            msg = f"Illiquid shell risk: Market capitalization ₹{market_cap_cr:.1f} Cr is below institutional threshold (₹{cls.MIN_MARKET_CAP_CR} Cr)."
+            msg = f"Illiquid shell risk: Market capitalization ₹{market_cap_cr:.1f} Cr is below threshold (₹{cls.MIN_MARKET_CAP_CR} Cr)."
             flags.append("SUB_SCALE_ILLIQUID_SHELL")
         else:
             p10 = True

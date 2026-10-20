@@ -159,7 +159,7 @@ def ttl_cache(ttl_seconds: int = 300, maxsize: int = 128):
 
 def enrich_fundamentals(ticker: str, data: dict) -> dict:
     """
-    Enriches stock fundamentals with institutional ratios.
+    Enriches stock fundamentals with ratios.
     First checks localized DB fundamentals cache, then falls back to yfinance backfill,
     and persists enriched metrics into cached_fundamentals repository.
     """
@@ -225,7 +225,7 @@ def enrich_fundamentals(ticker: str, data: dict) -> dict:
             if ind:
                 data["industry"] = ind
 
-        # Institutional Financial Ratios Enrichment
+        # Financial Ratios Enrichment
         fpe = info.get("forwardPE")
         if fpe and isinstance(fpe, (int, float)) and fpe > 0:
             data["forward_pe"] = f"{float(fpe):.2f}"
@@ -611,7 +611,7 @@ def get_stock_fundamentals(query: str) -> dict:
                     "current_price": round(float(price), 2),
                     "52w_high": round(float(high_52), 2) if isinstance(high_52, (int, float)) else str(high_52),
                     "52w_low": round(float(low_52), 2) if isinstance(low_52, (int, float)) else str(low_52),
-                    "description": f"Exchange data synthesized for {clean}.",
+                    "description": f"Exchange data compiled for {clean}.",
                     "exchange_status": "Active / Secondary (yfinance Fast Gateway)",
                     "is_fallback": True
                 }
@@ -836,12 +836,12 @@ def compute_pead_drift_band(stock_data: dict, hist_df=None) -> dict:
         vector = "ACCUMULATION_DRIFT"
         label = "Positive Post-Announcement Drift Vector"
         status = "bullish"
-        surprise_text = "Constructive Earnings / Institutional Accumulation"
+        surprise_text = "Constructive Earnings / Accumulation"
         lower_bound = round(price * (1 - 0.02), 2)
         target_drift = round(price * (1 + (empirical_drift_pct / 100.0)), 2)
         upper_bound = round(price * (1 + (empirical_drift_pct * 1.5 / 100.0)), 2)
         drift_direction = f"+{empirical_drift_pct:.1f}%"
-        guidance = "Empirical PEAD models project continued institutional price drift in the direction of the surprise over a 60-day window. Guardrail: Beware of thesis drift if valuation multiple expands beyond historical ceiling."
+        guidance = "Empirical PEAD models project continued price drift in the direction of the surprise over a 60-day window. Guardrail: Beware of thesis drift if valuation multiple expands beyond historical ceiling."
     else:
         vector = "COMPRESSION_DRIFT"
         label = "Downward Valuation Compression Vector"

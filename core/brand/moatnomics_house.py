@@ -4,7 +4,7 @@ Moatnomics Brand House, Content System & AI Voice Guide (October 2026)
 ======================================================================
 Canonical code representation of the Moatnomics working brand system:
 - Creative Territory: "Less noise, more nuance."
-- Operational Dual-Mandate Tagline: "Audit the Asset. Protect the Allocator."
+- Single public tagline (the dual-mandate line is retired, see docs/BRAND_HOUSE_AND_VOICE_GUIDE.md).
 - Core Brand Promise: "Understand the evidence. Examine the trade-offs. Know what deserves a closer look."
 - Editorial Method: Context -> Evidence -> Implication -> Next question
 """
@@ -50,7 +50,7 @@ Before delivery, check: Is the central point clear? Is it useful to the intended
 
 MOATNOMICS_BRAND_HOUSE: Dict[str, Any] = {
     "brand_name": "Moatnomics",
-    "tagline": "Audit the Asset. Protect the Allocator.",
+    "tagline": "Less noise, more nuance.",
     "creative_territory": "Less noise, more nuance.",
     "category_descriptor": "Multi-asset investment research",
     "core_principle": "Nuance should make a decision clearer, not make the reader work harder.",
@@ -75,17 +75,17 @@ MOATNOMICS_BRAND_HOUSE: Dict[str, Any] = {
         "supported by a credible research process."
     ),
     "core_philosophy": """
-        Moatnomics operates on a Dual-Mandate: 
-        1. We audit the economic moat of the asset (ROCE, governance, cash flow durability).
-        2. We construct a cognitive moat for the user (protection against confirmation bias, narrative seduction, and the disposition effect).
-        We are a cognitive prosthetic for the fundamental investor, not a stock tip generator. We blame the noisy market, not the user.
+        Moatnomics is multi-asset investment research. It does two things:
+        1. It examines the economic moat of the asset (ROCE, governance, cash flow durability).
+        2. It helps the reader notice common biases (confirmation bias, narrative seduction, the disposition effect) by showing the evidence and the countercase.
+        Moatnomics is a research aid for the fundamental investor, not a stock tip generator. Blame the noisy market, not the reader.
         Creative Territory: "Less noise, more nuance."
         Core Promise: "Understand the evidence. Examine the trade-offs. Know what deserves a closer look."
     """,
     "tone_and_voice": """
-        - Clinical, objective, empirical, and surgical.
+        - Clinical, objective, empirical and precise.
         - Zero condescension, but absolutely zero hype.
-        - Institutional grade: Use forensic terminology (e.g., 'Capital Misallocation', 'Thesis Drift', 'Structural Margin Contraction').
+        - Precise: Use accounting terminology (e.g., 'Capital Misallocation', 'Thesis Drift', 'Structural Margin Contraction').
         - Voice in one sentence: The mind of a research analyst, the clarity of a good editor and the restraint of someone who knows markets can make fools of confident people.
         - Traits: Intellectually rigorous; Clear, not simplistic; Balanced, not indecisive; Calmly confident; Insightful, not performatively clever.
     """,
@@ -107,6 +107,10 @@ MOATNOMICS_BRAND_HOUSE: Dict[str, Any] = {
         "AI Prediction",
         "Once-in-a-generation opportunity",
         "Undisputed compounder",
+        "Fiduciary",
+        "Wealth destruction",
+        "Zero-hallucination",
+        "Stock Research App",
     ],
     "taxonomy": {
         "Equities": "Moatnomics Equities",

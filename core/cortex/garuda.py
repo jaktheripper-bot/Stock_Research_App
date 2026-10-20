@@ -3,7 +3,7 @@ Garuda Event-Driven Micro-Snapshot Engine
 ========================================
 Phase 4 Proprietary Architecture (Anvik Cortex Engine).
 
-An event-driven corporate announcement classifier and surgical micro-snapshot reactor that:
+An event-driven corporate announcement classifier and targeted micro-snapshot reactor that:
 1. Ingests raw BSE/NSE exchange corporate disclosures in real-time or batch.
 2. Deterministically classifies announcements to specific 7-Pillar Dossier segments:
    - Pillar 1: Macro-Economic, Geopolitical & Environmental Overlays
@@ -13,7 +13,7 @@ An event-driven corporate announcement classifier and surgical micro-snapshot re
    - Pillar 5: Financial Fortress & Forensic Health (Quarterly Results, Audited Numbers)
    - Pillar 6: Corporate Governance & Forensic Integrity (Auditor Changes, Litigations, Board)
    - Pillar 7: Valuation Asymmetry & Margin of Safety (Credit Ratings, Cortex Updates)
-3. Generates a surgical 'MicroSnapshotDelta' targeting only the affected pillar, eliminating
+3. Generates a targeted 'MicroSnapshotDelta' targeting only the affected pillar, eliminating
    wasteful, full 7-pillar batch regeneration.
 4. Render-friendly: Stateless and callable on-demand via cron, webhook, or interval tick.
 """
@@ -84,7 +84,7 @@ class GarudaReflexEngine:
         details_url: str = "",
     ) -> MicroSnapshotDelta:
         """
-        Classifies an announcement and builds a surgical micro-snapshot delta.
+        Classifies an announcement and builds a targeted micro-snapshot delta.
         Hardened against nulls, non-string types, and malformed inputs.
         """
         clean_symbol = str(symbol or "UNKNOWN").upper().strip()

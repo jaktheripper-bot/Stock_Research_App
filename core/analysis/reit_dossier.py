@@ -1,4 +1,4 @@
-"""Statutory Section 115UA Tax Waterfall & Institutional REIT Dossier Engine.
+"""Statutory Section 115UA Tax Waterfall & REIT Dossier Engine.
 
 Enforces statutory and quantitative mathematical invariants for REITs, SM REITs, and InvITs:
 1. Section 115UA waterfall splits must sum to 100.0% (+/- 0.01%).

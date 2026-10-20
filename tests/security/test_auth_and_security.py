@@ -126,7 +126,7 @@ class TestAuthAndIsolation(unittest.TestCase):
         self.assertIn("Cross-origin request rejected", resp_order.json().get("detail", ""))
 
         resp_pm = self.client.post(
-            "/api/premortem",
+            "/api/countercase",
             json={"ticker": "INFY", "failure_vector": "Margin Compression", "anti_thesis_notes": "Test anti thesis"},
             headers=headers
         )
@@ -219,7 +219,7 @@ class TestAdminCreditGrant(unittest.TestCase):
     def test_admin_grant_with_ticket_auto_resolution(self):
         ticket_res = create_support_ticket(
             user_email=self.test_user_email,
-            subject="Synthesis failed on TCS",
+            subject="Report generation failed on TCS",
             message="Credits deducted but synthesis timed out",
             user_name="Remedy Test User",
             category="synthesis_error"
@@ -785,7 +785,7 @@ class TestSynthesizeSessionAuth(unittest.TestCase):
                         self.assertTrue(data.get("already_exists"))
 
     def test_synthesize_admin_authenticated_without_web_user(self):
-        """An authenticated admin without a web user can synthesize using clean_uid='admin_console'."""
+        """An authenticated admin without a web user can generate using clean_uid='admin_console'."""
         admin_session = {"email": "admin@moatnomics.com", "role": "super_admin"}
         with patch("web.routers.dossier._get_current_web_user", return_value=None):
             with patch("web.routers.dossier._is_admin_authenticated", return_value=admin_session):

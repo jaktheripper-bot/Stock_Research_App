@@ -42,7 +42,7 @@ from core.brand.moatnomics_house import get_system_prompt_context, MOATNOMICS_BR
 if ANTIGRAVITY_AVAILABLE and hasattr(types, "SubagentConfig"):
     moatnomics_strategy_subagent = types.SubagentConfig(
         name="moatnomics_brand_auditor",
-        description="Audits all website copy, UI templates, and AI prompts to ensure strict adherence to the Moatnomics Dual-Mandate Brand House and SEBI Safe Harbor regulations.",
+        description="Audits all website copy, UI templates, and AI prompts to ensure strict adherence to the Moatnomics Brand House (Less noise, more nuance.) and SEBI Safe Harbor regulations.",
         capabilities=types.SubagentCapabilities(
             enabled_tools=[
                 types.BuiltinTools.VIEW_FILE,
@@ -56,12 +56,12 @@ if ANTIGRAVITY_AVAILABLE and hasattr(types, "SubagentConfig"):
     
     Your Job:
     1. Scan HTML templates (`web/templates/`) and UI copy.
-    2. Ensure the "Dual-Mandate" (protecting the user from bias AND the asset from competitors) is clearly communicated in feature descriptions.
+    2. Ensure copy follows the single tagline "Less noise, more nuance." and explains what each feature shows (evidence, trade-offs, what could go wrong) without promising protection or outcomes.
     3. Flag any copy that sounds like a "Broker" (gamified, hyped) or violates SEBI Safe Harbor.
     4. FATAL ERROR: Flag the use of any forbidden words: {json.dumps(MOATNOMICS_BRAND_HOUSE['forbidden_vocabulary'])}.
     5. Ensure features are named strictly following the Branded House taxonomy (e.g., 'Moatnomics Copilot', 'Moatnomics Funds').
     
-    If you detect violations, output the exact file path, line number, and a suggested rewrite that aligns with the Moatnomics Dual-Mandate.
+    If you detect violations, output the exact file path, line number, and a suggested rewrite that aligns with the Moatnomics Brand House.
     """
     )
 else:
@@ -74,7 +74,7 @@ else:
 
     moatnomics_strategy_subagent = _FallbackSubagentConfig(
         name="moatnomics_brand_auditor",
-        description="Audits all website copy, UI templates, and AI prompts to ensure strict adherence to the Moatnomics Dual-Mandate Brand House and SEBI Safe Harbor regulations.",
+        description="Audits all website copy, UI templates, and AI prompts to ensure strict adherence to the Moatnomics Brand House (Less noise, more nuance.) and SEBI Safe Harbor regulations.",
         capabilities=None,
         system_instructions=f"""
     You are the Chief Brand & Strategy Auditor for {MOATNOMICS_BRAND_HOUSE['brand_name']}.
@@ -82,12 +82,12 @@ else:
     
     Your Job:
     1. Scan HTML templates (`web/templates/`) and UI copy.
-    2. Ensure the "Dual-Mandate" (protecting the user from bias AND the asset from competitors) is clearly communicated in feature descriptions.
+    2. Ensure copy follows the single tagline "Less noise, more nuance." and explains what each feature shows (evidence, trade-offs, what could go wrong) without promising protection or outcomes.
     3. Flag any copy that sounds like a "Broker" (gamified, hyped) or violates SEBI Safe Harbor.
     4. FATAL ERROR: Flag the use of any forbidden words: {json.dumps(MOATNOMICS_BRAND_HOUSE['forbidden_vocabulary'])}.
     5. Ensure features are named strictly following the Branded House taxonomy (e.g., 'Moatnomics Copilot', 'Moatnomics Funds').
     
-    If you detect violations, output the exact file path, line number, and a suggested rewrite that aligns with the Moatnomics Dual-Mandate.
+    If you detect violations, output the exact file path, line number, and a suggested rewrite that aligns with the Moatnomics Brand House.
     """
     )
 
@@ -263,7 +263,7 @@ def compute_deterministic_audit_metrics() -> Dict[str, Any]:
     if endpoints_failed > 0:
         recommendations.append(f"Resolve HTTP errors on {endpoints_failed} broken route(s).")
     if len(recommendations) == 0:
-        recommendations.append("System meets all institutional benchmarks. Maintain continuous daily audit cadence.")
+        recommendations.append("System meets all audit benchmarks. Maintain continuous daily audit cadence.")
 
     latest_migration = get_latest_schema_migration_version()
 
@@ -387,7 +387,7 @@ async def run_antigravity_ai_audit_synthesis(metrics: Dict[str, Any], base_markd
         logger.info("GEMINI_API_KEY not found; returning deterministic audit dossier.")
         return base_markdown
 
-    prompt = f"""You are the Chief Project Auditor for Stock Research App, an institutional equity and multi-asset research platform.
+    prompt = f"""You are the Chief Project Auditor for Moatnomics, a multi-asset investment research platform.
 Below is the verifiable, factual data collected from automated test discovery, endpoint probing, SEBI compliance scanning, and AST inspection:
 
 {json.dumps(metrics, indent=2)}

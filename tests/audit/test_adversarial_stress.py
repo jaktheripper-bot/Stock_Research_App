@@ -21,7 +21,7 @@ from core.cortex.engine import (
     DynamicStatutoryYieldWedge,
     ReverseDcfHurdleDeconstruct,
     PeadQuantDriftVelocity,
-    FiduciaryGovernanceScoringIndex,
+    GovernanceScoringIndex,
 )
 from core.analysis.valuation_radar import compute_valuation_radar
 from core.analysis.sector_scoring import detect_sector, evaluate_sector_fundamentals

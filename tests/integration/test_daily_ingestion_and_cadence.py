@@ -8,7 +8,7 @@ Verifies:
 2. Ingestion progress statistics report accurate coverage numbers and countdown to full saturation.
 3. Daily stock ingestion archives 7-pillar dossiers with Health Matrices into reports.db.
 4. Incremental mutual fund re-audit increases genuine look-through coverage for affected funds.
-5. /discovery template displays the Mutual Fund Institutional Footprint Badge.
+5. /discovery template displays the Mutual Fund Footprint Badge.
 6. /equities directory supports the 'Recently Inducted' filter chip and card badges.
 7. Admin endpoints (/api/admin/stocks/run-daily-ingest, /api/admin/stocks/ingestion-queue)
    enforce strict admin authentication and return valid schemas.
@@ -165,7 +165,7 @@ class TestDailyStockIngestionAndMFCoverage(unittest.TestCase):
             "roce_pct": 24.5,
             "debt_to_equity": 0.12,
             "sales_growth_3y": 20.0,
-            "ria_thesis": "Institutional compounder held across 18 mutual funds.",
+            "ria_thesis": "Compounder held across 18 mutual funds.",
             "catalyst_headline": "Statutory MF Constituent Induction",
             "key_metrics": {
                 "roce": "24.5%",
@@ -186,9 +186,9 @@ class TestDailyStockIngestionAndMFCoverage(unittest.TestCase):
         self.assertNotIn("{{", response.text)
         self.assertNotIn("{%", response.text)
 
-        # Check for Mutual Fund Institutional Footprint Badge
+        # Check for Mutual Fund Footprint Badge
         badge = soup.find(string=lambda t: t and "Held by 18 Mutual Funds" in t)
-        self.assertIsNotNone(badge, "Mutual Fund Institutional Footprint Badge missing on /discovery card.")
+        self.assertIsNotNone(badge, "Mutual Fund Footprint Badge missing on /discovery card.")
 
         aum_badge = soup.find(string=lambda t: t and "₹3,450 Cr AUM" in t)
         self.assertIsNotNone(aum_badge, "AUM exposure pill missing on /discovery card.")
@@ -396,7 +396,7 @@ class TestDailyCadenceAndRotation(unittest.TestCase):
         self.assertEqual(summary.get("status"), "SUCCESS")
         self.assertGreaterEqual(summary.get("persisted_to_db", 0), 400)
 
-        # Verify all 9 institutional categories are populated
+        # Verify all 9 categories are populated
         all_etfs = get_etf_matrix(category=None)
         self.assertGreaterEqual(len(all_etfs), 400)
         categories = {e.get("category") for e in all_etfs}
@@ -464,8 +464,8 @@ class TestDailyCadenceAndRotation(unittest.TestCase):
         self.assertGreaterEqual(len(curve_api_res.json().get("curve_points", [])), 16)
 
 
-    def test_asset_surveillance_scanner_and_debt_monitoring(self):
-        """Validates Always-On Asset Surveillance scan execution, audit ledger persistence, and /debt page integration."""
+    def test_asset_monitoring_scanner_and_debt_monitoring(self):
+        """Validates Always-On Asset Monitoring scan execution, audit ledger persistence, and /debt page integration."""
         from core.analysis.asset_scanner import run_comprehensive_asset_scan, get_asset_scan_runs
         
         # Execute scan

@@ -445,10 +445,10 @@ async def run_daily_amfi_scheduler():
             # 3. Multi-Asset Monitoring Scan (MF drift + Corporate Debt maturities/downgrade watches)
             scan_res = await loop.run_in_executor(None, run_comprehensive_asset_scan, "ALL_ASSETS", "nightly_cron")
             record_autonomous_event(
-                event_type="MULTI_ASSET_SURVEILLANCE_SCAN",
+                event_type="MULTI_ASSET_MONITORING_SCAN",
                 ticker="ALL_ASSETS",
-                trigger_source="NIGHTLY_SURVEILLANCE_SCHEDULER",
-                action_taken="SURVEILLANCE_SCAN_LEDGER_UPDATE",
+                trigger_source="NIGHTLY_MONITORING_SCHEDULER",
+                action_taken="MONITORING_SCAN_LEDGER_UPDATE",
                 summary=f"Multi-asset scan completed: {scan_res.get('items_scanned', 0)} items scanned (MFs + Corporate Debt).",
                 metadata=scan_res
             )
@@ -458,7 +458,7 @@ async def run_daily_amfi_scheduler():
             record_autonomous_event(
                 event_type="SOVEREIGN_BENCHMARK_SYNC",
                 ticker="RBI_AUCTION_CUTOFF",
-                trigger_source="NIGHTLY_SURVEILLANCE_SCHEDULER",
+                trigger_source="NIGHTLY_MONITORING_SCHEDULER",
                 action_taken="SOVEREIGN_CURVE_AND_SDL_SYNC",
                 summary=f"Sovereign risk-free benchmarks and SDL matrix refreshed for {today_str}.",
                 metadata=sov_res
@@ -1781,7 +1781,7 @@ def etf_dossier_page(request: Request, symbol: str):
             "arbitrage": detail["arbitrage_analysis"],
             "replication": detail["replication_audit"],
             "liquidity": detail["liquidity_audit"],
-            "inversion_risks": detail["inversion_risks"],
+            "countercase_risks": detail["countercase_risks"],
             "peers": detail["peers"],
             "forensic_notes": detail["forensic_notes"]
         }
@@ -2019,7 +2019,7 @@ def reit_dossier_page(request: Request, symbol: str):
             "tax_waterfall": detail["tax_waterfall"],
             "ndcf_audit": detail["ndcf_audit"],
             "portfolio_audit": detail["portfolio_audit"],
-            "inversion_risks": detail["inversion_risks"],
+            "countercase_risks": detail["countercase_risks"],
             "peers": detail["peers"],
             "forensic_notes": detail["forensic_notes"],
             "is_deep_dive_unlocked": is_deep_dive_unlocked,

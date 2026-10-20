@@ -11,7 +11,7 @@
 
 | Decision | Outcome |
 | :--- | :--- |
-| **Tagline** | **"Less noise, more nuance."** is the only public tagline. *"Audit the Asset. Protect the Allocator."* is retired. The site and `core/brand/moatnomics_house.py` still carry it until Copy Wave 3a lands |
+| **Tagline** | **"Less noise, more nuance."** is the only public tagline. *"Audit the Asset. Protect the Allocator."* is retired. It was removed from the site, `core/brand/moatnomics_house.py` and the AI/audit prompts on 20 Oct 2026 |
 | **Tagline status** | Working tagline, not market-validated (see `VISUAL_IDENTITY_AND_MOTION_GUIDE.md` §1, §17) |
 | **Brand name** | Closed. No naming, pronunciation or trademark workstream |
 | **Regulatory wording** | Any term that could contradict SEBI wording rules (e.g. *Fiduciary*, *Recommendation*, *zero-hallucination*, user-facing *Surveillance*) is replaced with a similar-meaning, neutral term |

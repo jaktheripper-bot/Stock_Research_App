@@ -1318,12 +1318,12 @@ window.sendAdminLoginOtp = window.sendAdminLoginOtp || async function() {
   }
 };
 
-window.handlePreMortemSubmit = async function(e, ticker) {
+window.handleCountercaseSubmit = async function(e, ticker) {
   if (e) e.preventDefault();
-  const vector = document.getElementById('premortemVector')?.value || '';
-  const notes = document.getElementById('premortemNotes')?.value || '';
-  const statusEl = document.getElementById('premortemStatus');
-  const btn = document.getElementById('btnCommitPremortem');
+  const vector = document.getElementById('countercaseVector')?.value || '';
+  const notes = document.getElementById('countercaseNotes')?.value || '';
+  const statusEl = document.getElementById('countercaseStatus');
+  const btn = document.getElementById('btnCommitCountercase');
 
   if (btn) {
     btn.disabled = true;
@@ -1332,7 +1332,7 @@ window.handlePreMortemSubmit = async function(e, ticker) {
 
   try {
     const user = getStoredUser();
-    const resp = await fetch('/api/premortem', {
+    const resp = await fetch('/api/countercase', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
@@ -2111,20 +2111,20 @@ function toggleAllFundPillars(expand) {
 // ==============================================================================
 // 10. Monitoring Feed Controller (Phase 4)
 // ==============================================================================
-async function toggleSurveillanceFeed() {
-  const modal = document.getElementById('surveillanceModal');
+async function toggleMonitoringFeed() {
+  const modal = document.getElementById('monitoringModal');
   if (!modal) return;
   const isHidden = modal.style.display === 'none' || !modal.style.display;
   if (isHidden) {
     modal.style.display = 'block';
-    loadSurveillanceEvents();
+    loadMonitoringEvents();
   } else {
     modal.style.display = 'none';
   }
 }
 
-async function loadSurveillanceEvents() {
-  const container = document.getElementById('surveillanceEventsList');
+async function loadMonitoringEvents() {
+  const container = document.getElementById('monitoringEventsList');
   if (!container) return;
   container.innerHTML = '<div style="color: #94a3b8; font-size: 12.5px; padding: 16px; text-align: center;">Loading real-time autonomous feed...</div>';
   try {

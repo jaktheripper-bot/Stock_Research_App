@@ -45,7 +45,7 @@ DEFAULT_ALTERNATIVE_YIELD_PRODUCTS = [
         "principal_guarantee_validity": False,
         "rbi_warning_circular": "SEBI Cautionary Notice on Unregulated Digital Gold and Derivative Leases",
         "liquidity_lock_months": 6,
-        "precedent_losses_summary": "Unsecured lease agreements with verified institutional jewelers. Security deposits held by the platform cover only a fractional margin of total leased volume.",
+        "precedent_losses_summary": "Unsecured lease agreements with verified jewelers. Security deposits held by the platform cover only a fractional margin of total leased volume.",
         "safe_alternative_recommendation": "SGB Tranches offering 2.50% Sovereign coupon + 100% Tax-Free capital gains.",
         "audit_matrix_json": json.dumps({
             "regulatory_license": "Digital vault provider (not a regulated NBFC or asset manager)",

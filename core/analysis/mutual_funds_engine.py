@@ -1,12 +1,12 @@
-"""Mutual Fund 6-Pillar Look-Through & Fiduciary Engine.
+"""Mutual Fund 6-Pillar Look-Through & Look-Through Analysis.
 
-Implements the institutional evaluation framework specified in EVALUATION_FRAMEWORKS.md:
+Implements the evaluation framework specified in EVALUATION_FRAMEWORKS.md:
 1. Dual-Sleeve Look-Through (7-Pillar Equity + 5-Pillar Debt)
 2. True Diversification & Active Share (Closet Indexing Detection)
 3. Multi-Fund Portfolio Overlap & Duplication Diagnostic
 4. Risk-Adjusted Alpha & Downside Capture (Sortino, DCR, UCR, Hurst Exponent)
-5. Intermediary Fee Drag & Wealth Destruction (Direct vs Regular TER Compounding)
-6. Scale & Mandate Drift Surveillance (AUM Capacity Traps)
+5. Direct vs Regular Plan Expense Drag (Direct vs Regular TER Compounding)
+6. Scale & Mandate Drift Monitoring (AUM Capacity Traps)
 """
 
 import math
@@ -402,7 +402,7 @@ def calculate_fee_drag(
     initial_investment_lakhs: float = 10.0,
     assumed_gross_return_pct: float = 12.0
 ) -> Dict[str, Any]:
-    """Calculates compounded wealth destruction in Direct vs Regular plans across time horizons."""
+    """Calculates compounded cost in Direct vs Regular plans across time horizons."""
     p0 = initial_investment_lakhs * 100000.0  # In INR
     r_gross = assumed_gross_return_pct / 100.0
     r_dir = r_gross - (ter_direct_pct / 100.0)
@@ -483,7 +483,7 @@ def evaluate_dual_sleeve_lookthrough(
         if h_type in ("EQUITY", "FOREIGN_EQUITY"):
             equity_weight += w
 
-            # Zero-Hallucination: Check if genuine 7-Pillar Equity report exists
+            # Source-Grounded: Check if genuine 7-Pillar Equity report exists
             rep = None
             try:
                 from core.db.reports import get_report_by_ticker
@@ -493,7 +493,7 @@ def evaluate_dual_sleeve_lookthrough(
 
             is_researched = bool(rep and rep.get("report_text"))
             if is_researched:
-                score = VERIFIED_RESEARCHED_EQUITY_SCORE  # Verified 7-pillar institutional asset
+                score = VERIFIED_RESEARCHED_EQUITY_SCORE  # Verified 7-pillar asset
                 genuine_covered_weight += w
                 equity_covered_weight += w
                 equity_weighted_score += (score * w)
@@ -514,7 +514,7 @@ def evaluate_dual_sleeve_lookthrough(
                     posture_badge = "badge-neutral"
                     notes = "Solid Core Holding (Pending 7-Pillar Audit)"
             else:
-                # Strict Zero-Hallucination: Mark unresearched stock as N/A
+                # Strict Source-Grounded: Mark unresearched stock as N/A
                 score = None
                 posture_badge = "badge-neutral"
                 notes = "Coverage Pending (Run 7-Pillar Audit)"
@@ -592,14 +592,14 @@ def evaluate_dual_sleeve_lookthrough(
             health_posture = "MEDIOCRE_HOLD"
             health_badge = "badge-warning"
         else:
-            health_posture = "FIDUCIARY_ALERT"
+            health_posture = "GOVERNANCE_ALERT"
             health_badge = "badge-danger"
     else:
         composite_health = None
         health_posture = "COVERAGE_PENDING"
         health_badge = "badge-neutral"
         warnings.append(
-            f"Look-Through Forensic Audit pending underlying constituent coverage ({genuine_coverage_pct}% verified vs 70.0% threshold). Composite Health Score & qualitative narrative paused."
+            f"Look-Through Accounting Check pending underlying constituent coverage ({genuine_coverage_pct}% verified vs 70.0% threshold). Composite Health Score & qualitative narrative paused."
         )
 
     # Scale and Mandate Drift Checks

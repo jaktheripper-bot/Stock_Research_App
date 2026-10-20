@@ -4,7 +4,7 @@ Comprehensive Reports Database Batch Updater
 Iterates through all equity research dossiers in `reports.db`:
 1. Fetches real-time exchange quotes, P/E multiples, and market caps via Angel One SmartAPI (with resilient fallbacks).
 2. Updates `reports` table with official exchange metrics and refreshed timestamp.
-3. Records an archived audit snapshot in `report_revisions` for thesis drift surveillance.
+3. Records an archived audit snapshot in `report_revisions` for thesis drift monitoring.
 4. Synchronizes all updated reports to Supabase cloud storage & PostgREST database.
 """
 

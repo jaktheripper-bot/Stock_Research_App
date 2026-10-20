@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-Institutional Stress Test & Latency Benchmark Harness
+Stress Test & Latency Benchmark Harness
 =====================================================
 Stress tests and benchmarks the 5 Cortex engines and Angel One Gateway:
 1. Angel One SmartAPI Gateway (TOTP concurrency, token resolution, depth analytics, mock quote failover)
@@ -10,7 +10,7 @@ Stress tests and benchmarks the 5 Cortex engines and Angel One Gateway:
 5. Phase 4: Garuda Event-Driven Reflex (1,000 filing classifications, regex collision stress)
 6. Phase 5: Sutra Portfolio Look-Through (Large multi-asset portfolios, concentration math, overlap alerts)
 
-Reports Mean, P95, P99 Latencies, Throughput (ops/sec), and Zero-Hallucination verification.
+Reports Mean, P95, P99 Latencies, Throughput (ops/sec), and Source-Grounded verification.
 """
 
 import os
@@ -55,7 +55,7 @@ def run_benchmark(name: str, fn, iterations: int = 1000):
 
 def main():
     print("=" * 85)
-    print("⚡ INSTITUTIONAL STRESS TEST & LATENCY BENCHMARK HARNESS")
+    print("⚡ STRESS TEST & LATENCY BENCHMARK HARNESS")
     print("=" * 85)
 
     # --------------------------------------------------------------------------
@@ -232,7 +232,7 @@ def main():
     sutra_audit = SutraLookThroughEngine.audit_portfolio(direct_holdings, fund_holdings, fixed_income)
     print(f"  • Total Portfolio Audited: ₹{sutra_audit.total_portfolio_value_inr:,.0f}")
     print(f"  • Top Underlying Stock:    {sutra_audit.top_stock_exposures[0].symbol} ({sutra_audit.top_stock_exposures[0].total_exposure_pct:.1f}% exposure)")
-    print(f"  • Fiduciary Health Score:  {sutra_audit.portfolio_fiduciary_health_score:.1f}/100")
+    print(f"  • Governance Health Score:  {sutra_audit.portfolio_governance_health_score:.1f}/100")
     print(f"  • Overlap Warnings:        {len(sutra_audit.hidden_overlap_alerts)} alerts emitted")
 
     print("\n" + "=" * 85)

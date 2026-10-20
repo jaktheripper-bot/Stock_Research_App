@@ -141,7 +141,7 @@ class TestAngelOneGateway(unittest.TestCase):
         }
         badge = AngelOneGateway.format_dossier_market_depth_badge(dummy_quote)
         self.assertIn("Exchange Level-2 Depth", badge)
-        self.assertIn("Institutional Accumulation", badge)
+        self.assertIn("Accumulation", badge)
         self.assertIn("Circuit Bands", badge)
 
 
@@ -210,8 +210,8 @@ class TestLocalTotpQr(unittest.TestCase):
 """Comprehensive unit tests for Priority 2 Implementation:
 1. Live AMFI Ingestion Pipeline & NAV Parser
 2. Multi-Asset Omni Product Search
-3. Always-On Asset Surveillance Engine & Ledger
-4. Zero-Hallucination Dual-Sleeve Look-Through
+3. Always-On Asset Monitoring Engine & Ledger
+4. Source-Grounded Dual-Sleeve Look-Through
 5. Search & Asset Web Endpoints
 """
 
@@ -322,7 +322,7 @@ class TestAmfiIngestionAndSearch(unittest.TestCase):
             self.assertIn("url", item)
 
     def test_asset_scanner_ledger(self):
-        scan_id = record_scan_start("test_surveillance", triggered_by="unit_test")
+        scan_id = record_scan_start("test_monitoring", triggered_by="unit_test")
         self.assertTrue(scan_id.startswith("scan_"))
 
         record_scan_complete(
@@ -442,7 +442,7 @@ class TestAmfiIngestionAndSearch(unittest.TestCase):
 """Test Suite for Dynamic AMFI ETF Ingestion Pipeline, Analytical Engine, and UI Integration.
 
 Validates:
-1. Canonical Institutional ETF Universe completeness (140+ ETFs across 9 categories).
+1. Canonical ETF Universe completeness (140+ ETFs across 9 categories).
 2. AMFI text feed parsing, FoF exclusion, deterministic symbol resolution, and categorization.
 3. Database persistence (SQLite/PostgreSQL dual-binding, batch upserts, search, sorting).
 4. Analytical engine evaluations (arbitrage detection, tracking error drag, liquidity tiers).
@@ -474,7 +474,7 @@ from web.main import app
 
 
 class TestCanonicalETFUniverse(unittest.TestCase):
-    """Validates the seed universe of institutional benchmark ETFs."""
+    """Validates the seed universe of benchmark ETFs."""
 
     def test_canonical_universe_size(self):
         self.assertGreaterEqual(len(CANONICAL_ETF_UNIVERSE), 140, "Universe must contain at least 140 ETFs")
@@ -621,7 +621,7 @@ class TestETFDatabaseOperations(unittest.TestCase):
 
 
 class TestETFMatrixEngine(unittest.TestCase):
-    """Validates analytical computations, forensic audit notes, and detail resolution."""
+    """Validates analytical computations, accounting check notes, and detail resolution."""
 
     @classmethod
     def setUpClass(cls):
@@ -653,7 +653,7 @@ class TestETFMatrixEngine(unittest.TestCase):
         self.assertIn("arbitrage_analysis", detail)
         self.assertIn("replication_audit", detail)
         self.assertIn("liquidity_audit", detail)
-        self.assertIn("inversion_risks", detail)
+        self.assertIn("countercase_risks", detail)
         self.assertIn("amc_issuer", detail)
         self.assertEqual(detail["amc_issuer"], "Nippon India Mutual Fund")
         self.assertIn("market_price", detail["arbitrage_analysis"])
@@ -681,7 +681,7 @@ class TestWebAndApiEndpoints(unittest.TestCase):
         self.assertIn("/etfs/NIFTYBEES", response.text)
 
     def test_etf_dossier_html_niftybees(self):
-        """Validates the ETF Institutional Dossier (/etfs/NIFTYBEES)."""
+        """Validates the ETF Stock Report (/etfs/NIFTYBEES)."""
         response = self.client.get("/etfs/NIFTYBEES")
         self.assertEqual(response.status_code, 200)
         html = response.text
@@ -746,7 +746,7 @@ class TestWebAndApiEndpoints(unittest.TestCase):
         self.assertEqual(data["status"], "SUCCESS")
 
     def test_etf_copilot_chat_arbitrage_query(self):
-        """Validates Forensic Intelligence Desk interaction for ETF queries."""
+        """Validates Research Desk interaction for ETF queries."""
         payload = {
             "conversation_id": "test-etf-copilot-arb",
             "message": "What is the arbitrage spread and premium for NIFTYBEES?",

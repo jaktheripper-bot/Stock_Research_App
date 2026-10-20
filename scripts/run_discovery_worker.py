@@ -4,7 +4,7 @@ Morning Discovery Reel Worker (Option B: Full Grounded Synthesis with Historical
 
 Nightly/batch automation script:
 1. Screens and curates 10-15 under-the-radar equities across diverse sectors.
-2. Ensures institutional-grade 7-pillar grounded research reports exist for all cohort members.
+2. Ensures 7-pillar grounded research reports exist for all cohort members.
 3. Persists the curated daily edition to PostgreSQL/SQLite discovery_reel repository.
 """
 
@@ -91,7 +91,7 @@ def run_discovery_pipeline(
                     pass
 
             if needs_synthesis:
-                logger.info(f"⚡ Synthesizing full 7-pillar grounded dossier for {ticker}...")
+                logger.info(f"⚡ Generating full 7-pillar grounded dossier for {ticker}...")
                 report_md = generate_stock_report(ticker, use_grounding=True)
                 if report_md and len(report_md.strip()) >= 500:
                     logger.info(f"✅ Successfully archived grounded dossier for {ticker} ({len(report_md)} chars).")
@@ -107,25 +107,25 @@ def run_discovery_pipeline(
 
     logger.info(
         f"🎉 Morning Discovery Reel edition {edition_date} complete! "
-        f"Saved: {saved_count} equities. Dossiers Synthesized: {synthesized_count}, Reused: {reused_count}."
+        f"Saved: {saved_count} equities. Dossiers Compiled: {synthesized_count}, Reused: {reused_count}."
     )
     return saved_count > 0
 
 
 def main():
-    parser = argparse.ArgumentParser(description="Morning Discovery Reel & Daily Institutional Ingestion Worker")
+    parser = argparse.ArgumentParser(description="Morning Discovery Reel & Daily Ingestion Worker")
     parser.add_argument("--count", type=int, default=15, help="Target number of stocks in cohort (default: 15)")
     parser.add_argument("--date", type=str, default=None, help="Edition date in YYYY-MM-DD format")
     parser.add_argument("--dry-run", action="store_true", help="Run screening without archiving or generating reports")
     parser.add_argument("--force", action="store_true", help="Force new AI synthesis for all stocks regardless of cache")
     parser.add_argument("--mode", choices=["all", "mf-ingest", "discovery"], default="all",
-                        help="Ingestion mode: 'mf-ingest' (uncovered MF constituents), 'discovery' (surveillance screening), or 'all' (default)")
+                        help="Ingestion mode: 'mf-ingest' (uncovered MF constituents), 'discovery' (monitoring screening), or 'all' (default)")
 
     args = parser.parse_args()
 
     success = False
     if args.mode in ("all", "mf-ingest"):
-        logger.info("🏛️ Running Daily 15-Stock Institutional Ingestion & Mutual Fund Saturation...")
+        logger.info("🏛️ Running Daily 15-Stock Ingestion & Mutual Fund Saturation...")
         from core.analysis.daily_stock_ingestion import ingest_daily_stock_cohort
         res = ingest_daily_stock_cohort(
             edition_date=args.date,

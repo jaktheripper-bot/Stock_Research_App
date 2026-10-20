@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """Generator script for Schemes 101 to 200 of the Mutual Fund Canonical Universe.
 
-Produces core/db/mutual_funds_expansion_101_200.py with exactly 100 institutional schemes
+Produces core/db/mutual_funds_expansion_101_200.py with exactly 100 schemes
 covering Multi-Asset, Balanced Advantage, Index & Factor, Sectoral & Thematic,
 Small Cap, Mid Cap, Flexi Cap, and Dividend Yield / Value categories.
 """

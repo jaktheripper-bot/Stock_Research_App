@@ -85,7 +85,7 @@ def get_gemini_spends_summary() -> Dict[str, Any]:
         except Exception as e:
             logger.debug(f"AI spend telemetry: fund_forensic_dossiers count query error: {e}")
 
-        # 3. Live Forensic Intelligence Desk (Genuine User Conversation Turns)
+        # 3. Live Research Desk (Genuine User Conversation Turns)
         try:
             if is_pg:
                 cursor.execute("SELECT COUNT(*) FROM agent_conversation_turns WHERE conversation_id NOT LIKE '%TEST%';")
@@ -138,13 +138,13 @@ def get_gemini_spends_summary() -> Dict[str, Any]:
     stock_cost_usd = (stock_input_tokens / 1_000_000 * GEMINI_FLASH_INPUT_RATE_PER_MILLION) + \
                      (stock_output_tokens / 1_000_000 * GEMINI_FLASH_OUTPUT_RATE_PER_MILLION)
 
-    # 2. Mutual Fund Look-Through Forensic Dossiers
+    # 2. Mutual Fund Look-Through Reports
     mf_input_tokens = mf_dossiers_count * TOKENS_PER_MF_DOSSIER_INPUT
     mf_output_tokens = mf_dossiers_count * TOKENS_PER_MF_DOSSIER_OUTPUT
     mf_cost_usd = (mf_input_tokens / 1_000_000 * GEMINI_FLASH_INPUT_RATE_PER_MILLION) + \
                   (mf_output_tokens / 1_000_000 * GEMINI_FLASH_OUTPUT_RATE_PER_MILLION)
 
-    # 3. Live Forensic Intelligence Desk
+    # 3. Live Research Desk
     copilot_input_tokens = copilot_user_turns * TOKENS_PER_COPILOT_TURN_INPUT
     copilot_output_tokens = copilot_user_turns * TOKENS_PER_COPILOT_TURN_OUTPUT
     copilot_cost_usd = (copilot_input_tokens / 1_000_000 * GEMINI_FLASH_INPUT_RATE_PER_MILLION) + \
@@ -192,7 +192,7 @@ def get_gemini_spends_summary() -> Dict[str, Any]:
         {
             "id": "mutual_funds",
             "name": "Mutual Fund 5-Dimension Look-Through Audits",
-            "category": "Institutional Asset Management",
+            "category": "Asset Management",
             "target_engine": "fund_overlap_auditor.py",
             "model_family": "Gemini_Chief_Forensic_Officer",
             "units_processed": mf_dossiers_count,
@@ -203,14 +203,14 @@ def get_gemini_spends_summary() -> Dict[str, Any]:
             "cost_usd": round(mf_cost_usd, 4),
             "cost_inr": round(mf_cost_usd * USD_TO_INR_RATE, 2),
             "share_pct": round((mf_cost_usd / safe_total_cost) * 100, 1),
-            "billing_type": "Portfolio Look-Through Forensic Synthesis",
+            "billing_type": "Portfolio Look-Through Report Generation",
             "status": "Active / Grounded"
         },
         {
             "id": "copilot_desk",
-            "name": "Live Forensic Intelligence Desk (Copilot)",
+            "name": "Live Research Desk (Copilot)",
             "category": "Interactive Subscriber Assistance",
-            "target_engine": "forensic_desk.py",
+            "target_engine": "research_desk.py",
             "model_family": "gemini-3.8-flash (Cascade)",
             "units_processed": copilot_user_turns,
             "units_label": f"{copilot_user_turns} Genuine User Turns",

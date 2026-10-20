@@ -7,7 +7,7 @@ Synthesizes:
 3. Unified 360° Forensic Health Sieve (10-Point Deterministic Filter)
 4. Multi-Model Valuation Radar & Margin of Safety
 5. Bull vs. Bear Structural Thesis
-Produces a unified institutional equity intelligence package for web dossiers and APIs.
+Produces a unified equity intelligence package for web dossiers and APIs.
 """
 
 from typing import Dict, Any, Optional
@@ -31,7 +31,7 @@ def compile_equity_dossier(
     angel_quote: Optional[Dict[str, Any]] = None,
 ) -> Dict[str, Any]:
     """
-    Assembles all Category 1 institutional intelligence modules into a unified payload.
+    Assembles all Category 1 intelligence modules into a unified payload.
     """
     # 1. Fetch Angel One quote if not provided and configured
     if angel_quote is None and AngelOneGateway.is_configured():
@@ -89,7 +89,7 @@ def compile_equity_dossier(
         flow_data=flow_data,
     )
 
-    # 7. Synthesize Institutional Quality Composite Score (0-100)
+    # 7. Generate Quality Composite Score (0-100)
     # Weights: 30% Sector Operations, 25% Valuation & MoS, 25% Forensic Integrity, 20% Institutional Flow
     sec_score = float(sector_data.get("score", 60.0))
     for_score = float(forensic_data.get("score", 80.0))

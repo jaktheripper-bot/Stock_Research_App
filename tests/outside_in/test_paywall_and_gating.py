@@ -4,7 +4,7 @@ Consolidated Paywalls & Access Control Test Suite
 Unifies:
 1. Equity Pillar 03/05 Paywall (Copilot redaction & route entitlement)
 2. PDF Watermarking & Gated Pillar Redaction
-3. Mutual Fund & Corporate Debt Deep Dive Paywalls (pages, APIs, PDFs, Forensic Desk, and credit unlocks)
+3. Mutual Fund & Corporate Debt Deep Dive Paywalls (pages, APIs, PDFs, Research Desk, and credit unlocks)
 """
 import asyncio
 import os
@@ -15,11 +15,11 @@ os.environ["TESTING"] = "1"
 
 from fastapi.testclient import TestClient
 
-from core.agents.copilot.forensic_desk import (
+from core.agents.copilot.research_desk import (
     GATED_PILLAR_NOTICE,
     build_unlock_notice,
     detect_gated_topic,
-    process_forensic_desk_turn,
+    process_research_desk_turn,
     redact_gated_pillars,
 )
 from core.db import init_db
@@ -91,7 +91,7 @@ class TestCopilotRouteEntitlement(unittest.TestCase):
         body = {"conversation_id": "c1", "message": "summarise", "ticker": "INFY", "user_id": "spoofed_paid_user"}
         if body_override:
             body.update(body_override)
-        with mock.patch("core.agents.copilot.forensic_desk.process_forensic_desk_turn", new=mock.AsyncMock(return_value={"response": "ok"})) as turn:
+        with mock.patch("core.agents.copilot.research_desk.process_research_desk_turn", new=mock.AsyncMock(return_value={"response": "ok"})) as turn:
             client.post("/api/copilot/chat", json=body, **kwargs)
         return turn.call_args.kwargs
 
@@ -256,15 +256,15 @@ class TestTopicDetection(unittest.TestCase):
 
 
 # ==============================================================================
-# 4. Forensic Desk Multi-Asset Paywall
+# 4. Research Desk Multi-Asset Paywall
 # ==============================================================================
-class TestForensicDeskPaywall(unittest.TestCase):
+class TestResearchDeskPaywall(unittest.TestCase):
     @classmethod
     def setUpClass(cls):
         init_db()
 
     def _turn(self, cid, message, ticker, asset_type, section=None, **kwargs):
-        return asyncio.run(process_forensic_desk_turn(
+        return asyncio.run(process_research_desk_turn(
             conversation_id=cid, user_message=message, ticker=ticker,
             asset_type=asset_type, section=section, **kwargs
         ))
@@ -328,14 +328,14 @@ class TestForensicDeskPaywall(unittest.TestCase):
     def test_section_data_dropped_when_locked(self):
         captured = {}
         real_builder = __import__(
-            "core.agents.copilot.forensic_desk", fromlist=["build_mutual_fund_deterministic_response"]
+            "core.agents.copilot.research_desk", fromlist=["build_mutual_fund_deterministic_response"]
         ).build_mutual_fund_deterministic_response
 
         def spy(context_data, *a, **k):
             captured.update(context_data)
             return real_builder(context_data, *a, **k)
 
-        with mock.patch("core.agents.copilot.forensic_desk.build_mutual_fund_deterministic_response", side_effect=spy):
+        with mock.patch("core.agents.copilot.research_desk.build_mutual_fund_deterministic_response", side_effect=spy):
             self._turn("PW-FUND-7", "overview", FUND, "mutual_fund", section_data={"leak": "SECRET"})
         self.assertEqual(captured.get("section_data"), {})
         for gated in ("weighted_moat_score", "accounting_risk_index", "dossier_text"):
@@ -534,8 +534,8 @@ class TestMultiAssetCopilotPaywallRedactions(unittest.TestCase):
             captured.update(ctx)
             return "OK"
 
-        with mock.patch("core.agents.copilot.forensic_desk.build_mutual_fund_deterministic_response", side_effect=mock_builder):
-            asyncio.run(process_forensic_desk_turn(
+        with mock.patch("core.agents.copilot.research_desk.build_mutual_fund_deterministic_response", side_effect=mock_builder):
+            asyncio.run(process_research_desk_turn(
                 conversation_id="TEST-RED-FUND-LOCKED",
                 user_message="Summarize the fund overview",
                 ticker="PPFAS_FLEXICAP_DIR",
@@ -552,8 +552,8 @@ class TestMultiAssetCopilotPaywallRedactions(unittest.TestCase):
             captured.update(ctx)
             return "OK"
 
-        with mock.patch("core.agents.copilot.forensic_desk.build_mutual_fund_deterministic_response", side_effect=mock_builder):
-            asyncio.run(process_forensic_desk_turn(
+        with mock.patch("core.agents.copilot.research_desk.build_mutual_fund_deterministic_response", side_effect=mock_builder):
+            asyncio.run(process_research_desk_turn(
                 conversation_id="TEST-RED-FUND-UNLOCKED",
                 user_message="Summarize the fund overview",
                 ticker="PPFAS_FLEXICAP_DIR",
@@ -570,8 +570,8 @@ class TestMultiAssetCopilotPaywallRedactions(unittest.TestCase):
             captured.update(ctx)
             return "OK"
 
-        with mock.patch("core.agents.copilot.forensic_desk.build_debt_deterministic_response", side_effect=mock_builder):
-            asyncio.run(process_forensic_desk_turn(
+        with mock.patch("core.agents.copilot.research_desk.build_debt_deterministic_response", side_effect=mock_builder):
+            asyncio.run(process_research_desk_turn(
                 conversation_id="TEST-RED-DEBT-LOCKED",
                 user_message="Overview of this bond",
                 ticker="INE002A08012",
@@ -590,8 +590,8 @@ class TestMultiAssetCopilotPaywallRedactions(unittest.TestCase):
             captured.update(ctx)
             return "OK"
 
-        with mock.patch("core.agents.copilot.forensic_desk.build_debt_deterministic_response", side_effect=mock_builder):
-            asyncio.run(process_forensic_desk_turn(
+        with mock.patch("core.agents.copilot.research_desk.build_debt_deterministic_response", side_effect=mock_builder):
+            asyncio.run(process_research_desk_turn(
                 conversation_id="TEST-RED-DEBT-UNLOCKED",
                 user_message="Overview of this bond",
                 ticker="INE002A08012",
@@ -603,14 +603,14 @@ class TestMultiAssetCopilotPaywallRedactions(unittest.TestCase):
         self.assertIn("investment_thesis", posture)
         self.assertIn("pillars", posture)
 
-    def test_locked_reit_empties_inversion_risks(self):
+    def test_locked_reit_empties_countercase_risks(self):
         captured = {}
         def mock_builder(ctx, sec, tick, msg):
             captured.update(ctx)
             return "OK"
 
-        with mock.patch("core.agents.copilot.forensic_desk.build_reit_deterministic_response", side_effect=mock_builder):
-            asyncio.run(process_forensic_desk_turn(
+        with mock.patch("core.agents.copilot.research_desk.build_reit_deterministic_response", side_effect=mock_builder):
+            asyncio.run(process_research_desk_turn(
                 conversation_id="TEST-RED-REIT-LOCKED",
                 user_message="Overview of this trust",
                 ticker="EMBASSY",
@@ -618,16 +618,16 @@ class TestMultiAssetCopilotPaywallRedactions(unittest.TestCase):
                 deep_dive_unlocked=False,
             ))
         self.assertFalse(captured.get("deep_dive_unlocked"))
-        self.assertEqual(captured.get("inversion_risks"), [])
+        self.assertEqual(captured.get("countercase_risks"), [])
 
-    def test_unlocked_reit_preserves_inversion_risks(self):
+    def test_unlocked_reit_preserves_countercase_risks(self):
         captured = {}
         def mock_builder(ctx, sec, tick, msg):
             captured.update(ctx)
             return "OK"
 
-        with mock.patch("core.agents.copilot.forensic_desk.build_reit_deterministic_response", side_effect=mock_builder):
-            asyncio.run(process_forensic_desk_turn(
+        with mock.patch("core.agents.copilot.research_desk.build_reit_deterministic_response", side_effect=mock_builder):
+            asyncio.run(process_research_desk_turn(
                 conversation_id="TEST-RED-REIT-UNLOCKED",
                 user_message="Overview of this trust",
                 ticker="EMBASSY",
@@ -635,8 +635,8 @@ class TestMultiAssetCopilotPaywallRedactions(unittest.TestCase):
                 deep_dive_unlocked=True,
             ))
         self.assertTrue(captured.get("deep_dive_unlocked"))
-        self.assertIsInstance(captured.get("inversion_risks"), list)
-        self.assertGreater(len(captured.get("inversion_risks")), 0)
+        self.assertIsInstance(captured.get("countercase_risks"), list)
+        self.assertGreater(len(captured.get("countercase_risks")), 0)
 
 
 if __name__ == "__main__":

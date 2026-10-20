@@ -1,4 +1,4 @@
-"""Search module for Stock Research App."""
+"""Search module for Moatnomics."""
 from core.search.product_search import (
     search_all_products,
     search_equities,

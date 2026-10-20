@@ -2,15 +2,15 @@
 """
 Unlisted MSME & Emerging SME Forensic Analysis Engine
 ==============================================================================
-Provides institutional-grade quantitative and qualitative forensic evaluations
+Provides quantitative and qualitative forensic evaluations
 for unlisted Indian enterprises under the revised MSMED Act 2020 framework.
 
 Evaluates:
 1. Working Capital & Cash Conversion Cycle (DIO, DSO, DPO, Net CCC Days, WCR in Cr)
 2. Listed Corporate Supply-Chain Linkages (Correlating MSMEs to listed NSE/BSE buyers)
 3. Solvency, Operating Margins & TReDS Liquidity Risk (ICR, 45-day statutory shield)
-4. Cluster Density & Capital Replacement Moat Score (0–100 Institutional Scorecard)
-5. Pre-Mortem Fragility Inversion Vectors & Growth Drivers
+4. Cluster Density & Capital Replacement Moat Score (0–100 Scorecard)
+5. Countercase Fragility Vectors & Growth Drivers
 ==============================================================================
 """
 
@@ -223,7 +223,7 @@ def _resolve_sector_benchmark(sector_name: Optional[str]) -> Dict[str, Any]:
 
 def compute_msme_forensic_dossier(firm_data: Dict[str, Any]) -> Dict[str, Any]:
     """
-    Computes a complete, institutional-grade 4-pillar forensic dossier for an MSME.
+    Computes a complete 4-pillar report for an MSME.
 
     Args:
         firm_data: Dictionary containing:
@@ -328,7 +328,7 @@ def compute_msme_forensic_dossier(firm_data: Dict[str, Any]) -> Dict[str, Any]:
 
     # TReDS Platform Liquidity Rating
     if turnover >= 50.0 and icr >= 3.0:
-        treds_grade = "Tier A (High Institutional Discounting Rate)"
+        treds_grade = "Tier A (High Discounting Rate)"
         treds_discount_cost = "~7.5% - 8.2% p.a."
         treds_liquidity_desc = "Qualifies for competitive non-recourse invoice discounting on RXIL / M1xchange against accepted listed-buyer invoices."
     elif turnover >= 15.0:
@@ -360,7 +360,7 @@ def compute_msme_forensic_dossier(firm_data: Dict[str, Any]) -> Dict[str, Any]:
     moat_score = int(max(35, min(95, round(raw_moat))))
 
     if moat_score >= 75:
-        moat_tier = "Institutional Quality Vendor"
+        moat_tier = "Quality Vendor"
         moat_color = "#10b981"
         moat_badge = "High Moat"
     elif moat_score >= 60:
@@ -412,7 +412,7 @@ def compute_msme_forensic_dossier(firm_data: Dict[str, Any]) -> Dict[str, Any]:
         for b in listed_buyers
     ]
 
-    # Assemble comprehensive forensic dossier payload
+    # Assemble comprehensive report payload
     return {
         "uin": uin,
         "name": name,

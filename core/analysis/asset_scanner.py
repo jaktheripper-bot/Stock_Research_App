@@ -1,9 +1,9 @@
 """Always-On Asset Scan & Multi-Asset Audit Engine.
 
-Executes scheduled surveillance across Mutual Funds, Corporate Debt, and Listed Securities:
+Executes scheduled monitoring across Mutual Funds, Corporate Debt, and Listed Securities:
 - Daily diff: NEW / CHANGED / CLOSED-MERGED -> ARCHIVED (append-only)
 - Logs every scan run to the immutable `asset_scan_runs` database ledger
-- Complies with SEBI continuous disclosure surveillance and portfolio drift rules
+- Complies with SEBI continuous disclosure monitoring and portfolio drift rules
 """
 
 import json
@@ -146,7 +146,7 @@ def scan_mutual_funds(limit: Optional[int] = None) -> Dict[str, Any]:
 
 def scan_debt_securities() -> Dict[str, Any]:
     """
-    Executes surveillance across Corporate Debt & Debentures:
+    Executes monitoring across Corporate Debt & Debentures:
     - Checks maturity dates (maturing within 30 days)
     - Verifies CRA credit rating downgrade watches
     """

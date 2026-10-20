@@ -144,7 +144,7 @@ class TestAiQosGovernorUnit(unittest.TestCase):
         barrier = threading.Barrier(10)
 
         synthetic_report = (
-            f"# Institutional Research Dossier for {ticker}\n"
+            f"# Research Dossier for {ticker}\n"
             "## 1. Executive Summary\n"
             "This company demonstrates durable competitive advantages with high ROCE and expanding margins. "
             "Capital allocation discipline is exemplary with zero promoter pledging and consistent dividend growth. "
@@ -173,7 +173,7 @@ class TestAiQosGovernorUnit(unittest.TestCase):
                 # Simulate network/LLM synthesis latency
                 time.sleep(0.04)
 
-                # Commit newly synthesized report to DB cache
+                # Commit newly compiled report to DB cache
                 save_report_to_archive(
                     stock_data={"ticker": ticker, "short_name": "Coalesce Test Ltd"},
                     report_text=synthetic_report,

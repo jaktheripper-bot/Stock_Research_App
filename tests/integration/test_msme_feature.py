@@ -4,9 +4,9 @@ Validates:
 1. Canonical MSME Seeding Engine & MSMED Act 2020 Tier Classification
 2. Ingestion Pipeline Fallback & Resiliency
 3. Dual-Dialect Search & Filter Engine (SQLite & PostgreSQL Compatible)
-4. Full 4-Pillar Analytical Forensic Engine (Working Capital, Listed Supply Chain, Solvency, Moat Score)
+4. Full 4-Pillar Analytical Research Engine (Working Capital, Listed Supply Chain, Solvency, Moat Score)
 5. MSME REST API Endpoints (/api/msme/stats, /sectors, /states, /search, /{uin})
-6. Standalone Institutional Dossier Route & 4-Pillar HTML Rendering (/msme/{uin})
+6. Standalone Stock Report Route & 4-Pillar HTML Rendering (/msme/{uin})
 7. Web Directory DOM Modal Contract, Element Binding & Click-Wiring (/msme)
 8. XML Sitemap Inclusion for /msme and enterprise dossiers
 """
@@ -133,11 +133,11 @@ class TestMsmeFeatureSuite(unittest.TestCase):
             self.assertIn("Tier", p3["treds_grade"])
             self.assertIn("%", p3["treds_discount_cost"])
 
-            # Pillar 4: Cluster Moat & Pre-Mortem Risk Inversion
+            # Pillar 4: Cluster Moat & Countercase Risk Inversion
             p4 = dossier["pillar_4_moat"]
             self.assertGreaterEqual(p4["moat_score"], 35)
             self.assertLessEqual(p4["moat_score"], 95)
-            self.assertIn(p4["moat_tier"], ["Institutional Quality Vendor", "Core Industrial Specialist", "Developing Ancillary Workshop"])
+            self.assertIn(p4["moat_tier"], ["Quality Vendor", "Core Industrial Specialist", "Developing Ancillary Workshop"])
             self.assertIn("Moat", p4["moat_badge"])
             self.assertGreaterEqual(len(p4["growth_catalysts"]), 2)
             self.assertGreaterEqual(len(p4["fragility_vectors"]), 2)
@@ -193,7 +193,7 @@ class TestMsmeFeatureSuite(unittest.TestCase):
             self.assertGreaterEqual(r["annual_turnover"], 50.0)
 
     def test_api_msme_profile_by_uin_endpoint_with_forensic_payload(self):
-        """Verify GET /api/msme/{uin} returns rich 4-pillar forensic dossier."""
+        """Verify GET /api/msme/{uin} returns rich 4-pillar report."""
         sample_uin = CANONICAL_MSME_FIRMS[0]["uin"]
         response = self.client.get(f"/api/msme/{sample_uin}")
         self.assertEqual(response.status_code, 200)

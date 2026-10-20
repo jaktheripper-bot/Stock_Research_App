@@ -1,5 +1,5 @@
 """
-Daily 15-Stock Institutional Ingestion & Mutual Fund Constituent Expansion Coordinator.
+Daily 15-Stock Ingestion & Mutual Fund Constituent Expansion Coordinator.
 
 Mission:
 1. Ingests 15 brand-new, high-impact constituent equities every single day at 08:30 AM IST.
@@ -228,14 +228,14 @@ def generate_deterministic_7pillar_report(stock_data: Dict[str, Any], candidate_
     de = candidate_meta.get("default_de") or 0.15
     scheme_count = candidate_meta.get("scheme_count") or 1
     est_aum_cr = candidate_meta.get("estimated_aum_cr") or 500.0
-    top_schemes = candidate_meta.get("top_schemes") or ["Marquee Institutional Portfolios"]
-    schemes_str = ", ".join(top_schemes[:2]) if top_schemes else "Institutional Portfolios"
+    top_schemes = candidate_meta.get("top_schemes") or ["Marquee Portfolios"]
+    schemes_str = ", ".join(top_schemes[:2]) if top_schemes else "Portfolios"
 
     moat_rating = "Wide" if roce >= 20.0 else "Moderate"
     solvency_rating = "Debt-Free" if de <= 0.05 else ("Moderate Debt" if de <= 0.5 else "High Debt")
     valuation_rating = "Fair" if pe != "N/A" else "Undervalued"
 
-    report_markdown = f"""# Institutional Equity Research Dossier: {company_name} ({ticker})
+    report_markdown = f"""# Equity Research Dossier: {company_name} ({ticker})
 
 ### Health Matrix
 - Macro: Stable
@@ -247,11 +247,11 @@ def generate_deterministic_7pillar_report(stock_data: Dict[str, Any], candidate_
 - Capital Allocation: Disciplined
 
 # DIAGNOSTIC SUMMARY & KEY TAKEAWAYS
-**Summary:** {company_name} is held across {scheme_count} active mutual fund schemes `[VERIFIED FACT]` and operates with a debt-to-equity ratio of {de:.2f} `[CALCULATED METRIC]` alongside a Return on Capital Employed (ROCE) of {roce:.1f}% `[CALCULATED METRIC]`. While the operating franchise benefits from steady institutional sponsorship, long-term compounding depends on converting incremental revenue into free cash flow without stretching working capital `[MODEL INTERPRETATION]`.
+**Summary:** {company_name} is held across {scheme_count} active mutual fund schemes `[VERIFIED FACT]` and operates with a debt-to-equity ratio of {de:.2f} `[CALCULATED METRIC]` alongside a Return on Capital Employed (ROCE) of {roce:.1f}% `[CALCULATED METRIC]`. While the operating franchise benefits from steady sponsorship, long-term compounding depends on converting incremental revenue into free cash flow without stretching working capital `[MODEL INTERPRETATION]`.
 
 ---
 ## Pillar 1: Macro-Economic, Geopolitical & Environmental Overlays
-{company_name} operates within the {sector} sector, where domestic demand and infrastructure capital expenditure provide medium-term volume visibility `[MODEL INTERPRETATION]`. Institutional allocations by schemes including {schemes_str} `[VERIFIED FACT]` reflect the company's established position in domestic supply chains, though margins remain sensitive to broader input-cost cycles and regulatory policy shifts `[UNRESOLVED UNCERTAINTY]`.
+{company_name} operates within the {sector} sector, where domestic demand and infrastructure capital expenditure provide medium-term volume visibility `[MODEL INTERPRETATION]`. Allocations by schemes including {schemes_str} `[VERIFIED FACT]` reflect the company's established position in domestic supply chains, though margins remain sensitive to broader input-cost cycles and regulatory policy shifts `[UNRESOLVED UNCERTAINTY]`.
 
 #### Falsification & Thesis-Revision Triggers
 - A sustained slowdown in domestic capital expenditure or adverse regulatory tariff revisions that reduce sector volume growth below historical baselines for two consecutive quarters.
@@ -284,7 +284,7 @@ At a current market price of ₹{price:,.2f} `[VERIFIED FACT]` and trailing P/E 
 Secondary market liquidity reflects institutional participation across {scheme_count} mutual fund schemes with an estimated holding footprint of ₹{est_aum_cr:,.1f} Cr `[CALCULATED METRIC]`. Order-book depth and moving-average alignment indicate orderly price discovery rather than speculative retail crowding `[MODEL INTERPRETATION]`.
 
 #### Falsification & Thesis-Revision Triggers
-- Sustained institutional distribution accompanied by a breakdown below the 200-day moving average on elevated delivery volume.
+- Sustained distribution accompanied by a breakdown below the 200-day moving average on elevated delivery volume.
 
 ## Pillar 7: ESG Impact Scorecard
 Tabulate the ESG analysis strictly using the following Markdown table format:
@@ -299,7 +299,7 @@ Tabulate the ESG analysis strictly using the following Markdown table format:
 
 ### Verified Regulatory Sources
 - Primary Source: [Official BSE Corporate Announcements ({ticker})](https://www.bseindia.com/stock-share-price/-/{scrip}/corporate-announcements/)
-- Institutional Registry: Statutory Mutual Fund Portfolio Disclosures under SEBI Regulations
+- Registry: Statutory Mutual Fund Portfolio Disclosures under SEBI Regulations
 """
     return report_markdown.strip()
 
@@ -347,7 +347,7 @@ def synthesize_and_archive_stock_dossier(
     if not stock_data.get("sector"):
         stock_data["sector"] = sector
 
-    # 2. Synthesize 7-Pillar Report
+    # 2. Generate 7-Pillar Report
     report_text = ""
     api_key = get_secret("GEMINI_API_KEY")
 
@@ -362,21 +362,21 @@ def synthesize_and_archive_stock_dossier(
             current_daemon_spend_usd=get_daemon_daily_spend_usd(),
         )
         if not daemon_ok:
-            logger.info(f"Background daemon QoS pause for {ticker}: {daemon_msg}. Using deterministic institutional synthesis to protect VIP quota.")
+            logger.info(f"Background daemon QoS pause for {ticker}: {daemon_msg}. Using deterministic synthesis to protect VIP quota.")
         else:
             try:
                 from core.analysis.dossier_report_synthesis import generate_stock_report
-                logger.info(f"Synthesizing Gemini 7-Pillar research dossier for daily ingestion: {ticker}...")
+                logger.info(f"Generating Gemini 7-Pillar research dossier for daily ingestion: {ticker}...")
                 report_text = generate_stock_report(ticker)
                 record_daemon_spend_usd(0.001)
             except Exception as gem_err:
-                logger.warning(f"Live Gemini synthesis notice for {ticker}: {gem_err}. Falling back to deterministic institutional synthesis.")
+                logger.warning(f"Live Gemini synthesis notice for {ticker}: {gem_err}. Falling back to deterministic synthesis.")
                 report_text = ""
 
 
     # Fallback to deterministic synthesis if Gemini is skipped or unavailable
     if not report_text or len(report_text.strip()) < 500:
-        logger.info(f"Generating deterministic institutional 7-pillar research report for {ticker}...")
+        logger.info(f"Generating deterministic 7-pillar research report for {ticker}...")
         report_text = generate_deterministic_7pillar_report(stock_data, candidate)
         ann = ""
         if not os.environ.get("TESTING") == "1" and scrip_code:
@@ -389,7 +389,7 @@ def synthesize_and_archive_stock_dossier(
             stock_data=stock_data,
             report_text=report_text,
             announcement=ann,
-            revision_trigger="Daily 08:30 AM Institutional Ingestion",
+            revision_trigger="Daily 08:30 AM Ingestion",
             citations=[{
                 "title": f"BSE Corporate Announcements & Disclosures ({ticker})",
                 "uri": f"https://www.bseindia.com/stock-share-price/-/{scrip_code}/corporate-announcements/" if scrip_code else "https://www.bseindia.com",
@@ -457,7 +457,7 @@ def recalculate_affected_mutual_funds(ingested_tickers: List[str]) -> List[Dict[
             if old_dossier:
                 old_cov = float(old_dossier.get("genuine_coverage_pct") or old_dossier.get("equity_coverage_pct") or 0.0)
 
-            # Re-compute forensic look-through
+            # Re-compute look-through
             new_dossier = compute_fund_forensic_lookthrough(scheme_code)
             save_fund_forensic_dossier(new_dossier)
 
@@ -488,7 +488,7 @@ def ingest_daily_stock_cohort(
     """
     Main Daily 08:30 AM Orchestrator:
     1. Selects top 15 uncovered mutual fund constituent equities.
-    2. Synthesizes full 7-Pillar institutional qualitative dossiers for each.
+    2. Synthesizes full 7-Pillar qualitative dossiers for each.
     3. Archives to reports.db and generates today's /discovery Morning Discovery Reel.
     4. Automatically recalculates all affected mutual fund look-through metrics.
     5. Records autonomous audit event.
@@ -513,7 +513,7 @@ def ingest_daily_stock_cohort(
             "message": "Universe fully saturated. All mutual fund constituents covered."
         }
 
-    # 2. Ingest and synthesize each stock
+    # 2. Ingest and generate each stock
     ingested_results = []
     discovery_reel_items = []
 
@@ -543,7 +543,7 @@ def ingest_daily_stock_cohort(
                 "debt_to_equity": de,
                 "sales_growth_3y": 18.5,
                 "ria_thesis": (
-                    f"Institutional compounder held across {scnt} mutual funds with an estimated ₹{aum_cr:,.0f} Cr holding footprint ({schemes_str}). "
+                    f"Compounder held across {scnt} mutual funds with an estimated ₹{aum_cr:,.0f} Cr holding footprint ({schemes_str}). "
                     f"Commands ROCE of {roce:.1f}% and debt-to-equity of {de:.2f}."
                 ),
                 "catalyst_headline": f"Statutory Mutual Fund Constituent Induction • {scnt} Schemes",

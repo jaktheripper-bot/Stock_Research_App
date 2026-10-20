@@ -7,7 +7,7 @@ from core.db.reports import _format_timestamp
 
 logger = logging.getLogger("equity_research.core.db.alerts")
 
-def record_alert_event(ticker: str, category: str, severity: str, title: str, details: str = "", source: str = "BSE Surveillance") -> int:
+def record_alert_event(ticker: str, category: str, severity: str, title: str, details: str = "", source: str = "BSE Monitoring") -> int:
     """Records an immutable alert event for a stock."""
     init_db()
     conn = get_db_connection()
@@ -79,7 +79,7 @@ def get_alert_events(ticker: str = None, category: str = None, unread_only: bool
                 "details": row[5] or "",
                 "timestamp": _format_timestamp(row[6]),
                 "is_read": bool(row[7]),
-                "source": row[8] or "BSE Surveillance"
+                "source": row[8] or "BSE Monitoring"
             })
     except Exception as e:
         logger.error(f"Error in get_alert_events: {e}")

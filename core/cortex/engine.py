@@ -1,13 +1,13 @@
 """
 Anvik Cortex Engine
 ===================
-Proprietary Institutional Quantitative Financial Architecture.
+Proprietary Quantitative Financial Architecture.
 
 Encapsulates four core proprietary quantitative and forensic valuation algorithms:
 1. Dynamic Statutory Yield Wedge (Statutory FCF Yield vs Sovereign / Monetary Baselines)
 2. Reverse DCF Hurdle Deconstruct (Numerical Root Solver for Market-Implied Growth CAGRs)
 3. PEAD Quant Drift Velocity (Post-Earnings Announcement Drift, Delivery Signature & Persistence)
-4. Fiduciary Governance Scoring Index (RPT, Promoter Pledge Velocity, Auditor Quality, Contingent Risk)
+4. Governance Scoring Index (RPT, Promoter Pledge Velocity, Auditor Quality, Contingent Risk)
 """
 
 from dataclasses import dataclass, field
@@ -305,7 +305,7 @@ class PeadDriftVelocityResult:
 class PeadQuantDriftVelocity:
     """
     Evaluates Post-Earnings Announcement Drift (PEAD) persistence, unexpected earnings surprise
-    (SUE), volume expansion, and institutional delivery accumulation signatures for Indian equities.
+    (SUE), volume expansion, and delivery accumulation signatures for Indian equities.
     """
 
     @classmethod
@@ -350,7 +350,7 @@ class PeadQuantDriftVelocity:
         else:
             vol_score = 5.0
 
-        # Component C: Institutional Delivery Surge Signature (max 30 pts)
+        # Component C: Delivery Surge Signature (max 30 pts)
         if post_delivery_pct >= 60.0 or delivery_surge >= 15.0:
             del_score = 30.0
         elif post_delivery_pct >= 45.0 or delivery_surge >= 5.0:
@@ -382,7 +382,7 @@ class PeadQuantDriftVelocity:
             persistence_days = 5
             summary = (
                 f"{symbol.upper()} signals post-earnings drift exhaustion or negative drag (Score: {total_score}/100). "
-                f"Subdued institutional delivery with earnings contraction ({sue_pct:+.1f}%)."
+                f"Subdued delivery with earnings contraction ({sue_pct:+.1f}%)."
             )
 
         return PeadDriftVelocityResult(
@@ -401,13 +401,13 @@ class PeadQuantDriftVelocity:
 
 
 # ==============================================================================
-# 4. Fiduciary Governance Scoring Index
+# 4. Governance Scoring Index
 # ==============================================================================
 
 @dataclass
-class FiduciaryGovernanceResult:
+class GovernanceResult:
     symbol: str
-    fiduciary_score: float  # 0 to 100
+    governance_score: float  # 0 to 100
     governance_tier: str  # "TIER_1_PRISTINE", "TIER_2_ACCEPTABLE", "TIER_3_ELEVATED_SCRUTINY", "TIER_4_RED_FLAG_DEFICIT"
     rpt_revenue_ratio_pct: float
     promoter_pledge_pct: float
@@ -419,7 +419,7 @@ class FiduciaryGovernanceResult:
     summary: str = ""
 
 
-class FiduciaryGovernanceScoringIndex:
+class GovernanceScoringIndex:
     """
     Forensic governance assessment indexing related-party transactions (RPT), promoter pledge
     velocity, board independence composition, contingent liability wedges, and statutory audit qualifications.
@@ -435,7 +435,7 @@ class FiduciaryGovernanceScoringIndex:
         board_independence_ratio_pct: float = 50.0,
         contingent_liabilities_to_networth_pct: float = 0.0,
         auditor_qualification_flag: bool = False,
-    ) -> FiduciaryGovernanceResult:
+    ) -> GovernanceResult:
         score = 100.0
         flags: List[str] = []
 
@@ -484,7 +484,7 @@ class FiduciaryGovernanceScoringIndex:
 
         if final_score >= 80.0:
             tier = "TIER_1_PRISTINE"
-            summary = f"{symbol.upper()} demonstrates pristine fiduciary governance (Score: {final_score}/100) with minimal encumbrances."
+            summary = f"{symbol.upper()} demonstrates pristine governance (Score: {final_score}/100) with minimal encumbrances."
         elif final_score >= 60.0:
             tier = "TIER_2_ACCEPTABLE"
             summary = f"{symbol.upper()} maintains acceptable governance compliance (Score: {final_score}/100) with minor observation points."
@@ -493,11 +493,11 @@ class FiduciaryGovernanceScoringIndex:
             summary = f"{symbol.upper()} exhibits elevated statutory governance scrutiny (Score: {final_score}/100). Review RPT and pledge disclosures."
         else:
             tier = "TIER_4_RED_FLAG_DEFICIT"
-            summary = f"{symbol.upper()} raises critical red-flag forensic deficits (Score: {final_score}/100). Fiduciary safety is compromised."
+            summary = f"{symbol.upper()} raises critical red-flag forensic deficits (Score: {final_score}/100). Governance safety is compromised."
 
-        return FiduciaryGovernanceResult(
+        return GovernanceResult(
             symbol=symbol.upper(),
-            fiduciary_score=final_score,
+            governance_score=final_score,
             governance_tier=tier,
             rpt_revenue_ratio_pct=round(rpt_revenue_ratio_pct, 2),
             promoter_pledge_pct=round(promoter_pledge_pct, 2),
@@ -520,7 +520,7 @@ class CortexCompositeEvaluation:
     yield_wedge: StatutoryYieldWedgeResult
     reverse_dcf: ReverseDcfHurdleResult
     pead_drift: PeadDriftVelocityResult
-    governance: FiduciaryGovernanceResult
+    governance: GovernanceResult
     institutional_cortex_score: float  # 0 to 100
     conviction_quadrant: str  # "ALPHA_LEADER", "DEFENSIVE_COMPOUNDER", "SPECULATIVE_MOMENTUM", "HIGH_RISK_DEFICIT"
     executive_verdict: str
@@ -528,7 +528,7 @@ class CortexCompositeEvaluation:
 
 class AnvikCortexEngine:
     """
-    Unified proprietary institutional intelligence engine orchestrating all four Anvik
+    Unified proprietary intelligence engine orchestrating all four Anvik
     cortex analytical methodologies into a cohesive equity verdict.
     """
 
@@ -578,7 +578,7 @@ class AnvikCortexEngine:
             post_delivery_pct=post_delivery_pct,
         )
 
-        gov = FiduciaryGovernanceScoringIndex.evaluate(
+        gov = GovernanceScoringIndex.evaluate(
             symbol=symbol,
             rpt_revenue_ratio_pct=rpt_revenue_ratio_pct,
             promoter_pledge_pct=promoter_pledge_pct,
@@ -588,12 +588,12 @@ class AnvikCortexEngine:
             auditor_qualification_flag=auditor_qualification_flag,
         )
 
-        # Calculate composite institutional score (0 - 100)
+        # Calculate composite score (0 - 100)
         # Weights: Governance (30%), Yield Wedge (25%), DCF Hurdle (25%), PEAD (20%)
         wedge_score = 100.0 if wedge.yield_hurdle_pass else (65.0 if wedge.regime == "FAIR_VALUE_EQUILIBRIUM" else 30.0)
         dcf_score = 100.0 if dcf.hurdle_difficulty == "LOW_HURDLE" else (65.0 if dcf.hurdle_difficulty == "MODERATE_HURDLE" else 30.0)
         pead_score = pead.drift_velocity_score
-        gov_score = gov.fiduciary_score
+        gov_score = gov.governance_score
 
         composite = round(
             (gov_score * 0.30) + (wedge_score * 0.25) + (dcf_score * 0.25) + (pead_score * 0.20),
@@ -603,16 +603,16 @@ class AnvikCortexEngine:
         # Determine conviction quadrant
         if gov.governance_tier in ("TIER_3_ELEVATED_SCRUTINY", "TIER_4_RED_FLAG_DEFICIT"):
             quadrant = "HIGH_RISK_DEFICIT"
-            verdict = f"Forensic governance red flags preclude institutional conviction despite operational metrics."
+            verdict = f"Forensic governance red flags preclude conviction despite operational metrics."
         elif composite >= 75.0:
             quadrant = "ALPHA_LEADER"
-            verdict = f"Pristine statutory profile, superior cash generation wedge, and positive institutional drift velocity."
+            verdict = f"Pristine statutory profile, superior cash generation wedge, and positive drift velocity."
         elif dcf.hurdle_difficulty == "LOW_HURDLE" and wedge.yield_hurdle_pass:
             quadrant = "DEFENSIVE_COMPOUNDER"
             verdict = f"Attractive margin of safety with cash flow yields exceeding sovereign benchmark hurdle."
         elif pead.pead_signal == "ACCELERATING_INSTITUTIONAL_DRIFT":
             quadrant = "SPECULATIVE_MOMENTUM"
-            verdict = f"Elevated valuation hurdles offset in the short term by strong institutional drift velocity."
+            verdict = f"Elevated valuation hurdles offset in the short term by strong drift velocity."
         else:
             quadrant = "DEFENSIVE_COMPOUNDER"
             verdict = f"Balanced fundamentals trading near fair valuation equilibrium."

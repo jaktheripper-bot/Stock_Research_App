@@ -1,6 +1,6 @@
 """Analytical Engine for Sovereign Risk-Free Benchmarks and RBI Yield Curves.
 
-Constructs the institutional Indian Sovereign Par Yield Curve across 91D, 182D, 364D Treasury Bills,
+Constructs the Indian Sovereign Par Yield Curve across 91D, 182D, 364D Treasury Bills,
 2Y, 3Y, 5Y, 7Y, 10Y, 14Y, 20Y, 30Y, 40Y, and 50Y Central Government Securities (G-Sec),
 Sovereign Green Bonds (SGrB), and State Development Loans (SDL) across 10 borrowing states.
 """
@@ -153,7 +153,7 @@ def evaluate_sovereign_curve() -> Dict[str, Any]:
     # Policy transmission spread (10Y minus Policy Repo)
     policy_spread_bps = round((gsec_10y - repo_val) * 100, 1)
 
-    # Institutional Macro Insights (Zero-condescension, authoritative tone)
+    # Macro Insights (Zero-condescension, authoritative tone)
     insights = []
     term_spread = analytics["term_spread_bps"]
     if term_spread > 50:
@@ -177,7 +177,7 @@ def evaluate_sovereign_curve() -> Dict[str, Any]:
         f"Policy Corridor Transmission: 10Y Benchmark trades at +{policy_spread_bps} bps over Policy Repo (6.50%), bounded within the SDF (6.25%) and MSF (6.75%) operational corridor."
     )
     insights.append(
-        f"Substantial Real Yield Anchor: 10Y Sovereign Real Return is +{real_10y_yield}% (Nominal {gsec_10y}% minus Headline CPI {cpi_val}%), exceeding institutional capital hurdle rates."
+        f"Substantial Real Yield Anchor: 10Y Sovereign Real Return is +{real_10y_yield}% (Nominal {gsec_10y}% minus Headline CPI {cpi_val}%), exceeding capital hurdle rates."
     )
     insights.append(
         f"Sub-Sovereign Fiscal Spread: 10Y State Development Loans (SDL) clear at a weighted spread of +{analytics['sdl_credit_spread_bps']} bps over Central G-Secs, reflecting state-level borrowing volume and debt-to-GSDP disparity."

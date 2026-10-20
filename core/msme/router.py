@@ -265,7 +265,7 @@ def get_msme_detail(uin: str) -> Optional[Dict[str, Any]]:
 
 @router.get("/{uin}")
 def get_msme(uin: str):
-    """Returns single MSME firm intelligence record and 4-pillar forensic dossier by UIN."""
+    """Returns single MSME firm intelligence record and 4-pillar report by UIN."""
     dossier = get_msme_detail(uin)
     if not dossier:
         raise HTTPException(status_code=404, detail=f"MSME firm with UIN '{uin}' not found")

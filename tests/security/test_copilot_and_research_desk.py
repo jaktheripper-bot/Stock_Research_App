@@ -1,8 +1,8 @@
 """
-tests/security/test_copilot_and_forensic_desk.py
+tests/security/test_copilot_and_research_desk.py
 =================================================
-Consolidated Forensic Desk, Autonomous Agents & Zero-Hallucination Guardrails:
-1. Forensic Desk multi-turn chat, multi-pillar intent classification, and fallback
+Consolidated Research Desk, Autonomous Agents & Source-Grounded Guardrails:
+1. Research Desk multi-turn chat, multi-pillar intent classification, and fallback
 2. Admin Copilot thread resolution, action execution, and credit grants
 3. Sitewide autonomous agent runners and background daemons
 4. Zero-hallucination contact, address, entity and SEBI non-registration guards
@@ -17,7 +17,7 @@ from fastapi.testclient import TestClient
 from web.main import app
 
 
-"""Unit tests for Forensic Desk Input Qualification, Open-Ended Synthesis, and Tier Gating."""
+"""Unit tests for Research Desk Input Qualification, Open-Ended Synthesis, and Tier Gating."""
 
 import os
 import unittest
@@ -25,17 +25,17 @@ import asyncio
 from fastapi.testclient import TestClient
 
 from web.main import app, init_db
-from core.agents.copilot.forensic_desk import (
+from core.agents.copilot.research_desk import (
     check_input_qualification,
     is_input_qualified,
     detect_forbidden_intent,
-    process_forensic_desk_turn,
+    process_research_desk_turn,
     _resolve_dynamic_entity_override,
     _answer_from_local_dossier_index
 )
 
 
-class TestForensicDeskEnhancements(unittest.TestCase):
+class TestResearchDeskEnhancements(unittest.TestCase):
     @classmethod
     def setUpClass(cls):
         os.environ["TESTING"] = "1"
@@ -64,7 +64,7 @@ class TestForensicDeskEnhancements(unittest.TestCase):
             self.assertIsNotNone(intercept, f"Expected '{sample}' to be intercepted as unqualified input.")
             self.assertEqual(intercept["status"], "INPUT_UNQUALIFIED")
             self.assertIn("Input Not Recognized", intercept["response"])
-            self.assertIn("What shocked you", intercept["response"])
+            self.assertIn("What stood out", intercept["response"])
 
     def test_input_qualification_greetings(self):
         """Verifies that casual greetings receive friendly onboarding orientation."""
@@ -73,7 +73,7 @@ class TestForensicDeskEnhancements(unittest.TestCase):
             intercept = check_input_qualification(sample, asset_class="EQUITY", ticker="INFY")
             self.assertIsNotNone(intercept, f"Expected '{sample}' to be intercepted as greeting.")
             self.assertEqual(intercept["status"], "GREETING")
-            self.assertIn("Welcome to the Forensic Intelligence Desk", intercept["response"])
+            self.assertIn("Welcome to the Research Desk", intercept["response"])
 
     def test_input_qualification_allows_valid_financial_queries(self):
         """Verifies that valid financial terms and questions are never falsely rejected."""
@@ -118,7 +118,7 @@ class TestForensicDeskEnhancements(unittest.TestCase):
     def test_equity_open_ended_what_shocked_you(self):
         """Verifies that 'what shocked you?' yields real contextual anomalies, not a canned menu."""
         async def _run():
-            res = await process_forensic_desk_turn(
+            res = await process_research_desk_turn(
                 conversation_id="TEST-OPEN-ENDED-SHOCK",
                 user_message="What shocked you during the research on this stock?",
                 ticker="INFY",
@@ -128,7 +128,7 @@ class TestForensicDeskEnhancements(unittest.TestCase):
             self.assertEqual(res["status"], "DETERMINISTIC_FALLBACK")
             resp = res["response"]
             self.assertIn("Key Forensic Surprises & Structural Red Flags", resp)
-            self.assertNotIn("Select a forensic diagnostic pillar to drill into:", resp)
+            self.assertNotIn("Select a diagnostic pillar to drill into:", resp)
             # Free tier distinction notice must be present
             self.assertIn("Free Tier", resp)
 
@@ -137,7 +137,7 @@ class TestForensicDeskEnhancements(unittest.TestCase):
     def test_equity_open_ended_bear_thesis(self):
         """Verifies that 'summarize the bear thesis' yields structured downside vectors."""
         async def _run():
-            res = await process_forensic_desk_turn(
+            res = await process_research_desk_turn(
                 conversation_id="TEST-OPEN-ENDED-BEAR",
                 user_message="Summarize the bear thesis for this stock.",
                 ticker="INFY",
@@ -146,7 +146,7 @@ class TestForensicDeskEnhancements(unittest.TestCase):
             )
             self.assertEqual(res["status"], "DETERMINISTIC_FALLBACK")
             resp = res["response"]
-            self.assertIn("Institutional Bear Thesis Summary", resp)
+            self.assertIn("Bear Thesis Summary", resp)
             self.assertIn("Multiple De-Rating", resp)
             self.assertIn("Free Tier", resp)
 
@@ -155,7 +155,7 @@ class TestForensicDeskEnhancements(unittest.TestCase):
     def test_equity_open_ended_bull_thesis(self):
         """Verifies that 'summarize the bull thesis' yields structural compounding vectors."""
         async def _run():
-            res = await process_forensic_desk_turn(
+            res = await process_research_desk_turn(
                 conversation_id="TEST-OPEN-ENDED-BULL",
                 user_message="Summarize the bull thesis and upside catalysts.",
                 ticker="INFY",
@@ -164,7 +164,7 @@ class TestForensicDeskEnhancements(unittest.TestCase):
             )
             self.assertEqual(res["status"], "DETERMINISTIC_FALLBACK")
             resp = res["response"]
-            self.assertIn("Institutional Bull Thesis Summary", resp)
+            self.assertIn("Bull Thesis Summary", resp)
             self.assertIn("Competitive Moat", resp)
             self.assertIn("Free Tier", resp)
 
@@ -172,7 +172,7 @@ class TestForensicDeskEnhancements(unittest.TestCase):
         """Verifies that unlocked / pro users receive verified Pro notice while free users get Free Tier notice."""
         async def _run():
             # Free user
-            res_free = await process_forensic_desk_turn(
+            res_free = await process_research_desk_turn(
                 conversation_id="TEST-TIER-FREE",
                 user_message="Explain the balance sheet solvency.",
                 ticker="INFY",
@@ -182,7 +182,7 @@ class TestForensicDeskEnhancements(unittest.TestCase):
             self.assertIn("Free Tier", res_free["response"])
 
             # Unlocked report user
-            res_unlocked = await process_forensic_desk_turn(
+            res_unlocked = await process_research_desk_turn(
                 conversation_id="TEST-TIER-UNLOCKED",
                 user_message="Explain the balance sheet solvency.",
                 ticker="INFY",
@@ -192,7 +192,7 @@ class TestForensicDeskEnhancements(unittest.TestCase):
             self.assertIn("Your entitlement is verified (Unlocked/Pro)", res_unlocked["response"])
 
             # Subscriber user
-            res_sub = await process_forensic_desk_turn(
+            res_sub = await process_research_desk_turn(
                 conversation_id="TEST-TIER-SUB",
                 user_message="Explain the balance sheet solvency.",
                 ticker="INFY",
@@ -206,7 +206,7 @@ class TestForensicDeskEnhancements(unittest.TestCase):
     def test_mutual_fund_open_ended_shock(self):
         """Verifies that mutual fund open-ended questions evaluate fee drag & active share without equity jargon."""
         async def _run():
-            res = await process_forensic_desk_turn(
+            res = await process_research_desk_turn(
                 conversation_id="TEST-MF-SHOCK",
                 user_message="What shocked you about this fund?",
                 ticker="PPFAS_FLEXICAP_DIR",
@@ -222,9 +222,9 @@ class TestForensicDeskEnhancements(unittest.TestCase):
     def test_corporate_debt_open_ended_shock(self):
         """Verifies that debt open-ended questions evaluate contagion & covenants without equity jargon."""
         async def _run():
-            res = await process_forensic_desk_turn(
+            res = await process_research_desk_turn(
                 conversation_id="TEST-DEBT-SHOCK",
-                user_message="What shocked you or stood out in this bond?",
+                user_message="What stood out in this bond?",
                 ticker="INE002A08012",
                 asset_type="corporate_debt",
                 deep_dive_unlocked=False
@@ -257,7 +257,7 @@ class TestForensicDeskEnhancements(unittest.TestCase):
         data = resp.json()
         self.assertTrue(data.get("success"))
         self.assertEqual(data.get("status"), "GREETING")
-        self.assertIn("Welcome to the Forensic Intelligence Desk", data.get("response"))
+        self.assertIn("Welcome to the Research Desk", data.get("response"))
 
 
     def test_resolve_dynamic_entity_override(self):
@@ -290,7 +290,7 @@ class TestForensicDeskEnhancements(unittest.TestCase):
             "baseline_price": 1500.0,
             "baseline_pe": 25.0,
             "report_text": """
-# Institutional Equity Research Report: Infosys Ltd (INFY)
+# Equity Research Report: Infosys Ltd (INFY)
 
 ## Pillar 01: Macro & Regulatory Exposure
 Macroeconomic environment remains resilient across North America and Europe. RBI policies and currency movements support exports.
@@ -355,7 +355,7 @@ Ranked in top decile of ESG and BRSR disclosure transparency with zero major reg
     def test_reverse_dcf_and_quick_chips_not_hijacked_by_pillar_04(self):
         """Regression test (WS1.4): Reverse DCF Implied Growth and quick-chips must not get hijacked by Pillar 04."""
         from unittest.mock import patch
-        from core.agents.copilot.forensic_desk import build_equity_deterministic_response
+        from core.agents.copilot.research_desk import build_equity_deterministic_response
 
         mock_7pillar_report = {
             "ticker": "INFY",
@@ -389,11 +389,11 @@ Ranked in top decile of ESG and BRSR disclosure transparency with zero major reg
                 f"Local dossier index hijacked specialized prompt: '{chip_prompt}'"
             )
 
-        # 2. Full process_forensic_desk_turn with 7-pillar report in DB must route Reverse DCF chip to Reverse DCF
+        # 2. Full process_research_desk_turn with 7-pillar report in DB must route Reverse DCF chip to Reverse DCF
         async def _run():
             with patch("core.db.reports.get_report_by_ticker_sync", return_value=mock_7pillar_report):
                 # With explicit section="reverse_dcf"
-                res_chip = await process_forensic_desk_turn(
+                res_chip = await process_research_desk_turn(
                     conversation_id="TEST-WS14-CHIP",
                     user_message="What implied growth rate is priced into current CMP based on Reverse DCF?",
                     ticker="INFY",
@@ -406,7 +406,7 @@ Ranked in top decile of ESG and BRSR disclosure transparency with zero major reg
                 self.assertNotIn("Earnings & Margin Diagnostic", res_chip["response"])
 
                 # Without section parameter (natural-language Reverse DCF question)
-                res_nl = await process_forensic_desk_turn(
+                res_nl = await process_research_desk_turn(
                     conversation_id="TEST-WS14-NL",
                     user_message="What implied FCF growth rate is currently priced into the stock's Reverse DCF?",
                     ticker="INFY",
@@ -417,7 +417,7 @@ Ranked in top decile of ESG and BRSR disclosure transparency with zero major reg
                 self.assertNotIn("Earnings & Margin Diagnostic", res_nl["response"])
 
                 # Hurdle rate sensitivity chip
-                res_hurdle = await process_forensic_desk_turn(
+                res_hurdle = await process_research_desk_turn(
                     conversation_id="TEST-WS14-HURDLE",
                     user_message="How sensitive is the Reverse DCF valuation to hurdle rate assumptions?",
                     ticker="INFY",
@@ -473,7 +473,7 @@ Ranked in top decile of ESG and BRSR disclosure transparency with zero major reg
                 conv_id = "TEST-WS3-INTERACTIVE-FLOW"
 
                 # Turn 1: User clicks Reverse DCF quick chip (sets section='reverse_dcf')
-                t1 = await process_forensic_desk_turn(
+                t1 = await process_research_desk_turn(
                     conversation_id=conv_id,
                     user_message="What implied growth rate is priced into current CMP based on Reverse DCF?",
                     ticker="INFY",
@@ -484,7 +484,7 @@ Ranked in top decile of ESG and BRSR disclosure transparency with zero major reg
                 self.assertIn("Reverse DCF Valuation & Implied Growth Deconstruction", t1["response"])
 
                 # Turn 2: User replies with single number "10000" (section='reverse_dcf' remains sticky)
-                t2 = await process_forensic_desk_turn(
+                t2 = await process_research_desk_turn(
                     conversation_id=conv_id,
                     user_message="10000",
                     ticker="INFY",
@@ -497,7 +497,7 @@ Ranked in top decile of ESG and BRSR disclosure transparency with zero major reg
                 self.assertIn("₹10,000", t2["response"])
 
                 # Turn 3: User replies with "15%" — carries forward ₹10,000 from Turn 2 and re-computes at 15.0% CAGR
-                t3 = await process_forensic_desk_turn(
+                t3 = await process_research_desk_turn(
                     conversation_id=conv_id,
                     user_message="15%",
                     ticker="INFY",
@@ -509,20 +509,20 @@ Ranked in top decile of ESG and BRSR disclosure transparency with zero major reg
                 self.assertIn("₹10,000", t3["response"])
                 self.assertIn("15.0%", t3["response"])
 
-                # Turn 4: Sticky section ('pre_mortem') does NOT hijack an explicit question about working capital / receivables
-                t4 = await process_forensic_desk_turn(
+                # Turn 4: Sticky section ('countercase') does NOT hijack an explicit question about working capital / receivables
+                t4 = await process_research_desk_turn(
                     conversation_id=conv_id,
                     user_message="How are receivable days and inventory turnover trending?",
                     ticker="INFY",
                     asset_type="equity",
-                    section="pre_mortem",
+                    section="countercase",
                     deep_dive_unlocked=True,
                 )
-                self.assertNotIn("Pre-Mortem Inversion Analysis", t4["response"])
+                self.assertNotIn("Countercase Analysis", t4["response"])
                 self.assertIn("receivable days (DSO) tightened from 68 to 54 days", t4["response"])
 
                 # Turn 5: Mutual Fund single-number follow-up ("10000") computes live Direct vs Regular fee drag
-                mf_t1 = await process_forensic_desk_turn(
+                mf_t1 = await process_research_desk_turn(
                     conversation_id="TEST-WS3-MF-FLOW",
                     user_message="10000",
                     ticker="122639",
@@ -534,7 +534,7 @@ Ranked in top decile of ESG and BRSR disclosure transparency with zero major reg
                 self.assertIn("₹10,000", mf_t1["response"])
 
                 # Turn 6: Mutual Fund sticky section ('fee_drag') does NOT trap a question about Active Share
-                mf_t2 = await process_forensic_desk_turn(
+                mf_t2 = await process_research_desk_turn(
                     conversation_id="TEST-WS3-MF-FLOW",
                     user_message="Audit the active share and check for closet indexing",
                     ticker="122639",
@@ -549,7 +549,7 @@ Ranked in top decile of ESG and BRSR disclosure transparency with zero major reg
 
     def test_debt_covenant_and_guarantee_questions_not_deflected_as_advisory(self):
         """WS1.1 (#4): Verifies legitimate debt covenant and parent-guarantee questions containing 'guaranteed' are never deflected as SEBI retail advisory."""
-        from core.agents.copilot.forensic_desk import (
+        from core.agents.copilot.research_desk import (
             build_equity_deterministic_response,
             build_debt_deterministic_response,
         )
@@ -593,7 +593,7 @@ Ranked in top decile of ESG and BRSR disclosure transparency with zero major reg
     def test_copilot_turn_with_dynamic_entity_override(self):
         """Verifies end-to-end Copilot turn switches entity seamlessly mid-conversation."""
         async def _run():
-            res = await process_forensic_desk_turn(
+            res = await process_research_desk_turn(
                 conversation_id="TEST-COPILOT-DYNAMIC-OVERRIDE",
                 user_message="What about INFY? What is its PE multiple?",
                 ticker="TCS",
@@ -612,16 +612,16 @@ Ranked in top decile of ESG and BRSR disclosure transparency with zero major reg
         """Verifies that entitled users on main successfully route through Gemini LLM synthesis."""
         async def _run():
             from unittest.mock import patch, MagicMock, AsyncMock
-            import core.agents.copilot.forensic_desk as fd
+            import core.agents.copilot.research_desk as fd
             mock_client = MagicMock()
             mock_resp = MagicMock()
-            mock_resp.text = "Here is the institutional forensic analysis synthesized by Gemini."
+            mock_resp.text = "Here is the forensic analysis compiled by Gemini."
             mock_client.aio.models.generate_content = AsyncMock(return_value=mock_resp)
 
             with patch.dict(os.environ, {"TESTING": "0", "PYTEST_CURRENT_TEST": ""}), \
                  patch.object(fd, "get_secret", return_value="fake_api_key"), \
                  patch("google.genai.Client", return_value=mock_client):
-                res = await process_forensic_desk_turn(
+                res = await process_research_desk_turn(
                     conversation_id="TEST-LLM-SUCCESS",
                     user_message="What shocked you about this stock?",
                     ticker="INFY",
@@ -629,8 +629,8 @@ Ranked in top decile of ESG and BRSR disclosure transparency with zero major reg
                     is_subscriber=True
                 )
                 self.assertEqual(res["status"], "COMPLETED")
-                self.assertIn("Institutional Generative Synthesis (Unlocked Deep Dive / Pro Tier)", res["response"])
-                self.assertIn("Here is the institutional forensic analysis", res["response"])
+                self.assertIn("Generative Synthesis (Unlocked Deep Dive / Pro Tier)", res["response"])
+                self.assertIn("Here is the forensic analysis", res["response"])
                 mock_client.aio.models.generate_content.assert_called_once()
 
         asyncio.run(_run())
@@ -1160,7 +1160,7 @@ class TestAdminCopilot(unittest.TestCase):
             admin_user=owner_user,
             message="Show subscribed provider quotas and Gemini AI spends"
         ))
-        self.assertIn("Subscribed Provider Quotas & AI Spend Surveillance", res["reply"])
+        self.assertIn("Subscribed Provider Quotas & AI Spend Monitoring", res["reply"])
         self.assertIn("Cumulative Gemini Token & Spend Ledger", res["reply"])
         self.assertIn("Google Gemini API", res["reply"])
 
@@ -1259,9 +1259,9 @@ from core.agents.funds.lookthrough_squad import audit_fund_lookthrough
 from core.agents.debt.credit_squad import audit_credit_offering
 from core.agents.reits.real_assets_squad import audit_real_asset, scan_sgb_parity_discounts
 from core.agents.macro.macro_squad import audit_macro_yield_environment
-from core.agents.copilot.forensic_desk import (
+from core.agents.copilot.research_desk import (
     check_non_advisory_compliance,
-    process_forensic_desk_turn
+    process_research_desk_turn
 )
 
 
@@ -1454,7 +1454,7 @@ class TestSitewideAgents(unittest.TestCase):
 """
 tests/test_zero_hallucination_and_grounding.py
 ==============================================================================
-Zero-Hallucination & Anti-Fabrication Test Suite.
+Source-Grounded & Anti-Fabrication Test Suite.
 Enforces that templates, legal content, codebases, and public UI strings
 strictly adhere to verified project facts established in user directives:
 

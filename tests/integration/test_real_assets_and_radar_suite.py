@@ -291,7 +291,7 @@ class TestRealAssetsAndRadarSuite(unittest.TestCase):
     # ==========================================
 
     def test_reits_web_page_rendering(self):
-        """Verifies GET /reits renders institutional terminal HTML template successfully."""
+        """Verifies GET /reits renders terminal HTML template successfully."""
         resp = self.client.get("/reits")
         self.assertEqual(resp.status_code, 200)
         html = resp.text
@@ -367,7 +367,7 @@ class TestRealAssetsAndRadarSuite(unittest.TestCase):
         self.assertIn("all_products", data)
 
     def test_reit_dossier_web_routes(self):
-        """Test individual institutional dossier web pages for Mainboard REITs, SM REITs, and InvITs."""
+        """Test individual stock report web pages for Mainboard REITs, SM REITs, and InvITs."""
         for sym in ["EMBASSY", "PROPSHARE", "PGINVIT", "IRBINVIT", "NHIT"]:
             # Baseline free tier view
             resp = self.client.get(f"/reits/{sym}")
@@ -430,7 +430,7 @@ class TestRealAssetsAndRadarSuite(unittest.TestCase):
         self.assertGreaterEqual(ndcf["payout_purity_pct"], ndcf["statutory_minimum_pct"])
 
         # Check 4 inversion failure modes
-        self.assertEqual(len(detail["inversion_risks"]), 4)
+        self.assertEqual(len(detail["countercase_risks"]), 4)
 
 
 if __name__ == "__main__":

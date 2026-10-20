@@ -1,4 +1,4 @@
-"""Institutional Net Real Post-Tax Return Engine for Indian Multi-Asset Wealth.
+"""Net Real Post-Tax Return Engine for Indian Multi-Asset Wealth.
 
 Accurately models purchasing power, post-tax cash flows, and capital preservation across:
 1. Bank Fixed Deposits (DICGC insured up to ₹5L, taxed at marginal slab)

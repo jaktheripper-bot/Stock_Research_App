@@ -7,7 +7,7 @@ Verifies:
 4. Unified 360° Forensic Health Sieve (governance, cash flow quality, debt solvency).
 5. Multi-model valuation radar (DCF, Graham, historical PE) and margin of safety.
 6. Bull vs. Bear thesis generation and full equity dossier compilation.
-7. Surgical pillar updates, technical DMA contexts, and incremental splicing.
+7. Price & Filing pillar updates, technical DMA contexts, and incremental splicing.
 """
 
 import os
@@ -34,10 +34,10 @@ from analyzer import (
     compute_deterministic_technical_context,
     splice_report_pillars,
     evaluate_material_change,
-    execute_surgical_pillar_update
+    execute_pillar_update
 )
 
-SAMPLE_REPORT = """# Institutional Equity Research Report: Infosys Ltd (INFY)
+SAMPLE_REPORT = """# Equity Research Report: Infosys Ltd (INFY)
 
 ---
 ## Pillar 1: Macro-Economic, Geopolitical & Environmental Overlays
@@ -278,7 +278,7 @@ class TestEquityUpgrades(unittest.TestCase):
         self.assertGreater(res.clean_room_score, 60.0)
 
 
-class TestSurgicalReportUpdates(unittest.TestCase):
+class TestPillarReportUpdates(unittest.TestCase):
     def test_compute_deterministic_technical_context(self):
         stock_data = {
             "current_price": 1500.0,
@@ -347,13 +347,13 @@ class TestSurgicalReportUpdates(unittest.TestCase):
         self.assertTrue(regen)
         self.assertEqual(change_type, "EXPIRED")
 
-    def test_execute_surgical_pillar_update_fallback(self):
+    def test_execute_pillar_update_fallback(self):
         cached = {
             "report_text": SAMPLE_REPORT,
             "baseline_price": 1000.0,
         }
         stock_data = {
-            "ticker": "TEST_SURGICAL_INFY",
+            "ticker": "TEST_PILLAR_INFY",
             "short_name": "Infosys Ltd",
             "current_price": 1100.0,
             "pe_ratio": "25.0",
@@ -362,7 +362,7 @@ class TestSurgicalReportUpdates(unittest.TestCase):
             "fifty_two_week_low": 900.0,
         }
         try:
-            spliced = execute_surgical_pillar_update("TEST_SURGICAL_INFY", cached, stock_data)
+            spliced = execute_pillar_update("TEST_PILLAR_INFY", cached, stock_data)
             self.assertIn("## Pillar 5: Valuation & Margin of Safety", spliced)
             self.assertIn("## Pillar 6: Technical & Momentum Overlay", spliced)
             self.assertIn("Pillar 1: Macro-Economic", spliced)

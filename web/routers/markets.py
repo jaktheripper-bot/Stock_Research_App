@@ -118,7 +118,7 @@ class PortfolioLookThroughRequest(BaseModel):
 SutraAuditRequest = PortfolioLookThroughRequest
 
 
-class PreMortemRequest(BaseModel):
+class CountercaseRequest(BaseModel):
     ticker: str
     failure_vector: str
     anti_thesis_notes: str
@@ -844,9 +844,10 @@ api_cortex_sutra_audit = api_cortex_portfolio_look_through
 # ==============================================================================
 # Countercase & Thesis Checkpoints
 # ==============================================================================
-@router.post("/api/premortem")
-async def api_premortem(payload: PreMortemRequest, request: Request):
-    """Commits a Countercase counter-thesis to the audit ledger."""
+@router.post("/api/countercase")
+@router.post("/api/premortem", include_in_schema=False)  # legacy alias kept for cached clients
+async def api_countercase(payload: CountercaseRequest, request: Request):
+    """Saves a countercase (what could go wrong) to the audit ledger."""
     if not _validate_request_origin(request):
         raise HTTPException(status_code=403, detail="Cross-origin request rejected.")
 
@@ -855,7 +856,7 @@ async def api_premortem(payload: PreMortemRequest, request: Request):
         raise HTTPException(status_code=400, detail="Invalid ticker symbol.")
 
     record_usage_event(
-        event_type="PREMORTEM",
+        event_type="COUNTERCASE",
         ticker=clean_t,
         details={
             "failure_vector": payload.failure_vector,

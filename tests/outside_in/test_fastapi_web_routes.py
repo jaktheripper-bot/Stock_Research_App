@@ -288,7 +288,7 @@ Detailed forensic analysis with exact page grounding to bseindia.com filings.
                 "roce_pct": 24.5,
                 "debt_to_equity": 0.05,
                 "sales_growth_3y": 20.0,
-                "ria_thesis": "Solid compounding profile under institutional radar.",
+                "ria_thesis": "Solid compounding profile under radar.",
                 "catalyst_headline": "BSE Announcement: Capacity expansion.",
                 "key_metrics": {"roce": "24.5%", "d_e": "0.05"}
             }
@@ -1588,7 +1588,7 @@ class TestComparisonAndTelemetry(unittest.TestCase):
         self.assertEqual(classify_page_category("/")[0], "Homepage / Terminal")
         self.assertEqual(classify_page_category("/dossier/INFY")[0], "Equity Dossier (INFY)")
         self.assertEqual(classify_page_category("/funds")[0], "Mutual Fund Directory")
-        self.assertEqual(classify_page_category("/funds/118989")[0], "Mutual Fund Forensic Dossier")
+        self.assertEqual(classify_page_category("/funds/118989")[0], "Mutual Fund Report")
         self.assertEqual(classify_page_category("/debt")[0], "Corporate Debt Directory")
         self.assertEqual(classify_page_category("/pricing")[0], "Pricing & Subscriptions")
         self.assertEqual(classify_page_category("/compare")[0], "Peer Head-to-Head Compare")
@@ -2167,7 +2167,7 @@ Detailed forensic analysis grounded in bseindia.com filings.
         self.assertTrue(resp.content.startswith(b"%PDF"))
 
     def test_api_v1_get_report_success(self):
-        """Verify /api/v1/reports/{ticker} returns structured institutional JSON with valid auth."""
+        """Verify /api/v1/reports/{ticker} returns structured JSON with valid auth."""
         resp = self.client.get(
             "/api/v1/reports/INFY",
             headers={"Authorization": "Bearer sr_dev_test_token_12345"}
@@ -2402,7 +2402,7 @@ class TestInteractiveUiContracts(unittest.TestCase):
             modal_expectations = [
                 ("/", "authModal"),
                 ("/", "checkoutModal"),
-                ("/", "surveillanceModal"),
+                ("/", "monitoringModal"),
                 ("/debt", "ingestModalBackdrop"),
                 ("/dossier/INFY", "thesisModalBackdrop"),
                 ("/etfs", "etf-modal"),

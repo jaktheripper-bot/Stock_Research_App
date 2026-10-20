@@ -4913,7 +4913,7 @@ def seed_default_mutual_funds() -> int:
 
 
 def save_fund_forensic_dossier(dossier: Dict[str, Any]) -> bool:
-    """Saves or updates a synthesized 7-pillar forensic fund dossier."""
+    """Saves or updates a compiled 7-pillar forensic fund dossier."""
     conn = get_db_connection()
     cursor = conn.cursor()
     use_pg = is_postgres_connection(conn)
@@ -4977,7 +4977,7 @@ def save_fund_forensic_dossier(dossier: Dict[str, Any]) -> bool:
         conn.commit()
         return True
     except Exception as e:
-        logger.error(f"Error saving fund forensic dossier for {code}: {e}")
+        logger.error(f"Error saving fund report for {code}: {e}")
         conn.rollback()
         return False
     finally:
@@ -4986,7 +4986,7 @@ def save_fund_forensic_dossier(dossier: Dict[str, Any]) -> bool:
 
 
 def get_fund_forensic_dossier(scheme_code: str) -> Optional[Dict[str, Any]]:
-    """Retrieves the latest forensic look-through dossier for a fund scheme."""
+    """Retrieves the latest look-through dossier for a fund scheme."""
     conn = get_db_connection()
     cursor = conn.cursor()
     use_pg = is_postgres_connection(conn)
@@ -5019,7 +5019,7 @@ def get_fund_forensic_dossier(scheme_code: str) -> Optional[Dict[str, Any]]:
                 res["top_quality_holdings"] = []
         return res
     except Exception as e:
-        logger.error(f"Error getting fund forensic dossier for {clean_code}: {e}")
+        logger.error(f"Error getting fund report for {clean_code}: {e}")
         return None
     finally:
         cursor.close()

@@ -1,7 +1,7 @@
 """
 Quantitative Metrics, Percentile Rankings, and Pillar Health Scoring Engine.
 
-Provides zero-hallucination mathematical indicators, valuation percentiles,
+Provides source-grounded mathematical indicators, valuation percentiles,
 range rankings, and qualitative pillar score quantifiers to mitigate cognitive
 biases (Anchoring Bias, Confirmation Bias, Disposition Effect, and False Equivalence).
 """

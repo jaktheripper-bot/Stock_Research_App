@@ -1,5 +1,5 @@
 """
-Batch Generation Pipeline for Nifty 100 Institutional Research Dossiers.
+Batch Generation Pipeline for Nifty 100 Research Dossiers.
 
 Iterates through India's canonical Nifty 100 universe, invokes the core 7-pillar
 fundamental analysis engine (BSE filings + Gemini reasoning + citation extraction),
@@ -85,7 +85,7 @@ def print_status_summary():
     uncovered = 0
 
     print("=" * 70)
-    print(" 📊 NIFTY 100 INSTITUTIONAL RESEARCH COVERAGE LEDGER")
+    print(" 📊 NIFTY 100 RESEARCH COVERAGE LEDGER")
     print("=" * 70)
     
     for s in symbols:
@@ -114,7 +114,7 @@ def print_status_summary():
     print("=" * 70)
 
 def generate_single_stock(symbol: str, meta: Dict[str, Any], force: bool = False, max_retries: int = 3) -> Dict[str, Any]:
-    """Generates 7-pillar institutional research report for a single stock."""
+    """Generates 7-pillar research report for a single stock."""
     # Check cache
     cached = get_report_by_ticker(symbol)
     if cached and is_report_fresh(cached) and not force:
@@ -128,7 +128,7 @@ def generate_single_stock(symbol: str, meta: Dict[str, Any], force: bool = False
         }
 
     company_name = meta.get("company_name", symbol) if meta else symbol
-    logger.info(f"🔬 Starting 7-Pillar Institutional Analysis for {symbol} ({company_name})...")
+    logger.info(f"🔬 Starting 7-Pillar Analysis for {symbol} ({company_name})...")
     start_time = time.time()
 
     last_error = None

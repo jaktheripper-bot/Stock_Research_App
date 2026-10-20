@@ -1,7 +1,7 @@
 """Database repository and data access layer for Sovereign Risk-Free Benchmarks,
 RBI Yield Curves (T-Bills, G-Sec, SDL), and the National ETF Performance & Liquidity Matrix.
 
-Complies with SEBI Zero-Hallucination and dual-binding rules (PostgreSQL / SQLite).
+Complies with SEBI Source-Grounded and dual-binding rules (PostgreSQL / SQLite).
 """
 
 import json
@@ -296,7 +296,7 @@ DEFAULT_MACRO_RATES = [
         "metric_value": 3.47,
         "unit": "%",
         "period_label": "Nominal 10Y (7.12%) minus Headline CPI (3.65%)",
-        "source": "Stock Research App Forensic Calculation"
+        "source": "Moatnomics Calculation"
     }
 ]
 
@@ -351,7 +351,7 @@ DEFAULT_HISTORICAL_CURVES = {
 
 from core.db.etf_universe import CANONICAL_ETF_UNIVERSE
 
-# Baseline ETF Matrix covering 140+ benchmark Indian ETFs across 9 institutional categories
+# Baseline ETF Matrix covering 140+ benchmark Indian ETFs across 9 categories
 DEFAULT_ETF_MATRIX = CANONICAL_ETF_UNIVERSE
 
 
@@ -500,7 +500,7 @@ def fetch_live_rbi_ccil_yield_curve(data_source: str = "CCIL_LIVE") -> Dict[str,
 
 def refresh_daily_sovereign_benchmarks(edition_date: Optional[str] = None) -> Dict[str, Any]:
     """Synchronizes the Sovereign Yield Curve and SDL Disparity Matrix for the daily edition.
-    Guarantees Zero-Hallucination: Does NOT overwrite historical auction_date unless verified
+    Guarantees Source-Grounded: Does NOT overwrite historical auction_date unless verified
     live auction cut-offs are fetched from CCIL / RBI.
     """
     if not edition_date:

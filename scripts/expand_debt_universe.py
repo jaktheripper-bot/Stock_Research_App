@@ -488,7 +488,7 @@ ADDITIONAL_INSTRUMENTS = [
             "dscr": 1.4,
             "debt_to_equity": 7.2,
             "credit_rating_rationale": "Strong institutional ownership by SBI, improved liquidity buffers, and complete write-off of legacy corporate stressed assets.",
-            "the_good": ["High 8.75% coupon for a senior banking instrument", "Senior rank above subordinated debt", "Backing of SBI as largest institutional shareholder"],
+            "the_good": ["High 8.75% coupon for a senior banking instrument", "Senior rank above subordinated debt", "Backing of SBI as largest shareholder"],
             "the_bad": ["Operating profitability still stabilizing post-reconstruction"],
             "the_ugly": ["Competitive pressure on deposit mobilization squeezing net interest margins"],
             "collated_sources": ["BSE Debt", "GoldenPi"]
@@ -521,7 +521,7 @@ ADDITIONAL_INSTRUMENTS = [
         "modified_duration_years": 4.43,
         "metadata": {
             "sector": "Private Commercial Banking / South-India Stronghold",
-            "promoter_group": "Institutional Shareholders",
+            "promoter_group": "Shareholders",
             "issuer_overview": "Old private sector bank with pan-India presence, dominant NRI remittance market share (>20%), and strong fintech lending partnerships.",
             "collateral_type": "Unsecured subordinated regulatory capital",
             "interest_coverage": 2.7,
@@ -648,7 +648,7 @@ ADDITIONAL_INSTRUMENTS = [
             "dscr": 2.0,
             "debt_to_equity": 4.8,
             "credit_rating_rationale": "CRISIL AAA rating reflects unmatched asset quality across commercial vehicle cycles and pristine reputation.",
-            "the_good": ["Gold-standard governance and zero historical default track record", "1.45x collateral cover registered with debenture trustee", "CRISIL AAA highest institutional credit rating"],
+            "the_good": ["Gold-standard governance and zero historical default track record", "1.45x collateral cover registered with debenture trustee", "CRISIL AAA highest credit rating"],
             "the_bad": ["Yield is tight over G-Sec benchmark"],
             "the_ugly": ["Extended national freight freight rate collapse impairing truck operator cash flows"],
             "collated_sources": ["NSE Debt", "GoldenPi"]
@@ -688,7 +688,7 @@ ADDITIONAL_INSTRUMENTS = [
             "dscr": 1.8,
             "debt_to_equity": 6.9,
             "credit_rating_rationale": "Strategic sovereign parentage by LIC and rock-solid residential home loan collateral backing.",
-            "the_good": ["Pristine LIC parentage provides institutional balance sheet safety", "CRISIL AAA rating with first floating charge on home loans", "High liquidity on BSE/NSE debt platforms"],
+            "the_good": ["Pristine LIC parentage provides balance sheet safety", "CRISIL AAA rating with first floating charge on home loans", "High liquidity on BSE/NSE debt platforms"],
             "the_bad": ["Post-tax yields for 30% slab clipped by income tax"],
             "the_ugly": ["Systemic real estate market slump in tier-2 builder project finance loans"],
             "collated_sources": ["BSE Debt", "IndiaBonds"]
@@ -808,7 +808,7 @@ ADDITIONAL_INSTRUMENTS = [
             "dscr": 1.6,
             "debt_to_equity": 3.6,
             "credit_rating_rationale": "High retail portfolio granularity, strong liquidity backing from Fairfax India, and rapid post-regulatory normalization.",
-            "the_good": ["Attractive 8.95% coupon yield", "Fairfax India institutional backing", "1.30x asset cover registered with IDBI Trusteeship"],
+            "the_good": ["Attractive 8.95% coupon yield", "Fairfax India backing", "1.30x asset cover registered with IDBI Trusteeship"],
             "the_bad": ["Regulatory sensitivity regarding gold loan cash disbursement limits"],
             "the_ugly": ["Sudden RBI regulatory sanctions on specific lending business verticals"],
             "collated_sources": ["BSE Debt", "GoldenPi"]
@@ -892,7 +892,7 @@ ADDITIONAL_INSTRUMENTS = [
             "dscr": 2.2,
             "debt_to_equity": 4.2,
             "credit_rating_rationale": "Pristine AAA credit rating underpinned by Tata Sons ownership and International Finance Corporation (IFC) partnership.",
-            "the_good": ["Pristine Tata parentage and IFC co-ownership", "CRISIL AAA highest institutional credit rating", "100% certified Green Bond compliance"],
+            "the_good": ["Pristine Tata parentage and IFC co-ownership", "CRISIL AAA highest credit rating", "100% certified Green Bond compliance"],
             "the_bad": ["Yield premium over G-Sec is modest (~85 bps)"],
             "the_ugly": ["Systemic borrower payment defaults in solar rooftop commercial segment"],
             "collated_sources": ["BSE Debt", "GoldenPi"]
@@ -1091,8 +1091,8 @@ ADDITIONAL_INSTRUMENTS = [
             "interest_coverage": 3.4,
             "dscr": 1.8,
             "debt_to_equity": 2.1,
-            "credit_rating_rationale": "High toll growth across economic freight corridors, strong institutional backing from GIC and Ferrovial, and healthy cash cover.",
-            "the_good": ["Toll revenues indexed annually to WPI inflation", "Strong foreign institutional partners (Ferrovial, GIC)", "High 8.95% coupon with 1.40x asset cover"],
+            "credit_rating_rationale": "High toll growth across economic freight corridors, strong backing from GIC and Ferrovial, and healthy cash cover.",
+            "the_good": ["Toll revenues indexed annually to WPI inflation", "Strong foreign partners (Ferrovial, GIC)", "High 8.95% coupon with 1.40x asset cover"],
             "the_bad": ["Toll collection traffic risk during monsoon road repairs"],
             "the_ugly": ["Government policy changes mandating toll waivers or alternative toll-free expressway construction"],
             "collated_sources": ["BSE Debt", "IndiaBonds"]
@@ -1376,7 +1376,7 @@ ADDITIONAL_INSTRUMENTS = [
             "dscr": 1.8,
             "debt_to_equity": 0.0,
             "credit_rating_rationale": "High 15% cash FLDG buffer deposited in escrow, vehicle GPS tracking, and daily escrow sweep of ride earnings.",
-            "the_good": ["High 11.75% YTM for institutional-grade yield", "15% cash FLDG reserve", "Daily revenue sweep into trustee escrow account"],
+            "the_good": ["High 11.75% YTM", "15% cash FLDG reserve", "Daily revenue sweep into trustee escrow account"],
             "the_bad": ["Fleet vehicle mileage depreciation over 3-year operating lease"],
             "the_ugly": ["Prolonged ride-hailing driver strikes or platform app bans"],
             "collated_sources": ["Grip Invest", "NSE Debt"]
@@ -1455,7 +1455,7 @@ ADDITIONAL_INSTRUMENTS = [
             "interest_coverage": 3.8,
             "dscr": 2.0,
             "debt_to_equity": 0.0,
-            "credit_rating_rationale": "High tenant stickiness, institutional Grade-A property location, and 12% cash FLDG reserve.",
+            "credit_rating_rationale": "High tenant stickiness, Grade-A property location, and 12% cash FLDG reserve.",
             "the_good": ["High 11.50% YTM backed by prime commercial office real estate", "12% cash FLDG buffer", "Monthly rental distributions directly into bank accounts"],
             "the_bad": ["Early lease surrender risk by IT corporate tenants"],
             "the_ugly": ["Structural shift to permanent remote work causing office park vacancy spikes"],
@@ -1535,7 +1535,7 @@ ADDITIONAL_INSTRUMENTS = [
             "interest_coverage": 2.7,
             "dscr": 1.6,
             "debt_to_equity": 2.8,
-            "credit_rating_rationale": "Strong capitalization (CRAR > 30%), marquee institutional backers (KKR, TRS), and seasoned retail loan portfolios.",
+            "credit_rating_rationale": "Strong capitalization (CRAR > 30%), marquee backers (KKR, TRS), and seasoned retail loan portfolios.",
             "the_good": ["Democratized ₹10,000 face value with high 9.85% coupon", "Enormous 30%+ capital adequacy ratio", "Short 2-year duration limits interest rate volatility"],
             "the_bad": ["CRISIL A+ rating reflects moderate credit spread"],
             "the_ugly": ["Unsecured retail borrower stress during national macroeconomic tightening"],
@@ -1731,7 +1731,7 @@ def main():
     code = '"""Canonical Benchmark Universe for Indian Corporate Debt, NCDs, and SDIs.\n\n'
     code += 'Complies with SEBI (Issue and Listing of Non-Convertible Securities) Regulations\n'
     code += 'and the SEBI ₹10,000 Face Value Democratization Framework (July 2024 Amendments).\n\n'
-    code += f'Contains {len(full_universe)} benchmark corporate debt instruments spanning 5 essential institutional segments:\n'
+    code += f'Contains {len(full_universe)} benchmark corporate debt instruments spanning 5 essential segments:\n'
     code += '1. PSU & Sovereign-Backed Quasi-Gilt Bonds (25 instruments: PFC, REC, NTPC, NHAI, IRFC, IOCL, etc.)\n'
     code += '2. Marquee Conglomerates & Corporate Giants (25 instruments: RIL, Tata Motors, L&T, TCS, M&M, etc.)\n'
     code += '3. Premier Banking & Financial Institutions (Senior, Tier-II & Infra) (25 instruments: SBI, HDFC, ICICI, etc.)\n'

@@ -2,7 +2,7 @@
 telemetry.py
 ==============================================================================
 Production Site Usage Telemetry, Visitor Attribution & Admin Access Control
-for Stock Research App
+for Moatnomics
 
 Features:
   1. Admin Passcode Gate: Secures private telemetry and analytics views.

@@ -1,4 +1,4 @@
-"""Quantitative Fixed-Income & Institutional Debt Dossier Engine.
+"""Quantitative Fixed-Income & Debt Dossier Engine.
 
 Enforces statutory and quantitative mathematical invariants for Debt, NCDs, and SDIs:
 1. Modified Duration = Macaulay Duration / (1 + y/k) < Macaulay Duration for y > 0.

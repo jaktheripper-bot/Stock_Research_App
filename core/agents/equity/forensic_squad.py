@@ -221,7 +221,7 @@ def run_deterministic_forensic_fallback(ticker: str) -> ForensicAuditResult:
         valuation_stress=valuation,
         agent_consensus=consensus,
         agent_divergences=divergences,
-        sebi_safe_harbor="Grounded educational forensic audit strictly complying with SEBI Research Analysts Regulations 2014 Section 2(u). Zero forward-looking price targets or trade recommendations.",
+        sebi_safe_harbor="Grounded educational accounting check strictly complying with SEBI Research Analysts Regulations 2014 Section 2(u). Zero forward-looking price targets or trade recommendations.",
         audit_timestamp=now_iso,
         engine="deterministic-forensic-rulebook"
     )
@@ -231,7 +231,7 @@ async def run_multi_agent_forensic_audit(
     ticker: str,
     api_key: Optional[str] = None
 ) -> ForensicAuditResult:
-    """Orchestrates the Google Antigravity multi-agent forensic audit team for a stock."""
+    """Orchestrates the Google Antigravity multi-agent accounting check team for a stock."""
     clean_sym = ticker.strip().upper()
     resolved_api_key = api_key or get_secret("GEMINI_API_KEY")
     
@@ -245,7 +245,7 @@ async def run_multi_agent_forensic_audit(
             description="Forensic accounting specialist inspecting earnings quality, Beneish M-Score, and working capital.",
             capabilities=types.SubagentCapabilities(agent_behavior=types.AgentBehavior.AUTONOMOUS),
             system_instructions=(
-                "You are an institutional forensic accounting investigator. Inspect revenue recognition, "
+                "You are an forensic accounting investigator. Inspect revenue recognition, "
                 "accruals, cash flow vs net profit divergence, and debt coverage. Provide concise, diagnostic facts."
             )
         )
@@ -280,19 +280,19 @@ async def run_multi_agent_forensic_audit(
                 allowed_subagents=["accounting_auditor", "governance_detective", "valuation_stress_analyst"],
             ),
             system_instructions=(
-                "You are the Chief Forensic Officer coordinating an institutional equity audit. "
+                "You are the Chief Forensic Officer coordinating an equity audit. "
                 "Delegate tasks to your 3 subagents: 'accounting_auditor', 'governance_detective', and 'valuation_stress_analyst'. "
-                "Synthesize their outputs into a unified audit verdict with a score (0-100), key consensus points, "
+                "Generate their outputs into a unified audit verdict with a score (0-100), key consensus points, "
                 "and any contradictions/divergences between agents. "
                 "Maintain strict SEBI Section 2(u) non-advisory compliance—no Buy/Sell/Hold advice."
             )
         )
         
         prompt = (
-            f"Conduct an institutional multi-agent forensic audit on {clean_sym}. "
+            f"Conduct an multi-agent accounting check on {clean_sym}. "
             f"First query tools for {clean_sym}. Then delegate accounting analysis to 'accounting_auditor', "
             f"governance analysis to 'governance_detective', and valuation stress testing to 'valuation_stress_analyst'. "
-            f"Synthesize the final audit report with an overall forensic score (0-100) and posture verdict."
+            f"Summarize the final audit report with an overall forensic score (0-100) and posture verdict."
         )
         
         async with Agent(config) as agent:
@@ -301,7 +301,7 @@ async def run_multi_agent_forensic_audit(
             
             base_result = run_deterministic_forensic_fallback(clean_sym)
             base_result.executive_summary = (
-                f"Multi-Agent Forensic Audit (Antigravity): {full_text[:400].strip()}..."
+                f"Multi-Agent Accounting Check (Antigravity): {full_text[:400].strip()}..."
                 if len(full_text) > 400 else full_text
             )
             base_result.engine = "google-antigravity-multi-agent"
@@ -318,7 +318,7 @@ def run_multi_agent_forensic_audit_sync(ticker: str) -> ForensicAuditResult:
 
 
 def run_deterministic_equity_audit(ticker: str) -> Dict[str, Any]:
-    """Offline deterministic fallback generating complete institutional equity audit."""
+    """Offline deterministic fallback generating complete equity audit."""
     clean = (ticker or "").strip().upper()
     fund_raw = tool_get_equity_fundamentals(clean)
     fund = json.loads(fund_raw)

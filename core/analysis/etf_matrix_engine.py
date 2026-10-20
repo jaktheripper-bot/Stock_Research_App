@@ -1,7 +1,7 @@
 """Analytical Engine for National ETF Matrix, Tracking Error Auditing, and Liquidity Tiers.
 
 Evaluates exchange pricing vs. NAV fair value, tracking error deviations,
-expense ratio drag, and secondary market liquidity depth across all 9 institutional categories.
+expense ratio drag, and secondary market liquidity depth across all 9 categories.
 Complies with SEBI (Mutual Funds) Regulations, 1996 passive portfolio benchmarks.
 """
 
@@ -244,8 +244,8 @@ def get_etf_detail(symbol: str) -> Optional[Dict[str, Any]]:
         "estimated_impact_cost_bps": 3 if liquidity_tier == "HIGH_LIQUIDITY" else (12 if liquidity_tier == "MODERATE_LIQUIDITY" else 35)
     }
 
-    # Pre-Mortem Inversion Risk Ledger
-    inversion_risks = [
+    # Countercase Risk Ledger
+    countercase_risks = [
         {
             "title": "Authorized Participant Withdrawal Risk",
             "desc": "During acute liquidity panics or circuit breaker triggers in underlying constituents, APs may temporarily widen bid-ask spreads, blowing out the premium/discount band.",
@@ -268,7 +268,7 @@ def get_etf_detail(symbol: str) -> Optional[Dict[str, Any]]:
         }
     ]
 
-    # Forensic audit takeaways
+    # Accounting check takeaways
     forensic_notes = []
     if abs(pd) >= 0.5:
         note_type = "WARNING" if pd > 0.5 else "OPPORTUNITY"
@@ -288,7 +288,7 @@ def get_etf_detail(symbol: str) -> Optional[Dict[str, Any]]:
     else:
         forensic_notes.append({
             "type": "STRENGTH",
-            "title": f"Institutional Benchmark Tracking ({te:.2f}%)",
+            "title": f"Benchmark Tracking ({te:.2f}%)",
             "desc": f"Exemplary replication fidelity with 1Y tracking error of {te:.2f}% vs underlying {item.get('underlying_index')}."
         })
 
@@ -296,7 +296,7 @@ def get_etf_detail(symbol: str) -> Optional[Dict[str, Any]]:
         forensic_notes.append({
             "type": "NOTE",
             "title": f"Expense Ratio Fee Drag ({ter:.2f}%)",
-            "desc": f"Total expense ratio of {ter:.2f}% is above the institutional passive average for this category."
+            "desc": f"Total expense ratio of {ter:.2f}% is above the passive average for this category."
         })
 
     return {
@@ -307,7 +307,7 @@ def get_etf_detail(symbol: str) -> Optional[Dict[str, Any]]:
         "arbitrage_analysis": arbitrage_analysis,
         "replication_audit": replication_audit,
         "liquidity_audit": liquidity_audit,
-        "inversion_risks": inversion_risks,
+        "countercase_risks": countercase_risks,
         "peers": peer_comparisons,
         "forensic_notes": forensic_notes
     }

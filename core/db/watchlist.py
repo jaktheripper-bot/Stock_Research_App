@@ -1,4 +1,4 @@
-"""Stock surveillance watchlist repository and state management."""
+"""Stock monitoring watchlist repository and state management."""
 
 import logging
 from functools import lru_cache
@@ -10,7 +10,7 @@ logger = logging.getLogger("equity_research.core.db.watchlist")
 
 @lru_cache(maxsize=128)
 def get_watchlist() -> list:
-    """Retrieves all tracked stocks in the surveillance watchlist."""
+    """Retrieves all tracked stocks in the monitoring watchlist."""
     init_db()
     conn = get_db_connection()
     cursor = conn.cursor()
@@ -55,7 +55,7 @@ def add_to_watchlist(ticker: str, short_name: str = "", scrip_code: str = "",
                      alert_material: bool = True, alert_fundamental: bool = True,
                      alert_valuation: bool = True, digest_mode: str = "instant",
                      initial_price: float = None) -> bool:
-    """Adds a stock to the surveillance watchlist or updates its subscription preferences."""
+    """Adds a stock to the monitoring watchlist or updates its subscription preferences."""
     init_db()
     conn = get_db_connection()
     cursor = conn.cursor()
@@ -112,7 +112,7 @@ def add_to_watchlist(ticker: str, short_name: str = "", scrip_code: str = "",
     return success
 
 def remove_from_watchlist(ticker: str) -> bool:
-    """Removes a stock from the surveillance watchlist."""
+    """Removes a stock from the monitoring watchlist."""
     init_db()
     conn = get_db_connection()
     cursor = conn.cursor()
@@ -135,7 +135,7 @@ def remove_from_watchlist(ticker: str) -> bool:
     return success
 
 def is_ticker_in_watchlist(ticker: str) -> bool:
-    """Checks whether a ticker is currently active on the surveillance watchlist."""
+    """Checks whether a ticker is currently active on the monitoring watchlist."""
     init_db()
     conn = get_db_connection()
     cursor = conn.cursor()
