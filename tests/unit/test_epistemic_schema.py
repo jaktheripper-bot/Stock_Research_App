@@ -302,6 +302,37 @@ Wide moat secured by patents.
         self.assertIn("🧠 MODEL INTERPRETATION", wrapped)
         self.assertIn("❓ UNRESOLVED UNCERTAINTY", wrapped)
 
+    def test_outside_in_dossier_dom_renders_epistemic_card_and_badges(self):
+        """Rule 6 Outside-In verification: asserts #epistemicFalsificationCard and .epistemic-badge render in DOM across all 4 dossier routes."""
+        from bs4 import BeautifulSoup
+        from fastapi.testclient import TestClient
+        from web.main import app
+
+        client = TestClient(app)
+        routes = [
+            "/dossier/TCS",
+            "/funds/122639",
+            "/debt/INE002A08012",
+            "/reits/EMBASSY",
+        ]
+        for route in routes:
+            resp = client.get(route)
+            self.assertEqual(resp.status_code, 200, f"Expected 200 OK on {route}")
+            html = resp.text
+            self.assertNotIn("{{", html, f"Unrendered Jinja expression found on {route}")
+            self.assertNotIn("{%", html, f"Unrendered Jinja tag found on {route}")
+
+            soup = BeautifulSoup(html, "html.parser")
+            card = soup.find(id="epistemicFalsificationCard")
+            self.assertIsNotNone(card, f"#epistemicFalsificationCard missing from rendered DOM on {route}")
+
+            badges = card.select(".epistemic-badge")
+            self.assertGreaterEqual(len(badges), 4, f"Expected >=4 .epistemic-badge pills inside #epistemicFalsificationCard on {route}")
+
+            # Verify falsification matrix table rows render
+            rows = card.select("table tbody tr")
+            self.assertGreaterEqual(len(rows), 1, f"Expected >=1 falsification trigger row on {route}")
+
 
 if __name__ == "__main__":
     unittest.main()

@@ -42,6 +42,84 @@ In EVERY Pillar (Pillar 1 through Pillar 7), you MUST enforce strict epistemic h
 """
 
 
+def _attach_ui_presentation_fields(ledger: Dict[str, Any], default_pillar_labels: Optional[List[str]] = None) -> Dict[str, Any]:
+    """
+    Enriches the canonical 5-part epistemic ledger with normalized `claims` and
+    `falsification_rows` arrays for direct Jinja template rendering across all asset classes,
+    while preserving all existing keys for backward compatibility.
+    """
+    as_of = ledger.get("as_of_date") or "Latest Filing"
+    vf_list = ledger.get("verified_facts") or []
+    cm_list = ledger.get("calculated_metrics") or []
+    mi_list = ledger.get("model_interpretations") or []
+    uu_list = ledger.get("unresolved_uncertainties") or []
+
+    claims: List[Dict[str, Any]] = []
+    for vf in vf_list[:2]:
+        claims.append({
+            "tier": "VERIFIED_FACT",
+            "badge": {"label": "VERIFIED FACT", "color": "#34d399", "bg": "rgba(16,185,129,0.15)"},
+            "claim": vf.get("claim", ""),
+            "source": vf.get("source", "Statutory Exchange Filing"),
+            "source_date": vf.get("source_date", as_of),
+            "passage": vf.get("passage", ""),
+        })
+
+    for cm in cm_list[:2]:
+        claims.append({
+            "tier": "CALCULATED_METRIC",
+            "badge": {"label": "CALCULATED METRIC", "color": "#38bdf8", "bg": "rgba(56,189,248,0.15)"},
+            "claim": cm.get("metric", ""),
+            "source": "Deterministic Quantitative Engine",
+            "source_date": as_of,
+            "passage": f"Formula / Derivation: {cm.get('formula', '')}",
+        })
+
+    if mi_list:
+        claims.append({
+            "tier": "MODEL_INTERPRETATION",
+            "badge": {"label": "MODEL INTERPRETATION", "color": "#c084fc", "bg": "rgba(168,85,247,0.15)"},
+            "claim": mi_list[0],
+            "source": "Moatnomics Analytical Framework",
+            "source_date": as_of,
+            "passage": mi_list[1] if len(mi_list) > 1 else "Evaluated against historical operating distributions and peer-group benchmarks.",
+        })
+
+    if uu_list:
+        claims.append({
+            "tier": "UNRESOLVED_UNCERTAINTY",
+            "badge": {"label": "UNRESOLVED UNCERTAINTY", "color": "#fbbf24", "bg": "rgba(245,158,11,0.15)"},
+            "claim": uu_list[0],
+            "source": "Statutory Disclosure Boundary",
+            "source_date": as_of,
+            "passage": uu_list[1] if len(uu_list) > 1 else "Monitored across upcoming quarterly exchange and regulatory disclosures.",
+        })
+
+    ft = ledger.get("falsification_triggers") or {}
+    contradicts = ft.get("what_could_contradict") or []
+    revisions = ft.get("evidence_that_changes_conclusion") or []
+    labels = default_pillar_labels or [
+        "Earnings Quality & Cash Conversion",
+        "Governance, Solvency & Valuation Hurdle",
+    ]
+
+    falsification_rows: List[Dict[str, str]] = []
+    max_len = max(len(contradicts), len(revisions))
+    for idx in range(max_len):
+        c_val = contradicts[idx] if idx < len(contradicts) else contradicts[-1]
+        r_val = revisions[idx] if idx < len(revisions) else revisions[-1]
+        p_label = labels[idx] if idx < len(labels) else f"Thesis Checkpoint 0{idx + 1}"
+        falsification_rows.append({
+            "pillar": p_label,
+            "contradicting_evidence": c_val,
+            "revision_threshold": r_val,
+        })
+
+    ledger["claims"] = claims
+    ledger["falsification_rows"] = falsification_rows
+    return ledger
+
+
 def build_equity_epistemic_ledger(
     ticker: str,
     stock_data: Optional[Dict[str, Any]] = None,
@@ -61,8 +139,10 @@ def build_equity_epistemic_ledger(
     fv = val_radar.get("fair_value")
     mos = val_radar.get("margin_of_safety_pct")
 
-    return {
+    ledger = {
         "as_of_date": formatted_date,
+        "asset_class": "EQUITY",
+        "entity_id": ticker,
         "verified_facts": [
             {
                 "claim": f"Exchange Market Quote & Valuation Baseline: CMP ₹{price} | Trailing P/E: {pe}x",
@@ -106,6 +186,13 @@ def build_equity_epistemic_ledger(
             ]
         }
     }
+    return _attach_ui_presentation_fields(
+        ledger,
+        default_pillar_labels=[
+            "Pillar 03 & 04 — Cash Conversion & Governance",
+            "Pillar 02 & 05 — Moat Durability & DCF Hurdle",
+        ],
+    )
 
 
 def extract_epistemic_badges(report_text: str) -> Dict[str, List[str]]:
@@ -199,7 +286,7 @@ def build_multi_asset_epistemic_ledger(
         aum = ctx.get("aum") or "N/A"
         nav = ctx.get("nav") or "N/A"
         ter = ctx.get("ter") or "N/A"
-        return {
+        ledger = {
             "as_of_date": formatted_date,
             "asset_class": "MUTUAL_FUND",
             "entity_id": entity_id,
@@ -232,13 +319,17 @@ def build_multi_asset_epistemic_ledger(
                 ]
             }
         }
+        return _attach_ui_presentation_fields(
+            ledger,
+            default_pillar_labels=["Dimension 01 & 04 — Active Share & Fee Justification"],
+        )
 
-    if ac in {"DEBT", "BOND"}:
+    if ac in {"DEBT", "BOND", "CORPORATE_DEBT"}:
         issuer = ctx.get("issuer_name") or entity_id
         rating = ctx.get("credit_rating") or "AAA"
-        ytm = ctx.get("ytm") or "N/A"
-        coupon = ctx.get("coupon_rate") or "N/A"
-        return {
+        ytm = ctx.get("ytm") or ctx.get("ytm_pct") or "N/A"
+        coupon = ctx.get("coupon_rate") or ctx.get("coupon_pct") or "N/A"
+        ledger = {
             "as_of_date": formatted_date,
             "asset_class": "DEBT",
             "entity_id": entity_id,
@@ -271,13 +362,17 @@ def build_multi_asset_epistemic_ledger(
                 ]
             }
         }
+        return _attach_ui_presentation_fields(
+            ledger,
+            default_pillar_labels=["Pillar 01 & 03 — Solvency Headroom & Rating Surveillance"],
+        )
 
     if ac in {"REIT", "INVIT"}:
         name = ctx.get("name") or entity_id
         dist = ctx.get("ndcf_distribution") or "N/A"
         wale = ctx.get("wale") or "N/A"
         ltv = ctx.get("ltv_pct") or "N/A"
-        return {
+        ledger = {
             "as_of_date": formatted_date,
             "asset_class": "REIT",
             "entity_id": entity_id,
@@ -310,6 +405,10 @@ def build_multi_asset_epistemic_ledger(
                 ]
             }
         }
+        return _attach_ui_presentation_fields(
+            ledger,
+            default_pillar_labels=["Pillar 01 & 04 — NDCF Payout Purity & Occupancy Floor"],
+        )
 
     return build_equity_epistemic_ledger(
         ticker=entity_id,

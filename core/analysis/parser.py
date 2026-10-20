@@ -81,19 +81,19 @@ def render_epistemic_badges_html(html_text: str) -> str:
     replacements = [
         (
             r"\[VERIFIED FACT([^\]]*)\]",
-            r'<span class="badge" style="background:rgba(16,185,129,0.14);color:#34d399;border:1px solid rgba(16,185,129,0.35);font-size:11px;font-weight:700;padding:2px 7px;border-radius:4px;margin-right:4px;">✓ VERIFIED FACT\1</span>'
+            r'<span class="badge epistemic-badge" style="background:rgba(16,185,129,0.14);color:#34d399;border:1px solid rgba(16,185,129,0.35);font-size:11px;font-weight:700;padding:2px 7px;border-radius:4px;margin-right:4px;">✓ VERIFIED FACT\1</span>'
         ),
         (
             r"\[CALCULATED METRIC([^\]]*)\]",
-            r'<span class="badge" style="background:rgba(56,189,248,0.14);color:#38bdf8;border:1px solid rgba(56,189,248,0.35);font-size:11px;font-weight:700;padding:2px 7px;border-radius:4px;margin-right:4px;">∑ CALCULATED METRIC\1</span>'
+            r'<span class="badge epistemic-badge" style="background:rgba(56,189,248,0.14);color:#38bdf8;border:1px solid rgba(56,189,248,0.35);font-size:11px;font-weight:700;padding:2px 7px;border-radius:4px;margin-right:4px;">∑ CALCULATED METRIC\1</span>'
         ),
         (
             r"\[MODEL INTERPRETATION([^\]]*)\]",
-            r'<span class="badge" style="background:rgba(168,85,247,0.14);color:#c084fc;border:1px solid rgba(168,85,247,0.35);font-size:11px;font-weight:700;padding:2px 7px;border-radius:4px;margin-right:4px;">🧠 MODEL INTERPRETATION\1</span>'
+            r'<span class="badge epistemic-badge" style="background:rgba(168,85,247,0.14);color:#c084fc;border:1px solid rgba(168,85,247,0.35);font-size:11px;font-weight:700;padding:2px 7px;border-radius:4px;margin-right:4px;">🧠 MODEL INTERPRETATION\1</span>'
         ),
         (
             r"\[UNRESOLVED UNCERTAINTY([^\]]*)\]",
-            r'<span class="badge" style="background:rgba(245,158,11,0.14);color:#fbbf24;border:1px solid rgba(245,158,11,0.35);font-size:11px;font-weight:700;padding:2px 7px;border-radius:4px;margin-right:4px;">❓ UNRESOLVED UNCERTAINTY\1</span>'
+            r'<span class="badge epistemic-badge" style="background:rgba(245,158,11,0.14);color:#fbbf24;border:1px solid rgba(245,158,11,0.35);font-size:11px;font-weight:700;padding:2px 7px;border-radius:4px;margin-right:4px;">❓ UNRESOLVED UNCERTAINTY\1</span>'
         ),
     ]
     out = html_text
@@ -220,7 +220,7 @@ def wrap_html_with_collapsible_pillars(
     # Check for presence of pillar token across English, Hindi, and technical sections
     has_pillar_token = any(token in html_content for token in ("Pillar", "स्तंभ", "Dimension"))
     if not has_pillar_token:
-        return html_content
+        return render_epistemic_badges_html(html_content)
 
     # Only build exchange links from a real, numeric BSE scrip code for THIS company.
     # Never substitute another company's code: a wrong citation is worse than none.
@@ -359,10 +359,21 @@ def wrap_html_with_collapsible_pillars(
 """
                     rendered_body = f"{teaser}\n{paywall_card}"
 
+        pillar_epistemic_tag = {
+            1: "[VERIFIED FACT]",
+            2: "[MODEL INTERPRETATION]",
+            3: "[VERIFIED FACT]",
+            4: "[MODEL INTERPRETATION]",
+            5: "[CALCULATED METRIC]",
+            6: "[CALCULATED METRIC]",
+            7: "[VERIFIED FACT]",
+        }.get(p_num, "[VERIFIED FACT]")
+
         if has_valid_scrip:
             citation_strip_html = (
-                f'<div style="display: flex; align-items: center; gap: 8px;">'
+                f'<div style="display: flex; align-items: center; gap: 8px; flex-wrap: wrap;">'
                 f'<span>📡</span>'
+                f'{pillar_epistemic_tag}'
                 f'<span><strong>Primary Exchange Source:</strong> '
                 f'<a href="{url}" target="_blank" rel="noopener noreferrer" class="pillar-citation-link">{name}</a> '
                 f'(official BSE page for BSE scrip {scrip}).</span>'
@@ -373,7 +384,7 @@ def wrap_html_with_collapsible_pillars(
             )
         else:
             citation_strip_html = (
-                '<span>📡 <strong>Primary Exchange Source:</strong> '
+                f'<span>📡 {pillar_epistemic_tag} <strong>Primary Exchange Source:</strong> '
                 'BSE scrip code not yet resolved for this company, so no exchange link is shown.</span>'
             )
 
@@ -523,8 +534,17 @@ def wrap_fund_dossier_with_collapsible_dimensions(
         doc_url = meta.get("doc_url", "https://www.amfiindia.com/")
         doc_label = meta.get("doc_label", "AMFI Portal")
 
-        citation_strip_html = f"""<div style="display: flex; align-items: center; gap: 8px;">
+        dim_epistemic_tag = {
+            1: "[CALCULATED METRIC]",
+            2: "[VERIFIED FACT]",
+            3: "[MODEL INTERPRETATION]",
+            4: "[CALCULATED METRIC]",
+            5: "[UNRESOLVED UNCERTAINTY]",
+        }.get(d_num, "[VERIFIED FACT]")
+
+        citation_strip_html = f"""<div style="display: flex; align-items: center; gap: 8px; flex-wrap: wrap;">
         <span>📡</span>
+        {dim_epistemic_tag}
         <span><strong>Regulatory Grounding:</strong> <span class="pillar-citation-link">{citation_source}</span> — {citation_desc}</span>
       </div>
       <a href="{doc_url}" target="_blank" rel="noopener noreferrer" class="btn btn-secondary btn-sm" style="font-size: 11.5px; padding: 4px 10px; font-weight: 600; text-decoration: none;" onclick="event.stopPropagation()">

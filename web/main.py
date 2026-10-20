@@ -1165,12 +1165,22 @@ def dossier_page(request: Request, ticker: str):
             parsed_pe = _safe_float(str(pe_val).replace("x", ""), 0.0)
             if parsed_pe > 0:
                 fund["pe_ratio"] = parsed_pe
+        if scrip_code and not fund.get("scrip_code"):
+            fund["scrip_code"] = scrip_code
         equity_intel = compile_equity_dossier(
             ticker=canonical,
             fundamentals=fund,
             company_name=rep.get("short_name", canonical),
             industry_str=rep.get("industry", ""),
         )
+        if equity_intel and equity_intel.get("epistemic_ledger"):
+            from core.analysis.epistemic_schema import build_equity_epistemic_ledger
+            equity_intel["epistemic_ledger"] = build_equity_epistemic_ledger(
+                ticker=canonical,
+                stock_data=fund,
+                equity_intel=equity_intel,
+                formatted_date=str(rep.get("formatted_date") or "Latest Filing"),
+            )
     except Exception as e:
         logger.debug(f"Equity dossier intelligence compilation notice for {canonical}: {e}")
 
@@ -1203,6 +1213,7 @@ def dossier_page(request: Request, ticker: str):
             "is_deep_dive_unlocked": is_deep_dive_unlocked,
             "web_user": web_user,
             "equity_intel": equity_intel,
+            "epistemic_ledger": equity_intel.get("epistemic_ledger") if equity_intel else None,
         }
     )
 
@@ -1389,6 +1400,20 @@ def debt_dossier_page(request: Request, isin: str):
     posture = evaluate_5_pillar_credit_posture(sec, rating_history=rating_history)
     is_deep_dive_unlocked = _asset_unlocked_for_request(request, "DEBT", clean_isin)
 
+    from core.analysis.epistemic_schema import build_multi_asset_epistemic_ledger
+    epistemic_ledger = build_multi_asset_epistemic_ledger(
+        asset_class="DEBT",
+        entity_id=clean_isin,
+        context={
+            "issuer_name": sec.get("issuer_name") or clean_isin,
+            "credit_rating": sec.get("credit_rating") or posture.get("credit_rating") or "AAA",
+            "ytm": posture.get("ytm_pct") or sec.get("ytm") or "N/A",
+            "coupon_rate": sec.get("coupon_rate") or posture.get("coupon_pct") or "N/A",
+            "modified_duration": (posture.get("duration_profile") or {}).get("modified_duration_years", "N/A"),
+        },
+        formatted_date=str(sec.get("last_updated") or "Latest Filing")[:10],
+    )
+
     return templates.TemplateResponse(
         request=request,
         name="debt_dossier.html",
@@ -1400,6 +1425,7 @@ def debt_dossier_page(request: Request, isin: str):
             "is_deep_dive_unlocked": is_deep_dive_unlocked,
             "unlock_kind": "DEBT",
             "unlock_id": clean_isin,
+            "epistemic_ledger": epistemic_ledger,
         }
     )
 
@@ -1653,6 +1679,22 @@ def fund_dossier_page(request: Request, scheme_code: str):
     except Exception as e:
         logger.warning(f"Could not calculate credit quote for {clean_code}: {e}")
 
+    from core.analysis.epistemic_schema import build_multi_asset_epistemic_ledger
+    sch_obj = dossier.get("scheme") or {}
+    as_obj = dossier.get("active_share") or {}
+    epistemic_ledger = build_multi_asset_epistemic_ledger(
+        asset_class="MUTUAL_FUND",
+        entity_id=clean_code,
+        context={
+            "scheme_name": sch_obj.get("scheme_name") or clean_code,
+            "aum": sch_obj.get("aum_crores") or "N/A",
+            "nav": sch_obj.get("nav") or "N/A",
+            "ter": sch_obj.get("ter_direct_pct") or "N/A",
+            "active_share": as_obj.get("active_share_pct") or sch_obj.get("active_share_pct") or "N/A",
+        },
+        formatted_date=str(sch_obj.get("last_updated") or "Latest Filing")[:10],
+    )
+
     return templates.TemplateResponse(
         request=request,
         name="fund_dossier.html",
@@ -1670,6 +1712,7 @@ def fund_dossier_page(request: Request, scheme_code: str):
             "forensic_locked": forensic_locked,
             "unlock_kind": "FUND",
             "unlock_id": clean_code,
+            "epistemic_ledger": epistemic_ledger,
         }
     )
 
@@ -1946,6 +1989,25 @@ def reit_dossier_page(request: Request, symbol: str):
     canonical_sym = detail["reit"]["symbol"]
     is_deep_dive_unlocked = _asset_unlocked_for_request(request, "REIT", canonical_sym)
 
+    from core.analysis.epistemic_schema import build_multi_asset_epistemic_ledger
+    reit_obj = detail.get("reit") or {}
+    port_obj = detail.get("portfolio_audit") or {}
+    wf_obj = detail.get("tax_waterfall") or {}
+    slabs = wf_obj.get("slabs") or []
+    std_slab = next((s for s in slabs if abs(float(s.get("slab_rate_pct", 0)) - 30.0) < 0.5), slabs[0] if slabs else {})
+    epistemic_ledger = build_multi_asset_epistemic_ledger(
+        asset_class="REIT",
+        entity_id=canonical_sym,
+        context={
+            "name": reit_obj.get("name") or canonical_sym,
+            "ndcf_distribution": reit_obj.get("annual_dpu_inr") or reit_obj.get("distribution_yield_pct") or "N/A",
+            "wale": port_obj.get("wale_years") or reit_obj.get("wale_years") or "N/A",
+            "ltv_pct": (port_obj.get("capital_structure") or {}).get("ltv_ratio_pct") or reit_obj.get("ltv_ratio_pct") or "N/A",
+            "post_tax_yield": std_slab.get("net_post_tax_yield_pct", "N/A"),
+        },
+        formatted_date=str(reit_obj.get("last_updated") or "Latest Filing")[:10],
+    )
+
     return templates.TemplateResponse(
         request=request,
         name="reit_dossier.html",
@@ -1960,7 +2022,8 @@ def reit_dossier_page(request: Request, symbol: str):
             "inversion_risks": detail["inversion_risks"],
             "peers": detail["peers"],
             "forensic_notes": detail["forensic_notes"],
-            "is_deep_dive_unlocked": is_deep_dive_unlocked
+            "is_deep_dive_unlocked": is_deep_dive_unlocked,
+            "epistemic_ledger": epistemic_ledger,
         }
     )
 
