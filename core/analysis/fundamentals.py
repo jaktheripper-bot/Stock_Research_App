@@ -74,17 +74,22 @@ _yf_session = None
 _yf_session_lock = threading.Lock()
 
 
-def get_hardened_yfinance_session() -> requests.Session:
-    """Returns a requests.Session configured with standard desktop browser User-Agent."""
+def get_hardened_yfinance_session():
+    """Returns a browser-impersonating session (curl_cffi Chrome TLS session when available, or requests.Session with desktop User-Agent fallback)."""
     global _yf_session
     with _yf_session_lock:
         if _yf_session is None:
-            sess = requests.Session()
-            sess.headers.update({
-                "User-Agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36",
-                "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
-                "Accept-Language": "en-US,en;q=0.9",
-            })
+            try:
+                from yfinance._http import new_session
+                sess = new_session()
+            except Exception as e:
+                logger.debug(f"yfinance._http.new_session fallback notice: {e}")
+                sess = requests.Session()
+                sess.headers.update({
+                    "User-Agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36",
+                    "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
+                    "Accept-Language": "en-US,en;q=0.9",
+                })
             _yf_session = sess
         return _yf_session
 
@@ -139,15 +144,16 @@ def ttl_cache(ttl_seconds: int = 300, maxsize: int = 128):
                         return val
                     del cache[key]
             res = fn(*args, **kwargs)
-            with lock:
-                if len(cache) >= maxsize:
-                    try:
-                        oldest = min(cache.keys(), key=lambda k: cache[k][1])
-                        cache.pop(oldest, None)
-                    except Exception as pop_err:
-                        logger.warning(f"TTL cache eviction reset notice: {pop_err}")
-                        cache.clear()
-                cache[key] = (res, now + ttl_seconds)
+            if res is not None:
+                with lock:
+                    if len(cache) >= maxsize:
+                        try:
+                            oldest = min(cache.keys(), key=lambda k: cache[k][1])
+                            cache.pop(oldest, None)
+                        except Exception as pop_err:
+                            logger.warning(f"TTL cache eviction reset notice: {pop_err}")
+                            cache.clear()
+                    cache[key] = (res, now + ttl_seconds)
             return res
         def cache_clear():
             with lock:
@@ -672,31 +678,65 @@ def get_historical_prices(ticker: str, period: str = "6mo"):
 
     clean = clean_ticker(ticker)
 
+    # Resolve canonical symbol across BSE master cache, PRIMARY_BSE_MAP, and stored report short_name
+    try:
+        from bse_master import PRIMARY_BSE_MAP, get_bse_scrips_cache
+        cached_scrips = get_bse_scrips_cache() or {}
+        symbols_map = cached_scrips.get("symbols", {})
+        if clean not in symbols_map:
+            canonical_candidate = resolve_canonical_symbol(clean)
+            if canonical_candidate and canonical_candidate in symbols_map:
+                clean = canonical_candidate
+            else:
+                try:
+                    from core.db.reports import get_report_by_ticker_sync
+                    rep_row = get_report_by_ticker_sync(clean)
+                    short_nm = str((rep_row or {}).get("short_name") or "").strip()
+                    if short_nm:
+                        base_nm = short_nm.upper().replace(" LIMITED", "").replace(" LTD.", "").replace(" LTD", "").strip()
+                        scrip_from_nm = resolve_bse_scrip_code(base_nm) or resolve_bse_scrip_code(short_nm)
+                        if scrip_from_nm:
+                            sym_from_nm = resolve_canonical_symbol(str(scrip_from_nm))
+                            if sym_from_nm:
+                                clean = sym_from_nm
+                except Exception as rep_err:
+                    logger.debug(f"Report short_name canonical resolution notice for {clean}: {rep_err}")
+    except Exception as sym_err:
+        logger.debug(f"Canonical symbol resolution notice for {clean}: {sym_err}")
+
     # Sanitize multi-word queries with spaces to their canonical security ID
     if " " in clean:
         scrip = resolve_bse_scrip_code(clean)
         if scrip:
-            try:
-                b = BSE()
-                q = b.getQuote(scrip)
-                sec_id = str(q.get("securityID") or "").strip().upper()
-                if sec_id and " " not in sec_id:
-                    clean = sec_id
-                else:
+            resolved_sym = resolve_canonical_symbol(str(scrip))
+            if resolved_sym and " " not in resolved_sym:
+                clean = resolved_sym
+            else:
+                try:
+                    b = BSE()
+                    q = b.getQuote(scrip)
+                    sec_id = str(q.get("securityID") or "").strip().upper()
+                    if sec_id and " " not in sec_id:
+                        clean = sec_id
+                    else:
+                        clean = clean.replace(" ", "")
+                except Exception as e:
+                    logger.debug(f"BSE quote lookup notice for {scrip}: {e}")
                     clean = clean.replace(" ", "")
-            except Exception as e:
-                logger.debug(f"BSE quote lookup notice for {scrip}: {e}")
-                clean = clean.replace(" ", "")
         else:
             clean = clean.replace(" ", "")
 
     # Reverse-lookup numeric scrip code to ticker symbol for yfinance
     if clean.isdigit():
         try:
-            from bse_master import PRIMARY_BSE_MAP
-            rev_map = {str(v).strip(): k for k, v in PRIMARY_BSE_MAP.items()}
-            if clean in rev_map:
-                clean = rev_map[clean]
+            resolved_sym = resolve_canonical_symbol(clean)
+            if resolved_sym and not resolved_sym.isdigit():
+                clean = resolved_sym
+            else:
+                from bse_master import PRIMARY_BSE_MAP
+                rev_map = {str(v).strip(): k for k, v in PRIMARY_BSE_MAP.items()}
+                if clean in rev_map:
+                    clean = rev_map[clean]
         except Exception as e:
             logger.debug(f"Reverse lookup notice for scrip {clean}: {e}")
 

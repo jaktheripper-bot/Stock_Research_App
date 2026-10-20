@@ -2746,8 +2746,8 @@ html[data-theme="light"] .theme-toggle-btn {
 /* 6. Unified Dossier Masthead */
 .dossier-masthead-v2 {
   position: relative;
-  background: linear-gradient(135deg, #0B2337 0%, #0E3D32 100%) !important;
-  border: 1px solid rgba(125, 167, 122, 0.3) !important;
+  background: linear-gradient(135deg, #0B2337 0%, #0F172A 100%) !important;
+  border: 1px solid rgba(148, 163, 184, 0.22) !important;
   border-top: 4px solid var(--asset-accent) !important;
   border-radius: var(--radius-lg);
   padding: 28px;
@@ -2864,11 +2864,11 @@ html[data-theme="light"] [style*="color: #38bdf8"],
   color: #0E3D32 !important;
 }
 
-/* Preserve light text inside dark Forest/Ink Navy mastheads & hero banners even in Light Mode */
+/* Preserve light text inside dark Ink Navy mastheads & hero banners even in Light Mode */
 html[data-theme="light"] .hero-portal-banner,
 html[data-theme="light"] .dossier-masthead-v2,
 .dossier-ivory-surface .dossier-masthead-v2 {
-  background: linear-gradient(135deg, #0B2337 0%, #0E3D32 100%) !important;
+  background: linear-gradient(135deg, #0B2337 0%, #0F172A 100%) !important;
   color: #F7F5EE !important;
 }
 
