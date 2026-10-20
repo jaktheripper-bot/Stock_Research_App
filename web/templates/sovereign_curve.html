@@ -33,7 +33,7 @@
 
     <!-- Evaluated Metadata Strip & Provenance Info -->
     <div class="dossier-meta-strip" style="margin-bottom: 20px;">
-      <span>📅 Evaluated: Live Benchmark • Verified RBI Auction Cut-offs • CCIL ZCYC Term Registry</span>
+      <span><svg class="glyph" style="width: 12px; height: 12px; vertical-align: -1px;"><use href="#glyph-clock"></use></svg> Evaluated: Live Benchmark • Verified RBI Auction Cut-offs • CCIL ZCYC Term Registry</span>
     </div>
     <p class="dossier-provenance-subline">Yields and term structures ingested directly from Reserve Bank of India primary auctions and CCIL statutory benchmarks.</p>
 
@@ -235,8 +235,8 @@
 
     <!-- Chart Footnote -->
     <div style="display: flex; justify-content: space-between; align-items: center; margin-top: 12px; font-size: 11.5px; color: #64748b; flex-wrap: wrap; gap: 8px;">
-      <span>📐 Scaling: Horizontal maturity axis uses square-root scaling ($\sqrt{Maturity}$) to prevent compression of short-term bills.</span>
-      <span>💡 Hover any data point to inspect clearing yield & spread.</span>
+      <span><svg class="glyph" style="width: 12px; height: 12px; vertical-align: -1px;"><use href="#glyph-scale"></use></svg> Scaling: Horizontal maturity axis uses square-root scaling ($\sqrt{Maturity}$) to prevent compression of short-term bills.</span>
+      <span><svg class="glyph" style="width: 12px; height: 12px; vertical-align: -1px;"><use href="#icon-insights"></use></svg> Hover any data point to inspect clearing yield & spread.</span>
     </div>
   </div>
 
@@ -267,7 +267,7 @@
       </div>
       <div style="display: flex; gap: 10px;">
         <a href="/calculator/tax?yield={{ analytics.benchmark_10y_gsec }}" class="btn btn-secondary btn-sm">
-          🧮 Compute 10Y Post-Tax Return
+          <svg class="glyph" style="width: 13px; height: 13px; vertical-align: -2px;"><use href="#icon-valuation"></use></svg> Compute 10Y Post-Tax Return
         </a>
       </div>
     </div>
@@ -297,7 +297,7 @@
               {% elif pt.instrument_type == 'GSEC' %}
                 <span style="background: rgba(14, 165, 233, 0.15); color: #38bdf8; padding: 2px 8px; border-radius: 4px; font-size: 11.5px; font-weight: 700;">Central G-Sec</span>
               {% elif pt.instrument_type == 'SGRB' %}
-                <span style="background: rgba(16, 185, 129, 0.2); color: #10b981; border: 1px solid rgba(16, 185, 129, 0.4); padding: 2px 8px; border-radius: 4px; font-size: 11.5px; font-weight: 700;">🌱 Green Bond</span>
+                <span style="background: rgba(16, 185, 129, 0.2); color: #10b981; border: 1px solid rgba(16, 185, 129, 0.4); padding: 2px 8px; border-radius: 4px; font-size: 11.5px; font-weight: 700;">Green Bond</span>
               {% else %}
                 <span style="background: rgba(168, 85, 247, 0.15); color: #c084fc; padding: 2px 8px; border-radius: 4px; font-size: 11.5px; font-weight: 700;">State SDL</span>
               {% endif %}
@@ -460,7 +460,7 @@
 
   <!-- SEBI Regulatory Safe-Harbor & Provenance -->
   <div style="font-size: 12px; color: #64748b; text-align: center; max-width: 840px; margin: 0 auto; line-height: 1.6;">
-    🔒 <strong>Statutory Data Provenance:</strong> Sourced strictly from official Reserve Bank of India (RBI) Weekly Primary Auction Bulletins, Clearing Corporation of India (CCIL) Zero-Coupon Yield Curve benchmarks, and Ministry of Statistics and Programme Implementation (MOSPI) Consumer Price Index Gazette releases. Sovereign metrics and spreads are published solely for and analytical benchmarking under Section 2(u) of the SEBI (Research Analysts) Regulations, 2014.
+    <svg class="glyph" style="width: 12px; height: 12px; vertical-align: -1px;"><use href="#glyph-lock"></use></svg> <strong>Statutory Data Provenance:</strong> Sourced strictly from official Reserve Bank of India (RBI) Weekly Primary Auction Bulletins, Clearing Corporation of India (CCIL) Zero-Coupon Yield Curve benchmarks, and Ministry of Statistics and Programme Implementation (MOSPI) Consumer Price Index Gazette releases. Sovereign metrics and spreads are published solely for and analytical benchmarking under Section 2(u) of the SEBI (Research Analysts) Regulations, 2014.
   </div>
 </div>
 

@@ -18,19 +18,19 @@
       Cross-company peer comparator and disparity diagnostics. Benchmark capital efficiency, valuation multiples, balance sheet liquidity, and 7-pillar qualitative moats across any two BSE/NSE listed equities with automated disparity gating.
     </p>
     <div class="dossier-meta-strip" style="margin-top: 10px;">
-      <span class="dossier-meta-pill">📅 Evaluated: Recent</span>
+      <span class="dossier-meta-pill"><svg class="glyph" style="width:12px;height:12px;vertical-align:-1px;margin-right:4px;"><use href="#icon-doc"></use></svg>Evaluated: Recent</span>
       <span class="dossier-meta-sep">•</span>
       <span class="badge badge-emerald"><span class="status-dot status-dot-emerald"></span> Dual Verified Exchange Feeds</span>
       <span class="dossier-meta-sep">•</span>
       <span class="badge badge-cyan" title="Cross-checked comparative metrics">
-        <span>📎</span> <span>Grounded Comparative Ratios</span>
+        <svg class="glyph" style="width:12px;height:12px;"><use href="#icon-doc"></use></svg> <span>Grounded Comparative Ratios</span>
       </span>
     </div>
     <div class="dossier-provenance-subline" style="margin-top: 6px;">
       Side-by-side fundamentals extracted directly from audited statutory BSE/NSE filings with automated disparity detection.
     </div>
     <button id="btnShareCompare" onclick="shareCurrentPage('compare')" class="btn btn-secondary btn-sm" style="margin-top: 12px;" title="Copy or share a link to this comparison" aria-label="Share this comparison">
-      <span>🔗</span> Share
+      <svg class="glyph"><use href="#glyph-globe"></use></svg> Share
     </button>
   </div>
 
@@ -75,7 +75,7 @@
 
   {% if compare_error %}
   <div class="alert alert-warning" style="margin: 1.5rem 0; padding: 1.25rem; border-left: 4px solid #f59e0b; background: rgba(245, 158, 11, 0.08); border-radius: 8px;">
-      <strong>⚠️ Peer Comparison Validation Notice:</strong> {{ compare_error }}
+      <strong><svg class="glyph" style="vertical-align:-2px;margin-right:4px;"><use href="#glyph-alert"></use></svg>Peer Comparison Validation Notice:</strong> {{ compare_error }}
   </div>
   {% endif %}
 
@@ -106,7 +106,7 @@
   {% if disparity.is_disparate %}
   <div style="background: rgba(244, 63, 94, 0.08); border-left: 4px solid var(--accent-rose); border-radius: var(--radius-sm); padding: 18px 20px; margin-bottom: 24px;">
     <div style="display: flex; align-items: center; gap: 8px; font-weight: 800; color: var(--accent-rose); font-size: 14px; margin-bottom: 8px;">
-      <span>⚠️</span>
+      <svg class="glyph"><use href="#glyph-alert"></use></svg>
       <span>Comparability Warning (False Equivalence Detected)</span>
     </div>
     <ul style="margin: 0; padding-left: 20px; font-size: 13.5px; color: var(--text-secondary); line-height: 1.6;">
@@ -120,7 +120,7 @@
   </div>
   {% else %}
   <div style="background: rgba(16, 185, 129, 0.08); border-left: 4px solid var(--accent-emerald); border-radius: var(--radius-sm); padding: 14px 18px; margin-bottom: 24px; font-size: 13.5px; color: var(--accent-emerald); display: flex; align-items: center; gap: 8px;">
-    <span>✅</span>
+    <svg class="glyph"><use href="#glyph-shield"></use></svg>
     <span><strong>Peer Alignment Verified:</strong> Both assets operate within aligned business domains and capital structure bounds. A direct comparison is valid.</span>
   </div>
   {% endif %}

@@ -110,7 +110,7 @@ def stream_genai_with_fallback(client, prompt: str, system_prompt: str, on_statu
     last_error = None
     for model_name in models_to_try:
         if on_status:
-            on_status("⚡ Initializing institutional synthesis engine...")
+            on_status("Initializing institutional synthesis engine...")
         for attempt in range(2):
             try:
                 sys_inst = system_prompt
@@ -129,9 +129,9 @@ def stream_genai_with_fallback(client, prompt: str, system_prompt: str, on_statu
                 )
                 if on_status:
                     if use_grounding:
-                        on_status("🔍 Grounding against official filings...")
+                        on_status("Grounding against official filings...")
                     else:
-                        on_status("⚡ Generating with verified exchange metrics (Fast / Zero Search Fee)...")
+                        on_status("Generating with verified exchange metrics (Fast / Zero Search Fee)...")
 
                 for chunk in chat.send_message_stream(prompt):
                     extracted_text = None
@@ -316,7 +316,7 @@ def stream_stock_report(ticker: str, language: str = "English (India)", stock_da
         logger.warning(f"Primary streaming synthesis failed: {gemini_err}")
         try:
             if on_status:
-                on_status("🔄 Switching to secondary search grounding channel...")
+                on_status("Switching to secondary search grounding channel...")
             for chunk in stream_perplexity_fallback(user_prompt, system_prompt, collected_citations=collected_citations):
                 report_accumulator.append(chunk)
                 yield chunk
@@ -326,14 +326,14 @@ def stream_stock_report(ticker: str, language: str = "English (India)", stock_da
             is_spend_cap = any(phrase in gem_err_msg for phrase in ["Spend cap breached", "PERMISSION_DENIED", "403", "quota"])
             if is_spend_cap:
                 err_msg = (
-                    "\n\n> ❌ **Live Synthesis Failed:** Grounded synthesis channels are temporarily unavailable. "
+                    "\n\n> **Live Synthesis Failed:** Grounded synthesis channels are temporarily unavailable. "
                     "Please retry shortly.\n"
                 )
                 report_accumulator.append(err_msg)
                 yield err_msg
             else:
                 notice_u = (
-                    "\n\n> ⚠️ **Notice: Live Web Grounding Offline.**\n"
+                    "\n\n> **Notice: Live Web Grounding Offline.**\n"
                     "> Generating thesis from core parametric intelligence.\n"
                     "> *Note:* Exchange metrics are verified, but recent disclosures may be omitted.\n\n"
                 )
@@ -345,7 +345,7 @@ def stream_stock_report(ticker: str, language: str = "English (India)", stock_da
                         yield chunk
                 except Exception as final_err:
                     logger.error(f"Ungrounded synthesis fallback failed: {final_err}")
-                    err_msg = "\n\n> ❌ **Live Synthesis Failed:** Unable to complete research synthesis at this time. Please retry shortly."
+                    err_msg = "\n\n> **Live Synthesis Failed:** Unable to complete research synthesis at this time. Please retry shortly."
                     report_accumulator.append(err_msg)
                     yield err_msg
 
@@ -363,7 +363,7 @@ def stream_stock_report(ticker: str, language: str = "English (India)", stock_da
         passed, disc = verify_stock_report(stock_data, complete_text)
         if not passed:
             formatted_disc = "; ".join(disc) if isinstance(disc, list) else str(disc)
-            note = f"\n\n> ⚠️ **Verification Audit Note:** {formatted_disc}"
+            note = f"\n\n> **Verification Audit Note:** {formatted_disc}"
             complete_text += note
             yield note
     except Exception as verif_err:

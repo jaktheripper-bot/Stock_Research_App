@@ -12,29 +12,29 @@
         <div style="display: flex; flex-wrap: wrap; gap: 8px; align-items: center; margin-bottom: 12px;">
           {% if is_yesterday_edition %}
           <div class="hero-badge" style="background: rgba(245, 158, 11, 0.15); border: 1px solid rgba(245, 158, 11, 0.4); color: #fbbf24; display: inline-flex; align-items: center; gap: 8px;">
-            <span>📅 YESTERDAY'S 9:00 AM EDITION</span>
+            <span>YESTERDAY'S 9:00 AM EDITION</span>
             <span>•</span>
             <span>QUALITY SCREEN</span>
             {% if not is_past_9am %}
             <span>•</span>
-            <span id="countdownBadge">⏳ NEXT EDITION IN {{ "%02d"|format(hours_until_9am) }}H {{ "%02d"|format(mins_until_9am) }}M (09:00 AM IST)</span>
+            <span id="countdownBadge">NEXT EDITION IN {{ "%02d"|format(hours_until_9am) }}H {{ "%02d"|format(mins_until_9am) }}M (09:00 AM IST)</span>
             {% endif %}
           </div>
           {% elif is_today_edition %}
           <div class="hero-badge" style="background: rgba(14, 165, 233, 0.15); border: 1px solid rgba(14, 165, 233, 0.4); color: var(--accent-cyan); display: inline-flex; align-items: center; gap: 8px;">
-            <span>🌅 TODAY'S 9:00 AM LIVE EDITION</span>
+            <span>TODAY'S 9:00 AM LIVE EDITION</span>
             <span>•</span>
             <span>QUALITY SCREEN</span>
             <span>•</span>
             {% if can_access_today %}
-            <span>👑 PRO SUBSCRIBER ACCESS</span>
+            <span>PRO SUBSCRIBER ACCESS</span>
             {% else %}
-            <span>🔒 PRO EXCLUSIVE PREVIEW</span>
+            <span>PRO EXCLUSIVE PREVIEW</span>
             {% endif %}
           </div>
           {% else %}
           <div class="hero-badge" style="display: inline-flex; align-items: center; gap: 8px;">
-            <span>📅 ARCHIVE EDITION ({{ current_edition }})</span>
+            <span>ARCHIVE EDITION ({{ current_edition }})</span>
             <span>•</span>
             <span>QUALITY SCREEN</span>
           </div>
@@ -51,7 +51,7 @@
 
         <!-- Evaluated Metadata Strip & Provenance Info -->
         <div class="dossier-meta-strip" style="margin-top: 18px; margin-bottom: 0;">
-          <span>📅 Evaluated: {{ current_edition }} 09:00 AM IST • Verified BSE Statutory Filings • Grounded Financial Ratios</span>
+          <span><svg class="glyph" style="width:12px;height:12px;vertical-align:-1px;margin-right:4px;"><use href="#icon-doc"></use></svg>Evaluated: {{ current_edition }} 09:00 AM IST • Verified BSE Statutory Filings • Grounded Financial Ratios</span>
         </div>
         <p class="dossier-provenance-subline">All equities filtered through ROCE &ge; 15% hurdle rates and conservative solvency sieves from audited financial statements.</p>
       </div>
@@ -64,7 +64,7 @@
           {% for ed in available_editions %}
           <option value="{{ ed }}" {% if ed == current_edition %}selected{% endif %}>
             {{ ed }}
-            {% if ed == today_date %} (Today's Live{% if not can_access_today %} 🔒 Pro{% endif %})
+            {% if ed == today_date %} (Today's Live{% if not can_access_today %} — Pro{% endif %})
             {% elif ed == yesterday_date %} (Yesterday's Edition)
             {% else %} (Archive)
             {% endif %}
@@ -80,7 +80,7 @@
   {% if not is_today_edition and is_past_9am and (today_date in available_editions) and not can_access_today %}
   <div style="margin-bottom: 28px; padding: 14px 20px; background: linear-gradient(90deg, rgba(14, 165, 233, 0.12), rgba(99, 102, 241, 0.12)); border: 1px solid rgba(14, 165, 233, 0.3); border-radius: 12px; display: flex; flex-wrap: wrap; justify-content: space-between; align-items: center; gap: 12px;">
     <div style="display: flex; align-items: center; gap: 10px;">
-      <span style="font-size: 20px;">⭐</span>
+      <span style="font-size: 20px; color: #38bdf8; display: inline-flex;"><svg class="glyph"><use href="#icon-radar"></use></svg></span>
       <div>
         <strong style="color: var(--text-primary); font-size: 14px;">Today's 9:00 AM Edition is Live!</strong>
         <span style="color: var(--text-secondary); font-size: 13px; margin-left: 6px;">Exclusively reserved for Pro Subscribed Members with 12 fresh high-ROCE equities.</span>
@@ -96,7 +96,7 @@
   <!-- Pro Gate Paywall Banner if viewing today's edition as unsubscribed -->
   {% if is_locked_for_user %}
   <div style="background: rgba(30, 41, 59, 0.7); backdrop-filter: blur(16px); border: 1px solid rgba(14, 165, 233, 0.35); border-radius: 16px; padding: 26px 20px; margin-bottom: 30px; text-align: center;">
-    <div style="display: inline-block; font-size: 32px; margin-bottom: 8px;">🔒</div>
+    <div style="display: inline-block; font-size: 32px; margin-bottom: 8px; color: #fbbf24;"><svg class="glyph" style="width: 32px; height: 32px;"><use href="#icon-lock"></use></svg></div>
     <h2 style="font-size: 22px; font-weight: 800; color: var(--text-primary); margin-bottom: 8px;">
       Today's 9:00 AM Edition is Reserved for Subscribed Members
     </h2>
@@ -125,7 +125,7 @@
   <!-- Empty State if no stocks available -->
   {% if not discovery_stocks %}
   <div style="background: rgba(30, 41, 59, 0.4); border: 1px dashed var(--border-color); border-radius: 16px; padding: 60px 20px; text-align: center;">
-    <div style="font-size: 40px; margin-bottom: 16px;">🌅</div>
+    <div style="font-size: 40px; margin-bottom: 16px; color: var(--accent-cyan);"><svg class="glyph" style="width: 36px; height: 36px;"><use href="#icon-radar"></use></svg></div>
     <h3 style="font-size: 20px; font-weight: 700; color: var(--text-primary); margin-bottom: 8px;">Stock Discovery @9AM Generating...</h3>
     <p style="font-size: 14px; color: var(--text-muted); max-width: 500px; margin: 0 auto 24px auto;">
       Today's cohort is undergoing screening across live exchange disclosures and unlocks at 09:00 AM IST. Check back at 9:00 AM or explore our existing public research repository.
@@ -142,7 +142,7 @@
       <!-- Locked Overlay for Unsubscribed Visitors on Today's Cohort (Cards 3+) -->
       {% if is_locked_for_user and loop.index0 >= 2 %}
       <div style="position: absolute; inset: 0; background: rgba(15, 23, 42, 0.9); backdrop-filter: blur(8px); border-radius: 16px; display: flex; flex-direction: column; justify-content: center; align-items: center; padding: 24px; text-align: center; z-index: 5;">
-        <div style="font-size: 32px; margin-bottom: 8px;">🔒</div>
+        <div style="font-size: 32px; margin-bottom: 8px; color: #fbbf24;"><svg class="glyph" style="width: 32px; height: 32px;"><use href="#icon-lock"></use></svg></div>
         <div style="font-size: 12px; font-weight: 800; color: #fbbf24; text-transform: uppercase; letter-spacing: 0.05em; margin-bottom: 6px;">
           PRO SUBSCRIBER EXCLUSIVE
         </div>
@@ -226,7 +226,7 @@
         <!-- Compounding Thesis Undercurrent -->
         <div style="background: rgba(14, 165, 233, 0.06); border-left: 3px solid var(--accent-cyan); border-radius: 6px; padding: 12px 14px; margin-bottom: 14px;">
           <div style="font-size: 11px; font-weight: 700; color: var(--accent-cyan); text-transform: uppercase; margin-bottom: 4px; letter-spacing: 0.05em;">
-            🎯 Qualitative Compounding Thesis
+            <svg class="glyph" style="width:12px;height:12px;vertical-align:-1px;margin-right:4px;"><use href="#icon-insights"></use></svg>Qualitative Compounding Thesis
           </div>
           <div style="font-size: 13px; color: var(--text-secondary); line-height: 1.5;">
             {{ item.ria_thesis }}
@@ -236,7 +236,7 @@
         <!-- Corporate Catalyst & Exchange Filing -->
         {% if item.catalyst_headline %}
         <div style="background: rgba(15, 23, 42, 0.4); border-radius: 6px; padding: 10px 12px; margin-bottom: 20px; display: flex; gap: 8px; align-items: flex-start;">
-          <span style="font-size: 13px; line-height: 1;">📢</span>
+          <span style="font-size: 13px; line-height: 1; color: var(--accent-cyan);"><svg class="glyph" style="width:13px;height:13px;"><use href="#icon-radar"></use></svg></span>
           <div style="font-size: 12px; color: var(--text-muted); line-height: 1.4;">
             <strong style="color: var(--text-secondary);">Latest Exchange Disclosure:</strong> {{ item.catalyst_headline }}
           </div>
@@ -330,9 +330,9 @@
         const h = String(Math.floor(remainingSec / 3600)).padStart(2, '0');
         const m = String(Math.floor((remainingSec % 3600) / 60)).padStart(2, '0');
         const s = String(remainingSec % 60).padStart(2, '0');
-        cdElem.textContent = `⏳ NEXT EDITION IN ${h}H ${m}M ${s}S (09:00 AM IST)`;
+        cdElem.textContent = `NEXT EDITION IN ${h}H ${m}M ${s}S (09:00 AM IST)`;
       } else {
-        cdElem.textContent = `🌅 TODAY'S 9:00 AM EDITION DROPPING NOW`;
+        cdElem.textContent = `TODAY'S 9:00 AM EDITION DROPPING NOW`;
       }
     }, 1000);
   }

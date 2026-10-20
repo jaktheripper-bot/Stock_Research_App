@@ -50,7 +50,7 @@
 
         <!-- Provenance Strip -->
         <div class="dossier-meta-strip" style="margin-top: 14px;">
-          <span class="dossier-meta-pill">📅 Trustee & Exchange Dispatches</span>
+          <span class="dossier-meta-pill"><svg class="glyph" style="width: 12px; height: 12px; vertical-align: -1px;"><use href="#glyph-clock"></use></svg> Trustee & Exchange Dispatches</span>
           <span class="dossier-meta-sep">•</span>
           <span class="badge badge-emerald"><span class="status-dot status-dot-emerald"></span> SEBI Statutory Appraised NAV</span>
           <span class="dossier-meta-sep">•</span>
@@ -75,17 +75,17 @@
           </button>
           {% if is_deep_dive_unlocked %}
           <span class="badge badge-emerald">
-            <span class="status-dot status-dot-emerald"></span> 🔓 Unlocked
+            <span class="status-dot status-dot-emerald"></span> Unlocked
           </span>
           <a href="/api/pdf/reit/{{ reit.symbol }}" class="btn btn-primary btn-sm" download title="Download Full PDF Report Dossier">
-            📄 Download PDF Report
+            <svg class="glyph" style="width: 13px; height: 13px; vertical-align: -2px;"><use href="#glyph-doc"></use></svg> Download PDF Report
           </a>
           {% else %}
           <button type="button" onclick="unlockAssetDeepDive('REIT', '{{ reit.symbol }}')" class="btn btn-primary btn-sm">
-            <span>🔓</span> Unlock Deep-Dive (1 Credit)
+            <span><svg class="glyph" style="width: 13px; height: 13px;"><use href="#glyph-lock"></use></svg></span> Unlock Deep-Dive (1 Credit)
           </button>
           <button type="button" onclick="unlockAssetDeepDive('REIT', '{{ reit.symbol }}')" class="btn btn-secondary btn-sm" title="Unlock required to download full PDF report with Countercase schedules">
-            📄 Download PDF (Locked)
+            <svg class="glyph" style="width: 13px; height: 13px; vertical-align: -2px;"><use href="#glyph-doc"></use></svg> Download PDF (Locked)
           </button>
           {% endif %}
           <a href="/reits" class="btn btn-sm btn-secondary" style="text-decoration: none; font-size: 12px; font-weight: 600;">
@@ -395,7 +395,7 @@
       <div style="display: flex; flex-wrap: wrap; gap: 8px;">
         {% for tenant in portfolio_audit.top_tenants %}
         <span style="background: rgba(255, 255, 255, 0.05); border: 1px solid rgba(255, 255, 255, 0.08); padding: 6px 12px; border-radius: 6px; font-size: 13px; color: #f8fafc; font-weight: 600;">
-          🏢 {{ tenant }}
+          <svg class="glyph" style="width: 12px; height: 12px; vertical-align: -1px;"><use href="#glyph-building"></use></svg> {{ tenant }}
         </span>
         {% endfor %}
       </div>
@@ -594,7 +594,7 @@
 
     const tracker = document.getElementById('reitSec56TrackerBar');
     if (tracker) {
-      tracker.innerHTML = `💧 <strong>Annual Post-Tax In-Hand Distribution (${activeReitSlabRate}% Slab):</strong> <span class="tnum" style="color:#10b981;font-weight:800;">₹${Math.round(netCashYr).toLocaleString('en-IN')}/yr</span> • <strong>Cumulative Tax-Free ROC (${years}Y):</strong> <span class="tnum" style="color:#38bdf8;">₹${Math.round(cumRoc).toLocaleString('en-IN')}</span> • <strong>Adjusted Sec 56(2)(xii) Cost Basis:</strong> <span class="tnum">₹${Math.round(adjCostBasis).toLocaleString('en-IN')}</span>`;
+      tracker.innerHTML = `<svg class="glyph" style="width: 13px; height: 13px; vertical-align: -2px;"><use href="#icon-valuation"></use></svg> <strong>Annual Post-Tax In-Hand Distribution (${activeReitSlabRate}% Slab):</strong> <span class="tnum" style="color:#10b981;font-weight:800;">₹${Math.round(netCashYr).toLocaleString('en-IN')}/yr</span> • <strong>Cumulative Tax-Free ROC (${years}Y):</strong> <span class="tnum" style="color:#38bdf8;">₹${Math.round(cumRoc).toLocaleString('en-IN')}</span> • <strong>Adjusted Sec 56(2)(xii) Cost Basis:</strong> <span class="tnum">₹${Math.round(adjCostBasis).toLocaleString('en-IN')}</span>`;
     }
   }
 

@@ -18,7 +18,7 @@
       </div>
 
       <div style="display: inline-flex; align-items: center; gap: 8px; font-size: 12px; color: #94a3b8; background: rgba(255, 255, 255, 0.05); padding: 4px 12px; border-radius: 8px; border: 1px solid rgba(255, 255, 255, 0.08);">
-        <span>⌨️ Shortcuts: Press <kbd style="background: #1e293b; padding: 2px 6px; border-radius: 4px; font-family: monospace; color: #38bdf8; border: 1px solid #334155;">1</kbd> Cards, <kbd style="background: #1e293b; padding: 2px 6px; border-radius: 4px; font-family: monospace; color: #38bdf8; border: 1px solid #334155;">2</kbd> Heatmap, <kbd style="background: #1e293b; padding: 2px 6px; border-radius: 4px; font-family: monospace; color: #38bdf8; border: 1px solid #334155;">3</kbd> Scatter, <kbd style="background: #1e293b; padding: 2px 6px; border-radius: 4px; font-family: monospace; color: #38bdf8; border: 1px solid #334155;">4</kbd> Table</span>
+        <span>Shortcuts: Press <kbd style="background: #1e293b; padding: 2px 6px; border-radius: 4px; font-family: monospace; color: #38bdf8; border: 1px solid #334155;">1</kbd> Cards, <kbd style="background: #1e293b; padding: 2px 6px; border-radius: 4px; font-family: monospace; color: #38bdf8; border: 1px solid #334155;">2</kbd> Heatmap, <kbd style="background: #1e293b; padding: 2px 6px; border-radius: 4px; font-family: monospace; color: #38bdf8; border: 1px solid #334155;">3</kbd> Scatter, <kbd style="background: #1e293b; padding: 2px 6px; border-radius: 4px; font-family: monospace; color: #38bdf8; border: 1px solid #334155;">4</kbd> Table</span>
       </div>
     </div>
 
@@ -29,12 +29,12 @@
       Multi-asset cross-market opportunity discovery and arbitrage scanner. Monitoring spanning <strong>Equities, Corporate Bonds/SDIs, SM REITs, InvITs, Sovereign Gold (SGB), Benchmark G-Secs, and Mutual Funds</strong>. Every offering is normalized against statutory tax regimes (Sec 47(viic), Sec 115UA, Sec 50AA) to reveal true in-hand yield after tax drag and inflation.
     </p>
     <div class="dossier-meta-strip" style="margin-top: -10px; margin-bottom: 24px;">
-      <span class="dossier-meta-pill">📅 Evaluated: Real-Time</span>
+      <span class="dossier-meta-pill"><svg class="glyph" style="width: 12px; height: 12px; vertical-align: -1px;"><use href="#glyph-clock"></use></svg> Evaluated: Real-Time</span>
       <span class="dossier-meta-sep">•</span>
       <span class="badge badge-emerald"><span class="status-dot status-dot-emerald"></span> Live Cross-Asset Monitoring Feeds</span>
       <span class="dossier-meta-sep">•</span>
       <span class="badge badge-cyan" title="Multi-asset risk-reward universe">
-        <span>📎</span> <span>Verified Statutory Yields & Tax Drag</span>
+        <span><svg class="glyph" style="width: 12px; height: 12px;"><use href="#glyph-doc"></use></svg></span> <span>Verified Statutory Yields & Tax Drag</span>
       </span>
       <div class="dossier-provenance-subline" style="width: 100%; margin-top: 4px;">
         Multi-asset relative valuation across Equities, Debt, Sovereign Curve, REITs, and ETFs updated continuously from verified exchange & RBI feeds.
@@ -91,16 +91,16 @@
     <!-- Modality Selector -->
     <div style="display: inline-flex; background: rgba(30, 41, 59, 0.8); border: 1px solid rgba(255, 255, 255, 0.1); border-radius: 10px; padding: 4px; gap: 4px;">
       <button id="viewBtnCards" class="btn btn-sm btn-primary view-mode-btn" onclick="switchView('cards')">
-        🗂️ Bento Cards
+        <svg class="glyph" style="width: 13px; height: 13px; vertical-align: -2px;"><use href="#icon-multi-asset"></use></svg> Bento Cards
       </button>
       <button id="viewBtnHeatmap" class="btn btn-sm btn-secondary view-mode-btn" onclick="switchView('heatmap')">
         <svg class="glyph"><use href="#glyph-chart"></use></svg> Spread Heatmap
       </button>
       <button id="viewBtnScatter" class="btn btn-sm btn-secondary view-mode-btn" onclick="switchView('scatter')">
-        📈 Risk-Yield Frontier
+        <svg class="glyph" style="width: 13px; height: 13px; vertical-align: -2px;"><use href="#icon-markets"></use></svg> Risk-Yield Frontier
       </button>
       <button id="viewBtnTable" class="btn btn-sm btn-secondary view-mode-btn" onclick="switchView('table')">
-        📑 Dense Table
+        <svg class="glyph" style="width: 13px; height: 13px; vertical-align: -2px;"><use href="#glyph-doc"></use></svg> Dense Table
       </button>
     </div>
 
@@ -133,7 +133,7 @@
   </div>
 
   <!-- ========================================================================= -->
-  <!-- MODALITY 1: 🗂️ BENTO OPPORTUNITY CARDS VIEW                               -->
+  <!-- MODALITY 1: BENTO OPPORTUNITY CARDS VIEW                                  -->
   <!-- ========================================================================= -->
   <div id="viewBentoContainer" class="view-panel">
     <div id="bentoCardsGrid" style="display: grid; grid-template-columns: repeat(auto-fill, minmax(min(100%, 340px), 1fr)); gap: 20px;">
@@ -183,7 +183,7 @@
   </div>
 
   <!-- ========================================================================= -->
-  <!-- MODALITY 3: 📈 RISK VS NET REAL POST-TAX YIELD SCATTER FRONTIER          -->
+  <!-- MODALITY 3: RISK VS NET REAL POST-TAX YIELD SCATTER FRONTIER              -->
   <!-- ========================================================================= -->
   <div id="viewScatterContainer" class="view-panel" style="display: none;">
     <div class="card" style="padding: 24px; margin-bottom: 24px;">
@@ -208,7 +208,7 @@
   </div>
 
   <!-- ========================================================================= -->
-  <!-- MODALITY 4: 📑 DENSE TABLE (POWER ANALYST MODE)             -->
+  <!-- MODALITY 4: DENSE TABLE (POWER ANALYST MODE)                              -->
   <!-- ========================================================================= -->
   <div id="viewTableContainer" class="view-panel" style="display: none;">
     <div class="card" style="padding: 24px; margin-bottom: 24px;">
@@ -222,8 +222,8 @@
           </p>
         </div>
         <div style="display: flex; gap: 8px;">
-          <button onclick="exportOpportunities('csv')" class="btn btn-secondary btn-sm" style="font-size: 12px;">⬇️ Export CSV</button>
-          <button onclick="exportOpportunities('json')" class="btn btn-secondary btn-sm" style="font-size: 12px;">⬇️ Export JSON</button>
+          <button onclick="exportOpportunities('csv')" class="btn btn-secondary btn-sm" style="font-size: 12px;"><svg class="glyph" style="width: 12px; height: 12px; vertical-align: -1px;"><use href="#icon-download"></use></svg> Export CSV</button>
+          <button onclick="exportOpportunities('json')" class="btn btn-secondary btn-sm" style="font-size: 12px;"><svg class="glyph" style="width: 12px; height: 12px; vertical-align: -1px;"><use href="#icon-download"></use></svg> Export JSON</button>
         </div>
       </div>
 
@@ -259,7 +259,7 @@
   <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 12px;">
     <div style="display: flex; align-items: center; gap: 12px; flex-wrap: wrap;">
       <div style="display: inline-flex; align-items: center; gap: 6px; font-weight: 800; font-size: 13px; color: #38bdf8;">
-        <span>📌</span>
+        <span><svg class="glyph" style="width: 14px; height: 14px;"><use href="#icon-screen"></use></svg></span>
         <span>ARBITRAGE DOCKET (<span id="docketCount">0</span>/4)</span>
       </div>
       <div id="docketChips" style="display: flex; gap: 8px; flex-wrap: wrap;">

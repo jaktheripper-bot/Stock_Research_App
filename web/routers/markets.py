@@ -882,7 +882,7 @@ async def api_countercase(payload: CountercaseRequest, request: Request):
     )
     return json_response_with_cache({
         "success": True,
-        "message": f"🔒 Countercase counter-thesis committed to your confidential decision ledger for {canonical}!"
+        "message": f"Countercase counter-thesis committed to your confidential decision ledger for {canonical}!"
     })
 
 
@@ -925,7 +925,7 @@ async def api_thesis_checkpoint(payload: ThesisCheckpointRequest, request: Reque
     )
     return json_response_with_cache({
         "success": True,
-        "message": f"⚖️ Thesis Checkpoint ('Would you buy today?') verdict committed for {canonical}!"
+        "message": f"Thesis Checkpoint ('Would you buy today?') verdict committed for {canonical}!"
     })
 
 

@@ -121,8 +121,8 @@ POLICIES = {
         <p>We are here to assist with any questions regarding research credits, access, technical support, or billing queries.</p>
 
         <div style="background: rgba(14, 165, 233, 0.08); border-left: 4px solid #0284c7; padding: 16px; border-radius: 6px; margin: 20px 0;">
-            <p style="margin: 0 0 8px 0;"><strong>💬 Administration Review:</strong> All user inquiries, suggestions, and feedback are submitted via our online form and reviewed directly from our administration console.</p>
-            <p style="margin: 0;"><strong>⏱️ Review Schedule:</strong> Monday to Friday, 9:30 AM – 6:30 PM IST</p>
+            <p style="margin: 0 0 8px 0;"><strong><svg class="glyph" style="width: 14px; height: 14px; vertical-align: -2px;"><use href="#icon-chat"></use></svg> Administration Review:</strong> All user inquiries, suggestions, and feedback are submitted via our online form and reviewed directly from our administration console.</p>
+            <p style="margin: 0;"><strong><svg class="glyph" style="width: 14px; height: 14px; vertical-align: -2px;"><use href="#glyph-clock"></use></svg> Review Schedule:</strong> Monday to Friday, 9:30 AM – 6:30 PM IST</p>
         </div>
 
         <h3>Grievance Officer (IT Rules, 2021)</h3>

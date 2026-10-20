@@ -682,7 +682,7 @@ async def api_copilot_chat(payload: CopilotChatRequest, request: Request):
             "success": False,
             "conversation_id": effective_conv_id,
             "response": (
-                "⚠️ **Rate Limit Exceeded:** Too many requests from your IP address (exceeded 30 requests/minute). "
+                "**Rate Limit Exceeded:** Too many requests from your IP address (exceeded 30 requests/minute). "
                 "Please pause for a moment before querying the Research Desk again."
             ),
             "status": "RATE_LIMITED"
@@ -692,7 +692,7 @@ async def api_copilot_chat(payload: CopilotChatRequest, request: Request):
             "success": False,
             "conversation_id": effective_conv_id,
             "response": (
-                "⚠️ **Hourly Velocity Cap Reached:** You have reached the maximum allowed Research Desk turns for this hour "
+                "**Hourly Velocity Cap Reached:** You have reached the maximum allowed Research Desk turns for this hour "
                 "(40 turns/hr) to protect your account. Please resume shortly."
             ),
             "status": "VELOCITY_CAPPED"
@@ -728,7 +728,7 @@ async def api_copilot_chat(payload: CopilotChatRequest, request: Request):
             "success": True,
             "conversation_id": effective_conv_id,
             "response": (
-                "⚡ **Research Desk Notice:** The analytical engine experienced a brief latency interruption while processing this inquiry. "
+                "**Research Desk Notice:** The analytical engine experienced a brief latency interruption while processing this inquiry. "
                 "All deterministic forensic data feeds remain online. Please re-submit your prompt or select one of the diagnostic queries below."
             ),
             "status": "RECOVERED"

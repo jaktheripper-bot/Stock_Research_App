@@ -133,7 +133,7 @@
           <div style="display: flex; align-items: center; gap: 12px;">
             <span id="auditProgressPct" style="font-size: 12px; font-weight: 700; color: #c084fc;">15%</span>
             <button id="btnEnableNotification" onclick="requestAuditDesktopNotification()" class="btn btn-sm btn-outline-secondary" style="font-size: 11px; padding: 4px 10px; border-radius: 9999px; display: inline-flex; align-items: center; gap: 4px;">
-              <span>🔔</span> Alert me on desktop when complete
+              <span><svg class="glyph" style="width: 12px; height: 12px;"><use href="#glyph-alert"></use></svg></span> Alert me on desktop when complete
             </button>
           </div>
         </div>
@@ -162,7 +162,7 @@
   <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 12px; margin-bottom: 24px;">
     <div style="display: flex; gap: 8px; overflow-x: auto; padding-bottom: 4px;">
       <a href="/funds" class="btn btn-sm {% if not current_category and not query %}btn-primary{% else %}btn-secondary{% endif %}" style="border-radius: 9999px;">All Schemes ({{ schemes|length }})</a>
-      <a href="/funds?broad_category=EQUITY" class="btn btn-sm {% if current_category == 'EQUITY' %}btn-primary{% else %}btn-secondary{% endif %}" style="border-radius: 9999px;">📈 Equity Funds</a>
+      <a href="/funds?broad_category=EQUITY" class="btn btn-sm {% if current_category == 'EQUITY' %}btn-primary{% else %}btn-secondary{% endif %}" style="border-radius: 9999px;"><svg class="glyph" style="width: 13px; height: 13px; vertical-align: -2px;"><use href="#glyph-chart"></use></svg> Equity Funds</a>
       <a href="/funds?category=Flexi+Cap+Fund" class="btn btn-sm {% if current_category == 'Flexi Cap Fund' %}btn-primary{% else %}btn-secondary{% endif %}" style="border-radius: 9999px;">Flexi Cap</a>
       <a href="/funds?category=Large+Cap+Fund" class="btn btn-sm {% if current_category == 'Large Cap Fund' %}btn-primary{% else %}btn-secondary{% endif %}" style="border-radius: 9999px;">Large Cap</a>
       <a href="/funds?category=Mid+Cap+Fund" class="btn btn-sm {% if current_category == 'Mid Cap Fund' %}btn-primary{% else %}btn-secondary{% endif %}" style="border-radius: 9999px;">Mid Cap</a>
@@ -173,7 +173,7 @@
 
     <div style="display: flex; gap: 8px; align-items: center;">
       <a href="/opportunities" class="btn btn-sm btn-secondary" style="display: inline-flex; align-items: center; gap: 6px; border-radius: 9999px; font-weight: 600; border-color: rgba(14, 165, 233, 0.4); color: #38bdf8;">
-        <span>🎯</span> Opportunity Terminal
+        <span><svg class="glyph" style="width: 13px; height: 13px;"><use href="#icon-screen"></use></svg></span> Opportunity Terminal
       </a>
       <!-- Overlap Diagnostic CTA Button -->
       <a href="/funds/compare/overlap" class="btn btn-sm btn-outline-primary" style="display: inline-flex; align-items: center; gap: 6px; border-radius: 9999px; font-weight: 600;">
@@ -277,7 +277,7 @@ function requestAuditDesktopNotification() {
       notificationRequested = true;
       const btn = document.getElementById("btnEnableNotification");
       if (btn) {
-        btn.innerHTML = "<span>✅</span> Desktop Alert Enabled";
+        btn.innerHTML = '<span><svg class="glyph" style="width: 12px; height: 12px;"><use href="#glyph-check"></use></svg></span> Desktop Alert Enabled';
         btn.style.borderColor = "#10b981";
         btn.style.color = "#10b981";
       }

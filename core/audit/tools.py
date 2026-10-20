@@ -481,26 +481,46 @@ def tool_audit_design_tokens() -> Dict[str, Any]:
         base_text = base_html.read_text(encoding="utf-8")
         defined_svg_symbols = set(re.findall(r'<symbol[^>]+id="([^"]+)"', base_text))
 
-    os_emojis = ["🏰", "⚖️", "📊", "🏦", "🏛️", "🪙", "🚨", "⚡", "🛡️", "🔍"]
+    emoji_re = re.compile(r"[\U0001F100-\U0001FAFF\u23F0-\u23FA\u26A0\u2696\u2699\u2705\u274C\u2728\u2795\u2B50\u231B\u23F3\u26A1]")
     emoji_count = 0
     broken_svg_uses = []
 
     for fpath in sorted(templates_dir.rglob("*.html")):
         try:
             text = fpath.read_text(encoding="utf-8")
-            for em in os_emojis:
-                cnt = text.count(em)
-                if cnt > 0:
-                    emoji_count += cnt
-            if fpath.name == "admin_audit.html":
-                admin_audit_emojis = re.findall(r"[\U0001F300-\U0001FAFF\u23F0-\u23FA]", text)
-                emoji_count += len(admin_audit_emojis)
+            if fpath.name not in ("admin.html", "admin_2fa.html"):
+                found_emojis = emoji_re.findall(text)
+                emoji_count += len(found_emojis)
             if defined_svg_symbols:
                 for ref in re.findall(r'<use[^>]+href="#([^"{}]+)"', text):
                     if ref not in defined_svg_symbols:
                         broken_svg_uses.append(f"{fpath.relative_to(PROJECT_ROOT)}:#{ref}")
         except Exception as read_err:
             logger.debug(f"Template read notice for {fpath}: {read_err}")
+
+    js_dir = PROJECT_ROOT / "web" / "static" / "js"
+    for jpath in sorted(js_dir.rglob("*.js")):
+        try:
+            jtext = jpath.read_text(encoding="utf-8")
+            emoji_count += len(emoji_re.findall(jtext))
+            if defined_svg_symbols:
+                for ref in re.findall(r'<use[^>]+href="#([^"{}$]+)"', jtext):
+                    if ref not in defined_svg_symbols:
+                        broken_svg_uses.append(f"{jpath.relative_to(PROJECT_ROOT)}:#{ref}")
+        except Exception as js_err:
+            logger.debug(f"JS read notice for {jpath}: {js_err}")
+
+    parser_py = PROJECT_ROOT / "core" / "analysis" / "parser.py"
+    if parser_py.exists():
+        try:
+            ptext = parser_py.read_text(encoding="utf-8")
+            emoji_count += len(emoji_re.findall(ptext))
+            if defined_svg_symbols:
+                for ref in re.findall(r'<use[^>]+href="#([^"{}]+)"', ptext):
+                    if ref not in defined_svg_symbols:
+                        broken_svg_uses.append(f"{parser_py.relative_to(PROJECT_ROOT)}:#{ref}")
+        except Exception as perr:
+            logger.debug(f"Parser read notice: {perr}")
 
     is_clean_design = has_tabular_nums and has_design_tokens and emoji_count == 0 and len(broken_svg_uses) == 0
     return {

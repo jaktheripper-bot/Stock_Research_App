@@ -270,8 +270,10 @@ Wide moat secured by patents.
         # Check badge classes, icons, colors, and content
         self.assertIn("✓ VERIFIED FACT — BSE Audited FY25/Q3: Revenue stood at ₹4,500 Cr", rendered)
         self.assertIn("∑ CALCULATED METRIC: RoCE = 24.8%", rendered)
-        self.assertIn("🧠 MODEL INTERPRETATION: Specialty chemical moat", rendered)
-        self.assertIn("❓ UNRESOLVED UNCERTAINTY: Outcome of pending USFDA inspection", rendered)
+        self.assertIn("MODEL INTERPRETATION: Specialty chemical moat", rendered)
+        self.assertIn("UNRESOLVED UNCERTAINTY: Outcome of pending USFDA inspection", rendered)
+        self.assertIn("#icon-insights", rendered)
+        self.assertIn("#glyph-alert", rendered)
         self.assertIn("color:#34d399", rendered)
         self.assertIn("color:#38bdf8", rendered)
         self.assertIn("color:#c084fc", rendered)
@@ -299,8 +301,12 @@ Wide moat secured by patents.
         wrapped = wrap_html_with_collapsible_pillars(sample_html, scrip_code="500209", ticker="INFY")
         self.assertIn("✓ VERIFIED FACT", wrapped)
         self.assertIn("∑ CALCULATED METRIC", wrapped)
-        self.assertIn("🧠 MODEL INTERPRETATION", wrapped)
-        self.assertIn("❓ UNRESOLVED UNCERTAINTY", wrapped)
+        self.assertIn("MODEL INTERPRETATION", wrapped)
+        self.assertIn("UNRESOLVED UNCERTAINTY", wrapped)
+        self.assertIn("#icon-insights", wrapped)
+        self.assertIn("#glyph-alert", wrapped)
+        self.assertIn("Open BSE Financial Results ↗", wrapped)
+        self.assertNotIn("Open BSE BSE", wrapped)
 
     def test_outside_in_dossier_dom_renders_epistemic_card_and_badges(self):
         """Rule 6 Outside-In verification: asserts #epistemicFalsificationCard and .epistemic-badge render in DOM across all 4 dossier routes."""

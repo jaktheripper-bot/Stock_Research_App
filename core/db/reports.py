@@ -445,16 +445,16 @@ def get_revision_by_id(rev_id: int) -> dict:
 # ==============================================================================
 
 SECTOR_TAXONOMY = {
-    "IT_TECH": ("IT & Technology", "💻"),
-    "BFSI": ("BFSI & Financials", "🏛️"),
-    "HEALTHCARE_PHARMA": ("Healthcare & Pharma", "🔬"),
-    "CAPITAL_GOODS_INFRA": ("Capital Goods & Infra", "⚙️"),
-    "AUTOMOTIVE": ("Automotive & Mobility", "🚗"),
-    "CONSUMER_FMCG": ("Consumer & Retail", "🛍️"),
-    "CHEMICALS_MATERIALS": ("Chemicals & Materials", "🧪"),
-    "COMMODITIES_ENERGY": ("Energy & Commodities", "⚡"),
-    "EMS_DEFENCE": ("EMS & Defence", "🛡️"),
-    "DIVERSIFIED": ("Diversified Industrials", "🏭"),
+    "IT_TECH": ("IT & Technology", "icon-sector-technology"),
+    "BFSI": ("BFSI & Financials", "icon-sector-financials"),
+    "HEALTHCARE_PHARMA": ("Healthcare & Pharma", "icon-sector-healthcare"),
+    "CAPITAL_GOODS_INFRA": ("Capital Goods & Infra", "icon-sector-capital-goods"),
+    "AUTOMOTIVE": ("Automotive & Mobility", "icon-sector-automotive"),
+    "CONSUMER_FMCG": ("Consumer & Retail", "icon-sector-consumer"),
+    "CHEMICALS_MATERIALS": ("Chemicals & Materials", "icon-sector-chemicals"),
+    "COMMODITIES_ENERGY": ("Energy & Commodities", "icon-sector-energy"),
+    "EMS_DEFENCE": ("EMS & Defence", "icon-sector-defence"),
+    "DIVERSIFIED": ("Diversified Industrials", "icon-sector-diversified"),
 }
 
 SECTOR_SVG_IDS = {
@@ -552,7 +552,7 @@ def get_all_equities_directory_sync() -> list:
 
             # Resolve Sector
             sec_slug = resolve_equity_sector(ticker, name, cached_sec)
-            sec_label, sec_icon = SECTOR_TAXONOMY.get(sec_slug, ("Diversified Industrials", "🏭"))
+            sec_label, sec_icon = SECTOR_TAXONOMY.get(sec_slug, ("Diversified Industrials", "icon-sector-diversified"))
             sec_svg_id = SECTOR_SVG_IDS.get(sec_slug, "icon-sector-industrials")
 
             # Market Cap in Crores

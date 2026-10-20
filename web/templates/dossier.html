@@ -14,12 +14,12 @@
         <div>
           <h1 class="ticker-title">{{ ticker }} <span class="ticker-sub">({{ short_name }})</span></h1>
           <div class="dossier-meta-strip">
-            <span class="dossier-meta-pill">📅 Evaluated: {{ formatted_date|default('Recent') }}</span>
+            <span class="dossier-meta-pill"><svg class="glyph" style="width:12px;height:12px;vertical-align:-1px;margin-right:4px;"><use href="#icon-doc"></use></svg>Evaluated: {{ formatted_date|default('Recent') }}</span>
             <span class="dossier-meta-sep">•</span>
             <span class="badge badge-emerald"><span class="status-dot status-dot-emerald"></span> Verified Exchange Feed</span>
             <span class="dossier-meta-sep">•</span>
             <a href="#citations" class="badge badge-cyan" style="text-decoration: none; cursor: pointer; pointer-events: auto;" title="View all grounded statutory exchange filings">
-              <span>📎</span> <span>{{ citations|length }} Grounded Sources</span>
+              <svg class="glyph" style="width:12px;height:12px;"><use href="#icon-doc"></use></svg> <span>{{ citations|length }} Grounded Sources</span>
             </a>
           </div>
           <div class="dossier-provenance-subline">
@@ -37,7 +37,7 @@
             <svg class="glyph"><use href="#icon-reading-surface"></use></svg>
           </button>
           <button id="btnShareDossier" onclick="shareCurrentPage('dossier')" class="btn btn-secondary btn-sm" title="Copy or share a link to this report" aria-label="Share this report">
-            <span>🔗</span> Share
+            <svg class="glyph"><use href="#glyph-globe"></use></svg> Share
           </button>
           <button onclick="openCopilot('{{ ticker }}', 'equity')" class="btn btn-hero-ai btn-sm" title="Open Research Desk (Shortcut: ⌘K or /)">
             <svg class="glyph"><use href="#glyph-shield"></use></svg> Research Desk
@@ -47,21 +47,21 @@
           </button>
           {% if is_deep_dive_unlocked %}
           <span class="badge badge-emerald">
-            <span class="status-dot status-dot-emerald"></span> 🔓 Unlocked
+            <span class="status-dot status-dot-emerald"></span> Unlocked
           </span>
           <a href="/api/pdf/{{ ticker }}" class="btn btn-primary btn-sm" download>
-            📄 Download PDF Report
+            <svg class="glyph"><use href="#icon-download"></use></svg> Download PDF Report
           </a>
           {% else %}
           <button onclick="unlockDeepDive('{{ ticker }}')" class="btn btn-primary btn-sm">
-            <span>🔓</span> Unlock Deep-Dive (1 Credit)
+            <svg class="glyph"><use href="#icon-lock"></use></svg> Unlock Deep-Dive (1 Credit)
           </button>
           <button onclick="unlockDeepDive('{{ ticker }}')" class="btn btn-secondary btn-sm" title="Unlock required to download full PDF report with forensic accounting schedules">
-            📄 Download PDF (Locked)
+            <svg class="glyph"><use href="#icon-download"></use></svg> Download PDF (Locked)
           </button>
           {% endif %}
           <button onclick="synthesizeReport('{{ ticker }}', true)" class="btn btn-secondary btn-sm">
-            🔄 Refresh / Generate
+            <svg class="glyph"><use href="#icon-radar"></use></svg> Refresh / Generate
           </button>
         </div>
       </div>
@@ -100,7 +100,7 @@
       {% if pct_52w is not none or pct_pe is not none %}
       <div style="background: rgba(15, 23, 42, 0.6); border-left: 3px solid #3b82f6; padding: 10px 16px; border-radius: 0 8px 8px 0; margin-top: 16px; font-size: 13px; color: #cbd5e1; display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 10px;" title="Anchoring Bias Guardrail: Decouples absolute price swings from distribution percentiles and intrinsic value.">
         <div style="display: flex; align-items: center; gap: 8px;">
-          <span>⚓</span>
+          <svg class="glyph" style="color: #93c5fd;"><use href="#glyph-scale"></use></svg>
           <span style="font-weight: 700; color: #93c5fd;">Anchoring Bias Guardrail:</span>
           <span>
             {% if pct_52w is not none %}
@@ -444,7 +444,7 @@
           <!-- Bull Thesis Column -->
           <div class="editorial-callout-conclusion" style="background: rgba(16, 185, 129, 0.05); border: 1px solid rgba(16, 185, 129, 0.25); border-radius: 8px; padding: 14px 16px;">
             <div style="font-size: 13.5px; font-weight: 700; color: #10b981; margin-bottom: 10px; display: flex; align-items: center; gap: 6px;">
-              <span>🟢</span> Top 3 Structural Tailwinds (Bull Case)
+              <span class="status-dot status-dot-emerald"></span> Top 3 Structural Tailwinds (Bull Case)
             </div>
             <div style="display: flex; flex-direction: column; gap: 10px;">
               {% for b in equity_intel.bull_bear_thesis.bull_thesis %}
@@ -459,7 +459,7 @@
           <!-- Bear Thesis Column -->
           <div class="editorial-callout-countercase" style="background: rgba(239, 68, 68, 0.05); border: 1px solid rgba(239, 68, 68, 0.25); border-radius: 8px; padding: 14px 16px;">
             <div style="font-size: 13.5px; font-weight: 700; color: #f87171; margin-bottom: 10px; display: flex; align-items: center; gap: 6px;">
-              <span>🔴</span> Top 3 Specific Vulnerabilities (Bear Case)
+              <span style="width:8px;height:8px;border-radius:50%;background:#f87171;display:inline-block;"></span> Top 3 Specific Vulnerabilities (Bear Case)
             </div>
             <div style="display: flex; flex-direction: column; gap: 10px;">
               {% for r in equity_intel.bull_bear_thesis.bear_thesis %}
@@ -487,7 +487,7 @@
     <div style="margin-bottom: 30px; background: rgba(15, 23, 42, 0.9); border: 1px solid rgba(14, 165, 233, 0.35); border-radius: var(--radius-md); padding: 22px;">
       <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 14px; flex-wrap: wrap; gap: 10px;">
         <div style="display: flex; align-items: center; gap: 10px;">
-          <span style="font-size: 20px;">📈</span>
+          <span style="font-size: 20px; color: var(--accent-cyan); display: inline-flex;"><svg class="glyph"><use href="#icon-markets"></use></svg></span>
           <h3 style="margin: 0; font-size: 17px; font-weight: 800; color: var(--text-primary);">
             Multi-Quarter Thesis Drift Monitoring
           </h3>
@@ -501,7 +501,7 @@
       <!-- Value Trap Warning Banner -->
       {% if diff.value_trap_detected %}
       <div style="background: rgba(244, 63, 94, 0.12); border-left: 4px solid var(--accent-rose); border-radius: 6px; padding: 12px 16px; margin-bottom: 16px; font-size: 13.5px; color: #fecdd3;">
-        <strong>⚠️ Value Trap Warning Detected:</strong> Multiple qualitative checks downgraded while valuation/price expanded. High risk of multiple compression.
+        <strong><svg class="glyph" style="vertical-align:-2px;margin-right:4px;"><use href="#glyph-alert"></use></svg>Value Trap Warning Detected:</strong> Multiple qualitative checks downgraded while valuation/price expanded. High risk of multiple compression.
       </div>
       {% endif %}
 
@@ -513,8 +513,8 @@
           {% for m in diff.pillar_migrations %}
           <span class="badge" style="background: rgba(30, 41, 59, 0.7); border: 1px solid var(--border-color); font-size: 12px; padding: 6px 12px;">
             <strong>{{ m.label }}:</strong> {{ m.from }} ➔ {{ m.to }} 
-            {% if m.direction == 'downgrade' %}<span style="color: var(--accent-rose);">[🔻 Downgrade]</span>
-            {% elif m.direction == 'upgrade' %}<span style="color: var(--accent-emerald);">[🔺 Upgrade]</span>
+            {% if m.direction == 'downgrade' %}<span style="color: var(--accent-rose);">[▼ Downgrade]</span>
+            {% elif m.direction == 'upgrade' %}<span style="color: var(--accent-emerald);">[▲ Upgrade]</span>
             {% else %}<span style="color: var(--accent-cyan);">[Shift]</span>{% endif %}
           </span>
           {% endfor %}
@@ -522,13 +522,13 @@
       </div>
       {% else %}
       <div style="font-size: 13px; color: var(--text-secondary); margin-bottom: 12px;">
-        ✅ <strong>Zero Thesis Drift:</strong> Core qualitative health matrix posture remained stable between snapshots.
+        ✓ <strong>Zero Thesis Drift:</strong> Core qualitative health matrix posture remained stable between snapshots.
       </div>
       {% endif %}
     </div>
     {% elif revisions_count == 1 %}
     <div style="margin-bottom: 24px; padding: 12px 16px; background: rgba(30, 41, 59, 0.35); border-radius: 8px; border: 1px solid var(--border-color); font-size: 12.5px; color: var(--text-muted); display: flex; align-items: center; justify-content: space-between;">
-      <span>ℹ️ <strong>Monitoring Active:</strong> Differential revision tracking will automatically highlight thesis drift upon subsequent quarterly earnings filings or material price shifts (≥5%).</span>
+      <span><svg class="glyph" style="vertical-align:-2px;margin-right:4px;"><use href="#icon-radar"></use></svg><strong>Monitoring Active:</strong> Differential revision tracking will automatically highlight thesis drift upon subsequent quarterly earnings filings or material price shifts (≥5%).</span>
       <span class="badge" style="background: rgba(14, 165, 233, 0.15); color: var(--accent-cyan); font-size: 11px;">1 Snapshot Archived</span>
     </div>
     {% endif %}
@@ -542,7 +542,7 @@
             Behavioral Anomaly & De-Biasing Engine
           </div>
           <h3 style="margin: 0; font-size: 16.5px; font-weight: 800; color: var(--text-primary); display: flex; align-items: center; gap: 8px;">
-            <span>🎯</span> Thesis Integrity Checkpoint & 60-Day PEAD Drift Band
+            <span><svg class="glyph"><use href="#icon-valuation"></use></svg></span> Thesis Integrity Checkpoint & 60-Day PEAD Drift Band
           </h3>
         </div>
         <div style="display: flex; align-items: center; gap: 8px; flex-wrap: wrap;">
@@ -607,7 +607,7 @@
 
       {% if chart_data.trend_inference %}
       <div class="chart-anatomy-footer" style="margin-top: 14px; padding: 10px 14px; background: rgba(30, 41, 59, 0.5); border-radius: 6px; font-size: 12.5px; color: var(--text-secondary); display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 8px;">
-        <span>💡 <strong>Trend Context:</strong> {{ chart_data.trend_inference }}</span>
+        <span><svg class="glyph" style="vertical-align:-2px;margin-right:4px;color:#38bdf8;"><use href="#icon-insights"></use></svg><strong>Trend Context:</strong> {{ chart_data.trend_inference }}</span>
         <span style="font-size: 12px; color: var(--text-muted);">
           Latest Quote: <strong style="color: #38bdf8;">₹{{ chart_data.latest_close }}</strong> • 50-DMA: <strong style="color: #f59e0b;">₹{{ chart_data.latest_sma|default('N/A') }}</strong>
         </span>
@@ -620,7 +620,7 @@
     <!-- Section Accordion Toolbar Controls -->
     <div class="pillar-toolbar">
       <div style="display: flex; align-items: center; gap: 10px;">
-        <span style="font-size: 18px;">📑</span>
+        <span style="font-size: 18px; color: var(--accent-cyan); display: inline-flex;"><svg class="glyph"><use href="#icon-doc"></use></svg></span>
         <div>
           <strong style="font-size: 14px; color: var(--text-primary); display: block;">Seven-Area Research (01–07)</strong>
           <span style="font-size: 11px; color: var(--text-muted);">Every metric and finding grounded in verified BSE regulatory filings</span>
@@ -659,18 +659,18 @@
         {% if contagion_alert %}
         <div style="display: inline-flex; align-items: center; gap: 6px; padding: 6px 14px; border-radius: 9999px; background: rgba(255, 255, 255, 0.05); border: 1px solid {{ contagion_alert.badge_color }};">
           <span style="width: 8px; height: 8px; border-radius: 50%; background: {{ contagion_alert.badge_color }};"></span>
-          <span style="font-size: 12px; font-weight: 700; color: {{ contagion_alert.badge_color }};">📡 {{ contagion_alert.radar_label }}</span>
+          <span style="font-size: 12px; font-weight: 700; color: {{ contagion_alert.badge_color }};"><svg class="glyph" style="width:12px;height:12px;vertical-align:-1px;margin-right:3px;"><use href="#icon-radar"></use></svg>{{ contagion_alert.radar_label }}</span>
         </div>
         {% endif %}
       </div>
 
       {% if contagion_alert and contagion_alert.radar_status == 'ACTIVE_CONTAGION_ALERT' %}
       <div style="background: rgba(239, 68, 68, 0.12); border-left: 4px solid #ef4444; border-radius: 6px; padding: 12px 16px; margin-bottom: 18px; font-size: 13px; color: #fca5a5; line-height: 1.5;">
-        <strong>⚠️ Active Equity-to-Debt Contagion Warning:</strong> {{ contagion_alert.radar_summary }}
+        <strong><svg class="glyph" style="vertical-align:-2px;margin-right:4px;"><use href="#glyph-alert"></use></svg>Active Equity-to-Debt Contagion Warning:</strong> {{ contagion_alert.radar_summary }}
       </div>
       {% elif contagion_alert and contagion_alert.radar_status == 'MONITORED_EQUITY_DRIFT' %}
       <div style="background: rgba(245, 158, 11, 0.1); border-left: 4px solid #f59e0b; border-radius: 6px; padding: 12px 16px; margin-bottom: 18px; font-size: 13px; color: #fde68a; line-height: 1.5;">
-        <strong>⚠️ Monitored Equity Drift:</strong> {{ contagion_alert.radar_summary }}
+        <strong><svg class="glyph" style="vertical-align:-2px;margin-right:4px;"><use href="#glyph-alert"></use></svg>Monitored Equity Drift:</strong> {{ contagion_alert.radar_summary }}
       </div>
       {% endif %}
 
@@ -759,9 +759,9 @@
         </div>
 
         <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 10px;">
-          <span id="countercaseStatus" style="font-size: 12px; color: var(--accent-emerald);">{% if user_countercase %}🔒 Private countercase saved ({{ user_countercase.updated_at }}){% endif %}</span>
+          <span id="countercaseStatus" style="font-size: 12px; color: var(--accent-emerald);">{% if user_countercase %}<svg class="glyph" style="width:12px;height:12px;vertical-align:-1px;margin-right:4px;"><use href="#icon-lock"></use></svg>Private countercase saved ({{ user_countercase.updated_at }}){% endif %}</span>
           <button type="submit" id="btnCommitCountercase" class="btn btn-secondary btn-sm" style="font-weight: 700;">
-            🔒 Save Countercase to Audit Ledger
+            <svg class="glyph"><use href="#icon-lock"></use></svg> Save Countercase to Audit Ledger
           </button>
         </div>
       </form>
@@ -772,7 +772,7 @@
     <div id="citations" class="citations-box" style="scroll-margin-top: 100px; margin-top: 40px; background: rgba(15, 23, 42, 0.95); border: 1px solid rgba(56, 189, 248, 0.25); border-radius: var(--radius-md); padding: 28px;">
       <div class="citations-title" style="display: flex; align-items: center; justify-content: space-between; border-bottom: 1px solid var(--border-subtle); padding-bottom: 16px; margin-bottom: 18px; flex-wrap: wrap; gap: 10px;">
         <div style="display: flex; align-items: center; gap: 12px;">
-          <span style="font-size: 22px;">📚</span>
+          <span style="font-size: 22px; color: var(--accent-cyan); display: inline-flex;"><svg class="glyph"><use href="#icon-doc"></use></svg></span>
           <div>
             <h3 style="margin: 0; font-size: 17px; font-weight: 800; color: var(--text-primary); letter-spacing: -0.01em;">
               Verified Regulatory Sources & Primary Footnote Citations
@@ -874,7 +874,7 @@
             <label style="display: flex; align-items: flex-start; gap: 10px; background: rgba(30, 41, 59, 0.5); padding: 10px 14px; border-radius: 8px; border: 1px solid var(--border-color); cursor: pointer;">
               <input type="radio" name="thesisDecision" value="WOULD_BUY_TODAY" {% if saved_dec == 'WOULD_BUY_TODAY' %}checked{% endif %} style="margin-top: 3px;" />
               <div>
-                <strong style="color: #34d399; font-size: 13px; display: block;">✅ Yes — Thesis Intact</strong>
+                <strong style="color: #34d399; font-size: 13px; display: block;">✓ Yes — Thesis Intact</strong>
                 <span style="font-size: 12px; color: #94a3b8;">Fundamentals, moat, and governance remain sound; valuation reflects margin of safety.</span>
               </div>
             </label>
@@ -890,7 +890,7 @@
             <label style="display: flex; align-items: flex-start; gap: 10px; background: rgba(30, 41, 59, 0.5); padding: 10px 14px; border-radius: 8px; border: 1px solid var(--border-color); cursor: pointer;">
               <input type="radio" name="thesisDecision" value="UNDER_REVIEW" {% if saved_dec == 'UNDER_REVIEW' %}checked{% endif %} style="margin-top: 3px;" />
               <div>
-                <strong style="color: #fbbf24; font-size: 13px; display: block;">⚠️ Caution — Under Review (Hold Gated)</strong>
+                <strong style="color: #fbbf24; font-size: 13px; display: block;"><svg class="glyph"><use href="#glyph-alert"></use></svg> Caution — Under Review (Hold Gated)</strong>
                 <span style="font-size: 12px; color: #94a3b8;">Material regulatory or sector headwind; awaiting next quarterly disclosure before committing.</span>
               </div>
             </label>
@@ -905,13 +905,13 @@
         </div>
 
         <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 10px;">
-          <span id="thesisStatus" style="font-size: 12px; font-weight: 600; color: var(--accent-emerald);">{% if user_thesis_checkpoint %}🔒 Private checkpoint saved ({{ user_thesis_checkpoint.updated_at }}){% endif %}</span>
+          <span id="thesisStatus" style="font-size: 12px; font-weight: 600; color: var(--accent-emerald);">{% if user_thesis_checkpoint %}<svg class="glyph" style="width:12px;height:12px;vertical-align:-1px;margin-right:4px;"><use href="#icon-lock"></use></svg>Private checkpoint saved ({{ user_thesis_checkpoint.updated_at }}){% endif %}</span>
           <div style="display: flex; gap: 10px;">
             <button type="button" onclick="closeThesisModal()" class="btn btn-secondary btn-sm" style="padding: 7px 16px;">
               Cancel
             </button>
             <button type="submit" id="btnCommitThesis" class="btn btn-primary btn-sm" style="font-weight: 700; padding: 7px 18px; background: #f59e0b; border-color: #f59e0b; color: #0f172a;">
-              🔒 Commit to Ledger
+              <svg class="glyph"><use href="#icon-lock"></use></svg> Commit to Ledger
             </button>
           </div>
         </div>

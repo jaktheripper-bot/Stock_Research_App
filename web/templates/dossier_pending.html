@@ -11,7 +11,7 @@
     <div style="display: flex; justify-content: space-between; align-items: flex-start; flex-wrap: wrap; gap: 16px;">
       <div>
         <div style="display: inline-flex; align-items: center; gap: 8px; background: rgba(245, 158, 11, 0.15); border: 1px solid rgba(245, 158, 11, 0.4); padding: 4px 12px; border-radius: 20px; font-size: 12px; font-weight: 700; color: #fbbf24; margin-bottom: 12px;">
-          <span>⏳ PENDING COMPILATION</span>
+          <svg class="glyph" style="width:12px;height:12px;"><use href="#icon-state-dossier-pending"></use></svg> <span>PENDING COMPILATION</span>
         </div>
         <h1 style="font-size: 32px; font-weight: 800; color: var(--text-primary); margin-bottom: 8px;">
           {{ display_ticker }} <span style="font-size: 20px; font-weight: 500; color: var(--text-secondary);">({{ company_name }})</span>
@@ -70,7 +70,7 @@
           </button>
       {% else %}
           <button id="synthesizeBtn" class="btn btn-secondary" style="text-align: center; width: 100%;" disabled title="Ticker not found in BSE/NSE scrip master">
-              🚫 Unlisted / Unrecognized Ticker (Cannot Generate)
+              <svg class="glyph" style="width: 14px; height: 14px; vertical-align: -2px; margin-right: 4px;"><use href="#glyph-alert"></use></svg>Unlisted / Unrecognized Ticker (Cannot Generate)
           </button>
           <p style="margin-top: 0.75rem; color: var(--text-muted); font-size: 0.9rem;">
               <strong>{{ ticker }}</strong> could not be matched to a listed BSE or NSE security. Please select one of the suggested scrips below or search the directory.
@@ -101,18 +101,18 @@
       {% if contagion_alert %}
       <div style="display: inline-flex; align-items: center; gap: 6px; padding: 6px 14px; border-radius: 9999px; background: rgba(255, 255, 255, 0.05); border: 1px solid {{ contagion_alert.badge_color }};">
         <span style="width: 8px; height: 8px; border-radius: 50%; background: {{ contagion_alert.badge_color }};"></span>
-        <span style="font-size: 12px; font-weight: 700; color: {{ contagion_alert.badge_color }};">📡 {{ contagion_alert.radar_label }}</span>
+        <span style="font-size: 12px; font-weight: 700; color: {{ contagion_alert.badge_color }};"><svg class="glyph" style="width:12px;height:12px;vertical-align:-1px;margin-right:3px;"><use href="#icon-radar"></use></svg>{{ contagion_alert.radar_label }}</span>
       </div>
       {% endif %}
     </div>
 
     {% if contagion_alert and contagion_alert.radar_status == 'ACTIVE_CONTAGION_ALERT' %}
     <div style="background: rgba(239, 68, 68, 0.12); border-left: 4px solid #ef4444; border-radius: 6px; padding: 12px 16px; margin-bottom: 18px; font-size: 13px; color: #fca5a5; line-height: 1.5;">
-      <strong>⚠️ Active Equity-to-Debt Contagion Warning:</strong> {{ contagion_alert.radar_summary }}
+      <strong><svg class="glyph" style="vertical-align:-2px;margin-right:4px;"><use href="#glyph-alert"></use></svg>Active Equity-to-Debt Contagion Warning:</strong> {{ contagion_alert.radar_summary }}
     </div>
     {% elif contagion_alert and contagion_alert.radar_status == 'MONITORED_EQUITY_DRIFT' %}
     <div style="background: rgba(245, 158, 11, 0.1); border-left: 4px solid #f59e0b; border-radius: 6px; padding: 12px 16px; margin-bottom: 18px; font-size: 13px; color: #fde68a; line-height: 1.5;">
-      <strong>⚠️ Monitored Equity Drift:</strong> {{ contagion_alert.radar_summary }}
+      <strong><svg class="glyph" style="vertical-align:-2px;margin-right:4px;"><use href="#glyph-alert"></use></svg>Monitored Equity Drift:</strong> {{ contagion_alert.radar_summary }}
     </div>
     {% endif %}
 

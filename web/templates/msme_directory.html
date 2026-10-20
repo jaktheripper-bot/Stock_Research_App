@@ -414,7 +414,7 @@ async function inspectMsme(uin, btnElement) {
     document.getElementById("modalFirmUin").innerText = "UIN: " + (data.uin || "N/A");
     document.getElementById("modalTierBadge").innerText = (data.tier || "Enterprise") + " Tier";
     document.getElementById("modalSectorBadge").innerText = (data.sector ? data.sector.replace(/_/g, ' ') : "General Manufacturing").toUpperCase();
-    document.getElementById("modalLocation").innerText = `📍 ${data.city || 'District'}, ${data.state || 'India'}`;
+    document.getElementById("modalLocation").innerText = `${data.city || 'District'}, ${data.state || 'India'}`;
     document.getElementById("modalSource").innerText = data.source || "Udyam Gazette";
 
     // Moat Badge

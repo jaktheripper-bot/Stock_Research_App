@@ -375,7 +375,7 @@ async def public_auth_callback(
     <html><head><meta charset="utf-8"><title>Authentication Successful</title></head>
     <body style="background:#0f172a;color:#f8fafc;font-family:sans-serif;display:flex;align-items:center;justify-content:center;height:100vh;">
         <div style="text-align:center;">
-            <h2>🎉 Welcome, {safe_name}!</h2>
+            <h2>Welcome, {safe_name}!</h2>
             <p style="color:#94a3b8;">Redirecting to your research terminal...</p>
             <noscript><meta http-equiv="refresh" content="1;url={safe_dest_html}"></noscript>
         </div>
@@ -719,7 +719,7 @@ async def api_unsubscribe_notifications(request: Request, token: Optional[str] =
 </head>
 <body>
   <div class="card">
-    <div class="icon">✉️</div>
+    <div class="icon"><svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="#38bdf8" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect width="20" height="16" x="2" y="4" rx="2"/><path d="m22 7-8.97 5.7a1.94 1.94 0 0 1-2.06 0L2 7"/></svg></div>
     <h1>You have been unsubscribed</h1>
     <p>
       We have updated your preferences. <span class="email-badge">{email_display}</span> will no longer receive the daily Moatnomics Research Bouquet and Morning Digest.
@@ -774,7 +774,7 @@ async def api_resubscribe_notifications(request: Request, token: Optional[str] =
 </head>
 <body>
   <div class="card">
-    <div class="icon">✅</div>
+    <div class="icon"><svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="#10b981" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><path d="m9 11 3 3L22 4"/></svg></div>
     <h1>Subscription Restored</h1>
     <p>You have successfully re-subscribed to the daily Moatnomics Research Bouquet and Morning Digest.</p>
     <a href="/" class="btn">Return to Platform</a>

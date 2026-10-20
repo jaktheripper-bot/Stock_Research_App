@@ -67,7 +67,7 @@
   <div style="background: rgba(30, 41, 59, 0.6); border: 1px solid rgba(255, 255, 255, 0.1); border-radius: 16px; padding: 28px; margin-bottom: 28px;">
     <!-- Evaluated Metadata Strip & Provenance Info -->
     <div class="dossier-meta-strip" style="margin-bottom: 20px;">
-      <span>📅 Evaluated: Live AMFI Feed • Look-Through Portfolio Holdings • Verified AMFI Statutory Registry</span>
+      <span><svg class="glyph" style="width: 12px; height: 12px; vertical-align: -1px;"><use href="#glyph-clock"></use></svg> Evaluated: Live AMFI Feed • Look-Through Portfolio Holdings • Verified AMFI Statutory Registry</span>
     </div>
     <p class="dossier-provenance-subline">Constituent weightings sourced directly from monthly AMFI portfolio disclosures under SEBI mutual fund transparency mandates.</p>
 
@@ -92,18 +92,18 @@
 
     {% if overlap_res.verdict == 'IDENTICAL_SCHEME_SELECTED' %}
     <div class="alert alert-danger" style="margin-bottom: 20px; padding: 12px 18px; border-radius: 8px; background: rgba(239, 68, 68, 0.1); border-left: 4px solid #ef4444; color: #fca5a5;">
-      <strong>⚠️ Identical Scheme Selected:</strong> {{ overlap_res.verdict_text }}
+      <strong><svg class="glyph" style="width: 14px; height: 14px; vertical-align: -2px;"><use href="#glyph-alert"></use></svg> Identical Scheme Selected:</strong> {{ overlap_res.verdict_text }}
     </div>
     {% elif overlap_res.verdict == 'INSUFFICIENT_HOLDINGS_DATA' %}
     <div class="alert alert-warning" style="margin-bottom: 20px; padding: 12px 18px; border-radius: 8px; background: rgba(245, 158, 11, 0.1); border-left: 4px solid #f59e0b; color: #fcd34d;">
-      <strong>⚠️ Holdings Data Notice:</strong> {{ overlap_res.verdict_text }}
+      <strong><svg class="glyph" style="width: 14px; height: 14px; vertical-align: -2px;"><use href="#glyph-alert"></use></svg> Holdings Data Notice:</strong> {{ overlap_res.verdict_text }}
     </div>
     {% endif %}
 
     <!-- Diagnostic Verdict Notice -->
     <div style="background: rgba(15, 23, 42, 0.6); border-radius: 10px; padding: 14px 18px; border: 1px solid rgba(255, 255, 255, 0.05); margin-bottom: 20px;">
       <div style="font-size: 14px; color: #e2e8f0; line-height: 1.5;">
-        💡 <strong>What the Overlap Shows:</strong> {{ overlap_res.verdict_text|default(overlap_res.recommendation) }}
+        <svg class="glyph" style="width: 14px; height: 14px; vertical-align: -2px;"><use href="#icon-insights"></use></svg> <strong>What the Overlap Shows:</strong> {{ overlap_res.verdict_text|default(overlap_res.recommendation) }}
       </div>
     </div>
 
@@ -153,7 +153,7 @@
     {% else %}
     <div style="padding: 2rem; text-align: center; color: var(--text-muted);">
         {% if overlap_res.verdict == 'INSUFFICIENT_HOLDINGS_DATA' %}
-            ⚠️ Constituent holding weights are not available for one or both selected schemes. Please choose two active equity schemes from the selector above.
+            <svg class="glyph" style="width: 14px; height: 14px; vertical-align: -2px;"><use href="#glyph-alert"></use></svg> Constituent holding weights are not available for one or both selected schemes. Please choose two active equity schemes from the selector above.
         {% else %}
             No shared stock or bond holdings detected! These portfolios are 100% distinct.
         {% endif %}

@@ -242,7 +242,7 @@ Detailed forensic analysis with exact page grounding to bseindia.com filings.
         res_unlisted = self.client.get("/dossier/UNLISTEDFAKE123")
         self.assertEqual(res_unlisted.status_code, 200)
         self.assertIn('id="synthesizeBtn"', res_unlisted.text)
-        self.assertIn("🚫 Unlisted / Unrecognized Ticker (Cannot Generate)", res_unlisted.text)
+        self.assertIn("Unlisted / Unrecognized Ticker (Cannot Generate)", res_unlisted.text)
         self.assertIn("could not be matched to a listed BSE or NSE security", res_unlisted.text)
         self.assertIn("disabled", res_unlisted.text)
 

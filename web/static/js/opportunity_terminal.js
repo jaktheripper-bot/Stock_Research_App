@@ -151,7 +151,7 @@ function renderBentoCards(items) {
   if (items.length === 0) {
     container.innerHTML = `
       <div style="grid-column: 1 / -1; text-align: center; padding: 48px 20px; background: rgba(15, 23, 42, 0.6); border: 1px dashed rgba(255, 255, 255, 0.15); border-radius: 12px; color: #94a3b8;">
-        <div style="font-size: 28px; margin-bottom: 8px;">🔍</div>
+        <div style="font-size: 28px; margin-bottom: 8px;"><svg class="glyph" style="width: 28px; height: 28px;"><use href="#glyph-search"></use></svg></div>
         <div style="font-size: 16px; font-weight: 700; color: #f8fafc; margin-bottom: 4px;">No offerings match your filter</div>
         <div style="font-size: 13px;">Try switching personas or adjusting the search keyword.</div>
       </div>
@@ -191,7 +191,7 @@ function renderBentoCards(items) {
 
             <!-- Pin Button -->
             <button onclick="togglePin('${item.id}')" title="Pin to Cross-Asset Arbitrage Docket" style="background: ${isPinned ? 'rgba(14, 165, 233, 0.3)' : 'rgba(255, 255, 255, 0.08)'}; border: 1px solid ${isPinned ? '#0ea5e9' : 'rgba(255, 255, 255, 0.15)'}; border-radius: 6px; color: ${isPinned ? '#38bdf8' : '#94a3b8'}; padding: 5px 10px; font-size: 12.5px; cursor: pointer; display: flex; align-items: center; gap: 4px;">
-              <span>${isPinned ? '📌 Pinned' : '➕ Pin'}</span>
+              <span>${isPinned ? '✓ Pinned' : '+ Pin'}</span>
             </button>
           </div>
 
@@ -259,7 +259,7 @@ function renderBentoCards(items) {
             Dossier &rarr;
           </a>
           <button onclick="openCopilot('${item.symbol || item.id}', '${item.asset_class === 'MF' ? 'mutual_fund' : (['BOND', 'SDI'].includes(item.asset_class) ? 'debt' : 'equity')}')" class="btn btn-hero-ai btn-sm" style="font-size: 13px; font-weight: 700; padding: 8px 12px; cursor: pointer;" title="Open Research Desk">
-            ⚡ Research Desk
+            <svg class="glyph" style="width: 13px; height: 13px;"><use href="#glyph-shield"></use></svg> Research Desk
           </button>
         </div>
       </div>
@@ -318,7 +318,7 @@ function renderHeatmap() {
                 <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 2px;">
                   <span style="font-weight: 800; font-size: 13px; color: #f8fafc;">${cell.symbol}</span>
                   <button onclick="togglePin('${cell.item_id}')" title="Pin to Docket" style="background: none; border: none; font-size: 12px; cursor: pointer; color: ${isPinned ? '#38bdf8' : '#64748b'};">
-                    ${isPinned ? '📌' : '➕'}
+                    ${isPinned ? '✓' : '+'}
                   </button>
                 </div>
                 <div style="font-size: 14.5px; font-weight: 800; color: ${textStyle};" class="tnum">
@@ -505,10 +505,10 @@ function renderDenseTable(items) {
         </td>
         <td style="padding: 12px 14px; text-align: center; white-space: nowrap;">
           <button onclick="togglePin('${item.id}')" title="Pin to Arbitrage Docket" style="background: ${isPinned ? 'rgba(14, 165, 233, 0.3)' : 'rgba(255, 255, 255, 0.08)'}; border: 1px solid ${isPinned ? '#0ea5e9' : 'rgba(255, 255, 255, 0.15)'}; border-radius: 6px; color: ${isPinned ? '#38bdf8' : '#94a3b8'}; padding: 5px 10px; font-size: 12px; cursor: pointer; margin-right: 4px;">
-            ${isPinned ? '📌' : '➕ Pin'}
+            ${isPinned ? '✓ Pinned' : '+ Pin'}
           </button>
           <button onclick="openCopilot('${item.symbol || item.id}', '${item.asset_class === 'MF' ? 'mutual_fund' : (['BOND', 'SDI'].includes(item.asset_class) ? 'debt' : 'equity')}')" title="Open Research Desk" class="btn btn-hero-ai btn-sm" style="padding: 4px 8px; font-size: 11px; cursor: pointer;">
-            ⚡ Research Desk
+            <svg class="glyph" style="width: 12px; height: 12px;"><use href="#glyph-shield"></use></svg> Research Desk
           </button>
         </td>
       </tr>
@@ -681,7 +681,7 @@ function renderScorecardTable(items) {
     { label: 'Recovery / Security Recourse', fn: it => `<span style="color: #cbd5e1; font-size: 12px;">${it.recovery_recourse}</span>` },
     { label: 'Minimum Ticket Size', fn: it => `<strong>₹${Number(it.min_ticket_inr).toLocaleString('en-IN')}</strong>` },
     { label: 'Secondary Exit Liquidity', fn: it => `<span>${it.liquidity_tier.replace('_', ' ')}</span>` },
-    { label: 'Countercase Failure Mode', fn: it => `<span style="color: #f87171; font-size: 12px;">⚠️ ${it.primary_failure_mode}</span>` }
+    { label: 'Countercase Failure Mode', fn: it => `<span style="color: #f87171; font-size: 12px;"><svg class="glyph" style="width: 12px; height: 12px; vertical-align: -1px;"><use href="#glyph-alert"></use></svg> ${it.primary_failure_mode}</span>` }
   ];
 
   tbody.innerHTML = rows.map(r => `

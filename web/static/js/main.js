@@ -244,9 +244,9 @@ function initCheckoutModals() {
 // Multi-Currency Converter & Indicative Pricing Architecture
 // ==============================================================================
 const SUPPORTED_CURRENCIES = {
-  INR: { code: 'INR', symbol: '₹', name: 'Indian Rupee', flag: '🇮🇳', rate: 1.0, buffer: 0.0, is_base: true },
-  USD: { code: 'USD', symbol: '$', name: 'US Dollar', flag: '🇺🇸', rate: 88.50, buffer: 0.035, is_base: false },
-  EUR: { code: 'EUR', symbol: '€', name: 'Euro', flag: '🇪🇺', rate: 96.50, buffer: 0.035, is_base: false }
+  INR: { code: 'INR', symbol: '₹', name: 'Indian Rupee', flag: 'IN', rate: 1.0, buffer: 0.0, is_base: true },
+  USD: { code: 'USD', symbol: '$', name: 'US Dollar', flag: 'US', rate: 88.50, buffer: 0.035, is_base: false },
+  EUR: { code: 'EUR', symbol: '€', name: 'Euro', flag: 'EU', rate: 96.50, buffer: 0.035, is_base: false }
 };
 
 let currentCurrency = 'INR';
@@ -491,7 +491,7 @@ window.openCheckout = function(planId, planName, amountInr, credits) {
               syncUserSession();
             }
             await refreshUserBalance(user);
-            alert(`🎉 Payment verified successfully! Added ${credits} credits to your account.\nNew Balance: ${verifyResult.new_balance !== undefined ? verifyResult.new_balance : (user ? user.credits_balance : credits)} Credits\nInvoice: ${verifyResult.invoice_number}`);
+            alert(`Payment verified successfully! Added ${credits} credits to your account.\nNew Balance: ${verifyResult.new_balance !== undefined ? verifyResult.new_balance : (user ? user.credits_balance : credits)} Credits\nInvoice: ${verifyResult.invoice_number}`);
             modal.classList.remove('active');
             window.location.reload();
           } else {
@@ -537,7 +537,7 @@ window.openCheckout = function(planId, planName, amountInr, credits) {
                     syncUserSession();
                   }
                   await refreshUserBalance(user);
-                  alert(`🎉 Payment Confirmed! Added ${credits} credits to your account.\nNew Balance: ${verifyResult.new_balance !== undefined ? verifyResult.new_balance : (user ? user.credits_balance : credits)} Credits\nInvoice: ${verifyResult.invoice_number}`);
+                  alert(`Payment Confirmed! Added ${credits} credits to your account.\nNew Balance: ${verifyResult.new_balance !== undefined ? verifyResult.new_balance : (user ? user.credits_balance : credits)} Credits\nInvoice: ${verifyResult.invoice_number}`);
                   modal.classList.remove('active');
                   window.location.reload();
                 } else {
@@ -823,9 +823,9 @@ window.synthesizeReport = async function(ticker, forceRefresh = false) {
       }
 
       if (data.already_exists) {
-        alert('✅ ' + (data.message || `Dossier for ${ticker} is already available.`));
+        alert(data.message || `Dossier for ${ticker} is already available.`);
       } else {
-        alert('🎉 ' + (data.message || `Dossier for ${ticker} compiled successfully!`));
+        alert(data.message || `Dossier for ${ticker} compiled successfully!`);
       }
 
       // Navigate directly to the newly generated dossier
@@ -942,7 +942,7 @@ window.unlockDeepDive = async function(ticker) {
         syncUserSession();
         if (typeof updateNavAuthUI === 'function') updateNavAuthUI(user);
       }
-      alert(`🎉 ${data.message || `Deep-Dive for ${cleanTicker} unlocked successfully!`}\n\nRemaining Balance: ${user.credits_balance} credits.`);
+      alert(`${data.message || `Deep-Dive for ${cleanTicker} unlocked successfully!`}\n\nRemaining Balance: ${user.credits_balance} credits.`);
       window.location.reload();
       return;
     }
@@ -962,7 +962,7 @@ window.unlockDeepDive = async function(ticker) {
       alert(errMsg || 'Your session has expired. Please sign in again.');
       openSignInModal();
     } else {
-      alert('❌ ' + errMsg);
+      alert(errMsg);
     }
   } catch (err) {
     if (typeof window.hideEvaluationHUD === 'function') window.hideEvaluationHUD();
@@ -1043,7 +1043,7 @@ window.unlockAssetDeepDive = async function(kind, assetId) {
         syncUserSession();
         if (typeof updateNavAuthUI === 'function') updateNavAuthUI(user);
       }
-      alert(`🎉 ${data.message || `Deep Dive unlocked for ${cleanId}!`}\n\nRemaining Balance: ${user.credits_balance} credits.`);
+      alert(`${data.message || `Deep Dive unlocked for ${cleanId}!`}\n\nRemaining Balance: ${user.credits_balance} credits.`);
       window.location.reload();
       return;
     }
@@ -1063,7 +1063,7 @@ window.unlockAssetDeepDive = async function(kind, assetId) {
       alert(errMsg || 'Your session has expired. Please sign in again.');
       openSignInModal();
     } else {
-      alert('❌ ' + errMsg);
+      alert(errMsg);
     }
   } catch (err) {
     if (typeof window.hideEvaluationHUD === 'function') window.hideEvaluationHUD();
@@ -1174,8 +1174,8 @@ window.handleAuthFormSubmit = async function(e) {
         if (noticeEl) {
           noticeEl.style.display = 'block';
           noticeEl.innerText = data.test_code 
-            ? `✅ Test code: ${data.test_code} (auto-filled).` 
-            : `📬 Verification code sent to ${email}. Valid for 10 minutes.`;
+            ? `✓ Test code: ${data.test_code} (auto-filled).` 
+            : `Verification code sent to ${email}. Valid for 10 minutes.`;
         }
         submitBtn.innerText = 'Verify & Claim 2 Credits →';
       } else {
@@ -1215,12 +1215,12 @@ window.handleAuthFormSubmit = async function(e) {
         if (window._pendingCheckout) {
           const p = window._pendingCheckout;
           window._pendingCheckout = null;
-          alert(`🎉 Welcome ${data.user.full_name}! 2 Free Welcome Credits have been claimed.\nOpening checkout for ${p.planName}...`);
+          alert(`Welcome ${data.user.full_name}! 2 Free Welcome Credits have been claimed.\nOpening checkout for ${p.planName}...`);
           openCheckout(p.planId, p.planName, p.amountInr, p.credits);
           return;
         }
 
-        alert(`🎉 Welcome ${data.user.full_name}! You have received 2 free research credits.`);
+        alert(`Welcome ${data.user.full_name}! You have received 2 free research credits.`);
         window.location.reload();
       } else {
         alert('Verification Failed: ' + extractApiError(data, 'Invalid or expired code.'));
@@ -1251,8 +1251,8 @@ window.handleResendOtp = async function() {
       if (noticeEl) {
         noticeEl.style.display = 'block';
         noticeEl.innerText = data.test_code 
-          ? `✅ New test code: ${data.test_code}` 
-          : `📬 Fresh code dispatched to ${email}.`;
+          ? `✓ New test code: ${data.test_code}` 
+          : `Fresh code dispatched to ${email}.`;
       }
       alert('A fresh verification code has been dispatched.');
     } else {
@@ -1297,18 +1297,18 @@ window.sendAdminLoginOtp = window.sendAdminLoginOtp || async function() {
       if (statusEl) {
         statusEl.style.display = 'block';
         statusEl.style.color = '#34d399';
-        statusEl.textContent = '📬 6-digit verification code sent to ' + email + '. Enter it above to continue.';
+        statusEl.textContent = '6-digit verification code sent to ' + email + '. Enter it above to continue.';
       }
     } else if (statusEl) {
       statusEl.style.display = 'block';
       statusEl.style.color = '#f87171';
-      statusEl.textContent = '❌ ' + (data.detail || data.message || 'Could not send verification code.');
+      statusEl.textContent = (data.detail || data.message || 'Could not send verification code.');
     }
   } catch (e) {
     if (statusEl) {
       statusEl.style.display = 'block';
       statusEl.style.color = '#f87171';
-      statusEl.textContent = '❌ Network error: ' + e.message;
+      statusEl.textContent = 'Network error: ' + e.message;
     }
   } finally {
     if (btnEl) {
@@ -1345,10 +1345,10 @@ window.handleCountercaseSubmit = async function(e, ticker) {
     const data = await resp.json();
     if (resp.ok && data.success) {
       if (statusEl) {
-        statusEl.innerText = '✅ Committed to Decision Ledger!';
+        statusEl.innerText = '✓ Committed to Decision Ledger!';
         statusEl.style.color = 'var(--accent-emerald)';
       }
-      alert(`🔒 ${data.message}`);
+      alert(data.message);
     } else {
       alert('Error: ' + extractApiError(data, 'Could not record.'));
     }
@@ -1357,7 +1357,7 @@ window.handleCountercaseSubmit = async function(e, ticker) {
   } finally {
     if (btn) {
       btn.disabled = false;
-      btn.innerText = '🔒 Save Countercase to Audit Ledger';
+      btn.innerHTML = '<svg class="glyph" style="width: 13px; height: 13px; vertical-align: -2px;"><use href="#glyph-lock"></use></svg> Save Countercase to Audit Ledger';
     }
   }
 };
@@ -1418,10 +1418,10 @@ window.handleThesisCheckpointSubmit = async function(e, ticker) {
     const data = await resp.json();
     if (resp.ok && data.success) {
       if (statusEl) {
-        statusEl.innerText = '✅ Committed to Decision Ledger!';
+        statusEl.innerText = '✓ Committed to Decision Ledger!';
         statusEl.style.color = 'var(--accent-emerald)';
       }
-      alert(`⚖️ ${data.message}`);
+      alert(data.message);
       window.closeThesisModal();
     } else {
       alert('Error: ' + extractApiError(data, 'Could not record checkpoint.'));
@@ -1431,7 +1431,7 @@ window.handleThesisCheckpointSubmit = async function(e, ticker) {
   } finally {
     if (btn) {
       btn.disabled = false;
-      btn.innerText = '🔒 Commit to Ledger';
+      btn.innerHTML = '<svg class="glyph" style="width: 13px; height: 13px; vertical-align: -2px;"><use href="#glyph-lock"></use></svg> Commit to Ledger';
     }
   }
 };
@@ -1459,7 +1459,7 @@ window.handleContactTicketSubmit = function(e) {
   const btnText = document.getElementById('contactSubmitBtnText');
 
   if (btnIcon) {
-    btnIcon.innerText = '⏳';
+    btnIcon.innerHTML = '<svg class="glyph" style="width: 14px; height: 14px;"><use href="#glyph-clock"></use></svg>';
   }
   if (btnText) {
     btnText.innerText = 'Sending Ticket...';
@@ -1489,7 +1489,7 @@ window.addEventListener('pageshow', function() {
     btn.style.pointerEvents = '';
   }
   if (btnIcon) {
-    btnIcon.innerText = '📨';
+    btnIcon.innerHTML = '<svg class="glyph" style="width: 14px; height: 14px;"><use href="#icon-chat"></use></svg>';
   }
   if (btnText) {
     btnText.innerText = 'Send Support Ticket';
@@ -1930,7 +1930,7 @@ function updateNavAuthUI(user) {
   if (navBtn) {
     if (user && user.id) {
       const bal = user.credits_balance !== undefined ? user.credits_balance : (user.credits !== undefined ? user.credits : 0);
-      navBtn.innerText = `👤 ${user.full_name || 'Account'} (${bal} Credits)`;
+      navBtn.innerText = `${user.full_name || 'Account'} (${bal} Credits)`;
       navBtn.classList.remove('btn-primary');
       navBtn.classList.add('btn-secondary');
     } else {
@@ -2144,12 +2144,12 @@ async function loadMonitoringEvents() {
     }
     container.innerHTML = events.map(evt => {
       const typeIcons = {
-        'DAILY_FUND_AUDIT': '🔍',
-        'AMFI_NAV_SYNC': '📊',
-        'bse_material_filing': '🚨',
-        'bse_reaudit_completed': '⚡'
+        'DAILY_FUND_AUDIT': '<svg class="glyph" style="width: 13px; height: 13px;"><use href="#glyph-search"></use></svg>',
+        'AMFI_NAV_SYNC': '<svg class="glyph" style="width: 13px; height: 13px;"><use href="#glyph-chart"></use></svg>',
+        'bse_material_filing': '<svg class="glyph" style="width: 13px; height: 13px;"><use href="#glyph-alert"></use></svg>',
+        'bse_reaudit_completed': '<svg class="glyph" style="width: 13px; height: 13px;"><use href="#glyph-zap"></use></svg>'
       };
-      const icon = typeIcons[evt.event_type] || '🤖';
+      const icon = typeIcons[evt.event_type] || '<svg class="glyph" style="width: 13px; height: 13px;"><use href="#glyph-shield"></use></svg>';
       return `
         <div style="background: rgba(30, 41, 59, 0.6); border: 1px solid rgba(255, 255, 255, 0.08); border-radius: 8px; padding: 12px; font-size: 12.5px;">
           <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 6px;">
@@ -2272,7 +2272,7 @@ function startButtonProgressFill(btn, baseLabel = 'Loading Dossier') {
       stage = 'Finalizing';
     }
 
-    btn.innerHTML = `<span class="btn-progress-label"><span style="display:inline-block; animation: spin 0.6s linear infinite;">⚡</span> ${stage}... ${elapsedSec}s / ~30s</span>`;
+    btn.innerHTML = `<span class="btn-progress-label"><svg class="glyph" style="width: 13px; height: 13px; display:inline-block; animation: spin 0.6s linear infinite;"><use href="#glyph-refresh"></use></svg> ${stage}... ${elapsedSec}s / ~30s</span>`;
   };
 
   // Synchronous immediate visual update on the exact click tick

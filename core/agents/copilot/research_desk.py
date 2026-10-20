@@ -568,8 +568,7 @@ def _answer_from_local_dossier_index(
             return (
                 f"**Competitive Moat & Industry Positioning — {company_name} (`{ticker}`)**\n"
                 f"- **Moat Rating:** `{matrix.get('Moat', 'Moderate')}` | **Macro Posture:** `{matrix.get('Macro', 'Neutral')}`\n\n"
-                f"{pillars[2]}\n\n"
-                f"*Source: Audited Equity Dossier Pillar 02 (`reports.db`).*"
+                f"{pillars[2]}"
             )
 
     # 3. Earnings / Revenue Drop / Margins / Operational Diagnostic (Pillar 4)
@@ -578,8 +577,7 @@ def _answer_from_local_dossier_index(
             return (
                 f"**Earnings & Margin Diagnostic — {company_name} (`{ticker}`)**\n"
                 f"- **Drop Diagnostic:** `{matrix.get('Diagnostic', 'Neutral')}` | **Capital Allocation:** `{matrix.get('CapitalAllocation', 'Disciplined')}`\n\n"
-                f"{pillars[4]}\n\n"
-                f"*Source: Audited Equity Dossier Pillar 04 (`reports.db`).*"
+                f"{pillars[4]}"
             )
 
     # 4. Macro / Geopolitical / Regulatory / Tariffs (Pillar 1)
@@ -588,8 +586,7 @@ def _answer_from_local_dossier_index(
             return (
                 f"**Macro & Regulatory Exposure — {company_name} (`{ticker}`)**\n"
                 f"- **Macro Verdict:** `{matrix.get('Macro', 'Neutral')}`\n\n"
-                f"{pillars[1]}\n\n"
-                f"*Source: Audited Equity Dossier Pillar 01 (`reports.db`).*"
+                f"{pillars[1]}"
             )
 
     # 5. ESG / Sustainability / BRSR (Pillar 7)
@@ -597,8 +594,7 @@ def _answer_from_local_dossier_index(
         if 7 in pillars:
             return (
                 f"**SEBI BRSR & ESG Scorecard — {company_name} (`{ticker}`)**\n\n"
-                f"{pillars[7]}\n\n"
-                f"*Source: Audited Equity Dossier Pillar 07 (`reports.db`).*"
+                f"{pillars[7]}"
             )
 
     return None
@@ -1060,6 +1056,7 @@ def _retrieve_relevant_dossier_passages(
         "reit", "etf", "tell", "me", "explain", "show", "give", "analyze", "audit",
         "check", "evaluate", "review", "please", "any", "there", "their", "its",
         "section", "metric", "metrics", "pillar", "dimension", "overview", "details",
+        "report", "reports", "dossier", "top",
         (ticker or "").lower()
     }
     query_tokens = [
@@ -1112,9 +1109,8 @@ def _retrieve_relevant_dossier_passages(
     )
     passages_md = "\n\n".join([f"**{h}:**\n{b}" for h, b, _ in top_blocks])
     return (
-        f"**Targeted Dossier Retrieval for {display_name} (`{ticker}`):**\n\n"
+        f"**{display_name} (`{ticker}`):**\n\n"
         f"{passages_md}\n\n"
-        f"*Source: Verified Dossier Text (`reports.db`) — matched to your query on `{', '.join(dict.fromkeys(query_tokens[:4]))}`.*\n\n"
         f"Would you like to stress-test these figures with a custom number (e.g. `10000`, `15%`, `10y`) or drill into another section?"
     )
 

@@ -15,7 +15,7 @@
         <span style="font-size: 12px; font-weight: 700; color: #34d399; text-transform: uppercase; letter-spacing: 0.05em;">National ETF Matrix • {{ data.total_tracked_etfs }}+ AMFI Passive Benchmarks</span>
       </div>
       <button id="sync-amfi-btn" onclick="triggerAmfiSync()" class="btn btn-secondary btn-sm" style="display: inline-flex; align-items: center; gap: 8px; font-size: 12px; border-radius: 8px; border-color: rgba(56, 189, 248, 0.4); color: #38bdf8;">
-        <span id="sync-icon">🔄</span> <span id="sync-text">Sync AMFI Feed</span>
+        <span id="sync-icon"><svg class="glyph" style="width: 13px; height: 13px; vertical-align: -2px;"><use href="#glyph-refresh"></use></svg></span> <span id="sync-text">Sync AMFI Feed</span>
       </button>
     </div>
 
@@ -29,7 +29,7 @@
 
     <!-- Evaluated Metadata Strip & Provenance Info -->
     <div class="dossier-meta-strip" style="margin-bottom: 20px;">
-      <span>📅 Evaluated: Live Master Feed • AMFI Statutory NAVAll Dispatches • Dual-Exchange Order Books</span>
+      <span><svg class="glyph" style="width: 12px; height: 12px; vertical-align: -1px;"><use href="#glyph-clock"></use></svg> Evaluated: Live Master Feed • AMFI Statutory NAVAll Dispatches • Dual-Exchange Order Books</span>
     </div>
     <p class="dossier-provenance-subline">End-of-day NAVs, tracking error deviations, and liquidity tiers calculated directly from regulatory dispatches and exchange execution feeds.</p>
 
@@ -167,9 +167,9 @@
               <div style="font-weight: 800; color: #f8fafc; display: flex; align-items: center; gap: 6px;">
                 <span>{{ etf.symbol }}</span>
                 {% if etf.arbitrage_signal == 'PREMIUM_EXPENSIVE' %}
-                  <span title="Premium Surcharge Alert" style="font-size: 11px; color: #f59e0b;">⚠️</span>
+                  <span title="Premium Surcharge Alert" style="font-size: 11px; color: #f59e0b;"><svg class="glyph" style="width: 12px; height: 12px;"><use href="#glyph-alert"></use></svg></span>
                 {% elif etf.arbitrage_signal == 'DISCOUNT_ATTRACTIVE' %}
-                  <span title="Discount Opportunity" style="font-size: 11px; color: #10b981;">💡</span>
+                  <span title="Discount Opportunity" style="font-size: 11px; color: #10b981;"><svg class="glyph" style="width: 12px; height: 12px;"><use href="#icon-insights"></use></svg></span>
                 {% endif %}
               </div>
               <div style="font-size: 11.5px; color: #94a3b8; max-width: 240px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;" title="{{ etf.scheme_name }}">{{ etf.scheme_name }}</div>
@@ -227,7 +227,7 @@
 
   <!-- Disclaimer Footer -->
   <div style="font-size: 12px; color: #64748b; text-align: center; max-width: 840px; margin: 0 auto; line-height: 1.6;">
-    🔒 <strong>Statutory Regulatory Disclosures:</strong> Data sourced from official AMFI daily NAVAll dispatches and statutory tracking error declarations under SEBI (Mutual Funds) Regulations, 1996. Secondary market prices reflect end-of-day traded levels. For educational and passive research analysis.
+    <svg class="glyph" style="width: 12px; height: 12px; vertical-align: -1px;"><use href="#glyph-lock"></use></svg> <strong>Statutory Regulatory Disclosures:</strong> Data sourced from official AMFI daily NAVAll dispatches and statutory tracking error declarations under SEBI (Mutual Funds) Regulations, 1996. Secondary market prices reflect end-of-day traded levels. For educational and passive research analysis.
   </div>
 </div>
 

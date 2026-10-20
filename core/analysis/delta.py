@@ -22,7 +22,7 @@ def evaluate_material_change(cached: dict, live_fund: dict, scrip_code: str) -> 
     4. Price delta >= 5% vs baseline price
     """
     if not cached:
-        return True, "⚡ Fresh Analysis: Initial dossier synthesis", "", "INITIAL"
+        return True, "Fresh Analysis: Initial dossier synthesis", "", "INITIAL"
 
     # Self-Healing Cache Gate: Invalidate and force re-synthesis if cached text was poisoned by an error or is incomplete
     cached_text = str(cached.get("report_text") or "").strip()
@@ -40,7 +40,7 @@ def evaluate_material_change(cached: dict, live_fund: dict, scrip_code: str) -> 
             or any(sig in cached_text for sig in poison_signatures)
             or ("Pillar 1" not in cached_text and "DIAGNOSTIC SUMMARY" not in cached_text)
         ):
-            return True, "⚡ Self-Healing Recovery: Cached report contained failed synthesis error or incomplete data", "", "POISONED_CACHE"
+            return True, "Self-Healing Recovery: Cached report contained failed synthesis error or incomplete data", "", "POISONED_CACHE"
 
     raw_ts = cached.get("raw_timestamp")
     if raw_ts:
@@ -50,14 +50,14 @@ def evaluate_material_change(cached: dict, live_fund: dict, scrip_code: str) -> 
             if ts.tzinfo is None:
                 ts = ts.replace(tzinfo=timezone.utc)
             if (now - ts).total_seconds() / 86400.0 > 14:
-                return True, "⚡ Regenerated: Report exceeded 14-day freshness window", "", "EXPIRED"
+                return True, "Regenerated: Report exceeded 14-day freshness window", "", "EXPIRED"
         except Exception as e:
             logger.debug(f"Timestamp freshness check notice: {e}")
 
     latest_ann = fetch_latest_bse_announcement(scrip_code)
     cached_ann = cached.get("latest_announcement", "")
     if latest_ann and cached_ann and latest_ann != cached_ann:
-        return True, f"⚡ Regenerated: New BSE Filing ({latest_ann[:35]}...)", latest_ann, "NEW_FILING"
+        return True, f"Regenerated: New BSE Filing ({latest_ann[:35]}...)", latest_ann, "NEW_FILING"
 
     cached_price = cached.get("baseline_price")
     live_price = live_fund.get("current_price") or live_fund.get("currentValue")
@@ -67,10 +67,10 @@ def evaluate_material_change(cached: dict, live_fund: dict, scrip_code: str) -> 
         if c_p > 0 and (abs(l_p - c_p) / c_p) >= 0.05:
             d = "+" if l_p > c_p else "-"
             shift_pct = (abs(l_p - c_p) / c_p) * 100
-            return True, f"⚡ Price shifted {d}{shift_pct:.1f}% vs baseline (₹{l_p:.2f} vs ₹{c_p:.2f})", latest_ann, "PRICE_DELTA"
+            return True, f"Price shifted {d}{shift_pct:.1f}% vs baseline (₹{l_p:.2f} vs ₹{c_p:.2f})", latest_ann, "PRICE_DELTA"
     except Exception as e:
         logger.debug(f"Price delta computation notice: {e}")
-    return False, "🛡️ Verified Cache: No material events detected (Live quote updated)", latest_ann, "NONE"
+    return False, "Verified Cache: No material events detected (Live quote updated)", latest_ann, "NONE"
 
 def splice_report_pillars(original_text: str, updated_pillars: dict) -> str:
     """
@@ -166,7 +166,7 @@ Verified Live Exchange Metrics:
             client = genai.Client(api_key=api_key)
             model_name = get_light_flash_model(client)
             if on_status:
-                on_status(f"⚡ Executing price & filing Pillar 5 & 6 refresh via `{model_name}` (Zero Grounding Fee)...")
+                on_status("Executing price & filing Pillar 5 & 6 refresh (Zero Grounding Fee)...")
             chat = client.chats.create(
                 model=model_name,
                 config=genai.types.GenerateContentConfig(

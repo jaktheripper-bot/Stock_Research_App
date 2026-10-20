@@ -39,12 +39,12 @@
           {{ posture.instrument_name }}
         </div>
         <div class="dossier-meta-strip" style="margin-top: 10px;">
-          <span class="dossier-meta-pill">📅 Evaluated: {{ security.maturity_date|default('Recent') }}</span>
+          <span class="dossier-meta-pill"><svg class="glyph" style="width:12px;height:12px;vertical-align:-1px;margin-right:4px;"><use href="#icon-doc"></use></svg>Evaluated: {{ security.maturity_date|default('Recent') }}</span>
           <span class="dossier-meta-sep">•</span>
           <span class="badge badge-emerald"><span class="status-dot status-dot-emerald"></span> Verified BSE Debt / SEBI Feed</span>
           <span class="dossier-meta-sep">•</span>
           <span class="badge badge-cyan" title="Audited credit rating monitoring and recovery waterfall">
-            <span>📎</span> <span>SEBI Statutory Seniority Waterfall</span>
+            <svg class="glyph" style="width:12px;height:12px;"><use href="#icon-doc"></use></svg> <span>SEBI Statutory Seniority Waterfall</span>
           </span>
         </div>
         <div class="dossier-provenance-subline" style="margin-top: 6px;">
@@ -73,7 +73,7 @@
             <svg class="glyph"><use href="#glyph-shield"></use></svg> Research Desk
           </button>
           <a href="/api/pdf/debt/{{ posture.isin }}" class="btn btn-sm btn-secondary" style="text-decoration: none; font-size: 12px; font-weight: 600;">
-            📄 Export PDF
+            <svg class="glyph"><use href="#icon-download"></use></svg> Export PDF
           </a>
         </div>
       </div>
@@ -107,7 +107,7 @@
   <!-- "What Am I Looking At?" Executive Primer -->
   <div style="background: linear-gradient(135deg, rgba(14, 165, 233, 0.08) 0%, rgba(30, 41, 59, 0.4) 100%); border: 1px solid rgba(56, 189, 248, 0.25); border-radius: 14px; padding: 22px; margin-bottom: 24px;">
     <div style="display: flex; align-items: center; gap: 10px; margin-bottom: 12px;">
-      <span style="font-size: 20px;">💡</span>
+      <span style="font-size: 20px; color: #38bdf8; display: inline-flex;"><svg class="glyph"><use href="#icon-insights"></use></svg></span>
       <h2 style="font-size: 18px; font-weight: 800; color: #38bdf8; margin: 0;">What Am I Looking At?</h2>
     </div>
     <div style="font-size: 14px; color: #f1f5f9; line-height: 1.6; margin-bottom: 12px;">
@@ -118,10 +118,10 @@
         <strong style="color: #10b981;"><svg class="glyph"><use href="#glyph-chart"></use></svg> Bank FD Comparison:</strong> {{ posture.primer.fd_comparison }}
       </div>
       <div style="background: rgba(15, 23, 42, 0.5); padding: 12px; border-radius: 8px; border: 1px solid rgba(255, 255, 255, 0.05);">
-        <strong style="color: #38bdf8;">🔒 Contractual Cash Flows:</strong> {{ posture.primer.contractual_certainty }}
+        <strong style="color: #38bdf8;"><svg class="glyph"><use href="#icon-lock"></use></svg> Contractual Cash Flows:</strong> {{ posture.primer.contractual_certainty }}
       </div>
       <div style="background: rgba(15, 23, 42, 0.5); padding: 12px; border-radius: 8px; border: 1px solid rgba(255, 255, 255, 0.05);">
-        <strong style="color: #f59e0b;">⚠️ Core Risks:</strong> {{ posture.primer.primary_risks }}
+        <strong style="color: #f59e0b;"><svg class="glyph"><use href="#glyph-alert"></use></svg> Core Risks:</strong> {{ posture.primer.primary_risks }}
       </div>
     </div>
   </div>
@@ -176,7 +176,7 @@
   <div style="background: linear-gradient(135deg, rgba(15, 23, 42, 0.8) 0%, rgba(30, 41, 59, 0.6) 100%); border: 1px solid rgba(255, 255, 255, 0.1); border-radius: 14px; padding: 24px; margin-bottom: 24px;">
     <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px; flex-wrap: wrap; gap: 10px;">
       <div style="display: flex; align-items: center; gap: 10px;">
-        <span style="font-size: 22px;">📡</span>
+        <span style="font-size: 22px; color: #38bdf8; display: inline-flex;"><svg class="glyph"><use href="#icon-radar"></use></svg></span>
         <div>
           <h2 style="font-size: 18px; font-weight: 800; color: #f8fafc; margin: 0;">Credit Contagion Radar: Equity-to-Debt Spillover Analysis</h2>
           <div style="font-size: 13px; color: #94a3b8; margin-top: 2px;">
@@ -214,7 +214,7 @@
     {% if posture.credit_contagion_radar.equity_ticker %}
     <div style="margin-top: 14px; display: flex; justify-content: flex-end;">
       <a href="/dossier/{{ posture.credit_contagion_radar.equity_ticker }}" class="btn btn-sm btn-secondary" style="font-size: 12px; font-weight: 600; border-radius: 9999px; text-decoration: none; display: inline-flex; align-items: center; gap: 6px; padding: 6px 14px; background: rgba(15, 23, 42, 0.6); border: 1px solid rgba(255, 255, 255, 0.15); color: #38bdf8;">
-        <span>📈</span> View Parent Equity Report ({{ posture.credit_contagion_radar.equity_ticker }}) &rarr;
+        <svg class="glyph"><use href="#icon-markets"></use></svg> View Parent Equity Report ({{ posture.credit_contagion_radar.equity_ticker }}) &rarr;
       </a>
     </div>
     {% endif %}
@@ -226,7 +226,7 @@
   <div style="margin-bottom: 24px;">
     {% for w in posture.warnings %}
     <div style="background: rgba(239, 68, 68, 0.1); border-left: 4px solid #ef4444; border-radius: 8px; padding: 14px 18px; margin-bottom: 10px; font-size: 13px; color: #fca5a5; line-height: 1.5;">
-      <strong>⚠️ Warning Alert:</strong> {{ w }}
+      <strong><svg class="glyph" style="vertical-align:-2px;margin-right:4px;"><use href="#glyph-alert"></use></svg>Warning Alert:</strong> {{ w }}
     </div>
     {% endfor %}
   </div>
@@ -247,7 +247,7 @@
 
       <!-- Educational Primer Box -->
       <div style="background: rgba(15, 23, 42, 0.5); border-left: 3px solid #38bdf8; border-radius: 6px; padding: 12px 14px; margin-bottom: 14px; font-size: 13px; color: #94a3b8; line-height: 1.5;">
-        <strong style="color: #38bdf8;">📘 What This Tests:</strong> {{ posture.pillars.p1_credit_quality.educational_overview }}
+        <strong style="color: #38bdf8;"><svg class="glyph" style="vertical-align:-2px;margin-right:4px;"><use href="#icon-doc"></use></svg>What This Tests:</strong> {{ posture.pillars.p1_credit_quality.educational_overview }}
       </div>
 
       <!-- Narrative -->
@@ -269,7 +269,7 @@
 
       <!-- Key Takeaway -->
       <div style="background: rgba(16, 185, 129, 0.08); border-radius: 8px; padding: 10px 14px; font-size: 13px; color: #6ee7b7;">
-        <strong>💡 Key Takeaway:</strong> {{ posture.pillars.p1_credit_quality.plain_english_takeaway }}
+        <strong><svg class="glyph" style="vertical-align:-2px;margin-right:4px;"><use href="#icon-insights"></use></svg>Key Takeaway:</strong> {{ posture.pillars.p1_credit_quality.plain_english_takeaway }}
       </div>
     </div>
 
@@ -281,7 +281,7 @@
       </div>
 
       <div style="background: rgba(15, 23, 42, 0.5); border-left: 3px solid #38bdf8; border-radius: 6px; padding: 12px 14px; margin-bottom: 14px; font-size: 13px; color: #94a3b8; line-height: 1.5;">
-        <strong style="color: #38bdf8;">📘 What This Tests:</strong> {{ posture.pillars.p2_capital_hierarchy.educational_overview }}
+        <strong style="color: #38bdf8;"><svg class="glyph" style="vertical-align:-2px;margin-right:4px;"><use href="#icon-doc"></use></svg>What This Tests:</strong> {{ posture.pillars.p2_capital_hierarchy.educational_overview }}
       </div>
 
       <div style="font-size: 14px; color: #cbd5e1; line-height: 1.6; margin-bottom: 14px;">
@@ -300,7 +300,7 @@
       </div>
 
       <div style="background: rgba(16, 185, 129, 0.08); border-radius: 8px; padding: 10px 14px; font-size: 13px; color: #6ee7b7;">
-        <strong>💡 Key Takeaway:</strong> {{ posture.pillars.p2_capital_hierarchy.plain_english_takeaway }}
+        <strong><svg class="glyph" style="vertical-align:-2px;margin-right:4px;"><use href="#icon-insights"></use></svg>Key Takeaway:</strong> {{ posture.pillars.p2_capital_hierarchy.plain_english_takeaway }}
       </div>
     </div>
 
@@ -313,7 +313,7 @@
       </div>
 
       <div style="background: rgba(15, 23, 42, 0.5); border-left: 3px solid #38bdf8; border-radius: 6px; padding: 12px 14px; margin-bottom: 14px; font-size: 13px; color: #94a3b8; line-height: 1.5;">
-        <strong style="color: #38bdf8;">📘 What This Tests:</strong> {{ posture.pillars.p3_solvency.educational_overview }}
+        <strong style="color: #38bdf8;"><svg class="glyph" style="vertical-align:-2px;margin-right:4px;"><use href="#icon-doc"></use></svg>What This Tests:</strong> {{ posture.pillars.p3_solvency.educational_overview }}
       </div>
 
       <div style="font-size: 14px; color: #cbd5e1; line-height: 1.6; margin-bottom: 14px;">
@@ -327,7 +327,7 @@
       </div>
 
       <div style="background: rgba(16, 185, 129, 0.08); border-radius: 8px; padding: 10px 14px; font-size: 13px; color: #6ee7b7;">
-        <strong>💡 Key Takeaway:</strong> {{ posture.pillars.p3_solvency.plain_english_takeaway }}
+        <strong><svg class="glyph" style="vertical-align:-2px;margin-right:4px;"><use href="#icon-insights"></use></svg>Key Takeaway:</strong> {{ posture.pillars.p3_solvency.plain_english_takeaway }}
       </div>
     </div>
     {% else %}
@@ -345,7 +345,7 @@
       </div>
 
       <div style="background: rgba(15, 23, 42, 0.5); border-left: 3px solid #38bdf8; border-radius: 6px; padding: 12px 14px; margin-bottom: 14px; font-size: 13px; color: #94a3b8; line-height: 1.5;">
-        <strong style="color: #38bdf8;">📘 What This Tests:</strong> {{ posture.pillars.p4_duration.educational_overview }}
+        <strong style="color: #38bdf8;"><svg class="glyph" style="vertical-align:-2px;margin-right:4px;"><use href="#icon-doc"></use></svg>What This Tests:</strong> {{ posture.pillars.p4_duration.educational_overview }}
       </div>
 
       <div style="font-size: 14px; color: #cbd5e1; line-height: 1.6; margin-bottom: 14px;">
@@ -359,7 +359,7 @@
       </div>
 
       <div style="background: rgba(16, 185, 129, 0.08); border-radius: 8px; padding: 10px 14px; font-size: 13px; color: #6ee7b7;">
-        <strong>💡 Key Takeaway:</strong> {{ posture.pillars.p4_duration.plain_english_takeaway }}
+        <strong><svg class="glyph" style="vertical-align:-2px;margin-right:4px;"><use href="#icon-insights"></use></svg>Key Takeaway:</strong> {{ posture.pillars.p4_duration.plain_english_takeaway }}
       </div>
     </div>
 
@@ -372,7 +372,7 @@
       </div>
 
       <div style="background: rgba(15, 23, 42, 0.5); border-left: 3px solid #38bdf8; border-radius: 6px; padding: 12px 14px; margin-bottom: 14px; font-size: 13px; color: #94a3b8; line-height: 1.5;">
-        <strong style="color: #38bdf8;">📘 What This Tests:</strong> {{ posture.pillars.p5_recovery.educational_overview }}
+        <strong style="color: #38bdf8;"><svg class="glyph" style="vertical-align:-2px;margin-right:4px;"><use href="#icon-doc"></use></svg>What This Tests:</strong> {{ posture.pillars.p5_recovery.educational_overview }}
       </div>
 
       <div style="font-size: 14px; color: #cbd5e1; line-height: 1.6; margin-bottom: 14px;">
@@ -392,7 +392,7 @@
       {% endif %}
 
       <div style="background: rgba(16, 185, 129, 0.08); border-radius: 8px; padding: 10px 14px; font-size: 13px; color: #6ee7b7;">
-        <strong>💡 Key Takeaway:</strong> {{ posture.pillars.p5_recovery.plain_english_takeaway }}
+        <strong><svg class="glyph" style="vertical-align:-2px;margin-right:4px;"><use href="#icon-insights"></use></svg>Key Takeaway:</strong> {{ posture.pillars.p5_recovery.plain_english_takeaway }}
       </div>
     </div>
     {% endif %}
@@ -406,7 +406,7 @@
     <!-- The Good -->
     <div style="background: rgba(16, 185, 129, 0.06); border: 1px solid rgba(16, 185, 129, 0.2); border-radius: 12px; padding: 20px;">
       <h3 style="font-size: 16px; font-weight: 700; color: #10b981; margin-top: 0; margin-bottom: 12px; display: flex; align-items: center; gap: 8px;">
-        <span>🟢</span> The Good (Strengths & Yield)
+        <span class="status-dot status-dot-emerald"></span> The Good (Strengths &amp; Yield)
       </h3>
       <ul style="margin: 0; padding-left: 20px; font-size: 13px; color: #cbd5e1; line-height: 1.6;">
         {% for item in posture.investment_thesis.the_good %}
@@ -418,7 +418,7 @@
     <!-- The Bad -->
     <div style="background: rgba(245, 158, 11, 0.06); border: 1px solid rgba(245, 158, 11, 0.2); border-radius: 12px; padding: 20px;">
       <h3 style="font-size: 16px; font-weight: 700; color: #f59e0b; margin-top: 0; margin-bottom: 12px; display: flex; align-items: center; gap: 8px;">
-        <span>🟡</span> The Bad (Risks & Covenants)
+        <span style="width:8px;height:8px;border-radius:50%;background:#f59e0b;display:inline-block;"></span> The Bad (Risks &amp; Covenants)
       </h3>
       <ul style="margin: 0; padding-left: 20px; font-size: 13px; color: #cbd5e1; line-height: 1.6;">
         {% for item in posture.investment_thesis.the_bad %}
@@ -430,7 +430,7 @@
     <!-- The Ugly -->
     <div style="background: rgba(239, 68, 68, 0.06); border: 1px solid rgba(239, 68, 68, 0.2); border-radius: 12px; padding: 20px;">
       <h3 style="font-size: 16px; font-weight: 700; color: #ef4444; margin-top: 0; margin-bottom: 12px; display: flex; align-items: center; gap: 8px;">
-        <span>🔴</span> The Ugly (Default Stress Test)
+        <span style="width:8px;height:8px;border-radius:50%;background:#ef4444;display:inline-block;"></span> The Ugly (Default Stress Test)
       </h3>
       <ul style="margin: 0; padding-left: 20px; font-size: 13px; color: #cbd5e1; line-height: 1.6;">
         {% for item in posture.investment_thesis.the_ugly %}

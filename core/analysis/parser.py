@@ -52,10 +52,11 @@ def remove_health_matrix_text(text: str) -> str:
         text
     )
     cleaned = re.sub(
-        r'(?im)^[ \t]*>[ \t]*(?:⚠️|🔄|•)?[ \t]*\**(?:Gemini|Perplexity|Rerouting to Perplexity)[^\n]*\n*',
+        r'(?im)^[ \t]*>[ \t]*(?:\u26a0\ufe0f?|\U0001f504|•)?[ \t]*\**(?:Gemini|Perplexity|Rerouting to Perplexity)[^\n]*\n*',
         '',
         cleaned
     )
+    cleaned = cleaned.replace("### \U0001f4da Verified Regulatory Sources", "### Verified Regulatory Sources")
     return cleaned.strip()
 
 def strip_conclusion_sections(text: str) -> str:
@@ -94,11 +95,11 @@ def render_epistemic_badges_html(html_text: str) -> str:
         ),
         (
             r"\[MODEL INTERPRETATION([^\]]*)\]",
-            r'<span class="badge epistemic-badge epistemic-badge-interp" style="background:rgba(168,85,247,0.14);color:#c084fc;border:1px solid rgba(168,85,247,0.35);font-size:11px;font-weight:700;padding:2px 7px;border-radius:4px;margin-right:4px;">🧠 MODEL INTERPRETATION\1</span>'
+            r'<span class="badge epistemic-badge epistemic-badge-interp" style="background:rgba(168,85,247,0.14);color:#c084fc;border:1px solid rgba(168,85,247,0.35);font-size:11px;font-weight:700;padding:2px 7px;border-radius:4px;margin-right:4px;"><svg class="glyph" style="width:11px;height:11px;vertical-align:-1px;margin-right:3px;"><use href="#icon-insights"></use></svg> MODEL INTERPRETATION\1</span>'
         ),
         (
             r"\[UNRESOLVED UNCERTAINTY([^\]]*)\]",
-            r'<span class="badge epistemic-badge epistemic-badge-uncert" style="background:rgba(245,158,11,0.14);color:#fbbf24;border:1px solid rgba(245,158,11,0.35);font-size:11px;font-weight:700;padding:2px 7px;border-radius:4px;margin-right:4px;">❓ UNRESOLVED UNCERTAINTY\1</span>'
+            r'<span class="badge epistemic-badge epistemic-badge-uncert" style="background:rgba(245,158,11,0.14);color:#fbbf24;border:1px solid rgba(245,158,11,0.35);font-size:11px;font-weight:700;padding:2px 7px;border-radius:4px;margin-right:4px;"><svg class="glyph" style="width:11px;height:11px;vertical-align:-1px;margin-right:3px;"><use href="#glyph-alert"></use></svg> UNRESOLVED UNCERTAINTY\1</span>'
         ),
     ]
     out = html_text
@@ -115,7 +116,7 @@ def format_citations_section(citations: list[dict], stock_data: dict = None) -> 
         return ""
 
     lines = [
-        "\n\n### 📚 Verified Regulatory Sources & Footnote Citations",
+        "\n\n### Verified Regulatory Sources & Footnote Citations",
         "*All qualitative findings, corporate governance audits, and strategic disclosures in this report are grounded in primary exchange filings and verified public intelligence under SEBI statutory safe-harbor standards:*\n"
     ]
     seen = set()
@@ -277,9 +278,9 @@ def wrap_html_with_collapsible_pillars(
 
         if p_num in (3, 5):
             if is_deep_dive_unlocked:
-                status_pill_html = '<span class="badge badge-emerald" style="font-size: 11px;">🔓 Unlocked</span>'
+                status_pill_html = '<span class="badge badge-emerald" style="font-size: 11px;"><svg class="glyph" style="width:11px;height:11px;vertical-align:-1px;margin-right:3px;"><use href="#glyph-shield"></use></svg>Unlocked</span>'
             else:
-                status_pill_html = '<span class="badge" style="background: rgba(245, 158, 11, 0.15); color: #fbbf24; border: 1px solid rgba(245, 158, 11, 0.3); font-size: 11px;">🔒 Gated (1 Credit)</span>'
+                status_pill_html = '<span class="badge" style="background: rgba(245, 158, 11, 0.15); color: #fbbf24; border: 1px solid rgba(245, 158, 11, 0.3); font-size: 11px;"><svg class="glyph" style="width:11px;height:11px;vertical-align:-1px;margin-right:3px;"><use href="#icon-lock"></use></svg>Gated (1 Credit)</span>'
                 
                 # Split body into introductory teaser paragraph and locked remainder
                 teaser = ""
@@ -302,23 +303,23 @@ def wrap_html_with_collapsible_pillars(
   </div>
   <div class="gated-paywall-overlay">
     <div class="gated-badge">
-      🔒 Accounting Check
+      <svg class="glyph" style="width:12px;height:12px;vertical-align:-1px;margin-right:4px;"><use href="#icon-lock"></use></svg>Accounting Check
     </div>
     <h4 class="gated-title">
-      Balance Sheet & Forensic Accounting Ledger
+      Balance Sheet &amp; Forensic Accounting Ledger
     </h4>
     <p class="gated-desc">
       Unlock Beneish M-Score accrual scrubbing, related-party cash extraction audits, promoter pledging risk, and off-balance sheet contingent liability headroom.
     </p>
     <div class="gated-features-grid">
-      <span class="badge gated-feature-chip">🛡️ Beneish M-Score Accrual Model</span>
-      <span class="badge gated-feature-chip">🔍 Related-Party Transaction Scrubbing</span>
-      <span class="badge gated-feature-chip">📊 Contingent Liability Headroom</span>
-      <span class="badge gated-feature-chip">🏛️ Promoter Pledging & Debt Run-Rate</span>
+      <span class="badge gated-feature-chip"><svg class="glyph" style="width:12px;height:12px;vertical-align:-1px;margin-right:4px;"><use href="#glyph-shield"></use></svg>Beneish M-Score Accrual Model</span>
+      <span class="badge gated-feature-chip"><svg class="glyph" style="width:12px;height:12px;vertical-align:-1px;margin-right:4px;"><use href="#glyph-search"></use></svg>Related-Party Transaction Scrubbing</span>
+      <span class="badge gated-feature-chip"><svg class="glyph" style="width:12px;height:12px;vertical-align:-1px;margin-right:4px;"><use href="#glyph-chart"></use></svg>Contingent Liability Headroom</span>
+      <span class="badge gated-feature-chip"><svg class="glyph" style="width:12px;height:12px;vertical-align:-1px;margin-right:4px;"><use href="#glyph-temple"></use></svg>Promoter Pledging &amp; Debt Run-Rate</span>
     </div>
     <div class="gated-action-row">
       <button type="button" class="btn btn-primary" onclick="unlockDeepDive('{t_clean}')">
-        <span>🔓</span> Unlock Full Accounting Ledger (1 Credit)
+        <svg class="glyph" style="width:14px;height:14px;vertical-align:-2px;margin-right:4px;"><use href="#icon-lock"></use></svg> Unlock Full Accounting Ledger (1 Credit)
       </button>
     </div>
     <div class="gated-subtext">
@@ -339,23 +340,23 @@ def wrap_html_with_collapsible_pillars(
   </div>
   <div class="gated-paywall-overlay">
     <div class="gated-badge">
-      🔒 Valuation & Reverse DCF Sandbox
+      <svg class="glyph" style="width:12px;height:12px;vertical-align:-1px;margin-right:4px;"><use href="#icon-lock"></use></svg>Valuation &amp; Reverse DCF Sandbox
     </div>
     <h4 class="gated-title">
-      Reverse DCF Sensitivity Sandbox & Valuation Model
+      Reverse DCF Sensitivity Sandbox &amp; Valuation Model
     </h4>
     <p class="gated-desc">
       Stress-test current price expectations against Reverse DCF implied Free Cash Flow growth, multi-scenario terminal multiples, and cost of capital (WACC) hurdle matrices.
     </p>
     <div class="gated-features-grid">
-      <span class="badge gated-feature-chip">🎯 Reverse DCF Implied Cash Flow Growth</span>
-      <span class="badge gated-feature-chip">📐 Multi-Scenario Terminal Multiple Matrix</span>
-      <span class="badge gated-feature-chip">📉 Margin of Safety Intrinsic Discount Table</span>
-      <span class="badge gated-feature-chip">🔄 Historical Valuation Band Normalization</span>
+      <span class="badge gated-feature-chip"><svg class="glyph" style="width:12px;height:12px;vertical-align:-1px;margin-right:4px;"><use href="#icon-valuation"></use></svg>Reverse DCF Implied Cash Flow Growth</span>
+      <span class="badge gated-feature-chip"><svg class="glyph" style="width:12px;height:12px;vertical-align:-1px;margin-right:4px;"><use href="#glyph-scale"></use></svg>Multi-Scenario Terminal Multiple Matrix</span>
+      <span class="badge gated-feature-chip"><svg class="glyph" style="width:12px;height:12px;vertical-align:-1px;margin-right:4px;"><use href="#glyph-chart"></use></svg>Margin of Safety Intrinsic Discount Table</span>
+      <span class="badge gated-feature-chip"><svg class="glyph" style="width:12px;height:12px;vertical-align:-1px;margin-right:4px;"><use href="#icon-compare"></use></svg>Historical Valuation Band Normalization</span>
     </div>
     <div class="gated-action-row">
       <button type="button" class="btn btn-primary" onclick="unlockDeepDive('{t_clean}')">
-        <span>🔓</span> Unlock Reverse DCF Sandbox (1 Credit)
+        <svg class="glyph" style="width:14px;height:14px;vertical-align:-2px;margin-right:4px;"><use href="#icon-lock"></use></svg> Unlock Reverse DCF Sandbox (1 Credit)
       </button>
     </div>
     <div class="gated-subtext">
@@ -376,10 +377,11 @@ def wrap_html_with_collapsible_pillars(
             7: "[VERIFIED FACT]",
         }.get(p_num, "[VERIFIED FACT]")
 
+        open_label = label if str(label).upper().startswith("BSE ") else f"BSE {label}"
         if has_valid_scrip:
             citation_strip_html = (
                 f'<div style="display: flex; align-items: center; gap: 8px; flex-wrap: wrap;">'
-                f'<span>📡</span>'
+                f'<svg class="glyph" style="width:14px;height:14px;color:#38bdf8;flex-shrink:0;"><use href="#icon-radar"></use></svg>'
                 f'{pillar_epistemic_tag}'
                 f'<span><strong>Primary Exchange Source:</strong> '
                 f'<a href="{url}" target="_blank" rel="noopener noreferrer" class="pillar-citation-link">{name}</a> '
@@ -387,11 +389,13 @@ def wrap_html_with_collapsible_pillars(
                 f'</div>'
                 f'<a href="{url}" target="_blank" rel="noopener noreferrer" class="btn btn-secondary btn-sm" '
                 f'style="font-size: 11.5px; padding: 4px 10px; font-weight: 600; text-decoration: none;" onclick="event.stopPropagation()">'
-                f'📄 Open BSE {label} ↗</a>'
+                f'<svg class="glyph" style="width:13px;height:13px;vertical-align:-2px;margin-right:4px;"><use href="#icon-doc"></use></svg>Open {open_label} ↗</a>'
             )
         else:
             citation_strip_html = (
-                f'<span>📡 {pillar_epistemic_tag} <strong>Primary Exchange Source:</strong> '
+                f'<span style="display: inline-flex; align-items: center; gap: 6px; flex-wrap: wrap;">'
+                f'<svg class="glyph" style="width:14px;height:14px;color:#38bdf8;flex-shrink:0;"><use href="#icon-radar"></use></svg> '
+                f'{pillar_epistemic_tag} <strong>Primary Exchange Source:</strong> '
                 'BSE scrip code not yet resolved for this company, so no exchange link is shown.</span>'
             )
 
@@ -550,12 +554,12 @@ def wrap_fund_dossier_with_collapsible_dimensions(
         }.get(d_num, "[VERIFIED FACT]")
 
         citation_strip_html = f"""<div style="display: flex; align-items: center; gap: 8px; flex-wrap: wrap;">
-        <span>📡</span>
+        <svg class="glyph" style="width:14px;height:14px;color:#38bdf8;flex-shrink:0;"><use href="#icon-radar"></use></svg>
         {dim_epistemic_tag}
         <span><strong>Regulatory Grounding:</strong> <span class="pillar-citation-link">{citation_source}</span> — {citation_desc}</span>
       </div>
       <a href="{doc_url}" target="_blank" rel="noopener noreferrer" class="btn btn-secondary btn-sm" style="font-size: 11.5px; padding: 4px 10px; font-weight: 600; text-decoration: none;" onclick="event.stopPropagation()">
-        📄 {doc_label} ↗
+        <svg class="glyph" style="width:13px;height:13px;vertical-align:-2px;margin-right:4px;"><use href="#icon-doc"></use></svg>{doc_label} ↗
       </a>"""
 
         card = f"""<details class="pillar-accordion" id="fund-dimension-{d_num}" open>

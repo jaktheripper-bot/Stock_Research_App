@@ -333,6 +333,34 @@
       <symbol id="icon-reading-surface" viewBox="0 0 24 24">
         <path d="M4 5.5A2.5 2.5 0 0 1 6.5 3H12v16H6.5A2.5 2.5 0 0 0 4 21.5V5.5Zm16 0A2.5 2.5 0 0 0 17.5 3H12v16h5.5a2.5 2.5 0 0 1 2.5 2.5V5.5Z" fill="none" stroke="currentColor" stroke-width="1.85" stroke-linejoin="round"/>
       </symbol>
+      <symbol id="glyph-clock" viewBox="0 0 24 24">
+        <circle cx="12" cy="12" r="9" fill="none" stroke="currentColor" stroke-width="1.85"/>
+        <path d="M12 7v5l3 2" fill="none" stroke="currentColor" stroke-width="1.85" stroke-linecap="round"/>
+      </symbol>
+      <symbol id="glyph-refresh" viewBox="0 0 24 24">
+        <path d="M21 12a9 9 0 0 0-9-9 9.75 9.75 0 0 0-6.74 2.74L3 8" fill="none" stroke="currentColor" stroke-width="1.85" stroke-linecap="round" stroke-linejoin="round"/>
+        <path d="M3 3v5h5" fill="none" stroke="currentColor" stroke-width="1.85" stroke-linecap="round" stroke-linejoin="round"/>
+        <path d="M3 12a9 9 0 0 0 9 9 9.75 9.75 0 0 0 6.74-2.74L21 16" fill="none" stroke="currentColor" stroke-width="1.85" stroke-linecap="round" stroke-linejoin="round"/>
+        <path d="M16 16h5v5" fill="none" stroke="currentColor" stroke-width="1.85" stroke-linecap="round" stroke-linejoin="round"/>
+      </symbol>
+      <symbol id="glyph-lock" viewBox="0 0 24 24">
+        <rect x="5" y="11" width="14" height="9" rx="2" fill="none" stroke="currentColor" stroke-width="1.85"/>
+        <path d="M8 11V7a4 4 0 0 1 8 0v4" fill="none" stroke="currentColor" stroke-width="1.85"/>
+      </symbol>
+      <symbol id="glyph-check" viewBox="0 0 24 24">
+        <path d="M20 6 9 17l-5-5" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+      </symbol>
+      <symbol id="glyph-doc" viewBox="0 0 24 24">
+        <path d="M6 3h9l4 4v13a1 1 0 0 1-1 1H6a1 1 0 0 1-1-1V4a1 1 0 0 1 1-1Z" fill="none" stroke="currentColor" stroke-width="1.85"/>
+        <path d="M9 12h6M9 16h6M9 8h3" fill="none" stroke="currentColor" stroke-width="1.85" stroke-linecap="round"/>
+      </symbol>
+      <symbol id="glyph-building" viewBox="0 0 24 24">
+        <path d="M4 20V5a1 1 0 0 1 1-1h9a1 1 0 0 1 1 1v15M15 10h4a1 1 0 0 1 1 1v9M2 20h20" fill="none" stroke="currentColor" stroke-width="1.85" stroke-linecap="round"/>
+        <path d="M8 8h3M8 12h3M8 16h3" fill="none" stroke="currentColor" stroke-width="1.85" stroke-linecap="round"/>
+      </symbol>
+      <symbol id="icon-chat" viewBox="0 0 24 24">
+        <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z" fill="none" stroke="currentColor" stroke-width="1.85" stroke-linejoin="round"/>
+      </symbol>
     </defs>
   </svg>
 
@@ -577,7 +605,7 @@
       </div>
 
       <div id="modalIntlNotice" style="display: none; margin-bottom: 14px; padding: 9px 12px; background: rgba(14, 165, 233, 0.08); border: 1px solid rgba(14, 165, 233, 0.2); border-radius: 6px; font-size: 11.5px; color: var(--text-secondary); line-height: 1.45;">
-        🌐 <strong>International Card Notice:</strong> Razorpay processes transactions in INR (₹). Your bank automatically converts this to your card's billing currency with estimated fees included in the conversion preview.
+        <svg class="glyph" style="width:12px;height:12px;vertical-align:-1px;margin-right:4px;"><use href="#glyph-globe"></use></svg><strong>International Card Notice:</strong> Razorpay processes transactions in INR (₹). Your bank automatically converts this to your card's billing currency with estimated fees included in the conversion preview.
       </div>
 
       <button id="modalConfirmBtn" class="btn btn-primary" style="width: 100%; padding: 14px; font-size: 15px; margin-bottom: 10px;">
@@ -592,7 +620,7 @@
       </div>
 
       <div style="text-align: center; font-size: 11px; color: var(--text-muted);">
-        🔒 256-bit encrypted checkout via Razorpay • Instant electronic receipt
+        <svg class="glyph" style="width:11px;height:11px;vertical-align:-1px;margin-right:3px;"><use href="#icon-lock"></use></svg>256-bit encrypted checkout via Razorpay • Instant electronic receipt
       </div>
     </div>
   </div>
@@ -606,7 +634,7 @@
       </div>
 
       <div style="background: rgba(16, 185, 129, 0.1); border-left: 3px solid var(--accent-emerald); padding: 12px; border-radius: 6px; margin-bottom: 20px; font-size: 13px; color: var(--accent-emerald);">
-        🎁 <strong>Welcome Bonus:</strong> 2 Free Research Credits granted instantly upon sign-in.
+        <svg class="glyph" style="width:13px;height:13px;vertical-align:-2px;margin-right:4px;"><use href="#glyph-coin"></use></svg><strong>Welcome Bonus:</strong> 2 Free Research Credits granted instantly upon sign-in.
       </div>
 
       <!-- Google OAuth Sign-in -->
@@ -638,7 +666,7 @@
             style="width: 100%; padding: 12px 14px; background: rgba(15, 23, 42, 0.8); border: 1px solid var(--border-color); border-radius: 8px; color: var(--text-primary); font-size: 16px; box-sizing: border-box;"
           >
           <div id="authEmailError" class="field-error-msg">
-            <span aria-hidden="true">❌</span> Please enter a valid email address.
+            <span aria-hidden="true">✕</span> Please enter a valid email address.
           </div>
         </div>
 
@@ -670,7 +698,7 @@
       </form>
 
       <div style="text-align: center; margin-top: 16px; font-size: 11px; color: var(--text-muted);">
-        🔒 Safe-Harbor Privacy: No personal financial or bank credentials collected.
+        <svg class="glyph" style="width:11px;height:11px;vertical-align:-1px;margin-right:3px;"><use href="#icon-lock"></use></svg>Safe-Harbor Privacy: No personal financial or bank credentials collected.
       </div>
     </div>
   </div>
@@ -757,7 +785,7 @@
       </div>
 
       <div style="background: rgba(14, 61, 50, 0.25); border: 1px solid rgba(125, 167, 122, 0.25); border-radius: 8px; padding: 10px 14px; font-size: 12px; color: var(--accent-cyan); display: flex; align-items: center; justify-content: center; gap: 6px;">
-        <span>⏳</span> <span id="overlayCalloutText">Live analytical pipeline active. Average compilation time: ~20–30s.</span>
+        <svg class="glyph" style="width:13px;height:13px;"><use href="#icon-radar"></use></svg> <span id="overlayCalloutText">Live analytical pipeline active. Average compilation time: ~20–30s.</span>
       </div>
     </div>
   </div>
@@ -783,13 +811,13 @@
       <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-bottom: 24px; font-size: 12px;">
         <div style="background: rgba(30, 41, 59, 0.5); border: 1px solid rgba(255, 255, 255, 0.08); border-radius: 8px; padding: 10px 12px;">
           <div style="display: flex; align-items: center; gap: 6px; font-weight: 700; color: #38bdf8; margin-bottom: 2px;">
-            <span>🟢</span> 5-Min BSE Watcher
+            <span class="status-dot status-dot-emerald"></span> 5-Min BSE Watcher
           </div>
           <div style="color: #94a3b8; font-size: 11px;">Scans filings for promoter pledge & auditor changes</div>
         </div>
         <div style="background: rgba(30, 41, 59, 0.5); border: 1px solid rgba(255, 255, 255, 0.08); border-radius: 8px; padding: 10px 12px;">
           <div style="display: flex; align-items: center; gap: 6px; font-weight: 700; color: #10b981; margin-bottom: 2px;">
-            <span>🟢</span> 23:30 IST Fund Auditor
+            <span class="status-dot status-dot-emerald"></span> 23:30 IST Fund Auditor
           </div>
           <div style="color: #94a3b8; font-size: 11px;">Nightly rotational look-through & style drift audit</div>
         </div>
@@ -841,7 +869,7 @@
             <li><a href="/opportunities">Opportunity Terminal</a></li>
             <li><a href="/funds">Mutual Funds Look-Through</a></li>
             <li><a href="/pricing">Pricing & Credit Packs</a></li>
-            <li><a href="/admin">🔐 Executive Admin Hub</a></li>
+            <li><a href="/admin"><svg class="glyph" style="width:12px;height:12px;vertical-align:-1px;margin-right:4px;"><use href="#icon-lock"></use></svg>Executive Admin Hub</a></li>
           </ul>
         </div>
 

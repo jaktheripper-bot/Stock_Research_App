@@ -528,7 +528,6 @@ class AngelOneGateway:
             return ""
         imb = quote_data.get("order_imbalance_ratio", 0.0)
         regime = "Accumulation" if imb > 0.20 else ("Distribution Pressure" if imb < -0.20 else "Balanced Depth")
-        badge_color = "🟢" if imb > 0.20 else ("🔴" if imb < -0.20 else "⚪")
         uc = quote_data.get("upper_circuit", 0.0)
         lc = quote_data.get("lower_circuit", 0.0)
         ltp = quote_data.get("ltp", 0.0)
@@ -539,7 +538,7 @@ class AngelOneGateway:
             circuit_info = f" | **Circuit Bands:** ₹{lc:,.2f} / ₹{uc:,.2f} (+{uc_dist:.1f}% to UC)"
 
         return (
-            f"\n> **{badge_color} Exchange Level-2 Depth:** `{regime}` (Order Imbalance: {imb:+.2f}){circuit_info}  \n"
+            f"\n> **Exchange Level-2 Depth:** `{regime}` (Order Imbalance: {imb:+.2f}){circuit_info}  \n"
             f"> *Source: Official Exchange Live Feed*\n"
         )
 

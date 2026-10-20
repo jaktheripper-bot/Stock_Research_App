@@ -110,7 +110,7 @@ class GarudaReflexEngine:
 
         # Create structured markdown bulletin snippet
         date_str = clean_date if clean_date else datetime.now().strftime("%Y-%m-%d")
-        badge_urgency = "🔴 CRITICAL NOTICE" if urgency == "IMMEDIATE_REFRESH" else "🔵 REGULATORY UPDATE"
+        badge_urgency = "CRITICAL NOTICE" if urgency == "IMMEDIATE_REFRESH" else "REGULATORY UPDATE"
         
         snippet = (
             f"\n> **{badge_urgency} ({date_str})** — `{clean_symbol}`  \n"

@@ -229,13 +229,13 @@ def render_bouquet_html(bouquet: Dict[str, Any], subscriber: Optional[Dict[str, 
 
       <!-- Section: Equities -->
       <div class="section-title">
-        <span>📈</span> Today's Under-The-Radar Equity Discovery Picks
+        Today's Under-The-Radar Equity Discovery Picks
       </div>
       {equities_html}
 
       <!-- Section: Sovereign Debt -->
       <div class="section-title">
-        <span>🏛️</span> Sovereign Par Curve & Macro Wedge
+        Sovereign Par Curve &amp; Macro Wedge
       </div>
       <div class="card">
         <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;">
@@ -252,7 +252,7 @@ def render_bouquet_html(bouquet: Dict[str, Any], subscriber: Optional[Dict[str, 
 
       <!-- Section: Mutual Fund Look-Through -->
       <div class="section-title">
-        <span>🛡️</span> Mutual Fund Look-Through Spotlight
+        Mutual Fund Look-Through Spotlight
       </div>
       <div class="card">
         <div style="font-weight: 700; font-size: 13.5px; color: #0f172a; margin-bottom: 4px;">
