@@ -1678,5 +1678,21 @@
       "revision_count": 274
     },
     "preflight_passed": true
+  },
+  {
+    "tag": "checkpoint_20261020_201303_brand_voice_site_and_report_copy",
+    "timestamp": "2026-10-20 20:13:03 IST",
+    "commit_sha": "137a2efffb785af3080f6a343b62090f91c6336f",
+    "branch": "main",
+    "description": "brand_voice_site_and_report_copy",
+    "database": {
+      "exists": true,
+      "filename": "reports_checkpoint_20261020_201303_brand_voice_site_and_report_copy.db",
+      "path": ".checkpoints/reports_checkpoint_20261020_201303_brand_voice_site_and_report_copy.db",
+      "size_bytes": 22450176,
+      "report_count": 196,
+      "revision_count": 428
+    },
+    "preflight_passed": false
   }
 ]

@@ -10,7 +10,7 @@
 
 | Checkpoint Tag | IST Timestamp | Commit | DB Reports | Description |
 |:---|:---|:---|:---|:---|
-| `checkpoint_20261020_201303_brand_voice_site_and_report_copy` | 2026-10-20 20:13:03 IST | `7a73df2` | 196 rep / 428 rev | brand_voice_site_and_report_copy |
+| `checkpoint_20261020_201303_brand_voice_site_and_report_copy` | 2026-10-20 20:13:03 IST | `137a2ef` | 196 rep / 428 rev | brand_voice_site_and_report_copy |
 | `checkpoint_20261020_002204_homepage_plain_language_trust_and_brand_alignment` | 2026-10-20 00:22:04 IST | `cec355c` | 166 rep / 274 rev | homepage_plain_language_trust_and_brand_alignment |
 | `checkpoint_20261019_231255_brand_voice_test_assertion_harmonization` | 2026-10-19 23:12:55 IST | `6d14570` | 166 rep / 274 rev | brand_voice_test_assertion_harmonization |
 | `checkpoint_20261019_101236_admin_ticket_reply_ajax_spa_upgrade` | 2026-10-19 10:12:36 IST | `fd76ad4` | 166 rep / 274 rev | admin_ticket_reply_ajax_spa_upgrade |
