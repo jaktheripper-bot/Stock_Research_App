@@ -1694,5 +1694,21 @@
       "revision_count": 428
     },
     "preflight_passed": false
+  },
+  {
+    "tag": "checkpoint_20261020_205726_brand_voice_backend_names_and_social_wiring",
+    "timestamp": "2026-10-20 20:57:26 IST",
+    "commit_sha": "ed26776d6044276389d11f1a9a63d32c6f7e96df",
+    "branch": "main",
+    "description": "brand_voice_backend_names_and_social_wiring",
+    "database": {
+      "exists": true,
+      "filename": "reports_checkpoint_20261020_205726_brand_voice_backend_names_and_social_wiring.db",
+      "path": ".checkpoints/reports_checkpoint_20261020_205726_brand_voice_backend_names_and_social_wiring.db",
+      "size_bytes": 22450176,
+      "report_count": 196,
+      "revision_count": 428
+    },
+    "preflight_passed": false
   }
 ]

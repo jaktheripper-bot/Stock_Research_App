@@ -1,6 +1,6 @@
 # Production Release Checkpoints & Disaster Recovery Ledger
 **Last Checkpoint:** 2026-10-20 20:57:26 IST  
-**Total Verified Rollback Points:** 108  
+**Total Verified Rollback Points:** 107  
 
 > [!NOTE]
 > These checkpoints represent byte-for-byte verified working releases that passed the 4-tier pre-flight audit.
@@ -11,7 +11,6 @@
 | Checkpoint Tag | IST Timestamp | Commit | DB Reports | Description |
 |:---|:---|:---|:---|:---|
 | `checkpoint_20261020_205726_brand_voice_backend_names_and_social_wiring` | 2026-10-20 20:57:26 IST | `fbd0b3f` | 196 rep / 428 rev | brand_voice_backend_names_and_social_wiring |
-| `checkpoint_20261020_205708_brand_voice_backend_names_and_social_wiring` | 2026-10-20 20:57:08 IST | `fbd0b3f` | 196 rep / 428 rev | brand_voice_backend_names_and_social_wiring |
 | `checkpoint_20261020_201303_brand_voice_site_and_report_copy` | 2026-10-20 20:13:03 IST | `137a2ef` | 196 rep / 428 rev | brand_voice_site_and_report_copy |
 | `checkpoint_20261020_002204_homepage_plain_language_trust_and_brand_alignment` | 2026-10-20 00:22:04 IST | `cec355c` | 166 rep / 274 rev | homepage_plain_language_trust_and_brand_alignment |
 | `checkpoint_20261019_231255_brand_voice_test_assertion_harmonization` | 2026-10-19 23:12:55 IST | `6d14570` | 166 rep / 274 rev | brand_voice_test_assertion_harmonization |
