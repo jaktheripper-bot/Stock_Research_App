@@ -60,15 +60,15 @@ _FORBIDDEN_WORD_BOUNDARY_RE = re.compile(
     r"is\s+(?:it|this)\s+(?:a\s+)?(?:good|strong)\s+(?:buy|investment|entry)|"
     r"is\s+this\s+stock\s+a\s+(?:good|strong)\s+buy|"
     r"good\s+time\s+to\s+(?:buy|sell|enter|invest)|"
-    r"strong\s+(?:buy|sell)|buy\s+rating|sell\s+rating|buy\s+or\s+sell|investment\s+recommendation|"
-    r"target\s+price|price\s+target|tomorrow\s+target|"
+    r"strong\s+(?:buy|sell)|buy\s+rating|sell\s+rating|buy\s+or\s+sell|(?:investment|buy|sell|stock)\s+recommendations?|"
+    r"target\s+price|price\s+target|buy\s+target|tomorrow\s+target|"
     r"stock\s+tips?|give\s+me\s+a?\s*tips?|buy\s+tips?|intraday\s+tips?|"
     r"multibaggers?|intraday\s+(?:call|trade|pick)|"
     r"stop\s*loss|stoploss|entry\s+price|exit\s+price|buy\s+call|sell\s+call|"
     r"which\s+(?:stock|fund|etf|reit)\s+to\s+buy|"
     r"best\s+(?:stock|fund|etf|reit)\s+to\s+buy|"
     r"recommend\s+me|"
-    r"guaranteed\s+returns?|jackpot\s+stocks?|sure\s+shot"
+    r"guaranteed\s+(?:returns?|profits?|gains?|multibaggers?|upside|doubling)|jackpot\s+stocks?|sure\s+shot"
     r")\b",
     re.IGNORECASE,
 )
@@ -1393,8 +1393,9 @@ def build_debt_deterministic_response(
 
     has_explicit_debt_msg = any(k in msg for k in [
         "covenant", "acr", "asset coverage", "coverage", "dscr", "headroom",
+        "guarantee", "guaranteed", "collateral", "indenture", "security charge",
         "contagion", "radar", "group", "systemic", "cross-default", "parent",
-        "seniority", "recovery", "liquidation", "tier", "recourse",
+        "seniority", "recovery", "liquidation", "tier", "recourse", "unsecured", "secured",
         "ytm", "duration"
     ])
 
@@ -1472,7 +1473,7 @@ def build_debt_deterministic_response(
             "**Analytical Implication:** Tracks cross-default clauses, parent-subsidiary guarantees, and parent equity pledge/leverage signals.\n\n"
             "Would you like to review recovery seniority or YTM profile?"
         )
-    elif any(k in msg for k in ["covenant", "acr", "asset coverage", "coverage", "dscr", "headroom"]) or (not has_explicit_debt_msg and sec in ["covenants", "asset_coverage"]):
+    elif any(k in msg for k in ["covenant", "acr", "asset coverage", "coverage", "dscr", "headroom", "guarantee", "guaranteed", "collateral", "indenture", "security charge"]) or (not has_explicit_debt_msg and sec in ["covenants", "asset_coverage"]):
         return (
             f"**Asset Coverage & Covenant Headroom for {name}:**\n\n"
             f"- Credit Rating: {context_data.get('credit_rating', 'N/A')}\n"
@@ -1977,8 +1978,8 @@ def build_equity_deterministic_response(
     cmp_display = f"{float(cmp_val):,.2f}" if isinstance(cmp_val, (int, float)) or (isinstance(cmp_val, str) and cmp_val.replace('.', '', 1).isdigit()) else str(cmp_val)
     pe_display = f"{float(pe_val):.2f}x" if isinstance(pe_val, (int, float)) or (isinstance(pe_val, str) and pe_val.replace('.', '', 1).isdigit()) else str(pe_val)
 
-    # 0. Regulatory & Advisory Safe-Harbor Guardrail
-    if any(k in msg for k in ["should i buy", "should i sell", "buy target", "guaranteed", "price target", "target price", "recommendation", "multibagger", "stock tip"]):
+    # 0. Regulatory & Advisory Safe-Harbor Guardrail (Word-boundary phrase check; never false-positives on 'debt guaranteed by parent' or 'covenant guarantee')
+    if detect_forbidden_intent(user_message):
         return (
             f"**SEBI Regulatory Non-Advisory Notice for {name}:**\n\n"
             f"Under SEBI (Research Analysts) Regulations 2014 Section 2(u), this platform provides purely educational, diagnostic, and deterministic research. "
@@ -2189,7 +2190,8 @@ def build_equity_deterministic_response(
     msg_matches_solvency = any(
         k in msg for k in [
             "solvency", "altman", "z-score", "balance sheet", "debt",
-            "leverage", "liquidity", "d/e", "interest coverage", "headroom", "cash"
+            "leverage", "liquidity", "d/e", "interest coverage", "headroom", "cash",
+            "covenant", "guarantee", "guaranteed", "contingent", "collateral"
         ]
     ) and not msg_matches_governance
     msg_matches_moat = any(

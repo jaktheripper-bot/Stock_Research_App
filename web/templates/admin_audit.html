@@ -21,16 +21,16 @@
 
         <div style="display: flex; align-items: center; gap: 0.5rem; flex-wrap: wrap;">
             <a href="/" class="btn" style="background: rgba(30, 41, 59, 0.6); color: #cbd5e1; border: 1px solid rgba(255, 255, 255, 0.08); padding: 0.45rem 0.75rem; border-radius: 6px; font-size: 0.8rem; font-weight: 600; text-decoration: none; display: inline-flex; align-items: center; gap: 0.35rem;">
-                🌐 Platform Home
+                <svg class="glyph" style="width: 13px; height: 13px;"><use href="#glyph-globe"></use></svg> Platform Home
             </a>
             <a href="/equities" class="btn" style="background: rgba(30, 41, 59, 0.6); color: #cbd5e1; border: 1px solid rgba(255, 255, 255, 0.08); padding: 0.45rem 0.75rem; border-radius: 6px; font-size: 0.8rem; font-weight: 600; text-decoration: none; display: inline-flex; align-items: center; gap: 0.35rem;">
-                📈 Equities
+                <svg class="glyph" style="width: 13px; height: 13px;"><use href="#icon-markets"></use></svg> Equities
             </a>
             <a href="/opportunities" class="btn" style="background: rgba(30, 41, 59, 0.6); color: #cbd5e1; border: 1px solid rgba(255, 255, 255, 0.08); padding: 0.45rem 0.75rem; border-radius: 6px; font-size: 0.8rem; font-weight: 600; text-decoration: none; display: inline-flex; align-items: center; gap: 0.35rem;">
-                🎯 Opportunities
+                <svg class="glyph" style="width: 13px; height: 13px;"><use href="#glyph-zap"></use></svg> Opportunities
             </a>
             <a href="/contact" class="btn" style="background: rgba(30, 41, 59, 0.6); color: #cbd5e1; border: 1px solid rgba(255, 255, 255, 0.08); padding: 0.45rem 0.75rem; border-radius: 6px; font-size: 0.8rem; font-weight: 600; text-decoration: none; display: inline-flex; align-items: center; gap: 0.35rem;">
-                🎧 Grievances Desk
+                <svg class="glyph" style="width: 13px; height: 13px;"><use href="#icon-support"></use></svg> Grievances Desk
             </a>
         </div>
     </div>
@@ -38,40 +38,40 @@
     <!-- Admin Operational Tabs Navigation Bar -->
     <div class="admin-tabs" style="margin-bottom: 1.5rem;">
         <a href="/admin?tab=billables" class="admin-tab-btn">
-            💳 Live Billables &amp; Inflow
+            <svg class="glyph" style="width: 13px; height: 13px;"><use href="#glyph-coin"></use></svg> Live Billables &amp; Inflow
         </a>
         <a href="/admin?tab=users" class="admin-tab-btn">
-            👤 User Accounts &amp; Usage
+            <svg class="glyph" style="width: 13px; height: 13px;"><use href="#icon-lock"></use></svg> User Accounts &amp; Usage
         </a>
         <a href="/admin?tab=tickets" class="admin-tab-btn">
-            📩 Service Inbox &amp; Tickets
+            <svg class="glyph" style="width: 13px; height: 13px;"><use href="#glyph-mail"></use></svg> Service Inbox &amp; Tickets
             {% if open_tickets_count and open_tickets_count > 0 %}
             <span class="admin-tab-badge">{{ open_tickets_count }}</span>
             {% endif %}
         </a>
         <a href="/admin?tab=traffic" class="admin-tab-btn">
-            🌐 Traffic &amp; Landing Pages
+            <svg class="glyph" style="width: 13px; height: 13px;"><use href="#glyph-globe"></use></svg> Traffic &amp; Landing Pages
         </a>
         <a href="/admin?tab=seo" class="admin-tab-btn">
-            🔎 SEO &amp; Search Visibility
+            <svg class="glyph" style="width: 13px; height: 13px;"><use href="#glyph-search"></use></svg> SEO &amp; Search Visibility
         </a>
         <a href="/admin?tab=journeys" class="admin-tab-btn">
-            🧭 Session Journeys
+            <svg class="glyph" style="width: 13px; height: 13px;"><use href="#icon-insights"></use></svg> Session Journeys
         </a>
         <a href="/admin?tab=telemetry" class="admin-tab-btn">
-            📜 Live Audit Stream
+            <svg class="glyph" style="width: 13px; height: 13px;"><use href="#icon-doc"></use></svg> Live Audit Stream
         </a>
         <a href="/admin?tab=team" class="admin-tab-btn">
-            👥 Team &amp; Access
+            <svg class="glyph" style="width: 13px; height: 13px;"><use href="#glyph-shield"></use></svg> Team &amp; Access
         </a>
         <a href="/admin?tab=audit" class="admin-tab-btn">
             <svg class="glyph" style="width: 13px; height: 13px;"><use href="#glyph-shield"></use></svg> Admin Audit Trail
         </a>
         <a href="/admin?tab=assets" class="admin-tab-btn">
-            📡 Asset Surveillance
+            <svg class="glyph" style="width: 13px; height: 13px;"><use href="#icon-radar"></use></svg> Asset Surveillance
         </a>
         <a href="/admin?tab=ai-spends" class="admin-tab-btn">
-            🤖 Gemini Spends &amp; AI Costs
+            <svg class="glyph" style="width: 13px; height: 13px;"><use href="#glyph-zap"></use></svg> Gemini Spends &amp; AI Costs
         </a>
         <a href="/admin/audit" class="admin-tab-btn active">
             <svg class="glyph" style="width: 13px; height: 13px;"><use href="#glyph-shield"></use></svg> Autonomous Project Auditor
@@ -81,23 +81,23 @@
     <!-- Breadcrumb & Top Bar -->
     <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1.5rem; flex-wrap: wrap; gap: 1rem;">
         <div>
-            <h1 style="font-size: 1.75rem; font-weight: 700; color: #f8fafc; margin: 0; letter-spacing: -0.02em; display: flex; align-items: center; gap: 0.75rem;">
+            <h1 style="font-size: 1.75rem; font-weight: 700; color: var(--text-primary, #f8fafc); margin: 0; letter-spacing: -0.02em; display: flex; align-items: center; gap: 0.75rem;">
                 <svg class="glyph"><use href="#glyph-shield"></use></svg> Autonomous Project Auditor
-                <span style="font-size: 0.75rem; font-weight: 600; padding: 0.2rem 0.6rem; border-radius: 9999px; background: rgba(14, 165, 233, 0.15); color: #38bdf8; border: 1px solid rgba(14, 165, 233, 0.3);">
+                <span style="font-size: 0.75rem; font-weight: 600; padding: 0.2rem 0.6rem; border-radius: 9999px; background: rgba(125, 167, 122, 0.16); color: var(--accent-lime, #C7E268); border: 1px solid rgba(199, 226, 104, 0.35);">
                     Continuous Health Engine
                 </span>
             </h1>
-            <p style="color: #94a3b8; font-size: 0.88rem; margin: 0.35rem 0 0 0;">
+            <p style="color: var(--text-secondary, #94a3b8); font-size: 0.88rem; margin: 0.35rem 0 0 0;">
                 Continuous automated multi-pillar auditing across Strategy &amp; SEBI Safe-Harbor, Code Implementation, and UI/UX.
             </p>
         </div>
 
         <div style="display: flex; gap: 0.75rem; align-items: center;">
-            <button id="btnRunQuickAudit" onclick="triggerAudit(false)" class="btn" style="background: rgba(30, 41, 59, 0.8); color: #f8fafc; border: 1px solid #334155; padding: 0.55rem 1rem; border-radius: 6px; font-size: 0.85rem; font-weight: 600; cursor: pointer; display: flex; align-items: center; gap: 0.5rem;">
+            <button id="btnRunQuickAudit" onclick="triggerAudit(false)" class="btn" style="background: var(--bg-secondary, rgba(14, 61, 50, 0.8)); color: var(--text-primary, #f8fafc); border: 1px solid var(--border-subtle, #334155); padding: 0.55rem 1rem; border-radius: 6px; font-size: 0.85rem; font-weight: 600; cursor: pointer; display: flex; align-items: center; gap: 0.5rem;">
                 <svg class="glyph"><use href="#glyph-zap"></use></svg> Fast Deterministic Audit
             </button>
-            <button id="btnRunFullAudit" onclick="triggerAudit(true)" class="btn btn-primary" style="background: #0ea5e9; color: #020617; border: none; padding: 0.55rem 1.15rem; border-radius: 6px; font-size: 0.85rem; font-weight: 700; cursor: pointer; display: flex; align-items: center; gap: 0.5rem;">
-                🧠 Full AI Cognitive Audit
+            <button id="btnRunFullAudit" onclick="triggerAudit(true)" class="btn btn-primary" style="background: var(--accent-lime, #C7E268); color: var(--color-ink, #0B2337); border: none; padding: 0.55rem 1.15rem; border-radius: 6px; font-size: 0.85rem; font-weight: 700; cursor: pointer; display: flex; align-items: center; gap: 0.5rem;">
+                <svg class="glyph" style="width: 14px; height: 14px;"><use href="#icon-insights"></use></svg> Full AI Cognitive Audit
             </button>
         </div>
     </div>
@@ -167,7 +167,7 @@
                 </span>
             </div>
             <div style="font-size: 0.75rem; color: #64748b; margin-top: 0.5rem;">
-                Dual-Binding DB (v001-v022) & AST Hygiene
+                Dual-Binding DB (v001-{{ (latest_migration_version or 'v033')[:4] }}) &amp; AST Hygiene
             </div>
         </div>
 
@@ -194,7 +194,7 @@
     {% else %}
     <div style="background: #0f172a; border: 1px solid #334155; border-radius: 8px; padding: 2rem; text-align: center; margin-bottom: 2rem;">
         <p style="color: #94a3b8; font-size: 1rem; margin-bottom: 1rem;">No project audit has been executed yet.</p>
-        <button onclick="triggerAudit(false)" class="btn btn-primary" style="background: #0ea5e9; color: #020617; font-weight: 700; padding: 0.6rem 1.25rem; border-radius: 6px;">
+        <button onclick="triggerAudit(false)" class="btn btn-primary" style="background: var(--accent-lime, #C7E268); color: var(--color-ink, #0B2337); font-weight: 700; padding: 0.6rem 1.25rem; border-radius: 6px;">
             Run Initial System Audit Now
         </button>
     </div>
@@ -210,7 +210,7 @@
             {% if latest_audit and latest_audit.recommendations %}
             <div style="background: #0f172a; border: 1px solid rgba(255,255,255,0.08); border-radius: 10px; padding: 1.5rem;">
                 <h2 style="font-size: 1.1rem; font-weight: 700; color: #f8fafc; margin: 0 0 1rem 0; display: flex; align-items: center; gap: 0.5rem;">
-                    📋 Active Remediation Checklist
+                    <svg class="glyph" style="width: 16px; height: 16px;"><use href="#glyph-shield"></use></svg> Active Remediation Checklist
                 </h2>
                 <div style="display: flex; flex-direction: column; gap: 0.75rem;">
                     {% for rec in latest_audit.recommendations %}
@@ -227,8 +227,8 @@
             {% if latest_audit and latest_audit.full_markdown_report %}
             <div style="background: #0f172a; border: 1px solid rgba(255,255,255,0.08); border-radius: 10px; padding: 1.5rem;">
                 <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem;">
-                    <h2 style="font-size: 1.1rem; font-weight: 700; color: #f8fafc; margin: 0;">
-                        📄 Latest Institutional Audit Dossier
+                    <h2 style="font-size: 1.1rem; font-weight: 700; color: #f8fafc; margin: 0; display: flex; align-items: center; gap: 0.5rem;">
+                        <svg class="glyph" style="width: 16px; height: 16px;"><use href="#icon-doc"></use></svg> Latest Institutional Audit Dossier
                     </h2>
                     <span style="font-size: 0.75rem; color: #64748b;">
                         {{ (latest_audit.created_at|string)[:19] }}
@@ -247,8 +247,8 @@
 
             <!-- Audit History Ledger -->
             <div style="background: #0f172a; border: 1px solid rgba(255,255,255,0.08); border-radius: 10px; padding: 1.5rem;">
-                <h2 style="font-size: 1.1rem; font-weight: 700; color: #f8fafc; margin: 0 0 1rem 0;">
-                    ⏱️ Audit Run Ledger
+                <h2 style="font-size: 1.1rem; font-weight: 700; color: #f8fafc; margin: 0 0 1rem 0; display: flex; align-items: center; gap: 0.5rem;">
+                    <svg class="glyph" style="width: 16px; height: 16px;"><use href="#icon-radar"></use></svg> Audit Run Ledger
                 </h2>
                 {% if audit_history %}
                 <div style="overflow-x: auto;">
@@ -290,19 +290,21 @@
 
             <!-- Probed Route Coverage -->
             <div style="background: #0f172a; border: 1px solid rgba(255,255,255,0.08); border-radius: 10px; padding: 1.5rem;">
-                <h2 style="font-size: 1.1rem; font-weight: 700; color: #f8fafc; margin: 0 0 1rem 0;">
-                    🌐 Monitored Route Coverage (25 Endpoints)
+                <h2 style="font-size: 1.1rem; font-weight: 700; color: #f8fafc; margin: 0 0 1rem 0; display: flex; align-items: center; gap: 0.5rem;">
+                    <svg class="glyph" style="width: 16px; height: 16px;"><use href="#glyph-globe"></use></svg> Monitored Route Coverage ({{ latest_audit.endpoints_checked if latest_audit else 35 }} Endpoints)
                 </h2>
                 <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 0.5rem; font-size: 0.8rem;">
                     <div style="background: rgba(30, 41, 59, 0.4); padding: 0.4rem 0.6rem; border-radius: 4px; color: #cbd5e1;"><code>/</code> (Terminal)</div>
-                    <div style="background: rgba(30, 41, 59, 0.4); padding: 0.4rem 0.6rem; border-radius: 4px; color: #cbd5e1;"><code>/discovery</code> (9 AM Reel)</div>
+                    <div style="background: rgba(30, 41, 59, 0.4); padding: 0.4rem 0.6rem; border-radius: 4px; color: #cbd5e1;"><code>/equities</code> (Equities Directory)</div>
                     <div style="background: rgba(30, 41, 59, 0.4); padding: 0.4rem 0.6rem; border-radius: 4px; color: #cbd5e1;"><code>/debt</code> (Listed NCDs)</div>
                     <div style="background: rgba(30, 41, 59, 0.4); padding: 0.4rem 0.6rem; border-radius: 4px; color: #cbd5e1;"><code>/funds</code> (Look-Through)</div>
+                    <div style="background: rgba(30, 41, 59, 0.4); padding: 0.4rem 0.6rem; border-radius: 4px; color: #cbd5e1;"><code>/funds/compare/overlap</code> (Overlap)</div>
                     <div style="background: rgba(30, 41, 59, 0.4); padding: 0.4rem 0.6rem; border-radius: 4px; color: #cbd5e1;"><code>/opportunities</code> (Terminal)</div>
                     <div style="background: rgba(30, 41, 59, 0.4); padding: 0.4rem 0.6rem; border-radius: 4px; color: #cbd5e1;"><code>/sovereign</code> (Par Curve)</div>
                     <div style="background: rgba(30, 41, 59, 0.4); padding: 0.4rem 0.6rem; border-radius: 4px; color: #cbd5e1;"><code>/reits</code> (Real Assets)</div>
                     <div style="background: rgba(30, 41, 59, 0.4); padding: 0.4rem 0.6rem; border-radius: 4px; color: #cbd5e1;"><code>/etfs</code> (Liquidity Matrix)</div>
                     <div style="background: rgba(30, 41, 59, 0.4); padding: 0.4rem 0.6rem; border-radius: 4px; color: #cbd5e1;"><code>/safety-radar</code> (Shadow P2P)</div>
+                    <div style="background: rgba(30, 41, 59, 0.4); padding: 0.4rem 0.6rem; border-radius: 4px; color: #cbd5e1;"><code>/tools/tax-calculator</code> (Tax Engine)</div>
                     <div style="background: rgba(30, 41, 59, 0.4); padding: 0.4rem 0.6rem; border-radius: 4px; color: #cbd5e1;"><code>/health</code> (System Uptime)</div>
                 </div>
             </div>
@@ -328,7 +330,7 @@ async function triggerAudit(useAi) {
     if (alertText) {
         alertText.textContent = useAi
             ? "Initiating Full AI Cognitive Audit (evaluating Strategy, Code & UI/UX)..."
-            : "Initiating Fast Deterministic Audit (testing 429+ assertions & probing 25+ routes)...";
+            : "Initiating Fast Deterministic Audit (testing {{ latest_audit.tests_total if latest_audit else 700 }}+ assertions & probing {{ latest_audit.endpoints_checked if latest_audit else 35 }}+ routes)...";
     }
 
     try {

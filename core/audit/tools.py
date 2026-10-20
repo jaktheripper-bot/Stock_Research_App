@@ -139,33 +139,65 @@ def tool_run_test_suite() -> Dict[str, Any]:
         }
 
 
+def get_latest_schema_migration_version() -> str:
+    """Queries the latest applied schema migration version from the database."""
+    try:
+        from core.db.connection import init_db, get_db_connection
+        init_db()
+        conn = get_db_connection()
+        cur = conn.cursor()
+        try:
+            cur.execute("SELECT version FROM schema_migrations ORDER BY version DESC LIMIT 1")
+            row = cur.fetchone()
+            if row:
+                return str(row[0] if not hasattr(row, "keys") else row["version"])
+        finally:
+            cur.close()
+            conn.close()
+    except Exception as e:
+        logger.warning("Could not query latest schema migration version: %s", e)
+    return "v033_reading_depth_and_study_timer"
+
+
 def tool_probe_web_endpoints(base_url: Optional[str] = None) -> Dict[str, Any]:
     """Probes critical FastAPI endpoints and validates HTTP 200 status, latency, and HTML structure."""
     from fastapi.testclient import TestClient
     from web.main import app
 
-    client = TestClient(app, raise_server_exceptions=False)
+    probe_headers = {"User-Agent": "testclient-project-auditor"}
 
     routes_to_test = [
-        # Core views
+        # Core & Multi-Asset Views (25 HTML views)
         ("/", "GET", "Home / Terminal"),
         ("/discovery", "GET", "9 AM Morning Discovery Reel"),
-        ("/debt", "GET", "Corporate Fixed-Income Directory"),
+        ("/equities", "GET", "Institutional Equities Directory"),
+        ("/dossier/INFY", "GET", "7-Pillar Equity Dossier"),
+        ("/compare", "GET", "Peer Comparison Matrix"),
+        ("/search?q=INFY", "GET", "Global Asset Search Results"),
+        ("/opportunities", "GET", "Cross-Asset Opportunity Terminal"),
+        ("/safety-radar", "GET", "Alternative Yield Safety Radar"),
         ("/funds", "GET", "Mutual Fund Forensic Terminal"),
         ("/funds/PPFAS_FLEXICAP_DIR", "GET", "Fund Forensic Dossier (PPFAS)"),
-        ("/opportunities", "GET", "Cross-Asset Opportunity Terminal"),
-        ("/sovereign", "GET", "Sovereign Debt & Yield Curve Terminal"),
-        ("/reits", "GET", "Alternative Real Assets & SGB Terminal"),
+        ("/funds/compare/overlap", "GET", "Mutual Fund Portfolio Overlap"),
         ("/etfs", "GET", "ETF Liquidity & Spread Matrix"),
-        ("/safety-radar", "GET", "Alternative Yield Safety Radar"),
+        ("/debt", "GET", "Corporate Fixed-Income Directory"),
+        ("/reits", "GET", "Alternative Real Assets & SGB Terminal"),
+        ("/sovereign", "GET", "Sovereign Debt & Yield Curve Terminal"),
+        ("/msme", "GET", "Private & MSME Supply-Chain Directory"),
         ("/calculator/tax", "GET", "Post-Tax Real Yield Calculator"),
-        ("/dossier/INFY", "GET", "7-Pillar Equity Dossier"),
+        ("/pricing", "GET", "Pricing & Credit Packs"),
+        ("/contact", "GET", "Feedback & Grievance Redressal"),
         ("/terms", "GET", "Terms of Service"),
+        ("/privacy", "GET", "Privacy Policy"),
+        ("/refund-policy", "GET", "Cancellation & Refund Policy"),
+        ("/shipping-policy", "GET", "Shipping & Delivery Policy"),
         ("/disclaimer", "GET", "Regulatory Disclaimers"),
+        # System & Core JSON APIs (11 endpoints)
         ("/robots.txt", "GET", "Robots Directives"),
         ("/sitemap.xml", "GET", "XML Sitemap"),
+        ("/security.txt", "GET", "Security Disclosure Directives"),
         ("/health", "GET", "System Health Check"),
-        # Core JSON APIs
+        ("/healthz", "GET", "Render / Kubernetes Healthz Probe"),
         ("/api/funds/schemes", "GET", "Fund Master Scheme API"),
         ("/api/funds/dossier/PPFAS_FLEXICAP_DIR", "GET", "Fund Dossier JSON API"),
         ("/api/sovereign/curve", "GET", "Sovereign Par Curve Feed"),
@@ -179,13 +211,14 @@ def tool_probe_web_endpoints(base_url: Optional[str] = None) -> Dict[str, Any]:
     results = []
     healthy_count = 0
 
+    client = TestClient(app, raise_server_exceptions=False)
     for path, method, name in routes_to_test:
         t0 = time.time()
         try:
             if method == "GET":
-                resp = client.get(path)
+                resp = client.get(path, headers=probe_headers)
             else:
-                resp = client.post(path)
+                resp = client.post(path, headers=probe_headers)
             latency_ms = round((time.time() - t0) * 1000, 1)
 
             is_healthy = resp.status_code == 200
@@ -377,7 +410,7 @@ def tool_scan_code_hygiene() -> Dict[str, Any]:
         "anti_patterns_count": len(findings),
         "unlogged_exceptions_count": len(unlogged_exceptions),
         "unlogged_exceptions": unlogged_exceptions,
-        "is_clean": len(findings) == 0,
+        "is_clean": len(findings) == 0 and len(unlogged_exceptions) == 0,
         "findings": findings
     }
 
@@ -385,7 +418,7 @@ def tool_scan_code_hygiene() -> Dict[str, Any]:
 def check_unlogged_blanket_exceptions() -> List[Dict[str, Any]]:
     """
     AST analysis that flags any blanket 'except Exception:' or 'except:' block in core/ or web/
-    that fails to invoke telemetry logging (logger.error, logger.warning, or logger.exception).
+    that fails to invoke telemetry logging or re-raise (unified with verify_reality_audit.py GATE-6).
     """
     core_dir = PROJECT_ROOT / "core"
     web_dir = PROJECT_ROOT / "web"
@@ -406,69 +439,78 @@ def check_unlogged_blanket_exceptions() -> List[Dict[str, Any]]:
 
                 for node in ast.walk(tree):
                     if isinstance(node, ast.ExceptHandler):
-                        is_blanket = False
-                        if node.type is None:
-                            is_blanket = True
-                        elif isinstance(node.type, ast.Name) and node.type.id in ("Exception", "BaseException"):
-                            is_blanket = True
+                        exc_type = ast.unparse(node.type) if (node.type and hasattr(ast, "unparse")) else "bare"
+                        is_blanket = (node.type is None) or ("Exception" in exc_type) or ("BaseException" in exc_type)
 
                         if is_blanket:
-                            has_telemetry = False
-                            for child in ast.walk(node):
-                                if isinstance(child, ast.Call) and isinstance(child.func, ast.Attribute):
-                                    if child.func.attr in ("error", "warning", "exception"):
-                                        has_telemetry = True
-                                        break
-                                elif isinstance(child, ast.Raise):
-                                    has_telemetry = True
-                                    break
+                            has_log = any(
+                                isinstance(s, ast.Call) and any(
+                                    kw in (ast.unparse(s.func) if hasattr(ast, "unparse") else "")
+                                    for kw in ("log", "print", "record", "warning", "error", "info", "debug", "exception")
+                                )
+                                for s in ast.walk(node)
+                            )
+                            has_raise = any(isinstance(s, ast.Raise) for s in ast.walk(node))
 
-                            if not has_telemetry:
+                            if not has_log and not has_raise:
                                 rel_path = str(fpath.relative_to(PROJECT_ROOT))
                                 flagged.append({
                                     "file": rel_path,
                                     "line": node.lineno,
-                                    "anti_pattern": "Blanket except Exception: block without telemetry logging (logger.error/warning/exception)"
+                                    "anti_pattern": "Blanket except Exception: block without telemetry logging or re-raise"
                                 })
     return flagged
 
 
 def tool_audit_design_tokens() -> Dict[str, Any]:
-    """Audits CSS design tokens, tabular numerals compliance, and deprecated emoji usage."""
+    """Audits CSS design tokens, tabular numerals compliance, SVG symbol parity, and deprecated emoji usage."""
     css_file = PROJECT_ROOT / "web" / "static" / "css" / "style.css"
     templates_dir = PROJECT_ROOT / "web" / "templates"
+    base_html = templates_dir / "base.html"
 
     has_tabular_nums = False
     has_design_tokens = False
-    emoji_occurrences = []
 
     if css_file.exists():
         css_text = css_file.read_text(encoding="utf-8")
         has_tabular_nums = "tabular-nums" in css_text or "tnum" in css_text
         has_design_tokens = "--bg-primary" in css_text and "--accent" in css_text
 
-    # Sample check for emojis in templates that are queued for vector SVG replacement (Priority 3)
+    defined_svg_symbols = set()
+    if base_html.exists():
+        base_text = base_html.read_text(encoding="utf-8")
+        defined_svg_symbols = set(re.findall(r'<symbol[^>]+id="([^"]+)"', base_text))
+
     os_emojis = ["🏰", "⚖️", "📊", "🏦", "🏛️", "🪙", "🚨", "⚡", "🛡️", "🔍"]
     emoji_count = 0
-    for root, _, files in os.walk(templates_dir):
-        for f in files:
-            if f.endswith(".html"):
-                fpath = Path(root) / f
-                try:
-                    text = fpath.read_text(encoding="utf-8")
-                    for em in os_emojis:
-                        cnt = text.count(em)
-                        if cnt > 0:
-                            emoji_count += cnt
-                except Exception as read_err:
-                    logger.debug(f"Template read notice for {fpath}: {read_err}")
+    broken_svg_uses = []
 
+    for fpath in sorted(templates_dir.rglob("*.html")):
+        try:
+            text = fpath.read_text(encoding="utf-8")
+            for em in os_emojis:
+                cnt = text.count(em)
+                if cnt > 0:
+                    emoji_count += cnt
+            if fpath.name == "admin_audit.html":
+                admin_audit_emojis = re.findall(r"[\U0001F300-\U0001FAFF\u23F0-\u23FA]", text)
+                emoji_count += len(admin_audit_emojis)
+            if defined_svg_symbols:
+                for ref in re.findall(r'<use[^>]+href="#([^"{}]+)"', text):
+                    if ref not in defined_svg_symbols:
+                        broken_svg_uses.append(f"{fpath.relative_to(PROJECT_ROOT)}:#{ref}")
+        except Exception as read_err:
+            logger.debug(f"Template read notice for {fpath}: {read_err}")
+
+    is_clean_design = has_tabular_nums and has_design_tokens and emoji_count == 0 and len(broken_svg_uses) == 0
     return {
         "has_tabular_nums": has_tabular_nums,
         "has_design_tokens": has_design_tokens,
         "legacy_os_emojis_found": emoji_count,
-        "design_health_score": 100.0 if (has_tabular_nums and has_design_tokens and emoji_count == 0) else (90.0 if (has_tabular_nums and has_design_tokens) else 75.0),
-        "notes": "Tabular lining numerals, CSS variables, and institutional vector SVG glyphs active." if emoji_count == 0 else "Tabular lining numerals and CSS variables active. Legacy glyphs tracked for SVG migration."
+        "broken_svg_uses_count": len(broken_svg_uses),
+        "broken_svg_uses": broken_svg_uses,
+        "design_health_score": 100.0 if is_clean_design else (90.0 if (has_tabular_nums and has_design_tokens) else 75.0),
+        "notes": "Tabular lining numerals, CSS variables, and institutional vector SVG glyphs active." if is_clean_design else "Tabular lining numerals and CSS variables active. Legacy glyphs or missing SVG symbols tracked for migration."
     }
 
 

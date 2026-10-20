@@ -150,7 +150,7 @@ def tool_get_billables_summary(window: str = "30d", limit: int = 10, exclude_tes
     """Retrieves detailed billing ledger records and cash flow breakdown."""
     days = _window_to_days(window)
     rev_summary = get_revenue_analytics_summary(days=days, exclude_tests=exclude_tests) or {}
-    all_billables = get_all_billables(status="all", limit=limit) or []
+    all_billables = get_all_billables(status="all", limit=limit, exclude_tests=exclude_tests, days=days) or []
     
     recent_transactions = []
     for b in all_billables[:limit]:
@@ -240,6 +240,296 @@ def tool_get_admin_audit_trail(limit: int = 10) -> List[Dict[str, Any]]:
             "ip_address": lg.get("ip_address")
         })
     return items
+
+
+def tool_lookup_ticket_detail(ticket_id: str) -> Optional[Dict[str, Any]]:
+    """Retrieves full details and response thread for a specific support ticket."""
+    clean_id = (ticket_id or "").strip().upper()
+    if not clean_id:
+        return None
+    try:
+        tkt = get_ticket_by_id(clean_id, include_responses=True)
+        return tkt
+    except Exception as e:
+        logger.warning(f"Error looking up ticket {clean_id}: {e}")
+        return None
+
+
+def tool_get_provider_quotas_and_ai_spends() -> Dict[str, Any]:
+    """Retrieves live subscribed service provider constraints and AI token/cost breakdown."""
+    try:
+        from core.analytics.provider_quotas import get_all_provider_constraints
+        quotas = get_all_provider_constraints() or {}
+    except Exception as e:
+        logger.warning(f"Error fetching provider constraints: {e}")
+        quotas = {"providers": [], "healthy_count": 0, "total_count": 0}
+
+    try:
+        from core.analytics.ai_spends import get_gemini_spends_summary
+        spends = get_gemini_spends_summary() or {}
+    except Exception as e:
+        logger.warning(f"Error fetching AI spends summary: {e}")
+        spends = {}
+
+    return {
+        "providers": quotas.get("providers", []),
+        "healthy_count": quotas.get("healthy_count", 0),
+        "total_count": quotas.get("total_count", 0),
+        "ai_spends": spends,
+    }
+
+
+def tool_get_catalog_and_user_funnel_stats() -> Dict[str, Any]:
+    """Queries live multi-asset catalog coverage and user account funnel metrics from reports.db."""
+    from core.db.connection import get_db_connection
+    stats = {
+        "equity_reports_count": 0,
+        "mf_dossiers_count": 0,
+        "msme_firms_count": 0,
+        "discovery_editions_count": 0,
+        "latest_discovery_date": "N/A",
+        "total_registered_users": 0,
+        "low_credit_users_count": 0,
+    }
+    conn = None
+    try:
+        conn = get_db_connection()
+        cur = conn.cursor()
+        for sql, key in [
+            ("SELECT COUNT(*) FROM reports;", "equity_reports_count"),
+            ("SELECT COUNT(*) FROM fund_forensic_dossiers;", "mf_dossiers_count"),
+            ("SELECT COUNT(*) FROM msme_firms;", "msme_firms_count"),
+            ("SELECT COUNT(DISTINCT edition_date) FROM discovery_reel;", "discovery_editions_count"),
+            ("SELECT COUNT(*) FROM user_accounts;", "total_registered_users"),
+            ("SELECT COUNT(*) FROM user_accounts WHERE credits_balance <= 1.0;", "low_credit_users_count"),
+        ]:
+            try:
+                cur.execute(sql)
+                row = cur.fetchone()
+                if row and row[0] is not None:
+                    stats[key] = int(row[0])
+            except Exception as q_err:
+                logger.debug(f"Catalog stat query notice ({key}): {q_err}")
+
+        try:
+            cur.execute("SELECT MAX(edition_date) FROM discovery_reel WHERE edition_date < '2090-01-01';")
+            row = cur.fetchone()
+            if row and row[0]:
+                stats["latest_discovery_date"] = str(row[0])
+        except Exception as d_err:
+            logger.debug(f"Discovery date query notice: {d_err}")
+        cur.close()
+    except Exception as e:
+        logger.warning(f"Error querying catalog and user funnel stats: {e}")
+    finally:
+        if conn:
+            try:
+                conn.close()
+            except Exception as c_err:
+                logger.debug(f"Catalog stats conn close notice: {c_err}")
+    return stats
+
+
+def tool_generate_data_driven_optimization_tips(kpis: Dict[str, Any]) -> str:
+    """
+    Synthesizes actionable, data-driven site metrics, funnel conversion, and performance
+    optimization tips grounded in actual live database telemetry.
+    """
+    window = (kpis.get("window") or "30d").upper()
+    sessions = int(kpis.get("unique_sessions") or 0)
+    actions = int(kpis.get("total_actions") or 0)
+    bounce = float(kpis.get("bounce_rate_pct") or 0.0)
+    cache_pct = float(kpis.get("cache_efficiency_pct") or 0.0)
+    cost_saved = float(kpis.get("total_cost_saved_usd") or 0.0)
+    pdfs = int(kpis.get("pdf_downloads") or 0)
+    gross_rev = float(kpis.get("gross_revenue_inr") or 0.0)
+    net_rev = float(kpis.get("net_revenue_inr") or 0.0)
+    orders = int(kpis.get("successful_transactions") or 0)
+    open_tkts = int(kpis.get("open_tickets_count") or 0)
+    top_routes = kpis.get("top_routes") or []
+    top_tickers = kpis.get("top_tickers") or []
+
+    actions_per_session = round(actions / max(1, sessions), 2)
+    pdf_conv_pct = round((pdfs / max(1, sessions)) * 100.0, 2)
+    order_conv_pct = round((orders / max(1, sessions)) * 100.0, 2)
+
+    catalog = tool_get_catalog_and_user_funnel_stats()
+    quotas = tool_get_provider_quotas_and_ai_spends()
+    ai_spends = quotas.get("ai_spends") or {}
+    total_ai_usd = float(ai_spends.get("total_cost_usd") or 0.0)
+
+    route_str = ", ".join([f"`{r.get('route', '/')}` ({r.get('count', 0)})" for r in top_routes[:3]]) or "`/`"
+    ticker_str = ", ".join([f"`{t.get('ticker', 'N/A')}` ({t.get('count', 0)})" for t in top_tickers[:3]]) or "`INFY`, `TCS`"
+
+    tips: List[str] = []
+
+    # 1. Traffic, Bounce Rate & Engagement Depth Tip
+    if bounce >= 35.0 or actions_per_session < 3.0:
+        tips.append(
+            f"1. **Reduce Bounce Rate (`{bounce:.1f}%`) & Deepen Session Depth (`{actions_per_session} actions/session` across `{sessions:,}` sessions):**\n"
+            f"   - **Observed Data:** Top entry routes are {route_str} and top researched securities are {ticker_str}.\n"
+            f"   - **Actionable Playbook:** Pin the top 3 researched tickers ({ticker_str}) directly in the homepage *Morning Discovery @9AM* preview strip and add 1-click *'Compare with Sector Peer'* pills inside `/dossier/{{ticker}}` headers. Moving interactive tools (`#reverseDcfSandbox`, `#mfFeeDragSimulator`, `#reitSec56Simulator`) above the fold converts single-page bounces into multi-action analytical sessions."
+        )
+    else:
+        tips.append(
+            f"1. **Compound High Session Engagement (`{bounce:.1f}%` Bounce Rate • `{actions_per_session} actions/session`):**\n"
+            f"   - **Observed Data:** Visitors on {route_str} are actively exploring {ticker_str} with `{pdfs}` PDF exports (`{pdf_conv_pct}%` session-to-PDF rate).\n"
+            f"   - **Actionable Playbook:** Add an inline *'Check Mutual Fund Exposure to This Stock'* cross-link on `/dossier/{{ticker}}` for top tickers ({ticker_str}) to route equity traffic into `/funds/compare/overlap` and double cross-asset pageviews per visit."
+        )
+
+    # 2. Monetization, Credit Exhaustion & Revenue Velocity Tip
+    low_cred = catalog.get("low_credit_users_count", 0)
+    tot_users = catalog.get("total_registered_users", 0)
+    tips.append(
+        f"2. **Unlock Credit Pack Conversion (`₹{net_rev:,.0f}` Net Inflow • `{orders}` Orders • `{order_conv_pct}%` Session Conversion):**\n"
+        f"   - **Observed Data:** Out of `{tot_users}` registered accounts, **`{low_cred}` users currently sit at $\\le 1.0$ research credit** (exhausted welcome credits).\n"
+        f"   - **Actionable Playbook:** Dispatch the weekly *Research Bouquet Digest* (`/admin?tab=digest`) highlighting fresh 7-Pillar catalysts on {ticker_str} to re-engage those `{low_cred}` low-balance accounts. Ensure gated Pillar 03 (Forensic Accounting) and Pillar 05 (Reverse DCF) preview cards show the specific metric count waiting behind the 1-credit unlock."
+    )
+
+    # 3. Cache Hit Rate, Latency & AI Margin Protection Tip
+    tips.append(
+        f"3. **Protect AI Unit Economics (`{cache_pct:.1f}%` Cache Hit Rate • `${cost_saved:,.2f}` Saved vs. `${total_ai_usd:.2f}` Total Gemini Spend):**\n"
+        f"   - **Observed Data:** Cached serves save `~$0.015` per query; current cache efficiency is `{cache_pct:.1f}%`.\n"
+        f"   - **Actionable Playbook:** Pre-warm any newly trending ticker from {ticker_str} via the 08:45 AM discovery batch (`skip_gemini=False`) so peak daytime traffic hits SQLite/Postgres cache (`<15ms` TTFB, `$0.00` marginal LLM cost). Keep Free-Tier Forensic Desk turns routed through the 5-stage deterministic calculator and local pillar index."
+    )
+
+    # 4. Multi-Asset SEO Catalog & Freshness Tip
+    eq_cnt = catalog.get("equity_reports_count", 0)
+    mf_cnt = catalog.get("mf_dossiers_count", 0)
+    msme_cnt = catalog.get("msme_firms_count", 0)
+    disc_date = catalog.get("latest_discovery_date", "N/A")
+    tips.append(
+        f"4. **Expand Long-Tail Multi-Asset Discovery (`{eq_cnt}` Equities • `{mf_cnt}` Mutual Funds • `{msme_cnt}` MSMEs • Latest Cohort `{disc_date}`):**\n"
+        f"   - **Observed Data:** The catalog holds `{eq_cnt + mf_cnt + msme_cnt}` indexed dossiers across 3 asset classes.\n"
+        f"   - **Actionable Playbook:** Trigger `Sync AMFI Daily NAV Feed` and `Asset Surveillance Scan` prior to 09:00 AM IST market open so every scheme and equity card displays a same-day freshness badge, improving organic search click-through and allocator trust."
+    )
+
+    # 5. Service Desk & Infrastructure Quota Hygiene Tip
+    degraded = [p for p in (quotas.get("providers") or []) if p.get("status") not in ("HEALTHY", "ACTIVE")]
+    deg_str = ", ".join([f"`{p.get('name')}` ({p.get('status')})" for p in degraded]) if degraded else "All monitored providers healthy"
+    tips.append(
+        f"5. **Service Desk SLA & Provider Quota Hygiene (`{open_tkts}` Open Tickets • `{quotas.get('healthy_count', 0)}/{quotas.get('total_count', 0)}` Providers Healthy):**\n"
+        f"   - **Observed Data:** Open grievances: `{open_tkts}`. Provider watchpoints: {deg_str}.\n"
+        f"   - **Actionable Playbook:** "
+        + (
+            f"You have `{open_tkts}` unresolved support ticket(s) — ask me *'Show open tickets'* and *'Reply to ticket TKT-...'* with a +2 credit goodwill grant to convert support contacts into advocates."
+            if open_tkts > 0 else
+            "Zero open support tickets backlog! Run *'Purge test telemetry'* after running test suites to keep executive bounce-rate and conversion ratios 100% free of synthetic noise."
+        )
+    )
+
+    return (
+        f"💡 **Data-Driven Site Metrics & Performance Optimization Playbook ({window} Window):**\n\n"
+        + "\n\n".join(tips)
+        + "\n\n**Instant Actions You Can Trigger Right Now:**\n"
+        "- Type *\"Purge test telemetry\"* to scrub any synthetic test rows distorting bounce/conversion rates.\n"
+        "- Type *\"Trigger asset surveillance scan\"* or *\"Sync AMFI\"* to refresh catalog timestamps.\n"
+        "- Type *\"Show provider quotas\"* or *\"Show open tickets\"* to drill into infrastructure or support queues."
+    )
+
+
+def _extract_admin_dialogue_slots(
+    user_message: str,
+    history: Optional[List[Dict[str, str]]] = None
+) -> Dict[str, Any]:
+    """
+    Stateful multi-turn slot extractor for Admin Executive Copilot (informed by #3).
+    Extracts and carries forward `ticket_id`, `email`, `order_id`, and `credits_val`
+    across `history` so follow-up turns ('Reply to it...', 'Resolve it', '10', 'Grant them 5 credits')
+    work seamlessly without repeating entity IDs.
+    """
+    slots: Dict[str, Any] = {
+        "ticket_id": None,
+        "email": None,
+        "order_id": None,
+        "number": None,
+        "prior_ticket_id": None,
+        "prior_email": None,
+        "prior_order_id": None,
+        "last_bot_topic": None,
+    }
+
+    # Scan prior history chronologically first
+    for turn in (history or []):
+        content = str(turn.get("content") or "")
+        role = str(turn.get("role") or "").lower()
+        tkt_m = re.search(r"\b(TKT-[A-Za-z0-9]+)\b", content, re.IGNORECASE)
+        if tkt_m:
+            slots["prior_ticket_id"] = tkt_m.group(1).upper()
+        em_m = re.search(r"([\w\.-]+@[\w\.-]+\.\w+)", content)
+        if em_m:
+            slots["prior_email"] = em_m.group(1).lower().strip()
+        ord_m = re.search(r"\b(order_[A-Za-z0-9_]+)\b", content, re.IGNORECASE)
+        if ord_m:
+            slots["prior_order_id"] = ord_m.group(1)
+        if role in ("model", "assistant", "bot"):
+            low_c = content.lower()
+            if "support grievances" in low_c or "ticket" in low_c:
+                slots["last_bot_topic"] = "tickets"
+            elif "cash flow" in low_c or "billables" in low_c or "transaction invoices" in low_c:
+                slots["last_bot_topic"] = "revenue"
+            elif "site usage" in low_c or "unique sessions" in low_c:
+                slots["last_bot_topic"] = "usage"
+            elif "target user required" in low_c or "grant" in low_c:
+                slots["last_bot_topic"] = "grant_credits"
+
+    # Extract from current user_message
+    msg = (user_message or "").strip()
+    tkt_now = re.search(r"\b(TKT-[A-Za-z0-9]+)\b", msg, re.IGNORECASE)
+    if tkt_now:
+        slots["ticket_id"] = tkt_now.group(1).upper()
+
+    em_now = re.search(r"([\w\.-]+@[\w\.-]+\.\w+)", msg)
+    if em_now:
+        slots["email"] = em_now.group(1).lower().strip()
+
+    ord_now = re.search(r"\b(order_[A-Za-z0-9_]+)\b", msg, re.IGNORECASE)
+    if ord_now:
+        slots["order_id"] = ord_now.group(1)
+
+    num_now = re.findall(r"\b(\d+(?:\.\d+)?)\b", msg)
+    if num_now:
+        for n in num_now:
+            val = float(n)
+            if 0 < val <= 1000:
+                slots["number"] = val
+                break
+
+    return slots
+
+
+def _resolve_admin_elliptical_followup(
+    user_message: str,
+    history: Optional[List[Dict[str, str]]] = None
+) -> str:
+    """
+    Resolves short elliptical follow-up replies ('yes', 'sure', 'show me', 'tips', 'invoices')
+    against the concrete follow-up offered at the end of the previous assistant turn.
+    """
+    raw = (user_message or "").strip()
+    if not raw or not history:
+        return raw
+    low = raw.lower().strip(" ?!.,")
+    affirmations = {
+        "yes", "yeah", "yep", "sure", "ok", "okay", "please", "go ahead",
+        "do it", "proceed", "show me", "yes please", "elaborate", "next", "tips"
+    }
+    if low not in affirmations:
+        return raw
+
+    for turn in reversed(history):
+        if str(turn.get("role") or "").lower() in ("model", "assistant", "bot"):
+            last_bot = str(turn.get("content") or "").lower()
+            if "transaction invoices" in last_bot or "inspect customer accounts" in last_bot:
+                return "Show recent billables and transaction invoices"
+            if "device breakdowns" in last_bot or "funnel conversion" in last_bot or "tips" in last_bot:
+                return "Give me data-driven tips and tricks to improve site metrics, conversion, and performance"
+            if "resolve a ticket" in last_bot and "tkt-" in last_bot:
+                m = re.search(r"(tkt-[a-z0-9]+)", last_bot, re.IGNORECASE)
+                if m:
+                    return f"Inspect ticket {m.group(1).upper()}"
+            break
+    return raw
 
 
 # ==============================================================================
@@ -510,11 +800,41 @@ def execute_confirmed_admin_action(
     # 6. TRIGGER_PROJECT_AUDIT
     elif action_type == AdminActionType.TRIGGER_PROJECT_AUDIT:
         try:
+            import concurrent.futures
+            import inspect
             from core.audit.project_auditor import audit_project_full
             mode = "quick" if payload.get("quick", True) else "full"
-            audit_res = audit_project_full(quick=(mode == "quick"))
+            is_quick = (mode == "quick")
+
+            def _run_audit_worker() -> Dict[str, Any]:
+                res_obj = audit_project_full(use_ai=not is_quick)
+                if inspect.isawaitable(res_obj):
+                    res_obj = asyncio.run(res_obj)
+                if isinstance(res_obj, dict):
+                    return res_obj
+                if hasattr(res_obj, "to_dict") and callable(res_obj.to_dict):
+                    return res_obj.to_dict()
+                return {
+                    "audit_id": getattr(res_obj, "audit_id", "AUD-COMPLETED"),
+                    "overall_score": getattr(res_obj, "overall_score", 0.0),
+                    "status": getattr(res_obj, "status", "PASS"),
+                }
+
+            # Run inside an isolated worker thread if an asyncio event loop is active on the current thread
+            try:
+                asyncio.get_running_loop()
+                has_running_loop = True
+            except RuntimeError:
+                has_running_loop = False
+
+            if has_running_loop:
+                with concurrent.futures.ThreadPoolExecutor(max_workers=1) as pool:
+                    audit_res = pool.submit(_run_audit_worker).result(timeout=60.0)
+            else:
+                audit_res = _run_audit_worker()
+
             audit_id = audit_res.get("audit_id", "AUD-COMPLETED")
-            score = audit_res.get("overall_score", 0.0)
+            score = float(audit_res.get("overall_score", 0.0))
             record_admin_audit(
                 admin_email=admin_email,
                 action="TRIGGER_PROJECT_AUDIT_VIA_COPILOT",
@@ -568,16 +888,33 @@ def execute_confirmed_admin_action(
 def parse_deterministic_admin_query(
     user_message: str,
     admin_user: Dict[str, Any],
-    kpis: Dict[str, Any]
+    kpis: Dict[str, Any],
+    history: Optional[List[Dict[str, str]]] = None
 ) -> Tuple[str, Optional[Dict[str, Any]]]:
     """
     Parses administrative questions and commands when Gemini is offline,
     in test environments, or when deterministic intent matches high confidence.
+    Incorporates the 5-layer Interactive Intelligence Framework (#3):
+    - Elliptical follow-up resolution ('yes', 'sure', 'show me')
+    - Multi-turn slot carry-forward (`ticket_id`, `email`, `order_id`, `number`)
+    - Live ticket & user account lookups
+    - `REPLY_TICKET` proposal generation
+    - Subscribed provider quota & AI spend diagnostics
+    - Data-driven site metrics & performance optimization tips
     """
-    msg = user_message.lower().strip()
+    resolved_msg = _resolve_admin_elliptical_followup(user_message, history)
+    msg = resolved_msg.lower().strip()
+    slots = _extract_admin_dialogue_slots(resolved_msg, history)
+
+    # 0. Multi-Turn Single-Number Slot Fill for Credit Grants (e.g. replying "10" after discussing a user/grant)
+    if re.match(r"^\d+(?:\.\d+)?$", msg) and slots.get("number") and (slots.get("prior_email") or slots.get("last_bot_topic") == "grant_credits"):
+        target_email = slots.get("prior_email") or (admin_user.get("email") or "").strip().lower()
+        credits_val = float(slots["number"])
+        resolved_msg = f"Grant {credits_val} credits to {target_email}"
+        msg = resolved_msg.lower()
 
     # 1. Action Intent: Purge Test Data
-    if any(k in msg for k in ["purge", "clean"]) and any(k in msg for k in ["test", "synthetic", "dummy"]):
+    if any(k in msg for k in ["purge", "clean"]) and any(k in msg for k in ["test", "synthetic", "dummy", "telemetry"]):
         proposal = create_action_proposal(
             action_type=AdminActionType.PURGE_TEST_DATA,
             title="Purge Synthetic Test Data",
@@ -594,43 +931,96 @@ def parse_deterministic_admin_query(
         )
         return reply, proposal
 
-    # 2. Action Intent: Grant Credits
+    # 2. Action Intent: Reply to Support Ticket (`REPLY_TICKET`)
+    is_reply_intent = any(k in msg for k in ["reply to", "reply ticket", "respond to", "answer ticket", "send reply", "message ticket"]) or (
+        msg.startswith("reply") and (slots.get("ticket_id") or slots.get("prior_ticket_id") or "tkt" in msg or "ticket" in msg)
+    )
+    if is_reply_intent:
+        ticket_id = slots.get("ticket_id") or slots.get("prior_ticket_id")
+        if not ticket_id:
+            open_tkts = tool_get_support_tickets_summary(status="open", limit=1, exclude_tests=kpis.get("exclude_tests", True))
+            if open_tkts:
+                ticket_id = open_tkts[0].get("ticket_id")
+
+        if not ticket_id:
+            return (
+                "⚠️ **Ticket ID Required for Reply**\n\n"
+                "Please specify the ticket reference ID and message (e.g., `Reply to ticket TKT-1234ABCD: We have resolved your issue and credited +2 credits`).",
+                None
+            )
+
+        # Extract custom reply body after colon, 'saying', 'that', or quotes
+        reply_body = ""
+        colon_m = re.search(r"(?:TKT-[A-Za-z0-9]+|ticket|it)\s*(?::|-|saying|that|with\s+message|with)\s*[\"']?(.+?)[\"']?$", resolved_msg, re.IGNORECASE)
+        if colon_m:
+            reply_body = colon_m.group(1).strip()
+        else:
+            quote_m = re.search(r"[\"']([^\"']{5,})[\"']", resolved_msg)
+            if quote_m:
+                reply_body = quote_m.group(1).strip()
+
+        if not reply_body:
+            reply_body = (
+                "Thank you for contacting the Moatnomics Service Desk. "
+                "We have reviewed your inquiry, verified the underlying data records, and resolved the issue on your account."
+            )
+
+        tkt_record = tool_lookup_ticket_detail(ticket_id) or {}
+        recipient_email = tkt_record.get("user_email") or slots.get("prior_email") or "registered user"
+
+        proposal = create_action_proposal(
+            action_type=AdminActionType.REPLY_TICKET,
+            title=f"Reply & Resolve Ticket {ticket_id}",
+            summary=f"Dispatch official Service Desk response to {recipient_email} for ticket {ticket_id} and mark status as 'resolved'.",
+            payload={
+                "ticket_id": ticket_id,
+                "reply_message": reply_body,
+                "status": "resolved",
+                "dispatch_email": True
+            },
+            impact_level="MEDIUM",
+            impact_warning=f"This will append an official response to {ticket_id}, mark it resolved, and dispatch an email notification to {recipient_email}."
+        )
+        reply = (
+            f"📨 **Action Proposal Prepared: Reply to Ticket {ticket_id}**\n\n"
+            f"- **Recipient:** `{recipient_email}`\n"
+            f"- **New Status:** `RESOLVED`\n"
+            f"- **Message Preview:** *\"{reply_body}\"*\n\n"
+            "Click **Confirm & Execute** below to dispatch the reply and update the ticket ledger."
+        )
+        return reply, proposal
+
+    # 3. Action Intent: Grant Credits
     credit_verbs = ["grant", "give", "allocate", "credit", "send", "add", "transfer", "load", "issue", "top up", "topup", "push", "deposit"]
     credit_nouns = ["credit", "credits", "balance", "token", "tokens"]
     if any(k in msg for k in credit_verbs) and any(k in msg for k in credit_nouns):
-        # Extract target email if explicitly provided
-        email_match = re.search(r"[\w\.-]+@[\w\.-]+\.\w+", user_message)
-        target_email = email_match.group(0).lower().strip() if email_match else ""
+        target_email = slots.get("email") or ""
 
         # Detect self-reference ('myself', 'me', 'my account', etc.) with strict word boundaries
         is_self = bool(re.search(r"\b(myself|me|my\s+account|my\s+email|self|mine|to\s+me|for\s+me|to\s+myself)\b", msg))
         admin_email = (admin_user.get("email") or "").strip().lower()
 
+        ticket_id = slots.get("ticket_id") or (slots.get("prior_ticket_id") if not is_self else None)
+
+        if not target_email and not is_self and slots.get("prior_email") and slots["prior_email"] != admin_email:
+            target_email = slots["prior_email"]
+
+        if not target_email and ticket_id:
+            tkt_rec = tool_lookup_ticket_detail(ticket_id)
+            if tkt_rec and tkt_rec.get("user_email"):
+                target_email = tkt_rec["user_email"].strip().lower()
+            else:
+                tickets = get_support_tickets(status="all", limit=50, exclude_tests=False)
+                for t in tickets:
+                    if t.get("ticket_id") == ticket_id:
+                        target_email = t.get("user_email", "")
+                        break
+
         if not target_email:
             if is_self or admin_email:
                 target_email = admin_email
 
-        # Extract numeric credit amount, defaulting cleanly to 5.0
-        num_matches = re.findall(r"\b(\d+(?:\.\d+)?)\b", user_message)
-        credits_val = 5.0
-        if num_matches:
-            for n in num_matches:
-                val = float(n)
-                if val > 0 and val <= 1000:
-                    credits_val = val
-                    break
-
-        # Extract ticket reference if present
-        tkt_match = re.search(r"(TKT-[A-Za-z0-9]+)", user_message, re.IGNORECASE)
-        ticket_id = tkt_match.group(1).upper() if tkt_match else None
-
-        if not target_email and ticket_id:
-            # Look up ticket to find user email
-            tickets = get_support_tickets(status="all", limit=50, exclude_tests=False)
-            for t in tickets:
-                if t.get("ticket_id") == ticket_id:
-                    target_email = t.get("user_email", "")
-                    break
+        credits_val = slots.get("number") or 5.0
 
         if not target_email:
             return (
@@ -643,9 +1033,6 @@ def parse_deterministic_admin_query(
         is_self_target = (target_email == admin_email)
         recipient_display = "your administrator account" if is_self_target else f"account `{target_email}`"
 
-        # Seamless Immediate Execution for Self Credit Grants:
-        # When an authenticated administrator commands their Copilot to allocate credits to themselves,
-        # execute immediately without requiring a redundant 2-step confirmation proposal card.
         if is_self_target:
             grant_res = admin_grant_user_credits(
                 admin_email=admin_email,
@@ -702,10 +1089,11 @@ def parse_deterministic_admin_query(
         )
         return reply, proposal
 
-    # 3. Action Intent: Resolve / Update Ticket
-    if any(k in msg for k in ["resolve", "close", "update", "mark"]) and any(k in msg for k in ["ticket", "tkt", "complaint", "grievance"]):
-        tkt_match = re.search(r"(TKT-[A-Za-z0-9]+)", user_message, re.IGNORECASE)
-        ticket_id = tkt_match.group(1).upper() if tkt_match else None
+    # 4. Action Intent: Resolve / Update Ticket
+    if any(k in msg for k in ["resolve", "close", "update", "mark"]) and (
+        any(k in msg for k in ["ticket", "tkt", "complaint", "grievance"]) or slots.get("ticket_id") or slots.get("prior_ticket_id")
+    ):
+        ticket_id = slots.get("ticket_id") or slots.get("prior_ticket_id")
 
         if not ticket_id:
             return (
@@ -734,12 +1122,10 @@ def parse_deterministic_admin_query(
         )
         return reply, proposal
 
-    # 4. Action Intent: Refund Order
+    # 5. Action Intent: Refund Order
     if any(k in msg for k in ["refund", "reimburse", "reverse payment"]):
-        order_match = re.search(r"(order_[A-Za-z0-9]+)", user_message, re.IGNORECASE)
-        order_id = order_match.group(1) if order_match else None
-        email_match = re.search(r"[\w\.-]+@[\w\.-]+\.\w+", user_message)
-        target_email = email_match.group(0) if email_match else ""
+        order_id = slots.get("order_id") or slots.get("prior_order_id")
+        target_email = slots.get("email") or slots.get("prior_email") or ""
 
         if not order_id:
             return (
@@ -767,7 +1153,7 @@ def parse_deterministic_admin_query(
         )
         return reply, proposal
 
-    # 5. Action Intent: Asset Surveillance Scan
+    # 6. Action Intent: Asset Surveillance Scan / Sync AMFI
     if any(k in msg for k in ["scan", "surveillance", "refresh assets", "sync amfi", "scan funds"]):
         action = AdminActionType.SYNC_AMFI if "amfi" in msg else AdminActionType.TRIGGER_ASSET_SCAN
         title = "Sync AMFI Daily NAV Feed" if action == AdminActionType.SYNC_AMFI else "Trigger Comprehensive Asset Surveillance Scan"
@@ -786,7 +1172,7 @@ def parse_deterministic_admin_query(
         )
         return reply, proposal
 
-    # 6. Action Intent: Run Project Health Audit
+    # 7. Action Intent: Run Project Health Audit
     if any(k in msg for k in ["project audit", "run audit", "system audit", "health check"]):
         proposal = create_action_proposal(
             action_type=AdminActionType.TRIGGER_PROJECT_AUDIT,
@@ -803,7 +1189,124 @@ def parse_deterministic_admin_query(
         )
         return reply, proposal
 
-    # 7. Analytical Q&A: Revenue, Billables & Cash Flow
+    # 8. Analytical Q&A: Data-Driven Site Metrics, Conversion & Performance Tips & Tricks
+    if any(k in msg for k in [
+        "tip", "tips", "trick", "tricks", "improve", "optimize", "optimization",
+        "recommend", "suggestions", "grow", "growth", "funnel", "conversion", "performance", "playbook"
+    ]):
+        return tool_generate_data_driven_optimization_tips(kpis), None
+
+    # 9. Analytical Q&A: Specific Support Ticket Inspection (`TKT-*`)
+    if slots.get("ticket_id"):
+        tkt_id = slots["ticket_id"]
+        tkt = tool_lookup_ticket_detail(tkt_id)
+        if not tkt:
+            return f"🔍 **Ticket Not Found:** No support grievance matching `{tkt_id}` was found in `reports.db`.", None
+        responses = tkt.get("responses") or []
+        resp_lines = "\n".join([
+            f"  - `{r.get('created_at', '')[:16]}` **{r.get('sender_name') or r.get('sender_type', 'admin')}**: {r.get('message', '')}"
+            for r in responses[-3:]
+        ]) if responses else "  - *No responses sent yet.*"
+        return (
+            f"🎫 **Support Ticket Detail — `{tkt.get('ticket_id')}`:**\n\n"
+            f"- **Status:** `{(tkt.get('status') or 'open').upper()}`\n"
+            f"- **Submitted By:** {tkt.get('user_name') or 'Visitor'} (`{tkt.get('user_email')}`)\n"
+            f"- **Category:** `{tkt.get('category', 'General')}`\n"
+            f"- **Subject:** *{tkt.get('subject', 'N/A')}*\n"
+            f"- **Message:** {tkt.get('message', 'N/A')}\n"
+            f"- **Thread History:**\n{resp_lines}\n\n"
+            f"💡 *Next step: Type `Reply to {tkt_id}: <your message>` or `Grant 2 credits to {tkt.get('user_email')}` or `Resolve {tkt_id}`.*",
+            None
+        )
+
+    # 10. Analytical Q&A: Live User Account Lookup (`email` or explicit lookup intent)
+    is_user_lookup = bool(slots.get("email")) or any(k in msg for k in [
+        "look up user", "lookup user", "inspect user", "find user", "user profile",
+        "user balance", "balance of", "credits for", "account for", "customer account"
+    ])
+    if is_user_lookup:
+        target_id = slots.get("email") or slots.get("prior_email")
+        if not target_id:
+            # Try extracting usr_* token
+            u_m = re.search(r"\b(usr_[A-Za-z0-9_]+)\b", resolved_msg)
+            if u_m:
+                target_id = u_m.group(1)
+        if target_id:
+            prof = tool_lookup_user_account(target_id)
+            if not prof:
+                return (
+                    f"🔍 **User Account Not Found (`{target_id}`):**\n\n"
+                    f"No registered account matches `{target_id}` in `user_accounts`. "
+                    f"You can auto-provision and credit this email by typing `Grant 5 credits to {target_id}`.",
+                    None
+                )
+            tx_list = prof.get("recent_transactions") or []
+            tx_str = "\n".join([
+                f"  - `{t.get('created_at', '')[:10]}`: `{t.get('pack_id') or t.get('payment_gateway', 'tx')}` (+{t.get('credits_added', 0)} credits, ₹{t.get('amount_inr', 0)})"
+                for t in tx_list[:3]
+            ]) if tx_list else "  - *No credit transactions recorded.*"
+            usage_list = prof.get("recent_usage") or []
+            u_str = "\n".join([
+                f"  - `{u.get('created_at', '')[:10]}`: `{u.get('action_type', 'UNLOCK')}` on `{u.get('ticker', 'N/A')}` (-{u.get('credits_deducted', 0)} credits)"
+                for u in usage_list[:3]
+            ]) if usage_list else "  - *No credit consumption recorded.*"
+            return (
+                f"👤 **Live User Account Profile — `{prof.get('email')}`:**\n\n"
+                f"- **User ID:** `{prof.get('id')}`\n"
+                f"- **Full Name:** {prof.get('full_name') or 'Not set'}\n"
+                f"- **Available Balance:** **`{prof.get('credits_balance', 0.0)} credits`**\n"
+                f"- **Subscription Tier:** `{(prof.get('subscription_tier') or 'free').upper()}`\n"
+                f"- **Recent Credit Grants/Purchases:**\n{tx_str}\n"
+                f"- **Recent Research Consumption:**\n{u_str}\n\n"
+                f"💡 *Tip: Type `Grant 5 credits to {prof.get('email')}` (or just `10`) to top up this account.*",
+                None
+            )
+
+    # 11. Analytical Q&A: Subscribed Provider Quotas, Rate Limits & AI Spends
+    if any(k in msg for k in [
+        "provider", "quota", "quotas", "constraint", "constraints", "rate limit",
+        "supabase", "resend", "angel one", "razorpay", "render", "ai spend", "ai spends",
+        "gemini spend", "token burn", "token cost", "monthly budget"
+    ]):
+        q_data = tool_get_provider_quotas_and_ai_spends()
+        providers = q_data.get("providers") or []
+        spends = q_data.get("ai_spends") or {}
+        prov_lines = "\n".join([
+            f"- **{p.get('name')}** (`{p.get('status')}`): {p.get('primary_metric')} ({p.get('utilization_pct', 0)}% used) — *{p.get('secondary_metric')}*"
+            for p in providers
+        ]) or "- All provider probes nominal."
+        tot_usd = float(spends.get("total_cost_usd") or 0.0)
+        tot_inr = float(spends.get("total_cost_inr") or 0.0)
+        tot_tok = int(spends.get("total_tokens") or 0)
+        return (
+            f"📡 **Subscribed Provider Quotas & AI Spend Surveillance ({q_data.get('healthy_count', 0)}/{q_data.get('total_count', 0)} Healthy):**\n\n"
+            f"{prov_lines}\n\n"
+            f"🧠 **Cumulative Gemini Token & Spend Ledger:**\n"
+            f"- **Total Estimated Spend:** **`${tot_usd:.4f} USD`** (`₹{tot_inr:,.2f} INR`)\n"
+            f"- **Total Tokens Processed:** `{tot_tok:,}` tokens\n\n"
+            "Would you like data-driven tips on optimizing AI cache hit rates and infrastructure capacity?",
+            None
+        )
+
+    # 12. Analytical Q&A: Recent Billables & Transaction Invoices
+    if any(k in msg for k in ["invoice", "invoices", "recent transactions", "recent billables", "orders list", "order history"]):
+        bill_data = tool_get_billables_summary(window=kpis.get("window", "30d"), limit=5, exclude_tests=kpis.get("exclude_tests", True))
+        txs = bill_data.get("recent_transactions") or []
+        if not txs:
+            tx_lines = "- No recent billable transactions recorded in this window."
+        else:
+            tx_lines = "\n".join([
+                f"- **`{t.get('invoice_number') or t.get('gateway_order_id') or 'ORD'}`** (`{t.get('customer_email')}`): ₹{t.get('net_amount_inr', 0):,.2f} — `{t.get('pack_type')}` (`{t.get('status')}`)"
+                for t in txs
+            ])
+        return (
+            f"🧾 **Recent Billable Transactions & Invoices:**\n\n"
+            f"{tx_lines}\n\n"
+            "You can inspect any customer by typing their email address or initiate a refund via `Refund order_... for user@example.com`.",
+            None
+        )
+
+    # 13. Analytical Q&A: Revenue, Billables & Cash Flow
     if any(k in msg for k in ["revenue", "billable", "sales", "cash", "inflow", "gross", "net", "money", "gst", "tax"]):
         gross = kpis.get("gross_revenue_inr", 0.0)
         refunds = kpis.get("refund_sum_inr", 0.0)
@@ -822,7 +1325,7 @@ def parse_deterministic_admin_query(
             None
         )
 
-    # 8. Analytical Q&A: Site Usage, Sessions & Traffic
+    # 14. Analytical Q&A: Site Usage, Sessions & Traffic
     if any(k in msg for k in ["session", "traffic", "visitor", "user", "bounce", "footprint", "action", "usage"]):
         sessions = kpis.get("unique_sessions", 0)
         actions = kpis.get("total_actions", 0)
@@ -838,11 +1341,11 @@ def parse_deterministic_admin_query(
             f"- **Bounce Rate:** {bounce:.1f}%\n"
             f"- **Top Visited Routes:** {routes}\n"
             f"- **Top Researched Tickers:** {tickers}\n\n"
-            "Would you like to examine device breakdowns or funnel conversion?",
+            "Would you like actionable tips and tricks to improve funnel conversion and lower bounce rate?",
             None
         )
 
-    # 9. Analytical Q&A: Cache Efficiency & Cost Savings
+    # 15. Analytical Q&A: Cache Efficiency & Cost Savings
     if any(k in msg for k in ["cache", "saving", "cost", "api cost", "efficiency"]):
         cache_pct = kpis.get("cache_efficiency_pct", 0.0)
         cost_saved = kpis.get("total_cost_saved_usd", 0.0)
@@ -857,16 +1360,16 @@ def parse_deterministic_admin_query(
             None
         )
 
-    # 10. Analytical Q&A: Support Grievances & Complaints
+    # 16. Analytical Q&A: Support Grievances & Complaints
     if any(k in msg for k in ["ticket", "support", "grievance", "complaint", "issue"]):
         open_count = kpis.get("open_tickets_count", 0)
-        recent_tickets = tool_get_support_tickets_summary(status="open", limit=3, exclude_tests=True)
+        recent_tickets = tool_get_support_tickets_summary(status="open", limit=5, exclude_tests=kpis.get("exclude_tests", True))
 
         if not recent_tickets:
             tkt_lines = "No open support grievances currently pending review."
         else:
             tkt_lines = "\n".join([
-                f"- **{t['ticket_id']}** ({t['user_email']}): *\"{t['subject']}\"* — `{t['category']}`"
+                f"- **{t['ticket_id']}** (`{t['user_email']}`): *\"{t['subject']}\"* — `{t['category']}`"
                 for t in recent_tickets
             ])
 
@@ -874,11 +1377,11 @@ def parse_deterministic_admin_query(
             f"📬 **Support Grievances & Complaints Docket:**\n\n"
             f"- **Unresolved Open Tickets:** {open_count}\n"
             f"{tkt_lines}\n\n"
-            "You can ask me to resolve a ticket or grant remedial research credits to any affected user.",
+            "You can ask me to inspect a ticket (`TKT-...`), reply to it (`Reply to TKT-...: message`), resolve it, or grant remedial credits.",
             None
         )
 
-    # 11. Analytical Q&A: Team, Admin Access & 2FA
+    # 17. Analytical Q&A: Team, Admin Access & 2FA
     if any(k in msg for k in ["team", "admin", "whitelist", "2fa", "access", "role", "who"]):
         admins = list_admin_users()
         lines = []
@@ -894,7 +1397,7 @@ def parse_deterministic_admin_query(
             None
         )
 
-    # 12. Analytical Q&A: Audit Trail
+    # 18. Analytical Q&A: Audit Trail
     if any(k in msg for k in ["audit log", "audit trail", "logs", "who did what", "history"]):
         logs = tool_get_admin_audit_trail(limit=5)
         if not logs:
@@ -915,19 +1418,19 @@ def parse_deterministic_admin_query(
     # Default Helpful Response
     return (
         "🤖 **Moatnomics Executive Admin Copilot**\n\n"
-        "I provide institutional diagnostics across live dashboard telemetry and can coordinate administrative mutations:\n\n"
+        "I provide institutional diagnostics across live dashboard telemetry, provider quotas, user accounts, and support dockets, and coordinate 2-step administrative mutations:\n\n"
         "**What you can ask me:**\n"
+        "- 💡 *\"Give me data-driven tips and tricks to improve site metrics and conversion\"*\n"
         "- 📊 *\"What are our unique sessions and top routes this month?\"*\n"
-        "- 💰 *\"Summarize our net cash inflow and recent billables.\"*\n"
-        "- 📬 *\"Show me open support tickets and complaints.\"*\n"
-        "- ⚡ *\"What is our cache hit rate and estimated API savings?\"*\n"
-        "- 👥 *\"Who has admin access and is 2FA enabled?\"*\n\n"
+        "- 📡 *\"Show subscribed provider quotas and Gemini AI spends.\"*\n"
+        "- 👤 *\"Look up user rahul@example.com\"* or *\"Inspect ticket TKT-7A4B2C\"*\n"
+        "- 💰 *\"Summarize our net cash inflow and recent billables.\"*\n\n"
         "**What I can do for you (Requires 1-Click Confirmation):**\n"
-        "- 🎁 *\"Grant 5 credits to rahul@example.com for downtime remedy\"*\n"
+        "- 🎁 *\"Grant 5 credits to rahul@example.com\"* (or *\"Grant 5 credits to myself\"*)\n"
+        "- 📨 *\"Reply to ticket TKT-7A4B2C: We have resolved your issue\"*\n"
         "- ✅ *\"Mark ticket TKT-7A4B2C as resolved\"*\n"
         "- 🧹 *\"Purge test telemetry and dummy tickets from the dashboard\"*\n"
-        "- 💳 *\"Process refund for order_12345\"*\n"
-        "- 📡 *\"Trigger asset surveillance scan\"*",
+        "- 📡 *\"Trigger asset surveillance scan\"* or *\"Run project audit\"*",
         None
     )
 
@@ -943,7 +1446,7 @@ async def process_admin_copilot_turn(
 ) -> Dict[str, Any]:
     """
     Coordinates an administrative copilot conversation turn.
-    1. Collects live telemetry and financial metrics.
+    1. Collects live telemetry, support dockets, provider quotas, and user/ticket lookups.
     2. Invokes Google GenAI with cascade (`gemini-3.8-flash`, `gemini-3.5-flash-lite`, `gemini-3.1-flash-lite`).
     3. Detects if an action proposal is returned.
     4. Seamlessly falls back to deterministic execution if LLM unavailable or offline.
@@ -968,7 +1471,7 @@ async def process_admin_copilot_turn(
     api_key = get_secret("GEMINI_API_KEY") or os.environ.get("GEMINI_API_KEY") or os.environ.get("GOOGLE_API_KEY")
 
     if is_testing or not api_key:
-        reply, proposal = parse_deterministic_admin_query(clean_msg, admin_user, kpis)
+        reply, proposal = parse_deterministic_admin_query(clean_msg, admin_user, kpis, history=history)
         is_executed = bool(proposal and proposal.get("status") == "EXECUTED")
         new_bal = proposal.get("new_balance") if is_executed else None
         active_prop = None if is_executed else proposal
@@ -987,6 +1490,22 @@ async def process_admin_copilot_turn(
         history_items = history or []
         history_str = "\n".join([f"{h.get('role', 'user').upper()}: {h.get('content', '')}" for h in history_items[-5:]])
 
+        # Gather rich live operational context so LLM is never blind to tickets, users, quotas, or optimization playbooks
+        slots = _extract_admin_dialogue_slots(clean_msg, history_items)
+        open_tickets = tool_get_support_tickets_summary(status="open", limit=5, exclude_tests=exclude_tests)
+        quotas_and_spends = tool_get_provider_quotas_and_ai_spends()
+        catalog_stats = tool_get_catalog_and_user_funnel_stats()
+
+        looked_up_user = None
+        target_email_lookup = slots.get("email") or slots.get("prior_email")
+        if target_email_lookup:
+            looked_up_user = tool_lookup_user_account(target_email_lookup)
+
+        looked_up_ticket = None
+        target_tkt_lookup = slots.get("ticket_id") or slots.get("prior_ticket_id")
+        if target_tkt_lookup:
+            looked_up_ticket = tool_lookup_ticket_detail(target_tkt_lookup)
+
         system_prompt = f"""
 {get_system_prompt_context()}
 
@@ -1001,34 +1520,54 @@ AUTHENTICATED ADMIN CONTEXT:
 LIVE DASHBOARD METRICS ({kpis.get('window', '30d').upper()} Window, Clean Real Data={kpis.get('exclude_tests')}):
 - Unique Sessions: {kpis.get('unique_sessions')}
 - Total User Actions: {kpis.get('total_actions')}
+- Bounce Rate: {kpis.get('bounce_rate_pct')}%
 - Cache Efficiency: {kpis.get('cache_efficiency_pct')}%
 - Estimated API Cost Saved: ${kpis.get('total_cost_saved_usd'):.2f} USD
 - PDF Research Dossiers Exported: {kpis.get('pdf_downloads')}
 - Gross Cash Receipts: ₹{kpis.get('gross_revenue_inr', 0.0):.2f}
 - Processed Refunds: ₹{kpis.get('refund_sum_inr', 0.0):.2f}
 - Net Cash Inflow: ₹{kpis.get('net_revenue_inr', 0.0):.2f}
-- Open Support Grievances: {kpis.get('open_tickets_count')}
+- Successful Orders: {kpis.get('successful_transactions', 0)}
+- Open Support Grievances Count: {kpis.get('open_tickets_count')}
 - Top Routes: {json.dumps(kpis.get('top_routes'))}
 - Top Researched Tickers: {json.dumps(kpis.get('top_tickers'))}
 
+LIVE CATALOG & USER FUNNEL STATS:
+{json.dumps(catalog_stats)}
+
+LIVE OPEN SUPPORT TICKETS (Top 5):
+{json.dumps(open_tickets)}
+
+LIVE SUBSCRIBED PROVIDER QUOTAS & AI SPENDS:
+- Healthy Providers: {quotas_and_spends.get('healthy_count')}/{quotas_and_spends.get('total_count')}
+- Providers: {json.dumps(quotas_and_spends.get('providers'))}
+- Gemini Spends: {json.dumps(quotas_and_spends.get('ai_spends'))}
+
+REFERENCED USER PROFILE (If queried in conversation):
+{json.dumps(looked_up_user) if looked_up_user else "None"}
+
+REFERENCED SUPPORT TICKET DETAIL (If queried in conversation):
+{json.dumps(looked_up_ticket) if looked_up_ticket else "None"}
+
 OPERATIONAL DIRECTIVES:
-1. When answering questions about metrics, cite exact, grounded numbers from the LIVE DASHBOARD METRICS above.
-2. We are an independent software tool and NOT registered anywhere. There are NO GST splits or fake SAC codes. Net cash inflow = Gross less refunds.
-3. If the administrator asks you to make ANY change (e.g. grant credits, update a ticket, issue a refund, purge test data, scan assets):
+1. When answering questions about metrics, tickets, users, or provider quotas, cite exact, grounded numbers from the live telemetry blocks above.
+2. When asked for tips, tricks, or ways to improve site metrics, conversion, or performance, provide concrete, data-backed recommendations grounded in the actual bounce rate, actions/session, low-credit user count ({catalog_stats.get('low_credit_users_count')} users <= 1 credit), top routes, top tickers, and cache efficiency.
+3. We are an independent software tool and NOT registered anywhere. There are NO GST splits or fake SAC codes. Net cash inflow = Gross less refunds.
+4. If the administrator asks you to make ANY change (e.g. grant credits, update a ticket, reply to a ticket, issue a refund, purge test data, scan assets, sync AMFI, run project audit):
    - You MUST formulate an action proposal.
    - If the administrator asks to grant or send credits to 'myself', 'me', 'my account', or does not specify another recipient email address, set target_user in the proposal payload to '{admin_user.get('email')}'. If no specific amount is requested, default to 5 credits.
    - At the end of your response, output a markdown block with language tag `proposal` containing valid JSON with this exact schema:
    ```proposal
    {{
-     "action_type": "GRANT_CREDITS" | "UPDATE_TICKET" | "PROCESS_REFUND" | "PURGE_TEST_DATA" | "TRIGGER_ASSET_SCAN" | "TRIGGER_PROJECT_AUDIT",
+     "action_type": "GRANT_CREDITS" | "UPDATE_TICKET" | "REPLY_TICKET" | "PROCESS_REFUND" | "PURGE_TEST_DATA" | "TRIGGER_ASSET_SCAN" | "TRIGGER_PROJECT_AUDIT" | "SYNC_AMFI",
      "title": "Short title describing the action",
      "summary": "Clear clinical summary of the operation",
      "impact_level": "LOW" | "MEDIUM" | "HIGH",
      "impact_warning": "Warning about database/financial impact",
-     "payload": {{ ... relevant parameters like target_user, credits, ticket_id, status, order_id ... }}
+     "payload": {{ ... relevant parameters like target_user, credits, ticket_id, reply_message, status, order_id ... }}
    }}
    ```
-4. Do NOT execute destructive or financial mutations directly without this proposal block. The web UI will render a two-step confirmation card for the admin to click.
+5. Do NOT execute destructive or financial mutations directly without this proposal block. The web UI will render a two-step confirmation card for the admin to click.
 
 RECENT CONVERSATION HISTORY:
 {history_str}
@@ -1117,7 +1656,7 @@ RECENT CONVERSATION HISTORY:
 
         # If LLM didn't produce proposal block but message is clearly an action, use deterministic proposal
         if not action_proposal:
-            _, fallback_prop = parse_deterministic_admin_query(clean_msg, admin_user, kpis)
+            _, fallback_prop = parse_deterministic_admin_query(clean_msg, admin_user, kpis, history=history)
             if fallback_prop:
                 if fallback_prop.get("status") == "EXECUTED":
                     return {
@@ -1136,7 +1675,7 @@ RECENT CONVERSATION HISTORY:
 
     except Exception as e:
         logger.warning(f"Admin Copilot LLM generation error: {e}. Executing deterministic fallback.")
-        reply, proposal = parse_deterministic_admin_query(clean_msg, admin_user, kpis)
+        reply, proposal = parse_deterministic_admin_query(clean_msg, admin_user, kpis, history=history)
         is_executed = bool(proposal and proposal.get("status") == "EXECUTED")
         new_bal = proposal.get("new_balance") if is_executed else None
         active_prop = None if is_executed else proposal

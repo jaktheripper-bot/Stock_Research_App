@@ -222,31 +222,20 @@ def _parse_event_ts(ev_ts):
 
 
 def _estimate_default_dwell(path: str) -> float:
-    """Estimated default dwell time for terminal visits without subsequent events."""
-    p = (path or "").lower()
-    if "/dossier/" in p:
-        return 65.0
-    if any(k in p for k in ["/funds/", "/debt/", "/reits/", "/msme/"]):
-        return 55.0
-    if "/compare" in p:
-        return 45.0
-    if "/pricing" in p:
-        return 35.0
-    if any(k in p for k in ["/equities", "/discovery", "/funds", "/debt", "/reits", "/msme"]):
-        return 30.0
-    if p in ("/", "/safety-radar", "/sovereign"):
-        return 25.0
-    return 20.0
+    """Zero-Illusion Policy: Never fabricate dwell time on unmeasured single-page bounces or terminal exits."""
+    return 0.0
 
 
 def compute_page_dwell_and_visit_tree(all_events: list) -> dict:
     """
     Computes:
-    1. Average and aggregate dwell time per page route from inter-event deltas and explicit client dwell measurements.
-    2. Site Visit Tree / Transition Matrix tracking which pages contributed to which subsequent clicks within the site.
-    3. Global summary statistics (average session dwell, total transitions).
+    1. Average and aggregate dwell time per page route from explicit client Active Attention Beacons
+       (`dwell_seconds`) and bounded inter-event deltas (1s..1800s), without fabricating dwell on single-page bounces.
+    2. Pillar / Section-level reading attention breakdown (`pillar_dwell_breakdown`) and scroll depth (`avg_scroll_pct`).
+    3. Site Visit Tree / Transition Matrix tracking which pages contributed to which subsequent clicks within the site.
+    4. Global summary statistics (average engaged dwell, total transitions).
     """
-    session_events = {}
+    raw_session_events = {}
 
     for ev_row in all_events:
         eid, sess_id, lp_col, det_raw, ev_tick, ev_type, ts_raw = ev_row[:7]
@@ -284,14 +273,63 @@ def compute_page_dwell_and_visit_tree(all_events: list) -> dict:
 
         ts = _parse_event_ts(ts_raw)
 
-        if effective_sess not in session_events:
-            session_events[effective_sess] = []
-        session_events[effective_sess].append({
+        if effective_sess not in raw_session_events:
+            raw_session_events[effective_sess] = []
+        raw_session_events[effective_sess].append({
             "path": p,
             "timestamp": ts,
-            "details": det,
-            "event_type": ev_type
+            "details": det if isinstance(det, dict) else {},
+            "event_type": ev_type or ""
         })
+
+    # Coalesce PAGE_DWELL exit beacons onto their corresponding page visit in the same session
+    # so client beacons enrich dwell_seconds, max_scroll_pct, and pillar_dwell without double-counting visits.
+    session_events = {}
+    pillar_dwell_accum = {}
+    scroll_accum = {}
+
+    for s_id, raw_list in raw_session_events.items():
+        coalesced = []
+        for ev in raw_list:
+            p = ev["path"]
+            det = ev["details"]
+            ev_type = (ev["event_type"] or "").upper()
+
+            # Harvest pillar-level dwell & scroll depth from any event that carries them
+            p_map = det.get("pillar_dwell")
+            if isinstance(p_map, dict):
+                for pil_key, pil_sec in p_map.items():
+                    try:
+                        val_s = min(max(float(pil_sec), 0.0), 1800.0)
+                    except (TypeError, ValueError):
+                        val_s = 0.0
+                    if val_s > 0:
+                        clean_pil = str(pil_key).strip()[:80]
+                        pillar_dwell_accum.setdefault(clean_pil, []).append(val_s)
+
+            sc_pct = det.get("max_scroll_pct")
+            if sc_pct is not None:
+                try:
+                    sc_val = min(max(float(sc_pct), 0.0), 100.0)
+                    if sc_val > 0:
+                        scroll_accum.setdefault(p, []).append(sc_val)
+                except (TypeError, ValueError):
+                    pass
+
+            if ev_type == "PAGE_DWELL" and not det.get("to_path") and coalesced and coalesced[-1]["path"] == p:
+                prev_det = dict(coalesced[-1]["details"])
+                prev_dwell = float(prev_det.get("dwell_seconds") or prev_det.get("duration_seconds") or 0.0)
+                new_dwell = float(det.get("dwell_seconds") or det.get("duration_seconds") or 0.0)
+                prev_det["dwell_seconds"] = min(prev_dwell + new_dwell, 1800.0)
+                if det.get("max_scroll_pct") is not None:
+                    prev_det["max_scroll_pct"] = max(
+                        float(prev_det.get("max_scroll_pct") or 0.0),
+                        float(det.get("max_scroll_pct") or 0.0),
+                    )
+                coalesced[-1]["details"] = prev_det
+            else:
+                coalesced.append(ev)
+        session_events[s_id] = coalesced
 
     dwell_accum = {}
     transitions = {}
@@ -303,7 +341,7 @@ def compute_page_dwell_and_visit_tree(all_events: list) -> dict:
             p = curr["path"]
             c_dwell = curr["details"].get("dwell_seconds") or curr["details"].get("duration_seconds")
 
-            # 1. Dwell time calculation
+            # 1. Dwell time calculation (Strictly empirical: client beacon or bounded inter-event delta)
             if c_dwell is not None and float(c_dwell) > 0:
                 dwell = min(float(c_dwell), 1800.0)
             elif i + 1 < len(ev_list) and curr["timestamp"] and ev_list[i + 1]["timestamp"]:
@@ -311,9 +349,9 @@ def compute_page_dwell_and_visit_tree(all_events: list) -> dict:
                 if 1.0 <= delta <= 1800.0:
                     dwell = delta
                 else:
-                    dwell = _estimate_default_dwell(p)
+                    dwell = 0.0
             else:
-                dwell = _estimate_default_dwell(p)
+                dwell = 0.0
 
             if p not in dwell_accum:
                 dwell_accum[p] = []
@@ -341,12 +379,21 @@ def compute_page_dwell_and_visit_tree(all_events: list) -> dict:
     all_dwell_values = []
     for path, d_list in dwell_accum.items():
         samples = len(d_list)
-        tot_sec = sum(d_list)
-        avg_sec = round(tot_sec / max(1, samples), 1)
-        all_dwell_values.extend(d_list)
+        measured_list = [d for d in d_list if d > 0]
+        measured_samples = len(measured_list)
+        tot_sec = sum(measured_list)
+        avg_sec = round(tot_sec / max(1, measured_samples), 1) if measured_samples > 0 else 0.0
+        all_dwell_values.extend(measured_list)
         cat_name, cat_icon = classify_page_category(path)
 
-        if avg_sec >= 90:
+        scroll_list = scroll_accum.get(path, [])
+        avg_scroll_pct = round(sum(scroll_list) / len(scroll_list), 1) if scroll_list else None
+
+        if measured_samples == 0:
+            tier = "quick"
+            tier_label = "Bounce / Unmeasured (0s)"
+            badge_color = "#64748b"
+        elif avg_sec >= 90:
             tier = "high"
             tier_label = "Deep Read (>90s)"
             badge_color = "#10b981"
@@ -368,12 +415,32 @@ def compute_page_dwell_and_visit_tree(all_events: list) -> dict:
             "total_dwell_seconds": round(tot_sec, 1),
             "formatted_total_dwell": format_duration(tot_sec),
             "visits_count": samples,
+            "measured_visits_count": measured_samples,
+            "avg_scroll_pct": avg_scroll_pct,
             "tier": tier,
             "tier_label": tier_label,
             "badge_color": badge_color,
         })
 
     page_dwell_times.sort(key=lambda x: (x["total_dwell_seconds"], x["visits_count"]), reverse=True)
+
+    pillar_dwell_breakdown = []
+    for pil_label, p_list in pillar_dwell_accum.items():
+        p_samples = len(p_list)
+        p_tot = sum(p_list)
+        p_avg = round(p_tot / max(1, p_samples), 1)
+        pillar_dwell_breakdown.append({
+            "pillar": pil_label,
+            "section": pil_label,
+            "avg_dwell_seconds": p_avg,
+            "formatted_avg_dwell": format_duration(p_avg),
+            "total_dwell_seconds": round(p_tot, 1),
+            "total_seconds": round(p_tot, 1),
+            "formatted_total_dwell": format_duration(p_tot),
+            "formatted_total": format_duration(p_tot),
+            "samples": p_samples,
+        })
+    pillar_dwell_breakdown.sort(key=lambda x: (x["total_dwell_seconds"], x["samples"]), reverse=True)
 
     site_visit_tree = []
     total_transitions_count = 0
@@ -413,6 +480,7 @@ def compute_page_dwell_and_visit_tree(all_events: list) -> dict:
 
     return {
         "page_dwell_times": page_dwell_times,
+        "pillar_dwell_breakdown": pillar_dwell_breakdown,
         "site_visit_tree": site_visit_tree,
         "overall_avg_dwell_seconds": overall_avg_sec,
         "formatted_overall_avg_dwell": format_duration(overall_avg_sec),
@@ -694,8 +762,10 @@ def get_site_usage_summary(days: int = None, start_date = None, end_date = None,
         for row in cursor.fetchall():
             ev, count, saved = row[0], int(row[1]), float(row[2])
             summary["action_breakdown"][ev] = count
-            summary["total_actions"] += count
             summary["total_cost_saved_usd"] += saved
+            # Passive PAGE_DWELL beacons measure attention duration; do not inflate user action counts
+            if ev != "PAGE_DWELL":
+                summary["total_actions"] += count
             if ev in ["SEARCH", "QUERY", "SEARCH_QUERY"]:
                 summary["total_queries"] += count
             elif ev == "CACHE_HIT":
@@ -799,19 +869,24 @@ def get_site_usage_summary(days: int = None, start_date = None, end_date = None,
 
             session_landing_map = {}
             page_views_map = {}
+            session_profile_map = {}
 
             for ev_row in all_events:
                 eid, sess_id, lp_col, det_raw, ev_tick, ev_type, _ = ev_row
                 effective_sess = str(sess_id).strip() if sess_id and str(sess_id).strip() else f"anon_{eid}"
 
                 p = str(lp_col).strip() if lp_col else ""
-                if not p and det_raw:
+                det_obj = {}
+                if det_raw:
                     try:
-                        d = json.loads(det_raw) if isinstance(det_raw, str) else det_raw
-                        p = d.get("landing_page") or d.get("path") or d.get("page") or ""
-                        if not p and d.get("landing_url"):
-                            from urllib.parse import urlparse
-                            p = urlparse(d["landing_url"]).path
+                        det_obj = json.loads(det_raw) if isinstance(det_raw, str) else det_raw
+                        if not isinstance(det_obj, dict):
+                            det_obj = {}
+                        if not p:
+                            p = det_obj.get("landing_page") or det_obj.get("path") or det_obj.get("page") or ""
+                            if not p and det_obj.get("landing_url"):
+                                from urllib.parse import urlparse
+                                p = urlparse(det_obj["landing_url"]).path
                     except Exception as parse_err:
                         logger.debug("Failed to parse telemetry details_json landing page: %s", parse_err)
                 if not p and ev_tick and str(ev_tick).upper() != "APP":
@@ -830,10 +905,31 @@ def get_site_usage_summary(days: int = None, start_date = None, end_date = None,
                 if effective_sess not in session_landing_map:
                     session_landing_map[effective_sess] = p
 
+                sp = session_profile_map.setdefault(effective_sess, {"paths": set(), "non_dwell_events": 0, "dwell_sec": 0.0})
+                sp["paths"].add(p)
+                if (ev_type or "").upper() == "PAGE_DWELL":
+                    try:
+                        sp["dwell_sec"] += float(det_obj.get("dwell_seconds") or det_obj.get("duration_seconds") or 0.0)
+                    except (TypeError, ValueError):
+                        pass
+                else:
+                    sp["non_dwell_events"] += 1
+
                 if p not in page_views_map:
                     page_views_map[p] = {"views": 0, "sessions": set()}
-                page_views_map[p]["views"] += 1
+                if (ev_type or "").upper() != "PAGE_DWELL" or effective_sess not in page_views_map[p]["sessions"]:
+                    page_views_map[p]["views"] += 1
                 page_views_map[p]["sessions"].add(effective_sess)
+
+            # Compute empirical Bounce Rate (1 page visited, <= 1 non-dwell action, < 10s measured dwell)
+            if session_profile_map:
+                bounced_cnt = sum(
+                    1 for sp in session_profile_map.values()
+                    if len(sp["paths"]) <= 1 and sp["non_dwell_events"] <= 1 and sp["dwell_sec"] < 10.0
+                )
+                summary["bounce_rate_pct"] = round((bounced_cnt / max(1, len(session_profile_map))) * 100.0, 1)
+            else:
+                summary["bounce_rate_pct"] = 0.0
 
             landing_counts = {}
             for s_id, l_path in session_landing_map.items():
@@ -857,17 +953,22 @@ def get_site_usage_summary(days: int = None, start_date = None, end_date = None,
                 cat_name, cat_icon = classify_page_category(path_key)
                 summary["top_visited_pages"].append({
                     "path": path_key,
+                    "route": path_key,
+                    "count": v_data["views"],
                     "category": cat_name,
                     "icon": cat_icon,
                     "views": v_data["views"],
                     "unique_sessions": len(v_data["sessions"]),
                     "percentage": round((v_data["views"] / total_all_views) * 100.0, 1)
                 })
+            summary["top_routes"] = summary["top_visited_pages"]
+            summary["top_tickers"] = summary["top_searched_tickers"]
 
             # 5c. Link Dwell Times and Site Visit Navigation Tree
             try:
                 flow_data = compute_page_dwell_and_visit_tree(all_events)
                 summary["page_dwell_times"] = flow_data.get("page_dwell_times", [])
+                summary["pillar_dwell_breakdown"] = flow_data.get("pillar_dwell_breakdown", [])
                 summary["site_visit_tree"] = flow_data.get("site_visit_tree", [])
                 summary["overall_avg_dwell_seconds"] = flow_data.get("overall_avg_dwell_seconds", 0.0)
                 summary["formatted_overall_avg_dwell"] = flow_data.get("formatted_overall_avg_dwell", "0s")
@@ -1142,6 +1243,18 @@ def get_session_journeys(days: int = None, start_date = None, end_date = None, l
             total_dur = 0
             if first_dt is not None and prev_dt is not None and prev_dt >= first_dt:
                 total_dur = int((prev_dt - first_dt).total_seconds())
+            # Also account for explicit client PAGE_DWELL beacon seconds on single-page reading sessions
+            beacon_dwell_sum = 0
+            for ev in sess_events:
+                ev_det = ev[4]
+                if ev_det:
+                    try:
+                        d_obj = json.loads(ev_det) if isinstance(ev_det, str) else ev_det
+                        if isinstance(d_obj, dict) and d_obj.get("dwell_seconds"):
+                            beacon_dwell_sum += int(min(float(d_obj["dwell_seconds"]), 1800.0))
+                    except Exception as bd_err:
+                        logger.debug("Beacon dwell parse notice: %s", bd_err)
+            total_dur = max(total_dur, beacon_dwell_sum)
 
             formatted_start = _format_timestamp(start_ts)
             journeys.append({
@@ -1366,6 +1479,7 @@ def purge_test_telemetry() -> dict:
                OR event_type LIKE 'UNIT_TEST_%'
                OR event_type LIKE 'TEST_%'
                OR event_type LIKE 'ADMIN_%'
+               OR (event_type = 'api_v1_fetch' AND browser IS NULL AND session_id IS NULL)
                OR landing_page LIKE '/admin%'
                OR landing_page LIKE '%/admin%';
         """)

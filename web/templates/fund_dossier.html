@@ -5,6 +5,9 @@
 
 {% block content %}
 <div id="dossierReadingContainer" class="container py-8" data-asset-class="funds">
+  <div id="dossierReadingProgressBar" class="dossier-reading-progress-track" role="progressbar" aria-label="Dossier reading progress">
+    <div id="dossierReadingProgressFill" class="dossier-reading-progress-fill"></div>
+  </div>
   <!-- Breadcrumbs -->
   <div style="font-size: 13px; color: #64748b; margin-bottom: 20px; display: flex; align-items: center; gap: 8px;">
     <a href="/" style="color: #94a3b8; text-decoration: none;">Home</a>
@@ -48,7 +51,12 @@
         <div class="dossier-provenance-subline" style="margin-top: 6px;">
           Data sourced directly from statutory AMFI monthly portfolio disclosures and cross-checked against exchange equity feeds.
         </div>
-        <div style="display: flex; gap: 8px; margin-top: 14px; flex-wrap: wrap;">
+        <div style="display: flex; gap: 8px; margin-top: 14px; flex-wrap: wrap; align-items: center;">
+          <span id="dossierReadTimeBadge" class="dossier-read-time-badge" title="Estimated reading time and live active study progress">
+            <span id="dossierEstReadMinutes">~5 min read</span>
+            <span class="dossier-meta-sep">•</span>
+            <span id="dossierActiveTimerText" class="mono">0s active • 0% read</span>
+          </span>
           <button id="dossierReadingToggleBtn" type="button" onclick="toggleDossierReadingMode()" class="btn btn-secondary btn-sm" title="Toggle Warm Ivory Reading Surface" aria-label="Toggle Warm Ivory Reading Surface" aria-pressed="false">
             <svg class="glyph"><use href="#icon-reading-surface"></use></svg>
           </button>

@@ -97,7 +97,8 @@ from core.audit.tools import (
     tool_scan_prohibited_terms,
     tool_scan_code_hygiene,
     tool_audit_design_tokens,
-    tool_audit_frontend_and_api_contracts
+    tool_audit_frontend_and_api_contracts,
+    get_latest_schema_migration_version
 )
 from core.db.audit_logs import save_project_audit_log
 from core.config import get_secret
@@ -192,8 +193,8 @@ def compute_deterministic_audit_metrics() -> Dict[str, Any]:
         impl_score -= min(contracts_res["unmapped_api_routes_count"] * 10.0, 20.0)
         critical_violations.append(f"Broken API contract: {contracts_res['unmapped_api_routes_count']} frontend fetch call(s) target unmapped FastAPI backend routes.")
 
-    # Deduct minor points for silent exception swallow anti-patterns
-    anti_patterns = hygiene_res.get("anti_patterns_count", 0)
+    # Deduct minor points for silent exception swallow anti-patterns & unlogged blanket exceptions
+    anti_patterns = hygiene_res.get("anti_patterns_count", 0) + hygiene_res.get("unlogged_exceptions_count", 0)
     if anti_patterns > 0:
         # Cap hygiene deduction at 15 points
         hygiene_deduction = min(round(anti_patterns * 0.4, 1), 15.0)
@@ -217,6 +218,9 @@ def compute_deterministic_audit_metrics() -> Dict[str, Any]:
         uiux_score_deduction = min(contracts_res["orphaned_onclicks_count"] * 10.0, 30.0)
         endpoint_subscore = max(endpoint_subscore - uiux_score_deduction, 0.0)
         critical_violations.append(f"Client-side click wiring failure: {contracts_res['orphaned_onclicks_count']} template onclick handler(s) call undefined JavaScript functions.")
+
+    if design_res.get("broken_svg_uses_count", 0) > 0:
+        critical_violations.append(f"Broken SVG sprite references: {design_res['broken_svg_uses_count']} <use> tag(s) reference missing <symbol> IDs.")
 
     # Design tokens & tabular nums account for 40% of UI/UX score
     design_subscore = (design_res.get("design_health_score", 80.0) / 100.0) * 40.0
@@ -246,6 +250,8 @@ def compute_deterministic_audit_metrics() -> Dict[str, Any]:
         recommendations.append(f"Refactor {anti_patterns} instances of silent exception swallowing (unhandled `except` blocks) across codebase.")
     if design_res.get("legacy_os_emojis_found", 0) > 0:
         recommendations.append(f"Execute Priority 3: Migrate {design_res['legacy_os_emojis_found']} OS Unicode emojis to institutional vector SVG sprite glyphs.")
+    if design_res.get("broken_svg_uses_count", 0) > 0:
+        recommendations.append(f"Fix {design_res['broken_svg_uses_count']} broken SVG <use> symbol reference(s): {', '.join(design_res.get('broken_svg_uses', [])[:5])}.")
     if contracts_res.get("orphaned_onclicks_count", 0) > 0:
         recommendations.append(f"Implement missing JavaScript handlers for {contracts_res['orphaned_onclicks_count']} orphaned onclick attributes.")
     if contracts_res.get("unmapped_api_routes_count", 0) > 0:
@@ -259,6 +265,8 @@ def compute_deterministic_audit_metrics() -> Dict[str, Any]:
     if len(recommendations) == 0:
         recommendations.append("System meets all institutional benchmarks. Maintain continuous daily audit cadence.")
 
+    latest_migration = get_latest_schema_migration_version()
+
     return {
         "overall_score": overall_score,
         "strategy_score": strategy_score,
@@ -267,6 +275,7 @@ def compute_deterministic_audit_metrics() -> Dict[str, Any]:
         "status": status,
         "critical_violations": critical_violations,
         "recommendations": recommendations,
+        "latest_migration": latest_migration,
         "test_results": test_res,
         "endpoint_results": endpoint_res,
         "terms_results": terms_res,
@@ -282,6 +291,18 @@ def synthesize_deterministic_markdown_report(audit_id: str, metrics: Dict[str, A
     overall = metrics["overall_score"]
     status = metrics["status"]
     crit_count = len(metrics["critical_violations"])
+    tests_total = metrics["test_results"].get("total_tests", 0)
+    endpoints_total = metrics["endpoint_results"].get("total_checked", 0)
+    latest_migration = metrics.get("latest_migration") or get_latest_schema_migration_version()
+    total_silent_swallows = (
+        metrics["hygiene_results"].get("anti_patterns_count", 0)
+        + metrics["hygiene_results"].get("unlogged_exceptions_count", 0)
+    )
+    smartapi_status = (
+        "Angel One SmartAPI primary broker feed credentials configured with BSE/cache fallback."
+        if bool(get_secret("ANGEL_API_KEY"))
+        else "Bring-Your-Own-Broker Angel One SmartAPI transition pending user credentials."
+    )
 
     badge_status = f"🟢 **{status}**" if status in ["EXEMPLARY", "COMPLIANT"] else f"🔴 **{status}**"
 
@@ -298,8 +319,8 @@ def synthesize_deterministic_markdown_report(audit_id: str, metrics: Dict[str, A
 | Audit Pillar | Score | Status | Key Evaluation Criteria |
 | :--- | :---: | :---: | :--- |
 | **Pillar 1: Strategy & Regulatory** | **{metrics['strategy_score']}/100** | {'PASS' if metrics['strategy_score'] >= 80 else 'WARN'} | SEBI Safe Harbor Section 2(u), Tone Neutrality, 7-Pillar Alignment |
-| **Pillar 2: Technical & Code** | **{metrics['implementation_score']}/100** | {'PASS' if metrics['implementation_score'] >= 80 else 'WARN'} | Unit Tests (129+), Dual-Binding DB, Zero-Hallucination AST, API Contracts |
-| **Pillar 3: UI/UX & Front-End** | **{metrics['uiux_score']}/100** | {'PASS' if metrics['uiux_score'] >= 80 else 'WARN'} | 25+ Live Routes, Tabular Lining Numerals, Click Wiring, Design Tokens |
+| **Pillar 2: Technical & Code** | **{metrics['implementation_score']}/100** | {'PASS' if metrics['implementation_score'] >= 80 else 'WARN'} | Unit Tests ({tests_total}), Dual-Binding DB ({latest_migration}), Zero-Hallucination AST, API Contracts |
+| **Pillar 3: UI/UX & Front-End** | **{metrics['uiux_score']}/100** | {'PASS' if metrics['uiux_score'] >= 80 else 'WARN'} | {endpoints_total} Live Routes, Tabular Lining Numerals, Click Wiring, Design Tokens |
 | **Composite Project Health** | **{overall}/100** | **{status}** | Weighted Aggregate (35% Strategy, 35% Impl, 30% UI/UX) |
 
 ---
@@ -308,22 +329,22 @@ def synthesize_deterministic_markdown_report(audit_id: str, metrics: Dict[str, A
 - **SEBI Safe Harbor Status:** {'100% Compliant — Zero prescriptive buy/sell recommendations detected.' if metrics['terms_results'].get('violations_count') == 0 else f"Violations detected: {metrics['terms_results'].get('violations_count')} prohibited items."}
 - **Statutory Section 2(u) Disclaimer:** {'Verified present in base web templates.' if metrics['terms_results'].get('has_statutory_disclaimer') else 'MISSING in base web templates.'}
 - **Tone Neutrality & Editorial Standard:** Adheres to institutional, objective diagnostic phrasing. Conversational baby talk filter active.
-- **Upstream Data Licensing:** Commercial monetization active (Razorpay); Bring-Your-Own-Broker Angel One SmartAPI transition pending user credentials.
+- **Upstream Data Licensing:** Commercial monetization active (Razorpay); {smartapi_status}
 
 ---
 
 ## 3. Pillar 2: Technical Architecture & Implementation
-- **Automated Test Suite:** `{metrics['test_results'].get('passed')}/{metrics['test_results'].get('total_tests')}` tests passing in `{metrics['test_results'].get('duration_s')}s` (`{metrics['test_results'].get('status')}`).
-- **Database Dual-Binding:** PostgreSQL (Supabase) and SQLite (`reports.db`) schema migrations verified up to `v022_project_audit_logs`.
+- **Automated Test Suite:** `{metrics['test_results'].get('passed')}/{tests_total}` tests passing in `{metrics['test_results'].get('duration_s')}s` (`{metrics['test_results'].get('status')}`).
+- **Database Dual-Binding:** PostgreSQL (Supabase) and SQLite (`reports.db`) schema migrations verified up to `{latest_migration}`.
 - **Zero-Hallucination AST Inspection:**
   - Scanned Python Files: `{metrics['hygiene_results'].get('scanned_python_files')}`
-  - Silent Exception Swallows (unhandled `except` blocks): `{metrics['hygiene_results'].get('anti_patterns_count')}` instances tracked for refactoring.
+  - Silent Exception Swallows (unhandled `except` blocks): `{total_silent_swallows}` instances tracked for refactoring.
   - Hardcoded Valuation Metrics: Zero detected. All metrics grounded in exchange data.
 
 ---
 
 ## 4. Pillar 3: UI/UX, Design Aesthetics & Ergonomics
-- **Live Endpoint Verification:** `{metrics['endpoint_results'].get('healthy_count')}/{metrics['endpoint_results'].get('total_checked')}` endpoints healthy (HTTP 200 OK).
+- **Live Endpoint Verification:** `{metrics['endpoint_results'].get('healthy_count')}/{endpoints_total}` endpoints healthy (HTTP 200 OK).
 - **Tabular Lining Numerals (`tabular-nums`):** {'Verified active in style.css to eliminate ocular drift.' if metrics['design_results'].get('has_tabular_nums') else 'Not detected.'}
 - **Design Tokens & Theme Consistency:** Theme variables (`--bg-primary`, `--accent`) active across all stylesheets.
 - **Visual Asset Cohesion:** `{metrics['design_results'].get('legacy_os_emojis_found')}` legacy OS Unicode emojis flagged for SVG sprite replacement (Priority 3).
@@ -360,7 +381,7 @@ def synthesize_deterministic_markdown_report(audit_id: str, metrics: Dict[str, A
 
 async def run_antigravity_ai_audit_synthesis(metrics: Dict[str, Any], base_markdown: str) -> str:
     """Invokes Gemini model to synthesize deep qualitative institutional commentary."""
-    from google.genai import Client
+    from google.genai import Client, types as genai_types
     api_key = get_secret("GEMINI_API_KEY")
     if not api_key:
         logger.info("GEMINI_API_KEY not found; returning deterministic audit dossier.")
@@ -374,7 +395,7 @@ Below is the verifiable, factual data collected from automated test discovery, e
 Synthesize an institutional executive audit commentary (300-450 words) to append to the report:
 1. Architectural & Regulatory Posture: Summarize the platform's stability, SEBI safe-harbor compliance, and data integrity.
 2. Codebase Craftsmanship: Critique test health, database dual-binding, and the {metrics['hygiene_results'].get('anti_patterns_count', 0)} silent exception instances.
-3. UI/UX & Investor Ergonomics: Evaluate the 73+ endpoint health, tabular numeral alignment, and next steps for vector SVG icon modernization.
+3. UI/UX & Investor Ergonomics: Evaluate the {metrics['endpoint_results'].get('total_checked', 35)}+ endpoint health, tabular numeral alignment, and next steps for vector SVG icon modernization.
 4. Editorial Directives: Strictly zero condescension, zero conversational fluff, institutional diagnostic tone.
 
 Format as clean markdown with sections:
@@ -383,10 +404,14 @@ Format as clean markdown with sections:
 """
     try:
         client = Client(api_key=api_key)
+        gen_config = genai_types.GenerateContentConfig(
+            automatic_function_calling=genai_types.AutomaticFunctionCallingConfig(disable=True)
+        )
         response = await asyncio.to_thread(
             client.models.generate_content,
             model="gemini-3.8-flash",
-            contents=prompt
+            contents=prompt,
+            config=gen_config
         )
         ai_commentary = response.text or ""
         if ai_commentary.strip():

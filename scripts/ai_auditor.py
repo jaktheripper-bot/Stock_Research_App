@@ -442,9 +442,13 @@ Produce a valid JSON object with EXACTLY the following keys:
 
 Return ONLY the raw JSON object."""
 
+                from google.genai import types as genai_types
                 response = self.client.models.generate_content(
                     model=self.model,
                     contents=prompt,
+                    config=genai_types.GenerateContentConfig(
+                        automatic_function_calling=genai_types.AutomaticFunctionCallingConfig(disable=True)
+                    ),
                 )
                 
                 # Estimate token usage

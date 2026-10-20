@@ -28,6 +28,7 @@ from pydantic import BaseModel
 
 from fastapi import APIRouter, Request, Response, HTTPException, Form, Header, Query, Body, BackgroundTasks
 from fastapi.responses import HTMLResponse, RedirectResponse, JSONResponse
+from starlette.concurrency import run_in_threadpool
 
 from core.db import (
     init_db,
@@ -273,7 +274,13 @@ async def admin_dashboard(
         }
 
     try:
-        billables = get_all_billables(limit=100, exclude_tests=exclude_tests)
+        billables = get_all_billables(
+            limit=100,
+            exclude_tests=exclude_tests,
+            days=selected_days,
+            start_date=parsed_start,
+            end_date=parsed_end,
+        )
     except Exception as e:
         logger.warning("Error fetching billables in admin_dashboard: %s", e)
         billables = []
@@ -444,9 +451,11 @@ async def admin_audit_dashboard(request: Request):
 
     from core.db.audit_logs import get_latest_project_audit_log, get_project_audit_history
     from core.db.support import get_open_tickets_count
+    from core.audit.tools import get_latest_schema_migration_version
     latest_audit = get_latest_project_audit_log()
     audit_history = get_project_audit_history(limit=15)
     open_tickets_count = get_open_tickets_count()
+    latest_migration_version = get_latest_schema_migration_version()
 
     return templates.TemplateResponse(
         request=request,
@@ -456,6 +465,7 @@ async def admin_audit_dashboard(request: Request):
             "latest_audit": latest_audit,
             "audit_history": audit_history,
             "open_tickets_count": open_tickets_count,
+            "latest_migration_version": latest_migration_version,
             "active_page": "admin",
             "active_tab": "audit"
         }
@@ -2219,12 +2229,13 @@ async def api_admin_copilot_execute(
     client_ip = _get_client_ip(request)
     user_agent = request.headers.get("user-agent", "")
 
-    result = execute_confirmed_admin_action(
+    result = await run_in_threadpool(
+        execute_confirmed_admin_action,
         action_type=req.action_type,
         payload=req.payload,
         admin_user=admin_session,
         client_ip=client_ip,
-        user_agent=user_agent
+        user_agent=user_agent,
     )
     status_code = 200 if result.get("success") else 400
     return JSONResponse(status_code=status_code, content=result)

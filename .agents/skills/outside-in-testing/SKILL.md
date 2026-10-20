@@ -186,6 +186,16 @@ assert state["portaledToBody"] and state["notInert"] and state["inputFocused"]
 page.locator("#copilotCloseBtn").click(timeout=5000)
 ```
 
+### 10. Exhaustive Template Glob & Audit-Report Telemetry Parity
+Never rely on sample allowlists or headline audit scores without verifying the underlying telemetry payload and 100% template coverage:
+1. **100% Template Glob Coverage:**
+   Verify every `.html` file under `web/templates/` (including `admin.html`, `admin_audit.html`, and `partials/*.html`) against the design token, Unicode emoji range (`[\U0001F300-\U0001FAFF\u2600-\u27BF]`), and SVG `<use href="#...">` contracts.
+2. **Audit Telemetry-to-Report Parity:**
+   After running `scripts/run_project_audit.py`, inspect the latest row in `project_audit_logs`:
+   - Assert that `pillar_breakdown_json` has `0` hidden violations (`unlogged_exceptions_count == 0`, `orphaned_onclicks_count == 0`, `unmapped_api_routes_count == 0`).
+   - Assert that `full_markdown_report` contains zero stale hardcoded counts (`129+`, `v022`) and matches `tests_total` and the latest `schema_migrations` version.
+   - Assert that running the audit probe does not insert synthetic rows into `site_usage_events`.
+
 ---
 
 ## When to Run Outside-In Tests

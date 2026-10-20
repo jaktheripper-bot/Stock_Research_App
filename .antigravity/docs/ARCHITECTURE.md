@@ -80,3 +80,9 @@
   * `etf_matrix_engine.py`: Low-cost tracking error and exchange liquidity spreads.
   * `retail_safety_radar.py`: Cross-asset liquidation seniority and shadow-banking danger scores.
 
+## 8. Autonomous Tri-Pillar Project Auditor & Zero-Illusion Reality Gate Parity
+* **Tri-Pillar Project Auditor (`core/audit/project_auditor.py`, `core/audit/tools.py`, `web/templates/admin_audit.html`):**
+  * Evaluates platform health across **Pillar 1 (Business Strategy & Regulatory Compliance)**, **Pillar 2 (Code Architecture & Runtime Stability — 700+ unit tests, AST static analysis, schema migration `v033`)**, and **Pillar 3 (UI/UX & Frontend Integrity — 37 live web endpoints, DOM/JS contract verification, 100% template SVG `<use href="#...">` symbol parity, and zero legacy OS emojis)**.
+  * Enforces strict AST parity with `scripts/verify_reality_audit.py` (`[GATE-1]` through `[GATE-12]`), ensuring every computed metric (`unlogged_exceptions_count`, `broken_svg_uses_count`, `legacy_os_emojis_found`) is wired into both pillar scores and the persisted `project_audit_logs` Markdown report without polluting live `site_usage_events` telemetry.
+
+

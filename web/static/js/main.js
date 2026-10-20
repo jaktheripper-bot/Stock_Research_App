@@ -1593,16 +1593,130 @@ window.trackUserEvent = function(eventType, ticker, details) {
   } catch {}
 };
 
+function formatActiveStudyClock(sec) {
+  const s = Math.max(0, Math.floor(sec || 0));
+  if (s < 60) return `${s}s`;
+  const m = Math.floor(s / 60);
+  const r = s % 60;
+  return `${m}m ${r < 10 ? '0' : ''}${r}s`;
+}
+
 function initDwellAndTransitionTelemetry() {
   if (typeof window === 'undefined' || typeof document === 'undefined') return;
   if (window.location.pathname.startsWith('/admin')) return;
 
-  const pageEnterTime = Date.now();
-  let lastBeaconSent = false;
+  const IDLE_CUTOFF_MS = 60000; // 60s idle cutoff: only count active reading attention
+  let lastActivityTime = Date.now();
+  let totalActiveSeconds = 0;
+  let unsentActiveSeconds = 0;
+  let maxScrollPct = 0;
+  let unsentPillarDwell = {};
+
+  // Detect Dossier Reading Container for User-Facing Progress Bar & Read Time Badge
+  const dossierContainer = document.getElementById('dossierReadingContainer');
+  const progressFill = document.getElementById('dossierReadingProgressFill');
+  const estReadLabel = document.getElementById('dossierEstReadMinutes');
+  const activeTimerLabel = document.getElementById('dossierActiveTimerText');
+
+  if (dossierContainer && estReadLabel) {
+    const rawWords = (dossierContainer.innerText || '').trim().split(/\s+/).filter(Boolean).length;
+    const estMins = Math.max(2, Math.ceil(rawWords / 220));
+    estReadLabel.textContent = `~${estMins} min read`;
+  }
+
+  function computeCurrentScrollPct() {
+    const docEl = document.documentElement;
+    const scrollTop = window.scrollY || docEl.scrollTop || 0;
+    const scrollable = Math.max(1, (docEl.scrollHeight || 1) - window.innerHeight);
+    const pct = Math.min(100, Math.max(0, Math.round((scrollTop / scrollable) * 100)));
+    if (pct > maxScrollPct) maxScrollPct = pct;
+    if (progressFill) {
+      progressFill.style.width = `${pct}%`;
+    }
+    return pct;
+  }
+
+  function detectVisiblePillarLabel() {
+    const candidates = document.querySelectorAll(
+      'details.pillar-card[open], .pillar-section, .fund-dimension-card, [id^="pillar-"], #reverseDcfSandbox, #epistemicFalsificationCard'
+    );
+    if (!candidates || candidates.length === 0) return null;
+    const vh = window.innerHeight || 800;
+    let bestLabel = null;
+    let bestOverlap = 0;
+
+    candidates.forEach((el) => {
+      const rect = el.getBoundingClientRect();
+      const visibleTop = Math.max(0, rect.top);
+      const visibleBottom = Math.min(vh, rect.bottom);
+      const overlap = Math.max(0, visibleBottom - visibleTop);
+      if (overlap > bestOverlap && overlap > 80) {
+        bestOverlap = overlap;
+        const heading = el.querySelector('summary, h2, h3, .pillar-title');
+        let rawLabel = (
+          el.getAttribute('data-pillar-label') ||
+          (heading ? heading.textContent : '') ||
+          el.id ||
+          ''
+        ).replace(/\s+/g, ' ').trim();
+        if (el.id === 'reverseDcfSandbox') {
+          rawLabel = 'Pillar 05 — Interactive Reverse DCF Sandbox';
+        } else if (el.id === 'epistemicFalsificationCard') {
+          rawLabel = 'Epistemic & Thesis Falsification Ledger';
+        }
+        if (rawLabel) {
+          bestLabel = rawLabel.slice(0, 72);
+        }
+      }
+    });
+    return bestLabel;
+  }
+
+  function markActivity() {
+    lastActivityTime = Date.now();
+  }
+
+  ['mousemove', 'mousedown', 'keydown', 'touchstart', 'click'].forEach((evtName) => {
+    window.addEventListener(evtName, markActivity, { passive: true });
+  });
+  window.addEventListener('scroll', () => {
+    markActivity();
+    const curPct = computeCurrentScrollPct();
+    if (activeTimerLabel) {
+      activeTimerLabel.textContent = `${formatActiveStudyClock(totalActiveSeconds)} active • ${curPct}% read`;
+    }
+  }, { passive: true });
+
+  computeCurrentScrollPct();
+
+  // 1-second Active Reading Attention ticker (only ticks when tab is visible AND user interacted within 60s)
+  const attentionInterval = setInterval(() => {
+    if (document.visibilityState !== 'visible') return;
+    if (Date.now() - lastActivityTime > IDLE_CUTOFF_MS) return;
+
+    totalActiveSeconds += 1;
+    unsentActiveSeconds += 1;
+
+    const activePillar = detectVisiblePillarLabel();
+    if (activePillar) {
+      unsentPillarDwell[activePillar] = (unsentPillarDwell[activePillar] || 0) + 1;
+    }
+
+    if (activeTimerLabel) {
+      const curPct = computeCurrentScrollPct();
+      activeTimerLabel.textContent = `${formatActiveStudyClock(totalActiveSeconds)} active • ${curPct}% read`;
+    }
+  }, 1000);
 
   function sendDwellBeacon(destinationPath) {
-    const elapsedSeconds = Math.max(1, Math.round((Date.now() - pageEnterTime) / 1000));
-    if (elapsedSeconds > 1800) return;
+    // Only dispatch when there is genuine active attention (>= 1s) or an explicit internal link transition
+    if (unsentActiveSeconds < 1 && !destinationPath) return;
+    const dwellToSend = Math.min(1800, Math.max(1, unsentActiveSeconds));
+    const pillarSnapshot = Object.assign({}, unsentPillarDwell);
+
+    // Reset unsent accumulators so subsequent reading in the same tab is captured incrementally
+    unsentActiveSeconds = 0;
+    unsentPillarDwell = {};
 
     try {
       const user = getStoredUser();
@@ -1618,9 +1732,15 @@ function initDwellAndTransitionTelemetry() {
         referrer: acq.referrer || '',
         landing_url: acq.landing_url || window.location.href,
         landing_page: currentPath,
+        path: currentPath,
+        dwell_seconds: dwellToSend,
+        max_scroll_pct: maxScrollPct,
+        pillar_dwell: pillarSnapshot,
         details: {
           path: currentPath,
-          dwell_seconds: elapsedSeconds,
+          dwell_seconds: dwellToSend,
+          max_scroll_pct: maxScrollPct,
+          pillar_dwell: pillarSnapshot,
           to_path: destinationPath || null,
           title: document.title || ''
         }
@@ -1628,9 +1748,9 @@ function initDwellAndTransitionTelemetry() {
 
       const blob = new Blob([JSON.stringify(payload)], { type: 'application/json' });
       if (navigator.sendBeacon) {
-        navigator.sendBeacon('/api/telemetry/event', blob);
+        navigator.sendBeacon('/api/telemetry/dwell', blob);
       } else {
-        fetch('/api/telemetry/event', {
+        fetch('/api/telemetry/dwell', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify(payload),
@@ -1656,21 +1776,19 @@ function initDwellAndTransitionTelemetry() {
 
     if (targetPath && targetPath !== window.location.pathname) {
       sendDwellBeacon(targetPath);
-      lastBeaconSent = true;
     }
   }, { capture: true, passive: true });
 
   window.addEventListener('pagehide', () => {
-    if (!lastBeaconSent) {
-      sendDwellBeacon(null);
-      lastBeaconSent = true;
-    }
+    clearInterval(attentionInterval);
+    sendDwellBeacon(null);
   });
 
   document.addEventListener('visibilitychange', () => {
-    if (document.visibilityState === 'hidden' && !lastBeaconSent) {
+    if (document.visibilityState === 'hidden') {
       sendDwellBeacon(null);
-      lastBeaconSent = true;
+    } else {
+      lastActivityTime = Date.now();
     }
   });
 }

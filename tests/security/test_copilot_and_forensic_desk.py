@@ -547,6 +547,49 @@ Ranked in top decile of ESG and BRSR disclosure transparency with zero major reg
 
         asyncio.run(_run())
 
+    def test_debt_covenant_and_guarantee_questions_not_deflected_as_advisory(self):
+        """WS1.1 (#4): Verifies legitimate debt covenant and parent-guarantee questions containing 'guaranteed' are never deflected as SEBI retail advisory."""
+        from core.agents.copilot.forensic_desk import (
+            build_equity_deterministic_response,
+            build_debt_deterministic_response,
+        )
+        legitimate_queries = [
+            "Is the subsidiary debt guaranteed by the parent company?",
+            "Are these NCDs guaranteed by state government or backed by DSCR covenants?",
+            "What are the corporate guarantees and contingent liabilities on the balance sheet?",
+            "Are the lease rentals guaranteed under the lock-in covenant?",
+            "What was the statutory auditor's recommendation on internal controls?",
+        ]
+        for q in legitimate_queries:
+            self.assertFalse(
+                detect_forbidden_intent(q),
+                f"Legitimate covenant/guarantee query falsely flagged as forbidden advisory: {q}"
+            )
+
+        # Genuine retail advisory 'guaranteed return' queries MUST still be intercepted
+        self.assertTrue(detect_forbidden_intent("Can you give me a guaranteed return stock tip?"))
+        self.assertTrue(detect_forbidden_intent("Which stock has guaranteed profits?"))
+
+        # Equity deterministic builder must route 'debt guaranteed by parent' to Solvency, not SEBI advisory deflection
+        eq_resp = build_equity_deterministic_response(
+            context_data={"company_name": "Infosys Ltd", "baseline_price": 1520.0, "baseline_pe": 24.5},
+            section=None,
+            ticker="INFY",
+            user_message="Is the subsidiary debt guaranteed by the parent company or backed by balance sheet covenants?",
+        )
+        self.assertNotIn("SEBI Regulatory Non-Advisory Notice", eq_resp)
+        self.assertIn("Balance Sheet Solvency & Liquidity Diagnostic", eq_resp)
+
+        # Debt deterministic builder must route 'guaranteed by DSCR covenants' to Covenant Headroom
+        debt_resp = build_debt_deterministic_response(
+            context_data={"instrument_name": "7.85% HDFC Bank AAA NCD", "credit_rating": "CRISIL AAA", "seniority_tier": "SENIOR_SECURED"},
+            section=None,
+            ticker="INE040A08351",
+            user_message="Are these bonds guaranteed by collateral covenants and what is the DSCR headroom?",
+        )
+        self.assertNotIn("SEBI Regulatory Non-Advisory Notice", debt_resp)
+        self.assertIn("Asset Coverage & Covenant Headroom", debt_resp)
+
     def test_copilot_turn_with_dynamic_entity_override(self):
         """Verifies end-to-end Copilot turn switches entity seamlessly mid-conversation."""
         async def _run():
@@ -1016,6 +1059,167 @@ class TestAdminCopilot(unittest.TestCase):
         data = res.json()
         self.assertTrue(data.get("success"))
         self.assertEqual(data.get("credits_added"), 2.0)
+
+    def test_admin_copilot_ticket_lookup_and_reply_proposal_and_execution(self):
+        """Verify live ticket list, specific TKT-* inspection, multi-turn REPLY_TICKET proposal, and confirmed execution."""
+        import asyncio
+        from core.db.support import create_support_ticket, get_ticket_by_id
+        owner_user = {"email": self.owner_email, "role": "owner"}
+
+        tkt = create_support_ticket(
+            user_email="rahul.sharma@example.com",
+            user_name="Rahul Sharma",
+            category="billing",
+            subject="Credits not reflected after checkout",
+            message="Completed payment of Rs 499 but balance is still 0.",
+        )
+        tkt_id = tkt["ticket_id"]
+
+        # 1. List open support tickets (including test domain tickets)
+        res_list = asyncio.run(process_admin_copilot_turn(
+            admin_user=owner_user,
+            message="Show me open support tickets",
+            context={"include_tests": 1},
+        ))
+        self.assertIn("Support Grievances & Complaints Docket", res_list["reply"])
+        self.assertIn(tkt_id, res_list["reply"])
+
+        # 2. Inspect specific ticket
+        res_detail = asyncio.run(process_admin_copilot_turn(
+            admin_user=owner_user,
+            message=f"Inspect ticket {tkt_id}"
+        ))
+        self.assertIn(tkt_id, res_detail["reply"])
+        self.assertIn("Completed payment of Rs 499", res_detail["reply"])
+
+        # 3. Multi-turn follow-up: "Reply to it saying: We have credited your account with 5.0 credits."
+        history = [
+            {"role": "user", "content": f"Inspect ticket {tkt_id}"},
+            {"role": "assistant", "content": res_detail["reply"]},
+        ]
+        res_reply_prop = asyncio.run(process_admin_copilot_turn(
+            admin_user=owner_user,
+            message="Reply to it saying: We have credited your account with 5.0 credits.",
+            history=history,
+        ))
+        self.assertIsNotNone(res_reply_prop["action_proposal"])
+        prop = res_reply_prop["action_proposal"]
+        self.assertEqual(prop["action_type"], AdminActionType.REPLY_TICKET)
+        self.assertEqual(prop["payload"]["ticket_id"], tkt_id)
+        self.assertIn("We have credited your account with 5.0 credits.", prop["payload"]["reply_message"])
+        self.assertTrue(prop["requires_confirmation"])
+
+        # 4. Execute confirmed REPLY_TICKET proposal
+        exec_payload = dict(prop["payload"], dispatch_email=False)
+        exec_res = execute_confirmed_admin_action(
+            admin_user=owner_user,
+            action_type=prop["action_type"],
+            payload=exec_payload,
+        )
+        self.assertTrue(exec_res["success"])
+        self.assertEqual(exec_res["ticket_id"], tkt_id)
+        updated_tkt = get_ticket_by_id(tkt_id, include_responses=True)
+        self.assertEqual(updated_tkt["status"], "resolved")
+        self.assertTrue(any("We have credited your account" in r.get("message", "") for r in updated_tkt.get("responses", [])))
+
+    def test_admin_copilot_user_account_lookup_and_multiturn_credit_grant(self):
+        """Verify live user account inspection and multi-turn entity carry-forward for credit grants."""
+        import asyncio
+        owner_user = {"email": self.owner_email, "role": "owner"}
+
+        # 1. Look up user account
+        res_lookup = asyncio.run(process_admin_copilot_turn(
+            admin_user=owner_user,
+            message=f"Look up user {self.test_user_email}"
+        ))
+        self.assertIn("Live User Account Profile", res_lookup["reply"])
+        self.assertIn(self.test_user_email, res_lookup["reply"])
+
+        # 2. Multi-turn follow-up without repeating email: "Grant 3 credits"
+        history = [
+            {"role": "user", "content": f"Look up user {self.test_user_email}"},
+            {"role": "assistant", "content": res_lookup["reply"]},
+        ]
+        res_grant = asyncio.run(process_admin_copilot_turn(
+            admin_user=owner_user,
+            message="Grant 3 credits",
+            history=history,
+        ))
+        self.assertIsNotNone(res_grant["action_proposal"])
+        prop = res_grant["action_proposal"]
+        self.assertEqual(prop["action_type"], AdminActionType.GRANT_CREDITS)
+        self.assertEqual(prop["payload"]["target_user"], self.test_user_email)
+        self.assertEqual(prop["payload"]["credits"], 3.0)
+
+    def test_admin_copilot_provider_quotas_and_ai_spends_qa(self):
+        """Verify subscribed provider quota & Gemini AI spend telemetry Q&A."""
+        import asyncio
+        owner_user = {"email": self.owner_email, "role": "owner"}
+
+        res = asyncio.run(process_admin_copilot_turn(
+            admin_user=owner_user,
+            message="Show subscribed provider quotas and Gemini AI spends"
+        ))
+        self.assertIn("Subscribed Provider Quotas & AI Spend Surveillance", res["reply"])
+        self.assertIn("Cumulative Gemini Token & Spend Ledger", res["reply"])
+        self.assertIn("Google Gemini API", res["reply"])
+
+    def test_admin_copilot_data_driven_optimization_tips_and_elliptical_followup(self):
+        """Verify data-driven site metrics & performance optimization playbook and elliptical 'yes' follow-up."""
+        import asyncio
+        owner_user = {"email": self.owner_email, "role": "owner"}
+
+        res_tips = asyncio.run(process_admin_copilot_turn(
+            admin_user=owner_user,
+            message="Give me data-driven tips and tricks to improve site metrics, conversion, and performance"
+        ))
+        self.assertIn("Data-Driven Site Metrics & Performance Optimization Playbook", res_tips["reply"])
+        self.assertIn("1. **", res_tips["reply"])
+        self.assertIn("2. **", res_tips["reply"])
+        self.assertIn("3. **", res_tips["reply"])
+        self.assertIn("4. **Expand Long-Tail Multi-Asset Discovery", res_tips["reply"])
+        self.assertIn("5. **Service Desk SLA & Provider Quota Hygiene", res_tips["reply"])
+
+        # Verify elliptical affirmation ("yes") after executive overview resolves to optimization tips
+        res_overview = asyncio.run(process_admin_copilot_turn(
+            admin_user=owner_user,
+            message="Give me an executive overview"
+        ))
+        history = [
+            {"role": "user", "content": "Give me an executive overview"},
+            {"role": "assistant", "content": res_overview["reply"]},
+        ]
+        res_followup = asyncio.run(process_admin_copilot_turn(
+            admin_user=owner_user,
+            message="yes",
+            history=history,
+        ))
+        self.assertIn("Data-Driven Site Metrics & Performance Optimization Playbook", res_followup["reply"])
+
+    def test_admin_copilot_trigger_project_audit_inside_async_event_loop(self):
+        """Verify TRIGGER_PROJECT_AUDIT safely executes inside an active asyncio event loop without RuntimeError."""
+        import asyncio
+        from unittest.mock import patch
+        import core.audit.project_auditor
+        owner_user = {"email": self.owner_email, "role": "owner"}
+
+        async def fake_audit_coro(use_ai=True):
+            # Simulates async audit_project_full coroutine executed inside a running event loop
+            await asyncio.sleep(0.001)
+            return {"audit_id": "AUD-TEST-99", "overall_status": "PASS", "overall_score": 99.5}
+
+        async def _invoke_from_running_loop():
+            with patch.object(core.audit.project_auditor, "audit_project_full", side_effect=fake_audit_coro):
+                return execute_confirmed_admin_action(
+                    admin_user=owner_user,
+                    action_type=AdminActionType.TRIGGER_PROJECT_AUDIT,
+                    payload={"quick": True},
+                )
+
+        res = asyncio.run(_invoke_from_running_loop())
+        self.assertTrue(res["success"])
+        self.assertEqual(res["audit_id"], "AUD-TEST-99")
+        self.assertEqual(res["score"], 99.5)
 
 
 

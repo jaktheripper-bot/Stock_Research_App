@@ -83,7 +83,7 @@ def _dispatch_via_resend(from_email: str, to_email: str, subject: str, text: str
             import certifi
             ctx = ssl.create_default_context(cafile=certifi.where())
         except Exception as e:
-            logger.debug("certifi not available or context creation failed, using system default SSL context: %s", e)
+            logger.warning("certifi not available or context creation failed, using system default SSL context: %s", e)
             ctx = ssl.create_default_context()
 
         payload = {

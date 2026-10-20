@@ -96,7 +96,7 @@ class VerifyPaymentRequest(BaseModel):
 
 
 class TelemetryEventRequest(BaseModel):
-    event_type: str
+    event_type: str = "PAGE_DWELL"
     ticker: Optional[str] = ""
     user_id: Optional[str] = None
     user_email: Optional[str] = None
@@ -104,6 +104,10 @@ class TelemetryEventRequest(BaseModel):
     referrer: Optional[str] = None
     landing_url: Optional[str] = None
     landing_page: Optional[str] = None
+    path: Optional[str] = None
+    dwell_seconds: Optional[float] = None
+    max_scroll_pct: Optional[float] = None
+    pillar_dwell: Optional[Dict[str, float]] = None
     utm_source: Optional[str] = None
     utm_medium: Optional[str] = None
     utm_campaign: Optional[str] = None
@@ -546,8 +550,9 @@ async def api_verify_payment(payload: VerifyPaymentRequest, request: Request):
 # Client Telemetry Ingestion
 # ==============================================================================
 @router.post("/api/telemetry/event")
+@router.post("/api/telemetry/dwell")
 async def api_record_telemetry_event(payload: TelemetryEventRequest, request: Request):
-    """Client-side telemetry event capture for user-level journey and acquisition tracking."""
+    """Client-side telemetry event capture for user-level journey, active reading dwell, and pillar attention tracking."""
     admin_cookie = request.cookies.get(ADMIN_COOKIE_NAME) or request.cookies.get("admin_session")
     if admin_cookie or _is_admin_authenticated(request):
         return json_response_with_cache({"status": "filtered", "reason": "admin_session"})
@@ -582,7 +587,14 @@ async def api_record_telemetry_event(payload: TelemetryEventRequest, request: Re
     sess_id = payload.session_id or f"sess_{hashlib.md5((client_ip + user_agent).encode()).hexdigest()[:10]}"
 
     evt_details = dict(payload.details or {})
-    resolved_lp = payload.landing_page or evt_details.get("landing_page") or ""
+    if payload.dwell_seconds is not None and "dwell_seconds" not in evt_details:
+        evt_details["dwell_seconds"] = min(max(float(payload.dwell_seconds), 0.0), 1800.0)
+    if payload.max_scroll_pct is not None and "max_scroll_pct" not in evt_details:
+        evt_details["max_scroll_pct"] = min(max(float(payload.max_scroll_pct), 0.0), 100.0)
+    if payload.pillar_dwell and isinstance(payload.pillar_dwell, dict) and "pillar_dwell" not in evt_details:
+        evt_details["pillar_dwell"] = payload.pillar_dwell
+
+    resolved_lp = payload.landing_page or payload.path or evt_details.get("landing_page") or ""
     if not resolved_lp and payload.landing_url:
         try:
             from urllib.parse import urlparse

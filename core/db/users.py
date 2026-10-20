@@ -596,11 +596,19 @@ def add_user_credits(
         conn.close()
 
 
-def get_all_billables(status: Optional[str] = None, limit: int = 100, offset: int = 0, exclude_tests: bool = True) -> List[Dict[str, Any]]:
+def get_all_billables(
+    status: Optional[str] = None,
+    limit: int = 100,
+    offset: int = 0,
+    exclude_tests: bool = True,
+    days: Optional[int] = None,
+    start_date: Any = None,
+    end_date: Any = None,
+) -> List[Dict[str, Any]]:
     """
     Retrieves all purchases, invoices, and returns for administrative billing audit.
     Includes tax breakdown (Base + GST 18%), SAC code, and gateway IDs.
-    Filters out synthetic test orders by default.
+    Filters out synthetic test orders by default and respects optional date-window filters.
     """
     init_db()
     conn = get_db_connection()
@@ -609,12 +617,40 @@ def get_all_billables(status: Optional[str] = None, limit: int = 100, offset: in
     try:
         where_conditions = []
         params = []
-        if status:
+        if status and str(status).strip().lower() != "all":
             where_conditions.append(f"t.status = {p}")
-            params.append(status.lower())
+            params.append(str(status).strip().lower())
+        if days is not None or (start_date and end_date):
+            from core.db.telemetry import _build_telemetry_time_filter, get_supabase_url
+            supabase_url = get_supabase_url()
+            time_filter = _build_telemetry_time_filter(
+                supabase_url,
+                days=days,
+                start_date=start_date,
+                end_date=end_date,
+                exclude_tests=False,
+            )
+            where_conditions.append(f"({time_filter.replace('timestamp', 't.created_at')})")
         if exclude_tests:
-            where_conditions.append("(t.customer_email IS NULL OR (t.customer_email NOT LIKE '%@example.com' AND t.customer_email NOT LIKE '%@test.com' AND t.customer_email NOT LIKE '%@pytest.com' AND t.customer_email NOT LIKE 'test_%'))")
-            where_conditions.append("(t.user_id NOT LIKE 'test_%' AND t.user_id NOT LIKE 'usr_test_%' AND t.user_id NOT IN ('guest_web_user', 'testclient', 'test_admin', 'test_user'))")
+            from core.db.telemetry import get_admin_emails
+            admin_emails = get_admin_emails()
+            admin_emails_sql = ", ".join(f"'{e}'" for e in sorted(admin_emails)) if admin_emails else "'admin@moatnomics.com'"
+            where_conditions.append(
+                f"(t.customer_email IS NULL OR ("
+                f"t.customer_email NOT LIKE '%@example.com' "
+                f"AND t.customer_email NOT LIKE '%@test.com' "
+                f"AND t.customer_email NOT LIKE '%@pytest.com' "
+                f"AND t.customer_email NOT LIKE 'test_%' "
+                f"AND LOWER(t.customer_email) NOT IN ({admin_emails_sql})"
+                f"))"
+            )
+            where_conditions.append(
+                "(t.user_id IS NULL OR ("
+                "t.user_id NOT LIKE 'test_%' "
+                "AND t.user_id NOT LIKE 'usr_test_%' "
+                "AND t.user_id NOT IN ('guest_web_user', 'testclient', 'test_admin', 'test_user', 'admin', 'adm_owner_primary', 'adm_owner_lyndon')"
+                "))"
+            )
             where_conditions.append("(t.gateway_order_id IS NULL OR (t.gateway_order_id NOT LIKE 'order_test_%' AND t.gateway_order_id NOT LIKE 'order_sim_%' AND t.gateway_order_id NOT LIKE 'test_%'))")
             where_conditions.append("(t.gateway_payment_id IS NULL OR (t.gateway_payment_id NOT LIKE 'pay_test_%' AND t.gateway_payment_id NOT LIKE 'pay_sim_%'))")
             where_conditions.append("t.payment_gateway != 'simulation'")

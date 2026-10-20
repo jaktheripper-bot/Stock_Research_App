@@ -7,12 +7,20 @@
 
 {% block content %}
 <div id="dossierReadingContainer" class="container py-8" data-asset-class="msme">
+  <div id="dossierReadingProgressBar" class="dossier-reading-progress-track" role="progressbar" aria-label="Dossier reading progress">
+    <div id="dossierReadingProgressFill" class="dossier-reading-progress-fill"></div>
+  </div>
   <!-- Top Navigation Breadcrumbs -->
   <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 24px; flex-wrap: wrap; gap: 12px;">
     <a href="/msme" style="display: inline-flex; align-items: center; gap: 6px; color: var(--accent-cyan); text-decoration: none; font-size: 13.5px; font-weight: 700;">
       <span>←</span> Back to MSME & SME Directory
     </a>
-    <div style="display: flex; align-items: center; gap: 10px;">
+    <div style="display: flex; align-items: center; gap: 10px; flex-wrap: wrap;">
+      <span id="dossierReadTimeBadge" class="dossier-read-time-badge" title="Estimated reading time and live active study progress">
+        <span id="dossierEstReadMinutes">~4 min read</span>
+        <span class="dossier-meta-sep">•</span>
+        <span id="dossierActiveTimerText" class="mono">0s active • 0% read</span>
+      </span>
       <button id="dossierReadingToggleBtn" type="button" onclick="toggleDossierReadingMode()" class="btn btn-secondary btn-sm" title="Toggle Warm Ivory Reading Surface" aria-label="Toggle Warm Ivory Reading Surface" aria-pressed="false" style="padding: 4px 8px;">
         <svg class="glyph"><use href="#icon-reading-surface"></use></svg>
       </button>

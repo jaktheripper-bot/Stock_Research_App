@@ -553,6 +553,7 @@ async def api_v1_get_report(
     record_usage_event(
         event_type="api_v1_fetch",
         ticker=clean_t,
+        browser=request.headers.get("user-agent", ""),
         details={"source": "developer_api"}
     )
 

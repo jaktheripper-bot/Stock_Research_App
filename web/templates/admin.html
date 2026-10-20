@@ -125,31 +125,78 @@
 .kpi-delta.warning { color: #f59e0b; }
 .kpi-delta.danger { color: #ef4444; }
 
-/* Admin Tabs Styling */
+/* Consolidated 5-Hub Primary Navigation & Sub-Tab Bar */
+.admin-hub-nav {
+  display: grid;
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+  gap: 10px;
+  margin-bottom: 12px;
+}
+@media (max-width: 1100px) {
+  .admin-hub-nav {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+}
+@media (max-width: 680px) {
+  .admin-hub-nav {
+    grid-template-columns: 1fr;
+  }
+}
+.admin-hub-btn {
+  background: rgba(15, 23, 42, 0.75);
+  border: 1px solid rgba(51, 65, 85, 0.75);
+  border-radius: 10px;
+  padding: 11px 14px;
+  color: var(--text-secondary, #94a3b8);
+  text-align: left;
+  cursor: pointer;
+  transition: all 0.18s ease;
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+}
+.admin-hub-btn:hover {
+  border-color: rgba(56, 189, 248, 0.45);
+  background: rgba(30, 41, 59, 0.85);
+  color: #f8fafc;
+}
+.admin-hub-btn.active {
+  background: linear-gradient(135deg, rgba(14, 61, 50, 0.65), rgba(11, 35, 55, 0.92));
+  border-color: #10b981;
+  box-shadow: 0 4px 16px rgba(16, 185, 129, 0.18);
+  color: #f8fafc;
+}
+.admin-hub-title {
+  font-size: 13px;
+  font-weight: 700;
+  color: inherit;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 6px;
+}
+.admin-hub-sub {
+  font-size: 11px;
+  color: #64748b;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.admin-hub-btn.active .admin-hub-sub {
+  color: #a7f3d0;
+}
+
+/* Admin Sub-Tabs Styling */
 .admin-tabs {
   display: flex;
+  flex-wrap: wrap;
+  align-items: center;
   gap: 8px;
-  overflow-x: auto;
-  border-bottom: 1px solid var(--border-subtle, #1e293b);
+  background: rgba(15, 23, 42, 0.55);
+  border: 1px solid var(--border-subtle, #1e293b);
+  border-radius: 10px;
   margin-bottom: 24px;
-  padding-bottom: 8px;
-  scrollbar-width: thin;
-  scrollbar-color: rgba(14, 165, 233, 0.4) transparent;
-  -webkit-overflow-scrolling: touch;
-}
-.admin-tabs::-webkit-scrollbar {
-  height: 6px;
-}
-.admin-tabs::-webkit-scrollbar-track {
-  background: rgba(15, 23, 42, 0.6);
-  border-radius: 3px;
-}
-.admin-tabs::-webkit-scrollbar-thumb {
-  background: rgba(14, 165, 233, 0.3);
-  border-radius: 3px;
-}
-.admin-tabs::-webkit-scrollbar-thumb:hover {
-  background: rgba(14, 165, 233, 0.5);
+  padding: 8px 12px;
 }
 .admin-tab-btn {
   background: transparent;
@@ -764,49 +811,90 @@
     </button>
   </div>
 
-  <!-- Navigation Tabs -->
-  <div class="admin-tabs">
-    <button class="admin-tab-btn {% if not active_tab or active_tab == 'billables' %}active{% endif %}" data-tab="billables" onclick="showTab('billables')">
-      💳 Live Billables & Invoices
+  {% set current_tab = active_tab or 'billables' %}
+  {% if current_tab in ['billables', 'users'] %}
+    {% set current_hub = 'revenue' %}
+  {% elif current_tab in ['tickets', 'digest'] %}
+    {% set current_hub = 'service' %}
+  {% elif current_tab in ['traffic', 'journeys', 'actions', 'seo'] %}
+    {% set current_hub = 'traffic' %}
+  {% elif current_tab in ['assets', 'ai-spends'] %}
+    {% set current_hub = 'platform' %}
+  {% else %}
+    {% set current_hub = 'governance' %}
+  {% endif %}
+
+  <!-- Consolidated 5-Hub Executive Navigation -->
+  <div id="adminPrimaryHubNav" class="admin-hub-nav" role="navigation" aria-label="Executive Hub Navigation">
+    <button type="button" class="btn admin-hub-btn {% if current_hub == 'revenue' %}active{% endif %}" data-hub="revenue" onclick="showHub('revenue')">
+      <span class="admin-hub-title"><span>💳 1. Revenue &amp; Users</span></span>
+      <span class="admin-hub-sub">Billables, Invoices &amp; User Credits</span>
     </button>
-    <button class="admin-tab-btn {% if active_tab == 'users' %}active{% endif %}" data-tab="users" onclick="showTab('users')">
-      👤 User Accounts & Usage
+    <button type="button" class="btn admin-hub-btn {% if current_hub == 'service' %}active{% endif %}" data-hub="service" onclick="showHub('service')">
+      <span class="admin-hub-title">
+        <span>📩 2. Service &amp; Digest</span>
+        <span id="adminHubServiceTicketsBadge" class="admin-tab-badge" style="{% if not open_tickets_count or open_tickets_count <= 0 %}display: none;{% endif %}">{{ open_tickets_count | default(0) }}</span>
+      </span>
+      <span class="admin-hub-sub">Support Inbox &amp; Morning Bouquet</span>
     </button>
-    <button class="admin-tab-btn {% if active_tab == 'tickets' %}active{% endif %}" data-tab="tickets" onclick="showTab('tickets')">
-      📩 Service Inbox & Tickets
+    <button type="button" class="btn admin-hub-btn {% if current_hub == 'traffic' %}active{% endif %}" data-hub="traffic" onclick="showHub('traffic')">
+      <span class="admin-hub-title"><span>🌐 3. Traffic &amp; Attention</span></span>
+      <span class="admin-hub-sub">Dwell, Journeys, Actions &amp; SEO</span>
+    </button>
+    <button type="button" class="btn admin-hub-btn {% if current_hub == 'platform' %}active{% endif %}" data-hub="platform" onclick="showHub('platform')">
+      <span class="admin-hub-title"><span>📡 4. Catalog &amp; AI Quotas</span></span>
+      <span class="admin-hub-sub">Asset Surveillance &amp; Gemini Spends</span>
+    </button>
+    <button type="button" class="btn admin-hub-btn {% if current_hub == 'governance' %}active{% endif %}" data-hub="governance" onclick="showHub('governance')">
+      <span class="admin-hub-title"><span><svg class="glyph" style="width: 14px; height: 14px;"><use href="#glyph-shield"></use></svg> 5. Security &amp; Audit</span></span>
+      <span class="admin-hub-sub">Audit Trail, Live Stream &amp; Team</span>
+    </button>
+  </div>
+
+  <!-- Contextual Sub-View Bar (Grouped by Active Hub) -->
+  <div id="adminSubTabNav" class="admin-tabs">
+    <span id="adminActiveHubLabel" style="font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.06em; color: #64748b; padding: 0 6px;">Sub-Views:</span>
+    <button class="admin-tab-btn {% if current_tab == 'billables' %}active{% endif %}" data-hub="revenue" data-tab="billables" onclick="showTab('billables')" style="{% if current_hub != 'revenue' %}display: none;{% endif %}">
+      💳 Live Billables &amp; Invoices
+    </button>
+    <button class="admin-tab-btn {% if current_tab == 'users' %}active{% endif %}" data-hub="revenue" data-tab="users" onclick="showTab('users')" style="{% if current_hub != 'revenue' %}display: none;{% endif %}">
+      👤 User Accounts &amp; Usage
+    </button>
+    <button class="admin-tab-btn {% if current_tab == 'tickets' %}active{% endif %}" data-hub="service" data-tab="tickets" onclick="showTab('tickets')" style="{% if current_hub != 'service' %}display: none;{% endif %}">
+      📩 Service Inbox &amp; Tickets
       <span id="adminNavTabTicketsBadge" class="admin-tab-badge" style="{% if not open_tickets_count or open_tickets_count <= 0 %}display: none;{% endif %}">{{ open_tickets_count | default(0) }}</span>
     </button>
-    <button class="admin-tab-btn {% if active_tab == 'traffic' %}active{% endif %}" data-tab="traffic" onclick="showTab('traffic')">
-      🌐 Traffic & Landing Pages
-    </button>
-    <button class="admin-tab-btn {% if active_tab == 'seo' %}active{% endif %}" data-tab="seo" onclick="showTab('seo')">
-      🔎 SEO & Search Visibility
-    </button>
-    <button class="admin-tab-btn {% if active_tab == 'actions' %}active{% endif %}" data-tab="actions" onclick="showTab('actions')">
-      🎯 User Actions
-    </button>
-    <button class="admin-tab-btn {% if active_tab == 'journeys' %}active{% endif %}" data-tab="journeys" onclick="showTab('journeys')">
-      🧭 Session Journeys
-    </button>
-    <button class="admin-tab-btn {% if active_tab == 'telemetry' %}active{% endif %}" data-tab="telemetry" onclick="showTab('telemetry')">
-      📜 Live Audit Stream
-    </button>
-    <button class="admin-tab-btn {% if active_tab == 'team' %}active{% endif %}" data-tab="team" onclick="showTab('team')">
-      👥 Team & Access
-    </button>
-    <button class="admin-tab-btn {% if active_tab == 'audit' %}active{% endif %}" data-tab="audit" onclick="showTab('audit')">
-      <svg class="glyph"><use href="#glyph-shield"></use></svg> Admin Audit Trail
-    </button>
-    <button class="admin-tab-btn {% if active_tab == 'assets' %}active{% endif %}" data-tab="assets" onclick="showTab('assets')">
-      📡 Asset Surveillance
-    </button>
-    <button class="admin-tab-btn {% if active_tab == 'ai-spends' %}active{% endif %}" data-tab="ai-spends" onclick="showTab('ai-spends')">
-      🤖 Gemini Spends & AI Costs
-    </button>
-    <button class="admin-tab-btn {% if active_tab == 'digest' %}active{% endif %}" data-tab="digest" onclick="showTab('digest')">
+    <button class="admin-tab-btn {% if current_tab == 'digest' %}active{% endif %}" data-hub="service" data-tab="digest" onclick="showTab('digest')" style="{% if current_hub != 'service' %}display: none;{% endif %}">
       <svg class="glyph" style="width: 14px; height: 14px;"><use href="#glyph-mail"></use></svg> Research Bouquet
     </button>
-    <a href="/admin/audit" class="admin-tab-btn" style="text-decoration: none; color: #38bdf8; border: 1px solid rgba(14, 165, 233, 0.4); background: rgba(14, 165, 233, 0.12); flex-shrink: 0;">
+    <button class="admin-tab-btn {% if current_tab == 'traffic' %}active{% endif %}" data-hub="traffic" data-tab="traffic" onclick="showTab('traffic')" style="{% if current_hub != 'traffic' %}display: none;{% endif %}">
+      🌐 Traffic &amp; Landing Pages
+    </button>
+    <button class="admin-tab-btn {% if current_tab == 'journeys' %}active{% endif %}" data-hub="traffic" data-tab="journeys" onclick="showTab('journeys')" style="{% if current_hub != 'traffic' %}display: none;{% endif %}">
+      🧭 Session Journeys
+    </button>
+    <button class="admin-tab-btn {% if current_tab == 'actions' %}active{% endif %}" data-hub="traffic" data-tab="actions" onclick="showTab('actions')" style="{% if current_hub != 'traffic' %}display: none;{% endif %}">
+      🎯 User Actions
+    </button>
+    <button class="admin-tab-btn {% if current_tab == 'seo' %}active{% endif %}" data-hub="traffic" data-tab="seo" onclick="showTab('seo')" style="{% if current_hub != 'traffic' %}display: none;{% endif %}">
+      🔎 SEO &amp; Search Visibility
+    </button>
+    <button class="admin-tab-btn {% if current_tab == 'assets' %}active{% endif %}" data-hub="platform" data-tab="assets" onclick="showTab('assets')" style="{% if current_hub != 'platform' %}display: none;{% endif %}">
+      📡 Asset Surveillance
+    </button>
+    <button class="admin-tab-btn {% if current_tab == 'ai-spends' %}active{% endif %}" data-hub="platform" data-tab="ai-spends" onclick="showTab('ai-spends')" style="{% if current_hub != 'platform' %}display: none;{% endif %}">
+      🤖 Gemini Spends &amp; AI Costs
+    </button>
+    <button class="admin-tab-btn {% if current_tab == 'audit' %}active{% endif %}" data-hub="governance" data-tab="audit" onclick="showTab('audit')" style="{% if current_hub != 'governance' %}display: none;{% endif %}">
+      <svg class="glyph"><use href="#glyph-shield"></use></svg> Admin Audit Trail
+    </button>
+    <button class="admin-tab-btn {% if current_tab == 'telemetry' %}active{% endif %}" data-hub="governance" data-tab="telemetry" onclick="showTab('telemetry')" style="{% if current_hub != 'governance' %}display: none;{% endif %}">
+      📜 Live Audit Stream
+    </button>
+    <button class="admin-tab-btn {% if current_tab == 'team' %}active{% endif %}" data-hub="governance" data-tab="team" onclick="showTab('team')" style="{% if current_hub != 'governance' %}display: none;{% endif %}">
+      👥 Team & Access
+    </button>
+    <a href="/admin/audit" class="admin-tab-btn" data-hub="governance" style="text-decoration: none; color: #38bdf8; border: 1px solid rgba(14, 165, 233, 0.4); background: rgba(14, 165, 233, 0.12); flex-shrink: 0; margin-left: auto;">
       <svg class="glyph"><use href="#glyph-shield"></use></svg> Autonomous Project Auditor →
     </a>
   </div>
@@ -1467,6 +1555,9 @@
               <td class="mono" style="font-weight: 700; color: #f8fafc;">
                 {{ item.formatted_avg_dwell }}
                 <span style="font-size: 11px; font-weight: normal; color: #64748b; margin-left: 4px;">({{ item.avg_dwell_seconds }}s)</span>
+                {% if item.avg_scroll_pct and item.avg_scroll_pct > 0 %}
+                <span style="display: inline-block; margin-left: 6px; padding: 1px 6px; border-radius: 4px; background: rgba(16, 185, 129, 0.14); color: #34d399; font-size: 10px; font-weight: 600;" title="Average Scroll Depth">↕ {{ item.avg_scroll_pct }}%</span>
+                {% endif %}
               </td>
               <td>
                 <span style="display: inline-flex; align-items: center; gap: 6px; padding: 3px 8px; border-radius: 9999px; font-size: 11px; font-weight: 600; background: rgba(255,255,255,0.06); color: {{ item.badge_color }}; border: 1px solid {{ item.badge_color }}40;">
@@ -1475,7 +1566,12 @@
                 </span>
               </td>
               <td class="mono" style="font-weight: 600; color: #c084fc;">{{ item.formatted_total_dwell }}</td>
-              <td class="mono">{{ item.visits_count }}</td>
+              <td class="mono">
+                {{ item.visits_count }}
+                {% if item.measured_visits_count is defined and item.measured_visits_count < item.visits_count %}
+                <span style="font-size: 10px; color: #94a3b8; display: block;" title="Visits with verified active reading telemetry">({{ item.measured_visits_count }} measured)</span>
+                {% endif %}
+              </td>
               <td>
                 <div style="display: flex; align-items: center; gap: 8px;">
                   <div style="flex: 1; height: 6px; background: rgba(255,255,255,0.08); border-radius: 3px; overflow: hidden;">
@@ -1495,6 +1591,47 @@
           </tbody>
         </table>
       </div>
+    </div>
+
+    <!-- Dossier Pillar-Level Active Reading Breakdown -->
+    <div class="admin-card" id="cardPillarDwellBreakdown" style="margin-bottom: 24px;">
+      <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 12px; margin-bottom: 14px;">
+        <div>
+          <h3 style="margin: 0; font-size: 16px; font-weight: 700; display: flex; align-items: center; gap: 8px;">
+            <span><svg class="glyph"><use href="#glyph-temple"></use></svg></span> Dossier Section &amp; 7-Pillar Reading Depth Breakdown
+          </h3>
+          <p style="margin: 4px 0 0; color: var(--text-secondary, #94a3b8); font-size: 12px;">
+            Viewport-verified active reading attention across specific analytical sections and the 7 Moatnomics Pillars (excluding idle/background tab time).
+          </p>
+        </div>
+        <span class="status-pill closed" style="font-size: 11px;">
+          Sections Tracked: <strong style="color: #10b981; margin-left: 4px;">{{ summary.pillar_dwell_breakdown|length if summary.pillar_dwell_breakdown else 0 }}</strong>
+        </span>
+      </div>
+      {% if summary.pillar_dwell_breakdown %}
+      <div style="display: grid; grid-template-columns: repeat(auto-fill, minmax(240px, 1fr)); gap: 12px;">
+        {% set max_pillar_sec = summary.pillar_dwell_breakdown[0].total_seconds if summary.pillar_dwell_breakdown else 1 %}
+        {% for p in summary.pillar_dwell_breakdown %}
+        <div style="background: rgba(15, 23, 42, 0.55); border: 1px solid rgba(255, 255, 255, 0.08); border-radius: 10px; padding: 12px 14px;">
+          <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 6px;">
+            <span class="mono" style="font-size: 12px; font-weight: 700; color: #38bdf8;">{{ p.section }}</span>
+            <span class="mono" style="font-size: 12px; font-weight: 700; color: #10b981;">{{ p.formatted_total }}</span>
+          </div>
+          <div style="height: 5px; background: rgba(255, 255, 255, 0.08); border-radius: 3px; overflow: hidden;">
+            <div style="width: {{ [((p.total_seconds / [max_pillar_sec, 1]|max) * 100)|round(1), 100]|min }}%; height: 100%; background: linear-gradient(90deg, #10b981, #38bdf8); border-radius: 3px;"></div>
+          </div>
+          <div style="margin-top: 4px; font-size: 11px; color: #94a3b8; display: flex; justify-content: space-between;">
+            <span>Active Attention</span>
+            <span class="mono">{{ p.total_seconds }}s</span>
+          </div>
+        </div>
+        {% endfor %}
+      </div>
+      {% else %}
+      <div style="padding: 18px; text-align: center; color: var(--text-secondary, #94a3b8); font-size: 12px; background: rgba(15, 23, 42, 0.35); border-radius: 8px; border: 1px dashed rgba(255,255,255,0.1);">
+        No section-level active reading beacons recorded yet in this date window. As readers scroll through Dossier Pillars (`#pillar-1` .. `#pillar-7`), live viewport attention will populate here automatically.
+      </div>
+      {% endif %}
     </div>
 
     <!-- Site Visit Tree & Internal Click Contributions -->
@@ -3738,6 +3875,11 @@
       navBadge.innerText = String(openCnt);
       navBadge.style.display = openCnt > 0 ? 'inline-flex' : 'none';
     }
+    const hubBadge = document.getElementById('adminHubServiceTicketsBadge');
+    if (hubBadge) {
+      hubBadge.innerText = String(openCnt);
+      hubBadge.style.display = openCnt > 0 ? 'inline-flex' : 'none';
+    }
 
     // Handle empty state placeholder rows
     if (activeBody) {
@@ -4084,7 +4226,57 @@
     }
   }
 
+  const TAB_TO_HUB_MAP = {
+    'billables': 'revenue',
+    'users': 'revenue',
+    'tickets': 'service',
+    'digest': 'service',
+    'traffic': 'traffic',
+    'journeys': 'traffic',
+    'actions': 'traffic',
+    'seo': 'traffic',
+    'assets': 'platform',
+    'ai-spends': 'platform',
+    'audit': 'governance',
+    'telemetry': 'governance',
+    'team': 'governance'
+  };
+
+  const HUB_DEFAULT_TAB_MAP = {
+    'revenue': 'billables',
+    'service': 'tickets',
+    'traffic': 'traffic',
+    'platform': 'assets',
+    'governance': 'audit'
+  };
+
+  const lastActiveTabByHub = {};
+
+  function syncHubNavigationUI(hubName) {
+    if (!hubName) return;
+    document.querySelectorAll('.admin-hub-btn').forEach(btn => {
+      if (btn.getAttribute('data-hub') === hubName) {
+        btn.classList.add('active');
+      } else {
+        btn.classList.remove('active');
+      }
+    });
+    document.querySelectorAll('#adminSubTabNav .admin-tab-btn[data-tab]').forEach(btn => {
+      const btnHub = btn.getAttribute('data-hub');
+      btn.style.display = (btnHub === hubName) ? 'inline-flex' : 'none';
+    });
+  }
+
+  function showHub(hubName) {
+    const targetTab = lastActiveTabByHub[hubName] || HUB_DEFAULT_TAB_MAP[hubName] || 'billables';
+    showTab(targetTab);
+  }
+
   function showTab(tabName) {
+    const parentHub = TAB_TO_HUB_MAP[tabName] || 'revenue';
+    lastActiveTabByHub[parentHub] = tabName;
+    syncHubNavigationUI(parentHub);
+
     document.querySelectorAll('.admin-tab-pane').forEach(el => el.classList.remove('active'));
     document.querySelectorAll('.admin-tab-btn').forEach(el => el.classList.remove('active'));
     const target = document.getElementById('tab-' + tabName);
@@ -4232,9 +4424,11 @@
 
     <!-- Quick Prompt Chips -->
     <div class="copilot-chips">
+      <button type="button" class="copilot-chip" onclick="handleQuickChip('Give me data-driven tips and tricks to improve site metrics, conversion, and performance')">💡 Growth &amp; Performance Tips</button>
       <button type="button" class="copilot-chip" onclick="handleQuickChip('Grant 5 credits to myself')">🎁 Add 5 Credits to Myself</button>
-      <button type="button" class="copilot-chip" onclick="handleQuickChip('What are our unique sessions and top visited routes?')"><svg class="glyph" style="width: 12px; height: 12px;"><use href="#glyph-chart"></use></svg> Sessions & Paths</button>
+      <button type="button" class="copilot-chip" onclick="handleQuickChip('What are our unique sessions and top visited routes?')"><svg class="glyph" style="width: 12px; height: 12px;"><use href="#glyph-chart"></use></svg> Sessions &amp; Paths</button>
       <button type="button" class="copilot-chip" onclick="handleQuickChip('Summarize our net cash inflow and recent billables.')">💰 Cash Inflow</button>
+      <button type="button" class="copilot-chip" onclick="handleQuickChip('Show subscribed provider quotas and Gemini AI spends.')">📡 Provider Quotas</button>
       <button type="button" class="copilot-chip" onclick="handleQuickChip('Show me open support tickets and complaints.')">📬 Open Tickets</button>
       <button type="button" class="copilot-chip" onclick="handleQuickChip('What is our cache hit rate and estimated API savings?')"><svg class="glyph" style="width: 12px; height: 12px;"><use href="#glyph-zap"></use></svg> Cache Savings</button>
       <button type="button" class="copilot-chip" onclick="handleQuickChip('Who has admin access and is 2FA enabled?')">👥 Team Access</button>

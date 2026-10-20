@@ -5,6 +5,9 @@
 
 {% block content %}
 <div id="dossierReadingContainer" class="container py-8" data-asset-class="debt" style="max-width: 1200px; margin: 0 auto; padding: 24px 16px;">
+  <div id="dossierReadingProgressBar" class="dossier-reading-progress-track" role="progressbar" aria-label="Dossier reading progress">
+    <div id="dossierReadingProgressFill" class="dossier-reading-progress-fill"></div>
+  </div>
   <!-- Breadcrumb & Collation Source Strip -->
   <div style="display: flex; flex-wrap: wrap; justify-content: space-between; align-items: center; gap: 12px; margin-bottom: 20px;">
     <div style="font-size: 13px; color: #64748b;">
@@ -57,7 +60,12 @@
         <div style="font-size: 12px; color: #64748b;">
           Credit Posture Score: <strong style="color: #f8fafc; font-size: 15px;">{{ posture.composite_score }} / 100</strong>
         </div>
-        <div style="display: flex; gap: 8px; margin-top: 4px;">
+        <div style="display: flex; gap: 8px; margin-top: 4px; flex-wrap: wrap; align-items: center;">
+          <span id="dossierReadTimeBadge" class="dossier-read-time-badge" title="Estimated reading time and live active study progress">
+            <span id="dossierEstReadMinutes">~5 min read</span>
+            <span class="dossier-meta-sep">•</span>
+            <span id="dossierActiveTimerText" class="mono">0s active • 0% read</span>
+          </span>
           <button id="dossierReadingToggleBtn" type="button" onclick="toggleDossierReadingMode()" class="btn btn-secondary btn-sm" title="Toggle Warm Ivory Reading Surface" aria-label="Toggle Warm Ivory Reading Surface" aria-pressed="false">
             <svg class="glyph"><use href="#icon-reading-surface"></use></svg>
           </button>

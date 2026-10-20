@@ -240,12 +240,175 @@ class TestAdminTrafficUiAndDomContracts(unittest.TestCase):
         self.assertIn("filterDwellTable", script_text, "filterDwellTable must be defined in scripts.")
         self.assertIn("filterSiteVisitTree", script_text, "filterSiteVisitTree must be defined in scripts.")
 
+        # 5b. Assert Pillar-level breakdown card is present in #tab-traffic
+        pillar_card = soup.find("div", id="cardPillarDwellBreakdown")
+        self.assertIsNotNone(pillar_card, "Missing #cardPillarDwellBreakdown in #tab-traffic.")
+
         # 6. Template Hygiene: Zero unrendered Jinja leaks in HTML attributes
         for tag in soup.find_all(True):
             for attr_name, attr_val in tag.attrs.items():
                 val_str = " ".join(attr_val) if isinstance(attr_val, list) else str(attr_val)
                 self.assertNotIn("{{", val_str, f"Unrendered Jinja expression found in <{tag.name} {attr_name}='{val_str}'>")
                 self.assertNotIn("{%", val_str, f"Unrendered Jinja block found in <{tag.name} {attr_name}='{val_str}'>")
+
+    def test_single_page_bounce_records_zero_dwell_not_fake_65s(self):
+        """#6a: Single-page bounce with no exit beacon must record 0.0s dwell, never fabricated 65s/55s."""
+        t0 = datetime(2026, 10, 20, 9, 0, 0)
+        events = [
+            (1, "sess_bounce_only", "/dossier/RELIANCE", "{}", "RELIANCE", "DOSSIER_VIEW", t0),
+        ]
+        res = compute_page_dwell_and_visit_tree(events)
+        dwells = {d["path"]: d for d in res["page_dwell_times"]}
+        self.assertIn("/dossier/RELIANCE", dwells)
+        self.assertEqual(dwells["/dossier/RELIANCE"]["avg_dwell_seconds"], 0.0)
+        self.assertEqual(dwells["/dossier/RELIANCE"]["total_dwell_seconds"], 0.0)
+        self.assertEqual(dwells["/dossier/RELIANCE"]["measured_visits_count"], 0)
+        self.assertEqual(dwells["/dossier/RELIANCE"]["visits_count"], 1)
+
+    def test_dwell_beacon_coalesces_without_inflating_visits_and_tracks_pillars(self):
+        """Options 1 & 2: PAGE_DWELL beacon coalesces onto prior page view, records scroll & pillar dwell."""
+        t0 = datetime(2026, 10, 20, 10, 0, 0)
+        events = [
+            (1, "sess_reader", "/dossier/TCS", "{}", "TCS", "DOSSIER_VIEW", t0),
+            (
+                2,
+                "sess_reader",
+                "/dossier/TCS",
+                json.dumps({
+                    "dwell_seconds": 95.0,
+                    "max_scroll_pct": 84,
+                    "pillar_dwell": {"pillar-1": 35, "pillar-4": 60},
+                }),
+                "TCS",
+                "PAGE_DWELL",
+                t0 + timedelta(seconds=95),
+            ),
+        ]
+        res = compute_page_dwell_and_visit_tree(events)
+        dwells = {d["path"]: d for d in res["page_dwell_times"]}
+        self.assertIn("/dossier/TCS", dwells)
+        tcs = dwells["/dossier/TCS"]
+        self.assertEqual(tcs["visits_count"], 1, "PAGE_DWELL must coalesce onto DOSSIER_VIEW without doubling visits.")
+        self.assertEqual(tcs["measured_visits_count"], 1)
+        self.assertEqual(tcs["avg_dwell_seconds"], 95.0)
+        self.assertEqual(tcs["avg_scroll_pct"], 84)
+
+        pillars = {p["section"]: p["total_seconds"] for p in res.get("pillar_dwell_breakdown", [])}
+        self.assertEqual(pillars.get("pillar-4"), 60.0)
+        self.assertEqual(pillars.get("pillar-1"), 35.0)
+
+    def test_post_telemetry_dwell_endpoint_and_billables_date_window(self):
+        """#6a + #6b: POST /api/telemetry/dwell records active attention; get_all_billables respects days filter."""
+        from core.db.users import get_all_billables
+        from core.db.connection import get_db_connection, get_placeholder
+
+        anon_client = TestClient(app)
+        resp = anon_client.post(
+            "/api/telemetry/dwell",
+            json={
+                "event_type": "PAGE_DWELL",
+                "path": "/dossier/HDFCBANK",
+                "ticker": "HDFCBANK",
+                "dwell_seconds": 72.5,
+                "max_scroll_pct": 68,
+                "pillar_dwell": {"pillar-2": 40, "pillar-5": 32.5},
+            },
+        )
+        self.assertEqual(resp.status_code, 200)
+        self.assertEqual(resp.json().get("status"), "ok")
+
+        # Verify #6b: get_all_billables filters out transactions outside selected days window
+        conn = get_db_connection()
+        c = conn.cursor()
+        p = get_placeholder()
+        old_tx_id = "tx_test_old_window_6b"
+        recent_tx_id = "tx_test_recent_window_6b"
+        old_ts = (datetime.now() - timedelta(days=45)).strftime("%Y-%m-%d %H:%M:%S")
+        recent_ts = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+        try:
+            c.execute(
+                f"INSERT INTO credit_transactions (id, user_id, amount_inr, credits_added, payment_gateway, status, pack_type, created_at) VALUES ({p}, {p}, {p}, {p}, {p}, {p}, {p}, {p})",
+                (old_tx_id, "usr_test_6b", 99.0, 1.0, "razorpay", "captured", "single", old_ts),
+            )
+            c.execute(
+                f"INSERT INTO credit_transactions (id, user_id, amount_inr, credits_added, payment_gateway, status, pack_type, created_at) VALUES ({p}, {p}, {p}, {p}, {p}, {p}, {p}, {p})",
+                (recent_tx_id, "usr_test_6b", 99.0, 1.0, "razorpay", "captured", "single", recent_ts),
+            )
+            conn.commit()
+
+            rows_7d = get_all_billables(limit=200, days=7, exclude_tests=False)
+            ids_7d = {r["id"] for r in rows_7d}
+            self.assertIn(recent_tx_id, ids_7d)
+            self.assertNotIn(old_tx_id, ids_7d, "45-day-old billable must not leak into 7-day window (#6b).")
+
+            rows_90d = get_all_billables(limit=200, days=90, exclude_tests=False)
+            ids_90d = {r["id"] for r in rows_90d}
+            self.assertIn(recent_tx_id, ids_90d)
+            self.assertIn(old_tx_id, ids_90d)
+        finally:
+            c.execute(f"DELETE FROM credit_transactions WHERE id IN ({p}, {p})", (old_tx_id, recent_tx_id))
+            c.execute(f"DELETE FROM site_usage_events WHERE ticker = {p} AND event_type = {p}", ("HDFCBANK", "PAGE_DWELL"))
+            conn.commit()
+            c.close()
+            conn.close()
+
+    def test_dossier_templates_include_reading_progress_bar_and_study_timer(self):
+        """Option 3: All 5 dossier templates and main.js wire #dossierReadingProgressBar & #dossierReadTimeBadge."""
+        template_files = [
+            "web/templates/dossier.html",
+            "web/templates/fund_dossier.html",
+            "web/templates/debt_dossier.html",
+            "web/templates/reit_dossier.html",
+            "web/templates/msme_dossier.html",
+        ]
+        for path in template_files:
+            with open(path, "r", encoding="utf-8") as f:
+                html = f.read()
+            self.assertIn('id="dossierReadingProgressBar"', html, f"Missing #dossierReadingProgressBar in {path}")
+            self.assertIn('id="dossierReadingProgressFill"', html, f"Missing #dossierReadingProgressFill in {path}")
+            self.assertIn('id="dossierReadTimeBadge"', html, f"Missing #dossierReadTimeBadge in {path}")
+            self.assertIn('id="dossierEstReadMinutes"', html, f"Missing #dossierEstReadMinutes in {path}")
+            self.assertIn('id="dossierActiveTimerText"', html, f"Missing #dossierActiveTimerText in {path}")
+
+        with open("web/static/js/main.js", "r", encoding="utf-8") as f:
+            js_code = f.read()
+        self.assertIn("/api/telemetry/dwell", js_code)
+        self.assertIn("dossierReadingProgressFill", js_code)
+        self.assertIn("dossierActiveTimerText", js_code)
+        self.assertIn("unsentPillarDwell", js_code)
+
+    def test_consolidated_5_hub_navigation_contracts(self):
+        """#7: Verify Admin Console renders Consolidated 5-Hub Primary Navigation + Contextual Sub-View Bar."""
+        resp = self.client.get("/admin?tab=traffic")
+        self.assertEqual(resp.status_code, 200)
+        soup = BeautifulSoup(resp.text, "html.parser")
+
+        hub_nav = soup.find("div", id="adminPrimaryHubNav")
+        self.assertIsNotNone(hub_nav, "Missing #adminPrimaryHubNav 5-Hub container.")
+        hub_btns = hub_nav.find_all("button", class_="admin-hub-btn")
+        self.assertEqual(len(hub_btns), 5, "Expected exactly 5 primary Executive Hubs.")
+        hub_ids = [b.get("data-hub") for b in hub_btns]
+        self.assertEqual(hub_ids, ["revenue", "service", "traffic", "platform", "governance"])
+
+        # Deep-linking to ?tab=traffic must mark the 'traffic' hub active
+        traffic_hub_btn = hub_nav.find("button", attrs={"data-hub": "traffic"})
+        self.assertIn("active", traffic_hub_btn.get("class", []))
+
+        # Sub-tab bar must group all 13 sub-views under the 5 hubs
+        sub_nav = soup.find("div", id="adminSubTabNav")
+        self.assertIsNotNone(sub_nav, "Missing #adminSubTabNav contextual sub-view bar.")
+        sub_btns = sub_nav.find_all("button", class_="admin-tab-btn")
+        self.assertEqual(len(sub_btns), 13)
+        for b in sub_btns:
+            self.assertIn(b.get("data-hub"), {"revenue", "service", "traffic", "platform", "governance"})
+
+        # Verify JS wiring for showHub & TAB_TO_HUB_MAP
+        script_text = "\n".join(s.string for s in soup.find_all("script") if s.string)
+        self.assertIn("function showHub(", script_text)
+        self.assertIn("TAB_TO_HUB_MAP", script_text)
+        self.assertIn("HUB_DEFAULT_TAB_MAP", script_text)
+
+
 
 
 if __name__ == "__main__":

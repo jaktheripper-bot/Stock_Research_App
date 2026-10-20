@@ -168,7 +168,7 @@ def build_pdf_dossier(
             from core.analysis import get_historical_prices
             hist_df = get_historical_prices(clean_name, period="6mo")
         except Exception as e:
-            logger.debug(f"Could not auto-fetch historical prices for {clean_name}: {e}")
+            logger.warning(f"Could not auto-fetch historical prices for {clean_name}: {e}")
             hist_df = None
 
     chart_filename = generate_pdf_chart_image(hist_df, clean_name) if hist_df is not None else None
