@@ -5,8 +5,8 @@
 
 {% block content %}
 <div class="container">
-  <article class="dossier-article">
-    <div class="dossier-header">
+  <article id="dossierReadingContainer" class="dossier-article" data-asset-class="equities">
+    <div class="dossier-header dossier-masthead-v2">
       <div class="ticker-title-wrap">
         <div>
           <h1 class="ticker-title">{{ ticker }} <span class="ticker-sub">({{ short_name }})</span></h1>
@@ -25,6 +25,9 @@
         </div>
 
         <div style="display: flex; gap: 10px; flex-wrap: wrap; align-items: center;">
+          <button id="dossierReadingToggleBtn" type="button" onclick="toggleDossierReadingMode()" class="btn btn-secondary btn-sm" title="Toggle Warm Ivory Reading Surface" aria-label="Toggle Warm Ivory Reading Surface" aria-pressed="false">
+            <svg class="glyph"><use href="#icon-reading-surface"></use></svg>
+          </button>
           <button id="btnShareDossier" onclick="shareCurrentPage('dossier')" class="btn btn-secondary btn-sm" title="Copy or share a link to this report" aria-label="Share this report">
             <span>🔗</span> Share
           </button>
@@ -914,19 +917,19 @@ document.addEventListener('DOMContentLoaded', function() {
         {
           label: 'Close Price (₹)',
           data: chartData.closes,
-          borderColor: '#38bdf8',
-          backgroundColor: 'rgba(56, 189, 248, 0.08)',
+          borderColor: '#7DA77A',
+          backgroundColor: 'rgba(14, 61, 50, 0.25)',
           borderWidth: 2,
           pointRadius: 0,
           pointHoverRadius: 5,
-          pointHoverBackgroundColor: '#38bdf8',
+          pointHoverBackgroundColor: '#7DA77A',
           fill: true,
           tension: 0.15
         },
         {
           label: '50-DMA (50-Day Moving Average)',
           data: chartData.sma50,
-          borderColor: '#f59e0b',
+          borderColor: '#C7E268',
           borderWidth: 1.8,
           borderDash: [5, 4],
           pointRadius: 0,

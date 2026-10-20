@@ -6,7 +6,7 @@
 {% block og_desc %}Section 115UA tax distribution breakdown, NDCF payout purity, and portfolio WALE audit for {{ reit.symbol }}.{% endblock %}
 
 {% block content %}
-<div class="container py-8">
+<div id="dossierReadingContainer" class="container py-8" data-asset-class="reits">
   <!-- Breadcrumbs -->
   <div style="font-size: 13px; color: #64748b; margin-bottom: 20px; display: flex; align-items: center; gap: 8px;">
     <a href="/" style="color: #94a3b8; text-decoration: none;">Home</a>
@@ -17,7 +17,7 @@
   </div>
 
   <!-- Header Banner -->
-  <div style="background: linear-gradient(135deg, rgba(30, 41, 59, 0.85) 0%, rgba(15, 23, 42, 0.95) 100%); border: 1px solid rgba(255, 255, 255, 0.1); border-radius: 16px; padding: 28px; margin-bottom: 24px; position: relative; overflow: hidden;">
+  <div class="dossier-masthead-v2" style="background: linear-gradient(135deg, rgba(30, 41, 59, 0.85) 0%, rgba(15, 23, 42, 0.95) 100%); border: 1px solid rgba(255, 255, 255, 0.1); border-radius: 16px; padding: 28px; margin-bottom: 24px; position: relative; overflow: hidden;">
     <div style="display: flex; justify-content: space-between; align-items: flex-start; flex-wrap: wrap; gap: 16px;">
       <div>
         <!-- Badges -->
@@ -59,6 +59,9 @@
 
         <!-- Action Buttons -->
         <div style="display: flex; gap: 10px; margin-top: 16px; flex-wrap: wrap; align-items: center;">
+          <button id="dossierReadingToggleBtn" type="button" onclick="toggleDossierReadingMode()" class="btn btn-secondary btn-sm" title="Toggle Warm Ivory Reading Surface" aria-label="Toggle Warm Ivory Reading Surface" aria-pressed="false">
+            <svg class="glyph"><use href="#icon-reading-surface"></use></svg>
+          </button>
           <button onclick="openCopilot('{{ reit.symbol }}', 'reit')" class="btn btn-hero-ai btn-sm" title="Launch Forensic Intelligence Desk (Shortcut: ⌘K or /)">
             <svg class="glyph"><use href="#glyph-shield"></use></svg> Forensic Desk
           </button>

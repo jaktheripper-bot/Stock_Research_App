@@ -4,7 +4,7 @@
 {% block meta_description %}Institutional 5-Pillar credit analysis, YTM, duration risk, seniority waterfall, rate shock sensitivity, and executive investment thesis for {{ posture.instrument_name }} ({{ posture.isin }}).{% endblock %}
 
 {% block content %}
-<div class="container py-8" style="max-width: 1200px; margin: 0 auto; padding: 24px 16px;">
+<div id="dossierReadingContainer" class="container py-8" data-asset-class="debt" style="max-width: 1200px; margin: 0 auto; padding: 24px 16px;">
   <!-- Breadcrumb & Collation Source Strip -->
   <div style="display: flex; flex-wrap: wrap; justify-content: space-between; align-items: center; gap: 12px; margin-bottom: 20px;">
     <div style="font-size: 13px; color: #64748b;">
@@ -23,7 +23,7 @@
   </div>
 
   <!-- Header Banner -->
-  <div style="background: linear-gradient(135deg, rgba(30, 41, 59, 0.8) 0%, rgba(15, 23, 42, 0.95) 100%); border: 1px solid rgba(255, 255, 255, 0.1); border-radius: 16px; padding: 28px; margin-bottom: 24px; box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.3);">
+  <div class="dossier-masthead-v2" style="background: linear-gradient(135deg, rgba(30, 41, 59, 0.8) 0%, rgba(15, 23, 42, 0.95) 100%); border: 1px solid rgba(255, 255, 255, 0.1); border-radius: 16px; padding: 28px; margin-bottom: 24px; box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.3);">
     <div style="display: flex; flex-wrap: wrap; justify-content: space-between; align-items: flex-start; gap: 16px; margin-bottom: 20px;">
       <div style="max-width: 800px;">
         <div style="display: flex; align-items: center; gap: 10px; margin-bottom: 8px; flex-wrap: wrap;">
@@ -58,6 +58,9 @@
           Credit Posture Score: <strong style="color: #f8fafc; font-size: 15px;">{{ posture.composite_score }} / 100</strong>
         </div>
         <div style="display: flex; gap: 8px; margin-top: 4px;">
+          <button id="dossierReadingToggleBtn" type="button" onclick="toggleDossierReadingMode()" class="btn btn-secondary btn-sm" title="Toggle Warm Ivory Reading Surface" aria-label="Toggle Warm Ivory Reading Surface" aria-pressed="false">
+            <svg class="glyph"><use href="#icon-reading-surface"></use></svg>
+          </button>
           <button onclick="openCopilot('{{ posture.ticker or posture.isin }}', 'debt')" class="btn btn-hero-ai btn-sm" title="Launch Forensic Intelligence Desk (Shortcut: ⌘K or /)">
             <svg class="glyph"><use href="#glyph-shield"></use></svg> Forensic Desk
           </button>

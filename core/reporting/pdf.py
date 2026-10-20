@@ -118,25 +118,25 @@ def generate_pdf_chart_image(df, ticker: str):
         plot_df = plot_df.sort_values("Date")
 
         fig, (ax1, ax2) = plt.subplots(2, 1, figsize=(7.2, 3.4), gridspec_kw={'height_ratios': [3, 1]}, sharex=True)
-        fig.patch.set_facecolor('#ffffff')
+        fig.patch.set_facecolor('#F7F5EE')
 
         # Price & 50-DMA
-        ax1.set_facecolor('#ffffff')
-        ax1.plot(plot_df["Date"], plot_df["Close"], color="#2563eb", linewidth=1.6, label="Close Price")
+        ax1.set_facecolor('#F7F5EE')
+        ax1.plot(plot_df["Date"], plot_df["Close"], color="#0E3D32", linewidth=1.75, label="Close Price")
         if "SMA50" in plot_df.columns and not plot_df["SMA50"].dropna().empty:
-            ax1.plot(plot_df["Date"], plot_df["SMA50"], color="#d97706", linewidth=1.3, linestyle="--", label="50-DMA")
+            ax1.plot(plot_df["Date"], plot_df["SMA50"], color="#7DA77A", linewidth=1.35, linestyle="--", label="50-DMA")
         
-        ax1.set_title(f"6-Month Price Momentum & 50-DMA ({ticker})", fontsize=10, fontweight="bold", pad=6, color="#0f172a")
-        ax1.set_ylabel("Price (INR)", fontsize=8, color="#334155")
+        ax1.set_title(f"6-Month Price Momentum & 50-DMA ({ticker})", fontsize=10, fontweight="bold", pad=6, color="#0B2337")
+        ax1.set_ylabel("Price (INR)", fontsize=8, color="#282F33")
         ax1.legend(loc="upper left", frameon=True, fontsize=8)
-        ax1.grid(True, linestyle=":", alpha=0.5)
+        ax1.grid(True, linestyle=":", color="#D9E3E8", alpha=0.8)
 
         # Volume
-        ax2.set_facecolor('#ffffff')
+        ax2.set_facecolor('#F7F5EE')
         if "Volume" in plot_df.columns:
-            ax2.bar(plot_df["Date"], plot_df["Volume"], color="#94a3b8", alpha=0.6, width=1.5)
-        ax2.set_ylabel("Vol", fontsize=7, color="#334155")
-        ax2.grid(True, linestyle=":", alpha=0.5)
+            ax2.bar(plot_df["Date"], plot_df["Volume"], color="#7DA77A", alpha=0.65, width=1.5)
+        ax2.set_ylabel("Vol", fontsize=7, color="#282F33")
+        ax2.grid(True, linestyle=":", color="#D9E3E8", alpha=0.8)
 
         plt.tight_layout()
         clean_name = re_mod.sub(r'[^a-zA-Z0-9]', '_', ticker)
@@ -195,36 +195,39 @@ def build_pdf_dossier(
     now_str = datetime.now(IST).strftime("%d %B %Y, %H:%M IST")
     doc_receipt_id = f"SR-DOC-{clean_name}-{int(datetime.now().timestamp())}"
 
-    # Typography & Institutional Print Styling
+    # Typography & Institutional Print Styling (Moatnomics v2.0 Forest/Ink/Ivory Palette)
     user_css = """
 body {
-    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+    font-family: "Inter", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
     font-size: 9.5pt;
     line-height: 1.55;
-    color: #1e293b;
+    color: #282F33;
+    font-variant-numeric: tabular-nums;
 }
 h1 {
+    font-family: "Playfair Display", Georgia, serif;
     font-size: 15pt;
     font-weight: 700;
-    color: #0f172a;
+    color: #0B2337;
     margin-top: 0;
     margin-bottom: 6px;
     letter-spacing: -0.2px;
 }
 h2 {
+    font-family: "Playfair Display", Georgia, serif;
     font-size: 11.5pt;
     font-weight: 700;
-    color: #1e3a8a;
+    color: #0E3D32;
     margin-top: 14px;
     margin-bottom: 6px;
     padding-bottom: 3px;
-    border-bottom: 1.5px solid #3b82f6;
+    border-bottom: 1.5px solid #7DA77A;
     page-break-after: avoid;
 }
 h3 {
     font-size: 10pt;
     font-weight: 700;
-    color: #1e293b;
+    color: #0B2337;
     margin-top: 10px;
     margin-bottom: 4px;
     page-break-after: avoid;
@@ -244,20 +247,20 @@ li {
     font-size: 9.5pt;
     line-height: 1.5;
     margin-bottom: 3px;
-    color: #1e293b;
+    color: #282F33;
 }
 ol li {
     font-size: 9.5pt;
     line-height: 1.5;
     margin-bottom: 4px;
-    color: #1e293b;
+    color: #282F33;
 }
 blockquote {
-    border-left: 3.5px solid #2563eb;
-    background: #f8fafc;
+    border-left: 3.5px solid #0E3D32;
+    background: #F7F5EE;
     padding: 6px 12px;
     margin: 8px 0;
-    color: #334155;
+    color: #282F33;
     font-size: 9pt;
 }
 table {
@@ -268,27 +271,27 @@ table {
     page-break-inside: avoid;
 }
 th {
-    background-color: #f1f5f9;
-    color: #0f172a;
+    background-color: #0B2337;
+    color: #F7F5EE;
     font-weight: 600;
     padding: 5px 8px;
-    border: 1px solid #cbd5e1;
+    border: 1px solid #0B2337;
     text-align: left;
 }
 td {
     padding: 5px 8px;
-    border: 1px solid #e2e8f0;
-    color: #334155;
+    border: 1px solid #D9E3E8;
+    color: #282F33;
     text-align: left;
     vertical-align: top;
 }
 tr:nth-child(even) td {
-    background-color: #f8fafc;
+    background-color: #F7F5EE;
 }
 hr {
     border: 0;
     height: 1px;
-    background-color: #e2e8f0;
+    background-color: #D9E3E8;
     margin: 12px 0;
 }
 img {
@@ -298,7 +301,7 @@ img {
     page-break-inside: avoid;
 }
 a {
-    color: #1d4ed8;
+    color: #0E3D32;
     text-decoration: underline;
 }
 """

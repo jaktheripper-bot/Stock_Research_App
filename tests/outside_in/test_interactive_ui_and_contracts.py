@@ -1462,6 +1462,64 @@ class TestCompetitiveEnhancements(unittest.TestCase):
             self.assertNotIn("{{", sim_str, f"Unrendered Jinja tag detected in #reitSec56Simulator for {sym}")
             self.assertNotIn("{%", sim_str, f"Unrendered Jinja directive detected in #reitSec56Simulator for {sym}")
 
+    def test_moatnomics_visual_identity_v2_contracts(self):
+        """
+        [Rule 6 Outside-In UI Contract Test]
+        Verifies Moatnomics Visual Identity v2.0 visual cues across Phases 1–5:
+        1. Brand tokens & ASSET_CLASS_VISUAL_TOKENS in core/brand/visual_identity.py.
+        2. Dual-theme CSS tokens, Playfair Display + tabular-nums, and 7 [data-asset-class] scopes in style.css.
+        3. Perspective Portal SVG logo (#logo-perspective-portal), 12 canonical icons (#icon-*), and #themeToggleBtn in base.html.
+        4. Asset-class visual framing across directories and Warm Ivory reading surface toggle (#dossierReadingToggleBtn) across dossiers.
+        5. Forest/Ink/Ivory print styling and Matplotlib chart palette in core/reporting/pdf.py.
+        """
+        from bs4 import BeautifulSoup
+        from core.brand import BRAND_PALETTE_V2, ASSET_CLASS_ACCENTS_V2, CANONICAL_ICONS_V2
+
+        self.assertEqual(BRAND_PALETTE_V2["forest"]["hex"], "#0E3D32")
+        self.assertEqual(BRAND_PALETTE_V2["ink_navy"]["hex"], "#0B2337")
+        self.assertEqual(BRAND_PALETTE_V2["warm_ivory"]["hex"], "#F7F5EE")
+        self.assertEqual(BRAND_PALETTE_V2["sage"]["hex"], "#7DA77A")
+        self.assertEqual(BRAND_PALETTE_V2["botanical_lime"]["hex"], "#C7E268")
+        self.assertEqual(len(ASSET_CLASS_ACCENTS_V2), 7)
+        self.assertEqual(len(CANONICAL_ICONS_V2), 12)
+
+        resp_home = self.client.get("/")
+        self.assertEqual(resp_home.status_code, 200)
+        soup_home = BeautifulSoup(resp_home.text, "html.parser")
+        self.assertIsNotNone(soup_home.find(id="logo-perspective-portal"))
+        self.assertIsNotNone(soup_home.find(id="themeToggleBtn"))
+        self.assertIsNotNone(soup_home.find(class_="portal-reveal-mark"))
+
+        # Check asset-class framing on directories
+        for route, expected_ac in [
+            ("/equities", "equities"),
+            ("/funds", "funds"),
+            ("/etfs", "etfs"),
+            ("/debt", "debt"),
+            ("/sovereign", "sovereign"),
+            ("/reits", "reits"),
+            ("/msme", "msme"),
+        ]:
+            r = self.client.get(route)
+            self.assertEqual(r.status_code, 200)
+            self.assertIn(f'data-asset-class="{expected_ac}"', r.text)
+
+        # Check dossier reading mode toggle & masthead framing across dossiers
+        for route, expected_ac in [
+            ("/dossier/INFY", "equities"),
+            ("/funds/PPFAS_FLEXICAP_DIR", "funds"),
+            ("/debt/INE002A08012", "debt"),
+            ("/reits/EMBASSY", "reits"),
+            ("/msme/UDYAM-MH-26-0012480", "msme"),
+        ]:
+            r = self.client.get(route)
+            self.assertEqual(r.status_code, 200)
+            s = BeautifulSoup(r.text, "html.parser")
+            self.assertIsNotNone(s.find(id="dossierReadingContainer"), f"Missing #dossierReadingContainer on {route}")
+            self.assertIsNotNone(s.find(id="dossierReadingToggleBtn"), f"Missing #dossierReadingToggleBtn on {route}")
+            self.assertIsNotNone(s.find(class_="dossier-masthead-v2"), f"Missing .dossier-masthead-v2 on {route}")
+            self.assertIn(f'data-asset-class="{expected_ac}"', r.text)
+
 
 if __name__ == "__main__":
     unittest.main()

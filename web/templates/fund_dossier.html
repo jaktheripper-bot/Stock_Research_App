@@ -4,7 +4,7 @@
 {% block meta_description %}Deep institutional look-through analysis of {{ scheme.scheme_name }}. Constituent stock & bond decomposition, Active Share closet-indexing check, and 10-year Direct vs Regular fee drag analysis.{% endblock %}
 
 {% block content %}
-<div class="container py-8">
+<div id="dossierReadingContainer" class="container py-8" data-asset-class="funds">
   <!-- Breadcrumbs -->
   <div style="font-size: 13px; color: #64748b; margin-bottom: 20px; display: flex; align-items: center; gap: 8px;">
     <a href="/" style="color: #94a3b8; text-decoration: none;">Home</a>
@@ -15,7 +15,7 @@
   </div>
 
   <!-- Header Banner -->
-  <div style="background: linear-gradient(135deg, rgba(30, 41, 59, 0.8) 0%, rgba(15, 23, 42, 0.95) 100%); border: 1px solid rgba(255, 255, 255, 0.1); border-radius: 16px; padding: 28px; margin-bottom: 24px;">
+  <div class="dossier-masthead-v2" style="background: linear-gradient(135deg, rgba(30, 41, 59, 0.8) 0%, rgba(15, 23, 42, 0.95) 100%); border: 1px solid rgba(255, 255, 255, 0.1); border-radius: 16px; padding: 28px; margin-bottom: 24px;">
     <div style="display: flex; justify-content: space-between; align-items: flex-start; flex-wrap: wrap; gap: 16px;">
       <div>
         <div style="display: inline-flex; align-items: center; gap: 8px; margin-bottom: 12px;">
@@ -49,6 +49,9 @@
           Data sourced directly from statutory AMFI monthly portfolio disclosures and cross-checked against exchange equity feeds.
         </div>
         <div style="display: flex; gap: 8px; margin-top: 14px; flex-wrap: wrap;">
+          <button id="dossierReadingToggleBtn" type="button" onclick="toggleDossierReadingMode()" class="btn btn-secondary btn-sm" title="Toggle Warm Ivory Reading Surface" aria-label="Toggle Warm Ivory Reading Surface" aria-pressed="false">
+            <svg class="glyph"><use href="#icon-reading-surface"></use></svg>
+          </button>
           <button onclick="openCopilot('{{ scheme.scheme_code }}', 'mutual_fund')" class="btn btn-hero-ai btn-sm" title="Launch Forensic Intelligence Desk (Shortcut: ⌘K or /)">
             <svg class="glyph"><use href="#glyph-shield"></use></svg> Forensic Desk
           </button>
