@@ -1540,6 +1540,31 @@ class TestCompetitiveEnhancements(unittest.TestCase):
         self.assertEqual(len(list(pathlib.Path("web/static/img/brand").glob("portal-*.webp"))), 4)
         self.assertEqual(len(list(pathlib.Path("web/static/img/heroes").glob("hero-*.webp"))), 13)
 
+        # Check Track 2 (2A Chart Anatomy, 2B Editorial Callouts, 2C Light/Ivory Contrast Sweep)
+        r_sov = self.client.get("/sovereign")
+        s_sov = BeautifulSoup(r_sov.text, "html.parser")
+        self.assertIsNotNone(s_sov.find(class_="chart-anatomy-card"), "Missing .chart-anatomy-card on /sovereign")
+        self.assertIsNotNone(s_sov.find(class_="chart-anatomy-header"), "Missing .chart-anatomy-header on /sovereign")
+        self.assertIsNotNone(s_sov.find(class_="chart-anatomy-canvas"), "Missing .chart-anatomy-canvas on /sovereign")
+
+        r_infy = self.client.get("/dossier/INFY")
+        s_infy = BeautifulSoup(r_infy.text, "html.parser")
+        self.assertIsNotNone(s_infy.find(class_="editorial-callout-conclusion"))
+        self.assertIsNotNone(s_infy.find(class_="editorial-callout-countercase"))
+        self.assertIsNotNone(s_infy.find(class_="editorial-callout-snapshot"))
+        self.assertIsNotNone(s_infy.find(class_="editorial-callout-watchpoints"))
+
+        css_text = pathlib.Path("web/static/css/style.css").read_text(encoding="utf-8")
+        for token in [
+            ".chart-anatomy-card",
+            ".editorial-callout-conclusion",
+            ".editorial-callout-countercase",
+            ".editorial-callout-watchpoints",
+            'html[data-theme="light"] [style*="background: rgba(15, 23, 42"]',
+            '.dossier-ivory-surface [style*="color: #f8fafc"]',
+        ]:
+            self.assertIn(token, css_text)
+
 
 if __name__ == "__main__":
     unittest.main()

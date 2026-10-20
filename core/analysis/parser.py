@@ -81,19 +81,19 @@ def render_epistemic_badges_html(html_text: str) -> str:
     replacements = [
         (
             r"\[VERIFIED FACT([^\]]*)\]",
-            r'<span class="badge epistemic-badge" style="background:rgba(16,185,129,0.14);color:#34d399;border:1px solid rgba(16,185,129,0.35);font-size:11px;font-weight:700;padding:2px 7px;border-radius:4px;margin-right:4px;">✓ VERIFIED FACT\1</span>'
+            r'<span class="badge epistemic-badge epistemic-badge-fact" style="background:rgba(16,185,129,0.14);color:#34d399;border:1px solid rgba(16,185,129,0.35);font-size:11px;font-weight:700;padding:2px 7px;border-radius:4px;margin-right:4px;">✓ VERIFIED FACT\1</span>'
         ),
         (
             r"\[CALCULATED METRIC([^\]]*)\]",
-            r'<span class="badge epistemic-badge" style="background:rgba(56,189,248,0.14);color:#38bdf8;border:1px solid rgba(56,189,248,0.35);font-size:11px;font-weight:700;padding:2px 7px;border-radius:4px;margin-right:4px;">∑ CALCULATED METRIC\1</span>'
+            r'<span class="badge epistemic-badge epistemic-badge-calc" style="background:rgba(56,189,248,0.14);color:#38bdf8;border:1px solid rgba(56,189,248,0.35);font-size:11px;font-weight:700;padding:2px 7px;border-radius:4px;margin-right:4px;">∑ CALCULATED METRIC\1</span>'
         ),
         (
             r"\[MODEL INTERPRETATION([^\]]*)\]",
-            r'<span class="badge epistemic-badge" style="background:rgba(168,85,247,0.14);color:#c084fc;border:1px solid rgba(168,85,247,0.35);font-size:11px;font-weight:700;padding:2px 7px;border-radius:4px;margin-right:4px;">🧠 MODEL INTERPRETATION\1</span>'
+            r'<span class="badge epistemic-badge epistemic-badge-interp" style="background:rgba(168,85,247,0.14);color:#c084fc;border:1px solid rgba(168,85,247,0.35);font-size:11px;font-weight:700;padding:2px 7px;border-radius:4px;margin-right:4px;">🧠 MODEL INTERPRETATION\1</span>'
         ),
         (
             r"\[UNRESOLVED UNCERTAINTY([^\]]*)\]",
-            r'<span class="badge epistemic-badge" style="background:rgba(245,158,11,0.14);color:#fbbf24;border:1px solid rgba(245,158,11,0.35);font-size:11px;font-weight:700;padding:2px 7px;border-radius:4px;margin-right:4px;">❓ UNRESOLVED UNCERTAINTY\1</span>'
+            r'<span class="badge epistemic-badge epistemic-badge-uncert" style="background:rgba(245,158,11,0.14);color:#fbbf24;border:1px solid rgba(245,158,11,0.35);font-size:11px;font-weight:700;padding:2px 7px;border-radius:4px;margin-right:4px;">❓ UNRESOLVED UNCERTAINTY\1</span>'
         ),
     ]
     out = html_text

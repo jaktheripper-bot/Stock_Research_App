@@ -6,6 +6,9 @@
 {% block content %}
 <div class="container">
   <article id="dossierReadingContainer" class="dossier-article" data-asset-class="equities">
+    <div id="dossierReadingProgressBar" class="dossier-reading-progress-track" role="progressbar" aria-label="Dossier reading progress">
+      <div id="dossierReadingProgressFill" class="dossier-reading-progress-fill"></div>
+    </div>
     <div class="dossier-header dossier-masthead-v2">
       <div class="ticker-title-wrap">
         <div>
@@ -25,6 +28,11 @@
         </div>
 
         <div style="display: flex; gap: 10px; flex-wrap: wrap; align-items: center;">
+          <span id="dossierReadTimeBadge" class="dossier-read-time-badge" title="Estimated reading time and live active study progress">
+            <span id="dossierEstReadMinutes">~6 min read</span>
+            <span class="dossier-meta-sep">•</span>
+            <span id="dossierActiveTimerText" class="mono">0s active • 0% read</span>
+          </span>
           <button id="dossierReadingToggleBtn" type="button" onclick="toggleDossierReadingMode()" class="btn btn-secondary btn-sm" title="Toggle Warm Ivory Reading Surface" aria-label="Toggle Warm Ivory Reading Surface" aria-pressed="false">
             <svg class="glyph"><use href="#icon-reading-surface"></use></svg>
           </button>
@@ -434,7 +442,7 @@
         <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(320px, 1fr)); gap: 16px;">
           
           <!-- Bull Thesis Column -->
-          <div style="background: rgba(16, 185, 129, 0.05); border: 1px solid rgba(16, 185, 129, 0.25); border-radius: 8px; padding: 14px 16px;">
+          <div class="editorial-callout-conclusion" style="background: rgba(16, 185, 129, 0.05); border: 1px solid rgba(16, 185, 129, 0.25); border-radius: 8px; padding: 14px 16px;">
             <div style="font-size: 13.5px; font-weight: 700; color: #10b981; margin-bottom: 10px; display: flex; align-items: center; gap: 6px;">
               <span>🟢</span> Top 3 Structural Tailwinds (Bull Case)
             </div>
@@ -449,7 +457,7 @@
           </div>
 
           <!-- Bear Thesis Column -->
-          <div style="background: rgba(239, 68, 68, 0.05); border: 1px solid rgba(239, 68, 68, 0.25); border-radius: 8px; padding: 14px 16px;">
+          <div class="editorial-callout-countercase" style="background: rgba(239, 68, 68, 0.05); border: 1px solid rgba(239, 68, 68, 0.25); border-radius: 8px; padding: 14px 16px;">
             <div style="font-size: 13.5px; font-weight: 700; color: #f87171; margin-bottom: 10px; display: flex; align-items: center; gap: 6px;">
               <span>🔴</span> Top 3 Specific Vulnerabilities (Bear Case)
             </div>
@@ -573,14 +581,14 @@
 
     <!-- 6-Month Price Momentum & 50-DMA Trend Chart -->
     {% if chart_data and chart_data.dates %}
-    <div style="margin-bottom: 30px; background: rgba(15, 23, 42, 0.85); border: 1px solid var(--border-color); border-radius: var(--radius-md); padding: 22px;">
-      <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 14px; flex-wrap: wrap; gap: 10px;">
+    <div class="chart-anatomy-card" style="margin-bottom: 30px; background: rgba(15, 23, 42, 0.85); border: 1px solid var(--border-color); border-radius: var(--radius-md); padding: 22px;">
+      <div class="chart-anatomy-header" style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 14px; flex-wrap: wrap; gap: 10px;">
         <div>
           <div style="font-size: 11px; font-weight: 700; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.05em; margin-bottom: 4px;">
             Technical & Intermediate Trend Architecture (Pillar 6)
           </div>
           <h3 style="margin: 0; font-size: 16.5px; font-weight: 800; color: var(--text-primary); display: flex; align-items: center; gap: 8px;">
-            <span>📈</span> 6-Month Price Momentum & 50-DMA Trendline
+            <span><svg class="glyph"><use href="#icon-markets"></use></svg></span> 6-Month Price Momentum & 50-DMA Trendline
           </h3>
         </div>
         {% if chart_data.trend_badge %}
@@ -593,12 +601,12 @@
       </div>
 
       <!-- Chart Canvas -->
-      <div style="position: relative; height: 280px; width: 100%;">
+      <div class="chart-anatomy-canvas" style="position: relative; height: 280px; width: 100%; padding: 8px;">
         <canvas id="momentumChart"></canvas>
       </div>
 
       {% if chart_data.trend_inference %}
-      <div style="margin-top: 14px; padding: 10px 14px; background: rgba(30, 41, 59, 0.5); border-radius: 6px; font-size: 12.5px; color: var(--text-secondary); display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 8px;">
+      <div class="chart-anatomy-footer" style="margin-top: 14px; padding: 10px 14px; background: rgba(30, 41, 59, 0.5); border-radius: 6px; font-size: 12.5px; color: var(--text-secondary); display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 8px;">
         <span>💡 <strong>Trend Context:</strong> {{ chart_data.trend_inference }}</span>
         <span style="font-size: 12px; color: var(--text-muted);">
           Latest Quote: <strong style="color: #38bdf8;">₹{{ chart_data.latest_close }}</strong> • 50-DMA: <strong style="color: #f59e0b;">₹{{ chart_data.latest_sma|default('N/A') }}</strong>

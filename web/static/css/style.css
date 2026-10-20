@@ -2771,6 +2771,141 @@ html[data-theme="light"] .theme-toggle-btn {
   animation: portalArchPulse 2.4s var(--ease-editorial) infinite;
 }
 
+/* 8. Track 2A: Canonical 6-Part Chart Anatomy Container */
+.chart-anatomy-card {
+  position: relative;
+  border-top: 3px solid var(--asset-accent, #7DA77A) !important;
+  border-radius: var(--radius-md);
+  box-shadow: 0 10px 28px rgba(0, 0, 0, 0.22);
+}
+
+.chart-anatomy-header {
+  padding-bottom: 12px;
+  margin-bottom: 16px;
+  border-bottom: 1px solid rgba(217, 227, 232, 0.12);
+}
+
+.chart-anatomy-canvas {
+  border-radius: var(--radius-sm);
+  border: 1px solid rgba(125, 167, 122, 0.22);
+}
+
+.chart-anatomy-footer {
+  border-top: 1px solid rgba(217, 227, 232, 0.12);
+  border-left: 3px solid var(--brand-sage, #7DA77A);
+}
+
+/* 9. Track 2B: Editorial Callout Surfaces & Epistemic Tier Classes */
+.editorial-callout-conclusion {
+  border-left: 4px solid var(--brand-sage, #7DA77A) !important;
+}
+
+.editorial-callout-snapshot {
+  border-top: 3px solid var(--brand-forest, #0E3D32) !important;
+}
+
+.editorial-callout-countercase {
+  border-left: 4px solid #C88A32 !important;
+}
+
+.editorial-callout-watchpoints {
+  border-left: 4px solid #B86545 !important;
+}
+
+.epistemic-badge-fact {
+  border-color: rgba(125, 167, 122, 0.45) !important;
+}
+
+.epistemic-badge-calc {
+  border-color: rgba(59, 122, 158, 0.45) !important;
+}
+
+.epistemic-badge-interp {
+  border-color: rgba(91, 95, 151, 0.45) !important;
+}
+
+.epistemic-badge-uncert {
+  border-color: rgba(200, 138, 50, 0.45) !important;
+}
+
+/* 10. Track 2C: Warm Ivory Light-Mode & Reading-Mode Contrast Sweep */
+html[data-theme="light"] [style*="background: rgba(15, 23, 42"],
+html[data-theme="light"] [style*="background: rgba(30, 41, 59"],
+html[data-theme="light"] [style*="background: rgba(2, 6, 23"],
+.dossier-ivory-surface [style*="background: rgba(15, 23, 42"],
+.dossier-ivory-surface [style*="background: rgba(30, 41, 59"],
+.dossier-ivory-surface [style*="background: rgba(2, 6, 23"] {
+  background: #FFFFFF !important;
+  border-color: #D9E3E8 !important;
+  color: #282F33 !important;
+  box-shadow: 0 2px 10px rgba(11, 35, 55, 0.04);
+}
+
+html[data-theme="light"] [style*="color: #f8fafc"],
+html[data-theme="light"] [style*="color: #f1f5f9"],
+html[data-theme="light"] [style*="color: #fff"],
+.dossier-ivory-surface [style*="color: #f8fafc"],
+.dossier-ivory-surface [style*="color: #f1f5f9"],
+.dossier-ivory-surface [style*="color: #fff"] {
+  color: #0B2337 !important;
+}
+
+html[data-theme="light"] [style*="color: #cbd5e1"],
+html[data-theme="light"] [style*="color: #94a3b8"],
+html[data-theme="light"] [style*="color: #64748b"],
+.dossier-ivory-surface [style*="color: #cbd5e1"],
+.dossier-ivory-surface [style*="color: #94a3b8"],
+.dossier-ivory-surface [style*="color: #64748b"] {
+  color: #282F33 !important;
+}
+
+html[data-theme="light"] [style*="color: #38bdf8"],
+.dossier-ivory-surface [style*="color: #38bdf8"] {
+  color: #0E3D32 !important;
+}
+
+/* Preserve light text inside dark Forest/Ink Navy mastheads & hero banners even in Light Mode */
+html[data-theme="light"] .hero-portal-banner,
+html[data-theme="light"] .dossier-masthead-v2,
+.dossier-ivory-surface .dossier-masthead-v2 {
+  background: linear-gradient(135deg, #0B2337 0%, #0E3D32 100%) !important;
+  color: #F7F5EE !important;
+}
+
+html[data-theme="light"] .hero-portal-banner h1,
+html[data-theme="light"] .hero-portal-banner h2,
+html[data-theme="light"] .hero-portal-banner [style*="color: #f8fafc"],
+html[data-theme="light"] .dossier-masthead-v2 h1,
+html[data-theme="light"] .dossier-masthead-v2 [style*="color: #f8fafc"],
+.dossier-ivory-surface .dossier-masthead-v2 h1,
+.dossier-ivory-surface .dossier-masthead-v2 [style*="color: #f8fafc"] {
+  color: #F7F5EE !important;
+}
+
+html[data-theme="light"] .hero-portal-banner [style*="color: #94a3b8"],
+html[data-theme="light"] .hero-portal-banner [style*="color: #cbd5e1"],
+html[data-theme="light"] .dossier-masthead-v2 [style*="color: #94a3b8"],
+html[data-theme="light"] .dossier-masthead-v2 [style*="color: #cbd5e1"],
+.dossier-ivory-surface .dossier-masthead-v2 [style*="color: #94a3b8"],
+.dossier-ivory-surface .dossier-masthead-v2 [style*="color: #cbd5e1"] {
+  color: #D9E3E8 !important;
+}
+
+html[data-theme="light"] .pillar-accordion,
+.dossier-ivory-surface .pillar-accordion {
+  background: #FFFFFF !important;
+  border-color: #D9E3E8 !important;
+  color: #282F33 !important;
+}
+
+html[data-theme="light"] .pillar-accordion summary,
+.dossier-ivory-surface .pillar-accordion summary {
+  background: #F7F5EE !important;
+  color: #0B2337 !important;
+  border-bottom: 1px solid #D9E3E8;
+}
+
+
 
 
 
