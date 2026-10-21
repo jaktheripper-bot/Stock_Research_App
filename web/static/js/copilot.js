@@ -25,8 +25,8 @@ const COPILOT_CONFIGS = {
         assetBadge: "Fundamental Equity Intelligence",
         introText: (ticker) => `Welcome to the <strong>Research Desk</strong>. I can assist in stress-testing your investment thesis on <strong>${ticker || 'the selected equity'}</strong>, deriving implied growth rates via Reverse DCF, or running a <strong>countercase analysis</strong>.`,
         features: [
-            { icon: "icon-compare", title: "Countercase", desc: "Expose failure modes & thesis risks", prompt: "Run a countercase analysis on this stock: what failure modes could destroy shareholder value?" },
-            { icon: "icon-valuation", title: "Reverse DCF Growth", desc: "Deconstruct implied growth priced into current CMP", prompt: "What implied growth rate is priced into current CMP based on Reverse DCF?" },
+            { icon: "icon-compare", title: "Countercase", desc: "Find failure modes and thesis risks", prompt: "Run a countercase analysis on this stock: what failure modes could destroy shareholder value?" },
+            { icon: "icon-valuation", title: "Reverse DCF Growth", desc: "See the growth implied by the current price", prompt: "What implied growth rate is priced into current CMP based on Reverse DCF?" },
             { icon: "icon-doc", title: "Governance Check", desc: "Audit promoter pledging & related-party transactions", prompt: "Are there any promoter pledging or corporate governance red flags in recent disclosures?" }
         ],
         chips: [
