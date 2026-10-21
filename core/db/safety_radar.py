@@ -263,6 +263,27 @@ def seed_default_safety_radar_products() -> int:
     return seeded
 
 
+def _normalize_safety_product(prod: Dict[str, Any]) -> Dict[str, Any]:
+    """Ensures a safety radar product dictionary always exposes parsed `audit_matrix`."""
+    item = dict(prod)
+    mat = item.get("audit_matrix")
+    if not isinstance(mat, dict):
+        raw_json = item.get("audit_matrix_json")
+        if isinstance(raw_json, dict):
+            mat = raw_json
+        elif isinstance(raw_json, str) and raw_json.strip():
+            try:
+                mat = json.loads(raw_json)
+            except Exception as e:
+                logger.debug("Failed parsing safety radar audit_matrix_json in fallback normalizer: %s", e)
+                mat = {}
+        else:
+            mat = {}
+    item["audit_matrix"] = mat
+    item.setdefault("updated_at", datetime.now(IST).strftime("%Y-%m-%d %H:%M:%S"))
+    return item
+
+
 def get_all_safety_radar_products(category: Optional[str] = None) -> List[Dict[str, Any]]:
     """Retrieves all tracked alternative yield products sorted by danger score descending."""
     conn = get_db_connection()
@@ -288,10 +309,10 @@ def get_all_safety_radar_products(category: Optional[str] = None) -> List[Dict[s
             seed_default_safety_radar_products()
 
         where_clauses = [
-            "product_id != 'GULLAK___SAFEGOLD'",
-            "product_name != 'Gold Yield 16% Leasing'",
+            f"product_id != {p}",
+            f"product_name != {p}",
         ]
-        params: List[Any] = []
+        params: List[Any] = ["GULLAK___SAFEGOLD", "Gold Yield 16% Leasing"]
         if category:
             where_clauses.append(f"category = {p}")
             params.append(category)
@@ -313,14 +334,14 @@ def get_all_safety_radar_products(category: Optional[str] = None) -> List[Dict[s
         if not rows and not category:
             for prod in DEFAULT_ALTERNATIVE_YIELD_PRODUCTS:
                 save_alternative_yield_product(prod)
-            return DEFAULT_ALTERNATIVE_YIELD_PRODUCTS
+            return [_normalize_safety_product(prod) for prod in DEFAULT_ALTERNATIVE_YIELD_PRODUCTS]
 
         results = []
         for r in rows:
             mat = {}
             if r[13]:
                 try:
-                    mat = json.loads(r[13])
+                    mat = json.loads(r[13]) if isinstance(r[13], str) else dict(r[13])
                 except Exception as e:
                     logger.debug("Failed parsing safety radar JSON: %s", e)
                     mat = {}
@@ -345,7 +366,10 @@ def get_all_safety_radar_products(category: Optional[str] = None) -> List[Dict[s
         return results
     except Exception as e:
         logger.error(f"Error fetching safety radar products: {e}")
-        return DEFAULT_ALTERNATIVE_YIELD_PRODUCTS
+        fallback = [_normalize_safety_product(prod) for prod in DEFAULT_ALTERNATIVE_YIELD_PRODUCTS]
+        if category:
+            fallback = [prod for prod in fallback if prod.get("category") == category]
+        return fallback
     finally:
         cursor.close()
         conn.close()

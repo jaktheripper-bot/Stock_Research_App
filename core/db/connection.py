@@ -95,6 +95,47 @@ def _normalize_pg_dsn(dsn: str) -> str:
         dsn = f"{dsn}{sep}sslmode=require"
     return dsn
 
+import re
+
+_SQL_SINGLE_QUOTE_RE = re.compile(r"'(?:''|[^'])*'")
+
+
+def _escape_pg_literal_percents(query: str) -> str:
+    """Escapes standalone literal '%' as '%%' inside single-quoted SQL literals for psycopg2 parameterized queries."""
+    if not isinstance(query, str) or "%" not in query or "'" not in query:
+        return query
+    return _SQL_SINGLE_QUOTE_RE.sub(
+        lambda m: re.sub(r"(?<!%)%(?!%)", "%%", m.group(0)),
+        query,
+    )
+
+
+class _SafePgCursorProxy:
+    """Wraps a psycopg2 cursor so empty param tuples do not trigger mogrify and literal '%' inside SQL quotes are escaped."""
+    def __init__(self, cur):
+        self._cur = cur
+
+    def __getattr__(self, name):
+        return getattr(self._cur, name)
+
+    def execute(self, query, vars=None):
+        if vars is not None and len(vars) == 0:
+            return self._cur.execute(query)
+        if vars is not None and isinstance(query, str):
+            query = _escape_pg_literal_percents(query)
+        return self._cur.execute(query, vars)
+
+    def __iter__(self):
+        return iter(self._cur)
+
+    def __enter__(self):
+        self._cur.__enter__()
+        return self
+
+    def __exit__(self, exc_type, exc_val, exc_tb):
+        return self._cur.__exit__(exc_type, exc_val, exc_tb)
+
+
 class _PooledConnectionProxy:
     """Proxy wrapper around a psycopg2 connection checked out from ThreadedConnectionPool.
     Calling .close() returns the connection to the pool rather than terminating the TCP/SSL socket."""
@@ -102,6 +143,9 @@ class _PooledConnectionProxy:
         self._pool = pool
         self._conn = conn
         self._returned = False
+
+    def cursor(self, *args, **kwargs):
+        return _SafePgCursorProxy(self._conn.cursor(*args, **kwargs))
 
     def __getattr__(self, name):
         return getattr(self._conn, name)
@@ -115,7 +159,10 @@ class _PooledConnectionProxy:
             except Exception as e:
                 logger.debug(f"Connection proxy rollback notice: {e}")
             try:
-                self._pool.putconn(self._conn)
+                if self._pool is not None:
+                    self._pool.putconn(self._conn)
+                else:
+                    self._conn.close()
             except Exception as e:
                 logger.debug(f"Connection pool return notice: {e}")
                 try:
@@ -215,7 +262,7 @@ def _get_raw_connection():
                 import psycopg2
                 direct_conn = psycopg2.connect(norm_url, connect_timeout=10)
                 _PG_AVAILABLE = True
-                return direct_conn
+                return _PooledConnectionProxy(None, direct_conn)
             except Exception as direct_err:
                 import time
                 _PG_AVAILABLE = False

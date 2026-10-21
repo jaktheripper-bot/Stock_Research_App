@@ -1379,8 +1379,8 @@ def get_user_usage_analytics(days: int = None, start_date = None, end_date = Non
                   AND (u.email IS NULL OR LOWER(u.email) NOT IN ({admin_emails_sql}))
                 GROUP BY e.user_email, u.id
                 ORDER BY total_events DESC
-                LIMIT {p};
-            """, (safe_limit,))
+                LIMIT {safe_limit};
+            """)
             top_rows = cursor.fetchall()
             user_list = []
             for r in top_rows:

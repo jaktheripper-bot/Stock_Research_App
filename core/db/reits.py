@@ -899,41 +899,69 @@ def save_reit_or_invit(reit: Dict[str, Any]) -> bool:
         conn.close()
 
 
+def _normalize_reit_item(reit: Dict[str, Any]) -> Dict[str, Any]:
+    """Ensures a REIT/InvIT dictionary always exposes parsed `details` and typed numeric fields."""
+    item = dict(reit)
+    det = item.get("details")
+    if not isinstance(det, dict):
+        raw_json = item.get("details_json")
+        if isinstance(raw_json, dict):
+            det = raw_json
+        elif isinstance(raw_json, str) and raw_json.strip():
+            try:
+                det = json.loads(raw_json)
+            except Exception as e:
+                logger.debug("Failed parsing REIT details_json in fallback normalizer: %s", e)
+                det = {}
+        else:
+            det = {}
+    item["details"] = det
+    item.setdefault("updated_at", datetime.now(IST).strftime("%Y-%m-%d %H:%M:%S"))
+    return item
+
+
 def get_all_reits_and_invits(structure_type: Optional[str] = None) -> List[Dict[str, Any]]:
     """Retrieves all tracked REITs, SM REITs, and InvITs."""
     conn = get_db_connection()
     cursor = conn.cursor()
     p = get_placeholder()
 
+    def _run_select() -> list:
+        if structure_type:
+            q = f"""
+                SELECT id, symbol, name, structure_type, current_price, nav_per_unit,
+                       discount_to_nav_pct, distribution_yield_pct, occupancy_pct,
+                       ndcf_payout_purity_pct, ltv_ratio_pct, wale_years,
+                       sponsor_holding_pct, sebi_compliant, details_json, updated_at
+                FROM reits_and_invits
+                WHERE structure_type = {p}
+                  AND UPPER(symbol) NOT LIKE {p}
+                  AND UPPER(name) NOT LIKE {p}
+                ORDER BY distribution_yield_pct DESC;
+            """
+            cursor.execute(q, (structure_type, "%TEST%", "%TEST%"))
+        else:
+            q = """
+                SELECT id, symbol, name, structure_type, current_price, nav_per_unit,
+                       discount_to_nav_pct, distribution_yield_pct, occupancy_pct,
+                       ndcf_payout_purity_pct, ltv_ratio_pct, wale_years,
+                       sponsor_holding_pct, sebi_compliant, details_json, updated_at
+                FROM reits_and_invits
+                WHERE UPPER(symbol) NOT LIKE '%TEST%'
+                  AND UPPER(name) NOT LIKE '%TEST%'
+                ORDER BY distribution_yield_pct DESC;
+            """
+            cursor.execute(q)
+        return cursor.fetchall()
+
     try:
-        if structure_type:
-            where_clause = f"WHERE structure_type = {p} AND UPPER(symbol) NOT LIKE '%TEST%' AND UPPER(name) NOT LIKE '%TEST%'"
-        else:
-            where_clause = "WHERE UPPER(symbol) NOT LIKE '%TEST%' AND UPPER(name) NOT LIKE '%TEST%'"
-        query = f"""
-            SELECT id, symbol, name, structure_type, current_price, nav_per_unit,
-                   discount_to_nav_pct, distribution_yield_pct, occupancy_pct,
-                   ndcf_payout_purity_pct, ltv_ratio_pct, wale_years,
-                   sponsor_holding_pct, sebi_compliant, details_json, updated_at
-            FROM reits_and_invits
-            {where_clause}
-            ORDER BY distribution_yield_pct DESC;
-        """
-        if structure_type:
-            cursor.execute(query, (structure_type,))
-        else:
-            cursor.execute(query)
-        rows = cursor.fetchall()
+        rows = _run_select()
 
         if not rows:
             logger.info("REITs and InvITs table is empty. Initializing baseline REITs...")
             for r in DEFAULT_REITS_AND_INVITS:
                 save_reit_or_invit(r)
-            if structure_type:
-                cursor.execute(query, (structure_type,))
-            else:
-                cursor.execute(query)
-            rows = cursor.fetchall()
+            rows = _run_select()
         else:
             # Clean up and migrate legacy synthetic placeholders to genuine SEBI entities
             legacy_migrations = {
@@ -948,26 +976,22 @@ def get_all_reits_and_invits(structure_type: Optional[str] = None) -> List[Dict[
                 cursor.execute(f"DELETE FROM reits_and_invits WHERE symbol = '{old_sym}' AND EXISTS (SELECT 1 FROM reits_and_invits WHERE symbol = '{new_sym}')")
             conn.commit()
 
-            cursor.execute(query if not structure_type else query, (structure_type,) if structure_type else ())
-            rows = cursor.fetchall()
+            rows = _run_select()
             existing_symbols = {r[1].upper() for r in rows}
-            missing_defaults = [r for r in DEFAULT_REITS_AND_INVITS if r["symbol"].upper() not in existing_symbols]
-            if missing_defaults:
-                logger.info(f"Seeding {len(missing_defaults)} newly added default REITs/InvITs...")
-                for r in missing_defaults:
-                    save_reit_or_invit(r)
-                if structure_type:
-                    cursor.execute(query, (structure_type,))
-                else:
-                    cursor.execute(query)
-                rows = cursor.fetchall()
+            if not structure_type:
+                missing_defaults = [r for r in DEFAULT_REITS_AND_INVITS if r["symbol"].upper() not in existing_symbols]
+                if missing_defaults:
+                    logger.info(f"Seeding {len(missing_defaults)} newly added default REITs/InvITs...")
+                    for r in missing_defaults:
+                        save_reit_or_invit(r)
+                    rows = _run_select()
 
         results = []
         for r in rows:
             det = {}
             if r[14]:
                 try:
-                    det = json.loads(r[14])
+                    det = json.loads(r[14]) if isinstance(r[14], str) else dict(r[14])
                 except Exception as e:
                     logger.debug("Failed parsing REIT details json: %s", e)
                     det = {}
@@ -993,7 +1017,10 @@ def get_all_reits_and_invits(structure_type: Optional[str] = None) -> List[Dict[
         return results
     except Exception as e:
         logger.error(f"Error fetching REITs and InvITs: {e}")
-        return DEFAULT_REITS_AND_INVITS
+        fallback = [_normalize_reit_item(r) for r in DEFAULT_REITS_AND_INVITS]
+        if structure_type:
+            fallback = [r for r in fallback if r.get("structure_type") == structure_type]
+        return fallback
     finally:
         cursor.close()
         conn.close()

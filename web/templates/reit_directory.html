@@ -441,10 +441,11 @@
     <div id="invitCardsGrid" style="display: grid; grid-template-columns: repeat(auto-fill, minmax(340px, 1fr)); gap: 20px;">
       {% for r in reit_audit.reits %}
       {% if r.structure_type == 'INVIT' %}
+      {% set r_det = r.details if r.details is defined and r.details else {} %}
       <div class="card asset-card-accent" style="padding: 20px; border-radius: 14px; display: flex; flex-direction: column; justify-content: space-between; transition: transform 0.2s ease, box-shadow 0.2s ease;">
         <div>
           <div style="display: flex; justify-content: space-between; align-items: center; gap: 8px; margin-bottom: 10px;">
-            {% if r.details.subtype == 'TRANSMISSION_ANNUITY' %}
+            {% if r_det.subtype == 'TRANSMISSION_ANNUITY' %}
               <span style="background: rgba(16, 185, 129, 0.15); color: #34d399; padding: 3px 10px; border-radius: 9999px; font-size: 11px; font-weight: 700;">
                 Availability Annuity • Zero Traffic Risk
               </span>
@@ -485,7 +486,7 @@
             <div style="background: rgba(15, 23, 42, 0.35); border: 1px solid rgba(255, 255, 255, 0.06); border-radius: 8px; padding: 8px 10px; display: flex; justify-content: space-between; align-items: center;">
               <span style="font-size: 11px; color: #64748b; font-weight: 600;">Scale / Driver</span>
               <span style="font-size: 11.5px; font-weight: 700; color: #cbd5e1;" class="tnum">
-                {% if r.details.availability_factor %}{{ r.details.availability_factor }}{% elif r.details.traffic_growth_cagr %}+{{ r.details.traffic_growth_cagr }} CAGR{% else %}99.0%+{% endif %}
+                {% if r_det.availability_factor %}{{ r_det.availability_factor }}{% elif r_det.traffic_growth_cagr %}+{{ r_det.traffic_growth_cagr }} CAGR{% else %}99.0%+{% endif %}
               </span>
             </div>
             <div style="background: rgba(15, 23, 42, 0.35); border: 1px solid rgba(255, 255, 255, 0.06); border-radius: 8px; padding: 8px 10px; display: flex; justify-content: space-between; align-items: center;">
@@ -538,13 +539,14 @@
         <tbody>
           {% for r in reit_audit.reits %}
           {% if r.structure_type == 'INVIT' %}
+          {% set r_det = r.details if r.details is defined and r.details else {} %}
           <tr style="border-bottom: 1px solid rgba(255, 255, 255, 0.05); transition: background 0.15s ease;">
             <td style="padding: 14px 14px;">
               <a href="/reits/{{ r.symbol }}" style="font-weight: 800; color: #f8fafc; text-decoration: none; display: inline-block;">{{ r.symbol }}</a>
               <div style="font-size: 11px; color: #94a3b8;">{{ r.name }}</div>
             </td>
             <td style="padding: 14px 14px;">
-              {% if r.details.subtype == 'TRANSMISSION_ANNUITY' %}
+              {% if r_det.subtype == 'TRANSMISSION_ANNUITY' %}
                 <span style="background: rgba(16, 185, 129, 0.15); color: #34d399; padding: 2px 8px; border-radius: 4px; font-size: 11px; font-weight: 700;">
                   Availability Annuity
                 </span>
@@ -566,10 +568,10 @@
               {{ r.distribution_yield_pct }}%
             </td>
             <td style="padding: 14px 14px; color: #cbd5e1;" class="tnum">
-              {% if r.details.availability_factor %}
-                {{ r.details.availability_factor }} Availability
-              {% elif r.details.traffic_growth_cagr %}
-                +{{ r.details.traffic_growth_cagr }} Traffic CAGR
+              {% if r_det.availability_factor %}
+                {{ r_det.availability_factor }} Availability
+              {% elif r_det.traffic_growth_cagr %}
+                +{{ r_det.traffic_growth_cagr }} Traffic CAGR
               {% else %}
                 99.0%+
               {% endif %}
@@ -611,7 +613,7 @@
           <span style="font-size: 11.5px; font-weight: 700; color: #facc15; text-transform: uppercase;">100% Tax-Free Capital Gains (Sec 47(viic))</span>
         </div>
         <h2 style="font-size: 20px; font-weight: 800; color: #f8fafc; margin: 0 0 6px 0;">
-          Sovereign Gold Bonds (SGB) Secondary Market Discount & Parity Scanner ({{ sgb_tranches|length }} Active Series)
+          Sovereign Gold Bonds (SGB) Secondary Market Discount & Parity Scanner ({{ sgb_audit.tranches|length }} Active Series)
         </h2>
         <p style="font-size: 13px; color: #94a3b8; max-width: 820px; margin: 0; line-height: 1.5;">
           Following Union Budget 2024 gold import duty cuts and pause on fresh primary issuances, secondary SGBs offer 

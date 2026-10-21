@@ -657,6 +657,8 @@ def get_all_billables(
 
         where_clause = f"WHERE {' AND '.join(where_conditions)}" if where_conditions else ""
 
+        safe_limit = max(1, min(int(limit or 100), 1000))
+        safe_offset = max(0, int(offset or 0))
         query = f"""
             SELECT 
                 t.id, t.user_id, t.amount_inr, t.credits_added, t.payment_gateway,
@@ -675,12 +677,12 @@ def get_all_billables(
             LEFT JOIN user_accounts u ON t.user_id = u.id
             {where_clause}
             ORDER BY t.created_at DESC
-            LIMIT {p} OFFSET {p};
+            LIMIT {safe_limit} OFFSET {safe_offset};
         """
-        safe_limit = max(1, min(int(limit or 100), 1000))
-        safe_offset = max(0, int(offset or 0))
-        params.extend([safe_limit, safe_offset])
-        cursor.execute(query, tuple(params))
+        if params:
+            cursor.execute(query, tuple(params))
+        else:
+            cursor.execute(query)
         rows = cursor.fetchall()
         billables = []
         for r in rows:

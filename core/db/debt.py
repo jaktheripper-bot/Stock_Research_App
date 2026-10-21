@@ -348,17 +348,18 @@ def get_active_debt_securities(
     cursor = conn.cursor()
     use_pg = is_postgres_connection(conn)
 
+    p = "%s" if use_pg else "?"
     clauses = ["(CAST(is_listed AS TEXT) IN ('1', 'true', 'TRUE', 't') OR is_listed IS TRUE)" if use_pg else "(is_listed = 1 OR CAST(is_listed AS TEXT) = '1')"]
-    clauses.append("(ticker NOT LIKE '%TEST%' AND ticker NOT LIKE '%UNITTEST%' AND isin NOT LIKE '%TEST%' AND instrument_name NOT LIKE '%Test%')")
-    params = []
+    clauses.append(f"(ticker NOT LIKE {p} AND ticker NOT LIKE {p} AND isin NOT LIKE {p} AND instrument_name NOT LIKE {p})")
+    params = ["%TEST%", "%UNITTEST%", "%TEST%", "%Test%"]
 
     if seniority:
         sen_aliases = _expand_seniority_aliases(seniority)
-        placeholders = ", ".join(["%s" if use_pg else "?" for _ in sen_aliases])
+        placeholders = ", ".join([p for _ in sen_aliases])
         clauses.append(f"UPPER(seniority_tier) IN ({placeholders})")
         params.extend(sen_aliases)
     if instrument_type:
-        clauses.append("instrument_type = %s" if use_pg else "instrument_type = ?")
+        clauses.append(f"instrument_type = {p}")
         params.append(instrument_type.strip().upper())
     if is_sdi is not None:
         if use_pg:
@@ -369,7 +370,6 @@ def get_active_debt_securities(
             params.append(1 if is_sdi else 0)
 
     where_str = " AND ".join(clauses)
-    p = "%s" if use_pg else "?"
     sql = f"SELECT * FROM corporate_debt_securities WHERE {where_str} ORDER BY ytm_pct DESC LIMIT {p}"
     params.append(int(limit))
 

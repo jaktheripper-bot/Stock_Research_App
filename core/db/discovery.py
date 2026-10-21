@@ -119,15 +119,29 @@ def get_active_discovery_reel(
         active_clause = "is_active = TRUE" if is_pg else "is_active = 1"
 
         if edition_date:
-            query = f"""
-                SELECT id, edition_date, ticker, company_name, sector, market_cap_tier,
-                       current_price, pe_ratio, roce_pct, debt_to_equity, sales_growth_3y,
-                       ria_thesis, catalyst_headline, key_metrics_json, created_at
-                FROM discovery_reel
-                WHERE edition_date = {placeholder} AND {active_clause} {test_filter}
-                ORDER BY id ASC;
-            """
-            cursor.execute(query, (edition_date,))
+            if exclude_tests:
+                query = f"""
+                    SELECT id, edition_date, ticker, company_name, sector, market_cap_tier,
+                           current_price, pe_ratio, roce_pct, debt_to_equity, sales_growth_3y,
+                           ria_thesis, catalyst_headline, key_metrics_json, created_at
+                    FROM discovery_reel
+                    WHERE edition_date = {placeholder} AND {active_clause}
+                      AND ticker NOT LIKE {placeholder}
+                      AND ticker NOT LIKE {placeholder}
+                      AND ticker NOT LIKE {placeholder}
+                    ORDER BY id ASC;
+                """
+                cursor.execute(query, (edition_date, "TEST%", "UNITTEST%", "SYNTHETIC%"))
+            else:
+                query = f"""
+                    SELECT id, edition_date, ticker, company_name, sector, market_cap_tier,
+                           current_price, pe_ratio, roce_pct, debt_to_equity, sales_growth_3y,
+                           ria_thesis, catalyst_headline, key_metrics_json, created_at
+                    FROM discovery_reel
+                    WHERE edition_date = {placeholder} AND {active_clause}
+                    ORDER BY id ASC;
+                """
+                cursor.execute(query, (edition_date,))
             rows = cursor.fetchall()
         else:
             rows = []

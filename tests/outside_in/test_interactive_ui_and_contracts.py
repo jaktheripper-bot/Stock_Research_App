@@ -1819,6 +1819,49 @@ class TestCompetitiveEnhancements(unittest.TestCase):
                 f"Missing Moatnomics Brand Identity Board / IBM Plex token '{brand_token}' in style.css",
             )
 
+        # Permanent Microscope Gate 4: PostgreSQL psycopg2 Percent Escaping & REIT/Safety Fallback Normalization Parity
+        from core.db.connection import _escape_pg_literal_percents, _SafePgCursorProxy
+        from core.db.reits import DEFAULT_REITS_AND_INVITS, _normalize_reit_item
+        from core.db.safety_radar import DEFAULT_ALTERNATIVE_YIELD_PRODUCTS, _normalize_safety_product
+
+        sample_sql = (
+            "SELECT * FROM reits_and_invits "
+            "WHERE structure_type = %s "
+            "AND UPPER(symbol) NOT LIKE '%TEST%' "
+            "AND product_name != 'Gold Yield 16% Leasing'"
+        )
+        escaped_sql = _escape_pg_literal_percents(sample_sql)
+        # Simulate psycopg2 Python %-interpolation
+        interpolated = escaped_sql % ("'SM_REIT'",)
+        self.assertIn("NOT LIKE '%TEST%'", interpolated)
+        self.assertIn("'Gold Yield 16% Leasing'", interpolated)
+
+        class _DummyPgCur:
+            def __init__(self):
+                self.calls = []
+            def execute(self, q, v=None):
+                if v is not None:
+                    # Simulate psycopg2 mogrify % formatting
+                    _ = q % tuple(repr(x) for x in v)
+                self.calls.append((q, v))
+
+        dummy_cur = _DummyPgCur()
+        proxy_cur = _SafePgCursorProxy(dummy_cur)
+        proxy_cur.execute("SELECT * FROM reits_and_invits WHERE UPPER(symbol) NOT LIKE '%TEST%'", ())
+        self.assertIsNone(dummy_cur.calls[-1][1], "Empty tuple must call execute(query) with vars=None")
+        proxy_cur.execute(sample_sql, ("SM_REIT",))
+        self.assertEqual(dummy_cur.calls[-1][1], ("SM_REIT",))
+
+        for raw_reit in DEFAULT_REITS_AND_INVITS:
+            norm_r = _normalize_reit_item(raw_reit)
+            self.assertIsInstance(norm_r.get("details"), dict)
+            if norm_r["structure_type"] == "INVIT":
+                self.assertIn("subtype", norm_r["details"])
+
+        for raw_prod in DEFAULT_ALTERNATIVE_YIELD_PRODUCTS:
+            norm_p = _normalize_safety_product(raw_prod)
+            self.assertIsInstance(norm_p.get("audit_matrix"), dict)
+
 
 
 if __name__ == "__main__":

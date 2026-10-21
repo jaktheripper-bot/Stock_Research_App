@@ -249,8 +249,8 @@ def get_recent_autonomous_events(
     try:
         placeholder = "%s" if use_pg else "?"
         safe_limit = max(1, min(int(limit or 50), 500))
-        base_filter = """
-            (ticker IS NULL OR (ticker NOT LIKE '%TEST%' AND ticker NOT LIKE '%UNITTEST%'))
+        base_filter = f"""
+            (ticker IS NULL OR (ticker NOT LIKE {placeholder} AND ticker NOT LIKE {placeholder}))
             AND (trigger_source IS NULL OR trigger_source NOT IN ('unit_test', 'TEST_SUITE_ROTATION'))
         """
         if event_type:
@@ -265,7 +265,7 @@ def get_recent_autonomous_events(
                     SELECT * FROM autonomous_event_ledger
                     WHERE event_type = {placeholder} AND {base_filter}
                     ORDER BY id DESC LIMIT {placeholder};
-                """, (event_type, safe_limit))
+                """, (event_type, "%TEST%", "%UNITTEST%", safe_limit))
         else:
             if include_test_events:
                 cursor.execute(f"""
@@ -277,7 +277,7 @@ def get_recent_autonomous_events(
                     SELECT * FROM autonomous_event_ledger 
                     WHERE {base_filter}
                     ORDER BY id DESC LIMIT {placeholder};
-                """, (safe_limit,))
+                """, ("%TEST%", "%UNITTEST%", safe_limit))
         rows = cursor.fetchall()
         return [clean_row(cursor, r) for r in rows]
     except Exception as e:
