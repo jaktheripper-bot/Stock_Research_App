@@ -147,8 +147,8 @@ MOATNOMICS_VISUAL_IDENTITY_V2: Dict[str, Any] = {
     "asset_class_accents": ASSET_CLASS_ACCENTS_V2,
     "typography": {
         "font_serif": "'Playfair Display', 'Tiempos Headline', Georgia, serif",
-        "font_sans": "'Inter', 'Plus Jakarta Sans', -apple-system, BlinkMacSystemFont, sans-serif",
-        "font_mono": "'JetBrains Mono', monospace",
+        "font_sans": "'IBM Plex Sans', 'Plus Jakarta Sans', -apple-system, BlinkMacSystemFont, sans-serif",
+        "font_mono": "'IBM Plex Mono', 'JetBrains Mono', monospace",
         "tabular_numerals_required": True,
     },
     "canonical_icons": CANONICAL_ICONS_V2,

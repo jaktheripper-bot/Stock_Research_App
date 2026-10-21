@@ -5,7 +5,7 @@ import logging
 from datetime import datetime
 from typing import Optional, List, Dict, Any
 
-from core.db.connection import init_db, get_db_connection, get_supabase_url, get_placeholder, IST
+from core.db.connection import init_db, get_db_connection, get_supabase_url, get_placeholder, is_postgres_connection, IST
 from core.db.reports import _format_timestamp
 from normalizer import clean_ticker
 
@@ -24,8 +24,8 @@ def save_discovery_reel(items: List[Dict[str, Any]], edition_date: Optional[str]
     init_db()
     conn = get_db_connection()
     cursor = conn.cursor()
-    placeholder = get_placeholder()
-    is_pg = bool(get_supabase_url())
+    is_pg = is_postgres_connection(conn)
+    placeholder = "%s" if is_pg else "?"
 
     if not edition_date:
         edition_date = datetime.now(IST).strftime("%Y-%m-%d")
@@ -106,8 +106,8 @@ def get_active_discovery_reel(
     init_db()
     conn = get_db_connection()
     cursor = conn.cursor()
-    placeholder = get_placeholder()
-    is_pg = bool(get_supabase_url())
+    is_pg = is_postgres_connection(conn)
+    placeholder = "%s" if is_pg else "?"
 
     # Default exclude_tests to True for public requests where edition_date is None
     if exclude_tests is None:
@@ -214,7 +214,8 @@ def get_available_discovery_editions(exclude_tests: bool = False) -> List[str]:
     init_db()
     conn = get_db_connection()
     cursor = conn.cursor()
-    is_pg = bool(get_supabase_url())
+    is_pg = is_postgres_connection(conn)
+    placeholder = "%s" if is_pg else "?"
 
     try:
         active_clause = "is_active = TRUE" if is_pg else "is_active = 1"

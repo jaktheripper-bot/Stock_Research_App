@@ -1,0 +1,115 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" width="3840" height="2500" viewBox="0 0 3840 2500" role="img" aria-labelledby="title desc">
+  <title id="title">Moatnomics v02 logo system and usage board</title>
+  <desc id="desc">Moatnomics v02 candidate asset. Editable SVG geometry. Final optical validation and licensed wordmark remain required.</desc>
+  
+  <rect width="3840" height="2500" fill="#F7F5EE"/>
+  <g fill="#0B2337" font-family="Inter, Arial, sans-serif">
+    <text x="120" y="126" font-size="32" font-weight="700" letter-spacing="9">MOATNOMICS / LOGO SYSTEM / V02</text>
+    <text x="3720" y="126" text-anchor="end" font-size="24" font-weight="700" letter-spacing="5">CANDIDATE ASSET PACKAGE — OPTICAL &amp; TYPE APPROVAL PENDING</text>
+    <line x1="120" y1="180" x2="3720" y2="180" stroke="#D9E3E8" stroke-width="4"/>
+  </g>
+  <g transform="translate(120 270)">
+    <text x="0" y="0" fill="#0B2337" font-family="Inter, Arial, sans-serif" font-size="25" font-weight="700" letter-spacing="7">PRIMARY DIMENSIONAL MARK / HERO · COVER · CAMPAIGN ONLY</text>
+    <rect x="0" y="58" width="1150" height="900" fill="#FFFFFF" stroke="#D9E3E8" stroke-width="4"/>
+    <path d="M760 58H1150V958H962C980 700 931 385 760 58Z" fill="#EAF0ED"/>
+    <g transform="translate(335 185) scale(4.583333333333333)">
+    <path d="M14 110V57C14 29 33 9 54 4V36C43 41 37 49 37 61V110H14Z" fill="#0E3D32"/>
+    <path d="M106 110V57C106 29 87 9 66 4V36C77 41 83 49 83 61V110H106Z" fill="#7DA77A"/>
+    <path d="M37 110V61C37 49 43 41 54 36V49C48 53 45 58 45 65V110Z" fill="#0A2F27"/>
+    <path d="M83 110V61C83 49 77 41 66 36V49C72 53 75 58 75 65V110Z" fill="#5D8C62"/>
+    <path d="M54 10L60 17V104L54 112L50 108V18Z" fill="#D9E3E8"/>
+    <path d="M60 17L66 10L70 18V108L66 112L60 104Z" fill="#EEF3F2"/>
+    <path d="M60 17V104" stroke="#91A9B3" stroke-width="1.2"/>
+  </g>
+    <text x="575" y="820" text-anchor="middle" fill="#0B2337" font-family="'Playfair Display', Georgia, serif" font-size="72" font-weight="700">Moatnomics</text>
+    <text x="575" y="872" text-anchor="middle" fill="#0B2337" font-family="Inter, Arial, sans-serif" font-size="20" font-weight="700" letter-spacing="6">LESS NOISE, MORE NUANCE.</text>
+  </g>
+  <g transform="translate(1390 270)">
+    <text x="0" y="0" fill="#0B2337" font-family="Inter, Arial, sans-serif" font-size="25" font-weight="700" letter-spacing="7">PRODUCT / DENSE UI / MONO</text>
+    <rect x="0" y="58" width="1050" height="900" fill="#FFFFFF" stroke="#D9E3E8" stroke-width="4"/>
+    <text x="60" y="140" fill="#0B2337" font-family="Inter, Arial, sans-serif" font-size="22" font-weight="700" letter-spacing="4">FLAT MASTER — DEFAULT UI LOGO</text>
+    <g transform="translate(105 210) scale(2.8333333333333335)" fill="#0B2337">
+    <path d="M14 110V58C14 30 33 10 54 5V38C43 42 40 50 40 62V110H14Z"/>
+    <path d="M106 110V58C106 30 87 10 66 5V38C77 42 80 50 80 62V110H106Z"/>
+  </g>
+    <text x="60" y="640" fill="#0B2337" font-family="Inter, Arial, sans-serif" font-size="22" font-weight="700" letter-spacing="4">REAL-SIZE PROOF</text>
+    <g><rect x="62" y="680" width="120" height="120" fill="none" stroke="#D9E3E8" stroke-width="3"/><g transform="translate(114 732) scale(0.13333333333333333)" fill="#0B2337">
+    <path d="M14 110V58C14 30 33 10 51 5V38C43 42 40 50 40 62V110H14Z"/>
+    <path d="M106 110V58C106 30 87 10 69 5V38C77 42 80 50 80 62V110H106Z"/>
+  </g><text x="122" y="850" text-anchor="middle" fill="#0B2337" font-family="Inter, Arial, sans-serif" font-size="20">16px</text><rect x="232" y="680" width="120" height="120" fill="none" stroke="#D9E3E8" stroke-width="3"/><g transform="translate(282 730) scale(0.16666666666666666)" fill="#0B2337">
+    <path d="M14 110V58C14 30 33 10 51 5V38C43 42 40 50 40 62V110H14Z"/>
+    <path d="M106 110V58C106 30 87 10 69 5V38C77 42 80 50 80 62V110H106Z"/>
+  </g><text x="292" y="850" text-anchor="middle" fill="#0B2337" font-family="Inter, Arial, sans-serif" font-size="20">20px</text><rect x="402" y="680" width="120" height="120" fill="none" stroke="#D9E3E8" stroke-width="3"/><g transform="translate(450 728) scale(0.2)" fill="#0B2337">
+    <path d="M14 110V58C14 30 33 10 51 5V38C43 42 40 50 40 62V110H14Z"/>
+    <path d="M106 110V58C106 30 87 10 69 5V38C77 42 80 50 80 62V110H106Z"/>
+  </g><text x="462" y="850" text-anchor="middle" fill="#0B2337" font-family="Inter, Arial, sans-serif" font-size="20">24px</text><rect x="572" y="680" width="120" height="120" fill="none" stroke="#D9E3E8" stroke-width="3"/><g transform="translate(616 724) scale(0.26666666666666666)" fill="#0B2337">
+    <path d="M14 110V58C14 30 33 10 51 5V38C43 42 40 50 40 62V110H14Z"/>
+    <path d="M106 110V58C106 30 87 10 69 5V38C77 42 80 50 80 62V110H106Z"/>
+  </g><text x="632" y="850" text-anchor="middle" fill="#0B2337" font-family="Inter, Arial, sans-serif" font-size="20">32px</text><rect x="742" y="680" width="120" height="120" fill="none" stroke="#D9E3E8" stroke-width="3"/><g transform="translate(778 716) scale(0.4)" fill="#0B2337">
+    <path d="M14 110V58C14 30 33 10 51 5V38C43 42 40 50 40 62V110H14Z"/>
+    <path d="M106 110V58C106 30 87 10 69 5V38C77 42 80 50 80 62V110H106Z"/>
+  </g><text x="802" y="850" text-anchor="middle" fill="#0B2337" font-family="Inter, Arial, sans-serif" font-size="20">48px</text></g>
+  </g>
+  <g transform="translate(2580 270)">
+    <text x="0" y="0" fill="#0B2337" font-family="Inter, Arial, sans-serif" font-size="25" font-weight="700" letter-spacing="7">LOCKUPS &amp; APPLICATION</text>
+    <rect x="0" y="58" width="1140" height="900" fill="#FFFFFF" stroke="#D9E3E8" stroke-width="4"/>
+    <g transform="translate(80 155) scale(1.7083333333333333)">
+    <path d="M14 110V57C14 29 33 9 54 4V36C43 41 37 49 37 61V110H14Z" fill="#0E3D32"/>
+    <path d="M106 110V57C106 29 87 9 66 4V36C77 41 83 49 83 61V110H106Z" fill="#7DA77A"/>
+    <path d="M37 110V61C37 49 43 41 54 36V49C48 53 45 58 45 65V110Z" fill="#0A2F27"/>
+    <path d="M83 110V61C83 49 77 41 66 36V49C72 53 75 58 75 65V110Z" fill="#5D8C62"/>
+    <path d="M54 10L60 17V104L54 112L50 108V18Z" fill="#D9E3E8"/>
+    <path d="M60 17L66 10L70 18V108L66 112L60 104Z" fill="#EEF3F2"/>
+    <path d="M60 17V104" stroke="#91A9B3" stroke-width="1.2"/>
+  </g><g transform="translate(320 262) scale(0.78)" fill="#0B2337">
+  <text x="0" y="0" font-family="'Playfair Display', Georgia, serif" font-size="66" font-weight="700" letter-spacing="-2.2">Moatnomics</text>
+  <text x="3" y="35" font-family="Inter, Arial, sans-serif" font-size="13" font-weight="600" letter-spacing="4.1">LESS NOISE, MORE NUANCE.</text>
+</g>
+    <rect x="52" y="440" width="1036" height="180" fill="#0E3D32" rx="4"/>
+    <g transform="translate(90 470) scale(1)">
+    <path d="M14 110V57C14 29 33 9 54 4V36C43 41 37 49 37 61V110H14Z" fill="#F7F5EE"/>
+    <path d="M106 110V57C106 29 87 9 66 4V36C77 41 83 49 83 61V110H106Z" fill="#D9E3E8"/>
+    <path d="M37 110V61C37 49 43 41 54 36V49C48 53 45 58 45 65V110Z" fill="#DCE8E2"/>
+    <path d="M83 110V61C83 49 77 41 66 36V49C72 53 75 58 75 65V110Z" fill="#B7D0B8"/>
+    <path d="M54 10L60 17V104L54 112L50 108V18Z" fill="#D9E3E8"/>
+    <path d="M60 17L66 10L70 18V108L66 112L60 104Z" fill="#F7F5EE"/>
+    <path d="M60 17V104" stroke="#0E3D32" stroke-width="1.2"/>
+  </g><g transform="translate(245 538) scale(0.63)" fill="#F7F5EE">
+  <text x="0" y="0" font-family="'Playfair Display', Georgia, serif" font-size="66" font-weight="700" letter-spacing="-2.2">Moatnomics</text>
+  
+</g>
+    <rect x="760" y="660" width="220" height="220" rx="48" fill="#0E3D32"/>
+    <g transform="translate(800 702) scale(1.1666666666666667)" fill="#F7F5EE">
+    <path d="M14 110V58C14 30 33 10 51 5V38C43 42 40 50 40 62V110H14Z"/>
+    <path d="M106 110V58C106 30 87 10 69 5V38C77 42 80 50 80 62V110H106Z"/>
+  </g>
+    <text x="100" y="790" fill="#0B2337" font-family="Inter, Arial, sans-serif" font-size="20" font-weight="700" letter-spacing="3">REPORT / HERO: DIMENSIONAL</text>
+    <text x="100" y="840" fill="#0B2337" font-family="Inter, Arial, sans-serif" font-size="20" font-weight="700" letter-spacing="3">NAV / FAVICON: FLAT MICRO</text>
+  </g>
+  <g transform="translate(120 1350)">
+    <line x1="0" y1="0" x2="3600" y2="0" stroke="#D9E3E8" stroke-width="4"/>
+    <text x="0" y="86" fill="#0B2337" font-family="Inter, Arial, sans-serif" font-size="28" font-weight="700" letter-spacing="7">USAGE RULES</text>
+    <text x="0" y="152" fill="#282F33" font-family="Inter, Arial, sans-serif" font-size="31">1. Use the dimensional mark for considered editorial moments, not dense interfaces.</text>
+    <text x="0" y="210" fill="#282F33" font-family="Inter, Arial, sans-serif" font-size="31">2. Use the flat master for UI, favicons, monochrome and small-scale reproduction.</text>
+    <text x="0" y="268" fill="#282F33" font-family="Inter, Arial, sans-serif" font-size="31">3. Preserve one central mirror width of clear space; never add glow, chrome or unapproved shadows.</text>
+    <text x="0" y="356" fill="#0B2337" font-family="Inter, Arial, sans-serif" font-size="24" font-weight="700" letter-spacing="5">NARRATIVE LOGIC</text>
+    <text x="0" y="414" fill="#282F33" font-family="Inter, Arial, sans-serif" font-size="30">The split arches form the discovery tunnel. The mirror cuts through it, reframing the same evidence from another vantage.</text>
+  </g>
+  <g transform="translate(120 1860)">
+    <rect width="3600" height="480" fill="#0B2337"/>
+    <g transform="translate(185 50) scale(3.0833333333333335)">
+    <path d="M14 110V57C14 29 33 9 54 4V36C43 41 37 49 37 61V110H14Z" fill="#F7F5EE"/>
+    <path d="M106 110V57C106 29 87 9 66 4V36C77 41 83 49 83 61V110H106Z" fill="#D9E3E8"/>
+    <path d="M37 110V61C37 49 43 41 54 36V49C48 53 45 58 45 65V110Z" fill="#DCE8E2"/>
+    <path d="M83 110V61C83 49 77 41 66 36V49C72 53 75 58 75 65V110Z" fill="#B7D0B8"/>
+    <path d="M54 10L60 17V104L54 112L50 108V18Z" fill="#D9E3E8"/>
+    <path d="M60 17L66 10L70 18V108L66 112L60 104Z" fill="#F7F5EE"/>
+    <path d="M60 17V104" stroke="#0E3D32" stroke-width="1.2"/>
+  </g>
+    <text x="680" y="150" fill="#C7E268" font-family="Inter, Arial, sans-serif" font-size="24" font-weight="700" letter-spacing="6">HIGH-RES USAGE BOARD</text>
+    <text x="680" y="263" fill="#F7F5EE" font-family="'Playfair Display', Georgia, serif" font-size="76" font-weight="700">Less noise, more nuance.</text>
+    <text x="680" y="340" fill="#D9E3E8" font-family="Inter, Arial, sans-serif" font-size="30">A logo system for deeper discovery and clearer perspectives.</text>
+  </g>
+
+</svg>

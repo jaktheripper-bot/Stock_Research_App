@@ -1805,6 +1805,20 @@ class TestCompetitiveEnhancements(unittest.TestCase):
                 f"Missing Light Mode contrast rule for .{badge_cls} in style.css",
             )
 
+        # Permanent Microscope Gate 3: Brand Identity Board Palette (#F7F5EE Warm Ivory, #0E3D32 Forest, #7DA77A Sage) & IBM Plex Typography
+        for brand_token in [
+            "--bg-primary: #F7F5EE;",
+            "--accent-cyan: #0E3D32;",
+            "--bg-surface: #18181B;",
+            "IBM Plex Sans",
+            "IBM Plex Mono",
+        ]:
+            self.assertIn(
+                brand_token,
+                css_text,
+                f"Missing Moatnomics Brand Identity Board / IBM Plex token '{brand_token}' in style.css",
+            )
+
 
 
 if __name__ == "__main__":

@@ -270,7 +270,7 @@
 <!-- Filter Tabs CSS & JS -->
 <style>
   .sector-tab {
-    background: rgba(30, 41, 59, 0.6);
+    background: var(--bg-card);
     color: var(--text-secondary);
     border: 1px solid var(--border-color);
     padding: 8px 16px;
@@ -282,19 +282,25 @@
     transition: all 0.2s ease;
   }
   .sector-tab:hover {
-    background: rgba(51, 65, 85, 0.8);
+    background: var(--bg-surface);
     color: var(--text-primary);
+    border-color: var(--accent-cyan);
   }
   .sector-tab.active {
-    background: var(--accent-cyan);
-    color: #0b1120;
-    border-color: var(--accent-cyan);
+    background: #0E3D32 !important;
+    color: #F7F5EE !important;
+    border-color: #0E3D32 !important;
     font-weight: 700;
   }
+  html[data-theme="dark"] .sector-tab.active {
+    background: #86EFAC !important;
+    color: #0B2337 !important;
+    border-color: #86EFAC !important;
+  }
   .discovery-card:hover {
-    border-color: rgba(14, 165, 233, 0.4) !important;
+    border-color: var(--asset-accent, #0E3D32) !important;
     transform: translateY(-3px);
-    box-shadow: 0 12px 24px -10px rgba(0, 0, 0, 0.5);
+    box-shadow: 0 12px 24px -10px rgba(14, 61, 50, 0.22);
   }
 </style>
 
