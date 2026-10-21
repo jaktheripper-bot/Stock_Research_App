@@ -2592,13 +2592,8 @@ html[data-theme="dark"] .gated-feature-chip {
 .table-sticky-wrap {
   position: relative;
   width: 100%;
-  overflow-x: auto;
-}
-
-@media (min-width: 1024px) {
-  .table-sticky-wrap {
-    overflow-x: visible;
-  }
+  max-width: 100%;
+  overflow-x: auto !important;
 }
 
 .table-sticky-wrap table thead th,

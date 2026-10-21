@@ -118,8 +118,84 @@
     </form>
   </div>
 
-  <!-- Enterprise Directory Table -->
-  <div style="background: rgba(15, 23, 42, 0.6); border: 1px solid rgba(255, 255, 255, 0.08); border-radius: 16px; overflow: hidden; margin-bottom: 32px;">
+  <!-- MSME Snapshot Biscuit Cards Grid + Optional Compact Table Toggle -->
+  <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 12px; margin-bottom: 18px;">
+    <div style="font-size: 14px; font-weight: 700; color: #f8fafc;">
+      Showing {{ firms|length }} Enterprises • <span style="font-size: 12px; font-weight: 500; color: #64748b;">Source: Ministry of MSME / Udyam Gazette Open Feed</span>
+    </div>
+    <div style="display: inline-flex; align-items: center; gap: 8px;">
+      <button type="button" id="msmeViewCardsBtn" onclick="switchMsmeViewMode('cards')" class="btn btn-primary btn-sm" style="border-radius: 8px; padding: 6px 12px; font-size: 12px;">
+        Snapshot Cards
+      </button>
+      <button type="button" id="msmeViewTableBtn" onclick="switchMsmeViewMode('table')" class="btn btn-secondary btn-sm" style="border-radius: 8px; padding: 6px 12px; font-size: 12px;">
+        Compact Table
+      </button>
+    </div>
+  </div>
+
+  <!-- Primary 3-Column Snapshot Biscuit Card Grid -->
+  <div id="msmeCardsGrid" style="display: grid; grid-template-columns: repeat(auto-fill, minmax(350px, 1fr)); gap: 20px; margin-bottom: 32px;">
+    {% for f in firms %}
+    <div class="stat-card asset-card-accent" data-asset-class="msme" style="background: rgba(30, 41, 59, 0.5); border: 1px solid rgba(255, 255, 255, 0.1); border-radius: 14px; padding: 22px; display: flex; flex-direction: column; justify-content: space-between; transition: transform 0.2s, border-color 0.2s;">
+      <div>
+        <div style="display: flex; justify-content: space-between; align-items: center; gap: 8px; margin-bottom: 12px;">
+          <span class="section-accent-pill" style="font-size: 11px; font-weight: 700; padding: 3px 9px; border-radius: 6px; text-transform: uppercase;">
+            {{ f.sector|replace('_', ' ')|title }}
+          </span>
+          {% if f.tier == "Medium" %}
+          <span style="background: rgba(16, 185, 129, 0.15); color: #34d399; border: 1px solid rgba(16, 185, 129, 0.3); border-radius: 9999px; padding: 2px 10px; font-size: 11px; font-weight: 700; text-transform: uppercase;">Medium Tier</span>
+          {% elif f.tier == "Small" %}
+          <span style="background: rgba(59, 130, 246, 0.15); color: #60a5fa; border: 1px solid rgba(59, 130, 246, 0.3); border-radius: 9999px; padding: 2px 10px; font-size: 11px; font-weight: 700; text-transform: uppercase;">Small Tier</span>
+          {% else %}
+          <span style="background: rgba(245, 158, 11, 0.15); color: #fbbf24; border: 1px solid rgba(245, 158, 11, 0.3); border-radius: 9999px; padding: 2px 10px; font-size: 11px; font-weight: 700; text-transform: uppercase;">Micro Tier</span>
+          {% endif %}
+        </div>
+
+        <h2 style="font-size: 18px; font-weight: 800; color: #f8fafc; margin: 0 0 4px 0; line-height: 1.3;">
+          <a href="/msme/{{ f.uin }}" style="color: inherit; text-decoration: none;">
+            {{ f.name }}
+          </a>
+        </h2>
+        <div style="font-size: 12.5px; color: #64748b; margin-bottom: 14px; font-family: var(--font-mono);">
+          {{ f.uin }} • {{ f.city }}, {{ f.state }}
+        </div>
+
+        <div style="display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; background: rgba(15, 23, 42, 0.5); border-radius: 10px; padding: 12px; margin-bottom: 16px; border: 1px solid rgba(255, 255, 255, 0.05);">
+          <div>
+            <div style="font-size: 10px; color: #64748b; text-transform: uppercase; font-weight: 600;">Turnover</div>
+            <div style="font-size: 15px; font-weight: 800; color: #10b981;" class="tnum">
+              {% if f.annual_turnover is not none %}₹{{ "{:,.1f}".format(f.annual_turnover) }} Cr{% else %}N/A{% endif %}
+            </div>
+          </div>
+          <div>
+            <div style="font-size: 10px; color: #64748b; text-transform: uppercase; font-weight: 600;">Headcount</div>
+            <div style="font-size: 15px; font-weight: 800; color: #f8fafc;" class="tnum">
+              {{ f.employee_count or '-' }}
+            </div>
+          </div>
+          <div>
+            <div style="font-size: 10px; color: #64748b; text-transform: uppercase; font-weight: 600;">Cluster</div>
+            <div style="font-size: 13px; font-weight: 700; color: #38bdf8; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">
+              {{ f.city }}
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div style="display: flex; gap: 8px;">
+        <a href="/msme/{{ f.uin }}" class="btn btn-secondary btn-sm" style="flex: 1; display: flex; justify-content: center; align-items: center; gap: 6px; font-weight: 600; border-radius: 8px;">
+          View MSME Dossier →
+        </a>
+        <button type="button" class="btn btn-secondary btn-sm" style="border-radius: 8px; padding: 6px 12px; font-size: 12px; font-weight: 700;" onclick="inspectMsme('{{ f.uin }}', this)">
+          Inspect
+        </button>
+      </div>
+    </div>
+    {% endfor %}
+  </div>
+
+  <!-- Optional Compact Table View (Hidden by Default, Preserves Table Contracts) -->
+  <div id="msmeTableCardWrap" style="display: none; background: rgba(15, 23, 42, 0.6); border: 1px solid rgba(255, 255, 255, 0.08); border-radius: 16px; overflow: hidden; margin-bottom: 32px;">
     <div style="padding: 16px 20px; border-bottom: 1px solid rgba(255, 255, 255, 0.08); display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 8px;">
       <div style="font-size: 14px; font-weight: 700; color: #f8fafc;">
         Showing {{ firms|length }} Enterprises
@@ -391,6 +467,24 @@
 </div>
 
 <script>
+function switchMsmeViewMode(mode) {
+  const cardsEl = document.getElementById('msmeCardsGrid');
+  const tableEl = document.getElementById('msmeTableCardWrap');
+  const btnCards = document.getElementById('msmeViewCardsBtn');
+  const btnTable = document.getElementById('msmeViewTableBtn');
+  if (mode === 'table') {
+    if (cardsEl) cardsEl.style.display = 'none';
+    if (tableEl) tableEl.style.display = 'block';
+    if (btnCards) { btnCards.classList.remove('btn-primary'); btnCards.classList.add('btn-secondary'); }
+    if (btnTable) { btnTable.classList.remove('btn-secondary'); btnTable.classList.add('btn-primary'); }
+  } else {
+    if (cardsEl) cardsEl.style.display = 'grid';
+    if (tableEl) tableEl.style.display = 'none';
+    if (btnCards) { btnCards.classList.remove('btn-secondary'); btnCards.classList.add('btn-primary'); }
+    if (btnTable) { btnTable.classList.remove('btn-primary'); btnTable.classList.add('btn-secondary'); }
+  }
+}
+
 async function inspectMsme(uin, btnElement) {
   const origText = btnElement ? btnElement.innerText : 'Inspect';
   if (btnElement) {

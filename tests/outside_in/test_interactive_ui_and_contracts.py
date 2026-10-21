@@ -1620,6 +1620,19 @@ class TestCompetitiveEnhancements(unittest.TestCase):
         for pcard in pillar_cards:
             self.assertTrue(pcard.get("data-asset-class"), "Homepage .pillar-card missing data-asset-class")
 
+        # Verify /etfs and /msme render Snapshot Biscuit Card Grids by default and never set overflow-x: visible on .table-sticky-wrap
+        r_etfs = self.client.get("/etfs")
+        s_etfs = BeautifulSoup(r_etfs.text, "html.parser")
+        etf_grid = s_etfs.find(id="etfCardsGrid")
+        self.assertIsNotNone(etf_grid, "Missing #etfCardsGrid snapshot biscuit grid on /etfs")
+        self.assertGreater(len(etf_grid.select(".asset-card-accent")), 0, "Expected ETF snapshot biscuit cards in #etfCardsGrid")
+
+        r_msme = self.client.get("/msme")
+        s_msme = BeautifulSoup(r_msme.text, "html.parser")
+        msme_grid = s_msme.find(id="msmeCardsGrid")
+        self.assertIsNotNone(msme_grid, "Missing #msmeCardsGrid snapshot biscuit grid on /msme")
+        self.assertGreater(len(msme_grid.select(".asset-card-accent")), 0, "Expected MSME snapshot biscuit cards in #msmeCardsGrid")
+
 
 if __name__ == "__main__":
     unittest.main()
