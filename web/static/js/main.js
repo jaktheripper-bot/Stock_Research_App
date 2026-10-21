@@ -2651,7 +2651,7 @@ document.querySelectorAll('[hidden="until-found"]').forEach((panel) => {
 });
 
 /**
- * 6. Dual-Theme Architecture (Dark & Editorial Warm Ivory)
+ * 6. Dual-Theme Architecture (Universal Light Mode Default & True Black Dark Mode)
  */
 function syncThemeToggleUI(theme) {
   const btn = document.getElementById("themeToggleBtn");
@@ -2666,8 +2666,13 @@ function syncThemeToggleUI(theme) {
 
 function initThemeToggle() {
   try {
-    const saved = localStorage.getItem("moatnomics_theme");
-    const theme = saved === "light" ? "light" : "dark";
+    let saved = localStorage.getItem("moatnomics_theme_v2");
+    if (!saved) {
+      saved = "light";
+      localStorage.setItem("moatnomics_theme_v2", "light");
+      localStorage.setItem("moatnomics_theme", "light");
+    }
+    const theme = saved === "dark" ? "dark" : "light";
     document.documentElement.dataset.theme = theme;
     syncThemeToggleUI(theme);
 
@@ -2681,15 +2686,17 @@ function initThemeToggle() {
       }
     }
   } catch (e) {
+    document.documentElement.dataset.theme = "light";
     console.warn("Theme initialization storage notice:", e);
   }
 }
 
 window.toggleSiteTheme = function () {
-  const current = document.documentElement.dataset.theme === "light" ? "light" : "dark";
+  const current = document.documentElement.dataset.theme === "dark" ? "dark" : "light";
   const next = current === "light" ? "dark" : "light";
   document.documentElement.dataset.theme = next;
   try {
+    localStorage.setItem("moatnomics_theme_v2", next);
     localStorage.setItem("moatnomics_theme", next);
   } catch (e) {
     console.warn("Could not persist theme preference:", e);

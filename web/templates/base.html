@@ -1,10 +1,10 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="en" data-theme="light">
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, minimum-scale=1.0">
-  <meta name="color-scheme" content="dark light">
-  <script>(function(){try{var s=localStorage.getItem('moatnomics_theme');document.documentElement.dataset.theme=(s==='light')?'light':'dark';}catch(e){}})();</script>
+  <meta name="color-scheme" content="light dark">
+  <script>(function(){try{var v=localStorage.getItem('moatnomics_theme_v2');if(!v){localStorage.setItem('moatnomics_theme_v2','light');localStorage.setItem('moatnomics_theme','light');v='light';}document.documentElement.dataset.theme=(v==='dark')?'dark':'light';}catch(e){document.documentElement.dataset.theme='light';}})();</script>
   <title>{% block title %}Moatnomics | Less noise, more nuance.{% endblock %}</title>
   <meta name="description" content="{% block meta_desc %}Moatnomics is independent research on Indian stocks, mutual funds and corporate bonds. See the evidence, the risks and what to check before you invest.{% endblock %}">
   {% if canonical_for is defined and request is defined and request %}{% set _canon = canonical_for(request) %}{% if _canon %}
@@ -30,9 +30,9 @@
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600;700&family=Playfair+Display:ital,wght@0,600;0,700;1,400&display=swap" rel="stylesheet">
-  <link rel="preload" href="/static/css/style.css?v=20261020_0200" as="style" onload="this.rel='stylesheet'">
-  <link rel="preload" href="/static/js/main.js?v=20261020_0200" as="script">
-  <link rel="stylesheet" href="/static/css/style.css?v=20261020_0200">
+  <link rel="preload" href="/static/css/style.css?v=20261020_2345" as="style" onload="this.rel='stylesheet'">
+  <link rel="preload" href="/static/js/main.js?v=20261020_2345" as="script">
+  <link rel="stylesheet" href="/static/css/style.css?v=20261020_2345">
 
   <!-- Schema.org Structured Data -->
   <script type="application/ld+json">
@@ -548,8 +548,8 @@
         </nav>
 
         <div class="nav-actions">
-          <button id="themeToggleBtn" type="button" class="btn btn-secondary btn-sm theme-toggle-btn" onclick="toggleSiteTheme()" aria-label="Toggle Light/Dark Theme" aria-pressed="false" title="Toggle Theme">
-            <svg class="glyph" style="width: 16px; height: 16px;"><use href="#icon-theme-sun"></use></svg>
+          <button id="themeToggleBtn" type="button" class="btn btn-secondary btn-sm theme-toggle-btn" onclick="toggleSiteTheme()" aria-label="Toggle Light/Dark Theme" aria-pressed="true" title="Toggle Theme">
+            <svg class="glyph" style="width: 16px; height: 16px;"><use href="#icon-theme-moon"></use></svg>
           </button>
           <button id="navSignInBtn" class="btn btn-secondary btn-sm" onclick="openSignInModal()">
             <span>Sign In / 2 Credits</span>
@@ -906,6 +906,6 @@
     </div>
   </footer>
 
-  <script src="/static/js/main.js?v=20261019_1900"></script>
+  <script src="/static/js/main.js?v=20261020_2345"></script>
 </body>
 </html>
