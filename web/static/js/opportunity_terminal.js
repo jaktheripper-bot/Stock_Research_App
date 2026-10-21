@@ -567,7 +567,7 @@ function togglePin(id) {
     pinnedIds.splice(index, 1);
   } else {
     if (pinnedIds.length >= 4) {
-      alert('You can compare a maximum of 4 opportunities simultaneously in the Arbitrage Docket.');
+      alert('You can compare up to 4 opportunities at a time.');
       return;
     }
     pinnedIds.push(id);
@@ -625,7 +625,7 @@ function clearDocket() {
 // =========================================================================
 async function openArbitrageModal() {
   if (pinnedIds.length === 0) {
-    alert('Please pin at least 1 opportunity to compare.');
+    alert('Pin at least one opportunity to compare.');
     return;
   }
 

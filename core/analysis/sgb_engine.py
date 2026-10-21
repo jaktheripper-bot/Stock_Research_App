@@ -27,7 +27,7 @@ def evaluate_sgb_market() -> Dict[str, Any]:
     asset_comparison = [
         {
             "dimension": "Acquisition Friction / Entry Pricing",
-            "sgb": "3% to 5% Secondary Discount to 999 Spot",
+            "sgb": "Typically a 3% to 7% secondary-market discount to 999 spot (varies by series)",
             "gold_etf": "At Par / NAV with 0.1% to 0.3% Market Spread",
             "physical_gold": "3% GST + 5% to 15% Making Charges"
         },
@@ -53,8 +53,8 @@ def evaluate_sgb_market() -> Dict[str, Any]:
 
     macro_takeaways = [
         "SGB Supply Scarcity Window: Following the Union Budget 2024 gold import duty cut and suspension of primary issuances, secondary SGBs represent a finite, closed-ended asset.",
-        "Secondary Discount Liquidity Premium: Illiquidity in exchange cash segments creates systematic mispricings, allowing astute allocators to acquire pure sovereign gold below bullion market parity.",
-        "Statutory Tax Exemption Shield: Section 47(viic) guarantees 100% exemption from capital gains tax upon redemption at maturity, generating an unreplicable 200+ bps annualized hurdle over Gold ETFs."
+        "Secondary Discount Liquidity Premium: Thin trading on the exchange often pushes SGB prices below bullion parity, so buyers can acquire sovereign-backed gold at a discount. The discount varies by series.",
+        "Statutory Tax Exemption Shield: Section 47(viic) guarantees 100% exemption from capital gains tax upon redemption at maturity, a tax advantage over Gold ETFs for investors who hold to maturity."
     ]
 
     return {

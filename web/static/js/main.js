@@ -402,7 +402,7 @@ window.openCheckout = function(planId, planName, amountInr, credits) {
   const storedUser = getStoredUser();
   if (!storedUser) {
     window._pendingCheckout = { planId: planId, planName: planName, amountInr: amountInr, credits: credits };
-    alert('Please enter your email to sign in or create your account first. You will receive 2 free welcome credits and your purchased credits will be credited directly to your account.');
+    alert('Please enter your email to sign in or create your account first. You will receive 2 free welcome credits and your purchased credits will be added to your account after payment.');
     openSignInModal();
     return;
   }
@@ -1404,7 +1404,7 @@ window.synthesizeReport = async function(ticker, forceRefresh = false) {
       alert(errMsg || 'Your session has expired. Please sign in again.');
       openSignInModal();
     } else {
-      alert(`Report Alert: ${errMsg}`);
+      alert(`We could not generate this report: ${errMsg}`);
     }
 
     // Refresh balance in background in case of refund
@@ -1734,10 +1734,10 @@ window.handleAuthFormSubmit = async function(e) {
         }
         submitBtn.innerText = 'Verify & Claim 2 Credits →';
       } else {
-        alert('Authentication Error: ' + extractApiError(data, 'Could not send verification code.'));
+        alert('Sign-in error: ' + extractApiError(data, 'Could not send verification code.'));
       }
     } catch (err) {
-      alert('Authentication Error: ' + err.message);
+      alert('Sign-in error: ' + err.message);
     } finally {
       submitBtn.disabled = false;
       if (!_authOtpRequested) submitBtn.innerText = 'Send Verification Code →';
@@ -1770,12 +1770,12 @@ window.handleAuthFormSubmit = async function(e) {
         if (window._pendingCheckout) {
           const p = window._pendingCheckout;
           window._pendingCheckout = null;
-          alert(`Welcome ${data.user.full_name}! 2 Free Welcome Credits have been claimed.\nOpening checkout for ${p.planName}...`);
+          alert(`Welcome, ${data.user.full_name}! Your 2 free welcome credits have been added.\nOpening checkout for ${p.planName}...`);
           openCheckout(p.planId, p.planName, p.amountInr, p.credits);
           return;
         }
 
-        alert(`Welcome ${data.user.full_name}! You have received 2 free research credits.`);
+        alert(`Welcome, ${data.user.full_name}! Your 2 free research credits have been added.`);
         window.location.reload();
       } else {
         alert('Verification Failed: ' + extractApiError(data, 'Invalid or expired code.'));
@@ -1809,7 +1809,7 @@ window.handleResendOtp = async function() {
           ? `✓ New test code: ${data.test_code}` 
           : `Fresh code dispatched to ${email}.`;
       }
-      alert('A fresh verification code has been dispatched.');
+      alert('A new verification code has been sent.');
     } else {
       alert('Notice: ' + extractApiError(data, 'Could not resend code.'));
     }
