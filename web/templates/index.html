@@ -434,11 +434,11 @@
       >
         <div>
           <!-- Badges Bar -->
-          <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px;">
+          <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 8px; margin-bottom: 12px;">
             <span style="font-size: 11px; font-weight: 700; color: #38bdf8; background: rgba(14, 165, 233, 0.12); padding: 3px 8px; border-radius: 6px; text-transform: uppercase;">
               <svg class="glyph" style="width: 13px; height: 13px; vertical-align: -2px;"><use href="#{{ eq.sector_svg_id|default('icon-sector-diversified') }}"></use></svg> {{ eq.sector|default('Equities') }}
             </span>
-            <div style="display: flex; gap: 6px;">
+            <div style="display: flex; gap: 6px; flex-wrap: wrap;">
               {% if eq.market_cap_tier %}
               <span class="badge {% if eq.market_cap_tier == 'Mega-Cap' %}badge-cyan{% elif eq.market_cap_tier == 'Large-Cap' %}badge-purple{% else %}badge-slate{% endif %}" style="font-size: 10.5px; padding: 2px 7px;">
                 {{ eq.market_cap_tier }}

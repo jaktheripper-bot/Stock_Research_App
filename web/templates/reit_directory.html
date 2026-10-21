@@ -237,7 +237,7 @@
       {% if r.structure_type in ['MAINBOARD_REIT', 'SM_REIT'] %}
       <div class="card asset-card-accent" style="padding: 20px; border-radius: 14px; display: flex; flex-direction: column; justify-content: space-between; transition: transform 0.2s ease, box-shadow 0.2s ease;">
         <div>
-          <div style="display: flex; justify-content: space-between; align-items: center; gap: 8px; margin-bottom: 10px;">
+          <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 8px; margin-bottom: 10px;">
             {% if r.structure_type == 'SM_REIT' %}
               <span style="background: rgba(168, 85, 247, 0.15); color: #c084fc; border: 1px solid rgba(168, 85, 247, 0.3); padding: 3px 10px; border-radius: 9999px; font-size: 11px; font-weight: 700;">
                 SEBI SM REIT
@@ -444,7 +444,7 @@
       {% set r_det = r.details if r.details is defined and r.details else {} %}
       <div class="card asset-card-accent" style="padding: 20px; border-radius: 14px; display: flex; flex-direction: column; justify-content: space-between; transition: transform 0.2s ease, box-shadow 0.2s ease;">
         <div>
-          <div style="display: flex; justify-content: space-between; align-items: center; gap: 8px; margin-bottom: 10px;">
+          <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 8px; margin-bottom: 10px;">
             {% if r_det.subtype == 'TRANSMISSION_ANNUITY' %}
               <span style="background: rgba(16, 185, 129, 0.15); color: #34d399; padding: 3px 10px; border-radius: 9999px; font-size: 11px; font-weight: 700;">
                 Availability Annuity • Zero Traffic Risk
@@ -673,7 +673,7 @@
       {% for sgb in sgb_audit.tranches %}
       <div class="card asset-card-accent" style="padding: 20px; border-radius: 14px; display: flex; flex-direction: column; justify-content: space-between; transition: transform 0.2s ease, box-shadow 0.2s ease;">
         <div>
-          <div style="display: flex; justify-content: space-between; align-items: center; gap: 8px; margin-bottom: 10px;">
+          <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 8px; margin-bottom: 10px;">
             <span style="background: rgba(234, 179, 8, 0.15); color: #facc15; border: 1px solid rgba(234, 179, 8, 0.3); padding: 3px 10px; border-radius: 9999px; font-size: 11px; font-weight: 700;">
               Sec 47(viic) Tax-Free Maturity
             </span>

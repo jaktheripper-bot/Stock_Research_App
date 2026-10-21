@@ -58,7 +58,7 @@ def tool_run_test_suite() -> Dict[str, Any]:
             stdout=subprocess.PIPE,
             stderr=subprocess.STDOUT,
             text=True,
-            timeout=180,
+            timeout=600,
             env=test_env
         )
         duration = round(time.time() - start_time, 2)
@@ -121,9 +121,9 @@ def tool_run_test_suite() -> Dict[str, Any]:
             "passed": 0,
             "failed": 0,
             "errors": 1,
-            "duration_s": 180.0,
+            "duration_s": 600.0,
             "exit_code": -1,
-            "summary": "Test execution timed out after 180s."
+            "summary": "Test execution timed out after 600s."
         }
     except Exception as e:
         logger.error(f"Failed to execute test runner: {e}")

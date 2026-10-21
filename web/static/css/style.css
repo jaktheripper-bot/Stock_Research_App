@@ -3251,6 +3251,36 @@ html[data-theme="dark"] .dossier-reading-toggle {
 
 .asset-card-accent {
   border-top: 3px solid var(--asset-accent) !important;
+  overflow: hidden;
+  box-sizing: border-box;
+}
+
+/* Card Pill & Badge Containment Hygiene (Prevent pill border spillover) */
+.card,
+.asset-card-accent,
+.pillar-card,
+.stat-card,
+.home-stock-card {
+  overflow: hidden;
+  box-sizing: border-box;
+}
+
+.card > div:first-child > div[style*="display: flex"],
+.asset-card-accent > div:first-child > div[style*="display: flex"],
+.stat-card > div:first-child > div[style*="display: flex"],
+.home-stock-card > div:first-child > div[style*="display: flex"],
+.pillar-card-top {
+  flex-wrap: wrap;
+  gap: 8px;
+  max-width: 100%;
+}
+
+.badge,
+.section-accent-pill,
+[style*="border-radius: 9999px"],
+[style*="border-radius: 999px"] {
+  max-width: 100%;
+  box-sizing: border-box;
 }
 
 /* 5. Perspective Portal Hero Banner & Architectural Arch Fallback */

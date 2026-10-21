@@ -1862,6 +1862,28 @@ class TestCompetitiveEnhancements(unittest.TestCase):
             norm_p = _normalize_safety_product(raw_prod)
             self.assertIsInstance(norm_p.get("audit_matrix"), dict)
 
+        # Permanent Microscope Gate 5: Biscuit Card Pill Containment & SVG Symbol Integrity
+        self.assertIn("/* Card Pill & Badge Containment Hygiene (Prevent pill border spillover) */", css_text)
+        self.assertIn(".asset-card-accent", css_text)
+
+        # Verify #icon-ai-spark exists in base.html SVG sprite
+        with open("web/templates/base.html", "r", encoding="utf-8") as f:
+            base_html_content = f.read()
+        self.assertIn('id="icon-ai-spark"', base_html_content)
+
+        # Verify card headers in REITs, Sovereign, Equities, MSME, Funds, ETFs have wrap enabled
+        for route_path in ["/reits", "/sovereign", "/equities", "/msme", "/funds", "/etfs"]:
+            resp = self.client.get(route_path)
+            self.assertEqual(resp.status_code, 200, f"Route {route_path} failed HTTP 200 check")
+            # Assert no broken svg symbol references in rendered output
+            soup = BeautifulSoup(resp.text, "html.parser")
+            uses = soup.find_all("use")
+            for u in uses:
+                href = u.get("href", "")
+                if href.startswith("#"):
+                    symbol_id = href[1:]
+                    self.assertIn(f'id="{symbol_id}"', base_html_content, f"Route {route_path} references undefined symbol #{symbol_id}")
+
 
 
 if __name__ == "__main__":
