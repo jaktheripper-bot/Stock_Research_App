@@ -2874,47 +2874,59 @@ progress.loading-spinner:indeterminate::-moz-progress-bar {
    7 Asset-Class Accents, Perspective Portal Framing & Motion Choreography
    ============================================================================== */
 
-/* 1. 7 Unique Asset-Class Editorial Accents */
+/* 1. Multi-Asset Editorial Section Colour Accents */
 [data-asset-class="equities"] {
   --asset-accent: #0284C7;
-  --asset-accent-subtle: rgba(2, 132, 199, 0.10);
-  --asset-accent-border: rgba(2, 132, 199, 0.35);
+  --asset-accent-subtle: rgba(2, 132, 199, 0.12);
+  --asset-accent-border: rgba(2, 132, 199, 0.38);
 }
 
 [data-asset-class="funds"] {
   --asset-accent: #2563EB;
-  --asset-accent-subtle: rgba(37, 99, 235, 0.10);
-  --asset-accent-border: rgba(37, 99, 235, 0.35);
+  --asset-accent-subtle: rgba(37, 99, 235, 0.12);
+  --asset-accent-border: rgba(37, 99, 235, 0.38);
 }
 
 [data-asset-class="etfs"] {
   --asset-accent: #0D9488;
-  --asset-accent-subtle: rgba(13, 148, 136, 0.10);
-  --asset-accent-border: rgba(13, 148, 136, 0.35);
+  --asset-accent-subtle: rgba(13, 148, 136, 0.12);
+  --asset-accent-border: rgba(13, 148, 136, 0.38);
 }
 
 [data-asset-class="debt"] {
   --asset-accent: #D97706;
-  --asset-accent-subtle: rgba(217, 119, 6, 0.10);
-  --asset-accent-border: rgba(217, 119, 6, 0.35);
+  --asset-accent-subtle: rgba(217, 119, 6, 0.12);
+  --asset-accent-border: rgba(217, 119, 6, 0.38);
 }
 
 [data-asset-class="sovereign"] {
   --asset-accent: #4F46E5;
-  --asset-accent-subtle: rgba(79, 70, 229, 0.10);
-  --asset-accent-border: rgba(79, 70, 229, 0.35);
+  --asset-accent-subtle: rgba(79, 70, 229, 0.12);
+  --asset-accent-border: rgba(79, 70, 229, 0.38);
 }
 
 [data-asset-class="reits"] {
   --asset-accent: #C2410C;
-  --asset-accent-subtle: rgba(194, 65, 12, 0.10);
-  --asset-accent-border: rgba(194, 65, 12, 0.35);
+  --asset-accent-subtle: rgba(194, 65, 12, 0.12);
+  --asset-accent-border: rgba(194, 65, 12, 0.38);
+}
+
+[data-asset-class="opportunities"] {
+  --asset-accent: #7C3AED;
+  --asset-accent-subtle: rgba(124, 58, 237, 0.12);
+  --asset-accent-border: rgba(124, 58, 237, 0.38);
 }
 
 [data-asset-class="msme"] {
-  --asset-accent: #78350F;
-  --asset-accent-subtle: rgba(120, 53, 15, 0.10);
-  --asset-accent-border: rgba(120, 53, 15, 0.35);
+  --asset-accent: #BE185D;
+  --asset-accent-subtle: rgba(190, 24, 93, 0.12);
+  --asset-accent-border: rgba(190, 24, 93, 0.38);
+}
+
+[data-asset-class="safety"] {
+  --asset-accent: #E11D48;
+  --asset-accent-subtle: rgba(225, 29, 72, 0.12);
+  --asset-accent-border: rgba(225, 29, 72, 0.38);
 }
 
 /* 2. Universal Light Mode ([data-theme="light"]) & Component-Specific Reading Surface */
@@ -2955,38 +2967,72 @@ html[data-theme="light"] [data-asset-class="equities"],
 .dossier-ivory-surface [data-asset-class="equities"],
 .dossier-ivory-surface[data-asset-class="equities"] {
   --asset-accent: #0284C7;
-  --asset-accent-subtle: rgba(2, 132, 199, 0.10);
-  --asset-accent-border: rgba(2, 132, 199, 0.35);
+  --asset-accent-subtle: rgba(2, 132, 199, 0.12);
+  --asset-accent-border: rgba(2, 132, 199, 0.38);
 }
 
 html[data-theme="light"] [data-asset-class="funds"],
+.dossier-ivory-surface [data-asset-class="funds"],
 .dossier-ivory-surface[data-asset-class="funds"] {
   --asset-accent: #2563EB;
+  --asset-accent-subtle: rgba(37, 99, 235, 0.12);
+  --asset-accent-border: rgba(37, 99, 235, 0.38);
 }
 
 html[data-theme="light"] [data-asset-class="etfs"],
+.dossier-ivory-surface [data-asset-class="etfs"],
 .dossier-ivory-surface[data-asset-class="etfs"] {
   --asset-accent: #0D9488;
+  --asset-accent-subtle: rgba(13, 148, 136, 0.12);
+  --asset-accent-border: rgba(13, 148, 136, 0.38);
 }
 
 html[data-theme="light"] [data-asset-class="debt"],
+.dossier-ivory-surface [data-asset-class="debt"],
 .dossier-ivory-surface[data-asset-class="debt"] {
   --asset-accent: #D97706;
+  --asset-accent-subtle: rgba(217, 119, 6, 0.12);
+  --asset-accent-border: rgba(217, 119, 6, 0.38);
 }
 
 html[data-theme="light"] [data-asset-class="sovereign"],
+.dossier-ivory-surface [data-asset-class="sovereign"],
 .dossier-ivory-surface[data-asset-class="sovereign"] {
   --asset-accent: #4F46E5;
+  --asset-accent-subtle: rgba(79, 70, 229, 0.12);
+  --asset-accent-border: rgba(79, 70, 229, 0.38);
 }
 
 html[data-theme="light"] [data-asset-class="reits"],
+.dossier-ivory-surface [data-asset-class="reits"],
 .dossier-ivory-surface[data-asset-class="reits"] {
   --asset-accent: #C2410C;
+  --asset-accent-subtle: rgba(194, 65, 12, 0.12);
+  --asset-accent-border: rgba(194, 65, 12, 0.38);
+}
+
+html[data-theme="light"] [data-asset-class="opportunities"],
+.dossier-ivory-surface [data-asset-class="opportunities"],
+.dossier-ivory-surface[data-asset-class="opportunities"] {
+  --asset-accent: #7C3AED;
+  --asset-accent-subtle: rgba(124, 58, 237, 0.12);
+  --asset-accent-border: rgba(124, 58, 237, 0.38);
 }
 
 html[data-theme="light"] [data-asset-class="msme"],
+.dossier-ivory-surface [data-asset-class="msme"],
 .dossier-ivory-surface[data-asset-class="msme"] {
-  --asset-accent: #78350F;
+  --asset-accent: #BE185D;
+  --asset-accent-subtle: rgba(190, 24, 93, 0.12);
+  --asset-accent-border: rgba(190, 24, 93, 0.38);
+}
+
+html[data-theme="light"] [data-asset-class="safety"],
+.dossier-ivory-surface [data-asset-class="safety"],
+.dossier-ivory-surface[data-asset-class="safety"] {
+  --asset-accent: #E11D48;
+  --asset-accent-subtle: rgba(225, 29, 72, 0.12);
+  --asset-accent-border: rgba(225, 29, 72, 0.38);
 }
 
 html[data-theme="light"] body {
@@ -3865,6 +3911,96 @@ html[data-theme="dark"] .hud-card-badge-product {
   border-radius: 9999px;
   transition: width 0.08s linear;
 }
+
+/* ==============================================================================
+   12. End-to-End Multi-Asset Section Colour Continuity
+   (Navigation Dropdowns -> Homepage Framework Cards -> Section Headers -> Dossiers)
+   ============================================================================== */
+.dropdown-item[data-asset-class] {
+  border-left: 3.5px solid var(--asset-accent) !important;
+  padding-left: 11px !important;
+  margin-bottom: 3px;
+  transition: background 0.16s ease, border-color 0.16s ease, transform 0.16s ease;
+}
+
+.dropdown-item[data-asset-class] .dropdown-icon,
+html[data-theme="light"] .dropdown-item[data-asset-class] .dropdown-icon {
+  background: var(--asset-accent-subtle) !important;
+  border: 1px solid var(--asset-accent-border) !important;
+  color: var(--asset-accent) !important;
+}
+
+.dropdown-item[data-asset-class] .dropdown-icon .glyph,
+html[data-theme="light"] .dropdown-item[data-asset-class] .dropdown-icon .glyph {
+  stroke: var(--asset-accent) !important;
+  color: var(--asset-accent) !important;
+}
+
+.dropdown-item[data-asset-class]:hover,
+.dropdown-item[data-asset-class].active,
+html[data-theme="light"] .dropdown-item[data-asset-class]:hover,
+html[data-theme="light"] .dropdown-item[data-asset-class].active {
+  background: var(--asset-accent-subtle) !important;
+  border-left-color: var(--asset-accent) !important;
+}
+
+.dropdown-item[data-asset-class]:hover .dropdown-title,
+.dropdown-item[data-asset-class].active .dropdown-title {
+  color: var(--asset-accent) !important;
+}
+
+/* Homepage 7-Asset-Class Evaluation Framework Cards Continuity */
+.pillar-card[data-asset-class],
+html[data-theme="light"] .pillar-card[data-asset-class] {
+  border-top: 3.5px solid var(--asset-accent) !important;
+}
+
+.pillar-card[data-asset-class] .pillar-icon,
+html[data-theme="light"] .pillar-card[data-asset-class] .pillar-icon {
+  background: var(--asset-accent-subtle) !important;
+  border: 1px solid var(--asset-accent-border) !important;
+  color: var(--asset-accent) !important;
+}
+
+.pillar-card[data-asset-class] .pillar-icon .glyph {
+  stroke: var(--asset-accent) !important;
+  color: var(--asset-accent) !important;
+}
+
+.pillar-card[data-asset-class] .pillar-card-link {
+  color: var(--asset-accent) !important;
+}
+
+/* Section Headers, Dossier Mastheads & Asset Cards Top Accent Continuity
+   (Placed after generic Light Mode inline-border overrides so border-top-color wins) */
+[data-asset-class] .hero-portal-banner,
+.hero-portal-banner[data-asset-class],
+html[data-theme="light"] [data-asset-class] .hero-portal-banner,
+html[data-theme="light"] .hero-portal-banner[data-asset-class] {
+  border-top: 4px solid var(--asset-accent) !important;
+}
+
+[data-asset-class] .dossier-masthead-v2,
+.dossier-masthead-v2[data-asset-class],
+html[data-theme="light"] [data-asset-class] .dossier-masthead-v2,
+html[data-theme="light"] .dossier-masthead-v2[data-asset-class] {
+  border-top: 4px solid var(--asset-accent) !important;
+}
+
+[data-asset-class] .asset-card-accent,
+.asset-card-accent[data-asset-class],
+html[data-theme="light"] [data-asset-class] .asset-card-accent,
+html[data-theme="light"] .asset-card-accent[data-asset-class] {
+  border-top: 3.5px solid var(--asset-accent) !important;
+}
+
+.section-accent-pill,
+html[data-theme="light"] .section-accent-pill {
+  background: var(--asset-accent-subtle) !important;
+  border: 1px solid var(--asset-accent-border) !important;
+  color: var(--asset-accent) !important;
+}
+
 
 
 

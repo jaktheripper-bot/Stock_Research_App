@@ -30,9 +30,9 @@
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600;700&family=Playfair+Display:ital,wght@0,600;0,700;1,400&display=swap" rel="stylesheet">
-  <link rel="preload" href="/static/css/style.css?v=20261021_0745" as="style" onload="this.rel='stylesheet'">
-  <link rel="preload" href="/static/js/main.js?v=20261021_0745" as="script">
-  <link rel="stylesheet" href="/static/css/style.css?v=20261021_0745">
+  <link rel="preload" href="/static/css/style.css?v=20261021_0800" as="style" onload="this.rel='stylesheet'">
+  <link rel="preload" href="/static/js/main.js?v=20261021_0800" as="script">
+  <link rel="stylesheet" href="/static/css/style.css?v=20261021_0800">
 
   <!-- Schema.org Structured Data -->
   <script type="application/ld+json">
@@ -391,21 +391,21 @@
               </svg>
             </button>
             <div class="dropdown-menu" role="menu" aria-labelledby="marketsDropdownBtn">
-              <a href="/equities" class="dropdown-item {% if active_page == 'equities' %}active{% endif %}" role="menuitem">
+              <a href="/equities" data-asset-class="equities" class="dropdown-item {% if active_page == 'equities' %}active{% endif %}" role="menuitem">
                 <div class="dropdown-icon"><svg class="glyph"><use href="#icon-markets"></use></svg></div>
                 <div class="dropdown-content">
                   <div class="dropdown-title">Stock Reports & Equities</div>
                   <div class="dropdown-desc">All BSE & NSE stock reports & screener</div>
                 </div>
               </a>
-              <a href="/funds" class="dropdown-item {% if active_page == 'funds' %}active{% endif %}" role="menuitem">
+              <a href="/funds" data-asset-class="funds" class="dropdown-item {% if active_page == 'funds' %}active{% endif %}" role="menuitem">
                 <div class="dropdown-icon"><svg class="glyph"><use href="#glyph-chart"></use></svg></div>
                 <div class="dropdown-content">
                   <div class="dropdown-title">Mutual Funds</div>
                   <div class="dropdown-desc">Dual-sleeve look-through, active share & fee drag</div>
                 </div>
               </a>
-              <a href="/etfs" class="dropdown-item {% if active_page == 'etfs' %}active{% endif %}" role="menuitem">
+              <a href="/etfs" data-asset-class="etfs" class="dropdown-item {% if active_page == 'etfs' %}active{% endif %}" role="menuitem">
                 <div class="dropdown-icon"><svg class="glyph"><use href="#glyph-globe"></use></svg></div>
                 <div class="dropdown-content">
                   <div class="dropdown-title">National ETF Matrix</div>
@@ -413,21 +413,21 @@
                 </div>
               </a>
               <div class="dropdown-divider"></div>
-              <a href="/debt" class="dropdown-item {% if active_page == 'debt' %}active{% endif %}" role="menuitem">
+              <a href="/debt" data-asset-class="debt" class="dropdown-item {% if active_page == 'debt' %}active{% endif %}" role="menuitem">
                 <div class="dropdown-icon"><svg class="glyph"><use href="#glyph-bank"></use></svg></div>
                 <div class="dropdown-content">
                   <div class="dropdown-title">Bonds, NCDs & SDIs</div>
                   <div class="dropdown-desc">SEBI ₹10K fixed income, senior secured yields & YTMs</div>
                 </div>
               </a>
-              <a href="/sovereign" class="dropdown-item {% if active_page == 'sovereign' %}active{% endif %}" role="menuitem">
+              <a href="/sovereign" data-asset-class="sovereign" class="dropdown-item {% if active_page == 'sovereign' %}active{% endif %}" role="menuitem">
                 <div class="dropdown-icon"><svg class="glyph"><use href="#icon-pillar-04"></use></svg></div>
                 <div class="dropdown-content">
                   <div class="dropdown-title">Sovereign Curve & T-Bills</div>
                   <div class="dropdown-desc">RBI T-Bills, 10Y G-Sec & SDL auction benchmarks</div>
                 </div>
               </a>
-              <a href="/reits" class="dropdown-item {% if active_page == 'reits' %}active{% endif %}" role="menuitem">
+              <a href="/reits" data-asset-class="reits" class="dropdown-item {% if active_page == 'reits' %}active{% endif %}" role="menuitem">
                 <div class="dropdown-icon"><svg class="glyph"><use href="#icon-sector-realestate"></use></svg></div>
                 <div class="dropdown-content">
                   <div class="dropdown-title">SM REITs, InvITs & SGBs</div>
@@ -435,14 +435,14 @@
                 </div>
               </a>
               <div class="dropdown-divider"></div>
-              <a href="/opportunities" class="dropdown-item {% if active_page == 'opportunities' %}active{% endif %}" role="menuitem">
+              <a href="/opportunities" data-asset-class="opportunities" class="dropdown-item {% if active_page == 'opportunities' %}active{% endif %}" role="menuitem">
                 <div class="dropdown-icon"><svg class="glyph"><use href="#icon-pillar-05"></use></svg></div>
                 <div class="dropdown-content">
                   <div class="dropdown-title">Opportunity Terminal</div>
                   <div class="dropdown-desc">Cross-asset discovery, spread heatmap & risk-yield frontier</div>
                 </div>
               </a>
-              <a href="/msme" class="dropdown-item {% if active_page == 'msme' %}active{% endif %}" role="menuitem">
+              <a href="/msme" data-asset-class="msme" class="dropdown-item {% if active_page == 'msme' %}active{% endif %}" role="menuitem">
                 <div class="dropdown-icon"><svg class="glyph"><use href="#icon-sector-industrials"></use></svg></div>
                 <div class="dropdown-content">
                   <div class="dropdown-title">Unlisted MSMEs & SMEs</div>
@@ -461,28 +461,28 @@
               </svg>
             </button>
             <div class="dropdown-menu" role="menu" aria-labelledby="toolsDropdownBtn">
-              <a href="/discovery" class="dropdown-item {% if active_page == 'discovery' %}active{% endif %}" role="menuitem">
+              <a href="/discovery" data-asset-class="equities" class="dropdown-item {% if active_page == 'discovery' %}active{% endif %}" role="menuitem">
                 <div class="dropdown-icon"><svg class="glyph"><use href="#icon-insights"></use></svg></div>
                 <div class="dropdown-content">
                   <div class="dropdown-title">Morning Discovery @9AM</div>
                   <div class="dropdown-desc">Daily screening of under-the-radar BSE equities</div>
                 </div>
               </a>
-              <a href="/compare" class="dropdown-item {% if active_page == 'compare' %}active{% endif %}" role="menuitem">
+              <a href="/compare" data-asset-class="funds" class="dropdown-item {% if active_page == 'compare' %}active{% endif %}" role="menuitem">
                 <div class="dropdown-icon"><svg class="glyph"><use href="#glyph-scale"></use></svg></div>
                 <div class="dropdown-content">
                   <div class="dropdown-title">Peer Comparison</div>
                   <div class="dropdown-desc">Side-by-side financial metrics & valuation disparity</div>
                 </div>
               </a>
-              <a href="/calculator/tax" class="dropdown-item {% if active_page == 'tax_calculator' %}active{% endif %}" role="menuitem">
+              <a href="/calculator/tax" data-asset-class="sovereign" class="dropdown-item {% if active_page == 'tax_calculator' %}active{% endif %}" role="menuitem">
                 <div class="dropdown-icon"><svg class="glyph"><use href="#icon-valuation"></use></svg></div>
                 <div class="dropdown-content">
                   <div class="dropdown-title">Net Real Tax Calculator</div>
                   <div class="dropdown-desc">Post-tax returns deflated by MOSPI CPI inflation</div>
                 </div>
               </a>
-              <a href="/safety-radar" class="dropdown-item {% if active_page == 'safety_radar' %}active{% endif %}" role="menuitem">
+              <a href="/safety-radar" data-asset-class="safety" class="dropdown-item {% if active_page == 'safety_radar' %}active{% endif %}" role="menuitem">
                 <div class="dropdown-icon"><svg class="glyph"><use href="#glyph-alert"></use></svg></div>
                 <div class="dropdown-content">
                   <div class="dropdown-title">Retail Safety Radar</div>
@@ -935,6 +935,6 @@
     </div>
   </footer>
 
-  <script src="/static/js/main.js?v=20261021_0745"></script>
+  <script src="/static/js/main.js?v=20261021_0800"></script>
 </body>
 </html>

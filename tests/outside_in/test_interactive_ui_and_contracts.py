@@ -1594,8 +1594,31 @@ class TestCompetitiveEnhancements(unittest.TestCase):
             ".editorial-callout-watchpoints",
             'html[data-theme="light"] [style*="background: rgba(15, 23, 42"]',
             '.dossier-ivory-surface [style*="color: #f8fafc"]',
+            ".dropdown-item[data-asset-class]",
+            ".pillar-card[data-asset-class]",
+            "[data-asset-class] .hero-portal-banner",
         ]:
             self.assertIn(token, css_text)
+
+        # Verify navigation dropdown items and homepage 7-framework cards carry data-asset-class continuity
+        markets_dd = soup_home.find(id="navMarketsDropdown")
+        self.assertIsNotNone(markets_dd)
+        for item in markets_dd.select("a.dropdown-item"):
+            self.assertTrue(
+                item.get("data-asset-class"),
+                f"Dropdown item {item.get('href')} in #navMarketsDropdown missing data-asset-class",
+            )
+        tools_dd = soup_home.find(id="navToolsDropdown")
+        self.assertIsNotNone(tools_dd)
+        for item in tools_dd.select("a.dropdown-item"):
+            self.assertTrue(
+                item.get("data-asset-class"),
+                f"Dropdown item {item.get('href')} in #navToolsDropdown missing data-asset-class",
+            )
+        pillar_cards = soup_home.select(".pillars-grid .pillar-card")
+        self.assertEqual(len(pillar_cards), 7)
+        for pcard in pillar_cards:
+            self.assertTrue(pcard.get("data-asset-class"), "Homepage .pillar-card missing data-asset-class")
 
 
 if __name__ == "__main__":
