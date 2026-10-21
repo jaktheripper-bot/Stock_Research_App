@@ -78,6 +78,10 @@ Detailed forensic analysis with exact page grounding to bseindia.com filings.
         self.assertIn("Four things we promise every reader", res.text)
         self.assertIn("We never tell you to buy or sell", res.text)
         self.assertIn("Multi-asset investment research", res.text)
+        self.assertIn("One Forensic Standard Across Seven Asset Classes", res.text)
+        self.assertIn("Statutory Exchange &amp; Registry Ingestion", res.text)
+        self.assertIn("Deterministic Financial &amp; Risk Modelling", res.text)
+        self.assertIn("4-Tier Epistemic Tagging &amp; Falsification", res.text)
         self.assertNotIn("ZERO-HALLUCINATION", res.text.upper())
 
     def test_security_headers_middleware(self):
