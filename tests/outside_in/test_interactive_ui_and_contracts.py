@@ -1633,6 +1633,26 @@ class TestCompetitiveEnhancements(unittest.TestCase):
         self.assertIsNotNone(msme_grid, "Missing #msmeCardsGrid snapshot biscuit grid on /msme")
         self.assertGreater(len(msme_grid.select(".asset-card-accent")), 0, "Expected MSME snapshot biscuit cards in #msmeCardsGrid")
 
+        for debt_url in [
+            "/debt",
+            "/debt?seniority=SENIOR_SECURED",
+            "/debt?is_sdi=true",
+            "/debt?seniority=SUBORDINATED_TIER_2",
+            "/debt?seniority=PERPETUAL_AT1",
+        ]:
+            r_debt = self.client.get(debt_url)
+            self.assertEqual(r_debt.status_code, 200, f"Failed GET {debt_url}")
+            self.assertNotIn(">0 Issues<", r_debt.text, f"{debt_url} rendered 0 Issues")
+            self.assertNotIn("All Issues (0)", r_debt.text, f"{debt_url} rendered All Issues (0)")
+            s_debt = BeautifulSoup(r_debt.text, "html.parser")
+            debt_grid = s_debt.find(id="debtCardsGrid")
+            self.assertIsNotNone(debt_grid, f"Missing #debtCardsGrid on {debt_url}")
+            self.assertGreater(
+                len(debt_grid.select(".asset-card-accent")),
+                0,
+                f"Expected non-zero .asset-card-accent bond cards on {debt_url}",
+            )
+
 
 if __name__ == "__main__":
     unittest.main()

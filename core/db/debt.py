@@ -300,6 +300,14 @@ def get_debt_securities_for_equity(equity_ticker: str) -> List[Dict[str, Any]]:
         cursor.close()
         conn.close()
 
+def _expand_seniority_aliases(seniority: str) -> List[str]:
+    """Expands seniority tier query into all canonical synonyms stored in DB/universe."""
+    sen_norm = (seniority or "").strip().upper()
+    if sen_norm in ("SUBORDINATED_TIER_2", "SUBORDINATED_TIER2", "TIER_2_SUBORDINATED", "TIER2"):
+        return ["SUBORDINATED_TIER_2", "SUBORDINATED_TIER2", "TIER_2_SUBORDINATED"]
+    return [sen_norm] if sen_norm else []
+
+
 def _filter_canonical_debt_fallback(
     seniority: Optional[str] = None,
     instrument_type: Optional[str] = None,
@@ -310,8 +318,8 @@ def _filter_canonical_debt_fallback(
     """Deterministic fallback filter over CANONICAL_DEBT_UNIVERSE when DB is empty or unavailable."""
     items = [dict(sec) for sec in CANONICAL_DEBT_UNIVERSE]
     if seniority:
-        sen_norm = seniority.strip().upper()
-        items = [r for r in items if str(r.get("seniority_tier", "")).strip().upper() == sen_norm]
+        allowed_sen = set(_expand_seniority_aliases(seniority))
+        items = [r for r in items if str(r.get("seniority_tier", "")).strip().upper() in allowed_sen]
     if instrument_type:
         it_norm = instrument_type.strip().upper()
         items = [r for r in items if str(r.get("instrument_type", "")).strip().upper() == it_norm]
@@ -345,14 +353,20 @@ def get_active_debt_securities(
     params = []
 
     if seniority:
-        clauses.append("seniority_tier = %s" if use_pg else "seniority_tier = ?")
-        params.append(seniority.strip().upper())
+        sen_aliases = _expand_seniority_aliases(seniority)
+        placeholders = ", ".join(["%s" if use_pg else "?" for _ in sen_aliases])
+        clauses.append(f"UPPER(seniority_tier) IN ({placeholders})")
+        params.extend(sen_aliases)
     if instrument_type:
         clauses.append("instrument_type = %s" if use_pg else "instrument_type = ?")
         params.append(instrument_type.strip().upper())
     if is_sdi is not None:
-        clauses.append("is_sdi = %s" if use_pg else "is_sdi = ?")
-        params.append(True if is_sdi else False)
+        if use_pg:
+            clauses.append("is_sdi = %s")
+            params.append(True if is_sdi else False)
+        else:
+            clauses.append("CAST(is_sdi AS INTEGER) = ?")
+            params.append(1 if is_sdi else 0)
 
     where_str = " AND ".join(clauses)
     p = "%s" if use_pg else "?"
@@ -364,8 +378,8 @@ def get_active_debt_securities(
         rows = cursor.fetchall()
         results = [clean_dict_row(cursor, r) for r in rows]
 
-        # Auto-seed canonical universe if no production securities are present
-        if not results and not _retry and not seniority and not instrument_type and not min_rating and is_sdi is None:
+        # Auto-seed canonical universe if production securities are missing or incomplete
+        if not results and not _retry:
             cursor.close()
             conn.close()
             seed_default_debt_securities()

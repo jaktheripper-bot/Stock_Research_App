@@ -1341,6 +1341,7 @@ def debt_directory_page(
     seniority: Optional[str] = None,
     instrument_type: Optional[str] = None,
     min_rating: Optional[str] = None,
+    is_sdi: Optional[bool] = None,
     q: Optional[str] = None
 ):
     """Corporate Debt, NCDs, and SDIs under the SEBI ₹10,000 face value framework."""
@@ -1358,8 +1359,11 @@ def debt_directory_page(
         securities = get_active_debt_securities(
             seniority=seniority,
             instrument_type=instrument_type,
-            min_rating=min_rating
+            min_rating=min_rating,
+            is_sdi=is_sdi,
         )
+
+    current_filter = "is_sdi" if is_sdi else (seniority.strip().upper() if seniority else None)
 
     recent_actions = get_recent_rating_actions(limit=8)
     valid_ytms = [
@@ -1391,6 +1395,7 @@ def debt_directory_page(
             "benchmark_10y_gsec": benchmark_10y,
             "last_scan_info": last_scan_info,
             "recent_actions": recent_actions,
+            "current_filter": current_filter,
             "current_seniority": seniority,
             "current_type": instrument_type,
             "current_rating": min_rating,
