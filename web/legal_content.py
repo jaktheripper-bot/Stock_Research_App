@@ -158,8 +158,8 @@ POLICIES = {
         "description": "Statutory non-advisory disclosures and educational safe-harbor terms.",
         "content_html": """
         <div style="background: rgba(245, 158, 11, 0.1); border-left: 4px solid #f59e0b; padding: 16px; border-radius: 6px; margin: 20px 0;">
-            <h4 style="margin: 0 0 10px 0; color: #b45309;">MANDATORY SEBI NON-ADVISORY SAFE HARBOR NOTICE</h4>
-            <p style="margin: 0; font-size: 14px; line-height: 1.6; color: #78350f;">
+            <h4 style="margin: 0 0 10px 0; color: var(--accent-amber);">MANDATORY SEBI NON-ADVISORY SAFE HARBOR NOTICE</h4>
+            <p style="margin: 0; font-size: 14px; line-height: 1.6; color: var(--text-primary);">
                 <strong>""" + MANDATORY_SEBI_DISCLAIMER + """</strong>
             </p>
         </div>

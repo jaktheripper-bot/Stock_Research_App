@@ -200,8 +200,9 @@ def api_get_debt_security_detail(isin: str, request: Request):
         posture["deep_dive_locked"] = True
         posture["unlock_endpoint"] = f"/api/debt/unlock/{clean_isin}"
 
+    from fastapi.encoders import jsonable_encoder
     return JSONResponse(
-        {"status": "success", "security": sec, "posture": posture, "rating_history": rating_history},
+        jsonable_encoder({"status": "success", "security": sec, "posture": posture, "rating_history": rating_history}),
         headers={"Cache-Control": "private, no-store"}
     )
 

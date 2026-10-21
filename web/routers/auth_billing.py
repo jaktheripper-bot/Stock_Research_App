@@ -412,10 +412,11 @@ async def public_auth_callback(
 @router.get("/api/auth/me")
 async def api_auth_me(request: Request):
     """Returns the currently authenticated user profile from session cookie or Authorization header."""
+    from fastapi.encoders import jsonable_encoder
     user = _get_current_web_user(request)
     if not user:
         return JSONResponse(content={"authenticated": False, "user": None})
-    return JSONResponse(content={"authenticated": True, "user": user})
+    return JSONResponse(content=jsonable_encoder({"authenticated": True, "user": user}))
 
 
 @router.post("/api/auth/signout")

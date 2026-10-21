@@ -1739,6 +1739,73 @@ class TestCompetitiveEnhancements(unittest.TestCase):
             r_fav = self.client.get(fav_url)
             self.assertEqual(r_fav.status_code, 200, f"Failed GET {fav_url}")
 
+        # Permanent Microscope Gate 1: Zero Dead Hover Cards Across All Directory, Search & Pricing Pages
+        for card_route in [
+            "/",
+            "/equities",
+            "/funds",
+            "/etfs",
+            "/debt",
+            "/sovereign",
+            "/reits",
+            "/msme",
+            "/safety-radar",
+            "/discovery",
+            "/search?q=TCS",
+            "/pricing",
+        ]:
+            r_page = self.client.get(card_route)
+            self.assertEqual(r_page.status_code, 200, f"Failed GET {card_route}")
+            s_page = BeautifulSoup(r_page.text, "html.parser")
+            candidates = s_page.select(
+                ".pillar-card, .home-stock-card, .discovery-card, .plan-card, .asset-card-accent"
+            )
+            for card_el in candidates:
+                cls_list = card_el.get("class") or []
+                if "hero-portal-banner" in cls_list or "dossier-masthead-v2" in cls_list:
+                    continue
+                has_action = bool(
+                    card_el.get("data-href")
+                    or (card_el.name == "a" and card_el.get("href"))
+                    or card_el.find_parent("a", href=True)
+                    or card_el.find("a", href=True)
+                    or card_el.find("button", onclick=True)
+                )
+                self.assertTrue(
+                    has_action,
+                    f"Dead hover card without link/button action on {card_route}: classes={cls_list}",
+                )
+
+        # Permanent Microscope Gate 2: Luminous Dark Mode & Light Mode Section Accents + Epistemic Badges
+        for section_cls in [
+            "equities",
+            "funds",
+            "etfs",
+            "debt",
+            "sovereign",
+            "reits",
+            "opportunities",
+            "msme",
+            "safety",
+        ]:
+            self.assertIn(
+                f'html[data-theme="dark"] [data-asset-class="{section_cls}"]',
+                css_text,
+                f"Missing dark-mode luminous section accent for {section_cls} in style.css",
+            )
+        for badge_cls in [
+            "epistemic-badge-fact",
+            "epistemic-badge-calc",
+            "epistemic-badge-interp",
+            "epistemic-badge-uncert",
+        ]:
+            self.assertIn(
+                f'html[data-theme="light"] .{badge_cls}',
+                css_text,
+                f"Missing Light Mode contrast rule for .{badge_cls} in style.css",
+            )
+
+
 
 if __name__ == "__main__":
     unittest.main()

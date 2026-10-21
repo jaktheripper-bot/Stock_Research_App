@@ -3057,6 +3057,9 @@ const INTERACTIVE_CARD_SELECTOR = [
 
 function resolveCardPrimaryAction(card) {
   if (!card) return null;
+  if (card.tagName === 'A' && card.href) return card;
+  const wrappingAnchor = card.closest('a[href]');
+  if (wrappingAnchor) return wrappingAnchor;
   if (card.dataset && card.dataset.href) {
     const explicitLink = card.querySelector(`a[href="${card.dataset.href}"]`) || card.querySelector('a.pillar-card-link[href], a.btn[href], a[href]');
     if (explicitLink) return explicitLink;

@@ -39,8 +39,8 @@
   --accent-cyan: #0284C7;
   --accent-cyan-glow: rgba(2, 132, 199, 0.16);
   --accent-blue: #2563EB;
-  --accent-emerald: #059669;
-  --accent-emerald-glow: rgba(5, 150, 105, 0.16);
+  --accent-emerald: #047857;
+  --accent-emerald-glow: rgba(4, 120, 87, 0.16);
   --accent-amber: #D97706;
   --accent-rose: #E11D48;
 
@@ -1124,7 +1124,7 @@ section.pricing-section {
   position: absolute;
   top: -12px;
   right: 28px;
-  background: linear-gradient(135deg, var(--accent-cyan), var(--accent-blue));
+  background: linear-gradient(135deg, #0284C7, #2563EB);
   color: white;
   padding: 4px 13px;
   border-radius: var(--radius-full);
@@ -2902,9 +2902,9 @@ progress.loading-spinner:indeterminate::-moz-progress-bar {
 }
 
 [data-asset-class="debt"] {
-  --asset-accent: #D97706;
-  --asset-accent-subtle: rgba(217, 119, 6, 0.12);
-  --asset-accent-border: rgba(217, 119, 6, 0.38);
+  --asset-accent: #B45309;
+  --asset-accent-subtle: rgba(180, 83, 9, 0.10);
+  --asset-accent-border: rgba(180, 83, 9, 0.35);
 }
 
 [data-asset-class="sovereign"] {
@@ -2955,8 +2955,8 @@ html[data-theme="light"],
   --accent-cyan: #0284C7;
   --accent-cyan-glow: rgba(2, 132, 199, 0.14);
   --accent-blue: #2563EB;
-  --accent-emerald: #059669;
-  --accent-amber: #D97706;
+  --accent-emerald: #047857;
+  --accent-amber: #B45309;
   --accent-rose: #E11D48;
   background-color: #F8FAFC;
   color: #0F172A;
@@ -2998,9 +2998,9 @@ html[data-theme="light"] [data-asset-class="etfs"],
 html[data-theme="light"] [data-asset-class="debt"],
 .dossier-ivory-surface [data-asset-class="debt"],
 .dossier-ivory-surface[data-asset-class="debt"] {
-  --asset-accent: #D97706;
-  --asset-accent-subtle: rgba(217, 119, 6, 0.12);
-  --asset-accent-border: rgba(217, 119, 6, 0.38);
+  --asset-accent: #B45309;
+  --asset-accent-subtle: rgba(180, 83, 9, 0.10);
+  --asset-accent-border: rgba(180, 83, 9, 0.35);
 }
 
 html[data-theme="light"] [data-asset-class="sovereign"],
@@ -3041,6 +3041,61 @@ html[data-theme="light"] [data-asset-class="safety"],
   --asset-accent: #E11D48;
   --asset-accent-subtle: rgba(225, 29, 72, 0.12);
   --asset-accent-border: rgba(225, 29, 72, 0.38);
+}
+
+/* Luminous Dark Mode Section Accents (Guarantees >= 5.0:1 Contrast on Carbon #09090B / #141418) */
+html[data-theme="dark"] [data-asset-class="equities"] {
+  --asset-accent: #38BDF8;
+  --asset-accent-subtle: rgba(56, 189, 248, 0.14);
+  --asset-accent-border: rgba(56, 189, 248, 0.42);
+}
+
+html[data-theme="dark"] [data-asset-class="funds"] {
+  --asset-accent: #60A5FA;
+  --asset-accent-subtle: rgba(96, 165, 250, 0.14);
+  --asset-accent-border: rgba(96, 165, 250, 0.42);
+}
+
+html[data-theme="dark"] [data-asset-class="etfs"] {
+  --asset-accent: #2DD4BF;
+  --asset-accent-subtle: rgba(45, 212, 191, 0.14);
+  --asset-accent-border: rgba(45, 212, 191, 0.42);
+}
+
+html[data-theme="dark"] [data-asset-class="debt"] {
+  --asset-accent: #FBBF24;
+  --asset-accent-subtle: rgba(251, 191, 36, 0.14);
+  --asset-accent-border: rgba(251, 191, 36, 0.42);
+}
+
+html[data-theme="dark"] [data-asset-class="sovereign"] {
+  --asset-accent: #818CF8;
+  --asset-accent-subtle: rgba(129, 140, 248, 0.14);
+  --asset-accent-border: rgba(129, 140, 248, 0.42);
+}
+
+html[data-theme="dark"] [data-asset-class="reits"] {
+  --asset-accent: #FB923C;
+  --asset-accent-subtle: rgba(251, 146, 60, 0.14);
+  --asset-accent-border: rgba(251, 146, 60, 0.42);
+}
+
+html[data-theme="dark"] [data-asset-class="opportunities"] {
+  --asset-accent: #A78BFA;
+  --asset-accent-subtle: rgba(167, 139, 250, 0.14);
+  --asset-accent-border: rgba(167, 139, 250, 0.42);
+}
+
+html[data-theme="dark"] [data-asset-class="msme"] {
+  --asset-accent: #F472B6;
+  --asset-accent-subtle: rgba(244, 114, 182, 0.14);
+  --asset-accent-border: rgba(244, 114, 182, 0.42);
+}
+
+html[data-theme="dark"] [data-asset-class="safety"] {
+  --asset-accent: #FB7185;
+  --asset-accent-subtle: rgba(251, 113, 133, 0.14);
+  --asset-accent-border: rgba(251, 113, 133, 0.42);
 }
 
 html[data-theme="light"] body {
@@ -3324,6 +3379,30 @@ html[data-theme="dark"] .chart-anatomy-canvas {
   border-color: rgba(217, 119, 6, 0.45) !important;
 }
 
+html[data-theme="light"] .epistemic-badge-fact,
+.dossier-ivory-surface .epistemic-badge-fact {
+  color: #047857 !important;
+  background: rgba(16, 185, 129, 0.12) !important;
+}
+
+html[data-theme="light"] .epistemic-badge-calc,
+.dossier-ivory-surface .epistemic-badge-calc {
+  color: #0369A1 !important;
+  background: rgba(14, 165, 233, 0.12) !important;
+}
+
+html[data-theme="light"] .epistemic-badge-interp,
+.dossier-ivory-surface .epistemic-badge-interp {
+  color: #6D28D9 !important;
+  background: rgba(168, 85, 247, 0.12) !important;
+}
+
+html[data-theme="light"] .epistemic-badge-uncert,
+.dossier-ivory-surface .epistemic-badge-uncert {
+  color: #B45309 !important;
+  background: rgba(245, 158, 11, 0.14) !important;
+}
+
 /* 10. Track 2C: Universal Light-Mode & Reading-Mode Contrast Sweep */
 html[data-theme="light"] [style*="background: rgba(15, 23, 42"]:not(.modal-backdrop):not(.copilot-backdrop),
 html[data-theme="light"] [style*="background: rgba(11, 15, 25"]:not(.modal-backdrop),
@@ -3421,6 +3500,7 @@ html[data-theme="light"] [style*="color: #06b6d4"],
 }
 
 html[data-theme="light"] [style*="color: #34d399"],
+html[data-theme="light"] [style*="color:#34d399"],
 html[data-theme="light"] [style*="color: #6ee7b7"],
 html[data-theme="light"] [style*="color: #a7f3d0"],
 html[data-theme="light"] [style*="color: #10b981"],
@@ -3429,23 +3509,28 @@ html[data-theme="light"] [style*="color: #7DA77A"],
 html[data-theme="light"] [style*="color: var(--brand-lime)"],
 html[data-theme="light"] [style*="color: var(--accent-lime"],
 .dossier-ivory-surface [style*="color: #34d399"],
+.dossier-ivory-surface [style*="color:#34d399"],
 .dossier-ivory-surface [style*="color: #10b981"] {
   color: #047857 !important;
 }
 
 html[data-theme="light"] [style*="color: #fbbf24"],
+html[data-theme="light"] [style*="color:#fbbf24"],
 html[data-theme="light"] [style*="color: #fcd34d"],
 html[data-theme="light"] [style*="color: #fde68a"],
 html[data-theme="light"] [style*="color: #fef3c7"],
 html[data-theme="light"] [style*="color: #facc15"],
 html[data-theme="light"] [style*="color: #f59e0b"],
+html[data-theme="light"] [style*="color:#f59e0b"],
 html[data-theme="light"] [style*="color: #eab308"],
 .dossier-ivory-surface [style*="color: #fbbf24"],
+.dossier-ivory-surface [style*="color:#fbbf24"],
 .dossier-ivory-surface [style*="color: #f59e0b"] {
   color: #B45309 !important;
 }
 
 html[data-theme="light"] [style*="color: #f87171"],
+html[data-theme="light"] [style*="color:#f87171"],
 html[data-theme="light"] [style*="color: #fca5a5"],
 html[data-theme="light"] [style*="color: #fecdd3"],
 html[data-theme="light"] [style*="color: #fb7185"],
@@ -3456,12 +3541,15 @@ html[data-theme="light"] [style*="color: #ef4444"],
 }
 
 html[data-theme="light"] [style*="color: #c084fc"],
+html[data-theme="light"] [style*="color:#c084fc"],
 html[data-theme="light"] [style*="color: #d8b4fe"],
 html[data-theme="light"] [style*="color: #e9d5ff"],
 html[data-theme="light"] [style*="color: #a78bfa"],
 html[data-theme="light"] [style*="color: #818cf8"],
 html[data-theme="light"] [style*="color: #a5b4fc"],
-html[data-theme="light"] [style*="color: #c7d2fe"] {
+html[data-theme="light"] [style*="color: #c7d2fe"],
+.dossier-ivory-surface [style*="color: #c084fc"],
+.dossier-ivory-surface [style*="color:#c084fc"] {
   color: #6D28D9 !important;
 }
 
@@ -4277,6 +4365,7 @@ html[data-theme="dark"] .core-competence-showcase .methodology-discipline-card.c
 .home-stock-card,
 .discovery-card,
 .plan-card,
+a[href] > .asset-card-accent,
 .asset-card-accent:not(.hero-portal-banner):not(.dossier-masthead-v2):has(a[href]),
 .asset-card-accent:not(.hero-portal-banner):not(.dossier-masthead-v2):has(button[onclick]),
 .stat-card:not(.trust-card):not(.methodology-discipline-card):has(a[href]),

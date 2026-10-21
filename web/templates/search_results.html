@@ -71,7 +71,7 @@
     <div style="display: grid; grid-template-columns: repeat(auto-fill, minmax(320px, 1fr)); gap: 14px;">
       {% for eq in search_results.categories.equities %}
       <a href="{{ eq.url }}" style="text-decoration: none; color: inherit;">
-        <div style="background: rgba(30, 41, 59, 0.5); border: 1px solid rgba(255, 255, 255, 0.1); border-radius: 12px; padding: 18px; transition: all 0.2s;" onmouseover="this.style.borderColor='rgba(16, 185, 129, 0.5)'; this.style.transform='translateY(-2px)';" onmouseout="this.style.borderColor='rgba(255, 255, 255, 0.1)'; this.style.transform='translateY(0)';">
+        <div class="card asset-card-accent" data-asset-class="equities" style="background: rgba(30, 41, 59, 0.5); border: 1px solid rgba(255, 255, 255, 0.1); border-radius: 12px; padding: 18px; transition: all 0.2s;" onmouseover="this.style.borderColor='rgba(16, 185, 129, 0.5)'; this.style.transform='translateY(-2px)';" onmouseout="this.style.borderColor='rgba(255, 255, 255, 0.1)'; this.style.transform='translateY(0)';">
           <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;">
             <span class="mono" style="font-size: 14px; font-weight: 800; color: #34d399;">{{ eq.identifier }}</span>
             <span style="font-size: 11px; font-weight: 700; background: rgba(16, 185, 129, 0.15); color: #34d399; padding: 2px 8px; border-radius: 6px;">STOCK</span>
@@ -96,7 +96,7 @@
     <div style="display: grid; grid-template-columns: repeat(auto-fill, minmax(340px, 1fr)); gap: 14px;">
       {% for mf in search_results.categories.mutual_funds %}
       <a href="{{ mf.url }}" style="text-decoration: none; color: inherit;">
-        <div style="background: rgba(30, 41, 59, 0.5); border: 1px solid rgba(255, 255, 255, 0.1); border-radius: 12px; padding: 18px; transition: all 0.2s;" onmouseover="this.style.borderColor='rgba(14, 165, 233, 0.5)'; this.style.transform='translateY(-2px)';" onmouseout="this.style.borderColor='rgba(255, 255, 255, 0.1)'; this.style.transform='translateY(0)';">
+        <div class="card asset-card-accent" data-asset-class="funds" style="background: rgba(30, 41, 59, 0.5); border: 1px solid rgba(255, 255, 255, 0.1); border-radius: 12px; padding: 18px; transition: all 0.2s;" onmouseover="this.style.borderColor='rgba(14, 165, 233, 0.5)'; this.style.transform='translateY(-2px)';" onmouseout="this.style.borderColor='rgba(255, 255, 255, 0.1)'; this.style.transform='translateY(0)';">
           <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;">
             <span class="mono" style="font-size: 12px; color: #38bdf8; font-weight: 700;">Code: {{ mf.identifier }}</span>
             <span style="font-size: 11px; font-weight: 700; background: rgba(14, 165, 233, 0.15); color: #38bdf8; padding: 2px 8px; border-radius: 6px;">MUTUAL FUND</span>
@@ -126,7 +126,7 @@
     <div style="display: grid; grid-template-columns: repeat(auto-fill, minmax(340px, 1fr)); gap: 14px;">
       {% for d in search_results.categories.corporate_debt %}
       <a href="{{ d.url }}" style="text-decoration: none; color: inherit;">
-        <div style="background: rgba(30, 41, 59, 0.5); border: 1px solid rgba(255, 255, 255, 0.1); border-radius: 12px; padding: 18px; transition: all 0.2s;" onmouseover="this.style.borderColor='rgba(245, 158, 11, 0.5)'; this.style.transform='translateY(-2px)';" onmouseout="this.style.borderColor='rgba(255, 255, 255, 0.1)'; this.style.transform='translateY(0)';">
+        <div class="card asset-card-accent" data-asset-class="debt" style="background: rgba(30, 41, 59, 0.5); border: 1px solid rgba(255, 255, 255, 0.1); border-radius: 12px; padding: 18px; transition: all 0.2s;" onmouseover="this.style.borderColor='rgba(245, 158, 11, 0.5)'; this.style.transform='translateY(-2px)';" onmouseout="this.style.borderColor='rgba(255, 255, 255, 0.1)'; this.style.transform='translateY(0)';">
           <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;">
             <span class="mono" style="font-size: 12px; color: #fbbf24; font-weight: 700;">ISIN: {{ d.identifier }}</span>
             <span style="font-size: 11px; font-weight: 700; background: rgba(245, 158, 11, 0.15); color: #fbbf24; padding: 2px 8px; border-radius: 6px;">NCD BOND</span>
