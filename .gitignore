@@ -18,6 +18,7 @@ backups/conversations/*.jsonl
 *.tar.gz
 scratch/
 .tmp.driveupload/
+.tmp.drivedownload/
 *.code-workspace
 .cache/
 audits/
