@@ -78,7 +78,7 @@ Detailed forensic analysis with exact page grounding to bseindia.com filings.
         self.assertIn("Four things we promise every reader", res.text)
         self.assertIn("We never tell you to buy or sell", res.text)
         self.assertIn("Multi-asset investment research", res.text)
-        self.assertIn("One Forensic Standard Across Seven Asset Classes", res.text)
+        self.assertIn("One Standard Across Seven Asset Classes", res.text)
         self.assertIn("Statutory Exchange &amp; Registry Ingestion", res.text)
         self.assertIn("Deterministic Financial &amp; Risk Modelling", res.text)
         self.assertIn("Glass-Box Multi-Agent AI &amp; Research Desk", res.text)

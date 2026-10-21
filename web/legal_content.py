@@ -26,7 +26,7 @@ POLICIES = {
         <p>Neither the Platform nor its operators are registered as Research Analysts under the SEBI (Research Analysts) Regulations, 2014, nor as Investment Advisers under SEBI (Investment Advisers) Regulations, 2013. All data, scores, qualitative pillar matrices, and syntheses are for informational, computational, and educational purposes only. You are solely responsible for conducting independent due diligence and consulting a SEBI-registered financial advisor before making any financial investment decisions.</p>
 
         <h3>4. User Accounts and Research Credits</h3>
-        <p>Access to automated live AI syntheses requires research credits or an active Pro subscription. Credits are non-transferable, possess no cash surrender value, and represent consumption units of server processing compute.</p>
+        <p>Access to automated live AI syntheses requires research credits or an active Pro subscription. Credits are non-transferable, possess no cash surrender value, and are used up when a report is generated.</p>
 
         <h3>5. Intellectual Property</h3>
         <p>All software architecture, algorithms, user interfaces, branding, and aggregated analysis formats are the intellectual property of the Platform operator. Users may download and print individual research reports for personal, non-commercial educational use. Reports, including any content unlocked with credits, may not be resold, republished, shared in bulk, or redistributed. Downloaded PDFs carry a personal-use notice and, when you are signed in, an anonymous account reference.</p>
@@ -51,7 +51,7 @@ POLICIES = {
             <li><strong>Usage Logs:</strong> Anonymized query logs and feature telemetry to monitor API compute costs, server latency, and error diagnostics.</li>
         </ul>
 
-        <h3>2. What We Explicitly DO NOT Collect</h3>
+        <h3>2. What We Do Not Collect</h3>
         <p><strong>We never collect or request:</strong></p>
         <ul>
             <li>Personal portfolio holdings or net worth figures.</li>
@@ -60,12 +60,12 @@ POLICIES = {
         </ul>
 
         <h3>3. How We Use Your Information</h3>
-        <p>Collected information is used exclusively to:</p>
+        <p>We use your information only to:</p>
         <ul>
             <li>Authenticate your account and maintain your credit balance in our database.</li>
             <li>Deliver requested research syntheses and issue tax invoices.</li>
             <li>Stamp downloaded PDFs with an anonymous account reference to deter redistribution. Your email address is never printed on a PDF.</li>
-            <li>Prevent abuse, rate limiting violations, and bot scraping.</li>
+            <li>Prevent abuse, rate-limit violations and bot scraping.</li>
         </ul>
 
         <h3>4. Data Security</h3>

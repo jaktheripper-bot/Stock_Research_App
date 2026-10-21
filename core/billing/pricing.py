@@ -64,7 +64,7 @@ PRICING_PACKS: Dict[str, Dict[str, Any]] = {
         "amount_paise": 179900,
         "credits": 10.0,
         "effective_per_stock": "₹180/dossier (40% savings)",
-        "description": "Comprehensive audit for an entire equity portfolio.",
+        "description": "Enough reports to cover a whole equity portfolio.",
         "features": [
             "10 Full 7-Pillar Stock Reports",
             "10 Watched Equities in Real-Time Monitoring",
@@ -84,7 +84,7 @@ PRICING_PACKS: Dict[str, Dict[str, Any]] = {
         "credits": 40.0,
         "billing_period": "month",
         "effective_per_stock": "₹25/stock (Active Tier)",
-        "description": "Continuous monitoring engine for full-time investors and advisors.",
+        "description": "Unlimited monitoring for full-time investors and advisors.",
         "features": [
             "40 Fresh 7-Pillar Stock Reports / month",
             "Unlimited Price & Filing Updates (0 credits)",

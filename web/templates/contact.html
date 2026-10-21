@@ -26,7 +26,7 @@
         <svg class="glyph"><use href="#icon-doc"></use></svg> Submit an Inquiry or Complaint
       </h3>
       <p style="font-size: 13px; color: var(--text-muted); margin-bottom: 24px; line-height: 1.5;">
-        Every inquiry is registered into our audit ledger with an immutable tracking ID and immediately alerted to our engineering and compliance leads.
+        Every inquiry gets a tracking ID, and our team reviews it directly.
       </p>
 
       {% if success_ticket %}
@@ -38,7 +38,7 @@
           Reference ID: <strong class="tnum" style="background: rgba(15, 23, 42, 0.6); padding: 2px 8px; border-radius: 4px; color: var(--accent-cyan);">{{ success_ticket.ticket_id }}</strong>
         </div>
         <p style="font-size: 13px; color: var(--text-secondary); line-height: 1.5; margin: 0 0 10px 0;">
-          A notification has been dispatched to our operations team. A confirmation has been logged for <strong>{{ success_ticket.user_email }}</strong>. We will review and respond within 24 hours.
+          Our team has been notified. A confirmation has been recorded for <strong>{{ success_ticket.user_email }}</strong>. We will review and respond within 24 hours.
         </p>
         <a href="/contact?ticket_id={{ success_ticket.ticket_id }}&email={{ success_ticket.user_email }}" class="btn btn-secondary btn-sm" style="display: inline-flex; align-items: center; gap: 6px; font-size: 12px; font-weight: 600;">
           <svg class="glyph" style="width: 13px; height: 13px;"><use href="#glyph-search"></use></svg> <span>Track Ticket Status Live →</span>
