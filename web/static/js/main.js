@@ -656,7 +656,453 @@ const EVALUATION_CONFIGS = {
   }
 };
 
+// ==============================================================================
+// 4b. 32-Card Weighted Trust & Product Discovery Deck (HUD Carousel Engine)
+// ==============================================================================
+const HUD_DISCOVERY_CARDS = [
+  // --- 20 Institutional Trust & Data Integrity Reasons (Weight: 3.0x) ---
+  {
+    id: 'trust-01',
+    category: 'trust',
+    weight: 3.0,
+    badge: 'Why Trust Our Research • #1 of 20',
+    title: 'Direct BSE & NSE Statutory Filings Only',
+    body: 'Every equity report is built directly from primary exchange filings, audited annual reports, and quarterly results—never social media tips, rumours, or unverified broker targets.',
+    pill: 'Source: bseindia.com & nseindia.com'
+  },
+  {
+    id: 'trust-02',
+    category: 'trust',
+    weight: 3.0,
+    badge: 'Why Trust Our Research • #2 of 20',
+    title: 'Zero Buy, Sell, or Price-Target Conflicts',
+    body: 'We never tell you to buy or sell, and we never publish promotional price targets. We lay out the numbers, moat durability, and failure modes so the decision stays 100% yours.',
+    pill: 'Mandate: Independent Evidence Only'
+  },
+  {
+    id: 'trust-03',
+    category: 'trust',
+    weight: 3.0,
+    badge: 'Why Trust Our Research • #3 of 20',
+    title: 'Zero Brokerage or Distributor Kickbacks',
+    body: 'We earn zero trail commissions from mutual fund AMCs, zero bond placement fees, and zero brokerage kickbacks. Reader compute credits are our sole source of funding.',
+    pill: 'Alignment: 100% Reader-Funded'
+  },
+  {
+    id: 'trust-04',
+    category: 'trust',
+    weight: 3.0,
+    badge: 'Why Trust Our Research • #4 of 20',
+    title: '4-Tier Epistemic Separation on Every Claim',
+    body: 'Every statement is tagged as [VERIFIED FACT], [CALCULATED METRIC], [MODEL INTERPRETATION], or [UNRESOLVED UNCERTAINTY] so model inferences are never confused with hard filing facts.',
+    pill: 'Engine: Epistemic Schema v2'
+  },
+  {
+    id: 'trust-05',
+    category: 'trust',
+    weight: 3.0,
+    badge: 'Why Trust Our Research • #5 of 20',
+    title: 'Mandatory Quantitative Falsification Triggers',
+    body: 'Every analytical pillar includes a "What Contradicts This Conclusion" section specifying the exact filing thresholds that would force us to revise or invalidate the thesis.',
+    pill: 'Discipline: Karl Popper Falsifiability'
+  },
+  {
+    id: 'trust-06',
+    category: 'trust',
+    weight: 3.0,
+    badge: 'Why Trust Our Research • #6 of 20',
+    title: '32-Iteration Reverse-DCF Implied Growth Solver',
+    body: 'Instead of guessing a subjective target price, our valuation engine reverse-solves the exact 10-year FCF growth rate implied by the current stock price against a 12% WACC hurdle.',
+    pill: 'Math: Closed-Form Bisection DCF'
+  },
+  {
+    id: 'trust-07',
+    category: 'trust',
+    weight: 3.0,
+    badge: 'Why Trust Our Research • #7 of 20',
+    title: 'Strict 70% Coverage Gate on Mutual Funds',
+    body: 'We withhold composite Moat and Accounting Risk scores on any mutual fund unless at least 70% of its underlying equity holdings by weight have completed full 7-pillar audits.',
+    pill: 'Guardrail: Zero Partial-Sample Guessing'
+  },
+  {
+    id: 'trust-08',
+    category: 'trust',
+    weight: 3.0,
+    badge: 'Why Trust Our Research • #8 of 20',
+    title: 'Forensic Cash-Flow vs. Accounting Profit Audits',
+    body: 'Net income can be flattered by aggressive working-capital accruals. Every equity dossier cross-checks Operating Cash Flow against EBITDA and flags receivables or inventory bloat.',
+    pill: 'Forensics: OCF / EBITDA Conversion'
+  },
+  {
+    id: 'trust-09',
+    category: 'trust',
+    weight: 3.0,
+    badge: 'Why Trust Our Research • #9 of 20',
+    title: 'Promoter Pledge & SAST Insider Surveillance',
+    body: 'Our governance engine tracks promoter share-pledging velocity, related-party transactions (RPTs), and SEBI SAST insider disclosures to surface dilution and encumbrance risks early.',
+    pill: 'Pillar 07: Governance & SAST Ledger'
+  },
+  {
+    id: 'trust-10',
+    category: 'trust',
+    weight: 3.0,
+    badge: 'Why Trust Our Research • #10 of 20',
+    title: 'Chanakya Clean-Room PR & Hype Sanitiser',
+    body: 'Corporate announcements and press releases pass through our deterministic clean-room filter that strips promotional superlatives while preserving statutory numbers and footnotes.',
+    pill: 'Filter: Chanakya Sieve Active'
+  },
+  {
+    id: 'trust-11',
+    category: 'trust',
+    weight: 3.0,
+    badge: 'Why Trust Our Research • #11 of 20',
+    title: 'Strictly Confidential Personal Thesis Ledger',
+    body: 'Any pre-mortem countercase or thesis checkpoint you record on a report is bound to your authenticated account—strictly confidential and visible only to you when logged in.',
+    pill: 'Privacy: Account-Scoped Encryption'
+  },
+  {
+    id: 'trust-12',
+    category: 'trust',
+    weight: 3.0,
+    badge: 'Why Trust Our Research • #12 of 20',
+    title: 'Official RBI Primary Auction & CCIL Yield Curves',
+    body: 'All risk-free hurdle rates, T-Bill cut-offs, and sovereign yield curves are compiled directly from Reserve Bank of India weekly auctions and CCIL Zero-Coupon Yield Curve benchmarks.',
+    pill: 'Macro: RBI & CCIL Primary Data'
+  },
+  {
+    id: 'trust-13',
+    category: 'trust',
+    weight: 3.0,
+    badge: 'Why Trust Our Research • #13 of 20',
+    title: 'Auditor Qualification & Contingent Liability Checks',
+    body: 'We specifically scan annual report footnotes for CARO auditor qualifications, off-balance-sheet corporate guarantees, disputed tax demands, and sudden auditor resignations.',
+    pill: 'Forensics: Footnote & CARO Audit'
+  },
+  {
+    id: 'trust-14',
+    category: 'trust',
+    weight: 3.0,
+    badge: 'Why Trust Our Research • #14 of 20',
+    title: '3-Step DuPont ROE Leverage Decomposition',
+    body: 'High Return on Equity can hide dangerous debt leverage. We decompose ROE into Net Profit Margin × Asset Turnover × Financial Leverage so you see the true operational driver.',
+    pill: 'Pillar 02: DuPont Capital Efficiency'
+  },
+  {
+    id: 'trust-15',
+    category: 'trust',
+    weight: 3.0,
+    badge: 'Why Trust Our Research • #15 of 20',
+    title: 'IBC Recovery Haircuts & Bond Seniority Stress-Tests',
+    body: 'We never take credit ratings at face value. Every corporate bond is evaluated for capital-hierarchy seniority, collateral cover, and historical Insolvency & Bankruptcy Code recovery rates.',
+    pill: 'Fixed Income: 5-Pillar Credit Matrix'
+  },
+  {
+    id: 'trust-16',
+    category: 'trust',
+    weight: 3.0,
+    badge: 'Why Trust Our Research • #16 of 20',
+    title: 'Behavioural Anchoring-Bias Guardrail',
+    body: 'Every equity dossier opens with an explicit Anchoring-Bias Guardrail prompting you to evaluate business quality and implied growth before anchoring on the current market price.',
+    pill: 'Behavioural Finance: Anti-Anchoring'
+  },
+  {
+    id: 'trust-17',
+    category: 'trust',
+    weight: 3.0,
+    badge: 'Why Trust Our Research • #17 of 20',
+    title: 'Verified Statutory Udyam MSME Partitioning',
+    body: 'In our Unlisted MSME directory, verified government Udyam registry attributes are strictly separated from sector benchmark medians—with zero synthetic entity fabrication.',
+    pill: 'MSME Registry: Statutory Udyam Data'
+  },
+  {
+    id: 'trust-18',
+    category: 'trust',
+    weight: 3.0,
+    badge: 'Why Trust Our Research • #18 of 20',
+    title: 'Immutable Revision Archives & Thesis Drift Tracking',
+    body: 'When a company files new quarterly results, our Garuda reflex engine invalidates stale caches and archives prior revisions so you can audit how the thesis evolved over time.',
+    pill: 'Lineage: Multi-Quarter Delta Audit'
+  },
+  {
+    id: 'trust-19',
+    category: 'trust',
+    weight: 3.0,
+    badge: 'Why Trust Our Research • #19 of 20',
+    title: 'Explicit Data Provenance & Freshness Badges',
+    body: 'Every directory card, yield curve, and dossier header displays its exact regulatory data source and last-updated timestamp—never static seeds disguised as live feeds.',
+    pill: 'Transparency: Timestamped Provenance'
+  },
+  {
+    id: 'trust-20',
+    category: 'trust',
+    weight: 3.0,
+    badge: 'Why Trust Our Research • #20 of 20',
+    title: '100% Free Public Archives & Exchange Quotes',
+    body: 'Reading existing research dossiers, checking exchange quotes, and exporting unlocked PDFs are completely free. Compute credits are only used when generating a fresh report.',
+    pill: 'Access: Open Public Library'
+  },
+
+  // --- 12 Platform Product & Tool Spotlights (Weight: 1.0x) ---
+  {
+    id: 'prod-01',
+    category: 'product',
+    weight: 1.0,
+    badge: 'Platform Spotlight • Mutual Funds (/funds)',
+    title: 'Dual-Sleeve Mutual Fund Look-Through Engine',
+    body: 'Inspect the underlying equity and debt holdings of AMFI mutual funds, measure Active Share against benchmark indices, and spot "closet indexers" charging active fees.',
+    pill: 'Product: Markets → Mutual Funds'
+  },
+  {
+    id: 'prod-02',
+    category: 'product',
+    weight: 1.0,
+    badge: 'Platform Spotlight • Fee-Drag Simulator (/funds)',
+    title: 'Interactive 20-Year Direct vs. Regular Fee-Drag Stress-Tester',
+    body: 'Slide your corpus, compounding horizon, and expected CAGR inside any Mutual Fund dossier to see the exact rupee wealth lost to Regular Plan distributor commissions.',
+    pill: 'Tool: Pillar 05 Fee-Drag Sandbox'
+  },
+  {
+    id: 'prod-03',
+    category: 'product',
+    weight: 1.0,
+    badge: 'Platform Spotlight • Corporate Debt (/debt)',
+    title: 'SEBI ₹10,000 Corporate Bonds, NCDs & SDIs Directory',
+    body: 'Screen 130+ exchange-listed corporate bonds and Securitized Debt Instruments by Yield-to-Maturity (YTM), Macaulay Duration, CRISIL/ICRA rating, and seniority tier.',
+    pill: 'Product: Markets → Bonds, NCDs & SDIs'
+  },
+  {
+    id: 'prod-04',
+    category: 'product',
+    weight: 1.0,
+    badge: 'Platform Spotlight • National ETF Matrix (/etfs)',
+    title: 'Real-Time ETF Price-to-NAV Dislocation & Tracking Error Matrix',
+    body: 'Avoid overpaying for illiquid ETFs. Audit 140+ Equity, Gold, Silver, and Debt ETFs for live exchange price vs. statutory NAV premiums, tracking error, and impact cost.',
+    pill: 'Product: Markets → National ETF Matrix'
+  },
+  {
+    id: 'prod-05',
+    category: 'product',
+    weight: 1.0,
+    badge: 'Platform Spotlight • Sovereign Curve (/sovereign)',
+    title: 'Indian Sovereign Par Yield Curve & State SDL Spreads',
+    body: 'Visualise the complete risk-free term structure across 91D–364D T-Bills and 2Y–50Y G-Secs alongside State Development Loan (SDL) fiscal-spread matrices.',
+    pill: 'Product: Markets → Sovereign Curve'
+  },
+  {
+    id: 'prod-06',
+    category: 'product',
+    weight: 1.0,
+    badge: 'Platform Spotlight • Real Assets (/reits)',
+    title: 'REITs, SEBI SM REITs & Section 115UA Tax Waterfall Simulator',
+    body: 'Evaluate commercial REITs and infrastructure InvITs on NDCF payout purity, WALE lease expiry, and simulate your post-tax cashflow across tax slabs under Section 115UA.',
+    pill: 'Product: Markets → SM REITs & InvITs'
+  },
+  {
+    id: 'prod-07',
+    category: 'product',
+    weight: 1.0,
+    badge: 'Platform Spotlight • Sovereign Gold Bonds (/reits)',
+    title: 'Sovereign Gold Bond (SGB) Secondary Market Parity Scanner',
+    body: 'Track secondary-market SGB series trading at a discount to IBJA 999 gold spot parity, with tax-free capital gains at maturity under Section 47(viic).',
+    pill: 'Product: Real Assets → SGB Scanner'
+  },
+  {
+    id: 'prod-08',
+    category: 'product',
+    weight: 1.0,
+    badge: 'Platform Spotlight • Opportunity Terminal (/opportunities)',
+    title: 'Setu Cross-Asset Relative-Value & Yield Spread Terminal',
+    body: 'Compare post-tax, CPI-inflation-adjusted real yields across equities, corporate bonds, REITs, ETFs, and G-Secs on a unified risk-adjusted frontier.',
+    pill: 'Product: Markets → Opportunity Terminal'
+  },
+  {
+    id: 'prod-09',
+    category: 'product',
+    weight: 1.0,
+    badge: 'Platform Spotlight • Unlisted MSMEs (/msme)',
+    title: 'Unlisted MSME & Industrial Corridor Forensic Directory',
+    body: 'Explore verified Micro, Small, and Medium Enterprises classified under the MSMED Act 2020 across India’s primary manufacturing and industrial clusters.',
+    pill: 'Product: Markets → Unlisted MSMEs'
+  },
+  {
+    id: 'prod-10',
+    category: 'product',
+    weight: 1.0,
+    badge: 'Platform Spotlight • Reverse-DCF Sandbox (/equities)',
+    title: 'Interactive Pillar 05 Reverse-DCF & Margin-of-Safety Sliders',
+    body: 'Inside every stock dossier, test your own Stage-1 EPS growth, WACC discount rate, and terminal growth assumptions to compute instant intrinsic value bands.',
+    pill: 'Tool: Equity Dossier → Pillar 05'
+  },
+  {
+    id: 'prod-11',
+    category: 'product',
+    weight: 1.0,
+    badge: 'Platform Spotlight • Peer Comparator (/compare)',
+    title: 'Head-to-Head Institutional Peer Disparity Matrix',
+    body: 'Compare any two listed companies side-by-side across valuation multiples, DuPont ROE drivers, debt-to-equity cushions, and 7-pillar qualitative health matrices.',
+    pill: 'Tool: Research Tools → Compare'
+  },
+  {
+    id: 'prod-12',
+    category: 'product',
+    weight: 1.0,
+    badge: 'Platform Spotlight • Safety & Tax Tools (/safety-radar)',
+    title: 'Accounting Red-Flag Radar & Post-Tax Real Return Calculator',
+    body: 'Screen the market for elevated promoter pledging and accounting stress on the Safety Radar, or compute net post-LTCG/STCG real purchasing power on the Tax Calculator.',
+    pill: 'Tool: Research Tools → Safety Radar'
+  }
+];
+
 let _globalEvaluationTimer = null;
+let _hudCardTimeout = null;
+let _hudCardTimerInterval = null;
+let _hudSeenCardIndices = new Set();
+let _hudCardHistory = [];
+let _hudCardHistoryPos = -1;
+let _hudLastCategory = null;
+let _hudActiveNavigationController = null;
+
+function _pickNextHudCardIndex() {
+  if (_hudSeenCardIndices.size >= HUD_DISCOVERY_CARDS.length) {
+    _hudSeenCardIndices.clear();
+  }
+
+  // Enforce higher preference to Trust messages:
+  // Never show two 'product' cards back-to-back, and weight 'trust' cards at 3.0x vs 1.0x
+  const candidates = [];
+  let totalWeight = 0;
+
+  HUD_DISCOVERY_CARDS.forEach((card, idx) => {
+    if (_hudSeenCardIndices.has(idx)) return;
+    if (_hudLastCategory === 'product' && card.category === 'product') return;
+    const w = card.category === 'trust' ? 3.2 : 1.0;
+    candidates.push({ idx, weight: w });
+    totalWeight += w;
+  });
+
+  if (candidates.length === 0) {
+    _hudSeenCardIndices.clear();
+    return 0;
+  }
+
+  let r = Math.random() * totalWeight;
+  for (let i = 0; i < candidates.length; i++) {
+    r -= candidates[i].weight;
+    if (r <= 0) {
+      return candidates[i].idx;
+    }
+  }
+  return candidates[candidates.length - 1].idx;
+}
+
+function _computeHudCardDwellMs(card, isFastNav) {
+  // Variable cadence ("different variances"): scales with text length + randomized jitter
+  const charLen = ((card && card.title ? card.title.length : 30) + (card && card.body ? card.body.length : 120));
+  const lengthFactorMs = Math.min(700, Math.max(0, (charLen - 130) * 6));
+  const varianceJitterMs = Math.floor((Math.random() - 0.35) * 650); // -227ms to +422ms variance
+  const baseMs = isFastNav ? 1750 : 2550;
+  return Math.max(1350, Math.min(3800, baseMs + lengthFactorMs + varianceJitterMs));
+}
+
+function _renderHudCardByIndex(cardIdx, dwellMs) {
+  const card = HUD_DISCOVERY_CARDS[cardIdx] || HUD_DISCOVERY_CARDS[0];
+  _hudSeenCardIndices.add(cardIdx);
+  _hudLastCategory = card.category;
+
+  const deckEl = document.getElementById('overlayTrustCardDeck');
+  const badgeEl = document.getElementById('overlayCardCategoryBadge');
+  const badgeTextEl = document.getElementById('overlayCardCategoryText');
+  const wrapEl = document.getElementById('overlayCardContentWrap');
+  const titleEl = document.getElementById('overlayCardTitle');
+  const bodyEl = document.getElementById('overlayCardBody');
+  const pillEl = document.getElementById('overlayCardHighlightPill');
+  const counterEl = document.getElementById('overlayCardIndexLabel');
+  const timerFillEl = document.getElementById('overlayCardTimerFill');
+
+  if (deckEl) {
+    deckEl.classList.toggle('hud-deck-product', card.category === 'product');
+  }
+  if (badgeEl) {
+    badgeEl.className = card.category === 'product'
+      ? 'hud-card-badge hud-card-badge-product'
+      : 'hud-card-badge hud-card-badge-trust';
+  }
+  if (badgeTextEl) {
+    badgeTextEl.textContent = card.badge;
+  }
+  if (wrapEl) {
+    wrapEl.classList.remove('hud-card-flip-anim');
+    void wrapEl.offsetWidth; // trigger reflow for crisp card flip animation
+    wrapEl.classList.add('hud-card-flip-anim');
+  }
+  if (titleEl) titleEl.textContent = card.title;
+  if (bodyEl) bodyEl.textContent = card.body;
+  if (pillEl) pillEl.textContent = card.pill;
+  if (counterEl) {
+    counterEl.textContent = `Card ${_hudCardHistoryPos + 1} • ${HUD_DISCOVERY_CARDS.length}-Card Deck`;
+  }
+
+  // Animate per-card progress bar across dwellMs
+  if (_hudCardTimerInterval) {
+    clearInterval(_hudCardTimerInterval);
+    _hudCardTimerInterval = null;
+  }
+  if (timerFillEl && dwellMs > 0) {
+    const cardStart = Date.now();
+    timerFillEl.style.width = '0%';
+    _hudCardTimerInterval = setInterval(() => {
+      const elapsed = Date.now() - cardStart;
+      const pct = Math.min(100, (elapsed / dwellMs) * 100);
+      timerFillEl.style.width = `${pct.toFixed(1)}%`;
+    }, 50);
+  }
+}
+
+function _scheduleNextHudCard(isFastNav) {
+  if (_hudCardTimeout) {
+    clearTimeout(_hudCardTimeout);
+    _hudCardTimeout = null;
+  }
+  const nextIdx = _pickNextHudCardIndex();
+  _hudCardHistory.push(nextIdx);
+  _hudCardHistoryPos = _hudCardHistory.length - 1;
+  const card = HUD_DISCOVERY_CARDS[nextIdx];
+  const dwellMs = _computeHudCardDwellMs(card, isFastNav);
+  _renderHudCardByIndex(nextIdx, dwellMs);
+
+  _hudCardTimeout = setTimeout(() => {
+    _scheduleNextHudCard(isFastNav);
+  }, dwellMs);
+}
+
+window.nextEvaluationCard = function() {
+  if (_hudCardTimeout) {
+    clearTimeout(_hudCardTimeout);
+    _hudCardTimeout = null;
+  }
+  if (_hudCardHistoryPos < _hudCardHistory.length - 1) {
+    _hudCardHistoryPos += 1;
+    const idx = _hudCardHistory[_hudCardHistoryPos];
+    const dwellMs = _computeHudCardDwellMs(HUD_DISCOVERY_CARDS[idx], false);
+    _renderHudCardByIndex(idx, dwellMs);
+    _hudCardTimeout = setTimeout(() => _scheduleNextHudCard(false), dwellMs);
+  } else {
+    _scheduleNextHudCard(false);
+  }
+};
+
+window.prevEvaluationCard = function() {
+  if (_hudCardHistoryPos <= 0) return;
+  if (_hudCardTimeout) {
+    clearTimeout(_hudCardTimeout);
+    _hudCardTimeout = null;
+  }
+  _hudCardHistoryPos -= 1;
+  const idx = _hudCardHistory[_hudCardHistoryPos];
+  const dwellMs = _computeHudCardDwellMs(HUD_DISCOVERY_CARDS[idx], false);
+  _renderHudCardByIndex(idx, dwellMs);
+  _hudCardTimeout = setTimeout(() => _scheduleNextHudCard(false), dwellMs);
+};
 
 window.showEvaluationHUD = function(options = {}) {
   const overlay = document.getElementById('synthesizingOverlay');
@@ -681,9 +1127,13 @@ window.showEvaluationHUD = function(options = {}) {
   }
 
   const maxSeconds = options.totalSec || 30;
+  const isFastNav = maxSeconds <= 10;
 
-  if (overlayBar) overlayBar.style.width = '14%';
-  if (overlayTime) overlayTime.innerText = `0s / ~${maxSeconds}s`;
+  if (overlayBar) {
+    overlayBar.style.transition = 'width 0.08s linear';
+    overlayBar.style.width = '8%';
+  }
+  if (overlayTime) overlayTime.innerText = `8% • 0.0s / ~${maxSeconds}s`;
   if (overlayStage) overlayStage.innerText = cfg.stages[0].stage;
   if (overlayStatusMsg) overlayStatusMsg.innerText = cfg.stages[0].msg;
 
@@ -694,26 +1144,77 @@ window.showEvaluationHUD = function(options = {}) {
     _globalEvaluationTimer = null;
   }
 
+  // Start cycling the 32-Card Weighted Trust & Product Discovery Deck immediately
+  _hudCardHistory = [];
+  _hudCardHistoryPos = -1;
+  _scheduleNextHudCard(isFastNav);
+
   const startMs = Date.now();
+  const maxMs = maxSeconds * 1000;
 
   _globalEvaluationTimer = setInterval(() => {
-    const elapsedSec = Math.floor((Date.now() - startMs) / 1000);
-    const cappedSec = Math.min(maxSeconds, elapsedSec);
-    const pct = Math.min(96, 14 + (cappedSec / maxSeconds) * 82);
+    const elapsedMs = Date.now() - startMs;
+    const elapsedSecFloat = Math.min(maxSeconds, elapsedMs / 1000);
+    // Smooth non-linear easing curve: fast initial ramp so bar visibly moves right away, asymptotic to 96%
+    const normalized = Math.min(1, elapsedMs / maxMs);
+    const eased = 1 - Math.pow(1 - normalized, 1.65);
+    const pct = Math.min(96, 8 + eased * 88);
 
     if (overlayBar) overlayBar.style.width = `${pct.toFixed(1)}%`;
-    if (overlayTime) overlayTime.innerText = `${cappedSec}s / ~${maxSeconds}s`;
+    if (overlayTime) overlayTime.innerText = `${Math.round(pct)}% • ${elapsedSecFloat.toFixed(1)}s / ~${maxSeconds}s`;
 
-    const currentStage = cfg.stages.find(s => cappedSec <= s.maxSec) || cfg.stages[cfg.stages.length - 1];
+    // Map stage dynamically by percentage so all 4 stages advance smoothly regardless of totalSec
+    const stageIdx = pct < 32 ? 0 : (pct < 60 ? 1 : (pct < 84 ? 2 : 3));
+    const currentStage = cfg.stages[Math.min(stageIdx, cfg.stages.length - 1)];
     if (overlayStage && currentStage) overlayStage.innerText = currentStage.stage;
     if (overlayStatusMsg && currentStage) overlayStatusMsg.innerText = currentStage.msg;
-  }, 250);
+  }, 50);
+};
+
+window.completeEvaluationHUD = function(onDone) {
+  if (_globalEvaluationTimer) {
+    clearInterval(_globalEvaluationTimer);
+    _globalEvaluationTimer = null;
+  }
+  const overlayBar = document.getElementById('overlayProgressBar');
+  const overlayTime = document.getElementById('overlayProgressTime');
+  const overlayStage = document.getElementById('overlayProgressStage');
+  if (overlayBar) {
+    overlayBar.style.transition = 'width 0.18s ease-out';
+    overlayBar.style.width = '100%';
+  }
+  if (overlayTime) {
+    overlayTime.innerText = '100% • Ready';
+  }
+  if (overlayStage) {
+    overlayStage.innerText = 'Complete • Opening Dossier...';
+  }
+  if (typeof onDone === 'function') {
+    setTimeout(onDone, 180);
+  }
 };
 
 window.hideEvaluationHUD = function() {
   if (_globalEvaluationTimer) {
     clearInterval(_globalEvaluationTimer);
     _globalEvaluationTimer = null;
+  }
+  if (_hudCardTimeout) {
+    clearTimeout(_hudCardTimeout);
+    _hudCardTimeout = null;
+  }
+  if (_hudCardTimerInterval) {
+    clearInterval(_hudCardTimerInterval);
+    _hudCardTimerInterval = null;
+  }
+  if (_hudActiveNavigationController) {
+    const targetUrl = _hudActiveNavigationController.targetUrl;
+    _hudActiveNavigationController.cancelled = true;
+    _hudActiveNavigationController = null;
+    if (targetUrl) {
+      window.location.href = targetUrl;
+      return;
+    }
   }
   const overlay = document.getElementById('synthesizingOverlay');
   if (overlay) {
@@ -2393,11 +2894,11 @@ document.addEventListener('click', (e) => {
   if (a.tagName === 'A' && a.href && a.origin === window.location.origin && !a.target && !e.ctrlKey && !e.metaKey && !e.shiftKey) {
     const targetMeta = resolveEvaluationTarget(a);
     if (targetMeta) {
-      // Trigger the sitewide Report Evaluation HUD
+      // Trigger the sitewide Report Evaluation HUD with smooth 5-second pacing for link navigation
       window.showEvaluationHUD({
         assetType: targetMeta.assetType,
         ticker: targetMeta.ticker,
-        totalSec: 30
+        totalSec: 5
       });
 
       // If clicked element is or contains a button, activate button progress fill
@@ -2408,6 +2909,25 @@ document.addEventListener('click', (e) => {
         if (childBtn) {
           startButtonProgressFill(childBtn, targetMeta.label);
         }
+      }
+
+      // Coordinate smooth progress bar completion + background pre-fetch so the bar never freezes at 0s
+      if (!navigator.webdriver) {
+        e.preventDefault();
+        const targetUrl = a.href;
+        const navState = { targetUrl, cancelled: false };
+        _hudActiveNavigationController = navState;
+
+        const minDisplayPromise = new Promise(resolve => setTimeout(resolve, 3600));
+        const warmFetchPromise = fetch(targetUrl, { credentials: 'same-origin' }).catch(() => null);
+
+        Promise.all([minDisplayPromise, warmFetchPromise]).then(() => {
+          if (navState.cancelled) return;
+          _hudActiveNavigationController = null;
+          window.completeEvaluationHUD(() => {
+            window.location.href = targetUrl;
+          });
+        });
       }
     }
   }

@@ -30,9 +30,9 @@
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600;700&family=Playfair+Display:ital,wght@0,600;0,700;1,400&display=swap" rel="stylesheet">
-  <link rel="preload" href="/static/css/style.css?v=20261021_0730" as="style" onload="this.rel='stylesheet'">
-  <link rel="preload" href="/static/js/main.js?v=20261021_0730" as="script">
-  <link rel="stylesheet" href="/static/css/style.css?v=20261021_0730">
+  <link rel="preload" href="/static/css/style.css?v=20261021_0745" as="style" onload="this.rel='stylesheet'">
+  <link rel="preload" href="/static/js/main.js?v=20261021_0745" as="script">
+  <link rel="stylesheet" href="/static/css/style.css?v=20261021_0745">
 
   <!-- Schema.org Structured Data -->
   <script type="application/ld+json">
@@ -749,10 +749,10 @@
 
   <!-- Global Report Evaluation & Progressive Timer HUD -->
   <div id="synthesizingOverlay" class="modal-backdrop">
-    <div class="modal-dialog" style="max-width: 520px; text-align: center; padding: 36px 28px; background: var(--bg-card); border: 1px solid var(--border-color); box-shadow: 0 25px 60px rgba(15, 23, 42, 0.22); position: relative;">
-      <button type="button" onclick="window.hideEvaluationHUD()" style="position: absolute; top: 14px; right: 14px; background: var(--bg-surface); border: 1px solid var(--border-subtle); color: var(--text-secondary); font-size: 14px; width: 28px; height: 28px; border-radius: 50%; cursor: pointer; display: flex; align-items: center; justify-content: center; transition: all 0.2s;" title="Dismiss HUD">✕</button>
-      <div style="width: 56px; height: 56px; margin: 0 auto 16px; display: flex; align-items: center; justify-content: center; border-radius: 14px; background: rgba(2, 132, 199, 0.08); border: 1px solid rgba(2, 132, 199, 0.25);">
-        <svg class="portal-reveal-mark" viewBox="0 0 64 64" style="width: 34px; height: 34px; color: var(--text-primary);" aria-hidden="true">
+    <div class="modal-dialog hud-evaluation-dialog" style="max-width: 580px; text-align: center; padding: 30px 28px 24px; background: var(--bg-card); border: 1px solid var(--border-color); box-shadow: 0 25px 60px rgba(15, 23, 42, 0.22); position: relative;">
+      <button type="button" onclick="window.hideEvaluationHUD()" style="position: absolute; top: 14px; right: 14px; background: var(--bg-surface); border: 1px solid var(--border-subtle); color: var(--text-secondary); font-size: 14px; width: 30px; height: 30px; border-radius: 50%; cursor: pointer; display: flex; align-items: center; justify-content: center; transition: all 0.2s;" title="Dismiss HUD">✕</button>
+      <div style="width: 50px; height: 50px; margin: 0 auto 12px; display: flex; align-items: center; justify-content: center; border-radius: 13px; background: rgba(2, 132, 199, 0.08); border: 1px solid rgba(2, 132, 199, 0.25);">
+        <svg class="portal-reveal-mark" viewBox="0 0 64 64" style="width: 30px; height: 30px; color: var(--text-primary);" aria-hidden="true">
           <path class="portal-frame" d="M 10 54 V 10 H 54 V 54" fill="none" stroke="currentColor" stroke-width="5" stroke-linecap="square"/>
           <path class="portal-arch" d="M 18 54 V 28 A 14 14 0 0 1 46 28 V 54" fill="none" stroke="#0284C7" stroke-width="4"/>
           <path class="portal-rays" d="M 32 24 L 22 54 M 32 24 L 42 54" fill="none" stroke="#38BDF8" stroke-width="2.5"/>
@@ -760,31 +760,61 @@
         </svg>
       </div>
 
-      <div style="margin-bottom: 8px;">
+      <div style="margin-bottom: 6px;">
         <span id="overlayAssetBadge" style="display: inline-flex; align-items: center; gap: 6px; padding: 3px 10px; border-radius: 9999px; background: rgba(2, 132, 199, 0.1); border: 1px solid rgba(2, 132, 199, 0.28); font-size: 11px; font-weight: 700; color: var(--accent-cyan); text-transform: uppercase;">
           Research Engine
         </span>
       </div>
 
-      <h3 id="overlayTickerTitle" style="font-weight: 800; font-size: 22px; margin-bottom: 8px; color: var(--text-primary); letter-spacing: -0.01em;">
+      <h3 id="overlayTickerTitle" style="font-weight: 800; font-size: 21px; margin-bottom: 6px; color: var(--text-primary); letter-spacing: -0.01em;">
         Generating Stock Report
       </h3>
-      <p id="overlayStatusMsg" style="font-size: 13.5px; color: var(--text-secondary); line-height: 1.55; margin-bottom: 18px; min-height: 44px;">
+      <p id="overlayStatusMsg" style="font-size: 13px; color: var(--text-secondary); line-height: 1.5; margin-bottom: 14px; min-height: 38px;">
         Reading live BSE exchange filings, checking each of the seven areas (01–07), running valuation scenarios and reviewing governance footnotes...
       </p>
 
-      <!-- 30-Second Progressive Fill Track -->
-      <div style="background: var(--bg-surface); border: 1px solid var(--border-color); border-radius: 9999px; height: 10px; overflow: hidden; margin-bottom: 10px; position: relative;">
-        <div id="overlayProgressBar" style="width: 0%; height: 100%; background: linear-gradient(90deg, #0284C7 0%, #2563EB 100%); border-radius: 9999px; transition: width 0.3s ease-out;"></div>
+      <!-- Continuous Smooth Fill Progress Track -->
+      <div class="hud-progress-track" style="background: var(--bg-surface); border: 1px solid var(--border-color); border-radius: 9999px; height: 12px; overflow: hidden; margin-bottom: 8px; position: relative;">
+        <div id="overlayProgressBar" class="hud-progress-fill" style="width: 8%; height: 100%; background: linear-gradient(90deg, #0284C7 0%, #38BDF8 50%, #2563EB 100%); border-radius: 9999px; transition: width 0.08s linear;"></div>
       </div>
 
       <div style="display: flex; justify-content: space-between; align-items: center; font-size: 12px; color: var(--text-muted); margin-bottom: 16px; font-variant-numeric: tabular-nums;">
         <span id="overlayProgressStage" style="font-weight: 600; color: var(--text-secondary);">Step 1/4: Ingesting BSE Filings</span>
-        <span id="overlayProgressTime" style="font-weight: 700; color: var(--accent-cyan); font-family: var(--font-mono);">0s / ~30s</span>
+        <span id="overlayProgressTime" style="font-weight: 700; color: var(--accent-cyan); font-family: var(--font-mono);">8% • 0.0s</span>
       </div>
 
-      <div style="background: var(--bg-surface); border: 1px solid var(--border-subtle); border-radius: 8px; padding: 10px 14px; font-size: 12px; color: var(--text-secondary); display: flex; align-items: center; justify-content: center; gap: 6px;">
-        <svg class="glyph" style="width:13px;height:13px; color: var(--accent-cyan);"><use href="#icon-radar"></use></svg> <span id="overlayCalloutText">Live analytical pipeline active. Average compilation time: ~20–30s.</span>
+      <!-- 32-Card Weighted Trust & Product Discovery Deck -->
+      <div id="overlayTrustCardDeck" class="hud-trust-deck" aria-live="polite">
+        <div class="hud-trust-deck-top">
+          <span id="overlayCardCategoryBadge" class="hud-card-badge hud-card-badge-trust">
+            <svg class="glyph" style="width: 12px; height: 12px;"><use href="#glyph-shield"></use></svg>
+            <span id="overlayCardCategoryText">Why Trust Our Research • 1 of 32</span>
+          </span>
+          <div class="hud-card-controls">
+            <button type="button" class="hud-card-nav-btn" onclick="window.prevEvaluationCard()" title="Previous Card" aria-label="Previous Card">←</button>
+            <button type="button" class="hud-card-nav-btn" onclick="window.nextEvaluationCard()" title="Next Card" aria-label="Next Card">→</button>
+          </div>
+        </div>
+        <div id="overlayCardContentWrap" class="hud-card-body-wrap">
+          <div id="overlayCardTitle" class="hud-card-title">Direct BSE &amp; NSE Statutory Filings Only</div>
+          <p id="overlayCardBody" class="hud-card-desc">
+            Every equity report is built from primary exchange filings, audited annual reports, and quarterly disclosures—never social media tips, rumours, or unverified broker targets.
+          </p>
+          <div id="overlayCardHighlightRow" class="hud-card-highlight">
+            <span id="overlayCardHighlightPill" class="hud-card-pill">Source: bseindia.com &amp; nseindia.com</span>
+            <span id="overlayCardIndexLabel" class="hud-card-counter">Trust Reason #1 / 20</span>
+          </div>
+        </div>
+        <div class="hud-card-timer-track">
+          <div id="overlayCardTimerFill" class="hud-card-timer-fill"></div>
+        </div>
+      </div>
+
+      <div style="background: var(--bg-surface); border: 1px solid var(--border-subtle); border-radius: 8px; padding: 8px 12px; margin-top: 12px; font-size: 11.5px; color: var(--text-secondary); display: flex; align-items: center; justify-content: space-between; gap: 8px;">
+        <span style="display: inline-flex; align-items: center; gap: 6px;">
+          <svg class="glyph" style="width:13px;height:13px; color: var(--accent-cyan);"><use href="#icon-radar"></use></svg>
+          <span id="overlayCalloutText">Live analytical pipeline active. Flipping through platform trust &amp; product notes while loading.</span>
+        </span>
       </div>
     </div>
   </div>
@@ -905,6 +935,6 @@
     </div>
   </footer>
 
-  <script src="/static/js/main.js?v=20261021_0730"></script>
+  <script src="/static/js/main.js?v=20261021_0745"></script>
 </body>
 </html>

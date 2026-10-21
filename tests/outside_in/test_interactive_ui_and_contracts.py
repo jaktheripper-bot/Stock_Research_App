@@ -627,6 +627,17 @@ class TestFrontendClickWiringAndCredits(unittest.TestCase):
         self.assertIn('id="overlayProgressBar"', base_html)
         self.assertIn('id="overlayProgressTime"', base_html)
         self.assertIn('id="overlayProgressStage"', base_html)
+        self.assertIn('id="overlayTrustCardDeck"', base_html)
+        self.assertIn('id="overlayCardCategoryBadge"', base_html)
+        self.assertIn('id="overlayCardTitle"', base_html)
+        self.assertIn('id="overlayCardBody"', base_html)
+        self.assertIn('id="overlayCardTimerFill"', base_html)
+        self.assertIn("HUD_DISCOVERY_CARDS", js_content)
+        self.assertIn("completeEvaluationHUD", js_content)
+        self.assertIn("nextEvaluationCard", js_content)
+        self.assertIn("prevEvaluationCard", js_content)
+        self.assertGreaterEqual(js_content.count("category: 'trust'"), 20)
+        self.assertGreaterEqual(js_content.count("category: 'product'"), 12)
 
     def test_dossier_header_kpi_cards_have_no_broken_bse_search_links(self):
         """
