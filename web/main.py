@@ -1858,11 +1858,11 @@ def msme_directory_page(
         seed_default_msme_firms()
 
     from core.msme.utils import build_search_query, classify_msme_tier
-    from core.db.connection import get_db_connection, get_supabase_url
+    from core.db.connection import get_db_connection, is_postgres_connection
     conn = get_db_connection()
     cur = conn.cursor()
     try:
-        use_pg = bool(get_supabase_url())
+        use_pg = is_postgres_connection(conn)
         placeholder = "%s" if use_pg else "?"
 
         where, values = build_search_query(

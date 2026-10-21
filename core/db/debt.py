@@ -300,12 +300,40 @@ def get_debt_securities_for_equity(equity_ticker: str) -> List[Dict[str, Any]]:
         cursor.close()
         conn.close()
 
-def get_active_debt_securities(
+def _filter_canonical_debt_fallback(
     seniority: Optional[str] = None,
     instrument_type: Optional[str] = None,
     min_rating: Optional[str] = None,
     is_sdi: Optional[bool] = None,
     limit: int = 500
+) -> List[Dict[str, Any]]:
+    """Deterministic fallback filter over CANONICAL_DEBT_UNIVERSE when DB is empty or unavailable."""
+    items = [dict(sec) for sec in CANONICAL_DEBT_UNIVERSE]
+    if seniority:
+        sen_norm = seniority.strip().upper()
+        items = [r for r in items if str(r.get("seniority_tier", "")).strip().upper() == sen_norm]
+    if instrument_type:
+        it_norm = instrument_type.strip().upper()
+        items = [r for r in items if str(r.get("instrument_type", "")).strip().upper() == it_norm]
+    if is_sdi is not None:
+        items = [r for r in items if bool(r.get("is_sdi", False)) == bool(is_sdi)]
+    if min_rating:
+        target_weight = RATING_TIER_ORDER.get(min_rating.strip().upper(), 1)
+        items = [
+            r for r in items
+            if RATING_TIER_ORDER.get(str(r.get("credit_rating", "")).replace("CRISIL ", "").replace("ICRA ", "").replace("CARE ", "").replace("IND ", "").strip(), 0) >= target_weight
+        ]
+    items.sort(key=lambda x: float(x.get("ytm_pct", 0.0)), reverse=True)
+    return items[:int(limit)]
+
+
+def get_active_debt_securities(
+    seniority: Optional[str] = None,
+    instrument_type: Optional[str] = None,
+    min_rating: Optional[str] = None,
+    is_sdi: Optional[bool] = None,
+    limit: int = 500,
+    _retry: bool = False
 ) -> List[Dict[str, Any]]:
     """Retrieves active debt securities filtered by seniority, rating, and instrument type."""
     conn = get_db_connection()
@@ -336,22 +364,26 @@ def get_active_debt_securities(
         rows = cursor.fetchall()
         results = [clean_dict_row(cursor, r) for r in rows]
 
-        # Auto-seed canonical universe only if table is completely empty
-        if not results and not seniority and not instrument_type and not min_rating and is_sdi is None:
-            cursor.execute("SELECT COUNT(*) FROM corporate_debt_securities")
-            cnt_row = cursor.fetchone()
-            total_count = cnt_row[0] if cnt_row else 0
-            if total_count == 0:
-                cursor.close()
-                conn.close()
-                seed_default_debt_securities()
-                return get_active_debt_securities(
-                    seniority=seniority,
-                    instrument_type=instrument_type,
-                    min_rating=min_rating,
-                    is_sdi=is_sdi,
-                    limit=limit
-                )
+        # Auto-seed canonical universe if no production securities are present
+        if not results and not _retry and not seniority and not instrument_type and not min_rating and is_sdi is None:
+            cursor.close()
+            conn.close()
+            seed_default_debt_securities()
+            seeded = get_active_debt_securities(
+                seniority=seniority,
+                instrument_type=instrument_type,
+                min_rating=min_rating,
+                is_sdi=is_sdi,
+                limit=limit,
+                _retry=True
+            )
+            return seeded if seeded else _filter_canonical_debt_fallback(
+                seniority=seniority,
+                instrument_type=instrument_type,
+                min_rating=min_rating,
+                is_sdi=is_sdi,
+                limit=limit
+            )
 
         if min_rating:
             target_weight = RATING_TIER_ORDER.get(min_rating.strip().upper(), 1)
@@ -362,7 +394,13 @@ def get_active_debt_securities(
         return results
     except Exception as e:
         logger.error(f"Error querying active debt securities: {e}")
-        return []
+        return _filter_canonical_debt_fallback(
+            seniority=seniority,
+            instrument_type=instrument_type,
+            min_rating=min_rating,
+            is_sdi=is_sdi,
+            limit=limit
+        )
     finally:
         try:
             cursor.close()

@@ -278,7 +278,9 @@
             {% endif %}
           </div>
           <p style="font-size: 13px; color: #94a3b8; margin: 0; line-height: 1.5;">
-            {% if credit_quote.uncached_count == 0 %}
+            {% if credit_quote.equity_holdings_count == 0 %}
+            <strong>Fixed-Income / Money-Market Mandate (0 Equity Constituents):</strong> Portfolio holds sovereign, corporate debt, or money-market instruments evaluated via the Debt &amp; Liquidity Sleeve below.
+            {% elif credit_quote.uncached_count == 0 %}
             <strong>All {{ credit_quote.equity_holdings_count }} equity constituents</strong> have verified 7-pillar dossiers (100% portfolio weight). Full look-through meters and accounting narrative are active.
             {% else %}
             <strong>{{ credit_quote.cached_count }}</strong> of {{ credit_quote.equity_holdings_count }} equity constituents have full 7-pillar dossiers ({{ credit_quote.cached_weight_pct }}% weight). 

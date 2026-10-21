@@ -906,7 +906,10 @@ def get_all_reits_and_invits(structure_type: Optional[str] = None) -> List[Dict[
     p = get_placeholder()
 
     try:
-        where_clause = f"WHERE structure_type = {p}" if structure_type else ""
+        if structure_type:
+            where_clause = f"WHERE structure_type = {p} AND UPPER(symbol) NOT LIKE '%TEST%' AND UPPER(name) NOT LIKE '%TEST%'"
+        else:
+            where_clause = "WHERE UPPER(symbol) NOT LIKE '%TEST%' AND UPPER(name) NOT LIKE '%TEST%'"
         query = f"""
             SELECT id, symbol, name, structure_type, current_price, nav_per_unit,
                    discount_to_nav_pct, distribution_yield_pct, occupancy_pct,

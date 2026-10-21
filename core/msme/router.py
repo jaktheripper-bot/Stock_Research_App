@@ -10,7 +10,7 @@ from fastapi import APIRouter, HTTPException, Query
 from fastapi.responses import JSONResponse
 from typing import Optional, List, Dict, Any
 
-from core.db.connection import get_db_connection, get_supabase_url
+from core.db.connection import get_db_connection, get_supabase_url, is_postgres_connection
 from core.msme.utils import build_search_query, paginate, classify_msme_tier
 
 logger = logging.getLogger(__name__)
@@ -148,7 +148,7 @@ def search_msme(
     conn = get_db_connection()
     cur = conn.cursor()
     try:
-        use_pg = bool(get_supabase_url())
+        use_pg = is_postgres_connection(conn)
         placeholder = "%s" if use_pg else "?"
 
         where, values = build_search_query(
@@ -215,12 +215,12 @@ def get_msme_detail(uin: str) -> Optional[Dict[str, Any]]:
     conn = get_db_connection()
     cur = conn.cursor()
     try:
-        use_pg = bool(get_supabase_url())
+        use_pg = is_postgres_connection(conn)
         placeholder = "%s" if use_pg else "?"
 
         sql = f"""
             SELECT uin, name, sector_code, sector_name, city, state, annual_turnover,
-                   employee_count, registration_date, source, last_updated
+                   employee_count, registration_date, source
             FROM msme_firms
             WHERE UPPER(uin) = {placeholder}
         """
@@ -252,7 +252,7 @@ def get_msme_detail(uin: str) -> Optional[Dict[str, Any]]:
         "employee_count": int(row[7]) if row[7] is not None else None,
         "registration_date": row[8],
         "source": row[9],
-        "last_updated": str(row[10]) if row[10] else None,
+        "last_updated": str(row[8]) if row[8] else None,
         "tier": classify_msme_tier(turnover)
     }
 
