@@ -1215,13 +1215,10 @@ window.hideEvaluationHUD = function() {
     _hudCardTimerInterval = null;
   }
   if (_hudActiveNavigationController) {
-    const targetUrl = _hudActiveNavigationController.targetUrl;
-    _hudActiveNavigationController.cancelled = true;
+    // Allow the evaluation pre-fetch and button progress bar to continue behind the scenes
+    // so the user can keep perusing and queueing multiple assets in one sitting.
+    _hudActiveNavigationController.dismissedToBackground = true;
     _hudActiveNavigationController = null;
-    if (targetUrl) {
-      window.location.href = targetUrl;
-      return;
-    }
   }
   const overlay = document.getElementById('synthesizingOverlay');
   if (overlay) {
@@ -2740,6 +2737,36 @@ function resetAllButtonProgressFills() {
 window.resetButtonProgressFill = resetButtonProgressFill;
 window.resetAllButtonProgressFills = resetAllButtonProgressFills;
 
+function markButtonProgressReady(btn, linkEl, finalUrl, labelText = 'Dossier') {
+  if (linkEl) {
+    linkEl.dataset.prefetchedReady = 'true';
+    linkEl.dataset.prefetchedUrl = finalUrl;
+    delete linkEl.dataset.progressActive;
+  }
+  if (btn) {
+    if (btn._progressInterval) {
+      clearInterval(btn._progressInterval);
+      btn._progressInterval = null;
+    }
+    if (btn._progressSafetyTimeout) {
+      clearTimeout(btn._progressSafetyTimeout);
+      btn._progressSafetyTimeout = null;
+    }
+    delete btn.dataset.progressActive;
+    btn.dataset.prefetchedReady = 'true';
+    btn.dataset.prefetchedUrl = finalUrl;
+    btn.classList.remove('btn-loading-progress');
+    btn.classList.add('btn-prefetched-ready');
+    btn.style.setProperty('--btn-progress', '100%');
+    btn.innerHTML = `<span class="btn-progress-label"><svg class="glyph" style="width: 14px; height: 14px; display:inline-block;"><use href="#glyph-check"></use></svg> Ready — Open Report →</span>`;
+    _activeProgressButtons.delete(btn);
+  }
+  if (typeof window.showToast === 'function') {
+    window.showToast(`${labelText} is ready in the background — click to open immediately.`, 'success', 5500);
+  }
+}
+window.markButtonProgressReady = markButtonProgressReady;
+
 function startButtonProgressFill(btn, baseLabel = 'Loading Dossier') {
   if (!btn || btn.dataset.progressActive) return;
 
@@ -2901,28 +2928,35 @@ document.addEventListener('click', (e) => {
   if (a.tagName === 'A' && a.href && a.origin === window.location.origin && !a.target && !e.ctrlKey && !e.metaKey && !e.shiftKey) {
     const targetMeta = resolveEvaluationTarget(a);
     if (targetMeta) {
-      // Trigger the sitewide Report Evaluation HUD with smooth 5-second pacing for link navigation
+      const cardContainer = a.closest('.card, .stat-card, [class*="card"], tr');
+      const progressBtn = a.classList.contains('btn')
+        ? a
+        : (a.querySelector?.('.btn') || cardContainer?.querySelector?.(`a.btn[href="${a.getAttribute('href')}"]`) || cardContainer?.querySelector?.('a.btn'));
+
+      // If this asset already finished loading behind the scenes, open it instantaneously with zero wait
+      if (a.dataset.prefetchedReady === 'true' || progressBtn?.dataset?.prefetchedReady === 'true') {
+        const readyUrl = a.dataset.prefetchedUrl || progressBtn?.dataset?.prefetchedUrl || a.href;
+        window.location.href = readyUrl;
+        return;
+      }
+
+      // Trigger the sitewide Report Evaluation HUD with smooth pacing for link navigation
       window.showEvaluationHUD({
         assetType: targetMeta.assetType,
         ticker: targetMeta.ticker,
         totalSec: 5
       });
 
-      // If clicked element is or contains a button, activate button progress fill
-      if (a.classList.contains('btn')) {
-        startButtonProgressFill(a, targetMeta.label);
-      } else {
-        const childBtn = a.querySelector?.('.btn');
-        if (childBtn) {
-          startButtonProgressFill(childBtn, targetMeta.label);
-        }
+      // Activate behind-the-scenes button progress fill on the card button
+      if (progressBtn) {
+        startButtonProgressFill(progressBtn, targetMeta.label);
       }
 
-      // Coordinate smooth progress bar completion + background pre-fetch so the bar never freezes at 0s
+      // Coordinate smooth progress bar completion + background pre-fetch
       if (!navigator.webdriver) {
         e.preventDefault();
         const targetUrl = a.href;
-        const navState = { targetUrl, cancelled: false };
+        const navState = { targetUrl, cancelled: false, dismissedToBackground: false };
         _hudActiveNavigationController = navState;
 
         const minDisplayPromise = new Promise(resolve => setTimeout(resolve, 3600));
@@ -2931,9 +2965,25 @@ document.addEventListener('click', (e) => {
           headers: { 'X-Moatnomics-Prefetch': '1' }
         }).catch(() => null);
 
+        // If user dismisses the HUD modal to peruse other assets, mark card ready as soon as fetch completes
+        warmFetchPromise.then((resp) => {
+          if (navState.cancelled) return;
+          if (navState.dismissedToBackground) {
+            const finalUrl = (resp && resp.ok && resp.url) ? resp.url : targetUrl;
+            markButtonProgressReady(progressBtn, a, finalUrl, targetMeta.ticker);
+          }
+        });
+
         Promise.all([minDisplayPromise, warmFetchPromise]).then(([, resp]) => {
           if (navState.cancelled) return;
-          _hudActiveNavigationController = null;
+          if (navState.dismissedToBackground) {
+            const finalUrl = (resp && resp.ok && resp.url) ? resp.url : targetUrl;
+            markButtonProgressReady(progressBtn, a, finalUrl, targetMeta.ticker);
+            return;
+          }
+          if (_hudActiveNavigationController === navState) {
+            _hudActiveNavigationController = null;
+          }
           const finalUrl = (resp && resp.ok && resp.url) ? resp.url : targetUrl;
           window.completeEvaluationHUD(() => {
             window.location.href = finalUrl;
