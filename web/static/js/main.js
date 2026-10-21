@@ -590,7 +590,7 @@ const EVALUATION_CONFIGS = {
     title: (ticker) => `Evaluating Equity Dossier: ${ticker || 'Selected Company'}`,
     stages: [
       { maxSec: 7, stage: "Step 1/4: Ingesting BSE Filings & L2 Depth", msg: "Ingesting verified corporate filings from BSE and parsing Level-2 order book depth..." },
-      { maxSec: 16, stage: "Step 2/4: Executing 7-Pillar Cortex & Sieve", msg: "Running Chanakya clean-room filter, DuPont ROE decomposition, and promoter pledge audits..." },
+      { maxSec: 16, stage: "Step 2/4: Executing 7-Pillar Cortex & Sieve", msg: "Running clean-room filing filters, 3-step capital efficiency decompositions, and promoter pledge audits..." },
       { maxSec: 25, stage: "Step 3/4: Solving Reverse DCF & Valuation", msg: "Computing implied market growth rate vs. 12% WACC hurdle rate and sector benchmarks..." },
       { maxSec: 30, stage: "Step 4/4: Finalizing Thesis", msg: "Assembling Countercase failure modes, statutory footnotes, and executive dossier..." }
     ]
@@ -680,7 +680,7 @@ const EVALUATION_CONFIGS = {
     title: (target) => `Unlocking Deep-Dive: ${target || 'Security'}`,
     stages: [
       { maxSec: 5, stage: "Step 1/3: Verifying Cryptographic Entitlement", msg: "Validating research credit balance, authorizing ledger transaction, and securing session tokens..." },
-      { maxSec: 10, stage: "Step 2/3: Decrypting Forensic Accounting Schedules", msg: "Unlocking 7-pillar forensic accounting ledger, Beneish M-score breakdowns, and Reverse DCF sandbox..." },
+      { maxSec: 10, stage: "Step 2/3: Decrypting Forensic Accounting Schedules", msg: "Unlocking 7-pillar forensic accounting ledger, accrual stress breakdowns, and Reverse DCF sandbox..." },
       { maxSec: 15, stage: "Step 3/3: Assembling PDF Report Package", msg: "Generating high-resolution SVG charts, printable schedules, and refreshing dossier view..." }
     ]
   }
@@ -695,7 +695,7 @@ const HUD_DISCOVERY_CARDS = [
     id: 'trust-01',
     category: 'trust',
     weight: 3.0,
-    badge: 'Why Trust Our Research • #1 of 20',
+    badge: 'Why Trust Our Research • Research Covenant',
     title: 'Direct BSE & NSE Statutory Filings Only',
     body: 'Every equity report is built directly from primary exchange filings, audited annual reports, and quarterly results—never social media tips, rumours, or unverified broker targets.',
     pill: 'Source: bseindia.com & nseindia.com'
@@ -704,7 +704,7 @@ const HUD_DISCOVERY_CARDS = [
     id: 'trust-02',
     category: 'trust',
     weight: 3.0,
-    badge: 'Why Trust Our Research • #2 of 20',
+    badge: 'Why Trust Our Research • Research Covenant',
     title: 'Zero Buy, Sell, or Price-Target Conflicts',
     body: 'We never tell you to buy or sell, and we never publish promotional price targets. We lay out the numbers, moat durability, and failure modes so the decision stays 100% yours.',
     pill: 'Mandate: Independent Evidence Only'
@@ -713,7 +713,7 @@ const HUD_DISCOVERY_CARDS = [
     id: 'trust-03',
     category: 'trust',
     weight: 3.0,
-    badge: 'Why Trust Our Research • #3 of 20',
+    badge: 'Why Trust Our Research • Research Covenant',
     title: 'Zero Brokerage or Distributor Kickbacks',
     body: 'We earn zero trail commissions from mutual fund AMCs, zero bond placement fees, and zero brokerage kickbacks. Reader compute credits are our sole source of funding.',
     pill: 'Alignment: 100% Reader-Funded'
@@ -722,7 +722,7 @@ const HUD_DISCOVERY_CARDS = [
     id: 'trust-04',
     category: 'trust',
     weight: 3.0,
-    badge: 'Why Trust Our Research • #4 of 20',
+    badge: 'Why Trust Our Research • Research Covenant',
     title: '4-Tier Epistemic Separation on Every Claim',
     body: 'Every statement is tagged as [VERIFIED FACT], [CALCULATED METRIC], [MODEL INTERPRETATION], or [UNRESOLVED UNCERTAINTY] so model inferences are never confused with hard filing facts.',
     pill: 'Engine: Epistemic Schema v2'
@@ -731,16 +731,16 @@ const HUD_DISCOVERY_CARDS = [
     id: 'trust-05',
     category: 'trust',
     weight: 3.0,
-    badge: 'Why Trust Our Research • #5 of 20',
+    badge: 'Why Trust Our Research • Research Covenant',
     title: 'Mandatory Quantitative Falsification Triggers',
     body: 'Every analytical pillar includes a "What Contradicts This Conclusion" section specifying the exact filing thresholds that would force us to revise or invalidate the thesis.',
-    pill: 'Discipline: Karl Popper Falsifiability'
+    pill: 'Discipline: Empirical Falsifiability'
   },
   {
     id: 'trust-06',
     category: 'trust',
     weight: 3.0,
-    badge: 'Why Trust Our Research • #6 of 20',
+    badge: 'Why Trust Our Research • Research Covenant',
     title: '32-Iteration Reverse-DCF Implied Growth Solver',
     body: 'Instead of guessing a subjective target price, our valuation engine reverse-solves the exact 10-year FCF growth rate implied by the current stock price against a 12% WACC hurdle.',
     pill: 'Math: Closed-Form Bisection DCF'
@@ -749,7 +749,7 @@ const HUD_DISCOVERY_CARDS = [
     id: 'trust-07',
     category: 'trust',
     weight: 3.0,
-    badge: 'Why Trust Our Research • #7 of 20',
+    badge: 'Why Trust Our Research • Research Covenant',
     title: 'Strict 70% Coverage Gate on Mutual Funds',
     body: 'We withhold composite Moat and Accounting Risk scores on any mutual fund unless at least 70% of its underlying equity holdings by weight have completed full 7-pillar audits.',
     pill: 'Guardrail: Zero Partial-Sample Guessing'
@@ -758,7 +758,7 @@ const HUD_DISCOVERY_CARDS = [
     id: 'trust-08',
     category: 'trust',
     weight: 3.0,
-    badge: 'Why Trust Our Research • #8 of 20',
+    badge: 'Why Trust Our Research • Research Covenant',
     title: 'Forensic Cash-Flow vs. Accounting Profit Audits',
     body: 'Net income can be flattered by aggressive working-capital accruals. Every equity dossier cross-checks Operating Cash Flow against EBITDA and flags receivables or inventory bloat.',
     pill: 'Forensics: OCF / EBITDA Conversion'
@@ -767,7 +767,7 @@ const HUD_DISCOVERY_CARDS = [
     id: 'trust-09',
     category: 'trust',
     weight: 3.0,
-    badge: 'Why Trust Our Research • #9 of 20',
+    badge: 'Why Trust Our Research • Research Covenant',
     title: 'Promoter Pledge & SAST Insider Surveillance',
     body: 'Our governance engine tracks promoter share-pledging velocity, related-party transactions (RPTs), and SEBI SAST insider disclosures to surface dilution and encumbrance risks early.',
     pill: 'Pillar 07: Governance & SAST Ledger'
@@ -776,16 +776,16 @@ const HUD_DISCOVERY_CARDS = [
     id: 'trust-10',
     category: 'trust',
     weight: 3.0,
-    badge: 'Why Trust Our Research • #10 of 20',
-    title: 'Chanakya Clean-Room PR & Hype Sanitiser',
+    badge: 'Why Trust Our Research • Research Covenant',
+    title: 'Clean-Room Corporate Disclosure Sanitiser',
     body: 'Corporate announcements and press releases pass through our deterministic clean-room filter that strips promotional superlatives while preserving statutory numbers and footnotes.',
-    pill: 'Filter: Chanakya Sieve Active'
+    pill: 'Filter: Forensic Clean-Room Sieve'
   },
   {
     id: 'trust-11',
     category: 'trust',
     weight: 3.0,
-    badge: 'Why Trust Our Research • #11 of 20',
+    badge: 'Why Trust Our Research • Research Covenant',
     title: 'Strictly Confidential Personal Thesis Ledger',
     body: 'Any pre-mortem countercase or thesis checkpoint you record on a report is bound to your authenticated account—strictly confidential and visible only to you when logged in.',
     pill: 'Privacy: Account-Scoped Encryption'
@@ -794,7 +794,7 @@ const HUD_DISCOVERY_CARDS = [
     id: 'trust-12',
     category: 'trust',
     weight: 3.0,
-    badge: 'Why Trust Our Research • #12 of 20',
+    badge: 'Why Trust Our Research • Research Covenant',
     title: 'Official RBI Primary Auction & CCIL Yield Curves',
     body: 'All risk-free hurdle rates, T-Bill cut-offs, and sovereign yield curves are compiled directly from Reserve Bank of India weekly auctions and CCIL Zero-Coupon Yield Curve benchmarks.',
     pill: 'Macro: RBI & CCIL Primary Data'
@@ -803,7 +803,7 @@ const HUD_DISCOVERY_CARDS = [
     id: 'trust-13',
     category: 'trust',
     weight: 3.0,
-    badge: 'Why Trust Our Research • #13 of 20',
+    badge: 'Why Trust Our Research • Research Covenant',
     title: 'Auditor Qualification & Contingent Liability Checks',
     body: 'We specifically scan annual report footnotes for CARO auditor qualifications, off-balance-sheet corporate guarantees, disputed tax demands, and sudden auditor resignations.',
     pill: 'Forensics: Footnote & CARO Audit'
@@ -812,7 +812,7 @@ const HUD_DISCOVERY_CARDS = [
     id: 'trust-14',
     category: 'trust',
     weight: 3.0,
-    badge: 'Why Trust Our Research • #14 of 20',
+    badge: 'Why Trust Our Research • Research Covenant',
     title: '3-Step DuPont ROE Leverage Decomposition',
     body: 'High Return on Equity can hide dangerous debt leverage. We decompose ROE into Net Profit Margin × Asset Turnover × Financial Leverage so you see the true operational driver.',
     pill: 'Pillar 02: DuPont Capital Efficiency'
@@ -821,7 +821,7 @@ const HUD_DISCOVERY_CARDS = [
     id: 'trust-15',
     category: 'trust',
     weight: 3.0,
-    badge: 'Why Trust Our Research • #15 of 20',
+    badge: 'Why Trust Our Research • Research Covenant',
     title: 'IBC Recovery Haircuts & Bond Seniority Stress-Tests',
     body: 'We never take credit ratings at face value. Every corporate bond is evaluated for capital-hierarchy seniority, collateral cover, and historical Insolvency & Bankruptcy Code recovery rates.',
     pill: 'Fixed Income: 5-Pillar Credit Matrix'
@@ -830,7 +830,7 @@ const HUD_DISCOVERY_CARDS = [
     id: 'trust-16',
     category: 'trust',
     weight: 3.0,
-    badge: 'Why Trust Our Research • #16 of 20',
+    badge: 'Why Trust Our Research • Research Covenant',
     title: 'Behavioural Anchoring-Bias Guardrail',
     body: 'Every equity dossier opens with an explicit Anchoring-Bias Guardrail prompting you to evaluate business quality and implied growth before anchoring on the current market price.',
     pill: 'Behavioural Finance: Anti-Anchoring'
@@ -839,7 +839,7 @@ const HUD_DISCOVERY_CARDS = [
     id: 'trust-17',
     category: 'trust',
     weight: 3.0,
-    badge: 'Why Trust Our Research • #17 of 20',
+    badge: 'Why Trust Our Research • Research Covenant',
     title: 'Verified Statutory Udyam MSME Partitioning',
     body: 'In our Unlisted MSME directory, verified government Udyam registry attributes are strictly separated from sector benchmark medians—with zero synthetic entity fabrication.',
     pill: 'MSME Registry: Statutory Udyam Data'
@@ -848,16 +848,16 @@ const HUD_DISCOVERY_CARDS = [
     id: 'trust-18',
     category: 'trust',
     weight: 3.0,
-    badge: 'Why Trust Our Research • #18 of 20',
+    badge: 'Why Trust Our Research • Research Covenant',
     title: 'Immutable Revision Archives & Thesis Drift Tracking',
-    body: 'When a company files new quarterly results, our Garuda reflex engine invalidates stale caches and archives prior revisions so you can audit how the thesis evolved over time.',
+    body: 'When a company files new quarterly results, our automated event engine invalidates stale caches and archives prior revisions so you can audit how the thesis evolved over time.',
     pill: 'Lineage: Multi-Quarter Delta Audit'
   },
   {
     id: 'trust-19',
     category: 'trust',
     weight: 3.0,
-    badge: 'Why Trust Our Research • #19 of 20',
+    badge: 'Why Trust Our Research • Research Covenant',
     title: 'Explicit Data Provenance & Freshness Badges',
     body: 'Every directory card, yield curve, and dossier header displays its exact regulatory data source and last-updated timestamp—never static seeds disguised as live feeds.',
     pill: 'Transparency: Timestamped Provenance'
@@ -866,7 +866,7 @@ const HUD_DISCOVERY_CARDS = [
     id: 'trust-20',
     category: 'trust',
     weight: 3.0,
-    badge: 'Why Trust Our Research • #20 of 20',
+    badge: 'Why Trust Our Research • Research Covenant',
     title: '100% Free Public Archives & Exchange Quotes',
     body: 'Reading existing research dossiers, checking exchange quotes, and exporting unlocked PDFs are completely free. Compute credits are only used when generating a fresh report.',
     pill: 'Access: Open Public Library'
@@ -941,7 +941,7 @@ const HUD_DISCOVERY_CARDS = [
     category: 'product',
     weight: 1.0,
     badge: 'Platform Spotlight • Opportunity Terminal (/opportunities)',
-    title: 'Setu Cross-Asset Relative-Value & Yield Spread Terminal',
+    title: 'Cross-Asset Relative-Value & Yield Spread Terminal',
     body: 'Compare post-tax, CPI-inflation-adjusted real yields across equities, corporate bonds, REITs, ETFs, and G-Secs on a unified risk-adjusted frontier.',
     pill: 'Product: Markets → Opportunity Terminal'
   },
@@ -992,13 +992,34 @@ let _hudCardHistoryPos = -1;
 let _hudLastCategory = null;
 let _hudActiveNavigationController = null;
 
+function _isReturningUser() {
+  try {
+    if (localStorage.getItem('sr_user')) return true;
+    if (localStorage.getItem('moatnomics_visited_before')) return true;
+    localStorage.setItem('moatnomics_visited_before', '1');
+    return false;
+  } catch {
+    return false;
+  }
+}
+
+let _hudSequentialCursor = 0;
+
 function _pickNextHudCardIndex() {
+  const isReturning = _isReturningUser();
+
+  // If first-time user: present cards in deliberate, canonical sequential order
+  if (!isReturning) {
+    const idx = _hudSequentialCursor % HUD_DISCOVERY_CARDS.length;
+    _hudSequentialCursor += 1;
+    return idx;
+  }
+
+  // Only randomise order for returning users:
   if (_hudSeenCardIndices.size >= HUD_DISCOVERY_CARDS.length) {
     _hudSeenCardIndices.clear();
   }
 
-  // Enforce higher preference to Trust messages:
-  // Never show two 'product' cards back-to-back, and weight 'trust' cards at 3.0x vs 1.0x
   const candidates = [];
   let totalWeight = 0;
 
@@ -1026,12 +1047,11 @@ function _pickNextHudCardIndex() {
 }
 
 function _computeHudCardDwellMs(card, isFastNav) {
-  // Variable cadence ("different variances"): scales with text length + randomized jitter
+  // Enforce at least 10 seconds between switches with subtle length-based pacing
   const charLen = ((card && card.title ? card.title.length : 30) + (card && card.body ? card.body.length : 120));
-  const lengthFactorMs = Math.min(700, Math.max(0, (charLen - 130) * 6));
-  const varianceJitterMs = Math.floor((Math.random() - 0.35) * 650); // -227ms to +422ms variance
-  const baseMs = isFastNav ? 1750 : 2550;
-  return Math.max(1350, Math.min(3800, baseMs + lengthFactorMs + varianceJitterMs));
+  const lengthFactorMs = Math.min(2500, Math.max(0, (charLen - 130) * 12));
+  const baseMs = 10000; // Minimum 10.0 seconds dwell time per user directive
+  return baseMs + lengthFactorMs;
 }
 
 function _renderHudCardByIndex(cardIdx, dwellMs) {
@@ -1069,7 +1089,7 @@ function _renderHudCardByIndex(cardIdx, dwellMs) {
   if (bodyEl) bodyEl.textContent = card.body;
   if (pillEl) pillEl.textContent = card.pill;
   if (counterEl) {
-    counterEl.textContent = `Card ${_hudCardHistoryPos + 1} • ${HUD_DISCOVERY_CARDS.length}-Card Deck`;
+    counterEl.textContent = card.category === 'product' ? 'Platform Spotlight' : 'Research Discipline';
   }
 
   // Animate per-card progress bar across dwellMs
@@ -3478,11 +3498,11 @@ function initThemeToggle() {
   try {
     let saved = localStorage.getItem("moatnomics_theme_v2");
     if (!saved) {
-      saved = "light";
-      localStorage.setItem("moatnomics_theme_v2", "light");
-      localStorage.setItem("moatnomics_theme", "light");
+      saved = "dark";
+      localStorage.setItem("moatnomics_theme_v2", "dark");
+      localStorage.setItem("moatnomics_theme", "dark");
     }
-    const theme = saved === "dark" ? "dark" : "light";
+    const theme = saved === "light" ? "light" : "dark";
     document.documentElement.dataset.theme = theme;
     syncThemeToggleUI(theme);
 
@@ -3496,7 +3516,7 @@ function initThemeToggle() {
       }
     }
   } catch (e) {
-    document.documentElement.dataset.theme = "light";
+    document.documentElement.dataset.theme = "dark";
     console.warn("Theme initialization storage notice:", e);
   }
 }

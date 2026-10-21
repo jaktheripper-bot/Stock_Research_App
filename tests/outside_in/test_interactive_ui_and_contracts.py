@@ -868,7 +868,7 @@ class TestCopilotUIAndSyntax(unittest.TestCase):
             ("countercase", "Run a countercase analysis on this stock: what failure modes could destroy shareholder value?"),
             ("reverse_dcf", "What implied growth rate is priced into current CMP based on Reverse DCF?"),
             ("governance", "Are there any promoter pledging or corporate governance red flags in recent disclosures?"),
-            ("solvency", "Evaluate balance sheet solvency, Altman Z-Score, and leverage ratios for this company.")
+            ("solvency", "Evaluate balance sheet solvency and leverage ratios for this company.")
         ]
 
         responses = {}
@@ -897,7 +897,7 @@ class TestCopilotUIAndSyntax(unittest.TestCase):
         self.assertIn("Forensic Accounting & Governance Audit", responses["governance"])
         self.assertIn("0.0% Pledged", responses["governance"])
         self.assertIn("Balance Sheet Solvency & Liquidity Diagnostic", responses["solvency"])
-        self.assertIn("Altman Z-Score Solvency Zone", responses["solvency"])
+        self.assertIn("Balance-Sheet Distress & Solvency Zone", responses["solvency"])
 
     def test_mutual_fund_options_yield_distinct_responses(self):
         """Verifies that each option within the Fund Look-Through Intelligence Desk returns a unique response."""

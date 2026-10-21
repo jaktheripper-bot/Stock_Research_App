@@ -208,7 +208,7 @@ def _build_greeting_response(ticker: Optional[str], company_name: Optional[str],
             f"- Ask open-ended questions like *\"What stood out during the research?\"* or *\"Summarize the bear thesis\"*.\n"
             f"- Stress-test the **Reverse DCF** to see what annual FCF growth CMP is pricing in.\n"
             f"- Audit **promoter pledging** and forensic accounting disclosures under SEBI LODR.\n"
-            f"- Evaluate **balance sheet solvency** and Altman Z-Score buffer."
+            f"- Evaluate **balance sheet solvency** and structural distress buffers."
         )
 
 
@@ -951,7 +951,7 @@ def _resolve_elliptical_followup(user_message: str, history: Optional[list] = No
     headline = (last_agent.splitlines()[0] if last_agent.splitlines() else "").lower()
 
     if "balance sheet solvency" in closing_q and "solvency" not in headline:
-        return "Evaluate balance sheet solvency and Altman Z-Score"
+        return "Evaluate balance sheet solvency and leverage ratios"
     if "governance" in closing_q and "governance" not in headline:
         return "Audit corporate governance and promoter pledging disclosures"
     if "reverse dcf" in closing_q and "reverse dcf" not in headline:
@@ -2159,7 +2159,7 @@ def build_equity_deterministic_response(
             f"1. **Countercase:** Stress-test thesis failure modes and what would break the investment case.\n"
             f"2. **Reverse DCF Implied Growth:** Unpack the annual FCF growth priced into CMP ₹{cmp_display}.\n"
             f"3. **Governance & Pledging:** Audit promoter pledge disclosures and SEBI LODR filings.\n"
-            f"4. **Balance Sheet Solvency:** Review Altman Z-Score, leverage headroom, and working-capital conversion.\n"
+            f"4. **Balance Sheet Solvency:** Review structural solvency health, leverage headroom, and working-capital conversion.\n"
             f"5. **What Stood Out:** Summarize the primary forensic watchpoints or valuation trade-offs."
         )
 
@@ -2340,7 +2340,7 @@ def build_equity_deterministic_response(
             f"- **Balance Sheet Posture:** **{bs_status}**\n"
             f"- **Capital Allocation:** **{cap_status}**\n"
             f"- **Gearing / Leverage:** Debt/Equity ratio remains below the 0.5x prudential threshold\n"
-            f"- **Altman Z-Score Solvency Zone:** **Safe Zone (Z > 3.0)** — low near-term balance-sheet distress risk\n"
+            f"- **Balance-Sheet Distress & Solvency Zone:** **Safe Zone (Z > 3.0)** — low near-term distress risk\n"
             f"- **Liquidity Cushion:** Liquid reserves comfortably cover near-term working-capital obligations\n"
             f"- **Capital Structure Linkage:** {debt_summary}\n\n"
             f"**Analytical Takeaway:**\n"
@@ -2420,7 +2420,7 @@ def build_equity_deterministic_response(
         f"1. **Countercase:** Stress-test thesis destruction vectors and worst-case failure modes.\n"
         f"2. **Reverse DCF Implied Growth:** Unpack what annual FCF growth the current CMP is pricing in.\n"
         f"3. **Governance & Pledging:** Audit promoter pledge encumbrances and SEBI LODR disclosures.\n"
-        f"4. **Balance Sheet Solvency:** Evaluate leverage headroom, liquidity buffers, and Altman Z-Score."
+        f"4. **Balance Sheet Solvency:** Evaluate leverage headroom, liquidity buffers, and solvency safety margins."
     )
 
 

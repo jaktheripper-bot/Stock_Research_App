@@ -1,10 +1,10 @@
 <!DOCTYPE html>
-<html lang="en" data-theme="light">
+<html lang="en" data-theme="dark">
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, minimum-scale=1.0">
   <meta name="color-scheme" content="light dark">
-  <script>(function(){try{var v=localStorage.getItem('moatnomics_theme_v2');if(!v){localStorage.setItem('moatnomics_theme_v2','light');localStorage.setItem('moatnomics_theme','light');v='light';}document.documentElement.dataset.theme=(v==='dark')?'dark':'light';}catch(e){document.documentElement.dataset.theme='light';}})();</script>
+  <script>(function(){try{var v=localStorage.getItem('moatnomics_theme_v2');if(!v){localStorage.setItem('moatnomics_theme_v2','dark');localStorage.setItem('moatnomics_theme','dark');v='dark';}document.documentElement.dataset.theme=(v==='light')?'light':'dark';}catch(e){document.documentElement.dataset.theme='dark';}})();</script>
   <title>{% block title %}Moatnomics | Less noise, more nuance.{% endblock %}</title>
   <meta name="description" content="{% block meta_desc %}Moatnomics is independent research on Indian stocks, mutual funds and corporate bonds. See the evidence, the risks and what to check before you invest.{% endblock %}">
   {% if canonical_for is defined and request is defined and request %}{% set _canon = canonical_for(request) %}{% if _canon %}
@@ -25,17 +25,17 @@
   <meta name="twitter:image" content="{{ site_asset_url('/static/img/brand/og-default.png') }}">
   
   <!-- Favicon, Typography & Stylesheet -->
-  <link id="siteFaviconSvg" rel="icon" type="image/svg+xml" href="/static/img/brand/favicon.svg?v=20261021_1430">
-  <link id="siteFaviconPng64" rel="icon" type="image/png" sizes="64x64" href="/static/img/brand/favicon-64x64.png?v=20261021_1430">
-  <link id="siteFaviconPng32" rel="icon" type="image/png" sizes="32x32" href="/static/img/brand/favicon-32x32.png?v=20261021_1430">
-  <link id="siteFaviconShortcut" rel="shortcut icon" href="/favicon.ico?v=20261021_1430">
-  <link rel="apple-touch-icon" sizes="180x180" href="/static/img/brand/apple-touch-icon.png?v=20261021_1430">
+  <link id="siteFaviconSvg" rel="icon" type="image/svg+xml" href="/static/img/brand/favicon.svg?v=20261021_1545">
+  <link id="siteFaviconPng64" rel="icon" type="image/png" sizes="64x64" href="/static/img/brand/favicon-64x64.png?v=20261021_1545">
+  <link id="siteFaviconPng32" rel="icon" type="image/png" sizes="32x32" href="/static/img/brand/favicon-32x32.png?v=20261021_1545">
+  <link id="siteFaviconShortcut" rel="shortcut icon" href="/favicon.ico?v=20261021_1545">
+  <link rel="apple-touch-icon" sizes="180x180" href="/static/img/brand/apple-touch-icon.png?v=20261021_1545">
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600;700&family=IBM+Plex+Sans:ital,wght@0,400;0,500;0,600;0,700;1,400&family=Playfair+Display:ital,wght@0,600;0,700;1,400&display=swap" rel="stylesheet">
-  <link rel="preload" href="/static/css/style.css?v=20261021_1430" as="style" onload="this.rel='stylesheet'">
-  <link rel="preload" href="/static/js/main.js?v=20261021_1430" as="script">
-  <link rel="stylesheet" href="/static/css/style.css?v=20261021_1430">
+  <link rel="preload" href="/static/css/style.css?v=20261021_1545" as="style" onload="this.rel='stylesheet'">
+  <link rel="preload" href="/static/js/main.js?v=20261021_1545" as="script">
+  <link rel="stylesheet" href="/static/css/style.css?v=20261021_1545">
 
   <!-- Schema.org Structured Data -->
   <script type="application/ld+json">
@@ -374,14 +374,14 @@
                 </div>
               </a>
               <a href="/funds" data-asset-class="funds" class="dropdown-item {% if active_page == 'funds' %}active{% endif %}" role="menuitem">
-                <div class="dropdown-icon"><svg class="glyph"><use href="#glyph-chart"></use></svg></div>
+                <div class="dropdown-icon"><svg class="glyph"><use href="#icon-portfolio"></use></svg></div>
                 <div class="dropdown-content">
                   <div class="dropdown-title">Mutual Funds</div>
                   <div class="dropdown-desc">Dual-sleeve look-through, active share & fee drag</div>
                 </div>
               </a>
               <a href="/etfs" data-asset-class="etfs" class="dropdown-item {% if active_page == 'etfs' %}active{% endif %}" role="menuitem">
-                <div class="dropdown-icon"><svg class="glyph"><use href="#glyph-globe"></use></svg></div>
+                <div class="dropdown-icon"><svg class="glyph"><use href="#icon-screen"></use></svg></div>
                 <div class="dropdown-content">
                   <div class="dropdown-title">National ETF Matrix</div>
                   <div class="dropdown-desc">NAV premium/discount, tracking error & liquidity depth</div>
@@ -389,7 +389,7 @@
               </a>
               <div class="dropdown-divider"></div>
               <a href="/debt" data-asset-class="debt" class="dropdown-item {% if active_page == 'debt' %}active{% endif %}" role="menuitem">
-                <div class="dropdown-icon"><svg class="glyph"><use href="#glyph-bank"></use></svg></div>
+                <div class="dropdown-icon"><svg class="glyph"><use href="#icon-risk"></use></svg></div>
                 <div class="dropdown-content">
                   <div class="dropdown-title">Bonds, NCDs & SDIs</div>
                   <div class="dropdown-desc">SEBI ₹10K fixed income, senior secured yields & YTMs</div>
@@ -444,7 +444,7 @@
                 </div>
               </a>
               <a href="/compare" data-asset-class="funds" class="dropdown-item {% if active_page == 'compare' %}active{% endif %}" role="menuitem">
-                <div class="dropdown-icon"><svg class="glyph"><use href="#glyph-scale"></use></svg></div>
+                <div class="dropdown-icon"><svg class="glyph"><use href="#icon-compare"></use></svg></div>
                 <div class="dropdown-content">
                   <div class="dropdown-title">Peer Comparison</div>
                   <div class="dropdown-desc">Side-by-side financial metrics & valuation disparity</div>
@@ -458,7 +458,7 @@
                 </div>
               </a>
               <a href="/safety-radar" data-asset-class="safety" class="dropdown-item {% if active_page == 'safety_radar' %}active{% endif %}" role="menuitem">
-                <div class="dropdown-icon"><svg class="glyph"><use href="#glyph-alert"></use></svg></div>
+                <div class="dropdown-icon"><svg class="glyph"><use href="#icon-alerts"></use></svg></div>
                 <div class="dropdown-content">
                   <div class="dropdown-title">Retail Safety Radar</div>
                   <div class="dropdown-desc">Risk checks on gold leasing & P2P lending</div>
@@ -496,7 +496,7 @@
                 </div>
               </a>
               <a href="/disclaimer" class="dropdown-item {% if active_page == 'disclaimer' %}active{% endif %}" role="menuitem">
-                <div class="dropdown-icon"><svg class="glyph"><use href="#glyph-shield"></use></svg></div>
+                <div class="dropdown-icon"><svg class="glyph"><use href="#icon-risk"></use></svg></div>
                 <div class="dropdown-content">
                   <div class="dropdown-title">SEBI Safe Harbor</div>
                   <div class="dropdown-desc">Non-advisory disclosures & statutory disclaimers</div>
@@ -523,7 +523,7 @@
 
         <div class="nav-actions">
           <button id="themeToggleBtn" type="button" class="btn btn-secondary btn-sm theme-toggle-btn" onclick="toggleSiteTheme()" aria-label="Toggle Light/Dark Theme" aria-pressed="true" title="Toggle Theme">
-            <svg class="glyph" style="width: 16px; height: 16px;"><use href="#icon-theme-moon"></use></svg>
+            <svg class="glyph" style="width: 16px; height: 16px;"><use href="#icon-theme-sun"></use></svg>
           </button>
           <button id="navSignInBtn" class="btn btn-secondary btn-sm" onclick="openSignInModal()">
             <span>Sign In / 2 Credits</span>
@@ -763,7 +763,7 @@
         <div class="hud-trust-deck-top">
           <span id="overlayCardCategoryBadge" class="hud-card-badge hud-card-badge-trust">
             <svg class="glyph" style="width: 12px; height: 12px;"><use href="#glyph-shield"></use></svg>
-            <span id="overlayCardCategoryText">Why Trust Our Research • 1 of 32</span>
+            <span id="overlayCardCategoryText">Why Trust Our Research • Independent Covenant</span>
           </span>
           <div class="hud-card-controls">
             <button type="button" class="hud-card-nav-btn" onclick="window.prevEvaluationCard()" title="Previous Card" aria-label="Previous Card">←</button>
@@ -777,7 +777,7 @@
           </p>
           <div id="overlayCardHighlightRow" class="hud-card-highlight">
             <span id="overlayCardHighlightPill" class="hud-card-pill">Source: bseindia.com &amp; nseindia.com</span>
-            <span id="overlayCardIndexLabel" class="hud-card-counter">Trust Reason #1 / 20</span>
+            <span id="overlayCardIndexLabel" class="hud-card-counter">Research Discipline</span>
           </div>
         </div>
         <div class="hud-card-timer-track">
@@ -910,6 +910,6 @@
     </div>
   </footer>
 
-  <script src="/static/js/main.js?v=20261021_1430"></script>
+  <script src="/static/js/main.js?v=20261021_1545"></script>
 </body>
 </html>

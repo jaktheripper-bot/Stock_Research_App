@@ -33,7 +33,7 @@ const COPILOT_CONFIGS = {
             { icon: "icon-compare", label: "Countercase", prompt: "Run a countercase analysis on this stock: what failure modes could destroy shareholder value?" },
             { icon: "icon-valuation", label: "Reverse DCF Implied Growth", prompt: "What implied growth rate is priced into current CMP based on Reverse DCF?" },
             { icon: "icon-doc", label: "Governance & Pledging Check", prompt: "Are there any promoter pledging or corporate governance red flags in recent disclosures?" },
-            { icon: "icon-risk", label: "Balance Sheet Solvency", prompt: "Evaluate balance sheet solvency, Altman Z-Score, and leverage ratios for this company." }
+            { icon: "icon-risk", label: "Balance Sheet Solvency", prompt: "Evaluate balance sheet solvency and leverage ratios for this company." }
         ]
     },
     mutual_fund: {
@@ -179,8 +179,8 @@ const SECTION_CHIPS = {
             { icon: "icon-screen", label: "Hurdle Rate Sensitivity", prompt: "How sensitive is the Reverse DCF valuation to hurdle rate assumptions?" }
         ],
         solvency: [
-            { icon: "icon-risk", label: "Balance Sheet Solvency", prompt: "Evaluate balance sheet solvency, Altman Z-Score, and leverage ratios." },
-            { icon: "icon-doc", label: "Beneish M-Score Check", prompt: "Are there any forensic accounting or earnings manipulation red flags?" }
+            { icon: "icon-risk", label: "Balance Sheet Solvency", prompt: "Evaluate balance sheet solvency and leverage ratios." },
+            { icon: "icon-doc", label: "Accrual & Earnings Check", prompt: "Are there any forensic accounting or earnings manipulation red flags?" }
         ],
         countercase: [
             { icon: "icon-compare", label: "Thesis Failure Modes", prompt: "Run a countercase analysis on this stock: what failure modes could destroy shareholder value?" },
@@ -313,10 +313,10 @@ const SECTION_METADATA = {
         solvency: {
             headerTitle: "Balance Sheet Solvency & Health Desk",
             introHeadline: "Solvency & Health Matrix Workspace",
-            introText: (ticker) => `Evaluating Altman Z-Score, leverage ratios, and balance sheet resilience under macroeconomic stress for <strong>${ticker || 'this equity'}</strong>.`,
+            introText: (ticker) => `Evaluating balance sheet solvency, leverage ratios, and financial resilience under macroeconomic stress for <strong>${ticker || 'this equity'}</strong>.`,
             features: [
-                { icon: "icon-risk", title: "Balance Sheet Solvency", desc: "Audit Altman Z-Score, net debt/EBITDA, and current ratio", prompt: "Evaluate balance sheet solvency, Altman Z-Score, and leverage ratios for this company." },
-                { icon: "icon-doc", title: "Beneish M-Score Audit", desc: "Forensic accounting screening for aggressive accruals", prompt: "Are there any forensic accounting or earnings manipulation red flags?" },
+                { icon: "icon-risk", title: "Balance Sheet Solvency", desc: "Audit solvency margin of safety, net debt/EBITDA, and current ratio", prompt: "Evaluate balance sheet solvency and leverage ratios for this company." },
+                { icon: "icon-doc", title: "Accrual Quality Audit", desc: "Forensic accounting screening for aggressive revenue and accruals", prompt: "Are there any forensic accounting or earnings manipulation red flags?" },
                 { icon: "icon-doc", title: "Promoter Pledging Check", desc: "Audit promoter pledge encumbrances and ownership stability", prompt: "Are there any promoter pledging or corporate governance red flags in recent disclosures?" }
             ]
         },
