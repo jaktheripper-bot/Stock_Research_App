@@ -1154,14 +1154,21 @@ window.showEvaluationHUD = function(options = {}) {
 
   _globalEvaluationTimer = setInterval(() => {
     const elapsedMs = Date.now() - startMs;
-    const elapsedSecFloat = Math.min(maxSeconds, elapsedMs / 1000);
-    // Smooth non-linear easing curve: fast initial ramp so bar visibly moves right away, asymptotic to 96%
-    const normalized = Math.min(1, elapsedMs / maxMs);
-    const eased = 1 - Math.pow(1 - normalized, 1.65);
-    const pct = Math.min(96, 8 + eased * 88);
+    const elapsedSecFloat = elapsedMs / 1000;
+    const displayMax = elapsedSecFloat > maxSeconds ? 30 : maxSeconds;
+    // Smooth non-linear easing curve: fast initial ramp up to 92% over maxSeconds, then gentle asymptotic glide toward 98.5% if server takes longer
+    let pct;
+    if (elapsedMs <= maxMs) {
+      const normalized = Math.min(1, elapsedMs / maxMs);
+      const eased = 1 - Math.pow(1 - normalized, 1.65);
+      pct = 8 + eased * 84;
+    } else {
+      const extraSec = (elapsedMs - maxMs) / 1000;
+      pct = Math.min(98.5, 92 + (1 - Math.exp(-extraSec / 12)) * 6.5);
+    }
 
     if (overlayBar) overlayBar.style.width = `${pct.toFixed(1)}%`;
-    if (overlayTime) overlayTime.innerText = `${Math.round(pct)}% • ${elapsedSecFloat.toFixed(1)}s / ~${maxSeconds}s`;
+    if (overlayTime) overlayTime.innerText = `${Math.round(pct)}% • ${elapsedSecFloat.toFixed(1)}s / ~${displayMax}s`;
 
     // Map stage dynamically by percentage so all 4 stages advance smoothly regardless of totalSec
     const stageIdx = pct < 32 ? 0 : (pct < 60 ? 1 : (pct < 84 ? 2 : 3));
@@ -2919,13 +2926,17 @@ document.addEventListener('click', (e) => {
         _hudActiveNavigationController = navState;
 
         const minDisplayPromise = new Promise(resolve => setTimeout(resolve, 3600));
-        const warmFetchPromise = fetch(targetUrl, { credentials: 'same-origin' }).catch(() => null);
+        const warmFetchPromise = fetch(targetUrl, {
+          credentials: 'same-origin',
+          headers: { 'X-Moatnomics-Prefetch': '1' }
+        }).catch(() => null);
 
-        Promise.all([minDisplayPromise, warmFetchPromise]).then(() => {
+        Promise.all([minDisplayPromise, warmFetchPromise]).then(([, resp]) => {
           if (navState.cancelled) return;
           _hudActiveNavigationController = null;
+          const finalUrl = (resp && resp.ok && resp.url) ? resp.url : targetUrl;
           window.completeEvaluationHUD(() => {
-            window.location.href = targetUrl;
+            window.location.href = finalUrl;
           });
         });
       }

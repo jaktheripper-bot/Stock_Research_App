@@ -3912,6 +3912,40 @@ html[data-theme="dark"] .hud-card-badge-product {
   transition: width 0.08s linear;
 }
 
+/* Explicit Light Mode & Dark Mode Contrast Guarantee for #synthesizingOverlay HUD */
+html[data-theme="light"] #synthesizingOverlay .hud-evaluation-dialog {
+  background: #FFFFFF !important;
+  border: 1px solid #CBD5E1 !important;
+  color: #0F172A !important;
+  box-shadow: 0 25px 60px rgba(15, 23, 42, 0.18) !important;
+}
+
+html[data-theme="light"] #synthesizingOverlay #overlayTickerTitle {
+  color: #0F172A !important;
+}
+
+html[data-theme="light"] #synthesizingOverlay #overlayStatusMsg,
+html[data-theme="light"] #synthesizingOverlay #overlayProgressStage,
+html[data-theme="light"] #synthesizingOverlay #overlayCalloutText {
+  color: #334155 !important;
+}
+
+html[data-theme="dark"] #synthesizingOverlay .hud-evaluation-dialog {
+  background: #141418 !important;
+  border: 1px solid #27272A !important;
+  color: #FAFAFA !important;
+}
+
+html[data-theme="dark"] #synthesizingOverlay #overlayTickerTitle {
+  color: #FAFAFA !important;
+}
+
+html[data-theme="dark"] #synthesizingOverlay #overlayStatusMsg,
+html[data-theme="dark"] #synthesizingOverlay #overlayProgressStage,
+html[data-theme="dark"] #synthesizingOverlay #overlayCalloutText {
+  color: #D4D4D8 !important;
+}
+
 /* ==============================================================================
    12. End-to-End Multi-Asset Section Colour Continuity
    (Navigation Dropdowns -> Homepage Framework Cards -> Section Headers -> Dossiers)

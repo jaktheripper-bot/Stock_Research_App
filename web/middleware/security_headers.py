@@ -29,4 +29,12 @@ class SecurityHeadersMiddleware(BaseHTTPMiddleware):
             'payment=(self "https://checkout.razorpay.com" "https://api.razorpay.com"), '
             'focus-without-user-activation=()'
         )
+        if (
+            request.method == "GET"
+            and request.headers.get("X-Moatnomics-Prefetch") == "1"
+            and response.status_code == 200
+            and "text/html" in response.headers.get("content-type", "")
+            and "Cache-Control" not in response.headers
+        ):
+            response.headers["Cache-Control"] = "private, max-age=15"
         return response
