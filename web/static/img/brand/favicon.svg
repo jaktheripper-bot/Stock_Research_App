@@ -1,9 +1,8 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" fill="none">
-  <rect width="64" height="64" rx="14" fill="#09090B"/>
-  <rect x="2" y="2" width="60" height="60" rx="12" fill="#18181B" stroke="#0284C7" stroke-opacity="0.45" stroke-width="1.5"/>
-  <path d="M14 52V28C14 18.2 21 10.5 29.2 9.5V20C24.2 20.9 20.5 25 20.5 30.5V52H14Z" fill="#0284C7"/>
-  <path d="M50 52V28C50 18.2 43 10.5 34.8 9.5V20C39.8 20.9 43.5 25 43.5 30.5V52H50Z" fill="#0284C7"/>
-  <path d="M20.5 30.5L29.2 20V47L20.5 52V30.5Z" fill="#09090B"/>
-  <path d="M43.5 30.5L34.8 20V47L43.5 52V30.5Z" fill="#0369A1"/>
-  <polygon points="32,6 34.2,10 34.2,54 32,58 29.8,54 29.8,10" fill="#38BDF8"/>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" fill="none" role="img" aria-label="Moatnomics Perspective Portal">
+  <rect width="64" height="64" rx="14" fill="#0F172A"/>
+  <rect x="2" y="2" width="60" height="60" rx="12" fill="#0F172A" stroke="#0284C7" stroke-opacity="0.55" stroke-width="2"/>
+  <path d="M 12 52 V 12 H 52 V 52" fill="none" stroke="#F8FAFC" stroke-width="5.5" stroke-linecap="square" stroke-linejoin="miter"/>
+  <path d="M 20 52 V 29 A 12 12 0 0 1 44 29 V 52" fill="none" stroke="#0284C7" stroke-width="4.2" stroke-linecap="square"/>
+  <path d="M 32 25 L 23 52 M 32 25 L 41 52" fill="none" stroke="#38BDF8" stroke-width="2.8" stroke-linecap="round"/>
+  <circle cx="32" cy="25" r="4" fill="#38BDF8"/>
 </svg>

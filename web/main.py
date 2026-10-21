@@ -2389,6 +2389,23 @@ async def healthz():
     return json_response_with_cache(data, max_age=30)
 
 
+@app.get("/favicon.ico", response_class=Response)
+async def favicon_ico():
+    """Serves the canonical Moatnomics Perspective Portal multi-size ICO favicon at root."""
+    ico_path = os.path.join(os.path.dirname(__file__), "static", "img", "brand", "favicon.ico")
+    try:
+        with open(ico_path, "rb") as f:
+            content = f.read()
+        return Response(
+            content=content,
+            media_type="image/x-icon",
+            headers={"Cache-Control": "no-cache, must-revalidate"},
+        )
+    except Exception as e:
+        logger.warning(f"Favicon read notice: {e}")
+        return Response(status_code=404)
+
+
 @app.get("/sitemap.xml", response_class=Response)
 async def sitemap_xml():
     """Generates automated XML sitemap for Google/Perplexity/Bing search crawlers."""

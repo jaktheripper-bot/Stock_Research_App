@@ -1714,6 +1714,22 @@ class TestCompetitiveEnhancements(unittest.TestCase):
         self.assertEqual(r_msme_api.status_code, 200)
         self.assertEqual(r_msme_api.json().get("uin"), "UDYAM-AP-10-0023910")
 
+        # Verify cache-busted SVG, PNG, and root /favicon.ico assets
+        for fav_id in ["siteFaviconSvg", "siteFaviconPng64", "siteFaviconPng32", "siteFaviconShortcut"]:
+            fav_el = soup_home.find(id=fav_id)
+            self.assertIsNotNone(fav_el, f"Missing #{fav_id} in base.html")
+            self.assertIn("?v=", fav_el.get("href", ""), f"#{fav_id} missing ?v= cache-bust query")
+
+        for fav_url in [
+            "/favicon.ico",
+            "/static/img/brand/favicon.svg",
+            "/static/img/brand/favicon-64x64.png",
+            "/static/img/brand/favicon-32x32.png",
+            "/static/img/brand/apple-touch-icon.png",
+        ]:
+            r_fav = self.client.get(fav_url)
+            self.assertEqual(r_fav.status_code, 200, f"Failed GET {fav_url}")
+
 
 if __name__ == "__main__":
     unittest.main()

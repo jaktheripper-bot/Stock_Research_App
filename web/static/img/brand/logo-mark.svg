@@ -1,34 +1,8 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" fill="none" role="img" aria-label="Moatnomics Perspective Portal">
-  <defs>
-    <linearGradient id="portalOuterArch" x1="10" y1="8" x2="54" y2="58" gradientUnits="userSpaceOnUse">
-      <stop offset="0%" stop-color="#7DA77A"/>
-      <stop offset="55%" stop-color="#1F6F54"/>
-      <stop offset="100%" stop-color="#0E3D32"/>
-    </linearGradient>
-    <linearGradient id="portalInnerPlaneL" x1="14" y1="18" x2="29" y2="54" gradientUnits="userSpaceOnUse">
-      <stop offset="0%" stop-color="#0E3D32"/>
-      <stop offset="100%" stop-color="#0B2337"/>
-    </linearGradient>
-    <linearGradient id="portalInnerPlaneR" x1="50" y1="18" x2="35" y2="54" gradientUnits="userSpaceOnUse">
-      <stop offset="0%" stop-color="#7DA77A" stop-opacity="0.85"/>
-      <stop offset="100%" stop-color="#0E3D32"/>
-    </linearGradient>
-    <linearGradient id="portalCenterPrism" x1="32" y1="4" x2="32" y2="60" gradientUnits="userSpaceOnUse">
-      <stop offset="0%" stop-color="#C7E268"/>
-      <stop offset="35%" stop-color="#F7F5EE"/>
-      <stop offset="100%" stop-color="#7DA77A"/>
-    </linearGradient>
-  </defs>
-  <!-- Left Split Arch Wing -->
-  <path d="M12 54V28C12 17.5 19.8 9.2 29 8.2V19.5C23.6 20.4 19.5 24.8 19.5 30.5V54H12Z" fill="url(#portalOuterArch)"/>
-  <!-- Right Split Arch Wing -->
-  <path d="M52 54V28C52 17.5 44.2 9.2 35 8.2V19.5C40.4 20.4 44.5 24.8 44.5 30.5V54H52Z" fill="url(#portalOuterArch)"/>
-  <!-- Inward-Angled Perspective Planes -->
-  <path d="M19.5 30.5C19.5 24.8 23.6 20.4 29 19.5V48.5L19.5 54V30.5Z" fill="url(#portalInnerPlaneL)" opacity="0.92"/>
-  <path d="M44.5 30.5C44.5 24.8 40.4 20.4 35 19.5V48.5L44.5 54V30.5Z" fill="url(#portalInnerPlaneR)" opacity="0.88"/>
-  <!-- Warm Ivory Threshold Base -->
-  <path d="M19.5 54L29 48.5H35L44.5 54H19.5Z" fill="#F7F5EE" fill-opacity="0.22"/>
-  <!-- Taller Central Vertical Mirror Prism -->
-  <polygon points="32,4 34.4,8.5 34.4,55.5 32,60 29.6,55.5 29.6,8.5" fill="url(#portalCenterPrism)"/>
-  <line x1="32" y1="5" x2="32" y2="59" stroke="#F7F5EE" stroke-width="1.1" stroke-opacity="0.85"/>
+  <rect width="64" height="64" rx="14" fill="#0F172A"/>
+  <rect x="2" y="2" width="60" height="60" rx="12" fill="#0F172A" stroke="#0284C7" stroke-opacity="0.55" stroke-width="2"/>
+  <path d="M 12 52 V 12 H 52 V 52" fill="none" stroke="#F8FAFC" stroke-width="5.5" stroke-linecap="square" stroke-linejoin="miter"/>
+  <path d="M 20 52 V 29 A 12 12 0 0 1 44 29 V 52" fill="none" stroke="#0284C7" stroke-width="4.2" stroke-linecap="square"/>
+  <path d="M 32 25 L 23 52 M 32 25 L 41 52" fill="none" stroke="#38BDF8" stroke-width="2.8" stroke-linecap="round"/>
+  <circle cx="32" cy="25" r="4" fill="#38BDF8"/>
 </svg>
