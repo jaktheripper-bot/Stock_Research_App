@@ -242,7 +242,7 @@
             <span style="color: #ef4444; font-weight: 600;">{{ r.weight_pct }}% ({{ "{:+.0f}".format(r.mos_pct) }}% MoS)</span>
           </div>
           {% else %}
-          <div style="font-size: 12px; color: #10b981;">✓ Zero elevated forensic accounting or leverage anomalies detected</div>
+          <div style="font-size: 12px; color: #10b981;"><svg class="glyph" style="width: 12px; height: 12px; vertical-align: -1px;"><use href="#glyph-check"></use></svg> Zero elevated forensic accounting or leverage anomalies detected</div>
           {% endfor %}
         </div>
       </div>
@@ -268,13 +268,19 @@
       <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 14px;">
         <div style="flex: 1; min-width: 280px;">
           <div style="display: flex; align-items: center; gap: 8px; margin-bottom: 4px; flex-wrap: wrap;">
-            <span style="font-size: 16px;"><svg class="glyph" style="width: 16px; height: 16px;"><use href="#glyph-search"></use></svg></span>
-            <span style="font-size: 14px; font-weight: 800; color: #f8fafc; letter-spacing: -0.01em;">Deep-Dive Stock Accounting Check Option</span>
+            {% if credit_quote.equity_holdings_count == 0 %}
+            <span style="font-size: 16px; color: var(--asset-accent);"><svg class="glyph" style="width: 16px; height: 16px;"><use href="#glyph-bank"></use></svg></span>
+            <span style="font-size: 14px; font-weight: 800; color: #f8fafc; letter-spacing: -0.01em;">Fixed-Income &amp; Money-Market Portfolio Sleeve</span>
+            <span style="font-size: 11px; padding: 2px 8px; border-radius: 9999px; background: rgba(16, 185, 129, 0.15); color: #10b981; font-weight: 700; border: 1px solid rgba(16, 185, 129, 0.3);"><svg class="glyph" style="width: 11px; height: 11px; vertical-align: -1px;"><use href="#glyph-check"></use></svg> Debt &amp; Liquidity Look-Through Active</span>
+            {% else %}
+            <span style="font-size: 16px; color: var(--asset-accent);"><svg class="glyph" style="width: 16px; height: 16px;"><use href="#icon-pillar-03"></use></svg></span>
+            <span style="font-size: 14px; font-weight: 800; color: #f8fafc; letter-spacing: -0.01em;">Constituent Stock Accounting Look-Through</span>
             <span style="font-size: 11px; padding: 2px 8px; border-radius: 9999px; background: rgba(16, 185, 129, 0.15); color: #10b981; font-weight: 700; border: 1px solid rgba(16, 185, 129, 0.3);">Layer 1 Active (1 Credit)</span>
             {% if credit_quote.uncached_count == 0 %}
-            <span style="font-size: 11px; padding: 2px 8px; border-radius: 9999px; background: rgba(16, 185, 129, 0.15); color: #10b981; font-weight: 700; border: 1px solid rgba(16, 185, 129, 0.3);">✓ 100% Constituent Coverage Active</span>
+            <span style="font-size: 11px; padding: 2px 8px; border-radius: 9999px; background: rgba(16, 185, 129, 0.15); color: #10b981; font-weight: 700; border: 1px solid rgba(16, 185, 129, 0.3);"><svg class="glyph" style="width: 11px; height: 11px; vertical-align: -1px;"><use href="#glyph-check"></use></svg> 100% Constituent Coverage Active</span>
             {% else %}
             <span style="font-size: 11px; padding: 2px 8px; border-radius: 9999px; background: rgba(168, 85, 247, 0.15); color: #c084fc; font-weight: 700; border: 1px solid rgba(168, 85, 247, 0.3);">Layer 2 Deep-Dive Available</span>
+            {% endif %}
             {% endif %}
           </div>
           <p style="font-size: 13px; color: #94a3b8; margin: 0; line-height: 1.5;">
