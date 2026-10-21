@@ -4048,6 +4048,27 @@ html[data-theme="light"] .section-accent-pill {
   color: var(--asset-accent) !important;
 }
 
+/* Defensive suppression of any decorative corner radial-gradient square inside section headers */
+.hero-portal-banner > div[style*="radial-gradient(circle"],
+.dossier-masthead-v2 > div[style*="radial-gradient(circle"] {
+  display: none !important;
+}
+
+/* Explicit case-insensitive Light Mode contrast guarantee for KPI values inside section headers */
+html[data-theme="light"] .hero-portal-banner [style*="color: #f8fafc" i],
+html[data-theme="light"] .hero-portal-banner [style*="color: #f7f5ee" i],
+html[data-theme="light"] .hero-portal-banner [style*="color: #f1f5f9" i],
+html[data-theme="light"] .dossier-masthead-v2 [style*="color: #f8fafc" i],
+html[data-theme="light"] .dossier-masthead-v2 [style*="color: #f7f5ee" i] {
+  color: #0F172A !important;
+}
+
+html[data-theme="light"] .hero-portal-banner [style*="color: #a855f7" i],
+html[data-theme="light"] .hero-portal-banner [style*="color: #c084fc" i] {
+  color: #6D28D9 !important;
+}
+
+
 
 
 
