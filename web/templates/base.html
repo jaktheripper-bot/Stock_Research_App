@@ -37,22 +37,61 @@
   <link rel="preload" href="/static/js/main.js?v=20261021_1545" as="script">
   <link rel="stylesheet" href="/static/css/style.css?v=20261021_1545">
 
-  <!-- Schema.org Structured Data -->
+  <!-- Schema.org Unified Entity Graph Structured Data (SEO & GEO) -->
+  {% block schema_jsonld %}
   <script type="application/ld+json">
   {
     "@context": "https://schema.org",
-    "@type": "SoftwareApplication",
-    "name": "Moatnomics",
-    "applicationCategory": "BusinessApplication",
-    "operatingSystem": "Web",
-    "offers": {
-      "@type": "Offer",
-      "price": "299",
-      "priceCurrency": "INR"
-    },
-    "description": "Moatnomics is independent research on Indian stocks, mutual funds and corporate bonds. See the evidence, the risks and what to check before you invest."
+    "@graph": [
+      {
+        "@type": "SoftwareApplication",
+        "@id": "https://moatnomics.com/#software",
+        "name": "Moatnomics",
+        "applicationCategory": "FinanceApplication",
+        "operatingSystem": "Web",
+        "url": "https://moatnomics.com",
+        "description": "Independent evidence-led qualitative equity dossiers, mutual fund look-through audits, corporate debt credit posture, and forensic accounting screens for Indian capital markets.",
+        "knowsAbout": [
+          "Indian Capital Markets",
+          "BSE",
+          "NSE",
+          "Equities",
+          "Mutual Funds",
+          "Corporate Debt",
+          "REITs",
+          "InvITs",
+          "Forensic Accounting",
+          "Credit Analysis",
+          "SEBI Regulations"
+        ],
+        "offers": {
+          "@type": "Offer",
+          "price": "299",
+          "priceCurrency": "INR"
+        }
+      },
+      {
+        "@type": "WebSite",
+        "@id": "https://moatnomics.com/#website",
+        "url": "https://moatnomics.com",
+        "name": "Moatnomics",
+        "description": "Less noise, more nuance. Independent multi-asset investment research for Indian capital markets.",
+        "publisher": {
+          "@id": "https://moatnomics.com/#software"
+        },
+        "potentialAction": {
+          "@type": "SearchAction",
+          "target": {
+            "@type": "EntryPoint",
+            "urlTemplate": "https://moatnomics.com/search?q={search_term_string}"
+          },
+          "query-input": "required name=search_term_string"
+        }
+      }
+    ]
   }
   </script>
+  {% endblock %}
 
   <!-- Razorpay Checkout SDK -->
   <script src="https://checkout.razorpay.com/v1/checkout.js"></script>

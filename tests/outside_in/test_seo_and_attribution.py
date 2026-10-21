@@ -219,5 +219,61 @@ class TestMoatnomicsDomainConfig(unittest.TestCase):
         self.assertEqual(detail_www, "Direct")
 
 
+# ==============================================================================
+# 9. Route Formatting & UTM Campaign Attribution Engine
+# ==============================================================================
+class TestRouteFormattingAndCampaignTracking(unittest.TestCase):
+    def test_format_route_display(self):
+        from core.db.telemetry import format_route_display
+        self.assertEqual(format_route_display("/"), "Homepage (/)")
+        self.assertEqual(format_route_display(""), "Homepage (/)")
+        self.assertEqual(format_route_display("/dossier/TCS"), "Equity Dossier (TCS) (/dossier/TCS)")
+        self.assertEqual(format_route_display("/funds"), "Mutual Fund Directory (/funds)")
+        self.assertEqual(format_route_display("/debt"), "Corporate Debt Directory (/debt)")
+        self.assertEqual(format_route_display("/pricing"), "Pricing & Subscriptions (/pricing)")
+
+    def test_utm_campaign_aggregation_in_summary(self):
+        from core.db.telemetry import get_site_usage_summary, record_usage_event
+        # Record synthetic events with is_test_override=True
+        record_usage_event(
+            event_type="PAGE_VIEW",
+            ticker="TCS",
+            session_id="camp_sess_01",
+            details={
+                "landing_page": "/dossier/TCS",
+                "utm_campaign": "launch_beta",
+                "utm_source": "linkedin",
+                "utm_medium": "social"
+            },
+            traffic_source="linkedin",
+            is_test_override=True
+        )
+        record_usage_event(
+            event_type="PAGE_VIEW",
+            ticker="INFY",
+            session_id="camp_sess_02",
+            details={
+                "landing_page": "/dossier/INFY",
+                "utm_campaign": "launch_beta",
+                "utm_source": "linkedin",
+                "utm_medium": "social"
+            },
+            traffic_source="linkedin",
+            is_test_override=True
+        )
+
+        summary = get_site_usage_summary(days=7, exclude_tests=False)
+        self.assertIn("top_campaigns", summary)
+        camps = [c["campaign"] for c in summary["top_campaigns"]]
+        self.assertIn("launch_beta", camps)
+
+        # Verify display_name is present in top_landing_pages and top_visited_pages
+        if summary.get("top_landing_pages"):
+            self.assertIn("display_name", summary["top_landing_pages"][0])
+        if summary.get("top_visited_pages"):
+            self.assertIn("display_name", summary["top_visited_pages"][0])
+
+
 if __name__ == "__main__":
     unittest.main()
+

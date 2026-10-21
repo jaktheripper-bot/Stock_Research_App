@@ -1323,8 +1323,14 @@
     <div class="kpi-grid" style="grid-template-columns: repeat(auto-fit, minmax(210px, 1fr)); margin-bottom: 24px;">
       <div class="kpi-card" style="border-left: 3px solid #38bdf8;">
         <div class="kpi-label">Primary Entry Route <span>📍</span></div>
-        <div class="kpi-value mono" style="font-size: 18px; color: #38bdf8; word-break: break-all;">
-          {{ summary.top_landing_pages[0].path if summary.top_landing_pages else '/' }}
+        <div class="kpi-value" style="font-size: 15px; font-weight: 700; color: #38bdf8; line-height: 1.35; margin-bottom: 4px;">
+          {% if summary.top_landing_pages and summary.top_landing_pages[0] %}
+            <span style="font-size: 16px; margin-right: 4px;">{{ summary.top_landing_pages[0].icon }}</span>{{ summary.top_landing_pages[0].category }}
+            <div class="mono" style="font-size: 12px; color: #94a3b8; font-weight: 400; margin-top: 2px;">{{ summary.top_landing_pages[0].path }}</div>
+          {% else %}
+            <span>🏠</span> Homepage / Terminal
+            <div class="mono" style="font-size: 12px; color: #94a3b8; font-weight: 400; margin-top: 2px;">/</div>
+          {% endif %}
         </div>
         <div class="kpi-delta success">
           {{ summary.top_landing_pages[0].percentage if summary.top_landing_pages else 0 }}% of Total Inbound Sessions
@@ -1339,8 +1345,14 @@
       </div>
       <div class="kpi-card" style="border-left: 3px solid #c084fc;">
         <div class="kpi-label">Most Visited Route <span>🔥</span></div>
-        <div class="kpi-value mono" style="font-size: 18px; color: #c084fc; word-break: break-all;">
-          {{ summary.top_visited_pages[0].path if summary.top_visited_pages else '/' }}
+        <div class="kpi-value" style="font-size: 15px; font-weight: 700; color: #c084fc; line-height: 1.35; margin-bottom: 4px;">
+          {% if summary.top_visited_pages and summary.top_visited_pages[0] %}
+            <span style="font-size: 16px; margin-right: 4px;">{{ summary.top_visited_pages[0].icon }}</span>{{ summary.top_visited_pages[0].category }}
+            <div class="mono" style="font-size: 12px; color: #94a3b8; font-weight: 400; margin-top: 2px;">{{ summary.top_visited_pages[0].path }}</div>
+          {% else %}
+            <span>🏠</span> Homepage / Terminal
+            <div class="mono" style="font-size: 12px; color: #94a3b8; font-weight: 400; margin-top: 2px;">/</div>
+          {% endif %}
         </div>
         <div class="kpi-delta">
           {{ summary.top_visited_pages[0].views if summary.top_visited_pages else 0 }} Page Impressions
@@ -1384,8 +1396,14 @@
       </div>
       <div class="kpi-card" style="border-left: 3px solid #ec4899;">
         <div class="kpi-label">Top Downstream Driver <span>🌳</span></div>
-        <div class="kpi-value mono" style="font-size: 16px; color: #f472b6; word-break: break-all;">
-          {{ summary.top_contributing_page.from_path if summary.top_contributing_page else '/' }}
+        <div class="kpi-value" style="font-size: 15px; font-weight: 700; color: #f472b6; line-height: 1.35; margin-bottom: 4px;">
+          {% if summary.top_contributing_page %}
+            <span style="font-size: 16px; margin-right: 4px;">{{ summary.top_contributing_page.icon }}</span>{{ summary.top_contributing_page.category }}
+            <div class="mono" style="font-size: 12px; color: #94a3b8; font-weight: 400; margin-top: 2px;">{{ summary.top_contributing_page.from_path }}</div>
+          {% else %}
+            <span>🏠</span> Homepage / Terminal
+            <div class="mono" style="font-size: 12px; color: #94a3b8; font-weight: 400; margin-top: 2px;">/</div>
+          {% endif %}
         </div>
         <div class="kpi-delta">
           {{ summary.top_contributing_page.total_outbound if summary.top_contributing_page else 0 }} outbound clicks generated
@@ -1729,6 +1747,129 @@
       </div>
     </div>
 
+    <!-- UTM Campaign Performance & Link Generator Grid -->
+    <div class="grid-2col" style="margin-bottom: 24px;">
+      <!-- Active UTM Campaigns Table -->
+      <div class="admin-card">
+        <div style="display: flex; justify-content: space-between; align-items: baseline; margin-bottom: 14px;">
+          <div>
+            <h3 style="margin: 0; font-size: 16px; font-weight: 700; display: flex; align-items: center; gap: 8px;">
+              <span>🎯</span> Active UTM Campaigns
+            </h3>
+            <p style="margin: 4px 0 0; color: var(--text-secondary, #94a3b8); font-size: 12px;">
+              Attributed sessions and audience share driven by tagged external links.
+            </p>
+          </div>
+        </div>
+        <div class="admin-table-wrap">
+          <table class="admin-table">
+            <thead>
+              <tr>
+                <th>Campaign Name</th>
+                <th>Source</th>
+                <th>Medium</th>
+                <th>Sessions</th>
+                <th>Share</th>
+              </tr>
+            </thead>
+            <tbody>
+              {% for camp in summary.top_campaigns %}
+              <tr>
+                <td style="font-weight: 600; color: #38bdf8;">{{ camp.campaign }}</td>
+                <td>
+                  <span class="status-pill closed" style="font-size: 11px;">{{ camp.source }}</span>
+                </td>
+                <td class="mono" style="font-size: 12px; color: #94a3b8;">{{ camp.medium }}</td>
+                <td class="mono" style="font-weight: 700; color: #34d399;">{{ camp.sessions }}</td>
+                <td style="min-width: 90px;">
+                  <div style="display: flex; align-items: center; gap: 8px;">
+                    <div style="flex: 1; height: 6px; background: rgba(255,255,255,0.08); border-radius: 3px; overflow: hidden;">
+                      <div style="width: {{ camp.percentage }}%; height: 100%; background: linear-gradient(90deg, #38bdf8, #0ea5e9); border-radius: 3px;"></div>
+                    </div>
+                    <span class="mono" style="font-size: 11.5px; color: #38bdf8; min-width: 32px; text-align: right;">{{ camp.percentage }}%</span>
+                  </div>
+                </td>
+              </tr>
+              {% else %}
+              <tr>
+                <td colspan="5" style="text-align: center; color: var(--text-secondary, #94a3b8); padding: 25px;">
+                  No UTM campaigns recorded yet. Use the Campaign Link Generator on the right to start tagging outbound posts.
+                </td>
+              </tr>
+              {% endfor %}
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+      <!-- Campaign Link Generator Widget -->
+      <div class="admin-card" style="border: 1px solid rgba(56, 189, 248, 0.25); background: linear-gradient(180deg, rgba(56, 189, 248, 0.04) 0%, rgba(15, 23, 42, 0.4) 100%);">
+        <div style="margin-bottom: 16px;">
+          <h3 style="margin: 0; font-size: 16px; font-weight: 700; display: flex; align-items: center; gap: 8px;">
+            <span>🔗</span> UTM Campaign Link Generator
+          </h3>
+          <p style="margin: 4px 0 0; color: var(--text-secondary, #94a3b8); font-size: 12px;">
+            Generate ready-to-share tracking URLs for social posts, newsletters, and community groups.
+          </p>
+        </div>
+
+        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-bottom: 12px;">
+          <div>
+            <label style="display: block; font-size: 11px; text-transform: uppercase; letter-spacing: 0.5px; color: #94a3b8; margin-bottom: 4px;">Target Path</label>
+            <input type="text" id="utmInputPath" value="/" placeholder="/ or /dossier/TCS"
+                   class="admin-input" style="width: 100%; font-size: 12px; font-family: monospace;" oninput="updateUtmLinkPreview()">
+          </div>
+          <div>
+            <label style="display: block; font-size: 11px; text-transform: uppercase; letter-spacing: 0.5px; color: #94a3b8; margin-bottom: 4px;">Campaign Source</label>
+            <select id="utmInputSource" class="admin-input" style="width: 100%; font-size: 12px;" onchange="handleUtmSourceChange()">
+              <option value="linkedin">LinkedIn</option>
+              <option value="twitter">X / Twitter</option>
+              <option value="whatsapp">WhatsApp</option>
+              <option value="telegram">Telegram</option>
+              <option value="newsletter">Newsletter</option>
+              <option value="reddit">Reddit</option>
+              <option value="custom">Custom...</option>
+            </select>
+            <input type="text" id="utmInputCustomSource" placeholder="custom_source"
+                   class="admin-input" style="width: 100%; font-size: 12px; margin-top: 6px; display: none;" oninput="updateUtmLinkPreview()">
+          </div>
+        </div>
+
+        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-bottom: 14px;">
+          <div>
+            <label style="display: block; font-size: 11px; text-transform: uppercase; letter-spacing: 0.5px; color: #94a3b8; margin-bottom: 4px;">Medium</label>
+            <select id="utmInputMedium" class="admin-input" style="width: 100%; font-size: 12px;" onchange="updateUtmLinkPreview()">
+              <option value="social">social</option>
+              <option value="post">post</option>
+              <option value="email">email</option>
+              <option value="chat">chat</option>
+              <option value="cpc">cpc (ad)</option>
+              <option value="referral">referral</option>
+            </select>
+          </div>
+          <div>
+            <label style="display: block; font-size: 11px; text-transform: uppercase; letter-spacing: 0.5px; color: #94a3b8; margin-bottom: 4px;">Campaign Name</label>
+            <input type="text" id="utmInputCampaign" value="launch_alpha" placeholder="e.g. daily_alpha_01"
+                   class="admin-input" style="width: 100%; font-size: 12px;" oninput="updateUtmLinkPreview()">
+          </div>
+        </div>
+
+        <div>
+          <label style="display: block; font-size: 11px; text-transform: uppercase; letter-spacing: 0.5px; color: #94a3b8; margin-bottom: 4px;">Generated Tracking URL</label>
+          <div style="display: flex; gap: 8px; align-items: center;">
+            <input type="text" id="utmGeneratedUrl" readonly
+                   class="admin-input mono" style="flex: 1; font-size: 11.5px; background: rgba(0,0,0,0.5); color: #38bdf8; border-color: rgba(56, 189, 248, 0.4);"
+                   value="">
+            <button type="button" class="btn btn-primary" id="btnCopyUtmUrl" onclick="copyUtmUrlToClipboard()"
+                    style="font-size: 12px; padding: 7px 14px; white-space: nowrap; display: inline-flex; align-items: center; gap: 6px;">
+              <span>📋</span> Copy URL
+            </button>
+          </div>
+          <span id="utmCopyStatus" style="display: none; font-size: 11.5px; color: #34d399; margin-top: 6px;">✓ Link copied to clipboard!</span>
+        </div>
+      </div>
+    </div>
+
     <div class="grid-2col">
       <div class="admin-card">
         <h3 style="margin-top: 0; font-size: 16px; font-weight: 700; margin-bottom: 16px;">Traffic Channels</h3>
@@ -1845,6 +1986,29 @@
       </p>
     </div>
 
+    <div class="kpi-grid" style="grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); margin-bottom: 16px;">
+      <div class="kpi-card" style="border-left: 3px solid #38bdf8;">
+        <div class="kpi-label">Generative AI Crawls <span>🤖</span></div>
+        <div class="kpi-value mono" style="color: #38bdf8;">{{ seo_summary.ai_crawl_total|default(0) }}</div>
+        <div class="kpi-delta">Perplexity, ChatGPT, Claude</div>
+      </div>
+      <div class="kpi-card" style="border-left: 3px solid #10b981;">
+        <div class="kpi-label">Search Engine Crawls <span>🔍</span></div>
+        <div class="kpi-value mono" style="color: #34d399;">{{ seo_summary.search_crawl_total|default(0) }}</div>
+        <div class="kpi-delta">Googlebot, Bingbot, Applebot</div>
+      </div>
+      <div class="kpi-card" style="border-left: 3px solid #c084fc;">
+        <div class="kpi-label">AI Search Referrals <span>⚡</span></div>
+        <div class="kpi-value mono" style="color: #c084fc;">{{ seo_summary.ai_search_sessions|default(0) }}</div>
+        <div class="kpi-delta">Inbound User Sessions from AI</div>
+      </div>
+      <div class="kpi-card" style="border-left: 3px solid #f59e0b;">
+        <div class="kpi-label">Organic Search Referrals <span>🌐</span></div>
+        <div class="kpi-value mono" style="color: #fbbf24;">{{ seo_summary.search_sessions|default(0) }}</div>
+        <div class="kpi-delta">Total Search-Referred Sessions</div>
+      </div>
+    </div>
+
     <div class="grid-2col">
       <div class="admin-card">
         <h3 style="margin-top: 0; font-size: 16px; font-weight: 700; margin-bottom: 16px;">Search Channels &amp; What Visitors Do</h3>
@@ -1886,7 +2050,7 @@
 
     <div class="grid-2col">
       <div class="admin-card">
-        <h3 style="margin-top: 0; font-size: 16px; font-weight: 700; margin-bottom: 16px;">Crawler Visits</h3>
+        <h3 style="margin-top: 0; font-size: 16px; font-weight: 700; margin-bottom: 16px;">Crawler Visits (AI &amp; Search Bots)</h3>
         <div class="admin-table-wrap">
           <table class="admin-table">
             <thead><tr><th>Bot</th><th>Type</th><th>Hits</th><th>Pages</th><th>Errors</th><th>Last Seen</th></tr></thead>
@@ -1894,7 +2058,11 @@
               {% for b in seo_summary.crawlers %}
               <tr>
                 <td style="font-weight: 600;">{{ b.bot }}</td>
-                <td>{{ b.kind }}</td>
+                <td>
+                  <span class="status-pill {% if b.kind == 'AI' %}closed{% else %}open{% endif %}" style="font-size: 11px;">
+                    {{ b.kind }}
+                  </span>
+                </td>
                 <td class="mono">{{ b.hits }}</td>
                 <td class="mono">{{ b.pages }}</td>
                 <td class="mono">{{ b.errors }}</td>
@@ -1909,15 +2077,32 @@
       </div>
 
       <div class="admin-card">
-        <h3 style="margin-top: 0; font-size: 16px; font-weight: 700; margin-bottom: 16px;">Most Crawled Pages</h3>
+        <h3 style="margin-top: 0; font-size: 16px; font-weight: 700; margin-bottom: 16px;">Crawl Distribution by Asset Class</h3>
+        <div class="admin-table-wrap" style="margin-bottom: 16px;">
+          <table class="admin-table">
+            <thead><tr><th>Asset Class</th><th>Crawler Hits</th></tr></thead>
+            <tbody>
+              {% for ac in seo_summary.asset_class_crawls %}
+              <tr>
+                <td style="font-weight: 600; color: #38bdf8;">{{ ac.asset }}</td>
+                <td class="mono" style="font-weight: 700; color: #34d399;">{{ ac.hits }}</td>
+              </tr>
+              {% else %}
+              <tr><td colspan="2" style="text-align: center; padding: 12px; color: #94a3b8;">No asset crawls recorded yet.</td></tr>
+              {% endfor %}
+            </tbody>
+          </table>
+        </div>
+
+        <h4 style="margin: 0 0 10px; font-size: 13px; font-weight: 700; color: #cbd5e1;">Most Crawled Pages</h4>
         <div class="admin-table-wrap">
           <table class="admin-table">
-            <thead><tr><th>Page</th><th>Crawler Hits</th></tr></thead>
+            <thead><tr><th>Page</th><th>Hits</th></tr></thead>
             <tbody>
               {% for p in seo_summary.crawl_pages %}
               <tr><td class="mono" style="font-size: 12px;">{{ p.path }}</td><td class="mono">{{ p.hits }}</td></tr>
               {% else %}
-              <tr><td colspan="2" style="text-align: center; padding: 20px;">Nothing yet.</td></tr>
+              <tr><td colspan="2" style="text-align: center; padding: 15px;">Nothing yet.</td></tr>
               {% endfor %}
             </tbody>
           </table>
@@ -4950,7 +5135,88 @@
     if (tabName === 'digest' && !currentDigestData) {
       loadDigestPreview();
     }
+    if (tabName === 'traffic') {
+      updateUtmLinkPreview();
+    }
   };
+
+  // UTM Campaign Link Generator Client Functions
+  function handleUtmSourceChange() {
+    const sel = document.getElementById('utmInputSource');
+    const customIn = document.getElementById('utmInputCustomSource');
+    if (!sel || !customIn) return;
+    if (sel.value === 'custom') {
+      customIn.style.display = 'block';
+      customIn.focus();
+    } else {
+      customIn.style.display = 'none';
+    }
+    updateUtmLinkPreview();
+  }
+
+  function updateUtmLinkPreview() {
+    const pathEl = document.getElementById('utmInputPath');
+    const srcSel = document.getElementById('utmInputSource');
+    const customSrc = document.getElementById('utmInputCustomSource');
+    const medEl = document.getElementById('utmInputMedium');
+    const campEl = document.getElementById('utmInputCampaign');
+    const outEl = document.getElementById('utmGeneratedUrl');
+    if (!pathEl || !srcSel || !outEl) return;
+
+    let targetPath = (pathEl.value || '/').trim();
+    if (!targetPath.startsWith('/')) targetPath = '/' + targetPath;
+
+    let source = srcSel.value === 'custom' ? (customSrc ? customSrc.value.trim() : '') : srcSel.value;
+    source = (source || 'share').toLowerCase().replace(/\s+/g, '_');
+
+    let medium = (medEl ? medEl.value : 'social').trim().toLowerCase().replace(/\s+/g, '_');
+    let campaign = (campEl ? campEl.value : '').trim().toLowerCase().replace(/\s+/g, '_');
+
+    const origin = window.location.origin || 'https://vestnomics.app';
+    const params = new URLSearchParams();
+    if (source) params.set('utm_source', source);
+    if (medium) params.set('utm_medium', medium);
+    if (campaign) params.set('utm_campaign', campaign);
+
+    const fullUrl = `${origin}${targetPath}?${params.toString()}`;
+    outEl.value = fullUrl;
+  }
+
+  function copyUtmUrlToClipboard() {
+    const outEl = document.getElementById('utmGeneratedUrl');
+    const statusEl = document.getElementById('utmCopyStatus');
+    if (!outEl || !outEl.value) return;
+
+    if (navigator.clipboard && navigator.clipboard.writeText) {
+      navigator.clipboard.writeText(outEl.value).then(() => {
+        if (statusEl) {
+          statusEl.style.display = 'inline-block';
+          setTimeout(() => { statusEl.style.display = 'none'; }, 3500);
+        }
+      }).catch(() => {
+        outEl.select();
+        document.execCommand('copy');
+        if (statusEl) {
+          statusEl.style.display = 'inline-block';
+          setTimeout(() => { statusEl.style.display = 'none'; }, 3500);
+        }
+      });
+    } else {
+      outEl.select();
+      document.execCommand('copy');
+      if (statusEl) {
+        statusEl.style.display = 'inline-block';
+        setTimeout(() => { statusEl.style.display = 'none'; }, 3500);
+      }
+    }
+  }
+
+  // Initialize UTM Link Generator on document ready
+  if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', updateUtmLinkPreview);
+  } else {
+    updateUtmLinkPreview();
+  }
   </script>
 
 {% endif %}

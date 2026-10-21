@@ -118,22 +118,12 @@ def save_report_to_archive(stock_data: dict, report_text: str, announcement: str
         # SEBI Compliance: Record statutory Safe Harbor disclaimer audit event
         # IndexNow instant ping – notify search engines of the new/updated dossier
         try:
+            from core.seo.indexnow import ping_indexnow_urls
             base_url = (os.getenv("CANONICAL_DOMAIN") or "https://moatnomics.com").rstrip("/")
             url = f"{base_url}/dossier/{clean_sym}"
-            # IndexNow key is expected in environment variable INDEXNOW_KEY
-            key = os.getenv("INDEXNOW_KEY")
-            if key:
-                resp = requests.get(
-                    "https://api.indexnow.org/indexnow",
-                    params={"url": url, "key": key},
-                    timeout=5,
-                )
-                if resp.status_code != 200:
-                    logger.warning(f"IndexNow ping failed for {url}: {resp.status_code}")
-            else:
-                logger.info("INDEXNOW_KEY not set – skipping IndexNow ping.")
+            ping_indexnow_urls(url)
         except Exception as ping_err:
-            logger.error(f"IndexNow ping error for {clean_sym}: {ping_err}")
+            logger.debug(f"IndexNow ping notice for {clean_sym}: {ping_err}")
 
         try:
             log_compliance_event(clean_sym)

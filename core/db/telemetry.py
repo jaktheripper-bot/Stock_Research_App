@@ -193,6 +193,21 @@ def classify_page_category(path: str) -> tuple[str, str]:
     return "Platform Page", "🌐"
 
 
+def format_route_display(path: str) -> str:
+    """
+    Returns a human-readable display title for any path route, e.g.
+    '/' -> 'Homepage (/)', '/dossier/TCS' -> 'Equity Dossier (TCS)'.
+    """
+    clean_p = (path or "").strip()
+    if not clean_p or clean_p == "/":
+        return "Homepage (/)"
+    cat_name, _ = classify_page_category(clean_p)
+    if cat_name and cat_name != "Platform Page":
+        return f"{cat_name} ({clean_p})"
+    return clean_p
+
+
+
 def format_duration(seconds: float) -> str:
     """Formats numeric seconds into human-readable duration string (e.g. 45s, 2m 14s, 1h 22m)."""
     sec = int(round(seconds))
@@ -408,6 +423,7 @@ def compute_page_dwell_and_visit_tree(all_events: list) -> dict:
 
         page_dwell_times.append({
             "path": path,
+            "display_name": format_route_display(path),
             "category": cat_name,
             "icon": cat_icon,
             "avg_dwell_seconds": avg_sec,
@@ -455,6 +471,7 @@ def compute_page_dwell_and_visit_tree(all_events: list) -> dict:
             to_cat, to_icon = classify_page_category(to_p)
             destinations.append({
                 "to_path": to_p,
+                "display_name": format_route_display(to_p),
                 "category": to_cat,
                 "icon": to_icon,
                 "count": cnt,
@@ -465,6 +482,7 @@ def compute_page_dwell_and_visit_tree(all_events: list) -> dict:
 
         site_visit_tree.append({
             "from_path": from_p,
+            "display_name": format_route_display(from_p),
             "category": cat_name,
             "icon": cat_icon,
             "total_outbound": total_outbound,
@@ -734,6 +752,7 @@ def get_site_usage_summary(days: int = None, start_date = None, end_date = None,
         "top_referrers": [],
         "top_landing_pages": [],
         "top_visited_pages": [],
+        "top_campaigns": [],
         "page_dwell_times": [],
         "site_visit_tree": [],
         "overall_avg_dwell_seconds": 0.0,
@@ -870,6 +889,7 @@ def get_site_usage_summary(days: int = None, start_date = None, end_date = None,
             session_landing_map = {}
             page_views_map = {}
             session_profile_map = {}
+            session_campaign_map = {}
 
             for ev_row in all_events:
                 eid, sess_id, lp_col, det_raw, ev_tick, ev_type, _ = ev_row
@@ -904,6 +924,17 @@ def get_site_usage_summary(days: int = None, start_date = None, end_date = None,
 
                 if effective_sess not in session_landing_map:
                     session_landing_map[effective_sess] = p
+
+                # Track UTM campaign attribution from details or query params
+                camp_name = (det_obj.get("utm_campaign") or "").strip()
+                camp_src = (det_obj.get("utm_source") or "").strip()
+                camp_med = (det_obj.get("utm_medium") or "").strip()
+                if (camp_name or camp_src) and effective_sess not in session_campaign_map:
+                    session_campaign_map[effective_sess] = {
+                        "campaign": camp_name or "default",
+                        "source": camp_src or "Organic / Other",
+                        "medium": camp_med or "referral"
+                    }
 
                 sp = session_profile_map.setdefault(effective_sess, {"paths": set(), "non_dwell_events": 0, "dwell_sec": 0.0})
                 sp["paths"].add(p)
@@ -941,6 +972,7 @@ def get_site_usage_summary(days: int = None, start_date = None, end_date = None,
                 cat_name, cat_icon = classify_page_category(path_key)
                 summary["top_landing_pages"].append({
                     "path": path_key,
+                    "display_name": format_route_display(path_key),
                     "category": cat_name,
                     "icon": cat_icon,
                     "sessions": s_count,
@@ -954,6 +986,7 @@ def get_site_usage_summary(days: int = None, start_date = None, end_date = None,
                 summary["top_visited_pages"].append({
                     "path": path_key,
                     "route": path_key,
+                    "display_name": format_route_display(path_key),
                     "count": v_data["views"],
                     "category": cat_name,
                     "icon": cat_icon,
@@ -963,6 +996,23 @@ def get_site_usage_summary(days: int = None, start_date = None, end_date = None,
                 })
             summary["top_routes"] = summary["top_visited_pages"]
             summary["top_tickers"] = summary["top_searched_tickers"]
+
+            # Aggregate Campaign Performance
+            campaign_counts = {}
+            for s_id, c_info in session_campaign_map.items():
+                c_key = (c_info["campaign"], c_info["source"], c_info["medium"])
+                campaign_counts[c_key] = campaign_counts.get(c_key, 0) + 1
+
+            total_campaign_sessions = max(1, sum(campaign_counts.values()))
+            summary["top_campaigns"] = []
+            for (c_name, c_src, c_med), c_count in sorted(campaign_counts.items(), key=lambda x: x[1], reverse=True)[:12]:
+                summary["top_campaigns"].append({
+                    "campaign": c_name,
+                    "source": c_src,
+                    "medium": c_med,
+                    "sessions": c_count,
+                    "percentage": round((c_count / total_campaign_sessions) * 100.0, 1)
+                })
 
             # 5c. Link Dwell Times and Site Visit Navigation Tree
             try:
@@ -1732,6 +1782,8 @@ def get_seo_summary(days: int = 30) -> dict:
 
     bots, crawl_pages = {}, {}
     sessions = {}
+    asset_crawls = {"Equities": 0, "Mutual Funds": 0, "Corporate Debt": 0, "REITs": 0, "ETFs": 0, "MSME": 0, "General": 0}
+
     for ev_type, sess, source, lp, browser, os_kind, ts, det in rows:
         if ev_type == "BOT_CRAWL":
             name = browser or "Unknown bot"
@@ -1747,7 +1799,24 @@ def get_seo_summary(days: int = 30) -> dict:
             b["errors"] += 1 if status >= 400 else 0
             b["last_seen"] = str(ts)[:16]
             crawl_pages[lp] = crawl_pages.get(lp, 0) + 1
+
+            # Categorize asset class crawled
+            if "/dossier/" in lp or lp == "/equities":
+                asset_crawls["Equities"] += 1
+            elif "/funds" in lp:
+                asset_crawls["Mutual Funds"] += 1
+            elif "/debt" in lp:
+                asset_crawls["Corporate Debt"] += 1
+            elif "/reits" in lp:
+                asset_crawls["REITs"] += 1
+            elif "/etfs" in lp:
+                asset_crawls["ETFs"] += 1
+            elif "/msme" in lp:
+                asset_crawls["MSME"] += 1
+            else:
+                asset_crawls["General"] += 1
             continue
+
         if not sess:
             continue
         s = sessions.setdefault(sess, {"source": source or "Direct / Bookmark", "landing": lp or "/", "date": str(ts)[:10], "pdf": False, "pricing": False})
@@ -1756,12 +1825,18 @@ def get_seo_summary(days: int = 30) -> dict:
         if "/pricing" in (lp or ""):
             s["pricing"] = True
 
-    summary["crawlers"] = sorted(
+    all_crawlers = sorted(
         ({"bot": b["bot"], "kind": b["kind"], "hits": b["hits"], "pages": len(b["pages"]), "errors": b["errors"], "last_seen": b["last_seen"]} for b in bots.values()),
         key=lambda x: x["hits"], reverse=True,
     )
-    summary["crawl_total"] = sum(b["hits"] for b in summary["crawlers"])
+    summary["crawlers"] = all_crawlers
+    summary["ai_crawlers"] = [b for b in all_crawlers if b["kind"] == "AI"]
+    summary["search_crawlers"] = [b for b in all_crawlers if b["kind"] == "Search"]
+    summary["crawl_total"] = sum(b["hits"] for b in all_crawlers)
+    summary["ai_crawl_total"] = sum(b["hits"] for b in summary["ai_crawlers"])
+    summary["search_crawl_total"] = sum(b["hits"] for b in summary["search_crawlers"])
     summary["crawl_pages"] = [{"path": p, "hits": h} for p, h in sorted(crawl_pages.items(), key=lambda x: x[1], reverse=True)[:12]]
+    summary["asset_class_crawls"] = [{"asset": k, "hits": v} for k, v in asset_crawls.items() if v > 0]
 
     channels = {"Organic Search": [0, 0, 0], "AI Search": [0, 0, 0], "Other": [0, 0, 0]}
     landing, trend = {}, {}
@@ -1775,6 +1850,7 @@ def get_seo_summary(days: int = 30) -> dict:
             trend[s["date"]] = trend.get(s["date"], 0) + 1
     summary["total_sessions"] = len(sessions)
     summary["search_sessions"] = channels["Organic Search"][0] + channels["AI Search"][0]
+    summary["ai_search_sessions"] = channels["AI Search"][0]
     summary["channels"] = [{"channel": k, "sessions": v[0], "pdf_sessions": v[1], "pricing_sessions": v[2]} for k, v in channels.items()]
     summary["organic_landing_pages"] = [{"path": p, "sessions": c} for p, c in sorted(landing.items(), key=lambda x: x[1], reverse=True)[:12]]
     summary["daily_trend"] = [{"date": d, "sessions": c} for d, c in sorted(trend.items())]

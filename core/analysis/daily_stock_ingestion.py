@@ -570,6 +570,16 @@ def ingest_daily_stock_cohort(
     ingested_tickers = [r["ticker"] for r in ingested_results]
     recalculated_funds = recalculate_affected_mutual_funds(ingested_tickers)
 
+    # 4b. IndexNow Batch Ping for newly ingested dossiers and discovery page
+    if ingested_tickers:
+        try:
+            from core.seo.indexnow import ping_indexnow_urls
+            base_url = (os.getenv("CANONICAL_DOMAIN") or "https://moatnomics.com").rstrip("/")
+            urls_to_ping = [f"{base_url}/discovery", f"{base_url}/equities"] + [f"{base_url}/dossier/{t}" for t in ingested_tickers]
+            ping_indexnow_urls(urls_to_ping)
+        except Exception as in_err:
+            logger.debug(f"IndexNow batch ping notice in daily stock ingestion: {in_err}")
+
     # 5. Log autonomous audit event
     try:
         record_autonomous_event(
