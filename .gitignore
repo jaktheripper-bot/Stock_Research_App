@@ -26,3 +26,6 @@ audits/
 data/amc_portfolios/
 moatnomics_codebase.txt
 project_structure.txt
+
+# Local large asset drop-in source packages
+web/static/img/Moatnomics-*/

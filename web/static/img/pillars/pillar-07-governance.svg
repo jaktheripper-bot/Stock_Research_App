@@ -1,3 +1,1 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.85" stroke-linecap="round" stroke-linejoin="round">
-  <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/><polyline points="9 12 11 14 15 10"/>
-</svg>
+<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.85" stroke-linecap="round" stroke-linejoin="round" role="img" aria-labelledby="pillar-07-governance-title"><title id="pillar-07-governance-title">Governance — financial ledger and forensic shield</title><path d="M14 3H4V21H10M14 3V8H19V11Z"/><line x1="7" y1="8" x2="10" y2="8" /><line x1="7" y1="12" x2="10" y2="12" /><path d="M16 12L21 14V17c0 2-2 3.5-5 4-3-.5-5-2-5-4V14Z"/><path d="M14 16L15.5 17.5 18 15"/></svg>

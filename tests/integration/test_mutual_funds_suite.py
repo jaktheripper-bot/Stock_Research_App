@@ -715,7 +715,7 @@ class TestFundForensicAuditor(unittest.TestCase):
 
         resp_dos = self.client.get("/funds/PPFAS_FLEXICAP_DIR", headers={"x-unlock-preview": "1"})
         self.assertEqual(resp_dos.status_code, 200)
-        self.assertIn("Deep-Dive Stock Accounting Check Option", resp_dos.text)
+        self.assertIn("Constituent Stock Accounting Look-Through", resp_dos.text)
         self.assertIn("Layer 1 Active (1 Credit)", resp_dos.text)
         self.assertIn("Initiate Deep-Dive Audit", resp_dos.text)
 

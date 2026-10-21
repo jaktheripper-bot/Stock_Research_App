@@ -8,6 +8,7 @@ Enforces SEBI (Real Estate Investment Trusts) Regulations, 2024 SM REIT criteria
 4. SGB Capital Gains Exemption (Section 47(viic) Income Tax Act).
 """
 
+import os
 import json
 import logging
 from typing import List, Dict, Any, Optional
@@ -920,38 +921,64 @@ def _normalize_reit_item(reit: Dict[str, Any]) -> Dict[str, Any]:
     return item
 
 
-def get_all_reits_and_invits(structure_type: Optional[str] = None) -> List[Dict[str, Any]]:
+def get_all_reits_and_invits(structure_type: Optional[str] = None, exclude_tests: Optional[bool] = None) -> List[Dict[str, Any]]:
     """Retrieves all tracked REITs, SM REITs, and InvITs."""
+    if exclude_tests is None:
+        exclude_tests = os.environ.get("TESTING") != "1"
+
     conn = get_db_connection()
     cursor = conn.cursor()
     p = get_placeholder()
 
     def _run_select() -> list:
         if structure_type:
-            q = f"""
-                SELECT id, symbol, name, structure_type, current_price, nav_per_unit,
-                       discount_to_nav_pct, distribution_yield_pct, occupancy_pct,
-                       ndcf_payout_purity_pct, ltv_ratio_pct, wale_years,
-                       sponsor_holding_pct, sebi_compliant, details_json, updated_at
-                FROM reits_and_invits
-                WHERE structure_type = {p}
-                  AND UPPER(symbol) NOT LIKE {p}
-                  AND UPPER(name) NOT LIKE {p}
-                ORDER BY distribution_yield_pct DESC;
-            """
-            cursor.execute(q, (structure_type, "%TEST%", "%TEST%"))
+            if exclude_tests:
+                q = f"""
+                    SELECT id, symbol, name, structure_type, current_price, nav_per_unit,
+                           discount_to_nav_pct, distribution_yield_pct, occupancy_pct,
+                           ndcf_payout_purity_pct, ltv_ratio_pct, wale_years,
+                           sponsor_holding_pct, sebi_compliant, details_json, updated_at
+                    FROM reits_and_invits
+                    WHERE structure_type = {p}
+                      AND UPPER(symbol) NOT LIKE {p}
+                      AND UPPER(name) NOT LIKE {p}
+                    ORDER BY distribution_yield_pct DESC;
+                """
+                cursor.execute(q, (structure_type, "%TEST%", "%TEST%"))
+            else:
+                q = f"""
+                    SELECT id, symbol, name, structure_type, current_price, nav_per_unit,
+                           discount_to_nav_pct, distribution_yield_pct, occupancy_pct,
+                           ndcf_payout_purity_pct, ltv_ratio_pct, wale_years,
+                           sponsor_holding_pct, sebi_compliant, details_json, updated_at
+                    FROM reits_and_invits
+                    WHERE structure_type = {p}
+                    ORDER BY distribution_yield_pct DESC;
+                """
+                cursor.execute(q, (structure_type,))
         else:
-            q = """
-                SELECT id, symbol, name, structure_type, current_price, nav_per_unit,
-                       discount_to_nav_pct, distribution_yield_pct, occupancy_pct,
-                       ndcf_payout_purity_pct, ltv_ratio_pct, wale_years,
-                       sponsor_holding_pct, sebi_compliant, details_json, updated_at
-                FROM reits_and_invits
-                WHERE UPPER(symbol) NOT LIKE '%TEST%'
-                  AND UPPER(name) NOT LIKE '%TEST%'
-                ORDER BY distribution_yield_pct DESC;
-            """
-            cursor.execute(q)
+            if exclude_tests:
+                q = """
+                    SELECT id, symbol, name, structure_type, current_price, nav_per_unit,
+                           discount_to_nav_pct, distribution_yield_pct, occupancy_pct,
+                           ndcf_payout_purity_pct, ltv_ratio_pct, wale_years,
+                           sponsor_holding_pct, sebi_compliant, details_json, updated_at
+                    FROM reits_and_invits
+                    WHERE UPPER(symbol) NOT LIKE '%TEST%'
+                      AND UPPER(name) NOT LIKE '%TEST%'
+                    ORDER BY distribution_yield_pct DESC;
+                """
+                cursor.execute(q)
+            else:
+                q = """
+                    SELECT id, symbol, name, structure_type, current_price, nav_per_unit,
+                           discount_to_nav_pct, distribution_yield_pct, occupancy_pct,
+                           ndcf_payout_purity_pct, ltv_ratio_pct, wale_years,
+                           sponsor_holding_pct, sebi_compliant, details_json, updated_at
+                    FROM reits_and_invits
+                    ORDER BY distribution_yield_pct DESC;
+                """
+                cursor.execute(q)
         return cursor.fetchall()
 
     try:

@@ -1,3 +1,1 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.85" stroke-linecap="round" stroke-linejoin="round">
-  <polygon points="12 2 19 6 19 14 12 18 5 14 5 6 12 2"/><line x1="12" y1="18" x2="12" y2="22"/>
-</svg>
+<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.85" stroke-linecap="round" stroke-linejoin="round" role="img" aria-labelledby="sector-chemicals-title"><title id="sector-chemicals-title">Chemicals — retort flask and crystal lattice</title><path d="M6 4V11L3 18q0 3 3 3H10q3 0 3-3L9 11V4M5 4H10"/><path d="M14 5L17 3 20 5V9L17 11 14 9Z"/><line x1="12" y1="14" x2="16" y2="10" /><line x1="6" y1="17" x2="10" y2="17" /></svg>

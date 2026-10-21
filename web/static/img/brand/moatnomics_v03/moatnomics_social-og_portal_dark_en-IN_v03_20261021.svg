@@ -1,0 +1,25 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="630" viewBox="0 0 1200 630" role="img" aria-labelledby="title desc">
+  <title id="title">Moatnomics social OpenGraph card</title>
+  <desc id="desc">Moatnomics v03 candidate asset. Editable SVG geometry. The central mirror is a sharp, top-and-bottom pointed prism. Final optical validation and licensed wordmark remain required.</desc>
+  
+  <rect width="1200" height="630" fill="#0B2337"/>
+  <rect x="42" y="42" width="1116" height="546" rx="6" fill="#0E3D32"/>
+  <path d="M 760 42 H1158 V588 H920 C930 445 900 278 760 42Z" fill="#103E34"/>
+  <path d="M 952 42 H1158 V588 H1055 C1075 392 1040 214 952 42Z" fill="#1A5447" opacity=".9"/>
+  <g transform="translate(796 110) scale(2.5)">
+    <path d="M14 110V57C14 29 33 9 54 4V36C43 41 37 49 37 61V110H14Z" fill="#F7F5EE"/>
+    <path d="M106 110V57C106 29 87 9 66 4V36C77 41 83 49 83 61V110H106Z" fill="#D9E3E8"/>
+    <path d="M37 110V61C37 49 43 41 54 36V49C48 53 45 58 45 65V110Z" fill="#DCE8E2"/>
+    <path d="M83 110V61C83 49 77 41 66 36V49C72 53 75 58 75 65V110Z" fill="#B7D0B8"/>
+    <path d="M60 4L60 116L53 108V13Z" fill="#D9E3E8"/>
+    <path d="M60 4L67 13V108L60 116Z" fill="#F7F5EE"/>
+    <path d="M60 5V115" stroke="#0E3D32" stroke-width="1.2"/>
+  </g>
+  <text x="104" y="145" fill="#C7E268" font-family="Inter, Arial, sans-serif" font-size="18" font-weight="700" letter-spacing="4">MULTI-ASSET INVESTMENT RESEARCH</text>
+  <text x="100" y="275" fill="#F7F5EE" font-family="'Playfair Display', Georgia, serif" font-size="82" font-weight="700">Less noise,</text>
+  <text x="100" y="366" fill="#F7F5EE" font-family="'Playfair Display', Georgia, serif" font-size="82" font-weight="700">more nuance.</text>
+  <text x="104" y="450" fill="#D9E3E8" font-family="Inter, Arial, sans-serif" font-size="25">Understand the evidence. Examine the trade-offs.</text>
+  <text x="104" y="536" fill="#F7F5EE" font-family="'Playfair Display', Georgia, serif" font-size="38" font-weight="700">Moatnomics</text>
+
+</svg>

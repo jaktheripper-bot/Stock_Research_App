@@ -1,3 +1,1 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.85" stroke-linecap="round" stroke-linejoin="round">
-  <path d="M6 2L3 6v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2V6l-3-4z"/><line x1="3" y1="6" x2="21" y2="6"/><path d="M16 10a4 4 0 0 1-8 0"/>
-</svg>
+<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.85" stroke-linecap="round" stroke-linejoin="round" role="img" aria-labelledby="sector-consumer-title"><title id="sector-consumer-title">Consumer — packaged goods and seal ribbon</title><rect x="4" y="5" width="16" height="15" rx="1"/><line x1="4" y1="8" x2="20" y2="8" /><path d="M10 5V12L12 10.5 14 12V5"/><line x1="8" y1="17" x2="16" y2="17" /></svg>

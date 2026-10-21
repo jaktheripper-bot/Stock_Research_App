@@ -1,3 +1,1 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.85" stroke-linecap="round" stroke-linejoin="round">
-  <path d="M3 17l5-5 4 4 9-9"/><line x1="3" y1="12" x2="21" y2="12" stroke-dasharray="2 2"/>
-</svg>
+<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.85" stroke-linecap="round" stroke-linejoin="round" role="img" aria-labelledby="pillar-06-technicals-title"><title id="pillar-06-technicals-title">Technicals — price series and moving average</title><path d="M3 18L7 11 11 15 16 6 21 9"/><line x1="3" y1="12" x2="21" y2="12" stroke-dasharray="2 2"/></svg>

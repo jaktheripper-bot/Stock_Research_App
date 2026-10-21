@@ -1,3 +1,1 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.85" stroke-linecap="round" stroke-linejoin="round">
-  <path d="M12 3v18"/><path d="M5 7h14"/><path d="M3 14l3-7 3 7a3.2 3.2 0 0 1-6 0z"/><path d="M15 14l3-7 3 7a3.2 3.2 0 0 1-6 0z"/><line x1="8" y1="21" x2="16" y2="21"/>
-</svg>
+<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.85" stroke-linecap="round" stroke-linejoin="round" role="img" aria-labelledby="pillar-02-capital-title"><title id="pillar-02-capital-title">Capital allocation — precision balance and hurdle</title><line x1="12" y1="3" x2="12" y2="17" /><line x1="5" y1="7" x2="19" y2="7" /><path d="M3 14L6 7 9 14a3.2 3.2 0 0 1-6 0Z"/><path d="M15 14L18 7 21 14a3.2 3.2 0 0 1-6 0Z"/><path d="M9 21L12 17 15 21Z"/><line x1="7" y1="21" x2="17" y2="21" /></svg>

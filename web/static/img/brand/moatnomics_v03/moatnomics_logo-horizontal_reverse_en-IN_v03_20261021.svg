@@ -1,0 +1,17 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" width="1600" height="400" viewBox="0 0 1600 400" role="img" aria-labelledby="title desc">
+  <title id="title">Moatnomics horizontal lockup dark</title>
+  <desc id="desc">Moatnomics v03 candidate asset. Editable SVG geometry. The central mirror is a sharp, top-and-bottom pointed prism. Final optical validation and licensed wordmark remain required.</desc>
+  <g><g transform="translate(48 68) scale(2.2)">
+    <path d="M14 110V57C14 29 33 9 54 4V36C43 41 37 49 37 61V110H14Z" fill="#F7F5EE"/>
+    <path d="M106 110V57C106 29 87 9 66 4V36C77 41 83 49 83 61V110H106Z" fill="#D9E3E8"/>
+    <path d="M37 110V61C37 49 43 41 54 36V49C48 53 45 58 45 65V110Z" fill="#DCE8E2"/>
+    <path d="M83 110V61C83 49 77 41 66 36V49C72 53 75 58 75 65V110Z" fill="#B7D0B8"/>
+    <path d="M60 4L60 116L53 108V13Z" fill="#D9E3E8"/>
+    <path d="M60 4L67 13V108L60 116Z" fill="#F7F5EE"/>
+    <path d="M60 5V115" stroke="#0E3D32" stroke-width="1.2"/>
+  </g><g transform="translate(370 190) scale(1.55)" fill="#F7F5EE">
+  <text x="0" y="0" font-family="'Playfair Display', Georgia, serif" font-size="66" font-weight="700" letter-spacing="-2.2">Moatnomics</text>
+  <text x="3" y="35" font-family="Inter, Arial, sans-serif" font-size="13" font-weight="600" letter-spacing="4.1">LESS NOISE, MORE NUANCE.</text>
+</g></g>
+</svg>
