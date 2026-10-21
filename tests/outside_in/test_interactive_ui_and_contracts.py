@@ -1653,6 +1653,25 @@ class TestCompetitiveEnhancements(unittest.TestCase):
                 f"Expected non-zero .asset-card-accent bond cards on {debt_url}",
             )
 
+        # Verify /reits, /sovereign, and /safety also host Snapshot Biscuit Card Grids by default
+        r_reits = self.client.get("/reits")
+        s_reits = BeautifulSoup(r_reits.text, "html.parser")
+        for grid_id in ["reitCardsGrid", "invitCardsGrid", "sgbCardsGrid"]:
+            g_el = s_reits.find(id=grid_id)
+            self.assertIsNotNone(g_el, f"Missing #{grid_id} snapshot biscuit grid on /reits")
+            self.assertGreater(len(g_el.select(".asset-card-accent")), 0, f"Expected .asset-card-accent cards in #{grid_id}")
+
+        for grid_id in ["sovereignTenorCardsGrid", "sdlCardsGrid"]:
+            g_el = s_sov.find(id=grid_id)
+            self.assertIsNotNone(g_el, f"Missing #{grid_id} snapshot biscuit grid on /sovereign")
+            self.assertGreater(len(g_el.select(".asset-card-accent")), 0, f"Expected .asset-card-accent cards in #{grid_id}")
+
+        r_safety = self.client.get("/safety-radar")
+        s_safety = BeautifulSoup(r_safety.text, "html.parser")
+        safety_grid = s_safety.find(id="safetyCardsGrid")
+        self.assertIsNotNone(safety_grid, "Missing #safetyCardsGrid on /safety-radar")
+        self.assertGreater(len(safety_grid.select(".asset-card-accent")), 0, "Expected .asset-card-accent cards in #safetyCardsGrid")
+
 
 if __name__ == "__main__":
     unittest.main()

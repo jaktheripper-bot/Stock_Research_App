@@ -176,7 +176,7 @@ function renderBentoCards(items) {
     const realWidth = Math.min(100, Math.max(5, (Math.max(0, realAlpha) / maxScale) * 100));
 
     return `
-      <div class="card" style="padding: 20px; display: flex; flex-direction: column; justify-content: space-between; position: relative; border: 1px solid rgba(255, 255, 255, 0.1); border-radius: 14px; background: rgba(30, 41, 59, 0.55); transition: transform 0.2s, border-color 0.2s;">
+      <div class="card asset-card-accent" style="padding: 20px; display: flex; flex-direction: column; justify-content: space-between; position: relative; border: 1px solid rgba(255, 255, 255, 0.1); border-radius: 14px; background: rgba(30, 41, 59, 0.55); transition: transform 0.2s, border-color 0.2s;">
         <div>
           <!-- Header Bar -->
           <div style="display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 12px;">

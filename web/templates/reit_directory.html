@@ -218,11 +218,106 @@
           Audited commercial office and retail consumption trusts. Tracking occupancy, WALE, and NDCF upstreaming purity.
         </p>
       </div>
-      <div style="display: flex; gap: 10px;">
+      <div style="display: flex; gap: 10px; align-items: center; flex-wrap: wrap;">
+        <div style="display: inline-flex; gap: 6px;">
+          <button type="button" id="smReitViewCardsBtn" onclick="switchReitSectionView('smReit', 'cards')" class="btn btn-primary btn-sm" style="border-radius: 9999px; font-size: 12px; padding: 6px 14px;">
+            <svg class="glyph" style="width: 13px; height: 13px; vertical-align: -2px;"><use href="#icon-multi-asset"></use></svg> Snapshot Cards
+          </button>
+          <button type="button" id="smReitViewTableBtn" onclick="switchReitSectionView('smReit', 'table')" class="btn btn-secondary btn-sm" style="border-radius: 9999px; font-size: 12px; padding: 6px 14px;">
+            <svg class="glyph" style="width: 13px; height: 13px; vertical-align: -2px;"><use href="#glyph-chart"></use></svg> Compact Table
+          </button>
+        </div>
         <a href="/calculator/tax?yield=8.10" class="btn btn-secondary btn-sm"><svg class="glyph" style="width: 13px; height: 13px; vertical-align: -2px;"><use href="#icon-valuation"></use></svg> Simulate Post-Tax Cashflows</a>
       </div>
     </div>
 
+    <!-- Snapshot Biscuit Card Grid (Default) -->
+    <div id="reitCardsGrid" style="display: grid; grid-template-columns: repeat(auto-fill, minmax(340px, 1fr)); gap: 20px;">
+      {% for r in reit_audit.reits %}
+      {% if r.structure_type in ['MAINBOARD_REIT', 'SM_REIT'] %}
+      <div class="card asset-card-accent" style="padding: 20px; border-radius: 14px; display: flex; flex-direction: column; justify-content: space-between; transition: transform 0.2s ease, box-shadow 0.2s ease;">
+        <div>
+          <div style="display: flex; justify-content: space-between; align-items: center; gap: 8px; margin-bottom: 10px;">
+            {% if r.structure_type == 'SM_REIT' %}
+              <span style="background: rgba(168, 85, 247, 0.15); color: #c084fc; border: 1px solid rgba(168, 85, 247, 0.3); padding: 3px 10px; border-radius: 9999px; font-size: 11px; font-weight: 700;">
+                SEBI SM REIT
+              </span>
+            {% else %}
+              <span style="background: rgba(14, 165, 233, 0.15); color: #38bdf8; border: 1px solid rgba(14, 165, 233, 0.3); padding: 3px 10px; border-radius: 9999px; font-size: 11px; font-weight: 700;">
+                Mainboard REIT
+              </span>
+            {% endif %}
+            {% if r.sebi_compliant %}
+              <span style="background: rgba(16, 185, 129, 0.15); color: #34d399; padding: 3px 9px; border-radius: 9999px; font-size: 11px; font-weight: 700;">
+                ✓ SEBI Compliant
+              </span>
+            {% else %}
+              <span style="background: rgba(239, 68, 68, 0.15); color: #f87171; padding: 3px 9px; border-radius: 9999px; font-size: 11px; font-weight: 700;">
+                <svg class="glyph" style="width: 11px; height: 11px; vertical-align: -1px;"><use href="#glyph-alert"></use></svg> Compliance Alert
+              </span>
+            {% endif %}
+          </div>
+
+          <div style="display: flex; justify-content: space-between; align-items: baseline; margin-bottom: 4px;">
+            <a href="/reits/{{ r.symbol }}" style="font-size: 19px; font-weight: 800; color: #f8fafc; text-decoration: none; font-family: monospace;">{{ r.symbol }}</a>
+            <span style="font-size: 11.5px; font-weight: 700; color: {% if r.discount_to_nav_pct < 0 %}#10b981{% else %}#f59e0b{% endif %};" class="tnum">
+              {% if r.discount_to_nav_pct < 0 %}{{ r.discount_to_nav_pct }}% Disc to NAV{% else %}+{{ r.discount_to_nav_pct }}% vs NAV{% endif %}
+            </span>
+          </div>
+          <h3 style="font-size: 13.5px; font-weight: 600; color: #cbd5e1; margin: 0 0 14px 0; line-height: 1.4;">{{ r.name }}</h3>
+
+          <!-- 3-Column Price / NAV / Yield Strip -->
+          <div style="display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; background: rgba(15, 23, 42, 0.45); border: 1px solid rgba(255, 255, 255, 0.08); border-radius: 10px; padding: 10px 12px; margin-bottom: 12px;">
+            <div>
+              <div style="font-size: 10px; color: #64748b; text-transform: uppercase; font-weight: 700;">Market Price</div>
+              <div style="font-size: 14px; font-weight: 800; color: #f8fafc;" class="tnum">₹{{ "{:,.2f}".format(r.current_price) }}</div>
+            </div>
+            <div>
+              <div style="font-size: 10px; color: #64748b; text-transform: uppercase; font-weight: 700;">Assessed NAV</div>
+              <div style="font-size: 14px; font-weight: 700; color: #94a3b8;" class="tnum">₹{{ "{:,.2f}".format(r.nav_per_unit) }}</div>
+            </div>
+            <div>
+              <div style="font-size: 10px; color: #64748b; text-transform: uppercase; font-weight: 700;">Dist. Yield</div>
+              <div style="font-size: 15px; font-weight: 800; color: #10b981;" class="tnum">{{ r.distribution_yield_pct }}%</div>
+            </div>
+          </div>
+
+          <!-- 4-Cell Portfolio Audit Metrics -->
+          <div style="display: grid; grid-template-columns: repeat(2, 1fr); gap: 8px; margin-bottom: 16px;">
+            <div style="background: rgba(15, 23, 42, 0.35); border: 1px solid rgba(255, 255, 255, 0.06); border-radius: 8px; padding: 8px 10px; display: flex; justify-content: space-between; align-items: center;">
+              <span style="font-size: 11px; color: #64748b; font-weight: 600;">Occupancy</span>
+              <span style="font-size: 12.5px; font-weight: 800; color: {% if r.occupancy_pct >= 95.0 %}#34d399{% else %}#fbbf24{% endif %};" class="tnum">{{ r.occupancy_pct }}%</span>
+            </div>
+            <div style="background: rgba(15, 23, 42, 0.35); border: 1px solid rgba(255, 255, 255, 0.06); border-radius: 8px; padding: 8px 10px; display: flex; justify-content: space-between; align-items: center;">
+              <span style="font-size: 11px; color: #64748b; font-weight: 600;">NDCF Purity</span>
+              <span style="font-size: 12.5px; font-weight: 800; color: #38bdf8;" class="tnum">{{ r.ndcf_payout_purity_pct }}%</span>
+            </div>
+            <div style="background: rgba(15, 23, 42, 0.35); border: 1px solid rgba(255, 255, 255, 0.06); border-radius: 8px; padding: 8px 10px; display: flex; justify-content: space-between; align-items: center;">
+              <span style="font-size: 11px; color: #64748b; font-weight: 600;">LTV Leverage</span>
+              <span style="font-size: 12.5px; font-weight: 700; color: #cbd5e1;" class="tnum">{{ r.ltv_ratio_pct }}%</span>
+            </div>
+            <div style="background: rgba(15, 23, 42, 0.35); border: 1px solid rgba(255, 255, 255, 0.06); border-radius: 8px; padding: 8px 10px; display: flex; justify-content: space-between; align-items: center;">
+              <span style="font-size: 11px; color: #64748b; font-weight: 600;">Portfolio WALE</span>
+              <span style="font-size: 12.5px; font-weight: 700; color: #f8fafc;" class="tnum">{{ r.wale_years }} yrs</span>
+            </div>
+          </div>
+        </div>
+
+        <div style="display: flex; gap: 8px;">
+          <a href="/reits/{{ r.symbol }}" onclick='return window.triggerDossierNavigation(event, "/reits/{{ r.symbol }}", {{ r.symbol|tojson }}, "REIT");' class="btn btn-primary btn-sm" style="flex: 1; text-align: center; justify-content: center; font-size: 12.5px; font-weight: 700; padding: 9px 12px; border-radius: 8px; text-decoration: none;">
+            Open REIT Dossier &rarr;
+          </a>
+          <a href="/api/pdf/reit/{{ r.symbol }}" class="btn btn-secondary btn-sm" style="font-size: 12px; padding: 9px 12px; border-radius: 8px; text-decoration: none;" title="Download PDF Dossier">
+            <svg class="glyph" style="width: 12px; height: 12px;"><use href="#icon-download"></use></svg> PDF
+          </a>
+        </div>
+      </div>
+      {% endif %}
+      {% endfor %}
+    </div>
+
+    <!-- Compact Table View (Optional Toggle) -->
+    <div id="smReitTableViewWrap" style="display: none;">
     <div class="table-sticky-wrap">
       <table class="table-sticky" style="width: 100%; border-collapse: collapse; font-size: 13.5px;">
         <thead class="sticky-thead">
@@ -313,6 +408,7 @@
         </tbody>
       </table>
     </div>
+    </div>
   </div>
 
   <!-- Section 2: Infrastructure Investment Trusts (InvITs) Concession Directory -->
@@ -326,11 +422,102 @@
           High-yield infrastructure concessions: Availability-based power transmission (zero traffic risk) vs. Toll roads (inflation upside).
         </p>
       </div>
-      <div style="font-size: 12px; color: #94a3b8; background: rgba(255,255,255,0.05); padding: 4px 12px; border-radius: 6px;">
-        High Cash Distribution (8.9% – 12.4% p.a.)
+      <div style="display: flex; gap: 10px; align-items: center; flex-wrap: wrap;">
+        <div style="display: inline-flex; gap: 6px;">
+          <button type="button" id="invitViewCardsBtn" onclick="switchReitSectionView('invit', 'cards')" class="btn btn-primary btn-sm" style="border-radius: 9999px; font-size: 12px; padding: 6px 14px;">
+            <svg class="glyph" style="width: 13px; height: 13px; vertical-align: -2px;"><use href="#icon-multi-asset"></use></svg> Snapshot Cards
+          </button>
+          <button type="button" id="invitViewTableBtn" onclick="switchReitSectionView('invit', 'table')" class="btn btn-secondary btn-sm" style="border-radius: 9999px; font-size: 12px; padding: 6px 14px;">
+            <svg class="glyph" style="width: 13px; height: 13px; vertical-align: -2px;"><use href="#glyph-chart"></use></svg> Compact Table
+          </button>
+        </div>
+        <div style="font-size: 12px; color: #94a3b8; background: rgba(255,255,255,0.05); padding: 4px 12px; border-radius: 6px;">
+          High Cash Distribution (8.9% – 12.4% p.a.)
+        </div>
       </div>
     </div>
 
+    <!-- InvIT Snapshot Biscuit Card Grid (Default) -->
+    <div id="invitCardsGrid" style="display: grid; grid-template-columns: repeat(auto-fill, minmax(340px, 1fr)); gap: 20px;">
+      {% for r in reit_audit.reits %}
+      {% if r.structure_type == 'INVIT' %}
+      <div class="card asset-card-accent" style="padding: 20px; border-radius: 14px; display: flex; flex-direction: column; justify-content: space-between; transition: transform 0.2s ease, box-shadow 0.2s ease;">
+        <div>
+          <div style="display: flex; justify-content: space-between; align-items: center; gap: 8px; margin-bottom: 10px;">
+            {% if r.details.subtype == 'TRANSMISSION_ANNUITY' %}
+              <span style="background: rgba(16, 185, 129, 0.15); color: #34d399; padding: 3px 10px; border-radius: 9999px; font-size: 11px; font-weight: 700;">
+                Availability Annuity • Zero Traffic Risk
+              </span>
+            {% else %}
+              <span style="background: rgba(245, 158, 11, 0.15); color: #fbbf24; padding: 3px 10px; border-radius: 9999px; font-size: 11px; font-weight: 700;">
+                Toll Volume Concession • Inflation Indexed
+              </span>
+            {% endif %}
+            <span style="font-size: 10.5px; font-weight: 700; color: #c084fc; background: rgba(168, 85, 247, 0.12); padding: 2px 8px; border-radius: 9999px;">
+              Sec 115UA
+            </span>
+          </div>
+
+          <div style="display: flex; justify-content: space-between; align-items: baseline; margin-bottom: 4px;">
+            <a href="/reits/{{ r.symbol }}" style="font-size: 19px; font-weight: 800; color: #f8fafc; text-decoration: none; font-family: monospace;">{{ r.symbol }}</a>
+            <span style="font-size: 11.5px; font-weight: 700; color: #94a3b8;" class="tnum">{{ r.wale_years }}y Concession Life</span>
+          </div>
+          <h3 style="font-size: 13.5px; font-weight: 600; color: #cbd5e1; margin: 0 0 14px 0; line-height: 1.4;">{{ r.name }}</h3>
+
+          <!-- 3-Column Price / NAV / Yield Strip -->
+          <div style="display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; background: rgba(15, 23, 42, 0.45); border: 1px solid rgba(255, 255, 255, 0.08); border-radius: 10px; padding: 10px 12px; margin-bottom: 12px;">
+            <div>
+              <div style="font-size: 10px; color: #64748b; text-transform: uppercase; font-weight: 700;">Current Price</div>
+              <div style="font-size: 14px; font-weight: 800; color: #f8fafc;" class="tnum">₹{{ "{:,.2f}".format(r.current_price) }}</div>
+            </div>
+            <div>
+              <div style="font-size: 10px; color: #64748b; text-transform: uppercase; font-weight: 700;">Assessed NAV</div>
+              <div style="font-size: 14px; font-weight: 700; color: #94a3b8;" class="tnum">₹{{ "{:,.2f}".format(r.nav_per_unit) }}</div>
+            </div>
+            <div>
+              <div style="font-size: 10px; color: #64748b; text-transform: uppercase; font-weight: 700;">Dist. Yield</div>
+              <div style="font-size: 15px; font-weight: 800; color: #10b981;" class="tnum">{{ r.distribution_yield_pct }}%</div>
+            </div>
+          </div>
+
+          <!-- 4-Cell Concession Audit Metrics -->
+          <div style="display: grid; grid-template-columns: repeat(2, 1fr); gap: 8px; margin-bottom: 16px;">
+            <div style="background: rgba(15, 23, 42, 0.35); border: 1px solid rgba(255, 255, 255, 0.06); border-radius: 8px; padding: 8px 10px; display: flex; justify-content: space-between; align-items: center;">
+              <span style="font-size: 11px; color: #64748b; font-weight: 600;">Scale / Driver</span>
+              <span style="font-size: 11.5px; font-weight: 700; color: #cbd5e1;" class="tnum">
+                {% if r.details.availability_factor %}{{ r.details.availability_factor }}{% elif r.details.traffic_growth_cagr %}+{{ r.details.traffic_growth_cagr }} CAGR{% else %}99.0%+{% endif %}
+              </span>
+            </div>
+            <div style="background: rgba(15, 23, 42, 0.35); border: 1px solid rgba(255, 255, 255, 0.06); border-radius: 8px; padding: 8px 10px; display: flex; justify-content: space-between; align-items: center;">
+              <span style="font-size: 11px; color: #64748b; font-weight: 600;">NDCF Payout</span>
+              <span style="font-size: 12.5px; font-weight: 800; color: #38bdf8;" class="tnum">{{ r.ndcf_payout_purity_pct }}%</span>
+            </div>
+            <div style="background: rgba(15, 23, 42, 0.35); border: 1px solid rgba(255, 255, 255, 0.06); border-radius: 8px; padding: 8px 10px; display: flex; justify-content: space-between; align-items: center;">
+              <span style="font-size: 11px; color: #64748b; font-weight: 600;">LTV Leverage</span>
+              <span style="font-size: 12.5px; font-weight: 700; color: #cbd5e1;" class="tnum">{{ r.ltv_ratio_pct }}%</span>
+            </div>
+            <div style="background: rgba(15, 23, 42, 0.35); border: 1px solid rgba(255, 255, 255, 0.06); border-radius: 8px; padding: 8px 10px; display: flex; justify-content: space-between; align-items: center;">
+              <span style="font-size: 11px; color: #64748b; font-weight: 600;">Concession Life</span>
+              <span style="font-size: 12.5px; font-weight: 700; color: #f8fafc;" class="tnum">{{ r.wale_years }} Years</span>
+            </div>
+          </div>
+        </div>
+
+        <div style="display: flex; gap: 8px;">
+          <a href="/reits/{{ r.symbol }}" onclick='return window.triggerDossierNavigation(event, "/reits/{{ r.symbol }}", {{ r.symbol|tojson }}, "REIT");' class="btn btn-primary btn-sm" style="flex: 1; text-align: center; justify-content: center; font-size: 12.5px; font-weight: 700; padding: 9px 12px; border-radius: 8px; text-decoration: none;">
+            Open InvIT Dossier &rarr;
+          </a>
+          <a href="/api/pdf/reit/{{ r.symbol }}" class="btn btn-secondary btn-sm" style="font-size: 12px; padding: 9px 12px; border-radius: 8px; text-decoration: none;" title="Download PDF Dossier">
+            <svg class="glyph" style="width: 12px; height: 12px;"><use href="#icon-download"></use></svg> PDF
+          </a>
+        </div>
+      </div>
+      {% endif %}
+      {% endfor %}
+    </div>
+
+    <!-- InvIT Compact Table View (Optional Toggle) -->
+    <div id="invitTableViewWrap" style="display: none;">
     <div class="table-sticky-wrap">
       <table class="table-sticky" style="width: 100%; border-collapse: collapse; font-size: 13.5px;">
         <thead class="sticky-thead">
@@ -413,6 +600,7 @@
         </tbody>
       </table>
     </div>
+    </div>
   </div>
 
   <!-- Section 3: Sovereign Gold Bond (SGB) Secondary Market Parity Scanner -->
@@ -432,10 +620,20 @@
         </p>
       </div>
 
-      <div style="background: rgba(15, 23, 42, 0.6); border: 1px solid rgba(255, 255, 255, 0.08); border-radius: 10px; padding: 12px 18px; text-align: right;">
-        <div style="font-size: 11px; color: #64748b; text-transform: uppercase;">Domestic Spot Gold Reference</div>
-        <div style="font-size: 20px; font-weight: 800; color: #eab308;" class="tnum">₹7,450 / gram (999 Purity)</div>
-        <div style="font-size: 11px; color: #94a3b8;">IBJA Benchmark Closing</div>
+      <div style="display: flex; flex-direction: column; align-items: flex-end; gap: 10px;">
+        <div style="display: inline-flex; gap: 6px;">
+          <button type="button" id="sgbViewCardsBtn" onclick="switchReitSectionView('sgb', 'cards')" class="btn btn-primary btn-sm" style="border-radius: 9999px; font-size: 12px; padding: 6px 14px;">
+            <svg class="glyph" style="width: 13px; height: 13px; vertical-align: -2px;"><use href="#icon-multi-asset"></use></svg> Snapshot Cards
+          </button>
+          <button type="button" id="sgbViewTableBtn" onclick="switchReitSectionView('sgb', 'table')" class="btn btn-secondary btn-sm" style="border-radius: 9999px; font-size: 12px; padding: 6px 14px;">
+            <svg class="glyph" style="width: 13px; height: 13px; vertical-align: -2px;"><use href="#glyph-chart"></use></svg> Compact Table
+          </button>
+        </div>
+        <div style="background: rgba(15, 23, 42, 0.6); border: 1px solid rgba(255, 255, 255, 0.08); border-radius: 10px; padding: 12px 18px; text-align: right;">
+          <div style="font-size: 11px; color: #64748b; text-transform: uppercase;">Domestic Spot Gold Reference</div>
+          <div style="font-size: 20px; font-weight: 800; color: #eab308;" class="tnum">₹7,450 / gram (999 Purity)</div>
+          <div style="font-size: 11px; color: #94a3b8;">IBJA Benchmark Closing</div>
+        </div>
       </div>
     </div>
 
@@ -468,7 +666,60 @@
       </div>
     </div>
 
-    <!-- SGB Tranches Table -->
+    <!-- SGB Snapshot Biscuit Card Grid (Default) -->
+    <div id="sgbCardsGrid" style="display: grid; grid-template-columns: repeat(auto-fill, minmax(340px, 1fr)); gap: 20px;">
+      {% for sgb in sgb_audit.tranches %}
+      <div class="card asset-card-accent" style="padding: 20px; border-radius: 14px; display: flex; flex-direction: column; justify-content: space-between; transition: transform 0.2s ease, box-shadow 0.2s ease;">
+        <div>
+          <div style="display: flex; justify-content: space-between; align-items: center; gap: 8px; margin-bottom: 10px;">
+            <span style="background: rgba(234, 179, 8, 0.15); color: #facc15; border: 1px solid rgba(234, 179, 8, 0.3); padding: 3px 10px; border-radius: 9999px; font-size: 11px; font-weight: 700;">
+              Sec 47(viic) Tax-Free Maturity
+            </span>
+            <span style="font-size: 11px; font-weight: 700; color: #94a3b8;" class="tnum">
+              Matures {{ sgb.maturity_date }}
+            </span>
+          </div>
+
+          <div style="display: flex; justify-content: space-between; align-items: baseline; margin-bottom: 4px;">
+            <span style="font-size: 18px; font-weight: 800; color: #f8fafc; font-family: monospace;">{{ sgb.symbol }}</span>
+            <span style="font-size: 12px; font-weight: 800; color: #10b981;" class="tnum">{{ sgb.discount_to_spot_pct }}% vs Spot</span>
+          </div>
+          <h3 style="font-size: 13px; font-weight: 600; color: #cbd5e1; margin: 0 0 14px 0; line-height: 1.4;">{{ sgb.series_name }}</h3>
+
+          <!-- 3-Column Market Price / Spot Parity / Compound YTM Strip -->
+          <div style="display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; background: rgba(15, 23, 42, 0.45); border: 1px solid rgba(255, 255, 255, 0.08); border-radius: 10px; padding: 10px 12px; margin-bottom: 12px;">
+            <div>
+              <div style="font-size: 10px; color: #64748b; text-transform: uppercase; font-weight: 700;">Market Price</div>
+              <div style="font-size: 14px; font-weight: 800; color: #f8fafc;" class="tnum">₹{{ "{:,.0f}".format(sgb.market_price) }}</div>
+            </div>
+            <div>
+              <div style="font-size: 10px; color: #64748b; text-transform: uppercase; font-weight: 700;">Spot Parity</div>
+              <div style="font-size: 14px; font-weight: 700; color: #94a3b8;" class="tnum">₹{{ "{:,.0f}".format(sgb.spot_gold_price) }}</div>
+            </div>
+            <div>
+              <div style="font-size: 10px; color: #64748b; text-transform: uppercase; font-weight: 700;">Compound YTM</div>
+              <div style="font-size: 15px; font-weight: 800; color: #eab308;" class="tnum">{{ sgb.ytm_annualized_pct }}%</div>
+            </div>
+          </div>
+
+          <!-- 2-Cell Coupon & Tax Alpha Strip -->
+          <div style="display: grid; grid-template-columns: repeat(2, 1fr); gap: 8px;">
+            <div style="background: rgba(15, 23, 42, 0.35); border: 1px solid rgba(255, 255, 255, 0.06); border-radius: 8px; padding: 8px 10px; display: flex; justify-content: space-between; align-items: center;">
+              <span style="font-size: 11px; color: #64748b; font-weight: 600;">Sovereign Coupon</span>
+              <span style="font-size: 12px; font-weight: 800; color: #38bdf8;" class="tnum">{{ sgb.annual_coupon_rate }}% p.a.</span>
+            </div>
+            <div style="background: rgba(15, 23, 42, 0.35); border: 1px solid rgba(255, 255, 255, 0.06); border-radius: 8px; padding: 8px 10px; display: flex; justify-content: space-between; align-items: center;">
+              <span style="font-size: 11px; color: #64748b; font-weight: 600;">Tax Alpha vs ETF</span>
+              <span style="font-size: 12px; font-weight: 800; color: #34d399;" class="tnum">+{{ sgb.etf_tax_adjusted_spread_pct }}% p.a.</span>
+            </div>
+          </div>
+        </div>
+      </div>
+      {% endfor %}
+    </div>
+
+    <!-- SGB Tranches Table (Optional Toggle) -->
+    <div id="sgbTableViewWrap" style="display: none;">
     <div class="table-sticky-wrap">
       <table class="table-sticky" style="width: 100%; border-collapse: collapse; font-size: 13.5px;">
         <thead class="sticky-thead">
@@ -518,6 +769,7 @@
           {% endfor %}
         </tbody>
       </table>
+    </div>
     </div>
   </div>
 
@@ -854,6 +1106,32 @@
       document.getElementById("dirSummaryText").textContent = 
         `At a ${dirSelectedSlab.toFixed(1)}% tax slab, ${entityName} delivers an effective in-hand yield of ${netYield.toFixed(2)}% (vs ${grossYield.toFixed(2)}% gross), with a tax drag of ${taxDragBps} bps because ${protectedPct}% of its distribution (${Math.round(normRoc)}% Return of Capital + ${Math.round(normDiv)}% SPV-exempt Dividend) is completely shielded from slab taxation under Section 115UA.`;
     }
+
+    function switchReitSectionView(sectionKey, mode) {
+      const map = {
+        smReit: { cards: 'reitCardsGrid', table: 'smReitTableViewWrap', cardsBtn: 'smReitViewCardsBtn', tableBtn: 'smReitViewTableBtn' },
+        invit: { cards: 'invitCardsGrid', table: 'invitTableViewWrap', cardsBtn: 'invitViewCardsBtn', tableBtn: 'invitViewTableBtn' },
+        sgb: { cards: 'sgbCardsGrid', table: 'sgbTableViewWrap', cardsBtn: 'sgbViewCardsBtn', tableBtn: 'sgbViewTableBtn' }
+      };
+      const cfg = map[sectionKey];
+      if (!cfg) return;
+      const cardsEl = document.getElementById(cfg.cards);
+      const tableEl = document.getElementById(cfg.table);
+      const cardsBtn = document.getElementById(cfg.cardsBtn);
+      const tableBtn = document.getElementById(cfg.tableBtn);
+      if (mode === 'table') {
+        if (cardsEl) cardsEl.style.display = 'none';
+        if (tableEl) tableEl.style.display = 'block';
+        if (cardsBtn) { cardsBtn.classList.remove('btn-primary'); cardsBtn.classList.add('btn-secondary'); }
+        if (tableBtn) { tableBtn.classList.remove('btn-secondary'); tableBtn.classList.add('btn-primary'); }
+      } else {
+        if (cardsEl) cardsEl.style.display = 'grid';
+        if (tableEl) tableEl.style.display = 'none';
+        if (cardsBtn) { cardsBtn.classList.remove('btn-secondary'); cardsBtn.classList.add('btn-primary'); }
+        if (tableBtn) { tableBtn.classList.remove('btn-primary'); tableBtn.classList.add('btn-secondary'); }
+      }
+    }
+    window.switchReitSectionView = switchReitSectionView;
 
     // Run on load
     document.addEventListener("DOMContentLoaded", function() {

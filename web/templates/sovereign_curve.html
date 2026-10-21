@@ -265,13 +265,68 @@
           Statutory RBI clearing yields from 91-Day T-Bills to the 50-Year G-Sec benchmark and Sovereign Green Bonds.
         </p>
       </div>
-      <div style="display: flex; gap: 10px;">
+      <div style="display: flex; gap: 10px; align-items: center; flex-wrap: wrap;">
+        <div style="display: inline-flex; gap: 6px;">
+          <button type="button" id="sovTenorViewCardsBtn" onclick="switchSovereignView('tenors', 'cards')" class="btn btn-primary btn-sm" style="border-radius: 9999px; font-size: 12px; padding: 6px 14px;">
+            <svg class="glyph" style="width: 13px; height: 13px; vertical-align: -2px;"><use href="#icon-multi-asset"></use></svg> Snapshot Cards
+          </button>
+          <button type="button" id="sovTenorViewTableBtn" onclick="switchSovereignView('tenors', 'table')" class="btn btn-secondary btn-sm" style="border-radius: 9999px; font-size: 12px; padding: 6px 14px;">
+            <svg class="glyph" style="width: 13px; height: 13px; vertical-align: -2px;"><use href="#glyph-chart"></use></svg> Compact Table
+          </button>
+        </div>
         <a href="/calculator/tax?yield={{ analytics.benchmark_10y_gsec }}" class="btn btn-secondary btn-sm">
           <svg class="glyph" style="width: 13px; height: 13px; vertical-align: -2px;"><use href="#icon-valuation"></use></svg> Compute 10Y Post-Tax Return
         </a>
       </div>
     </div>
 
+    <!-- Sovereign Tenors Snapshot Biscuit Card Grid (Default) -->
+    <div id="sovereignTenorCardsGrid" style="display: grid; grid-template-columns: repeat(auto-fill, minmax(300px, 1fr)); gap: 18px;">
+      {% for pt in analytics.curve_points %}
+      {% set spread = (pt.cut_off_yield - analytics.risk_free_short_tbill) * 100 %}
+      <div class="card asset-card-accent" style="padding: 18px; border-radius: 14px; display: flex; flex-direction: column; justify-content: space-between; transition: transform 0.2s ease, box-shadow 0.2s ease;">
+        <div>
+          <div style="display: flex; justify-content: space-between; align-items: center; gap: 8px; margin-bottom: 10px;">
+            {% if pt.instrument_type == 'TBILL' %}
+              <span style="background: rgba(16, 185, 129, 0.15); color: #34d399; padding: 3px 10px; border-radius: 9999px; font-size: 11px; font-weight: 700;">T-Bill • Money Market</span>
+            {% elif pt.instrument_type == 'GSEC' %}
+              <span style="background: rgba(14, 165, 233, 0.15); color: #38bdf8; padding: 3px 10px; border-radius: 9999px; font-size: 11px; font-weight: 700;">Central G-Sec</span>
+            {% elif pt.instrument_type == 'SGRB' %}
+              <span style="background: rgba(16, 185, 129, 0.2); color: #10b981; border: 1px solid rgba(16, 185, 129, 0.4); padding: 3px 10px; border-radius: 9999px; font-size: 11px; font-weight: 700;">Sovereign Green Bond</span>
+            {% else %}
+              <span style="background: rgba(168, 85, 247, 0.15); color: #c084fc; padding: 3px 10px; border-radius: 9999px; font-size: 11px; font-weight: 700;">State SDL</span>
+            {% endif %}
+            <span style="font-size: 11px; font-weight: 600; color: #94a3b8;" class="tnum">{{ pt.auction_date }}</span>
+          </div>
+
+          <div style="display: flex; justify-content: space-between; align-items: baseline; margin-bottom: 12px;">
+            <span style="font-size: 17px; font-weight: 800; color: #f8fafc;">{{ pt.tenor_label }}</span>
+            <span style="font-size: 11.5px; font-weight: 700; color: #94a3b8;" class="tnum">{{ pt.maturity_years }}Y Tenor</span>
+          </div>
+
+          <div style="display: grid; grid-template-columns: repeat(2, 1fr); gap: 8px; background: rgba(15, 23, 42, 0.45); border: 1px solid rgba(255, 255, 255, 0.08); border-radius: 10px; padding: 10px 12px; margin-bottom: 14px;">
+            <div>
+              <div style="font-size: 10px; color: #64748b; text-transform: uppercase; font-weight: 700;">RBI Cut-Off Yield</div>
+              <div style="font-size: 16px; font-weight: 800; color: #10b981;" class="tnum">{{ pt.cut_off_yield }}%</div>
+            </div>
+            <div>
+              <div style="font-size: 10px; color: #64748b; text-transform: uppercase; font-weight: 700;">Spread vs 91D</div>
+              <div style="font-size: 14px; font-weight: 800; color: #f59e0b;" class="tnum">
+                {% if spread >= 0 %}+{{ spread|round(1) }} bps{% else %}{{ spread|round(1) }} bps{% endif %}
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <a href="/calculator/tax?yield={{ pt.cut_off_yield }}" class="btn btn-secondary btn-sm" style="width: 100%; text-align: center; justify-content: center; font-size: 12px; font-weight: 700; padding: 8px 12px; border-radius: 8px; text-decoration: none;">
+          Simulate Post-Tax Return &rarr;
+        </a>
+      </div>
+      {% endfor %}
+    </div>
+
+    <!-- Sovereign Tenors Compact Table View (Optional Toggle) -->
+    <div id="sovereignTenorsTableViewWrap" style="display: none;">
     <div class="table-sticky-wrap">
       <table class="table-sticky" style="width: 100%; border-collapse: collapse; font-size: 14px;">
         <thead class="sticky-thead">
@@ -325,6 +380,7 @@
         </tbody>
       </table>
     </div>
+    </div>
   </div>
 
   <!-- State Development Loan (SDL) Fiscal Disparity Matrix -->
@@ -344,13 +400,76 @@
         </p>
       </div>
 
-      <div style="background: rgba(15, 23, 42, 0.6); border: 1px solid rgba(255, 255, 255, 0.08); border-radius: 10px; padding: 12px 18px; text-align: right;">
-        <div style="font-size: 11px; color: #64748b; text-transform: uppercase;">Sovereign Benchmark Anchor</div>
-        <div style="font-size: 18px; font-weight: 800; color: #38bdf8;" class="tnum">10Y G-Sec: {{ analytics.benchmark_10y_gsec }}%</div>
+      <div style="display: flex; flex-direction: column; align-items: flex-end; gap: 10px;">
+        <div style="display: inline-flex; gap: 6px;">
+          <button type="button" id="sdlViewCardsBtn" onclick="switchSovereignView('sdl', 'cards')" class="btn btn-primary btn-sm" style="border-radius: 9999px; font-size: 12px; padding: 6px 14px;">
+            <svg class="glyph" style="width: 13px; height: 13px; vertical-align: -2px;"><use href="#icon-multi-asset"></use></svg> Snapshot Cards
+          </button>
+          <button type="button" id="sdlViewTableBtn" onclick="switchSovereignView('sdl', 'table')" class="btn btn-secondary btn-sm" style="border-radius: 9999px; font-size: 12px; padding: 6px 14px;">
+            <svg class="glyph" style="width: 13px; height: 13px; vertical-align: -2px;"><use href="#glyph-chart"></use></svg> Compact Table
+          </button>
+        </div>
+        <div style="background: rgba(15, 23, 42, 0.6); border: 1px solid rgba(255, 255, 255, 0.08); border-radius: 10px; padding: 12px 18px; text-align: right;">
+          <div style="font-size: 11px; color: #64748b; text-transform: uppercase;">Sovereign Benchmark Anchor</div>
+          <div style="font-size: 18px; font-weight: 800; color: #38bdf8;" class="tnum">10Y G-Sec: {{ analytics.benchmark_10y_gsec }}%</div>
+        </div>
       </div>
     </div>
 
-    <!-- SDL Grid Table -->
+    <!-- SDL Snapshot Biscuit Card Grid (Default) -->
+    <div id="sdlCardsGrid" style="display: grid; grid-template-columns: repeat(auto-fill, minmax(320px, 1fr)); gap: 18px;">
+      {% for state in analytics.sdl_matrix %}
+      <div class="card asset-card-accent" style="padding: 18px; border-radius: 14px; display: flex; flex-direction: column; justify-content: space-between; transition: transform 0.2s ease, box-shadow 0.2s ease;">
+        <div>
+          <div style="display: flex; justify-content: space-between; align-items: center; gap: 8px; margin-bottom: 10px;">
+            {% if state.fiscal_tier == 'TIER_1_PRUDENT' %}
+              <span style="background: rgba(16, 185, 129, 0.15); color: #34d399; border: 1px solid rgba(16, 185, 129, 0.3); padding: 3px 10px; border-radius: 9999px; font-size: 11px; font-weight: 700;">
+                Tier 1: Prudent (&lt;35 bps)
+              </span>
+            {% elif state.fiscal_tier == 'TIER_2_MODERATE' %}
+              <span style="background: rgba(245, 158, 11, 0.15); color: #fbbf24; border: 1px solid rgba(245, 158, 11, 0.3); padding: 3px 10px; border-radius: 9999px; font-size: 11px; font-weight: 700;">
+                Tier 2: Moderate (35–45 bps)
+              </span>
+            {% else %}
+              <span style="background: rgba(239, 68, 68, 0.15); color: #f87171; border: 1px solid rgba(239, 68, 68, 0.3); padding: 3px 10px; border-radius: 9999px; font-size: 11px; font-weight: 700;">
+                Tier 3: Stressed (&gt;45 bps)
+              </span>
+            {% endif %}
+            <span style="font-size: 10.5px; font-weight: 700; color: #38bdf8; background: rgba(14, 165, 233, 0.12); padding: 2px 8px; border-radius: 9999px;">
+              RBI Auto-Debit
+            </span>
+          </div>
+
+          <div style="display: flex; justify-content: space-between; align-items: baseline; margin-bottom: 12px;">
+            <span style="font-size: 17px; font-weight: 800; color: #f8fafc;">{{ state.state_name }} <span style="font-size: 12px; color: #64748b; font-family: monospace;">({{ state.state_code }})</span></span>
+            <span style="font-size: 11px; color: #94a3b8;" class="tnum">{{ state.auction_date }}</span>
+          </div>
+
+          <div style="display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; background: rgba(15, 23, 42, 0.45); border: 1px solid rgba(255, 255, 255, 0.08); border-radius: 10px; padding: 10px 12px; margin-bottom: 14px;">
+            <div>
+              <div style="font-size: 10px; color: #64748b; text-transform: uppercase; font-weight: 700;">10Y Cut-Off</div>
+              <div style="font-size: 15px; font-weight: 800; color: #f8fafc;" class="tnum">{{ state.cut_off_yield }}%</div>
+            </div>
+            <div>
+              <div style="font-size: 10px; color: #64748b; text-transform: uppercase; font-weight: 700;">Spread vs G-Sec</div>
+              <div style="font-size: 14px; font-weight: 800; color: {% if state.spread_over_gsec_bps < 35 %}#34d399{% elif state.spread_over_gsec_bps < 48 %}#fbbf24{% else %}#f87171{% endif %};" class="tnum">+{{ state.spread_over_gsec_bps }} bps</div>
+            </div>
+            <div>
+              <div style="font-size: 10px; color: #64748b; text-transform: uppercase; font-weight: 700;">Debt / GSDP</div>
+              <div style="font-size: 14px; font-weight: 700; color: #cbd5e1;" class="tnum">{{ state.debt_to_gsdp_pct }}%</div>
+            </div>
+          </div>
+        </div>
+
+        <a href="/calculator/tax?yield={{ state.cut_off_yield }}" class="btn btn-secondary btn-sm" style="width: 100%; text-align: center; justify-content: center; font-size: 12px; font-weight: 700; padding: 8px 12px; border-radius: 8px; text-decoration: none;">
+          Simulate State SDL Post-Tax Return &rarr;
+        </a>
+      </div>
+      {% endfor %}
+    </div>
+
+    <!-- SDL Grid Table (Optional Toggle) -->
+    <div id="sdlTableViewWrap" style="display: none;">
     <div style="overflow-x: auto;">
       <table style="width: 100%; border-collapse: collapse; font-size: 14px;">
         <thead>
@@ -411,6 +530,7 @@
           {% endfor %}
         </tbody>
       </table>
+    </div>
     </div>
 
     <div style="background: rgba(14, 165, 233, 0.05); border: 1px solid rgba(14, 165, 233, 0.2); border-radius: 8px; padding: 14px 16px; margin-top: 18px; font-size: 12.5px; color: #94a3b8; line-height: 1.6;">
@@ -500,5 +620,30 @@
     const tooltip = document.getElementById('curveTooltip');
     if (tooltip) tooltip.style.display = 'none';
   }
+
+  function switchSovereignView(sectionKey, mode) {
+    const map = {
+      tenors: { cards: 'sovereignTenorCardsGrid', table: 'sovereignTenorsTableViewWrap', cardsBtn: 'sovTenorViewCardsBtn', tableBtn: 'sovTenorViewTableBtn' },
+      sdl: { cards: 'sdlCardsGrid', table: 'sdlTableViewWrap', cardsBtn: 'sdlViewCardsBtn', tableBtn: 'sdlViewTableBtn' }
+    };
+    const cfg = map[sectionKey];
+    if (!cfg) return;
+    const cardsEl = document.getElementById(cfg.cards);
+    const tableEl = document.getElementById(cfg.table);
+    const cardsBtn = document.getElementById(cfg.cardsBtn);
+    const tableBtn = document.getElementById(cfg.tableBtn);
+    if (mode === 'table') {
+      if (cardsEl) cardsEl.style.display = 'none';
+      if (tableEl) tableEl.style.display = 'block';
+      if (cardsBtn) { cardsBtn.classList.remove('btn-primary'); cardsBtn.classList.add('btn-secondary'); }
+      if (tableBtn) { tableBtn.classList.remove('btn-secondary'); tableBtn.classList.add('btn-primary'); }
+    } else {
+      if (cardsEl) cardsEl.style.display = 'grid';
+      if (tableEl) tableEl.style.display = 'none';
+      if (cardsBtn) { cardsBtn.classList.remove('btn-secondary'); cardsBtn.classList.add('btn-primary'); }
+      if (tableBtn) { tableBtn.classList.remove('btn-primary'); tableBtn.classList.add('btn-secondary'); }
+    }
+  }
+  window.switchSovereignView = switchSovereignView;
 </script>
 {% endblock %}
