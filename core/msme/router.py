@@ -18,12 +18,14 @@ router = APIRouter()
 
 
 def json_response_with_cache(data: dict, ttl_seconds: int = 300) -> JSONResponse:
-    """Simple cache wrapper for server-side HTTP caching."""
+    """Simple cache wrapper for server-side HTTP caching (PostgreSQL date/Decimal safe)."""
     import json, hashlib
-    content = json.dumps(data, sort_keys=True, default=str)
+    from fastapi.encoders import jsonable_encoder
+    safe_data = jsonable_encoder(data)
+    content = json.dumps(safe_data, sort_keys=True, default=str)
     etag = hashlib.sha256(content.encode()).hexdigest()
     return JSONResponse(
-        content=data,
+        content=safe_data,
         headers={
             "Cache-Control": f"public, max-age={ttl_seconds}",
             "ETag": etag,
@@ -192,7 +194,7 @@ def search_msme(
             "state": r[4],
             "annual_turnover": turnover,
             "employee_count": int(r[6]) if r[6] is not None else None,
-            "registration_date": r[7],
+            "registration_date": str(r[7]) if r[7] is not None else None,
             "source": r[8],
             "tier": classify_msme_tier(turnover)
         })
@@ -237,9 +239,34 @@ def get_msme_detail(uin: str) -> Optional[Dict[str, Any]]:
             logger.debug(f"Connection close notice: {e}")
 
     if not row:
+        # Resilient fallback to canonical/daily MSME catalogs if DB row was not yet seeded
+        clean_target = uin.strip().upper()
+        try:
+            from core.msme.seed import CANONICAL_MSME_FIRMS
+            from core.msme.daily_ingest import DAILY_MSME_CATALOG
+            for cand in list(CANONICAL_MSME_FIRMS) + list(DAILY_MSME_CATALOG):
+                if str(cand.get("uin", "")).strip().upper() == clean_target:
+                    row = (
+                        cand["uin"],
+                        cand["name"],
+                        cand.get("sector_code", ""),
+                        cand.get("sector_name", ""),
+                        cand.get("city", ""),
+                        cand.get("state", ""),
+                        cand.get("annual_turnover"),
+                        cand.get("employee_count"),
+                        cand.get("registration_date"),
+                        cand.get("source", "Udyam Gazette / Open Registry"),
+                    )
+                    break
+        except Exception as e:
+            logger.warning(f"MSME catalog fallback lookup notice for {clean_target}: {e}")
+
+    if not row:
         return None
 
     turnover = float(row[6]) if row[6] is not None else None
+    reg_date_str = str(row[8]) if row[8] is not None else None
     base_data = {
         "uin": row[0],
         "name": row[1],
@@ -250,9 +277,9 @@ def get_msme_detail(uin: str) -> Optional[Dict[str, Any]]:
         "state": row[5],
         "annual_turnover": turnover,
         "employee_count": int(row[7]) if row[7] is not None else None,
-        "registration_date": row[8],
+        "registration_date": reg_date_str,
         "source": row[9],
-        "last_updated": str(row[8]) if row[8] else None,
+        "last_updated": reg_date_str,
         "tier": classify_msme_tier(turnover)
     }
 

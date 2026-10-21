@@ -1697,6 +1697,23 @@ class TestCompetitiveEnhancements(unittest.TestCase):
                 f"Directory route {forbidden_dir_hud} must not trigger the Report Evaluation HUD in resolveEvaluationTarget",
             )
 
+        # Verify PostgreSQL datetime.date / Decimal serialization safety on /api/msme/{uin} and /api/msme/search
+        import datetime
+        import decimal
+        from core.msme.router import json_response_with_cache as msme_json_cache
+        pg_type_payload = {
+            "uin": "UDYAM-AP-10-0023910",
+            "registration_date": datetime.date(2020, 7, 25),
+            "annual_turnover": decimal.Decimal("188.0"),
+        }
+        pg_resp = msme_json_cache(pg_type_payload, ttl_seconds=300)
+        self.assertEqual(pg_resp.status_code, 200)
+        self.assertIn(b"2020-07-25", pg_resp.body)
+
+        r_msme_api = self.client.get("/api/msme/UDYAM-AP-10-0023910")
+        self.assertEqual(r_msme_api.status_code, 200)
+        self.assertEqual(r_msme_api.json().get("uin"), "UDYAM-AP-10-0023910")
+
 
 if __name__ == "__main__":
     unittest.main()

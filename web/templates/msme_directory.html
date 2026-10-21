@@ -496,7 +496,7 @@ async function inspectMsme(uin, btnElement) {
   try {
     const res = await fetch(`/api/msme/${encodeURIComponent(uin)}`);
     if (!res.ok) {
-      alert("Unable to fetch enterprise report.");
+      window.location.href = `/msme/${encodeURIComponent(uin)}`;
       return;
     }
     const data = await res.json();
@@ -579,13 +579,16 @@ async function inspectMsme(uin, btnElement) {
       pdfLink.href = `/api/pdf/msme/${encodeURIComponent(data.uin)}`;
     }
 
-    // Open Modal
+    // Open Modal (hoist to document.body for top-layer centering & inert safety)
     const modal = document.getElementById("msmeModal");
+    if (modal && modal.parentElement !== document.body) {
+      document.body.appendChild(modal);
+    }
     modal.classList.add("active");
     modal.style.display = "flex";
   } catch (err) {
     console.error("Error inspecting MSME:", err);
-    alert("Error fetching enterprise data. Please check network connection.");
+    window.location.href = `/msme/${encodeURIComponent(uin)}`;
   } finally {
     if (btnElement) {
       btnElement.innerText = origText;
