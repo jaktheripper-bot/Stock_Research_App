@@ -645,6 +645,36 @@ const EVALUATION_CONFIGS = {
       { maxSec: 30, stage: "Step 4/4: Assembling Terminal View", msg: "Rendering interactive analytics, sovereign curve visualizations, and diagnostic scorecards..." }
     ]
   },
+  etf: {
+    badge: 'Exchange Traded Fund & Arbitrage Engine',
+    title: (sym) => `Evaluating ETF Dossier: ${sym || 'Selected ETF'}`,
+    stages: [
+      { maxSec: 7, stage: "Step 1/4: Ingesting NSE/BSE Order Book & iNAV", msg: "Reading live market price, AMC intraday NAV (iNAV), and tracking difference history..." },
+      { maxSec: 16, stage: "Step 2/4: Auditing Creation Basket & Liquidity", msg: "Decomposing underlying index replication basket, impact cost, and bid-ask spread depth..." },
+      { maxSec: 25, stage: "Step 3/4: Stress-Testing Tracking Error & TER Drag", msg: "Evaluating 3-year tracking error persistence, cash drag, and expense ratio efficiency..." },
+      { maxSec: 30, stage: "Step 4/4: Finalizing ETF Execution Dossier", msg: "Compiling NAV premium/discount corridor, execution rules, and structural risk scorecard..." }
+    ]
+  },
+  reit: {
+    badge: 'Real Assets, InvITs & SGB Yield Engine',
+    title: (sym) => `Evaluating Real Asset Dossier: ${sym || 'Selected Trust'}`,
+    stages: [
+      { maxSec: 7, stage: "Step 1/4: Ingesting SEBI Trust & RBI Bullion Filings", msg: "Parsing statutory SPV cash-flow disclosures, WALE schedules, and IBJA 999 gold parity..." },
+      { maxSec: 16, stage: "Step 2/4: Auditing NDCF Distribution Purity", msg: "Decomposing tax-free return of capital, dividend vs interest split, and SPV debt headroom..." },
+      { maxSec: 25, stage: "Step 3/4: Stress-Testing NAV Discount & Occupancy", msg: "Evaluating market price discount to independent valuation NAV and tenant concentration..." },
+      { maxSec: 30, stage: "Step 4/4: Finalizing Real Asset Dossier", msg: "Assembling post-tax distribution yield matrix, refinance wall schedule, and risk verdict..." }
+    ]
+  },
+  msme: {
+    badge: 'MSME Emerging Growth & Solvency Engine',
+    title: (uin) => `Evaluating MSME Dossier: ${uin || 'Selected Enterprise'}`,
+    stages: [
+      { maxSec: 7, stage: "Step 1/4: Ingesting Udyam Registry & Cluster Data", msg: "Verifying Ministry of MSME Udyam registration, NIC 5-digit activity codes, and cluster filings..." },
+      { maxSec: 16, stage: "Step 2/4: Auditing Working Capital & Receivables", msg: "Evaluating MSME Samadhaan delayed-payment exposure, debtor cycle days, and asset turnover..." },
+      { maxSec: 25, stage: "Step 3/4: Stress-Testing Solvency & Credit Headroom", msg: "Benchmarking interest coverage, plant & machinery investment tier, and supply-chain moat..." },
+      { maxSec: 30, stage: "Step 4/4: Finalizing Enterprise Credit Dossier", msg: "Compiling emerging growth scorecard, cluster peer comparison, and governance checklist..." }
+    ]
+  },
   unlock: {
     badge: 'Cryptographic Entitlement Engine',
     title: (target) => `Unlocking Deep-Dive: ${target || 'Security'}`,
@@ -2826,88 +2856,187 @@ function startButtonProgressFill(btn, baseLabel = 'Loading Dossier') {
 // 10. Global Event Interceptors, Tactile Feedback & Sitewide Evaluation Activation
 // ==============================================================================
 
-// Helper: Determine asset evaluation metadata from URL or link element
+// Section-Accented Top Progress Ribbon for Instant Page-to-Page Navigation (Zero Timer / Non-Blocking)
+let _pageNavRibbonInterval = null;
+let _pageNavRibbonHideTimeout = null;
+
+const SECTION_NAV_ACCENTS = {
+  equities: { hex: '#0284C7', glow: 'rgba(2, 132, 199, 0.45)', gradient: 'linear-gradient(90deg, #0284C7 0%, #38BDF8 60%, #0EA5E9 100%)' },
+  funds: { hex: '#2563EB', glow: 'rgba(37, 99, 235, 0.45)', gradient: 'linear-gradient(90deg, #1D4ED8 0%, #3B82F6 60%, #60A5FA 100%)' },
+  etfs: { hex: '#0D9488', glow: 'rgba(13, 148, 136, 0.45)', gradient: 'linear-gradient(90deg, #0F766E 0%, #14B8A6 60%, #2DD4BF 100%)' },
+  debt: { hex: '#D97706', glow: 'rgba(217, 119, 6, 0.45)', gradient: 'linear-gradient(90deg, #B45309 0%, #F59E0B 60%, #FBBF24 100%)' },
+  sovereign: { hex: '#4F46E5', glow: 'rgba(79, 70, 229, 0.45)', gradient: 'linear-gradient(90deg, #4338CA 0%, #6366F1 60%, #818CF8 100%)' },
+  reits: { hex: '#EA580C', glow: 'rgba(234, 88, 12, 0.45)', gradient: 'linear-gradient(90deg, #C2410C 0%, #F97316 60%, #FB923C 100%)' },
+  opportunities: { hex: '#7C3AED', glow: 'rgba(124, 58, 237, 0.45)', gradient: 'linear-gradient(90deg, #6D28D9 0%, #8B5CF6 60%, #A78BFA 100%)' },
+  msme: { hex: '#E11D48', glow: 'rgba(225, 29, 72, 0.45)', gradient: 'linear-gradient(90deg, #BE123C 0%, #F43F5E 60%, #FB7185 100%)' },
+  safety: { hex: '#E11D48', glow: 'rgba(225, 29, 72, 0.45)', gradient: 'linear-gradient(90deg, #BE123C 0%, #F43F5E 60%, #FB7185 100%)' },
+  default: { hex: '#0E3D32', glow: 'rgba(14, 61, 50, 0.40)', gradient: 'linear-gradient(90deg, #0E3D32 0%, #0284C7 60%, #10B981 100%)' }
+};
+
+function resolveSectionAccentKey(aOrUrl) {
+  if (!aOrUrl) return 'default';
+  if (typeof aOrUrl === 'object' && aOrUrl.dataset) {
+    const explicitAttr = aOrUrl.dataset.assetClass || aOrUrl.closest?.('[data-asset-class]')?.dataset?.assetClass;
+    if (explicitAttr && SECTION_NAV_ACCENTS[explicitAttr]) return explicitAttr;
+  }
+  const p = (typeof aOrUrl === 'string')
+    ? (() => { try { return new URL(aOrUrl, window.location.origin).pathname; } catch (_) { return aOrUrl; } })()
+    : (aOrUrl.pathname || '');
+
+  if (p.startsWith('/equities') || p.startsWith('/discovery') || p.startsWith('/dossier') || p.startsWith('/search')) return 'equities';
+  if (p.startsWith('/funds') || p.startsWith('/compare')) return 'funds';
+  if (p.startsWith('/etfs')) return 'etfs';
+  if (p.startsWith('/debt')) return 'debt';
+  if (p.startsWith('/sovereign') || p.startsWith('/calculator/tax')) return 'sovereign';
+  if (p.startsWith('/reits')) return 'reits';
+  if (p.startsWith('/opportunities')) return 'opportunities';
+  if (p.startsWith('/msme')) return 'msme';
+  if (p.startsWith('/safety-radar')) return 'safety';
+  return 'default';
+}
+
+window.startPageNavigationRibbon = function(aOrUrl) {
+  const ribbon = document.getElementById('pageNavProgressRibbon');
+  const fill = document.getElementById('pageNavProgressFill');
+  if (!ribbon || !fill) return;
+
+  if (_pageNavRibbonInterval) {
+    clearInterval(_pageNavRibbonInterval);
+    _pageNavRibbonInterval = null;
+  }
+  if (_pageNavRibbonHideTimeout) {
+    clearTimeout(_pageNavRibbonHideTimeout);
+    _pageNavRibbonHideTimeout = null;
+  }
+
+  const key = resolveSectionAccentKey(aOrUrl);
+  const palette = SECTION_NAV_ACCENTS[key] || SECTION_NAV_ACCENTS.default;
+  fill.style.background = palette.gradient;
+  fill.style.boxShadow = `0 0 12px ${palette.glow}`;
+  fill.style.transition = 'none';
+  fill.style.width = '0%';
+  ribbon.classList.add('active');
+
+  if (typeof aOrUrl === 'object' && aOrUrl.classList) {
+    aOrUrl.classList.add('nav-link-transitioning');
+    aOrUrl.style.setProperty('--nav-transition-accent', palette.hex);
+  }
+
+  // Trigger immediate reflow so initial 0% -> 28% spring starts on click frame
+  void fill.offsetWidth;
+  fill.style.transition = 'width 0.22s cubic-bezier(0.22, 1, 0.36, 1)';
+  fill.style.width = '32%';
+
+  let currentPct = 32;
+  _pageNavRibbonInterval = setInterval(() => {
+    currentPct += (88 - currentPct) * 0.18;
+    fill.style.width = `${Math.min(88, currentPct).toFixed(1)}%`;
+  }, 90);
+};
+
+window.completePageNavigationRibbon = function() {
+  if (_pageNavRibbonInterval) {
+    clearInterval(_pageNavRibbonInterval);
+    _pageNavRibbonInterval = null;
+  }
+  document.querySelectorAll('.nav-link-transitioning').forEach(el => {
+    el.classList.remove('nav-link-transitioning');
+  });
+  const ribbon = document.getElementById('pageNavProgressRibbon');
+  const fill = document.getElementById('pageNavProgressFill');
+  if (!ribbon || !fill) return;
+  if (!ribbon.classList.contains('active')) return;
+
+  fill.style.transition = 'width 0.16s ease-out';
+  fill.style.width = '100%';
+  _pageNavRibbonHideTimeout = setTimeout(() => {
+    ribbon.classList.remove('active');
+    fill.style.width = '0%';
+  }, 180);
+};
+
+// Helper: Determine individual asset report/dossier evaluation metadata from URL or link element.
+// IMPORTANT: Returns non-null ONLY for individual asset reports/dossiers (or active 2-entity comparisons),
+// NEVER for top-level page/directory navigations (/equities, /funds, /etfs, /debt, /sovereign, /reits, /opportunities, /msme, etc.).
 function resolveEvaluationTarget(a) {
   if (!a || !a.pathname) return null;
-  const p = a.pathname;
+  const p = a.pathname.replace(/\/+$/, '');
 
-  // 1. Fundamental Equity Dossier
+  // 1. Fundamental Equity Dossier (/dossier/{ticker})
   if (p.startsWith('/dossier/')) {
     const raw = p.replace('/dossier/', '').split('/')[0] || '';
+    if (!raw) return null;
     const ticker = decodeURIComponent(raw).trim() || 'Selected Equity';
     return { assetType: 'equity', ticker, label: 'Evaluating Dossier' };
   }
 
-  // 2. Mutual Fund Look-Through
+  // 2. Mutual Fund Look-Through Dossier (/funds/{scheme_code}) or Active Overlap Pair
   if (p.startsWith('/funds/compare/overlap') || p.startsWith('/funds/compare')) {
-    return { assetType: 'compare', ticker: 'Portfolio Overlap & Divergence', label: 'Computing Overlap' };
+    try {
+      const u = new URL(a.href, window.location.origin);
+      const sA = u.searchParams.get('scheme_a');
+      const sB = u.searchParams.get('scheme_b');
+      if (sA && sB) {
+        return { assetType: 'compare', ticker: `${sA} vs ${sB}`, label: 'Computing Overlap' };
+      }
+    } catch (_) {}
+    return null;
   }
   if (p.startsWith('/funds/')) {
     const raw = p.replace('/funds/', '').split('/')[0] || '';
+    if (!raw || raw === 'compare') return null;
     const cardTitle = a.querySelector?.('h3, h4, .fund-title, [data-name]')?.innerText?.trim();
     const code = decodeURIComponent(raw).trim();
     return { assetType: 'fund', ticker: cardTitle || code || 'Selected Scheme', label: 'Auditing Fund' };
   }
 
-  // 3. Fixed Income & Credit Solvency
+  // 3. Corporate Bond & SDI Credit Dossier (/debt/{isin})
   if (p.startsWith('/debt/')) {
     const raw = p.replace('/debt/', '').split('/')[0] || '';
+    if (!raw) return null;
     const cardTitle = a.querySelector?.('h3, h4, .debt-title, [data-name]')?.innerText?.trim();
     const isin = decodeURIComponent(raw).trim();
     return { assetType: 'debt', ticker: cardTitle || isin || 'Corporate Bond', label: 'Auditing Credit' };
   }
 
-  // 4. Cross-Company Disparity Comparator
+  // 4. Real Asset Dossier: REITs, InvITs & SGBs (/reits/{symbol})
+  if (p.startsWith('/reits/')) {
+    const raw = p.replace('/reits/', '').split('/')[0] || '';
+    if (!raw) return null;
+    const cardTitle = a.querySelector?.('h3, h4, [data-name]')?.innerText?.trim();
+    const symbol = decodeURIComponent(raw).trim();
+    return { assetType: 'reit', ticker: cardTitle || symbol || 'Real Asset Trust', label: 'Auditing Real Asset' };
+  }
+
+  // 5. Exchange Traded Fund Dossier (/etfs/{symbol})
+  if (p.startsWith('/etfs/')) {
+    const raw = p.replace('/etfs/', '').split('/')[0] || '';
+    if (!raw) return null;
+    const cardTitle = a.querySelector?.('h3, h4, [data-name]')?.innerText?.trim();
+    const symbol = decodeURIComponent(raw).trim();
+    return { assetType: 'etf', ticker: cardTitle || symbol || 'Selected ETF', label: 'Auditing ETF' };
+  }
+
+  // 6. Unlisted MSME Enterprise Dossier (/msme/{uin})
+  if (p.startsWith('/msme/')) {
+    const raw = p.replace('/msme/', '').split('/')[0] || '';
+    if (!raw) return null;
+    const cardTitle = a.querySelector?.('h3, h4, [data-name]')?.innerText?.trim();
+    const uin = decodeURIComponent(raw).trim();
+    return { assetType: 'msme', ticker: cardTitle || uin || 'MSME Enterprise', label: 'Auditing MSME' };
+  }
+
+  // 7. Cross-Company Disparity Comparator ONLY when both peer tickers are in query params
   if (p === '/compare') {
     try {
-      const u = new URL(a.href);
+      const u = new URL(a.href, window.location.origin);
       const t1 = u.searchParams.get('a') || u.searchParams.get('ticker1');
       const t2 = u.searchParams.get('b') || u.searchParams.get('ticker2');
       if (t1 && t2) {
         return { assetType: 'compare', ticker: `${t1} vs ${t2}`, label: 'Benchmarking Peers' };
       }
     } catch (_) {}
-    return { assetType: 'compare', ticker: 'Peer Disparity Matrix', label: 'Benchmarking Peers' };
-  }
-
-  // 5. Multi-Asset Arbitrage Scanner / Opportunities
-  if (p === '/opportunities') {
-    return { assetType: 'opportunity', ticker: 'Multi-Asset Arbitrage Scanner', label: 'Scanning Spreads' };
-  }
-
-  // 6. Sovereign Curve & Macro Terminal
-  if (p === '/sovereign') {
-    return { assetType: 'macro', ticker: 'Sovereign Yield Curve & RBI Rates', label: 'Ingesting G-Secs' };
-  }
-
-  // 7. Alternative Real Assets (REITs / InvITs)
-  if (p === '/reits') {
-    return { assetType: 'opportunity', ticker: 'REITs & InvITs Yield Engine', label: 'Auditing Real Assets' };
-  }
-
-  // 8. ETFs & Index Arbitrage
-  if (p === '/etfs') {
-    return { assetType: 'macro', ticker: 'ETF Tracking Error & Arbitrage Matrix', label: 'Auditing ETFs' };
-  }
-
-  // 9. Accounting Red Flag Radar
-  if (p === '/safety-radar') {
-    return { assetType: 'equity', ticker: 'Forensic Accounting Red Flag Radar', label: 'Scanning Hazards' };
-  }
-
-  // 10. Discovery Screener
-  if (p === '/discovery') {
-    return { assetType: 'equity', ticker: 'Daily Exchange Discovery @ 9AM IST', label: 'Scanning Moats' };
-  }
-
-  // 11. MSME Emerging Growth Watchlist
-  if (p === '/msme') {
-    return { assetType: 'equity', ticker: 'MSME Emerging Growth & Solvency Radar', label: 'Auditing MSMEs' };
-  }
-
-  // 12. Post-Tax Purchasing Power Calculator
-  if (p === '/calculator/tax') {
-    return { assetType: 'opportunity', ticker: 'Post-Tax Purchasing Power Matrix', label: 'Calculating Real Yield' };
+    return null;
   }
 
   return null;
@@ -2926,6 +3055,11 @@ document.addEventListener('click', (e) => {
   }
 
   if (a.tagName === 'A' && a.href && a.origin === window.location.origin && !a.target && !e.ctrlKey && !e.metaKey && !e.shiftKey) {
+    const rawHref = a.getAttribute('href') || '';
+    if (rawHref.startsWith('#') || rawHref.startsWith('javascript:') || a.hasAttribute('download')) {
+      return;
+    }
+
     const targetMeta = resolveEvaluationTarget(a);
     if (targetMeta) {
       const cardContainer = a.closest('.card, .stat-card, [class*="card"], tr');
@@ -2940,7 +3074,7 @@ document.addEventListener('click', (e) => {
         return;
       }
 
-      // Trigger the sitewide Report Evaluation HUD with smooth pacing for link navigation
+      // Trigger the sitewide Report Evaluation HUD ONLY for individual asset reports/dossiers
       window.showEvaluationHUD({
         assetType: targetMeta.assetType,
         ticker: targetMeta.ticker,
@@ -2990,6 +3124,10 @@ document.addEventListener('click', (e) => {
           });
         });
       }
+    } else {
+      // Page-to-page navigation (/equities, /funds, /etfs, /debt, /sovereign, /reits, /opportunities, /msme, etc.):
+      // Never block or show a report timer — trigger the instantaneous Section-Accented Top Progress Ribbon.
+      window.startPageNavigationRibbon(a);
     }
   }
 }, true); // Use capture phase so listener fires immediately at the top of the event tree
@@ -3022,11 +3160,9 @@ document.addEventListener('submit', (e) => {
       const submitBtn = form.querySelector('button[type="submit"], input[type="submit"], .btn-primary');
       if (submitBtn) startButtonProgressFill(submitBtn, 'Calculating Overlap');
     }
-    // 3. Tax Calculator Form (/calculator/tax)
+    // 3. Tax Calculator Form (/calculator/tax) -> Instantaneous Ribbon (no 30s report timer)
     else if (p === '/calculator/tax') {
-      window.showEvaluationHUD({ assetType: 'opportunity', ticker: 'Post-Tax Purchasing Power Matrix', totalSec: 30 });
-      const submitBtn = form.querySelector('button[type="submit"], input[type="submit"], .btn-primary');
-      if (submitBtn) startButtonProgressFill(submitBtn, 'Recalculating');
+      window.startPageNavigationRibbon('/calculator/tax');
     }
   } catch (_) {}
 });
@@ -3059,12 +3195,14 @@ document.addEventListener('keydown', (e) => {
 // Resets all loading buttons and hides HUD whenever page is shown (back/forward cache)
 window.addEventListener('pageshow', (event) => {
   window.hideEvaluationHUD();
+  window.completePageNavigationRibbon();
   resetAllButtonProgressFills();
 });
 
 // Terminate active background intervals immediately when navigating away
 window.addEventListener('pagehide', () => {
   window.hideEvaluationHUD();
+  window.completePageNavigationRibbon();
   _activeProgressButtons.forEach(btn => {
     if (btn._progressInterval) {
       clearInterval(btn._progressInterval);
@@ -3079,11 +3217,13 @@ window.addEventListener('pagehide', () => {
 
 window.addEventListener('popstate', () => {
   window.hideEvaluationHUD();
+  window.completePageNavigationRibbon();
   resetAllButtonProgressFills();
 });
 
 document.addEventListener('DOMContentLoaded', () => {
   window.hideEvaluationHUD();
+  window.completePageNavigationRibbon();
   resetAllButtonProgressFills();
   initDwellAndTransitionTelemetry();
 });

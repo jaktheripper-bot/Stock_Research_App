@@ -1672,6 +1672,31 @@ class TestCompetitiveEnhancements(unittest.TestCase):
         self.assertIsNotNone(safety_grid, "Missing #safetyCardsGrid on /safety-radar")
         self.assertGreater(len(safety_grid.select(".asset-card-accent")), 0, "Expected .asset-card-accent cards in #safetyCardsGrid")
 
+        # Verify Page-to-Page Navigation Ribbon is present and strictly separated from Report Evaluation HUD
+        self.assertIsNotNone(soup_home.find(id="pageNavProgressRibbon"), "Missing #pageNavProgressRibbon in base.html")
+        self.assertIsNotNone(soup_home.find(id="pageNavProgressFill"), "Missing #pageNavProgressFill in base.html")
+        self.assertIn(".page-nav-progress-ribbon", css_text)
+        self.assertIn("@view-transition", css_text)
+        main_js_text = pathlib.Path("web/static/js/main.js").read_text(encoding="utf-8")
+        self.assertIn("window.startPageNavigationRibbon", main_js_text)
+        self.assertIn("window.completePageNavigationRibbon", main_js_text)
+        resolve_fn_slice = main_js_text.split("function resolveEvaluationTarget(a)")[1].split("// Global click interceptor")[0]
+        for forbidden_dir_hud in [
+            "p === '/opportunities'",
+            "p === '/sovereign'",
+            "p === '/reits'",
+            "p === '/etfs'",
+            "p === '/safety-radar'",
+            "p === '/discovery'",
+            "p === '/msme'",
+            "p === '/calculator/tax'",
+        ]:
+            self.assertNotIn(
+                forbidden_dir_hud,
+                resolve_fn_slice,
+                f"Directory route {forbidden_dir_hud} must not trigger the Report Evaluation HUD in resolveEvaluationTarget",
+            )
+
 
 if __name__ == "__main__":
     unittest.main()

@@ -4063,6 +4063,109 @@ html[data-theme="light"] .hero-portal-banner [style*="color: #c084fc" i] {
   color: #6D28D9 !important;
 }
 
+/* ==========================================================================
+   Page-to-Page Navigation Transitions (Section-Accented Top Ribbon + View Transitions)
+   Strictly separated from the Report Evaluation HUD (#synthesizingOverlay)
+   ========================================================================== */
+.page-nav-progress-ribbon {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 3px;
+  z-index: 10050;
+  pointer-events: none;
+  opacity: 0;
+  transition: opacity 0.16s ease;
+  view-transition-name: page-nav-ribbon;
+}
+
+.page-nav-progress-ribbon.active {
+  opacity: 1;
+}
+
+.page-nav-progress-fill {
+  height: 100%;
+  width: 0%;
+  border-radius: 0 999px 999px 0;
+  background: linear-gradient(90deg, #0E3D32 0%, #0284C7 60%, #10B981 100%);
+  position: relative;
+}
+
+.page-nav-progress-fill::after {
+  content: "";
+  position: absolute;
+  top: 0;
+  right: 0;
+  width: 64px;
+  height: 100%;
+  background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.75));
+  border-radius: 0 999px 999px 0;
+}
+
+.nav-link-transitioning {
+  border-color: var(--nav-transition-accent, var(--accent-cyan)) !important;
+  box-shadow: 0 0 0 2px rgba(2, 132, 199, 0.16);
+  transition: all 0.14s ease;
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  @view-transition {
+    navigation: auto;
+  }
+
+  header.site-header {
+    view-transition-name: site-header;
+  }
+
+  main {
+    view-transition-name: main-content;
+    animation: pageMainReveal 0.22s cubic-bezier(0.22, 1, 0.36, 1);
+  }
+
+  ::view-transition-old(main-content) {
+    animation: 0.14s ease-out both pageTransitionFadeOut;
+  }
+
+  ::view-transition-new(main-content) {
+    animation: 0.22s cubic-bezier(0.22, 1, 0.36, 1) both pageTransitionGlideIn;
+  }
+}
+
+@keyframes pageTransitionFadeOut {
+  from {
+    opacity: 1;
+    transform: translateY(0);
+  }
+  to {
+    opacity: 0;
+    transform: translateY(-4px);
+  }
+}
+
+@keyframes pageTransitionGlideIn {
+  from {
+    opacity: 0;
+    transform: translateY(6px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes pageMainReveal {
+  from {
+    opacity: 0.92;
+    transform: translateY(4px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+
 
 
 
