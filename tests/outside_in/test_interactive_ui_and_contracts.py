@@ -1615,10 +1615,19 @@ class TestCompetitiveEnhancements(unittest.TestCase):
                 item.get("data-asset-class"),
                 f"Dropdown item {item.get('href')} in #navToolsDropdown missing data-asset-class",
             )
+        competence_showcase = soup_home.select_one(".core-competence-showcase")
+        self.assertIsNotNone(competence_showcase, "Missing .core-competence-showcase on homepage")
+        competence_cards = competence_showcase.select(".methodology-discipline-card")
+        self.assertEqual(len(competence_cards), 4, "Expected 4 flagship competence pillars in .core-competence-showcase")
+        self.assertIn("Glass-Box Multi-Agent AI", competence_showcase.get_text())
+
         pillar_cards = soup_home.select(".pillars-grid .pillar-card")
         self.assertEqual(len(pillar_cards), 7)
         for pcard in pillar_cards:
             self.assertTrue(pcard.get("data-asset-class"), "Homepage .pillar-card missing data-asset-class")
+            self.assertTrue(pcard.get("data-href"), "Homepage .pillar-card missing data-href for whole-card link navigation")
+            self.assertEqual(pcard.get("role"), "link", "Homepage .pillar-card missing role='link'")
+            self.assertEqual(pcard.get("tabindex"), "0", "Homepage .pillar-card missing tabindex='0'")
 
         # Verify /etfs and /msme render Snapshot Biscuit Card Grids by default and never set overflow-x: visible on .table-sticky-wrap
         r_etfs = self.client.get("/etfs")

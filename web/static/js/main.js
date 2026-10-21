@@ -3042,9 +3042,77 @@ function resolveEvaluationTarget(a) {
   return null;
 }
 
-// Global click interceptor with capture: true for instant reaction
+/**
+ * Resolves the primary interactive action (<a href> or <button onclick>) inside an interactive card
+ * so that clicking anywhere on a hover-elevated card body activates its primary destination.
+ */
+const INTERACTIVE_CARD_SELECTOR = [
+  '.pillar-card',
+  '.home-stock-card',
+  '.discovery-card',
+  '.plan-card',
+  '.asset-card-accent:not(.hero-portal-banner):not(.dossier-masthead-v2)',
+  '.stat-card:not(.trust-card):not(.methodology-discipline-card)'
+].join(', ');
+
+function resolveCardPrimaryAction(card) {
+  if (!card) return null;
+  if (card.dataset && card.dataset.href) {
+    const explicitLink = card.querySelector(`a[href="${card.dataset.href}"]`) || card.querySelector('a.pillar-card-link[href], a.btn[href], a[href]');
+    if (explicitLink) return explicitLink;
+  }
+  const primaryAnchor = card.querySelector(
+    'a.pillar-card-link[href], a.btn[href], h2 a[href], h3 a[href], a[href]:not([href^="#"]):not([href^="javascript:"])'
+  );
+  if (primaryAnchor) return primaryAnchor;
+
+  const primaryBtn = card.querySelector('button.btn-primary[onclick], button.btn-secondary[onclick], button[onclick]');
+  if (primaryBtn) return primaryBtn;
+
+  return null;
+}
+
+// Progressive enhancement fallback for browsers without CSS :has() support (content-based-styling)
+function syncInteractiveCardFallbackClasses() {
+  try {
+    if (typeof CSS !== 'undefined' && typeof CSS.supports === 'function' && !CSS.supports('selector(:has(*))')) {
+      document.querySelectorAll(INTERACTIVE_CARD_SELECTOR).forEach((card) => {
+        if (resolveCardPrimaryAction(card) || (card.dataset && card.dataset.href)) {
+          card.classList.add('has-card-action');
+        }
+      });
+    }
+  } catch (_) {}
+}
+document.addEventListener('DOMContentLoaded', syncInteractiveCardFallbackClasses);
+
+// Global click interceptor with capture: true for instant reaction & site-wide card click delegation
 document.addEventListener('click', (e) => {
-  const a = e.target.closest('a, button');
+  let a = e.target.closest('a, button');
+
+  // Site-wide interactive card click delegation: if the user clicked on a card body (outside nested controls)
+  if (!a && !e.target.closest('input, select, textarea, label, summary, [role="button"]')) {
+    const selectedText = (typeof window.getSelection === 'function') ? String(window.getSelection()).trim() : '';
+    if (!selectedText) {
+      const card = e.target.closest(INTERACTIVE_CARD_SELECTOR);
+      if (card) {
+        const primaryAction = resolveCardPrimaryAction(card);
+        if (primaryAction) {
+          if ((e.metaKey || e.ctrlKey) && primaryAction.tagName === 'A' && primaryAction.href) {
+            window.open(primaryAction.href, '_blank', 'noopener');
+            return;
+          }
+          primaryAction.click();
+          return;
+        } else if (card.dataset && card.dataset.href) {
+          window.startPageNavigationRibbon(card.dataset.href);
+          window.location.href = card.dataset.href;
+          return;
+        }
+      }
+    }
+  }
+
   if (!a) return;
 
   // Prevent multiple double-clicks if already actively loading
@@ -3131,6 +3199,24 @@ document.addEventListener('click', (e) => {
     }
   }
 }, true); // Use capture phase so listener fires immediately at the top of the event tree
+
+// Keyboard accessibility (Enter / Space) for focusable interactive cards ([role="link"][data-href])
+document.addEventListener('keydown', (e) => {
+  if (e.key !== 'Enter' && e.key !== ' ') return;
+  const target = e.target;
+  if (!target || target.matches('a, button, input, select, textarea')) return;
+  const card = target.closest('.pillar-card[data-href], [role="link"][data-href]');
+  if (card && target === card) {
+    e.preventDefault();
+    const primaryAction = resolveCardPrimaryAction(card);
+    if (primaryAction) {
+      primaryAction.click();
+    } else if (card.dataset.href) {
+      window.startPageNavigationRibbon(card.dataset.href);
+      window.location.href = card.dataset.href;
+    }
+  }
+});
 
 // Global Form Submission Interceptor for Analytical Engines
 document.addEventListener('submit', (e) => {

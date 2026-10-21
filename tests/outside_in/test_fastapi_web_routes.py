@@ -81,6 +81,7 @@ Detailed forensic analysis with exact page grounding to bseindia.com filings.
         self.assertIn("One Forensic Standard Across Seven Asset Classes", res.text)
         self.assertIn("Statutory Exchange &amp; Registry Ingestion", res.text)
         self.assertIn("Deterministic Financial &amp; Risk Modelling", res.text)
+        self.assertIn("Glass-Box Multi-Agent AI &amp; Research Desk", res.text)
         self.assertIn("4-Tier Epistemic Tagging &amp; Falsification", res.text)
         self.assertNotIn("ZERO-HALLUCINATION", res.text.upper())
 
