@@ -16,26 +16,27 @@ POLICIES = {
         "description": "Terms governing the use of Moatnomics and computational research synthesis services.",
         "content_html": """
         <h3>1. Acceptance of Terms</h3>
-        <p>By accessing or using Moatnomics (the "Platform", "Service"), you agree to be bound by these Terms and Conditions. If you do not agree with any part of these terms, you must refrain from using the Service.</p>
+        <p>By accessing, browsing, or using Moatnomics (the "Platform"), whether manually or via automated systems, you agree to be bound by these Terms and Conditions. You acknowledge that you are using this Platform as an independent researcher. If you do not agree with any part of these terms, you must refrain from using the Platform.</p>
 
         <h3>2. Description of Service</h3>
-        <p>The Platform provides an automated, computational financial research synthesis software utility. The Platform aggregates publicly available exchange filings from the Bombay Stock Exchange (BSE) and National Stock Exchange (NSE), computes algorithmic financial ratios, and formats educational 7-pillar qualitative research dossiers using artificial intelligence.</p>
+        <p>Moatnomics is a multi-asset investment research platform. The Platform aggregates publicly available filings from the Bombay Stock Exchange (BSE) and National Stock Exchange (NSE), calculates standard financial metrics, and uses artificial intelligence to format structured, qualitative research reports.</p>
 
         <h3>3. Non-Advisory Safe Harbor (SEBI Compliance)</h3>
-        <p><strong>The Platform does not provide investment advice, financial planning, portfolio management services, or buy/hold/sell recommendations.</strong></p>
-        <p>Neither the Platform nor its operators are registered as Research Analysts under the SEBI (Research Analysts) Regulations, 2014, nor as Investment Advisers under SEBI (Investment Advisers) Regulations, 2013. All data, scores, qualitative pillar matrices, and syntheses are for informational, computational, and educational purposes only. You are solely responsible for conducting independent due diligence and consulting a SEBI-registered financial advisor before making any financial investment decisions.</p>
+        <p>Moatnomics operates as an independent software utility, not a registered fiduciary. The Platform does not provide investment advice, financial planning, portfolio management services, or prescriptive investment recommendations. Neither the Platform nor its operators are registered as Research Analysts under the SEBI (Research Analysts) Regulations, 2014, nor as Investment Advisers under the SEBI (Investment Advisers) Regulations, 2013.</p>
+        <p>All data, risk flags, diagnostic scores, and AI-generated qualitative reports are provided strictly for informational, educational, and auditing purposes only. You are solely responsible for conducting independent due diligence and consulting a SEBI-registered financial advisor before making any capital allocation decisions.</p>
 
         <h3>4. User Accounts and Research Credits</h3>
-        <p>Access to automated live AI syntheses requires research credits or an active Pro subscription. Credits are non-transferable, possess no cash surrender value, and are used up when a report is generated.</p>
+        <p>Reading existing, pre-generated reports is completely free. Generating a fresh report from the latest filings requires Research Credits or an active subscription. Research Credits are non-transferable and possess no cash surrender value. Because generating a new report consumes real-time server compute and third-party data resources, credits are permanently expended upon execution and are strictly non-refundable. We reserve the right to suspend accounts and revoke credits without refund if we detect abusive behaviour or automated system exploitation.</p>
 
         <h3>5. Intellectual Property</h3>
-        <p>All software architecture, algorithms, user interfaces, branding, and aggregated analysis formats are the intellectual property of the Platform operator. Users may download and print individual research reports for personal, non-commercial educational use. Reports, including any content unlocked with credits, may not be resold, republished, shared in bulk, or redistributed. Downloaded PDFs carry a personal-use notice and, when you are signed in, an anonymous account reference.</p>
+        <p>All software architecture, proprietary evaluation frameworks, user interfaces, branding, and aggregated data formats remain the exclusive intellectual property of Moatnomics. You may download individual research reports solely for personal, non-commercial use.</p>
+        <p>You are strictly prohibited from utilising automated bots, scrapers, or headless browsers to extract bulk data from the Platform. Furthermore, Moatnomics content, matrices, and reports may not be resold, republished, or used to train, fine-tune, or benchmark any external machine learning models or artificial intelligence systems. Downloaded PDFs carry a personal-use notice and cryptographically trace back to the initiating account to prevent unauthorised commercial redistribution.</p>
 
         <h3>6. Limitation of Liability</h3>
-        <p>While the Platform ingests public data directly from verified exchange endpoints, no guarantee of absolute accuracy or uninterrupted server uptime is made. The operators shall not be liable for any direct, indirect, incidental, or consequential financial losses arising from the use or inability to use the Platform.</p>
+        <p>The Platform extracts data from public exchange endpoints and utilises artificial intelligence to process unstructured text. While we employ strict grounding guardrails, we make no warranties regarding absolute accuracy, completeness, timeliness, or the complete absence of AI-generated anomalies or hallucinations. By using the Platform, you acknowledge that automated synthesis can occasionally misinterpret complex financial footnotes. To the maximum extent permitted by law, Moatnomics and its operators shall not be liable for any direct, indirect, incidental, or consequential financial losses arising from trading decisions, data parsing errors, reliance upon any report, or the inability to access the Platform.</p>
 
         <h3>7. Governing Law and Jurisdiction</h3>
-        <p>These Terms shall be governed by and construed in accordance with the laws of India. Any disputes arising in connection with the Service shall be subject to the exclusive jurisdiction of the competent courts in Bengaluru/Mumbai, India.</p>
+        <p>These Terms shall be governed by and construed in accordance with the laws of India. Any disputes arising in connection with the Platform shall be subject to the exclusive jurisdiction of the competent courts in Mumbai, India.</p>
         """
     },
     "privacy": {
