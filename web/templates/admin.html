@@ -271,6 +271,131 @@
 .admin-table tr:hover {
   background: rgba(255, 255, 255, 0.02);
 }
+
+/* Service Inbox & Support Tickets Table Sizing */
+.admin-table.tickets-table {
+  table-layout: fixed;
+  width: 100%;
+  min-width: 980px;
+}
+.admin-table.tickets-table th,
+.admin-table.tickets-table td {
+  vertical-align: top;
+  padding: 10px 12px;
+}
+.admin-table.tickets-table th {
+  font-size: 11px;
+  letter-spacing: 0.03em;
+  text-transform: uppercase;
+  color: var(--text-secondary, #94a3b8);
+}
+.admin-table.tickets-table .col-ticket {
+  width: 110px;
+  min-width: 110px;
+  max-width: 110px;
+  white-space: nowrap;
+}
+.admin-table.tickets-table .col-created {
+  width: 120px;
+  min-width: 120px;
+  max-width: 120px;
+  white-space: nowrap;
+}
+.admin-table.tickets-table .col-user {
+  width: 170px;
+  min-width: 150px;
+  max-width: 180px;
+  white-space: normal;
+}
+.admin-table.tickets-table .col-category {
+  width: 95px;
+  min-width: 90px;
+  max-width: 100px;
+  white-space: nowrap;
+}
+.admin-table.tickets-table .col-subject {
+  width: auto;
+  white-space: normal;
+  word-break: break-word;
+  overflow-wrap: anywhere;
+}
+.admin-table.tickets-table .col-status {
+  width: 115px;
+  min-width: 110px;
+  max-width: 120px;
+  white-space: nowrap;
+  text-align: center;
+}
+.admin-table.tickets-table .col-actions {
+  width: 145px;
+  min-width: 140px;
+  max-width: 150px;
+  white-space: nowrap;
+}
+
+.ticket-user-name {
+  font-weight: 600;
+  font-size: 12.5px;
+  line-height: 1.3;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.ticket-user-email {
+  font-size: 11px;
+  line-height: 1.3;
+  color: var(--text-secondary, #94a3b8);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.ticket-subject-title {
+  font-weight: 600;
+  font-size: 13px;
+  line-height: 1.35;
+  margin-bottom: 4px;
+  color: var(--text-primary, #f8fafc);
+  word-break: break-word;
+  overflow-wrap: anywhere;
+}
+.ticket-message-preview {
+  font-size: 12px;
+  color: var(--text-secondary, #94a3b8);
+  line-height: 1.45;
+  white-space: pre-line;
+  word-break: break-word;
+  overflow-wrap: anywhere;
+  display: -webkit-box;
+  -webkit-line-clamp: 3;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-height: 54px;
+  transition: max-height 0.2s ease;
+}
+.ticket-message-preview.expanded {
+  display: block;
+  -webkit-line-clamp: unset;
+  max-height: none;
+  overflow: visible;
+  white-space: pre-wrap;
+}
+.ticket-toggle-expand {
+  display: inline-block;
+  font-size: 10.5px;
+  color: var(--accent-cyan, #0ea5e9);
+  margin-top: 3px;
+  cursor: pointer;
+  background: none;
+  border: none;
+  padding: 0;
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
+.ticket-toggle-expand:hover {
+  color: #38bdf8;
+}
+
 .mono {
   font-family: 'JetBrains Mono', monospace;
 }
@@ -1121,31 +1246,43 @@
       </div>
 
       <div class="admin-table-wrap">
-        <table class="admin-table" id="activeTicketsTable">
+        <table class="admin-table tickets-table" id="activeTicketsTable">
+          <colgroup>
+            <col class="col-ticket" style="width: 110px;">
+            <col class="col-created" style="width: 120px;">
+            <col class="col-user" style="width: 170px;">
+            <col class="col-category" style="width: 95px;">
+            <col class="col-subject" style="width: auto;">
+            <col class="col-status" style="width: 115px;">
+            <col class="col-actions" style="width: 145px;">
+          </colgroup>
           <thead>
             <tr>
-              <th>Ticket ID</th>
-              <th>Created</th>
-              <th>User</th>
-              <th>Category</th>
-              <th>Subject &amp; Inquiry</th>
-              <th>Status (Click to Toggle)</th>
-              <th>Service Actions</th>
+              <th class="col-ticket">Ticket ID</th>
+              <th class="col-created">Created</th>
+              <th class="col-user">User</th>
+              <th class="col-category">Category</th>
+              <th class="col-subject">Subject &amp; Inquiry</th>
+              <th class="col-status">Status (Toggle)</th>
+              <th class="col-actions">Service Actions</th>
             </tr>
           </thead>
           <tbody id="activeTicketsTableBody">
             {% for t in active_tickets_list %}
             <tr id="ticket-row-{{ t.ticket_id }}" data-ticket-id="{{ t.ticket_id }}" data-status="{{ t.status }}" data-category="{{ t.category }}" data-email="{{ t.user_email }}" data-name="{{ t.user_name or 'User' }}" data-created="{{ t.created_at_raw or t.created_at }}">
-              <td class="mono" style="font-weight: 700; color: var(--accent-cyan, #0ea5e9);">{{ t.ticket_id }}</td>
-              <td class="mono" style="font-size: 11px;">{{ t.created_at }}</td>
-              <td>
-                <div style="font-weight: 600;">{{ t.user_name or 'User' }}</div>
-                <div style="font-size: 11px; color: var(--text-secondary, #94a3b8);">{{ t.user_email }}</div>
+              <td class="col-ticket mono" style="font-weight: 700; color: var(--accent-cyan, #0ea5e9);">{{ t.ticket_id }}</td>
+              <td class="col-created mono" style="font-size: 11px;">{{ t.created_at }}</td>
+              <td class="col-user">
+                <div class="ticket-user-name" title="{{ t.user_name or 'User' }}">{{ t.user_name or 'User' }}</div>
+                <div class="ticket-user-email" title="{{ t.user_email }}">{{ t.user_email }}</div>
               </td>
-              <td><span class="status-pill closed">{{ t.category }}</span></td>
-              <td style="max-width: 340px;">
-                <div style="font-weight: 600; margin-bottom: 4px;">{{ t.subject }}</div>
-                <div style="font-size: 12px; color: var(--text-secondary, #94a3b8); white-space: pre-wrap;">{{ t.message }}</div>
+              <td class="col-category"><span class="status-pill closed">{{ t.category }}</span></td>
+              <td class="col-subject">
+                <div class="ticket-subject-title">{{ t.subject or 'No subject' }}</div>
+                <div id="ticket-msg-{{ t.ticket_id }}" class="ticket-message-preview" title="{{ t.message }}">{{ t.message }}</div>
+                {% if t.message and (t.message|length > 120 or '\n' in t.message) %}
+                <button type="button" id="ticket-msg-btn-{{ t.ticket_id }}" class="ticket-toggle-expand" onclick="toggleTicketMsg('{{ t.ticket_id }}', event)">(more)</button>
+                {% endif %}
                 <div id="ticket-resp-wrap-{{ t.ticket_id }}" style="margin-top: 6px; {% if not (t.responses and t.responses|length > 0) %}display: none;{% endif %}">
                   <span style="font-size: 11px; color: #38bdf8; background: rgba(14, 165, 233, 0.1); padding: 3px 8px; border-radius: 4px; display: inline-flex; align-items: center; gap: 4px;">
                     <svg class="glyph" style="width: 12px; height: 12px;"><use href="#glyph-mail"></use></svg>
@@ -1156,30 +1293,30 @@
                   Note: <span id="ticket-notes-text-{{ t.ticket_id }}">{{ t.admin_notes }}</span>
                 </div>
               </td>
-              <td>
-                <button type="button" id="ticket-status-pill-{{ t.ticket_id }}" class="btn btn-secondary btn-sm status-pill {{ t.status }}" onclick="cycleTicketStatus('{{ t.ticket_id }}')" style="cursor: pointer; border: 1px solid rgba(255,255,255,0.16); display: inline-flex; align-items: center; gap: 5px; font-weight: 700;" title="Click to toggle to next status without reloading (Open → In Progress → Resolved)">
+              <td class="col-status">
+                <button type="button" id="ticket-status-pill-{{ t.ticket_id }}" class="btn btn-secondary btn-sm status-pill {{ t.status }}" onclick="cycleTicketStatus('{{ t.ticket_id }}')" style="cursor: pointer; border: 1px solid rgba(255,255,255,0.16); display: inline-flex; align-items: center; justify-content: center; gap: 4px; font-weight: 700; width: 100%; padding: 4px 6px; font-size: 11px;" title="Click to toggle to next status without reloading (Open → In Progress → Resolved)">
                   <span id="ticket-status-text-{{ t.ticket_id }}">{{ t.status }}</span>
                   <span style="font-size: 10px; opacity: 0.8;">↻</span>
                 </button>
               </td>
-              <td>
-                <div style="display: flex; flex-direction: column; gap: 6px;">
-                  <button type="button" class="btn btn-primary btn-sm" onclick="openTicketReplyModal('{{ t.ticket_id }}')" style="padding: 5px 10px; font-size: 11.5px; font-weight: 700; display: inline-flex; align-items: center; justify-content: center; gap: 6px; cursor: pointer;" title="Reply to inquiry and trigger email dispatch to {{ t.user_email }}">
-                    <svg class="glyph" style="width: 13px; height: 13px;"><use href="#glyph-mail"></use></svg> Reply &amp; Email
+              <td class="col-actions">
+                <div style="display: flex; flex-direction: column; gap: 5px;">
+                  <button type="button" class="btn btn-primary btn-sm" onclick="openTicketReplyModal('{{ t.ticket_id }}')" style="padding: 4px 8px; font-size: 11px; font-weight: 700; display: inline-flex; align-items: center; justify-content: center; gap: 5px; cursor: pointer; width: 100%;" title="Reply to inquiry and trigger email dispatch to {{ t.user_email }}">
+                    <svg class="glyph" style="width: 12px; height: 12px;"><use href="#glyph-mail"></use></svg> Reply &amp; Email
                   </button>
-                  <form method="POST" action="/admin/tickets/{{ t.ticket_id }}/status" onsubmit="return handleInlineTicketStatusSubmit(event, '{{ t.ticket_id }}')" style="display: flex; gap: 4px; align-items: center;">
-                    <select name="status" id="ticket-status-select-{{ t.ticket_id }}" class="admin-select" onchange="updateTicketStatusAjax('{{ t.ticket_id }}', this.value)" style="padding: 3px 6px; font-size: 11px;">
+                  <form method="POST" action="/admin/tickets/{{ t.ticket_id }}/status" onsubmit="return handleInlineTicketStatusSubmit(event, '{{ t.ticket_id }}')" style="display: flex; gap: 3px; align-items: center; width: 100%;">
+                    <select name="status" id="ticket-status-select-{{ t.ticket_id }}" class="admin-select" onchange="updateTicketStatusAjax('{{ t.ticket_id }}', this.value)" style="padding: 2px 4px; font-size: 10.5px; flex: 1; min-width: 0;">
                       <option value="open" {% if t.status == 'open' %}selected{% endif %}>Open</option>
                       <option value="in_progress" {% if t.status == 'in_progress' %}selected{% endif %}>In Progress</option>
                       <option value="resolved" {% if t.status == 'resolved' %}selected{% endif %}>Resolved</option>
                       <option value="closed" {% if t.status == 'closed' %}selected{% endif %}>Closed</option>
                     </select>
-                    <button type="submit" id="ticket-status-btn-{{ t.ticket_id }}" class="btn btn-secondary btn-sm" style="padding: 3px 6px; font-size: 10px; cursor: pointer;">
+                    <button type="submit" id="ticket-status-btn-{{ t.ticket_id }}" class="btn btn-secondary btn-sm" style="padding: 2px 5px; font-size: 10px; cursor: pointer;">
                       Update
                     </button>
                   </form>
-                  <button type="button" class="btn btn-secondary btn-sm" onclick="openGrantCreditsModal('{{ t.user_email }}', '{{ t.ticket_id }}', 'TASK_REMEDY', '')" style="padding: 4px 8px; font-size: 11px; color: #f59e0b; border-color: rgba(245, 158, 11, 0.4); background: rgba(245, 158, 11, 0.08); display: inline-flex; align-items: center; justify-content: center; gap: 4px; cursor: pointer;" title="Grant remedial credits &amp; resolve grievance">
-                    <svg class="glyph"><use href="#glyph-zap"></use></svg> Remedial Credits
+                  <button type="button" class="btn btn-secondary btn-sm" onclick="openGrantCreditsModal('{{ t.user_email }}', '{{ t.ticket_id }}', 'TASK_REMEDY', '')" style="padding: 3px 6px; font-size: 10.5px; color: #f59e0b; border-color: rgba(245, 158, 11, 0.4); background: rgba(245, 158, 11, 0.08); display: inline-flex; align-items: center; justify-content: center; gap: 4px; cursor: pointer; width: 100%;" title="Grant remedial credits &amp; resolve grievance">
+                    <svg class="glyph" style="width: 11px; height: 11px;"><use href="#glyph-zap"></use></svg> Remedial Credits
                   </button>
                 </div>
               </td>
@@ -1244,31 +1381,43 @@
       </div>
 
       <div class="admin-table-wrap">
-        <table class="admin-table" id="archivedTicketsTable">
+        <table class="admin-table tickets-table" id="archivedTicketsTable">
+          <colgroup>
+            <col class="col-ticket" style="width: 110px;">
+            <col class="col-created" style="width: 120px;">
+            <col class="col-user" style="width: 170px;">
+            <col class="col-category" style="width: 95px;">
+            <col class="col-subject" style="width: auto;">
+            <col class="col-status" style="width: 115px;">
+            <col class="col-actions" style="width: 145px;">
+          </colgroup>
           <thead>
             <tr>
-              <th>Ticket ID</th>
-              <th>Created</th>
-              <th>User</th>
-              <th>Category</th>
-              <th>Subject &amp; Resolution Summary</th>
-              <th>Archive Status</th>
-              <th>Reference &amp; Re-Open</th>
+              <th class="col-ticket">Ticket ID</th>
+              <th class="col-created">Created</th>
+              <th class="col-user">User</th>
+              <th class="col-category">Category</th>
+              <th class="col-subject">Subject &amp; Resolution Summary</th>
+              <th class="col-status">Archive Status</th>
+              <th class="col-actions">Reference &amp; Re-Open</th>
             </tr>
           </thead>
           <tbody id="archivedTicketsTableBody">
             {% for t in archived_tickets_list %}
             <tr id="ticket-row-{{ t.ticket_id }}" data-ticket-id="{{ t.ticket_id }}" data-status="{{ t.status }}" data-category="{{ t.category }}" data-email="{{ t.user_email }}" data-name="{{ t.user_name or 'User' }}" data-created="{{ t.created_at_raw or t.created_at }}">
-              <td class="mono" style="font-weight: 700; color: var(--accent-cyan, #0ea5e9);">{{ t.ticket_id }}</td>
-              <td class="mono" style="font-size: 11px;">{{ t.created_at }}</td>
-              <td>
-                <div style="font-weight: 600;">{{ t.user_name or 'User' }}</div>
-                <div style="font-size: 11px; color: var(--text-secondary, #94a3b8);">{{ t.user_email }}</div>
+              <td class="col-ticket mono" style="font-weight: 700; color: var(--accent-cyan, #0ea5e9);">{{ t.ticket_id }}</td>
+              <td class="col-created mono" style="font-size: 11px;">{{ t.created_at }}</td>
+              <td class="col-user">
+                <div class="ticket-user-name" title="{{ t.user_name or 'User' }}">{{ t.user_name or 'User' }}</div>
+                <div class="ticket-user-email" title="{{ t.user_email }}">{{ t.user_email }}</div>
               </td>
-              <td><span class="status-pill closed">{{ t.category }}</span></td>
-              <td style="max-width: 340px;">
-                <div style="font-weight: 600; margin-bottom: 4px;">{{ t.subject }}</div>
-                <div style="font-size: 12px; color: var(--text-secondary, #94a3b8); white-space: pre-wrap;">{{ t.message }}</div>
+              <td class="col-category"><span class="status-pill closed">{{ t.category }}</span></td>
+              <td class="col-subject">
+                <div class="ticket-subject-title">{{ t.subject or 'No subject' }}</div>
+                <div id="ticket-msg-{{ t.ticket_id }}" class="ticket-message-preview" title="{{ t.message }}">{{ t.message }}</div>
+                {% if t.message and (t.message|length > 120 or '\n' in t.message) %}
+                <button type="button" id="ticket-msg-btn-{{ t.ticket_id }}" class="ticket-toggle-expand" onclick="toggleTicketMsg('{{ t.ticket_id }}', event)">(more)</button>
+                {% endif %}
                 <div id="ticket-resp-wrap-{{ t.ticket_id }}" style="margin-top: 6px; {% if not (t.responses and t.responses|length > 0) %}display: none;{% endif %}">
                   <span style="font-size: 11px; color: #38bdf8; background: rgba(14, 165, 233, 0.1); padding: 3px 8px; border-radius: 4px; display: inline-flex; align-items: center; gap: 4px;">
                     <svg class="glyph" style="width: 12px; height: 12px;"><use href="#glyph-mail"></use></svg>
@@ -1279,25 +1428,25 @@
                   Note: <span id="ticket-notes-text-{{ t.ticket_id }}">{{ t.admin_notes }}</span>
                 </div>
               </td>
-              <td>
-                <button type="button" id="ticket-status-pill-{{ t.ticket_id }}" class="btn btn-secondary btn-sm status-pill {{ t.status }}" onclick="cycleTicketStatus('{{ t.ticket_id }}')" style="cursor: pointer; border: 1px solid rgba(255,255,255,0.16); display: inline-flex; align-items: center; gap: 5px; font-weight: 700;" title="Click to toggle status without reloading">
+              <td class="col-status">
+                <button type="button" id="ticket-status-pill-{{ t.ticket_id }}" class="btn btn-secondary btn-sm status-pill {{ t.status }}" onclick="cycleTicketStatus('{{ t.ticket_id }}')" style="cursor: pointer; border: 1px solid rgba(255,255,255,0.16); display: inline-flex; align-items: center; justify-content: center; gap: 4px; font-weight: 700; width: 100%; padding: 4px 6px; font-size: 11px;" title="Click to toggle status without reloading">
                   <span id="ticket-status-text-{{ t.ticket_id }}">{{ t.status }}</span>
                   <span style="font-size: 10px; opacity: 0.8;">↻</span>
                 </button>
               </td>
-              <td>
-                <div style="display: flex; flex-direction: column; gap: 6px;">
-                  <button type="button" class="btn btn-secondary btn-sm" onclick="openTicketReplyModal('{{ t.ticket_id }}')" style="padding: 5px 10px; font-size: 11.5px; font-weight: 700; color: #38bdf8; border-color: rgba(56, 189, 248, 0.35); display: inline-flex; align-items: center; justify-content: center; gap: 6px; cursor: pointer;" title="View full thread history or send follow-up email">
-                    <svg class="glyph" style="width: 13px; height: 13px;"><use href="#glyph-mail"></use></svg> View Thread / Reply
+              <td class="col-actions">
+                <div style="display: flex; flex-direction: column; gap: 5px;">
+                  <button type="button" class="btn btn-secondary btn-sm" onclick="openTicketReplyModal('{{ t.ticket_id }}')" style="padding: 4px 8px; font-size: 11px; font-weight: 700; color: #38bdf8; border-color: rgba(56, 189, 248, 0.35); display: inline-flex; align-items: center; justify-content: center; gap: 5px; cursor: pointer; width: 100%;" title="View full thread history or send follow-up email">
+                    <svg class="glyph" style="width: 12px; height: 12px;"><use href="#glyph-mail"></use></svg> View Thread / Reply
                   </button>
-                  <form method="POST" action="/admin/tickets/{{ t.ticket_id }}/status" onsubmit="return handleInlineTicketStatusSubmit(event, '{{ t.ticket_id }}')" style="display: flex; gap: 4px; align-items: center;">
-                    <select name="status" id="ticket-status-select-{{ t.ticket_id }}" class="admin-select" onchange="updateTicketStatusAjax('{{ t.ticket_id }}', this.value)" style="padding: 3px 6px; font-size: 11px;">
+                  <form method="POST" action="/admin/tickets/{{ t.ticket_id }}/status" onsubmit="return handleInlineTicketStatusSubmit(event, '{{ t.ticket_id }}')" style="display: flex; gap: 3px; align-items: center; width: 100%;">
+                    <select name="status" id="ticket-status-select-{{ t.ticket_id }}" class="admin-select" onchange="updateTicketStatusAjax('{{ t.ticket_id }}', this.value)" style="padding: 2px 4px; font-size: 10.5px; flex: 1; min-width: 0;">
                       <option value="open" {% if t.status == 'open' %}selected{% endif %}>Re-Open (Active)</option>
                       <option value="in_progress" {% if t.status == 'in_progress' %}selected{% endif %}>In Progress</option>
                       <option value="resolved" {% if t.status == 'resolved' %}selected{% endif %}>Resolved</option>
                       <option value="closed" {% if t.status == 'closed' %}selected{% endif %}>Closed</option>
                     </select>
-                    <button type="submit" id="ticket-status-btn-{{ t.ticket_id }}" class="btn btn-secondary btn-sm" style="padding: 3px 6px; font-size: 10px; cursor: pointer;">
+                    <button type="submit" id="ticket-status-btn-{{ t.ticket_id }}" class="btn btn-secondary btn-sm" style="padding: 2px 5px; font-size: 10px; cursor: pointer;">
                       Update
                     </button>
                   </form>
@@ -4139,25 +4288,48 @@
     updateGlobalTicketCounters(openTicketsCount);
   }
 
+  function toggleTicketMsg(ticketId, event) {
+    if (event) {
+      event.preventDefault();
+      event.stopPropagation();
+    }
+    const msgEl = document.getElementById(`ticket-msg-${ticketId}`);
+    const btn = document.getElementById(`ticket-msg-btn-${ticketId}`);
+    if (!msgEl) return;
+    const isExpanded = msgEl.classList.toggle('expanded');
+    if (btn) {
+      btn.innerText = isExpanded ? '(less)' : '(more)';
+      btn.setAttribute('aria-expanded', isExpanded ? 'true' : 'false');
+    }
+  }
+
   function buildTicketRowHtml(t) {
     const tid = escapeHtmlText(t.ticket_id);
     const status = escapeHtmlText(String(t.status || 'open').toLowerCase().trim());
     const isArchived = (status === 'resolved' || status === 'closed');
     const respLen = Array.isArray(t.responses) ? t.responses.length : 0;
     const hasNotes = Boolean(t.admin_notes && String(t.admin_notes).trim());
+    const rawMsg = t.message || '';
+    const safeMsg = escapeHtmlText(rawMsg);
+    const safeSubj = escapeHtmlText(t.subject || 'No subject');
+    const isLongMsg = rawMsg.length > 120 || rawMsg.includes('\n');
+    const safeName = escapeHtmlText(t.user_name || 'User');
+    const safeEmail = escapeHtmlText(t.user_email || '');
+    const safeCat = escapeHtmlText(t.category || 'general');
 
     return `
-      <tr id="ticket-row-${tid}" data-ticket-id="${tid}" data-status="${status}" data-category="${escapeHtmlText(t.category || 'general')}" data-email="${escapeHtmlText(t.user_email || '')}" data-name="${escapeHtmlText(t.user_name || 'User')}" data-created="${escapeHtmlText(t.created_at_raw || t.created_at || '')}">
-        <td class="mono" style="font-weight: 700; color: var(--accent-cyan, #0ea5e9);">${tid}</td>
-        <td class="mono" style="font-size: 11px;">${escapeHtmlText(t.created_at || '')}</td>
-        <td>
-          <div style="font-weight: 600;">${escapeHtmlText(t.user_name || 'User')}</div>
-          <div style="font-size: 11px; color: var(--text-secondary, #94a3b8);">${escapeHtmlText(t.user_email || '')}</div>
+      <tr id="ticket-row-${tid}" data-ticket-id="${tid}" data-status="${status}" data-category="${safeCat}" data-email="${safeEmail}" data-name="${safeName}" data-created="${escapeHtmlText(t.created_at_raw || t.created_at || '')}">
+        <td class="col-ticket mono" style="font-weight: 700; color: var(--accent-cyan, #0ea5e9);">${tid}</td>
+        <td class="col-created mono" style="font-size: 11px;">${escapeHtmlText(t.created_at || '')}</td>
+        <td class="col-user">
+          <div class="ticket-user-name" title="${safeName}">${safeName}</div>
+          <div class="ticket-user-email" title="${safeEmail}">${safeEmail}</div>
         </td>
-        <td><span class="status-pill closed">${escapeHtmlText(t.category || 'general')}</span></td>
-        <td style="max-width: 340px;">
-          <div style="font-weight: 600; margin-bottom: 4px;">${escapeHtmlText(t.subject || '')}</div>
-          <div style="font-size: 12px; color: var(--text-secondary, #94a3b8); white-space: pre-wrap;">${escapeHtmlText(t.message || '')}</div>
+        <td class="col-category"><span class="status-pill closed">${safeCat}</span></td>
+        <td class="col-subject">
+          <div class="ticket-subject-title">${safeSubj}</div>
+          <div id="ticket-msg-${tid}" class="ticket-message-preview" title="${safeMsg}">${safeMsg}</div>
+          ${isLongMsg ? `<button type="button" id="ticket-msg-btn-${tid}" class="ticket-toggle-expand" onclick="toggleTicketMsg('${tid}', event)">(more)</button>` : ''}
           <div id="ticket-resp-wrap-${tid}" style="margin-top: 6px; ${respLen > 0 ? '' : 'display: none;'}">
             <span style="font-size: 11px; color: #38bdf8; background: rgba(14, 165, 233, 0.1); padding: 3px 8px; border-radius: 4px; display: inline-flex; align-items: center; gap: 4px;">
               <svg class="glyph" style="width: 12px; height: 12px;"><use href="#glyph-mail"></use></svg>
@@ -4168,28 +4340,32 @@
             Note: <span id="ticket-notes-text-${tid}">${escapeHtmlText(t.admin_notes || '')}</span>
           </div>
         </td>
-        <td>
-          <button type="button" id="ticket-status-pill-${tid}" class="btn btn-secondary btn-sm status-pill ${status}" onclick="cycleTicketStatus('${tid}')" style="cursor: pointer; border: 1px solid rgba(255,255,255,0.16); display: inline-flex; align-items: center; gap: 5px; font-weight: 700;" title="Click to toggle status without reloading">
+        <td class="col-status">
+          <button type="button" id="ticket-status-pill-${tid}" class="btn btn-secondary btn-sm status-pill ${status}" onclick="cycleTicketStatus('${tid}')" style="cursor: pointer; border: 1px solid rgba(255,255,255,0.16); display: inline-flex; align-items: center; justify-content: center; gap: 4px; font-weight: 700; width: 100%; padding: 4px 6px; font-size: 11px;" title="Click to toggle status without reloading">
             <span id="ticket-status-text-${tid}">${status}</span>
             <span style="font-size: 10px; opacity: 0.8;">↻</span>
           </button>
         </td>
-        <td>
-          <div style="display: flex; flex-direction: column; gap: 6px;">
-            <button type="button" class="btn ${isArchived ? 'btn-secondary' : 'btn-primary'} btn-sm" onclick="openTicketReplyModal('${tid}')" style="padding: 5px 10px; font-size: 11.5px; font-weight: 700; ${isArchived ? 'color: #38bdf8; border-color: rgba(56, 189, 248, 0.35);' : ''} display: inline-flex; align-items: center; justify-content: center; gap: 6px; cursor: pointer;">
-              <svg class="glyph" style="width: 13px; height: 13px;"><use href="#glyph-mail"></use></svg> ${isArchived ? 'View Thread / Reply' : 'Reply &amp; Email'}
+        <td class="col-actions">
+          <div style="display: flex; flex-direction: column; gap: 5px;">
+            <button type="button" class="btn ${isArchived ? 'btn-secondary' : 'btn-primary'} btn-sm" onclick="openTicketReplyModal('${tid}')" style="padding: 4px 8px; font-size: 11px; font-weight: 700; ${isArchived ? 'color: #38bdf8; border-color: rgba(56, 189, 248, 0.35);' : ''} display: inline-flex; align-items: center; justify-content: center; gap: 5px; cursor: pointer; width: 100%;">
+              <svg class="glyph" style="width: 12px; height: 12px;"><use href="#glyph-mail"></use></svg> ${isArchived ? 'View Thread / Reply' : 'Reply &amp; Email'}
             </button>
-            <form method="POST" action="/admin/tickets/${tid}/status" onsubmit="return handleInlineTicketStatusSubmit(event, '${tid}')" style="display: flex; gap: 4px; align-items: center;">
-              <select name="status" id="ticket-status-select-${tid}" class="admin-select" onchange="updateTicketStatusAjax('${tid}', this.value)" style="padding: 3px 6px; font-size: 11px;">
+            <form method="POST" action="/admin/tickets/${tid}/status" onsubmit="return handleInlineTicketStatusSubmit(event, '${tid}')" style="display: flex; gap: 3px; align-items: center; width: 100%;">
+              <select name="status" id="ticket-status-select-${tid}" class="admin-select" onchange="updateTicketStatusAjax('${tid}', this.value)" style="padding: 2px 4px; font-size: 10.5px; flex: 1; min-width: 0;">
                 <option value="open" ${status === 'open' ? 'selected' : ''}>${isArchived ? 'Re-Open (Active)' : 'Open'}</option>
                 <option value="in_progress" ${status === 'in_progress' ? 'selected' : ''}>In Progress</option>
                 <option value="resolved" ${status === 'resolved' ? 'selected' : ''}>Resolved</option>
                 <option value="closed" ${status === 'closed' ? 'selected' : ''}>Closed</option>
               </select>
-              <button type="submit" id="ticket-status-btn-${tid}" class="btn btn-secondary btn-sm" style="padding: 3px 6px; font-size: 10px; cursor: pointer;">
+              <button type="submit" id="ticket-status-btn-${tid}" class="btn btn-secondary btn-sm" style="padding: 2px 5px; font-size: 10px; cursor: pointer;">
                 Update
               </button>
             </form>
+            ${!isArchived ? `
+            <button type="button" class="btn btn-secondary btn-sm" onclick="openGrantCreditsModal('${safeEmail}', '${tid}', 'TASK_REMEDY', '')" style="padding: 3px 6px; font-size: 10.5px; color: #f59e0b; border-color: rgba(245, 158, 11, 0.4); background: rgba(245, 158, 11, 0.08); display: inline-flex; align-items: center; justify-content: center; gap: 4px; cursor: pointer; width: 100%;" title="Grant remedial credits &amp; resolve grievance">
+              <svg class="glyph" style="width: 11px; height: 11px;"><use href="#glyph-zap"></use></svg> Remedial Credits
+            </button>` : ''}
           </div>
         </td>
       </tr>

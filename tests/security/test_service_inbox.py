@@ -431,7 +431,29 @@ class TestServiceInboxAndEmailReply(unittest.TestCase):
         self.assertEqual(resp.status_code, 200)
         soup = BeautifulSoup(resp.text, "html.parser")
 
-        self.assertIsNotNone(soup.find(id="activeTicketsTable"))
+        active_table = soup.find(id="activeTicketsTable")
+        self.assertIsNotNone(active_table)
+        self.assertIn("tickets-table", active_table.get("class", []))
+        self.assertIsNotNone(active_table.find("colgroup"))
+        self.assertEqual(len(active_table.find_all("col")), 7)
+
+        archived_table = soup.find(id="archivedTicketsTable")
+        self.assertIsNotNone(archived_table)
+        self.assertIn("tickets-table", archived_table.get("class", []))
+        self.assertIsNotNone(archived_table.find("colgroup"))
+        self.assertEqual(len(archived_table.find_all("col")), 7)
+
+        # Assert column classes present on table headers
+        th_classes = [th.get("class", []) for th in active_table.find_all("th")]
+        flattened_th_classes = [cls for sublist in th_classes for cls in sublist]
+        self.assertIn("col-ticket", flattened_th_classes)
+        self.assertIn("col-created", flattened_th_classes)
+        self.assertIn("col-user", flattened_th_classes)
+        self.assertIn("col-category", flattened_th_classes)
+        self.assertIn("col-subject", flattened_th_classes)
+        self.assertIn("col-status", flattened_th_classes)
+        self.assertIn("col-actions", flattened_th_classes)
+
         self.assertIsNotNone(soup.find(id="archivedTicketsTable"))
         self.assertIsNotNone(soup.find(id="archiveSearchInput"))
         self.assertIsNotNone(soup.find(id="archiveStatusFilter"))
@@ -442,6 +464,8 @@ class TestServiceInboxAndEmailReply(unittest.TestCase):
         self.assertIsNotNone(soup.find(id="btnRunSpellCheck"))
         self.assertIsNotNone(soup.find(id="btnDeleteSpamTicket"))
         self.assertIn("deleteCurrentTicketAsSpam", resp.text)
+        self.assertIn("toggleTicketMsg", resp.text)
+        self.assertIn("ticket-message-preview", resp.text)
 
         reply_textarea = soup.find(id="ticketReplyMessage")
         self.assertIsNotNone(reply_textarea)
