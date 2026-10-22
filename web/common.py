@@ -457,7 +457,9 @@ def _deep_dive_unlocked_for_request(request: Request, ticker: str) -> bool:
     admin_auth_fn = _get_override_fn("web.main", "_is_admin_authenticated", _is_admin_authenticated)
     if admin_auth_fn(request):
         return True
-    if os.environ.get("TESTING") == "1" and request.headers.get("x-unlock-preview") == "1":
+    if os.environ.get("TESTING") == "1" and (
+        request.headers.get("x-unlock-preview") == "1" or request.query_params.get("unlocked") == "1"
+    ):
         return True
     get_user_fn = _get_override_fn("web.main", "_get_current_web_user", _get_current_web_user)
     web_user = get_user_fn(request)
@@ -497,11 +499,17 @@ def _asset_unlock_key(kind: str, asset_id: str) -> str:
 
 
 def _asset_unlocked_for_request(request: Request, kind: str, asset_id: str) -> bool:
-    """Server-side rule for the Mutual Fund / Corporate Debt / REIT deep-dive paywall (1 credit each)."""
+    """Server-side rule for Equity / Mutual Fund / Corporate Debt / REIT deep-dive paywall (1 credit each)."""
+    kind_clean = (kind or "").strip().upper()
+    if kind_clean in ("EQUITY", "STOCK", ""):
+        return _deep_dive_unlocked_for_request(request, asset_id)
+
     admin_auth_fn = _get_override_fn("web.main", "_is_admin_authenticated", _is_admin_authenticated)
     if admin_auth_fn(request):
         return True
-    if os.environ.get("TESTING") == "1" and request.headers.get("x-unlock-preview") == "1":
+    if os.environ.get("TESTING") == "1" and (
+        request.headers.get("x-unlock-preview") == "1" or request.query_params.get("unlocked") == "1"
+    ):
         return True
     get_user_fn = _get_override_fn("web.main", "_get_current_web_user", _get_current_web_user)
     web_user = get_user_fn(request)
@@ -511,8 +519,118 @@ def _asset_unlocked_for_request(request: Request, kind: str, asset_id: str) -> b
             return True
         from core.db import is_ticker_unlocked_for_user
         check_fn = _get_override_fn("web.main", "is_ticker_unlocked_for_user", is_ticker_unlocked_for_user)
-        return bool(check_fn(web_user.get("id", ""), _asset_unlock_key(kind, asset_id)))
+        return bool(check_fn(web_user.get("id", ""), _asset_unlock_key(kind_clean, asset_id)))
     return False
+
+
+def redact_equity_intel_json(intel: Optional[Dict[str, Any]], is_unlocked: bool = False) -> Optional[Dict[str, Any]]:
+    """
+    Enforces strict server-side redaction on Equity Intelligence JSON.
+    When is_unlocked is False, physically strips or overwrites Pillar 3 (Forensic Accounting)
+    and Pillar 5 (Multi-Model DCF/Valuation Radar) so premium IP is never dispatched over HTTP.
+    """
+    if not intel or not isinstance(intel, dict):
+        return intel
+    if is_unlocked:
+        return intel
+
+    import copy
+    redacted = copy.deepcopy(intel)
+    clean_sym = str(redacted.get("ticker") or "").strip().upper()
+    unlock_url = f"/api/dossier/unlock/{clean_sym}" if clean_sym else "/pricing"
+
+    # Redact Pillar 3: Forensic Intelligence Ledger
+    if "forensic_intelligence" in redacted and redacted["forensic_intelligence"]:
+        redacted["forensic_intelligence"] = {
+            "status": "LOCKED",
+            "locked": True,
+            "badge_color": "#fbbf24",
+            "badge_label": "Gated (1 Credit)",
+            "passed_count": 0,
+            "total_checks": 10,
+            "summary": "Detailed 360° Forensic Clean-Room Ledger is locked. Unlock this dossier (1 credit) to view Beneish M-Score, cash quality, and auditor forensics.",
+            "red_flags": [],
+            "checks": [],
+            "unlock_endpoint": unlock_url,
+        }
+
+    # Redact Pillar 5: Valuation Radar & Reverse DCF Sandbox
+    if "valuation_radar" in redacted and redacted["valuation_radar"]:
+        orig_vr = redacted["valuation_radar"]
+        redacted["valuation_radar"] = {
+            "status": "LOCKED",
+            "locked": True,
+            "badge_color": "#fbbf24",
+            "badge_label": "Gated (1 Credit)",
+            "current_price": orig_vr.get("current_price"),
+            "fair_value": None,
+            "margin_of_safety_pct": None,
+            "summary": "Triangulated Multi-Model Intrinsic Valuation Matrix & Reverse DCF Sandbox are locked. Unlock this dossier (1 credit) to view detailed model valuations.",
+            "models": None,
+            "inputs": None,
+            "unlock_endpoint": unlock_url,
+        }
+
+    # Redact deep proprietary packets if present
+    if "varan_delta_packet" in redacted and redacted["varan_delta_packet"]:
+        redacted["varan_delta_packet"] = {
+            "status": "LOCKED",
+            "locked": True,
+            "unlock_endpoint": unlock_url,
+        }
+
+    if "setu_capital_matrix" in redacted and redacted["setu_capital_matrix"]:
+        redacted["setu_capital_matrix"] = {
+            "status": "LOCKED",
+            "locked": True,
+            "unlock_endpoint": unlock_url,
+        }
+
+    redacted["deep_dive_locked"] = True
+    redacted["unlock_endpoint"] = unlock_url
+    return redacted
+
+
+DEBT_GATED_PILLAR_KEYS = ("p3_solvency", "p5_recovery")
+FUND_FREE_DOSSIER_KEYS = ("scheme_code", "scheme_name", "composite_health_score", "last_audited_at")
+
+
+def server_side_paywall_redact(data: Dict[str, Any], asset_type: str, is_unlocked: bool) -> Dict[str, Any]:
+    """
+    Polymorphic server-side paywall redaction helper.
+    Physically removes premium intellectual property from JSON objects before HTTP response dispatch.
+    """
+    if is_unlocked or not data:
+        return data
+
+    asset_upper = (asset_type or "").strip().upper()
+    if asset_upper in ("EQUITY", "STOCK"):
+        return redact_equity_intel_json(data, is_unlocked=False) or {}
+
+    import copy
+    redacted = copy.deepcopy(data)
+    if asset_upper == "MUTUAL_FUND":
+        from core.agents.copilot.research_desk import MF_GATED_FIELDS
+        for field in MF_GATED_FIELDS:
+            redacted.pop(field, None)
+        redacted["deep_dive_locked"] = True
+        return redacted
+
+    if asset_upper == "CORPORATE_DEBT":
+        redacted.pop("credit_contagion_radar", None)
+        pillars = dict(redacted.get("pillars") or {})
+        for gated in DEBT_GATED_PILLAR_KEYS:
+            pillars.pop(gated, None)
+        redacted["pillars"] = pillars
+        redacted["deep_dive_locked"] = True
+        return redacted
+
+    if asset_upper == "REIT":
+        redacted.pop("countercase_risks", None)
+        redacted["deep_dive_locked"] = True
+        return redacted
+
+    return redacted
 
 
 def _unlock_asset_deep_dive(request: Request, kind: str, asset_id: str, label: str):

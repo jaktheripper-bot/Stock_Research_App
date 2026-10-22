@@ -100,23 +100,23 @@ async def synthesize_report(request: Request, payload: SynthesizeRequest):
     canonical = resolve_canonical_symbol(clean_t) or clean_t
 
     # Pre-flight validation: Ensure ticker is a recognized BSE/NSE security or archived entity
-    scrip_code = resolve_bse_scrip_code(canonical)
-    existing_report = get_latest_report(canonical)
-    if (not scrip_code or scrip_code == "N/A") and not existing_report:
-        suggestions = get_ticker_suggestions(canonical, limit=5)
-        raise HTTPException(
-            status_code=404,
-            detail={
-                "error": "UNRECOGNIZED_TICKER",
-                "message": (
-                    f"'{canonical}' was not found in the BSE/NSE scrip master. "
-                    + (f"Did you mean: {', '.join(suggestions)}?" if suggestions else "Please verify the ticker symbol.")
-                ),
-                "suggestions": suggestions,
-            },
-        )
-
     existing = get_report_by_ticker_sync(canonical)
+    if not existing:
+        scrip_code = resolve_bse_scrip_code(canonical)
+        if not scrip_code or scrip_code == "N/A":
+            suggestions = get_ticker_suggestions(canonical, limit=5)
+            raise HTTPException(
+                status_code=404,
+                detail={
+                    "error": "UNRECOGNIZED_TICKER",
+                    "message": (
+                        f"'{canonical}' was not found in the BSE/NSE scrip master. "
+                        + (f"Did you mean: {', '.join(suggestions)}?" if suggestions else "Please verify the ticker symbol.")
+                    ),
+                    "suggestions": suggestions,
+                },
+            )
+
     if existing and existing.get("report_text") and not payload.force_refresh:
         return json_response_with_cache({
             "success": True,
@@ -136,9 +136,29 @@ async def synthesize_report(request: Request, payload: SynthesizeRequest):
         client_ip=client_ip
     )
     if not synth_auth:
+        if "LIVE_GEN_CAP_EXCEEDED" in synth_reason or "DAILY_" in synth_reason:
+            cached_rep = get_report_by_ticker_sync(canonical)
+            if cached_rep and cached_rep.get("report_text"):
+                logger.warning(
+                    f"Live generation daily velocity cap hit ({synth_reason}) for {user_email}/{client_ip}. "
+                    f"Serving cached historical data for {canonical} without consuming live LLM tokens."
+                )
+                return json_response_with_cache({
+                    "success": True,
+                    "already_exists": True,
+                    "ticker": canonical,
+                    "dossier_url": f"/dossier/{canonical}",
+                    "new_balance": get_user_credits_balance(clean_uid) if web_user else 999.0,
+                    "message": f"Daily live generation velocity cap reached. Serving cached historical dossier for {canonical}."
+                })
+        detail_msg = (
+            "Hourly report generation limit reached (maximum 20 reports/hour per user) to protect account quota. Please retry later."
+            if "HOURLY" in synth_reason
+            else f"Daily live generation velocity limit reached ({synth_reason}). Please retry tomorrow or review existing dossiers."
+        )
         raise HTTPException(
             status_code=429,
-            detail="Hourly report generation limit reached (maximum 20 reports/hour per user) to protect account quota. Please retry later."
+            detail=detail_msg
         )
 
     if not is_admin:
@@ -265,10 +285,11 @@ async def api_dossier_status(request: Request, ticker: str):
 
 
 @router.get("/api/dossier/intel/{ticker}")
-async def api_dossier_intel(ticker: str):
+async def api_dossier_intel(ticker: str, request: Request):
     """
     Returns comprehensive Category 1 equity intelligence:
     Sector-native metrics, exchange level-2 depth, 360-degree accounting check, valuation radar, and bull/bear thesis.
+    Enforces strict server-side paywall redaction for non-unlocked requests.
     """
     clean_t = clean_ticker(ticker)
     if not clean_t:
@@ -284,13 +305,20 @@ async def api_dossier_intel(ticker: str):
         logger.debug(f"Fundamentals lookup notice for {canonical}: {e}")
 
     from core.analysis.equity_dossier import compile_equity_dossier
+    from web.common import _asset_unlocked_for_request, redact_equity_intel_json
     intel = compile_equity_dossier(
         ticker=canonical,
         fundamentals=fund,
         company_name=rep.get("short_name", canonical),
         industry_str=rep.get("industry", ""),
     )
-    return json_response_with_cache({"success": True, "intelligence": intel})
+    is_unlocked = _asset_unlocked_for_request(request, "EQUITY", canonical)
+    redacted_intel = redact_equity_intel_json(intel, is_unlocked=is_unlocked)
+    return json_response_with_cache({
+        "success": True,
+        "intelligence": redacted_intel,
+        "deep_dive_unlocked": is_unlocked,
+    })
 
 
 # ==============================================================================

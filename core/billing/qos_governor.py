@@ -17,7 +17,12 @@ logger = logging.getLogger(__name__)
 _USER_COPILOT_WINDOWS: Dict[str, Deque[float]] = defaultdict(deque)
 _USER_SYNTHESIS_WINDOWS: Dict[str, Deque[float]] = defaultdict(deque)
 _IP_BURST_WINDOWS: Dict[str, Deque[float]] = defaultdict(deque)
-_WINDOW_LOCK = threading.Lock()
+
+# Denial-of-Wallet Shield: Daily Live Generation (Cache Miss) Velocity Tracking
+_USER_DAILY_LIVE_GEN_WINDOWS: Dict[str, Deque[float]] = defaultdict(deque)
+_IP_DAILY_LIVE_GEN_WINDOWS: Dict[str, Deque[float]] = defaultdict(deque)
+
+_WINDOW_LOCK = threading.RLock()
 
 _INFLIGHT_TICKER_LOCKS: Dict[str, threading.Lock] = defaultdict(threading.Lock)
 _INFLIGHT_META_LOCK = threading.Lock()
@@ -32,6 +37,10 @@ MAX_SYNTHESIS_PER_USER_HOUR = int(os.environ.get("MAX_SYNTHESIS_PER_USER_HOUR", 
 MAX_ANON_REQUESTS_PER_IP_MINUTE = int(os.environ.get("MAX_ANON_REQUESTS_PER_IP_MINUTE", "30"))
 MAX_DAEMON_DAILY_SPEND_USD = float(os.environ.get("MAX_DAEMON_DAILY_SPEND_USD", "5.00"))
 
+# Strict per-user / per-IP daily caps on live generations (cache misses)
+MAX_DAILY_LIVE_GENERATIONS_PER_USER = int(os.environ.get("MAX_DAILY_LIVE_GENERATIONS_PER_USER", "25"))
+MAX_DAILY_LIVE_GENERATIONS_PER_IP = int(os.environ.get("MAX_DAILY_LIVE_GENERATIONS_PER_IP", "50"))
+
 
 def reset_qos_windows_for_test() -> None:
     """Clears in-memory rate-limit windows for deterministic unit testing."""
@@ -39,6 +48,8 @@ def reset_qos_windows_for_test() -> None:
         _USER_COPILOT_WINDOWS.clear()
         _USER_SYNTHESIS_WINDOWS.clear()
         _IP_BURST_WINDOWS.clear()
+        _USER_DAILY_LIVE_GEN_WINDOWS.clear()
+        _IP_DAILY_LIVE_GEN_WINDOWS.clear()
     with _DAEMON_SPEND_LOCK:
         global _DAEMON_DAILY_SPEND_USD, _DAEMON_SPEND_DATE
         _DAEMON_DAILY_SPEND_USD = 0.0
@@ -72,6 +83,87 @@ def _prune_and_check(window: Deque[float], now: float, period_sec: float, limit:
     if len(window) >= limit:
         return False
     window.append(now)
+    return True
+
+
+def authorize_live_generation(
+    user_email: str = "",
+    client_ip: str = ""
+) -> Tuple[bool, str]:
+    """
+    Enforces a strict per-user and per-IP daily velocity cap on live generations (cache misses)
+    to defeat Denial-of-Wallet attacks across micro-cap penny stocks.
+    Returns (True, "AUTHORIZED") or (False, reason).
+    """
+    try:
+        now = time.time()
+        actor_user = (user_email or "").strip().lower()
+        actor_ip = (client_ip or "").strip()
+
+        with _WINDOW_LOCK:
+            cutoff = now - 86400.0
+            if actor_ip:
+                ip_win = _IP_DAILY_LIVE_GEN_WINDOWS[actor_ip]
+                while ip_win and ip_win[0] < cutoff:
+                    ip_win.popleft()
+                if len(ip_win) >= MAX_DAILY_LIVE_GENERATIONS_PER_IP:
+                    return False, f"DAILY_IP_LIVE_GEN_CAP_EXCEEDED (Max {MAX_DAILY_LIVE_GENERATIONS_PER_IP}/day per IP)"
+
+            if actor_user:
+                user_win = _USER_DAILY_LIVE_GEN_WINDOWS[actor_user]
+                while user_win and user_win[0] < cutoff:
+                    user_win.popleft()
+                if len(user_win) >= MAX_DAILY_LIVE_GENERATIONS_PER_USER:
+                    return False, f"DAILY_USER_LIVE_GEN_CAP_EXCEEDED (Max {MAX_DAILY_LIVE_GENERATIONS_PER_USER}/day per account)"
+
+            if actor_ip:
+                _IP_DAILY_LIVE_GEN_WINDOWS[actor_ip].append(now)
+            if actor_user:
+                _USER_DAILY_LIVE_GEN_WINDOWS[actor_user].append(now)
+
+        return True, "AUTHORIZED"
+    except Exception as e:
+        logger.error(f"QoS Governor live generation check error (failing closed): {e}")
+        return False, "System busy verifying live generation velocity limits. Please retry later."
+
+
+def record_live_generation(user_email: str = "", client_ip: str = "") -> None:
+    """Manually registers a live generation occurrence under user and IP tracking windows."""
+    now = time.time()
+    actor_user = (user_email or "").strip().lower()
+    actor_ip = (client_ip or "").strip()
+    with _WINDOW_LOCK:
+        if actor_ip:
+            _IP_DAILY_LIVE_GEN_WINDOWS[actor_ip].append(now)
+        if actor_user:
+            _USER_DAILY_LIVE_GEN_WINDOWS[actor_user].append(now)
+
+
+def is_live_generation_allowed(user_email: str = "", client_ip: str = "") -> bool:
+    """Convenience boolean helper checking if live generation is permitted without recording."""
+    now = time.time()
+    actor_user = (user_email or "").strip().lower()
+    actor_ip = (client_ip or "").strip()
+    cutoff = now - 86400.0
+    with _WINDOW_LOCK:
+        if actor_ip:
+            ip_win = _IP_DAILY_LIVE_GEN_WINDOWS[actor_ip]
+            ip_count = sum(1 for t in ip_win if t >= cutoff)
+            if ip_count >= MAX_DAILY_LIVE_GENERATIONS_PER_IP:
+                return False
+        if actor_user:
+            user_win = _USER_DAILY_LIVE_GEN_WINDOWS[actor_user]
+            user_count = sum(1 for t in user_win if t >= cutoff)
+            if user_count >= MAX_DAILY_LIVE_GENERATIONS_PER_USER:
+                return False
+        if not actor_ip and not actor_user:
+            # If no actor specified, check whether any active IP or user is currently capped
+            for ip_win in _IP_DAILY_LIVE_GEN_WINDOWS.values():
+                if sum(1 for t in ip_win if t >= cutoff) >= MAX_DAILY_LIVE_GENERATIONS_PER_IP:
+                    return False
+            for user_win in _USER_DAILY_LIVE_GEN_WINDOWS.values():
+                if sum(1 for t in user_win if t >= cutoff) >= MAX_DAILY_LIVE_GENERATIONS_PER_USER:
+                    return False
     return True
 
 
@@ -135,6 +227,12 @@ def authorize_llm_execution(
                 )
                 if not ok:
                     return False, "USER_SYNTHESIS_HOURLY_VELOCITY_CAP"
+                
+                # Denial-of-Wallet Shield: check daily live generation cap (cache misses)
+                live_ok, live_reason = authorize_live_generation(user_email=user_email, client_ip=client_ip)
+                if not live_ok:
+                    return False, live_reason
+
                 return True, "VIP_SYNTHESIS_AUTHORIZED"
 
         return False, f"UNKNOWN_ACTOR_TYPE:{actor_type}"

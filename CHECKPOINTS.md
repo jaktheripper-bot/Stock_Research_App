@@ -10,7 +10,7 @@
 
 | Checkpoint Tag | IST Timestamp | Commit | DB Reports | Description |
 |:---|:---|:---|:---|:---|
-| `checkpoint_20261022_232946_checkpoint_20261022_233000_p0_p1_financial_ledger_auth_integrity` | 2026-10-22 23:29:46 IST | `4c69a3e` | 195 rep / 427 rev | checkpoint_20261022_233000_p0_p1_financial_ledger_auth_integrity |
+| `checkpoint_20261022_232946_checkpoint_20261022_233000_p0_p1_financial_ledger_auth_integrity` | 2026-10-22 23:29:46 IST | `9e2a4fb` | 195 rep / 427 rev | checkpoint_20261022_233000_p0_p1_financial_ledger_auth_integrity |
 | `checkpoint_20261022_224616_checkpoint_20261022_225000_admin_dwell_table_interactive_column_sorting` | 2026-10-22 22:46:16 IST | `36af7d5` | 195 rep / 427 rev | checkpoint_20261022_225000_admin_dwell_table_interactive_column_sorting |
 | `checkpoint_20261022_223948_checkpoint_20261022_223500_admin_service_inbox_table_sizing_and_proportions` | 2026-10-22 22:39:48 IST | `5d36723` | 195 rep / 427 rev | checkpoint_20261022_223500_admin_service_inbox_table_sizing_and_proportions |
 | `checkpoint_20261020_205726_brand_voice_backend_names_and_social_wiring` | 2026-10-20 20:57:26 IST | `ed26776` | 196 rep / 428 rev | brand_voice_backend_names_and_social_wiring |

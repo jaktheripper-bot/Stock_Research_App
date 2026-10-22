@@ -76,6 +76,7 @@ def evaluate_forensic_sieve(
         "red_flags": red_flags,
         "failed_checks": failed_checks,
         "summary": summary,
+        "status": status,
         "forensic_status": status,
         "chanakya_status": status,
     }

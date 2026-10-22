@@ -396,7 +396,11 @@ def stream_stock_report(ticker: str, language: str = "English (India)", stock_da
             logger.error(f"Error archiving report for {stock_data.get('ticker')}: {e}")
 
 def generate_stock_report(ticker: str, language: str = "English (India)", use_grounding: bool = True) -> str:
-    from core.billing.qos_governor import single_flight_ticker_lock
+    from core.billing.qos_governor import (
+        single_flight_ticker_lock,
+        is_live_generation_allowed,
+        record_live_generation,
+    )
     from core.db.reports import get_report_by_ticker
 
     clean_ticker = (ticker or "UNKNOWN").strip().upper()
@@ -407,11 +411,23 @@ def generate_stock_report(ticker: str, language: str = "English (India)", use_gr
         if cached and cached.get("report_text"):
             cached_text = cached.get("report_text", "")
             if len(cached_text.strip()) >= 500 and "Live Synthesis Failed" not in cached_text:
+                # Denial-of-Wallet Shield: If live generation velocity cap is hit, or coalesced, serve cached data
+                if not is_live_generation_allowed():
+                    logger.warning(f"Live generation velocity cap hit. Serving existing cached report for {clean_ticker}.")
+                    return cached_text
                 logger.info(f"Single-flight coalescer: Reusing freshly compiled cached report for {clean_ticker}")
                 return cached_text
+
+        # If live generation cap is hit but we have any cached text, serve it
+        if cached and cached.get("report_text") and not is_live_generation_allowed():
+            logger.warning(f"Live generation velocity limit reached. Serving cached historical report for {clean_ticker}.")
+            return cached.get("report_text", "")
 
         chunks = []
         for c in stream_stock_report(clean_ticker, language, use_grounding=use_grounding):
             chunks.append(c)
-        return "".join(chunks)
+        full_text = "".join(chunks)
+        if len(full_text.strip()) >= 800 and "Live Synthesis Failed" not in full_text:
+            record_live_generation()
+        return full_text
 

@@ -197,6 +197,8 @@ from web.common import (
     ADMIN_2FA_PENDING_COOKIE,
     USER_SESSION_COOKIE,
     ALLOWED_ORIGIN_HOSTS,
+    DEBT_GATED_PILLAR_KEYS,
+    FUND_FREE_DOSSIER_KEYS,
 )
 
 
@@ -1216,6 +1218,7 @@ def dossier_page(request: Request, ticker: str):
                 equity_intel=equity_intel,
                 formatted_date=str(rep.get("formatted_date") or "Latest Filing"),
             )
+
     except Exception as e:
         logger.debug(f"Equity dossier intelligence compilation notice for {canonical}: {e}")
 

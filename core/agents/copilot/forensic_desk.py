@@ -25,6 +25,34 @@ from core.agents.copilot.research_desk import (
     detect_gated_topic,
     build_unlock_notice,
 )
+from web.common import (
+    redact_equity_intel_json,
+    server_side_paywall_redact,
+)
 
 # Canonical aliases for Forensic Desk
 process_forensic_desk_turn = process_research_desk_turn
+
+__all__ = [
+    "SEBI_SAFE_HARBOR_DIRECTIVE",
+    "SEBI_SYSTEM_BOUNDARY_DIRECTIVE",
+    "SEBI_PRESCRIPTIVE_TOKENS_RE",
+    "scrub_prescriptive_tokens",
+    "scrub_streaming_yield",
+    "check_non_advisory_compliance",
+    "check_input_qualification",
+    "is_input_qualified",
+    "detect_forbidden_intent",
+    "process_research_desk_turn",
+    "process_forensic_desk_turn",
+    "build_equity_deterministic_response",
+    "build_mutual_fund_deterministic_response",
+    "build_debt_deterministic_response",
+    "build_etf_deterministic_response",
+    "build_reit_deterministic_response",
+    "redact_gated_pillars",
+    "detect_gated_topic",
+    "build_unlock_notice",
+    "redact_equity_intel_json",
+    "server_side_paywall_redact",
+]

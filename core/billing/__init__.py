@@ -54,6 +54,9 @@ from core.billing.currency import (
 
 from core.billing.qos_governor import (
     authorize_llm_execution,
+    authorize_live_generation,
+    record_live_generation,
+    is_live_generation_allowed,
     single_flight_ticker_lock,
     reset_qos_windows_for_test,
     record_daemon_spend_usd,
@@ -62,6 +65,8 @@ from core.billing.qos_governor import (
     MAX_SYNTHESIS_PER_USER_HOUR,
     MAX_ANON_REQUESTS_PER_IP_MINUTE,
     MAX_DAEMON_DAILY_SPEND_USD,
+    MAX_DAILY_LIVE_GENERATIONS_PER_USER,
+    MAX_DAILY_LIVE_GENERATIONS_PER_IP,
 )
 
 __all__ = [
@@ -85,6 +90,9 @@ __all__ = [
     "convert_inr_to_currency",
     "resolve_currency_for_request",
     "authorize_llm_execution",
+    "authorize_live_generation",
+    "record_live_generation",
+    "is_live_generation_allowed",
     "single_flight_ticker_lock",
     "reset_qos_windows_for_test",
     "record_daemon_spend_usd",
@@ -93,5 +101,7 @@ __all__ = [
     "MAX_SYNTHESIS_PER_USER_HOUR",
     "MAX_ANON_REQUESTS_PER_IP_MINUTE",
     "MAX_DAEMON_DAILY_SPEND_USD",
+    "MAX_DAILY_LIVE_GENERATIONS_PER_USER",
+    "MAX_DAILY_LIVE_GENERATIONS_PER_IP",
 ]
 

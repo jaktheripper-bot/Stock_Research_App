@@ -2903,6 +2903,10 @@ async def process_research_desk_turn(
                         contagion_alert = evaluate_equity_cross_contagion(linked_debt[0], fetch_live_fundamentals=False)
                 except Exception as e:
                     logger.debug(f"Cross-contagion lookup notice for {clean_ticker}: {e}")
+                safe_report_text = rep.get("report_text", "") if deep_dive_unlocked else redact_gated_pillars(rep.get("report_text", ""))
+                safe_rep = dict(rep) if rep else {}
+                if not deep_dive_unlocked and "report_text" in safe_rep:
+                    safe_rep["report_text"] = safe_report_text
 
                 context_data.update({
                     "ticker": clean_ticker,
@@ -2912,8 +2916,8 @@ async def process_research_desk_turn(
                     "market_cap": mcap_val,
                     "market_cap_str": mcap_str,
                     "health_matrix": matrix,
-                    "report_text": rep.get("report_text", "") if deep_dive_unlocked else redact_gated_pillars(rep.get("report_text", "")),
-                    "report_data": rep,
+                    "report_text": safe_report_text,
+                    "report_data": safe_rep,
                     "citations_count": len(rep.get("citations") or []),
                     # Reverse DCF is Pillar 05 (valuation) content, so it is gated too
                     "reverse_dcf": dcf_dict if deep_dive_unlocked else {},
