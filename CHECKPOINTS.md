@@ -10,7 +10,7 @@
 
 | Checkpoint Tag | IST Timestamp | Commit | DB Reports | Description |
 |:---|:---|:---|:---|:---|
-| `checkpoint_20261022_223948_checkpoint_20261022_223500_admin_service_inbox_table_sizing_and_proportions` | 2026-10-22 22:39:48 IST | `cb00c27` | 195 rep / 427 rev | checkpoint_20261022_223500_admin_service_inbox_table_sizing_and_proportions |
+| `checkpoint_20261022_223948_checkpoint_20261022_223500_admin_service_inbox_table_sizing_and_proportions` | 2026-10-22 22:39:48 IST | `5d36723` | 195 rep / 427 rev | checkpoint_20261022_223500_admin_service_inbox_table_sizing_and_proportions |
 | `checkpoint_20261020_205726_brand_voice_backend_names_and_social_wiring` | 2026-10-20 20:57:26 IST | `ed26776` | 196 rep / 428 rev | brand_voice_backend_names_and_social_wiring |
 | `checkpoint_20261020_201303_brand_voice_site_and_report_copy` | 2026-10-20 20:13:03 IST | `137a2ef` | 196 rep / 428 rev | brand_voice_site_and_report_copy |
 | `checkpoint_20261020_002204_homepage_plain_language_trust_and_brand_alignment` | 2026-10-20 00:22:04 IST | `cec355c` | 166 rep / 274 rev | homepage_plain_language_trust_and_brand_alignment |

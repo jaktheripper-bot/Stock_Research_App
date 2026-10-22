@@ -396,6 +396,51 @@
   color: #38bdf8;
 }
 
+/* Page Dwell & Reading Time Sortable Table Headers */
+.dwell-sortable-th {
+  cursor: pointer;
+  user-select: none;
+  transition: background 0.15s ease, color 0.15s ease, border-color 0.15s ease;
+  position: relative;
+}
+.dwell-sortable-th:hover {
+  background: rgba(255, 255, 255, 0.06);
+  color: var(--text-primary, #f8fafc);
+}
+html[data-theme="light"] .dwell-sortable-th:hover {
+  background: rgba(0, 0, 0, 0.04);
+}
+.dwell-sortable-th:focus-visible {
+  outline: 2px solid var(--accent-cyan, #38bdf8);
+  outline-offset: -2px;
+}
+.dwell-sort-header-inner {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  width: 100%;
+}
+.dwell-sort-indicator {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 11px;
+  min-width: 14px;
+  color: var(--text-muted, #64748b);
+  opacity: 0.55;
+  transition: transform 0.15s ease, color 0.15s ease, opacity 0.15s ease;
+}
+.dwell-sortable-th.sorted-active {
+  color: var(--accent-cyan, #38bdf8);
+}
+.dwell-sortable-th.sorted-active .dwell-sort-indicator {
+  color: var(--accent-cyan, #38bdf8);
+  opacity: 1;
+  font-weight: 800;
+  transform: scale(1.15);
+}
+
 .mono {
   font-family: 'JetBrains Mono', monospace;
 }
@@ -1696,19 +1741,62 @@
         <table class="admin-table" id="tablePageDwellTimes">
           <thead>
             <tr>
-              <th>Page Link / URL Route</th>
-              <th>Category</th>
-              <th>Avg Dwell Time</th>
-              <th>Engagement Tier</th>
-              <th>Total Attention Spent</th>
-              <th>Visits Tracked</th>
-              <th style="min-width: 140px;">Attention Share</th>
+              <th class="dwell-sortable-th" data-sort-key="path" role="columnheader" aria-sort="none" tabindex="0" onclick="sortDwellTable('path')" onkeydown="handleDwellHeaderKeydown(event, 'path')" title="Click to sort by Page Link / URL Route (A to Z)">
+                <div class="dwell-sort-header-inner">
+                  <span>Page Link / URL Route</span>
+                  <span class="dwell-sort-indicator" id="dwell-sort-ind-path">↕</span>
+                </div>
+              </th>
+              <th class="dwell-sortable-th" data-sort-key="category" role="columnheader" aria-sort="none" tabindex="0" onclick="sortDwellTable('category')" onkeydown="handleDwellHeaderKeydown(event, 'category')" title="Click to sort by Category (A to Z)">
+                <div class="dwell-sort-header-inner">
+                  <span>Category</span>
+                  <span class="dwell-sort-indicator" id="dwell-sort-ind-category">↕</span>
+                </div>
+              </th>
+              <th class="dwell-sortable-th" data-sort-key="avg-dwell" role="columnheader" aria-sort="none" tabindex="0" onclick="sortDwellTable('avg-dwell')" onkeydown="handleDwellHeaderKeydown(event, 'avg-dwell')" title="Click to sort by Avg Dwell Time (Largest to Smallest)">
+                <div class="dwell-sort-header-inner">
+                  <span>Avg Dwell Time</span>
+                  <span class="dwell-sort-indicator" id="dwell-sort-ind-avg-dwell">↕</span>
+                </div>
+              </th>
+              <th class="dwell-sortable-th" data-sort-key="tier-rank" role="columnheader" aria-sort="none" tabindex="0" onclick="sortDwellTable('tier-rank')" onkeydown="handleDwellHeaderKeydown(event, 'tier-rank')" title="Click to sort by Engagement Tier (Highest First)">
+                <div class="dwell-sort-header-inner">
+                  <span>Engagement Tier</span>
+                  <span class="dwell-sort-indicator" id="dwell-sort-ind-tier-rank">↕</span>
+                </div>
+              </th>
+              <th class="dwell-sortable-th sorted-active" data-sort-key="total-dwell" role="columnheader" aria-sort="descending" tabindex="0" onclick="sortDwellTable('total-dwell')" onkeydown="handleDwellHeaderKeydown(event, 'total-dwell')" title="Sorted by Total Attention Spent (Largest to Smallest). Click to sort Smallest to Largest">
+                <div class="dwell-sort-header-inner">
+                  <span>Total Attention Spent</span>
+                  <span class="dwell-sort-indicator" id="dwell-sort-ind-total-dwell">▼</span>
+                </div>
+              </th>
+              <th class="dwell-sortable-th" data-sort-key="visits" role="columnheader" aria-sort="none" tabindex="0" onclick="sortDwellTable('visits')" onkeydown="handleDwellHeaderKeydown(event, 'visits')" title="Click to sort by Visits Tracked (Largest to Smallest)">
+                <div class="dwell-sort-header-inner">
+                  <span>Visits Tracked</span>
+                  <span class="dwell-sort-indicator" id="dwell-sort-ind-visits">↕</span>
+                </div>
+              </th>
+              <th class="dwell-sortable-th" data-sort-key="attention-share" role="columnheader" aria-sort="none" tabindex="0" onclick="sortDwellTable('attention-share')" onkeydown="handleDwellHeaderKeydown(event, 'attention-share')" title="Click to sort by Attention Share (Largest to Smallest)" style="min-width: 140px;">
+                <div class="dwell-sort-header-inner">
+                  <span>Attention Share</span>
+                  <span class="dwell-sort-indicator" id="dwell-sort-ind-attention-share">↕</span>
+                </div>
+              </th>
             </tr>
           </thead>
           <tbody>
             {% set max_dwell = summary.page_dwell_times[0].total_dwell_seconds if summary.page_dwell_times else 1 %}
             {% for item in summary.page_dwell_times %}
-            <tr class="dwell-row" data-path="{{ item.path }}" data-tier="{{ item.tier }}">
+            <tr class="dwell-row"
+                data-path="{{ item.path }}"
+                data-category="{{ item.category }}"
+                data-avg-dwell="{{ item.avg_dwell_seconds }}"
+                data-tier="{{ item.tier }}"
+                data-tier-rank="{% if item.tier == 'high' %}3{% elif item.tier == 'medium' %}2{% elif item.tier == 'quick' %}1{% else %}0{% endif %}"
+                data-total-dwell="{{ item.total_dwell_seconds }}"
+                data-visits="{{ item.visits_count }}"
+                data-attention-share="{{ [((item.total_dwell_seconds / [max_dwell, 1]|max) * 100)|round(1), 100]|min }}">
               <td>
                 <a href="{{ item.path }}" target="_blank" style="color: #38bdf8; text-decoration: none; font-weight: 600; font-family: monospace; font-size: 12px; display: inline-flex; align-items: center; gap: 4px;">
                   {{ item.path }} <span style="font-size: 10px; opacity: 0.7;">↗</span>
@@ -4513,6 +4601,122 @@
     }
   }
 
+  let dwellSortState = {
+    key: 'total-dwell',
+    order: 'desc'
+  };
+
+  const DWELL_COLUMN_CONFIG = {
+    'path': { label: 'Page Link / URL Route', isNumeric: false, defaultOrder: 'asc' },
+    'category': { label: 'Category', isNumeric: false, defaultOrder: 'asc' },
+    'avg-dwell': { label: 'Avg Dwell Time', isNumeric: true, defaultOrder: 'desc' },
+    'tier-rank': { label: 'Engagement Tier', isNumeric: true, defaultOrder: 'desc' },
+    'total-dwell': { label: 'Total Attention Spent', isNumeric: true, defaultOrder: 'desc' },
+    'visits': { label: 'Visits Tracked', isNumeric: true, defaultOrder: 'desc' },
+    'attention-share': { label: 'Attention Share', isNumeric: true, defaultOrder: 'desc' }
+  };
+
+  function sortDwellTable(sortKey) {
+    const table = document.getElementById('tablePageDwellTimes');
+    if (!table) return;
+    const tbody = table.querySelector('tbody');
+    if (!tbody) return;
+
+    const rows = Array.from(tbody.querySelectorAll('tr.dwell-row'));
+    if (!rows.length) return;
+
+    const config = DWELL_COLUMN_CONFIG[sortKey] || { isNumeric: false, defaultOrder: 'asc', label: sortKey };
+
+    let nextOrder;
+    if (dwellSortState.key === sortKey) {
+      nextOrder = dwellSortState.order === 'desc' ? 'asc' : 'desc';
+    } else {
+      nextOrder = config.defaultOrder;
+    }
+
+    dwellSortState.key = sortKey;
+    dwellSortState.order = nextOrder;
+
+    rows.sort((a, b) => {
+      const aVal = a.getAttribute('data-' + sortKey) || '';
+      const bVal = b.getAttribute('data-' + sortKey) || '';
+
+      let cmp = 0;
+      if (config.isNumeric) {
+        const numA = parseFloat(aVal) || 0;
+        const numB = parseFloat(bVal) || 0;
+        cmp = numA - numB;
+      } else {
+        cmp = aVal.localeCompare(bVal, undefined, { sensitivity: 'base', numeric: true });
+      }
+
+      // Deterministic tie-breakers if primary column values match
+      if (cmp === 0) {
+        const tieA = parseFloat(a.getAttribute('data-total-dwell')) || 0;
+        const tieB = parseFloat(b.getAttribute('data-total-dwell')) || 0;
+        if (tieA !== tieB) {
+          cmp = tieA - tieB;
+        } else {
+          const pathA = a.getAttribute('data-path') || '';
+          const pathB = b.getAttribute('data-path') || '';
+          cmp = -pathA.localeCompare(pathB);
+        }
+      }
+
+      return nextOrder === 'desc' ? -cmp : cmp;
+    });
+
+    // Re-append rows in sorted order (preserves visibility state from search filtering)
+    rows.forEach(row => tbody.appendChild(row));
+
+    // Update table header aria attributes, icons, and titles
+    updateDwellSortHeaders(sortKey, nextOrder);
+  }
+
+  function handleDwellHeaderKeydown(event, sortKey) {
+    if (event.key === 'Enter' || event.key === ' ') {
+      event.preventDefault();
+      sortDwellTable(sortKey);
+    }
+  }
+
+  function updateDwellSortHeaders(activeKey, activeOrder) {
+    const table = document.getElementById('tablePageDwellTimes');
+    if (!table) return;
+
+    const headers = table.querySelectorAll('th.dwell-sortable-th');
+    headers.forEach(th => {
+      const key = th.getAttribute('data-sort-key');
+      const ind = document.getElementById('dwell-sort-ind-' + key);
+      const cfg = DWELL_COLUMN_CONFIG[key] || { label: key, isNumeric: false };
+
+      if (key === activeKey) {
+        th.classList.add('sorted-active');
+        th.setAttribute('aria-sort', activeOrder === 'asc' ? 'ascending' : 'descending');
+        if (ind) {
+          ind.textContent = activeOrder === 'desc' ? '▼' : '▲';
+        }
+        if (cfg.isNumeric) {
+          const curr = activeOrder === 'desc' ? 'Largest to Smallest' : 'Smallest to Largest';
+          const next = activeOrder === 'desc' ? 'Smallest to Largest' : 'Largest to Smallest';
+          th.setAttribute('title', `Sorted by ${cfg.label} (${curr}). Click to sort ${next}.`);
+        } else {
+          const curr = activeOrder === 'asc' ? 'A to Z' : 'Z to A';
+          const next = activeOrder === 'asc' ? 'Z to A' : 'A to Z';
+          th.setAttribute('title', `Sorted by ${cfg.label} (${curr}). Click to sort ${next}.`);
+        }
+      } else {
+        th.classList.remove('sorted-active');
+        th.setAttribute('aria-sort', 'none');
+        if (ind) {
+          ind.textContent = '↕';
+        }
+        const next = cfg.isNumeric ? 'Largest to Smallest' : 'A to Z';
+        th.setAttribute('title', `Click to sort by ${cfg.label} (${next})`);
+      }
+    });
+  }
+
   function filterDwellTable() {
     const input = document.getElementById('inputFilterDwell');
     if (!input) return;
@@ -4521,7 +4725,8 @@
     rows.forEach(row => {
       const path = (row.getAttribute('data-path') || '').toLowerCase();
       const tier = (row.getAttribute('data-tier') || '').toLowerCase();
-      if (!filter || path.includes(filter) || tier.includes(filter)) {
+      const cat = (row.getAttribute('data-category') || '').toLowerCase();
+      if (!filter || path.includes(filter) || tier.includes(filter) || cat.includes(filter)) {
         row.style.display = '';
       } else {
         row.style.display = 'none';

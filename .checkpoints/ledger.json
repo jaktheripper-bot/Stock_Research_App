@@ -1710,5 +1710,21 @@
       "revision_count": 428
     },
     "preflight_passed": false
+  },
+  {
+    "tag": "checkpoint_20261022_223948_checkpoint_20261022_223500_admin_service_inbox_table_sizing_and_proportions",
+    "timestamp": "2026-10-22 22:39:48 IST",
+    "commit_sha": "5d367233bdaed1fffd05ad96076532e01598412d",
+    "branch": "main",
+    "description": "checkpoint_20261022_223500_admin_service_inbox_table_sizing_and_proportions",
+    "database": {
+      "exists": true,
+      "filename": "reports_checkpoint_20261022_223948_checkpoint_20261022_223500_admin_service_inbox_table_sizing_and_proportions.db",
+      "path": ".checkpoints/reports_checkpoint_20261022_223948_checkpoint_20261022_223500_admin_service_inbox_table_sizing_and_proportions.db",
+      "size_bytes": 22450176,
+      "report_count": 195,
+      "revision_count": 427
+    },
+    "preflight_passed": true
   }
 ]

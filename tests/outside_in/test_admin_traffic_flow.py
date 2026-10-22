@@ -213,13 +213,33 @@ class TestAdminTrafficUiAndDomContracts(unittest.TestCase):
         self.assertIn("Site Visit Transitions", pane_text)
         self.assertIn("Top Downstream Driver", pane_text)
 
-        # 3. Assert Link Dwell Table and Column Headers
+        # 3. Assert Link Dwell Table and Column Headers with Interactive Sorting Controls
         dwell_table = soup.find("table", id="tablePageDwellTimes")
         self.assertIsNotNone(dwell_table, "Missing #tablePageDwellTimes table in DOM.")
         headers = [th.get_text(strip=True) for th in dwell_table.find_all("th")]
         expected_headers = ["Page Link / URL Route", "Category", "Avg Dwell Time", "Engagement Tier", "Total Attention Spent", "Visits Tracked", "Attention Share"]
         for exp in expected_headers:
             self.assertTrue(any(exp in h for h in headers), f"Header '{exp}' not found in dwell table.")
+
+        # 3b. Outside-in contract: Sortable headers and click/keyboard affordances
+        sortable_ths = dwell_table.find_all("th", class_="dwell-sortable-th")
+        self.assertEqual(len(sortable_ths), 7, "All 7 column headers must be sortable (.dwell-sortable-th).")
+        expected_keys = ["path", "category", "avg-dwell", "tier-rank", "total-dwell", "visits", "attention-share"]
+        for th in sortable_ths:
+            key = th.get("data-sort-key")
+            self.assertIn(key, expected_keys, f"Unexpected sort key: {key}")
+            self.assertEqual(th.get("role"), "columnheader")
+            self.assertEqual(th.get("tabindex"), "0")
+            self.assertIn(f"sortDwellTable('{key}')", th.get("onclick", ""))
+            indicator = th.find("span", id=f"dwell-sort-ind-{key}")
+            self.assertIsNotNone(indicator, f"Missing sort indicator span for column {key}")
+
+        # 3c. Default sort contract: Total Attention Spent is active descending
+        total_th = dwell_table.find("th", attrs={"data-sort-key": "total-dwell"})
+        self.assertIsNotNone(total_th)
+        self.assertIn("sorted-active", total_th.get("class", []))
+        self.assertEqual(total_th.get("aria-sort"), "descending")
+        self.assertEqual(total_th.find("span", id="dwell-sort-ind-total-dwell").get_text(strip=True), "▼")
 
         # 4. Assert Site Visit Tree Container and Filter Inputs
         tree_container = soup.find("div", id="siteVisitTreeContainer")
@@ -233,12 +253,16 @@ class TestAdminTrafficUiAndDomContracts(unittest.TestCase):
         self.assertIsNotNone(filter_tree, "Missing #inputFilterVisitTree search input.")
         self.assertIn("filterSiteVisitTree()", filter_tree.get("onkeyup", ""))
 
-        # 5. Assert Service Inbox JavaScript functions exist in scripts
+        # 5. Assert Service Inbox & Dwell Table JavaScript functions exist in scripts
         script_text = "\n".join(s.string for s in soup.find_all("script") if s.string)
         self.assertIn("openTicketReplyModal", script_text, "openTicketReplyModal must be defined in scripts.")
         self.assertIn("closeTicketReplyModal", script_text, "closeTicketReplyModal must be defined in scripts.")
         self.assertIn("filterDwellTable", script_text, "filterDwellTable must be defined in scripts.")
         self.assertIn("filterSiteVisitTree", script_text, "filterSiteVisitTree must be defined in scripts.")
+        self.assertIn("sortDwellTable", script_text, "sortDwellTable must be defined in scripts.")
+        self.assertIn("handleDwellHeaderKeydown", script_text, "handleDwellHeaderKeydown must be defined in scripts.")
+        self.assertIn("updateDwellSortHeaders", script_text, "updateDwellSortHeaders must be defined in scripts.")
+        self.assertIn("DWELL_COLUMN_CONFIG", script_text, "DWELL_COLUMN_CONFIG must be defined in scripts.")
 
         # 5b. Assert Pillar-level breakdown card is present in #tab-traffic
         pillar_card = soup.find("div", id="cardPillarDwellBreakdown")
