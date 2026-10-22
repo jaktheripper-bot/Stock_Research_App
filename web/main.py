@@ -576,23 +576,58 @@ async def warmup_task():
 
 
 # ==============================================================================
-# Application Lifespan & Initialization
+# Production Security & Secret Boot Guards
 # ==============================================================================
-@asynccontextmanager
-async def lifespan(app: FastAPI):
+INSECURE_SECRET_DEFAULTS = {
+    "dev_secret",
+    "secret",
+    "changeme",
+    "stock_research_user_session_salt_2026",
+    "stock_research_admin_master_secret_2026",
+    "default_secret_key",
+    "1234567890",
+}
+
+
+def verify_production_boot_guards():
+    """
+    Enforces strict production boot guards for HMAC and session secrets.
+    Refuses to start the server (raises RuntimeError) if ENVIRONMENT == 'production'
+    or RENDER == 'true' and SECRET_KEY is missing, under 32 characters, or a known default.
+    """
     env = (os.environ.get("ENVIRONMENT") or "").strip().lower()
-    is_render = (os.environ.get("RENDER") or "").strip().lower() in ["true", "1"]
-    if env == "production" or is_render:
+    is_render = (os.environ.get("RENDER") or "").strip().lower() in ("true", "1")
+    is_prod = (os.environ.get("PRODUCTION") or "").strip().lower() in ("true", "1")
+
+    if env in ("production", "prod", "live") or is_render or is_prod:
         secret_key = (os.environ.get("SECRET_KEY") or get_secret("SECRET_KEY") or "").strip()
-        if not secret_key or len(secret_key) < 32 or secret_key == "stock_research_user_session_salt_2026":
+        if not secret_key:
             raise RuntimeError(
                 "CRITICAL PRODUCTION BOOT FAILURE: SECRET_KEY is missing, insecure, or shorter than 32 characters. "
                 "Declare a high-entropy SECRET_KEY (minimum 32 characters) in production environment variables."
             )
-        admin_key = (os.environ.get("ADMIN_API_KEY") or get_secret("ADMIN_API_KEY") or "").strip()
-        admin_pwd = (os.environ.get("ADMIN_PASSWORD") or get_secret("ADMIN_PASSWORD") or "").strip()
-        if not admin_key or not admin_pwd:
-            logger.warning("Production Notice: ADMIN_API_KEY or ADMIN_PASSWORD should be declared in production.")
+        if secret_key.lower() in INSECURE_SECRET_DEFAULTS:
+            raise RuntimeError(
+                f"CRITICAL PRODUCTION BOOT FAILURE: SECRET_KEY is set to an insecure default '{secret_key}'. "
+                "Declare a high-entropy SECRET_KEY (minimum 32 characters) in production environment variables."
+            )
+        if len(secret_key) < 32:
+            raise RuntimeError(
+                f"CRITICAL PRODUCTION BOOT FAILURE: SECRET_KEY is shorter than 32 characters (len={len(secret_key)}). "
+                "Declare a high-entropy SECRET_KEY (minimum 32 characters) in production environment variables."
+            )
+
+
+# ==============================================================================
+# Application Lifespan & Initialization
+# ==============================================================================
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    verify_production_boot_guards()
+    admin_key = (os.environ.get("ADMIN_API_KEY") or get_secret("ADMIN_API_KEY") or "").strip()
+    admin_pwd = (os.environ.get("ADMIN_PASSWORD") or get_secret("ADMIN_PASSWORD") or "").strip()
+    if not admin_key or not admin_pwd:
+        logger.warning("Production Notice: ADMIN_API_KEY or ADMIN_PASSWORD should be declared in production.")
 
     init_db()
 

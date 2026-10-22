@@ -672,11 +672,12 @@ def init_db(force: bool = False):
                             credits_added NUMERIC NOT NULL,
                             payment_gateway TEXT DEFAULT 'razorpay',
                             gateway_order_id TEXT,
-                            gateway_payment_id TEXT,
+                            gateway_payment_id TEXT UNIQUE,
                             status TEXT DEFAULT 'success',
                             pack_type TEXT NOT NULL,
                             invoice_number TEXT,
-                            created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP
+                            created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
+                            CONSTRAINT uq_credit_tx_gateway_payment_id UNIQUE (gateway_payment_id)
                         );
                     ''')
                     cursor.execute('CREATE INDEX IF NOT EXISTS idx_credit_transactions_user ON credit_transactions (user_id, created_at DESC);')
@@ -725,11 +726,12 @@ def init_db(force: bool = False):
                             credits_added REAL NOT NULL,
                             payment_gateway TEXT DEFAULT 'razorpay',
                             gateway_order_id TEXT,
-                            gateway_payment_id TEXT,
+                            gateway_payment_id TEXT UNIQUE,
                             status TEXT DEFAULT 'success',
                             pack_type TEXT NOT NULL,
                             invoice_number TEXT,
-                            created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+                            created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+                            UNIQUE(gateway_payment_id)
                         );
                     ''')
                     cursor.execute('CREATE INDEX IF NOT EXISTS idx_credit_transactions_user ON credit_transactions (user_id, created_at DESC);')
@@ -2134,6 +2136,38 @@ def init_db(force: bool = False):
                     """)
                     cursor.execute("CREATE INDEX IF NOT EXISTS idx_user_thesis_ledger_lookup ON user_thesis_ledger (user_id, ticker);")
                     cursor.execute("INSERT INTO schema_migrations (version) VALUES (\'v034_user_thesis_ledger\') ON CONFLICT DO NOTHING;")
+                conn.commit()
+
+            # Migration v035: Strict Database-Level Payment Idempotency Constraint
+            if "v035_credit_transactions_unique_payment_id_constraint" not in applied:
+                logger.info("Applying schema migration: v035_credit_transactions_unique_payment_id_constraint...")
+                if supabase_url:
+                    cursor.execute("""
+                        UPDATE credit_transactions
+                        SET gateway_payment_id = NULL
+                        WHERE gateway_payment_id = '' OR payment_gateway = 'admin_grant' OR gateway_payment_id LIKE 'grant_by_%';
+
+                        CREATE UNIQUE INDEX IF NOT EXISTS idx_credit_tx_unique_payment_id
+                        ON credit_transactions(gateway_payment_id)
+                        WHERE gateway_payment_id IS NOT NULL AND gateway_payment_id != '';
+
+                        INSERT INTO schema_migrations (version) VALUES ('v035_credit_transactions_unique_payment_id_constraint') ON CONFLICT DO NOTHING;
+                    """)
+                else:
+                    try:
+                        cursor.execute("""
+                            UPDATE credit_transactions
+                            SET gateway_payment_id = NULL
+                            WHERE gateway_payment_id = '' OR payment_gateway = 'admin_grant' OR gateway_payment_id LIKE 'grant_by_%';
+                        """)
+                        cursor.execute("""
+                            CREATE UNIQUE INDEX IF NOT EXISTS idx_credit_tx_unique_payment_id
+                            ON credit_transactions(gateway_payment_id)
+                            WHERE gateway_payment_id IS NOT NULL AND gateway_payment_id != '';
+                        """)
+                    except Exception as e:
+                        logger.warning("Migration v035 unique index notice: %s", e)
+                    cursor.execute("INSERT INTO schema_migrations (version) VALUES ('v035_credit_transactions_unique_payment_id_constraint') ON CONFLICT DO NOTHING;")
                 conn.commit()
 
             _DB_INITIALIZED = True

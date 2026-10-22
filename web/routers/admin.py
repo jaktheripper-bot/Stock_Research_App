@@ -141,15 +141,11 @@ class AdminCopilotExecuteRequest(BaseModel):
 # ==============================================================================
 # Local Dev & Environment Helpers
 # ==============================================================================
+from web.common import is_production_environment, is_local_dev_request
+
 def _is_local_dev_request(request: Request) -> bool:
-    if os.getenv("ENVIRONMENT") == "production" or os.getenv("RENDER") == "true":
-        return False
-    client_ip = (request.client.host if request.client else "").strip()
-    forwarded = request.headers.get("x-forwarded-for", "").strip()
-    if forwarded or client_ip not in ("127.0.0.1", "::1", "testclient"):
-        return False
-    host = (request.url.hostname or "").lower()
-    return host in ("localhost", "127.0.0.1", "testserver")
+    return is_local_dev_request(request)
+
 
 
 @router.get("/admin/login")
@@ -627,7 +623,7 @@ async def api_copilot_chat(payload: CopilotChatRequest, request: Request):
     init_db()
     if not _validate_request_origin(request):
         raise HTTPException(status_code=403, detail="Cross-origin request rejected.")
-    from core.agents.copilot.research_desk import process_research_desk_turn
+    from core.agents.copilot.research_desk import process_research_desk_turn, scrub_prescriptive_tokens
     from core.db.agent_sessions import get_agent_conversation
 
     web_user = _get_current_web_user(request)
@@ -713,14 +709,18 @@ async def api_copilot_chat(payload: CopilotChatRequest, request: Request):
             unlock_checker=lambda kind, asset_id: _asset_unlocked_for_request(request, kind, asset_id),
             is_subscriber=is_subscriber
         )
-        reply_text = res.get("response", "")
+        raw_reply = res.get("response", "")
+        reply_text = scrub_prescriptive_tokens(raw_reply)
+        answer_text = scrub_prescriptive_tokens(res.get("answer") or raw_reply)
         return {
             "success": True,
-            "answer": res.get("answer") or reply_text,
+            "answer": answer_text,
             "response": reply_text,
             "citations": res.get("citations", []),
             "guardrail_triggered": res.get("guardrail_triggered", False),
-            **res
+            **res,
+            "answer": answer_text,
+            "response": reply_text,
         }
     except Exception as e:
         logger.error(f"Error in api_copilot_chat: {e}", exc_info=True)
@@ -948,7 +948,11 @@ async def admin_auth_callback(
 @router.post("/admin/auth/dev-login")
 async def admin_dev_login(request: Request, next_url: Optional[str] = Form(None)):
     """Instant single-click local development login for verified local environments."""
-    if not _is_local_dev_request(request):
+    if is_production_environment() or not _is_local_dev_request(request):
+        logger.warning(
+            f"Blocked unauthorized admin dev-login attempt. Production={is_production_environment()}, "
+            f"client_ip={request.client.host if request.client else 'unknown'}"
+        )
         return Response(content="Direct dev login only allowed on local environments.", status_code=403)
 
     from core.db.admin import DEFAULT_OWNER_EMAIL

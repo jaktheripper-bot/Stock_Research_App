@@ -221,6 +221,22 @@ class CreditDeductionResult(tuple):
             return self._dict[item]
         return super().__getitem__(item)
 
+    @property
+    def success(self) -> bool:
+        return bool(self._dict["success"])
+
+    @property
+    def credits_balance(self) -> float:
+        return float(self._dict["credits_balance"])
+
+    @property
+    def message(self) -> str:
+        return str(self._dict["message"])
+
+    @property
+    def error(self) -> Optional[str]:
+        return self._dict["error"]
+
     def get(self, key, default=None):
         return self._dict.get(key, default)
 
@@ -317,16 +333,9 @@ def deduct_user_credits(
             conn.commit()
             return CreditDeductionResult(True, current_balance, "Action covered under active Pro subscription (0 credits consumed).")
 
-        # Standard Credit Deduction Check
+        # Atomic Credit Deduction: Single atomic SQL update directly gates deduction.
+        # Eradicates Python-level check-then-act race conditions (natively prevents negative balances).
         cost = float(amount)
-        if current_balance < cost:
-            return CreditDeductionResult(
-                False,
-                current_balance,
-                f"Insufficient research credits ({current_balance:.1f} available, {cost:.2f} required). Please top up via UPI/Card.",
-                error="INSUFFICIENT_CREDITS"
-            )
-
         now_iso = datetime.now(timezone.utc).isoformat()
         use_pg = is_postgres_connection(conn)
 
@@ -337,15 +346,10 @@ def deduct_user_credits(
                 SET credits_balance = ROUND((credits_balance - %s)::numeric, 2),
                     updated_at = %s
                 WHERE id = %s AND credits_balance >= %s
-                RETURNING credits_balance
+                RETURNING credits_balance;
                 """,
                 (cost, now_iso, clean_id, cost),
             )
-            updated_row = cursor.fetchone()
-            if not updated_row:
-                conn.rollback()
-                return CreditDeductionResult(False, current_balance, "INSUFFICIENT_CREDITS", error="INSUFFICIENT_CREDITS")
-            new_balance = float(updated_row[0])
         else:
             cursor.execute(
                 """
@@ -353,14 +357,27 @@ def deduct_user_credits(
                 SET credits_balance = ROUND(credits_balance - ?, 2),
                     updated_at = ?
                 WHERE id = ? AND credits_balance >= ?
+                RETURNING credits_balance;
                 """,
                 (cost, now_iso, clean_id, cost),
             )
-            if cursor.rowcount == 0:
-                conn.rollback()
-                return CreditDeductionResult(False, current_balance, "INSUFFICIENT_CREDITS", error="INSUFFICIENT_CREDITS")
-            cursor.execute("SELECT credits_balance FROM user_accounts WHERE id = ?", (clean_id,))
-            new_balance = float(cursor.fetchone()[0])
+
+        updated_row = cursor.fetchone()
+        if not updated_row:
+            # Atomic update returned 0 rows (credits_balance < cost or user_id not found).
+            # Abort transaction immediately with rollback.
+            conn.rollback()
+            cursor.execute(f"SELECT credits_balance FROM user_accounts WHERE id = {p};", (clean_id,))
+            latest_row = cursor.fetchone()
+            latest_balance = float(latest_row[0] or 0.0) if latest_row else 0.0
+            return CreditDeductionResult(
+                False,
+                latest_balance,
+                f"Insufficient research credits ({latest_balance:.1f} available, {cost:.2f} required). Please top up via UPI/Card.",
+                error="INSUFFICIENT_CREDITS"
+            )
+
+        new_balance = float(updated_row[0])
 
         cursor.execute(
             f"""
@@ -477,16 +494,24 @@ def add_user_credits(
 
         current_balance = float(row[0] or 0.0)
 
+        # Normalize gateway identifiers (empty strings converted to NULL/None)
+        clean_payment_id = str(gateway_payment_id).strip() if gateway_payment_id else None
+        if clean_payment_id == "":
+            clean_payment_id = None
+        clean_order_id = str(gateway_order_id).strip() if gateway_order_id else None
+        if clean_order_id == "":
+            clean_order_id = None
+
         # Atomic Idempotency Check: Reject replay of existing successful payment or order
-        if (gateway_payment_id or gateway_order_id) and status == "success":
+        if (clean_payment_id or clean_order_id) and status == "success":
             conditions = []
             params = []
-            if gateway_payment_id:
+            if clean_payment_id:
                 conditions.append(f"gateway_payment_id = {p}")
-                params.append(str(gateway_payment_id).strip())
-            if gateway_order_id:
+                params.append(clean_payment_id)
+            if clean_order_id:
                 conditions.append(f"gateway_order_id = {p}")
-                params.append(str(gateway_order_id).strip())
+                params.append(clean_order_id)
             cursor.execute(
                 f"SELECT id, status, credits_added, invoice_number FROM credit_transactions WHERE ({' OR '.join(conditions)}) AND status = 'success';",
                 tuple(params)
@@ -495,7 +520,7 @@ def add_user_credits(
             if existing_tx:
                 logger.warning(
                     f"Idempotent payment replay detected for user {clean_id}: "
-                    f"gateway_payment_id={gateway_payment_id}, gateway_order_id={gateway_order_id}. "
+                    f"gateway_payment_id={clean_payment_id}, gateway_order_id={clean_order_id}. "
                     f"Existing tx_id={existing_tx[0]}. Preserving current balance {current_balance}."
                 )
                 return True, current_balance
@@ -522,12 +547,13 @@ def add_user_credits(
 
         # Determine gateway and simulation flag
         is_simulation_order = bool(
-            (gateway_order_id and str(gateway_order_id).startswith(("order_sim_", "order_test_"))) or
-            (gateway_payment_id and str(gateway_payment_id).startswith(("pay_sim_", "pay_test_")))
+            (clean_order_id and clean_order_id.startswith(("order_sim_", "order_test_"))) or
+            (clean_payment_id and clean_payment_id.startswith(("pay_sim_", "pay_test_")))
         )
         effective_gateway = "simulation" if is_simulation_order else "razorpay"
 
-        # Insert Transaction with complete tax & customer audit trail
+        # Insert Transaction with complete tax & customer audit trail.
+        # Strict database-level uniqueness constraint natively blocks duplicate payment replays.
         try:
             cursor.execute(
                 f"""
@@ -538,18 +564,38 @@ def add_user_credits(
                 )
                 VALUES ({p}, {p}, {p}, {p}, {p}, {p}, {p}, {p}, {p}, {p}, {p}, {p}, {p}, {p}, '');
                 """,
-                (tx_id, clean_id, amt, credits_to_add, effective_gateway, gateway_order_id, gateway_payment_id, status, pack_type, inv_num, cust_email, cust_name, base_amt, gst_amt)
+                (tx_id, clean_id, amt, credits_to_add, effective_gateway, clean_order_id, clean_payment_id, status, pack_type, inv_num, cust_email, cust_name, base_amt, gst_amt)
             )
         except Exception as e:
+            err_str = str(e).lower()
+            if any(token in err_str for token in ("unique", "duplicate", "idx_credit_tx_unique_payment_id", "integrity")):
+                conn.rollback()
+                logger.warning(
+                    f"Payment replay blocked at disk level via UNIQUE constraint: "
+                    f"gateway_payment_id={clean_payment_id}, user={clean_id}. Preserving balance {current_balance}."
+                )
+                return True, current_balance
+
             logger.debug("Fallback inserting credit transaction without detailed invoice columns: %s", e)
             # Fallback for earlier schema if columns not yet committed
-            cursor.execute(
-                f"""
-                INSERT INTO credit_transactions (id, user_id, amount_inr, credits_added, payment_gateway, gateway_order_id, gateway_payment_id, status, pack_type, invoice_number)
-                VALUES ({p}, {p}, {p}, {p}, {p}, {p}, {p}, {p}, {p}, {p});
-                """,
-                (tx_id, clean_id, amt, credits_to_add, effective_gateway, gateway_order_id, gateway_payment_id, status, pack_type, inv_num)
-            )
+            try:
+                cursor.execute(
+                    f"""
+                    INSERT INTO credit_transactions (id, user_id, amount_inr, credits_added, payment_gateway, gateway_order_id, gateway_payment_id, status, pack_type, invoice_number)
+                    VALUES ({p}, {p}, {p}, {p}, {p}, {p}, {p}, {p}, {p}, {p});
+                    """,
+                    (tx_id, clean_id, amt, credits_to_add, effective_gateway, clean_order_id, clean_payment_id, status, pack_type, inv_num)
+                )
+            except Exception as fb_err:
+                fb_str = str(fb_err).lower()
+                if any(token in fb_str for token in ("unique", "duplicate", "idx_credit_tx_unique_payment_id", "integrity")):
+                    conn.rollback()
+                    logger.warning(
+                        f"Payment replay blocked at disk level in fallback via UNIQUE constraint: "
+                        f"gateway_payment_id={clean_payment_id}, user={clean_id}. Preserving balance {current_balance}."
+                    )
+                    return True, current_balance
+                raise fb_err
 
         # Handle Subscriptions (Pro Monthly / Annual)
         normalized_pack = pack_type.upper()

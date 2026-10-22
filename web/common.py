@@ -178,6 +178,48 @@ def _get_client_ip(request: Request) -> str:
     return request.client.host if request.client else "unknown"
 
 
+def is_production_environment() -> bool:
+    """Returns True if running in production, on Render, or with production flags enabled."""
+    env = (os.environ.get("ENVIRONMENT") or "").strip().lower()
+    is_render = (os.environ.get("RENDER") or "").strip().lower() in ("true", "1")
+    is_prod = (os.environ.get("PRODUCTION") or "").strip().lower() in ("true", "1")
+    return env in ("production", "prod", "live") or is_render or is_prod
+
+
+def is_local_dev_request(request: Request) -> bool:
+    """
+    Evaluates whether an administrative request originates from an authentic local development host.
+
+    Hardcoded Production Kill-Switch & Anti-Spoofing Directives:
+    1. If running in production or on Render (ENVIRONMENT in ['production', 'prod'] or RENDER == 'true'),
+       dev-bypass is HARD-DISABLED and this function strictly returns False.
+    2. In production, never inspect or trust X-Forwarded-For, X-Real-IP, X-Forwarded-Host, or Host headers.
+    3. In local development, the presence of forwarding proxy headers (X-Forwarded-For, X-Forwarded-Host,
+       X-Real-IP, Forwarded) immediately disqualifies the request to natively prevent proxy header injection.
+    4. Client TCP host must strictly match loopback interfaces ('127.0.0.1', '::1') or 'testclient'.
+    5. URL host must strictly match 'localhost', '127.0.0.1', or 'testserver'.
+    """
+    # 1. Hardcoded Environment Kill-Switch
+    if is_production_environment():
+        return False
+
+    # 2. Reject any forwarding proxy headers (prevents proxy spoofing via X-Forwarded-For / Host)
+    for proxy_header in ("x-forwarded-for", "x-forwarded-host", "x-real-ip", "forwarded", "cf-connecting-ip", "true-client-ip"):
+        if request.headers.get(proxy_header):
+            return False
+
+    # 3. Direct Peer Socket Verification
+    client_ip = (request.client.host if request.client else "").strip()
+    if client_ip not in ("127.0.0.1", "::1", "testclient"):
+        return False
+
+    # 4. Host Header Verification
+    host = (request.url.hostname or "").lower()
+    return host in ("localhost", "127.0.0.1", "testserver")
+
+
+_is_local_dev_request = is_local_dev_request
+
 
 def _get_user_signing_key() -> bytes:
     key = (
@@ -189,8 +231,10 @@ def _get_user_signing_key() -> bytes:
         or get_secret("SUPABASE_SERVICE_ROLE_KEY")
         or os.environ.get("SUPABASE_DB_URL")
         or get_secret("SUPABASE_DB_URL")
-        or "stock_research_user_session_salt_2026"
     )
+    if is_production_environment() and not key:
+        raise RuntimeError("CRITICAL PRODUCTION SECURITY FAILURE: Cannot generate user signing key without SECRET_KEY in production.")
+    key = key or "stock_research_user_session_salt_2026"
     return hashlib.sha256(f"user_session:{key}".encode("utf-8")).digest()
 
 
@@ -254,8 +298,10 @@ def _get_admin_signing_key(purpose: str = "admin_session") -> bytes:
         or get_secret("SECRET_KEY")
         or os.environ.get("SUPABASE_DB_URL")
         or get_secret("SUPABASE_DB_URL")
-        or "stock_research_admin_master_secret_2026"
     )
+    if is_production_environment() and not key:
+        raise RuntimeError(f"CRITICAL PRODUCTION SECURITY FAILURE: Cannot generate admin key for '{purpose}' without ADMIN_API_KEY or SECRET_KEY in production.")
+    key = key or "stock_research_admin_master_secret_2026"
     return hashlib.sha256(f"{purpose}:{key}".encode("utf-8")).digest()
 
 
