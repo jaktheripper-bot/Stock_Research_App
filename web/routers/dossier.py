@@ -23,6 +23,7 @@ from fastapi.responses import JSONResponse
 from starlette.concurrency import run_in_threadpool
 
 PDF_SEMAPHORE = asyncio.Semaphore(4)
+PDF_GENERATION_TIMEOUT_SECONDS = float(os.environ.get("PDF_GENERATION_TIMEOUT_SECONDS", "15.0"))
 
 from normalizer import clean_ticker
 from bse_master import resolve_canonical_symbol, resolve_bse_scrip_code, get_ticker_suggestions
@@ -378,16 +379,26 @@ async def api_download_pdf(
 
     from core.reporting.pdf import generate_report_pdf, apply_pdf_watermark
     async with PDF_SEMAPHORE:
-        pdf_bytes = await run_in_threadpool(
-            generate_report_pdf,
-            clean_t,
-            report_text_for_pdf,
-            hist_df=df_hist,
-            citations=citations,
-            scrip_code=scrip_code,
-            branding=branding
-        )
-        pdf_bytes = await run_in_threadpool(apply_pdf_watermark, pdf_bytes, _pdf_account_ref(request))
+        try:
+            pdf_bytes = await asyncio.wait_for(
+                run_in_threadpool(
+                    generate_report_pdf,
+                    clean_t,
+                    report_text_for_pdf,
+                    hist_df=df_hist,
+                    citations=citations,
+                    scrip_code=scrip_code,
+                    branding=branding
+                ),
+                timeout=PDF_GENERATION_TIMEOUT_SECONDS
+            )
+            pdf_bytes = await run_in_threadpool(apply_pdf_watermark, pdf_bytes, _pdf_account_ref(request))
+        except asyncio.TimeoutError:
+            logger.error("PDF generation timed out (>%.1fs) for %s", PDF_GENERATION_TIMEOUT_SECONDS, clean_t)
+            raise HTTPException(
+                status_code=504,
+                detail=f"PDF generation timed out (maximum {int(PDF_GENERATION_TIMEOUT_SECONDS)} seconds). Please retry shortly."
+            )
 
     date_slug = datetime.now(IST).strftime("%d-%m-%Y")
     clean_firm = re.sub(r'[^a-zA-Z0-9]', '_', firm_name) + "_" if firm_name else ""
@@ -413,12 +424,22 @@ async def api_download_fund_pdf(scheme_code: str, request: Request):
 
     dossier = get_fund_forensic_dossier(clean_code) or {}
     async with PDF_SEMAPHORE:
-        pdf_bytes = await run_in_threadpool(
-            generate_fund_dossier_pdf,
-            clean_code, dossier, scheme,
-            deep_dive_unlocked=_asset_unlocked_for_request(request, "FUND", clean_code)
-        )
-        pdf_bytes = await run_in_threadpool(apply_pdf_watermark, pdf_bytes, _pdf_account_ref(request))
+        try:
+            pdf_bytes = await asyncio.wait_for(
+                run_in_threadpool(
+                    generate_fund_dossier_pdf,
+                    clean_code, dossier, scheme,
+                    deep_dive_unlocked=_asset_unlocked_for_request(request, "FUND", clean_code)
+                ),
+                timeout=PDF_GENERATION_TIMEOUT_SECONDS
+            )
+            pdf_bytes = await run_in_threadpool(apply_pdf_watermark, pdf_bytes, _pdf_account_ref(request))
+        except asyncio.TimeoutError:
+            logger.error("Fund PDF generation timed out (>%.1fs) for %s", PDF_GENERATION_TIMEOUT_SECONDS, clean_code)
+            raise HTTPException(
+                status_code=504,
+                detail=f"PDF generation timed out (maximum {int(PDF_GENERATION_TIMEOUT_SECONDS)} seconds). Please retry shortly."
+            )
     filename = f"Fund_Dossier_{clean_code}_{datetime.now(IST).strftime('%d-%m-%Y')}.pdf"
 
     return Response(
@@ -442,12 +463,22 @@ async def api_download_debt_pdf(isin: str, request: Request):
 
     posture = evaluate_5_pillar_credit_posture(sec)
     async with PDF_SEMAPHORE:
-        pdf_bytes = await run_in_threadpool(
-            generate_debt_dossier_pdf,
-            clean_isin, posture, sec,
-            deep_dive_unlocked=_asset_unlocked_for_request(request, "DEBT", clean_isin)
-        )
-        pdf_bytes = await run_in_threadpool(apply_pdf_watermark, pdf_bytes, _pdf_account_ref(request))
+        try:
+            pdf_bytes = await asyncio.wait_for(
+                run_in_threadpool(
+                    generate_debt_dossier_pdf,
+                    clean_isin, posture, sec,
+                    deep_dive_unlocked=_asset_unlocked_for_request(request, "DEBT", clean_isin)
+                ),
+                timeout=PDF_GENERATION_TIMEOUT_SECONDS
+            )
+            pdf_bytes = await run_in_threadpool(apply_pdf_watermark, pdf_bytes, _pdf_account_ref(request))
+        except asyncio.TimeoutError:
+            logger.error("Debt PDF generation timed out (>%.1fs) for ISIN %s", PDF_GENERATION_TIMEOUT_SECONDS, clean_isin)
+            raise HTTPException(
+                status_code=504,
+                detail=f"PDF generation timed out (maximum {int(PDF_GENERATION_TIMEOUT_SECONDS)} seconds). Please retry shortly."
+            )
     filename = f"Debt_Credit_Dossier_{clean_isin}_{datetime.now(IST).strftime('%d-%m-%Y')}.pdf"
 
     return Response(
@@ -470,11 +501,21 @@ async def api_download_reit_pdf(symbol: str, request: Request):
 
     is_unlocked = _asset_unlocked_for_request(request, "REIT", clean_sym)
     async with PDF_SEMAPHORE:
-        pdf_bytes = await run_in_threadpool(
-            generate_reit_dossier_pdf,
-            clean_sym, reit, deep_dive_unlocked=is_unlocked
-        )
-        pdf_bytes = await run_in_threadpool(apply_pdf_watermark, pdf_bytes, _pdf_account_ref(request))
+        try:
+            pdf_bytes = await asyncio.wait_for(
+                run_in_threadpool(
+                    generate_reit_dossier_pdf,
+                    clean_sym, reit, deep_dive_unlocked=is_unlocked
+                ),
+                timeout=PDF_GENERATION_TIMEOUT_SECONDS
+            )
+            pdf_bytes = await run_in_threadpool(apply_pdf_watermark, pdf_bytes, _pdf_account_ref(request))
+        except asyncio.TimeoutError:
+            logger.error("REIT PDF generation timed out (>%.1fs) for %s", PDF_GENERATION_TIMEOUT_SECONDS, clean_sym)
+            raise HTTPException(
+                status_code=504,
+                detail=f"PDF generation timed out (maximum {int(PDF_GENERATION_TIMEOUT_SECONDS)} seconds). Please retry shortly."
+            )
     filename = f"REIT_Dossier_{clean_sym}_{datetime.now(IST).strftime('%d-%m-%Y')}.pdf"
 
     return Response(
@@ -503,13 +544,23 @@ async def api_download_msme_pdf(uin: str, request: Request):
 
     is_unlocked = _asset_unlocked_for_request(request, "MSME", clean_uin)
     async with PDF_SEMAPHORE:
-        pdf_bytes = await run_in_threadpool(
-            generate_msme_dossier_pdf,
-            clean_uin,
-            dossier,
-            deep_dive_unlocked=is_unlocked
-        )
-        pdf_bytes = await run_in_threadpool(apply_pdf_watermark, pdf_bytes, _pdf_account_ref(request))
+        try:
+            pdf_bytes = await asyncio.wait_for(
+                run_in_threadpool(
+                    generate_msme_dossier_pdf,
+                    clean_uin,
+                    dossier,
+                    deep_dive_unlocked=is_unlocked
+                ),
+                timeout=PDF_GENERATION_TIMEOUT_SECONDS
+            )
+            pdf_bytes = await run_in_threadpool(apply_pdf_watermark, pdf_bytes, _pdf_account_ref(request))
+        except asyncio.TimeoutError:
+            logger.error("MSME PDF generation timed out (>%.1fs) for UIN %s", PDF_GENERATION_TIMEOUT_SECONDS, clean_uin)
+            raise HTTPException(
+                status_code=504,
+                detail=f"PDF generation timed out (maximum {int(PDF_GENERATION_TIMEOUT_SECONDS)} seconds). Please retry shortly."
+            )
     safe_uin = re.sub(r'[^a-zA-Z0-9_-]', '_', clean_uin)
     filename = f"MSME_Forensic_Dossier_{safe_uin}_{datetime.now(IST).strftime('%d-%m-%Y')}.pdf"
 

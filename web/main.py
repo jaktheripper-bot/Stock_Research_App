@@ -300,7 +300,8 @@ async def run_daily_discovery_scheduler():
             is_past_845 = (now.hour > 8) or (now.hour == 8 and now.minute >= 45)
             is_past_900 = now.hour >= 9
             loop = asyncio.get_running_loop()
-            from core.db.distributed_lock import job_lease
+            from core.db.distributed_lock import job_lease, prune_zombie_leases
+            prune_zombie_leases()
 
             # 1. 08:30 AM MF Priority Stock Ingest
             if is_past_830 and last_stock_run_date != today_str:

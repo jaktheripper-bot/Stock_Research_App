@@ -18,6 +18,9 @@ from db import IST, MANDATORY_SEBI_DISCLAIMER
 
 logger = logging.getLogger("equity_research.core.reporting.pdf")
 
+MAX_PDF_MARKDOWN_CHARS = int(os.environ.get("MAX_PDF_MARKDOWN_CHARS", "50000"))
+PDF_GENERATION_TIMEOUT_SECONDS = float(os.environ.get("PDF_GENERATION_TIMEOUT_SECONDS", "15.0"))
+
 
 def clean_paragraph_prose(text: str) -> str:
     """
@@ -174,6 +177,18 @@ def build_pdf_dossier(
     chart_filename = generate_pdf_chart_image(hist_df, clean_name) if hist_df is not None else None
 
     # Parse and clean text
+    if rep_text and len(rep_text) > MAX_PDF_MARKDOWN_CHARS:
+        logger.warning(
+            "Report markdown text exceeds limit of %d characters (length: %d) for ticker %s. Clamping to prevent OOM/ReDoS.",
+            MAX_PDF_MARKDOWN_CHARS,
+            len(rep_text),
+            clean_name,
+        )
+        rep_text = (
+            rep_text[:MAX_PDF_MARKDOWN_CHARS]
+            + f"\n\n... [Content Truncated to {MAX_PDF_MARKDOWN_CHARS:,} Characters to Prevent Memory Exhaustion]\n"
+        )
+
     matrix = extract_health_matrix(rep_text)
     clean_body = strip_conclusion_sections(remove_health_matrix_text(rep_text))
     clean_body = clean_paragraph_prose(clean_body)
@@ -371,6 +386,17 @@ a {
         f"{footer_disclaimer}"
     )
 
+    if len(full_md) > MAX_PDF_MARKDOWN_CHARS * 2:
+        logger.warning(
+            "Full compiled markdown exceeds safety threshold (%d chars) for %s. Truncating before PDF compilation.",
+            len(full_md),
+            clean_name,
+        )
+        full_md = (
+            full_md[:MAX_PDF_MARKDOWN_CHARS * 2]
+            + "\n\n... [Compiled Document Clamped to Safe Memory Limits]\n"
+        )
+
     out_name = os.path.join(tempfile.gettempdir(), f"_tmp_doc_{clean_name}_{uuid.uuid4().hex}.pdf")
     try:
         pdf = MarkdownPdf(toc_level=0)
@@ -512,6 +538,9 @@ def generate_fund_dossier_pdf(
 > Mutual Fund investments are subject to market risks, read all scheme related documents carefully.
 """
     full_md = f"{header}\n\n{scorecard_md}\n\n{meta_table}\n\n---\n\n{narrative}\n\n{footer}"
+    if len(full_md) > MAX_PDF_MARKDOWN_CHARS * 2:
+        logger.warning("Fund dossier markdown exceeds safety threshold (%d chars) for %s. Clamping before PDF compilation.", len(full_md), clean_name)
+        full_md = full_md[:MAX_PDF_MARKDOWN_CHARS * 2] + "\n\n... [Compiled Fund Dossier Clamped to Safe Memory Limits]\n"
     out_name = os.path.join(tempfile.gettempdir(), f"_tmp_doc_mf_{clean_name}_{uuid.uuid4().hex}.pdf")
     try:
         pdf = MarkdownPdf(toc_level=0)
@@ -616,6 +645,9 @@ def generate_debt_dossier_pdf(
 > Fixed-income investments carry market, credit, and reinvestment risk. YTMs are subject to prevailing secondary market prices and issuer creditworthiness.
 """
     full_md = f"{header}\n\n{scorecard_md}\n\n{contagion_md}\n\n{primer_md}\n\n{pillars_md}\n\n{footer}"
+    if len(full_md) > MAX_PDF_MARKDOWN_CHARS * 2:
+        logger.warning("Debt dossier markdown exceeds safety threshold (%d chars) for %s. Clamping before PDF compilation.", len(full_md), clean_isin)
+        full_md = full_md[:MAX_PDF_MARKDOWN_CHARS * 2] + "\n\n... [Compiled Debt Dossier Clamped to Safe Memory Limits]\n"
     out_name = os.path.join(tempfile.gettempdir(), f"_tmp_doc_debt_{clean_isin}_{uuid.uuid4().hex}.pdf")
     try:
         pdf = MarkdownPdf(toc_level=0)
@@ -725,6 +757,9 @@ Under Indian tax laws, distributions from REITs and InvITs pass through three di
 > Real estate and infrastructure investments carry market, tenant, occupancy, and interest rate risks. Past cash distributions are not a guarantee of future yield.
 """
     full_md = f"{header}\n\n{scorecard_md}\n\n{tax_md}\n\n{primer_md}\n\n{countercase_md}\n\n{footer}"
+    if len(full_md) > MAX_PDF_MARKDOWN_CHARS * 2:
+        logger.warning("REIT dossier markdown exceeds safety threshold (%d chars) for %s. Clamping before PDF compilation.", len(full_md), clean_sym)
+        full_md = full_md[:MAX_PDF_MARKDOWN_CHARS * 2] + "\n\n... [Compiled REIT Dossier Clamped to Safe Memory Limits]\n"
     out_name = os.path.join(tempfile.gettempdir(), f"_tmp_doc_reit_{clean_sym}_{uuid.uuid4().hex}.pdf")
     try:
         pdf = MarkdownPdf(toc_level=0)
@@ -838,6 +873,9 @@ def generate_msme_dossier_pdf(
 > Enterprise records are grounded in open gazette disclosures from the Udyam Registration Portal under the Ministry of Micro, Small and Medium Enterprises. Working capital cycles, TReDS solvency ratios, and sector offtake linkages are computed using sector-calibrated industrial benchmarks for informational research only.
 """
     full_md = f"{header}\n\n{scorecard_md}\n\n{pillars_md}\n\n{moat_md}\n\n{footer}"
+    if len(full_md) > MAX_PDF_MARKDOWN_CHARS * 2:
+        logger.warning("MSME dossier markdown exceeds safety threshold (%d chars) for %s. Clamping before PDF compilation.", len(full_md), clean_uin)
+        full_md = full_md[:MAX_PDF_MARKDOWN_CHARS * 2] + "\n\n... [Compiled MSME Dossier Clamped to Safe Memory Limits]\n"
     out_name = os.path.join(tempfile.gettempdir(), f"_tmp_doc_msme_{clean_uin}_{uuid.uuid4().hex}.pdf")
     try:
         pdf = MarkdownPdf(toc_level=0)

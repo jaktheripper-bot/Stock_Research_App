@@ -34,6 +34,8 @@ from core.db.distributed_lock import (
     acquire_job_lease,
     release_job_lease,
     job_lease,
+    prune_zombie_leases,
+    clear_zombie_leases,
 )
 
 from core.db.compliance import (
@@ -251,4 +253,6 @@ __all__ = [
     "acquire_job_lease",
     "release_job_lease",
     "job_lease",
+    "prune_zombie_leases",
+    "clear_zombie_leases",
 ]

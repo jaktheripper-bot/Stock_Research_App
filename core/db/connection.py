@@ -153,14 +153,19 @@ class _PooledConnectionProxy:
     def close(self):
         if not self._returned:
             self._returned = True
+            is_healthy = True
             try:
                 if not self._conn.closed:
                     self._conn.rollback()
             except Exception as e:
                 logger.debug(f"Connection proxy rollback notice: {e}")
+                is_healthy = False
             try:
                 if self._pool is not None:
-                    self._pool.putconn(self._conn)
+                    if not is_healthy or self._conn.closed != 0:
+                        self._pool.putconn(self._conn, close=True)
+                    else:
+                        self._pool.putconn(self._conn)
                 else:
                     self._conn.close()
             except Exception as e:
@@ -169,6 +174,15 @@ class _PooledConnectionProxy:
                     self._conn.close()
                 except Exception as close_err:
                     logger.debug(f"Connection direct close notice: {close_err}")
+
+    def __del__(self):
+        """Guarantees connection is returned to pool even if unhandled exceptions cause variable drop."""
+        try:
+            if not self._returned:
+                logger.warning("Unclosed pooled connection collected by GC; auto-releasing back to ThreadedConnectionPool.")
+                self.close()
+        except Exception as gc_err:
+            logger.debug(f"Connection GC finalizer notice: {gc_err}")
 
     def __enter__(self):
         return self
@@ -217,6 +231,10 @@ def _acquire_connection_from_pool(pool):
                 continue
             with conn.cursor() as cur:
                 cur.execute("SELECT 1;")
+            try:
+                conn.rollback()
+            except Exception as rb_err:
+                logger.debug(f"Connection pool post-probe rollback notice: {rb_err}")
             return conn
         except Exception:
             if conn:
@@ -309,32 +327,26 @@ get_connection = get_db_connection
 
 
 def init_db(force: bool = False):
-    """Initializes tables and executes incremental schema migrations (v001 - v031)."""
+    """Initializes tables and executes incremental schema migrations (v001 - v035)."""
     global _DB_INITIALIZED, _INITIALIZED_DBS
 
-    conn = _get_raw_connection()
-    is_pg = is_postgres_connection(conn)
-    supabase_url = get_configured_supabase_url() if is_pg else None
-    target_key = "postgres" if is_pg else get_db_path()
+    raw_url = get_configured_supabase_url()
+    target_key = "postgres" if (raw_url and is_postgres_active()) else get_db_path()
 
     if (target_key in _INITIALIZED_DBS) and not force:
-        try:
-            conn.close()
-        except Exception as e:
-            logger.debug(f"Pre-init connection close note: {e}")
         return
 
     with _DB_INIT_LOCK:
         if (target_key in _INITIALIZED_DBS) and not force:
-            try:
-                conn.close()
-            except Exception as e:
-                logger.debug(f"Locked pre-init connection close note: {e}")
             return
 
-        cursor = conn.cursor()
-
+        conn = _get_raw_connection()
+        cursor = None
         try:
+            is_pg = is_postgres_connection(conn)
+            supabase_url = get_configured_supabase_url() if is_pg else None
+            cursor = conn.cursor()
+
             # Schema Migration Engine: Ensure migrations table exists
             if supabase_url:
                 cursor.execute('''
@@ -2176,5 +2188,12 @@ def init_db(force: bool = False):
             logger.error(f"Error during init_db migrations: {e}")
             raise
         finally:
-            cursor.close()
-            conn.close()
+            if cursor is not None:
+                try:
+                    cursor.close()
+                except Exception as cur_err:
+                    logger.debug("Failed closing cursor in init_db: %s", cur_err)
+            try:
+                conn.close()
+            except Exception as close_err:
+                logger.debug("Failed closing connection in init_db: %s", close_err)
