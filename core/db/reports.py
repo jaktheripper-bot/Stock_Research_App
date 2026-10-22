@@ -199,6 +199,11 @@ def get_archived_reports(include_text: bool = False) -> list:
                        COALESCE(rc.rev_count, 0) AS rev_count, r.citations_json
                 FROM reports r 
                 LEFT JOIN (SELECT ticker, COUNT(*) AS rev_count FROM report_revisions GROUP BY ticker) rc ON rc.ticker = r.ticker
+                WHERE r.ticker NOT LIKE 'TEST_%' 
+                  AND r.ticker NOT LIKE 'UNIT_%'
+                  AND r.ticker NOT LIKE 'COAL_%'
+                  AND r.ticker NOT LIKE 'UNITCOAL_%'
+                  AND r.ticker NOT IN ('TESTCORP', 'TESTPEER', 'ZZTESTONLY', 'COALESCE_TEST')
                 ORDER BY r.timestamp DESC
             ''')
         else:
@@ -207,6 +212,11 @@ def get_archived_reports(include_text: bool = False) -> list:
                        COALESCE(rc.rev_count, 0) AS rev_count, NULL AS citations_json
                 FROM reports r 
                 LEFT JOIN (SELECT ticker, COUNT(*) AS rev_count FROM report_revisions GROUP BY ticker) rc ON rc.ticker = r.ticker
+                WHERE r.ticker NOT LIKE 'TEST_%' 
+                  AND r.ticker NOT LIKE 'UNIT_%'
+                  AND r.ticker NOT LIKE 'COAL_%'
+                  AND r.ticker NOT LIKE 'UNITCOAL_%'
+                  AND r.ticker NOT IN ('TESTCORP', 'TESTPEER', 'ZZTESTONLY', 'COALESCE_TEST')
                 ORDER BY r.timestamp DESC
             ''')
         rows = cursor.fetchall()
@@ -517,6 +527,11 @@ def get_all_equities_directory_sync() -> list:
             FROM reports r
             LEFT JOIN (SELECT ticker, COUNT(*) as cnt FROM report_revisions GROUP BY ticker) rev ON r.ticker = rev.ticker
             LEFT JOIN cached_fundamentals f ON r.ticker = f.ticker
+            WHERE r.ticker NOT LIKE 'TEST_%'
+              AND r.ticker NOT LIKE 'UNIT_%'
+              AND r.ticker NOT LIKE 'COAL_%'
+              AND r.ticker NOT LIKE 'UNITCOAL_%'
+              AND r.ticker NOT IN ('TESTCORP', 'TESTPEER', 'ZZTESTONLY', 'COALESCE_TEST')
         ''')
         rows = cursor.fetchall()
         for r in rows:

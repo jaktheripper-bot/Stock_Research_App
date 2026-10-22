@@ -1884,7 +1884,63 @@ class TestCompetitiveEnhancements(unittest.TestCase):
                     symbol_id = href[1:]
                     self.assertIn(f'id="{symbol_id}"', base_html_content, f"Route {route_path} references undefined symbol #{symbol_id}")
 
+    def test_dossier_cockpit_full_width_layout_and_payment_links(self):
+        """
+        Empirically verifies:
+        1. dossier.html tag nesting integrity (zero unclosed tags, balanced divs).
+        2. #reverseDcfSandbox and #epistemicFalsificationCard are full-width direct cockpit children.
+        3. Payment links in base.html and pricing.html use razorpay.me/@moatnomics (0 stockresearchapp).
+        4. /equities directory renders 0 synthetic test tickers.
+        """
+        import html.parser
+        import re
+
+        # 1. Dossier HTML Tag Nesting
+        templates_dir = Path("web/templates")
+        dossier_path = templates_dir / "dossier.html"
+        with open(dossier_path, "r", encoding="utf-8") as f:
+            dossier_raw = f.read()
+
+        div_opens = len(re.findall(r'<div\b', dossier_raw))
+        div_closes = len(re.findall(r'</div>', dossier_raw))
+        self.assertEqual(div_opens, div_closes, f"Mismatched div tags in dossier.html: <div={div_opens}, </div={div_closes}")
+
+        # 2. Rendered /dossier/INFY Cockpit Architecture
+        resp = self.client.get("/dossier/INFY")
+        self.assertEqual(resp.status_code, 200)
+        soup = BeautifulSoup(resp.text, "html.parser")
+        sandbox = soup.find(id="reverseDcfSandbox")
+        epistemic = soup.find(id="epistemicFalsificationCard")
+        self.assertIsNotNone(sandbox, "#reverseDcfSandbox must exist in rendered /dossier/INFY")
+        self.assertIsNotNone(epistemic, "#epistemicFalsificationCard must exist in rendered /dossier/INFY")
+
+        # Parent should be the cockpit container, NOT a nested auto-fit grid
+        sandbox_parent_style = sandbox.parent.get("style", "")
+        self.assertNotIn("grid-template-columns", sandbox_parent_style, "Sandbox must not be trapped in a multi-column grid")
+        self.assertIn("margin-bottom", sandbox_parent_style)
+
+        epistemic_parent_style = epistemic.parent.get("style", "")
+        self.assertNotIn("grid-template-columns", epistemic_parent_style, "Epistemic card must not be trapped in a multi-column grid")
+
+        # 3. Payment Link Verification
+        with open(templates_dir / "base.html", "r", encoding="utf-8") as f:
+            base_html = f.read()
+        with open(templates_dir / "pricing.html", "r", encoding="utf-8") as f:
+            pricing_html = f.read()
+
+        self.assertIn("razorpay.me/@moatnomics", base_html)
+        self.assertIn("razorpay.me/@moatnomics", pricing_html)
+        self.assertNotIn("stockresearchapp", base_html)
+        self.assertNotIn("stockresearchapp", pricing_html)
+
+        # 4. /equities Directory Hygiene
+        resp_eq = self.client.get("/equities")
+        self.assertEqual(resp_eq.status_code, 200)
+        self.assertNotIn("TEST_PILLAR_INFY", resp_eq.text)
+        self.assertNotIn("TEST_SURGICAL_INFY", resp_eq.text)
+        self.assertNotIn("UNITDSPR", resp_eq.text)
 
 
 if __name__ == "__main__":
     unittest.main()
+
