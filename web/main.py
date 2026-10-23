@@ -1709,7 +1709,7 @@ def fund_dossier_page(request: Request, scheme_code: str):
     init_db()
     clean_code = scheme_code.strip().upper()
     scheme = get_mutual_fund_scheme(clean_code)
-    if not scheme:
+    if not scheme and clean_code.isdigit() and 5 <= len(clean_code) <= 8:
         from core.ingestion.amfi import search_amfi_master_directory
         amfi_matches = search_amfi_master_directory(clean_code, limit=1)
         if amfi_matches:
@@ -1722,18 +1722,15 @@ def fund_dossier_page(request: Request, scheme_code: str):
     if not dossier:
         raise HTTPException(status_code=500, detail="Failed to generate mutual fund look-through dossier.")
 
-    forensic_dossier = get_fund_forensic_dossier(clean_code)
-    if not forensic_dossier:
-        try:
-            forensic_dossier = audit_single_fund_daily(clean_code)
-        except Exception as e:
-            logger.warning(f"Could not generate full report on-demand for {clean_code}: {e}")
-
     is_deep_dive_unlocked = _asset_unlocked_for_request(request, "FUND", clean_code)
-    forensic_locked = False
-    if forensic_dossier and not is_deep_dive_unlocked:
-        forensic_dossier = None
-        forensic_locked = True
+    forensic_dossier = None
+    forensic_locked = not is_deep_dive_unlocked
+
+    # Action 1.1: Never trigger synchronous LLM/external synthesis (audit_single_fund_daily) inside GET request.
+    # If is_deep_dive_unlocked is False, do not even query or synthesize the full forensic dossier narrative.
+    # If unlocked, only read the existing forensic dossier from the database.
+    if is_deep_dive_unlocked:
+        forensic_dossier = get_fund_forensic_dossier(clean_code)
 
     forensic_dossier_html = ""
     if forensic_dossier and forensic_dossier.get("dossier_text"):

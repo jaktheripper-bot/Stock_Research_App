@@ -138,23 +138,33 @@ def derive_benchmark_index(category_name: str, broad_category: str) -> str:
 
 
 def parse_amfi_nav_feed(
-    raw_text: str,
+    raw_source: Any,
     direct_growth_only: bool = False,
-    query_filter: Optional[str] = None
+    query_filter: Optional[str] = None,
+    limit: Optional[int] = None,
+    exact_code: Optional[str] = None
 ) -> List[Dict[str, Any]]:
     """
     Parses AMFI NAVAll.txt into standardized scheme objects.
+    Supports raw text string, open file object, or line iterator.
     Extracts category and AMC fund house from block headers.
+    Optionally stops immediately upon matching exact_code or reaching limit.
     """
-    if not raw_text:
+    if not raw_source:
         return []
 
-    lines = raw_text.splitlines()
+    if isinstance(raw_source, str):
+        import io
+        lines = io.StringIO(raw_source)
+    else:
+        lines = raw_source
+
     schemes = []
     current_category = "Open Ended Schemes (Equity Scheme - Flexi Cap Fund)"
     current_fund_house = "Unknown AMC"
 
     clean_q = query_filter.strip().lower() if query_filter else None
+    clean_exact = str(exact_code).strip() if exact_code else None
 
     for line in lines:
         line_clean = line.strip()
@@ -189,6 +199,10 @@ def parse_amfi_nav_feed(
         if not code.isdigit():
             continue
 
+        # If searching for an exact scheme code, filter early before building strings
+        if clean_exact and code != clean_exact:
+            continue
+
         # 8-column format: Code, ISIN Growth, ISIN Reinv, Name, Plan, Option, NAV, Date
         if len(parts) >= 8:
             isin_growth = parts[1]
@@ -207,11 +221,11 @@ def parse_amfi_nav_feed(
             nav_str = parts[4]
             date_str = parts[5]
 
-        # Filter: Direct Growth only
+        # Filter: Direct Growth only (bypassed if targeting an exact scheme code)
         is_direct = "direct" in plan.lower() or "direct" in full_name.lower()
         is_growth = "growth" in option.lower() or "growth" in full_name.lower()
 
-        if direct_growth_only and not (is_direct and is_growth):
+        if not clean_exact and direct_growth_only and not (is_direct and is_growth):
             continue
 
         # Query filter if provided
@@ -250,7 +264,16 @@ def parse_amfi_nav_feed(
             "last_portfolio_date": date.today().isoformat()
         })
 
+        # Early termination: exact code match or limit reached
+        if clean_exact:
+            break
+        if limit and len(schemes) >= limit:
+            break
+
     return schemes
+
+
+parse_amfi_nav_text = parse_amfi_nav_feed
 
 
 def search_amfi_master_directory(
@@ -260,18 +283,37 @@ def search_amfi_master_directory(
 ) -> List[Dict[str, Any]]:
     """
     Searches the live AMFI master directory for matching mutual fund schemes.
+    Streams line-by-line from disk cache without allocating the entire 1.5MB file in memory.
+    Stops immediately upon finding an exact scheme_code match or reaching limit items.
     Automatically persists matching schemes to the database for seamless future lookups.
     """
     if not query or len(query.strip()) < 2:
         return []
 
+    clean_q = query.strip()
+    is_numeric_code = clean_q.isdigit() and (5 <= len(clean_q) <= 8)
+
     try:
-        raw_text = fetch_amfi_nav_raw()
-        matches = parse_amfi_nav_feed(
-            raw_text,
-            direct_growth_only=direct_growth_only,
-            query_filter=query
-        )
+        # Ensure disk cache exists
+        if not CACHE_FILE.exists() or (time.time() - CACHE_FILE.stat().st_mtime) >= CACHE_TTL_SECONDS:
+            try:
+                fetch_amfi_nav_raw()
+            except Exception as fetch_err:
+                logger.debug("Live fetch notice in AMFI directory search: %s", fetch_err)
+
+        if not CACHE_FILE.exists():
+            return []
+
+        # Stream line-by-line using file iterator
+        with open(CACHE_FILE, "r", encoding="utf-8", errors="ignore") as f:
+            matches = parse_amfi_nav_feed(
+                f,
+                direct_growth_only=direct_growth_only if not is_numeric_code else False,
+                query_filter=clean_q if not is_numeric_code else None,
+                limit=limit,
+                exact_code=clean_q if is_numeric_code else None
+            )
+
         results = matches[:limit]
 
         # Opportunistically persist top matches to database if not present

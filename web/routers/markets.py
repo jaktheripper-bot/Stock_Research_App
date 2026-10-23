@@ -433,9 +433,9 @@ def api_get_fund_deep_dive_quote(scheme_code: str):
     if not clean or len(clean) > 40 or not re.match(r"^[A-Z0-9_\-]+$", clean):
         raise HTTPException(status_code=400, detail="Invalid scheme code format.")
     scheme = get_mutual_fund_scheme(clean)
-    if not scheme:
+    if not scheme and clean.isdigit() and 5 <= len(clean) <= 8:
         from core.ingestion.amfi import search_amfi_master_directory, save_mutual_fund_scheme
-        amfi_matches = search_amfi_master_directory(clean, limit=5)
+        amfi_matches = search_amfi_master_directory(clean, limit=1)
         for m in amfi_matches:
             if str(m.get("scheme_code", "")).strip().upper() == clean:
                 save_mutual_fund_scheme(m)

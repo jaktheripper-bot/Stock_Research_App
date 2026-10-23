@@ -961,6 +961,145 @@ Cash reserve of 12% cushions against broad equity sell-offs.
         finally:
             _cleanup()
 
+    @patch("web.main.audit_single_fund_daily")
+    @patch("web.main.get_fund_forensic_dossier")
+    def test_fund_dossier_page_never_triggers_synchronous_audit_on_locked_get(self, mock_get_forensic, mock_audit):
+        """Action 1.1: Never trigger synchronous audit_single_fund_daily on GET, and do not query forensic narrative if locked."""
+        mock_get_forensic.return_value = None
+        # Unlocked request
+        resp_unlocked = self.client.get("/funds/119551", headers={"x-unlock-preview": "1"})
+        self.assertEqual(resp_unlocked.status_code, 200)
+        mock_audit.assert_not_called()
+        mock_get_forensic.assert_called_with("119551")
+
+        mock_get_forensic.reset_mock()
+        mock_audit.reset_mock()
+
+        # Locked request (no unlock preview or session)
+        resp_locked = self.client.get("/funds/119551")
+        self.assertEqual(resp_locked.status_code, 200)
+        mock_audit.assert_not_called()
+        # In locked request, should not even query or synthesize full forensic dossier
+        mock_get_forensic.assert_not_called()
+
+    @patch("core.ingestion.amfi.search_amfi_master_directory")
+    def test_fund_dossier_page_only_falls_back_to_amfi_for_valid_numeric_codes(self, mock_amfi_search):
+        """Action 1.2: Fall back to search_amfi_master_directory ONLY for valid numeric scheme codes (len 5-8)."""
+        # Non-numeric scheme code -> 404 immediately, never calls search_amfi_master_directory
+        resp_invalid_alpha = self.client.get("/funds/INVALID_CODE")
+        self.assertEqual(resp_invalid_alpha.status_code, 404)
+        mock_amfi_search.assert_not_called()
+
+        # Numeric code too short (< 5 digits) -> 404 immediately, never calls search_amfi_master_directory
+        resp_too_short = self.client.get("/funds/1234")
+        self.assertEqual(resp_too_short.status_code, 404)
+        mock_amfi_search.assert_not_called()
+
+        # Valid numeric code (length 6) but absent in DB -> calls search_amfi_master_directory with limit=1
+        mock_amfi_search.return_value = []
+        resp_valid_numeric = self.client.get("/funds/987654")
+        self.assertEqual(resp_valid_numeric.status_code, 404)
+        mock_amfi_search.assert_called_once_with("987654", limit=1)
+
+    def test_amfi_stream_parsing_and_early_exit(self):
+        """Action 1.3: Streaming line iterator stops immediately on exact_code or limit."""
+        from core.ingestion.amfi import parse_amfi_nav_feed, parse_amfi_nav_text
+        import io
+
+        sample_lines = [
+            "Open Ended Schemes (Equity Scheme - Flexi Cap Fund)\n",
+            "Test AMC Mutual Fund\n",
+            "100001;INF001;INF002;Test Scheme Alpha;Direct;Growth;25.50;23-Oct-2026\n",
+            "100002;INF003;INF004;Test Scheme Beta;Direct;Growth;45.20;23-Oct-2026\n",
+            "100003;INF005;INF006;Test Scheme Gamma;Direct;Growth;65.10;23-Oct-2026\n",
+        ]
+
+        def line_generator():
+            for line in sample_lines:
+                yield line
+
+        # 1. Exact code stop
+        res_exact = parse_amfi_nav_feed(line_generator(), exact_code="100002")
+        self.assertEqual(len(res_exact), 1)
+        self.assertEqual(res_exact[0]["scheme_code"], "100002")
+        self.assertEqual(res_exact[0]["scheme_name"], "Test Scheme Beta - Direct - Growth")
+
+        # 2. Limit stop
+        res_limit = parse_amfi_nav_text(line_generator(), limit=1)
+        self.assertEqual(len(res_limit), 1)
+        self.assertEqual(res_limit[0]["scheme_code"], "100001")
+
+    @patch("urllib.request.urlopen")
+    def test_ensure_scheme_uses_latest_and_prunes_multi_year_nav(self, mock_urlopen):
+        """Action 1.4: ensure_scheme_and_holdings_exist uses /latest and drops multi-year arrays."""
+        from core.analysis.fund_overlap_auditor import ensure_scheme_and_holdings_exist
+        import uuid
+
+        test_code = f"88{uuid.uuid4().hex[:4].upper()}"
+        mock_resp = MagicMock()
+        mock_resp.read.return_value = json.dumps({
+            "meta": {
+                "scheme_name": "Test Memory Efficiency Fund",
+                "fund_house": "Prune AMC",
+                "scheme_category": "Flexi Cap Fund"
+            },
+            "data": [
+                {"date": "23-10-2026", "nav": "150.25"},
+                {"date": "22-10-2026", "nav": "149.80"},
+                {"date": "21-10-2026", "nav": "148.50"},
+                {"date": "20-10-2026", "nav": "147.10"}
+            ]
+        }).encode("utf-8")
+        mock_resp.__enter__.return_value = mock_resp
+        mock_urlopen.return_value = mock_resp
+
+        scheme = ensure_scheme_and_holdings_exist(test_code)
+        self.assertIsNotNone(scheme)
+        self.assertEqual(scheme["scheme_code"], test_code)
+        self.assertEqual(scheme["nav"], 150.25)
+        # Verify /latest URL requested
+        req = mock_urlopen.call_args[0][0]
+        self.assertTrue(req.full_url.endswith("/latest"))
+
+    def test_fund_audit_tasks_bounded_to_64(self):
+        """Action 1.5: FUND_AUDIT_TASKS is bounded to a maximum of 64 entries."""
+        from core.analysis.fund_overlap_auditor import (
+            FUND_AUDIT_TASKS,
+            MAX_FUND_AUDIT_TASKS,
+            create_async_fund_audit_task,
+            _bound_fund_audit_tasks
+        )
+
+        self.assertEqual(MAX_FUND_AUDIT_TASKS, 64)
+
+        # Clear existing tasks for test isolation
+        initial_tasks = dict(FUND_AUDIT_TASKS)
+        FUND_AUDIT_TASKS.clear()
+
+        try:
+            # Create 70 tasks
+            task_ids = []
+            for i in range(70):
+                tid = create_async_fund_audit_task(f"1000{i:02d}")
+                task_ids.append(tid)
+                # Mark first 40 as COMPLETED
+                if i < 40:
+                    FUND_AUDIT_TASKS[tid]["status"] = "COMPLETED"
+                    FUND_AUDIT_TASKS[tid]["completed_at"] = f"2026-10-23T08:00:{i:02d}Z"
+
+            # Enforce bounding
+            _bound_fund_audit_tasks(MAX_FUND_AUDIT_TASKS)
+            self.assertLessEqual(len(FUND_AUDIT_TASKS), 64)
+
+            # Oldest completed tasks should have been evicted first
+            self.assertNotIn(task_ids[0], FUND_AUDIT_TASKS)
+            self.assertNotIn(task_ids[5], FUND_AUDIT_TASKS)
+            # Most recent tasks must remain
+            self.assertIn(task_ids[-1], FUND_AUDIT_TASKS)
+        finally:
+            FUND_AUDIT_TASKS.clear()
+            FUND_AUDIT_TASKS.update(initial_tasks)
+
 
 
 if __name__ == "__main__":

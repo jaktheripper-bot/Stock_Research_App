@@ -548,13 +548,13 @@ def ensure_scheme_and_holdings_exist(scheme_code: str) -> Optional[Dict[str, Any
     clean_code = scheme_code.strip().upper()
     scheme = get_mutual_fund_scheme(clean_code)
 
-    if not scheme:
+    if not scheme and clean_code.isdigit() and 5 <= len(clean_code) <= 8:
         # Check AMFI directory
         try:
             from core.ingestion.amfi import search_amfi_master_directory
-            matches = search_amfi_master_directory(clean_code, limit=5)
+            matches = search_amfi_master_directory(clean_code, limit=1)
             for m in matches:
-                if str(m.get("scheme_code", "")).upper() == clean_code or clean_code in str(m.get("scheme_code", "")).upper():
+                if str(m.get("scheme_code", "")).strip().upper() == clean_code:
                     save_mutual_fund_scheme(m)
                     scheme = get_mutual_fund_scheme(clean_code)
                     break
@@ -562,7 +562,7 @@ def ensure_scheme_and_holdings_exist(scheme_code: str) -> Optional[Dict[str, Any
             logger.warning(f"Error checking AMFI directory for {clean_code}: {e}")
 
     if not scheme:
-        # Try fetching from public mfapi endpoint
+        # Try fetching from public mfapi endpoint using /latest to avoid multi-year daily NAV memory bloat
         try:
             import urllib.parse
             import urllib.request
@@ -570,11 +570,23 @@ def ensure_scheme_and_holdings_exist(scheme_code: str) -> Optional[Dict[str, Any
             import certifi
 
             encoded_code = urllib.parse.quote(clean_code, safe="")
-            url = f"https://api.mfapi.in/mf/{encoded_code}"
+            url = f"https://api.mfapi.in/mf/{encoded_code}/latest"
             req = urllib.request.Request(url, headers={"User-Agent": "Mozilla/5.0"})
             ssl_ctx = ssl.create_default_context(cafile=certifi.where())
-            with urllib.request.urlopen(req, timeout=12, context=ssl_ctx) as resp:
-                payload = json.loads(resp.read().decode("utf-8"))
+            try:
+                with urllib.request.urlopen(req, timeout=12, context=ssl_ctx) as resp:
+                    payload = json.loads(resp.read().decode("utf-8"))
+            except Exception as e_latest:
+                logger.debug(f"/latest endpoint fallback for {clean_code}: {e_latest}")
+                # Fallback to standard URL and immediately discard multi-year historical array
+                url_fallback = f"https://api.mfapi.in/mf/{encoded_code}"
+                req_fallback = urllib.request.Request(url_fallback, headers={"User-Agent": "Mozilla/5.0"})
+                with urllib.request.urlopen(req_fallback, timeout=12, context=ssl_ctx) as resp:
+                    payload = json.loads(resp.read().decode("utf-8"))
+
+            if isinstance(payload, dict) and "data" in payload and isinstance(payload["data"], list) and len(payload["data"]) > 1:
+                # Drop multi-year daily NAV arrays immediately to prevent memory bloat
+                payload["data"] = payload["data"][:1]
 
             meta = payload.get("meta", {}) if isinstance(payload, dict) else {}
             if meta:
@@ -725,8 +737,37 @@ def calculate_deep_dive_credit_cost(scheme_code: str) -> Dict[str, Any]:
     }
 
 
+MAX_FUND_AUDIT_TASKS = 64
+
 # Global registry for tracking background audit tasks
 FUND_AUDIT_TASKS: Dict[str, Dict[str, Any]] = {}
+
+
+def _bound_fund_audit_tasks(max_entries: int = MAX_FUND_AUDIT_TASKS) -> None:
+    """Evicts oldest completed/failed tasks (or oldest created) to enforce max entry bound."""
+    if len(FUND_AUDIT_TASKS) <= max_entries:
+        return
+
+    # First priority for eviction: terminal tasks (COMPLETED or FAILED) sorted by completion or creation time
+    finished_keys = [
+        k for k, v in FUND_AUDIT_TASKS.items()
+        if v.get("status") in ("COMPLETED", "FAILED")
+    ]
+    finished_keys.sort(key=lambda k: FUND_AUDIT_TASKS[k].get("completed_at") or FUND_AUDIT_TASKS[k].get("created_at") or "")
+
+    while len(FUND_AUDIT_TASKS) > max_entries and finished_keys:
+        evict_key = finished_keys.pop(0)
+        FUND_AUDIT_TASKS.pop(evict_key, None)
+
+    # If still exceeding capacity (e.g. many in-flight jobs), evict oldest created tasks
+    if len(FUND_AUDIT_TASKS) > max_entries:
+        oldest_keys = sorted(
+            FUND_AUDIT_TASKS.keys(),
+            key=lambda k: FUND_AUDIT_TASKS[k].get("created_at") or ""
+        )
+        while len(FUND_AUDIT_TASKS) > max_entries and oldest_keys:
+            evict_key = oldest_keys.pop(0)
+            FUND_AUDIT_TASKS.pop(evict_key, None)
 
 
 def audit_and_archive_constituent_stock(ticker: str, holding_name: str = "", sector: str = "") -> bool:
@@ -835,6 +876,7 @@ def create_async_fund_audit_task(scheme_code: str, allow_deep_dive: bool = False
     """Registers an asynchronous fund audit task."""
     clean_code = scheme_code.strip().upper()
     task_id = f"TASK-FUND-{clean_code}-{datetime.now(timezone.utc).strftime('%H%M%S')}-{os.urandom(2).hex()}"
+    _bound_fund_audit_tasks(MAX_FUND_AUDIT_TASKS - 1)
     FUND_AUDIT_TASKS[task_id] = {
         "task_id": task_id,
         "scheme_code": clean_code,
@@ -975,6 +1017,7 @@ def run_async_fund_audit_job(task_id: str, scheme_code: str, allow_deep_dive: bo
         FUND_AUDIT_TASKS[task_id]["completed_at"] = datetime.now(timezone.utc).isoformat()
         FUND_AUDIT_TASKS[task_id]["health_score"] = result.get("composite_health_score")
         FUND_AUDIT_TASKS[task_id]["estimated_seconds_remaining"] = 0
+        _bound_fund_audit_tasks(MAX_FUND_AUDIT_TASKS)
 
     except Exception as e:
         logger.error(f"Error in async fund audit {task_id}: {e}", exc_info=True)
@@ -983,6 +1026,7 @@ def run_async_fund_audit_job(task_id: str, scheme_code: str, allow_deep_dive: bo
         FUND_AUDIT_TASKS[task_id]["message"] = f"Audit failed: {str(e)}"
         FUND_AUDIT_TASKS[task_id]["stage"] = "FAILED"
         FUND_AUDIT_TASKS[task_id]["estimated_seconds_remaining"] = 0
+        _bound_fund_audit_tasks(MAX_FUND_AUDIT_TASKS)
 
 
 def get_fund_audit_task_status(task_id: str) -> Optional[Dict[str, Any]]:
