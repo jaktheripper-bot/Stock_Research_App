@@ -327,7 +327,7 @@ get_connection = get_db_connection
 
 
 def init_db(force: bool = False):
-    """Initializes tables and executes incremental schema migrations (v001 - v035)."""
+    """Initializes tables and executes incremental schema migrations (v001 - v036)."""
     global _DB_INITIALIZED, _INITIALIZED_DBS
 
     raw_url = get_configured_supabase_url()
@@ -1533,10 +1533,10 @@ def init_db(force: bool = False):
                         CREATE TABLE IF NOT EXISTS sovereign_macro_rates (
                             id SERIAL PRIMARY KEY,
                             metric_key VARCHAR(64) UNIQUE NOT NULL,
-                            metric_name VARCHAR(100) NOT NULL,
+                            metric_name VARCHAR(120) NOT NULL,
                             metric_value NUMERIC NOT NULL,
                             unit VARCHAR(20) NOT NULL,
-                            period_label VARCHAR(50) NOT NULL,
+                            period_label VARCHAR(120) NOT NULL,
                             source VARCHAR(100) DEFAULT 'RBI_MONETARY_POLICY',
                             updated_at TIMESTAMPTZ DEFAULT now()
                         );
@@ -2180,6 +2180,40 @@ def init_db(force: bool = False):
                     except Exception as e:
                         logger.warning("Migration v035 unique index notice: %s", e)
                     cursor.execute("INSERT INTO schema_migrations (version) VALUES ('v035_credit_transactions_unique_payment_id_constraint') ON CONFLICT DO NOTHING;")
+                conn.commit()
+
+            # Migration v031_widen_sovereign_macro_columns: Widen Sovereign Macro Columns (period_label and indicator/metric names)
+            if "v031_widen_sovereign_macro_columns" not in applied:
+                logger.info("Applying schema migration: v031_widen_sovereign_macro_columns...")
+                if supabase_url:
+                    cursor.execute("""
+                        DO $$
+                        BEGIN
+                            IF EXISTS (
+                                SELECT 1 FROM information_schema.columns 
+                                WHERE table_name='sovereign_macro_rates' AND column_name='period_label'
+                            ) THEN
+                                ALTER TABLE sovereign_macro_rates ALTER COLUMN period_label TYPE VARCHAR(120);
+                            END IF;
+                            IF EXISTS (
+                                SELECT 1 FROM information_schema.columns 
+                                WHERE table_name='sovereign_macro_rates' AND column_name='metric_name'
+                            ) THEN
+                                ALTER TABLE sovereign_macro_rates ALTER COLUMN metric_name TYPE VARCHAR(120);
+                            END IF;
+                            IF EXISTS (
+                                SELECT 1 FROM information_schema.columns 
+                                WHERE table_name='sovereign_macro_rates' AND column_name='indicator_name'
+                            ) THEN
+                                ALTER TABLE sovereign_macro_rates ALTER COLUMN indicator_name TYPE VARCHAR(120);
+                            END IF;
+                        END $$;
+                        INSERT INTO schema_migrations (version) VALUES ('v031_widen_sovereign_macro_columns') ON CONFLICT DO NOTHING;
+                        INSERT INTO schema_migrations (version) VALUES ('v036_widen_sovereign_macro_columns') ON CONFLICT DO NOTHING;
+                    """)
+                else:
+                    cursor.execute("INSERT INTO schema_migrations (version) VALUES ('v031_widen_sovereign_macro_columns') ON CONFLICT DO NOTHING;")
+                    cursor.execute("INSERT INTO schema_migrations (version) VALUES ('v036_widen_sovereign_macro_columns') ON CONFLICT DO NOTHING;")
                 conn.commit()
 
             _DB_INITIALIZED = True

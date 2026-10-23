@@ -143,6 +143,7 @@ from core.db.fundamentals import (
 
 from core.db.digest import (
     get_digest_subscribers,
+    get_active_digest_subscribers,
     get_subscriber_by_token,
     set_user_digest_subscription,
     record_digest_dispatch,
@@ -242,6 +243,7 @@ __all__ = [
     "extract_fundamentals_from_report_text",
     # research bouquet & digest
     "get_digest_subscribers",
+    "get_active_digest_subscribers",
     "get_subscriber_by_token",
     "set_user_digest_subscription",
     "record_digest_dispatch",

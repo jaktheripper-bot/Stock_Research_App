@@ -253,6 +253,7 @@ DEFAULT_MACRO_RATES = [
     {
         "metric_key": "repo_rate",
         "metric_name": "Policy Repo Rate",
+        "indicator_name": "Policy Repo Rate",
         "metric_value": 6.50,
         "unit": "%",
         "period_label": "Current Stance (Neutral / Withdrawal of Accommodation)",
@@ -261,6 +262,7 @@ DEFAULT_MACRO_RATES = [
     {
         "metric_key": "sdf_rate",
         "metric_name": "Standing Deposit Facility (SDF)",
+        "indicator_name": "Standing Deposit Facility (SDF)",
         "metric_value": 6.25,
         "unit": "%",
         "period_label": "Corridor Floor (Uncollateralized Absorption)",
@@ -269,6 +271,7 @@ DEFAULT_MACRO_RATES = [
     {
         "metric_key": "msf_rate",
         "metric_name": "Marginal Standing Facility (MSF)",
+        "indicator_name": "Marginal Standing Facility (MSF)",
         "metric_value": 6.75,
         "unit": "%",
         "period_label": "Corridor Ceiling (Emergency Liquidity Window)",
@@ -277,6 +280,7 @@ DEFAULT_MACRO_RATES = [
     {
         "metric_key": "cpi_inflation",
         "metric_name": "Headline CPI Retail Inflation",
+        "indicator_name": "Headline CPI Retail Inflation",
         "metric_value": 3.65,
         "unit": "%",
         "period_label": "Latest Statutory Gazette (Target: 4.0% +/- 2%)",
@@ -285,6 +289,7 @@ DEFAULT_MACRO_RATES = [
     {
         "metric_key": "net_laf_liquidity_cr",
         "metric_name": "Net LAF Banking System Liquidity",
+        "indicator_name": "Net LAF Banking System Liquidity",
         "metric_value": 125400.0,
         "unit": "₹ Cr",
         "period_label": "Daily System Liquidity Surplus",
@@ -293,6 +298,7 @@ DEFAULT_MACRO_RATES = [
     {
         "metric_key": "real_10y_yield",
         "metric_name": "10-Year Real Risk-Free Yield",
+        "indicator_name": "10-Year Real Risk-Free Yield",
         "metric_value": 3.47,
         "unit": "%",
         "period_label": "Nominal 10Y (7.12%) minus Headline CPI (3.65%)",
@@ -722,10 +728,11 @@ def get_macro_monetary_corridor() -> Dict[str, Any]:
         if not rows:
             p = get_placeholder()
             for m in DEFAULT_MACRO_RATES:
+                metric_name_val = m.get("metric_name") or m.get("indicator_name", "")
                 q = f"""INSERT INTO sovereign_macro_rates
                        (metric_key, metric_name, metric_value, unit, period_label, source)
                        VALUES ({p},{p},{p},{p},{p},{p}) ON CONFLICT (metric_key) DO NOTHING;"""
-                cursor.execute(q, (m["metric_key"], m["metric_name"], m["metric_value"], m["unit"], m["period_label"], m["source"]))
+                cursor.execute(q, (m["metric_key"], metric_name_val, m["metric_value"], m["unit"], m["period_label"], m["source"]))
             conn.commit()
             cursor.execute("SELECT metric_key, metric_name, metric_value, unit, period_label, source FROM sovereign_macro_rates;")
             rows = cursor.fetchall()
@@ -735,9 +742,11 @@ def get_macro_monetary_corridor() -> Dict[str, Any]:
             result_dict[r[0]] = {
                 "key": r[0],
                 "name": r[1],
+                "indicator_name": r[1],
                 "value": float(r[2]),
                 "unit": r[3],
                 "period": r[4],
+                "period_label": r[4],
                 "source": r[5]
             }
         return result_dict
@@ -746,10 +755,12 @@ def get_macro_monetary_corridor() -> Dict[str, Any]:
         return {
             m["metric_key"]: {
                 "key": m["metric_key"],
-                "name": m["metric_name"],
+                "name": m.get("metric_name", m.get("indicator_name", "")),
+                "indicator_name": m.get("indicator_name", m.get("metric_name", "")),
                 "value": m["metric_value"],
                 "unit": m["unit"],
                 "period": m["period_label"],
+                "period_label": m["period_label"],
                 "source": m["source"]
             }
             for m in DEFAULT_MACRO_RATES

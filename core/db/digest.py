@@ -6,7 +6,7 @@ import secrets
 import logging
 from typing import List, Dict, Any, Optional
 
-from core.db.connection import get_db_connection, get_placeholder, init_db
+from core.db.connection import get_db_connection, get_placeholder, init_db, is_postgres_connection
 
 logger = logging.getLogger("equity_research.core.db.digest")
 
@@ -16,11 +16,13 @@ def _generate_unsubscribe_token() -> str:
     return f"unsub_{secrets.token_urlsafe(32)}"
 
 
-def get_digest_subscribers(only_active_pro: bool = False) -> List[Dict[str, Any]]:
+def get_active_digest_subscribers(only_active_pro: bool = False) -> List[Dict[str, Any]]:
     """
     Retrieves all registered users eligible for Research Bouquet digest emails.
-    Filters out users who have unsubscribed (is_digest_subscribed = 0).
-    Optionally filters for active Pro/Subscriber tier users.
+    Filters out users who have unsubscribed.
+    Branches SQL query between PostgreSQL and SQLite to prevent boolean=integer type mismatches:
+      - PostgreSQL: WHERE is_digest_subscribed IS TRUE AND (is_subscriber IS TRUE OR subscription_expires_at > NOW())
+      - SQLite: WHERE (is_digest_subscribed = 1 OR is_digest_subscribed IS NULL) AND (is_subscriber = 1 OR subscription_expires_at > datetime('now'))
     """
     init_db()
     conn = get_db_connection()
@@ -28,15 +30,43 @@ def get_digest_subscribers(only_active_pro: bool = False) -> List[Dict[str, Any]
     p = get_placeholder()
 
     try:
-        query = f"""
-            SELECT id, email, full_name, credits_balance, subscription_tier, 
-                   is_subscriber, is_digest_subscribed, digest_unsubscribe_token, created_at
-            FROM user_accounts
-            WHERE (is_digest_subscribed = 1 OR is_digest_subscribed IS TRUE OR is_digest_subscribed IS NULL)
-              AND email IS NOT NULL AND email != ''
-        """
-        if only_active_pro:
-            query += " AND (subscription_tier IN ('pro_monthly', 'pro_annual') OR is_subscriber = 1 OR is_subscriber IS TRUE)"
+        is_pg = is_postgres_connection(conn)
+        if is_pg:
+            if only_active_pro:
+                query = """
+                    SELECT id, email, full_name, credits_balance, subscription_tier, 
+                           is_subscriber, is_digest_subscribed, digest_unsubscribe_token, created_at
+                    FROM user_accounts
+                    WHERE is_digest_subscribed IS TRUE
+                      AND (is_subscriber IS TRUE OR (subscription_expires_at IS NOT NULL AND subscription_expires_at > NOW()))
+                      AND email IS NOT NULL AND email != ''
+                """
+            else:
+                query = """
+                    SELECT id, email, full_name, credits_balance, subscription_tier, 
+                           is_subscriber, is_digest_subscribed, digest_unsubscribe_token, created_at
+                    FROM user_accounts
+                    WHERE (is_digest_subscribed IS TRUE OR is_digest_subscribed IS NULL)
+                      AND email IS NOT NULL AND email != ''
+                """
+        else:
+            if only_active_pro:
+                query = """
+                    SELECT id, email, full_name, credits_balance, subscription_tier, 
+                           is_subscriber, is_digest_subscribed, digest_unsubscribe_token, created_at
+                    FROM user_accounts
+                    WHERE (is_digest_subscribed = 1 OR is_digest_subscribed IS NULL)
+                      AND (is_subscriber = 1 OR (subscription_expires_at IS NOT NULL AND subscription_expires_at > datetime('now')))
+                      AND email IS NOT NULL AND email != ''
+                """
+            else:
+                query = """
+                    SELECT id, email, full_name, credits_balance, subscription_tier, 
+                           is_subscriber, is_digest_subscribed, digest_unsubscribe_token, created_at
+                    FROM user_accounts
+                    WHERE (is_digest_subscribed = 1 OR is_digest_subscribed IS NULL)
+                      AND email IS NOT NULL AND email != ''
+                """
 
         query += " ORDER BY created_at DESC;"
         cursor.execute(query)
@@ -84,6 +114,9 @@ def get_digest_subscribers(only_active_pro: bool = False) -> List[Dict[str, Any]
     finally:
         cursor.close()
         conn.close()
+
+
+get_digest_subscribers = get_active_digest_subscribers
 
 
 def get_subscriber_by_token(token: str) -> Optional[Dict[str, Any]]:
@@ -139,14 +172,14 @@ def set_user_digest_subscription(token_or_email: str, subscribe: bool) -> bool:
     p = get_placeholder()
 
     try:
-        sub_int = 1 if subscribe else 0
+        sub_val = bool(subscribe) if is_postgres_connection(conn) else (1 if subscribe else 0)
         cursor.execute(
             f"""
             UPDATE user_accounts 
             SET is_digest_subscribed = {p}
             WHERE digest_unsubscribe_token = {p} OR LOWER(email) = LOWER({p});
             """,
-            (sub_int, val, val)
+            (sub_val, val, val)
         )
         conn.commit()
         affected = cursor.rowcount
