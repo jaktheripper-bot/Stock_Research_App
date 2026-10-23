@@ -375,7 +375,7 @@ class TestRenderHardening(unittest.TestCase):
         with open(render_yaml_path, "r", encoding="utf-8") as f:
             content = f.read()
 
-        self.assertRegex(content, r"startCommand:\s*.*--workers 2", "render.yaml startCommand must configure --workers 2")
+        self.assertRegex(content, r"startCommand:\s*.*--workers 1", "render.yaml startCommand must configure --workers 1")
 
         required_secrets = ["SECRET_KEY", "ADMIN_API_KEY", "ADMIN_PASSWORD"]
         for sec in required_secrets:

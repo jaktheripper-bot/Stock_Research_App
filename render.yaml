@@ -3,10 +3,14 @@ services:
     name: stock-research-app
     env: python
     buildCommand: "pip install -r requirements.txt && TESTING=1 python3 scripts/verify_reality_audit.py && TESTING=1 pytest -q"
-    startCommand: "uvicorn web.main:app --host 0.0.0.0 --port $PORT --workers 2 --proxy-headers --forwarded-allow-ips='*'"
+    startCommand: "uvicorn web.main:app --host 0.0.0.0 --port $PORT --workers 1 --limit-concurrency 60 --timeout-keep-alive 5 --proxy-headers --forwarded-allow-ips='*'"
     envVars:
       - key: PYTHON_VERSION
         value: 3.14.0
+      - key: MALLOC_TRIM_THRESHOLD_
+        value: "65536"
+      - key: PYTHONMALLOC
+        value: malloc
       - key: SUPABASE_DB_URL
         sync: false
       - key: SUPABASE_URL

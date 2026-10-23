@@ -868,6 +868,22 @@ def save_etf_matrix_items(items: List[Dict[str, Any]]) -> int:
         conn.close()
 
 
+def get_etf_count() -> int:
+    """Lightweight helper returning total number of ETFs in the matrix table."""
+    conn = get_db_connection()
+    cursor = conn.cursor()
+    try:
+        cursor.execute("SELECT COUNT(*) FROM etf_matrix;")
+        row = cursor.fetchone()
+        return int(row[0]) if row and row[0] is not None else 0
+    except Exception as e:
+        logger.warning(f"Error querying ETF count: {e}")
+        return 0
+    finally:
+        cursor.close()
+        conn.close()
+
+
 def get_etf_matrix(
     category: Optional[str] = None,
     query: Optional[str] = None,

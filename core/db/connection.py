@@ -193,7 +193,7 @@ class _PooledConnectionProxy:
 from contextlib import contextmanager
 
 DB_POOL_MIN = int(os.environ.get("DB_POOL_MIN", "2"))
-DB_POOL_MAX = int(os.environ.get("DB_POOL_MAX", "20"))
+DB_POOL_MAX = int(os.environ.get("DB_POOL_MAX", "10"))
 
 _PG_POOLS = {}
 _PG_POOL_LOCK = threading.Lock()

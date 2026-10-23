@@ -372,35 +372,43 @@ async def run_daily_amfi_scheduler():
 
     # Pre-flight / Boot catch-up checks
     try:
-        from core.db.sovereign import get_etf_matrix, refresh_daily_sovereign_benchmarks
+        from core.db.sovereign import get_etf_count, refresh_daily_sovereign_benchmarks
         from core.ingestion.etf_ingest import ingest_all_amfi_etfs
         from core.analysis.asset_scanner import get_asset_scan_runs, run_comprehensive_asset_scan
         from core.db.agent_sessions import record_autonomous_event
+        from core.db.distributed_lock import job_lease
+        import gc
 
         now = datetime.now(IST)
         today_str = now.strftime("%Y-%m-%d")
 
-        # 1. ETF Universe Boot Check: Ensure all active AMFI ETFs are in database
-        etf_count = len(get_etf_matrix(category=None))
-        if etf_count < 400:
-            logger.info(f"📊 [ETF Ingestion Boot] ETF matrix has {etf_count} records (<400). Running dynamic AMFI ETF sync...")
-            etf_res = await loop.run_in_executor(None, ingest_all_amfi_etfs, True)
-            logger.info(f"📊 [ETF Ingestion Boot] Synced {etf_res.get('persisted_to_db', 0)} ETFs into matrix.")
+        with job_lease(f"boot_catchup_amfi_{today_str}", ttl_seconds=1800, release_on_exit=False) as acquired:
+            if acquired:
+                # 1. ETF Universe Boot Check: Ensure all active AMFI ETFs are in database
+                etf_count = get_etf_count()
+                if etf_count < 400:
+                    logger.info(f"📊 [ETF Ingestion Boot] ETF matrix has {etf_count} records (<400). Running dynamic AMFI ETF sync...")
+                    etf_res = await loop.run_in_executor(None, ingest_all_amfi_etfs, True)
+                    logger.info(f"📊 [ETF Ingestion Boot] Synced {etf_res.get('persisted_to_db', 0)} ETFs into matrix.")
 
-        # 2. Sovereign Benchmarks Boot Check: Ensure sovereign benchmarks are primed
-        await loop.run_in_executor(None, refresh_daily_sovereign_benchmarks, today_str)
+                # 2. Sovereign Benchmarks Boot Check: Ensure sovereign benchmarks are primed
+                await loop.run_in_executor(None, refresh_daily_sovereign_benchmarks, today_str)
 
-        # 3. Multi-Asset Monitoring & AMFI Catch-Up Check:
-        # Runs if past 23:15 IST without today's scan OR if the last scan is older than yesterday
-        from core.ingestion.amfi import ingest_amfi_daily_feed
-        yesterday_str = (now - timedelta(days=1)).strftime("%Y-%m-%d")
-        recent_scans = get_asset_scan_runs(limit=1)
-        last_scan_date = str(recent_scans[0].get("started_at", ""))[:10] if recent_scans else ""
-        is_past_2315 = (now.hour > 23) or (now.hour == 23 and now.minute >= 15)
-        if (is_past_2315 and last_scan_date != today_str) or (not last_scan_date or last_scan_date < yesterday_str):
-            logger.info(f"📊 [Asset Scan Catch-up] Last scan ({last_scan_date or 'none'}) stale on boot. Executing AMFI & multi-asset catch-up...")
-            await loop.run_in_executor(None, ingest_amfi_daily_feed, None, True)
-            await loop.run_in_executor(None, run_comprehensive_asset_scan, "ALL_ASSETS", "catch_up_boot")
+                # 3. Multi-Asset Monitoring & AMFI Catch-Up Check:
+                # Runs if past 23:15 IST without today's scan OR if the last scan is older than yesterday
+                from core.ingestion.amfi import ingest_amfi_daily_feed
+                yesterday_str = (now - timedelta(days=1)).strftime("%Y-%m-%d")
+                recent_scans = get_asset_scan_runs(limit=1)
+                last_scan_date = str(recent_scans[0].get("started_at", ""))[:10] if recent_scans else ""
+                is_past_2315 = (now.hour > 23) or (now.hour == 23 and now.minute >= 15)
+                if (is_past_2315 and last_scan_date != today_str) or (not last_scan_date or last_scan_date < yesterday_str):
+                    logger.info(f"📊 [Asset Scan Catch-up] Last scan ({last_scan_date or 'none'}) stale on boot. Executing AMFI & multi-asset catch-up...")
+                    await loop.run_in_executor(None, ingest_amfi_daily_feed, None, True)
+                    await loop.run_in_executor(None, run_comprehensive_asset_scan, "ALL_ASSETS", "catch_up_boot")
+
+                gc.collect()
+            else:
+                logger.info("📊 [AMFI & Multi-Asset Scheduler] Boot catch-up lease held by another worker. Skipping duplicate catch-up.")
 
     except Exception as boot_err:
         logger.warning(f"📊 [AMFI & Multi-Asset Scheduler] Boot catch-up notice: {boot_err}")
@@ -496,9 +504,16 @@ async def run_daily_fund_audit_scheduler():
             cur.close()
             conn.close()
         if not last_audit_date or last_audit_date < yesterday_str:
-            logger.info(f"🔍 [Fund Audit Scheduler] Last fund audit ({last_audit_date or 'none'}) older than {yesterday_str}. Running catch-up audit...")
-            loop = asyncio.get_running_loop()
-            await loop.run_in_executor(None, audit_single_fund_daily, None, False)
+            from core.db.distributed_lock import job_lease
+            import gc
+            with job_lease(f"boot_catchup_fund_audit_{now.strftime('%Y-%m-%d')}", ttl_seconds=1800, release_on_exit=False) as acquired:
+                if acquired:
+                    logger.info(f"🔍 [Fund Audit Scheduler] Last fund audit ({last_audit_date or 'none'}) older than {yesterday_str}. Running catch-up audit...")
+                    loop = asyncio.get_running_loop()
+                    await loop.run_in_executor(None, audit_single_fund_daily, None, False)
+                    gc.collect()
+                else:
+                    logger.info("🔍 [Fund Audit Scheduler] Boot catch-up lease held by another worker. Skipping duplicate catch-up.")
     except Exception as boot_err:
         logger.warning(f"🔍 [Fund Audit Scheduler] Boot catch-up notice: {boot_err}")
 
