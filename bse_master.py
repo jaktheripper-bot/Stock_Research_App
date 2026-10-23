@@ -145,6 +145,19 @@ def resolve_scrip_via_gemini_jit(query: str) -> str:
         pass
     return None
 
+def is_synthetic_test_symbol(query: str) -> bool:
+    """Detects test stub symbols, timestamped test runs, and synthetic mock fixtures."""
+    if not query:
+        return False
+    clean = str(query).strip().upper()
+    if any(clean.startswith(p) for p in ("COAL_", "UNITCOAL_", "TEST_", "UNIT_", "ZZTEST", "TESTCORP", "TESTPEER", "COALESCE_")):
+        return True
+    if clean in ("TESTCORP", "TESTPEER", "ZZTESTONLY", "COALESCE_TEST"):
+        return True
+    if bool(re.search(r"_\d{9,}", clean)):
+        return True
+    return False
+
 def resolve_bse_scrip_code(query: str) -> str:
     """
     5-Tier BSE Resolution Hierarchy:
@@ -158,6 +171,8 @@ def resolve_bse_scrip_code(query: str) -> str:
         return None
 
     clean = clean_ticker(query)
+    if is_synthetic_test_symbol(clean):
+        return None
 
     # 1. Direct 6-digit code
     if clean.isdigit() and len(clean) == 6:
@@ -203,6 +218,8 @@ def resolve_canonical_symbol(query: str) -> str:
     if not query:
         return ""
     clean = clean_ticker(query)
+    if is_synthetic_test_symbol(clean):
+        return clean
     scrip = resolve_bse_scrip_code(clean)
     if not scrip:
         return clean
@@ -246,8 +263,10 @@ def get_ticker_suggestions(query: str, n: int = 3, limit: Optional[int] = None) 
     """Finds closest matching ticker symbols or company names using fuzzy string matching."""
     if not query:
         return []
+    clean = clean_ticker(query)
+    if is_synthetic_test_symbol(clean):
+        return []
     if limit is not None:
         n = limit
-    clean = clean_ticker(query)
     candidates = _get_cached_candidates()
     return difflib.get_close_matches(clean, candidates, n=n, cutoff=0.5)

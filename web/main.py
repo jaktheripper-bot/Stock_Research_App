@@ -125,6 +125,7 @@ from bse_master import (
     resolve_canonical_symbol,
     resolve_bse_scrip_code,
     get_bse_scrips_cache,
+    is_synthetic_test_symbol,
 )
 from core.formatters import format_inr
 from web.legal_content import POLICIES
@@ -1022,6 +1023,8 @@ def dossier_page(request: Request, ticker: str):
 
     rep = get_report_by_ticker_sync(canonical)
     if not rep or not rep.get("report_text"):
+        if is_synthetic_test_symbol(canonical) or is_synthetic_test_symbol(clean_t):
+            raise HTTPException(status_code=404, detail=f"Stock dossier '{canonical}' not found.")
         # Resolve company details for the pending template
         scrip = resolve_bse_scrip_code(canonical) or "N/A"
         cached = get_bse_scrips_cache()
@@ -1114,11 +1117,13 @@ def dossier_page(request: Request, ticker: str):
     matrix = extract_health_matrix(raw_md)
 
     # Multi-Quarter Revisions & Thesis Drift Monitoring
-    revisions = get_report_revisions(canonical) or []
+    revisions = get_report_revisions(canonical, include_text=False) or []
     diff_data = None
     if len(revisions) >= 2:
         try:
-            diff_data = compare_revisions(revisions[1], revisions[0])
+            full_revisions = get_report_revisions(canonical, include_text=True) or []
+            if len(full_revisions) >= 2:
+                diff_data = compare_revisions(full_revisions[1], full_revisions[0])
         except Exception as e:
             logger.debug(f"Differential revision comparison notice: {e}")
 
@@ -1152,8 +1157,8 @@ def dossier_page(request: Request, ticker: str):
             dates = []
             closes = []
             sma50 = []
-            for _, row in df_hist.iterrows():
-                d_val = row["Date"]
+            for row in df_hist.to_dict("records"):
+                d_val = row.get("Date")
                 d_str = d_val.strftime("%d %b") if hasattr(d_val, "strftime") else str(d_val)[:10]
                 dates.append(d_str)
                 c_val = row.get("Close")
@@ -2207,6 +2212,40 @@ async def contact_page(
 
 _CONTACT_RATE_BUCKETS: Dict[str, List[float]] = {}
 
+def _check_and_record_contact_rate(rate_key: str, now_ts: float) -> bool:
+    """
+    Checks rate limit, records hit if allowed, prunes expired entries, and caps at 512 keys.
+    Returns True if allowed (hits < 5 in 600s), False if rate-limited.
+    """
+    # 1. Prune expired entries across all keys if bucket grows
+    if len(_CONTACT_RATE_BUCKETS) > 64:
+        expired_keys = [
+            k for k, hits in list(_CONTACT_RATE_BUCKETS.items())
+            if not hits or (now_ts - hits[-1]) >= 600
+        ]
+        for k in expired_keys:
+            _CONTACT_RATE_BUCKETS.pop(k, None)
+
+    # 2. Hard-cap bucket size at 512 keys by evicting oldest
+    while len(_CONTACT_RATE_BUCKETS) >= 512 and rate_key not in _CONTACT_RATE_BUCKETS:
+        try:
+            oldest_key = min(
+                _CONTACT_RATE_BUCKETS.keys(),
+                key=lambda k: _CONTACT_RATE_BUCKETS[k][-1] if _CONTACT_RATE_BUCKETS[k] else 0
+            )
+            _CONTACT_RATE_BUCKETS.pop(oldest_key, None)
+        except Exception as evict_err:
+            logger.warning(f"Contact rate bucket eviction notice: {evict_err}")
+            _CONTACT_RATE_BUCKETS.clear()
+            break
+
+    window_hits = [ts for ts in _CONTACT_RATE_BUCKETS.get(rate_key, []) if (now_ts - ts) < 600]
+    if len(window_hits) >= 5:
+        return False
+    window_hits.append(now_ts)
+    _CONTACT_RATE_BUCKETS[rate_key] = window_hits
+    return True
+
 _DISPOSABLE_EMAIL_DOMAINS = {
     "nolettersbox.com", "mailinator.com", "guerrillamail.com", "tempmail.com",
     "10minutemail.com", "yopmail.com", "trashmail.com", "sharklasers.com",
@@ -2296,8 +2335,7 @@ async def submit_contact_ticket(
         client_ip = _get_client_ip(request)
         rate_key = f"{client_ip}:{clean_email}"
         now_ts = _time.time()
-        window_hits = [ts for ts in _CONTACT_RATE_BUCKETS.get(rate_key, []) if (now_ts - ts) < 600]
-        if len(window_hits) >= 5:
+        if not _check_and_record_contact_rate(rate_key, now_ts):
             return templates.TemplateResponse(
                 request=request,
                 name="contact.html",
@@ -2312,8 +2350,6 @@ async def submit_contact_ticket(
                 },
                 status_code=429,
             )
-        window_hits.append(now_ts)
-        _CONTACT_RATE_BUCKETS[rate_key] = window_hits
 
     res = create_support_ticket(
         user_email=clean_email,

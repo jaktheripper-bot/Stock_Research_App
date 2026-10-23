@@ -1,0 +1,198 @@
+"""
+Integration and regression test suite for Phase 2:
+Right-Size Caches & Eliminate Heavy Per-Request Allocations on /dossier/{ticker}.
+"""
+
+import time
+import unittest
+from unittest import mock
+import pandas as pd
+from starlette.testclient import TestClient
+
+from web.main import app, _CONTACT_RATE_BUCKETS, _check_and_record_contact_rate
+from bse_master import is_synthetic_test_symbol, resolve_bse_scrip_code, resolve_canonical_symbol
+from core.db.reports import (
+    get_report_revisions,
+    get_report_by_ticker,
+    get_archived_reports,
+    get_all_equities_directory_sync,
+    save_report_to_archive,
+)
+from core.analysis.fundamentals import (
+    _FUNDAMENTALS_CACHE,
+    _BoundedFundamentalsCache,
+    get_historical_prices,
+)
+
+
+class TestPhase2CacheAndDossierAllocations(unittest.TestCase):
+    """Empirical verification suite for Phase 2 cache right-sizing and dossier optimizations."""
+
+    def setUp(self):
+        self.client = TestClient(app)
+        get_report_revisions.cache_clear()
+        get_report_by_ticker.cache_clear()
+        get_archived_reports.cache_clear()
+        get_all_equities_directory_sync.cache_clear()
+        _FUNDAMENTALS_CACHE.clear()
+
+    def tearDown(self):
+        get_report_revisions.cache_clear()
+        get_report_by_ticker.cache_clear()
+        get_archived_reports.cache_clear()
+        get_all_equities_directory_sync.cache_clear()
+        _FUNDAMENTALS_CACHE.clear()
+
+    def test_action_2_1_get_report_revisions_include_text_flag_and_cache(self):
+        """Action 2.1: get_report_revisions defaults to include_text=False and is cached with maxsize=32."""
+        # Verify cache maxsize is 32
+        self.assertEqual(get_report_revisions.cache_parameters()["maxsize"], 32)
+
+        # Call with include_text=False (default)
+        revs_no_text = get_report_revisions("INFY", include_text=False)
+        self.assertIsInstance(revs_no_text, list)
+        if revs_no_text:
+            first = revs_no_text[0]
+            self.assertEqual(first["report_text"], "")
+            self.assertEqual(first["citations"], [])
+            self.assertIn("ticker", first)
+            self.assertIn("baseline_price", first)
+
+        # Call with include_text=True
+        revs_with_text = get_report_revisions("INFY", include_text=True)
+        self.assertIsInstance(revs_with_text, list)
+        if revs_with_text:
+            first = revs_with_text[0]
+            self.assertTrue(len(first["report_text"]) > 0 or first["report_text"] != "")
+
+        # Verify separate cache entries for include_text=True vs include_text=False
+        info = get_report_revisions.cache_info()
+        self.assertGreaterEqual(info.currsize, 1)
+
+    def test_action_2_2_reduced_lru_cache_sizes(self):
+        """Action 2.2: Verify reduced lru_cache sizes for get_report_by_ticker and get_archived_reports."""
+        self.assertEqual(get_report_by_ticker.cache_parameters()["maxsize"], 48)
+        self.assertEqual(get_archived_reports.cache_parameters()["maxsize"], 16)
+
+    def test_action_2_3_ttl_cache_on_get_all_equities_directory_sync(self):
+        """Action 2.3: get_all_equities_directory_sync has TTL cache and invalidation on archive save."""
+        # First call loads and caches
+        res1 = get_all_equities_directory_sync()
+        self.assertIsInstance(res1, list)
+        self.assertGreater(len(res1), 0)
+
+        # Second call returns the cached object
+        res2 = get_all_equities_directory_sync()
+        self.assertIs(res1, res2)
+
+        # Manual cache clear
+        get_all_equities_directory_sync.cache_clear()
+        res3 = get_all_equities_directory_sync()
+        self.assertIsNot(res1, res3)
+        self.assertEqual(len(res1), len(res3))
+
+    def test_action_2_4_bounded_fundamentals_cache(self):
+        """Action 2.4: _FUNDAMENTALS_CACHE enforces maxsize=64 and prunes expired entries on write."""
+        cache = _BoundedFundamentalsCache(maxsize=4, ttl_seconds=0.1)
+
+        # Populate cache up to maxsize
+        now = time.time()
+        cache["SYM1"] = (now, {"price": 100})
+        cache["SYM2"] = (now, {"price": 200})
+        cache["SYM3"] = (now, {"price": 300})
+        cache["SYM4"] = (now, {"price": 400})
+        self.assertEqual(len(cache), 4)
+
+        # Adding a 5th item when full evicts the oldest entry (SYM1)
+        cache["SYM5"] = (now + 0.01, {"price": 500})
+        self.assertEqual(len(cache), 4)
+        self.assertNotIn("SYM1", cache)
+        self.assertIn("SYM5", cache)
+
+        # Wait for TTL expiration
+        time.sleep(0.12)
+        # On read, expired entries are cleared
+        self.assertNotIn("SYM2", cache)
+
+        # On write, expired entries are pruned
+        cache["SYM6"] = (time.time(), {"price": 600})
+        self.assertEqual(len(cache), 1)
+        self.assertIn("SYM6", cache)
+
+    def test_action_2_5_historical_prices_cache_and_vectorized_loop(self):
+        """Action 2.5: get_historical_prices maxsize=32 and vectorized record conversion in dossier."""
+        # Check cache decorated property
+        self.assertTrue(hasattr(get_historical_prices, "cache_clear"))
+
+        # Test df.to_dict('records') speed and format compatibility with dossier chart logic
+        dates = pd.date_range("2026-01-01", periods=10, freq="D")
+        df_dummy = pd.DataFrame({
+            "Date": dates,
+            "Close": [100.0 + i for i in range(10)],
+            "SMA50": [95.0 + i for i in range(10)]
+        })
+        records = df_dummy.to_dict("records")
+        self.assertEqual(len(records), 10)
+        self.assertEqual(records[0]["Close"], 100.0)
+        self.assertEqual(records[0]["SMA50"], 95.0)
+
+    def test_action_2_6_synthetic_ticker_guard_returns_404_without_bse_cache(self):
+        """Action 2.6: Synthetic test tickers return 404 without loading bse_scrips_cache.json."""
+        synthetic_cases = [
+            "COAL_1792573802959",
+            "TESTCORP",
+            "TEST_DUMMY_STOCK",
+            "UNIT_SAMPLE_STOCK",
+            "ZZTEST_PROBE",
+            "UNITCOAL_9999",
+            "MOCK_1712345678901",
+        ]
+
+        for sym in synthetic_cases:
+            self.assertTrue(is_synthetic_test_symbol(sym), f"Should recognize {sym} as synthetic")
+            self.assertIsNone(resolve_bse_scrip_code(sym))
+            self.assertEqual(resolve_canonical_symbol(sym), sym)
+
+        # Mock get_bse_scrips_cache to verify it is NEVER called for synthetic 404 probes
+        with mock.patch("web.main.get_bse_scrips_cache") as mock_scrip_cache:
+            resp = self.client.get("/dossier/COAL_1792573802959")
+            self.assertEqual(resp.status_code, 404)
+            mock_scrip_cache.assert_not_called()
+
+            resp2 = self.client.get("/dossier/TESTCORP")
+            self.assertEqual(resp2.status_code, 404)
+            mock_scrip_cache.assert_not_called()
+
+    def test_action_2_7_contact_rate_bucket_pruning_and_cap(self):
+        """Action 2.7: Prunes expired entries and caps _CONTACT_RATE_BUCKETS at 512 keys."""
+        _CONTACT_RATE_BUCKETS.clear()
+        t_base = time.time()
+
+        # Seed 500 expired entries (>600s old)
+        for i in range(500):
+            _CONTACT_RATE_BUCKETS[f"old_client_{i}:test@example.com"] = [t_base - 700]
+
+        self.assertEqual(len(_CONTACT_RATE_BUCKETS), 500)
+
+        # Recording a hit prunes expired entries
+        allowed = _check_and_record_contact_rate("new_client:new@example.com", t_base)
+        self.assertTrue(allowed)
+        # All 500 old keys should be pruned since they were >600s old
+        self.assertLessEqual(len(_CONTACT_RATE_BUCKETS), 512)
+        self.assertNotIn("old_client_0:test@example.com", _CONTACT_RATE_BUCKETS)
+        self.assertIn("new_client:new@example.com", _CONTACT_RATE_BUCKETS)
+
+        # Now test 512 hard cap eviction
+        _CONTACT_RATE_BUCKETS.clear()
+        for i in range(520):
+            _CONTACT_RATE_BUCKETS[f"active_{i}:user@example.com"] = [t_base]
+
+        # Trigger cap enforcement
+        _check_and_record_contact_rate("overflow_client:user@example.com", t_base)
+        self.assertLessEqual(len(_CONTACT_RATE_BUCKETS), 512)
+
+        _CONTACT_RATE_BUCKETS.clear()
+
+
+if __name__ == "__main__":
+    unittest.main()

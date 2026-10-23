@@ -450,7 +450,75 @@ def fetch_bse_exchange_data(query: str) -> dict:
         "is_fallback": False
     }
 
-_FUNDAMENTALS_CACHE = {}
+class _BoundedFundamentalsCache(dict):
+    """
+    Thread-safe bounded in-memory cache with LRU and TTL eviction for stock fundamentals.
+    Prevents unbounded dictionary growth under crawler/bot scans while guaranteeing sub-second reads.
+    """
+    def __init__(self, maxsize: int = 64, ttl_seconds: float = 900.0):
+        super().__init__()
+        self.maxsize = maxsize
+        self.ttl_seconds = ttl_seconds
+        self._lock = threading.Lock()
+
+    def __contains__(self, key: object) -> bool:
+        with self._lock:
+            if not super().__contains__(key):
+                return False
+            ts, _ = super().__getitem__(key)
+            if time.time() - ts >= self.ttl_seconds:
+                super().pop(key, None)
+                return False
+            return True
+
+    def __getitem__(self, key: object):
+        with self._lock:
+            val = super().__getitem__(key)
+            ts, _ = val
+            if time.time() - ts >= self.ttl_seconds:
+                super().pop(key, None)
+                raise KeyError(key)
+            return val
+
+    def get(self, key: object, default: Any = None):
+        with self._lock:
+            if not super().__contains__(key):
+                return default
+            val = super().__getitem__(key)
+            ts, _ = val
+            if time.time() - ts >= self.ttl_seconds:
+                super().pop(key, None)
+                return default
+            return val
+
+    def __setitem__(self, key: object, value: Tuple[float, Any]):
+        with self._lock:
+            now = time.time()
+            # 1. Prune expired entries on write
+            expired = [k for k, v in list(super().items()) if (now - v[0]) >= self.ttl_seconds]
+            for k in expired:
+                super().pop(k, None)
+
+            # 2. Enforce maxsize LRU eviction (evict oldest timestamp)
+            if len(self) >= self.maxsize and not super().__contains__(key):
+                try:
+                    oldest_k = min(super().keys(), key=lambda k: super(_BoundedFundamentalsCache, self).__getitem__(k)[0])
+                    super().pop(oldest_k, None)
+                except Exception as evict_err:
+                    logger.debug("Fundamentals cache eviction notice: %s", evict_err)
+                    super().clear()
+
+            super().__setitem__(key, value)
+
+    def pop(self, key: object, default: Any = None):
+        with self._lock:
+            return super().pop(key, default)
+
+    def clear(self):
+        with self._lock:
+            super().clear()
+
+_FUNDAMENTALS_CACHE = _BoundedFundamentalsCache(maxsize=64, ttl_seconds=900.0)
 
 def _enrich_with_cached_db_fundamentals(res_dict: dict, symbol: str) -> dict:
     """Blends localized DB fundamentals cache to ensure non-N/A ratios even on live exchange quote hits."""
@@ -666,7 +734,7 @@ def get_stock_fundamentals(query: str) -> dict:
     # If all fail, raise clean error
     raise ExchangeDataFetchError(clean, "Both primary BSE and secondary market gateways failed to return live quotes.")
 
-@ttl_cache(ttl_seconds=3600, maxsize=256)
+@ttl_cache(ttl_seconds=3600, maxsize=32)
 def get_historical_prices(ticker: str, period: str = "6mo"):
     """
     Fetches trailing daily historical prices via yfinance, attempting BSE (.BO)

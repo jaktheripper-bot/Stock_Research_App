@@ -3,9 +3,11 @@
 import json
 import logging
 import os
+import threading
+import time
 from datetime import datetime
+from functools import lru_cache, wraps
 import requests  # IndexNow ping
-from functools import lru_cache
 import asyncio
 
 from normalizer import clean_ticker, extract_citations_from_report
@@ -13,6 +15,45 @@ from core.db.connection import init_db, get_db_connection, get_supabase_url, get
 from core.db.compliance import log_compliance_event
 
 logger = logging.getLogger("equity_research.core.db.reports")
+
+def ttl_cache(ttl_seconds: int = 120, maxsize: int = 2):
+    """Thread-safe in-memory TTL and LRU cache for high-frequency directory queries."""
+    def decorator(fn):
+        cache = {}
+        lock = threading.Lock()
+
+        @wraps(fn)
+        def wrapped(*args, **kwargs):
+            key = (args, tuple(sorted(kwargs.items())))
+            now = time.time()
+            with lock:
+                if key in cache:
+                    val, exp = cache[key]
+                    if now < exp:
+                        return val
+                    del cache[key]
+            res = fn(*args, **kwargs)
+            if res is not None:
+                with lock:
+                    if len(cache) >= maxsize:
+                        try:
+                            oldest = min(cache.keys(), key=lambda k: cache[k][1])
+                            cache.pop(oldest, None)
+                        except Exception as pop_err:
+                            logger.debug("TTL cache eviction notice: %s", pop_err)
+                            cache.clear()
+                    cache[key] = (res, now + ttl_seconds)
+            return res
+
+        def cache_clear():
+            with lock:
+                cache.clear()
+
+        wrapped.cache_clear = cache_clear
+        wrapped.clear = cache_clear
+        return wrapped
+
+    return decorator
 
 def _format_timestamp(raw_ts) -> str:
     """Formats raw database timestamp into consistent IST string representation."""
@@ -113,6 +154,8 @@ def save_report_to_archive(stock_data: dict, report_text: str, announcement: str
         try:
             get_archived_reports.cache_clear()
             get_report_by_ticker.cache_clear()
+            get_report_revisions.cache_clear()
+            get_all_equities_directory_sync.cache_clear()
         except Exception as clear_err:
             logger.debug("Reports cache clear notice: %s", clear_err)
         # SEBI Compliance: Record statutory Safe Harbor disclaimer audit event
@@ -185,7 +228,7 @@ class AwaitableDict(dict):
         return _async_self().__await__()
 
 # LRU cached version (returns AwaitableList so it can be called synchronously or awaited)
-@lru_cache(maxsize=128)
+@lru_cache(maxsize=16)
 def get_archived_reports(include_text: bool = False) -> list:
     """Synchronous helper returning archived reports, cached for 5 minutes via manual invalidation."""
     init_db()
@@ -255,7 +298,7 @@ _get_archived_reports_sync = get_archived_reports
 get_archived_reports_sync = get_archived_reports
 
 # LRU cached sync helper for single ticker (returns AwaitableDict)
-@lru_cache(maxsize=256)
+@lru_cache(maxsize=48)
 def get_report_by_ticker(ticker: str) -> dict:
     """Fetch report by ticker, cached, returns AwaitableDict."""
     init_db()
@@ -303,8 +346,8 @@ _get_report_by_ticker_sync = get_report_by_ticker
 get_report_by_ticker_sync = get_report_by_ticker
 get_latest_report = get_report_by_ticker
 
-@lru_cache(maxsize=128)
-def get_report_revisions(ticker: str) -> list:
+@lru_cache(maxsize=32)
+def get_report_revisions(ticker: str, include_text: bool = False) -> list:
     """Retrieves immutable revision history for a stock to power the differential engine."""
     init_db()
     conn = get_db_connection()
@@ -313,24 +356,33 @@ def get_report_revisions(ticker: str) -> list:
     placeholder = get_placeholder()
     revisions = []
     try:
-        cursor.execute(f'''
-            SELECT id, ticker, short_name, report_text, timestamp, baseline_price, baseline_pe, baseline_mcap, latest_announcement, revision_trigger, citations_json
-            FROM report_revisions
-            WHERE ticker = {placeholder}
-            ORDER BY timestamp DESC
-        ''', (clean,))
+        if include_text:
+            cursor.execute(f'''
+                SELECT id, ticker, short_name, report_text, timestamp, baseline_price, baseline_pe, baseline_mcap, latest_announcement, revision_trigger, citations_json
+                FROM report_revisions
+                WHERE ticker = {placeholder}
+                ORDER BY timestamp DESC
+            ''', (clean,))
+        else:
+            cursor.execute(f'''
+                SELECT id, ticker, short_name, '' AS report_text, timestamp, baseline_price, baseline_pe, baseline_mcap, latest_announcement, revision_trigger, NULL AS citations_json
+                FROM report_revisions
+                WHERE ticker = {placeholder}
+                ORDER BY timestamp DESC
+            ''', (clean,))
         rows = cursor.fetchall()
         for row in rows:
-            rep_text = row[3]
+            rep_text = row[3] if include_text else ""
             cit_data = []
-            if len(row) > 10 and row[10]:
-                try:
-                    cit_data = json.loads(row[10])
-                except Exception as e:
-                    logger.debug("Failed parsing citations_json in get_report_revisions: %s", e)
-                    cit_data = []
-            if not cit_data and rep_text:
-                cit_data = extract_citations_from_report(rep_text)
+            if include_text:
+                if len(row) > 10 and row[10]:
+                    try:
+                        cit_data = json.loads(row[10])
+                    except Exception as e:
+                        logger.debug("Failed parsing citations_json in get_report_revisions: %s", e)
+                        cit_data = []
+                if not cit_data and rep_text:
+                    cit_data = extract_citations_from_report(rep_text)
             revisions.append({
                 "id": row[0],
                 "ticker": row[1],
@@ -366,23 +418,32 @@ def get_report_revisions(ticker: str) -> list:
                     rep_cits
                 ))
                 conn.commit()
-                cursor.execute(f'''
-                    SELECT id, ticker, short_name, report_text, timestamp, baseline_price, baseline_pe, baseline_mcap, latest_announcement, revision_trigger, citations_json
-                    FROM report_revisions
-                    WHERE ticker = {placeholder}
-                    ORDER BY timestamp DESC
-                ''', (clean,))
+                if include_text:
+                    cursor.execute(f'''
+                        SELECT id, ticker, short_name, report_text, timestamp, baseline_price, baseline_pe, baseline_mcap, latest_announcement, revision_trigger, citations_json
+                        FROM report_revisions
+                        WHERE ticker = {placeholder}
+                        ORDER BY timestamp DESC
+                    ''', (clean,))
+                else:
+                    cursor.execute(f'''
+                        SELECT id, ticker, short_name, '' AS report_text, timestamp, baseline_price, baseline_pe, baseline_mcap, latest_announcement, revision_trigger, NULL AS citations_json
+                        FROM report_revisions
+                        WHERE ticker = {placeholder}
+                        ORDER BY timestamp DESC
+                    ''', (clean,))
                 for s_row in cursor.fetchall():
-                    s_text = s_row[3]
+                    s_text = s_row[3] if include_text else ""
                     s_cit = []
-                    if len(s_row) > 10 and s_row[10]:
-                        try:
-                            s_cit = json.loads(s_row[10])
-                        except Exception as e:
-                            logger.debug("Failed parsing citations_json in self-healing revision: %s", e)
-                            s_cit = []
-                    if not s_cit and s_text:
-                        s_cit = extract_citations_from_report(s_text)
+                    if include_text:
+                        if len(s_row) > 10 and s_row[10]:
+                            try:
+                                s_cit = json.loads(s_row[10])
+                            except Exception as e:
+                                logger.debug("Failed parsing citations_json in self-healing revision: %s", e)
+                                s_cit = []
+                        if not s_cit and s_text:
+                            s_cit = extract_citations_from_report(s_text)
                     revisions.append({
                         "id": s_row[0],
                         "ticker": s_row[1],
@@ -496,6 +557,7 @@ def resolve_equity_sector(ticker: str, name: str, cached_sec: str = None) -> str
     return "DIVERSIFIED"
 
 
+@ttl_cache(ttl_seconds=120, maxsize=2)
 def get_all_equities_directory_sync() -> list:
     """
     Returns complete list of all 143 verified equities joined with
