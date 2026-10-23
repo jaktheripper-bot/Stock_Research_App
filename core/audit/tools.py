@@ -42,6 +42,7 @@ def tool_run_test_suite() -> Dict[str, Any]:
         sys.executable, "-m", "pytest",
         "--ignore=tests/unit/test_project_auditor.py",
         "--ignore=tests/audit/test_project_auditor.py",
+        "--ignore=tests/audit/test_remediation_ledger.py",
         "-q"
     ]
     start_time = time.time()

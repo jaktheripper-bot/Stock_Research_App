@@ -28,9 +28,18 @@ async def main_async():
     parser.add_argument("--quick", action="store_true", help="Execute deterministic-only audit (skips LLM generation)")
     parser.add_argument("--history", action="store_true", help="List recent project audit history from database")
     parser.add_argument("--id", type=str, help="View full markdown dossier of a specific audit by ID")
+    parser.add_argument("--plan", action="store_true", help="View current Remediation Action Plan (audits/REMEDIATION_ACTION_PLAN.md)")
     parser.add_argument("--output", type=str, help="Custom markdown output path")
 
     args = parser.parse_args()
+
+    if args.plan:
+        plan_path = PROJECT_ROOT / "audits" / "REMEDIATION_ACTION_PLAN.md"
+        if not plan_path.exists():
+            print("No active remediation plan found at audits/REMEDIATION_ACTION_PLAN.md. Run an audit to generate one.")
+            sys.exit(1)
+        print(plan_path.read_text(encoding="utf-8"))
+        return
 
     if args.history:
         history = get_project_audit_history(limit=10)
@@ -68,6 +77,12 @@ async def main_async():
 
     result = await audit_project_full(use_ai=use_ai)
 
+    remediation_stats = result.pillar_breakdown.get("remediation_stats", {})
+    total_open = remediation_stats.get("total_open", 0)
+    aging_3d = remediation_stats.get("aging_over_3d", 0)
+    resolved_total = remediation_stats.get("resolved_total", 0)
+    total_penalty = remediation_stats.get("total_penalty", 0.0)
+
     print("=========================================================================")
     print("                 PROJECT AUDIT EXECUTION COMPLETE                        ")
     print("=========================================================================")
@@ -78,6 +93,8 @@ async def main_async():
     print(f"  • UI/UX Pillar:      {result.uiux_score}/100")
     print(f"Tests Evaluated:       {result.tests_passed}/{result.tests_total} Passing")
     print(f"Endpoints Checked:     {result.endpoints_healthy}/{result.endpoints_checked} Healthy (HTTP 200)")
+    print(f"Remediation Ledger:    {total_open} Open Items ({aging_3d} Aging >=3d, -{total_penalty:.1f} pts) | {resolved_total} Resolved")
+    print(f"Action Plan:           audits/REMEDIATION_ACTION_PLAN.md")
     print(f"Critical Violations:   {len(result.critical_violations)}")
     print(f"Active Recommendations:{len(result.recommendations)}")
     print("=========================================================================\n")

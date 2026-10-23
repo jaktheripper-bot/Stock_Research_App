@@ -1,0 +1,407 @@
+"""Stateful Remediation Ledger Database Repository.
+
+Tracks the full lifecycle of audit findings across continuous runs:
+OPEN -> RE_EVALUATING -> RESOLVED
+
+Provides:
+- Deterministic deduplication via finding_hash.
+- Verification attempt and failure pass counters.
+- Dynamic age calculation (age_in_days) and progressive aging multipliers.
+- Dual-binding database support for local SQLite and production PostgreSQL (Supabase / Render).
+"""
+
+import json
+import hashlib
+import logging
+from decimal import Decimal
+from datetime import datetime, timezone, date
+from typing import Dict, Any, List, Optional
+
+from core.db.connection import get_db_connection, is_postgres_connection
+
+logger = logging.getLogger("equity_research.core.db.remediation")
+
+SEVERITY_BASE_POINTS = {
+    "CRITICAL": 15.0,
+    "HIGH": 8.0,
+    "MEDIUM": 4.0,
+    "LOW": 1.0,
+}
+
+
+def compute_finding_hash(category: str, invariant_name: str, target: str) -> str:
+    """Computes a deterministic SHA256 hash identifying a unique invariant violation."""
+    raw = f"{str(category).strip().upper()}:{str(invariant_name).strip()}:{str(target).strip()}".encode("utf-8")
+    return hashlib.sha256(raw).hexdigest()[:32]
+
+
+def _clean_remediation_row(cursor, row: Any) -> Dict[str, Any]:
+    """Normalizes an SQLite or psycopg2 row into a clean dictionary."""
+    if not row:
+        return {}
+    if hasattr(row, "keys"):
+        d = dict(row)
+    elif cursor and cursor.description:
+        cols = [c[0] for c in cursor.description]
+        d = dict(zip(cols, row))
+    else:
+        d = dict(row)
+
+    for k, v in list(d.items()):
+        if isinstance(v, Decimal):
+            d[k] = float(v)
+        elif isinstance(v, (datetime, date)):
+            d[k] = str(v)
+
+    if "finding_metadata_json" in d and isinstance(d["finding_metadata_json"], str):
+        try:
+            d["metadata"] = json.loads(d["finding_metadata_json"])
+        except Exception as e:
+            logger.debug("Failed parsing finding_metadata_json: %s", e)
+            d["metadata"] = {}
+    elif "metadata" not in d:
+        d["metadata"] = {}
+
+    # Calculate age in days and progressive multiplier dynamically
+    now_utc = datetime.now(timezone.utc)
+    first_detected_str = d.get("first_detected_at")
+    age_days = 0.0
+    if first_detected_str:
+        try:
+            cleaned_str = str(first_detected_str)[:19].replace("T", " ")
+            dt = datetime.strptime(cleaned_str, "%Y-%m-%d %H:%M:%S").replace(tzinfo=timezone.utc)
+            age_days = max(round((now_utc - dt).total_seconds() / 86400.0, 1), 0.0)
+        except Exception as parse_err:
+            logger.debug("Failed parsing first_detected_at %s: %s", first_detected_str, parse_err)
+            age_days = 0.0
+
+    d["age_in_days"] = age_days
+
+    # Progressive aging multiplier:
+    # 1.0x (<3 days), 1.5x (>=3 days), 2.0x (>=7 days)
+    if age_days >= 7.0:
+        aging_mult = 2.0
+    elif age_days >= 3.0:
+        aging_mult = 1.5
+    else:
+        aging_mult = 1.0
+
+    d["aging_multiplier"] = aging_mult
+
+    severity = str(d.get("severity", "MEDIUM")).upper()
+    base_deduction = SEVERITY_BASE_POINTS.get(severity, 4.0)
+    d["base_deduction"] = base_deduction
+    d["effective_penalty"] = round(base_deduction * aging_mult, 1)
+
+    return d
+
+
+def record_or_update_finding(
+    finding: Dict[str, Any],
+    conn: Optional[Any] = None,
+    cursor: Optional[Any] = None,
+    commit: bool = True
+) -> Dict[str, Any]:
+    """Records a new finding or updates an existing one with failed verification passes."""
+    owns_conn = False
+    if conn is None:
+        conn = get_db_connection()
+        cursor = conn.cursor()
+        owns_conn = True
+    elif cursor is None:
+        cursor = conn.cursor()
+
+    use_pg = is_postgres_connection(conn)
+
+    category = str(finding.get("category", "BACKEND_STABILITY")).strip().upper()
+    invariant_name = str(finding.get("invariant_name", "general_invariant")).strip()
+    target = str(finding.get("target_file_or_route", "general")).strip()
+    title = str(finding.get("title", f"Defect in {invariant_name}")).strip()[:255]
+    desc = str(finding.get("description", "")).strip()
+    severity = str(finding.get("severity", "MEDIUM")).strip().upper()
+    notes = finding.get("remediation_notes") or ""
+    metadata_json = json.dumps(finding.get("metadata", {}))
+
+    finding_hash = finding.get("finding_hash") or compute_finding_hash(category, invariant_name, target)
+
+    try:
+        # Check if record already exists
+        cursor.execute("SELECT id, status, verification_attempts, consecutive_failures FROM audit_remediation_ledger WHERE finding_hash = ?;" if not use_pg else "SELECT id, status, verification_attempts, consecutive_failures FROM audit_remediation_ledger WHERE finding_hash = %s;", (finding_hash,))
+        existing = cursor.fetchone()
+
+        if existing:
+            row_id, old_status, old_attempts, old_failures = existing[0], existing[1], existing[2], existing[3]
+            new_attempts = int(old_attempts or 0) + 1
+            new_failures = (int(old_failures or 0) + 1) if old_status != "RESOLVED" else 1
+
+            if use_pg:
+                update_sql = """
+                    UPDATE audit_remediation_ledger
+                    SET title = %s, description = %s, severity = %s,
+                        status = 'OPEN',
+                        verification_attempts = %s,
+                        consecutive_failures = %s,
+                        last_verified_at = now(),
+                        resolved_at = NULL,
+                        remediation_notes = %s,
+                        finding_metadata_json = %s
+                    WHERE finding_hash = %s;
+                """
+                cursor.execute(update_sql, (title, desc, severity, new_attempts, new_failures, notes, metadata_json, finding_hash))
+            else:
+                update_sql = """
+                    UPDATE audit_remediation_ledger
+                    SET title = ?, description = ?, severity = ?,
+                        status = 'OPEN',
+                        verification_attempts = ?,
+                        consecutive_failures = ?,
+                        last_verified_at = datetime('now'),
+                        resolved_at = NULL,
+                        remediation_notes = ?,
+                        finding_metadata_json = ?
+                    WHERE finding_hash = ?;
+                """
+                cursor.execute(update_sql, (title, desc, severity, new_attempts, new_failures, notes, metadata_json, finding_hash))
+        else:
+            if use_pg:
+                insert_sql = """
+                    INSERT INTO audit_remediation_ledger (
+                        finding_hash, category, invariant_name, title, description,
+                        target_file_or_route, severity, status, verification_attempts,
+                        consecutive_failures, first_detected_at, last_verified_at,
+                        resolved_at, remediation_notes, finding_metadata_json
+                    ) VALUES (%s, %s, %s, %s, %s, %s, %s, 'OPEN', 1, 1, now(), now(), NULL, %s, %s);
+                """
+                cursor.execute(insert_sql, (finding_hash, category, invariant_name, title, desc, target, severity, notes, metadata_json))
+            else:
+                insert_sql = """
+                    INSERT INTO audit_remediation_ledger (
+                        finding_hash, category, invariant_name, title, description,
+                        target_file_or_route, severity, status, verification_attempts,
+                        consecutive_failures, first_detected_at, last_verified_at,
+                        resolved_at, remediation_notes, finding_metadata_json
+                    ) VALUES (?, ?, ?, ?, ?, ?, ?, 'OPEN', 1, 1, datetime('now'), datetime('now'), NULL, ?, ?);
+                """
+                cursor.execute(insert_sql, (finding_hash, category, invariant_name, title, desc, target, severity, notes, metadata_json))
+
+        if commit:
+            conn.commit()
+
+        # Fetch and return normalized record
+        cursor.execute("SELECT * FROM audit_remediation_ledger WHERE finding_hash = ?;" if not use_pg else "SELECT * FROM audit_remediation_ledger WHERE finding_hash = %s;", (finding_hash,))
+        updated_row = cursor.fetchone()
+        return _clean_remediation_row(cursor, updated_row)
+    except Exception as e:
+        logger.error(f"Error recording or updating remediation finding {finding_hash}: {e}")
+        if commit:
+            try:
+                conn.rollback()
+            except Exception as rb_err:
+                logger.debug(f"Rollback notice for {finding_hash}: {rb_err}")
+        return {}
+    finally:
+        if owns_conn:
+            try:
+                cursor.close()
+            except Exception as c_err:
+                logger.debug(f"Cursor close notice: {c_err}")
+            try:
+                conn.close()
+            except Exception as conn_err:
+                logger.debug(f"Conn close notice: {conn_err}")
+
+
+def record_findings_batch(findings: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
+    """Records or updates multiple findings in a single atomic database transaction."""
+    if not findings:
+        return []
+    conn = get_db_connection()
+    cursor = conn.cursor()
+    results = []
+    try:
+        for finding in findings:
+            res = record_or_update_finding(finding, conn=conn, cursor=cursor, commit=False)
+            if res:
+                results.append(res)
+        conn.commit()
+        return results
+    except Exception as e:
+        logger.error(f"Error in record_findings_batch: {e}")
+        try:
+            conn.rollback()
+        except Exception as rb_err:
+            logger.debug(f"Rollback notice: {rb_err}")
+        return []
+    finally:
+        try:
+            cursor.close()
+        except Exception as c_err:
+            logger.debug(f"Cursor close notice: {c_err}")
+        try:
+            conn.close()
+        except Exception as conn_err:
+            logger.debug(f"Conn close notice: {conn_err}")
+
+
+def get_open_remediation_findings() -> List[Dict[str, Any]]:
+    """Returns all currently active (OPEN or RE_EVALUATING) remediation findings."""
+    conn = get_db_connection()
+    cursor = conn.cursor()
+    try:
+        cursor.execute("""
+            SELECT * FROM audit_remediation_ledger
+            WHERE status IN ('OPEN', 'RE_EVALUATING')
+            ORDER BY first_detected_at ASC;
+        """)
+        rows = cursor.fetchall()
+        cleaned = [_clean_remediation_row(cursor, r) for r in rows]
+        # Sort by effective_penalty DESC, then age_in_days DESC
+        cleaned.sort(key=lambda x: (x.get("effective_penalty", 0.0), x.get("age_in_days", 0.0)), reverse=True)
+        return cleaned
+    except Exception as e:
+        logger.error(f"Error fetching open remediation findings: {e}")
+        return []
+    finally:
+        try:
+            cursor.close()
+        except Exception as c_err:
+            logger.debug(f"Cursor close notice: {c_err}")
+        try:
+            conn.close()
+        except Exception as conn_err:
+            logger.debug(f"Conn close notice: {conn_err}")
+
+
+def mark_finding_re_evaluating(finding_hash: str) -> bool:
+    """Sets a finding's status to RE_EVALUATING as part of the Verify First cycle."""
+    conn = get_db_connection()
+    cursor = conn.cursor()
+    use_pg = is_postgres_connection(conn)
+    try:
+        sql = "UPDATE audit_remediation_ledger SET status = 'RE_EVALUATING', last_verified_at = now() WHERE finding_hash = %s;" if use_pg else "UPDATE audit_remediation_ledger SET status = 'RE_EVALUATING', last_verified_at = datetime('now') WHERE finding_hash = ?;"
+        cursor.execute(sql, (finding_hash,))
+        conn.commit()
+        return True
+    except Exception as e:
+        logger.error(f"Error marking finding {finding_hash} RE_EVALUATING: {e}")
+        try:
+            conn.rollback()
+        except Exception as rb_err:
+            logger.debug(f"Rollback notice for {finding_hash}: {rb_err}")
+        return False
+    finally:
+        try:
+            cursor.close()
+        except Exception as c_err:
+            logger.debug(f"Cursor close notice: {c_err}")
+        try:
+            conn.close()
+        except Exception as conn_err:
+            logger.debug(f"Conn close notice: {conn_err}")
+
+
+def mark_finding_resolved(finding_hash: str, notes: Optional[str] = None) -> bool:
+    """Marks an invariant violation as RESOLVED and records the resolution timestamp."""
+    conn = get_db_connection()
+    cursor = conn.cursor()
+    use_pg = is_postgres_connection(conn)
+    try:
+        if use_pg:
+            sql = """
+                UPDATE audit_remediation_ledger
+                SET status = 'RESOLVED',
+                    resolved_at = now(),
+                    consecutive_failures = 0,
+                    verification_attempts = verification_attempts + 1,
+                    remediation_notes = COALESCE(%s, remediation_notes)
+                WHERE finding_hash = %s;
+            """
+            cursor.execute(sql, (notes, finding_hash))
+        else:
+            sql = """
+                UPDATE audit_remediation_ledger
+                SET status = 'RESOLVED',
+                    resolved_at = datetime('now'),
+                    consecutive_failures = 0,
+                    verification_attempts = verification_attempts + 1,
+                    remediation_notes = COALESCE(?, remediation_notes)
+                WHERE finding_hash = ?;
+            """
+            cursor.execute(sql, (notes, finding_hash))
+        conn.commit()
+        logger.info(f"Remediation finding {finding_hash} successfully marked RESOLVED.")
+        return True
+    except Exception as e:
+        logger.error(f"Error marking finding {finding_hash} RESOLVED: {e}")
+        try:
+            conn.rollback()
+        except Exception as rb_err:
+            logger.debug(f"Rollback notice for {finding_hash}: {rb_err}")
+        return False
+    finally:
+        try:
+            cursor.close()
+        except Exception as c_err:
+            logger.debug(f"Cursor close notice: {c_err}")
+        try:
+            conn.close()
+        except Exception as conn_err:
+            logger.debug(f"Conn close notice: {conn_err}")
+
+
+def get_all_remediation_findings(limit: int = 100, status_filter: Optional[str] = None) -> List[Dict[str, Any]]:
+    """Retrieves remediation ledger entries with optional status filtering."""
+    conn = get_db_connection()
+    cursor = conn.cursor()
+    use_pg = is_postgres_connection(conn)
+    try:
+        if status_filter:
+            sql = "SELECT * FROM audit_remediation_ledger WHERE status = ? ORDER BY first_detected_at DESC LIMIT ?;" if not use_pg else "SELECT * FROM audit_remediation_ledger WHERE status = %s ORDER BY first_detected_at DESC LIMIT %s;"
+            cursor.execute(sql, (status_filter, limit))
+        else:
+            sql = "SELECT * FROM audit_remediation_ledger ORDER BY first_detected_at DESC LIMIT ?;" if not use_pg else "SELECT * FROM audit_remediation_ledger ORDER BY first_detected_at DESC LIMIT %s;"
+            cursor.execute(sql, (limit,))
+        rows = cursor.fetchall()
+        return [_clean_remediation_row(cursor, r) for r in rows]
+    except Exception as e:
+        logger.error(f"Error querying remediation findings: {e}")
+        return []
+    finally:
+        try:
+            cursor.close()
+        except Exception as c_err:
+            logger.debug(f"Cursor close notice: {c_err}")
+        try:
+            conn.close()
+        except Exception as conn_err:
+            logger.debug(f"Conn close notice: {conn_err}")
+
+
+def get_remediation_summary_stats() -> Dict[str, Any]:
+    """Computes high-level triage statistics across the remediation ledger."""
+    open_findings = get_open_remediation_findings()
+    all_findings = get_all_remediation_findings(limit=500)
+
+    total_open = len(open_findings)
+    critical_open = sum(1 for f in open_findings if f.get("severity") == "CRITICAL")
+    high_open = sum(1 for f in open_findings if f.get("severity") == "HIGH")
+    medium_open = sum(1 for f in open_findings if f.get("severity") == "MEDIUM")
+    low_open = sum(1 for f in open_findings if f.get("severity") == "LOW")
+
+    aging_over_3d = sum(1 for f in open_findings if f.get("age_in_days", 0.0) >= 3.0)
+    aging_over_7d = sum(1 for f in open_findings if f.get("age_in_days", 0.0) >= 7.0)
+
+    resolved_total = sum(1 for f in all_findings if f.get("status") == "RESOLVED")
+    total_penalty = sum(f.get("effective_penalty", 0.0) for f in open_findings)
+
+    return {
+        "total_open": total_open,
+        "critical_open": critical_open,
+        "high_open": high_open,
+        "medium_open": medium_open,
+        "low_open": low_open,
+        "aging_over_3d": aging_over_3d,
+        "aging_over_7d": aging_over_7d,
+        "resolved_total": resolved_total,
+        "total_penalty": round(total_penalty, 1),
+    }

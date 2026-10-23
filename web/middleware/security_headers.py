@@ -23,6 +23,7 @@ class SecurityHeadersMiddleware(BaseHTTPMiddleware):
         response.headers["Strict-Transport-Security"] = "max-age=15552000; includeSubDomains; preload"
         response.headers["Referrer-Policy"] = "strict-origin-when-cross-origin"
         response.headers["X-Content-Type-Options"] = "nosniff"
+        response.headers["X-Frame-Options"] = "SAMEORIGIN"
         response.headers["Cross-Origin-Opener-Policy"] = "same-origin-allow-popups"
         response.headers["Permissions-Policy"] = (
             'geolocation=(), microphone=(), camera=(), fullscreen=(self), '

@@ -150,6 +150,17 @@ from core.db.digest import (
     get_digest_dispatch_history,
 )
 
+from core.db.remediation import (
+    compute_finding_hash,
+    record_or_update_finding,
+    record_findings_batch,
+    get_open_remediation_findings,
+    mark_finding_re_evaluating,
+    mark_finding_resolved,
+    get_all_remediation_findings,
+    get_remediation_summary_stats,
+)
+
 __all__ = [
     # connection
     "IST",
@@ -257,4 +268,13 @@ __all__ = [
     "job_lease",
     "prune_zombie_leases",
     "clear_zombie_leases",
+    # stateful remediation ledger
+    "compute_finding_hash",
+    "record_or_update_finding",
+    "record_findings_batch",
+    "get_open_remediation_findings",
+    "mark_finding_re_evaluating",
+    "mark_finding_resolved",
+    "get_all_remediation_findings",
+    "get_remediation_summary_stats",
 ]

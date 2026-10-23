@@ -66,6 +66,14 @@ from core.db import (
     get_support_tickets,
     update_ticket_status,
     get_open_tickets_count,
+    compute_finding_hash,
+    record_or_update_finding,
+    record_findings_batch,
+    get_open_remediation_findings,
+    mark_finding_re_evaluating,
+    mark_finding_resolved,
+    get_all_remediation_findings,
+    get_remediation_summary_stats,
     __all__ as _core_db_all,
 )
 

@@ -247,34 +247,46 @@ CREATE TABLE IF NOT EXISTS project_audit_logs (
 
 ### 4.2 Deliverable Artifacts
 1. **Timestamped Markdown Dossier:** Saved to `audits/project_audit_YYYYMMDD_HHMMSS.md`.
-2. **Backlog Synchronization:** Updates the Executive Scorecard and Section 7.2 of `audit_findings.md`.
-3. **Web Admin Dashboard:** Accessible at `/admin/audit` with visual health meters, category breakdowns, and 1-click on-demand re-audit triggers.
+2. **Dedicated Action Plan Deliverable:** Saved and continuously updated at `audits/REMEDIATION_ACTION_PLAN.md` with prioritized technical debt and terminal command remediation playbooks.
+3. **Stateful Remediation Database Ledger:** Persisted in PostgreSQL/SQLite table `audit_remediation_ledger` (migration `v037`).
+4. **Backlog Synchronization:** Updates the Executive Scorecard and Section 7.2 of `audit_findings.md`.
+5. **Web Admin Dashboard:** Accessible at `/admin/audit` with visual health meters, category breakdowns, and 1-click on-demand re-audit triggers.
 
 ---
 
 ## 5. Phased Rollout Plan
 
-- **Phase 1: Deterministic Engine & Tools Setup**
+- **Phase 1: Deterministic Engine & Tools Setup** *(Completed)*
   - Implement deterministic tool functions (`tests`, `endpoints`, `prohibited_terms`, `design_tokens`) in `core/audit/tools.py`.
   - Add database table `project_audit_logs` via migration `v022_project_audit_logs`.
-- **Phase 2: Antigravity Multi-Agent Orchestrator**
+- **Phase 2: Antigravity Multi-Agent Orchestrator** *(Completed)*
   - Construct `core/audit/project_auditor.py` with `ChiefProjectAuditor` and 3 subagents (`strategy_auditor`, `code_auditor`, `uiux_auditor`).
   - Implement deterministic fallback for offline or headless environments.
-- **Phase 3: CLI Runner & Background Scheduler**
-  - Build `scripts/run_project_audit.py` with `--quick`, `--full`, `--pillar` flags.
+- **Phase 3: CLI Runner & Background Scheduler** *(Completed)*
+  - Build `scripts/run_project_audit.py` with `--quick`, `--full`, `--pillar`, `--plan` flags.
   - Wire nightly execution into FastAPI lifespan scheduler in `web/main.py`.
-- **Phase 4: Admin Web UI & Public Health API**
+- **Phase 4: Admin Web UI & Public Health API** *(Completed)*
   - Add `GET /admin/audit` and `POST /api/admin/run-project-audit` in `web/main.py`.
   - Render institutional audit scorecard with category breakdowns and trend graphs.
-- **Phase 5: Verification & Calibration**
+- **Phase 5: Verification & Calibration** *(Completed)*
   - Run full test suite; calibrate scoring weights to ensure zero false positives.
+- **Phase 6: Stateful Remediation Ledger & Closed-Loop Auditing Cycle** *(Completed & Active in Production)*
+  - Implement migration `v037_audit_remediation_ledger` creating persistent `audit_remediation_ledger` table.
+  - Authored `core/db/remediation.py` repository with state transitions (`OPEN` -> `RE_EVALUATING` -> `RESOLVED`), aging tracking, and attempt counters.
+  - Authored `core/audit/invariants.py` multi-domain invariant scanners (`INV_UNBOUNDED_CACHE`, `INV_SILENT_EXCEPTION_SWALLOW`, `INV_SQL_DIALECT_COMPAT`, `INV_DB_SCHEMA_BOUNDS`, `INV_DOM_INTEGRITY`, `INV_UI_NO_DEAD_HOVER`, `INV_SEC_HEADERS`, `INV_SEC_AUTH_SCOPE`, `INV_SEC_NO_STACKTRACE`, `INV_SEBI_SAFE_HARBOR`).
+  - Engineered 3-step closed-loop auditing loop in `core/audit/project_auditor.py`:
+    1. *Verify First:* Targeted re-verification of all `OPEN` findings. Passing items transition to `RESOLVED` and score is restored; failing items increment age and failure counters.
+    2. *Explore Next:* Broad multi-domain invariant scans upserting newly surfaced issues.
+    3. *Publish Score & Report:* Computes composite score with progressive aging penalties (1.0x, 1.5x, 2.0x) and publishes prioritized `audits/REMEDIATION_ACTION_PLAN.md`.
+  - Authored `core/audit/remediation_plan.py` generating comprehensive action plan with triage scorecards, debt alerts, prioritized queue with copy-paste bash fixes, and closed-loop verification logs.
 
 ---
 
 ## 6. Evaluation Checklist Prior to Going Live
 
-Before taking this autonomous auditing agent live in production:
-- [ ] User review and approval of the architectural plan and scoring criteria.
-- [ ] Verification of token budget and rate-limit guardrails (`BudgetConfig` with `max_total_tokens=150_000` per audit run).
-- [ ] Test isolation verification ensuring audit runs do not modify user-facing production records.
-- [ ] Administrative access gate verification ensuring audit triggers require verified admin authentication.
+- [x] User review and approval of the architectural plan and scoring criteria.
+- [x] Verification of token budget and rate-limit guardrails (`BudgetConfig` with `max_total_tokens=150_000` per audit run).
+- [x] Test isolation verification ensuring audit runs do not modify user-facing production records.
+- [x] Administrative access gate verification ensuring audit triggers require verified admin authentication.
+- [x] Stateful remediation ledger migration `v037` and closed-loop execution cycle verified active.
+

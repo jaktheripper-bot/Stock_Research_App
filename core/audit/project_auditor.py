@@ -25,7 +25,7 @@ import asyncio
 import logging
 from datetime import datetime, timezone
 from pathlib import Path
-from typing import Dict, Any, List, Optional
+from typing import Dict, Any, List, Optional, Tuple
 from dataclasses import dataclass, asdict
 
 # Google Antigravity SDK imports with graceful fallback
@@ -102,6 +102,16 @@ from core.audit.tools import (
 )
 from core.db.audit_logs import save_project_audit_log
 from core.config import get_secret
+from core.audit.remediation_plan import write_remediation_action_plan, ACTION_PLAN_PATH
+from core.audit.invariants import verify_invariant, scan_all_invariants
+from core.db.remediation import (
+    get_open_remediation_findings,
+    mark_finding_re_evaluating,
+    mark_finding_resolved,
+    record_or_update_finding,
+    record_findings_batch,
+    get_remediation_summary_stats,
+)
 
 logger = logging.getLogger("equity_research.core.audit.project_auditor")
 PROJECT_ROOT = Path(__file__).resolve().parent.parent.parent
@@ -133,8 +143,51 @@ class ProjectAuditResult:
         return asdict(self)
 
 
+def execute_closed_loop_remediation_cycle() -> Tuple[List[Dict[str, Any]], Dict[str, Any], List[Dict[str, Any]]]:
+    """
+    Closed-Loop Remediation Cycle:
+    Step 1 (Verify First): Re-test all currently OPEN action points against their specific invariants.
+      - Pass: Mark RESOLVED, update score positively, archive from active list.
+      - Fail: Increment aging counter and failed verification passes.
+    Step 2 (Explore Next): Move to broad invariant scans across Backend Stability, UI/UX Contracts, Database Parity, and Security/Vulnerabilities.
+    Step 3 (Publish Score & Report): Record composite health score and generate prioritized action plan.
+    """
+    # Step 1: Verify First
+    open_before = get_open_remediation_findings()
+    resolved_in_cycle = []
+
+    for finding in open_before:
+        h = finding.get("finding_hash")
+        mark_finding_re_evaluating(h)
+        is_resolved, notes = verify_invariant(finding)
+        if is_resolved:
+            mark_finding_resolved(h, notes=notes)
+            resolved_in_cycle.append({**finding, "status": "RESOLVED", "notes": notes})
+            logger.info("Closed-Loop Step 1: Finding %s (%s) verified RESOLVED.", h, finding.get("invariant_name"))
+        else:
+            record_or_update_finding(finding)
+            logger.info("Closed-Loop Step 1: Finding %s (%s) still OPEN.", h, finding.get("invariant_name"))
+
+    # Step 2: Explore Next (Batch atomic transaction)
+    new_findings = scan_all_invariants()
+    record_findings_batch(new_findings)
+
+    # Step 3: Retrieve post-cycle state
+    active_open = get_open_remediation_findings()
+    stats = get_remediation_summary_stats()
+
+    return active_open, stats, resolved_in_cycle
+
+
 def compute_deterministic_audit_metrics() -> Dict[str, Any]:
     """Runs all deterministic audit tools and computes base scores for the 3 pillars."""
+    # 0. Initialize DB and Execute Closed-Loop Remediation Cycle (Step 1 & Step 2)
+    from core.db.connection import init_db
+    init_db()
+
+    logger.info("Executing Closed-Loop Remediation Cycle (Step 1: Verify First -> Step 2: Explore Next)...")
+    active_open, remediation_stats, resolved_in_cycle = execute_closed_loop_remediation_cycle()
+
     logger.info("Running deterministic test suite tool...")
     test_res = tool_run_test_suite()
 
@@ -200,6 +253,19 @@ def compute_deterministic_audit_metrics() -> Dict[str, Any]:
         hygiene_deduction = min(round(anti_patterns * 0.4, 1), 15.0)
         impl_score -= hygiene_deduction
 
+    # Deduct progressive aging penalties from remediation ledger
+    total_penalty = remediation_stats.get("total_penalty", 0.0)
+    if total_penalty > 0:
+        aging_deduction = min(round(total_penalty * 0.4, 1), 20.0)
+        impl_score = max(round(impl_score - aging_deduction, 1), 0.0)
+
+    # Any critical remediation finding is elevated to critical_violations
+    for item in active_open:
+        if item.get("severity") == "CRITICAL":
+            crit_msg = f"[{item.get('invariant_name')}] {item.get('title')} ({item.get('target_file_or_route')})"
+            if crit_msg not in critical_violations:
+                critical_violations.append(crit_msg)
+
     impl_score = max(round(impl_score, 1), 0.0)
 
     # --- 3. Pillar: UI/UX Score (0-100) ---
@@ -242,7 +308,11 @@ def compute_deterministic_audit_metrics() -> Dict[str, Any]:
         1
     )
 
-    if overall_score >= 90.0 and len(critical_violations) == 0:
+    # Aging technical debt gate: If items >= 7 days exist, cap status at ACTION_REQUIRED
+    has_severe_aging = any(f.get("age_in_days", 0.0) >= 7.0 for f in active_open)
+    if has_severe_aging and overall_score >= 80.0:
+        status = "ACTION_REQUIRED"
+    elif overall_score >= 90.0 and len(critical_violations) == 0:
         status = "EXEMPLARY"
     elif overall_score >= 80.0 and len(critical_violations) == 0:
         status = "COMPLIANT"
@@ -278,6 +348,14 @@ def compute_deterministic_audit_metrics() -> Dict[str, Any]:
     contract_health = contracts_res.get("contract_health_score", 100.0)
     if contract_health < 90.0:
         recommendations.append(f"Remediate frontend-backend contract degradation (Contract Health Score: {contract_health}/100).")
+
+    # Add active remediation queue items to recommendations
+    for item in active_open:
+        if item.get("severity") in ("CRITICAL", "HIGH"):
+            rec_msg = f"Remediate {item.get('invariant_name')}: {item.get('title')} ({item.get('target_file_or_route')})"
+            if rec_msg not in recommendations:
+                recommendations.append(rec_msg)
+
     if len(recommendations) == 0:
         recommendations.append("System meets all audit benchmarks. Maintain continuous daily audit cadence.")
 
@@ -298,6 +376,9 @@ def compute_deterministic_audit_metrics() -> Dict[str, Any]:
         "hygiene_results": hygiene_res,
         "design_results": design_res,
         "contracts_results": contracts_res,
+        "remediation_stats": remediation_stats,
+        "open_remediation_findings": active_open,
+        "resolved_in_cycle": resolved_in_cycle,
     }
 
 
@@ -314,6 +395,8 @@ def synthesize_deterministic_markdown_report(audit_id: str, metrics: Dict[str, A
         metrics["hygiene_results"].get("anti_patterns_count", 0)
         + metrics["hygiene_results"].get("unlogged_exceptions_count", 0)
     )
+    remediation_stats = metrics.get("remediation_stats", {})
+    open_findings = metrics.get("open_remediation_findings", [])
     smartapi_status = (
         "Angel One SmartAPI primary broker feed credentials configured with BSE/cache fallback."
         if bool(get_secret("ANGEL_API_KEY"))
@@ -377,7 +460,16 @@ def synthesize_deterministic_markdown_report(audit_id: str, metrics: Dict[str, A
 
 ---
 
-## 6. Critical Violations & Remediation Items
+## 6. Stateful Remediation Ledger & Action Plan
+- **Active Remediation Items:** `{remediation_stats.get('total_open', len(open_findings))}` open defect(s) actively tracked.
+- **Critical Unresolved:** `{remediation_stats.get('critical_open', 0)}` critical finding(s).
+- **Aging Technical Debt (>=3 Days):** `{remediation_stats.get('aging_over_3d', 0)}` item(s) compounding penalties at 1.5x/2.0x.
+- **Resolved Total:** `{remediation_stats.get('resolved_total', 0)}` verified fixes archived.
+- **Dedicated Deliverable:** Prioritized action plan and reproduction steps saved to [`audits/REMEDIATION_ACTION_PLAN.md`](file:///Users/lyndonpinto/Documents/Stock_Research_App/audits/REMEDIATION_ACTION_PLAN.md).
+
+---
+
+## 7. Critical Violations & Remediation Items
 
 ### Critical Violations ({crit_count})
 """
@@ -434,7 +526,7 @@ Format as clean markdown with sections:
         )
         ai_commentary = response.text or ""
         if ai_commentary.strip():
-            return f"{base_markdown}\n\n---\n\n## 6. Institutional AI Audit Assessment\n\n{ai_commentary.strip()}"
+            return f"{base_markdown}\n\n---\n\n## 8. Institutional AI Audit Assessment\n\n{ai_commentary.strip()}"
     except Exception as e:
         logger.warning(f"AI synthesis encountered exception; falling back to deterministic report: {e}")
 
@@ -458,13 +550,26 @@ async def audit_project_full(use_ai: bool = True) -> ProjectAuditResult:
     else:
         full_report = base_report
 
-    # 4. Save to audits/ file (Non-blocking)
+    # 4. Save to audits/ file & write audits/REMEDIATION_ACTION_PLAN.md (Non-blocking)
     file_path = AUDITS_DIR / f"project_audit_{datetime.now(timezone.utc).strftime('%Y%m%d_%H%M%S')}.md"
     try:
         await asyncio.to_thread(file_path.write_text, full_report, encoding="utf-8")
         logger.info(f"Saved audit dossier to: {file_path}")
     except Exception as e:
         logger.error(f"Error saving audit file: {e}")
+
+    try:
+        await asyncio.to_thread(
+            write_remediation_action_plan,
+            audit_id,
+            metrics["overall_score"],
+            metrics.get("open_remediation_findings", []),
+            metrics.get("remediation_stats", {}),
+            metrics.get("resolved_in_cycle", [])
+        )
+        logger.info("Saved dedicated action plan to audits/REMEDIATION_ACTION_PLAN.md")
+    except Exception as e:
+        logger.error(f"Error saving REMEDIATION_ACTION_PLAN.md: {e}")
 
     # 5. Build Result Object
     result = ProjectAuditResult(
@@ -486,7 +591,10 @@ async def audit_project_full(use_ai: bool = True) -> ProjectAuditResult:
             "implementation": metrics["hygiene_results"],
             "uiux": metrics["design_results"],
             "contracts": metrics.get("contracts_results", {}),
-            "endpoint_results": metrics.get("endpoint_results", {})
+            "endpoint_results": metrics.get("endpoint_results", {}),
+            "remediation_stats": metrics.get("remediation_stats", {}),
+            "open_remediation_findings": metrics.get("open_remediation_findings", []),
+            "resolved_in_cycle": metrics.get("resolved_in_cycle", [])
         },
         full_markdown_report=full_report,
         audit_engine="autonomous-auditor-engine" if ANTIGRAVITY_AVAILABLE else "deterministic-fallback",

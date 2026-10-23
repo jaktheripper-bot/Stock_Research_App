@@ -327,7 +327,7 @@ get_connection = get_db_connection
 
 
 def init_db(force: bool = False):
-    """Initializes tables and executes incremental schema migrations (v001 - v036)."""
+    """Initializes tables and executes incremental schema migrations (v001 - v037)."""
     global _DB_INITIALIZED, _INITIALIZED_DBS
 
     raw_url = get_configured_supabase_url()
@@ -2214,6 +2214,59 @@ def init_db(force: bool = False):
                 else:
                     cursor.execute("INSERT INTO schema_migrations (version) VALUES ('v031_widen_sovereign_macro_columns') ON CONFLICT DO NOTHING;")
                     cursor.execute("INSERT INTO schema_migrations (version) VALUES ('v036_widen_sovereign_macro_columns') ON CONFLICT DO NOTHING;")
+                conn.commit()
+
+            # Migration v037: Stateful Audit Remediation Ledger
+            if "v037_audit_remediation_ledger" not in applied:
+                logger.info("Applying schema migration: v037_audit_remediation_ledger...")
+                if supabase_url:
+                    cursor.execute("""
+                        CREATE TABLE IF NOT EXISTS audit_remediation_ledger (
+                            id SERIAL PRIMARY KEY,
+                            finding_hash VARCHAR(64) UNIQUE NOT NULL,
+                            category VARCHAR(64) NOT NULL,
+                            invariant_name VARCHAR(128) NOT NULL,
+                            title VARCHAR(255) NOT NULL,
+                            description TEXT NOT NULL,
+                            target_file_or_route VARCHAR(255) NOT NULL,
+                            severity VARCHAR(16) NOT NULL,
+                            status VARCHAR(32) NOT NULL DEFAULT 'OPEN',
+                            verification_attempts INTEGER NOT NULL DEFAULT 1,
+                            consecutive_failures INTEGER NOT NULL DEFAULT 1,
+                            first_detected_at TIMESTAMPTZ DEFAULT now(),
+                            last_verified_at TIMESTAMPTZ DEFAULT now(),
+                            resolved_at TIMESTAMPTZ NULL,
+                            remediation_notes TEXT,
+                            finding_metadata_json TEXT
+                        );
+                        CREATE INDEX IF NOT EXISTS idx_remediation_status ON audit_remediation_ledger(status);
+                        CREATE INDEX IF NOT EXISTS idx_remediation_hash ON audit_remediation_ledger(finding_hash);
+                        INSERT INTO schema_migrations (version) VALUES ('v037_audit_remediation_ledger') ON CONFLICT DO NOTHING;
+                    """)
+                else:
+                    cursor.execute("""
+                        CREATE TABLE IF NOT EXISTS audit_remediation_ledger (
+                            id INTEGER PRIMARY KEY AUTOINCREMENT,
+                            finding_hash TEXT UNIQUE NOT NULL,
+                            category TEXT NOT NULL,
+                            invariant_name TEXT NOT NULL,
+                            title TEXT NOT NULL,
+                            description TEXT NOT NULL,
+                            target_file_or_route TEXT NOT NULL,
+                            severity TEXT NOT NULL,
+                            status TEXT NOT NULL DEFAULT 'OPEN',
+                            verification_attempts INTEGER NOT NULL DEFAULT 1,
+                            consecutive_failures INTEGER NOT NULL DEFAULT 1,
+                            first_detected_at TEXT DEFAULT (datetime('now')),
+                            last_verified_at TEXT DEFAULT (datetime('now')),
+                            resolved_at TEXT NULL,
+                            remediation_notes TEXT,
+                            finding_metadata_json TEXT
+                        );
+                    """)
+                    cursor.execute("CREATE INDEX IF NOT EXISTS idx_remediation_status ON audit_remediation_ledger(status);")
+                    cursor.execute("CREATE INDEX IF NOT EXISTS idx_remediation_hash ON audit_remediation_ledger(finding_hash);")
+                    cursor.execute("INSERT INTO schema_migrations (version) VALUES ('v037_audit_remediation_ledger') ON CONFLICT DO NOTHING;")
                 conn.commit()
 
             _DB_INITIALIZED = True

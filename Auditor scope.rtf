@@ -1,0 +1,230 @@
+{\rtf1\ansi\ansicpg1252\cocoartf2907
+\cocoatextscaling0\cocoaplatform0{\fonttbl\f0\froman\fcharset0 Times-Bold;\f1\froman\fcharset0 Times-Roman;\f2\fmodern\fcharset0 Courier;
+\f3\fmodern\fcharset0 Courier-Bold;\f4\fnil\fcharset0 STIXTwoMath-Regular;\f5\froman\fcharset0 TimesNewRomanPS-BoldMT;
+}
+{\colortbl;\red255\green255\blue255;\red0\green0\blue0;}
+{\*\expandedcolortbl;;\cssrgb\c0\c0\c0;}
+\paperw11900\paperh16840\margl1440\margr1440\vieww28600\viewh16040\viewkind0
+\deftab720
+
+\itap1\trowd \taflags0 \trgaph108\trleft-108 \trbrdrt\brdrnil \trbrdrl\brdrnil \trbrdrr\brdrnil 
+\clvertalc \clshdrawnil \clwWidth2032\clftsWidth3 \clmart10 \clmarl10 \clmarb10 \clmarr10 \clbrdrt\brdrnil \clbrdrl\brdrnil \clbrdrb\brdrnil \clbrdrr\brdrnil \clpadt20 \clpadl20 \clpadb20 \clpadr20 \gaph\cellx2880
+\clvertalc \clshdrawnil \clwWidth7985\clftsWidth3 \clmart10 \clmarl10 \clmarb10 \clmarr10 \clbrdrt\brdrnil \clbrdrl\brdrnil \clbrdrb\brdrnil \clbrdrr\brdrnil \clpadt20 \clpadl20 \clpadb20 \clpadr20 \gaph\cellx5760
+\clvertalc \clshdrawnil \clwWidth5382\clftsWidth3 \clmart10 \clmarl10 \clmarb10 \clmarr10 \clbrdrt\brdrnil \clbrdrl\brdrnil \clbrdrb\brdrnil \clbrdrr\brdrnil \clpadt20 \clpadl20 \clpadb20 \clpadr20 \gaph\cellx8640
+\pard\intbl\itap1\pardeftab720\partightenfactor0
+
+\f0\b\fs24 \cf0 \expnd0\expndtw0\kerning0
+\outl0\strokewidth0 \strokec2 Discussion Topic\cell 
+\pard\intbl\itap1\pardeftab720\partightenfactor0
+\cf0 Problem / Risk Identified\cell 
+\pard\intbl\itap1\pardeftab720\partightenfactor0
+\cf0 Autonomous Auditor Implementation & Guardrails\cell \row
+
+\itap1\trowd \taflags0 \trgaph108\trleft-108 \trbrdrl\brdrnil \trbrdrr\brdrnil 
+\clvertalc \clshdrawnil \clwWidth2032\clftsWidth3 \clmart10 \clmarl10 \clmarb10 \clmarr10 \clbrdrt\brdrnil \clbrdrl\brdrnil \clbrdrb\brdrnil \clbrdrr\brdrnil \clpadt20 \clpadl20 \clpadb20 \clpadr20 \gaph\cellx2880
+\clvertalc \clshdrawnil \clwWidth7985\clftsWidth3 \clmart10 \clmarl10 \clmarb10 \clmarr10 \clbrdrt\brdrnil \clbrdrl\brdrnil \clbrdrb\brdrnil \clbrdrr\brdrnil \clpadt20 \clpadl20 \clpadb20 \clpadr20 \gaph\cellx5760
+\clvertalc \clshdrawnil \clwWidth5382\clftsWidth3 \clmart10 \clmarl10 \clmarb10 \clmarr10 \clbrdrt\brdrnil \clbrdrl\brdrnil \clbrdrb\brdrnil \clbrdrr\brdrnil \clpadt20 \clpadl20 \clpadb20 \clpadr20 \gaph\cellx8640
+\pard\intbl\itap1\pardeftab720\partightenfactor0
+\cf0 1. Memory Over-Usage & OOM Restarts
+\f1\b0  (from Logs 1, 2, 3)\cell 
+\pard\intbl\itap1\pardeftab720\partightenfactor0
+\cf0 Crawlers hitting 
+\f2\fs26 /funds/*
+\f1\fs24  triggering live Gemini LLM calls, 1.5MB AMFI splits, multi-year NAV downloads, and unbounded caches (
+\f2\fs26 _FUNDAMENTALS_CACHE
+\f1\fs24 , 
+\f2\fs26 FUND_AUDIT_TASKS
+\f1\fs24 , 
+\f2\fs26 _CONTACT_RATE_BUCKETS
+\f1\fs24 , DataFrames).\cell 
+\pard\intbl\itap1\pardeftab720\partightenfactor0
+\cf0 \'95 
+\f3\b\fs26 INV_ASYM_ROUTE_COST
+\f1\b0\fs24 : Flags unauthenticated GET endpoints triggering heavy synchronous computations, external syncs, or LLM clients.\
+\'95 
+\f3\b\fs26 INV_UNBOUNDED_CACHE
+\f1\b0\fs24 : AST scanner flagging module-level dicts/lists without maxsize/eviction.\
+\'95 
+\f3\b\fs26 INV_MEM_PROFILE_SPIKE
+\f1\b0\fs24 : Automatic memory profiling (
+\f2\fs26 tracemalloc
+\f1\fs24 ) across crawler-targeted routes.\cell \row
+
+\itap1\trowd \taflags0 \trgaph108\trleft-108 \trbrdrl\brdrnil \trbrdrr\brdrnil 
+\clvertalc \clshdrawnil \clwWidth2032\clftsWidth3 \clmart10 \clmarl10 \clmarb10 \clmarr10 \clbrdrt\brdrnil \clbrdrl\brdrnil \clbrdrb\brdrnil \clbrdrr\brdrnil \clpadt20 \clpadl20 \clpadb20 \clpadr20 \gaph\cellx2880
+\clvertalc \clshdrawnil \clwWidth7985\clftsWidth3 \clmart10 \clmarl10 \clmarb10 \clmarr10 \clbrdrt\brdrnil \clbrdrl\brdrnil \clbrdrb\brdrnil \clbrdrr\brdrnil \clpadt20 \clpadl20 \clpadb20 \clpadr20 \gaph\cellx5760
+\clvertalc \clshdrawnil \clwWidth5382\clftsWidth3 \clmart10 \clmarl10 \clmarb10 \clmarr10 \clbrdrt\brdrnil \clbrdrl\brdrnil \clbrdrb\brdrnil \clbrdrr\brdrnil \clpadt20 \clpadl20 \clpadb20 \clpadr20 \gaph\cellx8640
+\pard\intbl\itap1\pardeftab720\partightenfactor0
+
+\f0\b \cf0 2. Dual-Engine DB Parity
+\f1\b0  (from Logs 1, 2, 3)\cell 
+\pard\intbl\itap1\pardeftab720\partightenfactor0
+
+\f2\fs26 \cf0 sovereign_macro_rates.period_label
+\f1\fs24  
+\f2\fs26 VARCHAR(50)
+\f1\fs24  overflow and 
+\f2\fs26 user_accounts.is_digest_subscribed = 1
+\f1\fs24  causing PostgreSQL 
+\f2\fs26 boolean = integer
+\f1\fs24  crash.\cell 
+\pard\intbl\itap1\pardeftab720\partightenfactor0
+\cf0 \'95 
+\f3\b\fs26 INV_SQL_DIALECT_COMPAT
+\f1\b0\fs24 : Checks SQL queries for SQLite-specific type coercions (
+\f2\fs26 = 1
+\f1\fs24 , raw 
+\f2\fs26 %
+\f1\fs24  without parameters).\
+\'95 
+\f3\b\fs26 INV_DB_SCHEMA_BOUNDS
+\f1\b0\fs24 : Tests default data seeds against strict column character limits.\cell \row
+
+\itap1\trowd \taflags0 \trgaph108\trleft-108 \trbrdrl\brdrnil \trbrdrr\brdrnil 
+\clvertalc \clshdrawnil \clwWidth2032\clftsWidth3 \clmart10 \clmarl10 \clmarb10 \clmarr10 \clbrdrt\brdrnil \clbrdrl\brdrnil \clbrdrb\brdrnil \clbrdrr\brdrnil \clpadt20 \clpadl20 \clpadb20 \clpadr20 \gaph\cellx2880
+\clvertalc \clshdrawnil \clwWidth7985\clftsWidth3 \clmart10 \clmarl10 \clmarb10 \clmarr10 \clbrdrt\brdrnil \clbrdrl\brdrnil \clbrdrb\brdrnil \clbrdrr\brdrnil \clpadt20 \clpadl20 \clpadb20 \clpadr20 \gaph\cellx5760
+\clvertalc \clshdrawnil \clwWidth5382\clftsWidth3 \clmart10 \clmarl10 \clmarb10 \clmarr10 \clbrdrt\brdrnil \clbrdrl\brdrnil \clbrdrb\brdrnil \clbrdrr\brdrnil \clpadt20 \clpadl20 \clpadb20 \clpadr20 \gaph\cellx8640
+\pard\intbl\itap1\pardeftab720\partightenfactor0
+
+\f0\b \cf0 3. Proactive Incentive & Adversarial Rigor
+\f1\b0 \cell 
+\pard\intbl\itap1\pardeftab720\partightenfactor0
+\cf0 Risk of auditors becoming complacent or, conversely, spamming trivial false alarms under perverse incentives.\cell 
+\pard\intbl\itap1\pardeftab720\partightenfactor0
+\cf0 \'95 
+\f0\b Invariant-Driven Heuristics
+\f1\b0 : Replaces brittle hardcoded checks with general rules.\
+\'95 
+\f0\b Empirical Verification Requirement
+\f1\b0 : A finding is only logged if accompanied by an automated, reproducible test or proof.\
+\'95 
+\f0\b Severity Weighting
+\f1\b0 : Critical operational risks (OOM, DB crash) are separated from cosmetic items.\cell \row
+
+\itap1\trowd \taflags0 \trgaph108\trleft-108 \trbrdrl\brdrnil \trbrdrr\brdrnil 
+\clvertalc \clshdrawnil \clwWidth2032\clftsWidth3 \clmart10 \clmarl10 \clmarb10 \clmarr10 \clbrdrt\brdrnil \clbrdrl\brdrnil \clbrdrb\brdrnil \clbrdrr\brdrnil \clpadt20 \clpadl20 \clpadb20 \clpadr20 \gaph\cellx2880
+\clvertalc \clshdrawnil \clwWidth7985\clftsWidth3 \clmart10 \clmarl10 \clmarb10 \clmarr10 \clbrdrt\brdrnil \clbrdrl\brdrnil \clbrdrb\brdrnil \clbrdrr\brdrnil \clpadt20 \clpadl20 \clpadb20 \clpadr20 \gaph\cellx5760
+\clvertalc \clshdrawnil \clwWidth5382\clftsWidth3 \clmart10 \clmarl10 \clmarb10 \clmarr10 \clbrdrt\brdrnil \clbrdrl\brdrnil \clbrdrb\brdrnil \clbrdrr\brdrnil \clpadt20 \clpadl20 \clpadb20 \clpadr20 \gaph\cellx8640
+\pard\intbl\itap1\pardeftab720\partightenfactor0
+
+\f0\b \cf0 4. Autonomous Closed-Loop Cycle
+\f1\b0 \cell 
+\pard\intbl\itap1\pardeftab720\partightenfactor0
+\cf0 Auditor must give action points, verify if fixes were implemented, re-list if failed, and move to the next issue if resolved.\cell 
+\pard\intbl\itap1\pardeftab720\partightenfactor0
+\cf0 \'95 
+\f0\b Stateful Lifecycle (
+\f3\fs26 OPEN
+\f4\b0\fs24 \
+\uc0\u8594 \
+\pard\intbl\itap1\pardeftab720\partightenfactor0
+
+\f1 \cf0 \\rightarrow\
+\pard\intbl\itap1\pardeftab720\partightenfactor0
+
+\f5\b \cf0 \uc0\u8594 
+\f0  
+\f3\fs26 RE_EVALUATING
+\f4\b0\fs24 \
+\uc0\u8594 \
+\pard\intbl\itap1\pardeftab720\partightenfactor0
+
+\f1 \cf0 \\rightarrow\
+\pard\intbl\itap1\pardeftab720\partightenfactor0
+
+\f5\b \cf0 \uc0\u8594 
+\f0  
+\f3\fs26 RESOLVED
+\f0\fs24 )
+\f1\b0  backed by 
+\f2\fs26 audit_remediation_ledger
+\f1\fs24 .\
+\'95 
+\f0\b Verify-First Order
+\f1\b0 : Always tests existing 
+\f2\fs26 OPEN
+\f1\fs24  items first before scanning for new ones.\
+\'95 
+\f0\b Aging Counters
+\f1\b0 : Tracks days open and verification attempts.\cell \row
+
+\itap1\trowd \taflags0 \trgaph108\trleft-108 \trbrdrl\brdrnil \trbrdrr\brdrnil 
+\clvertalc \clshdrawnil \clwWidth2032\clftsWidth3 \clmart10 \clmarl10 \clmarb10 \clmarr10 \clbrdrt\brdrnil \clbrdrl\brdrnil \clbrdrb\brdrnil \clbrdrr\brdrnil \clpadt20 \clpadl20 \clpadb20 \clpadr20 \gaph\cellx2880
+\clvertalc \clshdrawnil \clwWidth7985\clftsWidth3 \clmart10 \clmarl10 \clmarb10 \clmarr10 \clbrdrt\brdrnil \clbrdrl\brdrnil \clbrdrb\brdrnil \clbrdrr\brdrnil \clpadt20 \clpadl20 \clpadb20 \clpadr20 \gaph\cellx5760
+\clvertalc \clshdrawnil \clwWidth5382\clftsWidth3 \clmart10 \clmarl10 \clmarb10 \clmarr10 \clbrdrt\brdrnil \clbrdrl\brdrnil \clbrdrb\brdrnil \clbrdrr\brdrnil \clpadt20 \clpadl20 \clpadb20 \clpadr20 \gaph\cellx8640
+\pard\intbl\itap1\pardeftab720\partightenfactor0
+
+\f0\b \cf0 5. Non-Blocking Scoring & Reporting
+\f1\b0 \cell 
+\pard\intbl\itap1\pardeftab720\partightenfactor0
+\cf0 How to handle failed items without breaking scheduled pipelines.\cell 
+\pard\intbl\itap1\pardeftab720\partightenfactor0
+\cf0 \'95 
+\f0\b Composite Health Scoring
+\f1\b0  (e.g., 84/100 Grade B).\
+\'95 
+\f0\b Dedicated Report
+\f1\b0 : Persists clear action points to 
+\f2\fs26 audits/REMEDIATION_ACTION_PLAN.md
+\f1\fs24  with a dedicated "Aging Un-Remediated Items" alert section.\cell \row
+
+\itap1\trowd \taflags0 \trgaph108\trleft-108 \trbrdrl\brdrnil \trbrdrr\brdrnil 
+\clvertalc \clshdrawnil \clwWidth2032\clftsWidth3 \clmart10 \clmarl10 \clmarb10 \clmarr10 \clbrdrt\brdrnil \clbrdrl\brdrnil \clbrdrb\brdrnil \clbrdrr\brdrnil \clpadt20 \clpadl20 \clpadb20 \clpadr20 \gaph\cellx2880
+\clvertalc \clshdrawnil \clwWidth7985\clftsWidth3 \clmart10 \clmarl10 \clmarb10 \clmarr10 \clbrdrt\brdrnil \clbrdrl\brdrnil \clbrdrb\brdrnil \clbrdrr\brdrnil \clpadt20 \clpadl20 \clpadb20 \clpadr20 \gaph\cellx5760
+\clvertalc \clshdrawnil \clwWidth5382\clftsWidth3 \clmart10 \clmarl10 \clmarb10 \clmarr10 \clbrdrt\brdrnil \clbrdrl\brdrnil \clbrdrb\brdrnil \clbrdrr\brdrnil \clpadt20 \clpadl20 \clpadb20 \clpadr20 \gaph\cellx8640
+\pard\intbl\itap1\pardeftab720\partightenfactor0
+
+\f0\b \cf0 6. Front-End / UI / UX Rigor
+\f1\b0 \cell 
+\pard\intbl\itap1\pardeftab720\partightenfactor0
+\cf0 Ensuring user-visible issues are caught (mobile layout, dark mode, trapped modals, broken interactions).\cell 
+\pard\intbl\itap1\pardeftab720\partightenfactor0
+\cf0 \'95 
+\f3\b\fs26 INV_UI_NO_OVERFLOW
+\f1\b0\fs24 : Mobile/desktop viewport checks (
+\f2\fs26 scrollWidth <= innerWidth
+\f1\fs24 ).\
+\'95 
+\f3\b\fs26 INV_UI_CONTRAST
+\f1\b0\fs24 : Automated WCAG 4.5:1/3.0:1 contrast validation across Light, Dark, and Ivory themes.\
+\'95 
+\f3\b\fs26 INV_UI_MODAL_DISMISS
+\f1\b0\fs24 : Real pointer hit-testing for modal backdrop, 
+\f2\fs26 X
+\f1\fs24  button, and 
+\f2\fs26 Escape
+\f1\fs24  key.\
+\'95 
+\f3\b\fs26 INV_UI_NO_DEAD_HOVER
+\f1\b0\fs24 : Enforces clickable affordance for elevated cards.\cell \row
+
+\itap1\trowd \taflags0 \trgaph108\trleft-108 \trbrdrl\brdrnil \trbrdrt\brdrnil \trbrdrr\brdrnil 
+\clvertalc \clshdrawnil \clwWidth2032\clftsWidth3 \clmart10 \clmarl10 \clmarb10 \clmarr10 \clbrdrt\brdrnil \clbrdrl\brdrnil \clbrdrb\brdrnil \clbrdrr\brdrnil \clpadt20 \clpadl20 \clpadb20 \clpadr20 \gaph\cellx2880
+\clvertalc \clshdrawnil \clwWidth7985\clftsWidth3 \clmart10 \clmarl10 \clmarb10 \clmarr10 \clbrdrt\brdrnil \clbrdrl\brdrnil \clbrdrb\brdrnil \clbrdrr\brdrnil \clpadt20 \clpadl20 \clpadb20 \clpadr20 \gaph\cellx5760
+\clvertalc \clshdrawnil \clwWidth5382\clftsWidth3 \clmart10 \clmarl10 \clmarb10 \clmarr10 \clbrdrt\brdrnil \clbrdrl\brdrnil \clbrdrb\brdrnil \clbrdrr\brdrnil \clpadt20 \clpadl20 \clpadb20 \clpadr20 \gaph\cellx8640
+\pard\intbl\itap1\pardeftab720\partightenfactor0
+
+\f0\b \cf0 7. Security & Site Vulnerabilities
+\f1\b0 \cell 
+\pard\intbl\itap1\pardeftab720\partightenfactor0
+\cf0 Protecting against DoS, IDOR, XSS, insecure headers, and data leaks.\cell 
+\pard\intbl\itap1\pardeftab720\partightenfactor0
+\cf0 \'95 
+\f3\b\fs26 INV_SEC_HEADERS
+\f1\b0\fs24 : Validates CSP, X-Frame-Options, X-Content-Type-Options.\
+\'95 
+\f3\b\fs26 INV_SEC_COOKIE_FLAGS
+\f1\b0\fs24 : Enforces 
+\f2\fs26 HttpOnly
+\f1\fs24 , 
+\f2\fs26 Secure
+\f1\fs24 , 
+\f2\fs26 SameSite
+\f1\fs24 .\
+\'95 
+\f3\b\fs26 INV_SEC_NO_STACKTRACE
+\f1\b0\fs24 : Verifies 4xx/5xx responses never leak tracebacks or file paths.\
+\'95 
+\f3\b\fs26 INV_SEC_AUTH_SCOPE
+\f1\b0\fs24 : Verifies authorization checks on private user resources.\cell \lastrow\row
+}
