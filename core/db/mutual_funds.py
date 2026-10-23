@@ -4920,6 +4920,19 @@ def save_fund_forensic_dossier(dossier: Dict[str, Any]) -> bool:
 
     code = dossier["scheme_code"].strip().upper()
     text = dossier.get("dossier_text", "")
+    if not text or not str(text).strip():
+        # Archival guard: preserve existing non-empty dossier_text if incoming text is empty
+        try:
+            if use_pg:
+                cursor.execute("SELECT dossier_text FROM fund_forensic_dossiers WHERE scheme_code = %s", (code,))
+            else:
+                cursor.execute("SELECT dossier_text FROM fund_forensic_dossiers WHERE scheme_code = ?", (code,))
+            row = cursor.fetchone()
+            if row and row[0] and str(row[0]).strip():
+                text = str(row[0])
+        except Exception as guard_err:
+            logger.debug(f"Archival guard lookup notice for {code}: {guard_err}")
+
     raw_comp = dossier.get("composite_health_score")
     comp_score = float(raw_comp) if raw_comp is not None else -1.0
     moat_score = float(dossier.get("weighted_moat_score", 0.0))
@@ -4941,7 +4954,11 @@ def save_fund_forensic_dossier(dossier: Dict[str, Any]) -> bool:
                     audited_by, last_audited_at
                 ) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, now())
                 ON CONFLICT (scheme_code) DO UPDATE SET
-                    dossier_text = EXCLUDED.dossier_text,
+                    dossier_text = CASE 
+                        WHEN EXCLUDED.dossier_text IS NOT NULL AND TRIM(EXCLUDED.dossier_text) != '' 
+                        THEN EXCLUDED.dossier_text 
+                        ELSE fund_forensic_dossiers.dossier_text 
+                    END,
                     composite_health_score = EXCLUDED.composite_health_score,
                     weighted_moat_score = EXCLUDED.weighted_moat_score,
                     accounting_risk_index = EXCLUDED.accounting_risk_index,
@@ -4962,7 +4979,11 @@ def save_fund_forensic_dossier(dossier: Dict[str, Any]) -> bool:
                     audited_by, last_audited_at
                 ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, datetime('now'))
                 ON CONFLICT (scheme_code) DO UPDATE SET
-                    dossier_text = excluded.dossier_text,
+                    dossier_text = CASE 
+                        WHEN excluded.dossier_text IS NOT NULL AND TRIM(excluded.dossier_text) != '' 
+                        THEN excluded.dossier_text 
+                        ELSE fund_forensic_dossiers.dossier_text 
+                    END,
                     composite_health_score = excluded.composite_health_score,
                     weighted_moat_score = excluded.weighted_moat_score,
                     accounting_risk_index = excluded.accounting_risk_index,

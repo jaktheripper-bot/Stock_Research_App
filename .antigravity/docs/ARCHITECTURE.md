@@ -103,6 +103,18 @@
   * **FastAPI Lifespan Integration:** Initialized on startup in `web/main.py`; synchronous flush on shutdown (`flush_betterstack_logs`) prevents in-flight log drops on container restarts.
   * **Automated Test Isolation:** `is_test_environment()` suppresses remote HTTP logtail dispatches during test and CI executions, protecting bandwidth and logging quotas.
 
+## 10. Autonomous Scheduled Daemon & Data Archival Invariants
+* **Mutual Fund Look-Through Narrative Archival Guard (`core/analysis/daily_stock_ingestion.py`, `core/db/mutual_funds.py`):**
+  * **Synthesis Fallback & Narrative Retention:** During daily 15-stock look-through recalculation (`recalculate_affected_mutual_funds`), `new_dossier` retains existing `old_text` or synthesizes updated narrative via `synthesize_fund_forensic_narrative(new_dossier, scheme)`.
+  * **Dual-Layer Database Archival Guard:** In `save_fund_forensic_dossier`, checks existing database text if incoming is empty and enforces SQL `ON CONFLICT (scheme_code) DO UPDATE SET dossier_text = CASE WHEN excluded.dossier_text IS NOT NULL AND TRIM(excluded.dossier_text) != '' THEN excluded.dossier_text ELSE fund_forensic_dossiers.dossier_text END`, preventing quantitative recalibrations from wiping qualitative research dossiers.
+* **Sovereign Yield Curve Term-Structure History (`core/db/sovereign.py`):**
+  * **Daily Snapshot Archival:** `save_sovereign_curve_snapshot(edition_date)` records all 16 statutory yield curve tenors into `sovereign_curve_history` with `UNIQUE(snapshot_key, tenor_label)`.
+  * **Automated Nightly Synchronization:** Integrated directly into `refresh_daily_sovereign_benchmarks` (returning `curve_snapshots_saved: 16`) and callable via `get_sovereign_curve_history(snapshot_key)`.
+* **Python 3.14 Autonomous Pipeline Daemon (`launchd/com.moatnomics.pipeline.plist`):**
+  * **Runtime Alignment:** ProgramArguments targets active Python 3.14 (`/Library/Frameworks/Python.framework/Versions/3.14/bin/python3`), eliminating PEP 604 type-union compatibility crashes on outdated macOS system Python 3.9.
+  * **Autonomous Cadence:** Registered in `launchctl` (`com.moatnomics.pipeline`) with explicit `PATH` and `PYTHONPATH` environment variables, executing 08:30 IST morning ingestion and 23:15 IST nightly multi-asset synchronization independent of interactive web server lifespan.
+
+
 
 
 

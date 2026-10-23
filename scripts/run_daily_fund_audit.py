@@ -56,8 +56,10 @@ def list_fund_audit_status():
         if dos:
             comp_h = dos.get("composite_health_score")
             health = f"{comp_h:.1f}" if comp_h is not None else "Paused"
-            asri = f"{dos.get('accounting_risk_index', 0):.1f}%"
-            mos = f"{dos.get('margin_of_safety_pct', 0):+.1f}%"
+            asri_val = dos.get("accounting_risk_index")
+            asri = f"{float(asri_val):.1f}%" if asri_val is not None else "0.0%"
+            mos_val = dos.get("margin_of_safety_pct")
+            mos = f"{float(mos_val):+.1f}%" if mos_val is not None else "+0.0%"
             last = str(dos.get("last_audited_at", ""))[:19]
         else:
             health = "N/A"
@@ -97,12 +99,14 @@ def run_worker(scheme_code: Optional[str] = None, audit_all: bool = False):
     res = audit_single_fund_daily(target)
     print("\n" + "="*80)
     print(f"AUDIT COMPLETED: {res['scheme_name']} ({res['scheme_code']})")
-    print(f"Composite Health Score: {res['composite_health_score']} / 100")
-    print(f"Weighted Moat Score:    {res['weighted_moat_score']} / 100")
-    print(f"Accounting Risk (ASRI): {res['accounting_risk_index']}% of portfolio")
-    print(f"Margin of Safety (DCF): {res['margin_of_safety_pct']:+.1f}%")
-    print(f"Promoter Pledge Risk:   {res['promoter_pledge_exposure_pct']}%")
-    print(f"Active Share vs Index:  {res['active_share_pct']}%")
+    health_disp = f"{res['composite_health_score']:.1f} / 100" if res.get('composite_health_score') is not None else "Paused (Genuine Coverage < 70%)"
+    print(f"Composite Health Score: {health_disp}")
+    print(f"Weighted Moat Score:    {float(res.get('weighted_moat_score') or 0.0):.1f} / 100")
+    print(f"Accounting Risk (ASRI): {float(res.get('accounting_risk_index') or 0.0):.1f}% of portfolio")
+    mos_disp = f"{float(res['margin_of_safety_pct']):+.1f}%" if res.get('margin_of_safety_pct') is not None else "+0.0%"
+    print(f"Margin of Safety (DCF): {mos_disp}")
+    print(f"Promoter Pledge Risk:   {float(res.get('promoter_pledge_exposure_pct') or 0.0):.1f}%")
+    print(f"Active Share vs Index:  {float(res.get('active_share_pct') or 0.0):.1f}%")
     print("="*80)
     print("\nSYNTHeSIZED FORENSIC DOSSIER PREVIEW:")
     print(res["dossier_text"][:600] + "\n...\n")

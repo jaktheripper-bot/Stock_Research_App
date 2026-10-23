@@ -465,11 +465,29 @@ def recalculate_affected_mutual_funds(ingested_tickers: List[str]) -> List[Dict[
             # Check old coverage if existing dossier exists
             old_dossier = get_fund_forensic_dossier(scheme_code)
             old_cov = 0.0
+            old_text = ""
             if old_dossier:
                 old_cov = float(old_dossier.get("genuine_coverage_pct") or old_dossier.get("equity_coverage_pct") or 0.0)
+                old_text = (old_dossier.get("dossier_text") or "").strip()
 
             # Re-compute look-through
             new_dossier = compute_fund_forensic_lookthrough(scheme_code)
+
+            # Synthesize updated narrative or retain existing non-empty qualitative narrative
+            scheme = get_mutual_fund_scheme(scheme_code) or {"scheme_code": scheme_code, "scheme_name": scheme_name}
+            has_sufficient = new_dossier.get("has_sufficient_coverage", False)
+            was_paused = "Coverage Notice" in old_text or "temporarily paused" in old_text
+
+            if old_text and not (was_paused and has_sufficient):
+                new_dossier["dossier_text"] = old_text
+            else:
+                try:
+                    from core.analysis.fund_overlap_auditor import synthesize_fund_forensic_narrative
+                    new_dossier["dossier_text"] = synthesize_fund_forensic_narrative(new_dossier, scheme)
+                except Exception as synth_err:
+                    logger.debug(f"Notice synthesizing narrative for scheme {scheme_code}: {synth_err}")
+                    new_dossier["dossier_text"] = old_text
+
             save_fund_forensic_dossier(new_dossier)
 
             new_cov = float(new_dossier.get("genuine_coverage_pct") or new_dossier.get("equity_coverage_pct") or 0.0)

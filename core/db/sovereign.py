@@ -8,7 +8,7 @@ import json
 import logging
 from typing import List, Dict, Any, Optional
 from datetime import datetime
-from core.db.connection import get_db_connection, get_supabase_url, get_placeholder, IST
+from core.db.connection import get_db_connection, get_supabase_url, get_placeholder, IST, is_postgres_connection
 
 logger = logging.getLogger("equity_research.core.db.sovereign")
 
@@ -504,6 +504,100 @@ def fetch_live_rbi_ccil_yield_curve(data_source: str = "CCIL_LIVE") -> Dict[str,
     }
 
 
+def save_sovereign_curve_snapshot(edition_date: Optional[str] = None) -> int:
+    """Records the daily yield curve points into sovereign_curve_history with UNIQUE(snapshot_key, tenor_label).
+    Returns the number of curve points saved.
+    """
+    if not edition_date:
+        edition_date = datetime.now(IST).strftime("%Y-%m-%d")
+
+    curve = get_sovereign_yield_curve()
+    if not curve:
+        return 0
+
+    conn = get_db_connection()
+    cursor = conn.cursor()
+    p = get_placeholder()
+    is_pg = bool(get_supabase_url()) or is_postgres_connection(conn)
+
+    saved = 0
+    try:
+        for pt in curve:
+            tenor = pt["tenor_label"]
+            maturity = float(pt["maturity_years"])
+            yield_pct = float(pt["cut_off_yield"])
+
+            if is_pg:
+                query = f"""
+                    INSERT INTO sovereign_curve_history (
+                        snapshot_key, tenor_label, maturity_years, yield_pct
+                    ) VALUES ({p}, {p}, {p}, {p})
+                    ON CONFLICT (snapshot_key, tenor_label) DO UPDATE SET
+                        maturity_years = EXCLUDED.maturity_years,
+                        yield_pct = EXCLUDED.yield_pct;
+                """
+            else:
+                query = f"""
+                    INSERT INTO sovereign_curve_history (
+                        snapshot_key, tenor_label, maturity_years, yield_pct
+                    ) VALUES ({p}, {p}, {p}, {p})
+                    ON CONFLICT (snapshot_key, tenor_label) DO UPDATE SET
+                        maturity_years = excluded.maturity_years,
+                        yield_pct = excluded.yield_pct;
+                """
+            cursor.execute(query, (edition_date, tenor, maturity, yield_pct))
+            saved += 1
+
+        conn.commit()
+        logger.info(f"Recorded sovereign curve history snapshot for {edition_date}: {saved} points.")
+    except Exception as e:
+        logger.error(f"Error saving sovereign curve snapshot for {edition_date}: {e}")
+        conn.rollback()
+    finally:
+        cursor.close()
+        conn.close()
+
+    return saved
+
+
+def get_sovereign_curve_history(snapshot_key: Optional[str] = None) -> List[Dict[str, Any]]:
+    """Retrieves sovereign yield curve term structure history from sovereign_curve_history."""
+    conn = get_db_connection()
+    cursor = conn.cursor()
+    p = get_placeholder()
+    try:
+        if snapshot_key:
+            cursor.execute(f"""
+                SELECT id, snapshot_key, tenor_label, maturity_years, yield_pct
+                FROM sovereign_curve_history
+                WHERE snapshot_key = {p}
+                ORDER BY maturity_years ASC;
+            """, (snapshot_key,))
+        else:
+            cursor.execute("""
+                SELECT id, snapshot_key, tenor_label, maturity_years, yield_pct
+                FROM sovereign_curve_history
+                ORDER BY snapshot_key DESC, maturity_years ASC;
+            """)
+        rows = cursor.fetchall()
+        return [
+            {
+                "id": r[0],
+                "snapshot_key": r[1],
+                "tenor_label": r[2],
+                "maturity_years": float(r[3]),
+                "yield_pct": float(r[4])
+            }
+            for r in rows
+        ]
+    except Exception as e:
+        logger.error(f"Error querying sovereign_curve_history: {e}")
+        return []
+    finally:
+        cursor.close()
+        conn.close()
+
+
 def refresh_daily_sovereign_benchmarks(edition_date: Optional[str] = None) -> Dict[str, Any]:
     """Synchronizes the Sovereign Yield Curve and SDL Disparity Matrix for the daily edition.
     Guarantees Source-Grounded: Does NOT overwrite historical auction_date unless verified
@@ -543,6 +637,9 @@ def refresh_daily_sovereign_benchmarks(edition_date: Optional[str] = None) -> Di
     # Ensure macro monetary corridor is primed
     get_macro_monetary_corridor()
 
+    # Record daily term-structure snapshot into sovereign_curve_history
+    curve_snapshots = save_sovereign_curve_snapshot(edition_date)
+
     summary = {
         "status": "SUCCESS",
         "edition_date": edition_date,
@@ -550,10 +647,11 @@ def refresh_daily_sovereign_benchmarks(edition_date: Optional[str] = None) -> Di
         "is_live": is_live,
         "benchmarks_updated": benchmarks_updated,
         "sdl_spreads_updated": sdl_updated,
+        "curve_snapshots_saved": curve_snapshots,
         "total_tenors": len(DEFAULT_SOVEREIGN_BENCHMARKS),
         "total_sdls": len(DEFAULT_SDL_MATRIX)
     }
-    logger.info(f"Sovereign benchmark refresh complete: {benchmarks_updated} tenors ({active_source}), {sdl_updated} SDLs for {edition_date}.")
+    logger.info(f"Sovereign benchmark refresh complete: {benchmarks_updated} tenors ({active_source}), {sdl_updated} SDLs, {curve_snapshots} curve snapshots for {edition_date}.")
     return summary
 def get_sovereign_curve_analytics() -> Dict[str, Any]:
     """Computes key sovereign curve macro metrics: slope, credit spread, and real yield."""

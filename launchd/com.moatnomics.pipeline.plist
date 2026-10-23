@@ -8,11 +8,18 @@
     <string>/Users/lyndonpinto/Documents/Stock_Research_App</string>
     <key>ProgramArguments</key>
     <array>
-        <string>/usr/bin/python3</string>
+        <string>/Library/Frameworks/Python.framework/Versions/3.14/bin/python3</string>
         <string>scripts/run_scheduled_pipeline.py</string>
         <string>--mode</string>
         <string>all</string>
     </array>
+    <key>EnvironmentVariables</key>
+    <dict>
+        <key>PATH</key>
+        <string>/Library/Frameworks/Python.framework/Versions/3.14/bin:/usr/local/bin:/usr/bin:/bin:/usr/sbin:/sbin</string>
+        <key>PYTHONPATH</key>
+        <string>/Users/lyndonpinto/Documents/Stock_Research_App</string>
+    </dict>
     <key>StartCalendarInterval</key>
     <array>
         <!-- Morning Ingestion & Discovery Pipeline at 08:30 AM IST -->
