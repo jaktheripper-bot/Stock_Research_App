@@ -612,6 +612,10 @@ Detailed forensic analysis with exact page grounding to bseindia.com filings.
         self.assertIn("Autonomous Project Auditor", res_audit.text)
         self.assertIn("Platform Home", res_audit.text)
         self.assertIn("Admin Console", res_audit.text)
+        self.assertIn("Monitored Route Coverage", res_audit.text)
+        self.assertIn("37 Endpoints", res_audit.text)
+        self.assertIn("/calculator/tax", res_audit.text)
+        self.assertNotIn("/tools/tax-calculator", res_audit.text)
 
     def test_admin_update_ticket_status(self):
         from core.db.support import create_support_ticket

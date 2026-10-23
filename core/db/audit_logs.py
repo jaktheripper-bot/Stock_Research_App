@@ -219,3 +219,52 @@ def get_project_audit_by_id(audit_id: str) -> Optional[Dict[str, Any]]:
     finally:
         cursor.close()
         conn.close()
+
+
+def prune_old_project_audit_logs(keep_last: int = 90, max_age_days: int = 45) -> Dict[str, int]:
+    """Prunes project_audit_logs retaining the keep_last newest runs and removes audit files older than max_age_days."""
+    conn = get_db_connection()
+    cursor = conn.cursor()
+    use_pg = is_postgres_connection(conn)
+    deleted_db_rows = 0
+    try:
+        placeholder = "%s" if use_pg else "?"
+        cursor.execute(f"SELECT id FROM project_audit_logs ORDER BY id DESC LIMIT 1 OFFSET {placeholder};", (keep_last,))
+        row = cursor.fetchone()
+        if row:
+            cutoff_id = row[0]
+            cursor.execute(f"DELETE FROM project_audit_logs WHERE id <= {placeholder};", (cutoff_id,))
+            deleted_db_rows = cursor.rowcount
+            conn.commit()
+            logger.info("Pruned %d old project audit logs from database (retaining %d newest runs).", deleted_db_rows, keep_last)
+    except Exception as e:
+        logger.error("Error pruning old project audit logs from database: %s", e)
+        try:
+            conn.rollback()
+        except Exception as rb_err:
+            logger.debug("Rollback notice in prune_old_project_audit_logs: %s", rb_err)
+    finally:
+        cursor.close()
+        conn.close()
+
+    deleted_files = 0
+    try:
+        import time
+        from pathlib import Path
+        audits_dir = Path(__file__).resolve().parent.parent.parent / "audits"
+        if audits_dir.exists():
+            cutoff_time = time.time() - (max_age_days * 86400)
+            for f in audits_dir.glob("project_audit_*.md"):
+                if f.is_file() and f.stat().st_mtime < cutoff_time:
+                    try:
+                        f.unlink()
+                        deleted_files += 1
+                    except Exception as fe:
+                        logger.debug("Failed unlinking old audit file %s: %s", f, fe)
+            if deleted_files > 0:
+                logger.info("Pruned %d markdown dossiers from audits/ older than %d days.", deleted_files, max_age_days)
+    except Exception as file_err:
+        logger.warning("Error pruning old audit files: %s", file_err)
+
+    return {"deleted_db_rows": deleted_db_rows, "deleted_files": deleted_files}
+

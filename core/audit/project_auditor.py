@@ -214,6 +214,13 @@ def compute_deterministic_audit_metrics() -> Dict[str, Any]:
     if endpoints_failed > 0:
         critical_violations.append(f"{endpoints_failed} web endpoint(s) failed health check or threw error status.")
 
+    endpoints_no_h1 = [e for e in endpoint_res.get("endpoints", []) if e.get("has_h1") is False]
+    if endpoints_no_h1:
+        h1_deduction = min(len(endpoints_no_h1) * 5.0, 15.0)
+        endpoint_subscore = max(endpoint_subscore - h1_deduction, 0.0)
+        for ep in endpoints_no_h1:
+            critical_violations.append(f"SEO & Accessibility defect: Endpoint {ep['path']} lacks primary <h1> heading.")
+
     if contracts_res.get("orphaned_onclicks_count", 0) > 0:
         uiux_score_deduction = min(contracts_res["orphaned_onclicks_count"] * 10.0, 30.0)
         endpoint_subscore = max(endpoint_subscore - uiux_score_deduction, 0.0)
@@ -262,6 +269,15 @@ def compute_deterministic_audit_metrics() -> Dict[str, Any]:
         recommendations.append("Investigate and resolve failing automated unit tests in `tests/`.")
     if endpoints_failed > 0:
         recommendations.append(f"Resolve HTTP errors on {endpoints_failed} broken route(s).")
+    slow_endpoints = [e for e in endpoint_res.get("endpoints", []) if e.get("latency_ms", 0) > 1500.0]
+    if slow_endpoints:
+        slow_list = ", ".join(f"{e['path']} ({e['latency_ms']}ms)" for e in slow_endpoints[:3])
+        recommendations.append(f"Optimize response latency on {len(slow_endpoints)} endpoint(s) exceeding 1500ms threshold: {slow_list}.")
+    if endpoints_no_h1:
+        recommendations.append(f"Add primary <h1> headings to {len(endpoints_no_h1)} HTML view(s) to adhere to web standards.")
+    contract_health = contracts_res.get("contract_health_score", 100.0)
+    if contract_health < 90.0:
+        recommendations.append(f"Remediate frontend-backend contract degradation (Contract Health Score: {contract_health}/100).")
     if len(recommendations) == 0:
         recommendations.append("System meets all audit benchmarks. Maintain continuous daily audit cadence.")
 
@@ -345,6 +361,8 @@ def synthesize_deterministic_markdown_report(audit_id: str, metrics: Dict[str, A
 
 ## 4. Pillar 3: UI/UX, Design Aesthetics & Ergonomics
 - **Live Endpoint Verification:** `{metrics['endpoint_results'].get('healthy_count')}/{endpoints_total}` endpoints healthy (HTTP 200 OK).
+- **Primary <h1> Heading Coverage:** {'🟢 100% of HTML views contain valid <h1> tags.' if not [e for e in metrics['endpoint_results'].get('endpoints', []) if e.get('has_h1') is False] else f"🔴 {[e['path'] for e in metrics['endpoint_results'].get('endpoints', []) if e.get('has_h1') is False]} missing <h1> tag(s)."}
+- **Endpoint Latency Bounds:** {'🟢 All endpoints respond within 1500ms threshold.' if not [e for e in metrics['endpoint_results'].get('endpoints', []) if e.get('latency_ms', 0) > 1500.0] else f"⚠️ High latency endpoints (>1500ms): {[e['path'] for e in metrics['endpoint_results'].get('endpoints', []) if e.get('latency_ms', 0) > 1500.0]}"}
 - **Tabular Lining Numerals (`tabular-nums`):** {'Verified active in style.css to eliminate ocular drift.' if metrics['design_results'].get('has_tabular_nums') else 'Not detected.'}
 - **Design Tokens & Theme Consistency:** Theme variables (`--bg-primary`, `--accent`) active across all stylesheets.
 - **Visual Asset Cohesion:** `{metrics['design_results'].get('legacy_os_emojis_found')}` legacy OS Unicode emojis flagged for SVG sprite replacement (Priority 3).
@@ -352,6 +370,7 @@ def synthesize_deterministic_markdown_report(audit_id: str, metrics: Dict[str, A
 ---
 
 ## 5. Client-Side Click-Wiring, API Contracts & Link Grounding
+- **Contract Health Score:** `{metrics.get('contracts_results', {}).get('contract_health_score', 100.0)}/100` ({'🟢 Exemplary API & DOM Contract Integrity' if metrics.get('contracts_results', {}).get('contract_health_score', 100.0) >= 90.0 else '⚠️ Contract Drift Detected'}).
 - **Template Onclick Handlers Audited:** `{metrics.get('contracts_results', {}).get('total_onclick_handlers', 0)}` handlers across `{metrics.get('contracts_results', {}).get('templates_scanned', 0)}` templates ({'🟢 100% Wired to Defined JS Functions' if metrics.get('contracts_results', {}).get('orphaned_onclicks_count', 0) == 0 else f"🔴 {metrics.get('contracts_results', {}).get('orphaned_onclicks_count')} Orphaned Handler(s)"}).
 - **Frontend AJAX API Contracts:** `{metrics.get('contracts_results', {}).get('frontend_api_fetches_count', 0)}` endpoints audited ({'🟢 100% Mapped to Active FastAPI Routes' if metrics.get('contracts_results', {}).get('unmapped_api_routes_count', 0) == 0 else f"🔴 {metrics.get('contracts_results', {}).get('unmapped_api_routes_count')} Unmapped Route(s)"}).
 - **Exchange Link Grounding & URL Health:** {'🟢 Clean — Zero legacy/broken BSE ASPX forms detected.' if metrics.get('contracts_results', {}).get('stale_external_links_count', 0) == 0 else f"🔴 {metrics.get('contracts_results', {}).get('stale_external_links_count')} Deprecated Link(s) Found."}
@@ -466,7 +485,8 @@ async def audit_project_full(use_ai: bool = True) -> ProjectAuditResult:
             "strategy": metrics["terms_results"],
             "implementation": metrics["hygiene_results"],
             "uiux": metrics["design_results"],
-            "contracts": metrics.get("contracts_results", {})
+            "contracts": metrics.get("contracts_results", {}),
+            "endpoint_results": metrics.get("endpoint_results", {})
         },
         full_markdown_report=full_report,
         audit_engine="autonomous-auditor-engine" if ANTIGRAVITY_AVAILABLE else "deterministic-fallback",
@@ -476,4 +496,20 @@ async def audit_project_full(use_ai: bool = True) -> ProjectAuditResult:
     # 6. Persist to Database (Non-blocking)
     await asyncio.to_thread(save_project_audit_log, result.to_dict())
     logger.info(f"Completed and persisted project audit: {audit_id} with score {result.overall_score}/100")
+
+    # 7. Automated Retention Pruning (Retain 90 latest runs, delete markdown older than 45 days)
+    from core.db.audit_logs import prune_old_project_audit_logs
+    await asyncio.to_thread(prune_old_project_audit_logs, 90, 45)
+
+    # 8. Automated Incident Alerting (File support ticket if degraded, auto-resolve when exemplary)
+    from core.db.support import sync_audit_incident_ticket
+    await asyncio.to_thread(
+        sync_audit_incident_ticket,
+        result.audit_id,
+        result.overall_score,
+        result.status,
+        result.critical_violations,
+        result.recommendations
+    )
+
     return result

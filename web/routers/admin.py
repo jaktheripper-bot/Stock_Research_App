@@ -447,11 +447,12 @@ async def admin_audit_dashboard(request: Request):
 
     from core.db.audit_logs import get_latest_project_audit_log, get_project_audit_history
     from core.db.support import get_open_tickets_count
-    from core.audit.tools import get_latest_schema_migration_version
+    from core.audit.tools import get_latest_schema_migration_version, get_monitored_routes_inventory
     latest_audit = get_latest_project_audit_log()
     audit_history = get_project_audit_history(limit=15)
     open_tickets_count = get_open_tickets_count()
     latest_migration_version = get_latest_schema_migration_version()
+    monitored_endpoints = get_monitored_routes_inventory()
 
     return templates.TemplateResponse(
         request=request,
@@ -462,6 +463,7 @@ async def admin_audit_dashboard(request: Request):
             "audit_history": audit_history,
             "open_tickets_count": open_tickets_count,
             "latest_migration_version": latest_migration_version,
+            "monitored_endpoints": monitored_endpoints,
             "active_page": "admin",
             "active_tab": "audit"
         }

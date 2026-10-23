@@ -699,3 +699,64 @@ def delete_support_ticket(ticket_id: str) -> Dict[str, Any]:
         conn.close()
 
 
+def sync_audit_incident_ticket(
+    audit_id: str,
+    score: float,
+    status: str,
+    critical_violations: List[str],
+    recommendations: List[str]
+) -> Dict[str, Any]:
+    """
+    Automated incident management:
+    - If status != 'EXEMPLARY' or score < 90.0, files an internal incident ticket under TECHNICAL.
+    - If status == 'EXEMPLARY' and score >= 90.0, automatically resolves any open audit alert tickets.
+    """
+    try:
+        active_tickets = get_support_tickets(status="active", category="technical", limit=50, exclude_tests=False)
+        alert_tickets = [t for t in active_tickets if str(t.get("subject", "")).startswith("[SYSTEM AUDIT ALERT]")]
+
+        is_degraded = (status != "EXEMPLARY") or (score < 90.0) or (len(critical_violations) > 0)
+
+        if is_degraded:
+            if alert_tickets:
+                # Ticket already active
+                existing = alert_tickets[0]
+                logger.info(f"System audit alert ticket already open: {existing.get('ticket_id')}")
+                return {"action": "existing_open", "ticket_id": existing.get("ticket_id")}
+
+            violations_text = "\n".join(f"- {v}" for v in critical_violations) if critical_violations else "- None"
+            recs_text = "\n".join(f"- {r}" for r in recommendations) if recommendations else "- None"
+            msg = (
+                f"Autonomous Project Audit degradation detected on {audit_id}.\n\n"
+                f"Overall Score: {score}/100 ({status})\n\n"
+                f"Critical Violations:\n{violations_text}\n\n"
+                f"Remediation Actions:\n{recs_text}\n\n"
+                f"Investigate full audit dossier in the Admin Console (/admin?tab=audit)."
+            )
+            ticket = create_support_ticket(
+                user_email="system@moatnomics.internal",
+                subject=f"[SYSTEM AUDIT ALERT] Audit {audit_id} Degradation ({score:.1f}/100 - {status})",
+                message=msg,
+                user_name="Project Auditor Daemon",
+                category="technical",
+                source="system_audit"
+            )
+            logger.warning(f"Created system audit incident ticket: {ticket.get('ticket_id')}")
+            return {"action": "created", "ticket_id": ticket.get("ticket_id")}
+        else:
+            # System is exemplary — auto-resolve any open alert tickets
+            resolved_count = 0
+            for t in alert_tickets:
+                tid = t.get("ticket_id")
+                if tid:
+                    res_note = f"Auto-resolved: Audit {audit_id} certified at {score:.1f}/100 ({status}) with 0 critical violations."
+                    if update_ticket_status(tid, "resolved", admin_notes=res_note):
+                        resolved_count += 1
+                        logger.info(f"Auto-resolved audit alert ticket {tid}.")
+            return {"action": "auto_resolved", "resolved_count": resolved_count}
+    except Exception as e:
+        logger.error(f"Error in sync_audit_incident_ticket: {e}")
+        return {"action": "error", "error": str(e)}
+
+
+

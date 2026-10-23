@@ -207,6 +207,92 @@ class TestProjectAuditor(unittest.TestCase):
         self.assertTrue(status_data.get("success"))
         self.assertIn(status_data.get("status"), ["RUNNING", "COMPLETED"])
 
+    def test_monitored_routes_inventory(self):
+        """Verifies canonical 37 monitored endpoints and absence of defunct routes."""
+        from core.audit.tools import get_monitored_routes_inventory, MONITORED_ROUTES
+        inv = get_monitored_routes_inventory()
+        self.assertEqual(len(inv), 37)
+        self.assertEqual(len(MONITORED_ROUTES), 37)
+        paths = [e["path"] for e in inv]
+        self.assertIn("/calculator/tax", paths)
+        self.assertNotIn("/tools/tax-calculator", paths)
+        self.assertIn("/dossier/INFY", paths)
+        self.assertIn("/health", paths)
+
+    def test_prune_old_project_audit_logs(self):
+        """Verifies retention pruning retains the specified newest runs."""
+        from core.db.audit_logs import prune_old_project_audit_logs, save_project_audit_log
+        # Insert test audit entries
+        for i in range(10):
+            save_project_audit_log({
+                "audit_id": f"AUD-TEST-PRUNE-{i}",
+                "overall_score": 100.0,
+                "strategy_score": 100.0,
+                "implementation_score": 100.0,
+                "uiux_score": 100.0,
+                "status": "EXEMPLARY",
+                "tests_total": 770,
+                "tests_passed": 770,
+                "tests_failed": 0,
+                "endpoints_checked": 37,
+                "endpoints_healthy": 37,
+                "critical_violations": [],
+                "recommendations": [],
+                "pillar_breakdown": {},
+                "full_markdown_report": "# Test",
+                "audit_engine": "test"
+            })
+        res = prune_old_project_audit_logs(keep_last=5, max_age_days=30)
+        self.assertIsInstance(res, dict)
+        self.assertIn("deleted_db_rows", res)
+
+    def test_sync_audit_incident_ticket_lifecycle(self):
+        """Verifies automatic creation on degradation and auto-resolution on recovery."""
+        from core.db.support import sync_audit_incident_ticket, get_support_tickets, delete_support_ticket
+
+        # 1. Trigger degraded audit -> should create alert ticket
+        res1 = sync_audit_incident_ticket(
+            audit_id="AUD-TEST-ALERT-01",
+            score=82.0,
+            status="ACTION_REQUIRED",
+            critical_violations=["Test critical violation: broken endpoint"],
+            recommendations=["Fix broken route"]
+        )
+        self.assertEqual(res1.get("action"), "created")
+        ticket_id = res1.get("ticket_id")
+        self.assertTrue(ticket_id)
+
+        try:
+            # 2. Trigger another degraded audit -> should recognize existing ticket
+            res2 = sync_audit_incident_ticket(
+                audit_id="AUD-TEST-ALERT-02",
+                score=80.0,
+                status="ACTION_REQUIRED",
+                critical_violations=["Still broken"],
+                recommendations=["Fix broken route"]
+            )
+            self.assertEqual(res2.get("action"), "existing_open")
+            self.assertEqual(res2.get("ticket_id"), ticket_id)
+
+            # 3. Trigger exemplary audit -> should auto-resolve the ticket
+            res3 = sync_audit_incident_ticket(
+                audit_id="AUD-TEST-ALERT-03",
+                score=100.0,
+                status="EXEMPLARY",
+                critical_violations=[],
+                recommendations=[]
+            )
+            self.assertEqual(res3.get("action"), "auto_resolved")
+            self.assertGreaterEqual(res3.get("resolved_count", 0), 1)
+
+            # Confirm ticket status is resolved
+            active = get_support_tickets(status="active", category="technical", limit=50, exclude_tests=False)
+            active_alert_ids = [t["ticket_id"] for t in active if t["ticket_id"] == ticket_id]
+            self.assertEqual(len(active_alert_ids), 0)
+        finally:
+            if ticket_id:
+                delete_support_ticket(ticket_id)
+
 
 class TestMultiAgentForensicAudit(unittest.TestCase):
     def test_antigravity_sdk_installation(self):

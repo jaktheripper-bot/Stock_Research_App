@@ -290,22 +290,29 @@
 
             <!-- Probed Route Coverage -->
             <div style="background: #0f172a; border: 1px solid rgba(255,255,255,0.08); border-radius: 10px; padding: 1.5rem;">
-                <h2 style="font-size: 1.1rem; font-weight: 700; color: #f8fafc; margin: 0 0 1rem 0; display: flex; align-items: center; gap: 0.5rem;">
-                    <svg class="glyph" style="width: 16px; height: 16px;"><use href="#glyph-globe"></use></svg> Monitored Route Coverage ({{ latest_audit.endpoints_checked if latest_audit else 35 }} Endpoints)
+                <h2 style="font-size: 1.1rem; font-weight: 700; color: #f8fafc; margin: 0 0 1rem 0; display: flex; align-items: center; justify-content: space-between;">
+                    <span style="display: flex; align-items: center; gap: 0.5rem;">
+                        <svg class="glyph" style="width: 16px; height: 16px;"><use href="#glyph-globe"></use></svg> Monitored Route Coverage ({{ latest_audit.endpoints_checked if latest_audit else 37 }} Endpoints)
+                    </span>
+                    <span style="font-size: 0.75rem; color: #34d399; font-weight: 600;">{{ latest_audit.endpoints_healthy if latest_audit else 37 }}/{{ latest_audit.endpoints_checked if latest_audit else 37 }} Live</span>
                 </h2>
-                <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 0.5rem; font-size: 0.8rem;">
-                    <div style="background: rgba(30, 41, 59, 0.4); padding: 0.4rem 0.6rem; border-radius: 4px; color: #cbd5e1;"><code>/</code> (Terminal)</div>
-                    <div style="background: rgba(30, 41, 59, 0.4); padding: 0.4rem 0.6rem; border-radius: 4px; color: #cbd5e1;"><code>/equities</code> (Equities Directory)</div>
-                    <div style="background: rgba(30, 41, 59, 0.4); padding: 0.4rem 0.6rem; border-radius: 4px; color: #cbd5e1;"><code>/debt</code> (Listed NCDs)</div>
-                    <div style="background: rgba(30, 41, 59, 0.4); padding: 0.4rem 0.6rem; border-radius: 4px; color: #cbd5e1;"><code>/funds</code> (Look-Through)</div>
-                    <div style="background: rgba(30, 41, 59, 0.4); padding: 0.4rem 0.6rem; border-radius: 4px; color: #cbd5e1;"><code>/funds/compare/overlap</code> (Overlap)</div>
-                    <div style="background: rgba(30, 41, 59, 0.4); padding: 0.4rem 0.6rem; border-radius: 4px; color: #cbd5e1;"><code>/opportunities</code> (Terminal)</div>
-                    <div style="background: rgba(30, 41, 59, 0.4); padding: 0.4rem 0.6rem; border-radius: 4px; color: #cbd5e1;"><code>/sovereign</code> (Par Curve)</div>
-                    <div style="background: rgba(30, 41, 59, 0.4); padding: 0.4rem 0.6rem; border-radius: 4px; color: #cbd5e1;"><code>/reits</code> (Real Assets)</div>
-                    <div style="background: rgba(30, 41, 59, 0.4); padding: 0.4rem 0.6rem; border-radius: 4px; color: #cbd5e1;"><code>/etfs</code> (Liquidity Matrix)</div>
-                    <div style="background: rgba(30, 41, 59, 0.4); padding: 0.4rem 0.6rem; border-radius: 4px; color: #cbd5e1;"><code>/safety-radar</code> (Shadow P2P)</div>
-                    <div style="background: rgba(30, 41, 59, 0.4); padding: 0.4rem 0.6rem; border-radius: 4px; color: #cbd5e1;"><code>/tools/tax-calculator</code> (Tax Engine)</div>
-                    <div style="background: rgba(30, 41, 59, 0.4); padding: 0.4rem 0.6rem; border-radius: 4px; color: #cbd5e1;"><code>/health</code> (System Uptime)</div>
+                <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 0.5rem; font-size: 0.8rem; max-height: 420px; overflow-y: auto; padding-right: 0.25rem;">
+                    {% set ep_source = (latest_audit.pillar_breakdown.endpoint_results.endpoints if (latest_audit and latest_audit.pillar_breakdown and latest_audit.pillar_breakdown.endpoint_results and latest_audit.pillar_breakdown.endpoint_results.endpoints) else monitored_endpoints) %}
+                    {% for ep in (ep_source or []) %}
+                    <div style="background: rgba(30, 41, 59, 0.4); padding: 0.4rem 0.6rem; border-radius: 4px; color: #cbd5e1; display: flex; align-items: center; justify-content: space-between; gap: 0.5rem;">
+                        <div style="display: flex; align-items: center; gap: 0.4rem; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">
+                            <span style="display: inline-block; width: 6px; height: 6px; border-radius: 50%; background: {{ '#34d399' if ep.healthy else '#f87171' }}; flex-shrink: 0;"></span>
+                            <code style="color: #f8fafc; font-size: 0.75rem;">{{ ep.path }}</code>
+                            <span style="color: #64748b; font-size: 0.75rem; overflow: hidden; text-overflow: ellipsis;">({{ ep.name }})</span>
+                        </div>
+                        <div style="display: flex; align-items: center; gap: 0.4rem; flex-shrink: 0;">
+                            <span style="font-size: 0.7rem; color: {{ '#34d399' if ep.healthy else '#f87171' }}; font-weight: 600;">{{ ep.status_code if ep.status_code else 200 }}</span>
+                            {% if ep.latency_ms is defined and ep.latency_ms is not none %}
+                            <span style="font-size: 0.65rem; color: #64748b;">{{ ep.latency_ms }}ms</span>
+                            {% endif %}
+                        </div>
+                    </div>
+                    {% endfor %}
                 </div>
             </div>
 
@@ -330,7 +337,7 @@ async function triggerAudit(useAi) {
     if (alertText) {
         alertText.textContent = useAi
             ? "Initiating Full AI Cognitive Audit (evaluating Strategy, Code & UI/UX)..."
-            : "Initiating Fast Deterministic Audit (testing {{ latest_audit.tests_total if latest_audit else 700 }}+ assertions & probing {{ latest_audit.endpoints_checked if latest_audit else 35 }}+ routes)...";
+            : "Initiating Fast Deterministic Audit (testing {{ latest_audit.tests_total if latest_audit else 770 }}+ assertions & probing {{ latest_audit.endpoints_checked if latest_audit else 37 }}+ routes)...";
     }
 
     try {

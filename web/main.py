@@ -511,27 +511,33 @@ async def run_daily_fund_audit_scheduler():
             logger.info(f"🔍 [Fund Audit Scheduler] Next fund audit scheduled in {wait_seconds/3600:.2f} hours (at {target.strftime('%Y-%m-%d %H:%M:%S IST')}).")
             await asyncio.sleep(wait_seconds)
 
-            logger.info("🔍 [Fund Audit Scheduler] Executing scheduled nightly mutual fund accounting check...")
-            from core.analysis.fund_overlap_auditor import audit_single_fund_daily
-            from core.db.agent_sessions import record_autonomous_event
-            loop = asyncio.get_running_loop()
-            res = await loop.run_in_executor(None, audit_single_fund_daily, None, False)
+            today_str = datetime.now(IST).strftime("%Y%m%d")
+            from core.db.distributed_lock import job_lease
+            with job_lease(f"daily_fund_audit_{today_str}", ttl_seconds=3600, release_on_exit=False) as acquired:
+                if acquired:
+                    logger.info("🔍 [Fund Audit Scheduler] Acquired lease. Executing scheduled nightly mutual fund accounting check...")
+                    from core.analysis.fund_overlap_auditor import audit_single_fund_daily
+                    from core.db.agent_sessions import record_autonomous_event
+                    loop = asyncio.get_running_loop()
+                    res = await loop.run_in_executor(None, audit_single_fund_daily, None, False)
 
-            if res:
-                record_autonomous_event(
-                    event_type="DAILY_FUND_AUDIT",
-                    ticker=res.get("scheme_code", "UNKNOWN"),
-                    trigger_source="AMFI_SCHEDULER_ROTATION",
-                    action_taken="7_PILLAR_LOOKTHROUGH_AUDIT",
-                    summary=f"Automated 7-pillar look-through audit completed for {res.get('scheme_name')} ({res.get('scheme_code')}). Health: {res.get('composite_health_score')}/100, Moat: {res.get('weighted_moat_score')}/100, ASRI: {res.get('accounting_risk_index')}%.",
-                    metadata={
-                        "composite_health_score": res.get("composite_health_score"),
-                        "weighted_moat_score": res.get("weighted_moat_score"),
-                        "accounting_risk_index": res.get("accounting_risk_index"),
-                        "margin_of_safety_pct": res.get("margin_of_safety_pct")
-                    }
-                )
-            logger.info(f"🔍 [Fund Audit Scheduler] Nightly fund accounting check completed for {res.get('scheme_code')}.")
+                    if res:
+                        record_autonomous_event(
+                            event_type="DAILY_FUND_AUDIT",
+                            ticker=res.get("scheme_code", "UNKNOWN"),
+                            trigger_source="AMFI_SCHEDULER_ROTATION",
+                            action_taken="7_PILLAR_LOOKTHROUGH_AUDIT",
+                            summary=f"Automated 7-pillar look-through audit completed for {res.get('scheme_name')} ({res.get('scheme_code')}). Health: {res.get('composite_health_score')}/100, Moat: {res.get('weighted_moat_score')}/100, ASRI: {res.get('accounting_risk_index')}%.",
+                            metadata={
+                                "composite_health_score": res.get("composite_health_score"),
+                                "weighted_moat_score": res.get("weighted_moat_score"),
+                                "accounting_risk_index": res.get("accounting_risk_index"),
+                                "margin_of_safety_pct": res.get("margin_of_safety_pct")
+                            }
+                        )
+                    logger.info(f"🔍 [Fund Audit Scheduler] Nightly fund accounting check completed for {res.get('scheme_code') if res else 'no-op'}.")
+                else:
+                    logger.info(f"🔍 [Fund Audit Scheduler] Lease for daily_fund_audit_{today_str} held by another worker. Skipping duplicate fund audit.")
         except asyncio.CancelledError:
             logger.info("🔍 [Fund Audit Scheduler] Background fund audit scheduler cancelled.")
             break
@@ -553,10 +559,16 @@ async def run_daily_project_audit_scheduler():
             logger.info(f"🛡️ [Project Auditor Scheduler] Next audit scheduled in {wait_seconds/3600:.2f} hours (at {target.strftime('%Y-%m-%d %H:%M:%S IST')}).")
             await asyncio.sleep(wait_seconds)
 
-            logger.info("🛡️ [Project Auditor Scheduler] Executing scheduled nightly project audit...")
-            from core.audit.project_auditor import audit_project_full
-            await audit_project_full(use_ai=True)
-            logger.info("🛡️ [Project Auditor Scheduler] Nightly project audit completed.")
+            today_str = datetime.now(IST).strftime("%Y%m%d")
+            from core.db.distributed_lock import job_lease
+            with job_lease(f"daily_project_audit_{today_str}", ttl_seconds=3600, release_on_exit=False) as acquired:
+                if acquired:
+                    logger.info("🛡️ [Project Auditor Scheduler] Acquired lease. Executing scheduled nightly project audit...")
+                    from core.audit.project_auditor import audit_project_full
+                    await audit_project_full(use_ai=True)
+                    logger.info("🛡️ [Project Auditor Scheduler] Nightly project audit completed.")
+                else:
+                    logger.info(f"🛡️ [Project Auditor Scheduler] Lease for daily_project_audit_{today_str} held by another worker. Skipping duplicate audit.")
         except asyncio.CancelledError:
             logger.info("🛡️ [Project Auditor Scheduler] Background scheduler cancelled.")
             break

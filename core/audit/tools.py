@@ -159,54 +159,64 @@ def get_latest_schema_migration_version() -> str:
     return "v033_reading_depth_and_study_timer"
 
 
+MONITORED_ROUTES = [
+    # Core & Multi-Asset Views (24 HTML views)
+    ("/", "GET", "Home / Terminal"),
+    ("/discovery", "GET", "9 AM Morning Discovery Reel"),
+    ("/equities", "GET", "Institutional Equities Directory"),
+    ("/dossier/INFY", "GET", "7-Pillar Equity Dossier"),
+    ("/compare", "GET", "Peer Comparison Matrix"),
+    ("/search?q=INFY", "GET", "Global Asset Search Results"),
+    ("/opportunities", "GET", "Cross-Asset Opportunity Terminal"),
+    ("/safety-radar", "GET", "Alternative Yield Safety Radar"),
+    ("/funds", "GET", "Mutual Fund Forensic Terminal"),
+    ("/funds/PPFAS_FLEXICAP_DIR", "GET", "Fund Forensic Dossier (PPFAS)"),
+    ("/funds/compare/overlap", "GET", "Mutual Fund Portfolio Overlap"),
+    ("/etfs", "GET", "ETF Liquidity & Spread Matrix"),
+    ("/debt", "GET", "Corporate Fixed-Income Directory"),
+    ("/reits", "GET", "Alternative Real Assets & SGB Terminal"),
+    ("/sovereign", "GET", "Sovereign Debt & Yield Curve Terminal"),
+    ("/msme", "GET", "Private & MSME Supply-Chain Directory"),
+    ("/calculator/tax", "GET", "Post-Tax Real Yield Calculator"),
+    ("/pricing", "GET", "Pricing & Credit Packs"),
+    ("/contact", "GET", "Feedback & Grievance Redressal"),
+    ("/terms", "GET", "Terms of Service"),
+    ("/privacy", "GET", "Privacy Policy"),
+    ("/refund-policy", "GET", "Cancellation & Refund Policy"),
+    ("/shipping-policy", "GET", "Shipping & Delivery Policy"),
+    ("/disclaimer", "GET", "Regulatory Disclaimers"),
+    # System & Core JSON APIs (13 endpoints)
+    ("/robots.txt", "GET", "Robots Directives"),
+    ("/sitemap.xml", "GET", "XML Sitemap"),
+    ("/security.txt", "GET", "Security Disclosure Directives"),
+    ("/health", "GET", "System Health Check"),
+    ("/healthz", "GET", "Render / Kubernetes Healthz Probe"),
+    ("/api/funds/schemes", "GET", "Fund Master Scheme API"),
+    ("/api/funds/dossier/PPFAS_FLEXICAP_DIR", "GET", "Fund Dossier JSON API"),
+    ("/api/sovereign/curve", "GET", "Sovereign Par Curve Feed"),
+    ("/api/opportunities/universe", "GET", "Normalized Opportunity Universe Feed"),
+    ("/api/opportunities/heatmap", "GET", "Yield Heatmap API"),
+    ("/api/reits/directory", "GET", "REITs Directory API"),
+    ("/api/etfs/matrix", "GET", "ETF Matrix API"),
+    ("/api/safety-radar", "GET", "Safety Radar Feed"),
+]
+
+
+def get_monitored_routes_inventory() -> List[Dict[str, Any]]:
+    """Returns canonical inventory of all 37 monitored endpoints."""
+    return [
+        {"path": path, "method": method, "name": name, "healthy": True}
+        for path, method, name in MONITORED_ROUTES
+    ]
+
+
 def tool_probe_web_endpoints(base_url: Optional[str] = None) -> Dict[str, Any]:
     """Probes critical FastAPI endpoints and validates HTTP 200 status, latency, and HTML structure."""
     from fastapi.testclient import TestClient
     from web.main import app
 
     probe_headers = {"User-Agent": "testclient-project-auditor"}
-
-    routes_to_test = [
-        # Core & Multi-Asset Views (25 HTML views)
-        ("/", "GET", "Home / Terminal"),
-        ("/discovery", "GET", "9 AM Morning Discovery Reel"),
-        ("/equities", "GET", "Institutional Equities Directory"),
-        ("/dossier/INFY", "GET", "7-Pillar Equity Dossier"),
-        ("/compare", "GET", "Peer Comparison Matrix"),
-        ("/search?q=INFY", "GET", "Global Asset Search Results"),
-        ("/opportunities", "GET", "Cross-Asset Opportunity Terminal"),
-        ("/safety-radar", "GET", "Alternative Yield Safety Radar"),
-        ("/funds", "GET", "Mutual Fund Forensic Terminal"),
-        ("/funds/PPFAS_FLEXICAP_DIR", "GET", "Fund Forensic Dossier (PPFAS)"),
-        ("/funds/compare/overlap", "GET", "Mutual Fund Portfolio Overlap"),
-        ("/etfs", "GET", "ETF Liquidity & Spread Matrix"),
-        ("/debt", "GET", "Corporate Fixed-Income Directory"),
-        ("/reits", "GET", "Alternative Real Assets & SGB Terminal"),
-        ("/sovereign", "GET", "Sovereign Debt & Yield Curve Terminal"),
-        ("/msme", "GET", "Private & MSME Supply-Chain Directory"),
-        ("/calculator/tax", "GET", "Post-Tax Real Yield Calculator"),
-        ("/pricing", "GET", "Pricing & Credit Packs"),
-        ("/contact", "GET", "Feedback & Grievance Redressal"),
-        ("/terms", "GET", "Terms of Service"),
-        ("/privacy", "GET", "Privacy Policy"),
-        ("/refund-policy", "GET", "Cancellation & Refund Policy"),
-        ("/shipping-policy", "GET", "Shipping & Delivery Policy"),
-        ("/disclaimer", "GET", "Regulatory Disclaimers"),
-        # System & Core JSON APIs (11 endpoints)
-        ("/robots.txt", "GET", "Robots Directives"),
-        ("/sitemap.xml", "GET", "XML Sitemap"),
-        ("/security.txt", "GET", "Security Disclosure Directives"),
-        ("/health", "GET", "System Health Check"),
-        ("/healthz", "GET", "Render / Kubernetes Healthz Probe"),
-        ("/api/funds/schemes", "GET", "Fund Master Scheme API"),
-        ("/api/funds/dossier/PPFAS_FLEXICAP_DIR", "GET", "Fund Dossier JSON API"),
-        ("/api/sovereign/curve", "GET", "Sovereign Par Curve Feed"),
-        ("/api/opportunities/universe", "GET", "Normalized Opportunity Universe Feed"),
-        ("/api/opportunities/heatmap", "GET", "Yield Heatmap API"),
-        ("/api/reits/directory", "GET", "REITs Directory API"),
-        ("/api/etfs/matrix", "GET", "ETF Matrix API"),
-        ("/api/safety-radar", "GET", "Safety Radar Feed"),
-    ]
+    routes_to_test = MONITORED_ROUTES
 
     results = []
     healthy_count = 0
