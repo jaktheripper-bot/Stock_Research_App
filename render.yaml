@@ -39,3 +39,8 @@ services:
         sync: false
       - key: CANONICAL_DOMAIN
         value: https://moatnomics.com
+      - key: BETTER_STACK_SOURCE_TOKEN
+        value: "n9BuFhtn6SwGdLrRd4A8wFn6"
+      - key: BETTER_STACK_INGESTING_HOST
+        value: "s2808842.us-west-2a.betterstackdata.com"
+

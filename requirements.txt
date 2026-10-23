@@ -25,3 +25,4 @@ slowapi==0.1.10
 segno==1.6.6
 httpx==0.28.1
 pytest==9.1.1
+logtail-python==0.5.2

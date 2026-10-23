@@ -375,7 +375,18 @@ def synthesize_and_archive_stock_dossier(
 
 
     # Fallback to deterministic synthesis if Gemini is skipped or unavailable
-    if not report_text or len(report_text.strip()) < 500:
+    has_err_banner = any(sig in (report_text or "") for sig in [
+        "Live Synthesis Failed",
+        "Grounded synthesis channels are temporarily unavailable",
+        "Live Synthesis Error",
+        "Rate limit exceeded",
+    ])
+    archived_check = get_report_by_ticker_sync(ticker)
+    is_archived = bool(
+        archived_check and archived_check.get("report_text") and len(archived_check["report_text"].strip()) >= 500
+    )
+
+    if not report_text or len(report_text.strip()) < 500 or has_err_banner or not is_archived:
         logger.info(f"Generating deterministic 7-pillar research report for {ticker}...")
         report_text = generate_deterministic_7pillar_report(stock_data, candidate)
         ann = ""

@@ -54,7 +54,8 @@ def list_fund_audit_status():
         cat = f.get("category", "")[:20]
         dos = get_fund_forensic_dossier(code)
         if dos:
-            health = f"{dos.get('composite_health_score', 0):.1f}"
+            comp_h = dos.get("composite_health_score")
+            health = f"{comp_h:.1f}" if comp_h is not None else "Paused"
             asri = f"{dos.get('accounting_risk_index', 0):.1f}%"
             mos = f"{dos.get('margin_of_safety_pct', 0):+.1f}%"
             last = str(dos.get("last_audited_at", ""))[:19]

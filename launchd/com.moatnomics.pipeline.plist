@@ -1,0 +1,38 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+    <key>Label</key>
+    <string>com.moatnomics.pipeline</string>
+    <key>WorkingDirectory</key>
+    <string>/Users/lyndonpinto/Documents/Stock_Research_App</string>
+    <key>ProgramArguments</key>
+    <array>
+        <string>/usr/bin/python3</string>
+        <string>scripts/run_scheduled_pipeline.py</string>
+        <string>--mode</string>
+        <string>all</string>
+    </array>
+    <key>StartCalendarInterval</key>
+    <array>
+        <!-- Morning Ingestion & Discovery Pipeline at 08:30 AM IST -->
+        <dict>
+            <key>Hour</key>
+            <integer>8</integer>
+            <key>Minute</key>
+            <integer>30</integer>
+        </dict>
+        <!-- Nightly NAV, ETF & Multi-Asset Pipeline at 23:15 IST -->
+        <dict>
+            <key>Hour</key>
+            <integer>23</integer>
+            <key>Minute</key>
+            <integer>15</integer>
+        </dict>
+    </array>
+    <key>StandardOutPath</key>
+    <string>/Users/lyndonpinto/Documents/Stock_Research_App/backups/scheduled_pipeline.log</string>
+    <key>StandardErrorPath</key>
+    <string>/Users/lyndonpinto/Documents/Stock_Research_App/backups/scheduled_pipeline_err.log</string>
+</dict>
+</plist>

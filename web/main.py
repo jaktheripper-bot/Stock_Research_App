@@ -42,8 +42,11 @@ from slowapi import Limiter
 from slowapi.util import get_remote_address
 from slowapi.errors import RateLimitExceeded
 from slowapi.middleware import SlowAPIMiddleware
+from core.logging_config import setup_logging, flush_betterstack_logs
 
+setup_logging()
 logger = logging.getLogger("equity_research.web")
+
 
 try:
     from dotenv import load_dotenv
@@ -723,6 +726,8 @@ async def lifespan(app: FastAPI):
             bse_task.cancel()
         if scheduler:
             scheduler.shutdown()
+        flush_betterstack_logs()
+
 
 
 app = FastAPI(

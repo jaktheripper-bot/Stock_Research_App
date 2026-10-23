@@ -92,9 +92,27 @@ def run_discovery_pipeline(
 
             if needs_synthesis:
                 logger.info(f"⚡ Generating full 7-pillar grounded dossier for {ticker}...")
-                report_md = generate_stock_report(ticker, use_grounding=True)
-                if report_md and len(report_md.strip()) >= 500:
-                    logger.info(f"✅ Successfully archived grounded dossier for {ticker} ({len(report_md)} chars).")
+                report_md = ""
+                try:
+                    report_md = generate_stock_report(ticker, use_grounding=True)
+                except Exception as gen_err:
+                    logger.warning(f"Live synthesis attempt notice for {ticker}: {gen_err}")
+
+                has_err = any(sig in (report_md or "") for sig in [
+                    "Live Synthesis Failed",
+                    "Grounded synthesis channels are temporarily unavailable",
+                    "Live Synthesis Error",
+                    "Rate limit exceeded",
+                ])
+                archived = get_report_by_ticker_sync(ticker)
+                if not archived or not archived.get("report_text") or len(archived.get("report_text", "").strip()) < 500 or has_err:
+                    logger.info(f"Triggering deterministic 7-pillar fallback ingestion for {ticker}...")
+                    from core.analysis.daily_stock_ingestion import synthesize_and_archive_stock_dossier
+                    synthesize_and_archive_stock_dossier(item, skip_gemini=True)
+                    archived = get_report_by_ticker_sync(ticker)
+
+                if archived and archived.get("report_text") and len(archived.get("report_text", "").strip()) >= 500:
+                    logger.info(f"✅ Successfully verified archived dossier for {ticker} ({len(archived['report_text'])} chars).")
                     synthesized_count += 1
                 else:
                     logger.warning(f"⚠️ Synthesis for {ticker} generated shorter than expected response.")

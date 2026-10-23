@@ -91,3 +91,25 @@ def yfinance_fallback_enabled() -> bool:
     platform's reputation is being built. Set YFINANCE_FALLBACK=0 to disable it.
     """
     return str(get_secret("YFINANCE_FALLBACK", "1")).strip().lower() in ("1", "true", "yes", "on")
+
+
+def get_better_stack_config() -> dict:
+    """Retrieves Better Stack telemetry ingestion configuration credentials.
+
+    Returns dict containing source_token and ingesting_host.
+    """
+    token = get_secret(
+        "BETTER_STACK_SOURCE_TOKEN",
+        get_secret("LOGTAIL_SOURCE_TOKEN", "n9BuFhtn6SwGdLrRd4A8wFn6")
+    )
+    host = get_secret(
+        "BETTER_STACK_INGESTING_HOST",
+        get_secret("LOGTAIL_INGESTING_HOST", "s2808842.us-west-2a.betterstackdata.com")
+    )
+    if not host.startswith("http://") and not host.startswith("https://"):
+        host = f"https://{host}"
+    return {
+        "source_token": str(token).strip(),
+        "host": str(host).strip(),
+    }
+

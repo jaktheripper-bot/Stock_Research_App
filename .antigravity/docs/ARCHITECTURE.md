@@ -93,5 +93,16 @@
     * *Step 2 (Explore Next):* Executes broad multi-domain invariant scans across Backend Stability (`INV_UNBOUNDED_CACHE`, `INV_SILENT_EXCEPTION_SWALLOW`), UI/UX Contracts (`INV_DOM_INTEGRITY`, `INV_UI_NO_DEAD_HOVER`), Database Parity (`INV_SQL_DIALECT_COMPAT`, `INV_DB_SCHEMA_BOUNDS`), Security Vulnerabilities (`INV_SEC_HEADERS`, `INV_SEC_AUTH_SCOPE`, `INV_SEC_NO_STACKTRACE`), and Regulatory Safeguards (`INV_SEBI_SAFE_HARBOR`).
     * *Step 3 (Publish Score & Report):* Records composite health score factoring progressive aging penalties (1.0x multiplier for <3 days, 1.5x for 3–6 days, 2.0x compounding penalty for >=7 days with status capped at `ACTION_REQUIRED`). Generates Section 6 in the system audit report and automatically overwrites `audits/REMEDIATION_ACTION_PLAN.md` with an Executive Triage Scorecard, Aging Debt Alerts, Prioritized Active Queue (with copy-paste local bash commands), and Closed-Loop Verification Log.
 
+## 9. Observability & Centralized Telemetry Pipeline (Better Stack)
+* **Standard Library Log Ingestion Engine (`core/logging_config.py`):**
+  * Seamlessly routes Python standard library `logging` output to Better Stack (Logtail) via `logtail.LogtailHandler`.
+  * **Ingesting Host:** Configured to `s2808842.us-west-2a.betterstackdata.com` (or configurable via `BETTER_STACK_INGESTING_HOST` / `LOGTAIL_INGESTING_HOST`).
+  * **Source Token:** Secured via `n9BuFhtn6SwGdLrRd4A8wFn6` (or configurable via `BETTER_STACK_SOURCE_TOKEN` / `LOGTAIL_SOURCE_TOKEN`).
+  * **Namespace Routing:** Attached to the `equity_research` namespace and the root logger, automatically transmitting events from web routes, background schedulers, multi-asset engines, and admin copilots.
+  * **Structured Logging Context:** Full support for `logger.info("...", extra={"key": "value"})` conforming to the official Better Stack integration guide.
+  * **FastAPI Lifespan Integration:** Initialized on startup in `web/main.py`; synchronous flush on shutdown (`flush_betterstack_logs`) prevents in-flight log drops on container restarts.
+  * **Automated Test Isolation:** `is_test_environment()` suppresses remote HTTP logtail dispatches during test and CI executions, protecting bandwidth and logging quotas.
+
+
 
 
