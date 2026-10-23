@@ -14,10 +14,11 @@
 
 ## 4. Modular Domain Architecture & Persistence Facade
 * **Modular `core/db/` Package:** Database operations are modularized into domain-specific modules adhering to Single Responsibility:
-  * `core/db/connection.py`: Thread-safe connection pooling (`_PooledConnectionProxy`), SQLite WAL fallback, dual schema migrations (v001–v034).
+  * `core/db/connection.py`: Thread-safe connection pooling (`_PooledConnectionProxy`, hardened default `DB_POOL_MAX = 10`), SQLite WAL fallback, dual schema migrations (`v001–v036`, including `v031_widen_sovereign_macro_columns` widening `sovereign_macro_rates` text columns to `VARCHAR(120)` in PostgreSQL).
   * `core/db/users.py`: User accounts, welcome grants, credit usage ledgers, dossier unlocks, and confidential user-scoped Countercase & Thesis Checkpoint persistence (`user_thesis_ledger`).
+  * `core/db/digest.py`: Dialect-branched daily digest subscriber querying (`get_active_digest_subscribers`) enforcing PostgreSQL strict boolean comparison (`IS TRUE`, `NOW()`) and SQLite compatibility (`= 1`, `datetime('now')`).
   * `core/db/compliance.py`: SEBI safe-harbor disclaimer and immutable compliance audit logging.
-  * `core/db/reports.py`: Snapshot archiving, time-series differential revisions, and structured query retrieval.
+  * `core/db/reports.py`: Snapshot archiving, time-series differential revisions, bounded LRU caches (`get_report_by_ticker` maxsize=48, `get_archived_reports` maxsize=16, `get_report_revisions` maxsize=32 with `include_text: bool = False`), and bounded TTL caching on equities directory queries.
   * `core/db/watchlist.py`: Watched scrips, automated surveillance scan timestamps, and tracking status.
   * `core/db/alerts.py`: BSE material surveillance event ledger, notification counts, and user dismissals.
   * `core/db/support.py`: Support tickets, customer inquiry threads (`ticket_responses`), and status tracking.
@@ -29,24 +30,24 @@
 * **Modular `core/analysis/` Package:** Institutional research synthesis, fundamental ingestion, delta triggers, and peer comparisons are decomposed into specialized submodules:
   * `core/analysis/exceptions.py`: Robust pipeline exception taxonomy (`PipelineError`, `TickerResolutionError`, `ExchangeDataFetchError`).
   * `core/analysis/parser.py`: 7-pillar health matrix extraction, regulatory sanitization, citations footnote formatting, and time-series qualitative drift differential comparisons.
-  * `core/analysis/fundamentals.py`: Primary BSE exchange quote resolution, consolidated `yfinance` ratio fallback, 50-DMA/technical precomputation, and corporate announcements feed.
+  * `core/analysis/fundamentals.py`: Primary BSE exchange quote resolution, consolidated `yfinance` ratio fallback, thread-safe bounded LRU/TTL cache (`_BoundedFundamentalsCache(maxsize=64, ttl=900)`) with automatic write-time pruning of expired entries, 50-DMA/technical precomputation, and corporate announcements feed.
   * `core/analysis/dossier_report_synthesis.py`: Dynamic Flash model discovery cascade, Perplexity `sonar-pro` failover, SSE stream parsing, and visual citations attribution ingestion.
   * `core/analysis/dossier_bull_bear.py`: 60-second institutional Bull vs Bear thesis synthesis.
   * `core/analysis/delta.py`: 4-gate material change evaluation, self-healing cache checks, pillar markdown splicing, and zero-grounding-fee surgical valuation/technicals refresh.
-  * `core/analysis/peer_comparison.py`: Cross-company institutional peer comparison, side-by-side metric alignment, and 3-axis disparity diagnostics (Sector, Lifecycle, Scale).
+  * `core/analysis/peer_comparison.py`: Cross-company institutional peer comparison, lazy peer fundamentals resolution, side-by-side metric alignment, and 3-axis disparity diagnostics (Sector, Lifecycle, Scale).
   * `core/analysis/stock_discovery.py`: 09:00 AM daily pre-market candidate discovery pipeline.
   * `core/analysis/daily_stock_ingestion.py`: Pre-market 08:30 AM 15-stock ingestion pipeline, uncovered mutual fund constituent queue prioritization (`scheme_count DESC, total_weight_pct DESC`), 7-pillar synthesis with 7-check health matrix, and incremental mutual fund look-through recalculation.
   * `core/analysis/retail_safety_radar.py`: Cross-asset capital hierarchy risk comparator.
   * `core/analysis/net_real_tax_calculator.py`: Post-tax purchasing power deflator.
   * `core/analysis/mutual_funds_engine.py`: AMFI 6-pillar look-through, fee drag, and active share evaluator across 200 canonical mutual fund schemes.
-  * `core/analysis/fund_overlap_auditor.py`: Pairwise portfolio overlap matrix, constituent look-through aggregator across 200 canonical schemes, and on-demand constituent deep-dive audit synthesizer/archiver with staged progress tracking.
+  * `core/analysis/fund_overlap_auditor.py`: Pairwise portfolio overlap matrix, constituent look-through aggregator across 200 canonical schemes, bounded asynchronous task registry (`MAX_FUND_AUDIT_TASKS = 64`) with eviction prioritizing completed tasks, and on-demand constituent deep-dive audit synthesizer/archiver with staged progress tracking.
   * `core/analysis/debt_catalogue.py`: Structured catalogue of Indian corporate debt securities and SDIs.
   * `core/analysis/sm_reit_invit_engine.py`: Commercial REIT, InvIT, and SGB distribution yield engine.
 * **Zero-Breaking-Change Root Facade (`analyzer.py`):** The root `analyzer.py` exposes a 43-line facade re-exporting all symbols from `core.analysis`, ensuring zero import breakage across UI views, tests, and CLI task runners.
 
 ## 6. Server-Side Rendered Presentation & API Architecture
-* **FastAPI Application Orchestrator (`web/main.py`):** High-concurrency async ASGI application serving Jinja2 server-side rendered HTML views, rate limiting, and REST API routes.
-  * Public Views: `/` (Landing), `/discovery` (Stock Discovery @9AM), `/equities` (Institutional Equities Directory with `market_cap=RECENT` Recently Inducted filter), `/dossier/{ticker}` (Institutional Equity Dossier), `/opportunities` (Opportunity Terminal), `/funds` & `/funds/compare/overlap` (Mutual Funds & ETFs / Fund Overlap Auditor), `/debt` (Bonds, NCDs & SDIs), `/sovereign` (Sovereign Curve & T-Bills), `/reits` (SM REITs, InvITs & SGBs), `/etfs` (National ETF Matrix), `/calculator/tax` (Net Real Tax Calculator), `/safety-radar` (Retail Safety Radar), `/compare` (Peer Comparison), `/pricing` (Pricing & Billing with Location-Aware Multi-Currency Engine & Forex Buffer).
+* **FastAPI Application Orchestrator (`web/main.py`):** High-concurrency async ASGI application serving Jinja2 server-side rendered HTML views, single-worker execution (`--workers 1 --limit-concurrency 60 --timeout-keep-alive 5`), glibc arena trimming (`MALLOC_TRIM_THRESHOLD_=65536`, `PYTHONMALLOC=malloc`), distributed boot-time scheduler lease guards (`job_lease`), rate limiting, and REST API routes.
+  * Public Views: `/` (Landing), `/discovery` (Stock Discovery @9AM), `/equities` (Institutional Equities Directory with `market_cap=RECENT` Recently Inducted filter), `/dossier/{ticker}` (Institutional Equity Dossier), `/opportunities` (Opportunity Terminal), `/funds` & `/funds/compare/overlap` (Mutual Funds & ETFs / Fund Overlap Auditor with crawler LLM defense preventing synchronous external synthesis on GET), `/debt` (Bonds, NCDs & SDIs), `/sovereign` (Sovereign Curve & T-Bills), `/reits` (SM REITs, InvITs & SGBs), `/etfs` (National ETF Matrix), `/calculator/tax` (Net Real Tax Calculator), `/safety-radar` (Retail Safety Radar), `/compare` (Peer Comparison), `/pricing` (Pricing & Billing with Location-Aware Multi-Currency Engine & Forex Buffer).
   * REST APIs: `/api/dossier/intel/{ticker}`, `/api/cortex/*`, `/api/copilot/chat`, `/api/funds/overlap`, `/api/tax/compute`, `/api/auth/*`, `/api/billing/currencies`, `/api/admin/stocks/run-daily-ingest`, `/api/admin/stocks/ingestion-queue`, `/api/admin/ai-spends`.
   * Deep-Dive Paywalls (1 Credit / Permanent):
     * Equity: `POST /api/dossier/unlock/{ticker}` (Pillars 03/05, Reverse DCF Sandbox).
