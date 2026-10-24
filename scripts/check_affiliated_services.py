@@ -94,23 +94,45 @@ def check_betterstack():
 
 
 def check_angel_one():
-    api_key = get_secret("ANGEL_ONE_API_KEY") or os.environ.get("ANGEL_ONE_API_KEY") or ""
-    client_code = get_secret("ANGEL_ONE_CLIENT_CODE") or os.environ.get("ANGEL_ONE_CLIENT_CODE") or ""
-    totp_secret = get_secret("ANGEL_ONE_TOTP_SECRET") or os.environ.get("ANGEL_ONE_TOTP_SECRET") or ""
+    api_key = (
+        get_secret("ANGEL_API_KEY")
+        or get_secret("ANGEL_ONE_API_KEY")
+        or os.environ.get("ANGEL_API_KEY")
+        or os.environ.get("ANGEL_ONE_API_KEY")
+        or ""
+    )
+    client_code = (
+        get_secret("ANGEL_CLIENT_CODE")
+        or get_secret("ANGEL_ONE_CLIENT_CODE")
+        or os.environ.get("ANGEL_CLIENT_CODE")
+        or os.environ.get("ANGEL_ONE_CLIENT_CODE")
+        or ""
+    )
+    totp_secret = (
+        get_secret("ANGEL_TOTP_KEY")
+        or get_secret("ANGEL_ONE_TOTP_SECRET")
+        or os.environ.get("ANGEL_TOTP_KEY")
+        or os.environ.get("ANGEL_ONE_TOTP_SECRET")
+        or ""
+    )
+    proxy_url = get_secret("SMARTAPI_PROXY_URL") or os.environ.get("SMARTAPI_PROXY_URL") or ""
 
     if not (api_key and client_code and totp_secret):
         return {
             "name": "Angel One SmartAPI Gateway",
             "status": "UNCONFIGURED",
             "latency_ms": 0,
-            "details": "Missing ANGEL_ONE_API_KEY, CLIENT_CODE, or TOTP_SECRET",
+            "details": "Missing ANGEL_API_KEY, ANGEL_CLIENT_CODE, or ANGEL_TOTP_KEY",
         }
 
     return {
         "name": "Angel One SmartAPI Gateway",
         "status": "HEALTHY",
         "latency_ms": 0,
-        "details": f"Configured for Client {client_code[:4]}**** • Selective AWS Proxy Active",
+        "details": (
+            f"Configured for Client {client_code[:4]}**** • "
+            f"{'Selective AWS Proxy Active' if proxy_url else 'Direct Egress'} • L2 Depth + Historical EOD Candles"
+        ),
     }
 
 
@@ -128,7 +150,43 @@ def check_gemini_ai():
         "name": "Google Gemini AI Gateway",
         "status": "HEALTHY",
         "latency_ms": 0,
-        "details": "API Key Configured • Fallback Cascade: gemini-3.8-flash -> gemini-3.7-flash",
+        "details": "API Key Configured • Cascade: gemini-3.8-flash -> gemini-3.7-flash + Batch/Flex 50% Tier",
+    }
+
+
+def check_perplexity_sonar():
+    api_key = get_secret("PERPLEXITY_API_KEY") or os.environ.get("PERPLEXITY_API_KEY") or ""
+    if not api_key:
+        return {
+            "name": "Perplexity Sonar Failover Gateway",
+            "status": "UNCONFIGURED",
+            "latency_ms": 0,
+            "details": "PERPLEXITY_API_KEY not configured",
+        }
+
+    return {
+        "name": "Perplexity Sonar Failover Gateway",
+        "status": "HEALTHY",
+        "latency_ms": 0,
+        "details": f"Key Configured ({api_key[:9]}****) • Grounding Failover Active & Standby",
+    }
+
+
+def check_resend_email():
+    api_key = get_secret("RESEND_API_KEY") or os.environ.get("RESEND_API_KEY") or ""
+    if not api_key:
+        return {
+            "name": "Resend Transactional Email Gateway",
+            "status": "UNCONFIGURED",
+            "latency_ms": 0,
+            "details": "RESEND_API_KEY not configured",
+        }
+
+    return {
+        "name": "Resend Transactional Email Gateway",
+        "status": "HEALTHY",
+        "latency_ms": 0,
+        "details": f"Key Configured ({api_key[:7]}****) • Supabase GoTrue Auth Primary + Resend Digest/Ticket Dispatch",
     }
 
 
@@ -162,6 +220,8 @@ def main():
         check_betterstack,
         check_angel_one,
         check_gemini_ai,
+        check_perplexity_sonar,
+        check_resend_email,
         check_razorpay,
     ]
 

@@ -92,17 +92,17 @@ def get_all_provider_constraints() -> Dict[str, Any]:
         "name": "Google Gemini API (GenAI)",
         "category": "LLM Inference",
         "status": "UNCONFIGURED" if not gemini_key else ("WARNING" if gem_pct > 80 else "HEALTHY"),
-        "plan_label": "Pay-As-You-Go (Flash Cascade)",
+        "plan_label": "Pay-As-You-Go (Flash Cascade + Batch 50% Tier)",
         "primary_metric": f"${spent_usd:.4f} / ${monthly_budget_usd:.2f} USD",
         "utilization_pct": gem_pct,
         "secondary_metric": f"{ai_summary.get('total_tokens_formatted', '0')} tokens • {ai_summary.get('cortex_precompression_savings_pct', 92.4)}% saved by cache",
-        "constraint_note": "Tier-1 limit: 1,000–2,000 RPM / 4M TPM. Set GEMINI_MONTHLY_BUDGET_USD in env to adjust alert threshold.",
+        "constraint_note": "Tier-1 limit: 1,000–2,000 RPM / 4M TPM. Daily 08:30 AM ingestion uses Batch/Flex 50% discount tier.",
     })
 
     # -------------------------------------------------------------------------
     # 3. PERPLEXITY SONAR API (FAILOVER ENGINE)
     # -------------------------------------------------------------------------
-    pplx_key = get_secret("PERPLEXITY_API_KEY")
+    pplx_key = get_secret("PERPLEXITY_API_KEY") or os.environ.get("PERPLEXITY_API_KEY")
     providers.append({
         "id": "perplexity_api",
         "name": "Perplexity Sonar API (Failover)",
@@ -111,7 +111,7 @@ def get_all_provider_constraints() -> Dict[str, Any]:
         "plan_label": "Sonar Online (Search Failover)",
         "primary_metric": "50 req/min Cap" if pplx_key else "Not Configured",
         "utilization_pct": 5.0 if pplx_key else 0.0,
-        "secondary_metric": "Key: Active & Standby" if pplx_key else "Missing PERPLEXITY_API_KEY",
+        "secondary_metric": f"Key: {pplx_key[:9]}**** (Active & Standby)" if pplx_key else "Missing PERPLEXITY_API_KEY",
         "constraint_note": "Autonomous failover circuit when Gemini Search Grounding exhausts quota.",
     })
 
@@ -152,28 +152,38 @@ def get_all_provider_constraints() -> Dict[str, Any]:
         "name": "Resend / SMTP Dispatch",
         "category": "Transactional Email",
         "status": "HEALTHY" if email_configured else "UNCONFIGURED",
-        "plan_label": "Resend API" if resend_key else ("Custom SMTP" if smtp_host else "Local Fallback Only"),
+        "plan_label": "Resend API + Supabase GoTrue Auth" if resend_key else ("Custom SMTP" if smtp_host else "Local Fallback Only"),
         "primary_metric": f"{emails_sent_24h} / {daily_email_cap} Daily Cap",
         "utilization_pct": email_pct,
-        "secondary_metric": "Configured & Active" if email_configured else "Missing RESEND_API_KEY / SMTP_HOST",
-        "constraint_note": "Resend Free Tier limits to 100 emails/day (3,000/mo). Required for external ticket & OTP delivery.",
+        "secondary_metric": "Configured & Active (Auth OTPs offloaded to Supabase GoTrue)" if email_configured else "Missing RESEND_API_KEY / SMTP_HOST",
+        "constraint_note": "Resend Free Tier limits to 100 emails/day (3,000/mo). Auth OTPs route via Supabase GoTrue first to preserve Resend quota.",
     })
 
     # -------------------------------------------------------------------------
     # 5. ANGEL ONE SMARTAPI & AWS EGRESS PROXY
     # -------------------------------------------------------------------------
-    ao_key = get_secret("ANGEL_ONE_API_KEY")
-    proxy_url = get_secret("AWS_PROXY_URL") or os.environ.get("SMARTAPI_PROXY_URL", "")
+    ao_key = (
+        get_secret("ANGEL_API_KEY")
+        or get_secret("ANGEL_ONE_API_KEY")
+        or os.environ.get("ANGEL_API_KEY")
+        or os.environ.get("ANGEL_ONE_API_KEY")
+    )
+    proxy_url = (
+        get_secret("SMARTAPI_PROXY_URL")
+        or get_secret("AWS_PROXY_URL")
+        or os.environ.get("SMARTAPI_PROXY_URL")
+        or os.environ.get("AWS_PROXY_URL", "")
+    )
     providers.append({
         "id": "angel_one",
         "name": "Angel One SmartAPI + AWS Proxy",
         "category": "Exchange Market Data",
         "status": "HEALTHY" if ao_key else "WARNING",
-        "plan_label": "SEBI Static IP Egress",
-        "primary_metric": "10 req/sec Quote Limit",
+        "plan_label": "SEBI Static IP Egress (L2 Depth + EOD Candles)",
+        "primary_metric": "10 req/s Quote • 3 req/s EOD Candles",
         "utilization_pct": 15.0 if ao_key else 0.0,
         "secondary_metric": f"Proxy: {'Configured' if proxy_url else 'Direct Egress'} • Key: {'Active' if ao_key else 'Missing'}",
-        "constraint_note": "SmartAPI enforces 10 req/s for L2 quotes and 3 req/s for historical candles.",
+        "constraint_note": "Primary source for L2 quotes and historical EOD candles (10 req/s quotes, 3 req/s historical candles).",
     })
 
     # -------------------------------------------------------------------------
