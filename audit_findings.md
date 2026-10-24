@@ -500,39 +500,35 @@ A live route audit across all 73 registered FastAPI endpoints was performed:
 > For active feature requests, owner directives, and platform roadmaps created after October 16, 2026, refer to the authoritative register:
 > 👉 [**Authoritative Platform Roadmap & Pending Tasks Register (`docs/PENDING_TASKS.md`)**](file:///Users/lyndonpinto/Documents/Stock_Research_App/docs/PENDING_TASKS.md).
 
-The following items constitute the prioritized, operational active tasks:
-
-#### 🔴 P0 — Critical: Security & Runtime Integrity
-1. **Render Production Environment & Secrets Hardening:** *(Completed)*
-   - **Target Files:** `render.yaml`, `web/main.py`, `tests/test_render_hardening.py`
-   - **Details:** Declared `SECRET_KEY`, `ADMIN_API_KEY`, and `ADMIN_PASSWORD` in `render.yaml` with `sync: false`. Enforced strict production boot checks in `web/main.py` requiring a non-empty 32+ character `SECRET_KEY` when deployed. Configured `--workers 2` for multi-threaded performance.
-
-#### 🟠 P1 — High Impact: Core Features & Consistency
-2. **Peer Comparison (`/compare`) Data Source Harmonization (Audit 1 Finding F20):** *(Completed)*
-   - **Target Files:** `core/db/fundamentals.py`, `core/analysis/fundamentals.py`, `core/analysis/peer_comparison.py`, `web/templates/compare.html`, `tests/test_peer_comparison_data.py`
-   - **Details:** Connected `compare_two_companies()` to localized `cached_fundamentals` DB repository (migration `v027_cached_fundamentals`), extracting and caching verified ROCE, ROE, OPM, D/E, and 52-week ranges from report baseline text and discovery reel to ensure 100% non-N/A peer metrics.
-3. **Curated Mutual Fund Top 50 Expansion (Remaining 19 Schemes):** *(Completed)*
-   - **Target Files:** `core/db/mutual_funds.py`, `core/analysis/fund_overlap_auditor.py`, `tests/test_mutual_fund_top50_expansion.py`
-   - **Details:** Ingested 19 marquee institutional equity schemes across Flexi Cap (5), Mid Cap (5), Small Cap (5), and Large & Mid Cap (4) with constituent holdings, verified AMFI metrics, active share, Sortino ratio, and 7-pillar look-through integration to complete the Top 50 canonical universe.
-4. **Hybrid AI Auditor & Failure Synthesizer:** *(Completed)*
-   - **Target Files:** `scripts/ai_auditor.py`, `tests/test_ai_auditor.py`
-   - **Details:** Implemented the bounded 3-persona auditor (Regulatory Baiter, Edge-Case Quant, State Saboteur) using `gemini-3.8-flash` with a strict $0.50 token ceiling that outputs structured threat dossiers and auto-generates failing Python unit tests (`tests/test_regression_*.py`).
-5. **Curated Mutual Fund Top 100 Expansion (Next 50 Schemes):** *(Completed)*
-   - **Target Files:** `core/db/mutual_funds.py`, `core/analysis/fund_overlap_auditor.py`, `tests/test_mutual_fund_top100_expansion.py`
-   - **Details:** Expanded canonical institutional universe from Top 50 to Top 100 marquee schemes across Multi Cap (8), Focused (8), Value/Contra (8), ELSS (8), Large Cap (8), and Thematic/Sectoral (10) categories with verified AMFI metrics, expense drag ratios, active share benchmarks, Sortino ratios, and constituent equity look-through holdings mapped to the platform 143-equity database.
-
-#### 🟡 P2 — Operational Quality & Test Coverage
-6. **Install `openpyxl` Locally:** *(Completed)*
-   - **Details:** Installed `openpyxl 3.1.5` and `et-xmlfile 2.0.0` locally. Unskipped all 13 tests in `tests/test_mf_portfolio_ingest.py`, bringing suite execution to 100% (334 passed, 0 skipped, 0 failed).
-7. **Operational Gateway Liveness & Token Lifecycle Monitoring:** *(Completed)*
-   - **Target Files:** `core/ingestion/angel_one.py`, `scripts/verify_angel_proxy_ip.py`
-   - **Details:** Verified AWS Lightsail proxy daemon (`13.54.76.134:8888`), authenticated RFC 6238 TOTP session tokens against `apiconnect.angelone.in`, and verified live Level-2 market depth quote ingestion (`RELIANCE-EQ` LTP ₹1170.30, 52W range ₹1160.20-₹1611.80, order imbalance 1.0).
-
-#### ⚪ P3 — Hygiene & Explicitly Parked Backlog
-- **Completed (2026-10-11):** Unlisted MSME & SME Intelligence Platform (`/msme`, `core/msme/`) — Full 60-enterprise benchmark cluster seeding, dual-dialect SQL search, statutory MSMED Act 2020 tier classification, resilient open data ingestion, and interactive directory terminal.
-- **Completed (2026-10-11):** Audit AUD-20261010-213000 remediation — dynamic `_IncludedRouter` contract scanner, zero silent `except: pass`, and SVG sprite glyph migration of the audited legacy emojis (score 100.0/100).
+#### ⚪ Active Deferred & Parked Backlog
 - **Deferred Items:** Full CAS Encrypted PDF Parser.
 - **Parked (build only if users ask for mobile) — Mobile Brief Mode:** Compact, read-only "brief" response style for the Forensic Intelligence Desk on a mobile-first page (e.g. `/m`): headline score + top risk flag + link to the full desktop dossier, a daily 9AM discovery digest, and one-pillar-at-a-time follow-ups. Must stay deterministic (Gate 4), summarise only computed data, keep the SEBI non-advisory line, and respect credits and gated pillars.
+
+#### ✅ Completed Tasks (Moved to Bottom)
+1. ~~**Render Production Environment & Secrets Hardening (P0):** *(Completed)*~~
+   - ~~**Target Files:** `render.yaml`, `web/main.py`, `tests/test_render_hardening.py`~~
+   - ~~**Details:** Declared `SECRET_KEY`, `ADMIN_API_KEY`, and `ADMIN_PASSWORD` in `render.yaml` with `sync: false`. Enforced strict production boot checks in `web/main.py` requiring a non-empty 32+ character `SECRET_KEY` when deployed.~~
+2. ~~**Peer Comparison (`/compare`) Data Source Harmonization — Audit 1 Finding F20 (P1):** *(Completed)*~~
+   - ~~**Target Files:** `core/db/fundamentals.py`, `core/analysis/fundamentals.py`, `core/analysis/peer_comparison.py`, `web/templates/compare.html`, `tests/test_peer_comparison_data.py`~~
+   - ~~**Details:** Connected `compare_two_companies()` to localized `cached_fundamentals` DB repository (migration `v027_cached_fundamentals`), extracting and caching verified ROCE, ROE, OPM, D/E, and 52-week ranges from report baseline text and discovery reel to ensure 100% non-N/A peer metrics.~~
+3. ~~**Curated Mutual Fund Top 50 Expansion — Remaining 19 Schemes (P1):** *(Completed)*~~
+   - ~~**Target Files:** `core/db/mutual_funds.py`, `core/analysis/fund_overlap_auditor.py`, `tests/test_mutual_fund_top50_expansion.py`~~
+   - ~~**Details:** Ingested 19 marquee institutional equity schemes across Flexi Cap (5), Mid Cap (5), Small Cap (5), and Large & Mid Cap (4) with constituent holdings, verified AMFI metrics, active share, Sortino ratio, and 7-pillar look-through integration to complete the Top 50 canonical universe.~~
+4. ~~**Hybrid AI Auditor & Failure Synthesizer (P1):** *(Completed)*~~
+   - ~~**Target Files:** `scripts/ai_auditor.py`, `tests/test_ai_auditor.py`~~
+   - ~~**Details:** Implemented the bounded 3-persona auditor (Regulatory Baiter, Edge-Case Quant, State Saboteur) using `gemini-3.8-flash` with a strict \$0.50 token ceiling that outputs structured threat dossiers and auto-generates failing Python unit tests (`tests/test_regression_*.py`).~~
+5. ~~**Curated Mutual Fund Top 100 Expansion — Next 50 Schemes (P1):** *(Completed)*~~
+   - ~~**Target Files:** `core/db/mutual_funds.py`, `core/analysis/fund_overlap_auditor.py`, `tests/test_mutual_fund_top100_expansion.py`~~
+   - ~~**Details:** Expanded canonical institutional universe from Top 50 to Top 100 marquee schemes across Multi Cap (8), Focused (8), Value/Contra (8), ELSS (8), Large Cap (8), and Thematic/Sectoral (10) categories with verified AMFI metrics, expense drag ratios, active share benchmarks, Sortino ratios, and constituent equity look-through holdings mapped to the platform 143-equity database.~~
+6. ~~**Install `openpyxl` Locally (P2):** *(Completed)*~~
+   - ~~**Details:** Installed `openpyxl 3.1.5` and `et-xmlfile 2.0.0` locally. Unskipped all 13 tests in `tests/test_mf_portfolio_ingest.py`, bringing suite execution to 100% (334 passed, 0 skipped, 0 failed).~~
+7. ~~**Operational Gateway Liveness & Token Lifecycle Monitoring (P2):** *(Completed)*~~
+   - ~~**Target Files:** `core/ingestion/angel_one.py`, `scripts/verify_angel_proxy_ip.py`~~
+   - ~~**Details:** Verified AWS Lightsail proxy daemon (`13.54.76.134:8888`), authenticated RFC 6238 TOTP session tokens against `apiconnect.angelone.in`, and verified live Level-2 market depth quote ingestion (`RELIANCE-EQ` LTP ₹1170.30, 52W range ₹1160.20-₹1611.80, order imbalance 1.0).~~
+8. ~~**Unlisted MSME & SME Intelligence Platform (`/msme`, `core/msme/`) (P3):** *(Completed 2026-10-11)*~~
+   - ~~**Details:** Full 60-enterprise benchmark cluster seeding, dual-dialect SQL search, statutory MSMED Act 2020 tier classification, resilient open data ingestion, and interactive directory terminal.~~
+9. ~~**Audit AUD-20261010-213000 Remediation (P3):** *(Completed 2026-10-11)*~~
+   - ~~**Details:** Dynamic `_IncludedRouter` contract scanner, zero silent `except: pass`, and SVG sprite glyph migration of the audited legacy emojis (score 100.0/100).~~
 
 ---
 
