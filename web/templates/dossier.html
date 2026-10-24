@@ -96,6 +96,9 @@
           <button id="dossierReadingToggleBtn" type="button" onclick="toggleDossierReadingMode()" class="btn btn-secondary btn-sm" title="Toggle Warm Ivory Reading Surface" aria-label="Toggle Warm Ivory Reading Surface" aria-pressed="false">
             <svg class="glyph"><use href="#icon-reading-surface"></use></svg>
           </button>
+          <a id="dossierBriefViewLink" href="/m/equity/{{ ticker }}" class="btn btn-secondary btn-sm" title="Open the 30-second Brief View of this report" aria-label="Open Brief View for {{ ticker }}" style="text-decoration: none;">
+            <svg class="glyph"><use href="#icon-insights"></use></svg> Brief View
+          </a>
           <button id="btnShareDossier" onclick="shareCurrentPage('dossier')" class="btn btn-secondary btn-sm" title="Copy or share a link to this report" aria-label="Share this report">
             <svg class="glyph"><use href="#glyph-globe"></use></svg> Share
           </button>

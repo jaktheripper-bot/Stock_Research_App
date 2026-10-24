@@ -1017,6 +1017,84 @@ def discovery_page(request: Request, edition: Optional[str] = Query(None)):
     )
 
 
+_MOBILE_BRIEF_UNLOCK_DOMAINS = {
+    "equity": "EQUITY", "equities": "EQUITY", "stock": "EQUITY",
+    "fund": "FUND", "funds": "FUND", "mf": "FUND",
+    "debt": "DEBT", "bond": "DEBT", "ncd": "DEBT",
+    "reit": "REIT", "reits": "REIT", "invit": "REIT",
+    "msme": "MSME", "sme": "MSME",
+}
+
+
+def _mobile_brief_unlock_domain(kind: str) -> str:
+    """Map brief asset-type aliases to the canonical namespaced unlock domain (EQUITY/FUND/DEBT/REIT/MSME)."""
+    return _MOBILE_BRIEF_UNLOCK_DOMAINS.get(kind, kind.upper())
+
+
+@app.get("/m", response_class=HTMLResponse)
+def mobile_brief_hub_page(request: Request, q: Optional[str] = Query(None), edition: Optional[str] = Query(None)):
+    """Mobile Brief Mode (/m): 30-second commuter research hub and quick ticker jump."""
+    if q and q.strip():
+        return RedirectResponse(url=f"/m/equity/{clean_ticker(q.strip())}", status_code=302)
+
+    from core.analysis.mobile_brief import compile_morning_hub_brief
+    hub = compile_morning_hub_brief(edition_date=edition)
+    return templates.TemplateResponse(
+        request=request,
+        name="mobile_brief.html",
+        context={
+            "active_page": "discovery",
+            "brief": None,
+            "hub": hub,
+        },
+    )
+
+
+@app.get("/m/{ticker}", response_class=HTMLResponse)
+def mobile_brief_equity_shorthand_page(request: Request, ticker: str):
+    """Shorthand `/m/{ticker}` route for listed equity mobile briefs."""
+    return mobile_brief_asset_page(request=request, asset_type="equity", asset_id=ticker)
+
+
+@app.get("/m/{asset_type}/{asset_id}", response_class=HTMLResponse)
+def mobile_brief_asset_page(request: Request, asset_type: str, asset_id: str):
+    """Multi-asset Mobile Brief Mode card (`/m/{asset_type}/{asset_id}`)."""
+    from core.analysis.mobile_brief import compile_asset_mobile_brief, compile_morning_hub_brief
+
+    kind = (asset_type or "equity").strip().lower()
+    is_unlocked = _asset_unlocked_for_request(request, _mobile_brief_unlock_domain(kind), asset_id)
+    brief = compile_asset_mobile_brief(asset_type=kind, asset_id=asset_id, is_unlocked=is_unlocked)
+    if not brief:
+        if kind in ("equity", "equities", "stock"):
+            return RedirectResponse(url=f"/dossier/{clean_ticker(asset_id)}", status_code=302)
+        raise HTTPException(status_code=404, detail=f"Brief not found for {asset_type}/{asset_id}")
+
+    return templates.TemplateResponse(
+        request=request,
+        name="mobile_brief.html",
+        context={
+            "active_page": "discovery",
+            "brief": brief,
+            "hub": compile_morning_hub_brief(),
+        },
+    )
+
+
+@app.get("/api/mobile-brief/{asset_type}/{asset_id}")
+def api_get_mobile_brief(request: Request, asset_type: str, asset_id: str):
+    """Deterministic JSON endpoint for Mobile Brief Mode (zero LLM calls)."""
+    from fastapi.encoders import jsonable_encoder
+    from core.analysis.mobile_brief import compile_asset_mobile_brief
+
+    kind = (asset_type or "equity").strip().lower()
+    is_unlocked = _asset_unlocked_for_request(request, _mobile_brief_unlock_domain(kind), asset_id)
+    brief = compile_asset_mobile_brief(asset_type=kind, asset_id=asset_id, is_unlocked=is_unlocked)
+    if not brief:
+        raise HTTPException(status_code=404, detail="Asset brief not found")
+    return JSONResponse(content=jsonable_encoder(brief))
+
+
+
 @app.get("/pricing", response_class=HTMLResponse)
 def pricing_page(request: Request):
     """Public pricing and checkout page displaying single-pass, credit packs, and Pro memberships."""

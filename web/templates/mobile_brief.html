@@ -1,0 +1,230 @@
+{% extends "base.html" %}
+
+{% block title %}{% if brief %}{{ brief.title }} — 30-Second Brief | Moatnomics{% else %}30-Second Briefs (/m) | Moatnomics{% endif %}{% endblock %}
+{% block meta_desc %}{% if brief %}A 30-second, evidence-based brief of {{ brief.title }} with its main risk to watch and a link to the full report.{% else %}Quick, read-only research briefs on Indian equities, funds, bonds, REITs and unlisted MSMEs, refreshed with the 9 AM morning edition.{% endif %}{% endblock %}
+
+{% block content %}
+<div class="container" id="mobileBriefRoot" style="max-width: 680px; margin: 0 auto; padding-top: 16px; padding-bottom: 48px;">
+
+  <!-- Compact masthead -->
+  <header class="hero-portal-banner asset-card-accent" data-asset-class="{{ brief.asset_class_token if brief else 'equities' }}" style="padding: 20px 22px; margin-bottom: 20px;">
+    <div style="display: flex; justify-content: space-between; align-items: center; gap: 10px; flex-wrap: wrap; margin-bottom: 8px;">
+      <span class="badge badge-cyan" style="font-size: 11px; letter-spacing: 0.06em; text-transform: uppercase;">
+        <svg class="glyph" style="width: 12px; height: 12px; vertical-align: -2px;"><use href="#icon-insights"></use></svg>
+        Brief View
+      </span>
+      {% if brief %}
+      <a id="mbBackToHub" href="/m" class="btn btn-secondary btn-sm" style="font-size: 12px; padding: 4px 10px; text-decoration: none;">&larr; Morning briefs</a>
+      {% else %}
+      <span style="font-size: 12px; color: var(--text-muted);" class="tnum">Edition: {{ hub.formatted_date }}</span>
+      {% endif %}
+    </div>
+
+    {% if brief %}
+    <h1 style="font-size: 1.45rem; margin: 0 0 4px 0; line-height: 1.25;">{{ brief.title }}</h1>
+    <div style="font-size: 12.5px; color: var(--text-secondary);" class="tnum">{{ brief.subtitle }}</div>
+    {% else %}
+    <h1 style="font-size: 1.45rem; margin: 0 0 6px 0; line-height: 1.25;">30-Second Research Briefs</h1>
+    <p style="margin: 0; font-size: 13px; color: var(--text-secondary); line-height: 1.5;">
+      Short evidence summaries with the main risk to watch, built from stored reports. Nothing here is generated on page load.
+    </p>
+    {% endif %}
+
+    <form id="mbJumpForm" action="/m" method="get" style="margin-top: 14px; display: flex; gap: 8px;">
+      <input
+        id="mbJumpInput"
+        type="text"
+        name="q"
+        placeholder="Open a listed stock's brief (e.g. INFY, TCS)"
+        aria-label="Listed stock ticker"
+        autocomplete="off"
+        style="flex: 1; font-size: 16px; padding: 8px 12px; border-radius: 8px; border: 1px solid var(--border-color); background: var(--bg-card); color: var(--text-primary);"
+        required
+      >
+      <button id="mbJumpSubmit" type="submit" class="btn btn-primary btn-sm" style="padding: 8px 14px;">Open Brief</button>
+    </form>
+  </header>
+
+  {% if brief %}
+  <!-- Single-asset brief -->
+  <section class="card asset-card-accent" data-asset-class="{{ brief.asset_class_token }}" style="padding: 20px; margin-bottom: 18px;">
+    <div style="display: flex; justify-content: space-between; align-items: center; gap: 8px; flex-wrap: wrap; margin-bottom: 12px;">
+      <span class="badge badge-emerald" style="font-size: 11.5px; font-weight: 700;">{{ brief.headline_score }}</span>
+      <span style="font-size: 11.5px; color: var(--text-muted);" class="tnum">Data as of: {{ brief.last_updated }}</span>
+    </div>
+
+    <div style="margin-bottom: 16px;">
+      <h2 style="font-size: 11px; font-weight: 800; text-transform: uppercase; letter-spacing: 0.06em; color: var(--text-muted); margin: 0 0 8px 0;">Key evidence</h2>
+      <ul style="margin: 0; padding-left: 18px; display: grid; gap: 8px; font-size: 14px; line-height: 1.55; color: var(--text-primary);">
+        {% for line in brief.brief_lines %}
+        <li>{{ line }}</li>
+        {% endfor %}
+      </ul>
+    </div>
+
+    <div style="padding: 12px 14px; border-radius: 8px; background: rgba(245, 158, 11, 0.10); border-left: 3px solid #f59e0b; margin-bottom: 16px;">
+      <h2 style="font-size: 11px; font-weight: 800; text-transform: uppercase; letter-spacing: 0.06em; color: var(--accent-amber); margin: 0 0 4px 0;">Main risk to watch</h2>
+      <div style="font-size: 13.5px; line-height: 1.5; color: var(--text-primary);">{{ brief.top_risk_flag }}</div>
+    </div>
+
+    {% if brief.pillar_chips %}
+    <div style="margin-bottom: 18px;">
+      <h2 style="font-size: 11px; font-weight: 800; text-transform: uppercase; letter-spacing: 0.06em; color: var(--text-muted); margin: 0 0 8px 0;">Ask the Research Desk, one pillar at a time</h2>
+      <div style="display: grid; grid-template-columns: 1fr; gap: 8px;">
+        {% for chip in brief.pillar_chips %}
+        {% if chip.locked %}
+        <button
+          type="button"
+          id="mbPillar{{ chip.num }}"
+          data-mb-action="unlock"
+          data-asset-id="{{ brief.asset_id }}"
+          class="btn btn-secondary btn-sm"
+          style="justify-content: space-between; display: flex; align-items: center; text-align: left; padding: 9px 12px; width: 100%;"
+        >
+          <span><svg class="glyph" style="width: 13px; height: 13px; vertical-align: -2px; margin-right: 6px;"><use href="#icon-lock"></use></svg>{{ chip.label }}</span>
+          <span class="badge badge-amber" style="font-size: 10.5px;">{{ chip.status }}</span>
+        </button>
+        {% else %}
+        <button
+          type="button"
+          id="mbPillar{{ chip.num }}"
+          data-mb-action="copilot"
+          data-asset-id="{{ brief.asset_id }}"
+          data-asset-type="{{ brief.asset_type }}"
+          data-section="{{ chip.key|lower }}"
+          data-label="{{ chip.label }}"
+          data-prompt="{{ chip.prompt }}"
+          class="btn btn-secondary btn-sm"
+          style="justify-content: space-between; display: flex; align-items: center; text-align: left; padding: 9px 12px; width: 100%;"
+        >
+          <span><svg class="glyph" style="width: 13px; height: 13px; vertical-align: -2px; margin-right: 6px;"><use href="#icon-research"></use></svg>{{ chip.label }}</span>
+          <span class="badge badge-cyan" style="font-size: 10.5px;">{{ chip.status }} &rarr;</span>
+        </button>
+        {% endif %}
+        {% endfor %}
+      </div>
+    </div>
+    {% endif %}
+
+    <div style="display: flex; gap: 10px; flex-wrap: wrap; padding-top: 12px; border-top: 1px solid var(--border-subtle);">
+      <a id="mbOpenFullReport" href="{{ brief.desktop_url }}" class="btn btn-primary btn-sm" style="flex: 1; text-align: center; text-decoration: none;">Open full report &rarr;</a>
+      <button
+        type="button"
+        id="mbAskDesk"
+        data-mb-action="copilot"
+        data-asset-id="{{ brief.asset_id }}"
+        data-asset-type="{{ brief.asset_type }}"
+        class="btn btn-secondary btn-sm"
+      >
+        <svg class="glyph" style="width: 14px; height: 14px;"><use href="#glyph-shield"></use></svg> Ask Research Desk
+      </button>
+    </div>
+  </section>
+
+  {% else %}
+  <!-- Morning bouquet feed -->
+  <section style="display: grid; gap: 14px;">
+    <h2 style="font-size: 12px; font-weight: 800; text-transform: uppercase; letter-spacing: 0.06em; color: var(--text-muted); margin: 0;">
+      Morning equity ideas · {{ hub.formatted_date }}
+    </h2>
+
+    {% for eq in hub.bouquet.equities %}
+    <article class="card asset-card-accent" data-asset-class="equities" role="link" tabindex="0" data-href="/m/equity/{{ eq.canonical or eq.ticker }}" style="padding: 16px;">
+      <div style="display: flex; justify-content: space-between; align-items: baseline; gap: 8px; flex-wrap: wrap; margin-bottom: 6px;">
+        <strong style="font-size: 15px;">{{ eq.company_name }} ({{ eq.ticker }})</strong>
+        {% if eq.roce %}<span class="badge badge-emerald tnum" style="font-size: 11px;">ROCE {{ eq.roce }}%</span>{% endif %}
+      </div>
+      <div style="font-size: 12px; color: var(--text-muted); margin-bottom: 8px;" class="tnum">
+        {% if eq.sector %}Sector: {{ eq.sector }}{% endif %}
+        {% if eq.sales_growth_3y is not none %} · 3Y sales growth: {{ eq.sales_growth_3y }}%{% endif %}
+        {% if eq.debt_to_equity is not none %} · D/E: {{ eq.debt_to_equity }}x{% endif %}
+        {% if eq.cmp %} · CMP: ₹{{ eq.cmp }}{% endif %}
+      </div>
+      {% if eq.thesis %}
+      <p style="margin: 0 0 10px 0; font-size: 13px; line-height: 1.5; color: var(--text-secondary);">{{ eq.thesis }}</p>
+      {% endif %}
+      <div style="display: flex; gap: 14px; font-size: 12.5px; font-weight: 700;">
+        <a href="/m/equity/{{ eq.canonical or eq.ticker }}" style="color: var(--asset-accent); text-decoration: none;">30-second brief &rarr;</a>
+        <a href="{{ eq.dossier_url }}" style="color: var(--text-muted); text-decoration: none;">Full report &rarr;</a>
+      </div>
+    </article>
+    {% endfor %}
+
+    {% if hub.bouquet.sovereign %}
+    <article class="card asset-card-accent" data-asset-class="sovereign" role="link" tabindex="0" data-href="/sovereign" style="padding: 16px;">
+      <h3 style="font-size: 11px; font-weight: 800; text-transform: uppercase; letter-spacing: 0.06em; color: var(--asset-accent); margin: 0 0 4px 0;">Government bond yields &amp; RBI rate</h3>
+      <div style="font-size: 14px; font-weight: 700; margin-bottom: 6px;" class="tnum">
+        10Y G-Sec: {{ hub.bouquet.sovereign.ten_year_gsec }}% · 1Y T-Bill: {{ hub.bouquet.sovereign.one_year_tbill }}% · Repo: {{ hub.bouquet.sovereign.repo_rate }}%
+      </div>
+      <p style="margin: 0 0 8px 0; font-size: 13px; color: var(--text-secondary); line-height: 1.5;">{{ hub.bouquet.sovereign.stance }}</p>
+      <a href="/sovereign" style="font-size: 12.5px; font-weight: 700; color: var(--asset-accent); text-decoration: none;">Open yield curve &rarr;</a>
+    </article>
+    {% endif %}
+
+    {% if hub.bouquet.mutual_fund %}
+    <article class="card asset-card-accent" data-asset-class="funds" role="link" tabindex="0" data-href="/m/fund/{{ hub.bouquet.mutual_fund.scheme_code }}" style="padding: 16px;">
+      <h3 style="font-size: 11px; font-weight: 800; text-transform: uppercase; letter-spacing: 0.06em; color: var(--asset-accent); margin: 0 0 4px 0;">Mutual fund spotlight</h3>
+      <div style="font-size: 14px; font-weight: 700; margin-bottom: 4px;">{{ hub.bouquet.mutual_fund.scheme_name }}</div>
+      <div style="font-size: 12px; color: var(--text-muted); margin-bottom: 6px;" class="tnum">
+        Active share: {{ hub.bouquet.mutual_fund.active_share }} · Direct plan expense ratio: {{ hub.bouquet.mutual_fund.expense_ratio }}
+      </div>
+      <p style="margin: 0 0 8px 0; font-size: 13px; color: var(--text-secondary); line-height: 1.5;">{{ hub.bouquet.mutual_fund.takeaway }}</p>
+      <div style="display: flex; gap: 14px; font-size: 12.5px; font-weight: 700;">
+        <a href="/m/fund/{{ hub.bouquet.mutual_fund.scheme_code }}" style="color: var(--asset-accent); text-decoration: none;">30-second brief &rarr;</a>
+        <a href="/funds/{{ hub.bouquet.mutual_fund.scheme_code }}" style="color: var(--text-muted); text-decoration: none;">Full report &rarr;</a>
+      </div>
+    </article>
+    {% endif %}
+
+    {% if hub.bouquet.msme %}
+    <article class="card asset-card-accent" data-asset-class="msme" role="link" tabindex="0" data-href="/m/msme/{{ hub.bouquet.msme.uin }}" style="padding: 16px;">
+      <h3 style="font-size: 11px; font-weight: 800; text-transform: uppercase; letter-spacing: 0.06em; color: var(--asset-accent); margin: 0 0 4px 0;">Unlisted MSME spotlight</h3>
+      <div style="font-size: 14px; font-weight: 700; margin-bottom: 4px;">{{ hub.bouquet.msme.company_name }}</div>
+      <div style="font-size: 12px; color: var(--text-muted); margin-bottom: 6px;" class="tnum">
+        {{ hub.bouquet.msme.cluster }}{% if hub.bouquet.msme.roce %} · {{ hub.bouquet.msme.roce }}{% endif %}
+      </div>
+      {% if hub.bouquet.msme.moat_note %}
+      <p style="margin: 0 0 8px 0; font-size: 13px; color: var(--text-secondary); line-height: 1.5;">{{ hub.bouquet.msme.moat_note }}</p>
+      {% endif %}
+      <div style="display: flex; gap: 14px; font-size: 12.5px; font-weight: 700;">
+        <a href="/m/msme/{{ hub.bouquet.msme.uin }}" style="color: var(--asset-accent); text-decoration: none;">30-second brief &rarr;</a>
+        <a href="/msme/{{ hub.bouquet.msme.uin }}" style="color: var(--text-muted); text-decoration: none;">Full report &rarr;</a>
+      </div>
+    </article>
+    {% endif %}
+  </section>
+  {% endif %}
+
+  <!-- Non-advisory disclosure -->
+  <aside id="mbDisclaimer" style="margin-top: 20px; padding: 12px 14px; border-radius: 8px; border: 1px solid var(--border-subtle); font-size: 11.5px; line-height: 1.55; color: var(--text-secondary);">
+    {{ (brief.sebi_disclaimer if brief else hub.sebi_disclaimer) }}
+  </aside>
+</div>
+
+{% include "partials/copilot_modal.html" %}
+<script src="/static/js/copilot.js?v=20261019_1900"></script>
+<script>
+(function () {
+  var root = document.getElementById('mobileBriefRoot');
+  if (!root) return;
+  // One delegated handler; opens the Research Desk / unlock flow synchronously inside the click gesture.
+  root.addEventListener('click', function (ev) {
+    var btn = ev.target.closest('[data-mb-action]');
+    if (!btn || !root.contains(btn)) return;
+    var action = btn.getAttribute('data-mb-action');
+    var assetId = btn.getAttribute('data-asset-id') || '';
+    if (action === 'unlock' && typeof window.unlockDeepDive === 'function') {
+      window.unlockDeepDive(assetId);
+    } else if (action === 'copilot' && typeof window.openCopilot === 'function') {
+      window.openCopilot(
+        assetId,
+        btn.getAttribute('data-asset-type') || 'equity',
+        btn.getAttribute('data-section') || undefined,
+        btn.getAttribute('data-label') || undefined,
+        btn.getAttribute('data-prompt') || undefined
+      );
+    }
+  });
+})();
+</script>
+{% endblock %}
