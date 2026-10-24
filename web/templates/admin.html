@@ -5450,7 +5450,11 @@ html[data-theme="light"] .dwell-sortable-th:hover {
       closeAdminModal('broadcastDigestModal');
 
       if (resp.ok && data.success) {
-        showDigestAlert(`✓ Broadcast completed! Delivered: ${data.delivered}, Failed: ${data.failed} of ${data.recipients} recipients.`, 'success');
+        if (data.status === 'ALREADY_DISPATCHED') {
+          showDigestAlert(`ℹ️ Notice: ${data.message || "Today's edition has already been dispatched."}`, 'warning');
+        } else {
+          showDigestAlert(`✓ Broadcast completed! Delivered: ${data.delivered}, Failed: ${data.failed} of ${data.recipients} recipients.`, 'success');
+        }
         refreshDigestHistory();
       } else {
         showDigestAlert(`Broadcast failed: ${data.detail || data.message || 'Unknown error'}`, 'error');
@@ -5505,6 +5509,10 @@ html[data-theme="light"] .dwell-sortable-th:hover {
       banner.style.background = 'rgba(16, 185, 129, 0.15)';
       banner.style.border = '1px solid rgba(16, 185, 129, 0.4)';
       banner.style.color = '#34d399';
+    } else if (type === 'warning' || type === 'info') {
+      banner.style.background = 'rgba(245, 158, 11, 0.15)';
+      banner.style.border = '1px solid rgba(245, 158, 11, 0.4)';
+      banner.style.color = '#fbbf24';
     } else {
       banner.style.background = 'rgba(239, 68, 68, 0.15)';
       banner.style.border = '1px solid rgba(239, 68, 68, 0.4)';

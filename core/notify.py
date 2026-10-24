@@ -81,7 +81,8 @@ def _dispatch_via_resend(from_email: str, to_email: str, subject: str, text: str
         import ssl
         try:
             import certifi
-            ctx = ssl.create_default_context(cafile=certifi.where())
+            ca_file = os.environ.get("SSL_CERT_FILE") or certifi.where()
+            ctx = ssl.create_default_context(cafile=ca_file)
         except Exception as e:
             logger.warning("certifi not available or context creation failed, using system default SSL context: %s", e)
             ctx = ssl.create_default_context()
@@ -342,7 +343,8 @@ Moatnomics Service Desk
 def dispatch_research_bouquet(
     edition_date: Optional[str] = None,
     test_recipient: Optional[str] = None,
-    only_active_pro: bool = False
+    only_active_pro: bool = False,
+    force: bool = False,
 ) -> dict:
     """
     Dispatches the Research Bouquet & Morning Digest to subscribers or a test recipient.
@@ -357,6 +359,7 @@ def dispatch_research_bouquet(
     from core.db.digest import (
         get_digest_subscribers,
         record_digest_dispatch,
+        has_edition_been_dispatched,
     )
 
     bouquet = compile_research_bouquet(edition_date=edition_date)
@@ -406,6 +409,21 @@ def dispatch_research_bouquet(
         }
 
     # Broadcast to registered subscribers
+    if not force and has_edition_been_dispatched(bouquet["edition_date"]):
+        logger.info(
+            "[Research Bouquet] Edition %s has already been broadcast (idempotency guard). Skipping duplicate dispatch.",
+            bouquet["edition_date"],
+        )
+        return {
+            "success": True,
+            "status": "ALREADY_DISPATCHED",
+            "message": f"Edition for {bouquet['edition_date']} has already been broadcast.",
+            "edition_date": bouquet["edition_date"],
+            "delivered": 0,
+            "failed": 0,
+            "recipients": 0,
+        }
+
     subscribers = get_digest_subscribers(only_active_pro=only_active_pro)
     if not subscribers:
         logger.warning("No eligible digest subscribers found for dispatch.")

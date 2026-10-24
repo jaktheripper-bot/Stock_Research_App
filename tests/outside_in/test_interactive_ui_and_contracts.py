@@ -1513,7 +1513,7 @@ class TestCompetitiveEnhancements(unittest.TestCase):
         self.assertEqual(BRAND_PALETTE_V2["sage"]["hex"], "#7DA77A")
         self.assertEqual(BRAND_PALETTE_V2["botanical_lime"]["hex"], "#C7E268")
         self.assertEqual(len(ASSET_CLASS_ACCENTS_V2), 7)
-        self.assertEqual(len(CANONICAL_ICONS_V2), 12)
+        self.assertEqual(len(CANONICAL_ICONS_V2), 13)
 
         resp_home = self.client.get("/")
         self.assertEqual(resp_home.status_code, 200)

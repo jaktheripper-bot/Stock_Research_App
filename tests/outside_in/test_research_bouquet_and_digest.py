@@ -22,6 +22,7 @@ from core.db.digest import (
     set_user_digest_subscription,
     record_digest_dispatch,
     get_digest_dispatch_history,
+    has_edition_been_dispatched,
 )
 from core.analysis.research_bouquet import (
     compile_research_bouquet,
@@ -235,6 +236,119 @@ class TestResearchBouquetAndDigest(unittest.TestCase):
                 val = str(tag[attr])
                 self.assertNotIn("{{", val, f"Unrendered Jinja leak in {attr}: {val}")
                 self.assertNotIn("{%", val, f"Unrendered Jinja block leak in {attr}: {val}")
+
+    def test_08_has_edition_been_dispatched_idempotency(self):
+        """Validates has_edition_been_dispatched correctly guards broadcast status without blocking tests."""
+        test_date = "2026-10-28"
+        conn = get_db_connection()
+        cur = conn.cursor()
+        p = get_placeholder()
+        cur.execute(f"DELETE FROM digest_dispatches WHERE edition_date = {p};", (test_date,))
+        conn.commit()
+        cur.close()
+        conn.close()
+        
+        # 1. Non-existent date or empty inputs
+        self.assertFalse(has_edition_been_dispatched(""))
+        self.assertFalse(has_edition_been_dispatched(test_date))
+
+        # 2. TEST_SENT record should NOT mark edition as dispatched
+        record_digest_dispatch(
+            edition_date=test_date,
+            subject="Test Dispatch",
+            recipients_count=1,
+            delivered_count=1,
+            failed_count=0,
+            status="TEST_SENT",
+        )
+        self.assertFalse(has_edition_been_dispatched(test_date))
+
+        # 3. FAILED record should NOT mark edition as dispatched
+        record_digest_dispatch(
+            edition_date=test_date,
+            subject="Failed Dispatch",
+            recipients_count=10,
+            delivered_count=0,
+            failed_count=10,
+            status="FAILED",
+        )
+        self.assertFalse(has_edition_been_dispatched(test_date))
+
+        # 4. COMPLETED record marks edition as dispatched
+        record_digest_dispatch(
+            edition_date=test_date,
+            subject="Completed Broadcast",
+            recipients_count=5,
+            delivered_count=5,
+            failed_count=0,
+            status="COMPLETED",
+        )
+        self.assertTrue(has_edition_been_dispatched(test_date))
+
+        # Cleanup
+        conn = get_db_connection()
+        cur = conn.cursor()
+        cur.execute(f"DELETE FROM digest_dispatches WHERE edition_date = {p};", (test_date,))
+        conn.commit()
+        cur.close()
+        conn.close()
+
+    def test_09_broadcast_idempotency_guard_and_force_override(self):
+        """Validates dispatch_research_bouquet and API broadcast prevent duplicate sends unless forced."""
+        test_date = "2026-10-29"
+        conn = get_db_connection()
+        cur = conn.cursor()
+        p = get_placeholder()
+        cur.execute(f"DELETE FROM digest_dispatches WHERE edition_date = {p};", (test_date,))
+        conn.commit()
+        cur.close()
+        conn.close()
+
+        # Record initial completed broadcast
+        record_digest_dispatch(
+            edition_date=test_date,
+            subject="Existing Broadcast",
+            recipients_count=1,
+            delivered_count=1,
+            failed_count=0,
+            status="COMPLETED",
+        )
+        self.assertTrue(has_edition_been_dispatched(test_date))
+
+        # Direct function call without force -> ALREADY_DISPATCHED
+        res = dispatch_research_bouquet(edition_date=test_date, force=False)
+        self.assertTrue(res["success"])
+        self.assertEqual(res["status"], "ALREADY_DISPATCHED")
+        self.assertEqual(res["delivered"], 0)
+
+        # Authenticated API broadcast without force -> ALREADY_DISPATCHED
+        self.client.cookies.set(ADMIN_COOKIE_NAME, self.admin_token)
+        api_res = self.client.post(
+            "/api/admin/digest/broadcast",
+            json={"edition_date": test_date, "force": False}
+        )
+        self.assertEqual(api_res.status_code, 200)
+        data = api_res.json()
+        self.assertTrue(data["success"])
+        self.assertEqual(data["status"], "ALREADY_DISPATCHED")
+
+        # Authenticated API broadcast with force=True -> succeeds and dispatches
+        api_res_forced = self.client.post(
+            "/api/admin/digest/broadcast",
+            json={"edition_date": test_date, "force": True}
+        )
+        self.assertEqual(api_res_forced.status_code, 200)
+        data_forced = api_res_forced.json()
+        self.assertTrue(data_forced["success"])
+        self.assertIn(data_forced["status"], ("COMPLETED", "PARTIAL"))
+
+        # Cleanup
+        conn = get_db_connection()
+        cur = conn.cursor()
+        cur.execute(f"DELETE FROM digest_dispatches WHERE edition_date = {p};", (test_date,))
+        conn.commit()
+        cur.close()
+        conn.close()
 
 
 if __name__ == "__main__":

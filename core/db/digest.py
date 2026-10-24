@@ -273,3 +273,35 @@ def get_digest_dispatch_history(limit: int = 15) -> List[Dict[str, Any]]:
     finally:
         cursor.close()
         conn.close()
+
+
+def has_edition_been_dispatched(edition_date: str) -> bool:
+    """
+    Idempotency guard: returns True if a broadcast for `edition_date` has already
+    been recorded with status COMPLETED or PARTIAL in `digest_dispatches`.
+    """
+    if not edition_date or not str(edition_date).strip():
+        return False
+
+    clean_date = str(edition_date).strip()
+    init_db()
+    conn = get_db_connection()
+    cursor = conn.cursor()
+    p = get_placeholder()
+    try:
+        cursor.execute(
+            f"""
+            SELECT 1 FROM digest_dispatches
+            WHERE edition_date = {p}
+              AND status IN ('COMPLETED', 'PARTIAL')
+            LIMIT 1;
+            """,
+            (clean_date,),
+        )
+        return cursor.fetchone() is not None
+    except Exception as e:
+        logger.error(f"Failed checking digest dispatch status for {clean_date}: {e}")
+        return False
+    finally:
+        cursor.close()
+        conn.close()

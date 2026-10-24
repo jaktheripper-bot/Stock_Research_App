@@ -2459,9 +2459,10 @@ async def api_admin_digest_broadcast(request: Request):
         body = {}
 
     only_active_pro = bool(body.get("only_active_pro", False))
+    force = bool(body.get("force", False))
     edition_date = body.get("edition_date")
 
-    result = dispatch_research_bouquet(edition_date=edition_date, only_active_pro=only_active_pro)
+    result = dispatch_research_bouquet(edition_date=edition_date, only_active_pro=only_active_pro, force=force)
     return JSONResponse(status_code=200, content=result)
 
 

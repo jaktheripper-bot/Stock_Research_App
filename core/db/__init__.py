@@ -148,6 +148,7 @@ from core.db.digest import (
     set_user_digest_subscription,
     record_digest_dispatch,
     get_digest_dispatch_history,
+    has_edition_been_dispatched,
 )
 
 from core.db.remediation import (
@@ -259,6 +260,7 @@ __all__ = [
     "set_user_digest_subscription",
     "record_digest_dispatch",
     "get_digest_dispatch_history",
+    "has_edition_been_dispatched",
     # distributed locks & job lease
     "get_connection",
     "WORKER_ID",
