@@ -1073,12 +1073,13 @@ class TestCompetitiveEnhancements(unittest.TestCase):
 
     def test_equity_dossier_pending_renders_linked_debt(self):
         """Tests that uncompiled equity tickers with active debt display listed debt tranches."""
-        resp = self.client.get("/dossier/RELIANCE")
-        self.assertEqual(resp.status_code, 200)
-        self.assertIn("PENDING COMPILATION", resp.text)
-        self.assertIn("Capital Structure: Listed Corporate Debentures", resp.text)
-        self.assertIn("INE002A08012", resp.text)
-        self.assertIn("/debt/INE002A08012", resp.text)
+        with patch("web.main.get_report_by_ticker_sync", return_value=None):
+            resp = self.client.get("/dossier/RELIANCE")
+            self.assertEqual(resp.status_code, 200)
+            self.assertIn("PENDING COMPILATION", resp.text)
+            self.assertIn("Capital Structure: Listed Corporate Debentures", resp.text)
+            self.assertIn("INE002A08012", resp.text)
+            self.assertIn("/debt/INE002A08012", resp.text)
 
     def test_phase_3_opportunity_terminal_cross_asset_real_yield(self):
         """Tests Phase 3 cross-asset aggregation, statutory tax waterfalls, and scenario filters."""

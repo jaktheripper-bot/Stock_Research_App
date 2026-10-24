@@ -3282,12 +3282,19 @@ html[data-theme="dark"] .dossier-reading-toggle {
   box-sizing: border-box;
 }
 
-/* 5. Perspective Portal Hero Banner & Architectural Arch Fallback */
+/* 5. Perspective Portal Hero Banner & Split-Contrast WebP Artwork Layer */
 .hero-portal-banner {
+  --hero-banner-url: url('/static/img/heroes/hero-home.webp');
   position: relative;
   overflow: hidden;
   border-radius: var(--radius-lg);
-  background: linear-gradient(135deg, #FFFFFF 0%, #F4F1E6 100%) !important;
+  background-color: #FFFFFF !important;
+  background-image:
+    linear-gradient(95deg, #FFFFFF 0%, #FFFFFF 52%, rgba(247, 245, 238, 0.88) 76%, rgba(244, 241, 230, 0.72) 100%),
+    var(--hero-banner-url) !important;
+  background-size: cover, cover !important;
+  background-position: center, right center !important;
+  background-repeat: no-repeat !important;
   border: 1px solid #DCD6C6 !important;
   border-top: 4px solid var(--asset-accent) !important;
   padding: 32px;
@@ -3297,11 +3304,43 @@ html[data-theme="dark"] .dossier-reading-toggle {
 }
 
 html[data-theme="dark"] .hero-portal-banner {
-  background: linear-gradient(135deg, #141418 0%, #09090B 100%) !important;
+  background-color: #141418 !important;
+  background-image:
+    linear-gradient(95deg, #141418 0%, #141418 52%, rgba(20, 20, 24, 0.86) 76%, rgba(9, 9, 11, 0.68) 100%),
+    var(--hero-banner-url) !important;
+  background-size: cover, cover !important;
+  background-position: center, right center !important;
+  background-repeat: no-repeat !important;
   border: 1px solid #27272A !important;
   border-top: 4px solid var(--asset-accent) !important;
   box-shadow: 0 18px 44px rgba(0, 0, 0, 0.55);
   color: #FAFAFA !important;
+}
+
+/* Route-to-Hero WebP Mapping Across All 13 Canonical Hero Banners */
+section.hero.hero-portal-banner { --hero-banner-url: url('/static/img/heroes/hero-home.webp'); }
+[data-asset-class="equities"] .hero-portal-banner:not(section.hero) { --hero-banner-url: url('/static/img/heroes/hero-equities.webp'); }
+[data-asset-class="funds"] .hero-portal-banner { --hero-banner-url: url('/static/img/heroes/hero-mutual-funds.webp'); }
+[data-asset-class="etfs"] .hero-portal-banner { --hero-banner-url: url('/static/img/heroes/hero-etf-matrix.webp'); }
+[data-asset-class="debt"] .hero-portal-banner { --hero-banner-url: url('/static/img/heroes/hero-corporate-debt.webp'); }
+[data-asset-class="sovereign"] .hero-portal-banner { --hero-banner-url: url('/static/img/heroes/hero-sovereign-curve.webp'); }
+[data-asset-class="reits"] .hero-portal-banner { --hero-banner-url: url('/static/img/heroes/hero-reits-gold.webp'); }
+[data-asset-class="opportunities"] .hero-portal-banner { --hero-banner-url: url('/static/img/heroes/hero-opportunity-terminal.webp'); }
+[data-asset-class="msme"] .hero-portal-banner { --hero-banner-url: url('/static/img/heroes/hero-msme-clusters.webp'); }
+[data-asset-class="safety"] .hero-portal-banner { --hero-banner-url: url('/static/img/heroes/hero-safety-radar.webp'); }
+.hero-portal-banner[data-hero="compare"] { --hero-banner-url: url('/static/img/heroes/hero-peer-compare.webp'); }
+.hero-portal-banner[data-hero="tax"] { --hero-banner-url: url('/static/img/heroes/hero-tax-calculator.webp'); }
+.hero-portal-banner[data-hero="discovery"] { --hero-banner-url: url('/static/img/heroes/hero-discovery-9am.webp'); }
+
+/* Manifesto Portal Plates (4 Trust Commitments on Homepage) */
+.portal-plate-thumb {
+  width: 100%;
+  height: 110px;
+  object-fit: cover;
+  border-radius: 10px;
+  margin-bottom: 12px;
+  border: 1px solid var(--border-subtle);
+  display: block;
 }
 
 .hero-portal-banner::after,
