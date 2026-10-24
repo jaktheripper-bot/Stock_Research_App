@@ -61,6 +61,39 @@ class TestBetterStackClient(unittest.TestCase):
         self.assertEqual(statuses[0]["name"], "Moatnomics Web")
         self.assertEqual(statuses[0]["status"], "up")
 
+    @patch("urllib.request.urlopen")
+    def test_update_monitor(self, mock_urlopen):
+        mock_response = MagicMock()
+        mock_response.read.return_value = b'{"data": {"id": "99", "attributes": {"pronounceable_name": "Updated Web"}}}'
+        mock_response.__enter__.return_value = mock_response
+        mock_urlopen.return_value = mock_response
+
+        res = self.client.update_monitor("99", {"pronounceable_name": "Updated Web"})
+        self.assertEqual(res.get("data", {}).get("attributes", {}).get("pronounceable_name"), "Updated Web")
+
+    @patch("urllib.request.urlopen")
+    def test_create_heartbeat(self, mock_urlopen):
+        mock_response = MagicMock()
+        mock_response.read.return_value = b'{"data": {"id": "hb_1", "attributes": {"name": "Morning Pipeline"}}}'
+        mock_response.__enter__.return_value = mock_response
+        mock_urlopen.return_value = mock_response
+
+        res = self.client.create_heartbeat("Morning Pipeline", period=86400)
+        self.assertEqual(res.get("data", {}).get("id"), "hb_1")
+
+    @patch("core.telemetry.betterstack_client.BetterStackClient.list_sources")
+    @patch("core.telemetry.betterstack_client.BetterStackClient.get_monitor_statuses")
+    def test_get_cached_telemetry_summary(self, mock_monitors, mock_sources):
+        mock_sources.return_value = [{"id": "s1"}]
+        mock_monitors.return_value = [{"id": "m1", "status": "up"}]
+
+        from core.telemetry.betterstack_client import get_cached_telemetry_summary
+        summary = get_cached_telemetry_summary(client=self.client, ttl_seconds=10, force_refresh=True)
+        self.assertTrue(summary["is_configured"])
+        self.assertEqual(summary["sources_count"], 1)
+        self.assertEqual(summary["monitors_count"], 1)
+        self.assertTrue(summary["all_monitors_up"])
+
 
 if __name__ == "__main__":
     unittest.main()

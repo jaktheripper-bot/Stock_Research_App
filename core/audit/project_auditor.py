@@ -179,7 +179,7 @@ def execute_closed_loop_remediation_cycle() -> Tuple[List[Dict[str, Any]], Dict[
     return active_open, stats, resolved_in_cycle
 
 
-def compute_deterministic_audit_metrics() -> Dict[str, Any]:
+def compute_deterministic_audit_metrics(quick: bool = False) -> Dict[str, Any]:
     """Runs all deterministic audit tools and computes base scores for the 3 pillars."""
     # 0. Initialize DB and Execute Closed-Loop Remediation Cycle (Step 1 & Step 2)
     from core.db.connection import init_db
@@ -188,8 +188,8 @@ def compute_deterministic_audit_metrics() -> Dict[str, Any]:
     logger.info("Executing Closed-Loop Remediation Cycle (Step 1: Verify First -> Step 2: Explore Next)...")
     active_open, remediation_stats, resolved_in_cycle = execute_closed_loop_remediation_cycle()
 
-    logger.info("Running deterministic test suite tool...")
-    test_res = tool_run_test_suite()
+    logger.info("Running deterministic test suite tool (quick=%s)...", quick)
+    test_res = tool_run_test_suite(quick=quick)
 
     logger.info("Probing web endpoints...")
     endpoint_res = tool_probe_web_endpoints()
@@ -533,13 +533,13 @@ Format as clean markdown with sections:
     return base_markdown
 
 
-async def audit_project_full(use_ai: bool = True) -> ProjectAuditResult:
+async def audit_project_full(use_ai: bool = True, quick: bool = False) -> ProjectAuditResult:
     """Executes a complete project audit across Strategy, Implementation, and UI/UX."""
     audit_id = f"AUD-{datetime.now(timezone.utc).strftime('%Y%m%d-%H%M%S')}"
-    logger.info(f"Starting Project Audit: {audit_id}")
+    logger.info(f"Starting Project Audit: {audit_id} (quick={quick})")
 
     # 1. Deterministic Grounding (Non-blocking executor thread)
-    metrics = await asyncio.to_thread(compute_deterministic_audit_metrics)
+    metrics = await asyncio.to_thread(compute_deterministic_audit_metrics, quick)
 
     # 2. Base Markdown Report
     base_report = synthesize_deterministic_markdown_report(audit_id, metrics)

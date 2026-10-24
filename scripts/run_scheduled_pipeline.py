@@ -203,7 +203,35 @@ def main():
         summary["nightly"] = run_nightly_pipeline(date_str, force=args.force)
 
     logger.info("✅ Multi-Asset Scheduled Pipeline execution finished.")
+    dispatch_heartbeat(args.mode)
     return 0
+
+
+def dispatch_heartbeat(mode: str) -> None:
+    """Dispatches an uptime heartbeat to Better Stack if configured."""
+    from core.config import get_secret
+    import ssl
+    import urllib.request
+    import certifi
+
+    heartbeat_url = (
+        get_secret("BETTER_STACK_HEARTBEAT_URL")
+        or os.environ.get("BETTER_STACK_HEARTBEAT_URL")
+        or ""
+    ).strip()
+    if not heartbeat_url:
+        return
+
+    try:
+        ctx = ssl.create_default_context(cafile=certifi.where())
+        req = urllib.request.Request(
+            heartbeat_url,
+            headers={"User-Agent": f"Moatnomics-Pipeline-Heartbeat/{mode}"}
+        )
+        with urllib.request.urlopen(req, timeout=10, context=ctx) as resp:
+            logger.info("📡 Heartbeat successfully dispatched to Better Stack (status=%s)", resp.status)
+    except Exception as e:
+        logger.warning("Better Stack heartbeat notice: %s", e)
 
 
 if __name__ == "__main__":

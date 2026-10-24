@@ -505,6 +505,52 @@ def scan_sebi_regulatory_invariants() -> List[Dict[str, Any]]:
     return findings
 
 
+def scan_better_stack_telemetry() -> List[Dict[str, Any]]:
+    """INV_BETTER_STACK_TELEMETRY: Verifies production uptime monitors and log ingestion health."""
+    findings = []
+    from core.telemetry.betterstack_client import get_cached_telemetry_summary
+
+    summary = get_cached_telemetry_summary(ttl_seconds=60)
+
+    # 1. Check if Better Stack is configured
+    if not summary.get("is_configured"):
+        h = compute_finding_hash("BACKEND_STABILITY", "INV_BETTER_STACK_TELEMETRY", "config:missing_tokens")
+        findings.append({
+            "finding_hash": h,
+            "category": "BACKEND_STABILITY",
+            "invariant_name": "INV_BETTER_STACK_TELEMETRY",
+            "title": "Better Stack Telemetry Tokens Unconfigured",
+            "description": "Better Stack API tokens are not configured, disabling automated production observability and crash alerts.",
+            "target_file_or_route": ".env:BETTER_STACK_TELEMETRY_TOKEN",
+            "severity": "MEDIUM",
+            "remediation_notes": "Configure BETTER_STACK_TELEMETRY_TOKEN and BETTER_STACK_INCIDENTS_TOKEN in .env or environment.",
+            "metadata": {"type": "configuration_missing"}
+        })
+        return findings
+
+    # 2. Check if any production monitors are DOWN
+    for m in summary.get("monitors", []):
+        status = (m.get("status") or "").lower()
+        if status != "up":
+            mid = m.get("id", "unknown")
+            name = m.get("name", "Unknown Monitor")
+            target = m.get("url") or f"monitor:{mid}"
+            h = compute_finding_hash("BACKEND_STABILITY", "INV_BETTER_STACK_TELEMETRY", f"monitor:{mid}:{status}")
+            findings.append({
+                "finding_hash": h,
+                "category": "BACKEND_STABILITY",
+                "invariant_name": "INV_BETTER_STACK_TELEMETRY",
+                "title": f"Production Uptime Monitor '{name}' is {status.upper()}",
+                "description": f"Better Stack Uptime reports that '{name}' ({target}) is currently {status.upper()}. Last checked at {m.get('last_checked_at')}.",
+                "target_file_or_route": target,
+                "severity": "CRITICAL",
+                "remediation_notes": f"Inspect container logs for '{name}' and restore service availability.",
+                "metadata": m
+            })
+
+    return findings
+
+
 # =========================================================================
 # UNIFIED SCANNER & VERIFIER PIPELINE
 # =========================================================================
@@ -516,6 +562,7 @@ def scan_all_invariants() -> List[Dict[str, Any]]:
     # 1. Backend Stability & Memory Bounds
     all_findings.extend(scan_unbounded_caches())
     all_findings.extend(scan_silent_exception_swallowing())
+    all_findings.extend(scan_better_stack_telemetry())
 
     # 2. Dual-Engine Database Parity
     all_findings.extend(scan_sql_dialect_parity())
@@ -539,6 +586,7 @@ def scan_all_invariants() -> List[Dict[str, Any]]:
 INVARIANT_SCANNERS = {
     "INV_UNBOUNDED_CACHE": scan_unbounded_caches,
     "INV_SILENT_EXCEPTION_SWALLOW": scan_silent_exception_swallowing,
+    "INV_BETTER_STACK_TELEMETRY": scan_better_stack_telemetry,
     "INV_SQL_DIALECT_COMPAT": scan_sql_dialect_parity,
     "INV_DB_SCHEMA_BOUNDS": scan_database_schema_bounds,
     "INV_DOM_INTEGRITY": scan_dom_integrity,

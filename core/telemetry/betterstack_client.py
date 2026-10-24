@@ -130,3 +130,86 @@ class BetterStackClient:
                 "last_checked_at": attrs.get("last_checked_at"),
             })
         return summary
+
+    def update_monitor(self, monitor_id: str, attributes: Dict[str, Any]) -> Dict[str, Any]:
+        """Updates attributes of an existing uptime monitor."""
+        url = f"{INCIDENTS_API_BASE}/monitors/{monitor_id}"
+        return self._request(url, self.incidents_token, method="PATCH", payload=attributes)
+
+    def create_heartbeat(
+        self,
+        name: str,
+        period: int = 86400,
+        grace_period: int = 3600,
+    ) -> Dict[str, Any]:
+        """Creates a heartbeat monitor (dead man's snitch) in Better Stack."""
+        url = f"{INCIDENTS_API_BASE}/heartbeats"
+        payload = {
+            "name": name,
+            "period": period,
+            "grace_period": grace_period,
+        }
+        return self._request(url, self.incidents_token, method="POST", payload=payload)
+
+
+# Module-level cache for provider quotas & status queries to avoid blocking latency
+_TELEMETRY_CACHE_TIMESTAMP: float = 0.0
+_TELEMETRY_CACHED_SUMMARY: Optional[Dict[str, Any]] = None
+
+
+def get_cached_telemetry_summary(
+    client: Optional[BetterStackClient] = None,
+    ttl_seconds: int = 60,
+    force_refresh: bool = False,
+) -> Dict[str, Any]:
+    """
+    Returns a cached snapshot of Better Stack sources and monitor statuses.
+    Ensures zero blocking network latency on frequent web dashboard requests.
+    """
+    global _TELEMETRY_CACHE_TIMESTAMP, _TELEMETRY_CACHED_SUMMARY
+
+    import time
+    now = time.time()
+    if not force_refresh and _TELEMETRY_CACHED_SUMMARY is not None and (now - _TELEMETRY_CACHE_TIMESTAMP) < ttl_seconds:
+        return _TELEMETRY_CACHED_SUMMARY
+
+    if client is None:
+        client = BetterStackClient(timeout=4)
+
+    sources = []
+    monitors = []
+    has_token = bool(client.telemetry_token or client.incidents_token)
+
+    if has_token:
+        try:
+            if client.telemetry_token:
+                sources = client.list_sources()
+        except Exception as e_s:
+            logger.debug(f"Telemetry sources probe notice: {e_s}")
+
+        try:
+            if client.incidents_token:
+                monitors = client.get_monitor_statuses()
+        except Exception as e_m:
+            logger.debug(f"Uptime monitors probe notice: {e_m}")
+
+    all_up = True
+    for m in monitors:
+        if m.get("status") != "up":
+            all_up = False
+            break
+
+    summary = {
+        "is_configured": has_token,
+        "sources_count": len(sources),
+        "sources": sources,
+        "monitors_count": len(monitors),
+        "monitors": monitors,
+        "all_monitors_up": all_up,
+        "cached_at": now,
+    }
+
+    _TELEMETRY_CACHED_SUMMARY = summary
+    _TELEMETRY_CACHE_TIMESTAMP = now
+    return summary
+

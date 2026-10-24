@@ -23,7 +23,7 @@ logger = logging.getLogger("equity_research.core.audit.tools")
 PROJECT_ROOT = Path(__file__).resolve().parent.parent.parent
 
 
-def tool_run_test_suite() -> Dict[str, Any]:
+def tool_run_test_suite(quick: bool = False) -> Dict[str, Any]:
     """Executes the project automated test suite via pytest, safely ignoring recursive auditor tests."""
     if os.environ.get("AUDIT_RECURSION_GUARD") == "1":
         return {
@@ -38,13 +38,23 @@ def tool_run_test_suite() -> Dict[str, Any]:
             "summary": "1 passed in 0.01s (recursion guard active)"
         }
 
-    cmd = [
-        sys.executable, "-m", "pytest",
-        "--ignore=tests/unit/test_project_auditor.py",
-        "--ignore=tests/audit/test_project_auditor.py",
-        "--ignore=tests/audit/test_remediation_ledger.py",
-        "-q"
-    ]
+    is_quick = quick or (os.environ.get("AUDIT_QUICK_MODE") == "1")
+    if is_quick:
+        cmd = [
+            sys.executable, "-m", "pytest",
+            "tests/e2e/test_critical_journeys.py",
+            "tests/unit/test_findings_fixes.py",
+            "tests/unit/test_betterstack_client.py",
+            "-q"
+        ]
+    else:
+        cmd = [
+            sys.executable, "-m", "pytest",
+            "--ignore=tests/unit/test_project_auditor.py",
+            "--ignore=tests/audit/test_project_auditor.py",
+            "--ignore=tests/audit/test_remediation_ledger.py",
+            "-q"
+        ]
     start_time = time.time()
     try:
         test_env = dict(os.environ)

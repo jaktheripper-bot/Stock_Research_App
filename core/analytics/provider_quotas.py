@@ -219,6 +219,35 @@ def get_all_provider_constraints() -> Dict[str, Any]:
         "constraint_note": "Prevents OOM crashes during concurrent WeasyPrint PDF exports and AI syntheses.",
     })
 
+    # -------------------------------------------------------------------------
+    # 8. BETTER STACK TELEMETRY & PRODUCTION UPTIME
+    # -------------------------------------------------------------------------
+    from core.telemetry.betterstack_client import get_cached_telemetry_summary
+    bs_summary = get_cached_telemetry_summary(ttl_seconds=60)
+    is_bs_configured = bs_summary.get("is_configured", False)
+    all_monitors_up = bs_summary.get("all_monitors_up", True)
+    sources_count = bs_summary.get("sources_count", 0)
+    monitors_count = bs_summary.get("monitors_count", 0)
+
+    if not is_bs_configured:
+        bs_status = "UNCONFIGURED"
+    elif not all_monitors_up:
+        bs_status = "WARNING"
+    else:
+        bs_status = "HEALTHY"
+
+    providers.append({
+        "id": "better_stack",
+        "name": "Better Stack Telemetry & Uptime",
+        "category": "Observability & Alerts",
+        "status": bs_status,
+        "plan_label": "Telemetry & Incidents",
+        "primary_metric": f"{sources_count} Log Source(s) • {'All UP' if all_monitors_up and monitors_count > 0 else f'{monitors_count} Monitors'}",
+        "utilization_pct": 10.0 if is_bs_configured else 0.0,
+        "secondary_metric": "Python Logtail Stream + Render Syslog Drain (Port 6514)",
+        "constraint_note": "Monitors production /health endpoint and ingests real-time container crashes and exception traces.",
+    })
+
     return {
         "providers": providers,
         "healthy_count": sum(1 for p in providers if p["status"] == "HEALTHY"),

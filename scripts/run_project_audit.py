@@ -75,7 +75,7 @@ async def main_async():
     print(f"   Engine: Autonomous Multi-Agent Auditor | Mode: {'AI Synthesis' if use_ai else 'Deterministic Fast-Path'}")
     print("   Evaluating test suite, live endpoints, SEBI compliance, and AST code hygiene...\n")
 
-    result = await audit_project_full(use_ai=use_ai)
+    result = await audit_project_full(use_ai=use_ai, quick=args.quick)
 
     remediation_stats = result.pillar_breakdown.get("remediation_stats", {})
     total_open = remediation_stats.get("total_open", 0)
