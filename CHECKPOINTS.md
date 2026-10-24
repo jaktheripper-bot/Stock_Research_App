@@ -10,7 +10,7 @@
 
 | Checkpoint Tag | IST Timestamp | Commit | DB Reports | Description |
 |:---|:---|:---|:---|:---|
-| `checkpoint_20261024_170640_admin_svg_fix_and_homepage_hero_split` | 2026-10-24 17:06:40 IST | `0bd282c` | 237 rep / 895 rev | admin_svg_fix_and_homepage_hero_split |
+| `checkpoint_20261024_170640_admin_svg_fix_and_homepage_hero_split` | 2026-10-24 17:06:40 IST | `ac8b49c` | 237 rep / 895 rev | admin_svg_fix_and_homepage_hero_split |
 | `checkpoint_20261024_153811_mobile_brief_mode` | 2026-10-24 15:38:11 IST | `fb346e3` | 237 rep / 895 rev | mobile_brief_mode |
 | `checkpoint_20261024_112651_checkpoint_20261024_112500_svg_sprite_parity_ast_invariant_unification_and_tls_resilience` | 2026-10-24 11:26:51 IST | `9605b83` | 223 rep / 884 rev | checkpoint_20261024_112500_svg_sprite_parity_ast_invariant_unification_and_tls_resilience |
 | `checkpoint_20261023_002626` | 2026-10-23 00:26:26 IST | `88381e7` | 195 rep / 427 rev | Production Release Checkpoint |
