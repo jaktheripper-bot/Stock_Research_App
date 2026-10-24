@@ -129,6 +129,7 @@ CANONICAL_ICONS_V2: Dict[str, Dict[str, str]] = {
     "screen": {"symbol_id": "icon-screen", "label": "Screener & Filters", "viewbox": "0 0 24 24"},
     "alerts": {"symbol_id": "icon-alerts", "label": "Monitoring & Alerts", "viewbox": "0 0 24 24"},
     "download": {"symbol_id": "icon-download", "label": "Export PDF Dossier", "viewbox": "0 0 24 24"},
+    "link": {"symbol_id": "icon-link", "label": "External Link & Source", "viewbox": "0 0 24 24"},
 }
 
 

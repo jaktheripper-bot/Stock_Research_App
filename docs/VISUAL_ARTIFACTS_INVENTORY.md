@@ -108,6 +108,7 @@ web/static/img/
 | `web/static/img/nav/icon-alerts.svg` | `alerts` | `#9F1239` (Crimson Carmine) | Notification bell with dynamic thesis-change wave (Safety Radar & Watchpoints). |
 | `web/static/img/nav/icon-watchlist.svg`| `watchlist` | `#7DA77A` (Sage Green) | Crisp vertical bookmark ribbon with notched lower edge. |
 | `web/static/img/nav/icon-download.svg` | `download` | `#0B2337` (Deep Ink Navy) | Downward directional arrow docking into an institutional horizontal tray. |
+| `web/static/img/nav/icon-link.svg` | `link` | `#1B5678` (Deep Blue Sapphire) | Two interlocking chain link ellipses (Source citations & External disclosures). |
 
 ---
 

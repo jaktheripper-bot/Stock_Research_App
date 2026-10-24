@@ -31,6 +31,7 @@ All 62 named inventory files are present in this handoff. 54 items were generate
 | web/static/img/nav/icon-alerts.svg | 24 × 24 | Generated or refined to complete the inventory brief |
 | web/static/img/nav/icon-watchlist.svg | 24 × 24 | Generated or refined to complete the inventory brief |
 | web/static/img/nav/icon-download.svg | 24 × 24 | Generated or refined to complete the inventory brief |
+| web/static/img/nav/icon-link.svg | 24 × 24 | Generated or refined to complete the inventory brief |
 | web/static/img/pillars/pillar-01-moat.svg | 24 × 24 | Generated or refined to complete the inventory brief |
 | web/static/img/pillars/pillar-02-capital.svg | 24 × 24 | Generated or refined to complete the inventory brief |
 | web/static/img/pillars/pillar-03-solvency.svg | 24 × 24 | Generated or refined to complete the inventory brief |
