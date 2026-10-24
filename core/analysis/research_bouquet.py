@@ -352,6 +352,16 @@ def render_bouquet_html(bouquet: Dict[str, Any], subscriber: Optional[Dict[str, 
     base_url = get_tracking_base_url()
     unsub_url = f"{base_url}/api/notifications/unsubscribe?token={token}"
 
+    msme = {
+        "company_name": "Unlisted Manufacturing Enterprise",
+        "cluster": "Industrial Cluster",
+        "roce_pct": "Scale Under Audit",
+        "moat_note": "Deterministic working capital and supply-chain dossier available.",
+        "uin": "",
+    }
+    if bouquet.get("msme") and isinstance(bouquet.get("msme"), dict):
+        msme.update({k: v for k, v in bouquet["msme"].items() if v is not None})
+
     equities_html = ""
     for eq in bouquet.get("equities", []):
         link = build_tracked_link(eq["dossier_url"], token=token)
@@ -453,23 +463,17 @@ def render_bouquet_html(bouquet: Dict[str, Any], subscriber: Optional[Dict[str, 
       </div>
 
       <!-- Section: Unlisted MSME Champion -->
-      <div class="section-title">
-        Unlisted MSME Manufacturing Champion
-      </div>
-      <div class="card">
-        <div style="display: flex; justify-content: space-between; align-items: baseline; margin-bottom: 4px;">
-          <div style="font-weight: 700; font-size: 13.5px; color: #0f172a;">
-            {bouquet['msme']['company_name']}
-          </div>
-          <div style="font-size: 11.5px; font-weight: 700; color: #b45309; background: #fef3c7; padding: 2px 8px; border-radius: 4px;">
-            {bouquet['msme'].get('roce_pct', bouquet['msme'].get('roce', ''))}
-          </div>
+      <div style="margin-bottom:28px;">
+        <div style="font-size:12px;font-weight:700;text-transform:uppercase;letter-spacing:0.1em;color:#d97706;margin-bottom:10px;border-bottom:1px solid #e2e8f0;padding-bottom:6px;">
+          3. Unlisted MSME Forensic Spotlight
         </div>
-        <div style="font-size: 11.5px; color: #64748b; margin-bottom: 6px;">
-          {bouquet['msme']['cluster']}
-        </div>
-        <div style="font-size: 12.5px; color: #334155; line-height: 1.5;">
-          {bouquet['msme'].get('moat_note', bouquet['msme'].get('highlight', ''))}
+        <div style="background:#f8fafc;border:1px solid #e2e8f0;border-radius:10px;padding:16px;">
+          <div style="font-size:14px;font-weight:700;color:#0f172a;margin-bottom:4px;">{msme.get("company_name")}</div>
+          <div style="font-size:12px;color:#475569;margin-bottom:8px;">
+            Cluster: <strong>{msme.get("cluster")}</strong> &nbsp;·&nbsp; Scale: <strong>{msme.get("roce_pct")}</strong>
+          </div>
+          <p style="margin:0 0 10px;font-size:13px;line-height:1.55;color:#334155;">{msme.get("moat_note")}</p>
+          <a href="https://antigravity.averagettv.in/msme/{msme.get('uin', '')}" style="font-size:12px;font-weight:700;color:#d97706;text-decoration:none;">Inspect MSME Forensic Dossier &rarr;</a>
         </div>
       </div>
 
