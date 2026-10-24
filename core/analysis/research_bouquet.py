@@ -513,6 +513,16 @@ def render_bouquet_text(bouquet: Dict[str, Any], subscriber: Optional[Dict[str, 
     base_url = get_tracking_base_url()
     unsub_url = f"{base_url}/api/notifications/unsubscribe?token={token}"
 
+    msme = {
+        "company_name": "Unlisted Manufacturing Enterprise",
+        "cluster": "Industrial Cluster",
+        "roce_pct": "Scale Under Audit",
+        "moat_note": "Deterministic working capital and supply-chain dossier available.",
+        "uin": "",
+    }
+    if bouquet.get("msme") and isinstance(bouquet.get("msme"), dict):
+        msme.update({k: v for k, v in bouquet["msme"].items() if v is not None})
+
     text = f"""===============================================================
 MOATNOMICS RESEARCH BOUQUET — DAILY ASSET INTELLIGENCE
 ===============================================================
@@ -549,12 +559,11 @@ TER:          {bouquet['mutual_funds']['expense_ratio']}
 Forensic Note:{bouquet['mutual_funds']['highlight']}
 
 ---------------------------------------------------------------
-4. UNLISTED MSME MANUFACTURING CHAMPION
----------------------------------------------------------------
-Company:      {bouquet['msme']['company_name']}
-Cluster:      {bouquet['msme']['cluster']}
-Performance:  {bouquet['msme'].get('roce_pct', bouquet['msme'].get('roce', ''))}
-Forensic:     {bouquet['msme'].get('moat_note', bouquet['msme'].get('highlight', ''))}
+3. UNLISTED MSME FORENSIC SPOTLIGHT
+----------------------------------------
+{msme.get('company_name')} ({msme.get('cluster')}) | {msme.get('roce_pct')}
+{msme.get('moat_note')}
+Inspect MSME Dossier: https://antigravity.averagettv.in/msme/{msme.get('uin', '')}
 
 ===============================================================
 Terminal: {build_tracked_link('/', token=token)}
