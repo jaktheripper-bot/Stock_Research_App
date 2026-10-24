@@ -250,6 +250,12 @@ class TestProjectAuditor(unittest.TestCase):
         """Verifies automatic creation on degradation and auto-resolution on recovery."""
         from core.db.support import sync_audit_incident_ticket, get_support_tickets, delete_support_ticket
 
+        # Clean up any pre-existing active alert tickets from previous audit runs
+        existing_alerts = [t for t in get_support_tickets(status="active", category="technical", limit=50, exclude_tests=False)
+                           if str(t.get("subject", "")).startswith("[SYSTEM AUDIT ALERT]")]
+        for ea in existing_alerts:
+            delete_support_ticket(ea["ticket_id"])
+
         # 1. Trigger degraded audit -> should create alert ticket
         res1 = sync_audit_incident_ticket(
             audit_id="AUD-TEST-ALERT-01",

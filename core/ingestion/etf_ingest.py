@@ -43,8 +43,12 @@ CACHE_TTL_SECONDS = 12 * 3600  # 12 hours
 def _get_ssl_context() -> ssl.SSLContext:
     """Creates a verified SSL context using certifi CA bundle or system certificates."""
     try:
+        import os
         import certifi
-        return ssl.create_default_context(cafile=certifi.where())
+        cafile = os.environ.get("SSL_CERT_FILE")
+        if not cafile or not os.path.exists(cafile):
+            cafile = certifi.where()
+        return ssl.create_default_context(cafile=cafile)
     except Exception as cert_err:
         logger.debug("certifi context notice: %s", cert_err)
     return ssl.create_default_context()

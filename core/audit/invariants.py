@@ -88,18 +88,19 @@ def scan_silent_exception_swallowing() -> List[Dict[str, Any]]:
             unlogged_lines = []
             for node in ast.walk(tree):
                 if isinstance(node, ast.ExceptHandler):
-                    has_log_or_raise = False
-                    for b in node.body:
-                        if isinstance(b, ast.Raise):
-                            has_log_or_raise = True
-                            break
-                        if isinstance(b, ast.Expr) and isinstance(b.value, ast.Call):
-                            func = b.value.func
-                            if isinstance(func, ast.Attribute) and func.attr in ("error", "warning", "exception", "info", "debug"):
-                                has_log_or_raise = True
-                                break
-                    if not has_log_or_raise:
-                        unlogged_lines.append(node.lineno)
+                    exc_type = ast.unparse(node.type) if (node.type and hasattr(ast, "unparse")) else "bare"
+                    is_blanket = (node.type is None) or ("Exception" in exc_type) or ("BaseException" in exc_type)
+                    if is_blanket:
+                        has_log = any(
+                            isinstance(s, ast.Call) and any(
+                                kw in (ast.unparse(s.func) if hasattr(ast, "unparse") else "")
+                                for kw in ("log", "print", "record", "warning", "error", "info", "debug", "exception")
+                            )
+                            for s in ast.walk(node)
+                        )
+                        has_raise = any(isinstance(s, ast.Raise) for s in ast.walk(node))
+                        if not has_log and not has_raise:
+                            unlogged_lines.append(node.lineno)
 
             if unlogged_lines:
                 rel_path = str(fpath.relative_to(PROJECT_ROOT))

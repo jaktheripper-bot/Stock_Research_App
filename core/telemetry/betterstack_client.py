@@ -10,6 +10,7 @@ and uptime monitor health checks from within the IDE and CLI tools.
 
 import json
 import logging
+import os
 import ssl
 import urllib.parse
 import urllib.request
@@ -46,7 +47,14 @@ class BetterStackClient:
             or ""
         ).strip()
         self.timeout = timeout
-        self._ssl_context = ssl.create_default_context(cafile=certifi.where())
+        cafile = os.environ.get("SSL_CERT_FILE")
+        if not cafile or not os.path.exists(cafile):
+            cafile = certifi.where()
+        try:
+            self._ssl_context = ssl.create_default_context(cafile=cafile)
+        except Exception as ssl_err:
+            logger.debug(f"Custom cafile notice: {ssl_err}, falling back to certifi default")
+            self._ssl_context = ssl.create_default_context(cafile=certifi.where())
 
     def _request(
         self,
