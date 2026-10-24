@@ -1513,7 +1513,7 @@ class TestCompetitiveEnhancements(unittest.TestCase):
         self.assertEqual(BRAND_PALETTE_V2["warm_ivory"]["hex"], "#F7F5EE")
         self.assertEqual(BRAND_PALETTE_V2["sage"]["hex"], "#7DA77A")
         self.assertEqual(BRAND_PALETTE_V2["botanical_lime"]["hex"], "#C7E268")
-        self.assertEqual(len(ASSET_CLASS_ACCENTS_V2), 7)
+        self.assertEqual(len(ASSET_CLASS_ACCENTS_V2), 9)
         self.assertEqual(len(CANONICAL_ICONS_V2), 13)
 
         resp_home = self.client.get("/")
@@ -1531,7 +1531,9 @@ class TestCompetitiveEnhancements(unittest.TestCase):
             ("/debt", "debt"),
             ("/sovereign", "sovereign"),
             ("/reits", "reits"),
+            ("/opportunities", "opportunities"),
             ("/msme", "msme"),
+            ("/safety-radar", "safety"),
         ]:
             r = self.client.get(route)
             self.assertEqual(r.status_code, 200)
