@@ -711,7 +711,7 @@ html[data-theme="light"] .dwell-sortable-th:hover {
 
     {% if error %}
     <div style="background: rgba(239, 68, 68, 0.15); border: 1px solid rgba(239, 68, 68, 0.3); color: #fca5a5; padding: 12px; border-radius: 8px; font-size: 13px; margin-bottom: 20px;">
-      ❌ {{ error }}
+      {{ error }}
     </div>
     {% endif %}
 
@@ -719,7 +719,7 @@ html[data-theme="light"] .dwell-sortable-th:hover {
     <!-- Local Development Fast Lane -->
     <div style="background: rgba(14, 165, 233, 0.12); border: 1px solid rgba(14, 165, 233, 0.35); padding: 14px; border-radius: 10px; margin-bottom: 20px; text-align: left;">
       <div style="font-size: 12px; font-weight: 700; color: #38bdf8; margin-bottom: 6px; display: flex; align-items: center; gap: 6px;">
-        🛠️ <span>Local Development Fast Track</span>
+        <span>Local Development Fast Track</span>
       </div>
       <p style="font-size: 11.5px; color: #94a3b8; margin: 0 0 12px; line-height: 1.4;">
         Active environment is localhost. You can sign in instantly with one click, or continue below with standard 2FA (local bypass code: <code style="color: #fff; background: rgba(0,0,0,0.4); padding: 2px 5px; border-radius: 4px;">000000</code>).
@@ -790,7 +790,7 @@ html[data-theme="light"] .dwell-sortable-th:hover {
     </form>
 
     <div style="margin-top: 20px; font-size: 11px; color: #64748b; line-height: 1.5;">
-      🔒 Two-factor architecture: Access strictly restricted to whitelisted accounts with verified Master Admin Password (or Email OTP) and active Google Authenticator TOTP verification.
+      Two-factor architecture: Access strictly restricted to whitelisted accounts with verified Master Admin Password (or Email OTP) and active Google Authenticator TOTP verification.
     </div>
   </div>
   <script>
@@ -826,20 +826,20 @@ html[data-theme="light"] .dwell-sortable-th:hover {
         if (statusEl) {
           statusEl.style.display = 'block';
           statusEl.style.color = '#34d399';
-          statusEl.textContent = '📬 6-digit verification code sent to ' + email + '. Enter it above to continue.';
+          statusEl.textContent = '6-digit verification code sent to ' + email + '. Enter it above to continue.';
         }
       } else {
         if (statusEl) {
           statusEl.style.display = 'block';
           statusEl.style.color = '#f87171';
-          statusEl.textContent = '❌ ' + (data.detail || data.message || 'Could not send verification code.');
+          statusEl.textContent = '' + (data.detail || data.message || 'Could not send verification code.');
         }
       }
     } catch (e) {
       if (statusEl) {
         statusEl.style.display = 'block';
         statusEl.style.color = '#f87171';
-        statusEl.textContent = '❌ Network error: ' + e.message;
+        statusEl.textContent = 'Network error: ' + e.message;
       }
     } finally {
       if (btnEl) {
@@ -870,7 +870,7 @@ html[data-theme="light"] .dwell-sortable-th:hover {
           <option value="30d" {% if window == '30d' or not window %}selected{% endif %}>Last 30 Days (Default)</option>
           <option value="90d" {% if window == '90d' %}selected{% endif %}>Last 90 Days</option>
           <option value="mtd" {% if window == 'mtd' %}selected{% endif %}>Month to Date</option>
-          <option value="custom" {% if window == 'custom' %}selected{% endif %}>📅 Custom Range...</option>
+          <option value="custom" {% if window == 'custom' %}selected{% endif %}>Custom Range...</option>
         </select>
         
         <div id="customDateRange" style="display: {% if window == 'custom' %}inline-flex{% else %}none{% endif %}; align-items: center; gap: 6px;">
@@ -890,7 +890,7 @@ html[data-theme="light"] .dwell-sortable-th:hover {
         <span class="status-pill success" style="font-size: 10px; padding: 2px 6px;"><svg class="glyph"><use href="#glyph-shield"></use></svg> Clean Real Data</span>
         <a href="/admin?window={{ window }}&tab={{ active_tab }}&include_tests=1" style="font-size: 11px; color: #64748b; text-decoration: none;" title="Include synthetic test runs">(Show Tests)</a>
         {% else %}
-        <span class="status-pill warning" style="font-size: 10px; padding: 2px 6px;">⚠️ Incl. Test Data</span>
+        <span class="status-pill warning" style="font-size: 10px; padding: 2px 6px;">Incl. Test Data</span>
         <a href="/admin?window={{ window }}&tab={{ active_tab }}&include_tests=0" style="font-size: 11px; color: #38bdf8; text-decoration: none;" title="Exclude synthetic test runs">(Clean Mode)</a>
         {% endif %}
       </div>
@@ -898,40 +898,39 @@ html[data-theme="light"] .dwell-sortable-th:hover {
       <!-- Purge Test Data Button (Top Header, All Tabs) -->
       {% if current_admin.role in ['owner', 'admin'] %}
       <button type="button" onclick="openAdminModal('purgeDataModal')" class="btn btn-secondary btn-sm" style="color: #f87171; border-color: rgba(239, 68, 68, 0.45); background: rgba(239, 68, 68, 0.08); display: flex; align-items: center; gap: 6px; font-weight: 700; cursor: pointer;" title="Permanently delete synthetic test runs, dummy tickets, and test transactions">
-        🧹 Purge Test Data
+        Purge Test Data
       </button>
       {% endif %}
 
       <!-- Executive Copilot Toggle Button -->
-      <button type="button" onclick="toggleAdminCopilot()" class="btn btn-primary btn-sm" style="background: linear-gradient(135deg, #0284c7, #0ea5e9); border: none; box-shadow: 0 0 14px rgba(14, 165, 233, 0.35); font-weight: 700; display: flex; align-items: center; gap: 6px; cursor: pointer;" title="Toggle Executive Intelligence Copilot">
-        <span>🤖</span> Executive Copilot
+      <button type="button" onclick="toggleAdminCopilot()" class="btn btn-primary btn-sm" style="background: linear-gradient(135deg, #0284c7, #0ea5e9); border: none; box-shadow: 0 0 14px rgba(14, 165, 233, 0.35); font-weight: 700; display: flex; align-items: center; gap: 6px; cursor: pointer;" title="Toggle Executive Intelligence Copilot"><svg class=\"glyph\" style=\"width: 14px; height: 14px;\"><use href=\"#icon-ai-spark\"></use></svg> Executive Copilot
       </button>
 
       <!-- Admin Identity & 2FA Badge -->
       <div style="display: flex; align-items: center; gap: 8px; background: rgba(15, 23, 42, 0.8); border: 1px solid var(--border-subtle, #1e293b); padding: 6px 12px; border-radius: 8px;">
-        <span style="font-size: 12px; color: #f8fafc; font-weight: 600;">👤 {{ current_admin.email }}</span>
+        <span style="font-size: 12px; color: #f8fafc; font-weight: 600;">{{ current_admin.email }}</span>
         <span class="status-pill success" style="font-size: 10px; padding: 2px 6px;">{{ current_admin.role|upper }}</span>
-        <span class="status-pill success" style="font-size: 10px; padding: 2px 6px;">🔒 2FA ACTIVE</span>
+        <span class="status-pill success" style="font-size: 10px; padding: 2px 6px;">2FA ACTIVE</span>
         <span id="adminCreditBadge" class="status-pill info" style="font-size: 11px; padding: 2px 8px; background: rgba(16, 185, 129, 0.15); color: #10b981; border: 1px solid rgba(16, 185, 129, 0.35); font-weight: 700; display: inline-flex; align-items: center; gap: 4px;" title="Research Credits Balance"><svg class="glyph" style="width: 12px; height: 12px;"><use href="#glyph-zap"></use></svg> <span id="adminCreditBalance">{{ "%.1f"|format(admin_user_credits|default(0.0)) }}</span> Credits</span>
       </div>
 
       <!-- Logout Form -->
       <a href="/admin/logout" class="btn btn-secondary btn-sm" style="color: #fca5a5; border-color: rgba(239, 68, 68, 0.3);">
-        🚪 Log Out
+        Log Out
       </a>
     </div>
   </div>
 
   {% if notification %}
   <div style="background: rgba(16, 185, 129, 0.15); border: 1px solid rgba(16, 185, 129, 0.3); color: #6ee7b7; padding: 12px 16px; border-radius: 8px; font-size: 13px; margin-bottom: 20px;">
-    ✅ {{ notification }}
+    {{ notification }}
   </div>
   {% endif %}
 
   <!-- 5 Top Executive KPI Cards -->
   <div class="kpi-grid-5">
     <div class="kpi-card">
-      <div class="kpi-label">Unique Sessions <span>🌐</span></div>
+      <div class="kpi-label">Unique Sessions</div>
       <div class="kpi-value">{{ summary.unique_sessions }}</div>
       <div class="kpi-delta">Distinct Visitor Footprints</div>
     </div>
@@ -946,12 +945,12 @@ html[data-theme="light"] .dwell-sortable-th:hover {
       <div class="kpi-delta success">Zero-Cost Instant Serve</div>
     </div>
     <div class="kpi-card">
-      <div class="kpi-label">Est. API Cost Saved <span title="Heuristic estimate based on ~$0.015 baseline token generation cost mitigated per cached response">💡</span></div>
+      <div class="kpi-label">Est. API Cost Saved <span title="Heuristic estimate based on ~$0.015 baseline token generation cost mitigated per cached response"></span></div>
       <div class="kpi-value">${{ "%.2f"|format(summary.total_cost_saved_usd) }}</div>
       <div class="kpi-delta success">Cache Mitigation Heuristic</div>
     </div>
     <div class="kpi-card">
-      <div class="kpi-label">PDFs Exported <span>📄</span></div>
+      <div class="kpi-label">PDFs Exported</div>
       <div class="kpi-value">{{ summary.pdf_downloads }}</div>
       <div class="kpi-delta">Research Reports</div>
     </div>
@@ -997,22 +996,22 @@ html[data-theme="light"] .dwell-sortable-th:hover {
   <!-- Consolidated 5-Hub Executive Navigation -->
   <div id="adminPrimaryHubNav" class="admin-hub-nav" role="navigation" aria-label="Executive Hub Navigation">
     <button type="button" class="btn admin-hub-btn {% if current_hub == 'revenue' %}active{% endif %}" data-hub="revenue" onclick="showHub('revenue')">
-      <span class="admin-hub-title"><span>💳 1. Revenue &amp; Users</span></span>
+      <span class="admin-hub-title"><span>1. Revenue &amp; Users</span></span>
       <span class="admin-hub-sub">Billables, Invoices &amp; User Credits</span>
     </button>
     <button type="button" class="btn admin-hub-btn {% if current_hub == 'service' %}active{% endif %}" data-hub="service" onclick="showHub('service')">
       <span class="admin-hub-title">
-        <span>📩 2. Service &amp; Digest</span>
+        <span>2. Service &amp; Digest</span>
         <span id="adminHubServiceTicketsBadge" class="admin-tab-badge" style="{% if not open_tickets_count or open_tickets_count <= 0 %}display: none;{% endif %}">{{ open_tickets_count | default(0) }}</span>
       </span>
       <span class="admin-hub-sub">Support Inbox &amp; Morning Bouquet</span>
     </button>
     <button type="button" class="btn admin-hub-btn {% if current_hub == 'traffic' %}active{% endif %}" data-hub="traffic" onclick="showHub('traffic')">
-      <span class="admin-hub-title"><span>🌐 3. Traffic &amp; Attention</span></span>
+      <span class="admin-hub-title"><span>3. Traffic &amp; Attention</span></span>
       <span class="admin-hub-sub">Dwell, Journeys, Actions &amp; SEO</span>
     </button>
     <button type="button" class="btn admin-hub-btn {% if current_hub == 'platform' %}active{% endif %}" data-hub="platform" onclick="showHub('platform')">
-      <span class="admin-hub-title"><span>📡 4. Catalog &amp; AI Quotas</span></span>
+      <span class="admin-hub-title"><span>4. Catalog &amp; AI Quotas</span></span>
       <span class="admin-hub-sub">Asset Monitoring &amp; Gemini Spends</span>
     </button>
     <button type="button" class="btn admin-hub-btn {% if current_hub == 'governance' %}active{% endif %}" data-hub="governance" onclick="showHub('governance')">
@@ -1025,44 +1024,44 @@ html[data-theme="light"] .dwell-sortable-th:hover {
   <div id="adminSubTabNav" class="admin-tabs">
     <span id="adminActiveHubLabel" style="font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.06em; color: #64748b; padding: 0 6px;">Sub-Views:</span>
     <button class="admin-tab-btn {% if current_tab == 'billables' %}active{% endif %}" data-hub="revenue" data-tab="billables" onclick="showTab('billables')" style="{% if current_hub != 'revenue' %}display: none;{% endif %}">
-      💳 Live Billables &amp; Invoices
+      Live Billables &amp; Invoices
     </button>
     <button class="admin-tab-btn {% if current_tab == 'users' %}active{% endif %}" data-hub="revenue" data-tab="users" onclick="showTab('users')" style="{% if current_hub != 'revenue' %}display: none;{% endif %}">
-      👤 User Accounts &amp; Usage
+      User Accounts &amp; Usage
     </button>
     <button class="admin-tab-btn {% if current_tab == 'tickets' %}active{% endif %}" data-hub="service" data-tab="tickets" onclick="showTab('tickets')" style="{% if current_hub != 'service' %}display: none;{% endif %}">
-      📩 Service Inbox &amp; Tickets
+      Service Inbox &amp; Tickets
       <span id="adminNavTabTicketsBadge" class="admin-tab-badge" style="{% if not open_tickets_count or open_tickets_count <= 0 %}display: none;{% endif %}">{{ open_tickets_count | default(0) }}</span>
     </button>
     <button class="admin-tab-btn {% if current_tab == 'digest' %}active{% endif %}" data-hub="service" data-tab="digest" onclick="showTab('digest')" style="{% if current_hub != 'service' %}display: none;{% endif %}">
       <svg class="glyph" style="width: 14px; height: 14px;"><use href="#glyph-mail"></use></svg> Research Bouquet
     </button>
     <button class="admin-tab-btn {% if current_tab == 'traffic' %}active{% endif %}" data-hub="traffic" data-tab="traffic" onclick="showTab('traffic')" style="{% if current_hub != 'traffic' %}display: none;{% endif %}">
-      🌐 Traffic &amp; Landing Pages
+      Traffic &amp; Landing Pages
     </button>
     <button class="admin-tab-btn {% if current_tab == 'journeys' %}active{% endif %}" data-hub="traffic" data-tab="journeys" onclick="showTab('journeys')" style="{% if current_hub != 'traffic' %}display: none;{% endif %}">
-      🧭 Session Journeys
+      Session Journeys
     </button>
     <button class="admin-tab-btn {% if current_tab == 'actions' %}active{% endif %}" data-hub="traffic" data-tab="actions" onclick="showTab('actions')" style="{% if current_hub != 'traffic' %}display: none;{% endif %}">
-      🎯 User Actions
+      User Actions
     </button>
     <button class="admin-tab-btn {% if current_tab == 'seo' %}active{% endif %}" data-hub="traffic" data-tab="seo" onclick="showTab('seo')" style="{% if current_hub != 'traffic' %}display: none;{% endif %}">
-      🔎 SEO &amp; Search Visibility
+      SEO &amp; Search Visibility
     </button>
     <button class="admin-tab-btn {% if current_tab == 'assets' %}active{% endif %}" data-hub="platform" data-tab="assets" onclick="showTab('assets')" style="{% if current_hub != 'platform' %}display: none;{% endif %}">
-      📡 Asset Monitoring
+      Asset Monitoring
     </button>
     <button class="admin-tab-btn {% if current_tab == 'ai-spends' %}active{% endif %}" data-hub="platform" data-tab="ai-spends" onclick="showTab('ai-spends')" style="{% if current_hub != 'platform' %}display: none;{% endif %}">
-      🤖 Gemini Spends &amp; AI Costs
+      Gemini Spends &amp; AI Costs
     </button>
     <button class="admin-tab-btn {% if current_tab == 'audit' %}active{% endif %}" data-hub="governance" data-tab="audit" onclick="showTab('audit')" style="{% if current_hub != 'governance' %}display: none;{% endif %}">
       <svg class="glyph"><use href="#glyph-shield"></use></svg> Admin Audit Trail
     </button>
     <button class="admin-tab-btn {% if current_tab == 'telemetry' %}active{% endif %}" data-hub="governance" data-tab="telemetry" onclick="showTab('telemetry')" style="{% if current_hub != 'governance' %}display: none;{% endif %}">
-      📜 Live Audit Stream
+      Live Audit Stream
     </button>
     <button class="admin-tab-btn {% if current_tab == 'team' %}active{% endif %}" data-hub="governance" data-tab="team" onclick="showTab('team')" style="{% if current_hub != 'governance' %}display: none;{% endif %}">
-      👥 Team & Access
+      Team & Access
     </button>
     <a href="/admin/audit" class="admin-tab-btn" data-hub="governance" style="text-decoration: none; color: #38bdf8; border: 1px solid rgba(14, 165, 233, 0.4); background: rgba(14, 165, 233, 0.12); flex-shrink: 0; margin-left: auto;">
       <svg class="glyph"><use href="#glyph-shield"></use></svg> Autonomous Project Auditor →
@@ -1074,12 +1073,12 @@ html[data-theme="light"] .dwell-sortable-th:hover {
     <!-- Financial Overview Sub-Grid -->
   <div class="kpi-grid-6">
       <div class="kpi-card" style="border-left: 3px solid #10b981;">
-        <div class="kpi-label">Verified Cash Income <span>💵</span></div>
+        <div class="kpi-label">Verified Cash Income</div>
         <div class="kpi-value" style="color: #34d399;">₹{{ "{:,.2f}".format(rev_summary.gross_revenue_inr) }}</div>
         <div class="kpi-delta success">{{ rev_summary.paid_orders_count }} Verified Paid Order(s)</div>
       </div>
       <div class="kpi-card">
-        <div class="kpi-label">Net Cash Inflow <span>📈</span></div>
+        <div class="kpi-label">Net Cash Inflow</div>
         <div class="kpi-value" style="color: #38bdf8;">₹{{ "{:,.2f}".format(rev_summary.net_revenue_inr) }}</div>
         <div class="kpi-delta">Gross Less Refunds</div>
       </div>
@@ -1089,7 +1088,7 @@ html[data-theme="light"] .dwell-sortable-th:hover {
         <div class="kpi-delta">Cash-Backed Credits</div>
       </div>
       <div class="kpi-card" style="border-left: 3px solid #c084fc;">
-        <div class="kpi-label">Free Trial Tokens (₹0) <span>🎁</span></div>
+        <div class="kpi-label">Free Trial Tokens (₹0)</div>
         <div class="kpi-value" style="color: #c084fc;">{{ "{:,.1f}".format(rev_summary.free_credits_issued) }}</div>
         <div class="kpi-delta">{{ rev_summary.welcome_grants_count }} Free Welcome Grants</div>
       </div>
@@ -1108,15 +1107,15 @@ html[data-theme="light"] .dwell-sortable-th:hover {
     <!-- Actions & Table -->
     <div class="admin-card">
       <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px; flex-wrap: wrap; gap: 12px;">
-        <h3 style="margin: 0; font-size: 16px; font-weight: 700;">💳 Transaction &amp; Receipts Ledger</h3>
+        <h3 style="margin: 0; font-size: 16px; font-weight: 700;">Transaction &amp; Receipts Ledger</h3>
         <div style="display: flex; gap: 10px; flex-wrap: wrap;">
           {% if current_admin.role in ['owner', 'admin'] %}
           <button type="button" onclick="openAdminModal('purgeDataModal')" class="btn btn-secondary btn-sm" style="color: #f87171; border-color: rgba(239, 68, 68, 0.45); background: rgba(239, 68, 68, 0.08); display: flex; align-items: center; gap: 6px; font-weight: 600; cursor: pointer;">
-            🧹 Purge Test Data
+            Purge Test Data
           </button>
           {% endif %}
           <a href="/admin/export/transactions" class="btn btn-secondary btn-sm" download>
-            📥 Export Transaction Ledger (CSV)
+            Export Transaction Ledger (CSV)
           </a>
           <button class="btn btn-primary btn-sm" onclick="openAdminModal('refundModal')">
             ↩️ Process Refund
@@ -1151,11 +1150,11 @@ html[data-theme="light"] .dwell-sortable-th:hover {
               </td>
               <td>
                 {% if b.nature == 'VERIFIED_PAID' %}
-                <span class="status-pill success" style="font-size: 11px;">💳 Real Paid</span>
+                <span class="status-pill success" style="font-size: 11px;">Real Paid</span>
                 {% elif b.nature == 'FREE_GRANT' %}
-                <span class="status-pill" style="background: rgba(147, 51, 234, 0.15); color: #c084fc; border: 1px solid rgba(147, 51, 234, 0.3); font-size: 11px;">🎁 Free Grant (₹0)</span>
+                <span class="status-pill" style="background: rgba(147, 51, 234, 0.15); color: #c084fc; border: 1px solid rgba(147, 51, 234, 0.3); font-size: 11px;">Free Grant (₹0)</span>
                 {% elif b.nature == 'SIMULATION' %}
-                <span class="status-pill warning" style="font-size: 11px;">🧪 Simulation</span>
+                <span class="status-pill warning" style="font-size: 11px;">Simulation</span>
                 {% else %}
                 <span class="status-pill closed" style="font-size: 11px;">{{ b.nature_label or 'Standard' }}</span>
                 {% endif %}
@@ -1276,7 +1275,7 @@ html[data-theme="light"] .dwell-sortable-th:hover {
       <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px; flex-wrap: wrap; gap: 12px;">
         <div>
           <h3 style="margin: 0; font-size: 16px; font-weight: 700; display: flex; align-items: center; gap: 8px;">
-            <span>📩</span> Active Service Inbox &amp; User Inquiries
+            Active Service Inbox &amp; User Inquiries
           </h3>
           <p style="margin: 4px 0 0; font-size: 12px; color: var(--text-secondary, #94a3b8);">
             Displays only open and in-progress tickets requiring action. Click any status badge to cycle status or select a new state—updates apply immediately without reloading.
@@ -1369,7 +1368,7 @@ html[data-theme="light"] .dwell-sortable-th:hover {
             {% else %}
             <tr id="activeTicketsEmptyRow">
               <td colspan="7" style="text-align: center; color: var(--text-secondary, #94a3b8); padding: 30px;">
-                🎉 Active Service Inbox is clear! All pending investor inquiries have been resolved or archived below.
+                Active Service Inbox is clear! All pending investor inquiries have been resolved or archived below.
               </td>
             </tr>
             {% endfor %}
@@ -1383,7 +1382,7 @@ html[data-theme="light"] .dwell-sortable-th:hover {
       <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 14px; flex-wrap: wrap; gap: 12px;">
         <div>
           <h3 style="margin: 0; font-size: 16px; font-weight: 700; display: flex; align-items: center; gap: 8px;">
-            <span>🗄️</span> Resolved &amp; Closed Ticket Archive
+            Resolved &amp; Closed Ticket Archive
           </h3>
           <p style="margin: 4px 0 0; font-size: 12px; color: var(--text-secondary, #94a3b8);">
             Search, sort, and reference completed support threads. Tickets resolved or closed in the Active Inbox automatically move here.
@@ -1421,7 +1420,7 @@ html[data-theme="light"] .dwell-sortable-th:hover {
           <option value="status">Sort: Status</option>
         </select>
         <button type="button" class="btn btn-secondary btn-sm" onclick="fetchArchivedTickets()" style="padding: 7px 12px; font-size: 12px; cursor: pointer;">
-          🔎 Search &amp; Sort
+          Search &amp; Sort
         </button>
       </div>
 
@@ -1516,13 +1515,13 @@ html[data-theme="light"] .dwell-sortable-th:hover {
     <!-- Landing & Inbound KPIs -->
     <div class="kpi-grid" style="grid-template-columns: repeat(auto-fit, minmax(210px, 1fr)); margin-bottom: 24px;">
       <div class="kpi-card" style="border-left: 3px solid #38bdf8;">
-        <div class="kpi-label">Primary Entry Route <span>📍</span></div>
+        <div class="kpi-label">Primary Entry Route</div>
         <div class="kpi-value" style="font-size: 15px; font-weight: 700; color: #38bdf8; line-height: 1.35; margin-bottom: 4px;">
           {% if summary.top_landing_pages and summary.top_landing_pages[0] %}
             <span style="font-size: 16px; margin-right: 4px;">{{ summary.top_landing_pages[0].icon }}</span>{{ summary.top_landing_pages[0].category }}
             <div class="mono" style="font-size: 12px; color: #94a3b8; font-weight: 400; margin-top: 2px;">{{ summary.top_landing_pages[0].path }}</div>
           {% else %}
-            <span>🏠</span> Homepage / Terminal
+            Homepage / Terminal
             <div class="mono" style="font-size: 12px; color: #94a3b8; font-weight: 400; margin-top: 2px;">/</div>
           {% endif %}
         </div>
@@ -1531,20 +1530,20 @@ html[data-theme="light"] .dwell-sortable-th:hover {
         </div>
       </div>
       <div class="kpi-card" style="border-left: 3px solid #10b981;">
-        <div class="kpi-label">Inbound Entry Sessions <span>🚪</span></div>
+        <div class="kpi-label">Inbound Entry Sessions</div>
         <div class="kpi-value mono" style="color: #34d399;">
           {{ summary.unique_sessions }}
         </div>
         <div class="kpi-delta">Tracked Unique Visitors</div>
       </div>
       <div class="kpi-card" style="border-left: 3px solid #c084fc;">
-        <div class="kpi-label">Most Visited Route <span>🔥</span></div>
+        <div class="kpi-label">Most Visited Route</div>
         <div class="kpi-value" style="font-size: 15px; font-weight: 700; color: #c084fc; line-height: 1.35; margin-bottom: 4px;">
           {% if summary.top_visited_pages and summary.top_visited_pages[0] %}
             <span style="font-size: 16px; margin-right: 4px;">{{ summary.top_visited_pages[0].icon }}</span>{{ summary.top_visited_pages[0].category }}
             <div class="mono" style="font-size: 12px; color: #94a3b8; font-weight: 400; margin-top: 2px;">{{ summary.top_visited_pages[0].path }}</div>
           {% else %}
-            <span>🏠</span> Homepage / Terminal
+            Homepage / Terminal
             <div class="mono" style="font-size: 12px; color: #94a3b8; font-weight: 400; margin-top: 2px;">/</div>
           {% endif %}
         </div>
@@ -1553,7 +1552,7 @@ html[data-theme="light"] .dwell-sortable-th:hover {
         </div>
       </div>
       <div class="kpi-card" style="border-left: 3px solid #f59e0b;">
-        <div class="kpi-label">Top External Channel <span>🌐</span></div>
+        <div class="kpi-label">Top External Channel</div>
         <div class="kpi-value" style="font-size: 16px; color: #fbbf24;">
           {{ summary.traffic_sources[0].source if summary.traffic_sources else 'Direct / Bookmark' }}
         </div>
@@ -1571,7 +1570,7 @@ html[data-theme="light"] .dwell-sortable-th:hover {
         </div>
       </div>
       <div class="kpi-card" style="border-left: 3px solid #8b5cf6;">
-        <div class="kpi-label">Total Attention Spent <span>📖</span></div>
+        <div class="kpi-label">Total Attention Spent</div>
         <div class="kpi-value mono" style="font-size: 20px; color: #a78bfa;">
           {{ summary.total_dwell_hours }} <span style="font-size: 13px; color: #94a3b8;">hrs</span>
         </div>
@@ -1580,7 +1579,7 @@ html[data-theme="light"] .dwell-sortable-th:hover {
         </div>
       </div>
       <div class="kpi-card" style="border-left: 3px solid #10b981;">
-        <div class="kpi-label">Site Visit Transitions <span>🔀</span></div>
+        <div class="kpi-label">Site Visit Transitions</div>
         <div class="kpi-value mono" style="font-size: 20px; color: #34d399;">
           {{ summary.total_navigation_transitions }}
         </div>
@@ -1589,13 +1588,13 @@ html[data-theme="light"] .dwell-sortable-th:hover {
         </div>
       </div>
       <div class="kpi-card" style="border-left: 3px solid #ec4899;">
-        <div class="kpi-label">Top Downstream Driver <span>🌳</span></div>
+        <div class="kpi-label">Top Downstream Driver</div>
         <div class="kpi-value" style="font-size: 15px; font-weight: 700; color: #f472b6; line-height: 1.35; margin-bottom: 4px;">
           {% if summary.top_contributing_page %}
             <span style="font-size: 16px; margin-right: 4px;">{{ summary.top_contributing_page.icon }}</span>{{ summary.top_contributing_page.category }}
             <div class="mono" style="font-size: 12px; color: #94a3b8; font-weight: 400; margin-top: 2px;">{{ summary.top_contributing_page.from_path }}</div>
           {% else %}
-            <span>🏠</span> Homepage / Terminal
+            Homepage / Terminal
             <div class="mono" style="font-size: 12px; color: #94a3b8; font-weight: 400; margin-top: 2px;">/</div>
           {% endif %}
         </div>
@@ -1610,7 +1609,7 @@ html[data-theme="light"] .dwell-sortable-th:hover {
       <div class="admin-card">
         <div style="display: flex; justify-content: space-between; align-items: baseline; margin-bottom: 14px;">
           <div>
-            <h3 style="margin: 0; font-size: 16px; font-weight: 700;">📍 Top Landing Pages & Entry Routes</h3>
+            <h3 style="margin: 0; font-size: 16px; font-weight: 700;">Top Landing Pages & Entry Routes</h3>
             <p style="margin: 4px 0 0; color: var(--text-secondary, #94a3b8); font-size: 12px;">
               The exact touchpoint pages where visitors first arrived on the platform in each session.
             </p>
@@ -1664,7 +1663,7 @@ html[data-theme="light"] .dwell-sortable-th:hover {
       <div class="admin-card">
         <div style="display: flex; justify-content: space-between; align-items: baseline; margin-bottom: 14px;">
           <div>
-            <h3 style="margin: 0; font-size: 16px; font-weight: 700;">📄 Sitewide Most Visited Pages</h3>
+            <h3 style="margin: 0; font-size: 16px; font-weight: 700;">Sitewide Most Visited Pages</h3>
             <p style="margin: 4px 0 0; color: var(--text-secondary, #94a3b8); font-size: 12px;">
               Aggregate volume of views and unique visitor reach across all internal navigation routes.
             </p>
@@ -1894,7 +1893,7 @@ html[data-theme="light"] .dwell-sortable-th:hover {
       <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 12px; margin-bottom: 18px;">
         <div>
           <h3 style="margin: 0; font-size: 16px; font-weight: 700; display: flex; align-items: center; gap: 8px;">
-            <span>🌳</span> Site Visit Tree &amp; Internal Click Contributions
+            Site Visit Tree &amp; Internal Click Contributions
           </h3>
           <p style="margin: 4px 0 0; color: var(--text-secondary, #94a3b8); font-size: 12px;">
             Source-to-destination transition graph tracking which origin pages generated downstream clicks across the platform, and where sessions exited.
@@ -1919,7 +1918,6 @@ html[data-theme="light"] .dwell-sortable-th:hover {
           <!-- Node Header -->
           <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 10px; margin-bottom: 12px; padding-bottom: 10px; border-bottom: 1px solid rgba(255,255,255,0.06);">
             <div style="display: flex; align-items: center; gap: 10px;">
-              <span style="font-size: 18px;">📍</span>
               <div>
                 <a href="{{ tree_node.from_path }}" target="_blank" style="color: #38bdf8; text-decoration: none; font-weight: 700; font-family: monospace; font-size: 14px; display: inline-flex; align-items: center; gap: 4px;">
                   {{ tree_node.from_path }} <span style="font-size: 11px; opacity: 0.7;">↗</span>
@@ -1931,10 +1929,10 @@ html[data-theme="light"] .dwell-sortable-th:hover {
             </div>
             <div style="display: flex; align-items: center; gap: 10px; flex-wrap: wrap;">
               <span class="status-pill" style="font-size: 11px; background: rgba(56, 189, 248, 0.15); color: #38bdf8; border: 1px solid rgba(56, 189, 248, 0.3);">
-                🔀 <strong>{{ tree_node.total_outbound }}</strong> Outbound Clicks Contributed
+                <strong>{{ tree_node.total_outbound }}</strong> Outbound Clicks Contributed
               </span>
               <span class="status-pill" style="font-size: 11px; background: rgba(244, 63, 94, 0.12); color: #fb7185; border: 1px solid rgba(244, 63, 94, 0.25);">
-                🚪 <strong>{{ tree_node.exit_rate_pct }}%</strong> Session Exit Rate ({{ tree_node.exit_count }} exits)
+                <strong>{{ tree_node.exit_rate_pct }}%</strong> Session Exit Rate ({{ tree_node.exit_count }} exits)
               </span>
             </div>
           </div>
@@ -1991,7 +1989,7 @@ html[data-theme="light"] .dwell-sortable-th:hover {
         <div style="display: flex; justify-content: space-between; align-items: baseline; margin-bottom: 14px;">
           <div>
             <h3 style="margin: 0; font-size: 16px; font-weight: 700; display: flex; align-items: center; gap: 8px;">
-              <span>🎯</span> Active UTM Campaigns
+              Active UTM Campaigns
             </h3>
             <p style="margin: 4px 0 0; color: var(--text-secondary, #94a3b8); font-size: 12px;">
               Attributed sessions and audience share driven by tagged external links.
@@ -2043,7 +2041,7 @@ html[data-theme="light"] .dwell-sortable-th:hover {
       <div class="admin-card" style="border: 1px solid rgba(56, 189, 248, 0.25); background: linear-gradient(180deg, rgba(56, 189, 248, 0.04) 0%, rgba(15, 23, 42, 0.4) 100%);">
         <div style="margin-bottom: 16px;">
           <h3 style="margin: 0; font-size: 16px; font-weight: 700; display: flex; align-items: center; gap: 8px;">
-            <span>🔗</span> UTM Campaign Link Generator
+            UTM Campaign Link Generator
           </h3>
           <p style="margin: 4px 0 0; color: var(--text-secondary, #94a3b8); font-size: 12px;">
             Generate ready-to-share tracking URLs for social posts, newsletters, and community groups.
@@ -2099,10 +2097,10 @@ html[data-theme="light"] .dwell-sortable-th:hover {
                    value="">
             <button type="button" class="btn btn-primary" id="btnCopyUtmUrl" onclick="copyUtmUrlToClipboard()"
                     style="font-size: 12px; padding: 7px 14px; white-space: nowrap; display: inline-flex; align-items: center; gap: 6px;">
-              <span>📋</span> Copy URL
+              Copy URL
             </button>
           </div>
-          <span id="utmCopyStatus" style="display: none; font-size: 11.5px; color: #34d399; margin-top: 6px;">✓ Link copied to clipboard!</span>
+          <span id="utmCopyStatus" style="display: none; font-size: 11.5px; color: #34d399; margin-top: 6px;">Link copied to clipboard!</span>
         </div>
       </div>
     </div>
@@ -2188,7 +2186,7 @@ html[data-theme="light"] .dwell-sortable-th:hover {
         <ul style="list-style: none; padding: 0; margin: 0; font-size: 13px;">
           {% for d in summary.device_breakdown %}
           <li style="display: flex; justify-content: space-between; padding: 6px 0; border-bottom: 1px solid rgba(255,255,255,0.05);">
-            <span>📱 {{ d.device }}</span>
+            <span>{{ d.device }}</span>
             <span class="mono" style="font-weight: 700;">{{ d.count }}</span>
           </li>
           {% else %}
@@ -2202,7 +2200,7 @@ html[data-theme="light"] .dwell-sortable-th:hover {
         <ul style="list-style: none; padding: 0; margin: 0; font-size: 13px;">
           {% for b in summary.browser_breakdown %}
           <li style="display: flex; justify-content: space-between; padding: 6px 0; border-bottom: 1px solid rgba(255,255,255,0.05);">
-            <span>🌐 {{ b.browser }}</span>
+            <span>{{ b.browser }}</span>
             <span class="mono" style="font-weight: 700;">{{ b.count }}</span>
           </li>
           {% else %}
@@ -2225,22 +2223,22 @@ html[data-theme="light"] .dwell-sortable-th:hover {
 
     <div class="kpi-grid" style="grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); margin-bottom: 16px;">
       <div class="kpi-card" style="border-left: 3px solid #38bdf8;">
-        <div class="kpi-label">Generative AI Crawls <span>🤖</span></div>
+        <div class="kpi-label">Generative AI Crawls</div>
         <div class="kpi-value mono" style="color: #38bdf8;">{{ seo_summary.ai_crawl_total|default(0) }}</div>
         <div class="kpi-delta">Perplexity, ChatGPT, Claude</div>
       </div>
       <div class="kpi-card" style="border-left: 3px solid #10b981;">
-        <div class="kpi-label">Search Engine Crawls <span>🔍</span></div>
+        <div class="kpi-label">Search Engine Crawls</div>
         <div class="kpi-value mono" style="color: #34d399;">{{ seo_summary.search_crawl_total|default(0) }}</div>
         <div class="kpi-delta">Googlebot, Bingbot, Applebot</div>
       </div>
       <div class="kpi-card" style="border-left: 3px solid #c084fc;">
-        <div class="kpi-label">AI Search Referrals <span>⚡</span></div>
+        <div class="kpi-label">AI Search Referrals</div>
         <div class="kpi-value mono" style="color: #c084fc;">{{ seo_summary.ai_search_sessions|default(0) }}</div>
         <div class="kpi-delta">Inbound User Sessions from AI</div>
       </div>
       <div class="kpi-card" style="border-left: 3px solid #f59e0b;">
-        <div class="kpi-label">Organic Search Referrals <span>🌐</span></div>
+        <div class="kpi-label">Organic Search Referrals</div>
         <div class="kpi-value mono" style="color: #fbbf24;">{{ seo_summary.search_sessions|default(0) }}</div>
         <div class="kpi-delta">Total Search-Referred Sessions</div>
       </div>
@@ -2443,11 +2441,11 @@ html[data-theme="light"] .dwell-sortable-th:hover {
           <div style="font-weight: 700; font-size: 13px; display: flex; align-items: center; gap: 8px; flex-wrap: wrap;">
             <span class="mono" style="color: var(--accent-cyan, #0ea5e9);">{{ j.session_id }}</span>
             <span style="background: rgba(14, 165, 233, 0.12); color: #38bdf8; border: 1px solid rgba(14, 165, 233, 0.3); padding: 2px 8px; border-radius: 4px; font-size: 11px; font-weight: 600; display: inline-flex; align-items: center; gap: 4px;">
-              🏁 Landed: {{ j.landing_page or '/' }}
+              Landed: {{ j.landing_page or '/' }}
             </span>
             <span style="font-size: 11px; color: #94a3b8;">via {{ j.traffic_source }}</span>
-            {% if j.country %}<span style="font-size: 11px;">🌍 {{ j.country }}</span>{% endif %}
-            {% if j.device_type %}<span style="font-size: 11px;">📱 {{ j.device_type }}</span>{% endif %}
+            {% if j.country %}<span style="font-size: 11px;">{{ j.country }}</span>{% endif %}
+            {% if j.device_type %}<span style="font-size: 11px;">{{ j.device_type }}</span>{% endif %}
           </div>
           <div class="mono" style="font-size: 11px; color: #64748b;">
             Duration: {{ j.duration_seconds }}s | Started: {{ j.started_at }}
@@ -2461,7 +2459,7 @@ html[data-theme="light"] .dwell-sortable-th:hover {
             {% if step.ticker %}<span class="mono" style="color: var(--accent-cyan, #0ea5e9);">({{ step.ticker }})</span>{% endif %}
             <span class="mono" style="font-size: 10px; color: #64748b;">+{{ step.delta_sec }}s</span>
           </div>
-          {% if not loop.last %}<span style="color: #475569;">➔</span>{% endif %}
+          {% if not loop.last %}<span style="color: #475569;">&rarr;</span>{% endif %}
           {% endfor %}
         </div>
       </div>
@@ -2480,7 +2478,7 @@ html[data-theme="light"] .dwell-sortable-th:hover {
         <h3 style="margin: 0; font-size: 16px; font-weight: 700;">Live Platform Events Stream (Latest 50)</h3>
         {% if current_admin.role in ['owner', 'admin'] %}
         <button onclick="openAdminModal('purgeDataModal')" class="btn btn-secondary btn-sm" style="color: #f87171; border-color: rgba(239, 68, 68, 0.4); display: flex; align-items: center; gap: 6px;">
-          🧹 Purge Test Data
+          Purge Test Data
         </button>
         {% endif %}
       </div>
@@ -2525,13 +2523,13 @@ html[data-theme="light"] .dwell-sortable-th:hover {
   <div id="tab-team" class="admin-tab-pane {% if active_tab == 'team' %}active{% endif %}">
     <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px;">
       <div>
-        <h3 style="margin: 0; font-size: 18px; font-weight: 800;">👥 Administrator Whitelist & Role Management</h3>
+        <h3 style="margin: 0; font-size: 18px; font-weight: 800;">Administrator Whitelist & Role Management</h3>
         <p style="color: var(--text-secondary, #94a3b8); font-size: 13px; margin: 4px 0 0 0;">
           Manage verified team members authorized to access executive telemetry, user journeys, billing, and refunds.
         </p>
       </div>
       <button class="btn btn-primary btn-sm" onclick="openAdminModal('inviteAdminModal')">
-        ➕ Invite Administrator
+        Invite Administrator
       </button>
     </div>
 
@@ -2566,7 +2564,7 @@ html[data-theme="light"] .dwell-sortable-th:hover {
             </td>
             <td>
               {% if member.totp_enabled %}
-                <span class="status-pill success">🔒 TOTP ACTIVE</span>
+                <span class="status-pill success">TOTP ACTIVE</span>
               {% else %}
                 <span class="status-pill open">⏳ PENDING SETUP</span>
               {% endif %}
@@ -2619,7 +2617,7 @@ html[data-theme="light"] .dwell-sortable-th:hover {
         </p>
       </div>
       <div style="font-size: 12px; color: #10b981; font-weight: 600;">
-        🔒 Append-Only Isolation
+        Append-Only Isolation
       </div>
     </div>
 
@@ -2685,7 +2683,7 @@ html[data-theme="light"] .dwell-sortable-th:hover {
   <div id="tab-assets" class="admin-tab-pane {% if active_tab == 'assets' %}active{% endif %}">
     <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; flex-wrap: wrap; gap: 12px;">
       <div>
-        <h3 style="margin: 0; font-size: 18px; font-weight: 800;">📡 Multi-Asset Monitoring & Ingestion Engine</h3>
+        <h3 style="margin: 0; font-size: 18px; font-weight: 800;">Multi-Asset Monitoring & Ingestion Engine</h3>
         <p style="color: var(--text-secondary, #94a3b8); font-size: 13px; margin: 4px 0 0 0;">
           Automated daily diff monitoring across AMFI NAV feeds (~14,500 schemes) and Corporate Debt / NCD universe.
         </p>
@@ -2790,7 +2788,7 @@ html[data-theme="light"] .dwell-sortable-th:hover {
     <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; flex-wrap: wrap; gap: 12px;">
       <div>
         <h2 style="margin: 0; font-size: 20px; font-weight: 800; color: #f8fafc; display: flex; align-items: center; gap: 10px;">
-          <span>🤖</span> Google Gemini Spends &amp; Model Telemetry
+          Google Gemini Spends &amp; Model Telemetry
         </h2>
         <p style="margin: 4px 0 0 0; font-size: 13px; color: #94a3b8;">
           Live token consumption, USD/INR spend estimates, and workload distribution across platform LLM engines.
@@ -2812,7 +2810,7 @@ html[data-theme="light"] .dwell-sortable-th:hover {
       <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px; flex-wrap: wrap; gap: 10px;">
         <div>
           <h3 style="margin: 0; font-size: 16px; font-weight: 800; color: #f8fafc; display: flex; align-items: center; gap: 8px;">
-            <span>📡</span> Subscribed Service Provider Quotas &amp; Constraints
+            Subscribed Service Provider Quotas &amp; Constraints
           </h3>
           <p style="margin: 4px 0 0; font-size: 12.5px; color: #94a3b8;">
             Single-pane monitoring of storage limits, rate-limit ceilings, email caps, and runtime memory across all external providers.
@@ -2863,7 +2861,7 @@ html[data-theme="light"] .dwell-sortable-th:hover {
     <!-- AI Spends Top KPI Cards -->
     <div class="kpi-grid" style="grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); margin-bottom: 24px;">
       <div class="kpi-card" style="border-left: 3px solid #38bdf8;">
-        <div class="kpi-label">Total Cumulative Spend <span>💸</span></div>
+        <div class="kpi-label">Total Cumulative Spend</div>
         <div class="kpi-value mono" id="aiKpiTotalCostUsd" style="color: #38bdf8;">${{ "%.2f"|format(ai_spends.total_cost_usd or 0.0) }} <span style="font-size: 13px; color: #64748b;">USD</span></div>
         <div class="kpi-delta mono" id="aiKpiTotalCostInr" style="color: #34d399;">≈ ₹{{ "%.2f"|format(ai_spends.total_cost_inr or 0.0) }} INR (1 USD = ₹84)</div>
       </div>
@@ -2873,7 +2871,7 @@ html[data-theme="light"] .dwell-sortable-th:hover {
         <div class="kpi-delta mono" id="aiKpiTokenSplit" style="color: #94a3b8;">{{ "{:,.0f}".format(ai_spends.total_input_tokens or 0) }} In / {{ "{:,.0f}".format(ai_spends.total_output_tokens or 0) }} Out</div>
       </div>
       <div class="kpi-card" style="border-left: 3px solid #818cf8;">
-        <div class="kpi-label">Primary LLM Cascade <span>🧠</span></div>
+        <div class="kpi-label">Primary LLM Cascade</div>
         <div class="kpi-value" style="font-size: 18px; color: #a5b4fc; font-weight: 700; margin-top: 4px;">{{ ai_spends.primary_model or 'gemini-3.8-flash' }}</div>
         <div class="kpi-delta" style="color: #94a3b8; font-size: 11px;">Fallback: 3.5-flash-lite • 3.1-flash-lite</div>
       </div>
@@ -3007,7 +3005,7 @@ html[data-theme="light"] .dwell-sortable-th:hover {
     <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(320px, 1fr)); gap: 16px;">
       <div style="background: rgba(15, 23, 42, 0.6); border: 1px solid rgba(255, 255, 255, 0.08); border-radius: 10px; padding: 18px;">
         <h4 style="margin: 0 0 10px 0; font-size: 14px; font-weight: 700; color: #38bdf8; display: flex; align-items: center; gap: 8px;">
-          <span>📋</span> Official Google Gemini Flash Rate Card
+          Official Google Gemini Flash Rate Card
         </h4>
         <ul style="margin: 0; padding-left: 20px; font-size: 12px; color: #94a3b8; line-height: 1.8;">
           <li><strong style="color: #f8fafc;">Input Tokens:</strong> $0.10 USD per 1,000,000 tokens (~₹8.40 per 1M)</li>
@@ -3044,13 +3042,13 @@ html[data-theme="light"] .dwell-sortable-th:hover {
       </div>
       <div style="display: flex; gap: 10px; align-items: center; flex-wrap: wrap;">
         <button type="button" class="btn btn-secondary btn-sm" onclick="loadDigestPreview()" id="btnRefreshDigestPreview">
-          🔄 Refresh Preview
+          Refresh Preview
         </button>
         <button type="button" class="btn btn-secondary btn-sm" onclick="sendTestDigest()" id="btnSendTestDigest">
-          ✉️ Send Test to Admin
+          Send Test to Admin
         </button>
         <button type="button" class="btn btn-primary btn-sm" onclick="openBroadcastDigestModal()" id="btnOpenBroadcastModal" style="background: linear-gradient(135deg, #0284c7 0%, #0369a1 100%);">
-          🚀 Broadcast to Subscribers
+          Broadcast to Subscribers
         </button>
       </div>
     </div>
@@ -3061,7 +3059,7 @@ html[data-theme="light"] .dwell-sortable-th:hover {
     <!-- KPI Cards Band -->
     <div class="kpi-grid" style="grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); margin-bottom: 24px;">
       <div class="kpi-card" style="border-left: 3px solid #38bdf8;">
-        <div class="kpi-label">Active Digest Subscribers <span>👥</span></div>
+        <div class="kpi-label">Active Digest Subscribers</div>
         <div class="kpi-value mono" id="digestTotalSubsCount" style="color: #38bdf8;">{{ digest_summary.total_subscribers|default(0) }}</div>
         <div class="kpi-delta mono" id="digestProSubsCount" style="color: #94a3b8;">{{ digest_summary.pro_subscribers|default(0) }} Pro / Annual Entitled</div>
       </div>
@@ -3077,7 +3075,7 @@ html[data-theme="light"] .dwell-sortable-th:hover {
         <div class="kpi-value mono" id="digestKpiTrackingSubdomain" style="font-size: 14px; font-weight: 700; color: #a5b4fc; margin-top: 6px;">
           {{ digest_summary.tracking_url|default('https://links.moatnomics.com')|replace('https://', '')|replace('http://', '') }}
         </div>
-        <div class="kpi-delta" style="color: #34d399; font-size: 11px;">✓ 100% SPF/DKIM Alignment</div>
+        <div class="kpi-delta" style="color: #34d399; font-size: 11px;">100% SPF/DKIM Alignment</div>
       </div>
       <div class="kpi-card" style="border-left: 3px solid #f59e0b;">
         <div class="kpi-label">Statutory Compliance <svg class="glyph" style="width: 14px; height: 14px;"><use href="#glyph-shield"></use></svg></div>
@@ -3092,7 +3090,7 @@ html[data-theme="light"] .dwell-sortable-th:hover {
     <div style="background: rgba(15, 23, 42, 0.6); border: 1px solid rgba(255, 255, 255, 0.08); border-radius: 12px; padding: 20px; margin-bottom: 24px;">
       <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px; flex-wrap: wrap; gap: 10px;">
         <div style="font-size: 14px; font-weight: 700; color: #f8fafc; display: flex; align-items: center; gap: 8px;">
-          <span>📨</span> Live Compiled Bouquet: <span id="digestLiveSubject" style="color: #38bdf8; font-weight: 600;">Click "Refresh Preview" to generate live edition</span>
+          Live Compiled Bouquet: <span id="digestLiveSubject" style="color: #38bdf8; font-weight: 600;">Click "Refresh Preview" to generate live edition</span>
         </div>
         <div style="display: flex; gap: 6px;">
           <button type="button" class="btn btn-secondary btn-sm" id="btnViewHtmlDigest" onclick="switchDigestPreviewMode('html')" style="font-size: 11.5px; padding: 4px 10px; background: rgba(14, 165, 233, 0.2); border-color: #0ea5e9; color: #38bdf8;">HTML View</button>
@@ -3112,7 +3110,7 @@ html[data-theme="light"] .dwell-sortable-th:hover {
     <!-- Dispatch History & Delivery Ledger -->
     <div style="background: rgba(15, 23, 42, 0.6); border: 1px solid rgba(255, 255, 255, 0.08); border-radius: 12px; padding: 20px; margin-bottom: 24px;">
       <h4 style="margin: 0 0 14px 0; font-size: 14px; font-weight: 700; color: #f8fafc; display: flex; align-items: center; gap: 8px;">
-        <span>📜</span> Historical Dispatches &amp; Delivery Ledger
+        Historical Dispatches &amp; Delivery Ledger
       </h4>
       <div style="overflow-x: auto;">
         <table class="admin-table" style="width: 100%;">
@@ -3177,7 +3175,7 @@ html[data-theme="light"] .dwell-sortable-th:hover {
     <div class="modal-dialog" style="max-width: 480px; background: var(--bg-card, #131722); border-radius: 12px; padding: 24px; border: 1px solid rgba(255,255,255,0.12);">
       <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px;">
         <h3 style="margin: 0; font-size: 18px; font-weight: 800; color: #f8fafc; display: flex; align-items: center; gap: 8px;">
-          <span>🚀</span> Broadcast Research Bouquet
+          Broadcast Research Bouquet
         </h3>
         <button type="button" onclick="closeAdminModal('broadcastDigestModal')" style="background: none; border: none; color: #94a3b8; font-size: 20px; cursor: pointer;">&times;</button>
       </div>
@@ -3213,7 +3211,7 @@ html[data-theme="light"] .dwell-sortable-th:hover {
   <div id="inviteAdminModal" class="modal-backdrop" style="display: none; align-items: center; justify-content: center; z-index: 9999;">
     <div class="modal-dialog" style="max-width: 440px; background: var(--bg-card, #131722); border-radius: 12px; padding: 24px;">
       <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px;">
-        <h3 style="margin: 0; font-size: 18px; font-weight: 800;">➕ Invite Administrator</h3>
+        <h3 style="margin: 0; font-size: 18px; font-weight: 800;">Invite Administrator</h3>
         <button type="button" onclick="closeAdminModal('inviteAdminModal')" style="background: none; border: none; color: #fff; font-size: 20px; cursor: pointer;">&times;</button>
       </div>
 
@@ -3269,7 +3267,7 @@ html[data-theme="light"] .dwell-sortable-th:hover {
   <div id="purgeDataModal" class="modal-backdrop" style="display: none; align-items: center; justify-content: center; z-index: 9999;">
     <div class="modal-dialog" style="max-width: 480px; background: var(--bg-card, #131722); border-radius: 12px; padding: 24px; border: 1px solid rgba(239, 68, 68, 0.4);">
       <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px;">
-        <h3 style="margin: 0; font-size: 18px; font-weight: 800; color: #f87171;">🧹 Purge Synthetic Test Data</h3>
+        <h3 style="margin: 0; font-size: 18px; font-weight: 800; color: #f87171;">Purge Synthetic Test Data</h3>
         <button type="button" onclick="closeAdminModal('purgeDataModal')" style="background: none; border: none; color: #fff; font-size: 20px; cursor: pointer;">&times;</button>
       </div>
 
@@ -3286,7 +3284,7 @@ html[data-theme="light"] .dwell-sortable-th:hover {
       </ul>
 
       <div style="background: rgba(239, 68, 68, 0.1); border: 1px solid rgba(239, 68, 68, 0.2); padding: 10px; border-radius: 6px; font-size: 12px; color: #fca5a5; margin-bottom: 20px;">
-        🔒 All legitimate investor accounts, genuine paying transactions, and real visitor telemetry are strictly preserved.
+        All legitimate investor accounts, genuine paying transactions, and real visitor telemetry are strictly preserved.
       </div>
 
       <form method="POST" action="/admin/telemetry/purge-test-data" style="display: flex; gap: 10px; justify-content: flex-end;">
@@ -3429,14 +3427,14 @@ html[data-theme="light"] .dwell-sortable-th:hover {
         <div style="display: flex; justify-content: space-between; align-items: center; gap: 6px; margin-bottom: 6px; flex-wrap: wrap;">
           <div style="display: flex; gap: 5px; flex-wrap: wrap; align-items: center;">
             <span style="font-size: 11px; color: #94a3b8; font-weight: 600;">Canned Responses:</span>
-            <button type="button" onclick="insertReplyTemplate('investigating')" class="btn btn-secondary btn-sm" style="padding: 2px 7px; font-size: 10px; cursor: pointer;">📋 Investigating</button>
-            <button type="button" onclick="insertReplyTemplate('resolved')" class="btn btn-secondary btn-sm" style="padding: 2px 7px; font-size: 10px; color: #10b981; border-color: rgba(16, 185, 129, 0.4); cursor: pointer;">✅ Resolved</button>
-            <button type="button" onclick="insertReplyTemplate('credits')" class="btn btn-secondary btn-sm" style="padding: 2px 7px; font-size: 10px; color: #f59e0b; border-color: rgba(245, 158, 11, 0.4); cursor: pointer;">🎁 +2 Credits</button>
-            <button type="button" onclick="insertReplyTemplate('clarification')" class="btn btn-secondary btn-sm" style="padding: 2px 7px; font-size: 10px; cursor: pointer;">❓ Clarification</button>
+            <button type="button" onclick="insertReplyTemplate('investigating')" class="btn btn-secondary btn-sm" style="padding: 2px 7px; font-size: 10px; cursor: pointer;">Investigating</button>
+            <button type="button" onclick="insertReplyTemplate('resolved')" class="btn btn-secondary btn-sm" style="padding: 2px 7px; font-size: 10px; color: #10b981; border-color: rgba(16, 185, 129, 0.4); cursor: pointer;">Resolved</button>
+            <button type="button" onclick="insertReplyTemplate('credits')" class="btn btn-secondary btn-sm" style="padding: 2px 7px; font-size: 10px; color: #f59e0b; border-color: rgba(245, 158, 11, 0.4); cursor: pointer;">+2 Credits</button>
+            <button type="button" onclick="insertReplyTemplate('clarification')" class="btn btn-secondary btn-sm" style="padding: 2px 7px; font-size: 10px; cursor: pointer;">Clarification</button>
             <span id="savedCannedResponsesList" style="display: inline-flex; gap: 5px; flex-wrap: wrap; align-items: center;"></span>
           </div>
           <button type="button" id="btnToggleSaveCanned" onclick="toggleSaveCannedResponseBar()" class="btn btn-secondary btn-sm" style="padding: 2px 8px; font-size: 10.5px; color: #38bdf8; border-color: rgba(56, 189, 248, 0.35); cursor: pointer;" title="Save your current reply draft as a reusable canned response">
-            💾 + Save Draft as Canned
+            + Save Draft as Canned
           </button>
         </div>
 
@@ -3444,7 +3442,7 @@ html[data-theme="light"] .dwell-sortable-th:hover {
         <div id="saveCannedResponseBar" style="display: none; gap: 8px; align-items: center; margin-bottom: 8px; background: rgba(14, 165, 233, 0.08); border: 1px solid rgba(14, 165, 233, 0.25); padding: 8px 10px; border-radius: 6px; flex-wrap: wrap;">
           <input type="text" id="cannedResponseTitleInput" class="admin-input" placeholder="Template title (e.g., Refund Processed, Data Sync Fixed)..." style="flex: 1; min-width: 180px; font-size: 16px; padding: 5px 10px;">
           <button type="button" id="btnSaveCannedConfirm" onclick="saveCurrentDraftAsCannedResponse()" class="btn btn-primary btn-sm" style="padding: 5px 12px; font-size: 11px; font-weight: 700; cursor: pointer;">
-            💾 Save Template
+            Save Template
           </button>
           <button type="button" onclick="toggleSaveCannedResponseBar(false)" class="btn btn-secondary btn-sm" style="padding: 5px 8px; font-size: 11px; cursor: pointer;">
             Cancel
@@ -3454,14 +3452,14 @@ html[data-theme="light"] .dwell-sortable-th:hover {
         <!-- Inbuilt Spell & Proofread Check Toolbar -->
         <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 4px; flex-wrap: wrap; gap: 6px;">
           <span id="spellCheckStatusBadge" style="font-size: 11px; color: #34d399; font-weight: 600;">
-            ✓ Inbuilt Spell &amp; Grammar Check Active
+            Inbuilt Spell &amp; Grammar Check Active
           </span>
           <div style="display: flex; gap: 6px; align-items: center;">
             <button type="button" id="btnRunSpellCheck" onclick="runInbuiltSpellCheck(true)" class="btn btn-secondary btn-sm" style="padding: 2px 8px; font-size: 10.5px; color: #cbd5e1; cursor: pointer;">
-              🔎 Spell &amp; Grammar Check
+              Spell &amp; Grammar Check
             </button>
             <button type="button" id="btnFixAllSpellIssues" onclick="applyAllSpellCheckFixes()" class="btn btn-secondary btn-sm" style="display: none; padding: 2px 8px; font-size: 10.5px; color: #10b981; border-color: rgba(16, 185, 129, 0.45); background: rgba(16, 185, 129, 0.1); cursor: pointer;">
-              ✨ Fix All (<span id="spellFixAllCount">0</span>)
+              Fix All (<span id="spellFixAllCount">0</span>)
             </button>
           </div>
         </div>
@@ -3507,7 +3505,7 @@ html[data-theme="light"] .dwell-sortable-th:hover {
 
         <div style="display: flex; gap: 10px; justify-content: space-between; align-items: center; flex-wrap: wrap;">
           <button type="button" id="btnDeleteSpamTicket" onclick="deleteCurrentTicketAsSpam()" class="btn btn-secondary" style="padding: 8px 14px; font-size: 12.5px; font-weight: 700; color: #f87171; border-color: rgba(239, 68, 68, 0.4); background: rgba(239, 68, 68, 0.1); cursor: pointer;" title="Permanently delete this ticket as spam or invalid">
-            🗑️ Delete / Spam
+            Delete / Spam
           </button>
           <div style="display: flex; gap: 10px;">
             <button type="button" onclick="closeTicketReplyModal()" class="btn btn-secondary" style="padding: 8px 16px; font-size: 13px;">
@@ -3550,7 +3548,7 @@ html[data-theme="light"] .dwell-sortable-th:hover {
     container.innerHTML = customItems.map(item => `
       <span style="display: inline-flex; align-items: center; background: rgba(56, 189, 248, 0.12); border: 1px solid rgba(56, 189, 248, 0.35); border-radius: 5px; overflow: hidden;">
         <button type="button" onclick="insertSavedCannedResponse(${Number(item.id)})" class="btn btn-secondary btn-sm" style="padding: 2px 7px; font-size: 10px; color: #38bdf8; border: none; background: transparent; cursor: pointer;" title="Insert saved template (${escapeHtmlText(item.target_status || 'resolved')})">
-          📌 ${escapeHtmlText(item.title)}
+          ${escapeHtmlText(item.title)}
         </button>
         <button type="button" onclick="deleteSavedCannedResponse(event, ${Number(item.id)})" class="btn btn-secondary btn-sm" style="padding: 2px 5px; font-size: 10px; color: #f87171; border: none; border-left: 1px solid rgba(56, 189, 248, 0.25); background: transparent; cursor: pointer;" title="Delete saved template">
           &times;
@@ -3648,7 +3646,7 @@ html[data-theme="light"] .dwell-sortable-th:hover {
     } finally {
       if (btn) {
         btn.disabled = false;
-        btn.innerText = '💾 Save Template';
+        btn.innerText = 'Save Template';
       }
     }
   }
@@ -3821,7 +3819,7 @@ html[data-theme="light"] .dwell-sortable-th:hover {
       detectedSpellCheckIssues = [];
       tray.style.display = 'none';
       if (fixAllBtn) fixAllBtn.style.display = 'none';
-      badge.innerHTML = '✓ Inbuilt Spell &amp; Grammar Check Active';
+      badge.innerHTML = 'Inbuilt Spell &amp; Grammar Check Active';
       badge.style.color = '#34d399';
       return issues;
     }
@@ -3877,11 +3875,11 @@ html[data-theme="light"] .dwell-sortable-th:hover {
       tray.style.display = 'none';
       if (fixAllBtn) fixAllBtn.style.display = 'none';
       badge.innerHTML = manualTrigger
-        ? '✓ No spelling or grammar issues detected!'
-        : '✓ Spell &amp; Grammar Check: Clean';
+        ? 'No spelling or grammar issues detected!'
+        : 'Spell &amp; Grammar Check: Clean';
       badge.style.color = '#34d399';
     } else {
-      badge.innerHTML = `⚠️ ${issues.length} suggestion${issues.length > 1 ? 's' : ''} found`;
+      badge.innerHTML = `${issues.length} suggestion${issues.length > 1 ? 's' : ''} found`;
       badge.style.color = '#fbbf24';
       if (fixAllBtn && fixAllCount) {
         fixAllCount.innerText = String(issues.length);
@@ -3890,7 +3888,7 @@ html[data-theme="light"] .dwell-sortable-th:hover {
       tray.style.display = 'block';
       tray.innerHTML = `
         <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 6px;">
-          <strong style="color: #fbbf24;">🔎 Proofreading Suggestions (Click to apply):</strong>
+          <strong style="color: #fbbf24;">Proofreading Suggestions (Click to apply):</strong>
           <span style="font-size: 10.5px; color: #94a3b8;">Native browser spellcheck is also active</span>
         </div>
         <div style="display: flex; gap: 6px; flex-wrap: wrap;">
@@ -4000,7 +3998,7 @@ html[data-theme="light"] .dwell-sortable-th:hover {
         if (banner) banner.style.display = 'none';
         if (badge) {
           const prov = (data.email_service_status && data.email_service_status.provider) ? data.email_service_status.provider : 'Active';
-          badge.innerHTML = `🟢 ${prov}`;
+          badge.innerHTML = `${prov}`;
           badge.style.color = '#34d399';
         }
       } else {
@@ -4009,10 +4007,10 @@ html[data-theme="light"] .dwell-sortable-th:hover {
           banner.style.background = 'rgba(245, 158, 11, 0.12)';
           banner.style.border = '1px solid rgba(245, 158, 11, 0.3)';
           banner.style.color = '#fbbf24';
-          banner.innerHTML = '⚠️ <strong>Email Service Unconfigured:</strong> No SMTP credentials or <code>RESEND_API_KEY</code> are set in your environment (<code>.env</code>). Your reply will be saved to the ticket thread and logged to console, but <strong>no real email will be transmitted to the recipient</strong> until you configure <code>SMTP_HOST</code>, <code>SMTP_USER</code>, <code>SMTP_PASSWORD</code> or <code>RESEND_API_KEY</code>.';
+          banner.innerHTML = '<strong>Email Service Unconfigured:</strong> No SMTP credentials or <code>RESEND_API_KEY</code> are set in your environment (<code>.env</code>). Your reply will be saved to the ticket thread and logged to console, but <strong>no real email will be transmitted to the recipient</strong> until you configure <code>SMTP_HOST</code>, <code>SMTP_USER</code>, <code>SMTP_PASSWORD</code> or <code>RESEND_API_KEY</code>.';
         }
         if (badge) {
-          badge.innerHTML = '⚠️ Mock Mode (Unsent)';
+          badge.innerHTML = 'Mock Mode (Unsent)';
           badge.style.color = '#fbbf24';
         }
       }
@@ -4031,7 +4029,7 @@ html[data-theme="light"] .dwell-sortable-th:hover {
               <div style="display: flex; align-items: center; gap: 8px;">
                 <span class="mono" style="color: #94a3b8;">${escapeHtmlText(r.created_at)}</span>
                 <span style="font-size: 10px; padding: 1px 5px; border-radius: 3px; background: ${r.email_dispatched ? 'rgba(16,185,129,0.15)' : 'rgba(245,158,11,0.15)'}; color: ${r.email_dispatched ? '#10b981' : '#f59e0b'};">
-                  ${r.email_dispatched ? '✓ Email Delivered' : '⚠️ Unsent (Mock Logged)'}
+                  ${r.email_dispatched ? 'Email Delivered' : 'Unsent (Mock Logged)'}
                 </span>
               </div>
             </div>
@@ -4111,7 +4109,7 @@ html[data-theme="light"] .dwell-sortable-th:hover {
     } finally {
       if (btn) {
         btn.disabled = false;
-        btn.innerText = '🗑️ Delete / Spam';
+        btn.innerText = 'Delete / Spam';
       }
     }
   }
@@ -4317,7 +4315,7 @@ html[data-theme="light"] .dwell-sortable-th:hover {
         if (!emptyActive) {
           emptyActive = document.createElement('tr');
           emptyActive.id = 'activeTicketsEmptyRow';
-          emptyActive.innerHTML = '<td colspan="7" style="text-align: center; color: var(--text-secondary, #94a3b8); padding: 30px;">🎉 Active Service Inbox is clear! All pending investor inquiries have been resolved or archived below.</td>';
+          emptyActive.innerHTML = '<td colspan="7" style="text-align: center; color: var(--text-secondary, #94a3b8); padding: 30px;">Active Service Inbox is clear! All pending investor inquiries have been resolved or archived below.</td>';
           activeBody.appendChild(emptyActive);
         }
       } else if (emptyActive) {
@@ -4596,7 +4594,7 @@ html[data-theme="light"] .dwell-sortable-th:hover {
         if (footUsd) footUsd.innerText = '$' + Number(s.total_cost_usd || 0).toFixed(2);
         const footInr = document.getElementById('aiFooterCostInr');
         if (footInr) footInr.innerText = '₹' + Number(s.total_cost_inr || 0).toFixed(2);
-        if (lbl) lbl.innerText = '✓ Updated!';
+        if (lbl) lbl.innerText = 'Updated!';
         setTimeout(() => { if (lbl) lbl.innerText = 'Refresh Telemetry'; }, 2000);
       }
     } catch (e) {
@@ -4979,40 +4977,38 @@ html[data-theme="light"] .dwell-sortable-th:hover {
   <!-- Executive Copilot Floating Trigger & Interactive Drawer                     -->
   <!-- ========================================================================= -->
   <div id="adminCopilotFloatingTrigger" onclick="toggleAdminCopilot()" style="position: fixed; bottom: 24px; right: 24px; z-index: 9998; cursor: pointer; display: flex; align-items: center; gap: 8px; background: linear-gradient(135deg, #0284c7, #0ea5e9); color: #fff; padding: 12px 18px; border-radius: 9999px; box-shadow: 0 10px 30px rgba(0,0,0,0.5), 0 0 20px rgba(14,165,233,0.4); font-weight: 700; font-size: 13px; transition: transform 0.2s ease;">
-    <span>🤖</span> Executive Copilot
+    Executive Copilot
   </div>
 
   <div id="adminCopilotDrawer" class="copilot-drawer">
     <!-- Header -->
     <div class="copilot-header">
       <div class="copilot-title">
-        <span>🤖</span>
+        <svg class="glyph" style="width: 16px; height: 16px;"><use href="#icon-ai-spark"></use></svg>
         <span>Executive Copilot</span>
         <span class="copilot-badge">Research Desk AI</span>
       </div>
-      <button type="button" onclick="closeAdminCopilot()" style="background: none; border: none; color: #94a3b8; font-size: 18px; cursor: pointer; padding: 4px 8px; border-radius: 4px;" title="Close Copilot">
-        ✕
-      </button>
+      <button type="button" onclick="closeAdminCopilot()" style="background: none; border: none; color: #94a3b8; font-size: 18px; cursor: pointer; padding: 4px 8px; border-radius: 4px;" title="Close Copilot">&times;</button>
     </div>
 
     <!-- Quick Prompt Chips -->
     <div class="copilot-chips">
-      <button type="button" class="copilot-chip" onclick="handleQuickChip('Give me data-driven tips and tricks to improve site metrics, conversion, and performance')">💡 Growth &amp; Performance Tips</button>
-      <button type="button" class="copilot-chip" onclick="handleQuickChip('Grant 5 credits to myself')">🎁 Add 5 Credits to Myself</button>
+      <button type="button" class="copilot-chip" onclick="handleQuickChip('Give me data-driven tips and tricks to improve site metrics, conversion, and performance')">Growth &amp; Performance Tips</button>
+      <button type="button" class="copilot-chip" onclick="handleQuickChip('Grant 5 credits to myself')">Add 5 Credits to Myself</button>
       <button type="button" class="copilot-chip" onclick="handleQuickChip('What are our unique sessions and top visited routes?')"><svg class="glyph" style="width: 12px; height: 12px;"><use href="#glyph-chart"></use></svg> Sessions &amp; Paths</button>
-      <button type="button" class="copilot-chip" onclick="handleQuickChip('Summarize our net cash inflow and recent billables.')">💰 Cash Inflow</button>
-      <button type="button" class="copilot-chip" onclick="handleQuickChip('Show subscribed provider quotas and Gemini AI spends.')">📡 Provider Quotas</button>
-      <button type="button" class="copilot-chip" onclick="handleQuickChip('Show me open support tickets and complaints.')">📬 Open Tickets</button>
+      <button type="button" class="copilot-chip" onclick="handleQuickChip('Summarize our net cash inflow and recent billables.')">Cash Inflow</button>
+      <button type="button" class="copilot-chip" onclick="handleQuickChip('Show subscribed provider quotas and Gemini AI spends.')">Provider Quotas</button>
+      <button type="button" class="copilot-chip" onclick="handleQuickChip('Show me open support tickets and complaints.')">Open Tickets</button>
       <button type="button" class="copilot-chip" onclick="handleQuickChip('What is our cache hit rate and estimated API savings?')"><svg class="glyph" style="width: 12px; height: 12px;"><use href="#glyph-zap"></use></svg> Cache Savings</button>
-      <button type="button" class="copilot-chip" onclick="handleQuickChip('Who has admin access and is 2FA enabled?')">👥 Team Access</button>
-      <button type="button" class="copilot-chip" onclick="handleQuickChip('Purge test telemetry and dummy tickets from the dashboard')">🧹 Purge Test Data</button>
-      <button type="button" class="copilot-chip" onclick="handleQuickChip('Trigger comprehensive asset monitoring scan')">📡 Scan Assets</button>
+      <button type="button" class="copilot-chip" onclick="handleQuickChip('Who has admin access and is 2FA enabled?')">Team Access</button>
+      <button type="button" class="copilot-chip" onclick="handleQuickChip('Purge test telemetry and dummy tickets from the dashboard')">Purge Test Data</button>
+      <button type="button" class="copilot-chip" onclick="handleQuickChip('Trigger comprehensive asset monitoring scan')">Scan Assets</button>
     </div>
 
     <!-- Messages Container -->
     <div id="copilotMessages" class="copilot-messages">
       <div class="copilot-msg bot">
-        <p><strong>👋 Welcome to the Moatnomics Executive Copilot.</strong></p>
+        <p><strong>Welcome to the Moatnomics Executive Copilot.</strong></p>
         <p>I can analyze live dashboard telemetry, cash flows, and support grievances, or coordinate platform changes with verified 2-step confirmation.</p>
         <p style="font-size: 11px; color: #94a3b8; margin-top: 6px;">Try: <em>"Grant 5 credits to user@example.com"</em> or <em>"Summarize our net cash inflow"</em>.</p>
       </div>
@@ -5168,7 +5164,7 @@ html[data-theme="light"] .dwell-sortable-th:hover {
           window.activeCopilotProposals[prop.proposal_id] = prop;
 
           const cardId = 'card_' + prop.proposal_id;
-          const warnHtml = prop.impact_warning ? `<div class="action-card-warning">⚠️ ${prop.impact_warning}</div>` : '';
+          const warnHtml = prop.impact_warning ? `<div class="action-card-warning">${prop.impact_warning}</div>` : '';
           const payloadJson = JSON.stringify(prop.payload, null, 2);
 
           const cardHtml = `
@@ -5183,10 +5179,10 @@ html[data-theme="light"] .dwell-sortable-th:hover {
               <div class="action-card-payload">${payloadJson}</div>
               <div class="action-card-actions" id="actions_${cardId}">
                 <button type="button" class="btn btn-primary btn-sm" onclick="executeCopilotAction('${prop.proposal_id}', '${cardId}')" style="background: linear-gradient(135deg, #10b981, #059669); border: none; font-weight: 700; cursor: pointer;">
-                  ✓ Confirm & Execute
+                  Confirm & Execute
                 </button>
                 <button type="button" class="btn btn-secondary btn-sm" onclick="cancelCopilotAction('${cardId}')" style="cursor: pointer;">
-                  ✕ Cancel
+                  Cancel
                 </button>
               </div>
             </div>
@@ -5204,7 +5200,7 @@ html[data-theme="light"] .dwell-sortable-th:hover {
       } else {
         const errorDiv = document.createElement('div');
         errorDiv.className = 'copilot-msg bot';
-        errorDiv.innerHTML = `<span style="color: #fca5a5;">❌ Error: ${data.error || 'Failed to process request.'}</span>`;
+        errorDiv.innerHTML = `<span style="color: #fca5a5;">Error: ${data.error || 'Failed to process request.'}</span>`;
         msgContainer.appendChild(errorDiv);
         msgContainer.scrollTop = msgContainer.scrollHeight;
       }
@@ -5212,7 +5208,7 @@ html[data-theme="light"] .dwell-sortable-th:hover {
       loadingDiv.remove();
       const errDiv = document.createElement('div');
       errDiv.className = 'copilot-msg bot';
-      errDiv.innerHTML = `<span style="color: #fca5a5;">❌ Network Error: ${err.message || 'Server connection lost.'}</span>`;
+      errDiv.innerHTML = `<span style="color: #fca5a5;">Network Error: ${err.message || 'Server connection lost.'}</span>`;
       msgContainer.appendChild(errDiv);
       msgContainer.scrollTop = msgContainer.scrollHeight;
     } finally {
@@ -5261,7 +5257,7 @@ html[data-theme="light"] .dwell-sortable-th:hover {
           const balInfo = (resData.new_balance !== undefined) ? `<div style="font-size: 11px; color: #a7f3d0; margin-top: 4px;">Updated Balance: <strong>${resData.new_balance} credits</strong></div>` : '';
           actionsDiv.outerHTML = `
             <div class="action-card-success">
-              ✅ <strong>Executed & Audited:</strong> ${successMsg}
+              <strong>Executed & Audited:</strong> ${successMsg}
               ${balInfo}
               <div style="font-size: 10px; color: #6ee7b7; margin-top: 4px; font-weight: normal;">
                 Transaction logged in immutable Admin Audit Trail.
@@ -5273,7 +5269,7 @@ html[data-theme="light"] .dwell-sortable-th:hover {
         if (actionsDiv) {
           const errDetail = resData.error || 'Execution failed. Please verify administrative permissions.';
           actionsDiv.innerHTML = `
-            <div style="color: #fca5a5; font-size: 12px; margin-bottom: 8px;">❌ ${errDetail}</div>
+            <div style="color: #fca5a5; font-size: 12px; margin-bottom: 8px;">${errDetail}</div>
             <button type="button" class="btn btn-secondary btn-sm" onclick="cancelCopilotAction('${cardId}')">Dismiss</button>
           `;
         }
@@ -5281,7 +5277,7 @@ html[data-theme="light"] .dwell-sortable-th:hover {
     } catch (netErr) {
       if (actionsDiv) {
         actionsDiv.innerHTML = `
-          <div style="color: #fca5a5; font-size: 12px; margin-bottom: 8px;">❌ Network error: ${netErr.message}</div>
+          <div style="color: #fca5a5; font-size: 12px; margin-bottom: 8px;">Network error: ${netErr.message}</div>
           <button type="button" class="btn btn-secondary btn-sm" onclick="cancelCopilotAction('${cardId}')">Dismiss</button>
         `;
       }
@@ -5291,7 +5287,7 @@ html[data-theme="light"] .dwell-sortable-th:hover {
   function cancelCopilotAction(cardId) {
     const actionsDiv = document.getElementById('actions_' + cardId);
     if (actionsDiv) {
-      actionsDiv.innerHTML = '<span style="color: #94a3b8; font-size: 11px; font-style: italic;">✕ Action proposal cancelled by administrator. Zero database modifications performed.</span>';
+      actionsDiv.innerHTML = '<span style="color: #94a3b8; font-size: 11px; font-style: italic;">Action proposal cancelled by administrator. Zero database modifications performed.</span>';
     }
   }
 
@@ -5406,7 +5402,7 @@ html[data-theme="light"] .dwell-sortable-th:hover {
       });
       const data = await resp.json();
       if (resp.ok && data.success) {
-        showDigestAlert(`✓ Test digest sent successfully to ${data.test_email}! Dispatch ID: ${data.dispatch_id}`, 'success');
+        showDigestAlert(`Test digest sent successfully to ${data.test_email}! Dispatch ID: ${data.dispatch_id}`, 'success');
         refreshDigestHistory();
       } else {
         showDigestAlert(`Test dispatch failed: ${data.detail || data.message || 'Unknown error'}`, 'error');
@@ -5453,7 +5449,7 @@ html[data-theme="light"] .dwell-sortable-th:hover {
         if (data.status === 'ALREADY_DISPATCHED') {
           showDigestAlert(`ℹ️ Notice: ${data.message || "Today's edition has already been dispatched."}`, 'warning');
         } else {
-          showDigestAlert(`✓ Broadcast completed! Delivered: ${data.delivered}, Failed: ${data.failed} of ${data.recipients} recipients.`, 'success');
+          showDigestAlert(`Broadcast completed! Delivered: ${data.delivered}, Failed: ${data.failed} of ${data.recipients} recipients.`, 'success');
         }
         refreshDigestHistory();
       } else {

@@ -12,7 +12,7 @@
 - **Status:** `In Progress` (Phases 1–3 shipped 2026-10-20; `/terms` statutory 7-section realignment shipped 2026-10-23; items below remain open)
 - **Details:**
   1. Reference the hero banners (`img/heroes/*.webp`) and portal plates (`img/brand/portal-*.webp`) from their pages, after a browser review of text contrast.
-  2. Replace the remaining raw emojis in `web/main.py` server messages and `web/templates/admin.html` console with sprite icons.
+  2. ~~Replace the remaining raw emojis in `web/main.py` server messages and `web/templates/admin.html` console with clean text and sprite icons (`Completed 2026-10-24`).~~
   3. Decide whether to migrate stored values (`SURGICAL_REFRESH`, `FULL_SYNTHESIS`, contact category `synthesis`, existing `BSE Surveillance` alert rows) to the new wording; needs a data migration.
   4. ~~Owner decision on whether to retain or update the phrase `"computational financial research synthesis software utility"` inside `MANDATORY_SEBI_DISCLAIMER` (`core/db/compliance.py`) — updated to `"independent multi-asset investment research platform and software utility"` (`Completed 2026-10-24`).~~
   5. Hindi: per-language voice rules, string catalogues and the `language` parameter of `get_system_prompt()` (deferred).

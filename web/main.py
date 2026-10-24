@@ -217,7 +217,7 @@ async def run_daily_discovery_scheduler():
     - 08:45 AM IST: Discovery Reel morning screening (500+ scrips)
     - 09:00 AM IST: Daily unlisted MSME cohort ingestion & Research Bouquet dispatch
     """
-    logger.info("🌅 [Discovery Scheduler] Background BSE monitoring crawler & morning scheduler initiated.")
+    logger.info("[Discovery Scheduler] Background BSE monitoring crawler & morning scheduler initiated.")
     last_stock_run_date = None
     last_discovery_run_date = None
     last_msme_run_date = None
@@ -240,31 +240,31 @@ async def run_daily_discovery_scheduler():
         if is_past_830:
             with job_lease(f"mf_stock_ingest_{today_str}", ttl_seconds=7200, release_on_exit=False) as acquired:
                 if acquired:
-                    logger.info(f"🌅 [Discovery Scheduler] Past 08:30 AM IST on boot for {today_str}. Acquired lease. Triggering daily 15-stock ingestion...")
+                    logger.info(f"[Discovery Scheduler] Past 08:30 AM IST on boot for {today_str}. Acquired lease. Triggering daily 15-stock ingestion...")
                     await loop.run_in_executor(None, ingest_daily_stock_cohort, today_str, 15, False)
-                    logger.info(f"🌅 [Discovery Scheduler] 15-stock ingestion & mutual fund look-through re-audit completed for {today_str}.")
+                    logger.info(f"[Discovery Scheduler] 15-stock ingestion & mutual fund look-through re-audit completed for {today_str}.")
                 else:
-                    logger.info(f"🌅 [Discovery Scheduler] Lease for mf_stock_ingest_{today_str} held by another worker. Skipping boot ingestion.")
+                    logger.info(f"[Discovery Scheduler] Lease for mf_stock_ingest_{today_str} held by another worker. Skipping boot ingestion.")
             last_stock_run_date = today_str
 
             if is_past_845:
                 with job_lease(f"discovery_reel_{today_str}", ttl_seconds=7200, release_on_exit=False) as acquired:
                     if acquired:
-                        logger.info(f"🌅 [Discovery Watcher] Past 08:45 AM IST on boot for {today_str}. Acquired lease. Running discovery screening...")
+                        logger.info(f"[Discovery Watcher] Past 08:45 AM IST on boot for {today_str}. Acquired lease. Running discovery screening...")
                         await execute_discovery_screening()
-                        logger.info(f"🌅 [Discovery Watcher] Boot discovery screening completed for {today_str}.")
+                        logger.info(f"[Discovery Watcher] Boot discovery screening completed for {today_str}.")
                     else:
-                        logger.info(f"🌅 [Discovery Watcher] Lease for discovery_reel_{today_str} held by another worker. Skipping boot screening.")
+                        logger.info(f"[Discovery Watcher] Lease for discovery_reel_{today_str} held by another worker. Skipping boot screening.")
                 last_discovery_run_date = today_str
 
             if is_past_900:
                 with job_lease(f"msme_daily_ingest_{today_str}", ttl_seconds=7200, release_on_exit=False) as acquired:
                     if acquired:
-                        logger.info(f"🏭 [Discovery Scheduler] Past 09:00 AM IST on boot for {today_str}. Acquired lease. Triggering daily MSME cohort ingestion...")
+                        logger.info(f"[Discovery Scheduler] Past 09:00 AM IST on boot for {today_str}. Acquired lease. Triggering daily MSME cohort ingestion...")
                         await loop.run_in_executor(None, ingest_daily_msme_cohort, today_str, 15)
-                        logger.info(f"🏭 [Discovery Scheduler] MSME cohort ingestion completed for {today_str}.")
+                        logger.info(f"[Discovery Scheduler] MSME cohort ingestion completed for {today_str}.")
                     else:
-                        logger.info(f"🏭 [Discovery Scheduler] Lease for msme_daily_ingest_{today_str} held by another worker. Skipping boot MSME ingest.")
+                        logger.info(f"[Discovery Scheduler] Lease for msme_daily_ingest_{today_str} held by another worker. Skipping boot MSME ingest.")
                 last_msme_run_date = today_str
 
                 from core.db.digest import has_edition_been_dispatched
@@ -293,12 +293,12 @@ async def run_daily_discovery_scheduler():
             if not yesterday_existing:
                 with job_lease(f"mf_stock_ingest_bootstrap_{yesterday_str}", ttl_seconds=7200, release_on_exit=False) as acquired:
                     if acquired:
-                        logger.info(f"🌅 [Discovery Scheduler] Prior-day edition ({yesterday_str}) missing on pre-08:30 boot. Running catch-up ingestion...")
+                        logger.info(f"[Discovery Scheduler] Prior-day edition ({yesterday_str}) missing on pre-08:30 boot. Running catch-up ingestion...")
                         await loop.run_in_executor(None, ingest_daily_stock_cohort, yesterday_str, 15, False)
                         await execute_discovery_screening()
                         await loop.run_in_executor(None, ingest_daily_msme_cohort, yesterday_str, 15)
     except Exception as boot_err:
-        logger.warning(f"🌅 [Discovery Scheduler] Catch-up check notice: {boot_err}")
+        logger.warning(f"[Discovery Scheduler] Catch-up check notice: {boot_err}")
 
     while True:
         try:
@@ -317,11 +317,11 @@ async def run_daily_discovery_scheduler():
                 from core.analysis.daily_stock_ingestion import ingest_daily_stock_cohort
                 with job_lease(f"mf_stock_ingest_{today_str}", ttl_seconds=7200, release_on_exit=False) as acquired:
                     if acquired:
-                        logger.info(f"🌅 [Discovery Scheduler] 08:30 AM IST trigger reached for {today_str}. Acquired lease. Running daily 15-stock ingestion...")
+                        logger.info(f"[Discovery Scheduler] 08:30 AM IST trigger reached for {today_str}. Acquired lease. Running daily 15-stock ingestion...")
                         await loop.run_in_executor(None, ingest_daily_stock_cohort, today_str, 15, False)
-                        logger.info(f"🌅 [Discovery Scheduler] Daily 15-stock ingestion & mutual fund look-through re-audit completed for {today_str}.")
+                        logger.info(f"[Discovery Scheduler] Daily 15-stock ingestion & mutual fund look-through re-audit completed for {today_str}.")
                     else:
-                        logger.info(f"🌅 [Discovery Scheduler] Lease for mf_stock_ingest_{today_str} held by another worker. Skipping.")
+                        logger.info(f"[Discovery Scheduler] Lease for mf_stock_ingest_{today_str} held by another worker. Skipping.")
                 last_stock_run_date = today_str
 
             # 2. 08:45 AM Discovery Reel Screening
@@ -329,11 +329,11 @@ async def run_daily_discovery_scheduler():
                 from core.agents.watchers.discovery_watcher import execute_discovery_screening
                 with job_lease(f"discovery_reel_{today_str}", ttl_seconds=7200, release_on_exit=False) as acquired:
                     if acquired:
-                        logger.info(f"🌅 [Discovery Watcher] 08:45 AM IST trigger reached for {today_str}. Acquired lease. Running discovery screening...")
+                        logger.info(f"[Discovery Watcher] 08:45 AM IST trigger reached for {today_str}. Acquired lease. Running discovery screening...")
                         await execute_discovery_screening()
-                        logger.info(f"🌅 [Discovery Watcher] Daily 08:45 AM discovery reel screening completed for {today_str}.")
+                        logger.info(f"[Discovery Watcher] Daily 08:45 AM discovery reel screening completed for {today_str}.")
                     else:
-                        logger.info(f"🌅 [Discovery Watcher] Lease for discovery_reel_{today_str} held by another worker. Skipping.")
+                        logger.info(f"[Discovery Watcher] Lease for discovery_reel_{today_str} held by another worker. Skipping.")
                 last_discovery_run_date = today_str
 
             # 3. 09:00 AM MSME Ingestion
@@ -341,11 +341,11 @@ async def run_daily_discovery_scheduler():
                 from core.msme.daily_ingest import ingest_daily_msme_cohort
                 with job_lease(f"msme_daily_ingest_{today_str}", ttl_seconds=7200, release_on_exit=False) as acquired:
                     if acquired:
-                        logger.info(f"🏭 [MSME Ingest] 09:00 AM IST trigger reached for {today_str}. Acquired lease. Running daily MSME cohort ingestion...")
+                        logger.info(f"[MSME Ingest] 09:00 AM IST trigger reached for {today_str}. Acquired lease. Running daily MSME cohort ingestion...")
                         await loop.run_in_executor(None, ingest_daily_msme_cohort, today_str, 15)
-                        logger.info(f"🏭 [MSME Ingest] 09:00 AM IST unlisted MSME cohort ingestion completed for {today_str}.")
+                        logger.info(f"[MSME Ingest] 09:00 AM IST unlisted MSME cohort ingestion completed for {today_str}.")
                     else:
-                        logger.info(f"🏭 [MSME Ingest] Lease for msme_daily_ingest_{today_str} held by another worker. Skipping.")
+                        logger.info(f"[MSME Ingest] Lease for msme_daily_ingest_{today_str} held by another worker. Skipping.")
                 last_msme_run_date = today_str
 
             # 4. 09:00 AM IST ONLY: Dispatch Morning Research Bouquet Email
@@ -364,10 +364,10 @@ async def run_daily_discovery_scheduler():
             elif now.hour > 9 and last_bouquet_run_date != today_str:
                 last_bouquet_run_date = today_str
         except asyncio.CancelledError:
-            logger.info("🌅 [Discovery Scheduler] Background scheduler cancelled.")
+            logger.info("[Discovery Scheduler] Background scheduler cancelled.")
             break
         except Exception as e:
-            logger.error(f"🌅 [Discovery Scheduler] Error in daily discovery scheduler: {e}")
+            logger.error(f"[Discovery Scheduler] Error in daily discovery scheduler: {e}")
             await asyncio.sleep(60)
 
 
@@ -379,7 +379,7 @@ async def run_daily_amfi_scheduler():
     3. Always-On Multi-Asset Monitoring Scan (MF drift + Corporate Debt maturities/CRA watches)
     4. Sovereign Risk-Free Benchmarks & SDL Yield Curve Synchronization
     """
-    logger.info("📊 [AMFI & Multi-Asset Scheduler] Background synchronizer initiated.")
+    logger.info("[AMFI & Multi-Asset Scheduler] Background synchronizer initiated.")
     loop = asyncio.get_running_loop()
 
     # Pre-flight / Boot catch-up checks
@@ -399,9 +399,9 @@ async def run_daily_amfi_scheduler():
                 # 1. ETF Universe Boot Check: Ensure all active AMFI ETFs are in database
                 etf_count = get_etf_count()
                 if etf_count < 400:
-                    logger.info(f"📊 [ETF Ingestion Boot] ETF matrix has {etf_count} records (<400). Running dynamic AMFI ETF sync...")
+                    logger.info(f"[ETF Ingestion Boot] ETF matrix has {etf_count} records (<400). Running dynamic AMFI ETF sync...")
                     etf_res = await loop.run_in_executor(None, ingest_all_amfi_etfs, True)
-                    logger.info(f"📊 [ETF Ingestion Boot] Synced {etf_res.get('persisted_to_db', 0)} ETFs into matrix.")
+                    logger.info(f"[ETF Ingestion Boot] Synced {etf_res.get('persisted_to_db', 0)} ETFs into matrix.")
 
                 # 2. Sovereign Benchmarks Boot Check: Ensure sovereign benchmarks are primed
                 await loop.run_in_executor(None, refresh_daily_sovereign_benchmarks, today_str)
@@ -414,16 +414,16 @@ async def run_daily_amfi_scheduler():
                 last_scan_date = str(recent_scans[0].get("started_at", ""))[:10] if recent_scans else ""
                 is_past_2315 = (now.hour > 23) or (now.hour == 23 and now.minute >= 15)
                 if (is_past_2315 and last_scan_date != today_str) or (not last_scan_date or last_scan_date < yesterday_str):
-                    logger.info(f"📊 [Asset Scan Catch-up] Last scan ({last_scan_date or 'none'}) stale on boot. Executing AMFI & multi-asset catch-up...")
+                    logger.info(f"[Asset Scan Catch-up] Last scan ({last_scan_date or 'none'}) stale on boot. Executing AMFI & multi-asset catch-up...")
                     await loop.run_in_executor(None, ingest_amfi_daily_feed, None, True)
                     await loop.run_in_executor(None, run_comprehensive_asset_scan, "ALL_ASSETS", "catch_up_boot")
 
                 gc.collect()
             else:
-                logger.info("📊 [AMFI & Multi-Asset Scheduler] Boot catch-up lease held by another worker. Skipping duplicate catch-up.")
+                logger.info("[AMFI & Multi-Asset Scheduler] Boot catch-up lease held by another worker. Skipping duplicate catch-up.")
 
     except Exception as boot_err:
-        logger.warning(f"📊 [AMFI & Multi-Asset Scheduler] Boot catch-up notice: {boot_err}")
+        logger.warning(f"[AMFI & Multi-Asset Scheduler] Boot catch-up notice: {boot_err}")
 
     while True:
         try:
@@ -432,11 +432,11 @@ async def run_daily_amfi_scheduler():
             if now >= target:
                 target += timedelta(days=1)
             wait_seconds = (target - now).total_seconds()
-            logger.info(f"📊 [AMFI & Multi-Asset Scheduler] Next synchronization scheduled in {wait_seconds/3600:.2f} hours (at {target.strftime('%Y-%m-%d %H:%M:%S IST')}).")
+            logger.info(f"[AMFI & Multi-Asset Scheduler] Next synchronization scheduled in {wait_seconds/3600:.2f} hours (at {target.strftime('%Y-%m-%d %H:%M:%S IST')}).")
             await asyncio.sleep(wait_seconds)
 
             today_str = datetime.now(IST).strftime("%Y-%m-%d")
-            logger.info("📊 [AMFI & Multi-Asset Scheduler] Executing scheduled nightly synchronization...")
+            logger.info("[AMFI & Multi-Asset Scheduler] Executing scheduled nightly synchronization...")
 
             from core.ingestion.amfi import ingest_amfi_daily_feed
             from core.ingestion.etf_ingest import ingest_all_amfi_etfs
@@ -488,19 +488,19 @@ async def run_daily_amfi_scheduler():
                 metadata=sov_res
             )
 
-            logger.info("📊 [AMFI & Multi-Asset Scheduler] Scheduled nightly synchronization pipeline fully completed.")
+            logger.info("[AMFI & Multi-Asset Scheduler] Scheduled nightly synchronization pipeline fully completed.")
         except asyncio.CancelledError:
-            logger.info("📊 [AMFI & Multi-Asset Scheduler] Background scheduler cancelled.")
+            logger.info("[AMFI & Multi-Asset Scheduler] Background scheduler cancelled.")
             break
         except Exception as e:
-            logger.error(f"📊 [AMFI & Multi-Asset Scheduler] Error in multi-asset synchronization: {e}")
+            logger.error(f"[AMFI & Multi-Asset Scheduler] Error in multi-asset synchronization: {e}")
             await asyncio.sleep(120)
 
 
 
 async def run_daily_fund_audit_scheduler():
     """Automated background Mutual Fund Accounting Checkor (runs daily at 23:30 IST with boot catch-up)."""
-    logger.info("🔍 [Fund Audit Scheduler] Background mutual fund accounting checkor initiated.")
+    logger.info("[Fund Audit Scheduler] Background mutual fund accounting checkor initiated.")
     try:
         from core.analysis.fund_overlap_auditor import audit_single_fund_daily
         from core.db.connection import get_db_connection
@@ -520,14 +520,14 @@ async def run_daily_fund_audit_scheduler():
             import gc
             with job_lease(f"boot_catchup_fund_audit_{now.strftime('%Y-%m-%d')}", ttl_seconds=1800, release_on_exit=False) as acquired:
                 if acquired:
-                    logger.info(f"🔍 [Fund Audit Scheduler] Last fund audit ({last_audit_date or 'none'}) older than {yesterday_str}. Running catch-up audit...")
+                    logger.info(f"[Fund Audit Scheduler] Last fund audit ({last_audit_date or 'none'}) older than {yesterday_str}. Running catch-up audit...")
                     loop = asyncio.get_running_loop()
                     await loop.run_in_executor(None, audit_single_fund_daily, None, False)
                     gc.collect()
                 else:
-                    logger.info("🔍 [Fund Audit Scheduler] Boot catch-up lease held by another worker. Skipping duplicate catch-up.")
+                    logger.info("[Fund Audit Scheduler] Boot catch-up lease held by another worker. Skipping duplicate catch-up.")
     except Exception as boot_err:
-        logger.warning(f"🔍 [Fund Audit Scheduler] Boot catch-up notice: {boot_err}")
+        logger.warning(f"[Fund Audit Scheduler] Boot catch-up notice: {boot_err}")
 
     while True:
         try:
@@ -536,14 +536,14 @@ async def run_daily_fund_audit_scheduler():
             if now >= target:
                 target += timedelta(days=1)
             wait_seconds = (target - now).total_seconds()
-            logger.info(f"🔍 [Fund Audit Scheduler] Next fund audit scheduled in {wait_seconds/3600:.2f} hours (at {target.strftime('%Y-%m-%d %H:%M:%S IST')}).")
+            logger.info(f"[Fund Audit Scheduler] Next fund audit scheduled in {wait_seconds/3600:.2f} hours (at {target.strftime('%Y-%m-%d %H:%M:%S IST')}).")
             await asyncio.sleep(wait_seconds)
 
             today_str = datetime.now(IST).strftime("%Y%m%d")
             from core.db.distributed_lock import job_lease
             with job_lease(f"daily_fund_audit_{today_str}", ttl_seconds=3600, release_on_exit=False) as acquired:
                 if acquired:
-                    logger.info("🔍 [Fund Audit Scheduler] Acquired lease. Executing scheduled nightly mutual fund accounting check...")
+                    logger.info("[Fund Audit Scheduler] Acquired lease. Executing scheduled nightly mutual fund accounting check...")
                     from core.analysis.fund_overlap_auditor import audit_single_fund_daily
                     from core.db.agent_sessions import record_autonomous_event
                     loop = asyncio.get_running_loop()
@@ -563,20 +563,20 @@ async def run_daily_fund_audit_scheduler():
                                 "margin_of_safety_pct": res.get("margin_of_safety_pct")
                             }
                         )
-                    logger.info(f"🔍 [Fund Audit Scheduler] Nightly fund accounting check completed for {res.get('scheme_code') if res else 'no-op'}.")
+                    logger.info(f"[Fund Audit Scheduler] Nightly fund accounting check completed for {res.get('scheme_code') if res else 'no-op'}.")
                 else:
-                    logger.info(f"🔍 [Fund Audit Scheduler] Lease for daily_fund_audit_{today_str} held by another worker. Skipping duplicate fund audit.")
+                    logger.info(f"[Fund Audit Scheduler] Lease for daily_fund_audit_{today_str} held by another worker. Skipping duplicate fund audit.")
         except asyncio.CancelledError:
-            logger.info("🔍 [Fund Audit Scheduler] Background fund audit scheduler cancelled.")
+            logger.info("[Fund Audit Scheduler] Background fund audit scheduler cancelled.")
             break
         except Exception as e:
-            logger.error(f"🔍 [Fund Audit Scheduler] Error in fund audit scheduler: {e}")
+            logger.error(f"[Fund Audit Scheduler] Error in fund audit scheduler: {e}")
             await asyncio.sleep(180)
 
 
 async def run_daily_project_audit_scheduler():
     """Automated background Project Auditor (runs nightly at 03:00 IST)."""
-    logger.info("🛡️ [Project Auditor Scheduler] Background project auditor initiated.")
+    logger.info("[Project Auditor Scheduler] Background project auditor initiated.")
     while True:
         try:
             now = datetime.now(IST)
@@ -584,36 +584,36 @@ async def run_daily_project_audit_scheduler():
             if now >= target:
                 target += timedelta(days=1)
             wait_seconds = (target - now).total_seconds()
-            logger.info(f"🛡️ [Project Auditor Scheduler] Next audit scheduled in {wait_seconds/3600:.2f} hours (at {target.strftime('%Y-%m-%d %H:%M:%S IST')}).")
+            logger.info(f"[Project Auditor Scheduler] Next audit scheduled in {wait_seconds/3600:.2f} hours (at {target.strftime('%Y-%m-%d %H:%M:%S IST')}).")
             await asyncio.sleep(wait_seconds)
 
             today_str = datetime.now(IST).strftime("%Y%m%d")
             from core.db.distributed_lock import job_lease
             with job_lease(f"daily_project_audit_{today_str}", ttl_seconds=3600, release_on_exit=False) as acquired:
                 if acquired:
-                    logger.info("🛡️ [Project Auditor Scheduler] Acquired lease. Executing scheduled nightly project audit...")
+                    logger.info("[Project Auditor Scheduler] Acquired lease. Executing scheduled nightly project audit...")
                     from core.audit.project_auditor import audit_project_full
                     await audit_project_full(use_ai=True)
-                    logger.info("🛡️ [Project Auditor Scheduler] Nightly project audit completed.")
+                    logger.info("[Project Auditor Scheduler] Nightly project audit completed.")
                 else:
-                    logger.info(f"🛡️ [Project Auditor Scheduler] Lease for daily_project_audit_{today_str} held by another worker. Skipping duplicate audit.")
+                    logger.info(f"[Project Auditor Scheduler] Lease for daily_project_audit_{today_str} held by another worker. Skipping duplicate audit.")
         except asyncio.CancelledError:
-            logger.info("🛡️ [Project Auditor Scheduler] Background scheduler cancelled.")
+            logger.info("[Project Auditor Scheduler] Background scheduler cancelled.")
             break
         except Exception as e:
-            logger.error(f"🛡️ [Project Auditor Scheduler] Error in project audit scheduler: {e}")
+            logger.error(f"[Project Auditor Scheduler] Error in project audit scheduler: {e}")
             await asyncio.sleep(180)
 
 
 async def warmup_task():
     """Primes local database connections and cache pools."""
     if os.environ.get("TESTING") == "1" or "pytest" in sys.modules:
-        logger.info("🧪 Test environment detected: skipping live network warm-up task.")
+        logger.info("Test environment detected: skipping live network warm-up task.")
         return
-    logger.info("🚀 Starting warm‑up task: preloading local database connections...")
+    logger.info("Starting warm‑up task: preloading local database connections...")
     try:
         init_db()
-        logger.info("🚀 Warm‑up task completed: DB connection and schema caches primed.")
+        logger.info("Warm‑up task completed: DB connection and schema caches primed.")
     except Exception as e:
         logger.warning(f"Warm‑up task warning: {e}")
 
