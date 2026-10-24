@@ -351,18 +351,40 @@ def dispatch_research_bouquet(
     Supports Resend API and SMTP with graceful mock/logging fallback.
     Records delivery in digest_dispatches.
     """
+    from datetime import datetime, timezone, timedelta
     from core.analysis.research_bouquet import (
         compile_research_bouquet,
         render_bouquet_html,
         render_bouquet_text,
     )
     from core.db.digest import (
+        get_active_digest_subscribers,
         get_digest_subscribers,
         record_digest_dispatch,
         has_edition_been_dispatched,
     )
 
-    bouquet = compile_research_bouquet(edition_date=edition_date)
+    IST = timezone(timedelta(hours=5, minutes=30))
+    target_date = edition_date or datetime.now(IST).strftime("%Y-%m-%d")
+
+    # Fast-path idempotency guard: short-circuit before expensive multi-asset compilation
+    if not test_recipient and not force and has_edition_been_dispatched(target_date):
+        logger.info(
+            f"[DISPATCH] Morning Research Bouquet for {target_date} already dispatched. Skipping duplicate send."
+        )
+        return {
+            "success": True,
+            "edition_date": target_date,
+            "status": "ALREADY_DISPATCHED",
+            "message": f"Edition for {target_date} has already been broadcast.",
+            "sent_count": 0,
+            "failed_count": 0,
+            "delivered": 0,
+            "failed": 0,
+            "recipients": 0,
+        }
+
+    bouquet = compile_research_bouquet(edition_date=target_date)
     sender_email = _get_cfg("SMTP_FROM") or _get_cfg("RESEND_FROM") or _get_cfg("SMTP_USER") or "noreply@moatnomics.com"
 
     if test_recipient:
@@ -406,22 +428,6 @@ def dispatch_research_bouquet(
             "edition_date": bouquet["edition_date"],
             "subject": test_subject,
             "test_email": test_recipient
-        }
-
-    # Broadcast to registered subscribers
-    if not force and has_edition_been_dispatched(bouquet["edition_date"]):
-        logger.info(
-            "[Research Bouquet] Edition %s has already been broadcast (idempotency guard). Skipping duplicate dispatch.",
-            bouquet["edition_date"],
-        )
-        return {
-            "success": True,
-            "status": "ALREADY_DISPATCHED",
-            "message": f"Edition for {bouquet['edition_date']} has already been broadcast.",
-            "edition_date": bouquet["edition_date"],
-            "delivered": 0,
-            "failed": 0,
-            "recipients": 0,
         }
 
     subscribers = get_digest_subscribers(only_active_pro=only_active_pro)
