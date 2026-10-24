@@ -164,8 +164,16 @@ class TestMutualFundEngine(unittest.TestCase):
         self.assertIsNone(lt["composite_health_score"])
         self.assertEqual(lt["health_posture"], "COVERAGE_PENDING")
 
-        with patch("core.db.reports.get_report_by_ticker") as mock_rep:
-            mock_rep.return_value = {"report_text": "### Health Matrix\nVerified 7-pillar report"}
+        from core.db.mutual_funds import get_scheme_holdings
+        all_ppfas_tickers = {
+            h["identifier"].strip().upper()
+            for h in get_scheme_holdings("PPFAS_FLEXICAP_DIR")
+            if h.get("identifier")
+        }
+        with patch(
+            "core.analysis.mutual_funds_engine.get_researched_tickers_set",
+            return_value=all_ppfas_tickers,
+        ):
             unlocked_dossier = evaluate_mutual_fund_comprehensive("PPFAS_FLEXICAP_DIR")
             unlocked_lt = unlocked_dossier["lookthrough"]
             self.assertTrue(unlocked_lt["has_sufficient_coverage"])
