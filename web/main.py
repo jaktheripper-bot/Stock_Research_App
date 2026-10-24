@@ -274,12 +274,9 @@ async def run_daily_discovery_scheduler():
                     with job_lease(f"morning_bouquet_{today_str}", ttl_seconds=86400, release_on_exit=False) as acquired:
                         if acquired:
                             logger.info(
-                                f"📬 [Research Bouquet] Boot Check: 09:00 AM IST window active ({today_str}). Acquired lease. Dispatching morning bouquet..."
+                                f"Boot Check: 09:00 AM IST window active ({today_str}). Dispatching Morning Research Bouquet..."
                             )
-                            await loop.run_in_executor(None, dispatch_research_bouquet, today_str, None, False)
-                            logger.info(f"📬 [Research Bouquet] Morning bouquet dispatch completed for {today_str}.")
-                        else:
-                            logger.info(f"📬 [Research Bouquet] Lease for morning_bouquet_{today_str} held by another worker. Skipping boot bouquet dispatch.")
+                            await asyncio.to_thread(dispatch_research_bouquet, today_str)
                     last_bouquet_run_date = today_str
                 elif now.hour >= 9:
                     last_bouquet_run_date = today_str
@@ -351,23 +348,21 @@ async def run_daily_discovery_scheduler():
                         logger.info(f"🏭 [MSME Ingest] Lease for msme_daily_ingest_{today_str} held by another worker. Skipping.")
                 last_msme_run_date = today_str
 
-            # 4. 09:00 AM Research Bouquet Morning Dispatch
-            if is_past_900 and last_bouquet_run_date != today_str:
+            # 4. 09:00 AM IST ONLY: Dispatch Morning Research Bouquet Email
+            if now.hour == 9 and last_bouquet_run_date != today_str:
                 from core.notify import dispatch_research_bouquet
                 from core.db.digest import has_edition_been_dispatched
 
-                # Regular trigger: ONLY dispatch within the 09:00–09:59 AM IST window if not already sent today
-                if now.hour == 9 and not has_edition_been_dispatched(today_str):
+                if not has_edition_been_dispatched(today_str):
                     with job_lease(f"morning_bouquet_{today_str}", ttl_seconds=86400, release_on_exit=False) as acquired:
                         if acquired:
-                            logger.info(f"📬 [Research Bouquet] 09:00 AM IST trigger reached for {today_str}. Acquired lease. Dispatching morning bouquet...")
-                            await loop.run_in_executor(None, dispatch_research_bouquet, today_str, None, False)
-                            logger.info(f"📬 [Research Bouquet] 09:00 AM IST morning bouquet dispatch completed for {today_str}.")
-                        else:
-                            logger.info(f"📬 [Research Bouquet] Lease for morning_bouquet_{today_str} held by another worker. Skipping.")
-                    last_bouquet_run_date = today_str
-                elif now.hour >= 9:
-                    last_bouquet_run_date = today_str
+                            logger.info(
+                                f"Triggering 09:00 AM IST Morning Research Bouquet Email Dispatch for {today_str}..."
+                            )
+                            await asyncio.to_thread(dispatch_research_bouquet, today_str)
+                last_bouquet_run_date = today_str
+            elif now.hour > 9 and last_bouquet_run_date != today_str:
+                last_bouquet_run_date = today_str
         except asyncio.CancelledError:
             logger.info("🌅 [Discovery Scheduler] Background scheduler cancelled.")
             break
