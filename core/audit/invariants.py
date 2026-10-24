@@ -77,7 +77,7 @@ def scan_unbounded_caches() -> List[Dict[str, Any]]:
 
 
 def scan_silent_exception_swallowing() -> List[Dict[str, Any]]:
-    """INV_SILENT_EXCEPTION_SWALLOW: Detects blanket except Exception: pass blocks without logging."""
+    """INV_SILENT_EXCEPTION_SWALLOW: Detects blanket unlogged exception handlers without re-raising or logging."""
     findings = []
     py_files = [p for p in (PROJECT_ROOT / "core").rglob("*.py") if "__pycache__" not in str(p)]
     py_files.extend([p for p in (PROJECT_ROOT / "web").rglob("*.py") if "__pycache__" not in str(p)])

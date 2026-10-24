@@ -244,8 +244,10 @@ def get_all_provider_constraints() -> Dict[str, Any]:
         "plan_label": "Telemetry & Incidents",
         "primary_metric": f"{sources_count} Log Source(s) • {'All UP' if all_monitors_up and monitors_count > 0 else f'{monitors_count} Monitors'}",
         "utilization_pct": 10.0 if is_bs_configured else 0.0,
-        "secondary_metric": "Python Logtail Stream + Render Syslog Drain (Port 6514)",
-        "constraint_note": "Monitors production /health endpoint and ingests real-time container crashes and exception traces.",
+        "secondary_metric": f"Web Health + Pipeline Heartbeat • {sources_count} Ingestion Pipes",
+        "constraint_note": "Monitors production /health endpoint and ingests real-time container crashes, daemon heartbeats and exception traces.",
+        "action_url": "https://telemetry.betterstack.com",
+        "action_label": "Live Tail & Alerts →",
     })
 
     return {

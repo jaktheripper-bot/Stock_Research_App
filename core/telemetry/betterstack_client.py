@@ -108,27 +108,54 @@ class BetterStackClient:
     # -------------------------------------------------------------------------
     # Incidents & Uptime Monitors
     # -------------------------------------------------------------------------
+    # Uptime Monitors & Heartbeats (Incidents API)
+    # -------------------------------------------------------------------------
 
     def list_monitors(self) -> List[Dict[str, Any]]:
-        """Lists all configured uptime monitors and heartbeats."""
+        """Lists all configured uptime monitors."""
         url = f"{INCIDENTS_API_BASE}/monitors"
         res = self._request(url, self.incidents_token)
         return res.get("data", [])
 
+    def list_heartbeats(self) -> List[Dict[str, Any]]:
+        """Lists all configured heartbeat monitors (dead man's snitches)."""
+        url = f"{INCIDENTS_API_BASE}/heartbeats"
+        res = self._request(url, self.incidents_token)
+        return res.get("data", [])
+
     def get_monitor_statuses(self) -> List[Dict[str, Any]]:
-        """Extracts lightweight status summaries across all monitors."""
-        monitors = self.list_monitors()
+        """Extracts lightweight status summaries across all monitors and heartbeats."""
         summary = []
-        for m in monitors:
-            attrs = m.get("attributes", {})
-            summary.append({
-                "id": m.get("id"),
-                "name": attrs.get("pronounceable_name"),
-                "url": attrs.get("url"),
-                "status": attrs.get("status"),
-                "monitor_type": attrs.get("monitor_type"),
-                "last_checked_at": attrs.get("last_checked_at"),
-            })
+        try:
+            monitors = self.list_monitors()
+            for m in monitors:
+                attrs = m.get("attributes", {})
+                summary.append({
+                    "id": m.get("id"),
+                    "name": attrs.get("pronounceable_name") or attrs.get("name"),
+                    "url": attrs.get("url"),
+                    "status": attrs.get("status"),
+                    "monitor_type": attrs.get("monitor_type", "status"),
+                    "last_checked_at": attrs.get("last_checked_at"),
+                })
+        except Exception as e_m:
+            logger.debug(f"Uptime monitors query notice: {e_m}")
+
+        try:
+            heartbeats = self.list_heartbeats()
+            for hb in heartbeats:
+                attrs = hb.get("attributes", {})
+                summary.append({
+                    "id": hb.get("id"),
+                    "name": attrs.get("name"),
+                    "url": attrs.get("url"),
+                    "status": attrs.get("status"),
+                    "monitor_type": "heartbeat",
+                    "last_checked_at": attrs.get("updated_at"),
+                })
+        except Exception as e_hb:
+            logger.debug(f"Heartbeats query notice: {e_hb}")
+
         return summary
 
     def update_monitor(self, monitor_id: str, attributes: Dict[str, Any]) -> Dict[str, Any]:
@@ -140,14 +167,14 @@ class BetterStackClient:
         self,
         name: str,
         period: int = 86400,
-        grace_period: int = 3600,
+        grace: int = 3600,
     ) -> Dict[str, Any]:
         """Creates a heartbeat monitor (dead man's snitch) in Better Stack."""
         url = f"{INCIDENTS_API_BASE}/heartbeats"
         payload = {
             "name": name,
             "period": period,
-            "grace_period": grace_period,
+            "grace": grace,
         }
         return self._request(url, self.incidents_token, method="POST", payload=payload)
 

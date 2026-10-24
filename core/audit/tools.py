@@ -45,6 +45,7 @@ def tool_run_test_suite(quick: bool = False) -> Dict[str, Any]:
             "tests/e2e/test_critical_journeys.py",
             "tests/unit/test_findings_fixes.py",
             "tests/unit/test_betterstack_client.py",
+            "tests/unit/test_affiliated_services_contract.py",
             "-q"
         ]
     else:
@@ -393,16 +394,31 @@ def tool_scan_code_hygiene() -> Dict[str, Any]:
                     fpath = Path(root) / f
                     try:
                         content = fpath.read_text(encoding="utf-8")
-                        for pat, desc in anti_patterns:
-                            matches = list(re.finditer(pat, content))
-                            for m in matches:
-                                line_no = content[:m.start()].count("\n") + 1
-                                findings.append({
-                                    "file": str(fpath.relative_to(PROJECT_ROOT)),
-                                    "line": line_no,
-                                    "matched_text": m.group(0),
-                                    "anti_pattern": desc
-                                })
+                        # AST check for true blanket silent exception swallowing (immune to comments and docstrings)
+                        try:
+                            tree = ast.parse(content, filename=str(fpath))
+                            for node in ast.walk(tree):
+                                if isinstance(node, ast.ExceptHandler):
+                                    is_blanket = node.type is None or (isinstance(node.type, ast.Name) and node.type.id in ("Exception", "BaseException"))
+                                    if is_blanket and len(node.body) == 1 and isinstance(node.body[0], ast.Pass):
+                                        findings.append({
+                                            "file": str(fpath.relative_to(PROJECT_ROOT)),
+                                            "line": node.lineno,
+                                            "matched_text": "except: pass",
+                                            "anti_pattern": "Silent exception swallowing anti-pattern",
+                                        })
+                        except Exception as ast_err:
+                            logger.debug("AST parse notice for %s: %s", fpath, ast_err)
+
+                        # Check for hardcoded heuristic score anti-patterns
+                        for m in re.finditer(r"score\s*=\s*8[0-9]\.0\b", content):
+                            line_no = content[:m.start()].count("\n") + 1
+                            findings.append({
+                                "file": str(fpath.relative_to(PROJECT_ROOT)),
+                                "line": line_no,
+                                "matched_text": m.group(0),
+                                "anti_pattern": "Hardcoded heuristic score anti-pattern"
+                            })
                     except Exception as e:
                         logger.warning(f"Error scanning {fpath}: {e}")
                 elif f.endswith((".js", ".html")):

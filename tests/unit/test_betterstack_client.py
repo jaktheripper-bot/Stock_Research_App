@@ -50,16 +50,45 @@ class TestBetterStackClient(unittest.TestCase):
         self.assertIsNone(not_found)
 
     @patch("urllib.request.urlopen")
-    def test_get_monitor_statuses(self, mock_urlopen):
+    def test_list_heartbeats(self, mock_urlopen):
         mock_response = MagicMock()
-        mock_response.read.return_value = b'{"data": [{"id": "99", "attributes": {"pronounceable_name": "Moatnomics Web", "url": "https://moatnomics.com", "status": "up", "monitor_type": "status", "last_checked_at": "2026-10-24T00:00:00Z"}}]}'
+        mock_response.read.return_value = b'{"data": [{"id": "hb_99", "attributes": {"name": "Morning Ingestion", "url": "https://example.com/hb", "status": "up", "updated_at": "2026-10-24T00:00:00Z"}}]}'
         mock_response.__enter__.return_value = mock_response
         mock_urlopen.return_value = mock_response
 
+        heartbeats = self.client.list_heartbeats()
+        self.assertEqual(len(heartbeats), 1)
+        self.assertEqual(heartbeats[0]["attributes"]["name"], "Morning Ingestion")
+
+    @patch("core.telemetry.betterstack_client.BetterStackClient.list_monitors")
+    @patch("core.telemetry.betterstack_client.BetterStackClient.list_heartbeats")
+    def test_get_monitor_statuses(self, mock_heartbeats, mock_monitors):
+        mock_monitors.return_value = [{
+            "id": "99",
+            "attributes": {
+                "pronounceable_name": "Moatnomics Web",
+                "url": "https://moatnomics.com",
+                "status": "up",
+                "monitor_type": "status",
+                "last_checked_at": "2026-10-24T00:00:00Z",
+            }
+        }]
+        mock_heartbeats.return_value = [{
+            "id": "hb_1",
+            "attributes": {
+                "name": "Morning Pipeline",
+                "url": "https://example.com/hb1",
+                "status": "up",
+                "updated_at": "2026-10-24T00:00:00Z",
+            }
+        }]
+
         statuses = self.client.get_monitor_statuses()
-        self.assertEqual(len(statuses), 1)
+        self.assertEqual(len(statuses), 2)
         self.assertEqual(statuses[0]["name"], "Moatnomics Web")
-        self.assertEqual(statuses[0]["status"], "up")
+        self.assertEqual(statuses[0]["monitor_type"], "status")
+        self.assertEqual(statuses[1]["name"], "Morning Pipeline")
+        self.assertEqual(statuses[1]["monitor_type"], "heartbeat")
 
     @patch("urllib.request.urlopen")
     def test_update_monitor(self, mock_urlopen):

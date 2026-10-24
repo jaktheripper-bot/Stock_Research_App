@@ -63,10 +63,11 @@ CRITICAL COMPLIANCE DIRECTIVE: Strictly avoid providing any conclusions, forward
     return base_prompt + "\n\n" + brand_context + "\n\n" + EPISTEMIC_PROMPT_DIRECTIVE
 
 _DISCOVERED_MODELS_CACHE = {"models": [], "timestamp": 0}
+_MAX_DISCOVERED_MODELS_CACHE_SIZE = 10
 
 def get_latest_flash_models(client) -> list:
     now = time.time()
-    if _DISCOVERED_MODELS_CACHE["models"] and (now - _DISCOVERED_MODELS_CACHE["timestamp"]) < 86400:
+    if _DISCOVERED_MODELS_CACHE.get("models") and (now - _DISCOVERED_MODELS_CACHE.get("timestamp", 0)) < 86400:
         return _DISCOVERED_MODELS_CACHE["models"]
     fallback = ["gemini-3.8-flash", "gemini-3.7-flash"]
     try:
@@ -80,7 +81,8 @@ def get_latest_flash_models(client) -> list:
                         discovered.append((float(match.group(1)), model_id))
         if discovered:
             discovered.sort(key=lambda x: x[0], reverse=True)
-            ordered = [x[1] for x in discovered]
+            ordered = [x[1] for x in discovered][:_MAX_DISCOVERED_MODELS_CACHE_SIZE]
+            _DISCOVERED_MODELS_CACHE.clear()
             _DISCOVERED_MODELS_CACHE["models"] = ordered
             _DISCOVERED_MODELS_CACHE["timestamp"] = now
             return ordered

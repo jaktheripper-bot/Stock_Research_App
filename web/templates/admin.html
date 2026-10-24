@@ -2847,6 +2847,13 @@ html[data-theme="light"] .dwell-sortable-th:hover {
 
           <div style="font-size: 11.5px; color: #cbd5e1; margin-bottom: 4px;">{{ p.secondary_metric }}</div>
           <div style="font-size: 11px; color: #64748b; line-height: 1.4;">{{ p.constraint_note }}</div>
+          {% if p.action_url %}
+          <div style="margin-top: 10px;">
+            <a href="{{ p.action_url }}" target="_blank" rel="noopener" class="btn btn-secondary btn-sm" style="font-size: 11px; padding: 4px 10px; display: inline-flex; align-items: center; gap: 6px; text-decoration: none;">
+              <svg class="glyph" style="width: 12px; height: 12px;"><use href="#glyph-link"></use></svg> {{ p.action_label or 'Open Console' }}
+            </a>
+          </div>
+          {% endif %}
         </div>
         {% endfor %}
       </div>
