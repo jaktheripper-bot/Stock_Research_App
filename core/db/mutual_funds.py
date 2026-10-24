@@ -311,6 +311,51 @@ def get_scheme_holdings(scheme_code: str) -> List[Dict[str, Any]]:
         conn.close()
 
 
+def get_holdings_for_schemes_batch(scheme_codes: List[str]) -> Dict[str, List[Dict[str, Any]]]:
+    """Fetches constituent holdings for multiple schemes in a single database query to prevent N+1 latency."""
+    cleaned_codes = [str(c).strip().upper() for c in (scheme_codes or []) if c and str(c).strip()]
+    grouped: Dict[str, List[Dict[str, Any]]] = {c: [] for c in cleaned_codes}
+    if not cleaned_codes:
+        return grouped
+
+    conn = get_db_connection()
+    cursor = conn.cursor()
+    use_pg = is_postgres_connection(conn)
+    ph = ",".join(["%s" if use_pg else "?"] * len(cleaned_codes))
+
+    try:
+        sql = f"""
+            SELECT * FROM mutual_fund_holdings
+            WHERE scheme_code IN ({ph})
+            ORDER BY scheme_code ASC, weight_pct DESC
+        """
+        cursor.execute(sql, tuple(cleaned_codes))
+        rows = cursor.fetchall()
+        for r in rows:
+            item = clean_dict_row(cursor, r)
+            if "instrument_details" in item and isinstance(item["instrument_details"], str):
+                try:
+                    item["details"] = json.loads(item["instrument_details"])
+                except Exception as e:
+                    logger.debug("Failed parsing instrument_details in batch mutual_funds: %s", e)
+                    item["details"] = {}
+            else:
+                item["details"] = {}
+            sc = str(item.get("scheme_code") or "").strip().upper()
+            if sc in grouped:
+                grouped[sc].append(item)
+            elif sc:
+                grouped[sc] = [item]
+        return grouped
+    except Exception as e:
+        logger.error("Error batch-fetching holdings for %d schemes: %s", len(cleaned_codes), e)
+        return grouped
+    finally:
+        cursor.close()
+        conn.close()
+
+
+
 def get_schemes_by_holding(identifier: str) -> List[Dict[str, Any]]:
     """Reverse Look-Through: finds which mutual funds hold a specific stock ticker or bond ISIN."""
     conn = get_db_connection()

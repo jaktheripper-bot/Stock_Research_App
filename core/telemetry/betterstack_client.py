@@ -213,7 +213,10 @@ def get_cached_telemetry_summary(
 
     sources = []
     monitors = []
-    has_token = bool(client.telemetry_token or client.incidents_token)
+    from core.config import get_better_stack_config
+    bs_cfg = get_better_stack_config()
+    source_token = (bs_cfg.get("source_token") or "").strip()
+    has_token = bool(client.telemetry_token or client.incidents_token or source_token)
 
     if has_token:
         try:
@@ -221,6 +224,15 @@ def get_cached_telemetry_summary(
                 sources = client.list_sources()
         except Exception as e_s:
             logger.debug(f"Telemetry sources probe notice: {e_s}")
+
+        if not sources and source_token:
+            sources = [{
+                "id": "configured_logtail_source",
+                "attributes": {
+                    "name": "Moatnomics Production Logtail Stream",
+                    "ingesting_host": bs_cfg.get("ingesting_host", ""),
+                },
+            }]
 
         try:
             if client.incidents_token:

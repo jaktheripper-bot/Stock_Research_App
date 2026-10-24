@@ -14,12 +14,13 @@ from typing import Any, Optional
 
 logger = logging.getLogger("equity_research.core.config")
 
-# Attempt loading .env
-try:
-    from dotenv import load_dotenv
-    load_dotenv()
-except Exception as e:
-    logger.debug("dotenv load notice: %s", e)
+# Attempt loading .env unless isolated subprocess explicitly opts out
+if os.environ.get("SKIP_DOTENV_IN_SUBPROCESS") != "1":
+    try:
+        from dotenv import load_dotenv
+        load_dotenv()
+    except Exception as e:
+        logger.debug("dotenv load notice: %s", e)
 
 _SECRETS_CACHE: Optional[dict] = None
 _SECRETS_LOADED = False
@@ -27,6 +28,8 @@ _SECRETS_LOADED = False
 def _load_local_secrets() -> dict:
     """Reads secrets from local TOML files if they exist on disk, using stdlib tomllib."""
     global _SECRETS_CACHE, _SECRETS_LOADED
+    if os.environ.get("SKIP_DOTENV_IN_SUBPROCESS") == "1":
+        return {}
     if _SECRETS_LOADED:
         return _SECRETS_CACHE or {}
 

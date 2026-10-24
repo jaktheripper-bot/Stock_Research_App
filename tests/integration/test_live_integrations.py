@@ -13,9 +13,14 @@ import pandas as pd
 from core.analysis.fundamentals import get_stock_fundamentals, get_historical_prices
 from bse_master import resolve_canonical_symbol, resolve_bse_scrip_code
 
-# Skip live network socket execution during offline unittest discovery
+# Skip live network socket execution during offline unittest and pytest discovery
 if os.environ.get("RUN_INTEGRATION_TESTS") != "1":
     __test__ = False
+
+pytestmark = pytest.mark.skipif(
+    os.environ.get("RUN_INTEGRATION_TESTS") != "1",
+    reason="Live external socket tests require RUN_INTEGRATION_TESTS=1",
+)
 
 @pytest.mark.integration
 class TestLiveExternalProviders:

@@ -19,13 +19,18 @@ PROJECT_ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(PROJECT_ROOT))
 
 from core.audit.project_auditor import audit_project_full
-from core.db.audit_logs import get_project_audit_history, get_project_audit_by_id
+from core.db.audit_logs import (
+    get_project_audit_history,
+    get_project_audit_by_id,
+    sync_remote_audits_to_local,
+)
 
 
 async def main_async():
     parser = argparse.ArgumentParser(description="Autonomous Project-Wide Auditor (Strategy, Code & UI/UX)")
     parser.add_argument("--full", action="store_true", help="Execute complete audit with AI cognitive synthesis")
     parser.add_argument("--quick", action="store_true", help="Execute deterministic-only audit (skips LLM generation)")
+    parser.add_argument("--sync", action="store_true", help="Pull remote Supabase audit logs and remediation ledger into local DB and audits/")
     parser.add_argument("--history", action="store_true", help="List recent project audit history from database")
     parser.add_argument("--id", type=str, help="View full markdown dossier of a specific audit by ID")
     parser.add_argument("--plan", action="store_true", help="View current Remediation Action Plan (audits/REMEDIATION_ACTION_PLAN.md)")
@@ -33,7 +38,21 @@ async def main_async():
 
     args = parser.parse_args()
 
+    if args.sync:
+        res = sync_remote_audits_to_local(limit=50, force=True)
+        print("\n=========================================================================")
+        print("          MOATNOMICS — CLOUD-TO-LOCAL AUDIT SYNC COMPLETE                ")
+        print("=========================================================================")
+        print(f"Synced Status:         {res.get('synced')}")
+        print(f"Audit Logs Pulled:     {res.get('synced_audits', 0)}")
+        print(f"Markdown Files Saved:  {res.get('synced_files', 0)} (in audits/)")
+        print(f"Remediation Items:     {res.get('synced_findings', 0)}")
+        print(f"Latest Cloud Audit ID: {res.get('latest_audit_id') or 'N/A'}")
+        print("=========================================================================\n")
+        return
+
     if args.plan:
+        sync_remote_audits_to_local(limit=30)
         plan_path = PROJECT_ROOT / "audits" / "REMEDIATION_ACTION_PLAN.md"
         if not plan_path.exists():
             print("No active remediation plan found at audits/REMEDIATION_ACTION_PLAN.md. Run an audit to generate one.")
@@ -71,6 +90,7 @@ async def main_async():
         return
 
     use_ai = not args.quick
+    sync_remote_audits_to_local(limit=30)
     print("\n🔍 Initiating Autonomous Project Audit across Strategy, Code & UI/UX...")
     print(f"   Engine: Autonomous Multi-Agent Auditor | Mode: {'AI Synthesis' if use_ai else 'Deterministic Fast-Path'}")
     print("   Evaluating test suite, live endpoints, SEBI compliance, and AST code hygiene...\n")

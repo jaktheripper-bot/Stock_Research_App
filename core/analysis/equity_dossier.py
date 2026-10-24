@@ -33,8 +33,9 @@ def compile_equity_dossier(
     """
     Assembles all Category 1 intelligence modules into a unified payload.
     """
-    # 1. Fetch Angel One quote if not provided and configured
-    if angel_quote is None and AngelOneGateway.is_configured():
+    # 1. Fetch Angel One quote if not provided, configured, and price not already resolved
+    has_resolved_price = _safe_float((fundamentals or {}).get("current_price"), 0.0) > 0
+    if angel_quote is None and AngelOneGateway.is_configured() and not has_resolved_price:
         try:
             angel_quote = AngelOneGateway.get_stock_quote(ticker)
         except Exception as e:

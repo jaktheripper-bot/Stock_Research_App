@@ -211,17 +211,18 @@ from web.common import (
 # ==============================================================================
 async def run_daily_discovery_scheduler():
     """
-    Automated background BSE monitoring and screening scheduler:
-    Coordinates scheduled tasks across multi-worker deployments using distributed job leases:
-    - 08:30 AM IST: Daily 15-stock ingestion & mutual fund look-through saturation
-    - 08:45 AM IST: Discovery Reel morning screening (500+ scrips)
-    - 09:00 AM IST: Daily unlisted MSME cohort ingestion & Research Bouquet dispatch
+    Automated background BSE monitoring and cloud-failover morning scheduler:
+    Coordinates with GitHub Actions cloud batch runner via Supabase distributed_job_locks:
+    - 08:40 AM IST (+10m failover after 08:30 GHA): Daily 15-stock ingestion & MF look-through saturation
+    - 08:55 AM IST (+10m failover after 08:45): Discovery Reel morning screening (500+ scrips)
+    - 09:05 AM IST (+5m failover after 09:00): Daily unlisted MSME cohort ingestion & Research Bouquet dispatch
     """
     logger.info("[Discovery Scheduler] Background BSE monitoring crawler & morning scheduler initiated.")
     last_stock_run_date = None
     last_discovery_run_date = None
     last_msme_run_date = None
     last_bouquet_run_date = None
+    daily_ttl = 72000  # 20 hours
 
     try:
         now = datetime.now(IST)
@@ -231,45 +232,46 @@ async def run_daily_discovery_scheduler():
         from core.agents.watchers.discovery_watcher import execute_discovery_screening
         from core.notify import dispatch_research_bouquet
         from core.db.distributed_lock import job_lease
+        from core.db.connection import get_db_connection, get_placeholder
 
         loop = asyncio.get_running_loop()
-        is_past_830 = (now.hour > 8) or (now.hour == 8 and now.minute >= 30)
-        is_past_845 = (now.hour > 8) or (now.hour == 8 and now.minute >= 45)
-        is_past_900 = now.hour >= 9
+        is_past_840 = (now.hour > 8) or (now.hour == 8 and now.minute >= 40)
+        is_past_855 = (now.hour > 8) or (now.hour == 8 and now.minute >= 55)
+        is_past_905 = (now.hour > 9) or (now.hour == 9 and now.minute >= 5)
 
-        if is_past_830:
-            with job_lease(f"mf_stock_ingest_{today_str}", ttl_seconds=7200, release_on_exit=False) as acquired:
+        if is_past_840:
+            with job_lease(f"mf_stock_ingest_{today_str}", ttl_seconds=daily_ttl, release_on_exit=False) as acquired:
                 if acquired:
-                    logger.info(f"[Discovery Scheduler] Past 08:30 AM IST on boot for {today_str}. Acquired lease. Triggering daily 15-stock ingestion...")
+                    logger.info(f"[Discovery Scheduler] Past 08:40 AM IST on boot for {today_str}. Acquired lease. Triggering daily 15-stock ingestion...")
                     await loop.run_in_executor(None, ingest_daily_stock_cohort, today_str, 15, False)
                     logger.info(f"[Discovery Scheduler] 15-stock ingestion & mutual fund look-through re-audit completed for {today_str}.")
                 else:
-                    logger.info(f"[Discovery Scheduler] Lease for mf_stock_ingest_{today_str} held by another worker. Skipping boot ingestion.")
+                    logger.info(f"[Discovery Scheduler] Lease for mf_stock_ingest_{today_str} already satisfied. Skipping boot ingestion.")
             last_stock_run_date = today_str
 
-            if is_past_845:
-                with job_lease(f"discovery_reel_{today_str}", ttl_seconds=7200, release_on_exit=False) as acquired:
+            if is_past_855:
+                with job_lease(f"discovery_reel_{today_str}", ttl_seconds=daily_ttl, release_on_exit=False) as acquired:
                     if acquired:
-                        logger.info(f"[Discovery Watcher] Past 08:45 AM IST on boot for {today_str}. Acquired lease. Running discovery screening...")
+                        logger.info(f"[Discovery Watcher] Past 08:55 AM IST on boot for {today_str}. Acquired lease. Running discovery screening...")
                         await execute_discovery_screening()
                         logger.info(f"[Discovery Watcher] Boot discovery screening completed for {today_str}.")
                     else:
-                        logger.info(f"[Discovery Watcher] Lease for discovery_reel_{today_str} held by another worker. Skipping boot screening.")
+                        logger.info(f"[Discovery Watcher] Lease for discovery_reel_{today_str} already satisfied. Skipping boot screening.")
                 last_discovery_run_date = today_str
 
-            if is_past_900:
-                with job_lease(f"msme_daily_ingest_{today_str}", ttl_seconds=7200, release_on_exit=False) as acquired:
+            if is_past_905:
+                with job_lease(f"msme_daily_ingest_{today_str}", ttl_seconds=daily_ttl, release_on_exit=False) as acquired:
                     if acquired:
-                        logger.info(f"[Discovery Scheduler] Past 09:00 AM IST on boot for {today_str}. Acquired lease. Triggering daily MSME cohort ingestion...")
+                        logger.info(f"[Discovery Scheduler] Past 09:05 AM IST on boot for {today_str}. Acquired lease. Triggering daily MSME cohort ingestion...")
                         await loop.run_in_executor(None, ingest_daily_msme_cohort, today_str, 15)
                         logger.info(f"[Discovery Scheduler] MSME cohort ingestion completed for {today_str}.")
                     else:
-                        logger.info(f"[Discovery Scheduler] Lease for msme_daily_ingest_{today_str} held by another worker. Skipping boot MSME ingest.")
+                        logger.info(f"[Discovery Scheduler] Lease for msme_daily_ingest_{today_str} already satisfied. Skipping boot MSME ingest.")
                 last_msme_run_date = today_str
 
                 from core.db.digest import has_edition_been_dispatched
 
-                # Boot catch-up: ONLY dispatch within the 09:00–09:59 AM IST window if not already sent today
+                # Boot catch-up: ONLY dispatch within the 09:00-09:59 AM IST window if not already sent today
                 if now.hour == 9 and not has_edition_been_dispatched(today_str):
                     with job_lease(f"morning_bouquet_{today_str}", ttl_seconds=86400, release_on_exit=False) as acquired:
                         if acquired:
@@ -291,11 +293,32 @@ async def run_daily_discovery_scheduler():
                 )
             ]
             if not yesterday_existing:
-                with job_lease(f"mf_stock_ingest_bootstrap_{yesterday_str}", ttl_seconds=7200, release_on_exit=False) as acquired:
+                with job_lease(f"mf_stock_ingest_{yesterday_str}", ttl_seconds=daily_ttl, release_on_exit=False) as acquired:
                     if acquired:
-                        logger.info(f"[Discovery Scheduler] Prior-day edition ({yesterday_str}) missing on pre-08:30 boot. Running catch-up ingestion...")
+                        logger.info(f"[Discovery Scheduler] Prior-day edition ({yesterday_str}) missing on pre-08:40 boot. Running catch-up ingestion...")
                         await loop.run_in_executor(None, ingest_daily_stock_cohort, yesterday_str, 15, False)
+                with job_lease(f"discovery_reel_{yesterday_str}", ttl_seconds=daily_ttl, release_on_exit=False) as acquired:
+                    if acquired:
                         await execute_discovery_screening()
+
+            # Independent prior-day MSME cohort catch-up check
+            conn = get_db_connection()
+            cur = conn.cursor()
+            p = get_placeholder()
+            try:
+                cur.execute(
+                    f"SELECT COUNT(*) FROM msme_firms WHERE registration_date = {p} OR source LIKE {p}",
+                    (yesterday_str, f"%({yesterday_str})%"),
+                )
+                row = cur.fetchone()
+                yesterday_msme_count = int(row[0] or 0) if row else 0
+            finally:
+                cur.close()
+                conn.close()
+            if yesterday_msme_count == 0:
+                with job_lease(f"msme_daily_ingest_{yesterday_str}", ttl_seconds=daily_ttl, release_on_exit=False) as acquired:
+                    if acquired:
+                        logger.info(f"[Discovery Scheduler] Prior-day MSME cohort ({yesterday_str}) missing on boot. Running catch-up MSME ingestion...")
                         await loop.run_in_executor(None, ingest_daily_msme_cohort, yesterday_str, 15)
     except Exception as boot_err:
         logger.warning(f"[Discovery Scheduler] Catch-up check notice: {boot_err}")
@@ -305,51 +328,51 @@ async def run_daily_discovery_scheduler():
             await asyncio.sleep(60)
             now = datetime.now(IST)
             today_str = now.strftime("%Y-%m-%d")
-            is_past_830 = (now.hour > 8) or (now.hour == 8 and now.minute >= 30)
-            is_past_845 = (now.hour > 8) or (now.hour == 8 and now.minute >= 45)
-            is_past_900 = now.hour >= 9
+            is_past_840 = (now.hour > 8) or (now.hour == 8 and now.minute >= 40)
+            is_past_855 = (now.hour > 8) or (now.hour == 8 and now.minute >= 55)
+            is_past_905 = (now.hour > 9) or (now.hour == 9 and now.minute >= 5)
             loop = asyncio.get_running_loop()
             from core.db.distributed_lock import job_lease, prune_zombie_leases
             prune_zombie_leases()
 
-            # 1. 08:30 AM MF Priority Stock Ingest
-            if is_past_830 and last_stock_run_date != today_str:
+            # 1. 08:40 AM MF Priority Stock Ingest (Cloud Failover)
+            if is_past_840 and last_stock_run_date != today_str:
                 from core.analysis.daily_stock_ingestion import ingest_daily_stock_cohort
-                with job_lease(f"mf_stock_ingest_{today_str}", ttl_seconds=7200, release_on_exit=False) as acquired:
+                with job_lease(f"mf_stock_ingest_{today_str}", ttl_seconds=daily_ttl, release_on_exit=False) as acquired:
                     if acquired:
-                        logger.info(f"[Discovery Scheduler] 08:30 AM IST trigger reached for {today_str}. Acquired lease. Running daily 15-stock ingestion...")
+                        logger.info(f"[Discovery Scheduler] 08:40 AM IST failover window reached for {today_str}. Acquired lease. Running daily 15-stock ingestion...")
                         await loop.run_in_executor(None, ingest_daily_stock_cohort, today_str, 15, False)
                         logger.info(f"[Discovery Scheduler] Daily 15-stock ingestion & mutual fund look-through re-audit completed for {today_str}.")
                     else:
-                        logger.info(f"[Discovery Scheduler] Lease for mf_stock_ingest_{today_str} held by another worker. Skipping.")
+                        logger.info(f"[Discovery Scheduler] Lease for mf_stock_ingest_{today_str} already satisfied by cloud batch runner. Skipping.")
                 last_stock_run_date = today_str
 
-            # 2. 08:45 AM Discovery Reel Screening
-            if is_past_845 and last_discovery_run_date != today_str:
+            # 2. 08:55 AM Discovery Reel Screening (Cloud Failover)
+            if is_past_855 and last_discovery_run_date != today_str:
                 from core.agents.watchers.discovery_watcher import execute_discovery_screening
-                with job_lease(f"discovery_reel_{today_str}", ttl_seconds=7200, release_on_exit=False) as acquired:
+                with job_lease(f"discovery_reel_{today_str}", ttl_seconds=daily_ttl, release_on_exit=False) as acquired:
                     if acquired:
-                        logger.info(f"[Discovery Watcher] 08:45 AM IST trigger reached for {today_str}. Acquired lease. Running discovery screening...")
+                        logger.info(f"[Discovery Watcher] 08:55 AM IST failover window reached for {today_str}. Acquired lease. Running discovery screening...")
                         await execute_discovery_screening()
-                        logger.info(f"[Discovery Watcher] Daily 08:45 AM discovery reel screening completed for {today_str}.")
+                        logger.info(f"[Discovery Watcher] Daily discovery reel screening completed for {today_str}.")
                     else:
-                        logger.info(f"[Discovery Watcher] Lease for discovery_reel_{today_str} held by another worker. Skipping.")
+                        logger.info(f"[Discovery Watcher] Lease for discovery_reel_{today_str} already satisfied by cloud batch runner. Skipping.")
                 last_discovery_run_date = today_str
 
-            # 3. 09:00 AM MSME Ingestion
-            if is_past_900 and last_msme_run_date != today_str:
+            # 3. 09:05 AM MSME Ingestion (Cloud Failover)
+            if is_past_905 and last_msme_run_date != today_str:
                 from core.msme.daily_ingest import ingest_daily_msme_cohort
-                with job_lease(f"msme_daily_ingest_{today_str}", ttl_seconds=7200, release_on_exit=False) as acquired:
+                with job_lease(f"msme_daily_ingest_{today_str}", ttl_seconds=daily_ttl, release_on_exit=False) as acquired:
                     if acquired:
-                        logger.info(f"[MSME Ingest] 09:00 AM IST trigger reached for {today_str}. Acquired lease. Running daily MSME cohort ingestion...")
+                        logger.info(f"[MSME Ingest] 09:05 AM IST failover window reached for {today_str}. Acquired lease. Running daily MSME cohort ingestion...")
                         await loop.run_in_executor(None, ingest_daily_msme_cohort, today_str, 15)
-                        logger.info(f"[MSME Ingest] 09:00 AM IST unlisted MSME cohort ingestion completed for {today_str}.")
+                        logger.info(f"[MSME Ingest] Daily unlisted MSME cohort ingestion completed for {today_str}.")
                     else:
-                        logger.info(f"[MSME Ingest] Lease for msme_daily_ingest_{today_str} held by another worker. Skipping.")
+                        logger.info(f"[MSME Ingest] Lease for msme_daily_ingest_{today_str} already satisfied by cloud batch runner. Skipping.")
                 last_msme_run_date = today_str
 
-            # 4. 09:00 AM IST ONLY: Dispatch Morning Research Bouquet Email
-            if now.hour == 9 and last_bouquet_run_date != today_str:
+            # 4. 09:00 AM IST Hour ONLY: Dispatch Morning Research Bouquet Email
+            if now.hour == 9 and now.minute >= 5 and last_bouquet_run_date != today_str:
                 from core.notify import dispatch_research_bouquet
                 from core.db.digest import has_edition_been_dispatched
 
@@ -357,7 +380,7 @@ async def run_daily_discovery_scheduler():
                     with job_lease(f"morning_bouquet_{today_str}", ttl_seconds=86400, release_on_exit=False) as acquired:
                         if acquired:
                             logger.info(
-                                f"Triggering 09:00 AM IST Morning Research Bouquet Email Dispatch for {today_str}..."
+                                f"Triggering 09:05 AM IST Morning Research Bouquet Email Dispatch for {today_str}..."
                             )
                             await asyncio.to_thread(dispatch_research_bouquet, today_str)
                 last_bouquet_run_date = today_str
@@ -373,47 +396,58 @@ async def run_daily_discovery_scheduler():
 
 async def run_daily_amfi_scheduler():
     """Automated background Multi-Asset Monitoring & AMFI Synchronization Scheduler.
-    Runs catch-up initialization at boot, and executes full multi-asset pipeline nightly at 23:15 IST:
+    Runs catch-up initialization at boot, and executes cloud-failover nightly sync at 23:25 IST
+    (+10m after 23:15 IST GitHub Actions runner) coordinated via unified Supabase job leases:
     1. AMFI Daily NAV Feed & Scheme Master Ingestion (Mutual Funds)
-    2. National ETF Matrix Ingestion (all 436 AMFI ETFs across 9 categories)
+    2. National ETF Matrix Ingestion (all AMFI ETFs across 9 categories)
     3. Always-On Multi-Asset Monitoring Scan (MF drift + Corporate Debt maturities/CRA watches)
     4. Sovereign Risk-Free Benchmarks & SDL Yield Curve Synchronization
     """
     logger.info("[AMFI & Multi-Asset Scheduler] Background synchronizer initiated.")
     loop = asyncio.get_running_loop()
+    daily_ttl = 72000  # 20 hours
 
     # Pre-flight / Boot catch-up checks
     try:
         from core.db.sovereign import get_etf_count, refresh_daily_sovereign_benchmarks
         from core.ingestion.etf_ingest import ingest_all_amfi_etfs
         from core.analysis.asset_scanner import get_asset_scan_runs, run_comprehensive_asset_scan
-        from core.db.agent_sessions import record_autonomous_event
+        from core.db.connection import get_db_connection
         from core.db.distributed_lock import job_lease
         import gc
 
         now = datetime.now(IST)
         today_str = now.strftime("%Y-%m-%d")
+        yesterday_str = (now - timedelta(days=1)).strftime("%Y-%m-%d")
 
         with job_lease(f"boot_catchup_amfi_{today_str}", ttl_seconds=1800, release_on_exit=False) as acquired:
             if acquired:
-                # 1. ETF Universe Boot Check: Ensure all active AMFI ETFs are in database
+                # 1. ETF Universe & Freshness Boot Check
                 etf_count = get_etf_count()
-                if etf_count < 400:
-                    logger.info(f"[ETF Ingestion Boot] ETF matrix has {etf_count} records (<400). Running dynamic AMFI ETF sync...")
+                conn = get_db_connection()
+                cur = conn.cursor()
+                try:
+                    cur.execute("SELECT MAX(updated_at) FROM etf_matrix")
+                    row = cur.fetchone()
+                    last_etf_date = str(row[0] or "")[:10] if row else ""
+                finally:
+                    cur.close()
+                    conn.close()
+
+                if etf_count < 400 or not last_etf_date or last_etf_date < yesterday_str:
+                    logger.info(f"[ETF Ingestion Boot] ETF matrix stale (count={etf_count}, last_updated={last_etf_date or 'none'}). Running dynamic AMFI ETF sync...")
                     etf_res = await loop.run_in_executor(None, ingest_all_amfi_etfs, True)
                     logger.info(f"[ETF Ingestion Boot] Synced {etf_res.get('persisted_to_db', 0)} ETFs into matrix.")
 
-                # 2. Sovereign Benchmarks Boot Check: Ensure sovereign benchmarks are primed
+                # 2. Sovereign Benchmarks Boot Check
                 await loop.run_in_executor(None, refresh_daily_sovereign_benchmarks, today_str)
 
-                # 3. Multi-Asset Monitoring & AMFI Catch-Up Check:
-                # Runs if past 23:15 IST without today's scan OR if the last scan is older than yesterday
+                # 3. Multi-Asset Monitoring & AMFI Catch-Up Check
                 from core.ingestion.amfi import ingest_amfi_daily_feed
-                yesterday_str = (now - timedelta(days=1)).strftime("%Y-%m-%d")
                 recent_scans = get_asset_scan_runs(limit=1)
                 last_scan_date = str(recent_scans[0].get("started_at", ""))[:10] if recent_scans else ""
-                is_past_2315 = (now.hour > 23) or (now.hour == 23 and now.minute >= 15)
-                if (is_past_2315 and last_scan_date != today_str) or (not last_scan_date or last_scan_date < yesterday_str):
+                is_past_2325 = (now.hour > 23) or (now.hour == 23 and now.minute >= 25)
+                if (is_past_2325 and last_scan_date != today_str) or (not last_scan_date or last_scan_date < yesterday_str):
                     logger.info(f"[Asset Scan Catch-up] Last scan ({last_scan_date or 'none'}) stale on boot. Executing AMFI & multi-asset catch-up...")
                     await loop.run_in_executor(None, ingest_amfi_daily_feed, None, True)
                     await loop.run_in_executor(None, run_comprehensive_asset_scan, "ALL_ASSETS", "catch_up_boot")
@@ -428,67 +462,76 @@ async def run_daily_amfi_scheduler():
     while True:
         try:
             now = datetime.now(IST)
-            target = now.replace(hour=23, minute=15, second=0, microsecond=0)
+            target = now.replace(hour=23, minute=25, second=0, microsecond=0)
             if now >= target:
                 target += timedelta(days=1)
             wait_seconds = (target - now).total_seconds()
-            logger.info(f"[AMFI & Multi-Asset Scheduler] Next synchronization scheduled in {wait_seconds/3600:.2f} hours (at {target.strftime('%Y-%m-%d %H:%M:%S IST')}).")
+            logger.info(f"[AMFI & Multi-Asset Scheduler] Next failover synchronization scheduled in {wait_seconds/3600:.2f} hours (at {target.strftime('%Y-%m-%d %H:%M:%S IST')}).")
             await asyncio.sleep(wait_seconds)
 
             today_str = datetime.now(IST).strftime("%Y-%m-%d")
-            logger.info("[AMFI & Multi-Asset Scheduler] Executing scheduled nightly synchronization...")
+            logger.info("[AMFI & Multi-Asset Scheduler] Checking nightly synchronization leases...")
 
             from core.ingestion.amfi import ingest_amfi_daily_feed
             from core.ingestion.etf_ingest import ingest_all_amfi_etfs
             from core.analysis.asset_scanner import run_comprehensive_asset_scan
             from core.db.sovereign import refresh_daily_sovereign_benchmarks
             from core.db.agent_sessions import record_autonomous_event
+            from core.db.distributed_lock import job_lease
 
             # 1. Sync Mutual Funds NAV Feed
-            mf_res = await loop.run_in_executor(None, ingest_amfi_daily_feed, None, True)
-            record_autonomous_event(
-                event_type="AMFI_NAV_SYNC",
-                ticker="AMFI_PORTAL",
-                trigger_source="AMFI_NAV_SCHEDULER",
-                action_taken="NAV_SYNC_AND_DELTA_CALC",
-                summary=f"Nightly AMFI NAV synchronization completed: {mf_res.get('upserted', 0)} schemes updated.",
-                metadata=mf_res
-            )
+            with job_lease(f"amfi_nav_sync_{today_str}", ttl_seconds=daily_ttl, release_on_exit=False) as acquired:
+                if acquired:
+                    mf_res = await loop.run_in_executor(None, ingest_amfi_daily_feed, None, True)
+                    record_autonomous_event(
+                        event_type="AMFI_NAV_SYNC",
+                        ticker="AMFI_PORTAL",
+                        trigger_source="AMFI_NAV_SCHEDULER",
+                        action_taken="NAV_SYNC_AND_DELTA_CALC",
+                        summary=f"Nightly AMFI NAV synchronization completed: {mf_res.get('upserted', 0)} schemes updated.",
+                        metadata=mf_res,
+                    )
 
             # 2. Sync National ETF Matrix
-            etf_res = await loop.run_in_executor(None, ingest_all_amfi_etfs, True)
-            record_autonomous_event(
-                event_type="ETF_MATRIX_SYNC",
-                ticker="AMFI_ETF_PORTAL",
-                trigger_source="AMFI_NAV_SCHEDULER",
-                action_taken="ETF_UNIVERSE_DISCOVERY",
-                summary=f"Nightly AMFI ETF ingestion completed: {etf_res.get('persisted_to_db', 0)} ETFs synced across 9 categories.",
-                metadata=etf_res
-            )
+            with job_lease(f"etf_matrix_sync_{today_str}", ttl_seconds=daily_ttl, release_on_exit=False) as acquired:
+                if acquired:
+                    etf_res = await loop.run_in_executor(None, ingest_all_amfi_etfs, True)
+                    record_autonomous_event(
+                        event_type="ETF_MATRIX_SYNC",
+                        ticker="AMFI_ETF_PORTAL",
+                        trigger_source="AMFI_NAV_SCHEDULER",
+                        action_taken="ETF_UNIVERSE_DISCOVERY",
+                        summary=f"Nightly AMFI ETF ingestion completed: {etf_res.get('persisted_to_db', 0)} ETFs synced across 9 categories.",
+                        metadata=etf_res,
+                    )
 
             # 3. Multi-Asset Monitoring Scan (MF drift + Corporate Debt maturities/downgrade watches)
-            scan_res = await loop.run_in_executor(None, run_comprehensive_asset_scan, "ALL_ASSETS", "nightly_cron")
-            record_autonomous_event(
-                event_type="MULTI_ASSET_MONITORING_SCAN",
-                ticker="ALL_ASSETS",
-                trigger_source="NIGHTLY_MONITORING_SCHEDULER",
-                action_taken="MONITORING_SCAN_LEDGER_UPDATE",
-                summary=f"Multi-asset scan completed: {scan_res.get('items_scanned', 0)} items scanned (MFs + Corporate Debt).",
-                metadata=scan_res
-            )
+            with job_lease(f"asset_scan_{today_str}", ttl_seconds=daily_ttl, release_on_exit=False) as acquired:
+                if acquired:
+                    scan_res = await loop.run_in_executor(None, run_comprehensive_asset_scan, "ALL_ASSETS", "nightly_cron")
+                    record_autonomous_event(
+                        event_type="MULTI_ASSET_MONITORING_SCAN",
+                        ticker="ALL_ASSETS",
+                        trigger_source="NIGHTLY_MONITORING_SCHEDULER",
+                        action_taken="MONITORING_SCAN_LEDGER_UPDATE",
+                        summary=f"Multi-asset scan completed: {scan_res.get('items_scanned', 0)} items scanned (MFs + Corporate Debt).",
+                        metadata=scan_res,
+                    )
 
             # 4. Refresh Sovereign Yield Curve & SDL Disparity Matrix
-            sov_res = await loop.run_in_executor(None, refresh_daily_sovereign_benchmarks, today_str)
-            record_autonomous_event(
-                event_type="SOVEREIGN_BENCHMARK_SYNC",
-                ticker="RBI_AUCTION_CUTOFF",
-                trigger_source="NIGHTLY_MONITORING_SCHEDULER",
-                action_taken="SOVEREIGN_CURVE_AND_SDL_SYNC",
-                summary=f"Sovereign risk-free benchmarks and SDL matrix refreshed for {today_str}.",
-                metadata=sov_res
-            )
+            with job_lease(f"sovereign_sync_{today_str}", ttl_seconds=daily_ttl, release_on_exit=False) as acquired:
+                if acquired:
+                    sov_res = await loop.run_in_executor(None, refresh_daily_sovereign_benchmarks, today_str)
+                    record_autonomous_event(
+                        event_type="SOVEREIGN_BENCHMARK_SYNC",
+                        ticker="RBI_AUCTION_CUTOFF",
+                        trigger_source="NIGHTLY_MONITORING_SCHEDULER",
+                        action_taken="SOVEREIGN_CURVE_AND_SDL_SYNC",
+                        summary=f"Sovereign risk-free benchmarks and SDL matrix refreshed for {today_str}.",
+                        metadata=sov_res,
+                    )
 
-            logger.info("[AMFI & Multi-Asset Scheduler] Scheduled nightly synchronization pipeline fully completed.")
+            logger.info("[AMFI & Multi-Asset Scheduler] Nightly synchronization check completed.")
         except asyncio.CancelledError:
             logger.info("[AMFI & Multi-Asset Scheduler] Background scheduler cancelled.")
             break
@@ -497,51 +540,60 @@ async def run_daily_amfi_scheduler():
             await asyncio.sleep(120)
 
 
-
 async def run_daily_fund_audit_scheduler():
-    """Automated background Mutual Fund Accounting Checkor (runs daily at 23:30 IST with boot catch-up)."""
+    """Automated background Mutual Fund Accounting Checkor (failover at 23:40 IST with boot catch-up)."""
     logger.info("[Fund Audit Scheduler] Background mutual fund accounting checkor initiated.")
+    daily_ttl = 72000  # 20 hours
     try:
         from core.analysis.fund_overlap_auditor import audit_single_fund_daily
-        from core.db.connection import get_db_connection
+        from core.db.agent_sessions import get_recent_autonomous_events, record_autonomous_event
         now = datetime.now(IST)
         yesterday_str = (now - timedelta(days=1)).strftime("%Y-%m-%d")
-        conn = get_db_connection()
-        cur = conn.cursor()
-        try:
-            cur.execute("SELECT MAX(last_audited_at) FROM fund_forensic_dossiers")
-            row = cur.fetchone()
-            last_audit_date = str(row[0] or "")[:10] if row else ""
-        finally:
-            cur.close()
-            conn.close()
+        recent_audits = get_recent_autonomous_events(limit=1, event_type="DAILY_FUND_AUDIT")
+        last_audit_date = str(recent_audits[0].get("created_at", ""))[:10] if recent_audits else ""
+
         if not last_audit_date or last_audit_date < yesterday_str:
             from core.db.distributed_lock import job_lease
             import gc
-            with job_lease(f"boot_catchup_fund_audit_{now.strftime('%Y-%m-%d')}", ttl_seconds=1800, release_on_exit=False) as acquired:
+            catchup_key = yesterday_str if now.hour < 23 else now.strftime("%Y-%m-%d")
+            with job_lease(f"fund_audit_{catchup_key}", ttl_seconds=daily_ttl, release_on_exit=False) as acquired:
                 if acquired:
-                    logger.info(f"[Fund Audit Scheduler] Last fund audit ({last_audit_date or 'none'}) older than {yesterday_str}. Running catch-up audit...")
+                    logger.info(f"[Fund Audit Scheduler] Last DAILY_FUND_AUDIT event ({last_audit_date or 'none'}) older than {yesterday_str}. Running catch-up audit...")
                     loop = asyncio.get_running_loop()
-                    await loop.run_in_executor(None, audit_single_fund_daily, None, False)
+                    res = await loop.run_in_executor(None, audit_single_fund_daily, None, False)
+                    if res:
+                        record_autonomous_event(
+                            event_type="DAILY_FUND_AUDIT",
+                            ticker=res.get("scheme_code", "UNKNOWN"),
+                            trigger_source="AMFI_SCHEDULER_ROTATION",
+                            action_taken="7_PILLAR_LOOKTHROUGH_AUDIT",
+                            summary=f"Catch-up 7-pillar look-through audit completed for {res.get('scheme_name')} ({res.get('scheme_code')}).",
+                            metadata={
+                                "composite_health_score": res.get("composite_health_score"),
+                                "weighted_moat_score": res.get("weighted_moat_score"),
+                                "accounting_risk_index": res.get("accounting_risk_index"),
+                                "margin_of_safety_pct": res.get("margin_of_safety_pct"),
+                            },
+                        )
                     gc.collect()
                 else:
-                    logger.info("[Fund Audit Scheduler] Boot catch-up lease held by another worker. Skipping duplicate catch-up.")
+                    logger.info("[Fund Audit Scheduler] Boot catch-up lease already satisfied. Skipping duplicate catch-up.")
     except Exception as boot_err:
         logger.warning(f"[Fund Audit Scheduler] Boot catch-up notice: {boot_err}")
 
     while True:
         try:
             now = datetime.now(IST)
-            target = now.replace(hour=23, minute=30, second=0, microsecond=0)
+            target = now.replace(hour=23, minute=40, second=0, microsecond=0)
             if now >= target:
                 target += timedelta(days=1)
             wait_seconds = (target - now).total_seconds()
-            logger.info(f"[Fund Audit Scheduler] Next fund audit scheduled in {wait_seconds/3600:.2f} hours (at {target.strftime('%Y-%m-%d %H:%M:%S IST')}).")
+            logger.info(f"[Fund Audit Scheduler] Next fund audit failover check scheduled in {wait_seconds/3600:.2f} hours (at {target.strftime('%Y-%m-%d %H:%M:%S IST')}).")
             await asyncio.sleep(wait_seconds)
 
-            today_str = datetime.now(IST).strftime("%Y%m%d")
+            today_str = datetime.now(IST).strftime("%Y-%m-%d")
             from core.db.distributed_lock import job_lease
-            with job_lease(f"daily_fund_audit_{today_str}", ttl_seconds=3600, release_on_exit=False) as acquired:
+            with job_lease(f"fund_audit_{today_str}", ttl_seconds=daily_ttl, release_on_exit=False) as acquired:
                 if acquired:
                     logger.info("[Fund Audit Scheduler] Acquired lease. Executing scheduled nightly mutual fund accounting check...")
                     from core.analysis.fund_overlap_auditor import audit_single_fund_daily
@@ -560,12 +612,12 @@ async def run_daily_fund_audit_scheduler():
                                 "composite_health_score": res.get("composite_health_score"),
                                 "weighted_moat_score": res.get("weighted_moat_score"),
                                 "accounting_risk_index": res.get("accounting_risk_index"),
-                                "margin_of_safety_pct": res.get("margin_of_safety_pct")
-                            }
+                                "margin_of_safety_pct": res.get("margin_of_safety_pct"),
+                            },
                         )
                     logger.info(f"[Fund Audit Scheduler] Nightly fund accounting check completed for {res.get('scheme_code') if res else 'no-op'}.")
                 else:
-                    logger.info(f"[Fund Audit Scheduler] Lease for daily_fund_audit_{today_str} held by another worker. Skipping duplicate fund audit.")
+                    logger.info(f"[Fund Audit Scheduler] Lease for fund_audit_{today_str} already satisfied by cloud batch runner. Skipping.")
         except asyncio.CancelledError:
             logger.info("[Fund Audit Scheduler] Background fund audit scheduler cancelled.")
             break
@@ -1237,7 +1289,7 @@ def dossier_page(request: Request, ticker: str):
     # Anchoring Bias Guardrail: Valuation & 52-Week Percentiles
     fund = {}
     try:
-        fund = get_stock_fundamentals(canonical) or {}
+        fund = get_stock_fundamentals(canonical, fast_db_first=True) or {}
     except Exception as fund_err:
         logger.debug("Fundamentals lookup notice for %s: %s", canonical, fund_err)
 
@@ -1255,7 +1307,7 @@ def dossier_page(request: Request, ticker: str):
     chart_json = "{}"
     pead_data = None
     try:
-        df_hist = get_historical_prices(canonical, period="6mo")
+        df_hist = get_historical_prices(canonical, period="6mo", fast_only=True)
         from core.analysis.fundamentals import compute_pead_drift_band
         pead_data = compute_pead_drift_band(rep, df_hist)
 

@@ -67,75 +67,157 @@ def get_local_revisions(sqlite_path: str = None) -> List[Dict[str, Any]]:
         conn.close()
     return rows
 
-def sync_via_postgresql(reports: List[Dict[str, Any]], revisions: List[Dict[str, Any]], db_url: str) -> Dict[str, int]:
-    """Syncs rows directly to Supabase PostgreSQL using psycopg2."""
+def sync_via_postgresql(reports: List[Dict[str, Any]], revisions: List[Dict[str, Any]], db_url: str, sqlite_path: str = None) -> Dict[str, int]:
+    """Syncs all 8 multi-asset tables directly to Supabase PostgreSQL using psycopg2."""
     import psycopg2
     from psycopg2.extras import execute_batch
+    from datetime import datetime, timezone
+    from core.db.connection import init_db
 
     logger.info("Connecting to Supabase PostgreSQL via SUPABASE_DB_URL...")
-    conn = psycopg2.connect(db_url)
+    try:
+        conn = psycopg2.connect(db_url)
+    except psycopg2.OperationalError as op_err:
+        if "could not translate host name" in str(op_err) and "db." in db_url and ".supabase.co" in db_url:
+            logger.warning("Supabase direct host is IPv6-only or unreachable from this network. Attempting IPv4 pooler fallback...")
+            import re
+            m = re.search(r"postgresql://([^:]+):([^@]+)@db\.([^\.]+)\.supabase\.co:(\d+)/(.+)", db_url)
+            if m:
+                user, password, project_ref, port, dbname = m.groups()
+                for region in ["ap-southeast-1", "ap-south-1", "us-east-1", "eu-central-1"]:
+                    pooler_url = f"postgresql://{user}.{project_ref}:{password}@aws-0-{region}.pooler.supabase.com:5432/{dbname}"
+                    try:
+                        conn = psycopg2.connect(pooler_url, connect_timeout=5)
+                        logger.info(f"Connected to Supabase PostgreSQL via IPv4 pooler ({region})!")
+                        break
+                    except Exception:
+                        continue
+                else:
+                    raise op_err
+            else:
+                raise op_err
+        else:
+            raise op_err
+
+    conn.autocommit = False
     cursor = conn.cursor()
 
-    # Ensure tables exist
-    cursor.execute("""
-        CREATE TABLE IF NOT EXISTS reports (
-            ticker TEXT PRIMARY KEY,
-            short_name TEXT,
-            report_text TEXT,
-            timestamp TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
-            baseline_price REAL,
-            baseline_pe TEXT,
-            baseline_mcap REAL,
-            latest_announcement TEXT,
-            citations_json TEXT
-        );
-        CREATE TABLE IF NOT EXISTS report_revisions (
-            id SERIAL PRIMARY KEY,
-            ticker TEXT,
-            short_name TEXT,
-            report_text TEXT,
-            timestamp TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
-            baseline_price REAL,
-            baseline_pe TEXT,
-            baseline_mcap REAL,
-            latest_announcement TEXT,
-            revision_trigger TEXT,
-            citations_json TEXT
-        );
-    """)
-    conn.commit()
+    # 1. Initialize complete schema migrations (v001 through v037) on PostgreSQL
+    logger.info("Ensuring PostgreSQL schema migrations (v001 - v037) are initialized...")
+    try:
+        init_db(force=False)
+    except Exception as mig_err:
+        logger.debug("Schema migration notice: %s", mig_err)
 
-    upsert_query = """
-        INSERT INTO reports (
-            ticker, short_name, report_text, timestamp, baseline_price,
-            baseline_pe, baseline_mcap, latest_announcement, citations_json
-        ) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s)
-        ON CONFLICT (ticker) DO UPDATE SET
-            short_name = EXCLUDED.short_name,
-            report_text = EXCLUDED.report_text,
-            timestamp = EXCLUDED.timestamp,
-            baseline_price = EXCLUDED.baseline_price,
-            baseline_pe = EXCLUDED.baseline_pe,
-            baseline_mcap = EXCLUDED.baseline_mcap,
-            latest_announcement = EXCLUDED.latest_announcement,
-            citations_json = EXCLUDED.citations_json;
-    """
+    path = sqlite_path or get_db_path()
+    sqlite_conn = sqlite3.connect(path)
+    sqlite_conn.row_factory = sqlite3.Row
+    sqlite_cur = sqlite_conn.cursor()
 
-    report_params = [
-        (
-            r["ticker"], r["short_name"], r["report_text"], r["timestamp"],
-            r["baseline_price"], r["baseline_pe"], r["baseline_mcap"],
-            r["latest_announcement"], r["citations_json"]
-        )
-        for r in reports
+    # Tables to sync: (table_name, conflict_target, update_on_conflict)
+    sync_targets = [
+        ("reports", "ticker", True),
+        ("report_revisions", "id", False),
+        ("cached_fundamentals", "ticker", True),
+        ("discovery_reel", "id", False),
+        ("mutual_fund_schemes", "scheme_code", True),
+        ("mutual_fund_holdings", "id", False),
+        ("fund_forensic_dossiers", "scheme_code", True),
+        ("corporate_debt_securities", "isin", True),
+        ("sovereign_benchmarks", "tenor_label", True),
+        ("sovereign_curve_history", "snapshot_key, tenor_label", True),
+        ("sovereign_sdl_spreads", "state_name", True),
+        ("sovereign_macro_rates", "metric_key", True),
+        ("reits_and_invits", "symbol", True),
+        ("sgb_tranches", "symbol", True),
+        ("alternative_yield_products", "product_id", True),
+        ("etf_matrix", "symbol", True),
+        ("msme_firms", "uin", True),
     ]
-    execute_batch(cursor, upsert_query, report_params)
-    conn.commit()
+
+    sync_summary = {}
+
+    for table_name, conflict_col, do_update in sync_targets:
+        try:
+            sqlite_cur.execute(f"SELECT * FROM {table_name}")
+            rows = sqlite_cur.fetchall()
+            if not rows:
+                continue
+
+            cursor.execute(
+                "SELECT column_name, data_type FROM information_schema.columns WHERE table_schema = %s AND table_name = %s",
+                ("public", table_name),
+            )
+            pg_col_types = dict(cursor.fetchall())
+            if not pg_col_types:
+                logger.warning(f"Table {table_name} does not exist in target PostgreSQL schema.")
+                continue
+
+            raw_cols = [col[0] for col in sqlite_cur.description]
+
+            # If conflict_col is not 'id' and 'id' is a serial column in PG, omit 'id' to prevent sequence collisions
+            cols = [c for c in raw_cols if not (c == "id" and conflict_col != "id" and "id" in pg_col_types)]
+            cols_joined = ", ".join(cols)
+            placeholders = ", ".join(["%s"] * len(cols))
+
+            if do_update and conflict_col:
+                conflict_targets = [c.strip() for c in conflict_col.split(",")]
+                conflict_target_sql = ", ".join(conflict_targets)
+                update_assignments = ", ".join([f"{c} = EXCLUDED.{c}" for c in cols if c not in conflict_targets])
+                conflict_clause = f"ON CONFLICT ({conflict_target_sql}) DO UPDATE SET {update_assignments}"
+            elif conflict_col:
+                conflict_targets = [c.strip() for c in conflict_col.split(",")]
+                conflict_target_sql = ", ".join(conflict_targets)
+                conflict_clause = f"ON CONFLICT ({conflict_target_sql}) DO NOTHING"
+            else:
+                conflict_clause = ""
+
+            insert_query = f"INSERT INTO {table_name} ({cols_joined}) VALUES ({placeholders}) {conflict_clause}"
+
+            batch_data = []
+            for row in rows:
+                transformed_row = []
+                for c in cols:
+                    val = row[c]
+                    dt = pg_col_types.get(c, "")
+                    if val is not None:
+                        if dt == "boolean":
+                            val = bool(val) if not isinstance(val, str) else (val.strip().lower() in ("true", "t", "1", "yes"))
+                        elif "timestamp" in dt:
+                            if isinstance(val, (int, float)):
+                                val = datetime.fromtimestamp(float(val), tz=timezone.utc)
+                            elif isinstance(val, str) and val.strip().isdigit():
+                                val = datetime.fromtimestamp(float(val.strip()), tz=timezone.utc)
+                        elif dt == "date":
+                            if isinstance(val, (int, float)):
+                                val = datetime.fromtimestamp(float(val), tz=timezone.utc).date()
+                    transformed_row.append(val)
+                batch_data.append(tuple(transformed_row))
+
+            execute_batch(cursor, insert_query, batch_data, page_size=500)
+
+            # Sync sequence if table has a serial id column
+            if "id" in pg_col_types:
+                try:
+                    cursor.execute(f"SELECT setval(pg_get_serial_sequence('{table_name}', 'id'), COALESCE((SELECT MAX(id) FROM {table_name}), 1), true);")
+                except Exception as seq_err:
+                    logger.debug("Sequence reset notice for %s: %s", table_name, seq_err)
+
+            conn.commit()
+            sync_summary[table_name] = len(batch_data)
+            logger.info(f"✅ Synced {len(batch_data):4d} records to Supabase table: {table_name}")
+        except Exception as tbl_err:
+            conn.rollback()
+            logger.warning(f"Notice syncing table {table_name}: {tbl_err}")
+            sync_summary[table_name] = 0
 
     cursor.close()
     conn.close()
-    logger.info(f"✅ Successfully synced {len(reports)} reports to Supabase PostgreSQL.")
-    return {"reports_synced": len(reports), "revisions_synced": len(revisions)}
+    sqlite_cur.close()
+    sqlite_conn.close()
+
+    logger.info(f"🎉 Multi-Asset Supabase Sync Complete across {len(sync_summary)} tables!")
+    return sync_summary
 
 def sync_via_rest(reports: List[Dict[str, Any]], supabase_url: str, service_key: str) -> Dict[str, int]:
     """Syncs rows to Supabase PostgREST endpoint /rest/v1/reports."""
@@ -302,7 +384,7 @@ def main():
     # Check PostgreSQL connection
     pg_url = args.supabase_db_url or get_secret("SUPABASE_DB_URL")
     if pg_url:
-        sync_via_postgresql(reports, revisions, pg_url)
+        sync_via_postgresql(reports, revisions, pg_url, sqlite_path=sqlite_path)
         return
 
     # Check REST connection

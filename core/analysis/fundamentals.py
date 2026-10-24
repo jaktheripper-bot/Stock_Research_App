@@ -232,7 +232,13 @@ def enrich_fundamentals(ticker: str, data: dict) -> dict:
         # yfinance is an unofficial source; with the fallback off, empty info leaves
         # missing fields as 'N/A' (Not disclosed) rather than pulling third-party data.
         info = {}
-        if yfinance_fallback_enabled():
+        needs_remote_backfill = (
+            data.get("roce") in [None, "N/A", ""]
+            or data.get("roe") in [None, "N/A", ""]
+            or data.get("fifty_two_week_high") in [None, "N/A", "", 0, 0.0]
+            or data.get("pe_ratio") in [None, "N/A", "-", "", 0, "0"]
+        )
+        if needs_remote_backfill and yfinance_fallback_enabled():
             info = safe_fetch_yfinance_info(yf_ticker)
 
         # Trailing P/E
@@ -356,12 +362,13 @@ def enrich_fundamentals(ticker: str, data: dict) -> dict:
     elif data.get("ev_to_ebitda") not in [None, "N/A"]:
         data["ev_ebitda"] = data["ev_to_ebitda"]
 
-    # 3. Persist enriched state back to localized database cache
-    try:
-        from core.db.fundamentals import save_cached_fundamentals
-        save_cached_fundamentals(clean_sym, data)
-    except Exception as save_err:
-        logger.debug(f"Cached fundamentals persistence notice: {save_err}")
+    # 3. Persist enriched state back to localized database cache when new remote data arrived
+    if info:
+        try:
+            from core.db.fundamentals import save_cached_fundamentals
+            save_cached_fundamentals(clean_sym, data)
+        except Exception as save_err:
+            logger.debug(f"Cached fundamentals persistence notice: {save_err}")
 
     return data
 
@@ -608,7 +615,7 @@ def _enrich_with_cached_db_fundamentals(res_dict: dict, symbol: str) -> dict:
 
     return res_dict
 
-def get_stock_fundamentals(query: str) -> dict:
+def get_stock_fundamentals(query: str, fast_db_first: bool = False) -> dict:
     """
     Primary entry point: Fetches verified exchange data from BSE.
     If BSE direct fails or reports inactive, falls back gracefully to Yahoo Finance.
@@ -623,6 +630,54 @@ def get_stock_fundamentals(query: str) -> dict:
 
     canonical = resolve_canonical_symbol(query) or clean
     scrip = resolve_bse_scrip_code(query) or resolve_bse_scrip_code(canonical)
+
+    use_fast_db = fast_db_first or (
+        os.environ.get("TESTING") == "1" and os.environ.get("RUN_INTEGRATION_TESTS") != "1"
+    )
+    if use_fast_db:
+        try:
+            from core.db.fundamentals import get_cached_fundamentals
+            cached_fund = get_cached_fundamentals(canonical or clean)
+            if cached_fund and cached_fund.get("current_price"):
+                res_dict = dict(cached_fund)
+                res_dict.setdefault("ticker", canonical or clean)
+                res_dict.setdefault("short_name", cached_fund.get("company_name") or canonical or clean)
+                if scrip and not res_dict.get("scrip_code"):
+                    res_dict["scrip_code"] = scrip
+                res_dict = _enrich_with_cached_db_fundamentals(res_dict, canonical or clean)
+                res_dict["is_fallback"] = False
+                res_dict["exchange_status"] = "Audited Baseline (Cached Exchange Feed)"
+                _FUNDAMENTALS_CACHE[clean] = (now, res_dict)
+                _FUNDAMENTALS_CACHE[canonical] = (now, res_dict)
+                return dict(res_dict)
+
+            from core.db.reports import get_report_by_ticker_sync
+            rep = get_report_by_ticker_sync(canonical)
+            if rep and rep.get("baseline_price"):
+                res_dict = {
+                    "ticker": canonical or clean,
+                    "short_name": rep.get("short_name", canonical or clean),
+                    "scrip_code": scrip,
+                    "sector": rep.get("industry") or "General Industry",
+                    "industry": rep.get("industry") or "Diversified",
+                    "market_cap": rep.get("baseline_mcap") or "N/A",
+                    "pe_ratio": str(rep.get("baseline_pe") or "N/A"),
+                    "current_price": round(float(rep["baseline_price"]), 2),
+                    "52w_high": "N/A",
+                    "52w_low": "N/A",
+                    "description": f"Audited research baseline for {clean}.",
+                    "exchange_status": "Audited Baseline (Database Fallback)",
+                    "is_fallback": True,
+                }
+                res_dict = _enrich_with_cached_db_fundamentals(res_dict, canonical or clean)
+                _FUNDAMENTALS_CACHE[clean] = (now, res_dict)
+                _FUNDAMENTALS_CACHE[canonical] = (now, res_dict)
+                return dict(res_dict)
+        except Exception as fast_err:
+            logger.debug(f"Fast DB-first fundamentals lookup notice for {canonical}: {fast_err}")
+
+    if os.environ.get("SKIP_DOTENV_IN_SUBPROCESS") == "1" and os.environ.get("RUN_INTEGRATION_TESTS") != "1":
+        raise ExchangeDataFetchError(clean, "Isolated test mode skips live external exchange sockets for uncached symbols.")
     
     # 0. Primary Tier: Angel One SmartAPI (Exchange Audited Quote, Level-2 Depth & EOD Candles)
     try:
@@ -787,13 +842,15 @@ def get_stock_fundamentals(query: str) -> dict:
     raise ExchangeDataFetchError(clean, "Both primary BSE and secondary market gateways failed to return live quotes.")
 
 @ttl_cache(ttl_seconds=3600, maxsize=32)
-def get_historical_prices(ticker: str, period: str = "6mo"):
+def get_historical_prices(ticker: str, period: str = "6mo", fast_only: bool = False):
     """
     Fetches trailing daily historical prices via yfinance, attempting BSE (.BO)
     first with NSE (.NS) fallback. Computes 50-day Simple Moving Average (50-DMA).
     Auto-resolves 6-digit BSE scrip codes to alphanumeric ticker symbols.
     """
     if not ticker or not isinstance(ticker, str):
+        return None
+    if fast_only:
         return None
 
     clean = clean_ticker(ticker)

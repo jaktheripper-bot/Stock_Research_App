@@ -73,12 +73,6 @@ def prune_zombie_leases(job_name: str = None) -> int:
                 (now_iso,),
             )
         pruned = cur.rowcount or 0
-        try:
-            # Also clean distributed_locks table if present
-            cur.execute(f"DELETE FROM distributed_locks WHERE expires_at < {p}", (now_iso,))
-            pruned += (cur.rowcount or 0)
-        except Exception as alt_err:
-            logger.debug("Alternate distributed_locks table cleanup notice: %s", alt_err)
         conn.commit()
         if pruned > 0:
             logger.info("Cleared %d zombie distributed lease(s) (expired before %s)", pruned, now_iso)
@@ -181,16 +175,27 @@ def release_job_lease(job_name: str, force: bool = True) -> None:
 
 
 @contextmanager
-def job_lease(job_name: str, ttl_seconds: int = 1800, release_on_exit: bool = False) -> Iterator[bool]:
+def job_lease(
+    job_name: str,
+    ttl_seconds: int = 1800,
+    release_on_exit: bool = False,
+    release_on_failure: bool = True,
+) -> Iterator[bool]:
     """
     Context manager for scheduled tasks.
-    - For daily cron jobs (e.g., `morning_bouquet_2026_10_18`), keep `release_on_exit=False`
-      so the second worker doesn't re-run the job immediately after Worker 1 finishes.
+    - For daily cron jobs, keep `release_on_exit=False` with a 20h TTL so secondary cloud
+      workers do not re-run a completed daily job, while `release_on_failure=True` ensures
+      mid-flight crashes immediately release the lock for automatic failover retry.
     - For recurring interval loops, set `release_on_exit=True`.
     """
     acquired = acquire_job_lease(job_name, ttl_seconds=ttl_seconds)
+    failed = False
     try:
         yield acquired
+    except Exception:
+        failed = True
+        raise
     finally:
-        if acquired and release_on_exit:
+        if acquired and (release_on_exit or (failed and release_on_failure)):
             release_job_lease(job_name)
+

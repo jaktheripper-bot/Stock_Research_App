@@ -5,7 +5,6 @@ __pycache__/
 reports.db
 *.db
 .DS_Store
-.github/
 
 .vscode/
 *.csv

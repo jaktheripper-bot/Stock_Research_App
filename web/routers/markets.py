@@ -38,6 +38,7 @@ from core.db.mutual_funds import (
     get_active_mutual_funds,
     get_mutual_fund_scheme,
     get_scheme_holdings,
+    get_holdings_for_schemes_batch,
     get_schemes_by_holding,
     get_fund_forensic_dossier,
 )
@@ -45,6 +46,8 @@ from core.analysis.mutual_funds_engine import (
     evaluate_mutual_fund_comprehensive,
     evaluate_dual_sleeve_lookthrough,
     calculate_portfolio_overlap,
+    get_researched_tickers_set,
+    get_debt_securities_map,
 )
 from core.analysis.fund_overlap_auditor import (
     audit_single_fund_daily,
@@ -457,11 +460,20 @@ def api_get_mutual_fund_schemes(
     """Public API: List all tracked mutual fund schemes with look-through health scores."""
     init_db()
     schemes = get_active_mutual_funds(category=category, broad_category=broad_category)
+    scheme_codes = [s["scheme_code"] for s in schemes if s.get("scheme_code")]
+    holdings_by_scheme = get_holdings_for_schemes_batch(scheme_codes)
+    researched_tickers = get_researched_tickers_set()
+    debt_by_isin = get_debt_securities_map()
 
     results = []
     for s in schemes:
-        h = get_scheme_holdings(s["scheme_code"])
-        lt = evaluate_dual_sleeve_lookthrough(s, h)
+        h = holdings_by_scheme.get(s["scheme_code"], [])
+        lt = evaluate_dual_sleeve_lookthrough(
+            s,
+            h,
+            researched_tickers=researched_tickers,
+            debt_by_isin=debt_by_isin,
+        )
         results.append({
             "scheme_code": s["scheme_code"],
             "scheme_name": s["scheme_name"],

@@ -43,4 +43,8 @@ services:
         value: "n9BuFhtn6SwGdLrRd4A8wFn6"
       - key: BETTER_STACK_INGESTING_HOST
         value: "s2808842.us-west-2a.betterstackdata.com"
+      - key: BETTER_STACK_TELEMETRY_TOKEN
+        sync: false
+      - key: BETTER_STACK_INCIDENTS_TOKEN
+        sync: false
 

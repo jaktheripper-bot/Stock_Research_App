@@ -53,9 +53,16 @@ class TestMobileBriefMode(unittest.TestCase):
         }
 
     def _need(self, kind):
-        if not self.ids.get(kind):
+        val = self.ids.get(kind)
+        if kind == "equity":
+            from core.db.reports import get_report_by_ticker
+            if not val or not get_report_by_ticker(str(val)):
+                val = _first_value("SELECT ticker FROM reports WHERE ticker IN ('INFY', 'TCS', 'LTF') AND LENGTH(report_text) > 100 LIMIT 1") or _first_value("SELECT ticker FROM reports WHERE LENGTH(report_text) > 100 ORDER BY timestamp DESC LIMIT 1")
+                if val:
+                    self.ids["equity"] = val
+        if not val:
             self.skipTest(f"No {kind} record available in the database")
-        return str(self.ids[kind])
+        return str(val)
 
     # ---- routes -------------------------------------------------------
     def test_hub_renders(self):

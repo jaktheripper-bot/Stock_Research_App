@@ -448,5 +448,106 @@ class TestMoatnomicsBrandAuditorSubagent(unittest.TestCase):
         self.assertIn("Moatnomics Copilot", moatnomics_strategy_subagent.system_instructions)
 
 
+class TestAuditCloudLocalSyncAndEnvIsolation(unittest.TestCase):
+    """Verifies Render environment isolation in tool_run_test_suite and cloud-to-local audit sync."""
+
+    def test_tool_run_test_suite_strips_render_and_production_vars(self):
+        from core.audit.tools import tool_run_test_suite
+        captured_env = {}
+
+        def fake_subprocess_run(cmd, **kwargs):
+            captured_env.update(kwargs.get("env") or {})
+            m = MagicMock()
+            m.returncode = 0
+            m.stdout = "10 passed in 0.12s"
+            return m
+
+        with patch.dict(
+            os.environ,
+            {
+                "AUDIT_RECURSION_GUARD": "0",
+                "RENDER": "true",
+                "RENDER_SERVICE_ID": "srv-test",
+                "ENVIRONMENT": "production",
+                "RAZORPAY_KEY_ID": "rzp_live_123",
+                "RAZORPAY_KEY_SECRET": "sec_123",
+                "CANONICAL_DOMAIN": "https://moatnomics.com",
+            },
+            clear=False,
+        ):
+            with patch("core.audit.tools.subprocess.run", side_effect=fake_subprocess_run):
+                res = tool_run_test_suite(quick=True)
+
+        self.assertEqual(res["status"], "PASS")
+        self.assertEqual(captured_env.get("TESTING"), "1")
+        for forbidden_key in (
+            "RENDER",
+            "RENDER_SERVICE_ID",
+            "ENVIRONMENT",
+            "RAZORPAY_KEY_ID",
+            "RAZORPAY_KEY_SECRET",
+            "CANONICAL_DOMAIN",
+        ):
+            self.assertNotIn(forbidden_key, captured_env)
+
+    def test_sync_remote_audits_skips_in_testing_and_syncs_mocked_payload(self):
+        from core.db.audit_logs import sync_remote_audits_to_local, get_project_audit_by_id
+
+        # 1. In TESTING=1 mode, remote sync is strictly disabled
+        res_skip = sync_remote_audits_to_local(force=True)
+        self.assertFalse(res_skip["synced"])
+        self.assertEqual(res_skip["reason"], "unconfigured")
+
+        # 2. When credentials are mocked, remote logs sync cleanly into local SQLite
+        fake_logs = json.dumps([
+            {
+                "audit_id": "AUD-TEST-SYNC-20261024",
+                "overall_score": 100.0,
+                "strategy_score": 100.0,
+                "implementation_score": 100.0,
+                "uiux_score": 100.0,
+                "status": "EXEMPLARY",
+                "tests_total": 824,
+                "tests_passed": 824,
+                "tests_failed": 0,
+                "endpoints_checked": 37,
+                "endpoints_healthy": 37,
+                "critical_violations_json": "[]",
+                "recommendations_json": "[]",
+                "pillar_breakdown_json": "{}",
+                "full_markdown_report": "# Synced Test Dossier",
+                "audit_engine": "autonomous-auditor-engine",
+                "created_at": "2026-10-24T12:00:00Z",
+            }
+        ]).encode("utf-8")
+        fake_rem = b"[]"
+
+        class _FakeResp:
+            def __init__(self, body: bytes):
+                self._body = body
+            def read(self):
+                return self._body
+            def __enter__(self):
+                return self
+            def __exit__(self, *args):
+                return False
+
+        responses = [_FakeResp(fake_logs), _FakeResp(fake_rem)]
+
+        with patch("core.db.audit_logs._get_supabase_rest_credentials", return_value=("https://example.supabase.co", "test-key")), \
+             patch("core.db.audit_logs.urllib.request.urlopen", side_effect=lambda *a, **kw: responses.pop(0)), \
+             patch("core.audit.project_auditor.write_remediation_action_plan"):
+            res_sync = sync_remote_audits_to_local(limit=5, force=True)
+
+        self.assertTrue(res_sync["synced"])
+        self.assertEqual(res_sync["synced_audits"], 1)
+        synced_row = get_project_audit_by_id("AUD-TEST-SYNC-20261024")
+        self.assertIsNotNone(synced_row)
+        self.assertEqual(synced_row["status"], "EXEMPLARY")
+        md_file = Path(__file__).resolve().parent.parent.parent / "audits" / "project_audit_TEST_SYNC_20261024.md"
+        if md_file.exists():
+            md_file.unlink()
+
+
 if __name__ == "__main__":
     unittest.main()

@@ -59,9 +59,34 @@ def tool_run_test_suite(quick: bool = False) -> Dict[str, Any]:
     start_time = time.time()
     try:
         test_env = dict(os.environ)
-        test_env.pop("SUPABASE_DB_URL", None)
-        test_env.pop("SUPABASE_URL", None)
+        for prod_key in (
+            "SUPABASE_DB_URL",
+            "SUPABASE_URL",
+            "SUPABASE_SERVICE_ROLE_KEY",
+            "SUPABASE_ANON_KEY",
+            "RENDER",
+            "RENDER_SERVICE_ID",
+            "RENDER_EXTERNAL_URL",
+            "ENVIRONMENT",
+            "ENV",
+            "APP_ENV",
+            "FLY_APP_NAME",
+            "K_SERVICE",
+            "CANONICAL_DOMAIN",
+            "RAZORPAY_KEY_ID",
+            "RAZORPAY_KEY_SECRET",
+            "GEMINI_API_KEY",
+            "PERPLEXITY_API_KEY",
+            "ANGEL_API_KEY",
+            "ANGEL_CLIENT_CODE",
+            "ANGEL_PIN",
+            "ANGEL_TOTP_KEY",
+            "SMARTAPI_PROXY_URL",
+            "RESEND_API_KEY",
+        ):
+            test_env.pop(prod_key, None)
         test_env["TESTING"] = "1"
+        test_env["SKIP_DOTENV_IN_SUBPROCESS"] = "1"
         test_env["AUDIT_RECURSION_GUARD"] = "1"
 
         proc = subprocess.run(

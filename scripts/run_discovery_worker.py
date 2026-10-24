@@ -130,6 +130,10 @@ def run_discovery_pipeline(
     return saved_count > 0
 
 
+# Backward compatibility alias
+run_discovery_worker = run_discovery_pipeline
+
+
 def main():
     parser = argparse.ArgumentParser(description="Morning Discovery Reel & Daily Ingestion Worker")
     parser.add_argument("--count", type=int, default=15, help="Target number of stocks in cohort (default: 15)")

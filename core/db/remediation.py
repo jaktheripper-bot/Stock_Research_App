@@ -13,6 +13,8 @@ Provides:
 import json
 import hashlib
 import logging
+import os
+import urllib.request
 from decimal import Decimal
 from datetime import datetime, timezone, date
 from typing import Dict, Any, List, Optional
@@ -20,6 +22,53 @@ from typing import Dict, Any, List, Optional
 from core.db.connection import get_db_connection, is_postgres_connection
 
 logger = logging.getLogger("equity_research.core.db.remediation")
+
+
+def _push_remediation_row_to_supabase_rest(cleaned_row: Dict[str, Any]) -> bool:
+    """Mirrors a remediation ledger row to Supabase via PostgREST when local SQLite is primary."""
+    if not cleaned_row or os.environ.get("TESTING") == "1":
+        return False
+    try:
+        from core.db.audit_logs import _get_supabase_rest_credentials, _build_ssl_context
+        creds = _get_supabase_rest_credentials()
+        if not creds:
+            return False
+        sb_url, sb_key = creds
+        url = f"{sb_url}/rest/v1/audit_remediation_ledger?on_conflict=finding_hash"
+        payload = {
+            "finding_hash": cleaned_row.get("finding_hash"),
+            "category": cleaned_row.get("category", "BACKEND_STABILITY"),
+            "invariant_name": cleaned_row.get("invariant_name", "general_invariant"),
+            "title": cleaned_row.get("title", ""),
+            "description": cleaned_row.get("description", ""),
+            "target_file_or_route": cleaned_row.get("target_file_or_route", "general"),
+            "severity": cleaned_row.get("severity", "MEDIUM"),
+            "status": cleaned_row.get("status", "OPEN"),
+            "verification_attempts": int(cleaned_row.get("verification_attempts", 1)),
+            "consecutive_failures": int(cleaned_row.get("consecutive_failures", 0)),
+            "first_detected_at": cleaned_row.get("first_detected_at"),
+            "last_verified_at": cleaned_row.get("last_verified_at"),
+            "resolved_at": cleaned_row.get("resolved_at"),
+            "remediation_notes": cleaned_row.get("remediation_notes") or "",
+            "finding_metadata_json": cleaned_row.get("finding_metadata_json") or json.dumps(cleaned_row.get("metadata", {})),
+        }
+        req = urllib.request.Request(
+            url,
+            data=json.dumps(payload).encode("utf-8"),
+            headers={
+                "apikey": sb_key,
+                "Authorization": f"Bearer {sb_key}",
+                "Content-Type": "application/json",
+                "Prefer": "resolution=merge-duplicates,return=minimal",
+            },
+            method="POST",
+        )
+        with urllib.request.urlopen(req, timeout=10, context=_build_ssl_context()):
+            pass
+        return True
+    except Exception as e:
+        logger.warning("Supabase REST remediation push notice for %s: %s", cleaned_row.get("finding_hash"), e)
+        return False
 
 SEVERITY_BASE_POINTS = {
     "CRITICAL": 15.0,
@@ -190,7 +239,10 @@ def record_or_update_finding(
         # Fetch and return normalized record
         cursor.execute("SELECT * FROM audit_remediation_ledger WHERE finding_hash = ?;" if not use_pg else "SELECT * FROM audit_remediation_ledger WHERE finding_hash = %s;", (finding_hash,))
         updated_row = cursor.fetchone()
-        return _clean_remediation_row(cursor, updated_row)
+        cleaned = _clean_remediation_row(cursor, updated_row)
+        if not use_pg and commit:
+            _push_remediation_row_to_supabase_rest(cleaned)
+        return cleaned
     except Exception as e:
         logger.error(f"Error recording or updating remediation finding {finding_hash}: {e}")
         if commit:
@@ -224,6 +276,9 @@ def record_findings_batch(findings: List[Dict[str, Any]]) -> List[Dict[str, Any]
             if res:
                 results.append(res)
         conn.commit()
+        if not use_pg:
+            for r in results:
+                _push_remediation_row_to_supabase_rest(r)
         return results
     except Exception as e:
         logger.error(f"Error in record_findings_batch: {e}")
@@ -281,6 +336,11 @@ def mark_finding_re_evaluating(finding_hash: str) -> bool:
         sql = "UPDATE audit_remediation_ledger SET status = 'RE_EVALUATING', last_verified_at = now() WHERE finding_hash = %s;" if use_pg else "UPDATE audit_remediation_ledger SET status = 'RE_EVALUATING', last_verified_at = datetime('now') WHERE finding_hash = ?;"
         cursor.execute(sql, (finding_hash,))
         conn.commit()
+        if not use_pg:
+            cursor.execute("SELECT * FROM audit_remediation_ledger WHERE finding_hash = ?;", (finding_hash,))
+            row = cursor.fetchone()
+            if row:
+                _push_remediation_row_to_supabase_rest(_clean_remediation_row(cursor, row))
         return True
     except Exception as e:
         logger.error(f"Error marking finding {finding_hash} RE_EVALUATING: {e}")
@@ -329,6 +389,11 @@ def mark_finding_resolved(finding_hash: str, notes: Optional[str] = None) -> boo
             """
             cursor.execute(sql, (notes, finding_hash))
         conn.commit()
+        if not use_pg:
+            cursor.execute("SELECT * FROM audit_remediation_ledger WHERE finding_hash = ?;", (finding_hash,))
+            row = cursor.fetchone()
+            if row:
+                _push_remediation_row_to_supabase_rest(_clean_remediation_row(cursor, row))
         logger.info(f"Remediation finding {finding_hash} successfully marked RESOLVED.")
         return True
     except Exception as e:

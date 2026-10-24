@@ -122,8 +122,8 @@ async def compare_two_companies(ticker_a: str, ticker_b: str, progress_callback=
         clean = clean_ticker(ticker_str)
         # Fetch the report asynchronously
         report = get_report_by_ticker_sync(clean)
-        # Fetch fundamentals synchronously
-        fundamentals = get_stock_fundamentals(clean)
+        # Fetch fundamentals synchronously (DB-first for sub-second SSR comparison)
+        fundamentals = get_stock_fundamentals(clean, fast_db_first=True)
         # Harmonize with localized DB fundamentals cache & live ratio enrichment
         fundamentals = enrich_fundamentals(clean, fundamentals)
         # Extract health matrix from report text if available

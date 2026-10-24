@@ -684,12 +684,11 @@ def init_db(force: bool = False):
                             credits_added NUMERIC NOT NULL,
                             payment_gateway TEXT DEFAULT 'razorpay',
                             gateway_order_id TEXT,
-                            gateway_payment_id TEXT UNIQUE,
+                            gateway_payment_id TEXT,
                             status TEXT DEFAULT 'success',
                             pack_type TEXT NOT NULL,
                             invoice_number TEXT,
-                            created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
-                            CONSTRAINT uq_credit_tx_gateway_payment_id UNIQUE (gateway_payment_id)
+                            created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP
                         );
                     ''')
                     cursor.execute('CREATE INDEX IF NOT EXISTS idx_credit_transactions_user ON credit_transactions (user_id, created_at DESC);')
@@ -738,12 +737,11 @@ def init_db(force: bool = False):
                             credits_added REAL NOT NULL,
                             payment_gateway TEXT DEFAULT 'razorpay',
                             gateway_order_id TEXT,
-                            gateway_payment_id TEXT UNIQUE,
+                            gateway_payment_id TEXT,
                             status TEXT DEFAULT 'success',
                             pack_type TEXT NOT NULL,
                             invoice_number TEXT,
-                            created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-                            UNIQUE(gateway_payment_id)
+                            created_at DATETIME DEFAULT CURRENT_TIMESTAMP
                         );
                     ''')
                     cursor.execute('CREATE INDEX IF NOT EXISTS idx_credit_transactions_user ON credit_transactions (user_id, created_at DESC);')

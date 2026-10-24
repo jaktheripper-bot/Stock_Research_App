@@ -448,9 +448,39 @@ def calculate_fee_drag(
     }
 
 
+def get_researched_tickers_set() -> set:
+    """Fetches all researched equity ticker symbols in a single lightweight query without loading full report markdown."""
+    try:
+        from core.db.connection import get_db_connection
+        conn = get_db_connection()
+        cursor = conn.cursor()
+        try:
+            cursor.execute("SELECT DISTINCT UPPER(TRIM(ticker)) FROM reports WHERE report_text IS NOT NULL AND report_text != ''")
+            return {str(row[0]).strip().upper() for row in cursor.fetchall() if row and row[0]}
+        finally:
+            cursor.close()
+            conn.close()
+    except Exception as e:
+        logger.debug("Batch researched tickers lookup notice: %s", e)
+        return set()
+
+
+def get_debt_securities_map() -> Dict[str, Dict[str, Any]]:
+    """Pre-loads active debt securities indexed by uppercase ISIN in a single query."""
+    try:
+        from core.db.debt import get_active_debt_securities
+        secs = get_active_debt_securities(limit=500)
+        return {str(s.get("isin", "")).strip().upper(): s for s in secs if s.get("isin")}
+    except Exception as e:
+        logger.debug("Batch debt securities lookup notice: %s", e)
+        return {}
+
+
 def evaluate_dual_sleeve_lookthrough(
     scheme: Dict[str, Any],
-    holdings: List[Dict[str, Any]]
+    holdings: List[Dict[str, Any]],
+    researched_tickers: Optional[set] = None,
+    debt_by_isin: Optional[Dict[str, Dict[str, Any]]] = None,
 ) -> Dict[str, Any]:
     """Decomposes mutual fund portfolio into constituent equity and debt sleeves with composite scoring."""
     total_weight = sum(float(h.get("weight_pct", 0.0)) for h in holdings) or 100.0
@@ -468,6 +498,11 @@ def evaluate_dual_sleeve_lookthrough(
     evaluated_holdings = []
     warnings = []
 
+    if researched_tickers is None and any(h.get("holding_type", "EQUITY").upper() in ("EQUITY", "FOREIGN_EQUITY") for h in holdings):
+        researched_tickers = get_researched_tickers_set()
+    if debt_by_isin is None and any(h.get("holding_type", "EQUITY").upper() in ("DEBT", "SDI") for h in holdings):
+        debt_by_isin = get_debt_securities_map()
+
     for h in holdings:
         w = float(h.get("weight_pct", 0.0))
         h_type = h.get("holding_type", "EQUITY").upper()
@@ -483,15 +518,16 @@ def evaluate_dual_sleeve_lookthrough(
         if h_type in ("EQUITY", "FOREIGN_EQUITY"):
             equity_weight += w
 
-            # Source-Grounded: Check if genuine 7-Pillar Equity report exists
-            rep = None
-            try:
-                from core.db.reports import get_report_by_ticker
-                rep = get_report_by_ticker(ident)
-            except Exception as rep_err:
-                logger.debug("Report lookup notice for %s: %s", ident, rep_err)
+            # Source-Grounded: Check if genuine 7-Pillar Equity report exists via O(1) batch set
+            is_researched = bool(researched_tickers is not None and ident in researched_tickers)
+            if not is_researched:
+                try:
+                    from core.db.reports import get_report_by_ticker
+                    rep = get_report_by_ticker(ident)
+                    is_researched = bool(rep and rep.get("report_text"))
+                except Exception as rep_err:
+                    logger.debug("Report lookup notice for %s: %s", ident, rep_err)
 
-            is_researched = bool(rep and rep.get("report_text"))
             if is_researched:
                 score = VERIFIED_RESEARCHED_EQUITY_SCORE  # Verified 7-pillar asset
                 genuine_covered_weight += w
@@ -521,9 +557,9 @@ def evaluate_dual_sleeve_lookthrough(
 
         elif h_type in ("DEBT", "SDI"):
             debt_weight += w
-            sec = get_debt_security_by_isin(ident)
+            sec = (debt_by_isin or {}).get(ident) if debt_by_isin is not None else get_debt_security_by_isin(ident)
             if sec:
-                debt_eval = evaluate_5_pillar_credit_posture(sec)
+                debt_eval = evaluate_5_pillar_credit_posture(sec, include_live_equity_contagion=False)
                 score = debt_eval["composite_score"]
                 posture_badge = debt_eval["posture_badge"]
                 notes = f"{sec.get('credit_rating')} | YTM: {sec.get('ytm_pct')}%"

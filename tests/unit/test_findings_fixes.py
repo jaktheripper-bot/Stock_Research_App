@@ -107,20 +107,31 @@ class TestFindingsRemediations(unittest.TestCase):
         self.assertEqual(mos, "+0.0%")
 
     def test_finding_3_launchd_plist_targets_python314(self):
-        """Finding 3: launchd/com.moatnomics.pipeline.plist targets Python 3.14 and contains valid XML."""
-        plist_path = os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(__file__))), "launchd", "com.moatnomics.pipeline.plist")
-        self.assertTrue(os.path.exists(plist_path))
+        """Finding 3: Scheduled pipeline runner (macOS launchd or GitHub Actions cloud workflow)."""
+        base_dir = os.path.dirname(os.path.dirname(os.path.dirname(__file__)))
+        plist_path = os.path.join(base_dir, "launchd", "com.moatnomics.pipeline.plist")
+        gha_workflow = os.path.join(base_dir, ".github", "workflows", "scheduled_pipeline.yml")
 
-        tree = ET.parse(plist_path)
-        root = tree.getroot()
-        self.assertEqual(root.tag, "plist")
+        if os.path.exists(plist_path):
+            tree = ET.parse(plist_path)
+            root = tree.getroot()
+            self.assertEqual(root.tag, "plist")
 
-        with open(plist_path, encoding="utf-8") as f:
-            content = f.read()
-        self.assertNotIn("/usr/bin/python3", content, "Plist must not target incompatible macOS system Python 3.9")
-        self.assertIn("/Library/Frameworks/Python.framework/Versions/3.14/bin/python3", content)
-        self.assertIn("<key>EnvironmentVariables</key>", content)
-        self.assertIn("PYTHONPATH", content)
+            with open(plist_path, encoding="utf-8") as f:
+                content = f.read()
+            self.assertNotIn("/usr/bin/python3", content, "Plist must not target incompatible macOS system Python 3.9")
+            self.assertIn("/Library/Frameworks/Python.framework/Versions/3.14/bin/python3", content)
+            self.assertIn("<key>EnvironmentVariables</key>", content)
+            self.assertIn("PYTHONPATH", content)
+        else:
+            # Laptop launchd decommissioned in favor of autonomous cloud GitHub Actions runner
+            self.assertTrue(os.path.exists(gha_workflow), "Scheduled pipeline runner must exist in .github/workflows or launchd")
+            with open(gha_workflow, encoding="utf-8") as f:
+                content = f.read()
+            self.assertIn("Autonomous Multi-Asset Scheduled Pipeline", content)
+            self.assertIn("scripts/run_scheduled_pipeline.py", content)
+            self.assertIn("SUPABASE_DB_URL", content)
+
 
     def test_finding_4_sovereign_curve_snapshot_ingestion(self):
         """Finding 4: Sovereign curve daily snapshot records term structure points into sovereign_curve_history."""

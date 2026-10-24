@@ -49,6 +49,15 @@ def get_ingestion_progress_stats() -> Dict[str, Any]:
         # Total distinct equity holdings in mutual funds
         cursor.execute("SELECT COUNT(DISTINCT identifier) FROM mutual_fund_holdings WHERE holding_type = 'EQUITY';")
         total_mf_holdings = cursor.fetchone()[0] or 0
+        if total_mf_holdings == 0:
+            cursor.close()
+            conn.close()
+            from core.db.mutual_funds import seed_default_mutual_funds
+            seed_default_mutual_funds()
+            conn = get_db_connection()
+            cursor = conn.cursor()
+            cursor.execute("SELECT COUNT(DISTINCT identifier) FROM mutual_fund_holdings WHERE holding_type = 'EQUITY';")
+            total_mf_holdings = cursor.fetchone()[0] or 0
 
         # Distinct equity holdings covered in reports.db with substantial qualitative text
         cursor.execute("""
@@ -105,6 +114,15 @@ def get_uncovered_mutual_fund_holdings_queue(limit: int = 15) -> List[Dict[str, 
     cursor = conn.cursor()
 
     try:
+        cursor.execute("SELECT COUNT(*) FROM mutual_fund_holdings WHERE holding_type = 'EQUITY';")
+        if (cursor.fetchone()[0] or 0) == 0:
+            cursor.close()
+            conn.close()
+            from core.db.mutual_funds import seed_default_mutual_funds
+            seed_default_mutual_funds()
+            conn = get_db_connection()
+            cursor = conn.cursor()
+
         sql = """
             SELECT 
                 h.identifier,

@@ -177,6 +177,35 @@ class TestDistributedJobLocks(unittest.TestCase):
                 acquired_w2 = acquire_job_lease(task_name, ttl_seconds=1800)
                 self.assertFalse(acquired_w2, f"Worker 2 acquired conflicting lease for {task_name}, risking duplicate execution!")
 
+    def test_07_context_manager_release_on_failure_true(self):
+        """Failure semantics: mid-run exception immediately releases lease for retry."""
+        job_name = "test_failing_task_retry"
+
+        with self.assertRaises(RuntimeError):
+            with job_lease(job_name, ttl_seconds=1800, release_on_exit=False, release_on_failure=True) as acquired:
+                self.assertTrue(acquired)
+                raise RuntimeError("Mid-flight crash")
+
+        # Because release_on_failure=True, the lock was freed upon exception
+        with mock.patch("core.db.distributed_lock.WORKER_ID", "failover_worker"):
+            retry_acquired = acquire_job_lease(job_name, ttl_seconds=1800)
+            self.assertTrue(retry_acquired, "Failover worker should acquire lease immediately after mid-flight crash")
+
+    def test_08_context_manager_release_on_failure_false(self):
+        """When release_on_failure=False and release_on_exit=False, lease remains held on error."""
+        job_name = "test_failing_task_no_release"
+
+        with self.assertRaises(RuntimeError):
+            with job_lease(job_name, ttl_seconds=1800, release_on_exit=False, release_on_failure=False) as acquired:
+                self.assertTrue(acquired)
+                raise RuntimeError("Mid-flight crash without release")
+
+        # Lease should remain held until TTL
+        with mock.patch("core.db.distributed_lock.WORKER_ID", "failover_worker"):
+            retry_acquired = acquire_job_lease(job_name, ttl_seconds=1800)
+            self.assertFalse(retry_acquired, "Lease should still be held when release_on_failure=False")
+
 
 if __name__ == "__main__":
     unittest.main()
+

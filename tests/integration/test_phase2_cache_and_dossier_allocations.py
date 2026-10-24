@@ -76,8 +76,21 @@ class TestPhase2CacheAndDossierAllocations(unittest.TestCase):
 
     def test_action_2_3_ttl_cache_on_get_all_equities_directory_sync(self):
         """Action 2.3: get_all_equities_directory_sync has TTL cache and invalidation on archive save."""
-        # First call loads and caches
+        get_all_equities_directory_sync.cache_clear()
         res1 = get_all_equities_directory_sync()
+        if not res1:
+            save_report_to_archive(
+                {
+                    "ticker": "INFY",
+                    "short_name": "Infosys Ltd.",
+                    "industry": "Information Technology",
+                    "current_price": 1520.0,
+                    "pe_ratio": "24.5",
+                    "market_cap": 6300000000000,
+                },
+                "## Executive Summary\nBaseline test dossier for Infosys Ltd.",
+            )
+            res1 = get_all_equities_directory_sync()
         self.assertIsInstance(res1, list)
         self.assertGreater(len(res1), 0)
 
