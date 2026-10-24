@@ -498,7 +498,7 @@ class TestMutualFundTop200Expansion(unittest.TestCase):
             self.assertGreaterEqual(total_weight, 35.0, f"Scheme {code} total holding weight too low")
 
     def test_category_distribution_of_200_fund_universe(self):
-        schemes = get_active_mutual_funds(limit=250)
+        schemes = get_active_mutual_funds(limit=300)
         cats = {}
         for s in schemes:
             c = s.get("category", "")

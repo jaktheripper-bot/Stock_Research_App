@@ -5,48 +5,52 @@
 {% block content %}
 <section class="hero hero-portal-banner" data-asset-class="equities">
   <div class="container">
-    <div class="hero-badge">
-      <span><svg class="glyph"><use href="#glyph-search"></use></svg> EVIDENCE-LED INVESTMENT RESEARCH</span>
-      <span>•</span>
-      <span>NOT INVESTMENT ADVICE</span>
-    </div>
-
-    <h1 class="hero-title">
-      Less noise,<br>
-      <span class="gradient">more nuance.</span>
-    </h1>
-
-    <p class="hero-sub">
-      Independent research on Indian stocks, mutual funds and corporate bonds. See what the numbers mean, what could go wrong, and what to check before you invest.
-    </p>
-
-    <!-- Interactive Stock Search -->
-    <div class="search-container">
-      <form id="mainSearchForm" action="/search" method="GET">
-        <div class="search-input-wrap">
-          <span class="search-icon"><svg class="glyph"><use href="#glyph-search"></use></svg></span>
-          <input 
-            type="text" 
-            id="mainSearchInput" 
-            name="q" 
-            class="search-input" 
-            placeholder="Search a stock, mutual fund or bond (e.g. INFY, Parag Parikh, HDFC)..." 
-            autocomplete="off"
-            required
-          >
-          <button type="submit" class="btn btn-primary btn-sm">Search</button>
+    <div class="hero-split-wrap">
+      <div class="hero-lead-col">
+        <div class="hero-badge">
+          <span><svg class="glyph"><use href="#glyph-search"></use></svg> EVIDENCE-LED INVESTMENT RESEARCH</span>
+          <span>•</span>
+          <span>NOT INVESTMENT ADVICE</span>
         </div>
-      </form>
-      <div id="searchSuggestions" class="search-suggestions" style="display: none;"></div>
 
-      <div class="quick-chips">
-        <span>Popular stock reports:</span>
-        <a href="/dossier/INFY" class="chip">INFY</a>
-        <a href="/dossier/TCS" class="chip">TCS</a>
-        <a href="/dossier/RELIANCE" class="chip">RELIANCE</a>
-        <a href="/dossier/RAILTEL" class="chip">RAILTEL</a>
-        <a href="/dossier/HDFCBANK" class="chip">HDFCBANK</a>
-        <a href="/dossier/TATASTEEL" class="chip">TATASTEEL</a>
+        <h1 class="hero-title">
+          Less noise,<br>
+          <span class="gradient">more nuance.</span>
+        </h1>
+
+        <p class="hero-sub">
+          Independent research on Indian stocks, mutual funds and corporate bonds. See what the numbers mean, what could go wrong, and what to check before you invest.
+        </p>
+
+        <!-- Interactive Stock Search -->
+        <div class="search-container">
+          <form id="mainSearchForm" action="/search" method="GET">
+            <div class="search-input-wrap">
+              <span class="search-icon"><svg class="glyph"><use href="#glyph-search"></use></svg></span>
+              <input 
+                type="text" 
+                id="mainSearchInput" 
+                name="q" 
+                class="search-input" 
+                placeholder="Search a stock, mutual fund or bond (e.g. INFY, Parag Parikh, HDFC)..." 
+                autocomplete="off"
+                required
+              >
+              <button type="submit" class="btn btn-primary btn-sm">Search</button>
+            </div>
+          </form>
+          <div id="searchSuggestions" class="search-suggestions" style="display: none;"></div>
+
+          <div class="quick-chips">
+            <span>Popular stock reports:</span>
+            <a href="/dossier/INFY" class="chip">INFY</a>
+            <a href="/dossier/TCS" class="chip">TCS</a>
+            <a href="/dossier/RELIANCE" class="chip">RELIANCE</a>
+            <a href="/dossier/RAILTEL" class="chip">RAILTEL</a>
+            <a href="/dossier/HDFCBANK" class="chip">HDFCBANK</a>
+            <a href="/dossier/TATASTEEL" class="chip">TATASTEEL</a>
+          </div>
+        </div>
       </div>
     </div>
   </div>
@@ -62,25 +66,21 @@
     </div>
     <div class="stats-grid trust-grid">
       <div class="stat-card trust-card">
-        <img src="/static/img/brand/portal-depth.webp" alt="Primary source depth" class="portal-plate-thumb" loading="lazy" width="320" height="110">
         <div class="pillar-icon"><svg class="glyph"><use href="#glyph-search"></use></svg></div>
         <h3 class="trust-title">We start from public records</h3>
         <p class="trust-desc">Reports are built from company filings and exchange data, not tips, rumours or management claims. You can check the same sources yourself.</p>
       </div>
       <div class="stat-card trust-card">
-        <img src="/static/img/brand/portal-perspective.webp" alt="Balanced risk perspective" class="portal-plate-thumb" loading="lazy" width="320" height="110">
         <div class="pillar-icon"><svg class="glyph"><use href="#glyph-scale"></use></svg></div>
         <h3 class="trust-title">We show the risks, not just the pitch</h3>
         <p class="trust-desc">Every stock report covers seven areas, including debt, cash flow, valuation and governance, so strengths are read alongside what could go wrong.</p>
       </div>
       <div class="stat-card trust-card">
-        <img src="/static/img/brand/portal-clarity.webp" alt="Non-advisory clarity" class="portal-plate-thumb" loading="lazy" width="320" height="110">
         <div class="pillar-icon"><svg class="glyph"><use href="#glyph-shield"></use></svg></div>
         <h3 class="trust-title">We never tell you to buy or sell</h3>
         <p class="trust-desc">Our reports describe what the evidence shows. They are research, not investment advice, and the decision always stays with you.</p>
       </div>
       <div class="stat-card trust-card">
-        <img src="/static/img/brand/portal-opportunity.webp" alt="Reader-funded alignment" class="portal-plate-thumb" loading="lazy" width="320" height="110">
         <div class="pillar-icon"><svg class="glyph"><use href="#glyph-coin"></use></svg></div>
         <h3 class="trust-title">Reading is free, and readers pay us</h3>
         <p class="trust-desc">Existing reports and exchange quotes are free to read. Credits are used only when you ask for a fresh report, which is how we are funded.</p>

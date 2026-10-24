@@ -870,6 +870,26 @@ class RealityAuditor:
         else:
             self.ok(gate, "Research Desk mobile 16px input hygiene and #copilotCloseBtn contract verified")
 
+        # 12.3 Ensure zero backslash-escaped attribute quotes in HTML tags across all templates
+        escaped_quote_pattern = re.compile(r'<\w+[^>]*\\[\"][^>]*>')
+        bad_templates = []
+        for tmpl in (ROOT / "web/templates").rglob("*.html"):
+            tmpl_content = tmpl.read_text(encoding="utf-8")
+            clean_html = re.sub(r'<script\b[^>]*>[\s\S]*?<\/script>', '', tmpl_content, flags=re.IGNORECASE)
+            matches = list(escaped_quote_pattern.finditer(clean_html))
+            if matches:
+                bad_templates.append((str(tmpl.relative_to(ROOT)), len(matches)))
+
+        if bad_templates:
+            for tmpl_rel, count in bad_templates:
+                self.fail(
+                    gate,
+                    tmpl_rel,
+                    f"MALFORMED HTML ATTRIBUTE: Found {count} backslash-escaped quotes (\\\") inside HTML tag markup. Causes CSS attribute parse failures and broken SVG layout."
+                )
+        else:
+            self.ok(gate, "Zero backslash-escaped quotes in HTML tags across all web templates")
+
     def report(self) -> int:
         print("=" * 76)
         print("MOATNOMICS ZERO-ILLUSION REALITY & SECURITY AUDIT")

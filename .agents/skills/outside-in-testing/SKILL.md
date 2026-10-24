@@ -131,8 +131,12 @@ Never deliver empty cards or raw user echoes. Deep-dive modals and analytical pa
 - Clear qualitative insights and risk indicators.
 
 ### 7. Template Attribute & Rendering Hygiene
-Rendered HTML pages must be checked for leaked template tags:
+Rendered HTML pages and raw templates must be checked for leaked template tags, backslash-escaped attribute quotes, and unbounded replaced elements:
 ```python
+import re
+from pathlib import Path
+from bs4 import BeautifulSoup
+
 def assert_template_hygiene(html_content: str):
     soup = BeautifulSoup(html_content, 'html.parser')
     for tag in soup.find_all(True):
@@ -140,6 +144,24 @@ def assert_template_hygiene(html_content: str):
             val_str = str(attr_val)
             assert "{{" not in val_str, f"Unrendered Jinja tag '{{{{' in <{tag.name} {attr_name}=\"{val_str}\">"
             assert "{%" not in val_str, f"Unrendered Jinja tag '{{%' in <{tag.name} {attr_name}=\"{val_str}\">"
+
+def assert_zero_escaped_quotes_in_templates(templates_dir: Path):
+    """Assert zero backslash-escaped quotes inside HTML tag attributes (preventing CSS parse failure and W3C SVG 300x150 blowout)."""
+    pattern = re.compile(r'<\w+[^>]*\\[\"][^>]*>')
+    for tmpl in templates_dir.rglob("*.html"):
+        content = tmpl.read_text(encoding="utf-8")
+        clean = re.sub(r'<script\b[^>]*>[\s\S]*?<\/script>', '', content, flags=re.IGNORECASE)
+        matches = list(pattern.finditer(clean))
+        assert not matches, f"Template {tmpl.name} has {len(matches)} backslash-escaped attribute quotes!"
+
+def assert_inline_svg_dimension_bounds(html_content: str):
+    """Assert all inline SVG icons inside buttons/badges have explicit dimensions or .glyph class."""
+    soup = BeautifulSoup(html_content, 'html.parser')
+    for btn in soup.find_all(['button', 'a'], class_=lambda c: c and any(k in c for k in ['btn', 'chip', 'badge'])):
+        for svg in btn.find_all('svg'):
+            has_dim = ('width' in svg.attrs and 'height' in svg.attrs) or ('style' in svg.attrs and 'width:' in svg.attrs['style'])
+            has_glyph_class = 'glyph' in svg.get('class', [])
+            assert has_dim or has_glyph_class, f"Inline SVG inside <{btn.name}> missing dimension attributes or .glyph class: {svg}"
 ```
 
 ### 8. Dynamic Cadence & Time-Series Rotation Contracts (Zero Static Facades)
@@ -211,6 +233,8 @@ Static HTML parsing (BeautifulSoup) cannot calculate effective background lumina
    - Visit every filter sub-route (`/debt?is_sdi=true`, `/debt?seniority=SENIOR_SECURED`, `/equities`, `/funds`, `/etfs`, `/sovereign`, `/reits`, `/msme`, `/opportunities`, `/safety-radar`) and assert `renderedCards > 0`.
 4. **PostgreSQL Serialization Parity Check:**
    - Verify that every FastAPI `JSONResponse(content=...)` endpoint wraps database dictionaries in `fastapi.encoders.jsonable_encoder(...)` so `datetime.date`, `datetime.datetime`, and `Decimal` columns never raise HTTP 500 `TypeError` on production PostgreSQL.
+5. **Authenticated Route Layout & Visual Coverage Parity:**
+   - Run the CDP microscope with injected administrative session cookies (`admin_session`) against `/admin` and `/admin/audit` to assert zero layout clipping, zero console errors, and valid button/card bounding rects (`width <= 400px` for header buttons).
 
 ---
 

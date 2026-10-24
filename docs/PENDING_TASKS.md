@@ -9,24 +9,24 @@
 
 ### Task 5: Track 3 Language & Voice, Open Items
 - **Category:** Brand, Copy & Compliance Wording
-- **Status:** `In Progress` (Phases 1–3 shipped 2026-10-20; `/terms` statutory 7-section realignment shipped 2026-10-23; items below remain open)
+- **Status:** `In Progress` (Phases 1–3 shipped 2026-10-20; `/terms` statutory 7-section realignment shipped 2026-10-23; visual hero/portal integration & emoji cleanup shipped 2026-10-24)
 - **Details:**
-  1. Reference the hero banners (`img/heroes/*.webp`) and portal plates (`img/brand/portal-*.webp`) from their pages, after a browser review of text contrast.
-  2. ~~Replace the remaining raw emojis in `web/main.py` server messages and `web/templates/admin.html` console with clean text and sprite icons (`Completed 2026-10-24`).~~
-  3. Decide whether to migrate stored values (`SURGICAL_REFRESH`, `FULL_SYNTHESIS`, contact category `synthesis`, existing `BSE Surveillance` alert rows) to the new wording; needs a data migration.
-  4. ~~Owner decision on whether to retain or update the phrase `"computational financial research synthesis software utility"` inside `MANDATORY_SEBI_DISCLAIMER` (`core/db/compliance.py`) — updated to `"independent multi-asset investment research platform and software utility"` (`Completed 2026-10-24`).~~
-  5. Hindi: per-language voice rules, string catalogues and the `language` parameter of `get_system_prompt()` (deferred).
+  1. Decide whether to migrate stored values (`SURGICAL_REFRESH`, `FULL_SYNTHESIS`, contact category `synthesis`, existing `BSE Surveillance` alert rows) to the new wording; needs a data migration.
+  2. **Parked (Pending Audience Request):** Hindi per-language voice rules, string catalogues and the `language` parameter of `get_system_prompt()`.
+  3. ~~Reference the hero banners (`img/heroes/*.webp`) and portal plates (`img/brand/portal-*.webp`) from their pages, after a browser review of text contrast (`Completed 2026-10-24`).~~
+  4. ~~Replace the remaining raw emojis in `web/main.py` server messages and `web/templates/admin.html` console with clean text and sprite icons (`Completed 2026-10-24`).~~
+  5. ~~Owner decision on whether to retain or update the phrase `"computational financial research synthesis software utility"` inside `MANDATORY_SEBI_DISCLAIMER` (`core/db/compliance.py`) — updated to `"independent multi-asset investment research platform and software utility"` (`Completed 2026-10-24`).~~
   6. ~~Replace remaining raw emojis in public templates, `web/static/js/main.js`, and `web/static/js/opportunity_terminal.js` with sprite icons (`Completed 2026-10-21`).~~
   7. ~~Update `/terms` legal characterisation in `web/legal_content.py` to `"multi-asset investment research platform"` and `"independent software utility, not a registered fiduciary"` (`Completed 2026-10-23`).~~
-
-### 📱 Task 4: Mobile Brief Mode (Parked P3)
-- **Category:** Mobile Experience
-- **Status:** `Parked (Deferred pending user demand)`
-- **Details:** Compact, read-only "brief" response style for the Research Desk on a mobile-first page (e.g. `/m`): 3–4 line headline score + top risk flag + link to the full desktop dossier, keeping strict SEBI non-advisory guardrails.
 
 ---
 
 ## 2. Completed Tasks (Moved to Bottom)
+
+### ~~📱 Task 4: Mobile Brief Mode (`/m`)~~
+- ~~**Category:** Mobile Experience & High-Density Commuter Research~~
+- ~~**Status:** `Completed & Verified on Disk` (Shipped 2026-10-24 in commit `1fda96e`)~~
+- ~~**Details:** Compact, read-only multi-asset brief experience across all 5 asset classes (Equities, Funds, Debt, REITs, MSMEs) with zero-LLM deterministic compiler (`core/analysis/mobile_brief.py`), shorthand route `/m/{ticker}`, paywall-aware status pills, dossier integration, and 11 outside-in unit tests passing.~~
 
 ### ~~📬 Task 1: Subscribed Users Research Bouquet & Morning Digest with Custom Domain Tracking~~
 - ~~**Category:** Retention, Engagement & Investor Relations~~

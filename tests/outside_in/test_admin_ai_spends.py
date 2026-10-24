@@ -178,6 +178,20 @@ class TestAiSpendsAdminUiOutsideIn(unittest.TestCase):
         self.assertNotIn("{{ provider_constraints", html_str)
         self.assertNotIn("{% for p in provider_constraints", html_str)
 
+        # 8. Top Header Executive Copilot Button & SVG Hygiene Contract
+        copilot_toggle = soup.find("button", onclick="toggleAdminCopilot()")
+        self.assertIsNotNone(copilot_toggle, "Missing Executive Copilot toggle button in admin header")
+        self.assertIn("btn-sm", copilot_toggle.get("class", []))
+        self.assertIn("btn-primary", copilot_toggle.get("class", []))
+        svg = copilot_toggle.find("svg")
+        self.assertIsNotNone(svg, "Executive Copilot toggle button must contain an SVG icon")
+        self.assertEqual(svg.get("class"), ["glyph"], "SVG must have clean ['glyph'] class without backslash escaping")
+        self.assertIn("width: 14px", svg.get("style", ""), "SVG must have explicit inline width style without backslash escaping")
+        self.assertIn("height: 14px", svg.get("style", ""), "SVG must have explicit inline height style without backslash escaping")
+        use = svg.find("use")
+        self.assertIsNotNone(use, "SVG must contain a <use> element")
+        self.assertEqual(use.get("href"), "#icon-ai-spark", "SVG <use> must reference #icon-ai-spark without backslash escaping")
+
     def test_admin_audit_mirrors_ai_spends_tab_link(self):
         resp = self.client.get("/admin/audit")
         self.assertEqual(resp.status_code, 200)

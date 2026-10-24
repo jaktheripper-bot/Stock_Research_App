@@ -500,11 +500,11 @@ A live route audit across all 73 registered FastAPI endpoints was performed:
 > For active feature requests, owner directives, and platform roadmaps created after October 16, 2026, refer to the authoritative register:
 > 👉 [**Authoritative Platform Roadmap & Pending Tasks Register (`docs/PENDING_TASKS.md`)**](file:///Users/lyndonpinto/Documents/Stock_Research_App/docs/PENDING_TASKS.md).
 
-#### ⚪ Active Deferred & Parked Backlog
-- **Deferred Items:** Full CAS Encrypted PDF Parser.
-- **Parked (build only if users ask for mobile) — Mobile Brief Mode:** Compact, read-only "brief" response style for the Forensic Intelligence Desk on a mobile-first page (e.g. `/m`): headline score + top risk flag + link to the full desktop dossier, a daily 9AM discovery digest, and one-pillar-at-a-time follow-ups. Must stay deterministic (Gate 4), summarise only computed data, keep the SEBI non-advisory line, and respect credits and gated pillars.
+#### ⚪ Active Research & Parked Backlog
+- **Active Research (Initiated 2026-10-24) — Mobile Brief Mode (`/m`):** Compact, read-only "brief" response style for the Research Desk on a mobile-first page (e.g. `/m`): headline score + top risk flag + link to the full desktop dossier, a daily 9AM discovery digest, and one-pillar-at-a-time follow-ups. Must stay deterministic (Gate 4), summarise only computed data, keep the SEBI non-advisory line, and respect credits and gated pillars.
 
-#### ✅ Completed Tasks (Moved to Bottom)
+#### ✅ Completed & Permanently Retired Tasks (Moved to Bottom)
+- ~~**Full CAS Encrypted PDF Parser:** *(Permanently Retired 2026-10-24 — Importing personal portfolio holdings compromises research neutrality and conflicts with SEBI (Investment Advisers) Regulations, 2013 Safe-Harbor non-advisory boundaries and Privacy Policy §2.)*~~
 1. ~~**Render Production Environment & Secrets Hardening (P0):** *(Completed)*~~
    - ~~**Target Files:** `render.yaml`, `web/main.py`, `tests/test_render_hardening.py`~~
    - ~~**Details:** Declared `SECRET_KEY`, `ADMIN_API_KEY`, and `ADMIN_PASSWORD` in `render.yaml` with `sync: false`. Enforced strict production boot checks in `web/main.py` requiring a non-empty 32+ character `SECRET_KEY` when deployed.~~
