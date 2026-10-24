@@ -150,7 +150,7 @@ def check_gemini_ai():
         "name": "Google Gemini AI Gateway",
         "status": "HEALTHY",
         "latency_ms": 0,
-        "details": "API Key Configured • Cascade: gemini-3.8-flash -> gemini-3.7-flash + Batch/Flex 50% Tier",
+        "details": "API Key Configured • Fallback Cascade: gemini-3.8-flash -> gemini-3.7-flash + Batch/Flex 50% Tier",
     }
 
 

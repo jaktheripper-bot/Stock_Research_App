@@ -304,23 +304,13 @@ Tabulate the ESG analysis strictly using the following Markdown table format:
     return report_markdown.strip()
 
 
-def synthesize_and_archive_stock_dossier(
-    candidate: Dict[str, Any],
-    skip_gemini: bool = False
-) -> Dict[str, Any]:
-    """
-    Ingests live exchange fundamentals, resolves BSE scrip, synthesizes a complete
-    7-Pillar Research Report (via Gemini or deterministic synthesis), and archives it into reports.db.
-    """
+def _resolve_candidate_stock_data(candidate: Dict[str, Any]) -> Dict[str, Any]:
+    """Resolves exchange fundamentals and BSE scrip metadata for a daily ingestion candidate."""
     ticker = clean_ticker(candidate.get("ticker", ""))
     scrip_code = candidate.get("scrip_code") or resolve_bse_scrip_code(ticker) or ""
     company_name = candidate.get("company_name") or ticker
     sector = candidate.get("sector") or "Diversified"
 
-    if os.environ.get("TESTING") == "1":
-        skip_gemini = True
-
-    # 1. Fetch live fundamentals (bypass external network calls if in test mode)
     stock_data = {}
     if not os.environ.get("TESTING") == "1":
         try:
@@ -336,22 +326,74 @@ def synthesize_and_archive_stock_dossier(
             "scrip_code": scrip_code,
             "current_price": 500.0,
             "market_cap": 25_000_000_000,
-            "pe_ratio": "22.5"
+            "pe_ratio": "22.5",
         }
 
-    # Ensure scrip_code and company_name are populated
     if not stock_data.get("scrip_code") and scrip_code:
         stock_data["scrip_code"] = scrip_code
     if not stock_data.get("short_name"):
         stock_data["short_name"] = company_name
     if not stock_data.get("sector"):
         stock_data["sector"] = sector
+    return stock_data
 
-    # 2. Generate 7-Pillar Report
+
+def synthesize_and_archive_stock_dossier(
+    candidate: Dict[str, Any],
+    skip_gemini: bool = False,
+    pre_synthesized_report: Optional[Dict[str, Any]] = None,
+    resolved_stock_data: Optional[Dict[str, Any]] = None,
+) -> Dict[str, Any]:
+    """
+    Ingests live exchange fundamentals, resolves BSE scrip, synthesizes a complete
+    7-Pillar Research Report (via Gemini Batch/Flex API or deterministic synthesis), and archives it into reports.db.
+    """
+    ticker = clean_ticker(candidate.get("ticker", ""))
+    scrip_code = candidate.get("scrip_code") or resolve_bse_scrip_code(ticker) or ""
+    company_name = candidate.get("company_name") or ticker
+    sector = candidate.get("sector") or "Diversified"
+
+    if os.environ.get("TESTING") == "1":
+        skip_gemini = True
+
+    # 1. Fetch live fundamentals (bypass external network calls if in test mode)
+    stock_data = resolved_stock_data or _resolve_candidate_stock_data(candidate)
+    if not scrip_code and stock_data.get("scrip_code"):
+        scrip_code = str(stock_data["scrip_code"])
+
+    # 2. Generate or apply Batch-synthesized 7-Pillar Report
     report_text = ""
+    batch_citations = None
+    synthesis_tier = "DETERMINISTIC"
     api_key = get_secret("GEMINI_API_KEY")
 
-    if not skip_gemini and api_key and len(api_key.strip()) > 10:
+    if pre_synthesized_report and pre_synthesized_report.get("report_text"):
+        report_text = pre_synthesized_report["report_text"]
+        batch_citations = pre_synthesized_report.get("citations")
+        synthesis_tier = pre_synthesized_report.get("tier") or "GEMINI_BATCH_API_50PCT_DISCOUNT"
+        try:
+            from core.billing.qos_governor import record_daemon_spend_usd
+            record_daemon_spend_usd(0.0005)  # 50% Batch/Flex tier discount
+        except Exception as spend_err:
+            logger.debug(f"Daemon batch spend record notice for {ticker}: {spend_err}")
+        try:
+            ann = ""
+            if not os.environ.get("TESTING") == "1" and scrip_code:
+                ann = fetch_latest_bse_announcement(scrip_code)
+            save_report_to_archive(
+                stock_data=stock_data,
+                report_text=report_text,
+                announcement=ann,
+                revision_trigger=f"Daily 08:30 AM Batch Ingestion ({synthesis_tier})",
+                citations=batch_citations or [{
+                    "title": f"BSE Corporate Announcements & Disclosures ({ticker})",
+                    "uri": f"https://www.bseindia.com/stock-share-price/-/{scrip_code}/corporate-announcements/" if scrip_code else "https://www.bseindia.com",
+                    "source_type": "BSE Official Regulatory Filing",
+                }],
+            )
+        except Exception as save_err:
+            logger.warning(f"Batch report archive notice for {ticker}: {save_err}")
+    elif not skip_gemini and api_key and len(api_key.strip()) > 10:
         from core.billing.qos_governor import (
             authorize_llm_execution,
             get_daemon_daily_spend_usd,
@@ -365,10 +407,25 @@ def synthesize_and_archive_stock_dossier(
             logger.info(f"Background daemon QoS pause for {ticker}: {daemon_msg}. Using deterministic synthesis to protect VIP quota.")
         else:
             try:
-                from core.analysis.dossier_report_synthesis import generate_stock_report
-                logger.info(f"Generating Gemini 7-Pillar research dossier for daily ingestion: {ticker}...")
-                report_text = generate_stock_report(ticker)
-                record_daemon_spend_usd(0.001)
+                from core.analysis.dossier_report_synthesis import synthesize_batch_stock_reports, generate_stock_report
+                logger.info(f"Generating Gemini Batch/Flex 7-Pillar research dossier for daily ingestion: {ticker}...")
+                batch_map = synthesize_batch_stock_reports([{"ticker": ticker, "stock_data": stock_data}], poll_timeout_seconds=30)
+                if ticker in batch_map and batch_map[ticker].get("report_text"):
+                    report_text = batch_map[ticker]["report_text"]
+                    synthesis_tier = batch_map[ticker].get("tier") or "GEMINI_BATCH_API_50PCT_DISCOUNT"
+                    ann = fetch_latest_bse_announcement(scrip_code) if scrip_code else ""
+                    save_report_to_archive(
+                        stock_data=stock_data,
+                        report_text=report_text,
+                        announcement=ann,
+                        revision_trigger=f"Daily 08:30 AM Batch Ingestion ({synthesis_tier})",
+                        citations=batch_map[ticker].get("citations"),
+                    )
+                    record_daemon_spend_usd(0.0005)
+                else:
+                    report_text = generate_stock_report(ticker)
+                    synthesis_tier = "GEMINI_STANDARD_STREAM"
+                    record_daemon_spend_usd(0.001)
             except Exception as gem_err:
                 logger.warning(f"Live Gemini synthesis notice for {ticker}: {gem_err}. Falling back to deterministic synthesis.")
                 report_text = ""
@@ -542,13 +599,55 @@ def ingest_daily_stock_cohort(
             "message": "Universe fully saturated. All mutual fund constituents covered."
         }
 
-    # 2. Ingest and generate each stock
+    # 2. Pre-resolve exchange fundamentals and submit Gemini Batch API cohort (50% cost discount)
+    resolved_data_map: Dict[str, Dict[str, Any]] = {}
+    batch_reports_map: Dict[str, Dict[str, Any]] = {}
+
+    for item in queue:
+        t_clean = clean_ticker(item.get("ticker", ""))
+        resolved_data_map[t_clean] = _resolve_candidate_stock_data(item)
+
+    api_key = get_secret("GEMINI_API_KEY")
+    if not skip_gemini and api_key and len(api_key.strip()) > 10:
+        from core.billing.qos_governor import authorize_llm_execution, get_daemon_daily_spend_usd
+        daemon_ok, daemon_msg = authorize_llm_execution(
+            actor_type="BACKGROUND_DAEMON",
+            current_daemon_spend_usd=get_daemon_daily_spend_usd(),
+        )
+        if daemon_ok:
+            try:
+                from core.analysis.dossier_report_synthesis import synthesize_batch_stock_reports
+                batch_inputs = [
+                    {"ticker": t_sym, "stock_data": s_data}
+                    for t_sym, s_data in resolved_data_map.items()
+                ]
+                logger.info(
+                    "Submitting %d candidate stocks to Gemini Batch API (50%% discount) for edition %s...",
+                    len(batch_inputs),
+                    edition_date,
+                )
+                batch_reports_map = synthesize_batch_stock_reports(
+                    batch_inputs,
+                    edition_label=f"daily-ingestion-{edition_date}",
+                )
+            except Exception as batch_err:
+                logger.warning(f"Gemini Batch API cohort notice: {batch_err}")
+        else:
+            logger.info(f"Background daemon QoS pause for cohort: {daemon_msg}. Using deterministic synthesis.")
+
+    # 3. Ingest and archive each stock
     ingested_results = []
     discovery_reel_items = []
 
     for item in queue:
         try:
-            res = synthesize_and_archive_stock_dossier(item, skip_gemini=skip_gemini)
+            t_clean = clean_ticker(item.get("ticker", ""))
+            res = synthesize_and_archive_stock_dossier(
+                item,
+                skip_gemini=skip_gemini,
+                pre_synthesized_report=batch_reports_map.get(t_clean),
+                resolved_stock_data=resolved_data_map.get(t_clean),
+            )
             ingested_results.append(res)
 
             # Build rich discovery reel item with mutual fund footprint

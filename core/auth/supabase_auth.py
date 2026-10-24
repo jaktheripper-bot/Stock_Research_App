@@ -307,6 +307,52 @@ def send_magic_link(email: str, redirect_uri: Optional[str] = None) -> Tuple[boo
     return False, "Authentication service is not configured. Please use Google Sign-In or contact support."
 
 
+def verify_supabase_otp_token(email: str, token: str) -> Tuple[bool, Optional[str], Optional[str], str]:
+    """
+    Verifies a 6-digit email OTP or Magic Link token directly against Supabase GoTrue (/auth/v1/verify).
+    Returns:
+        (is_valid, verified_email, full_name, access_token_or_message)
+    """
+    clean_email = (email or "").strip().lower()
+    clean_token = (token or "").strip()
+    if not clean_email or not clean_token:
+        return False, None, None, "Email and verification token are required."
+
+    cfg = get_supabase_auth_config()
+    base_url = cfg.get("url")
+    anon_key = cfg.get("anon_key")
+    if not (base_url and anon_key) or os.environ.get("TESTING") == "1":
+        return False, None, None, "Supabase GoTrue OTP verification skipped."
+
+    endpoint = f"{base_url}/auth/v1/verify"
+    headers = {
+        "apikey": anon_key,
+        "Content-Type": "application/json",
+    }
+
+    for otp_type in ("email", "magiclink", "signup"):
+        try:
+            payload = {
+                "type": otp_type,
+                "email": clean_email,
+                "token": clean_token,
+            }
+            resp = requests.post(endpoint, json=payload, headers=headers, timeout=8)
+            if resp.status_code in (200, 201):
+                data = resp.json() or {}
+                u_info = data.get("user") or {}
+                v_email = (u_info.get("email") or clean_email).strip().lower()
+                u_meta = u_info.get("user_metadata") or {}
+                v_name = u_meta.get("full_name") or u_meta.get("name")
+                acc_tok = data.get("access_token") or ""
+                logger.info(f"Verified Supabase GoTrue OTP ({otp_type}) for {v_email}")
+                return True, v_email, v_name, acc_tok
+        except Exception as e:
+            logger.debug(f"Supabase GoTrue OTP verify ({otp_type}) notice for {clean_email}: {e}")
+
+    return False, None, None, "Supabase GoTrue OTP verification did not match."
+
+
 def set_session_user(user_record: Dict[str, Any], auth_token: Optional[str] = None):
     """Stores active user session record into thread-safe ContextVar."""
     _user_session_var.set(user_record)

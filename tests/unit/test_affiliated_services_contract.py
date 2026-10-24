@@ -13,6 +13,8 @@ from scripts.check_affiliated_services import (
     check_betterstack,
     check_angel_one,
     check_gemini_ai,
+    check_perplexity_sonar,
+    check_resend_email,
     check_razorpay,
 )
 
@@ -54,6 +56,21 @@ class TestAffiliatedServicesContract(unittest.TestCase):
         res = check_gemini_ai()
         self.assertEqual(res["status"], "HEALTHY")
         self.assertIn("Fallback Cascade", res["details"])
+        self.assertIn("Batch/Flex 50% Tier", res["details"])
+
+    @patch("scripts.check_affiliated_services.get_secret")
+    def test_check_perplexity_sonar_configured(self, mock_secret):
+        mock_secret.side_effect = lambda k: "pplx-test-key" if k == "PERPLEXITY_API_KEY" else ""
+        res = check_perplexity_sonar()
+        self.assertEqual(res["status"], "HEALTHY")
+        self.assertIn("Grounding Failover Active", res["details"])
+
+    @patch("scripts.check_affiliated_services.get_secret")
+    def test_check_resend_email_configured(self, mock_secret):
+        mock_secret.side_effect = lambda k: "re_test_key" if k == "RESEND_API_KEY" else ""
+        res = check_resend_email()
+        self.assertEqual(res["status"], "HEALTHY")
+        self.assertIn("Supabase GoTrue Auth Primary", res["details"])
 
     @patch("scripts.check_affiliated_services.get_secret")
     def test_check_razorpay_configured(self, mock_secret):

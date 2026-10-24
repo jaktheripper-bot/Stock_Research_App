@@ -58,8 +58,10 @@ class AngelOneGateway:
     LOGIN_ENDPOINT: str = "/rest/auth/angelbroking/user/v1/loginByPassword"
     QUOTE_ENDPOINT: str = "/rest/secure/angelbroking/market/v1/quote/"
     HISTORICAL_ENDPOINT: str = "/rest/secure/angelbroking/historical/v1/getCandleData"
+    SEARCH_SCRIP_ENDPOINT: str = "/rest/secure/angelbroking/order/v1/searchScrip"
 
     _session_cache: Dict[str, Any] = {}
+    _DYNAMIC_TOKEN_CACHE: Dict[str, Tuple[str, str]] = {}
     _auth_lock: threading.Lock = threading.Lock()
     _last_auth_failure_time: float = 0.0
     _AUTH_FAILURE_COOLDOWN: float = 300.0  # 5 minutes failure cooldown
@@ -277,11 +279,66 @@ class AngelOneGateway:
     }
 
     @classmethod
+    def search_scrip_token(cls, query: str, preferred_exchange: str = "NSE") -> Optional[Tuple[str, str]]:
+        """
+        Queries Angel One SmartAPI searchScrip endpoint to dynamically resolve (exchange, symboltoken)
+        for any listed NSE/BSE equity and caches the mapping in memory.
+        """
+        from normalizer import clean_ticker
+        clean = clean_ticker(query).upper()
+        if not clean:
+            return None
+        if clean in cls._DYNAMIC_TOKEN_CACHE:
+            return cls._DYNAMIC_TOKEN_CACHE[clean]
 
+        jwt_token = cls.authenticate()
+        if not jwt_token:
+            return None
+
+        api_key = (get_secret("ANGEL_API_KEY") or os.environ.get("ANGEL_API_KEY", "")).strip()
+        headers = {
+            "Content-Type": "application/json",
+            "Accept": "application/json",
+            "X-UserType": "USER",
+            "X-SourceID": "WEB",
+            "X-PrivateKey": api_key,
+            "Authorization": f"Bearer {jwt_token}",
+        }
+        proxies = cls.get_proxy_config()
+        url = f"{cls.BASE_URL}{cls.SEARCH_SCRIP_ENDPOINT}"
+
+        for exch in (preferred_exchange.upper(), "BSE"):
+            try:
+                resp = requests.post(
+                    url,
+                    json={"exchange": exch, "searchscrip": clean},
+                    headers=headers,
+                    proxies=proxies,
+                    timeout=5,
+                )
+                if resp.status_code == 200:
+                    data = resp.json() or {}
+                    items = data.get("data") or []
+                    if items and isinstance(items, list):
+                        # Prefer -EQ series on NSE or exact trading symbol match
+                        best = next(
+                            (it for it in items if str(it.get("tradingsymbol", "")).upper() in (f"{clean}-EQ", clean)),
+                            items[0],
+                        )
+                        tok = str(best.get("symboltoken") or "").strip()
+                        ex = str(best.get("exchange") or exch).strip().upper()
+                        if tok and tok.isdigit():
+                            cls._DYNAMIC_TOKEN_CACHE[clean] = (ex, tok)
+                            return (ex, tok)
+            except Exception as e:
+                logger.debug(f"Angel One searchScrip notice for {clean} on {exch}: {e}")
+        return None
+
+    @classmethod
     def resolve_symbol_token(cls, query: str) -> Tuple[str, str]:
         """
         Resolves a symbol query to (exchange, token).
-        Checks NSE token registry first, then BSE scrip code.
+        Checks NSE token registry first, then dynamic cache, then BSE scrip code, then searchScrip.
         """
         from normalizer import clean_ticker
         from bse_master import resolve_canonical_symbol, resolve_bse_scrip_code
@@ -292,10 +349,17 @@ class AngelOneGateway:
         if canonical in cls.CANONICAL_NSE_TOKENS:
             return ("NSE", cls.CANONICAL_NSE_TOKENS[canonical])
 
+        if canonical in cls._DYNAMIC_TOKEN_CACHE:
+            return cls._DYNAMIC_TOKEN_CACHE[canonical]
 
         scrip = resolve_bse_scrip_code(canonical) or resolve_bse_scrip_code(clean)
         if scrip:
             return ("BSE", str(scrip))
+
+        if os.environ.get("TESTING") != "1" and cls.is_configured():
+            dynamic = cls.search_scrip_token(canonical)
+            if dynamic:
+                return dynamic
 
         # Default fallback
         return ("NSE", clean)
@@ -499,8 +563,21 @@ class AngelOneGateway:
                 _candle_rate_wait()
                 resp = requests.post(url, json=payload, headers=headers, proxies=proxies, timeout=8)
             data = resp.json()
-            if resp.status_code == 200 and data.get("status") and data.get("data"):
-                raw_candles = data["data"]
+            raw_candles = (data.get("data") if (resp.status_code == 200 and data.get("status")) else None) or []
+
+            # If primary NSE/token attempt yielded no candles, try BSE scrip code fallback
+            if not raw_candles:
+                from bse_master import resolve_bse_scrip_code
+                bse_scrip = resolve_bse_scrip_code(query)
+                if bse_scrip and (exch.upper() != "BSE" or str(token) != str(bse_scrip)):
+                    payload_bse = dict(payload, exchange="BSE", symboltoken=str(bse_scrip))
+                    _candle_rate_wait()
+                    resp_bse = requests.post(url, json=payload_bse, headers=headers, proxies=proxies, timeout=8)
+                    data_bse = resp_bse.json() if resp_bse.status_code == 200 else {}
+                    if data_bse.get("status") and data_bse.get("data"):
+                        raw_candles = data_bse["data"]
+
+            if raw_candles:
                 candles = []
                 for c in raw_candles:
                     # Format: [timestamp, open, high, low, close, volume]
@@ -518,6 +595,46 @@ class AngelOneGateway:
             logger.debug(f"Angel One historical candles notice for {query}: {e}")
             return None
         return None
+
+    @classmethod
+    def get_eod_summary(cls, query: str) -> Optional[Dict[str, Any]]:
+        """
+        Computes verified EOD price, 52-week high/low, 50-DMA, 200-DMA, and 20-day average volume
+        directly from Angel One SmartAPI 1-year daily historical candles.
+        """
+        from datetime import datetime, timedelta
+        from_date = (datetime.now() - timedelta(days=370)).strftime("%Y-%m-%d 09:15")
+        candles = cls.get_historical_candles(query, interval="ONE_DAY", from_date=from_date)
+        if not candles or len(candles) < 5:
+            return None
+
+        closes = [float(c["close"]) for c in candles if c.get("close") and float(c["close"]) > 0]
+        highs = [float(c["high"]) for c in candles if c.get("high") and float(c["high"]) > 0]
+        lows = [float(c["low"]) for c in candles if c.get("low") and float(c["low"]) > 0]
+        vols = [int(c.get("volume", 0)) for c in candles]
+
+        if not closes:
+            return None
+
+        last_close = round(closes[-1], 2)
+        high_52w = round(max(highs[-252:]), 2) if highs else last_close
+        low_52w = round(min(lows[-252:]), 2) if lows else last_close
+        dma_50 = round(sum(closes[-50:]) / len(closes[-50:]), 2)
+        dma_200 = round(sum(closes[-200:]) / len(closes[-200:]), 2)
+        avg_vol_20d = int(sum(vols[-20:]) / max(1, len(vols[-20:])))
+
+        return {
+            "current_price": last_close,
+            "52w_high": high_52w,
+            "fifty_two_week_high": high_52w,
+            "52w_low": low_52w,
+            "fifty_two_week_low": low_52w,
+            "dma_50": dma_50,
+            "dma_200": dma_200,
+            "avg_volume_20d": avg_vol_20d,
+            "candle_count": len(candles),
+            "source": "Angel One SmartAPI EOD Candles",
+        }
 
     @classmethod
     def format_dossier_market_depth_badge(cls, quote_data: Dict[str, Any]) -> str:

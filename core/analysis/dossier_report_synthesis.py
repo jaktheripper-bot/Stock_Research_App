@@ -213,66 +213,102 @@ def stream_perplexity_fallback(prompt: str, system_prompt: str, collected_citati
         "stream": True
     }
 
-    res = requests.post(url, headers=headers, json=payload, stream=True, timeout=60)
-    if res.status_code != 200:
-        raise RuntimeError(f"Perplexity Agent API HTTP {res.status_code}: {res.text}")
-
-    current_event = None
     yielded = False
-    for raw_line in res.iter_lines(decode_unicode=False):
-        if not raw_line:
-            continue
-        line = raw_line.decode("utf-8", errors="replace")
-        if line.startswith("event: "):
-            current_event = line[7:].strip()
-        elif line.startswith("data: "):
-            data_str = line[6:].strip()
-            if data_str == "[DONE]":
-                break
-            try:
-                data = json.loads(data_str)
-                if current_event == "response.output_text.delta" or "delta" in data:
-                    delta = data.get("delta")
-                    if isinstance(delta, str) and delta:
-                        yielded = True
-                        yield delta
-                if collected_citations is not None and "citations" in data:
-                    for c_url in data.get("citations", []):
+    res = requests.post(url, headers=headers, json=payload, stream=True, timeout=60)
+    if res.status_code == 200:
+        current_event = None
+        for raw_line in res.iter_lines(decode_unicode=False):
+            if not raw_line:
+                continue
+            line = raw_line.decode("utf-8", errors="replace")
+            if line.startswith("event: "):
+                current_event = line[7:].strip()
+            elif line.startswith("data: "):
+                data_str = line[6:].strip()
+                if data_str == "[DONE]":
+                    break
+                try:
+                    data = json.loads(data_str)
+                    if current_event == "response.output_text.delta" or "delta" in data:
+                        delta = data.get("delta")
+                        if isinstance(delta, str) and delta:
+                            yielded = True
+                            yield delta
+                    if collected_citations is not None and "citations" in data:
+                        for c_url in data.get("citations", []):
+                            if isinstance(c_url, str) and c_url.startswith("http") and not any(e.get("uri") == c_url for e in collected_citations):
+                                collected_citations.append({
+                                    "title": c_url.split("//")[-1].split("/")[0],
+                                    "uri": c_url,
+                                    "source_type": "Verified Web Grounding"
+                                })
+                except Exception as stream_err:
+                    logger.debug(f"Perplexity streaming parse notice: {stream_err}")
+                    continue
+
+    if not yielded:
+        # Non-streaming fallback via /v1/responses if SSE streaming yielded no tokens
+        try:
+            r2 = requests.post(
+                url,
+                headers={"Authorization": f"Bearer {api_key}", "Content-Type": "application/json"},
+                json={"input": prompt, "instructions": system_prompt, "preset": "fast"},
+                timeout=60
+            )
+            if r2.status_code == 200:
+                d2 = r2.json()
+                for item in d2.get("output", []):
+                    if isinstance(item, dict) and item.get("type") == "message":
+                        for c in item.get("content", []):
+                            if c.get("type") == "output_text":
+                                txt = c.get("text", "")
+                                if txt:
+                                    yielded = True
+                                    yield txt
+                if collected_citations is not None and "citations" in d2:
+                    for c_url in d2.get("citations", []):
                         if isinstance(c_url, str) and c_url.startswith("http") and not any(e.get("uri") == c_url for e in collected_citations):
                             collected_citations.append({
                                 "title": c_url.split("//")[-1].split("/")[0],
                                 "uri": c_url,
                                 "source_type": "Verified Web Grounding"
                             })
-            except Exception as stream_err:
-                logger.debug(f"Perplexity streaming parse notice: {stream_err}")
-                continue
+        except Exception as r2_err:
+            logger.debug(f"Perplexity /v1/responses fallback notice: {r2_err}")
 
     if not yielded:
-        # Non-streaming fallback if SSE streaming yielded no tokens
-        r2 = requests.post(
-            url,
+        # Standard Perplexity Sonar /chat/completions endpoint fallback
+        sonar_url = "https://api.perplexity.ai/chat/completions"
+        r3 = requests.post(
+            sonar_url,
             headers={"Authorization": f"Bearer {api_key}", "Content-Type": "application/json"},
-            json={"input": prompt, "instructions": system_prompt, "preset": "fast"},
-            timeout=60
+            json={
+                "model": "sonar",
+                "messages": [
+                    {"role": "system", "content": system_prompt},
+                    {"role": "user", "content": prompt},
+                ],
+                "temperature": 0.2,
+            },
+            timeout=60,
         )
-        if r2.status_code == 200:
-            d2 = r2.json()
-            for item in d2.get("output", []):
-                if isinstance(item, dict) and item.get("type") == "message":
-                    for c in item.get("content", []):
-                        if c.get("type") == "output_text":
-                            txt = c.get("text", "")
-                            if txt:
-                                yield txt
-            if collected_citations is not None and "citations" in d2:
-                for c_url in d2.get("citations", []):
-                    if isinstance(c_url, str) and c_url.startswith("http") and not any(e.get("uri") == c_url for e in collected_citations):
-                        collected_citations.append({
-                            "title": c_url.split("//")[-1].split("/")[0],
-                            "uri": c_url,
-                            "source_type": "Verified Web Grounding"
-                        })
+        if r3.status_code != 200:
+            raise RuntimeError(f"Perplexity Sonar API HTTP {r3.status_code}: {r3.text}")
+        d3 = r3.json()
+        choices = d3.get("choices") or []
+        if choices:
+            msg_content = (choices[0].get("message") or {}).get("content") or ""
+            if msg_content:
+                yielded = True
+                yield msg_content
+        if collected_citations is not None and "citations" in d3:
+            for c_url in d3.get("citations", []):
+                if isinstance(c_url, str) and c_url.startswith("http") and not any(e.get("uri") == c_url for e in collected_citations):
+                    collected_citations.append({
+                        "title": c_url.split("//")[-1].split("/")[0],
+                        "uri": c_url,
+                        "source_type": "Verified Web Grounding",
+                    })
 
 def stream_gemini_ungrounded_bypass(client, prompt: str, system_prompt: str):
     model_name = get_latest_flash_models(client)[0]
@@ -432,4 +468,175 @@ def generate_stock_report(ticker: str, language: str = "English (India)", use_gr
         if len(full_text.strip()) >= 800 and "Live Synthesis Failed" not in full_text:
             record_live_generation()
         return full_text
+
+
+def synthesize_batch_stock_reports(
+    items: list,
+    language: str = "English (India)",
+    use_grounding: bool = True,
+    poll_timeout_seconds: int = 120,
+    poll_interval_seconds: int = 5,
+    edition_label: str = "daily-ingestion",
+) -> dict:
+    """
+    Submits a cohort of stock synthesis requests via the Gemini Batch API (client.batches.create)
+    at a 50% cost discount. Polls for inline batch completion up to poll_timeout_seconds, and
+    seamlessly falls back to Gemini Flex tier (service_tier='flex', also 50% discount) for any
+    items still pending so the 08:30 AM Morning Discovery run finishes reliably at half cost.
+
+    Args:
+        items: List of dicts, each containing {"ticker": str, "stock_data": dict}
+    Returns:
+        Dict mapping uppercase ticker -> {"report_text": str, "citations": list, "tier": str, "batch_job_name": str}
+    """
+    from core.config import get_secret
+    api_key = get_secret("GEMINI_API_KEY")
+    if not api_key or len(api_key.strip()) <= 10 or not items:
+        return {}
+
+    client = genai.Client(api_key=api_key)
+    model_name = get_latest_flash_models(client)[0]
+
+    valid_items = []
+    inline_requests = []
+    for entry in items:
+        ticker = (entry.get("ticker") or "").strip().upper()
+        stock_data = entry.get("stock_data") or {}
+        if not ticker:
+            continue
+        passed, _ = pass_pre_screening_gates(stock_data, stock_data)
+        if not passed:
+            continue
+        sys_inst = get_system_prompt(ticker, language)
+        req_cfg = {
+            "system_instruction": {"parts": [{"text": sys_inst}]},
+            "temperature": 0.2,
+        }
+        if use_grounding:
+            req_cfg["system_instruction"]["parts"][0]["text"] += (
+                "\n- Search recent BSE/NSE disclosures and concalls from the past 90-180 days."
+            )
+            req_cfg["tools"] = [{"google_search": {}}]
+
+        user_prompt = (
+            f"Generate research report for: {stock_data.get('short_name') or ticker} ({ticker})\n"
+            f"Data: {stock_data}"
+        )
+        inline_requests.append({
+            "contents": [{
+                "parts": [{"text": user_prompt}],
+                "role": "user",
+            }],
+            "config": req_cfg,
+        })
+        valid_items.append((ticker, stock_data, user_prompt, sys_inst))
+
+    if not valid_items:
+        return {}
+
+    results: dict = {}
+    batch_job_name = ""
+
+    # 1. Submit cohort via Gemini Batch API (50% cost discount)
+    try:
+        batch_job = client.batches.create(
+            model=model_name,
+            src=inline_requests,
+            config={"display_name": f"moatnomics-{edition_label}"},
+        )
+        batch_job_name = getattr(batch_job, "name", "") or ""
+        logger.info(
+            "Submitted Gemini Batch API job '%s' for %d stocks (model=%s)",
+            batch_job_name,
+            len(valid_items),
+            model_name,
+        )
+
+        deadline = time.monotonic() + max(0, poll_timeout_seconds)
+        while batch_job_name:
+            state_obj = getattr(batch_job, "state", None)
+            state_name = getattr(state_obj, "name", None) or str(state_obj or "")
+            if state_name == "JOB_STATE_SUCCEEDED":
+                dest = getattr(batch_job, "dest", None)
+                inlined = getattr(dest, "inlined_responses", None) or []
+                for idx, inline_resp in enumerate(inlined):
+                    if idx >= len(valid_items):
+                        break
+                    t_sym, s_data, _, _ = valid_items[idx]
+                    resp_obj = getattr(inline_resp, "response", None)
+                    txt = getattr(resp_obj, "text", None) if resp_obj else None
+                    if txt and len(str(txt).strip()) >= 500:
+                        scrip = str(s_data.get("scrip_code") or "").strip()
+                        cites = []
+                        if scrip and scrip.isdigit():
+                            cites.append({
+                                "title": f"BSE Corporate Announcements & Disclosures ({t_sym})",
+                                "uri": f"https://www.bseindia.com/stock-share-price/-/{scrip}/corporate-announcements/",
+                                "source_type": "BSE Official Regulatory Filing",
+                            })
+                        results[t_sym] = {
+                            "report_text": str(txt).strip(),
+                            "citations": cites,
+                            "tier": "GEMINI_BATCH_API_50PCT_DISCOUNT",
+                            "batch_job_name": batch_job_name,
+                        }
+                break
+            if state_name in ("JOB_STATE_FAILED", "JOB_STATE_CANCELLED", "JOB_STATE_EXPIRED"):
+                logger.warning("Gemini Batch job '%s' ended with state %s", batch_job_name, state_name)
+                break
+            if time.monotonic() >= deadline:
+                logger.info(
+                    "Gemini Batch job '%s' still %s after %ds poll window; completing remaining via Flex 50%% tier.",
+                    batch_job_name,
+                    state_name,
+                    poll_timeout_seconds,
+                )
+                break
+            time.sleep(max(1, poll_interval_seconds))
+            batch_job = client.batches.get(name=batch_job_name)
+    except Exception as batch_err:
+        logger.warning("Gemini Batch API submission/polling notice: %s. Falling back to Flex 50%% tier.", batch_err)
+
+    # 2. Complete any remaining stocks via Gemini Flex Inference (service_tier="flex", 50% cost discount)
+    for t_sym, s_data, u_prompt, s_inst in valid_items:
+        if t_sym in results:
+            continue
+        try:
+            tools_list = [{"google_search": {}}] if use_grounding else None
+            sys_full = (
+                s_inst + "\n- Search recent BSE/NSE disclosures and concalls from the past 90-180 days."
+                if use_grounding
+                else s_inst
+            )
+            resp = client.models.generate_content(
+                model=model_name,
+                contents=u_prompt,
+                config=genai.types.GenerateContentConfig(
+                    system_instruction=sys_full,
+                    tools=tools_list,
+                    temperature=0.2,
+                    service_tier="flex",
+                ),
+            )
+            txt = getattr(resp, "text", None) or ""
+            if len(txt.strip()) >= 500:
+                scrip = str(s_data.get("scrip_code") or "").strip()
+                cites = []
+                if scrip and scrip.isdigit():
+                    cites.append({
+                        "title": f"BSE Corporate Announcements & Disclosures ({t_sym})",
+                        "uri": f"https://www.bseindia.com/stock-share-price/-/{scrip}/corporate-announcements/",
+                        "source_type": "BSE Official Regulatory Filing",
+                    })
+                results[t_sym] = {
+                    "report_text": txt.strip(),
+                    "citations": cites,
+                    "tier": "GEMINI_FLEX_50PCT_DISCOUNT",
+                    "batch_job_name": batch_job_name,
+                }
+        except Exception as flex_err:
+            logger.debug("Gemini Flex tier notice for %s: %s", t_sym, flex_err)
+
+    return results
+
 

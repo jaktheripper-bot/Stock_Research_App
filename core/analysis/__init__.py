@@ -45,6 +45,7 @@ from core.analysis.dossier_report_synthesis import (
     stream_gemini_ungrounded_bypass,
     stream_stock_report,
     generate_stock_report,
+    synthesize_batch_stock_reports,
     _DISCOVERED_MODELS_CACHE,
 )
 

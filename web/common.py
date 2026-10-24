@@ -271,11 +271,11 @@ def _validate_user_session_token(token: Optional[str]) -> Optional[Dict[str, Any
 
 
 def _get_current_web_user(request: Request) -> Optional[Dict[str, Any]]:
-    """Retrieves authenticated web user from signed cookie or Bearer header."""
+    """Retrieves authenticated web user from signed session cookie, Supabase JWT cookie, or Bearer header."""
     override = _get_override_fn("web.main", "_get_current_web_user", None)
     if override is not None and override is not _get_current_web_user:
         return override(request)
-    token = request.cookies.get(USER_SESSION_COOKIE)
+    token = request.cookies.get(USER_SESSION_COOKIE) or request.cookies.get("sb-access-token")
     if not token:
         auth_header = request.headers.get("authorization", "")
         if auth_header.lower().startswith("bearer "):
@@ -285,6 +285,13 @@ def _get_current_web_user(request: Request) -> Optional[Dict[str, Any]]:
         user = get_user_by_email(session["email"])
         if user:
             return user
+    if token and token.count(".") == 2:
+        from core.auth.supabase_auth import verify_supabase_access_token
+        v_email, _ = verify_supabase_access_token(token)
+        if v_email:
+            user = get_user_by_email(v_email)
+            if user:
+                return user
     return None
 
 

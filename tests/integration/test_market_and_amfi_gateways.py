@@ -144,6 +144,99 @@ class TestAngelOneGateway(unittest.TestCase):
         self.assertIn("Accumulation", badge)
         self.assertIn("Circuit Bands", badge)
 
+    def test_angel_one_eod_summary_from_historical_candles(self):
+        with patch.object(AngelOneGateway, "get_historical_candles", return_value=_candles(100)):
+            eod = AngelOneGateway.get_eod_summary("INFY")
+            self.assertIsNotNone(eod)
+            self.assertEqual(eod["source"], "Angel One SmartAPI EOD Candles")
+            self.assertGreater(eod["current_price"], 100.0)
+            self.assertGreaterEqual(eod["52w_high"], eod["current_price"])
+            self.assertLessEqual(eod["52w_low"], eod["current_price"])
+            self.assertIsNotNone(eod["dma_50"])
+            self.assertIsNotNone(eod["dma_200"])
+
+    @patch("requests.post")
+    def test_angel_one_search_scrip_token_dynamic_resolution(self, mock_post):
+        AngelOneGateway._DYNAMIC_TOKEN_CACHE.pop("COFORGE", None)
+        mock_resp = MagicMock()
+        mock_resp.status_code = 200
+        mock_resp.json.return_value = {
+            "status": True,
+            "data": [{"exchange": "NSE", "tradingsymbol": "COFORGE-EQ", "symboltoken": "11543"}],
+        }
+        mock_post.return_value = mock_resp
+        with patch.object(AngelOneGateway, "authenticate", return_value="jwt_test_token"):
+            res = AngelOneGateway.search_scrip_token("COFORGE")
+            self.assertEqual(res, ("NSE", "11543"))
+            self.assertEqual(AngelOneGateway._DYNAMIC_TOKEN_CACHE.get("COFORGE"), ("NSE", "11543"))
+
+    def test_gemini_batch_api_synthesis_and_flex_fallback(self):
+        from core.analysis.dossier_report_synthesis import synthesize_batch_stock_reports
+        sample_report = "# Equity Research Dossier: Infosys (INFY)\n" + ("Detailed 7-Pillar institutional analysis. " * 25)
+
+        mock_inline_resp = MagicMock()
+        mock_inline_resp.response.text = sample_report
+        mock_batch_job = MagicMock()
+        mock_batch_job.name = "batches/test-job-123"
+        mock_batch_job.state.name = "JOB_STATE_SUCCEEDED"
+        mock_batch_job.dest.inlined_responses = [mock_inline_resp]
+
+        mock_client = MagicMock()
+        mock_client.batches.create.return_value = mock_batch_job
+
+        with patch("core.config.get_secret", return_value="AIzaSyTestBatchApiKey1234567890"), \
+             patch("core.analysis.dossier_report_synthesis.genai.Client", return_value=mock_client), \
+             patch("core.analysis.dossier_report_synthesis.get_latest_flash_models", return_value=["gemini-3.8-flash"]), \
+             patch("core.analysis.dossier_report_synthesis.pass_pre_screening_gates", return_value=(True, "OK")):
+            res = synthesize_batch_stock_reports(
+                [{"ticker": "INFY", "stock_data": {"ticker": "INFY", "short_name": "Infosys", "scrip_code": "500209"}}],
+                poll_timeout_seconds=5,
+                edition_label="unit-test",
+            )
+            self.assertIn("INFY", res)
+            self.assertEqual(res["INFY"]["tier"], "GEMINI_BATCH_API_50PCT_DISCOUNT")
+            self.assertEqual(res["INFY"]["batch_job_name"], "batches/test-job-123")
+            self.assertGreaterEqual(len(res["INFY"]["report_text"]), 500)
+
+    @patch("requests.post")
+    def test_perplexity_sonar_failover_chat_completions(self, mock_post):
+        from core.analysis.dossier_report_synthesis import stream_perplexity_fallback
+
+        resp_fail = MagicMock()
+        resp_fail.status_code = 404
+        resp_sonar = MagicMock()
+        resp_sonar.status_code = 200
+        resp_sonar.json.return_value = {
+            "choices": [{"message": {"content": "Perplexity Sonar grounded synthesis output."}}],
+            "citations": ["https://www.bseindia.com/filing/123"],
+        }
+        mock_post.side_effect = [resp_fail, resp_fail, resp_sonar]
+
+        cites = []
+        with patch("core.config.get_secret", return_value="pplx-test-key-12345"):
+            chunks = list(stream_perplexity_fallback("Analyze INFY", "System prompt", collected_citations=cites))
+        self.assertEqual("".join(chunks), "Perplexity Sonar grounded synthesis output.")
+        self.assertEqual(len(cites), 1)
+        self.assertEqual(cites[0]["uri"], "https://www.bseindia.com/filing/123")
+
+    @patch("requests.post")
+    def test_standardized_supabase_auth_otp_verification(self, mock_post):
+        from core.auth.supabase_auth import verify_supabase_otp_token
+        mock_resp = MagicMock()
+        mock_resp.status_code = 200
+        mock_resp.json.return_value = {
+            "access_token": "sb.jwt.token",
+            "user": {"email": "investor@moatnomics.com", "user_metadata": {"full_name": "Rahul Sharma"}},
+        }
+        mock_post.return_value = mock_resp
+
+        with patch.dict(os.environ, {"TESTING": "0", "SUPABASE_URL": "https://omswdxrtzrvlszkidssh.supabase.co", "SUPABASE_ANON_KEY": "anon_test_key"}):
+            ok, v_email, v_name, tok = verify_supabase_otp_token("investor@moatnomics.com", "654321")
+            self.assertTrue(ok)
+            self.assertEqual(v_email, "investor@moatnomics.com")
+            self.assertEqual(v_name, "Rahul Sharma")
+            self.assertEqual(tok, "sb.jwt.token")
+
 
 # ==============================================================================
 # 2. yfinance Opt-in & Fallback Verification

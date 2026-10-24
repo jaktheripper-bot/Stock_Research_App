@@ -200,6 +200,32 @@ def enrich_fundamentals(ticker: str, data: dict) -> dict:
     except Exception as cache_err:
         logger.debug(f"Localized fundamentals cache enrichment notice for {clean_sym}: {cache_err}")
 
+    # 1.5. Exchange EOD Enrichment via Angel One SmartAPI Historical Candles (before yfinance)
+    if os.environ.get("TESTING") != "1":
+        try:
+            from core.ingestion.angel_one import AngelOneGateway
+            if AngelOneGateway.is_configured() and (
+                data.get("current_price") in [None, "N/A", 0, 0.0]
+                or data.get("52w_high") in [None, "N/A", 0, 0.0]
+                or data.get("fifty_two_week_high") in [None, "N/A", 0, 0.0]
+            ):
+                eod = AngelOneGateway.get_eod_summary(clean_sym)
+                if eod:
+                    if data.get("current_price") in [None, "N/A", 0, 0.0] and eod.get("current_price"):
+                        data["current_price"] = eod["current_price"]
+                    if data.get("fifty_two_week_high") in [None, "N/A", 0, 0.0] and eod.get("52w_high"):
+                        data["fifty_two_week_high"] = eod["52w_high"]
+                        data["52w_high"] = eod["52w_high"]
+                    if data.get("fifty_two_week_low") in [None, "N/A", 0, 0.0] and eod.get("52w_low"):
+                        data["fifty_two_week_low"] = eod["52w_low"]
+                        data["52w_low"] = eod["52w_low"]
+                    if eod.get("dma_50"):
+                        data["dma_50"] = eod["dma_50"]
+                    if eod.get("dma_200"):
+                        data["dma_200"] = eod["dma_200"]
+        except Exception as ao_eod_err:
+            logger.debug(f"Angel One EOD candle enrichment notice for {clean_sym}: {ao_eod_err}")
+
     # 2. Secondary enrichment: yfinance backfill
     try:
         yf_ticker = f"{clean_sym}.BO" if clean_sym.isdigit() else f"{clean_sym}.NS"
@@ -598,13 +624,12 @@ def get_stock_fundamentals(query: str) -> dict:
     canonical = resolve_canonical_symbol(query) or clean
     scrip = resolve_bse_scrip_code(query) or resolve_bse_scrip_code(canonical)
     
-    # 0. Primary Tier: Angel One SmartAPI (Exchange Audited Quote & Level-2 Depth)
+    # 0. Primary Tier: Angel One SmartAPI (Exchange Audited Quote, Level-2 Depth & EOD Candles)
     try:
         from core.ingestion.angel_one import AngelOneGateway
         if AngelOneGateway.is_configured():
             quote = AngelOneGateway.get_stock_quote(canonical or clean)
             if quote and quote.get("ltp"):
-
                 res_dict = {
                     "ticker": canonical or clean,
                     "short_name": canonical or clean,
@@ -620,6 +645,33 @@ def get_stock_fundamentals(query: str) -> dict:
                     "lower_circuit": quote.get("lower_circuit", 0.0),
                     "description": f"Live exchange feed for {clean}.",
                     "exchange_status": "Active / Primary (Exchange Feed)",
+                    "is_fallback": False,
+                }
+                res_dict = _enrich_with_cached_db_fundamentals(res_dict, canonical or clean)
+                _FUNDAMENTALS_CACHE[clean] = (now, res_dict)
+                _FUNDAMENTALS_CACHE[canonical] = (now, res_dict)
+                return res_dict
+
+            # Off-market hours fallback via Angel One SmartAPI EOD Historical Candles
+            eod = AngelOneGateway.get_eod_summary(canonical or clean)
+            if eod and eod.get("current_price"):
+                res_dict = {
+                    "ticker": canonical or clean,
+                    "short_name": canonical or clean,
+                    "sector": "General Industry",
+                    "industry": "Diversified",
+                    "market_cap": "N/A",
+                    "pe_ratio": resolve_pe_with_failsafes(canonical or clean, scrip or ""),
+                    "current_price": round(float(eod["current_price"]), 2),
+                    "52w_high": round(float(eod.get("52w_high", 0)), 2),
+                    "52w_low": round(float(eod.get("52w_low", 0)), 2),
+                    "dma_50": eod.get("dma_50"),
+                    "dma_200": eod.get("dma_200"),
+                    "order_imbalance_ratio": 0.0,
+                    "upper_circuit": 0.0,
+                    "lower_circuit": 0.0,
+                    "description": f"Exchange EOD historical candle feed for {clean}.",
+                    "exchange_status": "Active / Primary (SmartAPI EOD Candles)",
                     "is_fallback": False,
                 }
                 res_dict = _enrich_with_cached_db_fundamentals(res_dict, canonical or clean)

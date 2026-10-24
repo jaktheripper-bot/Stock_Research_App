@@ -140,7 +140,19 @@ def create_email_otp(email: str) -> Tuple[bool, str, Optional[str]]:
         logger.info(f"Generated secure OTP for {clean_email}")
 
         if os.environ.get("TESTING") != "1":
-            send_otp_email(clean_email, code, ttl_minutes=OTP_TTL_MINUTES)
+            # Primary: Standardized Supabase GoTrue Auth OTP / Magic Link dispatch
+            sb_dispatched = False
+            try:
+                from core.auth.supabase_auth import send_magic_link
+                canonical = (os.environ.get("CANONICAL_DOMAIN") or "https://moatnomics.com").rstrip("/")
+                sb_ok, _ = send_magic_link(clean_email, redirect_uri=f"{canonical}/auth/callback")
+                if sb_ok:
+                    sb_dispatched = True
+            except Exception as sb_err:
+                logger.debug(f"Supabase GoTrue OTP dispatch fallback notice for {clean_email}: {sb_err}")
+
+            if not sb_dispatched:
+                send_otp_email(clean_email, code, ttl_minutes=OTP_TTL_MINUTES)
 
         return True, "Verification code sent successfully to your email.", code
     except Exception as e:
@@ -209,7 +221,18 @@ def verify_email_otp(email: str, code: str) -> Tuple[bool, str]:
             _delete_otp(clean_email)
             return False, "Verification code has expired. Please request a new code."
 
-        # 3. Check hash
+        # 3. Primary: Standardized Supabase GoTrue OTP verification (in production)
+        if os.environ.get("TESTING") != "1":
+            try:
+                from core.auth.supabase_auth import verify_supabase_otp_token
+                sb_valid, _, _, _ = verify_supabase_otp_token(clean_email, clean_code)
+                if sb_valid:
+                    _delete_otp(clean_email)
+                    return True, "Code verified successfully."
+            except Exception as sb_v_err:
+                logger.debug(f"Supabase GoTrue OTP verification fallback notice for {clean_email}: {sb_v_err}")
+
+        # 4. Secondary / Local Hash Verification
         expected_hash = _hash_otp(clean_email, clean_code)
         if secrets.compare_digest(stored_hash, expected_hash):
             _delete_otp(clean_email)
