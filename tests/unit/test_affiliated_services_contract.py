@@ -5,6 +5,7 @@ Unit tests for Affiliated External Services Health Matrix and Contracts.
 ==============================================================================
 """
 
+import os
 import unittest
 from unittest.mock import patch, MagicMock
 
@@ -45,10 +46,19 @@ class TestAffiliatedServicesContract(unittest.TestCase):
 
     @patch("scripts.check_affiliated_services.get_secret")
     def test_check_angel_one_configured(self, mock_secret):
+        # 1. With SmartAPI proxy configured
+        mock_secret.side_effect = lambda k: "mock_value" if ("ANGEL_ONE" in k or k == "SMARTAPI_PROXY_URL") else ""
+        with patch.dict(os.environ, {"SMARTAPI_PROXY_URL": "http://mock-proxy:8888"}):
+            res = check_angel_one()
+            self.assertEqual(res["status"], "HEALTHY")
+            self.assertIn("Selective AWS Proxy Active", res["details"])
+
+        # 2. Direct egress fallback when proxy is unconfigured
         mock_secret.side_effect = lambda k: "mock_value" if "ANGEL_ONE" in k else ""
-        res = check_angel_one()
-        self.assertEqual(res["status"], "HEALTHY")
-        self.assertIn("Selective AWS Proxy Active", res["details"])
+        with patch.dict(os.environ, {}, clear=True):
+            res = check_angel_one()
+            self.assertEqual(res["status"], "HEALTHY")
+            self.assertIn("Direct Egress", res["details"])
 
     @patch("scripts.check_affiliated_services.get_secret")
     def test_check_gemini_ai_configured(self, mock_secret):

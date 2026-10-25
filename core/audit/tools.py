@@ -90,7 +90,6 @@ def tool_run_test_suite(quick: bool = False) -> Dict[str, Any]:
         test_env["SKIP_DOTENV_IN_SUBPROCESS"] = "1"
         test_env["AUDIT_RECURSION_GUARD"] = "1"
         test_env["ADMIN_PASSWORD"] = "test_admin_pwd_default"
-        test_env["ENVIRONMENT"] = "test"
 
         proc = subprocess.run(
             cmd,
