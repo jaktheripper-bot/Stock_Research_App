@@ -19,7 +19,31 @@ from typing import Optional, List, Dict, Any, Tuple
 import certifi
 
 from core.config import get_secret
-from core.db.connection import get_db_connection, get_supabase_url, is_postgres_connection, is_postgres_active
+from core.db.connection import get_db_connection, get_supabase_url, is_postgres_connection, is_postgres_active, IST
+
+def format_audit_timestamp_ist(raw_ts: Any) -> str:
+    """Formats an audit UTC timestamp (ISO string, datetime, or SQLite text) into IST 'YYYY-MM-DD HH:MM IST'."""
+    if not raw_ts:
+        return "—"
+    try:
+        from datetime import timezone
+        if isinstance(raw_ts, datetime):
+            dt = raw_ts if raw_ts.tzinfo else raw_ts.replace(tzinfo=timezone.utc)
+            return dt.astimezone(IST).strftime("%Y-%m-%d %H:%M IST")
+
+        s = str(raw_ts).strip()
+        if not s:
+            return "—"
+        iso_str = s.replace(" ", "T")
+        if not iso_str.endswith("Z") and "+" not in iso_str and "-" not in iso_str[10:]:
+            iso_str += "+00:00"
+        elif iso_str.endswith("Z"):
+            iso_str = iso_str[:-1] + "+00:00"
+        dt = datetime.fromisoformat(iso_str)
+        return dt.astimezone(IST).strftime("%Y-%m-%d %H:%M IST")
+    except Exception as e:
+        logger.debug("Failed converting audit timestamp '%s' to IST: %s", raw_ts, e)
+        return str(raw_ts)[:16]
 
 def is_supabase_enabled() -> bool:
     return bool((get_supabase_url() and is_postgres_active()) or _get_supabase_rest_credentials())
@@ -324,6 +348,11 @@ def clean_audit_row(cursor, row: Any) -> Dict[str, Any]:
             d[k] = float(v)
         elif isinstance(v, (datetime, date)):
             d[k] = str(v)
+
+    if "created_at" in d and d["created_at"]:
+        d["created_at_raw"] = str(d["created_at"])
+        d["created_at_ist"] = format_audit_timestamp_ist(d["created_at"])
+        d["created_at"] = d["created_at_ist"]
 
     for json_field, target_field in [
         ("critical_violations_json", "critical_violations"),

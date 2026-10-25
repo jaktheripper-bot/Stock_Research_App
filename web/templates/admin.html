@@ -296,16 +296,18 @@
   white-space: nowrap;
 }
 .admin-table.tickets-table .col-created {
-  width: 120px;
-  min-width: 120px;
-  max-width: 120px;
-  white-space: nowrap;
+  width: 140px;
+  min-width: 135px;
+  max-width: 155px;
+  white-space: normal;
+  line-height: 1.35;
 }
 .admin-table.tickets-table .col-user {
   width: 170px;
   min-width: 150px;
-  max-width: 180px;
+  max-width: 190px;
   white-space: normal;
+  padding-left: 14px;
 }
 .admin-table.tickets-table .col-category {
   width: 95px;
@@ -1627,7 +1629,7 @@ html[data-theme="light"] .copilot-input {
         <table class="admin-table tickets-table" id="activeTicketsTable">
           <colgroup>
             <col class="col-ticket" style="width: 110px;">
-            <col class="col-created" style="width: 120px;">
+            <col class="col-created" style="width: 140px;">
             <col class="col-user" style="width: 170px;">
             <col class="col-category" style="width: 95px;">
             <col class="col-subject" style="width: auto;">
@@ -1637,7 +1639,7 @@ html[data-theme="light"] .copilot-input {
           <thead>
             <tr>
               <th class="col-ticket">Ticket ID</th>
-              <th class="col-created">Created</th>
+              <th class="col-created">Created (IST)</th>
               <th class="col-user">User</th>
               <th class="col-category">Category</th>
               <th class="col-subject">Subject &amp; Inquiry</th>
@@ -1649,7 +1651,15 @@ html[data-theme="light"] .copilot-input {
             {% for t in active_tickets_list %}
             <tr id="ticket-row-{{ t.ticket_id }}" data-ticket-id="{{ t.ticket_id }}" data-status="{{ t.status }}" data-category="{{ t.category }}" data-email="{{ t.user_email }}" data-name="{{ t.user_name or 'User' }}" data-created="{{ t.created_at_raw or t.created_at }}">
               <td class="col-ticket mono" style="font-weight: 700; color: var(--accent-cyan, #0ea5e9);">{{ t.ticket_id }}</td>
-              <td class="col-created mono" style="font-size: 11px;">{{ t.created_at }}</td>
+              <td class="col-created mono" style="font-size: 11px; line-height: 1.35; white-space: normal;">
+                {% if ', ' in t.created_at %}
+                  {% set dt_parts = t.created_at.split(', ') %}
+                  <div style="font-weight: 600; white-space: nowrap;">{{ dt_parts[0] }}</div>
+                  <div style="font-size: 10px; color: var(--text-secondary, #94a3b8); white-space: nowrap;">{{ dt_parts[1] }}</div>
+                {% else %}
+                  <div style="white-space: nowrap;">{{ t.created_at }}</div>
+                {% endif %}
+              </td>
               <td class="col-user">
                 <div class="ticket-user-name" title="{{ t.user_name or 'User' }}">{{ t.user_name or 'User' }}</div>
                 <div class="ticket-user-email" title="{{ t.user_email }}">{{ t.user_email }}</div>
@@ -1762,7 +1772,7 @@ html[data-theme="light"] .copilot-input {
         <table class="admin-table tickets-table" id="archivedTicketsTable">
           <colgroup>
             <col class="col-ticket" style="width: 110px;">
-            <col class="col-created" style="width: 120px;">
+            <col class="col-created" style="width: 140px;">
             <col class="col-user" style="width: 170px;">
             <col class="col-category" style="width: 95px;">
             <col class="col-subject" style="width: auto;">
@@ -1772,7 +1782,7 @@ html[data-theme="light"] .copilot-input {
           <thead>
             <tr>
               <th class="col-ticket">Ticket ID</th>
-              <th class="col-created">Created</th>
+              <th class="col-created">Created (IST)</th>
               <th class="col-user">User</th>
               <th class="col-category">Category</th>
               <th class="col-subject">Subject &amp; Resolution Summary</th>
@@ -1784,7 +1794,15 @@ html[data-theme="light"] .copilot-input {
             {% for t in archived_tickets_list %}
             <tr id="ticket-row-{{ t.ticket_id }}" data-ticket-id="{{ t.ticket_id }}" data-status="{{ t.status }}" data-category="{{ t.category }}" data-email="{{ t.user_email }}" data-name="{{ t.user_name or 'User' }}" data-created="{{ t.created_at_raw or t.created_at }}">
               <td class="col-ticket mono" style="font-weight: 700; color: var(--accent-cyan, #0ea5e9);">{{ t.ticket_id }}</td>
-              <td class="col-created mono" style="font-size: 11px;">{{ t.created_at }}</td>
+              <td class="col-created mono" style="font-size: 11px; line-height: 1.35; white-space: normal;">
+                {% if ', ' in t.created_at %}
+                  {% set dt_parts = t.created_at.split(', ') %}
+                  <div style="font-weight: 600; white-space: nowrap;">{{ dt_parts[0] }}</div>
+                  <div style="font-size: 10px; color: var(--text-secondary, #94a3b8); white-space: nowrap;">{{ dt_parts[1] }}</div>
+                {% else %}
+                  <div style="white-space: nowrap;">{{ t.created_at }}</div>
+                {% endif %}
+              </td>
               <td class="col-user">
                 <div class="ticket-user-name" title="{{ t.user_name or 'User' }}">{{ t.user_name or 'User' }}</div>
                 <div class="ticket-user-email" title="{{ t.user_email }}">{{ t.user_email }}</div>
@@ -4743,11 +4761,17 @@ html[data-theme="light"] .copilot-input {
     const safeName = escapeHtmlText(t.user_name || 'User');
     const safeEmail = escapeHtmlText(t.user_email || '');
     const safeCat = escapeHtmlText(t.category || 'general');
+    const rawCreated = escapeHtmlText(t.created_at || '');
+    let createdHtml = `<div style="white-space: nowrap;">${rawCreated}</div>`;
+    if (rawCreated.includes(', ')) {
+      const createdParts = rawCreated.split(', ');
+      createdHtml = `<div style="font-weight: 600; white-space: nowrap;">${createdParts[0]}</div><div style="font-size: 10px; color: var(--text-secondary, #94a3b8); white-space: nowrap;">${createdParts.slice(1).join(', ')}</div>`;
+    }
 
     return `
       <tr id="ticket-row-${tid}" data-ticket-id="${tid}" data-status="${status}" data-category="${safeCat}" data-email="${safeEmail}" data-name="${safeName}" data-created="${escapeHtmlText(t.created_at_raw || t.created_at || '')}">
         <td class="col-ticket mono" style="font-weight: 700; color: var(--accent-cyan, #0ea5e9);">${tid}</td>
-        <td class="col-created mono" style="font-size: 11px;">${escapeHtmlText(t.created_at || '')}</td>
+        <td class="col-created mono" style="font-size: 11px; line-height: 1.35; white-space: normal;">${createdHtml}</td>
         <td class="col-user">
           <div class="ticket-user-name" title="${safeName}">${safeName}</div>
           <div class="ticket-user-email" title="${safeEmail}">${safeEmail}</div>
