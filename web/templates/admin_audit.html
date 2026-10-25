@@ -362,6 +362,12 @@ async function triggerAudit(useAi) {
         }
 
         if (!resp.ok) {
+            if (resp.status === 401 || resp.status === 403) {
+                if (confirm("Your administrative session has expired. Would you like to re-authenticate at the Admin Portal now?")) {
+                    window.location.href = "/admin?next=" + encodeURIComponent(window.location.pathname);
+                    return;
+                }
+            }
             const errorMsg = (data && (data.detail || data.error || data.message))
                 || (rawText ? rawText.slice(0, 200) : `HTTP ${resp.status} ${resp.statusText || 'Error'}`);
             alert("Audit execution error: " + errorMsg);
@@ -422,6 +428,15 @@ async function triggerAudit(useAi) {
                 }
 
                 if (!pollResp.ok) {
+                    if (pollResp.status === 401 || pollResp.status === 403) {
+                        clearInterval(pollInterval);
+                        alert("Administrative session expired during audit run. Please re-authenticate at /admin.");
+                        btnQuick.disabled = false;
+                        btnFull.disabled = false;
+                        btnQuick.style.opacity = "1";
+                        btnFull.style.opacity = "1";
+                        alertBox.style.display = "none";
+                    }
                     return;
                 }
 

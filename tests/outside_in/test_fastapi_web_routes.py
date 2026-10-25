@@ -545,7 +545,7 @@ Detailed forensic analysis with exact page grounding to bseindia.com filings.
     def _get_authenticated_admin_client(self):
         from core.db.admin import get_admin_user
         from core.auth.totp import get_totp_code
-        admin_pwd = os.environ.get("ADMIN_PASSWORD", "test_admin_pwd_default")
+        admin_pwd = (os.environ.get("ADMIN_PASSWORD") or "test_admin_pwd_default").strip()
         client = TestClient(app)
         res_verify = client.post(
             "/admin/auth/direct-verify",
@@ -579,7 +579,7 @@ Detailed forensic analysis with exact page grounding to bseindia.com filings.
         self.assertIn("Sign In with Google", res.text)
 
     def test_admin_login_invalid_user(self):
-        admin_pwd = os.environ.get("ADMIN_PASSWORD", "test_admin_pwd_default")
+        admin_pwd = (os.environ.get("ADMIN_PASSWORD") or "test_admin_pwd_default").strip()
         res = self.client.post(
             "/admin/auth/direct-verify",
             data={"email": "unauthorized_user@example.com", "password": admin_pwd},

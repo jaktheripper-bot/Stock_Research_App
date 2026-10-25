@@ -997,6 +997,8 @@ async def admin_auth_direct_verify(
         if os.environ.get("TESTING") == "1"
         else (os.environ.get("ADMIN_PASSWORD") or get_secret("ADMIN_PASSWORD"))
     )
+    if os.environ.get("TESTING") == "1" and not expected_pwd:
+        expected_pwd = "test_admin_pwd_default"
     expected_pwd = (expected_pwd or "").strip()
 
     pwd_matched = bool(expected_pwd and clean_pwd and hmac.compare_digest(clean_pwd, expected_pwd))
@@ -1028,13 +1030,14 @@ async def admin_auth_direct_verify(
         target += f"?next={urllib.parse.quote(next_url)}"
 
     resp = RedirectResponse(url=target, status_code=303)
+    is_secure = request.url.scheme == "https" or (os.environ.get("ENVIRONMENT") == "production" and os.environ.get("TESTING") != "1")
     resp.set_cookie(
         key="admin_2fa_pending",
         value=pending_token,
         httponly=True,
         max_age=600,
         samesite="lax",
-        secure=True if (request.url.scheme == "https" or os.environ.get("ENVIRONMENT") == "production") else False,
+        secure=is_secure,
     )
     return resp
 

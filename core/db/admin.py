@@ -126,17 +126,14 @@ def get_admin_user(email: str) -> Optional[Dict[str, Any]]:
                         """,
                         (admin_id, clean_email)
                     )
+                else:
                     cursor.execute(
                         f"""
-                        INSERT INTO admin_users (id, email, role, totp_enabled)
-                        VALUES ({p}, {p}, 'owner', 0)
-                        ON CONFLICT (email) DO NOTHING;
+                        INSERT INTO admin_users (id, email, role, totp_enabled, created_at, updated_at)
+                        VALUES ({p}, {p}, 'owner', 0, datetime('now'), datetime('now'))
+                        ON CONFLICT (email) DO UPDATE SET role = 'owner';
                         """,
                         (admin_id, clean_email)
-                    )
-                    cursor.execute(
-                        f"UPDATE admin_users SET role = 'owner' WHERE LOWER(email) = LOWER({p});",
-                        (clean_email,)
                     )
                 conn.commit()
 
