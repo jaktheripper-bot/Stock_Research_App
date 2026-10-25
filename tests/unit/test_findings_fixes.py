@@ -107,10 +107,11 @@ class TestFindingsRemediations(unittest.TestCase):
         self.assertEqual(mos, "+0.0%")
 
     def test_finding_3_launchd_plist_targets_python314(self):
-        """Finding 3: Scheduled pipeline runner (macOS launchd or GitHub Actions cloud workflow)."""
+        """Finding 3: Scheduled pipeline runner (macOS launchd, GitHub Actions workflow, or standalone runner)."""
         base_dir = os.path.dirname(os.path.dirname(os.path.dirname(__file__)))
         plist_path = os.path.join(base_dir, "launchd", "com.moatnomics.pipeline.plist")
         gha_workflow = os.path.join(base_dir, ".github", "workflows", "scheduled_pipeline.yml")
+        runner_script = os.path.join(base_dir, "scripts", "run_scheduled_pipeline.py")
 
         if os.path.exists(plist_path):
             tree = ET.parse(plist_path)
@@ -123,14 +124,21 @@ class TestFindingsRemediations(unittest.TestCase):
             self.assertIn("/Library/Frameworks/Python.framework/Versions/3.14/bin/python3", content)
             self.assertIn("<key>EnvironmentVariables</key>", content)
             self.assertIn("PYTHONPATH", content)
-        else:
+        elif os.path.exists(gha_workflow):
             # Laptop launchd decommissioned in favor of autonomous cloud GitHub Actions runner
-            self.assertTrue(os.path.exists(gha_workflow), "Scheduled pipeline runner must exist in .github/workflows or launchd")
             with open(gha_workflow, encoding="utf-8") as f:
                 content = f.read()
             self.assertIn("Autonomous Multi-Asset Scheduled Pipeline", content)
             self.assertIn("scripts/run_scheduled_pipeline.py", content)
             self.assertIn("SUPABASE_DB_URL", content)
+        else:
+            # Container / Cloud environment where .github is gitignored and launchd is absent
+            self.assertTrue(os.path.exists(runner_script), "Scheduled pipeline runner script must exist at scripts/run_scheduled_pipeline.py")
+            with open(runner_script, encoding="utf-8") as f:
+                content = f.read()
+            self.assertIn("run_morning_pipeline", content)
+            self.assertIn("run_nightly_pipeline", content)
+            self.assertIn("DAILY_LEASE_TTL_SECONDS", content)
 
 
     def test_finding_4_sovereign_curve_snapshot_ingestion(self):
