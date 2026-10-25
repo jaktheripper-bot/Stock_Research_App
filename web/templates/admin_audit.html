@@ -479,5 +479,154 @@ async function triggerAudit(useAi) {
 @keyframes spin {
     to { transform: rotate(360deg); }
 }
+
+/* ==============================================================================
+   Admin Audit Console Universal Light Theme Overrides (WCAG AA Compliant)
+   ============================================================================== */
+html[data-theme="light"] .audit-workspace {
+  color: #0B2337;
+}
+
+/* Top Navigation & Return Bar */
+html[data-theme="light"] .audit-workspace div[style*="background: rgba(15, 23, 42, 0.7)" i] {
+  background: #FFFFFF !important;
+  border: 1px solid #DCD6C6 !important;
+  box-shadow: 0 1px 4px rgba(11, 35, 55, 0.04);
+}
+html[data-theme="light"] .audit-workspace a[href="/admin"].btn {
+  background: #F0FDF4 !important;
+  color: #0E3D32 !important;
+  border-color: #0E3D32 !important;
+}
+html[data-theme="light"] .audit-workspace div[style*="color: #94a3b8" i] {
+  color: #46545E !important;
+}
+html[data-theme="light"] .audit-workspace span[style*="color: #38bdf8" i] {
+  color: #0369A1 !important;
+}
+html[data-theme="light"] .audit-workspace a.btn[style*="background: rgba(30, 41, 59, 0.6)" i] {
+  background: #FFFFFF !important;
+  border: 1px solid #CBD5E1 !important;
+  color: #22303A !important;
+  box-shadow: 0 1px 3px rgba(11, 35, 55, 0.04);
+}
+html[data-theme="light"] .audit-workspace a.btn[style*="background: rgba(30, 41, 59, 0.6)" i]:hover {
+  background: #F8FAFC !important;
+  color: #0B2337 !important;
+  border-color: #0E3D32 !important;
+}
+
+/* Operational Tabs Navigation Bar */
+html[data-theme="light"] .audit-workspace .admin-tabs {
+  background: #EFECE2 !important;
+  border: 1px solid #DCD6C6 !important;
+}
+html[data-theme="light"] .audit-workspace .admin-tab-btn {
+  color: #22303A !important;
+}
+html[data-theme="light"] .audit-workspace .admin-tab-btn:hover {
+  color: #0B2337 !important;
+  background: rgba(11, 35, 55, 0.06) !important;
+}
+html[data-theme="light"] .audit-workspace .admin-tab-btn.active {
+  color: #0E3D32 !important;
+  background: #FFFFFF !important;
+  border: 1px solid #CFC8B8 !important;
+  box-shadow: 0 2px 6px rgba(11, 35, 55, 0.08) !important;
+  font-weight: 700;
+}
+
+/* Audit Trigger Action Buttons */
+html[data-theme="light"] #btnRunQuickAudit {
+  background: #FFFFFF !important;
+  border: 1px solid #CBD5E1 !important;
+  color: #0B2337 !important;
+  box-shadow: 0 1px 3px rgba(11, 35, 55, 0.06);
+}
+html[data-theme="light"] #btnRunQuickAudit:hover {
+  background: #F8FAFC !important;
+  border-color: #0E3D32 !important;
+}
+html[data-theme="light"] #btnRunFullAudit {
+  background: #0E3D32 !important;
+  color: #FFFFFF !important;
+  box-shadow: 0 4px 14px rgba(14, 61, 50, 0.25) !important;
+}
+html[data-theme="light"] #btnRunFullAudit:hover {
+  background: #115E38 !important;
+}
+html[data-theme="light"] .audit-workspace span[style*="background: rgba(125, 167, 122" i] {
+  background: rgba(4, 120, 87, 0.12) !important;
+  color: #047857 !important;
+  border-color: rgba(4, 120, 87, 0.3) !important;
+}
+
+/* In-Progress Alert Banner */
+html[data-theme="light"] #auditRunningAlert {
+  background: #F0F9FF !important;
+  border: 1px solid rgba(3, 105, 161, 0.3) !important;
+  color: #0369A1 !important;
+}
+
+/* 4-Card Scorecard Meter Strip & Panels */
+html[data-theme="light"] .audit-workspace div[style*="background: #0f172a" i] {
+  background: #FFFFFF !important;
+  border: 1px solid #DCD6C6 !important;
+  box-shadow: 0 2px 8px rgba(11, 35, 55, 0.04);
+}
+html[data-theme="light"] .audit-workspace div[style*="color: #94a3b8" i],
+html[data-theme="light"] .audit-workspace span[style*="color: #94a3b8" i] {
+  color: #46545E !important;
+}
+html[data-theme="light"] .audit-workspace span[style*="color: #64748b" i],
+html[data-theme="light"] .audit-workspace div[style*="color: #64748b" i] {
+  color: #46545E !important;
+}
+html[data-theme="light"] .audit-workspace h1,
+html[data-theme="light"] .audit-workspace h2,
+html[data-theme="light"] .audit-workspace h3 {
+  color: #0B2337 !important;
+}
+
+/* Pillar Score Values */
+html[data-theme="light"] .audit-workspace span[style*="color: #38bdf8" i] {
+  color: #0369A1 !important;
+}
+html[data-theme="light"] .audit-workspace span[style*="color: #a78bfa" i] {
+  color: #6B21A8 !important;
+}
+html[data-theme="light"] .audit-workspace span[style*="color: #f472b6" i] {
+  color: #9F1239 !important;
+}
+html[data-theme="light"] .audit-workspace span[style*="color: #10b981" i],
+html[data-theme="light"] .audit-workspace span[style*="color: #34d399" i] {
+  color: #047857 !important;
+}
+html[data-theme="light"] .audit-workspace span[style*="color: #fbbf24" i] {
+  color: #B45309 !important;
+}
+
+/* Remediation Checklist Items */
+html[data-theme="light"] .audit-workspace div[style*="background: rgba(30, 41, 59, 0.4)" i] {
+  background: #F8FAFC !important;
+  border: 1px solid #E2DDD0 !important;
+}
+html[data-theme="light"] .audit-workspace span[style*="color: #cbd5e1" i] {
+  color: #0B2337 !important;
+}
+
+/* Audit Run Ledger Table */
+html[data-theme="light"] .audit-workspace table th {
+  background: #EFECE2 !important;
+  color: #22303A !important;
+  border-bottom: 1px solid #DCD6C6 !important;
+}
+html[data-theme="light"] .audit-workspace table td {
+  border-bottom: 1px solid #E2DDD0 !important;
+  color: #0B2337 !important;
+}
+html[data-theme="light"] .audit-workspace table tr:hover {
+  background: #FCFBF8 !important;
+}
 </style>
 {% endblock %}

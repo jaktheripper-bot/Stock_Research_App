@@ -695,6 +695,340 @@ html[data-theme="light"] .dwell-sortable-th:hover {
   opacity: 0.5;
   cursor: not-allowed;
 }
+
+/* ==============================================================================
+   Admin Console Universal Light Theme Overrides (WCAG AA Compliant >= 4.5:1)
+   ============================================================================== */
+html[data-theme="light"] .admin-container {
+  color: #0B2337;
+}
+
+/* Header Bar & Top Controls */
+html[data-theme="light"] .admin-header-bar {
+  border-bottom-color: #DCD6C6;
+}
+html[data-theme="light"] .admin-title-group h1 {
+  color: #0B2337;
+}
+html[data-theme="light"] .admin-title-group p {
+  color: #46545E;
+}
+
+/* Form Controls & Dropdowns */
+html[data-theme="light"] .admin-select,
+html[data-theme="light"] .admin-input {
+  background: #FFFFFF !important;
+  border: 1px solid #CBD5E1 !important;
+  color: #0B2337 !important;
+  box-shadow: 0 1px 3px rgba(11, 35, 55, 0.05);
+}
+html[data-theme="light"] .admin-select:focus,
+html[data-theme="light"] .admin-input:focus {
+  border-color: #0E3D32 !important;
+  outline: 2px solid rgba(14, 61, 50, 0.2) !important;
+}
+
+/* Top Action Badges & Filters */
+html[data-theme="light"] .admin-controls-group > div {
+  background: #FFFFFF !important;
+  border-color: #CBD5E1 !important;
+  box-shadow: 0 1px 3px rgba(11, 35, 55, 0.05);
+}
+html[data-theme="light"] .admin-controls-group span[style*="color: #f8fafc"] {
+  color: #0B2337 !important;
+}
+
+/* Status Pills (Contrast >= 4.5:1 against light surfaces) */
+html[data-theme="light"] .status-pill.success {
+  background: rgba(4, 120, 87, 0.12) !important;
+  color: #047857 !important;
+  border: 1px solid rgba(4, 120, 87, 0.3) !important;
+}
+html[data-theme="light"] .status-pill.warning,
+html[data-theme="light"] .status-pill.in_progress {
+  background: rgba(180, 83, 9, 0.12) !important;
+  color: #B45309 !important;
+  border: 1px solid rgba(180, 83, 9, 0.3) !important;
+}
+html[data-theme="light"] .status-pill.open,
+html[data-theme="light"] .status-pill.danger {
+  background: rgba(185, 28, 28, 0.1) !important;
+  color: #B91C1C !important;
+  border: 1px solid rgba(185, 28, 28, 0.3) !important;
+}
+html[data-theme="light"] .status-pill.closed {
+  background: rgba(70, 84, 94, 0.1) !important;
+  color: #46545E !important;
+  border: 1px solid rgba(70, 84, 94, 0.3) !important;
+}
+html[data-theme="light"] #adminCreditBadge {
+  background: rgba(4, 120, 87, 0.12) !important;
+  color: #047857 !important;
+  border-color: rgba(4, 120, 87, 0.3) !important;
+}
+
+/* Purge & Logout Buttons */
+html[data-theme="light"] button[onclick*="purgeDataModal"] {
+  background: rgba(185, 28, 28, 0.08) !important;
+  border-color: rgba(185, 28, 28, 0.35) !important;
+  color: #B91C1C !important;
+}
+html[data-theme="light"] button[onclick*="purgeDataModal"]:hover {
+  background: rgba(185, 28, 28, 0.15) !important;
+}
+html[data-theme="light"] a[href="/admin/logout"] {
+  background: #FFFFFF !important;
+  border-color: rgba(185, 28, 28, 0.35) !important;
+  color: #B91C1C !important;
+}
+html[data-theme="light"] a[href="/admin/logout"]:hover {
+  background: rgba(185, 28, 28, 0.08) !important;
+}
+
+/* 5 Top Executive KPI Cards */
+html[data-theme="light"] .kpi-card {
+  background: #FFFFFF !important;
+  border: 1px solid #DCD6C6 !important;
+  box-shadow: 0 2px 8px rgba(11, 35, 55, 0.04);
+}
+html[data-theme="light"] .kpi-card:hover {
+  border-color: #0E3D32 !important;
+  box-shadow: 0 6px 16px rgba(11, 35, 55, 0.08);
+}
+html[data-theme="light"] .kpi-label {
+  color: #46545E !important;
+}
+html[data-theme="light"] .kpi-value {
+  color: #0B2337 !important;
+}
+html[data-theme="light"] .kpi-delta {
+  color: #0369A1 !important;
+}
+html[data-theme="light"] .kpi-delta.success {
+  color: #047857 !important;
+}
+html[data-theme="light"] .kpi-delta.warning {
+  color: #B45309 !important;
+}
+html[data-theme="light"] .kpi-delta.danger {
+  color: #B91C1C !important;
+}
+
+/* 4-Card Executive Overview Strip (#adminExecutiveOverview) */
+html[data-theme="light"] #adminExecutiveOverview button[onclick*="billables"] {
+  background: #F0FDF4 !important;
+  border: 1px solid rgba(4, 120, 87, 0.28) !important;
+}
+html[data-theme="light"] #adminExecutiveOverview button[onclick*="billables"] span[style*="color: #6ee7b7" i] {
+  color: #047857 !important;
+}
+html[data-theme="light"] #adminExecutiveOverview button[onclick*="billables"] span[style*="color: #f8fafc" i] {
+  color: #0B2337 !important;
+}
+html[data-theme="light"] #adminExecutiveOverview button[onclick*="billables"] span[style*="color: #94a3b8" i] {
+  color: #46545E !important;
+}
+
+html[data-theme="light"] #adminExecutiveOverview button[onclick*="tickets"] {
+  background: #FFFBEB !important;
+  border: 1px solid rgba(180, 83, 9, 0.28) !important;
+}
+html[data-theme="light"] #adminExecutiveOverview button[onclick*="tickets"] span[style*="color: #fcd34d" i] {
+  color: #B45309 !important;
+}
+html[data-theme="light"] #adminExecutiveOverview button[onclick*="tickets"] span[style*="color: #f8fafc" i] {
+  color: #0B2337 !important;
+}
+html[data-theme="light"] #adminExecutiveOverview button[onclick*="tickets"] span[style*="color: #94a3b8" i] {
+  color: #46545E !important;
+}
+
+html[data-theme="light"] #adminExecutiveOverview button[onclick*="assets"] {
+  background: #F0F9FF !important;
+  border: 1px solid rgba(3, 105, 161, 0.28) !important;
+}
+html[data-theme="light"] #adminExecutiveOverview button[onclick*="assets"] span[style*="color: #7dd3fc" i] {
+  color: #0369A1 !important;
+}
+html[data-theme="light"] #adminExecutiveOverview button[onclick*="assets"] span[style*="color: #34d399" i] {
+  color: #047857 !important;
+}
+html[data-theme="light"] #adminExecutiveOverview button[onclick*="assets"] span[style*="color: #94a3b8" i] {
+  color: #46545E !important;
+}
+
+html[data-theme="light"] #adminExecutiveOverview button[onclick*="users"] {
+  background: #FAF5FF !important;
+  border: 1px solid rgba(107, 33, 168, 0.25) !important;
+}
+html[data-theme="light"] #adminExecutiveOverview button[onclick*="users"] span[style*="color: #d8b4fe" i] {
+  color: #6B21A8 !important;
+}
+html[data-theme="light"] #adminExecutiveOverview button[onclick*="users"] span[style*="color: #f8fafc" i] {
+  color: #0B2337 !important;
+}
+html[data-theme="light"] #adminExecutiveOverview button[onclick*="users"] span[style*="color: #94a3b8" i] {
+  color: #46545E !important;
+}
+
+/* 5-Hub Primary Navigation (.admin-hub-nav) */
+html[data-theme="light"] .admin-hub-btn {
+  background: #FFFFFF !important;
+  border: 1px solid #CBD5E1 !important;
+  color: #22303A !important;
+  box-shadow: 0 1px 4px rgba(11, 35, 55, 0.04);
+}
+html[data-theme="light"] .admin-hub-btn:hover {
+  background: #F8FAFC !important;
+  border-color: #0E3D32 !important;
+  color: #0B2337 !important;
+}
+html[data-theme="light"] .admin-hub-btn .admin-hub-title {
+  color: #0B2337 !important;
+  font-weight: 700;
+}
+html[data-theme="light"] .admin-hub-btn .admin-hub-sub {
+  color: #46545E !important;
+}
+html[data-theme="light"] .admin-hub-btn.active {
+  background: linear-gradient(135deg, #0E3D32 0%, #115E38 100%) !important;
+  border-color: #0E3D32 !important;
+  box-shadow: 0 4px 14px rgba(14, 61, 50, 0.25) !important;
+  color: #FFFFFF !important;
+}
+html[data-theme="light"] .admin-hub-btn.active .admin-hub-title {
+  color: #FFFFFF !important;
+}
+html[data-theme="light"] .admin-hub-btn.active .admin-hub-sub {
+  color: #D1FAE5 !important;
+}
+
+/* Contextual Sub-View Bar (.admin-tabs) */
+html[data-theme="light"] .admin-tabs {
+  background: #EFECE2 !important;
+  border: 1px solid #DCD6C6 !important;
+  box-shadow: inset 0 1px 2px rgba(11, 35, 55, 0.04);
+}
+html[data-theme="light"] #adminActiveHubLabel {
+  color: #46545E !important;
+}
+html[data-theme="light"] .admin-tab-btn {
+  color: #22303A !important;
+  background: transparent !important;
+}
+html[data-theme="light"] .admin-tab-btn:hover {
+  color: #0B2337 !important;
+  background: rgba(11, 35, 55, 0.06) !important;
+}
+html[data-theme="light"] .admin-tab-btn.active {
+  color: #0E3D32 !important;
+  background: #FFFFFF !important;
+  border: 1px solid #CFC8B8 !important;
+  box-shadow: 0 2px 6px rgba(11, 35, 55, 0.08) !important;
+  font-weight: 700;
+}
+html[data-theme="light"] .admin-tabs a[href="/admin/audit"],
+html[data-theme="light"] a[href="/admin/audit"].admin-tab-btn {
+  background: #FFFFFF !important;
+  border-color: #0E3D32 !important;
+  color: #0E3D32 !important;
+  font-weight: 700 !important;
+}
+html[data-theme="light"] a[href="/admin/audit"].admin-tab-btn:hover {
+  background: #F0FDF4 !important;
+}
+
+/* Data Tables & Cards Across All Tabs */
+html[data-theme="light"] .admin-card {
+  background: #FFFFFF !important;
+  border-color: #DCD6C6 !important;
+  box-shadow: 0 2px 10px rgba(11, 35, 55, 0.04);
+}
+html[data-theme="light"] .admin-table-wrap {
+  background: #FFFFFF !important;
+  border: 1px solid #DCD6C6 !important;
+}
+html[data-theme="light"] .admin-table th {
+  background: #EFECE2 !important;
+  color: #22303A !important;
+  border-bottom: 1px solid #DCD6C6 !important;
+}
+html[data-theme="light"] .admin-table td {
+  border-bottom: 1px solid #E2DDD0 !important;
+  color: #0B2337 !important;
+}
+html[data-theme="light"] .admin-table tr:hover {
+  background: #FCFBF8 !important;
+}
+html[data-theme="light"] .ticket-user-name {
+  color: #0B2337 !important;
+}
+html[data-theme="light"] .ticket-user-email {
+  color: #46545E !important;
+}
+
+/* KPI Grid 6 (Verified Cash Income, Net Cash Inflow, etc.) */
+html[data-theme="light"] .kpi-card [style*="color: #34d399" i] {
+  color: #047857 !important;
+}
+html[data-theme="light"] .kpi-card [style*="color: #38bdf8" i] {
+  color: #0369A1 !important;
+}
+html[data-theme="light"] .kpi-card [style*="color: #c084fc" i] {
+  color: #7E22CE !important;
+}
+
+/* Copilot Drawer in Light Mode */
+html[data-theme="light"] .copilot-drawer {
+  background: #FFFFFF !important;
+  border: 1px solid #DCD6C6 !important;
+  box-shadow: 0 20px 50px rgba(11, 35, 55, 0.15), 0 0 20px rgba(14, 61, 50, 0.08) !important;
+}
+html[data-theme="light"] .copilot-header {
+  background: #EFECE2 !important;
+  border-bottom: 1px solid #DCD6C6 !important;
+}
+html[data-theme="light"] .copilot-title {
+  color: #0B2337 !important;
+}
+html[data-theme="light"] .copilot-chips {
+  background: #F7F5EE !important;
+  border-bottom: 1px solid #DCD6C6 !important;
+}
+html[data-theme="light"] .copilot-chip {
+  background: #FFFFFF !important;
+  border: 1px solid #CBD5E1 !important;
+  color: #22303A !important;
+}
+html[data-theme="light"] .copilot-chip:hover {
+  background: #EFECE2 !important;
+  border-color: #0E3D32 !important;
+  color: #0E3D32 !important;
+}
+html[data-theme="light"] .copilot-msg.bot {
+  background: #F3F0E6 !important;
+  border: 1px solid #DCD6C6 !important;
+  color: #0B2337 !important;
+}
+html[data-theme="light"] .copilot-action-card {
+  background: #FFFBEB !important;
+  border: 1px solid rgba(180, 83, 9, 0.35) !important;
+}
+html[data-theme="light"] .action-card-title {
+  color: #0B2337 !important;
+}
+html[data-theme="light"] .action-card-summary {
+  color: #46545E !important;
+}
+html[data-theme="light"] .copilot-input-area {
+  background: #EFECE2 !important;
+  border-top: 1px solid #DCD6C6 !important;
+}
+html[data-theme="light"] .copilot-input {
+  background: #FFFFFF !important;
+  border: 1px solid #CBD5E1 !important;
+  color: #0B2337 !important;
+}
 </style>
 
 
