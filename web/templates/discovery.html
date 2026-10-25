@@ -51,7 +51,7 @@
 
         <!-- Evaluated Metadata Strip & Provenance Info -->
         <div class="dossier-meta-strip" style="margin-top: 18px; margin-bottom: 0;">
-          <span><svg class="glyph" style="width:12px;height:12px;vertical-align:-1px;margin-right:4px;"><use href="#icon-doc"></use></svg>Evaluated: {{ current_edition }} 09:00 AM IST • Verified BSE Statutory Filings • Grounded Financial Ratios</span>
+          <span><svg class="glyph" style="width:12px;height:12px;vertical-align:-1px;margin-right:4px;"><use href="#icon-doc"></use></svg>Evaluated: {{ formatted_current_edition|default(current_edition) }}, 09:00 IST • Verified BSE Statutory Filings • Grounded Financial Ratios</span>
         </div>
         <p class="dossier-provenance-subline">All equities filtered through ROCE &ge; 15% hurdle rates and conservative solvency sieves from audited financial statements.</p>
       </div>
@@ -59,11 +59,11 @@
       <!-- Edition Selector -->
       {% if available_editions %}
       <div style="background: rgba(30, 41, 59, 0.6); padding: 12px 16px; border-radius: 12px; border: 1px solid var(--border-color); display: flex; align-items: center; gap: 12px;">
-        <span style="font-size: 13px; color: var(--text-muted); font-weight: 600;">Edition Date:</span>
+        <label for="editionSelect" style="font-size: 13px; color: var(--text-muted); font-weight: 600;">Edition Date:</label>
         <select id="editionSelect" onchange="switchEdition(this.value)" style="background: var(--bg-surface); color: var(--text-primary); border: 1px solid var(--border-color); border-radius: 6px; padding: 6px 12px; font-size: 13px; font-weight: 600; cursor: pointer; outline: none;">
           {% for ed in available_editions %}
           <option value="{{ ed }}" {% if ed == current_edition %}selected{% endif %}>
-            {{ ed }}
+            {{ edition_labels.get(ed, ed) if edition_labels else ed }}
             {% if ed == today_date %} (Today's Live{% if not can_access_today %} — Pro{% endif %})
             {% elif ed == yesterday_date %} (Yesterday's Edition)
             {% else %} (Archive)
@@ -111,7 +111,7 @@
   {% endif %}
 
   <!-- Sector Filter Navigation Tabs -->
-  <div style="display: flex; gap: 8px; overflow-x: auto; padding-bottom: 12px; margin-bottom: 30px; scrollbar-width: none;">
+  <div style="display: flex; gap: 8px; overflow-x: auto; padding-bottom: 12px; margin-bottom: 14px; scrollbar-width: none;">
     <button class="sector-tab active" onclick="filterSector('ALL', this)">All Sectors ({{ discovery_stocks|length }})</button>
     {% set seen_sectors = [] %}
     {% for s in discovery_stocks %}
@@ -120,6 +120,9 @@
         <button class="sector-tab" onclick="filterSector('{{ s.sector }}', this)">{{ s.sector }}</button>
       {% endif %}
     {% endfor %}
+  </div>
+  <div style="font-size: 12px; color: var(--text-secondary); margin-bottom: 22px; padding: 6px 12px; border-radius: 8px; background: var(--bg-surface); border: 1px solid var(--border-subtle);">
+    <strong>Metric Key:</strong> <code>NM</code> = Not Meaningful (negative trailing 12M EPS) • <code>BFSI</code> = Banks/NBFCs/Insurers evaluated on CRAR &amp; Net NPA rather than industrial D/E • <code>—</code> = Statutory filing sync pending • Hover any ratio for calculation basis.
   </div>
 
   <!-- Empty State if no stocks available -->
@@ -187,22 +190,34 @@
         </div>
 
         <!-- Key Financial Metrics Bar -->
+        {% set dr_roce = item.roce_display|default(item.roce_pct ~ '%') %}
+        {% set dr_de = item.de_display|default(item.debt_to_equity ~ 'x') %}
+        {% set dr_pe = item.pe_display|default(item.pe_ratio) %}
+        {% set dr_sales = item.sales_growth_display|default('+' ~ item.sales_growth_3y ~ '%') %}
         <div style="display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; background: rgba(15, 23, 42, 0.5); border: 1px solid rgba(255, 255, 255, 0.05); border-radius: 10px; padding: 10px; margin-bottom: 14px; text-align: center;">
           <div>
             <div style="font-size: 11px; color: var(--text-muted); font-weight: 600;">ROCE</div>
-            <div class="tnum" style="font-size: 14px; font-weight: 800; color: var(--accent-cyan);">{{ item.roce_pct }}%</div>
+            <div class="tnum" style="font-size: 14px; font-weight: 800; color: var(--accent-cyan);">
+              {% if dr_roce == '—' %}<abbr title="{{ item.roce_tooltip|default('Pending statutory filing extract') }}" style="text-decoration: underline dotted rgba(148, 163, 184, 0.5); text-underline-offset: 2px; cursor: help;">{{ dr_roce }}</abbr>{% else %}<span title="{{ item.roce_tooltip|default('Return on Capital Employed (ROCE)') }}" style="cursor: help;">{{ dr_roce }}</span>{% endif %}
+            </div>
           </div>
           <div>
             <div style="font-size: 11px; color: var(--text-muted); font-weight: 600;">D/E</div>
-            <div class="tnum" style="font-size: 14px; font-weight: 800; color: #a5b4fc;">{{ item.debt_to_equity }}x</div>
+            <div class="tnum" style="font-size: 14px; font-weight: 800; color: var(--text-primary);">
+              {% if dr_de in ('BFSI', '—') %}<abbr title="{{ item.de_tooltip|default('Balance-sheet solvency indicator') }}" style="text-decoration: underline dotted rgba(148, 163, 184, 0.5); text-underline-offset: 2px; cursor: help;">{{ dr_de }}</abbr>{% else %}<span title="{{ item.de_tooltip|default('Total Debt divided by Shareholder Equity') }}" style="cursor: help;">{{ dr_de }}</span>{% endif %}
+            </div>
           </div>
           <div>
             <div style="font-size: 11px; color: var(--text-muted); font-weight: 600;">P/E</div>
-            <div class="tnum" style="font-size: 14px; font-weight: 800; color: var(--text-primary);">{{ item.pe_ratio }}</div>
+            <div class="tnum" style="font-size: 14px; font-weight: 800; color: var(--text-primary);">
+              {% if dr_pe in ('NM', '—') %}<abbr title="{{ item.pe_tooltip|default('Trailing 12-month Price-to-Earnings') }}" style="text-decoration: underline dotted rgba(148, 163, 184, 0.5); text-underline-offset: 2px; cursor: help;">{{ dr_pe }}</abbr>{% else %}<span title="{{ item.pe_tooltip|default('Trailing 12-month Price-to-Earnings') }}" style="cursor: help;">{{ dr_pe }}</span>{% endif %}
+            </div>
           </div>
           <div>
             <div style="font-size: 11px; color: var(--text-muted); font-weight: 600;">3Y Sales</div>
-            <div class="tnum" style="font-size: 14px; font-weight: 800; color: var(--accent-emerald);">+{{ item.sales_growth_3y }}%</div>
+            <div class="tnum" style="font-size: 14px; font-weight: 800; color: var(--accent-emerald);">
+              {% if dr_sales == '—' %}<abbr title="{{ item.sales_tooltip|default('Pending 3-year sales CAGR extract') }}" style="text-decoration: underline dotted rgba(148, 163, 184, 0.5); text-underline-offset: 2px; cursor: help;">{{ dr_sales }}</abbr>{% else %}<span title="{{ item.sales_tooltip|default('3-Year Compounded Sales Growth') }}" style="cursor: help;">{{ dr_sales }}</span>{% endif %}
+            </div>
           </div>
         </div>
 

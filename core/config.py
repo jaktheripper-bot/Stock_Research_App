@@ -89,11 +89,16 @@ def get_secret(key: str, default: Any = None) -> Any:
 def yfinance_fallback_enabled() -> bool:
     """Whether the unofficial yfinance gap-filler may be used.
 
-    On by default: exchange-grounded feeds (Angel One, BSE, cache) are tried first and
-    yfinance only fills fields they cannot supply, so reports stay complete while the
-    platform's reputation is being built. Set YFINANCE_FALLBACK=0 to disable it.
+    Disabled by default ("0") in production now that Angel One SmartAPI and direct BSE
+    exchange feeds serve as primary market gateways. Only activates if explicitly opted in
+    via YFINANCE_FALLBACK=1 (or in isolated unit tests that mock yfinance offline).
     """
-    return str(get_secret("YFINANCE_FALLBACK", "1")).strip().lower() in ("1", "true", "yes", "on")
+    explicit = get_secret("YFINANCE_FALLBACK")
+    if explicit is not None:
+        return str(explicit).strip().lower() in ("1", "true", "yes", "on")
+    if os.environ.get("TESTING") == "1":
+        return True
+    return False
 
 
 def get_better_stack_config() -> dict:

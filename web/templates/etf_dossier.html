@@ -49,7 +49,7 @@
 
         <!-- Provenance Strip -->
         <div class="dossier-meta-strip" style="margin-top: 14px;">
-          <span class="dossier-meta-pill"><svg class="glyph" style="width: 12px; height: 12px; vertical-align: -1px;"><use href="#glyph-clock"></use></svg> Evaluated: Live AMFI Feed</span>
+          <span class="dossier-meta-pill"><svg class="glyph" style="width: 12px; height: 12px; vertical-align: -1px;"><use href="#glyph-clock"></use></svg> Updated: {{ etf_updated_str|default('Latest AMFI / Exchange Sync') }}</span>
           <span class="dossier-meta-sep">•</span>
           <span class="badge badge-emerald"><span class="status-dot status-dot-emerald"></span> Statutory Dispatched NAV</span>
           <span class="dossier-meta-sep">•</span>
@@ -57,6 +57,26 @@
         </div>
         <div class="dossier-provenance-subline" style="margin-top: 6px;">
           Statutory end-of-day NAV verified against AMFI master feed; exchange pricing cross-referenced across NSE and BSE secondary trading order books.
+        </div>
+        <div class="dossier-provenance-bar" role="group" aria-label="ETF Data Provenance and Statutory Links">
+          <div class="provenance-grid">
+            <div class="provenance-cell">
+              <div class="provenance-label"><svg class="glyph" style="width:12px;height:12px;"><use href="#glyph-clock"></use></svg> Exchange CMP vs. Statutory NAV</div>
+              <div class="provenance-value tnum">CMP ₹{{ etf.last_price|round(2) }} • NAV ₹{{ etf.nav|round(2) }}</div>
+              <div class="provenance-sub">As of {{ etf_updated_str|default('Latest AMFI / Exchange Sync') }}</div>
+            </div>
+            <div class="provenance-cell">
+              <div class="provenance-label"><svg class="glyph" style="width:12px;height:12px;"><use href="#icon-doc"></use></svg> Benchmark &amp; Registry Identifiers</div>
+              <div class="provenance-value">{{ etf.underlying_index }}</div>
+              <div class="provenance-sub">Symbol: <span class="tnum">{{ etf.symbol }}</span>{% if etf.isin %} • ISIN: <span class="tnum">{{ etf.isin }}</span>{% endif %}{% if etf.scheme_code %} • AMFI: <span class="tnum">{{ etf.scheme_code }}</span>{% endif %}</div>
+            </div>
+          </div>
+          <div class="provenance-registry-bar">
+            <span class="provenance-registry-prefix">Verify in Exchange &amp; AMFI Feeds:</span>
+            <a href="https://www.nseindia.com/get-quotes/equity?symbol={{ etf.symbol }}" target="_blank" rel="noopener noreferrer" class="provenance-registry-chip" title="NSE India ETF Order Book & iNAV"><svg class="glyph" style="width:12px;height:12px;"><use href="#icon-doc"></use></svg><span>NSE ETF Quote ↗</span></a>
+            <a href="https://www.bseindia.com/markets/etf/ETF_MktWatch.aspx" target="_blank" rel="noopener noreferrer" class="provenance-registry-chip" title="BSE India ETF Market Watch"><svg class="glyph" style="width:12px;height:12px;"><use href="#icon-doc"></use></svg><span>BSE ETF Watch ↗</span></a>
+            <a href="https://www.amfiindia.com/net-asset-value/nav-history" target="_blank" rel="noopener noreferrer" class="provenance-registry-chip" title="Official AMFI Historical NAV Ledger"><svg class="glyph" style="width:12px;height:12px;"><use href="#icon-doc"></use></svg><span>AMFI NAV Ledger ↗</span></a>
+          </div>
         </div>
 
         <!-- Action Buttons -->

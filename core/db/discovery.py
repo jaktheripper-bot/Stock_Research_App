@@ -7,6 +7,12 @@ from typing import Optional, List, Dict, Any
 
 from core.db.connection import init_db, get_db_connection, get_supabase_url, get_placeholder, is_postgres_connection, IST
 from core.db.reports import _format_timestamp
+from core.presentation.formatters import (
+    format_de_multiple,
+    format_pct_metric,
+    format_pe_multiple,
+    format_standard_date,
+)
 from normalizer import clean_ticker
 
 logger = logging.getLogger("equity_research.core.db.discovery")
@@ -194,18 +200,39 @@ def get_active_discovery_reel(
                     logger.debug("Failed parsing metrics_dict json in discovery reel: %s", e)
                     metrics_dict = {}
 
+            pe_meta = format_pe_multiple(r[7])
+            de_meta = format_de_multiple(
+                r[9],
+                ticker=str(r[2] or ""),
+                sector_label=str(r[4] or ""),
+                company_name=str(r[3] or ""),
+            )
+            roce_meta = format_pct_metric(r[8], metric_name="Return on Capital Employed (ROCE)")
+            sales_meta = format_pct_metric(r[10], metric_name="3-Year Sales CAGR", signed=True)
+
             results.append({
                 "id": r[0],
                 "edition_date": str(r[1]),
+                "formatted_edition_date": format_standard_date(r[1]),
                 "ticker": r[2],
                 "company_name": r[3],
                 "sector": r[4],
                 "market_cap_tier": r[5],
                 "current_price": float(r[6]) if r[6] is not None else 0.0,
-                "pe_ratio": str(r[7] or "N/A"),
+                "pe_ratio": pe_meta["display"],
+                "pe_display": pe_meta["display"],
+                "pe_tooltip": pe_meta["tooltip"],
+                "pe_status": pe_meta["status"],
                 "roce_pct": float(r[8]) if r[8] is not None else 0.0,
+                "roce_display": roce_meta["display"],
+                "roce_tooltip": roce_meta["tooltip"],
                 "debt_to_equity": float(r[9]) if r[9] is not None else 0.0,
+                "de_display": de_meta["display"],
+                "de_tooltip": de_meta["tooltip"],
+                "de_status": de_meta["status"],
                 "sales_growth_3y": float(r[10]) if r[10] is not None else 0.0,
+                "sales_growth_display": sales_meta["display"],
+                "sales_tooltip": sales_meta["tooltip"],
                 "ria_thesis": r[11],
                 "catalyst_headline": r[12] or "",
                 "key_metrics": metrics_dict,

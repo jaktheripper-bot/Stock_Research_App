@@ -12,6 +12,7 @@ Enforces:
 
 import logging
 import hashlib
+import re
 from datetime import datetime, timedelta
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from typing import List, Dict, Any, Optional
@@ -112,18 +113,33 @@ def evaluate_under_the_radar_candidate(candidate: Dict[str, Any]) -> Optional[Di
 
     from bsedata.bse import BSE
     from core.db import get_report_by_ticker_sync
+    from core.db.fundamentals import extract_fundamentals_from_report_text, get_cached_fundamentals
+    from core.presentation.formatters import normalize_pe_raw
 
     p_float = 0.0
-    pe_str = "Fair"
+    pe_str = "N/A"
     mcap_float = 0.0
 
     # 1. Fast Path: Read existing verified DB snapshot (1ms)
     try:
         rep = get_report_by_ticker_sync(canonical)
-        if rep and rep.get("baseline_price"):
-            p_float = float(str(rep.get("baseline_price")).replace(",", "").strip())
-            pe_str = str(rep.get("baseline_pe") or "Fair")
-            mcap_float = float(str(rep.get("baseline_mcap") or 0))
+        if rep:
+            rep_txt = rep.get("report_text") or ""
+            # Exclude entities flagged for High Governance Risk in archived 7-Pillar dossiers
+            if re.search(r"Governance:\s*High\s*Risk", rep_txt, re.I):
+                logger.info("Discovery gate excluded %s due to High Risk governance health matrix.", canonical)
+                return None
+            if rep.get("baseline_price"):
+                p_float = float(str(rep.get("baseline_price")).replace(",", "").strip())
+                pe_str = normalize_pe_raw(rep.get("baseline_pe"))
+                if pe_str == "N/A" and rep_txt:
+                    ext = extract_fundamentals_from_report_text(rep_txt)
+                    pe_str = normalize_pe_raw(ext.get("pe_ratio"))
+                mcap_float = float(str(rep.get("baseline_mcap") or 0))
+        if pe_str == "N/A":
+            cf = get_cached_fundamentals(canonical)
+            if cf and cf.get("pe_ratio"):
+                pe_str = normalize_pe_raw(cf.get("pe_ratio"))
     except Exception as db_err:
         logger.debug("DB snapshot lookup notice for %s: %s", canonical, db_err)
 
@@ -205,9 +221,16 @@ def evaluate_under_the_radar_candidate(candidate: Dict[str, Any]) -> Optional[Di
     roe_float = float(candidate.get("roe", 16.0))
     sales_growth_float = float(candidate.get("sales_growth_3y", 15.0))
 
-    # Gate: Debt-to-Equity must be conservative (<= 0.8)
+    # Gate: Debt-to-Equity must be conservative (<= 0.8) and exclude distressed optical P/E (< 3.0x)
     if de_float > 0.8:
         return None
+    if pe_str not in ("N/A", "NM"):
+        try:
+            if float(pe_str) < 3.0:
+                logger.info("Discovery gate excluded %s due to optical distressed P/E (%sx < 3.0x).", canonical, pe_str)
+                return None
+        except ValueError:
+            pass
 
     # Phase 1: 10-Point Deterministic Accounting Screening Sieve
     chanakya_res = ChanakyaGate.evaluate_from_dict(candidate, mode="STRICT")

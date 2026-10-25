@@ -1134,12 +1134,14 @@ function toggleResearchDesk() {
     }
 }
 
-// Global shortcut listener: ⌘K or Ctrl+K or / (when not typing in an input)
+// Global shortcut listener: ⌘K or Ctrl+K (without Shift) toggles Research Desk on dossier pages;
+// '/' and ⇧⌘K are reserved globally for 7-Asset Omni-Search in main.js.
 document.addEventListener("keydown", function(e) {
-    if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === "k") {
-        e.preventDefault();
-        toggleResearchDesk();
-    } else if (e.key === "/" && !["INPUT", "TEXTAREA", "SELECT"].includes(document.activeElement?.tagName)) {
+    if ((e.metaKey || e.ctrlKey) && !e.shiftKey && e.key.toLowerCase() === "k") {
+        const omniModal = document.getElementById("omniSearchModal");
+        if (omniModal && omniModal.classList.contains("active") && typeof window.closeOmniSearchModal === "function") {
+            window.closeOmniSearchModal();
+        }
         e.preventDefault();
         toggleResearchDesk();
     }

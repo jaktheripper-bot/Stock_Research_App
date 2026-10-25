@@ -50,7 +50,7 @@
 
         <!-- Provenance Strip -->
         <div class="dossier-meta-strip" style="margin-top: 14px;">
-          <span class="dossier-meta-pill"><svg class="glyph" style="width: 12px; height: 12px; vertical-align: -1px;"><use href="#glyph-clock"></use></svg> Trustee & Exchange Dispatches</span>
+          <span class="dossier-meta-pill"><svg class="glyph" style="width: 12px; height: 12px; vertical-align: -1px;"><use href="#glyph-clock"></use></svg> Updated: {{ reit_updated_str|default('Latest SEBI Appraisal Sync') }}</span>
           <span class="dossier-meta-sep">•</span>
           <span class="badge badge-emerald"><span class="status-dot status-dot-emerald"></span> SEBI Statutory Appraised NAV</span>
           <span class="dossier-meta-sep">•</span>
@@ -58,6 +58,26 @@
         </div>
         <div class="dossier-provenance-subline" style="margin-top: 6px;">
           Independent valuer appraisals verified against SEBI quarterly filings; Net Distributable Cash Flow (NDCF) audited under Section 115UA and SEBI REIT/InvIT Regulations.
+        </div>
+        <div class="dossier-provenance-bar" role="group" aria-label="REIT and InvIT Data Provenance and Statutory Links">
+          <div class="provenance-grid">
+            <div class="provenance-cell">
+              <div class="provenance-label"><svg class="glyph" style="width:12px;height:12px;"><use href="#glyph-clock"></use></svg> Exchange CMP vs. Appraised NAV</div>
+              <div class="provenance-value tnum">CMP {{ reit.current_price_formatted }} • NAV {{ reit.nav_per_unit_formatted }}</div>
+              <div class="provenance-sub">As of {{ reit_updated_str|default('Latest SEBI Appraisal Sync') }}</div>
+            </div>
+            <div class="provenance-cell">
+              <div class="provenance-label"><svg class="glyph" style="width:12px;height:12px;"><use href="#icon-doc"></use></svg> Statutory Valuation &amp; Tax Basis</div>
+              <div class="provenance-value">SEBI Reg. 21 Appraisal &amp; Sec 115UA NDCF</div>
+              <div class="provenance-sub">Ticker: <span class="tnum">{{ reit.symbol }}</span>{% if reit.isin and reit.isin != 'N/A' %} • ISIN: <span class="tnum">{{ reit.isin }}</span>{% endif %}</div>
+            </div>
+          </div>
+          <div class="provenance-registry-bar">
+            <span class="provenance-registry-prefix">Verify in Exchange &amp; SEBI Filings:</span>
+            <a href="https://www.nseindia.com/get-quotes/equity?symbol={{ reit.symbol }}" target="_blank" rel="noopener noreferrer" class="provenance-registry-chip" title="NSE India Unit Quote & Corporate Disclosures"><svg class="glyph" style="width:12px;height:12px;"><use href="#icon-doc"></use></svg><span>NSE Quote &amp; Filings ↗</span></a>
+            <a href="https://www.bseindia.com/corporates/ann.html" target="_blank" rel="noopener noreferrer" class="provenance-registry-chip" title="BSE Trustee & Valuation Announcements"><svg class="glyph" style="width:12px;height:12px;"><use href="#icon-doc"></use></svg><span>BSE Corporate Filings ↗</span></a>
+            <a href="https://www.sebi.gov.in/sebiweb/home/HomeAction.do?doListing=yes&sid=3&ssid=73&smid=0" target="_blank" rel="noopener noreferrer" class="provenance-registry-chip" title="SEBI REIT & InvIT Public Filings"><svg class="glyph" style="width:12px;height:12px;"><use href="#icon-doc"></use></svg><span>SEBI REIT/InvIT Filings ↗</span></a>
+          </div>
         </div>
 
         <!-- Action Buttons -->

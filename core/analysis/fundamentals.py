@@ -165,17 +165,20 @@ def ttl_cache(ttl_seconds: int = 300, maxsize: int = 128):
 
 def enrich_fundamentals(ticker: str, data: dict) -> dict:
     """
-    Enriches stock fundamentals with ratios.
-    First checks localized DB fundamentals cache, then falls back to yfinance backfill,
-    and persists enriched metrics into cached_fundamentals repository.
+    Enriches stock fundamentals with exchange-grounded quotes and statutory filing ratios:
+    1. Localized DB fundamentals cache + archived BSE statutory dossier text extraction.
+    2. Angel One SmartAPI (live quote + 1Y EOD historical candles) for price, 52W range, & DMAs.
+    3. Official BSE Exchange Direct API (ComHeader / getQuote) for market cap, official P/E, & sector.
+    4. Optional yfinance fallback ONLY if explicitly enabled via YFINANCE_FALLBACK=1 (off by default).
     """
     clean_sym = clean_ticker(ticker)
     if data is None:
         data = {}
+    exchange_enriched = False
 
-    # 1. Primary enrichment: Localized DB fundamentals cache
+    # 1. Primary enrichment: Localized DB fundamentals cache + Statutory Dossier Text
     try:
-        from core.db.fundamentals import get_cached_fundamentals
+        from core.db.fundamentals import get_cached_fundamentals, extract_fundamentals_from_report_text
         cached = get_cached_fundamentals(clean_sym)
         if cached:
             for k in [
@@ -195,12 +198,22 @@ def enrich_fundamentals(ticker: str, data: dict) -> dict:
                 data["market_cap"] = cached["market_cap"]
             if data.get("current_price") in [None, "N/A", 0, 0.0] and cached.get("current_price"):
                 data["current_price"] = cached["current_price"]
-            if data.get("pe_ratio") in [None, "N/A", ""] and cached.get("pe_ratio"):
+            if data.get("pe_ratio") in [None, "N/A", "", "Fair"] and cached.get("pe_ratio"):
                 data["pe_ratio"] = cached["pe_ratio"]
+
+        if any(data.get(k) in [None, "N/A", "", "Fair"] for k in ("pe_ratio", "roce", "roe", "debt_to_equity", "operating_margin")):
+            from core.db.reports import get_report_by_ticker_sync
+            rep = get_report_by_ticker_sync(clean_sym)
+            if rep and rep.get("report_text"):
+                extracted = extract_fundamentals_from_report_text(rep["report_text"], fallback_data=data)
+                for k in ("pe_ratio", "roce", "roe", "operating_margin", "debt_to_equity", "fifty_two_week_high", "fifty_two_week_low"):
+                    if data.get(k) in [None, "N/A", "", "Fair"] and extracted.get(k) not in [None, "N/A", ""]:
+                        data[k] = extracted[k]
+                        exchange_enriched = True
     except Exception as cache_err:
         logger.debug(f"Localized fundamentals cache enrichment notice for {clean_sym}: {cache_err}")
 
-    # 1.5. Exchange EOD Enrichment via Angel One SmartAPI Historical Candles (before yfinance)
+    # 1.5. Primary Live/EOD Market Feed via Angel One SmartAPI (Quotes + 1Y Historical Candles)
     if os.environ.get("TESTING") != "1":
         try:
             from core.ingestion.angel_one import AngelOneGateway
@@ -209,22 +222,64 @@ def enrich_fundamentals(ticker: str, data: dict) -> dict:
                 or data.get("52w_high") in [None, "N/A", 0, 0.0]
                 or data.get("fifty_two_week_high") in [None, "N/A", 0, 0.0]
             ):
-                eod = AngelOneGateway.get_eod_summary(clean_sym)
-                if eod:
-                    if data.get("current_price") in [None, "N/A", 0, 0.0] and eod.get("current_price"):
-                        data["current_price"] = eod["current_price"]
-                    if data.get("fifty_two_week_high") in [None, "N/A", 0, 0.0] and eod.get("52w_high"):
-                        data["fifty_two_week_high"] = eod["52w_high"]
-                        data["52w_high"] = eod["52w_high"]
-                    if data.get("fifty_two_week_low") in [None, "N/A", 0, 0.0] and eod.get("52w_low"):
-                        data["fifty_two_week_low"] = eod["52w_low"]
-                        data["52w_low"] = eod["52w_low"]
-                    if eod.get("dma_50"):
-                        data["dma_50"] = eod["dma_50"]
-                    if eod.get("dma_200"):
-                        data["dma_200"] = eod["dma_200"]
+                ao_quote = AngelOneGateway.get_stock_quote(clean_sym)
+                if ao_quote and ao_quote.get("ltp"):
+                    if data.get("current_price") in [None, "N/A", 0, 0.0]:
+                        data["current_price"] = round(float(ao_quote["ltp"]), 2)
+                    if data.get("fifty_two_week_high") in [None, "N/A", 0, 0.0] and ao_quote.get("52w_high"):
+                        data["fifty_two_week_high"] = round(float(ao_quote["52w_high"]), 2)
+                        data["52w_high"] = data["fifty_two_week_high"]
+                    if data.get("fifty_two_week_low") in [None, "N/A", 0, 0.0] and ao_quote.get("52w_low"):
+                        data["fifty_two_week_low"] = round(float(ao_quote["52w_low"]), 2)
+                        data["52w_low"] = data["fifty_two_week_low"]
+                    exchange_enriched = True
+
+                # Only fetch 1Y historical candles when quote or 52W range is still missing
+                if (
+                    data.get("current_price") in [None, "N/A", 0, 0.0]
+                    or data.get("fifty_two_week_high") in [None, "N/A", 0, 0.0]
+                    or data.get("fifty_two_week_low") in [None, "N/A", 0, 0.0]
+                ):
+                    eod = AngelOneGateway.get_eod_summary(clean_sym)
+                    if eod:
+                        if data.get("current_price") in [None, "N/A", 0, 0.0] and eod.get("current_price"):
+                            data["current_price"] = eod["current_price"]
+                        if data.get("fifty_two_week_high") in [None, "N/A", 0, 0.0] and eod.get("52w_high"):
+                            data["fifty_two_week_high"] = eod["52w_high"]
+                            data["52w_high"] = eod["52w_high"]
+                        if data.get("fifty_two_week_low") in [None, "N/A", 0, 0.0] and eod.get("52w_low"):
+                            data["fifty_two_week_low"] = eod["52w_low"]
+                            data["52w_low"] = eod["52w_low"]
+                        if eod.get("dma_50"):
+                            data["dma_50"] = eod["dma_50"]
+                        if eod.get("dma_200"):
+                            data["dma_200"] = eod["dma_200"]
+                        exchange_enriched = True
         except Exception as ao_eod_err:
-            logger.debug(f"Angel One EOD candle enrichment notice for {clean_sym}: {ao_eod_err}")
+            logger.debug(f"Angel One SmartAPI enrichment notice for {clean_sym}: {ao_eod_err}")
+
+        # 1.6. Official BSE Exchange Direct API for Market Cap, Trailing P/E & Industry
+        try:
+            if (
+                data.get("market_cap") in [None, "N/A", 0, "0", ""]
+                or data.get("pe_ratio") in [None, "N/A", "Fair", "—", "-", "", 0, "0"]
+                or data.get("sector") in [None, "N/A", "", "General Industry", "Core Industry"]
+            ):
+                bse_snap = fetch_bse_exchange_data(clean_sym)
+                if bse_snap:
+                    if data.get("current_price") in [None, "N/A", 0, 0.0] and bse_snap.get("current_price"):
+                        data["current_price"] = bse_snap["current_price"]
+                    if data.get("market_cap") in [None, "N/A", 0, "0", ""] and bse_snap.get("market_cap"):
+                        data["market_cap"] = bse_snap["market_cap"]
+                    if data.get("pe_ratio") in [None, "N/A", "Fair", "—", "-", "", 0, "0"] and bse_snap.get("pe_ratio") not in [None, "N/A", "Fair", ""]:
+                        data["pe_ratio"] = bse_snap["pe_ratio"]
+                    if data.get("sector") in [None, "N/A", "", "General Industry", "Core Industry"] and bse_snap.get("sector"):
+                        data["sector"] = bse_snap["sector"]
+                    if data.get("industry") in [None, "N/A", "", "Diversified"] and bse_snap.get("industry"):
+                        data["industry"] = bse_snap["industry"]
+                    exchange_enriched = True
+        except Exception as bse_enrich_err:
+            logger.debug(f"BSE official exchange enrichment notice for {clean_sym}: {bse_enrich_err}")
 
     # 2. Secondary enrichment: yfinance backfill
     try:
@@ -236,16 +291,22 @@ def enrich_fundamentals(ticker: str, data: dict) -> dict:
             data.get("roce") in [None, "N/A", ""]
             or data.get("roe") in [None, "N/A", ""]
             or data.get("fifty_two_week_high") in [None, "N/A", "", 0, 0.0]
-            or data.get("pe_ratio") in [None, "N/A", "-", "", 0, "0"]
+            or data.get("pe_ratio") in [None, "N/A", "Fair", "—", "-", "", 0, "0"]
+            or data.get("debt_to_equity") in [None, "N/A", ""]
         )
         if needs_remote_backfill and yfinance_fallback_enabled():
             info = safe_fetch_yfinance_info(yf_ticker)
 
         # Trailing P/E
-        if data.get("pe_ratio") in [None, "N/A", "-", "", 0, "0"]:
+        if data.get("pe_ratio") in [None, "N/A", "Fair", "—", "-", "", 0, "0"]:
             pe = info.get("trailingPE")
+            eps = info.get("trailingEps")
             if pe is not None and isinstance(pe, (int, float)):
-                data["pe_ratio"] = round(pe, 2) if pe > 0 else "N/A (Loss-Making)"
+                data["pe_ratio"] = round(pe, 2) if pe > 0 else "NM"
+            elif eps is not None and isinstance(eps, (int, float)) and eps < 0:
+                data["pe_ratio"] = "NM"
+            elif data.get("pe_ratio") == "Fair":
+                data["pe_ratio"] = "N/A"
 
         # Market Cap
         if data.get("market_cap") in [None, "N/A", 0, "-", "", "0"]:
@@ -307,7 +368,8 @@ def enrich_fundamentals(ticker: str, data: dict) -> dict:
 
         de = info.get("debtToEquity")
         if de is not None and isinstance(de, (int, float)):
-            data["debt_to_equity"] = round(float(de), 2)
+            # Yahoo Finance info['debtToEquity'] is expressed in percentage points (e.g. 9.83 = 9.83% = 0.10x)
+            data["debt_to_equity"] = round(float(de) / 100.0, 2)
         elif data.get("debt_to_equity") is None:
             data["debt_to_equity"] = "N/A"
 
@@ -362,10 +424,11 @@ def enrich_fundamentals(ticker: str, data: dict) -> dict:
     elif data.get("ev_to_ebitda") not in [None, "N/A"]:
         data["ev_ebitda"] = data["ev_to_ebitda"]
 
-    # 3. Persist enriched state back to localized database cache when new remote data arrived
-    if info:
+    # 3. Persist enriched state back to localized database cache when exchange/remote data arrived
+    if exchange_enriched or info:
         try:
             from core.db.fundamentals import save_cached_fundamentals
+            data["source"] = "SMARTAPI_BSE_EXCHANGE" if (exchange_enriched and not info) else "YFINANCE_ENRICHED"
             save_cached_fundamentals(clean_sym, data)
         except Exception as save_err:
             logger.debug(f"Cached fundamentals persistence notice: {save_err}")
@@ -375,14 +438,22 @@ def enrich_fundamentals(ticker: str, data: dict) -> dict:
 def resolve_pe_with_failsafes(ticker: str, scrip: str = "") -> str:
     clean = clean_ticker(ticker).replace(" ", "")
 
-    # Tier 0: Instant check against verified report baseline in database
+    # Tier 0: Instant check against verified report baseline in database (skip legacy ₹500/22.5x placeholders)
     try:
         from core.db.reports import get_report_by_ticker_sync
         rep = get_report_by_ticker_sync(clean)
         if rep and rep.get("baseline_pe"):
             b_pe = str(rep["baseline_pe"]).strip()
-            if b_pe and b_pe not in ["", "N/A", "-", "None", "0"]:
-                return b_pe
+            b_px = rep.get("baseline_price")
+            b_mc = rep.get("baseline_mcap")
+            is_synth_baseline = bool(
+                b_mc is not None
+                and abs(float(b_mc) - 25_000_000_000.0) < 1.0
+                and b_pe in ("22.5", "22.50")
+                and (b_px is None or abs(float(b_px) - 500.0) < 1e-6 or float(b_px) > 0)
+            )
+            if not is_synth_baseline and b_pe and b_pe not in ["", "N/A", "Fair", "—", "-", "None", "0"]:
+                return "NM" if "loss" in b_pe.lower() else b_pe
     except Exception as err:
         logger.debug(f"Baseline PE lookup notice for {clean}: {err}")
 
@@ -396,7 +467,7 @@ def resolve_pe_with_failsafes(ticker: str, scrip: str = "") -> str:
                 raw_pe = res.json().get("PE")
                 if raw_pe and str(raw_pe).strip() not in ["", "-", "None", "0", "0.00"]:
                     val = float(str(raw_pe).replace(",", "").strip())
-                    return f"{val:.2f}" if val > 0 else "N/A (Loss-Making)"
+                    return f"{val:.2f}" if val > 0 else "NM"
         except Exception as e:
             logger.debug(f"BSE ComHeader direct P/E fetch notice: {e}")
 
@@ -444,6 +515,73 @@ def fetch_bse_exchange_data(query: str) -> dict:
     if not scrip:
         raise ValueError(f"Could not resolve an official BSE scrip code for '{query}'.")
 
+    clean_ticker_val = clean_ticker(query)
+
+    # Fast official BSE JSON API tier (sub-second, skips slow HTML scraping in live mode)
+    if os.environ.get("TESTING") != "1" and str(scrip).isdigit():
+        try:
+            headers = {
+                "User-Agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36",
+                "Referer": "https://www.bseindia.com/",
+                "Accept": "application/json, text/plain, */*",
+            }
+            hdr_res = requests.get(
+                f"https://api.bseindia.com/BseIndiaAPI/api/getScripHeaderData/w?Debtflag=&scripcode={scrip}&seriesid=",
+                headers=headers,
+                timeout=2.0,
+            )
+            com_res = requests.get(
+                f"https://api.bseindia.com/BseIndiaAPI/api/ComHeader/w?quotetype=EQ&scripcode={scrip}&seriesid=",
+                headers=headers,
+                timeout=2.0,
+            )
+            hdr_json = hdr_res.json() if hdr_res.status_code == 200 else {}
+            com_json = com_res.json() if com_res.status_code == 200 else {}
+            curr_rate = hdr_json.get("CurrRate") or {}
+            ltp_raw = curr_rate.get("LTP")
+            if ltp_raw and str(ltp_raw).strip() not in ("", "-", "0", "0.00"):
+                curr_p = float(str(ltp_raw).replace(",", "").strip())
+                mcap_raw = com_json.get("MktCapFull") or com_json.get("MktCapFF") or "0"
+                mcap_clean = str(mcap_raw).replace("Cr.", "").replace("Cr", "").replace(",", "").strip()
+                try:
+                    mcap_inr = int(float(mcap_clean) * 10_000_000) if mcap_clean and mcap_clean != "-" else 0
+                except ValueError:
+                    mcap_inr = 0
+
+                cmp_name = (hdr_json.get("Cmpname") or {}).get("FullN") or clean_ticker_val
+                sec_id = str((hdr_json.get("Header") or {}).get("Atea") or com_json.get("SecurityId") or "").strip().upper()
+                canonical_ticker = (
+                    sec_id if (sec_id and " " not in sec_id)
+                    else (clean_ticker_val if " " not in clean_ticker_val else clean_ticker_val.replace(" ", ""))
+                )
+                raw_pe = com_json.get("PE")
+                if raw_pe and str(raw_pe).strip() not in ("", "-", "None", "0", "0.00"):
+                    pe_f = float(str(raw_pe).replace(",", "").strip())
+                    resolved_pe = f"{pe_f:.2f}" if pe_f > 0 else "NM"
+                else:
+                    resolved_pe = resolve_pe_with_failsafes(canonical_ticker, scrip)
+
+                ind_str = str(com_json.get("Industry") or com_json.get("Sector") or "Core Industry").strip() or "Core Industry"
+                sec_str = str(com_json.get("Sector") or ind_str).strip() or "Core Industry"
+                wk_hi = str(com_json.get("FiftyTwoWkHigh") or "N/A").replace(",", "").strip()
+                wk_lo = str(com_json.get("FiftyTwoWkLow") or "N/A").replace(",", "").strip()
+                return {
+                    "ticker": canonical_ticker,
+                    "short_name": str(cmp_name),
+                    "scrip_code": scrip,
+                    "current_price": curr_p,
+                    "market_cap": mcap_inr,
+                    "pe_ratio": resolved_pe,
+                    "industry": ind_str,
+                    "sector": sec_str,
+                    "52w_high": wk_hi if wk_hi not in ("", "-") else "N/A",
+                    "52w_low": wk_lo if wk_lo not in ("", "-") else "N/A",
+                    "description": f"BSE Listed Equity under group {com_json.get('GRP', 'General')}.",
+                    "is_fallback": False,
+                }
+        except Exception as fast_bse_err:
+            logger.warning(f"Fast BSE JSON lookup notice for {query} ({scrip}): {fast_bse_err}")
+
     b = BSE()
     q = b.getQuote(scrip)
     if not q or "currentValue" not in q:
@@ -457,7 +595,6 @@ def fetch_bse_exchange_data(query: str) -> dict:
         logger.debug(f"BSE MCap parsing note: {e}")
         mcap_inr = 0
 
-    clean_ticker_val = clean_ticker(query)
     sec_id = str(q.get("securityID") or q.get("scrip_id") or "").strip().upper()
     canonical_ticker = sec_id if (sec_id and " " not in sec_id) else (clean_ticker_val if " " not in clean_ticker_val else (sec_id or clean_ticker_val.replace(" ", "")))
     resolved_pe = resolve_pe_with_failsafes(canonical_ticker, scrip)
@@ -703,6 +840,18 @@ def get_stock_fundamentals(query: str, fast_db_first: bool = False) -> dict:
                     "is_fallback": False,
                 }
                 res_dict = _enrich_with_cached_db_fundamentals(res_dict, canonical or clean)
+                if res_dict.get("market_cap") in (None, "N/A", 0, "0") and scrip:
+                    try:
+                        bse_meta = fetch_bse_exchange_data(canonical or clean)
+                        if bse_meta.get("market_cap"):
+                            res_dict["market_cap"] = bse_meta["market_cap"]
+                        if res_dict.get("short_name") == (canonical or clean) and bse_meta.get("short_name"):
+                            res_dict["short_name"] = bse_meta["short_name"]
+                        if res_dict.get("sector") == "General Industry" and bse_meta.get("sector"):
+                            res_dict["sector"] = bse_meta["sector"]
+                            res_dict["industry"] = bse_meta.get("industry", res_dict["industry"])
+                    except Exception as bse_meta_err:
+                        logger.debug(f"BSE market-cap complement notice for {canonical}: {bse_meta_err}")
                 _FUNDAMENTALS_CACHE[clean] = (now, res_dict)
                 _FUNDAMENTALS_CACHE[canonical] = (now, res_dict)
                 return res_dict
@@ -730,6 +879,18 @@ def get_stock_fundamentals(query: str, fast_db_first: bool = False) -> dict:
                     "is_fallback": False,
                 }
                 res_dict = _enrich_with_cached_db_fundamentals(res_dict, canonical or clean)
+                if res_dict.get("market_cap") in (None, "N/A", 0, "0") and scrip:
+                    try:
+                        bse_meta = fetch_bse_exchange_data(canonical or clean)
+                        if bse_meta.get("market_cap"):
+                            res_dict["market_cap"] = bse_meta["market_cap"]
+                        if res_dict.get("short_name") == (canonical or clean) and bse_meta.get("short_name"):
+                            res_dict["short_name"] = bse_meta["short_name"]
+                        if res_dict.get("sector") == "General Industry" and bse_meta.get("sector"):
+                            res_dict["sector"] = bse_meta["sector"]
+                            res_dict["industry"] = bse_meta.get("industry", res_dict["industry"])
+                    except Exception as bse_meta_err:
+                        logger.debug(f"BSE market-cap complement notice for {canonical}: {bse_meta_err}")
                 _FUNDAMENTALS_CACHE[clean] = (now, res_dict)
                 _FUNDAMENTALS_CACHE[canonical] = (now, res_dict)
                 return res_dict

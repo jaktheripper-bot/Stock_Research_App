@@ -40,7 +40,7 @@
           Benchmark: <strong style="color: #f8fafc;">{{ scheme.benchmark_index }}</strong> • Manager: <strong style="color: #f8fafc;">{{ scheme.fund_manager }}</strong> • Portfolio Date: {{ scheme.last_portfolio_date }}
         </div>
         <div class="dossier-meta-strip" style="margin-top: 10px;">
-          <span class="dossier-meta-pill"><svg class="glyph" style="width: 12px; height: 12px; vertical-align: -1px;"><use href="#glyph-clock"></use></svg> Evaluated: {{ scheme.last_portfolio_date|default('Recent') }}</span>
+          <span class="dossier-meta-pill"><svg class="glyph" style="width: 12px; height: 12px; vertical-align: -1px;"><use href="#glyph-clock"></use></svg> Portfolio Date: {{ fund_portfolio_date_str|default(scheme.last_portfolio_date|default('Latest AMFI Monthly')) }}</span>
           <span class="dossier-meta-sep">•</span>
           <span class="badge badge-emerald"><span class="status-dot status-dot-emerald"></span> Verified AMFI Portfolio Feed</span>
           <span class="dossier-meta-sep">•</span>
@@ -50,6 +50,26 @@
         </div>
         <div class="dossier-provenance-subline" style="margin-top: 6px;">
           Data sourced directly from statutory AMFI monthly portfolio disclosures and cross-checked against exchange equity feeds.
+        </div>
+        <div class="dossier-provenance-bar" role="group" aria-label="Mutual Fund Data Provenance and Statutory Links">
+          <div class="provenance-grid">
+            <div class="provenance-cell">
+              <div class="provenance-label"><svg class="glyph" style="width:12px;height:12px;"><use href="#glyph-clock"></use></svg> Statutory NAV &amp; Sync Date</div>
+              <div class="provenance-value tnum">{% if scheme.nav %}₹{{ "%.2f"|format(scheme.nav) }}{% else %}—{% endif %} • As of {{ fund_updated_str|default('Latest AMFI Sync') }}</div>
+              <div class="provenance-sub">Direct Plan TER: <span class="tnum">{{ "%.2f"|format(scheme.ter_direct_pct|default(0)) }}%</span> vs Regular: <span class="tnum">{{ "%.2f"|format(scheme.ter_regular_pct|default(0)) }}%</span></div>
+            </div>
+            <div class="provenance-cell">
+              <div class="provenance-label"><svg class="glyph" style="width:12px;height:12px;"><use href="#icon-doc"></use></svg> Holdings Disclosure Period</div>
+              <div class="provenance-value">AMFI Portfolio: {{ fund_portfolio_date_str|default(scheme.last_portfolio_date|default('Latest Monthly')) }}</div>
+              <div class="provenance-sub">Scheme Code: <span class="tnum">{{ scheme.scheme_code }}</span> • {{ scheme.holdings|length|default(0) }} Disclosed Securities</div>
+            </div>
+          </div>
+          <div class="provenance-registry-bar">
+            <span class="provenance-registry-prefix">Verify in Statutory Registries:</span>
+            <a href="https://www.amfiindia.com/research-information/other-data/scheme-details" target="_blank" rel="noopener noreferrer" class="provenance-registry-chip" title="Official AMFI Scheme & Portfolio Disclosures"><svg class="glyph" style="width:12px;height:12px;"><use href="#icon-doc"></use></svg><span>AMFI Scheme Portal ↗</span></a>
+            <a href="https://www.amfiindia.com/research-information/ter-of-mutual-fund-schemes" target="_blank" rel="noopener noreferrer" class="provenance-registry-chip" title="Official AMFI Total Expense Ratio Ledger"><svg class="glyph" style="width:12px;height:12px;"><use href="#icon-doc"></use></svg><span>AMFI TER Filings ↗</span></a>
+            <a href="https://www.sebi.gov.in/sebiweb/other/OtherAction.do?doMutualFund=yes" target="_blank" rel="noopener noreferrer" class="provenance-registry-chip" title="SEBI Mutual Fund SID & KIM Filings"><svg class="glyph" style="width:12px;height:12px;"><use href="#icon-doc"></use></svg><span>SEBI SID / KIM Filings ↗</span></a>
+          </div>
         </div>
         <div style="display: flex; gap: 8px; margin-top: 14px; flex-wrap: wrap; align-items: center;">
           <span id="dossierReadTimeBadge" class="dossier-read-time-badge" title="Estimated reading time and live active study progress">

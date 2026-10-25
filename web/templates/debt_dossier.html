@@ -39,7 +39,7 @@
           {{ posture.instrument_name }}
         </div>
         <div class="dossier-meta-strip" style="margin-top: 10px;">
-          <span class="dossier-meta-pill"><svg class="glyph" style="width:12px;height:12px;vertical-align:-1px;margin-right:4px;"><use href="#icon-doc"></use></svg>Evaluated: {{ security.maturity_date|default('Recent') }}</span>
+          <span class="dossier-meta-pill"><svg class="glyph" style="width:12px;height:12px;vertical-align:-1px;margin-right:4px;"><use href="#icon-doc"></use></svg>Updated: {{ debt_updated_str|default('Latest BSE Debt Sync') }}</span>
           <span class="dossier-meta-sep">•</span>
           <span class="badge badge-emerald"><span class="status-dot status-dot-emerald"></span> Verified BSE Debt / SEBI Feed</span>
           <span class="dossier-meta-sep">•</span>
@@ -49,6 +49,28 @@
         </div>
         <div class="dossier-provenance-subline" style="margin-top: 6px;">
           Data sourced directly from official BSE Debt disclosures, credit rating rationales, and SEBI Online Bond Provider filings.
+        </div>
+        <div class="dossier-provenance-bar" role="group" aria-label="Corporate Debt Data Provenance and Statutory Links">
+          <div class="provenance-grid">
+            <div class="provenance-cell">
+              <div class="provenance-label"><svg class="glyph" style="width:12px;height:12px;"><use href="#glyph-clock"></use></svg> Yield Quote &amp; Sync Date</div>
+              <div class="provenance-value tnum">YTM {{ posture.ytm_pct }}% • As of {{ debt_updated_str|default('Latest BSE Debt Sync') }}</div>
+              <div class="provenance-sub">Coupon: <span class="tnum">{{ posture.coupon_rate_pct }}%</span> ({{ posture.coupon_frequency.title() }}) • Rating: <strong>{{ posture.credit_rating }}</strong></div>
+            </div>
+            <div class="provenance-cell">
+              <div class="provenance-label"><svg class="glyph" style="width:12px;height:12px;"><use href="#icon-doc"></use></svg> Indenture &amp; Maturity Basis</div>
+              <div class="provenance-value tnum">ISIN {{ security.isin }} • Maturity {{ debt_maturity_str|default(security.maturity_date) }}</div>
+              <div class="provenance-sub">SEBINCS Disclosure &amp; Debenture Trustee Security Cover</div>
+            </div>
+          </div>
+          <div class="provenance-registry-bar">
+            <span class="provenance-registry-prefix">Verify in Original Registries:</span>
+            <a href="https://www.bseindia.com/markets/debt/debt_corporate_EOD.aspx" target="_blank" rel="noopener noreferrer" class="provenance-registry-chip" title="BSE Corporate Debt Trade & Reporting Ledger"><svg class="glyph" style="width:12px;height:12px;"><use href="#icon-doc"></use></svg><span>BSE Debt Segment ↗</span></a>
+            <a href="https://www.indiabondinfo.nsdl.com/" target="_blank" rel="noopener noreferrer" class="provenance-registry-chip" title="SEBI / NSDL IndiaBondInfo ISIN Covenant Database"><svg class="glyph" style="width:12px;height:12px;"><use href="#icon-doc"></use></svg><span>NSDL IndiaBondInfo (ISIN) ↗</span></a>
+            {% if security.ticker %}
+            <a href="/dossier/{{ security.ticker }}" class="provenance-registry-chip" title="Open Listed Parent Equity Solvency Dossier"><svg class="glyph" style="width:12px;height:12px;"><use href="#glyph-shield"></use></svg><span>Issuer Equity Dossier ({{ security.ticker }}) →</span></a>
+            {% endif %}
+          </div>
         </div>
       </div>
 

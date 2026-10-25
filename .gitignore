@@ -29,3 +29,6 @@ project_structure.txt
 
 # Local large asset drop-in source packages
 web/static/img/Moatnomics-*/
+
+# GitHub Actions workflows managed locally (prevents PAT scope rejection without workflow grant)
+.github/

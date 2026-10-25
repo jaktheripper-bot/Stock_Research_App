@@ -1,9 +1,29 @@
 """Report parsing, 7-pillar health matrix extraction, regulatory sanitization, citations formatting, and differential comparison."""
 
-import re
+from datetime import datetime
 import logging
+import re
+from typing import Any, Dict, List, Optional, Tuple
+import urllib.parse
 
 logger = logging.getLogger("equity_research.core.analysis.parser")
+
+PRIMARY_STATUTORY_DOMAINS = (
+    "bseindia.com",
+    "nseindia.com",
+    "sebi.gov.in",
+    "mca.gov.in",
+    "rbi.org.in",
+    "amfiindia.com",
+    "crisil.com",
+    "icra.in",
+    "careedge.in",
+    "careratings.com",
+    "indiabudget.gov.in",
+    "ibbi.gov.in",
+    "nclt.gov.in",
+    "ccilindia.com",
+)
 
 def extract_health_matrix(report_text: str) -> dict:
     """
@@ -155,6 +175,268 @@ def format_citations_section(citations: list[dict], stock_data: dict = None) -> 
             idx += 1
 
     return "\n".join(lines)
+
+
+def _normalize_fy_year(raw_yr: str) -> int:
+    """Converts 2-digit or 4-digit Indian fiscal year token ('26' or '2026') to 4-digit integer."""
+    yr = int(raw_yr)
+    if yr < 100:
+        return 2000 + yr
+    return yr
+
+
+def extract_financial_period_covered(report_text: str, reference_date: Any = None) -> str:
+    """Deterministically extracts the reported Indian fiscal period (e.g. 'Q3 FY26 • FY25 Audited')
+    from dossier text while excluding forward Reverse-DCF terminal projection years.
+    """
+    if not report_text or not isinstance(report_text, str):
+        return "TTM Statutory Exchange Filings"
+
+    ref_dt: Optional[datetime] = None
+    try:
+        from core.presentation.formatters import _coerce_datetime
+        ref_dt = _coerce_datetime(reference_date)
+    except Exception as dt_err:
+        logger.warning("Reference date parse notice in extract_financial_period_covered: %s", dt_err)
+
+    if ref_dt is None:
+        ref_dt = datetime.now()
+
+    current_indian_fy = (ref_dt.year + 1) if ref_dt.month >= 4 else ref_dt.year
+    max_quarter_fy = current_indian_fy
+    max_completed_annual_fy = current_indian_fy - 1
+    min_fy = max(2021, current_indian_fy - 4)
+
+    clean = report_text.replace("\xa0", " ").replace("–", "-").replace("—", "-")
+
+    # 1. Quarterly / interim period tags: Q1 FY26, 3QFY26, 9M FY26, H1 FY26
+    quarters_found: List[Tuple[int, int, str]] = []
+    for m_q in re.finditer(r"(?i)\b(?:Q([1-4])|([1-4])Q)\s*[-/]?\s*FY\s*['’]?(20\d{2}|\d{2})\b", clean):
+        q_num = int(m_q.group(1) or m_q.group(2))
+        fy_yr = _normalize_fy_year(m_q.group(3))
+        prefix_ctx = clean[max(0, m_q.start() - 28):m_q.start()].lower()
+        if any(w in prefix_ctx for w in ("target", "projected", "by ", "estimate", "forecast")):
+            continue
+        if min_fy <= fy_yr <= max_quarter_fy:
+            quarters_found.append((fy_yr, q_num, f"Q{q_num} FY{str(fy_yr)[-2:]}"))
+
+    interims_found: List[Tuple[int, int, str]] = []
+    for m_int in re.finditer(r"(?i)\b(9M|H1|H2)\s*[-/]?\s*FY\s*['’]?(20\d{2}|\d{2})\b", clean):
+        tag = m_int.group(1).upper()
+        fy_yr = _normalize_fy_year(m_int.group(2))
+        rank = 3 if tag == "9M" else (2 if tag == "H1" else 4)
+        if min_fy <= fy_yr <= max_quarter_fy:
+            interims_found.append((fy_yr, rank, f"{tag} FY{str(fy_yr)[-2:]}"))
+
+    # 2. Annual fiscal year tags: FY2024-25 (-> FY25), FY25, FY2025
+    annual_fys: List[int] = []
+    for m_span in re.finditer(r"(?i)\bFY\s*['’]?(20\d{2}|\d{2})\s*-\s*(\d{2,4})\b", clean):
+        end_part = m_span.group(2)
+        fy_yr = _normalize_fy_year(end_part[-2:] if len(end_part) == 2 else end_part)
+        prefix_ctx = clean[max(0, m_span.start() - 28):m_span.start()].lower()
+        if any(w in prefix_ctx for w in ("terminal", "projected", "horizon", "by ", "cagr to ")):
+            continue
+        if min_fy <= fy_yr <= max_completed_annual_fy:
+            annual_fys.append(fy_yr)
+
+    # Mask spans & quarters before scanning standalone FY tokens so Q2 FY27 doesn't count as completed annual FY27
+    masked = re.sub(r"(?i)\b(?:Q[1-4]|[1-4]Q|9M|H1|H2)\s*[-/]?\s*FY\s*['’]?(?:20\d{2}|\d{2})\b", " ", clean)
+    masked = re.sub(r"(?i)\bFY\s*['’]?(?:20\d{2}|\d{2})\s*-\s*\d{2,4}\b", " ", masked)
+
+    for m_fy in re.finditer(r"(?i)\bFY\s*['’]?(20\d{2}|\d{2})\b", masked):
+        fy_yr = _normalize_fy_year(m_fy.group(1))
+        prefix_ctx = masked[max(0, m_fy.start() - 32):m_fy.start()].lower()
+        suffix_ctx = masked[m_fy.end():min(len(masked), m_fy.end() + 28)].lower()
+        if any(w in prefix_ctx for w in ("terminal", "projected", "horizon", "by ", "through ", "target ", "into ")):
+            continue
+        if re.search(r"^(?:[epf]\b|\s*(?:est|proj|target|forecast))", suffix_ctx, re.I):
+            continue
+        if min_fy <= fy_yr <= max_completed_annual_fy:
+            annual_fys.append(fy_yr)
+        elif fy_yr == current_indian_fy and any(w in suffix_ctx or w in prefix_ctx for w in ("audited", "annual report")):
+            annual_fys.append(fy_yr)
+
+    best_interim_label = ""
+    if quarters_found:
+        quarters_found.sort(key=lambda x: (x[0], x[1]))
+        best_interim_label = quarters_found[-1][2]
+    elif interims_found:
+        interims_found.sort(key=lambda x: (x[0], x[1]))
+        best_interim_label = interims_found[-1][2]
+
+    best_annual_fy = max(annual_fys) if annual_fys else None
+
+    if best_interim_label and best_annual_fy:
+        return f"{best_interim_label} • FY{str(best_annual_fy)[-2:]} Audited (TTM)"
+    if best_interim_label:
+        return f"{best_interim_label} Statutory Filing (TTM)"
+    if best_annual_fy:
+        return f"FY{str(best_annual_fy)[-2:]} Audited Filings (TTM)"
+    return "TTM Statutory Exchange Filings"
+
+
+def enrich_and_classify_citations(
+    citations: Optional[List[Dict[str, Any]]],
+    *,
+    scrip_code: str = "",
+    ticker: str = "",
+    company_name: str = "",
+) -> Dict[str, Any]:
+    """Classifies dossier citations into Primary Statutory Filings vs. Secondary Web Grounding,
+    builds 1-click exchange registry links, and deterministically backfills official BSE repository
+    links when a listed BSE company has zero primary statutory citations.
+    """
+    clean_scrip = str(scrip_code or "").strip()
+    if not clean_scrip or not clean_scrip.isdigit():
+        for raw_c in (citations or []):
+            if isinstance(raw_c, dict):
+                c_uri = str(raw_c.get("uri") or raw_c.get("url") or "")
+                m_cd = re.search(r"[?&]scrip_cd=(\d{6})\b|/(\d{6})/", c_uri)
+                if m_cd:
+                    clean_scrip = m_cd.group(1) or m_cd.group(2)
+                    break
+    has_valid_scrip = bool(clean_scrip) and clean_scrip.isdigit()
+    clean_sym = str(ticker or "").strip().upper()
+    display_entity = str(company_name or clean_sym or "Issuer").strip()
+
+    direct_registry_links: List[Dict[str, str]] = []
+    if has_valid_scrip:
+        direct_registry_links.extend([
+            {
+                "label": "BSE Filings",
+                "title": f"{display_entity} — Official BSE Corporate Announcements (Scrip {clean_scrip})",
+                "uri": f"https://www.bseindia.com/corporates/ann.html?scrip_cd={clean_scrip}",
+                "source_type": "BSE Statutory Filing",
+            },
+            {
+                "label": "Financial Results",
+                "title": f"{display_entity} — BSE Audited & Quarterly Financial Results (Scrip {clean_scrip})",
+                "uri": f"https://www.bseindia.com/stock-share-price/-/-/{clean_scrip}/financials-results/",
+                "source_type": "BSE Financial Statements",
+            },
+            {
+                "label": "Shareholding Pattern",
+                "title": f"{display_entity} — BSE Statutory Shareholding & Pledge Ledger (Scrip {clean_scrip})",
+                "uri": f"https://www.bseindia.com/corporates/ShareholdingPattern.aspx?scrip_cd={clean_scrip}",
+                "source_type": "BSE Shareholding Registry",
+            },
+            {
+                "label": "Annual Reports",
+                "title": f"{display_entity} — BSE Annual Reports & SEBI BRSR Filings (Scrip {clean_scrip})",
+                "uri": f"https://www.bseindia.com/stock-share-price/-/-/{clean_scrip}/financials-annual-reports/",
+                "source_type": "BSE Annual Reports",
+            },
+        ])
+    if clean_sym and not clean_sym.isdigit() and " " not in clean_sym:
+        direct_registry_links.append({
+            "label": "NSE Quote",
+            "title": f"{display_entity} — NSE India Security Quote & Disclosures ({clean_sym})",
+            "uri": f"https://www.nseindia.com/get-quotes/equity?symbol={urllib.parse.quote(clean_sym)}",
+            "source_type": "NSE Exchange Feed",
+        })
+
+    primary_items: List[Dict[str, Any]] = []
+    secondary_items: List[Dict[str, Any]] = []
+    seen_uris = set()
+
+    for raw_c in (citations or []):
+        if not isinstance(raw_c, dict):
+            continue
+        uri = str(raw_c.get("uri") or raw_c.get("url") or "").strip()
+        title = str(raw_c.get("title") or "").strip()
+        stype = str(raw_c.get("source_type") or raw_c.get("domain") or "").strip()
+
+        if uri and uri in seen_uris:
+            continue
+        if uri:
+            seen_uris.add(uri)
+
+        parsed_host = ""
+        if uri:
+            try:
+                parsed_host = (urllib.parse.urlparse(uri).netloc or "").lower()
+            except Exception as url_err:
+                logger.warning("Citation URL parse notice for %r: %s", uri, url_err)
+                parsed_host = ""
+
+        is_redirect = "vertexaisearch.cloud.google.com" in parsed_host
+        is_primary_domain = (not is_redirect) and any(
+            parsed_host == dom or parsed_host.endswith(f".{dom}")
+            for dom in PRIMARY_STATUTORY_DOMAINS
+        )
+
+        # Clean bare domain titles
+        low_title = title.lower()
+        if low_title == "bseindia.com":
+            title = "BSE India Official Disclosures & Filing Repository" + (" (Grounded Search)" if is_redirect else "")
+        elif low_title == "nseindia.com":
+            title = "NSE India Corporate Announcements Feed" + (" (Grounded Search)" if is_redirect else "")
+        elif low_title == "mca.gov.in":
+            title = "Ministry of Corporate Affairs Company Master Data"
+        elif low_title == "sebi.gov.in":
+            title = "SEBI Statutory Orders & Regulatory Framework"
+        elif not title:
+            title = parsed_host or "Verified Regulatory / Market Disclosure"
+
+        if is_primary_domain:
+            if not stype or "grounding" in stype.lower() or "perplexity" in stype.lower() or "gemini" in stype.lower():
+                if "bseindia.com" in parsed_host:
+                    stype = "BSE Statutory Filing"
+                elif "nseindia.com" in parsed_host:
+                    stype = "NSE Exchange Filing"
+                elif "sebi.gov.in" in parsed_host:
+                    stype = "SEBI Regulatory Filing"
+                elif "mca.gov.in" in parsed_host:
+                    stype = "MCA Statutory Registry"
+                elif "rbi.org.in" in parsed_host:
+                    stype = "RBI Statutory Release"
+                elif "amfiindia.com" in parsed_host:
+                    stype = "AMFI Statutory Feed"
+                else:
+                    stype = "Primary Statutory Filing"
+            primary_items.append({
+                "title": title,
+                "uri": uri,
+                "source_type": stype,
+                "tier": "PRIMARY_STATUTORY",
+                "tier_label": "Primary Statutory Filing",
+            })
+        else:
+            if not stype or "perplexity" in stype.lower() or "gemini" in stype.lower():
+                stype = "Verified Web Grounding"
+            secondary_items.append({
+                "title": title,
+                "uri": uri,
+                "source_type": stype,
+                "tier": "SECONDARY_GROUNDING",
+                "tier_label": "Secondary Web Grounding",
+            })
+
+    # Deterministically backfill official BSE primary filing repositories when a listed BSE company has 0 primary links
+    if has_valid_scrip and len(primary_items) == 0:
+        for reg in direct_registry_links:
+            if "bseindia.com" in reg["uri"] and reg["uri"] not in seen_uris:
+                seen_uris.add(reg["uri"])
+                primary_items.append({
+                    "title": reg["title"],
+                    "uri": reg["uri"],
+                    "source_type": reg["source_type"],
+                    "tier": "PRIMARY_STATUTORY",
+                    "tier_label": "Primary Statutory Filing",
+                })
+
+    ordered = primary_items + secondary_items
+    for idx, item in enumerate(ordered, 1):
+        item["index"] = idx
+
+    return {
+        "citations": ordered,
+        "primary_count": len(primary_items),
+        "secondary_count": len(secondary_items),
+        "direct_registry_links": direct_registry_links,
+        "primary_statutory": primary_items,
+        "secondary_grounding": secondary_items,
+    }
 
 PILLAR_METADATA = {
     1: {

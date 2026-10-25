@@ -1,184 +1,342 @@
 {% extends "base.html" %}
 
-{% block title %}Omni-Product Investment Search | Equities, Mutual Funds & Debt{% endblock %}
-{% block meta_description %}Unified search across Indian listed equities, AMFI mutual fund schemes, and BSE/NSE corporate debt securities.{% endblock %}
+{% block title %}7-Asset Investment Search | Moatnomics{% endblock %}
+{% block meta_desc %}Unified search across Indian listed equities, AMFI mutual funds, ETFs, corporate bonds, REITs/InvITs/SGBs, RBI sovereign benchmarks, and unlisted MSMEs.{% endblock %}
 
 {% block content %}
-<div class="container py-8" data-asset-class="equities">
+{% set cats = search_results.categories or {} %}
+<div class="container py-8 search-results-page" data-asset-class="equities">
   <!-- Search Hero Header -->
-  <div class="hero-portal-banner" style="background: linear-gradient(135deg, rgba(30, 41, 59, 0.7) 0%, rgba(15, 23, 42, 0.9) 100%); border: 1px solid rgba(255, 255, 255, 0.1); border-radius: 16px; padding: 32px; margin-bottom: 28px;">
-    <div style="display: inline-flex; align-items: center; gap: 8px; background: rgba(14, 165, 233, 0.15); border: 1px solid rgba(14, 165, 233, 0.3); border-radius: 9999px; padding: 4px 12px; margin-bottom: 16px;">
-      <span style="width: 8px; height: 8px; border-radius: 50%; background: #0ea5e9;"></span>
-      <span style="font-size: 12px; font-weight: 700; color: #38bdf8; text-transform: uppercase; letter-spacing: 0.05em;">Multi-Asset Omni Search</span>
+  <div class="hero-portal-banner search-results-hero">
+    <div class="search-hero-pill">
+      <span class="search-hero-dot" aria-hidden="true"></span>
+      <span>7-Asset Omni-Search</span>
     </div>
 
-    <h1 style="font-size: 32px; font-weight: 800; color: #f8fafc; margin-bottom: 12px; letter-spacing: -0.02em;">
-      Search Investment Products
+    <h1 class="search-hero-heading">
+      Search Investment Products Across Seven Asset Classes
     </h1>
-    <p style="font-size: 15px; color: #94a3b8; max-width: 780px; line-height: 1.6; margin-bottom: 24px;">
-      Instant discovery across <strong>Public Equities</strong>, <strong>AMFI Mutual Funds</strong>, and <strong>Listed Corporate Bonds & SDIs</strong>. Search by company name, ticker symbol, scheme code, or ISIN.
+    <p class="search-hero-subtitle">
+      Locate <strong>Listed Equities</strong>, <strong>AMFI Mutual Funds</strong>, <strong>ETFs</strong>, <strong>Corporate Bonds &amp; SDIs</strong>, <strong>REITs / InvITs / SGBs</strong>, <strong>RBI Sovereign Benchmarks</strong>, and <strong>Unlisted MSMEs</strong> by ticker, scheme code, ISIN, BSE scrip code, or Udyam UIN.
     </p>
 
-    <!-- Search Form -->
-    <form action="/search" method="GET" style="display: flex; gap: 10px; max-width: 760px; flex-wrap: wrap;">
-      <div style="flex: 1; min-width: 280px; position: relative;">
-        <input type="text" name="q" id="omniSearchInput" value="{{ query or '' }}" placeholder="Search stocks, mutual funds, bonds (e.g. INFY, Parag Parikh, HDFC, INE002A)..." autofocus class="form-control" style="background: rgba(15, 23, 42, 0.9); border: 1px solid rgba(255, 255, 255, 0.2); color: #fff; padding: 12px 18px; border-radius: 10px; font-size: 15px; width: 100%;">
+    <form action="/search" method="GET" class="search-page-form">
+      <div class="search-page-input-wrap">
+        <label for="omniSearchInput" class="visually-hidden">Search across all 7 asset classes</label>
+        <input
+          type="search"
+          name="q"
+          id="omniSearchInput"
+          value="{{ query or '' }}"
+          placeholder="e.g. TCS, Parag Parikh, NIFTYBEES, INE002A, EMBASSY, 10Y G-Sec, UDYAM..."
+          autocomplete="off"
+          style="font-size: 16px;"
+          class="form-control search-page-input"
+        >
       </div>
       <input type="hidden" name="type" value="{{ selected_type or 'ALL' }}">
-      <button type="submit" class="btn btn-primary" style="padding: 12px 24px; font-size: 14px; font-weight: 700; border-radius: 10px;">
-        <svg class="glyph"><use href="#glyph-search"></use></svg> Search All
+      <button type="submit" class="btn btn-primary search-page-submit-btn">
+        <svg class="glyph" aria-hidden="true"><use href="#glyph-search"></use></svg> Search All
       </button>
     </form>
   </div>
 
-  <!-- Category Filter Pills -->
   {% if query %}
-  <div style="display: flex; gap: 8px; margin-bottom: 24px; overflow-x: auto; padding-bottom: 4px;">
-    <a href="/search?q={{ query }}&type=ALL" class="btn btn-sm {% if selected_type == 'ALL' or not selected_type %}btn-primary{% else %}btn-secondary{% endif %}" style="border-radius: 9999px;">
+  <!-- 7-Asset Category Filter Pills -->
+  <div class="search-category-pills" role="navigation" aria-label="Filter search results by asset class">
+    <a href="/search?q={{ query|urlencode }}&type=ALL" class="btn btn-sm {% if selected_type == 'ALL' or not selected_type %}btn-primary{% else %}btn-secondary{% endif %} search-cat-pill">
       All Categories ({{ search_results.total_matches }})
     </a>
-    <a href="/search?q={{ query }}&type=EQUITY" class="btn btn-sm {% if selected_type == 'EQUITY' %}btn-primary{% else %}btn-secondary{% endif %}" style="border-radius: 9999px;">
-      <svg class="glyph"><use href="#icon-markets"></use></svg> Stocks ({{ search_results.categories.equities|length }})
+    <a href="/search?q={{ query|urlencode }}&type=EQUITY" class="btn btn-sm {% if selected_type in ['EQUITY', 'EQUITIES', 'STOCK'] %}btn-primary{% else %}btn-secondary{% endif %} search-cat-pill">
+      <svg class="glyph" aria-hidden="true"><use href="#icon-markets"></use></svg> Equities ({{ (cats.equities or [])|length }})
     </a>
-    <a href="/search?q={{ query }}&type=MUTUAL_FUND" class="btn btn-sm {% if selected_type == 'MUTUAL_FUND' %}btn-primary{% else %}btn-secondary{% endif %}" style="border-radius: 9999px;">
-      <svg class="glyph"><use href="#glyph-chart"></use></svg> Mutual Funds ({{ search_results.categories.mutual_funds|length }})
+    <a href="/search?q={{ query|urlencode }}&type=MUTUAL_FUND" class="btn btn-sm {% if selected_type in ['MUTUAL_FUND', 'FUND', 'MF'] %}btn-primary{% else %}btn-secondary{% endif %} search-cat-pill">
+      <svg class="glyph" aria-hidden="true"><use href="#icon-portfolio"></use></svg> Mutual Funds ({{ (cats.mutual_funds or [])|length }})
     </a>
-    <a href="/search?q={{ query }}&type=DEBT" class="btn btn-sm {% if selected_type == 'DEBT' %}btn-primary{% else %}btn-secondary{% endif %}" style="border-radius: 9999px;">
-      <svg class="glyph"><use href="#glyph-temple"></use></svg> Corporate Debt & NCDs ({{ search_results.categories.corporate_debt|length }})
+    <a href="/search?q={{ query|urlencode }}&type=ETF" class="btn btn-sm {% if selected_type in ['ETF', 'ETFS'] %}btn-primary{% else %}btn-secondary{% endif %} search-cat-pill">
+      <svg class="glyph" aria-hidden="true"><use href="#icon-screen"></use></svg> ETFs ({{ (cats.etfs or [])|length }})
+    </a>
+    <a href="/search?q={{ query|urlencode }}&type=DEBT" class="btn btn-sm {% if selected_type in ['DEBT', 'BOND', 'NCD'] %}btn-primary{% else %}btn-secondary{% endif %} search-cat-pill">
+      <svg class="glyph" aria-hidden="true"><use href="#icon-risk"></use></svg> Bonds &amp; NCDs ({{ (cats.corporate_debt or [])|length }})
+    </a>
+    <a href="/search?q={{ query|urlencode }}&type=REIT_INVIT" class="btn btn-sm {% if selected_type in ['REIT', 'REIT_INVIT', 'INVIT', 'SGB'] %}btn-primary{% else %}btn-secondary{% endif %} search-cat-pill">
+      <svg class="glyph" aria-hidden="true"><use href="#icon-sector-realestate"></use></svg> REITs &amp; SGBs ({{ (cats.reits_invits or [])|length }})
+    </a>
+    <a href="/search?q={{ query|urlencode }}&type=SOVEREIGN" class="btn btn-sm {% if selected_type in ['SOVEREIGN', 'GSEC', 'TBILL', 'SDL'] %}btn-primary{% else %}btn-secondary{% endif %} search-cat-pill">
+      <svg class="glyph" aria-hidden="true"><use href="#icon-pillar-04"></use></svg> Sovereign ({{ (cats.sovereign or [])|length }})
+    </a>
+    <a href="/search?q={{ query|urlencode }}&type=MSME" class="btn btn-sm {% if selected_type in ['MSME', 'SME', 'UDYAM'] %}btn-primary{% else %}btn-secondary{% endif %} search-cat-pill">
+      <svg class="glyph" aria-hidden="true"><use href="#icon-sector-industrials"></use></svg> MSMEs ({{ (cats.msmes or [])|length }})
     </a>
   </div>
 
-  <!-- Search Results Sections -->
   {% if search_results.total_matches == 0 %}
-  <div style="background: rgba(30, 41, 59, 0.4); border: 1px solid rgba(255, 255, 255, 0.08); border-radius: 12px; padding: 48px; text-align: center;">
-    <div style="font-size: 48px; margin-bottom: 16px;"><svg class="glyph" style="width: 48px; height: 48px;"><use href="#icon-state-empty-search"></use></svg></div>
-    <h3 style="font-size: 18px; font-weight: 700; color: #f8fafc; margin-bottom: 8px;">No matching investment products found</h3>
-    <p style="font-size: 14px; color: #94a3b8; max-width: 500px; margin: 0 auto 20px;">
-      We couldn't find any equities, mutual fund schemes, or debt securities matching "<strong>{{ query }}</strong>". Try searching with a broader keyword, ticker symbol, or AMFI scheme code.
+  <div class="search-empty-card">
+    <div class="search-empty-icon">
+      <svg class="glyph" style="width: 44px; height: 44px;" aria-hidden="true"><use href="#icon-state-empty-search"></use></svg>
+    </div>
+    <h2 class="search-empty-title">No matching securities or instruments found</h2>
+    <p class="search-empty-desc">
+      No listed equities, mutual funds, ETFs, debt securities, REITs/SGBs, sovereign benchmarks, or MSME records matched "<strong>{{ query }}</strong>". Search with a broader company name, NSE/BSE ticker, 6-digit BSE scrip code, AMFI scheme code, ISIN, or Udyam UIN.
     </p>
-    <a href="/funds" class="btn btn-secondary btn-sm" style="border-radius: 8px;">Browse Mutual Funds Directory</a>
+    <div style="display: flex; gap: 10px; justify-content: center; flex-wrap: wrap;">
+      <a href="/equities" class="btn btn-secondary btn-sm">Browse Equities</a>
+      <a href="/funds" class="btn btn-secondary btn-sm">Browse Mutual Funds</a>
+      <a href="/etfs" class="btn btn-secondary btn-sm">Browse ETFs</a>
+      <a href="/debt" class="btn btn-secondary btn-sm">Browse Corporate Debt</a>
+    </div>
   </div>
   {% else %}
 
   <!-- 1. Equities Section -->
-  {% if search_results.categories.equities and (selected_type == 'ALL' or selected_type == 'EQUITY') %}
-  <div style="margin-bottom: 32px;">
-    <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 14px;">
-      <h2 style="font-size: 18px; font-weight: 700; color: #f8fafc; display: flex; align-items: center; gap: 8px;">
-        <span><svg class="glyph"><use href="#icon-markets"></use></svg></span> Listed Equities & Stocks ({{ search_results.categories.equities|length }})
-      </h2>
-    </div>
-    <div style="display: grid; grid-template-columns: repeat(auto-fill, minmax(320px, 1fr)); gap: 14px;">
-      {% for eq in search_results.categories.equities %}
-      <a href="{{ eq.url }}" style="text-decoration: none; color: inherit;">
-        <div class="card asset-card-accent" data-asset-class="equities" style="background: rgba(30, 41, 59, 0.5); border: 1px solid rgba(255, 255, 255, 0.1); border-radius: 12px; padding: 18px; transition: all 0.2s;" onmouseover="this.style.borderColor='rgba(16, 185, 129, 0.5)'; this.style.transform='translateY(-2px)';" onmouseout="this.style.borderColor='rgba(255, 255, 255, 0.1)'; this.style.transform='translateY(0)';">
-          <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;">
-            <span class="mono" style="font-size: 14px; font-weight: 800; color: #34d399;">{{ eq.identifier }}</span>
-            <span style="font-size: 11px; font-weight: 700; background: rgba(16, 185, 129, 0.15); color: #34d399; padding: 2px 8px; border-radius: 6px;">STOCK</span>
+  {% if cats.equities and (selected_type in ['ALL', 'EQUITY', 'EQUITIES', 'STOCK'] or not selected_type) %}
+  <section class="search-category-section">
+    <h2 class="search-section-heading">
+      <svg class="glyph" aria-hidden="true"><use href="#icon-markets"></use></svg>
+      <span>Listed Equities &amp; Stock Dossiers ({{ cats.equities|length }})</span>
+    </h2>
+    <div class="search-cards-grid">
+      {% for eq in cats.equities %}
+      <a href="{{ eq.url }}" class="search-card-link">
+        <div class="card asset-card-accent search-result-card" data-asset-class="equities">
+          <div class="search-card-top">
+            <span class="mono search-card-id">{{ eq.identifier }}</span>
+            <span class="search-card-badge">{{ eq.badge or 'Stock' }}</span>
           </div>
-          <div style="font-size: 15px; font-weight: 700; color: #f8fafc; margin-bottom: 4px;">{{ eq.title }}</div>
-          <div style="font-size: 12px; color: #94a3b8;">{{ eq.subtitle }}</div>
+          <div class="search-card-title">{{ eq.title }}</div>
+          <div class="search-card-subtitle">{{ eq.subtitle }}</div>
         </div>
       </a>
       {% endfor %}
     </div>
-  </div>
+  </section>
   {% endif %}
 
   <!-- 2. Mutual Funds Section -->
-  {% if search_results.categories.mutual_funds and (selected_type == 'ALL' or selected_type == 'MUTUAL_FUND') %}
-  <div style="margin-bottom: 32px;">
-    <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 14px;">
-      <h2 style="font-size: 18px; font-weight: 700; color: #f8fafc; display: flex; align-items: center; gap: 8px;">
-        <span><svg class="glyph"><use href="#glyph-chart"></use></svg></span> Mutual Fund Schemes ({{ search_results.categories.mutual_funds|length }})
-      </h2>
-    </div>
-    <div style="display: grid; grid-template-columns: repeat(auto-fill, minmax(340px, 1fr)); gap: 14px;">
-      {% for mf in search_results.categories.mutual_funds %}
-      <a href="{{ mf.url }}" style="text-decoration: none; color: inherit;">
-        <div class="card asset-card-accent" data-asset-class="funds" style="background: rgba(30, 41, 59, 0.5); border: 1px solid rgba(255, 255, 255, 0.1); border-radius: 12px; padding: 18px; transition: all 0.2s;" onmouseover="this.style.borderColor='rgba(14, 165, 233, 0.5)'; this.style.transform='translateY(-2px)';" onmouseout="this.style.borderColor='rgba(255, 255, 255, 0.1)'; this.style.transform='translateY(0)';">
-          <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;">
-            <span class="mono" style="font-size: 12px; color: #38bdf8; font-weight: 700;">Code: {{ mf.identifier }}</span>
-            <span style="font-size: 11px; font-weight: 700; background: rgba(14, 165, 233, 0.15); color: #38bdf8; padding: 2px 8px; border-radius: 6px;">MUTUAL FUND</span>
+  {% if cats.mutual_funds and (selected_type in ['ALL', 'MUTUAL_FUND', 'FUND', 'MF'] or not selected_type) %}
+  <section class="search-category-section">
+    <h2 class="search-section-heading">
+      <svg class="glyph" aria-hidden="true"><use href="#icon-portfolio"></use></svg>
+      <span>Mutual Fund Schemes ({{ cats.mutual_funds|length }})</span>
+    </h2>
+    <div class="search-cards-grid">
+      {% for mf in cats.mutual_funds %}
+      <a href="{{ mf.url }}" class="search-card-link">
+        <div class="card asset-card-accent search-result-card" data-asset-class="funds">
+          <div class="search-card-top">
+            <span class="mono search-card-id">AMFI: {{ mf.identifier }}</span>
+            <span class="search-card-badge">{{ mf.badge or 'Mutual Fund' }}</span>
           </div>
-          <div style="font-size: 15px; font-weight: 700; color: #f8fafc; margin-bottom: 4px; line-height: 1.3;">{{ mf.title }}</div>
-          <div style="font-size: 12px; color: #94a3b8; margin-bottom: 10px;">{{ mf.subtitle }}</div>
-          {% if mf.details.nav %}
-          <div style="display: inline-block; font-size: 12px; font-weight: 700; color: #cbd5e1; background: rgba(255, 255, 255, 0.05); padding: 3px 8px; border-radius: 6px;">
-            NAV: {{ mf.details.nav }}
-          </div>
+          <div class="search-card-title">{{ mf.title }}</div>
+          <div class="search-card-subtitle">{{ mf.subtitle }}</div>
+          {% if mf.details and mf.details.nav %}
+          <div class="search-card-meta-pill">NAV: {{ mf.details.nav }}</div>
           {% endif %}
         </div>
       </a>
       {% endfor %}
     </div>
-  </div>
+  </section>
   {% endif %}
 
-  <!-- 3. Corporate Debt Section -->
-  {% if search_results.categories.corporate_debt and (selected_type == 'ALL' or selected_type == 'DEBT') %}
-  <div style="margin-bottom: 32px;">
-    <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 14px;">
-      <h2 style="font-size: 18px; font-weight: 700; color: #f8fafc; display: flex; align-items: center; gap: 8px;">
-        <span><svg class="glyph"><use href="#glyph-temple"></use></svg></span> Corporate Debt Securities & NCDs ({{ search_results.categories.corporate_debt|length }})
-      </h2>
-    </div>
-    <div style="display: grid; grid-template-columns: repeat(auto-fill, minmax(340px, 1fr)); gap: 14px;">
-      {% for d in search_results.categories.corporate_debt %}
-      <a href="{{ d.url }}" style="text-decoration: none; color: inherit;">
-        <div class="card asset-card-accent" data-asset-class="debt" style="background: rgba(30, 41, 59, 0.5); border: 1px solid rgba(255, 255, 255, 0.1); border-radius: 12px; padding: 18px; transition: all 0.2s;" onmouseover="this.style.borderColor='rgba(245, 158, 11, 0.5)'; this.style.transform='translateY(-2px)';" onmouseout="this.style.borderColor='rgba(255, 255, 255, 0.1)'; this.style.transform='translateY(0)';">
-          <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;">
-            <span class="mono" style="font-size: 12px; color: #fbbf24; font-weight: 700;">ISIN: {{ d.identifier }}</span>
-            <span style="font-size: 11px; font-weight: 700; background: rgba(245, 158, 11, 0.15); color: #fbbf24; padding: 2px 8px; border-radius: 6px;">NCD BOND</span>
+  <!-- 3. ETFs Section -->
+  {% if cats.etfs and (selected_type in ['ALL', 'ETF', 'ETFS'] or not selected_type) %}
+  <section class="search-category-section">
+    <h2 class="search-section-heading">
+      <svg class="glyph" aria-hidden="true"><use href="#icon-screen"></use></svg>
+      <span>Exchange-Traded Funds ({{ cats.etfs|length }})</span>
+    </h2>
+    <div class="search-cards-grid">
+      {% for etf in cats.etfs %}
+      <a href="{{ etf.url }}" class="search-card-link">
+        <div class="card asset-card-accent search-result-card" data-asset-class="etfs">
+          <div class="search-card-top">
+            <span class="mono search-card-id">{{ etf.identifier }}</span>
+            <span class="search-card-badge">{{ etf.badge or 'ETF' }}</span>
           </div>
-          <div style="font-size: 15px; font-weight: 700; color: #f8fafc; margin-bottom: 4px;">{{ d.title }}</div>
-          <div style="font-size: 12px; color: #94a3b8; margin-bottom: 8px;">{{ d.subtitle }}</div>
+          <div class="search-card-title">{{ etf.title }}</div>
+          <div class="search-card-subtitle">{{ etf.subtitle }}</div>
         </div>
       </a>
       {% endfor %}
     </div>
-  </div>
+  </section>
+  {% endif %}
+
+  <!-- 4. Corporate Debt Section -->
+  {% if cats.corporate_debt and (selected_type in ['ALL', 'DEBT', 'BOND', 'NCD'] or not selected_type) %}
+  <section class="search-category-section">
+    <h2 class="search-section-heading">
+      <svg class="glyph" aria-hidden="true"><use href="#icon-risk"></use></svg>
+      <span>Corporate Debt Securities &amp; NCDs ({{ cats.corporate_debt|length }})</span>
+    </h2>
+    <div class="search-cards-grid">
+      {% for d in cats.corporate_debt %}
+      <a href="{{ d.url }}" class="search-card-link">
+        <div class="card asset-card-accent search-result-card" data-asset-class="debt">
+          <div class="search-card-top">
+            <span class="mono search-card-id">ISIN: {{ d.identifier }}</span>
+            <span class="search-card-badge">{{ d.badge or 'Corporate Debt' }}</span>
+          </div>
+          <div class="search-card-title">{{ d.title }}</div>
+          <div class="search-card-subtitle">{{ d.subtitle }}</div>
+        </div>
+      </a>
+      {% endfor %}
+    </div>
+  </section>
+  {% endif %}
+
+  <!-- 5. REITs, SM REITs, InvITs & SGBs Section -->
+  {% if cats.reits_invits and (selected_type in ['ALL', 'REIT', 'REIT_INVIT', 'INVIT', 'SGB'] or not selected_type) %}
+  <section class="search-category-section">
+    <h2 class="search-section-heading">
+      <svg class="glyph" aria-hidden="true"><use href="#icon-sector-realestate"></use></svg>
+      <span>REITs, SM REITs, InvITs &amp; SGBs ({{ cats.reits_invits|length }})</span>
+    </h2>
+    <div class="search-cards-grid">
+      {% for r in cats.reits_invits %}
+      <a href="{{ r.url }}" class="search-card-link">
+        <div class="card asset-card-accent search-result-card" data-asset-class="reits">
+          <div class="search-card-top">
+            <span class="mono search-card-id">{{ r.identifier }}</span>
+            <span class="search-card-badge">{{ r.badge or 'REIT / InvIT' }}</span>
+          </div>
+          <div class="search-card-title">{{ r.title }}</div>
+          <div class="search-card-subtitle">{{ r.subtitle }}</div>
+        </div>
+      </a>
+      {% endfor %}
+    </div>
+  </section>
+  {% endif %}
+
+  <!-- 6. Sovereign Curve & SDLs Section -->
+  {% if cats.sovereign and (selected_type in ['ALL', 'SOVEREIGN', 'GSEC', 'TBILL', 'SDL'] or not selected_type) %}
+  <section class="search-category-section">
+    <h2 class="search-section-heading">
+      <svg class="glyph" aria-hidden="true"><use href="#icon-pillar-04"></use></svg>
+      <span>Sovereign Yield Curve, T-Bills &amp; SDLs ({{ cats.sovereign|length }})</span>
+    </h2>
+    <div class="search-cards-grid">
+      {% for sov in cats.sovereign %}
+      <a href="{{ sov.url }}" class="search-card-link">
+        <div class="card asset-card-accent search-result-card" data-asset-class="sovereign">
+          <div class="search-card-top">
+            <span class="mono search-card-id">{{ sov.identifier }}</span>
+            <span class="search-card-badge">{{ sov.badge or 'Sovereign / RBI' }}</span>
+          </div>
+          <div class="search-card-title">{{ sov.title }}</div>
+          <div class="search-card-subtitle">{{ sov.subtitle }}</div>
+        </div>
+      </a>
+      {% endfor %}
+    </div>
+  </section>
+  {% endif %}
+
+  <!-- 7. Unlisted MSMEs & SMEs Section -->
+  {% if cats.msmes and (selected_type in ['ALL', 'MSME', 'SME', 'UDYAM'] or not selected_type) %}
+  <section class="search-category-section">
+    <h2 class="search-section-heading">
+      <svg class="glyph" aria-hidden="true"><use href="#icon-sector-industrials"></use></svg>
+      <span>Unlisted MSMEs &amp; Emerging SMEs ({{ cats.msmes|length }})</span>
+    </h2>
+    <div class="search-cards-grid">
+      {% for m in cats.msmes %}
+      <a href="{{ m.url }}" class="search-card-link">
+        <div class="card asset-card-accent search-result-card" data-asset-class="msme">
+          <div class="search-card-top">
+            <span class="mono search-card-id">{{ m.identifier }}</span>
+            <span class="search-card-badge">{{ m.badge or 'Unlisted MSME' }}</span>
+          </div>
+          <div class="search-card-title">{{ m.title }}</div>
+          <div class="search-card-subtitle">{{ m.subtitle }}</div>
+        </div>
+      </a>
+      {% endfor %}
+    </div>
+  </section>
   {% endif %}
 
   {% endif %}
   {% else %}
-  <!-- Initial Explore Prompt -->
-  <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 20px;">
-    <div style="background: rgba(30, 41, 59, 0.4); border: 1px solid rgba(255, 255, 255, 0.08); border-radius: 14px; padding: 24px;">
-      <div style="font-size: 28px; margin-bottom: 12px;"><svg class="glyph" style="width: 28px; height: 28px;"><use href="#icon-markets"></use></svg></div>
-      <h3 style="font-size: 17px; font-weight: 700; color: #f8fafc; margin-bottom: 8px;">Public Listed Equities</h3>
-      <p style="font-size: 13px; color: #94a3b8; line-height: 1.5; margin-bottom: 16px;">
-        7-area stock reports for NIFTY 50, NIFTY 500 and mid/small-cap companies, built from exchange filings with sources you can check.
-      </p>
-      <div style="display: flex; gap: 6px; flex-wrap: wrap;">
-        <a href="/search?q=INFY" class="btn btn-secondary btn-sm" style="font-size: 11px; padding: 4px 8px;">INFY</a>
-        <a href="/search?q=TCS" class="btn btn-secondary btn-sm" style="font-size: 11px; padding: 4px 8px;">TCS</a>
-        <a href="/search?q=RELIANCE" class="btn btn-secondary btn-sm" style="font-size: 11px; padding: 4px 8px;">RELIANCE</a>
-        <a href="/search?q=HDFCBANK" class="btn btn-secondary btn-sm" style="font-size: 11px; padding: 4px 8px;">HDFCBANK</a>
+  <!-- Initial 7-Asset Explore Grid -->
+  <div class="search-explore-grid">
+    <div class="search-explore-card">
+      <div class="search-explore-icon"><svg class="glyph" style="width: 24px; height: 24px;" aria-hidden="true"><use href="#icon-markets"></use></svg></div>
+      <h3 class="search-explore-title">Listed Equities</h3>
+      <p class="search-explore-desc">7-Pillar BSE/NSE filing dossiers with Reverse-DCF implied growth, DuPont ROE, and statutory citations.</p>
+      <div class="search-explore-chips">
+        <a href="/search?q=TCS" class="btn btn-secondary btn-sm">TCS</a>
+        <a href="/search?q=INFY" class="btn btn-secondary btn-sm">INFY</a>
+        <a href="/search?q=RELIANCE" class="btn btn-secondary btn-sm">RELIANCE</a>
+        <a href="/equities" class="btn btn-secondary btn-sm">Directory →</a>
       </div>
     </div>
 
-    <div style="background: rgba(30, 41, 59, 0.4); border: 1px solid rgba(255, 255, 255, 0.08); border-radius: 14px; padding: 24px;">
-      <div style="font-size: 28px; margin-bottom: 12px;"><svg class="glyph"><use href="#glyph-chart"></use></svg></div>
-      <h3 style="font-size: 17px; font-weight: 700; color: #f8fafc; margin-bottom: 8px;">Mutual Fund Schemes</h3>
-      <p style="font-size: 13px; color: #94a3b8; line-height: 1.5; margin-bottom: 16px;">
-        AMFI daily NAV tracking, Active Share closet-indexing detection, and 10-year Direct vs Regular TER fee drag models.
-      </p>
-      <div style="display: flex; gap: 6px; flex-wrap: wrap;">
-        <a href="/search?q=Parag+Parikh" class="btn btn-secondary btn-sm" style="font-size: 11px; padding: 4px 8px;">Parag Parikh</a>
-        <a href="/search?q=Quant+Small+Cap" class="btn btn-secondary btn-sm" style="font-size: 11px; padding: 4px 8px;">Quant Small Cap</a>
-        <a href="/search?q=HDFC+Mid-Cap" class="btn btn-secondary btn-sm" style="font-size: 11px; padding: 4px 8px;">HDFC Mid-Cap</a>
+    <div class="search-explore-card">
+      <div class="search-explore-icon"><svg class="glyph" style="width: 24px; height: 24px;" aria-hidden="true"><use href="#icon-portfolio"></use></svg></div>
+      <h3 class="search-explore-title">Mutual Funds</h3>
+      <p class="search-explore-desc">AMFI Direct plans, underlying stock &amp; debt sleeve look-through, Active Share, and 20Y TER fee drag.</p>
+      <div class="search-explore-chips">
+        <a href="/search?q=Parag+Parikh" class="btn btn-secondary btn-sm">Parag Parikh</a>
+        <a href="/search?q=HDFC+Mid-Cap" class="btn btn-secondary btn-sm">HDFC Mid-Cap</a>
+        <a href="/funds" class="btn btn-secondary btn-sm">Directory →</a>
       </div>
     </div>
 
-    <div style="background: rgba(30, 41, 59, 0.4); border: 1px solid rgba(255, 255, 255, 0.08); border-radius: 14px; padding: 24px;">
-      <div style="font-size: 28px; margin-bottom: 12px;"><svg class="glyph"><use href="#glyph-temple"></use></svg></div>
-      <h3 style="font-size: 17px; font-weight: 700; color: #f8fafc; margin-bottom: 8px;">Bonds & Debentures</h3>
-      <p style="font-size: 13px; color: #94a3b8; line-height: 1.5; margin-bottom: 16px;">
-        5-Pillar Credit & Duration Core for BSE/NSE listed NCDs, Senior Secured Debentures, and Securitized Debt Instruments.
-      </p>
-      <div style="display: flex; gap: 6px; flex-wrap: wrap;">
-        <a href="/debt" class="btn btn-secondary btn-sm" style="font-size: 11px; padding: 4px 8px;">Browse All Debt</a>
+    <div class="search-explore-card">
+      <div class="search-explore-icon"><svg class="glyph" style="width: 24px; height: 24px;" aria-hidden="true"><use href="#icon-screen"></use></svg></div>
+      <h3 class="search-explore-title">Exchange-Traded Funds</h3>
+      <p class="search-explore-desc">iNAV premium/discount parity, 1Y tracking error, expense ratios, and secondary market liquidity depth.</p>
+      <div class="search-explore-chips">
+        <a href="/search?q=NIFTYBEES" class="btn btn-secondary btn-sm">NIFTYBEES</a>
+        <a href="/search?q=GOLDBEES" class="btn btn-secondary btn-sm">GOLDBEES</a>
+        <a href="/etfs" class="btn btn-secondary btn-sm">Matrix →</a>
+      </div>
+    </div>
+
+    <div class="search-explore-card">
+      <div class="search-explore-icon"><svg class="glyph" style="width: 24px; height: 24px;" aria-hidden="true"><use href="#icon-risk"></use></svg></div>
+      <h3 class="search-explore-title">Corporate Bonds &amp; SDIs</h3>
+      <p class="search-explore-desc">5-Pillar credit &amp; duration evaluation across BSE/NSE listed NCDs, Senior Secured Bonds, and SDIs.</p>
+      <div class="search-explore-chips">
+        <a href="/search?q=NCD&type=DEBT" class="btn btn-secondary btn-sm">Listed NCDs</a>
+        <a href="/debt" class="btn btn-secondary btn-sm">Directory →</a>
+      </div>
+    </div>
+
+    <div class="search-explore-card">
+      <div class="search-explore-icon"><svg class="glyph" style="width: 24px; height: 24px;" aria-hidden="true"><use href="#icon-sector-realestate"></use></svg></div>
+      <h3 class="search-explore-title">REITs, InvITs &amp; SGBs</h3>
+      <p class="search-explore-desc">Sec 115UA NDCF payout purity, LTV leverage, WALE lease tenure, and secondary SGB tax-free yields.</p>
+      <div class="search-explore-chips">
+        <a href="/search?q=EMBASSY" class="btn btn-secondary btn-sm">EMBASSY</a>
+        <a href="/search?q=SGB" class="btn btn-secondary btn-sm">SGB Series</a>
+        <a href="/reits" class="btn btn-secondary btn-sm">Directory →</a>
+      </div>
+    </div>
+
+    <div class="search-explore-card">
+      <div class="search-explore-icon"><svg class="glyph" style="width: 24px; height: 24px;" aria-hidden="true"><use href="#icon-pillar-04"></use></svg></div>
+      <h3 class="search-explore-title">Sovereign Curve &amp; SDLs</h3>
+      <p class="search-explore-desc">RBI T-Bill &amp; G-Sec auction cutoffs, Sovereign Green Bonds, and State Development Loan fiscal spreads.</p>
+      <div class="search-explore-chips">
+        <a href="/search?q=10Y" class="btn btn-secondary btn-sm">10Y G-Sec</a>
+        <a href="/search?q=SDL" class="btn btn-secondary btn-sm">State SDLs</a>
+        <a href="/sovereign" class="btn btn-secondary btn-sm">Curve →</a>
+      </div>
+    </div>
+
+    <div class="search-explore-card">
+      <div class="search-explore-icon"><svg class="glyph" style="width: 24px; height: 24px;" aria-hidden="true"><use href="#icon-sector-industrials"></use></svg></div>
+      <h3 class="search-explore-title">Unlisted MSMEs &amp; SMEs</h3>
+      <p class="search-explore-desc">Udyam enterprise registry across Indian industrial clusters with MSMED Act 2020 turnover &amp; headcount tiers.</p>
+      <div class="search-explore-chips">
+        <a href="/search?q=Pune&type=MSME" class="btn btn-secondary btn-sm">Pune Cluster</a>
+        <a href="/search?q=UDYAM&type=MSME" class="btn btn-secondary btn-sm">Udyam Registry</a>
+        <a href="/msme" class="btn btn-secondary btn-sm">Directory →</a>
       </div>
     </div>
   </div>

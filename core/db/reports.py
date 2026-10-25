@@ -13,6 +13,14 @@ import asyncio
 from normalizer import clean_ticker, extract_citations_from_report
 from core.db.connection import init_db, get_db_connection, get_supabase_url, get_placeholder, IST
 from core.db.compliance import log_compliance_event
+from core.presentation.formatters import (
+    format_52w_range,
+    format_de_multiple,
+    format_pct_metric,
+    format_pe_multiple,
+    format_standard_date,
+    format_standard_timestamp,
+)
 
 logger = logging.getLogger("equity_research.core.db.reports")
 
@@ -56,22 +64,10 @@ def ttl_cache(ttl_seconds: int = 120, maxsize: int = 2):
     return decorator
 
 def _format_timestamp(raw_ts) -> str:
-    """Formats raw database timestamp into consistent IST string representation."""
+    """Formats raw database timestamp (datetime, ISO string, YYYY-MM-DD, or Unix epoch) into IST."""
     if not raw_ts:
         return "Unknown Date"
-    try:
-        if isinstance(raw_ts, datetime):
-            dt = raw_ts
-        elif isinstance(raw_ts, str):
-            dt = datetime.fromisoformat(raw_ts.replace("Z", "+00:00"))
-        else:
-            return str(raw_ts)
-        if hasattr(dt, "astimezone"):
-            dt = dt.astimezone(IST)
-        return dt.strftime("%d-%m-%Y %H:%M IST")
-    except Exception as e:
-        logger.debug("Failed formatting timestamp %s: %s", raw_ts, e)
-        return str(raw_ts)
+    return format_standard_timestamp(raw_ts, fallback=str(raw_ts))
 
 def save_report_to_archive(stock_data: dict, report_text: str, announcement: str = "", revision_trigger: str = "", citations: list = None):
     """
@@ -577,9 +573,9 @@ def get_all_equities_directory_sync() -> list:
                 f.company_name, 
                 f.sector, 
                 f.industry, 
-                f.current_price, 
-                f.market_cap, 
-                f.pe_ratio, 
+                COALESCE(f.current_price, r.baseline_price) as current_price, 
+                COALESCE(f.market_cap, r.baseline_mcap) as market_cap, 
+                CASE WHEN f.pe_ratio IS NOT NULL AND f.pe_ratio NOT IN ('N/A', 'Fair', '', '-') THEN f.pe_ratio ELSE r.baseline_pe END as pe_ratio, 
                 f.roce, 
                 f.roe, 
                 f.debt_to_equity, 
@@ -640,57 +636,37 @@ def get_all_equities_directory_sync() -> list:
                 logger.debug("Failed parsing cmp_val: %s", e)
                 cmp_float = 0.0
 
-            # Parse P/E
-            try:
-                pe_float = float(str(pe_val).replace(",", "").strip())
-                pe_str = f"{pe_float:.1f}x"
-            except Exception as e:
-                logger.debug("Failed parsing pe_val: %s", e)
-                pe_float = None
-                pe_str = "N/A" if pe_val in [None, "N/A", ""] else str(pe_val)
+            # Parse standardized institutional multiples & return ratios (Feedback #4 & #10)
+            pe_meta = format_pe_multiple(pe_val)
+            pe_float = pe_meta["float_val"]
+            pe_str = pe_meta["display"]
 
-            # Parse ROCE
-            try:
-                roce_float = float(str(roce_val).replace("%", "").strip()) if roce_val is not None else None
-            except Exception as e:
-                logger.debug("Failed parsing roce_val: %s", e)
-                roce_float = None
+            roce_meta = format_pct_metric(roce_val, metric_name="Return on Capital Employed (ROCE)")
+            roce_float = roce_meta["float_val"]
 
-            # Parse ROE
-            try:
-                roe_float = float(str(roe_val).replace("%", "").strip()) if roe_val is not None else None
-            except Exception as e:
-                logger.debug("Failed parsing roe_val: %s", e)
-                roe_float = None
+            roe_meta = format_pct_metric(roe_val, metric_name="Return on Equity (ROE)")
+            roe_float = roe_meta["float_val"]
 
-            # Parse D/E
-            try:
-                de_float = float(str(de_val).replace("x", "").strip()) if de_val is not None else 0.0
-            except Exception as e:
-                logger.debug("Failed parsing de_val: %s", e)
-                de_float = 0.0
+            de_meta = format_de_multiple(
+                de_val,
+                ticker=ticker,
+                sector_slug=sec_slug,
+                sector_label=sec_label,
+                industry=ind,
+                company_name=name,
+            )
+            de_float = de_meta["float_val"]
 
-            # Parse OPM
-            try:
-                opm_float = float(str(opm_val).replace("%", "").strip()) if opm_val is not None else None
-            except Exception as e:
-                logger.debug("Failed parsing opm_val: %s", e)
-                opm_float = None
+            opm_meta = format_pct_metric(opm_val, metric_name="Operating Margin (OPM)")
+            opm_float = opm_meta["float_val"]
 
             # Calculate recently inducted status (within last 48 hours)
             is_recently_inducted = False
             if raw_ts:
                 try:
-                    if isinstance(raw_ts, str):
-                        ts_clean = raw_ts.replace("Z", "+00:00")
-                        ts_dt = datetime.fromisoformat(ts_clean)
-                        if not ts_dt.tzinfo:
-                            ts_dt = ts_dt.replace(tzinfo=IST)
-                    elif isinstance(raw_ts, datetime):
-                        ts_dt = raw_ts if raw_ts.tzinfo else raw_ts.replace(tzinfo=IST)
-                    else:
-                        ts_dt = None
-                    if ts_dt and (datetime.now(IST) - ts_dt.astimezone(IST)).total_seconds() < 48 * 3600:
+                    from core.presentation.formatters import _coerce_datetime
+                    ts_dt = _coerce_datetime(raw_ts)
+                    if ts_dt and (datetime.now(IST) - ts_dt).total_seconds() < 48 * 3600:
                         is_recently_inducted = True
                 except Exception as e:
                     logger.debug("Failed parsing raw_ts for recently inducted: %s", e)
@@ -707,25 +683,34 @@ def get_all_equities_directory_sync() -> list:
                 "sector_svg_id": sec_svg_id,
                 "industry": ind,
                 "current_price": cmp_float,
-                "formatted_price": f"₹{cmp_float:,.2f}" if cmp_float > 0 else "N/A",
+                "formatted_price": f"₹{cmp_float:,.2f}" if cmp_float > 0 else "—",
                 "market_cap_cr": mcap_cr,
-                "formatted_mcap": f"₹{mcap_cr:,.0f} Cr" if mcap_cr > 0 else "N/A",
+                "formatted_mcap": f"₹{mcap_cr:,.0f} Cr" if mcap_cr > 0 else "—",
                 "market_cap_tier": tier,
                 "market_cap_tier_slug": tier_slug,
                 "pe_ratio": pe_str,
                 "pe_float": pe_float,
+                "pe_tooltip": pe_meta["tooltip"],
+                "pe_status": pe_meta["status"],
                 "roce": roce_float,
-                "roce_pct": f"{roce_float:.1f}%" if roce_float is not None else "N/A",
+                "roce_pct": roce_meta["display"],
+                "roce_tooltip": roce_meta["tooltip"],
                 "roe": roe_float,
-                "roe_pct": f"{roe_float:.1f}%" if roe_float is not None else "N/A",
-                "debt_to_equity": f"{de_float:.2f}x",
+                "roe_pct": roe_meta["display"],
+                "roe_tooltip": roe_meta["tooltip"],
+                "debt_to_equity": de_meta["display"],
                 "debt_to_equity_float": de_float,
-                "operating_margin": f"{opm_float:.1f}%" if opm_float is not None else "N/A",
+                "de_tooltip": de_meta["tooltip"],
+                "de_status": de_meta["status"],
+                "operating_margin": opm_meta["display"],
                 "operating_margin_float": opm_float,
-                "fifty_two_week_high": high52 or "N/A",
-                "fifty_two_week_low": low52 or "N/A",
+                "opm_tooltip": opm_meta["tooltip"],
+                "fifty_two_week_high": high52 or "—",
+                "fifty_two_week_low": low52 or "—",
+                "formatted_52w_range": format_52w_range(low52, high52),
                 "revision_count": rev_cnt,
-                "formatted_date": _format_timestamp(raw_ts),
+                "formatted_date": format_standard_date(raw_ts, fallback="Archived"),
+                "formatted_timestamp": _format_timestamp(raw_ts),
                 "dossier_url": f"/dossier/{ticker}",
                 "is_recently_inducted": is_recently_inducted,
             })

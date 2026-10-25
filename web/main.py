@@ -107,6 +107,8 @@ from core.analysis.dossier_report_synthesis import generate_stock_report
 from core.analysis.peer_comparison import compare_two_companies
 from core.analysis.parser import (
     extract_health_matrix,
+    extract_financial_period_covered,
+    enrich_and_classify_citations,
     compare_revisions,
     remove_health_matrix_text,
     wrap_html_with_collapsible_pillars,
@@ -950,8 +952,10 @@ def search_page(
     type: Optional[str] = None,
     asset_class: Optional[str] = None
 ):
-    """Multi-asset unified search discovery page across Equities, Mutual Funds, and Corporate Debt/NCDs."""
+    """Multi-asset unified search discovery page across all 7 covered asset classes."""
     init_db()
+    from core.search.product_search import empty_search_categories, search_investment_products
+
     query_str = (q or "").strip()
     selected_type = (type or asset_class or "ALL").strip().upper()
 
@@ -959,10 +963,9 @@ def search_page(
         "query": query_str,
         "total_matches": 0,
         "results": [],
-        "categories": {"equities": [], "mutual_funds": [], "corporate_debt": []}
+        "categories": empty_search_categories(),
     }
     if query_str:
-        from core.search.product_search import search_investment_products
         search_res = search_investment_products(query_str, product_type=selected_type, limit_per_category=20)
 
     return templates.TemplateResponse(
@@ -980,19 +983,29 @@ def search_page(
 @app.get("/api/search/products")
 def api_search_products(
     q: str = Query(..., min_length=1, description="Search query string"),
-    asset_class: str = Query("all", description="Asset class filter: 'all', 'equity', 'mutual_fund', 'debt'"),
-    limit: int = Query(25, ge=1, le=100)
+    asset_class: str = Query(
+        "all",
+        description="Asset class filter: 'all', 'equity', 'mutual_fund', 'etf', 'debt', 'reit', 'sovereign', 'msme'",
+    ),
+    limit: int = Query(28, ge=1, le=100),
+    limit_per_category: int = Query(6, ge=1, le=30),
 ):
-    """Public Omni-Product Search API across Equities, Mutual Funds, and Corporate Debt/NCDs."""
+    """Public 7-Asset Omni-Product Search API returning grouped categories and ranked flat matches."""
     init_db()
-    from core.search.product_search import search_all_products
-    matches = search_all_products(q, asset_class=asset_class, limit=limit)
+    from core.search.product_search import search_investment_products
+
+    clean_ac = (asset_class or "all").strip()
+    per_cat = limit_per_category if clean_ac.upper() == "ALL" else max(limit_per_category, min(limit, 30))
+    grouped = search_investment_products(q, product_type=clean_ac, limit_per_category=per_cat)
+    flat_matches = grouped.get("results", [])[:limit]
     return json_response_with_cache({
         "status": "success",
-        "query": q,
-        "asset_class": asset_class,
-        "count": len(matches),
-        "results": matches
+        "query": grouped.get("query", q),
+        "asset_class": clean_ac,
+        "count": len(flat_matches),
+        "total_matches": grouped.get("total_matches", len(flat_matches)),
+        "results": flat_matches,
+        "categories": grouped.get("categories", {}),
     }, max_age=60)
 
 
@@ -1042,10 +1055,13 @@ def discovery_page(request: Request, edition: Optional[str] = Query(None)):
         logger.error(f"Error fetching discovery reel: {e}")
         discovery_stocks = []
 
+    from core.presentation.formatters import format_standard_date
     actual_edition = discovery_stocks[0]["edition_date"] if discovery_stocks else selected_edition
     is_today_edition = (actual_edition == today_str and is_past_9am)
     is_yesterday_edition = (actual_edition == yesterday_str) or (not is_past_9am) or (actual_edition < today_str)
     is_locked_for_user = (is_today_edition and not can_access_today)
+    formatted_current_edition = format_standard_date(actual_edition, fallback=actual_edition)
+    edition_labels = {ed: format_standard_date(ed, fallback=ed) for ed in available_editions}
 
     return templates.TemplateResponse(
         request=request,
@@ -1054,7 +1070,9 @@ def discovery_page(request: Request, edition: Optional[str] = Query(None)):
             "active_page": "discovery",
             "discovery_stocks": discovery_stocks,
             "available_editions": available_editions,
+            "edition_labels": edition_labels,
             "current_edition": actual_edition,
+            "formatted_current_edition": formatted_current_edition,
             "today_date": today_str,
             "yesterday_date": yesterday_str,
             "is_today_edition": is_today_edition,
@@ -1261,16 +1279,21 @@ def dossier_page(request: Request, ticker: str):
         extensions=["tables", "fenced_code", "nl2br"]
     )
     scrip_code = rep.get("scrip_code") or resolve_bse_scrip_code(canonical) or ""
+    citation_bundle = enrich_and_classify_citations(
+        citations,
+        scrip_code=scrip_code,
+        ticker=canonical,
+        company_name=rep.get("short_name", canonical),
+    )
+    citations = citation_bundle["citations"]
+    financial_period_covered = extract_financial_period_covered(raw_md, rep.get("raw_timestamp"))
+
     html_content = wrap_html_with_collapsible_pillars(
         html_content,
         scrip_code=scrip_code,
         is_deep_dive_unlocked=is_deep_dive_unlocked,
         ticker=canonical
     )
-
-    mcap = rep.get("baseline_mcap")
-    # format_inr() already prefixes the rupee symbol.
-    mcap_formatted = format_inr(mcap) if mcap else "N/A"
 
     # 7-Pillar Health Matrix
     matrix = extract_health_matrix(raw_md)
@@ -1291,12 +1314,78 @@ def dossier_page(request: Request, ticker: str):
     try:
         fund = get_stock_fundamentals(canonical, fast_db_first=True) or {}
     except Exception as fund_err:
-        logger.debug("Fundamentals lookup notice for %s: %s", canonical, fund_err)
+        logger.warning("Fundamentals lookup notice for %s: %s", canonical, fund_err)
 
-    price_val = rep.get("baseline_price") or fund.get("current_price")
+    from core.presentation.formatters import (
+        format_52w_range,
+        format_pe_multiple,
+        format_standard_date,
+        format_standard_timestamp,
+    )
+    fund_price = fund.get("current_price")
+    rep_price = rep.get("baseline_price")
+    try:
+        fp_num = float(fund_price) if fund_price not in (None, "N/A", "") else 0.0
+    except (TypeError, ValueError):
+        fp_num = 0.0
+    try:
+        rp_num = float(rep_price) if rep_price not in (None, "N/A", "") else 0.0
+    except (TypeError, ValueError):
+        rp_num = 0.0
+
+    rep_mcap_raw = rep.get("baseline_mcap")
+    is_rp_synth_500 = bool(
+        abs(rp_num - 500.0) < 1e-6
+        and rep_mcap_raw is not None
+        and abs(float(rep_mcap_raw) - 25_000_000_000.0) < 1.0
+    )
+    is_fp_synth_500 = abs(fp_num - 500.0) < 1e-6 and rp_num > 0 and abs(rp_num - 500.0) > 1e-6
+
+    if fp_num > 0 and not is_fp_synth_500:
+        price_val = fp_num
+        quote_source_label = "BSE / SmartAPI Feed"
+    elif rp_num > 0 and not is_rp_synth_500:
+        price_val = rp_num
+        quote_source_label = "Synthesis Baseline"
+    else:
+        price_val = None
+        quote_source_label = "Exchange Feed"
+
+    baseline_price_str = None
+    price_drift_pct = None
+    if price_val and rp_num > 0 and not is_rp_synth_500:
+        drift = ((price_val - rp_num) / rp_num) * 100.0
+        if abs(drift) >= 0.5:
+            baseline_price_str = f"{rp_num:,.2f}"
+            price_drift_pct = round(drift, 1)
+
+    fund_mcap = fund.get("market_cap")
+    mcap = None
+    if isinstance(fund_mcap, (int, float)) and fund_mcap > 0 and abs(float(fund_mcap) - 25_000_000_000.0) >= 1.0:
+        mcap = fund_mcap
+    elif rep_mcap_raw and not is_rp_synth_500 and abs(float(rep_mcap_raw) - 25_000_000_000.0) >= 1.0:
+        mcap = rep_mcap_raw
+    # format_inr() already prefixes the rupee symbol.
+    mcap_formatted = format_inr(mcap) if mcap else "N/A"
+
+    formatted_eval_date = format_standard_date(
+        rep.get("raw_timestamp"),
+        fallback=str(rep.get("formatted_date") or "Archived"),
+    )
+    quote_timestamp_str = format_standard_timestamp(
+        fund.get("quote_updated_at") or rep.get("raw_timestamp"),
+        fallback=formatted_eval_date,
+    )
+
     low_52 = fund.get("fifty_two_week_low") or fund.get("52w_low")
     high_52 = fund.get("fifty_two_week_high") or fund.get("52w_high")
-    pe_val = rep.get("baseline_pe") or fund.get("pe_ratio")
+    pe_val = (
+        fund.get("pe_ratio")
+        if rep.get("baseline_pe") in (None, "N/A", "Fair", "", "22.5", "22.50") and fund.get("pe_ratio") not in (None, "N/A", "Fair", "")
+        else (rep.get("baseline_pe") or fund.get("pe_ratio"))
+    )
+    pe_meta = format_pe_multiple(pe_val)
+    formatted_price_str = f"{float(price_val):,.2f}" if price_val and str(price_val) != "N/A" else "—"
 
     pct_52w = calculate_52w_percentile(price_val, low_52, high_52)
     pct_pe = calculate_pe_percentile(pe_val, revisions)
@@ -1416,14 +1505,24 @@ def dossier_page(request: Request, ticker: str):
         context={
             "ticker": clean_t,
             "short_name": rep.get("short_name", clean_t),
-            "current_price": str(rep.get("baseline_price") or "N/A"),
-            "pe_ratio": str(rep.get("baseline_pe") or "N/A"),
-            "market_cap_str": mcap_formatted,
+            "current_price": formatted_price_str,
+            "pe_ratio": pe_meta["display"],
+            "pe_tooltip": pe_meta["tooltip"],
+            "formatted_52w_range": format_52w_range(low_52, high_52),
+            "market_cap_str": mcap_formatted if mcap_formatted != "N/A" else "—",
             "scrip_code": scrip_code if str(scrip_code or "").strip().isdigit() else "N/A",
-            "formatted_date": rep.get("formatted_date", "Archived"),
+            "formatted_date": formatted_eval_date,
+            "quote_timestamp_str": quote_timestamp_str,
+            "quote_source_label": quote_source_label,
+            "baseline_price_str": baseline_price_str,
+            "price_drift_pct": price_drift_pct,
+            "financial_period_covered": financial_period_covered,
             "raw_timestamp": rep.get("raw_timestamp"),
             "report_html": html_content,
             "citations": citations,
+            "primary_citations_count": citation_bundle["primary_count"],
+            "secondary_citations_count": citation_bundle["secondary_count"],
+            "direct_registry_links": citation_bundle["direct_registry_links"],
             "matrix": matrix,
             "diff": diff_data,
             "revisions_count": len(revisions),
@@ -1648,6 +1747,16 @@ def debt_dossier_page(request: Request, isin: str):
         formatted_date=str(sec.get("last_updated") or "Latest Filing")[:10],
     )
 
+    from core.presentation.formatters import format_standard_date
+    debt_updated_str = format_standard_date(
+        sec.get("last_updated") or sec.get("updated_at"),
+        fallback="Latest BSE Debt Sync",
+    )
+    debt_maturity_str = format_standard_date(
+        sec.get("maturity_date"),
+        fallback=str(sec.get("maturity_date") or "—"),
+    )
+
     return templates.TemplateResponse(
         request=request,
         name="debt_dossier.html",
@@ -1660,6 +1769,8 @@ def debt_dossier_page(request: Request, isin: str):
             "unlock_kind": "DEBT",
             "unlock_id": clean_isin,
             "epistemic_ledger": epistemic_ledger,
+            "debt_updated_str": debt_updated_str,
+            "debt_maturity_str": debt_maturity_str,
         }
     )
 
@@ -1926,6 +2037,16 @@ def fund_dossier_page(request: Request, scheme_code: str):
         formatted_date=str(sch_obj.get("last_updated") or "Latest Filing")[:10],
     )
 
+    from core.presentation.formatters import format_standard_date
+    fund_portfolio_date_str = format_standard_date(
+        sch_obj.get("last_portfolio_date"),
+        fallback=str(sch_obj.get("last_portfolio_date") or "Latest AMFI Monthly"),
+    )
+    fund_updated_str = format_standard_date(
+        sch_obj.get("last_updated"),
+        fallback=fund_portfolio_date_str,
+    )
+
     return templates.TemplateResponse(
         request=request,
         name="fund_dossier.html",
@@ -1944,6 +2065,8 @@ def fund_dossier_page(request: Request, scheme_code: str):
             "unlock_kind": "FUND",
             "unlock_id": clean_code,
             "epistemic_ledger": epistemic_ledger,
+            "fund_portfolio_date_str": fund_portfolio_date_str,
+            "fund_updated_str": fund_updated_str,
         }
     )
 
@@ -1998,6 +2121,13 @@ def etf_dossier_page(request: Request, symbol: str):
     if not detail:
         raise HTTPException(status_code=404, detail=f"ETF '{clean_sym}' not found in master matrix.")
 
+    from core.presentation.formatters import format_standard_date
+    etf_obj = detail.get("etf") or {}
+    etf_updated_str = format_standard_date(
+        etf_obj.get("last_updated") or etf_obj.get("updated_at") or detail.get("last_updated"),
+        fallback="Latest AMFI / Exchange Sync",
+    )
+
     return templates.TemplateResponse(
         request=request,
         name="etf_dossier.html",
@@ -2014,7 +2144,8 @@ def etf_dossier_page(request: Request, symbol: str):
             "liquidity": detail["liquidity_audit"],
             "countercase_risks": detail["countercase_risks"],
             "peers": detail["peers"],
-            "forensic_notes": detail["forensic_notes"]
+            "forensic_notes": detail["forensic_notes"],
+            "etf_updated_str": etf_updated_str,
         }
     )
 
@@ -2239,6 +2370,12 @@ def reit_dossier_page(request: Request, symbol: str):
         formatted_date=str(reit_obj.get("last_updated") or "Latest Filing")[:10],
     )
 
+    from core.presentation.formatters import format_standard_date
+    reit_updated_str = format_standard_date(
+        reit_obj.get("last_updated") or reit_obj.get("updated_at"),
+        fallback="Latest SEBI Appraisal Sync",
+    )
+
     return templates.TemplateResponse(
         request=request,
         name="reit_dossier.html",
@@ -2255,6 +2392,7 @@ def reit_dossier_page(request: Request, symbol: str):
             "forensic_notes": detail["forensic_notes"],
             "is_deep_dive_unlocked": is_deep_dive_unlocked,
             "epistemic_ledger": epistemic_ledger,
+            "reit_updated_str": reit_updated_str,
         }
     )
 

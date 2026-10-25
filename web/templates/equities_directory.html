@@ -70,25 +70,25 @@
 
         <!-- 5-Metric Spotlight Strip -->
         <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(130px, 1fr)); gap: 10px; margin-bottom: 16px;">
-          <div style="background: rgba(15, 23, 42, 0.7); border: 1px solid rgba(255, 255, 255, 0.08); border-radius: 10px; padding: 10px 14px;">
+          <div style="background: rgba(15, 23, 42, 0.7); border: 1px solid rgba(255, 255, 255, 0.08); border-radius: 10px; padding: 10px 14px;" title="{{ featured_equity.roce_tooltip|default('Return on Capital Employed (ROCE)') }}">
             <div style="font-size: 10px; color: #94a3b8; text-transform: uppercase; font-weight: 600;">ROCE (Capital Return)</div>
-            <div style="font-size: 20px; font-weight: 800; color: var(--accent-cyan, #0ea5e9);">{{ featured_equity.roce_pct }}</div>
+            <div class="tnum" style="font-size: 20px; font-weight: 800; color: var(--accent-cyan, #0ea5e9); cursor: help;">{{ featured_equity.roce_pct }}</div>
           </div>
-          <div style="background: rgba(15, 23, 42, 0.7); border: 1px solid rgba(255, 255, 255, 0.08); border-radius: 10px; padding: 10px 14px;">
+          <div style="background: rgba(15, 23, 42, 0.7); border: 1px solid rgba(255, 255, 255, 0.08); border-radius: 10px; padding: 10px 14px;" title="{{ featured_equity.de_tooltip|default('Total Debt divided by Shareholder Equity') }}">
             <div style="font-size: 10px; color: #94a3b8; text-transform: uppercase; font-weight: 600;">Debt-to-Equity</div>
-            <div style="font-size: 20px; font-weight: 800; color: #a5b4fc;">{{ featured_equity.debt_to_equity }}</div>
+            <div class="tnum" style="font-size: 20px; font-weight: 800; color: #a5b4fc; cursor: help;">{{ featured_equity.debt_to_equity }}</div>
           </div>
-          <div style="background: rgba(15, 23, 42, 0.7); border: 1px solid rgba(255, 255, 255, 0.08); border-radius: 10px; padding: 10px 14px;">
+          <div style="background: rgba(15, 23, 42, 0.7); border: 1px solid rgba(255, 255, 255, 0.08); border-radius: 10px; padding: 10px 14px;" title="{{ featured_equity.pe_tooltip|default('Trailing 12-Month Price-to-Earnings') }}">
             <div style="font-size: 10px; color: #94a3b8; text-transform: uppercase; font-weight: 600;">Trailing P/E</div>
-            <div style="font-size: 20px; font-weight: 800; color: #f8fafc;">{{ featured_equity.pe_ratio }}</div>
+            <div class="tnum" style="font-size: 20px; font-weight: 800; color: #f8fafc; cursor: help;">{{ featured_equity.pe_ratio }}</div>
           </div>
-          <div style="background: rgba(15, 23, 42, 0.7); border: 1px solid rgba(255, 255, 255, 0.08); border-radius: 10px; padding: 10px 14px;">
+          <div style="background: rgba(15, 23, 42, 0.7); border: 1px solid rgba(255, 255, 255, 0.08); border-radius: 10px; padding: 10px 14px;" title="{{ featured_equity.opm_tooltip|default('Operating Margin (OPM)') }}">
             <div style="font-size: 10px; color: #94a3b8; text-transform: uppercase; font-weight: 600;">Operating Margin</div>
-            <div style="font-size: 20px; font-weight: 800; color: var(--accent-emerald, #10b981);">{{ featured_equity.operating_margin }}</div>
+            <div class="tnum" style="font-size: 20px; font-weight: 800; color: var(--accent-emerald, #10b981); cursor: help;">{{ featured_equity.operating_margin }}</div>
           </div>
           <div style="background: rgba(15, 23, 42, 0.7); border: 1px solid rgba(255, 255, 255, 0.08); border-radius: 10px; padding: 10px 14px;">
             <div style="font-size: 10px; color: #94a3b8; text-transform: uppercase; font-weight: 600;">Market Cap</div>
-            <div style="font-size: 20px; font-weight: 800; color: #f8fafc;">{{ featured_equity.formatted_mcap }}</div>
+            <div class="tnum" style="font-size: 20px; font-weight: 800; color: #f8fafc;">{{ featured_equity.formatted_mcap }}</div>
           </div>
         </div>
 
@@ -183,9 +183,9 @@
   </div>
 
   <!-- Active Results Count Header -->
-  <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px;">
-    <div style="font-size: 14px; font-weight: 600; color: #94a3b8;">
-      Showing <strong style="color: #f8fafc;">{{ equities|length }}</strong> of {{ total_equities }} Equities
+  <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 10px; margin-bottom: 10px;">
+    <div style="font-size: 14px; font-weight: 600; color: var(--text-secondary);">
+      Showing <strong style="color: var(--text-primary);">{{ equities|length }}</strong> of {{ total_equities }} Equities
       {% if query %}<span style="color: var(--accent-cyan);">matching "{{ query }}"</span>{% endif %}
       {% if current_sector %}<span style="color: #c084fc;">in {{ sector_options.get(current_sector, [current_sector])[0] }}</span>{% endif %}
     </div>
@@ -193,6 +193,9 @@
       <a href="/opportunities" class="btn btn-sm btn-secondary" style="border-radius: 9999px; font-size: 11.5px;"><svg class="glyph" style="width: 13px; height: 13px; vertical-align: -2px;"><use href="#icon-screen"></use></svg> Opportunity Terminal</a>
       <a href="/funds" class="btn btn-sm btn-secondary" style="border-radius: 9999px; font-size: 11.5px;"><svg class="glyph" style="width: 13px; height: 13px; vertical-align: -2px;"><use href="#icon-portfolio"></use></svg> Mutual Funds Look-Through</a>
     </div>
+  </div>
+  <div style="font-size: 12px; color: var(--text-secondary); margin-bottom: 16px; padding: 6px 12px; border-radius: 8px; background: var(--bg-surface); border: 1px solid var(--border-subtle);">
+    <strong>Metric Key:</strong> <code>NM</code> = Not Meaningful (negative trailing 12M EPS) • <code>BFSI</code> = Banks/NBFCs/Insurers evaluated on CRAR &amp; Net NPA rather than industrial D/E • <code>—</code> = Statutory filing sync pending • Hover any ratio for calculation basis.
   </div>
 
   <!-- Equities Cards Grid -->
@@ -243,19 +246,19 @@
           <div style="flex: 1; background: rgba(15, 23, 42, 0.6); padding: 7px 8px; border-radius: 6px; text-align: center; border: 1px solid rgba(255, 255, 255, 0.04);">
             <div style="font-size: 10px; color: var(--text-muted); text-transform: uppercase; font-weight: 600;">ROCE</div>
             <div class="tnum" style="font-size: 13px; font-weight: 700; color: var(--accent-cyan, #0ea5e9);">
-              {{ eq.roce_pct }}
+              {% if eq.roce_pct == '—' %}<abbr title="{{ eq.roce_tooltip }}" style="text-decoration: underline dotted rgba(148, 163, 184, 0.5); text-underline-offset: 2px; cursor: help;">{{ eq.roce_pct }}</abbr>{% else %}<span title="{{ eq.roce_tooltip }}" style="cursor: help;">{{ eq.roce_pct }}</span>{% endif %}
             </div>
           </div>
           <div style="flex: 1; background: rgba(15, 23, 42, 0.6); padding: 7px 8px; border-radius: 6px; text-align: center; border: 1px solid rgba(255, 255, 255, 0.04);">
             <div style="font-size: 10px; color: var(--text-muted); text-transform: uppercase; font-weight: 600;">D/E</div>
             <div class="tnum" style="font-size: 13px; font-weight: 700; color: #a5b4fc;">
-              {{ eq.debt_to_equity }}
+              {% if eq.debt_to_equity in ('BFSI', '—') %}<abbr title="{{ eq.de_tooltip }}" style="text-decoration: underline dotted rgba(148, 163, 184, 0.5); text-underline-offset: 2px; cursor: help;">{{ eq.debt_to_equity }}</abbr>{% else %}<span title="{{ eq.de_tooltip }}" style="cursor: help;">{{ eq.debt_to_equity }}</span>{% endif %}
             </div>
           </div>
           <div style="flex: 1; background: rgba(15, 23, 42, 0.6); padding: 7px 8px; border-radius: 6px; text-align: center; border: 1px solid rgba(255, 255, 255, 0.04);">
             <div style="font-size: 10px; color: var(--text-muted); text-transform: uppercase; font-weight: 600;">P/E</div>
             <div class="tnum" style="font-size: 13px; font-weight: 700; color: var(--text-primary, #f8fafc);">
-              {{ eq.pe_ratio }}
+              {% if eq.pe_ratio in ('NM', '—') %}<abbr title="{{ eq.pe_tooltip }}" style="text-decoration: underline dotted rgba(148, 163, 184, 0.5); text-underline-offset: 2px; cursor: help;">{{ eq.pe_ratio }}</abbr>{% else %}<span title="{{ eq.pe_tooltip }}" style="cursor: help;">{{ eq.pe_ratio }}</span>{% endif %}
             </div>
           </div>
         </div>
@@ -264,21 +267,21 @@
         <div style="font-size: 12px; color: #94a3b8; display: flex; flex-direction: column; gap: 6px; margin-bottom: 16px;">
           <div style="display: flex; justify-content: space-between;">
             <span>Return on Equity (ROE):</span>
-            <strong style="color: {% if eq.roe and eq.roe >= 15.0 %}#10b981{% elif eq.roe and eq.roe > 0 %}#38bdf8{% else %}#94a3b8{% endif %};">
+            <strong style="color: {% if eq.roe and eq.roe >= 15.0 %}#10b981{% elif eq.roe and eq.roe > 0 %}#38bdf8{% else %}#94a3b8{% endif %};" title="{{ eq.roe_tooltip }}">
               {{ eq.roe_pct }}
             </strong>
           </div>
           <div style="display: flex; justify-content: space-between;">
             <span>Operating Margin (OPM):</span>
-            <strong style="color: #38bdf8;">{{ eq.operating_margin }}</strong>
+            <strong style="color: #38bdf8;" title="{{ eq.opm_tooltip }}">{{ eq.operating_margin }}</strong>
           </div>
           <div style="display: flex; justify-content: space-between;">
             <span>52-Week Range:</span>
-            <span style="color: #f8fafc; font-weight: 500;">₹{{ eq.fifty_two_week_low }} – ₹{{ eq.fifty_two_week_high }}</span>
+            <span class="tnum" style="color: #f8fafc; font-weight: 500;">{{ eq.formatted_52w_range|default('—') }}</span>
           </div>
           <div style="display: flex; justify-content: space-between;">
             <span>Market Cap:</span>
-            <span style="color: #f8fafc; font-weight: 600;">{{ eq.formatted_mcap }}</span>
+            <span class="tnum" style="color: #f8fafc; font-weight: 600;">{{ eq.formatted_mcap }}</span>
           </div>
         </div>
       </div>

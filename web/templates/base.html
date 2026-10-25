@@ -33,9 +33,9 @@
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600;700&family=IBM+Plex+Sans:ital,wght@0,400;0,500;0,600;0,700;1,400&family=Playfair+Display:ital,wght@0,600;0,700;1,400&display=swap" rel="stylesheet">
-  <link rel="preload" href="/static/css/style.css?v=20261024_1655" as="style" onload="this.rel='stylesheet'">
-  <link rel="preload" href="/static/js/main.js?v=20261021_1545" as="script">
-  <link rel="stylesheet" href="/static/css/style.css?v=20261024_1655">
+  <link rel="preload" href="/static/css/style.css?v=20261025_1415" as="style" onload="this.rel='stylesheet'">
+  <link rel="preload" href="/static/js/main.js?v=20261025_1415" as="script">
+  <link rel="stylesheet" href="/static/css/style.css?v=20261025_1415">
 
   <!-- Schema.org Unified Entity Graph Structured Data (SEO & GEO) -->
   {% block schema_jsonld %}
@@ -399,9 +399,18 @@
         </a>
 
         <nav id="mainNav" class="main-nav" aria-label="Main Navigation">
-          <a href="/search" class="nav-link {% if active_page == 'search' %}active{% endif %}" id="navSearchLink">
-            <span class="nav-icon"><svg class="glyph"><use href="#glyph-search"></use></svg></span> Search
-          </a>
+          <button
+            type="button"
+            id="navOmniSearchBtn"
+            class="btn btn-secondary btn-sm header-omni-search-pill {% if active_page == 'search' %}active{% endif %}"
+            onclick="openOmniSearchModal()"
+            aria-haspopup="dialog"
+            aria-controls="omniSearchModal"
+          >
+            <svg class="glyph" aria-hidden="true"><use href="#glyph-search"></use></svg>
+            <span class="omni-pill-label">Search stocks, MFs, ETFs, ISINs...</span>
+            <kbd class="omni-kbd-hint" aria-hidden="true">/</kbd>
+          </button>
 
           <!-- Markets & Multi-Asset Sub-Tabs -->
           <div class="nav-item dropdown {% if active_page in ['home', 'equities', 'opportunities', 'debt', 'funds', 'sovereign', 'etfs', 'reits', 'dossier', 'msme'] %}active-parent{% endif %}" id="navMarketsDropdown">
@@ -589,6 +598,122 @@
     {% block content %}{% endblock %}
   </main>
 
+  <!-- Global 7-Asset Omni-Search Command Palette Modal -->
+  <div id="omniSearchModal" class="modal-backdrop omni-search-backdrop">
+    <div class="modal-dialog omni-search-dialog" role="dialog" aria-modal="true" aria-labelledby="omniSearchModalTitle">
+      <div class="modal-header omni-modal-header">
+        <h3 id="omniSearchModalTitle" class="omni-modal-title">
+          <svg class="glyph" aria-hidden="true"><use href="#glyph-search"></use></svg>
+          <span>Search Across 7 Asset Classes</span>
+        </h3>
+        <button type="button" id="closeOmniSearchModalBtn" class="modal-close-btn" onclick="closeOmniSearchModal()" aria-label="Close Omni-Search">&times;</button>
+      </div>
+
+      <form id="omniSearchModalForm" class="omni-search-form" onsubmit="handleOmniSearchSubmit(event)">
+        <label for="omniSearchModalInput" class="visually-hidden">Search stocks, mutual funds, ETFs, corporate bonds, REITs, Sovereign G-Secs, or MSMEs</label>
+        <div id="omniSearchInputHint" class="omni-search-hint">
+          Ticker, company name, 6-digit BSE code, AMFI scheme, ETF symbol, bond ISIN, REIT/SGB, RBI tenor, or Udyam UIN
+        </div>
+        <div class="omni-search-input-shell">
+          <svg class="glyph omni-input-icon" aria-hidden="true"><use href="#glyph-search"></use></svg>
+          <input
+            type="search"
+            id="omniSearchModalInput"
+            name="q"
+            autocomplete="off"
+            autocorrect="off"
+            autocapitalize="off"
+            spellcheck="false"
+            aria-describedby="omniSearchInputHint"
+            placeholder="Search TCS, Parag Parikh, NIFTYBEES, INE002A, EMBASSY, 10Y G-Sec, UDYAM..."
+            style="font-size: 16px;"
+          >
+          <span id="omniSearchSpinner" class="omni-search-spinner" hidden>Searching...</span>
+        </div>
+      </form>
+
+      <div class="omni-filter-toolbar" role="toolbar" aria-label="Filter search by asset class">
+        <button type="button" class="btn btn-secondary btn-sm omni-filter-chip active" data-omni-cat="ALL" aria-pressed="true" onclick="setOmniSearchCategory('ALL')">All (7)</button>
+        <button type="button" class="btn btn-secondary btn-sm omni-filter-chip" data-omni-cat="EQUITY" aria-pressed="false" onclick="setOmniSearchCategory('EQUITY')">Equities</button>
+        <button type="button" class="btn btn-secondary btn-sm omni-filter-chip" data-omni-cat="MUTUAL_FUND" aria-pressed="false" onclick="setOmniSearchCategory('MUTUAL_FUND')">Mutual Funds</button>
+        <button type="button" class="btn btn-secondary btn-sm omni-filter-chip" data-omni-cat="ETF" aria-pressed="false" onclick="setOmniSearchCategory('ETF')">ETFs</button>
+        <button type="button" class="btn btn-secondary btn-sm omni-filter-chip" data-omni-cat="DEBT" aria-pressed="false" onclick="setOmniSearchCategory('DEBT')">Bonds &amp; NCDs</button>
+        <button type="button" class="btn btn-secondary btn-sm omni-filter-chip" data-omni-cat="REIT_INVIT" aria-pressed="false" onclick="setOmniSearchCategory('REIT_INVIT')">REITs &amp; SGBs</button>
+        <button type="button" class="btn btn-secondary btn-sm omni-filter-chip" data-omni-cat="SOVEREIGN" aria-pressed="false" onclick="setOmniSearchCategory('SOVEREIGN')">Sovereign</button>
+        <button type="button" class="btn btn-secondary btn-sm omni-filter-chip" data-omni-cat="MSME" aria-pressed="false" onclick="setOmniSearchCategory('MSME')">MSMEs</button>
+      </div>
+
+      <div id="omniSearchLiveStatus" class="visually-hidden" role="status" aria-live="polite" aria-atomic="true"></div>
+
+      <div id="omniSearchResultsContainer" class="omni-results-viewport">
+        <div class="omni-default-directory-grid" id="omniSearchDefaultPanel">
+          <div class="omni-group-heading">Direct Asset-Class Universes</div>
+          <a href="/equities" class="omni-result-item" data-omni-item data-asset-class="equities">
+            <div class="omni-result-main">
+              <span class="omni-result-title"><svg class="glyph" aria-hidden="true"><use href="#icon-markets"></use></svg> Listed Equities &amp; Stock Dossiers</span>
+              <span class="omni-result-sub">7-Pillar BSE/NSE filing audits, Reverse-DCF &amp; DuPont ROE</span>
+            </div>
+            <span class="omni-result-badge">Equities →</span>
+          </a>
+          <a href="/funds" class="omni-result-item" data-omni-item data-asset-class="funds">
+            <div class="omni-result-main">
+              <span class="omni-result-title"><svg class="glyph" aria-hidden="true"><use href="#icon-portfolio"></use></svg> Mutual Fund Schemes</span>
+              <span class="omni-result-sub">AMFI Direct plans, Active Share &amp; 20Y TER fee-drag look-through</span>
+            </div>
+            <span class="omni-result-badge">Funds →</span>
+          </a>
+          <a href="/etfs" class="omni-result-item" data-omni-item data-asset-class="etfs">
+            <div class="omni-result-main">
+              <span class="omni-result-title"><svg class="glyph" aria-hidden="true"><use href="#icon-screen"></use></svg> Exchange-Traded Funds (ETFs)</span>
+              <span class="omni-result-sub">iNAV premium/discount parity, tracking error &amp; liquidity tiers</span>
+            </div>
+            <span class="omni-result-badge">ETFs →</span>
+          </a>
+          <a href="/debt" class="omni-result-item" data-omni-item data-asset-class="debt">
+            <div class="omni-result-main">
+              <span class="omni-result-title"><svg class="glyph" aria-hidden="true"><use href="#icon-risk"></use></svg> Corporate Bonds, NCDs &amp; SDIs</span>
+              <span class="omni-result-sub">Seniority waterfall, credit spreads, YTM &amp; modified duration</span>
+            </div>
+            <span class="omni-result-badge">Debt →</span>
+          </a>
+          <a href="/reits" class="omni-result-item" data-omni-item data-asset-class="reits">
+            <div class="omni-result-main">
+              <span class="omni-result-title"><svg class="glyph" aria-hidden="true"><use href="#icon-sector-realestate"></use></svg> REITs, SM REITs, InvITs &amp; SGBs</span>
+              <span class="omni-result-sub">Sec 115UA NDCF payout purity, WALE &amp; secondary SGB yields</span>
+            </div>
+            <span class="omni-result-badge">Real Assets →</span>
+          </a>
+          <a href="/sovereign" class="omni-result-item" data-omni-item data-asset-class="sovereign">
+            <div class="omni-result-main">
+              <span class="omni-result-title"><svg class="glyph" aria-hidden="true"><use href="#icon-pillar-04"></use></svg> Sovereign Yield Curve, T-Bills &amp; SDLs</span>
+              <span class="omni-result-sub">RBI auction cutoffs, Greenium &amp; State Development Loan spreads</span>
+            </div>
+            <span class="omni-result-badge">Sovereign →</span>
+          </a>
+          <a href="/msme" class="omni-result-item" data-omni-item data-asset-class="msme">
+            <div class="omni-result-main">
+              <span class="omni-result-title"><svg class="glyph" aria-hidden="true"><use href="#icon-sector-industrials"></use></svg> Unlisted MSMEs &amp; Emerging SMEs</span>
+              <span class="omni-result-sub">Udyam registry, manufacturing clusters &amp; MSMED turnover tiers</span>
+            </div>
+            <span class="omni-result-badge">MSME →</span>
+          </a>
+        </div>
+      </div>
+
+      <div class="omni-modal-footer">
+        <span class="omni-key-legend">
+          <kbd>↑</kbd><kbd>↓</kbd> Navigate &middot; <kbd>↵</kbd> Open &middot; <kbd>Esc</kbd> Close
+        </span>
+        <div class="omni-footer-actions">
+          <button type="button" id="omniOpenResearchDeskBtn" class="btn btn-secondary btn-sm omni-desk-switch-btn" onclick="switchOmniToResearchDesk()" hidden>
+            <svg class="glyph" aria-hidden="true"><use href="#icon-ai-spark"></use></svg> Ask Research Desk (⌘K)
+          </button>
+          <a href="/search" id="navSearchLink" class="omni-footer-link">Open Full Search Page &rarr;</a>
+        </div>
+      </div>
+    </div>
+  </div>
+
   <!-- Global Checkout Modal -->
   <div id="checkoutModal" class="modal-backdrop">
     <div class="modal-dialog">
@@ -764,6 +889,73 @@
       <div style="display: flex; justify-content: space-between; align-items: center; margin-top: 16px; font-size: 12px;">
         <span style="color: var(--text-muted);">Consumes 1 compute credit</span>
         <a href="/pricing" style="color: var(--accent-cyan); text-decoration: none; font-weight: 600;">Get More Credits →</a>
+      </div>
+    </div>
+  </div>
+
+  <!-- Global Pre-Flight Credit & Auto-Refund Modal (WS4 - Feedback #8) -->
+  <div id="preflightCreditModal" class="modal-backdrop">
+    <div class="modal-dialog preflight-credit-dialog" role="dialog" aria-modal="true" aria-labelledby="preflightModalTitle" style="max-width: 500px; padding: 26px 28px;">
+      <div class="modal-header" style="margin-bottom: 16px;">
+        <h3 id="preflightModalTitle" style="font-weight: 800; font-size: 19px; display: flex; align-items: center; gap: 8px; margin: 0;">
+          <svg class="glyph" aria-hidden="true" style="color: var(--accent-cyan);"><use href="#glyph-coin"></use></svg>
+          <span id="preflightModalHeading">Confirm Research Task</span>
+        </h3>
+        <button type="button" id="closePreflightModalBtn" class="modal-close-btn" onclick="closePreflightCreditModal()" aria-label="Close Pre-Flight Modal">&times;</button>
+      </div>
+
+      <div class="preflight-body">
+        <p id="preflightModalActionDesc" style="font-size: 14px; color: var(--text-primary); line-height: 1.5; margin-bottom: 16px;">
+          Generate a fresh, verified 7-pillar research report for this asset.
+        </p>
+
+        <!-- 3-Item Credit Breakdown Box -->
+        <div class="preflight-ledger-box" style="background: var(--bg-surface); border: 1px solid var(--border-color); border-radius: 10px; padding: 14px 16px; margin-bottom: 16px;">
+          <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px; font-size: 13px;">
+            <span style="color: var(--text-secondary);">Current Available Balance:</span>
+            <strong id="preflightCurrentBalance" class="tnum" style="color: var(--text-primary); font-size: 14px;">0 Credits</strong>
+          </div>
+          <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px; font-size: 13px;">
+            <span style="color: var(--text-secondary);">Research Compute Cost:</span>
+            <strong id="preflightCost" class="tnum" style="color: var(--accent-amber); font-size: 14px;">1 Credit</strong>
+          </div>
+          <div style="height: 1px; background: var(--border-subtle); margin: 8px 0;"></div>
+          <div style="display: flex; justify-content: space-between; align-items: center; font-size: 13px;">
+            <span style="color: var(--text-secondary); font-weight: 600;">Remaining Balance After Task:</span>
+            <strong id="preflightRemainingBalance" class="tnum" style="color: var(--accent-emerald); font-size: 14px;">0 Credits</strong>
+          </div>
+        </div>
+
+        <!-- Atomic Refund Guarantee Notice -->
+        <div class="preflight-guarantee-box" style="background: rgba(14, 165, 233, 0.08); border-left: 3px solid var(--accent-cyan); border-radius: 6px; padding: 12px 14px; margin-bottom: 18px; font-size: 12.5px; color: var(--text-secondary); line-height: 1.5;">
+          <strong style="color: var(--text-primary); display: flex; align-items: center; gap: 6px; margin-bottom: 4px;">
+            <svg class="glyph" style="width: 14px; height: 14px; color: var(--accent-cyan);"><use href="#glyph-shield"></use></svg>
+            Atomic Refund Guarantee
+          </strong>
+          Credits are only deducted upon successful synthesis and delivery. If external exchange ingestion fails or the task aborts for any reason, your credit is immediately and automatically refunded to your balance.
+        </div>
+
+        <!-- In-Place Error/Refund Notice (hidden by default) -->
+        <div id="preflightErrorBox" style="display: none; background: rgba(239, 68, 68, 0.1); border: 1px solid rgba(239, 68, 68, 0.3); border-radius: 8px; padding: 12px 14px; margin-bottom: 16px; font-size: 13px; color: #ef4444; line-height: 1.45;">
+          <div style="font-weight: 700; margin-bottom: 4px;" id="preflightErrorTitle">Synthesis Could Not Complete</div>
+          <div id="preflightErrorMessage" style="font-size: 12px; margin-bottom: 10px; color: var(--text-secondary);">Your research credit was not charged (or has been automatically refunded).</div>
+          <button type="button" id="preflightRetryBtn" class="btn btn-secondary btn-sm" style="font-size: 12px; padding: 6px 12px;">Try Again</button>
+        </div>
+
+        <!-- Actions -->
+        <div id="preflightActionsContainer" style="display: flex; gap: 10px;">
+          <button type="button" id="preflightCancelBtn" class="btn btn-secondary" onclick="closePreflightCreditModal()" style="flex: 1; padding: 12px; font-size: 14px;">Cancel</button>
+          <button type="button" id="preflightConfirmBtn" class="btn btn-primary" style="flex: 2; padding: 12px; font-weight: 700; font-size: 14px;">
+            <span id="preflightConfirmBtnText">Confirm &amp; Proceed (1 Credit)</span>
+          </button>
+        </div>
+
+        <div id="preflightTopUpContainer" style="display: none; flex-direction: column; gap: 8px;">
+          <a href="/pricing" class="btn btn-primary" style="width: 100%; padding: 12px; text-align: center; text-decoration: none; font-weight: 700;">
+            Buy Research Credits →
+          </a>
+          <button type="button" class="btn btn-secondary" onclick="closePreflightCreditModal()" style="width: 100%; padding: 10px;">Dismiss</button>
+        </div>
       </div>
     </div>
   </div>
@@ -956,6 +1148,6 @@
     </div>
   </footer>
 
-  <script src="/static/js/main.js?v=20261021_1545"></script>
+  <script src="/static/js/main.js?v=20261025_1415"></script>
 </body>
 </html>

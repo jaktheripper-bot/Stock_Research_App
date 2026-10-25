@@ -238,7 +238,8 @@ def generate_deterministic_7pillar_report(stock_data: Dict[str, Any], candidate_
     scrip = stock_data.get("scrip_code") or resolve_bse_scrip_code(ticker) or "500000"
 
     price = float(stock_data.get("current_price") or stock_data.get("currentValue") or 100.0)
-    pe = str(stock_data.get("pe_ratio") or "Fair")
+    raw_pe_val = stock_data.get("pe_ratio")
+    pe = "N/A" if raw_pe_val in (None, "", "Fair", "-", "—") else str(raw_pe_val)
     mcap = float(stock_data.get("market_cap") or stock_data.get("marketCapFull") or 10_000_000_000)
     mcap_cr = round(mcap / 10_000_000.0, 1) if mcap > 1000 else round(mcap, 1)
 
@@ -251,7 +252,7 @@ def generate_deterministic_7pillar_report(stock_data: Dict[str, Any], candidate_
 
     moat_rating = "Wide" if roce >= 20.0 else "Moderate"
     solvency_rating = "Debt-Free" if de <= 0.05 else ("Moderate Debt" if de <= 0.5 else "High Debt")
-    valuation_rating = "Fair" if pe != "N/A" else "Undervalued"
+    valuation_rating = "Loss-Making" if pe in ("NM", "N/A (Loss-Making)") else "Fair"
 
     report_markdown = f"""# Equity Research Dossier: {company_name} ({ticker})
 
@@ -328,24 +329,42 @@ def _resolve_candidate_stock_data(candidate: Dict[str, Any]) -> Dict[str, Any]:
     scrip_code = candidate.get("scrip_code") or resolve_bse_scrip_code(ticker) or ""
     company_name = candidate.get("company_name") or ticker
     sector = candidate.get("sector") or "Diversified"
+    is_testing = os.environ.get("TESTING") == "1"
 
-    stock_data = {}
-    if not os.environ.get("TESTING") == "1":
+    stock_data: Dict[str, Any] = {}
+    if not is_testing:
         try:
-            stock_data = get_stock_fundamentals(ticker)
+            stock_data = get_stock_fundamentals(ticker) or {}
         except Exception as e:
             logger.debug(f"Fundamentals fetch notice for {ticker}: {e}")
+        if not stock_data:
+            try:
+                from core.db.fundamentals import get_cached_fundamentals
+                stock_data = get_cached_fundamentals(ticker) or {}
+            except Exception as cf_err:
+                logger.debug(f"Cached fundamentals fallback notice for {ticker}: {cf_err}")
 
     if not stock_data:
-        stock_data = {
-            "ticker": ticker,
-            "short_name": company_name,
-            "sector": sector,
-            "scrip_code": scrip_code,
-            "current_price": 500.0,
-            "market_cap": 25_000_000_000,
-            "pe_ratio": "22.5",
-        }
+        if is_testing:
+            stock_data = {
+                "ticker": ticker,
+                "short_name": company_name,
+                "sector": sector,
+                "scrip_code": scrip_code,
+                "current_price": 500.0,
+                "market_cap": 25_000_000_000,
+                "pe_ratio": "22.5",
+            }
+        else:
+            stock_data = {
+                "ticker": ticker,
+                "short_name": company_name,
+                "sector": sector,
+                "scrip_code": scrip_code,
+                "current_price": None,
+                "market_cap": None,
+                "pe_ratio": "N/A",
+            }
 
     if not stock_data.get("scrip_code") and scrip_code:
         stock_data["scrip_code"] = scrip_code
@@ -483,16 +502,29 @@ def synthesize_and_archive_stock_dossier(
             }]
         )
 
-    # 3. Synchronize cached fundamentals
+    # 3. Synchronize cached fundamentals (never fabricate default ROCE/D/E when unverified)
+    clean_pe_sync = stock_data.get("pe_ratio")
+    if clean_pe_sync in (None, "", "Fair", "-", "—"):
+        clean_pe_sync = "N/A"
+    extracted: Dict[str, Any] = {}
     try:
-        extracted = extract_fundamentals_from_report_text(report_text, fallback_data={
+        fallback_seed: Dict[str, Any] = {
             "ticker": ticker,
-            "current_price": stock_data.get("current_price", 0.0),
-            "pe_ratio": stock_data.get("pe_ratio", "Fair"),
-            "market_cap": stock_data.get("market_cap", 0.0),
-            "roce": candidate.get("default_roce", 22.0),
-            "debt_to_equity": candidate.get("default_de", 0.15),
-        })
+            "company_name": company_name,
+            "sector": sector,
+            "current_price": stock_data.get("current_price"),
+            "pe_ratio": clean_pe_sync,
+            "market_cap": stock_data.get("market_cap"),
+        }
+        if stock_data.get("roce") is not None:
+            fallback_seed["roce"] = stock_data.get("roce")
+        elif candidate.get("default_roce") is not None:
+            fallback_seed["roce"] = candidate.get("default_roce")
+        if stock_data.get("debt_to_equity") is not None:
+            fallback_seed["debt_to_equity"] = stock_data.get("debt_to_equity")
+        elif candidate.get("default_de") is not None:
+            fallback_seed["debt_to_equity"] = candidate.get("default_de")
+        extracted = extract_fundamentals_from_report_text(report_text, fallback_data=fallback_seed)
         save_cached_fundamentals(ticker, extracted)
     except Exception as cache_err:
         logger.debug(f"Cached fundamentals sync notice for {ticker}: {cache_err}")
@@ -502,8 +534,11 @@ def synthesize_and_archive_stock_dossier(
         "company_name": company_name,
         "sector": sector,
         "status": "INGESTED_RESEARCHED",
-        "current_price": stock_data.get("current_price", 0.0),
-        "pe_ratio": stock_data.get("pe_ratio", "Fair"),
+        "current_price": extracted.get("current_price") or stock_data.get("current_price") or 0.0,
+        "market_cap": extracted.get("market_cap") or stock_data.get("market_cap") or 0.0,
+        "pe_ratio": extracted.get("pe_ratio") or clean_pe_sync,
+        "roce": extracted.get("roce"),
+        "debt_to_equity": extracted.get("debt_to_equity"),
         "scheme_count": candidate.get("scheme_count", 0),
         "estimated_aum_cr": candidate.get("estimated_aum_cr", 0.0)
     }
@@ -668,39 +703,60 @@ def ingest_daily_stock_cohort(
             )
             ingested_results.append(res)
 
-            # Build rich discovery reel item with mutual fund footprint
+            # Build rich discovery reel item with mutual fund footprint (exclude unpriced or Mega-Caps >= ₹1L Cr)
             ticker = res["ticker"]
+            curr_px = float(res.get("current_price") or 0.0)
+            mcap_raw = float(res.get("market_cap") or 0.0)
+            mcap_cr = mcap_raw / 1e7 if mcap_raw > 1e6 else mcap_raw
+            if curr_px <= 0 or mcap_cr >= 100000:
+                continue
+
             scnt = item.get("scheme_count") or 1
             aum_cr = item.get("estimated_aum_cr") or 0.0
             top_schemes = item.get("top_schemes") or []
             schemes_str = f"held by {top_schemes[0]}" if top_schemes else "core fund allocation"
 
-            roce = item.get("default_roce") or 22.4
-            de = item.get("default_de") or 0.15
+            roce_val = res.get("roce") if res.get("roce") is not None else item.get("default_roce")
+            de_val = res.get("debt_to_equity") if res.get("debt_to_equity") is not None else item.get("default_de")
+            if mcap_cr >= 25000:
+                cap_tier = "Large-Cap"
+            elif mcap_cr >= 5000:
+                cap_tier = "Mid-Cap"
+            else:
+                cap_tier = "Emerging Mid-Cap" if aum_cr > 2000 else "Small-Cap"
+
+            from core.cortex.chanakya import ChanakyaGate
+            chanakya_res = ChanakyaGate.evaluate_from_dict(
+                {"ticker": ticker, "roce": roce_val, "debt_to_equity": de_val},
+                mode="STRICT",
+            )
+
+            roce_clause = f"ROCE of {float(roce_val):.1f}%" if roce_val is not None else "statutory capital efficiency tracking"
+            de_clause = f"debt-to-equity of {float(de_val):.2f}x" if de_val is not None else "audited solvency review"
 
             discovery_reel_items.append({
                 "ticker": ticker,
                 "company_name": res["company_name"],
                 "sector": res["sector"],
-                "market_cap_tier": "Emerging Mid-Cap" if aum_cr > 2000 else "Small-Cap",
-                "current_price": res["current_price"],
+                "market_cap_tier": cap_tier,
+                "current_price": curr_px,
                 "pe_ratio": res["pe_ratio"],
-                "roce_pct": roce,
-                "debt_to_equity": de,
-                "sales_growth_3y": 18.5,
+                "roce_pct": float(roce_val) if roce_val is not None else None,
+                "debt_to_equity": float(de_val) if de_val is not None else None,
+                "sales_growth_3y": item.get("sales_growth_3y"),
                 "ria_thesis": (
-                    f"Compounder held across {scnt} mutual funds with an estimated ₹{aum_cr:,.0f} Cr holding footprint ({schemes_str}). "
-                    f"Commands ROCE of {roce:.1f}% and debt-to-equity of {de:.2f}."
+                    f"Institutional holding across {scnt} mutual funds with an estimated ₹{aum_cr:,.0f} Cr footprint ({schemes_str}); "
+                    f"{roce_clause} and {de_clause}."
                 ),
                 "catalyst_headline": f"Statutory Mutual Fund Constituent Induction • {scnt} Schemes",
                 "key_metrics": {
-                    "roce": f"{roce:.1f}%",
-                    "debt_to_equity": f"{de:.2f}",
+                    "roce": f"{float(roce_val):.1f}%" if roce_val is not None else "—",
+                    "debt_to_equity": f"{float(de_val):.2f}x" if de_val is not None else "—",
                     "pe": str(res["pe_ratio"]),
                     "scheme_count": scnt,
                     "estimated_aum_cr": f"₹{aum_cr:,.0f} Cr",
                     "top_schemes": top_schemes,
-                    "chanakya_score": "88/100",
+                    "chanakya_score": f"{chanakya_res.clean_room_score:.0f}/100",
                     "inducted_today": True
                 }
             })
