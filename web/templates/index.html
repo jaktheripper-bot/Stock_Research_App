@@ -3,6 +3,7 @@
 {% block title %}Moatnomics | Less noise, more nuance.{% endblock %}
 
 {% block content %}
+<!-- Section 1 & 2: Hero Banner & Brand Introduction + Infy Audited Dossier Below -->
 <section class="hero hero-portal-banner" data-asset-class="equities">
   <div class="container">
     <div class="hero-split-wrap">
@@ -53,7 +54,7 @@
         </div>
       </div>
 
-      <!-- Right Column: Flagship Sample Dossier Preview Card -->
+      <!-- Section 2: Flagship Sample Dossier Preview Card (Placed Below Banner & Brand Intro) -->
       <div class="hero-preview-col">
         <aside class="flagship-sample-card" aria-label="Flagship Sample Dossier Preview">
           <div class="flagship-card-header">
@@ -100,69 +101,48 @@
   </div>
 </section>
 
-<!-- Live Research Proof Strip & Honest 2-Column Comparison Strip -->
-<section style="padding: 40px 0 20px 0;">
+<!-- Section 3: Primary-Source Data, Fixed Maths and AI You Can Check (4 Promises, Up to Screenshot) -->
+<section class="pillars-section" style="padding: 56px 0 28px 0;" aria-labelledby="coreCompetenceHeading">
   <div class="container">
-    <!-- Honest 2-Column Comparison Strip -->
-    <div class="comparison-strip-wrap" style="margin-top: 0; margin-bottom: 32px;">
-      <div class="comparison-strip-card">
-        <div class="comparison-columns-grid">
-          <!-- Always Free Column -->
-          <div class="comparison-col">
-            <div class="comparison-col-header">
-              <h3 class="comparison-col-title">
-                <svg class="glyph" style="color: var(--accent-emerald);"><use href="#glyph-check"></use></svg>
-                Always Free to Read
-              </h3>
-              <span class="comparison-col-badge free">0 Credits</span>
-            </div>
-            <ul class="comparison-list comparison-list-free">
-              <li>
-                <svg class="glyph"><use href="#glyph-check"></use></svg>
-                <span><strong>Public Research Library:</strong> 100% free access to all existing company dossiers and analyst reports.</span>
-              </li>
-              <li>
-                <svg class="glyph"><use href="#glyph-check"></use></svg>
-                <span><strong>Live Exchange Data:</strong> BSE/NSE quotes, ROCE, D/E, P/E multiples, and market cap tiers.</span>
-              </li>
-              <li>
-                <svg class="glyph"><use href="#glyph-check"></use></svg>
-                <span><strong>Stock Discovery @9AM:</strong> Daily curated exchange screens released every market morning.</span>
-              </li>
-              <li>
-                <svg class="glyph"><use href="#glyph-check"></use></svg>
-                <span><strong>Multi-Asset Directories:</strong> Filter equities, mutual funds, ETFs, debt, sovereign, and REITs.</span>
-              </li>
-            </ul>
-          </div>
+    <div class="core-competence-showcase" role="region" aria-labelledby="coreCompetenceHeading">
+      <div class="core-competence-header">
+        <div class="core-competence-eyebrow">
+          <svg class="glyph" style="width: 14px; height: 14px;"><use href="#glyph-shield"></use></svg>
+          <span>Who We Are • Our Core Competence</span>
+        </div>
+        <h2 id="coreCompetenceHeading" class="core-competence-title">
+          Primary-Source Data, Fixed Maths and AI You Can Check
+        </h2>
+        <p class="core-competence-sub">
+          The asset classes below are where we apply our method. <strong>The method is what sets us apart.</strong> AI never calculates a number, and we never rely on secondary market commentary. Every report combines statutory filings, fixed mathematical models, an AI reading desk that cites its sources, and explicit conditions that would prove the conclusion wrong.
+        </p>
+      </div>
 
-          <!-- Uses 1 Credit Column -->
-          <div class="comparison-col">
-            <div class="comparison-col-header">
-              <h3 class="comparison-col-title">
-                <svg class="glyph" style="color: var(--accent-cyan);"><use href="#glyph-coin"></use></svg>
-                Uses 1 Research Credit
-              </h3>
-              <span class="comparison-col-badge paid">On-Demand Compute</span>
-            </div>
-            <ul class="comparison-list comparison-list-paid">
-              <li>
-                <svg class="glyph"><use href="#glyph-coin"></use></svg>
-                <span><strong>Fresh Synthesis On-Demand:</strong> Ingest today's latest BSE filing for un-cached companies.</span>
-              </li>
-              <li>
-                <svg class="glyph"><use href="#glyph-coin"></use></svg>
-                <span><strong>Multi-Scenario Reverse DCF:</strong> 32-iteration Python solver calibrated to your specific assumptions.</span>
-              </li>
-              <li>
-                <svg class="glyph"><use href="#glyph-coin"></use></svg>
-                <span><strong>Forensic Footnote Inspection:</strong> Multi-agent AI cross-examination of 100+ page auditor notes.</span>
-              </li>
-              <li>
-                <svg class="glyph"><use href="#glyph-coin"></use></svg>
-                <span><strong>Atomic Refund Guarantee:</strong> If synthesis fails or data is missing, credit is instantly restored.</span>
-              </li>
-            </ul>
+      <!-- 4 Promises Strip -->
+      <div>
+        <div style="font-size: 11px; font-weight: 800; text-transform: uppercase; letter-spacing: 0.05em; color: var(--text-muted); margin-bottom: 12px;">
+          Four things we promise every reader
+        </div>
+        <div class="stats-grid trust-grid" style="margin-top: 0;">
+          <div class="stat-card trust-card">
+            <div class="pillar-icon"><svg class="glyph"><use href="#glyph-search"></use></svg></div>
+            <h3 class="trust-title">We start from public records</h3>
+            <p class="trust-desc">Reports are built from company filings and exchange data, not tips, rumours or management claims. You can check the same sources yourself.</p>
+          </div>
+          <div class="stat-card trust-card">
+            <div class="pillar-icon"><svg class="glyph"><use href="#glyph-scale"></use></svg></div>
+            <h3 class="trust-title">We show the risks, not just the pitch</h3>
+            <p class="trust-desc">Every stock report covers seven areas, including debt, cash flow, valuation and governance, so strengths are read alongside what could go wrong.</p>
+          </div>
+          <div class="stat-card trust-card">
+            <div class="pillar-icon"><svg class="glyph"><use href="#glyph-shield"></use></svg></div>
+            <h3 class="trust-title">We never tell you to buy or sell</h3>
+            <p class="trust-desc">Our reports describe what the evidence shows. They are research, not investment advice, and the decision always stays with you.</p>
+          </div>
+          <div class="stat-card trust-card">
+            <div class="pillar-icon"><svg class="glyph"><use href="#glyph-coin"></use></svg></div>
+            <h3 class="trust-title">Reading is free, and readers pay us</h3>
+            <p class="trust-desc">Existing reports and exchange quotes are free to read. Credits are used only when you ask for a fresh report, which is how we are funded.</p>
           </div>
         </div>
       </div>
@@ -170,7 +150,7 @@
   </div>
 </section>
 
-<!-- Stock Discovery @9AM Section -->
+<!-- Section 4: Stock Discovery @ 9:00 AM IST Section -->
 {% if discovery_stocks %}
 <section style="padding: 48px 0; background: linear-gradient(180deg, rgba(15, 23, 42, 0.7) 0%, rgba(11, 17, 32, 0.9) 100%); border-top: 1px solid rgba(255, 255, 255, 0.05); border-bottom: 1px solid rgba(255, 255, 255, 0.05);">
   <div class="container">
@@ -187,7 +167,7 @@
         </div>
         <h2 class="section-title" style="margin-bottom: 6px;">Stock Discovery @9AM</h2>
         <p class="section-sub" style="margin: 0; max-width: 640px;">
-          Curated and released daily at 9:00 AM IST from verified BSE exchange filings. High-ROCE, conservative leverage companies across varied sectors that analysts already follow.
+          Curated and released daily at 9:00 AM IST from statutory BSE exchange filings. High-ROCE, conservative leverage companies across varied sectors that analysts already follow.
         </p>
       </div>
       <div>
@@ -262,14 +242,104 @@
 </section>
 {% endif %}
 
-<!-- Interactive Stock Reports Browser Section -->
+<!-- Section 5: The Other Attached Section of 4 More Cards & Solvers (Image 3) -->
+<section style="padding: 48px 0 36px 0;">
+  <div class="container">
+    <div class="core-competence-disciplines-showcase">
+      <!-- 4-Pillar Core Competence Matrix -->
+      <div class="methodology-discipline-strip core-competence-grid" style="margin-top: 0; margin-bottom: 24px;">
+        <div class="methodology-discipline-card">
+          <div class="methodology-discipline-header">
+            <span class="methodology-step-badge"><svg class="glyph" style="width: 14px; height: 14px;"><use href="#glyph-doc"></use></svg> Competence 01 • Data Provenance</span>
+            <span class="methodology-code-pill">Primary Filings Only</span>
+          </div>
+          <h3 class="methodology-discipline-title">Statutory Exchange &amp; Registry Ingestion</h3>
+          <p class="methodology-discipline-desc">
+            Direct automated ingestion of BSE/NSE corporate filings, RBI primary auction cut-offs, CCIL Zero-Coupon Yield Curves, AMFI scheme disclosures, and Udyam statutory records—eliminating third-party aggregator drift and unverified consensus estimates.
+          </p>
+        </div>
+
+        <div class="methodology-discipline-card">
+          <div class="methodology-discipline-header">
+            <span class="methodology-step-badge"><svg class="glyph" style="width: 14px; height: 14px;"><use href="#icon-valuation"></use></svg> Competence 02 • Quantitative Engine</span>
+            <span class="methodology-code-pill">Closed-Form Math</span>
+          </div>
+          <h3 class="methodology-discipline-title">Deterministic Financial &amp; Risk Modelling</h3>
+          <p class="methodology-discipline-desc">
+            AI never computes or approximates numbers. Every valuation and risk metric is executed in hard Python solvers: 32-iteration bisection Reverse-DCF implied growth, 3-step DuPont ROE decomposition, Macaulay/Modified duration &amp; convexity shock matrices, and Section 115UA tax waterfalls.
+          </p>
+        </div>
+
+        <div class="methodology-discipline-card competence-card-ai">
+          <div class="methodology-discipline-header">
+            <span class="methodology-step-badge"><svg class="glyph" style="width: 14px; height: 14px;"><use href="#icon-ai-spark"></use></svg> Competence 03 • Grounded AI Layer</span>
+            <span class="methodology-code-pill">Multi-Agent Forensic RAG</span>
+          </div>
+          <h3 class="methodology-discipline-title">Glass-Box Multi-Agent AI &amp; Research Desk</h3>
+          <p class="methodology-discipline-desc">
+            Specialized AI agents read 100+ page statutory footnotes, auditor qualifications, related-party disclosures, and credit rating rationales—cross-examining management claims against hard cash-flow statements and powering our live interactive Research Desk.
+          </p>
+        </div>
+
+        <div class="methodology-discipline-card">
+          <div class="methodology-discipline-header">
+            <span class="methodology-step-badge"><svg class="glyph" style="width: 14px; height: 14px;"><use href="#glyph-shield"></use></svg> Competence 04 • Epistemic Rigour</span>
+            <span class="methodology-code-pill">Falsifiable Theses</span>
+          </div>
+          <h3 class="methodology-discipline-title">4-Tier Epistemic Tagging &amp; Falsification</h3>
+          <p class="methodology-discipline-desc">
+            Every statement is tagged as <code>[VERIFIED FACT]</code>, <code>[CALCULATED METRIC]</code>, <code>[MODEL INTERPRETATION]</code>, or <code>[UNRESOLVED UNCERTAINTY]</code>, paired with explicit quantitative filing triggers that automatically force a thesis revision.
+          </p>
+        </div>
+      </div>
+
+      <!-- Technical Architecture Drawer (For Quants & Engineers) -->
+      <details class="technical-solver-drawer">
+        <summary>
+          <svg class="glyph" style="width: 16px; height: 16px; color: var(--accent-cyan);"><use href="#icon-valuation"></use></svg>
+          <span>Deep Technical Architecture &amp; Solvers (For Quants &amp; Engineers)</span>
+        </summary>
+        <div class="technical-solver-content">
+          <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap: 16px;">
+            <div>
+              <strong style="color: var(--text-primary); display: block; margin-bottom: 4px;">Deterministic Python Valuation Engine</strong>
+              <p style="margin: 0; font-size: 12.5px;">
+                Closed-form 32-iteration bisection solver for 10-year implied FCF growth rate, Graham Earning Power Value (EPV) reproduction cost asset floor, and 3-step DuPont Return on Equity decomposition (Net Margin × Asset Turnover × Financial Leverage).
+              </p>
+            </div>
+            <div>
+              <strong style="color: var(--text-primary); display: block; margin-bottom: 4px;">Fixed-Income &amp; Convexity Math</strong>
+              <p style="margin: 0; font-size: 12.5px;">
+                Macaulay duration, Modified duration, and second-order convexity shock matrices computed on exact cash flow schedules across SEBI ₹10k face-value debt and CCIL Sovereign Zero-Coupon Yield Curves.
+              </p>
+            </div>
+            <div>
+              <strong style="color: var(--text-primary); display: block; margin-bottom: 4px;">Statutory Tax Waterfall (Section 115UA)</strong>
+              <p style="margin: 0; font-size: 12.5px;">
+                4-tier pass-through distribution categorization (Interest, Dividend, Rental Income, Capital Repayment) incorporating Finance Act Section 56(2)(xii) cost-basis amortization for REIT/InvIT unitholders.
+              </p>
+            </div>
+            <div>
+              <strong style="color: var(--text-primary); display: block; margin-bottom: 4px;">Epistemic Grounding &amp; Citations</strong>
+              <p style="margin: 0; font-size: 12.5px;">
+                Strict 4-tier truth tagging (<code>[VERIFIED FACT]</code>, <code>[CALCULATED METRIC]</code>, <code>[MODEL INTERPRETATION]</code>, <code>[UNRESOLVED UNCERTAINTY]</code>). Multi-agent LLM analysis is restricted to qualitative footnote analysis and audit cross-checks with exact filing citations.
+              </p>
+            </div>
+          </div>
+        </div>
+      </details>
+    </div>
+  </div>
+</section>
+
+<!-- Section 6: Interactive Stock Reports Browser Section (With 'Verified' Removed) -->
 <section style="padding: 56px 0; background: rgba(15, 23, 42, 0.45); border-top: 1px solid rgba(255, 255, 255, 0.05); border-bottom: 1px solid rgba(255, 255, 255, 0.05);">
   <div class="container">
     <div class="section-head" style="margin-bottom: 28px;">
       <div class="section-tag" style="background: rgba(14, 165, 233, 0.15); color: #38bdf8; border: 1px solid rgba(14, 165, 233, 0.3);">
         Public Research Library • Stock Reports
       </div>
-      <h2 class="section-title">Browse Verified Stock Research Reports</h2>
+      <h2 class="section-title">Browse Stock Research Reports</h2>
       <p class="section-sub">
         Free access to <strong>BSE &amp; NSE stock reports</strong>. 
         Filter by sector, search tickers, and inspect 7-pillar scorecards with reverse DCF margin of safety and DuPont ROE decompositions.
@@ -374,7 +444,7 @@
               </a>
             </h3>
             <span style="font-size: 18px; font-weight: 700; color: var(--accent-emerald, #10b981);">
-              {{ eq.formatted_price|default('Verified') }}
+              {{ eq.formatted_price|default('—') }}
             </span>
           </div>
 
@@ -575,139 +645,10 @@
   });
 </script>
 
-<!-- Why You Can Trust What You Read & Our Core Competence -->
-<section class="pillars-section" aria-labelledby="frameworkHeading">
+<!-- Section 7: One Standard Across Seven Asset Classes -->
+<section class="pillars-section" aria-labelledby="frameworkHeading" style="padding: 64px 0;">
   <div class="container">
-    <!-- PART I: WHO WE ARE — OUR CORE COMPETENCE SHOWCASE -->
-    <div class="core-competence-showcase" role="region" aria-labelledby="coreCompetenceHeading">
-      <div class="core-competence-header">
-        <div class="core-competence-eyebrow">
-          <svg class="glyph" style="width: 14px; height: 14px;"><use href="#glyph-shield"></use></svg>
-          <span>Who We Are • Our Core Competence</span>
-        </div>
-        <h2 id="coreCompetenceHeading" class="core-competence-title">
-          Primary-Source Data, Fixed Maths and AI You Can Check
-        </h2>
-        <p class="core-competence-sub">
-          The asset classes below are where we apply our method. <strong>The method is what sets us apart.</strong> AI never calculates a number, and we never rely on secondary market commentary. Every report combines statutory filings, fixed mathematical models, an AI reading desk that cites its sources, and explicit conditions that would prove the conclusion wrong.
-        </p>
-      </div>
-
-      <!-- 4 Promises Strip -->
-      <div style="margin-bottom: 28px;">
-        <div style="font-size: 11px; font-weight: 800; text-transform: uppercase; letter-spacing: 0.05em; color: var(--text-muted); margin-bottom: 12px;">
-          Four things we promise every reader
-        </div>
-        <div class="stats-grid trust-grid" style="margin-top: 0;">
-          <div class="stat-card trust-card">
-            <div class="pillar-icon"><svg class="glyph"><use href="#glyph-search"></use></svg></div>
-            <h3 class="trust-title">We start from public records</h3>
-            <p class="trust-desc">Reports are built from company filings and exchange data, not tips, rumours or management claims. You can check the same sources yourself.</p>
-          </div>
-          <div class="stat-card trust-card">
-            <div class="pillar-icon"><svg class="glyph"><use href="#glyph-scale"></use></svg></div>
-            <h3 class="trust-title">We show the risks, not just the pitch</h3>
-            <p class="trust-desc">Every stock report covers seven areas, including debt, cash flow, valuation and governance, so strengths are read alongside what could go wrong.</p>
-          </div>
-          <div class="stat-card trust-card">
-            <div class="pillar-icon"><svg class="glyph"><use href="#glyph-shield"></use></svg></div>
-            <h3 class="trust-title">We never tell you to buy or sell</h3>
-            <p class="trust-desc">Our reports describe what the evidence shows. They are research, not investment advice, and the decision always stays with you.</p>
-          </div>
-          <div class="stat-card trust-card">
-            <div class="pillar-icon"><svg class="glyph"><use href="#glyph-coin"></use></svg></div>
-            <h3 class="trust-title">Reading is free, and readers pay us</h3>
-            <p class="trust-desc">Existing reports and exchange quotes are free to read. Credits are used only when you ask for a fresh report, which is how we are funded.</p>
-          </div>
-        </div>
-      </div>
-
-      <!-- 4-Pillar Core Competence Matrix -->
-      <div class="methodology-discipline-strip core-competence-grid">
-        <div class="methodology-discipline-card">
-          <div class="methodology-discipline-header">
-            <span class="methodology-step-badge"><svg class="glyph" style="width: 14px; height: 14px;"><use href="#glyph-doc"></use></svg> Competence 01 • Data Provenance</span>
-            <span class="methodology-code-pill">Primary Filings Only</span>
-          </div>
-          <h3 class="methodology-discipline-title">Statutory Exchange &amp; Registry Ingestion</h3>
-          <p class="methodology-discipline-desc">
-            Direct automated ingestion of BSE/NSE corporate filings, RBI primary auction cut-offs, CCIL Zero-Coupon Yield Curves, AMFI scheme disclosures, and Udyam statutory records—eliminating third-party aggregator drift and unverified consensus estimates.
-          </p>
-        </div>
-
-        <div class="methodology-discipline-card">
-          <div class="methodology-discipline-header">
-            <span class="methodology-step-badge"><svg class="glyph" style="width: 14px; height: 14px;"><use href="#icon-valuation"></use></svg> Competence 02 • Quantitative Engine</span>
-            <span class="methodology-code-pill">Closed-Form Math</span>
-          </div>
-          <h3 class="methodology-discipline-title">Deterministic Financial &amp; Risk Modelling</h3>
-          <p class="methodology-discipline-desc">
-            AI never computes or approximates numbers. Every valuation and risk metric is executed in hard Python solvers: 32-iteration bisection Reverse-DCF implied growth, 3-step DuPont ROE decomposition, Macaulay/Modified duration &amp; convexity shock matrices, and Section 115UA tax waterfalls.
-          </p>
-        </div>
-
-        <div class="methodology-discipline-card competence-card-ai">
-          <div class="methodology-discipline-header">
-            <span class="methodology-step-badge"><svg class="glyph" style="width: 14px; height: 14px;"><use href="#icon-ai-spark"></use></svg> Competence 03 • Grounded AI Layer</span>
-            <span class="methodology-code-pill">Multi-Agent Forensic RAG</span>
-          </div>
-          <h3 class="methodology-discipline-title">Glass-Box Multi-Agent AI &amp; Research Desk</h3>
-          <p class="methodology-discipline-desc">
-            Specialized AI agents read 100+ page statutory footnotes, auditor qualifications, related-party disclosures, and credit rating rationales—cross-examining management claims against hard cash-flow statements and powering our live interactive Research Desk.
-          </p>
-        </div>
-
-        <div class="methodology-discipline-card">
-          <div class="methodology-discipline-header">
-            <span class="methodology-step-badge"><svg class="glyph" style="width: 14px; height: 14px;"><use href="#glyph-shield"></use></svg> Competence 04 • Epistemic Rigour</span>
-            <span class="methodology-code-pill">Falsifiable Theses</span>
-          </div>
-          <h3 class="methodology-discipline-title">4-Tier Epistemic Tagging &amp; Falsification</h3>
-          <p class="methodology-discipline-desc">
-            Every statement is tagged as <code>[VERIFIED FACT]</code>, <code>[CALCULATED METRIC]</code>, <code>[MODEL INTERPRETATION]</code>, or <code>[UNRESOLVED UNCERTAINTY]</code>, paired with explicit quantitative filing triggers that automatically force a thesis revision.
-          </p>
-        </div>
-      </div>
-
-      <!-- Technical Architecture Drawer (For Quants & Engineers) -->
-      <details class="technical-solver-drawer">
-        <summary>
-          <svg class="glyph" style="width: 16px; height: 16px; color: var(--accent-cyan);"><use href="#icon-valuation"></use></svg>
-          <span>Deep Technical Architecture &amp; Solvers (For Quants &amp; Engineers)</span>
-        </summary>
-        <div class="technical-solver-content">
-          <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap: 16px;">
-            <div>
-              <strong style="color: var(--text-primary); display: block; margin-bottom: 4px;">Deterministic Python Valuation Engine</strong>
-              <p style="margin: 0; font-size: 12.5px;">
-                Closed-form 32-iteration bisection solver for 10-year implied FCF growth rate, Graham Earning Power Value (EPV) reproduction cost asset floor, and 3-step DuPont Return on Equity decomposition (Net Margin × Asset Turnover × Financial Leverage).
-              </p>
-            </div>
-            <div>
-              <strong style="color: var(--text-primary); display: block; margin-bottom: 4px;">Fixed-Income &amp; Convexity Math</strong>
-              <p style="margin: 0; font-size: 12.5px;">
-                Macaulay duration, Modified duration, and second-order convexity shock matrices computed on exact cash flow schedules across SEBI ₹10k face-value debt and CCIL Sovereign Zero-Coupon Yield Curves.
-              </p>
-            </div>
-            <div>
-              <strong style="color: var(--text-primary); display: block; margin-bottom: 4px;">Statutory Tax Waterfall (Section 115UA)</strong>
-              <p style="margin: 0; font-size: 12.5px;">
-                4-tier pass-through distribution categorization (Interest, Dividend, Rental Income, Capital Repayment) incorporating Finance Act Section 56(2)(xii) cost-basis amortization for REIT/InvIT unitholders.
-              </p>
-            </div>
-            <div>
-              <strong style="color: var(--text-primary); display: block; margin-bottom: 4px;">Epistemic Grounding &amp; Citations</strong>
-              <p style="margin: 0; font-size: 12.5px;">
-                Strict 4-tier truth tagging (<code>[VERIFIED FACT]</code>, <code>[CALCULATED METRIC]</code>, <code>[MODEL INTERPRETATION]</code>, <code>[UNRESOLVED UNCERTAINTY]</code>). Multi-agent LLM analysis is restricted to qualitative footnote analysis and audit cross-checks with exact filing citations.
-              </p>
-            </div>
-          </div>
-        </div>
-      </details>
-    </div>
-
-    <!-- PART II: THE ASSETS WE COVER — 7 ASSET-CLASS TERMINALS -->
-    <div class="section-head" style="margin-top: 56px; margin-bottom: 36px;">
+    <div class="section-head" style="margin-bottom: 36px;">
       <div class="section-tag">The Assets We Cover • Click Any Card to Open Terminal</div>
       <h2 id="frameworkHeading" class="section-title">One Standard Across Seven Asset Classes</h2>
       <p class="section-sub" style="max-width: 780px;">
@@ -825,9 +766,75 @@
   </div>
 </section>
 
-<!-- Pricing Section -->
-<section class="pricing-section">
+<!-- Section 8: Subscription Section (Honest Comparison Strip + Research Credits & Subscriptions) -->
+<section class="pricing-section" style="padding: 64px 0;">
   <div class="container">
+    <!-- Honest 2-Column Comparison Strip -->
+    <div class="comparison-strip-wrap" style="margin-top: 0; margin-bottom: 48px;">
+      <div class="comparison-strip-card">
+        <div class="comparison-columns-grid">
+          <!-- Always Free Column -->
+          <div class="comparison-col">
+            <div class="comparison-col-header">
+              <h3 class="comparison-col-title">
+                <svg class="glyph" style="color: var(--accent-emerald);"><use href="#glyph-check"></use></svg>
+                Always Free to Read
+              </h3>
+              <span class="comparison-col-badge free">0 Credits</span>
+            </div>
+            <ul class="comparison-list comparison-list-free">
+              <li>
+                <svg class="glyph"><use href="#glyph-check"></use></svg>
+                <span><strong>Public Research Library:</strong> 100% free access to all existing company dossiers and analyst reports.</span>
+              </li>
+              <li>
+                <svg class="glyph"><use href="#glyph-check"></use></svg>
+                <span><strong>Live Exchange Data:</strong> BSE/NSE quotes, ROCE, D/E, P/E multiples, and market cap tiers.</span>
+              </li>
+              <li>
+                <svg class="glyph"><use href="#glyph-check"></use></svg>
+                <span><strong>Stock Discovery @9AM:</strong> Daily curated exchange screens released every market morning.</span>
+              </li>
+              <li>
+                <svg class="glyph"><use href="#glyph-check"></use></svg>
+                <span><strong>Multi-Asset Directories:</strong> Filter equities, mutual funds, ETFs, debt, sovereign, and REITs.</span>
+              </li>
+            </ul>
+          </div>
+
+          <!-- Uses 1 Credit Column -->
+          <div class="comparison-col">
+            <div class="comparison-col-header">
+              <h3 class="comparison-col-title">
+                <svg class="glyph" style="color: var(--accent-cyan);"><use href="#glyph-coin"></use></svg>
+                Uses 1 Research Credit
+              </h3>
+              <span class="comparison-col-badge paid">On-Demand Compute</span>
+            </div>
+            <ul class="comparison-list comparison-list-paid">
+              <li>
+                <svg class="glyph"><use href="#glyph-coin"></use></svg>
+                <span><strong>Fresh Synthesis On-Demand:</strong> Ingest today's latest BSE filing for un-cached companies.</span>
+              </li>
+              <li>
+                <svg class="glyph"><use href="#glyph-coin"></use></svg>
+                <span><strong>Multi-Scenario Reverse DCF:</strong> 32-iteration Python solver calibrated to your specific assumptions.</span>
+              </li>
+              <li>
+                <svg class="glyph"><use href="#glyph-coin"></use></svg>
+                <span><strong>Forensic Footnote Inspection:</strong> Multi-agent AI cross-examination of 100+ page auditor notes.</span>
+              </li>
+              <li>
+                <svg class="glyph"><use href="#glyph-coin"></use></svg>
+                <span><strong>Atomic Refund Guarantee:</strong> If synthesis fails or data is missing, credit is instantly restored.</span>
+              </li>
+            </ul>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Pricing Grid Header -->
     <div class="section-head">
       <div class="section-tag">Transparent Monetization</div>
       <h2 class="section-title">Research Credits &amp; Subscriptions</h2>

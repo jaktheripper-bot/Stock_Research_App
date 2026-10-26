@@ -89,13 +89,15 @@ Zero long-term debt and high FCF conversion.
         self.assertIn("Uses 1 Research Credit", strip.text)
         self.assertIn("0 Credits", strip.text)
 
-        # 5. Core Competence Section
+        # 5. Core Competence Section (Promises and Decoupled Disciplines)
         core_comp = soup.find(class_="core-competence-showcase")
         self.assertIsNotNone(core_comp, "Core competence showcase must exist")
         self.assertIn("Four things we promise every reader", core_comp.text)
         self.assertIn("We never tell you to buy or sell", core_comp.text)
-        self.assertIn("Statutory Exchange & Registry Ingestion", core_comp.text)
-        self.assertIn("Deterministic Financial & Risk Modelling", core_comp.text)
+        disciplines = soup.find(class_="core-competence-disciplines-showcase")
+        self.assertIsNotNone(disciplines, "Core competence disciplines showcase must exist")
+        self.assertIn("Statutory Exchange & Registry Ingestion", disciplines.text)
+        self.assertIn("Deterministic Financial & Risk Modelling", disciplines.text)
 
         # 6. Technical Solver Drawer
         drawer = soup.find("details", class_="technical-solver-drawer")

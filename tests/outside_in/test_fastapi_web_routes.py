@@ -1093,7 +1093,7 @@ Detailed forensic analysis with exact page grounding to bseindia.com filings.
         res = self.client.get("/")
         self.assertEqual(res.status_code, 200)
         html = res.text
-        self.assertIn("Browse Verified Stock Research Reports", html)
+        self.assertIn("Browse Stock Research Reports", html)
         self.assertIn("home-stock-card", html)
         self.assertIn("homeStockSearchInput", html)
         self.assertIn("homeSectorPills", html)

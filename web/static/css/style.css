@@ -3343,14 +3343,15 @@ html[data-theme="dark"] section.hero.hero-portal-banner {
 
 .hero-split-wrap {
   display: flex;
-  align-items: center;
-  justify-content: space-between;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 32px;
   width: 100%;
   position: relative;
 }
 
 .hero-lead-col {
-  max-width: 590px;
+  max-width: 680px;
   width: 100%;
   z-index: 2;
   text-align: left;
@@ -4451,7 +4452,8 @@ html[data-theme="light"] .hero-portal-banner [style*="color: #c084fc" i] {
 /* ==========================================================================
    13. Flagship Core Competence Showcase vs. Multi-Asset Coverage Distinction
    ========================================================================== */
-.core-competence-showcase {
+.core-competence-showcase,
+.core-competence-disciplines-showcase {
   background: linear-gradient(145deg, rgba(14, 61, 50, 0.06) 0%, rgba(2, 132, 199, 0.05) 100%);
   border: 1.5px solid rgba(14, 61, 50, 0.22);
   border-top: 4px solid #0E3D32;
@@ -4461,7 +4463,8 @@ html[data-theme="light"] .hero-portal-banner [style*="color: #c084fc" i] {
   box-shadow: 0 12px 32px rgba(15, 23, 42, 0.05);
 }
 
-html[data-theme="dark"] .core-competence-showcase {
+html[data-theme="dark"] .core-competence-showcase,
+html[data-theme="dark"] .core-competence-disciplines-showcase {
   background: linear-gradient(145deg, rgba(14, 61, 50, 0.22) 0%, rgba(15, 23, 42, 0.85) 100%);
   border-color: rgba(125, 167, 122, 0.28);
   border-top: 4px solid #10B981;
@@ -4525,7 +4528,8 @@ html[data-theme="dark"] .core-competence-eyebrow {
   }
 }
 
-.core-competence-showcase .methodology-discipline-card {
+.core-competence-showcase .methodology-discipline-card,
+.core-competence-disciplines-showcase .methodology-discipline-card {
   background: var(--bg-card);
   border: 1px solid var(--border-color);
   border-left: 4px solid #0E3D32;
@@ -4534,16 +4538,19 @@ html[data-theme="dark"] .core-competence-eyebrow {
   cursor: default;
 }
 
-html[data-theme="dark"] .core-competence-showcase .methodology-discipline-card {
+html[data-theme="dark"] .core-competence-showcase .methodology-discipline-card,
+html[data-theme="dark"] .core-competence-disciplines-showcase .methodology-discipline-card {
   border-left-color: #10B981;
 }
 
-.core-competence-showcase .methodology-discipline-card.competence-card-ai {
+.core-competence-showcase .methodology-discipline-card.competence-card-ai,
+.core-competence-disciplines-showcase .methodology-discipline-card.competence-card-ai {
   border-left-color: #0284C7;
   background: linear-gradient(180deg, rgba(2, 132, 199, 0.04) 0%, var(--bg-card) 100%);
 }
 
-html[data-theme="dark"] .core-competence-showcase .methodology-discipline-card.competence-card-ai {
+html[data-theme="dark"] .core-competence-showcase .methodology-discipline-card.competence-card-ai,
+html[data-theme="dark"] .core-competence-disciplines-showcase .methodology-discipline-card.competence-card-ai {
   border-left-color: #38BDF8;
   background: linear-gradient(180deg, rgba(56, 189, 248, 0.08) 0%, var(--bg-card) 100%);
 }
@@ -5768,19 +5775,21 @@ html[data-theme="dark"] .search-explore-desc {
    Workstream 4 & 5: Commercial Trust, Pricing Transparency & Homepage Split Hero
    ============================================================================== */
 
-/* 1. Hero 2-Column Asymmetric Split Layout */
+/* 1. Hero Stacked Layout: Banner Intro Above, Flagship Card Below */
 .hero-split-wrap {
-  display: grid;
-  grid-template-columns: 1fr;
+  display: flex;
+  flex-direction: column;
   gap: 32px;
-  align-items: center;
+  align-items: flex-start;
   text-align: left;
+  width: 100%;
 }
 
 @media (min-width: 992px) {
   .hero-split-wrap {
-    grid-template-columns: 1.15fr 0.85fr;
-    gap: 40px;
+    display: flex;
+    flex-direction: column;
+    gap: 32px;
   }
 }
 
@@ -5788,6 +5797,8 @@ html[data-theme="dark"] .search-explore-desc {
   display: flex;
   flex-direction: column;
   align-items: flex-start;
+  max-width: 680px;
+  width: 100%;
 }
 
 .hero-lead-col .quick-chips {
@@ -5801,6 +5812,7 @@ html[data-theme="dark"] .search-explore-desc {
 
 /* 2. Flagship Sample Dossier Preview Card */
 .hero-preview-col {
+  max-width: 680px;
   width: 100%;
 }
 
