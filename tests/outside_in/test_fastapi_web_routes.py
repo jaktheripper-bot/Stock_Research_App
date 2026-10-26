@@ -1662,6 +1662,7 @@ class TestComparisonAndTelemetry(unittest.TestCase):
     def test_landing_pages_telemetry_and_classification(self):
         self.assertEqual(classify_page_category("/")[0], "Homepage / Terminal")
         self.assertEqual(classify_page_category("/dossier/INFY")[0], "Equity Dossier (INFY)")
+        self.assertEqual(classify_page_category("/dossier/UDYAM-MH-01-0001234")[0], "MSME Dossier (UDYAM-MH-01-0001234)")
         self.assertEqual(classify_page_category("/funds")[0], "Mutual Fund Directory")
         self.assertEqual(classify_page_category("/funds/118989")[0], "Mutual Fund Report")
         self.assertEqual(classify_page_category("/debt")[0], "Corporate Debt Directory")

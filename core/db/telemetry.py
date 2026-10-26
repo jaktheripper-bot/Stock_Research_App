@@ -151,7 +151,9 @@ def classify_page_category(path: str) -> tuple[str, str]:
         return "Homepage / Terminal", "🏠"
     if clean_p.startswith("/dossier/"):
         tick = clean_p.split("/")[2] if len(clean_p.split("/")) > 2 else ""
-        return f"Equity Dossier ({tick})" if tick else "Equity Research Dossier", "📈"
+        if tick.startswith("UDYAM"):
+            return (f"MSME Dossier ({tick})", "🏭") if tick else ("MSME Dossier", "🏭")
+        return (f"Equity Dossier ({tick})", "📈") if tick else ("Equity Dossier", "📈")
     if clean_p == "/dossier":
         return "Equity Dossier Index", "📈"
     if clean_p == "/funds":
