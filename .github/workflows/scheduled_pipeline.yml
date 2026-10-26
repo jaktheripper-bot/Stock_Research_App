@@ -1,0 +1,91 @@
+name: Autonomous Multi-Asset Scheduled Pipeline
+
+on:
+  schedule:
+    # 08:30 AM IST (03:00 UTC) — Daily 15-Stock Ingest, Discovery Reel & MSME Cohort
+    - cron: "0 3 * * *"
+    # 23:15 IST (17:45 UTC) — Nightly AMFI NAV, ETFs, Sovereign Curve, Debt Scan & Fund Audit
+    - cron: "45 17 * * *"
+  workflow_dispatch:
+    inputs:
+      mode:
+        description: "Pipeline mode to execute"
+        required: true
+        default: "all"
+        type: choice
+        options:
+          - morning
+          - nightly
+          - all
+      date:
+        description: "Optional IST edition date (YYYY-MM-DD)"
+        required: false
+        type: string
+      force:
+        description: "Bypass distributed job lease lock"
+        required: false
+        default: false
+        type: boolean
+
+concurrency:
+  group: moatnomics-pipeline-${{ github.event.schedule || inputs.mode }}
+  cancel-in-progress: false
+
+jobs:
+  execute-pipeline:
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python 3.14
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.14"
+          cache: "pip"
+
+      - name: Install Dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+
+      - name: Execute Cloud Multi-Asset Pipeline
+        env:
+          TZ: Asia/Kolkata
+          PYTHONPATH: ${{ github.workspace }}
+          SUPABASE_DB_URL: ${{ secrets.SUPABASE_DB_URL }}
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+          GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
+          PERPLEXITY_API_KEY: ${{ secrets.PERPLEXITY_API_KEY }}
+          SMARTAPI_PROXY_URL: ${{ secrets.SMARTAPI_PROXY_URL }}
+          ANGEL_API_KEY: ${{ secrets.ANGEL_API_KEY }}
+          ANGEL_CLIENT_CODE: ${{ secrets.ANGEL_CLIENT_CODE }}
+          ANGEL_PIN: ${{ secrets.ANGEL_PIN }}
+          ANGEL_TOTP_KEY: ${{ secrets.ANGEL_TOTP_KEY }}
+          RESEND_API_KEY: ${{ secrets.RESEND_API_KEY }}
+          SMTP_FROM: ${{ secrets.SMTP_FROM }}
+          ADMIN_ALERT_EMAIL: ${{ secrets.ADMIN_ALERT_EMAIL }}
+          BETTER_STACK_SOURCE_TOKEN: ${{ secrets.BETTER_STACK_SOURCE_TOKEN }}
+          BETTER_STACK_INGESTING_HOST: ${{ secrets.BETTER_STACK_INGESTING_HOST }}
+          BETTER_STACK_HEARTBEAT_URL: ${{ secrets.BETTER_STACK_HEARTBEAT_URL }}
+        run: |
+          if [ "${{ github.event_name }}" = "schedule" ]; then
+            if [ "${{ github.event.schedule }}" = "0 3 * * *" ]; then
+              MODE="morning"
+            else
+              MODE="nightly"
+            fi
+            python scripts/run_scheduled_pipeline.py --mode "$MODE"
+          else
+            ARGS="--mode ${{ inputs.mode }}"
+            if [ -n "${{ inputs.date }}" ]; then
+              ARGS="$ARGS --date ${{ inputs.date }}"
+            fi
+            if [ "${{ inputs.force }}" = "true" ]; then
+              ARGS="$ARGS --force"
+            fi
+            python scripts/run_scheduled_pipeline.py $ARGS
+          fi
