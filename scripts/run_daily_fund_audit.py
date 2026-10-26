@@ -97,6 +97,21 @@ def run_worker(scheme_code: Optional[str] = None, audit_all: bool = False):
 
     logger.info(f"Executing 7-pillar look-through audit on {target}...")
     res = audit_single_fund_daily(target)
+    if isinstance(res, dict) and res.get("scheme_code"):
+        from core.db.agent_sessions import record_autonomous_event
+        record_autonomous_event(
+            event_type="DAILY_FUND_AUDIT",
+            ticker=res.get("scheme_code", "UNKNOWN"),
+            trigger_source="CLI_FUND_AUDIT_WORKER",
+            action_taken="7_PILLAR_LOOKTHROUGH_AUDIT",
+            summary=f"Automated 7-pillar look-through audit completed for {res.get('scheme_name')} ({res.get('scheme_code')}).",
+            metadata={
+                "composite_health_score": res.get("composite_health_score"),
+                "weighted_moat_score": res.get("weighted_moat_score"),
+                "accounting_risk_index": res.get("accounting_risk_index"),
+                "margin_of_safety_pct": res.get("margin_of_safety_pct"),
+            },
+        )
     print("\n" + "="*80)
     print(f"AUDIT COMPLETED: {res['scheme_name']} ({res['scheme_code']})")
     health_disp = f"{res['composite_health_score']:.1f} / 100" if res.get('composite_health_score') is not None else "Paused (Genuine Coverage < 70%)"

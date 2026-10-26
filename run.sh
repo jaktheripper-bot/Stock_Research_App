@@ -120,8 +120,13 @@ case "$COMMAND" in
         echo "--> Updating all reports in reports.db with exchange data and syncing..."
         "$PYTHON" scripts/update_all_reports.py "$@"
         ;;
+    pipeline|scheduled-pipeline|run-pipeline)
+        shift
+        echo "--> Running Multi-Asset Scheduled Pipeline Runner..."
+        "$PYTHON" scripts/run_scheduled_pipeline.py "$@"
+        ;;
     *)
-        echo "Usage: ./run.sh [lint | test | bench | preflight | live-audit | start | web | admin | mf-ingest | nifty100 | sync-supabase | update-reports | dump-chat | checkpoint | rollback | checkpoints]"
+        echo "Usage: ./run.sh [lint | test | bench | preflight | live-audit | start | web | admin | mf-ingest | nifty100 | sync-supabase | update-reports | pipeline | dump-chat | checkpoint | rollback | checkpoints]"
         exit 1
         ;;
 esac

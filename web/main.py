@@ -446,11 +446,16 @@ async def run_daily_amfi_scheduler():
 
                 # 3. Multi-Asset Monitoring & AMFI Catch-Up Check
                 from core.ingestion.amfi import ingest_amfi_daily_feed
-                recent_scans = get_asset_scan_runs(limit=1)
+                recent_scans = get_asset_scan_runs(limit=10)
                 last_scan_date = str(recent_scans[0].get("started_at", ""))[:10] if recent_scans else ""
-                is_past_2325 = (now.hour > 23) or (now.hour == 23 and now.minute >= 25)
-                if (is_past_2325 and last_scan_date != today_str) or (not last_scan_date or last_scan_date < yesterday_str):
-                    logger.info(f"[Asset Scan Catch-up] Last scan ({last_scan_date or 'none'}) stale on boot. Executing AMFI & multi-asset catch-up...")
+                nightly_scans = [
+                    s for s in recent_scans
+                    if s.get("status") == "completed" and s.get("triggered_by") in ("nightly_cron", "nightly_pipeline", "catch_up_boot", "daily_audit")
+                ]
+                last_nightly_date = str(nightly_scans[0].get("started_at", ""))[:10] if nightly_scans else ""
+                is_past_2325 = (now.hour == 23 and now.minute >= 25)
+                if (is_past_2325 and last_scan_date != today_str) or (not last_nightly_date or last_nightly_date < yesterday_str):
+                    logger.info(f"[Asset Scan Catch-up] Last nightly scan ({last_nightly_date or 'none'}) stale on boot. Executing AMFI & multi-asset catch-up...")
                     await loop.run_in_executor(None, ingest_amfi_daily_feed, None, True)
                     await loop.run_in_executor(None, run_comprehensive_asset_scan, "ALL_ASSETS", "catch_up_boot")
 

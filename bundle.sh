@@ -11,7 +11,7 @@ echo "" >> "$TEMP_OUTPUT"
 
 echo "=== 1. DIRECTORY STRUCTURE ===" >> "$TEMP_OUTPUT"
 if command -v tree &> /dev/null; then
-    tree $TARGET_DIRS -I "node_modules\vert{}.git\vert{}.next\vert{}dist\vert{}build\vert{}venv\vert{}__pycache__\vert{}.venv\vert{}coverage\vert{}.turbo\vert{}*env*\vert{}*secret*\vert{}*credential*\vert{}*.pem\vert{}*.key" >> "$TEMP_OUTPUT"
+    tree $TARGET_DIRS -I "node_modules|.git|.next|dist|build|venv|__pycache__|.venv|coverage|.turbo|*env*|*secret*|*credential*|*.pem|*.key" >> "$TEMP_OUTPUT"
 else
     find $TARGET_DIRS -maxdepth 3 \
       -not -path '*/.*' \
@@ -27,7 +27,7 @@ echo "" >> "$TEMP_OUTPUT"
 echo "=== 2. SOURCE FILES ===" >> "$TEMP_OUTPUT"
 
 find $TARGET_DIRS -type f \
-  \( -name "*.ts" -o -name "*.tsx" -o -name "*.js" -o -name "*.jsx" \ -o -name "*.py" -o -name "*.sql" -o -name "*.prisma" -o -name "*.graphql" \ -o -name "*.json" -o -name "*.yaml" -o -name "*.yml" -o -name "*.toml" \ -o -name "*.sh" -o -name "Dockerfile*" -o -name "*.css" \) \
+  \( -name "*.ts" -o -name "*.tsx" -o -name "*.js" -o -name "*.jsx" -o -name "*.py" -o -name "*.sql" -o -name "*.prisma" -o -name "*.graphql" -o -name "*.json" -o -name "*.yaml" -o -name "*.yml" -o -name "*.toml" -o -name "*.sh" -o -name "Dockerfile*" -o -name "*.css" \) \
   ! -iname "*.env*" \
   ! -iname ".env*" \
   ! -iname "*env.local*" \
@@ -58,7 +58,7 @@ find $TARGET_DIRS -type f \
   ! -name "*.min.js" \
   ! -name "*.min.css" \
   | sort | while read -r file; do
-    if [[ "$file" == *".env"* ]] || [[ "$file" == *"secret"* ]] \vert{}\vert{} [[ "$file" == *"credential"* ]]; then
+    if [[ "$file" == *".env"* ]] || [[ "$file" == *"secret"* ]] || [[ "$file" == *"credential"* ]]; then
       continue
     fi
     echo "================================================================================" >> "$TEMP_OUTPUT"
