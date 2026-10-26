@@ -28,22 +28,24 @@ on:
         type: boolean
 
 concurrency:
-  group: moatnomics-pipeline-${{ github.event.schedule || inputs.mode }}
+  group: moatnomics-pipeline-${{ github.event.schedule || inputs.mode || 'default' }}
   cancel-in-progress: false
 
 jobs:
   execute-pipeline:
     runs-on: ubuntu-latest
     timeout-minutes: 45
+    permissions:
+      contents: read
 
     steps:
       - name: Checkout Repository
         uses: actions/checkout@v4
 
-      - name: Set up Python 3.14
+      - name: Set up Python 3.12
         uses: actions/setup-python@v5
         with:
-          python-version: "3.14"
+          python-version: "3.12"
           cache: "pip"
 
       - name: Install Dependencies

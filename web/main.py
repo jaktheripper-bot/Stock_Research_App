@@ -450,12 +450,12 @@ async def run_daily_amfi_scheduler():
                 last_scan_date = str(recent_scans[0].get("started_at", ""))[:10] if recent_scans else ""
                 nightly_scans = [
                     s for s in recent_scans
-                    if s.get("status") == "completed" and s.get("triggered_by") in ("nightly_cron", "nightly_pipeline", "catch_up_boot", "daily_audit")
+                    if s.get("status") == "completed" and s.get("triggered_by") in ("nightly_cron", "nightly_pipeline", "catch_up_boot")
                 ]
                 last_nightly_date = str(nightly_scans[0].get("started_at", ""))[:10] if nightly_scans else ""
-                is_past_2325 = (now.hour == 23 and now.minute >= 25)
-                if (is_past_2325 and last_scan_date != today_str) or (not last_nightly_date or last_nightly_date < yesterday_str):
-                    logger.info(f"[Asset Scan Catch-up] Last nightly scan ({last_nightly_date or 'none'}) stale on boot. Executing AMFI & multi-asset catch-up...")
+                target_nightly_date = today_str if (now.hour == 23 and now.minute >= 25) else (yesterday_str if now.hour < 9 else None)
+                if (target_nightly_date and (not last_nightly_date or last_nightly_date < target_nightly_date)) or (not last_nightly_date or last_nightly_date < yesterday_str):
+                    logger.info(f"[Asset Scan Catch-up] Nightly scan for {target_nightly_date or yesterday_str} stale on boot (last: {last_nightly_date or 'none'}). Executing AMFI & multi-asset catch-up...")
                     await loop.run_in_executor(None, ingest_amfi_daily_feed, None, True)
                     await loop.run_in_executor(None, run_comprehensive_asset_scan, "ALL_ASSETS", "catch_up_boot")
 
@@ -555,17 +555,23 @@ async def run_daily_fund_audit_scheduler():
         from core.analysis.fund_overlap_auditor import audit_single_fund_daily
         from core.db.agent_sessions import get_recent_autonomous_events, record_autonomous_event
         now = datetime.now(IST)
+        today_str = now.strftime("%Y-%m-%d")
         yesterday_str = (now - timedelta(days=1)).strftime("%Y-%m-%d")
-        recent_audits = get_recent_autonomous_events(limit=1, event_type="DAILY_FUND_AUDIT")
-        last_audit_date = str(recent_audits[0].get("created_at", ""))[:10] if recent_audits else ""
+        recent_audits = get_recent_autonomous_events(limit=10, event_type="DAILY_FUND_AUDIT")
+        nightly_audits = [
+            a for a in recent_audits
+            if a.get("trigger_source") in ("AMFI_SCHEDULER_ROTATION", "SCHEDULED_RUNNER", "nightly_pipeline")
+        ]
+        last_audit_date = str(nightly_audits[0].get("created_at", ""))[:10] if nightly_audits else ""
 
-        if not last_audit_date or last_audit_date < yesterday_str:
+        target_audit_date = today_str if (now.hour == 23 and now.minute >= 40) else (yesterday_str if now.hour < 9 else None)
+        if (target_audit_date and (not last_audit_date or last_audit_date < target_audit_date)) or (not last_audit_date or last_audit_date < yesterday_str):
             from core.db.distributed_lock import job_lease
             import gc
-            catchup_key = yesterday_str if now.hour < 23 else now.strftime("%Y-%m-%d")
+            catchup_key = target_audit_date or yesterday_str
             with job_lease(f"fund_audit_{catchup_key}", ttl_seconds=daily_ttl, release_on_exit=False) as acquired:
                 if acquired:
-                    logger.info(f"[Fund Audit Scheduler] Last DAILY_FUND_AUDIT event ({last_audit_date or 'none'}) older than {yesterday_str}. Running catch-up audit...")
+                    logger.info(f"[Fund Audit Scheduler] Nightly rotation audit for {catchup_key} stale on boot (last: {last_audit_date or 'none'}). Running catch-up audit...")
                     loop = asyncio.get_running_loop()
                     res = await loop.run_in_executor(None, audit_single_fund_daily, None, False)
                     if res:
