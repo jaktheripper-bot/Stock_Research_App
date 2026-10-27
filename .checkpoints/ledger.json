@@ -1854,5 +1854,21 @@
       "revision_count": 895
     },
     "preflight_passed": true
+  },
+  {
+    "tag": "checkpoint_20261027_234119_english_india_spelling_and_report_quality_filter",
+    "timestamp": "2026-10-27 23:41:19 IST",
+    "commit_sha": "628bf6ab280e75466ef55819ef4fcc70d4af83f7",
+    "branch": "main",
+    "description": "english_india_spelling_and_report_quality_filter",
+    "database": {
+      "exists": true,
+      "filename": "reports_checkpoint_20261027_234119_english_india_spelling_and_report_quality_filter.db",
+      "path": ".checkpoints/reports_checkpoint_20261027_234119_english_india_spelling_and_report_quality_filter.db",
+      "size_bytes": 34918400,
+      "report_count": 309,
+      "revision_count": 1758
+    },
+    "preflight_passed": true
   }
 ]
