@@ -1870,5 +1870,21 @@
       "revision_count": 1758
     },
     "preflight_passed": true
+  },
+  {
+    "tag": "checkpoint_20261028_001448_substance_gates_dedup_and_queue_remediation",
+    "timestamp": "2026-10-28 00:14:48 IST",
+    "commit_sha": "73749f59a8a8194d5047cc9ffabcf03e43022f66",
+    "branch": "main",
+    "description": "substance_gates_dedup_and_queue_remediation",
+    "database": {
+      "exists": true,
+      "filename": "reports_checkpoint_20261028_001448_substance_gates_dedup_and_queue_remediation.db",
+      "path": ".checkpoints/reports_checkpoint_20261028_001448_substance_gates_dedup_and_queue_remediation.db",
+      "size_bytes": 34918400,
+      "report_count": 309,
+      "revision_count": 1040
+    },
+    "preflight_passed": true
   }
 ]
