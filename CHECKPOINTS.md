@@ -1,6 +1,6 @@
 # Production Release Checkpoints & Disaster Recovery Ledger
-**Last Checkpoint:** 2026-10-27 23:41:19 IST  
-**Total Verified Rollback Points:** 117  
+**Last Checkpoint:** 2026-10-28 00:14:48 IST  
+**Total Verified Rollback Points:** 118  
 
 > [!NOTE]
 > These checkpoints represent byte-for-byte verified working releases that passed the 4-tier pre-flight audit.
@@ -10,6 +10,7 @@
 
 | Checkpoint Tag | IST Timestamp | Commit | DB Reports | Description |
 |:---|:---|:---|:---|:---|
+| `checkpoint_20261028_001448_substance_gates_dedup_and_queue_remediation` | 2026-10-28 00:14:48 IST | `82fd3ce` | 309 rep / 1040 rev | substance_gates_dedup_and_queue_remediation |
 | `checkpoint_20261027_234119_english_india_spelling_and_report_quality_filter` | 2026-10-27 23:41:19 IST | `628bf6a` | 309 rep / 1758 rev | english_india_spelling_and_report_quality_filter |
 | `checkpoint_20261024_170640_admin_svg_fix_and_homepage_hero_split` | 2026-10-24 17:06:40 IST | `ac8b49c` | 237 rep / 895 rev | admin_svg_fix_and_homepage_hero_split |
 | `checkpoint_20261024_153811_mobile_brief_mode` | 2026-10-24 15:38:11 IST | `fb346e3` | 237 rep / 895 rev | mobile_brief_mode |
