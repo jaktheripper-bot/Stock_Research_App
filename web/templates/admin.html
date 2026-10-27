@@ -3136,6 +3136,79 @@ html[data-theme="light"] .copilot-input {
         </tbody>
       </table>
     </div>
+
+    <!-- Autonomous Cloud Scheduled Pipeline & Ingestion Ledger -->
+    <div style="margin-top: 36px; margin-bottom: 20px;">
+      <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px; flex-wrap: wrap; gap: 8px;">
+        <div>
+          <h3 style="margin: 0; font-size: 16px; font-weight: 700; color: #f8fafc; display: flex; align-items: center; gap: 8px;">
+            <svg class="glyph" style="color: var(--accent-emerald, #10b981);"><use href="#glyph-check"></use></svg>
+            Autonomous Cloud Pipeline &amp; Ingestion Ledger
+          </h3>
+          <p style="color: var(--text-secondary, #94a3b8); font-size: 12.5px; margin: 4px 0 0 0;">
+            Real-time execution log of daily pre-market morning (08:30 AM IST) and nightly (23:15 IST) pipelines across GitHub Actions and cloud schedulers.
+          </p>
+        </div>
+        <div style="font-size: 11.5px; color: #38bdf8; font-weight: 600;">
+          {{ autonomous_events|length }} Recent Pipeline Events
+        </div>
+      </div>
+
+      <div class="admin-table-wrap">
+        <table class="admin-table">
+          <thead>
+            <tr>
+              <th>Timestamp (IST)</th>
+              <th>Pipeline Event</th>
+              <th>Trigger Source</th>
+              <th>Execution Summary</th>
+              <th>Action Taken</th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for ev in autonomous_events %}
+            <tr>
+              <td class="mono" style="font-size: 12px; color: #94a3b8; white-space: nowrap;">
+                {{ ev.created_at }}
+              </td>
+              <td>
+                {% if 'MORNING_PIPELINE' in ev.event_type %}
+                  <span class="status-pill success" style="font-size: 11px; font-weight: 700;">🌅 {{ ev.event_type }}</span>
+                {% elif 'NIGHTLY_PIPELINE' in ev.event_type %}
+                  <span class="status-pill in_progress" style="font-size: 11px; font-weight: 700; background: rgba(14, 165, 233, 0.15); color: #38bdf8;">🌙 {{ ev.event_type }}</span>
+                {% elif 'DAILY_STOCK' in ev.event_type %}
+                  <span class="status-pill success" style="font-size: 11px;">📈 {{ ev.event_type }}</span>
+                {% elif 'DAILY_MSME' in ev.event_type %}
+                  <span class="status-pill in_progress" style="font-size: 11px;">🏭 {{ ev.event_type }}</span>
+                {% elif 'DAILY_FUND' in ev.event_type %}
+                  <span class="status-pill closed" style="font-size: 11px;">🏛️ {{ ev.event_type }}</span>
+                {% else %}
+                  <span class="status-pill closed" style="font-size: 11px;">{{ ev.event_type }}</span>
+                {% endif %}
+              </td>
+              <td>
+                <span class="mono" style="font-size: 11px; color: #cbd5e1; background: rgba(255,255,255,0.04); padding: 2px 6px; border-radius: 4px;">
+                  {{ ev.trigger_source or 'CRON_SCHEDULER' }}
+                </span>
+              </td>
+              <td style="font-size: 12px; color: #e2e8f0; max-width: 380px;">
+                {{ ev.summary or 'Pipeline phase completed successfully.' }}
+              </td>
+              <td style="font-size: 11.5px; color: #94a3b8;">
+                {{ ev.action_taken or '-' }}
+              </td>
+            </tr>
+            {% else %}
+            <tr>
+              <td colspan="5" style="text-align: center; color: var(--text-secondary, #94a3b8); padding: 30px;">
+                No autonomous pipeline events recorded yet.
+              </td>
+            </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    </div>
   </div>
 
   <!-- TAB: Gemini Spends & AI Costs -->

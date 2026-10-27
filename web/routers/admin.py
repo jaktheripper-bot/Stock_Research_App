@@ -343,6 +343,13 @@ async def admin_dashboard(
         logger.warning("Error fetching asset scan runs in admin_dashboard: %s", e)
         asset_scans = []
 
+    try:
+        from core.db.agent_sessions import get_recent_autonomous_events
+        autonomous_events = get_recent_autonomous_events(limit=30)
+    except Exception as e:
+        logger.warning("Error fetching autonomous events in admin_dashboard: %s", e)
+        autonomous_events = []
+
     admin_user_credits = 0.0
     try:
         from core.db.users import get_user_by_email
@@ -396,6 +403,7 @@ async def admin_dashboard(
             "admin_team": admin_team,
             "admin_audit_logs": admin_audit_logs,
             "asset_scans": asset_scans,
+            "autonomous_events": autonomous_events,
             "active_tab": tab,
             "window": window,
             "exclude_tests": exclude_tests,
