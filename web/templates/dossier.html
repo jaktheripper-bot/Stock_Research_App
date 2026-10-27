@@ -141,7 +141,7 @@
           </div>
         </div>
 
-        <div style="display: flex; gap: 10px; flex-wrap: wrap; align-items: center;">
+        <div class="dossier-actions-strip" style="display: flex; gap: 10px; flex-wrap: wrap; align-items: center; margin-top: 6px;">
           <span id="dossierReadTimeBadge" class="dossier-read-time-badge" title="Estimated reading time and live active study progress">
             <span id="dossierEstReadMinutes">~6 min read</span>
             <span class="dossier-meta-sep">•</span>
@@ -755,9 +755,6 @@
       </div>
       {% endif %}
 
-      <!-- Epistemic Grounding & Thesis Falsification Card (epistemicFalsificationCard) -->
-      {% include "partials/epistemic_ledger_card.html" %}
-
       <!-- 60-Second "Bull vs. Bear" Structural Thesis Box -->
       {% if equity_intel.bull_bear_thesis %}
       <div style="border-top: 1px solid rgba(255,255,255,0.08); padding-top: 18px;">
@@ -1055,6 +1052,9 @@
         </div>
       </form>
     </div>
+
+    <!-- Methodology Grounding & Thesis Revision Triggers (epistemicFalsificationCard) -->
+    {% include "partials/epistemic_ledger_card.html" %}
 
     <!-- Verified Sources & Footnotes Appendix -->
     {% if citations %}

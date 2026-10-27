@@ -272,37 +272,37 @@ def generate_deterministic_7pillar_report(stock_data: Dict[str, Any], candidate_
 ## Pillar 1: Macro-Economic, Geopolitical & Environmental Overlays
 {company_name} operates within the {sector} sector, where domestic demand and infrastructure capital expenditure provide medium-term volume visibility `[MODEL INTERPRETATION]`. Allocations by schemes including {schemes_str} `[VERIFIED FACT]` reflect the company's established position in domestic supply chains, though margins remain sensitive to broader input-cost cycles and regulatory policy shifts `[UNRESOLVED UNCERTAINTY]`.
 
-#### Falsification & Thesis-Revision Triggers
+#### What Would Change This View (Revision Triggers)
 - A sustained slowdown in domestic capital expenditure or adverse regulatory tariff revisions that reduce sector volume growth below historical baselines for two consecutive quarters.
 
 ## Pillar 2: Industry Dynamics & Competitive Positioning
-The business exhibits a {moat_rating.lower()} economic moat `[MODEL INTERPRETATION]` supported by product specialization, enterprise vendor qualifications, and customer switching costs. Rather than relying solely on headline revenue expansion, the durability of its competitive position rests on whether {company_name} can defend gross margins when raw-material costs rise `[MODEL INTERPRETATION]`.
+The business exhibits a {moat_rating.lower()} economic moat `[MODEL INTERPRETATION]` supported by product specialisation, enterprise vendor qualifications, and customer switching costs. Rather than relying solely on headline revenue expansion, the durability of its competitive position rests on whether {company_name} can defend gross margins when raw-material costs rise `[MODEL INTERPRETATION]`.
 
-#### Falsification & Thesis-Revision Triggers
+#### What Would Change This View (Revision Triggers)
 - Operating margin compression exceeding 200 bps YoY accompanied by market-share loss to organized or unorganized competitors.
 
 ## Pillar 3: Promoter Quality & Fundamental Health
 Promoter ownership remains stable with unencumbered equity holdings `[VERIFIED FACT]`, aligning management incentives with minority shareholders. Balance sheet leverage stands at {de:.2f}x debt-to-equity `[CALCULATED METRIC]`, limiting refinancing risk across interest rate cycles. The critical analytical test is cash conversion—specifically whether reported EBITDA translates cleanly into operating cash flow after working-capital movements `[MODEL INTERPRETATION]`.
 
-#### Falsification & Thesis-Revision Triggers
+#### What Would Change This View (Revision Triggers)
 - Any emergence of promoter share pledging above 0.0%, qualified statutory audit opinions, or cumulative CFO-to-EBITDA conversion falling below 65%.
 
 ## Pillar 4: The "Structural vs. Temporary" Drop Diagnostic
 Near-term earnings or price fluctuations currently appear tied to cyclical working-capital timing rather than permanent franchise impairment `[MODEL INTERPRETATION]`. Payables (DPO) and inventory (DIO) days remain within sector norms, though receivable collection discipline must be tracked closely if customer liquidity tightens `[UNRESOLVED UNCERTAINTY]`.
 
-#### Falsification & Thesis-Revision Triggers
+#### What Would Change This View (Revision Triggers)
 - Receivable days (DSO) stretching by more than 20% over historical norms, indicating channel stuffing or weakening customer credit quality.
 
 ## Pillar 5: Valuation & Margin of Safety
-At a current market price of ₹{price:,.2f} `[VERIFIED FACT]` and trailing P/E multiple of {pe} (market capitalization of ₹{mcap_cr:,.1f} Cr `[CALCULATED METRIC]`), the business generates an ROCE of {roce:.1f}% `[CALCULATED METRIC]` against an assumed cost of capital (WACC) of ~11.5%. Separating business quality from valuation: the underlying return profile is constructive, but future investor returns depend on execution staying ahead of the expectations embedded in the current multiple `[MODEL INTERPRETATION]`.
+At a current market price of ₹{price:,.2f} `[VERIFIED FACT]` and trailing P/E multiple of {pe} (market capitalisation of ₹{mcap_cr:,.1f} Cr `[CALCULATED METRIC]`), the business generates an ROCE of {roce:.1f}% `[CALCULATED METRIC]` against an assumed cost of capital (WACC) of ~11.5%. Separating business quality from valuation: the underlying return profile is constructive, but future investor returns depend on execution staying ahead of the expectations embedded in the current multiple `[MODEL INTERPRETATION]`.
 
-#### Falsification & Thesis-Revision Triggers
+#### What Would Change This View (Revision Triggers)
 - Return on Capital Employed (ROCE) declining toward or below the 11.5% WACC hurdle rate while the valuation multiple remains above sector median.
 
 ## Pillar 6: Technical & Momentum Overlay
 Secondary market liquidity reflects institutional participation across {scheme_count} mutual fund schemes with an estimated holding footprint of ₹{est_aum_cr:,.1f} Cr `[CALCULATED METRIC]`. Order-book depth and moving-average alignment indicate orderly price discovery rather than speculative retail crowding `[MODEL INTERPRETATION]`.
 
-#### Falsification & Thesis-Revision Triggers
+#### What Would Change This View (Revision Triggers)
 - Sustained distribution accompanied by a breakdown below the 200-day moving average on elevated delivery volume.
 
 ## Pillar 7: ESG Impact Scorecard
@@ -313,14 +313,19 @@ Tabulate the ESG analysis strictly using the following Markdown table format:
 | **Social** | 80 | Workplace safety standards, workforce retention, and statutory CSR disclosures `[VERIFIED FACT]`. |
 | **Governance** | 88 | Independent board oversight, audit-committee transparency, and timely SEBI LODR filings `[VERIFIED FACT]`. |
 
-#### Falsification & Thesis-Revision Triggers
+#### What Would Change This View (Revision Triggers)
 - Any regulatory penalty, environmental compliance notice, or related-party transaction that dilutes minority shareholder value.
 
 ### Verified Regulatory Sources
 - Primary Source: [Official BSE Corporate Announcements ({ticker})](https://www.bseindia.com/stock-share-price/-/{scrip}/corporate-announcements/)
 - Registry: Statutory Mutual Fund Portfolio Disclosures under SEBI Regulations
 """
-    return report_markdown.strip()
+    try:
+        from core.analysis.language_filter import enforce_indian_english
+        return enforce_indian_english(report_markdown.strip())
+    except Exception as lang_err:
+        logger.debug("Language filter normalization notice in daily ingestion: %s", lang_err)
+        return report_markdown.strip()
 
 
 def _resolve_candidate_stock_data(candidate: Dict[str, Any]) -> Dict[str, Any]:

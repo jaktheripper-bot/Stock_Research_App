@@ -4978,6 +4978,13 @@ def save_fund_forensic_dossier(dossier: Dict[str, Any]) -> bool:
         except Exception as guard_err:
             logger.debug(f"Archival guard lookup notice for {code}: {guard_err}")
 
+    if text:
+        try:
+            from core.analysis.language_filter import enforce_indian_english
+            text = enforce_indian_english(text)
+        except Exception as filter_err:
+            logger.debug("Fund forensic language filter notice: %s", filter_err)
+
     raw_comp = dossier.get("composite_health_score")
     comp_score = float(raw_comp) if raw_comp is not None else -1.0
     moat_score = float(dossier.get("weighted_moat_score", 0.0))

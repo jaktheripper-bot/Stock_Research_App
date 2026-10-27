@@ -666,7 +666,7 @@ class TestMoatnomicsBrandHouse(unittest.TestCase):
         )
         self.assertIn("[VERIFIED FACT]", rep_md)
         self.assertIn("[CALCULATED METRIC]", rep_md)
-        self.assertIn("Falsification & Thesis-Revision Triggers", rep_md)
+        self.assertIn("What Would Change This View (Revision Triggers)", rep_md)
 
         # 4. Mutual Fund Dossier narrative uses calm trade-off language
         mf_md = synthesize_fund_forensic_narrative(

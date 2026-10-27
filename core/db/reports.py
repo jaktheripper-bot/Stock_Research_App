@@ -98,6 +98,13 @@ def save_report_to_archive(stock_data: dict, report_text: str, announcement: str
 
     pe = str(stock_data.get("pe_ratio", "N/A"))
 
+    if report_text:
+        try:
+            from core.analysis.language_filter import enforce_indian_english
+            report_text = enforce_indian_english(report_text)
+        except Exception as filter_err:
+            logger.debug("Language filter normalization notice: %s", filter_err)
+
     if citations is None:
         citations = extract_citations_from_report(report_text)
     citations_json = json.dumps(citations) if citations else None

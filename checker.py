@@ -23,4 +23,15 @@ def verify_stock_report(stock_data: dict, report_text: str) -> tuple[bool, list[
     if re.search(r'(?:₹|INR|Rs\.?)\s*\d+(?:\.\d+)?\s*(?:million|billion)', report_text, re.IGNORECASE):
         discrepancies.append("Use Lakhs/Crores for Indian Rupee figures instead of Millions/Billions.")
 
+    # Enforce English (India) / British spelling conventions
+    try:
+        from core.analysis.language_filter import detect_americanisms
+        americanisms = detect_americanisms(report_text)
+        if americanisms:
+            samples = ", ".join(f"'{item['term']}' (use '{item['replacement']}')" for item in americanisms[:3])
+            more = f" (+{len(americanisms) - 3} more)" if len(americanisms) > 3 else ""
+            discrepancies.append(f"English (India) spelling required: found Americanisms {samples}{more}.")
+    except Exception as lang_err:
+        pass
+
     return len(discrepancies) == 0, discrepancies

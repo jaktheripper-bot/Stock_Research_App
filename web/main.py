@@ -1273,6 +1273,11 @@ def dossier_page(request: Request, ticker: str):
 
     # Strip redundant Health Matrix markdown list so only top colored badge pills appear
     prose_md = remove_health_matrix_text(prose_md)
+    try:
+        from core.analysis.language_filter import enforce_indian_english
+        prose_md = enforce_indian_english(prose_md)
+    except Exception as lang_err:
+        logger.debug("Language filter normalization notice on dossier: %s", lang_err)
 
     # Determine deep-dive unlock status (Pillars 03 & 05 + Thesis Drift)
     web_user = _get_current_web_user(request)

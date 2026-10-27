@@ -30,12 +30,12 @@ class TestEpistemicSchemaAndFalsificationEngine(unittest.TestCase):
     """Test suite for epistemic separation, source attribution, and thesis falsification."""
 
     def test_epistemic_prompt_directive_structure(self):
-        """Verifies that the prompt directive defines all 4 epistemic tiers and falsification block."""
+        """Verifies that the prompt directive defines all 4 epistemic tiers and revision triggers block."""
         self.assertIn("[VERIFIED FACT]", EPISTEMIC_PROMPT_DIRECTIVE)
         self.assertIn("[CALCULATED METRIC]", EPISTEMIC_PROMPT_DIRECTIVE)
         self.assertIn("[MODEL INTERPRETATION]", EPISTEMIC_PROMPT_DIRECTIVE)
         self.assertIn("[UNRESOLVED UNCERTAINTY]", EPISTEMIC_PROMPT_DIRECTIVE)
-        self.assertIn("#### Falsification & Thesis-Revision Triggers", EPISTEMIC_PROMPT_DIRECTIVE)
+        self.assertIn("#### What Would Change This View (Revision Triggers)", EPISTEMIC_PROMPT_DIRECTIVE)
         self.assertIn("What Contradicts This Conclusion:", EPISTEMIC_PROMPT_DIRECTIVE)
         self.assertIn("Evidence That Forces a Revision:", EPISTEMIC_PROMPT_DIRECTIVE)
 
@@ -130,7 +130,7 @@ class TestEpistemicSchemaAndFalsificationEngine(unittest.TestCase):
         sample_report = """
 ## Pillar 1: Macro-Economic Overlays
 Inflation trajectory remains favorable.
-#### Falsification & Thesis-Revision Triggers
+#### What Would Change This View (Revision Triggers)
 * **What Contradicts This Conclusion:** Global crude price sustaining above $105/bbl for >90 days.
 * **Evidence That Forces a Revision:** RBI repo rate hike >50 bps or CPI inflation exceeding 6.5%.
 
@@ -189,7 +189,7 @@ Wide moat secured by patents.
         prompt = get_system_prompt("TCS", "English (India)")
         self.assertIn("MANDATORY EPISTEMIC SEPARATION, SOURCE ATTRIBUTION & FALSIFICATION PROTOCOL", prompt)
         self.assertIn("[VERIFIED FACT]", prompt)
-        self.assertIn("#### Falsification & Thesis-Revision Triggers", prompt)
+        self.assertIn("#### What Would Change This View (Revision Triggers)", prompt)
 
     def test_compile_equity_dossier_attaches_epistemic_ledger(self):
         """Verifies that compile_equity_dossier attaches a valid epistemic_ledger to the intelligence package."""
@@ -243,7 +243,21 @@ Wide moat secured by patents.
         self.assertNotIn("poised for long-term compounding", cleaned)
         self.assertNotIn("VERDICT: BUY", cleaned)
 
-        # 3. Text without conclusion should remain intact
+        # 3. Text with What Would Change This View (Revision Triggers) should also be protected
+        sample_new_title = (
+            "## Pillar 1: Moat Architecture\n"
+            "- Defensible margins.\n"
+            "#### What Would Change This View (Revision Triggers):\n"
+            "1. Margin drops below 10%.\n\n"
+            "## Conclusion\n"
+            "End of report."
+        )
+        cleaned_new = strip_conclusion_sections(sample_new_title)
+        self.assertIn("What Would Change This View (Revision Triggers)", cleaned_new)
+        self.assertNotIn("## Conclusion", cleaned_new)
+        self.assertNotIn("End of report", cleaned_new)
+
+        # 4. Text without conclusion should remain intact
         non_concl = (
             "## Pillar 1: Macro\n"
             "* **What Contradicts This Conclusion:** Rate hikes.\n"
@@ -278,6 +292,12 @@ Wide moat secured by patents.
         self.assertIn("color:#38bdf8", rendered)
         self.assertIn("color:#c084fc", rendered)
         self.assertIn("color:#fbbf24", rendered)
+
+        # 3. Verify transformation of legacy falsification heading to What Would Change This View
+        heading_html = "<h4>Falsification &amp; Thesis-Revision Triggers</h4><p>Details</p>"
+        transformed = render_epistemic_badges_html(heading_html)
+        self.assertIn("<h4>What Would Change This View (Revision Triggers)</h4>", transformed)
+        self.assertNotIn("Falsification", transformed)
 
     def test_wrap_html_with_collapsible_pillars_renders_badges(self):
         """Verifies that wrap_html_with_collapsible_pillars passes body content through render_epistemic_badges_html."""

@@ -215,7 +215,7 @@ Across all 7 pillars, the research synthesis engine enforces three non-negotiabl
    * `[CALCULATED METRIC]` — Deterministic mathematical output (ratios, valuations, duration, DCF models).
    * `[MODEL INTERPRETATION]` — Analytical regime classification, qualitative moat durability, or drop diagnostic inferences.
    * `[UNRESOLVED UNCERTAINTY]` — Missing disclosures, unlisted subsidiary opacity, or forward contingencies.
-3. **Mandatory Falsification Protocol:** Every pillar concludes with `#### Falsification & Thesis-Revision Triggers`:
+3. **Mandatory Falsification Protocol:** Every pillar concludes with `#### What Would Change This View (Revision Triggers)`:
    * *What Contradicts This Conclusion:* Specific disconfirming empirical evidence challenging the pillar thesis.
    * *Evidence That Forces a Revision:* Quantitative threshold targets in upcoming quarterly/annual filings (e.g. RoCE dropping below $X\%$, promoter pledge crossing $Y\%$) that mandate a thesis downgrade.
 4. **Structured 5-Part Epistemic Ledger:** `build_equity_epistemic_ledger()` and polymorphic `build_multi_asset_epistemic_ledger()` construct machine-readable attribution ledgers for APIs, dossiers, and copilot contexts.

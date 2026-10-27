@@ -33,9 +33,9 @@ In EVERY Pillar (Pillar 1 through Pillar 7), you MUST enforce strict epistemic h
      * `[CALCULATED METRIC]` — State the formula or deterministic derivation (e.g., *"[CALCULATED METRIC: Net Debt/EBITDA = 0.42x; 2-Stage DCF Intrinsic Value = ₹...]"*).
      * `[MODEL INTERPRETATION]` — Clearly mark qualitative moat, governance, or drop-diagnostic inferences (e.g., *"[MODEL INTERPRETATION: Margin compression reflects temporary raw-material destocking rather than structural pricing decay]"*).
      * `[UNRESOLVED UNCERTAINTY]` — Explicitly flag unverified contingencies, unlisted subsidiary opacity, or pending regulatory outcomes.
-2. **Mandatory Falsification Block at the End of Each Pillar:**
+2. **Mandatory Revision Triggers Block at the End of Each Pillar:**
    - Conclude each pillar with a concise sub-block titled:
-     `#### Falsification & Thesis-Revision Triggers`
+     `#### What Would Change This View (Revision Triggers)`
    - Inside this sub-block, include exactly two bullets:
      * **What Contradicts This Conclusion:** Specific disconfirming evidence or counter-indicators that would challenge the pillar's thesis.
      * **Evidence That Forces a Revision:** Quantifiable thresholds in upcoming quarterly/annual filings (e.g., RoCE dropping below X%, promoter pledge crossing Y%, DSO expanding >30 days) that would automatically downgrade this pillar's rating.
@@ -244,13 +244,15 @@ def extract_falsification_triggers(report_text: str) -> Dict[int, Dict[str, str]
         p_idx = int(m.group(1))
         p_body = m.group(3)
 
-        f_match = re.search(r"(?im)####\s*Falsification\s*&\s*Thesis[- ]Revision\s*Triggers\s*\n(.*?)(?=^#|\Z)", p_body, re.DOTALL)
+        f_match = re.search(r"(?im)####\s*(?:What\s+Would\s+Change\s+This\s+View\s*\(Revision\s+Triggers\)|Falsification\s*(?:&amp;|&|\+)\s*Thesis[- ]Revision\s*Triggers)\s*\n(.*?)(?=^#|\Z)", p_body, re.DOTALL)
         if f_match:
             block = f_match.group(1).strip()
             contradict_m = re.search(r"(?i)What\s+Contradicts[^\n:]*[:\*]+\s*([^\n]+(?:\n(?!\s*[\*\-]).*)*)", block)
             revision_m = re.search(r"(?i)Evidence\s+That\s+Forces[^\n:]*[:\*]+\s*([^\n]+(?:\n(?!\s*[\*\-]).*)*)", block)
             c_text = contradict_m.group(1).strip().lstrip("*: ").strip() if contradict_m else ""
             r_text = revision_m.group(1).strip().lstrip("*: ").strip() if revision_m else ""
+            if not c_text and not r_text and block:
+                c_text = block.lstrip("-*•▷ ").strip()
             triggers[p_idx] = {
                 "what_contradicts": c_text,
                 "evidence_that_forces_revision": r_text

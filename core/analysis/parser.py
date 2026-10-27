@@ -88,14 +88,14 @@ def remove_health_matrix_text(text: str) -> str:
 def strip_conclusion_sections(text: str) -> str:
     """
     Removes trailing standalone 'Conclusion' or 'Final Verdict' summary sections
-    while strictly preserving 'Falsification & Thesis-Revision Triggers' and
-    'What Contradicts This Conclusion' blocks inside pillars.
+    while strictly preserving 'What Would Change This View (Revision Triggers)',
+    'Falsification & Thesis-Revision Triggers', and 'What Contradicts This Conclusion' blocks inside pillars.
     """
     if not text:
         return ""
     pattern = re.compile(
         r'(?im)^\s*#*\s*(?:\d+[\.:\)]\s*)?'
-        r'(?!.*(?:Falsification|Contradict|Revision\s+Trigger))'
+        r'(?!.*(?:Falsification|Contradict|Revision\s+Trigger|Change\s+This\s+View))'
         r'(?:Conclusion|Final\s+Verdict|Overall\s+Summary|Summary\s+&\s+Conclusion|Key\s+Monitorables|Actionable\s+Guidance|Diagnostic\s+Synthesis|Recommendation|Target\s+Price|Investment\s+Summary\b|Outlook\s+&\s+Recommendation|Strategic\s+Portfolio\s+Roadmap|निष्कर्ष|कार्रवाई\s+योग्य\s+मार्गदर्शन)\b.*$'
     )
     parts = pattern.split(text)
@@ -131,6 +131,13 @@ def render_epistemic_badges_html(html_text: str) -> str:
     out = html_text
     for pat, rep in replacements:
         out = re.sub(pat, rep, out, flags=re.IGNORECASE)
+    # Transform technical/jargon-heavy falsification headings to approachable plain language
+    out = re.sub(
+        r'<h([3-5])([^>]*)>\s*Falsification\s*(?:&amp;|&|\+)\s*Thesis[- ]Revision\s*Triggers\s*</h\1>',
+        r'<h\1\2>What Would Change This View (Revision Triggers)</h\1>',
+        out,
+        flags=re.IGNORECASE
+    )
     return out
 
 def format_citations_section(citations: list[dict], stock_data: dict = None) -> str:
@@ -513,6 +520,12 @@ def wrap_html_with_collapsible_pillars(
     if not html_content:
         return html_content
 
+    try:
+        from core.analysis.language_filter import enforce_indian_english
+        html_content = enforce_indian_english(html_content)
+    except Exception as lang_err:
+        logger.debug("Language filter notice in collapsible pillars: %s", lang_err)
+
     # Check for presence of pillar token across English, Hindi, and technical sections
     has_pillar_token = any(token in html_content for token in ("Pillar", "स्तंभ", "Dimension"))
     if not has_pillar_token:
@@ -777,6 +790,12 @@ def wrap_fund_dossier_with_collapsible_dimensions(
     """
     if not dossier_text:
         return ""
+
+    try:
+        from core.analysis.language_filter import enforce_indian_english
+        dossier_text = enforce_indian_english(dossier_text)
+    except Exception as lang_err:
+        logger.debug("Language filter notice in fund dossier wrap: %s", lang_err)
 
     is_html = "<h1" in dossier_text or "<h2" in dossier_text or "<h3" in dossier_text or "<p>" in dossier_text
     if not is_html:

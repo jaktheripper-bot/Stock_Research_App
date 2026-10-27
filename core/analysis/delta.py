@@ -106,7 +106,7 @@ def execute_pillar_update(
     Surgically updates ONLY Pillar 5 (Valuation) and Pillar 6 (Technicals)
     for a cached report whose stock price shifted >= 5%.
 
-    Credit & Cost Optimization:
+    Credit & Cost Optimisation:
       1. ZERO Google Search Grounding: saves $0.035 search fee per invocation.
       2. Deterministic Technical Precomputation: 50-DMA and price bands passed directly.
       3. Minimal Token Burn: ~350-500 output tokens instead of 3,000+ (85%+ token reduction).
@@ -122,7 +122,7 @@ def execute_pillar_update(
     low_str = f"₹{metrics['52w_low']}" if metrics["52w_low"] else "N/A"
     mcap_str = f"₹{metrics['mcap_cr']:,.2f} Cr" if metrics['mcap_cr'] > 0 else "N/A"
 
-    lang_rule = "Write entirely in English (India)." if language == "English (India)" else f"Write in {language}."
+    lang_rule = "Write entirely in English (India) using British/Indian spelling." if language == "English (India)" else f"Write in {language}."
 
     brand_context = get_system_prompt_context(content_type="monitoring", include_master_prompt=False).strip()
 
@@ -151,7 +151,7 @@ Return strictly the two markdown sections:
 Verified Live Exchange Metrics:
 - Current Market Price: ₹{price}
 - Trailing P/E Multiple: {pe}
-- Market Capitalization: {mcap_str}
+- Market Capitalisation: {mcap_str}
 - 52-Week Range: High {high_str} | Low {low_str}
 - 50-Day Moving Average: {dma}{dma_rel}"""
 
@@ -190,7 +190,7 @@ Verified Live Exchange Metrics:
         pe_desc = f"trades at a trailing P/E [Price-to-Earnings Ratio] of {pe}" if pe != "N/A" else "operates with unlisted trailing P/E metrics"
         p5_text = (
             f"## Pillar 5: Valuation & Margin of Safety\n\n"
-            f"At the current market price of ₹{price:.2f}, {short_name} {pe_desc} with an exchange market capitalization of {mcap_str}. "
+            f"At the current market price of ₹{price:.2f}, {short_name} {pe_desc} with an exchange market capitalisation of {mcap_str}. "
             f"Compared to its 52-week peak of {high_str} and trough of {low_str}, the current multiple reflects recent market adjustments. "
             f"Investors should evaluate current valuation against broader industry peer benchmarks and historical cash-flow yield multiples."
         )
@@ -223,4 +223,9 @@ Verified Live Exchange Metrics:
     except Exception as err:
         logger.error(f"Error persisting pillar report update: {err}")
 
-    return spliced_text
+    try:
+        from core.analysis.language_filter import enforce_indian_english
+        return enforce_indian_english(spliced_text)
+    except Exception as lang_err:
+        logger.debug("Language filter normalization notice in delta report: %s", lang_err)
+        return spliced_text

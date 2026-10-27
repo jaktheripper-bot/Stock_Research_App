@@ -1,71 +1,127 @@
 {% set ep_ledger = epistemic_ledger if (epistemic_ledger is defined and epistemic_ledger) else (equity_intel.epistemic_ledger if (equity_intel is defined and equity_intel and equity_intel.epistemic_ledger is defined) else None) %}
 {% if ep_ledger %}
-<!-- Epistemic Attribution & Falsification Ledger (#epistemicFalsificationCard) -->
-<div id="epistemicFalsificationCard" class="editorial-callout-snapshot" style="margin-top: 20px; margin-bottom: 24px; background: rgba(15, 23, 42, 0.78); border: 1px solid rgba(148, 163, 184, 0.22); border-radius: 12px; padding: 18px 20px;">
-  <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 10px; margin-bottom: 14px; border-bottom: 1px solid rgba(255,255,255,0.06); padding-bottom: 10px;">
+<!-- Methodology Grounding & Thesis Revision Triggers (#epistemicFalsificationCard) -->
+<div id="epistemicFalsificationCard" class="editorial-callout-snapshot methodology-audit-section" style="margin-top: 36px; margin-bottom: 30px; background: transparent; border: none; padding: 0;">
+  
+  <!-- Appendix Section Header -->
+  <div style="display: flex; justify-content: space-between; align-items: flex-end; margin-bottom: 14px; flex-wrap: wrap; gap: 10px; border-bottom: 1px solid rgba(255,255,255,0.06); padding-bottom: 10px;">
     <div>
-      <span style="font-size: 11px; font-weight: 800; color: #38bdf8; text-transform: uppercase; letter-spacing: 0.05em; display: inline-flex; align-items: center; gap: 6px;">
+      <span style="font-size: 11px; font-weight: 800; color: #38bdf8; text-transform: uppercase; letter-spacing: 0.06em; display: inline-flex; align-items: center; gap: 6px;">
         <svg class="glyph" style="width: 13px; height: 13px;"><use href="#glyph-shield"></use></svg>
-        Epistemic Grounding &amp; Thesis Falsification Ledger
+        Institutional Methodology &amp; Audit Layer
       </span>
-      <h4 style="margin: 3px 0 0; font-size: 15px; font-weight: 800; color: #f8fafc;">
-        Fact vs. Model Separation, Source Passages &amp; Thesis-Revision Thresholds
-      </h4>
+      <h3 style="margin: 4px 0 0; font-size: 16px; font-weight: 800; color: var(--text-primary); letter-spacing: -0.01em;">
+        Research Methodology, Source Passages &amp; Revision Triggers
+      </h3>
     </div>
-    <div style="display: flex; gap: 6px; flex-wrap: wrap; font-size: 10.5px; font-weight: 700;">
-      <span class="badge epistemic-badge" style="padding: 2px 8px; border-radius: 999px; background: rgba(16,185,129,0.15); color: #34d399; border: 1px solid rgba(16,185,129,0.35);">VERIFIED FACT</span>
-      <span class="badge epistemic-badge" style="padding: 2px 8px; border-radius: 999px; background: rgba(56,189,248,0.15); color: #38bdf8; border: 1px solid rgba(56,189,248,0.35);">CALCULATED METRIC</span>
-      <span class="badge epistemic-badge" style="padding: 2px 8px; border-radius: 999px; background: rgba(168,85,247,0.15); color: #c084fc; border: 1px solid rgba(168,85,247,0.35);">MODEL INTERPRETATION</span>
-      <span class="badge epistemic-badge" style="padding: 2px 8px; border-radius: 999px; background: rgba(245,158,11,0.15); color: #fbbf24; border: 1px solid rgba(245,158,11,0.35);">UNRESOLVED UNCERTAINTY</span>
-    </div>
+    <span style="font-size: 11.5px; color: var(--text-muted); font-weight: 500;">
+      Optional reading • Choose to inspect underlying derivations or falsification thresholds
+    </span>
   </div>
 
-  <!-- 4-Tier Epistemic Claims & Source-Passage Attribution Grid -->
-  {% if ep_ledger.claims %}
-  <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap: 12px; margin-bottom: 16px;">
-    {% for c in ep_ledger.claims %}
-    <div style="background: rgba(2, 6, 23, 0.55); border: 1px solid rgba(255,255,255,0.07); border-left: 3px solid {{ c.badge.color }}; border-radius: 8px; padding: 12px;">
-      <div style="display: flex; justify-content: space-between; align-items: center; gap: 6px; margin-bottom: 6px;">
-        <span class="epistemic-badge" style="font-size: 10px; font-weight: 800; color: {{ c.badge.color }}; text-transform: uppercase; letter-spacing: 0.04em;">{{ c.badge.label }}</span>
-        <span class="tnum" style="font-size: 10.5px; color: #94a3b8;">As of {{ c.source_date }}</span>
+  <!-- Section 1: Fact vs. Model Separation & Source-Passage Grounding (Collapsed by Default) -->
+  <details class="methodology-accordion" id="methodologyGroundingDrawer" style="margin-bottom: 14px;">
+    <summary>
+      <div style="display: flex; align-items: center; gap: 12px; min-width: 0;">
+        <span class="pillar-badge" style="background: rgba(56, 189, 248, 0.15); color: #38bdf8; border: 1px solid rgba(56, 189, 248, 0.35); font-size: 11px; font-weight: 800;">
+          01
+        </span>
+        <div>
+          <div style="font-size: 14px; font-weight: 700; color: var(--text-primary); line-height: 1.35; display: flex; align-items: center; gap: 8px; flex-wrap: wrap;">
+            <span>Methodology &amp; Source Passages: Fact vs. Model Separation</span>
+          </div>
+          <div style="font-size: 11.5px; color: var(--text-muted); margin-top: 2px;">
+            How we calculated the information • 4-tier statutory filing passages, deterministic formulas &amp; regime boundaries
+          </div>
+        </div>
       </div>
-      <div style="font-size: 12.5px; font-weight: 600; color: #f1f5f9; margin-bottom: 6px; line-height: 1.45;">{{ c.claim }}</div>
-      <div style="font-size: 11px; color: #94a3b8; line-height: 1.4;">
-        <strong style="color: #cbd5e1;">Source ({{ c.source }}):</strong> <em>"{{ c.passage }}"</em>
+      <div style="display: flex; align-items: center; gap: 10px; flex-shrink: 0;">
+        <div class="methodology-pill-group" style="display: flex; gap: 5px; flex-wrap: wrap;">
+          <span class="badge epistemic-badge" style="padding: 2px 7px; border-radius: 999px; background: rgba(16,185,129,0.15); color: #34d399; border: 1px solid rgba(16,185,129,0.35); font-size: 10px; font-weight: 700;">VERIFIED FACT</span>
+          <span class="badge epistemic-badge" style="padding: 2px 7px; border-radius: 999px; background: rgba(56,189,248,0.15); color: #38bdf8; border: 1px solid rgba(56,189,248,0.35); font-size: 10px; font-weight: 700;">CALCULATED METRIC</span>
+          <span class="badge epistemic-badge" style="padding: 2px 7px; border-radius: 999px; background: rgba(168,85,247,0.15); color: #c084fc; border: 1px solid rgba(168,85,247,0.35); font-size: 10px; font-weight: 700;">MODEL INTERPRETATION</span>
+          <span class="badge epistemic-badge" style="padding: 2px 7px; border-radius: 999px; background: rgba(245,158,11,0.15); color: #fbbf24; border: 1px solid rgba(245,158,11,0.35); font-size: 10px; font-weight: 700;">UNRESOLVED UNCERTAINTY</span>
+        </div>
+        <span class="methodology-chevron">▼</span>
       </div>
+    </summary>
+    <div class="methodology-drawer-body" style="padding: 16px 18px 20px; border-top: 1px solid rgba(255,255,255,0.06);">
+      <p style="font-size: 12.5px; color: var(--text-secondary); margin: 0 0 14px; line-height: 1.5;">
+        Every statement across our research dossier is classified into one of four epistemic tiers so investors can verify statutory filings directly and separate empirical facts from quantitative model estimates:
+      </p>
+      {% if ep_ledger.claims %}
+      <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap: 12px;">
+        {% for c in ep_ledger.claims %}
+        <div style="background: rgba(2, 6, 23, 0.55); border: 1px solid rgba(255,255,255,0.07); border-left: 3px solid {{ c.badge.color }}; border-radius: 8px; padding: 12px;">
+          <div style="display: flex; justify-content: space-between; align-items: center; gap: 6px; margin-bottom: 6px;">
+            <span class="epistemic-badge" style="font-size: 10px; font-weight: 800; color: {{ c.badge.color }}; text-transform: uppercase; letter-spacing: 0.04em;">{{ c.badge.label }}</span>
+            <span class="tnum" style="font-size: 10.5px; color: #94a3b8;">As of {{ c.source_date }}</span>
+          </div>
+          <div style="font-size: 12.5px; font-weight: 600; color: #f1f5f9; margin-bottom: 6px; line-height: 1.45;">{{ c.claim }}</div>
+          <div style="font-size: 11px; color: #94a3b8; line-height: 1.4;">
+            <strong style="color: #cbd5e1;">Source ({{ c.source }}):</strong> <em>"{{ c.passage }}"</em>
+          </div>
+        </div>
+        {% endfor %}
+      </div>
+      {% endif %}
     </div>
-    {% endfor %}
-  </div>
-  {% endif %}
+  </details>
 
-  <!-- Falsification Triggers Table: What Contradicts & Evidence That Forces Revision -->
+  <!-- Section 2: What Would Change This View (Revision Triggers Matrix - Collapsed by Default) -->
   {% if ep_ledger.falsification_rows %}
-  <div class="editorial-callout-watchpoints" style="background: rgba(239, 68, 68, 0.06); border: 1px solid rgba(239, 68, 68, 0.25); border-radius: 10px; padding: 14px;">
-    <div style="font-size: 12px; font-weight: 800; color: #f87171; text-transform: uppercase; letter-spacing: 0.04em; margin-bottom: 10px; display: flex; align-items: center; gap: 6px;">
-      <svg class="glyph" style="width: 13px; height: 13px;"><use href="#glyph-scale"></use></svg>
-      Thesis Falsification Matrix — What Contradicts This Conclusion &amp; Evidence That Forces Revision
+  <details class="methodology-accordion" id="methodologyTriggersDrawer" style="margin-bottom: 14px;">
+    <summary>
+      <div style="display: flex; align-items: center; gap: 12px; min-width: 0;">
+        <span class="pillar-badge" style="background: rgba(239, 68, 68, 0.12); color: #f87171; border: 1px solid rgba(239, 68, 68, 0.3); font-size: 11px; font-weight: 800;">
+          02
+        </span>
+        <div>
+          <div style="font-size: 14px; font-weight: 700; color: var(--text-primary); line-height: 1.35; display: flex; align-items: center; gap: 8px; flex-wrap: wrap;">
+            <svg class="glyph" style="width: 14px; height: 14px; color: #f87171;"><use href="#glyph-scale"></use></svg>
+            <span>What Would Change This View (Revision Triggers Matrix)</span>
+          </div>
+          <div style="font-size: 11.5px; color: var(--text-muted); margin-top: 2px;">
+            Why it's accurate &amp; what breaks it • Specific disconfirming empirical evidence and quantitative thresholds
+          </div>
+        </div>
+      </div>
+      <div style="display: flex; align-items: center; gap: 10px; flex-shrink: 0;">
+        <span class="badge" style="padding: 3px 9px; border-radius: 999px; background: rgba(239, 68, 68, 0.12); color: #f87171; border: 1px solid rgba(239, 68, 68, 0.28); font-size: 10.5px; font-weight: 700;">
+          {{ ep_ledger.falsification_rows|length }} Watchpoint Triggers
+        </span>
+        <span class="methodology-chevron">▼</span>
+      </div>
+    </summary>
+    <div class="methodology-drawer-body" style="padding: 16px 18px 20px; border-top: 1px solid rgba(255,255,255,0.06);">
+      <p style="font-size: 12.5px; color: var(--text-secondary); margin: 0 0 14px; line-height: 1.5;">
+        Every thesis is strictly falsifiable. The following matrix outlines observable exchange filings, margin contractions, and capital allocation breaches that would force an automatic thesis downgrade:
+      </p>
+      <div class="editorial-callout-watchpoints" style="background: rgba(239, 68, 68, 0.05); border: 1px solid rgba(239, 68, 68, 0.2); border-radius: 10px; padding: 14px;">
+        <div style="overflow-x: auto;">
+          <table style="width: 100%; border-collapse: collapse; font-size: 12px; text-align: left;">
+            <thead>
+              <tr style="border-bottom: 1px solid rgba(255,255,255,0.08); color: #94a3b8;">
+                <th style="padding: 8px 10px;">Pillar / Analytical Checkpoint</th>
+                <th style="padding: 8px 10px;">What Contradicts This Conclusion</th>
+                <th style="padding: 8px 10px;">New Evidence That Forces a Revision</th>
+              </tr>
+            </thead>
+            <tbody>
+              {% for ft in ep_ledger.falsification_rows %}
+              <tr style="border-bottom: 1px solid rgba(255,255,255,0.04);">
+                <td style="padding: 8px 10px; font-weight: 700; color: #f8fafc;">{{ ft.pillar }}</td>
+                <td style="padding: 8px 10px; color: #cbd5e1; line-height: 1.45;">{{ ft.contradicting_evidence }}</td>
+                <td style="padding: 8px 10px; color: #fca5a5; font-weight: 600; line-height: 1.45;">{{ ft.revision_threshold }}</td>
+              </tr>
+              {% endfor %}
+            </tbody>
+          </table>
+        </div>
+      </div>
     </div>
-    <div style="overflow-x: auto;">
-      <table style="width: 100%; border-collapse: collapse; font-size: 12px; text-align: left;">
-        <thead>
-          <tr style="border-bottom: 1px solid rgba(255,255,255,0.08); color: #94a3b8;">
-            <th style="padding: 8px 10px;">Pillar / Analytical Checkpoint</th>
-            <th style="padding: 8px 10px;">What Contradicts This Conclusion</th>
-            <th style="padding: 8px 10px;">New Evidence That Forces a Revision</th>
-          </tr>
-        </thead>
-        <tbody>
-          {% for ft in ep_ledger.falsification_rows %}
-          <tr style="border-bottom: 1px solid rgba(255,255,255,0.04);">
-            <td style="padding: 8px 10px; font-weight: 700; color: #f8fafc;">{{ ft.pillar }}</td>
-            <td style="padding: 8px 10px; color: #cbd5e1; line-height: 1.45;">{{ ft.contradicting_evidence }}</td>
-            <td style="padding: 8px 10px; color: #fca5a5; font-weight: 600; line-height: 1.45;">{{ ft.revision_threshold }}</td>
-          </tr>
-          {% endfor %}
-        </tbody>
-      </table>
-    </div>
-  </div>
+  </details>
   {% endif %}
+
 </div>
 {% endif %}

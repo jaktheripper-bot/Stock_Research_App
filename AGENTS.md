@@ -18,16 +18,25 @@
 - **System Architecture ([`.antigravity/docs/ARCHITECTURE.md`](file:///Users/lyndonpinto/Documents/Stock_Research_App/.antigravity/docs/ARCHITECTURE.md)):** Synchronize architectural directives and persistence mechanisms.
 - **Strict Anti-Hallucination Guardrail:** NEVER document planned features or offline prototypes as live pipelines until merged and active on `main`.
 
-## 4. Proactive Critical Thinking, Intent Clarification & Pushback
+## 4. Pre-Implementation Consequence & Blast-Radius Protocol (Think Before Coding)
+**Never write or modify code until 2nd- and 3rd-order consequences are traced end-to-end.** For any change to ingestion, scoring, classification, schemas, or synthesis, activate the `consequence-sandbox-testing` skill first.
 - **Brief Dissection:** Clarify underspecified briefs, edge cases, and cadences before executing.
 - **Constructive Pushback:** If a request has hidden risks, regulatory pitfalls (e.g. SEBI compliance), architectural anti-patterns, or creates static facades / stale data, explain the root cause and propose a resilient alternative.
 - **Forbid Shortcuts:** Never substitute an end-to-end dynamic workflow with a one-time static seed unless explicitly instructed.
+- **End-to-End Consumer & Failure Trace:** Before editing any function, map:
+  1. *Degraded Inputs:* Exact behavior when upstream APIs/caches return `None`, `0`, `"N/A"`, `{}` or timeout.
+  2. *Downstream Chain:* Every caller, screening gate, `except` handler, persisted column **AND serialized prose/JSON blob** (`report_text`, `dossier_text`, `pillar_breakdown_json`), and UI template consuming that data.
+- **Fail-Closed Domain Integrity ("Pending Over Potemkin"):** NEVER write fallback templates, proxy portfolio clones, or default financial metrics (`price=100`, `roce=22.4`, `revenue_cr=100`) when live data or LLM synthesis fails. Fail closed to an explicit `PENDING` / unarchived state and retry next cycle; never emit `[VERIFIED FACT]` or `[CALCULATED METRIC]` on fallback values.
+- **Process & Environment Isolation:** Background ingestion/mutation schedulers must NEVER auto-fire on local web server boot or test runs without an explicit `ENABLE_BACKGROUND_SCHEDULERS=1` opt-in guard.
 
-## 5. Mandatory Empirical Verification Protocol
-**NEVER state a task is completed without empirically verifying on disk and running tests.**
+## 5. Mandatory Sandbox Simulation & Empirical Verification Protocol
+**Work out edge cases in `<appDataDir>/brain/<conversation-id>/scratch/` against cloned data BEFORE mutating workspace databases or committing.**
 - **Phase 0 (Compliance Check):** Re-read brief line-by-line; construct requirement vs file:line matrix.
+- **Phase 0.5 (Sandbox Blast-Radius Simulation):**
+  - Clone `reports.db` to `scratch/` (or run read-only scratch probes) and execute new classifiers, regexes, scorers, or migrations across **100% of corpus rows** (never 2–3 happy-path tickers). Inspect category distributions and outliers (e.g. catching `"IT"` matching `"LIMITED"` or `"ADITYA"`).
+  - Simulate degraded/offline upstream responses (`API_KEY=""`, empty quote dict) in sandbox and verify **0** template/fabricated rows are persisted.
 - **Phase 1 (Ground Truth):** Inspect modified lines in destination files; verify zero forgotten items.
-- **Phase 2 (Runtime & Test Validation):** Run tests (`python3 -m unittest discover -s tests`, `scripts/run_project_audit.py --quick`); verify zero premature conclusions.
+- **Phase 2 (Runtime, Substance & Test Validation):** Run unit/integration tests (`python3 -m unittest discover -s tests`), `scripts/run_project_audit.py --quick`, and payload substance checks (prose uniqueness + header-vs-prose numerical parity).
 - **Phase 3 (Git State):** Confirm clean tree (`git status`) and aligned tracking branches.
 
 ## 6. Mandatory Outside-In Testing Protocol (UI-to-Code Contracts)
@@ -54,6 +63,8 @@
 - **Pre-Completion Gate:** Execute `python3 scripts/verify_reality_audit.py` before completing any turn modifying `.py`, `.js`, `.html`, or `.css`. Must resolve all `[GATE-1]` through `[GATE-12]` failures.
 - **Forbidden Patterns:**
   - No auth fallbacks in catch/except blocks.
+  - No deterministic Mad-Libs prose fallbacks, cloned proxy holdings across distinct schemes, or synthetic numeric defaults in analytical engines.
+  - No unanchored substring taxonomy matching (`"IT" in text`) for short tokens; enforce strict `\b...\b` regex word boundaries.
   - No module-level user session globals (use `ContextVar` or signed `HttpOnly` cookies).
   - No unverified TLS (`ssl._create_unverified_context()` forbidden; use `certifi.where()`).
   - No silent exception swallowing (log via `logger.error`/`logger.warning`; never fabricate metrics).
@@ -64,6 +75,7 @@
 - **Exhaustive Glob Over Manual Lists:** Enumerate 100% of templates via `Path("web/templates").rglob("*.html")`.
 - **Zero Computed-But-Unscored Metrics:** All metrics in `pillar_breakdown_json` must factor into scoring and Markdown reports.
 - **Zero Hardcoded Metadata:** Query test counts and migration versions dynamically from runtime state.
+- **Payload Substance & Cross-Layer Parity:** Dossier prose (`report_text` / `dossier_text`) must pass N-gram uniqueness (`< 25%` 8-gram overlap across distinct entities) and match structured header metrics (`current_price`, `market_cap`, `pe_ratio`, `roce`) within drift tolerance.
 
 ## 9. Mandatory UI, Theme & Brand Changeover Protocol
 Complete all 6 gates on visual identity or theme updates:

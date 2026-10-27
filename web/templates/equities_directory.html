@@ -141,7 +141,7 @@
 
     <!-- Sector Navigation Tabs (Horizontal Scrollable) -->
     <div style="margin-bottom: 14px;">
-      <div style="display: flex; gap: 8px; overflow-x: auto; padding-bottom: 6px;">
+      <div class="pills-scroll-track">
         <a href="/equities?{% if current_tier %}market_cap={{ current_tier }}&{% endif %}{% if current_sort %}sort={{ current_sort }}&{% endif %}{% if query %}q={{ query }}{% endif %}" class="btn btn-sm {% if not current_sector %}btn-primary{% else %}btn-secondary{% endif %}" style="border-radius: 9999px; white-space: nowrap;">
           All Equities ({{ total_equities }})
         </a>

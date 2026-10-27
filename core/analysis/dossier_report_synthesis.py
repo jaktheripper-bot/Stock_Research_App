@@ -21,7 +21,12 @@ from checker import verify_stock_report
 logger = logging.getLogger("equity_research.core.analysis.dossier_report_synthesis")
 
 def get_system_prompt(ticker: str, language: str) -> str:
-    lang_rule = "The report must be entirely in English (India) using British/Indian spelling." if language == "English (India)" else f"The report must be fully translated into {language} without omitting technical rigor."
+    lang_rule = (
+        "The report must be entirely in English (India) using British/Indian spelling "
+        "(e.g., capitalisation, specialisation, prioritise, analyse, labour, behaviour, defence, signalling, colour, programme, centre)."
+        if language == "English (India)"
+        else f"The report must be fully translated into {language} without omitting technical rigor."
+    )
     base_prompt = f"""You are an equity research analyst. Write a comprehensive research report for {ticker}.
 {lang_rule}
 
@@ -54,7 +59,7 @@ Tabulate the ESG analysis strictly using the following Markdown table format:
 | Parameter | Score (0-100) | Evaluation & Key Drivers |
 | :--- | :--- | :--- |
 | **Environmental** | [Score] | [Key factors] |
-| **Social** | [Score] | [Labor, community impact] |
+| **Social** | [Score] | [Labour, community impact] |
 | **Governance** | [Score] | [Board independence, transparency] |
 
 CRITICAL COMPLIANCE DIRECTIVE: Strictly avoid providing any conclusions, forward-looking advice, actionable investment guidance, Buy/Sell/Hold verdicts, investment recommendations, portfolio allocation advice, target prices, trade execution signals, or portfolio roadmaps. The research report concludes strictly after Pillar 7. All analysis must remain purely descriptive, factual, and diagnostic under SEBI Safe Harbor principles."""
@@ -396,6 +401,12 @@ def stream_stock_report(ticker: str, language: str = "English (India)", stock_da
             yield citations_block
 
     complete_text = "".join(report_accumulator)
+    try:
+        from core.analysis.language_filter import enforce_indian_english
+        complete_text = enforce_indian_english(complete_text)
+    except Exception as lang_err:
+        logger.debug("Language filter normalization notice in stream_stock_report: %s", lang_err)
+
     passed = False
     try:
         passed, disc = verify_stock_report(stock_data, complete_text)
@@ -465,6 +476,11 @@ def generate_stock_report(ticker: str, language: str = "English (India)", use_gr
         for c in stream_stock_report(clean_ticker, language, use_grounding=use_grounding):
             chunks.append(c)
         full_text = "".join(chunks)
+        try:
+            from core.analysis.language_filter import enforce_indian_english
+            full_text = enforce_indian_english(full_text)
+        except Exception as lang_err:
+            logger.debug("Language filter normalization notice in generate_stock_report: %s", lang_err)
         if len(full_text.strip()) >= 800 and "Live Synthesis Failed" not in full_text:
             record_live_generation()
         return full_text
@@ -566,6 +582,12 @@ def synthesize_batch_stock_reports(
                     resp_obj = getattr(inline_resp, "response", None)
                     txt = getattr(resp_obj, "text", None) if resp_obj else None
                     if txt and len(str(txt).strip()) >= 500:
+                        clean_txt = str(txt).strip()
+                        try:
+                            from core.analysis.language_filter import enforce_indian_english
+                            clean_txt = enforce_indian_english(clean_txt)
+                        except Exception as lang_err:
+                            logger.debug("Language filter normalization notice in batch inline: %s", lang_err)
                         scrip = str(s_data.get("scrip_code") or "").strip()
                         cites = []
                         if scrip and scrip.isdigit():
@@ -575,7 +597,7 @@ def synthesize_batch_stock_reports(
                                 "source_type": "BSE Official Regulatory Filing",
                             })
                         results[t_sym] = {
-                            "report_text": str(txt).strip(),
+                            "report_text": clean_txt,
                             "citations": cites,
                             "tier": "GEMINI_BATCH_API_50PCT_DISCOUNT",
                             "batch_job_name": batch_job_name,
@@ -620,6 +642,12 @@ def synthesize_batch_stock_reports(
             )
             txt = getattr(resp, "text", None) or ""
             if len(txt.strip()) >= 500:
+                clean_flex_txt = txt.strip()
+                try:
+                    from core.analysis.language_filter import enforce_indian_english
+                    clean_flex_txt = enforce_indian_english(clean_flex_txt)
+                except Exception as lang_err:
+                    logger.debug("Language filter normalization notice in batch flex: %s", lang_err)
                 scrip = str(s_data.get("scrip_code") or "").strip()
                 cites = []
                 if scrip and scrip.isdigit():
@@ -629,7 +657,7 @@ def synthesize_batch_stock_reports(
                         "source_type": "BSE Official Regulatory Filing",
                     })
                 results[t_sym] = {
-                    "report_text": txt.strip(),
+                    "report_text": clean_flex_txt,
                     "citations": cites,
                     "tier": "GEMINI_FLEX_50PCT_DISCOUNT",
                     "batch_job_name": batch_job_name,
