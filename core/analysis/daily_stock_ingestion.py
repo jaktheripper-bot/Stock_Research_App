@@ -468,12 +468,29 @@ def synthesize_and_archive_stock_dossier(
                     report_text = generate_stock_report(ticker)
                     synthesis_tier = "GEMINI_STANDARD_STREAM"
                     record_daemon_spend_usd(0.001)
+                    if report_text and len(report_text.strip()) >= 500 and not any(sig in report_text for sig in [
+                        "Live Synthesis Failed",
+                        "Grounded synthesis channels are temporarily unavailable",
+                        "Live Synthesis Error",
+                        "Rate limit exceeded",
+                    ]):
+                        ann = fetch_latest_bse_announcement(scrip_code) if scrip_code else ""
+                        save_report_to_archive(
+                            stock_data=stock_data,
+                            report_text=report_text,
+                            announcement=ann,
+                            revision_trigger=f"Daily 08:30 AM Streaming Ingestion ({synthesis_tier})",
+                            citations=[{
+                                "title": f"BSE Corporate Announcements & Disclosures ({ticker})",
+                                "uri": f"https://www.bseindia.com/stock-share-price/-/{scrip_code}/corporate-announcements/" if scrip_code else "https://www.bseindia.com",
+                                "source_type": "BSE Official Regulatory Filing",
+                            }],
+                        )
             except Exception as gem_err:
-                logger.warning(f"Live Gemini synthesis notice for {ticker}: {gem_err}. Falling back to deterministic synthesis.")
+                logger.warning(f"Live Gemini synthesis notice for {ticker}: {gem_err}. Synthesis deferred to compilation queue.")
                 report_text = ""
 
-
-    # Fallback to deterministic synthesis if Gemini is skipped or unavailable
+    # Archival state and error banner inspection (preserve successful LLM runs and fail closed to pending)
     has_err_banner = any(sig in (report_text or "") for sig in [
         "Live Synthesis Failed",
         "Grounded synthesis channels are temporarily unavailable",
@@ -485,27 +502,28 @@ def synthesize_and_archive_stock_dossier(
         archived_check and archived_check.get("report_text") and len(archived_check["report_text"].strip()) >= 500
     )
 
-    if not report_text or len(report_text.strip()) < 500 or has_err_banner or not is_archived:
-        logger.info(f"Generating deterministic 7-pillar research report for {ticker}...")
-        report_text = generate_deterministic_7pillar_report(stock_data, candidate)
-        ann = ""
-        if not os.environ.get("TESTING") == "1" and scrip_code:
-            try:
-                ann = fetch_latest_bse_announcement(scrip_code)
-            except Exception as e:
-                logger.warning(f"BSE announcement fetch notice for {scrip_code}: {e}")
-                ann = ""
-        save_report_to_archive(
-            stock_data=stock_data,
-            report_text=report_text,
-            announcement=ann,
-            revision_trigger="Daily 08:30 AM Ingestion",
-            citations=[{
-                "title": f"BSE Corporate Announcements & Disclosures ({ticker})",
-                "uri": f"https://www.bseindia.com/stock-share-price/-/{scrip_code}/corporate-announcements/" if scrip_code else "https://www.bseindia.com",
-                "source_type": "BSE Official Regulatory Filing"
-            }]
-        )
+    if not report_text or len(report_text.strip()) < 500 or has_err_banner:
+        if is_archived and archived_check and archived_check.get("report_text"):
+            report_text = archived_check["report_text"]
+            logger.info(f"Reusing existing verified archived dossier for {ticker}.")
+        elif os.environ.get("TESTING") == "1":
+            logger.info(f"Generating test-mode 7-pillar research report for {ticker}...")
+            report_text = generate_deterministic_7pillar_report(stock_data, candidate)
+            ann = ""
+            save_report_to_archive(
+                stock_data=stock_data,
+                report_text=report_text,
+                announcement=ann,
+                revision_trigger="Test Ingestion",
+                citations=[{
+                    "title": f"BSE Corporate Announcements & Disclosures ({ticker})",
+                    "uri": f"https://www.bseindia.com/stock-share-price/-/{scrip_code}/corporate-announcements/" if scrip_code else "https://www.bseindia.com",
+                    "source_type": "BSE Official Regulatory Filing",
+                }],
+            )
+        else:
+            logger.info(f"Synthesis for {ticker} pending genuine data compilation. Adhering to fail-closed domain integrity.")
+            report_text = ""
 
     # 3. Synchronize cached fundamentals (never fabricate default ROCE/D/E when unverified)
     clean_pe_sync = stock_data.get("pe_ratio")

@@ -127,6 +127,11 @@ sequenceDiagram
     UI->>RepDB: Query /discovery (renders MF footprint badge) & /equities (market_cap=RECENT chip)
 ```
 
+#### Fail-Closed Domain Integrity & Substance Invariants (Pre-Commit Gates 4.5 & 4.6)
+* **Pending Over Potemkin:** When live or batch LLM synthesis is throttled or fails in production, the pipeline adheres to Rule 4 ("Pending Over Potemkin"), setting `report_text = NULL` and transitioning candidate stocks into the `PENDING COMPILATION` queue state (served via `dossier_pending.html`). Ingestion never fabricates synthetic or deterministic fallback prose in production databases.
+* **Gate 4.5 Substance AST & Corpus Gate (`INV_NO_STATIC_REPORT_TEMPLATES`):** Scans 100% of dossiers in `reports.db` against 7 known static template phrases (`"operating franchise benefits from steady sponsorship"`, `"cyclical working-capital timing"`, `"product specialisation"`, etc.), halting CI on any static template match.
+* **Gate 4.6 Database Report De-duplication (`INV_DATABASE_REPORT_DEDUPLICATION`):** Enforces pairwise paragraph de-duplication ($\ge 120$ characters, headers and disclaimers stripped) across non-peer dossiers in `reports.db`, verifying zero copy-paste boilerplate across entities while respecting known corporate peer aliases (e.g. `ETERNAL` / `ZOMATO`).
+
 ### 2.3 Mutual Funds & ETFs Look-Through & Overlap Flow
 ```mermaid
 sequenceDiagram

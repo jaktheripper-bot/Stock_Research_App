@@ -28,7 +28,12 @@ from core.analysis.daily_stock_ingestion import (
     ingest_daily_stock_cohort,
     recalculate_affected_mutual_funds,
 )
-from core.db.reports import get_report_by_ticker_sync
+from core.db.reports import (
+    get_report_by_ticker_sync,
+    get_report_by_ticker,
+    get_archived_reports,
+    get_report_revisions,
+)
 from core.db.mutual_funds import get_fund_forensic_dossier
 from web.main import app
 from web.routers.admin import ADMIN_COOKIE_NAME, _generate_admin_token
@@ -55,13 +60,19 @@ class TestDailyStockIngestionAndMFCoverage(unittest.TestCase):
                 cur.execute("DELETE FROM report_revisions WHERE ticker = ?;", (t,))
                 cur.execute("DELETE FROM cached_fundamentals WHERE ticker = ?;", (t,))
                 cur.execute("DELETE FROM mutual_fund_holdings WHERE identifier = ?;", (t,))
-            cur.execute("DELETE FROM reports WHERE ticker = 'RELIANCE';")
+            cur.execute("UPDATE reports SET report_text = NULL, citations_json = NULL WHERE ticker = 'RELIANCE';")
             cur.execute("DELETE FROM report_revisions WHERE ticker = 'RELIANCE';")
             cur.execute("DELETE FROM cached_fundamentals WHERE ticker = 'RELIANCE';")
             cur.execute("DELETE FROM discovery_reel WHERE edition_date = ?;", (self.test_edition_date,))
             conn.commit()
             cur.close()
             conn.close()
+        except Exception:
+            pass
+        try:
+            get_report_by_ticker.cache_clear()
+            get_archived_reports.cache_clear()
+            get_report_revisions.cache_clear()
         except Exception:
             pass
 
@@ -144,12 +155,18 @@ class TestDailyStockIngestionAndMFCoverage(unittest.TestCase):
         conn = get_db_connection()
         cur = conn.cursor()
         for t in ingested_tickers:
-            cur.execute("DELETE FROM reports WHERE ticker = ?;", (t,))
+            if t == "RELIANCE":
+                cur.execute("UPDATE reports SET report_text = NULL, citations_json = NULL WHERE ticker = ?;", (t,))
+            else:
+                cur.execute("DELETE FROM reports WHERE ticker = ?;", (t,))
             cur.execute("DELETE FROM report_revisions WHERE ticker = ?;", (t,))
             cur.execute("DELETE FROM cached_fundamentals WHERE ticker = ?;", (t,))
         conn.commit()
         cur.close()
         conn.close()
+        get_report_by_ticker.cache_clear()
+        get_archived_reports.cache_clear()
+        get_report_revisions.cache_clear()
 
     def test_discovery_page_renders_mutual_fund_footprint(self):
         """Verifies that /discovery renders the Mutual Fund Footprint Badge on stock cards."""
@@ -243,12 +260,18 @@ class TestDailyStockIngestionAndMFCoverage(unittest.TestCase):
         conn = get_db_connection()
         cur = conn.cursor()
         for t in ingested_tickers:
-            cur.execute("DELETE FROM reports WHERE ticker = ?;", (t,))
+            if t == "RELIANCE":
+                cur.execute("UPDATE reports SET report_text = NULL, citations_json = NULL WHERE ticker = ?;", (t,))
+            else:
+                cur.execute("DELETE FROM reports WHERE ticker = ?;", (t,))
             cur.execute("DELETE FROM report_revisions WHERE ticker = ?;", (t,))
             cur.execute("DELETE FROM cached_fundamentals WHERE ticker = ?;", (t,))
         conn.commit()
         cur.close()
         conn.close()
+        get_report_by_ticker.cache_clear()
+        get_archived_reports.cache_clear()
+        get_report_revisions.cache_clear()
 
 """
 Outside-In Dynamic Cadence and Time-Series Rotation Tests (Pillar 8)

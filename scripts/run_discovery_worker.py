@@ -104,9 +104,19 @@ def run_discovery_pipeline(
                     "Live Synthesis Error",
                     "Rate limit exceeded",
                 ])
+                if report_md and len(report_md.strip()) >= 500 and not has_err:
+                    from core.db.reports import save_report_to_archive
+                    from core.analysis.daily_stock_ingestion import _resolve_candidate_stock_data
+                    stock_data = _resolve_candidate_stock_data(item)
+                    save_report_to_archive(
+                        stock_data=stock_data,
+                        report_text=report_md,
+                        announcement="",
+                        revision_trigger="Discovery Worker Live Stream",
+                    )
                 archived = get_report_by_ticker_sync(ticker)
                 if not archived or not archived.get("report_text") or len(archived.get("report_text", "").strip()) < 500 or has_err:
-                    logger.info(f"Triggering deterministic 7-pillar fallback ingestion for {ticker}...")
+                    logger.info(f"Synthesis for {ticker} pending live data. Triggering candidate ingestion...")
                     from core.analysis.daily_stock_ingestion import synthesize_and_archive_stock_dossier
                     synthesize_and_archive_stock_dossier(item, skip_gemini=True)
                     archived = get_report_by_ticker_sync(ticker)

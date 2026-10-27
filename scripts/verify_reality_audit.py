@@ -260,6 +260,26 @@ class RealityAuditor:
                 self.fail(gate, "core/msme/daily_ingest.py",
                           "Synthetic Data Violation: Procedural fake MSME name/Udyam generator still active.")
 
+        # 4.5 Substance-Based AST & Corpus Gate: Zero static boilerplate templates in reports.db
+        from core.audit.invariants import scan_no_static_report_templates, scan_database_report_deduplication
+        template_findings = scan_no_static_report_templates()
+        if template_findings:
+            sample_tickers = ", ".join(f.get("metadata", {}).get("ticker", "UNKNOWN") for f in template_findings[:5])
+            self.fail(gate, "reports.db:reports",
+                      f"Substance-Based AST Gate Failed: {len(template_findings)} dossiers match known static boilerplate templates ({sample_tickers}).")
+        else:
+            self.ok(gate, "Zero static boilerplate templates in reports.db")
+
+        # 4.6 Database De-duplication / Boilerplate Invariant: No two non-peer reports share identical paragraph text
+        dedup_findings = scan_database_report_deduplication()
+        if dedup_findings:
+            sample_viol = dedup_findings[0]
+            tickers_str = ", ".join(sample_viol.get("metadata", {}).get("tickers", [])[:4])
+            self.fail(gate, "reports.db:reports",
+                      f"Database Report De-duplication Failed: {len(dedup_findings)} duplicate paragraphs shared across non-peer tickers ({tickers_str}).")
+        else:
+            self.ok(gate, "Database report de-duplication verified: zero identical paragraphs across non-peer dossiers")
+
     # =========================================================================
     # GATE 5: BEHAVIORAL NEGATIVE-PATH TESTS
     # =========================================================================

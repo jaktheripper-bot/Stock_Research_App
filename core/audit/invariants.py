@@ -17,6 +17,7 @@ import ast
 import re
 import json
 import logging
+from collections import defaultdict
 from pathlib import Path
 from typing import Dict, Any, List, Tuple, Optional
 
@@ -506,6 +507,123 @@ def scan_sebi_regulatory_invariants() -> List[Dict[str, Any]]:
     return findings
 
 
+KNOWN_STATIC_REPORT_TEMPLATE_PHRASES = [
+    "operating franchise benefits from steady sponsorship",
+    "product specialisation, enterprise vendor qualifications, and customer switching costs",
+    "Near-term earnings or price fluctuations currently appear tied to cyclical working-capital timing",
+    "Secondary market liquidity reflects institutional participation across",
+    "Resource-efficiency protocols and statutory industrial waste-management compliance",
+    "You are an institutional equity research analyst. Write a comprehensive research report for",
+    "While the operating franchise benefits from steady sponsorship",
+]
+
+KNOWN_PEER_ALIASES = [
+    {"ETERNAL", "ZOMATO"},
+]
+
+
+def are_report_peers(t1: str, t2: str) -> bool:
+    if t1 == t2:
+        return True
+    for group in KNOWN_PEER_ALIASES:
+        if t1 in group and t2 in group:
+            return True
+    return False
+
+
+def scan_no_static_report_templates() -> List[Dict[str, Any]]:
+    """INV_NO_STATIC_REPORT_TEMPLATES: Fails if any dossier in reports.db matches known static boilerplate templates."""
+    findings = []
+    try:
+        from core.db.connection import get_db_connection, init_db
+        init_db()
+        conn = get_db_connection()
+        cur = conn.cursor()
+        cur.execute("SELECT ticker, report_text FROM reports WHERE report_text IS NOT NULL")
+        rows = cur.fetchall()
+        cur.close()
+        conn.close()
+
+        for row in rows:
+            ticker = row[0]
+            text = row[1] or ""
+            for phrase in KNOWN_STATIC_REPORT_TEMPLATE_PHRASES:
+                if phrase in text:
+                    h = compute_finding_hash("STRATEGY_REGULATORY", "INV_NO_STATIC_REPORT_TEMPLATES", f"{ticker}:{phrase[:30]}")
+                    findings.append({
+                        "finding_hash": h,
+                        "category": "STRATEGY_REGULATORY",
+                        "invariant_name": "INV_NO_STATIC_REPORT_TEMPLATES",
+                        "title": f"Static Boilerplate Template in Dossier for {ticker}",
+                        "description": f"Dossier for {ticker} matches known static fallback template phrase: '{phrase[:60]}...'. Fails anti-potemkin domain integrity.",
+                        "target_file_or_route": f"reports.db:reports:{ticker}",
+                        "severity": "CRITICAL",
+                        "remediation_notes": f"Queue ticker {ticker} for genuine synthesis or reset report_text to NULL.",
+                        "metadata": {"ticker": ticker, "matched_phrase": phrase}
+                    })
+                    break
+    except Exception as e:
+        logger.error(f"Error scanning static report templates: {e}")
+
+    return findings
+
+
+def scan_database_report_deduplication() -> List[Dict[str, Any]]:
+    """INV_DATABASE_REPORT_DEDUPLICATION: Verifies that no two non-peer reports in reports.db share identical paragraph text."""
+    findings = []
+    try:
+        from core.db.connection import get_db_connection, init_db
+        init_db()
+        conn = get_db_connection()
+        cur = conn.cursor()
+        cur.execute("SELECT ticker, report_text FROM reports WHERE report_text IS NOT NULL")
+        rows = cur.fetchall()
+        cur.close()
+        conn.close()
+
+        para_to_tickers = defaultdict(set)
+        for row in rows:
+            ticker = row[0]
+            text = row[1] or ""
+            raw_paras = [p.strip() for p in text.split("\n\n") if p.strip()]
+            for p in raw_paras:
+                clean_p = re.sub(r'^(#+\s+[^\n]+\n+)+', '', p).strip()
+                if len(clean_p) < 120:
+                    continue
+                if clean_p.startswith(("-", "*", "|", "1.", "2.", "3.")):
+                    continue
+                if any(term in clean_p for term in ["SEBI", "Disclaimer", "Regulatory", "http", "Safe Harbor", "BSE Corporate"]):
+                    continue
+                para_to_tickers[clean_p].add(ticker)
+
+        for para, tickers in para_to_tickers.items():
+            if len(tickers) > 1:
+                ticker_list = sorted(list(tickers))
+                is_peer_group = all(
+                    are_report_peers(t1, t2)
+                    for i, t1 in enumerate(ticker_list)
+                    for t2 in ticker_list[i+1:]
+                )
+                if not is_peer_group:
+                    sample_tickers = ", ".join(ticker_list[:4])
+                    h = compute_finding_hash("STRATEGY_REGULATORY", "INV_DATABASE_REPORT_DEDUPLICATION", f"{ticker_list[0]}:{ticker_list[1]}:{para[:30]}")
+                    findings.append({
+                        "finding_hash": h,
+                        "category": "STRATEGY_REGULATORY",
+                        "invariant_name": "INV_DATABASE_REPORT_DEDUPLICATION",
+                        "title": f"Duplicate Paragraph Across Non-Peer Reports: {sample_tickers}",
+                        "description": f"Identical substantive paragraph ({len(para)} chars) shared across non-peer tickers [{sample_tickers}]: '{para[:80]}...'",
+                        "target_file_or_route": f"reports.db:reports:{ticker_list[0]}",
+                        "severity": "HIGH",
+                        "remediation_notes": "De-duplicate reports by compiling unique, grounded research dossiers for each entity.",
+                        "metadata": {"tickers": ticker_list, "paragraph_sample": para[:100]}
+                    })
+    except Exception as e:
+        logger.error(f"Error scanning database report deduplication: {e}")
+
+    return findings
+
+
 def scan_better_stack_telemetry() -> List[Dict[str, Any]]:
     """INV_BETTER_STACK_TELEMETRY: Verifies production uptime monitors and log ingestion health."""
     findings = []
@@ -580,6 +698,8 @@ def scan_all_invariants() -> List[Dict[str, Any]]:
 
     # 5. Strategy & Regulatory Directives
     all_findings.extend(scan_sebi_regulatory_invariants())
+    all_findings.extend(scan_no_static_report_templates())
+    all_findings.extend(scan_database_report_deduplication())
 
     return all_findings
 
@@ -597,6 +717,8 @@ INVARIANT_SCANNERS = {
     "INV_SEC_NO_STACKTRACE": scan_security_no_stacktrace,
     "INV_SEBI_SAFE_HARBOR": scan_sebi_regulatory_invariants,
     "INV_SEBI_STATUTORY_DISCLAIMER": scan_sebi_regulatory_invariants,
+    "INV_NO_STATIC_REPORT_TEMPLATES": scan_no_static_report_templates,
+    "INV_DATABASE_REPORT_DEDUPLICATION": scan_database_report_deduplication,
 }
 
 
