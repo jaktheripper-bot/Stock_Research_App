@@ -1982,5 +1982,21 @@
       "revision_count": 1040
     },
     "preflight_passed": true
+  },
+  {
+    "tag": "checkpoint_20261028_085606_fund_overlap_auditor_remove_proxy_holdings_cloning",
+    "timestamp": "2026-10-28 08:56:06 IST",
+    "commit_sha": "835e6ff6eba272884f8683ac6b47217d82abcf54",
+    "branch": "main",
+    "description": "fund_overlap_auditor_remove_proxy_holdings_cloning",
+    "database": {
+      "exists": true,
+      "filename": "reports_checkpoint_20261028_085606_fund_overlap_auditor_remove_proxy_holdings_cloning.db",
+      "path": ".checkpoints/reports_checkpoint_20261028_085606_fund_overlap_auditor_remove_proxy_holdings_cloning.db",
+      "size_bytes": 34918400,
+      "report_count": 307,
+      "revision_count": 1040
+    },
+    "preflight_passed": true
   }
 ]
