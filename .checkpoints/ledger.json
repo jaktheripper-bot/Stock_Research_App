@@ -2126,5 +2126,21 @@
       "revision_count": 1048
     },
     "preflight_passed": true
+  },
+  {
+    "tag": "checkpoint_20261028_094858_remediate_corpus_substance_script",
+    "timestamp": "2026-10-28 09:48:58 IST",
+    "commit_sha": "a717dee7b564a61e85bce04649e152ac5f541853",
+    "branch": "main",
+    "description": "remediate_corpus_substance_script",
+    "database": {
+      "exists": true,
+      "filename": "reports_checkpoint_20261028_094858_remediate_corpus_substance_script.db",
+      "path": ".checkpoints/reports_checkpoint_20261028_094858_remediate_corpus_substance_script.db",
+      "size_bytes": 34918400,
+      "report_count": 308,
+      "revision_count": 1049
+    },
+    "preflight_passed": true
   }
 ]

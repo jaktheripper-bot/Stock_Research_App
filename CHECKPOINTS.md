@@ -10,7 +10,7 @@
 
 | Checkpoint Tag | IST Timestamp | Commit | DB Reports | Description |
 |:---|:---|:---|:---|:---|
-| `checkpoint_20261028_094858_remediate_corpus_substance_script` | 2026-10-28 09:48:58 IST | `0b45f99` | 308 rep / 1049 rev | remediate_corpus_substance_script |
+| `checkpoint_20261028_094858_remediate_corpus_substance_script` | 2026-10-28 09:48:58 IST | `a717dee` | 308 rep / 1049 rev | remediate_corpus_substance_script |
 | `checkpoint_20261028_094532_render_yaml_enable_background_schedulers` | 2026-10-28 09:45:32 IST | `91c440d` | 308 rep / 1048 rev | render_yaml_enable_background_schedulers |
 | `checkpoint_20261028_094159_web_main_scheduler_boot_guard` | 2026-10-28 09:41:59 IST | `d2628e0` | 308 rep / 1047 rev | web_main_scheduler_boot_guard |
 | `checkpoint_20261028_093209_daily_stock_ingestion_skip_unsynthesized_discovery` | 2026-10-28 09:32:09 IST | `ef64dfb` | 308 rep / 1044 rev | daily_stock_ingestion_skip_unsynthesized_discovery |
