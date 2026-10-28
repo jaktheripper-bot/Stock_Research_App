@@ -19,31 +19,17 @@ from typing import Optional, List, Dict, Any, Tuple
 import certifi
 
 from core.config import get_secret
-from core.db.connection import get_db_connection, get_supabase_url, is_postgres_connection, is_postgres_active, IST
+from core.db.connection import get_db_connection, get_supabase_url, is_postgres_connection, is_postgres_active, IST, now_ist_iso
+from core.presentation.formatters import _coerce_datetime
 
 def format_audit_timestamp_ist(raw_ts: Any) -> str:
-    """Formats an audit UTC timestamp (ISO string, datetime, or SQLite text) into IST 'YYYY-MM-DD HH:MM IST'."""
+    """Formats an audit timestamp (ISO string, datetime, or SQLite text) into IST 'YYYY-MM-DD HH:MM IST'."""
     if not raw_ts:
         return "—"
-    try:
-        from datetime import timezone
-        if isinstance(raw_ts, datetime):
-            dt = raw_ts if raw_ts.tzinfo else raw_ts.replace(tzinfo=timezone.utc)
-            return dt.astimezone(IST).strftime("%Y-%m-%d %H:%M IST")
-
-        s = str(raw_ts).strip()
-        if not s:
-            return "—"
-        iso_str = s.replace(" ", "T")
-        if not iso_str.endswith("Z") and "+" not in iso_str and "-" not in iso_str[10:]:
-            iso_str += "+00:00"
-        elif iso_str.endswith("Z"):
-            iso_str = iso_str[:-1] + "+00:00"
-        dt = datetime.fromisoformat(iso_str)
-        return dt.astimezone(IST).strftime("%Y-%m-%d %H:%M IST")
-    except Exception as e:
-        logger.debug("Failed converting audit timestamp '%s' to IST: %s", raw_ts, e)
-        return str(raw_ts)[:16]
+    dt = _coerce_datetime(raw_ts)
+    if dt:
+        return dt.strftime("%Y-%m-%d %H:%M IST")
+    return str(raw_ts)[:16]
 
 def is_supabase_enabled() -> bool:
     return bool((get_supabase_url() and is_postgres_active()) or _get_supabase_rest_credentials())
@@ -178,9 +164,8 @@ def sync_remote_audits_to_local(limit: int = 30, force: bool = False) -> Dict[st
                 continue
             latest_audit_id = audit_id
             latest_overall_score = float(r.get("overall_score", 0.0))
-            created_str = str(r.get("created_at") or "")[:19].replace("T", " ").strip()
-            if not created_str:
-                created_str = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+            coerced_created = _coerce_datetime(r.get("created_at"))
+            created_str = coerced_created.strftime("%Y-%m-%d %H:%M:%S+05:30") if coerced_created else now_ist_iso()
 
             cursor.execute(
                 """
@@ -248,10 +233,13 @@ def sync_remote_audits_to_local(limit: int = 30, force: bool = False) -> Dict[st
             f_hash = f.get("finding_hash")
             if not f_hash:
                 continue
-            first_dt = str(f.get("first_detected_at") or "")[:19].replace("T", " ").strip() or datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-            last_dt = str(f.get("last_verified_at") or "")[:19].replace("T", " ").strip() or first_dt
+            first_coerced = _coerce_datetime(f.get("first_detected_at"))
+            first_dt = first_coerced.strftime("%Y-%m-%d %H:%M:%S+05:30") if first_coerced else now_ist_iso()
+            last_coerced = _coerce_datetime(f.get("last_verified_at"))
+            last_dt = last_coerced.strftime("%Y-%m-%d %H:%M:%S+05:30") if last_coerced else first_dt
             res_raw = f.get("resolved_at")
-            res_dt = str(res_raw)[:19].replace("T", " ").strip() if res_raw else None
+            res_coerced = _coerce_datetime(res_raw) if res_raw else None
+            res_dt = res_coerced.strftime("%Y-%m-%d %H:%M:%S+05:30") if res_coerced else None
 
             cursor.execute(
                 """
@@ -429,6 +417,7 @@ def save_project_audit_log(audit: Dict[str, Any]) -> bool:
                 audit.get("audit_engine", "autonomous-auditor-engine"),
             ))
         else:
+            now_ts = now_ist_iso()
             query = """
                 INSERT INTO project_audit_logs (
                     audit_id, overall_score, strategy_score, implementation_score, uiux_score,
@@ -436,7 +425,7 @@ def save_project_audit_log(audit: Dict[str, Any]) -> bool:
                     endpoints_checked, endpoints_healthy,
                     critical_violations_json, recommendations_json, pillar_breakdown_json,
                     full_markdown_report, audit_engine, created_at
-                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, datetime('now'))
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                 ON CONFLICT (audit_id) DO UPDATE SET
                     overall_score = EXCLUDED.overall_score,
                     strategy_score = EXCLUDED.strategy_score,
@@ -453,7 +442,7 @@ def save_project_audit_log(audit: Dict[str, Any]) -> bool:
                     pillar_breakdown_json = EXCLUDED.pillar_breakdown_json,
                     full_markdown_report = EXCLUDED.full_markdown_report,
                     audit_engine = EXCLUDED.audit_engine,
-                    created_at = datetime('now');
+                    created_at = EXCLUDED.created_at;
             """
             cursor.execute(query, (
                 audit.get("audit_id"),
@@ -472,6 +461,7 @@ def save_project_audit_log(audit: Dict[str, Any]) -> bool:
                 pillar_breakdown_json,
                 audit.get("full_markdown_report", ""),
                 audit.get("audit_engine", "autonomous-auditor-engine"),
+                now_ts,
             ))
         conn.commit()
         if not use_pg:

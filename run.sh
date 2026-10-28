@@ -66,7 +66,7 @@ case "$COMMAND" in
         ;;
     backup)
         echo "--> Creating site backup (web assets + DB)..."
-        TIMESTAMP=$(date +"%Y%m%d_%H%M%S")
+        TIMESTAMP=$(TZ=Asia/Kolkata date +"%Y%m%d_%H%M%S")
         BACKUP_DIR="${SCRIPT_DIR}/backups/${TIMESTAMP}"
         mkdir -p "${BACKUP_DIR}"
         tar -czf "${BACKUP_DIR}/site_assets.tar.gz" web/ reports.db

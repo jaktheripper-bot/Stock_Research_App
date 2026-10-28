@@ -16,10 +16,11 @@ import logging
 import os
 import urllib.request
 from decimal import Decimal
-from datetime import datetime, timezone, date
+from datetime import datetime, date
 from typing import Dict, Any, List, Optional
 
-from core.db.connection import get_db_connection, is_postgres_connection
+from core.db.connection import get_db_connection, is_postgres_connection, IST, now_ist_iso
+from core.presentation.formatters import _coerce_datetime
 
 logger = logging.getLogger("equity_research.core.db.remediation")
 
@@ -113,17 +114,13 @@ def _clean_remediation_row(cursor, row: Any) -> Dict[str, Any]:
         d["metadata"] = {}
 
     # Calculate age in days and progressive multiplier dynamically
-    now_utc = datetime.now(timezone.utc)
+    now_ist = datetime.now(IST)
     first_detected_str = d.get("first_detected_at")
     age_days = 0.0
     if first_detected_str:
-        try:
-            cleaned_str = str(first_detected_str)[:19].replace("T", " ")
-            dt = datetime.strptime(cleaned_str, "%Y-%m-%d %H:%M:%S").replace(tzinfo=timezone.utc)
-            age_days = max(round((now_utc - dt).total_seconds() / 86400.0, 1), 0.0)
-        except Exception as parse_err:
-            logger.debug("Failed parsing first_detected_at %s: %s", first_detected_str, parse_err)
-            age_days = 0.0
+        dt = _coerce_datetime(first_detected_str)
+        if dt is not None:
+            age_days = max(round((now_ist - dt).total_seconds() / 86400.0, 1), 0.0)
 
     d["age_in_days"] = age_days
 
@@ -199,19 +196,20 @@ def record_or_update_finding(
                 """
                 cursor.execute(update_sql, (title, desc, severity, new_attempts, new_failures, notes, metadata_json, finding_hash))
             else:
+                now_ts = now_ist_iso()
                 update_sql = """
                     UPDATE audit_remediation_ledger
                     SET title = ?, description = ?, severity = ?,
                         status = 'OPEN',
                         verification_attempts = ?,
                         consecutive_failures = ?,
-                        last_verified_at = datetime('now'),
+                        last_verified_at = ?,
                         resolved_at = NULL,
                         remediation_notes = ?,
                         finding_metadata_json = ?
                     WHERE finding_hash = ?;
                 """
-                cursor.execute(update_sql, (title, desc, severity, new_attempts, new_failures, notes, metadata_json, finding_hash))
+                cursor.execute(update_sql, (title, desc, severity, new_attempts, new_failures, now_ts, notes, metadata_json, finding_hash))
         else:
             if use_pg:
                 insert_sql = """
@@ -224,15 +222,16 @@ def record_or_update_finding(
                 """
                 cursor.execute(insert_sql, (finding_hash, category, invariant_name, title, desc, target, severity, notes, metadata_json))
             else:
+                now_ts = now_ist_iso()
                 insert_sql = """
                     INSERT INTO audit_remediation_ledger (
                         finding_hash, category, invariant_name, title, description,
                         target_file_or_route, severity, status, verification_attempts,
                         consecutive_failures, first_detected_at, last_verified_at,
                         resolved_at, remediation_notes, finding_metadata_json
-                    ) VALUES (?, ?, ?, ?, ?, ?, ?, 'OPEN', 1, 1, datetime('now'), datetime('now'), NULL, ?, ?);
+                    ) VALUES (?, ?, ?, ?, ?, ?, ?, 'OPEN', 1, 1, ?, ?, NULL, ?, ?);
                 """
-                cursor.execute(insert_sql, (finding_hash, category, invariant_name, title, desc, target, severity, notes, metadata_json))
+                cursor.execute(insert_sql, (finding_hash, category, invariant_name, title, desc, target, severity, now_ts, now_ts, notes, metadata_json))
 
         if commit:
             conn.commit()
@@ -269,6 +268,7 @@ def record_findings_batch(findings: List[Dict[str, Any]]) -> List[Dict[str, Any]
     if not findings:
         return []
     conn = get_db_connection()
+    use_pg = is_postgres_connection(conn)
     cursor = conn.cursor()
     results = []
     try:
@@ -302,6 +302,7 @@ def record_findings_batch(findings: List[Dict[str, Any]]) -> List[Dict[str, Any]
 def get_open_remediation_findings() -> List[Dict[str, Any]]:
     """Returns all currently active (OPEN or RE_EVALUATING) remediation findings."""
     conn = get_db_connection()
+    use_pg = is_postgres_connection(conn)
     cursor = conn.cursor()
     try:
         cursor.execute("""
@@ -331,11 +332,20 @@ def get_open_remediation_findings() -> List[Dict[str, Any]]:
 def mark_finding_re_evaluating(finding_hash: str) -> bool:
     """Sets a finding's status to RE_EVALUATING as part of the Verify First cycle."""
     conn = get_db_connection()
+    use_pg = is_postgres_connection(conn)
     cursor = conn.cursor()
     use_pg = is_postgres_connection(conn)
     try:
-        sql = "UPDATE audit_remediation_ledger SET status = 'RE_EVALUATING', last_verified_at = now() WHERE finding_hash = %s;" if use_pg else "UPDATE audit_remediation_ledger SET status = 'RE_EVALUATING', last_verified_at = datetime('now') WHERE finding_hash = ?;"
-        cursor.execute(sql, (finding_hash,))
+        if use_pg:
+            cursor.execute(
+                "UPDATE audit_remediation_ledger SET status = 'RE_EVALUATING', last_verified_at = now() WHERE finding_hash = %s;",
+                (finding_hash,),
+            )
+        else:
+            cursor.execute(
+                "UPDATE audit_remediation_ledger SET status = 'RE_EVALUATING', last_verified_at = ? WHERE finding_hash = ?;",
+                (now_ist_iso(), finding_hash),
+            )
         conn.commit()
         if not use_pg:
             cursor.execute("SELECT * FROM audit_remediation_ledger WHERE finding_hash = ?;", (finding_hash,))
@@ -364,6 +374,7 @@ def mark_finding_re_evaluating(finding_hash: str) -> bool:
 def mark_finding_resolved(finding_hash: str, notes: Optional[str] = None) -> bool:
     """Marks an invariant violation as RESOLVED and records the resolution timestamp."""
     conn = get_db_connection()
+    use_pg = is_postgres_connection(conn)
     cursor = conn.cursor()
     use_pg = is_postgres_connection(conn)
     try:
@@ -382,13 +393,13 @@ def mark_finding_resolved(finding_hash: str, notes: Optional[str] = None) -> boo
             sql = """
                 UPDATE audit_remediation_ledger
                 SET status = 'RESOLVED',
-                    resolved_at = datetime('now'),
+                    resolved_at = ?,
                     consecutive_failures = 0,
                     verification_attempts = verification_attempts + 1,
                     remediation_notes = COALESCE(?, remediation_notes)
                 WHERE finding_hash = ?;
             """
-            cursor.execute(sql, (notes, finding_hash))
+            cursor.execute(sql, (now_ist_iso(), notes, finding_hash))
         conn.commit()
         if not use_pg:
             cursor.execute("SELECT * FROM audit_remediation_ledger WHERE finding_hash = ?;", (finding_hash,))
@@ -418,6 +429,7 @@ def mark_finding_resolved(finding_hash: str, notes: Optional[str] = None) -> boo
 def get_all_remediation_findings(limit: int = 100, status_filter: Optional[str] = None) -> List[Dict[str, Any]]:
     """Retrieves remediation ledger entries with optional status filtering."""
     conn = get_db_connection()
+    use_pg = is_postgres_connection(conn)
     cursor = conn.cursor()
     use_pg = is_postgres_connection(conn)
     try:

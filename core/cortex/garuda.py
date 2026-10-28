@@ -109,7 +109,8 @@ class GarudaReflexEngine:
         pillar_title = cls.PILLAR_TITLES.get(target_pillar, "Corporate Disclosures")
 
         # Create structured markdown bulletin snippet
-        date_str = clean_date if clean_date else datetime.now().strftime("%Y-%m-%d")
+        from core.db.connection import IST
+        date_str = clean_date if clean_date else datetime.now(IST).strftime("%Y-%m-%d")
         badge_urgency = "CRITICAL NOTICE" if urgency == "IMMEDIATE_REFRESH" else "REGULATORY UPDATE"
         
         snippet = (

@@ -28,6 +28,7 @@ from core.agents.config import (
     get_default_agent_policies,
     get_tier_budget_config
 )
+from core.db.connection import IST
 from core.agents.tools_base import (
     tool_get_equity_fundamentals,
     tool_get_recent_bse_disclosures,
@@ -210,7 +211,7 @@ def run_deterministic_forensic_fallback(ticker: str) -> ForensicAuditResult:
     if pledge > 5:
         divergences.append(f"Governance Detective flags {pledge:.1f}% promoter pledge overhang despite strong operating performance.")
         
-    now_iso = datetime.now(timezone.utc).isoformat()
+    now_iso = datetime.now(IST).isoformat()
     return ForensicAuditResult(
         ticker=clean_sym,
         forensic_score=round(score, 1),

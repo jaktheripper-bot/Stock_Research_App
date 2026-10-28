@@ -597,7 +597,12 @@ window.renderCopilotMarkdown = renderCopilotMarkdown;
 
 function formatCurrentTime() {
     const now = new Date();
-    return now.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+    return now.toLocaleTimeString('en-IN', {
+        timeZone: 'Asia/Kolkata',
+        hour: '2-digit',
+        minute: '2-digit',
+        hour12: false
+    }) + ' IST';
 }
 
 function renderIntroWelcomeCard(cfg, ticker, section, sectionLabel) {

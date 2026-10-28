@@ -207,7 +207,8 @@ def extract_financial_period_covered(report_text: str, reference_date: Any = Non
         logger.warning("Reference date parse notice in extract_financial_period_covered: %s", dt_err)
 
     if ref_dt is None:
-        ref_dt = datetime.now()
+        from core.db.connection import IST
+        ref_dt = datetime.now(IST)
 
     current_indian_fy = (ref_dt.year + 1) if ref_dt.month >= 4 else ref_dt.year
     max_quarter_fy = current_indian_fy

@@ -2190,7 +2190,7 @@ function getAcquisitionData() {
       utm_term: params.get('utm_term') || '',
       utm_content: params.get('utm_content') || '',
       ref: params.get('ref') || params.get('source') || '',
-      captured_at: new Date().toISOString()
+      captured_at: new Date().toLocaleString('sv-SE', { timeZone: 'Asia/Kolkata' }).replace(' ', 'T') + '+05:30'
     };
     sessionStorage.setItem('sr_acquisition', JSON.stringify(acquisition));
     stripTrackingParams();

@@ -11,7 +11,7 @@ import requests  # IndexNow ping
 import asyncio
 
 from normalizer import clean_ticker, extract_citations_from_report
-from core.db.connection import init_db, get_db_connection, get_supabase_url, get_placeholder, IST
+from core.db.connection import init_db, get_db_connection, get_supabase_url, get_placeholder, IST, now_ist_iso
 from core.db.compliance import log_compliance_event
 from core.presentation.formatters import (
     format_52w_range,
@@ -110,15 +110,16 @@ def save_report_to_archive(stock_data: dict, report_text: str, announcement: str
     citations_json = json.dumps(citations) if citations else None
 
     try:
+        now_ts = now_ist_iso()
         # 1. Update/Upsert the current snapshot in 'reports'
         query_snapshot = f'''
-            INSERT INTO reports (ticker, short_name, report_text, baseline_price, baseline_pe, baseline_mcap, latest_announcement, citations_json)
-            VALUES ({placeholder}, {placeholder}, {placeholder}, {placeholder}, {placeholder}, {placeholder}, {placeholder}, {placeholder})
+            INSERT INTO reports (ticker, short_name, report_text, timestamp, baseline_price, baseline_pe, baseline_mcap, latest_announcement, citations_json)
+            VALUES ({placeholder}, {placeholder}, {placeholder}, {placeholder}, {placeholder}, {placeholder}, {placeholder}, {placeholder}, {placeholder})
             ON CONFLICT (ticker) 
             DO UPDATE SET 
                 short_name = EXCLUDED.short_name,
                 report_text = EXCLUDED.report_text,
-                timestamp = CURRENT_TIMESTAMP,
+                timestamp = EXCLUDED.timestamp,
                 baseline_price = EXCLUDED.baseline_price,
                 baseline_pe = EXCLUDED.baseline_pe,
                 baseline_mcap = EXCLUDED.baseline_mcap,
@@ -129,6 +130,7 @@ def save_report_to_archive(stock_data: dict, report_text: str, announcement: str
             clean_sym, 
             short_name, 
             report_text,
+            now_ts,
             curr_price,
             pe,
             mcap,
@@ -138,13 +140,14 @@ def save_report_to_archive(stock_data: dict, report_text: str, announcement: str
 
         # 2. Append-Only Historical Archiving for Differential Tracking Engine
         query_revision = f'''
-            INSERT INTO report_revisions (ticker, short_name, report_text, baseline_price, baseline_pe, baseline_mcap, latest_announcement, revision_trigger, citations_json)
-            VALUES ({placeholder}, {placeholder}, {placeholder}, {placeholder}, {placeholder}, {placeholder}, {placeholder}, {placeholder}, {placeholder})
+            INSERT INTO report_revisions (ticker, short_name, report_text, timestamp, baseline_price, baseline_pe, baseline_mcap, latest_announcement, revision_trigger, citations_json)
+            VALUES ({placeholder}, {placeholder}, {placeholder}, {placeholder}, {placeholder}, {placeholder}, {placeholder}, {placeholder}, {placeholder}, {placeholder})
         '''
         cursor.execute(query_revision, (
             clean_sym,
             short_name,
             report_text,
+            now_ts,
             curr_price,
             pe,
             mcap,
@@ -192,6 +195,7 @@ def save_report_to_archive(stock_data: dict, report_text: str, announcement: str
                         "ticker": clean_sym,
                         "short_name": short_name,
                         "report_text": report_text,
+                        "timestamp": now_ts,
                         "baseline_price": curr_price,
                         "baseline_pe": str(pe or ""),
                         "baseline_mcap": mcap,

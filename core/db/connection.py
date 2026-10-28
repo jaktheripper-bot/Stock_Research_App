@@ -3,10 +3,15 @@
 import logging
 import os
 import threading
-from datetime import timezone, timedelta
+from datetime import datetime, timezone, timedelta
 from core.config import get_secret
 
 IST = timezone(timedelta(hours=5, minutes=30))
+
+
+def now_ist_iso() -> str:
+    """Returns current timestamp formatted in ISO-8601 IST with explicit +05:30 offset."""
+    return datetime.now(IST).strftime("%Y-%m-%d %H:%M:%S+05:30")
 logger = logging.getLogger("equity_research.core.db.connection")
 
 _DB_INITIALIZED = False
@@ -183,6 +188,7 @@ class _PooledConnectionProxy:
                 if self._pool is not None:
                     if not is_healthy or self._conn.closed != 0:
                         _CONN_LAST_OK.pop(id(self._conn), None)
+                        _CONN_TZ_SET.discard(id(self._conn))
                         self._pool.putconn(self._conn, close=True)
                     else:
                         import time
@@ -224,7 +230,19 @@ DB_POOL_MAX = int(os.environ.get("DB_POOL_MAX", "10"))
 _PG_POOLS = {}
 _PG_POOL_LOCK = threading.Lock()
 _CONN_LAST_OK = {}
+_CONN_TZ_SET = set()
 _CONN_FRESH_PROBE_TTL_SECONDS = 10.0
+
+
+def _ensure_pg_ist_timezone(conn) -> None:
+    """Sets PostgreSQL session timezone to Asia/Kolkata once per pooled socket so NOW()/CURRENT_TIMESTAMP use IST."""
+    cid = id(conn)
+    if cid in _CONN_TZ_SET:
+        return
+    with conn.cursor() as cur:
+        cur.execute("SET TIME ZONE 'Asia/Kolkata';")
+    conn.commit()
+    _CONN_TZ_SET.add(cid)
 
 def _get_pg_pool(dsn: str):
     """Thread-safe singleton ThreadedConnectionPool without Streamlit runtime dependency."""
@@ -254,6 +272,7 @@ def _acquire_connection_from_pool(pool):
             conn = pool.getconn()
             if conn.closed != 0:
                 _CONN_LAST_OK.pop(id(conn), None)
+                _CONN_TZ_SET.discard(id(conn))
                 try:
                     pool.putconn(conn, close=True)
                 except Exception as e:
@@ -268,18 +287,27 @@ def _acquire_connection_from_pool(pool):
                     conn.rollback()
                 except Exception as rb_err:
                     logger.debug(f"Connection pool post-probe rollback notice: {rb_err}")
+                _ensure_pg_ist_timezone(conn)
                 _CONN_LAST_OK[id(conn)] = now_mono
+            elif id(conn) not in _CONN_TZ_SET:
+                _ensure_pg_ist_timezone(conn)
             return conn
         except Exception:
             if conn:
                 _CONN_LAST_OK.pop(id(conn), None)
+                _CONN_TZ_SET.discard(id(conn))
                 try:
                     pool.putconn(conn, close=True)
                 except Exception as e:
                     logger.debug(f"Connection pool retry putconn notice: {e}")
     import psycopg2
     supabase_url = get_configured_supabase_url()
-    return psycopg2.connect(_normalize_pg_dsn(supabase_url), connect_timeout=10)
+    direct = psycopg2.connect(_normalize_pg_dsn(supabase_url), connect_timeout=10)
+    try:
+        _ensure_pg_ist_timezone(direct)
+    except Exception as tz_err:
+        logger.debug(f"Direct PG timezone init notice: {tz_err}")
+    return direct
 
 def get_db_path() -> str:
     """Returns the SQLite database path based on environment."""
@@ -318,6 +346,10 @@ def _get_raw_connection():
             try:
                 import psycopg2
                 direct_conn = psycopg2.connect(norm_url, connect_timeout=10)
+                try:
+                    _ensure_pg_ist_timezone(direct_conn)
+                except Exception as tz_err:
+                    logger.debug(f"Direct PG fallback timezone init notice: {tz_err}")
                 _PG_AVAILABLE = True
                 return _PooledConnectionProxy(None, direct_conn)
             except Exception as direct_err:

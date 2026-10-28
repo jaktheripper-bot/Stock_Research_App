@@ -81,12 +81,13 @@ def run_discovery_pipeline(
             raw_ts = existing.get("raw_timestamp") or existing.get("timestamp") or existing.get("created_at")
             if not needs_synthesis and raw_ts:
                 try:
-                    rep_date_str = str(raw_ts)[:10]
-                    rep_dt = datetime.strptime(rep_date_str, "%Y-%m-%d")
-                    age_days = (datetime.now(IST).replace(tzinfo=None) - rep_dt).days
-                    if age_days > 14:
-                        logger.info(f"Archived report for {ticker} is {age_days} days old (>14d threshold). Refreshing...")
-                        needs_synthesis = True
+                    from core.presentation.formatters import _coerce_datetime
+                    rep_dt = _coerce_datetime(raw_ts)
+                    if rep_dt is not None:
+                        age_days = (datetime.now(IST) - rep_dt).days
+                        if age_days > 14:
+                            logger.info(f"Archived report for {ticker} is {age_days} days old (>14d threshold). Refreshing...")
+                            needs_synthesis = True
                 except Exception as ts_err:
                     logger.debug(f"Timestamp parse notice for {ticker}: {ts_err}")
 

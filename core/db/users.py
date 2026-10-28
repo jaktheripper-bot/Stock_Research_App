@@ -19,9 +19,11 @@ from core.db.connection import (
     get_placeholder,
     init_db,
     IST,
+    now_ist_iso,
     is_postgres_connection,
 )
 from core.db.reports import _format_timestamp
+from core.presentation.formatters import _coerce_datetime
 
 logger = logging.getLogger("equity_research.core.db.users")
 
@@ -308,18 +310,9 @@ def deduct_user_credits(
             if sub_expires is None:
                 is_pro_active = True
             else:
-                now = datetime.now(timezone.utc)
-                if isinstance(sub_expires, str):
-                    try:
-                        exp_dt = datetime.fromisoformat(sub_expires.replace("Z", "+00:00"))
-                        is_pro_active = exp_dt > now
-                    except Exception as e:
-                        logger.debug("Failed parsing sub_expires in deduct_user_credits: %s", e)
-                        is_pro_active = True
-                elif hasattr(sub_expires, "tzinfo"):
-                    is_pro_active = sub_expires > now
-                else:
-                    is_pro_active = True
+                now = datetime.now(IST)
+                exp_dt = _coerce_datetime(sub_expires)
+                is_pro_active = exp_dt > now if exp_dt is not None else True
 
         # Pro Tier Entitlements: Price & Filing updates & PDF exports are uncapped / free
         if is_pro_active and action_type in ("SURGICAL_REFRESH", "PDF_EXPORT"):
@@ -336,7 +329,7 @@ def deduct_user_credits(
         # Atomic Credit Deduction: Single atomic SQL update directly gates deduction.
         # Eradicates Python-level check-then-act race conditions (natively prevents negative balances).
         cost = float(amount)
-        now_iso = datetime.now(timezone.utc).isoformat()
+        now_iso = now_ist_iso()
         use_pg = is_postgres_connection(conn)
 
         if use_pg:
@@ -599,7 +592,7 @@ def add_user_credits(
 
         # Handle Subscriptions (Pro Monthly / Annual)
         normalized_pack = pack_type.upper()
-        now_dt = datetime.now(timezone.utc)
+        now_dt = datetime.now(IST)
         if "PRO_MONTHLY" in normalized_pack:
             exp_date = now_dt + timedelta(days=30)
             cursor.execute(
@@ -1109,18 +1102,9 @@ def _format_user_record(row) -> Dict[str, Any]:
         if sub_expires is None:
             is_pro = True
         else:
-            now = datetime.now(timezone.utc)
-            if isinstance(sub_expires, str):
-                try:
-                    exp_dt = datetime.fromisoformat(sub_expires.replace("Z", "+00:00"))
-                    is_pro = exp_dt > now
-                except Exception as e:
-                    logger.debug("Failed parsing sub_expires in get_user_by_id: %s", e)
-                    is_pro = True
-            elif hasattr(sub_expires, "tzinfo"):
-                is_pro = sub_expires > now
-            else:
-                is_pro = True
+            now = datetime.now(IST)
+            exp_dt = _coerce_datetime(sub_expires)
+            is_pro = exp_dt > now if exp_dt is not None else True
 
     return {
         "id": row[0],

@@ -78,10 +78,40 @@ class TestEquityMetricsAndConsistency(unittest.TestCase):
         self.assertEqual(high_pe["status"], "elevated")
 
     def test_timestamp_and_52w_range_standardization(self):
-        """Verifies Unix epoch integers, ISO dates, and missing 52W ranges format uniformly."""
+        """Verifies Unix epoch integers, ISO dates, SQLite naive UTC, and IST strings format strictly in IST."""
+        import logging
+        from datetime import datetime, timezone
+        from core.db.connection import IST
+        from core.logging_config import _ISTLogFormatter
+        from core.audit.remediation_plan import generate_remediation_action_plan
+
         ts_str = format_standard_timestamp(1792870197)
         self.assertIn("IST", ts_str)
         self.assertNotEqual(ts_str, "1792870197")
+
+        # All representations of 2026-10-28 16:37:54 IST (= 11:07:54 UTC) must render identically
+        for variant in (
+            "2026-10-28 11:07:54",               # SQLite CURRENT_TIMESTAMP naive UTC
+            "2026-10-28 11:07:54+00:00",         # PostgreSQL UTC ISO
+            "2026-10-28T11:07:54Z",              # REST Z ISO
+            "2026-10-28 11:07:54 UTC",           # Explicit UTC label
+            "2026-10-28 16:37:54+05:30",         # Explicit IST ISO
+            "2026-10-28 16:37:54 IST",           # Explicit IST label
+            "28-10-2026 16:37 IST",              # Support ticket IST format
+            "28-Oct-2026 16:37 IST",             # User account IST format
+            datetime(2026, 10, 28, 11, 7, 54, tzinfo=timezone.utc),
+            datetime(2026, 10, 28, 16, 37, 54, tzinfo=IST),
+        ):
+            self.assertEqual(format_standard_timestamp(variant), "28 Oct 2026, 16:37 IST", f"Failed for {variant!r}")
+
+        # Audit action plan and log formatter must strictly emit IST
+        plan_md = generate_remediation_action_plan("AUD-20261028-180000", 100.0, [], {}, [])
+        self.assertIn("IST", plan_md.splitlines()[1])
+        self.assertNotIn("UTC", plan_md.splitlines()[1])
+
+        fmt = _ISTLogFormatter("%(asctime)s %(message)s")
+        rec = logging.LogRecord("test", logging.INFO, __file__, 1, "ping", (), None)
+        self.assertIn("IST", fmt.format(rec))
 
         self.assertEqual(format_standard_date("2026-10-25"), "25 Oct 2026")
         self.assertEqual(format_52w_range(None, None), "—")

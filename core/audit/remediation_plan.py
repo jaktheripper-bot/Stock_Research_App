@@ -11,9 +11,11 @@ Includes:
 - Closed-Loop Resolution Log (Empirically verified fixes with timestamps).
 """
 
-from datetime import datetime, timezone
+from datetime import datetime
 from pathlib import Path
 from typing import Dict, Any, List
+
+from core.db.connection import IST
 
 PROJECT_ROOT = Path(__file__).resolve().parent.parent.parent
 ACTION_PLAN_PATH = PROJECT_ROOT / "audits" / "REMEDIATION_ACTION_PLAN.md"
@@ -27,7 +29,7 @@ def generate_remediation_action_plan(
     resolved_in_cycle: List[Dict[str, Any]]
 ) -> str:
     """Generates the full markdown content for audits/REMEDIATION_ACTION_PLAN.md."""
-    now_utc = datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M:%S UTC")
+    now_ist = datetime.now(IST).strftime("%Y-%m-%d %H:%M:%S IST")
 
     # Determine health grade
     if composite_score >= 90.0:
@@ -55,7 +57,7 @@ def generate_remediation_action_plan(
 
     # 1. Header
     md = f"""# System Remediation Action Plan
-**Generated At:** {now_utc}  
+**Generated At:** {now_ist}  
 **Latest Audit Run:** `{audit_id}`  
 **Composite Health Score:** {badge} **{composite_score:.1f}/100** — *{grade}*  
 **Active Ledger Status:** `{total_open}` Open Items | `{resolved_total}` Resolved Total | **Total Aging Penalty:** `-{total_penalty:.1f} pts`  
@@ -155,7 +157,7 @@ Records items successfully re-tested in Step 1 (Verify First) and verified as RE
             inv = r.get("invariant_name", "")
             tgt = r.get("target_file_or_route", "")
             res_notes = r.get("notes") or r.get("remediation_notes") or "Empirically verified resolved in Verify-First pass."
-            md += f"| `{now_utc}` | `{inv}` (`{h}`) | `{tgt}` | {res_notes} |\n"
+            md += f"| `{now_ist}` | `{inv}` (`{h}`) | `{tgt}` | {res_notes} |\n"
     else:
         md += "\n> *No open findings were marked resolved during this execution pass.*\n"
 

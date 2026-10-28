@@ -388,14 +388,14 @@ def save_sovereign_benchmark(bench: Dict[str, Any]) -> bool:
                 INSERT INTO sovereign_benchmarks (
                     tenor_label, instrument_type, maturity_years, cut_off_yield,
                     auction_date, source, updated_at
-                ) VALUES ({p}, {p}, {p}, {p}, {p}, {p}, datetime('now'))
+                ) VALUES ({p}, {p}, {p}, {p}, {p}, {p}, (datetime('now', '+5 hours', '+30 minutes') || '+05:30'))
                 ON CONFLICT (tenor_label) DO UPDATE SET
                     instrument_type = excluded.instrument_type,
                     maturity_years = excluded.maturity_years,
                     cut_off_yield = excluded.cut_off_yield,
                     auction_date = excluded.auction_date,
                     source = excluded.source,
-                    updated_at = datetime('now');
+                    updated_at = (datetime('now', '+5 hours', '+30 minutes') || '+05:30');
             """
         params = (
             bench["tenor_label"],
@@ -658,14 +658,14 @@ def refresh_daily_sovereign_benchmarks(edition_date: Optional[str] = None) -> Di
             else:
                 q_macro = f"""
                     INSERT INTO sovereign_macro_rates (metric_key, metric_name, metric_value, unit, period_label, source, updated_at)
-                    VALUES ({p}, {p}, {p}, {p}, {p}, {p}, datetime('now'))
+                    VALUES ({p}, {p}, {p}, {p}, {p}, {p}, (datetime('now', '+5 hours', '+30 minutes') || '+05:30'))
                     ON CONFLICT (metric_key) DO UPDATE SET
                         metric_name = excluded.metric_name,
                         metric_value = excluded.metric_value,
                         unit = excluded.unit,
                         period_label = excluded.period_label,
                         source = excluded.source,
-                        updated_at = datetime('now');
+                        updated_at = (datetime('now', '+5 hours', '+30 minutes') || '+05:30');
                 """
             cursor.execute(q_macro, (m["metric_key"], metric_name_val, m["metric_value"], m["unit"], m["period_label"], m["source"]))
             macro_updated += 1
@@ -771,7 +771,7 @@ def save_sovereign_sdl_item(item: Dict[str, Any]) -> bool:
                     state_name, state_code, tenor_years, cut_off_yield,
                     spread_over_gsec_bps, fiscal_tier, debt_to_gsdp_pct,
                     auction_date, updated_at
-                ) VALUES ({p}, {p}, {p}, {p}, {p}, {p}, {p}, {p}, datetime('now'))
+                ) VALUES ({p}, {p}, {p}, {p}, {p}, {p}, {p}, {p}, (datetime('now', '+5 hours', '+30 minutes') || '+05:30'))
                 ON CONFLICT (state_name) DO UPDATE SET
                     state_code = excluded.state_code,
                     tenor_years = excluded.tenor_years,
@@ -780,7 +780,7 @@ def save_sovereign_sdl_item(item: Dict[str, Any]) -> bool:
                     fiscal_tier = excluded.fiscal_tier,
                     debt_to_gsdp_pct = excluded.debt_to_gsdp_pct,
                     auction_date = excluded.auction_date,
-                    updated_at = datetime('now');
+                    updated_at = (datetime('now', '+5 hours', '+30 minutes') || '+05:30');
             """
         params = (
             item["state_name"],
@@ -963,7 +963,7 @@ def save_etf_matrix_items(items: List[Dict[str, Any]]) -> int:
                     last_price, nav, premium_discount_pct, tracking_error_1y,
                     expense_ratio_pct, aum_crores, avg_daily_volume,
                     avg_daily_turnover_cr, liquidity_tier, scheme_code, isin, updated_at
-                ) VALUES ({p}, {p}, {p}, {p}, {p}, {p}, {p}, {p}, {p}, {p}, {p}, {p}, {p}, {p}, {p}, datetime('now'))
+                ) VALUES ({p}, {p}, {p}, {p}, {p}, {p}, {p}, {p}, {p}, {p}, {p}, {p}, {p}, {p}, {p}, (datetime('now', '+5 hours', '+30 minutes') || '+05:30'))
                 ON CONFLICT (symbol) DO UPDATE SET
                     scheme_name = excluded.scheme_name,
                     category = excluded.category,
@@ -979,7 +979,7 @@ def save_etf_matrix_items(items: List[Dict[str, Any]]) -> int:
                     liquidity_tier = excluded.liquidity_tier,
                     scheme_code = COALESCE(excluded.scheme_code, etf_matrix.scheme_code),
                     isin = COALESCE(excluded.isin, etf_matrix.isin),
-                    updated_at = datetime('now');
+                    updated_at = (datetime('now', '+5 hours', '+30 minutes') || '+05:30');
             """
 
         for item in items:

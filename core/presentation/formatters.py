@@ -12,13 +12,13 @@ Omni-Search, and Research Dossiers:
   across ISO strings, YYYY-MM-DD strings, datetime objects, and Unix epoch integers.
 """
 
-from datetime import date, datetime, timezone
+from datetime import date, datetime, timedelta, timezone
 import logging
 import math
 import re
 from typing import Any, Dict, Optional
 
-from core.db.connection import IST
+IST = timezone(timedelta(hours=5, minutes=30))
 
 logger = logging.getLogger("equity_research.core.presentation.formatters")
 
@@ -405,12 +405,12 @@ def format_52w_range(low_val: Any, high_val: Any) -> str:
 
 
 def _coerce_datetime(raw_ts: Any) -> Optional[datetime]:
-    """Parses datetime, date, ISO string, YYYY-MM-DD, or Unix epoch (sec/ms) into IST datetime."""
+    """Parses datetime, date, ISO string, IST/UTC-labelled string, YYYY-MM-DD, or Unix epoch into IST datetime."""
     if raw_ts is None or raw_ts == "":
         return None
     try:
         if isinstance(raw_ts, datetime):
-            dt = raw_ts if raw_ts.tzinfo else raw_ts.replace(tzinfo=IST)
+            dt = raw_ts if raw_ts.tzinfo else raw_ts.replace(tzinfo=timezone.utc)
             return dt.astimezone(IST)
         if isinstance(raw_ts, date):
             return datetime(raw_ts.year, raw_ts.month, raw_ts.day, tzinfo=IST)
@@ -423,7 +423,7 @@ def _coerce_datetime(raw_ts: Any) -> Optional[datetime]:
             return None
 
         s = str(raw_ts).strip()
-        if not s:
+        if not s or s.upper() in ("N/A", "NA", "NONE", "NULL", "—", "-"):
             return None
         if re.fullmatch(r"\d{10}(?:\.\d+)?", s):
             return datetime.fromtimestamp(float(s), tz=timezone.utc).astimezone(IST)
@@ -433,10 +433,39 @@ def _coerce_datetime(raw_ts: Any) -> Optional[datetime]:
             d = datetime.strptime(s, "%Y-%m-%d")
             return d.replace(tzinfo=IST)
 
+        if re.search(r"\s+IST$", s, flags=re.IGNORECASE):
+            body = re.sub(r"\s+IST$", "", s, flags=re.IGNORECASE).strip()
+            for fmt in (
+                "%Y-%m-%d %H:%M:%S",
+                "%Y-%m-%d %H:%M",
+                "%d %b %Y, %H:%M",
+                "%d %B %Y, %H:%M",
+                "%d %B %Y, %I:%M %p",
+                "%d-%m-%Y %H:%M",
+                "%d-%b-%Y %H:%M",
+            ):
+                try:
+                    return datetime.strptime(body, fmt).replace(tzinfo=IST)
+                except ValueError:
+                    continue
+            dt_ist = datetime.fromisoformat(body)
+            return (dt_ist if dt_ist.tzinfo else dt_ist.replace(tzinfo=IST)).astimezone(IST)
+
+        if re.search(r"\s+(?:UTC|GMT)$", s, flags=re.IGNORECASE):
+            body = re.sub(r"\s+(?:UTC|GMT)$", "", s, flags=re.IGNORECASE).strip()
+            for fmt in ("%Y-%m-%d %H:%M:%S", "%Y-%m-%d %H:%M", "%d %b %Y, %H:%M"):
+                try:
+                    return datetime.strptime(body, fmt).replace(tzinfo=timezone.utc).astimezone(IST)
+                except ValueError:
+                    continue
+            dt_utc = datetime.fromisoformat(body)
+            return (dt_utc if dt_utc.tzinfo else dt_utc.replace(tzinfo=timezone.utc)).astimezone(IST)
+
         iso_clean = s.replace("Z", "+00:00")
         dt = datetime.fromisoformat(iso_clean)
         if not dt.tzinfo:
-            dt = dt.replace(tzinfo=IST)
+            # SQLite CURRENT_TIMESTAMP / datetime('now') produces naive UTC strings
+            dt = dt.replace(tzinfo=timezone.utc)
         return dt.astimezone(IST)
     except Exception as err:
         logger.debug("Date coercion notice for %r: %s", raw_ts, err)

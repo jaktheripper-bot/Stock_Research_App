@@ -338,7 +338,9 @@ def process_successful_payment(
         )
         return True, current_bal, existing_inv, "Payment already processed (idempotent replay). Balance preserved."
 
-    inv_number = f"INV-{time.strftime('%Y%m')}-{int(time.time()) % 100000:05d}"
+    from datetime import datetime
+    from core.db.connection import IST
+    inv_number = f"INV-{datetime.now(IST).strftime('%Y%m')}-{int(time.time()) % 100000:05d}"
     success, new_balance = add_user_credits(
         user_id=user_id,
         amount_inr=float(plan["amount_inr"]),

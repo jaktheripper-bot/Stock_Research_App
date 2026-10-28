@@ -11,7 +11,7 @@ from decimal import Decimal
 from datetime import datetime, date, timezone
 from typing import Optional, List, Dict, Any
 
-from core.db.connection import get_db_connection, get_supabase_url, is_postgres_connection, is_postgres_active
+from core.db.connection import get_db_connection, get_supabase_url, is_postgres_connection, is_postgres_active, IST, now_ist_iso
 
 def is_supabase_enabled() -> bool:
     return bool(get_supabase_url() and is_postgres_active())
@@ -103,7 +103,7 @@ def create_or_get_agent_conversation(
             query = """
                 INSERT INTO agent_conversations (
                     conversation_id, user_id, agent_type, context_ticker, turn_count, total_tokens, created_at, updated_at
-                ) VALUES (?, ?, ?, ?, 0, 0, datetime('now'), datetime('now'));
+                ) VALUES (?, ?, ?, ?, 0, 0, (datetime('now', '+5 hours', '+30 minutes') || '+05:30'), (datetime('now', '+5 hours', '+30 minutes') || '+05:30'));
             """
             cursor.execute(query, (conversation_id, user_id, agent_type, context_ticker))
             cursor.execute("SELECT * FROM agent_conversations WHERE conversation_id = ?;", (conversation_id,))
@@ -153,11 +153,11 @@ def append_conversation_turn(
             cursor.execute("""
                 INSERT INTO agent_conversation_turns (
                     conversation_id, turn_index, sender_role, content, tool_calls_json, created_at
-                ) VALUES (?, ?, ?, ?, ?, datetime('now'));
+                ) VALUES (?, ?, ?, ?, ?, (datetime('now', '+5 hours', '+30 minutes') || '+05:30'));
             """, (conversation_id, turn_index, sender_role, content, tool_calls_json))
             cursor.execute("""
                 UPDATE agent_conversations
-                SET turn_count = turn_count + 1, updated_at = datetime('now')
+                SET turn_count = turn_count + 1, updated_at = (datetime('now', '+5 hours', '+30 minutes') || '+05:30')
                 WHERE conversation_id = ?;
             """, (conversation_id,))
 
@@ -209,7 +209,7 @@ def record_autonomous_event(
     conn = get_db_connection()
     cursor = conn.cursor()
     use_pg = is_postgres_connection(conn)
-    event_id = f"EVT-{datetime.now(timezone.utc).strftime('%Y%m%d%H%M%S')}-{os.urandom(3).hex()}"
+    event_id = f"EVT-{datetime.now(IST).strftime('%Y%m%d%H%M%S')}-{os.urandom(3).hex()}"
     metadata_json = json.dumps(metadata or {})
 
     try:
@@ -223,8 +223,8 @@ def record_autonomous_event(
             cursor.execute("""
                 INSERT INTO autonomous_event_ledger (
                     event_id, event_type, ticker, trigger_source, action_taken, summary, metadata_json, created_at
-                ) VALUES (?, ?, ?, ?, ?, ?, ?, datetime('now'));
-            """, (event_id, event_type, ticker, trigger_source, action_taken, summary, metadata_json))
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?);
+            """, (event_id, event_type, ticker, trigger_source, action_taken, summary, metadata_json, now_ist_iso()))
         conn.commit()
         return event_id
     except Exception as e:

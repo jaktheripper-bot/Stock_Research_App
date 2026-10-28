@@ -5,7 +5,7 @@ import json
 import logging
 from typing import Optional, Dict, Any
 from normalizer import clean_ticker
-from core.db.connection import init_db, get_db_connection, get_placeholder
+from core.db.connection import init_db, get_db_connection, get_placeholder, now_ist_iso
 from core.presentation.formatters import normalize_de_ratio, normalize_pe_raw
 
 logger = logging.getLogger("equity_research.core.db.fundamentals")
@@ -471,6 +471,7 @@ def save_cached_fundamentals(ticker: str, data: Dict[str, Any], force_overwrite:
     )
 
     try:
+        now_ts = now_ist_iso()
         query = f"""
             INSERT INTO cached_fundamentals (
                 ticker, company_name, sector, industry, current_price, market_cap,
@@ -480,7 +481,7 @@ def save_cached_fundamentals(ticker: str, data: Dict[str, Any], force_overwrite:
             VALUES (
                 {placeholder}, {placeholder}, {placeholder}, {placeholder}, {placeholder}, {placeholder},
                 {placeholder}, {placeholder}, {placeholder}, {placeholder}, {placeholder}, {placeholder},
-                {placeholder}, {placeholder}, {placeholder}, {placeholder}, {placeholder}, CURRENT_TIMESTAMP
+                {placeholder}, {placeholder}, {placeholder}, {placeholder}, {placeholder}, {placeholder}
             )
             ON CONFLICT (ticker)
             DO UPDATE SET
@@ -500,12 +501,12 @@ def save_cached_fundamentals(ticker: str, data: Dict[str, Any], force_overwrite:
                 fifty_two_week_high = COALESCE(EXCLUDED.fifty_two_week_high, cached_fundamentals.fifty_two_week_high),
                 fifty_two_week_low = COALESCE(EXCLUDED.fifty_two_week_low, cached_fundamentals.fifty_two_week_low),
                 source = EXCLUDED.source,
-                updated_at = CURRENT_TIMESTAMP;
+                updated_at = EXCLUDED.updated_at;
         """
         cursor.execute(query, (
             clean, company_name, sector, industry, curr_price, market_cap,
             pe_ratio, forward_pe, pb_ratio, ev_ebitda, roce, roe, opm,
-            de, h52, l52, source
+            de, h52, l52, source, now_ts
         ))
         conn.commit()
     except Exception as e:

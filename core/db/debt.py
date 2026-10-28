@@ -10,7 +10,7 @@ from decimal import Decimal
 from datetime import datetime, date, timezone
 from typing import Optional, List, Dict, Any
 
-from core.db.connection import get_db_connection, get_supabase_url, is_postgres_connection, is_postgres_active
+from core.db.connection import get_db_connection, get_supabase_url, is_postgres_connection, is_postgres_active, IST
 from core.db.debt_universe import (
     CANONICAL_DEBT_UNIVERSE,
     CANONICAL_DEBT_BY_ISIN,
@@ -153,7 +153,7 @@ def save_debt_security(sec: Dict[str, Any]) -> bool:
                 ) VALUES (
                     ?, ?, ?, ?, ?, ?, ?, ?, ?, ?,
                     ?, ?, ?, ?, ?, ?, ?, ?, ?, ?,
-                    ?, ?, ?, ?, ?, datetime('now')
+                    ?, ?, ?, ?, ?, (datetime('now', '+5 hours', '+30 minutes') || '+05:30')
                 )
                 ON CONFLICT(isin) DO UPDATE SET
                     ticker=excluded.ticker,
@@ -179,7 +179,7 @@ def save_debt_security(sec: Dict[str, Any]) -> bool:
                     macaulay_duration_years=excluded.macaulay_duration_years,
                     modified_duration_years=excluded.modified_duration_years,
                     metadata_json=excluded.metadata_json,
-                    last_updated=datetime('now');
+                    last_updated=(datetime('now', '+5 hours', '+30 minutes') || '+05:30');
             """
             cursor.execute(query, (
                 isin, ticker, scrip_code, series, instrument_name, instrument_type,
@@ -434,7 +434,7 @@ def record_rating_event(event: Dict[str, Any]) -> bool:
     rating_symbol = event.get("rating_symbol", "AAA").upper()
     outlook = event.get("outlook", "STABLE").upper()
     action_type = event.get("action_type", "AFFIRMED").upper()
-    event_date = event.get("event_date", date.today().isoformat())
+    event_date = event.get("event_date", datetime.now(IST).date().isoformat())
     action_rationale = event.get("action_rationale", "")
 
     try:
@@ -451,7 +451,7 @@ def record_rating_event(event: Dict[str, Any]) -> bool:
                 INSERT INTO credit_rating_events (
                     isin, ticker, rating_agency, rating_symbol, outlook,
                     action_type, event_date, action_rationale, created_at
-                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, datetime('now'))
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, (datetime('now', '+5 hours', '+30 minutes') || '+05:30'))
             """
             cursor.execute(sql, (isin, ticker, rating_agency, rating_symbol, outlook, action_type, event_date, action_rationale))
         conn.commit()
@@ -522,7 +522,7 @@ def seed_default_debt_securities() -> int:
                 "rating_symbol": clean_rating.strip(),
                 "outlook": "STABLE",
                 "action_type": "AFFIRMED",
-                "event_date": s.get("issue_date", date.today().isoformat()),
+                "event_date": s.get("issue_date", datetime.now(IST).date().isoformat()),
                 "action_rationale": f"Initial benchmark rating assigned upon listing on {s.get('exchange', 'BSE')} debt segment."
             })
     logger.info(f"Seeded {count} benchmark corporate debt securities from canonical universe.")

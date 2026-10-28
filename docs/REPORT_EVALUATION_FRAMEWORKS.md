@@ -1,7 +1,7 @@
 # Multi-Asset Institutional Report Evaluation Frameworks, Data Sources & Operational Flows Specification
 
 **Document Identifier:** `docs/REPORT_EVALUATION_FRAMEWORKS.md`  
-**Document Version:** 3.4.0 | **Effective Date:** 2026-10-28  
+**Document Version:** 3.5.0 | **Effective Date:** 2026-10-28  
 **Target System:** `Stock Research App` (`main` branch)  
 **Compliance Standards:** 
 * SEBI (Research Analysts) Regulations, 2014 Section 2(u) — Factual Non-Advisory Safe Harbor
@@ -45,6 +45,14 @@ Every numerical metric, order book depth, corporate filing, and regulatory discl
 | **11. Peer Comparison** (`/compare`) | **Dual-Binding Database** (`reports.db` + Supabase) | Multi-entity relational query with dynamic 3-axis disparity gating | Live Angel One quote enrichment | Instant cached query (< 15ms) | 🟢 **FACTUAL COMPARISON** |
 | **12. Forensic Intelligence Desk** (`/api/copilot/chat`) | **Google Gemini 3.8 Flash / 2.5 Flash** (via `google-genai` SDK) & **Deterministic Forensic Engine** | Tier-gated execution: Gemini LLM for Unlocked Deep Dives & Pro Subscribers; Deterministic Rule Engine for Free Tier | Rule-based deterministic fallback on API 403 / offline; Input qualification layer rejects gibberish | Ephemeral multi-turn context; stateless server execution | 🟢 **SAFE HARBOR SECTION 2(u)**<br>Deterministic refusal of Buy/Sell inquiries; factual diagnostics only. |
 | **13. 7-Asset Omni-Product Search & Discovery Index** (`/search`, `/api/search/products`) | **Unified 7-Asset Statutory Registry Index** (`core/search/product_search.py`) | Parameterized dual-binding SQL (4-worker parallel `ThreadPoolExecutor` category fan-out when `is_postgres_active()` is `True`) + in-memory scrip/scheme indices across Equities (`reports`, `cached_fundamentals`, `bse_master`), Mutual Funds (`mutual_fund_schemes`, AMFI master), ETFs (`etf_matrix`), Corporate Debt (`corporate_debt_securities`), REITs/InvITs/SGBs (`reits_and_invits`, `sgb_tranches`), Sovereign Curve/SDLs (`sovereign_yield_curve`, `sovereign_sdl_matrix`), and Unlisted MSMEs (`msme_firms`, Udyam clusters) | 6-digit BSE scrip code (`resolve_canonical_symbol`), `PRIMARY_BSE_MAP`, and `bse_scrips_cache.json` fallback | Instant cached API response (`120s` HTTP cache on `/api/search/products`; zero LLM calls) | 🟢 **FACTUAL NAVIGATION INDEX**<br>Pure registry lookup with `format_pe_multiple` sentinel normalization and test-row exclusion. |
+
+### 1.1 Platform-Wide IST (`Asia/Kolkata`, `UTC+05:30`) Temporal Invariant
+
+All database storage, delta-gating comparisons, scheduler triggers, audit dossiers, log records, and client/UI formatting operate strictly in **Indian Standard Time (`IST`, `Asia/Kolkata`, `UTC+05:30`)**:
+
+1. **PostgreSQL & SQLite Dual-Engine Persistence (`core/db/connection.py`):** Pooled and direct PostgreSQL connections execute `SET TIME ZONE 'Asia/Kolkata';` (`_ensure_pg_ist_timezone`), and all application writes bind explicit `+05:30` ISO-8601 strings via `now_ist_iso()` (`YYYY-MM-DD HH:MM:SS+05:30`). SQLite SQL-inline timestamp expressions use `(datetime('now', '+5 hours', '+30 minutes') || '+05:30')`, and cross-offset lease/expiry comparisons (`core/db/distributed_lock.py`, `core/db/digest.py`) normalize ISO strings via `datetime(col) < datetime(?)`.
+2. **Canonical Coercion & Provenance Display (`core/presentation/formatters.py`):** `_coerce_datetime()` converts naive datetime strings (such as legacy SQLite `CURRENT_TIMESTAMP` UTC outputs), `Z` / `+00:00` / `UTC` / `GMT` timestamps, and Unix epochs into `IST` (`DD Mon YYYY, HH:MM IST`), while preserving date-only `YYYY-MM-DD` strings and `date` objects as exact `IST` calendar dates (`DD Mon YYYY`) with zero day-rollover drift.
+3. **Observability, Audit Artifacts & Client Formatting:** Console/application logs format timestamps via `_ISTLogFormatter` (`YYYY-MM-DD HH:MM:SS,mmm IST`), `project_auditor.py` and `remediation_plan.py` emit IST-stamped `AUD-YYYYMMDD-HHMMSS` dossiers and `REMEDIATION_ACTION_PLAN.md` headers, client scripts (`main.js`, `copilot.js`, `opportunity_terminal.js`) format dates using `timeZone: 'Asia/Kolkata'`, `Dockerfile` sets `ENV TZ=Asia/Kolkata`, and `run.sh backup` stamps backup directories in `IST`.
 
 ---
 

@@ -861,7 +861,7 @@ def ingest_daily_msme_cohort(edition_date: Optional[str] = None, count: int = 15
                 uin, name, sector_code, sector_name, city, state,
                 annual_turnover, employee_count, registration_date, source, last_updated
             ) VALUES (
-                ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, datetime('now')
+                ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, (datetime('now', '+5 hours', '+30 minutes') || '+05:30')
             )
             ON CONFLICT(uin) DO UPDATE SET
                 name = excluded.name,
@@ -873,7 +873,7 @@ def ingest_daily_msme_cohort(edition_date: Optional[str] = None, count: int = 15
                 employee_count = excluded.employee_count,
                 registration_date = excluded.registration_date,
                 source = excluded.source,
-                last_updated = datetime('now')
+                last_updated = (datetime('now', '+5 hours', '+30 minutes') || '+05:30')
         """
 
     ingested_count = 0

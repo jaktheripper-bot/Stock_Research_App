@@ -9,8 +9,10 @@ import threading
 import time
 from collections import defaultdict, deque
 from contextlib import contextmanager
-from datetime import datetime, timezone
+from datetime import datetime
 from typing import Deque, Dict, Iterator, Tuple
+
+from core.db.connection import IST
 
 logger = logging.getLogger(__name__)
 
@@ -30,7 +32,7 @@ _INFLIGHT_META_LOCK = threading.Lock()
 # Daemon daily spend tracking (in-memory with daily rollover)
 _DAEMON_SPEND_LOCK = threading.Lock()
 _DAEMON_DAILY_SPEND_USD: float = 0.0
-_DAEMON_SPEND_DATE: str = datetime.now(timezone.utc).strftime("%Y-%m-%d")
+_DAEMON_SPEND_DATE: str = datetime.now(IST).strftime("%Y-%m-%d")
 
 MAX_COPILOT_TURNS_PER_USER_HOUR = int(os.environ.get("MAX_COPILOT_TURNS_PER_USER_HOUR", "40"))
 MAX_SYNTHESIS_PER_USER_HOUR = int(os.environ.get("MAX_SYNTHESIS_PER_USER_HOUR", "20"))
@@ -53,13 +55,13 @@ def reset_qos_windows_for_test() -> None:
     with _DAEMON_SPEND_LOCK:
         global _DAEMON_DAILY_SPEND_USD, _DAEMON_SPEND_DATE
         _DAEMON_DAILY_SPEND_USD = 0.0
-        _DAEMON_SPEND_DATE = datetime.now(timezone.utc).strftime("%Y-%m-%d")
+        _DAEMON_SPEND_DATE = datetime.now(IST).strftime("%Y-%m-%d")
 
 
 def record_daemon_spend_usd(amount_usd: float) -> None:
     """Records daemon LLM spend for the current day."""
     global _DAEMON_DAILY_SPEND_USD, _DAEMON_SPEND_DATE
-    today_str = datetime.now(timezone.utc).strftime("%Y-%m-%d")
+    today_str = datetime.now(IST).strftime("%Y-%m-%d")
     with _DAEMON_SPEND_LOCK:
         if _DAEMON_SPEND_DATE != today_str:
             _DAEMON_SPEND_DATE = today_str
@@ -69,7 +71,7 @@ def record_daemon_spend_usd(amount_usd: float) -> None:
 
 def get_daemon_daily_spend_usd() -> float:
     """Retrieves current recorded daemon spend in USD for today."""
-    today_str = datetime.now(timezone.utc).strftime("%Y-%m-%d")
+    today_str = datetime.now(IST).strftime("%Y-%m-%d")
     with _DAEMON_SPEND_LOCK:
         if _DAEMON_SPEND_DATE != today_str:
             return 0.0

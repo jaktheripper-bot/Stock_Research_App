@@ -125,9 +125,10 @@ class TestStatefulRemediationLedger(unittest.TestCase):
         cur = conn.cursor()
         use_pg = is_postgres_connection(conn)
         try:
-            # Insert item simulated from 4 days ago
-            now_utc = datetime.now(timezone.utc)
-            four_days_ago = (now_utc - timedelta(days=4, hours=2)).strftime("%Y-%m-%d %H:%M:%S")
+            # Insert item simulated from 4 days ago in IST
+            from core.db.connection import IST
+            now_ist = datetime.now(IST)
+            four_days_ago = (now_ist - timedelta(days=4, hours=2)).strftime("%Y-%m-%d %H:%M:%S+05:30")
             h_4d = compute_finding_hash("BACKEND_STABILITY", "INV_TEST", "aging_4d")
 
             if use_pg:
@@ -144,11 +145,11 @@ class TestStatefulRemediationLedger(unittest.TestCase):
                         finding_hash, category, invariant_name, title, description,
                         target_file_or_route, severity, status, verification_attempts,
                         consecutive_failures, first_detected_at, last_verified_at
-                    ) VALUES (?, 'BACKEND_STABILITY', 'INV_TEST', 'Aging 4d', 'Desc', 'target', 'HIGH', 'OPEN', 4, 4, ?, datetime('now'));
+                    ) VALUES (?, 'BACKEND_STABILITY', 'INV_TEST', 'Aging 4d', 'Desc', 'target', 'HIGH', 'OPEN', 4, 4, ?, (datetime('now', '+5 hours', '+30 minutes') || '+05:30'));
                 """, (h_4d, four_days_ago))
 
-            # Insert item simulated from 8 days ago
-            eight_days_ago = (now_utc - timedelta(days=8, hours=1)).strftime("%Y-%m-%d %H:%M:%S")
+            # Insert item simulated from 8 days ago in IST
+            eight_days_ago = (now_ist - timedelta(days=8, hours=1)).strftime("%Y-%m-%d %H:%M:%S+05:30")
             h_8d = compute_finding_hash("SECURITY_VULNERABILITY", "INV_SEC", "aging_8d")
             if use_pg:
                 cur.execute("""
@@ -164,7 +165,7 @@ class TestStatefulRemediationLedger(unittest.TestCase):
                         finding_hash, category, invariant_name, title, description,
                         target_file_or_route, severity, status, verification_attempts,
                         consecutive_failures, first_detected_at, last_verified_at
-                    ) VALUES (?, 'SECURITY_VULNERABILITY', 'INV_SEC', 'Aging 8d', 'Desc', 'target', 'CRITICAL', 'OPEN', 8, 8, ?, datetime('now'));
+                    ) VALUES (?, 'SECURITY_VULNERABILITY', 'INV_SEC', 'Aging 8d', 'Desc', 'target', 'CRITICAL', 'OPEN', 8, 8, ?, (datetime('now', '+5 hours', '+30 minutes') || '+05:30'));
                 """, (h_8d, eight_days_ago))
 
             conn.commit()

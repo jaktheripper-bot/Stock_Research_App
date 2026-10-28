@@ -69,23 +69,11 @@ def is_report_fresh(cached_report: Dict[str, Any], max_age_days: int = 14) -> bo
     if not raw_ts:
         return False
     try:
-        if isinstance(raw_ts, datetime):
-            dt = raw_ts
-        elif isinstance(raw_ts, (int, float)):
-            dt = datetime.fromtimestamp(float(raw_ts), tz=timezone.utc)
-        elif isinstance(raw_ts, str):
-            clean_ts = raw_ts.replace("Z", "+00:00").strip()
-            if clean_ts.isdigit():
-                dt = datetime.fromtimestamp(float(clean_ts), tz=timezone.utc)
-            elif " " in clean_ts and "T" not in clean_ts:
-                dt = datetime.strptime(clean_ts[:19], "%Y-%m-%d %H:%M:%S")
-            else:
-                dt = datetime.fromisoformat(clean_ts)
-        else:
+        from core.presentation.formatters import _coerce_datetime
+        dt = _coerce_datetime(raw_ts)
+        if dt is None:
             return False
-        if dt.tzinfo is None:
-            dt = dt.replace(tzinfo=timezone.utc)
-        now = datetime.now(timezone.utc)
+        now = datetime.now(IST)
         return (now - dt).days < max_age_days
     except Exception:
         return False

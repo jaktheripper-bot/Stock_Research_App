@@ -855,7 +855,7 @@ def save_reit_or_invit(reit: Dict[str, Any]) -> bool:
                     discount_to_nav_pct, distribution_yield_pct, occupancy_pct,
                     ndcf_payout_purity_pct, ltv_ratio_pct, wale_years,
                     sponsor_holding_pct, sebi_compliant, details_json, updated_at
-                ) VALUES ({p}, {p}, {p}, {p}, {p}, {p}, {p}, {p}, {p}, {p}, {p}, {p}, {p}, {p}, datetime('now'))
+                ) VALUES ({p}, {p}, {p}, {p}, {p}, {p}, {p}, {p}, {p}, {p}, {p}, {p}, {p}, {p}, (datetime('now', '+5 hours', '+30 minutes') || '+05:30'))
                 ON CONFLICT (symbol) DO UPDATE SET
                     name = excluded.name,
                     structure_type = excluded.structure_type,
@@ -870,7 +870,7 @@ def save_reit_or_invit(reit: Dict[str, Any]) -> bool:
                     sponsor_holding_pct = excluded.sponsor_holding_pct,
                     sebi_compliant = excluded.sebi_compliant,
                     details_json = excluded.details_json,
-                    updated_at = datetime('now');
+                    updated_at = (datetime('now', '+5 hours', '+30 minutes') || '+05:30');
             """
         params = (
             reit["symbol"].upper(),
@@ -917,7 +917,7 @@ def _normalize_reit_item(reit: Dict[str, Any]) -> Dict[str, Any]:
         else:
             det = {}
     item["details"] = det
-    item.setdefault("updated_at", datetime.now(IST).strftime("%Y-%m-%d %H:%M:%S"))
+    item.setdefault("updated_at", datetime.now(IST).strftime("%Y-%m-%d %H:%M:%S+05:30"))
     return item
 
 
@@ -1109,7 +1109,7 @@ def save_sgb_tranche(sgb: Dict[str, Any]) -> bool:
                     spot_gold_price, discount_to_spot_pct, annual_coupon_rate,
                     maturity_date, ytm_annualized_pct, tax_treatment,
                     etf_tax_adjusted_spread_pct, updated_at
-                ) VALUES ({p}, {p}, {p}, {p}, {p}, {p}, {p}, {p}, {p}, {p}, {p}, datetime('now'))
+                ) VALUES ({p}, {p}, {p}, {p}, {p}, {p}, {p}, {p}, {p}, {p}, {p}, (datetime('now', '+5 hours', '+30 minutes') || '+05:30'))
                 ON CONFLICT (symbol) DO UPDATE SET
                     series_name = excluded.series_name,
                     issue_price = excluded.issue_price,
@@ -1121,7 +1121,7 @@ def save_sgb_tranche(sgb: Dict[str, Any]) -> bool:
                     ytm_annualized_pct = excluded.ytm_annualized_pct,
                     tax_treatment = excluded.tax_treatment,
                     etf_tax_adjusted_spread_pct = excluded.etf_tax_adjusted_spread_pct,
-                    updated_at = datetime('now');
+                    updated_at = (datetime('now', '+5 hours', '+30 minutes') || '+05:30');
             """
         params = (
             sgb["symbol"].upper(),

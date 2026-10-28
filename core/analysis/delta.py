@@ -3,10 +3,12 @@
 import os
 import re
 import logging
-from datetime import datetime, timezone
+from datetime import datetime
 from google import genai
 
 from core.db import save_report_to_archive
+from core.db.connection import IST
+from core.presentation.formatters import _coerce_datetime
 from core.analysis.fundamentals import fetch_latest_bse_announcement, compute_deterministic_technical_context
 from core.analysis.dossier_report_synthesis import get_light_flash_model
 from core.brand.moatnomics_house import get_system_prompt_context
@@ -45,11 +47,8 @@ def evaluate_material_change(cached: dict, live_fund: dict, scrip_code: str) -> 
     raw_ts = cached.get("raw_timestamp")
     if raw_ts:
         try:
-            ts = raw_ts if isinstance(raw_ts, datetime) else datetime.fromisoformat(str(raw_ts).replace("Z", "+00:00"))
-            now = datetime.now(timezone.utc)
-            if ts.tzinfo is None:
-                ts = ts.replace(tzinfo=timezone.utc)
-            if (now - ts).total_seconds() / 86400.0 > 14:
+            ts = _coerce_datetime(raw_ts)
+            if ts is not None and (datetime.now(IST) - ts).total_seconds() / 86400.0 > 14:
                 return True, "Regenerated: Report exceeded 14-day freshness window", "", "EXPIRED"
         except Exception as e:
             logger.debug(f"Timestamp freshness check notice: {e}")

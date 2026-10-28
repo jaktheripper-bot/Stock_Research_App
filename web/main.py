@@ -2811,8 +2811,9 @@ async def favicon_ico():
 @app.get("/sitemap.xml", response_class=Response)
 async def sitemap_xml():
     """Generates automated XML sitemap for Google/Perplexity/Bing search crawlers."""
+    from core.presentation.formatters import _coerce_datetime
     archives = get_archived_reports_sync()
-    now_iso = datetime.now(timezone.utc).strftime("%Y-%m-%d")
+    now_iso = datetime.now(IST).strftime("%Y-%m-%d")
 
     base_url = (os.environ.get("CANONICAL_DOMAIN") or "https://moatnomics.com").rstrip("/")
     xml_lines = [
@@ -2846,15 +2847,8 @@ async def sitemap_xml():
         if t:
             raw_ts = a.get("raw_timestamp")
             if raw_ts:
-                try:
-                    if isinstance(raw_ts, str):
-                        dt = datetime.fromisoformat(raw_ts.replace('Z', '+00:00'))
-                    else:
-                        dt = raw_ts
-                    lastmod_date = dt.astimezone(timezone.utc).strftime("%Y-%m-%d")
-                except Exception as e:
-                    logger.debug("Failed parsing raw_ts for sitemap: %s", e)
-                    lastmod_date = now_iso
+                dt = _coerce_datetime(raw_ts)
+                lastmod_date = dt.strftime("%Y-%m-%d") if dt else now_iso
             else:
                 lastmod_date = now_iso
             xml_lines.append(
@@ -3034,7 +3028,7 @@ async def llms_full_txt():
 async def security_txt():
     """RFC 9116 Vulnerability Disclosure Policy pointing strictly to the on-site support desk."""
     base_url = (os.environ.get("CANONICAL_DOMAIN") or "https://moatnomics.com").rstrip("/")
-    expires_iso = (datetime.now(timezone.utc) + timedelta(days=365)).strftime("%Y-%m-%dT00:00:00.000Z")
+    expires_iso = (datetime.now(IST) + timedelta(days=365)).strftime("%Y-%m-%dT00:00:00+05:30")
     content = (
         f"Contact: {base_url}/contact\n"
         f"Expires: {expires_iso}\n"

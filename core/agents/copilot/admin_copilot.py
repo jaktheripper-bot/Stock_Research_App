@@ -30,6 +30,7 @@ from datetime import datetime, timezone
 from typing import Dict, Any, List, Optional, Tuple
 
 from core.config import get_secret
+from core.db.connection import IST
 from core.brand.moatnomics_house import get_system_prompt_context, MOATNOMICS_BRAND_HOUSE
 from core.db import (
     init_db,
@@ -558,7 +559,7 @@ def create_action_proposal(
         "payload": payload,
         "requires_confirmation": True,
         "status": "AWAITING_CONFIRMATION",
-        "created_at": datetime.now(timezone.utc).isoformat()
+        "created_at": datetime.now(IST).isoformat()
     }
 
 

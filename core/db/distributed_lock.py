@@ -8,10 +8,10 @@ import os
 import socket
 import uuid
 from contextlib import contextmanager
-from datetime import datetime, timedelta, timezone
+from datetime import datetime, timedelta
 from typing import Iterator
 
-from core.db.connection import get_connection, get_placeholder
+from core.db.connection import get_connection, get_placeholder, is_postgres_connection, IST
 
 logger = logging.getLogger(__name__)
 
@@ -51,25 +51,27 @@ MAX_LEASE_TTL_SECONDS = 86400      # 24 hours
 
 def prune_zombie_leases(job_name: str = None) -> int:
     """
-    Routinely purges expired/zombie job leases from distributed_job_locks where expires_at < NOW() (UTC).
+    Routinely purges expired/zombie job leases from distributed_job_locks where expires_at < NOW() (IST).
     Prevents dead worker processes (e.g. killed via SIGKILL) from permanently blocking scheduled pipelines.
     Returns the count of purged zombie leases.
     """
     ensure_lock_table_exists()
     conn = get_connection()
+    is_pg = is_postgres_connection(conn)
     cur = conn.cursor()
     p = get_placeholder()
-    now_utc = datetime.now(timezone.utc)
-    now_iso = now_utc.isoformat()
+    now_ist = datetime.now(IST)
+    now_iso = now_ist.isoformat()
+    exp_cmp = f"expires_at < {p}" if is_pg else f"datetime(expires_at) < datetime({p})"
     try:
         if job_name:
             cur.execute(
-                f"DELETE FROM distributed_job_locks WHERE job_name = {p} AND expires_at < {p}",
+                f"DELETE FROM distributed_job_locks WHERE job_name = {p} AND {exp_cmp}",
                 (job_name, now_iso),
             )
         else:
             cur.execute(
-                f"DELETE FROM distributed_job_locks WHERE expires_at < {p}",
+                f"DELETE FROM distributed_job_locks WHERE {exp_cmp}",
                 (now_iso,),
             )
         pruned = cur.rowcount or 0
@@ -114,13 +116,15 @@ def acquire_job_lease(job_name: str, ttl_seconds: int = DEFAULT_LEASE_TTL_SECOND
     clamped_ttl = max(MIN_LEASE_TTL_SECONDS, min(ttl_val, MAX_LEASE_TTL_SECONDS))
 
     conn = get_connection()
+    is_pg = is_postgres_connection(conn)
     cur = conn.cursor()
     p = get_placeholder()
 
-    now_utc = datetime.now(timezone.utc)
-    expires_utc = now_utc + timedelta(seconds=clamped_ttl)
-    now_iso = now_utc.isoformat()
-    exp_iso = expires_utc.isoformat()
+    now_ist = datetime.now(IST)
+    expires_ist = now_ist + timedelta(seconds=clamped_ttl)
+    now_iso = now_ist.isoformat()
+    exp_iso = expires_ist.isoformat()
+    exp_cmp = f"distributed_job_locks.expires_at < {p}" if is_pg else f"datetime(distributed_job_locks.expires_at) < datetime({p})"
 
     sql = f"""
         INSERT INTO distributed_job_locks (job_name, locked_by, locked_at, expires_at)
@@ -129,7 +133,7 @@ def acquire_job_lease(job_name: str, ttl_seconds: int = DEFAULT_LEASE_TTL_SECOND
         SET locked_by = EXCLUDED.locked_by,
             locked_at = EXCLUDED.locked_at,
             expires_at = EXCLUDED.expires_at
-        WHERE distributed_job_locks.expires_at < {p}
+        WHERE {exp_cmp}
            OR distributed_job_locks.locked_by = {p}
     """
     try:

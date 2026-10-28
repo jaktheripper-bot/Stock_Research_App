@@ -608,6 +608,8 @@ def run_remediation(
                         "de": live_de,
                     })
                     if apply_changes:
+                        from core.db.connection import now_ist_iso
+                        now_ts = now_ist_iso()
                         cur.execute(
                             f"""
                             INSERT INTO cached_fundamentals (
@@ -615,7 +617,7 @@ def run_remediation(
                                 pe_ratio, roce, roe, operating_margin, debt_to_equity,
                                 fifty_two_week_high, fifty_two_week_low, source, updated_at
                             )
-                            VALUES ({p}, {p}, {p}, {p}, {p}, {p}, {p}, {p}, {p}, {p}, {p}, {p}, {p}, {p}, CURRENT_TIMESTAMP)
+                            VALUES ({p}, {p}, {p}, {p}, {p}, {p}, {p}, {p}, {p}, {p}, {p}, {p}, {p}, {p}, {p})
                             ON CONFLICT (ticker) DO UPDATE SET
                                 current_price = COALESCE(EXCLUDED.current_price, cached_fundamentals.current_price),
                                 market_cap = CASE WHEN ABS(COALESCE(cached_fundamentals.market_cap, 0) - 25000000000.0) < 1.0 THEN EXCLUDED.market_cap ELSE COALESCE(EXCLUDED.market_cap, cached_fundamentals.market_cap) END,
@@ -627,7 +629,7 @@ def run_remediation(
                                 fifty_two_week_high = COALESCE(EXCLUDED.fifty_two_week_high, cached_fundamentals.fifty_two_week_high),
                                 fifty_two_week_low = COALESCE(EXCLUDED.fifty_two_week_low, cached_fundamentals.fifty_two_week_low),
                                 source = EXCLUDED.source,
-                                updated_at = CURRENT_TIMESTAMP
+                                updated_at = EXCLUDED.updated_at
                             """,
                             (
                                 t,
@@ -644,6 +646,7 @@ def run_remediation(
                                 live_h52,
                                 live_l52,
                                 "SMARTAPI_BSE_EXCHANGE",
+                                now_ts,
                             ),
                         )
                         cur.execute(

@@ -520,10 +520,11 @@ class AngelOneGateway:
         api_key = (get_secret("ANGEL_API_KEY") or os.environ.get("ANGEL_API_KEY", "")).strip()
 
         from datetime import datetime, timedelta
+        from core.db.connection import IST
         if not to_date:
-            to_date = datetime.now().strftime("%Y-%m-%d 15:30")
+            to_date = datetime.now(IST).strftime("%Y-%m-%d 15:30")
         if not from_date:
-            from_date = (datetime.now() - timedelta(days=120)).strftime("%Y-%m-%d 09:15")
+            from_date = (datetime.now(IST) - timedelta(days=120)).strftime("%Y-%m-%d 09:15")
 
         local_ip = "127.0.0.1"
         try:
@@ -603,7 +604,8 @@ class AngelOneGateway:
         directly from Angel One SmartAPI 1-year daily historical candles.
         """
         from datetime import datetime, timedelta
-        from_date = (datetime.now() - timedelta(days=370)).strftime("%Y-%m-%d 09:15")
+        from core.db.connection import IST
+        from_date = (datetime.now(IST) - timedelta(days=370)).strftime("%Y-%m-%d 09:15")
         candles = cls.get_historical_candles(query, interval="ONE_DAY", from_date=from_date)
         if not candles or len(candles) < 5:
             return None

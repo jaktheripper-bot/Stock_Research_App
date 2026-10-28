@@ -706,11 +706,13 @@ function exportOpportunities(format) {
     return;
   }
 
+  const istDateSlug = new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Kolkata' }).format(new Date());
+
   if (format === 'json') {
     const dataStr = 'data:text/json;charset=utf-8,' + encodeURIComponent(JSON.stringify(filtered, null, 2));
     const a = document.createElement('a');
     a.href = dataStr;
-    a.download = `opportunities_universe_${new Date().toISOString().slice(0, 10)}.json`;
+    a.download = `opportunities_universe_${istDateSlug}.json`;
     a.click();
   } else if (format === 'csv') {
     const headers = ['Symbol', 'Name', 'Asset_Class', 'Seniority', 'Gross_Yield_Pct', 'Net_Yield_Pct', 'Real_Yield_Pct', 'Spread_10Y_Bps', 'Min_Ticket_INR', 'Tax_Statute'];
@@ -730,7 +732,7 @@ function exportOpportunities(format) {
     const encodedUri = encodeURI(csvContent);
     const a = document.createElement('a');
     a.href = encodedUri;
-    a.download = `opportunities_universe_${new Date().toISOString().slice(0, 10)}.csv`;
+    a.download = `opportunities_universe_${istDateSlug}.csv`;
     a.click();
   }
 }

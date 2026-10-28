@@ -23,8 +23,9 @@ from datetime import datetime, timezone, timedelta
 from typing import Tuple, Optional, Dict, Any
 
 from core.config import get_secret
-from core.db.connection import get_db_connection, is_postgres_connection
+from core.db.connection import get_db_connection, is_postgres_connection, IST
 from core.notify import send_otp_email
+from core.presentation.formatters import _coerce_datetime
 
 logger = logging.getLogger("equity_research.core.auth.otp")
 
@@ -73,8 +74,8 @@ def create_email_otp(email: str) -> Tuple[bool, str, Optional[str]]:
     is_pg = is_postgres_connection(conn)
     p = "%s" if is_pg else "?"
     cursor = conn.cursor()
-    now_utc = datetime.now(timezone.utc)
-    expires_at = now_utc + timedelta(minutes=OTP_TTL_MINUTES)
+    now_ist = datetime.now(IST)
+    expires_at = now_ist + timedelta(minutes=OTP_TTL_MINUTES)
 
     # 1. Check existing record for rate-limiting
     try:
@@ -82,20 +83,9 @@ def create_email_otp(email: str) -> Tuple[bool, str, Optional[str]]:
         row = cursor.fetchone()
         if row:
             created_at = row[2]
-            if isinstance(created_at, str):
-                try:
-                    created_dt = datetime.fromisoformat(created_at.replace("Z", "+00:00"))
-                    if created_dt.tzinfo is None:
-                        created_dt = created_dt.replace(tzinfo=timezone.utc)
-                    elapsed = (now_utc - created_dt).total_seconds()
-                    if elapsed < RESEND_COOLDOWN_SECONDS and os.environ.get("TESTING") != "1":
-                        remaining = int(RESEND_COOLDOWN_SECONDS - elapsed)
-                        return False, f"Please wait {remaining} seconds before requesting a new code.", None
-                except Exception as parse_err:
-                    logger.debug("OTP created_at parse error: %s", parse_err)
-            elif isinstance(created_at, datetime):
-                created_dt = created_at if created_at.tzinfo else created_at.replace(tzinfo=timezone.utc)
-                elapsed = (now_utc - created_dt).total_seconds()
+            created_dt = _coerce_datetime(created_at)
+            if created_dt is not None:
+                elapsed = (now_ist - created_dt).total_seconds()
                 if elapsed < RESEND_COOLDOWN_SECONDS and os.environ.get("TESTING") != "1":
                     remaining = int(RESEND_COOLDOWN_SECONDS - elapsed)
                     return False, f"Please wait {remaining} seconds before requesting a new code.", None
@@ -110,7 +100,7 @@ def create_email_otp(email: str) -> Tuple[bool, str, Optional[str]]:
 
     otp_hash = _hash_otp(clean_email, code)
     expires_str = expires_at.isoformat()
-    created_str = now_utc.isoformat()
+    created_str = now_ist.isoformat()
 
     try:
         if is_pg:
@@ -123,7 +113,7 @@ def create_email_otp(email: str) -> Tuple[bool, str, Optional[str]]:
                     attempts = 0,
                     created_at = EXCLUDED.created_at;
             """
-            cursor.execute(query, (clean_email, otp_hash, expires_at, now_utc))
+            cursor.execute(query, (clean_email, otp_hash, expires_at, now_ist))
         else:
             query = f"""
                 INSERT INTO auth_otps (email, otp_hash, expires_at, attempts, created_at)
@@ -180,7 +170,7 @@ def verify_email_otp(email: str, code: str) -> Tuple[bool, str]:
     is_pg = is_postgres_connection(conn)
     p = "%s" if is_pg else "?"
     cursor = conn.cursor()
-    now_utc = datetime.now(timezone.utc)
+    now_ist = datetime.now(IST)
 
     try:
         cursor.execute(f"SELECT otp_hash, expires_at, attempts FROM auth_otps WHERE email = {p};", (clean_email,))
@@ -201,21 +191,8 @@ def verify_email_otp(email: str, code: str) -> Tuple[bool, str]:
             return False, "Too many failed attempts. This code has been invalidated. Please request a new one."
 
         # 2. Check expiry
-        is_expired = False
-        if isinstance(expires_at, str):
-            try:
-                exp_dt = datetime.fromisoformat(expires_at.replace("Z", "+00:00"))
-                if exp_dt.tzinfo is None:
-                    exp_dt = exp_dt.replace(tzinfo=timezone.utc)
-                if now_utc > exp_dt:
-                    is_expired = True
-            except Exception as e:
-                logger.warning("Error parsing OTP expires_at timestamp '%s': %s", expires_at, e)
-                is_expired = False
-        elif isinstance(expires_at, datetime):
-            exp_dt = expires_at if expires_at.tzinfo else expires_at.replace(tzinfo=timezone.utc)
-            if now_utc > exp_dt:
-                is_expired = True
+        exp_dt = _coerce_datetime(expires_at)
+        is_expired = bool(exp_dt is not None and now_ist > exp_dt)
 
         if is_expired:
             _delete_otp(clean_email)

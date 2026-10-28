@@ -22,6 +22,7 @@ from fastapi.templating import Jinja2Templates
 from core.config import get_secret
 from core.db import init_db, IST, MANDATORY_SEBI_DISCLAIMER
 from core.db.users import get_user_by_email, is_ticker_unlocked_for_user
+from core.presentation.formatters import _coerce_datetime
 from normalizer import clean_ticker
 from bse_master import resolve_canonical_symbol
 
@@ -240,7 +241,7 @@ def _get_user_signing_key() -> bytes:
 
 def _generate_user_session_token(user_id: str, email: str) -> str:
     secret = _get_user_signing_key()
-    now_ts = int(datetime.now(timezone.utc).timestamp())
+    now_ts = int(datetime.now(IST).timestamp())
     data = json.dumps({"user_id": user_id, "email": email.strip().lower(), "purpose": "user_session", "ts": now_ts})
     payload_b64 = base64.urlsafe_b64encode(data.encode("utf-8")).decode("utf-8")
     sig = hmac.new(secret, payload_b64.encode("utf-8"), hashlib.sha256).hexdigest()
@@ -262,7 +263,7 @@ def _validate_user_session_token(token: Optional[str]) -> Optional[Dict[str, Any
             return None
         ts = payload.get("ts", 0)
         # Valid for 30 days
-        if datetime.now(timezone.utc).timestamp() - ts < 2592000:
+        if datetime.now(IST).timestamp() - ts < 2592000:
             return payload
         return None
     except Exception as e:
@@ -314,7 +315,7 @@ def _get_admin_signing_key(purpose: str = "admin_session") -> bytes:
 
 def _generate_admin_token(email: str, role: str = "super_admin") -> str:
     secret = _get_admin_signing_key("admin_session")
-    now_ts = int(datetime.now(timezone.utc).timestamp())
+    now_ts = int(datetime.now(IST).timestamp())
     data = json.dumps({"email": email.strip().lower(), "role": role, "purpose": "admin_session", "ts": now_ts})
     payload_b64 = base64.urlsafe_b64encode(data.encode("utf-8")).decode("utf-8")
     sig = hmac.new(secret, payload_b64.encode("utf-8"), hashlib.sha256).hexdigest()
@@ -342,7 +343,7 @@ def _validate_admin_token(token: Optional[str]) -> Optional[Dict[str, Any]]:
             return None
         ts = payload.get("ts", 0)
         # Valid for 24 hours
-        if datetime.now(timezone.utc).timestamp() - ts < 86400:
+        if datetime.now(IST).timestamp() - ts < 86400:
             return payload
         return None
     except Exception as e:
@@ -361,7 +362,7 @@ def _is_admin_authenticated(request: Request) -> Optional[Dict[str, Any]]:
 
 def _generate_pending_2fa_token(email: str) -> str:
     secret = _get_admin_signing_key("admin_2fa_pending")
-    now_ts = int(datetime.now(timezone.utc).timestamp())
+    now_ts = int(datetime.now(IST).timestamp())
     data = json.dumps({"pending_email": email.strip().lower(), "purpose": "admin_2fa_pending", "ts": now_ts})
     payload_b64 = base64.urlsafe_b64encode(data.encode("utf-8")).decode("utf-8")
     sig = hmac.new(secret, payload_b64.encode("utf-8"), hashlib.sha256).hexdigest()
@@ -382,7 +383,7 @@ def _validate_pending_2fa_token(token: Optional[str]) -> Optional[str]:
             return None
         ts = data.get("ts", 0)
         # Valid for 15 minutes
-        if datetime.now(timezone.utc).timestamp() - ts < 900:
+        if datetime.now(IST).timestamp() - ts < 900:
             return data.get("pending_email")
         return None
     except Exception as e:
@@ -408,17 +409,9 @@ def _is_user_subscribed(user: Optional[Dict[str, Any]]) -> bool:
         exp = user.get("subscription_expires_at")
         if not exp:
             return True
-        now = datetime.now(timezone.utc)
-        if isinstance(exp, str):
-            try:
-                exp_dt = datetime.fromisoformat(exp.replace("Z", "+00:00"))
-                return exp_dt > now
-            except Exception as e:
-                logger.debug("Failed parsing subscription_expires_at in _is_user_subscribed: %s", e)
-                return True
-        elif hasattr(exp, "tzinfo"):
-            return exp > now
-        return True
+        now = datetime.now(IST)
+        exp_dt = _coerce_datetime(exp)
+        return exp_dt > now if exp_dt is not None else True
     return False
 
 

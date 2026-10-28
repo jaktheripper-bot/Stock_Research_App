@@ -3,7 +3,8 @@ FROM python:3.14-slim
 WORKDIR /app
 
 ENV MALLOC_TRIM_THRESHOLD_=65536 \
-    PYTHONMALLOC=malloc
+    PYTHONMALLOC=malloc \
+    TZ=Asia/Kolkata
 
 RUN apt-get update && apt-get install -y --no-install-recommends \
     build-essential \

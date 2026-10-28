@@ -17,6 +17,7 @@ from bse_master import resolve_bse_scrip_code, resolve_canonical_symbol
 from typing import Any, Dict, List, Optional, Tuple, Union
 from core.analysis.exceptions import ExchangeDataFetchError
 from core.config import get_secret, yfinance_fallback_enabled
+from core.db.connection import IST
 
 logger = logging.getLogger("equity_research.core.analysis.fundamentals")
 logging.getLogger("yfinance").setLevel(logging.CRITICAL)
@@ -493,7 +494,7 @@ def fetch_latest_bse_announcement(scrip_code: str) -> str:
     if not scrip_code or not str(scrip_code).isdigit():
         return ""
     try:
-        now_dt = datetime.now()
+        now_dt = datetime.now(IST)
         str_to_date = now_dt.strftime("%Y%m%d")
         str_prev_date = (now_dt - timedelta(days=60)).strftime("%Y%m%d")
         url = f"https://api.bseindia.com/BseIndiaAPI/api/AnnSubCategoryGetData/w?pageno=1&strCat=-1&strPrevDate={str_prev_date}&strScrip={scrip_code}&strSearch=P&strToDate={str_to_date}&strType=C"
@@ -1085,7 +1086,7 @@ def get_historical_prices(ticker: str, period: str = "6mo", fast_only: bool = Fa
         from core.ingestion.angel_one import AngelOneGateway
         if AngelOneGateway.is_configured():
             lookback_days = {"1mo": 35, "3mo": 100, "6mo": 190, "1y": 370, "2y": 740}.get(period, 190)
-            from_date = (datetime.now() - timedelta(days=lookback_days)).strftime("%Y-%m-%d 09:15")
+            from_date = (datetime.now(IST) - timedelta(days=lookback_days)).strftime("%Y-%m-%d 09:15")
             candles = AngelOneGateway.get_historical_candles(clean, from_date=from_date)
             if candles and len(candles) > 5:
                 df = pd.DataFrame(candles).rename(columns={"timestamp": "Date", "close": "Close", "volume": "Volume"})

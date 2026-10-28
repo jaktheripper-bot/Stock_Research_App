@@ -24,7 +24,7 @@ if ROOT_DIR not in sys.path:
     sys.path.insert(0, ROOT_DIR)
 
 from core.ingestion.angel_one import AngelOneGateway
-from core.db.connection import get_db_path
+from core.db.connection import get_db_path, IST, now_ist_iso
 from core.config import get_secret
 from bse_master import resolve_canonical_symbol
 
@@ -137,7 +137,7 @@ def update_database_reports(db_path: str, max_workers: int = 6):
     c.execute("UPDATE reports SET timestamp = datetime(timestamp, 'unixepoch') WHERE typeof(timestamp) = 'integer'")
     c.execute("UPDATE report_revisions SET timestamp = datetime(timestamp, 'unixepoch') WHERE typeof(timestamp) = 'integer'")
 
-    now_iso = datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M:%S")
+    now_iso = now_ist_iso()
     quotes_synced = 0
     revisions_archived = 0
     material_moves_flagged = 0

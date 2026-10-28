@@ -17,9 +17,22 @@ LogtailHandler:
 import os
 import sys
 import logging
+from datetime import datetime, timezone, timedelta
 from typing import Optional, Dict, Any, List
 
 from core.config import get_secret
+
+IST = timezone(timedelta(hours=5, minutes=30))
+
+
+class _ISTLogFormatter(logging.Formatter):
+    """Formats Python log timestamps strictly in IST (Asia/Kolkata, UTC+05:30)."""
+
+    def formatTime(self, record: logging.LogRecord, datefmt: Optional[str] = None) -> str:
+        dt = datetime.fromtimestamp(record.created, tz=IST)
+        if datefmt:
+            return dt.strftime(datefmt)
+        return f"{dt.strftime('%Y-%m-%d %H:%M:%S')},{int(record.msecs):03d} IST"
 
 logger = logging.getLogger("equity_research.core.logging_config")
 
@@ -133,7 +146,7 @@ def setup_logging(
     """
     global _LOGGING_INITIALIZED
     log_format = "%(asctime)s [%(levelname)s] %(name)s: %(message)s"
-    formatter = logging.Formatter(log_format)
+    formatter = _ISTLogFormatter(log_format)
 
     # Console stream handler
     console_handler = logging.StreamHandler(sys.stdout)

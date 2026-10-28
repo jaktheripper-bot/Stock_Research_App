@@ -56,7 +56,7 @@ def get_active_digest_subscribers(only_active_pro: bool = False) -> List[Dict[st
                            is_subscriber, is_digest_subscribed, digest_unsubscribe_token, created_at
                     FROM user_accounts
                     WHERE (is_digest_subscribed = 1 OR is_digest_subscribed IS NULL)
-                      AND (is_subscriber = 1 OR (subscription_expires_at IS NOT NULL AND subscription_expires_at > datetime('now')))
+                      AND (is_subscriber = 1 OR (subscription_expires_at IS NOT NULL AND datetime(subscription_expires_at) > datetime('now')))
                       AND email IS NOT NULL AND email != ''
                 """
             else:

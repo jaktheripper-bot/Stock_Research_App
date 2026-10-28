@@ -61,7 +61,8 @@ FREQUENCY_PERIODS = {
 def calculate_time_to_maturity_years(maturity_date_str: str, from_date: Optional[date] = None) -> float:
     """Calculates exact fractional years from reference date to maturity date."""
     if not from_date:
-        from_date = date.today()
+        from core.db.connection import IST
+        from_date = datetime.now(IST).date()
     if isinstance(maturity_date_str, str):
         clean_str = maturity_date_str[:10]
         mat_dt = datetime.strptime(clean_str, "%Y-%m-%d").date()

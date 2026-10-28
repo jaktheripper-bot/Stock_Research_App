@@ -16,13 +16,14 @@ import math
 import os
 import re
 import time
-from datetime import datetime, timezone
+from datetime import datetime
 from typing import Dict, List, Optional, Any
 
 from google import genai
 
 from core.config import get_secret
 from core.db import save_report_to_archive
+from core.db.connection import IST
 from core.db.reports import get_report_by_ticker, get_archived_reports
 from core.db.mutual_funds import (
     get_mutual_fund_scheme,
@@ -617,7 +618,7 @@ def ensure_scheme_and_holdings_exist(scheme_code: str) -> Optional[Dict[str, Any
                     "active_share_pct": 68.0,
                     "risk_grade": "Very High",
                     "fund_manager": "Senior Fund Manager",
-                    "last_portfolio_date": datetime.now(timezone.utc).strftime("%Y-%m-%d"),
+                    "last_portfolio_date": datetime.now(IST).strftime("%Y-%m-%d"),
                     "metadata": {"source": "mfapi_on_demand"}
                 }
                 save_mutual_fund_scheme(scheme_dict)
@@ -642,7 +643,7 @@ def ensure_scheme_and_holdings_exist(scheme_code: str) -> Optional[Dict[str, Any
             "active_share_pct": 68.0,
             "risk_grade": "Very High",
             "fund_manager": "Senior Fund Manager",
-            "last_portfolio_date": datetime.now(timezone.utc).strftime("%Y-%m-%d"),
+            "last_portfolio_date": datetime.now(IST).strftime("%Y-%m-%d"),
             "metadata": {"source": "on_demand_generic"}
         }
         save_mutual_fund_scheme(fallback_scheme)
@@ -825,7 +826,7 @@ def audit_and_archive_constituent_stock(ticker: str, holding_name: str = "", sec
 def create_async_fund_audit_task(scheme_code: str, allow_deep_dive: bool = False) -> str:
     """Registers an asynchronous fund audit task."""
     clean_code = scheme_code.strip().upper()
-    task_id = f"TASK-FUND-{clean_code}-{datetime.now(timezone.utc).strftime('%H%M%S')}-{os.urandom(2).hex()}"
+    task_id = f"TASK-FUND-{clean_code}-{datetime.now(IST).strftime('%H%M%S')}-{os.urandom(2).hex()}"
     _bound_fund_audit_tasks(MAX_FUND_AUDIT_TASKS - 1)
     FUND_AUDIT_TASKS[task_id] = {
         "task_id": task_id,
@@ -841,7 +842,7 @@ def create_async_fund_audit_task(scheme_code: str, allow_deep_dive: bool = False
         "total_stocks": 0,
         "estimated_seconds_remaining": None,
         "allow_deep_dive": allow_deep_dive,
-        "created_at": datetime.now(timezone.utc).isoformat(),
+        "created_at": datetime.now(IST).isoformat(),
         "completed_at": None,
         "result_url": f"/funds/{clean_code}",
         "error": None
@@ -964,7 +965,7 @@ def run_async_fund_audit_job(task_id: str, scheme_code: str, allow_deep_dive: bo
         FUND_AUDIT_TASKS[task_id]["stage"] = "COMPLETE"
         FUND_AUDIT_TASKS[task_id]["stage_title"] = "Look-Through Audit Complete"
         FUND_AUDIT_TASKS[task_id]["message"] = "Deep-dive constituent audit complete! Forensic look-through dossier ready. All meters active."
-        FUND_AUDIT_TASKS[task_id]["completed_at"] = datetime.now(timezone.utc).isoformat()
+        FUND_AUDIT_TASKS[task_id]["completed_at"] = datetime.now(IST).isoformat()
         FUND_AUDIT_TASKS[task_id]["health_score"] = result.get("composite_health_score")
         FUND_AUDIT_TASKS[task_id]["estimated_seconds_remaining"] = 0
         _bound_fund_audit_tasks(MAX_FUND_AUDIT_TASKS)

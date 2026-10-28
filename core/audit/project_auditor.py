@@ -384,7 +384,8 @@ def compute_deterministic_audit_metrics(quick: bool = False) -> Dict[str, Any]:
 
 def synthesize_deterministic_markdown_report(audit_id: str, metrics: Dict[str, Any]) -> str:
     """Generates an institutional audit dossier in markdown format."""
-    now_str = datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M:%S UTC")
+    from core.db.connection import IST
+    now_str = datetime.now(IST).strftime("%Y-%m-%d %H:%M:%S IST")
     overall = metrics["overall_score"]
     status = metrics["status"]
     crit_count = len(metrics["critical_violations"])
@@ -465,7 +466,7 @@ def synthesize_deterministic_markdown_report(audit_id: str, metrics: Dict[str, A
 - **Critical Unresolved:** `{remediation_stats.get('critical_open', 0)}` critical finding(s).
 - **Aging Technical Debt (>=3 Days):** `{remediation_stats.get('aging_over_3d', 0)}` item(s) compounding penalties at 1.5x/2.0x.
 - **Resolved Total:** `{remediation_stats.get('resolved_total', 0)}` verified fixes archived.
-- **Dedicated Deliverable:** Prioritized action plan and reproduction steps saved to [`audits/REMEDIATION_ACTION_PLAN.md`](file:///Users/lyndonpinto/Documents/Stock_Research_App/audits/REMEDIATION_ACTION_PLAN.md).
+- **Dedicated Deliverable:** Prioritized action plan and reproduction steps saved to [`audits/REMEDIATION_ACTION_PLAN.md`](REMEDIATION_ACTION_PLAN.md).
 
 ---
 
@@ -535,7 +536,8 @@ Format as clean markdown with sections:
 
 async def audit_project_full(use_ai: bool = True, quick: bool = False) -> ProjectAuditResult:
     """Executes a complete project audit across Strategy, Implementation, and UI/UX."""
-    audit_id = f"AUD-{datetime.now(timezone.utc).strftime('%Y%m%d-%H%M%S')}"
+    from core.db.connection import IST
+    audit_id = f"AUD-{datetime.now(IST).strftime('%Y%m%d-%H%M%S')}"
     logger.info(f"Starting Project Audit: {audit_id} (quick={quick})")
 
     # 1. Deterministic Grounding (Non-blocking executor thread)
@@ -551,7 +553,7 @@ async def audit_project_full(use_ai: bool = True, quick: bool = False) -> Projec
         full_report = base_report
 
     # 4. Save to audits/ file & write audits/REMEDIATION_ACTION_PLAN.md (Non-blocking)
-    file_path = AUDITS_DIR / f"project_audit_{datetime.now(timezone.utc).strftime('%Y%m%d_%H%M%S')}.md"
+    file_path = AUDITS_DIR / f"project_audit_{datetime.now(IST).strftime('%Y%m%d_%H%M%S')}.md"
     try:
         await asyncio.to_thread(file_path.write_text, full_report, encoding="utf-8")
         logger.info(f"Saved audit dossier to: {file_path}")
@@ -598,7 +600,7 @@ async def audit_project_full(use_ai: bool = True, quick: bool = False) -> Projec
         },
         full_markdown_report=full_report,
         audit_engine="autonomous-auditor-engine" if ANTIGRAVITY_AVAILABLE else "deterministic-fallback",
-        created_at=datetime.now(timezone.utc).isoformat()
+        created_at=datetime.now(IST).isoformat()
     )
 
     # 6. Persist to Database (Non-blocking)

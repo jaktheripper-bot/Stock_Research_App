@@ -10,13 +10,13 @@ Monthly ingestion script for Ministry of MSME / Udyam open data exports.
 
 import logging
 import pathlib
-from datetime import datetime, timezone
+from datetime import datetime
 from typing import List, Dict, Optional, Any
 
 import pandas as pd
 import requests
 
-from core.db.connection import get_db_connection, get_supabase_url
+from core.db.connection import get_db_connection, get_supabase_url, IST
 from core.msme.utils import normalise_sector
 from core.msme.seed import seed_default_msme_firms
 
@@ -29,10 +29,10 @@ MINISTRY_URL = "https://msme.gov.in/sites/default/files/MSME_Firms_List.xlsx"
 
 
 def download_latest() -> Optional[pathlib.Path]:
-    """Download the most recent Ministry file, caching it for the current UTC day.
+    """Download the most recent Ministry file, caching it for the current IST day.
     Returns path to file if successful, or None on failure.
     """
-    today = datetime.now(timezone.utc).strftime("%Y-%m-%d")
+    today = datetime.now(IST).strftime("%Y-%m-%d")
     target = DATA_DIR / f"msme_{today}.xlsx"
     if target.exists() and target.stat().st_size > 0:
         logger.info("Using cached Ministry file %s", target.name)
@@ -127,7 +127,7 @@ def upsert_firms(rows: List[Dict[str, Any]]) -> int:
                     uin, name, sector_code, sector_name, city, state,
                     annual_turnover, employee_count, registration_date, source, last_updated
                 ) VALUES (
-                    ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, datetime('now')
+                    ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, (datetime('now', '+5 hours', '+30 minutes') || '+05:30')
                 )
                 ON CONFLICT(uin) DO UPDATE SET
                     name=excluded.name,
@@ -139,7 +139,7 @@ def upsert_firms(rows: List[Dict[str, Any]]) -> int:
                     employee_count=excluded.employee_count,
                     registration_date=excluded.registration_date,
                     source=excluded.source,
-                    last_updated=datetime('now')
+                    last_updated=(datetime('now', '+5 hours', '+30 minutes') || '+05:30')
             """
 
         count = 0

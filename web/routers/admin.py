@@ -499,7 +499,7 @@ async def api_admin_run_project_audit(
     async_mode = bool(payload.get("async_task", False))
 
     if async_mode:
-        audit_id = f"AUD-{datetime.now(timezone.utc).strftime('%Y%m%d-%H%M%S')}"
+        audit_id = f"AUD-{datetime.now(IST).strftime('%Y%m%d-%H%M%S')}"
         if len(_ACTIVE_PROJECT_AUDITS) > 100:
             sorted_keys = sorted(_ACTIVE_PROJECT_AUDITS.keys())
             for old_key in sorted_keys[:-50]:
@@ -509,7 +509,7 @@ async def api_admin_run_project_audit(
             "audit_id": audit_id,
             "status": "RUNNING",
             "progress_message": "Running test discovery, probing 25+ endpoints, and inspecting code hygiene...",
-            "created_at": datetime.now(timezone.utc).isoformat(),
+            "created_at": datetime.now(IST).isoformat(),
             "use_ai": use_ai,
             "result": None,
             "error": None

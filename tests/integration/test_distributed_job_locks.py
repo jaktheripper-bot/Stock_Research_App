@@ -19,7 +19,7 @@ from unittest import mock
 
 os.environ["TESTING"] = "1"
 
-from core.db.connection import get_connection, get_placeholder, init_db
+from core.db.connection import get_connection, get_placeholder, init_db, IST
 from core.db.distributed_lock import (
     WORKER_ID,
     ensure_lock_table_exists,
@@ -100,12 +100,12 @@ class TestDistributedJobLocks(unittest.TestCase):
         cur = conn.cursor()
         p = get_placeholder()
 
-        # Seed expired lock directly
-        past_utc = (datetime.now(timezone.utc) - timedelta(seconds=120)).isoformat()
+        # Seed expired lock directly in IST
+        past_ist = (datetime.now(IST) - timedelta(seconds=120)).isoformat()
         try:
             cur.execute(
                 f"INSERT INTO distributed_job_locks (job_name, locked_by, locked_at, expires_at) VALUES ({p}, {p}, {p}, {p})",
-                (job_name, "stale_crashed_worker:1234:xyz", past_utc, past_utc),
+                (job_name, "stale_crashed_worker:1234:xyz", past_ist, past_ist),
             )
             conn.commit()
         finally:
@@ -155,7 +155,7 @@ class TestDistributedJobLocks(unittest.TestCase):
 
     def test_06_four_production_scheduled_tasks_multi_worker_defense(self):
         """Empirically simulates 2 Uvicorn workers racing for the 4 production scheduled tasks."""
-        today_str = datetime.now(timezone.utc).strftime("%Y-%m-%d")
+        today_str = datetime.now(IST).strftime("%Y-%m-%d")
         w1 = "uvicorn_worker_1:8000:a1b2c3"
         w2 = "uvicorn_worker_2:8000:d4e5f6"
 

@@ -72,7 +72,8 @@ def sync_via_postgresql(reports: List[Dict[str, Any]], revisions: List[Dict[str,
     import psycopg2
     from psycopg2.extras import execute_batch
     from datetime import datetime, timezone
-    from core.db.connection import init_db
+    from core.db.connection import init_db, IST
+    from core.presentation.formatters import _coerce_datetime
 
     logger.info("Connecting to Supabase PostgreSQL via SUPABASE_DB_URL...")
     try:
@@ -196,13 +197,12 @@ def sync_via_postgresql(reports: List[Dict[str, Any]], revisions: List[Dict[str,
                         if dt == "boolean":
                             val = bool(val) if not isinstance(val, str) else (val.strip().lower() in ("true", "t", "1", "yes"))
                         elif "timestamp" in dt:
-                            if isinstance(val, (int, float)):
-                                val = datetime.fromtimestamp(float(val), tz=timezone.utc)
-                            elif isinstance(val, str) and val.strip().isdigit():
-                                val = datetime.fromtimestamp(float(val.strip()), tz=timezone.utc)
+                            coerced = _coerce_datetime(val)
+                            if coerced is not None:
+                                val = coerced
                         elif dt == "date":
                             if isinstance(val, (int, float)):
-                                val = datetime.fromtimestamp(float(val), tz=timezone.utc).date()
+                                val = datetime.fromtimestamp(float(val), tz=IST).date()
                     transformed_row.append(val)
                 batch_data.append(tuple(transformed_row))
 
@@ -278,7 +278,8 @@ def upload_sqlite_backup_to_storage(sqlite_path: str, supabase_url: str, service
     if not os.path.exists(sqlite_path):
         return False
     
-    timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+    from core.db.connection import IST
+    timestamp = datetime.now(IST).strftime("%Y%m%d_%H%M%S")
     target_name = f"reports_db_{timestamp}.sqlite"
     storage_url = f"{supabase_url.rstrip('/')}/storage/v1/object/backups/{target_name}"
 

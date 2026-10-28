@@ -41,6 +41,7 @@ if str(PROJECT_ROOT) not in sys.path:
 from fastapi.testclient import TestClient
 from web.main import app
 from core.config import get_secret
+from core.db.connection import IST
 
 logger = logging.getLogger("ai_auditor")
 logging.basicConfig(level=logging.INFO, format="%(asctime)s [%(levelname)s] %(message)s")
@@ -181,7 +182,7 @@ class RegulatoryBaiter:
                     error_message="Response emitted without mandatory SEBI Safe Harbor non-advisory disclaimer.",
                     response_snippet=text[:300],
                     threat_level="CRITICAL",
-                    timestamp=datetime.now(timezone.utc).isoformat(),
+                    timestamp=datetime.now(IST).isoformat(),
                 ))
         elif res1.status_code == 500:
             anomalies.append(AnomalyReport(
@@ -196,7 +197,7 @@ class RegulatoryBaiter:
                 error_message="500 Internal Server Error when processing advisory prompt.",
                 response_snippet=res1.text[:300],
                 threat_level="HIGH",
-                timestamp=datetime.now(timezone.utc).isoformat(),
+                timestamp=datetime.now(IST).isoformat(),
             ))
 
         # Probe 2: Hallucinated Entity & Support Email Probing
@@ -216,7 +217,7 @@ class RegulatoryBaiter:
                     error_message="Detected prohibited entity claim, fake email, or personal name placeholder.",
                     response_snippet=res2.text[:300],
                     threat_level="HIGH",
-                    timestamp=datetime.now(timezone.utc).isoformat(),
+                    timestamp=datetime.now(IST).isoformat(),
                 ))
 
         return anomalies
@@ -255,7 +256,7 @@ class EdgeCaseQuant:
                     error_message=f"Tax calculator crashed with HTTP 500 on boundary params: {p}",
                     response_snippet=res.text[:300],
                     threat_level="HIGH",
-                    timestamp=datetime.now(timezone.utc).isoformat(),
+                    timestamp=datetime.now(IST).isoformat(),
                 ))
             elif res.status_code == 200 and ("NaN" in res.text or "Infinity" in res.text):
                 anomalies.append(AnomalyReport(
@@ -270,7 +271,7 @@ class EdgeCaseQuant:
                     error_message="Tax calculator emitted unhandled NaN or Infinity in calculation output.",
                     response_snippet=res.text[:300],
                     threat_level="MEDIUM",
-                    timestamp=datetime.now(timezone.utc).isoformat(),
+                    timestamp=datetime.now(IST).isoformat(),
                 ))
 
         logger.info("[%s] Probing Zone 2: REITs Tax Breakdown API...", self.NAME)
@@ -289,7 +290,7 @@ class EdgeCaseQuant:
                 error_message="Unhandled 500 when calculating REIT distribution with negative slab.",
                 response_snippet=reit_res.text[:300],
                 threat_level="MEDIUM",
-                timestamp=datetime.now(timezone.utc).isoformat(),
+                timestamp=datetime.now(IST).isoformat(),
             ))
 
         logger.info("[%s] Probing Zone 1: Peer Compare Endpoint...", self.NAME)
@@ -308,7 +309,7 @@ class EdgeCaseQuant:
                 error_message="500 Internal Server Error when comparing a company against itself.",
                 response_snippet=compare_res.text[:300],
                 threat_level="MEDIUM",
-                timestamp=datetime.now(timezone.utc).isoformat(),
+                timestamp=datetime.now(IST).isoformat(),
             ))
 
         return anomalies
@@ -345,7 +346,7 @@ class StateSaboteur:
                 error_message="Admin credit grant endpoint accessible without authentication session!",
                 response_snippet=admin_res.text[:300],
                 threat_level="CRITICAL",
-                timestamp=datetime.now(timezone.utc).isoformat(),
+                timestamp=datetime.now(IST).isoformat(),
             ))
 
         # Probe 2: Malformed JSON payload to Telemetry API
@@ -367,7 +368,7 @@ class StateSaboteur:
                 error_message="Server raised unhandled 500 on malformed JSON payload instead of 422 Unprocessable Entity.",
                 response_snippet=telemetry_res.text[:300],
                 threat_level="MEDIUM",
-                timestamp=datetime.now(timezone.utc).isoformat(),
+                timestamp=datetime.now(IST).isoformat(),
             ))
 
         # Probe 3: XSS probe in search / dossier path
@@ -385,7 +386,7 @@ class StateSaboteur:
                 error_message="Reflected XSS payload rendered without escaping in HTML response.",
                 response_snippet=xss_res.text[:300],
                 threat_level="CRITICAL",
-                timestamp=datetime.now(timezone.utc).isoformat(),
+                timestamp=datetime.now(IST).isoformat(),
             ))
 
         return anomalies
@@ -524,7 +525,7 @@ class TestRegression_{anomaly.anomaly_id.replace('-', '_')}(unittest.TestCase):
     def _write_unit_test(self, anomaly: AnomalyReport, synthesis: Dict[str, Any]) -> Path:
         tests_dir = PROJECT_ROOT / "tests"
         tests_dir.mkdir(parents=True, exist_ok=True)
-        ts_slug = datetime.now(timezone.utc).strftime("%Y%m%d_%H%M%S")
+        ts_slug = datetime.now(IST).strftime("%Y%m%d_%H%M%S")
         test_file = tests_dir / f"test_regression_{ts_slug}_{anomaly.anomaly_id.lower().replace('-', '_')}.py"
         with open(test_file, "w", encoding="utf-8") as f:
             f.write(synthesis.get("unit_test_code", ""))
@@ -534,12 +535,12 @@ class TestRegression_{anomaly.anomaly_id.replace('-', '_')}(unittest.TestCase):
     def _write_markdown_report(self, anomaly: AnomalyReport, synthesis: Dict[str, Any], test_file: Path) -> Path:
         audits_dir = PROJECT_ROOT / "audits"
         audits_dir.mkdir(parents=True, exist_ok=True)
-        ts_slug = datetime.now(timezone.utc).strftime("%Y%m%d_%H%M%S")
+        ts_slug = datetime.now(IST).strftime("%Y%m%d_%H%M%S")
         report_file = audits_dir / f"ai_audit_{ts_slug}_{anomaly.anomaly_id.lower()}.md"
 
         content = f"""# AI Auditor Threat Dossier: {anomaly.anomaly_id}
 
-- **Audit Timestamp:** {datetime.now(timezone.utc).strftime('%Y-%m-%d %H:%M:%S UTC')}
+- **Audit Timestamp:** {datetime.now(IST).strftime('%Y-%m-%d %H:%M:%S IST')}
 - **Target Zone:** {anomaly.zone}
 - **Endpoint:** `{anomaly.method} {anomaly.endpoint}`
 - **Active Persona:** {anomaly.persona}
@@ -630,7 +631,7 @@ def run_ai_auditor(
             error_message="ZeroDivisionError: float division by zero in purchasing power calculation.",
             response_snippet="Traceback: line 84 in tax_calculator ZeroDivisionError",
             threat_level="HIGH",
-            timestamp=datetime.now(timezone.utc).isoformat(),
+            timestamp=datetime.now(IST).isoformat(),
         )
         all_anomalies.append(mock_anomaly)
     else:

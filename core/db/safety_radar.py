@@ -193,7 +193,7 @@ def save_alternative_yield_product(prod: Dict[str, Any]) -> bool:
                     principal_guarantee_validity, rbi_warning_circular,
                     liquidity_lock_months, precedent_losses_summary,
                     safe_alternative_recommendation, audit_matrix_json, updated_at
-                ) VALUES ({p}, {p}, {p}, {p}, {p}, {p}, {p}, {p}, {p}, {p}, {p}, {p}, {p}, datetime('now'))
+                ) VALUES ({p}, {p}, {p}, {p}, {p}, {p}, {p}, {p}, {p}, {p}, {p}, {p}, {p}, (datetime('now', '+5 hours', '+30 minutes') || '+05:30'))
                 ON CONFLICT (product_id) DO UPDATE SET
                     product_name = excluded.product_name,
                     category = excluded.category,
@@ -207,7 +207,7 @@ def save_alternative_yield_product(prod: Dict[str, Any]) -> bool:
                     precedent_losses_summary = excluded.precedent_losses_summary,
                     safe_alternative_recommendation = excluded.safe_alternative_recommendation,
                     audit_matrix_json = excluded.audit_matrix_json,
-                    updated_at = datetime('now');
+                    updated_at = (datetime('now', '+5 hours', '+30 minutes') || '+05:30');
             """
         params = (
             prod_id,
@@ -280,7 +280,7 @@ def _normalize_safety_product(prod: Dict[str, Any]) -> Dict[str, Any]:
         else:
             mat = {}
     item["audit_matrix"] = mat
-    item.setdefault("updated_at", datetime.now(IST).strftime("%Y-%m-%d %H:%M:%S"))
+    item.setdefault("updated_at", datetime.now(IST).strftime("%Y-%m-%d %H:%M:%S+05:30"))
     return item
 
 

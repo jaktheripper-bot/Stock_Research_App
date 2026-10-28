@@ -63,7 +63,8 @@ def compile_research_bouquet(edition_date: Optional[str] = None) -> Dict[str, An
     """
     Compiles today's dynamic multi-asset research bouquet from active engines.
     """
-    date_str = edition_date or datetime.now().strftime("%Y-%m-%d")
+    from core.db.connection import IST
+    date_str = edition_date or datetime.now(IST).strftime("%Y-%m-%d")
     formatted_date = datetime.strptime(date_str, "%Y-%m-%d").strftime("%A, %B %d, %Y")
 
     # 1. Equities from 9:00 AM Morning Discovery Reel

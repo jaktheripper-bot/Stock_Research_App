@@ -23,6 +23,7 @@ from pathlib import Path
 from datetime import datetime, date, timezone
 from typing import List, Dict, Optional, Any, Tuple
 
+from core.db.connection import IST
 from core.db.mutual_funds import save_mutual_fund_scheme, get_mutual_fund_scheme
 
 logger = logging.getLogger(__name__)
@@ -265,7 +266,7 @@ def parse_amfi_nav_feed(
             "active_share_pct": 70.0 if broad_cat == "EQUITY" else 0.0,
             "risk_grade": "Very High" if broad_cat == "EQUITY" else "Moderate",
             "fund_manager": "Senior Fund Manager",
-            "last_portfolio_date": date.today().isoformat()
+            "last_portfolio_date": datetime.now(IST).date().isoformat()
         })
 
         # Early termination: exact code match or limit reached
@@ -376,5 +377,5 @@ def ingest_amfi_daily_feed(
         "upserted": upserted_count,
         "errors": error_count,
         "duration_seconds": duration,
-        "feed_date": schemes[0]["nav_date"] if schemes else str(date.today())
+        "feed_date": schemes[0]["nav_date"] if schemes else datetime.now(IST).date().isoformat()
     }

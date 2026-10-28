@@ -25,7 +25,7 @@ from fastapi.responses import JSONResponse
 
 from normalizer import clean_ticker
 from bse_master import get_ticker_suggestions
-from core.db import init_db
+from core.db import init_db, IST
 from core.db.debt import (
     get_active_debt_securities,
     get_debt_security_by_isin,
@@ -286,7 +286,7 @@ def api_ingest_debt_security(request: Request, payload: IngestDebtRequest):
     coupon = float(effective_coupon if effective_coupon is not None else 8.50)
     if coupon < 0.0 or coupon > 30.0:
         raise HTTPException(status_code=400, detail="Coupon rate must be between 0.0% and 30.0%.")
-    now_dt = datetime.now()
+    now_dt = datetime.now(IST)
     mat_date = _strip_tags(payload.maturity_date)[:16] or f"{now_dt.year + 3}-{now_dt.month:02d}-{now_dt.day:02d}"
     face_val = float(payload.face_value or 10000.0)
     if face_val < 100.0 or face_val > 100000000.0:

@@ -22,6 +22,7 @@ from datetime import date, datetime, timedelta
 from pathlib import Path
 from typing import Any, Callable, Dict, List, Optional, Tuple
 
+from core.db.connection import IST
 from core.db.mutual_funds import (
     get_mutual_fund_scheme,
     save_mutual_fund_holdings,
@@ -61,7 +62,7 @@ def amc_key_for_fund_house(fund_house: str, sources: Dict[str, Dict[str, Any]]) 
 
 def recent_month_ends(n: int = 4, today: Optional[date] = None) -> List[date]:
     """Last n completed month-end dates, newest first."""
-    d = (today or date.today()).replace(day=1)
+    d = (today or datetime.now(IST).date()).replace(day=1)
     out: List[date] = []
     for _ in range(n):
         d = d - timedelta(days=1)
@@ -163,7 +164,7 @@ def load_isin_symbol_map(force_refresh: bool = False) -> Dict[str, str]:
 # --------------------------------------------------------------------------- #
 def build_holdings(parsed: Dict[str, Any], isin_map: Dict[str, str]) -> List[Dict[str, Any]]:
     """Converts a parsed sheet into rows for save_mutual_fund_holdings (merging duplicate lines)."""
-    as_on = parsed.get("as_on_date") or date.today().isoformat()
+    as_on = parsed.get("as_on_date") or datetime.now(IST).date().isoformat()
     merged: Dict[Tuple[str, str], Dict[str, Any]] = {}
     for h in parsed["holdings"]:
         htype = h["holding_type"]
@@ -309,7 +310,7 @@ def ingest_top_funds(
             skipped.append({**_brief(row), "reason": f"validation failed: {problem}"})
             continue
 
-        as_on = parsed.get("as_on_date") or date.today().isoformat()
+        as_on = parsed.get("as_on_date") or datetime.now(IST).date().isoformat()
         if not dry_run:
             if not _upsert_scheme_master(row, amfi_lookup, holdings, as_on, book["source"]):
                 skipped.append({**_brief(row), "reason": "scheme master save failed"})

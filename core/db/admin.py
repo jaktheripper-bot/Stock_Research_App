@@ -17,7 +17,9 @@ from core.db.connection import (
     init_db,
     get_db_connection,
     get_supabase_url,
-    get_placeholder
+    get_placeholder,
+    IST,
+    now_ist_iso,
 )
 
 logger = logging.getLogger("equity_research.core.db.admin")
@@ -108,7 +110,7 @@ def get_admin_user(email: str) -> Optional[Dict[str, Any]]:
     if clean_email in bootstrap_emails:
         logger.info(f"Auto-bootstrapping authorized owner admin record for '{clean_email}'...")
         admin_id = f"adm_owner_{clean_email.split('@')[0]}"
-        now_iso = datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M:%S")
+        now_iso = now_ist_iso()
 
         # Attempt to persist/upsert into DB without destroying existing totp_secret
         try:
@@ -130,10 +132,10 @@ def get_admin_user(email: str) -> Optional[Dict[str, Any]]:
                     cursor.execute(
                         f"""
                         INSERT INTO admin_users (id, email, role, totp_enabled, created_at, updated_at)
-                        VALUES ({p}, {p}, 'owner', 0, datetime('now'), datetime('now'))
+                        VALUES ({p}, {p}, 'owner', 0, {p}, {p})
                         ON CONFLICT (email) DO UPDATE SET role = 'owner';
                         """,
-                        (admin_id, clean_email)
+                        (admin_id, clean_email, now_iso, now_iso)
                     )
                 conn.commit()
 
@@ -299,7 +301,7 @@ def update_admin_role(email: str, new_role: str, requesting_email: str) -> Tuple
     supabase_url = get_supabase_url()
 
     try:
-        now_ts = datetime.now(timezone.utc).isoformat()
+        now_ts = now_ist_iso()
         cursor.execute(
             f"UPDATE admin_users SET role = {p}, updated_at = {p} WHERE LOWER(email) = LOWER({p});",
             (clean_role, now_ts, clean_email)
@@ -355,7 +357,7 @@ def enable_admin_totp(email: str) -> bool:
     supabase_url = get_supabase_url()
 
     try:
-        now_ts = datetime.now(timezone.utc).isoformat()
+        now_ts = now_ist_iso()
         totp_flag = True if supabase_url else 1
         cursor.execute(
             f"UPDATE admin_users SET totp_enabled = {p}, updated_at = {p} WHERE LOWER(email) = LOWER({p});",
@@ -384,7 +386,7 @@ def update_admin_last_login(email: str):
     clean_email = email.strip().lower()
 
     try:
-        now_ts = datetime.now(timezone.utc).isoformat()
+        now_ts = now_ist_iso()
         cursor.execute(
             f"UPDATE admin_users SET last_login_at = {p} WHERE LOWER(email) = LOWER({p});",
             (now_ts, clean_email)
@@ -575,7 +577,7 @@ def admin_grant_user_credits(
         )
 
         # Step 2: Insert into credit_transactions (Isolated zero-revenue ledger entry)
-        now_epoch = int(datetime.now(timezone.utc).timestamp())
+        now_epoch = int(datetime.now(IST).timestamp())
         tx_id = f"tx_grant_{user_id[:8]}_{now_epoch}_{uuid.uuid4().hex[:6]}"
         inv_num = f"INV-GRANT-{uuid.uuid4().hex[:8].upper()}"
         pack_type = f"ADMIN_GRANT_{clean_reason}"
@@ -601,7 +603,7 @@ def admin_grant_user_credits(
                 (user_id, clean_ticker or "PLATFORM", pack_type, new_balance)
             )
         else:
-            now_ts = datetime.now(timezone.utc).isoformat()
+            now_ts = now_ist_iso()
             cursor.execute(
                 f"""
                 INSERT INTO credit_transactions (
@@ -670,7 +672,7 @@ def admin_grant_user_credits(
                 new_notes = f"{prev_notes}\n{remedy_text} {admin_note}".strip() if prev_notes else f"{remedy_text} {admin_note}".strip()
                 final_status = "resolved" if resolve_ticket else curr_status
 
-                now_ts = datetime.now(timezone.utc).isoformat()
+                now_ts = now_ist_iso()
                 cursor.execute(
                     f"UPDATE support_tickets SET status = {p}, admin_notes = {p}, updated_at = {p} WHERE ticket_id = {p};",
                     (final_status, new_notes, now_ts, clean_ticket)

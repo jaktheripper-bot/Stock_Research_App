@@ -163,7 +163,8 @@ def scan_debt_securities() -> Dict[str, Any]:
     maturing_soon = 0
     retired_matured = 0
     downgrade_watches = 0
-    now_date = date.today()
+    from core.db.connection import IST
+    now_date = datetime.now(IST).date()
     retired_isins: List[str] = []
     verified_isins: List[str] = []
 
@@ -206,7 +207,7 @@ def scan_debt_securities() -> Dict[str, Any]:
                     )
                 else:
                     cursor.execute(
-                        f"UPDATE corporate_debt_securities SET is_listed = 0, last_updated = datetime('now') WHERE isin IN ({ph_ret});",
+                        f"UPDATE corporate_debt_securities SET is_listed = 0, last_updated = (datetime('now', '+5 hours', '+30 minutes') || '+05:30') WHERE isin IN ({ph_ret});",
                         tuple(retired_isins),
                     )
             if verified_isins:
@@ -218,7 +219,7 @@ def scan_debt_securities() -> Dict[str, Any]:
                     )
                 else:
                     cursor.execute(
-                        f"UPDATE corporate_debt_securities SET last_updated = datetime('now') WHERE isin IN ({ph_ver});",
+                        f"UPDATE corporate_debt_securities SET last_updated = (datetime('now', '+5 hours', '+30 minutes') || '+05:30') WHERE isin IN ({ph_ver});",
                         tuple(verified_isins),
                     )
             conn.commit()

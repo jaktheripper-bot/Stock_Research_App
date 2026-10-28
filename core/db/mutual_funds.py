@@ -10,7 +10,7 @@ from decimal import Decimal
 from datetime import datetime, date, timezone
 from typing import Optional, List, Dict, Any
 
-from core.db.connection import get_db_connection, get_supabase_url, is_postgres_connection, is_postgres_active
+from core.db.connection import get_db_connection, get_supabase_url, is_postgres_connection, is_postgres_active, IST
 
 def is_supabase_enabled() -> bool:
     return bool(get_supabase_url() and is_postgres_active())
@@ -64,7 +64,7 @@ def save_mutual_fund_scheme(scheme: Dict[str, Any]) -> bool:
     active_share = float(scheme.get("active_share_pct", 65.0))
     risk_grade = scheme.get("risk_grade", "Very High")
     fund_mgr = scheme.get("fund_manager", "Senior Fund Manager")
-    port_date = scheme.get("last_portfolio_date", date.today().isoformat())
+    port_date = scheme.get("last_portfolio_date", datetime.now(IST).date().isoformat())
 
     meta = scheme.get("metadata", {})
     if isinstance(meta, dict):
@@ -116,7 +116,7 @@ def save_mutual_fund_scheme(scheme: Dict[str, Any]) -> bool:
                     benchmark_index, aum_crores, nav, ter_direct_pct, ter_regular_pct,
                     portfolio_turnover_ratio_pct, active_share_pct, risk_grade,
                     fund_manager, metadata_json, last_portfolio_date, last_updated
-                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, datetime('now'))
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, (datetime('now', '+5 hours', '+30 minutes') || '+05:30'))
                 ON CONFLICT (scheme_code) DO UPDATE SET
                     scheme_name = excluded.scheme_name,
                     fund_house = excluded.fund_house,
@@ -133,7 +133,7 @@ def save_mutual_fund_scheme(scheme: Dict[str, Any]) -> bool:
                     fund_manager = CASE WHEN excluded.fund_manager IS NOT NULL AND excluded.fund_manager <> 'Senior Fund Manager' THEN excluded.fund_manager ELSE COALESCE(NULLIF(mutual_fund_schemes.fund_manager, ''), excluded.fund_manager) END,
                     metadata_json = CASE WHEN excluded.metadata_json IS NOT NULL AND excluded.metadata_json NOT IN ('{}', '') THEN excluded.metadata_json ELSE COALESCE(NULLIF(mutual_fund_schemes.metadata_json, ''), excluded.metadata_json) END,
                     last_portfolio_date = excluded.last_portfolio_date,
-                    last_updated = datetime('now');
+                    last_updated = (datetime('now', '+5 hours', '+30 minutes') || '+05:30');
             """, (
                 code, name, amc, cat, broad_cat,
                 benchmark, aum, nav, ter_dir, ter_reg,
@@ -174,7 +174,7 @@ def save_mutual_fund_schemes_batch(schemes: List[Dict[str, Any]]) -> int:
         active_share = float(scheme.get("active_share_pct", 65.0) or 0.0)
         risk_grade = scheme.get("risk_grade", "Very High")
         fund_mgr = scheme.get("fund_manager", "Senior Fund Manager")
-        port_date = scheme.get("last_portfolio_date", date.today().isoformat())
+        port_date = scheme.get("last_portfolio_date", datetime.now(IST).date().isoformat())
         meta = scheme.get("metadata", {})
         meta_json = json.dumps(meta) if isinstance(meta, dict) else str(meta)
         deduped[raw_code] = (
@@ -229,7 +229,7 @@ def save_mutual_fund_schemes_batch(schemes: List[Dict[str, Any]]) -> int:
                     benchmark_index, aum_crores, nav, ter_direct_pct, ter_regular_pct,
                     portfolio_turnover_ratio_pct, active_share_pct, risk_grade,
                     fund_manager, metadata_json, last_portfolio_date, last_updated
-                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, datetime('now'))
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, (datetime('now', '+5 hours', '+30 minutes') || '+05:30'))
                 ON CONFLICT (scheme_code) DO UPDATE SET
                     scheme_name = excluded.scheme_name,
                     fund_house = excluded.fund_house,
@@ -246,7 +246,7 @@ def save_mutual_fund_schemes_batch(schemes: List[Dict[str, Any]]) -> int:
                     fund_manager = CASE WHEN excluded.fund_manager IS NOT NULL AND excluded.fund_manager <> 'Senior Fund Manager' THEN excluded.fund_manager ELSE COALESCE(NULLIF(mutual_fund_schemes.fund_manager, ''), excluded.fund_manager) END,
                     metadata_json = CASE WHEN excluded.metadata_json IS NOT NULL AND excluded.metadata_json NOT IN ('{}', '') THEN excluded.metadata_json ELSE COALESCE(NULLIF(mutual_fund_schemes.metadata_json, ''), excluded.metadata_json) END,
                     last_portfolio_date = excluded.last_portfolio_date,
-                    last_updated = datetime('now');
+                    last_updated = (datetime('now', '+5 hours', '+30 minutes') || '+05:30');
             """
             cursor.executemany(sql_sq, rows)
         conn.commit()
@@ -280,7 +280,7 @@ def save_mutual_fund_holdings(scheme_code: str, holdings: List[Dict[str, Any]]) 
             name = h.get("holding_name", ident)
             weight = float(h.get("weight_pct", 0.0))
             sector = h.get("sector_or_rating", "Diversified")
-            port_date = h.get("portfolio_date", date.today().isoformat())
+            port_date = h.get("portfolio_date", datetime.now(IST).date().isoformat())
             det = h.get("instrument_details", {})
             det_json = json.dumps(det) if isinstance(det, dict) else str(det)
 
@@ -5138,7 +5138,7 @@ def save_fund_forensic_dossier(dossier: Dict[str, Any]) -> bool:
                     accounting_risk_index, margin_of_safety_pct, promoter_pledge_exposure_pct,
                     active_share_pct, top_risky_holdings_json, top_quality_holdings_json,
                     audited_by, last_audited_at
-                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, datetime('now'))
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, (datetime('now', '+5 hours', '+30 minutes') || '+05:30'))
                 ON CONFLICT (scheme_code) DO UPDATE SET
                     dossier_text = CASE 
                         WHEN excluded.dossier_text IS NOT NULL AND TRIM(excluded.dossier_text) != '' 
@@ -5154,7 +5154,7 @@ def save_fund_forensic_dossier(dossier: Dict[str, Any]) -> bool:
                     top_risky_holdings_json = excluded.top_risky_holdings_json,
                     top_quality_holdings_json = excluded.top_quality_holdings_json,
                     audited_by = excluded.audited_by,
-                    last_audited_at = datetime('now');
+                    last_audited_at = (datetime('now', '+5 hours', '+30 minutes') || '+05:30');
             """, (code, text, comp_score, moat_score, asri, mos, pledge, active_share, risky_json, quality_json, auditor))
         conn.commit()
         return True
