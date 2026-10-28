@@ -100,62 +100,86 @@ def fetch_amfi_nav_raw(force_refresh: bool = False, timeout_sec: int = 15) -> st
     return ""
 
 
+_AMC_PREFIX_RE = re.compile(
+    r"^\s*(?:ADITYA\s+BIRLA\s+SUN\s+LIFE|ADITYA\s+BIRLA|ABSL|NIPPON\s+INDIA|ICICI\s+PRUDENTIAL|"
+    r"SBI|HDFC|KOTAK|UTI|MIRAE\s+ASSET|MOTILAL\s+OSWAL|AXIS|TATA|DSP|EDELWEISS|ZERODHA|"
+    r"GROWW|ANGEL\s+ONE|LIC\s+MF|BANDHAN|FRANKLIN\s+INDIA|INVESCO\s+INDIA|NAVI|QUANTUM|SHRIRAM|"
+    r"BAJAJ\s+FINSERV|BARODA\s+BNP\s+PARIBAS|CANARA\s+ROBECO|HSBC|UNION|360\s+ONE)\b",
+    re.IGNORECASE,
+)
+
+
+def _strip_amc_house(scheme_name: str) -> str:
+    s = _AMC_PREFIX_RE.sub("", str(scheme_name or "").strip()).strip()
+    s = re.sub(r"^\s*(?:MUTUAL\s+FUND|ETF|INDEX\s+FUND)\b[\s\-]*", "", s, flags=re.IGNORECASE)
+    return s.upper()
+
+
+def _has_word(text: str, token: str) -> bool:
+    return bool(re.search(rf"\b{re.escape(token)}\b", text, re.IGNORECASE))
+
+
 def derive_etf_category(scheme_name: str, amfi_category: str = "") -> str:
-    """Classifies an ETF into one of the 9 benchmark categories."""
-    name_upper = scheme_name.upper()
-    cat_upper = amfi_category.upper()
+    """Classifies an ETF into one of the 9 benchmark categories without AMC substring collisions."""
+    raw_upper = str(scheme_name or "").upper()
+    core_upper = _strip_amc_house(scheme_name)
+    cat_upper = str(amfi_category or "").upper()
 
     # 1. Commodity Silver
-    if "SILVER" in name_upper:
+    if _has_word(core_upper, "SILVER") or _has_word(raw_upper, "SILVER") or "SILVERBEES" in raw_upper:
         return "COMMODITY_SILVER"
 
     # 2. Commodity Gold
-    if "GOLD" in name_upper or "GOLD ETF" in cat_upper:
+    if _has_word(core_upper, "GOLD") or "GOLD ETF" in cat_upper or "GOLDBEES" in raw_upper:
         return "COMMODITY_GOLD"
 
     # 3. Liquid / Overnight
-    if any(k in name_upper for k in ["LIQUID", "1D RATE", "OVERNIGHT", "TREPS", "CASH BEES", "LIQUIDBEES"]):
+    if any(k in core_upper for k in ("LIQUID", "1D RATE", "OVERNIGHT", "TREPS", "CASH BEES", "LIQUIDBEES", "MONEY MARKET")):
         return "LIQUID"
 
     # 4. Debt Target Maturity
-    if any(k in name_upper for k in ["BHARAT BOND", "TARGET MATURITY", "SDL 20", "G-SEC 20", "SDL MATURITY", "CRISIL IBX"]):
-        # Verify year pattern (e.g., 2026, 2030, 2033)
-        if re.search(r"20[2-4][0-9]", name_upper):
+    if any(k in core_upper for k in ("BHARAT BOND", "TARGET MATURITY", "SDL 20", "G-SEC 20", "SDL MATURITY", "CRISIL IBX", "CRISIL-IBX")):
+        if re.search(r"20[2-4][0-9]", core_upper):
             return "DEBT_TARGET_MATURITY"
 
     # 5. Debt Sovereign (G-Sec & Gilts)
-    if any(k in name_upper for k in ["G-SEC", "GSEC", "GILT", "5 YR BENCHMARK", "10 YR BENCHMARK", "10 YEAR GILT", "CONSTANT MATURITY"]):
+    if any(k in core_upper for k in ("G-SEC", "GSEC", "GILT", "5 YR BENCHMARK", "10 YR BENCHMARK", "10 YEAR GILT", "8-13 YR", "CONSTANT MATURITY", "SDL")):
         return "DEBT_SOVEREIGN"
 
     # 6. International / Global
-    if any(k in name_upper for k in ["NASDAQ", "S&P 500", "FANG", "HANG SENG", "WORLD", "GLOBAL", "US TECH", "TOP 50 US", "TAIWAN", "BRAZIL"]):
+    if any(k in core_upper for k in ("NASDAQ", "S&P 500", "FANG", "HANG SENG", "WORLD", "GLOBAL", "US TECH", "TOP 50 US", "TAIWAN", "BRAZIL", "MON100", "HNGSNGBEES")):
         return "INTERNATIONAL"
 
     # 7. Smart Beta / Factor
-    if any(k in name_upper for k in [
+    if any(k in core_upper for k in (
         "MOMENTUM", "LOW VOLATILITY", "LOW VOL", "QUALITY", "ALPHA", "VALUE 20",
-        "DIVIDEND OPPORTUNITIES", "HIGH DIVIDEND", "EQUAL WEIGHT", "NV20"
-    ]):
+        "VALUE", "DIVIDEND OPPORTUNITIES", "HIGH DIVIDEND", "DIVIDEND", "EQUAL WEIGHT",
+    )) or _has_word(core_upper, "NV20"):
         return "EQUITY_FACTOR"
 
-    # 8. Sectoral & Thematic
-    if any(k in name_upper for k in [
-        "BANK", "BANKING", "IT", "PHARMA", "AUTO", "FMCG", "INFRA", "INFRASTRUCTURE",
-        "ENERGY", "METAL", "FINANCIAL SERVICES", "PSU BANK", "CPSE", "BHARAT 22",
-        "HEALTHCARE", "DIGITAL", "DEFENCE", "MANUFACTURING", "CONSUMPTION", "COMMODITIES",
-        "OIL & GAS", "REALTY", "MEDIA", "MIDCAP 50", "NEXT 50"
-    ]) and not ("NIFTY NEXT 50" in name_upper and "JUNIOR" in name_upper):
-        if "NIFTY NEXT 50" in name_upper or "JUNIOR BEES" in name_upper:
-            return "EQUITY_INDEX"
+    # 8. Broad-market domestic indices that must remain EQUITY_INDEX
+    if any(k in core_upper for k in ("NIFTY NEXT 50", "NEXT 50", "JUNIOR BEES", "JUNIORBEES", "MSCI INDIA")):
+        return "EQUITY_INDEX"
+
+    # 9. Sectoral & Thematic (strict word boundary on short tokens like IT, AUTO, PSU, PSE)
+    sectoral_phrases = (
+        "BANK", "BANKING", "BANKBEES", "PHARMA", "PHARMABEES", "FMCG", "INFRA", "INFRASTRUCTURE",
+        "INFRABEES", "ENERGY", "METAL", "METALS", "FINANCIAL SERVICES", "FIN SERVICES",
+        "PSU BANK", "PSUBNKBEES", "CPSE", "BHARAT 22", "HEALTHCARE", "DIGITAL", "DEFENCE",
+        "DEFENSE", "MANUFACTURING", "CONSUMPTION", "COMMODITIES", "OIL & GAS", "REALTY",
+        "MEDIA", "TOURISM", "EV & NEW AGE", "RAILWAYS", "ITBEES", "AUTOBEES",
+    )
+    sectoral_words = ("IT", "AUTO", "PSU", "PSE", "MNC")
+    if any(k in core_upper for k in sectoral_phrases) or any(_has_word(core_upper, w) for w in sectoral_words):
         return "EQUITY_SECTORAL"
 
-    # 9. Equity Index (Default broad market)
+    # 10. Equity Index (Default broad market)
     return "EQUITY_INDEX"
 
 
 def derive_underlying_index(scheme_name: str, category: str) -> str:
     """Derives standard benchmark index from ETF scheme name and category."""
-    name_upper = scheme_name.upper()
+    core_upper = _strip_amc_house(scheme_name)
 
     if category == "COMMODITY_GOLD":
         return "Domestic Price of Physical Gold (999 Purity)"
@@ -164,56 +188,105 @@ def derive_underlying_index(scheme_name: str, category: str) -> str:
     if category == "LIQUID":
         return "Nifty 1D Rate Index (TREPS)"
 
-    if "NIFTY 50" in name_upper and "NEXT 50" not in name_upper:
-        return "Nifty 50 TRI"
-    if "SENSEX" in name_upper:
-        return "BSE Sensex TRI"
-    if "NEXT 50" in name_upper or "JUNIOR" in name_upper:
-        return "Nifty Next 50 TRI"
-    if "BANK" in name_upper:
-        if "PSU" in name_upper:
-            return "Nifty PSU Bank TRI"
-        return "Nifty Bank TRI"
-    if "IT" in name_upper:
-        return "Nifty IT TRI"
-    if "PHARMA" in name_upper or "HEALTHCARE" in name_upper:
-        return "Nifty Healthcare TRI"
-    if "AUTO" in name_upper:
-        return "Nifty Auto TRI"
-    if "FMCG" in name_upper:
-        return "Nifty FMCG TRI"
-    if "INFRA" in name_upper:
-        return "Nifty Infrastructure TRI"
-    if "MIDCAP 150" in name_upper:
-        return "Nifty Midcap 150 TRI"
-    if "SMALLCAP 250" in name_upper:
-        return "Nifty Smallcap 250 TRI"
-    if "NIFTY 500" in name_upper:
-        return "Nifty 500 TRI"
-    if "MOMENTUM" in name_upper:
-        return "Nifty200 Momentum 30 TRI"
-    if "LOW VOL" in name_upper:
-        return "Nifty100 Low Volatility 30 TRI"
-    if "QUALITY" in name_upper:
-        return "Nifty200 Quality 30 TRI"
-    if "ALPHA" in name_upper:
-        return "Nifty Alpha 50 TRI"
-    if "VALUE 20" in name_upper or "NV20" in name_upper:
-        return "Nifty50 Value 20 TRI"
-    if "BHARAT BOND" in name_upper:
-        m = re.search(r"20[2-4][0-9]", name_upper)
+    # Debt benchmarks first so G-Sec / Gilt / Bharat Bond ETFs never collide with equity rules
+    if "BHARAT BOND" in core_upper:
+        m = re.search(r"20[2-4][0-9]", core_upper)
         year = m.group(0) if m else "2030"
         return f"Nifty BHARAT Bond Index - April {year}"
-    if "10 YR" in name_upper or "10 YEAR" in name_upper:
+    if "8-13 YR" in core_upper or "8-13 YEAR" in core_upper:
+        return "Nifty 8-13 yr G-Sec Index"
+    if "10 YR" in core_upper or "10 YEAR" in core_upper:
         return "Nifty 10 yr Benchmark G-Sec Index"
-    if "5 YR" in name_upper or "5 YEAR" in name_upper:
+    if "5 YR" in core_upper or "5 YEAR" in core_upper:
         return "Nifty 5 yr Benchmark G-Sec Index"
-    if "NASDAQ" in name_upper:
+    if category in ("DEBT_SOVEREIGN", "DEBT_TARGET_MATURITY"):
+        if "SDL" in core_upper:
+            return "Nifty SDL Index"
+        if "BROAD BASED GILT" in core_upper or "CRISIL" in core_upper:
+            return "CRISIL Broad Based Gilt Index"
+        return "Nifty All Duration G-Sec Index"
+
+    # International benchmarks
+    if "NASDAQ" in core_upper or "MON100" in core_upper:
         return "NASDAQ 100 TRI"
-    if "S&P 500" in name_upper:
+    if "S&P 500" in core_upper or "TOP 50 US" in core_upper:
         return "S&P 500 TRI"
-    if "FANG" in name_upper:
+    if "FANG" in core_upper:
         return "NYSE FANG+ Index"
+    if "HANG SENG" in core_upper or "HNGSNGBEES" in core_upper:
+        return "Hang Seng TECH / Composite TRI" if "TECH" in core_upper else "Hang Seng Index TRI"
+    if "TAIWAN" in core_upper:
+        return "Taiwanese Equity Index"
+    if category == "INTERNATIONAL":
+        return "Global Equity Benchmark Index"
+
+    # Smart-Beta / Factor benchmarks
+    if "MOMENTUM" in core_upper:
+        return "Nifty200 Momentum 30 TRI"
+    if "LOW VOL" in core_upper:
+        return "Nifty100 Low Volatility 30 TRI"
+    if "QUALITY" in core_upper:
+        return "Nifty200 Quality 30 TRI"
+    if "ALPHA" in core_upper:
+        return "Nifty Alpha 50 TRI"
+    if "VALUE 20" in core_upper or _has_word(core_upper, "NV20") or _has_word(core_upper, "VALUE"):
+        return "Nifty50 Value 20 TRI"
+    if "EQUAL WEIGHT" in core_upper:
+        return "Nifty100 Equal Weight TRI"
+    if "DIVIDEND" in core_upper:
+        return "Nifty Dividend Opportunities 50 TRI"
+
+    # Broad domestic equity benchmarks
+    if "NEXT 50" in core_upper or "JUNIOR" in core_upper:
+        return "Nifty Next 50 TRI"
+    if "NIFTY 50" in core_upper and "NIFTY 500" not in core_upper:
+        return "Nifty 50 TRI"
+    if "SENSEX" in core_upper:
+        return "BSE Sensex TRI"
+    if "MSCI INDIA" in core_upper:
+        return "MSCI India Index"
+    if "MIDCAP 150" in core_upper:
+        return "Nifty Midcap 150 TRI"
+    if "MIDCAP 100" in core_upper or "MIDCAP 50" in core_upper:
+        return "Nifty Midcap 100 TRI"
+    if "SMALLCAP 250" in core_upper:
+        return "Nifty Smallcap 250 TRI"
+    if "NIFTY 500" in core_upper or "BSE 500" in core_upper:
+        return "Nifty 500 TRI"
+    if "NIFTY 100" in core_upper:
+        return "Nifty 100 TRI"
+
+    # Sectoral / Thematic benchmarks
+    if "BANK" in core_upper:
+        if _has_word(core_upper, "PSU") or "PSUBNK" in core_upper:
+            return "Nifty PSU Bank TRI"
+        if "PRIVATE" in core_upper:
+            return "Nifty Private Bank TRI"
+        return "Nifty Bank TRI"
+    if "FINANCIAL SERVICES" in core_upper or "FIN SERVICES" in core_upper:
+        return "Nifty Financial Services TRI"
+    if _has_word(core_upper, "IT") or "ITBEES" in core_upper or "INFORMATION TECHNOLOGY" in core_upper:
+        return "Nifty IT TRI"
+    if "PHARMA" in core_upper or "HEALTHCARE" in core_upper:
+        return "Nifty Healthcare TRI"
+    if _has_word(core_upper, "AUTO") or "AUTOBEES" in core_upper or "AUTOMOTIVE" in core_upper:
+        return "Nifty Auto TRI"
+    if "FMCG" in core_upper or "CONSUMPTION" in core_upper:
+        return "Nifty FMCG TRI" if "FMCG" in core_upper else "Nifty India Consumption TRI"
+    if "INFRA" in core_upper:
+        return "Nifty Infrastructure TRI"
+    if _has_word(core_upper, "PSE") or "CPSE" in core_upper or "BHARAT 22" in core_upper:
+        return "CPSE Index TRI" if "CPSE" in core_upper else "Nifty PSE TRI"
+    if "METAL" in core_upper:
+        return "Nifty Metal TRI"
+    if "ENERGY" in core_upper or "OIL & GAS" in core_upper:
+        return "Nifty Energy TRI"
+    if "DEFENCE" in core_upper or "DEFENSE" in core_upper:
+        return "Nifty India Defence TRI"
+    if "MANUFACTURING" in core_upper:
+        return "Nifty India Manufacturing TRI"
+    if "REALTY" in core_upper:
+        return "Nifty Realty TRI"
 
     return "Nifty 50 TRI"
 

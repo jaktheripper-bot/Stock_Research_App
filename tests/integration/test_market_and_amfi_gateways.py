@@ -613,12 +613,24 @@ class TestAMFIParsingAndCategorization(unittest.TestCase):
         self.assertEqual(derive_etf_category("Mirae Asset Nifty Midcap 150 ETF"), "EQUITY_INDEX")
         self.assertEqual(derive_etf_category("Nippon India ETF Nifty Bank BeES"), "EQUITY_SECTORAL")
         self.assertEqual(derive_etf_category("UTI Nifty200 Momentum 30 ETF"), "EQUITY_FACTOR")
+        # AMC Prefix collision guards (ADITYA contains IT but must NOT trigger EQUITY_SECTORAL for broad index)
+        self.assertEqual(derive_etf_category("Aditya Birla Sun Life BSE Sensex ETF"), "EQUITY_INDEX")
+        self.assertEqual(derive_etf_category("Aditya Birla Sun Life Nifty 50 ETF"), "EQUITY_INDEX")
+        self.assertEqual(derive_etf_category("Aditya Birla Sun Life Nifty IT ETF"), "EQUITY_SECTORAL")
+        # Factor / Smart Beta verification
+        self.assertEqual(derive_etf_category("Axis Nifty500 Value 50 ETF"), "EQUITY_FACTOR")
+        self.assertEqual(derive_etf_category("Mirae Asset BSE 500 Dividend Leaders 50 ETF"), "EQUITY_FACTOR")
+        self.assertEqual(derive_etf_category("Nippon India ETF Nifty Next 50 Junior BeES"), "EQUITY_INDEX")
 
     def test_underlying_index_derivation(self):
         self.assertEqual(derive_underlying_index("Nippon India ETF Gold BeES", "COMMODITY_GOLD"), "Domestic Price of Physical Gold (999 Purity)")
         self.assertEqual(derive_underlying_index("Nippon India ETF Liquid BeES", "LIQUID"), "Nifty 1D Rate Index (TREPS)")
         self.assertIn("Nifty 50", derive_underlying_index("HDFC Nifty 50 ETF", "EQUITY_INDEX"))
         self.assertIn("Momentum", derive_underlying_index("UTI Nifty200 Momentum 30 ETF", "EQUITY_FACTOR"))
+        # AMC Prefix stripped benchmark derivation
+        self.assertEqual(derive_underlying_index("Aditya Birla Sun Life BSE Sensex ETF", "EQUITY_INDEX"), "BSE Sensex TRI")
+        self.assertEqual(derive_underlying_index("Nippon India ETF Nifty IT", "EQUITY_SECTORAL"), "Nifty IT TRI")
+        self.assertEqual(derive_underlying_index("Edelweiss BHARAT Bond ETF - April 2030", "DEBT_TARGET_MATURITY"), "Nifty BHARAT Bond Index - April 2030")
 
     def test_fof_filtering_in_feed_parser(self):
         sample_feed = (
