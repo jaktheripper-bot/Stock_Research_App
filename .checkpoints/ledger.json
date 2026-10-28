@@ -1966,5 +1966,21 @@
       "revision_count": 1040
     },
     "preflight_passed": true
+  },
+  {
+    "tag": "checkpoint_20261028_085128_fund_overlap_auditor_fail_closed_persistence_gate",
+    "timestamp": "2026-10-28 08:51:28 IST",
+    "commit_sha": "44f3e6715f9550a9aa1d26a7ba9388965ecdd858",
+    "branch": "main",
+    "description": "fund_overlap_auditor_fail_closed_persistence_gate",
+    "database": {
+      "exists": true,
+      "filename": "reports_checkpoint_20261028_085128_fund_overlap_auditor_fail_closed_persistence_gate.db",
+      "path": ".checkpoints/reports_checkpoint_20261028_085128_fund_overlap_auditor_fail_closed_persistence_gate.db",
+      "size_bytes": 34918400,
+      "report_count": 307,
+      "revision_count": 1040
+    },
+    "preflight_passed": true
   }
 ]

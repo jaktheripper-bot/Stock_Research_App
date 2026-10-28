@@ -10,7 +10,7 @@
 
 | Checkpoint Tag | IST Timestamp | Commit | DB Reports | Description |
 |:---|:---|:---|:---|:---|
-| `checkpoint_20261028_085128_fund_overlap_auditor_fail_closed_persistence_gate` | 2026-10-28 08:51:28 IST | `41de0ef` | 307 rep / 1040 rev | fund_overlap_auditor_fail_closed_persistence_gate |
+| `checkpoint_20261028_085128_fund_overlap_auditor_fail_closed_persistence_gate` | 2026-10-28 08:51:28 IST | `44f3e67` | 307 rep / 1040 rev | fund_overlap_auditor_fail_closed_persistence_gate |
 | `checkpoint_20261028_084604_etf_ingest_category_and_index_derivation_hardening` | 2026-10-28 08:46:04 IST | `5342155` | 307 rep / 1040 rev | etf_ingest_category_and_index_derivation_hardening |
 | `checkpoint_20261028_083757_equity_dossier_varan_and_setu_fail_closed` | 2026-10-28 08:37:57 IST | `befb0a4` | 307 rep / 1040 rev | equity_dossier_varan_and_setu_fail_closed |
 | `checkpoint_20261028_083129_equity_dossier_effective_industry_and_name_resolution` | 2026-10-28 08:31:29 IST | `98dfb01` | 307 rep / 1040 rev | equity_dossier_effective_industry_and_name_resolution |
