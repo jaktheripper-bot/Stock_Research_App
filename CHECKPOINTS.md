@@ -1,6 +1,6 @@
 # Production Release Checkpoints & Disaster Recovery Ledger
-**Last Checkpoint:** 2026-10-28 08:37:57 IST  
-**Total Verified Rollback Points:** 122  
+**Last Checkpoint:** 2026-10-28 08:46:04 IST  
+**Total Verified Rollback Points:** 123  
 
 > [!NOTE]
 > These checkpoints represent byte-for-byte verified working releases that passed the 4-tier pre-flight audit.
@@ -10,6 +10,7 @@
 
 | Checkpoint Tag | IST Timestamp | Commit | DB Reports | Description |
 |:---|:---|:---|:---|:---|
+| `checkpoint_20261028_084604_etf_ingest_category_and_index_derivation_hardening` | 2026-10-28 08:46:04 IST | `3ce6adc` | 307 rep / 1040 rev | etf_ingest_category_and_index_derivation_hardening |
 | `checkpoint_20261028_083757_equity_dossier_varan_and_setu_fail_closed` | 2026-10-28 08:37:57 IST | `befb0a4` | 307 rep / 1040 rev | equity_dossier_varan_and_setu_fail_closed |
 | `checkpoint_20261028_083129_equity_dossier_effective_industry_and_name_resolution` | 2026-10-28 08:31:29 IST | `98dfb01` | 307 rep / 1040 rev | equity_dossier_effective_industry_and_name_resolution |
 | `checkpoint_20261028_080928_known_ticker_sectors_and_detect_sector_cascade` | 2026-10-28 08:09:28 IST | `07d7a11` | 307 rep / 1040 rev | known_ticker_sectors_and_detect_sector_cascade |
