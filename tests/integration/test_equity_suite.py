@@ -118,6 +118,16 @@ class TestEquityUpgrades(unittest.TestCase):
         self.assertEqual(detect_sector("TCS", "Software Consulting"), "IT_TECH")
         self.assertEqual(detect_sector("SUNPHARMA", "Pharmaceuticals"), "HEALTHCARE_PHARMA")
         self.assertEqual(detect_sector("L&T", "Engineering & Construction"), "CAPITAL_GOODS_INFRA")
+        # Direct KNOWN_TICKER_SECTORS expansions
+        self.assertEqual(detect_sector("BIOCON"), "HEALTHCARE_PHARMA")
+        self.assertEqual(detect_sector("ATHER"), "AUTOMOTIVE")
+        self.assertEqual(detect_sector("ZOMATO"), "CONSUMER_FMCG")
+        self.assertEqual(detect_sector("PIDILITIND"), "CHEMICALS_MATERIALS")
+        self.assertEqual(detect_sector("DLF"), "CAPITAL_GOODS_INFRA")
+        self.assertEqual(detect_sector("AVANTEL"), "IT_TECH")
+        # Edge cases: NONE string and empty
+        self.assertEqual(detect_sector("NONE"), "CONSUMER_FMCG")
+        self.assertEqual(detect_sector(""), "CONSUMER_FMCG")
 
     def test_sector_display_names_and_word_boundaries(self):
         # 1. Verify all 8 core sectors have defined display names
@@ -129,7 +139,7 @@ class TestEquityUpgrades(unittest.TestCase):
 
         # 2. Verify word-boundary enforcement prevents 'LIMITED' from triggering IT_TECH
         self.assertEqual(detect_sector("ABC", company_name="ABC Limited"), "CONSUMER_FMCG")
-        self.assertEqual(detect_sector("BIOCON", "Pharmaceuticals", "Biocon Limited"), "HEALTHCARE_PHARMA")
+        self.assertEqual(detect_sector("BIOCON", company_name="Biocon Limited"), "HEALTHCARE_PHARMA")
         self.assertEqual(detect_sector("VEDL", "Metals & Mining", "Vedanta Limited"), "COMMODITIES_ENERGY")
         self.assertEqual(detect_sector("TATAMOTORS", "Automobiles", "Tata Motors Limited"), "AUTOMOTIVE")
 

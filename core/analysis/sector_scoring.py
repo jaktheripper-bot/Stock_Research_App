@@ -190,34 +190,118 @@ KNOWN_TICKER_SECTORS = {
     "LTIM": "IT_TECH",
     "KPITTECH": "IT_TECH",
     "TATAELXSI": "IT_TECH",
+    "COFORGE": "IT_TECH",
+    "PERSISTENT": "IT_TECH",
+    "MPHASIS": "IT_TECH",
+    "OFSS": "IT_TECH",
+    "BHARTIARTL": "IT_TECH",
+    "BHARTI AIRTEL": "IT_TECH",
+    "AVANTEL": "IT_TECH",
+    "INDUSINDBK": "BFSI",
+    "HDFCBANK": "BFSI",
+    "ICICIBANK": "BFSI",
+    "SBIN": "BFSI",
+    "SBILIFE": "BFSI",
+    "SBICARD": "BFSI",
+    "LICI": "BFSI",
+    "KOTAKBANK": "BFSI",
+    "AXISBANK": "BFSI",
+    "BAJFINANCE": "BFSI",
+    "BAJAJFINSV": "BFSI",
+    "JIOFIN": "BFSI",
+    "BSE": "BFSI",
+    "MCX": "BFSI",
+    "CDSL": "BFSI",
+    "ANGELONE": "BFSI",
+    "CHOLAFIN": "BFSI",
+    "SHRIRAMFIN": "BFSI",
+    "MUTHOOTFIN": "BFSI",
+    "PFC": "BFSI",
+    "RECLTD": "BFSI",
+    "IRFC": "BFSI",
     "RELIANCE": "COMMODITIES_ENERGY",
     "TATASTEEL": "COMMODITIES_ENERGY",
+    "TATA STEEL": "COMMODITIES_ENERGY",
     "JSWSTEEL": "COMMODITIES_ENERGY",
     "HINDALCO": "COMMODITIES_ENERGY",
+    "VEDL": "COMMODITIES_ENERGY",
     "COALINDIA": "COMMODITIES_ENERGY",
     "ONGC": "COMMODITIES_ENERGY",
     "IOC": "COMMODITIES_ENERGY",
     "BPCL": "COMMODITIES_ENERGY",
+    "HPCL": "COMMODITIES_ENERGY",
+    "HINDPETRO": "COMMODITIES_ENERGY",
+    "GAIL": "COMMODITIES_ENERGY",
+    "NTPC": "COMMODITIES_ENERGY",
+    "POWERGRID": "COMMODITIES_ENERGY",
+    "TATAPOWER": "COMMODITIES_ENERGY",
+    "CESC": "COMMODITIES_ENERGY",
     "SUNPHARMA": "HEALTHCARE_PHARMA",
     "DRREDDY": "HEALTHCARE_PHARMA",
     "CIPLA": "HEALTHCARE_PHARMA",
     "DIVISLAB": "HEALTHCARE_PHARMA",
+    "LUPIN": "HEALTHCARE_PHARMA",
+    "BIOCON": "HEALTHCARE_PHARMA",
+    "SYNGENE": "HEALTHCARE_PHARMA",
     "APOLLOHOSP": "HEALTHCARE_PHARMA",
+    "MAXHEALTH": "HEALTHCARE_PHARMA",
+    "MANKIND": "HEALTHCARE_PHARMA",
     "TATAMOTORS": "AUTOMOTIVE",
+    "TATA MOTORS": "AUTOMOTIVE",
+    "TMCV": "AUTOMOTIVE",
+    "TMPV": "AUTOMOTIVE",
     "M&M": "AUTOMOTIVE",
     "MARUTI": "AUTOMOTIVE",
     "BAJAJ-AUTO": "AUTOMOTIVE",
+    "BAJAJ AUTO": "AUTOMOTIVE",
     "HEROMOTOCO": "AUTOMOTIVE",
+    "EICHERMOT": "AUTOMOTIVE",
+    "TVSMOTOR": "AUTOMOTIVE",
+    "TVS": "AUTOMOTIVE",
+    "BOSCHLTD": "AUTOMOTIVE",
+    "MOTHERSON": "AUTOMOTIVE",
+    "ATHER": "AUTOMOTIVE",
+    "ATHER ENERGY LTD": "AUTOMOTIVE",
+    "OLA": "AUTOMOTIVE",
+    "OLAELECTRIC": "AUTOMOTIVE",
     "LT": "CAPITAL_GOODS_INFRA",
     "L&T": "CAPITAL_GOODS_INFRA",
     "SIEMENS": "CAPITAL_GOODS_INFRA",
     "ABB": "CAPITAL_GOODS_INFRA",
     "BHEL": "CAPITAL_GOODS_INFRA",
+    "BEL": "CAPITAL_GOODS_INFRA",
+    "HAL": "CAPITAL_GOODS_INFRA",
+    "BDL": "CAPITAL_GOODS_INFRA",
+    "3MINDIA": "CAPITAL_GOODS_INFRA",
+    "HONAUT": "CAPITAL_GOODS_INFRA",
+    "CUMMINSIND": "CAPITAL_GOODS_INFRA",
+    "THERMAX": "CAPITAL_GOODS_INFRA",
+    "AEQUS": "CAPITAL_GOODS_INFRA",
+    "ADANIENT": "CAPITAL_GOODS_INFRA",
+    "ADANIPORTS": "CAPITAL_GOODS_INFRA",
+    "INDIGO": "CAPITAL_GOODS_INFRA",
+    "INTERGLOBE": "CAPITAL_GOODS_INFRA",
+    "DLF": "CAPITAL_GOODS_INFRA",
+    "POLYCAB": "CAPITAL_GOODS_INFRA",
+    "KEI": "CAPITAL_GOODS_INFRA",
+    "HAVELLS": "CAPITAL_GOODS_INFRA",
+    "PIDILITIND": "CHEMICALS_MATERIALS",
+    "SRF": "CHEMICALS_MATERIALS",
+    "PIIND": "CHEMICALS_MATERIALS",
+    "UPL": "CHEMICALS_MATERIALS",
+    "DEEPAKNTR": "CHEMICALS_MATERIALS",
+    "NAVINFLUOR": "CHEMICALS_MATERIALS",
+    "AETHER": "CHEMICALS_MATERIALS",
     "HINDUNILVR": "CONSUMER_FMCG",
     "ITC": "CONSUMER_FMCG",
     "NESTLEIND": "CONSUMER_FMCG",
     "BRITANNIA": "CONSUMER_FMCG",
     "TITAN": "CONSUMER_FMCG",
+    "TRENT": "CONSUMER_FMCG",
+    "ZOMATO": "CONSUMER_FMCG",
+    "ETERNAL": "CONSUMER_FMCG",
+    "SWIGGY": "CONSUMER_FMCG",
+    "DMART": "CONSUMER_FMCG",
 }
 
 
@@ -227,29 +311,45 @@ def detect_sector(
     company_name: str = ""
 ) -> str:
     """
-    Infers the high-level sector classification using symbol, industry description, and name.
-    Hardened against null and non-string tickers.
+    Infers high-level sector classification using symbol, industry metadata, and stripped
+    company name with strict regex word boundaries.
     """
     clean_sym = str(ticker or "").upper().replace("-EQ", "").strip()
+    if not clean_sym or clean_sym == "NONE":
+        return "CONSUMER_FMCG"
+
     if clean_sym in KNOWN_TICKER_SECTORS:
         return KNOWN_TICKER_SECTORS[clean_sym]
 
-    # Priority rule: Direct BFSI banking tickers
-    if any(b in clean_sym for b in ["BANK", "HDFC", "ICICI", "KOTAK", "AXIS", "SBIN", "PNB", "INDUSIND"]):
+    if any(b in clean_sym for b in ("BANK", "HDFC", "ICICI", "KOTAK", "AXIS", "SBIN", "PNB", "INDUSIND")):
         return "BFSI"
 
     clean_ind = str(industry_str or "").strip()
-    if clean_ind.upper() in _GENERIC_SECTOR_LABELS:
-        clean_ind = ""
-    clean_comp = _CORP_NOISE_RE.sub(" ", str(company_name or "")).strip()
-
-    text_to_check = f"{clean_sym} {clean_ind} {clean_comp}".strip()
-    for sector, patterns in _COMPILED_SECTOR_PATTERNS.items():
-        for pat in patterns:
-            if pat.search(text_to_check):
+    if clean_ind.upper() not in _GENERIC_SECTOR_LABELS:
+        for sector, patterns in _COMPILED_SECTOR_PATTERNS.items():
+            if any(p.search(clean_ind) for p in patterns):
                 return sector
 
-    return "CONSUMER_FMCG"  # Default generalized industrial category
+    stripped_name = _CORP_NOISE_RE.sub(" ", str(company_name or ""))
+    name_and_sym = f"{clean_sym} {stripped_name}"
+    for sector, patterns in _COMPILED_SECTOR_PATTERNS.items():
+        if any(p.search(name_and_sym) for p in patterns):
+            return sector
+
+    if clean_ind.upper() in _GENERIC_SECTOR_LABELS and not clean_sym.isdigit():
+        try:
+            from core.db.fundamentals import get_cached_fundamentals
+            cf = get_cached_fundamentals(clean_sym)
+            if isinstance(cf, dict):
+                cf_meta = f"{cf.get('sector') or ''} {cf.get('industry') or ''}".strip()
+                if cf_meta and cf_meta.upper() not in _GENERIC_SECTOR_LABELS:
+                    for sector, patterns in _COMPILED_SECTOR_PATTERNS.items():
+                        if any(p.search(cf_meta) for p in patterns):
+                            return sector
+        except Exception as cf_err:
+            logger.debug("Cached sector lookup notice for %s: %s", clean_sym, cf_err)
+
+    return "CONSUMER_FMCG"
 
 
 def evaluate_sector_fundamentals(
