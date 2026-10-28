@@ -61,35 +61,35 @@ def compile_equity_dossier(
     # 4. Forensic & Governance Sieve
     forensic_data = evaluate_forensic_sieve(
         symbol=ticker,
-        fundamentals=fundamentals
+        fundamentals=fund_dict
     )
 
     # 5. Multi-Model Valuation Radar
     raw_price = (
         (angel_quote.get("ltp") if angel_quote else None) or 
-        fundamentals.get("current_price") or 
-        fundamentals.get("base_price") or 
+        fund_dict.get("current_price") or 
+        fund_dict.get("base_price") or 
         0.0
     )
     current_price = _safe_float(raw_price, 0.0)
     
-    raw_pe = fundamentals.get("pe_ratio")
-    pe_ratio = _safe_float(raw_pe, 0.0) or _safe_float(fundamentals.get("forward_pe"), 0.0)
+    raw_pe = fund_dict.get("pe_ratio")
+    pe_ratio = _safe_float(raw_pe, 0.0) or _safe_float(fund_dict.get("forward_pe"), 0.0)
 
-    raw_growth = fundamentals.get("sales_growth_3y")
+    raw_growth = fund_dict.get("sales_growth_3y")
     sales_growth = _safe_float(raw_growth, 12.0) if raw_growth is not None else None
     
     valuation_data = compute_valuation_radar(
         current_price=current_price,
         pe_ratio=pe_ratio,
         sales_growth_3y=sales_growth,
-        eps=fundamentals.get("eps"),
+        eps=fund_dict.get("eps"),
     )
 
     # 6. Bull vs. Bear Thesis Synthesis
     bull_bear_data = synthesize_bull_bear_thesis(
         ticker=ticker,
-        fundamentals=fundamentals,
+        fundamentals=fund_dict,
         sector_data=sector_data,
         valuation_data=valuation_data,
         forensic_data=forensic_data,
@@ -142,43 +142,47 @@ def compile_equity_dossier(
         composite_verdict = "ELEVATED_VULNERABILITY"
         composite_color = "#ef4444"
 
-    # 8. Varan Deterministic Financial Ingestion & Delta Packet
+    # 8. Varan Deterministic Financial Ingestion & Delta Packet (fail-closed without genuine revenue series)
     varan_packet = None
-    try:
-        from core.cortex.varan import VaranEngine
-        rev = float(fundamentals.get("revenue_cr") or 100.0)
-        ebitda = float(fundamentals.get("ebitda_cr") or 20.0)
-        pat = float(fundamentals.get("pat_cr") or 10.0)
-        cfo = float(fundamentals.get("operating_cash_flow_cr") or 15.0)
-        capex = float(fundamentals.get("capex_cr") or 5.0)
-        bs = fundamentals.get("balance_sheet") if isinstance(fundamentals.get("balance_sheet"), dict) else {}
-        varan_packet = VaranEngine.compile_delta_packet(
-            symbol=ticker,
-            annual_revenues=fundamentals.get("historical_revenues") or [rev],
-            annual_ebitda=fundamentals.get("historical_ebitda") or [ebitda],
-            annual_pat=fundamentals.get("historical_pat") or [pat],
-            annual_cfo=fundamentals.get("historical_cfo") or [cfo],
-            annual_capex=fundamentals.get("historical_capex") or [capex],
-            latest_balance_sheet=bs,
-        )
-    except Exception as e:
-        logger.debug(f"VaranEngine compilation notice for {ticker}: {e}")
+    hist_rev = fund_dict.get("historical_revenues")
+    rev_raw = fund_dict.get("revenue_cr")
+    if (isinstance(hist_rev, list) and len(hist_rev) > 0) or (rev_raw is not None and _safe_float(rev_raw, 0.0) > 0):
+        try:
+            from core.cortex.varan import VaranEngine
+            rev = _safe_float(rev_raw, 0.0)
+            ebitda = _safe_float(fund_dict.get("ebitda_cr"), 0.0)
+            pat = _safe_float(fund_dict.get("pat_cr"), 0.0)
+            cfo = _safe_float(fund_dict.get("operating_cash_flow_cr"), 0.0)
+            capex = _safe_float(fund_dict.get("capex_cr"), 0.0)
+            bs = fund_dict.get("balance_sheet") if isinstance(fund_dict.get("balance_sheet"), dict) else {}
+            varan_packet = VaranEngine.compile_delta_packet(
+                symbol=ticker,
+                annual_revenues=hist_rev or [rev],
+                annual_ebitda=fund_dict.get("historical_ebitda") or [ebitda],
+                annual_pat=fund_dict.get("historical_pat") or [pat],
+                annual_cfo=fund_dict.get("historical_cfo") or [cfo],
+                annual_capex=fund_dict.get("historical_capex") or [capex],
+                latest_balance_sheet=bs,
+            )
+        except Exception as e:
+            logger.debug(f"VaranEngine compilation notice for {ticker}: {e}")
 
-    # 9. Setu Cross-Asset Capital Structure Matrix
+    # 9. Setu Cross-Asset Capital Structure Matrix (fail-closed without genuine FCF yield)
     setu_matrix = None
-    try:
-        from core.cortex.setu import SetuMatrixEngine
-        fcf_yield = float(fundamentals.get("fcf_yield_pct") or 5.0)
-        rating = str(fundamentals.get("credit_rating") or "AAA")
-        pledge = float(fundamentals.get("promoter_pledge_pct") or 0.0)
-        setu_matrix = SetuMatrixEngine.evaluate(
-            symbol=ticker,
-            equity_fcf_yield_pct=fcf_yield,
-            debt_credit_rating=rating,
-            promoter_pledge_pct=pledge,
-        )
-    except Exception as e:
-        logger.debug(f"SetuMatrixEngine evaluation notice for {ticker}: {e}")
+    if fund_dict.get("fcf_yield_pct") is not None:
+        try:
+            from core.cortex.setu import SetuMatrixEngine
+            fcf_yield = _safe_float(fund_dict.get("fcf_yield_pct"), 0.0)
+            rating = str(fund_dict.get("credit_rating") or "UNRATED")
+            pledge = _safe_float(fund_dict.get("promoter_pledge_pct"), 0.0)
+            setu_matrix = SetuMatrixEngine.evaluate(
+                symbol=ticker,
+                equity_fcf_yield_pct=fcf_yield,
+                debt_credit_rating=rating,
+                promoter_pledge_pct=pledge,
+            )
+        except Exception as e:
+            logger.debug(f"SetuMatrixEngine evaluation notice for {ticker}: {e}")
 
     # 10. Epistemic Ledger & Falsification Triggers
     epistemic_ledger = None
@@ -186,7 +190,7 @@ def compile_equity_dossier(
         from core.analysis.epistemic_schema import build_equity_epistemic_ledger
         epistemic_ledger = build_equity_epistemic_ledger(
             ticker=ticker,
-            stock_data=fundamentals,
+            stock_data=fund_dict,
             equity_intel={
                 "sector_intelligence": sector_data,
                 "forensic_intelligence": forensic_data,

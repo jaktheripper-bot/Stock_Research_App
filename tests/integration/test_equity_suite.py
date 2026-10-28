@@ -335,6 +335,49 @@ class TestEquityUpgrades(unittest.TestCase):
         )
         self.assertEqual(intel_3["sector_intelligence"]["sector"], "HEALTHCARE_PHARMA")
 
+    def test_compile_equity_dossier_varan_and_setu_fail_closed(self):
+        # 1. Empty fundamentals -> fail closed: both varan_delta_packet and setu_capital_matrix are None
+        intel_empty = compile_equity_dossier("EMPTY_CO", {})
+        self.assertIsNone(intel_empty["varan_delta_packet"])
+        self.assertIsNone(intel_empty["setu_capital_matrix"])
+
+        # 2. Non-dict fundamentals (None) -> fail closed
+        intel_none = compile_equity_dossier("NONE_CO", None)
+        self.assertIsNone(intel_none["varan_delta_packet"])
+        self.assertIsNone(intel_none["setu_capital_matrix"])
+
+        # 3. Scalar revenue_cr only -> varan compiled, setu stays None
+        fund_rev_only = {
+            "revenue_cr": 2500.0,
+            "ebitda_cr": 500.0,
+            "pat_cr": 300.0,
+        }
+        intel_rev = compile_equity_dossier("REV_CO", fund_rev_only)
+        self.assertIsNotNone(intel_rev["varan_delta_packet"])
+        self.assertIsNone(intel_rev["setu_capital_matrix"])
+
+        # 4. FCF yield only -> setu compiled, varan stays None
+        fund_fcf_only = {
+            "fcf_yield_pct": 5.2,
+            "credit_rating": "AA",
+            "promoter_pledge_pct": 2.5,
+        }
+        intel_fcf = compile_equity_dossier("FCF_CO", fund_fcf_only)
+        self.assertIsNone(intel_fcf["varan_delta_packet"])
+        self.assertIsNotNone(intel_fcf["setu_capital_matrix"])
+
+        # 5. Full financial fundamentals -> both compiled
+        fund_full = {
+            "historical_revenues": [1000.0, 1200.0, 1500.0],
+            "historical_ebitda": [200.0, 260.0, 350.0],
+            "historical_pat": [100.0, 140.0, 200.0],
+            "fcf_yield_pct": 4.8,
+            "credit_rating": "AAA",
+        }
+        intel_full = compile_equity_dossier("FULL_CO", fund_full)
+        self.assertIsNotNone(intel_full["varan_delta_packet"])
+        self.assertIsNotNone(intel_full["setu_capital_matrix"])
+
     def test_missing_fundamentals_honest_reporting(self):
         res = evaluate_sector_fundamentals("TESTCO", {})
         self.assertIn("coverage", res)
