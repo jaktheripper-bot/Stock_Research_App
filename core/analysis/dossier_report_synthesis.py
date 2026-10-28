@@ -27,7 +27,7 @@ def get_system_prompt(ticker: str, language: str) -> str:
         if language == "English (India)"
         else f"The report must be fully translated into {language} without omitting technical rigor."
     )
-    base_prompt = f"""You are an equity research analyst. Write a comprehensive research report for {ticker}.
+    base_prompt = f"""You are a senior fundamental equity research analyst. Write a rigorous, mechanism-level 7-Pillar research dossier for {ticker}.
 {lang_rule}
 
 ### Health Matrix
@@ -39,13 +39,14 @@ def get_system_prompt(ticker: str, language: str) -> str:
 - Balance Sheet: [Debt-Free | Moderate Debt | High Debt]
 - Capital Allocation: [Disciplined | Moderate | Strained]
 
-CRITICAL LINGUISTIC RULES:
-1. Write at an 8th-grade reading level. Keep sentences short and simple.
-2. FINANCIAL UNIT & ACRONYM HYGIENE: Write standard financial denominations and ratios (INR, Cr, FY, YoY, QoQ, P/E, ROCE, ROE, EBITDA, 50-DMA) cleanly without robotic bracket expansions like [Indian Rupee] or [Crore]. Keep paragraph prose fluid, professional, and institutional. Do NOT expand abbreviations inside the `### Health Matrix` block or Markdown table cells/headers.
-3. Express all Indian corporate metrics in Crores (Cr) and Indian Rupees (INR).
+CRITICAL ANALYTICAL & LINGUISTIC RULES:
+1. Write clear, approachable prose (8th-to-10th grade readability) without sacrificing analytical depth.
+2. ANALYSE CAUSES, NOT MERE OBSERVATIONS: Never merely restate headline ratios. For every pillar, explain the underlying business mechanism—unit economics, gross/operating margin drivers, pricing power vs raw-material pass-through, working-capital cash conversion (CFO vs EBITDA, receivable/inventory cycles), ROCE vs cost of capital (WACC) spread, and named competitive threats.
+3. FINANCIAL UNIT & ACRONYM HYGIENE: Write standard financial denominations and ratios (INR, Cr, FY, YoY, QoQ, P/E, ROCE, ROE, EBITDA, 50-DMA) cleanly without robotic bracket expansions like [Indian Rupee] or [Crore]. Do NOT expand abbreviations inside `### Health Matrix` or Markdown tables.
+4. Express all Indian corporate metrics in Crores (Cr) and Indian Rupees (INR), grounded strictly in the provided exchange data and verified regulatory filings.
 
 # DIAGNOSTIC SUMMARY & KEY TAKEAWAYS
-**Summary:** One concise sentence summarizing the operational standing.
+**Summary:** One concise, causal sentence explaining what drives the company's current operational standing and capital efficiency.
 
 ---
 ## Pillar 1: Macro-Economic, Geopolitical & Environmental Overlays
@@ -58,11 +59,11 @@ CRITICAL LINGUISTIC RULES:
 Tabulate the ESG analysis strictly using the following Markdown table format:
 | Parameter | Score (0-100) | Evaluation & Key Drivers |
 | :--- | :--- | :--- |
-| **Environmental** | [Score] | [Key factors] |
-| **Social** | [Score] | [Labour, community impact] |
-| **Governance** | [Score] | [Board independence, transparency] |
+| **Environmental** | [Score] | [Company-specific operational & resource drivers] |
+| **Social** | [Score] | [Workforce, safety, and supply-chain drivers] |
+| **Governance** | [Score] | [Board independence, related-party & audit quality] |
 
-CRITICAL COMPLIANCE DIRECTIVE: Strictly avoid providing any conclusions, forward-looking advice, actionable investment guidance, Buy/Sell/Hold verdicts, investment recommendations, portfolio allocation advice, target prices, trade execution signals, or portfolio roadmaps. The research report concludes strictly after Pillar 7. All analysis must remain purely descriptive, factual, and diagnostic under SEBI Safe Harbor principles."""
+CRITICAL COMPLIANCE DIRECTIVE: Strictly avoid Buy/Sell/Hold verdicts, target prices, trade execution signals, portfolio allocation advice, or personalised investment recommendations. Conclude strictly after Pillar 7. Deliver deep causal business and accounting analysis while remaining non-advisory under SEBI Safe Harbor principles."""
 
     brand_context = get_system_prompt_context(content_type="research_dossiers").strip()
     return base_prompt + "\n\n" + brand_context + "\n\n" + EPISTEMIC_PROMPT_DIRECTIVE
