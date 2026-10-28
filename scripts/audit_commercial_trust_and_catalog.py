@@ -74,10 +74,15 @@ def run_trust_and_catalog_audit(sqlite_path: Optional[str] = None) -> Dict[str, 
         try:
             cur.execute("SELECT COUNT(*) FROM user_accounts WHERE credits_balance < 0")
             negative_balances = cur.fetchone()[0]
-            cur.execute("SELECT COUNT(*) FROM user_credit_ledger WHERE delta < 0")
+            cur.execute("SELECT COUNT(*) FROM credit_usage_ledger WHERE credits_consumed > 0")
             charges_count = cur.fetchone()[0]
-            cur.execute("SELECT COUNT(*) FROM user_credit_ledger WHERE reason LIKE '%REFUND%'")
-            refunds_count = cur.fetchone()[0]
+            cur.execute(
+                "SELECT COUNT(*) FROM credit_usage_ledger WHERE UPPER(COALESCE(action_type, '')) LIKE '%REFUND%' OR credits_consumed < 0"
+            )
+            usage_refunds = cur.fetchone()[0]
+            cur.execute("SELECT COUNT(*) FROM credit_transactions WHERE refunded_at IS NOT NULL")
+            tx_refunds = cur.fetchone()[0]
+            refunds_count = int(usage_refunds or 0) + int(tx_refunds or 0)
 
             summary["credit_ledger_health"] = {
                 "negative_balances_count": negative_balances,
@@ -88,6 +93,11 @@ def run_trust_and_catalog_audit(sqlite_path: Optional[str] = None) -> Dict[str, 
             if negative_balances > 0:
                 summary["failures"].append(f"Found {negative_balances} user accounts with negative credit balances!")
         except Exception as cl_err:
+            if is_pg:
+                try:
+                    conn.rollback()
+                except Exception as rb_err:
+                    logger.debug("Credit ledger rollback notice: %s", rb_err)
             summary["credit_ledger_health"] = {"status": "SKIPPED", "notice": str(cl_err)}
 
         # 2. Audit Homepage Flagship Sample Stock (INFY)
@@ -114,14 +124,20 @@ def run_trust_and_catalog_audit(sqlite_path: Optional[str] = None) -> Dict[str, 
                     "notice": "INFY not in cached_fundamentals; fallback to reports text",
                 }
         except Exception as infy_err:
+            if is_pg:
+                try:
+                    conn.rollback()
+                except Exception as rb_err:
+                    logger.debug("Flagship sample rollback notice: %s", rb_err)
             summary["homepage_flagship_check"] = {"status": "ERROR", "notice": str(infy_err)}
 
         # 3. Audit Discovery Reel Health
         try:
-            cur.execute("""
+            active_clause = "is_active = TRUE" if is_pg else "is_active = 1"
+            cur.execute(f"""
                 SELECT ticker, pe_ratio, roce_pct, debt_to_equity, is_active 
                 FROM discovery_reel 
-                WHERE is_active = 1 OR is_active = TRUE
+                WHERE {active_clause}
             """)
             active_reel = cur.fetchall()
             fair_count = sum(1 for r in active_reel if str(r[1] or "").strip().lower() == "fair")
@@ -136,6 +152,11 @@ def run_trust_and_catalog_audit(sqlite_path: Optional[str] = None) -> Dict[str, 
             if fair_count > 0:
                 summary["failures"].append(f"Found {fair_count} active discovery_reel items with qualitative 'Fair' in numeric pe_ratio slot!")
         except Exception as dr_err:
+            if is_pg:
+                try:
+                    conn.rollback()
+                except Exception as rb_err:
+                    logger.debug("Discovery reel rollback notice: %s", rb_err)
             summary["discovery_reel_health"] = {"status": "SKIPPED", "notice": str(dr_err)}
 
     finally:

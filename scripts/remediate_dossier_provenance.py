@@ -103,16 +103,41 @@ def run_provenance_remediation(
                 except (ValueError, TypeError):
                     pass
         except Exception as cf_err:
+            if is_pg:
+                try:
+                    conn.rollback()
+                except Exception as rb_err:
+                    logger.debug("Rollback notice after cached_fundamentals pre-fetch: %s", rb_err)
             logger.debug("cached_fundamentals price pre-fetch notice: %s", cf_err)
 
-        # 2. Fetch all reports
+        # 2. Fetch all compiled reports (exclude PENDING_SYNTHESIS rows with NULL/empty report_text)
         query = """
             SELECT ticker, short_name, baseline_price, timestamp, citations_json, report_text
             FROM reports
+            WHERE report_text IS NOT NULL AND TRIM(report_text) != ''
             ORDER BY ticker ASC
         """
         cur.execute(query)
         rows = cur.fetchall()
+
+        has_rev_citations = False
+        if apply_changes:
+            try:
+                if is_pg:
+                    cur.execute(
+                        "SELECT 1 FROM information_schema.columns "
+                        "WHERE table_schema = 'public' AND table_name = 'report_revisions' AND column_name = 'citations_json'"
+                    )
+                    has_rev_citations = cur.fetchone() is not None
+                else:
+                    cur.execute("PRAGMA table_info(report_revisions)")
+                    has_rev_citations = any(str(r[1]) == "citations_json" for r in cur.fetchall())
+            except Exception as col_err:
+                if is_pg:
+                    conn.rollback()
+                logger.debug("report_revisions column check notice: %s", col_err)
+
+        pending_updates: List[Tuple[str, str]] = []
 
         target_tickers_set = set(t.upper() for t in tickers_filter) if tickers_filter else None
 
@@ -205,17 +230,22 @@ def run_provenance_remediation(
                 })
 
                 if apply_changes:
-                    update_sql = f"UPDATE reports SET citations_json = {p} WHERE ticker = {p}"
-                    cur.execute(update_sql, (new_citations_json, raw_ticker))
+                    pending_updates.append((new_citations_json, raw_ticker))
 
-                    # Also update report_revisions if present
-                    try:
-                        rev_sql = f"UPDATE report_revisions SET citations_json = {p} WHERE ticker = {p}"
-                        cur.execute(rev_sql, (new_citations_json, raw_ticker))
-                    except Exception as rev_err:
-                        logger.debug("report_revisions citations update notice for %s: %s", raw_ticker, rev_err)
+        if apply_changes and pending_updates:
+            update_sql = f"UPDATE reports SET citations_json = {p} WHERE ticker = {p}"
+            if is_pg:
+                from psycopg2.extras import execute_batch
 
-        if apply_changes:
+                execute_batch(cur, update_sql, pending_updates, page_size=100)
+                if has_rev_citations:
+                    rev_sql = f"UPDATE report_revisions SET citations_json = {p} WHERE ticker = {p}"
+                    execute_batch(cur, rev_sql, pending_updates, page_size=100)
+            else:
+                cur.executemany(update_sql, pending_updates)
+                if has_rev_citations:
+                    rev_sql = f"UPDATE report_revisions SET citations_json = {p} WHERE ticker = {p}"
+                    cur.executemany(rev_sql, pending_updates)
             conn.commit()
 
     finally:

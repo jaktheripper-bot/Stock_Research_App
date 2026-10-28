@@ -994,26 +994,38 @@ def search_investment_products(
     type_filter = (product_type or "ALL").strip().upper()
     cap_limit = max(1, min(int(limit_per_category or 6), 50))
 
+    from core.db.connection import is_postgres_active
+
+    tasks = []
     if type_filter in ("ALL", "EQUITY", "EQUITIES", "STOCK", "STOCKS"):
-        categories["equities"] = search_equities(clean_q, limit=cap_limit)
-
+        tasks.append(("equities", search_equities))
     if type_filter in ("ALL", "MUTUAL_FUND", "MUTUAL_FUNDS", "FUND", "FUNDS", "MF"):
-        categories["mutual_funds"] = search_mutual_funds(clean_q, limit=cap_limit)
-
+        tasks.append(("mutual_funds", search_mutual_funds))
     if type_filter in ("ALL", "ETF", "ETFS"):
-        categories["etfs"] = search_etfs(clean_q, limit=cap_limit)
-
+        tasks.append(("etfs", search_etfs))
     if type_filter in ("ALL", "DEBT", "CORPORATE_DEBT", "BOND", "BONDS", "NCD", "SDI"):
-        categories["corporate_debt"] = search_debt_securities(clean_q, limit=cap_limit)
-
+        tasks.append(("corporate_debt", search_debt_securities))
     if type_filter in ("ALL", "REIT", "REITS", "REIT_INVIT", "REITS_INVITS", "INVIT", "SGB"):
-        categories["reits_invits"] = search_reits_and_sgbs(clean_q, limit=cap_limit)
-
+        tasks.append(("reits_invits", search_reits_and_sgbs))
     if type_filter in ("ALL", "SOVEREIGN", "GSEC", "G-SEC", "TBILL", "SDL"):
-        categories["sovereign"] = search_sovereign(clean_q, limit=cap_limit)
-
+        tasks.append(("sovereign", search_sovereign))
     if type_filter in ("ALL", "MSME", "MSMES", "SME", "UDYAM"):
-        categories["msmes"] = search_msmes(clean_q, limit=cap_limit)
+        tasks.append(("msmes", search_msmes))
+
+    if len(tasks) > 1 and is_postgres_active():
+        from concurrent.futures import ThreadPoolExecutor
+        init_db()
+        with ThreadPoolExecutor(max_workers=min(4, len(tasks))) as pool:
+            fut_map = {cat_key: pool.submit(fn, clean_q, cap_limit) for cat_key, fn in tasks}
+            for cat_key, fut in fut_map.items():
+                try:
+                    categories[cat_key] = fut.result()
+                except Exception as exc:
+                    logger.warning("Omni-search parallel category '%s' error: %s", cat_key, exc)
+                    categories[cat_key] = []
+    else:
+        for cat_key, fn in tasks:
+            categories[cat_key] = fn(clean_q, limit=cap_limit)
 
     # Interleave results across all 7 asset classes for flat representation
     lists_in_order = [categories[k] for k in CATEGORY_ORDER]

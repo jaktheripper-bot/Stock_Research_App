@@ -1,396 +1,705 @@
 {
-  "updated_at": "2026-10-09 09:02:21 IST",
+  "updated_at": "2026-10-28 16:50:21 IST",
   "tickers": {
     "HDFCBANK": {
       "symbol": "HDFCBANK",
       "status": "SKIPPED",
-      "report_length": 9189,
+      "report_length": 9191,
       "error": null,
-      "timestamp": "2026-10-09 08:14:06 IST"
+      "timestamp": "2026-10-28 16:50:21 IST"
     },
     "RELIANCE": {
       "symbol": "RELIANCE",
       "status": "SKIPPED",
-      "report_length": 7991,
+      "report_length": 22909,
       "error": null,
-      "timestamp": "2026-10-09 08:14:06 IST"
+      "timestamp": "2026-10-28 16:50:21 IST"
     },
     "TCS": {
       "symbol": "TCS",
       "status": "SKIPPED",
-      "report_length": 8551,
+      "report_length": 533,
       "error": null,
-      "timestamp": "2026-10-09 08:14:06 IST"
+      "timestamp": "2026-10-28 16:50:21 IST"
     },
     "ICICIBANK": {
       "symbol": "ICICIBANK",
       "status": "SKIPPED",
       "report_length": 5846,
       "error": null,
-      "timestamp": "2026-10-09 08:14:06 IST"
+      "timestamp": "2026-10-28 16:50:21 IST"
     },
     "BHARTIARTL": {
       "symbol": "BHARTIARTL",
       "status": "SKIPPED",
-      "report_length": 9359,
+      "report_length": 9358,
       "error": null,
-      "timestamp": "2026-10-09 08:14:06 IST"
+      "timestamp": "2026-10-28 16:50:21 IST"
     },
     "SBIN": {
       "symbol": "SBIN",
       "status": "SKIPPED",
       "report_length": 6285,
       "error": null,
-      "timestamp": "2026-10-09 08:14:06 IST"
+      "timestamp": "2026-10-28 16:50:21 IST"
     },
     "ITC": {
       "symbol": "ITC",
       "status": "SKIPPED",
       "report_length": 6228,
       "error": null,
-      "timestamp": "2026-10-09 08:14:06 IST"
+      "timestamp": "2026-10-28 16:50:21 IST"
     },
     "INFY": {
       "symbol": "INFY",
       "status": "SKIPPED",
-      "report_length": 7530,
+      "report_length": 17234,
       "error": null,
-      "timestamp": "2026-10-09 08:14:06 IST"
+      "timestamp": "2026-10-28 16:50:21 IST"
     },
     "LT": {
       "symbol": "LT",
-      "status": "SUCCESS",
-      "latency_seconds": 42.6,
-      "report_length": 6535,
+      "status": "SKIPPED",
+      "report_length": 6538,
       "error": null,
-      "timestamp": "2026-10-09 08:14:49 IST"
+      "timestamp": "2026-10-28 16:50:21 IST"
     },
     "HINDUNILVR": {
       "symbol": "HINDUNILVR",
-      "status": "SUCCESS",
-      "latency_seconds": 83.3,
+      "status": "SKIPPED",
       "report_length": 7120,
       "error": null,
-      "timestamp": "2026-10-09 08:16:17 IST"
+      "timestamp": "2026-10-28 16:50:21 IST"
     },
     "BAJFINANCE": {
       "symbol": "BAJFINANCE",
-      "status": "SUCCESS",
-      "latency_seconds": 53.9,
-      "report_length": 6185,
+      "status": "SKIPPED",
+      "report_length": 6186,
       "error": null,
-      "timestamp": "2026-10-09 08:17:16 IST"
+      "timestamp": "2026-10-28 16:50:21 IST"
     },
     "MARUTI": {
       "symbol": "MARUTI",
-      "status": "SUCCESS",
-      "latency_seconds": 55.8,
-      "report_length": 6583,
+      "status": "SKIPPED",
+      "report_length": 6586,
       "error": null,
-      "timestamp": "2026-10-09 08:18:17 IST"
+      "timestamp": "2026-10-28 16:50:21 IST"
     },
     "HCLTECH": {
       "symbol": "HCLTECH",
-      "status": "SUCCESS",
-      "latency_seconds": 66.6,
+      "status": "SKIPPED",
       "report_length": 6981,
       "error": null,
-      "timestamp": "2026-10-09 08:19:28 IST"
+      "timestamp": "2026-10-28 16:50:21 IST"
     },
     "SUNPHARMA": {
       "symbol": "SUNPHARMA",
-      "status": "SUCCESS",
-      "latency_seconds": 80.6,
-      "report_length": 9115,
+      "status": "SKIPPED",
+      "report_length": 9116,
       "error": null,
-      "timestamp": "2026-10-09 08:20:54 IST"
+      "timestamp": "2026-10-28 16:50:21 IST"
     },
     "M&M": {
       "symbol": "M&M",
-      "status": "SUCCESS",
-      "latency_seconds": 80.9,
-      "report_length": 7647,
+      "status": "SKIPPED",
+      "report_length": 7648,
       "error": null,
-      "timestamp": "2026-10-09 08:22:20 IST"
+      "timestamp": "2026-10-28 16:50:21 IST"
     },
     "TATAMOTORS": {
       "symbol": "TATAMOTORS",
-      "status": "SUCCESS",
-      "latency_seconds": 68.1,
-      "report_length": 7912,
+      "status": "SKIPPED",
+      "report_length": 7913,
       "error": null,
-      "timestamp": "2026-10-09 08:23:33 IST"
+      "timestamp": "2026-10-28 16:50:21 IST"
     },
     "KOTAKBANK": {
       "symbol": "KOTAKBANK",
-      "status": "SUCCESS",
-      "latency_seconds": 52.3,
+      "status": "SKIPPED",
       "report_length": 6047,
       "error": null,
-      "timestamp": "2026-10-09 08:24:30 IST"
+      "timestamp": "2026-10-28 16:50:21 IST"
     },
     "AXISBANK": {
       "symbol": "AXISBANK",
-      "status": "SUCCESS",
-      "latency_seconds": 90.7,
-      "report_length": 5455,
+      "status": "SKIPPED",
+      "report_length": 5457,
       "error": null,
-      "timestamp": "2026-10-09 08:26:06 IST"
+      "timestamp": "2026-10-28 16:50:21 IST"
     },
     "NTPC": {
       "symbol": "NTPC",
-      "status": "SUCCESS",
-      "latency_seconds": 64.3,
+      "status": "SKIPPED",
       "report_length": 10077,
       "error": null,
-      "timestamp": "2026-10-09 08:27:15 IST"
+      "timestamp": "2026-10-28 16:50:21 IST"
     },
     "TITAN": {
       "symbol": "TITAN",
-      "status": "SUCCESS",
-      "latency_seconds": 55.9,
-      "report_length": 7982,
+      "status": "SKIPPED",
+      "report_length": 7984,
       "error": null,
-      "timestamp": "2026-10-09 08:28:16 IST"
+      "timestamp": "2026-10-28 16:50:21 IST"
     },
     "ONGC": {
       "symbol": "ONGC",
-      "status": "SUCCESS",
-      "latency_seconds": 54.5,
+      "status": "SKIPPED",
       "report_length": 7032,
       "error": null,
-      "timestamp": "2026-10-09 08:29:16 IST"
+      "timestamp": "2026-10-28 16:50:21 IST"
     },
     "POWERGRID": {
       "symbol": "POWERGRID",
-      "status": "SUCCESS",
-      "latency_seconds": 47.0,
+      "status": "SKIPPED",
       "report_length": 7803,
       "error": null,
-      "timestamp": "2026-10-09 08:30:08 IST"
+      "timestamp": "2026-10-28 16:50:21 IST"
     },
     "ADANIENT": {
       "symbol": "ADANIENT",
-      "status": "SUCCESS",
-      "latency_seconds": 78.1,
-      "report_length": 8309,
+      "status": "SKIPPED",
+      "report_length": 8311,
       "error": null,
-      "timestamp": "2026-10-09 08:31:31 IST"
+      "timestamp": "2026-10-28 16:50:21 IST"
     },
     "ADANIPORTS": {
       "symbol": "ADANIPORTS",
-      "status": "SUCCESS",
-      "latency_seconds": 40.9,
+      "status": "SKIPPED",
       "report_length": 8045,
       "error": null,
-      "timestamp": "2026-10-09 08:32:17 IST"
+      "timestamp": "2026-10-28 16:50:21 IST"
     },
     "COALINDIA": {
       "symbol": "COALINDIA",
-      "status": "SUCCESS",
-      "latency_seconds": 46.0,
-      "report_length": 6562,
+      "status": "SKIPPED",
+      "report_length": 20003,
       "error": null,
-      "timestamp": "2026-10-09 08:33:08 IST"
+      "timestamp": "2026-10-28 16:50:21 IST"
     },
     "BAJAJFINSV": {
       "symbol": "BAJAJFINSV",
-      "status": "SUCCESS",
-      "latency_seconds": 39.2,
+      "status": "SKIPPED",
       "report_length": 6854,
       "error": null,
-      "timestamp": "2026-10-09 08:33:52 IST"
+      "timestamp": "2026-10-28 16:50:21 IST"
     },
     "ASIANPAINT": {
       "symbol": "ASIANPAINT",
-      "status": "SUCCESS",
-      "latency_seconds": 87.0,
+      "status": "SKIPPED",
       "report_length": 7415,
       "error": null,
-      "timestamp": "2026-10-09 08:35:24 IST"
+      "timestamp": "2026-10-28 16:50:21 IST"
     },
     "ULTRACEMCO": {
       "symbol": "ULTRACEMCO",
-      "status": "SUCCESS",
-      "latency_seconds": 72.2,
-      "report_length": 8816,
+      "status": "SKIPPED",
+      "report_length": 8819,
       "error": null,
-      "timestamp": "2026-10-09 08:36:41 IST"
+      "timestamp": "2026-10-28 16:50:21 IST"
     },
     "TATASTEEL": {
       "symbol": "TATASTEEL",
       "status": "SKIPPED",
-      "report_length": 9589,
+      "report_length": 9588,
       "error": null,
-      "timestamp": "2026-10-09 08:36:46 IST"
+      "timestamp": "2026-10-28 16:50:21 IST"
     },
     "SIEMENS": {
       "symbol": "SIEMENS",
-      "status": "SUCCESS",
-      "latency_seconds": 60.7,
+      "status": "SKIPPED",
       "report_length": 7230,
       "error": null,
-      "timestamp": "2026-10-09 08:37:47 IST"
+      "timestamp": "2026-10-28 16:50:21 IST"
     },
     "JSWSTEEL": {
       "symbol": "JSWSTEEL",
-      "status": "SUCCESS",
-      "latency_seconds": 70.6,
-      "report_length": 8565,
+      "status": "SKIPPED",
+      "report_length": 8566,
       "error": null,
-      "timestamp": "2026-10-09 08:39:03 IST"
+      "timestamp": "2026-10-28 16:50:21 IST"
     },
     "GRASIM": {
       "symbol": "GRASIM",
-      "status": "SUCCESS",
-      "latency_seconds": 85.2,
-      "report_length": 7352,
+      "status": "SKIPPED",
+      "report_length": 7353,
       "error": null,
-      "timestamp": "2026-10-09 08:40:33 IST"
+      "timestamp": "2026-10-28 16:50:21 IST"
     },
     "BEL": {
       "symbol": "BEL",
-      "status": "SUCCESS",
-      "latency_seconds": 62.0,
+      "status": "SKIPPED",
       "report_length": 7741,
       "error": null,
-      "timestamp": "2026-10-09 08:41:40 IST"
+      "timestamp": "2026-10-28 16:50:21 IST"
     },
     "VBL": {
       "symbol": "VBL",
-      "status": "SUCCESS",
-      "latency_seconds": 75.6,
+      "status": "SKIPPED",
       "report_length": 7725,
       "error": null,
-      "timestamp": "2026-10-09 08:43:00 IST"
+      "timestamp": "2026-10-28 16:50:21 IST"
     },
     "HAL": {
       "symbol": "HAL",
-      "status": "SUCCESS",
-      "latency_seconds": 47.7,
-      "report_length": 7023,
+      "status": "SKIPPED",
+      "report_length": 7029,
       "error": null,
-      "timestamp": "2026-10-09 08:43:53 IST"
+      "timestamp": "2026-10-28 16:50:21 IST"
     },
     "NESTLEIND": {
       "symbol": "NESTLEIND",
-      "status": "SUCCESS",
-      "latency_seconds": 57.5,
+      "status": "SKIPPED",
       "report_length": 6613,
       "error": null,
-      "timestamp": "2026-10-09 08:44:56 IST"
+      "timestamp": "2026-10-28 16:50:21 IST"
     },
     "TRENT": {
       "symbol": "TRENT",
-      "status": "SUCCESS",
-      "latency_seconds": 123.8,
+      "status": "SKIPPED",
       "report_length": 6260,
       "error": null,
-      "timestamp": "2026-10-09 08:47:04 IST"
+      "timestamp": "2026-10-28 16:50:21 IST"
     },
     "DLF": {
       "symbol": "DLF",
-      "status": "SUCCESS",
-      "latency_seconds": 59.5,
+      "status": "SKIPPED",
       "report_length": 6585,
       "error": null,
-      "timestamp": "2026-10-09 08:48:09 IST"
+      "timestamp": "2026-10-28 16:50:21 IST"
     },
     "ZOMATO": {
       "symbol": "ZOMATO",
-      "status": "SUCCESS",
-      "latency_seconds": 87.5,
+      "status": "SKIPPED",
       "report_length": 7541,
       "error": null,
-      "timestamp": "2026-10-09 08:49:42 IST"
+      "timestamp": "2026-10-28 16:50:21 IST"
     },
     "IOC": {
       "symbol": "IOC",
-      "status": "SUCCESS",
-      "latency_seconds": 33.8,
+      "status": "SKIPPED",
       "report_length": 6426,
       "error": null,
-      "timestamp": "2026-10-09 08:50:20 IST"
+      "timestamp": "2026-10-28 16:50:21 IST"
     },
     "TECHM": {
       "symbol": "TECHM",
-      "status": "SUCCESS",
-      "latency_seconds": 51.2,
+      "status": "SKIPPED",
       "report_length": 5252,
       "error": null,
-      "timestamp": "2026-10-09 08:51:17 IST"
+      "timestamp": "2026-10-28 16:50:21 IST"
     },
     "INDUSINDBK": {
       "symbol": "INDUSINDBK",
-      "status": "SUCCESS",
-      "latency_seconds": 47.6,
-      "report_length": 7982,
+      "status": "SKIPPED",
+      "report_length": 7983,
       "error": null,
-      "timestamp": "2026-10-09 08:52:09 IST"
+      "timestamp": "2026-10-28 16:50:21 IST"
     },
     "HINDALCO": {
       "symbol": "HINDALCO",
-      "status": "SUCCESS",
-      "latency_seconds": 76.3,
-      "report_length": 7868,
+      "status": "SKIPPED",
+      "report_length": 7867,
       "error": null,
-      "timestamp": "2026-10-09 08:53:31 IST"
+      "timestamp": "2026-10-28 16:50:21 IST"
     },
     "BRITANNIA": {
       "symbol": "BRITANNIA",
-      "status": "SUCCESS",
-      "latency_seconds": 75.8,
+      "status": "SKIPPED",
       "report_length": 8390,
       "error": null,
-      "timestamp": "2026-10-09 08:54:51 IST"
+      "timestamp": "2026-10-28 16:50:21 IST"
     },
     "CIPLA": {
       "symbol": "CIPLA",
-      "status": "SUCCESS",
-      "latency_seconds": 69.8,
-      "report_length": 6838,
+      "status": "SKIPPED",
+      "report_length": 6843,
       "error": null,
-      "timestamp": "2026-10-09 08:56:06 IST"
+      "timestamp": "2026-10-28 16:50:21 IST"
     },
     "BPCL": {
       "symbol": "BPCL",
-      "status": "SUCCESS",
-      "latency_seconds": 87.0,
+      "status": "SKIPPED",
       "report_length": 7297,
       "error": null,
-      "timestamp": "2026-10-09 08:57:38 IST"
+      "timestamp": "2026-10-28 16:50:21 IST"
     },
     "APOLLOHOSP": {
       "symbol": "APOLLOHOSP",
-      "status": "SUCCESS",
-      "latency_seconds": 34.1,
+      "status": "SKIPPED",
       "report_length": 8444,
       "error": null,
-      "timestamp": "2026-10-09 08:58:17 IST"
+      "timestamp": "2026-10-28 16:50:21 IST"
     },
     "EICHERMOT": {
       "symbol": "EICHERMOT",
-      "status": "SUCCESS",
-      "latency_seconds": 63.3,
+      "status": "SKIPPED",
       "report_length": 8100,
       "error": null,
-      "timestamp": "2026-10-09 08:59:26 IST"
+      "timestamp": "2026-10-28 16:50:21 IST"
     },
     "DRREDDY": {
       "symbol": "DRREDDY",
-      "status": "SUCCESS",
-      "latency_seconds": 60.3,
+      "status": "SKIPPED",
       "report_length": 8242,
       "error": null,
-      "timestamp": "2026-10-09 09:00:31 IST"
+      "timestamp": "2026-10-28 16:50:21 IST"
     },
     "TATACONSUM": {
       "symbol": "TATACONSUM",
-      "status": "SUCCESS",
-      "latency_seconds": 105.3,
+      "status": "SKIPPED",
       "report_length": 7925,
       "error": null,
-      "timestamp": "2026-10-09 09:02:21 IST"
+      "timestamp": "2026-10-28 16:50:21 IST"
+    },
+    "CHOLAFIN": {
+      "symbol": "CHOLAFIN",
+      "status": "SKIPPED",
+      "report_length": 16742,
+      "error": null,
+      "timestamp": "2026-10-28 16:50:21 IST"
+    },
+    "JIOFIN": {
+      "symbol": "JIOFIN",
+      "status": "SKIPPED",
+      "report_length": 19699,
+      "error": null,
+      "timestamp": "2026-10-28 16:50:21 IST"
+    },
+    "POLYCAB": {
+      "symbol": "POLYCAB",
+      "status": "SKIPPED",
+      "report_length": 21015,
+      "error": null,
+      "timestamp": "2026-10-28 16:50:21 IST"
+    },
+    "PERSISTENT": {
+      "symbol": "PERSISTENT",
+      "status": "SKIPPED",
+      "report_length": 20629,
+      "error": null,
+      "timestamp": "2026-10-28 16:50:21 IST"
+    },
+    "COFORGE": {
+      "symbol": "COFORGE",
+      "status": "SKIPPED",
+      "report_length": 16361,
+      "error": null,
+      "timestamp": "2026-10-28 16:50:21 IST"
+    },
+    "MAXHEALTH": {
+      "symbol": "MAXHEALTH",
+      "status": "SKIPPED",
+      "report_length": 25105,
+      "error": null,
+      "timestamp": "2026-10-28 16:50:21 IST"
+    },
+    "LUPIN": {
+      "symbol": "LUPIN",
+      "status": "SKIPPED",
+      "report_length": 21173,
+      "error": null,
+      "timestamp": "2026-10-28 16:50:21 IST"
+    },
+    "BHARATFORG": {
+      "symbol": "BHARATFORG",
+      "status": "SKIPPED",
+      "report_length": 14493,
+      "error": null,
+      "timestamp": "2026-10-28 16:50:21 IST"
+    },
+    "CUMMINSIND": {
+      "symbol": "CUMMINSIND",
+      "status": "SKIPPED",
+      "report_length": 24145,
+      "error": null,
+      "timestamp": "2026-10-28 16:50:21 IST"
+    },
+    "TATACOMM": {
+      "symbol": "TATACOMM",
+      "status": "SKIPPED",
+      "report_length": 8368,
+      "error": null,
+      "timestamp": "2026-10-28 16:50:21 IST"
+    },
+    "FEDERALBNK": {
+      "symbol": "FEDERALBNK",
+      "status": "SKIPPED",
+      "report_length": 22399,
+      "error": null,
+      "timestamp": "2026-10-28 16:50:21 IST"
+    },
+    "VOLTAS": {
+      "symbol": "VOLTAS",
+      "status": "SKIPPED",
+      "report_length": 20285,
+      "error": null,
+      "timestamp": "2026-10-28 16:50:21 IST"
+    },
+    "TVSMOTOR": {
+      "symbol": "TVSMOTOR",
+      "status": "SKIPPED",
+      "report_length": 28051,
+      "error": null,
+      "timestamp": "2026-10-28 16:50:21 IST"
+    },
+    "HAVELLS": {
+      "symbol": "HAVELLS",
+      "status": "SKIPPED",
+      "report_length": 25155,
+      "error": null,
+      "timestamp": "2026-10-28 16:50:21 IST"
+    },
+    "PIDILITIND": {
+      "symbol": "PIDILITIND",
+      "status": "SKIPPED",
+      "report_length": 23942,
+      "error": null,
+      "timestamp": "2026-10-28 16:50:21 IST"
+    },
+    "DIVISLAB": {
+      "symbol": "DIVISLAB",
+      "status": "SKIPPED",
+      "report_length": 26862,
+      "error": null,
+      "timestamp": "2026-10-28 16:50:21 IST"
+    },
+    "GAIL": {
+      "symbol": "GAIL",
+      "status": "SKIPPED",
+      "report_length": 31963,
+      "error": null,
+      "timestamp": "2026-10-28 16:50:21 IST"
+    },
+    "SHREECEM": {
+      "symbol": "SHREECEM",
+      "status": "SKIPPED",
+      "report_length": 20380,
+      "error": null,
+      "timestamp": "2026-10-28 16:50:21 IST"
+    },
+    "ABB": {
+      "symbol": "ABB",
+      "status": "SKIPPED",
+      "report_length": 24714,
+      "error": null,
+      "timestamp": "2026-10-28 16:50:21 IST"
+    },
+    "AMBUJACEM": {
+      "symbol": "AMBUJACEM",
+      "status": "SKIPPED",
+      "report_length": 26973,
+      "error": null,
+      "timestamp": "2026-10-28 16:50:21 IST"
+    },
+    "BANKBARODA": {
+      "symbol": "BANKBARODA",
+      "status": "SKIPPED",
+      "report_length": 22701,
+      "error": null,
+      "timestamp": "2026-10-28 16:50:21 IST"
+    },
+    "PNB": {
+      "symbol": "PNB",
+      "status": "SKIPPED",
+      "report_length": 21299,
+      "error": null,
+      "timestamp": "2026-10-28 16:50:21 IST"
+    },
+    "CANBK": {
+      "symbol": "CANBK",
+      "status": "SKIPPED",
+      "report_length": 25591,
+      "error": null,
+      "timestamp": "2026-10-28 16:50:21 IST"
+    },
+    "PFC": {
+      "symbol": "PFC",
+      "status": "SKIPPED",
+      "report_length": 19769,
+      "error": null,
+      "timestamp": "2026-10-28 16:50:21 IST"
+    },
+    "UNIONBANK": {
+      "symbol": "UNIONBANK",
+      "status": "SKIPPED",
+      "report_length": 20170,
+      "error": null,
+      "timestamp": "2026-10-28 16:50:21 IST"
+    },
+    "RECLTD": {
+      "symbol": "RECLTD",
+      "status": "SKIPPED",
+      "report_length": 32503,
+      "error": null,
+      "timestamp": "2026-10-28 16:50:21 IST"
+    },
+    "CGPOWER": {
+      "symbol": "CGPOWER",
+      "status": "SKIPPED",
+      "report_length": 23634,
+      "error": null,
+      "timestamp": "2026-10-28 16:50:21 IST"
+    },
+    "BDL": {
+      "symbol": "BDL",
+      "status": "SKIPPED",
+      "report_length": 21132,
+      "error": null,
+      "timestamp": "2026-10-28 16:50:21 IST"
+    },
+    "MPHASIS": {
+      "symbol": "MPHASIS",
+      "status": "SKIPPED",
+      "report_length": 27074,
+      "error": null,
+      "timestamp": "2026-10-28 16:50:21 IST"
+    },
+    "TORNTPHARM": {
+      "symbol": "TORNTPHARM",
+      "status": "SKIPPED",
+      "report_length": 18902,
+      "error": null,
+      "timestamp": "2026-10-28 16:50:21 IST"
+    },
+    "AUROPHARMA": {
+      "symbol": "AUROPHARMA",
+      "status": "SKIPPED",
+      "report_length": 27498,
+      "error": null,
+      "timestamp": "2026-10-28 16:50:21 IST"
+    },
+    "MANKIND": {
+      "symbol": "MANKIND",
+      "status": "SKIPPED",
+      "report_length": 28442,
+      "error": null,
+      "timestamp": "2026-10-28 16:50:21 IST"
+    },
+    "BOSCHLTD": {
+      "symbol": "BOSCHLTD",
+      "status": "SKIPPED",
+      "report_length": 22677,
+      "error": null,
+      "timestamp": "2026-10-28 16:50:21 IST"
+    },
+    "ALKEM": {
+      "symbol": "ALKEM",
+      "status": "SKIPPED",
+      "report_length": 23116,
+      "error": null,
+      "timestamp": "2026-10-28 16:50:21 IST"
+    },
+    "MOTHERSON": {
+      "symbol": "MOTHERSON",
+      "status": "SKIPPED",
+      "report_length": 27863,
+      "error": null,
+      "timestamp": "2026-10-28 16:50:21 IST"
+    },
+    "BALKRISIND": {
+      "symbol": "BALKRISIND",
+      "status": "SKIPPED",
+      "report_length": 26427,
+      "error": null,
+      "timestamp": "2026-10-28 16:50:21 IST"
+    },
+    "HEROMOTOCO": {
+      "symbol": "HEROMOTOCO",
+      "status": "SKIPPED",
+      "report_length": 27057,
+      "error": null,
+      "timestamp": "2026-10-28 16:50:21 IST"
+    },
+    "GODREJCP": {
+      "symbol": "GODREJCP",
+      "status": "SKIPPED",
+      "report_length": 23853,
+      "error": null,
+      "timestamp": "2026-10-28 16:50:21 IST"
+    },
+    "COLPAL": {
+      "symbol": "COLPAL",
+      "status": "SKIPPED",
+      "report_length": 20001,
+      "error": null,
+      "timestamp": "2026-10-28 16:50:21 IST"
+    },
+    "MARICO": {
+      "symbol": "MARICO",
+      "status": "SKIPPED",
+      "report_length": 36789,
+      "error": null,
+      "timestamp": "2026-10-28 16:50:21 IST"
+    },
+    "DABUR": {
+      "symbol": "DABUR",
+      "status": "SKIPPED",
+      "report_length": 19273,
+      "error": null,
+      "timestamp": "2026-10-28 16:50:21 IST"
+    },
+    "BERGEPAINT": {
+      "symbol": "BERGEPAINT",
+      "status": "SKIPPED",
+      "report_length": 21932,
+      "error": null,
+      "timestamp": "2026-10-28 16:50:21 IST"
+    },
+    "SRF": {
+      "symbol": "SRF",
+      "status": "SKIPPED",
+      "report_length": 45720,
+      "error": null,
+      "timestamp": "2026-10-28 16:50:21 IST"
+    },
+    "PIIND": {
+      "symbol": "PIIND",
+      "status": "SKIPPED",
+      "report_length": 22165,
+      "error": null,
+      "timestamp": "2026-10-28 16:50:21 IST"
+    },
+    "DEEPAKNTR": {
+      "symbol": "DEEPAKNTR",
+      "status": "SKIPPED",
+      "report_length": 26272,
+      "error": null,
+      "timestamp": "2026-10-28 16:50:21 IST"
+    },
+    "INDIGO": {
+      "symbol": "INDIGO",
+      "status": "SKIPPED",
+      "report_length": 29399,
+      "error": null,
+      "timestamp": "2026-10-28 16:50:21 IST"
+    },
+    "DMART": {
+      "symbol": "DMART",
+      "status": "SKIPPED",
+      "report_length": 25037,
+      "error": null,
+      "timestamp": "2026-10-28 16:50:21 IST"
+    },
+    "NAUKRI": {
+      "symbol": "NAUKRI",
+      "status": "SKIPPED",
+      "report_length": 25401,
+      "error": null,
+      "timestamp": "2026-10-28 16:50:21 IST"
+    },
+    "LTIM": {
+      "symbol": "LTIM",
+      "status": "SKIPPED",
+      "report_length": 21619,
+      "error": null,
+      "timestamp": "2026-10-28 16:50:21 IST"
+    },
+    "MUTHOOTFIN": {
+      "symbol": "MUTHOOTFIN",
+      "status": "SKIPPED",
+      "report_length": 30660,
+      "error": null,
+      "timestamp": "2026-10-28 16:50:21 IST"
     }
   }
 }

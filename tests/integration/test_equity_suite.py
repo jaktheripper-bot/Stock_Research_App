@@ -99,13 +99,15 @@ class TestNifty100Universe(unittest.TestCase):
         self.assertEqual(reliance["bse_scrip"], "500325")
 
     def test_is_report_fresh(self):
-        """Validates the 14-day freshness window evaluator."""
+        """Validates the 14-day freshness window and >=500-char fail-closed dossier evaluator."""
         now = datetime.now(timezone.utc)
         fresh_ts = (now - timedelta(days=2)).isoformat()
         stale_ts = (now - timedelta(days=20)).isoformat()
+        valid_body = "Institutional 7-pillar equity research synthesis grounded in statutory filings. " * 10
 
-        self.assertTrue(is_report_fresh({"report_text": "sample text", "timestamp": fresh_ts}))
-        self.assertFalse(is_report_fresh({"report_text": "sample text", "timestamp": stale_ts}))
+        self.assertTrue(is_report_fresh({"report_text": valid_body, "timestamp": fresh_ts}))
+        self.assertFalse(is_report_fresh({"report_text": valid_body, "timestamp": stale_ts}))
+        self.assertFalse(is_report_fresh({"report_text": "short stub", "timestamp": fresh_ts}))
         self.assertFalse(is_report_fresh({"report_text": "", "timestamp": fresh_ts}))
         self.assertFalse(is_report_fresh(None))
 

@@ -182,8 +182,11 @@ class _PooledConnectionProxy:
             try:
                 if self._pool is not None:
                     if not is_healthy or self._conn.closed != 0:
+                        _CONN_LAST_OK.pop(id(self._conn), None)
                         self._pool.putconn(self._conn, close=True)
                     else:
+                        import time
+                        _CONN_LAST_OK[id(self._conn)] = time.monotonic()
                         self._pool.putconn(self._conn)
                 else:
                     self._conn.close()
@@ -195,11 +198,15 @@ class _PooledConnectionProxy:
                     logger.debug(f"Connection direct close notice: {close_err}")
 
     def __del__(self):
-        """Guarantees connection is returned to pool even if unhandled exceptions cause variable drop."""
+        """Guarantees connection is returned to pool without deadlocking non-reentrant pool locks during GC."""
         try:
             if not self._returned:
                 logger.warning("Unclosed pooled connection collected by GC; auto-releasing back to ThreadedConnectionPool.")
-                self.close()
+                pool_lock = getattr(self._pool, "_lock", None) if self._pool is not None else None
+                if pool_lock is not None and pool_lock.locked():
+                    threading.Thread(target=self.close, daemon=True).start()
+                else:
+                    self.close()
         except Exception as gc_err:
             logger.debug(f"Connection GC finalizer notice: {gc_err}")
 
@@ -216,6 +223,8 @@ DB_POOL_MAX = int(os.environ.get("DB_POOL_MAX", "10"))
 
 _PG_POOLS = {}
 _PG_POOL_LOCK = threading.Lock()
+_CONN_LAST_OK = {}
+_CONN_FRESH_PROBE_TTL_SECONDS = 10.0
 
 def _get_pg_pool(dsn: str):
     """Thread-safe singleton ThreadedConnectionPool without Streamlit runtime dependency."""
@@ -238,25 +247,32 @@ def _get_pg_pool(dsn: str):
     return _PG_POOLS[dsn]
 
 def _acquire_connection_from_pool(pool):
+    import time
     for attempt in range(5):
         conn = None
         try:
             conn = pool.getconn()
             if conn.closed != 0:
+                _CONN_LAST_OK.pop(id(conn), None)
                 try:
                     pool.putconn(conn, close=True)
                 except Exception as e:
                     logger.debug(f"Stale connection return notice: {e}")
                 continue
-            with conn.cursor() as cur:
-                cur.execute("SELECT 1;")
-            try:
-                conn.rollback()
-            except Exception as rb_err:
-                logger.debug(f"Connection pool post-probe rollback notice: {rb_err}")
+            now_mono = time.monotonic()
+            last_ok = _CONN_LAST_OK.get(id(conn), 0.0)
+            if (now_mono - last_ok) >= _CONN_FRESH_PROBE_TTL_SECONDS:
+                with conn.cursor() as cur:
+                    cur.execute("SELECT 1;")
+                try:
+                    conn.rollback()
+                except Exception as rb_err:
+                    logger.debug(f"Connection pool post-probe rollback notice: {rb_err}")
+                _CONN_LAST_OK[id(conn)] = now_mono
             return conn
         except Exception:
             if conn:
+                _CONN_LAST_OK.pop(id(conn), None)
                 try:
                     pool.putconn(conn, close=True)
                 except Exception as e:

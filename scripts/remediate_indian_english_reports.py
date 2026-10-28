@@ -14,16 +14,28 @@ import logging
 import os
 import sqlite3
 import sys
-from typing import Any, Dict, List, Tuple
+from typing import Any, List, Optional, Tuple
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 from core.analysis.language_filter import enforce_indian_english, detect_americanisms
+from core.db.connection import get_db_connection, is_postgres_connection
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s [%(levelname)s] %(message)s")
 logger = logging.getLogger("remediate_indian_english")
 
-def remediate_table(conn: sqlite3.Connection, table: str, pk_col: str, text_col: str, apply_changes: bool = False) -> Tuple[int, int]:
+
+def _open_target_connection(sqlite_path: Optional[str] = None) -> Tuple[Any, bool, str]:
+    if sqlite_path:
+        conn = sqlite3.connect(sqlite_path, timeout=30.0)
+        return conn, False, f"SQLite ({sqlite_path})"
+    conn = get_db_connection()
+    is_pg = is_postgres_connection(conn)
+    label = "PostgreSQL (SUPABASE_DB_URL)" if is_pg else f"SQLite ({os.environ.get('DB_PATH', 'reports.db')})"
+    return conn, is_pg, label
+
+
+def remediate_table(conn: Any, is_pg: bool, table: str, pk_col: str, text_col: str, apply_changes: bool = False) -> Tuple[int, int]:
     cursor = conn.cursor()
     cursor.execute(f"SELECT {pk_col}, {text_col} FROM {table} WHERE {text_col} IS NOT NULL AND TRIM({text_col}) != ''")
     rows = cursor.fetchall()
@@ -46,7 +58,12 @@ def remediate_table(conn: sqlite3.Connection, table: str, pk_col: str, text_col:
                 logger.info(f"[{table}] ID {pk_val}: detected Americanisms {terms}")
 
     if apply_changes and updates:
-        cursor.executemany(f"UPDATE {table} SET {text_col} = ? WHERE {pk_col} = ?", updates)
+        if is_pg:
+            from psycopg2.extras import execute_batch
+            raw_cur = getattr(cursor, "_cur", cursor)
+            execute_batch(raw_cur, f"UPDATE {table} SET {text_col} = %s WHERE {pk_col} = %s", updates, page_size=100)
+        else:
+            cursor.executemany(f"UPDATE {table} SET {text_col} = ? WHERE {pk_col} = ?", updates)
         conn.commit()
         logger.info(f"[{table}] Applied {len(updates)} English (India) spelling remediations.")
     else:
@@ -54,33 +71,34 @@ def remediate_table(conn: sqlite3.Connection, table: str, pk_col: str, text_col:
 
     return scanned, updated
 
+
 def main():
     parser = argparse.ArgumentParser(description="Remediate reports database to English (India) spellings.")
     parser.add_argument("--apply", action="store_true", help="Apply updates to database.")
     parser.add_argument("--dry-run", action="store_true", help="Inspect without modifying database.")
+    parser.add_argument("--sqlite-path", type=str, default=None, help="Optional explicit SQLite DB path (bypasses SUPABASE_DB_URL).")
     args = parser.parse_args()
 
     if not args.apply and not args.dry_run:
         print("Please specify either --dry-run or --apply.")
         sys.exit(1)
 
-    db_path = "reports.db"
-    conn = sqlite3.connect(db_path)
+    conn, is_pg, db_label = _open_target_connection(args.sqlite_path)
 
     try:
-        logger.info(f"Starting English (India) database audit on '{db_path}' (apply={args.apply})...")
+        logger.info(f"Starting English (India) database audit on {db_label} (apply={args.apply})...")
 
         # 1. reports
-        s1, u1 = remediate_table(conn, "reports", "ticker", "report_text", apply_changes=args.apply)
+        s1, u1 = remediate_table(conn, is_pg, "reports", "ticker", "report_text", apply_changes=args.apply)
 
         # 2. report_revisions
-        s2, u2 = remediate_table(conn, "report_revisions", "id", "report_text", apply_changes=args.apply)
+        s2, u2 = remediate_table(conn, is_pg, "report_revisions", "id", "report_text", apply_changes=args.apply)
 
         # 3. fund_forensic_dossiers
-        s3, u3 = remediate_table(conn, "fund_forensic_dossiers", "scheme_code", "dossier_text", apply_changes=args.apply)
+        s3, u3 = remediate_table(conn, is_pg, "fund_forensic_dossiers", "scheme_code", "dossier_text", apply_changes=args.apply)
 
         # 4. discovery_reel (ria_thesis)
-        s4, u4 = remediate_table(conn, "discovery_reel", "id", "ria_thesis", apply_changes=args.apply)
+        s4, u4 = remediate_table(conn, is_pg, "discovery_reel", "id", "ria_thesis", apply_changes=args.apply)
 
         total_scanned = s1 + s2 + s3 + s4
         total_updated = u1 + u2 + u3 + u4

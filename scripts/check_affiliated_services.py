@@ -146,11 +146,13 @@ def check_gemini_ai():
             "details": "GEMINI_API_KEY not configured",
         }
 
+    use_vertex = (get_secret("GOOGLE_GENAI_USE_VERTEXAI") or os.environ.get("GOOGLE_GENAI_USE_VERTEXAI") or "").strip().lower() == "true"
+    mode_label = "Vertex AI Postpay Grounded" if use_vertex else "AI Studio Direct"
     return {
         "name": "Google Gemini AI Gateway",
         "status": "HEALTHY",
         "latency_ms": 0,
-        "details": "API Key Configured • Fallback Cascade: gemini-3.8-flash -> gemini-3.7-flash + Batch/Flex 50% Tier",
+        "details": f"API Key Configured ({mode_label}) • Fallback Cascade: gemini-3.8-flash -> gemini-3.5-flash-lite + Batch/Flex 50% Tier",
     }
 
 
