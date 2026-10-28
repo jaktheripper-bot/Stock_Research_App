@@ -1902,5 +1902,21 @@
       "revision_count": 1040
     },
     "preflight_passed": true
+  },
+  {
+    "tag": "checkpoint_20261028_080928_known_ticker_sectors_and_detect_sector_cascade",
+    "timestamp": "2026-10-28 08:09:28 IST",
+    "commit_sha": "07d7a1124762dedb2b8b406a89b24b74425e9e4e",
+    "branch": "main",
+    "description": "known_ticker_sectors_and_detect_sector_cascade",
+    "database": {
+      "exists": true,
+      "filename": "reports_checkpoint_20261028_080928_known_ticker_sectors_and_detect_sector_cascade.db",
+      "path": ".checkpoints/reports_checkpoint_20261028_080928_known_ticker_sectors_and_detect_sector_cascade.db",
+      "size_bytes": 34918400,
+      "report_count": 307,
+      "revision_count": 1040
+    },
+    "preflight_passed": true
   }
 ]
