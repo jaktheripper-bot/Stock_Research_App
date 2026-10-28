@@ -552,11 +552,12 @@ def synthesize_and_archive_stock_dossier(
     except Exception as cache_err:
         logger.debug(f"Cached fundamentals sync notice for {ticker}: {cache_err}")
 
+    has_grounded_report = bool(report_text and len(report_text.strip()) >= 500)
     return {
         "ticker": ticker,
         "company_name": company_name,
         "sector": sector,
-        "status": "INGESTED_RESEARCHED",
+        "status": "INGESTED_RESEARCHED" if has_grounded_report else "PENDING_SYNTHESIS",
         "current_price": extracted.get("current_price") or stock_data.get("current_price") or 0.0,
         "market_cap": extracted.get("market_cap") or stock_data.get("market_cap") or 0.0,
         "pe_ratio": extracted.get("pe_ratio") or clean_pe_sync,

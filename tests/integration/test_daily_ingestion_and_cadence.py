@@ -17,6 +17,7 @@ Verifies:
 
 import os
 import unittest
+from unittest.mock import patch
 from datetime import datetime
 from bs4 import BeautifulSoup
 from fastapi.testclient import TestClient
@@ -27,6 +28,7 @@ from core.analysis.daily_stock_ingestion import (
     get_ingestion_progress_stats,
     ingest_daily_stock_cohort,
     recalculate_affected_mutual_funds,
+    synthesize_and_archive_stock_dossier,
 )
 from core.db.reports import (
     get_report_by_ticker_sync,
@@ -272,6 +274,43 @@ class TestDailyStockIngestionAndMFCoverage(unittest.TestCase):
         get_report_by_ticker.cache_clear()
         get_archived_reports.cache_clear()
         get_report_revisions.cache_clear()
+
+    def test_synthesize_and_archive_stock_dossier_status_distinction(self):
+        """Verifies status is INGESTED_RESEARCHED when grounded report >= 500 chars, else PENDING_SYNTHESIS."""
+        test_cand = {
+            "ticker": "STATUS_TEST_TICK",
+            "company_name": "Status Test Corp",
+            "sector": "IT & Technology",
+            "scheme_count": 5,
+            "estimated_aum_cr": 120.0,
+        }
+        try:
+            # 1. Test mode generation produces grounded report >= 500 chars -> INGESTED_RESEARCHED
+            res_researched = synthesize_and_archive_stock_dossier(test_cand, skip_gemini=True)
+            self.assertEqual(res_researched["status"], "INGESTED_RESEARCHED")
+            self.assertEqual(res_researched["ticker"], "STATUS_TEST_TICK")
+
+            # 2. When report_text is absent or too short (< 500 chars) in non-testing environment -> PENDING_SYNTHESIS
+            with patch.dict(os.environ, {"TESTING": "0"}):
+                res_pending = synthesize_and_archive_stock_dossier(
+                    test_cand,
+                    skip_gemini=True,
+                    pre_synthesized_report={"report_text": "Short dummy summary."}
+                )
+                self.assertEqual(res_pending["status"], "PENDING_SYNTHESIS")
+                self.assertEqual(res_pending["ticker"], "STATUS_TEST_TICK")
+        finally:
+            conn = get_db_connection()
+            cur = conn.cursor()
+            cur.execute("DELETE FROM reports WHERE ticker = ?;", ("STATUS_TEST_TICK",))
+            cur.execute("DELETE FROM report_revisions WHERE ticker = ?;", ("STATUS_TEST_TICK",))
+            cur.execute("DELETE FROM cached_fundamentals WHERE ticker = ?;", ("STATUS_TEST_TICK",))
+            conn.commit()
+            cur.close()
+            conn.close()
+            get_report_by_ticker.cache_clear()
+            get_archived_reports.cache_clear()
+
 
 """
 Outside-In Dynamic Cadence and Time-Series Rotation Tests (Pillar 8)
