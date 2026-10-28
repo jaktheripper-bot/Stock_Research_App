@@ -23,7 +23,11 @@ from core.universe.nifty100 import (
 )
 from bse_master import resolve_bse_scrip_code
 from scripts.generate_nifty100_reports import is_report_fresh
-from core.analysis.sector_scoring import detect_sector, evaluate_sector_fundamentals
+from core.analysis.sector_scoring import (
+    detect_sector,
+    evaluate_sector_fundamentals,
+    SECTOR_DISPLAY_NAMES,
+)
 from core.analysis.institutional_flow import analyze_institutional_flow
 from core.analysis.forensic_sieve import evaluate_forensic_sieve
 from core.analysis.valuation_radar import compute_valuation_radar
@@ -114,6 +118,24 @@ class TestEquityUpgrades(unittest.TestCase):
         self.assertEqual(detect_sector("TCS", "Software Consulting"), "IT_TECH")
         self.assertEqual(detect_sector("SUNPHARMA", "Pharmaceuticals"), "HEALTHCARE_PHARMA")
         self.assertEqual(detect_sector("L&T", "Engineering & Construction"), "CAPITAL_GOODS_INFRA")
+
+    def test_sector_display_names_and_word_boundaries(self):
+        # 1. Verify all 8 core sectors have defined display names
+        expected_sectors = {
+            "BFSI", "IT_TECH", "HEALTHCARE_PHARMA", "CAPITAL_GOODS_INFRA",
+            "AUTOMOTIVE", "CONSUMER_FMCG", "CHEMICALS_MATERIALS", "COMMODITIES_ENERGY"
+        }
+        self.assertEqual(set(SECTOR_DISPLAY_NAMES.keys()), expected_sectors)
+
+        # 2. Verify word-boundary enforcement prevents 'LIMITED' from triggering IT_TECH
+        self.assertEqual(detect_sector("ABC", company_name="ABC Limited"), "CONSUMER_FMCG")
+        self.assertEqual(detect_sector("BIOCON", "Pharmaceuticals", "Biocon Limited"), "HEALTHCARE_PHARMA")
+        self.assertEqual(detect_sector("VEDL", "Metals & Mining", "Vedanta Limited"), "COMMODITIES_ENERGY")
+        self.assertEqual(detect_sector("TATAMOTORS", "Automobiles", "Tata Motors Limited"), "AUTOMOTIVE")
+
+        # 3. Verify evaluate_sector_fundamentals populates sector_display_name
+        res = evaluate_sector_fundamentals("TCS", {"roce": 30.0}, industry_str="Software")
+        self.assertEqual(res["sector_display_name"], "IT & Technology Services")
 
     def test_sector_fundamentals_bfsi(self):
         fund = {

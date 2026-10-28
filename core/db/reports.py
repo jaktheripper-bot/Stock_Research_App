@@ -537,7 +537,11 @@ SECTOR_SVG_IDS = {
 
 def resolve_equity_sector(ticker: str, name: str, cached_sec: str = None) -> str:
     """Classifies an equity into standard sector taxonomies."""
-    from core.analysis.sector_scoring import KNOWN_TICKER_SECTORS, SECTOR_KEYWORDS
+    from core.analysis.sector_scoring import (
+        KNOWN_TICKER_SECTORS,
+        _COMPILED_SECTOR_PATTERNS,
+        _CORP_NOISE_RE,
+    )
     c_sec = str(cached_sec or "")
     if "Specialty Chemicals" in c_sec:
         return "CHEMICALS_MATERIALS"
@@ -553,10 +557,12 @@ def resolve_equity_sector(ticker: str, name: str, cached_sec: str = None) -> str
         return "AUTOMOTIVE"
     if ticker in KNOWN_TICKER_SECTORS:
         return KNOWN_TICKER_SECTORS[ticker]
-    combined = f"{ticker} {name}".upper()
-    for sec_slug, kws in SECTOR_KEYWORDS.items():
-        if any(kw in combined for kw in kws):
-            return sec_slug
+    clean_name = _CORP_NOISE_RE.sub(" ", str(name or "")).strip()
+    combined = f"{ticker} {clean_name}".strip()
+    for sec_slug, patterns in _COMPILED_SECTOR_PATTERNS.items():
+        for pat in patterns:
+            if pat.search(combined):
+                return sec_slug
     return "DIVERSIFIED"
 
 

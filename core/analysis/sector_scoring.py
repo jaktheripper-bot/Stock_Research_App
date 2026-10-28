@@ -9,6 +9,7 @@ Replaces generic one-size-fits-all scoring with domain-appropriate financial sie
 from typing import Dict, Any, List, Optional, Tuple
 import math
 import logging
+import re
 
 logger = logging.getLogger("equity_research.core.analysis.sector_scoring")
 
@@ -47,40 +48,80 @@ def _parse_optional_float(v: Any) -> Optional[float]:
 
 
 # Sector taxonomy classification keyword map
+SECTOR_DISPLAY_NAMES = {
+    "BFSI": "BFSI & Financial Services",
+    "IT_TECH": "IT & Technology Services",
+    "HEALTHCARE_PHARMA": "Healthcare & Pharmaceuticals",
+    "CAPITAL_GOODS_INFRA": "Capital Goods & Infrastructure",
+    "AUTOMOTIVE": "Automotive & Ancillaries",
+    "CONSUMER_FMCG": "Consumer & FMCG",
+    "CHEMICALS_MATERIALS": "Chemicals & Specialty Materials",
+    "COMMODITIES_ENERGY": "Commodities, Metals & Energy",
+}
+
+# Ordered from domain-specific sectors first so compound labels ("Capital Goods") classify accurately
 SECTOR_KEYWORDS = {
-    "BFSI": [
-        "BANK", "FINANCE", "FINANCIAL", "NBFC", "INSURANCE", "HOUSING FINANCE", 
-        "SECURITIES", "CAPITAL", "INVESTMENT", "ASSET MANAGEMENT", "AMC", "LENDING"
-    ],
-    "IT_TECH": [
-        "SOFTWARE", "IT", "TECHNOLOGY", "TECH", "DIGITAL", "CONSULTING", 
-        "TELECOM", "CLOUD", "PLATFORM", "ELECTRONICS", "EMS"
-    ],
     "HEALTHCARE_PHARMA": [
-        "PHARMA", "PHARMACEUTICAL", "HEALTHCARE", "HOSPITAL", "DIAGNOSTICS", 
-        "BIOTECH", "LIFE SCIENCES", "DRUGS", "API", "CRAMS", "CDMO"
-    ],
-    "CAPITAL_GOODS_INFRA": [
-        "ENGINEERING", "INFRASTRUCTURE", "MACHINERY", "CONSTRUCTION", "CAPITAL GOODS",
-        "POWER", "ELECTRICAL", "DEFENCE", "AEROSPACE", "CEMENT", "INDUSTRIAL"
+        "PHARMA", "PHARMACEUTICAL", "PHARMACEUTICALS", "HEALTHCARE", "HOSPITAL", "HOSPITALS",
+        "DIAGNOSTICS", "DIAGNOSTIC", "BIOTECH", "BIOTECHNOLOGY", "LIFE SCIENCES", "LIFESCIENCE",
+        "LIFESCIENCES", "DRUGS", "MEDICINE", "LABORATORIES", "LABS", "API", "CRAMS", "CDMO",
+        "ORGANICS", "FORMULATIONS",
     ],
     "AUTOMOTIVE": [
-        "AUTO", "AUTOMOTIVE", "MOTOR", "VEHICLE", "TYRE", "ANCILLARY", 
-        "TRANSMISSION", "FORGING", "EV"
-    ],
-    "CONSUMER_FMCG": [
-        "CONSUMER", "FMCG", "FOOD", "BEVERAGE", "RETAIL", "TEXTILE", "APPAREL", 
-        "FOOTWEAR", "PACKAGING", "BUILDING MATERIALS", "SANITARYWARE", "HOME"
+        "AUTOMOBILE", "AUTOMOTIVE", "AUTO COMPONENTS", "AUTO ANCILLARY", "AUTO ANCILLARIES",
+        "AUTO", "MOTOR", "MOTORS", "VEHICLE", "VEHICLES", "MOBILITY", "TYRE", "TYRES",
+        "ANCILLARY", "TRANSMISSION", "FORGING", "FORGE", "TRACTOR", "TRACTORS", "EV",
     ],
     "CHEMICALS_MATERIALS": [
-        "CHEMICAL", "SPECIALTY CHEMICAL", "AGROCHEMICAL", "FERTILIZER", 
-        "POLYMER", "PIGMENT", "PETROCHEMICAL"
+        "SPECIALTY CHEMICAL", "SPECIALTY CHEMICALS", "CHEMICAL", "CHEMICALS", "AGROCHEMICAL",
+        "AGROCHEMICALS", "RASAYAN", "FERTILIZER", "FERTILIZERS", "FERTILISERS", "POLYMER",
+        "POLYMERS", "PIGMENT", "PIGMENTS", "PETROCHEMICAL", "PETROCHEMICALS", "FLUORO",
+        "AMINES", "ALKYL", "ADHESIVES",
     ],
     "COMMODITIES_ENERGY": [
-        "STEEL", "METALS", "MINING", "OIL", "GAS", "REFINERY", "ENERGY", 
-        "COAL", "ALUMINIUM", "COPPER"
-    ]
+        "STEEL", "METALS", "METAL", "MINING", "MINERALS", "OIL", "GAS", "PETROLEUM",
+        "REFINERY", "ENERGY", "SOLAR", "RENEWABLE", "HYDRO", "COAL", "ALUMINIUM",
+        "ALUMINUM", "COPPER", "ZINC", "POWER",
+    ],
+    "CAPITAL_GOODS_INFRA": [
+        "CAPITAL GOODS", "ENGINEERING", "INFRASTRUCTURE", "INFRA", "MACHINERY", "CONSTRUCTION",
+        "ELECTRICAL", "ELECTRICALS", "DEFENCE", "DEFENSE", "AEROSPACE", "DYNAMICS", "TURBINE",
+        "CEMENT", "CEMENTS", "INDUSTRIAL", "LOGISTICS", "PORTS", "PORT", "SHIPPING", "RAIL",
+        "RAILWAYS", "AVIATION", "AIRLINES", "REALTY", "PROPERTIES", "DEVELOPERS", "HOUSING",
+        "BEARINGS", "ABRASIVES", "CABLES", "WIRES", "PIPES", "TUBES",
+    ],
+    "IT_TECH": [
+        "INFORMATION TECHNOLOGY", "SOFTWARE", "IT SERVICES", "IT", "TECHNOLOGY", "TECHNOLOGIES",
+        "TECH", "DIGITAL", "CONSULTING", "CONSULTANCY", "TELECOM", "COMMUNICATIONS",
+        "HEXACOM", "CLOUD", "PLATFORM", "ELECTRONICS", "EMS", "SEMICONDUCTOR", "INFOTECH",
+    ],
+    "BFSI": [
+        "BANK", "BANKING", "FINANCE", "FINANCIAL", "FINSERV", "NBFC", "INSURANCE",
+        "ASSURANCE", "HOUSING FINANCE", "SECURITIES", "CAPITAL MARKETS", "CAPITAL MARKET",
+        "INVESTMENT", "INVESTMENTS", "ASSET MANAGEMENT", "AMC", "LENDING", "BROKING",
+        "WEALTH", "EXCHANGE", "DEPOSITORY", "CREDIT", "MICROFINANCE", "MUTUAL FUND",
+    ],
+    "CONSUMER_FMCG": [
+        "CONSUMER", "FMCG", "FOOD", "FOODS", "FOODWORLD", "BEVERAGE", "BEVERAGES",
+        "BREWERIES", "SPIRITS", "DISTILLERIES", "RETAIL", "MART", "TEXTILE", "TEXTILES",
+        "APPAREL", "GARMENTS", "FOOTWEAR", "PACKAGING", "BUILDING MATERIALS", "SANITARYWARE",
+        "CERAMICS", "PAINTS", "PAINT", "JEWELLERY", "LIFESTYLE", "HOME", "APPLIANCES",
+        "DURABLES", "HOTELS", "HOSPITALITY", "LEISURE", "MEDIA", "MUSIC", "AGRI",
+    ],
 }
+
+_COMPILED_SECTOR_PATTERNS = {
+    sec: [re.compile(rf"\b{re.escape(kw)}\b", re.IGNORECASE) for kw in kws]
+    for sec, kws in SECTOR_KEYWORDS.items()
+}
+
+_CORP_NOISE_RE = re.compile(
+    r"\b(?:LIMITED|LTD|PVT|PRIVATE|PUBLIC|COMPANY|CO|CORPORATION|CORP|INDIA|ENTERPRISES|ENTERPRISE|INDUSTRIES|HOLDINGS|GROUP|INTERNATIONAL)\b",
+    re.IGNORECASE,
+)
+
+_GENERIC_SECTOR_LABELS = {"", "DIVERSIFIED", "GENERAL INDUSTRY", "GENERAL", "N/A", "NONE", "UNKNOWN"}
+
 
 # Industry median benchmarks for India (NSE/BSE listed)
 SECTOR_BENCHMARKS = {
@@ -197,10 +238,15 @@ def detect_sector(
     if any(b in clean_sym for b in ["BANK", "HDFC", "ICICI", "KOTAK", "AXIS", "SBIN", "PNB", "INDUSIND"]):
         return "BFSI"
 
-    text_to_check = f"{clean_sym} {str(industry_str or '')} {str(company_name or '')}".upper()
-    for sector, keywords in SECTOR_KEYWORDS.items():
-        for kw in keywords:
-            if kw in text_to_check:
+    clean_ind = str(industry_str or "").strip()
+    if clean_ind.upper() in _GENERIC_SECTOR_LABELS:
+        clean_ind = ""
+    clean_comp = _CORP_NOISE_RE.sub(" ", str(company_name or "")).strip()
+
+    text_to_check = f"{clean_sym} {clean_ind} {clean_comp}".strip()
+    for sector, patterns in _COMPILED_SECTOR_PATTERNS.items():
+        for pat in patterns:
+            if pat.search(text_to_check):
                 return sector
 
     return "CONSUMER_FMCG"  # Default generalized industrial category
@@ -434,7 +480,7 @@ def evaluate_sector_fundamentals(
 
     return {
         "sector": sector,
-        "sector_display_name": sector.replace("_", " ").title(),
+        "sector_display_name": SECTOR_DISPLAY_NAMES.get(sector, sector.replace("_", " ").title()),
         "score": normalized_score,
         "verdict": verdict,
         "badge_color": badge_color,
