@@ -18,6 +18,7 @@ from core.db.reports import (
     get_all_equities_directory_sync,
     save_report_to_archive,
 )
+from core.db.connection import get_db_connection
 from core.analysis.fundamentals import (
     _FUNDAMENTALS_CACHE,
     _BoundedFundamentalsCache,
@@ -73,6 +74,49 @@ class TestPhase2CacheAndDossierAllocations(unittest.TestCase):
         """Action 2.2: Verify reduced lru_cache sizes for get_report_by_ticker and get_archived_reports."""
         self.assertEqual(get_report_by_ticker.cache_parameters()["maxsize"], 48)
         self.assertEqual(get_archived_reports.cache_parameters()["maxsize"], 16)
+
+    def test_action_2_2_get_archived_reports_filters_null_and_empty_text(self):
+        """Verify get_archived_reports excludes records with NULL or whitespace-only report_text."""
+        conn = get_db_connection()
+        cur = conn.cursor()
+        test_tickers = ("NULL_TEXT_TICK", "EMPTY_TEXT_TICK")
+        try:
+            for t in test_tickers:
+                cur.execute("DELETE FROM reports WHERE ticker = ?;", (t,))
+            cur.execute(
+                "INSERT INTO reports (ticker, short_name, report_text, timestamp) VALUES (?, ?, ?, ?);",
+                ("NULL_TEXT_TICK", "Null Candidate", None, "2026-10-28 09:00:00"),
+            )
+            cur.execute(
+                "INSERT INTO reports (ticker, short_name, report_text, timestamp) VALUES (?, ?, ?, ?);",
+                ("EMPTY_TEXT_TICK", "Empty Candidate", "   ", "2026-10-28 09:00:00"),
+            )
+            conn.commit()
+
+            get_archived_reports.cache_clear()
+            reps_with_text = get_archived_reports(include_text=True)
+            reps_without_text = get_archived_reports(include_text=False)
+
+            returned_tickers_with = {r["ticker"] for r in reps_with_text}
+            returned_tickers_without = {r["ticker"] for r in reps_without_text}
+
+            self.assertNotIn("NULL_TEXT_TICK", returned_tickers_with)
+            self.assertNotIn("EMPTY_TEXT_TICK", returned_tickers_with)
+            self.assertNotIn("NULL_TEXT_TICK", returned_tickers_without)
+            self.assertNotIn("EMPTY_TEXT_TICK", returned_tickers_without)
+
+            # Ensure all returned items have non-empty text when include_text=True
+            for r in reps_with_text:
+                self.assertIsNotNone(r["report_text"])
+                self.assertTrue(r["report_text"].strip() != "")
+        finally:
+            for t in test_tickers:
+                cur.execute("DELETE FROM reports WHERE ticker = ?;", (t,))
+            conn.commit()
+            cur.close()
+            conn.close()
+            get_archived_reports.cache_clear()
+
 
     def test_action_2_3_ttl_cache_on_get_all_equities_directory_sync(self):
         """Action 2.3: get_all_equities_directory_sync has TTL cache and invalidation on archive save."""

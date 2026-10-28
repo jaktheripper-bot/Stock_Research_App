@@ -245,7 +245,9 @@ def get_archived_reports(include_text: bool = False) -> list:
                        COALESCE(rc.rev_count, 0) AS rev_count, r.citations_json
                 FROM reports r 
                 LEFT JOIN (SELECT ticker, COUNT(*) AS rev_count FROM report_revisions GROUP BY ticker) rc ON rc.ticker = r.ticker
-                WHERE r.ticker NOT LIKE 'TEST_%' 
+                WHERE r.report_text IS NOT NULL
+                  AND TRIM(r.report_text) != ''
+                  AND r.ticker NOT LIKE 'TEST_%' 
                   AND r.ticker NOT LIKE 'UNIT_%'
                   AND r.ticker NOT LIKE 'COAL_%'
                   AND r.ticker NOT LIKE 'UNITCOAL_%'
@@ -258,7 +260,9 @@ def get_archived_reports(include_text: bool = False) -> list:
                        COALESCE(rc.rev_count, 0) AS rev_count, NULL AS citations_json
                 FROM reports r 
                 LEFT JOIN (SELECT ticker, COUNT(*) AS rev_count FROM report_revisions GROUP BY ticker) rc ON rc.ticker = r.ticker
-                WHERE r.ticker NOT LIKE 'TEST_%' 
+                WHERE r.report_text IS NOT NULL
+                  AND TRIM(r.report_text) != ''
+                  AND r.ticker NOT LIKE 'TEST_%' 
                   AND r.ticker NOT LIKE 'UNIT_%'
                   AND r.ticker NOT LIKE 'COAL_%'
                   AND r.ticker NOT LIKE 'UNITCOAL_%'
