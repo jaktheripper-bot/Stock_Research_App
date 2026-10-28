@@ -2094,5 +2094,21 @@
       "revision_count": 1044
     },
     "preflight_passed": true
+  },
+  {
+    "tag": "checkpoint_20261028_094159_web_main_scheduler_boot_guard",
+    "timestamp": "2026-10-28 09:41:59 IST",
+    "commit_sha": "d2628e0527eed2eab9aa6c312db2542e0b2554fd",
+    "branch": "main",
+    "description": "web_main_scheduler_boot_guard",
+    "database": {
+      "exists": true,
+      "filename": "reports_checkpoint_20261028_094159_web_main_scheduler_boot_guard.db",
+      "path": ".checkpoints/reports_checkpoint_20261028_094159_web_main_scheduler_boot_guard.db",
+      "size_bytes": 34918400,
+      "report_count": 308,
+      "revision_count": 1047
+    },
+    "preflight_passed": true
   }
 ]

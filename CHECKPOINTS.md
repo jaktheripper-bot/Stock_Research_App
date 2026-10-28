@@ -10,7 +10,7 @@
 
 | Checkpoint Tag | IST Timestamp | Commit | DB Reports | Description |
 |:---|:---|:---|:---|:---|
-| `checkpoint_20261028_094159_web_main_scheduler_boot_guard` | 2026-10-28 09:41:59 IST | `48276e7` | 308 rep / 1047 rev | web_main_scheduler_boot_guard |
+| `checkpoint_20261028_094159_web_main_scheduler_boot_guard` | 2026-10-28 09:41:59 IST | `d2628e0` | 308 rep / 1047 rev | web_main_scheduler_boot_guard |
 | `checkpoint_20261028_093209_daily_stock_ingestion_skip_unsynthesized_discovery` | 2026-10-28 09:32:09 IST | `ef64dfb` | 308 rep / 1044 rev | daily_stock_ingestion_skip_unsynthesized_discovery |
 | `checkpoint_20261028_092749_daily_stock_ingestion_has_grounded_report_status` | 2026-10-28 09:27:49 IST | `2b9ef6b` | 308 rep / 1042 rev | daily_stock_ingestion_has_grounded_report_status |
 | `checkpoint_20261028_092025_reports_get_archived_reports_filter_null_text` | 2026-10-28 09:20:25 IST | `59f9ab2` | 307 rep / 1040 rev | reports_get_archived_reports_filter_null_text |
