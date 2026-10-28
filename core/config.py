@@ -24,6 +24,21 @@ if os.environ.get("SKIP_DOTENV_IN_SUBPROCESS") != "1":
 
 _SECRETS_CACHE: Optional[dict] = None
 _SECRETS_LOADED = False
+_DB_SECRETS_CACHE: dict[str, tuple[Optional[str], float]] = {}
+_DB_SECRET_TTL = 300.0
+_DB_SYNCABLE_SECRET_KEYS = frozenset({
+    "ANGEL_API_KEY",
+    "ANGEL_ONE_API_KEY",
+    "ANGEL_CLIENT_CODE",
+    "ANGEL_PIN",
+    "ANGEL_TOTP_KEY",
+    "SMARTAPI_PROXY_URL",
+    "AWS_PROXY_URL",
+    "PERPLEXITY_API_KEY",
+    "BETTER_STACK_TELEMETRY_TOKEN",
+    "BETTER_STACK_INCIDENTS_TOKEN",
+    "BETTER_STACK_HEARTBEAT_URL",
+})
 _TEST_GUARDED_SECRET_KEYS = frozenset({
     "RESEND_API_KEY",
     "SMTP_HOST",
@@ -96,7 +111,8 @@ def get_secret(key: str, default: Any = None) -> Any:
     Retrieves configuration value from:
     1. os.environ
     2. Local secrets.toml
-    3. default fallback
+    3. RLS-protected Supabase PostgreSQL system_settings (for synced cloud gateway keys)
+    4. default fallback
     """
     val = os.environ.get(key)
     if val is not None and str(val).strip():
@@ -107,6 +123,24 @@ def get_secret(key: str, default: Any = None) -> Any:
         sec_val = secrets[key]
         if sec_val is not None:
             return sec_val
+
+    if key in _DB_SYNCABLE_SECRET_KEYS and not _is_test_runtime():
+        import time
+        now = time.time()
+        cached = _DB_SECRETS_CACHE.get(key)
+        if cached is not None and (now - cached[1]) < _DB_SECRET_TTL:
+            return cached[0] if cached[0] is not None else default
+        try:
+            from core.db.settings import get_system_setting
+            db_val = get_system_setting(key)
+            clean_db_val = str(db_val).strip() if db_val and str(db_val).strip() else None
+            _DB_SECRETS_CACHE[key] = (clean_db_val, now)
+            if clean_db_val:
+                os.environ[key] = clean_db_val
+                return clean_db_val
+        except Exception as e:
+            logger.debug("Database secret lookup notice for %s: %s", key, e)
+            _DB_SECRETS_CACHE[key] = (None, now)
 
     return default
 
