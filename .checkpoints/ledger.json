@@ -1918,5 +1918,21 @@
       "revision_count": 1040
     },
     "preflight_passed": true
+  },
+  {
+    "tag": "checkpoint_20261028_083129_equity_dossier_effective_industry_and_name_resolution",
+    "timestamp": "2026-10-28 08:31:29 IST",
+    "commit_sha": "98dfb011489d64889ea4af42170bc1241b41321b",
+    "branch": "main",
+    "description": "equity_dossier_effective_industry_and_name_resolution",
+    "database": {
+      "exists": true,
+      "filename": "reports_checkpoint_20261028_083129_equity_dossier_effective_industry_and_name_resolution.db",
+      "path": ".checkpoints/reports_checkpoint_20261028_083129_equity_dossier_effective_industry_and_name_resolution.db",
+      "size_bytes": 34918400,
+      "report_count": 307,
+      "revision_count": 1040
+    },
+    "preflight_passed": true
   }
 ]
