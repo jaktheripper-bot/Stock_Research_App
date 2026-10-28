@@ -252,6 +252,97 @@ We prioritise cost reduction and analyse the market. Market capitalisation is re
         valid, discrepancies = verify_stock_report(stock_data, clean_report)
         self.assertTrue(valid, f"Unexpected discrepancies: {discrepancies}")
 
+    def test_checker_enforces_banned_boilerplate_in_production(self):
+        from unittest.mock import patch
+        from checker import verify_stock_report
+        stock_data = {"short_name": "Test Corp", "ticker": "TEST"}
+        report_with_boilerplate = """# DIAGNOSTIC SUMMARY
+Strong fundamentals.
+## Pillar 1: Macro
+The operating franchise benefits from steady sponsorship across domestic lenders.
+## Pillar 2: Industry
+Clean.
+## Pillar 3: Promoter
+Clean.
+## Pillar 4: Structural Drop
+Clean.
+## Pillar 5: Valuation
+Clean.
+## Pillar 6: Technical
+Clean.
+## Pillar 7: ESG Impact Scorecard
+| Parameter | Score | Factors |
+| **Environmental** | 80/100 | Clean |
+| **Social** | 80/100 | Clean |
+| **Governance** | 80/100 | Clean |
+"""
+        # Production mode: rejected
+        with patch.dict("os.environ", {"TESTING": "0"}):
+            valid, discrepancies = verify_stock_report(stock_data, report_with_boilerplate)
+            self.assertFalse(valid)
+            self.assertTrue(any("Static fallback boilerplate rejected" in d for d in discrepancies))
+
+        # Test mode: allowed
+        with patch.dict("os.environ", {"TESTING": "1"}):
+            valid, discrepancies = verify_stock_report(stock_data, report_with_boilerplate)
+            self.assertTrue(valid)
+
+    def test_checker_enforces_header_vs_prose_price_parity_in_production(self):
+        from unittest.mock import patch
+        from checker import verify_stock_report
+        stock_data = {"short_name": "Test Corp", "ticker": "TEST", "current_price": 1000.0}
+
+        # Contradiction: prose cites 500 vs live 1000 (>35% drift)
+        report_contradictory = """# DIAGNOSTIC SUMMARY
+Trading at a current market price of ₹ 500.00 against intrinsic fair value.
+## Pillar 1: Macro
+Clean.
+## Pillar 2: Industry
+Clean.
+## Pillar 3: Promoter
+Clean.
+## Pillar 4: Structural Drop
+Clean.
+## Pillar 5: Valuation
+Clean.
+## Pillar 6: Technical
+Clean.
+## Pillar 7: ESG Impact Scorecard
+| Parameter | Score | Factors |
+| **Environmental** | 80/100 | Clean |
+| **Social** | 80/100 | Clean |
+| **Governance** | 80/100 | Clean |
+"""
+        with patch.dict("os.environ", {"TESTING": "0"}):
+            valid, discrepancies = verify_stock_report(stock_data, report_contradictory)
+            self.assertFalse(valid)
+            self.assertTrue(any("Header-vs-prose price contradiction" in d for d in discrepancies))
+
+        # Consistent: prose cites 1,020 vs live 1000 (<35% drift)
+        report_consistent = """# DIAGNOSTIC SUMMARY
+Trading at a current market price of ₹ 1,020.00 against intrinsic fair value.
+## Pillar 1: Macro
+Clean.
+## Pillar 2: Industry
+Clean.
+## Pillar 3: Promoter
+Clean.
+## Pillar 4: Structural Drop
+Clean.
+## Pillar 5: Valuation
+Clean.
+## Pillar 6: Technical
+Clean.
+## Pillar 7: ESG Impact Scorecard
+| Parameter | Score | Factors |
+| **Environmental** | 80/100 | Clean |
+| **Social** | 80/100 | Clean |
+| **Governance** | 80/100 | Clean |
+"""
+        with patch.dict("os.environ", {"TESTING": "0"}):
+            valid, discrepancies = verify_stock_report(stock_data, report_consistent)
+            self.assertTrue(valid, f"Unexpected discrepancies: {discrepancies}")
+
 
 if __name__ == "__main__":
     unittest.main()
