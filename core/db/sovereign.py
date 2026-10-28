@@ -634,7 +634,48 @@ def refresh_daily_sovereign_benchmarks(edition_date: Optional[str] = None) -> Di
         if save_sovereign_sdl_item(s_copy):
             sdl_updated += 1
 
-    # Ensure macro monetary corridor is primed
+    # Synchronize macro monetary corridor rates and stamp updated_at
+    macro_updated = 0
+    conn = get_db_connection()
+    cursor = conn.cursor()
+    p = get_placeholder()
+    is_pg = bool(get_supabase_url()) or is_postgres_connection(conn)
+    try:
+        for m in DEFAULT_MACRO_RATES:
+            metric_name_val = m.get("metric_name") or m.get("indicator_name", "")
+            if is_pg:
+                q_macro = f"""
+                    INSERT INTO sovereign_macro_rates (metric_key, metric_name, metric_value, unit, period_label, source, updated_at)
+                    VALUES ({p}, {p}, {p}, {p}, {p}, {p}, now())
+                    ON CONFLICT (metric_key) DO UPDATE SET
+                        metric_name = EXCLUDED.metric_name,
+                        metric_value = EXCLUDED.metric_value,
+                        unit = EXCLUDED.unit,
+                        period_label = EXCLUDED.period_label,
+                        source = EXCLUDED.source,
+                        updated_at = now();
+                """
+            else:
+                q_macro = f"""
+                    INSERT INTO sovereign_macro_rates (metric_key, metric_name, metric_value, unit, period_label, source, updated_at)
+                    VALUES ({p}, {p}, {p}, {p}, {p}, {p}, datetime('now'))
+                    ON CONFLICT (metric_key) DO UPDATE SET
+                        metric_name = excluded.metric_name,
+                        metric_value = excluded.metric_value,
+                        unit = excluded.unit,
+                        period_label = excluded.period_label,
+                        source = excluded.source,
+                        updated_at = datetime('now');
+                """
+            cursor.execute(q_macro, (m["metric_key"], metric_name_val, m["metric_value"], m["unit"], m["period_label"], m["source"]))
+            macro_updated += 1
+        conn.commit()
+    except Exception as macro_err:
+        logger.warning(f"Macro monetary corridor sync notice: {macro_err}")
+        conn.rollback()
+    finally:
+        cursor.close()
+        conn.close()
     get_macro_monetary_corridor()
 
     # Record daily term-structure snapshot into sovereign_curve_history

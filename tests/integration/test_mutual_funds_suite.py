@@ -1175,7 +1175,7 @@ Cash reserve of 12% cushions against broad equity sell-offs.
         _cleanup()
         try:
             # 1. Under production mode (!is_testing), if live synthesis fails, returns False and does not archive
-            with patch.dict(os.environ, {"TESTING": "0", "PYTEST_CURRENT_TEST": ""}):
+            with patch.dict(os.environ, {"TESTING": "0", "ENVIRONMENT": "testing", "PYTEST_CURRENT_TEST": "", "SUPABASE_DB_URL": ""}):
                 with patch("core.analysis.dossier_report_synthesis.generate_stock_report", return_value="Live Synthesis Failed: Service unavailable"):
                     res = audit_and_archive_constituent_stock(test_ticker, "Test Constituent Ltd", "Technology")
                     self.assertFalse(res)

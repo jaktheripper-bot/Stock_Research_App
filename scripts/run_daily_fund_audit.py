@@ -23,7 +23,7 @@ ROOT_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 if ROOT_DIR not in sys.path:
     sys.path.insert(0, ROOT_DIR)
 
-from core.db.connection import init_db
+from core.db.connection import init_db, get_db_connection
 from core.db.mutual_funds import (
     get_active_mutual_funds,
     get_fund_forensic_dossier,
@@ -42,37 +42,76 @@ logging.basicConfig(
 logger = logging.getLogger("fund_audit_worker")
 
 
-def list_fund_audit_status():
-    """Prints table of mutual funds and their current accounting check status."""
+def list_fund_audit_status(limit: int = 500):
+    """Prints table of mutual funds and their current accounting check status via single batch JOIN."""
     init_db()
-    funds = get_active_mutual_funds()
-    print("\n" + "="*95)
+    conn = get_db_connection()
+    cur = conn.cursor()
+    try:
+        cur.execute(
+            """
+            SELECT s.scheme_code,
+                   s.category,
+                   d.composite_health_score,
+                   d.accounting_risk_index,
+                   d.margin_of_safety_pct,
+                   d.last_audited_at
+            FROM mutual_fund_schemes s
+            LEFT JOIN fund_forensic_dossiers d ON s.scheme_code = d.scheme_code
+            WHERE s.broad_category IN ('EQUITY', 'HYBRID')
+            ORDER BY s.aum_crores DESC, s.scheme_name ASC
+            LIMIT %s
+            """
+            if hasattr(cur, "mogrify") or getattr(cur, "_cur", None) is not None
+            else """
+            SELECT s.scheme_code,
+                   s.category,
+                   d.composite_health_score,
+                   d.accounting_risk_index,
+                   d.margin_of_safety_pct,
+                   d.last_audited_at
+            FROM mutual_fund_schemes s
+            LEFT JOIN fund_forensic_dossiers d ON s.scheme_code = d.scheme_code
+            WHERE s.broad_category IN ('EQUITY', 'HYBRID')
+            ORDER BY s.aum_crores DESC, s.scheme_name ASC
+            LIMIT ?
+            """,
+            (limit,),
+        )
+        rows = cur.fetchall()
+    finally:
+        cur.close()
+        conn.close()
+
+    print("\n" + "=" * 95)
     print(f"{'SCHEME CODE':<25} | {'CATEGORY':<20} | {'HEALTH':<7} | {'ASRI':<6} | {'MOS':<6} | {'LAST AUDITED':<19}")
-    print("="*95)
-    for f in funds:
-        code = f.get("scheme_code", "")
-        cat = f.get("category", "")[:20]
-        dos = get_fund_forensic_dossier(code)
-        if dos:
-            comp_h = dos.get("composite_health_score")
+    print("=" * 95)
+    for row in rows:
+        code = str(row[0] or "")
+        cat = str(row[1] or "")[:20]
+        comp_h_raw = row[2]
+        asri_val = row[3]
+        mos_val = row[4]
+        last_raw = row[5]
+        if last_raw is not None:
+            comp_h = float(comp_h_raw) if (comp_h_raw is not None and float(comp_h_raw) >= 0) else None
             health = f"{comp_h:.1f}" if comp_h is not None else "Paused"
-            asri_val = dos.get("accounting_risk_index")
             asri = f"{float(asri_val):.1f}%" if asri_val is not None else "0.0%"
-            mos_val = dos.get("margin_of_safety_pct")
             mos = f"{float(mos_val):+.1f}%" if mos_val is not None else "+0.0%"
-            last = str(dos.get("last_audited_at", ""))[:19]
+            last = str(last_raw)[:19]
         else:
             health = "N/A"
             asri = "N/A"
             mos = "N/A"
             last = "Pending Initial Audit"
         print(f"{code:<25} | {cat:<20} | {health:<7} | {asri:<6} | {mos:<6} | {last:<19}")
-    print("="*95 + "\n")
+    print("=" * 95 + "\n")
 
 
 def run_worker(scheme_code: Optional[str] = None, audit_all: bool = False):
     init_db()
-    seed_default_mutual_funds()
+    if not get_active_mutual_funds(limit=1):
+        seed_default_mutual_funds()
 
     if audit_all:
         funds = get_active_mutual_funds()
@@ -123,8 +162,12 @@ def run_worker(scheme_code: Optional[str] = None, audit_all: bool = False):
     print(f"Promoter Pledge Risk:   {float(res.get('promoter_pledge_exposure_pct') or 0.0):.1f}%")
     print(f"Active Share vs Index:  {float(res.get('active_share_pct') or 0.0):.1f}%")
     print("="*80)
-    print("\nSYNTHeSIZED FORENSIC DOSSIER PREVIEW:")
-    print(res["dossier_text"][:600] + "\n...\n")
+    print("\nSYNTHESIZED FORENSIC DOSSIER PREVIEW:")
+    preview_text = (res.get("dossier_text") or "").strip()
+    if preview_text:
+        print(preview_text[:600] + "\n...\n")
+    else:
+        print("[Pending Gemini narrative synthesis — quantitative look-through scores archived cleanly]\n")
 
 
 if __name__ == "__main__":

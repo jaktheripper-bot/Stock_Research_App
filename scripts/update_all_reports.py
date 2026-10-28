@@ -15,6 +15,7 @@ import math
 import sqlite3
 import logging
 from concurrent.futures import ThreadPoolExecutor, as_completed
+from datetime import datetime, timezone
 from typing import Dict, Any, Optional
 
 # Ensure repository root is in python path
@@ -128,11 +129,18 @@ def update_database_reports(db_path: str, max_workers: int = 6):
             except Exception as e:
                 logger.warning(f"[{completed}/{total}] Error updating {t}: {e}")
 
-    # Commit updates back to SQLite database
+    # Commit updates back to SQLite database (preserving qualitative TTL timestamps & NOT NULL invariants)
     conn = sqlite3.connect(db_path)
     c = conn.cursor()
-    updated_count = 0
-    now_ts = int(time.time())
+
+    # Self-heal any legacy integer-epoch timestamps written by older versions
+    c.execute("UPDATE reports SET timestamp = datetime(timestamp, 'unixepoch') WHERE typeof(timestamp) = 'integer'")
+    c.execute("UPDATE report_revisions SET timestamp = datetime(timestamp, 'unixepoch') WHERE typeof(timestamp) = 'integer'")
+
+    now_iso = datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M:%S")
+    quotes_synced = 0
+    revisions_archived = 0
+    material_moves_flagged = 0
 
     for row in reports:
         ticker, short_name, old_price, old_pe, old_mcap, report_text, citations_json = row
@@ -143,44 +151,101 @@ def update_database_reports(db_path: str, max_workers: int = 6):
         new_price = new_data["price"] if new_data["price"] is not None else old_price
         new_pe = new_data["pe"] if new_data["pe"] is not None else old_pe
         new_mcap = new_data["mcap"] if new_data["mcap"] is not None else old_mcap
+        live_fetched = new_data.get("source") != "Unchanged" and new_data.get("price") is not None
 
-        c.execute("""
-            UPDATE reports 
-            SET baseline_price = ?, baseline_pe = ?, baseline_mcap = ?, timestamp = ?
-            WHERE ticker = ?
-        """, (new_price, new_pe, new_mcap, now_ts, ticker))
+        # 1. Sync live exchange quote into cached_fundamentals whenever available
+        if live_fetched:
+            c.execute(
+                """
+                UPDATE cached_fundamentals
+                SET current_price = ?,
+                    pe_ratio = COALESCE(?, pe_ratio),
+                    market_cap = COALESCE(?, market_cap),
+                    updated_at = ?
+                WHERE ticker = ?
+                """,
+                (new_price, str(new_pe) if new_pe is not None else None, new_mcap, now_iso, ticker),
+            )
+            quotes_synced += 1
 
-        # Record revision snapshot
-        c.execute("""
-            INSERT INTO report_revisions (
-                ticker, short_name, report_text, timestamp, 
-                baseline_price, baseline_pe, baseline_mcap, revision_trigger, citations_json
-            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
-        """, (
-            ticker, short_name, report_text, now_ts,
-            new_price, new_pe, new_mcap, "EXCHANGE_FEED_REFRESH", citations_json
-        ))
-        updated_count += 1
+        has_compiled_prose = bool(report_text and str(report_text).strip())
+        if not has_compiled_prose:
+            # Pending compilation queue row: update exchange baselines ONLY; preserve timestamp & skip report_revisions
+            c.execute(
+                """
+                UPDATE reports
+                SET baseline_price = ?, baseline_pe = ?, baseline_mcap = ?
+                WHERE ticker = ?
+                """,
+                (new_price, new_pe, new_mcap, ticker),
+            )
+            continue
+
+        # 2. Compiled dossier row: preserve >=5% drift for MaterialChangeGate Pillar 5 & 6 re-synthesis
+        old_p_float = _safe_float(old_price)
+        price_delta = (
+            abs(float(new_price) - old_p_float) / old_p_float
+            if (live_fetched and old_p_float and old_p_float > 0)
+            else 0.0
+        )
+        if live_fetched and price_delta < 0.05:
+            c.execute(
+                """
+                UPDATE reports
+                SET baseline_price = ?, baseline_pe = ?, baseline_mcap = ?
+                WHERE ticker = ?
+                """,
+                (new_price, new_pe, new_mcap, ticker),
+            )
+            c.execute(
+                """
+                INSERT INTO report_revisions (
+                    ticker, short_name, report_text, timestamp,
+                    baseline_price, baseline_pe, baseline_mcap, revision_trigger, citations_json
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+                """,
+                (
+                    ticker, short_name, report_text, now_iso,
+                    new_price, new_pe, new_mcap, "EXCHANGE_FEED_REFRESH", citations_json,
+                ),
+            )
+            revisions_archived += 1
+        elif live_fetched and price_delta >= 0.05:
+            material_moves_flagged += 1
 
     conn.commit()
     conn.close()
-    logger.info(f"✅ Successfully updated and archived {updated_count}/{total} reports in SQLite database.")
+    logger.info(
+        f"✅ Exchange feed refresh complete across {total} tickers: "
+        f"{quotes_synced} live quotes synced, {revisions_archived} revisions archived, "
+        f"{material_moves_flagged} >=5% moves preserved for Pillar 5/6 re-synthesis."
+    )
 
 
 def main():
     db_path = get_db_path()
     update_database_reports(db_path, max_workers=6)
 
-    # Trigger Supabase sync if credentials available
+    # Trigger Supabase sync (direct PostgreSQL first, PostgREST fallback second)
     logger.info("📡 Synchronizing updated reports with Supabase...")
     try:
-        from scripts.sync_to_supabase import get_local_reports, sync_via_rest
+        from scripts.sync_to_supabase import (
+            get_local_reports,
+            get_local_revisions,
+            sync_via_postgresql,
+            sync_via_rest,
+        )
+        pg_url = get_secret("SUPABASE_DB_URL")
         sb_url = get_secret("SUPABASE_URL")
         service_key = get_secret("SUPABASE_SERVICE_ROLE_KEY")
-        if sb_url and service_key:
-            reports = get_local_reports(db_path)
+        reports = get_local_reports(db_path)
+        if pg_url:
+            revisions = get_local_revisions(db_path)
+            res = sync_via_postgresql(reports, revisions, pg_url, sqlite_path=db_path)
+            logger.info(f"☁️  Supabase PostgreSQL sync complete: {res}")
+        elif sb_url and service_key:
             res = sync_via_rest(reports, sb_url, service_key)
-            logger.info(f"☁️  Supabase sync complete: {res} reports synchronized to cloud.")
+            logger.info(f"☁️  Supabase REST sync complete: {res}")
         else:
             logger.warning("Supabase credentials not configured in environment.")
     except Exception as e:

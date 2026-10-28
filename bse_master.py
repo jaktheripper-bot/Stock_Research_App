@@ -88,21 +88,23 @@ def resolve_scrip_from_supabase(query: str) -> str:
     return None
 
 def _get_active_flash_model(client) -> str:
-    """Discovers active Gemini Flash model with graceful fallback."""
+    """Discovers active Gemini Flash-Lite model for lightweight scrip lookups."""
     try:
-        from analyzer import get_latest_flash_models
-        models = get_latest_flash_models(client)
-        if models:
-            return models[0]
+        from core.analysis.dossier_report_synthesis import get_light_flash_model
+        model = get_light_flash_model(client)
+        if model:
+            return model
     except Exception:
         pass
-    return "gemini-2.5-flash"
+    return "gemini-3.5-flash-lite"
 
 def resolve_scrip_via_gemini_jit(query: str) -> str:
     """
     Tier 5: Just-In-Time Gemini Grounded Search.
     Discovers official 6-digit BSE scrip codes for newly listed IPOs or unindexed companies.
     """
+    if os.environ.get("TESTING") == "1":
+        return None
     try:
         from google import genai
         from core.config import get_secret
@@ -150,7 +152,9 @@ def is_synthetic_test_symbol(query: str) -> bool:
     if not query:
         return False
     clean = str(query).strip().upper()
-    if any(clean.startswith(p) for p in ("COAL_", "UNITCOAL_", "TEST_", "UNIT_", "ZZTEST", "TESTCORP", "TESTPEER", "COALESCE_")):
+    if any(clean.startswith(p) for p in ("COAL_", "UNITCOAL_", "TEST_", "UNIT_", "ZZTEST", "TESTCORP", "TESTPEER", "COALESCE_", "FAKE_", "MOCK_", "DUMMY_", "STATUS_TEST")):
+        return True
+    if "_TEST_" in clean or clean.endswith("_TEST"):
         return True
     if clean in ("TESTCORP", "TESTPEER", "ZZTESTONLY", "COALESCE_TEST"):
         return True

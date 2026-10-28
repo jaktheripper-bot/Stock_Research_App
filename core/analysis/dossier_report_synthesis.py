@@ -73,13 +73,16 @@ _MAX_DISCOVERED_MODELS_CACHE_SIZE = 10
 
 def get_latest_flash_models(client) -> list:
     now = time.time()
+    is_vertex = getattr(client, "vertexai", False) is True
+    if is_vertex:
+        return ["gemini-3.8-flash", "gemini-3.7-flash", "gemini-3.5-flash"]
     if _DISCOVERED_MODELS_CACHE.get("models") and (now - _DISCOVERED_MODELS_CACHE.get("timestamp", 0)) < 86400:
         return _DISCOVERED_MODELS_CACHE["models"]
-    fallback = ["gemini-3.8-flash", "gemini-3.7-flash"]
+    fallback = ["gemini-3.8-flash", "gemini-3.7-flash", "gemini-3.5-flash"]
     try:
         discovered = []
         for m in client.models.list():
-            model_id = m.name.replace("models/", "") if hasattr(m, "name") else ""
+            model_id = m.name.split("/")[-1] if hasattr(m, "name") and m.name else ""
             if "gemini" in model_id and "flash" in model_id and "preview" not in model_id:
                 if not any(k in model_id for k in ["image", "tts", "audio", "embed"]):
                     match = re.search(r"gemini-(\d+(?:\.\d+)?)", model_id)
@@ -98,20 +101,22 @@ def get_latest_flash_models(client) -> list:
 
 def get_light_flash_model(client) -> str:
     """Returns the most cost-efficient flash model (e.g., flash-lite if available, else standard flash)."""
+    if getattr(client, "vertexai", False) is True:
+        return "gemini-3.5-flash-lite"
     try:
         discovered = get_latest_flash_models(client)
         for m in discovered:
             if "lite" in m:
                 return m
         for m in client.models.list():
-            model_id = m.name.replace("models/", "") if hasattr(m, "name") else ""
+            model_id = m.name.split("/")[-1] if hasattr(m, "name") and m.name else ""
             if "flash-lite" in model_id and "preview" not in model_id:
                 return model_id
         if discovered:
             return discovered[0]
     except Exception as surg_err:
         logger.debug("Light model selection notice: %s", surg_err)
-    return "gemini-3.8-flash"
+    return "gemini-3.5-flash-lite"
 
 def stream_genai_with_fallback(client, prompt: str, system_prompt: str, on_status=None, use_grounding: bool = True, collected_citations: list = None):
     models_to_try = get_latest_flash_models(client)[:2]
@@ -553,74 +558,76 @@ def synthesize_batch_stock_reports(
 
     results: dict = {}
     batch_job_name = ""
+    is_vertex = getattr(client, "vertexai", False) is True
 
-    # 1. Submit cohort via Gemini Batch API (50% cost discount)
-    try:
-        batch_job = client.batches.create(
-            model=model_name,
-            src=inline_requests,
-            config={"display_name": f"moatnomics-{edition_label}"},
-        )
-        batch_job_name = getattr(batch_job, "name", "") or ""
-        logger.info(
-            "Submitted Gemini Batch API job '%s' for %d stocks (model=%s)",
-            batch_job_name,
-            len(valid_items),
-            model_name,
-        )
+    # 1. Submit cohort via Gemini Batch API (AI Studio inline batch; Vertex AI requires GCS URIs so routes directly to Step 2)
+    if not is_vertex:
+        try:
+            batch_job = client.batches.create(
+                model=model_name,
+                src=inline_requests,
+                config={"display_name": f"moatnomics-{edition_label}"},
+            )
+            batch_job_name = getattr(batch_job, "name", "") or ""
+            logger.info(
+                "Submitted Gemini Batch API job '%s' for %d stocks (model=%s)",
+                batch_job_name,
+                len(valid_items),
+                model_name,
+            )
 
-        deadline = time.monotonic() + max(0, poll_timeout_seconds)
-        while batch_job_name:
-            state_obj = getattr(batch_job, "state", None)
-            state_name = getattr(state_obj, "name", None) or str(state_obj or "")
-            if state_name == "JOB_STATE_SUCCEEDED":
-                dest = getattr(batch_job, "dest", None)
-                inlined = getattr(dest, "inlined_responses", None) or []
-                for idx, inline_resp in enumerate(inlined):
-                    if idx >= len(valid_items):
-                        break
-                    t_sym, s_data, _, _ = valid_items[idx]
-                    resp_obj = getattr(inline_resp, "response", None)
-                    txt = getattr(resp_obj, "text", None) if resp_obj else None
-                    if txt and len(str(txt).strip()) >= 500:
-                        clean_txt = str(txt).strip()
-                        try:
-                            from core.analysis.language_filter import enforce_indian_english
-                            clean_txt = enforce_indian_english(clean_txt)
-                        except Exception as lang_err:
-                            logger.debug("Language filter normalization notice in batch inline: %s", lang_err)
-                        scrip = str(s_data.get("scrip_code") or "").strip()
-                        cites = []
-                        if scrip and scrip.isdigit():
-                            cites.append({
-                                "title": f"BSE Corporate Announcements & Disclosures ({t_sym})",
-                                "uri": f"https://www.bseindia.com/stock-share-price/-/{scrip}/corporate-announcements/",
-                                "source_type": "BSE Official Regulatory Filing",
-                            })
-                        results[t_sym] = {
-                            "report_text": clean_txt,
-                            "citations": cites,
-                            "tier": "GEMINI_BATCH_API_50PCT_DISCOUNT",
-                            "batch_job_name": batch_job_name,
-                        }
-                break
-            if state_name in ("JOB_STATE_FAILED", "JOB_STATE_CANCELLED", "JOB_STATE_EXPIRED"):
-                logger.warning("Gemini Batch job '%s' ended with state %s", batch_job_name, state_name)
-                break
-            if time.monotonic() >= deadline:
-                logger.info(
-                    "Gemini Batch job '%s' still %s after %ds poll window; completing remaining via Flex 50%% tier.",
-                    batch_job_name,
-                    state_name,
-                    poll_timeout_seconds,
-                )
-                break
-            time.sleep(max(1, poll_interval_seconds))
-            batch_job = client.batches.get(name=batch_job_name)
-    except Exception as batch_err:
-        logger.warning("Gemini Batch API submission/polling notice: %s. Falling back to Flex 50%% tier.", batch_err)
+            deadline = time.monotonic() + max(0, poll_timeout_seconds)
+            while batch_job_name:
+                state_obj = getattr(batch_job, "state", None)
+                state_name = getattr(state_obj, "name", None) or str(state_obj or "")
+                if state_name == "JOB_STATE_SUCCEEDED":
+                    dest = getattr(batch_job, "dest", None)
+                    inlined = getattr(dest, "inlined_responses", None) or []
+                    for idx, inline_resp in enumerate(inlined):
+                        if idx >= len(valid_items):
+                            break
+                        t_sym, s_data, _, _ = valid_items[idx]
+                        resp_obj = getattr(inline_resp, "response", None)
+                        txt = getattr(resp_obj, "text", None) if resp_obj else None
+                        if txt and len(str(txt).strip()) >= 500:
+                            clean_txt = str(txt).strip()
+                            try:
+                                from core.analysis.language_filter import enforce_indian_english
+                                clean_txt = enforce_indian_english(clean_txt)
+                            except Exception as lang_err:
+                                logger.debug("Language filter normalization notice in batch inline: %s", lang_err)
+                            scrip = str(s_data.get("scrip_code") or "").strip()
+                            cites = []
+                            if scrip and scrip.isdigit():
+                                cites.append({
+                                    "title": f"BSE Corporate Announcements & Disclosures ({t_sym})",
+                                    "uri": f"https://www.bseindia.com/stock-share-price/-/{scrip}/corporate-announcements/",
+                                    "source_type": "BSE Official Regulatory Filing",
+                                })
+                            results[t_sym] = {
+                                "report_text": clean_txt,
+                                "citations": cites,
+                                "tier": "GEMINI_BATCH_API_50PCT_DISCOUNT",
+                                "batch_job_name": batch_job_name,
+                            }
+                    break
+                if state_name in ("JOB_STATE_FAILED", "JOB_STATE_CANCELLED", "JOB_STATE_EXPIRED"):
+                    logger.warning("Gemini Batch job '%s' ended with state %s", batch_job_name, state_name)
+                    break
+                if time.monotonic() >= deadline:
+                    logger.info(
+                        "Gemini Batch job '%s' still %s after %ds poll window; completing remaining via Flex 50%% tier.",
+                        batch_job_name,
+                        state_name,
+                        poll_timeout_seconds,
+                    )
+                    break
+                time.sleep(max(1, poll_interval_seconds))
+                batch_job = client.batches.get(name=batch_job_name)
+        except Exception as batch_err:
+            logger.warning("Gemini Batch API submission/polling notice: %s. Falling back to Flex 50%% tier.", batch_err)
 
-    # 2. Complete any remaining stocks via Gemini Flex Inference (service_tier="flex", 50% cost discount)
+    # 2. Complete remaining stocks via Vertex AI Postpay Grounded or AI Studio Flex Inference
     for t_sym, s_data, u_prompt, s_inst in valid_items:
         if t_sym in results:
             continue
@@ -631,15 +638,17 @@ def synthesize_batch_stock_reports(
                 if use_grounding
                 else s_inst
             )
+            cfg_kwargs = {
+                "system_instruction": sys_full,
+                "tools": tools_list,
+                "temperature": 0.2,
+            }
+            if not is_vertex:
+                cfg_kwargs["service_tier"] = "flex"
             resp = client.models.generate_content(
                 model=model_name,
                 contents=u_prompt,
-                config=genai.types.GenerateContentConfig(
-                    system_instruction=sys_full,
-                    tools=tools_list,
-                    temperature=0.2,
-                    service_tier="flex",
-                ),
+                config=genai.types.GenerateContentConfig(**cfg_kwargs),
             )
             txt = getattr(resp, "text", None) or ""
             if len(txt.strip()) >= 500:
@@ -660,7 +669,7 @@ def synthesize_batch_stock_reports(
                 results[t_sym] = {
                     "report_text": clean_flex_txt,
                     "citations": cites,
-                    "tier": "GEMINI_FLEX_50PCT_DISCOUNT",
+                    "tier": "VERTEX_AI_POSTPAY_GROUNDED" if is_vertex else "GEMINI_FLEX_50PCT_DISCOUNT",
                     "batch_job_name": batch_job_name,
                 }
         except Exception as flex_err:

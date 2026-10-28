@@ -352,15 +352,20 @@ def ingest_amfi_daily_feed(
     upserted_count = 0
     error_count = 0
 
-    for s in schemes:
-        try:
-            if save_mutual_fund_scheme(s):
-                upserted_count += 1
-            else:
+    from core.db.mutual_funds import save_mutual_fund_schemes_batch
+    batch_saved = save_mutual_fund_schemes_batch(schemes)
+    if batch_saved > 0 or not schemes:
+        upserted_count = batch_saved
+    else:
+        for s in schemes:
+            try:
+                if save_mutual_fund_scheme(s):
+                    upserted_count += 1
+                else:
+                    error_count += 1
+            except Exception as e:
                 error_count += 1
-        except Exception as e:
-            error_count += 1
-            logger.debug(f"Failed to upsert scheme {s.get('scheme_code')}: {e}")
+                logger.debug(f"Failed to upsert scheme {s.get('scheme_code')}: {e}")
 
     duration = round(time.time() - t0, 2)
     logger.info(f"AMFI Ingestion completed: {upserted_count} schemes saved/updated ({error_count} errors) in {duration}s.")

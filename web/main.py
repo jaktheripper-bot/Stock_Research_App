@@ -48,11 +48,12 @@ setup_logging()
 logger = logging.getLogger("equity_research.web")
 
 
-try:
-    from dotenv import load_dotenv
-    load_dotenv()
-except Exception as dot_err:
-    logger.debug("dotenv load notice: %s", dot_err)
+if os.environ.get("SKIP_DOTENV_IN_SUBPROCESS") != "1":
+    try:
+        from dotenv import load_dotenv
+        load_dotenv()
+    except Exception as dot_err:
+        logger.debug("dotenv load notice: %s", dot_err)
 
 try:
     import toml
@@ -255,7 +256,7 @@ async def run_daily_discovery_scheduler():
                 with job_lease(f"discovery_reel_{today_str}", ttl_seconds=daily_ttl, release_on_exit=False) as acquired:
                     if acquired:
                         logger.info(f"[Discovery Watcher] Past 08:55 AM IST on boot for {today_str}. Acquired lease. Running discovery screening...")
-                        await execute_discovery_screening()
+                        await execute_discovery_screening(edition_date=today_str, acquire_lease=False)
                         logger.info(f"[Discovery Watcher] Boot discovery screening completed for {today_str}.")
                     else:
                         logger.info(f"[Discovery Watcher] Lease for discovery_reel_{today_str} already satisfied. Skipping boot screening.")
@@ -301,7 +302,7 @@ async def run_daily_discovery_scheduler():
                         await loop.run_in_executor(None, ingest_daily_stock_cohort, yesterday_str, 15, False)
                 with job_lease(f"discovery_reel_{yesterday_str}", ttl_seconds=daily_ttl, release_on_exit=False) as acquired:
                     if acquired:
-                        await execute_discovery_screening()
+                        await execute_discovery_screening(edition_date=yesterday_str, acquire_lease=False)
 
             # Independent prior-day MSME cohort catch-up check
             conn = get_db_connection()
@@ -355,7 +356,7 @@ async def run_daily_discovery_scheduler():
                 with job_lease(f"discovery_reel_{today_str}", ttl_seconds=daily_ttl, release_on_exit=False) as acquired:
                     if acquired:
                         logger.info(f"[Discovery Watcher] 08:55 AM IST failover window reached for {today_str}. Acquired lease. Running discovery screening...")
-                        await execute_discovery_screening()
+                        await execute_discovery_screening(edition_date=today_str, acquire_lease=False)
                         logger.info(f"[Discovery Watcher] Daily discovery reel screening completed for {today_str}.")
                     else:
                         logger.info(f"[Discovery Watcher] Lease for discovery_reel_{today_str} already satisfied by cloud batch runner. Skipping.")

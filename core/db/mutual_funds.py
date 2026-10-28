@@ -92,15 +92,15 @@ def save_mutual_fund_scheme(scheme: Dict[str, Any]) -> bool:
                     category = EXCLUDED.category,
                     broad_category = EXCLUDED.broad_category,
                     benchmark_index = EXCLUDED.benchmark_index,
-                    aum_crores = EXCLUDED.aum_crores,
+                    aum_crores = CASE WHEN EXCLUDED.aum_crores > 0 THEN EXCLUDED.aum_crores ELSE mutual_fund_schemes.aum_crores END,
                     nav = EXCLUDED.nav,
                     ter_direct_pct = EXCLUDED.ter_direct_pct,
                     ter_regular_pct = EXCLUDED.ter_regular_pct,
                     portfolio_turnover_ratio_pct = EXCLUDED.portfolio_turnover_ratio_pct,
                     active_share_pct = EXCLUDED.active_share_pct,
                     risk_grade = EXCLUDED.risk_grade,
-                    fund_manager = EXCLUDED.fund_manager,
-                    metadata_json = EXCLUDED.metadata_json,
+                    fund_manager = CASE WHEN EXCLUDED.fund_manager IS NOT NULL AND EXCLUDED.fund_manager <> 'Senior Fund Manager' THEN EXCLUDED.fund_manager ELSE COALESCE(NULLIF(mutual_fund_schemes.fund_manager, ''), EXCLUDED.fund_manager) END,
+                    metadata_json = CASE WHEN EXCLUDED.metadata_json IS NOT NULL AND EXCLUDED.metadata_json NOT IN ('{}', '') THEN EXCLUDED.metadata_json ELSE COALESCE(NULLIF(mutual_fund_schemes.metadata_json, ''), EXCLUDED.metadata_json) END,
                     last_portfolio_date = EXCLUDED.last_portfolio_date,
                     last_updated = now();
             """, (
@@ -123,15 +123,15 @@ def save_mutual_fund_scheme(scheme: Dict[str, Any]) -> bool:
                     category = excluded.category,
                     broad_category = excluded.broad_category,
                     benchmark_index = excluded.benchmark_index,
-                    aum_crores = excluded.aum_crores,
+                    aum_crores = CASE WHEN excluded.aum_crores > 0 THEN excluded.aum_crores ELSE mutual_fund_schemes.aum_crores END,
                     nav = excluded.nav,
                     ter_direct_pct = excluded.ter_direct_pct,
                     ter_regular_pct = excluded.ter_regular_pct,
                     portfolio_turnover_ratio_pct = excluded.portfolio_turnover_ratio_pct,
                     active_share_pct = excluded.active_share_pct,
                     risk_grade = excluded.risk_grade,
-                    fund_manager = excluded.fund_manager,
-                    metadata_json = excluded.metadata_json,
+                    fund_manager = CASE WHEN excluded.fund_manager IS NOT NULL AND excluded.fund_manager <> 'Senior Fund Manager' THEN excluded.fund_manager ELSE COALESCE(NULLIF(mutual_fund_schemes.fund_manager, ''), excluded.fund_manager) END,
+                    metadata_json = CASE WHEN excluded.metadata_json IS NOT NULL AND excluded.metadata_json NOT IN ('{}', '') THEN excluded.metadata_json ELSE COALESCE(NULLIF(mutual_fund_schemes.metadata_json, ''), excluded.metadata_json) END,
                     last_portfolio_date = excluded.last_portfolio_date,
                     last_updated = datetime('now');
             """, (
@@ -146,6 +146,115 @@ def save_mutual_fund_scheme(scheme: Dict[str, Any]) -> bool:
         logger.error(f"Error saving mutual fund scheme {code}: {e}")
         conn.rollback()
         return False
+    finally:
+        cursor.close()
+        conn.close()
+
+
+def save_mutual_fund_schemes_batch(schemes: List[Dict[str, Any]]) -> int:
+    """Batch upserts mutual fund schemes in a single database connection while preserving curated AUM/metadata."""
+    if not schemes:
+        return 0
+
+    deduped: Dict[str, tuple] = {}
+    for scheme in schemes:
+        raw_code = (scheme.get("scheme_code") or "").strip().upper()
+        if not raw_code:
+            continue
+        name = (scheme.get("scheme_name") or raw_code).strip()
+        amc = scheme.get("fund_house", "Generic AMC")
+        cat = scheme.get("category", "Flexi Cap Fund")
+        broad_cat = str(scheme.get("broad_category", "EQUITY")).upper()
+        benchmark = scheme.get("benchmark_index", "NIFTY 500 TRI")
+        aum = float(scheme.get("aum_crores", 0.0) or 0.0)
+        nav = float(scheme.get("nav", 10.0) or 0.0)
+        ter_dir = float(scheme.get("ter_direct_pct", 0.75) or 0.75)
+        ter_reg = float(scheme.get("ter_regular_pct", 1.50) or 1.50)
+        ptr = float(scheme.get("portfolio_turnover_ratio_pct", 25.0) or 25.0)
+        active_share = float(scheme.get("active_share_pct", 65.0) or 0.0)
+        risk_grade = scheme.get("risk_grade", "Very High")
+        fund_mgr = scheme.get("fund_manager", "Senior Fund Manager")
+        port_date = scheme.get("last_portfolio_date", date.today().isoformat())
+        meta = scheme.get("metadata", {})
+        meta_json = json.dumps(meta) if isinstance(meta, dict) else str(meta)
+        deduped[raw_code] = (
+            raw_code, name, amc, cat, broad_cat,
+            benchmark, aum, nav, ter_dir, ter_reg,
+            ptr, active_share, risk_grade,
+            fund_mgr, meta_json, port_date,
+        )
+
+    rows = list(deduped.values())
+    if not rows:
+        return 0
+
+    conn = get_db_connection()
+    cursor = conn.cursor()
+    use_pg = is_postgres_connection(conn)
+    try:
+        if use_pg:
+            from psycopg2.extras import execute_values
+            sql_pg = """
+                INSERT INTO mutual_fund_schemes (
+                    scheme_code, scheme_name, fund_house, category, broad_category,
+                    benchmark_index, aum_crores, nav, ter_direct_pct, ter_regular_pct,
+                    portfolio_turnover_ratio_pct, active_share_pct, risk_grade,
+                    fund_manager, metadata_json, last_portfolio_date, last_updated
+                ) VALUES %s
+                ON CONFLICT (scheme_code) DO UPDATE SET
+                    scheme_name = EXCLUDED.scheme_name,
+                    fund_house = EXCLUDED.fund_house,
+                    category = EXCLUDED.category,
+                    broad_category = EXCLUDED.broad_category,
+                    benchmark_index = EXCLUDED.benchmark_index,
+                    aum_crores = CASE WHEN EXCLUDED.aum_crores > 0 THEN EXCLUDED.aum_crores ELSE mutual_fund_schemes.aum_crores END,
+                    nav = EXCLUDED.nav,
+                    ter_direct_pct = EXCLUDED.ter_direct_pct,
+                    ter_regular_pct = EXCLUDED.ter_regular_pct,
+                    portfolio_turnover_ratio_pct = EXCLUDED.portfolio_turnover_ratio_pct,
+                    active_share_pct = EXCLUDED.active_share_pct,
+                    risk_grade = EXCLUDED.risk_grade,
+                    fund_manager = CASE WHEN EXCLUDED.fund_manager IS NOT NULL AND EXCLUDED.fund_manager <> 'Senior Fund Manager' THEN EXCLUDED.fund_manager ELSE COALESCE(NULLIF(mutual_fund_schemes.fund_manager, ''), EXCLUDED.fund_manager) END,
+                    metadata_json = CASE WHEN EXCLUDED.metadata_json IS NOT NULL AND EXCLUDED.metadata_json NOT IN ('{}', '') THEN EXCLUDED.metadata_json ELSE COALESCE(NULLIF(mutual_fund_schemes.metadata_json, ''), EXCLUDED.metadata_json) END,
+                    last_portfolio_date = EXCLUDED.last_portfolio_date,
+                    last_updated = now();
+            """
+            template = "(%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, now())"
+            for idx in range(0, len(rows), 500):
+                execute_values(cursor, sql_pg, rows[idx:idx + 500], template=template)
+        else:
+            sql_sq = """
+                INSERT INTO mutual_fund_schemes (
+                    scheme_code, scheme_name, fund_house, category, broad_category,
+                    benchmark_index, aum_crores, nav, ter_direct_pct, ter_regular_pct,
+                    portfolio_turnover_ratio_pct, active_share_pct, risk_grade,
+                    fund_manager, metadata_json, last_portfolio_date, last_updated
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, datetime('now'))
+                ON CONFLICT (scheme_code) DO UPDATE SET
+                    scheme_name = excluded.scheme_name,
+                    fund_house = excluded.fund_house,
+                    category = excluded.category,
+                    broad_category = excluded.broad_category,
+                    benchmark_index = excluded.benchmark_index,
+                    aum_crores = CASE WHEN excluded.aum_crores > 0 THEN excluded.aum_crores ELSE mutual_fund_schemes.aum_crores END,
+                    nav = excluded.nav,
+                    ter_direct_pct = excluded.ter_direct_pct,
+                    ter_regular_pct = excluded.ter_regular_pct,
+                    portfolio_turnover_ratio_pct = excluded.portfolio_turnover_ratio_pct,
+                    active_share_pct = excluded.active_share_pct,
+                    risk_grade = excluded.risk_grade,
+                    fund_manager = CASE WHEN excluded.fund_manager IS NOT NULL AND excluded.fund_manager <> 'Senior Fund Manager' THEN excluded.fund_manager ELSE COALESCE(NULLIF(mutual_fund_schemes.fund_manager, ''), excluded.fund_manager) END,
+                    metadata_json = CASE WHEN excluded.metadata_json IS NOT NULL AND excluded.metadata_json NOT IN ('{}', '') THEN excluded.metadata_json ELSE COALESCE(NULLIF(mutual_fund_schemes.metadata_json, ''), excluded.metadata_json) END,
+                    last_portfolio_date = excluded.last_portfolio_date,
+                    last_updated = datetime('now');
+            """
+            cursor.executemany(sql_sq, rows)
+        conn.commit()
+        return len(rows)
+    except Exception as e:
+        logger.error(f"Error batch saving mutual fund schemes: {e}")
+        conn.rollback()
+        return 0
     finally:
         cursor.close()
         conn.close()
@@ -5109,6 +5218,7 @@ def get_featured_daily_fund_dossier() -> Optional[Dict[str, Any]]:
                    s.aum_crores, s.nav, s.ter_direct_pct, s.fund_manager, s.benchmark_index
             FROM fund_forensic_dossiers d
             JOIN mutual_fund_schemes s ON d.scheme_code = s.scheme_code
+            WHERE d.dossier_text IS NOT NULL AND TRIM(d.dossier_text) != ''
             ORDER BY d.last_audited_at DESC
             LIMIT 1
         """
@@ -5150,7 +5260,14 @@ def get_next_fund_for_daily_audit() -> Optional[Dict[str, Any]]:
             FROM mutual_fund_schemes s
             LEFT JOIN fund_forensic_dossiers d ON s.scheme_code = d.scheme_code
             WHERE s.broad_category IN ('EQUITY', 'HYBRID')
-            ORDER BY (d.last_audited_at IS NOT NULL), d.last_audited_at ASC
+            ORDER BY
+                CASE WHEN EXISTS (SELECT 1 FROM mutual_fund_holdings h WHERE h.scheme_code = s.scheme_code) THEN 0 ELSE 1 END ASC,
+                CASE
+                    WHEN d.last_audited_at IS NULL THEN 0
+                    WHEN TRIM(COALESCE(d.dossier_text, '')) = '' THEN 1
+                    ELSE 2
+                END ASC,
+                d.last_audited_at ASC
             LIMIT 1
         """
         cursor.execute(sql)

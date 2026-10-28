@@ -13,8 +13,8 @@ import logging
 from datetime import datetime, date, timezone
 from typing import Dict, List, Optional, Any, Tuple
 
-from core.db.connection import get_db_connection, get_placeholder, get_supabase_url, init_db
-from core.db.mutual_funds import get_active_mutual_funds, save_mutual_fund_scheme
+from core.db.connection import get_db_connection, get_placeholder, get_supabase_url, init_db, is_postgres_connection
+from core.db.mutual_funds import get_active_mutual_funds, save_mutual_fund_scheme, save_mutual_fund_schemes_batch
 from core.db.debt import get_active_debt_securities
 from core.ingestion.amfi import fetch_amfi_nav_raw, parse_amfi_nav_feed
 
@@ -108,12 +108,13 @@ def scan_mutual_funds(limit: Optional[int] = None) -> Dict[str, Any]:
     changed_count = 0
     unchanged_count = 0
     sample_diffs = []
+    to_upsert: List[Dict[str, Any]] = []
 
     for s in live_schemes:
         code = s["scheme_code"]
         if code not in existing:
             new_count += 1
-            save_mutual_fund_scheme(s)
+            to_upsert.append(s)
             if len(sample_diffs) < 5:
                 sample_diffs.append({"type": "NEW", "scheme_code": code, "name": s["scheme_name"]})
         else:
@@ -122,7 +123,7 @@ def scan_mutual_funds(limit: Optional[int] = None) -> Dict[str, Any]:
             new_nav = float(s.get("nav") or 0.0)
             if abs(old_nav - new_nav) > 0.0001:
                 changed_count += 1
-                save_mutual_fund_scheme(s)
+                to_upsert.append(s)
                 if len(sample_diffs) < 10:
                     sample_diffs.append({
                         "type": "CHANGED",
@@ -133,6 +134,12 @@ def scan_mutual_funds(limit: Optional[int] = None) -> Dict[str, Any]:
                     })
             else:
                 unchanged_count += 1
+
+    if to_upsert:
+        saved_batch = save_mutual_fund_schemes_batch(to_upsert)
+        if saved_batch == 0:
+            for item in to_upsert:
+                save_mutual_fund_scheme(item)
 
     return {
         "asset_class": "MUTUAL_FUNDS",
@@ -147,32 +154,85 @@ def scan_mutual_funds(limit: Optional[int] = None) -> Dict[str, Any]:
 def scan_debt_securities() -> Dict[str, Any]:
     """
     Executes monitoring across Corporate Debt & Debentures:
+    - Retires matured instruments (maturity_date < today)
     - Checks maturity dates (maturing within 30 days)
     - Verifies CRA credit rating downgrade watches
+    - Stamps last_updated across active listed securities audited in this scan
     """
     securities = get_active_debt_securities()
     maturing_soon = 0
+    retired_matured = 0
     downgrade_watches = 0
     now_date = date.today()
+    retired_isins: List[str] = []
+    verified_isins: List[str] = []
 
     for sec in securities:
+        isin = (sec.get("isin") or "").strip().upper()
+        is_matured = False
         mat_date_str = sec.get("maturity_date")
         if mat_date_str:
             try:
                 mat_date = datetime.strptime(str(mat_date_str)[:10], "%Y-%m-%d").date()
                 days_left = (mat_date - now_date).days
-                if 0 <= days_left <= 30:
+                if days_left < 0:
+                    is_matured = True
+                    retired_matured += 1
+                    if isin:
+                        retired_isins.append(isin)
+                elif 0 <= days_left <= 30:
                     maturing_soon += 1
             except Exception as mat_err:
                 logger.debug("Maturity date parse notice: %s", mat_err)
+
+        if not is_matured and isin:
+            verified_isins.append(isin)
 
         rating = (sec.get("credit_rating") or "").upper()
         if any(w in rating for w in ("WATCH", "NEGATIVE", "DEFAULT", "D", "BBB-")):
             downgrade_watches += 1
 
+    if retired_isins or verified_isins:
+        conn = get_db_connection()
+        cursor = conn.cursor()
+        use_pg = is_postgres_connection(conn)
+        try:
+            if retired_isins:
+                ph_ret = ", ".join(["%s" if use_pg else "?" for _ in retired_isins])
+                if use_pg:
+                    cursor.execute(
+                        f"UPDATE corporate_debt_securities SET is_listed = FALSE, last_updated = now() WHERE isin IN ({ph_ret});",
+                        tuple(retired_isins),
+                    )
+                else:
+                    cursor.execute(
+                        f"UPDATE corporate_debt_securities SET is_listed = 0, last_updated = datetime('now') WHERE isin IN ({ph_ret});",
+                        tuple(retired_isins),
+                    )
+            if verified_isins:
+                ph_ver = ", ".join(["%s" if use_pg else "?" for _ in verified_isins])
+                if use_pg:
+                    cursor.execute(
+                        f"UPDATE corporate_debt_securities SET last_updated = now() WHERE isin IN ({ph_ver});",
+                        tuple(verified_isins),
+                    )
+                else:
+                    cursor.execute(
+                        f"UPDATE corporate_debt_securities SET last_updated = datetime('now') WHERE isin IN ({ph_ver});",
+                        tuple(verified_isins),
+                    )
+            conn.commit()
+        except Exception as db_err:
+            logger.error("Error stamping corporate debt surveillance status: %s", db_err)
+            conn.rollback()
+        finally:
+            cursor.close()
+            conn.close()
+
     return {
         "asset_class": "CORPORATE_DEBT",
         "scanned": len(securities),
+        "retired_matured_count": retired_matured,
         "maturing_soon_count": maturing_soon,
         "downgrade_watch_count": downgrade_watches
     }

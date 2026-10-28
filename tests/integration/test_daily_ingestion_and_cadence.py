@@ -291,7 +291,7 @@ class TestDailyStockIngestionAndMFCoverage(unittest.TestCase):
             self.assertEqual(res_researched["ticker"], "STATUS_TEST_TICK")
 
             # 2. When report_text is absent or too short (< 500 chars) in non-testing environment -> PENDING_SYNTHESIS
-            with patch.dict(os.environ, {"TESTING": "0"}):
+            with patch.dict(os.environ, {"TESTING": "0", "ENVIRONMENT": "testing", "SUPABASE_DB_URL": ""}):
                 res_pending = synthesize_and_archive_stock_dossier(
                     test_cand,
                     skip_gemini=True,

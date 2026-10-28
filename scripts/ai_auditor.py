@@ -403,7 +403,7 @@ class FailureSynthesizer:
         self.client = None
         self.model = "gemini-3.8-flash"
         api_key = get_secret("GEMINI_API_KEY")
-        if api_key:
+        if api_key and os.environ.get("TESTING") != "1":
             try:
                 from google import genai
                 self.client = genai.Client(api_key=api_key)

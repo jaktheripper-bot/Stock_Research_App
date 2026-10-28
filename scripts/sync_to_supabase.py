@@ -163,7 +163,19 @@ def sync_via_postgresql(reports: List[Dict[str, Any]], revisions: List[Dict[str,
             if do_update and conflict_col:
                 conflict_targets = [c.strip() for c in conflict_col.split(",")]
                 conflict_target_sql = ", ".join(conflict_targets)
-                update_assignments = ", ".join([f"{c} = EXCLUDED.{c}" for c in cols if c not in conflict_targets])
+                preserve_non_empty_cols = {"report_text", "citations_json", "dossier_text"}
+                update_parts = []
+                for c in cols:
+                    if c in conflict_targets:
+                        continue
+                    if c in preserve_non_empty_cols:
+                        update_parts.append(
+                            f"{c} = CASE WHEN EXCLUDED.{c} IS NOT NULL AND TRIM(EXCLUDED.{c}) <> '' "
+                            f"THEN EXCLUDED.{c} ELSE {table_name}.{c} END"
+                        )
+                    else:
+                        update_parts.append(f"{c} = EXCLUDED.{c}")
+                update_assignments = ", ".join(update_parts)
                 conflict_clause = f"ON CONFLICT ({conflict_target_sql}) DO UPDATE SET {update_assignments}"
             elif conflict_col:
                 conflict_targets = [c.strip() for c in conflict_col.split(",")]

@@ -26,7 +26,8 @@ logger = logging.getLogger("equity_research.core.db.remediation")
 
 def _push_remediation_row_to_supabase_rest(cleaned_row: Dict[str, Any]) -> bool:
     """Mirrors a remediation ledger row to Supabase via PostgREST when local SQLite is primary."""
-    if not cleaned_row or os.environ.get("TESTING") == "1":
+    from core.db.connection import _is_unit_test_runtime
+    if not cleaned_row or _is_unit_test_runtime():
         return False
     try:
         from core.db.audit_logs import _get_supabase_rest_credentials, _build_ssl_context

@@ -149,7 +149,7 @@ Return strictly the two markdown sections:
 
     user_prompt = f"""Company: {short_name} ({ticker})
 Verified Live Exchange Metrics:
-- Current Market Price: ₹{price}
+- Current Market Price: ₹{price:.2f}
 - Trailing P/E Multiple: {pe}
 - Market Capitalisation: {mcap_str}
 - 52-Week Range: High {high_str} | Low {low_str}
@@ -158,11 +158,11 @@ Verified Live Exchange Metrics:
     p5_text = ""
     p6_text = ""
 
-    # Attempt Gemini Flash with zero grounding fee
+    # Attempt Gemini Flash with zero grounding fee (bypass live LLM in isolated test runs)
     try:
         from core.config import get_secret
         api_key = get_secret("GEMINI_API_KEY")
-        if api_key:
+        if api_key and os.environ.get("TESTING") != "1":
             client = genai.Client(api_key=api_key)
             model_name = get_light_flash_model(client)
             if on_status:

@@ -201,14 +201,26 @@ class RealityAuditor:
     # =========================================================================
     def run_gate_3_sql_schema(self) -> None:
         gate = "GATE-3:SQL-SCHEMA"
-        from core.db.connection import init_db, get_connection
+        from core.db.connection import init_db, get_connection, is_postgres_connection
         init_db()
         conn = get_connection()
         cur = conn.cursor()
-
-        # Introspect all actual columns in admin_audit_log
-        cur.execute("PRAGMA table_info(admin_audit_log)")
-        audit_cols = {row[1] for row in cur.fetchall()}
+        try:
+            if is_postgres_connection(conn):
+                cur.execute(
+                    """
+                    SELECT column_name
+                    FROM information_schema.columns
+                    WHERE table_schema = 'public' AND table_name = 'admin_audit_log'
+                    """
+                )
+                audit_cols = {row[0] for row in cur.fetchall()}
+            else:
+                cur.execute("PRAGMA table_info(admin_audit_log)")
+                audit_cols = {row[1] for row in cur.fetchall()}
+        finally:
+            cur.close()
+            conn.close()
 
         ai_spends_path = ROOT / "core/analytics/ai_spends.py"
         if ai_spends_path.exists():

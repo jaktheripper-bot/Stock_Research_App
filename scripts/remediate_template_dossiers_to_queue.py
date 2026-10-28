@@ -17,7 +17,7 @@ from pathlib import Path
 PROJECT_ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(PROJECT_ROOT))
 
-from core.db.connection import get_db_connection, init_db
+from core.db.connection import get_db_connection, init_db, is_postgres_connection
 from core.audit.invariants import (
     KNOWN_STATIC_REPORT_TEMPLATE_PHRASES,
     scan_no_static_report_templates,
@@ -55,14 +55,15 @@ def remediate_template_dossiers():
         conn.close()
         return
 
-    # 2. Reset report_text = NULL and citations_json = NULL
+    # 2. Reset report_text = NULL and citations_json = NULL (dual-dialect PG %s / SQLite ?)
+    p = "%s" if is_postgres_connection(conn) else "?"
     for ticker in sorted(affected_tickers):
         cur.execute(
-            "UPDATE reports SET report_text = NULL, citations_json = NULL WHERE ticker = ?",
+            f"UPDATE reports SET report_text = NULL, citations_json = NULL WHERE ticker = {p}",
             (ticker,)
         )
         cur.execute(
-            "DELETE FROM report_revisions WHERE ticker = ?",
+            f"DELETE FROM report_revisions WHERE ticker = {p}",
             (ticker,)
         )
 

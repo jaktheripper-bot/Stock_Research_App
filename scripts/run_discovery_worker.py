@@ -33,7 +33,7 @@ logger = logging.getLogger("discovery_worker")
 
 
 def run_discovery_pipeline(
-    target_count: int = 12,
+    target_count: int = 15,
     edition_date: str = None,
     dry_run: bool = False,
     force_synthesis: bool = False
@@ -77,18 +77,18 @@ def run_discovery_pipeline(
             existing = get_report_by_ticker_sync(ticker)
             needs_synthesis = force_synthesis or not existing or not existing.get("report_text")
 
-            # Check staleness if existing
-            if not needs_synthesis and existing.get("created_at"):
-                # If existing report is older than 14 days, refresh
+            # Check staleness if existing (reports helper exposes raw_timestamp / timestamp)
+            raw_ts = existing.get("raw_timestamp") or existing.get("timestamp") or existing.get("created_at")
+            if not needs_synthesis and raw_ts:
                 try:
-                    rep_date_str = str(existing.get("created_at"))[:10]
+                    rep_date_str = str(raw_ts)[:10]
                     rep_dt = datetime.strptime(rep_date_str, "%Y-%m-%d")
-                    age_days = (datetime.now() - rep_dt).days
+                    age_days = (datetime.now(IST).replace(tzinfo=None) - rep_dt).days
                     if age_days > 14:
                         logger.info(f"Archived report for {ticker} is {age_days} days old (>14d threshold). Refreshing...")
                         needs_synthesis = True
-                except Exception:
-                    pass
+                except Exception as ts_err:
+                    logger.debug(f"Timestamp parse notice for {ticker}: {ts_err}")
 
             if needs_synthesis:
                 logger.info(f"⚡ Generating full 7-pillar grounded dossier for {ticker}...")
@@ -155,27 +155,48 @@ def main():
 
     args = parser.parse_args()
 
-    success = False
+    target_date = args.date or datetime.now(IST).strftime("%Y-%m-%d")
+    ingest_ok = False
+    discovery_ok = False
+
     if args.mode in ("all", "mf-ingest"):
         logger.info("🏛️ Running Daily 15-Stock Ingestion & Mutual Fund Saturation...")
         from core.analysis.daily_stock_ingestion import ingest_daily_stock_cohort
         res = ingest_daily_stock_cohort(
-            edition_date=args.date,
+            edition_date=target_date,
             count=args.count,
             skip_gemini=args.dry_run
         )
-        logger.info(f"Ingestion result: {res.get('status')} | Ingested: {res.get('ingested_count')} stocks | Affected Funds: {res.get('affected_funds_count')}")
-        success = res.get("status") in ("success", "already_ingested")
-
-    if args.mode in ("all", "discovery") and not success:
-        success = run_discovery_pipeline(
-            target_count=args.count,
-            edition_date=args.date,
-            dry_run=args.dry_run,
-            force_synthesis=args.force
+        logger.info(
+            f"Ingestion result: {res.get('status')} | Ingested: {res.get('ingested_count')} stocks "
+            f"| Pending: {res.get('pending_count', 0)} | Affected Funds: {res.get('affected_funds_count')}"
         )
+        ingest_ok = res.get("status") in ("success", "already_ingested")
 
-    sys.exit(0 if success else 1)
+    if args.mode in ("all", "discovery"):
+        existing_reel = get_active_discovery_reel(
+            edition_date=target_date,
+            exclude_tests=True,
+            allow_fallback=False,
+        )
+        if args.mode == "discovery" or len(existing_reel) < args.count:
+            discovery_ok = run_discovery_pipeline(
+                target_count=args.count,
+                edition_date=target_date,
+                dry_run=args.dry_run,
+                force_synthesis=args.force
+            )
+        else:
+            logger.info(
+                f"✅ Discovery Reel for {target_date} already populated with {len(existing_reel)} equities."
+            )
+            discovery_ok = True
+
+    overall_ok = (
+        ingest_ok if args.mode == "mf-ingest"
+        else (discovery_ok if args.mode == "discovery" else (ingest_ok or discovery_ok))
+    )
+    sys.exit(0 if overall_ok else 1)
 
 
 if __name__ == "__main__":

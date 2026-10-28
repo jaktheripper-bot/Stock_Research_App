@@ -19,9 +19,28 @@ _PG_AVAILABLE = None  # None = untested, True = alive, False = failed
 _PG_LAST_FAIL = 0.0
 _PG_FAIL_COOLDOWN = 60.0  # retry failed postgres after 60s cooldown
 
+def _is_unit_test_runtime() -> bool:
+    """Detects active unittest/pytest runners or isolated audit test subprocesses."""
+    import sys
+    argv0 = sys.argv[0] if sys.argv else ""
+    is_test_entrypoint = any(runner in argv0 for runner in ("unittest", "pytest"))
+    return (
+        os.environ.get("TESTING") == "1"
+        or os.environ.get("ENVIRONMENT") == "testing"
+        or os.environ.get("SKIP_DOTENV_IN_SUBPROCESS") == "1"
+        or bool(os.environ.get("PYTEST_CURRENT_TEST"))
+        or is_test_entrypoint
+    )
+
+
 def get_configured_supabase_url() -> str | None:
     """Returns configured Supabase DB URL from secrets or environment, or None in unit tests."""
     if os.environ.get("TESTING") == "1" and os.environ.get("TEST_SUPABASE") != "1":
+        return None
+    if _is_unit_test_runtime() and os.environ.get("TEST_SUPABASE") != "1":
+        explicit_url = os.environ.get("SUPABASE_DB_URL", "")
+        if explicit_url and ("127.0.0.1" in explicit_url or "localhost" in explicit_url):
+            return explicit_url
         return None
     global _CACHED_SUPABASE_URL, _SUPABASE_URL_RESOLVED
     if not _SUPABASE_URL_RESOLVED:
@@ -250,7 +269,11 @@ def get_db_path() -> str:
     """Returns the SQLite database path based on environment."""
     if os.environ.get("TESTING") == "1":
         return os.environ.get("TEST_DB_PATH", "test_reports.db")
-    return os.environ.get("DB_PATH", "reports.db")
+    if os.environ.get("DB_PATH"):
+        return os.environ["DB_PATH"]
+    if _is_unit_test_runtime():
+        return os.environ.get("TEST_DB_PATH", "test_reports.db")
+    return "reports.db"
 
 DB_NAME = "reports.db"
 

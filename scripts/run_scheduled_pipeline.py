@@ -49,7 +49,8 @@ def run_morning_pipeline(date_str: str, force: bool = False) -> dict:
             logger.info("Executing Phase 1: Daily 15-Stock MF Constituent Ingestion...")
             res = ingest_daily_stock_cohort(edition_date=date_str, count=15, skip_gemini=False)
             results["stock_ingestion"] = res
-            logger.info(f"Phase 1 Complete: {res.get('status')} ({len(res.get('ingested_stocks', []))} equities).")
+            ingested_n = res.get("ingested_count", len(res.get("ingested_tickers") or res.get("ingested_stocks") or []))
+            logger.info(f"Phase 1 Complete: {res.get('status')} ({ingested_n} equities).")
         else:
             logger.info(f"Lease for {lease_name} held by another worker. Skipping Phase 1.")
             results["stock_ingestion"] = "SKIPPED_LEASE_HELD"

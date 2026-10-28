@@ -56,7 +56,8 @@ _REMOTE_SYNC_COOLDOWN_SEC: float = 60.0
 
 def _get_supabase_rest_credentials() -> Optional[Tuple[str, str]]:
     """Returns (supabase_url, service_role_key) when configured and not in unit test mode."""
-    if os.environ.get("TESTING") == "1":
+    from core.db.connection import _is_unit_test_runtime
+    if _is_unit_test_runtime():
         return None
     sb_url = (get_secret("SUPABASE_URL") or os.environ.get("SUPABASE_URL") or "").strip().rstrip("/")
     sb_key = (

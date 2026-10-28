@@ -162,51 +162,55 @@ def save_report_to_archive(stock_data: dict, report_text: str, announcement: str
         except Exception as clear_err:
             logger.debug("Reports cache clear notice: %s", clear_err)
         # SEBI Compliance: Record statutory Safe Harbor disclaimer audit event
+        from core.db.connection import _is_unit_test_runtime
+
         # IndexNow instant ping – notify search engines of the new/updated dossier
-        try:
-            from core.seo.indexnow import ping_indexnow_urls
-            base_url = (os.getenv("CANONICAL_DOMAIN") or "https://moatnomics.com").rstrip("/")
-            url = f"{base_url}/dossier/{clean_sym}"
-            ping_indexnow_urls(url)
-        except Exception as ping_err:
-            logger.debug(f"IndexNow ping notice for {clean_sym}: {ping_err}")
+        if not _is_unit_test_runtime():
+            try:
+                from core.seo.indexnow import ping_indexnow_urls
+                base_url = (os.getenv("CANONICAL_DOMAIN") or "https://moatnomics.com").rstrip("/")
+                url = f"{base_url}/dossier/{clean_sym}"
+                ping_indexnow_urls(url)
+            except Exception as ping_err:
+                logger.debug(f"IndexNow ping notice for {clean_sym}: {ping_err}")
 
         try:
             log_compliance_event(clean_sym)
         except Exception as ce:
             logger.error(f"Failed to record SEBI compliance event during archive: {ce}")
 
-        # Supabase Cloud Dual-Write Sync (PostgREST)
-        try:
-            from core.config import get_secret
-            sb_url = get_secret("SUPABASE_URL")
-            sb_key = get_secret("SUPABASE_SERVICE_ROLE_KEY")
-            if sb_url and sb_key and not get_supabase_url():
-                import requests
-                rest_url = f"{sb_url.rstrip('/')}/rest/v1/reports"
-                payload = {
-                    "ticker": clean_sym,
-                    "short_name": short_name,
-                    "report_text": report_text,
-                    "baseline_price": curr_price,
-                    "baseline_pe": str(pe or ""),
-                    "baseline_mcap": mcap,
-                    "latest_announcement": announcement,
-                    "citations_json": citations_json
-                }
-                requests.post(
-                    rest_url,
-                    headers={
-                        "apikey": sb_key,
-                        "Authorization": f"Bearer {sb_key}",
-                        "Content-Type": "application/json",
-                        "Prefer": "resolution=merge-duplicates"
-                    },
-                    json=payload,
-                    timeout=5
-                )
-        except Exception as sb_err:
-            logger.debug(f"Dual-write to Supabase REST skipped: {sb_err}")
+        # Supabase Cloud Dual-Write Sync (PostgREST) — strictly disabled in unit/integration tests
+        if not _is_unit_test_runtime():
+            try:
+                from core.config import get_secret
+                sb_url = get_secret("SUPABASE_URL")
+                sb_key = get_secret("SUPABASE_SERVICE_ROLE_KEY")
+                if sb_url and sb_key and not get_supabase_url():
+                    import requests
+                    rest_url = f"{sb_url.rstrip('/')}/rest/v1/reports"
+                    payload = {
+                        "ticker": clean_sym,
+                        "short_name": short_name,
+                        "report_text": report_text,
+                        "baseline_price": curr_price,
+                        "baseline_pe": str(pe or ""),
+                        "baseline_mcap": mcap,
+                        "latest_announcement": announcement,
+                        "citations_json": citations_json
+                    }
+                    requests.post(
+                        rest_url,
+                        headers={
+                            "apikey": sb_key,
+                            "Authorization": f"Bearer {sb_key}",
+                            "Content-Type": "application/json",
+                            "Prefer": "resolution=merge-duplicates"
+                        },
+                        json=payload,
+                        timeout=5
+                    )
+            except Exception as sb_err:
+                logger.debug(f"Dual-write to Supabase REST skipped: {sb_err}")
     except Exception as e:
         try:
             conn.rollback()

@@ -49,4 +49,6 @@ services:
         sync: false
       - key: ENABLE_BACKGROUND_SCHEDULERS
         value: "1"
+      - key: GOOGLE_GENAI_USE_VERTEXAI
+        value: "true"
 

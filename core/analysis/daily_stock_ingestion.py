@@ -19,7 +19,7 @@ from typing import List, Dict, Any, Optional
 
 from normalizer import clean_ticker
 from bse_master import resolve_canonical_symbol, resolve_bse_scrip_code
-from core.db.connection import init_db, get_db_connection, get_placeholder, IST
+from core.db.connection import init_db, get_db_connection, get_placeholder, is_postgres_connection, IST
 from core.db.mutual_funds import is_supabase_enabled
 from core.db.reports import save_report_to_archive, get_report_by_ticker_sync
 from core.db.fundamentals import extract_fundamentals_from_report_text, save_cached_fundamentals
@@ -90,13 +90,14 @@ def get_ingestion_progress_stats() -> Dict[str, Any]:
     except Exception as e:
         logger.error(f"Error computing ingestion progress stats: {e}")
         return {
-            "total_mf_holdings": 501,
-            "covered_mf_holdings": 84,
-            "uncovered_mf_holdings": 417,
-            "coverage_pct": 16.8,
-            "total_reports_count": 143,
-            "days_to_full_coverage": 28,
-            "daily_cadence": 15
+            "total_mf_holdings": 0,
+            "covered_mf_holdings": 0,
+            "uncovered_mf_holdings": 0,
+            "coverage_pct": 0.0,
+            "total_reports_count": 0,
+            "days_to_full_coverage": 0,
+            "daily_cadence": 15,
+            "status": "ERROR",
         }
     finally:
         cursor.close()
@@ -123,28 +124,28 @@ def get_uncovered_mutual_fund_holdings_queue(limit: int = 15) -> List[Dict[str, 
             conn = get_db_connection()
             cursor = conn.cursor()
 
-        sql = """
-            SELECT 
+        use_pg = is_postgres_connection(conn)
+        p = "%s" if use_pg else "?"
+        sql = f"""
+            SELECT
                 h.identifier,
-                h.holding_name,
-                h.sector_or_rating,
-                COUNT(DISTINCT h.scheme_code) as scheme_count,
-                SUM(h.weight_pct) as total_weight_pct,
-                SUM(h.weight_pct * COALESCE(s.aum_crores, 1000.0) / 100.0) as estimated_aum_cr
+                MAX(h.holding_name) AS holding_name,
+                MAX(h.sector_or_rating) AS sector_or_rating,
+                COUNT(DISTINCT h.scheme_code) AS scheme_count,
+                SUM(h.weight_pct) AS total_weight_pct,
+                SUM(h.weight_pct * COALESCE(s.aum_crores, 1000.0) / 100.0) AS estimated_aum_cr
             FROM mutual_fund_holdings h
             LEFT JOIN mutual_fund_schemes s ON h.scheme_code = s.scheme_code
             WHERE h.holding_type = 'EQUITY'
-              AND h.identifier NOT IN (
-                  SELECT UPPER(TRIM(ticker)) 
-                  FROM reports 
+              AND UPPER(TRIM(h.identifier)) NOT IN (
+                  SELECT UPPER(TRIM(ticker))
+                  FROM reports
                   WHERE report_text IS NOT NULL AND LENGTH(report_text) > 100
               )
             GROUP BY h.identifier
             ORDER BY scheme_count DESC, total_weight_pct DESC
-            LIMIT ?;
+            LIMIT {p};
         """
-        if is_supabase_enabled():
-            sql = sql.replace("?", "%s")
 
         cursor.execute(sql, (limit,))
         rows = cursor.fetchall()
@@ -153,7 +154,7 @@ def get_uncovered_mutual_fund_holdings_queue(limit: int = 15) -> List[Dict[str, 
         tickers_list = [clean_ticker(r[0]) for r in rows if r[0]]
         schemes_by_ticker: Dict[str, List[str]] = {}
         if tickers_list:
-            ph = ",".join(["?" if not is_supabase_enabled() else "%s"] * len(tickers_list))
+            ph = ",".join([p] * len(tickers_list))
             top_schemes_sql = f"""
                 SELECT h.identifier, COALESCE(s.scheme_name, h.scheme_code) as scheme_name
                 FROM mutual_fund_holdings h
@@ -552,7 +553,7 @@ def synthesize_and_archive_stock_dossier(
     except Exception as cache_err:
         logger.debug(f"Cached fundamentals sync notice for {ticker}: {cache_err}")
 
-    has_grounded_report = bool(report_text and len(report_text.strip()) >= 500)
+    has_grounded_report = bool(report_text and len(report_text.strip()) >= 500 and not has_err_banner)
     return {
         "ticker": ticker,
         "company_name": company_name,
@@ -669,9 +670,12 @@ def ingest_daily_stock_cohort(
     if not queue:
         logger.warning("No uncovered stocks found in queue. All mutual fund constituents covered!")
         return {
+            "status": "already_ingested",
             "edition_date": edition_date,
             "ingested_count": 0,
             "ingested_tickers": [],
+            "pending_count": 0,
+            "pending_tickers": [],
             "affected_funds_count": 0,
             "message": "Universe fully saturated. All mutual fund constituents covered."
         }
@@ -712,8 +716,9 @@ def ingest_daily_stock_cohort(
         else:
             logger.info(f"Background daemon QoS pause for cohort: {daemon_msg}. Using deterministic synthesis.")
 
-    # 3. Ingest and archive each stock
+    # 3. Ingest and archive each stock (fail closed: only report-backed stocks enter Discovery & MF re-audit)
     ingested_results = []
+    pending_tickers: List[str] = []
     discovery_reel_items = []
 
     for item in queue:
@@ -727,6 +732,7 @@ def ingest_daily_stock_cohort(
             )
             if res.get("status") != "INGESTED_RESEARCHED":
                 logger.info("Skipping discovery/IndexNow publication for %s (status=%s).", t_clean, res.get("status"))
+                pending_tickers.append(res["ticker"])
                 continue
             ingested_results.append(res)
 
@@ -828,9 +834,12 @@ def ingest_daily_stock_cohort(
         logger.debug(f"Autonomous event record notice: {evt_err}")
 
     return {
+        "status": "success" if ingested_tickers else ("pending_synthesis" if pending_tickers else "no_candidates"),
         "edition_date": edition_date,
         "ingested_count": len(ingested_results),
         "ingested_tickers": ingested_tickers,
+        "pending_count": len(pending_tickers),
+        "pending_tickers": pending_tickers,
         "affected_funds_count": len(recalculated_funds),
         "recalculated_funds": recalculated_funds,
         "progress_stats": get_ingestion_progress_stats()
