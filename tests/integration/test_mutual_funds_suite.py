@@ -755,6 +755,8 @@ class TestFundForensicAuditor(unittest.TestCase):
             self.assertEqual(scheme["scheme_name"], "Quant Small Cap Fund - Growth")
             self.assertEqual(scheme["nav"], 245.82)
             self.assertEqual(scheme["metadata"].get("source"), "mfapi_on_demand")
+            # Action 4B: Fail-closed holdings check verifies zero synthetic proxy holdings are created
+            self.assertEqual(get_scheme_holdings(test_code), [])
 
             # Verify call arguments (URL encoding, user agent, timeout, certifi context)
             mock_urlopen.assert_called_once()
@@ -1068,6 +1070,8 @@ Cash reserve of 12% cushions against broad equity sell-offs.
         # Verify /latest URL requested
         req = mock_urlopen.call_args[0][0]
         self.assertTrue(req.full_url.endswith("/latest"))
+        # Verify no synthetic proxy holdings were fabricated
+        self.assertEqual(get_scheme_holdings(test_code), [])
 
     def test_fund_audit_tasks_bounded_to_64(self):
         """Action 1.5: FUND_AUDIT_TASKS is bounded to a maximum of 64 entries."""

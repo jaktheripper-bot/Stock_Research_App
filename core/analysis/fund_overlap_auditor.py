@@ -37,7 +37,6 @@ from core.db.agent_sessions import record_autonomous_event
 from core.analysis.mutual_funds_engine import (
     calculate_active_share,
     EQUITY_HEALTH_DEFAULTS,
-    BENCHMARK_PROXIES,
 )
 from core.analysis.dossier_report_synthesis import get_light_flash_model
 
@@ -649,34 +648,14 @@ def ensure_scheme_and_holdings_exist(scheme_code: str) -> Optional[Dict[str, Any
         save_mutual_fund_scheme(fallback_scheme)
         scheme = get_mutual_fund_scheme(clean_code)
 
-    # Verify holdings exist
+    # Fail-closed holdings check: never fabricate synthetic BENCHMARK_PROXIES holdings when statutory
+    # monthly portfolio disclosures have not yet been ingested for this scheme.
     holdings = get_scheme_holdings(clean_code)
-    if not holdings and scheme:
-        # Generate representative holdings using benchmark index proxy
-        bench_idx = scheme.get("benchmark_index", "NIFTY 500 TRI")
-        proxy_holdings = BENCHMARK_PROXIES.get(bench_idx, BENCHMARK_PROXIES.get("NIFTY 500 TRI", {}))
-        synthetic_holdings = []
-        tot_proxy = sum(proxy_holdings.values()) or 100.0
-
-        for ticker, raw_w in proxy_holdings.items():
-            norm_w = round((raw_w / tot_proxy) * 85.0, 2)  # 85% equity sleeve
-            synthetic_holdings.append({
-                "holding_type": "EQUITY",
-                "identifier": ticker,
-                "holding_name": f"{ticker} Ltd",
-                "weight_pct": norm_w,
-                "sector_or_rating": "Diversified Core Equity"
-            })
-        # Add cash / sovereign collateral
-        synthetic_holdings.append({
-            "holding_type": "CASH_EQUIVALENT",
-            "identifier": "TREPS",
-            "holding_name": "Tri-Party Repo (TREPS) & Cash Margin",
-            "weight_pct": 15.0,
-            "sector_or_rating": "CASH"
-        })
-        save_mutual_fund_holdings(clean_code, synthetic_holdings)
-        logger.info(f"Populated {len(synthetic_holdings)} representative holdings for on-demand scheme {clean_code}")
+    if not holdings:
+        logger.info(
+            "No disclosed statutory holdings on file for scheme %s; look-through score will remain withheld until AMFI portfolio ingestion.",
+            clean_code,
+        )
 
     return scheme
 
