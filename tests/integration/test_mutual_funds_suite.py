@@ -1108,6 +1108,50 @@ Cash reserve of 12% cushions against broad equity sell-offs.
             FUND_AUDIT_TASKS.clear()
             FUND_AUDIT_TASKS.update(initial_tasks)
 
+    def test_synthesize_narrative_fail_closed_outside_testing_and_audit_daily_gate(self):
+        """Action 4A: Validates that deterministic prose fallback is strictly gated to TESTING=1,
+        and audit_single_fund_daily fails closed with RuntimeError when AI synthesis is unavailable in production."""
+        metrics_mock = {
+            "has_sufficient_coverage": True,
+            "scheme_name": "Test Large Cap Direct",
+            "scheme_code": "TEST_SCHEME_FAILCLOSED",
+            "aum_crores": 5000.0,
+            "ter_direct_pct": 0.50,
+            "ter_regular_pct": 1.25,
+            "active_share_pct": 62.0,
+            "weighted_moat_score": 75.0,
+            "accounting_risk_index": 2.5,
+            "margin_of_safety_pct": 12.0,
+            "promoter_pledge_exposure_pct": 0.1,
+            "portfolio_turnover_ratio_pct": 18.0,
+            "benchmark_index": "NIFTY 50 TRI",
+            "top_risky_holdings": [],
+            "top_quality_holdings": [{"name": "Tata Consultancy Services Ltd"}],
+            "composite_health_score": 82.0,
+        }
+        scheme_mock = {"scheme_name": "Test Large Cap Direct", "scheme_code": "TEST_SCHEME_FAILCLOSED"}
+
+        # 1. Under TESTING=1: Fallback activates cleanly when live API is unavailable
+        with patch.dict(os.environ, {"TESTING": "1", "PYTEST_CURRENT_TEST": "", "GEMINI_API_KEY": ""}):
+            narrative = synthesize_fund_forensic_narrative(metrics_mock, scheme_mock)
+            self.assertIn("# FORENSIC DOSSIER:", narrative)
+            self.assertIn("## 1. Mandate Integrity vs Ground Reality", narrative)
+
+        # 2. Outside TESTING mode: Fallback strictly disabled (returns empty string)
+        with patch.dict(os.environ, {"TESTING": "", "PYTEST_CURRENT_TEST": "", "GEMINI_API_KEY": ""}):
+            prod_narrative = synthesize_fund_forensic_narrative(metrics_mock, scheme_mock)
+            self.assertEqual(prod_narrative, "")
+
+        # 3. audit_single_fund_daily fails closed with RuntimeError when narrative is empty
+        with patch("core.analysis.fund_overlap_auditor.ensure_scheme_and_holdings_exist", return_value=scheme_mock), \
+             patch("core.analysis.fund_overlap_auditor.compute_fund_forensic_lookthrough", return_value=metrics_mock), \
+             patch("core.analysis.fund_overlap_auditor.synthesize_fund_forensic_narrative", return_value=""), \
+             patch("core.analysis.fund_overlap_auditor.save_fund_forensic_dossier") as mock_save:
+            with self.assertRaises(RuntimeError) as ctx:
+                audit_single_fund_daily(scheme_code="TEST_SCHEME_FAILCLOSED")
+            self.assertIn("failing closed without persisting template prose", str(ctx.exception))
+            mock_save.assert_not_called()
+
 
 
 if __name__ == "__main__":

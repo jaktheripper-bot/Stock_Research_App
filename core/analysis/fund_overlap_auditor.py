@@ -452,8 +452,9 @@ Detail the liquidity bottleneck and sector concentration fault lines if liquidit
         except Exception as e:
             logger.warning(f"Gemini API narrative generation error ({e}). Proceeding to algorithmic synthesis.")
 
-    # High-Reliability Algorithmic Synthesis Fallback
-    if not gen_text:
+    # Deterministic fallback is restricted strictly to offline test mode (TESTING=1)
+    is_testing = os.environ.get("TESTING") == "1" or bool(os.environ.get("PYTEST_CURRENT_TEST"))
+    if not gen_text and is_testing:
         as_verdict = (
             f"With an Active Share of {as_val:.1f}% `[CALCULATED METRIC]`, the portfolio diverges meaningfully from {bench}, "
             f"providing a clearer basis for its active fee structure." if as_val >= 60.0 else
@@ -515,8 +516,12 @@ def audit_single_fund_daily(
     # Compute 7-pillar portfolio look-through metrics
     metrics = compute_fund_forensic_lookthrough(scheme_code)
 
-    # Generate AI narrative
+    # Generate AI narrative (or honest <70% Coverage Notice)
     dossier_narrative = synthesize_fund_forensic_narrative(metrics, scheme)
+    if metrics.get("has_sufficient_coverage") and not dossier_narrative:
+        raise RuntimeError(
+            f"Live AI synthesis unavailable for scheme {scheme_code}; failing closed without persisting template prose."
+        )
 
     # Package record for persistent database storage
     dossier_record = {
