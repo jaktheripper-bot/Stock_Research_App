@@ -725,6 +725,9 @@ def ingest_daily_stock_cohort(
                 pre_synthesized_report=batch_reports_map.get(t_clean),
                 resolved_stock_data=resolved_data_map.get(t_clean),
             )
+            if res.get("status") != "INGESTED_RESEARCHED":
+                logger.info("Skipping discovery/IndexNow publication for %s (status=%s).", t_clean, res.get("status"))
+                continue
             ingested_results.append(res)
 
             # Build rich discovery reel item with mutual fund footprint (exclude unpriced or Mega-Caps >= ₹1L Cr)
