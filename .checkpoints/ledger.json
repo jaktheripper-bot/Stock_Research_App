@@ -1950,5 +1950,21 @@
       "revision_count": 1040
     },
     "preflight_passed": true
+  },
+  {
+    "tag": "checkpoint_20261028_084604_etf_ingest_category_and_index_derivation_hardening",
+    "timestamp": "2026-10-28 08:46:04 IST",
+    "commit_sha": "5342155e50064eefd56dedff214e1a5479477794",
+    "branch": "main",
+    "description": "etf_ingest_category_and_index_derivation_hardening",
+    "database": {
+      "exists": true,
+      "filename": "reports_checkpoint_20261028_084604_etf_ingest_category_and_index_derivation_hardening.db",
+      "path": ".checkpoints/reports_checkpoint_20261028_084604_etf_ingest_category_and_index_derivation_hardening.db",
+      "size_bytes": 34918400,
+      "report_count": 307,
+      "revision_count": 1040
+    },
+    "preflight_passed": true
   }
 ]
