@@ -289,6 +289,52 @@ class TestEquityUpgrades(unittest.TestCase):
         self.assertIn("valuation_radar", intel)
         self.assertIn("bull_bear_thesis", intel)
 
+    def test_compile_equity_dossier_effective_industry_and_name_fallbacks(self):
+        # 1. When industry_str is empty, fallback to fundamentals sector/industry
+        fund_empty_ind = {
+            "sector": "Technology",
+            "industry": "Software Services",
+            "company_name": "Infosys Limited",
+            "current_price": 1800.0,
+        }
+        intel_1 = compile_equity_dossier(
+            ticker="INFY",
+            fundamentals=fund_empty_ind,
+            company_name="",
+            industry_str=""
+        )
+        self.assertEqual(intel_1["sector_intelligence"]["sector"], "IT_TECH")
+
+        # 2. When industry_str is generic ('DIVERSIFIED'), fallback to fundamentals
+        fund_generic_ind = {
+            "sector": "Automotive",
+            "industry": "Commercial Vehicles",
+            "company_name": "Tata Motors Ltd",
+            "current_price": 950.0,
+        }
+        intel_2 = compile_equity_dossier(
+            ticker="TMCV",
+            fundamentals=fund_generic_ind,
+            company_name="",
+            industry_str="DIVERSIFIED"
+        )
+        self.assertEqual(intel_2["sector_intelligence"]["sector"], "AUTOMOTIVE")
+
+        # 3. When company_name is missing, fallback to fundamentals company_name / short_name
+        fund_pharma = {
+            "sector": "Healthcare",
+            "industry": "Pharmaceuticals",
+            "short_name": "Cipla Ltd",
+            "current_price": 1400.0,
+        }
+        intel_3 = compile_equity_dossier(
+            ticker="CIPLA",
+            fundamentals=fund_pharma,
+            company_name="",
+            industry_str="GENERAL INDUSTRY"
+        )
+        self.assertEqual(intel_3["sector_intelligence"]["sector"], "HEALTHCARE_PHARMA")
+
     def test_missing_fundamentals_honest_reporting(self):
         res = evaluate_sector_fundamentals("TESTCO", {})
         self.assertIn("coverage", res)

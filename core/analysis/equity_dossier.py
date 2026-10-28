@@ -42,11 +42,17 @@ def compile_equity_dossier(
             logger.debug(f"Angel One quote lookup notice for {ticker}: {e}")
 
     # 2. Sector-Native Operational Scoring
+    fund_dict = fundamentals if isinstance(fundamentals, dict) else {}
+    effective_industry = industry_str
+    if not effective_industry or effective_industry.strip().upper() in ("DIVERSIFIED", "GENERAL INDUSTRY", "GENERAL"):
+        effective_industry = f"{fund_dict.get('sector') or ''} {fund_dict.get('industry') or ''}".strip()
+    effective_name = company_name or str(fund_dict.get("company_name") or fund_dict.get("short_name") or "")
+
     sector_data = evaluate_sector_fundamentals(
         ticker=ticker,
-        fundamentals=fundamentals,
-        industry_str=industry_str,
-        company_name=company_name
+        fundamentals=fund_dict,
+        industry_str=effective_industry,
+        company_name=effective_name
     )
 
     # 3. Institutional Flow & Market Depth
