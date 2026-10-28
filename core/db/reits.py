@@ -1007,10 +1007,26 @@ def get_all_reits_and_invits(structure_type: Optional[str] = None, exclude_tests
             existing_symbols = {r[1].upper() for r in rows}
             if not structure_type:
                 missing_defaults = [r for r in DEFAULT_REITS_AND_INVITS if r["symbol"].upper() not in existing_symbols]
+                needs_refresh = False
                 if missing_defaults:
                     logger.info(f"Seeding {len(missing_defaults)} newly added default REITs/InvITs...")
                     for r in missing_defaults:
                         save_reit_or_invit(r)
+                    needs_refresh = True
+
+                for r in DEFAULT_REITS_AND_INVITS:
+                    sym = r["symbol"].upper()
+                    if sym in existing_symbols:
+                        curr_row = next((x for x in rows if x[1].upper() == sym), None)
+                        if curr_row and curr_row[14]:
+                            try:
+                                curr_det = json.loads(curr_row[14]) if isinstance(curr_row[14], str) else dict(curr_row[14])
+                                if "tax_breakdown" not in curr_det:
+                                    save_reit_or_invit(r)
+                                    needs_refresh = True
+                            except Exception as err:
+                                logger.debug("Details tax breakdown inspection notice for %s: %s", sym, err)
+                if needs_refresh:
                     rows = _run_select()
 
         results = []

@@ -127,12 +127,20 @@ class TestP3PDFMemoryExhaustionAndReDoS(unittest.TestCase):
     def test_03_equity_pdf_timeout_returns_http_504(self):
         """Verifies that an equity PDF generation exceeding 15.0s is aborted with HTTP 504 Gateway Timeout."""
         from core.db.reports import save_report_to_archive
-        save_report_to_archive({"ticker": "RELIANCE", "short_name": "Reliance Industries"}, "## Executive Summary\nSafe report.")
+        save_report_to_archive({"ticker": "TEST_PDF_TIMEOUT", "short_name": "Test PDF Timeout Stock"}, "## Executive Summary\nSafe report.")
 
-        with patch("web.routers.dossier.asyncio.wait_for", side_effect=self._timeout_wait_for):
-            resp = self.client.get("/api/pdf/RELIANCE")
-            self.assertEqual(resp.status_code, 504)
-            self.assertIn("PDF generation timed out", resp.json().get("detail", ""))
+        try:
+            with patch("web.routers.dossier.asyncio.wait_for", side_effect=self._timeout_wait_for):
+                resp = self.client.get("/api/pdf/TEST_PDF_TIMEOUT")
+                self.assertEqual(resp.status_code, 504)
+                self.assertIn("PDF generation timed out", resp.json().get("detail", ""))
+        finally:
+            from core.db.connection import get_db_connection
+            conn = get_db_connection()
+            c = conn.cursor()
+            c.execute("DELETE FROM reports WHERE ticker = 'TEST_PDF_TIMEOUT'")
+            conn.commit()
+            conn.close()
 
     def test_04_fund_pdf_timeout_returns_http_504(self):
         """Verifies that a mutual fund PDF generation exceeding 15.0s returns HTTP 504."""
