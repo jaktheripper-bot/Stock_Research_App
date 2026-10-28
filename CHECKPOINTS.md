@@ -10,7 +10,7 @@
 
 | Checkpoint Tag | IST Timestamp | Commit | DB Reports | Description |
 |:---|:---|:---|:---|:---|
-| `checkpoint_20261028_092025_reports_get_archived_reports_filter_null_text` | 2026-10-28 09:20:25 IST | `1824cb5` | 307 rep / 1040 rev | reports_get_archived_reports_filter_null_text |
+| `checkpoint_20261028_092025_reports_get_archived_reports_filter_null_text` | 2026-10-28 09:20:25 IST | `59f9ab2` | 307 rep / 1040 rev | reports_get_archived_reports_filter_null_text |
 | `checkpoint_20261028_091340_checker_anti_boilerplate_and_numerical_parity_gate` | 2026-10-28 09:13:40 IST | `773a5b1` | 307 rep / 1040 rev | checker_anti_boilerplate_and_numerical_parity_gate |
 | `checkpoint_20261028_090921_dossier_synthesis_causal_system_prompt_upgrade` | 2026-10-28 09:09:21 IST | `7459333` | 307 rep / 1040 rev | dossier_synthesis_causal_system_prompt_upgrade |
 | `checkpoint_20261028_090429_fund_overlap_auditor_constituent_synthesis_fail_closed` | 2026-10-28 09:04:29 IST | `b72f6be` | 307 rep / 1040 rev | fund_overlap_auditor_constituent_synthesis_fail_closed |

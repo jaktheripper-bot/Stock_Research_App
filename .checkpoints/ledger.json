@@ -2046,5 +2046,21 @@
       "revision_count": 1040
     },
     "preflight_passed": true
+  },
+  {
+    "tag": "checkpoint_20261028_092025_reports_get_archived_reports_filter_null_text",
+    "timestamp": "2026-10-28 09:20:25 IST",
+    "commit_sha": "59f9ab20693a4e611d2c6cc6a0bb96ada572d6cb",
+    "branch": "main",
+    "description": "reports_get_archived_reports_filter_null_text",
+    "database": {
+      "exists": true,
+      "filename": "reports_checkpoint_20261028_092025_reports_get_archived_reports_filter_null_text.db",
+      "path": ".checkpoints/reports_checkpoint_20261028_092025_reports_get_archived_reports_filter_null_text.db",
+      "size_bytes": 34918400,
+      "report_count": 307,
+      "revision_count": 1040
+    },
+    "preflight_passed": true
   }
 ]
