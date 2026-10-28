@@ -2062,5 +2062,21 @@
       "revision_count": 1040
     },
     "preflight_passed": true
+  },
+  {
+    "tag": "checkpoint_20261028_092749_daily_stock_ingestion_has_grounded_report_status",
+    "timestamp": "2026-10-28 09:27:49 IST",
+    "commit_sha": "2b9ef6ba51cc3bcb48840b5c0627e3c169071078",
+    "branch": "main",
+    "description": "daily_stock_ingestion_has_grounded_report_status",
+    "database": {
+      "exists": true,
+      "filename": "reports_checkpoint_20261028_092749_daily_stock_ingestion_has_grounded_report_status.db",
+      "path": ".checkpoints/reports_checkpoint_20261028_092749_daily_stock_ingestion_has_grounded_report_status.db",
+      "size_bytes": 34918400,
+      "report_count": 308,
+      "revision_count": 1042
+    },
+    "preflight_passed": true
   }
 ]
