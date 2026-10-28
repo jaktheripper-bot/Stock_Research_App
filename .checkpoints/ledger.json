@@ -1886,5 +1886,21 @@
       "revision_count": 1040
     },
     "preflight_passed": true
+  },
+  {
+    "tag": "checkpoint_20261028_080310_sector_scoring_keywords_and_word_boundary_hardening",
+    "timestamp": "2026-10-28 08:03:10 IST",
+    "commit_sha": "316d45483caa1c2e664ae51f5243cc922237f957",
+    "branch": "main",
+    "description": "sector_scoring_keywords_and_word_boundary_hardening",
+    "database": {
+      "exists": true,
+      "filename": "reports_checkpoint_20261028_080310_sector_scoring_keywords_and_word_boundary_hardening.db",
+      "path": ".checkpoints/reports_checkpoint_20261028_080310_sector_scoring_keywords_and_word_boundary_hardening.db",
+      "size_bytes": 34918400,
+      "report_count": 307,
+      "revision_count": 1040
+    },
+    "preflight_passed": true
   }
 ]
