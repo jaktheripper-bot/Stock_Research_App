@@ -1934,5 +1934,21 @@
       "revision_count": 1040
     },
     "preflight_passed": true
+  },
+  {
+    "tag": "checkpoint_20261028_083757_equity_dossier_varan_and_setu_fail_closed",
+    "timestamp": "2026-10-28 08:37:57 IST",
+    "commit_sha": "befb0a4ea2a6a6785f9578b1dc75dad3256c98ae",
+    "branch": "main",
+    "description": "equity_dossier_varan_and_setu_fail_closed",
+    "database": {
+      "exists": true,
+      "filename": "reports_checkpoint_20261028_083757_equity_dossier_varan_and_setu_fail_closed.db",
+      "path": ".checkpoints/reports_checkpoint_20261028_083757_equity_dossier_varan_and_setu_fail_closed.db",
+      "size_bytes": 34918400,
+      "report_count": 307,
+      "revision_count": 1040
+    },
+    "preflight_passed": true
   }
 ]
