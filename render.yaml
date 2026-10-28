@@ -47,4 +47,6 @@ services:
         sync: false
       - key: BETTER_STACK_INCIDENTS_TOKEN
         sync: false
+      - key: ENABLE_BACKGROUND_SCHEDULERS
+        value: "1"
 
