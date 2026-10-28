@@ -300,14 +300,15 @@ class RealityAuditor:
 
         # 5.1 Verify send_magic_link does NOT log a user in when Supabase is unconfigured
         from core.auth import supabase_auth
-        os.environ.pop("SUPABASE_ANON_KEY", None)
-        res = supabase_auth.send_magic_link("audit_victim@example.com")
-        current = supabase_auth.get_current_user()
-        if (isinstance(res, dict) and res.get("user")) or (current and current.get("email") == "audit_victim@example.com"):
-            self.fail(gate, "core/auth/supabase_auth.py:send_magic_link",
-                      "EXPLOIT CONFIRMED: send_magic_link('audit_victim@example.com') logged the user in without verification!")
-        else:
-            self.ok(gate, "send_magic_link() properly rejects unverified login on gateway failure")
+        from unittest.mock import patch as _mock_patch
+        with _mock_patch.object(supabase_auth, "get_supabase_auth_config", return_value={"url": "", "anon_key": ""}):
+            res = supabase_auth.send_magic_link("audit_victim@example.com")
+            current = supabase_auth.get_current_user()
+            if (isinstance(res, dict) and res.get("user")) or (current and current.get("email") == "audit_victim@example.com"):
+                self.fail(gate, "core/auth/supabase_auth.py:send_magic_link",
+                          "EXPLOIT CONFIRMED: send_magic_link('audit_victim@example.com') logged the user in without verification!")
+            else:
+                self.ok(gate, "send_magic_link() properly rejects unverified login on gateway failure")
 
         # 5.2 Verify format_citations_section actually returns a non-empty string
         from core.analysis.parser import format_citations_section

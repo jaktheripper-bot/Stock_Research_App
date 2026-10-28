@@ -16,8 +16,12 @@ class TestScheduledPipeline(unittest.TestCase):
     @patch("core.analysis.daily_stock_ingestion.ingest_daily_stock_cohort")
     @patch("scripts.run_discovery_worker.run_discovery_pipeline")
     @patch("core.msme.daily_ingest.ingest_daily_msme_cohort")
+    @patch("core.db.digest.has_edition_been_dispatched", return_value=False)
+    @patch("core.notify.dispatch_research_bouquet")
     def test_run_morning_pipeline_signatures(
         self,
+        mock_bouquet,
+        mock_has_dispatched,
         mock_msme,
         mock_discovery,
         mock_stock_ingest,
@@ -29,17 +33,20 @@ class TestScheduledPipeline(unittest.TestCase):
         mock_stock_ingest.return_value = {"status": "SUCCESS", "ingested_stocks": ["TCS", "INFY"]}
         mock_discovery.return_value = True
         mock_msme.return_value = 15
+        mock_bouquet.return_value = {"status": "COMPLETED", "delivered": 3}
 
         res = run_morning_pipeline("2026-10-25", force=False)
 
         self.assertEqual(res.get("discovery_reel"), "SUCCESS")
         self.assertEqual(res.get("msme_ingest"), "INGESTED_15")
+        self.assertEqual(res.get("morning_bouquet"), "COMPLETED")
         mock_discovery.assert_called_once_with(
             target_count=15,
             edition_date="2026-10-25",
             dry_run=False,
             force_synthesis=False,
         )
+        mock_bouquet.assert_called_once_with(edition_date="2026-10-25", force=False)
         mock_record_event.assert_called_once()
         call_kwargs = mock_record_event.call_args[1]
         self.assertEqual(call_kwargs.get("event_type"), "MORNING_PIPELINE_COMPLETE")
@@ -153,6 +160,35 @@ class TestScheduledPipeline(unittest.TestCase):
                 asyncio.run(_run_enabled())
                 mock_sched.assert_called_once()
                 mock_sched_instance.start.assert_called_once()
+
+    def test_ide_and_test_email_guard_blocks_live_network_calls(self):
+        """Verifies that local IDE / test runs never fire real HTTP requests to Resend or SMTP unless mocked or explicitly enabled."""
+        import os
+        import urllib.request
+        from core.notify import _dispatch_via_resend, _is_live_email_dispatch_allowed
+
+        # 1. Under test runtime, _is_live_email_dispatch_allowed() is always False
+        self.assertFalse(_is_live_email_dispatch_allowed())
+
+        # 2. Even if RESEND_API_KEY is present in os.environ, unmocked urllib.request.urlopen is NEVER called
+        def _forbid_network(*args, **kwargs):
+            raise AssertionError("Real network call to Resend API was attempted during test/IDE guard!")
+
+        with patch.dict(os.environ, {"RESEND_API_KEY": "re_live_simulated_key_123", "TESTING": "1"}, clear=False), \
+             patch.object(urllib.request, "urlopen", side_effect=_forbid_network):
+            # Note: patch.object with side_effect creates a MagicMock, so let's test with a plain function replacement
+            orig_urlopen = urllib.request.urlopen
+            try:
+                urllib.request.urlopen = _forbid_network
+                ok = _dispatch_via_resend(
+                    "desk@moatnomics.com",
+                    "subscriber@example.com",
+                    "Test Subject",
+                    "Test Body",
+                )
+                self.assertTrue(ok)
+            finally:
+                urllib.request.urlopen = orig_urlopen
 
 
 if __name__ == "__main__":

@@ -129,7 +129,8 @@ def create_email_otp(email: str) -> Tuple[bool, str, Optional[str]]:
         conn.commit()
         logger.info(f"Generated secure OTP for {clean_email}")
 
-        if os.environ.get("TESTING") != "1":
+        from core.notify import _is_live_email_dispatch_allowed, _is_test_runtime
+        if not _is_test_runtime() and _is_live_email_dispatch_allowed():
             # Primary: Standardized Supabase GoTrue Auth OTP / Magic Link dispatch
             sb_dispatched = False
             try:
@@ -143,6 +144,13 @@ def create_email_otp(email: str) -> Tuple[bool, str, Optional[str]]:
 
             if not sb_dispatched:
                 send_otp_email(clean_email, code, ttl_minutes=OTP_TTL_MINUTES)
+        elif not _is_test_runtime():
+            logger.info(
+                "[IDE/TEST EMAIL GUARD] Local OTP generated for %s (Code: %s). "
+                "Live Supabase/Resend email skipped in IDE.",
+                clean_email,
+                code,
+            )
 
         return True, "Verification code sent successfully to your email.", code
     except Exception as e:

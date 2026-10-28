@@ -118,9 +118,10 @@
 * **Sovereign Yield Curve Term-Structure History (`core/db/sovereign.py`):**
   * **Daily Snapshot Archival:** `save_sovereign_curve_snapshot(edition_date)` records all 16 statutory yield curve tenors into `sovereign_curve_history` with `UNIQUE(snapshot_key, tenor_label)`.
   * **Automated Nightly Synchronization:** Integrated directly into `refresh_daily_sovereign_benchmarks` (returning `curve_snapshots_saved: 16`) and callable via `get_sovereign_curve_history(snapshot_key)`.
-* **Python 3.14 Autonomous Pipeline Daemon (`launchd/com.moatnomics.pipeline.plist`):**
+* **Python 3.14 Autonomous Pipeline Daemon (`launchd/com.moatnomics.pipeline.plist`) & Cloud Morning Schedule (`scripts/run_scheduled_pipeline.py`, `web/main.py`):**
   * **Runtime Alignment:** ProgramArguments targets active Python 3.14 (`/Library/Frameworks/Python.framework/Versions/3.14/bin/python3`), eliminating PEP 604 type-union compatibility crashes on outdated macOS system Python 3.9.
-  * **Autonomous Cadence:** Registered in `launchctl` (`com.moatnomics.pipeline`) with explicit `PATH` and `PYTHONPATH` environment variables, executing 08:30 IST morning ingestion and 23:15 IST nightly multi-asset synchronization independent of interactive web server lifespan.
+  * **Pre-09:00 AM IST Morning Cadence:** GitHub Actions executes `run_morning_pipeline()` starting at `08:15 AM IST` (`45 2 * * *`), running Phase 1 (15-stock MF constituent ingestion), Phase 2 (Discovery Reel screening), Phase 3 (15-firm MSME cohort), and Phase 4 (`morning_bouquet_{date_str}` lease dispatching the Morning Research Bouquet email immediately at ~`08:35–08:45 AM IST`). Render's failover scheduler in `web/main.py` executes staggered catch-up windows (`08:30 AM` Stock Ingest, `08:40 AM` Discovery Reel, `08:45 AM` MSME Ingest, `08:50 AM IST` Morning Bouquet Dispatch with 20s polling cadence) so emails always arrive early before `09:00 AM IST` and never drift to `09:05 AM IST`.
+  * **IDE & Test Outgoing Email Sandbox Guard (`core/config.py`, `core/notify.py`):** `_is_live_email_dispatch_allowed()` blocks unmocked network calls to Resend/SMTP during `unittest`/`pytest`/audit runs and in local IDE environments unless `ENABLE_LIVE_EMAIL_DISPATCH=1` or running on authorized cloud infrastructure (`RENDER`, `GITHUB_ACTIONS=true`, `ENVIRONMENT=production`).
 
 
 

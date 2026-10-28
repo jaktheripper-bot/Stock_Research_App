@@ -33,6 +33,8 @@ services:
         sync: false
       - key: RESEND_API_KEY
         sync: false
+      - key: ENABLE_LIVE_EMAIL_DISPATCH
+        value: "1"
       - key: SMTP_FROM
         value: "Moatnomics Service Desk <desk@moatnomics.com>"
       - key: ADMIN_ALERT_EMAIL

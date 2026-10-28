@@ -9,7 +9,11 @@ Empirically validates:
 5. UI and DOM element binding contracts (zero missing IDs, zero unrendered Jinja leaks).
 """
 
+import os
 import unittest
+
+os.environ["TESTING"] = "1"
+
 from bs4 import BeautifulSoup
 from fastapi.testclient import TestClient
 

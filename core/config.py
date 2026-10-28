@@ -24,6 +24,27 @@ if os.environ.get("SKIP_DOTENV_IN_SUBPROCESS") != "1":
 
 _SECRETS_CACHE: Optional[dict] = None
 _SECRETS_LOADED = False
+_TEST_GUARDED_SECRET_KEYS = frozenset({
+    "RESEND_API_KEY",
+    "SMTP_HOST",
+    "SMTP_USER",
+    "SMTP_PASSWORD",
+})
+
+
+def _is_test_runtime() -> bool:
+    """Detects active unittest/pytest runners or isolated test subprocesses."""
+    argv0 = sys.argv[0] if sys.argv else ""
+    is_test_entrypoint = any(runner in argv0 for runner in ("unittest", "pytest"))
+    return (
+        os.environ.get("TESTING") == "1"
+        or os.environ.get("ENVIRONMENT") == "testing"
+        or os.environ.get("SKIP_DOTENV_IN_SUBPROCESS") == "1"
+        or bool(os.environ.get("PYTEST_CURRENT_TEST"))
+        or "pytest" in sys.modules
+        or is_test_entrypoint
+    )
+
 
 def _load_local_secrets() -> dict:
     """Reads secrets from local TOML files if they exist on disk, using stdlib tomllib."""
@@ -33,6 +54,7 @@ def _load_local_secrets() -> dict:
     if _SECRETS_LOADED:
         return _SECRETS_CACHE or {}
 
+    is_test = _is_test_runtime()
     secrets = {}
     base_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
     candidate_paths = [
@@ -56,6 +78,9 @@ def _load_local_secrets() -> dict:
                     # Flatten top-level keys
                     for k, v in loaded.items():
                         secrets[k] = v
+                        # Never auto-inject live outgoing email credentials into os.environ during tests
+                        if is_test and k in _TEST_GUARDED_SECRET_KEYS:
+                            continue
                         # If not already in os.environ and is a string, populate os.environ
                         if isinstance(v, str) and k not in os.environ:
                             os.environ[k] = v

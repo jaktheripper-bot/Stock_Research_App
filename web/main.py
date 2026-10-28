@@ -217,8 +217,10 @@ async def run_daily_discovery_scheduler():
     Automated background BSE monitoring and cloud-failover morning scheduler:
     Coordinates with GitHub Actions cloud batch runner via Supabase distributed_job_locks:
     - 08:40 AM IST (+10m failover after 08:30 GHA): Daily 15-stock ingestion & MF look-through saturation
-    - 08:55 AM IST (+10m failover after 08:45): Discovery Reel morning screening (500+ scrips)
-    - 09:05 AM IST (+5m failover after 09:00): Daily unlisted MSME cohort ingestion & Research Bouquet dispatch
+    - 08:30 AM IST (+15m failover after 08:15): Daily 15-stock MF constituent ingestion
+    - 08:40 AM IST: Discovery Reel morning screening (500+ scrips)
+    - 08:45 AM IST: Daily unlisted MSME cohort ingestion
+    - 08:50 AM IST (early pre-09:00 AM dispatch): Morning Research Bouquet email dispatch
     """
     logger.info("[Discovery Scheduler] Background BSE monitoring crawler & morning scheduler initiated.")
     last_stock_run_date = None
@@ -238,52 +240,55 @@ async def run_daily_discovery_scheduler():
         from core.db.connection import get_db_connection, get_placeholder
 
         loop = asyncio.get_running_loop()
+        is_past_830 = (now.hour > 8) or (now.hour == 8 and now.minute >= 30)
         is_past_840 = (now.hour > 8) or (now.hour == 8 and now.minute >= 40)
-        is_past_855 = (now.hour > 8) or (now.hour == 8 and now.minute >= 55)
-        is_past_905 = (now.hour > 9) or (now.hour == 9 and now.minute >= 5)
+        is_past_845 = (now.hour > 8) or (now.hour == 8 and now.minute >= 45)
+        is_past_850 = (now.hour > 8) or (now.hour == 8 and now.minute >= 50)
 
-        if is_past_840:
+        if is_past_830:
             with job_lease(f"mf_stock_ingest_{today_str}", ttl_seconds=daily_ttl, release_on_exit=False) as acquired:
                 if acquired:
-                    logger.info(f"[Discovery Scheduler] Past 08:40 AM IST on boot for {today_str}. Acquired lease. Triggering daily 15-stock ingestion...")
+                    logger.info(f"[Discovery Scheduler] Past 08:30 AM IST on boot for {today_str}. Acquired lease. Triggering daily 15-stock ingestion...")
                     await loop.run_in_executor(None, ingest_daily_stock_cohort, today_str, 15, False)
                     logger.info(f"[Discovery Scheduler] 15-stock ingestion & mutual fund look-through re-audit completed for {today_str}.")
                 else:
                     logger.info(f"[Discovery Scheduler] Lease for mf_stock_ingest_{today_str} already satisfied. Skipping boot ingestion.")
             last_stock_run_date = today_str
 
-            if is_past_855:
+            if is_past_840:
                 with job_lease(f"discovery_reel_{today_str}", ttl_seconds=daily_ttl, release_on_exit=False) as acquired:
                     if acquired:
-                        logger.info(f"[Discovery Watcher] Past 08:55 AM IST on boot for {today_str}. Acquired lease. Running discovery screening...")
+                        logger.info(f"[Discovery Watcher] Past 08:40 AM IST on boot for {today_str}. Acquired lease. Running discovery screening...")
                         await execute_discovery_screening(edition_date=today_str, acquire_lease=False)
                         logger.info(f"[Discovery Watcher] Boot discovery screening completed for {today_str}.")
                     else:
                         logger.info(f"[Discovery Watcher] Lease for discovery_reel_{today_str} already satisfied. Skipping boot screening.")
                 last_discovery_run_date = today_str
 
-            if is_past_905:
+            if is_past_845:
                 with job_lease(f"msme_daily_ingest_{today_str}", ttl_seconds=daily_ttl, release_on_exit=False) as acquired:
                     if acquired:
-                        logger.info(f"[Discovery Scheduler] Past 09:05 AM IST on boot for {today_str}. Acquired lease. Triggering daily MSME cohort ingestion...")
+                        logger.info(f"[Discovery Scheduler] Past 08:45 AM IST on boot for {today_str}. Acquired lease. Triggering daily MSME cohort ingestion...")
                         await loop.run_in_executor(None, ingest_daily_msme_cohort, today_str, 15)
                         logger.info(f"[Discovery Scheduler] MSME cohort ingestion completed for {today_str}.")
                     else:
                         logger.info(f"[Discovery Scheduler] Lease for msme_daily_ingest_{today_str} already satisfied. Skipping boot MSME ingest.")
                 last_msme_run_date = today_str
 
+            if is_past_850:
                 from core.db.digest import has_edition_been_dispatched
 
-                # Boot catch-up: ONLY dispatch within the 09:00-09:59 AM IST window if not already sent today
-                if now.hour == 9 and not has_edition_been_dispatched(today_str):
+                # Boot catch-up: Dispatch within the 08:50-09:59 AM IST morning window if not already sent today
+                in_morning_dispatch_window = (now.hour == 8 and now.minute >= 50) or now.hour == 9
+                if in_morning_dispatch_window and not has_edition_been_dispatched(today_str):
                     with job_lease(f"morning_bouquet_{today_str}", ttl_seconds=86400, release_on_exit=False) as acquired:
                         if acquired:
                             logger.info(
-                                f"Boot Check: 09:00 AM IST window active ({today_str}). Dispatching Morning Research Bouquet..."
+                                f"Boot Check: Morning dispatch window active ({today_str}). Dispatching Morning Research Bouquet..."
                             )
                             await asyncio.to_thread(dispatch_research_bouquet, today_str)
                     last_bouquet_run_date = today_str
-                elif now.hour >= 9:
+                elif now.hour >= 9 or (now.hour == 8 and now.minute >= 50):
                     last_bouquet_run_date = today_str
         else:
             from core.db.discovery import get_active_discovery_reel
@@ -298,7 +303,7 @@ async def run_daily_discovery_scheduler():
             if not yesterday_existing:
                 with job_lease(f"mf_stock_ingest_{yesterday_str}", ttl_seconds=daily_ttl, release_on_exit=False) as acquired:
                     if acquired:
-                        logger.info(f"[Discovery Scheduler] Prior-day edition ({yesterday_str}) missing on pre-08:40 boot. Running catch-up ingestion...")
+                        logger.info(f"[Discovery Scheduler] Prior-day edition ({yesterday_str}) missing on pre-08:30 boot. Running catch-up ingestion...")
                         await loop.run_in_executor(None, ingest_daily_stock_cohort, yesterday_str, 15, False)
                 with job_lease(f"discovery_reel_{yesterday_str}", ttl_seconds=daily_ttl, release_on_exit=False) as acquired:
                     if acquired:
@@ -328,54 +333,56 @@ async def run_daily_discovery_scheduler():
 
     while True:
         try:
-            await asyncio.sleep(60)
+            await asyncio.sleep(20)
             now = datetime.now(IST)
             today_str = now.strftime("%Y-%m-%d")
+            is_past_830 = (now.hour > 8) or (now.hour == 8 and now.minute >= 30)
             is_past_840 = (now.hour > 8) or (now.hour == 8 and now.minute >= 40)
-            is_past_855 = (now.hour > 8) or (now.hour == 8 and now.minute >= 55)
-            is_past_905 = (now.hour > 9) or (now.hour == 9 and now.minute >= 5)
+            is_past_845 = (now.hour > 8) or (now.hour == 8 and now.minute >= 45)
+            is_past_850 = (now.hour > 8) or (now.hour == 8 and now.minute >= 50)
             loop = asyncio.get_running_loop()
             from core.db.distributed_lock import job_lease, prune_zombie_leases
             prune_zombie_leases()
 
-            # 1. 08:40 AM MF Priority Stock Ingest (Cloud Failover)
-            if is_past_840 and last_stock_run_date != today_str:
+            # 1. 08:30 AM MF Priority Stock Ingest (Cloud Failover)
+            if is_past_830 and last_stock_run_date != today_str:
                 from core.analysis.daily_stock_ingestion import ingest_daily_stock_cohort
                 with job_lease(f"mf_stock_ingest_{today_str}", ttl_seconds=daily_ttl, release_on_exit=False) as acquired:
                     if acquired:
-                        logger.info(f"[Discovery Scheduler] 08:40 AM IST failover window reached for {today_str}. Acquired lease. Running daily 15-stock ingestion...")
+                        logger.info(f"[Discovery Scheduler] 08:30 AM IST failover window reached for {today_str}. Acquired lease. Running daily 15-stock ingestion...")
                         await loop.run_in_executor(None, ingest_daily_stock_cohort, today_str, 15, False)
                         logger.info(f"[Discovery Scheduler] Daily 15-stock ingestion & mutual fund look-through re-audit completed for {today_str}.")
                     else:
                         logger.info(f"[Discovery Scheduler] Lease for mf_stock_ingest_{today_str} already satisfied by cloud batch runner. Skipping.")
                 last_stock_run_date = today_str
 
-            # 2. 08:55 AM Discovery Reel Screening (Cloud Failover)
-            if is_past_855 and last_discovery_run_date != today_str:
+            # 2. 08:40 AM Discovery Reel Screening (Cloud Failover)
+            if is_past_840 and last_discovery_run_date != today_str:
                 from core.agents.watchers.discovery_watcher import execute_discovery_screening
                 with job_lease(f"discovery_reel_{today_str}", ttl_seconds=daily_ttl, release_on_exit=False) as acquired:
                     if acquired:
-                        logger.info(f"[Discovery Watcher] 08:55 AM IST failover window reached for {today_str}. Acquired lease. Running discovery screening...")
+                        logger.info(f"[Discovery Watcher] 08:40 AM IST failover window reached for {today_str}. Acquired lease. Running discovery screening...")
                         await execute_discovery_screening(edition_date=today_str, acquire_lease=False)
                         logger.info(f"[Discovery Watcher] Daily discovery reel screening completed for {today_str}.")
                     else:
                         logger.info(f"[Discovery Watcher] Lease for discovery_reel_{today_str} already satisfied by cloud batch runner. Skipping.")
                 last_discovery_run_date = today_str
 
-            # 3. 09:05 AM MSME Ingestion (Cloud Failover)
-            if is_past_905 and last_msme_run_date != today_str:
+            # 3. 08:45 AM MSME Ingestion (Cloud Failover)
+            if is_past_845 and last_msme_run_date != today_str:
                 from core.msme.daily_ingest import ingest_daily_msme_cohort
                 with job_lease(f"msme_daily_ingest_{today_str}", ttl_seconds=daily_ttl, release_on_exit=False) as acquired:
                     if acquired:
-                        logger.info(f"[MSME Ingest] 09:05 AM IST failover window reached for {today_str}. Acquired lease. Running daily MSME cohort ingestion...")
+                        logger.info(f"[MSME Ingest] 08:45 AM IST failover window reached for {today_str}. Acquired lease. Running daily MSME cohort ingestion...")
                         await loop.run_in_executor(None, ingest_daily_msme_cohort, today_str, 15)
                         logger.info(f"[MSME Ingest] Daily unlisted MSME cohort ingestion completed for {today_str}.")
                     else:
                         logger.info(f"[MSME Ingest] Lease for msme_daily_ingest_{today_str} already satisfied by cloud batch runner. Skipping.")
                 last_msme_run_date = today_str
 
-            # 4. 09:00 AM IST Hour ONLY: Dispatch Morning Research Bouquet Email
-            if now.hour == 9 and now.minute >= 5 and last_bouquet_run_date != today_str:
+            # 4. 08:50-09:59 AM IST Window: Early Pre-09:00 AM Dispatch of Morning Research Bouquet Email
+            in_morning_dispatch_window = (now.hour == 8 and now.minute >= 50) or now.hour == 9
+            if in_morning_dispatch_window and last_bouquet_run_date != today_str:
                 from core.notify import dispatch_research_bouquet
                 from core.db.digest import has_edition_been_dispatched
 
@@ -383,7 +390,7 @@ async def run_daily_discovery_scheduler():
                     with job_lease(f"morning_bouquet_{today_str}", ttl_seconds=86400, release_on_exit=False) as acquired:
                         if acquired:
                             logger.info(
-                                f"Triggering 09:05 AM IST Morning Research Bouquet Email Dispatch for {today_str}..."
+                                f"Triggering Pre-09:00 AM IST Morning Research Bouquet Email Dispatch for {today_str}..."
                             )
                             await asyncio.to_thread(dispatch_research_bouquet, today_str)
                 last_bouquet_run_date = today_str

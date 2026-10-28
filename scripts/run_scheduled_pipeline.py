@@ -73,7 +73,7 @@ def run_morning_pipeline(date_str: str, force: bool = False) -> dict:
             logger.info(f"Lease for {lease_name} held by another worker. Skipping Phase 2.")
             results["discovery_reel"] = "SKIPPED_LEASE_HELD"
 
-    # 3. 09:00 AM IST: Daily Unlisted MSME Cohort Ingestion
+    # 3. 08:45 AM IST: Daily Unlisted MSME Cohort Ingestion
     from core.msme.daily_ingest import ingest_daily_msme_cohort
     lease_name = f"msme_daily_ingest_{date_str}"
     with job_lease(lease_name, ttl_seconds=DAILY_LEASE_TTL_SECONDS, release_on_exit=False) as acquired:
@@ -86,12 +86,38 @@ def run_morning_pipeline(date_str: str, force: bool = False) -> dict:
             logger.info(f"Lease for {lease_name} held by another worker. Skipping Phase 3.")
             results["msme_ingest"] = "SKIPPED_LEASE_HELD"
 
+    # 4. Pre-09:00 AM IST: Morning Research Bouquet Email Dispatch (Immediate post-screening delivery)
+    from core.notify import dispatch_research_bouquet
+    from core.db.digest import has_edition_been_dispatched
+    lease_name = f"morning_bouquet_{date_str}"
+    if not force and has_edition_been_dispatched(date_str):
+        logger.info(f"Morning Research Bouquet for {date_str} already dispatched. Skipping Phase 4.")
+        results["morning_bouquet"] = "ALREADY_DISPATCHED"
+    else:
+        with job_lease(lease_name, ttl_seconds=86400, release_on_exit=False) as acquired:
+            if acquired or force:
+                logger.info("Executing Phase 4: Morning Research Bouquet Email Dispatch...")
+                bouquet_res = dispatch_research_bouquet(edition_date=date_str, force=force)
+                results["morning_bouquet"] = bouquet_res.get("status", "COMPLETED")
+                logger.info(
+                    f"Phase 4 Complete: Morning Bouquet dispatch status={results['morning_bouquet']} "
+                    f"(delivered={bouquet_res.get('delivered', 0)})."
+                )
+            else:
+                logger.info(f"Lease for {lease_name} held by another worker. Skipping Phase 4.")
+                results["morning_bouquet"] = "SKIPPED_LEASE_HELD"
+
     record_autonomous_event(
         event_type="MORNING_PIPELINE_COMPLETE",
         ticker="MULTI_ASSET",
         trigger_source="SCHEDULED_RUNNER",
         action_taken=f"Executed morning pipeline for {date_str}",
-        summary=f"Stock Ingest: {results.get('stock_ingestion')}, Discovery: {results.get('discovery_reel')}, MSME: {results.get('msme_ingest')}",
+        summary=(
+            f"Stock Ingest: {results.get('stock_ingestion')}, "
+            f"Discovery: {results.get('discovery_reel')}, "
+            f"MSME: {results.get('msme_ingest')}, "
+            f"Bouquet: {results.get('morning_bouquet')}"
+        ),
         metadata=results,
     )
     return results

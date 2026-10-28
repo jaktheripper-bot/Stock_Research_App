@@ -20,11 +20,63 @@ from core.config import get_secret
 logger = logging.getLogger("equity_research.core.notify")
 
 
+def _is_test_runtime() -> bool:
+    """Detects whether the current process is executing unit/integration/audit tests."""
+    import sys
+    argv0 = sys.argv[0] if sys.argv else ""
+    is_test_entrypoint = any(runner in argv0 for runner in ("unittest", "pytest", "run_project_audit", "verify_reality_audit"))
+    return (
+        os.environ.get("TESTING") == "1"
+        or os.environ.get("ENVIRONMENT") == "testing"
+        or os.environ.get("SKIP_DOTENV_IN_SUBPROCESS") == "1"
+        or os.environ.get("AUDIT_RECURSION_GUARD") == "1"
+        or bool(os.environ.get("PYTEST_CURRENT_TEST"))
+        or "pytest" in sys.modules
+        or is_test_entrypoint
+    )
+
+
+def _is_live_email_dispatch_allowed() -> bool:
+    """Returns True ONLY when running in an authorized cloud/production environment or explicitly opted in.
+
+    Prevents local IDE report updates, audits, and test runs from spamming real subscribers via Resend/SMTP.
+    """
+    if _is_test_runtime():
+        return False
+    explicit = (os.environ.get("ENABLE_LIVE_EMAIL_DISPATCH") or "").strip().lower()
+    if explicit in ("1", "true", "yes", "on"):
+        return True
+    if explicit in ("0", "false", "no", "off"):
+        return False
+    env_mode = (os.environ.get("ENVIRONMENT") or "").strip().lower()
+    if (
+        os.environ.get("RENDER")
+        or os.environ.get("RENDER_SERVICE_ID")
+        or os.environ.get("GITHUB_ACTIONS") == "true"
+        or env_mode in ("production", "prod", "live")
+    ):
+        return True
+    return False
+
+
+def _is_mock_object(obj) -> bool:
+    """Checks whether a transport callable (urlopen, SMTP, SMTP_SSL) has been patched by unittest.mock."""
+    try:
+        from unittest.mock import Base as MockBase
+        if isinstance(obj, MockBase):
+            return True
+    except Exception as e:
+        logger.debug("Mock base inspection notice: %s", e)
+    return "unittest.mock" in str(type(obj))
+
+
 def _get_cfg(key: str, default: Optional[str] = None) -> Optional[str]:
     """Retrieves configuration value across os.environ, .env, and local secrets."""
     if key in os.environ:
         val = os.environ[key]
         return val if val != "" else default
+    if _is_test_runtime() and key in ("RESEND_API_KEY", "SMTP_HOST", "SMTP_USER", "SMTP_PASSWORD"):
+        return default
     secret_val = get_secret(key)
     if secret_val:
         return str(secret_val)
@@ -49,10 +101,12 @@ def is_email_service_configured() -> bool:
 
 def get_email_service_status() -> dict:
     """Returns metadata describing active outgoing email provider."""
+    live_allowed = _is_live_email_dispatch_allowed()
     if _get_cfg("RESEND_API_KEY"):
         return {
             "configured": True,
-            "provider": "Resend API",
+            "live_dispatch_enabled": live_allowed,
+            "provider": "Resend API" if live_allowed else "Resend API (IDE/Test Guard — Sandbox Log Only)",
             "from_email": _get_cfg("SMTP_FROM") or "noreply@moatnomics.com"
         }
     if _get_cfg("SMTP_HOST") and _get_cfg("SMTP_USER") and _get_cfg("SMTP_PASSWORD"):
@@ -60,11 +114,13 @@ def get_email_service_status() -> dict:
         port = _get_cfg("SMTP_PORT", "587")
         return {
             "configured": True,
-            "provider": f"SMTP ({host}:{port})",
+            "live_dispatch_enabled": live_allowed,
+            "provider": f"SMTP ({host}:{port})" if live_allowed else f"SMTP ({host}:{port}) (IDE/Test Guard — Sandbox Log Only)",
             "from_email": _get_cfg("SMTP_FROM") or _get_cfg("SMTP_USER")
         }
     return {
         "configured": False,
+        "live_dispatch_enabled": False,
         "provider": "Mock / Console Logging (Unsent)",
         "from_email": "noreply@localhost"
     }
@@ -79,6 +135,17 @@ def _dispatch_via_resend(from_email: str, to_email: str, subject: str, text: str
         import json
         import urllib.request
         import ssl
+
+        # Guard: Never make real network calls to Resend from local IDE or unmocked test flows
+        if not _is_live_email_dispatch_allowed() and not _is_mock_object(urllib.request.urlopen):
+            logger.info(
+                "[IDE/TEST EMAIL GUARD] Blocked live Resend API dispatch to %s (Subject: %s). "
+                "Set ENABLE_LIVE_EMAIL_DISPATCH=1 to allow live email from local IDE.",
+                to_email,
+                subject,
+            )
+            return True
+
         try:
             import certifi
             ca_file = os.environ.get("SSL_CERT_FILE") or certifi.where()
@@ -128,6 +195,17 @@ def _dispatch_via_smtp(from_email: str, to_email: str, subject: str, text: str, 
         return False
 
     try:
+        target_cls = smtplib.SMTP_SSL if smtp_port == 465 else smtplib.SMTP
+        if not _is_live_email_dispatch_allowed() and not _is_mock_object(target_cls):
+            logger.info(
+                "[IDE/TEST EMAIL GUARD] Blocked live SMTP dispatch (%s:%s) to %s (Subject: %s). "
+                "Set ENABLE_LIVE_EMAIL_DISPATCH=1 to allow live email from local IDE.",
+                smtp_host,
+                smtp_port,
+                to_email,
+                subject,
+            )
+            return True
         if html:
             msg = MIMEMultipart("alternative")
             msg["From"] = from_email

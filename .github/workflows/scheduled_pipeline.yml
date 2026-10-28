@@ -2,8 +2,8 @@ name: Autonomous Multi-Asset Scheduled Pipeline
 
 on:
   schedule:
-    # 08:30 AM IST (03:00 UTC) — Daily 15-Stock Ingest, Discovery Reel & MSME Cohort
-    - cron: "0 3 * * *"
+    # 08:15 AM IST (02:45 UTC) — Daily 15-Stock Ingest, Discovery Reel, MSME Cohort & Morning Bouquet Dispatch
+    - cron: "45 2 * * *"
     # 23:15 IST (17:45 UTC) — Nightly AMFI NAV, ETFs, Sovereign Curve, Debt Scan & Fund Audit
     - cron: "45 17 * * *"
   workflow_dispatch:
@@ -69,6 +69,7 @@ jobs:
           ANGEL_PIN: ${{ secrets.ANGEL_PIN }}
           ANGEL_TOTP_KEY: ${{ secrets.ANGEL_TOTP_KEY }}
           RESEND_API_KEY: ${{ secrets.RESEND_API_KEY }}
+          ENABLE_LIVE_EMAIL_DISPATCH: "1"
           SMTP_FROM: ${{ secrets.SMTP_FROM }}
           ADMIN_ALERT_EMAIL: ${{ secrets.ADMIN_ALERT_EMAIL }}
           BETTER_STACK_SOURCE_TOKEN: ${{ secrets.BETTER_STACK_SOURCE_TOKEN }}
@@ -76,7 +77,7 @@ jobs:
           BETTER_STACK_HEARTBEAT_URL: ${{ secrets.BETTER_STACK_HEARTBEAT_URL }}
         run: |
           if [ "${{ github.event_name }}" = "schedule" ]; then
-            if [ "${{ github.event.schedule }}" = "0 3 * * *" ]; then
+            if [ "${{ github.event.schedule }}" = "45 2 * * *" ] || [ "${{ github.event.schedule }}" = "0 3 * * *" ]; then
               MODE="morning"
             else
               MODE="nightly"
