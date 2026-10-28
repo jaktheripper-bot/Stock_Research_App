@@ -147,6 +147,22 @@ class TestEquityUpgrades(unittest.TestCase):
         res = evaluate_sector_fundamentals("TCS", {"roce": 30.0}, industry_str="Software")
         self.assertEqual(res["sector_display_name"], "IT & Technology Services")
 
+        # 4. Verify evaluate_sector_fundamentals populates canonical display names across all 8 sectors
+        sector_sample_tickers = {
+            "BFSI": "HDFCBANK",
+            "IT_TECH": "TCS",
+            "HEALTHCARE_PHARMA": "SUNPHARMA",
+            "CAPITAL_GOODS_INFRA": "LT",
+            "AUTOMOTIVE": "MARUTI",
+            "CONSUMER_FMCG": "ITC",
+            "CHEMICALS_MATERIALS": "PIDILITIND",
+            "COMMODITIES_ENERGY": "RELIANCE",
+        }
+        for sec, sym in sector_sample_tickers.items():
+            s_res = evaluate_sector_fundamentals(sym, {})
+            self.assertEqual(s_res["sector"], sec)
+            self.assertEqual(s_res["sector_display_name"], SECTOR_DISPLAY_NAMES[sec])
+
     def test_sector_fundamentals_bfsi(self):
         fund = {
             "roe": 16.5,
