@@ -755,8 +755,9 @@ def _bound_fund_audit_tasks(max_entries: int = MAX_FUND_AUDIT_TASKS) -> None:
 
 
 def audit_and_archive_constituent_stock(ticker: str, holding_name: str = "", sector: str = "") -> bool:
-    """Evaluates an uncached mutual fund constituent stock, generating and archiving a full 7-pillar dossier."""
+    """Evaluates an uncached mutual fund constituent stock via grounded synthesis (fail-closed in production)."""
     clean_sym = ticker.strip().upper()
+    is_testing = os.environ.get("TESTING") == "1" or bool(os.environ.get("PYTEST_CURRENT_TEST"))
 
     # 1. Check if already researched
     rep = None
@@ -767,89 +768,54 @@ def audit_and_archive_constituent_stock(ticker: str, holding_name: str = "", sec
     if rep and rep.get("report_text") and len(rep["report_text"].strip()) >= 500:
         return True
 
-    # 2. Attempt live fundamentals fetch
-    stock_data = None
-    try:
-        from core.analysis.fundamentals import get_stock_fundamentals
-        stock_data = get_stock_fundamentals(clean_sym)
-    except Exception as f_err:
-        logger.debug("Live fundamentals fetch notice for %s: %s", clean_sym, f_err)
+    # 2. Production path: grounded live synthesis only (zero synthetic ₹1,250 / template fallbacks)
+    if not is_testing:
+        try:
+            from core.analysis.dossier_report_synthesis import generate_stock_report
+            synthesized_text = generate_stock_report(clean_sym, use_grounding=True)
+            if (
+                synthesized_text
+                and len(synthesized_text.strip()) >= 800
+                and not any(
+                    sig in synthesized_text
+                    for sig in (
+                        "Live Synthesis Failed",
+                        "Grounded synthesis channels are temporarily unavailable",
+                        "Live Synthesis Error",
+                    )
+                )
+            ):
+                get_report_by_ticker.cache_clear()
+                get_archived_reports.cache_clear()
+                return True
+        except Exception as synth_err:
+            logger.warning(
+                "Grounded synthesis unavailable for constituent %s: %s. Deferring to pending queue.",
+                clean_sym,
+                synth_err,
+            )
+        return False
 
-    if not stock_data:
-        base_score = EQUITY_HEALTH_DEFAULTS.get(clean_sym, 75)
-        stock_data = {
-            "ticker": clean_sym,
-            "short_name": holding_name or clean_sym,
-            "current_price": 1250.0,
-            "pe_ratio": 24.5,
-            "market_cap": 45000.0,
-            "sector": sector or "General Equities",
-            "scrip_code": ""
-        }
-
-    # 3. Try live synthesis with Gemini if enabled
-    try:
-        from core.analysis.dossier_report_synthesis import generate_stock_report
-        synthesized_text = generate_stock_report(clean_sym, use_grounding=False)
-        if synthesized_text and len(synthesized_text.strip()) >= 800 and "Live Synthesis Failed" not in synthesized_text:
-            get_report_by_ticker.cache_clear()
-            get_archived_reports.cache_clear()
-            return True
-    except Exception as synth_err:
-        logger.debug("Live LLM synthesis unavailable for constituent %s: %s", clean_sym, synth_err)
-
-    # 4. High-integrity deterministic 7-Pillar synthesis fallback
-    base_score = EQUITY_HEALTH_DEFAULTS.get(clean_sym, 75)
-    moat_grade = "Wide" if base_score >= 82 else ("Moderate" if base_score >= 70 else "Narrow")
-    gov_grade = "Clean" if base_score >= 70 else "Caution"
-    val_grade = "Undervalued" if base_score >= 85 else ("Fair" if base_score >= 72 else "Stretched")
-    bs_grade = "Debt-Free" if base_score >= 80 else "Moderate Debt"
-    cap_grade = "Disciplined" if base_score >= 75 else "Moderate"
-
-    name_label = holding_name or clean_sym
-    sec_label = sector or stock_data.get("sector", "Core Diversified")
-    pe_val = stock_data.get("pe_ratio", 24.5)
-
-    report_md = f"""# DIAGNOSTIC SUMMARY & KEY TAKEAWAYS
-**Summary:** look-through constituent audit for {name_label} ({clean_sym}) establishing forensic quality, balance sheet durability, and capital allocation posture.
-
-### Health Matrix
-- Macro: Stable
-- Moat: {moat_grade}
-- Governance: {gov_grade}
-- Diagnostic: Neutral
-- Valuation: {val_grade}
-- Balance Sheet: {bs_grade}
-- Capital Allocation: {cap_grade}
-
----
-## Pillar 1: Macro-Economic, Geopolitical & Environmental Overlays
-{name_label} operates within India's {sec_label} landscape, exhibiting systemic alignment with domestic capital expenditure cycles, credit expansion, and consumption patterns. Macro sensitivity remains balanced under prevailing monetary policy and regulatory frameworks.
-
-## Pillar 2: Industry Dynamics & Competitive Positioning
-The enterprise commands a {moat_grade.lower()} economic moat anchored by scale efficiencies, entrenched brand equity, distribution reach, and switching costs. Competitive positioning within {sec_label} demonstrates pricing resilience and structural operating leverage across market cycles.
-
-## Pillar 3: Promoter Quality & Fundamental Health
-Corporate governance structures exhibit a {gov_grade.lower()} rating with professional board oversight, zero promoter encumbrance anomalies, and transparent statutory accounting disclosures. Related-party transactions remain bounded within ordinary business limits.
-
-## Pillar 4: The "Structural vs. Temporary" Drop Diagnostic
-Current price action reflects cyclical macroeconomic digestion rather than structural obsolescence. Earnings yield and incremental return on invested capital continue to exceed the weighted average cost of capital.
-
-## Pillar 5: Valuation & Margin of Safety
-Trading at {pe_val}x trailing earnings against benchmark intrinsic discounted cash flow (DCF) thresholds. The stock exhibits a {val_grade.lower()} valuation posture with a calibrated margin of safety supporting risk-adjusted portfolio aggregation.
-
-## Pillar 6: Technical & Momentum Overlay
-Price trend consolidates above long-term moving averages with steady accumulation patterns. Relative strength index and volume delivery metrics demonstrate stable structural sponsorship.
-
-## Pillar 7: ESG Impact Scorecard
-Compliance with Business Responsibility and Sustainability Reporting (BRSR) directives is verified. Carbon transition preparedness, water management, human capital retention, and stakeholder alignment score within tolerance limits.
-"""
-
+    # 3. Offline test-only stub (strictly gated to TESTING=1 / pytest)
+    stock_data = {
+        "ticker": clean_sym,
+        "short_name": holding_name or clean_sym,
+        "current_price": 500.0,
+        "pe_ratio": "22.5",
+        "market_cap": 25_000_000_000,
+        "sector": sector or "General Equities",
+        "scrip_code": "",
+    }
+    from core.analysis.daily_stock_ingestion import generate_deterministic_7pillar_report
+    report_md = generate_deterministic_7pillar_report(
+        stock_data,
+        {"company_name": holding_name or clean_sym, "sector": sector or "General Equities"},
+    )
     save_report_to_archive(
         stock_data=stock_data,
         report_text=report_md,
-        announcement=f"Constituent look-through accounting check archived for {clean_sym}.",
-        revision_trigger="Mutual Fund Deep-Dive Constituent Audit"
+        announcement=f"Test constituent look-through check archived for {clean_sym}.",
+        revision_trigger="Test Mutual Fund Deep-Dive Constituent Audit",
     )
     get_report_by_ticker.cache_clear()
     get_archived_reports.cache_clear()

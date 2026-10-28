@@ -45,6 +45,7 @@ from core.analysis.fund_overlap_auditor import (
     create_async_fund_audit_task,
     run_async_fund_audit_job,
     get_fund_audit_task_status,
+    audit_and_archive_constituent_stock,
 )
 from core.analysis.parser import wrap_fund_dossier_with_collapsible_dimensions, FUND_DIMENSION_METADATA
 
@@ -1156,6 +1157,40 @@ Cash reserve of 12% cushions against broad equity sell-offs.
             self.assertIn("failing closed without persisting template prose", str(ctx.exception))
             mock_save.assert_not_called()
 
+    def test_audit_and_archive_constituent_stock_fail_closed_in_production(self):
+        """Verifies audit_and_archive_constituent_stock fails closed in production and generates stub in testing."""
+        from core.db.connection import get_db_connection
+        from core.db.reports import get_report_by_ticker
+
+        test_ticker = "TEST_CONSTITUENT_FAILCLOSED"
+
+        def _cleanup():
+            conn = get_db_connection()
+            c = conn.cursor()
+            c.execute("DELETE FROM reports WHERE ticker = ?;", (test_ticker,))
+            c.execute("DELETE FROM report_revisions WHERE ticker = ?;", (test_ticker,))
+            conn.commit()
+            get_report_by_ticker.cache_clear()
+
+        _cleanup()
+        try:
+            # 1. Under production mode (!is_testing), if live synthesis fails, returns False and does not archive
+            with patch.dict(os.environ, {"TESTING": "0", "PYTEST_CURRENT_TEST": ""}):
+                with patch("core.analysis.dossier_report_synthesis.generate_stock_report", return_value="Live Synthesis Failed: Service unavailable"):
+                    res = audit_and_archive_constituent_stock(test_ticker, "Test Constituent Ltd", "Technology")
+                    self.assertFalse(res)
+                    rep = get_report_by_ticker(test_ticker)
+                    self.assertFalse(rep.get("report_text"))
+
+            # 2. Under testing mode (TESTING=1), generates deterministic report and returns True
+            with patch.dict(os.environ, {"TESTING": "1", "PYTEST_CURRENT_TEST": ""}):
+                res = audit_and_archive_constituent_stock(test_ticker, "Test Constituent Ltd", "Technology")
+                self.assertTrue(res)
+                rep = get_report_by_ticker(test_ticker)
+                self.assertIsNotNone(rep)
+                self.assertIn("Test Constituent Ltd", rep.get("report_text", ""))
+        finally:
+            _cleanup()
 
 
 if __name__ == "__main__":
