@@ -2014,5 +2014,21 @@
       "revision_count": 1040
     },
     "preflight_passed": true
+  },
+  {
+    "tag": "checkpoint_20261028_090921_dossier_synthesis_causal_system_prompt_upgrade",
+    "timestamp": "2026-10-28 09:09:21 IST",
+    "commit_sha": "7459333422e4689c457238e9851db16a0715e585",
+    "branch": "main",
+    "description": "dossier_synthesis_causal_system_prompt_upgrade",
+    "database": {
+      "exists": true,
+      "filename": "reports_checkpoint_20261028_090921_dossier_synthesis_causal_system_prompt_upgrade.db",
+      "path": ".checkpoints/reports_checkpoint_20261028_090921_dossier_synthesis_causal_system_prompt_upgrade.db",
+      "size_bytes": 34918400,
+      "report_count": 307,
+      "revision_count": 1040
+    },
+    "preflight_passed": true
   }
 ]
