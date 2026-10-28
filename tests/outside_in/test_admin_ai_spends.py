@@ -117,6 +117,11 @@ class TestAiSpendsApiEndpoint(unittest.TestCase):
         self.assertEqual(len(constraints["providers"]), constraints["total_count"])
         self.assertGreaterEqual(len(constraints["providers"]), 6)
 
+        host_card = next((p for p in constraints["providers"] if p["id"] == "host_runtime"), None)
+        self.assertIsNotNone(host_card, "Missing host_runtime card in provider constraints")
+        self.assertIn("Peak RSS:", host_card.get("secondary_metric", ""))
+        self.assertIn("MB RAM", host_card.get("primary_metric", ""))
+
 
 class TestAiSpendsAdminUiOutsideIn(unittest.TestCase):
     """Outside-in contract testing for /admin?tab=ai-spends DOM rendering."""
@@ -149,10 +154,15 @@ class TestAiSpendsAdminUiOutsideIn(unittest.TestCase):
         self.assertIn("Subscribed Service Provider Quotas", constraints_card.text)
         self.assertIn("Providers Healthy", constraints_card.text)
 
-        # 4. KPI Elements Binding Contract
+        # 4. KPI Elements Binding Contract (INR Primary)
+        cost_inr_el = soup.find("div", id="aiKpiTotalCostInr")
+        self.assertIsNotNone(cost_inr_el, "Missing KPI element #aiKpiTotalCostInr")
+        self.assertIn("INR", cost_inr_el.text)
+        self.assertIn("₹", cost_inr_el.text)
+
         cost_el = soup.find("div", id="aiKpiTotalCostUsd")
         self.assertIsNotNone(cost_el, "Missing KPI element #aiKpiTotalCostUsd")
-        self.assertIn("USD", cost_el.text)
+        self.assertIn("tokens", cost_el.text)
 
         tokens_el = soup.find("div", id="aiKpiTotalTokens")
         self.assertIsNotNone(tokens_el, "Missing KPI element #aiKpiTotalTokens")

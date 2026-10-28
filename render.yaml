@@ -63,4 +63,8 @@ services:
         value: "1"
       - key: GOOGLE_GENAI_USE_VERTEXAI
         value: "true"
+      - key: SUPABASE_STORAGE_LIMIT_MB
+        value: "2048"
+      - key: HOST_MEMORY_LIMIT_MB
+        value: "2048"
 

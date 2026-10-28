@@ -328,6 +328,8 @@ async def run_daily_discovery_scheduler():
                     if acquired:
                         logger.info(f"[Discovery Scheduler] Prior-day MSME cohort ({yesterday_str}) missing on boot. Running catch-up MSME ingestion...")
                         await loop.run_in_executor(None, ingest_daily_msme_cohort, yesterday_str, 15)
+        import gc
+        gc.collect()
     except Exception as boot_err:
         logger.warning(f"[Discovery Scheduler] Catch-up check notice: {boot_err}")
 
@@ -417,8 +419,9 @@ async def run_daily_amfi_scheduler():
     loop = asyncio.get_running_loop()
     daily_ttl = 72000  # 20 hours
 
-    # Pre-flight / Boot catch-up checks
+    # Pre-flight / Boot catch-up checks (staggered by 8s after Discovery Scheduler to prevent concurrent RAM spikes)
     try:
+        await asyncio.sleep(8)
         from core.db.sovereign import get_etf_count, refresh_daily_sovereign_benchmarks
         from core.ingestion.etf_ingest import ingest_all_amfi_etfs
         from core.analysis.asset_scanner import get_asset_scan_runs, run_comprehensive_asset_scan
@@ -560,6 +563,7 @@ async def run_daily_fund_audit_scheduler():
     logger.info("[Fund Audit Scheduler] Background mutual fund accounting checkor initiated.")
     daily_ttl = 72000  # 20 hours
     try:
+        await asyncio.sleep(16)
         from core.analysis.fund_overlap_auditor import audit_single_fund_daily
         from core.db.agent_sessions import get_recent_autonomous_events, record_autonomous_event
         now = datetime.now(IST)

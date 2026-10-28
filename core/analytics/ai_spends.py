@@ -237,7 +237,7 @@ def get_gemini_spends_summary() -> Dict[str, Any]:
             "cost_usd": round(audit_cost_usd, 4),
             "cost_inr": round(audit_cost_usd * USD_TO_INR_RATE, 2),
             "share_pct": round((audit_cost_usd / safe_total_cost) * 100, 1),
-            "billing_type": "On-Demand ($0.50 Capped Budget)",
+            "billing_type": "On-Demand (₹42 Capped Budget)",
             "status": "Admin On-Demand"
         },
         {

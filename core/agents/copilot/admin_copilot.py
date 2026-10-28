@@ -135,6 +135,7 @@ def tool_get_admin_dashboard_kpis(window: str = "30d", exclude_tests: bool = Tru
         "total_actions": usage.get("total_actions", 0),
         "cache_efficiency_pct": usage.get("cache_efficiency_pct", 0.0),
         "total_cost_saved_usd": usage.get("total_cost_saved_usd", 0.0),
+        "total_cost_saved_inr": usage.get("total_cost_saved_inr", round(float(usage.get("total_cost_saved_usd", 0.0)) * 84.0, 2)),
         "pdf_downloads": usage.get("pdf_downloads", 0),
         "bounce_rate_pct": usage.get("bounce_rate_pct", 0.0),
         "gross_revenue_inr": revenue.get("gross_revenue_inr", 0.0),
@@ -342,6 +343,7 @@ def tool_generate_data_driven_optimization_tips(kpis: Dict[str, Any]) -> str:
     bounce = float(kpis.get("bounce_rate_pct") or 0.0)
     cache_pct = float(kpis.get("cache_efficiency_pct") or 0.0)
     cost_saved = float(kpis.get("total_cost_saved_usd") or 0.0)
+    cost_saved_inr = float(kpis.get("total_cost_saved_inr") or (cost_saved * 84.0))
     pdfs = int(kpis.get("pdf_downloads") or 0)
     gross_rev = float(kpis.get("gross_revenue_inr") or 0.0)
     net_rev = float(kpis.get("net_revenue_inr") or 0.0)
@@ -358,6 +360,7 @@ def tool_generate_data_driven_optimization_tips(kpis: Dict[str, Any]) -> str:
     quotas = tool_get_provider_quotas_and_ai_spends()
     ai_spends = quotas.get("ai_spends") or {}
     total_ai_usd = float(ai_spends.get("total_cost_usd") or 0.0)
+    total_ai_inr = float(ai_spends.get("total_cost_inr") or (total_ai_usd * 84.0))
 
     route_str = ", ".join([f"`{r.get('route', '/')}` ({r.get('count', 0)})" for r in top_routes[:3]]) or "`/`"
     ticker_str = ", ".join([f"`{t.get('ticker', 'N/A')}` ({t.get('count', 0)})" for t in top_tickers[:3]]) or "`INFY`, `TCS`"
@@ -389,9 +392,9 @@ def tool_generate_data_driven_optimization_tips(kpis: Dict[str, Any]) -> str:
 
     # 3. Cache Hit Rate, Latency & AI Margin Protection Tip
     tips.append(
-        f"3. **Protect AI Unit Economics (`{cache_pct:.1f}%` Cache Hit Rate • `${cost_saved:,.2f}` Saved vs. `${total_ai_usd:.2f}` Total Gemini Spend):**\n"
-        f"   - **Observed Data:** Cached serves save `~$0.015` per query; current cache efficiency is `{cache_pct:.1f}%`.\n"
-        f"   - **Actionable Playbook:** Pre-warm any newly trending ticker from {ticker_str} via the 08:45 AM discovery batch (`skip_gemini=False`) so peak daytime traffic hits SQLite/Postgres cache (`<15ms` TTFB, `$0.00` marginal LLM cost). Keep Free-Tier Research Desk turns routed through the 5-stage deterministic calculator and local pillar index."
+        f"3. **Protect AI Unit Economics (`{cache_pct:.1f}%` Cache Hit Rate • `₹{cost_saved_inr:,.2f}` Saved vs. `₹{total_ai_inr:,.2f}` Total Gemini Spend):**\n"
+        f"   - **Observed Data:** Cached serves save `~₹1.26` per query; current cache efficiency is `{cache_pct:.1f}%`.\n"
+        f"   - **Actionable Playbook:** Pre-warm any newly trending ticker from {ticker_str} via the 08:45 AM discovery batch (`skip_gemini=False`) so peak daytime traffic hits SQLite/Postgres cache (`<15ms` TTFB, `₹0.00` marginal LLM cost). Keep Free-Tier Research Desk turns routed through the 5-stage deterministic calculator and local pillar index."
     )
 
     # 4. Multi-Asset SEO Catalog & Freshness Tip
@@ -1283,7 +1286,7 @@ def parse_deterministic_admin_query(
             f"📡 **Subscribed Provider Quotas & AI Spend Monitoring ({q_data.get('healthy_count', 0)}/{q_data.get('total_count', 0)} Healthy):**\n\n"
             f"{prov_lines}\n\n"
             f"🧠 **Cumulative Gemini Token & Spend Ledger:**\n"
-            f"- **Total Estimated Spend:** **`${tot_usd:.4f} USD`** (`₹{tot_inr:,.2f} INR`)\n"
+            f"- **Total Estimated Spend:** **`₹{tot_inr:,.2f} INR`**\n"
             f"- **Total Tokens Processed:** `{tot_tok:,}` tokens\n\n"
             "Would you like data-driven tips on optimizing AI cache hit rates and infrastructure capacity?",
             None
@@ -1350,13 +1353,14 @@ def parse_deterministic_admin_query(
     if any(k in msg for k in ["cache", "saving", "cost", "api cost", "efficiency"]):
         cache_pct = kpis.get("cache_efficiency_pct", 0.0)
         cost_saved = kpis.get("total_cost_saved_usd", 0.0)
+        cost_saved_inr = kpis.get("total_cost_saved_inr", round(float(cost_saved) * 84.0, 2))
         window = kpis.get("window", "30d")
 
         return (
             f"⚡ **Cache Mitigation & Latency Diagnostics ({window.upper()} Window):**\n\n"
             f"- **Cache Efficiency:** {cache_pct:.1f}% instant zero-cost serves\n"
-            f"- **Estimated API Cost Saved:** ${cost_saved:,.2f} USD\n"
-            f"- **Heuristic Baseline:** Grounded at ~$0.015 generation cost mitigated per cached analytical query.\n\n"
+            f"- **Estimated API Cost Saved:** ₹{cost_saved_inr:,.2f} INR\n"
+            f"- **Heuristic Baseline:** Grounded at ~₹1.26 generation cost mitigated per cached analytical query.\n\n"
             "High cache efficiency guarantees sub-10ms response times for repeat security searches.",
             None
         )
@@ -1523,7 +1527,7 @@ LIVE DASHBOARD METRICS ({kpis.get('window', '30d').upper()} Window, Clean Real D
 - Total User Actions: {kpis.get('total_actions')}
 - Bounce Rate: {kpis.get('bounce_rate_pct')}%
 - Cache Efficiency: {kpis.get('cache_efficiency_pct')}%
-- Estimated API Cost Saved: ${kpis.get('total_cost_saved_usd'):.2f} USD
+- Estimated API Cost Saved: ₹{kpis.get('total_cost_saved_inr', float(kpis.get('total_cost_saved_usd', 0.0)) * 84.0):.2f} INR
 - PDF Research Dossiers Exported: {kpis.get('pdf_downloads')}
 - Gross Cash Receipts: ₹{kpis.get('gross_revenue_inr', 0.0):.2f}
 - Processed Refunds: ₹{kpis.get('refund_sum_inr', 0.0):.2f}

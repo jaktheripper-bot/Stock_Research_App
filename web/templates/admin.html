@@ -1284,8 +1284,8 @@ html[data-theme="light"] .copilot-input {
       <div class="kpi-delta success">Zero-Cost Instant Serve</div>
     </div>
     <div class="kpi-card">
-      <div class="kpi-label">Est. API Cost Saved <span title="Heuristic estimate based on ~$0.015 baseline token generation cost mitigated per cached response"></span></div>
-      <div class="kpi-value">${{ "%.2f"|format(summary.total_cost_saved_usd) }}</div>
+      <div class="kpi-label">Est. API Cost Saved <span title="Heuristic estimate based on ~₹1.26 baseline token generation cost mitigated per cached response"></span></div>
+      <div class="kpi-value">₹{{ "{:,.2f}".format(summary.total_cost_saved_inr | default((summary.total_cost_saved_usd | default(0.0)) * 84.0)) }}</div>
       <div class="kpi-delta success">Cache Mitigation Heuristic</div>
     </div>
     <div class="kpi-card">
@@ -3219,7 +3219,7 @@ html[data-theme="light"] .copilot-input {
           Google Gemini Spends &amp; Model Telemetry
         </h2>
         <p style="margin: 4px 0 0 0; font-size: 13px; color: #94a3b8;">
-          Live token consumption, USD/INR spend estimates, and workload distribution across platform LLM engines.
+          Live token consumption, INR spend estimates, and workload distribution across platform LLM engines.
         </p>
       </div>
       <div style="display: flex; gap: 10px; align-items: center;">
@@ -3290,8 +3290,8 @@ html[data-theme="light"] .copilot-input {
     <div class="kpi-grid" style="grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); margin-bottom: 24px;">
       <div class="kpi-card" style="border-left: 3px solid #38bdf8;">
         <div class="kpi-label">Total Cumulative Spend</div>
-        <div class="kpi-value mono" id="aiKpiTotalCostUsd" style="color: #38bdf8;">${{ "%.2f"|format(ai_spends.total_cost_usd or 0.0) }} <span style="font-size: 13px; color: #64748b;">USD</span></div>
-        <div class="kpi-delta mono" id="aiKpiTotalCostInr" style="color: #34d399;">≈ ₹{{ "%.2f"|format(ai_spends.total_cost_inr or 0.0) }} INR (1 USD = ₹84)</div>
+        <div class="kpi-value mono" id="aiKpiTotalCostInr" style="color: #38bdf8;">₹{{ "{:,.2f}".format(ai_spends.total_cost_inr or 0.0) }} <span style="font-size: 13px; color: #64748b;">INR</span></div>
+        <div class="kpi-delta mono" id="aiKpiTotalCostUsd" style="color: #34d399;">Calibrated across {{ "{:,.0f}".format(ai_spends.total_tokens or 0) }} total tokens</div>
       </div>
       <div class="kpi-card" style="border-left: 3px solid #10b981;">
         <div class="kpi-label">Total Tokens Processed <svg class="glyph" style="width: 13px; height: 13px;"><use href="#glyph-zap"></use></svg></div>
@@ -3325,7 +3325,7 @@ html[data-theme="light"] .copilot-input {
       <div style="display: flex; height: 12px; border-radius: 6px; overflow: hidden; background: rgba(255, 255, 255, 0.05); margin-bottom: 14px;">
         {% for feat in ai_spends.features %}
           {% if feat.share_pct > 0 %}
-          <div style="width: {{ feat.share_pct }}%; background: {% if feat.id == 'equity_dossiers' %}#38bdf8{% elif feat.id == 'mutual_funds' %}#10b981{% elif feat.id == 'copilot_desk' %}#818cf8{% elif feat.id == 'ai_auditor' %}#f59e0b{% elif feat.id == 'admin_copilot' %}#ec4899{% else %}#64748b{% endif %}; transition: width 0.3s ease;" title="{{ feat.name }}: {{ feat.share_pct }}% (${{ feat.cost_usd }})"></div>
+          <div style="width: {{ feat.share_pct }}%; background: {% if feat.id == 'equity_dossiers' %}#38bdf8{% elif feat.id == 'mutual_funds' %}#10b981{% elif feat.id == 'copilot_desk' %}#818cf8{% elif feat.id == 'ai_auditor' %}#f59e0b{% elif feat.id == 'admin_copilot' %}#ec4899{% else %}#64748b{% endif %}; transition: width 0.3s ease;" title="{{ feat.name }}: {{ feat.share_pct }}% (₹{{ '%.2f'|format(feat.cost_inr) }})"></div>
           {% endif %}
         {% endfor %}
       </div>
@@ -3335,27 +3335,27 @@ html[data-theme="light"] .copilot-input {
         <div style="display: flex; align-items: center; gap: 6px;">
           <span style="width: 10px; height: 10px; border-radius: 2px; background: #38bdf8;"></span>
           <span style="color: #cbd5e1;">Equity Dossiers:</span>
-          <strong class="mono" style="color: #38bdf8;">{% for f in ai_spends.features if f.id == 'equity_dossiers' %}{{ f.share_pct }}% (${{ f.cost_usd }}){% endfor %}</strong>
+          <strong class="mono" style="color: #38bdf8;">{% for f in ai_spends.features if f.id == 'equity_dossiers' %}{{ f.share_pct }}% (₹{{ "%.2f"|format(f.cost_inr) }}){% endfor %}</strong>
         </div>
         <div style="display: flex; align-items: center; gap: 6px;">
           <span style="width: 10px; height: 10px; border-radius: 2px; background: #10b981;"></span>
           <span style="color: #cbd5e1;">Mutual Funds:</span>
-          <strong class="mono" style="color: #10b981;">{% for f in ai_spends.features if f.id == 'mutual_funds' %}{{ f.share_pct }}% (${{ f.cost_usd }}){% endfor %}</strong>
+          <strong class="mono" style="color: #10b981;">{% for f in ai_spends.features if f.id == 'mutual_funds' %}{{ f.share_pct }}% (₹{{ "%.2f"|format(f.cost_inr) }}){% endfor %}</strong>
         </div>
         <div style="display: flex; align-items: center; gap: 6px;">
           <span style="width: 10px; height: 10px; border-radius: 2px; background: #818cf8;"></span>
           <span style="color: #cbd5e1;">Copilot Desk:</span>
-          <strong class="mono" style="color: #818cf8;">{% for f in ai_spends.features if f.id == 'copilot_desk' %}{{ f.share_pct }}% (${{ f.cost_usd }}){% endfor %}</strong>
+          <strong class="mono" style="color: #818cf8;">{% for f in ai_spends.features if f.id == 'copilot_desk' %}{{ f.share_pct }}% (₹{{ "%.2f"|format(f.cost_inr) }}){% endfor %}</strong>
         </div>
         <div style="display: flex; align-items: center; gap: 6px;">
           <span style="width: 10px; height: 10px; border-radius: 2px; background: #f59e0b;"></span>
           <span style="color: #cbd5e1;">AI Auditor:</span>
-          <strong class="mono" style="color: #f59e0b;">{% for f in ai_spends.features if f.id == 'ai_auditor' %}{{ f.share_pct }}% (${{ f.cost_usd }}){% endfor %}</strong>
+          <strong class="mono" style="color: #f59e0b;">{% for f in ai_spends.features if f.id == 'ai_auditor' %}{{ f.share_pct }}% (₹{{ "%.2f"|format(f.cost_inr) }}){% endfor %}</strong>
         </div>
         <div style="display: flex; align-items: center; gap: 6px;">
           <span style="width: 10px; height: 10px; border-radius: 2px; background: #64748b;"></span>
           <span style="color: #cbd5e1;">Deterministic Modules:</span>
-          <strong class="mono" style="color: #94a3b8;">0% ($0.00)</strong>
+          <strong class="mono" style="color: #94a3b8;">0% (₹0.00)</strong>
         </div>
       </div>
     </div>
@@ -3370,7 +3370,6 @@ html[data-theme="light"] .copilot-input {
             <th>AI Model</th>
             <th>Units Processed</th>
             <th style="text-align: right;">Est. Tokens</th>
-            <th style="text-align: right;">Cost (USD)</th>
             <th style="text-align: right;">Cost (INR)</th>
             <th style="text-align: right;">% Share</th>
             <th>Billing Mechanism</th>
@@ -3393,11 +3392,8 @@ html[data-theme="light"] .copilot-input {
             <td class="mono" style="text-align: right; font-size: 12px; color: #cbd5e1;">
               {{ "{:,.0f}".format(feat.total_tokens) }}
             </td>
-            <td class="mono" style="text-align: right; font-weight: 700; color: {% if feat.cost_usd > 0 %}#38bdf8{% else %}#64748b{% endif %}; font-size: 12px;">
-              ${{ "%.4f"|format(feat.cost_usd) }}
-            </td>
-            <td class="mono" style="text-align: right; color: {% if feat.cost_inr > 0 %}#34d399{% else %}#64748b{% endif %}; font-size: 12px;">
-              ₹{{ "%.2f"|format(feat.cost_inr) }}
+            <td class="mono" style="text-align: right; font-weight: 700; color: {% if feat.cost_inr > 0 %}#34d399{% else %}#64748b{% endif %}; font-size: 12px;">
+              ₹{{ "{:,.2f}".format(feat.cost_inr) }}
             </td>
             <td class="mono" style="text-align: right; font-weight: 700; color: #f8fafc; font-size: 12px;">
               {{ feat.share_pct }}%
@@ -3414,11 +3410,8 @@ html[data-theme="light"] .copilot-input {
             <td class="mono" id="aiFooterTokens" style="text-align: right; color: #34d399; font-size: 13px;">
               {{ "{:,.0f}".format(ai_spends.total_tokens or 0) }}
             </td>
-            <td class="mono" id="aiFooterCostUsd" style="text-align: right; color: #38bdf8; font-size: 13px;">
-              ${{ "%.2f"|format(ai_spends.total_cost_usd or 0.0) }}
-            </td>
             <td class="mono" id="aiFooterCostInr" style="text-align: right; color: #34d399; font-size: 13px;">
-              ₹{{ "%.2f"|format(ai_spends.total_cost_inr or 0.0) }}
+              ₹{{ "{:,.2f}".format(ai_spends.total_cost_inr or 0.0) }}
             </td>
             <td class="mono" style="text-align: right; color: #f8fafc; font-size: 13px;">
               100.0%
@@ -3433,13 +3426,13 @@ html[data-theme="light"] .copilot-input {
     <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(320px, 1fr)); gap: 16px;">
       <div style="background: rgba(15, 23, 42, 0.6); border: 1px solid rgba(255, 255, 255, 0.08); border-radius: 10px; padding: 18px;">
         <h4 style="margin: 0 0 10px 0; font-size: 14px; font-weight: 700; color: #38bdf8; display: flex; align-items: center; gap: 8px;">
-          Official Google Gemini Flash Rate Card
+          Official Google Gemini Flash Rate Card (INR)
         </h4>
         <ul style="margin: 0; padding-left: 20px; font-size: 12px; color: #94a3b8; line-height: 1.8;">
-          <li><strong style="color: #f8fafc;">Input Tokens:</strong> $0.10 USD per 1,000,000 tokens (~₹8.40 per 1M)</li>
-          <li><strong style="color: #f8fafc;">Output Tokens:</strong> $0.40 USD per 1,000,000 tokens (~₹33.60 per 1M)</li>
+          <li><strong style="color: #f8fafc;">Input Tokens:</strong> ₹8.40 INR per 1,000,000 tokens</li>
+          <li><strong style="color: #f8fafc;">Output Tokens:</strong> ₹33.60 INR per 1,000,000 tokens</li>
           <li><strong style="color: #f8fafc;">Active Models:</strong> Primary <code>gemini-3.8-flash</code> with cascade to <code>3.5-flash-lite</code></li>
-          <li><strong style="color: #f8fafc;">Currency Conversion:</strong> 1 USD = ₹84.00 INR baseline exchange conversion</li>
+          <li><strong style="color: #f8fafc;">Billing Currency:</strong> All telemetry &amp; budget caps standardized in Indian Rupees (INR ₹)</li>
         </ul>
       </div>
 
@@ -3449,7 +3442,7 @@ html[data-theme="light"] .copilot-input {
         </h4>
         <ul style="margin: 0; padding-left: 20px; font-size: 12px; color: #94a3b8; line-height: 1.8;">
           <li><strong style="color: #f8fafc;">Deterministic Math Pre-Computation:</strong> Chanakya, Varan, Reverse DCF, and ratio math run in Python before calling LLM, eliminating &gt;90% of token burn.</li>
-          <li><strong style="color: #f8fafc;">Immutable Database Caching:</strong> Reports &amp; revisions are written to <code>reports.db</code> / Supabase; visitors read from cache with $0.00 API burn.</li>
+          <li><strong style="color: #f8fafc;">Immutable Database Caching:</strong> Reports &amp; revisions are written to <code>reports.db</code> / Supabase; visitors read from cache with ₹0.00 API burn.</li>
           <li><strong style="color: #f8fafc;">Free Tier Isolation:</strong> Unlocked deep dives consume credits; free-tier copilot queries use deterministic rule sieves with zero Gemini calls.</li>
         </ul>
       </div>
@@ -5014,20 +5007,18 @@ html[data-theme="light"] .copilot-input {
       const data = await resp.json();
       if (data && data.success && data.spends) {
         const s = data.spends;
-        const usdEl = document.getElementById('aiKpiTotalCostUsd');
-        if (usdEl) usdEl.innerHTML = '$' + Number(s.total_cost_usd || 0).toFixed(2) + ' <span style="font-size: 13px; color: #64748b;">USD</span>';
         const inrEl = document.getElementById('aiKpiTotalCostInr');
-        if (inrEl) inrEl.innerText = '≈ ₹' + Number(s.total_cost_inr || 0).toFixed(2) + ' INR (1 USD = ₹84)';
+        if (inrEl) inrEl.innerHTML = '₹' + Number(s.total_cost_inr || 0).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) + ' <span style="font-size: 13px; color: #64748b;">INR</span>';
+        const usdEl = document.getElementById('aiKpiTotalCostUsd');
+        if (usdEl) usdEl.innerText = 'Calibrated across ' + Number(s.total_tokens || 0).toLocaleString('en-IN') + ' total tokens';
         const tokEl = document.getElementById('aiKpiTotalTokens');
-        if (tokEl) tokEl.innerText = Number(s.total_tokens || 0).toLocaleString();
+        if (tokEl) tokEl.innerText = Number(s.total_tokens || 0).toLocaleString('en-IN');
         const splitEl = document.getElementById('aiKpiTokenSplit');
-        if (splitEl) splitEl.innerText = Number(s.total_input_tokens || 0).toLocaleString() + ' In / ' + Number(s.total_output_tokens || 0).toLocaleString() + ' Out';
+        if (splitEl) splitEl.innerText = Number(s.total_input_tokens || 0).toLocaleString('en-IN') + ' In / ' + Number(s.total_output_tokens || 0).toLocaleString('en-IN') + ' Out';
         const footTok = document.getElementById('aiFooterTokens');
-        if (footTok) footTok.innerText = Number(s.total_tokens || 0).toLocaleString();
-        const footUsd = document.getElementById('aiFooterCostUsd');
-        if (footUsd) footUsd.innerText = '$' + Number(s.total_cost_usd || 0).toFixed(2);
+        if (footTok) footTok.innerText = Number(s.total_tokens || 0).toLocaleString('en-IN');
         const footInr = document.getElementById('aiFooterCostInr');
-        if (footInr) footInr.innerText = '₹' + Number(s.total_cost_inr || 0).toFixed(2);
+        if (footInr) footInr.innerText = '₹' + Number(s.total_cost_inr || 0).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
         if (lbl) lbl.innerText = 'Updated!';
         setTimeout(() => { if (lbl) lbl.innerText = 'Refresh Telemetry'; }, 2000);
       }

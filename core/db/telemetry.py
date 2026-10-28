@@ -745,6 +745,7 @@ def get_site_usage_summary(days: int = None, start_date = None, end_date = None,
         "full_syntheses": 0,
         "cache_efficiency_pct": 0.0,
         "total_cost_saved_usd": 0.0,
+        "total_cost_saved_inr": 0.0,
         "pdf_downloads": 0,
         "comparisons": 0,
         "watchlist_actions": 0,
@@ -784,6 +785,7 @@ def get_site_usage_summary(days: int = None, start_date = None, end_date = None,
             ev, count, saved = row[0], int(row[1]), float(row[2])
             summary["action_breakdown"][ev] = count
             summary["total_cost_saved_usd"] += saved
+            summary["total_cost_saved_inr"] = round(summary["total_cost_saved_usd"] * 84.0, 2)
             # Passive PAGE_DWELL beacons measure attention duration; do not inflate user action counts
             if ev != "PAGE_DWELL":
                 summary["total_actions"] += count

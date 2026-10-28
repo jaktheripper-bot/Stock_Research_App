@@ -13,15 +13,93 @@ Aggregates live capacity, quota consumption, and health constraints across:
 ==============================================================================
 """
 
+import gc
 import os
+import ctypes
 import resource
 import logging
-from typing import Dict, Any, List
+from typing import Dict, Any, List, Tuple
 from core.config import get_secret
 from core.db.connection import get_db_connection, get_supabase_url, get_db_path
 from core.analytics.ai_spends import get_gemini_spends_summary
 
 logger = logging.getLogger("equity_research.core.analytics.provider_quotas")
+
+
+def _probe_host_memory_mb() -> Tuple[float, float, float]:
+    """
+    Probes current live RSS (MB), peak RSS high-water mark (MB), and container RAM limit (MB).
+    - Calls gc.collect() + glibc malloc_trim(0) on Linux so reclaimed Python arenas are returned to OS.
+    - Reads live RSS from /proc/self/status (VmRSS) on Linux rather than ru_maxrss (which only tracks
+      lifetime peak high-water mark since container boot and never decreases).
+    - Auto-detects container RAM limit from Linux cgroups v2 (/sys/fs/cgroup/memory.max) or
+      cgroups v1 (/sys/fs/cgroup/memory/memory.limit_in_bytes), falling back to HOST_MEMORY_LIMIT_MB (default 2048 MB).
+    """
+    try:
+        gc.collect()
+        if os.uname().sysname == "Linux":
+            try:
+                ctypes.CDLL("libc.so.6").malloc_trim(0)
+            except Exception as e_trim:
+                logger.debug("glibc malloc_trim notice: %s", e_trim)
+    except Exception as e_gc:
+        logger.debug("Memory GC probe notice: %s", e_gc)
+
+    peak_rss_mb = 120.0
+    try:
+        rusage = resource.getrusage(resource.RUSAGE_SELF)
+        peak_rss_mb = (
+            round(rusage.ru_maxrss / (1024 * 1024), 1)
+            if os.uname().sysname == "Darwin"
+            else round(rusage.ru_maxrss / 1024, 1)
+        )
+    except Exception as e_res:
+        logger.debug("Host peak memory probe notice: %s", e_res)
+
+    live_rss_mb = peak_rss_mb
+    # On Linux containers (Render), read live current resident memory from /proc/self/status (VmRSS)
+    if os.path.exists("/proc/self/status"):
+        try:
+            with open("/proc/self/status", "r", encoding="utf-8") as f:
+                for line in f:
+                    if line.startswith("VmRSS:"):
+                        parts = line.split()
+                        if len(parts) >= 2 and parts[1].isdigit():
+                            live_rss_mb = round(int(parts[1]) / 1024.0, 1)
+                        break
+        except Exception as e_proc:
+            logger.debug("Linux /proc/self/status VmRSS read notice: %s", e_proc)
+
+    # Detect container RAM ceiling: Linux cgroup v2/v1 hardware limit -> explicit env/secret override -> 2048 MB (2 GB) default
+    ram_limit_mb = 0.0
+    for cg_path in (
+        "/sys/fs/cgroup/memory.max",
+        "/sys/fs/cgroup/memory/memory.limit_in_bytes",
+    ):
+        if os.path.exists(cg_path):
+            try:
+                with open(cg_path, "r", encoding="utf-8") as f:
+                    raw = f.read().strip()
+                if raw and raw != "max" and raw.isdigit():
+                    limit_bytes = int(raw)
+                    # Valid container ceiling between 128 MB and 64 GB (ignores unconstrained host max int64)
+                    if 128 * 1024 * 1024 <= limit_bytes <= 64 * 1024 * 1024 * 1024:
+                        ram_limit_mb = round(limit_bytes / (1024 * 1024), 0)
+                        break
+            except Exception as e_cg:
+                logger.debug("Cgroup memory limit probe notice (%s): %s", cg_path, e_cg)
+
+    env_limit = (os.environ.get("HOST_MEMORY_LIMIT_MB") or get_secret("HOST_MEMORY_LIMIT_MB") or "").strip()
+    if env_limit and ram_limit_mb <= 0:
+        try:
+            ram_limit_mb = float(env_limit)
+        except ValueError:
+            ram_limit_mb = 0.0
+
+    if ram_limit_mb <= 0:
+        ram_limit_mb = 2048.0
+
+    return live_rss_mb, peak_rss_mb, ram_limit_mb
 
 
 def get_all_provider_constraints() -> Dict[str, Any]:
@@ -32,7 +110,11 @@ def get_all_provider_constraints() -> Dict[str, Any]:
     # 1. SUPABASE POSTGRESQL & AUTH QUOTAS
     # -------------------------------------------------------------------------
     sb_url = get_supabase_url()
-    sb_tier_mb = float(os.environ.get("SUPABASE_STORAGE_LIMIT_MB", "500"))  # 500 MB Free tier default
+    sb_tier_raw = (os.environ.get("SUPABASE_STORAGE_LIMIT_MB") or get_secret("SUPABASE_STORAGE_LIMIT_MB") or "2048").strip()
+    try:
+        sb_tier_mb = float(sb_tier_raw)
+    except ValueError:
+        sb_tier_mb = 2048.0
     sb_used_mb = 0.0
     sb_conns = 0
     sb_max_conns = int(os.environ.get("SUPABASE_MAX_CONNECTIONS", "60"))
@@ -84,7 +166,9 @@ def get_all_provider_constraints() -> Dict[str, Any]:
     gemini_key = get_secret("GEMINI_API_KEY")
     ai_summary = get_gemini_spends_summary()
     monthly_budget_usd = float(os.environ.get("GEMINI_MONTHLY_BUDGET_USD", "20.0"))
+    monthly_budget_inr = monthly_budget_usd * 84.0
     spent_usd = float(ai_summary.get("total_cost_usd", 0.0))
+    spent_inr = float(ai_summary.get("total_cost_inr", spent_usd * 84.0))
     gem_pct = min(100.0, round((spent_usd / max(0.01, monthly_budget_usd)) * 100.0, 1))
 
     providers.append({
@@ -93,7 +177,7 @@ def get_all_provider_constraints() -> Dict[str, Any]:
         "category": "LLM Inference",
         "status": "UNCONFIGURED" if not gemini_key else ("WARNING" if gem_pct > 80 else "HEALTHY"),
         "plan_label": "Pay-As-You-Go (Flash Cascade + Batch 50% Tier)",
-        "primary_metric": f"${spent_usd:.4f} / ${monthly_budget_usd:.2f} USD",
+        "primary_metric": f"₹{spent_inr:,.2f} / ₹{monthly_budget_inr:,.0f} INR",
         "utilization_pct": gem_pct,
         "secondary_metric": f"{ai_summary.get('total_tokens_formatted', '0')} tokens • {ai_summary.get('cortex_precompression_savings_pct', 92.4)}% saved by cache",
         "constraint_note": "Tier-1 limit: 1,000–2,000 RPM / 4M TPM. Daily 08:30 AM ingestion uses Batch/Flex 50% discount tier.",
@@ -206,15 +290,7 @@ def get_all_provider_constraints() -> Dict[str, Any]:
     # -------------------------------------------------------------------------
     # 7. RENDER HOST MEMORY & CONCURRENCY GOVERNOR
     # -------------------------------------------------------------------------
-    rss_mb = 120.0
-    try:
-        rusage = resource.getrusage(resource.RUSAGE_SELF)
-        # macOS ru_maxrss is bytes; Linux is kilobytes
-        rss_mb = round(rusage.ru_maxrss / (1024 * 1024), 1) if os.uname().sysname == "Darwin" else round(rusage.ru_maxrss / 1024, 1)
-    except Exception as e_res:
-        logger.debug("Host memory probe notice: %s", e_res)
-
-    ram_limit_mb = float(os.environ.get("HOST_MEMORY_LIMIT_MB", "512"))
+    rss_mb, peak_rss_mb, ram_limit_mb = _probe_host_memory_mb()
     ram_pct = min(100.0, round((rss_mb / max(1.0, ram_limit_mb)) * 100.0, 1))
 
     providers.append({
@@ -225,8 +301,8 @@ def get_all_provider_constraints() -> Dict[str, Any]:
         "plan_label": f"{int(ram_limit_mb)} MB Container",
         "primary_metric": f"{rss_mb} MB / {int(ram_limit_mb)} MB RAM",
         "utilization_pct": ram_pct,
-        "secondary_metric": "PDF Semaphore: 4 slots • Single-Flight Ticker Lock: Active",
-        "constraint_note": "Prevents OOM crashes during concurrent WeasyPrint PDF exports and AI syntheses.",
+        "secondary_metric": f"Peak RSS: {peak_rss_mb} MB • PDF Semaphore: 4 slots • Single-Flight Lock: Active",
+        "constraint_note": "Live VmRSS after GC/malloc_trim vs. cgroup container ceiling. Prevents OOM during concurrent PDF exports and syntheses.",
     })
 
     # -------------------------------------------------------------------------
