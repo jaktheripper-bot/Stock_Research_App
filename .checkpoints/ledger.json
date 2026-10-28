@@ -1998,5 +1998,21 @@
       "revision_count": 1040
     },
     "preflight_passed": true
+  },
+  {
+    "tag": "checkpoint_20261028_090429_fund_overlap_auditor_constituent_synthesis_fail_closed",
+    "timestamp": "2026-10-28 09:04:29 IST",
+    "commit_sha": "b72f6bef6f530ce4fb54c558e5d92825ef818ce7",
+    "branch": "main",
+    "description": "fund_overlap_auditor_constituent_synthesis_fail_closed",
+    "database": {
+      "exists": true,
+      "filename": "reports_checkpoint_20261028_090429_fund_overlap_auditor_constituent_synthesis_fail_closed.db",
+      "path": ".checkpoints/reports_checkpoint_20261028_090429_fund_overlap_auditor_constituent_synthesis_fail_closed.db",
+      "size_bytes": 34918400,
+      "report_count": 307,
+      "revision_count": 1040
+    },
+    "preflight_passed": true
   }
 ]
