@@ -103,6 +103,57 @@ class TestScheduledPipeline(unittest.TestCase):
         from scripts.run_discovery_worker import run_discovery_worker, run_discovery_pipeline
         self.assertIs(run_discovery_worker, run_discovery_pipeline)
 
+    def test_scheduler_boot_guard_requires_explicit_enable_flag(self):
+        """Verifies that background schedulers do not boot without ENABLE_BACKGROUND_SCHEDULERS=1."""
+        from web.main import lifespan, app
+        import asyncio
+        import os
+        import sys
+
+        async def _noop(*args, **kwargs):
+            pass
+
+        # When ENABLE_BACKGROUND_SCHEDULERS is not set
+        with patch.dict(os.environ, {"TESTING": "0", "ENABLE_BACKGROUND_SCHEDULERS": "0"}, clear=False), \
+             patch.dict(sys.modules):
+            sys.modules.pop("pytest", None)
+            with patch("web.main.AsyncIOScheduler") as mock_sched, \
+                 patch("web.main.warmup_task", side_effect=_noop), \
+                 patch("web.main.run_daily_discovery_scheduler", side_effect=_noop) as mock_disc, \
+                 patch("web.main.run_daily_amfi_scheduler", side_effect=_noop) as mock_amfi:
+
+                async def _run():
+                    async with lifespan(app):
+                        pass
+
+                asyncio.run(_run())
+                mock_sched.assert_not_called()
+                mock_disc.assert_not_called()
+                mock_amfi.assert_not_called()
+
+        # When ENABLE_BACKGROUND_SCHEDULERS=1
+        with patch.dict(os.environ, {"TESTING": "0", "ENABLE_BACKGROUND_SCHEDULERS": "1"}, clear=False), \
+             patch.dict(sys.modules):
+            sys.modules.pop("pytest", None)
+            with patch("web.main.AsyncIOScheduler") as mock_sched, \
+                 patch("web.main.warmup_task", side_effect=_noop), \
+                 patch("web.main.run_daily_discovery_scheduler", side_effect=_noop), \
+                 patch("web.main.run_daily_amfi_scheduler", side_effect=_noop), \
+                 patch("web.main.run_daily_fund_audit_scheduler", side_effect=_noop), \
+                 patch("web.main.run_daily_project_audit_scheduler", side_effect=_noop), \
+                 patch("core.agents.watchers.bse_watcher.run_bse_watcher_loop", side_effect=_noop):
+
+                mock_sched_instance = MagicMock()
+                mock_sched.return_value = mock_sched_instance
+
+                async def _run_enabled():
+                    async with lifespan(app):
+                        pass
+
+                asyncio.run(_run_enabled())
+                mock_sched.assert_called_once()
+                mock_sched_instance.start.assert_called_once()
+
 
 if __name__ == "__main__":
     unittest.main()

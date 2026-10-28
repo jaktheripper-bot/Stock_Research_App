@@ -766,6 +766,7 @@ async def lifespan(app: FastAPI):
         logger.warning(f"Initial Safety Radar bootstrap seed skipped: {e}")
 
     is_testing = os.environ.get("TESTING") == "1" or "pytest" in sys.modules
+    enable_schedulers = os.environ.get("ENABLE_BACKGROUND_SCHEDULERS", "").strip() == "1"
     scheduler = None
     discovery_task = None
     amfi_task = None
@@ -775,6 +776,8 @@ async def lifespan(app: FastAPI):
 
     if not is_testing:
         asyncio.create_task(warmup_task())
+
+    if not is_testing and enable_schedulers:
         scheduler = AsyncIOScheduler()
         register_jobs(scheduler)
         scheduler.start()
