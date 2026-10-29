@@ -2158,5 +2158,21 @@
       "revision_count": 1257
     },
     "preflight_passed": false
+  },
+  {
+    "tag": "checkpoint_20261029_143126_registered_user_contact_gate_and_antibot_filter",
+    "timestamp": "2026-10-29 14:31:26 IST",
+    "commit_sha": "676116084aa644422c9c134a01bb40292bc06f2b",
+    "branch": "dev",
+    "description": "registered_user_contact_gate_and_antibot_filter",
+    "database": {
+      "exists": true,
+      "filename": "reports_checkpoint_20261029_143126_registered_user_contact_gate_and_antibot_filter.db",
+      "path": ".checkpoints/reports_checkpoint_20261029_143126_registered_user_contact_gate_and_antibot_filter.db",
+      "size_bytes": 39161856,
+      "report_count": 322,
+      "revision_count": 1257
+    },
+    "preflight_passed": true
   }
 ]
