@@ -2142,5 +2142,21 @@
       "revision_count": 1049
     },
     "preflight_passed": true
+  },
+  {
+    "tag": "checkpoint_20261029_095659_sql_wildcard_hygiene_fail_closed_directory_and_batch_synthesis",
+    "timestamp": "2026-10-29 09:56:59 IST",
+    "commit_sha": "43b96b62d123c151d1cc1fe8e21c430b44d17e02",
+    "branch": "dev",
+    "description": "sql_wildcard_hygiene_fail_closed_directory_and_batch_synthesis",
+    "database": {
+      "exists": true,
+      "filename": "reports_checkpoint_20261029_095659_sql_wildcard_hygiene_fail_closed_directory_and_batch_synthesis.db",
+      "path": ".checkpoints/reports_checkpoint_20261029_095659_sql_wildcard_hygiene_fail_closed_directory_and_batch_synthesis.db",
+      "size_bytes": 39161856,
+      "report_count": 322,
+      "revision_count": 1257
+    },
+    "preflight_passed": false
   }
 ]
