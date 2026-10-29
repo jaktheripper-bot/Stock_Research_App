@@ -105,6 +105,9 @@
   </div>
   {% endif %}
 
+  {% set has_quant_filter = (min_roce is not none) or (max_de is not none) or (max_pe is not none) or (min_opm is not none) %}
+  {% set quant_qs = ('&min_roce=' ~ min_roce if min_roce is not none else '') ~ ('&max_de=' ~ max_de if max_de is not none else '') ~ ('&max_pe=' ~ max_pe if max_pe is not none else '') ~ ('&min_opm=' ~ min_opm if min_opm is not none else '') %}
+
   <!-- Search & Filter Controls Container -->
   <div style="background: rgba(30, 41, 59, 0.4); border: 1px solid rgba(255, 255, 255, 0.1); border-radius: 14px; padding: 18px 20px; margin-bottom: 24px;">
     <!-- Search Bar -->
@@ -117,7 +120,7 @@
           value="{{ query or '' }}" 
           placeholder="Search by Ticker or Company Name (e.g. INFY, TCS, Reliance, Kaynes, Dynamatic, Neuland)..." 
           class="form-control" 
-          style="background: rgba(15, 23, 42, 0.9); border: 1px solid rgba(255, 255, 255, 0.15); color: #fff; padding: 10px 16px; border-radius: 8px; width: 100%; font-size: 14px;"
+          style="background: rgba(15, 23, 42, 0.9); border: 1px solid rgba(255, 255, 255, 0.15); color: #fff; padding: 10px 16px; border-radius: 8px; width: 100%; font-size: 16px;"
           oninput="liveFilterDirectoryEquities()"
         >
       </div>
@@ -132,22 +135,34 @@
       {% if current_sort %}
       <input type="hidden" name="sort" value="{{ current_sort }}">
       {% endif %}
+      {% if min_roce is not none %}
+      <input type="hidden" name="min_roce" value="{{ min_roce }}">
+      {% endif %}
+      {% if max_de is not none %}
+      <input type="hidden" name="max_de" value="{{ max_de }}">
+      {% endif %}
+      {% if max_pe is not none %}
+      <input type="hidden" name="max_pe" value="{{ max_pe }}">
+      {% endif %}
+      {% if min_opm is not none %}
+      <input type="hidden" name="min_opm" value="{{ min_opm }}">
+      {% endif %}
 
       <button type="submit" class="btn btn-primary btn-sm" style="padding: 10px 20px; font-weight: 700;">Search Equities</button>
       {% if query %}
-      <a href="/equities{% if current_sector %}?sector={{ current_sector }}{% endif %}" class="btn btn-secondary btn-sm" style="padding: 10px 14px;">Clear Search</a>
+      <a href="/equities?{% if current_sector %}sector={{ current_sector }}&{% endif %}{% if current_tier %}market_cap={{ current_tier }}&{% endif %}sort={{ current_sort|default('mcap_desc') }}{{ quant_qs }}" class="btn btn-secondary btn-sm" style="padding: 10px 14px;">Clear Search</a>
       {% endif %}
     </form>
 
     <!-- Sector Navigation Tabs (Horizontal Scrollable) -->
     <div style="margin-bottom: 14px;">
       <div class="pills-scroll-track">
-        <a href="/equities?{% if current_tier %}market_cap={{ current_tier }}&{% endif %}{% if current_sort %}sort={{ current_sort }}&{% endif %}{% if query %}q={{ query }}{% endif %}" class="btn btn-sm {% if not current_sector %}btn-primary{% else %}btn-secondary{% endif %}" style="border-radius: 9999px; white-space: nowrap;">
+        <a href="/equities?{% if current_tier %}market_cap={{ current_tier }}&{% endif %}sort={{ current_sort|default('mcap_desc') }}{% if query %}&q={{ query }}{% endif %}{{ quant_qs }}" class="btn btn-sm {% if not current_sector %}btn-primary{% else %}btn-secondary{% endif %}" style="border-radius: 9999px; white-space: nowrap;">
           All Equities ({{ total_equities }})
         </a>
         {% set sector_svg_map = {'IT_TECH': 'icon-sector-technology', 'BFSI': 'icon-sector-financials', 'HEALTHCARE_PHARMA': 'icon-sector-healthcare', 'CAPITAL_GOODS_INFRA': 'icon-sector-capital-goods', 'AUTOMOTIVE': 'icon-sector-automotive', 'CONSUMER_FMCG': 'icon-sector-consumer', 'CHEMICALS_MATERIALS': 'icon-sector-chemicals', 'COMMODITIES_ENERGY': 'icon-sector-energy', 'EMS_DEFENCE': 'icon-sector-defence', 'DIVERSIFIED': 'icon-sector-diversified'} %}
         {% for s_slug, s_info in sector_options.items() %}
-        <a href="/equities?sector={{ s_slug }}{% if current_tier %}&market_cap={{ current_tier }}{% endif %}{% if current_sort %}&sort={{ current_sort }}{% endif %}{% if query %}&q={{ query }}{% endif %}" class="btn btn-sm {% if current_sector == s_slug %}btn-primary{% else %}btn-secondary{% endif %}" style="border-radius: 9999px; white-space: nowrap;">
+        <a href="/equities?sector={{ s_slug }}{% if current_tier %}&market_cap={{ current_tier }}{% endif %}{% if current_sort %}&sort={{ current_sort }}{% endif %}{% if query %}&q={{ query }}{% endif %}{{ quant_qs }}" class="btn btn-sm {% if current_sector == s_slug %}btn-primary{% else %}btn-secondary{% endif %}" style="border-radius: 9999px; white-space: nowrap;">
           <svg class="glyph" style="width: 14px; height: 14px; vertical-align: -2px;"><use href="#{{ sector_svg_map.get(s_slug, 'icon-sector-diversified') }}"></use></svg> {{ s_info[0] }} ({{ sector_counts.get(s_slug, 0) }})
         </a>
         {% endfor %}
@@ -159,27 +174,96 @@
       <!-- Market Cap Filter Chips -->
       <div style="display: flex; gap: 6px; align-items: center; flex-wrap: wrap;">
         <span style="font-size: 11px; font-weight: 700; color: #64748b; text-transform: uppercase; margin-right: 4px;">Cap Size:</span>
-        <a href="/equities?{% if current_sector %}sector={{ current_sector }}&{% endif %}{% if current_sort %}sort={{ current_sort }}&{% endif %}{% if query %}q={{ query }}{% endif %}" class="chip {% if not current_tier %}active{% endif %}" style="text-decoration: none; font-size: 11.5px; padding: 4px 10px;">All</a>
-        <a href="/equities?market_cap=RECENT{% if current_sector %}&sector={{ current_sector }}{% endif %}{% if current_sort %}&sort={{ current_sort }}{% endif %}{% if query %}&q={{ query }}{% endif %}" class="chip {% if current_tier == 'RECENT' %}active{% endif %}" style="text-decoration: none; font-size: 11.5px; padding: 4px 10px; background: rgba(16, 185, 129, 0.12); color: #10b981; border: 1px solid rgba(16, 185, 129, 0.3);">Recently Inducted{% if recent_inductions_count %} ({{ recent_inductions_count }}){% endif %}</a>
-        <a href="/equities?market_cap=MEGA{% if current_sector %}&sector={{ current_sector }}{% endif %}{% if current_sort %}&sort={{ current_sort }}{% endif %}{% if query %}&q={{ query }}{% endif %}" class="chip {% if current_tier == 'MEGA' %}active{% endif %}" style="text-decoration: none; font-size: 11.5px; padding: 4px 10px;">Mega-Cap (&gt;₹1L Cr)</a>
-        <a href="/equities?market_cap=LARGE{% if current_sector %}&sector={{ current_sector }}{% endif %}{% if current_sort %}&sort={{ current_sort }}{% endif %}{% if query %}&q={{ query }}{% endif %}" class="chip {% if current_tier == 'LARGE' %}active{% endif %}" style="text-decoration: none; font-size: 11.5px; padding: 4px 10px;">Large-Cap (₹25k–1L Cr)</a>
-        <a href="/equities?market_cap=MID{% if current_sector %}&sector={{ current_sector }}{% endif %}{% if current_sort %}&sort={{ current_sort }}{% endif %}{% if query %}&q={{ query }}{% endif %}" class="chip {% if current_tier == 'MID' %}active{% endif %}" style="text-decoration: none; font-size: 11.5px; padding: 4px 10px;">Mid-Cap (₹5k–25k Cr)</a>
-        <a href="/equities?market_cap=SMALL{% if current_sector %}&sector={{ current_sector }}{% endif %}{% if current_sort %}&sort={{ current_sort }}{% endif %}{% if query %}&q={{ query }}{% endif %}" class="chip {% if current_tier == 'SMALL' %}active{% endif %}" style="text-decoration: none; font-size: 11.5px; padding: 4px 10px;">Small-Cap (&lt;₹5k Cr)</a>
+        <a href="/equities?{% if current_sector %}sector={{ current_sector }}&{% endif %}sort={{ current_sort|default('mcap_desc') }}{% if query %}&q={{ query }}{% endif %}{{ quant_qs }}" class="chip {% if not current_tier %}active{% endif %}" style="text-decoration: none; font-size: 11.5px; padding: 4px 10px;">All</a>
+        <a href="/equities?market_cap=RECENT{% if current_sector %}&sector={{ current_sector }}{% endif %}{% if current_sort %}&sort={{ current_sort }}{% endif %}{% if query %}&q={{ query }}{% endif %}{{ quant_qs }}" class="chip {% if current_tier == 'RECENT' %}active{% endif %}" style="text-decoration: none; font-size: 11.5px; padding: 4px 10px; background: rgba(16, 185, 129, 0.12); color: #10b981; border: 1px solid rgba(16, 185, 129, 0.3);">Recently Inducted{% if recent_inductions_count %} ({{ recent_inductions_count }}){% endif %}</a>
+        <a href="/equities?market_cap=MEGA{% if current_sector %}&sector={{ current_sector }}{% endif %}{% if current_sort %}&sort={{ current_sort }}{% endif %}{% if query %}&q={{ query }}{% endif %}{{ quant_qs }}" class="chip {% if current_tier == 'MEGA' %}active{% endif %}" style="text-decoration: none; font-size: 11.5px; padding: 4px 10px;">Mega-Cap (&gt;₹1L Cr)</a>
+        <a href="/equities?market_cap=LARGE{% if current_sector %}&sector={{ current_sector }}{% endif %}{% if current_sort %}&sort={{ current_sort }}{% endif %}{% if query %}&q={{ query }}{% endif %}{{ quant_qs }}" class="chip {% if current_tier == 'LARGE' %}active{% endif %}" style="text-decoration: none; font-size: 11.5px; padding: 4px 10px;">Large-Cap (₹25k–1L Cr)</a>
+        <a href="/equities?market_cap=MID{% if current_sector %}&sector={{ current_sector }}{% endif %}{% if current_sort %}&sort={{ current_sort }}{% endif %}{% if query %}&q={{ query }}{% endif %}{{ quant_qs }}" class="chip {% if current_tier == 'MID' %}active{% endif %}" style="text-decoration: none; font-size: 11.5px; padding: 4px 10px;">Mid-Cap (₹5k–25k Cr)</a>
+        <a href="/equities?market_cap=SMALL{% if current_sector %}&sector={{ current_sector }}{% endif %}{% if current_sort %}&sort={{ current_sort }}{% endif %}{% if query %}&q={{ query }}{% endif %}{{ quant_qs }}" class="chip {% if current_tier == 'SMALL' %}active{% endif %}" style="text-decoration: none; font-size: 11.5px; padding: 4px 10px;">Small-Cap (&lt;₹5k Cr)</a>
       </div>
 
       <!-- Sorting Selector -->
       <div style="display: flex; gap: 8px; align-items: center;">
         <label for="sortSelect" style="font-size: 11px; font-weight: 700; color: #64748b; text-transform: uppercase;">Sort By:</label>
         <select id="sortSelect" onchange="window.location.href=this.value" style="background: rgba(15, 23, 42, 0.9); border: 1px solid rgba(255, 255, 255, 0.15); color: #f8fafc; padding: 5px 12px; border-radius: 6px; font-size: 12px; cursor: pointer;">
-          <option value="/equities?sort=mcap_desc{% if current_sector %}&sector={{ current_sector }}{% endif %}{% if current_tier %}&market_cap={{ current_tier }}{% endif %}{% if query %}&q={{ query }}{% endif %}" {% if current_sort == 'mcap_desc' %}selected{% endif %}>Market Cap: High to Low</option>
-          <option value="/equities?sort=mcap_asc{% if current_sector %}&sector={{ current_sector }}{% endif %}{% if current_tier %}&market_cap={{ current_tier }}{% endif %}{% if query %}&q={{ query }}{% endif %}" {% if current_sort == 'mcap_asc' %}selected{% endif %}>Market Cap: Low to High</option>
-          <option value="/equities?sort=roce_desc{% if current_sector %}&sector={{ current_sector }}{% endif %}{% if current_tier %}&market_cap={{ current_tier }}{% endif %}{% if query %}&q={{ query }}{% endif %}" {% if current_sort == 'roce_desc' %}selected{% endif %}>Capital Efficiency (ROCE)</option>
-          <option value="/equities?sort=pe_asc{% if current_sector %}&sector={{ current_sector }}{% endif %}{% if current_tier %}&market_cap={{ current_tier }}{% endif %}{% if query %}&q={{ query }}{% endif %}" {% if current_sort == 'pe_asc' %}selected{% endif %}>Valuation (Lowest P/E)</option>
-          <option value="/equities?sort=name_asc{% if current_sector %}&sector={{ current_sector }}{% endif %}{% if current_tier %}&market_cap={{ current_tier }}{% endif %}{% if query %}&q={{ query }}{% endif %}" {% if current_sort == 'name_asc' %}selected{% endif %}>Company Name (A–Z)</option>
-          <option value="/equities?sort=rev_desc{% if current_sector %}&sector={{ current_sector }}{% endif %}{% if current_tier %}&market_cap={{ current_tier }}{% endif %}{% if query %}&q={{ query }}{% endif %}" {% if current_sort == 'rev_desc' %}selected{% endif %}>Most Revisions / Audits</option>
+          <option value="/equities?sort=mcap_desc{% if current_sector %}&sector={{ current_sector }}{% endif %}{% if current_tier %}&market_cap={{ current_tier }}{% endif %}{% if query %}&q={{ query }}{% endif %}{{ quant_qs }}" {% if current_sort == 'mcap_desc' %}selected{% endif %}>Market Cap: High to Low</option>
+          <option value="/equities?sort=mcap_asc{% if current_sector %}&sector={{ current_sector }}{% endif %}{% if current_tier %}&market_cap={{ current_tier }}{% endif %}{% if query %}&q={{ query }}{% endif %}{{ quant_qs }}" {% if current_sort == 'mcap_asc' %}selected{% endif %}>Market Cap: Low to High</option>
+          <option value="/equities?sort=roce_desc{% if current_sector %}&sector={{ current_sector }}{% endif %}{% if current_tier %}&market_cap={{ current_tier }}{% endif %}{% if query %}&q={{ query }}{% endif %}{{ quant_qs }}" {% if current_sort == 'roce_desc' %}selected{% endif %}>Capital Efficiency (ROCE)</option>
+          <option value="/equities?sort=pe_asc{% if current_sector %}&sector={{ current_sector }}{% endif %}{% if current_tier %}&market_cap={{ current_tier }}{% endif %}{% if query %}&q={{ query }}{% endif %}{{ quant_qs }}" {% if current_sort == 'pe_asc' %}selected{% endif %}>Valuation (Lowest P/E)</option>
+          <option value="/equities?sort=name_asc{% if current_sector %}&sector={{ current_sector }}{% endif %}{% if current_tier %}&market_cap={{ current_tier }}{% endif %}{% if query %}&q={{ query }}{% endif %}{{ quant_qs }}" {% if current_sort == 'name_asc' %}selected{% endif %}>Company Name (A–Z)</option>
+          <option value="/equities?sort=rev_desc{% if current_sector %}&sector={{ current_sector }}{% endif %}{% if current_tier %}&market_cap={{ current_tier }}{% endif %}{% if query %}&q={{ query }}{% endif %}{{ quant_qs }}" {% if current_sort == 'rev_desc' %}selected{% endif %}>Most Revisions / Audits</option>
         </select>
       </div>
     </div>
+
+    <!-- Collapsible Quantitative Ratio Screener Drawer (Native <details> for accessible Search-in-Page) -->
+    <details id="quantScreenerDrawer" {% if has_quant_filter %}open{% endif %} style="margin-top: 14px; padding-top: 12px; border-top: 1px solid rgba(255, 255, 255, 0.08);">
+      <summary style="cursor: pointer; display: flex; justify-content: space-between; align-items: center; gap: 10px; font-size: 13px; font-weight: 700; color: #e2e8f0; list-style: none;">
+        <span style="display: inline-flex; align-items: center; gap: 8px;">
+          <svg class="glyph" style="width: 14px; height: 14px; color: #38bdf8;"><use href="#icon-screen"></use></svg>
+          <span>Quantitative Ratio Filters (ROCE, D/E, P/E, OPM)</span>
+          {% if has_quant_filter %}
+          <span class="badge badge-emerald" style="font-size: 10.5px;">Active Screen</span>
+          {% endif %}
+        </span>
+        <span style="font-size: 11.5px; color: #94a3b8; font-weight: 600;">Expand / Collapse ▾</span>
+      </summary>
+
+      <div style="margin-top: 14px;">
+        <!-- 1-Click Non-Advisory Descriptive Presets -->
+        <div style="display: flex; gap: 8px; align-items: center; flex-wrap: wrap; margin-bottom: 14px;">
+          <span style="font-size: 11px; font-weight: 700; color: #64748b; text-transform: uppercase;">Quick Screens:</span>
+          <a href="/equities?min_roce=20&amp;max_de=0.3{% if current_sector %}&amp;sector={{ current_sector }}{% endif %}{% if current_tier %}&amp;market_cap={{ current_tier }}{% endif %}&amp;sort=roce_desc" class="btn btn-secondary btn-sm" style="font-size: 11.5px; border-radius: 9999px;">
+            ROCE ≥ 20% &amp; D/E ≤ 0.3x
+          </a>
+          <a href="/equities?min_opm=20&amp;min_roce=15{% if current_sector %}&amp;sector={{ current_sector }}{% endif %}{% if current_tier %}&amp;market_cap={{ current_tier }}{% endif %}&amp;sort=roce_desc" class="btn btn-secondary btn-sm" style="font-size: 11.5px; border-radius: 9999px;">
+            OPM ≥ 20% &amp; ROCE ≥ 15%
+          </a>
+          <a href="/equities?max_pe=25&amp;min_roce=18{% if current_sector %}&amp;sector={{ current_sector }}{% endif %}{% if current_tier %}&amp;market_cap={{ current_tier }}{% endif %}&amp;sort=pe_asc" class="btn btn-secondary btn-sm" style="font-size: 11.5px; border-radius: 9999px;">
+            P/E ≤ 25x &amp; ROCE ≥ 18%
+          </a>
+          {% if has_quant_filter %}
+          <a href="/equities?{% if current_sector %}sector={{ current_sector }}&amp;{% endif %}{% if current_tier %}market_cap={{ current_tier }}&amp;{% endif %}sort={{ current_sort|default('mcap_desc') }}{% if query %}&amp;q={{ query }}{% endif %}" class="btn btn-secondary btn-sm" style="font-size: 11.5px; border-radius: 9999px; color: #f87171;">
+            Reset Ratio Filters
+          </a>
+          {% endif %}
+        </div>
+
+        <form action="/equities" method="GET" style="display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 12px; align-items: end;">
+          {% if query %}<input type="hidden" name="q" value="{{ query }}">{% endif %}
+          {% if current_sector %}<input type="hidden" name="sector" value="{{ current_sector }}">{% endif %}
+          {% if current_tier %}<input type="hidden" name="market_cap" value="{{ current_tier }}">{% endif %}
+          {% if current_sort %}<input type="hidden" name="sort" value="{{ current_sort }}">{% endif %}
+
+          <div>
+            <label for="inputMinRoce" style="display: block; font-size: 11.5px; font-weight: 700; color: #94a3b8; margin-bottom: 5px;">Min ROCE (%)</label>
+            <input id="inputMinRoce" type="number" step="0.5" name="min_roce" value="{{ min_roce if min_roce is not none else '' }}" placeholder="e.g. 18" style="width: 100%; padding: 8px 10px; border-radius: 8px; background: rgba(15, 23, 42, 0.9); border: 1px solid rgba(255, 255, 255, 0.15); color: #f8fafc; font-size: 16px;">
+          </div>
+          <div>
+            <label for="inputMaxDe" style="display: block; font-size: 11.5px; font-weight: 700; color: #94a3b8; margin-bottom: 5px;">Max Debt / Equity (x)</label>
+            <input id="inputMaxDe" type="number" step="0.1" min="0" name="max_de" value="{{ max_de if max_de is not none else '' }}" placeholder="e.g. 0.5" style="width: 100%; padding: 8px 10px; border-radius: 8px; background: rgba(15, 23, 42, 0.9); border: 1px solid rgba(255, 255, 255, 0.15); color: #f8fafc; font-size: 16px;">
+          </div>
+          <div>
+            <label for="inputMaxPe" style="display: block; font-size: 11.5px; font-weight: 700; color: #94a3b8; margin-bottom: 5px;">Max Trailing P/E (x)</label>
+            <input id="inputMaxPe" type="number" step="1" min="1" name="max_pe" value="{{ max_pe if max_pe is not none else '' }}" placeholder="e.g. 30" style="width: 100%; padding: 8px 10px; border-radius: 8px; background: rgba(15, 23, 42, 0.9); border: 1px solid rgba(255, 255, 255, 0.15); color: #f8fafc; font-size: 16px;">
+          </div>
+          <div>
+            <label for="inputMinOpm" style="display: block; font-size: 11.5px; font-weight: 700; color: #94a3b8; margin-bottom: 5px;">Min Operating Margin (%)</label>
+            <input id="inputMinOpm" type="number" step="0.5" name="min_opm" value="{{ min_opm if min_opm is not none else '' }}" placeholder="e.g. 15" style="width: 100%; padding: 8px 10px; border-radius: 8px; background: rgba(15, 23, 42, 0.9); border: 1px solid rgba(255, 255, 255, 0.15); color: #f8fafc; font-size: 16px;">
+          </div>
+          <div style="display: flex; gap: 8px;">
+            <button type="submit" class="btn btn-primary btn-sm" style="padding: 9px 16px; font-weight: 700; width: 100%;">Apply Filters</button>
+          </div>
+        </form>
+
+        {% if min_opm is not none or max_de is not none %}
+        <div id="bfsiScreenerNotice" style="margin-top: 12px; padding: 10px 14px; border-radius: 8px; background: rgba(245, 158, 11, 0.1); border-left: 3px solid #f59e0b; font-size: 12px; color: #fde68a; line-height: 1.5;">
+          <svg class="glyph" style="width: 13px; height: 13px; vertical-align: -2px; margin-right: 4px;"><use href="#glyph-alert"></use></svg>
+          <strong>BFSI Accounting Scope Notice:</strong> Banks, NBFCs, and Insurers (<code>BFSI</code>) use deposit/liability funding rather than industrial Debt/Equity or non-financial Operating Margin (<code>OPM</code>) and are excluded when <code>max_de</code> or <code>min_opm</code> thresholds are active. Clear those two fields to include financial institutions.
+        </div>
+        {% endif %}
+      </div>
+    </details>
   </div>
 
   <!-- Active Results Count Header -->

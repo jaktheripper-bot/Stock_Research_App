@@ -2239,17 +2239,124 @@ function getAcquisitionData() {
   }
 }
 
+// Official fetchLater() polyfill for full-session analytics & dwell telemetry
+globalThis.fetchLater ??= function fetchLater(url, init = {}) {
+  let timeoutHandle;
+  let activated = false;
+
+  function sendNow() {
+    if (!(init.signal && init.signal.aborted)) {
+      if (
+        (typeof Request !== 'undefined' && 'keepalive' in Request.prototype) ||
+        init.method !== 'POST' ||
+        init.headers
+      ) {
+        fetch(url, Object.assign({}, init, { keepalive: true })).catch(() => {});
+        activated = true;
+      } else if (typeof navigator !== 'undefined' && navigator.sendBeacon) {
+        activated = navigator.sendBeacon(url, init.body);
+      }
+    }
+    destroy();
+  }
+
+  function destroy() {
+    if (typeof document !== 'undefined') {
+      document.removeEventListener('visibilitychange', sendNow);
+    }
+    clearTimeout(timeoutHandle);
+  }
+
+  if (typeof document !== 'undefined' && document.visibilityState === 'hidden') {
+    queueMicrotask(sendNow);
+  } else if (typeof document !== 'undefined') {
+    document.addEventListener('visibilitychange', sendNow);
+    if (typeof init.activateAfter === 'number' && init.activateAfter >= 0) {
+      timeoutHandle = setTimeout(sendNow, init.activateAfter);
+    }
+  }
+
+  if (init.signal) {
+    init.signal.addEventListener('abort', destroy);
+  }
+
+  return {
+    get activated() {
+      return activated;
+    }
+  };
+};
+
+function getReturningVisitorMeta() {
+  try {
+    const SESSION_GAP_MS = 30 * 60 * 1000;
+    const now = Date.now();
+    let vid = localStorage.getItem('sr_visitor_id');
+    if (!vid) {
+      const rand = (typeof crypto !== 'undefined' && crypto.randomUUID)
+        ? crypto.randomUUID().replace(/-/g, '').slice(0, 16)
+        : Math.random().toString(36).slice(2, 12) + Date.now().toString(36);
+      vid = 'vis_' + rand;
+      localStorage.setItem('sr_visitor_id', vid);
+    }
+
+    let visitCount = parseInt(localStorage.getItem('sr_visit_count') || '0', 10) || 0;
+    const lastActiveRaw = parseInt(localStorage.getItem('sr_last_activity_ts') || '0', 10) || 0;
+    let daysSinceLast = null;
+    const sessionCounted = sessionStorage.getItem('sr_visit_session_counted');
+
+    if (!visitCount) {
+      visitCount = 1;
+      localStorage.setItem('sr_visit_count', '1');
+      sessionStorage.setItem('sr_visit_session_counted', '1');
+    } else if (!sessionCounted && lastActiveRaw > 0 && (now - lastActiveRaw) > SESSION_GAP_MS) {
+      visitCount += 1;
+      daysSinceLast = Math.round(((now - lastActiveRaw) / 86400000) * 10) / 10;
+      localStorage.setItem('sr_visit_count', String(visitCount));
+      sessionStorage.setItem('sr_days_since_last_visit', String(daysSinceLast));
+      sessionStorage.setItem('sr_visit_session_counted', '1');
+    } else {
+      sessionStorage.setItem('sr_visit_session_counted', '1');
+      const storedGap = sessionStorage.getItem('sr_days_since_last_visit');
+      if (storedGap !== null && storedGap !== '') {
+        const parsedGap = parseFloat(storedGap);
+        if (!Number.isNaN(parsedGap)) daysSinceLast = parsedGap;
+      }
+    }
+
+    localStorage.setItem('sr_last_activity_ts', String(now));
+    return {
+      visitor_id: vid,
+      visit_number: visitCount,
+      is_returning: visitCount >= 2,
+      days_since_last_visit: daysSinceLast
+    };
+  } catch {
+    return {
+      visitor_id: null,
+      visit_number: 1,
+      is_returning: false,
+      days_since_last_visit: null
+    };
+  }
+}
+
 window.trackUserEvent = function(eventType, ticker, details) {
   try {
     const user = getStoredUser();
     const acq = getAcquisitionData();
+    const vis = getReturningVisitorMeta();
     const currentPath = window.location.pathname;
     const landingPath = acq.landing_path || currentPath;
     const mergedDetails = Object.assign({
       path: currentPath,
       landing_page: landingPath,
       landing_url: acq.landing_url || window.location.href,
-      title: document.title || ''
+      title: document.title || '',
+      visitor_id: vis.visitor_id,
+      visit_number: vis.visit_number,
+      is_returning: vis.is_returning,
+      days_since_last_visit: vis.days_since_last_visit
     }, details || {});
 
     const payload = {
@@ -2258,6 +2365,10 @@ window.trackUserEvent = function(eventType, ticker, details) {
       user_id: user ? user.id : null,
       user_email: user ? user.email : null,
       session_id: getTelemetrySessionId(),
+      visitor_id: vis.visitor_id,
+      visit_number: vis.visit_number,
+      is_returning: vis.is_returning,
+      days_since_last_visit: vis.days_since_last_visit,
       referrer: acq.referrer || (document.referrer && !document.referrer.startsWith(window.location.origin) ? document.referrer : ''),
       landing_url: acq.landing_url || window.location.href,
       landing_page: landingPath,
@@ -2267,11 +2378,16 @@ window.trackUserEvent = function(eventType, ticker, details) {
       ref: acq.ref || '',
       details: mergedDetails
     };
-    fetch('/api/telemetry/event', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(payload)
-    }).catch(() => {});
+    try {
+      fetchLater('/api/telemetry/event', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload),
+        activateAfter: 0
+      });
+    } catch {
+      // Quota or unsupported state gracefully ignored
+    }
   } catch {}
 };
 
@@ -2388,11 +2504,79 @@ function initDwellAndTransitionTelemetry() {
       const curPct = computeCurrentScrollPct();
       activeTimerLabel.textContent = `${formatActiveStudyClock(totalActiveSeconds)} active • ${curPct}% read`;
     }
+
+    if (unsentActiveSeconds > 0 && unsentActiveSeconds % 5 === 0) {
+      queuePendingDwellBeacon();
+    }
   }, 1000);
+
+  let dwellFetchLaterController = null;
+
+  function buildDwellPayload(dwellToSend, pillarSnapshot, destinationPath) {
+    const user = getStoredUser();
+    const acq = getAcquisitionData();
+    const vis = getReturningVisitorMeta();
+    const currentPath = window.location.pathname;
+    return {
+      event_type: 'PAGE_DWELL',
+      ticker: '',
+      user_id: user ? user.id : null,
+      user_email: user ? user.email : null,
+      session_id: getTelemetrySessionId(),
+      visitor_id: vis.visitor_id,
+      visit_number: vis.visit_number,
+      is_returning: vis.is_returning,
+      days_since_last_visit: vis.days_since_last_visit,
+      referrer: acq.referrer || '',
+      landing_url: acq.landing_url || window.location.href,
+      landing_page: currentPath,
+      path: currentPath,
+      dwell_seconds: dwellToSend,
+      max_scroll_pct: maxScrollPct,
+      pillar_dwell: pillarSnapshot,
+      details: {
+        path: currentPath,
+        dwell_seconds: dwellToSend,
+        max_scroll_pct: maxScrollPct,
+        pillar_dwell: pillarSnapshot,
+        to_path: destinationPath || null,
+        title: document.title || '',
+        visitor_id: vis.visitor_id,
+        visit_number: vis.visit_number,
+        is_returning: vis.is_returning,
+        days_since_last_visit: vis.days_since_last_visit
+      }
+    };
+  }
+
+  function queuePendingDwellBeacon() {
+    if (unsentActiveSeconds < 1) return;
+    if (dwellFetchLaterController) {
+      dwellFetchLaterController.abort();
+    }
+    dwellFetchLaterController = new AbortController();
+    const dwellSnapshot = Math.min(1800, Math.max(1, unsentActiveSeconds));
+    const pillarSnapshot = Object.assign({}, unsentPillarDwell);
+    const payload = buildDwellPayload(dwellSnapshot, pillarSnapshot, null);
+    try {
+      fetchLater('/api/telemetry/dwell', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload),
+        signal: dwellFetchLaterController.signal
+      });
+    } catch {
+      // Handle quota errors gracefully
+    }
+  }
 
   function sendDwellBeacon(destinationPath) {
     // Only dispatch when there is genuine active attention (>= 1s) or an explicit internal link transition
     if (unsentActiveSeconds < 1 && !destinationPath) return;
+    if (dwellFetchLaterController) {
+      dwellFetchLaterController.abort();
+      dwellFetchLaterController = null;
+    }
     const dwellToSend = Math.min(1800, Math.max(1, unsentActiveSeconds));
     const pillarSnapshot = Object.assign({}, unsentPillarDwell);
 
@@ -2400,46 +2584,17 @@ function initDwellAndTransitionTelemetry() {
     unsentActiveSeconds = 0;
     unsentPillarDwell = {};
 
+    const payload = buildDwellPayload(dwellToSend, pillarSnapshot, destinationPath);
     try {
-      const user = getStoredUser();
-      const acq = getAcquisitionData();
-      const currentPath = window.location.pathname;
-
-      const payload = {
-        event_type: 'PAGE_DWELL',
-        ticker: '',
-        user_id: user ? user.id : null,
-        user_email: user ? user.email : null,
-        session_id: getTelemetrySessionId(),
-        referrer: acq.referrer || '',
-        landing_url: acq.landing_url || window.location.href,
-        landing_page: currentPath,
-        path: currentPath,
-        dwell_seconds: dwellToSend,
-        max_scroll_pct: maxScrollPct,
-        pillar_dwell: pillarSnapshot,
-        details: {
-          path: currentPath,
-          dwell_seconds: dwellToSend,
-          max_scroll_pct: maxScrollPct,
-          pillar_dwell: pillarSnapshot,
-          to_path: destinationPath || null,
-          title: document.title || ''
-        }
-      };
-
-      const blob = new Blob([JSON.stringify(payload)], { type: 'application/json' });
-      if (navigator.sendBeacon) {
-        navigator.sendBeacon('/api/telemetry/dwell', blob);
-      } else {
-        fetch('/api/telemetry/dwell', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify(payload),
-          keepalive: true
-        }).catch(() => {});
-      }
-    } catch {}
+      fetchLater('/api/telemetry/dwell', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload),
+        activateAfter: 0
+      });
+    } catch {
+      // Handle quota errors gracefully
+    }
   }
 
   document.addEventListener('click', (e) => {
@@ -2460,19 +2615,6 @@ function initDwellAndTransitionTelemetry() {
       sendDwellBeacon(targetPath);
     }
   }, { capture: true, passive: true });
-
-  window.addEventListener('pagehide', () => {
-    clearInterval(attentionInterval);
-    sendDwellBeacon(null);
-  });
-
-  document.addEventListener('visibilitychange', () => {
-    if (document.visibilityState === 'hidden') {
-      sendDwellBeacon(null);
-    } else {
-      lastActivityTime = Date.now();
-    }
-  });
 }
 
 function showShareToast(message) {
@@ -2494,8 +2636,15 @@ window.shareCurrentPage = async function(kind) {
     const url = new URL(origin + window.location.pathname);
     if (window.location.pathname === '/compare') {
       const cur = new URLSearchParams(window.location.search);
-      if (cur.get('a')) url.searchParams.set('a', cur.get('a'));
-      if (cur.get('b')) url.searchParams.set('b', cur.get('b'));
+      if (cur.get('tickers')) {
+        url.searchParams.set('tickers', cur.get('tickers'));
+      } else {
+        if (cur.get('a')) url.searchParams.set('a', cur.get('a'));
+        if (cur.get('b')) url.searchParams.set('b', cur.get('b'));
+        if (cur.get('c')) url.searchParams.set('c', cur.get('c'));
+        if (cur.get('d')) url.searchParams.set('d', cur.get('d'));
+        if (cur.get('e')) url.searchParams.set('e', cur.get('e'));
+      }
     }
     url.searchParams.set('utm_source', 'share');
     url.searchParams.set('utm_medium', 'referral');

@@ -1,7 +1,7 @@
 # Multi-Asset Institutional Report Evaluation Frameworks, Data Sources & Operational Flows Specification
 
 **Document Identifier:** `docs/REPORT_EVALUATION_FRAMEWORKS.md`  
-**Document Version:** 3.5.3 | **Effective Date:** 2026-10-30  
+**Document Version:** 3.5.4 | **Effective Date:** 2026-10-30  
 **Target System:** `Stock Research App` (`main` branch)  
 **Compliance Standards:** 
 * SEBI (Research Analysts) Regulations, 2014 Section 2(u) — Factual Non-Advisory Safe Harbor
@@ -525,16 +525,17 @@ Evaluates listed commercial real estate under the SEBI REIT Regulations and Marc
 
 ---
 
-### Report 8: Net Real Tax Calculator Report (`/calculator/tax`)
+### Report 8: Net Real Tax Calculator & Live Security Tax Bridge (`/calculator/tax`, `/api/calculator/live-yields`)
 
-Calculates purchasing power preservation factoring in inflation and statutory tax codes:
+Calculates purchasing power preservation factoring in inflation, 4% Health & Education Cess + HNI Surcharges (`10.40%` to `39.00%`), and statutory tax codes across both asset-class benchmarks and live tracked instruments (`core/analysis/live_security_tax_bridge.py`):
 $$R_{\text{real}} = \frac{1 + R_{\text{nominal}} \cdot (1 - T)}{1 + \pi_{\text{CPI}}} - 1$$
 Where:
-* $T_{\text{Debt}}$: Marginal Slab Rate up to $39.0\%$ under Section 50AA.
+* $T_{\text{Debt / G-Sec}}$: Effective Marginal Slab Rate up to $39.0\%$ ($30\% + 25\%$ surcharge $+ 4\%$ cess) under Section 50AA / Section 56(2).
+* $T_{\text{REIT / InvIT}}$: Blended Section 115UA SPV waterfall rate $T_{\text{eff}} \cdot (w_{\text{interest}} + w_{\text{rental}} + 0.5 \cdot w_{\text{dividend}})$; **fails closed** (instrument omitted rather than guessed) when entity-specific `tax_breakdown` is undisclosed.
 * $T_{\text{Equity LTCG}}$: $12.5\%$ above ₹1.25 Lakh exemption under Section 112A.
 * $T_{\text{Equity STCG}}$: $20.0\%$ under Section 111A.
-* $T_{\text{SGB}}$: $0.0\%$ capital gains tax at maturity under Section 47(viic) $+ 2.5\%$ annual coupon (taxed at slab).
-* $\pi_{\text{CPI}}$: Current MOSPI Consumer Price Index inflation rate.
+* $T_{\text{SGB}}$: $0.0\%$ capital gains tax at maturity under Section 47(viic) $+ 2.5\%$ annual coupon (taxed at effective slab).
+* $\pi_{\text{CPI}}$: Current MOSPI Consumer Price Index inflation rate (with optional `?yield=` custom instrument audit `#customYieldAuditCard`).
 
 ---
 
@@ -550,9 +551,9 @@ Classifies assets across a **6-Tier Capital Seniority Waterfall**:
 
 ---
 
-### Report 10: Peer Comparison Report (`/compare`)
+### Report 10: Peer Comparison & 2-to-5 Cluster Matrix (`/compare`, `/api/equity/peer-cluster`)
 
-Enforces **3-Axis Disparity Gates** to prevent comparing structurally mismatched companies:
+Benchmarks **2 to 5 Indian listed equities** (`?a=&b=` backward-compatible + `?tickers=` / `c,d,e` via `core/analysis/peer_cluster.py`), computing **Cluster Median** dispersion across Market Cap, P/E, ROCE %, ROE %, OPM %, and Debt-to-Equity while enforcing **3-Axis Disparity Gates**:
 1. **Sector/Business Model Gate:** Mismatched sectors (e.g., Banking vs SaaS) suppress non-comparable multiples (EV/EBITDA, P/B) and highlight universal cash metrics: Return on Invested Capital (ROIC), Free Cash Flow Yield, and 3-Year Revenue CAGR.
 2. **Lifecycle Stage Gate:** Flags comparing unprofitable high-burn growth assets ($P/E < 0$) against mature dividend-paying blue chips.
 3. **Scale Divergence Gate:** Flags a $\ge 100\times$ divergence in market cap.

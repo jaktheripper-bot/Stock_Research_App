@@ -162,6 +162,9 @@
           <button id="btnOpenThesisTop" onclick="openThesisModal()" class="btn btn-secondary btn-sm" style="font-weight: 700; border-color: rgba(245, 158, 11, 0.4); color: #fbbf24;">
             <svg class="glyph"><use href="#glyph-scale"></use></svg> Thesis Checkpoint
           </button>
+          <a href="/compare?tickers={{ peer_cluster_query|default(ticker ~ ',TCS') }}" class="btn btn-secondary btn-sm" title="Benchmark against top compiled sector peers with Cluster Median">
+            <svg class="glyph"><use href="#glyph-scale"></use></svg> Compare Sector Peers
+          </a>
           {% if is_deep_dive_unlocked %}
           <span class="badge badge-emerald">
             <span class="status-dot status-dot-emerald"></span> Unlocked
@@ -169,12 +172,18 @@
           <a href="/api/pdf/{{ ticker }}" class="btn btn-primary btn-sm" download>
             <svg class="glyph"><use href="#icon-download"></use></svg> Download PDF Report
           </a>
+          <a href="/api/model/{{ ticker }}?format=xlsx" class="btn btn-secondary btn-sm" download title="Download 3-sheet Excel (.xlsx) valuation &amp; forensic workbook (included with Deep-Dive unlock)">
+            <svg class="glyph"><use href="#icon-download"></use></svg> Download Excel (.xlsx)
+          </a>
           {% else %}
           <button onclick="unlockDeepDive('{{ ticker }}')" class="btn btn-primary btn-sm">
             <svg class="glyph"><use href="#icon-lock"></use></svg> Unlock Deep-Dive (1 Credit)
           </button>
           <button onclick="unlockDeepDive('{{ ticker }}')" class="btn btn-secondary btn-sm" title="Unlock required to download full PDF report with forensic accounting schedules">
             <svg class="glyph"><use href="#icon-download"></use></svg> Download PDF (Locked)
+          </button>
+          <button onclick="unlockDeepDive('{{ ticker }}')" class="btn btn-secondary btn-sm" title="Unlock required to download 3-sheet Excel (.xlsx) model (0 extra credits once unlocked)">
+            <svg class="glyph"><use href="#icon-download"></use></svg> Excel Model (Locked)
           </button>
           {% endif %}
           <button onclick="synthesizeReport('{{ ticker }}', true)" class="btn btn-secondary btn-sm">
@@ -797,35 +806,92 @@
       </div>
       {% endif %}
 
+      <!-- Conditional Ind AS 108 Operating Segment Mix & Order-Book Backlog Card -->
+      {% if equity_intel.segment_intelligence and equity_intel.segment_intelligence.status == 'DISCLOSED' %}
+      <div id="indAs108SegmentCard" style="background: rgba(15, 23, 42, 0.85); border: 1px solid rgba(56, 189, 248, 0.28); border-radius: var(--radius-md); padding: 20px;">
+        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 14px; flex-wrap: wrap; gap: 10px;">
+          <div>
+            <div style="font-size: 11px; font-weight: 800; text-transform: uppercase; letter-spacing: 0.05em; color: #38bdf8; margin-bottom: 4px;">
+              Ind AS 108 Statutory Revenue Disaggregation
+            </div>
+            <h3 style="margin: 0; font-size: 16px; font-weight: 800; color: var(--text-primary); display: flex; align-items: center; gap: 8px;">
+              <svg class="glyph"><use href="#glyph-chart"></use></svg>
+              <span>Operating Segment Mix &amp; Executable Order-Book</span>
+            </h3>
+          </div>
+          <div style="display: flex; align-items: center; gap: 8px; flex-wrap: wrap;">
+            {% if equity_intel.segment_intelligence.order_book_cr %}
+            <span class="badge badge-emerald tnum" style="font-size: 11.5px; padding: 5px 10px;">
+              Order Backlog: ₹{{ "{:,.0f}".format(equity_intel.segment_intelligence.order_book_cr) }} Cr
+            </span>
+            {% endif %}
+            <span class="badge" style="background: rgba(56, 189, 248, 0.15); color: #38bdf8; font-size: 11px;">
+              [VERIFIED FACT • {{ equity_intel.segment_intelligence.filing_period|default('Latest Filing') }}]
+            </span>
+          </div>
+        </div>
+
+        {% if equity_intel.segment_intelligence.segments %}
+        <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(210px, 1fr)); gap: 12px;">
+          {% for seg in equity_intel.segment_intelligence.segments %}
+          <div style="background: rgba(30, 41, 59, 0.55); border: 1px solid var(--border-color); border-radius: 8px; padding: 12px 14px;">
+            <div style="display: flex; justify-content: space-between; align-items: baseline; gap: 8px; margin-bottom: 6px;">
+              <span style="font-size: 13px; font-weight: 700; color: #f1f5f9;">{{ seg.segment_name }}</span>
+              <span class="tnum" style="font-size: 14px; font-weight: 800; color: #38bdf8;">{{ seg.revenue_share_pct }}%</span>
+            </div>
+            <div style="height: 6px; width: 100%; background: rgba(15, 23, 42, 0.85); border-radius: 999px; overflow: hidden;">
+              <div style="height: 100%; width: {{ [seg.revenue_share_pct, 100]|min }}%; background: linear-gradient(90deg, #0ea5e9, #10b981); border-radius: 999px;"></div>
+            </div>
+          </div>
+          {% endfor %}
+        </div>
+        {% endif %}
+      </div>
+      {% endif %}
+
     </div>
     {% endif %}
 
     <!-- Multi-Quarter Thesis Drift Monitoring Card (Hoisted Above Report) -->
-    {% if diff %}
-    <div style="margin-bottom: 30px; background: rgba(15, 23, 42, 0.9); border: 1px solid rgba(14, 165, 233, 0.35); border-radius: var(--radius-md); padding: 22px;">
+    {% if diff or (thesis_drift and thesis_drift.status == 'DRIFT_COMPUTED') %}
+    {% set drift_from_date = thesis_drift.prior_snapshot_date if (thesis_drift and thesis_drift.prior_snapshot_date) else (diff.state_a_date if diff else '') %}
+    {% set drift_to_date = thesis_drift.latest_snapshot_date if (thesis_drift and thesis_drift.latest_snapshot_date) else (diff.state_b_date if diff else '') %}
+    <div id="thesisDriftCard" style="margin-bottom: 30px; background: rgba(15, 23, 42, 0.9); border: 1px solid rgba(14, 165, 233, 0.35); border-radius: var(--radius-md); padding: 22px;">
       <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 14px; flex-wrap: wrap; gap: 10px;">
-        <div style="display: flex; align-items: center; gap: 10px;">
+        <div style="display: flex; align-items: center; gap: 10px; flex-wrap: wrap;">
           <span style="font-size: 20px; color: var(--accent-cyan); display: inline-flex;"><svg class="glyph"><use href="#icon-markets"></use></svg></span>
           <h3 style="margin: 0; font-size: 17px; font-weight: 800; color: var(--text-primary);">
             Multi-Quarter Thesis Drift Monitoring
           </h3>
           <span class="badge" style="background: rgba(14, 165, 233, 0.2); color: var(--accent-cyan); font-size: 11px;">
-            State A ({{ diff.state_a_date }}) ➔ State B ({{ diff.state_b_date }})
+            State A ({{ drift_from_date }}) ➔ State B ({{ drift_to_date }})
           </span>
+          {% if thesis_drift and thesis_drift.latest_trigger %}
+          <span class="badge" style="background: rgba(30, 41, 59, 0.8); border: 1px solid var(--border-color); color: #cbd5e1; font-size: 11px;">
+            Trigger: {{ thesis_drift.latest_trigger }}
+          </span>
+          {% endif %}
         </div>
-        <span class="badge badge-emerald" style="font-size: 11px;">Monitoring Active</span>
+        <div style="display: flex; align-items: center; gap: 8px; flex-wrap: wrap;">
+          {% if thesis_drift and thesis_drift.price_drift_pct is not none %}
+          <span class="badge tnum" style="{% if thesis_drift.price_drift_pct >= 0 %}background: rgba(16, 185, 129, 0.16); color: #34d399;{% else %}background: rgba(244, 63, 94, 0.16); color: #fb7185;{% endif %} font-size: 11px;">
+            Split-Safe Baseline Drift: {% if thesis_drift.price_drift_pct >= 0 %}+{% endif %}{{ thesis_drift.price_drift_pct }}%
+          </span>
+          {% endif %}
+          <span class="badge badge-emerald" style="font-size: 11px;">{{ thesis_drift.revision_count if thesis_drift else revisions_count }} Snapshots Archived</span>
+        </div>
       </div>
 
       <!-- Value Trap Warning Banner -->
-      {% if diff.value_trap_detected %}
+      {% if diff and diff.value_trap_detected %}
       <div style="background: rgba(244, 63, 94, 0.12); border-left: 4px solid var(--accent-rose); border-radius: 6px; padding: 12px 16px; margin-bottom: 16px; font-size: 13.5px; color: #fecdd3;">
         <strong><svg class="glyph" style="vertical-align:-2px;margin-right:4px;"><use href="#glyph-alert"></use></svg>Value Trap Warning Detected:</strong> Multiple qualitative checks downgraded while valuation/price expanded. High risk of multiple compression.
       </div>
       {% endif %}
 
       <!-- Drift Migration Chips -->
-      {% if diff.pillar_migrations %}
-      <div style="margin-bottom: 16px;">
+      {% if diff and diff.pillar_migrations %}
+      <div style="margin-bottom: 12px;">
         <div style="font-size: 12px; font-weight: 700; color: var(--text-muted); margin-bottom: 8px;">Matrix Migrations Detected:</div>
         <div style="display: flex; gap: 8px; flex-wrap: wrap;">
           {% for m in diff.pillar_migrations %}
@@ -838,9 +904,20 @@
           {% endfor %}
         </div>
       </div>
+      {% elif thesis_drift and thesis_drift.pillar_migrations %}
+      <div style="margin-bottom: 12px;">
+        <div style="font-size: 12px; font-weight: 700; color: var(--text-muted); margin-bottom: 8px;">Distinct-Snapshot Pillar Migrations:</div>
+        <div style="display: flex; gap: 8px; flex-wrap: wrap;">
+          {% for m in thesis_drift.pillar_migrations %}
+          <span class="badge" style="background: rgba(30, 41, 59, 0.7); border: 1px solid var(--border-color); font-size: 12px; padding: 6px 12px;">
+            <strong>{{ m.pillar }}:</strong> {{ m.prior_posture }} ➔ {{ m.current_posture }}
+          </span>
+          {% endfor %}
+        </div>
+      </div>
       {% else %}
-      <div style="font-size: 13px; color: var(--text-secondary); margin-bottom: 12px;">
-        ✓ <strong>Zero Thesis Drift:</strong> Core qualitative health matrix posture remained stable between snapshots.
+      <div style="font-size: 13px; color: var(--text-secondary); margin-bottom: 8px;">
+        ✓ <strong>Zero Thesis Drift:</strong> Core qualitative health matrix posture remained stable across distinct archived snapshots.
       </div>
       {% endif %}
     </div>

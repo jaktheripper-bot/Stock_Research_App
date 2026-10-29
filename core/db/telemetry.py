@@ -1852,3 +1852,469 @@ def get_seo_summary(days: int = 30) -> dict:
     summary["daily_trend"] = [{"date": d, "sessions": c} for d, c in sorted(trend.items())]
     return summary
 
+
+def get_returning_visitor_insights(
+    days: int = 30,
+    start_date=None,
+    end_date=None,
+    exclude_tests: bool = True,
+    limit: int = 25,
+) -> dict:
+    """
+    Computes Returning Visitor & Return-Intent Analytics:
+    1. Stitches anonymous persistent `visitor_id`s to authenticated `user_email` / `user_id` once signed in.
+    2. Separates First-Time vs. Returning Visitors (>= 2 distinct sessions OR explicit client `visit_number >= 2`).
+    3. Ranks "What Brought Users Back" (`return_magnets` + `return_intent_categories`) across return sessions.
+    4. Builds expandable Multi-Session Returning Visitor Timelines (`returning_timelines`).
+    """
+    init_db()
+    conn = get_db_connection()
+    cursor = conn.cursor()
+    supabase_url = get_supabase_url()
+
+    result = {
+        "total_visitors": 0,
+        "returning_visitors": 0,
+        "new_visitors": 0,
+        "returning_rate_pct": 0.0,
+        "identified_returning_count": 0,
+        "avg_sessions_per_returning": 0.0,
+        "return_dwell_avg_seconds": 0.0,
+        "formatted_return_dwell_avg": "0s",
+        "new_dwell_avg_seconds": 0.0,
+        "formatted_new_dwell_avg": "0s",
+        "return_magnets": [],
+        "return_intent_categories": [],
+        "returning_timelines": [],
+    }
+
+    try:
+        where_clause = _build_telemetry_time_filter(
+            supabase_url=supabase_url,
+            days=days,
+            start_date=start_date,
+            end_date=end_date,
+            exclude_tests=exclude_tests,
+            include_bots=False,
+        )
+        cursor.execute(
+            f"""
+            SELECT
+                id, session_id, user_id, user_email, event_type, ticker,
+                landing_page, traffic_source, details, browser, timestamp
+            FROM site_usage_events
+            WHERE {where_clause}
+            ORDER BY timestamp ASC, id ASC
+            """
+        )
+        rows = cursor.fetchall() or []
+    except Exception as q_err:
+        logger.warning("Failed querying returning visitor insights: %s", q_err)
+        rows = []
+    finally:
+        try:
+            cursor.close()
+            conn.close()
+        except Exception as c_err:
+            logger.debug("Connection close notice in get_returning_visitor_insights: %s", c_err)
+
+    if not rows:
+        return result
+
+    # Pass 1: Parse events, filter synthetic/admin rows if exclude_tests, and build identity stitch map
+    parsed_events = []
+    vid_to_email = {}
+    vid_to_uid = {}
+    sess_to_email = {}
+    sess_to_vid = {}
+
+    for r in rows:
+        eid, sess_raw, uid_raw, email_raw, ev_type_raw, tick_raw, lp_raw, src_raw, det_raw, brw_raw, ts_raw = r[:11]
+        det = {}
+        if det_raw:
+            try:
+                det = json.loads(det_raw) if isinstance(det_raw, str) else det_raw
+                if not isinstance(det, dict):
+                    det = {}
+            except Exception as j_err:
+                logger.debug("JSON parse notice in get_returning_visitor_insights: %s", j_err)
+                det = {}
+
+        sess_id = str(sess_raw or "").strip() or f"anon_evt_{eid}"
+        uid = str(uid_raw or "").strip()
+        email = str(email_raw or "").strip().lower()
+        ev_type = str(ev_type_raw or "").strip()
+        tick = clean_ticker(tick_raw) if tick_raw else ""
+        lp = str(lp_raw or det.get("path") or det.get("landing_page") or "/").strip() or "/"
+        if not lp.startswith("/"):
+            lp = "/" + lp
+        if len(lp) > 1 and lp.endswith("/"):
+            lp = lp.rstrip("/")
+
+        if exclude_tests and is_excluded_telemetry_event(
+            event_type=ev_type,
+            ticker=tick,
+            browser=str(brw_raw or ""),
+            user_id=uid,
+            user_email=email,
+            landing_page=lp,
+            session_id=sess_id,
+            details=det,
+        ):
+            continue
+
+        vid = str(det.get("visitor_id") or "").strip()
+        if vid and sess_id:
+            sess_to_vid[sess_id] = vid
+        if email:
+            sess_to_email[sess_id] = email
+            if vid:
+                vid_to_email[vid] = email
+        if uid and vid:
+            vid_to_uid[vid] = uid
+
+        parsed_events.append({
+            "id": eid,
+            "session_id": sess_id,
+            "visitor_id": vid,
+            "user_id": uid,
+            "user_email": email,
+            "event_type": ev_type,
+            "ticker": tick,
+            "path": lp,
+            "traffic_source": str(src_raw or "Direct / Bookmark").strip() or "Direct / Bookmark",
+            "details": det,
+            "timestamp": _parse_event_ts(ts_raw),
+            "ts_raw": str(ts_raw or ""),
+        })
+
+    if not parsed_events:
+        return result
+
+    # Propagate stitched email across sessions sharing a visitor_id
+    for sess_id, vid in sess_to_vid.items():
+        if sess_id in sess_to_email and vid not in vid_to_email:
+            vid_to_email[vid] = sess_to_email[sess_id]
+
+    # Pass 2: Group events into visitor profiles -> sessions
+    visitors = {}
+    for ev in parsed_events:
+        sess_id = ev["session_id"]
+        vid = ev["visitor_id"] or sess_to_vid.get(sess_id, "")
+        stitched_email = ev["user_email"] or sess_to_email.get(sess_id, "") or (vid_to_email.get(vid, "") if vid else "")
+        stitched_uid = ev["user_id"] or (vid_to_uid.get(vid, "") if vid else "")
+
+        if stitched_email:
+            v_key = f"acct:{stitched_email}"
+        elif stitched_uid:
+            v_key = f"uid:{stitched_uid}"
+        elif vid:
+            v_key = f"vis:{vid}"
+        else:
+            v_key = f"sess:{sess_id}"
+
+        prof = visitors.setdefault(v_key, {
+            "visitor_key": v_key,
+            "visitor_id": vid,
+            "user_email": stitched_email,
+            "user_id": stitched_uid,
+            "max_visit_number": 1,
+            "explicit_returning": False,
+            "days_since_last_visit": None,
+            "sessions": {},
+        })
+        if stitched_email and not prof["user_email"]:
+            prof["user_email"] = stitched_email
+        if vid and not prof["visitor_id"]:
+            prof["visitor_id"] = vid
+
+        det = ev["details"]
+        try:
+            v_num = int(det.get("visit_number") or 1)
+            if v_num > prof["max_visit_number"]:
+                prof["max_visit_number"] = v_num
+        except (TypeError, ValueError):
+            v_num = 1
+
+        if det.get("is_returning") is True or v_num >= 2:
+            prof["explicit_returning"] = True
+
+        if det.get("days_since_last_visit") is not None:
+            try:
+                prof["days_since_last_visit"] = round(float(det.get("days_since_last_visit")), 1)
+            except (TypeError, ValueError):
+                pass
+
+        s_obj = prof["sessions"].setdefault(sess_id, {
+            "session_id": sess_id,
+            "first_ts": ev["timestamp"],
+            "first_ts_raw": ev["ts_raw"],
+            "last_ts": ev["timestamp"],
+            "traffic_source": ev["traffic_source"],
+            "entry_path": ev["path"],
+            "explicit_visit_num": v_num,
+            "events": [],
+        })
+        if ev["timestamp"] and (not s_obj["first_ts"] or ev["timestamp"] < s_obj["first_ts"]):
+            s_obj["first_ts"] = ev["timestamp"]
+            s_obj["first_ts_raw"] = ev["ts_raw"]
+            s_obj["entry_path"] = ev["path"]
+        if ev["timestamp"] and (not s_obj["last_ts"] or ev["timestamp"] > s_obj["last_ts"]):
+            s_obj["last_ts"] = ev["timestamp"]
+        if v_num > s_obj["explicit_visit_num"]:
+            s_obj["explicit_visit_num"] = v_num
+        s_obj["events"].append(ev)
+
+    # Pass 3: Compute session dwell, return magnets, intent categories, and timelines
+    total_visitors = len(visitors)
+    returning_profiles = []
+    return_session_dwells = []
+    new_session_dwells = []
+    magnet_accum = {}
+    intent_cat_accum = {}
+
+    def _intent_bucket(path: str, ev_types: set) -> str:
+        if any("UNLOCK" in t or "PDF" in t or "MODEL" in t for t in ev_types):
+            return "Deep-Dive Unlocks & Exports"
+        if path.startswith("/dossier/"):
+            return "Equity Dossiers"
+        if path.startswith("/discovery") or path.startswith("/opportunities"):
+            return "Daily Discovery & Alpha Screening"
+        if path.startswith("/compare"):
+            return "Peer Cluster Benchmarking"
+        if path.startswith("/funds"):
+            return "Mutual Fund Look-Through"
+        if path.startswith("/debt") or path.startswith("/sovereign") or path.startswith("/reits") or path.startswith("/calculator"):
+            return "Yield, Debt & Post-Tax Real Assets"
+        if path.startswith("/safety-radar"):
+            return "Retail Safety Radar"
+        if path.startswith("/equities"):
+            return "Equities Screener & Directory"
+        if path.startswith("/pricing"):
+            return "Pricing & Credit Packs"
+        return "Platform Navigation"
+
+    for v_key, prof in visitors.items():
+        ordered_sessions = sorted(
+            prof["sessions"].values(),
+            key=lambda s: (s["first_ts"] is None, s["first_ts"] or datetime.min, s["session_id"]),
+        )
+        is_returning = (len(ordered_sessions) >= 2) or prof["explicit_returning"]
+
+        session_summaries = []
+        visitor_total_dwell = 0.0
+        visitor_tickers = []
+        visitor_cat_counts = {}
+        high_intent_badges = []
+
+        for idx, s_obj in enumerate(ordered_sessions):
+            evs = s_obj["events"]
+            route_dwell = {}
+            route_order = []
+            ev_types_set = set()
+
+            for i, e_item in enumerate(evs):
+                rp = e_item["path"]
+                ev_u = (e_item["event_type"] or "").upper()
+                ev_types_set.add(ev_u)
+                if rp not in route_dwell:
+                    route_dwell[rp] = 0.0
+                    route_order.append(rp)
+
+                c_dw = e_item["details"].get("dwell_seconds") or e_item["details"].get("duration_seconds")
+                dw_val = 0.0
+                if c_dw is not None:
+                    try:
+                        dw_val = min(max(float(c_dw), 0.0), 1800.0)
+                    except (TypeError, ValueError):
+                        dw_val = 0.0
+                elif i + 1 < len(evs) and e_item["timestamp"] and evs[i + 1]["timestamp"]:
+                    delta_s = (evs[i + 1]["timestamp"] - e_item["timestamp"]).total_seconds()
+                    if 1.0 <= delta_s <= 1800.0 and evs[i + 1]["event_type"].upper() != "PAGE_DWELL":
+                        dw_val = delta_s
+                route_dwell[rp] = min(1800.0, route_dwell[rp] + dw_val)
+
+                tk = e_item["ticker"]
+                if not tk and rp.startswith("/dossier/") and len(rp.split("/")) > 2:
+                    tk = clean_ticker(rp.split("/")[2])
+                if tk and tk not in ("APP", "TEST") and tk not in visitor_tickers:
+                    visitor_tickers.append(tk)
+
+                if "UNLOCK" in ev_u and "Deep-Dive Unlock" not in high_intent_badges:
+                    high_intent_badges.append("Deep-Dive Unlock")
+                if ("PDF" in ev_u or "MODEL" in ev_u) and "Report / Model Export" not in high_intent_badges:
+                    high_intent_badges.append("Report / Model Export")
+                if (rp.startswith("/compare") or "COMPARE" in ev_u) and "Peer Compare" not in high_intent_badges:
+                    high_intent_badges.append("Peer Compare")
+                if rp.startswith("/pricing") and "Checked Pricing" not in high_intent_badges:
+                    high_intent_badges.append("Checked Pricing")
+
+            sess_dwell = round(sum(route_dwell.values()), 1)
+            visitor_total_dwell += sess_dwell
+
+            is_return_session = (idx >= 1) or (s_obj["explicit_visit_num"] >= 2) or (is_returning and len(ordered_sessions) == 1)
+            if is_return_session:
+                return_session_dwells.append(sess_dwell)
+                # Determine primary return magnet for this return session:
+                # If entry was generic '/', prefer deepest non-root route visited in that return session if any
+                non_root = [r_p for r_p in route_order if r_p != "/"]
+                if s_obj["entry_path"] == "/" and non_root:
+                    magnet_path = max(non_root, key=lambda r_p: (route_dwell.get(r_p, 0.0), -route_order.index(r_p)))
+                else:
+                    magnet_path = s_obj["entry_path"]
+
+                m_entry = magnet_accum.setdefault(magnet_path, {
+                    "path": magnet_path,
+                    "sessions": 0,
+                    "visitors": set(),
+                    "dwell_total": 0.0,
+                    "high_intent_actions": 0,
+                })
+                m_entry["sessions"] += 1
+                m_entry["visitors"].add(v_key)
+                m_entry["dwell_total"] += route_dwell.get(magnet_path, sess_dwell)
+                if any(("UNLOCK" in x or "PDF" in x or "MODEL" in x or "COMPARE" in x) for x in ev_types_set):
+                    m_entry["high_intent_actions"] += 1
+
+                bucket = _intent_bucket(magnet_path, ev_types_set)
+                b_entry = intent_cat_accum.setdefault(bucket, {"category": bucket, "sessions": 0, "visitors": set()})
+                b_entry["sessions"] += 1
+                b_entry["visitors"].add(v_key)
+            else:
+                new_session_dwells.append(sess_dwell)
+
+            routes_out = []
+            for r_p in route_order[:8]:
+                cat_n, cat_i = classify_page_category(r_p)
+                visitor_cat_counts[cat_n] = visitor_cat_counts.get(cat_n, 0) + 1
+                routes_out.append({
+                    "path": r_p,
+                    "category": cat_n,
+                    "icon": cat_i,
+                    "dwell_seconds": round(route_dwell.get(r_p, 0.0), 1),
+                    "formatted_dwell": format_duration(route_dwell.get(r_p, 0.0)),
+                })
+
+            entry_cat, entry_icon = classify_page_category(s_obj["entry_path"])
+            started_str = _format_timestamp(s_obj["first_ts_raw"]) if s_obj["first_ts_raw"] else "Recent"
+            session_summaries.append({
+                "visit_index": max(idx + 1, s_obj["explicit_visit_num"]),
+                "is_return_session": is_return_session,
+                "started_at_str": started_str,
+                "traffic_source": s_obj["traffic_source"],
+                "entry_path": s_obj["entry_path"],
+                "entry_category": entry_cat,
+                "entry_icon": entry_icon,
+                "pages_visited_count": len(route_order),
+                "dwell_seconds": sess_dwell,
+                "formatted_dwell": format_duration(sess_dwell),
+                "routes": routes_out,
+            })
+
+        if is_returning:
+            gap_days = prof["days_since_last_visit"]
+            if gap_days is None and len(ordered_sessions) >= 2:
+                t_prev = ordered_sessions[-2]["last_ts"] or ordered_sessions[-2]["first_ts"]
+                t_curr = ordered_sessions[-1]["first_ts"]
+                if t_prev and t_curr and t_curr >= t_prev:
+                    gap_days = round((t_curr - t_prev).total_seconds() / 86400.0, 1)
+
+            fav_cat = max(visitor_cat_counts.items(), key=lambda kv: kv[1])[0] if visitor_cat_counts else "Platform Page"
+            raw_vid = prof["visitor_id"] or v_key
+            short_tag = raw_vid[-6:].upper() if len(raw_vid) >= 6 else raw_vid.upper()
+            display_id = prof["user_email"] if prof["user_email"] else f"Returning Reader #{short_tag}"
+            last_seen_dt = ordered_sessions[-1]["last_ts"] or ordered_sessions[-1]["first_ts"]
+
+            returning_profiles.append({
+                "visitor_key": v_key,
+                "display_identity": display_id,
+                "is_authenticated": bool(prof["user_email"]),
+                "visit_count": max(len(ordered_sessions), prof["max_visit_number"]),
+                "recorded_sessions_in_window": len(ordered_sessions),
+                "days_since_prev_visit": gap_days,
+                "total_dwell_seconds": round(visitor_total_dwell, 1),
+                "formatted_total_dwell": format_duration(visitor_total_dwell),
+                "favorite_category": fav_cat,
+                "top_tickers": visitor_tickers[:5],
+                "high_intent_badges": high_intent_badges[:4],
+                "last_seen_dt": last_seen_dt,
+                "last_seen_str": session_summaries[-1]["started_at_str"] if session_summaries else "Recent",
+                "latest_return_route": session_summaries[-1]["entry_path"] if session_summaries else "/",
+                "sessions": list(reversed(session_summaries)),
+            })
+
+    returning_count = len(returning_profiles)
+    new_count = max(0, total_visitors - returning_count)
+    identified_count = sum(1 for rp in returning_profiles if rp["is_authenticated"])
+    avg_sess_ret = round(
+        sum(rp["visit_count"] for rp in returning_profiles) / max(1, returning_count),
+        1,
+    ) if returning_count else 0.0
+
+    ret_avg_dwell = round(sum(return_session_dwells) / max(1, len(return_session_dwells)), 1) if return_session_dwells else 0.0
+    new_avg_dwell = round(sum(new_session_dwells) / max(1, len(new_session_dwells)), 1) if new_session_dwells else 0.0
+
+    return_magnets = []
+    total_return_sessions = max(1, sum(m["sessions"] for m in magnet_accum.values()))
+    for m_path, m_data in sorted(
+        magnet_accum.items(),
+        key=lambda kv: (kv[1]["sessions"], kv[1]["dwell_total"]),
+        reverse=True,
+    )[:12]:
+        cat_n, cat_i = classify_page_category(m_path)
+        tk = clean_ticker(m_path.split("/")[2]) if m_path.startswith("/dossier/") and len(m_path.split("/")) > 2 else ""
+        avg_dw = round(m_data["dwell_total"] / max(1, m_data["sessions"]), 1)
+        return_magnets.append({
+            "path": m_path,
+            "display_name": format_route_display(m_path),
+            "category": cat_n,
+            "icon": cat_i,
+            "ticker": tk,
+            "return_sessions_count": m_data["sessions"],
+            "share_pct": round((m_data["sessions"] / total_return_sessions) * 100.0, 1),
+            "unique_returning_visitors": len(m_data["visitors"]),
+            "avg_dwell_seconds": avg_dw,
+            "formatted_avg_dwell": format_duration(avg_dw),
+            "high_intent_actions": m_data["high_intent_actions"],
+        })
+
+    return_intent_categories = [
+        {
+            "category": b_val["category"],
+            "return_sessions": b_val["sessions"],
+            "unique_visitors": len(b_val["visitors"]),
+            "share_pct": round((b_val["sessions"] / total_return_sessions) * 100.0, 1),
+        }
+        for b_val in sorted(intent_cat_accum.values(), key=lambda x: x["sessions"], reverse=True)
+    ]
+
+    returning_profiles.sort(
+        key=lambda rp: (
+            rp["last_seen_dt"] is not None,
+            rp["last_seen_dt"] or datetime.min,
+            rp["visit_count"],
+            rp["total_dwell_seconds"],
+        ),
+        reverse=True,
+    )
+    for rp in returning_profiles:
+        rp.pop("last_seen_dt", None)
+
+    result.update({
+        "total_visitors": total_visitors,
+        "returning_visitors": returning_count,
+        "new_visitors": new_count,
+        "returning_rate_pct": round((returning_count / max(1, total_visitors)) * 100.0, 1) if total_visitors else 0.0,
+        "identified_returning_count": identified_count,
+        "avg_sessions_per_returning": avg_sess_ret,
+        "return_dwell_avg_seconds": ret_avg_dwell,
+        "formatted_return_dwell_avg": format_duration(ret_avg_dwell),
+        "new_dwell_avg_seconds": new_avg_dwell,
+        "formatted_new_dwell_avg": format_duration(new_avg_dwell),
+        "return_magnets": return_magnets,
+        "return_intent_categories": return_intent_categories,
+        "returning_timelines": returning_profiles[: max(1, int(limit or 25))],
+    })
+    return result
+
+

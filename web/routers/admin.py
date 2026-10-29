@@ -333,6 +333,33 @@ async def admin_dashboard(
                        "channels": [], "organic_landing_pages": [], "daily_trend": [],
                        "total_sessions": 0, "search_sessions": 0}
 
+    try:
+        from core.db.telemetry import get_returning_visitor_insights
+        returning_insights = get_returning_visitor_insights(
+            days=selected_days if selected_days is not None else 30,
+            start_date=parsed_start,
+            end_date=parsed_end,
+            exclude_tests=exclude_tests,
+            limit=25,
+        )
+    except Exception as ret_err:
+        logger.warning("Error fetching returning visitor insights: %s", ret_err)
+        returning_insights = {
+            "total_visitors": 0,
+            "returning_visitors": 0,
+            "new_visitors": 0,
+            "returning_rate_pct": 0.0,
+            "identified_returning_count": 0,
+            "avg_sessions_per_returning": 0.0,
+            "return_dwell_avg_seconds": 0.0,
+            "formatted_return_dwell_avg": "0s",
+            "new_dwell_avg_seconds": 0.0,
+            "formatted_new_dwell_avg": "0s",
+            "return_magnets": [],
+            "return_intent_categories": [],
+            "returning_timelines": [],
+        }
+
     admin_team = list_admin_users()
     admin_audit_logs = get_admin_audit_logs(limit=100)
 
@@ -422,6 +449,7 @@ async def admin_dashboard(
             "canned_responses": canned_responses,
             "open_tickets_count": open_tickets_count,
             "session_journeys": session_journeys,
+            "returning_insights": returning_insights,
             "seo_summary": seo_summary,
             "ai_spends": ai_spends,
             "digest_summary": digest_summary,
@@ -429,6 +457,27 @@ async def admin_dashboard(
             "active_page": "admin"
         }
     )
+
+
+@router.get("/admin/api/returning-visitors")
+def admin_api_returning_visitors(
+    request: Request,
+    days: int = Query(30, ge=1, le=365),
+    include_tests: int = Query(0),
+    limit: int = Query(25, ge=1, le=100),
+    x_admin_key: Optional[str] = Header(None),
+):
+    """Authenticated JSON endpoint returning Returning Visitor KPIs, Return Magnets, and Multi-Session Timelines."""
+    if not _is_admin_authenticated(request) and not _verify_admin_api_key(x_admin_key):
+        raise HTTPException(status_code=403, detail="Administrator authentication required.")
+    from fastapi.encoders import jsonable_encoder
+    from core.db.telemetry import get_returning_visitor_insights
+    data = get_returning_visitor_insights(
+        days=days,
+        exclude_tests=not bool(include_tests),
+        limit=limit,
+    )
+    return JSONResponse(content=jsonable_encoder(data))
 
 
 # ==============================================================================

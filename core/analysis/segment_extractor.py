@@ -18,10 +18,10 @@ _NOISE_WORD_RE = re.compile(
     r"tax|taxation|gst|excise|duty|tariff|subsidy|"
     r"market\s+share|volume\s+share|value\s+share|wallet\s+share|"
     r"ratio|ratios|tier\s*1|cet[\s\-]*1|deposit|lcr|nsfr|"
-    r"yield|nim|casa|gnpa|nnpa|npa|crar|car|pcr|credit\s+cost|cost\s+of\s+funds|opex|cost[\s\-]+to[\s\-]+income|spread|"
+    r"yield|nim|casa|gnpa|nnpa|npa|crar|car\s+ratio|capital\s+adequacy|pcr|credit\s+cost|cost\s+of\s+funds|opex|cost[\s\-]+to[\s\-]+income|spread|"
     r"capex|utilization|utilisation|capacity|occupancy|penetration|localisation|localization|"
     r"churn|attrition|retention|collection|payout|dividend|buyback|"
-    r"multiple|pe|ev|beta|volatility|inflation|discount|upside|downside|target|score|weight"
+    r"multiple|p\/e|pe\s+(?:ratio|multiple)|ev\s*\/\s*(?:ebitda|sales|ebit)|ev\s+multiple|beta|volatility|inflation|discount|upside|downside|target|score|weight"
     r")\b"
 )
 
@@ -138,8 +138,13 @@ def _parse_revenue_markdown_tables(scope: str, resolved_period: str) -> List[Dic
         cells = [c.strip() for c in stripped.strip("|").split("|")]
         if all(re.match(r"^[:\-\s]+$", c) for c in cells if c):
             continue
+        value_cells_have_pct = any(
+            re.search(r"~?\s*\d{1,3}(?:\.\d+)?\s*%", c) for c in cells[1:]
+        )
         header_join = " | ".join(cells).lower()
-        if any(h in header_join for h in ("segment", "vertical", "division", "business", "geography")):
+        if not value_cells_have_pct and any(
+            h in header_join for h in ("segment", "vertical", "division", "business", "geography")
+        ):
             if "market share" in header_join:
                 in_rev_table = False
             elif any(r in header_join for r in ("revenue", "sales", "turnover", "mix", "split", "contribution", "share")):

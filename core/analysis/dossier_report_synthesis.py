@@ -51,6 +51,7 @@ CRITICAL ANALYTICAL & LINGUISTIC RULES:
 ---
 ## Pillar 1: Macro-Economic, Geopolitical & Environmental Overlays
 ## Pillar 2: Industry Dynamics & Competitive Positioning
+Where statutory Ind AS 108 / BSE Regulation 33 multi-segment revenue splits are disclosed, include a concise Markdown table (`| Operating Segment | Revenue Share (%) | Key Unit-Economic Driver |`); for capital-goods, defence, EPC, EMS, or IT engineering entities with disclosed backlog, state the verified order book in `INR ... Cr`. Skip segment tables cleanly for single-segment enterprises rather than estimating splits.
 ## Pillar 3: Promoter Quality & Fundamental Health
 ## Pillar 4: The "Structural vs. Temporary" Drop Diagnostic
 ## Pillar 5: Valuation & Margin of Safety

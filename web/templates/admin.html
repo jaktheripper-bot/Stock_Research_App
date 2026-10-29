@@ -2051,6 +2051,162 @@ html[data-theme="light"] .copilot-input {
       </div>
     </div>
 
+    <!-- Returning Visitors & "What Brought Users Back" Return-Intent Intelligence -->
+    {% set ret = returning_insights|default({}) %}
+    <div id="cardReturningVisitorsIntel" class="admin-card" style="margin-bottom: 24px; border: 1px solid rgba(16, 185, 129, 0.25);">
+      <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 12px; margin-bottom: 18px;">
+        <div>
+          <h3 style="margin: 0; font-size: 16.5px; font-weight: 800; display: flex; align-items: center; gap: 8px; color: #f8fafc;">
+            <svg class="glyph" style="width: 16px; height: 16px; color: #34d399;"><use href="#icon-radar"></use></svg>
+            <span>Returning Visitors &amp; Return-Intent Intelligence</span>
+          </h3>
+          <p style="margin: 4px 0 0; color: var(--text-secondary, #94a3b8); font-size: 12px;">
+            Tracks repeat readers across sessions (&gt;30m gap), stitches signed-in accounts, and surfaces the exact routes and tickers that bring users back.
+          </p>
+        </div>
+        <div style="display: flex; gap: 8px; align-items: center; flex-wrap: wrap;">
+          <span class="status-pill" style="font-size: 11px; background: rgba(16, 185, 129, 0.14); color: #34d399; border: 1px solid rgba(16, 185, 129, 0.3);">
+            Returning Share: <strong>{{ ret.returning_rate_pct|default(0) }}%</strong>
+          </span>
+          <span class="status-pill closed" style="font-size: 11px;">
+            Identified Accounts: <strong style="color: #38bdf8; margin-left: 4px;">{{ ret.identified_returning_count|default(0) }}</strong>
+          </span>
+        </div>
+      </div>
+
+      <!-- Returning vs First-Time KPIs -->
+      <div class="kpi-grid" style="grid-template-columns: repeat(auto-fit, minmax(185px, 1fr)); margin-bottom: 20px;">
+        <div class="kpi-card" style="border-left: 3px solid #10b981;">
+          <div class="kpi-label">Returning Visitors</div>
+          <div class="kpi-value mono" style="color: #34d399;">{{ ret.returning_visitors|default(0) }}</div>
+          <div class="kpi-delta">of {{ ret.total_visitors|default(0) }} distinct visitors ({{ ret.new_visitors|default(0) }} first-time)</div>
+        </div>
+        <div class="kpi-card" style="border-left: 3px solid #38bdf8;">
+          <div class="kpi-label">Avg Visits / Returning Reader</div>
+          <div class="kpi-value mono" style="color: #38bdf8;">{{ ret.avg_sessions_per_returning|default(0) }}x</div>
+          <div class="kpi-delta">Distinct sessions per repeat reader</div>
+        </div>
+        <div class="kpi-card" style="border-left: 3px solid #f59e0b;">
+          <div class="kpi-label">Return Session Dwell</div>
+          <div class="kpi-value mono" style="color: #fbbf24;">{{ ret.formatted_return_dwell_avg|default('0s') }}</div>
+          <div class="kpi-delta">vs {{ ret.formatted_new_dwell_avg|default('0s') }} on first-time sessions</div>
+        </div>
+        <div class="kpi-card" style="border-left: 3px solid #c084fc;">
+          <div class="kpi-label">Top Return Habit Pillar</div>
+          <div class="kpi-value" style="font-size: 14.5px; font-weight: 700; color: #c084fc;">
+            {% if ret.return_intent_categories and ret.return_intent_categories[0] %}
+              {{ ret.return_intent_categories[0].category }}
+            {% else %}
+              Awaiting Return Sessions
+            {% endif %}
+          </div>
+          <div class="kpi-delta">
+            {% if ret.return_intent_categories and ret.return_intent_categories[0] %}
+              {{ ret.return_intent_categories[0].share_pct }}% of return visits ({{ ret.return_intent_categories[0].return_sessions }} sessions)
+            {% else %}
+              Populates automatically on Visit #2+
+            {% endif %}
+          </div>
+        </div>
+      </div>
+
+      <!-- Return Magnet Leaderboard + Multi-Session Visitor Timelines -->
+      <div class="grid-2col" style="gap: 18px; align-items: start;">
+        <div>
+          <h4 id="returnMagnetHeading" style="margin: 0 0 8px; font-size: 14px; font-weight: 700; color: #e2e8f0;">
+            What Brought Users Back (Return Magnet Leaderboard)
+          </h4>
+          <div tabindex="0" role="region" aria-labelledby="returnMagnetHeading" class="admin-table-wrap table-sticky-wrap" style="overflow-x: auto;">
+            <table id="tableReturnMagnets" class="admin-table">
+              <thead>
+                <tr>
+                  <th>Return Magnet Route</th>
+                  <th>Return Visits</th>
+                  <th>Readers</th>
+                  <th>Avg Dwell</th>
+                </tr>
+              </thead>
+              <tbody>
+                {% for mag in ret.return_magnets|default([]) %}
+                <tr>
+                  <th scope="row" style="text-align: left; font-weight: 600;">
+                    <a href="{{ mag.path }}" target="_blank" style="color: #38bdf8; text-decoration: none; font-family: monospace; font-size: 12px;">
+                      {{ mag.path }} ↗
+                    </a>
+                    <div style="font-size: 11px; color: #94a3b8; font-weight: 500; margin-top: 2px;">
+                      {{ mag.icon }} {{ mag.category }}{% if mag.high_intent_actions %} • <span style="color: #fbbf24;">{{ mag.high_intent_actions }} high-intent</span>{% endif %}
+                    </div>
+                  </th>
+                  <td class="mono" style="font-weight: 700; color: #34d399;">{{ mag.return_sessions_count }} ({{ mag.share_pct }}%)</td>
+                  <td class="mono">{{ mag.unique_returning_visitors }}</td>
+                  <td class="mono" style="color: #06b6d4;">{{ mag.formatted_avg_dwell }}</td>
+                </tr>
+                {% else %}
+                <tr>
+                  <td colspan="4" style="text-align: center; color: #94a3b8; padding: 18px; font-size: 12px;">
+                    No multi-session return visits recorded in this date window yet.
+                  </td>
+                </tr>
+                {% endfor %}
+              </tbody>
+            </table>
+          </div>
+        </div>
+
+        <div>
+          <h4 style="margin: 0 0 8px; font-size: 14px; font-weight: 700; color: #e2e8f0;">
+            Multi-Session Returning Reader Timelines (Searchable)
+          </h4>
+          <div id="returningTimelinesContainer" style="display: flex; flex-direction: column; gap: 10px; max-height: 420px; overflow-y: auto; padding-right: 4px;">
+            {% for prof in ret.returning_timelines|default([]) %}
+            <details class="returning-visitor-timeline" style="background: rgba(15, 23, 42, 0.65); border: 1px solid rgba(255, 255, 255, 0.09); border-radius: 8px; padding: 10px 14px;">
+              <summary style="cursor: pointer; display: flex; justify-content: space-between; align-items: center; gap: 10px; flex-wrap: wrap; font-size: 12.5px; font-weight: 700; color: #f1f5f9; list-style: none;">
+                <span style="display: inline-flex; align-items: center; gap: 8px; flex-wrap: wrap;">
+                  <span style="color: {% if prof.is_authenticated %}#34d399{% else %}#38bdf8{% endif %};">{{ prof.display_identity }}</span>
+                  <span class="status-pill closed" style="font-size: 10.5px;">Visit #{{ prof.visit_count }}</span>
+                  {% if prof.days_since_prev_visit is not none %}
+                  <span style="font-size: 11px; color: #94a3b8; font-weight: 500;">returned after {{ prof.days_since_prev_visit }}d</span>
+                  {% endif %}
+                </span>
+                <span class="mono" style="font-size: 11px; color: #fbbf24;">{{ prof.formatted_total_dwell }} total ▾</span>
+              </summary>
+
+              <div style="margin-top: 10px; padding-top: 10px; border-top: 1px solid rgba(255, 255, 255, 0.06); font-size: 12px;">
+                <div style="display: flex; gap: 6px; flex-wrap: wrap; margin-bottom: 8px;">
+                  <span class="status-pill closed" style="font-size: 10.5px;">Primary Focus: {{ prof.favorite_category }}</span>
+                  {% for tk in prof.top_tickers %}
+                  <a href="/dossier/{{ tk }}" target="_blank" class="status-pill" style="font-size: 10.5px; text-decoration: none; background: rgba(56, 189, 248, 0.14); color: #38bdf8;">{{ tk }}</a>
+                  {% endfor %}
+                  {% for b in prof.high_intent_badges %}
+                  <span class="status-pill" style="font-size: 10.5px; background: rgba(245, 158, 11, 0.14); color: #fbbf24;">{{ b }}</span>
+                  {% endfor %}
+                </div>
+
+                <div style="display: flex; flex-direction: column; gap: 6px;">
+                  {% for sess in prof.sessions %}
+                  <div style="background: rgba(30, 41, 59, 0.45); border-radius: 6px; padding: 8px 10px; border-left: 3px solid {% if sess.is_return_session %}#10b981{% else %}#64748b{% endif %};">
+                    <div style="display: flex; justify-content: space-between; gap: 8px; flex-wrap: wrap; color: #cbd5e1; font-weight: 600; font-size: 11.5px;">
+                      <span>Visit #{{ sess.visit_index }} • {{ sess.started_at_str }} ({{ sess.traffic_source }})</span>
+                      <span class="mono" style="color: #38bdf8;">{{ sess.formatted_dwell }} • {{ sess.pages_visited_count }} pg</span>
+                    </div>
+                    <div style="margin-top: 4px; color: #94a3b8; font-family: monospace; font-size: 11px; line-height: 1.45;">
+                      {% for r in sess.routes %}{{ r.path }} ({{ r.formatted_dwell }}){% if not loop.last %} → {% endif %}{% endfor %}
+                    </div>
+                  </div>
+                  {% endfor %}
+                </div>
+              </div>
+            </details>
+            {% else %}
+            <div style="padding: 18px; text-align: center; color: #94a3b8; font-size: 12px; background: rgba(15, 23, 42, 0.35); border-radius: 8px; border: 1px dashed rgba(255, 255, 255, 0.1);">
+              Repeat reader timelines appear here automatically once a visitor returns for Visit #2+.
+            </div>
+            {% endfor %}
+          </div>
+        </div>
+      </div>
+    </div>
+
     <!-- Top Landing Pages & Visited Routes Grid -->
     <div class="grid-2col" style="margin-bottom: 24px;">
       <div class="admin-card">

@@ -268,6 +268,18 @@ def compile_equity_dossier(
     except Exception as e:
         logger.debug(f"Epistemic ledger compilation notice for {ticker}: {e}")
 
+    # 11. Ind AS 108 Statutory Segment Mix & Order-Book Backlog (fail-closed on single-segment / undisclosed)
+    segment_intel = None
+    try:
+        from core.analysis.segment_extractor import extract_ind_as_108_segments
+        segment_intel = extract_ind_as_108_segments(
+            ticker=clean_sym,
+            report_text=report_text,
+            company_name=company_name,
+        )
+    except Exception as e:
+        logger.debug(f"Segment intelligence extraction notice for {ticker}: {e}")
+
     return {
         "ticker": ticker,
         "composite_score": composite_score,
@@ -281,4 +293,5 @@ def compile_equity_dossier(
         "varan_delta_packet": varan_packet,
         "setu_capital_matrix": setu_matrix,
         "epistemic_ledger": epistemic_ledger,
+        "segment_intelligence": segment_intel,
     }

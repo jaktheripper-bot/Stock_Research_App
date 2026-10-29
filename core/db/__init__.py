@@ -83,6 +83,7 @@ from core.db.telemetry import (
     get_session_journeys,
     get_user_usage_analytics,
     get_traffic_flow_analytics,
+    get_returning_visitor_insights,
     compute_page_dwell_and_visit_tree,
     format_duration,
 )
@@ -210,6 +211,7 @@ __all__ = [
     "get_site_usage_summary",
     "get_session_journeys",
     "get_traffic_flow_analytics",
+    "get_returning_visitor_insights",
     "compute_page_dwell_and_visit_tree",
     "format_duration",
     # settings

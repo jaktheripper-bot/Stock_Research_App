@@ -1551,6 +1551,47 @@ def dossier_page(request: Request, ticker: str):
         except Exception as e:
             logger.debug(f"User thesis lookup notice for {canonical}: {e}")
 
+    # Sequential Thesis Drift & Filing-vs-Baseline Accountability
+    thesis_drift = None
+    try:
+        from core.analysis.guidance_delivery_audit import compute_sequential_thesis_drift
+        thesis_drift = compute_sequential_thesis_drift(canonical)
+        if thesis_drift and not is_deep_dive_unlocked:
+            raw_triggers = thesis_drift.get("active_revision_triggers")
+            if isinstance(raw_triggers, dict):
+                thesis_drift["active_revision_triggers"] = {
+                    k: (
+                        "[Unlocked with Full 7-Pillar Deep Dive]"
+                        if int(str(k).strip() or 0) in (3, 5)
+                        else v
+                    )
+                    for k, v in raw_triggers.items()
+                    if str(k).strip().isdigit()
+                }
+    except Exception as e:
+        logger.debug(f"Sequential thesis drift notice for {canonical}: {e}")
+
+    # Dynamic Sector Peer Cluster Query (Top compiled peers in same sector by Market Cap)
+    peer_cluster_query = f"{canonical},{'TCS' if canonical != 'TCS' else 'INFY'}"
+    try:
+        all_dir_eqs = get_all_equities_directory_sync() or []
+        target_sec = next((eq.get("sector_slug") for eq in all_dir_eqs if eq.get("ticker") == canonical), None)
+        peer_candidates = [
+            eq["ticker"]
+            for eq in sorted(all_dir_eqs, key=lambda x: x.get("market_cap_cr", 0.0), reverse=True)
+            if eq.get("ticker") and eq.get("ticker") != canonical and (not target_sec or eq.get("sector_slug") == target_sec)
+        ][:3]
+        if not peer_candidates:
+            peer_candidates = [
+                eq["ticker"]
+                for eq in sorted(all_dir_eqs, key=lambda x: x.get("market_cap_cr", 0.0), reverse=True)
+                if eq.get("ticker") and eq.get("ticker") != canonical
+            ][:3]
+        if peer_candidates:
+            peer_cluster_query = ",".join([canonical] + peer_candidates)
+    except Exception as e:
+        logger.debug(f"Peer cluster query notice for {canonical}: {e}")
+
     return templates.TemplateResponse(
         request=request,
         name="dossier.html",
@@ -1595,6 +1636,8 @@ def dossier_page(request: Request, ticker: str):
             "user_thesis_checkpoint": user_thesis_checkpoint,
             "equity_intel": equity_intel,
             "epistemic_ledger": equity_intel.get("epistemic_ledger") if equity_intel else None,
+            "thesis_drift": thesis_drift,
+            "peer_cluster_query": peer_cluster_query,
         }
     )
 
@@ -1604,15 +1647,107 @@ async def compare_page(
     request: Request,
     a: Optional[str] = "INFY",
     b: Optional[str] = "TCS",
-    compare_error: Optional[str] = None
+    c: Optional[str] = None,
+    d: Optional[str] = None,
+    e: Optional[str] = None,
+    tickers: Optional[str] = None,
+    compare_error: Optional[str] = None,
 ):
-    """Cross-company peer comparison and 3-tier disparity diagnostic."""
+    """Cross-company peer comparison (2-to-5 stock cluster + 3-tier disparity diagnostic)."""
+    extra_inputs = [s for s in (c, d, e) if s and str(s).strip()]
+    use_cluster_mode = bool((tickers and str(tickers).strip()) or extra_inputs)
+
+    cluster_data = None
+    error_msg = compare_error
+
+    if use_cluster_mode:
+        raw_parts = (
+            [p.strip() for p in str(tickers).split(",") if p.strip()]
+            if (tickers and str(tickers).strip())
+            else [p for p in (a, b, c, d, e) if p and str(p).strip()]
+        )
+        canonical_list = []
+        for raw_sym in raw_parts:
+            cl = clean_ticker(raw_sym)
+            if cl:
+                can = resolve_canonical_symbol(cl) or cl
+                if can not in canonical_list:
+                    canonical_list.append(can)
+        canonical_list = canonical_list[:5]
+
+        canonical_a = canonical_list[0] if len(canonical_list) >= 1 else "INFY"
+        canonical_b = canonical_list[1] if len(canonical_list) >= 2 else "TCS"
+
+        if len(canonical_list) < 2:
+            if len(raw_parts) >= 2 and len(canonical_list) == 1:
+                error_msg = error_msg or f"Cannot compare a company against itself ({canonical_list[0]}). Please select distinct entities for peer comparison."
+            else:
+                error_msg = error_msg or "Please provide between 2 and 5 distinct stock ticker symbols to initiate peer cluster comparison."
+        else:
+            unrecognized = []
+            for sym in canonical_list:
+                scrip = resolve_bse_scrip_code(sym)
+                has_rep = get_report_by_ticker_sync(sym)
+                if (not scrip or scrip == "N/A") and not has_rep:
+                    unrecognized.append(sym)
+            if unrecognized:
+                suggestions = []
+                for u in unrecognized:
+                    suggestions.extend(get_ticker_suggestions(u, limit=3))
+                hint = f" Did you mean: {', '.join(dict.fromkeys(suggestions))}?" if suggestions else ""
+                error_msg = (
+                    f"Unrecognized or unlisted ticker symbol(s): {', '.join(unrecognized)}. "
+                    f"Please select listed BSE/NSE companies for peer comparison.{hint}"
+                )
+
+        if not error_msg:
+            try:
+                from core.analysis.peer_cluster import compare_peer_cluster
+                cluster_data = await compare_peer_cluster(canonical_list)
+                for p_item in cluster_data.get("peers", []):
+                    pf = p_item.get("fundamentals") or {}
+                    if pf.get("market_cap"):
+                        pf["market_cap_str"] = format_inr(pf["market_cap"])
+            except Exception as exc:
+                logger.error(f"Error comparing peer cluster {canonical_list}: {exc}")
+                error_msg = f"Unable to retrieve verified peer cluster metrics for {', '.join(canonical_list)}: {exc}"
+
+        peers_out = (cluster_data or {}).get("peers", [])
+        fund_a_out = peers_out[0]["fundamentals"] if len(peers_out) >= 1 else {}
+        fund_b_out = peers_out[1]["fundamentals"] if len(peers_out) >= 2 else {}
+        pillars_a_out = peers_out[0]["pillars"] if len(peers_out) >= 1 else {}
+        pillars_b_out = peers_out[1]["pillars"] if len(peers_out) >= 2 else {}
+        disp_warns = (cluster_data or {}).get("disparity_warnings", [])
+        return templates.TemplateResponse(
+            request=request,
+            name="compare.html",
+            context={
+                "active_page": "compare",
+                "ticker_a": canonical_a,
+                "ticker_b": canonical_b,
+                "ticker_c": canonical_list[2] if len(canonical_list) >= 3 else "",
+                "ticker_d": canonical_list[3] if len(canonical_list) >= 4 else "",
+                "ticker_e": canonical_list[4] if len(canonical_list) >= 5 else "",
+                "cluster": cluster_data,
+                "compared": not bool(error_msg) and bool(peers_out),
+                "compare_error": error_msg,
+                "comparison": {
+                    "company_a": {"ticker": canonical_a, "fundamentals": fund_a_out, "pillars": pillars_a_out},
+                    "company_b": {"ticker": canonical_b, "fundamentals": fund_b_out, "pillars": pillars_b_out},
+                },
+                "fund_a": fund_a_out,
+                "fund_b": fund_b_out,
+                "matrix_a": pillars_a_out,
+                "matrix_b": pillars_b_out,
+                "disparity": {"is_disparate": bool(disp_warns), "warnings": disp_warns},
+            },
+        )
+
     clean_a = clean_ticker(a if a is not None else "INFY")
     clean_b = clean_ticker(b if b is not None else "TCS")
     canonical_a = resolve_canonical_symbol(clean_a) or clean_a
     canonical_b = resolve_canonical_symbol(clean_b) or clean_b
 
-    error_msg = compare_error
     if not clean_a or not clean_b:
         error_msg = error_msg or "Please provide two valid stock ticker symbols to initiate peer comparison."
     elif canonical_a == canonical_b:
@@ -1648,9 +1783,9 @@ async def compare_page(
     if not error_msg:
         try:
             comp_data = await compare_two_companies(canonical_a, canonical_b)
-        except Exception as e:
-            logger.error(f"Error comparing companies {canonical_a} vs {canonical_b}: {e}")
-            error_msg = f"Unable to retrieve verified peer metrics for {canonical_a} vs {canonical_b}: {e}"
+        except Exception as exc:
+            logger.error(f"Error comparing companies {canonical_a} vs {canonical_b}: {exc}")
+            error_msg = f"Unable to retrieve verified peer metrics for {canonical_a} vs {canonical_b}: {exc}"
 
     for f_key in ["fund_a", "fund_b"]:
         m = comp_data.get(f_key, {}).get("market_cap")
@@ -1691,6 +1826,10 @@ async def compare_page(
             "active_page": "compare",
             "ticker_a": canonical_a,
             "ticker_b": canonical_b,
+            "ticker_c": "",
+            "ticker_d": "",
+            "ticker_e": "",
+            "cluster": None,
             "compared": not bool(error_msg),
             "compare_error": error_msg,
             "comparison": comparison,
@@ -2255,13 +2394,23 @@ def etf_dossier_page(request: Request, symbol: str):
 async def tax_calculator_page(
     request: Request,
     tax_slab: Optional[str] = Query("30.0"),
+    slab_key: Optional[str] = Query(None),
     inflation: Optional[str] = Query("5.0"),
+    custom_yield: Optional[str] = Query(None, alias="yield"),
 ):
-    """Render Post-Tax Real Return Matrix across Indian asset classes."""
-    try:
-        parsed_slab = float(tax_slab) if tax_slab not in (None, "") else 30.0
-    except (ValueError, TypeError):
-        parsed_slab = 30.0
+    """Render Post-Tax Real Return Matrix + Live Tracked Yield Instruments across Indian asset classes."""
+    from core.analysis.net_real_tax_calculator import calculate_post_tax_matrix, calculate_net_real_return
+    from core.analysis.live_security_tax_bridge import HNI_EFFECTIVE_SLABS, compare_live_tracked_yield_instruments
+
+    raw_slab_input = slab_key if (slab_key and str(slab_key).strip()) else tax_slab
+    upper_key = str(raw_slab_input or "").strip().upper()
+    if upper_key in HNI_EFFECTIVE_SLABS:
+        parsed_slab = HNI_EFFECTIVE_SLABS[upper_key]
+    else:
+        try:
+            parsed_slab = float(raw_slab_input) if raw_slab_input not in (None, "") else 30.0
+        except (ValueError, TypeError):
+            parsed_slab = 30.0
 
     try:
         parsed_inflation = float(inflation) if inflation not in (None, "") else 5.0
@@ -2272,11 +2421,37 @@ async def tax_calculator_page(
     clamped_slab = max(0.0, min(42.74, parsed_slab))
     clamped_inflation = max(0.0, min(25.0, parsed_inflation))
 
-    from core.analysis.net_real_tax_calculator import calculate_post_tax_matrix
+    custom_yield_val = None
+    custom_yield_result = None
+    raw_custom_yield = custom_yield if custom_yield not in (None, "") else request.query_params.get("yield")
+    if raw_custom_yield not in (None, ""):
+        try:
+            clean_y = float(str(raw_custom_yield).replace("%", "").replace(",", "").strip())
+            if 0.0 < clean_y <= 100.0:
+                custom_yield_val = round(clean_y, 2)
+                custom_yield_result = calculate_net_real_return(
+                    nominal_annual_return_pct=custom_yield_val,
+                    tax_rate_pct=clamped_slab,
+                    cpi_inflation_pct=clamped_inflation,
+                )
+                custom_yield_result["post_tax_yield_pct"] = custom_yield_result["post_tax_nominal_pct"]
+        except (ValueError, TypeError) as yield_err:
+            logger.debug("Custom yield parse notice on /calculator/tax: %s", yield_err)
+
     matrix = calculate_post_tax_matrix(
         marginal_tax_slab_pct=clamped_slab,
         inflation_pct=clamped_inflation,
     )
+    live_instruments = []
+    try:
+        live_instruments = compare_live_tracked_yield_instruments(
+            slab_key=clamped_slab,
+            cpi_inflation_pct=clamped_inflation,
+            limit_per_class=5,
+        )
+    except Exception as bridge_err:
+        logger.warning("Live yield instruments bridge notice on /calculator/tax: %s", bridge_err)
+
     return templates.TemplateResponse(
         request,
         "tax_calculator.html",
@@ -2284,6 +2459,9 @@ async def tax_calculator_page(
             "request": request,
             "matrix": matrix,
             "assets": matrix,
+            "live_instruments": live_instruments,
+            "custom_yield_val": custom_yield_val,
+            "custom_yield_result": custom_yield_result,
             "tax_slab": clamped_slab,
             "current_slab": clamped_slab,
             "inflation": clamped_inflation,

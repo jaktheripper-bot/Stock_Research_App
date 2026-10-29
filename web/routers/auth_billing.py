@@ -101,6 +101,10 @@ class TelemetryEventRequest(BaseModel):
     user_id: Optional[str] = None
     user_email: Optional[str] = None
     session_id: Optional[str] = None
+    visitor_id: Optional[str] = None
+    visit_number: Optional[int] = None
+    is_returning: Optional[bool] = None
+    days_since_last_visit: Optional[float] = None
     referrer: Optional[str] = None
     landing_url: Optional[str] = None
     landing_page: Optional[str] = None
@@ -599,6 +603,22 @@ async def api_record_telemetry_event(payload: TelemetryEventRequest, request: Re
         evt_details["max_scroll_pct"] = min(max(float(payload.max_scroll_pct), 0.0), 100.0)
     if payload.pillar_dwell and isinstance(payload.pillar_dwell, dict) and "pillar_dwell" not in evt_details:
         evt_details["pillar_dwell"] = payload.pillar_dwell
+    if payload.visitor_id and "visitor_id" not in evt_details:
+        evt_details["visitor_id"] = str(payload.visitor_id).strip()[:64]
+    if payload.visit_number is not None and "visit_number" not in evt_details:
+        evt_details["visit_number"] = max(1, int(payload.visit_number))
+    if payload.is_returning is not None and "is_returning" not in evt_details:
+        evt_details["is_returning"] = bool(payload.is_returning)
+    if payload.days_since_last_visit is not None and "days_since_last_visit" not in evt_details:
+        evt_details["days_since_last_visit"] = max(0.0, round(float(payload.days_since_last_visit), 1))
+
+    resolved_user_id = payload.user_id
+    resolved_user_email = payload.user_email
+    if not resolved_user_id or not resolved_user_email:
+        web_user = _get_current_web_user(request)
+        if web_user:
+            resolved_user_id = resolved_user_id or web_user.get("id")
+            resolved_user_email = resolved_user_email or web_user.get("email")
 
     resolved_lp = payload.landing_page or payload.path or evt_details.get("landing_page") or ""
     if not resolved_lp and payload.landing_url:
@@ -624,8 +644,8 @@ async def api_record_telemetry_event(payload: TelemetryEventRequest, request: Re
         event_type=payload.event_type or "",
         ticker=payload.ticker or "",
         browser=client_env.get("browser", "Chrome"),
-        user_id=payload.user_id or "",
-        user_email=payload.user_email or "",
+        user_id=resolved_user_id or "",
+        user_email=resolved_user_email or "",
         landing_page=resolved_lp,
         session_id=sess_id,
         details=evt_details
@@ -643,8 +663,8 @@ async def api_record_telemetry_event(payload: TelemetryEventRequest, request: Re
         device_type=client_env.get("device", "Unknown"),
         browser=client_env.get("browser", "Unknown"),
         os=client_env.get("os", "Unknown"),
-        user_id=payload.user_id,
-        user_email=payload.user_email,
+        user_id=resolved_user_id,
+        user_email=resolved_user_email,
         landing_page=resolved_lp
     )
     return json_response_with_cache({"status": "ok"})

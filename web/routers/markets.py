@@ -684,6 +684,73 @@ def api_tax_calculator(
     )
 
 
+@router.get("/api/calculator/live-yields")
+def api_live_tracked_yield_instruments(
+    slab: str = Query("SLAB_30_BASE"),
+    cpi_inflation: float = Query(5.0),
+    cpi: Optional[float] = Query(None),
+    limit_per_class: int = Query(5, ge=1, le=15),
+):
+    """Public API: Live tracked Corporate Debt NCDs, REITs/InvITs, SGBs, and Sovereign G-Secs post-tax real yields."""
+    from fastapi.encoders import jsonable_encoder
+    from core.analysis.live_security_tax_bridge import (
+        compare_live_tracked_yield_instruments,
+        resolve_effective_slab_pct,
+    )
+    init_db()
+    raw_cpi = cpi if cpi is not None else cpi_inflation
+    clamped_cpi = max(0.0, min(25.0, float(raw_cpi)))
+    eff_slab = resolve_effective_slab_pct(slab)
+    items = compare_live_tracked_yield_instruments(
+        slab_key=slab,
+        cpi_inflation_pct=clamped_cpi,
+        limit_per_class=limit_per_class,
+    )
+    return JSONResponse(
+        content=jsonable_encoder({
+            "status": "success",
+            "effective_slab_pct": eff_slab,
+            "cpi_inflation_pct": clamped_cpi,
+            "count": len(items),
+            "instruments": items,
+        }),
+        headers={"Cache-Control": "public, max-age=300"},
+    )
+
+
+@router.get("/api/equity/peer-cluster")
+async def api_equity_peer_cluster(
+    tickers: str = Query(..., description="Comma-separated list of 2 to 5 BSE/NSE ticker symbols"),
+):
+    """Public API: 2-to-5 stock quantitative peer cluster dispersion table with cluster medians."""
+    from fastapi.encoders import jsonable_encoder
+    from bse_master import resolve_canonical_symbol
+    from core.analysis.peer_cluster import compare_peer_cluster
+
+    init_db()
+    raw_parts = [p.strip() for p in (tickers or "").split(",") if p.strip()]
+    canonical_list: List[str] = []
+    for p in raw_parts:
+        ct = clean_ticker(p)
+        if not ct:
+            continue
+        can = resolve_canonical_symbol(ct) or ct
+        if can and can not in canonical_list:
+            canonical_list.append(can)
+
+    if len(canonical_list) < 2 or len(canonical_list) > 5:
+        raise HTTPException(
+            status_code=400,
+            detail="Peer cluster comparison requires between 2 and 5 distinct valid ticker symbols.",
+        )
+
+    cluster = await compare_peer_cluster(canonical_list)
+    return JSONResponse(
+        content=jsonable_encoder({"status": "success", "cluster": cluster}),
+        headers={"Cache-Control": "public, max-age=180"},
+    )
+
+
 @router.get("/api/reits/directory")
 def api_reits_directory(structure: Optional[str] = None):
     """Public API: Audited REITs, SM REITs, and InvITs."""

@@ -413,6 +413,139 @@ async def api_download_pdf(
     )
 
 
+@router.get("/api/model/{ticker}")
+async def api_download_equity_model(
+    ticker: str,
+    request: Request,
+    format: str = "xlsx",
+):
+    """
+    Exports watermarked multi-tab OOXML (.xlsx) or UTF-8 BOM (.csv) financial model
+    bundled with the 1-credit Deep-Dive unlock (zero extra credits once unlocked).
+    """
+    clean_t = clean_ticker(ticker)
+    if not clean_t:
+        raise HTTPException(status_code=400, detail="Invalid ticker symbol.")
+    fmt = (format or "xlsx").strip().lower()
+    if fmt not in ("xlsx", "csv"):
+        raise HTTPException(status_code=400, detail="Unsupported format. Use format=xlsx or format=csv.")
+
+    canonical = resolve_canonical_symbol(clean_t) or clean_t
+    get_rep_fn = _get_override_fn("web.main", "get_report_by_ticker_sync", get_report_by_ticker_sync)
+    rep = get_rep_fn(canonical)
+    if not rep or not rep.get("report_text"):
+        raise HTTPException(status_code=404, detail="Compiled dossier not found.")
+
+    if not _deep_dive_unlocked_for_request(request, canonical):
+        get_user_fn = _get_override_fn("web.main", "_get_current_web_user", _get_current_web_user)
+        if not get_user_fn(request) and not _is_admin_authenticated(request):
+            raise HTTPException(
+                status_code=401,
+                detail="Sign in and unlock Deep-Dive (1 credit) to download the financial model workbook.",
+            )
+        raise HTTPException(
+            status_code=402,
+            detail="1-credit Deep-Dive unlock required to download the financial model workbook. Zero additional credits are charged once unlocked.",
+        )
+
+    fund: Dict[str, Any] = {}
+    try:
+        fund = await run_in_threadpool(get_stock_fundamentals, canonical, True) or {}
+    except Exception as fund_err:
+        logger.debug("Model export fundamentals lookup notice for %s: %s", canonical, fund_err)
+
+    from core.analysis.equity_dossier import compile_equity_dossier, _safe_float
+    if _safe_float(fund.get("current_price"), 0.0) <= 0 and rep.get("baseline_price"):
+        bp = _safe_float(rep.get("baseline_price"), 0.0)
+        if bp > 0:
+            fund["current_price"] = bp
+    if _safe_float(fund.get("pe_ratio"), 0.0) <= 0 and rep.get("baseline_pe") not in (None, "N/A", ""):
+        fund["pe_ratio"] = rep.get("baseline_pe")
+
+    intel = await run_in_threadpool(
+        compile_equity_dossier,
+        canonical,
+        fund,
+        rep.get("short_name", canonical),
+        rep.get("industry", ""),
+        None,
+        rep.get("report_text", ""),
+        True,
+    )
+    account_ref = _pdf_account_ref(request)
+
+    from core.reporting.xlsx_exporter import (
+        build_equity_model_xlsx_workbook,
+        build_equity_model_csv_bundle,
+    )
+    if fmt == "csv":
+        model_bytes = await run_in_threadpool(build_equity_model_csv_bundle, canonical, fund, intel, account_ref)
+        media_type = "text/csv; charset=utf-8"
+        ext = "csv"
+    else:
+        model_bytes = await run_in_threadpool(build_equity_model_xlsx_workbook, canonical, fund, intel, account_ref)
+        media_type = "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+        ext = "xlsx"
+
+    web_user = _get_current_web_user(request)
+    record_usage_event(
+        event_type="model_download",
+        ticker=canonical,
+        user_id=web_user.get("id") if web_user else None,
+        details={"action": "export_model", "format": ext},
+    )
+
+    date_slug = datetime.now(IST).strftime("%d-%m-%Y")
+    filename = f"{canonical}_{date_slug}_Financial_Model.{ext}"
+    return Response(
+        content=model_bytes,
+        media_type=media_type,
+        headers={
+            "Content-Disposition": f'attachment; filename="{filename}"',
+            "Cache-Control": "private, no-store",
+        },
+    )
+
+
+@router.get("/api/equity/thesis-drift/{ticker}")
+async def api_equity_thesis_drift(ticker: str, request: Request):
+    """
+    Returns sequential multi-quarter thesis drift, split-safe baseline price drift,
+    and active falsification triggers (redacting Pillars 03 & 05 when locked).
+    """
+    from fastapi.encoders import jsonable_encoder
+    from core.analysis.guidance_delivery_audit import compute_sequential_thesis_drift
+
+    clean_t = clean_ticker(ticker)
+    if not clean_t:
+        raise HTTPException(status_code=400, detail="Invalid ticker symbol.")
+    canonical = resolve_canonical_symbol(clean_t) or clean_t
+
+    get_rep_fn = _get_override_fn("web.main", "get_report_by_ticker_sync", get_report_by_ticker_sync)
+    rep = get_rep_fn(canonical)
+    if not rep or not rep.get("report_text"):
+        raise HTTPException(status_code=404, detail="Compiled dossier not found.")
+
+    drift = await run_in_threadpool(compute_sequential_thesis_drift, canonical)
+    is_unlocked = _deep_dive_unlocked_for_request(request, canonical)
+    if not is_unlocked:
+        raw_triggers = drift.get("active_revision_triggers") or {}
+        drift["active_revision_triggers"] = {
+            k: v
+            for k, v in raw_triggers.items()
+            if str(k).strip() not in ("3", "5", "03", "05")
+        }
+        drift["deep_dive_locked"] = True
+        drift["redacted_trigger_pillars"] = [3, 5]
+    else:
+        drift["deep_dive_locked"] = False
+
+    return JSONResponse(
+        content=jsonable_encoder({"status": "success", "drift": drift}),
+        headers={"Cache-Control": "private, no-store"},
+    )
+
+
 @router.get("/api/pdf/fund/{scheme_code}")
 async def api_download_fund_pdf(scheme_code: str, request: Request):
     """Generates and serves downloadable PDF report look-through dossier for a Mutual Fund."""
