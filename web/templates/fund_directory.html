@@ -209,8 +209,8 @@
         <div style="display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; background: rgba(15, 23, 42, 0.5); border-radius: 10px; padding: 12px; margin-bottom: 16px; border: 1px solid rgba(255, 255, 255, 0.05);">
           <div>
             <div style="font-size: 10px; color: #64748b; text-transform: uppercase;">Active Share</div>
-            <div style="font-size: 16px; font-weight: 800; color: {% if s.active_share_pct >= 60.0 %}#10b981{% elif s.active_share_pct >= 40.0 %}#f59e0b{% else %}#ef4444{% endif %};">
-              {{ s.active_share_pct }}%
+            <div style="font-size: 16px; font-weight: 800; color: {% if s.active_share_pct is not none %}{% if s.active_share_pct >= 60.0 %}#10b981{% elif s.active_share_pct >= 40.0 %}#f59e0b{% else %}#ef4444{% endif %}{% else %}#94a3b8{% endif %};">
+              {% if s.active_share_pct is not none %}{{ s.active_share_pct }}%{% else %}Pending{% endif %}
             </div>
           </div>
           <div>

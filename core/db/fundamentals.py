@@ -111,12 +111,16 @@ def extract_fundamentals_from_report_text(report_text: str, fallback_data: Optio
 
     # 3. Operating Margin (OPM) / EBITDA Margin
     if res.get("operating_margin") in [None, "N/A", "", 0, 0.0]:
-        m_opm = re.search(r'(?:Operating\s+Margins?|OPM|EBITDA\s+Margins?)[^\d\n]*?(\d+(?:\.\d+)?)\s*%', txt, re.I)
-        if not m_opm:
-            m_opm = re.search(r'(?:Operating\s+Margins?|OPM|EBITDA\s+Margins?)\s*(?:remains?|stands?|is|was|between|in the|near)?\s*(?:healthy|steady|firm)?[^\d\n]*?(\d+(?:\.\d+)?)\s*%', txt, re.I)
+        m_opm = re.search(
+            r'(?:Operating\s+(?:Profit\s+)?Margins?|OPM|EBITDA\s*[\]\)]?\s*Margins?)[^\d\n%]{0,45}?(-?\d+(?:\.\d+)?)\s*%',
+            txt,
+            re.I,
+        )
         if m_opm:
             try:
-                res["operating_margin"] = float(m_opm.group(1))
+                cand_opm = float(m_opm.group(1))
+                if -100.0 <= cand_opm <= 95.0:
+                    res["operating_margin"] = cand_opm
             except Exception as e:
                 logger.debug("Failed parsing OPM from report text: %s", e)
 
@@ -146,10 +150,18 @@ def extract_fundamentals_from_report_text(report_text: str, fallback_data: Optio
                 except Exception as e:
                     logger.debug("Failed parsing D/E from report text: %s", e)
 
-    # 5. 52-Week High & Low
+    # 5. 52-Week High & Low (strictly reject % drawdowns or x multiples like '3.1x' / '27.0%')
     if res.get("fifty_two_week_high") in [None, "N/A", "", 0, 0.0] or res.get("fifty_two_week_low") in [None, "N/A", "", 0, 0.0]:
-        mh = re.search(r'52-week\s+high[^\d\n]*?(?:INR|₹|Rs\.?)?\s*([\d,]+(?:\.\d+)?)\s*(?:INR|₹|Rs\.?)?', txt, re.I)
-        ml = re.search(r'52-week\s+low[^\d\n]*?(?:INR|₹|Rs\.?)?\s*([\d,]+(?:\.\d+)?)\s*(?:INR|₹|Rs\.?)?', txt, re.I)
+        mh = re.search(
+            r'52-week\s+high[^\d\n%]{0,30}?(?:INR|₹|Rs\.?)\s*([\d,]+(?:\.\d+)?)(?!\s*(?:%|x\b|times\b))',
+            txt,
+            re.I,
+        )
+        ml = re.search(
+            r'52-week\s+low[^\d\n%]{0,30}?(?:INR|₹|Rs\.?)\s*([\d,]+(?:\.\d+)?)(?!\s*(?:%|x\b|times\b))',
+            txt,
+            re.I,
+        )
         if mh and res.get("fifty_two_week_high") in [None, "N/A", "", 0, 0.0]:
             try:
                 res["fifty_two_week_high"] = float(mh.group(1).replace(",", "").strip())
@@ -161,9 +173,13 @@ def extract_fundamentals_from_report_text(report_text: str, fallback_data: Optio
             except Exception as e:
                 logger.debug("Failed parsing 52-week low from report text: %s", e)
 
-        # Combined range pattern fallback: "52-week range of 1,000 - 1,500"
+        # Combined range pattern fallback: "52-week range of ₹1,000 - ₹1,500"
         if res.get("fifty_two_week_high") in [None, "N/A", ""] or res.get("fifty_two_week_low") in [None, "N/A", ""]:
-            m_comb = re.search(r'52-week\s+(?:range|band)[^\d\n]*?(?:INR|₹|Rs\.?)?\s*([\d,]+(?:\.\d+)?)\s*[-–]\s*(?:INR|₹|Rs\.?)?\s*([\d,]+(?:\.\d+)?)', txt, re.I)
+            m_comb = re.search(
+                r'52-week\s+(?:range|band)[^\d\n%]{0,30}?(?:INR|₹|Rs\.?)?\s*([\d,]+(?:\.\d+)?)\s*[-–]\s*(?:INR|₹|Rs\.?)?\s*([\d,]+(?:\.\d+)?)(?!\s*(?:%|x\b|times\b))',
+                txt,
+                re.I,
+            )
             if m_comb:
                 try:
                     val1 = float(m_comb.group(1).replace(",", "").strip())
@@ -172,6 +188,25 @@ def extract_fundamentals_from_report_text(report_text: str, fallback_data: Optio
                     res["fifty_two_week_high"] = max(val1, val2)
                 except Exception as e:
                     logger.debug("Failed parsing 52-week range from report text: %s", e)
+
+        # Sanity-check extracted 52W pair against inverted bounds or CMP distortion
+        try:
+            ref_cmp = float(str(res.get("current_price") or 0).replace(",", "").strip() or 0)
+            ext_hi = res.get("fifty_two_week_high")
+            ext_lo = res.get("fifty_two_week_low")
+            hi_f = float(ext_hi) if ext_hi not in [None, "N/A", ""] else None
+            lo_f = float(ext_lo) if ext_lo not in [None, "N/A", ""] else None
+            if hi_f is not None and ref_cmp > 0 and hi_f < ref_cmp * 0.50:
+                res.pop("fifty_two_week_high", None)
+                hi_f = None
+            if lo_f is not None and ref_cmp > 0 and lo_f > ref_cmp * 1.50:
+                res.pop("fifty_two_week_low", None)
+                lo_f = None
+            if hi_f is not None and lo_f is not None and hi_f < lo_f:
+                res.pop("fifty_two_week_high", None)
+                res.pop("fifty_two_week_low", None)
+        except Exception as e:
+            logger.debug("52-week sanity guard notice: %s", e)
 
     # 6. Price to Book (P/B)
     if res.get("pb_ratio") in [None, "N/A", ""]:

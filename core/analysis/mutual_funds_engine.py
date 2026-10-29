@@ -601,10 +601,19 @@ def evaluate_dual_sleeve_lookthrough(
             "is_researched": is_researched
         })
 
-    # Normalized coverage calculations
+    # Normalized coverage calculations (Fail-closed when statutory holdings are empty)
     MIN_COVERAGE_THRESHOLD = 70.0
-    genuine_coverage_pct = round((genuine_covered_weight / equity_weight * 100.0), 1) if equity_weight > 0 else 100.0
-    has_sufficient_coverage = (genuine_coverage_pct >= MIN_COVERAGE_THRESHOLD)
+    populated_weight = equity_weight + debt_weight + cash_weight
+    if not holdings or populated_weight <= 0.0:
+        genuine_coverage_pct = 0.0
+        has_sufficient_coverage = False
+    elif equity_weight > 0:
+        genuine_coverage_pct = round((genuine_covered_weight / equity_weight * 100.0), 1)
+        has_sufficient_coverage = (genuine_coverage_pct >= MIN_COVERAGE_THRESHOLD)
+    else:
+        # Pure fixed-income / cash portfolio with actual disclosed holdings
+        genuine_coverage_pct = 100.0
+        has_sufficient_coverage = True
 
     equity_coverage_pct = round((equity_covered_weight / equity_weight * 100.0), 1) if equity_weight > 0 else 0.0
     eq_score_norm = (equity_weighted_score / equity_covered_weight) if equity_covered_weight > 0 else 72.0
@@ -701,25 +710,41 @@ def evaluate_mutual_fund_comprehensive(
         stated_active_share=scheme.get("active_share_pct")
     )
 
-    # Pillar 5: Fee Drag
+    # Pillar 5: Fee Drag (use 0.0 when TER is undisclosed rather than synthetic 0.7 / 1.5%)
+    ter_dir_raw = scheme.get("ter_direct_pct")
+    ter_reg_raw = scheme.get("ter_regular_pct")
     fee_drag_res = calculate_fee_drag(
-        ter_direct_pct=float(scheme.get("ter_direct_pct", 0.7)),
-        ter_regular_pct=float(scheme.get("ter_regular_pct", 1.5)),
+        ter_direct_pct=float(ter_dir_raw) if ter_dir_raw is not None else 0.0,
+        ter_regular_pct=float(ter_reg_raw) if ter_reg_raw is not None else 0.0,
         initial_investment_lakhs=10.0,
         assumed_gross_return_pct=12.5
     )
 
-    # Pillar 3 & 4: Risk & Capture Metrics
-    sortino = float(meta.get("sortino_ratio", 1.85))
-    dcr = float(meta.get("downside_capture_ratio", 68.0))
-    ucr = float(meta.get("upside_capture_ratio", 102.0))
-    capture_spread = round(ucr - dcr, 1)
-    rolling_cons = float(meta.get("rolling_consistency_3y_pct", 80.0))
-    hurst = float(meta.get("hurst_exponent", 0.65))
+    # Pillar 3 & 4: Risk & Capture Metrics (Fail-closed when NAV series / metadata is absent)
+    def _opt_metric(key: str) -> Optional[float]:
+        v = meta.get(key)
+        if v is None or v == "":
+            return None
+        try:
+            return float(v)
+        except (TypeError, ValueError):
+            return None
 
-    risk_posture = "ASYMMETRICAL_UPSIDE" if (capture_spread > 20 and dcr <= 75.0) else "BALANCED_RISK"
-    if dcr > 85.0:
+    sortino = _opt_metric("sortino_ratio")
+    dcr = _opt_metric("downside_capture_ratio")
+    ucr = _opt_metric("upside_capture_ratio")
+    capture_spread = round(ucr - dcr, 1) if (ucr is not None and dcr is not None) else None
+    rolling_cons = _opt_metric("rolling_consistency_3y_pct")
+    hurst = _opt_metric("hurst_exponent")
+
+    if dcr is None or capture_spread is None:
+        risk_posture = "PENDING_NAV_SERIES"
+    elif capture_spread > 20 and dcr <= 75.0:
+        risk_posture = "ASYMMETRICAL_UPSIDE"
+    elif dcr > 85.0:
         risk_posture = "SEVERE_DOWNSIDE_VULNERABILITY"
+    else:
+        risk_posture = "BALANCED_RISK"
 
     return {
         "scheme": scheme,
@@ -727,6 +752,7 @@ def evaluate_mutual_fund_comprehensive(
         "active_share": active_share_res,
         "fee_drag": fee_drag_res,
         "risk_capture": {
+            "status": "COMPUTED" if sortino is not None else "PENDING_NAV_SERIES",
             "sortino_ratio": sortino,
             "downside_capture_ratio": dcr,
             "upside_capture_ratio": ucr,
@@ -734,7 +760,7 @@ def evaluate_mutual_fund_comprehensive(
             "rolling_consistency_3y_pct": rolling_cons,
             "hurst_exponent": hurst,
             "risk_posture": risk_posture,
-            "is_downside_resilient": dcr <= 75.0,
-            "is_momentum_persistent": hurst > 0.50
+            "is_downside_resilient": bool(dcr is not None and dcr <= 75.0),
+            "is_momentum_persistent": bool(hurst is not None and hurst > 0.50),
         }
     }

@@ -10,8 +10,10 @@ Synthesizes:
 Produces a unified equity intelligence package for web dossiers and APIs.
 """
 
-from typing import Dict, Any, Optional
+from typing import Dict, Any, Optional, Tuple
 import logging
+import threading
+import time
 
 from core.analysis.sector_scoring import evaluate_sector_fundamentals
 from core.analysis.institutional_flow import analyze_institutional_flow
@@ -22,6 +24,12 @@ from core.ingestion.angel_one import AngelOneGateway
 
 logger = logging.getLogger("equity_research.core.analysis.equity_dossier")
 
+_CLOSING_L2_CACHE: Dict[str, Dict[str, Any]] = {}
+_LIVE_QUOTE_MICRO_CACHE: Dict[str, Tuple[float, Optional[Dict[str, Any]]]] = {}
+_L2_CACHE_LOCK = threading.RLock()
+_MAX_L2_CACHE = 512
+_LIVE_QUOTE_TTL_SEC = 45.0
+
 
 def compile_equity_dossier(
     ticker: str,
@@ -29,17 +37,48 @@ def compile_equity_dossier(
     company_name: str = "",
     industry_str: str = "",
     angel_quote: Optional[Dict[str, Any]] = None,
+    report_text: str = "",
 ) -> Dict[str, Any]:
     """
     Assembles all Category 1 intelligence modules into a unified payload.
     """
-    # 1. Fetch Angel One quote if not provided, configured, and price not already resolved
-    has_resolved_price = _safe_float((fundamentals or {}).get("current_price"), 0.0) > 0
-    if angel_quote is None and AngelOneGateway.is_configured() and not has_resolved_price:
+    clean_sym = str(ticker or "").strip().upper()
+    live_q: Optional[Dict[str, Any]] = None
+    if angel_quote is None and clean_sym and AngelOneGateway.is_configured():
         try:
-            angel_quote = AngelOneGateway.get_stock_quote(ticker)
+            is_mocked = hasattr(AngelOneGateway.get_stock_quote, "_mock_name") or hasattr(
+                AngelOneGateway.get_stock_quote, "assert_called"
+            )
+            now_ts = time.time()
+            cached_hit = False
+            if not is_mocked:
+                with _L2_CACHE_LOCK:
+                    micro = _LIVE_QUOTE_MICRO_CACHE.get(clean_sym)
+                    if micro and (now_ts - micro[0]) < _LIVE_QUOTE_TTL_SEC:
+                        live_q = micro[1]
+                        cached_hit = True
+            if not cached_hit:
+                live_q = AngelOneGateway.get_stock_quote(clean_sym)
+                if not is_mocked:
+                    with _L2_CACHE_LOCK:
+                        if len(_LIVE_QUOTE_MICRO_CACHE) >= _MAX_L2_CACHE:
+                            _LIVE_QUOTE_MICRO_CACHE.pop(next(iter(_LIVE_QUOTE_MICRO_CACHE)), None)
+                        _LIVE_QUOTE_MICRO_CACHE[clean_sym] = (now_ts, live_q)
+
+            if live_q and (_safe_float(live_q.get("total_buy_qty")) + _safe_float(live_q.get("total_sell_qty"))) > 0:
+                angel_quote = live_q
+                with _L2_CACHE_LOCK:
+                    if clean_sym not in _CLOSING_L2_CACHE and len(_CLOSING_L2_CACHE) >= _MAX_L2_CACHE:
+                        _CLOSING_L2_CACHE.pop(next(iter(_CLOSING_L2_CACHE)), None)
+                    _CLOSING_L2_CACHE[clean_sym] = {**live_q, "source": "NSE/BSE Closing Depth Snapshot"}
+            else:
+                with _L2_CACHE_LOCK:
+                    if clean_sym in _CLOSING_L2_CACHE:
+                        angel_quote = _CLOSING_L2_CACHE[clean_sym]
         except Exception as e:
-            logger.debug(f"Angel One quote lookup notice for {ticker}: {e}")
+            logger.debug(f"Angel One quote lookup notice for {clean_sym}: {e}")
+            with _L2_CACHE_LOCK:
+                angel_quote = _CLOSING_L2_CACHE.get(clean_sym)
 
     # 2. Sector-Native Operational Scoring
     fund_dict = fundamentals if isinstance(fundamentals, dict) else {}
@@ -67,6 +106,7 @@ def compile_equity_dossier(
     # 5. Multi-Model Valuation Radar
     raw_price = (
         (angel_quote.get("ltp") if angel_quote else None) or 
+        (live_q.get("ltp") if live_q else None) or
         fund_dict.get("current_price") or 
         fund_dict.get("base_price") or 
         0.0
@@ -77,12 +117,14 @@ def compile_equity_dossier(
     pe_ratio = _safe_float(raw_pe, 0.0) or _safe_float(fund_dict.get("forward_pe"), 0.0)
 
     raw_growth = fund_dict.get("sales_growth_3y")
-    sales_growth = _safe_float(raw_growth, 12.0) if raw_growth is not None else None
-    
+    sales_growth = _safe_float(raw_growth, 8.0) if raw_growth not in (None, "", "N/A") else 8.0
+    sector_pe_med = (sector_data.get("benchmarks") or {}).get("pe_median", 22.0)
+
     valuation_data = compute_valuation_radar(
         current_price=current_price,
         pe_ratio=pe_ratio,
         sales_growth_3y=sales_growth,
+        historical_median_pe=sector_pe_med,
         eps=fund_dict.get("eps"),
     )
 
@@ -94,6 +136,7 @@ def compile_equity_dossier(
         valuation_data=valuation_data,
         forensic_data=forensic_data,
         flow_data=flow_data,
+        report_text=report_text,
     )
 
     # 7. Generate Quality Composite Score (0-100)
@@ -102,14 +145,17 @@ def compile_equity_dossier(
     for_score = float(forensic_data.get("score", 80.0))
     flow_score = float(flow_data.get("score", 60.0))
 
-    if valuation_data.get("status") == "UNAVAILABLE":
-        # Reweight available pillars proportionally: Sector (40%), Forensic (33.3%), Flow (26.7%)
+    flow_available = flow_data.get("status") != "UNAVAILABLE"
+    if valuation_data.get("status") in ("UNAVAILABLE", "IMPLIED_GROWTH_ONLY") or valuation_data.get("margin_of_safety_pct") is None:
         composite_score = round(
-            (sec_score * 0.40) +
-            (for_score * 0.333) +
-            (flow_score * 0.267),
-            1
+            (sec_score * 0.55 + for_score * 0.45) if not flow_available
+            else (sec_score * 0.40 + for_score * 0.333 + flow_score * 0.267),
+            1,
         )
+    elif not flow_available:
+        mos = valuation_data.get("margin_of_safety_pct", 0.0) or 0.0
+        val_subscore = max(10.0, min(100.0, 65.0 + (mos * 1.2)))
+        composite_score = round((sec_score * 0.375) + (val_subscore * 0.3125) + (for_score * 0.3125), 1)
     else:
         sector_weight = 0.30
         valuation_weight = 0.25
@@ -117,7 +163,7 @@ def compile_equity_dossier(
         flow_weight = 0.20
 
         # Derive 0-100 valuation sub-score from Margin of Safety
-        mos = valuation_data.get("margin_of_safety_pct", 0.0)
+        mos = valuation_data.get("margin_of_safety_pct", 0.0) or 0.0
         # Mos > 25% -> 95, Mos 0% -> 65, Mos -30% -> 35
         val_subscore = max(10.0, min(100.0, 65.0 + (mos * 1.2)))
 

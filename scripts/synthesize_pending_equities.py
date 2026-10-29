@@ -25,7 +25,7 @@ PROJECT_ROOT = Path(__file__).resolve().parent.parent
 if str(PROJECT_ROOT) not in sys.path:
     sys.path.insert(0, str(PROJECT_ROOT))
 
-from bse_master import is_synthetic_test_symbol, resolve_canonical_symbol
+from bse_master import NSE_ONLY_EQUITIES, is_synthetic_test_symbol, resolve_canonical_symbol
 from core.audit.invariants import KNOWN_STATIC_REPORT_TEMPLATE_PHRASES
 from core.config import get_secret
 from core.db.connection import (
@@ -53,14 +53,10 @@ ERROR_SIGNATURES = (
     "Grounded synthesis channels are temporarily unavailable",
 )
 
-# NSE-only listed equities that do not trade on BSE (prevents name-substring collision with BSE ETFs)
-NSE_ONLY_EQUITIES = frozenset({"BSE"})
-
-
 def _resolve_target_symbol(sym: str) -> str:
     clean = (sym or "").strip().upper()
     if clean in NSE_ONLY_EQUITIES:
-        return clean
+        return NSE_ONLY_EQUITIES[clean]
     return resolve_canonical_symbol(clean) or clean
 
 
@@ -149,6 +145,9 @@ def reconcile_pg_sqlite_drift(sqlite_path: Optional[str] = None) -> Dict[str, in
         # 1. Local SQLite -> Supabase PG (e.g. COALINDIA compiled locally, UNITDSPR queued row)
         for sym, sq_row in sorted(sq_map.items()):
             sq_has_text = len((sq_row[2] or "").strip()) >= 500
+            canon_sym = _resolve_target_symbol(sym)
+            if not sq_has_text and canon_sym != sym and canon_sym in pg_map:
+                continue
             pg_row = pg_map.get(sym)
             pg_has_text = bool(pg_row and len((pg_row[2] or "").strip()) >= 500)
             if pg_row is None or (sq_has_text and not pg_has_text):
@@ -246,10 +245,56 @@ def reconcile_pg_sqlite_drift(sqlite_path: Optional[str] = None) -> Dict[str, in
                         )
                         alias_cleaned += 1
 
+        # 4. Sync cached_fundamentals from PostgreSQL -> local SQLite so header metrics match compiled reports
+        cf_synced = 0
+        try:
+            pg_cur.execute(
+                """
+                SELECT ticker, company_name, sector, industry, current_price, market_cap,
+                       pe_ratio, forward_pe, pb_ratio, ev_ebitda, roce, roe, operating_margin,
+                       debt_to_equity, fifty_two_week_high, fifty_two_week_low, source, updated_at
+                FROM cached_fundamentals
+                """
+            )
+            for cf_row in pg_cur.fetchall():
+                if not cf_row[0] or is_synthetic_test_symbol(cf_row[0]):
+                    continue
+                sq_cur.execute(
+                    """
+                    INSERT INTO cached_fundamentals (
+                        ticker, company_name, sector, industry, current_price, market_cap,
+                        pe_ratio, forward_pe, pb_ratio, ev_ebitda, roce, roe, operating_margin,
+                        debt_to_equity, fifty_two_week_high, fifty_two_week_low, source, updated_at
+                    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                    ON CONFLICT (ticker) DO UPDATE SET
+                        company_name = COALESCE(excluded.company_name, cached_fundamentals.company_name),
+                        sector = COALESCE(excluded.sector, cached_fundamentals.sector),
+                        industry = COALESCE(excluded.industry, cached_fundamentals.industry),
+                        current_price = COALESCE(excluded.current_price, cached_fundamentals.current_price),
+                        market_cap = COALESCE(excluded.market_cap, cached_fundamentals.market_cap),
+                        pe_ratio = COALESCE(excluded.pe_ratio, cached_fundamentals.pe_ratio),
+                        forward_pe = COALESCE(excluded.forward_pe, cached_fundamentals.forward_pe),
+                        pb_ratio = COALESCE(excluded.pb_ratio, cached_fundamentals.pb_ratio),
+                        ev_ebitda = COALESCE(excluded.ev_ebitda, cached_fundamentals.ev_ebitda),
+                        roce = COALESCE(excluded.roce, cached_fundamentals.roce),
+                        roe = COALESCE(excluded.roe, cached_fundamentals.roe),
+                        operating_margin = COALESCE(excluded.operating_margin, cached_fundamentals.operating_margin),
+                        debt_to_equity = COALESCE(excluded.debt_to_equity, cached_fundamentals.debt_to_equity),
+                        fifty_two_week_high = COALESCE(excluded.fifty_two_week_high, cached_fundamentals.fifty_two_week_high),
+                        fifty_two_week_low = COALESCE(excluded.fifty_two_week_low, cached_fundamentals.fifty_two_week_low),
+                        source = COALESCE(excluded.source, cached_fundamentals.source),
+                        updated_at = COALESCE(excluded.updated_at, cached_fundamentals.updated_at)
+                    """,
+                    tuple(_sq_param(v) for v in cf_row),
+                )
+                cf_synced += 1
+        except Exception as cf_err:
+            logger.debug("cached_fundamentals PG->SQLite sync notice: %s", cf_err)
+
         pg_conn.commit()
         sq_conn.commit()
         _clear_report_caches()
-        return {"pushed_to_pg": pushed, "pulled_to_sqlite": pulled, "aliases_reconciled": alias_cleaned}
+        return {"pushed_to_pg": pushed, "pulled_to_sqlite": pulled, "aliases_reconciled": alias_cleaned, "cf_synced": cf_synced}
     finally:
         pg_cur.close()
         sq_cur.close()
@@ -383,10 +428,14 @@ def main() -> None:
     parser.add_argument("--reconcile-drift", action="store_true", help="Sync compiled reports between PG and local SQLite")
     parser.add_argument("--synthesize", action="store_true", help="Compile pending equity dossiers via LLM engine")
     parser.add_argument("--limit", type=int, default=None, help="Max pending equities to synthesize in this run")
+    parser.add_argument("--batch-size", type=int, default=None, help="Alias for --limit (implies --synthesize unless --dry-run)")
     parser.add_argument("--tickers", type=str, default=None, help="Comma-separated subset of tickers to synthesize")
     parser.add_argument("--delay", type=float, default=3.0, help="Seconds between synthesis calls (default: 3.0)")
     parser.add_argument("--audit-mfs", type=int, default=0, help="Run daily look-through audit for N un-audited MF schemes")
     args = parser.parse_args()
+
+    effective_limit = args.batch_size if args.batch_size is not None else args.limit
+    do_synthesize = bool(args.synthesize or args.batch_size is not None)
 
     if args.clean_test_rows and not args.dry_run:
         clean_stray_test_rows()
@@ -401,16 +450,16 @@ def main() -> None:
         by_bucket[b] = by_bucket.get(b, 0) + 1
     logger.info("Pending Equity Queue: %d total | Breakdown: %s", len(pending), by_bucket)
 
-    if args.dry_run or not (args.synthesize or args.clean_test_rows or args.reconcile_drift or args.audit_mfs > 0):
+    if args.dry_run or not (do_synthesize or args.clean_test_rows or args.reconcile_drift or args.audit_mfs > 0):
         for i, (sym, sname, b) in enumerate(pending[:30], start=1):
             print(f"  {i:3d}. [{b:14s}] {sym:16s} | {sname}")
         if len(pending) > 30:
             print(f"  ... and {len(pending) - 30} more pending equities.")
         return
 
-    if args.synthesize:
+    if do_synthesize:
         ticker_list = [t.strip() for t in args.tickers.split(",")] if args.tickers else None
-        res = synthesize_pending_batch(limit=args.limit, tickers=ticker_list, delay=args.delay)
+        res = synthesize_pending_batch(limit=effective_limit, tickers=ticker_list, delay=args.delay)
         logger.info("Equity synthesis batch result: %s", res)
         reconcile_pg_sqlite_drift()
 

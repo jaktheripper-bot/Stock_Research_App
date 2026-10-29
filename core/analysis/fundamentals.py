@@ -265,6 +265,7 @@ def enrich_fundamentals(ticker: str, data: dict) -> dict:
                 data.get("market_cap") in [None, "N/A", 0, "0", ""]
                 or data.get("pe_ratio") in [None, "N/A", "Fair", "—", "-", "", 0, "0"]
                 or data.get("sector") in [None, "N/A", "", "General Industry", "Core Industry"]
+                or data.get("operating_margin") in [None, "N/A", ""]
             ):
                 bse_snap = fetch_bse_exchange_data(clean_sym)
                 if bse_snap:
@@ -278,6 +279,9 @@ def enrich_fundamentals(ticker: str, data: dict) -> dict:
                         data["sector"] = bse_snap["sector"]
                     if data.get("industry") in [None, "N/A", "", "Diversified"] and bse_snap.get("industry"):
                         data["industry"] = bse_snap["industry"]
+                    if data.get("operating_margin") in [None, "N/A", ""] and bse_snap.get("operating_margin") not in [None, "N/A", ""]:
+                        data["operating_margin"] = bse_snap["operating_margin"]
+                        data["opm"] = bse_snap["operating_margin"]
                     exchange_enriched = True
         except Exception as bse_enrich_err:
             logger.debug(f"BSE official exchange enrichment notice for {clean_sym}: {bse_enrich_err}")
@@ -291,6 +295,7 @@ def enrich_fundamentals(ticker: str, data: dict) -> dict:
         needs_remote_backfill = (
             data.get("roce") in [None, "N/A", ""]
             or data.get("roe") in [None, "N/A", ""]
+            or data.get("operating_margin") in [None, "N/A", ""]
             or data.get("fifty_two_week_high") in [None, "N/A", "", 0, 0.0]
             or data.get("pe_ratio") in [None, "N/A", "Fair", "—", "-", "", 0, "0"]
             or data.get("debt_to_equity") in [None, "N/A", ""]
@@ -499,8 +504,9 @@ def fetch_latest_bse_announcement(scrip_code: str) -> str:
         str_prev_date = (now_dt - timedelta(days=60)).strftime("%Y%m%d")
         url = f"https://api.bseindia.com/BseIndiaAPI/api/AnnSubCategoryGetData/w?pageno=1&strCat=-1&strPrevDate={str_prev_date}&strScrip={scrip_code}&strSearch=P&strToDate={str_to_date}&strType=C"
         headers = {
-            "User-Agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
-            "Referer": "https://www.bseindia.com/"
+            "User-Agent": "Mozilla/5.0",
+            "Referer": "https://www.bseindia.com/",
+            "Accept": "application/json",
         }
         res = requests.get(url, headers=headers, timeout=5)
         if res.status_code == 200:
@@ -522,9 +528,9 @@ def fetch_bse_exchange_data(query: str) -> dict:
     if os.environ.get("TESTING") != "1" and str(scrip).isdigit():
         try:
             headers = {
-                "User-Agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36",
+                "User-Agent": "Mozilla/5.0",
                 "Referer": "https://www.bseindia.com/",
-                "Accept": "application/json, text/plain, */*",
+                "Accept": "application/json",
             }
             hdr_res = requests.get(
                 f"https://api.bseindia.com/BseIndiaAPI/api/getScripHeaderData/w?Debtflag=&scripcode={scrip}&seriesid=",
@@ -532,7 +538,7 @@ def fetch_bse_exchange_data(query: str) -> dict:
                 timeout=2.0,
             )
             com_res = requests.get(
-                f"https://api.bseindia.com/BseIndiaAPI/api/ComHeader/w?quotetype=EQ&scripcode={scrip}&seriesid=",
+                f"https://api.bseindia.com/BseIndiaAPI/api/ComHeadernew/w?quotetype=EQ&scripcode={scrip}&seriesid=",
                 headers=headers,
                 timeout=2.0,
             )
@@ -555,7 +561,7 @@ def fetch_bse_exchange_data(query: str) -> dict:
                     sec_id if (sec_id and " " not in sec_id)
                     else (clean_ticker_val if " " not in clean_ticker_val else clean_ticker_val.replace(" ", ""))
                 )
-                raw_pe = com_json.get("PE")
+                raw_pe = com_json.get("ConPE") if str(com_json.get("ConPE") or "").strip() not in ("", "-", "None", "0", "0.00") else com_json.get("PE")
                 if raw_pe and str(raw_pe).strip() not in ("", "-", "None", "0", "0.00"):
                     pe_f = float(str(raw_pe).replace(",", "").strip())
                     resolved_pe = f"{pe_f:.2f}" if pe_f > 0 else "NM"
@@ -566,7 +572,28 @@ def fetch_bse_exchange_data(query: str) -> dict:
                 sec_str = str(com_json.get("Sector") or ind_str).strip() or "Core Industry"
                 wk_hi = str(com_json.get("FiftyTwoWkHigh") or "N/A").replace(",", "").strip()
                 wk_lo = str(com_json.get("FiftyTwoWkLow") or "N/A").replace(",", "").strip()
-                return {
+
+                resolved_opm = None
+                try:
+                    from core.presentation.formatters import is_bfsi_entity
+                    if not is_bfsi_entity(ticker=canonical_ticker, industry=ind_str, sector_label=sec_str, company_name=str(cmp_name)):
+                        raw_con_opm = str(com_json.get("ConOPM") or "").replace(",", "").strip()
+                        raw_st_opm = str(com_json.get("OPM") or "").replace(",", "").strip()
+                        con_pe_str = str(com_json.get("ConPE") or "").replace(",", "").strip()
+                        con_pe_val = float(con_pe_str) if con_pe_str not in ("", "-", "None") else None
+                        opm_cand = None
+                        if raw_con_opm not in ("", "-", "None", "0", "0.00"):
+                            opm_cand = float(raw_con_opm)
+                        elif raw_st_opm not in ("", "-", "None"):
+                            st_val = float(raw_st_opm)
+                            if not (con_pe_val is not None and con_pe_val < 0 and st_val > 50.0):
+                                opm_cand = st_val
+                        if opm_cand is not None and -100.0 <= opm_cand <= 95.0:
+                            resolved_opm = round(opm_cand, 2)
+                except Exception as opm_err:
+                    logger.debug(f"BSE OPM parse notice for {canonical_ticker}: {opm_err}")
+
+                out_snap = {
                     "ticker": canonical_ticker,
                     "short_name": str(cmp_name),
                     "scrip_code": scrip,
@@ -575,11 +602,15 @@ def fetch_bse_exchange_data(query: str) -> dict:
                     "pe_ratio": resolved_pe,
                     "industry": ind_str,
                     "sector": sec_str,
-                    "52w_high": wk_hi if wk_hi not in ("", "-") else "N/A",
-                    "52w_low": wk_lo if wk_lo not in ("", "-") else "N/A",
+                    "52w_high": wk_hi if wk_hi not in ("", "-", "None") else "N/A",
+                    "52w_low": wk_lo if wk_lo not in ("", "-", "None") else "N/A",
                     "description": f"BSE Listed Equity under group {com_json.get('GRP', 'General')}.",
                     "is_fallback": False,
                 }
+                if resolved_opm is not None:
+                    out_snap["operating_margin"] = resolved_opm
+                    out_snap["opm"] = resolved_opm
+                return out_snap
         except Exception as fast_bse_err:
             logger.warning(f"Fast BSE JSON lookup notice for {query} ({scrip}): {fast_bse_err}")
 
@@ -707,14 +738,20 @@ def _enrich_with_cached_db_fundamentals(res_dict: dict, symbol: str) -> dict:
                 if res_dict.get(k) in [None, "N/A", "", 0, 0.0] and cached.get(k) is not None:
                     res_dict[k] = cached[k]
 
-            if res_dict.get("52w_high") in [None, "N/A", "", 0, 0.0] and cached.get("fifty_two_week_high"):
-                res_dict["52w_high"] = cached["fifty_two_week_high"]
-            if res_dict.get("52w_low") in [None, "N/A", "", 0, 0.0] and cached.get("fifty_two_week_low"):
-                res_dict["52w_low"] = cached["fifty_two_week_low"]
-            if res_dict.get("fifty_two_week_high") in [None, "N/A", "", 0, 0.0]:
-                res_dict["fifty_two_week_high"] = cached.get("fifty_two_week_high") or res_dict.get("52w_high")
-            if res_dict.get("fifty_two_week_low") in [None, "N/A", "", 0, 0.0]:
-                res_dict["fifty_two_week_low"] = cached.get("fifty_two_week_low") or res_dict.get("52w_low")
+            live_hi = res_dict.get("fifty_two_week_high") if res_dict.get("fifty_two_week_high") not in [None, "N/A", "", 0, 0.0] else res_dict.get("52w_high")
+            live_lo = res_dict.get("fifty_two_week_low") if res_dict.get("fifty_two_week_low") not in [None, "N/A", "", 0, 0.0] else res_dict.get("52w_low")
+            if live_hi in [None, "N/A", "", 0, 0.0] and cached.get("fifty_two_week_high"):
+                live_hi = cached["fifty_two_week_high"]
+            if live_lo in [None, "N/A", "", 0, 0.0] and cached.get("fifty_two_week_low"):
+                live_lo = cached["fifty_two_week_low"]
+            if live_hi not in [None, "N/A", "", 0, 0.0]:
+                res_dict["52w_high"] = live_hi
+                res_dict["fifty_two_week_high"] = live_hi
+            if live_lo not in [None, "N/A", "", 0, 0.0]:
+                res_dict["52w_low"] = live_lo
+                res_dict["fifty_two_week_low"] = live_lo
+            if res_dict.get("short_name") in [None, "N/A", "", symbol] and cached.get("company_name"):
+                res_dict["short_name"] = cached["company_name"]
             if res_dict.get("sector") in [None, "N/A", "", "General Industry"] and cached.get("sector"):
                 res_dict["sector"] = cached["sector"]
             if res_dict.get("industry") in [None, "N/A", "", "Diversified"] and cached.get("industry"):
@@ -727,6 +764,23 @@ def _enrich_with_cached_db_fundamentals(res_dict: dict, symbol: str) -> dict:
                     res_dict["pe_ratio"] = c_pe
                 elif cached.get("forward_pe") not in [None, "N/A", "", "Fair", 0, 0.0, "0"]:
                     res_dict["pe_ratio"] = cached["forward_pe"]
+
+        if res_dict.get("operating_margin") in [None, "N/A", ""] and res_dict.get("opm") in [None, "N/A", ""]:
+            from core.presentation.formatters import is_bfsi_entity
+            if not is_bfsi_entity(
+                ticker=symbol,
+                sector_label=str(res_dict.get("sector") or ""),
+                industry=str(res_dict.get("industry") or ""),
+                company_name=str(res_dict.get("short_name") or ""),
+            ):
+                from core.db.reports import get_report_by_ticker_sync
+                from core.db.fundamentals import extract_fundamentals_from_report_text
+                rep = get_report_by_ticker_sync(symbol)
+                if rep and rep.get("report_text"):
+                    ext = extract_fundamentals_from_report_text(rep["report_text"], fallback_data=res_dict)
+                    if ext.get("operating_margin") not in [None, "N/A", ""]:
+                        res_dict["operating_margin"] = ext["operating_margin"]
+                        res_dict["opm"] = ext["operating_margin"]
     except Exception as e:
         logger.debug(f"Cached fundamentals blend notice for {symbol}: {e}")
 
@@ -841,18 +895,21 @@ def get_stock_fundamentals(query: str, fast_db_first: bool = False) -> dict:
                     "is_fallback": False,
                 }
                 res_dict = _enrich_with_cached_db_fundamentals(res_dict, canonical or clean)
-                if res_dict.get("market_cap") in (None, "N/A", 0, "0") and scrip:
+                if (res_dict.get("market_cap") in (None, "N/A", 0, "0") or res_dict.get("operating_margin") in (None, "N/A", "")) and scrip:
                     try:
                         bse_meta = fetch_bse_exchange_data(canonical or clean)
-                        if bse_meta.get("market_cap"):
+                        if res_dict.get("market_cap") in (None, "N/A", 0, "0") and bse_meta.get("market_cap"):
                             res_dict["market_cap"] = bse_meta["market_cap"]
+                        if res_dict.get("operating_margin") in (None, "N/A", "") and bse_meta.get("operating_margin") is not None:
+                            res_dict["operating_margin"] = bse_meta["operating_margin"]
+                            res_dict["opm"] = bse_meta["operating_margin"]
                         if res_dict.get("short_name") == (canonical or clean) and bse_meta.get("short_name"):
                             res_dict["short_name"] = bse_meta["short_name"]
                         if res_dict.get("sector") == "General Industry" and bse_meta.get("sector"):
                             res_dict["sector"] = bse_meta["sector"]
                             res_dict["industry"] = bse_meta.get("industry", res_dict["industry"])
                     except Exception as bse_meta_err:
-                        logger.debug(f"BSE market-cap complement notice for {canonical}: {bse_meta_err}")
+                        logger.debug(f"BSE market-cap/OPM complement notice for {canonical}: {bse_meta_err}")
                 _FUNDAMENTALS_CACHE[clean] = (now, res_dict)
                 _FUNDAMENTALS_CACHE[canonical] = (now, res_dict)
                 return res_dict
@@ -880,18 +937,21 @@ def get_stock_fundamentals(query: str, fast_db_first: bool = False) -> dict:
                     "is_fallback": False,
                 }
                 res_dict = _enrich_with_cached_db_fundamentals(res_dict, canonical or clean)
-                if res_dict.get("market_cap") in (None, "N/A", 0, "0") and scrip:
+                if (res_dict.get("market_cap") in (None, "N/A", 0, "0") or res_dict.get("operating_margin") in (None, "N/A", "")) and scrip:
                     try:
                         bse_meta = fetch_bse_exchange_data(canonical or clean)
-                        if bse_meta.get("market_cap"):
+                        if res_dict.get("market_cap") in (None, "N/A", 0, "0") and bse_meta.get("market_cap"):
                             res_dict["market_cap"] = bse_meta["market_cap"]
+                        if res_dict.get("operating_margin") in (None, "N/A", "") and bse_meta.get("operating_margin") is not None:
+                            res_dict["operating_margin"] = bse_meta["operating_margin"]
+                            res_dict["opm"] = bse_meta["operating_margin"]
                         if res_dict.get("short_name") == (canonical or clean) and bse_meta.get("short_name"):
                             res_dict["short_name"] = bse_meta["short_name"]
                         if res_dict.get("sector") == "General Industry" and bse_meta.get("sector"):
                             res_dict["sector"] = bse_meta["sector"]
                             res_dict["industry"] = bse_meta.get("industry", res_dict["industry"])
                     except Exception as bse_meta_err:
-                        logger.debug(f"BSE market-cap complement notice for {canonical}: {bse_meta_err}")
+                        logger.debug(f"BSE market-cap/OPM complement notice for {canonical}: {bse_meta_err}")
                 _FUNDAMENTALS_CACHE[clean] = (now, res_dict)
                 _FUNDAMENTALS_CACHE[canonical] = (now, res_dict)
                 return res_dict
@@ -934,19 +994,23 @@ def get_stock_fundamentals(query: str, fast_db_first: bool = False) -> dict:
                 high_52 = getattr(fast, "year_high", None) or "N/A"
                 low_52 = getattr(fast, "year_low", None) or "N/A"
 
-                # Check if we have baseline PE in reports DB
+                # Check if we have baseline PE or canonical company name in reports DB
                 pe = "N/A"
+                short_nm = canonical or clean
                 try:
                     from core.db.reports import get_report_by_ticker_sync
                     rep = get_report_by_ticker_sync(canonical)
-                    if rep and rep.get("baseline_pe"):
-                        pe = str(rep["baseline_pe"]).strip()
+                    if rep:
+                        if rep.get("baseline_pe") and str(rep["baseline_pe"]).strip() not in ("", "N/A"):
+                            pe = str(rep["baseline_pe"]).strip()
+                        if rep.get("short_name") and str(rep["short_name"]).strip():
+                            short_nm = str(rep["short_name"]).strip()
                 except Exception as err:
                     logger.debug(f"Fast gateway baseline PE lookup notice: {err}")
 
                 res_dict = {
                     "ticker": canonical or clean,
-                    "short_name": canonical or clean,
+                    "short_name": short_nm,
                     "sector": "General Industry",
                     "industry": "Diversified",
                     "market_cap": mcap,

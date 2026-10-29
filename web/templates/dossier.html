@@ -378,6 +378,8 @@
             <span style="font-size: 12px; font-weight: 800; color: {{ equity_intel.valuation_radar.badge_color }};">
               {% if equity_intel.valuation_radar.status == 'UNAVAILABLE' %}
                 N/A
+              {% elif equity_intel.valuation_radar.status == 'IMPLIED_GROWTH_ONLY' %}
+                Implied CAGR
               {% elif equity_intel.valuation_radar.status == 'LOCKED' or equity_intel.valuation_radar.locked %}
                 <span class="badge" style="background: rgba(245, 158, 11, 0.15); color: #fbbf24; font-size: 11px;"><svg class="glyph" style="width:10px;height:10px;vertical-align:-1px;margin-right:2px;"><use href="#icon-lock"></use></svg>Gated</span>
               {% else %}
@@ -388,6 +390,8 @@
           <div style="font-size: 13.5px; font-weight: 700; color: #e2e8f0; margin-top: 4px;">
             {% if equity_intel.valuation_radar.status == 'UNAVAILABLE' %}
               <span style="color: var(--text-muted); font-size: 12.5px;">Pending Financial Disclosures</span>
+            {% elif equity_intel.valuation_radar.status == 'IMPLIED_GROWTH_ONLY' %}
+              {{ equity_intel.valuation_radar.inputs.implied_fcf_growth_pct }}% <span style="font-size: 11px; color: var(--text-muted); font-weight: normal;">Implied 5Y Growth</span>
             {% elif equity_intel.valuation_radar.status == 'LOCKED' or equity_intel.valuation_radar.locked or equity_intel.valuation_radar.fair_value is none %}
               <span style="color: #fbbf24; font-size: 12px; font-weight: 600;"><svg class="glyph" style="width:11px;height:11px;vertical-align:-1px;margin-right:3px;"><use href="#icon-lock"></use></svg>1 Credit Unlock</span>
             {% else %}
@@ -551,7 +555,7 @@
             </span>
           </div>
           <p style="margin: 0 0 10px; font-size: 11.5px; color: #94a3b8; line-height: 1.4;">
-            Cross-weights 2-Stage DCF (40%), Historical P/E Multiple (40%), and Graham Earnings Power Value Floor (20%).
+            Cross-weights 2-Stage DCF (40%), Historical P/E Multiple (35%), and Graham Earnings Power Value Floor (25%).
           </p>
           <div style="overflow-x: auto;">
             <table class="admin-table" style="width: 100%; font-size: 11.5px; margin: 0;">
@@ -574,14 +578,14 @@
                 <tr style="border-bottom: 1px solid rgba(255,255,255,0.04);">
                   <td style="padding: 6px 8px; color: #cbd5e1;">Historical 5Y Median P/E</td>
                   <td class="mono" style="padding: 6px 8px; text-align: right; color: #f8fafc; font-weight: 700;">₹{{ "{:,.2f}".format(equity_intel.valuation_radar.models.historical_pe_model.fair_value) }}</td>
-                  <td class="mono" style="padding: 6px 8px; text-align: right; color: #94a3b8;">40%</td>
+                  <td class="mono" style="padding: 6px 8px; text-align: right; color: #94a3b8;">35%</td>
                 </tr>
                 {% endif %}
                 {% if equity_intel.valuation_radar.models.epv_model %}
                 <tr style="border-bottom: 1px solid rgba(255,255,255,0.04);">
                   <td style="padding: 6px 8px; color: #cbd5e1;">Graham EPV Floor</td>
                   <td class="mono" style="padding: 6px 8px; text-align: right; color: #f8fafc; font-weight: 700;">₹{{ "{:,.2f}".format(equity_intel.valuation_radar.models.epv_model.fair_value) }}</td>
-                  <td class="mono" style="padding: 6px 8px; text-align: right; color: #94a3b8;">20%</td>
+                  <td class="mono" style="padding: 6px 8px; text-align: right; color: #94a3b8;">25%</td>
                 </tr>
                 {% endif %}
               </tbody>
@@ -685,7 +689,7 @@
         const tv = (proj * (1 + tg)) / spread;
         const dcfFv = pvStage1 + (tv / Math.pow(1 + wacc, 5));
 
-        const compositeFv = (peModelFv * 0.40) + (dcfFv * 0.40) + (epvModelFv * 0.20);
+        const compositeFv = (dcfFv * 0.40) + (peModelFv * 0.35) + (epvModelFv * 0.25);
         const mos = cmp > 0 ? ((compositeFv - cmp) / cmp) * 100.0 : 0.0;
 
         const fvEl = document.getElementById('dcfSimFairValue');
@@ -738,7 +742,7 @@
                 <span>Always Free (0 Credits)</span>
               </div>
               <div style="color: var(--text-secondary); line-height: 1.4;">
-                Pillars 01, 02, 04, 06, 07 • Live exchange quote &amp; historical drift • Peer comparisons • Interactive Reverse-DCF slider • Public directory screener
+                Pillars 01, 02, 04, 06, 07 • Live exchange quote &amp; historical drift • Peer comparisons • Public directory screener
               </div>
             </div>
             <div style="background: rgba(14, 165, 233, 0.06); border: 1px solid rgba(14, 165, 233, 0.2); border-radius: 8px; padding: 10px 12px;">
@@ -1021,31 +1025,32 @@
         <span><strong style="color: #34d399;">Strictly Confidential:</strong> All theses are strictly confidential and can only be viewed by you when you log in.</span>
       </div>
 
-      <form id="countercaseForm" onsubmit="handleCountercaseSubmit(event, '{{ ticker }}')">
+      <form id="countercaseForm" action="/api/countercase" method="POST" onsubmit="handleCountercaseSubmit(event, '{{ ticker }}')">
         <div style="margin-bottom: 14px;">
-          <label style="display: block; font-size: 13px; font-weight: 600; color: var(--text-secondary); margin-bottom: 6px;">
+          <label for="countercaseVector" style="display: block; font-size: 13px; font-weight: 600; color: var(--text-secondary); margin-bottom: 6px;">
             Primary Hypothetical Failure Vector:
           </label>
           {% set saved_vec = user_countercase.failure_vector if user_countercase else '' %}
-          <select id="countercaseVector" style="width: 100%; padding: 10px 14px; background: rgba(30, 41, 59, 0.8); border: 1px solid var(--border-color); border-radius: 6px; color: var(--text-primary); font-size: 13.5px;">
+          <select id="countercaseVector" name="failure_vector" style="width: 100%; padding: 10px 14px; background: rgba(30, 41, 59, 0.8); border: 1px solid var(--border-color); border-radius: 6px; color: var(--text-primary); font-size: 16px;">
+            {% for vec in dynamic_failure_vectors|default([]) %}
+            <option value="{{ vec }}" {% if saved_vec == vec %}selected{% endif %}>{{ vec }}</option>
+            {% endfor %}
             <option {% if saved_vec == 'Customer / Geographic Concentration Risk (e.g. Top 3 clients >35% revenue)' %}selected{% endif %}>Customer / Geographic Concentration Risk (e.g. Top 3 clients >35% revenue)</option>
             <option {% if saved_vec == 'Regulatory / Policy Vulnerability (e.g. import tariffs, export duties, PLI scheme expiration)' %}selected{% endif %}>Regulatory / Policy Vulnerability (e.g. import tariffs, export duties, PLI scheme expiration)</option>
             <option {% if saved_vec == 'Operating Margin Squeeze / Raw Material Inflation (e.g. >200 bps margin contraction)' %}selected{% endif %}>Operating Margin Squeeze / Raw Material Inflation (e.g. >200 bps margin contraction)</option>
-            <option {% if saved_vec == 'Capital Misallocation / Debt-Fueled Acquisition' %}selected{% endif %}>Capital Misallocation / Debt-Fueled Acquisition</option>
-            <option {% if saved_vec == 'Technological Obsolescence / Moat Decay' %}selected{% endif %}>Technological Obsolescence / Moat Decay</option>
             <option {% if saved_vec == 'Custom Operational Vulnerability...' %}selected{% endif %}>Custom Operational Vulnerability...</option>
           </select>
         </div>
 
         <div style="margin-bottom: 16px;">
-          <label style="display: block; font-size: 13px; font-weight: 600; color: var(--text-secondary); margin-bottom: 6px;">
+          <label for="countercaseNotes" style="display: block; font-size: 13px; font-weight: 600; color: var(--text-secondary); margin-bottom: 6px;">
             Analyst Anti-Thesis Rationale:
           </label>
-          <textarea id="countercaseNotes" rows="2" placeholder="Articulate specific operational failure scenarios (e.g., loss of principal client, margin compression)..." style="width: 100%; padding: 10px 14px; background: rgba(30, 41, 59, 0.8); border: 1px solid var(--border-color); border-radius: 6px; color: var(--text-primary); font-size: 13.5px; box-sizing: border-box;">{{ user_countercase.rationale if user_countercase else '' }}</textarea>
+          <textarea id="countercaseNotes" name="anti_thesis_notes" rows="2" placeholder="Articulate specific operational failure scenarios (e.g., loss of principal client, margin compression)..." style="width: 100%; padding: 10px 14px; background: rgba(30, 41, 59, 0.8); border: 1px solid var(--border-color); border-radius: 6px; color: var(--text-primary); font-size: 16px; box-sizing: border-box;">{{ user_countercase.rationale if user_countercase else '' }}</textarea>
         </div>
 
         <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 10px;">
-          <span id="countercaseStatus" style="font-size: 12px; color: var(--accent-emerald);">{% if user_countercase %}<svg class="glyph" style="width:12px;height:12px;vertical-align:-1px;margin-right:4px;"><use href="#icon-lock"></use></svg>Private countercase saved ({{ user_countercase.updated_at }}){% endif %}</span>
+          <span id="countercaseStatus" role="status" aria-live="polite" style="font-size: 12px; color: var(--accent-emerald);">{% if user_countercase %}<svg class="glyph" style="width:12px;height:12px;vertical-align:-1px;margin-right:4px;"><use href="#icon-lock"></use></svg>Private countercase saved ({{ user_countercase.updated_at }}){% endif %}</span>
           <button type="submit" id="btnCommitCountercase" class="btn btn-secondary btn-sm" style="font-weight: 700;">
             <svg class="glyph"><use href="#icon-lock"></use></svg> Save Countercase to Audit Ledger
           </button>

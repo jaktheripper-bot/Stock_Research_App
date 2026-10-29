@@ -226,6 +226,26 @@ def save_report_to_archive(stock_data: dict, report_text: str, announcement: str
         cursor.close()
         conn.close()
 
+    # Keep cached_fundamentals synchronized with freshly archived dossiers so header metrics never drift
+    try:
+        from core.db.connection import _is_unit_test_runtime
+        from bse_master import is_synthetic_test_symbol
+        if not _is_unit_test_runtime() and not is_synthetic_test_symbol(clean_sym) and curr_price > 0 and report_text and len(report_text.strip()) >= 800:
+            from core.db.fundamentals import extract_fundamentals_from_report_text, save_cached_fundamentals
+            base_cf = dict(stock_data or {})
+            base_cf["ticker"] = clean_sym
+            base_cf["company_name"] = short_name
+            base_cf["current_price"] = curr_price
+            if mcap and mcap > 0:
+                base_cf["market_cap"] = mcap
+            if pe and pe not in ("N/A", ""):
+                base_cf["pe_ratio"] = pe
+            base_cf.setdefault("source", "REPORTS_ARCHIVE_SYNC")
+            extracted_cf = extract_fundamentals_from_report_text(report_text, base_cf)
+            save_cached_fundamentals(clean_sym, extracted_cf)
+    except Exception as cf_sync_err:
+        logger.debug(f"Post-archive cached_fundamentals sync notice for {clean_sym}: {cf_sync_err}")
+
 class AwaitableList(list):
     def __await__(self):
         async def _async_self():
@@ -725,6 +745,7 @@ def get_all_equities_directory_sync() -> list:
                 "de_status": de_meta["status"],
                 "operating_margin": opm_meta["display"],
                 "operating_margin_float": opm_float,
+                "opm_float": opm_float,
                 "opm_tooltip": opm_meta["tooltip"],
                 "fifty_two_week_high": high52 or "—",
                 "fifty_two_week_low": low52 or "—",

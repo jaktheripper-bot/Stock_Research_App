@@ -6,11 +6,24 @@ Complies with SEBI (Mutual Funds) Regulations, 1996 portfolio disclosure norms.
 
 import json
 import logging
+import re
 from decimal import Decimal
 from datetime import datetime, date, timezone
 from typing import Optional, List, Dict, Any
 
 from core.db.connection import get_db_connection, get_supabase_url, is_postgres_connection, is_postgres_active, IST
+
+
+def normalize_scheme_stem(name: str) -> str:
+    """Canonicalizes a mutual fund scheme name to its core AMC + strategy stem for AMFI/slug twin matching."""
+    s = re.sub(
+        r"(?i)\b(direct|regular|plan|growth|option|idcw|dividend(?!\s+yield\b)|payout|reinvestment)\b",
+        " ",
+        name or "",
+    )
+    s = re.sub(r"[^a-zA-Z0-9]+", " ", s).strip().upper()
+    s = re.sub(r"\s+", " ", s)
+    return re.sub(r"\b(FLEXI|LARGE|MID|SMALL|MULTI)\s+CAP\b", r"\1CAP", s)
 
 def is_supabase_enabled() -> bool:
     return bool(get_supabase_url() and is_postgres_active())
@@ -44,6 +57,18 @@ def clean_dict_row(cursor, row: Any) -> Dict[str, Any]:
     return d
 
 
+def _normalize_pg_portfolio_date(port_date: Any) -> Any:
+    """Coerces non-ISO date placeholders (e.g. 'Pending Monthly Disclosure') to None for PostgreSQL DATE columns."""
+    if port_date is None:
+        return None
+    if isinstance(port_date, str):
+        s = port_date.strip()
+        if len(s) >= 10 and s[4:5] == "-" and s[7:8] == "-" and s[:4].isdigit() and s[5:7].isdigit() and s[8:10].isdigit():
+            return s[:10]
+        return None
+    return port_date
+
+
 def save_mutual_fund_scheme(scheme: Dict[str, Any]) -> bool:
     """Inserts or updates a mutual fund scheme master record."""
     conn = get_db_connection()
@@ -56,15 +81,17 @@ def save_mutual_fund_scheme(scheme: Dict[str, Any]) -> bool:
     cat = scheme.get("category", "Flexi Cap Fund")
     broad_cat = scheme.get("broad_category", "EQUITY").upper()
     benchmark = scheme.get("benchmark_index", "NIFTY 500 TRI")
-    aum = float(scheme.get("aum_crores", 0.0))
-    nav = float(scheme.get("nav", 10.0))
-    ter_dir = float(scheme.get("ter_direct_pct", 0.75))
-    ter_reg = float(scheme.get("ter_regular_pct", 1.50))
-    ptr = float(scheme.get("portfolio_turnover_ratio_pct", 25.0))
-    active_share = float(scheme.get("active_share_pct", 65.0))
+    aum = float(scheme.get("aum_crores") if scheme.get("aum_crores") is not None else 0.0)
+    nav = float(scheme.get("nav") if scheme.get("nav") is not None else 10.0)
+    ter_dir = float(scheme.get("ter_direct_pct") if scheme.get("ter_direct_pct") is not None else 0.75)
+    ter_reg = float(scheme.get("ter_regular_pct") if scheme.get("ter_regular_pct") is not None else 1.50)
+    ptr = float(scheme.get("portfolio_turnover_ratio_pct") if scheme.get("portfolio_turnover_ratio_pct") is not None else 25.0)
+    raw_as = scheme.get("active_share_pct", 65.0) if "active_share_pct" not in scheme else scheme.get("active_share_pct")
+    active_share = float(raw_as) if raw_as is not None else None
     risk_grade = scheme.get("risk_grade", "Very High")
     fund_mgr = scheme.get("fund_manager", "Senior Fund Manager")
     port_date = scheme.get("last_portfolio_date", datetime.now(IST).date().isoformat())
+    pg_port_date = _normalize_pg_portfolio_date(port_date)
 
     meta = scheme.get("metadata", {})
     if isinstance(meta, dict):
@@ -107,7 +134,7 @@ def save_mutual_fund_scheme(scheme: Dict[str, Any]) -> bool:
                 code, name, amc, cat, broad_cat,
                 benchmark, aum, nav, ter_dir, ter_reg,
                 ptr, active_share, risk_grade,
-                fund_mgr, meta_json, port_date
+                fund_mgr, meta_json, pg_port_date
             ))
         else:
             cursor.execute("""
@@ -346,11 +373,16 @@ def get_active_mutual_funds(
     broad_category: Optional[str] = None,
     limit: Optional[int] = 500,
     audited_only: bool = False,
+    dedupe_twins: Optional[bool] = None,
 ) -> List[Dict[str, Any]]:
     """Retrieves active mutual fund schemes filtered by category."""
     conn = get_db_connection()
     cursor = conn.cursor()
     use_pg = is_postgres_connection(conn)
+
+    should_dedupe = audited_only if dedupe_twins is None else bool(dedupe_twins)
+    if dedupe_twins is None and limit is not None and 0 < int(limit) <= 1000:
+        should_dedupe = True
 
     clauses = ["SUBSTR(scheme_code, 1, 5) != 'TEST_'"]
     params = []
@@ -367,10 +399,11 @@ def get_active_mutual_funds(
         )
 
     where_str = f"WHERE {' AND '.join(clauses)}" if clauses else ""
-    if limit and isinstance(limit, int) and limit > 0:
+    sql_limit = (int(limit) * 3) if (should_dedupe and limit and isinstance(limit, int) and limit > 0) else limit
+    if sql_limit and isinstance(sql_limit, int) and sql_limit > 0:
         p = "%s" if use_pg else "?"
         limit_str = f"LIMIT {p}"
-        params.append(int(limit))
+        params.append(int(sql_limit))
     else:
         limit_str = ""
     sql = f"SELECT * FROM mutual_fund_schemes {where_str} ORDER BY aum_crores DESC {limit_str}".strip()
@@ -378,7 +411,29 @@ def get_active_mutual_funds(
     try:
         cursor.execute(sql, tuple(params))
         rows = cursor.fetchall()
-        return [clean_dict_row(cursor, r) for r in rows]
+        items = [clean_dict_row(cursor, r) for r in rows]
+        if should_dedupe:
+            # Prefer curated slug as canonical representative per twin stem, then order by AUM DESC
+            items.sort(
+                key=lambda x: (
+                    0 if str(x.get("scheme_code") or "").isdigit() else 1,
+                    float(x.get("aum_crores") or 0.0),
+                ),
+                reverse=True,
+            )
+            deduped: List[Dict[str, Any]] = []
+            seen_stems = set()
+            for item in items:
+                stem = normalize_scheme_stem(str(item.get("scheme_name") or "")) or str(item.get("scheme_code") or "")
+                if stem in seen_stems:
+                    continue
+                seen_stems.add(stem)
+                deduped.append(item)
+            deduped.sort(key=lambda x: float(x.get("aum_crores") or 0.0), reverse=True)
+            if limit and isinstance(limit, int) and limit > 0:
+                return deduped[: int(limit)]
+            return deduped
+        return items
     except Exception as e:
         logger.error(f"Error querying active mutual funds: {e}")
         return []
@@ -398,16 +453,22 @@ def get_scheme_holdings(scheme_code: str) -> List[Dict[str, Any]]:
         sql = """
             SELECT * FROM mutual_fund_holdings
             WHERE scheme_code = %s
-            ORDER BY weight_pct DESC
+            ORDER BY weight_pct DESC, id DESC
         """ if use_pg else """
             SELECT * FROM mutual_fund_holdings
             WHERE scheme_code = ?
-            ORDER BY weight_pct DESC
+            ORDER BY weight_pct DESC, id DESC
         """
         cursor.execute(sql, (clean_code,))
         rows = cursor.fetchall()
-        results = [clean_dict_row(cursor, r) for r in rows]
-        for r in results:
+        results: List[Dict[str, Any]] = []
+        seen_holding_keys = set()
+        for raw_row in rows:
+            r = clean_dict_row(cursor, raw_row)
+            h_key = (str(r.get("holding_type") or "").upper(), str(r.get("identifier") or "").upper())
+            if h_key in seen_holding_keys:
+                continue
+            seen_holding_keys.add(h_key)
             if "instrument_details" in r and isinstance(r["instrument_details"], str):
                 try:
                     r["details"] = json.loads(r["instrument_details"])
@@ -416,6 +477,7 @@ def get_scheme_holdings(scheme_code: str) -> List[Dict[str, Any]]:
                     r["details"] = {}
             else:
                 r["details"] = {}
+            results.append(r)
         return results
     except Exception as e:
         logger.error(f"Error getting holdings for scheme {clean_code}: {e}")
@@ -441,12 +503,19 @@ def get_holdings_for_schemes_batch(scheme_codes: List[str]) -> Dict[str, List[Di
         sql = f"""
             SELECT * FROM mutual_fund_holdings
             WHERE scheme_code IN ({ph})
-            ORDER BY scheme_code ASC, weight_pct DESC
+            ORDER BY scheme_code ASC, weight_pct DESC, id DESC
         """
         cursor.execute(sql, tuple(cleaned_codes))
         rows = cursor.fetchall()
+        seen_per_scheme: Dict[str, set] = {}
         for r in rows:
             item = clean_dict_row(cursor, r)
+            sc = str(item.get("scheme_code") or "").strip().upper()
+            h_key = (str(item.get("holding_type") or "").upper(), str(item.get("identifier") or "").upper())
+            seen_set = seen_per_scheme.setdefault(sc, set())
+            if h_key in seen_set:
+                continue
+            seen_set.add(h_key)
             if "instrument_details" in item and isinstance(item["instrument_details"], str):
                 try:
                     item["details"] = json.loads(item["instrument_details"])
@@ -455,7 +524,6 @@ def get_holdings_for_schemes_batch(scheme_codes: List[str]) -> Dict[str, List[Di
                     item["details"] = {}
             else:
                 item["details"] = {}
-            sc = str(item.get("scheme_code") or "").strip().upper()
             if sc in grouped:
                 grouped[sc].append(item)
             elif sc:
@@ -484,18 +552,38 @@ def get_schemes_by_holding(identifier: str) -> List[Dict[str, Any]]:
             FROM mutual_fund_holdings h
             JOIN mutual_fund_schemes s ON h.scheme_code = s.scheme_code
             WHERE h.identifier = %s
-            ORDER BY h.weight_pct DESC
+            ORDER BY h.weight_pct DESC, s.aum_crores DESC
         """ if use_pg else """
             SELECT h.scheme_code, s.scheme_name, s.category, s.broad_category,
                    h.holding_type, h.weight_pct, h.portfolio_date, s.aum_crores
             FROM mutual_fund_holdings h
             JOIN mutual_fund_schemes s ON h.scheme_code = s.scheme_code
             WHERE h.identifier = ?
-            ORDER BY h.weight_pct DESC
+            ORDER BY h.weight_pct DESC, s.aum_crores DESC
         """
         cursor.execute(sql, (clean_id,))
-        rows = cursor.fetchall()
-        return [clean_dict_row(cursor, r) for r in rows]
+        rows = [clean_dict_row(cursor, r) for r in cursor.fetchall()]
+        rows.sort(
+            key=lambda x: (
+                0 if str(x.get("scheme_code") or "").isdigit() else 1,
+                float(x.get("weight_pct") or 0.0),
+                float(x.get("aum_crores") or 0.0),
+            ),
+            reverse=True,
+        )
+        deduped: List[Dict[str, Any]] = []
+        seen_stems = set()
+        for item in rows:
+            stem = normalize_scheme_stem(str(item.get("scheme_name") or "")) or str(item.get("scheme_code") or "")
+            if stem in seen_stems:
+                continue
+            seen_stems.add(stem)
+            deduped.append(item)
+        deduped.sort(
+            key=lambda x: (float(x.get("weight_pct") or 0.0), float(x.get("aum_crores") or 0.0)),
+            reverse=True,
+        )
+        return deduped
     except Exception as e:
         logger.error(f"Error reverse-querying schemes for holding {clean_id}: {e}")
         return []

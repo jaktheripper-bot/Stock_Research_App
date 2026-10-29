@@ -101,6 +101,24 @@ class TestEpistemicSchemaAndFalsificationEngine(unittest.TestCase):
         self.assertIn("Pending", ledger["calculated_metrics"][0]["metric"])
         self.assertIn("what_could_contradict", ledger["falsification_triggers"])
 
+    def test_insufficient_disclosures_never_stamped_as_verified_fact(self):
+        """Step B (2.1.2): INSUFFICIENT_DISCLOSURES must route to unresolved_uncertainties[0], never verified_facts."""
+        partial_intel = compile_equity_dossier(
+            ticker="PARTIALCO",
+            fundamentals={"current_price": 450.0, "pe_ratio": 19.5, "debt_to_equity": 0.2},
+            company_name="Partial Disclosures Ltd",
+            industry_str="Industrial Manufacturing",
+        )
+        self.assertEqual(partial_intel["forensic_intelligence"]["verdict"], "INSUFFICIENT_DISCLOSURES")
+        ledger = partial_intel["epistemic_ledger"]
+        self.assertEqual(len(ledger["verified_facts"]), 1)
+        self.assertFalse(any("Forensic Sieve Pass Rate" in vf["claim"] for vf in ledger["verified_facts"]))
+        self.assertEqual(len(ledger["unresolved_uncertainties"]), 3)
+        self.assertIn("1/10 statutory schedules", ledger["unresolved_uncertainties"][0])
+        uu_claims = [c for c in ledger["claims"] if c["tier"] == "UNRESOLVED_UNCERTAINTY"]
+        self.assertEqual(len(uu_claims), 1)
+        self.assertIn("1/10 statutory schedules", uu_claims[0]["claim"])
+
     def test_extract_epistemic_badges_from_markdown(self):
         """Verifies extraction and categorization of 4 epistemic badge types from report text."""
         sample_report = """

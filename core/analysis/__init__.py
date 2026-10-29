@@ -59,6 +59,9 @@ from core.analysis.peer_comparison import (
     evaluate_company_disparity,
     compare_two_companies,
 )
+from core.analysis.peer_cluster import (
+    compare_peer_cluster,
+)
 
 from core.analysis.metrics import (
     calculate_52w_percentile,
@@ -80,6 +83,19 @@ from core.analysis.epistemic_schema import (
     extract_epistemic_badges,
     extract_falsification_triggers,
     build_multi_asset_epistemic_ledger,
+)
+
+from core.analysis.segment_extractor import (
+    extract_ind_as_108_segments,
+)
+
+from core.analysis.guidance_delivery_audit import (
+    compute_sequential_thesis_drift,
+)
+
+from core.analysis.live_security_tax_bridge import (
+    HNI_EFFECTIVE_SLABS,
+    compare_live_tracked_yield_instruments,
 )
 
 __all__ = [
@@ -119,6 +135,7 @@ __all__ = [
     # comparator
     "evaluate_company_disparity",
     "compare_two_companies",
+    "compare_peer_cluster",
     # metrics
     "calculate_52w_percentile",
     "calculate_pe_percentile",
@@ -135,4 +152,11 @@ __all__ = [
     "extract_epistemic_badges",
     "extract_falsification_triggers",
     "build_multi_asset_epistemic_ledger",
+    # statutory segment & order-book extractor
+    "extract_ind_as_108_segments",
+    # sequential thesis drift & accountability audit
+    "compute_sequential_thesis_drift",
+    # live security-linked post-tax real return bridge
+    "HNI_EFFECTIVE_SLABS",
+    "compare_live_tracked_yield_instruments",
 ]

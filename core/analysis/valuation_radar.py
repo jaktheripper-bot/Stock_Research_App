@@ -70,8 +70,53 @@ def compute_valuation_radar(
             "models": {}
         }
 
-    # 1. Derive or estimate normalized EPS
-    s_eps = _safe_float(eps) if eps is not None else 0.0
+    # 1. Guard distorted TTM multiples (e.g. VEDL 2.22x demerger/one-off EPS or ETERNAL 722.9x inflection EPS)
+    #    when explicit normalized EPS is not supplied by the caller.
+    explicit_eps = _safe_float(eps) if eps is not None else 0.0
+    if explicit_eps <= 0 and (pe < 4.0 or pe > 120.0):
+        s_eps = round(c_price / pe, 2) if pe > 0 else 0.0
+        disc_rate = max(0.02, _safe_float(discount_rate, default=0.11))
+        term_rate = min(disc_rate - 0.015, max(0.01, _safe_float(terminal_growth_rate, default=0.045)))
+        low_g, high_g = -0.20, 0.45
+        for _ in range(32):
+            mid_g = (low_g + high_g) / 2.0
+            pv_s1, proj = 0.0, s_eps
+            for yr in range(1, 6):
+                proj *= (1.0 + mid_g)
+                pv_s1 += proj / ((1.0 + disc_rate) ** yr)
+            pv_tv = ((proj * (1.0 + term_rate)) / max(0.02, disc_rate - term_rate)) / ((1.0 + disc_rate) ** 5)
+            if (pv_s1 + pv_tv) < c_price:
+                low_g = mid_g
+            else:
+                high_g = mid_g
+        implied_g = round(((low_g + high_g) / 2.0) * 100.0, 1)
+        return {
+            "status": "IMPLIED_GROWTH_ONLY",
+            "current_price": c_price,
+            "fair_value": None,
+            "range_low": 0.0,
+            "range_high": 0.0,
+            "margin_of_safety_pct": None,
+            "regime": "EXTREME_MULTIPLE_REGIME",
+            "badge_label": f"Implied Growth ({implied_g}% CAGR)",
+            "badge_color": "#f59e0b",
+            "summary": (
+                f"Trailing P/E ({pe:.1f}x) reflects non-normalized or early inflection-stage earnings; "
+                f"evaluated via Reverse-DCF market-implied 5Y FCF growth ({implied_g}% CAGR at {disc_rate*100:.1f}% WACC)."
+            ),
+            "inputs": {
+                "normalized_eps": s_eps,
+                "initial_growth_pct": 0.0,
+                "discount_rate_pct": round(disc_rate * 100.0, 1),
+                "terminal_growth_pct": round(term_rate * 100.0, 1),
+                "historical_median_pe": 0.0,
+                "implied_fcf_growth_pct": implied_g,
+            },
+            "models": {},
+        }
+
+    # Derive or estimate normalized EPS
+    s_eps = explicit_eps
     if s_eps <= 0:
         if pe > 0:
             s_eps = round(c_price / pe, 2)
@@ -129,8 +174,8 @@ def compute_valuation_radar(
     # Margin of Safety %
     # Positive means current price is below fair value (Discount)
     # Negative means current price is above fair value (Premium / Overvalued)
-    if composite_fair_value > 0:
-        margin_of_safety = round(((composite_fair_value - c_price) / composite_fair_value) * 100.0, 1)
+    if c_price > 0 and composite_fair_value > 0:
+        margin_of_safety = round(((composite_fair_value - c_price) / c_price) * 100.0, 1)
     else:
         margin_of_safety = 0.0
 

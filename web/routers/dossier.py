@@ -312,6 +312,7 @@ async def api_dossier_intel(ticker: str, request: Request):
         fundamentals=fund,
         company_name=rep.get("short_name", canonical),
         industry_str=rep.get("industry", ""),
+        report_text=rep.get("report_text", ""),
     )
     is_unlocked = _asset_unlocked_for_request(request, "EQUITY", canonical)
     redacted_intel = redact_equity_intel_json(intel, is_unlocked=is_unlocked)

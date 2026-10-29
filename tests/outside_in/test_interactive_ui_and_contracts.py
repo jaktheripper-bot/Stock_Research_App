@@ -1407,11 +1407,27 @@ class TestCompetitiveEnhancements(unittest.TestCase):
         self.assertIn("function recalcDcfSandbox()", scripts[0])
         self.assertIn("dcfGrowthSlider", scripts[0])
         self.assertIn("dcfSimFairValue", scripts[0])
+        self.assertIn("(dcfFv * 0.40) + (peModelFv * 0.35) + (epvModelFv * 0.25)", scripts[0])
+        self.assertIn("Historical P/E Multiple (35%)", resp.text)
+        self.assertIn("Graham Earnings Power Value Floor (25%)", resp.text)
 
         # Verify Zero Jinja Leaks in rendered sandbox
         sandbox_str = str(sandbox)
         self.assertNotIn("{{", sandbox_str, "Unrendered Jinja tag detected in #reverseDcfSandbox")
         self.assertNotIn("{%", sandbox_str, "Unrendered Jinja directive detected in #reverseDcfSandbox")
+
+        # Verify locked dossier Free Strip does NOT falsely claim 'Interactive Reverse-DCF slider' is free
+        locked_resp = TestClient(app).get("/dossier/INFY")
+        self.assertEqual(locked_resp.status_code, 200)
+        self.assertNotIn("Interactive Reverse-DCF slider", locked_resp.text)
+
+        # Verify IMPLIED_GROWTH_ONLY renders Implied CAGR / Implied 5Y Growth without None% or 1 Credit Unlock on unlocked view
+        ext_resp = self.client.get("/dossier/ETERNAL")
+        self.assertEqual(ext_resp.status_code, 200)
+        self.assertIn("Implied CAGR", ext_resp.text)
+        self.assertIn("Implied 5Y Growth", ext_resp.text)
+        self.assertNotIn("None%", ext_resp.text)
+        self.assertNotIn("1 Credit Unlock", ext_resp.text)
 
 
     def test_interactive_mf_fee_drag_simulator_contracts(self):
@@ -1969,6 +1985,187 @@ class TestCompetitiveEnhancements(unittest.TestCase):
         self.assertNotIn("TEST_SURGICAL_INFY", resp_eq.text)
         self.assertNotIn("COAL_1792573802959", resp_eq.text)
         self.assertNotIn("UNIT_SAMPLE_STOCK", resp_eq.text)
+
+    def test_dynamic_ticker_specific_countercase_vector_and_bear_triggers(self):
+        """
+        Outside-in contract: #countercaseVector populates filing-grounded Revision Triggers
+        specific to each ticker (capped <= 140 chars) with accessible label/name/status bindings,
+        and falls back cleanly to structural archetypes when Revision Triggers are absent.
+        """
+        from unittest.mock import patch
+
+        mock_reports = {
+            "INFY": {
+                "ticker": "INFY",
+                "short_name": "Infosys Ltd",
+                "industry": "IT Services",
+                "baseline_price": 1820.0,
+                "formatted_date": "29 Oct 2026",
+                "raw_timestamp": "2026-10-29T00:00:00Z",
+                "report_text": (
+                    "## Pillar 1: Business Model\nEnterprise IT services.\n"
+                    "#### What Would Change This View (Revision Triggers)\n"
+                    "- **What Contradicts This Conclusion:** Discretionary BFSI software budgets freezing across North American tier-1 accounts for two straight quarters.\n"
+                    "- **Evidence That Forces a Revision:** Constant-currency revenue growth dropping below 0% YoY alongside large-deal TCV slipping under USD 1.5B.\n"
+                ),
+            },
+            "FEDERALBNK": {
+                "ticker": "FEDERALBNK",
+                "short_name": "Federal Bank Ltd",
+                "industry": "Banking",
+                "baseline_price": 205.0,
+                "formatted_date": "29 Oct 2026",
+                "raw_timestamp": "2026-10-29T00:00:00Z",
+                "report_text": (
+                    "## Pillar 1: Deposit Franchise\nRemittance-backed deposit base.\n"
+                    "#### What Would Change This View (Revision Triggers)\n"
+                    "- **What Contradicts This Conclusion:** Wholesale funding reliance rising faster than NRE deposit inflows in southern corridors.\n"
+                    "- **Evidence That Forces a Revision:** NRE/NRO deposit growth decelerating below 6% YoY coupled with credit-deposit ratio breaching 90%.\n"
+                ),
+            },
+            "LEGACYCO": {
+                "ticker": "LEGACYCO",
+                "short_name": "Legacy Corp",
+                "industry": "Manufacturing",
+                "baseline_price": 450.0,
+                "formatted_date": "29 Oct 2026",
+                "raw_timestamp": "2026-10-29T00:00:00Z",
+                "report_text": "## Pillar 1: Business Model\nLegacy text without revision triggers block.\n" * 15,
+            },
+        }
+
+        with patch("web.main.get_report_by_ticker_sync", side_effect=lambda sym: mock_reports.get(sym)):
+            r_infy = self.client.get("/dossier/INFY")
+            self.assertEqual(r_infy.status_code, 200)
+            s_infy = BeautifulSoup(r_infy.text, "html.parser")
+            sel_infy = s_infy.find("select", id="countercaseVector")
+            self.assertIsNotNone(sel_infy)
+            self.assertEqual(sel_infy.get("name"), "failure_vector")
+            self.assertIsNotNone(s_infy.find("label", attrs={"for": "countercaseVector"}))
+            self.assertIsNotNone(s_infy.find("label", attrs={"for": "countercaseNotes"}))
+            status_el = s_infy.find(id="countercaseStatus")
+            self.assertIsNotNone(status_el)
+            self.assertEqual(status_el.get("aria-live"), "polite")
+
+            infy_opts = [o.get_text(strip=True) for o in sel_infy.find_all("option")]
+            self.assertTrue(all(len(o) <= 140 for o in infy_opts))
+            self.assertIn("Constant-currency revenue growth dropping below 0%", infy_opts[0])
+            self.assertEqual(infy_opts[-1], "Custom Operational Vulnerability...")
+
+            bear_infy = s_infy.find(class_="editorial-callout-countercase")
+            self.assertIsNotNone(bear_infy)
+            self.assertIn("Discretionary BFSI software budgets freezing", bear_infy.get_text())
+
+            r_fed = self.client.get("/dossier/FEDERALBNK")
+            self.assertEqual(r_fed.status_code, 200)
+            s_fed = BeautifulSoup(r_fed.text, "html.parser")
+            sel_fed = s_fed.find("select", id="countercaseVector")
+            fed_opts = [o.get_text(strip=True) for o in sel_fed.find_all("option")]
+            self.assertNotEqual(infy_opts[0], fed_opts[0])
+            self.assertIn("NRE/NRO deposit growth decelerating below 6%", fed_opts[0])
+
+            # Fallback when Revision Triggers block is absent
+            r_leg = self.client.get("/dossier/LEGACYCO")
+            self.assertEqual(r_leg.status_code, 200)
+            s_leg = BeautifulSoup(r_leg.text, "html.parser")
+            sel_leg = s_leg.find("select", id="countercaseVector")
+            leg_opts = [o.get_text(strip=True) for o in sel_leg.find_all("option")]
+            self.assertEqual(len(leg_opts), 4)
+
+    def test_equities_directory_quantitative_range_filters(self):
+        """
+        Outside-in contract: /equities supports min_roce, max_de, max_pe, and min_opm
+        without 422 errors on empty form strings, and normalize_de_ratio handles Decimal.
+        """
+        from decimal import Decimal
+        from unittest.mock import patch
+        from core.presentation.formatters import normalize_de_ratio
+
+        self.assertEqual(normalize_de_ratio(Decimal("0.18")), 0.18)
+
+        sample_dir = [
+            {
+                "ticker": "HIGHQUAL",
+                "name": "High Quality Ltd",
+                "company_name": "High Quality Ltd",
+                "sector": "Information Technology",
+                "sector_slug": "IT_TECH",
+                "sector_icon": "icon-sector-it",
+                "sector_svg_id": "icon-sector-it",
+                "industry": "Software",
+                "current_price": 1500.0,
+                "formatted_price": "₹1,500.00",
+                "market_cap_cr": 120000.0,
+                "formatted_mcap": "₹1,20,000 Cr",
+                "market_cap_tier": "Mega-Cap",
+                "market_cap_tier_slug": "MEGA",
+                "pe_ratio": "22.0x",
+                "pe_float": 22.0,
+                "roce": 32.0,
+                "roce_pct": "32.0%",
+                "roe": 28.0,
+                "roe_pct": "28.0%",
+                "debt_to_equity": "0.05x",
+                "debt_to_equity_float": 0.05,
+                "operating_margin": "24.0%",
+                "operating_margin_float": 24.0,
+                "opm_float": 24.0,
+                "formatted_52w_range": "₹1,100 – ₹1,650",
+                "revision_count": 2,
+                "formatted_date": "29 Oct 2026",
+                "dossier_url": "/dossier/HIGHQUAL",
+                "is_recently_inducted": False,
+            },
+            {
+                "ticker": "LEVERAGEDCO",
+                "name": "Leveraged Infra Ltd",
+                "company_name": "Leveraged Infra Ltd",
+                "sector": "Capital Goods",
+                "sector_slug": "CAPITAL_GOODS_INFRA",
+                "sector_icon": "icon-sector-industrials",
+                "sector_svg_id": "icon-sector-industrials",
+                "industry": "Infra",
+                "current_price": 400.0,
+                "formatted_price": "₹400.00",
+                "market_cap_cr": 15000.0,
+                "formatted_mcap": "₹15,000 Cr",
+                "market_cap_tier": "Mid-Cap",
+                "market_cap_tier_slug": "MID",
+                "pe_ratio": "48.0x",
+                "pe_float": 48.0,
+                "roce": 11.0,
+                "roce_pct": "11.0%",
+                "roe": 9.0,
+                "roe_pct": "9.0%",
+                "debt_to_equity": "1.40x",
+                "debt_to_equity_float": 1.40,
+                "operating_margin": "10.5%",
+                "operating_margin_float": 10.5,
+                "opm_float": 10.5,
+                "formatted_52w_range": "₹280 – ₹460",
+                "revision_count": 1,
+                "formatted_date": "29 Oct 2026",
+                "dossier_url": "/dossier/LEVERAGEDCO",
+                "is_recently_inducted": False,
+            },
+        ]
+
+        with patch("web.main.get_all_equities_directory_sync", return_value=sample_dir):
+            r_all = self.client.get("/equities")
+            self.assertEqual(r_all.status_code, 200)
+            self.assertIn("/dossier/HIGHQUAL", r_all.text)
+            self.assertIn("/dossier/LEVERAGEDCO", r_all.text)
+
+            r_filt = self.client.get("/equities?min_roce=20&max_de=0.5&max_pe=30&min_opm=18")
+            self.assertEqual(r_filt.status_code, 200)
+            self.assertIn("/dossier/HIGHQUAL", r_filt.text)
+            self.assertNotIn("/dossier/LEVERAGEDCO", r_filt.text)
+
+            # Empty browser form inputs must never trigger 422 Unprocessable Entity
+            r_blank = self.client.get("/equities?min_roce=20&max_de=&max_pe=&min_opm=")
+            self.assertEqual(r_blank.status_code, 200)
+            self.assertIn("/dossier/HIGHQUAL", r_blank.text)
+            self.assertNotIn("/dossier/LEVERAGEDCO", r_blank.text)
 
 
 if __name__ == "__main__":

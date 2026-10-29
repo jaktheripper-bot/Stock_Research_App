@@ -13,7 +13,10 @@ def audit_alternative_yield_radar(category: Optional[str] = None) -> Dict[str, A
     products = get_all_safety_radar_products(category=category)
 
     extreme_danger_count = sum(1 for p in products if p["danger_score"] >= 80)
-    unregulated_count = sum(1 for p in products if "UNREGULATED" in p["regulatory_status"])
+    unregulated_count = sum(
+        1 for p in products
+        if any(tok in str(p.get("regulatory_status", "")).upper() for tok in ("UNREGULATED", "UNREGISTERED"))
+    )
 
     # Group by risk severity
     high_danger_schemes = [p for p in products if p["danger_score"] >= 75]

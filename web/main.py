@@ -1327,8 +1327,25 @@ def dossier_page(request: Request, ticker: str):
         ticker=canonical
     )
 
-    # 7-Pillar Health Matrix
+    # 7-Pillar Health Matrix & Ticker-Specific Countercase Failure Vectors
     matrix = extract_health_matrix(raw_md)
+    from core.analysis.epistemic_schema import extract_falsification_triggers
+    parsed_triggers = extract_falsification_triggers(raw_md)
+
+    def _clip_failure_vector(val: str, limit: int = 140) -> str:
+        s = (val or "").strip()
+        if len(s) <= limit:
+            return s
+        cut = s[: limit - 1]
+        if " " in cut:
+            cut = cut.rsplit(" ", 1)[0]
+        return cut.rstrip(",;:( ") + "…"
+
+    dynamic_failure_vectors = [
+        _clip_failure_vector(t.get("evidence_that_forces_revision") or t.get("what_contradicts") or "", 140)
+        for _, t in sorted(parsed_triggers.items())
+        if (t.get("evidence_that_forces_revision") or t.get("what_contradicts") or "").strip()
+    ]
 
     # Multi-Quarter Revisions & Thesis Drift Monitoring
     revisions = get_report_revisions(canonical, include_text=False) or []
@@ -1507,6 +1524,7 @@ def dossier_page(request: Request, ticker: str):
             fundamentals=fund,
             company_name=rep.get("short_name", canonical),
             industry_str=rep.get("industry", ""),
+            report_text=raw_md,
         )
         if equity_intel and equity_intel.get("epistemic_ledger"):
             from core.analysis.epistemic_schema import build_equity_epistemic_ledger
@@ -1556,6 +1574,7 @@ def dossier_page(request: Request, ticker: str):
             "secondary_citations_count": citation_bundle["secondary_count"],
             "direct_registry_links": citation_bundle["direct_registry_links"],
             "matrix": matrix,
+            "dynamic_failure_vectors": dynamic_failure_vectors,
             "diff": diff_data,
             "revisions_count": len(revisions),
             "pct_52w": pct_52w,
@@ -1833,6 +1852,10 @@ def equities_directory_page(
     sector: Optional[str] = None,
     market_cap: Optional[str] = None,
     sort: Optional[str] = "mcap_desc",
+    min_roce: Optional[str] = None,
+    max_de: Optional[str] = None,
+    max_pe: Optional[str] = None,
+    min_opm: Optional[str] = None,
 ):
     """Equities Directory & Screener."""
     init_db()
@@ -1882,6 +1905,37 @@ def equities_directory_page(
     elif tier_filter in ["RECENT", "NEW", "INDUCTED"]:
         filtered = [e for e in filtered if e.get("is_recently_inducted")]
 
+    def _opt_flt(raw_q: Any) -> Optional[float]:
+        if raw_q is None:
+            return None
+        if isinstance(raw_q, (int, float)):
+            return float(raw_q)
+        s = str(raw_q).strip().replace(",", "").replace("%", "")
+        if not s:
+            return None
+        try:
+            return float(s)
+        except ValueError:
+            return None
+
+    min_roce_f = _opt_flt(min_roce)
+    max_de_f = _opt_flt(max_de)
+    max_pe_f = _opt_flt(max_pe)
+    min_opm_f = _opt_flt(min_opm)
+
+    if min_roce_f is not None:
+        filtered = [e for e in filtered if e.get("roce") is not None and e["roce"] >= min_roce_f]
+    if max_de_f is not None:
+        filtered = [e for e in filtered if e.get("debt_to_equity_float") is not None and e["debt_to_equity_float"] <= max_de_f]
+    if max_pe_f is not None:
+        filtered = [e for e in filtered if e.get("pe_float") is not None and 0 < e["pe_float"] <= max_pe_f]
+    if min_opm_f is not None:
+        filtered = [
+            e for e in filtered
+            if (e.get("opm_float") if e.get("opm_float") is not None else e.get("operating_margin_float")) is not None
+            and (e.get("opm_float") if e.get("opm_float") is not None else e.get("operating_margin_float")) >= min_opm_f
+        ]
+
     recent_inductions_count = sum(1 for e in all_equities if e.get("is_recently_inducted"))
 
     sort_key = (sort or "mcap_desc").strip().lower()
@@ -1916,6 +1970,10 @@ def equities_directory_page(
             "current_tier": tier_filter or None,
             "current_sort": sort_key,
             "query": query_str,
+            "min_roce": min_roce_f,
+            "max_de": max_de_f,
+            "max_pe": max_pe_f,
+            "min_opm": min_opm_f,
         }
     )
 

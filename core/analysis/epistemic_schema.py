@@ -139,24 +139,37 @@ def build_equity_epistemic_ledger(
     fv = val_radar.get("fair_value")
     mos = val_radar.get("margin_of_safety_pct")
 
+    verified_facts = [
+        {
+            "claim": f"Exchange Market Quote & Valuation Baseline: CMP ₹{price} | Trailing P/E: {pe}x",
+            "source": f"BSE / NSE Exchange Feed (Scrip: {scrip})",
+            "source_date": formatted_date,
+            "passage": f"Official exchange trade execution record and trailing twelve-month (TTM) statutory EPS filing for {ticker}."
+        }
+    ]
+    unresolved_uncertainties = [
+        "Intraday off-market block crossovers and unannounced working-capital credit lines between quarterly Regulation 33 filings remain unobserved until statutory exchange publication.",
+        "Forward DCF realization depends on management sustaining historical reinvestment efficiency across the next 4–8 quarters without dilutive equity raises.",
+    ]
+
+    if forensic.get("verdict") == "INSUFFICIENT_DISCLOSURES":
+        unresolved_uncertainties.insert(
+            0,
+            f"360° Forensic Accounting Check partially populated ({forensic.get('disclosed_count', 0)}/10 statutory schedules in structured cache); full clean-room certification withheld until complete balance-sheet note extraction."
+        )
+    else:
+        verified_facts.append({
+            "claim": f"360° Forensic Sieve Pass Rate: {forensic.get('passed_count', 'N/A')}/{forensic.get('total_checks', 10)} Statutory Checks Passed",
+            "source": "BSE Corporate Shareholding & Audited Balance Sheet Filings",
+            "source_date": formatted_date,
+            "passage": f"Grounded against Regulation 31 shareholding disclosures and statutory balance sheet schedules ({forensic.get('badge_label', 'Audited')})."
+        })
+
     ledger = {
         "as_of_date": formatted_date,
         "asset_class": "EQUITY",
         "entity_id": ticker,
-        "verified_facts": [
-            {
-                "claim": f"Exchange Market Quote & Valuation Baseline: CMP ₹{price} | Trailing P/E: {pe}x",
-                "source": f"BSE / NSE Exchange Feed (Scrip: {scrip})",
-                "source_date": formatted_date,
-                "passage": f"Official exchange trade execution record and trailing twelve-month (TTM) statutory EPS filing for {ticker}."
-            },
-            {
-                "claim": f"360° Forensic Sieve Pass Rate: {forensic.get('passed_count', 'N/A')}/{forensic.get('total_checks', 10)} Statutory Checks Passed",
-                "source": "BSE Corporate Shareholding & Audited Balance Sheet Filings",
-                "source_date": formatted_date,
-                "passage": f"Grounded against Regulation 31 shareholding disclosures and statutory balance sheet schedules ({forensic.get('badge_label', 'Audited')})."
-            }
-        ],
+        "verified_facts": verified_facts,
         "calculated_metrics": [
             {
                 "metric": f"Multi-Model Intrinsic Fair Value: {'₹{:,.2f}'.format(fv) if isinstance(fv, (int, float)) else 'Pending'} (Margin of Safety: {mos if mos is not None else 'N/A'}%)",
@@ -171,10 +184,7 @@ def build_equity_epistemic_ledger(
             f"Valuation Regime classified as '{val_radar.get('regime', 'FAIR_VALUE').replace('_', ' ').title()}': {val_radar.get('summary', 'Evaluated against conservative cash flow discount rates.')}",
             f"Sector & Moat Posture: {sector_intel.get('narrative', 'Evaluated against domestic capex and industry margin cycles.')}"
         ],
-        "unresolved_uncertainties": [
-            "Intraday off-market block crossovers and unannounced working-capital credit lines between quarterly Regulation 33 filings remain unobserved until statutory exchange publication.",
-            "Forward DCF realization depends on management sustaining historical reinvestment efficiency across the next 4–8 quarters without dilutive equity raises."
-        ],
+        "unresolved_uncertainties": unresolved_uncertainties,
         "falsification_triggers": {
             "what_could_contradict": [
                 "Operating cash flow (OCF) to EBITDA conversion falling below 65% for two consecutive semi-annual balance sheet disclosures, indicating aggressive accrual recognition.",

@@ -611,17 +611,24 @@ def _answer_from_local_dossier_index(
             book_value_per_share=safe_bvps,
         )
         p5_excerpt = pillars.get(5, "")
-        fv = radar.get("fair_value", 0.0)
-        mos = radar.get("margin_of_safety_pct", 0.0)
+        fv = radar.get("fair_value")
+        mos = radar.get("margin_of_safety_pct")
         imp_g = radar.get("inputs", {}).get("implied_fcf_growth_pct", 11.5)
+        fv_str = f"₹{fv:,.2f}" if isinstance(fv, (int, float)) and fv > 0 else "Implied-Growth Mode"
+        range_str = (
+            f"Range: `₹{radar.get('range_low', 0):,.2f}` – `₹{radar.get('range_high', 0):,.2f}`"
+            if isinstance(fv, (int, float)) and fv > 0
+            else "Non-normalized TTM multiple"
+        )
+        mos_str = f"{mos:+.1f}%" if isinstance(mos, (int, float)) else "N/A (Reverse-DCF)"
         return (
             f"**Valuation & Multiples Diagnostic — {company_name} (`{ticker}`)**\n\n"
             f"| Valuation Metric | Audited Value | Benchmark / Regime |\n"
             f"| :--- | :--- | :--- |\n"
             f"| **Current Market Price (CMP)** | `₹{safe_price:,.2f}` | Live / Cached Exchange Quote |\n"
             f"| **Trailing P/E Multiple** | `{pe}x` | Verdict: **{matrix.get('Valuation', 'Fair')}** |\n"
-            f"| **Composite Intrinsic Value** | `₹{fv:,.2f}` | Range: `₹{radar.get('range_low', 0):,.2f}` – `₹{radar.get('range_high', 0):,.2f}` |\n"
-            f"| **Margin of Safety** | `{mos:+.1f}%` | **{radar.get('badge_label', 'Fair Value')}** |\n"
+            f"| **Composite Intrinsic Value** | `{fv_str}` | {range_str} |\n"
+            f"| **Margin of Safety** | `{mos_str}` | **{radar.get('badge_label', 'Fair Value')}** |\n"
             f"| **Reverse-DCF Implied 10Y Growth** | `{imp_g:.1f}% CAGR` | At 11.0% WACC hurdle & 4.5% terminal growth |\n\n"
             f"{p5_excerpt}\n\n"
             f"*SEBI Safe Harbor: Factual valuation triangulation from audited filings; not a buy/sell recommendation.*"

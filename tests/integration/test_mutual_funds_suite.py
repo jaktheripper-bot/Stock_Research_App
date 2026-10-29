@@ -271,6 +271,68 @@ class TestMutualFundEngine(unittest.TestCase):
         warnings_str = " ".join(lt["warnings"])
         self.assertIn("AUM Capacity Trap", warnings_str)
 
+    def test_empty_holdings_fail_closed_without_governance_alert(self):
+        scheme_eq = {
+            "scheme_code": "199999",
+            "scheme_name": "Sample Unaudited Flexi Cap Direct Growth",
+            "category": "Flexi Cap Fund",
+            "aum_crores": 1200.0,
+            "portfolio_turnover_ratio_pct": 20.0,
+        }
+        lt_empty = evaluate_dual_sleeve_lookthrough(scheme_eq, [])
+        self.assertEqual(lt_empty["genuine_coverage_pct"], 0.0)
+        self.assertFalse(lt_empty["has_sufficient_coverage"])
+        self.assertIsNone(lt_empty["composite_health_score"])
+        self.assertEqual(lt_empty["health_posture"], "COVERAGE_PENDING")
+        self.assertNotEqual(lt_empty["health_posture"], "GOVERNANCE_ALERT")
+
+        lt_zero_weight = evaluate_dual_sleeve_lookthrough(
+            scheme_eq,
+            [{"holding_type": "EQUITY", "identifier": "HDFCBANK", "weight_pct": 0.0}],
+        )
+        self.assertEqual(lt_zero_weight["genuine_coverage_pct"], 0.0)
+        self.assertFalse(lt_zero_weight["has_sufficient_coverage"])
+        self.assertIsNone(lt_zero_weight["composite_health_score"])
+        self.assertEqual(lt_zero_weight["health_posture"], "COVERAGE_PENDING")
+
+        # Pure fixed-income portfolio with actual disclosed holdings must still qualify
+        scheme_debt = get_mutual_fund_scheme("ABSL_CORPBOND_DIR")
+        holdings_debt = get_scheme_holdings("ABSL_CORPBOND_DIR")
+        lt_debt = evaluate_dual_sleeve_lookthrough(scheme_debt, holdings_debt)
+        self.assertEqual(lt_debt["genuine_coverage_pct"], 100.0)
+        self.assertTrue(lt_debt["has_sufficient_coverage"])
+        self.assertIsNotNone(lt_debt["composite_health_score"])
+        self.assertGreater(lt_debt["composite_health_score"], 75.0)
+
+    def test_missing_nav_metadata_fails_closed_to_pending_nav_series(self):
+        unseeded_scheme = {
+            "scheme_code": "199998",
+            "scheme_name": "Sample AMFI Scheme Without NAV Series",
+            "category": "Large Cap Fund",
+            "benchmark_index": "NIFTY 50 TRI",
+            "ter_direct_pct": None,
+            "ter_regular_pct": None,
+            "metadata": {},
+        }
+        with patch("core.analysis.mutual_funds_engine.get_mutual_fund_scheme", return_value=unseeded_scheme), \
+             patch("core.analysis.mutual_funds_engine.get_scheme_holdings", return_value=[]):
+            dossier = evaluate_mutual_fund_comprehensive("199998")
+
+        self.assertIsNotNone(dossier)
+        rc = dossier["risk_capture"]
+        self.assertEqual(rc["status"], "PENDING_NAV_SERIES")
+        self.assertEqual(rc["risk_posture"], "PENDING_NAV_SERIES")
+        self.assertIsNone(rc["sortino_ratio"])
+        self.assertIsNone(rc["downside_capture_ratio"])
+        self.assertIsNone(rc["upside_capture_ratio"])
+        self.assertIsNone(rc["capture_spread"])
+        self.assertIsNone(rc["rolling_consistency_3y_pct"])
+        self.assertIsNone(rc["hurst_exponent"])
+        self.assertFalse(rc["is_downside_resilient"])
+        self.assertFalse(rc["is_momentum_persistent"])
+        self.assertEqual(dossier["fee_drag"]["ter_direct_pct"], 0.0)
+        self.assertEqual(dossier["fee_drag"]["ter_regular_pct"], 0.0)
+
 
 # ==============================================================================
 # 2. Top 50 AMFI Schemes Expansion
@@ -755,6 +817,13 @@ class TestFundForensicAuditor(unittest.TestCase):
             self.assertEqual(scheme["scheme_code"], test_code)
             self.assertEqual(scheme["scheme_name"], "Quant Small Cap Fund - Growth")
             self.assertEqual(scheme["nav"], 245.82)
+            self.assertEqual(scheme["aum_crores"], 0.0)
+            self.assertEqual(scheme["ter_direct_pct"], 0.0)
+            self.assertEqual(scheme["ter_regular_pct"], 0.0)
+            self.assertEqual(scheme["portfolio_turnover_ratio_pct"], 0.0)
+            self.assertIsNone(scheme["active_share_pct"])
+            self.assertEqual(scheme["risk_grade"], "Disclosed in SID")
+            self.assertEqual(scheme["fund_manager"], "Pending Monthly Fact Sheet Sync")
             self.assertEqual(scheme["metadata"].get("source"), "mfapi_on_demand")
             # Action 4B: Fail-closed holdings check verifies zero synthetic proxy holdings are created
             self.assertEqual(get_scheme_holdings(test_code), [])
@@ -993,6 +1062,76 @@ Cash reserve of 12% cushions against broad equity sell-offs.
         # In locked request, should not even query or synthesize full forensic dossier
         mock_get_forensic.assert_not_called()
 
+    @patch("web.main.get_fund_forensic_dossier")
+    def test_step_d_zero_holdings_and_pending_nav_dossier_rendering(self, mock_get_forensic):
+        """Step D (2.1.1): Zero-holding & missing-NAV schemes render fail-closed Pending banners without GOVERNANCE_ALERT or None% leaks."""
+        from core.db.connection import get_db_connection, is_postgres_connection
+        from core.db.mutual_funds import save_mutual_fund_scheme
+
+        scheme_code = "TEST_ZERO_HOLD_DIR"
+
+        def _cleanup():
+            conn = get_db_connection()
+            p = "%s" if is_postgres_connection(conn) else "?"
+            cur = conn.cursor()
+            try:
+                cur.execute(f"DELETE FROM fund_forensic_dossiers WHERE scheme_code = {p}", (scheme_code,))
+                cur.execute(f"DELETE FROM mutual_fund_holdings WHERE scheme_code = {p}", (scheme_code,))
+                cur.execute(f"DELETE FROM mutual_fund_schemes WHERE scheme_code = {p}", (scheme_code,))
+                conn.commit()
+            finally:
+                cur.close()
+                conn.close()
+
+        _cleanup()
+        try:
+            save_mutual_fund_scheme({
+                "scheme_code": scheme_code,
+                "scheme_name": "Test Pending Holdings Growth Fund - Direct",
+                "fund_house": "AMFI Registered AMC",
+                "category": "Flexi Cap Fund",
+                "broad_category": "EQUITY",
+                "benchmark_index": "Category TRI Benchmark",
+                "aum_crores": 0.0,
+                "nav": 42.15,
+                "ter_direct_pct": 0.0,
+                "ter_regular_pct": 0.0,
+                "portfolio_turnover_ratio_pct": 0.0,
+                "active_share_pct": None,
+                "risk_grade": "Disclosed in SID",
+                "fund_manager": "Pending Monthly Fact Sheet Sync",
+                "last_portfolio_date": "Pending Monthly Disclosure",
+                "metadata": {"source": "mfapi_on_demand"},
+            })
+
+            mock_get_forensic.return_value = {
+                "scheme_code": scheme_code,
+                "dossier_text": "# Coverage Notice\nAwaiting monthly statutory disclosure.",
+                "composite_health_score": None,
+                "weighted_moat_score": 0.0,
+                "accounting_risk_index": 0.0,
+                "margin_of_safety_pct": 0.0,
+                "promoter_pledge_exposure_pct": 0.0,
+                "active_share_pct": 0.0,
+                "top_risky_holdings": [],
+                "top_quality_holdings": [],
+            }
+
+            resp = self.client.get(f"/funds/{scheme_code}", headers={"x-unlock-preview": "1"})
+            self.assertEqual(resp.status_code, 200)
+            self.assertNotIn("GOVERNANCE_ALERT", resp.text)
+            self.assertNotIn("None%", resp.text)
+            self.assertNotIn("+None", resp.text)
+            self.assertIn("Coverage Pending", resp.text)
+            self.assertIn("Awaiting 36M NAV Windows", resp.text)
+            self.assertIn("Pending 3Y Rolling Series", resp.text)
+            self.assertIn("Monthly Portfolio Disclosure Pending Sync", resp.text)
+            self.assertIn("Holdings Awaiting AMFI Ingestion", resp.text)
+            self.assertNotIn("Fixed-Income &amp; Money-Market Portfolio Sleeve", resp.text)
+            self.assertNotIn("Fixed-Income & Money-Market Portfolio Sleeve", resp.text)
+        finally:
+            _cleanup()
+
     @patch("core.ingestion.amfi.search_amfi_master_directory")
     def test_fund_dossier_page_only_falls_back_to_amfi_for_valid_numeric_codes(self, mock_amfi_search):
         """Action 1.2: Fall back to search_amfi_master_directory ONLY for valid numeric scheme codes (len 5-8)."""
@@ -1189,6 +1328,82 @@ Cash reserve of 12% cushions against broad equity sell-offs.
                 rep = get_report_by_ticker(test_ticker)
                 self.assertIsNotNone(rep)
                 self.assertIn("Test Constituent Ltd", rep.get("report_text", ""))
+        finally:
+            _cleanup()
+
+    def test_amfi_flagship_twin_holdings_sync_and_deduplication(self):
+        """2.2.3: Bridges curated slug holdings to exact numeric AMFI Direct-Growth twins without duplicating directory cards."""
+        from core.db.connection import get_db_connection, is_postgres_connection
+        from core.db.mutual_funds import (
+            get_active_mutual_funds,
+            get_scheme_holdings,
+            normalize_scheme_stem,
+            save_mutual_fund_scheme,
+        )
+        from scripts.sync_amfi_flagship_holdings import _sync_on_cursor
+
+        self.assertEqual(
+            normalize_scheme_stem("Parag Parikh Flexi Cap Fund - Direct Plan - Growth"),
+            normalize_scheme_stem("Parag Parikh Flexicap Fund - Direct Plan - GROWTH OPTION"),
+        )
+        self.assertNotEqual(
+            normalize_scheme_stem("Aditya Birla Sun Life Dividend Yield Fund - Direct Plan - Growth"),
+            normalize_scheme_stem("Aditya Birla Sun Life Yield Fund - Direct Plan - Growth"),
+        )
+
+        num_code = "99912263"
+
+        def _cleanup():
+            conn = get_db_connection()
+            p = "%s" if is_postgres_connection(conn) else "?"
+            cur = conn.cursor()
+            try:
+                cur.execute(f"DELETE FROM fund_forensic_dossiers WHERE scheme_code = {p}", (num_code,))
+                cur.execute(f"DELETE FROM mutual_fund_holdings WHERE scheme_code = {p}", (num_code,))
+                cur.execute(f"DELETE FROM mutual_fund_schemes WHERE scheme_code = {p}", (num_code,))
+                conn.commit()
+            finally:
+                cur.close()
+                conn.close()
+
+        _cleanup()
+        try:
+            save_mutual_fund_scheme({
+                "scheme_code": num_code,
+                "scheme_name": "Parag Parikh Flexi Cap Fund - Direct Plan - Growth Option",
+                "fund_house": "PPFAS Mutual Fund",
+                "category": "Equity Scheme - Flexi Cap Fund",
+                "broad_category": "EQUITY",
+                "aum_crores": 0.0,
+                "nav": 89.28,
+            })
+
+            conn = get_db_connection()
+            p = "%s" if is_postgres_connection(conn) else "?"
+            cur = conn.cursor()
+            try:
+                bridged = _sync_on_cursor(cur, p, apply=True, verbose=False)
+                conn.commit()
+                self.assertGreaterEqual(bridged, 1)
+                bridged_again = _sync_on_cursor(cur, p, apply=True, verbose=False)
+                conn.commit()
+                self.assertEqual(bridged_again, 0)
+            finally:
+                cur.close()
+                conn.close()
+
+            twins_holdings = get_scheme_holdings(num_code)
+            slug_holdings = get_scheme_holdings("PPFAS_FLEXICAP_DIR")
+            self.assertEqual(len(twins_holdings), len(slug_holdings))
+            self.assertGreaterEqual(len(twins_holdings), 5)
+
+            audited_dir = get_active_mutual_funds(limit=None, audited_only=True)
+            ppfas_stems = [
+                s["scheme_code"]
+                for s in audited_dir
+                if normalize_scheme_stem(s.get("scheme_name", "")) == normalize_scheme_stem("Parag Parikh Flexi Cap Fund")
+            ]
+            self.assertEqual(len(ppfas_stems), 1)
         finally:
             _cleanup()
 

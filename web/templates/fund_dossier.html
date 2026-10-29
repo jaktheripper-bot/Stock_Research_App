@@ -45,7 +45,7 @@
           <span class="badge badge-emerald"><span class="status-dot status-dot-emerald"></span> Verified AMFI Portfolio Feed</span>
           <span class="dossier-meta-sep">•</span>
           <span class="badge badge-cyan" title="Full constituent securities look-through">
-            <span><svg class="glyph" style="width: 12px; height: 12px;"><use href="#glyph-doc"></use></svg></span> <span>{{ scheme.holdings|length|default(10) }} Grounded Constituents</span>
+            <span><svg class="glyph" style="width: 12px; height: 12px;"><use href="#glyph-doc"></use></svg></span> <span>{{ lookthrough.holdings|length }} Grounded Constituents</span>
           </span>
         </div>
         <div class="dossier-provenance-subline" style="margin-top: 6px;">
@@ -61,7 +61,7 @@
             <div class="provenance-cell">
               <div class="provenance-label"><svg class="glyph" style="width:12px;height:12px;"><use href="#icon-doc"></use></svg> Holdings Disclosure Period</div>
               <div class="provenance-value">AMFI Portfolio: {{ fund_portfolio_date_str|default(scheme.last_portfolio_date|default('Latest Monthly')) }}</div>
-              <div class="provenance-sub">Scheme Code: <span class="tnum">{{ scheme.scheme_code }}</span> • {{ scheme.holdings|length|default(0) }} Disclosed Securities</div>
+              <div class="provenance-sub">Scheme Code: <span class="tnum">{{ scheme.scheme_code }}</span> • {{ lookthrough.holdings|length }} Disclosed Securities</div>
             </div>
           </div>
           <div class="provenance-registry-bar">
@@ -288,7 +288,11 @@
       <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 14px;">
         <div style="flex: 1; min-width: 280px;">
           <div style="display: flex; align-items: center; gap: 8px; margin-bottom: 4px; flex-wrap: wrap;">
-            {% if credit_quote.equity_holdings_count == 0 %}
+            {% if credit_quote.total_holdings_count == 0 %}
+            <span style="font-size: 16px; color: #fbbf24;"><svg class="glyph" style="width: 16px; height: 16px;"><use href="#glyph-clock"></use></svg></span>
+            <span style="font-size: 14px; font-weight: 800; color: #f8fafc;">Monthly Portfolio Disclosure Pending Sync</span>
+            <span style="font-size: 11px; padding: 2px 8px; border-radius: 9999px; background: rgba(245, 158, 11, 0.15); color: #fbbf24; font-weight: 700;">Holdings Awaiting AMFI Ingestion</span>
+            {% elif credit_quote.equity_holdings_count == 0 %}
             <span style="font-size: 16px; color: var(--asset-accent);"><svg class="glyph" style="width: 16px; height: 16px;"><use href="#glyph-bank"></use></svg></span>
             <span style="font-size: 14px; font-weight: 800; color: #f8fafc; letter-spacing: -0.01em;">Fixed-Income &amp; Money-Market Portfolio Sleeve</span>
             <span style="font-size: 11px; padding: 2px 8px; border-radius: 9999px; background: rgba(16, 185, 129, 0.15); color: #10b981; font-weight: 700; border: 1px solid rgba(16, 185, 129, 0.3);"><svg class="glyph" style="width: 11px; height: 11px; vertical-align: -1px;"><use href="#glyph-check"></use></svg> Debt &amp; Liquidity Look-Through Active</span>
@@ -304,7 +308,9 @@
             {% endif %}
           </div>
           <p style="font-size: 13px; color: #94a3b8; margin: 0; line-height: 1.5;">
-            {% if credit_quote.equity_holdings_count == 0 %}
+            {% if credit_quote.total_holdings_count == 0 %}
+            <strong>Constituent Portfolio Pending Statutory Sync:</strong> Monthly AMFI / AMC security-level holdings have not yet been ingested for this scheme. Composite look-through scores remain withheld until constituent weights are verified.
+            {% elif credit_quote.equity_holdings_count == 0 %}
             <strong>Fixed-Income / Money-Market Mandate (0 Equity Constituents):</strong> Portfolio holds sovereign, corporate debt, or money-market instruments evaluated via the Debt &amp; Liquidity Sleeve below.
             {% elif credit_quote.uncached_count == 0 %}
             <strong>All {{ credit_quote.equity_holdings_count }} equity constituents</strong> have verified 7-pillar dossiers (100% portfolio weight). Full look-through meters and accounting narrative are active.
@@ -533,6 +539,12 @@
               </td>
               <td style="padding: 12px 16px; color: #64748b; font-size: 12px;">{{ h.notes }}</td>
             </tr>
+            {% else %}
+            <tr>
+              <td colspan="7" style="padding: 20px 16px; text-align: center; color: #94a3b8; font-size: 13px;">
+                Statutory monthly constituent holdings have not yet been ingested for this scheme.
+              </td>
+            </tr>
             {% endfor %}
           </tbody>
         </table>
@@ -595,29 +607,29 @@
         <div style="display: grid; grid-template-columns: repeat(2, 1fr); gap: 10px; margin-bottom: 16px;">
           <div style="background: rgba(15, 23, 42, 0.6); border-radius: 8px; padding: 12px; border: 1px solid rgba(255, 255, 255, 0.05);">
             <div style="font-size: 12px; color: #64748b; font-weight: 600;">Sortino Ratio</div>
-            <div style="font-size: 20px; font-weight: 800; color: #10b981;">
-              {{ risk_capture.sortino_ratio }}
+            <div style="font-size: 20px; font-weight: 800; color: {% if risk_capture.sortino_ratio is not none %}#10b981{% else %}#94a3b8{% endif %};">
+              {{ risk_capture.sortino_ratio if risk_capture.sortino_ratio is not none else 'Pending' }}
             </div>
             <div style="font-size: 11.5px; color: #94a3b8;">Downside Risk Only</div>
           </div>
           <div style="background: rgba(15, 23, 42, 0.6); border-radius: 8px; padding: 12px; border: 1px solid rgba(255, 255, 255, 0.05);">
             <div style="font-size: 12px; color: #64748b; font-weight: 600;">Downside Capture</div>
-            <div style="font-size: 20px; font-weight: 800; color: {% if risk_capture.is_downside_resilient %}#10b981{% else %}#ef4444{% endif %};">
-              {{ risk_capture.downside_capture_ratio }}%
+            <div style="font-size: 20px; font-weight: 800; color: {% if risk_capture.downside_capture_ratio is none %}#94a3b8{% elif risk_capture.is_downside_resilient %}#10b981{% else %}#ef4444{% endif %};">
+              {% if risk_capture.downside_capture_ratio is not none %}{{ risk_capture.downside_capture_ratio }}%{% else %}Pending{% endif %}
             </div>
             <div style="font-size: 11.5px; color: #94a3b8;">Benchmark: ≤ 75%</div>
           </div>
           <div style="background: rgba(15, 23, 42, 0.6); border-radius: 8px; padding: 12px; border: 1px solid rgba(255, 255, 255, 0.05);">
             <div style="font-size: 12px; color: #64748b; font-weight: 600;">Capture Spread</div>
-            <div style="font-size: 20px; font-weight: 800; color: #38bdf8;">
-              +{{ risk_capture.capture_spread }}%
+            <div style="font-size: 20px; font-weight: 800; color: {% if risk_capture.capture_spread is not none %}#38bdf8{% else %}#94a3b8{% endif %};">
+              {% if risk_capture.capture_spread is not none %}{{ "{:+.1f}".format(risk_capture.capture_spread) }}%{% else %}Pending{% endif %}
             </div>
-            <div style="font-size: 11.5px; color: #94a3b8;">UCR ({{ risk_capture.upside_capture_ratio }}%) - DCR</div>
+            <div style="font-size: 11.5px; color: #94a3b8;">{% if risk_capture.upside_capture_ratio is not none %}UCR ({{ risk_capture.upside_capture_ratio }}%) - DCR{% else %}Awaiting 36M NAV Windows{% endif %}</div>
           </div>
           <div style="background: rgba(15, 23, 42, 0.6); border-radius: 8px; padding: 12px; border: 1px solid rgba(255, 255, 255, 0.05);">
             <div style="font-size: 12px; color: #64748b; font-weight: 600;">Hurst Exponent (H)</div>
-            <div style="font-size: 20px; font-weight: 800; color: #c084fc;">
-              {{ risk_capture.hurst_exponent }}
+            <div style="font-size: 20px; font-weight: 800; color: {% if risk_capture.hurst_exponent is not none %}#c084fc{% else %}#94a3b8{% endif %};">
+              {{ risk_capture.hurst_exponent if risk_capture.hurst_exponent is not none else 'Pending' }}
             </div>
             <div style="font-size: 11.5px; color: #94a3b8;">Persistent Momentum</div>
           </div>
@@ -625,7 +637,9 @@
 
         <div style="display: flex; justify-content: space-between; font-size: 13.5px; padding-top: 8px; border-top: 1px solid rgba(255, 255, 255, 0.05);">
           <span style="color: #64748b;">3-Year Rolling Return Consistency:</span>
-          <strong style="color: #10b981;">{{ risk_capture.rolling_consistency_3y_pct }}% of windows</strong>
+          <strong style="color: {% if risk_capture.rolling_consistency_3y_pct is not none %}#10b981{% else %}#94a3b8{% endif %};">
+            {% if risk_capture.rolling_consistency_3y_pct is not none %}{{ risk_capture.rolling_consistency_3y_pct }}% of windows{% else %}Pending 3Y Rolling Series{% endif %}
+          </strong>
         </div>
       </div>
     </div>

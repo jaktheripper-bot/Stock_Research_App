@@ -53,6 +53,7 @@ def synthesize_bull_bear_thesis(
     valuation_data: Optional[Dict[str, Any]] = None,
     forensic_data: Optional[Dict[str, Any]] = None,
     flow_data: Optional[Dict[str, Any]] = None,
+    report_text: str = "",
 ) -> Dict[str, Any]:
     """
     Synthesizes the core operational merits and risks into a digestible 60-second summary.
@@ -231,6 +232,30 @@ def synthesize_bull_bear_thesis(
             "title": "Working Capital & Capex Conversion",
             "detail": "The investment case depends on converting incremental capital expenditure and receivables into free cash flow without stretching the cash conversion cycle."
         })
+
+    if isinstance(report_text, str) and report_text.strip():
+        from core.analysis.epistemic_schema import extract_falsification_triggers
+        pillar_triggers = extract_falsification_triggers(report_text)
+        pillar_names = {
+            1: "Business Model & Revenue Visibility",
+            2: "Competitive Moat Durability",
+            3: "Balance Sheet & Cash Conversion",
+            4: "Capital Allocation & Governance",
+            5: "Valuation & Implied Expectations",
+            6: "Sector & Regulatory Sensitivity",
+            7: "Execution & Drawdown Risk",
+        }
+        grounded_bears: List[Dict[str, str]] = []
+        for p_idx, trig in sorted(pillar_triggers.items()):
+            detail = (trig.get("what_contradicts") or trig.get("evidence_that_forces_revision") or "").strip()
+            if len(detail) >= 35:
+                grounded_bears.append({
+                    "pillar": f"Pillar 0{p_idx} Trigger",
+                    "title": pillar_names.get(p_idx, f"Pillar 0{p_idx} Watchpoint"),
+                    "detail": detail[:280],
+                })
+        if grounded_bears:
+            bear_points = (grounded_bears + bear_points)[:3]
 
     return {
         "bull_thesis": bull_points[:3],

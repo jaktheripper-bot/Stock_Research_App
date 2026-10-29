@@ -154,10 +154,21 @@ def save_alternative_yield_product(prod: Dict[str, Any]) -> bool:
         pg_val = bool(prod.get("principal_guarantee_validity", False))
         rbi_circ = prod.get("rbi_warning_circular") or prod.get("rbi_warning_ref", "")
         lock_m = int(prod.get("liquidity_lock_months", 0))
-        prec_loss = prod.get("precedent_losses_summary") or prod.get("safety_verdict", "")
+        cp_prose = str(prod.get("counterparty_risk") or "").strip()
+        bk_prose = str(prod.get("bankruptcy_reality") or "").strip()
+        fallback_prec = " ".join(
+            part for part in (cp_prose, f"Bankruptcy reality: {bk_prose}" if bk_prose else "") if part
+        ).strip()
+        prec_loss = prod.get("precedent_losses_summary") or prod.get("safety_verdict") or fallback_prec
         safe_alt = prod.get("safe_alternative_recommendation", "")
 
-        mat_json = prod.get("audit_matrix_json", "{}")
+        mat_json = prod.get("audit_matrix_json")
+        if not mat_json and (cp_prose or bk_prose):
+            mat_json = {
+                "counterparty_risk": cp_prose,
+                "bankruptcy_reality": bk_prose,
+            }
+        mat_json = mat_json or "{}"
         if isinstance(mat_json, dict):
             mat_json = json.dumps(mat_json)
 

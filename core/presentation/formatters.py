@@ -167,7 +167,10 @@ def normalize_de_ratio(
     elif isinstance(raw_val, (int, float)):
         val = float(raw_val)
     else:
-        return None
+        try:
+            val = float(raw_val)
+        except (TypeError, ValueError):
+            return None
 
     if math.isnan(val) or math.isinf(val) or val < 0:
         return None

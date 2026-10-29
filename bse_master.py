@@ -21,6 +21,20 @@ PRIMARY_BSE_MAP = {
     "LTIM": "540005", "LTIMINDTREE": "540005"
 }
 
+# Under SEBI SECC / Depositories Regulations, exchanges and depositories affiliated with BSE
+# list exclusively on NSE (cannot self-list on BSE). Guard against substring name collisions
+# with BSE-listed Sensex ETFs (e.g. 'Kotak S&P BSE Sensex ETF' -> SENSEX1 / 532985).
+NSE_ONLY_EQUITIES = {
+    "BSE": "BSE",
+    "BSE LIMITED": "BSE",
+    "BSE LTD": "BSE",
+    "CDSL": "CDSL",
+    "CENTRAL DEPOSITORY SERVICES": "CDSL",
+    "CENTRAL DEPOSITORY SERVICES (INDIA)": "CDSL",
+    "CENTRAL DEPOSITORY SERVICES (INDIA) LIMITED": "CDSL",
+    "CENTRAL DEPOSITORY SERVICES INDIA": "CDSL",
+}
+
 _ALIASES_CACHE = {"data": None, "mtime": 0}
 _SCRIPS_CACHE = {"data": None, "mtime": 0}
 _SUGGESTION_CANDIDATES = {"list": [], "scrips_mtime": -1, "alias_mtime": -1}
@@ -177,6 +191,8 @@ def resolve_bse_scrip_code(query: str) -> str:
     clean = clean_ticker(query)
     if is_synthetic_test_symbol(clean):
         return None
+    if clean in NSE_ONLY_EQUITIES:
+        return None
 
     # 1. Direct 6-digit code
     if clean.isdigit() and len(clean) == 6:
@@ -224,6 +240,8 @@ def resolve_canonical_symbol(query: str) -> str:
     clean = clean_ticker(query)
     if is_synthetic_test_symbol(clean):
         return clean
+    if clean in NSE_ONLY_EQUITIES:
+        return NSE_ONLY_EQUITIES[clean]
     scrip = resolve_bse_scrip_code(clean)
     if not scrip:
         return clean

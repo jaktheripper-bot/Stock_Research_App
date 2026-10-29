@@ -24,8 +24,9 @@ def evaluate_company_disparity(fund_a: dict, fund_b: dict) -> dict:
     generic = {"N/A", "General Industry", "Core Industry", "Diversified / Core Industry", ""}
     
     def norm_sec(s: str) -> str:
+        import re
         sl = s.lower().strip()
-        if any(k in sl for k in ["tech", "software", "it -", "computers", "information technology"]):
+        if any(k in sl for k in ["tech", "software", "it -", "it services", "computers", "information technology"]) or re.search(r"\bit\b", sl):
             return "technology"
         if any(k in sl for k in ["bank", "financial", "nbfc", "lending", "insurance"]):
             return "financial_services"

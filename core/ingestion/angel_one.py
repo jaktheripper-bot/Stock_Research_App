@@ -276,6 +276,8 @@ class AngelOneGateway:
         "COALINDIA": "20374",
         "ADANIENT": "25",
         "ADANIPORTS": "15083",
+        "BSE": "19585",
+        "CDSL": "21174",
     }
 
     @classmethod

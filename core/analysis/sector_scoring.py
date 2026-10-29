@@ -92,20 +92,22 @@ SECTOR_KEYWORDS = {
     ],
     "IT_TECH": [
         "INFORMATION TECHNOLOGY", "SOFTWARE", "IT SERVICES", "IT", "TECHNOLOGY", "TECHNOLOGIES",
-        "TECH", "DIGITAL", "CONSULTING", "CONSULTANCY", "TELECOM", "COMMUNICATIONS",
-        "HEXACOM", "CLOUD", "PLATFORM", "ELECTRONICS", "EMS", "SEMICONDUCTOR", "INFOTECH",
+        "TECH", "DIGITAL", "CONSULTING", "CONSULTANCY", "TELECOM", "TELECOMMUNICATIONS",
+        "TELEPHONE", "COMMUNICATIONS", "HEXACOM", "CLOUD", "PLATFORM", "SEMICONDUCTOR", "INFOTECH",
     ],
     "BFSI": [
-        "BANK", "BANKING", "FINANCE", "FINANCIAL", "FINSERV", "NBFC", "INSURANCE",
-        "ASSURANCE", "HOUSING FINANCE", "SECURITIES", "CAPITAL MARKETS", "CAPITAL MARKET",
-        "INVESTMENT", "INVESTMENTS", "ASSET MANAGEMENT", "AMC", "LENDING", "BROKING",
-        "WEALTH", "EXCHANGE", "DEPOSITORY", "CREDIT", "MICROFINANCE", "MUTUAL FUND",
+        "BANK", "BANKING", "FINANCE", "FINANCIAL", "FINSERV", "FINTECH", "NBFC", "INSURANCE",
+        "INSURANCE BROKING", "ASSURANCE", "HOUSING FINANCE", "SECURITIES", "CAPITAL MARKETS",
+        "CAPITAL MARKET", "INVESTMENT", "INVESTMENTS", "ASSET MANAGEMENT", "AMC", "LENDING",
+        "BROKING", "WEALTH", "EXCHANGE", "DEPOSITORY", "CREDIT", "MICROFINANCE", "MUTUAL FUND",
+        "REGISTRAR",
     ],
     "CONSUMER_FMCG": [
+        "CONSUMER ELECTRICALS", "CONSUMER DURABLES", "HOME APPLIANCES",
         "CONSUMER", "FMCG", "FOOD", "FOODS", "FOODWORLD", "BEVERAGE", "BEVERAGES",
         "BREWERIES", "SPIRITS", "DISTILLERIES", "RETAIL", "MART", "TEXTILE", "TEXTILES",
-        "APPAREL", "GARMENTS", "FOOTWEAR", "PACKAGING", "BUILDING MATERIALS", "SANITARYWARE",
-        "CERAMICS", "PAINTS", "PAINT", "JEWELLERY", "LIFESTYLE", "HOME", "APPLIANCES",
+        "APPAREL", "GARMENTS", "FOOTWEAR", "PACKAGING", "SANITARYWARE", "CERAMICS",
+        "PAINTS", "PAINT", "JEWELLERY", "LIFESTYLE", "HOME", "APPLIANCES",
         "DURABLES", "HOTELS", "HOSPITALITY", "LEISURE", "MEDIA", "MUSIC", "AGRI",
     ],
 }
@@ -302,7 +304,34 @@ KNOWN_TICKER_SECTORS = {
     "ETERNAL": "CONSUMER_FMCG",
     "SWIGGY": "CONSUMER_FMCG",
     "DMART": "CONSUMER_FMCG",
+    "MTNL": "IT_TECH",
+    "TATACOMM": "IT_TECH",
+    "INDUSTOWER": "IT_TECH",
+    "HFCL": "IT_TECH",
+    "TEJASNET": "IT_TECH",
+    "ROUTE": "IT_TECH",
+    "TANLA": "IT_TECH",
+    "POLICYBZR": "BFSI",
+    "PAYTM": "BFSI",
+    "CAMS": "BFSI",
+    "KFINTECH": "BFSI",
+    "IEX": "BFSI",
+    "ICICIAMC": "BFSI",
+    "CROMPTON": "CONSUMER_FMCG",
+    "VOLTAS": "CONSUMER_FMCG",
+    "BLUESTARCO": "CONSUMER_FMCG",
+    "WHIRLPOOL": "CONSUMER_FMCG",
+    "VGUARD": "CONSUMER_FMCG",
+    "BAJAJELEC": "CONSUMER_FMCG",
+    "ORIENTELEC": "CONSUMER_FMCG",
+    "SYMPHONY": "CONSUMER_FMCG",
+    "ELECON": "CAPITAL_GOODS_INFRA",
 }
+
+_CONSUMER_ELECTRICALS_RE = re.compile(
+    r"\b(?:CONSUMER\s+ELECTRICALS?|CONSUMER\s+DURABLES?|HOME\s+APPLIANCES?)\b",
+    re.IGNORECASE,
+)
 
 
 def detect_sector(
@@ -325,6 +354,8 @@ def detect_sector(
         return "BFSI"
 
     clean_ind = str(industry_str or "").strip()
+    if _CONSUMER_ELECTRICALS_RE.search(clean_ind):
+        return "CONSUMER_FMCG"
     if clean_ind.upper() not in _GENERIC_SECTOR_LABELS:
         for sector, patterns in _COMPILED_SECTOR_PATTERNS.items():
             if any(p.search(clean_ind) for p in patterns):
@@ -332,6 +363,8 @@ def detect_sector(
 
     stripped_name = _CORP_NOISE_RE.sub(" ", str(company_name or ""))
     name_and_sym = f"{clean_sym} {stripped_name}"
+    if _CONSUMER_ELECTRICALS_RE.search(name_and_sym):
+        return "CONSUMER_FMCG"
     for sector, patterns in _COMPILED_SECTOR_PATTERNS.items():
         if any(p.search(name_and_sym) for p in patterns):
             return sector
@@ -343,6 +376,8 @@ def detect_sector(
             if isinstance(cf, dict):
                 cf_meta = f"{cf.get('sector') or ''} {cf.get('industry') or ''}".strip()
                 if cf_meta and cf_meta.upper() not in _GENERIC_SECTOR_LABELS:
+                    if _CONSUMER_ELECTRICALS_RE.search(cf_meta):
+                        return "CONSUMER_FMCG"
                     for sector, patterns in _COMPILED_SECTOR_PATTERNS.items():
                         if any(p.search(cf_meta) for p in patterns):
                             return sector

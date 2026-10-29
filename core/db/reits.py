@@ -1269,3 +1269,7 @@ def get_sgb_by_symbol(symbol: str) -> Optional[Dict[str, Any]]:
             return item
     return None
 
+
+get_all_reits_invits = get_all_reits_and_invits
+
+
