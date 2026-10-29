@@ -33,6 +33,46 @@ OTP_TTL_MINUTES = 10
 MAX_VERIFICATION_ATTEMPTS = 5
 RESEND_COOLDOWN_SECONDS = 60
 
+DISPOSABLE_EMAIL_DOMAINS = frozenset({
+    "nolettersbox.com",
+    "mailinator.com",
+    "guerrillamail.com",
+    "tempmail.com",
+    "10minutemail.com",
+    "yopmail.com",
+    "trashmail.com",
+    "sharklasers.com",
+    "dispostable.com",
+    "maildrop.cc",
+    "temp-mail.org",
+    "fakeinbox.com",
+    "getnada.com",
+    "mohmal.com",
+    "throwawaymail.com",
+    "geiiml.my.id",
+    "tehbo.my.id",
+    "smaqty.com",
+})
+
+DISPOSABLE_EMAIL_SUFFIXES = (
+    ".my.id",
+)
+
+
+def is_disposable_or_bot_email(email: str) -> bool:
+    """Returns True if email is malformed or belongs to a disposable/burner spam domain."""
+    clean = (email or "").strip().lower()
+    if "@" not in clean:
+        return True
+    domain = clean.rsplit("@", 1)[-1]
+    if not domain or "." not in domain:
+        return True
+    if domain in DISPOSABLE_EMAIL_DOMAINS:
+        return True
+    if any(domain.endswith(sfx) for sfx in DISPOSABLE_EMAIL_SUFFIXES):
+        return True
+    return False
+
 
 def _resolve_otp_secret() -> bytes:
     """Resolves a deterministic cross-worker HMAC secret (never using os.getpid())."""
@@ -69,6 +109,9 @@ def create_email_otp(email: str) -> Tuple[bool, str, Optional[str]]:
     clean_email = (email or "").strip().lower()
     if not clean_email or "@" not in clean_email or "." not in clean_email.split("@")[-1]:
         return False, "Please provide a valid email address.", None
+    if is_disposable_or_bot_email(clean_email):
+        logger.warning("Blocked OTP generation for disposable/burner email domain: %s", clean_email)
+        return False, "Temporary or disposable email domains are not permitted. Please use your primary work or personal email.", None
 
     conn = get_db_connection()
     is_pg = is_postgres_connection(conn)

@@ -1,7 +1,7 @@
 # Multi-Asset Institutional Report Evaluation Frameworks, Data Sources & Operational Flows Specification
 
 **Document Identifier:** `docs/REPORT_EVALUATION_FRAMEWORKS.md`  
-**Document Version:** 3.5.1 | **Effective Date:** 2026-10-29  
+**Document Version:** 3.5.2 | **Effective Date:** 2026-10-29  
 **Target System:** `Stock Research App` (`main` branch)  
 **Compliance Standards:** 
 * SEBI (Research Analysts) Regulations, 2014 Section 2(u) — Factual Non-Advisory Safe Harbor

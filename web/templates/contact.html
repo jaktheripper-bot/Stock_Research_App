@@ -4,74 +4,102 @@
 {% block meta_desc %}Need assistance with research credits, account billing, technical inquiries, or regulatory compliance? Contact our support desk or file a complaint.{% endblock %}
 
 {% block content %}
-<div class="container" style="max-width: 960px; margin: 40px auto 80px;">
-  
+<div class="container" style="max-width: 980px; margin: 40px auto 80px;">
+
   <div style="text-align: center; margin-bottom: 40px;">
-    <div style="display: inline-flex; align-items: center; gap: 8px; background: rgba(14, 165, 233, 0.1); border: 1px solid rgba(14, 165, 233, 0.25); padding: 4px 14px; border-radius: 20px; font-size: 12px; font-weight: 700; color: var(--accent-cyan); margin-bottom: 12px;">
+    <div style="display: inline-flex; align-items: center; gap: 8px; background: var(--asset-accent-subtle); border: 1px solid var(--asset-accent-border); padding: 4px 14px; border-radius: 20px; font-size: 12px; font-weight: 700; color: var(--accent-cyan); margin-bottom: 12px;">
       <svg class="glyph" style="width:13px;height:13px;"><use href="#icon-support"></use></svg> <span>HELP &amp; REDRESSAL DESK</span>
     </div>
     <h1 style="font-size: clamp(2rem, 4vw, 2.75rem); font-weight: 800; color: var(--text-primary); margin-bottom: 12px;">
       We're Here to Help
     </h1>
-    <p style="font-size: 16px; color: var(--text-secondary); max-width: 600px; margin: 0 auto; line-height: 1.6;">
-      Have a question regarding research credits, payment reconciliation, platform bugs, or regulatory governance? Submit a ticket below.
+    <p style="font-size: 16px; color: var(--text-secondary); max-width: 620px; margin: 0 auto; line-height: 1.6;">
+      Have a question regarding research credits, payment reconciliation, platform bugs, or regulatory governance? Sign in with your Moatnomics account and submit a tracked ticket below.
     </p>
   </div>
 
-  <div style="display: grid; grid-template-columns: 3fr 2fr; gap: 32px; align-items: flex-start;">
-    
+  <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 380px), 1fr)); gap: 32px; align-items: flex-start;">
+
     <!-- Contact & Complaint Submission Form -->
-    <div style="background: rgba(30, 41, 59, 0.7); border: 1px solid var(--border-color); border-radius: var(--radius-lg); padding: 32px; backdrop-filter: blur(12px);">
+    <div style="background: var(--bg-card); border: 1px solid var(--border-color); border-radius: var(--radius-lg); padding: 32px;">
       <h3 style="font-size: 20px; font-weight: 700; color: var(--text-primary); margin-bottom: 8px; display: flex; align-items: center; gap: 8px;">
         <svg class="glyph"><use href="#icon-doc"></use></svg> Submit an Inquiry or Complaint
       </h3>
-      <p style="font-size: 13px; color: var(--text-muted); margin-bottom: 24px; line-height: 1.5;">
-        Every inquiry gets a tracking ID, and our team reviews it directly.
+      <p style="font-size: 13px; color: var(--text-muted); margin-bottom: 20px; line-height: 1.5;">
+        Every inquiry receives a unique tracking ID and is reviewed directly by our desk.
       </p>
 
+      {% if contact_user %}
+      <div id="contactVerifiedBanner" style="display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 8px; background: var(--accent-emerald-glow); border: 1px solid var(--accent-emerald); border-radius: 8px; padding: 10px 14px; margin-bottom: 20px; font-size: 13px; color: var(--text-primary);">
+        <span style="display: inline-flex; align-items: center; gap: 6px;">
+          <svg class="glyph" style="width: 14px; height: 14px; color: var(--accent-emerald);"><use href="#glyph-shield"></use></svg>
+          <span>Verified Member Session: <strong>{{ contact_user.email }}</strong></span>
+        </span>
+      </div>
+      {% else %}
+      <div id="contactAuthGateBanner" style="background: var(--asset-accent-subtle); border: 1px solid var(--asset-accent-border); border-radius: 10px; padding: 16px 18px; margin-bottom: 22px;">
+        <div style="display: flex; align-items: center; gap: 8px; font-size: 14px; font-weight: 700; color: var(--text-primary); margin-bottom: 6px;">
+          <svg class="glyph" style="width: 15px; height: 15px; color: var(--accent-cyan);"><use href="#glyph-lock"></use></svg>
+          <span>Registered Account Required</span>
+        </div>
+        <p style="font-size: 13px; color: var(--text-secondary); line-height: 1.55; margin: 0 0 12px 0;">
+          To protect our support desk from automated bot spam, only signed-in Moatnomics members can send messages or post ticket replies. Sign in or create a free account via Google or Email OTP.
+        </p>
+        <button type="button" id="contactSignInPromptBtn" class="btn btn-primary btn-sm" onclick="openContactSignInModal()" style="display: inline-flex; align-items: center; gap: 6px; padding: 9px 16px; font-size: 13px; font-weight: 700;">
+          <svg class="glyph" style="width: 13px; height: 13px;"><use href="#glyph-lock"></use></svg>
+          <span>Sign In / Verify Email (Free)</span>
+        </button>
+      </div>
+      {% endif %}
+
       {% if success_ticket %}
-      <div style="background: rgba(16, 185, 129, 0.12); border: 1px solid var(--accent-emerald); border-radius: 8px; padding: 20px; margin-bottom: 24px;">
+      <div role="status" aria-live="polite" style="background: var(--accent-emerald-glow); border: 1px solid var(--accent-emerald); border-radius: 8px; padding: 20px; margin-bottom: 24px;">
         <div style="display: flex; align-items: center; gap: 8px; font-weight: 800; color: var(--accent-emerald); font-size: 16px; margin-bottom: 6px;">
           <svg class="glyph"><use href="#glyph-shield"></use></svg> Ticket Registered Successfully!
         </div>
         <div style="font-size: 14px; color: var(--text-primary); margin-bottom: 10px;">
-          Reference ID: <strong class="tnum" style="background: rgba(15, 23, 42, 0.6); padding: 2px 8px; border-radius: 4px; color: var(--accent-cyan);">{{ success_ticket.ticket_id }}</strong>
+          Reference ID: <strong class="tnum" style="background: var(--bg-surface); padding: 2px 8px; border-radius: 4px; border: 1px solid var(--border-subtle); color: var(--accent-cyan);">{{ success_ticket.ticket_id }}</strong>
         </div>
         <p style="font-size: 13px; color: var(--text-secondary); line-height: 1.5; margin: 0 0 10px 0;">
           Our team has been notified. A confirmation has been recorded for <strong>{{ success_ticket.user_email }}</strong>. We will review and respond within 24 hours.
         </p>
-        <a href="/contact?ticket_id={{ success_ticket.ticket_id }}&email={{ success_ticket.user_email }}" class="btn btn-secondary btn-sm" style="display: inline-flex; align-items: center; gap: 6px; font-size: 12px; font-weight: 600;">
+        <a href="/contact?ticket_id={{ success_ticket.ticket_id }}&amp;email={{ success_ticket.user_email }}" class="btn btn-secondary btn-sm" style="display: inline-flex; align-items: center; gap: 6px; font-size: 12px; font-weight: 600;">
           <svg class="glyph" style="width: 13px; height: 13px;"><use href="#glyph-search"></use></svg> <span>Track Ticket Status Live →</span>
         </a>
       </div>
       {% endif %}
 
       {% if error_msg %}
-      <div style="background: rgba(239, 68, 68, 0.12); border: 1px solid #ef4444; border-radius: 8px; padding: 14px; margin-bottom: 20px; font-size: 13px; color: #fca5a5;">
+      <div role="alert" aria-live="polite" style="background: rgba(190, 18, 60, 0.1); border: 1px solid var(--accent-rose); border-radius: 8px; padding: 14px; margin-bottom: 20px; font-size: 13px; font-weight: 600; color: var(--accent-rose);">
         <svg class="glyph" style="vertical-align:-2px;margin-right:4px;"><use href="#glyph-alert"></use></svg>{{ error_msg }}
       </div>
       {% endif %}
 
-      <form id="contactTicketForm" action="/contact" method="POST" onsubmit="return handleContactTicketSubmit(event)">
+      <form id="contactTicketForm" action="/contact" method="POST" data-authenticated="{{ 'true' if contact_user else 'false' }}" onsubmit="return handleContactTicketSubmit(event)">
+        <input type="hidden" id="contactFormToken" name="form_token" value="{{ contact_form_token|default('') }}">
+
         <div style="margin-bottom: 18px;">
           <label for="contactUserName" style="display: block; font-size: 13px; font-weight: 600; color: var(--text-secondary); margin-bottom: 6px;">
             Your Name (Optional)
           </label>
-          <input type="text" id="contactUserName" name="user_name" autocomplete="name" placeholder="e.g., Rahul Sharma" style="width: 100%; padding: 12px 14px; background: rgba(15, 23, 42, 0.6); border: 1px solid var(--border-color); border-radius: 6px; color: var(--text-primary); font-size: 16px;" value="{{ form_name|default('') }}">
+          <input type="text" id="contactUserName" name="user_name" autocomplete="name" placeholder="e.g., Rahul Sharma" style="width: 100%; box-sizing: border-box; padding: 12px 14px; background: var(--bg-surface); border: 1px solid var(--border-color); border-radius: 6px; color: var(--text-primary); font-size: 16px;" value="{{ form_name|default('') }}">
         </div>
 
         <div style="margin-bottom: 18px;">
           <label for="contactUserEmail" style="display: block; font-size: 13px; font-weight: 600; color: var(--text-secondary); margin-bottom: 6px;">
-            Email Address <span style="color: #ef4444;">*</span>
+            Verified Account Email <span style="color: var(--accent-rose);">*</span>
           </label>
-          <input type="email" id="contactUserEmail" name="user_email" required autocomplete="email" autocorrect="off" autocapitalize="off" spellcheck="false" placeholder="you@domain.com" style="width: 100%; padding: 12px 14px; background: rgba(15, 23, 42, 0.6); border: 1px solid var(--border-color); border-radius: 6px; color: var(--text-primary); font-size: 16px;" value="{{ form_email|default('') }}">
+          <input type="email" id="contactUserEmail" name="user_email" required autocomplete="email" autocorrect="off" autocapitalize="off" spellcheck="false" aria-describedby="contactEmailHelp" placeholder="Sign in above to verify your email" {% if contact_user %}readonly aria-readonly="true"{% endif %} style="width: 100%; box-sizing: border-box; padding: 12px 14px; background: var(--bg-surface); border: 1px solid var(--border-color); border-radius: 6px; color: var(--text-primary); font-size: 16px; {% if contact_user %}opacity: 0.9;{% endif %}" value="{{ form_email|default('') }}">
+          <span id="contactEmailHelp" style="display: block; margin-top: 5px; font-size: 11.5px; color: var(--text-muted);">
+            {% if contact_user %}Locked to your authenticated Moatnomics account email.{% else %}Sign in first so your ticket is bound to your verified email address.{% endif %}
+          </span>
         </div>
 
         <div style="margin-bottom: 18px;">
           <label for="contactCategory" style="display: block; font-size: 13px; font-weight: 600; color: var(--text-secondary); margin-bottom: 6px;">
-            Category <span style="color: #ef4444;">*</span>
+            Category <span style="color: var(--accent-rose);">*</span>
           </label>
-          <select id="contactCategory" name="category" style="width: 100%; padding: 12px 14px; background: #0f172a; border: 1px solid var(--border-color); border-radius: 6px; color: var(--text-primary); font-size: 16px;">
+          <select id="contactCategory" name="category" style="width: 100%; box-sizing: border-box; padding: 12px 14px; background: var(--bg-surface); border: 1px solid var(--border-color); border-radius: 6px; color: var(--text-primary); font-size: 16px;">
             <option value="billing" {% if form_cat == 'billing' %}selected{% endif %}>Billing / Payment Dispute / Refund</option>
             <option value="synthesis" {% if form_cat == 'synthesis' %}selected{% endif %}>Report Generation / Data Issue</option>
             <option value="bug" {% if form_cat == 'bug' %}selected{% endif %}>Bug Report / Platform Technical Issue</option>
@@ -82,27 +110,27 @@
 
         <div style="margin-bottom: 18px;">
           <label for="contactSubject" style="display: block; font-size: 13px; font-weight: 600; color: var(--text-secondary); margin-bottom: 6px;">
-            Subject <span style="color: #ef4444;">*</span>
+            Subject <span style="color: var(--accent-rose);">*</span>
           </label>
-          <input type="text" id="contactSubject" name="subject" required placeholder="Brief summary of your inquiry..." style="width: 100%; padding: 12px 14px; background: rgba(15, 23, 42, 0.6); border: 1px solid var(--border-color); border-radius: 6px; color: var(--text-primary); font-size: 16px;" value="{{ form_subj|default('') }}">
+          <input type="text" id="contactSubject" name="subject" required placeholder="Brief summary of your inquiry..." style="width: 100%; box-sizing: border-box; padding: 12px 14px; background: var(--bg-surface); border: 1px solid var(--border-color); border-radius: 6px; color: var(--text-primary); font-size: 16px;" value="{{ form_subj|default('') }}">
         </div>
 
         <div style="margin-bottom: 24px;">
           <label for="contactMessage" style="display: block; font-size: 13px; font-weight: 600; color: var(--text-secondary); margin-bottom: 6px;">
-            Detailed Message / Complaint <span style="color: #ef4444;">*</span>
+            Detailed Message / Complaint <span style="color: var(--accent-rose);">*</span>
           </label>
-          <textarea id="contactMessage" name="message" required rows="5" placeholder="Please describe the issue in detail, including order ID, ticker symbol, or timestamps if applicable..." style="width: 100%; padding: 12px 14px; background: rgba(15, 23, 42, 0.6); border: 1px solid var(--border-color); border-radius: 6px; color: var(--text-primary); font-size: 16px; resize: vertical; line-height: 1.5;">{{ form_msg|default('') }}</textarea>
+          <textarea id="contactMessage" name="message" required rows="5" placeholder="Please describe the issue in detail, including order ID, ticker symbol, or timestamps if applicable..." style="width: 100%; box-sizing: border-box; padding: 12px 14px; background: var(--bg-surface); border: 1px solid var(--border-color); border-radius: 6px; color: var(--text-primary); font-size: 16px; resize: vertical; line-height: 1.5;">{{ form_msg|default('') }}</textarea>
         </div>
 
-        <!-- Anti-Bot Honeypot (Hidden from humans & screen readers; auto-filled by spam bots) -->
-        <div style="position: absolute; left: -9999px; width: 1px; height: 1px; overflow: hidden;" aria-hidden="true">
+        <!-- Anti-Bot Honeypot (Hidden visually via clip-path; auto-filled by spam bots) -->
+        <div style="position: absolute; clip-path: inset(50%); overflow: hidden; width: 1px; height: 1px; margin: -1px; padding: 0; border: 0; white-space: nowrap;" aria-hidden="true">
           <label for="contactWebsiteUrl">Website</label>
-          <input type="text" id="contactWebsiteUrl" name="website_url" tabindex="-1" autocomplete="off" value="">
+          <input type="text" id="contactWebsiteUrl" name="website_url" tabindex="-1" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false" value="">
         </div>
 
         <button type="submit" id="contactSubmitBtn" class="btn btn-primary" style="width: 100%; padding: 14px; font-size: 15px; font-weight: 700; display: flex; justify-content: center; align-items: center; gap: 8px; transition: all 0.2s ease;">
           <span id="contactSubmitBtnIcon"><svg class="glyph"><use href="#glyph-mail"></use></svg></span>
-          <span id="contactSubmitBtnText">Send Support Ticket</span>
+          <span id="contactSubmitBtnText">{% if contact_user %}Send Support Ticket{% else %}Sign In to Send Support Ticket{% endif %}</span>
         </button>
       </form>
     </div>
@@ -110,57 +138,60 @@
     <!-- Direct Administration Desk & Ticket Review Information -->
     <div>
       <!-- Track & Reply to Existing Support Ticket -->
-      <div style="background: rgba(15, 23, 42, 0.78); border: 1px solid rgba(56, 189, 248, 0.3); border-radius: var(--radius-md); padding: 24px; margin-bottom: 24px;">
+      <div style="background: var(--bg-card); border: 1px solid var(--asset-accent-border); border-radius: var(--radius-md); padding: 24px; margin-bottom: 24px;">
         <h4 style="font-size: 16px; font-weight: 700; color: var(--text-primary); margin-bottom: 8px; display: flex; align-items: center; gap: 8px;">
           <svg class="glyph"><use href="#glyph-search"></use></svg> Track or Reply to an Existing Ticket
         </h4>
         <p style="font-size: 12.5px; color: var(--text-secondary); line-height: 1.5; margin-bottom: 14px;">
-          Enter your Reference ID (e.g. <code>TKT-...</code>) and email to view official Admin responses or post a follow-up reply.
+          Sign in with your registered account and enter your Reference ID (e.g. <code>TKT-...</code>) to view official responses or post a follow-up reply.
         </p>
 
         {% if lookup_error %}
-        <div style="background: rgba(239, 68, 68, 0.12); border: 1px solid rgba(239, 68, 68, 0.35); border-radius: 6px; padding: 10px 12px; font-size: 12px; color: #fca5a5; margin-bottom: 12px;">
+        <div role="alert" aria-live="polite" style="background: rgba(190, 18, 60, 0.1); border: 1px solid var(--accent-rose); border-radius: 6px; padding: 10px 12px; font-size: 12px; font-weight: 600; color: var(--accent-rose); margin-bottom: 12px;">
           {{ lookup_error }}
         </div>
         {% endif %}
 
         <form action="/contact" method="GET" style="display: flex; flex-direction: column; gap: 10px;">
-          <input type="text" name="ticket_id" required placeholder="Ticket ID (e.g. TKT-A1B2C3)" value="{{ lookup_ticket_id|default('') }}" style="width: 100%; padding: 10px 12px; background: rgba(2, 6, 23, 0.65); border: 1px solid var(--border-color); border-radius: 6px; color: var(--text-primary); font-size: 14px; font-family: monospace;">
-          <input type="email" name="email" required placeholder="Registered Email Address" value="{{ lookup_email|default('') }}" style="width: 100%; padding: 10px 12px; background: rgba(2, 6, 23, 0.65); border: 1px solid var(--border-color); border-radius: 6px; color: var(--text-primary); font-size: 14px;">
+          <label for="lookupTicketIdInput" style="font-size: 12px; font-weight: 600; color: var(--text-secondary);">Ticket Reference ID</label>
+          <input type="text" id="lookupTicketIdInput" name="ticket_id" required autocorrect="off" autocapitalize="off" spellcheck="false" placeholder="Ticket ID (e.g. TKT-A1B2C3)" value="{{ lookup_ticket_id|default('') }}" style="width: 100%; box-sizing: border-box; padding: 10px 12px; background: var(--bg-surface); border: 1px solid var(--border-color); border-radius: 6px; color: var(--text-primary); font-size: 16px; font-family: var(--font-mono);">
+          <label for="lookupTicketEmailInput" style="font-size: 12px; font-weight: 600; color: var(--text-secondary);">Registered Email Address</label>
+          <input type="email" id="lookupTicketEmailInput" name="email" required autocomplete="email" autocorrect="off" autocapitalize="off" spellcheck="false" placeholder="Registered Email Address" value="{{ lookup_email|default('') }}" {% if contact_user %}readonly aria-readonly="true"{% endif %} style="width: 100%; box-sizing: border-box; padding: 10px 12px; background: var(--bg-surface); border: 1px solid var(--border-color); border-radius: 6px; color: var(--text-primary); font-size: 16px;">
           <button type="submit" class="btn btn-secondary" style="width: 100%; padding: 10px; font-size: 13px; font-weight: 700;">
             View Ticket Status &amp; Thread
           </button>
         </form>
 
         {% if tracked_ticket %}
-        <div style="margin-top: 18px; padding-top: 16px; border-top: 1px solid rgba(255,255,255,0.1);">
+        <div style="margin-top: 18px; padding-top: 16px; border-top: 1px solid var(--border-subtle);">
           <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;">
             <strong class="tnum" style="color: var(--accent-cyan); font-size: 13px;">{{ tracked_ticket.ticket_id }}</strong>
-            <span class="badge" style="font-size: 11px; background: rgba(16, 185, 129, 0.15); color: #34d399;">{{ tracked_ticket.status }}</span>
+            <span class="badge" style="font-size: 11px; background: var(--accent-emerald-glow); color: var(--accent-emerald);">{{ tracked_ticket.status }}</span>
           </div>
-          <div style="font-size: 13px; font-weight: 700; color: #f8fafc; margin-bottom: 10px;">{{ tracked_ticket.subject }}</div>
+          <div style="font-size: 13px; font-weight: 700; color: var(--text-primary); margin-bottom: 10px;">{{ tracked_ticket.subject }}</div>
 
           <div style="display: flex; flex-direction: column; gap: 10px; max-height: 300px; overflow-y: auto; margin-bottom: 14px;">
-            <div style="background: rgba(30, 41, 59, 0.55); border-radius: 8px; padding: 10px 12px; font-size: 12.5px; color: #e2e8f0;">
-              <div style="font-size: 11px; color: #94a3b8; margin-bottom: 4px;">You • {{ tracked_ticket.created_at }}</div>
+            <div style="background: var(--bg-surface); border: 1px solid var(--border-subtle); border-radius: 8px; padding: 10px 12px; font-size: 12.5px; color: var(--text-primary);">
+              <div style="font-size: 11px; color: var(--text-muted); margin-bottom: 4px;">You • {{ tracked_ticket.created_at }}</div>
               {{ tracked_ticket.message }}
             </div>
             {% for resp in tracked_ticket.responses %}
-            <div style="background: {% if resp.responder_role == 'user' %}rgba(30, 41, 59, 0.55){% else %}rgba(14, 165, 233, 0.12){% endif %}; border-left: 3px solid {% if resp.responder_role == 'user' %}#64748b{% else %}#38bdf8{% endif %}; border-radius: 6px; padding: 10px 12px; font-size: 12.5px; color: #f1f5f9;">
-              <div style="font-size: 11px; color: #38bdf8; font-weight: 700; margin-bottom: 4px;">
+            <div style="background: var(--bg-surface); border-left: 3px solid {% if resp.responder_role == 'user' %}var(--border-color){% else %}var(--accent-cyan){% endif %}; border-radius: 6px; padding: 10px 12px; font-size: 12.5px; color: var(--text-primary);">
+              <div style="font-size: 11px; color: var(--accent-cyan); font-weight: 700; margin-bottom: 4px;">
                 {% if resp.responder_role == 'user' %}You{% else %}<svg class="glyph" style="width: 12px; height: 12px; vertical-align: -1px;"><use href="#glyph-shield"></use></svg> Moatnomics Support Desk{% endif %} • {{ resp.created_at }}
               </div>
               {{ resp.message }}
             </div>
             {% else %}
-            <div style="font-size: 12px; color: #94a3b8; font-style: italic;">Our team is reviewing your ticket. Responses will appear here.</div>
+            <div style="font-size: 12px; color: var(--text-muted); font-style: italic;">Our team is reviewing your ticket. Responses will appear here.</div>
             {% endfor %}
           </div>
 
           <form action="/contact/reply" method="POST" style="display: flex; flex-direction: column; gap: 8px;">
             <input type="hidden" name="ticket_id" value="{{ tracked_ticket.ticket_id }}">
             <input type="hidden" name="user_email" value="{{ tracked_ticket.user_email }}">
-            <textarea name="reply_message" required rows="2" placeholder="Write a follow-up reply..." style="width: 100%; padding: 8px 10px; background: rgba(2, 6, 23, 0.7); border: 1px solid var(--border-color); border-radius: 6px; color: #f8fafc; font-size: 13px;"></textarea>
+            <label for="contactReplyMessage" style="font-size: 12px; font-weight: 600; color: var(--text-secondary);">Follow-Up Reply</label>
+            <textarea id="contactReplyMessage" name="reply_message" required rows="2" placeholder="Write a follow-up reply..." style="width: 100%; box-sizing: border-box; padding: 8px 10px; background: var(--bg-surface); border: 1px solid var(--border-color); border-radius: 6px; color: var(--text-primary); font-size: 16px; resize: vertical;"></textarea>
             <button type="submit" class="btn btn-primary btn-sm" style="align-self: flex-end; padding: 7px 14px; font-size: 12px; font-weight: 700;">
               Post Follow-Up Reply
             </button>
@@ -169,7 +200,7 @@
         {% endif %}
       </div>
 
-      <div style="background: rgba(15, 23, 42, 0.6); border: 1px solid var(--border-color); border-radius: var(--radius-md); padding: 24px; margin-bottom: 24px;">
+      <div style="background: var(--bg-card); border: 1px solid var(--border-color); border-radius: var(--radius-md); padding: 24px; margin-bottom: 24px;">
         <h4 style="font-size: 16px; font-weight: 700; color: var(--text-primary); margin-bottom: 14px; display: flex; align-items: center; gap: 8px;">
           <svg class="glyph"><use href="#icon-support"></use></svg> Admin Desk Review
         </h4>
@@ -182,22 +213,22 @@
         </div>
       </div>
 
-      <div style="background: rgba(15, 23, 42, 0.6); border: 1px solid var(--border-color); border-radius: var(--radius-md); padding: 24px; margin-bottom: 24px;">
+      <div style="background: var(--bg-card); border: 1px solid var(--border-color); border-radius: var(--radius-md); padding: 24px; margin-bottom: 24px;">
         <h4 style="font-size: 16px; font-weight: 700; color: var(--accent-cyan); margin-bottom: 12px; display: flex; align-items: center; gap: 8px;">
           <span><svg class="glyph"><use href="#glyph-scale"></use></svg></span> Statutory Grievance Handling
         </h4>
         <p style="font-size: 12px; color: var(--text-secondary); line-height: 1.6; margin-bottom: 12px;">
           Under the Information Technology (Intermediary Guidelines) Rules, 2021 and Consumer Protection (E-Commerce) Rules, 2020:
         </p>
-        <div style="font-size: 12px; color: var(--text-muted); line-height: 1.7; background: rgba(30, 41, 59, 0.4); padding: 12px; border-radius: 6px;">
-          <div><strong>Desk:</strong> Operations & Compliance Desk</div>
+        <div style="font-size: 12px; color: var(--text-muted); line-height: 1.7; background: var(--bg-surface); border: 1px solid var(--border-subtle); padding: 12px; border-radius: 6px;">
+          <div><strong>Desk:</strong> Operations &amp; Compliance Desk</div>
           <div><strong>Submission:</strong> Select "Statutory Grievance / Compliance" above</div>
           <div><strong>Acknowledgment:</strong> Within 24 hours of receipt</div>
           <div><strong>Resolution Target:</strong> Maximum 15 business days</div>
         </div>
       </div>
 
-      <div style="background: rgba(15, 23, 42, 0.6); border: 1px solid var(--border-color); border-radius: var(--radius-md); padding: 20px;">
+      <div style="background: var(--bg-card); border: 1px solid var(--border-color); border-radius: var(--radius-md); padding: 20px;">
         <h5 style="font-size: 14px; font-weight: 700; color: var(--text-primary); margin-bottom: 8px;">Payment Reconciliation Note</h5>
         <p style="font-size: 12px; color: var(--text-secondary); line-height: 1.5; margin-bottom: 0;">
           For payment disputes or credit top-ups, please quote your 14-character Payment ID (e.g. <code>pay_...</code>) or Order ID in your message so it can be verified directly in our ledger.
@@ -208,7 +239,7 @@
   </div>
 
   <!-- Mandatory SEBI Safe-Harbor Disclosure -->
-  <div style="margin-top: 48px; padding: 20px; background: rgba(15, 23, 42, 0.6); border: 1px solid rgba(255, 255, 255, 0.08); border-radius: var(--radius-md); font-size: 13px; color: var(--text-secondary); line-height: 1.6;">
+  <div style="margin-top: 48px; padding: 20px; background: var(--bg-card); border: 1px solid var(--border-subtle); border-radius: var(--radius-md); font-size: 13px; color: var(--text-secondary); line-height: 1.6;">
     <strong style="color: var(--accent-cyan); display: flex; align-items: center; gap: 6px; margin-bottom: 6px;">
       <span><svg class="glyph"><use href="#glyph-shield"></use></svg></span> Mandatory SEBI Safe-Harbor Disclosure
     </strong>

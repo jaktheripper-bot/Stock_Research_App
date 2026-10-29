@@ -21,6 +21,7 @@ import csv
 import io
 import hmac
 import hashlib
+import base64
 import statistics
 import collections
 import urllib.parse
@@ -2505,6 +2506,69 @@ async def refund_policy_page(request: Request):
     )
 
 
+def _resolve_authenticated_contact_user(request: Request) -> Optional[Dict[str, str]]:
+    """Resolves verified registered user or admin session required to interact with /contact."""
+    web_user = _get_current_web_user(request)
+    if web_user and web_user.get("email"):
+        return {
+            "id": str(web_user.get("id") or ""),
+            "email": str(web_user["email"]).strip().lower(),
+            "full_name": str(web_user.get("full_name") or "").strip(),
+            "role": "user",
+        }
+    admin_sess = _is_admin_authenticated(request)
+    if admin_sess and admin_sess.get("email"):
+        return {
+            "id": "admin",
+            "email": str(admin_sess["email"]).strip().lower(),
+            "full_name": "Administrator",
+            "role": "admin",
+        }
+    return None
+
+
+def _generate_contact_form_token(issued_ts: Optional[float] = None) -> str:
+    """Generates an HMAC-signed render timestamp token for anti-bot form timing checks."""
+    import time as _time
+    secret = _get_user_signing_key()
+    ts_val = round(float(issued_ts if issued_ts is not None else _time.time()), 3)
+    payload_str = json.dumps({"purpose": "contact_form", "ts": ts_val})
+    payload_b64 = base64.urlsafe_b64encode(payload_str.encode("utf-8")).decode("utf-8")
+    sig = hmac.new(secret, payload_b64.encode("utf-8"), hashlib.sha256).hexdigest()
+    return f"{payload_b64}.{sig}"
+
+
+def _verify_contact_form_token(
+    token: Optional[str],
+    min_elapsed_sec: float = 2.0,
+    max_age_sec: float = 86400.0,
+) -> tuple[bool, str]:
+    """Verifies HMAC integrity and human dwell time (>= min_elapsed_sec) of a /contact form token."""
+    import time as _time
+    raw = (token or "").strip()
+    if not raw or "." not in raw:
+        return False, "missing_or_malformed_token"
+    try:
+        payload_b64, sig = raw.rsplit(".", 1)
+        secret = _get_user_signing_key()
+        expected_sig = hmac.new(secret, payload_b64.encode("utf-8"), hashlib.sha256).hexdigest()
+        if not hmac.compare_digest(sig, expected_sig):
+            return False, "invalid_signature"
+        data = json.loads(base64.urlsafe_b64decode(payload_b64.encode("utf-8")).decode("utf-8"))
+        if not isinstance(data, dict) or data.get("purpose") != "contact_form":
+            return False, "invalid_purpose"
+        issued_ts = float(data.get("ts", 0.0))
+        elapsed = _time.time() - issued_ts
+        if elapsed < min_elapsed_sec:
+            return False, "submitted_too_fast"
+        if elapsed > max_age_sec:
+            return False, "token_expired"
+        return True, "ok"
+    except Exception as exc:
+        logger.debug("Contact form token verification failed: %s", exc)
+        return False, "parse_error"
+
+
 @app.get("/contact", response_class=HTMLResponse)
 async def contact_page(
     request: Request,
@@ -2513,27 +2577,37 @@ async def contact_page(
 ):
     """Interactive Support Desk, Complaints, and Two-Way Ticket Status Lookup page."""
     init_db()
+    contact_user = _resolve_authenticated_contact_user(request)
     tracked_ticket = None
     lookup_error = None
     if ticket_id and email:
         from core.db import get_ticket_by_id
         clean_tid = ticket_id.strip().upper()
         clean_em = email.strip().lower()
-        t_obj = get_ticket_by_id(clean_tid)
-        if t_obj and str(t_obj.get("user_email", "")).strip().lower() == clean_em:
-            tracked_ticket = t_obj
+        if not contact_user:
+            lookup_error = "Please sign in with your registered Moatnomics account to view or reply to support tickets."
+        elif contact_user["role"] != "admin" and contact_user["email"] != clean_em:
+            lookup_error = "Ticket lookup requires signing in with the same registered email address that submitted the ticket."
         else:
-            lookup_error = f"No matching ticket found for ID '{clean_tid}' and email '{clean_em}'."
+            t_obj = get_ticket_by_id(clean_tid)
+            if t_obj and str(t_obj.get("user_email", "")).strip().lower() == clean_em:
+                tracked_ticket = t_obj
+            else:
+                lookup_error = f"No matching ticket found for ID '{clean_tid}' and email '{clean_em}'."
 
     return templates.TemplateResponse(
         request=request,
         name="contact.html",
         context={
             "active_page": "contact",
+            "contact_user": contact_user,
+            "contact_form_token": _generate_contact_form_token(),
+            "form_name": contact_user["full_name"] if contact_user else "",
+            "form_email": contact_user["email"] if contact_user else "",
             "tracked_ticket": tracked_ticket,
             "lookup_error": lookup_error,
             "lookup_ticket_id": (ticket_id or "").strip().upper(),
-            "lookup_email": (email or "").strip().lower(),
+            "lookup_email": (email or (contact_user["email"] if contact_user else "")).strip().lower(),
         }
     )
 
@@ -2574,26 +2648,109 @@ def _check_and_record_contact_rate(rate_key: str, now_ts: float) -> bool:
     _CONTACT_RATE_BUCKETS[rate_key] = window_hits
     return True
 
-_DISPOSABLE_EMAIL_DOMAINS = {
-    "nolettersbox.com", "mailinator.com", "guerrillamail.com", "tempmail.com",
-    "10minutemail.com", "yopmail.com", "trashmail.com", "sharklasers.com",
-}
+
+from core.auth.otp import DISPOSABLE_EMAIL_DOMAINS as _DISPOSABLE_EMAIL_DOMAINS, is_disposable_or_bot_email
+
+_LEGIT_SUPPORT_ID_PREFIXES = (
+    "pay_", "order_", "sub_", "inv_", "rfnd_", "plink_",
+    "tkt-", "udyam-", "usr_", "sess_", "ine", "in0",
+    "http://", "https://",
+)
+_CYRILLIC_SPAM_RE = re.compile(r"[\u0400-\u04FF]")
+_CAMPAIGN_CODE_SPAM_RE = re.compile(r"\b[A-Z]{3,10}\d{5,8}[A-Z]{3,10}\b")
+_SPAM_URL_RE = re.compile(
+    r"https?://[^\s/]*(?:\.(?:buzz|top|icu|cyou|work|click|gq|cf|tk|ml|ga|workers\.dev|my\.id)"
+    r"|(?:^|[./])(?:tinyurl\.com|goo\.su|bit\.ly|is\.gd|cutt\.ly|t\.ly|rb\.gy))(?:/|\b)",
+    re.IGNORECASE,
+)
+
+
+def _is_random_gibberish_token(tok: str) -> bool:
+    """Detects synthetic mixed-case/alphanumeric bot tokens (e.g. 8F0BKhG, DhOZDMD, Und6uI3) while preserving legitimate IDs."""
+    cleaned = tok.strip(".,;:!?()[]{}<>\"'")
+    if len(cleaned) < 4 or len(cleaned) > 24:
+        return False
+    low = cleaned.lower()
+    if any(low.startswith(pfx) for pfx in _LEGIT_SUPPORT_ID_PREFIXES):
+        return False
+    if not cleaned.isalnum():
+        return False
+    if cleaned.isdigit() or cleaned.islower() or cleaned.isupper():
+        return False
+    if cleaned[0].isupper() and cleaned[1:].islower():
+        return False
+    if re.match(r"^(?:[QH]\d)?FY\d{2,4}$", cleaned, re.IGNORECASE):
+        return False
+    if re.match(r"^\d+(?:st|nd|rd|th|Cr|cr|L|K|k|M|B|x\d+|bps|pct)$", cleaned):
+        return False
+    if re.match(
+        r"^(?:iPhone|iPad|macOS|iOS|OnePlus|YouTube|PayPal|LinkedIn|GitHub|FastAPI|PostgreSQL|JavaScript|TypeScript|Moatnomics|SmallCap|MidCap|LargeCap|FlexiCap|MultiCap)$",
+        cleaned,
+    ):
+        return False
+
+    has_upper = any(c.isupper() for c in cleaned)
+    has_lower = any(c.islower() for c in cleaned)
+    has_digit = any(c.isdigit() for c in cleaned)
+    if has_upper and has_lower and has_digit:
+        return True
+
+    transitions = sum(
+        1 for i in range(1, len(cleaned))
+        if (cleaned[i].isupper() != cleaned[i - 1].isupper()) and cleaned[i].isalpha() and cleaned[i - 1].isalpha()
+    )
+    if has_upper and has_lower and transitions >= 2:
+        return True
+    if has_upper and has_lower and cleaned[-1].isupper() and any(c.islower() for c in cleaned[:-1]):
+        return True
+    if len(cleaned) <= 8 and re.match(r"^[A-Z]{2,4}[a-z]{1,4}$", cleaned):
+        return True
+    return False
 
 
 def _is_bot_gibberish_ticket(name: str, subject: str, message: str) -> bool:
-    """Detects automated scanner payloads (e.g. NARTYTRYUT802262NERTHRRTH / MERTYHR802262MAVNGHJTH)."""
-    # 1. Message or subject is a single unbroken 16+ char alphanumeric token with no spaces
+    """Detects automated bot spam, Cyrillic blasts, phishing links, campaign tokens, and random token bursts."""
+    name = name or ""
+    subject = subject or ""
+    message = message or ""
+    combined = f"{name}\n{subject}\n{message}"
+
+    # 1. Single unbroken 16+ char alphanumeric scanner payload
     if (" " not in message and len(message) >= 16 and message.isalnum()) or (
         " " not in subject and len(subject) >= 16 and subject.isalnum()
     ):
         return True
+
     # 2. Shared 5+ digit correlation token injected across name, subject, and message
-    import re as _re
-    name_digits = set(_re.findall(r"\d{5,}", name))
-    subj_digits = set(_re.findall(r"\d{5,}", subject))
-    msg_digits = set(_re.findall(r"\d{5,}", message))
+    name_digits = set(re.findall(r"\d{5,}", name))
+    subj_digits = set(re.findall(r"\d{5,}", subject))
+    msg_digits = set(re.findall(r"\d{5,}", message))
     if name_digits and (name_digits & subj_digits) and (name_digits & msg_digits):
         return True
+
+    # 3. Cyrillic script spam (lottery/phishing blasts)
+    if _CYRILLIC_SPAM_RE.search(combined):
+        return True
+
+    # 4. Campaign correlation code in any field (e.g. JUYEGRT401223THRT, NFDAW401223JUYEGRT)
+    if _CAMPAIGN_CODE_SPAM_RE.search(combined):
+        return True
+
+    # 5. Phishing / URL shortener / burner TLD links (.buzz, tinyurl.com, goo.su, .my.id, etc.)
+    if _SPAM_URL_RE.search(combined):
+        return True
+
+    # 6. Multi-token random mixed-case/alphanumeric bursts (e.g. "8F0BKhG d3Mu DhOZDMD O3jFL9u 1dAG VfijJy1")
+    for text in (subject, message):
+        tokens = [t for t in text.split() if t.strip()]
+        if not tokens:
+            continue
+        gib_count = sum(1 for t in tokens if _is_random_gibberish_token(t))
+        if gib_count >= 3 and (gib_count / max(len(tokens), 1)) >= 0.4:
+            return True
+        if gib_count >= 4:
+            return True
+
     return False
 
 
@@ -2601,39 +2758,88 @@ def _is_bot_gibberish_ticket(name: str, subject: str, message: str) -> bool:
 async def submit_contact_ticket(
     request: Request,
     background_tasks: BackgroundTasks,
-    user_email: str = Form(...),
+    user_email: Optional[str] = Form(""),
     subject: str = Form(...),
     message: str = Form(...),
     user_name: Optional[str] = Form(""),
     category: Optional[str] = Form("general"),
     website_url: Optional[str] = Form(""),
+    form_token: Optional[str] = Form(""),
 ):
-    """Processes user complaint/support ticket, logs to audit ledger, and alerts admin."""
+    """Processes verified registered-user complaint/support ticket, logs to audit ledger, and alerts admin."""
     import time as _time
-    clean_email = str(user_email).strip().lower()[:160]
-    clean_subj = str(subject).strip()[:250]
-    clean_msg = str(message).strip()[:5000]
-    clean_name = str(user_name or "").strip()[:100]
-    clean_cat = str(category or "general").strip().lower()[:40]
-    email_domain = clean_email.split("@")[-1] if "@" in clean_email else ""
-
     if not _validate_request_origin(request):
         raise HTTPException(status_code=403, detail="Cross-origin request rejected.")
 
-    # Silent honeypot & bot-gibberish rejection
-    if (
-        str(website_url or "").strip()
-        or email_domain in _DISPOSABLE_EMAIL_DOMAINS
-        or _is_bot_gibberish_ticket(clean_name, clean_subj, clean_msg)
-    ):
+    init_db()
+    submitted_email = str(user_email or "").strip().lower()[:160]
+    clean_subj = str(subject or "").strip()[:250]
+    clean_msg = str(message or "").strip()[:5000]
+    clean_name = str(user_name or "").strip()[:100]
+    clean_cat = str(category or "general").strip().lower()[:40]
+
+    # Gate 1: Strictly require authenticated registered user (or admin) session before any DB/email action
+    contact_user = _resolve_authenticated_contact_user(request)
+    if not contact_user:
         logger.warning(
-            f"Spam/bot ticket rejected on /contact: {clean_email} (domain='{email_domain}', honeypot='{str(website_url or '')[:50]}')"
+            "Blocked unauthenticated /contact submission (ip=%s, claimed_email=%s)",
+            _get_client_ip(request),
+            submitted_email,
         )
         return templates.TemplateResponse(
             request=request,
             name="contact.html",
             context={
                 "active_page": "contact",
+                "contact_user": None,
+                "contact_form_token": _generate_contact_form_token(),
+                "error_msg": "Sign-in required: Only registered Moatnomics accounts can send support messages. Please sign in or create a free account above.",
+                "form_name": clean_name,
+                "form_email": "",
+                "form_subj": clean_subj,
+                "form_msg": clean_msg,
+                "form_cat": clean_cat,
+            },
+            status_code=401,
+        )
+
+    # Gate 2: Bind ticket identity strictly to the signed-in verified email (prevent email spoofing)
+    clean_email = contact_user["email"]
+    if not clean_name and contact_user.get("full_name"):
+        clean_name = contact_user["full_name"][:100]
+
+    # Gate 3: Anti-bot timing token verification
+    is_testing = os.environ.get("TESTING") == "1"
+    raw_form_token = str(form_token or "").strip()
+    token_ok = True
+    token_reason = "ok"
+    if not is_testing:
+        token_ok, token_reason = _verify_contact_form_token(raw_form_token, min_elapsed_sec=2.0)
+    elif raw_form_token:
+        min_sec = 2.0 if request.headers.get("x-enforce-form-timing") == "1" else 0.0
+        token_ok, token_reason = _verify_contact_form_token(raw_form_token, min_elapsed_sec=min_sec)
+
+    # Gate 4: Honeypot, disposable email domain, form timing & multi-layer bot payload rejection
+    if (
+        str(website_url or "").strip()
+        or not token_ok
+        or is_disposable_or_bot_email(clean_email)
+        or (submitted_email and is_disposable_or_bot_email(submitted_email))
+        or _is_bot_gibberish_ticket(clean_name, clean_subj, clean_msg)
+    ):
+        logger.warning(
+            "Spam/bot ticket rejected on /contact: %s (token=%s, honeypot=%r)",
+            clean_email,
+            token_reason,
+            str(website_url or "")[:50],
+        )
+        return templates.TemplateResponse(
+            request=request,
+            name="contact.html",
+            context={
+                "active_page": "contact",
+                "contact_user": contact_user,
+                "contact_form_token": _generate_contact_form_token(),
                 "error_msg": "Please provide a valid email address and a clear, multi-word description of your inquiry.",
                 "form_name": clean_name,
                 "form_email": clean_email,
@@ -2650,16 +2856,19 @@ async def submit_contact_ticket(
             name="contact.html",
             context={
                 "active_page": "contact",
+                "contact_user": contact_user,
+                "contact_form_token": _generate_contact_form_token(),
                 "error_msg": "Please provide a valid email address, subject, and detailed message.",
                 "form_name": clean_name,
                 "form_email": clean_email,
                 "form_subj": clean_subj,
                 "form_msg": clean_msg,
                 "form_cat": clean_cat,
-            }
+            },
+            status_code=400,
         )
 
-    if os.environ.get("TESTING") != "1":
+    if not is_testing:
         client_ip = _get_client_ip(request)
         rate_key = f"{client_ip}:{clean_email}"
         now_ts = _time.time()
@@ -2669,6 +2878,8 @@ async def submit_contact_ticket(
                 name="contact.html",
                 context={
                     "active_page": "contact",
+                    "contact_user": contact_user,
+                    "contact_form_token": _generate_contact_form_token(),
                     "error_msg": "Too many support requests submitted recently. Please wait a few minutes before submitting another ticket.",
                     "form_name": clean_name,
                     "form_email": clean_email,
@@ -2694,13 +2905,16 @@ async def submit_contact_ticket(
             name="contact.html",
             context={
                 "active_page": "contact",
+                "contact_user": contact_user,
+                "contact_form_token": _generate_contact_form_token(),
                 "error_msg": f"Failed to submit ticket: {res.get('error', 'Database error')}",
                 "form_name": clean_name,
                 "form_email": clean_email,
                 "form_subj": clean_subj,
                 "form_msg": clean_msg,
                 "form_cat": clean_cat,
-            }
+            },
+            status_code=500,
         )
 
     background_tasks.add_task(dispatch_support_ticket_alert, res)
@@ -2716,6 +2930,11 @@ async def submit_contact_ticket(
         name="contact.html",
         context={
             "active_page": "contact",
+            "contact_user": contact_user,
+            "contact_form_token": _generate_contact_form_token(),
+            "form_name": clean_name,
+            "form_email": clean_email,
+            "lookup_email": clean_email,
             "success_ticket": res,
         }
     )
@@ -2725,10 +2944,10 @@ async def submit_contact_ticket(
 async def user_reply_to_support_ticket(
     request: Request,
     ticket_id: str = Form(...),
-    user_email: str = Form(...),
+    user_email: Optional[str] = Form(""),
     reply_message: str = Form(...),
 ):
-    """Allows a user to post a follow-up reply directly onto their support ticket thread."""
+    """Allows a signed-in registered user to post a follow-up reply onto their own support ticket thread."""
     if not _validate_request_origin(request):
         raise HTTPException(status_code=403, detail="Cross-origin request rejected.")
     init_db()
@@ -2737,24 +2956,71 @@ async def user_reply_to_support_ticket(
     clean_em = str(user_email or "").strip().lower()[:160]
     clean_msg = str(reply_message or "").strip()[:5000]
 
-    t_obj = get_ticket_by_id(clean_tid)
-    if not t_obj or str(t_obj.get("user_email", "")).strip().lower() != clean_em:
+    contact_user = _resolve_authenticated_contact_user(request)
+    if not contact_user:
         return templates.TemplateResponse(
             request=request,
             name="contact.html",
             context={
                 "active_page": "contact",
-                "lookup_error": "Could not verify ticket ownership. Please check your Ticket ID and Email.",
+                "contact_user": None,
+                "contact_form_token": _generate_contact_form_token(),
+                "lookup_error": "Sign-in required: Please sign in with your registered account to reply to a support ticket.",
                 "lookup_ticket_id": clean_tid,
                 "lookup_email": clean_em,
-            }
+            },
+            status_code=401,
+        )
+
+    t_obj = get_ticket_by_id(clean_tid)
+    owner_email = str(t_obj.get("user_email", "")).strip().lower() if t_obj else ""
+    effective_email = clean_em or contact_user["email"]
+    is_owner = bool(
+        t_obj
+        and owner_email
+        and effective_email == owner_email
+        and (contact_user["role"] == "admin" or contact_user["email"] == owner_email)
+    )
+    if not is_owner:
+        return templates.TemplateResponse(
+            request=request,
+            name="contact.html",
+            context={
+                "active_page": "contact",
+                "contact_user": contact_user,
+                "contact_form_token": _generate_contact_form_token(),
+                "form_name": contact_user["full_name"],
+                "form_email": contact_user["email"],
+                "lookup_error": "Could not verify ticket ownership. Please check your Ticket ID and signed-in Email.",
+                "lookup_ticket_id": clean_tid,
+                "lookup_email": effective_email,
+            },
+            status_code=403,
+        )
+
+    if _is_bot_gibberish_ticket("", "", clean_msg):
+        return templates.TemplateResponse(
+            request=request,
+            name="contact.html",
+            context={
+                "active_page": "contact",
+                "contact_user": contact_user,
+                "contact_form_token": _generate_contact_form_token(),
+                "form_name": contact_user["full_name"],
+                "form_email": contact_user["email"],
+                "tracked_ticket": t_obj,
+                "lookup_error": "Please enter a clear, human-readable reply without automated spam links.",
+                "lookup_ticket_id": clean_tid,
+                "lookup_email": owner_email,
+            },
+            status_code=400,
         )
 
     if clean_msg:
         add_ticket_response(
             ticket_id=clean_tid,
-            responder_email=clean_em,
-            responder_role="user",
+            responder_email=contact_user["email"],
+            responder_role="admin" if contact_user["role"] == "admin" else "user",
             message=clean_msg,
             email_sent=False
         )
@@ -2767,9 +3033,13 @@ async def user_reply_to_support_ticket(
         name="contact.html",
         context={
             "active_page": "contact",
+            "contact_user": contact_user,
+            "contact_form_token": _generate_contact_form_token(),
+            "form_name": contact_user["full_name"],
+            "form_email": contact_user["email"],
             "tracked_ticket": updated_ticket,
             "lookup_ticket_id": clean_tid,
-            "lookup_email": clean_em,
+            "lookup_email": owner_email,
         }
     )
 

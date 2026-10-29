@@ -1766,7 +1766,34 @@ window.openSignInModal = function() {
     return;
   }
   const modal = document.getElementById('authModal');
-  if (modal) modal.classList.add('active');
+  if (modal) {
+    if (modal.parentElement !== document.body) {
+      document.body.appendChild(modal);
+    }
+    const googleLink = modal.querySelector('a[href^="/auth/google"]');
+    if (googleLink && window.location && window.location.pathname && window.location.pathname.startsWith('/')) {
+      const returnPath = window.location.pathname + (window.location.search || '');
+      googleLink.setAttribute('href', '/auth/google?redirect=' + encodeURIComponent(returnPath));
+    }
+    modal.classList.add('active');
+    const emailInput = document.getElementById('authEmailInput');
+    if (emailInput) {
+      emailInput.focus({ preventScroll: true });
+    }
+  }
+};
+
+window.openContactSignInModal = function() {
+  const form = document.getElementById('contactTicketForm');
+  if (form && form.getAttribute('data-authenticated') === 'false') {
+    try { localStorage.removeItem('sr_user'); } catch {}
+    if (typeof updateNavAuthUI === 'function') {
+      updateNavAuthUI(null);
+    }
+  }
+  if (typeof window.openSignInModal === 'function') {
+    window.openSignInModal();
+  }
 };
 
 window.closeSignInModal = function() {
@@ -2084,6 +2111,16 @@ window.handleContactTicketSubmit = function(e) {
   }
 
   const form = document.getElementById('contactTicketForm');
+  if (form && form.getAttribute('data-authenticated') === 'false') {
+    if (e && typeof e.preventDefault === 'function') {
+      e.preventDefault();
+    }
+    if (typeof window.openContactSignInModal === 'function') {
+      window.openContactSignInModal();
+    }
+    return false;
+  }
+
   if (form && typeof form.checkValidity === 'function' && !form.checkValidity()) {
     return true;
   }
@@ -2115,6 +2152,8 @@ window.handleContactTicketSubmit = function(e) {
 
 window.addEventListener('pageshow', function() {
   _contactFormSubmitting = false;
+  const form = document.getElementById('contactTicketForm');
+  const isAuthed = !form || form.getAttribute('data-authenticated') !== 'false';
   const btn = document.getElementById('contactSubmitBtn');
   const btnIcon = document.getElementById('contactSubmitBtnIcon');
   const btnText = document.getElementById('contactSubmitBtnText');
@@ -2125,10 +2164,10 @@ window.addEventListener('pageshow', function() {
     btn.style.pointerEvents = '';
   }
   if (btnIcon) {
-    btnIcon.innerHTML = '<svg class="glyph" style="width: 14px; height: 14px;"><use href="#icon-chat"></use></svg>';
+    btnIcon.innerHTML = '<svg class="glyph" style="width: 14px; height: 14px;"><use href="#glyph-mail"></use></svg>';
   }
   if (btnText) {
-    btnText.innerText = 'Send Support Ticket';
+    btnText.innerText = isAuthed ? 'Send Support Ticket' : 'Sign In to Send Support Ticket';
   }
 });
 

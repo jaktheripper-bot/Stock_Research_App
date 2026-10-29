@@ -344,124 +344,250 @@ Detailed forensic analysis with exact page grounding to bseindia.com filings.
             self.assertEqual(data.get("status"), "initiated")
 
     def test_contact_page_get_and_post(self):
-        # 1. GET /contact returns interactive form
-        res_get = self.client.get("/contact")
-        self.assertEqual(res_get.status_code, 200)
-        self.assertIn("Submit an Inquiry or Complaint", res_get.text)
-        self.assertIn("Grievance Redressal", res_get.text)
+        import re as _re
+        import time as _time
+        from core.db import get_or_create_user, get_ticket_by_id
+        from core.db.connection import get_db_connection, get_placeholder
+        from web.common import USER_SESSION_COOKIE, _generate_user_session_token
+        from web.main import _generate_contact_form_token
 
-        soup = BeautifulSoup(res_get.text, "html.parser")
-        contact_ids = ["contactUserName", "contactUserEmail", "contactCategory", "contactSubject", "contactMessage"]
-        for cid in contact_ids:
-            self.assertIsNotNone(soup.find(id=cid), f"Missing #{cid} in /contact form")
-            label = soup.find("label", attrs={"for": cid})
-            self.assertIsNotNone(label, f"Missing label[for='{cid}'] in /contact form")
+        verified_email = "contact_verified_member@example.com"
+        verified_uid = "usr_contact_verified_member"
+        created_tids = []
 
-        email_input = soup.find(id="contactUserEmail")
-        self.assertEqual(email_input.get("autocomplete"), "email")
-        name_input = soup.find(id="contactUserName")
-        self.assertEqual(name_input.get("autocomplete"), "name")
+        try:
+            # 1. Signed-out GET /contact returns public page + auth gate banner + full DOM bindings
+            self.client.cookies.clear()
+            res_get = self.client.get("/contact")
+            self.assertEqual(res_get.status_code, 200)
+            self.assertIn("Submit an Inquiry or Complaint", res_get.text)
+            self.assertIn("Grievance Redressal", res_get.text)
+            self.assertIn("Registered Account Required", res_get.text)
 
-        # Verify anti-bot honeypot DOM presence and accessibility hygiene
-        honeypot_input = soup.find(id="contactWebsiteUrl")
-        self.assertIsNotNone(honeypot_input, "Missing anti-bot honeypot #contactWebsiteUrl in /contact form")
-        self.assertEqual(honeypot_input.get("tabindex"), "-1")
-        self.assertIsNotNone(soup.find("label", attrs={"for": "contactWebsiteUrl"}))
+            soup = BeautifulSoup(res_get.text, "html.parser")
+            self.assertIsNotNone(soup.find(id="contactAuthGateBanner"))
+            self.assertIsNotNone(soup.find(id="contactSignInPromptBtn"))
+            self.assertIsNotNone(soup.find(id="contactFormToken"))
 
-        # Verify tactile submit button, double-submit protection & JS wiring contracts
-        form_el = soup.find(id="contactTicketForm")
-        self.assertIsNotNone(form_el, "Missing #contactTicketForm in /contact form")
-        self.assertIn("handleContactTicketSubmit(event)", form_el.get("onsubmit", ""))
-        submit_btn = soup.find(id="contactSubmitBtn")
-        self.assertIsNotNone(submit_btn, "Missing #contactSubmitBtn in /contact form")
-        self.assertEqual(submit_btn.get("type"), "submit")
-        self.assertIn("btn", submit_btn.get("class", []))
-        self.assertIn("btn-primary", submit_btn.get("class", []))
-        self.assertIsNotNone(soup.find(id="contactSubmitBtnIcon"))
-        self.assertIsNotNone(soup.find(id="contactSubmitBtnText"))
+            contact_ids = ["contactUserName", "contactUserEmail", "contactCategory", "contactSubject", "contactMessage"]
+            for cid in contact_ids:
+                self.assertIsNotNone(soup.find(id=cid), f"Missing #{cid} in /contact form")
+                label = soup.find("label", attrs={"for": cid})
+                self.assertIsNotNone(label, f"Missing label[for='{cid}'] in /contact form")
 
-        main_js_res = self.client.get("/static/js/main.js")
-        self.assertEqual(main_js_res.status_code, 200)
-        main_js_content = main_js_res.text
-        self.assertIn("window.handleContactTicketSubmit = function", main_js_content)
-        self.assertIn("Sending Ticket...", main_js_content)
-        self.assertIn("_contactFormSubmitting = true", main_js_content)
-        self.assertIn("window.addEventListener('pageshow'", main_js_content)
+            email_input = soup.find(id="contactUserEmail")
+            self.assertEqual(email_input.get("autocomplete"), "email")
+            name_input = soup.find(id="contactUserName")
+            self.assertEqual(name_input.get("autocomplete"), "name")
 
-        # 2. POST /contact creates ticket and dispatches alert
-        post_data = {
-            "user_name": "Test Investor",
-            "user_email": "investor@example.com",
-            "category": "billing",
-            "subject": "Payment credit verification query",
-            "message": "Testing automated support ticket dispatch and admin alerting."
-        }
-        res_post = self.client.post("/contact", data=post_data)
-        self.assertEqual(res_post.status_code, 200)
-        self.assertIn("Ticket Registered Successfully", res_post.text)
-        self.assertIn("TKT-", res_post.text)
+            honeypot_input = soup.find(id="contactWebsiteUrl")
+            self.assertIsNotNone(honeypot_input, "Missing anti-bot honeypot #contactWebsiteUrl in /contact form")
+            self.assertEqual(honeypot_input.get("tabindex"), "-1")
+            self.assertIsNotNone(soup.find("label", attrs={"for": "contactWebsiteUrl"}))
 
-        # 3. POST /contact with populated honeypot triggers 400 rejection
-        bot_post_data = {
-            "user_name": "Spam Bot",
-            "user_email": "bot@spammer.org",
-            "category": "general",
-            "subject": "Buy cheap stuff",
-            "message": "Spam link spam link",
-            "website_url": "http://spambot-malicious-domain.com"
-        }
-        res_bot = self.client.post("/contact", data=bot_post_data)
-        self.assertEqual(res_bot.status_code, 400)
-        self.assertIn("Please provide a valid email address and a clear, multi-word description", res_bot.text)
+            form_el = soup.find(id="contactTicketForm")
+            self.assertIsNotNone(form_el, "Missing #contactTicketForm in /contact form")
+            self.assertEqual(form_el.get("data-authenticated"), "false")
+            self.assertIn("handleContactTicketSubmit(event)", form_el.get("onsubmit", ""))
+            submit_btn = soup.find(id="contactSubmitBtn")
+            self.assertIsNotNone(submit_btn, "Missing #contactSubmitBtn in /contact form")
+            self.assertEqual(submit_btn.get("type"), "submit")
+            self.assertIn("btn", submit_btn.get("class", []))
+            self.assertIn("btn-primary", submit_btn.get("class", []))
+            self.assertIsNotNone(soup.find(id="contactSubmitBtnIcon"))
+            self.assertIsNotNone(soup.find(id="contactSubmitBtnText"))
 
-        # 4. POST /contact with disposable email domain triggers 400 rejection
-        disposable_post_data = {
-            "user_name": "Temp User",
-            "user_email": "anonymous@mailinator.com",
-            "category": "general",
-            "subject": "Checking something",
-            "message": "This is a message from a disposable address."
-        }
-        res_disp = self.client.post("/contact", data=disposable_post_data)
-        self.assertEqual(res_disp.status_code, 400)
-        self.assertIn("Please provide a valid email address and a clear, multi-word description", res_disp.text)
+            main_js_res = self.client.get("/static/js/main.js")
+            self.assertEqual(main_js_res.status_code, 200)
+            main_js_content = main_js_res.text
+            self.assertIn("window.handleContactTicketSubmit = function", main_js_content)
+            self.assertIn("window.openContactSignInModal = function", main_js_content)
+            self.assertIn("Sending Ticket...", main_js_content)
+            self.assertIn("_contactFormSubmitting = true", main_js_content)
+            self.assertIn("window.addEventListener('pageshow'", main_js_content)
 
-        # 5. POST /contact with bot scanner gibberish (single unbroken 16+ alphanumeric token) triggers 400 rejection
-        gibberish_post_data = {
-            "user_name": "Scanner",
-            "user_email": "scanner@legitlookingdomain.org",
-            "category": "general",
-            "subject": "NARTYTRYUT802262NERTHRRTH",
-            "message": "MERTYHR802262MAVNGHJTH"
-        }
-        res_gibberish = self.client.post("/contact", data=gibberish_post_data)
-        self.assertEqual(res_gibberish.status_code, 400)
-        self.assertIn("Please provide a valid email address and a clear, multi-word description", res_gibberish.text)
+            # 2. Unauthenticated POST /contact is strictly blocked with HTTP 401
+            unauth_post = self.client.post("/contact", data={
+                "user_name": "Unregistered Bot",
+                "user_email": verified_email,
+                "category": "general",
+                "subject": "Anonymous bot submission attempt",
+                "message": "Bots without a verified session must be rejected with HTTP 401.",
+            })
+            self.assertEqual(unauth_post.status_code, 401)
+            self.assertIn("Sign-in required", unauth_post.text)
 
-        # 6. POST /contact with shared 5+ digit correlation token across name, subject, and message triggers 400 rejection
-        correlated_bot_data = {
-            "user_name": "Bot_987654_User",
-            "user_email": "probe@sometestingdomain.io",
-            "category": "general",
-            "subject": "Inquiry regarding token 987654 status",
-            "message": "This is inquiry payload with 987654 injected."
-        }
-        res_corr = self.client.post("/contact", data=correlated_bot_data)
-        self.assertEqual(res_corr.status_code, 400)
-        self.assertIn("Please provide a valid email address and a clear, multi-word description", res_corr.text)
+            # 3. Disposable / burner bot domains cannot even request Email OTPs
+            for burner_email in ("bot@geiiml.my.id", "bot@tehbo.my.id", "bot@smaqty.com", "anon@mailinator.com"):
+                otp_res = self.client.post("/api/auth/send-otp", json={"email": burner_email})
+                self.assertEqual(otp_res.status_code, 400, f"Burner domain {burner_email} should fail OTP request")
+
+            # 4. Authenticate as a registered Moatnomics user
+            get_or_create_user(user_id=verified_uid, email=verified_email, full_name="Rahul Sharma")
+            session_tok = _generate_user_session_token(verified_uid, verified_email)
+            self.client.cookies.set(USER_SESSION_COOKIE, session_tok)
+
+            res_authed_get = self.client.get("/contact")
+            self.assertEqual(res_authed_get.status_code, 200)
+            authed_soup = BeautifulSoup(res_authed_get.text, "html.parser")
+            self.assertIsNotNone(authed_soup.find(id="contactVerifiedBanner"))
+            self.assertEqual(authed_soup.find(id="contactTicketForm").get("data-authenticated"), "true")
+            authed_email_inp = authed_soup.find(id="contactUserEmail")
+            self.assertEqual(authed_email_inp.get("value"), verified_email)
+            self.assertTrue(authed_email_inp.has_attr("readonly"))
+
+            # 5. Authenticated POST /contact creates ticket bound strictly to session email (ignoring spoofed email & allowing Razorpay IDs)
+            valid_form_tok = _generate_contact_form_token(issued_ts=_time.time() - 5.0)
+            post_data = {
+                "user_name": "Rahul Sharma",
+                "user_email": "spoofed_victim@otherdomain.com",
+                "category": "billing",
+                "subject": "Payment credit verification query",
+                "message": "My Razorpay payment pay_P8xL9mK2vN4qR1 succeeded for ₹499; please check credit balance.",
+                "form_token": valid_form_tok,
+            }
+            res_post = self.client.post("/contact", data=post_data, headers={"X-Enforce-Form-Timing": "1"})
+            self.assertEqual(res_post.status_code, 200)
+            self.assertIn("Ticket Registered Successfully", res_post.text)
+            m_tid = _re.search(r"TKT-[A-Z0-9]+", res_post.text)
+            self.assertIsNotNone(m_tid)
+            created_tid = m_tid.group(0)
+            created_tids.append(created_tid)
+            saved_ticket = get_ticket_by_id(created_tid)
+            self.assertEqual(saved_ticket["user_email"], verified_email)
+
+            # 6. Defense-in-depth anti-bot rejections (HTTP 400) even when authenticated
+            # 6a. Honeypot populated
+            res_bot = self.client.post("/contact", data={
+                "user_name": "Spam Bot",
+                "user_email": verified_email,
+                "category": "general",
+                "subject": "Buy cheap stuff",
+                "message": "Spam link spam link",
+                "website_url": "http://spambot-malicious-domain.com",
+            })
+            self.assertEqual(res_bot.status_code, 400)
+
+            # 6b. Disposable email supplied in form field
+            res_disp = self.client.post("/contact", data={
+                "user_name": "Temp User",
+                "user_email": "anonymous@mailinator.com",
+                "category": "general",
+                "subject": "Checking something",
+                "message": "This is a message from a disposable address.",
+            })
+            self.assertEqual(res_disp.status_code, 400)
+
+            # 6c. Single unbroken 16+ alphanumeric scanner token
+            res_gibberish = self.client.post("/contact", data={
+                "user_name": "Scanner",
+                "user_email": verified_email,
+                "category": "general",
+                "subject": "NARTYTRYUT802262NERTHRRTH",
+                "message": "MERTYHR802262MAVNGHJTH",
+            })
+            self.assertEqual(res_gibberish.status_code, 400)
+
+            # 6d. Shared 5+ digit correlation token across name, subject, and message
+            res_corr = self.client.post("/contact", data={
+                "user_name": "Bot_987654_User",
+                "user_email": verified_email,
+                "category": "general",
+                "subject": "Inquiry regarding token 987654 status",
+                "message": "This is inquiry payload with 987654 injected.",
+            })
+            self.assertEqual(res_corr.status_code, 400)
+
+            # 6e. Cyrillic lottery/phishing blast
+            res_cyr = self.client.post("/contact", data={
+                "user_name": "Lottery",
+                "user_email": verified_email,
+                "category": "general",
+                "subject": "Ваш билет неизрасходован",
+                "message": "Депозит 4019 Руб в ожидании активации",
+            })
+            self.assertEqual(res_cyr.status_code, 400)
+
+            # 6f. Multi-token random mixed-case gibberish burst (even with English subject)
+            res_burst = self.client.post("/contact", data={
+                "user_name": "Bot",
+                "user_email": verified_email,
+                "category": "general",
+                "subject": "Your ticket is unused",
+                "message": "8F0BKhG d3Mu DhOZDMD O3jFL9u 1dAG VfijJy1",
+            })
+            self.assertEqual(res_burst.status_code, 400)
+
+            # 6g. Phishing/shortener link & campaign code
+            res_phish = self.client.post("/contact", data={
+                "user_name": "Bot",
+                "user_email": verified_email,
+                "category": "general",
+                "subject": "Reward ready",
+                "message": "Claim reward at https://cv3cph.eqoumo.buzz/eNp6iml3 NFDAW401223JUYEGRT",
+            })
+            self.assertEqual(res_phish.status_code, 400)
+
+            # 6h. Instant (<2s) scripted form submission & forged signature rejection
+            instant_tok = _generate_contact_form_token(issued_ts=_time.time())
+            res_fast = self.client.post(
+                "/contact",
+                data={
+                    "user_name": "Rahul Sharma",
+                    "user_email": verified_email,
+                    "category": "general",
+                    "subject": "Legitimate looking subject",
+                    "message": "Submitted instantaneously by headless script under 2 seconds.",
+                    "form_token": instant_tok,
+                },
+                headers={"X-Enforce-Form-Timing": "1"},
+            )
+            self.assertEqual(res_fast.status_code, 400)
+
+            res_forged = self.client.post(
+                "/contact",
+                data={
+                    "user_name": "Rahul Sharma",
+                    "user_email": verified_email,
+                    "category": "general",
+                    "subject": "Legitimate looking subject",
+                    "message": "Submitted with forged form signature.",
+                    "form_token": "eyJwdXJwb3NlIjoiY29udGFjdF9mb3JtIiwidHMiOjE3MDAwMDAwMDB9.deadbeef",
+                },
+            )
+            self.assertEqual(res_forged.status_code, 400)
+        finally:
+            self.client.cookies.clear()
+            conn = get_db_connection()
+            c = conn.cursor()
+            p = get_placeholder()
+            try:
+                for tid in created_tids:
+                    c.execute(f"DELETE FROM ticket_responses WHERE ticket_id = {p}", (tid,))
+                    c.execute(f"DELETE FROM support_tickets WHERE ticket_id = {p}", (tid,))
+                    c.execute(f"DELETE FROM alert_events WHERE ticker = 'SUPPORT' AND title LIKE {p}", (f"%{tid}%",))
+                c.execute(
+                    f"DELETE FROM site_usage_events WHERE event_type = 'SUPPORT_TICKET_SUBMITTED' AND details LIKE {p}",
+                    (f"%{verified_email}%",),
+                )
+                c.execute(f"DELETE FROM user_accounts WHERE email = {p}", (verified_email,))
+                conn.commit()
+            finally:
+                c.close()
+                conn.close()
 
     def test_contact_page_ticket_lookup_and_user_reply(self):
-        from core.db import create_support_ticket, get_ticket_by_id, update_ticket_status
+        from core.db import create_support_ticket, get_or_create_user, get_ticket_by_id, update_ticket_status
         from core.db.connection import get_db_connection, get_placeholder
+        from web.common import USER_SESSION_COOKIE, _generate_user_session_token
 
-        # 1. Non-matching ticket lookup returns diagnostic error
-        res_lookup_fail = self.client.get("/contact?ticket_id=TKT-NONEXISTENT&email=nobody@example.com")
-        self.assertEqual(res_lookup_fail.status_code, 200)
-        self.assertIn("No matching ticket found", res_lookup_fail.text)
+        owner_email = "two_way_investor@example.com"
+        owner_uid = "usr_two_way_investor"
+        imposter_email = "contact_imposter@example.com"
+        imposter_uid = "usr_contact_imposter"
 
-        # 2. Create test ticket and look up successfully
         t_res = create_support_ticket(
-            user_email="two_way_investor@example.com",
+            user_email=owner_email,
             user_name="Two-Way Tester",
             subject="Question regarding DCF hurdle rate",
             message="Can you explain the terminal growth rate assumption?",
@@ -472,8 +598,31 @@ Detailed forensic analysis with exact page grounding to bseindia.com filings.
         tid = t_res["ticket_id"]
 
         try:
-            # 3. Successful lookup renders ticket and original inquiry
-            res_lookup_ok = self.client.get(f"/contact?ticket_id={tid}&email=two_way_investor@example.com")
+            # 1. Unauthenticated lookup & reply are blocked cleanly
+            self.client.cookies.clear()
+            res_unauth_lookup = self.client.get(f"/contact?ticket_id={tid}&email={owner_email}")
+            self.assertEqual(res_unauth_lookup.status_code, 200)
+            self.assertIn("Please sign in with your registered Moatnomics account", res_unauth_lookup.text)
+            self.assertNotIn("Can you explain the terminal growth rate assumption?", res_unauth_lookup.text)
+
+            res_unauth_reply = self.client.post("/contact/reply", data={
+                "ticket_id": tid,
+                "user_email": owner_email,
+                "reply_message": "Unauthenticated reply attempt."
+            })
+            self.assertEqual(res_unauth_reply.status_code, 401)
+
+            # 2. Authenticate as owner; non-matching ticket ID returns diagnostic error
+            get_or_create_user(user_id=owner_uid, email=owner_email, full_name="Two-Way Tester")
+            get_or_create_user(user_id=imposter_uid, email=imposter_email, full_name="Imposter User")
+
+            self.client.cookies.set(USER_SESSION_COOKIE, _generate_user_session_token(owner_uid, owner_email))
+            res_lookup_fail = self.client.get(f"/contact?ticket_id=TKT-NONEXISTENT&email={owner_email}")
+            self.assertEqual(res_lookup_fail.status_code, 200)
+            self.assertIn("No matching ticket found", res_lookup_fail.text)
+
+            # 3. Successful authenticated owner lookup renders ticket and original inquiry
+            res_lookup_ok = self.client.get(f"/contact?ticket_id={tid}&email={owner_email}")
             self.assertEqual(res_lookup_ok.status_code, 200)
             self.assertIn(tid, res_lookup_ok.text)
             self.assertIn("Question regarding DCF hurdle rate", res_lookup_ok.text)
@@ -487,19 +636,21 @@ Detailed forensic analysis with exact page grounding to bseindia.com filings.
                     val_str = " ".join(attr_val) if isinstance(attr_val, list) else str(attr_val)
                     self.assertNotIn("{{", val_str, f"Unrendered Jinja in <{tag.name} {attr_name}='{val_str}'>")
 
-            # 4. Reply with mismatched email fails ownership verification
+            # 4. Reply while signed in as different user fails ownership verification (HTTP 403)
+            self.client.cookies.set(USER_SESSION_COOKIE, _generate_user_session_token(imposter_uid, imposter_email))
             res_reply_fail = self.client.post("/contact/reply", data={
                 "ticket_id": tid,
-                "user_email": "imposter@example.com",
+                "user_email": owner_email,
                 "reply_message": "Unauthorized reply attempt."
             })
-            self.assertEqual(res_reply_fail.status_code, 200)
+            self.assertEqual(res_reply_fail.status_code, 403)
             self.assertIn("Could not verify ticket ownership", res_reply_fail.text)
 
-            # 5. Valid user follow-up reply appends to conversation thread
+            # 5. Valid authenticated owner follow-up reply appends to conversation thread
+            self.client.cookies.set(USER_SESSION_COOKIE, _generate_user_session_token(owner_uid, owner_email))
             res_reply_ok = self.client.post("/contact/reply", data={
                 "ticket_id": tid,
-                "user_email": "two_way_investor@example.com",
+                "user_email": owner_email,
                 "reply_message": "Here is additional context regarding the terminal value."
             })
             self.assertEqual(res_reply_ok.status_code, 200)
@@ -514,7 +665,7 @@ Detailed forensic analysis with exact page grounding to bseindia.com filings.
 
             res_reopen = self.client.post("/contact/reply", data={
                 "ticket_id": tid,
-                "user_email": "two_way_investor@example.com",
+                "user_email": owner_email,
                 "reply_message": "Re-opening ticket: I need clarification on discount rates."
             })
             self.assertEqual(res_reopen.status_code, 200)
@@ -523,14 +674,18 @@ Detailed forensic analysis with exact page grounding to bseindia.com filings.
             self.assertIn("Re-opened by user follow-up", t_reopened.get("admin_notes", ""))
 
         finally:
+            self.client.cookies.clear()
             conn = get_db_connection()
             c = conn.cursor()
             p = get_placeholder()
-            c.execute(f"DELETE FROM ticket_responses WHERE ticket_id = {p}", (tid,))
-            c.execute(f"DELETE FROM support_tickets WHERE ticket_id = {p}", (tid,))
-            conn.commit()
-            c.close()
-            conn.close()
+            try:
+                c.execute(f"DELETE FROM ticket_responses WHERE ticket_id = {p}", (tid,))
+                c.execute(f"DELETE FROM support_tickets WHERE ticket_id = {p}", (tid,))
+                c.execute(f"DELETE FROM user_accounts WHERE email IN ({p}, {p})", (owner_email, imposter_email))
+                conn.commit()
+            finally:
+                c.close()
+                conn.close()
 
     def test_seo_robots_and_sitemap(self):
         res_robots = self.client.get("/robots.txt")

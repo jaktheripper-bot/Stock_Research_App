@@ -19,7 +19,7 @@ from pydantic import BaseModel
 from fastapi import APIRouter, Request, HTTPException
 from fastapi.responses import HTMLResponse, RedirectResponse, JSONResponse
 
-from core.auth.otp import create_email_otp, verify_email_otp
+from core.auth.otp import create_email_otp, verify_email_otp, is_disposable_or_bot_email
 from core.auth.supabase_auth import get_supabase_auth_config, verify_supabase_access_token
 from core.db import get_or_create_user, get_user_by_id
 from core.db.telemetry import (
@@ -187,6 +187,11 @@ async def api_signin(payload: SignInRequest):
     clean_email = (payload.email or "").strip().lower()
     if not clean_email or "@" not in clean_email or "." not in clean_email.split("@")[-1]:
         raise HTTPException(status_code=400, detail="Please provide a valid email address.")
+    if is_disposable_or_bot_email(clean_email):
+        raise HTTPException(
+            status_code=400,
+            detail="Temporary or disposable email domains are not permitted. Please use your primary work or personal email.",
+        )
 
     if os.environ.get("TESTING") != "1":
         if not payload.otp_code:
