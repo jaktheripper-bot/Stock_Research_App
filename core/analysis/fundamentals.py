@@ -202,12 +202,12 @@ def enrich_fundamentals(ticker: str, data: dict) -> dict:
             if data.get("pe_ratio") in [None, "N/A", "", "Fair"] and cached.get("pe_ratio"):
                 data["pe_ratio"] = cached["pe_ratio"]
 
-        if any(data.get(k) in [None, "N/A", "", "Fair"] for k in ("pe_ratio", "roce", "roe", "debt_to_equity", "operating_margin")):
+        if any(data.get(k) in [None, "N/A", "", "Fair"] for k in ("pe_ratio", "roce", "roe", "debt_to_equity")):
             from core.db.reports import get_report_by_ticker_sync
             rep = get_report_by_ticker_sync(clean_sym)
             if rep and rep.get("report_text"):
                 extracted = extract_fundamentals_from_report_text(rep["report_text"], fallback_data=data)
-                for k in ("pe_ratio", "roce", "roe", "operating_margin", "debt_to_equity", "fifty_two_week_high", "fifty_two_week_low"):
+                for k in ("pe_ratio", "roce", "roe", "debt_to_equity"):
                     if data.get(k) in [None, "N/A", "", "Fair"] and extracted.get(k) not in [None, "N/A", ""]:
                         data[k] = extracted[k]
                         exchange_enriched = True
@@ -577,17 +577,38 @@ def fetch_bse_exchange_data(query: str) -> dict:
                 try:
                     from core.presentation.formatters import is_bfsi_entity
                     if not is_bfsi_entity(ticker=canonical_ticker, industry=ind_str, sector_label=sec_str, company_name=str(cmp_name)):
+                        from core.presentation.formatters import is_bfsi_entity
                         raw_con_opm = str(com_json.get("ConOPM") or "").replace(",", "").strip()
                         raw_st_opm = str(com_json.get("OPM") or "").replace(",", "").strip()
                         con_pe_str = str(com_json.get("ConPE") or "").replace(",", "").strip()
+                        st_pe_str = str(com_json.get("PE") or "").replace(",", "").strip()
+                        con_eps_str = str(com_json.get("ConEPS") or "").replace(",", "").strip()
+                        st_eps_str = str(com_json.get("EPS") or "").replace(",", "").strip()
                         con_pe_val = float(con_pe_str) if con_pe_str not in ("", "-", "None") else None
+                        st_pe_val = float(st_pe_str) if st_pe_str not in ("", "-", "None") else None
+                        con_eps_val = float(con_eps_str) if con_eps_str not in ("", "-", "None", "0", "0.00") else None
+                        st_eps_val = float(st_eps_str) if st_eps_str not in ("", "-", "None", "0", "0.00") else None
+                        bfsi_flag = is_bfsi_entity(
+                            ticker=canonical_ticker,
+                            sector_label=sec_str,
+                            industry=ind_str,
+                            company_name=str(cmp_name),
+                        )
                         opm_cand = None
-                        if raw_con_opm not in ("", "-", "None", "0", "0.00"):
-                            opm_cand = float(raw_con_opm)
-                        elif raw_st_opm not in ("", "-", "None"):
-                            st_val = float(raw_st_opm)
-                            if not (con_pe_val is not None and con_pe_val < 0 and st_val > 50.0):
-                                opm_cand = st_val
+                        if not bfsi_flag:
+                            if raw_con_opm not in ("", "-", "None", "0", "0.00"):
+                                opm_cand = float(raw_con_opm)
+                            elif raw_st_opm not in ("", "-", "None", "0", "0.00"):
+                                st_val = float(raw_st_opm)
+                                eps_divergent = (
+                                    con_eps_val is not None
+                                    and st_eps_val is not None
+                                    and max(abs(con_eps_val), abs(st_eps_val)) > 0
+                                    and abs(con_eps_val - st_eps_val) / max(abs(con_eps_val), abs(st_eps_val)) > 0.25
+                                )
+                                loss_making = (con_pe_val is not None and con_pe_val < 0) or (st_pe_val is not None and st_pe_val < 0)
+                                if not eps_divergent and not loss_making and -40.0 <= st_val <= 42.0:
+                                    opm_cand = st_val
                         if opm_cand is not None and -100.0 <= opm_cand <= 95.0:
                             resolved_opm = round(opm_cand, 2)
                 except Exception as opm_err:
@@ -764,23 +785,6 @@ def _enrich_with_cached_db_fundamentals(res_dict: dict, symbol: str) -> dict:
                     res_dict["pe_ratio"] = c_pe
                 elif cached.get("forward_pe") not in [None, "N/A", "", "Fair", 0, 0.0, "0"]:
                     res_dict["pe_ratio"] = cached["forward_pe"]
-
-        if res_dict.get("operating_margin") in [None, "N/A", ""] and res_dict.get("opm") in [None, "N/A", ""]:
-            from core.presentation.formatters import is_bfsi_entity
-            if not is_bfsi_entity(
-                ticker=symbol,
-                sector_label=str(res_dict.get("sector") or ""),
-                industry=str(res_dict.get("industry") or ""),
-                company_name=str(res_dict.get("short_name") or ""),
-            ):
-                from core.db.reports import get_report_by_ticker_sync
-                from core.db.fundamentals import extract_fundamentals_from_report_text
-                rep = get_report_by_ticker_sync(symbol)
-                if rep and rep.get("report_text"):
-                    ext = extract_fundamentals_from_report_text(rep["report_text"], fallback_data=res_dict)
-                    if ext.get("operating_margin") not in [None, "N/A", ""]:
-                        res_dict["operating_margin"] = ext["operating_margin"]
-                        res_dict["opm"] = ext["operating_margin"]
     except Exception as e:
         logger.debug(f"Cached fundamentals blend notice for {symbol}: {e}")
 
@@ -1067,16 +1071,86 @@ def get_stock_fundamentals(query: str, fast_db_first: bool = False) -> dict:
     # If all fail, raise clean error
     raise ExchangeDataFetchError(clean, "Both primary BSE and secondary market gateways failed to return live quotes.")
 
-@ttl_cache(ttl_seconds=3600, maxsize=32)
+@ttl_cache(ttl_seconds=21600, maxsize=512)
+def _fetch_cached_historical_prices(clean: str, period: str):
+    """
+    6-hour thread-safe EOD candle cache backed primarily by Angel One SmartAPI
+    (with opt-in yfinance fallback only when YFINANCE_FALLBACK=1).
+    """
+    df = pd.DataFrame()
+
+    # Primary: official exchange daily candles via Angel One SmartAPI
+    try:
+        from core.ingestion.angel_one import AngelOneGateway
+        if AngelOneGateway.is_configured():
+            lookback_days = {"1mo": 35, "3mo": 100, "6mo": 190, "1y": 370, "2y": 740}.get(period, 190)
+            from_date = (datetime.now(IST) - timedelta(days=lookback_days)).strftime("%Y-%m-%d 09:15")
+            candles = AngelOneGateway.get_historical_candles(clean, from_date=from_date)
+            if candles and len(candles) > 5:
+                df = pd.DataFrame(candles).rename(
+                    columns={
+                        "timestamp": "Date",
+                        "open": "Open",
+                        "high": "High",
+                        "low": "Low",
+                        "close": "Close",
+                        "volume": "Volume",
+                    }
+                )
+    except Exception as angel_err:
+        logger.debug(f"Angel One historical candles notice for {clean}: {angel_err}")
+
+    # Last resort (opt-in only): unofficial yfinance history
+    if df.empty and yfinance_fallback_enabled() and _yf_circuit_breaker.is_available():
+        for suffix in [".BO", ".NS"]:
+            try:
+                sym = f"{clean}{suffix}"
+                with suppress_yfinance_noise():
+                    t = get_hardened_yfinance_ticker(sym)
+                    hist = t.history(period=period)
+                if hist is not None and not hist.empty and len(hist) > 5:
+                    df = hist
+                    _yf_circuit_breaker.record_success()
+                    break
+            except Exception as yf_err:
+                _yf_circuit_breaker.record_failure(yf_err)
+                logger.warning(f"yfinance history fetch notice for {clean}{suffix}: {yf_err}")
+                continue
+
+    if df.empty:
+        return None
+
+    df = df.reset_index()
+    if "Date" not in df.columns or "Close" not in df.columns:
+        return None
+
+    df["Date"] = pd.to_datetime(df["Date"]).dt.tz_localize(None)
+    df["Close"] = pd.to_numeric(df["Close"], errors="coerce")
+    for ohl_col in ("Open", "High", "Low"):
+        if ohl_col in df.columns:
+            df[ohl_col] = pd.to_numeric(df[ohl_col], errors="coerce")
+    df["Volume"] = pd.to_numeric(df.get("Volume", 0), errors="coerce").fillna(0)
+    df = df.dropna(subset=["Close"])
+
+    if len(df) < 5:
+        return None
+
+    window = min(50, len(df))
+    df["SMA50"] = df["Close"].rolling(window=window, min_periods=5).mean()
+
+    ordered_cols = [c for c in ("Date", "Open", "High", "Low", "Close", "SMA50", "Volume") if c in df.columns]
+    return df[ordered_cols]
+
+
 def get_historical_prices(ticker: str, period: str = "6mo", fast_only: bool = False):
     """
-    Fetches trailing daily historical prices via yfinance, attempting BSE (.BO)
-    first with NSE (.NS) fallback. Computes 50-day Simple Moving Average (50-DMA).
-    Auto-resolves 6-digit BSE scrip codes to alphanumeric ticker symbols.
+    Fetches trailing daily historical prices primarily via Angel One SmartAPI
+    with a 6-hour thread-safe EOD cache (skipping live calls only when fast_only=True
+    under automated TESTING=1 runs). Computes 50-day Simple Moving Average (50-DMA).
     """
     if not ticker or not isinstance(ticker, str):
         return None
-    if fast_only:
+    if fast_only and os.environ.get("TESTING") == "1":
         return None
 
     clean = clean_ticker(ticker)
@@ -1129,7 +1203,7 @@ def get_historical_prices(ticker: str, period: str = "6mo", fast_only: bool = Fa
         else:
             clean = clean.replace(" ", "")
 
-    # Reverse-lookup numeric scrip code to ticker symbol for yfinance
+    # Reverse-lookup numeric scrip code to ticker symbol
     if clean.isdigit():
         try:
             resolved_sym = resolve_canonical_symbol(clean)
@@ -1143,56 +1217,11 @@ def get_historical_prices(ticker: str, period: str = "6mo", fast_only: bool = Fa
         except Exception as e:
             logger.debug(f"Reverse lookup notice for scrip {clean}: {e}")
 
-    df = pd.DataFrame()
+    res_df = _fetch_cached_historical_prices(clean, period)
+    return res_df.copy() if res_df is not None else None
 
-    # Primary: official exchange daily candles via Angel One SmartAPI
-    try:
-        from core.ingestion.angel_one import AngelOneGateway
-        if AngelOneGateway.is_configured():
-            lookback_days = {"1mo": 35, "3mo": 100, "6mo": 190, "1y": 370, "2y": 740}.get(period, 190)
-            from_date = (datetime.now(IST) - timedelta(days=lookback_days)).strftime("%Y-%m-%d 09:15")
-            candles = AngelOneGateway.get_historical_candles(clean, from_date=from_date)
-            if candles and len(candles) > 5:
-                df = pd.DataFrame(candles).rename(columns={"timestamp": "Date", "close": "Close", "volume": "Volume"})
-    except Exception as angel_err:
-        logger.debug(f"Angel One historical candles notice for {clean}: {angel_err}")
 
-    # Last resort (opt-in only): unofficial yfinance history
-    if df.empty and yfinance_fallback_enabled() and _yf_circuit_breaker.is_available():
-        for suffix in [".BO", ".NS"]:
-            try:
-                sym = f"{clean}{suffix}"
-                with suppress_yfinance_noise():
-                    t = get_hardened_yfinance_ticker(sym)
-                    hist = t.history(period=period)
-                if hist is not None and not hist.empty and len(hist) > 5:
-                    df = hist
-                    _yf_circuit_breaker.record_success()
-                    break
-            except Exception as yf_err:
-                _yf_circuit_breaker.record_failure(yf_err)
-                logger.warning(f"yfinance history fetch notice for {clean}{suffix}: {yf_err}")
-                continue
-
-    if df.empty:
-        return None
-
-    df = df.reset_index()
-    if "Date" not in df.columns or "Close" not in df.columns:
-        return None
-
-    df["Date"] = pd.to_datetime(df["Date"]).dt.tz_localize(None)
-    df["Close"] = pd.to_numeric(df["Close"], errors="coerce")
-    df["Volume"] = pd.to_numeric(df.get("Volume", 0), errors="coerce").fillna(0)
-    df = df.dropna(subset=["Close"])
-
-    if len(df) < 5:
-        return None
-
-    window = min(50, len(df))
-    df["SMA50"] = df["Close"].rolling(window=window, min_periods=5).mean()
-
-    return df[["Date", "Close", "SMA50", "Volume"]]
+get_historical_prices.cache_clear = _fetch_cached_historical_prices.cache_clear
 
 def compute_deterministic_technical_context(stock_data: dict, hist_df=None) -> dict:
     """

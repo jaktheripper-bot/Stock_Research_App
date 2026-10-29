@@ -303,6 +303,39 @@ class TestP2QoSCacheMissAndPaywallRedaction(unittest.TestCase):
         self.assertTrue(_asset_unlocked_for_request(mock_req, "STOCK", "INFY"))
         self.assertTrue(_asset_unlocked_for_request(mock_req, "", "INFY"))
 
+    def test_expired_pro_subscription_does_not_unlock_deep_dive(self):
+        """Expired 30-day Pro passes must revert to per-ticker unlock checks rather than granting lifetime unlocks."""
+        from datetime import datetime, timedelta
+        from unittest.mock import patch
+        from core.db.connection import IST
+        from web.common import _deep_dive_unlocked_for_request
+
+        mock_req = MagicMock()
+        mock_req.headers = {}
+        mock_req.query_params = {}
+        mock_req.cookies = {}
+
+        expired_user = {
+            "id": "usr_exp_1",
+            "subscription_tier": "pro_monthly",
+            "subscription_expires_at": (datetime.now(IST) - timedelta(days=2)).isoformat(),
+        }
+        active_user = {
+            "id": "usr_act_1",
+            "subscription_tier": "pro_monthly",
+            "subscription_expires_at": (datetime.now(IST) + timedelta(days=15)).isoformat(),
+        }
+
+        with patch("web.main._get_current_web_user", return_value=expired_user), \
+             patch("web.main.is_ticker_unlocked_for_user", return_value=False):
+            self.assertFalse(_deep_dive_unlocked_for_request(mock_req, "INFY"))
+            self.assertFalse(_asset_unlocked_for_request(mock_req, "MUTUAL_FUND", "122639"))
+
+        with patch("web.main._get_current_web_user", return_value=active_user), \
+             patch("web.main.is_ticker_unlocked_for_user", return_value=False):
+            self.assertTrue(_deep_dive_unlocked_for_request(mock_req, "INFY"))
+            self.assertTrue(_asset_unlocked_for_request(mock_req, "MUTUAL_FUND", "122639"))
+
 
 if __name__ == "__main__":
     unittest.main()

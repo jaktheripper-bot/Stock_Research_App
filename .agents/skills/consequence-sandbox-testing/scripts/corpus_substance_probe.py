@@ -124,31 +124,17 @@ def run_probe(db_path: Path, strict: bool = False) -> int:
     if high_overlap_pairs:
         issues.append(f"{len(high_overlap_pairs)} equity dossier pairs exceed 25% 8-gram similarity")
 
-    # 2. Mutual Fund Cloned Portfolios & Template Dossiers (group by distinct canonical scheme stem so AMFI/slug twins are not misflagged)
-    def _mf_stem(nm: str) -> str:
-        s = re.sub(
-            r"(?i)\b(direct|regular|plan|growth|option|idcw|dividend(?!\s+yield\b)|payout|reinvestment)\b",
-            " ",
-            nm or "",
-        )
-        s = re.sub(r"[^a-zA-Z0-9]+", " ", s).strip().upper()
-        s = re.sub(r"\s+", " ", s)
-        return re.sub(r"\b(FLEXI|LARGE|MID|SMALL|MULTI)\s+CAP\b", r"\1CAP", s)
-
-    cur.execute("SELECT scheme_code, scheme_name FROM mutual_fund_schemes")
-    mf_names = {str(sc): str(sn or sc) for sc, sn in cur.fetchall()}
+    # 2. Mutual Fund Cloned Portfolios & Template Dossiers
     cur.execute(
         """
-        SELECT scheme_code, GROUP_CONCAT(identifier || ':' || ROUND(weight_pct, 2), ',') as sig
-        FROM (SELECT DISTINCT scheme_code, holding_type, identifier, weight_pct FROM mutual_fund_holdings ORDER BY scheme_code, identifier)
-        GROUP BY scheme_code
+        SELECT COUNT(*) as scheme_cnt, sig FROM (
+          SELECT scheme_code, GROUP_CONCAT(identifier || ':' || ROUND(weight_pct, 2), ',') as sig
+          FROM (SELECT DISTINCT scheme_code, holding_type, identifier, weight_pct FROM mutual_fund_holdings ORDER BY scheme_code, identifier)
+          GROUP BY scheme_code
+        ) GROUP BY sig HAVING COUNT(*) > 1
         """
     )
-    sig_stems: Dict[str, set] = defaultdict(set)
-    for sc, sig in cur.fetchall():
-        if sig:
-            sig_stems[sig].add(_mf_stem(mf_names.get(str(sc), str(sc))) or str(sc))
-    cloned_mf_groups = [(len(stems), sig) for sig, stems in sig_stems.items() if len(stems) > 1]
+    cloned_mf_groups = cur.fetchall()
     cur.execute("SELECT COUNT(*), SUM(CASE WHEN dossier_text LIKE '%With an Active Share of%' THEN 1 ELSE 0 END) FROM fund_forensic_dossiers")
     tot_ffd, det_ffd = cur.fetchone()
     tot_ffd = tot_ffd or 0
@@ -179,6 +165,10 @@ def run_probe(db_path: Path, strict: bool = False) -> int:
 
     # 4. Sector Scoring Corpus Distribution Check
     try:
+        import os
+
+        os.environ.setdefault("TESTING", "1")
+        os.environ.setdefault("ENABLE_BACKGROUND_SCHEDULERS", "0")
         root_dir = Path(__file__).resolve().parents[4]
         if str(root_dir) not in sys.path:
             sys.path.insert(0, str(root_dir))

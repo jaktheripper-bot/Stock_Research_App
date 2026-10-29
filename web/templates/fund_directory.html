@@ -191,7 +191,7 @@
             {{ s.category }}
           </span>
           <span style="font-size: 11px; font-weight: 600; color: #94a3b8; background: rgba(255, 255, 255, 0.05); padding: 3px 8px; border-radius: 6px;">
-            AUM: ₹{{ "{:,.0f}".format(s.aum_crores) }} Cr
+            AUM: {% if s.aum_crores and s.aum_crores > 0 %}₹{{ "{:,.0f}".format(s.aum_crores) }} Cr{% else %}Pending{% endif %}
           </span>
         </div>
 
@@ -209,20 +209,20 @@
         <div style="display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; background: rgba(15, 23, 42, 0.5); border-radius: 10px; padding: 12px; margin-bottom: 16px; border: 1px solid rgba(255, 255, 255, 0.05);">
           <div>
             <div style="font-size: 10px; color: #64748b; text-transform: uppercase;">Active Share</div>
-            <div style="font-size: 16px; font-weight: 800; color: {% if s.active_share_pct is not none %}{% if s.active_share_pct >= 60.0 %}#10b981{% elif s.active_share_pct >= 40.0 %}#f59e0b{% else %}#ef4444{% endif %}{% else %}#94a3b8{% endif %};">
-              {% if s.active_share_pct is not none %}{{ s.active_share_pct }}%{% else %}Pending{% endif %}
+            <div style="font-size: 16px; font-weight: 800; color: {% if s.active_share_pct is not none and s.active_share_pct > 0 %}{% if s.active_share_pct >= 60.0 %}#10b981{% elif s.active_share_pct >= 40.0 %}#f59e0b{% else %}#ef4444{% endif %}{% else %}#94a3b8{% endif %};">
+              {% if s.active_share_pct is not none and s.active_share_pct > 0 %}{{ s.active_share_pct }}%{% else %}Pending{% endif %}
             </div>
           </div>
           <div>
             <div style="font-size: 10px; color: #64748b; text-transform: uppercase;">Direct TER</div>
-            <div style="font-size: 16px; font-weight: 800; color: #38bdf8;">
-              {{ s.ter_direct_pct }}%
+            <div style="font-size: 16px; font-weight: 800; color: {% if s.ter_direct_pct is not none and s.ter_direct_pct > 0 %}#38bdf8{% else %}#94a3b8{% endif %};">
+              {% if s.ter_direct_pct is not none and s.ter_direct_pct > 0 %}{{ s.ter_direct_pct }}%{% else %}Pending{% endif %}
             </div>
           </div>
           <div>
             <div style="font-size: 10px; color: #64748b; text-transform: uppercase;">Regular TER</div>
-            <div style="font-size: 16px; font-weight: 800; color: #ef4444;">
-              {{ s.ter_regular_pct }}%
+            <div style="font-size: 16px; font-weight: 800; color: {% if s.ter_regular_pct is not none and s.ter_regular_pct > 0 %}#ef4444{% else %}#94a3b8{% endif %};">
+              {% if s.ter_regular_pct is not none and s.ter_regular_pct > 0 %}{{ s.ter_regular_pct }}%{% else %}Pending{% endif %}
             </div>
           </div>
         </div>
@@ -231,15 +231,23 @@
         <div style="font-size: 12px; color: #94a3b8; display: flex; flex-direction: column; gap: 6px; margin-bottom: 16px;">
           <div style="display: flex; justify-content: space-between;">
             <span>Manager Churn (PTR):</span>
+            {% if s.portfolio_turnover_ratio_pct is not none and s.portfolio_turnover_ratio_pct > 0 %}
             <strong style="color: {% if s.portfolio_turnover_ratio_pct > 100.0 %}#ef4444{% elif s.portfolio_turnover_ratio_pct > 50.0 %}#f59e0b{% else %}#10b981{% endif %};">
               {{ s.portfolio_turnover_ratio_pct }}%
             </strong>
+            {% else %}
+            <strong style="color: #94a3b8;">Pending</strong>
+            {% endif %}
           </div>
           <div style="display: flex; justify-content: space-between;">
             <span>10-Yr Commission Drag:</span>
+            {% if s.ter_regular_pct is not none and s.ter_direct_pct is not none and s.ter_regular_pct > 0 and s.ter_direct_pct > 0 %}
             <strong style="color: #ef4444;">
               -{{ "{:,.0f}".format((s.ter_regular_pct - s.ter_direct_pct) * 100) }} bps/yr
             </strong>
+            {% else %}
+            <strong style="color: #94a3b8;">Pending</strong>
+            {% endif %}
           </div>
           <div style="display: flex; justify-content: space-between;">
             <span>Fund Manager:</span>

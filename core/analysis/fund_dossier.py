@@ -68,9 +68,10 @@ def calculate_active_share(
         benchmark_name=benchmark_name,
         stated_active_share=stated_active_share
     )
-    raw_as = res.get("active_share", 65.0)
-    clamped_as = clamp_active_share(raw_as)
+    raw_as = res.get("active_share_pct") if "active_share_pct" in res else res.get("active_share")
+    clamped_as = clamp_active_share(raw_as) if raw_as is not None else None
     res["active_share"] = clamped_as
+    res["active_share_pct"] = clamped_as
     return res
 
 
@@ -80,7 +81,8 @@ def compute_fund_forensic_lookthrough(scheme_code: str) -> Dict[str, Any]:
 
     genuine_cov = float(data.get("genuine_coverage_pct", 0.0))
     raw_score = float(data.get("composite_health_score", 70.0)) if data.get("composite_health_score") is not None else 70.0
-    raw_as = float(data.get("active_share", 65.0))
+    raw_as_opt = data.get("active_share_pct") if "active_share_pct" in data else data.get("active_share")
+    raw_as = float(raw_as_opt) if raw_as_opt is not None else 0.0
 
     final_score, clamped_as = evaluate_fund_coverage_and_health(
         genuine_coverage_pct=genuine_cov,
@@ -89,7 +91,8 @@ def compute_fund_forensic_lookthrough(scheme_code: str) -> Dict[str, Any]:
     )
 
     data["composite_health_score"] = final_score
-    data["active_share"] = clamped_as
+    data["active_share"] = clamped_as if raw_as_opt is not None else None
+    data["active_share_pct"] = clamped_as if raw_as_opt is not None else None
 
     if final_score is None:
         data["health_score_withheld"] = True

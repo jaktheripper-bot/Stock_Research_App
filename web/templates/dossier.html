@@ -391,7 +391,7 @@
             {% if equity_intel.valuation_radar.status == 'UNAVAILABLE' %}
               <span style="color: var(--text-muted); font-size: 12.5px;">Pending Financial Disclosures</span>
             {% elif equity_intel.valuation_radar.status == 'IMPLIED_GROWTH_ONLY' %}
-              {{ equity_intel.valuation_radar.inputs.implied_fcf_growth_pct }}% <span style="font-size: 11px; color: var(--text-muted); font-weight: normal;">Implied 5Y Growth</span>
+              {{ equity_intel.valuation_radar.inputs.implied_fcf_growth_display|default(equity_intel.valuation_radar.inputs.implied_fcf_growth_pct ~ '% CAGR') }} <span style="font-size: 11px; color: var(--text-muted); font-weight: normal;">Implied 5Y Growth</span>
             {% elif equity_intel.valuation_radar.status == 'LOCKED' or equity_intel.valuation_radar.locked or equity_intel.valuation_radar.fair_value is none %}
               <span style="color: #fbbf24; font-size: 12px; font-weight: 600;"><svg class="glyph" style="width:11px;height:11px;vertical-align:-1px;margin-right:3px;"><use href="#icon-lock"></use></svg>1 Credit Unlock</span>
             {% else %}
@@ -404,7 +404,7 @@
         <div style="background: rgba(30, 41, 59, 0.5); border: 1px solid rgba(255,255,255,0.06); border-radius: 8px; padding: 12px 14px;">
           <div style="display: flex; justify-content: space-between; align-items: center;">
             <span style="font-size: 11px; color: var(--text-muted); font-weight: 600;">360° ACCOUNTING CHECK</span>
-            <span style="font-size: 12px; font-weight: 800; color: {{ equity_intel.forensic_intelligence.badge_color }};">{% if equity_intel.forensic_intelligence.locked %}<svg class="glyph" style="width:10px;height:10px;vertical-align:-1px;margin-right:2px;"><use href="#icon-lock"></use></svg>Gated{% else %}{{ equity_intel.forensic_intelligence.passed_count }}/{{ equity_intel.forensic_intelligence.total_checks }} Passed{% endif %}</span>
+            <span style="font-size: 12px; font-weight: 800; color: {{ equity_intel.forensic_intelligence.badge_color }};">{% if equity_intel.forensic_intelligence.locked %}<svg class="glyph" style="width:10px;height:10px;vertical-align:-1px;margin-right:2px;"><use href="#icon-lock"></use></svg>Gated{% elif equity_intel.forensic_intelligence.verdict == 'INSUFFICIENT_DISCLOSURES' %}{{ equity_intel.forensic_intelligence.disclosed_count }}/{{ equity_intel.forensic_intelligence.total_checks }} Verified{% else %}{{ equity_intel.forensic_intelligence.passed_count }}/{{ equity_intel.forensic_intelligence.total_checks }} Passed{% endif %}</span>
           </div>
           <div style="font-size: 13.5px; font-weight: 700; color: {{ equity_intel.forensic_intelligence.badge_color }}; margin-top: 4px;">
             {{ equity_intel.forensic_intelligence.badge_label }}
@@ -507,8 +507,8 @@
         <div style="background: rgba(15, 23, 42, 0.6); border: 1px solid rgba(255,255,255,0.08); border-radius: 8px; padding: 14px 16px;">
           <div style="font-size: 13px; font-weight: 700; color: #38bdf8; margin-bottom: 8px; display: flex; justify-content: space-between; align-items: center;">
             <span>360° Forensic Clean-Room Ledger</span>
-            <span class="badge" style="font-size: 10.5px; background: rgba(16,185,129,0.15); color: {{ equity_intel.forensic_intelligence.badge_color }};">
-              {{ equity_intel.forensic_intelligence.passed_count }}/{{ equity_intel.forensic_intelligence.total_checks }} Passed
+            <span class="badge" style="font-size: 10.5px; background: rgba(148,163,184,0.14); color: {{ equity_intel.forensic_intelligence.badge_color }};">
+              {% if equity_intel.forensic_intelligence.verdict == 'INSUFFICIENT_DISCLOSURES' %}{{ equity_intel.forensic_intelligence.disclosed_count }}/{{ equity_intel.forensic_intelligence.total_checks }} Verified{% else %}{{ equity_intel.forensic_intelligence.passed_count }}/{{ equity_intel.forensic_intelligence.total_checks }} Passed{% endif %}
             </span>
           </div>
           <p style="margin: 0 0 10px; font-size: 11.5px; color: #94a3b8; line-height: 1.4;">
@@ -523,22 +523,12 @@
                 </tr>
               </thead>
               <tbody>
+                {% for chk in equity_intel.forensic_intelligence.checks_detail|default([]) %}
                 <tr style="border-bottom: 1px solid rgba(255,255,255,0.04);">
-                  <td style="padding: 6px 8px; color: #cbd5e1;">CFO / EBITDA Cash Quality</td>
-                  <td style="padding: 6px 8px; text-align: right; color: #10b981; font-weight: 700;">Verified Clean</td>
+                  <td style="padding: 6px 8px; color: #cbd5e1;">{{ chk.label }}</td>
+                  <td style="padding: 6px 8px; text-align: right; color: {{ chk.color }}; font-weight: 700;">{{ chk.verdict }}</td>
                 </tr>
-                <tr style="border-bottom: 1px solid rgba(255,255,255,0.04);">
-                  <td style="padding: 6px 8px; color: #cbd5e1;">Promoter Pledge Velocity</td>
-                  <td style="padding: 6px 8px; text-align: right; color: #10b981; font-weight: 700;">Zero Red Flags</td>
-                </tr>
-                <tr style="border-bottom: 1px solid rgba(255,255,255,0.04);">
-                  <td style="padding: 6px 8px; color: #cbd5e1;">Auditor Tenure &amp; Resignations</td>
-                  <td style="padding: 6px 8px; text-align: right; color: #10b981; font-weight: 700;">Stable Audit Desk</td>
-                </tr>
-                <tr style="border-bottom: 1px solid rgba(255,255,255,0.04);">
-                  <td style="padding: 6px 8px; color: #cbd5e1;">Working Capital Drag &amp; DSO</td>
-                  <td style="padding: 6px 8px; text-align: right; color: #10b981; font-weight: 700;">Contained Cycle</td>
-                </tr>
+                {% endfor %}
               </tbody>
             </table>
           </div>
@@ -608,7 +598,7 @@
           <div style="display: flex; align-items: center; gap: 8px;">
             <span style="font-size: 12px; color: #94a3b8;">Market Implied Growth at CMP (₹{{ "{:,.2f}".format(equity_intel.valuation_radar.current_price) }}):</span>
             <strong class="tnum" style="font-size: 13px; color: #fbbf24; background: rgba(245, 158, 11, 0.14); border: 1px solid rgba(245, 158, 11, 0.3); padding: 2px 8px; border-radius: 6px;">
-              {{ equity_intel.valuation_radar.inputs.implied_fcf_growth_pct|default(12.0) }}% CAGR
+              {{ equity_intel.valuation_radar.inputs.implied_fcf_growth_display|default((equity_intel.valuation_radar.inputs.implied_fcf_growth_pct|default(12.0)) ~ '% CAGR') }}
             </strong>
           </div>
         </div>
@@ -690,7 +680,8 @@
         const dcfFv = pvStage1 + (tv / Math.pow(1 + wacc, 5));
 
         const compositeFv = (dcfFv * 0.40) + (peModelFv * 0.35) + (epvModelFv * 0.25);
-        const mos = cmp > 0 ? ((compositeFv - cmp) / cmp) * 100.0 : 0.0;
+        const denom = Math.max(compositeFv, cmp);
+        const mos = (cmp > 0 && denom > 0) ? ((compositeFv - cmp) / denom) * 100.0 : 0.0;
 
         const fvEl = document.getElementById('dcfSimFairValue');
         const mosEl = document.getElementById('dcfSimMos');
@@ -709,7 +700,7 @@
       {% endif %}
 
       {% if not is_deep_dive_unlocked %}
-      <!-- Gated Deep-Dive Paywall Card for Valuation Sandbox & Forensic Ledger -->
+      <!-- Gated Deep-Dive Paywall Card for Pillar 03 & 05 Narratives -->
       <div class="card asset-card-accent" style="margin-bottom: 22px; padding: 20px 24px; border: 1px solid rgba(245, 158, 11, 0.35); background: linear-gradient(135deg, rgba(15, 23, 42, 0.85) 0%, rgba(30, 41, 59, 0.7) 100%);">
         <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 12px;">
           <div>
@@ -717,13 +708,13 @@
               <span class="badge" style="background: rgba(245, 158, 11, 0.15); color: #fbbf24; border: 1px solid rgba(245, 158, 11, 0.3); font-size: 11px;">
                 <svg class="glyph" style="width:11px;height:11px;vertical-align:-1px;margin-right:3px;"><use href="#icon-lock"></use></svg>Deep Dive Locked (1 Credit)
               </span>
-              <span style="font-size: 12px; color: var(--text-muted);">Pillars 03 &amp; 05 Proprietary Quantitative Modules</span>
+              <span style="font-size: 12px; color: var(--text-muted);">Pillars 03 &amp; 05 Deep-Dive Forensic Narratives</span>
             </div>
             <h4 style="margin: 0; font-size: 16px; font-weight: 800; color: #f8fafc;">
-              Unlock Interactive Reverse DCF Sandbox &amp; 360° Forensic Clean-Room Ledger
+              Unlock Pillar 03 &amp; 05 Deep-Dive Narratives &amp; Executive PDF Dossier
             </h4>
             <p style="margin: 6px 0 0; font-size: 12.5px; color: var(--text-secondary); max-width: 680px; line-height: 1.5;">
-              Access triangulated DCF/EPV valuation models, live perpetual growth stress-testers, Beneish M-Score accrual scrubbing, and promoter pledge velocity for {{ display_ticker|default(ticker) }}.
+              Access full Pillar 03 balance-sheet &amp; accrual forensics, Pillar 05 valuation sensitivity narratives, complete falsification watchpoints, and branded PDF export for {{ display_ticker|default(ticker) }}.
             </p>
           </div>
           <div>
@@ -742,7 +733,7 @@
                 <span>Always Free (0 Credits)</span>
               </div>
               <div style="color: var(--text-secondary); line-height: 1.4;">
-                Pillars 01, 02, 04, 06, 07 • Live exchange quote &amp; historical drift • Peer comparisons • Public directory screener
+                Pillars 01, 02, 04, 06, 07 • Interactive Reverse-DCF slider &amp; 3-model valuation sandbox • Live exchange quote &amp; peer comparisons
               </div>
             </div>
             <div style="background: rgba(14, 165, 233, 0.06); border: 1px solid rgba(14, 165, 233, 0.2); border-radius: 8px; padding: 10px 12px;">
@@ -751,7 +742,7 @@
                 <span>Uses 1 Research Credit</span>
               </div>
               <div style="color: var(--text-secondary); line-height: 1.4;">
-                360° Forensic Clean-Room Ledger • Triangulated DCF/EPV intrinsic matrices • Executive PDF export • Automatic refund guarantee if synthesis aborts
+                Pillar 03 &amp; 05 deep-dive forensic narratives • Full falsification watchpoints • Executive PDF export • Automatic refund guarantee if synthesis aborts
               </div>
             </div>
           </div>

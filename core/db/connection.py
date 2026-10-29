@@ -398,7 +398,7 @@ get_connection = get_db_connection
 
 
 def init_db(force: bool = False):
-    """Initializes tables and executes incremental schema migrations (v001 - v037)."""
+    """Initializes tables and executes incremental schema migrations (v001 - v038)."""
     global _DB_INITIALIZED, _INITIALIZED_DBS
 
     raw_url = get_configured_supabase_url()
@@ -1189,6 +1189,7 @@ def init_db(force: bool = False):
                         CREATE INDEX IF NOT EXISTS idx_mf_holdings_scheme ON mutual_fund_holdings(scheme_code);
                         CREATE INDEX IF NOT EXISTS idx_mf_holdings_ident ON mutual_fund_holdings(identifier);
                         CREATE INDEX IF NOT EXISTS idx_mf_holdings_type ON mutual_fund_holdings(holding_type);
+                        CREATE UNIQUE INDEX IF NOT EXISTS uq_mf_holdings_scheme_type_ident ON mutual_fund_holdings(scheme_code, holding_type, identifier);
 
                         INSERT INTO schema_migrations (version) VALUES ('v013_mutual_fund_schemes_and_portfolios') ON CONFLICT DO NOTHING;
                     """)
@@ -1236,6 +1237,7 @@ def init_db(force: bool = False):
                     cursor.execute("CREATE INDEX IF NOT EXISTS idx_mf_holdings_scheme ON mutual_fund_holdings(scheme_code);")
                     cursor.execute("CREATE INDEX IF NOT EXISTS idx_mf_holdings_ident ON mutual_fund_holdings(identifier);")
                     cursor.execute("CREATE INDEX IF NOT EXISTS idx_mf_holdings_type ON mutual_fund_holdings(holding_type);")
+                    cursor.execute("CREATE UNIQUE INDEX IF NOT EXISTS uq_mf_holdings_scheme_type_ident ON mutual_fund_holdings(scheme_code, holding_type, identifier);")
                     cursor.execute("INSERT INTO schema_migrations (version) VALUES (\'v013_mutual_fund_schemes_and_portfolios\') ON CONFLICT DO NOTHING;")
                 conn.commit()
 
@@ -2336,6 +2338,51 @@ def init_db(force: bool = False):
                     cursor.execute("CREATE INDEX IF NOT EXISTS idx_remediation_status ON audit_remediation_ledger(status);")
                     cursor.execute("CREATE INDEX IF NOT EXISTS idx_remediation_hash ON audit_remediation_ledger(finding_hash);")
                     cursor.execute("INSERT INTO schema_migrations (version) VALUES ('v037_audit_remediation_ledger') ON CONFLICT DO NOTHING;")
+                conn.commit()
+
+            # Migration v038: Mutual Fund Holdings Deduplication & Unique Constituent Constraint
+            if "v038_mf_holdings_unique_index" not in applied:
+                logger.info("Applying schema migration: v038_mf_holdings_unique_index...")
+                if supabase_url:
+                    cursor.execute("""
+                        DELETE FROM mutual_fund_holdings h
+                        WHERE h.portfolio_date < (
+                            SELECT MAX(h2.portfolio_date)
+                            FROM mutual_fund_holdings h2
+                            WHERE h2.scheme_code = h.scheme_code
+                        );
+                        DELETE FROM mutual_fund_holdings
+                        WHERE id NOT IN (
+                            SELECT MAX(id)
+                            FROM mutual_fund_holdings
+                            GROUP BY scheme_code, holding_type, identifier
+                        );
+                        CREATE UNIQUE INDEX IF NOT EXISTS uq_mf_holdings_scheme_type_ident
+                            ON mutual_fund_holdings(scheme_code, holding_type, identifier);
+                        INSERT INTO schema_migrations (version) VALUES ('v038_mf_holdings_unique_index') ON CONFLICT DO NOTHING;
+                    """)
+                else:
+                    cursor.execute("""
+                        DELETE FROM mutual_fund_holdings
+                        WHERE portfolio_date < (
+                            SELECT MAX(h2.portfolio_date)
+                            FROM mutual_fund_holdings h2
+                            WHERE h2.scheme_code = mutual_fund_holdings.scheme_code
+                        );
+                    """)
+                    cursor.execute("""
+                        DELETE FROM mutual_fund_holdings
+                        WHERE id NOT IN (
+                            SELECT MAX(id)
+                            FROM mutual_fund_holdings
+                            GROUP BY scheme_code, holding_type, identifier
+                        );
+                    """)
+                    cursor.execute("""
+                        CREATE UNIQUE INDEX IF NOT EXISTS uq_mf_holdings_scheme_type_ident
+                            ON mutual_fund_holdings(scheme_code, holding_type, identifier);
+                    """)
+                    cursor.execute("INSERT INTO schema_migrations (version) VALUES ('v038_mf_holdings_unique_index') ON CONFLICT DO NOTHING;")
                 conn.commit()
 
             _DB_INITIALIZED = True

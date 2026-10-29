@@ -326,7 +326,8 @@ def compute_fund_forensic_lookthrough(scheme_code: str) -> Dict[str, Any]:
     bench_name = scheme.get("benchmark_index", "NIFTY 500 TRI")
     stated_as = scheme.get("active_share_pct")
     as_res = calculate_active_share(holdings, bench_name, stated_as)
-    active_share_val = as_res.get("active_share", 65.0)
+    raw_as_pct = as_res.get("active_share_pct")
+    active_share_val = float(raw_as_pct) if raw_as_pct is not None else None
 
     return {
         "scheme_code": scheme_code,

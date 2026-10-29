@@ -37,12 +37,16 @@
           {{ scheme.scheme_name }}
         </h1>
         <div style="font-size: 14px; color: #94a3b8;">
-          Benchmark: <strong style="color: #f8fafc;">{{ scheme.benchmark_index }}</strong> • Manager: <strong style="color: #f8fafc;">{{ scheme.fund_manager }}</strong> • Portfolio Date: {{ scheme.last_portfolio_date }}
+          Benchmark: <strong style="color: #f8fafc;">{{ scheme.benchmark_index }}</strong> • Manager: <strong style="color: #f8fafc;">{{ scheme.fund_manager }}</strong> • Portfolio Date: {{ fund_portfolio_date_str if lookthrough.holdings else 'Pending Monthly Disclosure' }}
         </div>
         <div class="dossier-meta-strip" style="margin-top: 10px;">
-          <span class="dossier-meta-pill"><svg class="glyph" style="width: 12px; height: 12px; vertical-align: -1px;"><use href="#glyph-clock"></use></svg> Portfolio Date: {{ fund_portfolio_date_str|default(scheme.last_portfolio_date|default('Latest AMFI Monthly')) }}</span>
+          <span class="dossier-meta-pill"><svg class="glyph" style="width: 12px; height: 12px; vertical-align: -1px;"><use href="#glyph-clock"></use></svg> Portfolio Date: {{ fund_portfolio_date_str|default('Pending Monthly Disclosure') }}</span>
           <span class="dossier-meta-sep">•</span>
+          {% if lookthrough.holdings %}
           <span class="badge badge-emerald"><span class="status-dot status-dot-emerald"></span> Verified AMFI Portfolio Feed</span>
+          {% else %}
+          <span class="badge badge-neutral" style="color: #94a3b8;"><span class="status-dot"></span> Pending Monthly Portfolio Sync</span>
+          {% endif %}
           <span class="dossier-meta-sep">•</span>
           <span class="badge badge-cyan" title="Full constituent securities look-through">
             <span><svg class="glyph" style="width: 12px; height: 12px;"><use href="#glyph-doc"></use></svg></span> <span>{{ lookthrough.holdings|length }} Grounded Constituents</span>
@@ -56,7 +60,7 @@
             <div class="provenance-cell">
               <div class="provenance-label"><svg class="glyph" style="width:12px;height:12px;"><use href="#glyph-clock"></use></svg> Statutory NAV &amp; Sync Date</div>
               <div class="provenance-value tnum">{% if scheme.nav %}₹{{ "%.2f"|format(scheme.nav) }}{% else %}—{% endif %} • As of {{ fund_updated_str|default('Latest AMFI Sync') }}</div>
-              <div class="provenance-sub">Direct Plan TER: <span class="tnum">{{ "%.2f"|format(scheme.ter_direct_pct|default(0)) }}%</span> vs Regular: <span class="tnum">{{ "%.2f"|format(scheme.ter_regular_pct|default(0)) }}%</span></div>
+              <div class="provenance-sub">Direct Plan TER: <span class="tnum">{% if scheme.ter_direct_pct is not none and scheme.ter_direct_pct > 0 %}{{ "%.2f"|format(scheme.ter_direct_pct) }}%{% else %}Pending{% endif %}</span> vs Regular: <span class="tnum">{% if scheme.ter_regular_pct is not none and scheme.ter_regular_pct > 0 %}{{ "%.2f"|format(scheme.ter_regular_pct) }}%{% else %}Pending{% endif %}</span></div>
             </div>
             <div class="provenance-cell">
               <div class="provenance-label"><svg class="glyph" style="width:12px;height:12px;"><use href="#icon-doc"></use></svg> Holdings Disclosure Period</div>
@@ -570,10 +574,10 @@
 
         <div style="background: rgba(15, 23, 42, 0.6); border-radius: 10px; padding: 16px; margin-bottom: 16px; border: 1px solid rgba(255, 255, 255, 0.05); text-align: center;">
           <div style="font-size: 12px; font-weight: 700; color: #94a3b8; text-transform: uppercase;">Active Share Score</div>
-          <div style="font-size: 36px; font-weight: 900; color: {% if active_share.active_share_pct >= 60.0 %}#10b981{% elif active_share.active_share_pct >= 40.0 %}#f59e0b{% else %}#ef4444{% endif %};">
-            {{ active_share.active_share_pct }}%
+          <div style="font-size: 36px; font-weight: 900; color: {% if active_share.active_share_pct is none %}#94a3b8{% elif active_share.active_share_pct >= 60.0 %}#10b981{% elif active_share.active_share_pct >= 40.0 %}#f59e0b{% else %}#ef4444{% endif %};">
+            {% if active_share.active_share_pct is not none %}{{ active_share.active_share_pct }}%{% else %}Pending{% endif %}
           </div>
-          <div style="font-size: 13px; font-weight: 700; margin-top: 4px; color: {% if active_share.active_share_pct >= 60.0 %}#10b981{% elif active_share.active_share_pct >= 40.0 %}#f59e0b{% else %}#ef4444{% endif %};">
+          <div style="font-size: 13px; font-weight: 700; margin-top: 4px; color: {% if active_share.active_share_pct is none %}#94a3b8{% elif active_share.active_share_pct >= 60.0 %}#10b981{% elif active_share.active_share_pct >= 40.0 %}#f59e0b{% else %}#ef4444{% endif %};">
             {{ active_share.posture }}
           </div>
         </div>
@@ -662,9 +666,15 @@
         </div>
         <div style="text-align: right;">
           <div style="font-size: 11px; color: #64748b; text-transform: uppercase;">Annual Distributor Commission Drag</div>
+          {% if fee_drag.status == 'PENDING_TER_DISCLOSURE' %}
+          <div style="font-size: 18px; font-weight: 800; color: #94a3b8;">
+            Pending AMFI TER Sync
+          </div>
+          {% else %}
           <div style="font-size: 20px; font-weight: 800; color: #ef4444;">
             {{ fee_drag.ter_spread_bps }} bps / yr ({{ scheme.ter_regular_pct }}% - {{ scheme.ter_direct_pct }}%)
           </div>
+          {% endif %}
         </div>
       </div>
 

@@ -590,17 +590,32 @@ def add_user_credits(
                     return True, current_balance
                 raise fb_err
 
-        # Handle Subscriptions (Pro Monthly / Annual)
+        # Handle Subscriptions (Pro Monthly / Annual) — stack onto remaining active window if renewing early
         normalized_pack = pack_type.upper()
         now_dt = datetime.now(IST)
+        base_exp_dt = now_dt
+        if "PRO_MONTHLY" in normalized_pack or "PRO_ANNUAL" in normalized_pack:
+            try:
+                cursor.execute(f"SELECT subscription_expires_at FROM user_accounts WHERE id = {p};", (clean_id,))
+                exp_row = cursor.fetchone()
+                raw_exp = exp_row[0] if exp_row and len(exp_row) > 0 else None
+                if raw_exp:
+                    parsed_exp = raw_exp if isinstance(raw_exp, datetime) else datetime.fromisoformat(str(raw_exp).replace("Z", "+00:00"))
+                    if parsed_exp.tzinfo is None:
+                        parsed_exp = parsed_exp.replace(tzinfo=IST)
+                    if parsed_exp > now_dt:
+                        base_exp_dt = parsed_exp
+            except Exception as exp_parse_err:
+                logger.debug("Subscription expiry stack lookup notice for %s: %s", clean_id, exp_parse_err)
+
         if "PRO_MONTHLY" in normalized_pack:
-            exp_date = now_dt + timedelta(days=30)
+            exp_date = base_exp_dt + timedelta(days=30)
             cursor.execute(
                 f"UPDATE user_accounts SET credits_balance = {p}, subscription_tier = 'pro_monthly', subscription_expires_at = {p} WHERE id = {p};",
                 (new_balance, exp_date.isoformat(), clean_id)
             )
         elif "PRO_ANNUAL" in normalized_pack:
-            exp_date = now_dt + timedelta(days=365)
+            exp_date = base_exp_dt + timedelta(days=365)
             cursor.execute(
                 f"UPDATE user_accounts SET credits_balance = {p}, subscription_tier = 'pro_annual', subscription_expires_at = {p} WHERE id = {p};",
                 (new_balance, exp_date.isoformat(), clean_id)

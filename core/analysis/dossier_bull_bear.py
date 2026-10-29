@@ -54,6 +54,7 @@ def synthesize_bull_bear_thesis(
     forensic_data: Optional[Dict[str, Any]] = None,
     flow_data: Optional[Dict[str, Any]] = None,
     report_text: str = "",
+    include_gated_pillars: bool = True,
 ) -> Dict[str, Any]:
     """
     Synthesizes the core operational merits and risks into a digestible 60-second summary.
@@ -247,6 +248,8 @@ def synthesize_bull_bear_thesis(
         }
         grounded_bears: List[Dict[str, str]] = []
         for p_idx, trig in sorted(pillar_triggers.items()):
+            if not include_gated_pillars and p_idx in (3, 5):
+                continue
             detail = (trig.get("what_contradicts") or trig.get("evidence_that_forces_revision") or "").strip()
             if len(detail) >= 35:
                 grounded_bears.append({

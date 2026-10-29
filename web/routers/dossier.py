@@ -307,14 +307,15 @@ async def api_dossier_intel(ticker: str, request: Request):
 
     from core.analysis.equity_dossier import compile_equity_dossier
     from web.common import _asset_unlocked_for_request, redact_equity_intel_json
+    is_unlocked = _asset_unlocked_for_request(request, "EQUITY", canonical)
     intel = compile_equity_dossier(
         ticker=canonical,
         fundamentals=fund,
         company_name=rep.get("short_name", canonical),
         industry_str=rep.get("industry", ""),
         report_text=rep.get("report_text", ""),
+        include_gated_pillars=is_unlocked,
     )
-    is_unlocked = _asset_unlocked_for_request(request, "EQUITY", canonical)
     redacted_intel = redact_equity_intel_json(intel, is_unlocked=is_unlocked)
     return json_response_with_cache({
         "success": True,

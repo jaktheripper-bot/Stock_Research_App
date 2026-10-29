@@ -292,6 +292,14 @@ class TestEquityUpgrades(unittest.TestCase):
         self.assertIsNone(eternal_res["fair_value"])
         self.assertIsNone(eternal_res["margin_of_safety_pct"])
         self.assertGreater(eternal_res["inputs"]["implied_fcf_growth_pct"], 20.0)
+        self.assertTrue(eternal_res["inputs"]["implied_fcf_growth_bounded"])
+        self.assertEqual(eternal_res["inputs"]["implied_fcf_growth_display"], ">45.0% CAGR")
+        self.assertEqual(vedl_res["inputs"]["implied_fcf_growth_display"], "<-20.0% CAGR")
+
+        # Discounted stock uses exact Benjamin Graham (FV - P) / FV
+        disc_res = compute_valuation_radar(current_price=600.0, pe_ratio=12.0, eps=50.0, sales_growth_3y=14.0, historical_median_pe=22.0)
+        expected_graham_mos = round(((disc_res["fair_value"] - 600.0) / disc_res["fair_value"]) * 100.0, 1)
+        self.assertEqual(disc_res["margin_of_safety_pct"], expected_graham_mos)
 
         high_pe_res = compute_valuation_radar(current_price=5000.0, pe_ratio=110.0, sales_growth_3y=15.0)
         self.assertEqual(high_pe_res["status"], "COMPUTED")

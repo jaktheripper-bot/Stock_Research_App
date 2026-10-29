@@ -109,20 +109,36 @@ def extract_fundamentals_from_report_text(report_text: str, fallback_data: Optio
             except Exception as e:
                 logger.debug("Failed parsing ROE from report text: %s", e)
 
-    # 3. Operating Margin (OPM) / EBITDA Margin
+    # 3. Operating Margin (OPM) / EBITDA Margin — strict direct copula/colon match only (never prose sentence skips or BFSI)
     if res.get("operating_margin") in [None, "N/A", "", 0, 0.0]:
-        m_opm = re.search(
-            r'(?:Operating\s+(?:Profit\s+)?Margins?|OPM|EBITDA\s*[\]\)]?\s*Margins?)[^\d\n%]{0,45}?(-?\d+(?:\.\d+)?)\s*%',
-            txt,
-            re.I,
-        )
-        if m_opm:
-            try:
-                cand_opm = float(m_opm.group(1))
-                if -100.0 <= cand_opm <= 95.0:
-                    res["operating_margin"] = cand_opm
-            except Exception as e:
-                logger.debug("Failed parsing OPM from report text: %s", e)
+        from core.presentation.formatters import is_bfsi_entity
+        if not is_bfsi_entity(
+            ticker=str(res.get("ticker") or ""),
+            sector_label=str(res.get("sector") or ""),
+            industry=str(res.get("industry") or ""),
+            company_name=str(res.get("company_name") or res.get("short_name") or ""),
+        ):
+            m_opm = re.search(
+                r'\b(?:Operating\s+(?:Profit\s+)?Margins?|OPM\b|EBITDA\s*[\]\)]?\s*Margins?)'
+                r'(?:\s*(?:\[[^\]]*\]|\([^\)]*\)))?\s*\**(?:'
+                r'of|stands?\s+at|stood\s+at|expanded\s+to|contracted\s+to|improved\s+to|'
+                r'rose\s+to|fell\s+to|moderated\s+to|reached|is|was|are|were|at|around|near|'
+                r'remains?\s+(?:healthy\s+|strong\s+|resilient\s+|stable\s+|steady\s+|robust\s+)?(?:at|near|around|within(?:\s+the)?|in\s+the)|'
+                r':|\|'
+                r')\**\s*(?:~|approx\.?\s*|around\s*)?`?(-?\d+(?:\.\d+)?)\s*%',
+                txt,
+                re.I,
+            )
+            if m_opm:
+                line_start = txt.rfind("\n", 0, m_opm.start()) + 1
+                line_prefix = txt[line_start:m_opm.start()]
+                if not re.search(r"\b(?:segment|division|vertical|Jio|Leasing|Europe|Aspiration|hypothetical|if\s+|assuming)\b", line_prefix, re.I):
+                    try:
+                        cand_opm = float(m_opm.group(1))
+                        if -100.0 <= cand_opm <= 95.0:
+                            res["operating_margin"] = cand_opm
+                    except Exception as e:
+                        logger.debug("Failed parsing OPM from report text: %s", e)
 
     # 4. Debt-to-Equity (D/E)
     if not is_legacy_synth_template and res.get("debt_to_equity") in [None, "N/A", ""]:

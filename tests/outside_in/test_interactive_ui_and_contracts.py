@@ -47,6 +47,25 @@ from web.main import app
 class TestInteractiveUiAndDomContracts(unittest.TestCase):
     @classmethod
     def setUpClass(cls):
+        from core.db import get_report_by_ticker_sync, save_report_to_archive, save_cached_fundamentals
+        for sym, sname, px, pe in (
+            ("INFY", "Infosys Ltd", 1520.0, 25.0),
+            ("TCS", "Tata Consultancy Services Ltd", 3850.0, 28.0),
+            ("ETERNAL", "Eternal Ltd", 330.05, 722.92),
+        ):
+            if not get_report_by_ticker_sync(sym):
+                save_report_to_archive(
+                    stock_data={"ticker": sym, "short_name": sname, "current_price": px, "pe_ratio": str(pe), "market_cap": 6000000000000.0},
+                    report_text=(
+                        "### 7-Pillar Qualitative Health Matrix:\n- Moat: Strong\n- Management: Stable\n\n"
+                        "## Pillar 1: Macro\n[VERIFIED FACT: Exchange filing verified.]\n\n"
+                        "## Pillar 3: Promoter Quality & Forensic Health\nClean balance sheet.\n\n"
+                        "## Pillar 5: Valuation & Margin of Safety\nFair value sensitivity.\n"
+                    ),
+                    announcement="Quarterly exchange filing.",
+                )
+                save_cached_fundamentals(sym, {"current_price": px, "pe_ratio": pe, "roce": 32.0, "debt_to_equity": 0.08, "operating_margin": 21.5})
+
         cls.client = TestClient(app)
         cls.project_root = Path(__file__).resolve().parent.parent.parent
         cls.templates_dir = cls.project_root / "web" / "templates"
@@ -1416,10 +1435,15 @@ class TestCompetitiveEnhancements(unittest.TestCase):
         self.assertNotIn("{{", sandbox_str, "Unrendered Jinja tag detected in #reverseDcfSandbox")
         self.assertNotIn("{%", sandbox_str, "Unrendered Jinja directive detected in #reverseDcfSandbox")
 
-        # Verify locked dossier Free Strip does NOT falsely claim 'Interactive Reverse-DCF slider' is free
+        # Verify locked dossier keeps the Valuation Sandbox available for free, aligns Free Strip copy,
+        # and redacts Pillar 03 & Pillar 05 falsification triggers from free bear-case / countercase previews.
         locked_resp = TestClient(app).get("/dossier/INFY")
         self.assertEqual(locked_resp.status_code, 200)
-        self.assertNotIn("Interactive Reverse-DCF slider", locked_resp.text)
+        self.assertIn('id="reverseDcfSandbox"', locked_resp.text)
+        self.assertIn("Interactive Reverse-DCF slider", locked_resp.text)
+        self.assertNotIn("Unlock Interactive Reverse DCF Sandbox", locked_resp.text)
+        self.assertNotIn("Pillar 03 Trigger", locked_resp.text)
+        self.assertNotIn("Pillar 05 Trigger", locked_resp.text)
 
         # Verify IMPLIED_GROWTH_ONLY renders Implied CAGR / Implied 5Y Growth without None% or 1 Credit Unlock on unlocked view
         ext_resp = self.client.get("/dossier/ETERNAL")

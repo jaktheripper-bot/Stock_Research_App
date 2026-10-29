@@ -9,7 +9,7 @@ from typing import Dict, Any, List
 # Research credit action cost schedule
 ACTION_COSTS: Dict[str, float] = {
     "LIVE_SYNTHESIS": 1.0,      # Full 7-pillar synthesis + valuation + PDF
-    "DEEP_DIVE_UNLOCK": 1.0,    # Unlocks Accounting Ledger, Reverse DCF Sandbox & Thesis Drift
+    "DEEP_DIVE_UNLOCK": 1.0,    # Unlocks Pillar 03/05 Narratives, Accounting Ledger & Thesis Drift
     "SURGICAL_REFRESH": 0.25,   # Pillars 5 & 6 announcement incremental delta (Free for Pro)
     "PDF_EXPORT": 0.0,          # Free for active and archived reports
     "ARCHIVE_READ": 0.0,        # Free archival retrieval
@@ -91,7 +91,7 @@ PRICING_PACKS: Dict[str, Dict[str, Any]] = {
             "50 Watched Equities in Real-Time Monitoring",
             "Unlimited PDF Report Exports",
             "Telegram & WhatsApp Alert Feeds",
-            "Auto-renews monthly, cancel anytime"
+            "30-day Pro pass · No auto-debit"
         ],
         "is_subscription": True,
         "is_popular": False,

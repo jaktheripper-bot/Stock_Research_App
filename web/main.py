@@ -1343,8 +1343,9 @@ def dossier_page(request: Request, ticker: str):
 
     dynamic_failure_vectors = [
         _clip_failure_vector(t.get("evidence_that_forces_revision") or t.get("what_contradicts") or "", 140)
-        for _, t in sorted(parsed_triggers.items())
-        if (t.get("evidence_that_forces_revision") or t.get("what_contradicts") or "").strip()
+        for p_idx, t in sorted(parsed_triggers.items())
+        if (is_deep_dive_unlocked or p_idx not in (3, 5))
+        and (t.get("evidence_that_forces_revision") or t.get("what_contradicts") or "").strip()
     ]
 
     # Multi-Quarter Revisions & Thesis Drift Monitoring
@@ -1460,7 +1461,7 @@ def dossier_page(request: Request, ticker: str):
                 dates.append(d_str)
                 c_val = row.get("Close")
                 closes.append(round(float(c_val), 2) if c_val is not None and pd.notna(c_val) else None)
-                s_val = row.get("SMA50")
+                s_val = row.get("SMA50") if row.get("SMA50") is not None else row.get("SMA_50")
                 sma50.append(round(float(s_val), 2) if s_val is not None and pd.notna(s_val) else None)
 
             latest_close = closes[-1] if closes else None
@@ -1525,6 +1526,7 @@ def dossier_page(request: Request, ticker: str):
             company_name=rep.get("short_name", canonical),
             industry_str=rep.get("industry", ""),
             report_text=raw_md,
+            include_gated_pillars=is_deep_dive_unlocked,
         )
         if equity_intel and equity_intel.get("epistemic_ledger"):
             from core.analysis.epistemic_schema import build_equity_epistemic_ledger
@@ -2005,15 +2007,21 @@ def fund_directory_page(
                     "category": m.get("details", {}).get("category", "Mutual Fund"),
                     "aum_crores": 0.0,
                     "nav": nav_val,
-                    "ter_direct_pct": 0.75,
-                    "ter_regular_pct": 1.50,
-                    "active_share_pct": 70.0
+                    "ter_direct_pct": None,
+                    "ter_regular_pct": None,
+                    "active_share_pct": None,
+                    "portfolio_turnover_ratio_pct": None,
+                    "fund_manager": "Pending Monthly Fact Sheet Sync",
                 })
     else:
         schemes = get_active_mutual_funds(category=category, broad_category=broad_category, audited_only=True)
 
-    total_aum = sum(s.get("aum_crores", 0.0) for s in schemes)
-    drag_vals = [(s.get("ter_regular_pct", 1.5) - s.get("ter_direct_pct", 0.7)) * 100 for s in schemes]
+    total_aum = sum(float(s.get("aum_crores") or 0.0) for s in schemes)
+    drag_vals = [
+        (float(s.get("ter_regular_pct") or 0.0) - float(s.get("ter_direct_pct") or 0.0)) * 100
+        for s in schemes
+        if (s.get("ter_regular_pct") or 0.0) > 0 and (s.get("ter_direct_pct") or 0.0) > 0
+    ]
     avg_drag_bps = round(sum(drag_vals) / len(drag_vals), 0) if drag_vals else 75
     featured_fund = get_featured_daily_fund_dossier()
 
@@ -2128,9 +2136,12 @@ def fund_dossier_page(request: Request, scheme_code: str):
     )
 
     from core.presentation.formatters import format_standard_date
-    fund_portfolio_date_str = format_standard_date(
-        sch_obj.get("last_portfolio_date"),
-        fallback=str(sch_obj.get("last_portfolio_date") or "Latest AMFI Monthly"),
+    has_disclosed_holdings = bool((dossier.get("lookthrough") or {}).get("holdings"))
+    raw_port_date = sch_obj.get("last_portfolio_date")
+    fund_portfolio_date_str = (
+        format_standard_date(raw_port_date, fallback=str(raw_port_date))
+        if (has_disclosed_holdings and raw_port_date)
+        else "Pending Monthly Disclosure"
     )
     fund_updated_str = format_standard_date(
         sch_obj.get("last_updated"),

@@ -1,21 +1,22 @@
 #!/usr/bin/env python3
 """
-Bridges verified constituent holdings from curated slug schemes (e.g. PPFAS_FLEXICAP_DIR)
-to their exact numeric AMFI Direct-Plan Growth counterparts (e.g. 122639) when AMC + core
-scheme name match, eliminating empty-holdings split brains without fabricating holdings.
+Audits and purges static-seed-cloned mutual fund holdings and forensic dossiers
+on numeric AMFI scheme codes, and deduplicates constituent holding rows so
+un-ingested AMFI funds cleanly fail closed to Pending (AGENTS.md Rule 4 & 7).
 """
 
 import argparse
 import os
-import re
 import sqlite3
 import sys
 from pathlib import Path
+from typing import Dict
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 os.environ["ENABLE_BACKGROUND_SCHEDULERS"] = "0"
 
 from core.db.connection import (
+    _get_raw_connection,
     get_db_connection,
     get_db_path,
     get_placeholder,
@@ -28,156 +29,228 @@ def _norm_scheme_stem(name: str) -> str:
     return normalize_scheme_stem(name)
 
 
-def _sync_on_cursor(cur, ph: str, apply: bool = False, verbose: bool = True) -> int:
+def _purge_seeded_clones_on_cursor(
+    cur, ph: str, is_pg: bool = False, apply: bool = False, verbose: bool = True
+) -> Dict[str, int]:
+    """Detects and removes static-seed-cloned numeric AMFI holdings/dossiers and duplicate holding rows."""
+    # 1. Identify numeric AMFI schemes whose exact holding vector matches a non-numeric seeded slug scheme
     cur.execute(
         """
-        SELECT s.scheme_code, s.scheme_name, COUNT(h.identifier) AS raw_cnt
-        FROM mutual_fund_schemes s
-        LEFT JOIN mutual_fund_holdings h ON s.scheme_code = h.scheme_code
-        GROUP BY s.scheme_code, s.scheme_name
-        ORDER BY s.scheme_code
+        SELECT DISTINCT scheme_code, holding_type, identifier, weight_pct
+        FROM mutual_fund_holdings
+        ORDER BY scheme_code, holding_type, identifier
         """
     )
-    rows = cur.fetchall()
+    vecs: Dict[str, list] = {}
+    for sc, ht, ident, w in cur.fetchall():
+        vecs.setdefault(str(sc), []).append((str(ht or "").upper(), str(ident or "").upper(), round(float(w or 0.0), 2)))
 
-    # Count deduplicated verified holdings per curated slug source
+    slug_fingerprints = {tuple(v): sc for sc, v in vecs.items() if v and not sc.isdigit()}
+    cloned_numeric_codes = sorted(
+        sc for sc, v in vecs.items() if sc.isdigit() and tuple(v) in slug_fingerprints
+    )
+
+    # 2. Identify numeric AMFI forensic dossiers whose text was cloned verbatim from a slug dossier
+    if is_pg:
+        cur.execute(
+            """
+            SELECT d.scheme_code
+            FROM fund_forensic_dossiers d
+            WHERE d.scheme_code ~ '^[0-9]+$'
+              AND EXISTS (
+                  SELECT 1 FROM fund_forensic_dossiers slug
+                  WHERE slug.scheme_code !~ '^[0-9]+$'
+                    AND slug.dossier_text = d.dossier_text
+              )
+            ORDER BY d.scheme_code
+            """
+        )
+    else:
+        cur.execute(
+            """
+            SELECT d.scheme_code
+            FROM fund_forensic_dossiers d
+            WHERE d.scheme_code GLOB '[0-9]*'
+              AND EXISTS (
+                  SELECT 1 FROM fund_forensic_dossiers slug
+                  WHERE slug.scheme_code NOT GLOB '[0-9]*'
+                    AND slug.dossier_text = d.dossier_text
+              )
+            ORDER BY d.scheme_code
+            """
+        )
+    cloned_dossier_codes = [str(r[0]) for r in cur.fetchall()]
+
+    # 3. Count excess duplicate holding rows (stale portfolio_date or duplicate holding_type+identifier)
     cur.execute(
         """
-        SELECT scheme_code, COUNT(*) FROM (
-            SELECT DISTINCT scheme_code, holding_type, identifier
+        SELECT COUNT(*) FROM mutual_fund_holdings h
+        WHERE h.portfolio_date < (
+            SELECT MAX(h2.portfolio_date)
+            FROM mutual_fund_holdings h2
+            WHERE h2.scheme_code = h.scheme_code
+        )
+        """
+    )
+    stale_date_rows = int((cur.fetchone() or [0])[0] or 0)
+
+    cur.execute(
+        """
+        SELECT COUNT(*) FROM mutual_fund_holdings
+        WHERE id NOT IN (
+            SELECT MAX(id)
             FROM mutual_fund_holdings
-        ) AS dedup_h
-        GROUP BY scheme_code
+            GROUP BY scheme_code, holding_type, identifier
+        )
         """
     )
-    distinct_cnt_map = {str(sc): int(cnt or 0) for sc, cnt in cur.fetchall()}
+    dup_rows = int((cur.fetchone() or [0])[0] or 0)
 
-    populated_by_stem = {}
-    empty_numeric = []
-    for code, name, _raw_cnt in rows:
-        code_str = str(code or "").strip()
-        stem = _norm_scheme_stem(name)
-        if not stem or len(stem) < 8:
-            continue
-        h_cnt = distinct_cnt_map.get(code_str, 0)
-        if h_cnt >= 5 and not code_str.isdigit():
-            populated_by_stem.setdefault(stem, (code_str, name, h_cnt))
-        elif code_str.isdigit() and h_cnt < 5:
-            if not re.search(r"(?i)\b(idcw|payout|reinvestment|bonus|segregated)\b", name or ""):
-                empty_numeric.append((code_str, name, stem))
+    stats = {
+        "cloned_numeric_schemes": len(cloned_numeric_codes),
+        "deleted_cloned_holdings": 0,
+        "deleted_cloned_dossiers": len(cloned_dossier_codes) if not apply else 0,
+        "reset_scheme_metadata": 0,
+        "deduped_holding_rows": stale_date_rows + dup_rows if not apply else 0,
+    }
 
-    bridged = 0
-    for num_code, num_name, stem in empty_numeric:
-        if stem not in populated_by_stem:
-            continue
-        src_code, _src_name, src_cnt = populated_by_stem[stem]
-        if src_code == num_code:
-            continue
-        if verbose:
-            print(
-                f"[{'APPLY' if apply else 'DRY-RUN'}] Link AMFI {num_code} ({num_name}) <- {src_code} ({src_cnt} verified holdings)"
-            )
-        bridged += 1
-        if apply:
-            # 1. Bridge deduplicated verified holdings (preserving NOT NULL portfolio_date & instrument_details)
-            cur.execute(
-                f"""
-                INSERT INTO mutual_fund_holdings (
-                    scheme_code, identifier, holding_name, holding_type,
-                    weight_pct, sector_or_rating, instrument_details, portfolio_date
-                )
-                SELECT
-                    {ph}, src.identifier, src.holding_name, src.holding_type,
-                    src.weight_pct, src.sector_or_rating, COALESCE(src.instrument_details, '{{}}'), src.portfolio_date
-                FROM mutual_fund_holdings src
-                WHERE src.id IN (
-                    SELECT MAX(id)
-                    FROM mutual_fund_holdings
-                    WHERE scheme_code = {ph}
-                    GROUP BY holding_type, identifier
-                )
-                AND NOT EXISTS (
-                    SELECT 1 FROM mutual_fund_holdings ex
-                    WHERE ex.scheme_code = {ph}
-                      AND ex.holding_type = src.holding_type
-                      AND ex.identifier = src.identifier
-                )
-                """,
-                (num_code, src_code, num_code),
-            )
+    if verbose:
+        mode = "APPLY" if apply else "DRY-RUN"
+        print(
+            f"[{mode}] Cloned numeric AMFI schemes={len(cloned_numeric_codes)} | "
+            f"Cloned dossiers={len(cloned_dossier_codes)} | "
+            f"Stale-date rows={stale_date_rows} | Duplicate rows={dup_rows}"
+        )
 
-            # 2. Bridge curated scheme metadata (AUM, TER, Manager, Risk Capture) while keeping live AMFI NAV
+    if not apply:
+        return stats
+
+    affected_codes = sorted(set(cloned_numeric_codes) | set(cloned_dossier_codes))
+
+    if cloned_numeric_codes:
+        in_ph = ",".join([ph] * len(cloned_numeric_codes))
+        cur.execute(
+            f"DELETE FROM mutual_fund_holdings WHERE scheme_code IN ({in_ph})",
+            tuple(cloned_numeric_codes),
+        )
+        stats["deleted_cloned_holdings"] = int(cur.rowcount or 0)
+
+    if cloned_dossier_codes:
+        in_ph = ",".join([ph] * len(cloned_dossier_codes))
+        cur.execute(
+            f"DELETE FROM fund_forensic_dossiers WHERE scheme_code IN ({in_ph})",
+            tuple(cloned_dossier_codes),
+        )
+        stats["deleted_cloned_dossiers"] = int(cur.rowcount or 0)
+
+    if affected_codes:
+        in_ph = ",".join([ph] * len(affected_codes))
+        if is_pg:
             cur.execute(
                 f"""
                 UPDATE mutual_fund_schemes
-                SET
-                    aum_crores = CASE WHEN COALESCE(aum_crores, 0) <= 0 THEN (SELECT aum_crores FROM mutual_fund_schemes WHERE scheme_code = {ph}) ELSE aum_crores END,
-                    ter_direct_pct = CASE WHEN ter_direct_pct IS NULL OR ABS(ter_direct_pct - 0.75) < 1e-6 THEN (SELECT ter_direct_pct FROM mutual_fund_schemes WHERE scheme_code = {ph}) ELSE ter_direct_pct END,
-                    ter_regular_pct = CASE WHEN ter_regular_pct IS NULL OR ABS(ter_regular_pct - 1.50) < 1e-6 THEN (SELECT ter_regular_pct FROM mutual_fund_schemes WHERE scheme_code = {ph}) ELSE ter_regular_pct END,
-                    portfolio_turnover_ratio_pct = CASE WHEN portfolio_turnover_ratio_pct IS NULL OR ABS(portfolio_turnover_ratio_pct - 25.0) < 1e-6 THEN (SELECT portfolio_turnover_ratio_pct FROM mutual_fund_schemes WHERE scheme_code = {ph}) ELSE portfolio_turnover_ratio_pct END,
-                    active_share_pct = CASE WHEN active_share_pct IS NULL OR ABS(active_share_pct - 70.0) < 1e-6 OR ABS(active_share_pct - 65.0) < 1e-6 THEN (SELECT active_share_pct FROM mutual_fund_schemes WHERE scheme_code = {ph}) ELSE active_share_pct END,
-                    fund_manager = CASE WHEN fund_manager IS NULL OR fund_manager IN ('', 'Senior Fund Manager') THEN (SELECT fund_manager FROM mutual_fund_schemes WHERE scheme_code = {ph}) ELSE fund_manager END,
-                    metadata_json = CASE WHEN metadata_json IS NULL OR metadata_json IN ('', '{{}}') THEN (SELECT metadata_json FROM mutual_fund_schemes WHERE scheme_code = {ph}) ELSE metadata_json END,
-                    last_portfolio_date = COALESCE((SELECT last_portfolio_date FROM mutual_fund_schemes WHERE scheme_code = {ph}), last_portfolio_date)
-                WHERE scheme_code = {ph}
-                """,
-                (src_code, src_code, src_code, src_code, src_code, src_code, src_code, src_code, num_code),
-            )
-
-            # 3. Bridge genuine LLM forensic dossier if the numeric AMFI twin does not yet have one
-            cur.execute(
-                f"""
-                INSERT INTO fund_forensic_dossiers (
-                    scheme_code, dossier_text, composite_health_score, weighted_moat_score,
-                    accounting_risk_index, margin_of_safety_pct, promoter_pledge_exposure_pct,
-                    active_share_pct, top_risky_holdings_json, top_quality_holdings_json,
-                    audited_by, last_audited_at
-                )
-                SELECT
-                    {ph}, src.dossier_text, src.composite_health_score, src.weighted_moat_score,
-                    src.accounting_risk_index, src.margin_of_safety_pct, src.promoter_pledge_exposure_pct,
-                    src.active_share_pct, src.top_risky_holdings_json, src.top_quality_holdings_json,
-                    src.audited_by, src.last_audited_at
-                FROM fund_forensic_dossiers src
-                WHERE src.scheme_code = {ph}
-                  AND src.composite_health_score IS NOT NULL
-                  AND COALESCE(src.dossier_text, '') NOT LIKE {ph}
+                SET aum_crores = 0.0,
+                    active_share_pct = 0.0,
+                    fund_manager = 'Pending Monthly Fact Sheet Sync',
+                    metadata_json = '{{}}',
+                    last_portfolio_date = COALESCE(last_updated::date, CURRENT_DATE)
+                WHERE scheme_code IN ({in_ph})
                   AND NOT EXISTS (
-                      SELECT 1 FROM fund_forensic_dossiers ex WHERE ex.scheme_code = {ph}
+                      SELECT 1 FROM mutual_fund_holdings h WHERE h.scheme_code = mutual_fund_schemes.scheme_code
                   )
                 """,
-                (num_code, src_code, "%With an Active Share of%", num_code),
+                tuple(affected_codes),
             )
-    return bridged
+        else:
+            cur.execute(
+                f"""
+                UPDATE mutual_fund_schemes
+                SET aum_crores = 0.0,
+                    active_share_pct = 0.0,
+                    fund_manager = 'Pending Monthly Fact Sheet Sync',
+                    metadata_json = '{{}}',
+                    last_portfolio_date = 'Pending Monthly Disclosure'
+                WHERE scheme_code IN ({in_ph})
+                  AND NOT EXISTS (
+                      SELECT 1 FROM mutual_fund_holdings h WHERE h.scheme_code = mutual_fund_schemes.scheme_code
+                  )
+                """,
+                tuple(affected_codes),
+            )
+        stats["reset_scheme_metadata"] = int(cur.rowcount or 0)
+
+    cur.execute(
+        """
+        DELETE FROM mutual_fund_holdings
+        WHERE portfolio_date < (
+            SELECT MAX(h2.portfolio_date)
+            FROM mutual_fund_holdings h2
+            WHERE h2.scheme_code = mutual_fund_holdings.scheme_code
+        )
+        """
+    )
+    removed_stale = int(cur.rowcount or 0)
+
+    cur.execute(
+        """
+        DELETE FROM mutual_fund_holdings
+        WHERE id NOT IN (
+            SELECT MAX(id)
+            FROM mutual_fund_holdings
+            GROUP BY scheme_code, holding_type, identifier
+        )
+        """
+    )
+    removed_dups = int(cur.rowcount or 0)
+    stats["deduped_holding_rows"] = removed_stale + removed_dups
+
+    cur.execute(
+        """
+        CREATE UNIQUE INDEX IF NOT EXISTS uq_mf_holdings_scheme_type_ident
+            ON mutual_fund_holdings (scheme_code, holding_type, identifier)
+        """
+    )
+    cur.execute("SAVEPOINT sp_mig")
+    try:
+        cur.execute(
+            "INSERT INTO schema_migrations (version) VALUES ('v038_mf_holdings_unique_index') ON CONFLICT DO NOTHING"
+        )
+        cur.execute("RELEASE SAVEPOINT sp_mig")
+    except Exception as mig_err:
+        cur.execute("ROLLBACK TO SAVEPOINT sp_mig")
+        if verbose:
+            print(f"[NOTICE] schema_migrations update skipped: {mig_err}")
+    return stats
 
 
-def sync_exact_amfi_twins(apply: bool = False) -> int:
+def purge_seeded_amfi_clones(apply: bool = False) -> Dict[str, int]:
     ph = get_placeholder()
-    with get_db_connection() as conn:
+    conn_factory = get_db_connection if apply else _get_raw_connection
+    with conn_factory() as conn:
         is_pg = is_postgres_connection(conn)
         cur = conn.cursor()
         try:
-            bridged = _sync_on_cursor(cur, ph, apply=apply, verbose=True)
+            stats = _purge_seeded_clones_on_cursor(cur, ph, is_pg=is_pg, apply=apply, verbose=True)
             if apply:
                 conn.commit()
+            else:
+                conn.rollback()
         finally:
             cur.close()
 
-        # Keep local reports.db synchronized when primary connection is PostgreSQL
         if apply and is_pg:
             sq_path = Path(get_db_path())
             if sq_path.exists():
                 sq_conn = sqlite3.connect(str(sq_path))
                 sq_cur = sq_conn.cursor()
                 try:
-                    _sync_on_cursor(sq_cur, "?", apply=True, verbose=False)
+                    _purge_seeded_clones_on_cursor(sq_cur, "?", is_pg=False, apply=True, verbose=True)
                     sq_conn.commit()
                 finally:
                     sq_cur.close()
                     sq_conn.close()
 
-    print(f"Exact AMFI twin schemes bridged: {bridged}")
-    return bridged
+    return stats
 
 
 if __name__ == "__main__":
@@ -185,4 +258,4 @@ if __name__ == "__main__":
     ap.add_argument("--apply", action="store_true")
     ap.add_argument("--dry-run", action="store_true")
     args = ap.parse_args()
-    sync_exact_amfi_twins(apply=bool(args.apply and not args.dry_run))
+    purge_seeded_amfi_clones(apply=bool(args.apply and not args.dry_run))

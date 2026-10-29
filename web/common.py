@@ -405,7 +405,7 @@ def _is_user_subscribed(user: Optional[Dict[str, Any]]) -> bool:
     if not user:
         return False
     tier = (user.get("subscription_tier") or "free").lower()
-    if tier in ("pro_monthly", "pro_annual", "pro", "institutional_pro"):
+    if tier in ("pro_monthly", "pro_annual", "pro", "institutional_pro") or "pro" in tier:
         exp = user.get("subscription_expires_at")
         if not exp:
             return True
@@ -464,8 +464,7 @@ def _deep_dive_unlocked_for_request(request: Request, ticker: str) -> bool:
     get_user_fn = _get_override_fn("web.main", "_get_current_web_user", _get_current_web_user)
     web_user = get_user_fn(request)
     if web_user and ticker:
-        tier = (web_user.get("subscription_tier") or "free").lower()
-        if tier in ("pro_monthly", "pro_annual") or "pro" in tier or web_user.get("is_pro"):
+        if _is_user_subscribed(web_user) or web_user.get("is_pro"):
             return True
         t_clean = clean_ticker(ticker)
         canonical = resolve_canonical_symbol(t_clean) or t_clean
@@ -514,8 +513,7 @@ def _asset_unlocked_for_request(request: Request, kind: str, asset_id: str) -> b
     get_user_fn = _get_override_fn("web.main", "_get_current_web_user", _get_current_web_user)
     web_user = get_user_fn(request)
     if web_user and asset_id:
-        tier = (web_user.get("subscription_tier") or "free").lower()
-        if tier in ("pro_monthly", "pro_annual") or "pro" in tier or web_user.get("is_pro"):
+        if _is_user_subscribed(web_user) or web_user.get("is_pro"):
             return True
         from core.db import is_ticker_unlocked_for_user
         check_fn = _get_override_fn("web.main", "is_ticker_unlocked_for_user", is_ticker_unlocked_for_user)

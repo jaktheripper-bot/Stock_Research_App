@@ -12,6 +12,7 @@ Produces a unified equity intelligence package for web dossiers and APIs.
 
 from typing import Dict, Any, Optional, Tuple
 import logging
+import os
 import threading
 import time
 
@@ -25,10 +26,13 @@ from core.ingestion.angel_one import AngelOneGateway
 logger = logging.getLogger("equity_research.core.analysis.equity_dossier")
 
 _CLOSING_L2_CACHE: Dict[str, Dict[str, Any]] = {}
+_CLOSING_L2_TS: Dict[str, float] = {}
 _LIVE_QUOTE_MICRO_CACHE: Dict[str, Tuple[float, Optional[Dict[str, Any]]]] = {}
 _L2_CACHE_LOCK = threading.RLock()
 _MAX_L2_CACHE = 512
 _LIVE_QUOTE_TTL_SEC = 45.0
+_CLOSING_L2_TTL_SEC = 86400.0
+_DEFAULT_GET_STOCK_QUOTE_FUNC = getattr(AngelOneGateway.get_stock_quote, "__func__", AngelOneGateway.get_stock_quote)
 
 
 def compile_equity_dossier(
@@ -38,6 +42,7 @@ def compile_equity_dossier(
     industry_str: str = "",
     angel_quote: Optional[Dict[str, Any]] = None,
     report_text: str = "",
+    include_gated_pillars: bool = True,
 ) -> Dict[str, Any]:
     """
     Assembles all Category 1 intelligence modules into a unified payload.
@@ -46,39 +51,53 @@ def compile_equity_dossier(
     live_q: Optional[Dict[str, Any]] = None
     if angel_quote is None and clean_sym and AngelOneGateway.is_configured():
         try:
-            is_mocked = hasattr(AngelOneGateway.get_stock_quote, "_mock_name") or hasattr(
-                AngelOneGateway.get_stock_quote, "assert_called"
-            )
+            current_fn = getattr(AngelOneGateway.get_stock_quote, "__func__", AngelOneGateway.get_stock_quote)
+            is_patched = current_fn is not _DEFAULT_GET_STOCK_QUOTE_FUNC
             now_ts = time.time()
-            cached_hit = False
-            if not is_mocked:
+            if not is_patched and os.environ.get("TESTING") == "1":
                 with _L2_CACHE_LOCK:
-                    micro = _LIVE_QUOTE_MICRO_CACHE.get(clean_sym)
-                    if micro and (now_ts - micro[0]) < _LIVE_QUOTE_TTL_SEC:
-                        live_q = micro[1]
-                        cached_hit = True
-            if not cached_hit:
-                live_q = AngelOneGateway.get_stock_quote(clean_sym)
-                if not is_mocked:
-                    with _L2_CACHE_LOCK:
-                        if len(_LIVE_QUOTE_MICRO_CACHE) >= _MAX_L2_CACHE:
-                            _LIVE_QUOTE_MICRO_CACHE.pop(next(iter(_LIVE_QUOTE_MICRO_CACHE)), None)
-                        _LIVE_QUOTE_MICRO_CACHE[clean_sym] = (now_ts, live_q)
-
-            if live_q and (_safe_float(live_q.get("total_buy_qty")) + _safe_float(live_q.get("total_sell_qty"))) > 0:
-                angel_quote = live_q
-                with _L2_CACHE_LOCK:
-                    if clean_sym not in _CLOSING_L2_CACHE and len(_CLOSING_L2_CACHE) >= _MAX_L2_CACHE:
-                        _CLOSING_L2_CACHE.pop(next(iter(_CLOSING_L2_CACHE)), None)
-                    _CLOSING_L2_CACHE[clean_sym] = {**live_q, "source": "NSE/BSE Closing Depth Snapshot"}
-            else:
-                with _L2_CACHE_LOCK:
-                    if clean_sym in _CLOSING_L2_CACHE:
+                    snap_ts = _CLOSING_L2_TS.get(clean_sym, 0.0)
+                    if clean_sym in _CLOSING_L2_CACHE and (now_ts - snap_ts) < _CLOSING_L2_TTL_SEC:
                         angel_quote = _CLOSING_L2_CACHE[clean_sym]
+            else:
+                cached_hit = False
+                if not is_patched:
+                    with _L2_CACHE_LOCK:
+                        micro = _LIVE_QUOTE_MICRO_CACHE.get(clean_sym)
+                        if micro and (now_ts - micro[0]) < _LIVE_QUOTE_TTL_SEC:
+                            live_q = micro[1]
+                            cached_hit = True
+                if not cached_hit:
+                    live_q = AngelOneGateway.get_stock_quote(clean_sym)
+                    if not is_patched:
+                        with _L2_CACHE_LOCK:
+                            if len(_LIVE_QUOTE_MICRO_CACHE) >= _MAX_L2_CACHE:
+                                _LIVE_QUOTE_MICRO_CACHE.pop(next(iter(_LIVE_QUOTE_MICRO_CACHE)), None)
+                            _LIVE_QUOTE_MICRO_CACHE[clean_sym] = (now_ts, live_q)
+
+                if live_q and (_safe_float(live_q.get("total_buy_qty")) + _safe_float(live_q.get("total_sell_qty"))) > 0:
+                    angel_quote = live_q
+                    with _L2_CACHE_LOCK:
+                        if clean_sym not in _CLOSING_L2_CACHE and len(_CLOSING_L2_CACHE) >= _MAX_L2_CACHE:
+                            oldest = next(iter(_CLOSING_L2_CACHE))
+                            _CLOSING_L2_CACHE.pop(oldest, None)
+                            _CLOSING_L2_TS.pop(oldest, None)
+                        _CLOSING_L2_CACHE[clean_sym] = {**live_q, "source": "NSE/BSE Closing Depth Snapshot"}
+                        _CLOSING_L2_TS[clean_sym] = now_ts
+                else:
+                    with _L2_CACHE_LOCK:
+                        snap_ts = _CLOSING_L2_TS.get(clean_sym, now_ts)
+                        if clean_sym in _CLOSING_L2_CACHE and (now_ts - snap_ts) < _CLOSING_L2_TTL_SEC:
+                            angel_quote = _CLOSING_L2_CACHE[clean_sym]
+                        elif clean_sym in _CLOSING_L2_CACHE:
+                            _CLOSING_L2_CACHE.pop(clean_sym, None)
+                            _CLOSING_L2_TS.pop(clean_sym, None)
         except Exception as e:
             logger.debug(f"Angel One quote lookup notice for {clean_sym}: {e}")
             with _L2_CACHE_LOCK:
-                angel_quote = _CLOSING_L2_CACHE.get(clean_sym)
+                snap_ts = _CLOSING_L2_TS.get(clean_sym, time.time())
+                if clean_sym in _CLOSING_L2_CACHE and (time.time() - snap_ts) < _CLOSING_L2_TTL_SEC:
+                    angel_quote = _CLOSING_L2_CACHE.get(clean_sym)
 
     # 2. Sector-Native Operational Scoring
     fund_dict = fundamentals if isinstance(fundamentals, dict) else {}
@@ -117,6 +136,8 @@ def compile_equity_dossier(
     pe_ratio = _safe_float(raw_pe, 0.0) or _safe_float(fund_dict.get("forward_pe"), 0.0)
 
     raw_growth = fund_dict.get("sales_growth_3y")
+    if raw_growth in (None, "", "N/A"):
+        raw_growth = fund_dict.get("sales_growth")
     sales_growth = _safe_float(raw_growth, 8.0) if raw_growth not in (None, "", "N/A") else 8.0
     sector_pe_med = (sector_data.get("benchmarks") or {}).get("pe_median", 22.0)
 
@@ -137,6 +158,7 @@ def compile_equity_dossier(
         forensic_data=forensic_data,
         flow_data=flow_data,
         report_text=report_text,
+        include_gated_pillars=include_gated_pillars,
     )
 
     # 7. Generate Quality Composite Score (0-100)

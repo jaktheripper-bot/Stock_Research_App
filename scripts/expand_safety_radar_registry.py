@@ -24,7 +24,7 @@ NEW_STRUCTURAL_ARCHETYPES = [
         "regulatory_status": "RBI_RESTRICTED_STRUCTURE",
         "danger_score": 86,
         "liquidity_lock_months": 12,
-        "rbi_warning_circular": "RBI/2024-25/62 DoR.FIN.REC.35/03.10.124/2024-25 (Master Direction — NBFC-P2P Amendment, 16 Aug 2024)",
+        "rbi_warning_circular": "RBI/2024-25/63 DoR.FIN.REC.35/03.10.124/2024-25 (Master Direction — NBFC-P2P Amendment, 16 Aug 2024)",
         "counterparty_risk": "100% unsecured retail borrower credit risk borne directly by lender; RBI Aug-2024 Master Direction prohibits credit enhancement, assured-return framing, and instant T+0 liquidity matching.",
         "bankruptcy_reality": "Zero DICGC insurance; platform escrow passes borrower defaults directly to lender principal.",
         "safe_alternative_recommendation": "Listed Senior Secured AAA/AA Corporate NCDs (₹10,000 SEBI face value) or RBI Retail Direct Treasury Bills.",
@@ -78,6 +78,61 @@ def run(apply: bool = False) -> None:
             ok = save_alternative_yield_product(item)
             if not ok:
                 raise RuntimeError(f"Failed persisting safety-radar archetype: {item['product_id']}")
+    if apply:
+        import json as _json
+        import sqlite3
+        from core.db.connection import get_db_path
+        sq_path = Path(get_db_path())
+        if sq_path.exists():
+            sq_conn = sqlite3.connect(str(sq_path))
+            try:
+                for item in NEW_STRUCTURAL_ARCHETYPES:
+                    cp_prose = str(item.get("counterparty_risk") or "").strip()
+                    bk_prose = str(item.get("bankruptcy_reality") or "").strip()
+                    prec_loss = " ".join(
+                        p for p in (cp_prose, f"Bankruptcy reality: {bk_prose}" if bk_prose else "") if p
+                    ).strip()
+                    mat_json = _json.dumps({"counterparty_risk": cp_prose, "bankruptcy_reality": bk_prose})
+                    sq_conn.execute(
+                        """
+                        INSERT INTO alternative_yield_products (
+                            product_id, product_name, category, promoted_yield_pct,
+                            danger_score, regulatory_status, counterparty_risk_level,
+                            principal_guarantee_validity, rbi_warning_circular,
+                            liquidity_lock_months, precedent_losses_summary,
+                            safe_alternative_recommendation, audit_matrix_json,
+                            updated_at
+                        ) VALUES (?, ?, ?, ?, ?, ?, 'HIGH', 0, ?, ?, ?, ?, ?, (datetime('now', '+5 hours', '+30 minutes') || '+05:30'))
+                        ON CONFLICT(product_id) DO UPDATE SET
+                            product_name = excluded.product_name,
+                            category = excluded.category,
+                            promoted_yield_pct = excluded.promoted_yield_pct,
+                            danger_score = excluded.danger_score,
+                            regulatory_status = excluded.regulatory_status,
+                            rbi_warning_circular = excluded.rbi_warning_circular,
+                            liquidity_lock_months = excluded.liquidity_lock_months,
+                            precedent_losses_summary = excluded.precedent_losses_summary,
+                            safe_alternative_recommendation = excluded.safe_alternative_recommendation,
+                            audit_matrix_json = excluded.audit_matrix_json,
+                            updated_at = (datetime('now', '+5 hours', '+30 minutes') || '+05:30')
+                        """,
+                        (
+                            item["product_id"],
+                            item["product_name"],
+                            item["category"],
+                            item["advertised_yield_pct"],
+                            item["danger_score"],
+                            item["regulatory_status"],
+                            item["rbi_warning_circular"],
+                            item["liquidity_lock_months"],
+                            prec_loss,
+                            item["safe_alternative_recommendation"],
+                            mat_json,
+                        ),
+                    )
+                sq_conn.commit()
+            finally:
+                sq_conn.close()
     print(f"Processed {len(NEW_STRUCTURAL_ARCHETYPES)} structural safety-radar archetypes.")
 
 

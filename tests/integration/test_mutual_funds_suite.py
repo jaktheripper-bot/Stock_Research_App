@@ -1332,15 +1332,16 @@ Cash reserve of 12% cushions against broad equity sell-offs.
             _cleanup()
 
     def test_amfi_flagship_twin_holdings_sync_and_deduplication(self):
-        """2.2.3: Bridges curated slug holdings to exact numeric AMFI Direct-Growth twins without duplicating directory cards."""
+        """2.2.3: Enforces fail-closed isolation (no static-seed holdings cloned onto numeric AMFI codes) and holding row deduplication."""
         from core.db.connection import get_db_connection, is_postgres_connection
         from core.db.mutual_funds import (
             get_active_mutual_funds,
             get_scheme_holdings,
             normalize_scheme_stem,
+            save_mutual_fund_holdings,
             save_mutual_fund_scheme,
         )
-        from scripts.sync_amfi_flagship_holdings import _sync_on_cursor
+        from scripts.sync_amfi_flagship_holdings import _purge_seeded_clones_on_cursor
 
         self.assertEqual(
             normalize_scheme_stem("Parag Parikh Flexi Cap Fund - Direct Plan - Growth"),
@@ -1352,15 +1353,17 @@ Cash reserve of 12% cushions against broad equity sell-offs.
         )
 
         num_code = "99912263"
+        dup_test_code = "TEST_DUP_HOLD_99"
 
         def _cleanup():
             conn = get_db_connection()
             p = "%s" if is_postgres_connection(conn) else "?"
             cur = conn.cursor()
             try:
-                cur.execute(f"DELETE FROM fund_forensic_dossiers WHERE scheme_code = {p}", (num_code,))
-                cur.execute(f"DELETE FROM mutual_fund_holdings WHERE scheme_code = {p}", (num_code,))
-                cur.execute(f"DELETE FROM mutual_fund_schemes WHERE scheme_code = {p}", (num_code,))
+                for sc in (num_code, dup_test_code):
+                    cur.execute(f"DELETE FROM fund_forensic_dossiers WHERE scheme_code = {p}", (sc,))
+                    cur.execute(f"DELETE FROM mutual_fund_holdings WHERE scheme_code = {p}", (sc,))
+                    cur.execute(f"DELETE FROM mutual_fund_schemes WHERE scheme_code = {p}", (sc,))
                 conn.commit()
             finally:
                 cur.close()
@@ -1376,28 +1379,62 @@ Cash reserve of 12% cushions against broad equity sell-offs.
                 "broad_category": "EQUITY",
                 "aum_crores": 0.0,
                 "nav": 89.28,
+                "ter_direct_pct": 0.0,
+                "ter_regular_pct": 0.0,
+                "active_share_pct": None,
+                "metadata": {},
             })
 
+            # Simulate an accidental clone from PPFAS_FLEXICAP_DIR and verify purge cleans it up
+            slug_holdings = get_scheme_holdings("PPFAS_FLEXICAP_DIR")
+            self.assertGreaterEqual(len(slug_holdings), 5)
+            save_mutual_fund_holdings(num_code, slug_holdings)
+            self.assertEqual(len(get_scheme_holdings(num_code)), len(slug_holdings))
+
             conn = get_db_connection()
-            p = "%s" if is_postgres_connection(conn) else "?"
+            is_pg = is_postgres_connection(conn)
+            p = "%s" if is_pg else "?"
             cur = conn.cursor()
             try:
-                bridged = _sync_on_cursor(cur, p, apply=True, verbose=False)
+                stats = _purge_seeded_clones_on_cursor(cur, p, is_pg=is_pg, apply=True, verbose=False)
                 conn.commit()
-                self.assertGreaterEqual(bridged, 1)
-                bridged_again = _sync_on_cursor(cur, p, apply=True, verbose=False)
-                conn.commit()
-                self.assertEqual(bridged_again, 0)
+                self.assertGreaterEqual(stats["cloned_numeric_schemes"], 1)
+                self.assertGreaterEqual(stats["deleted_cloned_holdings"], len(slug_holdings))
             finally:
                 cur.close()
                 conn.close()
 
-            twins_holdings = get_scheme_holdings(num_code)
-            slug_holdings = get_scheme_holdings("PPFAS_FLEXICAP_DIR")
-            self.assertEqual(len(twins_holdings), len(slug_holdings))
-            self.assertGreaterEqual(len(twins_holdings), 5)
+            # Numeric AMFI twin must now fail closed to Pending with 0 cloned holdings
+            self.assertEqual(get_scheme_holdings(num_code), [])
+            resp = self.client.get(f"/funds/{num_code}")
+            self.assertEqual(resp.status_code, 200)
+            self.assertIn("Pending", resp.text)
+            self.assertIn("PENDING_HOLDINGS_SYNC", resp.text)
+            self.assertNotIn("MODERATE_ACTIVE", resp.text)
+            self.assertNotIn("None%", resp.text)
 
-            audited_dir = get_active_mutual_funds(limit=None, audited_only=True)
+            # Verify duplicate constituents passed into save_mutual_fund_holdings are strictly deduplicated
+            save_mutual_fund_scheme({
+                "scheme_code": dup_test_code,
+                "scheme_name": "Test Deduplicated Holdings Fund",
+                "fund_house": "Test AMC",
+                "category": "Flexi Cap Fund",
+                "broad_category": "EQUITY",
+                "aum_crores": 100.0,
+                "nav": 12.34,
+            })
+            save_mutual_fund_holdings(
+                dup_test_code,
+                [
+                    {"holding_type": "EQUITY", "identifier": "HDFCBANK", "holding_name": "HDFC Bank", "weight_pct": 8.4},
+                    {"holding_type": "EQUITY", "identifier": "HDFCBANK", "holding_name": "HDFC Bank", "weight_pct": 8.4},
+                    {"holding_type": "EQUITY", "identifier": "INFY", "holding_name": "Infosys", "weight_pct": 6.8},
+                ],
+            )
+            deduped = get_scheme_holdings(dup_test_code)
+            self.assertEqual(len(deduped), 2)
+
+            audited_dir = get_active_mutual_funds(limit=None, audited_only=True, dedupe_twins=True)
             ppfas_stems = [
                 s["scheme_code"]
                 for s in audited_dir

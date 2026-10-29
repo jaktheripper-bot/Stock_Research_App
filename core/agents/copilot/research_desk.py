@@ -565,14 +565,15 @@ def _answer_from_local_dossier_index(
         return None
 
     from core.analysis.parser import extract_health_matrix
+    from core.analysis.sector_scoring import evaluate_sector_fundamentals
     from core.analysis.valuation_radar import compute_valuation_radar
 
     fund = fundamentals or {}
     company_name = report_data.get("company_name") or fund.get("short_name") or ticker
     price = fund.get("current_price") or report_data.get("baseline_price") or 0.0
     pe = fund.get("pe_ratio") or report_data.get("baseline_pe") or 0.0
-    eps = fund.get("eps") or 0.0
-    sales_g = fund.get("sales_growth") or 12.0
+    eps = fund.get("eps")
+    raw_sales_g = fund.get("sales_growth_3y") if fund.get("sales_growth_3y") not in (None, "", "N/A") else fund.get("sales_growth")
     bvps = fund.get("book_value") or 0.0
     matrix = extract_health_matrix(report_text)
 
@@ -587,9 +588,17 @@ def _answer_from_local_dossier_index(
 
     safe_price = _safe_float(price)
     safe_pe = _safe_float(pe)
-    safe_eps = _safe_float(eps)
-    safe_sales_g = _safe_float(sales_g, 12.0)
+    safe_eps = _safe_float(eps) if eps is not None else None
+    safe_sales_g = _safe_float(raw_sales_g, 8.0) if raw_sales_g not in (None, "", "N/A") else 8.0
     safe_bvps = _safe_float(bvps)
+    eff_industry = str(report_data.get("industry") or f"{fund.get('sector') or ''} {fund.get('industry') or ''}").strip()
+    sector_eval = evaluate_sector_fundamentals(
+        ticker=ticker,
+        fundamentals=fund,
+        industry_str=eff_industry,
+        company_name=str(company_name),
+    )
+    sector_pe_med = (sector_eval.get("benchmarks") or {}).get("pe_median", 22.0)
 
     # Extract individual pillars from markdown
     pillars: Dict[int, str] = {}
@@ -608,12 +617,13 @@ def _answer_from_local_dossier_index(
             pe_ratio=safe_pe,
             eps=safe_eps,
             sales_growth_3y=safe_sales_g,
+            historical_median_pe=sector_pe_med,
             book_value_per_share=safe_bvps,
         )
         p5_excerpt = pillars.get(5, "")
         fv = radar.get("fair_value")
         mos = radar.get("margin_of_safety_pct")
-        imp_g = radar.get("inputs", {}).get("implied_fcf_growth_pct", 11.5)
+        imp_disp = radar.get("inputs", {}).get("implied_fcf_growth_display") or f"{radar.get('inputs', {}).get('implied_fcf_growth_pct', 11.5):.1f}% CAGR"
         fv_str = f"₹{fv:,.2f}" if isinstance(fv, (int, float)) and fv > 0 else "Implied-Growth Mode"
         range_str = (
             f"Range: `₹{radar.get('range_low', 0):,.2f}` – `₹{radar.get('range_high', 0):,.2f}`"
@@ -629,7 +639,7 @@ def _answer_from_local_dossier_index(
             f"| **Trailing P/E Multiple** | `{pe}x` | Verdict: **{matrix.get('Valuation', 'Fair')}** |\n"
             f"| **Composite Intrinsic Value** | `{fv_str}` | {range_str} |\n"
             f"| **Margin of Safety** | `{mos_str}` | **{radar.get('badge_label', 'Fair Value')}** |\n"
-            f"| **Reverse-DCF Implied 10Y Growth** | `{imp_g:.1f}% CAGR` | At 11.0% WACC hurdle & 4.5% terminal growth |\n\n"
+            f"| **Reverse-DCF Implied 5Y Growth** | `{imp_disp}` | At 11.0% WACC hurdle & 4.5% terminal growth |\n\n"
             f"{p5_excerpt}\n\n"
             f"*SEBI Safe Harbor: Factual valuation triangulation from audited filings; not a buy/sell recommendation.*"
         )

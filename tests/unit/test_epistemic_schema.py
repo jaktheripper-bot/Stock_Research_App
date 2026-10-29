@@ -350,7 +350,16 @@ Wide moat secured by patents.
         """Rule 6 Outside-In verification: asserts #epistemicFalsificationCard and .epistemic-badge render in DOM across all 4 dossier routes."""
         from bs4 import BeautifulSoup
         from fastapi.testclient import TestClient
+        from core.db import get_report_by_ticker_sync, save_report_to_archive, save_cached_fundamentals
         from web.main import app
+
+        if not get_report_by_ticker_sync("TCS"):
+            save_report_to_archive(
+                stock_data={"ticker": "TCS", "short_name": "Tata Consultancy Services Ltd", "current_price": 3850.0, "pe_ratio": "28.0", "market_cap": 14000000000000.0},
+                report_text="## Pillar 1: Macro\n[VERIFIED FACT: BSE filing verified.]\n\n## Pillar 5: Valuation\n[CALCULATED METRIC: ROE 48%.]\n",
+                announcement="Quarterly financial results.",
+            )
+            save_cached_fundamentals("TCS", {"current_price": 3850.0, "pe_ratio": 28.0, "roce": 54.0, "debt_to_equity": 0.05, "operating_margin": 26.0})
 
         client = TestClient(app)
         routes = [

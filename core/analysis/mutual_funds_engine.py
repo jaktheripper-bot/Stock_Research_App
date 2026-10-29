@@ -112,20 +112,34 @@ def calculate_active_share(
     benchmark_name: str = "NIFTY 500 TRI",
     stated_active_share: Optional[float] = None
 ) -> Dict[str, Any]:
-    """Computes Active Share AS = 0.5 * sum(|w_fund - w_bench|) to expose closet indexing."""
+    """Computes Active Share AS = 0.5 * sum(|w_fund - w_bench|) to expose closet indexing.
+
+    Fails closed (active_share_pct=None) when constituent holdings have not been ingested
+    or when no equity sleeve exists and no verified stated Active Share is disclosed.
+    """
+    if not holdings:
+        return {
+            "active_share_pct": None,
+            "posture": "PENDING_HOLDINGS_SYNC",
+            "badge": "badge-neutral",
+            "description": "Active Share withheld pending statutory monthly portfolio constituent ingestion.",
+            "is_closet_indexer": False,
+        }
+
+    # Aggregate holdings weights by identifier and normalize to equity sleeve
+    raw_weights: Dict[str, float] = {}
+    for h in holdings:
+        ident = (h.get("identifier") or "").strip().upper()
+        if ident and h.get("holding_type") in ("EQUITY", "FOREIGN_EQUITY"):
+            w_val = float(h.get("weight_pct") or 0.0)
+            if w_val > 0.0:
+                raw_weights[ident] = raw_weights.get(ident, 0.0) + w_val
+
     if stated_active_share is not None and float(stated_active_share) > 0:
         active_share = float(stated_active_share)
-    else:
+    elif raw_weights and sum(raw_weights.values()) > 0.0:
         bench = BENCHMARK_PROXIES.get(benchmark_name.strip().upper(), BENCHMARK_PROXIES["NIFTY 500 TRI"])
-
-        # Aggregate holdings weights by identifier and normalize to equity sleeve
-        raw_weights = {}
-        for h in holdings:
-            ident = h.get("identifier", "").strip().upper()
-            if ident and h.get("holding_type") in ("EQUITY", "FOREIGN_EQUITY"):
-                raw_weights[ident] = raw_weights.get(ident, 0.0) + float(h.get("weight_pct", 0.0))
-
-        tot_eq = sum(raw_weights.values()) or 100.0
+        tot_eq = sum(raw_weights.values())
         fund_weights = {k: (v / tot_eq) * 100.0 for k, v in raw_weights.items()}
 
         all_keys = set(fund_weights.keys()).union(set(bench.keys()))
@@ -140,6 +154,14 @@ def calculate_active_share(
 
         active_share = round(0.5 * diff_sum, 1)
         active_share = min(100.0, max(0.0, active_share))
+    else:
+        return {
+            "active_share_pct": None,
+            "posture": "NOT_APPLICABLE_DEBT",
+            "badge": "badge-neutral",
+            "description": "Equity Active Share is not applicable to pure fixed-income or money-market portfolios.",
+            "is_closet_indexer": False,
+        }
 
     if active_share >= 60.0:
         posture = "TRUE_ACTIVE_ALPHA"
@@ -710,14 +732,21 @@ def evaluate_mutual_fund_comprehensive(
         stated_active_share=scheme.get("active_share_pct")
     )
 
-    # Pillar 5: Fee Drag (use 0.0 when TER is undisclosed rather than synthetic 0.7 / 1.5%)
+    # Pillar 5: Fee Drag (use 0.0 when TER is undisclosed rather than synthetic 0.7 / 1.5%, and tag status)
     ter_dir_raw = scheme.get("ter_direct_pct")
     ter_reg_raw = scheme.get("ter_regular_pct")
+    ter_dir_f = float(ter_dir_raw) if ter_dir_raw is not None else 0.0
+    ter_reg_f = float(ter_reg_raw) if ter_reg_raw is not None else 0.0
     fee_drag_res = calculate_fee_drag(
-        ter_direct_pct=float(ter_dir_raw) if ter_dir_raw is not None else 0.0,
-        ter_regular_pct=float(ter_reg_raw) if ter_reg_raw is not None else 0.0,
+        ter_direct_pct=ter_dir_f,
+        ter_regular_pct=ter_reg_f,
         initial_investment_lakhs=10.0,
         assumed_gross_return_pct=12.5
+    )
+    fee_drag_res["status"] = (
+        "COMPUTED"
+        if (ter_dir_raw is not None and ter_reg_raw is not None and (ter_dir_f > 0.0 or ter_reg_f > 0.0))
+        else "PENDING_TER_DISCLOSURE"
     )
 
     # Pillar 3 & 4: Risk & Capture Metrics (Fail-closed when NAV series / metadata is absent)

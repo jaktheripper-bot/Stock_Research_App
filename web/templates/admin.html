@@ -64,6 +64,12 @@
   gap: 16px;
   margin-bottom: 24px;
 }
+.kpi-grid-3 {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 16px;
+  margin-bottom: 24px;
+}
 .kpi-grid-5 {
   display: grid;
   grid-template-columns: repeat(5, minmax(0, 1fr));
@@ -81,10 +87,12 @@
   .kpi-grid-6 { grid-template-columns: repeat(3, minmax(0, 1fr)); }
 }
 @media (max-width: 900px) {
+  .kpi-grid-3 { grid-template-columns: repeat(2, minmax(0, 1fr)); }
   .kpi-grid-5 { grid-template-columns: repeat(2, minmax(0, 1fr)); }
   .kpi-grid-6 { grid-template-columns: repeat(2, minmax(0, 1fr)); }
 }
 @media (max-width: 580px) {
+  .kpi-grid-3 { grid-template-columns: 1fr; }
   .kpi-grid-5 { grid-template-columns: 1fr; }
   .kpi-grid-6 { grid-template-columns: 1fr; }
 }
@@ -95,11 +103,55 @@
   padding: 18px 20px;
   position: relative;
   overflow: hidden;
-  transition: transform 0.2s ease, border-color 0.2s ease;
+  transition: transform 0.2s ease, border-color 0.2s ease, box-shadow 0.2s ease;
 }
-.kpi-card:hover {
+.kpi-card-interactive {
+  cursor: pointer;
+}
+.kpi-card-interactive:hover,
+.kpi-card-interactive:has(.kpi-card-trigger:hover) {
   transform: translateY(-2px);
-  border-color: rgba(14, 165, 233, 0.4);
+  border-color: rgba(14, 165, 233, 0.45);
+  box-shadow: 0 8px 22px rgba(2, 6, 23, 0.35);
+}
+.kpi-card-interactive:has(.kpi-card-trigger:focus-visible) {
+  outline: 2px solid #38bdf8;
+  outline-offset: 2px;
+  border-color: rgba(56, 189, 248, 0.6);
+}
+.kpi-card-trigger {
+  position: static !important;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 0 !important;
+  margin: 0;
+  background: transparent !important;
+  border: none !important;
+  box-shadow: none !important;
+  font-family: inherit;
+  font-size: 11.5px;
+  font-weight: 700;
+  color: var(--accent-cyan, #38bdf8);
+  cursor: pointer;
+  text-align: left;
+  max-width: 100%;
+  min-height: 0;
+}
+.kpi-card-trigger.success {
+  color: #10b981;
+}
+.kpi-card-trigger:focus,
+.kpi-card-trigger:focus-visible {
+  outline: none !important;
+}
+.kpi-card-trigger::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+}
+[tabindex="-1"]:focus:not(:focus-visible) {
+  outline: none;
 }
 .kpi-label {
   font-size: 12px;
@@ -790,15 +842,36 @@ html[data-theme="light"] a[href="/admin/logout"]:hover {
   background: rgba(185, 28, 28, 0.08) !important;
 }
 
-/* 5 Top Executive KPI Cards */
+/* Executive & Hub KPI Cards */
 html[data-theme="light"] .kpi-card {
   background: #FFFFFF !important;
   border: 1px solid #DCD6C6 !important;
   box-shadow: 0 2px 8px rgba(11, 35, 55, 0.04);
 }
-html[data-theme="light"] .kpi-card:hover {
+html[data-theme="light"] .kpi-card-interactive:has(.kpi-card-trigger:hover) {
   border-color: #0E3D32 !important;
   box-shadow: 0 6px 16px rgba(11, 35, 55, 0.08);
+}
+html[data-theme="light"] .kpi-card-interactive:has(.kpi-card-trigger:focus-visible) {
+  outline: 2px solid #0E3D32 !important;
+  outline-offset: 2px;
+  border-color: #0E3D32 !important;
+}
+html[data-theme="light"] .kpi-card-trigger {
+  color: #0369A1 !important;
+}
+html[data-theme="light"] .kpi-card-trigger.success {
+  color: #047857 !important;
+}
+html[data-theme="light"] #governanceAuditorCard {
+  background: #F0FDF4 !important;
+  border-color: rgba(14, 61, 50, 0.28) !important;
+}
+html[data-theme="light"] #governanceAuditorCard h3 {
+  color: #0B2337 !important;
+}
+html[data-theme="light"] #governanceAuditorCard p {
+  color: #46545E !important;
 }
 html[data-theme="light"] .kpi-label {
   color: #46545E !important;
@@ -1266,33 +1339,32 @@ html[data-theme="light"] .copilot-input {
   </div>
   {% endif %}
 
-  <!-- 5 Top Executive KPI Cards -->
-  <div class="kpi-grid-5">
-    <div class="kpi-card">
+  <!-- 3 Top Interactive Executive KPI Cards -->
+  <div class="kpi-grid-3" id="adminTopKpiStrip">
+    <article class="kpi-card kpi-card-interactive">
       <div class="kpi-label">Unique Sessions</div>
       <div class="kpi-value">{{ summary.unique_sessions }}</div>
-      <div class="kpi-delta">Distinct Visitor Footprints</div>
-    </div>
-    <div class="kpi-card">
+      <button type="button" class="btn kpi-card-trigger" onclick="navigateToAdminSection('journeys', 'headingSessionJourneys')">
+        <span>Distinct Visitor Footprints</span>
+        <span aria-hidden="true">→ Session Journeys</span>
+      </button>
+    </article>
+    <article class="kpi-card kpi-card-interactive">
       <div class="kpi-label">Total Actions <span><svg class="glyph"><use href="#glyph-zap"></use></svg></span></div>
       <div class="kpi-value">{{ summary.total_actions }}</div>
-      <div class="kpi-delta">Queries, Dockets & Exports</div>
-    </div>
-    <div class="kpi-card">
-      <div class="kpi-label">Cache Efficiency <span><svg class="glyph"><use href="#glyph-shield"></use></svg></span></div>
-      <div class="kpi-value">{{ summary.cache_efficiency_pct }}%</div>
-      <div class="kpi-delta success">Zero-Cost Instant Serve</div>
-    </div>
-    <div class="kpi-card">
-      <div class="kpi-label">Est. API Cost Saved <span title="Heuristic estimate based on ~₹1.26 baseline token generation cost mitigated per cached response"></span></div>
-      <div class="kpi-value">₹{{ "{:,.2f}".format(summary.total_cost_saved_inr | default((summary.total_cost_saved_usd | default(0.0)) * 84.0)) }}</div>
-      <div class="kpi-delta success">Cache Mitigation Heuristic</div>
-    </div>
-    <div class="kpi-card">
+      <button type="button" class="btn kpi-card-trigger" onclick="navigateToAdminSection('actions', 'headingActionBreakdown')">
+        <span>Queries, Dockets &amp; Exports</span>
+        <span aria-hidden="true">→ Action Breakdown</span>
+      </button>
+    </article>
+    <article class="kpi-card kpi-card-interactive">
       <div class="kpi-label">PDFs Exported</div>
       <div class="kpi-value">{{ summary.pdf_downloads }}</div>
-      <div class="kpi-delta">Research Reports</div>
-    </div>
+      <button type="button" class="btn kpi-card-trigger" onclick="navigateToAdminSection('users', 'headingTopActiveUsers')">
+        <span>Research Reports</span>
+        <span aria-hidden="true">→ User Export Ledger</span>
+      </button>
+    </article>
   </div>
 
   <!-- Executive Command Overview (4-Card Action Strip) -->
@@ -1313,9 +1385,9 @@ html[data-theme="light"] .copilot-input {
       <span style="font-size: 11px; color: #94a3b8; margin-top: 2px;">Multi-Asset Catalog & Schedulers → Inspect</span>
     </button>
     <button type="button" class="btn btn-secondary" onclick="showTab('users')" style="display: flex; flex-direction: column; align-items: flex-start; text-align: left; padding: 14px 16px; background: rgba(168, 85, 247, 0.08); border: 1px solid rgba(168, 85, 247, 0.28); border-radius: 10px; cursor: pointer;">
-      <span style="font-size: 11px; font-weight: 800; color: #d8b4fe; text-transform: uppercase; letter-spacing: 0.05em;">4. Active Allocators & Compute</span>
-      <span style="font-size: 20px; font-weight: 800; color: #f8fafc; margin-top: 4px;" class="tnum">{{ summary.unique_sessions | default(0) if summary else 0 }} Sessions</span>
-      <span style="font-size: 11px; color: #94a3b8; margin-top: 2px;">{{ "%.1f"|format(summary.cache_efficiency_pct | default(0)) if summary else "0.0" }}% Cache Hit Rate → Manage Users</span>
+      <span style="font-size: 11px; font-weight: 800; color: #d8b4fe; text-transform: uppercase; letter-spacing: 0.05em;">4. Registered Accounts &amp; Usage</span>
+      <span style="font-size: 20px; font-weight: 800; color: #f8fafc; margin-top: 4px;" class="tnum">{{ user_analytics.total_registered_users | default(0) if user_analytics else 0 }} Accounts</span>
+      <span style="font-size: 11px; color: #94a3b8; margin-top: 2px;">{{ user_analytics.active_users_in_period | default(0) if user_analytics else 0 }} active in period → Manage Users</span>
     </button>
   </div>
 
@@ -1351,11 +1423,11 @@ html[data-theme="light"] .copilot-input {
     </button>
     <button type="button" class="btn admin-hub-btn {% if current_hub == 'platform' %}active{% endif %}" data-hub="platform" onclick="showHub('platform')">
       <span class="admin-hub-title"><span>4. Catalog &amp; AI Quotas</span></span>
-      <span class="admin-hub-sub">Asset Monitoring &amp; Gemini Spends</span>
+      <span class="admin-hub-sub">Cache Efficiency, Catalog &amp; Gemini Spends</span>
     </button>
     <button type="button" class="btn admin-hub-btn {% if current_hub == 'governance' %}active{% endif %}" data-hub="governance" onclick="showHub('governance')">
       <span class="admin-hub-title"><span><svg class="glyph" style="width: 14px; height: 14px;"><use href="#glyph-shield"></use></svg> 5. Security &amp; Audit</span></span>
-      <span class="admin-hub-sub">Audit Trail, Live Stream &amp; Team</span>
+      <span class="admin-hub-sub">Project Auditor, Audit Trail &amp; Team</span>
     </button>
   </div>
 
@@ -1402,9 +1474,29 @@ html[data-theme="light"] .copilot-input {
     <button class="admin-tab-btn {% if current_tab == 'team' %}active{% endif %}" data-hub="governance" data-tab="team" onclick="showTab('team')" style="{% if current_hub != 'governance' %}display: none;{% endif %}">
       Team & Access
     </button>
-    <a href="/admin/audit" class="admin-tab-btn" data-hub="governance" style="text-decoration: none; color: #38bdf8; border: 1px solid rgba(14, 165, 233, 0.4); background: rgba(14, 165, 233, 0.12); flex-shrink: 0; margin-left: auto;">
+    <a href="/admin/audit" class="admin-tab-btn" data-hub="governance" style="{% if current_hub != 'governance' %}display: none;{% else %}display: inline-flex;{% endif %} text-decoration: none; color: #38bdf8; border: 1px solid rgba(14, 165, 233, 0.4); background: rgba(14, 165, 233, 0.12); flex-shrink: 0; margin-left: auto;">
       <svg class="glyph"><use href="#glyph-shield"></use></svg> Autonomous Project Auditor →
     </a>
+  </div>
+
+  <!-- Hub 4 (Catalog & AI Quotas): Cache Efficiency & Est. API Cost Saved -->
+  <div id="platformQuotaCacheKpis" data-hub-section="platform" class="kpi-grid" style="{% if current_hub != 'platform' %}display: none;{% else %}display: grid;{% endif %} grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); margin-bottom: 20px;">
+    <article class="kpi-card kpi-card-interactive" style="border-left: 3px solid #10b981;">
+      <div class="kpi-label">Cache Efficiency <span><svg class="glyph"><use href="#glyph-shield"></use></svg></span></div>
+      <div class="kpi-value">{{ summary.cache_efficiency_pct }}%</div>
+      <button type="button" class="btn kpi-card-trigger success" onclick="navigateToAdminSection('ai-spends', 'headingAiSpendsTelemetry')">
+        <span>Zero-Cost Instant Serve</span>
+        <span aria-hidden="true">→ Gemini Spend Telemetry</span>
+      </button>
+    </article>
+    <article class="kpi-card kpi-card-interactive" style="border-left: 3px solid #38bdf8;">
+      <div class="kpi-label">Est. API Cost Saved <span title="Heuristic estimate based on ~₹1.26 baseline token generation cost mitigated per cached response"></span></div>
+      <div class="kpi-value">₹{{ "{:,.2f}".format(summary.total_cost_saved_inr | default((summary.total_cost_saved_usd | default(0.0)) * 84.0)) }}</div>
+      <button type="button" class="btn kpi-card-trigger success" onclick="navigateToAdminSection('ai-spends', 'headingAiSpendsTelemetry')">
+        <span>Cache Mitigation Heuristic</span>
+        <span aria-hidden="true">→ AI Quotas &amp; Spends</span>
+      </button>
+    </article>
   </div>
 
   <!-- TAB 1: Live Billables & Invoices -->
@@ -1554,7 +1646,7 @@ html[data-theme="light"] .copilot-input {
 
     <div class="admin-card">
       <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px;">
-        <h3 style="margin: 0; font-size: 16px; font-weight: 700;">Top Active Users in Period</h3>
+        <h3 id="headingTopActiveUsers" tabindex="-1" style="margin: 0; font-size: 16px; font-weight: 700;">Top Active Users in Period</h3>
         <button type="button" class="btn btn-primary btn-sm" onclick="openGrantCreditsModal('', '', 'TASK_REMEDY', '')" style="display: flex; align-items: center; gap: 6px; font-weight: 600; cursor: pointer;">
           <svg class="glyph"><use href="#glyph-zap"></use></svg> Direct Credit Grant
         </button>
@@ -2721,7 +2813,7 @@ html[data-theme="light"] .copilot-input {
   <div id="tab-actions" class="admin-tab-pane {% if active_tab == 'actions' %}active{% endif %}">
     <div class="grid-2col">
       <div class="admin-card">
-        <h3 style="margin-top: 0; font-size: 16px; font-weight: 700; margin-bottom: 16px;">Action Breakdown</h3>
+        <h3 id="headingActionBreakdown" tabindex="-1" style="margin-top: 0; font-size: 16px; font-weight: 700; margin-bottom: 16px;">Action Breakdown</h3>
         <div class="admin-table-wrap">
           <table class="admin-table">
             <thead>
@@ -2785,7 +2877,7 @@ html[data-theme="light"] .copilot-input {
   <!-- TAB 6: Session Journeys -->
   <div id="tab-journeys" class="admin-tab-pane {% if active_tab == 'journeys' %}active{% endif %}">
     <div class="admin-card">
-      <h3 style="margin-top: 0; font-size: 16px; font-weight: 700; margin-bottom: 16px;">Recent Visitor Session Journeys</h3>
+      <h3 id="headingSessionJourneys" tabindex="-1" style="margin-top: 0; font-size: 16px; font-weight: 700; margin-bottom: 16px;">Recent Visitor Session Journeys</h3>
       <p style="color: var(--text-secondary, #94a3b8); font-size: 13px; margin-bottom: 20px;">
         Chronological step-by-step visitor breadcrumbs across the platform.
       </p>
@@ -2964,6 +3056,20 @@ html[data-theme="light"] .copilot-input {
 
   <!-- TAB 9: Immutable Administrator Audit Trail -->
   <div id="tab-audit" class="admin-tab-pane {% if active_tab == 'audit' %}active{% endif %}">
+    <div id="governanceAuditorCard" class="admin-card" style="display: flex; justify-content: space-between; align-items: center; gap: 16px; flex-wrap: wrap; margin-bottom: 20px; background: rgba(14, 165, 233, 0.08); border: 1px solid rgba(14, 165, 233, 0.3);">
+      <div>
+        <h3 style="margin: 0; font-size: 16px; font-weight: 800; color: #f8fafc; display: flex; align-items: center; gap: 8px;">
+          <svg class="glyph" style="width: 15px; height: 15px;"><use href="#glyph-shield"></use></svg> Autonomous Project Auditor
+        </h3>
+        <p style="color: var(--text-secondary, #94a3b8); font-size: 13px; margin: 4px 0 0 0;">
+          Continuous 37-endpoint outside-in probe, 12 Reality Gates, SEBI statutory compliance, and AST hygiene diagnostics.
+        </p>
+      </div>
+      <a href="/admin/audit" class="btn btn-primary btn-sm" style="display: inline-flex; align-items: center; gap: 6px; font-weight: 700; text-decoration: none; white-space: nowrap;">
+        <svg class="glyph" style="width: 14px; height: 14px;"><use href="#glyph-shield"></use></svg> Open Autonomous Project Auditor →
+      </a>
+    </div>
+
     <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px;">
       <div>
         <h3 style="margin: 0; font-size: 18px; font-weight: 800;"><svg class="glyph"><use href="#glyph-shield"></use></svg> Immutable Administrator Audit Ledger</h3>
@@ -3215,7 +3321,7 @@ html[data-theme="light"] .copilot-input {
   <div id="tab-ai-spends" class="admin-tab-pane {% if active_tab == 'ai-spends' %}active{% endif %}">
     <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; flex-wrap: wrap; gap: 12px;">
       <div>
-        <h2 style="margin: 0; font-size: 20px; font-weight: 800; color: #f8fafc; display: flex; align-items: center; gap: 10px;">
+        <h2 id="headingAiSpendsTelemetry" tabindex="-1" style="margin: 0; font-size: 20px; font-weight: 800; color: #f8fafc; display: flex; align-items: center; gap: 10px;">
           Google Gemini Spends &amp; Model Telemetry
         </h2>
         <p style="margin: 4px 0 0 0; font-size: 13px; color: #94a3b8;">
@@ -5257,10 +5363,25 @@ html[data-theme="light"] .copilot-input {
         btn.classList.remove('active');
       }
     });
-    document.querySelectorAll('#adminSubTabNav .admin-tab-btn[data-tab]').forEach(btn => {
-      const btnHub = btn.getAttribute('data-hub');
-      btn.style.display = (btnHub === hubName) ? 'inline-flex' : 'none';
+    document.querySelectorAll('#adminSubTabNav [data-hub]').forEach(el => {
+      const elHub = el.getAttribute('data-hub');
+      el.style.display = (elHub === hubName) ? 'inline-flex' : 'none';
     });
+    document.querySelectorAll('[data-hub-section]').forEach(sec => {
+      const secHub = sec.getAttribute('data-hub-section');
+      sec.style.display = (secHub === hubName) ? 'grid' : 'none';
+    });
+  }
+
+  function navigateToAdminSection(tabName, targetId) {
+    showTab(tabName);
+    if (!targetId) return;
+    const targetEl = document.getElementById(targetId);
+    if (targetEl) {
+      const prefersReducedMotion = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+      targetEl.scrollIntoView({ behavior: prefersReducedMotion ? 'auto' : 'smooth', block: 'start' });
+      targetEl.focus({ preventScroll: true });
+    }
   }
 
   function showHub(hubName) {

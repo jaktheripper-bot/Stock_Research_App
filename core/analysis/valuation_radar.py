@@ -30,6 +30,15 @@ def _safe_float(v: Any, default: float = 0.0) -> float:
         return default
 
 
+def _format_implied_growth(low_g: float, high_g: float) -> tuple[float, bool, str]:
+    mid_pct = round(((low_g + high_g) / 2.0) * 100.0, 1)
+    if mid_pct >= 44.9:
+        return 45.0, True, ">45.0% CAGR"
+    if mid_pct <= -19.9:
+        return -20.0, True, "<-20.0% CAGR"
+    return mid_pct, False, f"{mid_pct}% CAGR"
+
+
 def compute_valuation_radar(
     current_price: float,
     pe_ratio: float,
@@ -66,6 +75,8 @@ def compute_valuation_radar(
                 "terminal_growth_pct": round(_safe_float(terminal_growth_rate, default=0.045) * 100.0, 1),
                 "historical_median_pe": 0.0,
                 "implied_fcf_growth_pct": 0.0,
+                "implied_fcf_growth_bounded": False,
+                "implied_fcf_growth_display": "0.0% CAGR",
             },
             "models": {}
         }
@@ -89,7 +100,8 @@ def compute_valuation_radar(
                 low_g = mid_g
             else:
                 high_g = mid_g
-        implied_g = round(((low_g + high_g) / 2.0) * 100.0, 1)
+        implied_g, is_bounded, implied_display = _format_implied_growth(low_g, high_g)
+        bound_note = " [bounded solver limit]" if is_bounded else ""
         return {
             "status": "IMPLIED_GROWTH_ONLY",
             "current_price": c_price,
@@ -98,11 +110,11 @@ def compute_valuation_radar(
             "range_high": 0.0,
             "margin_of_safety_pct": None,
             "regime": "EXTREME_MULTIPLE_REGIME",
-            "badge_label": f"Implied Growth ({implied_g}% CAGR)",
+            "badge_label": f"Implied Growth ({implied_display})",
             "badge_color": "#f59e0b",
             "summary": (
                 f"Trailing P/E ({pe:.1f}x) reflects non-normalized or early inflection-stage earnings; "
-                f"evaluated via Reverse-DCF market-implied 5Y FCF growth ({implied_g}% CAGR at {disc_rate*100:.1f}% WACC)."
+                f"evaluated via Reverse-DCF market-implied 5Y FCF growth ({implied_display}{bound_note} at {disc_rate*100:.1f}% WACC)."
             ),
             "inputs": {
                 "normalized_eps": s_eps,
@@ -111,6 +123,8 @@ def compute_valuation_radar(
                 "terminal_growth_pct": round(term_rate * 100.0, 1),
                 "historical_median_pe": 0.0,
                 "implied_fcf_growth_pct": implied_g,
+                "implied_fcf_growth_bounded": is_bounded,
+                "implied_fcf_growth_display": implied_display,
             },
             "models": {},
         }
@@ -171,11 +185,12 @@ def compute_valuation_radar(
     min_range = round(min(model1_pe_value, model2_dcf_value, model3_epv_value), 2)
     max_range = round(max(model1_pe_value, model2_dcf_value, model3_epv_value), 2)
 
-    # Margin of Safety %
-    # Positive means current price is below fair value (Discount)
-    # Negative means current price is above fair value (Premium / Overvalued)
+    # Margin of Safety % (Symmetric Graham Margin of Safety):
+    # - Discount (FV >= P): exact Benjamin Graham (FV - P) / FV in [0%, +100%)
+    # - Premium (P > FV): bounded downside (FV - P) / P in (-100%, 0%)
     if c_price > 0 and composite_fair_value > 0:
-        margin_of_safety = round(((composite_fair_value - c_price) / c_price) * 100.0, 1)
+        denom = max(composite_fair_value, c_price)
+        margin_of_safety = round(((composite_fair_value - c_price) / denom) * 100.0, 1)
     else:
         margin_of_safety = 0.0
 
@@ -207,8 +222,10 @@ def compute_valuation_radar(
 
     g_rate = growth_rate
 
-    # Reverse-solve implied 10Y growth rate required to justify current_price at discount_rate
+    # Reverse-solve implied 5Y Stage-1 growth rate required to justify current_price at discount_rate
     implied_g = 0.0
+    is_bounded = False
+    implied_display = "0.0% CAGR"
     if s_eps > 0 and current_price > 0:
         low_g, high_g = -0.20, 0.45
         for _ in range(32):
@@ -224,7 +241,7 @@ def compute_valuation_radar(
                 low_g = mid_g
             else:
                 high_g = mid_g
-        implied_g = round(((low_g + high_g) / 2.0) * 100.0, 1)
+        implied_g, is_bounded, implied_display = _format_implied_growth(low_g, high_g)
 
     return {
         "status": "COMPUTED",
@@ -244,6 +261,8 @@ def compute_valuation_radar(
             "terminal_growth_pct": round(terminal_growth_rate * 100.0, 1),
             "historical_median_pe": round(med_pe, 1),
             "implied_fcf_growth_pct": implied_g,
+            "implied_fcf_growth_bounded": is_bounded,
+            "implied_fcf_growth_display": implied_display,
         },
         "models": {
             "historical_pe_model": {

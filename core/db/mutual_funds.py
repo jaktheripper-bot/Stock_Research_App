@@ -301,30 +301,49 @@ def save_mutual_fund_holdings(scheme_code: str, holdings: List[Dict[str, Any]]) 
         else:
             cursor.execute("DELETE FROM mutual_fund_holdings WHERE scheme_code = ?;", (clean_code,))
 
+        deduped_holdings: Dict[tuple, tuple] = {}
         for h in holdings:
-            h_type = h.get("holding_type", "EQUITY").upper()
-            ident = h.get("identifier", "").strip().upper()
+            h_type = str(h.get("holding_type", "EQUITY") or "EQUITY").strip().upper()
+            ident = str(h.get("identifier", "") or "").strip().upper()
+            if not ident:
+                continue
             name = h.get("holding_name", ident)
             weight = float(h.get("weight_pct", 0.0))
             sector = h.get("sector_or_rating", "Diversified")
             port_date = h.get("portfolio_date", datetime.now(IST).date().isoformat())
             det = h.get("instrument_details", {})
             det_json = json.dumps(det) if isinstance(det, dict) else str(det)
+            deduped_holdings[(h_type, ident)] = (
+                clean_code, h_type, ident, name, weight, sector, det_json, port_date
+            )
 
+        for row_vals in deduped_holdings.values():
             if use_pg:
                 cursor.execute("""
                     INSERT INTO mutual_fund_holdings (
                         scheme_code, holding_type, identifier, holding_name,
                         weight_pct, sector_or_rating, instrument_details, portfolio_date
-                    ) VALUES (%s, %s, %s, %s, %s, %s, %s, %s);
-                """, (clean_code, h_type, ident, name, weight, sector, det_json, port_date))
+                    ) VALUES (%s, %s, %s, %s, %s, %s, %s, %s)
+                    ON CONFLICT (scheme_code, holding_type, identifier) DO UPDATE SET
+                        holding_name = EXCLUDED.holding_name,
+                        weight_pct = EXCLUDED.weight_pct,
+                        sector_or_rating = EXCLUDED.sector_or_rating,
+                        instrument_details = EXCLUDED.instrument_details,
+                        portfolio_date = EXCLUDED.portfolio_date;
+                """, row_vals)
             else:
                 cursor.execute("""
                     INSERT INTO mutual_fund_holdings (
                         scheme_code, holding_type, identifier, holding_name,
                         weight_pct, sector_or_rating, instrument_details, portfolio_date
-                    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?);
-                """, (clean_code, h_type, ident, name, weight, sector, det_json, port_date))
+                    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+                    ON CONFLICT (scheme_code, holding_type, identifier) DO UPDATE SET
+                        holding_name = excluded.holding_name,
+                        weight_pct = excluded.weight_pct,
+                        sector_or_rating = excluded.sector_or_rating,
+                        instrument_details = excluded.instrument_details,
+                        portfolio_date = excluded.portfolio_date;
+                """, row_vals)
 
         conn.commit()
         return True
@@ -373,16 +392,14 @@ def get_active_mutual_funds(
     broad_category: Optional[str] = None,
     limit: Optional[int] = 500,
     audited_only: bool = False,
-    dedupe_twins: Optional[bool] = None,
+    dedupe_twins: Optional[bool] = False,
 ) -> List[Dict[str, Any]]:
     """Retrieves active mutual fund schemes filtered by category."""
     conn = get_db_connection()
     cursor = conn.cursor()
     use_pg = is_postgres_connection(conn)
 
-    should_dedupe = audited_only if dedupe_twins is None else bool(dedupe_twins)
-    if dedupe_twins is None and limit is not None and 0 < int(limit) <= 1000:
-        should_dedupe = True
+    should_dedupe = bool(dedupe_twins)
 
     clauses = ["SUBSTR(scheme_code, 1, 5) != 'TEST_'"]
     params = []
@@ -5193,7 +5210,8 @@ def save_fund_forensic_dossier(dossier: Dict[str, Any]) -> bool:
     asri = float(dossier.get("accounting_risk_index", 0.0))
     mos = float(dossier.get("margin_of_safety_pct", 0.0))
     pledge = float(dossier.get("promoter_pledge_exposure_pct", 0.0))
-    active_share = float(dossier.get("active_share_pct", 0.0))
+    raw_as_dos = dossier.get("active_share_pct")
+    active_share = float(raw_as_dos) if raw_as_dos is not None else None
     risky_json = json.dumps(dossier.get("top_risky_holdings", []))
     quality_json = json.dumps(dossier.get("top_quality_holdings", []))
     auditor = dossier.get("audited_by", "Gemini_Chief_Forensic_Officer")

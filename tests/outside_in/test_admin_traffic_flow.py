@@ -432,6 +432,74 @@ class TestAdminTrafficUiAndDomContracts(unittest.TestCase):
         self.assertIn("TAB_TO_HUB_MAP", script_text)
         self.assertIn("HUB_DEFAULT_TAB_MAP", script_text)
 
+    def test_executive_kpi_navigation_and_hub_scoping_contracts(self):
+        """Verify interactive Top KPIs, Catalog & AI Quotas cache metrics, and Governance-scoped Project Auditor."""
+        # 1. Default Revenue Hub (/admin?tab=users)
+        resp_rev = self.client.get("/admin?tab=users")
+        self.assertEqual(resp_rev.status_code, 200)
+        soup_rev = BeautifulSoup(resp_rev.text, "html.parser")
+
+        top_strip = soup_rev.find("div", id="adminTopKpiStrip")
+        self.assertIsNotNone(top_strip, "Missing #adminTopKpiStrip 3-card interactive strip.")
+        top_cards = top_strip.find_all("article", class_="kpi-card-interactive")
+        self.assertEqual(len(top_cards), 3, "Expected exactly 3 interactive top KPI cards.")
+        self.assertNotIn("Cache Efficiency", top_strip.get_text())
+        self.assertNotIn("Est. API Cost Saved", top_strip.get_text())
+
+        expected_targets = [
+            ("Unique Sessions", "journeys", "headingSessionJourneys"),
+            ("Total Actions", "actions", "headingActionBreakdown"),
+            ("PDFs Exported", "users", "headingTopActiveUsers"),
+        ]
+        for label, tab_id, heading_id in expected_targets:
+            self.assertIn(label, top_strip.get_text())
+            trigger = top_strip.find(
+                "button",
+                onclick=f"navigateToAdminSection('{tab_id}', '{heading_id}')",
+            )
+            self.assertIsNotNone(trigger, f"Missing interactive KPI trigger for {label} -> {tab_id}#{heading_id}")
+            self.assertIsNotNone(soup_rev.find(id=f"tab-{tab_id}"), f"Missing target tab pane #tab-{tab_id}")
+            heading_el = soup_rev.find(id=heading_id)
+            self.assertIsNotNone(heading_el, f"Missing target section heading #{heading_id}")
+            self.assertEqual(heading_el.get("tabindex"), "-1")
+
+        # Cache Efficiency & Est. API Cost Saved must sit in Catalog & AI Quotas (hidden on Revenue hub)
+        platform_kpis_rev = soup_rev.find("div", id="platformQuotaCacheKpis")
+        self.assertIsNotNone(platform_kpis_rev)
+        self.assertEqual(platform_kpis_rev.get("data-hub-section"), "platform")
+        self.assertIn("display: none", platform_kpis_rev.get("style", ""))
+        self.assertIn("Cache Efficiency", platform_kpis_rev.get_text())
+        self.assertIn("Est. API Cost Saved", platform_kpis_rev.get_text())
+
+        # Autonomous Project Auditor link in sub-tab bar must NOT display on Revenue & Users
+        sub_nav_rev = soup_rev.find("div", id="adminSubTabNav")
+        auditor_sub_link_rev = sub_nav_rev.find("a", href="/admin/audit")
+        self.assertIsNotNone(auditor_sub_link_rev)
+        self.assertEqual(auditor_sub_link_rev.get("data-hub"), "governance")
+        self.assertIn("display: none", auditor_sub_link_rev.get("style", ""))
+
+        # 2. Catalog & AI Quotas Hub (/admin?tab=assets) reveals Cache Efficiency & Est. API Cost Saved
+        resp_plat = self.client.get("/admin?tab=assets")
+        self.assertEqual(resp_plat.status_code, 200)
+        soup_plat = BeautifulSoup(resp_plat.text, "html.parser")
+        platform_kpis_plat = soup_plat.find("div", id="platformQuotaCacheKpis")
+        self.assertIn("display: grid", platform_kpis_plat.get("style", ""))
+        self.assertNotIn("display: none", platform_kpis_plat.get("style", ""))
+
+        # 3. Security & Audit Hub (/admin?tab=audit) surfaces Autonomous Project Auditor cleanly
+        resp_gov = self.client.get("/admin?tab=audit")
+        self.assertEqual(resp_gov.status_code, 200)
+        soup_gov = BeautifulSoup(resp_gov.text, "html.parser")
+        auditor_sub_link_gov = soup_gov.find("div", id="adminSubTabNav").find("a", href="/admin/audit")
+        self.assertIn("display: inline-flex", auditor_sub_link_gov.get("style", ""))
+        self.assertNotIn("display: none", auditor_sub_link_gov.get("style", ""))
+        gov_card = soup_gov.find("div", id="governanceAuditorCard")
+        self.assertIsNotNone(gov_card, "Missing #governanceAuditorCard inside #tab-audit.")
+        self.assertIsNotNone(gov_card.find("a", href="/admin/audit"))
+
+        script_text = "\n".join(s.string for s in soup_gov.find_all("script") if s.string)
+        self.assertIn("function navigateToAdminSection(", script_text)
+
 
 
 

@@ -1,7 +1,7 @@
 # Multi-Asset Institutional Report Evaluation Frameworks, Data Sources & Operational Flows Specification
 
 **Document Identifier:** `docs/REPORT_EVALUATION_FRAMEWORKS.md`  
-**Document Version:** 3.5.2 | **Effective Date:** 2026-10-29  
+**Document Version:** 3.5.3 | **Effective Date:** 2026-10-30  
 **Target System:** `Stock Research App` (`main` branch)  
 **Compliance Standards:** 
 * SEBI (Research Analysts) Regulations, 2014 Section 2(u) — Factual Non-Advisory Safe Harbor
@@ -312,11 +312,16 @@ $$\text{Fair Value} = 0.35 \cdot V_{\text{Historical PE}} + 0.40 \cdot V_{\text{
    * *Clamping Rules:* $r = \max(0.10, \text{WACC})$, $g_2 = \min(0.05, \text{Terminal Growth})$, Spread $(r - g_2) \ge 0.015$.
 3. **Graham Earnings Power Value ($V_{\text{Graham EPV}}$):**
    $$V_{\text{EPV}} = \frac{\text{Normalized Operating Earnings} \cdot (1 - T)}{\text{Cost of Capital}}$$
-* **Margin of Safety (%):**
-  $$\text{Margin of Safety} = \frac{\text{Fair Value} - \text{Current Market Price (CMP)}}{\text{Fair Value}} \times 100\%$$
+* **Symmetric Graham Margin of Safety (%):**
+  $$\text{Margin of Safety} = \frac{\text{Fair Value} - \text{Current Market Price (CMP)}}{\max(\text{Fair Value}, \text{Current Market Price (CMP)})} \times 100\%$$
+  * Measures classic discount to intrinsic value $\frac{\text{FV} - \text{CMP}}{\text{FV}}$ when $\text{CMP} \le \text{FV}$, and bounded downside exposure $\frac{\text{FV} - \text{CMP}}{\text{CMP}} \in (-100\%, 0\%)$ when trading at a market premium ($\text{CMP} > \text{FV}$), eliminating $-500\%$ denominator explosions on high-multiple growth equities.
   * *Undervalued:* $\text{Margin of Safety} \ge +15.0\%$
   * *Fair Value:* $-15.0\% < \text{Margin of Safety} < +15.0\%$
   * *Overvalued / Stretched:* $\text{Margin of Safety} \le -15.0\%$
+* **Reverse-DCF Bisection Bounds & Explicit Clamp Disclosure:**
+  * Solves for the 5-year FCF CAGR $g_{\text{imp}} \in [-20.0\%, +45.0\%]$ implied by CMP. Whenever the market multiple exceeds or undershoots the solver's bounded domain, `implied_fcf_growth_bounded = True` and `implied_fcf_growth_display` renders explicit inequality bounds (`>45.0% CAGR` or `<-20.0% CAGR`) rather than misreporting the boundary clamp as an exact point solution. The SSR 3-Model Valuation Matrix & Reverse-DCF Stress-Tester (`#reverseDcfSandbox`) is open-access (`0` credits) on `/dossier/{ticker}`.
+* **360° Accounting Check Partial-Filing Honesty (`core/analysis/forensic_sieve.py`):**
+  * Evaluates 6 statutory groups (`operating_margin`, `roce`/`roe`/`pb_ratio`, `market_cap`, `debt_to_equity`, CARO schedules, and SEBI Reg 31 pledges). When $< 4$ statutory groups are disclosed, returns `INSUFFICIENT_DISCLOSURES` with dynamic per-item `checks_detail` (`Pending statutory schedule` rather than claiming unindexed schedules are `"Verified Clean"`) and a non-penalizing partial composite score.
 
 ##### 7. Sector-Native Scoring Engine (`core/analysis/sector_scoring.py`)
 Replaces uniform ratios with sector-specialized diagnostic weights:

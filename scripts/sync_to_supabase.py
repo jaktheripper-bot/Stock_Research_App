@@ -103,8 +103,8 @@ def sync_via_postgresql(reports: List[Dict[str, Any]], revisions: List[Dict[str,
     conn.autocommit = False
     cursor = conn.cursor()
 
-    # 1. Initialize complete schema migrations (v001 through v037) on PostgreSQL
-    logger.info("Ensuring PostgreSQL schema migrations (v001 - v037) are initialized...")
+    # 1. Initialize complete schema migrations (v001 through v038) on PostgreSQL
+    logger.info("Ensuring PostgreSQL schema migrations (v001 - v038) are initialized...")
     try:
         init_db(force=False)
     except Exception as mig_err:

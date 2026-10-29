@@ -55,11 +55,7 @@ def run_remediation(apply_changes: bool = False) -> Dict[str, int]:
             if new_cat != old_cat or new_idx != old_idx:
                 etf_updates.append((new_cat, new_idx, row_id))
 
-        # 2. Identify cloned BENCHMARK_PROXIES portfolios shared identically across >1 distinct MF schemes
-        from core.db.mutual_funds import normalize_scheme_stem
-
-        cur.execute("SELECT scheme_code, scheme_name FROM mutual_fund_schemes")
-        mf_name_map = {str(sc): str(sn or sc) for sc, sn in cur.fetchall()}
+        # 2. Identify cloned BENCHMARK_PROXIES portfolios shared identically across >1 MF schemes
         cur.execute("SELECT DISTINCT scheme_code, holding_type, identifier, weight_pct FROM mutual_fund_holdings ORDER BY scheme_code, identifier")
         mf_vecs: Dict[str, List[Tuple[str, float]]] = defaultdict(list)
         for sc, _ht, ident, w in cur.fetchall():
@@ -68,14 +64,7 @@ def run_remediation(apply_changes: bool = False) -> Dict[str, int]:
         sig_to_schemes: Dict[Tuple[Tuple[str, float], ...], List[str]] = defaultdict(list)
         for sc, vec in mf_vecs.items():
             sig_to_schemes[tuple(vec)].append(sc)
-        cloned_mf_codes = sorted(
-            {
-                sc
-                for vec, scs in sig_to_schemes.items()
-                if len({normalize_scheme_stem(mf_name_map.get(c, c)) or c for c in scs}) > 1
-                for sc in scs
-            }
-        )
+        cloned_mf_codes = sorted({sc for vec, scs in sig_to_schemes.items() if len(scs) > 1 for sc in scs})
 
         # 3. Identify static algorithmic narratives in fund_forensic_dossiers
         cur.execute(
