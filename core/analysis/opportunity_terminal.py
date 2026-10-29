@@ -361,7 +361,7 @@ def get_normalized_opportunity_universe(
     # 5. Mutual Funds & ETFs
     # ----------------------------------------------------
     try:
-        funds = get_active_mutual_funds(limit=20)
+        funds = get_active_mutual_funds(limit=20, audited_only=True)
         for f in funds:
             broad = (f.get("broad_category") or "EQUITY").upper()
             cat_name = f.get("category") or ""

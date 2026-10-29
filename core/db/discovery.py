@@ -120,6 +120,13 @@ def get_active_discovery_reel(
         exclude_tests = (edition_date is None)
 
     test_filter = "AND ticker NOT LIKE 'TEST%' AND ticker NOT LIKE 'UNITTEST%' AND ticker NOT LIKE 'SYNTHETIC%'" if exclude_tests else ""
+    pending_report_guard = """
+        AND NOT EXISTS (
+            SELECT 1 FROM reports r
+            WHERE r.ticker = discovery_reel.ticker
+              AND (r.report_text IS NULL OR TRIM(r.report_text) = '')
+        )
+    """
 
     try:
         active_clause = "is_active = TRUE" if is_pg else "is_active = 1"
@@ -135,6 +142,7 @@ def get_active_discovery_reel(
                       AND ticker NOT LIKE {placeholder}
                       AND ticker NOT LIKE {placeholder}
                       AND ticker NOT LIKE {placeholder}
+                      {pending_report_guard}
                     ORDER BY id ASC;
                 """
                 cursor.execute(query, (edition_date, "TEST%", "UNITTEST%", "SYNTHETIC%"))
@@ -144,7 +152,7 @@ def get_active_discovery_reel(
                            current_price, pe_ratio, roce_pct, debt_to_equity, sales_growth_3y,
                            ria_thesis, catalyst_headline, key_metrics_json, created_at
                     FROM discovery_reel
-                    WHERE edition_date = {placeholder} AND {active_clause}
+                    WHERE edition_date = {placeholder} AND {active_clause} {pending_report_guard}
                     ORDER BY id ASC;
                 """
                 cursor.execute(query, (edition_date,))
@@ -165,9 +173,9 @@ def get_active_discovery_reel(
                        current_price, pe_ratio, roce_pct, debt_to_equity, sales_growth_3y,
                        ria_thesis, catalyst_headline, key_metrics_json, created_at
                 FROM discovery_reel
-                WHERE {active_clause} {test_filter}
+                WHERE {active_clause} {test_filter} {pending_report_guard}
                   AND edition_date = (
-                      SELECT MAX(edition_date) FROM discovery_reel WHERE {active_clause} {test_filter} {date_filter}
+                      SELECT MAX(edition_date) FROM discovery_reel WHERE {active_clause} {test_filter} {pending_report_guard} {date_filter}
                   )
                 ORDER BY id ASC;
             """
@@ -181,9 +189,9 @@ def get_active_discovery_reel(
                            current_price, pe_ratio, roce_pct, debt_to_equity, sales_growth_3y,
                            ria_thesis, catalyst_headline, key_metrics_json, created_at
                     FROM discovery_reel
-                    WHERE {active_clause} {test_filter}
+                    WHERE {active_clause} {test_filter} {pending_report_guard}
                       AND edition_date = (
-                          SELECT MAX(edition_date) FROM discovery_reel WHERE {active_clause} {test_filter}
+                          SELECT MAX(edition_date) FROM discovery_reel WHERE {active_clause} {test_filter} {pending_report_guard}
                       )
                     ORDER BY id ASC;
                 """

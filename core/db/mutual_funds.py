@@ -344,14 +344,15 @@ get_mutual_fund_by_code = get_mutual_fund_scheme
 def get_active_mutual_funds(
     category: Optional[str] = None,
     broad_category: Optional[str] = None,
-    limit: Optional[int] = 500
+    limit: Optional[int] = 500,
+    audited_only: bool = False,
 ) -> List[Dict[str, Any]]:
     """Retrieves active mutual fund schemes filtered by category."""
     conn = get_db_connection()
     cursor = conn.cursor()
     use_pg = is_postgres_connection(conn)
 
-    clauses = []
+    clauses = ["SUBSTR(scheme_code, 1, 5) != 'TEST_'"]
     params = []
 
     if category:
@@ -360,6 +361,10 @@ def get_active_mutual_funds(
     if broad_category:
         clauses.append("broad_category = %s" if use_pg else "broad_category = ?")
         params.append(broad_category.strip().upper())
+    if audited_only:
+        clauses.append(
+            "EXISTS (SELECT 1 FROM mutual_fund_holdings h WHERE h.scheme_code = mutual_fund_schemes.scheme_code)"
+        )
 
     where_str = f"WHERE {' AND '.join(clauses)}" if clauses else ""
     if limit and isinstance(limit, int) and limit > 0:

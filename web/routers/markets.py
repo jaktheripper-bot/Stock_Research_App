@@ -459,7 +459,7 @@ def api_get_mutual_fund_schemes(
 ):
     """Public API: List all tracked mutual fund schemes with look-through health scores."""
     init_db()
-    schemes = get_active_mutual_funds(category=category, broad_category=broad_category)
+    schemes = get_active_mutual_funds(category=category, broad_category=broad_category, audited_only=True)
     scheme_codes = [s["scheme_code"] for s in schemes if s.get("scheme_code")]
     holdings_by_scheme = get_holdings_for_schemes_batch(scheme_codes)
     researched_tickers = get_researched_tickers_set()

@@ -75,6 +75,7 @@ Detailed forensic analysis with exact page grounding to bseindia.com filings.
         self.assertIn("Less noise,", res.text)
         self.assertIn("more nuance.", res.text)
         self.assertIn("EVIDENCE-LED INVESTMENT RESEARCH", res.text)
+        self.assertNotIn("<span>NOT INVESTMENT ADVICE</span>", res.text)
         self.assertIn("Four things we promise every reader", res.text)
         self.assertIn("We never tell you to buy or sell", res.text)
         self.assertIn("Multi-asset investment research", res.text)
@@ -1094,6 +1095,12 @@ Detailed forensic analysis with exact page grounding to bseindia.com filings.
         self.assertEqual(res.status_code, 200)
         html = res.text
         self.assertIn("Browse Stock Research Reports", html)
+        self.assertIn("One Standard Across Seven Asset Classes", html)
+        self.assertLess(
+            html.index("One Standard Across Seven Asset Classes"),
+            html.index("Browse Stock Research Reports"),
+            "Browse Stock Research Reports section must appear below One Standard Across Seven Asset Classes",
+        )
         self.assertIn("home-stock-card", html)
         self.assertIn("homeStockSearchInput", html)
         self.assertIn("homeSectorPills", html)

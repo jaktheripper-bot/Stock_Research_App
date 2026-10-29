@@ -10,7 +10,7 @@ import unittest
 import xml.etree.ElementTree as ET
 from datetime import datetime
 
-from core.db.connection import init_db, IST
+from core.db.connection import get_db_connection, init_db, is_postgres_connection, IST
 from core.db.mutual_funds import (
     save_fund_forensic_dossier,
     get_fund_forensic_dossier,
@@ -28,6 +28,19 @@ class TestFindingsRemediations(unittest.TestCase):
     @classmethod
     def setUpClass(cls):
         init_db()
+
+    @classmethod
+    def tearDownClass(cls):
+        conn = get_db_connection()
+        p = "%s" if is_postgres_connection(conn) else "?"
+        cur = conn.cursor()
+        try:
+            cur.execute(f"DELETE FROM fund_forensic_dossiers WHERE scheme_code = {p}", ("TEST_GUARD_SCHEME_001",))
+            cur.execute(f"DELETE FROM mutual_fund_schemes WHERE scheme_code = {p}", ("TEST_GUARD_SCHEME_001",))
+            conn.commit()
+        finally:
+            cur.close()
+            conn.close()
 
     def test_finding_1_save_fund_forensic_dossier_archival_guard(self):
         """Finding 1: Archival guard preserves existing qualitative research narrative when incoming text is empty."""

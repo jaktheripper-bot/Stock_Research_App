@@ -1951,7 +1951,7 @@ def fund_directory_page(
                     "active_share_pct": 70.0
                 })
     else:
-        schemes = get_active_mutual_funds(category=category, broad_category=broad_category)
+        schemes = get_active_mutual_funds(category=category, broad_category=broad_category, audited_only=True)
 
     total_aum = sum(s.get("aum_crores", 0.0) for s in schemes)
     drag_vals = [(s.get("ter_regular_pct", 1.5) - s.get("ter_direct_pct", 0.7)) * 100 for s in schemes]

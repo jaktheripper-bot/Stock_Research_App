@@ -1967,7 +1967,8 @@ class TestCompetitiveEnhancements(unittest.TestCase):
         self.assertEqual(resp_eq.status_code, 200)
         self.assertNotIn("TEST_PILLAR_INFY", resp_eq.text)
         self.assertNotIn("TEST_SURGICAL_INFY", resp_eq.text)
-        self.assertNotIn("UNITDSPR", resp_eq.text)
+        self.assertNotIn("COAL_1792573802959", resp_eq.text)
+        self.assertNotIn("UNIT_SAMPLE_STOCK", resp_eq.text)
 
 
 if __name__ == "__main__":

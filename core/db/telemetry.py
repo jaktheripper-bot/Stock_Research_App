@@ -1634,25 +1634,17 @@ def purge_test_telemetry() -> dict:
         try:
             cursor.execute("""
                 DELETE FROM reports
-                WHERE ticker LIKE 'COAL_%'
-                   OR ticker LIKE 'UNITCOAL_%'
-                   OR ticker = 'COALESCE_TEST'
-                   OR ticker LIKE 'TEST_%'
-                   OR ticker LIKE 'UNIT_%'
-                   OR ticker LIKE 'UNITDSPR%'
-                   OR ticker IN ('TESTCORP', 'TESTPEER', 'ZZTESTONLY', 'UNITDSPR')
+                WHERE SUBSTR(ticker, 1, 5) IN ('COAL_', 'TEST_', 'UNIT_')
+                   OR SUBSTR(ticker, 1, 9) = 'UNITCOAL_'
+                   OR ticker IN ('TESTCORP', 'TESTPEER', 'ZZTESTONLY', 'COALESCE_TEST')
                    OR short_name = 'Coalesce Test Ltd';
             """)
             purged_counts["test_reports_purged"] = cursor.rowcount if cursor.rowcount and cursor.rowcount > 0 else 0
             cursor.execute("""
                 DELETE FROM report_revisions
-                WHERE ticker LIKE 'COAL_%'
-                   OR ticker LIKE 'UNITCOAL_%'
-                   OR ticker = 'COALESCE_TEST'
-                   OR ticker LIKE 'TEST_%'
-                   OR ticker LIKE 'UNIT_%'
-                   OR ticker LIKE 'UNITDSPR%'
-                   OR ticker IN ('TESTCORP', 'TESTPEER', 'ZZTESTONLY', 'UNITDSPR');
+                WHERE SUBSTR(ticker, 1, 5) IN ('COAL_', 'TEST_', 'UNIT_')
+                   OR SUBSTR(ticker, 1, 9) = 'UNITCOAL_'
+                   OR ticker IN ('TESTCORP', 'TESTPEER', 'ZZTESTONLY', 'COALESCE_TEST');
             """)
             # If a test suite overwrote INFY or TCS with a short test stub (<2000 chars), restore the full revision
             p = "%s" if get_supabase_url() else "?"
@@ -1674,31 +1666,22 @@ def purge_test_telemetry() -> dict:
             cursor.execute("""
                 DELETE FROM discovery_reel
                 WHERE ticker = 'TESTCORP'
-                   OR ticker LIKE 'TEST_%'
-                   OR ticker LIKE 'UNIT_%'
+                   OR SUBSTR(ticker, 1, 5) IN ('TEST_', 'UNIT_')
                    OR company_name = 'Test Diagnostics Corp'
                    OR edition_date >= '2099-01-01';
             """)
             cursor.execute("""
                 DELETE FROM cached_fundamentals
-                WHERE ticker LIKE 'COAL_%'
-                   OR ticker LIKE 'UNITCOAL_%'
-                   OR ticker = 'COALESCE_TEST'
-                   OR ticker LIKE 'TEST_%'
-                   OR ticker LIKE 'UNIT_%'
-                   OR ticker LIKE 'UNITDSPR%'
-                   OR ticker IN ('TESTCORP', 'TESTPEER', 'ZZTESTONLY', 'UNITDSPR')
+                WHERE SUBSTR(ticker, 1, 5) IN ('COAL_', 'TEST_', 'UNIT_')
+                   OR SUBSTR(ticker, 1, 9) = 'UNITCOAL_'
+                   OR ticker IN ('TESTCORP', 'TESTPEER', 'ZZTESTONLY', 'COALESCE_TEST')
                    OR source = 'UNIT_TEST';
             """)
             cursor.execute("""
                 DELETE FROM compliance_audit_log
-                WHERE ticker LIKE 'COAL_%'
-                   OR ticker LIKE 'UNITCOAL_%'
-                   OR ticker = 'COALESCE_TEST'
-                   OR ticker LIKE 'TEST_%'
-                   OR ticker LIKE 'UNIT_%'
-                   OR ticker LIKE 'UNITDSPR%'
-                   OR ticker IN ('TESTCORP', 'TESTPEER', 'ZZTESTONLY', 'UNITDSPR');
+                WHERE SUBSTR(ticker, 1, 5) IN ('COAL_', 'TEST_', 'UNIT_')
+                   OR SUBSTR(ticker, 1, 9) = 'UNITCOAL_'
+                   OR ticker IN ('TESTCORP', 'TESTPEER', 'ZZTESTONLY', 'COALESCE_TEST');
             """)
             cursor.execute("""
                 DELETE FROM autonomous_event_ledger

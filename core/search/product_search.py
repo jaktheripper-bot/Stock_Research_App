@@ -147,12 +147,11 @@ def search_equities(query: str, limit: int = 10) -> List[Dict[str, Any]]:
             WHERE (UPPER(r.ticker) LIKE {p}
                    OR LOWER(COALESCE(r.short_name, '')) LIKE {p}
                    OR LOWER(COALESCE(cf.sector, '')) LIKE {p})
-              AND r.ticker NOT LIKE {p}
-              AND r.ticker NOT LIKE {p}
-              AND r.ticker NOT LIKE {p}
+              AND SUBSTR(r.ticker, 1, 5) NOT IN ('TEST_', 'UNIT_', 'COAL_')
+              AND SUBSTR(r.ticker, 1, 6) != 'ZZTEST'
             LIMIT {p};
             """,
-            (f"%{clean_q}%", f"%{clean_q_lower}%", f"%{clean_q_lower}%", "TEST_%", "UNIT_%", "ZZTEST%", safe_limit),
+            (f"%{clean_q}%", f"%{clean_q_lower}%", f"%{clean_q_lower}%", safe_limit),
         )
         rows = cursor.fetchall()
         for r in rows:
@@ -202,12 +201,11 @@ def search_equities(query: str, limit: int = 10) -> List[Dict[str, Any]]:
                 WHERE (UPPER(ticker) LIKE {p}
                        OR LOWER(COALESCE(sector, '')) LIKE {p}
                        OR LOWER(COALESCE(industry, '')) LIKE {p})
-                  AND ticker NOT LIKE {p}
-                  AND ticker NOT LIKE {p}
-                  AND ticker NOT LIKE {p}
+                  AND SUBSTR(ticker, 1, 5) NOT IN ('TEST_', 'UNIT_', 'COAL_')
+                  AND SUBSTR(ticker, 1, 6) != 'ZZTEST'
                 LIMIT {p};
                 """,
-                (f"%{clean_q}%", f"%{clean_q_lower}%", f"%{clean_q_lower}%", "TEST_%", "UNIT_%", "ZZTEST%", rem + 10),
+                (f"%{clean_q}%", f"%{clean_q_lower}%", f"%{clean_q_lower}%", rem + 10),
             )
             cf_rows = cursor.fetchall()
             for r in cf_rows:

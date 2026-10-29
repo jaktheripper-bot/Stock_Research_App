@@ -76,10 +76,19 @@ class TestPhase2CacheAndDossierAllocations(unittest.TestCase):
         self.assertEqual(get_archived_reports.cache_parameters()["maxsize"], 16)
 
     def test_action_2_2_get_archived_reports_filters_null_and_empty_text(self):
-        """Verify get_archived_reports excludes records with NULL or whitespace-only report_text."""
+        """Verify get_archived_reports and get_all_equities_directory_sync exclude NULL/empty report_text and enforce literal underscore prefixes."""
         conn = get_db_connection()
         cur = conn.cursor()
-        test_tickers = ("NULL_TEXT_TICK", "EMPTY_TEXT_TICK")
+        test_tickers = (
+            "NULL_TEXT_TICK",
+            "EMPTY_TEXT_TICK",
+            "COALINDIA",
+            "UNITDSPR",
+            "COAL_SYNTH99",
+            "UNIT_SYNTH99",
+            "TEST_SYNTH99",
+            "UNITCOAL_SYNTH99",
+        )
         try:
             for t in test_tickers:
                 cur.execute("DELETE FROM reports WHERE ticker = ?;", (t,))
@@ -91,19 +100,61 @@ class TestPhase2CacheAndDossierAllocations(unittest.TestCase):
                 "INSERT INTO reports (ticker, short_name, report_text, timestamp) VALUES (?, ?, ?, ?);",
                 ("EMPTY_TEXT_TICK", "Empty Candidate", "   ", "2026-10-28 09:00:00"),
             )
+            cur.execute(
+                "INSERT INTO reports (ticker, short_name, report_text, timestamp) VALUES (?, ?, ?, ?);",
+                ("COALINDIA", "Coal India Ltd", "## Executive Summary\nValid archived dossier.", "2026-10-28 09:00:00"),
+            )
+            cur.execute(
+                "INSERT INTO reports (ticker, short_name, report_text, timestamp) VALUES (?, ?, ?, ?);",
+                ("UNITDSPR", "United Spirits Ltd", "## Executive Summary\nValid archived dossier.", "2026-10-28 09:00:00"),
+            )
+            for synth in ("COAL_SYNTH99", "UNIT_SYNTH99", "TEST_SYNTH99", "UNITCOAL_SYNTH99"):
+                cur.execute(
+                    "INSERT INTO reports (ticker, short_name, report_text, timestamp) VALUES (?, ?, ?, ?);",
+                    (synth, "Synthetic Fixture", "## Executive Summary\nSynthetic text.", "2026-10-28 09:00:00"),
+                )
             conn.commit()
 
             get_archived_reports.cache_clear()
+            get_all_equities_directory_sync.cache_clear()
             reps_with_text = get_archived_reports(include_text=True)
             reps_without_text = get_archived_reports(include_text=False)
+            dir_equities = get_all_equities_directory_sync()
 
             returned_tickers_with = {r["ticker"] for r in reps_with_text}
             returned_tickers_without = {r["ticker"] for r in reps_without_text}
+            returned_dir_tickers = {r["ticker"] for r in dir_equities}
 
-            self.assertNotIn("NULL_TEXT_TICK", returned_tickers_with)
-            self.assertNotIn("EMPTY_TEXT_TICK", returned_tickers_with)
-            self.assertNotIn("NULL_TEXT_TICK", returned_tickers_without)
-            self.assertNotIn("EMPTY_TEXT_TICK", returned_tickers_without)
+            for returned in (returned_tickers_with, returned_tickers_without, returned_dir_tickers):
+                self.assertNotIn("NULL_TEXT_TICK", returned)
+                self.assertNotIn("EMPTY_TEXT_TICK", returned)
+                self.assertIn("COALINDIA", returned)
+                self.assertIn("UNITDSPR", returned)
+                self.assertNotIn("COAL_SYNTH99", returned)
+                self.assertNotIn("UNIT_SYNTH99", returned)
+                self.assertNotIn("TEST_SYNTH99", returned)
+                self.assertNotIn("UNITCOAL_SYNTH99", returned)
+
+            # Verify search_equities includes COALINDIA and UNITDSPR while excluding synthetic prefixes
+            from core.search.product_search import search_equities
+            coal_hits = {m["identifier"] for m in search_equities("COAL", limit=50)}
+            unit_hits = {m["identifier"] for m in search_equities("UNIT", limit=50)}
+            self.assertIn("COALINDIA", coal_hits)
+            self.assertNotIn("COAL_SYNTH99", coal_hits)
+            self.assertNotIn("UNITCOAL_SYNTH99", coal_hits)
+            self.assertIn("UNITDSPR", unit_hits)
+            self.assertNotIn("UNIT_SYNTH99", unit_hits)
+
+            # Verify purge_test_telemetry deletes synthetic prefixes while preserving COALINDIA and UNITDSPR
+            from core.db.telemetry import purge_test_telemetry
+            purge_test_telemetry()
+            surviving = {
+                r[0]
+                for r in cur.execute(
+                    "SELECT ticker FROM reports WHERE ticker IN ('COALINDIA', 'UNITDSPR', 'COAL_SYNTH99', 'UNIT_SYNTH99', 'TEST_SYNTH99', 'UNITCOAL_SYNTH99');"
+                ).fetchall()
+            }
+            self.assertEqual(surviving, {"COALINDIA", "UNITDSPR"})
 
             # Ensure all returned items have non-empty text when include_text=True
             for r in reps_with_text:
@@ -116,6 +167,7 @@ class TestPhase2CacheAndDossierAllocations(unittest.TestCase):
             cur.close()
             conn.close()
             get_archived_reports.cache_clear()
+            get_all_equities_directory_sync.cache_clear()
 
 
     def test_action_2_3_ttl_cache_on_get_all_equities_directory_sync(self):
@@ -249,6 +301,166 @@ class TestPhase2CacheAndDossierAllocations(unittest.TestCase):
         self.assertLessEqual(len(_CONTACT_RATE_BUCKETS), 512)
 
         _CONTACT_RATE_BUCKETS.clear()
+
+    def test_discovery_reel_pending_report_guard(self):
+        """Excludes discovery_reel rows queued in reports with NULL/empty report_text until synthesized, while preserving rows absent from reports."""
+        from core.db.discovery import save_discovery_reel, get_active_discovery_reel
+
+        edition = "2026-10-04"
+        conn = get_db_connection()
+        cur = conn.cursor()
+        test_tickers = ("DISC_PENDING_NULL", "DISC_PENDING_EMPTY", "DISC_SYNTH_OK", "DISC_UNQUEUED_OK")
+        try:
+            cur.execute("DELETE FROM discovery_reel WHERE edition_date = ?;", (edition,))
+            for t in test_tickers:
+                cur.execute("DELETE FROM reports WHERE ticker = ?;", (t,))
+
+            cur.execute(
+                "INSERT INTO reports (ticker, short_name, report_text, timestamp) VALUES (?, ?, ?, ?);",
+                ("DISC_PENDING_NULL", "Pending Null Ltd", None, "2026-10-04 09:00:00"),
+            )
+            cur.execute(
+                "INSERT INTO reports (ticker, short_name, report_text, timestamp) VALUES (?, ?, ?, ?);",
+                ("DISC_PENDING_EMPTY", "Pending Empty Ltd", "   ", "2026-10-04 09:00:00"),
+            )
+            cur.execute(
+                "INSERT INTO reports (ticker, short_name, report_text, timestamp) VALUES (?, ?, ?, ?);",
+                ("DISC_SYNTH_OK", "Synthesized Ltd", "## Executive Summary\nComplete dossier.", "2026-10-04 09:00:00"),
+            )
+            conn.commit()
+
+            save_discovery_reel(
+                [
+                    {"ticker": "DISC_PENDING_NULL", "company_name": "Pending Null Ltd", "sector": "Industrials", "current_price": 450.0, "ria_thesis": "Thesis A"},
+                    {"ticker": "DISC_PENDING_EMPTY", "company_name": "Pending Empty Ltd", "sector": "Industrials", "current_price": 460.0, "ria_thesis": "Thesis B"},
+                    {"ticker": "DISC_SYNTH_OK", "company_name": "Synthesized Ltd", "sector": "Industrials", "current_price": 470.0, "ria_thesis": "Thesis C"},
+                    {"ticker": "DISC_UNQUEUED_OK", "company_name": "Unqueued Ltd", "sector": "Industrials", "current_price": 480.0, "ria_thesis": "Thesis D"},
+                ],
+                edition_date=edition,
+            )
+
+            for excl in (False, True):
+                reel = get_active_discovery_reel(edition_date=edition, exclude_tests=excl, allow_fallback=False)
+                tickers = [r["ticker"] for r in reel]
+                self.assertEqual(tickers, ["DISC_SYNTH_OK", "DISC_UNQUEUED_OK"])
+
+            # Once DISC_PENDING_NULL is synthesized, it automatically reappears
+            cur.execute(
+                "UPDATE reports SET report_text = ? WHERE ticker = ?;",
+                ("## Executive Summary\nNewly synthesized dossier.", "DISC_PENDING_NULL"),
+            )
+            conn.commit()
+
+            reel_after = get_active_discovery_reel(edition_date=edition, exclude_tests=True, allow_fallback=False)
+            self.assertEqual([r["ticker"] for r in reel_after], ["DISC_PENDING_NULL", "DISC_SYNTH_OK", "DISC_UNQUEUED_OK"])
+        finally:
+            cur.execute("DELETE FROM discovery_reel WHERE edition_date = ?;", (edition,))
+            for t in test_tickers:
+                cur.execute("DELETE FROM reports WHERE ticker = ?;", (t,))
+            conn.commit()
+            cur.close()
+            conn.close()
+
+    def test_get_active_mutual_funds_audited_only_and_test_prefix_guard(self):
+        """Verifies get_active_mutual_funds filters TEST_ prefixes and enforces audited_only holdings EXISTS check when requested."""
+        from core.db.mutual_funds import (
+            get_active_mutual_funds,
+            save_mutual_fund_scheme,
+            save_mutual_fund_holdings,
+        )
+
+        codes = ("MF_AUDITED_PROBE_99", "MF_UNAUDITED_PROBE_99", "TEST_MF_PROBE_99")
+        conn = get_db_connection()
+        cur = conn.cursor()
+        try:
+            for code in codes:
+                cur.execute("DELETE FROM mutual_fund_holdings WHERE scheme_code = ?;", (code,))
+                cur.execute("DELETE FROM mutual_fund_schemes WHERE scheme_code = ?;", (code,))
+            conn.commit()
+
+            for code in codes:
+                save_mutual_fund_scheme(
+                    {
+                        "scheme_code": code,
+                        "scheme_name": f"Probe Scheme {code}",
+                        "fund_house": "Probe AMC",
+                        "category": "Flexi Cap Fund",
+                        "broad_category": "EQUITY",
+                        "aum_crores": 999999.0,
+                        "nav": 120.0,
+                    }
+                )
+            save_mutual_fund_holdings(
+                "MF_AUDITED_PROBE_99",
+                [
+                    {
+                        "holding_type": "EQUITY",
+                        "identifier": "INFY",
+                        "holding_name": "Infosys Ltd",
+                        "weight_pct": 10.0,
+                        "sector_or_rating": "IT",
+                    }
+                ],
+            )
+            save_mutual_fund_holdings(
+                "TEST_MF_PROBE_99",
+                [
+                    {
+                        "holding_type": "EQUITY",
+                        "identifier": "INFY",
+                        "holding_name": "Infosys Ltd",
+                        "weight_pct": 10.0,
+                        "sector_or_rating": "IT",
+                    }
+                ],
+            )
+
+            all_codes = {s["scheme_code"] for s in get_active_mutual_funds(limit=None)}
+            audited_codes = {s["scheme_code"] for s in get_active_mutual_funds(limit=None, audited_only=True)}
+
+            self.assertIn("MF_AUDITED_PROBE_99", all_codes)
+            self.assertIn("MF_UNAUDITED_PROBE_99", all_codes)
+            self.assertNotIn("TEST_MF_PROBE_99", all_codes)
+
+            self.assertIn("MF_AUDITED_PROBE_99", audited_codes)
+            self.assertNotIn("MF_UNAUDITED_PROBE_99", audited_codes)
+            self.assertNotIn("TEST_MF_PROBE_99", audited_codes)
+
+            # Outside-in /funds browse grid shows audited schemes only, while /funds?q=... still finds unaudited AMFI schemes
+            resp_browse = self.client.get("/funds")
+            self.assertEqual(resp_browse.status_code, 200)
+            self.assertIn("MF_AUDITED_PROBE_99", resp_browse.text)
+            self.assertNotIn("MF_UNAUDITED_PROBE_99", resp_browse.text)
+            self.assertNotIn("TEST_MF_PROBE_99", resp_browse.text)
+
+            resp_search = self.client.get("/funds?q=MF_UNAUDITED_PROBE_99")
+            self.assertEqual(resp_search.status_code, 200)
+            self.assertIn("MF_UNAUDITED_PROBE_99", resp_search.text)
+
+            resp_api = self.client.get("/api/funds/schemes")
+            self.assertEqual(resp_api.status_code, 200)
+            api_codes = {s["scheme_code"] for s in resp_api.json().get("schemes", [])}
+            self.assertIn("MF_AUDITED_PROBE_99", api_codes)
+            self.assertNotIn("MF_UNAUDITED_PROBE_99", api_codes)
+            self.assertNotIn("TEST_MF_PROBE_99", api_codes)
+
+            resp_opp = self.client.get("/api/opportunities/universe")
+            self.assertEqual(resp_opp.status_code, 200)
+            opp_mf_codes = {
+                item["symbol"]
+                for item in resp_opp.json().get("items", [])
+                if item.get("asset_class") == "MF"
+            }
+            self.assertIn("MF_AUDITED_PROBE_99", opp_mf_codes)
+            self.assertNotIn("MF_UNAUDITED_PROBE_99", opp_mf_codes)
+            self.assertNotIn("TEST_MF_PROBE_99", opp_mf_codes)
+        finally:
+            for code in codes:
+                cur.execute("DELETE FROM mutual_fund_holdings WHERE scheme_code = ?;", (code,))
+                cur.execute("DELETE FROM mutual_fund_schemes WHERE scheme_code = ?;", (code,))
+            conn.commit()
+            cur.close()
+            conn.close()
 
 
 if __name__ == "__main__":
