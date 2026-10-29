@@ -1,6 +1,6 @@
 # Production Release Checkpoints & Disaster Recovery Ledger
-**Last Checkpoint:** 2026-10-28 09:48:58 IST  
-**Total Verified Rollback Points:** 134  
+**Last Checkpoint:** 2026-10-29 09:56:59 IST  
+**Total Verified Rollback Points:** 135  
 
 > [!NOTE]
 > These checkpoints represent byte-for-byte verified working releases that passed the 4-tier pre-flight audit.
@@ -10,6 +10,7 @@
 
 | Checkpoint Tag | IST Timestamp | Commit | DB Reports | Description |
 |:---|:---|:---|:---|:---|
+| `checkpoint_20261029_095659_sql_wildcard_hygiene_fail_closed_directory_and_batch_synthesis` | 2026-10-29 09:56:59 IST | `a167eb9` | 322 rep / 1257 rev | sql_wildcard_hygiene_fail_closed_directory_and_batch_synthesis |
 | `checkpoint_20261028_094858_remediate_corpus_substance_script` | 2026-10-28 09:48:58 IST | `a717dee` | 308 rep / 1049 rev | remediate_corpus_substance_script |
 | `checkpoint_20261028_094532_render_yaml_enable_background_schedulers` | 2026-10-28 09:45:32 IST | `91c440d` | 308 rep / 1048 rev | render_yaml_enable_background_schedulers |
 | `checkpoint_20261028_094159_web_main_scheduler_boot_guard` | 2026-10-28 09:41:59 IST | `d2628e0` | 308 rep / 1047 rev | web_main_scheduler_boot_guard |
