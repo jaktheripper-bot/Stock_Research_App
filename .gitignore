@@ -4,6 +4,8 @@ __pycache__/
 .env
 reports.db
 *.db
+*.db-shm
+*.db-wal
 .DS_Store
 
 .vscode/

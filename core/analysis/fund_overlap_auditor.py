@@ -438,7 +438,7 @@ Detail the liquidity bottleneck and sector concentration fault lines if liquidit
     api_key = get_secret("GEMINI_API_KEY")
     if api_key and os.environ.get("TESTING") != "1":
         try:
-            client = genai.Client(api_key=api_key)
+            client = genai.Client(api_key=api_key, http_options={"timeout": 60000})
             model_name = get_light_flash_model(client)
             chat = client.chats.create(
                 model=model_name,

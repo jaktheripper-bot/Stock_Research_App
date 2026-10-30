@@ -3191,7 +3191,7 @@ Recent Conversation History:
 {history_str}
 """
     try:
-        client = Client(api_key=api_key)
+        client = Client(api_key=api_key, http_options={"timeout": 15000})
         agent_reply = None
         candidate_models = ["gemini-3.8-flash", "gemini-3.5-flash-lite", "gemini-3.1-flash-lite"]
         try:

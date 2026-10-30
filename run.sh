@@ -105,10 +105,20 @@ case "$COMMAND" in
         echo "--> Initiating Nifty 100 Institutional Research Generation Pipeline..."
         "$PYTHON" scripts/generate_nifty100_reports.py "$@"
         ;;
-    sync-supabase|supabase-sync)
+    sync-supabase|supabase-sync|sync-up)
         shift
         echo "--> Syncing local research reports to Supabase..."
         "$PYTHON" scripts/sync_to_supabase.py "$@"
+        ;;
+    sync-down|pull-supabase|supabase-pull)
+        shift
+        echo "--> Pulling latest multi-asset records from Supabase into local SQLite..."
+        "$PYTHON" scripts/sync_from_supabase.py "$@"
+        ;;
+    daily-audit|local-audit)
+        shift
+        echo "--> Running Local Autonomous Daily Multi-Asset Audit & Catch-Up..."
+        bash "$SCRIPT_DIR/scripts/run_local_daily_audit.sh" "$@"
         ;;
     dump-chat|backup-chat|dump-session)
         shift
@@ -126,7 +136,7 @@ case "$COMMAND" in
         "$PYTHON" scripts/run_scheduled_pipeline.py "$@"
         ;;
     *)
-        echo "Usage: ./run.sh [lint | test | bench | preflight | live-audit | start | web | admin | mf-ingest | nifty100 | sync-supabase | update-reports | pipeline | dump-chat | checkpoint | rollback | checkpoints]"
+        echo "Usage: ./run.sh [lint | test | bench | preflight | live-audit | start | web | admin | mf-ingest | nifty100 | sync-supabase | sync-down | daily-audit | update-reports | pipeline | dump-chat | checkpoint | rollback | checkpoints]"
         exit 1
         ;;
 esac

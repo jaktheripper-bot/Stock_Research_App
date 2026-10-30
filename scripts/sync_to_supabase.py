@@ -67,17 +67,44 @@ def get_local_revisions(sqlite_path: str = None) -> List[Dict[str, Any]]:
         conn.close()
     return rows
 
+def _coerce_pg_date(val: Any):
+    """Coerces SQLite date/timestamp/sentinel values into a Python datetime.date or None for PostgreSQL DATE columns."""
+    from datetime import date, datetime
+    from core.db.connection import IST
+    from core.presentation.formatters import _coerce_datetime
+
+    if val is None:
+        return None
+    if isinstance(val, datetime):
+        return (val.astimezone(IST) if val.tzinfo else val).date()
+    if isinstance(val, date):
+        return val
+    if isinstance(val, (int, float)):
+        return datetime.fromtimestamp(float(val), tz=IST).date()
+    if isinstance(val, str):
+        s = val.strip()
+        if not s or s.lower() in {
+            "none", "null", "n/a", "na", "pending", "pending monthly disclosure", "-", "unknown"
+        }:
+            return None
+        try:
+            return datetime.strptime(s[:10], "%Y-%m-%d").date()
+        except ValueError:
+            coerced = _coerce_datetime(s)
+            return coerced.date() if coerced is not None else None
+    return None
+
+
 def sync_via_postgresql(reports: List[Dict[str, Any]], revisions: List[Dict[str, Any]], db_url: str, sqlite_path: str = None) -> Dict[str, int]:
-    """Syncs all 8 multi-asset tables directly to Supabase PostgreSQL using psycopg2."""
+    """Syncs all 17 multi-asset tables directly to Supabase PostgreSQL using psycopg2."""
     import psycopg2
     from psycopg2.extras import execute_batch
-    from datetime import datetime, timezone
-    from core.db.connection import init_db, IST
+    from core.db.connection import IST, _normalize_pg_dsn, close_all_pg_pools, init_db
     from core.presentation.formatters import _coerce_datetime
 
     logger.info("Connecting to Supabase PostgreSQL via SUPABASE_DB_URL...")
     try:
-        conn = psycopg2.connect(db_url)
+        conn = psycopg2.connect(_normalize_pg_dsn(db_url), connect_timeout=10)
     except psycopg2.OperationalError as op_err:
         if "could not translate host name" in str(op_err) and "db." in db_url and ".supabase.co" in db_url:
             logger.warning("Supabase direct host is IPv6-only or unreachable from this network. Attempting IPv4 pooler fallback...")
@@ -85,8 +112,11 @@ def sync_via_postgresql(reports: List[Dict[str, Any]], revisions: List[Dict[str,
             m = re.search(r"postgresql://([^:]+):([^@]+)@db\.([^\.]+)\.supabase\.co:(\d+)/(.+)", db_url)
             if m:
                 user, password, project_ref, port, dbname = m.groups()
+                dbname_clean = dbname.split("?")[0]
                 for region in ["ap-southeast-1", "ap-south-1", "us-east-1", "eu-central-1"]:
-                    pooler_url = f"postgresql://{user}.{project_ref}:{password}@aws-0-{region}.pooler.supabase.com:5432/{dbname}"
+                    pooler_url = _normalize_pg_dsn(
+                        f"postgresql://{user}.{project_ref}:{password}@aws-0-{region}.pooler.supabase.com:5432/{dbname_clean}"
+                    )
                     try:
                         conn = psycopg2.connect(pooler_url, connect_timeout=5)
                         logger.info(f"Connected to Supabase PostgreSQL via IPv4 pooler ({region})!")
@@ -102,43 +132,59 @@ def sync_via_postgresql(reports: List[Dict[str, Any]], revisions: List[Dict[str,
 
     conn.autocommit = False
     cursor = conn.cursor()
+    cursor.execute("SET TIME ZONE 'Asia/Kolkata';")
+    conn.commit()
 
-    # 1. Initialize complete schema migrations (v001 through v038) on PostgreSQL
-    logger.info("Ensuring PostgreSQL schema migrations (v001 - v038) are initialized...")
+    # 1. Initialize complete schema migrations on PostgreSQL and release pool sockets immediately
+    logger.info("Ensuring PostgreSQL schema migrations are initialized...")
     try:
         init_db(force=False)
     except Exception as mig_err:
         logger.debug("Schema migration notice: %s", mig_err)
+    finally:
+        close_all_pg_pools()
 
     path = sqlite_path or get_db_path()
     sqlite_conn = sqlite3.connect(path)
     sqlite_conn.row_factory = sqlite3.Row
     sqlite_cur = sqlite_conn.cursor()
 
-    # Tables to sync: (table_name, conflict_target, update_on_conflict)
+    # Tables to sync: (table_name, conflict_target, update_on_conflict, ts_col)
     sync_targets = [
-        ("reports", "ticker", True),
-        ("report_revisions", "id", False),
-        ("cached_fundamentals", "ticker", True),
-        ("discovery_reel", "id", False),
-        ("mutual_fund_schemes", "scheme_code", True),
-        ("mutual_fund_holdings", "id", False),
-        ("fund_forensic_dossiers", "scheme_code", True),
-        ("corporate_debt_securities", "isin", True),
-        ("sovereign_benchmarks", "tenor_label", True),
-        ("sovereign_curve_history", "snapshot_key, tenor_label", True),
-        ("sovereign_sdl_spreads", "state_name", True),
-        ("sovereign_macro_rates", "metric_key", True),
-        ("reits_and_invits", "symbol", True),
-        ("sgb_tranches", "symbol", True),
-        ("alternative_yield_products", "product_id", True),
-        ("etf_matrix", "symbol", True),
-        ("msme_firms", "uin", True),
+        ("reports", "ticker", True, "timestamp"),
+        ("report_revisions", "__natural_revision__", False, "timestamp"),
+        ("cached_fundamentals", "ticker", True, "updated_at"),
+        ("discovery_reel", "__natural_discovery__", True, "created_at"),
+        ("mutual_fund_schemes", "scheme_code", True, "last_updated"),
+        ("mutual_fund_holdings", "scheme_code, holding_type, identifier", True, "created_at"),
+        ("fund_forensic_dossiers", "scheme_code", True, "last_audited_at"),
+        ("corporate_debt_securities", "isin", True, "last_updated"),
+        ("sovereign_benchmarks", "tenor_label", True, "updated_at"),
+        ("sovereign_curve_history", "snapshot_key, tenor_label", True, None),
+        ("sovereign_sdl_spreads", "state_name", True, "updated_at"),
+        ("sovereign_macro_rates", "metric_key", True, "updated_at"),
+        ("reits_and_invits", "symbol", True, "updated_at"),
+        ("sgb_tranches", "symbol", True, "updated_at"),
+        ("alternative_yield_products", "product_id", True, "updated_at"),
+        ("etf_matrix", "symbol", True, "updated_at"),
+        ("msme_firms", "uin", True, "last_updated"),
     ]
+
+    def _transform_cell(val: Any, dt: str) -> Any:
+        if val is None:
+            return None
+        if dt == "boolean":
+            return bool(val) if not isinstance(val, str) else (val.strip().lower() in ("true", "t", "1", "yes"))
+        if "timestamp" in dt:
+            coerced = _coerce_datetime(val)
+            return coerced if coerced is not None else None
+        if dt == "date":
+            return _coerce_pg_date(val)
+        return val
 
     sync_summary = {}
 
-    for table_name, conflict_col, do_update in sync_targets:
+    for table_name, conflict_col, do_update, ts_col in sync_targets:
         try:
             sqlite_cur.execute(f"SELECT * FROM {table_name}")
             rows = sqlite_cur.fetchall()
@@ -155,58 +201,129 @@ def sync_via_postgresql(reports: List[Dict[str, Any]], revisions: List[Dict[str,
                 continue
 
             raw_cols = [col[0] for col in sqlite_cur.description]
-
-            # If conflict_col is not 'id' and 'id' is a serial column in PG, omit 'id' to prevent sequence collisions
-            cols = [c for c in raw_cols if not (c == "id" and conflict_col != "id" and "id" in pg_col_types)]
+            cols = [c for c in raw_cols if not (c == "id" and conflict_col != "id" and "id" in pg_col_types) and c in pg_col_types]
             cols_joined = ", ".join(cols)
             placeholders = ", ".join(["%s"] * len(cols))
 
-            if do_update and conflict_col:
-                conflict_targets = [c.strip() for c in conflict_col.split(",")]
-                conflict_target_sql = ", ".join(conflict_targets)
-                preserve_non_empty_cols = {"report_text", "citations_json", "dossier_text"}
-                update_parts = []
-                for c in cols:
-                    if c in conflict_targets:
-                        continue
-                    if c in preserve_non_empty_cols:
-                        update_parts.append(
-                            f"{c} = CASE WHEN EXCLUDED.{c} IS NOT NULL AND TRIM(EXCLUDED.{c}) <> '' "
-                            f"THEN EXCLUDED.{c} ELSE {table_name}.{c} END"
+            if conflict_col == "__natural_discovery__":
+                cursor.execute("SELECT edition_date, ticker, created_at FROM discovery_reel")
+                pg_by_ed: Dict[str, List[Any]] = {}
+                for ped, pticker, pcreated in cursor.fetchall():
+                    pg_by_ed.setdefault(str(ped)[:10], []).append(
+                        (str(pticker or "").strip().upper(), _coerce_datetime(pcreated))
+                    )
+
+                sq_by_ed: Dict[str, List[Any]] = {}
+                for row in rows:
+                    ed_date = _coerce_pg_date(row["edition_date"])
+                    if ed_date:
+                        sq_by_ed.setdefault(ed_date.isoformat(), []).append(row)
+
+                batch_count = 0
+                for ed_iso, sq_cohort in sq_by_ed.items():
+                    pg_cohort = pg_by_ed.get(ed_iso)
+                    sq_tickers = {str(r["ticker"] or "").strip().upper() for r in sq_cohort}
+                    sq_max_dt = max(
+                        (_coerce_datetime(r["created_at"]) for r in sq_cohort if _coerce_datetime(r["created_at"])),
+                        default=None,
+                    )
+                    if pg_cohort is None:
+                        to_ins = [
+                            tuple(_transform_cell(r[c], pg_col_types.get(c, "")) for c in cols)
+                            for r in sq_cohort
+                        ]
+                        execute_batch(
+                            cursor,
+                            f"INSERT INTO discovery_reel ({cols_joined}) VALUES ({placeholders})",
+                            to_ins,
+                            page_size=500,
                         )
+                        batch_count += len(to_ins)
                     else:
-                        update_parts.append(f"{c} = EXCLUDED.{c}")
-                update_assignments = ", ".join(update_parts)
-                conflict_clause = f"ON CONFLICT ({conflict_target_sql}) DO UPDATE SET {update_assignments}"
-            elif conflict_col:
-                conflict_targets = [c.strip() for c in conflict_col.split(",")]
-                conflict_target_sql = ", ".join(conflict_targets)
-                conflict_clause = f"ON CONFLICT ({conflict_target_sql}) DO NOTHING"
+                        pg_tickers = {x[0] for x in pg_cohort}
+                        pg_max_dt = max((x[1] for x in pg_cohort if x[1] is not None), default=None)
+                        if sq_tickers != pg_tickers and sq_max_dt and (pg_max_dt is None or (sq_max_dt - pg_max_dt).total_seconds() > 1.0):
+                            cursor.execute("DELETE FROM discovery_reel WHERE edition_date = %s", (_coerce_pg_date(ed_iso),))
+                            to_ins = [
+                                tuple(_transform_cell(r[c], pg_col_types.get(c, "")) for c in cols)
+                                for r in sq_cohort
+                            ]
+                            execute_batch(
+                                cursor,
+                                f"INSERT INTO discovery_reel ({cols_joined}) VALUES ({placeholders})",
+                                to_ins,
+                                page_size=500,
+                            )
+                            batch_count += len(to_ins)
+            elif conflict_col == "__natural_revision__":
+                cursor.execute("SELECT ticker, timestamp FROM report_revisions")
+                pg_rev_keys = set()
+                for pticker, pts in cursor.fetchall():
+                    pdt = _coerce_datetime(pts)
+                    pg_rev_keys.add((str(pticker or "").strip().upper(), int(pdt.timestamp()) if pdt else str(pts)))
+
+                to_insert = []
+                for row in rows:
+                    tkr = str(row["ticker"] or "").strip().upper()
+                    sdt = _coerce_datetime(row["timestamp"])
+                    rkey = (tkr, int(sdt.timestamp()) if sdt else str(row["timestamp"]))
+                    if rkey not in pg_rev_keys:
+                        to_insert.append(tuple(_transform_cell(row[c], pg_col_types.get(c, "")) for c in cols))
+                        pg_rev_keys.add(rkey)
+
+                if to_insert:
+                    execute_batch(
+                        cursor,
+                        f"INSERT INTO report_revisions ({cols_joined}) VALUES ({placeholders})",
+                        to_insert,
+                        page_size=500,
+                    )
+                batch_count = len(to_insert)
             else:
-                conflict_clause = ""
+                if do_update and conflict_col:
+                    conflict_targets = [c.strip() for c in conflict_col.split(",")]
+                    conflict_target_sql = ", ".join(conflict_targets)
+                    preserve_non_empty_cols = {"report_text", "citations_json", "dossier_text"}
+                    update_parts = []
+                    for c in cols:
+                        if c in conflict_targets:
+                            continue
+                        if c in preserve_non_empty_cols:
+                            update_parts.append(
+                                f"{c} = CASE WHEN EXCLUDED.{c} IS NOT NULL AND TRIM(EXCLUDED.{c}) <> '' "
+                                f"THEN EXCLUDED.{c} ELSE {table_name}.{c} END"
+                            )
+                        else:
+                            update_parts.append(f"{c} = EXCLUDED.{c}")
+                    update_assignments = ", ".join(update_parts)
+                    where_guard = ""
+                    if ts_col and ts_col in cols:
+                        extra_substance_guard = ""
+                        if table_name == "reports":
+                            extra_substance_guard = f" OR {table_name}.report_text IS NULL OR LENGTH(TRIM({table_name}.report_text)) < 500"
+                        elif table_name == "fund_forensic_dossiers":
+                            extra_substance_guard = f" OR {table_name}.dossier_text IS NULL OR TRIM({table_name}.dossier_text) = ''"
+                        where_guard = (
+                            f" WHERE {table_name}.{ts_col} IS NULL "
+                            f"OR EXCLUDED.{ts_col} IS NULL "
+                            f"OR EXCLUDED.{ts_col} >= {table_name}.{ts_col}"
+                            f"{extra_substance_guard}"
+                        )
+                    conflict_clause = f"ON CONFLICT ({conflict_target_sql}) DO UPDATE SET {update_assignments}{where_guard}"
+                elif conflict_col:
+                    conflict_targets = [c.strip() for c in conflict_col.split(",")]
+                    conflict_target_sql = ", ".join(conflict_targets)
+                    conflict_clause = f"ON CONFLICT ({conflict_target_sql}) DO NOTHING"
+                else:
+                    conflict_clause = ""
 
-            insert_query = f"INSERT INTO {table_name} ({cols_joined}) VALUES ({placeholders}) {conflict_clause}"
-
-            batch_data = []
-            for row in rows:
-                transformed_row = []
-                for c in cols:
-                    val = row[c]
-                    dt = pg_col_types.get(c, "")
-                    if val is not None:
-                        if dt == "boolean":
-                            val = bool(val) if not isinstance(val, str) else (val.strip().lower() in ("true", "t", "1", "yes"))
-                        elif "timestamp" in dt:
-                            coerced = _coerce_datetime(val)
-                            if coerced is not None:
-                                val = coerced
-                        elif dt == "date":
-                            if isinstance(val, (int, float)):
-                                val = datetime.fromtimestamp(float(val), tz=IST).date()
-                    transformed_row.append(val)
-                batch_data.append(tuple(transformed_row))
-
-            execute_batch(cursor, insert_query, batch_data, page_size=500)
+                insert_query = f"INSERT INTO {table_name} ({cols_joined}) VALUES ({placeholders}) {conflict_clause}"
+                batch_data = [
+                    tuple(_transform_cell(row[c], pg_col_types.get(c, "")) for c in cols)
+                    for row in rows
+                ]
+                execute_batch(cursor, insert_query, batch_data, page_size=500)
+                batch_count = len(batch_data)
 
             # Sync sequence if table has a serial id column
             if "id" in pg_col_types:
@@ -216,8 +333,8 @@ def sync_via_postgresql(reports: List[Dict[str, Any]], revisions: List[Dict[str,
                     logger.debug("Sequence reset notice for %s: %s", table_name, seq_err)
 
             conn.commit()
-            sync_summary[table_name] = len(batch_data)
-            logger.info(f"✅ Synced {len(batch_data):4d} records to Supabase table: {table_name}")
+            sync_summary[table_name] = batch_count
+            logger.info(f"✅ Synced {batch_count:4d} records to Supabase table: {table_name}")
         except Exception as tbl_err:
             conn.rollback()
             logger.warning(f"Notice syncing table {table_name}: {tbl_err}")
@@ -380,14 +497,22 @@ def main():
 
     sb_url = args.supabase_url or get_secret("SUPABASE_URL")
     service_key = get_secret("SUPABASE_SERVICE_ROLE_KEY")
+    pg_url = (
+        args.supabase_db_url
+        if args.supabase_db_url is not None
+        else (os.environ.get("SUPABASE_DB_URL") if "SUPABASE_DB_URL" in os.environ else get_secret("SUPABASE_DB_URL"))
+    )
 
     if args.pull:
+        if pg_url:
+            from scripts.sync_from_supabase import sync_via_postgresql_pull
+            sync_via_postgresql_pull(sqlite_path=sqlite_path, db_url=pg_url)
+            return
         if sb_url and service_key:
             pull_from_supabase_rest(sqlite_path, sb_url, service_key)
             return
-        else:
-            logger.error("SUPABASE_URL and SUPABASE_SERVICE_ROLE_KEY required for --pull.")
-            return
+        logger.error("SUPABASE_DB_URL or (SUPABASE_URL + SUPABASE_SERVICE_ROLE_KEY) required for --pull.")
+        return
 
     reports = get_local_reports(sqlite_path)
     revisions = get_local_revisions(sqlite_path)
@@ -395,7 +520,6 @@ def main():
     logger.info(f"Found {len(reports)} reports and {len(revisions)} revisions in {sqlite_path}")
 
     # Check PostgreSQL connection
-    pg_url = args.supabase_db_url or get_secret("SUPABASE_DB_URL")
     if pg_url:
         sync_via_postgresql(reports, revisions, pg_url, sqlite_path=sqlite_path)
         return

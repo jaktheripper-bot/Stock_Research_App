@@ -39,7 +39,11 @@ def _is_unit_test_runtime() -> bool:
 
 
 def get_configured_supabase_url() -> str | None:
-    """Returns configured Supabase DB URL from secrets or environment, or None in unit tests."""
+    """Returns configured Supabase DB URL from secrets or environment, or None in unit tests / explicit local-only mode."""
+    if os.environ.get("FORCE_LOCAL_SQLITE") == "1":
+        return None
+    if "SUPABASE_DB_URL" in os.environ and not os.environ["SUPABASE_DB_URL"].strip():
+        return None
     if os.environ.get("TESTING") == "1" and os.environ.get("TEST_SUPABASE") != "1":
         return None
     if _is_unit_test_runtime() and os.environ.get("TEST_SUPABASE") != "1":
@@ -223,9 +227,23 @@ class _PooledConnectionProxy:
         self.close()
 
 from contextlib import contextmanager
+import atexit
 
-DB_POOL_MIN = int(os.environ.get("DB_POOL_MIN", "2"))
-DB_POOL_MAX = int(os.environ.get("DB_POOL_MAX", "10"))
+
+def _is_web_server_runtime() -> bool:
+    """Returns True when running inside an ASGI/WSGI web server process rather than a CLI worker."""
+    if os.environ.get("WEB_SERVER_RUNTIME") == "1":
+        return True
+    import sys
+    argv_joined = " ".join(sys.argv).lower()
+    return any(srv in argv_joined for srv in ("uvicorn", "gunicorn", "hypercorn"))
+
+
+_DEFAULT_POOL_MIN = "1"
+_DEFAULT_POOL_MAX = "8" if _is_web_server_runtime() else "2"
+
+DB_POOL_MIN = int(os.environ.get("DB_POOL_MIN", _DEFAULT_POOL_MIN))
+DB_POOL_MAX = max(DB_POOL_MIN, int(os.environ.get("DB_POOL_MAX", _DEFAULT_POOL_MAX)))
 
 _PG_POOLS = {}
 _PG_POOL_LOCK = threading.Lock()
@@ -234,15 +252,41 @@ _CONN_TZ_SET = set()
 _CONN_FRESH_PROBE_TTL_SECONDS = 10.0
 
 
+def _is_transaction_pooler_conn(conn) -> bool:
+    """Detects Supavisor transaction-mode port (:6543) where session state resets across commits."""
+    dsn_str = str(getattr(conn, "dsn", "") or "")
+    return "port=6543" in dsn_str or ":6543" in dsn_str
+
+
 def _ensure_pg_ist_timezone(conn) -> None:
-    """Sets PostgreSQL session timezone to Asia/Kolkata once per pooled socket so NOW()/CURRENT_TIMESTAMP use IST."""
+    """Sets PostgreSQL session timezone to Asia/Kolkata so NOW()/CURRENT_TIMESTAMP use IST.
+    Caches per socket on session ports (:5432), and re-applies on every checkout for transaction poolers (:6543)."""
     cid = id(conn)
-    if cid in _CONN_TZ_SET:
+    is_tx_pooler = _is_transaction_pooler_conn(conn)
+    if not is_tx_pooler and cid in _CONN_TZ_SET:
         return
     with conn.cursor() as cur:
         cur.execute("SET TIME ZONE 'Asia/Kolkata';")
     conn.commit()
-    _CONN_TZ_SET.add(cid)
+    if not is_tx_pooler:
+        _CONN_TZ_SET.add(cid)
+
+
+def close_all_pg_pools() -> None:
+    """Cleanly closes all pooled PostgreSQL connections on process teardown to prevent EMAXCONNSESSION leaks."""
+    with _PG_POOL_LOCK:
+        pools = list(_PG_POOLS.values())
+        _PG_POOLS.clear()
+        _CONN_LAST_OK.clear()
+        _CONN_TZ_SET.clear()
+    for pool in pools:
+        try:
+            pool.closeall()
+        except Exception as close_err:
+            logger.debug(f"Pool teardown notice: {close_err}")
+
+
+atexit.register(close_all_pg_pools)
 
 def _get_pg_pool(dsn: str):
     """Thread-safe singleton ThreadedConnectionPool without Streamlit runtime dependency."""

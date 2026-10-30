@@ -1,7 +1,7 @@
 # Multi-Asset Institutional Report Evaluation Frameworks, Data Sources & Operational Flows Specification
 
 **Document Identifier:** `docs/REPORT_EVALUATION_FRAMEWORKS.md`  
-**Document Version:** 3.5.4 | **Effective Date:** 2026-10-30  
+**Document Version:** 3.5.5 | **Effective Date:** 2026-10-30  
 **Target System:** `Stock Research App` (`main` branch)  
 **Compliance Standards:** 
 * SEBI (Research Analysts) Regulations, 2014 Section 2(u) — Factual Non-Advisory Safe Harbor
@@ -50,7 +50,7 @@ Every numerical metric, order book depth, corporate filing, and regulatory discl
 
 All database storage, delta-gating comparisons, scheduler triggers, audit dossiers, log records, and client/UI formatting operate strictly in **Indian Standard Time (`IST`, `Asia/Kolkata`, `UTC+05:30`)**:
 
-1. **PostgreSQL & SQLite Dual-Engine Persistence (`core/db/connection.py`):** Pooled and direct PostgreSQL connections execute `SET TIME ZONE 'Asia/Kolkata';` (`_ensure_pg_ist_timezone`), and all application writes bind explicit `+05:30` ISO-8601 strings via `now_ist_iso()` (`YYYY-MM-DD HH:MM:SS+05:30`). SQLite SQL-inline timestamp expressions use `(datetime('now', '+5 hours', '+30 minutes') || '+05:30')`, and cross-offset lease/expiry comparisons (`core/db/distributed_lock.py`, `core/db/digest.py`) normalize ISO strings via `datetime(col) < datetime(?)`.
+1. **PostgreSQL & SQLite Dual-Engine Persistence (`core/db/connection.py`, `scripts/sync_from_supabase.py`, `scripts/sync_to_supabase.py`):** Pooled and direct PostgreSQL connections execute `SET TIME ZONE 'Asia/Kolkata';` (`_ensure_pg_ist_timezone`, cached per socket on `:5432` session ports and re-applied on every checkout if `:6543` transaction pooling is used), while CLI worker pools cap at `DB_POOL_MAX=2` with `atexit` `close_all_pg_pools()` teardown to prevent Supavisor `EMAXCONNSESSION` contention. All application writes and bidirectional 17-table syncs (`sync_from_supabase.py` / `./run.sh sync-down` and `sync_to_supabase.py` / `./run.sh sync-supabase`, orchestrated locally via `scripts/run_local_daily_audit.sh` / `./run.sh daily-audit`) normalize timestamps to explicit `+05:30` ISO-8601 strings (`YYYY-MM-DD HH:MM:SS+05:30`) and coerce non-ISO date sentinels (`_coerce_pg_date`) safely. SQLite SQL-inline timestamp expressions use `(datetime('now', '+5 hours', '+30 minutes') || '+05:30')`, and cross-offset lease/expiry comparisons (`core/db/distributed_lock.py`, `core/db/digest.py`) normalize ISO strings via `datetime(col) < datetime(?)`.
 2. **Canonical Coercion & Provenance Display (`core/presentation/formatters.py`):** `_coerce_datetime()` converts naive datetime strings (such as legacy SQLite `CURRENT_TIMESTAMP` UTC outputs), `Z` / `+00:00` / `UTC` / `GMT` timestamps, and Unix epochs into `IST` (`DD Mon YYYY, HH:MM IST`), while preserving date-only `YYYY-MM-DD` strings and `date` objects as exact `IST` calendar dates (`DD Mon YYYY`) with zero day-rollover drift.
 3. **Observability, Audit Artifacts & Client Formatting:** Console/application logs format timestamps via `_ISTLogFormatter` (`YYYY-MM-DD HH:MM:SS,mmm IST`), `project_auditor.py` and `remediation_plan.py` emit IST-stamped `AUD-YYYYMMDD-HHMMSS` dossiers and `REMEDIATION_ACTION_PLAN.md` headers, client scripts (`main.js`, `copilot.js`, `opportunity_terminal.js`) format dates using `timeZone: 'Asia/Kolkata'`, `Dockerfile` sets `ENV TZ=Asia/Kolkata`, and `run.sh backup` stamps backup directories in `IST`.
 

@@ -343,7 +343,7 @@ def stream_stock_report(ticker: str, language: str = "English (India)", stock_da
 
     from core.config import get_secret
     api_key = get_secret("GEMINI_API_KEY")
-    client = genai.Client(api_key=api_key)
+    client = genai.Client(api_key=api_key, http_options={"timeout": 60000})
     system_prompt = get_system_prompt(ticker, language)
     user_prompt = f"Generate research report for: {stock_data.get('short_name')} ({stock_data.get('ticker')})\nData: {stock_data}"
 
@@ -517,7 +517,7 @@ def synthesize_batch_stock_reports(
     if not api_key or len(api_key.strip()) <= 10 or not items:
         return {}
 
-    client = genai.Client(api_key=api_key)
+    client = genai.Client(api_key=api_key, http_options={"timeout": 60000})
     model_name = get_latest_flash_models(client)[0]
 
     valid_items = []

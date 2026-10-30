@@ -515,7 +515,7 @@ Format as clean markdown with sections:
 ### Strategic & Technical Directives
 """
     try:
-        client = Client(api_key=api_key)
+        client = Client(api_key=api_key, http_options={"timeout": 60000})
         gen_config = genai_types.GenerateContentConfig(
             automatic_function_calling=genai_types.AutomaticFunctionCallingConfig(disable=True)
         )

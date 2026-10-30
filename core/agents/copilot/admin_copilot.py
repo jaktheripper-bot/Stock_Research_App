@@ -1490,7 +1490,7 @@ async def process_admin_copilot_turn(
     # Attempt Generative AI Cascade
     try:
         from google.genai import Client, types as genai_types
-        client = Client(api_key=api_key)
+        client = Client(api_key=api_key, http_options={"timeout": 15000})
 
         history_items = history or []
         history_str = "\n".join([f"{h.get('role', 'user').upper()}: {h.get('content', '')}" for h in history_items[-5:]])

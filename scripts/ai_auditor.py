@@ -407,7 +407,7 @@ class FailureSynthesizer:
         if api_key and os.environ.get("TESTING") != "1":
             try:
                 from google import genai
-                self.client = genai.Client(api_key=api_key)
+                self.client = genai.Client(api_key=api_key, http_options={"timeout": 60000})
             except Exception as e:
                 logger.warning("Could not initialize google.genai: %s", e)
 
