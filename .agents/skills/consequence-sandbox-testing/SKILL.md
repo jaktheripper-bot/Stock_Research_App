@@ -11,6 +11,8 @@ description: >-
 
 ## Core Principle
 
+> **Prerequisite:** For major/structural requests, the `implication-preflight` brief must be approved first. Its Loophole IDs seed Gates 3–5 here as concrete test cases.
+
 Never validate analytical or ingestion code solely on happy-path unit inputs or structural container checks (`HTTP 200`, `len(text) >= 500`, presence of `## Pillar 1`). Every non-trivial backend or data change must pass **5 Consequence Gates** inside `<appDataDir>/brain/<conversation-id>/scratch/` before touching production state or committing.
 
 ---

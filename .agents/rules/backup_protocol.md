@@ -26,6 +26,7 @@ Whenever any code, route, analytical engine, database schema, or feature is upda
 - **Strict Anti-Hallucination Guardrail in Documentation:** Never document planned features, offline prototypes, or standalone experiments as live inline production pipelines until fully integrated and tested on `main`.
 
 ## Rule 4: Proactive Critical Thinking, Intent Clarification & Constructive Pushback
+- **Implication Preflight Gate (Major/Structural Requests):** Run the `implication-preflight` skill (grill-me intent interview → 9-lens implication map → full-corpus permutation/loophole probes in `scratch/` → approved Implication Brief) before planning or coding any major or structural change. Zero workspace edits before approval.
 - **Pre-Execution Brief Dissection:** Before touching code or proposing solutions, systematically break down the user's brief. If ANY requirement, edge case, data source, or intended cadence is ambiguous or underspecified, STOP and ask clarifying questions first.
 - **Challenge Suboptimal Briefs & Push Back:** If a user request has hidden risks, regulatory pitfalls (e.g. SEBI compliance), architectural anti-patterns, or will result in static facades / stale data, DO NOT passively execute it. Explicitly push back, explain the root cause, and propose a resilient alternative.
 - **Forbid Assumptions & Shortcuts:** Never substitute an end-to-end dynamic workflow with a one-time static seed or mock unless explicitly instructed that a static prototype is desired.

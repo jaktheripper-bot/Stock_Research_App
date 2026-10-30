@@ -20,6 +20,7 @@
 
 ## 4. Pre-Implementation Consequence & Blast-Radius Protocol (Think Before Coding)
 **Never write or modify code until 2nd- and 3rd-order consequences are traced end-to-end.** For any change to ingestion, scoring, classification, schemas, or synthesis, activate the `consequence-sandbox-testing` skill first.
+- **Implication Preflight Gate (Major/Structural Requests):** Before planning or coding any new feature, multi-module change, schema/migration, scoring/valuation math, ingestion/scheduler change, SEBI-sensitive surface, billing/auth change, or research-to-feature request, run the `implication-preflight` skill: grill-me intent interview (one question at a time, `(Recommended)` first, no question cap), 9-lens implication map, full-corpus permutation/loophole probes in `scratch/`, and an approved Implication Brief. Zero workspace edits before approval; never assume intent silently.
 - **Brief Dissection:** Clarify underspecified briefs, edge cases, and cadences before executing.
 - **Constructive Pushback:** If a request has hidden risks, regulatory pitfalls (e.g. SEBI compliance), architectural anti-patterns, or creates static facades / stale data, explain the root cause and propose a resilient alternative.
 - **Forbid Shortcuts:** Never substitute an end-to-end dynamic workflow with a one-time static seed unless explicitly instructed.
