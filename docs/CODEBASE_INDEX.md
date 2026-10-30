@@ -93,3 +93,9 @@
 - **`scripts/audit_commercial_trust_and_catalog.py` (WS4 & WS5):** Commercial trust invariants, credit ledger non-negativity, homepage flagship sample audit, and template hygiene.
 - **`scripts/verify_reality_audit.py`:** Pre-completion Zero-Illusion Reality Audit gate (Gates 1–12 AST validator).
 - **`scripts/run_project_audit.py`:** Autonomous Tri-Pillar project auditor runner.
+
+---
+
+## 5. Emergency Operations & Incident Response (`docs/`)
+
+- **`docs/BREAK_GLASS_IN_CASE_OF_EMERGENCY.md` (`BREAK-GLASS EMERGENCY RUNBOOK (SEV-1)`):** Standalone traffic-surge crash recovery and rapid 10x–50x scaling playbook (Cloudflare anonymous `120s` edge shield, Render vertical/horizontal scaling & Uvicorn concurrency overrides, Supabase Supavisor connection-pool math, external API quota cliffs, 45s deploy rollback, and safe scale-down sequence).

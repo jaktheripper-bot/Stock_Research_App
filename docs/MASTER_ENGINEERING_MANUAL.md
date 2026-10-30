@@ -991,6 +991,9 @@ The table below links every major release, structural change, and engine impleme
 ---
 
 ### End of Engineering Manual
+*For live traffic-surge crash recovery and rapid 10x–50x scaling, open the standalone Break-Glass playbook:*
+- [`docs/BREAK_GLASS_IN_CASE_OF_EMERGENCY.md`](file:///Users/lyndonpinto/Documents/Stock_Research_App/docs/BREAK_GLASS_IN_CASE_OF_EMERGENCY.md)
+
 *For emergency rollback to any certified checkpoint, run:*
 ```bash
 ./run.sh rollback <CHECKPOINT_TAG>
