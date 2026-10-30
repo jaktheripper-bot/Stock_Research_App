@@ -99,3 +99,21 @@
 ## 5. Emergency Operations & Incident Response (`docs/`)
 
 - **`docs/BREAK_GLASS_IN_CASE_OF_EMERGENCY.md` (`BREAK-GLASS EMERGENCY RUNBOOK (SEV-1)`):** Standalone traffic-surge crash recovery and rapid 10x–50x scaling playbook (Cloudflare anonymous `120s` edge shield, Render vertical/horizontal scaling & Uvicorn concurrency overrides, Supabase Supavisor connection-pool math, external API quota cliffs, 45s deploy rollback, and safe scale-down sequence).
+
+---
+
+## 6. Domain & Strategic Research Reference Library (`docs/`)
+
+Authoritative catalog of distinct external/deep-research studies archived in `docs/`, ordered newest-first for unambiguous cross-referencing:
+
+- **`docs/RESEARCH_REF_2026_10_29_PRODUCT_FEEDBACK_TOOLSET_AND_RIVAL_AUDIT_137556a408ff.md` (`2026-10-29`, Gemini Share `137556a408ff`):** Post-launch empirical audit of live `moatnomics.com` pages, SEBI Safe Harbor & Privacy feedback filter (Accept vs. Reject), deployed 9-tool audit, Indian rival pricing & AI cross-contamination audit (`Screener.in`, `Tijori Finance`, `Trendlyne`, `Tickertape`), 3-phase engineering roadmap, and Appendix B implementation ledger.
+- **`docs/UNBIASED_AI_AUDIT_BRIEFING.md` (`2026-10-18`):** Independent external AI audit briefing and evaluation rubric across multi-asset engines.
+- **`docs/competitive_analysis_baseline_and_action_plan.md` (`2026-10-11`):** Pre-launch multi-asset competitive baseline blueprint across Indian equities, mutual funds, corporate debt, REITs, and sovereign macro.
+- **`docs/mutual_fund_forensic_lookthrough_architecture.md` (`2026-10-11`):** Architectural research for AMFI direct/regular TER fee drag, Active Share, and constituent-level 7-pillar look-through scoring.
+- **`docs/data_provenance_and_untapped_investment_universe_audit.md` (`2026-10-11`):** Exchange data provenance standards and untapped Indian retail/institutional asset-universe expansion study.
+- **`docs/Building an Automated Stock Research App.md` (`2026-10-10`):** Foundational automated equity research synthesis and pipeline architecture study.
+- **`docs/Memorable Project Naming Conventions.md` (`2026-10-10`):** Brand naming linguistics and positioning study culminating in the `Moatnomics` identity.
+- **`docs/Equity Researcher Behavioral UI_UX.md` (`2026-10-09`):** Behavioral finance, cognitive ergonomics, and 4 analyst archetypes (*Forensic Sceptic*, *Quality Compounder*, *Relative Value Arbitrageur*, *Post-Investment Monitor*).
+- **`docs/Definitive AI Analysis.md` (`2026-10-08`):** Grounded LLM reasoning, epistemic tagging, and hallucination-prevention study.
+- **`docs/Indian Non-Stock Investment Apps.md` (`2026-10-08`):** Non-equity Indian savings & OBPP ecosystem study (SEBI ₹10,000 bond face-value reform, SDIs, SM REITs, P2P & gold-leasing risks).
+- **`docs/opportunity_consumption_architecture.md` (`2026-10-08`):** Cross-asset post-tax, post-CPI purchasing-power frontier and Opportunity Terminal design study.

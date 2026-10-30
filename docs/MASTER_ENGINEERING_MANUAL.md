@@ -996,6 +996,9 @@ The table below links every major release, structural change, and engine impleme
 *For live traffic-surge crash recovery and rapid 10x–50x scaling, open the standalone Break-Glass playbook:*
 - [`docs/BREAK_GLASS_IN_CASE_OF_EMERGENCY.md`](file:///Users/lyndonpinto/Documents/Stock_Research_App/docs/BREAK_GLASS_IN_CASE_OF_EMERGENCY.md)
 
+*For the post-launch product feedback, 9-tool audit, and Indian competitor contamination reference (`Share ID: 137556a408ff`), see:*
+- [`docs/RESEARCH_REF_2026_10_29_PRODUCT_FEEDBACK_TOOLSET_AND_RIVAL_AUDIT_137556a408ff.md`](file:///Users/lyndonpinto/Documents/Stock_Research_App/docs/RESEARCH_REF_2026_10_29_PRODUCT_FEEDBACK_TOOLSET_AND_RIVAL_AUDIT_137556a408ff.md) (full multi-study catalog in [`docs/CODEBASE_INDEX.md`](file:///Users/lyndonpinto/Documents/Stock_Research_App/docs/CODEBASE_INDEX.md))
+
 *For emergency rollback to any certified checkpoint, run:*
 ```bash
 ./run.sh rollback <CHECKPOINT_TAG>
