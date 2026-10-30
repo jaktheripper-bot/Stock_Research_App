@@ -201,10 +201,10 @@
       <strong>Metric Key:</strong> <code>NM</code> = Not Meaningful (negative trailing 12M EPS) • <code>BFSI</code> = Banks/NBFCs/Insurers evaluated on CRAR &amp; Net NPA rather than industrial D/E • <code>—</code> = Statutory filing sync pending • Hover any ratio for calculation basis.
     </div>
 
-    <!-- Discovery Highlights Grid (Top 6) -->
-    <div style="display: grid; grid-template-columns: repeat(auto-fill, minmax(320px, 1fr)); gap: 20px;">
+    <!-- Discovery Highlights Grid (single row; remaining picks signposted below) -->
+    <div id="discoveryHighlightsGrid" data-edition-total="{{ discovery_stocks|length }}" style="display: grid; grid-template-columns: repeat(auto-fill, minmax(320px, 1fr)); gap: 20px;">
       {% for item in discovery_stocks[:6] %}
-      <div class="stat-card" style="display: flex; flex-direction: column; justify-content: space-between; border: 1px solid rgba(14, 165, 233, 0.2); background: rgba(30, 41, 59, 0.5);">
+      <div class="stat-card discovery-highlight-card" style="display: flex; flex-direction: column; justify-content: space-between; border: 1px solid rgba(14, 165, 233, 0.2); background: rgba(30, 41, 59, 0.5);">
         <div>
           <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px;">
             <span class="badge badge-cyan" style="font-size: 10px; text-transform: uppercase;">{{ item.sector }}</span>
@@ -256,6 +256,22 @@
         </a>
       </div>
       {% endfor %}
+    </div>
+
+    <!-- Remaining picks indicator (shown only when the edition has more than one row of picks) -->
+    <div id="discoveryMoreIndicator" class="home-more-indicator" hidden>
+      <div class="home-more-indicator__lead">
+        <span class="home-more-indicator__deck" aria-hidden="true"><span></span><span></span><span></span></span>
+        <div class="home-more-indicator__title">
+          <strong id="discoveryMoreCount" class="tnum">+0</strong> more picks in this edition waiting to be explored
+        </div>
+      </div>
+      <div class="home-more-indicator__actions">
+        <a href="/discovery" class="btn btn-primary home-screener-btn">
+          <span>View Full Edition</span>
+          <span>→</span>
+        </a>
+      </div>
     </div>
   </div>
 </section>
@@ -510,7 +526,7 @@
             placeholder="Search stock reports by ticker, name, or industry (e.g. INFY, TCS, Reliance, Kaynes, Neuland, BFSI)..." 
             class="form-control" 
             style="background: rgba(15, 23, 42, 0.9); border: 1px solid rgba(255, 255, 255, 0.15); color: #fff; padding: 11px 16px; border-radius: 8px; width: 100%; font-size: 14px;"
-            oninput="filterHomeStockReports()"
+            oninput="onHomeSearchInput()"
           >
         </div>
         <button type="button" id="btnHomeClearSearch" onclick="clearHomeStockSearch()" class="btn btn-secondary btn-sm" style="display: none; padding: 11px 16px; font-weight: 600;">
@@ -543,7 +559,7 @@
     <!-- Active Summary Bar -->
     <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 10px; margin-bottom: 10px; padding: 0 4px;">
       <div style="font-size: 13.5px; font-weight: 600; color: var(--text-secondary);">
-        Showing <strong id="homeVisibleCounter" style="color: var(--text-primary);">12</strong> of <strong id="homeTotalMatchesCounter" style="color: #38bdf8;">All</strong> Stock Reports
+        Showing <strong id="homeVisibleCounter" style="color: var(--text-primary);">{{ [3, (all_equities if all_equities else featured_reports)|length]|min }}</strong> of <strong id="homeTotalMatchesCounter" style="color: #38bdf8;">All</strong> Stock Reports
         <span id="homeActiveFilterLabel" style="color: #c084fc; margin-left: 6px;"></span>
       </div>
       <div style="display: flex; gap: 8px;">
@@ -673,20 +689,23 @@
       </button>
     </div>
 
-    <!-- Load More & Full Screener Controls -->
-    <div class="home-reports-actions">
-      <div id="homeLoadMoreWrapper" class="home-load-more-group">
-        <button type="button" id="btnHomeLoadMore" onclick="loadMoreHomeReports(12)" class="btn btn-secondary home-action-btn">
-          <span>Load More Reports (+12)</span>
-        </button>
-        <button type="button" id="btnHomeShowAll" onclick="showAllHomeReports()" class="btn btn-secondary home-action-btn">
-          <span>Show All Reports</span>
-        </button>
+    <!-- One-Row Preview Indicator: signals the remaining library without burying the pricing section below -->
+    <div id="homeMoreIndicator" class="home-more-indicator" hidden>
+      <div class="home-more-indicator__lead">
+        <span class="home-more-indicator__deck" aria-hidden="true"><span></span><span></span><span></span></span>
+        <div>
+          <div class="home-more-indicator__title">
+            <strong id="homeMoreCount" class="tnum">0</strong> <span id="homeMoreLabel">more stock reports waiting to be explored</span>
+          </div>
+          <div id="homeMorePreview" class="home-more-indicator__preview"></div>
+        </div>
       </div>
-
-      <div class="home-screener-wrapper">
+      <div class="home-more-indicator__actions">
+        <button type="button" id="btnHomeToggleAll" onclick="toggleHomeReportsExpanded()" class="btn btn-secondary home-action-btn" aria-expanded="false" aria-controls="homeStockCardsGrid">
+          <span id="btnHomeToggleAllLabel">Show all here</span>
+        </button>
         <a href="/equities" class="btn btn-primary home-screener-btn">
-          <span>Launch Full Screener</span>
+          <span>Open Full Screener</span>
           <span>→</span>
         </a>
       </div>
@@ -694,10 +713,17 @@
   </div>
 </section>
 
-<!-- Client-side Interactive Filter Script -->
+<!-- Client-side Interactive Filter Script (One-Row Preview: never more than a single row of report cards above pricing) -->
 <script>
   let homeCurrentSector = 'ALL';
-  let homeVisibleLimit = 12;
+  let homeExpanded = false;
+
+  // Number of cards that fit in one row of the responsive auto-fill grid (1 on mobile, 2-4 on wider screens).
+  function getGridRowCapacity(gridEl) {
+    if (!gridEl) return 1;
+    const tracks = getComputedStyle(gridEl).gridTemplateColumns.split(' ').filter(t => t && t !== 'none');
+    return Math.max(1, tracks.length);
+  }
 
   function filterHomeStockReports() {
     const qInput = document.getElementById('homeStockSearchInput');
@@ -705,6 +731,7 @@
     const clearBtn = document.getElementById('btnHomeClearSearch');
     if (clearBtn) clearBtn.style.display = q ? 'inline-block' : 'none';
 
+    const grid = document.getElementById('homeStockCardsGrid');
     const cards = Array.from(document.querySelectorAll('.home-stock-card'));
     let matchedCards = [];
 
@@ -724,33 +751,71 @@
       }
     });
 
-    const isFiltered = (q.length > 0) || (homeCurrentSector !== 'ALL');
-    const effectiveLimit = isFiltered ? matchedCards.length : homeVisibleLimit;
+    const rowCapacity = getGridRowCapacity(grid);
+    const collapsedLimit = Math.min(rowCapacity, matchedCards.length);
+    const effectiveLimit = homeExpanded ? matchedCards.length : collapsedLimit;
+    const remaining = matchedCards.length - collapsedLimit;
 
     matchedCards.forEach((card, idx) => {
-      if (idx < effectiveLimit) {
-        card.style.display = 'flex';
-      } else {
-        card.style.display = 'none';
-      }
+      card.style.display = (idx < effectiveLimit) ? 'flex' : 'none';
     });
 
     const counterEl = document.getElementById('homeVisibleCounter');
     const matchesEl = document.getElementById('homeTotalMatchesCounter');
     const emptyState = document.getElementById('homeStockEmptyState');
-    const loadMoreWrapper = document.getElementById('homeLoadMoreWrapper');
 
-    if (counterEl) counterEl.textContent = Math.min(effectiveLimit, matchedCards.length);
+    if (counterEl) counterEl.textContent = effectiveLimit;
     if (matchesEl) matchesEl.textContent = matchedCards.length;
-
     if (emptyState) emptyState.style.display = (matchedCards.length === 0) ? 'block' : 'none';
-    if (loadMoreWrapper) {
-      loadMoreWrapper.style.display = (isFiltered || effectiveLimit >= matchedCards.length) ? 'none' : 'flex';
+
+    updateHomeMoreIndicator(matchedCards, collapsedLimit, remaining, q.length > 0 || homeCurrentSector !== 'ALL');
+  }
+
+  function updateHomeMoreIndicator(matchedCards, collapsedLimit, remaining, isFiltered) {
+    const indicator = document.getElementById('homeMoreIndicator');
+    if (!indicator) return;
+    if (remaining <= 0) {
+      indicator.hidden = true;
+      homeExpanded = false;
+      return;
+    }
+    indicator.hidden = false;
+
+    const countEl = document.getElementById('homeMoreCount');
+    const labelEl = document.getElementById('homeMoreLabel');
+    const previewEl = document.getElementById('homeMorePreview');
+    const toggleBtn = document.getElementById('btnHomeToggleAll');
+    const toggleLabel = document.getElementById('btnHomeToggleAllLabel');
+    const noun = remaining === 1 ? 'report' : 'reports';
+
+    if (homeExpanded) {
+      if (countEl) countEl.textContent = matchedCards.length;
+      if (labelEl) labelEl.textContent = isFiltered ? 'matching stock reports shown' : 'stock reports shown';
+      if (previewEl) previewEl.textContent = 'Collapse back to a single row when you are done browsing.';
+    } else {
+      if (countEl) countEl.textContent = '+' + remaining;
+      if (labelEl) labelEl.textContent = isFiltered ? `more matching stock ${noun} waiting to be explored` : `more stock ${noun} waiting to be explored`;
+      if (previewEl) {
+        const nextTickers = matchedCards.slice(collapsedLimit, collapsedLimit + 4).map(c => (c.getAttribute('data-ticker') || '').toUpperCase()).filter(Boolean);
+        previewEl.textContent = nextTickers.length ? 'Up next: ' + nextTickers.join(' · ') + (remaining > nextTickers.length ? ' …' : '') : '';
+      }
+    }
+    if (toggleBtn) toggleBtn.setAttribute('aria-expanded', homeExpanded ? 'true' : 'false');
+    if (toggleLabel) toggleLabel.textContent = homeExpanded ? 'Collapse to one row' : 'Show all here';
+  }
+
+  function toggleHomeReportsExpanded() {
+    homeExpanded = !homeExpanded;
+    filterHomeStockReports();
+    if (!homeExpanded) {
+      const grid = document.getElementById('homeStockCardsGrid');
+      if (grid) grid.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
     }
   }
 
   function selectHomeSector(sectorSlug, btnEl) {
     homeCurrentSector = sectorSlug;
+    homeExpanded = false;
     document.querySelectorAll('.home-sector-btn').forEach(btn => {
       btn.classList.remove('btn-primary');
       btn.classList.add('btn-secondary');
@@ -768,6 +833,11 @@
     filterHomeStockReports();
   }
 
+  function onHomeSearchInput() {
+    homeExpanded = false;
+    filterHomeStockReports();
+  }
+
   function clearHomeStockSearch() {
     const qInput = document.getElementById('homeStockSearchInput');
     if (qInput) {
@@ -777,24 +847,44 @@
     filterHomeStockReports();
   }
 
-  function loadMoreHomeReports(increment) {
-    homeVisibleLimit += (increment || 12);
-    filterHomeStockReports();
-  }
-
-  function showAllHomeReports() {
-    homeVisibleLimit = 9999;
-    filterHomeStockReports();
-  }
-
   function resetHomeStockFilter() {
     clearHomeStockSearch();
     const allBtn = document.querySelector('.home-sector-btn[data-sector="ALL"]');
     selectHomeSector('ALL', allBtn);
   }
 
+  // Discovery @9AM grid: same single-row cap, with a pointer to the full edition.
+  function capDiscoveryGridToOneRow() {
+    const grid = document.getElementById('discoveryHighlightsGrid');
+    if (!grid) return;
+    const cards = Array.from(grid.querySelectorAll('.discovery-highlight-card'));
+    const limit = Math.min(getGridRowCapacity(grid), cards.length);
+    cards.forEach((card, idx) => { card.style.display = (idx < limit) ? 'flex' : 'none'; });
+
+    const indicator = document.getElementById('discoveryMoreIndicator');
+    const countEl = document.getElementById('discoveryMoreCount');
+    const total = parseInt(grid.getAttribute('data-edition-total') || '0', 10) || cards.length;
+    const remaining = total - limit;
+    if (indicator) indicator.hidden = remaining <= 0;
+    if (countEl) countEl.textContent = '+' + Math.max(0, remaining);
+  }
+
+  // Re-evaluate the one-row cap only when the column count actually changes (rotation / resize).
+  let homeLastRowCapacity = null;
+  window.addEventListener('resize', function() {
+    window.requestAnimationFrame(function() {
+      const cap = getGridRowCapacity(document.getElementById('homeStockCardsGrid'));
+      if (cap === homeLastRowCapacity) return;
+      homeLastRowCapacity = cap;
+      filterHomeStockReports();
+      capDiscoveryGridToOneRow();
+    });
+  });
+
   document.addEventListener('DOMContentLoaded', function() {
+    homeLastRowCapacity = getGridRowCapacity(document.getElementById('homeStockCardsGrid'));
     filterHomeStockReports();
+    capDiscoveryGridToOneRow();
   });
 </script>
 
