@@ -356,6 +356,15 @@ def compute_fund_forensic_lookthrough(scheme_code: str) -> Dict[str, Any]:
     }
 
 
+class FundSynthesisPendingError(RuntimeError):
+    """Live AI synthesis was unavailable for a scheme with sufficient look-through coverage.
+
+    Fail-closed: nothing is persisted, the previous dossier and last_audited_at stay intact,
+    and the rotation queue retries the same scheme on the next cycle. Subclasses RuntimeError
+    so existing callers that catch RuntimeError keep working.
+    """
+
+
 def synthesize_fund_forensic_narrative(metrics: Dict[str, Any], scheme: Dict[str, Any]) -> str:
     """Produces forensic qualitative analysis via Gemini Flash or deterministic engine."""
     scheme_name = scheme.get("scheme_name", metrics.get("scheme_name", ""))
@@ -451,7 +460,8 @@ Detail the liquidity bottleneck and sector concentration fault lines if liquidit
             if resp and resp.text:
                 gen_text = resp.text.strip()
         except Exception as e:
-            logger.warning(f"Gemini API narrative generation error ({e}). Proceeding to algorithmic synthesis.")
+            # Production has no template fallback (test-mode only), so this is a hard synthesis failure.
+            logger.error(f"Gemini narrative synthesis failed for {scheme_code}: {e}")
 
     # Deterministic fallback is restricted strictly to offline test mode (TESTING=1)
     is_testing = os.environ.get("TESTING") == "1" or bool(os.environ.get("PYTEST_CURRENT_TEST"))
@@ -520,7 +530,7 @@ def audit_single_fund_daily(
     # Generate AI narrative (or honest <70% Coverage Notice)
     dossier_narrative = synthesize_fund_forensic_narrative(metrics, scheme)
     if metrics.get("has_sufficient_coverage") and not dossier_narrative:
-        raise RuntimeError(
+        raise FundSynthesisPendingError(
             f"Live AI synthesis unavailable for scheme {scheme_code}; failing closed without persisting template prose."
         )
 

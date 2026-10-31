@@ -35,6 +35,51 @@ logging.basicConfig(
 logger = logging.getLogger("equity_research.scheduled_pipeline")
 
 
+def _phase_status(value) -> str:
+    """Maps a phase result to OK / SKIPPED / FAILED for event summaries."""
+    if value == "SKIPPED_LEASE_HELD":
+        return "SKIPPED"
+    if isinstance(value, str) and value.startswith("FAILED"):
+        return "FAILED"
+    return "OK"
+
+
+def _failed_phases(results: dict) -> list:
+    """Returns the result keys of every phase that failed in a pipeline run."""
+    return [key for key, value in results.items() if _phase_status(value) == "FAILED"]
+
+
+def _run_leased_phase(
+    results: dict,
+    result_key: str,
+    lease_name: str,
+    phase_label: str,
+    phase_fn,
+    force: bool = False,
+    ttl_seconds: int = DAILY_LEASE_TTL_SECONDS,
+) -> None:
+    """Runs one leased pipeline phase in isolation.
+
+    The exception is caught OUTSIDE the job_lease context manager on purpose: job_lease
+    must still observe the failure so release_on_failure=True frees the daily lease for a
+    same-day retry (local catch-up or a second cloud worker). A failed phase is recorded as
+    "FAILED: ..." in results and the remaining phases continue. Nothing is fabricated: the
+    failed phase simply has no output for this cycle.
+    """
+    try:
+        with job_lease(lease_name, ttl_seconds=ttl_seconds, release_on_exit=False) as acquired:
+            if not (acquired or force):
+                logger.info(f"Lease for {lease_name} held by another worker. Skipping {phase_label}.")
+                results[result_key] = "SKIPPED_LEASE_HELD"
+                return
+            logger.info(f"Executing {phase_label}...")
+            results[result_key] = phase_fn()
+            logger.info(f"{phase_label} complete.")
+    except Exception as exc:
+        logger.exception(f"{phase_label} failed; continuing with remaining phases: {exc}")
+        results[result_key] = f"FAILED: {type(exc).__name__}: {exc}"
+
+
 def run_morning_pipeline(date_str: str, force: bool = False) -> dict:
     """Executes the pre-market morning ingestion and screening pipeline."""
     logger.info(f"Starting Morning Multi-Asset Pipeline for {date_str}...")
@@ -42,70 +87,80 @@ def run_morning_pipeline(date_str: str, force: bool = False) -> dict:
     prune_zombie_leases()
 
     # 1. 08:30 AM IST: Daily 15-Stock Ingestion & Mutual Fund Look-Through Saturation
-    from core.analysis.daily_stock_ingestion import ingest_daily_stock_cohort
-    lease_name = f"mf_stock_ingest_{date_str}"
-    with job_lease(lease_name, ttl_seconds=DAILY_LEASE_TTL_SECONDS, release_on_exit=False) as acquired:
-        if acquired or force:
-            logger.info("Executing Phase 1: Daily 15-Stock MF Constituent Ingestion...")
-            res = ingest_daily_stock_cohort(edition_date=date_str, count=15, skip_gemini=False)
-            results["stock_ingestion"] = res
-            ingested_n = res.get("ingested_count", len(res.get("ingested_tickers") or res.get("ingested_stocks") or []))
-            logger.info(f"Phase 1 Complete: {res.get('status')} ({ingested_n} equities).")
-        else:
-            logger.info(f"Lease for {lease_name} held by another worker. Skipping Phase 1.")
-            results["stock_ingestion"] = "SKIPPED_LEASE_HELD"
+    def _stock_ingestion():
+        from core.analysis.daily_stock_ingestion import ingest_daily_stock_cohort
+        res = ingest_daily_stock_cohort(edition_date=date_str, count=15, skip_gemini=False)
+        ingested_n = res.get("ingested_count", len(res.get("ingested_tickers") or res.get("ingested_stocks") or []))
+        logger.info(f"Phase 1 result: {res.get('status')} ({ingested_n} equities).")
+        return res
+
+    _run_leased_phase(
+        results, "stock_ingestion", f"mf_stock_ingest_{date_str}",
+        "Phase 1: Daily 15-Stock MF Constituent Ingestion", _stock_ingestion, force=force,
+    )
 
     # 2. 08:45 AM / 09:00 AM IST: Discovery Reel Morning Screening
-    from scripts.run_discovery_worker import run_discovery_pipeline
-    lease_name = f"discovery_reel_{date_str}"
-    with job_lease(lease_name, ttl_seconds=DAILY_LEASE_TTL_SECONDS, release_on_exit=False) as acquired:
-        if acquired or force:
-            logger.info("Executing Phase 2: Discovery Reel Screening & Dossier Verification...")
-            success = run_discovery_pipeline(
-                target_count=15,
-                edition_date=date_str,
-                dry_run=False,
-                force_synthesis=False,
-            )
-            results["discovery_reel"] = "SUCCESS" if success else "FAILED"
-            logger.info(f"Phase 2 Complete: Discovery reel {results['discovery_reel']}.")
-        else:
-            logger.info(f"Lease for {lease_name} held by another worker. Skipping Phase 2.")
-            results["discovery_reel"] = "SKIPPED_LEASE_HELD"
+    def _discovery_reel():
+        from scripts.run_discovery_worker import run_discovery_pipeline
+        success = run_discovery_pipeline(
+            target_count=15,
+            edition_date=date_str,
+            dry_run=False,
+            force_synthesis=False,
+        )
+        if not success:
+            # Raise so job_lease releases the daily lease and a same-day retry can run.
+            raise RuntimeError("Discovery pipeline reported an unsuccessful run.")
+        return "SUCCESS"
+
+    _run_leased_phase(
+        results, "discovery_reel", f"discovery_reel_{date_str}",
+        "Phase 2: Discovery Reel Screening & Dossier Verification", _discovery_reel, force=force,
+    )
 
     # 3. 08:45 AM IST: Daily Unlisted MSME Cohort Ingestion
-    from core.msme.daily_ingest import ingest_daily_msme_cohort
-    lease_name = f"msme_daily_ingest_{date_str}"
-    with job_lease(lease_name, ttl_seconds=DAILY_LEASE_TTL_SECONDS, release_on_exit=False) as acquired:
-        if acquired or force:
-            logger.info("Executing Phase 3: Daily MSME 15-Firm Cohort Ingestion...")
-            msme_count = ingest_daily_msme_cohort(date_str, 15)
-            results["msme_ingest"] = f"INGESTED_{msme_count}"
-            logger.info(f"Phase 3 Complete: Ingested {msme_count} MSME firms.")
-        else:
-            logger.info(f"Lease for {lease_name} held by another worker. Skipping Phase 3.")
-            results["msme_ingest"] = "SKIPPED_LEASE_HELD"
+    def _msme_ingest():
+        from core.msme.daily_ingest import ingest_daily_msme_cohort
+        msme_count = ingest_daily_msme_cohort(date_str, 15)
+        return f"INGESTED_{msme_count}"
+
+    _run_leased_phase(
+        results, "msme_ingest", f"msme_daily_ingest_{date_str}",
+        "Phase 3: Daily MSME 15-Firm Cohort Ingestion", _msme_ingest, force=force,
+    )
 
     # 4. Pre-09:00 AM IST: Morning Research Bouquet Email Dispatch (Immediate post-screening delivery)
-    from core.notify import dispatch_research_bouquet
-    from core.db.digest import has_edition_been_dispatched
-    lease_name = f"morning_bouquet_{date_str}"
-    if not force and has_edition_been_dispatched(date_str):
+    already_dispatched = False
+    dispatch_check_failed = False
+    if not force:
+        try:
+            from core.db.digest import has_edition_been_dispatched
+            already_dispatched = has_edition_been_dispatched(date_str)
+        except Exception as exc:
+            # Fail closed: if we cannot confirm the edition was not sent, do not risk a duplicate email.
+            logger.exception(f"Phase 4 dispatch-ledger check failed; skipping email dispatch: {exc}")
+            results["morning_bouquet"] = f"FAILED: {type(exc).__name__}: {exc}"
+            dispatch_check_failed = True
+
+    if already_dispatched:
         logger.info(f"Morning Research Bouquet for {date_str} already dispatched. Skipping Phase 4.")
         results["morning_bouquet"] = "ALREADY_DISPATCHED"
-    else:
-        with job_lease(lease_name, ttl_seconds=86400, release_on_exit=False) as acquired:
-            if acquired or force:
-                logger.info("Executing Phase 4: Morning Research Bouquet Email Dispatch...")
-                bouquet_res = dispatch_research_bouquet(edition_date=date_str, force=force)
-                results["morning_bouquet"] = bouquet_res.get("status", "COMPLETED")
-                logger.info(
-                    f"Phase 4 Complete: Morning Bouquet dispatch status={results['morning_bouquet']} "
-                    f"(delivered={bouquet_res.get('delivered', 0)})."
-                )
-            else:
-                logger.info(f"Lease for {lease_name} held by another worker. Skipping Phase 4.")
-                results["morning_bouquet"] = "SKIPPED_LEASE_HELD"
+    elif not dispatch_check_failed:
+        def _morning_bouquet():
+            from core.notify import dispatch_research_bouquet
+            bouquet_res = dispatch_research_bouquet(edition_date=date_str, force=force)
+            status = bouquet_res.get("status", "COMPLETED")
+            logger.info(
+                f"Phase 4 result: Morning Bouquet dispatch status={status} "
+                f"(delivered={bouquet_res.get('delivered', 0)})."
+            )
+            return status
+
+        _run_leased_phase(
+            results, "morning_bouquet", f"morning_bouquet_{date_str}",
+            "Phase 4: Morning Research Bouquet Email Dispatch", _morning_bouquet,
+            force=force, ttl_seconds=86400,
+        )
 
     record_autonomous_event(
         event_type="MORNING_PIPELINE_COMPLETE",
@@ -113,10 +168,10 @@ def run_morning_pipeline(date_str: str, force: bool = False) -> dict:
         trigger_source="SCHEDULED_RUNNER",
         action_taken=f"Executed morning pipeline for {date_str}",
         summary=(
-            f"Stock Ingest: {results.get('stock_ingestion')}, "
-            f"Discovery: {results.get('discovery_reel')}, "
-            f"MSME: {results.get('msme_ingest')}, "
-            f"Bouquet: {results.get('morning_bouquet')}"
+            f"Stock Ingest: {_phase_status(results.get('stock_ingestion'))}, "
+            f"Discovery: {_phase_status(results.get('discovery_reel'))}, "
+            f"MSME: {_phase_status(results.get('msme_ingest'))}, "
+            f"Bouquet: {_phase_status(results.get('morning_bouquet'))}"
         ),
         metadata=results,
     )
@@ -130,90 +185,87 @@ def run_nightly_pipeline(date_str: str, force: bool = False) -> dict:
     prune_zombie_leases()
 
     # 1. 23:15 IST: AMFI Daily NAV Feed & Scheme Master Ingestion
-    from core.ingestion.amfi import ingest_amfi_daily_feed
-    lease_name = f"amfi_nav_sync_{date_str}"
-    with job_lease(lease_name, ttl_seconds=DAILY_LEASE_TTL_SECONDS, release_on_exit=False) as acquired:
-        if acquired or force:
-            logger.info("Executing Nightly Phase 1: AMFI Daily NAV & Master Sync...")
-            amfi_res = ingest_amfi_daily_feed(limit=None, direct_growth_only=True)
-            results["amfi_sync"] = amfi_res
-            logger.info("Nightly Phase 1 Complete: AMFI sync finished.")
-        else:
-            logger.info(f"Lease for {lease_name} held by another worker. Skipping AMFI Sync.")
-            results["amfi_sync"] = "SKIPPED_LEASE_HELD"
+    def _amfi_sync():
+        from core.ingestion.amfi import ingest_amfi_daily_feed
+        return ingest_amfi_daily_feed(limit=None, direct_growth_only=True)
+
+    _run_leased_phase(
+        results, "amfi_sync", f"amfi_nav_sync_{date_str}",
+        "Nightly Phase 1: AMFI Daily NAV & Master Sync", _amfi_sync, force=force,
+    )
 
     # 2. National ETF Matrix Ingestion
-    from core.ingestion.etf_ingest import ingest_all_amfi_etfs
-    lease_name = f"etf_matrix_sync_{date_str}"
-    with job_lease(lease_name, ttl_seconds=DAILY_LEASE_TTL_SECONDS, release_on_exit=False) as acquired:
-        if acquired or force:
-            logger.info("Executing Nightly Phase 2: National ETF Matrix Synchronization...")
-            etf_res = ingest_all_amfi_etfs(force_refresh=True)
-            results["etf_sync"] = etf_res
-            logger.info(f"Nightly Phase 2 Complete: Synced {etf_res.get('persisted_to_db', 0)} ETFs.")
-        else:
-            logger.info(f"Lease for {lease_name} held by another worker. Skipping ETF Sync.")
-            results["etf_sync"] = "SKIPPED_LEASE_HELD"
+    def _etf_sync():
+        from core.ingestion.etf_ingest import ingest_all_amfi_etfs
+        etf_res = ingest_all_amfi_etfs(force_refresh=True)
+        logger.info(f"Nightly Phase 2 result: Synced {etf_res.get('persisted_to_db', 0)} ETFs.")
+        return etf_res
+
+    _run_leased_phase(
+        results, "etf_sync", f"etf_matrix_sync_{date_str}",
+        "Nightly Phase 2: National ETF Matrix Synchronization", _etf_sync, force=force,
+    )
 
     # 3. Sovereign Curve & Benchmarks Refresh
-    from core.db.sovereign import refresh_daily_sovereign_benchmarks
-    lease_name = f"sovereign_sync_{date_str}"
-    with job_lease(lease_name, ttl_seconds=DAILY_LEASE_TTL_SECONDS, release_on_exit=False) as acquired:
-        if acquired or force:
-            logger.info("Executing Nightly Phase 3: Sovereign Curve & SDL Spreads Refresh...")
-            sov_res = refresh_daily_sovereign_benchmarks(date_str)
-            results["sovereign_sync"] = sov_res
-            logger.info(f"Nightly Phase 3 Complete: Refreshed {sov_res.get('benchmarks_updated', 0)} benchmarks.")
-        else:
-            logger.info(f"Lease for {lease_name} held by another worker. Skipping Sovereign Sync.")
-            results["sovereign_sync"] = "SKIPPED_LEASE_HELD"
+    def _sovereign_sync():
+        from core.db.sovereign import refresh_daily_sovereign_benchmarks
+        sov_res = refresh_daily_sovereign_benchmarks(date_str)
+        logger.info(f"Nightly Phase 3 result: Refreshed {sov_res.get('benchmarks_updated', 0)} benchmarks.")
+        return sov_res
+
+    _run_leased_phase(
+        results, "sovereign_sync", f"sovereign_sync_{date_str}",
+        "Nightly Phase 3: Sovereign Curve & SDL Spreads Refresh", _sovereign_sync, force=force,
+    )
 
     # 4. Multi-Asset Monitoring Scan
-    from core.analysis.asset_scanner import run_comprehensive_asset_scan
-    lease_name = f"asset_scan_{date_str}"
-    with job_lease(lease_name, ttl_seconds=DAILY_LEASE_TTL_SECONDS, release_on_exit=False) as acquired:
-        if acquired or force:
-            logger.info("Executing Nightly Phase 4: Multi-Asset Surveillance Scan...")
-            scan_res = run_comprehensive_asset_scan("ALL_ASSETS", "nightly_pipeline")
-            results["asset_scan"] = scan_res
-            logger.info("Nightly Phase 4 Complete: Surveillance scan finished.")
-        else:
-            logger.info(f"Lease for {lease_name} held by another worker. Skipping Surveillance Scan.")
-            results["asset_scan"] = "SKIPPED_LEASE_HELD"
+    def _asset_scan():
+        from core.analysis.asset_scanner import run_comprehensive_asset_scan
+        return run_comprehensive_asset_scan("ALL_ASSETS", "nightly_pipeline")
 
-    # 5. 23:30 IST: Mutual Fund Accounting Checkor
-    from core.analysis.fund_overlap_auditor import audit_single_fund_daily
-    lease_name = f"fund_audit_{date_str}"
-    with job_lease(lease_name, ttl_seconds=DAILY_LEASE_TTL_SECONDS, release_on_exit=False) as acquired:
-        if acquired or force:
-            logger.info("Executing Nightly Phase 5: Mutual Fund Rotation Look-Through Audit...")
-            fund_res = audit_single_fund_daily(scheme_code=None, force_refresh_stocks=False)
-            results["fund_audit"] = fund_res
-            if isinstance(fund_res, dict) and fund_res.get("scheme_code"):
-                record_autonomous_event(
-                    event_type="DAILY_FUND_AUDIT",
-                    ticker=fund_res.get("scheme_code", "UNKNOWN"),
-                    trigger_source="SCHEDULED_RUNNER",
-                    action_taken="7_PILLAR_LOOKTHROUGH_AUDIT",
-                    summary=f"Automated 7-pillar look-through audit completed for {fund_res.get('scheme_name')} ({fund_res.get('scheme_code')}).",
-                    metadata={
-                        "composite_health_score": fund_res.get("composite_health_score"),
-                        "weighted_moat_score": fund_res.get("weighted_moat_score"),
-                        "accounting_risk_index": fund_res.get("accounting_risk_index"),
-                        "margin_of_safety_pct": fund_res.get("margin_of_safety_pct"),
-                    },
-                )
-            logger.info(f"Nightly Phase 5 Complete: Audited fund {fund_res.get('scheme_code') if fund_res else 'none'}.")
-        else:
-            logger.info(f"Lease for {lease_name} held by another worker. Skipping Fund Audit.")
-            results["fund_audit"] = "SKIPPED_LEASE_HELD"
+    _run_leased_phase(
+        results, "asset_scan", f"asset_scan_{date_str}",
+        "Nightly Phase 4: Multi-Asset Surveillance Scan", _asset_scan, force=force,
+    )
+
+    # 5. 23:30 IST: Mutual Fund Rotation Look-Through Audit
+    def _fund_audit():
+        from core.analysis.fund_overlap_auditor import audit_single_fund_daily
+        fund_res = audit_single_fund_daily(scheme_code=None, force_refresh_stocks=False)
+        if isinstance(fund_res, dict) and fund_res.get("scheme_code"):
+            record_autonomous_event(
+                event_type="DAILY_FUND_AUDIT",
+                ticker=fund_res.get("scheme_code", "UNKNOWN"),
+                trigger_source="SCHEDULED_RUNNER",
+                action_taken="7_PILLAR_LOOKTHROUGH_AUDIT",
+                summary=f"Automated 7-pillar look-through audit completed for {fund_res.get('scheme_name')} ({fund_res.get('scheme_code')}).",
+                metadata={
+                    "composite_health_score": fund_res.get("composite_health_score"),
+                    "weighted_moat_score": fund_res.get("weighted_moat_score"),
+                    "accounting_risk_index": fund_res.get("accounting_risk_index"),
+                    "margin_of_safety_pct": fund_res.get("margin_of_safety_pct"),
+                },
+            )
+        logger.info(f"Nightly Phase 5 result: Audited fund {fund_res.get('scheme_code') if fund_res else 'none'}.")
+        return fund_res
+
+    _run_leased_phase(
+        results, "fund_audit", f"fund_audit_{date_str}",
+        "Nightly Phase 5: Mutual Fund Rotation Look-Through Audit", _fund_audit, force=force,
+    )
 
     record_autonomous_event(
         event_type="NIGHTLY_PIPELINE_COMPLETE",
         ticker="MULTI_ASSET",
         trigger_source="SCHEDULED_RUNNER",
         action_taken=f"Executed nightly pipeline for {date_str}",
-        summary=f"AMFI: {'OK' if results.get('amfi_sync') != 'SKIPPED_LEASE_HELD' else 'SKIPPED'}, ETFs: {'OK' if results.get('etf_sync') != 'SKIPPED_LEASE_HELD' else 'SKIPPED'}, Sovereign: {'OK' if results.get('sovereign_sync') != 'SKIPPED_LEASE_HELD' else 'SKIPPED'}",
+        summary=(
+            f"AMFI: {_phase_status(results.get('amfi_sync'))}, "
+            f"ETFs: {_phase_status(results.get('etf_sync'))}, "
+            f"Sovereign: {_phase_status(results.get('sovereign_sync'))}, "
+            f"Scan: {_phase_status(results.get('asset_scan'))}, "
+            f"Fund Audit: {_phase_status(results.get('fund_audit'))}"
+        ),
         metadata=results,
     )
     return results
@@ -283,6 +335,17 @@ def main():
 
         if args.mode in ("nightly", "all"):
             summary["nightly"] = run_nightly_pipeline(date_str, force=args.force)
+
+        failed = [
+            f"{mode}.{key}"
+            for mode, mode_results in summary.items()
+            for key in _failed_phases(mode_results)
+        ]
+        if failed:
+            # Every phase has already run; exit non-zero so the cloud run is visibly red and
+            # withhold the Better Stack heartbeat so the missed-heartbeat alert fires.
+            logger.error(f"Multi-Asset Scheduled Pipeline finished with failed phases: {failed}")
+            return 1
 
         logger.info("Multi-Asset Scheduled Pipeline execution finished.")
         dispatch_heartbeat(args.mode)

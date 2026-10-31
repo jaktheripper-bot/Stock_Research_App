@@ -226,7 +226,11 @@ def stream_perplexity_fallback(prompt: str, system_prompt: str, collected_citati
     }
 
     yielded = False
+    errors = []
     res = requests.post(url, headers=headers, json=payload, stream=True, timeout=60)
+    if res.status_code != 200:
+        errors.append(f"stream HTTP {res.status_code}: {str(res.text)[:300]}")
+        logger.warning("Perplexity /v1/responses stream HTTP %s: %s", res.status_code, str(res.text)[:300])
     if res.status_code == 200:
         current_event = None
         for raw_line in res.iter_lines(decode_unicode=False):
@@ -285,42 +289,21 @@ def stream_perplexity_fallback(prompt: str, system_prompt: str, collected_citati
                                 "uri": c_url,
                                 "source_type": "Verified Web Grounding"
                             })
+            else:
+                errors.append(f"non-stream HTTP {r2.status_code}: {str(r2.text)[:300]}")
+                logger.warning("Perplexity /v1/responses HTTP %s: %s", r2.status_code, str(r2.text)[:300])
         except Exception as r2_err:
-            logger.debug(f"Perplexity /v1/responses fallback notice: {r2_err}")
+            errors.append(f"non-stream error: {r2_err}")
+            logger.warning(f"Perplexity /v1/responses request failed: {r2_err}")
 
     if not yielded:
-        # Standard Perplexity Sonar /chat/completions endpoint fallback
-        sonar_url = "https://api.perplexity.ai/chat/completions"
-        r3 = requests.post(
-            sonar_url,
-            headers={"Authorization": f"Bearer {api_key}", "Content-Type": "application/json"},
-            json={
-                "model": "sonar",
-                "messages": [
-                    {"role": "system", "content": system_prompt},
-                    {"role": "user", "content": prompt},
-                ],
-                "temperature": 0.2,
-            },
-            timeout=60,
+        # The legacy /chat/completions (Sonar) endpoint is retired and always returns 403
+        # chat_completions_not_available, so it is no longer called. Surface the real
+        # /v1/responses failure so the caller fails closed with an accurate reason.
+        raise RuntimeError(
+            "Perplexity /v1/responses produced no output: " + ("; ".join(errors) or "empty response body")
         )
-        if r3.status_code != 200:
-            raise RuntimeError(f"Perplexity Sonar API HTTP {r3.status_code}: {r3.text}")
-        d3 = r3.json()
-        choices = d3.get("choices") or []
-        if choices:
-            msg_content = (choices[0].get("message") or {}).get("content") or ""
-            if msg_content:
-                yielded = True
-                yield msg_content
-        if collected_citations is not None and "citations" in d3:
-            for c_url in d3.get("citations", []):
-                if isinstance(c_url, str) and c_url.startswith("http") and not any(e.get("uri") == c_url for e in collected_citations):
-                    collected_citations.append({
-                        "title": c_url.split("//")[-1].split("/")[0],
-                        "uri": c_url,
-                        "source_type": "Verified Web Grounding",
-                    })
+
 
 def stream_gemini_ungrounded_bypass(client, prompt: str, system_prompt: str):
     model_name = get_latest_flash_models(client)[0]

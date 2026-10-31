@@ -199,25 +199,47 @@ class TestAngelOneGateway(unittest.TestCase):
             self.assertGreaterEqual(len(res["INFY"]["report_text"]), 500)
 
     @patch("requests.post")
-    def test_perplexity_sonar_failover_chat_completions(self, mock_post):
+    def test_perplexity_responses_non_stream_fallback(self, mock_post):
         from core.analysis.dossier_report_synthesis import stream_perplexity_fallback
 
-        resp_fail = MagicMock()
-        resp_fail.status_code = 404
-        resp_sonar = MagicMock()
-        resp_sonar.status_code = 200
-        resp_sonar.json.return_value = {
-            "choices": [{"message": {"content": "Perplexity Sonar grounded synthesis output."}}],
+        resp_stream_fail = MagicMock()
+        resp_stream_fail.status_code = 502
+        resp_stream_fail.text = "bad gateway"
+        resp_ok = MagicMock()
+        resp_ok.status_code = 200
+        resp_ok.json.return_value = {
+            "output": [{"type": "message", "content": [{"type": "output_text", "text": "Perplexity grounded synthesis output."}]}],
             "citations": ["https://www.bseindia.com/filing/123"],
         }
-        mock_post.side_effect = [resp_fail, resp_fail, resp_sonar]
+        mock_post.side_effect = [resp_stream_fail, resp_ok]
 
         cites = []
         with patch("core.config.get_secret", return_value="pplx-test-key-12345"):
             chunks = list(stream_perplexity_fallback("Analyze INFY", "System prompt", collected_citations=cites))
-        self.assertEqual("".join(chunks), "Perplexity Sonar grounded synthesis output.")
+        self.assertEqual("".join(chunks), "Perplexity grounded synthesis output.")
         self.assertEqual(len(cites), 1)
         self.assertEqual(cites[0]["uri"], "https://www.bseindia.com/filing/123")
+        self.assertEqual(mock_post.call_count, 2)
+        for call in mock_post.call_args_list:
+            self.assertEqual(call.args[0], "https://api.perplexity.ai/v1/responses")
+
+    @patch("requests.post")
+    def test_perplexity_failure_raises_real_responses_error_without_legacy_sonar_call(self, mock_post):
+        from core.analysis.dossier_report_synthesis import stream_perplexity_fallback
+
+        resp_fail = MagicMock()
+        resp_fail.status_code = 401
+        resp_fail.text = '{"error":"invalid api key"}'
+        mock_post.side_effect = [resp_fail, resp_fail]
+
+        with patch("core.config.get_secret", return_value="pplx-test-key-12345"):
+            with self.assertRaises(RuntimeError) as ctx:
+                list(stream_perplexity_fallback("Analyze INFY", "System prompt", collected_citations=[]))
+        self.assertIn("/v1/responses", str(ctx.exception))
+        self.assertIn("401", str(ctx.exception))
+        self.assertEqual(mock_post.call_count, 2)
+        for call in mock_post.call_args_list:
+            self.assertNotIn("chat/completions", call.args[0])
 
     @patch("requests.post")
     def test_standardized_supabase_auth_otp_verification(self, mock_post):

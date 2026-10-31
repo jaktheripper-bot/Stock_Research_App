@@ -2,6 +2,8 @@
 Unit tests for scripts/run_scheduled_pipeline.py.
 Verifies invocation contracts, signatures, and lease coordination across morning and nightly workflows.
 """
+import contextlib
+import sys
 import unittest
 from unittest.mock import patch, MagicMock
 
@@ -189,6 +191,120 @@ class TestScheduledPipeline(unittest.TestCase):
                 self.assertTrue(ok)
             finally:
                 urllib.request.urlopen = orig_urlopen
+
+
+class TestScheduledPipelinePhaseIsolation(unittest.TestCase):
+    """A failing phase must not abort later phases, must free its lease, and must fail the run."""
+
+    def setUp(self):
+        self.released = []
+        released = self.released
+
+        @contextlib.contextmanager
+        def fake_job_lease(job_name, ttl_seconds=1800, release_on_exit=False, release_on_failure=True):
+            # Mirrors core.db.distributed_lock.job_lease: release only on exit or on failure.
+            failed = False
+            try:
+                yield True
+            except Exception:
+                failed = True
+                raise
+            finally:
+                if release_on_exit or (failed and release_on_failure):
+                    released.append(job_name)
+
+        self.fake_job_lease = fake_job_lease
+
+    @patch("scripts.run_scheduled_pipeline.prune_zombie_leases")
+    @patch("scripts.run_scheduled_pipeline.record_autonomous_event", autospec=True)
+    @patch("core.ingestion.amfi.ingest_amfi_daily_feed", side_effect=RuntimeError("AMFI feed timeout"))
+    @patch("core.ingestion.etf_ingest.ingest_all_amfi_etfs", return_value={"persisted_to_db": 5})
+    @patch("core.db.sovereign.refresh_daily_sovereign_benchmarks", return_value={"benchmarks_updated": 16})
+    @patch("core.analysis.asset_scanner.run_comprehensive_asset_scan", return_value={"status": "OK"})
+    @patch("core.analysis.fund_overlap_auditor.audit_single_fund_daily")
+    def test_nightly_phase_failure_does_not_abort_later_phases(
+        self, mock_fund_audit, mock_scan, mock_sov, mock_etf, mock_amfi, mock_record_event, mock_prune
+    ):
+        from core.analysis.fund_overlap_auditor import FundSynthesisPendingError
+        mock_fund_audit.side_effect = FundSynthesisPendingError("Live AI synthesis unavailable for scheme X")
+
+        with patch("scripts.run_scheduled_pipeline.job_lease", self.fake_job_lease):
+            res = run_nightly_pipeline("2026-10-30", force=False)
+
+        self.assertTrue(res["amfi_sync"].startswith("FAILED: RuntimeError"))
+        self.assertTrue(res["fund_audit"].startswith("FAILED: FundSynthesisPendingError"))
+        mock_etf.assert_called_once()
+        mock_sov.assert_called_once()
+        mock_scan.assert_called_once()
+        mock_fund_audit.assert_called_once()
+        # Failed phases free their lease for a same-day retry; successful phases keep theirs.
+        self.assertIn("amfi_nav_sync_2026-10-30", self.released)
+        self.assertIn("fund_audit_2026-10-30", self.released)
+        self.assertNotIn("etf_matrix_sync_2026-10-30", self.released)
+        # No DAILY_FUND_AUDIT event for a failed audit; only the pipeline summary event.
+        self.assertEqual(mock_record_event.call_count, 1)
+        summary_kwargs = mock_record_event.call_args.kwargs
+        self.assertEqual(summary_kwargs["event_type"], "NIGHTLY_PIPELINE_COMPLETE")
+        self.assertIn("AMFI: FAILED", summary_kwargs["summary"])
+        self.assertIn("Fund Audit: FAILED", summary_kwargs["summary"])
+        self.assertIn("ETFs: OK", summary_kwargs["summary"])
+
+    @patch("scripts.run_scheduled_pipeline.prune_zombie_leases")
+    @patch("scripts.run_scheduled_pipeline.record_autonomous_event", autospec=True)
+    @patch("core.analysis.daily_stock_ingestion.ingest_daily_stock_cohort", return_value={"status": "OK", "ingested_count": 15})
+    @patch("scripts.run_discovery_worker.run_discovery_pipeline", return_value=True)
+    @patch("core.msme.daily_ingest.ingest_daily_msme_cohort", return_value=15)
+    @patch("core.db.digest.has_edition_been_dispatched", side_effect=RuntimeError("ledger unavailable"))
+    @patch("core.notify.dispatch_research_bouquet")
+    def test_morning_bouquet_fails_closed_when_dispatch_ledger_unreadable(
+        self, mock_bouquet, mock_has_dispatched, mock_msme, mock_discovery, mock_ingest, mock_record_event, mock_prune
+    ):
+        with patch("scripts.run_scheduled_pipeline.job_lease", self.fake_job_lease):
+            res = run_morning_pipeline("2026-10-30", force=False)
+
+        mock_bouquet.assert_not_called()
+        self.assertTrue(res["morning_bouquet"].startswith("FAILED: RuntimeError"))
+        self.assertEqual(res["discovery_reel"], "SUCCESS")
+        self.assertEqual(res["msme_ingest"], "INGESTED_15")
+
+    @patch("scripts.run_scheduled_pipeline.prune_zombie_leases")
+    @patch("scripts.run_scheduled_pipeline.record_autonomous_event", autospec=True)
+    @patch("core.analysis.daily_stock_ingestion.ingest_daily_stock_cohort", return_value={"status": "OK", "ingested_count": 15})
+    @patch("scripts.run_discovery_worker.run_discovery_pipeline", return_value=False)
+    @patch("core.msme.daily_ingest.ingest_daily_msme_cohort", return_value=15)
+    @patch("core.db.digest.has_edition_been_dispatched", return_value=True)
+    def test_unsuccessful_discovery_run_is_failed_and_releases_lease(
+        self, mock_has_dispatched, mock_msme, mock_discovery, mock_ingest, mock_record_event, mock_prune
+    ):
+        with patch("scripts.run_scheduled_pipeline.job_lease", self.fake_job_lease):
+            res = run_morning_pipeline("2026-10-30", force=False)
+
+        self.assertTrue(res["discovery_reel"].startswith("FAILED: RuntimeError"))
+        self.assertIn("discovery_reel_2026-10-30", self.released)
+        self.assertEqual(res["msme_ingest"], "INGESTED_15")
+        self.assertEqual(res["morning_bouquet"], "ALREADY_DISPATCHED")
+
+    def test_main_exits_nonzero_and_withholds_heartbeat_when_a_phase_failed(self):
+        import scripts.run_scheduled_pipeline as runner
+        with patch.object(sys, "argv", ["run_scheduled_pipeline.py", "--mode", "nightly", "--date", "2026-10-30"]), \
+             patch.object(runner, "setup_logging"), \
+             patch.object(runner, "init_db"), \
+             patch.object(runner, "flush_betterstack_logs"), \
+             patch.object(runner, "dispatch_heartbeat") as mock_heartbeat, \
+             patch.object(runner, "run_nightly_pipeline", return_value={"amfi_sync": "FAILED: RuntimeError: x", "etf_sync": {}}):
+            self.assertEqual(runner.main(), 1)
+        mock_heartbeat.assert_not_called()
+
+    def test_main_exits_zero_and_sends_heartbeat_when_all_phases_ok(self):
+        import scripts.run_scheduled_pipeline as runner
+        with patch.object(sys, "argv", ["run_scheduled_pipeline.py", "--mode", "nightly", "--date", "2026-10-30"]), \
+             patch.object(runner, "setup_logging"), \
+             patch.object(runner, "init_db"), \
+             patch.object(runner, "flush_betterstack_logs"), \
+             patch.object(runner, "dispatch_heartbeat") as mock_heartbeat, \
+             patch.object(runner, "run_nightly_pipeline", return_value={"amfi_sync": {}, "etf_sync": "SKIPPED_LEASE_HELD"}):
+            self.assertEqual(runner.main(), 0)
+        mock_heartbeat.assert_called_once_with("nightly")
 
 
 if __name__ == "__main__":
