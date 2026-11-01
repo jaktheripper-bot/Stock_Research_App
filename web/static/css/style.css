@@ -3397,17 +3397,25 @@ html[data-theme="dark"] .dossier-reading-toggle {
 
 /* 5. Perspective Portal Hero Banner & Split-Contrast WebP Artwork Layer */
 .hero-portal-banner {
-  --hero-banner-url: url('/static/img/heroes/hero-home.webp');
+  --hero-banner-fallback: url('/static/img/heroes/hero-home.webp?v=20261101_2245');
+  --hero-banner-url: image-set(
+    url('/static/img/heroes/hero-home.webp?v=20261101_2245') type('image/webp') 2x,
+    url('/static/img/heroes/hero-home.webp?v=20261101_2245') type('image/webp') 1x
+  );
   position: relative;
   overflow: hidden;
   border-radius: var(--radius-lg);
   background-color: #FFFFFF !important;
   background-image:
-    linear-gradient(95deg, #FFFFFF 0%, #FFFFFF 52%, rgba(247, 245, 238, 0.88) 76%, rgba(244, 241, 230, 0.72) 100%),
+    linear-gradient(95deg, #FFFFFF 0%, #FFFFFF 46%, rgba(247, 245, 238, 0.84) 72%, rgba(244, 241, 230, 0.62) 100%),
+    var(--hero-banner-fallback) !important;
+  background-image:
+    linear-gradient(95deg, #FFFFFF 0%, #FFFFFF 46%, rgba(247, 245, 238, 0.84) 72%, rgba(244, 241, 230, 0.62) 100%),
     var(--hero-banner-url) !important;
   background-size: cover, cover !important;
   background-position: center, right center !important;
   background-repeat: no-repeat !important;
+  image-rendering: -webkit-optimize-contrast;
   border: 1px solid #DCD6C6 !important;
   border-top: 4px solid var(--asset-accent) !important;
   padding: 32px;
@@ -3419,7 +3427,10 @@ html[data-theme="dark"] .dossier-reading-toggle {
 html[data-theme="dark"] .hero-portal-banner {
   background-color: #141418 !important;
   background-image:
-    linear-gradient(95deg, #141418 0%, #141418 52%, rgba(20, 20, 24, 0.86) 76%, rgba(9, 9, 11, 0.68) 100%),
+    linear-gradient(95deg, #141418 0%, #141418 46%, rgba(20, 20, 24, 0.82) 72%, rgba(9, 9, 11, 0.58) 100%),
+    var(--hero-banner-fallback) !important;
+  background-image:
+    linear-gradient(95deg, #141418 0%, #141418 46%, rgba(20, 20, 24, 0.82) 72%, rgba(9, 9, 11, 0.58) 100%),
     var(--hero-banner-url) !important;
   background-size: cover, cover !important;
   background-position: center, right center !important;
@@ -3432,10 +3443,17 @@ html[data-theme="dark"] .hero-portal-banner {
 
 /* Route-to-Hero WebP Mapping Across All 13 Canonical Hero Banners */
 section.hero.hero-portal-banner {
-  --hero-banner-url: url('/static/img/heroes/hero-home.webp');
+  --hero-banner-fallback: url('/static/img/heroes/hero-home.webp?v=20261101_2245');
+  --hero-banner-url: image-set(
+    url('/static/img/heroes/hero-home.webp?v=20261101_2245') type('image/webp') 2x,
+    url('/static/img/heroes/hero-home.webp?v=20261101_2245') type('image/webp') 1x
+  );
   background-color: #FFFFFF !important;
   background-image:
-    linear-gradient(95deg, #FFFFFF 0%, #FFFFFF 44%, rgba(255, 255, 255, 0.92) 50%, rgba(247, 245, 238, 0.55) 58%, rgba(247, 245, 238, 0.12) 68%, transparent 76%, transparent 100%),
+    linear-gradient(95deg, #FFFFFF 0%, #FFFFFF 42%, rgba(255, 255, 255, 0.90) 49%, rgba(247, 245, 238, 0.52) 58%, rgba(247, 245, 238, 0.12) 68%, transparent 76%, transparent 100%),
+    var(--hero-banner-fallback) !important;
+  background-image:
+    linear-gradient(95deg, #FFFFFF 0%, #FFFFFF 42%, rgba(255, 255, 238, 0.90) 49%, rgba(247, 245, 238, 0.52) 58%, rgba(247, 245, 238, 0.12) 68%, transparent 76%, transparent 100%),
     var(--hero-banner-url) !important;
   background-size: cover, cover !important;
   background-position: center, right center !important;
@@ -3447,7 +3465,10 @@ section.hero.hero-portal-banner {
 html[data-theme="dark"] section.hero.hero-portal-banner {
   background-color: #141418 !important;
   background-image:
-    linear-gradient(95deg, #141418 0%, #141418 44%, rgba(20, 20, 24, 0.92) 50%, rgba(20, 20, 24, 0.55) 58%, rgba(20, 20, 24, 0.12) 68%, transparent 76%, transparent 100%),
+    linear-gradient(95deg, #141418 0%, #141418 42%, rgba(20, 20, 24, 0.90) 49%, rgba(20, 20, 24, 0.52) 58%, rgba(20, 20, 24, 0.12) 68%, transparent 76%, transparent 100%),
+    var(--hero-banner-fallback) !important;
+  background-image:
+    linear-gradient(95deg, #141418 0%, #141418 42%, rgba(20, 20, 24, 0.90) 49%, rgba(20, 20, 24, 0.52) 58%, rgba(20, 20, 24, 0.12) 68%, transparent 76%, transparent 100%),
     var(--hero-banner-url) !important;
   background-size: cover, cover !important;
   background-position: center, right center !important;
@@ -3547,18 +3568,90 @@ section.hero.hero-portal-banner .quick-chips {
   }
 }
 
-[data-asset-class="equities"] .hero-portal-banner:not(section.hero) { --hero-banner-url: url('/static/img/heroes/hero-equities.webp'); }
-[data-asset-class="funds"] .hero-portal-banner { --hero-banner-url: url('/static/img/heroes/hero-mutual-funds.webp'); }
-[data-asset-class="etfs"] .hero-portal-banner { --hero-banner-url: url('/static/img/heroes/hero-etf-matrix.webp'); }
-[data-asset-class="debt"] .hero-portal-banner { --hero-banner-url: url('/static/img/heroes/hero-corporate-debt.webp'); }
-[data-asset-class="sovereign"] .hero-portal-banner { --hero-banner-url: url('/static/img/heroes/hero-sovereign-curve.webp'); }
-[data-asset-class="reits"] .hero-portal-banner { --hero-banner-url: url('/static/img/heroes/hero-reits-gold.webp'); }
-[data-asset-class="opportunities"] .hero-portal-banner { --hero-banner-url: url('/static/img/heroes/hero-opportunity-terminal.webp'); }
-[data-asset-class="msme"] .hero-portal-banner { --hero-banner-url: url('/static/img/heroes/hero-msme-clusters.webp'); }
-[data-asset-class="safety"] .hero-portal-banner { --hero-banner-url: url('/static/img/heroes/hero-safety-radar.webp'); }
-.hero-portal-banner[data-hero="compare"] { --hero-banner-url: url('/static/img/heroes/hero-peer-compare.webp'); }
-.hero-portal-banner[data-hero="tax"] { --hero-banner-url: url('/static/img/heroes/hero-tax-calculator.webp'); }
-.hero-portal-banner[data-hero="discovery"] { --hero-banner-url: url('/static/img/heroes/hero-discovery-9am.webp'); }
+[data-asset-class="equities"] .hero-portal-banner:not(section.hero) {
+  --hero-banner-fallback: url('/static/img/heroes/hero-equities.webp?v=20261101_2245');
+  --hero-banner-url: image-set(
+    url('/static/img/heroes/hero-equities.webp?v=20261101_2245') type('image/webp') 2x,
+    url('/static/img/heroes/hero-equities.webp?v=20261101_2245') type('image/webp') 1x
+  );
+}
+[data-asset-class="funds"] .hero-portal-banner {
+  --hero-banner-fallback: url('/static/img/heroes/hero-mutual-funds.webp?v=20261101_2245');
+  --hero-banner-url: image-set(
+    url('/static/img/heroes/hero-mutual-funds.webp?v=20261101_2245') type('image/webp') 2x,
+    url('/static/img/heroes/hero-mutual-funds.webp?v=20261101_2245') type('image/webp') 1x
+  );
+}
+[data-asset-class="etfs"] .hero-portal-banner {
+  --hero-banner-fallback: url('/static/img/heroes/hero-etf-matrix.webp?v=20261101_2245');
+  --hero-banner-url: image-set(
+    url('/static/img/heroes/hero-etf-matrix.webp?v=20261101_2245') type('image/webp') 2x,
+    url('/static/img/heroes/hero-etf-matrix.webp?v=20261101_2245') type('image/webp') 1x
+  );
+}
+[data-asset-class="debt"] .hero-portal-banner {
+  --hero-banner-fallback: url('/static/img/heroes/hero-corporate-debt.webp?v=20261101_2245');
+  --hero-banner-url: image-set(
+    url('/static/img/heroes/hero-corporate-debt.webp?v=20261101_2245') type('image/webp') 2x,
+    url('/static/img/heroes/hero-corporate-debt.webp?v=20261101_2245') type('image/webp') 1x
+  );
+}
+[data-asset-class="sovereign"] .hero-portal-banner {
+  --hero-banner-fallback: url('/static/img/heroes/hero-sovereign-curve.webp?v=20261101_2245');
+  --hero-banner-url: image-set(
+    url('/static/img/heroes/hero-sovereign-curve.webp?v=20261101_2245') type('image/webp') 2x,
+    url('/static/img/heroes/hero-sovereign-curve.webp?v=20261101_2245') type('image/webp') 1x
+  );
+}
+[data-asset-class="reits"] .hero-portal-banner {
+  --hero-banner-fallback: url('/static/img/heroes/hero-reits-gold.webp?v=20261101_2245');
+  --hero-banner-url: image-set(
+    url('/static/img/heroes/hero-reits-gold.webp?v=20261101_2245') type('image/webp') 2x,
+    url('/static/img/heroes/hero-reits-gold.webp?v=20261101_2245') type('image/webp') 1x
+  );
+}
+[data-asset-class="opportunities"] .hero-portal-banner {
+  --hero-banner-fallback: url('/static/img/heroes/hero-opportunity-terminal.webp?v=20261101_2245');
+  --hero-banner-url: image-set(
+    url('/static/img/heroes/hero-opportunity-terminal.webp?v=20261101_2245') type('image/webp') 2x,
+    url('/static/img/heroes/hero-opportunity-terminal.webp?v=20261101_2245') type('image/webp') 1x
+  );
+}
+[data-asset-class="msme"] .hero-portal-banner {
+  --hero-banner-fallback: url('/static/img/heroes/hero-msme-clusters.webp?v=20261101_2245');
+  --hero-banner-url: image-set(
+    url('/static/img/heroes/hero-msme-clusters.webp?v=20261101_2245') type('image/webp') 2x,
+    url('/static/img/heroes/hero-msme-clusters.webp?v=20261101_2245') type('image/webp') 1x
+  );
+}
+[data-asset-class="safety"] .hero-portal-banner {
+  --hero-banner-fallback: url('/static/img/heroes/hero-safety-radar.webp?v=20261101_2245');
+  --hero-banner-url: image-set(
+    url('/static/img/heroes/hero-safety-radar.webp?v=20261101_2245') type('image/webp') 2x,
+    url('/static/img/heroes/hero-safety-radar.webp?v=20261101_2245') type('image/webp') 1x
+  );
+}
+.hero-portal-banner[data-hero="compare"] {
+  --hero-banner-fallback: url('/static/img/heroes/hero-peer-compare.webp?v=20261101_2245');
+  --hero-banner-url: image-set(
+    url('/static/img/heroes/hero-peer-compare.webp?v=20261101_2245') type('image/webp') 2x,
+    url('/static/img/heroes/hero-peer-compare.webp?v=20261101_2245') type('image/webp') 1x
+  );
+}
+.hero-portal-banner[data-hero="tax"] {
+  --hero-banner-fallback: url('/static/img/heroes/hero-tax-calculator.webp?v=20261101_2245');
+  --hero-banner-url: image-set(
+    url('/static/img/heroes/hero-tax-calculator.webp?v=20261101_2245') type('image/webp') 2x,
+    url('/static/img/heroes/hero-tax-calculator.webp?v=20261101_2245') type('image/webp') 1x
+  );
+}
+.hero-portal-banner[data-hero="discovery"] {
+  --hero-banner-fallback: url('/static/img/heroes/hero-discovery-9am.webp?v=20261101_2245');
+  --hero-banner-url: image-set(
+    url('/static/img/heroes/hero-discovery-9am.webp?v=20261101_2245') type('image/webp') 2x,
+    url('/static/img/heroes/hero-discovery-9am.webp?v=20261101_2245') type('image/webp') 1x
+  );
+}
 
 .hero-portal-banner::after,
 html[data-theme="dark"] .hero-portal-banner::after {
@@ -3701,43 +3794,43 @@ html[data-theme="light"] .epistemic-badge-uncert,
 }
 
 /* 10. Track 2C: Universal Light-Mode & Reading-Mode Contrast Sweep */
-html[data-theme="light"] [style*="background: rgba(15, 23, 42"]:not(.modal-backdrop):not(.copilot-backdrop),
-html[data-theme="light"] [style*="background: rgba(11, 15, 25"]:not(.modal-backdrop),
-html[data-theme="light"] [style*="background: rgba(11, 17, 32"]:not(.modal-backdrop),
-html[data-theme="light"] [style*="background: rgba(11, 19, 41"]:not(.modal-backdrop),
-html[data-theme="light"] [style*="background: rgba(11, 35, 55"]:not(.modal-backdrop),
-html[data-theme="light"] [style*="background: rgba(10, 15, 29"]:not(.modal-backdrop),
-html[data-theme="light"] [style*="background: rgba(17, 24, 39"]:not(.modal-backdrop),
-html[data-theme="light"] [style*="background: rgba(2, 6, 23"]:not(.modal-backdrop),
-html[data-theme="light"] [style*="background: #0f172a"],
-html[data-theme="light"] [style*="background: #020617"],
-html[data-theme="light"] [style*="background: #0b1120"],
-html[data-theme="light"] [style*="background: linear-gradient(135deg, rgba(15, 23, 42"],
-html[data-theme="light"] [style*="background: linear-gradient(135deg, rgba(30, 41, 59"],
-html[data-theme="light"] [style*="background: linear-gradient(135deg, rgba(30, 27, 75"],
-html[data-theme="light"] [style*="background: linear-gradient(135deg, rgba(14, 61, 50"],
-html[data-theme="light"] [style*="background: linear-gradient(135deg, rgba(239, 68, 68, 0.15) 0%, rgba(15, 23, 42"],
-html[data-theme="light"] [style*="background: linear-gradient(135deg, rgba(147, 51, 234, 0.2) 0%, rgba(30, 41, 59"],
-html[data-theme="light"] [style*="background: linear-gradient(145deg, rgba(15, 23, 42"],
-html[data-theme="light"] [style*="background: linear-gradient(180deg, rgba(15, 23, 42"],
-html[data-theme="light"] [style*="background: linear-gradient(180deg, #0b1120"],
-.dossier-ivory-surface [style*="background: rgba(15, 23, 42"],
-.dossier-ivory-surface [style*="background: rgba(30, 41, 59"],
-.dossier-ivory-surface [style*="background: rgba(2, 6, 23"] {
+html[data-theme="light"] [style*="background: rgba(15, 23, 42"]:not(.modal-backdrop):not(.copilot-backdrop):not(.hero-portal-banner),
+html[data-theme="light"] [style*="background: rgba(11, 15, 25"]:not(.modal-backdrop):not(.hero-portal-banner),
+html[data-theme="light"] [style*="background: rgba(11, 17, 32"]:not(.modal-backdrop):not(.hero-portal-banner),
+html[data-theme="light"] [style*="background: rgba(11, 19, 41"]:not(.modal-backdrop):not(.hero-portal-banner),
+html[data-theme="light"] [style*="background: rgba(11, 35, 55"]:not(.modal-backdrop):not(.hero-portal-banner),
+html[data-theme="light"] [style*="background: rgba(10, 15, 29"]:not(.modal-backdrop):not(.hero-portal-banner),
+html[data-theme="light"] [style*="background: rgba(17, 24, 39"]:not(.modal-backdrop):not(.hero-portal-banner),
+html[data-theme="light"] [style*="background: rgba(2, 6, 23"]:not(.modal-backdrop):not(.hero-portal-banner),
+html[data-theme="light"] [style*="background: #0f172a"]:not(.hero-portal-banner),
+html[data-theme="light"] [style*="background: #020617"]:not(.hero-portal-banner),
+html[data-theme="light"] [style*="background: #0b1120"]:not(.hero-portal-banner),
+html[data-theme="light"] [style*="background: linear-gradient(135deg, rgba(15, 23, 42"]:not(.hero-portal-banner),
+html[data-theme="light"] [style*="background: linear-gradient(135deg, rgba(30, 41, 59"]:not(.hero-portal-banner),
+html[data-theme="light"] [style*="background: linear-gradient(135deg, rgba(30, 27, 75"]:not(.hero-portal-banner),
+html[data-theme="light"] [style*="background: linear-gradient(135deg, rgba(14, 61, 50"]:not(.hero-portal-banner),
+html[data-theme="light"] [style*="background: linear-gradient(135deg, rgba(239, 68, 68, 0.15) 0%, rgba(15, 23, 42"]:not(.hero-portal-banner),
+html[data-theme="light"] [style*="background: linear-gradient(135deg, rgba(147, 51, 234, 0.2) 0%, rgba(30, 41, 59"]:not(.hero-portal-banner),
+html[data-theme="light"] [style*="background: linear-gradient(145deg, rgba(15, 23, 42"]:not(.hero-portal-banner),
+html[data-theme="light"] [style*="background: linear-gradient(180deg, rgba(15, 23, 42"]:not(.hero-portal-banner),
+html[data-theme="light"] [style*="background: linear-gradient(180deg, #0b1120"]:not(.hero-portal-banner),
+.dossier-ivory-surface [style*="background: rgba(15, 23, 42"]:not(.hero-portal-banner),
+.dossier-ivory-surface [style*="background: rgba(30, 41, 59"]:not(.hero-portal-banner),
+.dossier-ivory-surface [style*="background: rgba(2, 6, 23"]:not(.hero-portal-banner) {
   background: #FFFFFF !important;
   border-color: #E2E8F0 !important;
   color: #0F172A !important;
   box-shadow: 0 2px 10px rgba(15, 23, 42, 0.04);
 }
 
-html[data-theme="light"] [style*="background: rgba(30, 41, 59"],
-html[data-theme="light"] [style*="background: rgba(30,41,59"],
-html[data-theme="light"] [style*="background: rgba(51, 65, 85"],
-html[data-theme="light"] [style*="background: rgba(14, 61, 50"],
-html[data-theme="light"] [style*="background: #1e293b"],
-html[data-theme="light"] [style*="background: #334155"],
-html[data-theme="light"] [style*="background: rgba(0, 0, 0, 0.4"],
-html[data-theme="light"] [style*="background: rgba(0,0,0,0."] {
+html[data-theme="light"] [style*="background: rgba(30, 41, 59"]:not(.hero-portal-banner),
+html[data-theme="light"] [style*="background: rgba(30,41,59"]:not(.hero-portal-banner),
+html[data-theme="light"] [style*="background: rgba(51, 65, 85"]:not(.hero-portal-banner),
+html[data-theme="light"] [style*="background: rgba(14, 61, 50"]:not(.hero-portal-banner),
+html[data-theme="light"] [style*="background: #1e293b"]:not(.hero-portal-banner),
+html[data-theme="light"] [style*="background: #334155"]:not(.hero-portal-banner),
+html[data-theme="light"] [style*="background: rgba(0, 0, 0, 0.4"]:not(.hero-portal-banner),
+html[data-theme="light"] [style*="background: rgba(0,0,0,0."]:not(.hero-portal-banner) {
   background: #F8FAFC !important;
   border-color: #CBD5E1 !important;
   color: #0F172A !important;
@@ -3981,35 +4074,35 @@ html[data-theme="light"] .copilot-notice {
 }
 
 /* 11. True Black Dark Mode ([data-theme="dark"]) Surface Normalization (Zero Blue/Green Tint) */
-html[data-theme="dark"] [style*="background: rgba(15, 23, 42"]:not(.modal-backdrop):not(.copilot-backdrop),
-html[data-theme="dark"] [style*="background: rgba(11, 15, 25"]:not(.modal-backdrop),
-html[data-theme="dark"] [style*="background: rgba(11, 17, 32"]:not(.modal-backdrop),
-html[data-theme="dark"] [style*="background: rgba(11, 19, 41"]:not(.modal-backdrop),
-html[data-theme="dark"] [style*="background: rgba(11, 35, 55"]:not(.modal-backdrop),
-html[data-theme="dark"] [style*="background: rgba(10, 15, 29"]:not(.modal-backdrop),
-html[data-theme="dark"] [style*="background: rgba(17, 24, 39"]:not(.modal-backdrop),
-html[data-theme="dark"] [style*="background: rgba(2, 6, 23"]:not(.modal-backdrop),
-html[data-theme="dark"] [style*="background: #0f172a"],
-html[data-theme="dark"] [style*="background: #020617"],
-html[data-theme="dark"] [style*="background: #0b1120"],
-html[data-theme="dark"] [style*="background: linear-gradient(135deg, rgba(15, 23, 42"],
-html[data-theme="dark"] [style*="background: linear-gradient(135deg, rgba(30, 41, 59"],
-html[data-theme="dark"] [style*="background: linear-gradient(135deg, rgba(30, 27, 75"],
-html[data-theme="dark"] [style*="background: linear-gradient(135deg, rgba(14, 61, 50"],
-html[data-theme="dark"] [style*="background: linear-gradient(145deg, rgba(15, 23, 42"],
-html[data-theme="dark"] [style*="background: linear-gradient(180deg, rgba(15, 23, 42"],
-html[data-theme="dark"] [style*="background: linear-gradient(180deg, #0b1120"],
+html[data-theme="dark"] [style*="background: rgba(15, 23, 42"]:not(.modal-backdrop):not(.copilot-backdrop):not(.hero-portal-banner),
+html[data-theme="dark"] [style*="background: rgba(11, 15, 25"]:not(.modal-backdrop):not(.hero-portal-banner),
+html[data-theme="dark"] [style*="background: rgba(11, 17, 32"]:not(.modal-backdrop):not(.hero-portal-banner),
+html[data-theme="dark"] [style*="background: rgba(11, 19, 41"]:not(.modal-backdrop):not(.hero-portal-banner),
+html[data-theme="dark"] [style*="background: rgba(11, 35, 55"]:not(.modal-backdrop):not(.hero-portal-banner),
+html[data-theme="dark"] [style*="background: rgba(10, 15, 29"]:not(.modal-backdrop):not(.hero-portal-banner),
+html[data-theme="dark"] [style*="background: rgba(17, 24, 39"]:not(.modal-backdrop):not(.hero-portal-banner),
+html[data-theme="dark"] [style*="background: rgba(2, 6, 23"]:not(.modal-backdrop):not(.hero-portal-banner),
+html[data-theme="dark"] [style*="background: #0f172a"]:not(.hero-portal-banner),
+html[data-theme="dark"] [style*="background: #020617"]:not(.hero-portal-banner),
+html[data-theme="dark"] [style*="background: #0b1120"]:not(.hero-portal-banner),
+html[data-theme="dark"] [style*="background: linear-gradient(135deg, rgba(15, 23, 42"]:not(.hero-portal-banner),
+html[data-theme="dark"] [style*="background: linear-gradient(135deg, rgba(30, 41, 59"]:not(.hero-portal-banner),
+html[data-theme="dark"] [style*="background: linear-gradient(135deg, rgba(30, 27, 75"]:not(.hero-portal-banner),
+html[data-theme="dark"] [style*="background: linear-gradient(135deg, rgba(14, 61, 50"]:not(.hero-portal-banner),
+html[data-theme="dark"] [style*="background: linear-gradient(145deg, rgba(15, 23, 42"]:not(.hero-portal-banner),
+html[data-theme="dark"] [style*="background: linear-gradient(180deg, rgba(15, 23, 42"]:not(.hero-portal-banner),
+html[data-theme="dark"] [style*="background: linear-gradient(180deg, #0b1120"]:not(.hero-portal-banner),
 html[data-theme="dark"] .copilot-panel {
   background: #141418 !important;
   border-color: #27272A !important;
 }
 
-html[data-theme="dark"] [style*="background: rgba(30, 41, 59"],
-html[data-theme="dark"] [style*="background: rgba(30,41,59"],
-html[data-theme="dark"] [style*="background: rgba(51, 65, 85"],
-html[data-theme="dark"] [style*="background: rgba(14, 61, 50"],
-html[data-theme="dark"] [style*="background: #1e293b"],
-html[data-theme="dark"] [style*="background: #334155"],
+html[data-theme="dark"] [style*="background: rgba(30, 41, 59"]:not(.hero-portal-banner),
+html[data-theme="dark"] [style*="background: rgba(30,41,59"]:not(.hero-portal-banner),
+html[data-theme="dark"] [style*="background: rgba(51, 65, 85"]:not(.hero-portal-banner),
+html[data-theme="dark"] [style*="background: rgba(14, 61, 50"]:not(.hero-portal-banner),
+html[data-theme="dark"] [style*="background: #1e293b"]:not(.hero-portal-banner),
+html[data-theme="dark"] [style*="background: #334155"]:not(.hero-portal-banner),
 html[data-theme="dark"] .copilot-header,
 html[data-theme="dark"] .copilot-chips-wrap,
 html[data-theme="dark"] .copilot-input-bar {
