@@ -306,6 +306,140 @@ class TestScheduledPipelinePhaseIsolation(unittest.TestCase):
             self.assertEqual(runner.main(), 0)
         mock_heartbeat.assert_called_once_with("nightly")
 
+    def test_resolve_mode_and_date_prevents_morning_lease_poisoning_and_midnight_rollover(self):
+        """08:00 AM catch-up binds to T-1; 00:00-04:59 nightly binds to T-1; 19:30 evening binds to T."""
+        from datetime import datetime
+        from scripts.run_scheduled_pipeline import IST, _resolve_mode_and_date
+
+        # 08:00 AM IST Monday -> morning mode on T-1 (2026-11-01), never pre-locking 2026-11-02 evening leases
+        mon_8am = datetime(2026, 11, 2, 8, 0, tzinfo=IST)
+        self.assertEqual(_resolve_mode_and_date("auto", mon_8am), ("morning", "2026-11-01"))
+        self.assertEqual(_resolve_mode_and_date("morning", mon_8am), ("morning", "2026-11-01"))
+
+        # 19:30 IST Monday -> evening harvest on T (2026-11-02)
+        mon_1930 = datetime(2026, 11, 2, 19, 30, tzinfo=IST)
+        self.assertEqual(_resolve_mode_and_date("auto", mon_1930), ("evening", "2026-11-02"))
+        self.assertEqual(_resolve_mode_and_date("evening", mon_1930), ("evening", "2026-11-02"))
+
+        # 00:15 AM IST Tuesday (delayed GHA cron) -> nightly on T-1 (2026-11-02)
+        tue_0015 = datetime(2026, 11, 3, 0, 15, tzinfo=IST)
+        self.assertEqual(_resolve_mode_and_date("auto", tue_0015), ("nightly", "2026-11-02"))
+        self.assertEqual(_resolve_mode_and_date("nightly", tue_0015), ("nightly", "2026-11-02"))
+
+    @patch("scripts.run_scheduled_pipeline.prune_zombie_leases")
+    @patch("scripts.run_scheduled_pipeline.record_autonomous_event", autospec=True)
+    @patch("core.db.sovereign.refresh_daily_sovereign_benchmarks", return_value={"benchmarks_updated": 16})
+    @patch("core.ingestion.etf_ingest.ingest_all_amfi_etfs", return_value={"persisted_to_db": 442})
+    @patch("core.analysis.asset_scanner.run_comprehensive_asset_scan", return_value={"status": "OK"})
+    @patch("scripts.run_discovery_worker.run_discovery_pipeline", return_value=True)
+    @patch("core.msme.daily_ingest.ingest_daily_msme_cohort", return_value=15)
+    @patch("core.analysis.daily_stock_ingestion.ingest_daily_stock_cohort", return_value={"status": "OK", "ingested_count": 15})
+    @patch("core.db.digest.has_edition_been_dispatched", return_value=False)
+    @patch("core.notify.dispatch_research_bouquet", return_value={"status": "COMPLETED", "delivered": 4})
+    def test_evening_harvest_runs_all_7_phases_on_weekday_and_warehouse_only_on_weekend(
+        self,
+        mock_bouquet,
+        mock_has_dispatched,
+        mock_stock_ingest,
+        mock_msme,
+        mock_disc,
+        mock_scan,
+        mock_etf,
+        mock_sov,
+        mock_record_event,
+        mock_prune,
+    ):
+        from scripts.run_scheduled_pipeline import _failed_phases, run_evening_harvest_pipeline
+
+        with patch("scripts.run_scheduled_pipeline.job_lease", self.fake_job_lease):
+            # 1. Friday (2026-10-30): all 7 phases execute including Day-End Wrap
+            fri_res = run_evening_harvest_pipeline("2026-10-30", force=False, respect_market_calendar=True)
+            self.assertEqual(_failed_phases(fri_res), [])
+            self.assertEqual(fri_res["discovery_reel"], "SUCCESS")
+            self.assertEqual(fri_res["msme_ingest"], "INGESTED_15")
+            self.assertEqual(fri_res["morning_bouquet"], "COMPLETED")
+            mock_bouquet.assert_called_once_with(edition_date="2026-10-30", force=False)
+
+            mock_bouquet.reset_mock()
+            mock_disc.reset_mock()
+            mock_sov.reset_mock()
+            mock_etf.reset_mock()
+            mock_scan.reset_mock()
+
+            # 2. Sunday (2026-11-01): Weekend Warehouse Mode skips market & email phases, runs MSME + Stock Ingest
+            sun_res = run_evening_harvest_pipeline("2026-11-01", force=False, respect_market_calendar=True)
+            self.assertEqual(_failed_phases(sun_res), [])
+            self.assertEqual(sun_res["sovereign_sync"], "SKIPPED_MARKET_CLOSED")
+            self.assertEqual(sun_res["etf_sync"], "SKIPPED_MARKET_CLOSED")
+            self.assertEqual(sun_res["asset_scan"], "SKIPPED_MARKET_CLOSED")
+            self.assertEqual(sun_res["discovery_reel"], "SKIPPED_MARKET_CLOSED")
+            self.assertEqual(sun_res["morning_bouquet"], "SKIPPED_MARKET_CLOSED")
+            self.assertEqual(sun_res["msme_ingest"], "INGESTED_15")
+            self.assertEqual(sun_res["stock_ingestion"]["status"], "OK")
+            mock_bouquet.assert_not_called()
+            mock_disc.assert_not_called()
+            mock_sov.assert_not_called()
+            mock_etf.assert_not_called()
+            mock_scan.assert_not_called()
+
+    @patch("scripts.run_scheduled_pipeline.prune_zombie_leases")
+    @patch("scripts.run_scheduled_pipeline.record_autonomous_event", autospec=True)
+    @patch("core.ingestion.amfi.ingest_amfi_daily_feed")
+    @patch("core.ingestion.etf_ingest.ingest_all_amfi_etfs")
+    @patch("core.db.sovereign.refresh_daily_sovereign_benchmarks")
+    @patch("core.analysis.asset_scanner.run_comprehensive_asset_scan")
+    @patch("core.analysis.fund_overlap_auditor.audit_single_fund_daily")
+    def test_nightly_weekend_warehouse_skips_amfi_and_runs_fund_audit(
+        self,
+        mock_fund_audit,
+        mock_scan,
+        mock_sov,
+        mock_etf,
+        mock_amfi,
+        mock_record_event,
+        mock_prune,
+    ):
+        from scripts.run_scheduled_pipeline import _failed_phases, run_nightly_pipeline
+
+        mock_fund_audit.return_value = {
+            "scheme_code": "122639",
+            "scheme_name": "Parag Parikh Flexi Cap Fund",
+            "composite_health_score": 85.0,
+            "weighted_moat_score": 88.0,
+            "accounting_risk_index": 12.0,
+            "margin_of_safety_pct": 24.5,
+        }
+        with patch("scripts.run_scheduled_pipeline.job_lease", self.fake_job_lease):
+            sun_res = run_nightly_pipeline("2026-11-01", force=False, respect_market_calendar=True)
+        self.assertEqual(_failed_phases(sun_res), [])
+        self.assertEqual(sun_res["amfi_sync"], "SKIPPED_MARKET_CLOSED")
+        self.assertEqual(sun_res["etf_sync"], "SKIPPED_MARKET_CLOSED")
+        self.assertEqual(sun_res["sovereign_sync"], "SKIPPED_MARKET_CLOSED")
+        self.assertEqual(sun_res["asset_scan"], "SKIPPED_MARKET_CLOSED")
+        self.assertEqual(sun_res["fund_audit"]["scheme_code"], "122639")
+        mock_amfi.assert_not_called()
+        mock_fund_audit.assert_called_once()
+
+    def test_local_email_guard_skips_bouquet_lease_when_live_dispatch_disabled(self):
+        """Local non-cloud hosts must return SKIPPED_LOCAL_GUARD without locking morning_bouquet_{date}."""
+        from scripts.run_scheduled_pipeline import _dispatch_bouquet_phase
+
+        results = {}
+        leased_names = []
+
+        @contextlib.contextmanager
+        def tracking_lease(name, **kwargs):
+            leased_names.append(name)
+            yield True
+
+        with patch("scripts.run_scheduled_pipeline.job_lease", tracking_lease), \
+             patch("core.notify._is_live_email_dispatch_allowed", return_value=False), \
+             patch("core.notify._is_test_runtime", return_value=False):
+            _dispatch_bouquet_phase(results, "2026-11-02", force=False, respect_market_calendar=True)
+
+        self.assertEqual(results["morning_bouquet"], "SKIPPED_LOCAL_GUARD")
+        self.assertEqual(leased_names, [])
+
 
 if __name__ == "__main__":
     unittest.main()

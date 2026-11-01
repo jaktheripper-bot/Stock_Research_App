@@ -1,7 +1,7 @@
 {% extends "base.html" %}
 
 {% block title %}{% if brief %}{{ brief.title }} — 30-Second Brief | Moatnomics{% else %}30-Second Briefs (/m) | Moatnomics{% endif %}{% endblock %}
-{% block meta_desc %}{% if brief %}A 30-second, evidence-based brief of {{ brief.title }} with its main risk to watch and a link to the full report.{% else %}Quick, read-only research briefs on Indian equities, funds, bonds, REITs and unlisted MSMEs, refreshed with the 9 AM morning edition.{% endif %}{% endblock %}
+{% block meta_desc %}{% if brief %}A 30-second, evidence-based brief of {{ brief.title }} with its main risk to watch and a link to the full report.{% else %}Quick, read-only research briefs on Indian equities, funds, bonds, REITs and unlisted MSMEs, refreshed with the post-close evening edition.{% endif %}{% endblock %}
 
 {% block content %}
 <div class="container" id="mobileBriefRoot" style="max-width: 680px; margin: 0 auto; padding-top: 16px; padding-bottom: 48px;">
@@ -14,7 +14,7 @@
         Brief View
       </span>
       {% if brief %}
-      <a id="mbBackToHub" href="/m" class="btn btn-secondary btn-sm" style="font-size: 12px; padding: 4px 10px; text-decoration: none;">&larr; Morning briefs</a>
+      <a id="mbBackToHub" href="/m" class="btn btn-secondary btn-sm" style="font-size: 12px; padding: 4px 10px; text-decoration: none;">&larr; Daily briefs</a>
       {% else %}
       <span style="font-size: 12px; color: var(--text-muted);" class="tnum">Edition: {{ hub.formatted_date }}</span>
       {% endif %}
@@ -122,10 +122,10 @@
   </section>
 
   {% else %}
-  <!-- Morning bouquet feed -->
+  <!-- Day-End bouquet feed -->
   <section style="display: grid; gap: 14px;">
     <h2 style="font-size: 12px; font-weight: 800; text-transform: uppercase; letter-spacing: 0.06em; color: var(--text-muted); margin: 0;">
-      Morning equity ideas · {{ hub.formatted_date }}
+      Post-close equity ideas · {{ hub.formatted_date }}
     </h2>
 
     {% for eq in hub.bouquet.equities %}

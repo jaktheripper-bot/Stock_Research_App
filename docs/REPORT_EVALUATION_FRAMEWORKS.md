@@ -32,11 +32,11 @@ Every numerical metric, order book depth, corporate filing, and regulatory discl
 
 | Report Type / Domain | Primary Ingestion Gateway | Protocol & Routing Mechanism | Secondary Fallback | Update Frequency & TTL | Legal & SEBI Provenance Status |
 | :--- | :--- | :--- | :--- | :--- | :--- |
-| **1. Institutional Equity Dossier** (`/dossier/{sym}`) | **Angel One SmartAPI Gateway** (`core/ingestion/angel_one.py`) + **Official BSE Direct JSON API** (`getScripHeaderData/w`, `ComHeader/w`) + **Nifty 100 Batch Pipeline** (`scripts/generate_nifty100_reports.py`) | HTTPS REST + WebSockets via **AWS Lightsail Static Proxy** (`13.54.76.134:8888`), authenticated with pure Python RFC 6238 TOTP; 100/100 (`100.0%`) Nifty 100 flagship grounded coverage via Vertex AI `gemini-3.8-flash` (`>= 500`-char fail-closed validation & canonical symbol mapping `TATAMOTORS -> TMPV`, `LTIM -> LTM`) | **Angel One SmartAPI EOD Candles** (`get_eod_summary`, `search_scrip_token`) + **Statutory Filing Text Extraction** (`extract_fundamentals_from_report_text`); `yfinance` disabled by default in production (`YFINANCE_FALLBACK=0`); Perplexity Agent API (`/v1/responses`) failover (legacy `/chat/completions` Sonar endpoint retired; failures surface the real `/v1/responses` HTTP status and fail closed) | Live L2 Depth & IST Quote Timestamp on demand (with explicit Synthesis Baseline drift $\ge 0.5\%$); 14-day TTL for qualitative synthesis (invalidated on $\ge 5\%$ price jump or new BSE filing) | 🟢 **STATUTORY & LICENSED**<br>Broker API session + Official BSE corporate filing repositories (`PRIMARY_STATUTORY` vs. `SECONDARY_GROUNDING` citation tiers). |
-| **2. Stock Discovery, Daily 15-Stock Ingestion & Pre-09:00 AM Research Bouquet** (`/discovery`, `/equities`) | **BSE India Active Scrip Master** + **AMFI Mutual Fund Holdings Registry** (`mutual_fund_holdings`) + **Angel One Quotes** + **Vertex AI Postpay / Gemini Batch-Flex API** | Daily autonomous batch starting at 08:15 AM IST (GitHub Actions `45 2 * * *` with Render failover starting 08:30 AM IST): Phase 1 (15-stock MF constituent ingestion), Phase 2 (08:40 AM IST Discovery reel refresh; uncompiled `PENDING_SYNTHESIS` rows fail closed), Phase 3 (08:45 AM IST 15-firm MSME cohort), and Phase 4 (Pre-09:00 AM IST Morning Research Bouquet email dispatch at ~08:45–08:50 AM IST under `morning_bouquet_{date_str}` lease; local IDE/test email sends blocked unless `ENABLE_LIVE_EMAIL_DISPATCH=1`) | Cached NSE/BSE Universe (`bse_scrips_cache.json`) + `mutual_fund_holdings` | 24 Hours (daily pre-market run with boot catch-up & admin trigger) | 🟢 **STATUTORY**<br>Official BSE/NSE master universe + AMFI statutory portfolio disclosures with deterministic Chanakya filter. |
-| **3. Mutual Funds & ETFs** (`/funds`, `/funds/compare/overlap`) | **AMFI India Daily NAV API** (`NAVAll.txt`) | HTTP streaming download from `portal.amfiindia.com` (~1.5 MB text feed); public browse grids (`/funds` default view, `/api/funds/schemes`, `/api/opportunities/universe`) enforce `audited_only=True` (`EXISTS` on `mutual_fund_holdings`, surfacing `231` portfolio-backed schemes) while `/funds?q=...` queries all `2,059` AMFI schemes | AMC Monthly Portfolio Disclosures (SEBI mandated `.xls` / `.csv`) | NAV updated daily at 23:15 IST; constituent holdings updated monthly (30-day TTL) | 🟢 **OFFICIAL STATUTORY UTILITY**<br>AMFI is the SEBI-mandated statutory authority. 100% legal immunity. |
+| **1. Institutional Equity Dossier** (`/dossier/{sym}`) | **Angel One SmartAPI Gateway** (`core/ingestion/angel_one.py`) + **Official BSE Direct JSON API** (`getScripHeaderData/w`, `ComHeader/w`) + **Nifty 100 Batch Pipeline** (`scripts/generate_nifty100_reports.py`) | HTTPS REST + WebSockets via **AWS Lightsail Static Proxy** (`13.54.76.134:8888`), authenticated with pure Python RFC 6238 TOTP; 100/100 (`100.0%`) Nifty 100 flagship grounded coverage via Vertex AI `gemini-3.8-flash` SSE streaming (`VERTEX_AI_POSTPAY_GROUNDED_SSE`, `>= 500`-char fail-closed validation & canonical symbol mapping `TATAMOTORS -> TMPV`, `LTIM -> LTM`) | **Angel One SmartAPI EOD Candles** (`get_eod_summary`, `search_scrip_token`) + **Statutory Filing Text Extraction** (`extract_fundamentals_from_report_text`); `yfinance` disabled by default in production (`YFINANCE_FALLBACK=0`); Perplexity Agent API (`/v1/responses`) failover with session circuit breaker (`_PERPLEXITY_CIRCUIT_OPEN`) on `401/402/403` / `restricted_api_key` / `insufficient_quota` | Live L2 Depth & IST Quote Timestamp on demand (with explicit Synthesis Baseline drift $\ge 0.5\%$); 14-day TTL for qualitative synthesis (invalidated on $\ge 5\%$ price jump or new BSE filing) | 🟢 **STATUTORY & LICENSED**<br>Broker API session + Official BSE corporate filing repositories (`PRIMARY_STATUTORY` vs. `SECONDARY_GROUNDING` citation tiers). |
+| **2. Stock Discovery, Daily 15-Stock Ingestion & 7-Asset Day-End Market Wrap** (`/discovery`, `/equities`, `/m`) | **BSE India Active Scrip Master** + **AMFI Mutual Fund Holdings Registry** (`mutual_fund_holdings`) + **Angel One Quotes** + **Vertex AI Postpay SSE / Gemini Batch-Flex API** (`core/analysis/research_bouquet.py`) | **Two-Step Evening Harvest + Weekend Warehouse Mode:** Step A at `19:30 IST` (GitHub Actions `0 14 * * *` `--mode evening`, Render failover `19:45–20:59 IST`, macOS `launchd` `19:55 IST`) refreshes Sovereign Curve, ETF Matrix, Multi-Asset Surveillance Scan, 15-stock `discovery_reel` on settled closing prices, 15-firm MSME cohort, and 15-stock MF constituent ingestion (`PENDING_SYNTHESIS` rows fail closed), followed at `~19:45 IST` by the **7-Asset Day-End Market Wrap Newsletter** (`morning_bouquet_{date_str}` lease; `require_live_data=True` raises `BouquetDataUnavailableError` with zero static fallbacks; local IDE/test email sends blocked unless `ENABLE_LIVE_EMAIL_DISPATCH=1`). Step B at `23:15 IST` (`45 17 * * *` `--mode nightly`) syncs AMFI `NAVAll.txt` + 7-pillar `fund_audit` (powering the next trading day's `Prior-Session AMFI Audit (YYYY-MM-DD)` spotlight). `08:00 AM IST` (`30 2 * * *` `--mode morning`) performs silent `T-1` catch-up without pre-locking `T` leases. On **Saturdays & Sundays**, market-session phases & newsletter skip with `"SKIPPED_MARKET_CLOSED"` while Warehouse Mode (`msme_ingest`, `stock_ingestion`, `fund_audit`) runs 7/7 days | Cached NSE/BSE Universe (`bse_scrips_cache.json`) + `mutual_fund_holdings` | Trading-day post-close (`19:30 IST` harvest + `~19:45 IST` wrap); 7/7-day warehouse backlog expansion | 🟢 **STATUTORY**<br>Official BSE/NSE master universe + AMFI statutory portfolio disclosures with deterministic Chanakya filter. |
+| **3. Mutual Funds & ETFs** (`/funds`, `/funds/compare/overlap`) | **AMFI India Daily NAV API** (`NAVAll.txt`) | HTTP streaming download from `portal.amfiindia.com` (~1.5 MB text feed); public browse grids (`/funds` default view, `/api/funds/schemes`, `/api/opportunities/universe`) enforce `audited_only=True` (`EXISTS` on `mutual_fund_holdings`, surfacing `231` portfolio-backed schemes) while `/funds?q=...` queries all `2,059` AMFI schemes | AMC Monthly Portfolio Disclosures (SEBI mandated `.xls` / `.csv`) | NAV updated trading days at 23:15 IST (Step B); 7-pillar `fund_audit` rotation runs 7/7 days at 23:15 IST via SSE streaming | 🟢 **OFFICIAL STATUTORY UTILITY**<br>AMFI is the SEBI-mandated statutory authority. 100% legal immunity. |
 | **4. Bonds, NCDs & SDIs** (`/debt`, `/debt/{sym}`) | **BSE / NSE Debt Reporting Platform** + Credit Rating Agencies (CRAs) | Direct public parser for BSE Debt Bhavcopy; CRA press releases (CRISIL, ICRA, CARE) | MCA Charge Filings & SEBI OBPP Public Registers | Daily EOD for secondary yields; immediate upon CRA rating action publication | 🟢 **REGULATORY DISCLOSURES**<br>Public CRA rating actions and exchange trade reporting logs. No private OBPP scraping. |
-| **5. Sovereign Curve & T-Bills** (`/sovereign`) | **CCIL (Clearing Corp of India)** & **RBI DBIE** | FBIL daily benchmark rate sheets + MOSPI Open Data Portal (`api.mospi.gov.in`); daily term-structure history archived to `sovereign_curve_history` | Hardcoded Nelson-Siegel 1Y–30Y baseline benchmark anchors | Daily at 18:00 IST upon publication of FBIL clearing cut-offs & nightly sync at 23:15 IST (`refresh_daily_sovereign_benchmarks`) | 🟢 **SOVEREIGN PUBLIC RECORD**<br>Direct Govt of India and RBI gazette data. Zero copyright friction. |
+| **5. Sovereign Curve & T-Bills** (`/sovereign`) | **CCIL (Clearing Corp of India)** & **RBI DBIE** | FBIL daily benchmark rate sheets + MOSPI Open Data Portal (`api.mospi.gov.in`); daily term-structure history archived to `sovereign_curve_history` | Hardcoded Nelson-Siegel 1Y–30Y baseline benchmark anchors | Trading days at `19:30 IST` post-close harvest (`refresh_daily_sovereign_benchmarks`, skipped on Sat/Sun when FBIL/CCIL markets are closed) | 🟢 **SOVEREIGN PUBLIC RECORD**<br>Direct Govt of India and RBI gazette data. Zero copyright friction. |
 | **6. SM REITs, InvITs & SGBs** (`/reits`) | **BSE Listed Equities** + **AMC NDCF Filings** | Direct extraction from BSE corporate quarterly compliance reports & annual NDCF filings | SEBI Registered Valuer semi-annual reports | Quarterly upon earnings release; 90-day TTL | 🟢 **STATUTORY DISCLOSURES**<br>Mandatory SEBI REIT Regulations 2014 & SM REIT Regs 2024 disclosures. |
 | **7. National ETF Matrix** (`/etfs`) | **NSE / BSE Exchange Live Quotes** + **AMFI Scheme Master** | Angel One SmartAPI Level-2 book + AMFI NAV feed | yfinance Fast Info | Live intraday quotes; EOD NAV for tracking error computation | 🟢 **LICENSED & STATUTORY** |
 | **8. Unlisted MSME & SME Forensic Dossier** (`/msme/{uin}`, `/msme`) | **Ministry of MSME Udyam Open Gazette** & **Industrial Benchmarks** (`core/msme/forensic_engine.py`) | Direct statutory Udyam registry ingestion + 6-sector calibrated analytical modeling | Local canonical industrial clusters & vendor seed matrix | Continuous caching; 30-day TTL | 🟢 **STATUTORY OPEN DATA & HEURISTIC**<br>Open government gazette registry under MSMED Act 2020. |
@@ -93,46 +93,43 @@ sequenceDiagram
     Router-->>Browser: Rendered Institutional Dossier (HTML + Glassmorphism UI)
 ```
 
-### 2.2 Daily 15-Stock Ingestion & Pre-Market Discovery Pipeline
+### 2.2 Two-Step Evening Harvest (`19:30 IST` + `23:15 IST`), 7-Asset Day-End Market Wrap & Weekend Warehouse Mode
 
-The daily pre-market operational pipeline operates in two coordinated phases to continuously deliver fresh research to allocators while systematically expanding underlying equity coverage across the Indian mutual fund universe:
+The autonomous multi-asset pipeline aligns with real Indian post-market statutory settlement clocks across two evening windows plus a silent morning `T-1` catch-up check and Saturday/Sunday Warehouse Mode:
 
 ```mermaid
 sequenceDiagram
     autonumber
-    participant Sched as Background Scheduler (08:30 AM & 09:00 AM IST)
+    participant Sched as Scheduled Pipeline (19:30 IST, 23:15 IST & 08:00 AM IST)
+    participant Mkt as Sovereign, ETF & Asset Surveillance Engines
+    participant Disc as scripts/run_discovery_worker.py
     participant Ingest as core/analysis/daily_stock_ingestion.py
-    participant Disc as core/analysis/stock_discovery.py
-    participant MFDB as reports.db (mutual_fund_holdings)
-    participant RepDB as reports.db (reports & revisions)
-    participant FundEng as core/analysis/mutual_funds_engine.py
-    participant UI as /discovery & /equities Views
+    participant Wrap as core/analysis/research_bouquet.py & core/notify.py
+    participant FundEng as core/ingestion/amfi.py & fund_overlap_auditor.py
+    participant DB as Supabase PostgreSQL & reports.db
 
-    Note over Sched, Ingest: Phase 1: 08:30 AM IST - Daily 15-Stock MF Constituent Ingestion
-    Sched->>Ingest: Trigger ingest_daily_stock_cohort(target_count=15)
-    Ingest->>MFDB: get_uncovered_mutual_fund_holdings_queue(limit=15)
-    MFDB-->>Ingest: Prioritized uncovered equities (scheme_count DESC, total_weight_pct DESC)
-    loop For each candidate equity (e.g. RELIANCE, COFORGE)
-        Ingest->>Ingest: Synthesize 7-Pillar AI Dossier + 7-Check Health Matrix
-        Ingest->>RepDB: Archive to reports & cached_fundamentals
+    Note over Sched, Wrap: Step A: 19:30 IST (--mode evening) - Post-Close 7-Asset Harvest & ~19:45 IST Market Wrap
+    alt Trading Day (Mon-Fri) or --force
+        Sched->>Mkt: Refresh Sovereign Curve (16 tenors + SDLs), ETF Matrix (442 ETFs) & Surveillance Scan
+        Sched->>Disc: Screen & archive 15-stock Discovery Reel on settled NSE/BSE closing prices
+    else Weekend (Sat-Sun) Warehouse Mode
+        Sched-->>Sched: Skip Sovereign, ETF, Scan & Discovery Reel (SKIPPED_MARKET_CLOSED)
     end
-    Ingest->>MFDB: Find all mutual fund schemes holding newly ingested stocks
-    loop For each affected mutual fund scheme
-        Ingest->>FundEng: compute_fund_forensic_lookthrough(scheme_code)
-        FundEng->>MFDB: Recalculate & cache look-through scores, unpausing meters
+    Sched->>Ingest: Ingest 15 MSME firms + 15 uncovered MF constituent equities (Vertex AI SSE / Batch-Flex)
+    Ingest->>DB: Archive compiled 7-Pillar dossiers & recalculate affected MF look-through scores
+    alt Trading Day (Mon-Fri)
+        Sched->>Wrap: Compile & dispatch 7-Asset Day-End Market Wrap (morning_bouquet_{date_str} lease)
+        Wrap->>DB: Record immutable digest_dispatches audit row
+    else Weekend (Sat-Sun)
+        Sched-->>Sched: Skip Day-End Market Wrap email (SKIPPED_MARKET_CLOSED)
     end
-    Ingest->>RepDB: Log event in autonomous_events & publish to discovery reel
 
-    Note over Sched, Disc: Phase 2: 09:00 AM IST - Stock Discovery Candidate Screening
-    Sched->>Disc: Trigger refresh_daily_discovery()
-    Disc->>Disc: Fetch active universe quotes & filter turnover >= ₹1 Cr
-    loop For each candidate stock
-        Disc->>Disc: Run 10-Point Clean-Room Soft Sieve & Rank Top Candidates
-    end
-    Disc->>RepDB: Insert discovery cohort with publish date
-    Disc-->>Sched: Cohort successfully published
+    Note over Sched, FundEng: Step B: 23:15 IST (--mode nightly) - AMFI NAV Sync & 7-Pillar Fund Rotation
+    Sched->>FundEng: Sync AMFI NAVAll.txt (Mon-Fri) + Run 1-scheme 7-Pillar Fund Audit SSE (7/7 days)
+    FundEng->>DB: Persist audited fund dossier powering next trading day's Prior-Session AMFI Audit spotlight
 
-    UI->>RepDB: Query /discovery (renders MF footprint badge) & /equities (market_cap=RECENT chip)
+    Note over Sched, DB: 08:00 AM IST (--mode morning) - Silent T-1 Catch-Up Check (Never Pre-Locks T)
+    Sched->>DB: Verify prior day (yesterday_str) leases; retry only missed T-1 phases without re-emailing
 ```
 
 #### Fail-Closed Domain Integrity, Public Directory Completeness & Substance Invariants (Pre-Commit Gates 4.5 & 4.6)

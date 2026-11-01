@@ -29,6 +29,7 @@ from core.db.digest import (
     has_edition_been_dispatched,
 )
 from core.analysis.research_bouquet import (
+    BouquetDataUnavailableError,
     compile_research_bouquet,
     render_bouquet_html,
     render_bouquet_text,
@@ -74,35 +75,55 @@ class TestResearchBouquetAndDigest(unittest.TestCase):
         conn.close()
 
     def test_01_bouquet_synthesis_multi_asset_depth(self):
-        """Validates that compile_research_bouquet aggregates all 4 required asset pillars."""
-        bouquet = compile_research_bouquet("2026-10-17")
-        self.assertIn("Moatnomics Morning Bouquet", bouquet["subject"])
+        """Validates that compile_research_bouquet aggregates all 7 required live asset pillars."""
+        bouquet = compile_research_bouquet("2026-10-30", require_live_data=True)
+        self.assertIn("Moatnomics Day-End Market Wrap", bouquet["subject"])
         self.assertIn("equities", bouquet)
         self.assertGreater(len(bouquet["equities"]), 0)
-        
-        # Check equity structure
+
+        # Check equity structure & real ROCE/CMP mapping (zero hardcoded 18.0 Potemkin fallback)
         eq0 = bouquet["equities"][0]
         self.assertIn("ticker", eq0)
         self.assertIn("company_name", eq0)
         self.assertIn("roce", eq0)
         self.assertIn("thesis", eq0)
+        self.assertIsNotNone(eq0["cmp"])
+        self.assertGreater(eq0["cmp"], 0.0)
 
         # Check sovereign posture
         self.assertIn("sovereign", bouquet)
         self.assertIn("ten_year_gsec", bouquet["sovereign"])
         self.assertIn("repo_rate", bouquet["sovereign"])
 
-        # Check mutual fund spotlight
+        # Check corporate debt, ETFs, and REITs/SGBs
+        self.assertIn("corporate_debt", bouquet)
+        self.assertIn("isin", bouquet["corporate_debt"])
+        self.assertIn("etfs", bouquet)
+        self.assertIn("symbol", bouquet["etfs"])
+        self.assertIn("reits_sgb", bouquet)
+        self.assertIn("reit_symbol", bouquet["reits_sgb"])
+
+        # Check mutual fund spotlight & Prior-Session AMFI Audit badge
         self.assertIn("mutual_funds", bouquet)
         self.assertIn("scheme_name", bouquet["mutual_funds"])
+        self.assertIn("Prior-Session AMFI Audit", bouquet["mutual_funds"]["provenance_badge"])
 
         # Check MSME highlight
         self.assertIn("msme", bouquet)
         self.assertIn("company_name", bouquet["msme"])
 
+    def test_01b_bouquet_fails_closed_when_live_pillars_missing(self):
+        """Validates fail-closed BouquetDataUnavailableError when live asset tables are empty."""
+        from unittest.mock import patch
+
+        with patch("core.analysis.research_bouquet._load_live_equities", return_value=[]):
+            with self.assertRaises(BouquetDataUnavailableError) as ctx:
+                compile_research_bouquet("2026-10-30", require_live_data=True)
+            self.assertIn("equities", str(ctx.exception))
+
     def test_02_email_rendering_and_statutory_hygiene(self):
-        """Validates HTML and plain text renderings for unsubscribe URLs, tracking domains, and statutory disclosures."""
-        bouquet = compile_research_bouquet("2026-10-17")
+        """Validates HTML and plain text renderings for all 7 asset sections, domain links, and statutory disclosures."""
+        bouquet = compile_research_bouquet("2026-10-30", require_live_data=True)
         sub = {
             "full_name": "Rahul Sharma",
             "email": "rahul.sharma@example.com",
@@ -111,15 +132,22 @@ class TestResearchBouquetAndDigest(unittest.TestCase):
 
         html = render_bouquet_html(bouquet, subscriber=sub)
         self.assertIn("Rahul Sharma", html)
+        self.assertIn("Good evening", html)
+        self.assertNotIn("antigravity.averagettv.in", html)
         self.assertIn("/api/notifications/unsubscribe?token=unsub_token_test_123", html)
         self.assertIn("Regulatory Safe-Harbor Disclosure", html)
         self.assertIn("independent financial technology analytics software tool", html)
+        for sec_num in range(1, 8):
+            self.assertIn(f"{sec_num}.", html)
 
         # Plain text rendering
         text = render_bouquet_text(bouquet, subscriber=sub)
         self.assertIn("Rahul Sharma", text)
+        self.assertNotIn("antigravity.averagettv.in", text)
         self.assertIn("/api/notifications/unsubscribe?token=unsub_token_test_123", text)
         self.assertIn("MANDATORY STATUTORY SAFE HARBOR", text)
+        for sec_num in range(1, 8):
+            self.assertIn(f"{sec_num}.", text)
 
     def test_03_subscriber_retrieval_and_token_generation(self):
         """Validates get_digest_subscribers backfills unsubscribe tokens and correctly filters audiences."""

@@ -119,13 +119,29 @@ def get_light_flash_model(client) -> str:
         logger.debug("Light model selection notice: %s", surg_err)
     return "gemini-3.5-flash-lite"
 
-def stream_genai_with_fallback(client, prompt: str, system_prompt: str, on_status=None, use_grounding: bool = True, collected_citations: list = None):
+def stream_genai_with_fallback(
+    client,
+    prompt: str,
+    system_prompt: str,
+    on_status=None,
+    use_grounding: bool = True,
+    collected_citations: list = None,
+    on_retry_reset=None,
+):
     models_to_try = get_latest_flash_models(client)[:2]
     last_error = None
+    base_citations_len = len(collected_citations) if collected_citations is not None else 0
+    prior_attempt_yielded = False
     for model_name in models_to_try:
         if on_status:
             on_status("Initializing institutional synthesis engine...")
         for attempt in range(2):
+            if prior_attempt_yielded:
+                if collected_citations is not None:
+                    del collected_citations[base_citations_len:]
+                if callable(on_retry_reset):
+                    on_retry_reset()
+                prior_attempt_yielded = False
             try:
                 sys_inst = system_prompt
                 tools_list = None
@@ -194,6 +210,7 @@ def stream_genai_with_fallback(client, prompt: str, system_prompt: str, on_statu
                         except Exception as text_err:
                             logger.debug("Chunk text extraction notice: %s", text_err)
                     if extracted_text:
+                        prior_attempt_yielded = True
                         yield extracted_text
                 return
             except Exception as e:
@@ -206,7 +223,28 @@ def stream_genai_with_fallback(client, prompt: str, system_prompt: str, on_statu
                 break
     raise ValueError(f"Gemini grounded search exhausted: {last_error}")
 
+_PERPLEXITY_CIRCUIT_OPEN = False
+
+
+def reset_perplexity_circuit_breaker() -> None:
+    """Resets the in-memory Perplexity auth/quota circuit breaker (used by test suites)."""
+    global _PERPLEXITY_CIRCUIT_OPEN
+    _PERPLEXITY_CIRCUIT_OPEN = False
+
+
+def _is_perplexity_circuit_guard_active() -> bool:
+    if os.environ.get("ENABLE_PERPLEXITY_CIRCUIT_IN_TEST") == "1":
+        return True
+    from core.notify import _is_test_runtime
+    return not _is_test_runtime()
+
+
 def stream_perplexity_fallback(prompt: str, system_prompt: str, collected_citations: list = None):
+    global _PERPLEXITY_CIRCUIT_OPEN
+    if _PERPLEXITY_CIRCUIT_OPEN and _is_perplexity_circuit_guard_active():
+        raise RuntimeError(
+            "Perplexity /v1/responses circuit breaker open (API key quota/credit restriction detected earlier in session)."
+        )
     from core.config import get_secret
     api_key = get_secret("PERPLEXITY_API_KEY")
     if not api_key:
@@ -229,8 +267,12 @@ def stream_perplexity_fallback(prompt: str, system_prompt: str, collected_citati
     errors = []
     res = requests.post(url, headers=headers, json=payload, stream=True, timeout=60)
     if res.status_code != 200:
-        errors.append(f"stream HTTP {res.status_code}: {str(res.text)[:300]}")
-        logger.warning("Perplexity /v1/responses stream HTTP %s: %s", res.status_code, str(res.text)[:300])
+        err_body = str(res.text)[:300]
+        errors.append(f"stream HTTP {res.status_code}: {err_body}")
+        logger.warning("Perplexity /v1/responses stream HTTP %s: %s", res.status_code, err_body)
+        if res.status_code in (401, 402, 403) or "restricted_api_key" in err_body or "insufficient_quota" in err_body:
+            _PERPLEXITY_CIRCUIT_OPEN = True
+            raise RuntimeError(f"Perplexity /v1/responses auth/credit restriction ({res.status_code}): {err_body}")
     if res.status_code == 200:
         current_event = None
         for raw_line in res.iter_lines(decode_unicode=False):
@@ -290,9 +332,15 @@ def stream_perplexity_fallback(prompt: str, system_prompt: str, collected_citati
                                 "source_type": "Verified Web Grounding"
                             })
             else:
-                errors.append(f"non-stream HTTP {r2.status_code}: {str(r2.text)[:300]}")
-                logger.warning("Perplexity /v1/responses HTTP %s: %s", r2.status_code, str(r2.text)[:300])
+                r2_err_body = str(r2.text)[:300]
+                errors.append(f"non-stream HTTP {r2.status_code}: {r2_err_body}")
+                logger.warning("Perplexity /v1/responses HTTP %s: %s", r2.status_code, r2_err_body)
+                if r2.status_code in (401, 402, 403) or "restricted_api_key" in r2_err_body or "insufficient_quota" in r2_err_body:
+                    _PERPLEXITY_CIRCUIT_OPEN = True
+                    raise RuntimeError(f"Perplexity /v1/responses auth/credit restriction ({r2.status_code}): {r2_err_body}")
         except Exception as r2_err:
+            if _PERPLEXITY_CIRCUIT_OPEN and "auth/credit restriction" in str(r2_err):
+                raise
             errors.append(f"non-stream error: {r2_err}")
             logger.warning(f"Perplexity /v1/responses request failed: {r2_err}")
 
@@ -326,7 +374,7 @@ def stream_stock_report(ticker: str, language: str = "English (India)", stock_da
 
     from core.config import get_secret
     api_key = get_secret("GEMINI_API_KEY")
-    client = genai.Client(api_key=api_key, http_options={"timeout": 60000})
+    client = genai.Client(api_key=api_key, http_options={"timeout": 180000})
     system_prompt = get_system_prompt(ticker, language)
     user_prompt = f"Generate research report for: {stock_data.get('short_name')} ({stock_data.get('ticker')})\nData: {stock_data}"
 
@@ -339,14 +387,25 @@ def stream_stock_report(ticker: str, language: str = "English (India)", stock_da
             "uri": f"https://www.bseindia.com/stock-share-price/-/{scrip}/corporate-announcements/",
             "source_type": "BSE Official Regulatory Filing"
         })
+    base_cites_count = len(collected_citations)
 
     report_accumulator = []
     try:
-        for chunk in stream_genai_with_fallback(client, user_prompt, system_prompt, on_status=on_status, use_grounding=use_grounding, collected_citations=collected_citations):
+        for chunk in stream_genai_with_fallback(
+            client,
+            user_prompt,
+            system_prompt,
+            on_status=on_status,
+            use_grounding=use_grounding,
+            collected_citations=collected_citations,
+            on_retry_reset=report_accumulator.clear,
+        ):
             report_accumulator.append(chunk)
             yield chunk
     except Exception as gemini_err:
         logger.warning(f"Primary streaming synthesis failed: {gemini_err}")
+        report_accumulator.clear()
+        del collected_citations[base_cites_count:]
         try:
             if on_status:
                 on_status("Switching to secondary search grounding channel...")
@@ -355,6 +414,8 @@ def stream_stock_report(ticker: str, language: str = "English (India)", stock_da
                 yield chunk
         except Exception as p_err:
             logger.warning(f"Secondary fallback synthesis failed: {p_err}")
+            report_accumulator.clear()
+            del collected_citations[base_cites_count:]
             gem_err_msg = str(gemini_err)
             is_spend_cap = any(phrase in gem_err_msg for phrase in ["Spend cap breached", "PERMISSION_DENIED", "403", "quota"])
             if is_spend_cap:
@@ -409,9 +470,11 @@ def stream_stock_report(ticker: str, language: str = "English (India)", stock_da
         logger.warning(f"Report verification audit notice: {verif_err}")
         passed = False
 
-    # Check for failure indicators
+    # Check for failure indicators (including ungrounded offline fallback or shield token leaks)
     error_signatures = [
         "Live Synthesis Failed",
+        "Live Web Grounding Offline",
+        "__IN_SHIELD_TOKEN_",
         "Spend cap breached",
         "PERMISSION_DENIED",
         "403 PERMISSION_DENIED",
@@ -500,7 +563,7 @@ def synthesize_batch_stock_reports(
     if not api_key or len(api_key.strip()) <= 10 or not items:
         return {}
 
-    client = genai.Client(api_key=api_key, http_options={"timeout": 60000})
+    client = genai.Client(api_key=api_key, http_options={"timeout": 180000})
     model_name = get_latest_flash_models(client)[0]
 
     valid_items = []
@@ -611,49 +674,69 @@ def synthesize_batch_stock_reports(
         except Exception as batch_err:
             logger.warning("Gemini Batch API submission/polling notice: %s. Falling back to Flex 50%% tier.", batch_err)
 
-    # 2. Complete remaining stocks via Vertex AI Postpay Grounded or AI Studio Flex Inference
+    # 2. Complete remaining stocks via Vertex AI SSE Streaming (avoids 60s unary 504 timeouts) or AI Studio Flex
     for t_sym, s_data, u_prompt, s_inst in valid_items:
         if t_sym in results:
             continue
         try:
-            tools_list = [{"google_search": {}}] if use_grounding else None
-            sys_full = (
-                s_inst + "\n- Search recent BSE/NSE disclosures and concalls from the past 90-180 days."
-                if use_grounding
-                else s_inst
-            )
-            cfg_kwargs = {
-                "system_instruction": sys_full,
-                "tools": tools_list,
-                "temperature": 0.2,
-            }
-            if not is_vertex:
-                cfg_kwargs["service_tier"] = "flex"
-            resp = client.models.generate_content(
-                model=model_name,
-                contents=u_prompt,
-                config=genai.types.GenerateContentConfig(**cfg_kwargs),
-            )
-            txt = getattr(resp, "text", None) or ""
+            cites = []
+            txt = ""
+            if is_vertex and os.environ.get("FORCE_UNARY_VERTEX_IN_TEST") != "1":
+                stream_chunks = []
+                for chunk in stream_genai_with_fallback(
+                    client,
+                    u_prompt,
+                    s_inst,
+                    use_grounding=use_grounding,
+                    collected_citations=cites,
+                    on_retry_reset=stream_chunks.clear,
+                ):
+                    stream_chunks.append(chunk)
+                txt = "".join(stream_chunks)
+            else:
+                tools_list = [{"google_search": {}}] if use_grounding else None
+                sys_full = (
+                    s_inst + "\n- Search recent BSE/NSE disclosures and concalls from the past 90-180 days."
+                    if use_grounding
+                    else s_inst
+                )
+                cfg_kwargs = {
+                    "system_instruction": sys_full,
+                    "tools": tools_list,
+                    "temperature": 0.2,
+                }
+                if not is_vertex:
+                    cfg_kwargs["service_tier"] = "flex"
+                resp = client.models.generate_content(
+                    model=model_name,
+                    contents=u_prompt,
+                    config=genai.types.GenerateContentConfig(**cfg_kwargs),
+                )
+                txt = getattr(resp, "text", None) or ""
             if len(txt.strip()) >= 500:
                 clean_flex_txt = txt.strip()
+                scrip = str(s_data.get("scrip_code") or "").strip()
+                if scrip and scrip.isdigit():
+                    bse_uri = f"https://www.bseindia.com/stock-share-price/-/{scrip}/corporate-announcements/"
+                    if not any(existing.get("uri") == bse_uri for existing in cites):
+                        cites.append({
+                            "title": f"BSE Corporate Announcements & Disclosures ({t_sym})",
+                            "uri": bse_uri,
+                            "source_type": "BSE Official Regulatory Filing",
+                        })
+                if cites and "Verified Regulatory Sources" not in clean_flex_txt:
+                    citations_block = format_citations_section(cites, s_data)
+                    if citations_block:
+                        clean_flex_txt += citations_block
                 try:
                     from core.analysis.language_filter import enforce_indian_english
                     clean_flex_txt = enforce_indian_english(clean_flex_txt)
                 except Exception as lang_err:
                     logger.debug("Language filter normalization notice in batch flex: %s", lang_err)
-                scrip = str(s_data.get("scrip_code") or "").strip()
-                cites = []
-                if scrip and scrip.isdigit():
-                    cites.append({
-                        "title": f"BSE Corporate Announcements & Disclosures ({t_sym})",
-                        "uri": f"https://www.bseindia.com/stock-share-price/-/{scrip}/corporate-announcements/",
-                        "source_type": "BSE Official Regulatory Filing",
-                    })
                 results[t_sym] = {
                     "report_text": clean_flex_txt,
                     "citations": cites,
-                    "tier": "VERTEX_AI_POSTPAY_GROUNDED" if is_vertex else "GEMINI_FLEX_50PCT_DISCOUNT",
+                    "tier": "VERTEX_AI_POSTPAY_GROUNDED_SSE" if is_vertex else "GEMINI_FLEX_50PCT_DISCOUNT",
                     "batch_job_name": batch_job_name,
                 }
         except Exception as flex_err:

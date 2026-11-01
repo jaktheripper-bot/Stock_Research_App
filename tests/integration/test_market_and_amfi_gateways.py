@@ -225,21 +225,136 @@ class TestAngelOneGateway(unittest.TestCase):
 
     @patch("requests.post")
     def test_perplexity_failure_raises_real_responses_error_without_legacy_sonar_call(self, mock_post):
-        from core.analysis.dossier_report_synthesis import stream_perplexity_fallback
+        from core.analysis.dossier_report_synthesis import (
+            reset_perplexity_circuit_breaker,
+            stream_perplexity_fallback,
+        )
 
+        reset_perplexity_circuit_breaker()
         resp_fail = MagicMock()
         resp_fail.status_code = 401
         resp_fail.text = '{"error":"invalid api key"}'
         mock_post.side_effect = [resp_fail, resp_fail]
 
-        with patch("core.config.get_secret", return_value="pplx-test-key-12345"):
-            with self.assertRaises(RuntimeError) as ctx:
-                list(stream_perplexity_fallback("Analyze INFY", "System prompt", collected_citations=[]))
-        self.assertIn("/v1/responses", str(ctx.exception))
-        self.assertIn("401", str(ctx.exception))
-        self.assertEqual(mock_post.call_count, 2)
-        for call in mock_post.call_args_list:
-            self.assertNotIn("chat/completions", call.args[0])
+        try:
+            with patch("core.config.get_secret", return_value="pplx-test-key-12345"):
+                with self.assertRaises(RuntimeError) as ctx:
+                    list(stream_perplexity_fallback("Analyze INFY", "System prompt", collected_citations=[]))
+            self.assertIn("/v1/responses", str(ctx.exception))
+            self.assertIn("401", str(ctx.exception))
+            self.assertEqual(mock_post.call_count, 1)
+            for call in mock_post.call_args_list:
+                self.assertNotIn("chat/completions", call.args[0])
+        finally:
+            reset_perplexity_circuit_breaker()
+
+    @patch("requests.post")
+    def test_perplexity_circuit_breaker_trips_and_blocks_subsequent_calls(self, mock_post):
+        from core.analysis.dossier_report_synthesis import (
+            reset_perplexity_circuit_breaker,
+            stream_perplexity_fallback,
+        )
+
+        reset_perplexity_circuit_breaker()
+        resp_quota = MagicMock()
+        resp_quota.status_code = 403
+        resp_quota.text = '{"error":"restricted_api_key"}'
+        mock_post.return_value = resp_quota
+
+        try:
+            with patch.dict(os.environ, {"ENABLE_PERPLEXITY_CIRCUIT_IN_TEST": "1"}, clear=False), \
+                 patch("core.config.get_secret", return_value="pplx-test-key-12345"):
+                with self.assertRaises(RuntimeError):
+                    list(stream_perplexity_fallback("Analyze TCS", "System prompt", collected_citations=[]))
+                self.assertEqual(mock_post.call_count, 1)
+
+                # Subsequent stock in batch must fail fast without firing another HTTP request
+                with self.assertRaises(RuntimeError) as second_ctx:
+                    list(stream_perplexity_fallback("Analyze WIPRO", "System prompt", collected_citations=[]))
+                self.assertIn("circuit breaker open", str(second_ctx.exception).lower())
+                self.assertEqual(mock_post.call_count, 1)
+        finally:
+            reset_perplexity_circuit_breaker()
+
+    def test_vertex_batch_sse_preserves_grounded_citations(self):
+        from core.analysis.dossier_report_synthesis import synthesize_batch_stock_reports
+
+        sample_report = "# Equity Research Dossier: Infosys (INFY)\n" + (
+            "Detailed 7-Pillar institutional analysis with cash flow conversion. " * 15
+        )
+        mock_client = MagicMock()
+        mock_client.vertexai = True
+
+        def _fake_stream(client, prompt, sys_inst, use_grounding=True, collected_citations=None, **kwargs):
+            if collected_citations is not None:
+                collected_citations.append(
+                    {
+                        "title": "Infosys Q2 Reg 33 Filing",
+                        "uri": "https://www.nseindia.com/filings/infy-q2",
+                        "source_type": "NSE Official Filing",
+                    }
+                )
+            yield sample_report
+
+        with patch.dict(os.environ, {"TESTING": "0"}, clear=False), \
+             patch("core.config.get_secret", return_value="vertex-api-key-test"), \
+             patch("core.analysis.dossier_report_synthesis.genai.Client", return_value=mock_client), \
+             patch("core.analysis.dossier_report_synthesis.get_latest_flash_models", return_value=["gemini-3.8-flash"]), \
+             patch("core.analysis.dossier_report_synthesis.pass_pre_screening_gates", return_value=(True, "OK")), \
+             patch("core.analysis.dossier_report_synthesis.stream_genai_with_fallback", side_effect=_fake_stream):
+            res = synthesize_batch_stock_reports(
+                [{"ticker": "INFY", "stock_data": {"ticker": "INFY", "short_name": "Infosys", "scrip_code": "500209"}}],
+                edition_label="vertex-sse-test",
+            )
+            self.assertIn("INFY", res)
+            self.assertEqual(res["INFY"]["tier"], "VERTEX_AI_POSTPAY_GROUNDED_SSE")
+            self.assertIn("https://www.nseindia.com/filings/infy-q2", res["INFY"]["report_text"])
+            self.assertIn("500209/corporate-announcements", res["INFY"]["report_text"])
+
+    def test_stream_genai_with_fallback_resets_partial_chunks_on_retry(self):
+        from core.analysis.dossier_report_synthesis import stream_genai_with_fallback
+
+        mock_client = MagicMock()
+        mock_client.vertexai = True
+        call_counter = {"n": 0}
+
+        def _fake_create(model, config):
+            chat_obj = MagicMock()
+            call_counter["n"] += 1
+            attempt_idx = call_counter["n"]
+
+            def _gen(_prompt):
+                first_chunk = MagicMock()
+                first_chunk.candidates = []
+                first_chunk.text = "### Health Matrix\n- Macro: Stable\n"
+                yield first_chunk
+                if attempt_idx == 1:
+                    raise RuntimeError("503 UNAVAILABLE mid-stream")
+                second_chunk = MagicMock()
+                second_chunk.candidates = []
+                second_chunk.text = "# DIAGNOSTIC SUMMARY & KEY TAKEAWAYS\nClean single report."
+                yield second_chunk
+
+            chat_obj.send_message_stream.side_effect = _gen
+            return chat_obj
+
+        mock_client.chats.create.side_effect = _fake_create
+        buf = []
+        cites = [{"title": "Base", "uri": "https://www.bseindia.com/base"}]
+        with patch("core.analysis.dossier_report_synthesis.get_latest_flash_models", return_value=["gemini-3.8-flash"]), \
+             patch("core.analysis.dossier_report_synthesis.time.sleep"):
+            for ch in stream_genai_with_fallback(
+                mock_client,
+                "Analyze INFY",
+                "Sys prompt",
+                use_grounding=True,
+                collected_citations=cites,
+                on_retry_reset=buf.clear,
+            ):
+                buf.append(ch)
+        combined = "".join(buf)
+        self.assertEqual(combined.count("### Health Matrix"), 1)
+        self.assertIn("Clean single report.", combined)
 
     @patch("requests.post")
     def test_standardized_supabase_auth_otp_verification(self, mock_post):

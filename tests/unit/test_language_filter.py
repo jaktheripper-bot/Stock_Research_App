@@ -343,6 +343,17 @@ Clean.
             valid, discrepancies = verify_stock_report(stock_data, report_consistent)
             self.assertTrue(valid, f"Unexpected discrepancies: {discrepancies}")
 
+    def test_inequality_signs_never_leak_shield_tokens(self):
+        prose = (
+            "Net Debt/EBITDA is negative (<0.0x), reflecting a net-cash balance sheet.\n\n"
+            "`[VERIFIED FACT]` Domestic spices growth stood at 11.1% YoY while we optimize margins.\n\n"
+            "Peers trade at >60x P/E compared with 24x here."
+        )
+        converted = enforce_indian_english(prose)
+        self.assertNotIn("__IN_SHIELD_TOKEN_", converted)
+        self.assertIn("`[VERIFIED FACT]`", converted)
+        self.assertIn("optimise margins", converted)
+
 
 if __name__ == "__main__":
     unittest.main()

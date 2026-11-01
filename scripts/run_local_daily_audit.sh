@@ -62,14 +62,14 @@ done
 
 TARGET_DB="${DB_PATH_OVERRIDE:-$ROOT_DIR/reports.db}"
 
-# Default target date: if >= 09:05 IST, audit today's morning+prior nightly state;
-# before 09:05 IST (e.g., midnight 00:00 IST audit), audit the just-completed IST day.
+# Default target date: if >= 19:45 IST, audit today's post-close evening harvest;
+# before 19:45 IST, audit the prior IST calendar day (and roll market-session checks back to Friday on weekends).
 if [ -z "$TARGET_DATE" ]; then
     TARGET_DATE=$("$PYTHON" -c '
 from datetime import datetime, timedelta
 from zoneinfo import ZoneInfo
 now = datetime.now(ZoneInfo("Asia/Kolkata"))
-target = now.date() if (now.hour > 9 or (now.hour == 9 and now.minute >= 5)) else (now - timedelta(days=1)).date()
+target = now.date() if (now.hour > 19 or (now.hour == 19 and now.minute >= 45)) else (now - timedelta(days=1)).date()
 print(target.isoformat())
 ')
 fi
@@ -114,6 +114,13 @@ target_date = sys.argv[2]
 ist = ZoneInfo("Asia/Kolkata")
 now_ist = datetime.now(ist)
 
+target_dt = datetime.strptime(target_date[:10], "%Y-%m-%d").date()
+last_trading_dt = target_dt
+while last_trading_dt.weekday() >= 5:
+    last_trading_dt -= timedelta(days=1)
+last_trading_date = last_trading_dt.isoformat()
+market_stale_days = 4 if (target_dt.weekday() >= 5 or now_ist.weekday() in (5, 6, 0)) else 2
+
 conn = sqlite3.connect(db_path)
 cur = conn.cursor()
 
@@ -131,11 +138,11 @@ rep_rows = cur.execute("SELECT ticker, LENGTH(TRIM(COALESCE(report_text, ''))), 
 short_reports = [r[0] for r in rep_rows if (r[1] or 0) < 500]
 stale_reports = count_stale([(r[2],) for r in rep_rows], 14)
 
-# 2. Stock Discovery & Daily 15-Stock Ingestion
+# 2. Stock Discovery & Daily 15-Stock Ingestion (bound to last_trading_date on Sat/Sun)
 disc_tickers = [
     r[0] for r in cur.execute(
         "SELECT ticker FROM discovery_reel WHERE substr(edition_date, 1, 10) = ? AND is_active = 1",
-        (target_date,),
+        (last_trading_date,),
     ).fetchall()
 ]
 compiled_set = {r[0] for r in rep_rows if (r[1] or 0) >= 500}
@@ -143,7 +150,7 @@ unbacked_disc = [t for t in disc_tickers if t not in compiled_set]
 
 # 3. Mutual Funds & Forensic Look-Through
 mf_ts = cur.execute("SELECT MAX(last_updated) FROM mutual_fund_schemes").fetchone()[0]
-mf_stale = count_stale([(mf_ts,)], 2) if mf_ts else 1
+mf_stale = count_stale([(mf_ts,)], market_stale_days) if mf_ts else 1
 unaudited_funds = [
     r[0] for r in cur.execute("""
         SELECT DISTINCT h.scheme_code
@@ -156,12 +163,12 @@ unaudited_funds = [
 
 # 4. Corporate Debt Surveillance
 debt_ts = cur.execute("SELECT MAX(last_updated) FROM corporate_debt_securities").fetchone()[0]
-debt_stale = count_stale([(debt_ts,)], 2) if debt_ts else 1
+debt_stale = count_stale([(debt_ts,)], market_stale_days) if debt_ts else 1
 
-# 5. Sovereign Curve & Benchmarks
+# 5. Sovereign Curve & Benchmarks (bound to last_trading_date on Sat/Sun)
 sov_tenors = cur.execute(
     "SELECT COUNT(*) FROM sovereign_curve_history WHERE snapshot_key = ?",
-    (target_date,),
+    (last_trading_date,),
 ).fetchone()[0]
 
 # 6. REITs, InvITs, SGBs & Alternative Yield (90-day TTL)
@@ -173,9 +180,9 @@ alt_stale = (
 
 # 7. National ETF Matrix
 etf_ts = cur.execute("SELECT MAX(updated_at) FROM etf_matrix").fetchone()[0]
-etf_stale = count_stale([(etf_ts,)], 2) if etf_ts else 1
+etf_stale = count_stale([(etf_ts,)], market_stale_days) if etf_ts else 1
 
-# 8. Unlisted MSME & SME Forensic Dossiers (15-firm daily cohort & 30-day TTL)
+# 8. Unlisted MSME & SME Forensic Dossiers (15-firm daily cohort & 30-day TTL — runs 7/7 days)
 msme_cohort = cur.execute(
     "SELECT COUNT(*) FROM msme_firms WHERE substr(last_updated, 1, 10) >= ?",
     (target_date,),
@@ -185,15 +192,18 @@ msme_stale = count_stale(cur.execute("SELECT last_updated FROM msme_firms").fetc
 conn.close()
 
 gaps = {
+    "need_evening": (len(disc_tickers) < 15 or len(unbacked_disc) > 0 or msme_cohort < 15),
     "need_morning": (len(disc_tickers) < 15 or len(unbacked_disc) > 0 or msme_cohort < 15),
     "need_nightly": (mf_stale > 0 or debt_stale > 0 or sov_tenors < 16 or etf_stale > 0 or alt_stale > 0),
     "need_reports_refresh": (len(short_reports) > 0 or stale_reports > 0),
+    "last_trading_date": last_trading_date,
     "unaudited_funds": unaudited_funds,
     "details": {
         "reports_total": len(rep_rows),
         "short_reports": len(short_reports),
         "stale_reports_14d": stale_reports,
         "discovery_count": len(disc_tickers),
+        "discovery_edition_checked": last_trading_date,
         "discovery_unbacked": len(unbacked_disc),
         "unaudited_funds_count": len(unaudited_funds),
         "sovereign_tenors_for_date": sov_tenors,
@@ -226,9 +236,9 @@ UNAUDITED_FUNDS=$("$PYTHON" -c "import json,sys; print(' '.join(json.loads(sys.a
 echo "--> [Phase 3/4] Running targeted local catch-up pipelines..."
 
 if [ "$NEED_MORNING" -eq 1 ]; then
-    echo "    [Catch-Up] Running morning pipeline locally for $TARGET_DATE..."
+    echo "    [Catch-Up] Running evening harvest pipeline locally for $TARGET_DATE..."
     FORCE_LOCAL_SQLITE=1 SUPABASE_DB_URL="" DB_PATH="$TARGET_DB" \
-        "$PYTHON" "$ROOT_DIR/scripts/run_scheduled_pipeline.py" --mode morning --date "$TARGET_DATE" --force
+        "$PYTHON" "$ROOT_DIR/scripts/run_scheduled_pipeline.py" --mode evening --date "$TARGET_DATE" --force
     REMEDIATED=1
 fi
 

@@ -353,8 +353,8 @@ def _shield_protected_content(text: str) -> Tuple[str, List[str]]:
     # 4. Raw URLs (https://... or http://...)
     text = re.sub(r"https?://[^\s<>\)\]]+", _replace_block, text)
 
-    # 5. HTML Tags (<...>)
-    text = re.sub(r"<[^>]+>", _replace_block, text)
+    # 5. HTML Tags (<tag...> / </tag>) — require leading ASCII tag name & single-line bound so math inequalities (<0.0x ... >60x) never span prose
+    text = re.sub(r"</?[a-zA-Z][^>\n]*>", _replace_block, text)
 
     # 6. Epistemic tags: [VERIFIED FACT], [CALCULATED METRIC], etc.
     def _replace_epistemic_tag(m: re.Match) -> str:
@@ -371,9 +371,9 @@ def _shield_protected_content(text: str) -> Tuple[str, List[str]]:
     return text, shields
 
 def _unshield_protected_content(text: str, shields: List[str]) -> str:
-    """Restores shielded blocks back to their original state."""
-    for idx, orig in enumerate(shields):
-        text = text.replace(f"__IN_SHIELD_TOKEN_{idx}__", orig)
+    """Restores shielded blocks in LIFO order so nested shield tokens always expand cleanly."""
+    for idx in range(len(shields) - 1, -1, -1):
+        text = text.replace(f"__IN_SHIELD_TOKEN_{idx}__", shields[idx])
     return text
 
 # ------------------------------------------------------------------------------

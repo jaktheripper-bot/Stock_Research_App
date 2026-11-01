@@ -1,27 +1,36 @@
 """
-Research Bouquet & Morning Digest Compiler.
+Research Bouquet & Day-End 7-Asset Market Wrap Compiler.
 
-Curates multi-asset intelligence across:
-- Today's under-the-radar equities from the 9:00 AM Morning Discovery Reel
-- Mutual Fund look-through accounting checks
-- 10Y Sovereign benchmark curve & corporate credit spreads
-- Unlisted MSME manufacturing champions
+Curates post-settlement (post-19:30 IST) multi-asset intelligence across all 7 asset classes:
+1. Listed Equities (from the settled Discovery Reel & 7-pillar archive)
+2. Sovereign Par Curve & State Development Loan (SDL) Spreads
+3. Corporate Debt & Listed NCD / SDI Credit Surveillance
+4. National ETF Liquidity, NAV & Tracking Error Matrix
+5. REITs, InvITs & Sovereign Gold Bond (SGB) Yield Arbitrage
+6. Mutual Fund Look-Through Spotlight (stamped with Prior-Session AMFI Audit date)
+7. Unlisted MSME Manufacturing & Supply-Chain Champions
 
-Generates HTML & Plain-Text emails with:
-- Branded click tracking subdomain alignment (e.g. links.moatnomics.com)
-- Statutory SEBI non-advisory safe harbor disclosures
+Enforces:
+- Fail-closed domain integrity (`BouquetDataUnavailableError` when `require_live_data=True` and live tables are empty; zero synthetic Potemkin fallback payloads)
+- Branded click tracking subdomain alignment (`links.moatnomics.com` / `moatnomics.com`)
+- Statutory SEBI non-advisory safe harbor disclosures (descriptive post-close observations only)
 - Statutory 1-click unsubscribe per IT Rules 2021 & anti-spam regulations
 """
 
-import os
+import hashlib
 import logging
+import os
 from datetime import datetime
-from typing import Dict, Any, List, Optional
-from urllib.parse import urlencode, quote
+from typing import Any, Dict, List, Optional
+from urllib.parse import urlencode
 
 from core.config import get_secret
 
 logger = logging.getLogger("equity_research.core.analysis.research_bouquet")
+
+
+class BouquetDataUnavailableError(RuntimeError):
+    """Raised when `require_live_data=True` and one or more required live asset pillars lack database records."""
 
 
 def get_tracking_base_url() -> str:
@@ -45,11 +54,11 @@ def build_tracked_link(target_path: str, token: Optional[str] = None, utm_medium
     """
     base = get_tracking_base_url()
     path = target_path if target_path.startswith("/") else f"/{target_path}"
-    
+
     params = {
         "utm_source": "moatnomics_digest",
         "utm_medium": utm_medium,
-        "utm_campaign": "research_bouquet"
+        "utm_campaign": "research_bouquet",
     }
     if token:
         params["sub_tk"] = token
@@ -59,119 +68,156 @@ def build_tracked_link(target_path: str, token: Optional[str] = None, utm_medium
     return f"{base}{path}{sep}{qs}"
 
 
-def compile_research_bouquet(edition_date: Optional[str] = None) -> Dict[str, Any]:
-    """
-    Compiles today's dynamic multi-asset research bouquet from active engines.
-    """
-    from core.db.connection import IST
-    date_str = edition_date or datetime.now(IST).strftime("%Y-%m-%d")
-    formatted_date = datetime.strptime(date_str, "%Y-%m-%d").strftime("%A, %B %d, %Y")
+def _truncate_clean(text: Any, max_chars: int = 190) -> str:
+    raw = " ".join(str(text or "").split()).strip()
+    if not raw:
+        return ""
+    if len(raw) <= max_chars:
+        return raw
+    clipped = raw[: max_chars - 3].rsplit(" ", 1)[0]
+    return f"{clipped}..."
 
-    # 1. Equities from 9:00 AM Morning Discovery Reel
-    equity_picks = []
+
+def _date_index(seed_prefix: str, date_str: str, pool_len: int) -> int:
+    if pool_len <= 0:
+        return 0
+    digest = hashlib.sha256(f"{seed_prefix}:{date_str}".encode("utf-8")).hexdigest()[:8]
+    return int(digest, 16) % pool_len
+
+
+def _load_live_equities(date_str: str, limit: int = 3) -> List[Dict[str, Any]]:
+    """Load post-settlement listed equity highlights from `discovery_reel` (zero fabricated defaults)."""
+    equity_picks: List[Dict[str, Any]] = []
     try:
         from core.db.discovery import get_active_discovery_reel
-        raw_picks = get_active_discovery_reel(edition_date=date_str, limit=3)
-        if not raw_picks:
-            from core.analysis.stock_discovery import get_daily_discovery_picks
-            raw_picks = get_daily_discovery_picks(edition_date=date_str, limit=3)
-        for p in raw_picks:
-            equity_picks.append({
-                "ticker": p.get("ticker", "UNKNOWN"),
-                "canonical": p.get("canonical", p.get("ticker")),
-                "company_name": p.get("company_name", "Featured Company"),
-                "sector": p.get("sector", "Core Industry"),
-                "roce": p.get("roce", 18.0),
-                "sales_growth_3y": p.get("sales_growth_3y", 15.0),
-                "debt_to_equity": p.get("debt_to_equity", 0.1),
-                "thesis": p.get("default_thesis", "High return on capital employed with conservative leverage.")[:160] + "...",
-                "cmp": p.get("cmp") or p.get("base_price", 0.0),
-                "dossier_url": f"/dossier/{p.get('canonical', p.get('ticker'))}"
-            })
+
+        raw_picks = get_active_discovery_reel(
+            edition_date=date_str,
+            exclude_tests=True,
+            allow_fallback=True,
+            limit=limit,
+        )
+
+        for p in raw_picks or []:
+            ticker = str(p.get("ticker") or "").strip().upper()
+            if not ticker:
+                continue
+            canonical = str(p.get("canonical") or ticker).strip().upper()
+            roce_raw = p.get("roce_pct") if p.get("roce_pct") is not None else p.get("roce")
+            cmp_raw = (
+                p.get("current_price")
+                if p.get("current_price") is not None
+                else (p.get("cmp") if p.get("cmp") is not None else p.get("base_price"))
+            )
+            sales_raw = p.get("sales_growth_3y")
+            de_raw = p.get("debt_to_equity")
+            thesis_raw = p.get("ria_thesis") or p.get("default_thesis") or ""
+            pe_disp = str(p.get("pe_display") or p.get("pe_ratio") or "N/A")
+
+            equity_picks.append(
+                {
+                    "ticker": ticker,
+                    "canonical": canonical,
+                    "company_name": str(p.get("company_name") or ticker),
+                    "sector": str(p.get("sector") or "Listed Equity"),
+                    "roce": round(float(roce_raw), 1) if roce_raw is not None else None,
+                    "sales_growth_3y": round(float(sales_raw), 1) if sales_raw is not None else None,
+                    "debt_to_equity": round(float(de_raw), 2) if de_raw is not None else None,
+                    "cmp": round(float(cmp_raw), 2) if cmp_raw is not None else None,
+                    "pe_display": pe_disp,
+                    "thesis": _truncate_clean(thesis_raw, 195),
+                    "edition_source_date": str(p.get("edition_date") or date_str)[:10],
+                    "dossier_url": f"/dossier/{canonical}",
+                }
+            )
     except Exception as eq_err:
-        logger.warning("Equity discovery picks notice for bouquet: %s", eq_err)
-        # Resilient fallback sample
-        equity_picks = [
-            {
-                "ticker": "FINEORG",
-                "canonical": "FINEORG",
-                "company_name": "Fine Organic Industries Ltd",
-                "sector": "Specialty Chemicals",
-                "roce": 26.4,
-                "sales_growth_3y": 18.5,
-                "debt_to_equity": 0.01,
-                "thesis": "Global leader in oleochemical green additives with zero debt and consistent 25%+ ROCE.",
-                "cmp": 4200.0,
-                "dossier_url": "/dossier/FINEORG"
-            },
-            {
-                "ticker": "KAYNES",
-                "canonical": "KAYNES",
-                "company_name": "Kaynes Technology India Ltd",
-                "sector": "EMS & Defence Electronics",
-                "roce": 18.2,
-                "sales_growth_3y": 42.1,
-                "debt_to_equity": 0.28,
-                "thesis": "High-complexity PCB & cleanroom electronics player expanding into OSAT packaging.",
-                "cmp": 3394.80,
-                "dossier_url": "/dossier/KAYNES"
-            }
-        ]
-
-    # 2. Sovereign & Macro Posture (Live from sovereign_yield_curve & macro_monetary_corridor)
-    sovereign_posture = _load_live_sovereign_posture()
-
-    # 3. Mutual Fund Look-Through Insight (Date-rotated across live mutual_fund_schemes + dossiers)
-    mf_highlight = _load_live_mf_highlight(date_str)
-
-    # 4. Highlighted Unlisted MSME Champion (Live from today's msme_firms cohort + forensic engine)
-    msme_highlight = _load_live_msme_highlight(date_str)
-
-    return {
-        "edition_date": date_str,
-        "formatted_date": formatted_date,
-        "subject": f"Moatnomics Morning Bouquet: Top Under-the-Radar Ideas & Macro Signals ({date_str})",
-        "equities": equity_picks,
-        "sovereign": sovereign_posture,
-        "mutual_funds": mf_highlight,
-        "mutual_fund": mf_highlight,
-        "msme": msme_highlight,
-        "tracking_domain": get_tracking_base_url(),
-    }
+        logger.error("Failed loading live equity discovery picks for %s: %s", date_str, eq_err)
+    return equity_picks
 
 
-def _load_live_sovereign_posture() -> Dict[str, Any]:
-    """Query live sovereign yield curve and RBI monetary corridor from the database."""
+def _load_live_sovereign_posture(date_str: str) -> Dict[str, Any]:
+    """Query live sovereign yield curve, RBI monetary corridor, and SDL fiscal spreads from the database."""
     try:
+        from core.db.connection import get_db_connection, init_db
         from core.db.sovereign import (
             get_macro_monetary_corridor,
             get_sovereign_curve_analytics,
         )
 
+        init_db()
         curve_analytics = get_sovereign_curve_analytics() or {}
         corridor = get_macro_monetary_corridor() or {}
 
-        ten_yr = float(
-            curve_analytics.get("benchmark_10y_gsec")
-            or curve_analytics.get("ten_year_yield")
-            or 6.82
-        )
-        one_yr = float(
-            curve_analytics.get("risk_free_short_tbill")
-            or curve_analytics.get("one_year_yield")
-            or 6.64
-        )
-        spread_bps = int(round((ten_yr - one_yr) * 100))
-        curve_shape = curve_analytics.get("curve_shape") or "Normal (Upward Sloping)"
-        duration_guidance = (
-            f"Term spread at +{spread_bps} bps ({curve_shape}). "
-            f"10Y benchmark trading at {ten_yr:.2f}% vs 364D T-Bill at {one_yr:.2f}%."
-        )
+        ten_raw = curve_analytics.get("benchmark_10y_gsec") or curve_analytics.get("ten_year_yield")
+        one_raw = curve_analytics.get("risk_free_short_tbill") or curve_analytics.get("one_year_yield")
+
         repo_val = corridor.get("repo_rate")
-        if isinstance(repo_val, dict):
-            repo_rate = float(repo_val.get("value") or 6.50)
-        else:
-            repo_rate = float(repo_val or 6.50)
+        repo_raw = repo_val.get("value") if isinstance(repo_val, dict) else repo_val
+
+        sdl_highlight = None
+        conn = get_db_connection()
+        cur = conn.cursor()
+        try:
+            if ten_raw is None or one_raw is None:
+                cur.execute(
+                    "SELECT tenor_label, cut_off_yield FROM sovereign_benchmarks WHERE tenor_label IN ('10Y_GSEC', '364D_TBILL')"
+                )
+                bench_map = {str(r[0]): float(r[1]) for r in cur.fetchall() if r and r[1] is not None}
+                if ten_raw is None:
+                    ten_raw = bench_map.get("10Y_GSEC")
+                if one_raw is None:
+                    one_raw = bench_map.get("364D_TBILL")
+
+            if repo_raw is None:
+                cur.execute(
+                    "SELECT rate_pct FROM sovereign_macro_rates WHERE rate_key IN ('REPO', 'repo_rate') LIMIT 1"
+                )
+                r_row = cur.fetchone()
+                if r_row and r_row[0] is not None:
+                    repo_raw = float(r_row[0])
+
+            cur.execute(
+                """
+                SELECT state_name, cut_off_yield, spread_over_gsec_bps, fiscal_tier
+                FROM sovereign_sdl_spreads
+                WHERE cut_off_yield IS NOT NULL
+                ORDER BY spread_over_gsec_bps ASC, state_name ASC
+                """
+            )
+            sdl_rows = cur.fetchall()
+            if sdl_rows:
+                idx = _date_index("sdl", date_str, len(sdl_rows))
+                s_row = sdl_rows[idx]
+                sdl_highlight = {
+                    "state_name": str(s_row[0]),
+                    "cut_off_yield": round(float(s_row[1]), 2),
+                    "spread_bps": int(round(float(s_row[2] or 0.0))),
+                    "fiscal_tier": str(s_row[3] or "AUDITED"),
+                }
+        finally:
+            cur.close()
+            conn.close()
+
+        if ten_raw is None or one_raw is None:
+            return {}
+
+        ten_yr = float(ten_raw)
+        one_yr = float(one_raw)
+        repo_rate = float(repo_raw) if repo_raw is not None else round(one_yr - 0.25, 2)
+        spread_bps = int(round((ten_yr - one_yr) * 100))
+        curve_shape = str(curve_analytics.get("curve_shape") or "Normal (Upward Sloping)")
+
+        sdl_clause = ""
+        if sdl_highlight:
+            sdl_clause = (
+                f" 10Y {sdl_highlight['state_name']} SDL settled at {sdl_highlight['cut_off_yield']:.2f}% "
+                f"({sdl_highlight['spread_bps']:+d} bps over G-Sec)."
+            )
+
+        duration_summary = (
+            f"Term spread closed at {spread_bps:+d} bps ({curve_shape}): "
+            f"10Y G-Sec at {ten_yr:.2f}% vs 364D T-Bill at {one_yr:.2f}%.{sdl_clause}"
+        )
 
         return {
             "ten_year_gsec": round(ten_yr, 2),
@@ -180,106 +226,341 @@ def _load_live_sovereign_posture() -> Dict[str, Any]:
             "term_spread_bps": spread_bps,
             "yield_wedge_bps": spread_bps,
             "curve_shape": curve_shape,
-            "stance": duration_guidance,
-            "signal_summary": duration_guidance,
+            "sdl_highlight": sdl_highlight,
+            "stance": duration_summary,
+            "signal_summary": duration_summary,
             "tax_free_highlight": (
-                f"Sovereign 10Y G-Sec yields {ten_yr:.2f}% (Repo {repo_rate:.2f}%, "
-                f"Term Spread {spread_bps:+d} bps) — zero credit risk anchor for core duration sleeves."
+                f"Sovereign 10Y G-Sec settled at {ten_yr:.2f}% (Policy Repo {repo_rate:.2f}%, "
+                f"Term Spread {spread_bps:+d} bps)."
             ),
         }
     except Exception as e:
-        logger.warning(f"Falling back to baseline sovereign posture in bouquet: {e}")
+        logger.error("Failed loading live sovereign posture for %s: %s", date_str, e)
+        return {}
+
+
+def _load_live_corporate_debt(date_str: str) -> Dict[str, Any]:
+    """Deterministically rotate across live `corporate_debt_securities` records."""
+    from core.db.connection import get_db_connection, init_db
+
+    try:
+        init_db()
+        conn = get_db_connection()
+        cur = conn.cursor()
+        try:
+            cur.execute(
+                """
+                SELECT isin, ticker, instrument_name, instrument_type, seniority_tier,
+                       coupon_rate_pct, credit_rating, credit_rating_agency,
+                       asset_cover_ratio, is_sdi, ytm_pct, modified_duration_years, last_updated
+                FROM corporate_debt_securities
+                WHERE ytm_pct IS NOT NULL
+                ORDER BY ytm_pct DESC, isin ASC
+                """
+            )
+            cols = [c[0] for c in cur.description]
+            rows = [dict(zip(cols, r)) for r in cur.fetchall()]
+        finally:
+            cur.close()
+            conn.close()
+
+        if not rows:
+            return {}
+
+        high_grade = [
+            r
+            for r in rows
+            if str(r.get("credit_rating") or "").upper().startswith(("AAA", "AA"))
+            and not bool(r.get("is_sdi"))
+        ]
+        pool = high_grade if high_grade else rows
+        picked = pool[_date_index("corp_debt", date_str, len(pool))]
+
+        sdi_count = sum(1 for r in rows if bool(r.get("is_sdi")))
+        aaa_ytms = sorted(
+            float(r["ytm_pct"])
+            for r in rows
+            if str(r.get("credit_rating") or "").upper().startswith("AAA") and r.get("ytm_pct") is not None
+        )
+        median_aaa = round(aaa_ytms[len(aaa_ytms) // 2], 2) if aaa_ytms else round(float(picked["ytm_pct"]), 2)
+
+        isin = str(picked.get("isin") or "")
+        rating = str(picked.get("credit_rating") or "Rated")
+        agency = str(picked.get("credit_rating_agency") or "CRA")
+        seniority = str(picked.get("seniority_tier") or "SENIOR_SECURED").replace("_", " ").title()
+        ytm = round(float(picked.get("ytm_pct") or 0.0), 2)
+        coupon = round(float(picked.get("coupon_rate_pct") or 0.0), 2)
+        cover = picked.get("asset_cover_ratio")
+        cover_str = f"{float(cover):.2f}x" if cover is not None else "N/A"
+        duration = picked.get("modified_duration_years")
+        dur_str = f"{float(duration):.2f} yrs" if duration is not None else "N/A"
+
+        summary = (
+            f"{rating} ({agency}) · {seniority} · YTM {ytm:.2f}% (Coupon {coupon:.2f}%, "
+            f"Asset Cover {cover_str}, Mod. Duration {dur_str}). "
+            f"Universe median AAA YTM: {median_aaa:.2f}% across {len(rows)} tracked securities ({sdi_count} SDIs)."
+        )
+
         return {
-            "ten_year_gsec": 6.82,
-            "one_year_tbill": 6.64,
-            "repo_rate": 6.50,
-            "term_spread_bps": 18,
-            "yield_wedge_bps": 18,
-            "curve_shape": "Normal",
-            "stance": "Bull-Flattening Bias — Duration sweet spot remains in 7Y–10Y Sovereign G-Secs.",
-            "signal_summary": "10-year benchmark sovereign yield remains anchored near 6.82%, pricing orderly liquidity and a steady monetary wedge.",
-            "tax_free_highlight": "REC & NHAI Tax-Free tranches trading at 5.35%–5.45% YTM (~7.80% pre-tax equivalent for 30% bracket).",
+            "isin": isin,
+            "ticker": str(picked.get("ticker") or isin),
+            "instrument_name": str(picked.get("instrument_name") or picked.get("ticker") or isin),
+            "credit_rating": rating,
+            "credit_rating_agency": agency,
+            "seniority": seniority,
+            "ytm_pct": ytm,
+            "coupon_rate_pct": coupon,
+            "asset_cover": cover_str,
+            "modified_duration": dur_str,
+            "median_aaa_ytm": median_aaa,
+            "total_tracked": len(rows),
+            "sdi_count": sdi_count,
+            "summary": summary,
+            "detail_url": f"/debt/{isin}",
         }
+    except Exception as e:
+        logger.error("Failed loading live corporate debt highlight for %s: %s", date_str, e)
+        return {}
+
+
+def _load_live_etf_highlight(date_str: str) -> Dict[str, Any]:
+    """Deterministically rotate across high-liquidity ETFs in `etf_matrix`."""
+    from core.db.connection import get_db_connection, init_db
+
+    try:
+        init_db()
+        conn = get_db_connection()
+        cur = conn.cursor()
+        try:
+            cur.execute(
+                """
+                SELECT symbol, scheme_name, category, last_price, nav,
+                       premium_discount_pct, tracking_error_1y, expense_ratio_pct,
+                       aum_crores, liquidity_tier, updated_at
+                FROM etf_matrix
+                WHERE last_price IS NOT NULL AND nav IS NOT NULL
+                ORDER BY COALESCE(aum_crores, 0) DESC, symbol ASC
+                """
+            )
+            cols = [c[0] for c in cur.description]
+            rows = [dict(zip(cols, r)) for r in cur.fetchall()]
+        finally:
+            cur.close()
+            conn.close()
+
+        if not rows:
+            return {}
+
+        liquid_pool = rows[: min(45, len(rows))]
+        picked = liquid_pool[_date_index("etf_matrix", date_str, len(liquid_pool))]
+        categories = {str(r.get("category") or "") for r in rows if r.get("category")}
+
+        symbol = str(picked.get("symbol") or "")
+        price = round(float(picked.get("last_price") or 0.0), 2)
+        nav = round(float(picked.get("nav") or 0.0), 2)
+        prem_disc = round(float(picked.get("premium_discount_pct") or 0.0), 2)
+        te_raw = picked.get("tracking_error_1y")
+        ter_raw = picked.get("expense_ratio_pct")
+        te_str = f"{float(te_raw):.2f}%" if te_raw is not None else "N/A"
+        ter_str = f"{float(ter_raw):.2f}%" if ter_raw is not None else "N/A"
+
+        summary = (
+            f"Closed at ₹{price:.2f} vs iNAV/NAV ₹{nav:.2f} ({prem_disc:+.2f}% premium/discount) · "
+            f"1Y Tracking Error {te_str} · TER {ter_str}. "
+            f"Tracked across {len(rows)} listed ETFs in {len(categories)} categories."
+        )
+
+        return {
+            "symbol": symbol,
+            "scheme_name": str(picked.get("scheme_name") or symbol),
+            "category": str(picked.get("category") or "Index ETF"),
+            "last_price": price,
+            "nav": nav,
+            "premium_discount_pct": prem_disc,
+            "tracking_error": te_str,
+            "expense_ratio": ter_str,
+            "total_tracked": len(rows),
+            "categories_count": len(categories),
+            "summary": summary,
+            "detail_url": f"/etfs/{symbol}",
+        }
+    except Exception as e:
+        logger.error("Failed loading live ETF matrix highlight for %s: %s", date_str, e)
+        return {}
+
+
+def _load_live_reits_and_sgb(date_str: str) -> Dict[str, Any]:
+    """Load live REIT/InvIT cash-flow purity and Sovereign Gold Bond parity from database."""
+    from core.db.connection import get_db_connection, init_db
+
+    try:
+        init_db()
+        conn = get_db_connection()
+        cur = conn.cursor()
+        try:
+            cur.execute(
+                """
+                SELECT symbol, name, structure_type, current_price, nav_per_unit,
+                       discount_to_nav_pct, distribution_yield_pct, ndcf_payout_purity_pct
+                FROM reits_and_invits
+                WHERE current_price IS NOT NULL
+                ORDER BY COALESCE(distribution_yield_pct, 0) DESC, symbol ASC
+                """
+            )
+            r_cols = [c[0] for c in cur.description]
+            reit_rows = [dict(zip(r_cols, r)) for r in cur.fetchall()]
+
+            cur.execute(
+                """
+                SELECT symbol, series_name, market_price, spot_gold_price,
+                       discount_to_spot_pct, annual_coupon_rate, maturity_date
+                FROM sgb_tranches
+                WHERE market_price IS NOT NULL
+                ORDER BY COALESCE(discount_to_spot_pct, 0) ASC, symbol ASC
+                """
+            )
+            s_cols = [c[0] for c in cur.description]
+            sgb_rows = [dict(zip(s_cols, r)) for r in cur.fetchall()]
+        finally:
+            cur.close()
+            conn.close()
+
+        if not reit_rows and not sgb_rows:
+            return {}
+
+        reit_pick = reit_rows[_date_index("reit", date_str, len(reit_rows))] if reit_rows else {}
+        sgb_pick = sgb_rows[_date_index("sgb", date_str, len(sgb_rows))] if sgb_rows else {}
+
+        r_sym = str(reit_pick.get("symbol") or "")
+        r_name = str(reit_pick.get("name") or r_sym)
+        r_price = round(float(reit_pick.get("current_price") or 0.0), 2)
+        r_yield = round(float(reit_pick.get("distribution_yield_pct") or 0.0), 2)
+        r_disc = round(float(reit_pick.get("discount_to_nav_pct") or 0.0), 1)
+        r_purity = round(float(reit_pick.get("ndcf_payout_purity_pct") or 0.0), 1)
+
+        sgb_clause = ""
+        sgb_symbol = ""
+        sgb_disc = None
+        if sgb_pick:
+            sgb_symbol = str(sgb_pick.get("symbol") or "")
+            sgb_price = round(float(sgb_pick.get("market_price") or 0.0), 1)
+            sgb_disc = round(float(sgb_pick.get("discount_to_spot_pct") or 0.0), 2)
+            sgb_coupon = round(float(sgb_pick.get("annual_coupon_rate") or 2.5), 2)
+            sgb_clause = (
+                f" SGB parity watch: {sgb_pick.get('series_name') or sgb_symbol} ({sgb_symbol}) "
+                f"at ₹{sgb_price:.1f} ({sgb_disc:+.2f}% vs IBJA spot gold, {sgb_coupon:.2f}% coupon)."
+            )
+
+        summary = (
+            f"{r_name} ({r_sym}) settled at ₹{r_price:.2f} ({r_disc:+.1f}% vs NAV) · "
+            f"Distribution Yield {r_yield:.2f}% · NDCF Payout Purity {r_purity:.1f}%.{sgb_clause}"
+        )
+
+        return {
+            "reit_symbol": r_sym,
+            "reit_name": r_name,
+            "structure_type": str(reit_pick.get("structure_type") or "REIT").replace("_", " "),
+            "current_price": r_price,
+            "distribution_yield_pct": r_yield,
+            "discount_to_nav_pct": r_disc,
+            "ndcf_purity_pct": r_purity,
+            "sgb_symbol": sgb_symbol,
+            "sgb_series": str(sgb_pick.get("series_name") or sgb_symbol),
+            "sgb_discount_to_spot_pct": sgb_disc,
+            "summary": summary,
+            "detail_url": f"/reits/{r_sym}" if r_sym else "/reits",
+        }
+    except Exception as e:
+        logger.error("Failed loading live REIT/InvIT & SGB highlight for %s: %s", date_str, e)
+        return {}
 
 
 def _load_live_mf_highlight(date_str: str) -> Dict[str, Any]:
-    """Deterministically rotate across live Mutual Fund schemes and forensic dossiers by edition_date."""
-    import hashlib
+    """Deterministically rotate across live Mutual Fund schemes & prior-session AMFI forensic dossiers."""
     from core.db.connection import get_db_connection, init_db
 
     try:
         init_db()
         conn = get_db_connection()
         cursor = conn.cursor()
-        cursor.execute(
-            """
-            SELECT s.scheme_code, s.scheme_name, s.category, s.ter_direct_pct,
-                   d.active_share_pct, d.composite_health_score,
-                   d.weighted_moat_score, d.promoter_pledge_exposure_pct,
-                   d.margin_of_safety_pct
-            FROM mutual_fund_schemes s
-            LEFT JOIN fund_forensic_dossiers d ON s.scheme_code = d.scheme_code
-            ORDER BY (d.weighted_moat_score IS NULL) ASC, d.weighted_moat_score DESC, d.composite_health_score DESC
-            """
-        )
-        cols = [c[0] for c in cursor.description]
-        rows = [dict(zip(cols, r)) for r in cursor.fetchall()]
-        cursor.close()
-        conn.close()
+        try:
+            cursor.execute(
+                """
+                SELECT s.scheme_code, s.scheme_name, s.category, s.nav, s.ter_direct_pct,
+                       s.last_portfolio_date, s.last_updated,
+                       d.active_share_pct, d.composite_health_score,
+                       d.weighted_moat_score, d.promoter_pledge_exposure_pct,
+                       d.margin_of_safety_pct, d.last_audited_at
+                FROM mutual_fund_schemes s
+                LEFT JOIN fund_forensic_dossiers d ON s.scheme_code = d.scheme_code
+                ORDER BY (d.weighted_moat_score IS NULL) ASC, d.weighted_moat_score DESC, s.scheme_code ASC
+                """
+            )
+            cols = [c[0] for c in cursor.description]
+            rows = [dict(zip(cols, r)) for r in cursor.fetchall()]
+        finally:
+            cursor.close()
+            conn.close()
 
-        if rows:
-            # Prioritize schemes with full forensic dossiers, rotating daily by date hash
-            audited = [r for r in rows if r.get("weighted_moat_score") is not None]
-            pool = audited if len(audited) >= 2 else rows
-            day_idx = int(hashlib.sha256(date_str.encode("utf-8")).hexdigest()[:8], 16) % len(pool)
-            picked = pool[day_idx]
+        if not rows:
+            return {}
 
-            active_share = picked.get("active_share_pct")
-            ter = picked.get("ter_direct_pct")
-            moat = picked.get("weighted_moat_score")
-            pledge = picked.get("promoter_pledge_exposure_pct")
-            health = picked.get("composite_health_score")
+        audited = [r for r in rows if r.get("weighted_moat_score") is not None]
+        pool = audited if len(audited) >= 2 else rows
+        picked = pool[_date_index("mf", date_str, len(pool))]
 
-            active_share_str = f"{float(active_share):.1f}%" if active_share is not None else "Audited Direct Sleeve"
-            ter_str = f"{float(ter):.2f}%" if ter is not None else "0.55%"
+        active_share = picked.get("active_share_pct")
+        ter = picked.get("ter_direct_pct")
+        moat = picked.get("weighted_moat_score")
+        pledge = picked.get("promoter_pledge_exposure_pct")
+        health = picked.get("composite_health_score")
+        nav_val = picked.get("nav")
 
-            if moat is not None:
-                takeaway = (
-                    f"Look-through weighted Moat Score of {float(moat):.1f}/100 with "
-                    f"{float(pledge or 0.0):.2f}% promoter-pledge exposure across underlying holdings."
-                )
-            elif health is not None:
-                takeaway = (
-                    f"{picked.get('category', 'Equity')} mandate scoring {float(health):.1f}/100 composite "
-                    f"forensic health with {ter_str} direct expense drag."
-                )
-            else:
-                takeaway = "High-conviction institutional mandate with low expense drag and clean governance look-through."
+        amfi_as_of = str(
+            picked.get("last_updated")
+            or picked.get("last_audited_at")
+            or picked.get("last_portfolio_date")
+            or date_str
+        )[:10]
+        provenance_badge = f"Prior-Session AMFI Audit ({amfi_as_of})"
 
-            return {
-                "scheme_code": picked["scheme_code"],
-                "scheme_name": picked["scheme_name"],
-                "active_share": active_share_str,
-                "expense_ratio": ter_str,
-                "takeaway": takeaway,
-                "highlight": takeaway,
-            }
+        active_share_str = f"{float(active_share):.1f}%" if active_share is not None else "Direct Sleeve"
+        ter_str = f"{float(ter):.2f}%" if ter is not None else "N/A"
+        nav_str = f"₹{float(nav_val):.2f}" if nav_val is not None else "N/A"
+
+        if moat is not None:
+            takeaway = (
+                f"Look-through weighted Moat Score of {float(moat):.1f}/100 with "
+                f"{float(pledge or 0.0):.2f}% promoter-pledge exposure across underlying holdings (NAV {nav_str})."
+            )
+        elif health is not None:
+            takeaway = (
+                f"{picked.get('category', 'Equity')} mandate scoring {float(health):.1f}/100 composite "
+                f"forensic health with {ter_str} direct expense ratio (NAV {nav_str})."
+            )
+        else:
+            takeaway = f"Direct-growth institutional scheme tracked at NAV {nav_str} ({ter_str} direct TER)."
+
+        code = str(picked["scheme_code"])
+        return {
+            "scheme_code": code,
+            "scheme_name": str(picked["scheme_name"]),
+            "nav": nav_str,
+            "active_share": active_share_str,
+            "expense_ratio": ter_str,
+            "amfi_as_of_date": amfi_as_of,
+            "provenance_badge": provenance_badge,
+            "takeaway": takeaway,
+            "highlight": takeaway,
+            "detail_url": f"/funds/{code}",
+        }
     except Exception as e:
-        logger.warning(f"Failed loading live MF highlight for {date_str}: {e}")
-
-    return {
-        "scheme_code": "PPFAS_FLEXICAP_DIR",
-        "scheme_name": "Parag Parikh Flexi Cap Fund (Direct-Growth)",
-        "active_share": "76.4%",
-        "expense_ratio": "0.62%",
-        "takeaway": "High true active share with disciplined cash buffer and zero high-pledge holdings in top 15 weights.",
-        "highlight": "High true active share with disciplined cash buffer and zero high-pledge holdings in top 15 weights.",
-    }
+        logger.error("Failed loading live MF highlight for %s: %s", date_str, e)
+        return {}
 
 
 def _load_live_msme_highlight(date_str: str) -> Dict[str, Any]:
-    """Select the top Unlisted MSME Champion from today's cohort (or rotating across the live pool)."""
-    import hashlib
+    """Select a live Unlisted MSME enterprise from `msme_firms` + deterministic forensic engine."""
     from core.db.connection import get_db_connection, init_db
     from core.msme.forensic_engine import compute_msme_forensic_dossier
 
@@ -287,106 +568,276 @@ def _load_live_msme_highlight(date_str: str) -> Dict[str, Any]:
         init_db()
         conn = get_db_connection()
         cursor = conn.cursor()
-        cursor.execute(
-            """
-            SELECT uin, name, sector_code, sector_name, city, state, annual_turnover,
-                   employee_count, registration_date, source, last_updated
-            FROM msme_firms
-            ORDER BY annual_turnover DESC
-            LIMIT 30
-            """
+        try:
+            cursor.execute(
+                """
+                SELECT uin, name, sector_code, sector_name, city, state, annual_turnover,
+                       employee_count, registration_date, source, last_updated
+                FROM msme_firms
+                ORDER BY annual_turnover DESC, uin ASC
+                LIMIT 30
+                """
+            )
+            cols = [c[0] for c in cursor.description]
+            rows = [dict(zip(cols, r)) for r in cursor.fetchall()]
+        finally:
+            cursor.close()
+            conn.close()
+
+        if not rows:
+            return {}
+
+        firm = rows[_date_index("msme", date_str, len(rows))]
+        dossier = compute_msme_forensic_dossier(firm)
+        wc = dossier.get("pillar_1_working_capital", {})
+        supply_chain = dossier.get("pillar_2_supply_chain", {})
+        solv = dossier.get("pillar_3_solvency", {})
+        moat = dossier.get("pillar_4_moat", {})
+        bench = dossier.get("sector_forensic_benchmarks", {})
+        buyers = supply_chain.get("listed_buyers", [])
+
+        turnover_cr = firm.get("annual_turnover") or 0
+        ccc_days = wc.get("net_ccc_days", "N/A")
+        moat_score = moat.get("moat_score", "N/A")
+        icr = solv.get("interest_coverage_ratio", "N/A")
+        debt_to_turnover = bench.get("debt_to_turnover_median")
+        oem_str = ", ".join([b.get("name", "") for b in buyers[:2] if b.get("name")]) or "Listed Industrial OEMs"
+
+        moat_note = (
+            f"Heuristic Moat {moat_score}/100 · Sector Median Net CCC {ccc_days} days · "
+            f"Est. ICR {icr}x · Offtake universe: {oem_str}."
         )
-        cols = [c[0] for c in cursor.description]
-        rows = [dict(zip(cols, r)) for r in cursor.fetchall()]
-        cursor.close()
-        conn.close()
+        uin = str(firm.get("uin") or "")
 
-        if rows:
-            day_idx = int(hashlib.sha256(f"msme:{date_str}".encode("utf-8")).hexdigest()[:8], 16) % len(rows)
-            firm = rows[day_idx]
-            dossier = compute_msme_forensic_dossier(firm)
-            wc = dossier.get("pillar_1_working_capital", {})
-            supply_chain = dossier.get("pillar_2_supply_chain", {})
-            buyers = supply_chain.get("listed_buyers", [])
-            moat = dossier.get("pillar_4_moat", {})
+        return {
+            "uin": uin,
+            "company_name": str(firm.get("name") or uin),
+            "cluster": f"{firm.get('city', 'Industrial')}, {firm.get('state', 'India')} ({firm.get('sector_name', 'Manufacturing')})",
+            "roce_pct": f"₹{turnover_cr} Cr Turnover",
+            "roce": f"₹{turnover_cr} Cr",
+            "debt_to_equity": f"{float(debt_to_turnover):.2f}" if debt_to_turnover is not None else "N/A",
+            "moat_note": moat_note,
+            "highlight": moat_note,
+            "detail_url": f"/msme/{uin}",
+        }
+    except Exception as e:
+        logger.error("Failed loading live MSME highlight for %s: %s", date_str, e)
+        return {}
 
-            turnover_cr = firm.get("annual_turnover") or 0
-            ccc_days = wc.get("net_ccc_days", 48)
-            moat_score = moat.get("moat_score", 80)
-            oem_str = ", ".join([b.get("name", "") for b in buyers[:2]]) if buyers else "Tier-1 Industrial OEMs"
-            moat_note = (
-                f"Moat Score {moat_score}/100 · Cash Conversion Cycle {ccc_days} days · "
-                f"Verified supply-chain linkage to {oem_str}."
+
+def compile_research_bouquet(
+    edition_date: Optional[str] = None,
+    require_live_data: bool = False,
+) -> Dict[str, Any]:
+    """
+    Compiles the 7-asset Day-End Market Wrap from live database tables.
+    When `require_live_data=True`, raises `BouquetDataUnavailableError` if any required live pillar is empty.
+    """
+    from core.db.connection import IST
+
+    date_str = edition_date or datetime.now(IST).strftime("%Y-%m-%d")
+    formatted_date = datetime.strptime(date_str[:10], "%Y-%m-%d").strftime("%A, %B %d, %Y")
+
+    equity_picks = _load_live_equities(date_str, limit=3)
+    sovereign_posture = _load_live_sovereign_posture(date_str)
+    corporate_debt = _load_live_corporate_debt(date_str)
+    etf_highlight = _load_live_etf_highlight(date_str)
+    reits_sgb = _load_live_reits_and_sgb(date_str)
+    mf_highlight = _load_live_mf_highlight(date_str)
+    msme_highlight = _load_live_msme_highlight(date_str)
+
+    if require_live_data:
+        required_map = {
+            "equities": equity_picks,
+            "sovereign": sovereign_posture,
+            "corporate_debt": corporate_debt,
+            "etfs": etf_highlight,
+            "reits_sgb": reits_sgb,
+            "mutual_funds": mf_highlight,
+            "msme": msme_highlight,
+        }
+        missing = [name for name, val in required_map.items() if not val]
+        if missing:
+            raise BouquetDataUnavailableError(
+                f"Cannot compile live Day-End Market Wrap for {date_str}; missing live pillars: {', '.join(missing)}"
             )
 
-            return {
-                "uin": firm.get("uin", ""),
-                "company_name": firm.get("name", "Unlisted Industrial Champion"),
-                "cluster": f"{firm.get('city', 'Industrial')}, {firm.get('state', 'India')} ({firm.get('sector_name', 'Manufacturing')})",
-                "roce_pct": f"₹{turnover_cr} Cr Turnover",
-                "roce": f"₹{turnover_cr} Cr",
-                "debt_to_equity": "0.14",
-                "moat_note": moat_note,
-                "highlight": moat_note,
-            }
-    except Exception as e:
-        logger.warning(f"Failed loading live MSME highlight for {date_str}: {e}")
-
     return {
-        "uin": "UDYAM-MH-26-0012480",
-        "company_name": "Sahyadri Precision Forgings Pvt Ltd",
-        "cluster": "Pune, Maharashtra (Auto Components)",
-        "roce_pct": "₹84.5 Cr Turnover",
-        "roce": "₹84.5 Cr",
-        "debt_to_equity": "0.14",
-        "moat_note": "Moat Score 64/100 · Cash Conversion Cycle 63 days · Verified supply-chain linkage to Tata Motors Ltd, Bharat Forge Ltd.",
-        "highlight": "Moat Score 64/100 · Cash Conversion Cycle 63 days · Verified supply-chain linkage to Tata Motors Ltd, Bharat Forge Ltd.",
+        "edition_date": date_str[:10],
+        "formatted_date": formatted_date,
+        "subject": f"Moatnomics Day-End Market Wrap: 7-Asset Close & Forensic Signals ({date_str[:10]})",
+        "equities": equity_picks,
+        "sovereign": sovereign_posture,
+        "corporate_debt": corporate_debt,
+        "etfs": etf_highlight,
+        "reits_sgb": reits_sgb,
+        "mutual_funds": mf_highlight,
+        "mutual_fund": mf_highlight,
+        "msme": msme_highlight,
+        "tracking_domain": get_tracking_base_url(),
     }
 
 
 def render_bouquet_html(bouquet: Dict[str, Any], subscriber: Optional[Dict[str, Any]] = None) -> str:
     """
-    Renders an institutional, responsive HTML email template for the research bouquet.
+    Renders an institutional, responsive 7-asset Day-End Market Wrap HTML email template.
     """
     token = subscriber.get("unsubscribe_token") if subscriber else "preview_token"
-    user_name = subscriber.get("full_name") if subscriber else "Institutional Investor"
+    user_name = subscriber.get("full_name") if subscriber else "Reader"
     base_url = get_tracking_base_url()
     unsub_url = f"{base_url}/api/notifications/unsubscribe?token={token}"
 
-    msme = {
-        "company_name": "Unlisted Manufacturing Enterprise",
-        "cluster": "Industrial Cluster",
-        "roce_pct": "Scale Under Audit",
-        "moat_note": "Deterministic working capital and supply-chain dossier available.",
-        "uin": "",
-    }
-    if bouquet.get("msme") and isinstance(bouquet.get("msme"), dict):
-        msme.update({k: v for k, v in bouquet["msme"].items() if v is not None})
-
     equities_html = ""
-    for eq in bouquet.get("equities", []):
-        link = build_tracked_link(eq["dossier_url"], token=token)
+    for eq in bouquet.get("equities") or []:
+        link = build_tracked_link(eq.get("dossier_url") or f"/dossier/{eq.get('ticker', '')}", token=token)
+        roce_disp = f"{eq['roce']}%" if eq.get("roce") is not None else "N/A"
+        sg_disp = f"{eq['sales_growth_3y']:+.1f}%" if eq.get("sales_growth_3y") is not None else "N/A"
+        de_disp = f"{eq['debt_to_equity']}" if eq.get("debt_to_equity") is not None else "N/A"
+        cmp_disp = f"₹{eq['cmp']}" if eq.get("cmp") is not None else "N/A"
         equities_html += f"""
-        <div style="background: #ffffff; border: 1px solid #e2e8f0; border-radius: 8px; padding: 16px; margin-bottom: 14px;">
-          <div style="display: flex; justify-content: space-between; align-items: baseline; margin-bottom: 6px;">
+        <div class="card">
+          <div style="display: flex; justify-content: space-between; align-items: baseline; flex-wrap: wrap; gap: 6px; margin-bottom: 6px;">
             <div style="font-size: 15px; font-weight: 800; color: #0f172a;">
-              <a href="{link}" style="color: #0284c7; text-decoration: none;">{eq['ticker']}</a>
-              <span style="font-size: 13px; font-weight: 500; color: #64748b; margin-left: 6px;">{eq['company_name']}</span>
+              <a href="{link}" style="color: #0E3D32; text-decoration: none;">{eq.get('ticker')}</a>
+              <span style="font-size: 13px; font-weight: 500; color: #64748b; margin-left: 6px;">{eq.get('company_name')}</span>
             </div>
-            <div style="font-size: 12px; font-weight: 700; color: #0284c7; background: #e0f2fe; padding: 2px 8px; border-radius: 4px;">
-              {eq['sector']}
-            </div>
+            <div class="pill">{eq.get('sector')} &bull; Close {cmp_disp}</div>
           </div>
           <div style="font-size: 12.5px; color: #334155; line-height: 1.5; margin-bottom: 10px;">
-            {eq['thesis']}
+            {eq.get('thesis')}
           </div>
-          <div style="display: flex; gap: 14px; font-size: 11.5px; color: #64748b; border-top: 1px solid #f1f5f9; padding-top: 8px;">
-            <span>ROCE: <strong style="color: #10b981;">{eq['roce']}%</strong></span>
-            <span>Sales Growth (3Y): <strong style="color: #0f172a;">+{eq['sales_growth_3y']}%</strong></span>
-            <span>D/E: <strong style="color: #0f172a;">{eq['debt_to_equity']}</strong></span>
-            <span style="margin-left: auto;"><a href="{link}" style="color: #0284c7; font-weight: 700; text-decoration: none;">Open Dossier &rarr;</a></span>
+          <div style="display: flex; flex-wrap: wrap; gap: 12px; font-size: 11.5px; color: #64748b; border-top: 1px solid #f1f5f9; padding-top: 8px;">
+            <span>ROCE: <strong style="color: #0E3D32;">{roce_disp}</strong></span>
+            <span>3Y Sales: <strong style="color: #0f172a;">{sg_disp}</strong></span>
+            <span>D/E: <strong style="color: #0f172a;">{de_disp}</strong></span>
+            <span style="margin-left: auto;"><a href="{link}" style="color: #0E3D32; font-weight: 700; text-decoration: none;">Open Dossier &rarr;</a></span>
           </div>
         </div>
+        """
+
+    sov = bouquet.get("sovereign") or {}
+    sov_link = build_tracked_link("/sovereign", token=token)
+    sov_html = ""
+    if sov:
+        sov_html = f"""
+      <div class="section-title">2. Sovereign Par Curve &amp; SDL Spreads</div>
+      <div class="card">
+        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;">
+          <span style="font-weight: 700; font-size: 13.5px; color: #0f172a;">10Y Benchmark G-Sec Close</span>
+          <span style="font-size: 15px; font-weight: 800; color: #0E3D32;">{sov.get('ten_year_gsec')}%</span>
+        </div>
+        <div style="font-size: 12.5px; color: #475569; line-height: 1.5; margin-bottom: 8px;">
+          {sov.get('signal_summary')}
+        </div>
+        <div style="display: flex; flex-wrap: wrap; gap: 10px; font-size: 11.5px; color: #64748b;">
+          <span>364D T-Bill: <strong>{sov.get('one_year_tbill')}%</strong></span>
+          <span>&bull; Policy Repo: <strong>{sov.get('repo_rate')}%</strong></span>
+          <span>&bull; Wedge: <strong>{sov.get('yield_wedge_bps'):+d} bps</strong></span>
+          <span style="margin-left: auto;"><a href="{sov_link}" style="color: #0E3D32; font-weight: 700; text-decoration: none;">Yield Curve &rarr;</a></span>
+        </div>
+      </div>
+        """
+
+    debt = bouquet.get("corporate_debt") or {}
+    debt_html = ""
+    if debt:
+        debt_link = build_tracked_link(debt.get("detail_url") or "/debt", token=token)
+        debt_html = f"""
+      <div class="section-title">3. Corporate Debt &amp; Credit Surveillance</div>
+      <div class="card">
+        <div style="display: flex; justify-content: space-between; align-items: baseline; gap: 8px; margin-bottom: 6px;">
+          <span style="font-weight: 700; font-size: 13.5px; color: #0f172a;">{debt.get('instrument_name')} ({debt.get('isin')})</span>
+          <span class="pill">{debt.get('credit_rating')} &bull; {debt.get('ytm_pct')}% YTM</span>
+        </div>
+        <div style="font-size: 12.5px; color: #334155; line-height: 1.5; margin-bottom: 8px;">
+          {debt.get('summary')}
+        </div>
+        <div style="font-size: 11.5px; text-align: right;">
+          <a href="{debt_link}" style="color: #0E3D32; font-weight: 700; text-decoration: none;">Inspect Credit Dossier &rarr;</a>
+        </div>
+      </div>
+        """
+
+    etf = bouquet.get("etfs") or {}
+    etf_html = ""
+    if etf:
+        etf_link = build_tracked_link(etf.get("detail_url") or "/etfs", token=token)
+        etf_html = f"""
+      <div class="section-title">4. National ETF Liquidity &amp; Tracking Matrix</div>
+      <div class="card">
+        <div style="display: flex; justify-content: space-between; align-items: baseline; gap: 8px; margin-bottom: 6px;">
+          <span style="font-weight: 700; font-size: 13.5px; color: #0f172a;">{etf.get('scheme_name')} ({etf.get('symbol')})</span>
+          <span class="pill">{etf.get('category')}</span>
+        </div>
+        <div style="font-size: 12.5px; color: #334155; line-height: 1.5; margin-bottom: 8px;">
+          {etf.get('summary')}
+        </div>
+        <div style="font-size: 11.5px; text-align: right;">
+          <a href="{etf_link}" style="color: #0E3D32; font-weight: 700; text-decoration: none;">Open ETF Matrix &rarr;</a>
+        </div>
+      </div>
+        """
+
+    reits = bouquet.get("reits_sgb") or {}
+    reits_html = ""
+    if reits:
+        reit_link = build_tracked_link(reits.get("detail_url") or "/reits", token=token)
+        reits_html = f"""
+      <div class="section-title">5. REITs, InvITs &amp; Sovereign Gold Parity</div>
+      <div class="card">
+        <div style="display: flex; justify-content: space-between; align-items: baseline; gap: 8px; margin-bottom: 6px;">
+          <span style="font-weight: 700; font-size: 13.5px; color: #0f172a;">{reits.get('reit_name')} ({reits.get('reit_symbol')})</span>
+          <span class="pill">Yield {reits.get('distribution_yield_pct')}%</span>
+        </div>
+        <div style="font-size: 12.5px; color: #334155; line-height: 1.5; margin-bottom: 8px;">
+          {reits.get('summary')}
+        </div>
+        <div style="font-size: 11.5px; text-align: right;">
+          <a href="{reit_link}" style="color: #0E3D32; font-weight: 700; text-decoration: none;">Open Real Assets &amp; SGBs &rarr;</a>
+        </div>
+      </div>
+        """
+
+    mf = bouquet.get("mutual_funds") or {}
+    mf_html = ""
+    if mf:
+        mf_link = build_tracked_link(mf.get("detail_url") or f"/funds/{mf.get('scheme_code', '')}", token=token)
+        mf_badge = mf.get("provenance_badge") or "Prior-Session AMFI Audit"
+        mf_html = f"""
+      <div class="section-title">6. Mutual Fund Look-Through Spotlight</div>
+      <div class="card">
+        <div style="display: flex; justify-content: space-between; align-items: baseline; flex-wrap: wrap; gap: 6px; margin-bottom: 6px;">
+          <span style="font-weight: 700; font-size: 13.5px; color: #0f172a;">{mf.get('scheme_name')}</span>
+          <span class="pill">{mf_badge}</span>
+        </div>
+        <div style="font-size: 12.5px; color: #334155; line-height: 1.5; margin-bottom: 8px;">
+          {mf.get('highlight')}
+        </div>
+        <div style="display: flex; flex-wrap: wrap; gap: 10px; font-size: 11.5px; color: #64748b;">
+          <span>Active Share: <strong style="color: #0E3D32;">{mf.get('active_share')}</strong></span>
+          <span>&bull; Direct TER: <strong>{mf.get('expense_ratio')}</strong></span>
+          <span style="margin-left: auto;"><a href="{mf_link}" style="color: #0E3D32; font-weight: 700; text-decoration: none;">Look-Through Audit &rarr;</a></span>
+        </div>
+      </div>
+        """
+
+    msme = bouquet.get("msme") or {}
+    msme_html = ""
+    if msme:
+        msme_path = msme.get("detail_url") or (f"/msme/{msme['uin']}" if msme.get("uin") else "/msme")
+        msme_link = build_tracked_link(msme_path, token=token)
+        msme_html = f"""
+      <div class="section-title">7. Unlisted MSME Forensic Spotlight</div>
+      <div class="card">
+        <div style="font-size: 13.5px; font-weight: 700; color: #0f172a; margin-bottom: 4px;">{msme.get('company_name')}</div>
+        <div style="font-size: 12px; color: #475569; margin-bottom: 8px;">
+          Cluster: <strong>{msme.get('cluster')}</strong> &nbsp;&bull;&nbsp; Scale: <strong>{msme.get('roce_pct')}</strong>
+        </div>
+        <div style="font-size: 12.5px; line-height: 1.5; color: #334155; margin-bottom: 8px;">{msme.get('moat_note')}</div>
+        <div style="font-size: 11.5px; text-align: right;">
+          <a href="{msme_link}" style="color: #0E3D32; font-weight: 700; text-decoration: none;">Inspect MSME Forensic Dossier &rarr;</a>
+        </div>
+      </div>
         """
 
     return f"""<!DOCTYPE html>
@@ -402,101 +853,54 @@ def render_bouquet_html(bouquet: Dict[str, Any], subscriber: Optional[Dict[str, 
     .header h1 {{ margin: 0; font-family: 'Playfair Display', Georgia, serif; font-size: 20px; font-weight: 800; letter-spacing: -0.01em; color: #F7F5EE; }}
     .header p {{ margin: 4px 0 0; font-size: 12px; color: #D9E3E8; }}
     .content {{ padding: 24px; }}
-    .section-title {{ font-size: 13px; font-weight: 800; color: #0B2337; text-transform: uppercase; letter-spacing: 0.05em; margin: 20px 0 10px 0; display: flex; align-items: center; gap: 6px; }}
+    .section-title {{ font-size: 12.5px; font-weight: 800; color: #0B2337; text-transform: uppercase; letter-spacing: 0.05em; margin: 20px 0 10px 0; }}
     .card {{ background: #ffffff; border: 1px solid #D9E3E8; border-radius: 8px; padding: 16px; margin-bottom: 14px; }}
     .footer {{ background: #D9E3E8; padding: 20px 24px; font-size: 11.5px; color: #282F33; border-top: 1px solid #7DA77A; text-align: center; line-height: 1.5; }}
     .footer a {{ color: #0E3D32; text-decoration: underline; }}
-    .pill {{ display: inline-block; background: #D9E3E8; color: #0B2337; padding: 2px 8px; border-radius: 4px; font-size: 11px; font-weight: 600; }}
+    .pill {{ display: inline-block; background: #E7EFE9; color: #0E3D32; padding: 2px 8px; border-radius: 4px; font-size: 11px; font-weight: 700; }}
   </style>
 </head>
 <body>
   <div class="wrapper">
     <div class="header">
       <div style="font-size: 11px; text-transform: uppercase; letter-spacing: 0.1em; color: #C7E268; font-weight: 700; margin-bottom: 4px;">
-        Daily Research Bouquet &bull; Multi-Asset Intelligence
+        Day-End 7-Asset Market Wrap &bull; Post-Close Intelligence
       </div>
       <h1>MOATNOMICS RESEARCH</h1>
-      <p>{bouquet.get('formatted_date')} &bull; Dispatched to {user_name}</p>
+      <p>{bouquet.get('formatted_date')} &bull; Prepared for {user_name}</p>
     </div>
 
     <div class="content">
       <p style="font-size: 14px; margin-top: 0; color: #334155;">
-        Good morning. Here is today's curated research intelligence across equities, sovereign debt, mutual fund look-through audits, and unlisted MSME champions.
+        Good evening. Here is today's post-settlement breakdown across listed equities, sovereign yields, corporate credit, ETFs, real assets &amp; gold parity, mutual fund look-through audits, and unlisted MSME enterprises.
       </p>
 
-      <!-- Section: Equities -->
-      <div class="section-title">
-        Today's Under-The-Radar Equity Discovery Picks
-      </div>
+      <div class="section-title">1. Listed Equities &mdash; Post-Close Discovery Cohort</div>
       {equities_html}
+      {sov_html}
+      {debt_html}
+      {etf_html}
+      {reits_html}
+      {mf_html}
+      {msme_html}
 
-      <!-- Section: Sovereign Debt -->
-      <div class="section-title">
-        Sovereign Par Curve &amp; Macro Wedge
-      </div>
-      <div class="card">
-        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;">
-          <span style="font-weight: 700; font-size: 13.5px; color: #0f172a;">10Y Benchmark G-Sec</span>
-          <span style="font-size: 15px; font-weight: 800; color: #0284c7;">{bouquet['sovereign']['ten_year_gsec']}%</span>
-        </div>
-        <div style="font-size: 12.5px; color: #475569; line-height: 1.5; margin-bottom: 8px;">
-          {bouquet['sovereign']['signal_summary']}
-        </div>
-        <div style="font-size: 11.5px; color: #64748b;">
-          1Y T-Bill: <strong>{bouquet['sovereign']['one_year_tbill']}%</strong> &bull; Policy Repo: <strong>{bouquet['sovereign']['repo_rate']}%</strong> &bull; Spread: <strong>+{bouquet['sovereign']['yield_wedge_bps']} bps</strong>
-        </div>
-      </div>
-
-      <!-- Section: Mutual Fund Look-Through -->
-      <div class="section-title">
-        Mutual Fund Look-Through Spotlight
-      </div>
-      <div class="card">
-        <div style="font-weight: 700; font-size: 13.5px; color: #0f172a; margin-bottom: 4px;">
-          {bouquet['mutual_funds']['scheme_name']}
-        </div>
-        <div style="font-size: 12.5px; color: #334155; line-height: 1.5; margin-bottom: 8px;">
-          {bouquet['mutual_funds']['highlight']}
-        </div>
-        <div style="font-size: 11.5px; color: #64748b;">
-          Active Share: <strong style="color: #10b981;">{bouquet['mutual_funds']['active_share']}</strong> &bull; Direct TER: <strong>{bouquet['mutual_funds']['expense_ratio']}</strong>
-        </div>
-      </div>
-
-      <!-- Section: Unlisted MSME Champion -->
-      <div style="margin-bottom:28px;">
-        <div style="font-size:12px;font-weight:700;text-transform:uppercase;letter-spacing:0.1em;color:#d97706;margin-bottom:10px;border-bottom:1px solid #e2e8f0;padding-bottom:6px;">
-          3. Unlisted MSME Forensic Spotlight
-        </div>
-        <div style="background:#f8fafc;border:1px solid #e2e8f0;border-radius:10px;padding:16px;">
-          <div style="font-size:14px;font-weight:700;color:#0f172a;margin-bottom:4px;">{msme.get("company_name")}</div>
-          <div style="font-size:12px;color:#475569;margin-bottom:8px;">
-            Cluster: <strong>{msme.get("cluster")}</strong> &nbsp;·&nbsp; Scale: <strong>{msme.get("roce_pct")}</strong>
-          </div>
-          <p style="margin:0 0 10px;font-size:13px;line-height:1.55;color:#334155;">{msme.get("moat_note")}</p>
-          <a href="https://antigravity.averagettv.in/msme/{msme.get('uin', '')}" style="font-size:12px;font-weight:700;color:#d97706;text-decoration:none;">Inspect MSME Forensic Dossier &rarr;</a>
-        </div>
-      </div>
-
-      <!-- Action Button -->
       <div style="text-align: center; margin: 28px 0 12px 0;">
-        <a href="{build_tracked_link('/', token=token)}" style="background: #0ea5e9; color: #020617; font-weight: 800; font-size: 14px; text-decoration: none; padding: 12px 28px; border-radius: 8px; display: inline-block;">
-          Open Terminal &rarr;
+        <a href="{build_tracked_link('/', token=token)}" style="background: #0E3D32; color: #F7F5EE; font-weight: 800; font-size: 14px; text-decoration: none; padding: 12px 28px; border-radius: 8px; display: inline-block;">
+          Open Research Terminal &rarr;
         </a>
       </div>
     </div>
 
-    <!-- Statutory Footer & Unsubscribe -->
     <div class="footer">
-      <p style="margin: 0 0 8px 0; font-weight: 700; color: #475569;">
-        Moatnomics &bull; Quantitative Asset Intelligence & Solvency Auditing
+      <p style="margin: 0 0 8px 0; font-weight: 700; color: #0B2337;">
+        Moatnomics &bull; Quantitative Multi-Asset Intelligence &amp; Solvency Auditing
       </p>
-      <p style="margin: 0 0 10px 0; font-size: 10.5px; color: #94a3b8; line-height: 1.4;">
-        <strong>Regulatory Safe-Harbor Disclosure:</strong> Moatnomics is an independent financial technology analytics software tool. We are not registered anywhere as a corporate entity or broker, and do not provide SEBI-regulated investment advice or recommendations. All data is computed deterministically for research and forensic screening only.
+      <p style="margin: 0 0 10px 0; font-size: 10.5px; color: #475569; line-height: 1.4;">
+        <strong>Regulatory Safe-Harbor Disclosure:</strong> Moatnomics is an independent financial technology analytics software tool. We are not registered anywhere as a corporate entity or broker, and do not provide SEBI-regulated investment advice or recommendations. All data is computed deterministically for educational research and forensic screening only.
       </p>
       <p style="margin: 0; font-size: 11px;">
-        You received this email because your account is registered for Research Digest dispatches.<br>
-        To opt out immediately with one click: <a href="{unsub_url}" style="color: #64748b; font-weight: 600;">Unsubscribe from Research Bouquet</a>.
+        You received this email because your account is subscribed to Moatnomics Research Digest dispatches.<br>
+        To opt out immediately with one click: <a href="{unsub_url}" style="color: #0E3D32; font-weight: 700;">Unsubscribe from Research Digest</a>.
       </p>
     </div>
   </div>
@@ -507,72 +911,137 @@ def render_bouquet_html(bouquet: Dict[str, Any], subscriber: Optional[Dict[str, 
 
 def render_bouquet_text(bouquet: Dict[str, Any], subscriber: Optional[Dict[str, Any]] = None) -> str:
     """
-    Renders clean plain-text version of the research bouquet for clients without HTML support.
+    Renders clean plain-text version of the 7-asset Day-End Market Wrap.
     """
     token = subscriber.get("unsubscribe_token") if subscriber else "preview_token"
-    user_name = subscriber.get("full_name") if subscriber else "Institutional Investor"
+    user_name = subscriber.get("full_name") if subscriber else "Reader"
     base_url = get_tracking_base_url()
     unsub_url = f"{base_url}/api/notifications/unsubscribe?token={token}"
 
-    msme = {
-        "company_name": "Unlisted Manufacturing Enterprise",
-        "cluster": "Industrial Cluster",
-        "roce_pct": "Scale Under Audit",
-        "moat_note": "Deterministic working capital and supply-chain dossier available.",
-        "uin": "",
-    }
-    if bouquet.get("msme") and isinstance(bouquet.get("msme"), dict):
-        msme.update({k: v for k, v in bouquet["msme"].items() if v is not None})
+    lines = [
+        "===============================================================",
+        "MOATNOMICS DAY-END MARKET WRAP — 7-ASSET POST-CLOSE DIGEST",
+        "===============================================================",
+        f"Edition Date: {bouquet.get('formatted_date')}",
+        f"Recipient:    {user_name}",
+        "",
+        "Good evening. Here is today's post-settlement breakdown across all seven asset classes.",
+        "",
+        "---------------------------------------------------------------",
+        "1. LISTED EQUITIES — POST-CLOSE DISCOVERY COHORT",
+        "---------------------------------------------------------------",
+    ]
+    for eq in bouquet.get("equities") or []:
+        link = build_tracked_link(eq.get("dossier_url") or f"/dossier/{eq.get('ticker', '')}", token=token)
+        cmp_disp = f"₹{eq['cmp']}" if eq.get("cmp") is not None else "N/A"
+        roce_disp = f"{eq['roce']}%" if eq.get("roce") is not None else "N/A"
+        sg_disp = f"{eq['sales_growth_3y']:+.1f}%" if eq.get("sales_growth_3y") is not None else "N/A"
+        lines.extend(
+            [
+                f"* {eq.get('ticker')} — {eq.get('company_name')} ({eq.get('sector')}) | Close: {cmp_disp}",
+                f"  ROCE: {roce_disp} | 3Y Sales: {sg_disp} | D/E: {eq.get('debt_to_equity')}",
+                f"  Note: {eq.get('thesis')}",
+                f"  Dossier: {link}",
+                "",
+            ]
+        )
 
-    text = f"""===============================================================
-MOATNOMICS RESEARCH BOUQUET — DAILY ASSET INTELLIGENCE
-===============================================================
-Edition Date: {bouquet.get('formatted_date')}
-Recipient:    {user_name}
+    sov = bouquet.get("sovereign") or {}
+    if sov:
+        lines.extend(
+            [
+                "---------------------------------------------------------------",
+                "2. SOVEREIGN PAR CURVE & SDL SPREADS",
+                "---------------------------------------------------------------",
+                f"10Y Benchmark G-Sec: {sov.get('ten_year_gsec')}% | 364D T-Bill: {sov.get('one_year_tbill')}% | Policy Repo: {sov.get('repo_rate')}%",
+                f"Signal: {sov.get('signal_summary')}",
+                f"Curve:  {build_tracked_link('/sovereign', token=token)}",
+                "",
+            ]
+        )
 
----------------------------------------------------------------
-1. UNDER-THE-RADAR EQUITY DISCOVERY PICKS
----------------------------------------------------------------
-"""
-    for eq in bouquet.get("equities", []):
-        link = build_tracked_link(eq["dossier_url"], token=token)
-        text += f"""* {eq['ticker']} — {eq['company_name']} ({eq['sector']})
-  ROCE: {eq['roce']}% | Sales Growth (3Y): +{eq['sales_growth_3y']}% | D/E: {eq['debt_to_equity']}
-  Thesis: {eq['thesis']}
-  Dossier: {link}
+    debt = bouquet.get("corporate_debt") or {}
+    if debt:
+        lines.extend(
+            [
+                "---------------------------------------------------------------",
+                "3. CORPORATE DEBT & CREDIT SURVEILLANCE",
+                "---------------------------------------------------------------",
+                f"{debt.get('instrument_name')} ({debt.get('isin')})",
+                f"{debt.get('summary')}",
+                f"Dossier: {build_tracked_link(debt.get('detail_url') or '/debt', token=token)}",
+                "",
+            ]
+        )
 
-"""
+    etf = bouquet.get("etfs") or {}
+    if etf:
+        lines.extend(
+            [
+                "---------------------------------------------------------------",
+                "4. NATIONAL ETF LIQUIDITY & TRACKING MATRIX",
+                "---------------------------------------------------------------",
+                f"{etf.get('scheme_name')} ({etf.get('symbol')}) [{etf.get('category')}]",
+                f"{etf.get('summary')}",
+                f"Matrix:  {build_tracked_link(etf.get('detail_url') or '/etfs', token=token)}",
+                "",
+            ]
+        )
 
-    text += f"""---------------------------------------------------------------
-2. SOVEREIGN PAR CURVE & MACRO WEDGE
----------------------------------------------------------------
-10Y Benchmark G-Sec: {bouquet['sovereign']['ten_year_gsec']}%
-1Y T-Bill:            {bouquet['sovereign']['one_year_tbill']}%
-Policy Repo:          {bouquet['sovereign']['repo_rate']}%
-Macro Signal:         {bouquet['sovereign']['signal_summary']}
+    reits = bouquet.get("reits_sgb") or {}
+    if reits:
+        lines.extend(
+            [
+                "---------------------------------------------------------------",
+                "5. REITS, INVITS & SOVEREIGN GOLD PARITY",
+                "---------------------------------------------------------------",
+                f"{reits.get('summary')}",
+                f"Details: {build_tracked_link(reits.get('detail_url') or '/reits', token=token)}",
+                "",
+            ]
+        )
 
----------------------------------------------------------------
-3. MUTUAL FUND FORENSIC SPOTLIGHT
----------------------------------------------------------------
-Scheme:       {bouquet['mutual_funds']['scheme_name']}
-Active Share: {bouquet['mutual_funds']['active_share']}
-TER:          {bouquet['mutual_funds']['expense_ratio']}
-Forensic Note:{bouquet['mutual_funds']['highlight']}
+    mf = bouquet.get("mutual_funds") or {}
+    if mf:
+        lines.extend(
+            [
+                "---------------------------------------------------------------",
+                f"6. MUTUAL FUND LOOK-THROUGH SPOTLIGHT [{mf.get('provenance_badge', 'Prior-Session AMFI Audit')}]",
+                "---------------------------------------------------------------",
+                f"Scheme:       {mf.get('scheme_name')}",
+                f"Active Share: {mf.get('active_share')} | Direct TER: {mf.get('expense_ratio')}",
+                f"Audit Note:   {mf.get('highlight')}",
+                f"Dossier:      {build_tracked_link(mf.get('detail_url') or '/funds', token=token)}",
+                "",
+            ]
+        )
 
----------------------------------------------------------------
-3. UNLISTED MSME FORENSIC SPOTLIGHT
-----------------------------------------
-{msme.get('company_name')} ({msme.get('cluster')}) | {msme.get('roce_pct')}
-{msme.get('moat_note')}
-Inspect MSME Dossier: https://antigravity.averagettv.in/msme/{msme.get('uin', '')}
+    msme = bouquet.get("msme") or {}
+    if msme:
+        msme_path = msme.get("detail_url") or (f"/msme/{msme['uin']}" if msme.get("uin") else "/msme")
+        lines.extend(
+            [
+                "---------------------------------------------------------------",
+                "7. UNLISTED MSME FORENSIC SPOTLIGHT",
+                "---------------------------------------------------------------",
+                f"{msme.get('company_name')} ({msme.get('cluster')}) | {msme.get('roce_pct')}",
+                f"{msme.get('moat_note')}",
+                f"Inspect MSME Dossier: {build_tracked_link(msme_path, token=token)}",
+                "",
+            ]
+        )
 
-===============================================================
-Terminal: {build_tracked_link('/', token=token)}
-===============================================================
-MANDATORY STATUTORY SAFE HARBOR:
-Moatnomics is an independent financial technology analytics software tool and is NOT registered anywhere as a corporate entity or broker. We do not provide investment advice under SEBI regulations. 
-
-1-Click Unsubscribe Link:
-{unsub_url}
-"""
-    return text
+    lines.extend(
+        [
+            "===============================================================",
+            f"Terminal: {build_tracked_link('/', token=token)}",
+            "===============================================================",
+            "MANDATORY STATUTORY SAFE HARBOR:",
+            "Moatnomics is an independent financial technology analytics software tool and is NOT registered anywhere as a corporate entity or broker. We do not provide investment advice under SEBI regulations.",
+            "",
+            "1-Click Unsubscribe Link:",
+            unsub_url,
+            "",
+        ]
+    )
+    return "\n".join(lines)

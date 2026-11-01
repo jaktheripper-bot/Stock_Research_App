@@ -1,7 +1,7 @@
 """Deterministic Multi-Asset Mobile Brief Compiler (`/m`).
 
 Produces compact, read-only 3-4 line brief cards across:
-- 9:00 AM Morning Research Bouquet
+- Day-End 7-Asset Research Bouquet (`~19:45 IST` post-settlement edition)
 - Listed Equities (with 7-pillar status pills & paywall-aware 1-pillar Research Desk chips)
 - Mutual Funds, Corporate Debt, REITs/InvITs & Unlisted MSMEs
 
@@ -462,7 +462,7 @@ def compile_asset_mobile_brief(
 
 
 def compile_morning_hub_brief(edition_date: Optional[str] = None) -> Dict[str, Any]:
-    """Compile the `/m` pocket hub combining the 9:00 AM Research Bouquet and quick-access asset briefs."""
+    """Compile the `/m` pocket hub combining the Day-End 7-Asset Research Bouquet and quick-access asset briefs."""
     target_date = edition_date or datetime.now(IST).strftime("%Y-%m-%d")
     bouquet = compile_research_bouquet(target_date) or {}
     return {

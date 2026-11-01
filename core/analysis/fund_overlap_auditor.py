@@ -447,18 +447,19 @@ Detail the liquidity bottleneck and sector concentration fault lines if liquidit
     api_key = get_secret("GEMINI_API_KEY")
     if api_key and os.environ.get("TESTING") != "1":
         try:
-            client = genai.Client(api_key=api_key, http_options={"timeout": 60000})
-            model_name = get_light_flash_model(client)
-            chat = client.chats.create(
-                model=model_name,
-                config=genai.types.GenerateContentConfig(
-                    system_instruction=sys_prompt,
-                    temperature=0.2,
-                )
-            )
-            resp = chat.send_message(user_prompt)
-            if resp and resp.text:
-                gen_text = resp.text.strip()
+            from core.analysis.dossier_report_synthesis import stream_genai_with_fallback
+
+            client = genai.Client(api_key=api_key, http_options={"timeout": 180000})
+            chunks = []
+            for ch in stream_genai_with_fallback(
+                client,
+                user_prompt,
+                sys_prompt,
+                use_grounding=False,
+                on_retry_reset=chunks.clear,
+            ):
+                chunks.append(ch)
+            gen_text = "".join(chunks).strip()
         except Exception as e:
             # Production has no template fallback (test-mode only), so this is a hard synthesis failure.
             logger.error(f"Gemini narrative synthesis failed for {scheme_code}: {e}")

@@ -1415,7 +1415,7 @@ html[data-theme="light"] .copilot-input {
         <span>2. Service &amp; Digest</span>
         <span id="adminHubServiceTicketsBadge" class="admin-tab-badge" style="{% if not open_tickets_count or open_tickets_count <= 0 %}display: none;{% endif %}">{{ open_tickets_count | default(0) }}</span>
       </span>
-      <span class="admin-hub-sub">Support Inbox &amp; Morning Bouquet</span>
+      <span class="admin-hub-sub">Support Inbox &amp; Day-End Wrap</span>
     </button>
     <button type="button" class="btn admin-hub-btn {% if current_hub == 'traffic' %}active{% endif %}" data-hub="traffic" onclick="showHub('traffic')">
       <span class="admin-hub-title"><span>3. Traffic &amp; Attention</span></span>
@@ -3711,13 +3711,13 @@ html[data-theme="light"] .copilot-input {
     </div>
   </div>
 
-  <!-- TAB 13: Research Bouquet & Morning Digest Desk -->
+  <!-- TAB 13: Research Bouquet & Day-End Market Wrap Desk -->
   <div id="tab-digest" class="admin-tab-pane {% if active_tab == 'digest' %}active{% endif %}">
     <div style="display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 20px; flex-wrap: wrap; gap: 14px;">
       <div>
         <h3 style="margin: 0 0 6px 0; font-size: 20px; font-weight: 800; color: #f8fafc; display: flex; align-items: center; gap: 8px;">
           <svg class="glyph" style="width: 20px; height: 20px; color: #38bdf8;"><use href="#glyph-mail"></use></svg>
-          Research Bouquet &amp; Morning Digest Desk
+          Research Bouquet &amp; Day-End Market Wrap Desk
         </h3>
         <p style="margin: 0; font-size: 13px; color: #94a3b8; line-height: 1.5;">
           Automated multi-asset intelligence dispatches with branded open/click tracking (<code style="color: #38bdf8;" id="kpiDigestTrackingDomainHeader">{{ digest_summary.tracking_url|default('https://links.moatnomics.com') }}</code>) and statutory 1-click unsubscribe.

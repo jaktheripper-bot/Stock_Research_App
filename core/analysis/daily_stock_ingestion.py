@@ -471,6 +471,8 @@ def synthesize_and_archive_stock_dossier(
                     record_daemon_spend_usd(0.001)
                     if report_text and len(report_text.strip()) >= 500 and not any(sig in report_text for sig in [
                         "Live Synthesis Failed",
+                        "Live Web Grounding Offline",
+                        "__IN_SHIELD_TOKEN_",
                         "Grounded synthesis channels are temporarily unavailable",
                         "Live Synthesis Error",
                         "Rate limit exceeded",
@@ -796,10 +798,33 @@ def ingest_daily_stock_cohort(
         except Exception as ingest_err:
             logger.error(f"Error ingesting candidate stock {item.get('ticker')}: {ingest_err}")
 
-    # 3. Persist today's Discovery Reel with the freshly ingested cohort
+    # 3. Persist today's Discovery Reel with the freshly ingested cohort (without clobbering a full 15-stock curated reel or creating partial weekend reels)
     if discovery_reel_items:
-        save_discovery_reel(discovery_reel_items, edition_date=edition_date)
-        logger.info(f"Persisted {len(discovery_reel_items)} newly inducted stocks to discovery_reel for {edition_date}.")
+        is_weekend_edition = False
+        try:
+            if edition_date and len(str(edition_date)) >= 10:
+                is_weekend_edition = datetime.strptime(str(edition_date)[:10], "%Y-%m-%d").weekday() >= 5
+        except ValueError:
+            is_weekend_edition = False
+
+        if is_weekend_edition:
+            logger.info(
+                f"Weekend Warehouse Mode active for {edition_date}: skipping discovery_reel write so Friday's curated 15-stock edition remains primary."
+            )
+        else:
+            from core.db.discovery import get_active_discovery_reel
+            existing_curated = get_active_discovery_reel(
+                edition_date=edition_date,
+                exclude_tests=True,
+                allow_fallback=False,
+            )
+            if len(existing_curated) >= 15:
+                logger.info(
+                    f"Curated 15-stock Discovery Reel already active for {edition_date} ({len(existing_curated)} items); preserving without overwrite."
+                )
+            else:
+                save_discovery_reel(discovery_reel_items, edition_date=edition_date)
+                logger.info(f"Persisted {len(discovery_reel_items)} newly inducted stocks to discovery_reel for {edition_date}.")
 
     # 4. Trigger incremental mutual fund re-audit
     ingested_tickers = [r["ticker"] for r in ingested_results]

@@ -425,8 +425,9 @@ def dispatch_research_bouquet(
     force: bool = False,
 ) -> dict:
     """
-    Dispatches the Research Bouquet & Morning Digest to subscribers or a test recipient.
+    Dispatches the Day-End 7-Asset Market Wrap & Research Bouquet to subscribers or a test recipient.
     Supports Resend API and SMTP with graceful mock/logging fallback.
+    Fails closed (`BouquetDataUnavailableError`) if any of the 7 asset classes lack live database rows.
     Records delivery in digest_dispatches.
     """
     from datetime import datetime, timezone, timedelta
@@ -448,7 +449,7 @@ def dispatch_research_bouquet(
     # Fast-path idempotency guard: short-circuit before expensive multi-asset compilation
     if not test_recipient and not force and has_edition_been_dispatched(target_date):
         logger.info(
-            f"[DISPATCH] Morning Research Bouquet for {target_date} already dispatched. Skipping duplicate send."
+            f"[DISPATCH] Day-End Research Bouquet for {target_date} already dispatched. Skipping duplicate send."
         )
         return {
             "success": True,
@@ -462,7 +463,7 @@ def dispatch_research_bouquet(
             "recipients": 0,
         }
 
-    bouquet = compile_research_bouquet(edition_date=target_date)
+    bouquet = compile_research_bouquet(edition_date=target_date, require_live_data=True)
     sender_email = _get_cfg("SMTP_FROM") or _get_cfg("RESEND_FROM") or _get_cfg("SMTP_USER") or "noreply@moatnomics.com"
 
     if test_recipient:
