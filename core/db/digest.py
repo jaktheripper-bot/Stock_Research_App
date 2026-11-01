@@ -235,8 +235,201 @@ def record_digest_dispatch(
         conn.close()
 
 
+EMAILER_CONTENT_LABELS: Dict[str, Dict[str, str]] = {
+    "equity_card": {"label": "Listed Equities (Discovery Cohort)", "icon": "📈"},
+    "sovereign_curve": {"label": "Sovereign Par Curve & SDL Spreads", "icon": "🏛️"},
+    "corporate_debt": {"label": "Corporate Debt & Credit Surveillance", "icon": "🏦"},
+    "etf_matrix": {"label": "National ETF Liquidity & Tracking Matrix", "icon": "📊"},
+    "reits_sgb": {"label": "REITs, InvITs & Sovereign Gold Parity", "icon": "🏢"},
+    "mutual_fund": {"label": "Mutual Fund Look-Through Spotlight", "icon": "💼"},
+    "msme_spotlight": {"label": "Unlisted MSME Forensic Spotlight", "icon": "🏭"},
+    "terminal_cta": {"label": "Primary CTA (Open Research Terminal)", "icon": "🚀"},
+    "contact_desk": {"label": "Support Desk Ticket Reply Link", "icon": "📩"},
+    "unsubscribe_return": {"label": "Unsubscribe Confirmation Return", "icon": "↩️"},
+    "resubscribe_return": {"label": "Re-subscribe Confirmation Return", "icon": "✅"},
+}
+
+
+def _format_dwell_brief(seconds: float) -> str:
+    sec = int(round(max(0.0, float(seconds or 0.0))))
+    if sec < 60:
+        return f"{sec}s"
+    mins = sec // 60
+    rem = sec % 60
+    if mins < 60:
+        return f"{mins}m {rem:02d}s" if rem else f"{mins}m"
+    hrs = mins // 60
+    rem_m = mins % 60
+    return f"{hrs}h {rem_m:02d}m"
+
+
+def get_emailer_utm_analytics() -> Dict[str, Any]:
+    """
+    Aggregates empirical UTM click-through sessions, unique verified subscriber refs (`sub_ref`),
+    per-edition attribution, and per-asset-pillar (`utm_content`) reading dwell time across
+    `site_usage_events`. Zero fabricated metrics: returns 0 / 0.0% when no clicks exist.
+    """
+    import json
+
+    init_db()
+    conn = get_db_connection()
+    cursor = conn.cursor()
+    try:
+        cursor.execute(
+            """
+            SELECT id, session_id, details, event_type
+            FROM site_usage_events
+            WHERE details LIKE '%moatnomics_digest%'
+               OR details LIKE '%moatnomics_support%'
+               OR details LIKE '%research_bouquet%'
+               OR details LIKE '%email_digest%'
+               OR details LIKE '%email_support%'
+               OR traffic_source IN ('moatnomics_digest', 'moatnomics_support', 'Email Digest (Bouquet)', 'Support Desk Email')
+            ORDER BY timestamp ASC;
+            """
+        )
+        rows = cursor.fetchall()
+    except Exception as e:
+        logger.debug("Emailer UTM analytics query notice: %s", e)
+        rows = []
+    finally:
+        cursor.close()
+        conn.close()
+
+    session_meta: Dict[str, Dict[str, Any]] = {}
+    for r in rows:
+        eid, sess_id, det_raw, ev_type = r
+        eff_sess = str(sess_id).strip() if sess_id and str(sess_id).strip() else f"anon_{eid}"
+        det: Dict[str, Any] = {}
+        if det_raw:
+            try:
+                det = json.loads(det_raw) if isinstance(det_raw, str) else det_raw
+                if not isinstance(det, dict):
+                    det = {}
+            except Exception as parse_err:
+                logger.debug("Emailer UTM details JSON parse notice: %s", parse_err)
+                det = {}
+
+        src = str(det.get("utm_source") or "").strip()
+        med = str(det.get("utm_medium") or "").strip()
+        camp = str(det.get("utm_campaign") or "").strip()
+        content = str(det.get("utm_content") or "").strip()
+        term = str(det.get("utm_term") or "").strip()
+        sub_ref = str(det.get("sub_ref") or det.get("sub_tk") or "").strip()
+        if sub_ref in ("preview_token", "test_admin_token"):
+            sub_ref = ""
+
+        sm = session_meta.setdefault(
+            eff_sess,
+            {
+                "source": src or "moatnomics_digest",
+                "medium": med or "email_digest",
+                "campaign": camp or "research_bouquet",
+                "content": content,
+                "term": term,
+                "sub_ref": sub_ref,
+                "dwell_sec": 0.0,
+            },
+        )
+        if src and not sm.get("source"):
+            sm["source"] = src
+        if med and not sm.get("medium"):
+            sm["medium"] = med
+        if camp and (not sm.get("campaign") or sm["campaign"] == "research_bouquet"):
+            sm["campaign"] = camp
+        if content and not sm.get("content"):
+            sm["content"] = content
+        if term and not sm.get("term"):
+            sm["term"] = term
+        if sub_ref and not sm.get("sub_ref"):
+            sm["sub_ref"] = sub_ref
+
+        if str(ev_type or "").upper() == "PAGE_DWELL":
+            try:
+                sm["dwell_sec"] += float(det.get("dwell_seconds") or det.get("duration_seconds") or 0.0)
+            except (TypeError, ValueError):
+                pass
+
+    edition_stats: Dict[str, Dict[str, Any]] = {}
+    content_stats: Dict[str, Dict[str, Any]] = {}
+    all_click_sessions = len(session_meta)
+    all_unique_clickers = set()
+    total_dwell_sec = 0.0
+
+    for s_id, sm in session_meta.items():
+        clicker_key = sm["sub_ref"] if sm.get("sub_ref") else f"sess:{s_id}"
+        all_unique_clickers.add(clicker_key)
+        dwell_val = float(sm.get("dwell_sec") or 0.0)
+        total_dwell_sec += dwell_val
+
+        camp_str = str(sm.get("campaign") or "research_bouquet")
+        ed_key = ""
+        if camp_str.startswith("research_bouquet_") and len(camp_str) >= len("research_bouquet_YYYY-MM-DD"):
+            ed_key = camp_str[len("research_bouquet_") : len("research_bouquet_") + 10]
+        if ed_key:
+            eb = edition_stats.setdefault(ed_key, {"sessions": 0, "unique_clickers": set(), "dwell_sec": 0.0})
+            eb["sessions"] += 1
+            eb["unique_clickers"].add(clicker_key)
+            eb["dwell_sec"] += dwell_val
+
+        c_key = sm.get("content") or ("contact_desk" if sm.get("source") == "moatnomics_support" else "terminal_cta")
+        cb = content_stats.setdefault(
+            c_key,
+            {"sessions": 0, "unique_clickers": set(), "dwell_sec": 0.0, "terms": {}},
+        )
+        cb["sessions"] += 1
+        cb["unique_clickers"].add(clicker_key)
+        cb["dwell_sec"] += dwell_val
+        if sm.get("term"):
+            t_k = sm["term"]
+            cb["terms"][t_k] = cb["terms"].get(t_k, 0) + 1
+
+    asset_breakdown: List[Dict[str, Any]] = []
+    denom_sessions = max(1, all_click_sessions)
+    for c_key, cb in sorted(content_stats.items(), key=lambda x: (x[1]["sessions"], x[1]["dwell_sec"]), reverse=True):
+        meta_info = EMAILER_CONTENT_LABELS.get(
+            c_key,
+            {"label": c_key.replace("_", " ").title(), "icon": "🔗"},
+        )
+        s_cnt = cb["sessions"]
+        avg_dw = round(cb["dwell_sec"] / max(1, s_cnt), 1)
+        top_term = max(cb["terms"].items(), key=lambda x: x[1])[0] if cb["terms"] else "-"
+        asset_breakdown.append(
+            {
+                "content_key": c_key,
+                "label": meta_info["label"],
+                "icon": meta_info["icon"],
+                "click_sessions": s_cnt,
+                "unique_clickers": len(cb["unique_clickers"]),
+                "share_pct": round((s_cnt / denom_sessions) * 100.0, 1),
+                "avg_dwell_seconds": avg_dw,
+                "formatted_avg_dwell": _format_dwell_brief(avg_dw),
+                "top_term": top_term,
+            }
+        )
+
+    overall_avg_dwell = round(total_dwell_sec / max(1, all_click_sessions), 1) if all_click_sessions else 0.0
+
+    return {
+        "total_click_sessions": all_click_sessions,
+        "unique_clickers_count": len(all_unique_clickers),
+        "avg_dwell_seconds": overall_avg_dwell,
+        "formatted_avg_dwell": _format_dwell_brief(overall_avg_dwell),
+        "asset_breakdown": asset_breakdown,
+        "edition_stats": {
+            k: {
+                "click_sessions": v["sessions"],
+                "unique_clickers": len(v["unique_clickers"]),
+                "avg_dwell_seconds": round(v["dwell_sec"] / max(1, v["sessions"]), 1),
+                "formatted_avg_dwell": _format_dwell_brief(round(v["dwell_sec"] / max(1, v["sessions"]), 1)),
+            }
+            for k, v in edition_stats.items()
+        },
+    }
+
+
 def get_digest_dispatch_history(limit: int = 15) -> List[Dict[str, Any]]:
-    """Retrieves chronological dispatch history for the Admin Console."""
+    """Retrieves chronological dispatch history for the Admin Console enriched with UTM click & CTR metrics."""
     init_db()
     conn = get_db_connection()
     cursor = conn.cursor()
@@ -254,25 +447,47 @@ def get_digest_dispatch_history(limit: int = 15) -> List[Dict[str, Any]]:
             (int(limit),)
         )
         rows = cursor.fetchall()
-        return [
-            {
-                "id": r[0],
-                "edition_date": r[1],
-                "subject": r[2],
-                "recipients_count": r[3],
-                "delivered_count": r[4],
-                "failed_count": r[5],
-                "status": r[6],
-                "created_at": str(r[7])[:19] if r[7] else ""
-            }
-            for r in rows
-        ]
     except Exception as e:
         logger.error(f"Error fetching digest dispatch history: {e}")
         return []
     finally:
         cursor.close()
         conn.close()
+
+    utm_analytics = get_emailer_utm_analytics()
+    ed_map = utm_analytics.get("edition_stats", {})
+
+    history: List[Dict[str, Any]] = []
+    for r in rows:
+        ed_date = str(r[1] or "")[:10]
+        delivered = int(r[4] or 0)
+        status_str = str(r[6] or "")
+        ed_stat = ed_map.get(ed_date, {}) if status_str != "TEST_SENT" else {}
+        click_sessions = int(ed_stat.get("click_sessions", 0))
+        unique_clickers = int(ed_stat.get("unique_clickers", 0))
+        ctr_pct = (
+            min(100.0, round((unique_clickers / max(1, delivered)) * 100.0, 1))
+            if delivered > 0 and unique_clickers > 0
+            else 0.0
+        )
+        history.append(
+            {
+                "id": r[0],
+                "edition_date": r[1],
+                "subject": r[2],
+                "recipients_count": r[3],
+                "delivered_count": delivered,
+                "failed_count": r[5],
+                "status": status_str,
+                "created_at": str(r[7])[:19] if r[7] else "",
+                "click_sessions": click_sessions,
+                "unique_clickers": unique_clickers,
+                "ctr_pct": ctr_pct,
+                "avg_dwell_seconds": ed_stat.get("avg_dwell_seconds", 0.0),
+                "formatted_avg_dwell": ed_stat.get("formatted_avg_dwell", "0s"),
+            }
+        )
+    return history
 
 
 def has_edition_been_dispatched(edition_date: str) -> bool:

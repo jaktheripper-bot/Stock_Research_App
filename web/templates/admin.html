@@ -2391,6 +2391,7 @@ html[data-theme="light"] .copilot-input {
             {% set max_dwell = summary.page_dwell_times[0].total_dwell_seconds if summary.page_dwell_times else 1 %}
             {% for item in summary.page_dwell_times %}
             <tr class="dwell-row"
+                {% if loop.index > 10 %}style="display: none;"{% endif %}
                 data-path="{{ item.path }}"
                 data-category="{{ item.category }}"
                 data-avg-dwell="{{ item.avg_dwell_seconds }}"
@@ -2447,6 +2448,20 @@ html[data-theme="light"] .copilot-input {
             {% endfor %}
           </tbody>
         </table>
+      </div>
+      {% set total_dwell_routes = summary.page_dwell_times|length if summary.page_dwell_times else 0 %}
+      <div id="dwellPaginationFooter" style="display: {% if total_dwell_routes > 0 %}flex{% else %}none{% endif %}; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 12px; margin-top: 14px; padding-top: 12px; border-top: 1px solid rgba(255,255,255,0.08);">
+        <div style="font-size: 12px; color: var(--text-secondary, #94a3b8);">
+          Showing <strong id="dwellShowingCount" style="color: #f8fafc;">{{ [total_dwell_routes, 10]|min }}</strong> of <strong id="dwellTotalCount" style="color: #f8fafc;">{{ total_dwell_routes }}</strong> tracked routes
+        </div>
+        <div style="display: flex; align-items: center; gap: 8px;">
+          <button type="button" id="btnCollapseDwell" class="btn btn-secondary" onclick="resetDwellRowsLimit()" style="display: none; font-size: 12px; padding: 6px 14px;">
+            Show Top 10
+          </button>
+          <button type="button" id="btnLoadMoreDwell" class="btn btn-secondary" onclick="loadMoreDwellRows(10)" style="display: {% if total_dwell_routes > 10 %}inline-flex{% else %}none{% endif %}; align-items: center; gap: 6px; font-size: 12px; padding: 6px 14px;">
+            See More (+{{ [10, [total_dwell_routes - 10, 0]|max]|min }})
+          </button>
+        </div>
       </div>
     </div>
 
@@ -2600,13 +2615,15 @@ html[data-theme="light"] .copilot-input {
           </div>
         </div>
         <div class="admin-table-wrap">
-          <table class="admin-table">
+          <table class="admin-table" id="tableActiveUtmCampaigns">
             <thead>
               <tr>
                 <th>Campaign Name</th>
                 <th>Source</th>
                 <th>Medium</th>
+                <th>Top Section</th>
                 <th>Sessions</th>
+                <th>Avg Dwell</th>
                 <th>Share</th>
               </tr>
             </thead>
@@ -2618,7 +2635,14 @@ html[data-theme="light"] .copilot-input {
                   <span class="status-pill closed" style="font-size: 11px;">{{ camp.source }}</span>
                 </td>
                 <td class="mono" style="font-size: 12px; color: #94a3b8;">{{ camp.medium }}</td>
-                <td class="mono" style="font-weight: 700; color: #34d399;">{{ camp.sessions }}</td>
+                <td class="mono" style="font-size: 11.5px; color: #cbd5e1;">{{ camp.top_content|default('-') }}</td>
+                <td class="mono" style="font-weight: 700; color: #34d399;">
+                  {{ camp.sessions }}
+                  {% if camp.unique_subscribers and camp.unique_subscribers > 0 %}
+                  <span style="font-size: 10px; color: #94a3b8; display: block;">({{ camp.unique_subscribers }} subs)</span>
+                  {% endif %}
+                </td>
+                <td class="mono" style="font-size: 12px; color: #c084fc;">{{ camp.formatted_avg_dwell|default('0s') }}</td>
                 <td style="min-width: 90px;">
                   <div style="display: flex; align-items: center; gap: 8px;">
                     <div style="flex: 1; height: 6px; background: rgba(255,255,255,0.08); border-radius: 3px; overflow: hidden;">
@@ -2630,7 +2654,7 @@ html[data-theme="light"] .copilot-input {
               </tr>
               {% else %}
               <tr>
-                <td colspan="5" style="text-align: center; color: var(--text-secondary, #94a3b8); padding: 25px;">
+                <td colspan="7" style="text-align: center; color: var(--text-secondary, #94a3b8); padding: 25px;">
                   No UTM campaigns recorded yet. Use the Campaign Link Generator on the right to start tagging outbound posts.
                 </td>
               </tr>
@@ -2770,16 +2794,20 @@ html[data-theme="light"] .copilot-input {
 
     <!-- Demographics Grid -->
     <div class="kpi-grid" style="grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));">
-      <div class="admin-card" style="margin-bottom: 0;">
-        <h4 style="margin-top: 0; font-size: 14px; font-weight: 700;">Geographic Distribution</h4>
-        <ul style="list-style: none; padding: 0; margin: 0; font-size: 13px;">
+      <!-- Primary Human Geographic Distribution -->
+      <div class="admin-card" id="cardHumanGeoDistribution" style="margin-bottom: 0;">
+        <div style="display:flex; justify-content:space-between; align-items:center;">
+          <h4 style="margin:0; font-size:14px; font-weight:700;">Verified Human Traffic by Country</h4>
+          <span class="badge" style="background:#10b981; color:#fff; font-size:10px;">Engaged</span>
+        </div>
+        <ul style="list-style:none; padding:0; margin:10px 0 0 0; font-size:13px;">
           {% for g in summary.geographic_distribution %}
-          <li style="display: flex; justify-content: space-between; padding: 6px 0; border-bottom: 1px solid rgba(255,255,255,0.05);">
-            <span>{{ g.flag }} {{ g.country }}</span>
-            <span class="mono" style="font-weight: 700;">{{ g.count }}</span>
+          <li style="display:flex; justify-content:space-between; padding:6px 0; border-bottom:1px solid rgba(255,255,255,0.05);">
+            <span>{{ g.country }}</span>
+            <span class="mono" style="font-weight:700;">{{ g.count }}</span>
           </li>
           {% else %}
-          <li style="color: #64748b; padding: 10px 0;">No geo data in period.</li>
+          <li style="color:#64748b; padding:10px 0;">No verified human traffic.</li>
           {% endfor %}
         </ul>
       </div>
@@ -2799,7 +2827,7 @@ html[data-theme="light"] .copilot-input {
       </div>
 
       <div class="admin-card" style="margin-bottom: 0;">
-        <h4 style="margin-top: 0; font-size: 14px; font-weight: 700;">Browser & OS</h4>
+        <h4 style="margin-top: 0; font-size: 14px; font-weight: 700;">Browser &amp; OS</h4>
         <ul style="list-style: none; padding: 0; margin: 0; font-size: 13px;">
           {% for b in summary.browser_breakdown %}
           <li style="display: flex; justify-content: space-between; padding: 6px 0; border-bottom: 1px solid rgba(255,255,255,0.05);">
@@ -2811,6 +2839,24 @@ html[data-theme="light"] .copilot-input {
           {% endfor %}
         </ul>
       </div>
+    </div>
+
+    <!-- Secondary: Automated Crawlers & Data Center Bots -->
+    <div class="admin-card" id="cardCrawlerGeoDistribution" style="opacity: 0.85; border-left: 3px solid #64748b; margin-top: 16px;">
+      <div style="display:flex; justify-content:space-between; align-items:center;">
+        <h4 style="margin:0; font-size:14px; font-weight:700;">Automated Bots &amp; Scrapers</h4>
+        <span class="badge" style="background:#475569; color:#fff; font-size:10px;">Scrapers / Probes</span>
+      </div>
+      <ul style="list-style:none; padding:0; margin:10px 0 0 0; font-size:13px;">
+        {% for g in summary.crawler_geographic_distribution %}
+        <li style="display:flex; justify-content:space-between; padding:6px 0; border-bottom:1px solid rgba(255,255,255,0.05);">
+          <span>{{ g.country }} (Cloud Egress)</span>
+          <span class="mono" style="font-weight:700; color:#94a3b8;">{{ g.count }}</span>
+        </li>
+        {% else %}
+        <li style="color:#64748b; padding:10px 0;">No automated crawler or cloud egress activity recorded in period.</li>
+        {% endfor %}
+      </ul>
     </div>
   </div>
 
@@ -3767,6 +3813,76 @@ html[data-theme="light"] .copilot-input {
         </div>
         <div class="kpi-delta" style="color: #94a3b8; font-size: 11px;">1-Click Unsubscribe + SEBI Safe Harbor</div>
       </div>
+      <div class="kpi-card" style="border-left: 3px solid #c084fc;">
+        <div class="kpi-label">Emailer UTM Clicks &amp; CTR</div>
+        <div class="kpi-value mono" id="digestUtmTotalClicks" style="color: #c084fc;">
+          {{ digest_summary.utm_analytics.total_click_sessions|default(0) if digest_summary.utm_analytics else 0 }}
+        </div>
+        <div class="kpi-delta mono" id="digestUtmCtrLabel" style="color: #94a3b8; font-size: 11px;">
+          {{ digest_summary.utm_analytics.unique_clickers_count|default(0) if digest_summary.utm_analytics else 0 }} unique clickers ({{ digest_summary.utm_analytics.overall_ctr_pct|default(0.0) if digest_summary.utm_analytics else 0.0 }}% CTR) &bull; Avg dwell {{ digest_summary.utm_analytics.formatted_avg_dwell|default('0s') if digest_summary.utm_analytics else '0s' }}
+        </div>
+      </div>
+    </div>
+
+    <!-- Emailer UTM Attribution & Asset-Pillar Click Breakdown -->
+    <div id="cardEmailerUtmAttribution" style="background: rgba(15, 23, 42, 0.6); border: 1px solid rgba(255, 255, 255, 0.08); border-radius: 12px; padding: 20px; margin-bottom: 24px;">
+      <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 10px; margin-bottom: 14px;">
+        <div>
+          <h4 style="margin: 0; font-size: 14px; font-weight: 700; color: #f8fafc; display: flex; align-items: center; gap: 8px;">
+            Emailer UTM Attribution &amp; Asset-Pillar Click Breakdown
+          </h4>
+          <p style="margin: 4px 0 0; font-size: 12px; color: #94a3b8;">
+            Empirical click-through sessions, privacy-safe verified subscriber attribution (<code>sub_ref</code>), and post-click reading dwell time per emailer section (<code>utm_content</code>).
+          </p>
+        </div>
+        <span class="status-pill closed" style="font-size: 11px;">
+          UTM Schema: <strong style="color: #38bdf8; margin-left: 4px;">research_bouquet_YYYY-MM-DD + sub_ref</strong>
+        </span>
+      </div>
+      <div style="overflow-x: auto;">
+        <table class="admin-table" id="tableEmailerAssetClicks" style="width: 100%;">
+          <thead>
+            <tr>
+              <th>Emailer Section / Asset Pillar (<code>utm_content</code>)</th>
+              <th>Top Entity (<code>utm_term</code>)</th>
+              <th>Click Sessions</th>
+              <th>Unique Clickers</th>
+              <th>Avg Post-Click Dwell</th>
+              <th>Click Share</th>
+            </tr>
+          </thead>
+          <tbody id="tbodyEmailerAssetClicks">
+            {% if digest_summary.utm_analytics and digest_summary.utm_analytics.asset_breakdown %}
+              {% for ab in digest_summary.utm_analytics.asset_breakdown %}
+              <tr>
+                <td style="font-weight: 600; color: #f8fafc;">
+                  <span>{{ ab.icon }}</span> {{ ab.label }}
+                  <span class="mono" style="font-size: 11px; color: #64748b; margin-left: 6px;">({{ ab.content_key }})</span>
+                </td>
+                <td class="mono" style="color: #38bdf8; font-size: 12px;">{{ ab.top_term }}</td>
+                <td class="mono" style="font-weight: 700; color: #34d399;">{{ ab.click_sessions }}</td>
+                <td class="mono" style="color: #cbd5e1;">{{ ab.unique_clickers }}</td>
+                <td class="mono" style="color: #c084fc; font-weight: 600;">{{ ab.formatted_avg_dwell }}</td>
+                <td style="min-width: 110px;">
+                  <div style="display: flex; align-items: center; gap: 8px;">
+                    <div style="flex: 1; height: 6px; background: rgba(255,255,255,0.08); border-radius: 3px; overflow: hidden;">
+                      <div style="width: {{ ab.share_pct }}%; height: 100%; background: linear-gradient(90deg, #10b981, #38bdf8); border-radius: 3px;"></div>
+                    </div>
+                    <span class="mono" style="font-size: 11.5px; color: #38bdf8; min-width: 34px; text-align: right;">{{ ab.share_pct }}%</span>
+                  </div>
+                </td>
+              </tr>
+              {% endfor %}
+            {% else %}
+              <tr>
+                <td colspan="6" style="text-align: center; color: #64748b; padding: 18px; font-style: italic;">
+                  No emailer UTM click sessions recorded yet. Links in outgoing Research Bouquet and Support Desk emails automatically carry edition, asset-pillar, and subscriber-hash tags.
+                </td>
+              </tr>
+            {% endif %}
+          </tbody>
+        </table>
+      </div>
     </div>
 
     <!-- Live Preview Workspace -->
@@ -3803,6 +3919,10 @@ html[data-theme="light"] .copilot-input {
               <th>Subject</th>
               <th>Recipients</th>
               <th>Delivered</th>
+              <th title="Unique verified subscriber/session clickers">Unique Clicks</th>
+              <th title="Total click-through sessions from this edition">Total Clicks</th>
+              <th title="Unique Clickers / Delivered (clamped to 100%)">CTR %</th>
+              <th title="Average active reading dwell per click session">Avg Dwell</th>
               <th>Status</th>
               <th>Dispatched At</th>
             </tr>
@@ -3815,6 +3935,10 @@ html[data-theme="light"] .copilot-input {
                 <td style="color: #f1f5f9; font-size: 12.5px;">{{ d.subject }}</td>
                 <td class="mono">{{ d.recipients_count }}</td>
                 <td class="mono" style="color: #34d399;">{{ d.delivered_count }}</td>
+                <td class="mono" style="color: #38bdf8; font-weight: 600;">{{ d.unique_clickers|default(0) }}</td>
+                <td class="mono" style="color: #cbd5e1;">{{ d.click_sessions|default(0) }}</td>
+                <td class="mono" style="color: #fbbf24; font-weight: 700;">{{ d.ctr_pct|default(0.0) }}%</td>
+                <td class="mono" style="color: #c084fc;">{{ d.formatted_avg_dwell|default('0s') }}</td>
                 <td>
                   <span class="status-pill {% if d.status == 'COMPLETED' or d.status == 'TEST_SENT' %}success{% else %}warning{% endif %}" style="font-size: 10.5px;">
                     {{ d.status }}
@@ -3825,7 +3949,7 @@ html[data-theme="light"] .copilot-input {
               {% endfor %}
             {% else %}
               <tr>
-                <td colspan="6" style="text-align: center; color: #64748b; padding: 20px; font-style: italic;">
+                <td colspan="10" style="text-align: center; color: #64748b; padding: 20px; font-style: italic;">
                   No previous research bouquet broadcasts recorded. Send a test or broadcast today's edition above.
                 </td>
               </tr>
@@ -5297,6 +5421,8 @@ html[data-theme="light"] .copilot-input {
     key: 'total-dwell',
     order: 'desc'
   };
+  let dwellVisibleLimit = 10;
+  const DWELL_PAGE_STEP = 10;
 
   const DWELL_COLUMN_CONFIG = {
     'path': { label: 'Page Link / URL Route', isNumeric: false, defaultOrder: 'asc' },
@@ -5358,11 +5484,12 @@ html[data-theme="light"] .copilot-input {
       return nextOrder === 'desc' ? -cmp : cmp;
     });
 
-    // Re-append rows in sorted order (preserves visibility state from search filtering)
+    // Re-append rows in sorted order and enforce current filter + pagination limit
     rows.forEach(row => tbody.appendChild(row));
 
     // Update table header aria attributes, icons, and titles
     updateDwellSortHeaders(sortKey, nextOrder);
+    filterDwellTable();
   }
 
   function handleDwellHeaderKeydown(event, sortKey) {
@@ -5411,19 +5538,61 @@ html[data-theme="light"] .copilot-input {
 
   function filterDwellTable() {
     const input = document.getElementById('inputFilterDwell');
-    if (!input) return;
-    const filter = input.value.toLowerCase().trim();
-    const rows = document.querySelectorAll('#tablePageDwellTimes tbody tr.dwell-row');
+    const filter = input ? input.value.toLowerCase().trim() : '';
+    const rows = Array.from(document.querySelectorAll('#tablePageDwellTimes tbody tr.dwell-row'));
+    const matchedRows = [];
+
     rows.forEach(row => {
       const path = (row.getAttribute('data-path') || '').toLowerCase();
       const tier = (row.getAttribute('data-tier') || '').toLowerCase();
       const cat = (row.getAttribute('data-category') || '').toLowerCase();
       if (!filter || path.includes(filter) || tier.includes(filter) || cat.includes(filter)) {
-        row.style.display = '';
+        matchedRows.push(row);
       } else {
         row.style.display = 'none';
       }
     });
+
+    const visibleCount = Math.min(dwellVisibleLimit, matchedRows.length);
+    matchedRows.forEach((row, idx) => {
+      row.style.display = idx < dwellVisibleLimit ? '' : 'none';
+    });
+
+    const footer = document.getElementById('dwellPaginationFooter');
+    const showingEl = document.getElementById('dwellShowingCount');
+    const totalEl = document.getElementById('dwellTotalCount');
+    const btnMore = document.getElementById('btnLoadMoreDwell');
+    const btnCollapse = document.getElementById('btnCollapseDwell');
+
+    if (showingEl) showingEl.textContent = String(visibleCount);
+    if (totalEl) totalEl.textContent = String(matchedRows.length);
+    if (footer) {
+      footer.style.display = rows.length > 0 ? 'flex' : 'none';
+    }
+    if (btnMore) {
+      const remaining = matchedRows.length - visibleCount;
+      if (remaining > 0) {
+        const nextStep = Math.min(DWELL_PAGE_STEP, remaining);
+        btnMore.textContent = `See More (+${nextStep})`;
+        btnMore.style.display = 'inline-flex';
+      } else {
+        btnMore.style.display = 'none';
+      }
+    }
+    if (btnCollapse) {
+      btnCollapse.style.display = (dwellVisibleLimit > DWELL_PAGE_STEP && matchedRows.length > DWELL_PAGE_STEP) ? 'inline-flex' : 'none';
+    }
+  }
+
+  function loadMoreDwellRows(step) {
+    const increment = parseInt(step, 10) || DWELL_PAGE_STEP;
+    dwellVisibleLimit += increment;
+    filterDwellTable();
+  }
+
+  function resetDwellRowsLimit() {
+    dwellVisibleLimit = DWELL_PAGE_STEP;
+    filterDwellTable();
   }
 
   function filterSiteVisitTree() {
@@ -6176,7 +6345,7 @@ html[data-theme="light"] .copilot-input {
         const tbody = document.getElementById('digestHistoryTableBody');
         if (!tbody) return;
         if (data.history.length === 0) {
-          tbody.innerHTML = '<tr><td colspan="6" style="text-align: center; color: #64748b; padding: 20px; font-style: italic;">No previous research bouquet broadcasts recorded.</td></tr>';
+          tbody.innerHTML = '<tr><td colspan="10" style="text-align: center; color: #64748b; padding: 20px; font-style: italic;">No previous research bouquet broadcasts recorded.</td></tr>';
           return;
         }
         tbody.innerHTML = data.history.map(d => `
@@ -6185,6 +6354,10 @@ html[data-theme="light"] .copilot-input {
             <td style="color: #f1f5f9; font-size: 12.5px;">${d.subject}</td>
             <td class="mono">${d.recipients_count}</td>
             <td class="mono" style="color: #34d399;">${d.delivered_count}</td>
+            <td class="mono" style="color: #38bdf8; font-weight: 600;">${d.unique_clickers || 0}</td>
+            <td class="mono" style="color: #cbd5e1;">${d.click_sessions || 0}</td>
+            <td class="mono" style="color: #fbbf24; font-weight: 700;">${d.ctr_pct || 0}%</td>
+            <td class="mono" style="color: #c084fc;">${d.formatted_avg_dwell || '0s'}</td>
             <td>
               <span class="status-pill ${d.status === 'COMPLETED' || d.status === 'TEST_SENT' ? 'success' : 'warning'}" style="font-size: 10.5px;">
                 ${d.status}

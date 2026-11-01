@@ -74,7 +74,7 @@ def is_synthetic_test_event(
         if ev.startswith("UNIT_TEST_") or ev.startswith("TEST_"):
             return True
     if details and isinstance(details, dict):
-        if details.get("is_test") or details.get("test") or details.get("synthetic"):
+        if details.get("is_test") or details.get("test") or details.get("synthetic") or details.get("is_automated"):
             return True
     return False
 
@@ -634,13 +634,79 @@ def record_usage_event(
         except Exception as close_err:
             logger.debug("Telemetry connection close notice: %s", close_err)
 
+# Classification clause:
+# An automated/crawler session exhibits:
+# - event_type = 'BOT_CRAWL'
+# - OR details JSON has is_automated = true
+# - OR (0% scroll depth AND 0 search/unlock/auth actions AND 1 single instantaneous view from cloud DC)
+HUMAN_ENGAGEMENT_CONDITION = """
+    (
+        event_type NOT IN ('BOT_CRAWL')
+        AND COALESCE(LOWER(details::json->>'is_automated'), 'false') NOT IN ('true', '1')
+        AND (
+            user_id IS NOT NULL
+            OR event_type IN ('pdf_download', 'PDF_DOWNLOAD', 'compare_view', 'COMPARE', 'COMPARE_STOCKS', 'PEER_COMPARISON', 'SUPPORT_TICKET_SUBMITTED', 'ARCHIVE_LOAD', 'dossier_unlock', 'SEARCH', 'QUERY', 'SEARCH_QUERY', 'WATCHLIST_ADD', 'WATCHLIST_REMOVE', 'WATCHLIST')
+            OR COALESCE(NULLIF(details::json->>'max_scroll_pct', '')::float, 0) > 0
+            OR COALESCE(NULLIF(details::json->>'dwell_seconds', '')::float, 0) >= 15
+        )
+    )
+"""
+
+CRAWLER_CONDITION = f"NOT ({HUMAN_ENGAGEMENT_CONDITION})"
+
+HUMAN_ENGAGEMENT_CONDITION_SQLITE = """
+    (
+        (event_type IS NULL OR event_type NOT IN ('BOT_CRAWL'))
+        AND COALESCE(LOWER(CAST(json_extract(CASE WHEN json_valid(details) THEN details ELSE '{}' END, '$.is_automated') AS TEXT)), '0') NOT IN ('true', '1')
+        AND (
+            user_id IS NOT NULL
+            OR event_type IN ('pdf_download', 'PDF_DOWNLOAD', 'compare_view', 'COMPARE', 'COMPARE_STOCKS', 'PEER_COMPARISON', 'SUPPORT_TICKET_SUBMITTED', 'ARCHIVE_LOAD', 'dossier_unlock', 'SEARCH', 'QUERY', 'SEARCH_QUERY', 'WATCHLIST_ADD', 'WATCHLIST_REMOVE', 'WATCHLIST')
+            OR COALESCE(CAST(json_extract(CASE WHEN json_valid(details) THEN details ELSE '{}' END, '$.max_scroll_pct') AS REAL), 0.0) > 0
+            OR COALESCE(CAST(json_extract(CASE WHEN json_valid(details) THEN details ELSE '{}' END, '$.dwell_seconds') AS REAL), 0.0) >= 15
+        )
+    )
+"""
+
+CRAWLER_CONDITION_SQLITE = f"NOT ({HUMAN_ENGAGEMENT_CONDITION_SQLITE})"
+
+
+def _get_human_engagement_sql(supabase_url: str) -> str:
+    """Returns dialect-appropriate SQL predicate for human engagement classification."""
+    return HUMAN_ENGAGEMENT_CONDITION if supabase_url else HUMAN_ENGAGEMENT_CONDITION_SQLITE
+
+
+def _get_crawler_condition_sql(supabase_url: str) -> str:
+    """Returns dialect-appropriate SQL predicate for automated/crawler classification."""
+    return CRAWLER_CONDITION if supabase_url else CRAWLER_CONDITION_SQLITE
+
+
+def _build_audience_filter_clause(supabase_url: str, audience_filter: str = "all") -> str:
+    """Constructs SQL WHERE fragment for segregating 'human' vs 'crawler'/'bot' vs 'all' telemetry."""
+    af = (audience_filter or "all").strip().lower()
+    human_cond = _get_human_engagement_sql(supabase_url)
+    if af == "human":
+        return (
+            f" AND ({human_cond} OR (session_id IS NOT NULL AND session_id != '' AND session_id IN ("
+            f"SELECT DISTINCT session_id FROM site_usage_events WHERE session_id IS NOT NULL AND {human_cond}"
+            f")))"
+        )
+    if af in ("crawler", "bot", "automated"):
+        return (
+            f" AND NOT ({human_cond}) AND (session_id IS NULL OR session_id = '' OR session_id NOT IN ("
+            f"SELECT DISTINCT session_id FROM site_usage_events WHERE session_id IS NOT NULL AND {human_cond}"
+            f"))"
+        )
+    return ""
+
+
 def _build_telemetry_time_filter(
     supabase_url: str,
     days: int = None,
     start_date = None,
     end_date = None,
     exclude_tests: bool = True,
-    include_bots: bool = False
+    include_bots: bool = False,
+    audience_filter: str = "all"
 ) -> str:
     """Constructs dynamic SQL WHERE clause for relative days or exact start/end date ranges with automated test exclusion."""
     if start_date and end_date:
@@ -723,21 +789,39 @@ def _build_telemetry_time_filter(
             f" ))"
         )
 
-    if exclude_tests and not include_bots:
-        # Crawler hits are logged as BOT_CRAWL events and must never count as visitors
+    af = (audience_filter or "all").strip().lower()
+    if exclude_tests and not include_bots and af not in ("crawler", "bot", "automated"):
+        # Crawler hits are logged as BOT_CRAWL events and must never count as visitors unless explicitly querying crawlers
         base_clause += " AND (event_type IS NULL OR event_type != 'BOT_CRAWL')"
+
+    if af in ("human", "crawler", "bot", "automated"):
+        base_clause += _build_audience_filter_clause(supabase_url, af)
 
     return base_clause
 
-def get_site_usage_summary(days: int = None, start_date = None, end_date = None, exclude_tests: bool = True) -> dict:
+def get_site_usage_summary(
+    days: int = None,
+    start_date = None,
+    end_date = None,
+    exclude_tests: bool = True,
+    audience_filter: str = "all"
+) -> dict:
     """Aggregates backend usage analytics, visitor origins, demographics, and credit savings across a selectable date range."""
     init_db()
     conn = get_db_connection()
     cursor = conn.cursor()
     supabase_url = get_supabase_url()
-    
+    normalized_audience = (audience_filter or "all").strip().lower()
+    if normalized_audience not in ("all", "human", "crawler", "bot", "automated"):
+        normalized_audience = "all"
+
     summary = {
+        "audience_filter": normalized_audience,
         "unique_sessions": 0,
+        "human_sessions": 0,
+        "crawler_sessions": 0,
+        "human_events": 0,
+        "crawler_events": 0,
         "total_actions": 0,
         "total_queries": 0,
         "cache_hits": 0,
@@ -764,15 +848,57 @@ def get_site_usage_summary(days: int = None, start_date = None, end_date = None,
         "total_navigation_transitions": 0,
         "top_contributing_page": None,
         "geographic_distribution": [],
+        "crawler_geographic_distribution": [],
         "device_breakdown": [],
+        "crawler_device_breakdown": [],
         "browser_breakdown": [],
+        "crawler_browser_breakdown": [],
         "os_breakdown": [],
+        "crawler_os_breakdown": [],
         "recent_events": [],
     }
     try:
-        time_filter = _build_telemetry_time_filter(
-            supabase_url, days=days, start_date=start_date, end_date=end_date, exclude_tests=exclude_tests
+        base_time_filter = _build_telemetry_time_filter(
+            supabase_url,
+            days=days,
+            start_date=start_date,
+            end_date=end_date,
+            exclude_tests=exclude_tests,
+            include_bots=True,
+            audience_filter="all",
         )
+        time_filter = _build_telemetry_time_filter(
+            supabase_url,
+            days=days,
+            start_date=start_date,
+            end_date=end_date,
+            exclude_tests=exclude_tests,
+            include_bots=(normalized_audience in ("crawler", "bot", "automated")),
+            audience_filter=normalized_audience,
+        )
+
+        # 0. Audience Segregation Breakdown (Human Engaged vs Automated/Crawler)
+        try:
+            human_cond = _get_human_engagement_sql(supabase_url)
+            crawler_cond = _get_crawler_condition_sql(supabase_url)
+            cursor.execute(f'''
+                SELECT
+                    COALESCE(SUM(CASE WHEN {human_cond} THEN 1 ELSE 0 END), 0),
+                    COALESCE(SUM(CASE WHEN {crawler_cond} THEN 1 ELSE 0 END), 0),
+                    COUNT(DISTINCT CASE WHEN {human_cond} AND session_id IS NOT NULL AND session_id != '' THEN session_id END),
+                    COUNT(DISTINCT CASE WHEN session_id IS NOT NULL AND session_id != '' THEN session_id END)
+                FROM site_usage_events
+                WHERE {base_time_filter}
+            ''')
+            seg_row = cursor.fetchone()
+            if seg_row:
+                summary["human_events"] = int(seg_row[0] or 0)
+                summary["crawler_events"] = int(seg_row[1] or 0)
+                summary["human_sessions"] = int(seg_row[2] or 0)
+                total_distinct_sess = int(seg_row[3] or 0)
+                summary["crawler_sessions"] = max(0, total_distinct_sess - summary["human_sessions"])
+        except Exception as seg_err:
+            logger.debug("Audience segregation summary query notice: %s", seg_err)
 
         # 1. Total Events & Cost Savings by Event Type
         cursor.execute(f'''
@@ -933,12 +1059,26 @@ def get_site_usage_summary(days: int = None, start_date = None, end_date = None,
                 camp_name = (det_obj.get("utm_campaign") or "").strip()
                 camp_src = (det_obj.get("utm_source") or "").strip()
                 camp_med = (det_obj.get("utm_medium") or "").strip()
-                if (camp_name or camp_src) and effective_sess not in session_campaign_map:
+                camp_content = (det_obj.get("utm_content") or "").strip()
+                camp_term = (det_obj.get("utm_term") or "").strip()
+                camp_sub_ref = (det_obj.get("sub_ref") or det_obj.get("sub_tk") or "").strip()
+                if (camp_name or camp_src or camp_sub_ref) and effective_sess not in session_campaign_map:
                     session_campaign_map[effective_sess] = {
                         "campaign": camp_name or "default",
                         "source": camp_src or "Organic / Other",
-                        "medium": camp_med or "referral"
+                        "medium": camp_med or "referral",
+                        "content": camp_content,
+                        "term": camp_term,
+                        "sub_ref": camp_sub_ref,
                     }
+                elif effective_sess in session_campaign_map:
+                    existing_camp = session_campaign_map[effective_sess]
+                    if camp_content and not existing_camp.get("content"):
+                        existing_camp["content"] = camp_content
+                    if camp_term and not existing_camp.get("term"):
+                        existing_camp["term"] = camp_term
+                    if camp_sub_ref and not existing_camp.get("sub_ref"):
+                        existing_camp["sub_ref"] = camp_sub_ref
 
                 sp = session_profile_map.setdefault(effective_sess, {"paths": set(), "non_dwell_events": 0, "dwell_sec": 0.0})
                 sp["paths"].add(p)
@@ -1001,20 +1141,42 @@ def get_site_usage_summary(days: int = None, start_date = None, end_date = None,
             summary["top_routes"] = summary["top_visited_pages"]
             summary["top_tickers"] = summary["top_searched_tickers"]
 
-            # Aggregate Campaign Performance
-            campaign_counts = {}
+            # Aggregate Campaign Performance (with Dwell Time, Unique Subscribers & Content Breakdown)
+            campaign_stats = {}
             for s_id, c_info in session_campaign_map.items():
                 c_key = (c_info["campaign"], c_info["source"], c_info["medium"])
-                campaign_counts[c_key] = campaign_counts.get(c_key, 0) + 1
+                bucket = campaign_stats.setdefault(c_key, {
+                    "sessions": 0,
+                    "sub_refs": set(),
+                    "dwell_total": 0.0,
+                    "content_counts": {},
+                })
+                bucket["sessions"] += 1
+                if c_info.get("sub_ref"):
+                    bucket["sub_refs"].add(c_info["sub_ref"])
+                sess_dwell = session_profile_map.get(s_id, {}).get("dwell_sec", 0.0) or 0.0
+                bucket["dwell_total"] += float(sess_dwell)
+                if c_info.get("content"):
+                    cnt_key = c_info["content"]
+                    bucket["content_counts"][cnt_key] = bucket["content_counts"].get(cnt_key, 0) + 1
 
-            total_campaign_sessions = max(1, sum(campaign_counts.values()))
+            total_campaign_sessions = max(1, sum(b["sessions"] for b in campaign_stats.values()))
             summary["top_campaigns"] = []
-            for (c_name, c_src, c_med), c_count in sorted(campaign_counts.items(), key=lambda x: x[1], reverse=True)[:12]:
+            for (c_name, c_src, c_med), b_data in sorted(campaign_stats.items(), key=lambda x: x[1]["sessions"], reverse=True)[:12]:
+                c_count = b_data["sessions"]
+                avg_camp_dwell = round(b_data["dwell_total"] / max(1, c_count), 1)
+                top_content = ""
+                if b_data["content_counts"]:
+                    top_content = max(b_data["content_counts"].items(), key=lambda x: x[1])[0]
                 summary["top_campaigns"].append({
                     "campaign": c_name,
                     "source": c_src,
                     "medium": c_med,
                     "sessions": c_count,
+                    "unique_subscribers": len(b_data["sub_refs"]),
+                    "avg_dwell_seconds": avg_camp_dwell,
+                    "formatted_avg_dwell": format_duration(avg_camp_dwell),
+                    "top_content": top_content or "-",
                     "percentage": round((c_count / total_campaign_sessions) * 100.0, 1)
                 })
 
@@ -1038,36 +1200,92 @@ def get_site_usage_summary(days: int = None, start_date = None, end_date = None,
             summary["page_dwell_times"] = []
             summary["site_visit_tree"] = []
 
-        # 6. Geographic Distribution (Countries)
+        # 6. Geographic Distribution (Countries) — Primary Human Visitor Metrics vs Headless & Crawler Activity
         try:
+            human_cond = _get_human_engagement_sql(supabase_url)
+            crawler_cond = _get_crawler_condition_sql(supabase_url)
+            human_session_clause = (
+                f"({human_cond} OR (session_id IS NOT NULL AND session_id != '' AND session_id IN ("
+                f"SELECT DISTINCT session_id FROM site_usage_events WHERE session_id IS NOT NULL AND {human_cond}"
+                f")))"
+            )
+            crawler_session_clause = (
+                f"({crawler_cond}) AND (session_id IS NULL OR session_id = '' OR session_id NOT IN ("
+                f"SELECT DISTINCT session_id FROM site_usage_events WHERE session_id IS NOT NULL AND {human_cond}"
+                f"))"
+            )
+            geo_human_where = (
+                f"{time_filter} AND session_id IS NOT NULL AND session_id != '' AND {human_session_clause}"
+                if normalized_audience == "all"
+                else f"{time_filter} AND session_id IS NOT NULL AND session_id != ''"
+            )
+            # Query 1: Primary Human Visitor Metrics (Focused view)
             cursor.execute(f'''
                 SELECT COALESCE(country, 'Unknown'), COUNT(DISTINCT session_id) as cnt
                 FROM site_usage_events
-                WHERE {time_filter} AND session_id IS NOT NULL AND session_id != ''
+                WHERE {geo_human_where}
                 GROUP BY COALESCE(country, 'Unknown')
                 ORDER BY cnt DESC
                 LIMIT 8
             ''')
-            summary["geographic_distribution"] = [{"country": row[0], "count": int(row[1])} for row in cursor.fetchall()]
+            summary["geographic_distribution"] = [{"country": r[0], "count": int(r[1])} for r in cursor.fetchall()]
+
+            # Query 2: Headless & Crawler Activity (Secondary section)
+            cursor.execute(f'''
+                SELECT COALESCE(country, 'Unknown'), COUNT(DISTINCT session_id) as cnt
+                FROM site_usage_events
+                WHERE {base_time_filter} AND session_id IS NOT NULL AND session_id != '' AND {crawler_session_clause}
+                GROUP BY COALESCE(country, 'Unknown')
+                ORDER BY cnt DESC
+                LIMIT 8
+            ''')
+            summary["crawler_geographic_distribution"] = [{"country": r[0], "count": int(r[1])} for r in cursor.fetchall()]
         except Exception as e:
             logger.debug("Failed querying geographic distribution: %s", e)
             summary["geographic_distribution"] = []
+            summary["crawler_geographic_distribution"] = []
 
-        # 7. Device Types, Browsers, and OS
+        # 7. Device Types, Browsers, and OS (Primary Human vs Headless/Crawler)
         try:
+            human_cond = _get_human_engagement_sql(supabase_url)
+            crawler_cond = _get_crawler_condition_sql(supabase_url)
+            human_session_clause = (
+                f"({human_cond} OR (session_id IS NOT NULL AND session_id != '' AND session_id IN ("
+                f"SELECT DISTINCT session_id FROM site_usage_events WHERE session_id IS NOT NULL AND {human_cond}"
+                f")))"
+            )
+            crawler_session_clause = (
+                f"({crawler_cond}) AND (session_id IS NULL OR session_id = '' OR session_id NOT IN ("
+                f"SELECT DISTINCT session_id FROM site_usage_events WHERE session_id IS NOT NULL AND {human_cond}"
+                f"))"
+            )
+            dev_human_where = (
+                f"{time_filter} AND session_id IS NOT NULL AND session_id != '' AND {human_session_clause}"
+                if normalized_audience == "all"
+                else f"{time_filter} AND session_id IS NOT NULL AND session_id != ''"
+            )
             cursor.execute(f'''
                 SELECT COALESCE(device_type, 'Unknown'), COUNT(DISTINCT session_id) as cnt
                 FROM site_usage_events
-                WHERE {time_filter} AND session_id IS NOT NULL AND session_id != ''
+                WHERE {dev_human_where}
                 GROUP BY COALESCE(device_type, 'Unknown')
                 ORDER BY cnt DESC
             ''')
             summary["device_breakdown"] = [{"device": row[0], "count": int(row[1])} for row in cursor.fetchall()]
 
             cursor.execute(f'''
+                SELECT COALESCE(device_type, 'Unknown'), COUNT(DISTINCT session_id) as cnt
+                FROM site_usage_events
+                WHERE {base_time_filter} AND session_id IS NOT NULL AND session_id != '' AND {crawler_session_clause}
+                GROUP BY COALESCE(device_type, 'Unknown')
+                ORDER BY cnt DESC
+            ''')
+            summary["crawler_device_breakdown"] = [{"device": row[0], "count": int(row[1])} for row in cursor.fetchall()]
+
+            cursor.execute(f'''
                 SELECT COALESCE(browser, 'Unknown'), COUNT(DISTINCT session_id) as cnt
                 FROM site_usage_events
-                WHERE {time_filter} AND session_id IS NOT NULL AND session_id != ''
+                WHERE {dev_human_where}
                 GROUP BY COALESCE(browser, 'Unknown')
                 ORDER BY cnt DESC
                 LIMIT 6
@@ -1075,14 +1293,34 @@ def get_site_usage_summary(days: int = None, start_date = None, end_date = None,
             summary["browser_breakdown"] = [{"browser": row[0], "count": int(row[1])} for row in cursor.fetchall()]
 
             cursor.execute(f'''
+                SELECT COALESCE(browser, 'Unknown'), COUNT(DISTINCT session_id) as cnt
+                FROM site_usage_events
+                WHERE {base_time_filter} AND session_id IS NOT NULL AND session_id != '' AND {crawler_session_clause}
+                GROUP BY COALESCE(browser, 'Unknown')
+                ORDER BY cnt DESC
+                LIMIT 6
+            ''')
+            summary["crawler_browser_breakdown"] = [{"browser": row[0], "count": int(row[1])} for row in cursor.fetchall()]
+
+            cursor.execute(f'''
                 SELECT COALESCE(os, 'Unknown'), COUNT(DISTINCT session_id) as cnt
                 FROM site_usage_events
-                WHERE {time_filter} AND session_id IS NOT NULL AND session_id != ''
+                WHERE {dev_human_where}
                 GROUP BY COALESCE(os, 'Unknown')
                 ORDER BY cnt DESC
                 LIMIT 6
             ''')
             summary["os_breakdown"] = [{"os": row[0], "count": int(row[1])} for row in cursor.fetchall()]
+
+            cursor.execute(f'''
+                SELECT COALESCE(os, 'Unknown'), COUNT(DISTINCT session_id) as cnt
+                FROM site_usage_events
+                WHERE {base_time_filter} AND session_id IS NOT NULL AND session_id != '' AND {crawler_session_clause}
+                GROUP BY COALESCE(os, 'Unknown')
+                ORDER BY cnt DESC
+                LIMIT 6
+            ''')
+            summary["crawler_os_breakdown"] = [{"os": row[0], "count": int(row[1])} for row in cursor.fetchall()]
         except Exception as os_err:
             logger.debug("OS breakdown query notice: %s", os_err)
 
@@ -1145,7 +1383,13 @@ def get_site_usage_summary(days: int = None, start_date = None, end_date = None,
     return summary
 
 
-def get_traffic_flow_analytics(days: int = None, start_date = None, end_date = None, exclude_tests: bool = True) -> dict:
+def get_traffic_flow_analytics(
+    days: int = None,
+    start_date = None,
+    end_date = None,
+    exclude_tests: bool = True,
+    audience_filter: str = "all"
+) -> dict:
     """
     Computes fine-grained link dwell times and internal transition navigation tree
     across sessions for the traffic and landing pages analytics dashboard.
@@ -1154,9 +1398,18 @@ def get_traffic_flow_analytics(days: int = None, start_date = None, end_date = N
     conn = get_db_connection()
     cursor = conn.cursor()
     supabase_url = get_supabase_url()
+    normalized_audience = (audience_filter or "all").strip().lower()
+    if normalized_audience not in ("all", "human", "crawler", "bot", "automated"):
+        normalized_audience = "all"
     try:
         time_filter = _build_telemetry_time_filter(
-            supabase_url, days=days, start_date=start_date, end_date=end_date, exclude_tests=exclude_tests
+            supabase_url,
+            days=days,
+            start_date=start_date,
+            end_date=end_date,
+            exclude_tests=exclude_tests,
+            include_bots=(normalized_audience in ("crawler", "bot", "automated")),
+            audience_filter=normalized_audience,
         )
         try:
             cursor.execute(f'''

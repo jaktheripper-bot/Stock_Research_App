@@ -336,6 +336,17 @@ def send_ticket_reply_email(ticket: dict, reply_message: str, admin_name: str = 
     user_name = ticket.get("user_name") or "Investor"
     sender_email = _get_cfg("SMTP_FROM") or _get_cfg("RESEND_FROM") or _get_cfg("SMTP_USER") or "noreply@moatnomics.com"
 
+    from core.analysis.research_bouquet import build_tracked_link
+    contact_tracked_url = build_tracked_link(
+        "/contact",
+        token=user_email,
+        utm_source="moatnomics_support",
+        utm_medium="email_support",
+        utm_campaign="ticket_reply",
+        utm_content="contact_desk",
+        utm_term=str(ticket_id),
+    )
+
     text_body = f"""Hello {user_name},
 
 Thank you for reaching out to Moatnomics.
@@ -349,7 +360,7 @@ Original Message:
 "{ticket.get('message', '').strip()}"
 
 You can view ongoing status or submit further queries through our contact desk:
-https://moatnomics.com/contact
+{contact_tracked_url}
 
 Kind regards,
 Moatnomics Service Desk
@@ -390,7 +401,7 @@ Moatnomics Service Desk
         <p style="margin: 0; font-style: italic;">"{ticket.get('message', '').strip()}"</p>
       </div>
 
-      <p style="margin-top: 24px; font-size: 14px;">If you have any further questions or require additional details, you can connect with us directly via the <a href="https://moatnomics.com/contact" style="color: #0E3D32; font-weight: 600;">Feedback & Grievances Desk</a>.</p>
+      <p style="margin-top: 24px; font-size: 14px;">If you have any further questions or require additional details, you can connect with us directly via the <a href="{contact_tracked_url}" style="color: #0E3D32; font-weight: 600;">Feedback & Grievances Desk</a>.</p>
     </div>
     <div class="footer">
       <p style="margin: 0 0 4px 0;">Moatnomics &bull; Independent Quantitative Equity & Asset Intelligence</p>

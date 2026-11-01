@@ -115,6 +115,9 @@ class TelemetryEventRequest(BaseModel):
     utm_source: Optional[str] = None
     utm_medium: Optional[str] = None
     utm_campaign: Optional[str] = None
+    utm_content: Optional[str] = None
+    utm_term: Optional[str] = None
+    sub_ref: Optional[str] = None
     ref: Optional[str] = None
     details: Optional[dict] = None
 
@@ -576,6 +579,12 @@ async def api_record_telemetry_event(payload: TelemetryEventRequest, request: Re
         query_params["utm_medium"] = payload.utm_medium
     if payload.utm_campaign:
         query_params["utm_campaign"] = payload.utm_campaign
+    if payload.utm_content:
+        query_params["utm_content"] = payload.utm_content
+    if payload.utm_term:
+        query_params["utm_term"] = payload.utm_term
+    if payload.sub_ref:
+        query_params["sub_ref"] = payload.sub_ref
     if payload.ref:
         query_params["ref"] = payload.ref
 
@@ -597,6 +606,20 @@ async def api_record_telemetry_event(payload: TelemetryEventRequest, request: Re
     sess_id = payload.session_id or f"sess_{hashlib.md5((client_ip + user_agent).encode()).hexdigest()[:10]}"
 
     evt_details = dict(payload.details or {})
+    if payload.utm_source and not evt_details.get("utm_source"):
+        evt_details["utm_source"] = str(payload.utm_source).strip()[:120]
+    if payload.utm_medium and not evt_details.get("utm_medium"):
+        evt_details["utm_medium"] = str(payload.utm_medium).strip()[:120]
+    if payload.utm_campaign and not evt_details.get("utm_campaign"):
+        evt_details["utm_campaign"] = str(payload.utm_campaign).strip()[:160]
+    if payload.utm_content and not evt_details.get("utm_content"):
+        evt_details["utm_content"] = str(payload.utm_content).strip()[:120]
+    if payload.utm_term and not evt_details.get("utm_term"):
+        evt_details["utm_term"] = str(payload.utm_term).strip()[:120]
+    if payload.sub_ref and not evt_details.get("sub_ref"):
+        evt_details["sub_ref"] = str(payload.sub_ref).strip()[:64]
+    if payload.ref and not evt_details.get("ref"):
+        evt_details["ref"] = str(payload.ref).strip()[:120]
     if payload.dwell_seconds is not None and "dwell_seconds" not in evt_details:
         evt_details["dwell_seconds"] = min(max(float(payload.dwell_seconds), 0.0), 1800.0)
     if payload.max_scroll_pct is not None and "max_scroll_pct" not in evt_details:
@@ -720,9 +743,12 @@ async def api_unsubscribe_notifications(request: Request, token: Optional[str] =
 
     if is_html_request:
         import html as _html
+        from core.analysis.research_bouquet import compute_subscriber_ref
         raw_email_display = subscriber["email"] if subscriber else param
         email_display = _html.escape(str(raw_email_display))
         resubscribe_url = f"/api/notifications/resubscribe?token={urllib.parse.quote(param)}"
+        sub_ref_q = f"&sub_ref={urllib.parse.quote(compute_subscriber_ref(param) or '')}" if compute_subscriber_ref(param) else ""
+        return_home_url = f"/?utm_source=moatnomics_digest&utm_medium=email_digest&utm_campaign=digest_preferences&utm_content=unsubscribe_return{sub_ref_q}"
         html = f"""<!DOCTYPE html>
 <html lang="en">
 <head>
@@ -752,7 +778,7 @@ async def api_unsubscribe_notifications(request: Request, token: Optional[str] =
     </p>
     <div style="margin-top: 24px;">
       <a href="{resubscribe_url}" class="btn btn-undo">Undo &amp; Re-subscribe</a>
-      <a href="/" class="btn btn-secondary">Return to Platform</a>
+      <a href="{return_home_url}" class="btn btn-secondary">Return to Platform</a>
     </div>
     <div class="footer-note">
       Your research credits, bookmarks, and account access remain unaffected.
@@ -784,6 +810,9 @@ async def api_resubscribe_notifications(request: Request, token: Optional[str] =
     is_html_request = "text/html" in accept_header
 
     if is_html_request:
+        from core.analysis.research_bouquet import compute_subscriber_ref
+        sub_ref_q = f"&sub_ref={urllib.parse.quote(compute_subscriber_ref(param) or '')}" if compute_subscriber_ref(param) else ""
+        return_home_url = f"/?utm_source=moatnomics_digest&utm_medium=email_digest&utm_campaign=digest_preferences&utm_content=resubscribe_return{sub_ref_q}"
         html = f"""<!DOCTYPE html>
 <html lang="en">
 <head>
@@ -803,7 +832,7 @@ async def api_resubscribe_notifications(request: Request, token: Optional[str] =
     <div class="icon"><svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="#10b981" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><path d="m9 11 3 3L22 4"/></svg></div>
     <h1>Subscription Restored</h1>
     <p>You have successfully re-subscribed to the daily Moatnomics Research Bouquet and Morning Digest.</p>
-    <a href="/" class="btn">Return to Platform</a>
+    <a href="{return_home_url}" class="btn">Return to Platform</a>
   </div>
 </body>
 </html>"""

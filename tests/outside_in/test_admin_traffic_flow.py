@@ -241,6 +241,34 @@ class TestAdminTrafficUiAndDomContracts(unittest.TestCase):
         self.assertEqual(total_th.get("aria-sort"), "descending")
         self.assertEqual(total_th.find("span", id="dwell-sort-ind-total-dwell").get_text(strip=True), "▼")
 
+        # 3d. Pagination contract: At most 10 rows shown initially, with +10 "See More" and "Show Top 10" controls
+        dwell_rows = dwell_table.find_all("tr", class_="dwell-row")
+        visible_dwell_rows = [
+            r for r in dwell_rows if "display: none" not in (r.get("style") or "").lower()
+        ]
+        self.assertLessEqual(len(visible_dwell_rows), 10, "At most 10 dwell rows should be visible initially.")
+        if len(dwell_rows) > 10:
+            self.assertEqual(len(visible_dwell_rows), 10)
+
+        pagination_footer = soup.find("div", id="dwellPaginationFooter")
+        self.assertIsNotNone(pagination_footer, "Missing #dwellPaginationFooter in DOM.")
+        showing_el = soup.find("strong", id="dwellShowingCount")
+        total_el = soup.find("strong", id="dwellTotalCount")
+        self.assertIsNotNone(showing_el, "Missing #dwellShowingCount counter span.")
+        self.assertIsNotNone(total_el, "Missing #dwellTotalCount counter span.")
+        self.assertEqual(int(showing_el.get_text(strip=True)), min(len(dwell_rows), 10))
+        self.assertEqual(int(total_el.get_text(strip=True)), len(dwell_rows))
+
+        btn_more = soup.find("button", id="btnLoadMoreDwell")
+        self.assertIsNotNone(btn_more, "Missing #btnLoadMoreDwell pagination button.")
+        self.assertIn("loadMoreDwellRows(10)", btn_more.get("onclick", ""))
+        self.assertIn("btn", btn_more.get("class", []))
+
+        btn_collapse = soup.find("button", id="btnCollapseDwell")
+        self.assertIsNotNone(btn_collapse, "Missing #btnCollapseDwell reset button.")
+        self.assertIn("resetDwellRowsLimit()", btn_collapse.get("onclick", ""))
+        self.assertIn("btn", btn_collapse.get("class", []))
+
         # 4. Assert Site Visit Tree Container and Filter Inputs
         tree_container = soup.find("div", id="siteVisitTreeContainer")
         self.assertIsNotNone(tree_container, "Missing #siteVisitTreeContainer in DOM.")
@@ -263,10 +291,23 @@ class TestAdminTrafficUiAndDomContracts(unittest.TestCase):
         self.assertIn("handleDwellHeaderKeydown", script_text, "handleDwellHeaderKeydown must be defined in scripts.")
         self.assertIn("updateDwellSortHeaders", script_text, "updateDwellSortHeaders must be defined in scripts.")
         self.assertIn("DWELL_COLUMN_CONFIG", script_text, "DWELL_COLUMN_CONFIG must be defined in scripts.")
+        self.assertIn("loadMoreDwellRows", script_text, "loadMoreDwellRows must be defined in scripts.")
+        self.assertIn("resetDwellRowsLimit", script_text, "resetDwellRowsLimit must be defined in scripts.")
 
         # 5b. Assert Pillar-level breakdown card is present in #tab-traffic
         pillar_card = soup.find("div", id="cardPillarDwellBreakdown")
         self.assertIsNotNone(pillar_card, "Missing #cardPillarDwellBreakdown in #tab-traffic.")
+
+        # 5c. Assert Primary Human Geo Distribution and Secondary Automated Bots & Scrapers cards are present
+        human_geo_card = soup.find("div", id="cardHumanGeoDistribution")
+        self.assertIsNotNone(human_geo_card, "Missing #cardHumanGeoDistribution in #tab-traffic.")
+        self.assertIn("Verified Human Traffic by Country", human_geo_card.get_text())
+        self.assertIn("Engaged", human_geo_card.get_text())
+
+        crawler_geo_card = soup.find("div", id="cardCrawlerGeoDistribution")
+        self.assertIsNotNone(crawler_geo_card, "Missing #cardCrawlerGeoDistribution in #tab-traffic.")
+        self.assertIn("Automated Bots & Scrapers", crawler_geo_card.get_text())
+        self.assertIn("Scrapers / Probes", crawler_geo_card.get_text())
 
         # 6. Template Hygiene: Zero unrendered Jinja leaks in HTML attributes
         for tag in soup.find_all(True):
@@ -500,7 +541,105 @@ class TestAdminTrafficUiAndDomContracts(unittest.TestCase):
         script_text = "\n".join(s.string for s in soup_gov.find_all("script") if s.string)
         self.assertIn("function navigateToAdminSection(", script_text)
 
+    def test_audience_filter_segregation_human_vs_crawler(self):
+        """Verifies HUMAN_ENGAGEMENT_CONDITION, CRAWLER_CONDITION, and audience_filter in get_site_usage_summary."""
+        from core.db.connection import get_db_connection, get_placeholder
+        from core.db.telemetry import (
+            HUMAN_ENGAGEMENT_CONDITION,
+            CRAWLER_CONDITION,
+            get_site_usage_summary,
+        )
 
+        self.assertIn("BOT_CRAWL", HUMAN_ENGAGEMENT_CONDITION)
+        self.assertIn("max_scroll_pct", HUMAN_ENGAGEMENT_CONDITION)
+        self.assertIn("dwell_seconds", HUMAN_ENGAGEMENT_CONDITION)
+        self.assertTrue(CRAWLER_CONDITION.startswith("NOT ("))
+
+        human_sess = "sess_human_engaged_seg_991"
+        crawler_sess = "sess_crawler_bot_seg_992"
+        conn = get_db_connection()
+        c = conn.cursor()
+        p = get_placeholder()
+        now_ts = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+        try:
+            # 1. Human session: anonymous page view followed by 25s dwell & 45% scroll depth
+            c.execute(f"""
+                INSERT INTO site_usage_events (session_id, event_type, ticker, timestamp, landing_page, country, device_type, browser, os, details)
+                VALUES ({p}, {p}, {p}, {p}, {p}, {p}, {p}, {p}, {p}, {p})
+            """, (
+                human_sess,
+                "DOSSIER_VIEW",
+                "TCS",
+                now_ts,
+                "/dossier/TCS",
+                "India",
+                "Desktop",
+                "Chrome",
+                "macOS",
+                json.dumps({"is_automated": False, "max_scroll_pct": 0, "dwell_seconds": 0}),
+            ))
+            c.execute(f"""
+                INSERT INTO site_usage_events (session_id, event_type, ticker, timestamp, landing_page, country, device_type, browser, os, details)
+                VALUES ({p}, {p}, {p}, {p}, {p}, {p}, {p}, {p}, {p}, {p})
+            """, (
+                human_sess,
+                "PAGE_DWELL",
+                "TCS",
+                now_ts,
+                "/dossier/TCS",
+                "India",
+                "Desktop",
+                "Chrome",
+                "macOS",
+                json.dumps({"is_automated": False, "max_scroll_pct": 45, "dwell_seconds": 25}),
+            ))
+
+            # 2. Crawler session: 0% scroll, 0s dwell, is_automated=True
+            c.execute(f"""
+                INSERT INTO site_usage_events (session_id, event_type, ticker, timestamp, landing_page, country, device_type, browser, os, details)
+                VALUES ({p}, {p}, {p}, {p}, {p}, {p}, {p}, {p}, {p}, {p})
+            """, (
+                crawler_sess,
+                "DOSSIER_VIEW",
+                "HDFCBANK",
+                now_ts,
+                "/dossier/HDFCBANK",
+                "United States",
+                "Bot / Server",
+                "ChromeBot",
+                "Linux",
+                json.dumps({"is_automated": True, "max_scroll_pct": 0, "dwell_seconds": 0}),
+            ))
+            conn.commit()
+
+            summary_all = get_site_usage_summary(days=7, exclude_tests=False, audience_filter="all")
+            self.assertIn("geographic_distribution", summary_all)
+            self.assertIn("crawler_geographic_distribution", summary_all)
+            human_countries = {g["country"] for g in summary_all["geographic_distribution"]}
+            crawler_countries = {g["country"] for g in summary_all["crawler_geographic_distribution"]}
+            self.assertIn("India", human_countries)
+            self.assertIn("United States", crawler_countries)
+
+            summary_human = get_site_usage_summary(days=7, exclude_tests=False, audience_filter="human")
+            self.assertEqual(summary_human["audience_filter"], "human")
+            self.assertGreaterEqual(summary_human["human_sessions"], 1)
+            human_recent_sess = {e["session_id"] for e in summary_human["recent_events"]}
+            self.assertIn(human_sess[:10], human_recent_sess)
+            self.assertNotIn(crawler_sess[:10], human_recent_sess)
+
+            summary_crawler = get_site_usage_summary(days=7, exclude_tests=False, audience_filter="crawler")
+            self.assertEqual(summary_crawler["audience_filter"], "crawler")
+            crawler_recent_sess = {e["session_id"] for e in summary_crawler["recent_events"]}
+            self.assertIn(crawler_sess[:10], crawler_recent_sess)
+            self.assertNotIn(human_sess[:10], crawler_recent_sess)
+        finally:
+            c.execute(
+                f"DELETE FROM site_usage_events WHERE session_id IN ({p}, {p})",
+                (human_sess, crawler_sess),
+            )
+            conn.commit()
+            c.close()
+            conn.close()
 
 
 if __name__ == "__main__":

@@ -48,20 +48,56 @@ def get_tracking_base_url() -> str:
     return "https://moatnomics.com"
 
 
-def build_tracked_link(target_path: str, token: Optional[str] = None, utm_medium: str = "email_digest") -> str:
+def compute_subscriber_ref(token_or_email: Optional[str]) -> Optional[str]:
     """
-    Builds an email link with UTM attribution and subscriber tracking parameters.
+    Computes a privacy-safe, non-reversible 12-character subscriber reference hash (`sub_ref`)
+    from an unsubscribe token or email so article links track unique verified subscriber CTR
+    without exposing the raw unsubscribe token (`sub_tk`).
+    """
+    raw = str(token_or_email or "").strip()
+    if not raw:
+        return None
+    if raw in ("preview_token", "test_admin_token"):
+        return raw
+    return f"sub_{hashlib.sha256(f'moatnomics_sub_ref:{raw}'.encode('utf-8')).hexdigest()[:12]}"
+
+
+def build_tracked_link(
+    target_path: str,
+    token: Optional[str] = None,
+    utm_medium: str = "email_digest",
+    utm_source: str = "moatnomics_digest",
+    utm_campaign: Optional[str] = None,
+    utm_content: Optional[str] = None,
+    utm_term: Optional[str] = None,
+    edition_date: Optional[str] = None,
+) -> str:
+    """
+    Builds an email link with structured UTM attribution and privacy-safe subscriber reference (`sub_ref`).
     """
     base = get_tracking_base_url()
     path = target_path if target_path.startswith("/") else f"/{target_path}"
 
-    params = {
-        "utm_source": "moatnomics_digest",
-        "utm_medium": utm_medium,
-        "utm_campaign": "research_bouquet",
+    clean_edition = str(edition_date or "").strip()[:10]
+    effective_campaign = (
+        str(utm_campaign).strip()
+        if utm_campaign and str(utm_campaign).strip()
+        else (f"research_bouquet_{clean_edition}" if clean_edition else "research_bouquet")
+    )
+
+    params: Dict[str, str] = {
+        "utm_source": str(utm_source or "moatnomics_digest").strip(),
+        "utm_medium": str(utm_medium or "email_digest").strip(),
+        "utm_campaign": effective_campaign,
     }
-    if token:
-        params["sub_tk"] = token
+    if utm_content and str(utm_content).strip():
+        params["utm_content"] = str(utm_content).strip()
+    if utm_term and str(utm_term).strip():
+        params["utm_term"] = str(utm_term).strip()
+
+    sub_ref = compute_subscriber_ref(token)
+    if sub_ref:
+        params["sub_ref"] = sub_ref
 
     qs = urlencode(params)
     sep = "&" if "?" in path else "?"
@@ -684,12 +720,20 @@ def render_bouquet_html(bouquet: Dict[str, Any], subscriber: Optional[Dict[str, 
     """
     token = subscriber.get("unsubscribe_token") if subscriber else "preview_token"
     user_name = subscriber.get("full_name") if subscriber else "Reader"
+    edition_date = str(bouquet.get("edition_date") or "").strip()[:10]
     base_url = get_tracking_base_url()
     unsub_url = f"{base_url}/api/notifications/unsubscribe?token={token}"
 
     equities_html = ""
     for eq in bouquet.get("equities") or []:
-        link = build_tracked_link(eq.get("dossier_url") or f"/dossier/{eq.get('ticker', '')}", token=token)
+        eq_ticker = str(eq.get("ticker") or "").strip()
+        link = build_tracked_link(
+            eq.get("dossier_url") or f"/dossier/{eq_ticker}",
+            token=token,
+            edition_date=edition_date,
+            utm_content="equity_card",
+            utm_term=eq_ticker,
+        )
         roce_disp = f"{eq['roce']}%" if eq.get("roce") is not None else "N/A"
         sg_disp = f"{eq['sales_growth_3y']:+.1f}%" if eq.get("sales_growth_3y") is not None else "N/A"
         de_disp = f"{eq['debt_to_equity']}" if eq.get("debt_to_equity") is not None else "N/A"
@@ -716,7 +760,13 @@ def render_bouquet_html(bouquet: Dict[str, Any], subscriber: Optional[Dict[str, 
         """
 
     sov = bouquet.get("sovereign") or {}
-    sov_link = build_tracked_link("/sovereign", token=token)
+    sov_link = build_tracked_link(
+        "/sovereign",
+        token=token,
+        edition_date=edition_date,
+        utm_content="sovereign_curve",
+        utm_term="10Y_GSEC",
+    )
     sov_html = ""
     if sov:
         sov_html = f"""
@@ -741,7 +791,13 @@ def render_bouquet_html(bouquet: Dict[str, Any], subscriber: Optional[Dict[str, 
     debt = bouquet.get("corporate_debt") or {}
     debt_html = ""
     if debt:
-        debt_link = build_tracked_link(debt.get("detail_url") or "/debt", token=token)
+        debt_link = build_tracked_link(
+            debt.get("detail_url") or "/debt",
+            token=token,
+            edition_date=edition_date,
+            utm_content="corporate_debt",
+            utm_term=str(debt.get("isin") or ""),
+        )
         debt_html = f"""
       <div class="section-title">3. Corporate Debt &amp; Credit Surveillance</div>
       <div class="card">
@@ -761,7 +817,13 @@ def render_bouquet_html(bouquet: Dict[str, Any], subscriber: Optional[Dict[str, 
     etf = bouquet.get("etfs") or {}
     etf_html = ""
     if etf:
-        etf_link = build_tracked_link(etf.get("detail_url") or "/etfs", token=token)
+        etf_link = build_tracked_link(
+            etf.get("detail_url") or "/etfs",
+            token=token,
+            edition_date=edition_date,
+            utm_content="etf_matrix",
+            utm_term=str(etf.get("symbol") or ""),
+        )
         etf_html = f"""
       <div class="section-title">4. National ETF Liquidity &amp; Tracking Matrix</div>
       <div class="card">
@@ -781,7 +843,13 @@ def render_bouquet_html(bouquet: Dict[str, Any], subscriber: Optional[Dict[str, 
     reits = bouquet.get("reits_sgb") or {}
     reits_html = ""
     if reits:
-        reit_link = build_tracked_link(reits.get("detail_url") or "/reits", token=token)
+        reit_link = build_tracked_link(
+            reits.get("detail_url") or "/reits",
+            token=token,
+            edition_date=edition_date,
+            utm_content="reits_sgb",
+            utm_term=str(reits.get("reit_symbol") or ""),
+        )
         reits_html = f"""
       <div class="section-title">5. REITs, InvITs &amp; Sovereign Gold Parity</div>
       <div class="card">
@@ -801,7 +869,13 @@ def render_bouquet_html(bouquet: Dict[str, Any], subscriber: Optional[Dict[str, 
     mf = bouquet.get("mutual_funds") or {}
     mf_html = ""
     if mf:
-        mf_link = build_tracked_link(mf.get("detail_url") or f"/funds/{mf.get('scheme_code', '')}", token=token)
+        mf_link = build_tracked_link(
+            mf.get("detail_url") or f"/funds/{mf.get('scheme_code', '')}",
+            token=token,
+            edition_date=edition_date,
+            utm_content="mutual_fund",
+            utm_term=str(mf.get("scheme_code") or ""),
+        )
         mf_badge = mf.get("provenance_badge") or "Prior-Session AMFI Audit"
         mf_html = f"""
       <div class="section-title">6. Mutual Fund Look-Through Spotlight</div>
@@ -825,7 +899,13 @@ def render_bouquet_html(bouquet: Dict[str, Any], subscriber: Optional[Dict[str, 
     msme_html = ""
     if msme:
         msme_path = msme.get("detail_url") or (f"/msme/{msme['uin']}" if msme.get("uin") else "/msme")
-        msme_link = build_tracked_link(msme_path, token=token)
+        msme_link = build_tracked_link(
+            msme_path,
+            token=token,
+            edition_date=edition_date,
+            utm_content="msme_spotlight",
+            utm_term=str(msme.get("uin") or ""),
+        )
         msme_html = f"""
       <div class="section-title">7. Unlisted MSME Forensic Spotlight</div>
       <div class="card">
@@ -839,6 +919,13 @@ def render_bouquet_html(bouquet: Dict[str, Any], subscriber: Optional[Dict[str, 
         </div>
       </div>
         """
+
+    terminal_cta_link = build_tracked_link(
+        "/",
+        token=token,
+        edition_date=edition_date,
+        utm_content="terminal_cta",
+    )
 
     return f"""<!DOCTYPE html>
 <html>
@@ -885,7 +972,7 @@ def render_bouquet_html(bouquet: Dict[str, Any], subscriber: Optional[Dict[str, 
       {msme_html}
 
       <div style="text-align: center; margin: 28px 0 12px 0;">
-        <a href="{build_tracked_link('/', token=token)}" style="background: #0E3D32; color: #F7F5EE; font-weight: 800; font-size: 14px; text-decoration: none; padding: 12px 28px; border-radius: 8px; display: inline-block;">
+        <a href="{terminal_cta_link}" style="background: #0E3D32; color: #F7F5EE; font-weight: 800; font-size: 14px; text-decoration: none; padding: 12px 28px; border-radius: 8px; display: inline-block;">
           Open Research Terminal &rarr;
         </a>
       </div>
@@ -915,6 +1002,7 @@ def render_bouquet_text(bouquet: Dict[str, Any], subscriber: Optional[Dict[str, 
     """
     token = subscriber.get("unsubscribe_token") if subscriber else "preview_token"
     user_name = subscriber.get("full_name") if subscriber else "Reader"
+    edition_date = str(bouquet.get("edition_date") or "").strip()[:10]
     base_url = get_tracking_base_url()
     unsub_url = f"{base_url}/api/notifications/unsubscribe?token={token}"
 
@@ -932,7 +1020,14 @@ def render_bouquet_text(bouquet: Dict[str, Any], subscriber: Optional[Dict[str, 
         "---------------------------------------------------------------",
     ]
     for eq in bouquet.get("equities") or []:
-        link = build_tracked_link(eq.get("dossier_url") or f"/dossier/{eq.get('ticker', '')}", token=token)
+        eq_ticker = str(eq.get("ticker") or "").strip()
+        link = build_tracked_link(
+            eq.get("dossier_url") or f"/dossier/{eq_ticker}",
+            token=token,
+            edition_date=edition_date,
+            utm_content="equity_card",
+            utm_term=eq_ticker,
+        )
         cmp_disp = f"₹{eq['cmp']}" if eq.get("cmp") is not None else "N/A"
         roce_disp = f"{eq['roce']}%" if eq.get("roce") is not None else "N/A"
         sg_disp = f"{eq['sales_growth_3y']:+.1f}%" if eq.get("sales_growth_3y") is not None else "N/A"
@@ -955,7 +1050,7 @@ def render_bouquet_text(bouquet: Dict[str, Any], subscriber: Optional[Dict[str, 
                 "---------------------------------------------------------------",
                 f"10Y Benchmark G-Sec: {sov.get('ten_year_gsec')}% | 364D T-Bill: {sov.get('one_year_tbill')}% | Policy Repo: {sov.get('repo_rate')}%",
                 f"Signal: {sov.get('signal_summary')}",
-                f"Curve:  {build_tracked_link('/sovereign', token=token)}",
+                f"Curve:  {build_tracked_link('/sovereign', token=token, edition_date=edition_date, utm_content='sovereign_curve', utm_term='10Y_GSEC')}",
                 "",
             ]
         )
@@ -969,7 +1064,7 @@ def render_bouquet_text(bouquet: Dict[str, Any], subscriber: Optional[Dict[str, 
                 "---------------------------------------------------------------",
                 f"{debt.get('instrument_name')} ({debt.get('isin')})",
                 f"{debt.get('summary')}",
-                f"Dossier: {build_tracked_link(debt.get('detail_url') or '/debt', token=token)}",
+                f"Dossier: {build_tracked_link(debt.get('detail_url') or '/debt', token=token, edition_date=edition_date, utm_content='corporate_debt', utm_term=str(debt.get('isin') or ''))}",
                 "",
             ]
         )
@@ -983,7 +1078,7 @@ def render_bouquet_text(bouquet: Dict[str, Any], subscriber: Optional[Dict[str, 
                 "---------------------------------------------------------------",
                 f"{etf.get('scheme_name')} ({etf.get('symbol')}) [{etf.get('category')}]",
                 f"{etf.get('summary')}",
-                f"Matrix:  {build_tracked_link(etf.get('detail_url') or '/etfs', token=token)}",
+                f"Matrix:  {build_tracked_link(etf.get('detail_url') or '/etfs', token=token, edition_date=edition_date, utm_content='etf_matrix', utm_term=str(etf.get('symbol') or ''))}",
                 "",
             ]
         )
@@ -996,7 +1091,7 @@ def render_bouquet_text(bouquet: Dict[str, Any], subscriber: Optional[Dict[str, 
                 "5. REITS, INVITS & SOVEREIGN GOLD PARITY",
                 "---------------------------------------------------------------",
                 f"{reits.get('summary')}",
-                f"Details: {build_tracked_link(reits.get('detail_url') or '/reits', token=token)}",
+                f"Details: {build_tracked_link(reits.get('detail_url') or '/reits', token=token, edition_date=edition_date, utm_content='reits_sgb', utm_term=str(reits.get('reit_symbol') or ''))}",
                 "",
             ]
         )
@@ -1011,7 +1106,7 @@ def render_bouquet_text(bouquet: Dict[str, Any], subscriber: Optional[Dict[str, 
                 f"Scheme:       {mf.get('scheme_name')}",
                 f"Active Share: {mf.get('active_share')} | Direct TER: {mf.get('expense_ratio')}",
                 f"Audit Note:   {mf.get('highlight')}",
-                f"Dossier:      {build_tracked_link(mf.get('detail_url') or '/funds', token=token)}",
+                f"Dossier:      {build_tracked_link(mf.get('detail_url') or '/funds', token=token, edition_date=edition_date, utm_content='mutual_fund', utm_term=str(mf.get('scheme_code') or ''))}",
                 "",
             ]
         )
@@ -1026,7 +1121,7 @@ def render_bouquet_text(bouquet: Dict[str, Any], subscriber: Optional[Dict[str, 
                 "---------------------------------------------------------------",
                 f"{msme.get('company_name')} ({msme.get('cluster')}) | {msme.get('roce_pct')}",
                 f"{msme.get('moat_note')}",
-                f"Inspect MSME Dossier: {build_tracked_link(msme_path, token=token)}",
+                f"Inspect MSME Dossier: {build_tracked_link(msme_path, token=token, edition_date=edition_date, utm_content='msme_spotlight', utm_term=str(msme.get('uin') or ''))}",
                 "",
             ]
         )
@@ -1034,7 +1129,7 @@ def render_bouquet_text(bouquet: Dict[str, Any], subscriber: Optional[Dict[str, 
     lines.extend(
         [
             "===============================================================",
-            f"Terminal: {build_tracked_link('/', token=token)}",
+            f"Terminal: {build_tracked_link('/', token=token, edition_date=edition_date, utm_content='terminal_cta')}",
             "===============================================================",
             "MANDATORY STATUTORY SAFE HARBOR:",
             "Moatnomics is an independent financial technology analytics software tool and is NOT registered anywhere as a corporate entity or broker. We do not provide investment advice under SEBI regulations.",

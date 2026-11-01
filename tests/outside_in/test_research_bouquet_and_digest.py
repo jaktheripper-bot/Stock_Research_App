@@ -26,6 +26,7 @@ from core.db.digest import (
     set_user_digest_subscription,
     record_digest_dispatch,
     get_digest_dispatch_history,
+    get_emailer_utm_analytics,
     has_edition_been_dispatched,
 )
 from core.analysis.research_bouquet import (
@@ -35,6 +36,7 @@ from core.analysis.research_bouquet import (
     render_bouquet_text,
     get_tracking_base_url,
     build_tracked_link,
+    compute_subscriber_ref,
 )
 from core.notify import dispatch_research_bouquet
 
@@ -251,10 +253,15 @@ class TestResearchBouquetAndDigest(unittest.TestCase):
         self.assertIsNotNone(soup.find("button", id="btnSendTestDigest"))
         self.assertIsNotNone(soup.find("button", id="btnOpenBroadcastModal"))
 
-        # 4. Preview containers
+        # 4. Preview containers & UTM attribution panels
         self.assertIsNotNone(soup.find("iframe", id="digestPreviewIframe"))
         self.assertIsNotNone(soup.find("pre", id="digestTextContent"))
         self.assertIsNotNone(soup.find("tbody", id="digestHistoryTableBody"))
+        self.assertIsNotNone(soup.find("div", id="digestUtmTotalClicks"))
+        self.assertIsNotNone(soup.find("div", id="digestUtmCtrLabel"))
+        self.assertIsNotNone(soup.find("div", id="cardEmailerUtmAttribution"))
+        self.assertIsNotNone(soup.find("table", id="tableEmailerAssetClicks"))
+        self.assertIsNotNone(soup.find("tbody", id="tbodyEmailerAssetClicks"))
 
         # 5. Broadcast modal
         modal = soup.find("div", id="broadcastDigestModal")
@@ -381,6 +388,170 @@ class TestResearchBouquetAndDigest(unittest.TestCase):
         conn.commit()
         cur.close()
         conn.close()
+
+    def test_10_emailer_utm_tags_and_sub_ref_privacy_contracts(self):
+        """Validates Loopholes L1–L6: edition-aware UTM tags, hashed sub_ref (never raw sub_tk on content links), and end-to-end CTR/dwell aggregation."""
+        from urllib.parse import urlparse, parse_qs
+        import json
+
+        bouquet = compile_research_bouquet("2026-10-30", require_live_data=True)
+        raw_token = "unsub_secret_token_991122"
+        expected_sub_ref = compute_subscriber_ref(raw_token)
+        self.assertTrue(expected_sub_ref.startswith("sub_"))
+        self.assertNotIn(raw_token, expected_sub_ref)
+
+        html = render_bouquet_html(
+            bouquet,
+            subscriber={"full_name": "Rahul Sharma", "email": "rahul@domain.in", "unsubscribe_token": raw_token},
+        )
+        soup = BeautifulSoup(html, "html.parser")
+        links = [a.get("href", "") for a in soup.find_all("a") if a.get("href")]
+        self.assertGreaterEqual(len(links), 10)
+
+        content_sections_seen = set()
+        for href in links:
+            parsed = urlparse(href)
+            qs = parse_qs(parsed.query)
+            if "/api/notifications/unsubscribe" in parsed.path:
+                self.assertEqual(qs.get("token", [""])[0], raw_token)
+                self.assertNotIn("sub_ref", qs)
+            else:
+                # L2: Zero raw unsubscribe tokens on content links; uses non-reversible sub_ref
+                self.assertNotIn("sub_tk", qs, f"Raw sub_tk leaked in content link: {href}")
+                self.assertNotIn(raw_token, href)
+                self.assertEqual(qs.get("sub_ref", [""])[0], expected_sub_ref)
+                # L3: Edition-specific campaign & section-specific utm_content
+                self.assertEqual(qs.get("utm_source", [""])[0], "moatnomics_digest")
+                self.assertEqual(qs.get("utm_medium", [""])[0], "email_digest")
+                self.assertEqual(qs.get("utm_campaign", [""])[0], "research_bouquet_2026-10-30")
+                self.assertIn("utm_content", qs, f"Missing utm_content on link: {href}")
+                content_sections_seen.add(qs["utm_content"][0])
+
+        for expected_sec in (
+            "equity_card",
+            "sovereign_curve",
+            "corporate_debt",
+            "etf_matrix",
+            "reits_sgb",
+            "mutual_fund",
+            "msme_spotlight",
+            "terminal_cta",
+        ):
+            self.assertIn(expected_sec, content_sections_seen)
+
+        # L1, L4, L5: Simulate real visitor telemetry landing & dwell from emailer and verify CTR clamping <= 100%
+        test_ed = "2026-10-27"
+        conn = get_db_connection()
+        cur = conn.cursor()
+        p = get_placeholder()
+        cur.execute(f"DELETE FROM digest_dispatches WHERE edition_date = {p};", (test_ed,))
+        cur.execute(f"DELETE FROM site_usage_events WHERE session_id IN ({p}, {p});", ("sess_utm_live_01", "sess_utm_live_02"))
+        conn.commit()
+        cur.close()
+        conn.close()
+
+        try:
+            record_digest_dispatch(
+                edition_date=test_ed,
+                subject="Wrap 2026-10-27",
+                recipients_count=2,
+                delivered_count=2,
+                failed_count=0,
+                status="COMPLETED",
+            )
+            # Same subscriber (sub_ref) opens 2 different asset cards in 2 sessions -> unique_clickers = 1, click_sessions = 2, CTR = 50.0%
+            ua_headers = {"User-Agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 14_0) AppleWebKit/537.36 Chrome/128.0.0.0 Safari/537.36"}
+            unauth_client = TestClient(app)
+            r1 = unauth_client.post(
+                "/api/telemetry/event",
+                headers=ua_headers,
+                json={
+                    "event_type": "DOSSIER_VIEW",
+                    "ticker": "RELIANCE",
+                    "session_id": "sess_utm_live_01",
+                    "landing_page": "/dossier/RELIANCE",
+                    "utm_source": "moatnomics_digest",
+                    "utm_medium": "email_digest",
+                    "utm_campaign": f"research_bouquet_{test_ed}",
+                    "utm_content": "equity_card",
+                    "utm_term": "RELIANCE",
+                    "sub_ref": expected_sub_ref,
+                },
+            )
+            self.assertEqual(r1.status_code, 200)
+            self.assertEqual(r1.json().get("status"), "ok")
+
+            r2 = unauth_client.post(
+                "/api/telemetry/dwell",
+                headers=ua_headers,
+                json={
+                    "event_type": "PAGE_DWELL",
+                    "session_id": "sess_utm_live_01",
+                    "path": "/dossier/RELIANCE",
+                    "dwell_seconds": 80.0,
+                    "utm_source": "moatnomics_digest",
+                    "utm_medium": "email_digest",
+                    "utm_campaign": f"research_bouquet_{test_ed}",
+                    "utm_content": "equity_card",
+                    "utm_term": "RELIANCE",
+                    "sub_ref": expected_sub_ref,
+                },
+            )
+            self.assertEqual(r2.status_code, 200)
+
+            r3 = unauth_client.post(
+                "/api/telemetry/event",
+                headers=ua_headers,
+                json={
+                    "event_type": "PAGE_VIEW",
+                    "session_id": "sess_utm_live_02",
+                    "landing_page": "/sovereign",
+                    "utm_source": "moatnomics_digest",
+                    "utm_medium": "email_digest",
+                    "utm_campaign": f"research_bouquet_{test_ed}",
+                    "utm_content": "sovereign_curve",
+                    "utm_term": "10Y_GSEC",
+                    "sub_ref": expected_sub_ref,
+                },
+            )
+            self.assertEqual(r3.status_code, 200)
+
+            # Verify automated headless event is filtered out by is_synthetic_test_event
+            r_bot = unauth_client.post(
+                "/api/telemetry/event",
+                headers=ua_headers,
+                json={
+                    "event_type": "DOSSIER_VIEW",
+                    "ticker": "TCS",
+                    "session_id": "sess_utm_bot_99",
+                    "landing_page": "/dossier/TCS",
+                    "utm_source": "moatnomics_digest",
+                    "details": {"is_automated": True},
+                },
+            )
+            self.assertEqual(r_bot.json().get("status"), "filtered")
+
+            history = get_digest_dispatch_history(limit=15)
+            ed_row = next((h for h in history if h["edition_date"] == test_ed), None)
+            self.assertIsNotNone(ed_row)
+            self.assertEqual(ed_row["click_sessions"], 2)
+            self.assertEqual(ed_row["unique_clickers"], 1)
+            self.assertEqual(ed_row["ctr_pct"], 50.0)
+            self.assertEqual(ed_row["avg_dwell_seconds"], 40.0)
+
+            utm_summary = get_emailer_utm_analytics()
+            self.assertGreaterEqual(utm_summary["total_click_sessions"], 2)
+            ab_keys = {a["content_key"] for a in utm_summary["asset_breakdown"]}
+            self.assertIn("equity_card", ab_keys)
+            self.assertIn("sovereign_curve", ab_keys)
+        finally:
+            conn = get_db_connection()
+            cur = conn.cursor()
+            cur.execute(f"DELETE FROM digest_dispatches WHERE edition_date = {p};", (test_ed,))
+            cur.execute(f"DELETE FROM site_usage_events WHERE session_id IN ({p}, {p});", ("sess_utm_live_01", "sess_utm_live_02"))
+            conn.commit()
+            cur.close()
+            conn.close()
 
 
 if __name__ == "__main__":

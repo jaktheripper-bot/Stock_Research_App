@@ -12,6 +12,7 @@ Provides:
 - Forensic Intelligence Copilot chat dialogue and conversation history APIs
 """
 
+import hashlib
 import os
 import sys
 import io
@@ -178,6 +179,7 @@ async def admin_dashboard(
     start_date: Optional[str] = None,
     end_date: Optional[str] = None,
     include_tests: int = 0,
+    audience_filter: Optional[str] = "all",
     msg: Optional[str] = None,
     err: Optional[str] = None,
     error: Optional[str] = None,
@@ -243,11 +245,20 @@ async def admin_dashboard(
             window = "30d"
 
     try:
-        summary = get_site_usage_summary(days=selected_days, start_date=parsed_start, end_date=parsed_end, exclude_tests=exclude_tests)
+        summary = get_site_usage_summary(
+            days=selected_days,
+            start_date=parsed_start,
+            end_date=parsed_end,
+            exclude_tests=exclude_tests,
+            audience_filter=audience_filter or "all",
+        )
     except Exception as e:
         logger.error(f"Error fetching site usage summary: {e}")
         summary = {
-            "unique_sessions": 0, "total_actions": 0, "cache_efficiency_pct": 0.0,
+            "audience_filter": audience_filter or "all",
+            "unique_sessions": 0, "human_sessions": 0, "crawler_sessions": 0,
+            "human_events": 0, "crawler_events": 0,
+            "total_actions": 0, "cache_efficiency_pct": 0.0,
             "total_cost_saved_usd": 0.0, "total_cost_saved_inr": 0.0, "pdf_downloads": 0, "action_breakdown": {},
             "top_searched_tickers": [], "traffic_sources": [], "top_referrers": [],
             "top_landing_pages": [], "top_visited_pages": [],
@@ -255,8 +266,11 @@ async def admin_dashboard(
             "overall_avg_dwell_seconds": 0.0, "formatted_overall_avg_dwell": "0s",
             "total_dwell_hours": 0.0, "total_navigation_transitions": 0,
             "top_contributing_page": None,
-            "geographic_distribution": [], "device_breakdown": [], "browser_breakdown": [],
-            "os_breakdown": [], "recent_events": []
+            "geographic_distribution": [], "crawler_geographic_distribution": [],
+            "device_breakdown": [], "crawler_device_breakdown": [],
+            "browser_breakdown": [], "crawler_browser_breakdown": [],
+            "os_breakdown": [], "crawler_os_breakdown": [],
+            "recent_events": []
         }
 
     try:
@@ -397,18 +411,33 @@ async def admin_dashboard(
         ai_spends = {}
 
     try:
-        from core.db.digest import get_digest_subscribers, get_digest_dispatch_history
+        from core.db.digest import (
+            get_digest_subscribers,
+            get_digest_dispatch_history,
+            get_emailer_utm_analytics,
+        )
         from core.notify import get_email_service_status, get_admin_notification_email
         from core.analysis.research_bouquet import get_tracking_base_url
         digest_subs = get_digest_subscribers(only_active_pro=False)
         pro_subs = [s for s in digest_subs if s.get("subscription_tier") in ("pro_monthly", "pro_annual") or s.get("is_subscriber")]
+        recent_dispatches = get_digest_dispatch_history(limit=10)
+        utm_analytics = get_emailer_utm_analytics()
+        prod_delivered = sum(int(d.get("delivered_count") or 0) for d in recent_dispatches if d.get("status") != "TEST_SENT")
+        unique_clickers = int(utm_analytics.get("unique_clickers_count") or 0)
+        overall_ctr_pct = (
+            min(100.0, round((unique_clickers / max(1, prod_delivered)) * 100.0, 1))
+            if prod_delivered > 0 and unique_clickers > 0
+            else 0.0
+        )
+        utm_analytics["overall_ctr_pct"] = overall_ctr_pct
         digest_summary = {
             "total_subscribers": len(digest_subs),
             "pro_subscribers": len(pro_subs),
             "email_service": get_email_service_status(),
             "admin_email": get_admin_notification_email(),
             "tracking_url": get_tracking_base_url(),
-            "recent_dispatches": get_digest_dispatch_history(limit=10)
+            "recent_dispatches": recent_dispatches,
+            "utm_analytics": utm_analytics,
         }
     except Exception as dig_err:
         logger.debug(f"Error compiling digest summary for admin view: {dig_err}")
@@ -1870,27 +1899,31 @@ async def admin_process_refund(
     current_email = admin_session.get("email")
     client_ip = _get_client_ip(request)
 
-    res = process_refund(gateway_order_id=order_id, user_email=user_email, reason=reason)
-    if res.get("success"):
+    success, message = process_refund(
+        transaction_id=order_id,
+        reason=reason or "Customer request",
+        admin_notes=f"User: {user_email}",
+    )
+    if success:
         record_admin_audit(
             current_email,
             "process_refund_success",
             target_type="order",
             target_id=order_id,
-            details={"user_email": user_email, "amount": res.get("refund_amount", 0), "reason": reason},
+            details={"user_email": user_email, "message": message, "reason": reason},
             ip_address=client_ip
         )
-        msg = f"Refund+of+Rs+{res.get('refund_amount', 0)}+processed+successfully+for+{order_id}"
+        msg = urllib.parse.quote_plus(message)
     else:
         record_admin_audit(
             current_email,
             "process_refund_failed",
             target_type="order",
             target_id=order_id,
-            details={"user_email": user_email, "error": res.get("error")},
+            details={"user_email": user_email, "error": message},
             ip_address=client_ip
         )
-        msg = f"Refund+failed:+{res.get('error', 'Unknown error')}"
+        msg = urllib.parse.quote_plus(f"Refund failed: {message}")
     return RedirectResponse(url=f"/admin?tab=billables&msg={msg}", status_code=303)
 
 
@@ -2404,7 +2437,8 @@ def api_admin_traffic_flow(
     days: Optional[int] = Query(30, ge=1, le=365),
     start_date: Optional[str] = Query(None),
     end_date: Optional[str] = Query(None),
-    include_tests: Optional[bool] = Query(False)
+    include_tests: Optional[bool] = Query(False),
+    audience_filter: Optional[str] = Query("all")
 ):
     """
     Returns granular page dwell times and the internal site visit navigation tree (transition matrix).
@@ -2428,10 +2462,12 @@ def api_admin_traffic_flow(
         days=days if not (parsed_start and parsed_end) else None,
         start_date=parsed_start,
         end_date=parsed_end,
-        exclude_tests=not include_tests
+        exclude_tests=not include_tests,
+        audience_filter=audience_filter or "all"
     )
     return JSONResponse(status_code=200, content={
         "success": True,
+        "audience_filter": (audience_filter or "all").strip().lower(),
         "flow": flow
     })
 
@@ -2528,16 +2564,25 @@ async def api_admin_digest_broadcast(request: Request):
 
 @router.get("/api/admin/digest/history")
 async def api_admin_digest_history(request: Request, limit: int = 15):
-    """Returns chronological digest dispatch logs."""
+    """Returns chronological digest dispatch logs and emailer UTM attribution summary."""
     if not _is_admin_authenticated(request):
         raise HTTPException(status_code=401, detail="Admin authentication required.")
 
-    from core.db.digest import get_digest_dispatch_history
+    from core.db.digest import get_digest_dispatch_history, get_emailer_utm_analytics
 
     history = get_digest_dispatch_history(limit=limit)
+    utm_analytics = get_emailer_utm_analytics()
+    prod_delivered = sum(int(d.get("delivered_count") or 0) for d in history if d.get("status") != "TEST_SENT")
+    unique_clickers = int(utm_analytics.get("unique_clickers_count") or 0)
+    utm_analytics["overall_ctr_pct"] = (
+        min(100.0, round((unique_clickers / max(1, prod_delivered)) * 100.0, 1))
+        if prod_delivered > 0 and unique_clickers > 0
+        else 0.0
+    )
     return JSONResponse(status_code=200, content={
         "success": True,
-        "history": history
+        "history": history,
+        "utm_analytics": utm_analytics,
     })
 
 

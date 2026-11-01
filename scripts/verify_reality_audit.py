@@ -179,22 +179,23 @@ class RealityAuditor:
                             self.fail(gate, f"{rel}:{node.lineno}",
                                       f"NameError on Python <=3.12: '{sub.id}' used in type annotation but never imported from typing.")
 
-        # 2.5 Verify `process_refund` call sites match `core.db.users.process_refund` signature
+        # 2.5 Verify `process_refund` call sites match `core.db.users.process_refund` signature across all callers
         from core.db.users import process_refund
         sig = inspect.signature(process_refund)
         valid_params = set(sig.parameters.keys())
-        ac_path = ROOT / "core/agents/copilot/admin_copilot.py"
-        if ac_path.exists():
-            tree = ast.parse(ac_path.read_text(encoding="utf-8"))
-            for node in ast.walk(tree):
-                if isinstance(node, ast.Call) and getattr(node.func, "id", "") == "process_refund":
-                    call_kwargs = {kw.arg for kw in node.keywords if kw.arg}
-                    invalid_kw = call_kwargs - valid_params
-                    if invalid_kw:
-                        self.fail(gate, f"core/agents/copilot/admin_copilot.py:{node.lineno}",
-                                  f"process_refund() called with invalid kwargs {invalid_kw}; valid={valid_params}")
-                    else:
-                        self.ok(gate, "process_refund() signature matches admin_copilot.py call site")
+        for call_rel in ("core/agents/copilot/admin_copilot.py", "web/routers/admin.py"):
+            call_path = ROOT / call_rel
+            if call_path.exists():
+                tree = ast.parse(call_path.read_text(encoding="utf-8"))
+                for node in ast.walk(tree):
+                    if isinstance(node, ast.Call) and getattr(node.func, "id", "") == "process_refund":
+                        call_kwargs = {kw.arg for kw in node.keywords if kw.arg}
+                        invalid_kw = call_kwargs - valid_params
+                        if invalid_kw:
+                            self.fail(gate, f"{call_rel}:{node.lineno}",
+                                      f"process_refund() called with invalid kwargs {invalid_kw}; valid={valid_params}")
+                        else:
+                            self.ok(gate, f"process_refund() signature matches {call_rel} call site")
 
     # =========================================================================
     # GATE 3: LIVE SQL-TO-SCHEMA INTROSPECTION

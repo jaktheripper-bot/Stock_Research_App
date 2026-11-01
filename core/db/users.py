@@ -942,37 +942,59 @@ def get_revenue_analytics_summary(days: int = None, start_date = None, end_date 
 
 
 def process_refund(
-    transaction_id: str,
+    transaction_id: Optional[str] = None,
     refund_amount: Optional[float] = None,
     reason: str = "Customer requested return within policy",
-    admin_notes: str = ""
+    admin_notes: str = "",
+    gateway_order_id: Optional[str] = None,
+    user_email: Optional[str] = None,
 ) -> Tuple[bool, str]:
     """
     Processes a return / refund for an existing purchase transaction.
+    - Accepts `transaction_id` or `gateway_order_id` (matches `id`, `gateway_order_id`, `gateway_payment_id`, or `invoice_number`)
     - Sets transaction status to 'refunded' with immutable audit fields
     - Deducts the equivalent credits from the user's credit balance
     - Logs a reversal ledger entry for SEBI / accounting audit trail
     """
-    if not transaction_id:
-        return False, "Transaction ID required."
+    target_ref = str(transaction_id or gateway_order_id or "").strip()
+    if not target_ref:
+        return False, "Transaction ID or Gateway Order ID required."
+
+    if user_email and f"User: {user_email}" not in admin_notes:
+        admin_notes = f"{admin_notes} | User: {user_email}".strip(" |")
 
     init_db()
     conn = get_db_connection()
     cursor = conn.cursor()
     p = get_placeholder()
-    tx_clean = str(transaction_id).strip()
 
     try:
+        # 1. Try matching by gateway_order_id, gateway_payment_id, or invoice_number first (all VARCHAR)
         cursor.execute(
-            f"SELECT id, user_id, amount_inr, credits_added, status, invoice_number FROM credit_transactions WHERE id = {p};",
-            (tx_clean,)
+            f"""
+            SELECT id, user_id, amount_inr, credits_added, status, invoice_number
+            FROM credit_transactions
+            WHERE gateway_order_id = {p} OR gateway_payment_id = {p} OR invoice_number = {p}
+            ORDER BY created_at DESC LIMIT 1;
+            """,
+            (target_ref, target_ref, target_ref),
         )
         tx = cursor.fetchone()
-        if not tx:
-            return False, f"Transaction {tx_clean} not found."
 
+        # 2. If not found and target_ref is numeric, try matching primary key `id`
+        if not tx and target_ref.isdigit():
+            cursor.execute(
+                f"SELECT id, user_id, amount_inr, credits_added, status, invoice_number FROM credit_transactions WHERE id = {p};",
+                (int(target_ref),),
+            )
+            tx = cursor.fetchone()
+
+        if not tx:
+            return False, f"Transaction {target_ref} not found."
+
+        tx_pk = tx[0]
         if tx[4] == "refunded":
-            return False, f"Transaction {tx_clean} is already marked as refunded."
+            return False, f"Transaction {target_ref} is already marked as refunded."
 
         user_id = tx[1]
         orig_amount = float(tx[2] or 0.0)
@@ -980,7 +1002,6 @@ def process_refund(
         actual_refund_amt = float(refund_amount) if refund_amount is not None else orig_amount
 
         # Update credit_transactions
-        now_val = "CURRENT_TIMESTAMP"
         cursor.execute(
             f"""
             UPDATE credit_transactions
@@ -990,7 +1011,7 @@ def process_refund(
                 refunded_at = CURRENT_TIMESTAMP
             WHERE id = {p};
             """,
-            (actual_refund_amt, f"{reason} | Notes: {admin_notes}", tx_clean)
+            (actual_refund_amt, f"{reason} | Notes: {admin_notes}", tx_pk)
         )
 
         # Adjust user balance
@@ -1011,10 +1032,10 @@ def process_refund(
         )
 
         conn.commit()
-        logger.info(f"Processed refund for tx {tx_clean} (User: {user_id}, Amount: ₹{actual_refund_amt}). Adjusted balance: {new_bal}")
+        logger.info(f"Processed refund for tx {target_ref} (id={tx_pk}, User: {user_id}, Amount: ₹{actual_refund_amt}). Adjusted balance: {new_bal}")
         return True, f"Successfully processed refund of ₹{actual_refund_amt:.2f} for Invoice {tx[5]}. Reversal ledger committed."
     except Exception as e:
-        logger.error(f"Error processing refund for {transaction_id}: {e}")
+        logger.error(f"Error processing refund for {target_ref}: {e}")
         try:
             conn.rollback()
         except Exception as rb_err:

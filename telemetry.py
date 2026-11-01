@@ -173,8 +173,13 @@ def parse_traffic_source(referrer: str, query_params: dict) -> tuple:
     # 1. UTM Attribution
     utm_source = query_params.get("utm_source") or query_params.get("ref") or query_params.get("source")
     if utm_source:
-        if str(utm_source).strip().lower() == "share":
+        src_clean = str(utm_source).strip().lower()
+        if src_clean == "share":
             return "Shared Link", referrer or "Share Button"
+        if src_clean == "moatnomics_digest":
+            return "Email Digest (Bouquet)", referrer or "Research Bouquet Emailer"
+        if src_clean in ("moatnomics_support", "support_desk"):
+            return "Support Desk Email", referrer or "Support Ticket Reply"
         return str(utm_source), referrer or "Campaign Link"
 
     # 2. Direct Navigation

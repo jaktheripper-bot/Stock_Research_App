@@ -2194,12 +2194,24 @@ function getTelemetrySessionId() {
   }
 }
 
+function detectAutomationPresence() {
+  try {
+    const isWebDriver = !!navigator.webdriver;
+    const isHeadless = /HeadlessChrome/.test(navigator.userAgent) ||
+                       Boolean(window.chrome && !window.chrome.runtime && !navigator.languages);
+    const hasZeroPlugins = navigator.plugins && navigator.plugins.length === 0;
+    return Boolean(isWebDriver || isHeadless || (isWebDriver && hasZeroPlugins));
+  } catch (e) {
+    return false;
+  }
+}
+
 function stripTrackingParams() {
-  // Remove campaign tags from the visible URL after they have been captured, so a copied address-bar link is clean
+  // Remove campaign and subscriber tracking tags from the visible URL after capture so a copied address-bar link is clean
   try {
     const url = new URL(window.location.href);
     let changed = false;
-    ['utm_source', 'utm_medium', 'utm_campaign', 'utm_term', 'utm_content', 'ref', 'source'].forEach(function(k) {
+    ['utm_source', 'utm_medium', 'utm_campaign', 'utm_term', 'utm_content', 'sub_ref', 'sub_tk', 'ref', 'source'].forEach(function(k) {
       if (url.searchParams.has(k)) { url.searchParams.delete(k); changed = true; }
     });
     if (changed) window.history.replaceState(window.history.state, '', url.pathname + url.search + url.hash);
@@ -2209,7 +2221,7 @@ function stripTrackingParams() {
 function getAcquisitionData() {
   try {
     const params = new URLSearchParams(window.location.search);
-    const hasCampaign = !!(params.get('utm_source') || params.get('ref') || params.get('source'));
+    const hasCampaign = !!(params.get('utm_source') || params.get('utm_campaign') || params.get('sub_ref') || params.get('sub_tk') || params.get('ref') || params.get('source'));
     let data = sessionStorage.getItem('sr_acquisition');
     if (data && !hasCampaign) return JSON.parse(data);
 
@@ -2228,6 +2240,7 @@ function getAcquisitionData() {
       utm_campaign: params.get('utm_campaign') || '',
       utm_term: params.get('utm_term') || '',
       utm_content: params.get('utm_content') || '',
+      sub_ref: params.get('sub_ref') || params.get('sub_tk') || '',
       ref: params.get('ref') || params.get('source') || '',
       captured_at: new Date().toLocaleString('sv-SE', { timeZone: 'Asia/Kolkata' }).replace(' ', 'T') + '+05:30'
     };
@@ -2348,6 +2361,8 @@ window.trackUserEvent = function(eventType, ticker, details) {
     const vis = getReturningVisitorMeta();
     const currentPath = window.location.pathname;
     const landingPath = acq.landing_path || currentPath;
+    const screenRes = (typeof window !== 'undefined' && window.screen) ? `${window.screen.width}x${window.screen.height}` : '';
+    const hasTouch = typeof window !== 'undefined' && ('ontouchstart' in window || (navigator && navigator.maxTouchPoints > 0));
     const mergedDetails = Object.assign({
       path: currentPath,
       landing_page: landingPath,
@@ -2356,7 +2371,16 @@ window.trackUserEvent = function(eventType, ticker, details) {
       visitor_id: vis.visitor_id,
       visit_number: vis.visit_number,
       is_returning: vis.is_returning,
-      days_since_last_visit: vis.days_since_last_visit
+      days_since_last_visit: vis.days_since_last_visit,
+      utm_source: acq.utm_source || '',
+      utm_medium: acq.utm_medium || '',
+      utm_campaign: acq.utm_campaign || '',
+      utm_content: acq.utm_content || '',
+      utm_term: acq.utm_term || '',
+      sub_ref: acq.sub_ref || '',
+      is_automated: detectAutomationPresence(),
+      screen_res: screenRes,
+      touch: hasTouch
     }, details || {});
 
     const payload = {
@@ -2375,6 +2399,9 @@ window.trackUserEvent = function(eventType, ticker, details) {
       utm_source: acq.utm_source || '',
       utm_medium: acq.utm_medium || '',
       utm_campaign: acq.utm_campaign || '',
+      utm_content: acq.utm_content || '',
+      utm_term: acq.utm_term || '',
+      sub_ref: acq.sub_ref || '',
       ref: acq.ref || '',
       details: mergedDetails
     };
@@ -2517,6 +2544,8 @@ function initDwellAndTransitionTelemetry() {
     const acq = getAcquisitionData();
     const vis = getReturningVisitorMeta();
     const currentPath = window.location.pathname;
+    const screenRes = (typeof window !== 'undefined' && window.screen) ? `${window.screen.width}x${window.screen.height}` : '';
+    const hasTouch = typeof window !== 'undefined' && ('ontouchstart' in window || (navigator && navigator.maxTouchPoints > 0));
     return {
       event_type: 'PAGE_DWELL',
       ticker: '',
@@ -2534,6 +2563,13 @@ function initDwellAndTransitionTelemetry() {
       dwell_seconds: dwellToSend,
       max_scroll_pct: maxScrollPct,
       pillar_dwell: pillarSnapshot,
+      utm_source: acq.utm_source || '',
+      utm_medium: acq.utm_medium || '',
+      utm_campaign: acq.utm_campaign || '',
+      utm_content: acq.utm_content || '',
+      utm_term: acq.utm_term || '',
+      sub_ref: acq.sub_ref || '',
+      ref: acq.ref || '',
       details: {
         path: currentPath,
         dwell_seconds: dwellToSend,
@@ -2544,7 +2580,16 @@ function initDwellAndTransitionTelemetry() {
         visitor_id: vis.visitor_id,
         visit_number: vis.visit_number,
         is_returning: vis.is_returning,
-        days_since_last_visit: vis.days_since_last_visit
+        days_since_last_visit: vis.days_since_last_visit,
+        utm_source: acq.utm_source || '',
+        utm_medium: acq.utm_medium || '',
+        utm_campaign: acq.utm_campaign || '',
+        utm_content: acq.utm_content || '',
+        utm_term: acq.utm_term || '',
+        sub_ref: acq.sub_ref || '',
+        is_automated: detectAutomationPresence(),
+        screen_res: screenRes,
+        touch: hasTouch
       }
     };
   }
