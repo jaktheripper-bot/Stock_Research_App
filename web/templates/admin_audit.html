@@ -120,11 +120,11 @@
                 Overall System Health
             </div>
             <div style="display: flex; align-items: baseline; gap: 0.5rem;">
-                <span style="font-size: 2.25rem; font-weight: 800; color: {% if latest_audit.overall_score >= 85 %}#10b981{% elif latest_audit.overall_score >= 70 %}#f59e0b{% else %}#f43f5e{% endif %}; font-variant-numeric: tabular-nums;">
+                <span data-style-color="{% if latest_audit.overall_score >= 85 %}#10b981{% elif latest_audit.overall_score >= 70 %}#f59e0b{% else %}#f43f5e{% endif %}" style="font-size: 2.25rem; font-weight: 800; font-variant-numeric: tabular-nums;">
                     {{ "%.1f"|format(latest_audit.overall_score) }}
                 </span>
                 <span style="color: #64748b; font-size: 1rem; font-weight: 600;">/ 100</span>
-                <span style="margin-left: auto; font-size: 0.75rem; font-weight: 700; padding: 0.2rem 0.5rem; border-radius: 4px; background: {% if latest_audit.status in ['EXEMPLARY', 'COMPLIANT'] %}rgba(16, 185, 129, 0.15); color: #34d399;{% else %}rgba(245, 158, 11, 0.15); color: #fbbf24;{% endif %}">
+                <span data-style-bg="{% if latest_audit.status in ['EXEMPLARY', 'COMPLIANT'] %}rgba(16, 185, 129, 0.15){% else %}rgba(245, 158, 11, 0.15){% endif %}" data-style-color="{% if latest_audit.status in ['EXEMPLARY', 'COMPLIANT'] %}#34d399{% else %}#fbbf24{% endif %}" style="margin-left: auto; font-size: 0.75rem; font-weight: 700; padding: 0.2rem 0.5rem; border-radius: 4px;">
                     {{ latest_audit.status }}
                 </span>
             </div>
@@ -267,7 +267,7 @@
                                 <td style="padding: 0.6rem 0.5rem 0.6rem 0; font-family: monospace; color: #cbd5e1;">
                                     {{ a.audit_id }}
                                 </td>
-                                <td style="padding: 0.6rem 0.5rem; font-weight: 700; font-variant-numeric: tabular-nums; color: {% if a.overall_score >= 85 %}#10b981{% elif a.overall_score >= 70 %}#f59e0b{% else %}#f43f5e{% endif %};">
+                                <td data-style-color="{% if a.overall_score >= 85 %}#10b981{% elif a.overall_score >= 70 %}#f59e0b{% else %}#f43f5e{% endif %}" style="padding: 0.6rem 0.5rem; font-weight: 700; font-variant-numeric: tabular-nums;">
                                     {{ "%.1f"|format(a.overall_score) }}
                                 </td>
                                 <td style="padding: 0.6rem 0.5rem;">
@@ -301,12 +301,12 @@
                     {% for ep in (ep_source or []) %}
                     <div style="background: rgba(30, 41, 59, 0.4); padding: 0.4rem 0.6rem; border-radius: 4px; color: #cbd5e1; display: flex; align-items: center; justify-content: space-between; gap: 0.5rem;">
                         <div style="display: flex; align-items: center; gap: 0.4rem; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">
-                            <span style="display: inline-block; width: 6px; height: 6px; border-radius: 50%; background: {{ '#34d399' if ep.healthy else '#f87171' }}; flex-shrink: 0;"></span>
+                            <span data-style-bg="{{ '#34d399' if ep.healthy else '#f87171' }}" style="display: inline-block; width: 6px; height: 6px; border-radius: 50%; flex-shrink: 0;"></span>
                             <code style="color: #f8fafc; font-size: 0.75rem;">{{ ep.path }}</code>
                             <span style="color: #64748b; font-size: 0.75rem; overflow: hidden; text-overflow: ellipsis;">({{ ep.name }})</span>
                         </div>
                         <div style="display: flex; align-items: center; gap: 0.4rem; flex-shrink: 0;">
-                            <span style="font-size: 0.7rem; color: {{ '#34d399' if ep.healthy else '#f87171' }}; font-weight: 600;">{{ ep.status_code if ep.status_code else 200 }}</span>
+                            <span data-style-color="{{ '#34d399' if ep.healthy else '#f87171' }}" style="font-size: 0.7rem; font-weight: 600;">{{ ep.status_code if ep.status_code else 200 }}</span>
                             {% if ep.latency_ms is defined and ep.latency_ms is not none %}
                             <span style="font-size: 0.65rem; color: #64748b;">{{ ep.latency_ms }}ms</span>
                             {% endif %}

@@ -99,9 +99,9 @@
       </div>
 
       {% if contagion_alert %}
-      <div style="display: inline-flex; align-items: center; gap: 6px; padding: 6px 14px; border-radius: 9999px; background: rgba(255, 255, 255, 0.05); border: 1px solid {{ contagion_alert.badge_color }};">
-        <span style="width: 8px; height: 8px; border-radius: 50%; background: {{ contagion_alert.badge_color }};"></span>
-        <span style="font-size: 12px; font-weight: 700; color: {{ contagion_alert.badge_color }};"><svg class="glyph" style="width:12px;height:12px;vertical-align:-1px;margin-right:3px;"><use href="#icon-radar"></use></svg>{{ contagion_alert.radar_label }}</span>
+      <div data-style-border-color="{{ contagion_alert.badge_color }}" style="display: inline-flex; align-items: center; gap: 6px; padding: 6px 14px; border-radius: 9999px; background: rgba(255, 255, 255, 0.05); border: 1px solid transparent;">
+        <span data-style-bg="{{ contagion_alert.badge_color }}" style="width: 8px; height: 8px; border-radius: 50%;"></span>
+        <span data-style-color="{{ contagion_alert.badge_color }}" style="font-size: 12px; font-weight: 700;"><svg class="glyph" style="width:12px;height:12px;vertical-align:-1px;margin-right:3px;"><use href="#icon-radar"></use></svg>{{ contagion_alert.radar_label }}</span>
       </div>
       {% endif %}
     </div>

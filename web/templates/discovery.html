@@ -341,10 +341,10 @@
   }
 
   // Live countdown to 09:00 AM IST
-  {% if not is_past_9am and is_yesterday_edition %}
-  let remainingSec = {{ seconds_until_9am }};
+  const isCountdownActive = "{{ '1' if (not is_past_9am and is_yesterday_edition) else '0' }}" === "1";
+  let remainingSec = Number("{{ seconds_until_9am or 0 }}");
   const cdElem = document.getElementById('countdownBadge');
-  if (cdElem && remainingSec > 0) {
+  if (isCountdownActive && cdElem && remainingSec > 0) {
     setInterval(() => {
       if (remainingSec > 0) {
         remainingSec--;
@@ -357,6 +357,5 @@
       }
     }, 1000);
   }
-  {% endif %}
 </script>
 {% endblock %}

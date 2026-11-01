@@ -116,7 +116,7 @@
           </div>
           <div style="display: flex; justify-content: space-between;">
             <span style="color: #64748b;">Seniority Waterfall:</span>
-            <span style="font-weight: 600; color: {% if s.seniority_tier == 'SENIOR_SECURED' %}#10b981{% elif s.seniority_tier == 'PERPETUAL_AT1' %}#ef4444{% else %}#f59e0b{% endif %};">
+            <span data-style-color="{% if s.seniority_tier == 'SENIOR_SECURED' %}#10b981{% elif s.seniority_tier == 'PERPETUAL_AT1' %}#ef4444{% else %}#f59e0b{% endif %}" style="font-weight: 600;">
               {{ s.seniority_tier.replace('_', ' ') }}
             </span>
           </div>

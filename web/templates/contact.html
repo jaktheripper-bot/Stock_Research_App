@@ -89,7 +89,7 @@
           <label for="contactUserEmail" style="display: block; font-size: 13px; font-weight: 600; color: var(--text-secondary); margin-bottom: 6px;">
             Verified Account Email <span style="color: var(--accent-rose);">*</span>
           </label>
-          <input type="email" id="contactUserEmail" name="user_email" required autocomplete="email" autocorrect="off" autocapitalize="off" spellcheck="false" aria-describedby="contactEmailHelp" placeholder="Sign in above to verify your email" {% if contact_user %}readonly aria-readonly="true"{% endif %} style="width: 100%; box-sizing: border-box; padding: 12px 14px; background: var(--bg-surface); border: 1px solid var(--border-color); border-radius: 6px; color: var(--text-primary); font-size: 16px; {% if contact_user %}opacity: 0.9;{% endif %}" value="{{ form_email|default('') }}">
+          <input type="email" id="contactUserEmail" name="user_email" required autocomplete="email" autocorrect="off" autocapitalize="off" spellcheck="false" aria-describedby="contactEmailHelp" placeholder="Sign in above to verify your email" data-style-opacity="{% if contact_user %}0.9{% else %}1{% endif %}" style="width: 100%; box-sizing: border-box; padding: 12px 14px; background: var(--bg-surface); border: 1px solid var(--border-color); border-radius: 6px; color: var(--text-primary); font-size: 16px;" value="{{ form_email|default('') }}" {% if contact_user %}readonly aria-readonly="true"{% endif %}>
           <span id="contactEmailHelp" style="display: block; margin-top: 5px; font-size: 11.5px; color: var(--text-muted);">
             {% if contact_user %}Locked to your authenticated Moatnomics account email.{% else %}Sign in first so your ticket is bound to your verified email address.{% endif %}
           </span>
@@ -176,7 +176,7 @@
               {{ tracked_ticket.message }}
             </div>
             {% for resp in tracked_ticket.responses %}
-            <div style="background: var(--bg-surface); border-left: 3px solid {% if resp.responder_role == 'user' %}var(--border-color){% else %}var(--accent-cyan){% endif %}; border-radius: 6px; padding: 10px 12px; font-size: 12.5px; color: var(--text-primary);">
+            <div data-style-border-left-color="{% if resp.responder_role == 'user' %}var(--border-color){% else %}var(--accent-cyan){% endif %}" style="background: var(--bg-surface); border-left: 3px solid var(--border-color); border-radius: 6px; padding: 10px 12px; font-size: 12.5px; color: var(--text-primary);">
               <div style="font-size: 11px; color: var(--accent-cyan); font-weight: 700; margin-bottom: 4px;">
                 {% if resp.responder_role == 'user' %}You{% else %}<svg class="glyph" style="width: 12px; height: 12px; vertical-align: -1px;"><use href="#glyph-shield"></use></svg> Moatnomics Support Desk{% endif %} • {{ resp.created_at }}
               </div>

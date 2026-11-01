@@ -175,7 +175,11 @@
   <div class="container">
     <div style="display: flex; flex-wrap: wrap; justify-content: space-between; align-items: flex-end; margin-bottom: 32px; gap: 16px;">
       <div>
-        <div class="hero-badge" style="margin-bottom: 10px; display: inline-flex; align-items: center; gap: 8px; {% if is_yesterday_edition %}background: rgba(245, 158, 11, 0.15); border-color: rgba(245, 158, 11, 0.4); color: #fbbf24;{% endif %}">
+        {% if is_yesterday_edition %}
+        <div class="hero-badge" style="margin-bottom: 10px; display: inline-flex; align-items: center; gap: 8px; background: rgba(245, 158, 11, 0.15); border-color: rgba(245, 158, 11, 0.4); color: #fbbf24;">
+        {% else %}
+        <div class="hero-badge" style="margin-bottom: 10px; display: inline-flex; align-items: center; gap: 8px;">
+        {% endif %}
           {% if is_yesterday_edition %}
           <span><svg class="glyph" style="width: 12px; height: 12px; vertical-align: -1px;"><use href="#glyph-clock"></use></svg> YESTERDAY'S 9:00 AM EDITION</span>
           {% else %}
@@ -651,7 +655,7 @@
           <div style="font-size: 12px; color: #94a3b8; display: flex; flex-direction: column; gap: 6px; margin-bottom: 16px;">
             <div style="display: flex; justify-content: space-between;">
               <span>Return on Equity (ROE):</span>
-              <strong style="color: {% if eq.roe and eq.roe >= 15.0 %}#10b981{% elif eq.roe and eq.roe > 0 %}#38bdf8{% else %}#94a3b8{% endif %};" title="{{ eq.roe_tooltip|default('Return on Equity (ROE)') }}">
+              <strong data-style-color="{% if eq.roe and eq.roe >= 15.0 %}#10b981{% elif eq.roe and eq.roe > 0 %}#38bdf8{% else %}#94a3b8{% endif %}" title="{{ eq.roe_tooltip|default('Return on Equity (ROE)') }}">
                 {{ eq.roe_pct|default('—') }}
               </strong>
             </div>

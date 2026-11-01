@@ -88,7 +88,7 @@
         </div>
         <div class="tnum">
           <div style="font-size: 11px; color: #94a3b8; text-transform: uppercase;">Net Real Return</div>
-          <div style="font-size: 20px; font-weight: 800; color: {% if custom_yield_result.net_real_return_pct >= 0 %}#10b981{% else %}#ef4444{% endif %};">
+          <div data-style-color="{% if custom_yield_result.net_real_return_pct >= 0 %}#10b981{% else %}#ef4444{% endif %}" style="font-size: 20px; font-weight: 800;">
             {% if custom_yield_result.net_real_return_pct >= 0 %}+{% endif %}{{ custom_yield_result.net_real_return_pct }}%
           </div>
         </div>

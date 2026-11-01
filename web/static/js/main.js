@@ -4326,6 +4326,48 @@ if (document.readyState === "loading") {
   initOmniSearchModal();
 }
 
+// Hydrate dynamic inline styles from data-style-* attributes so raw HTML templates never contain Jinja inside style=""
+function hydrateDynamicInlineStyles(root) {
+  const scope = root || document;
+  scope.querySelectorAll("[data-style-color]").forEach((el) => {
+    const val = el.getAttribute("data-style-color");
+    if (val) el.style.color = val;
+  });
+  scope.querySelectorAll("[data-style-bg]").forEach((el) => {
+    const val = el.getAttribute("data-style-bg");
+    if (val) el.style.background = val;
+  });
+  scope.querySelectorAll("[data-style-border-color]").forEach((el) => {
+    const val = el.getAttribute("data-style-border-color");
+    if (val) el.style.borderColor = val;
+  });
+  scope.querySelectorAll("[data-style-border-left-color]").forEach((el) => {
+    const val = el.getAttribute("data-style-border-left-color");
+    if (val) el.style.borderLeftColor = val;
+  });
+  scope.querySelectorAll("[data-style-width]").forEach((el) => {
+    const val = el.getAttribute("data-style-width");
+    if (val) el.style.width = val;
+  });
+  scope.querySelectorAll("[data-style-left]").forEach((el) => {
+    const val = el.getAttribute("data-style-left");
+    if (val) el.style.left = val;
+  });
+  scope.querySelectorAll("[data-style-box-shadow]").forEach((el) => {
+    const val = el.getAttribute("data-style-box-shadow");
+    if (val) el.style.boxShadow = val;
+  });
+  scope.querySelectorAll("[data-style-opacity]").forEach((el) => {
+    const val = el.getAttribute("data-style-opacity");
+    if (val) el.style.opacity = val;
+  });
+}
+
+hydrateDynamicInlineStyles();
+if (document.readyState === "loading") {
+  document.addEventListener("DOMContentLoaded", () => hydrateDynamicInlineStyles());
+}
+
 
 
 

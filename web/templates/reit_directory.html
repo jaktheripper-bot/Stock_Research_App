@@ -260,7 +260,7 @@
 
           <div style="display: flex; justify-content: space-between; align-items: baseline; margin-bottom: 4px;">
             <a href="/reits/{{ r.symbol }}" style="font-size: 19px; font-weight: 800; color: #f8fafc; text-decoration: none; font-family: monospace;">{{ r.symbol }}</a>
-            <span style="font-size: 11.5px; font-weight: 700; color: {% if r.discount_to_nav_pct < 0 %}#10b981{% else %}#f59e0b{% endif %};" class="tnum">
+            <span data-style-color="{% if r.discount_to_nav_pct < 0 %}#10b981{% else %}#f59e0b{% endif %}" style="font-size: 11.5px; font-weight: 700;" class="tnum">
               {% if r.discount_to_nav_pct < 0 %}{{ r.discount_to_nav_pct }}% Disc to NAV{% else %}+{{ r.discount_to_nav_pct }}% vs NAV{% endif %}
             </span>
           </div>
@@ -286,7 +286,7 @@
           <div style="display: grid; grid-template-columns: repeat(2, 1fr); gap: 8px; margin-bottom: 16px;">
             <div style="background: rgba(15, 23, 42, 0.35); border: 1px solid rgba(255, 255, 255, 0.06); border-radius: 8px; padding: 8px 10px; display: flex; justify-content: space-between; align-items: center;">
               <span style="font-size: 11px; color: #64748b; font-weight: 600;">Occupancy</span>
-              <span style="font-size: 12.5px; font-weight: 800; color: {% if r.occupancy_pct >= 95.0 %}#34d399{% else %}#fbbf24{% endif %};" class="tnum">{{ r.occupancy_pct }}%</span>
+              <span data-style-color="{% if r.occupancy_pct >= 95.0 %}#34d399{% else %}#fbbf24{% endif %}" style="font-size: 12.5px; font-weight: 800;" class="tnum">{{ r.occupancy_pct }}%</span>
             </div>
             <div style="background: rgba(15, 23, 42, 0.35); border: 1px solid rgba(255, 255, 255, 0.06); border-radius: 8px; padding: 8px 10px; display: flex; justify-content: space-between; align-items: center;">
               <span style="font-size: 11px; color: #64748b; font-weight: 600;">NDCF Purity</span>
@@ -361,7 +361,7 @@
             <td style="padding: 14px 14px; color: #94a3b8;" class="tnum">
               ₹{{ "{:,.2f}".format(r.nav_per_unit) }}
             </td>
-            <td style="padding: 14px 14px; color: {% if r.discount_to_nav_pct < 0 %}#10b981{% else %}#f59e0b{% endif %};" class="tnum font-weight-bold">
+            <td data-style-color="{% if r.discount_to_nav_pct < 0 %}#10b981{% else %}#f59e0b{% endif %}" style="padding: 14px 14px;" class="tnum font-weight-bold">
               {{ r.discount_to_nav_pct }}%
             </td>
             <td style="padding: 14px 14px; font-weight: 800; color: #10b981;" class="tnum">

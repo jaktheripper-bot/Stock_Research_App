@@ -924,6 +924,46 @@ class RealityAuditor:
         else:
             self.ok(gate, "Zero backslash-escaped quotes in HTML tags across all web templates")
 
+        # 12.4 No Jinja expressions/statements inside style="..." or unquoted inside executable <script> blocks
+        style_jinja_violations = []
+        script_jinja_violations = []
+        for tmpl in sorted((ROOT / "web/templates").rglob("*.html")):
+            txt = tmpl.read_text(encoding="utf-8")
+            rel_path = str(tmpl.relative_to(ROOT))
+            for line_no, line in enumerate(txt.splitlines(), 1):
+                for m in re.finditer(r'style\s*=\s*(["\'])(.*?)\1', line):
+                    if "{{" in m.group(2) or "{%" in m.group(2):
+                        style_jinja_violations.append(f"{rel_path}:{line_no}")
+            for m in re.finditer(r"<script([^>]*)>(.*?)</script>", txt, re.DOTALL | re.IGNORECASE):
+                attrs = m.group(1)
+                if "application/json" in attrs or "application/ld+json" in attrs:
+                    continue
+                body = m.group(2)
+                start_line = txt[:m.start()].count("\n") + 1
+                for offset, line in enumerate(body.splitlines()):
+                    stripped = re.sub(r'(["\'`])(?:\\.|(?!\1).)*\1', "", line)
+                    if "{{" in stripped or "{%" in stripped:
+                        script_jinja_violations.append(f"{rel_path}:{start_line + offset}")
+
+        if style_jinja_violations:
+            self.fail(
+                gate,
+                ", ".join(style_jinja_violations[:5]),
+                f"STATIC CSS PARSER VIOLATION: Found {len(style_jinja_violations)} style=\"...\" attribute(s) containing raw Jinja ({{{{ or {{%). Use CSS classes or data-style-* attributes hydrated by hydrateDynamicInlineStyles()."
+            )
+        else:
+            self.ok(gate, "Zero raw Jinja tokens inside style=\"...\" attributes across 100% of web templates")
+
+        if script_jinja_violations:
+            self.fail(
+                gate,
+                ", ".join(script_jinja_violations[:5]),
+                f"STATIC JS PARSER VIOLATION: Found {len(script_jinja_violations)} unquoted Jinja expression(s)/statement(s) inside executable <script> block(s). Use <script type=\"application/json\"> + JSON.parse() or quoted strings."
+            )
+        else:
+            self.ok(gate, "Zero unquoted Jinja tokens inside executable <script> blocks across 100% of web templates")
+
+
     def report(self) -> int:
         print("=" * 76)
         print("MOATNOMICS ZERO-ILLUSION REALITY & SECURITY AUDIT")

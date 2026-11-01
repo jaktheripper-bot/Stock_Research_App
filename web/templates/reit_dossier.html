@@ -25,7 +25,7 @@
       <div>
         <!-- Badges -->
         <div style="display: inline-flex; align-items: center; gap: 8px; margin-bottom: 12px; flex-wrap: wrap;">
-          <span style="font-size: 12px; font-weight: 700; color: {% if reit.structure_type == 'SM_REIT' %}#c084fc{% elif reit.structure_type == 'INVIT' %}#fbbf24{% else %}#38bdf8{% endif %}; background: {% if reit.structure_type == 'SM_REIT' %}rgba(168, 85, 247, 0.15){% elif reit.structure_type == 'INVIT' %}rgba(245, 158, 11, 0.15){% else %}rgba(14, 165, 233, 0.15){% endif %}; border: 1px solid {% if reit.structure_type == 'SM_REIT' %}rgba(168, 85, 247, 0.3){% elif reit.structure_type == 'INVIT' %}rgba(245, 158, 11, 0.3){% else %}rgba(14, 165, 233, 0.3){% endif %}; padding: 4px 10px; border-radius: 6px; text-transform: uppercase;">
+          <span data-style-color="{% if reit.structure_type == 'SM_REIT' %}#c084fc{% elif reit.structure_type == 'INVIT' %}#fbbf24{% else %}#38bdf8{% endif %}" data-style-bg="{% if reit.structure_type == 'SM_REIT' %}rgba(168, 85, 247, 0.15){% elif reit.structure_type == 'INVIT' %}rgba(245, 158, 11, 0.15){% else %}rgba(14, 165, 233, 0.15){% endif %}" data-style-border-color="{% if reit.structure_type == 'SM_REIT' %}rgba(168, 85, 247, 0.3){% elif reit.structure_type == 'INVIT' %}rgba(245, 158, 11, 0.3){% else %}rgba(14, 165, 233, 0.3){% endif %}" style="font-size: 12px; font-weight: 700; border: 1px solid transparent; padding: 4px 10px; border-radius: 6px; text-transform: uppercase;">
             {{ reit.structure_label }}
           </span>
           <span style="font-size: 12px; font-weight: 600; color: #94a3b8; background: rgba(255, 255, 255, 0.05); padding: 4px 10px; border-radius: 6px;">
@@ -117,10 +117,10 @@
       <!-- Discount / Premium to NAV Status Card -->
       <div style="text-align: right; background: rgba(15, 23, 42, 0.75); border: 1px solid rgba(255, 255, 255, 0.1); border-radius: 14px; padding: 18px 24px; min-width: 230px;">
         <div style="font-size: 11.5px; color: #94a3b8; text-transform: uppercase; font-weight: 700; margin-bottom: 6px;">Valuation vs Appraised NAV</div>
-        <div style="font-size: 34px; font-weight: 900; line-height: 1; color: {% if reit.discount_to_nav_pct < 0 %}#34d399{% elif reit.discount_to_nav_pct > 0 %}#f59e0b{% else %}#94a3b8{% endif %};" class="tnum">
+        <div data-style-color="{% if reit.discount_to_nav_pct < 0 %}#34d399{% elif reit.discount_to_nav_pct > 0 %}#f59e0b{% else %}#94a3b8{% endif %}" style="font-size: 34px; font-weight: 900; line-height: 1;" class="tnum">
           {% if reit.discount_to_nav_pct > 0 %}+{{ reit.discount_to_nav_pct }}%{% else %}{{ reit.discount_to_nav_pct }}%{% endif %}
         </div>
-        <div style="font-size: 12.5px; font-weight: 700; margin-top: 6px; color: {% if reit.discount_to_nav_pct < 0 %}#34d399{% elif reit.discount_to_nav_pct > 0 %}#f59e0b{% else %}#94a3b8{% endif %};">
+        <div data-style-color="{% if reit.discount_to_nav_pct < 0 %}#34d399{% elif reit.discount_to_nav_pct > 0 %}#f59e0b{% else %}#94a3b8{% endif %}" style="font-size: 12.5px; font-weight: 700; margin-top: 6px;">
           {{ reit.discount_label }}
         </div>
         <div style="font-size: 11px; color: #64748b; margin-top: 4px;">
@@ -186,16 +186,16 @@
       <!-- Multi-segment bar -->
       <div style="height: 18px; background: rgba(15, 23, 42, 0.8); border-radius: 8px; overflow: hidden; display: flex; box-shadow: inset 0 1px 3px rgba(0,0,0,0.5);">
         {% if tax_waterfall.return_of_capital_pct > 0 %}
-        <div style="width: {{ tax_waterfall.return_of_capital_pct }}%; background: #10b981;" title="Return of Capital: {{ tax_waterfall.return_of_capital_pct }}% (Tax Exempt up to Cost)"></div>
+        <div data-style-width="{{ tax_waterfall.return_of_capital_pct }}%" style="background: #10b981;" title="Return of Capital: {{ tax_waterfall.return_of_capital_pct }}% (Tax Exempt up to Cost)"></div>
         {% endif %}
         {% if tax_waterfall.dividend_pct > 0 %}
-        <div style="width: {{ tax_waterfall.dividend_pct }}%; background: #38bdf8;" title="Dividend: {{ tax_waterfall.dividend_pct }}% (Exempt if SPV opted for 25% tax)"></div>
+        <div data-style-width="{{ tax_waterfall.dividend_pct }}%" style="background: #38bdf8;" title="Dividend: {{ tax_waterfall.dividend_pct }}% (Exempt if SPV opted for 25% tax)"></div>
         {% endif %}
         {% if tax_waterfall.interest_pct > 0 %}
-        <div style="width: {{ tax_waterfall.interest_pct }}%; background: #c084fc;" title="Interest: {{ tax_waterfall.interest_pct }}% (Taxable at marginal slab)"></div>
+        <div data-style-width="{{ tax_waterfall.interest_pct }}%" style="background: #c084fc;" title="Interest: {{ tax_waterfall.interest_pct }}% (Taxable at marginal slab)"></div>
         {% endif %}
         {% if tax_waterfall.rental_pct > 0 %}
-        <div style="width: {{ tax_waterfall.rental_pct }}%; background: #f59e0b;" title="Rental: {{ tax_waterfall.rental_pct }}% (Taxable at marginal slab)"></div>
+        <div data-style-width="{{ tax_waterfall.rental_pct }}%" style="background: #f59e0b;" title="Rental: {{ tax_waterfall.rental_pct }}% (Taxable at marginal slab)"></div>
         {% endif %}
       </div>
 
@@ -440,7 +440,7 @@
       <div style="background: rgba(30, 41, 59, 0.5); border: 1px solid rgba(255, 255, 255, 0.06); border-radius: 10px; padding: 16px;">
         <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 6px;">
           <div style="font-size: 13.5px; font-weight: 700; color: #f8fafc;">{{ risk.category }}</div>
-          <span style="font-size: 10.5px; font-weight: 700; padding: 2px 6px; border-radius: 4px; background: {% if risk.severity in ['CRITICAL', 'HIGH'] %}rgba(239, 68, 68, 0.2){% elif risk.severity == 'MODERATE' %}rgba(245, 158, 11, 0.2){% else %}rgba(56, 189, 248, 0.15){% endif %}; color: {% if risk.severity in ['CRITICAL', 'HIGH'] %}#f87171{% elif risk.severity == 'MODERATE' %}#fbbf24{% else %}#38bdf8{% endif %};">
+          <span data-style-bg="{% if risk.severity in ['CRITICAL', 'HIGH'] %}rgba(239, 68, 68, 0.2){% elif risk.severity == 'MODERATE' %}rgba(245, 158, 11, 0.2){% else %}rgba(56, 189, 248, 0.15){% endif %}" data-style-color="{% if risk.severity in ['CRITICAL', 'HIGH'] %}#f87171{% elif risk.severity == 'MODERATE' %}#fbbf24{% else %}#38bdf8{% endif %}" style="font-size: 10.5px; font-weight: 700; padding: 2px 6px; border-radius: 4px;">
             {{ risk.severity }}
           </span>
         </div>
@@ -494,9 +494,13 @@
         </thead>
         <tbody>
           {% for peer in peers %}
-          <tr style="border-bottom: 1px solid rgba(255, 255, 255, 0.05); {% if peer.is_current %}background: rgba(56, 189, 248, 0.1); border-left: 3px solid #38bdf8;{% else %}transition: background 0.15s ease;{% endif %}" {% if not peer.is_current %}onmouseover="this.style.background='rgba(30, 41, 59, 0.5)'" onmouseout="this.style.background='transparent'"{% endif %}>
+          {% if peer.is_current %}
+          <tr style="border-bottom: 1px solid rgba(255, 255, 255, 0.05); background: rgba(56, 189, 248, 0.1); border-left: 3px solid #38bdf8;">
+          {% else %}
+          <tr style="border-bottom: 1px solid rgba(255, 255, 255, 0.05); transition: background 0.15s ease;" onmouseover="this.style.background='rgba(30, 41, 59, 0.5)'" onmouseout="this.style.background='transparent'">
+          {% endif %}
             <td style="padding: 12px 14px;">
-              <span style="font-weight: 800; color: {% if peer.is_current %}#38bdf8{% else %}#f8fafc{% endif %};">{{ peer.symbol }}</span>
+              <span data-style-color="{% if peer.is_current %}#38bdf8{% else %}#f8fafc{% endif %}" style="font-weight: 800;">{{ peer.symbol }}</span>
               {% if peer.is_current %}<span style="font-size: 11px; background: rgba(56, 189, 248, 0.2); color: #38bdf8; padding: 1px 6px; border-radius: 4px; margin-left: 6px;">Current</span>{% endif %}
               <div style="font-size: 11.5px; color: #94a3b8; max-width: 220px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">{{ peer.name }}</div>
             </td>
@@ -507,7 +511,7 @@
               ₹{{ "{:,.2f}".format(peer.nav_per_unit) }}
             </td>
             <td style="padding: 12px 14px; font-weight: 700; text-align: right;" class="tnum">
-              <span style="color: {% if peer.discount_to_nav_pct < 0 %}#34d399{% elif peer.discount_to_nav_pct > 0 %}#f59e0b{% else %}#94a3b8{% endif %};">
+              <span data-style-color="{% if peer.discount_to_nav_pct < 0 %}#34d399{% elif peer.discount_to_nav_pct > 0 %}#f59e0b{% else %}#94a3b8{% endif %}">
                 {% if peer.discount_to_nav_pct > 0 %}+{{ peer.discount_to_nav_pct }}%{% else %}{{ peer.discount_to_nav_pct }}%{% endif %}
               </span>
             </td>
@@ -541,12 +545,13 @@
 
 {% include "partials/copilot_modal.html" %}
 
+<script id="reitTaxSlabsData" type="application/json">{{ tax_waterfall.slabs | tojson }}</script>
 <script>
   window.__CURRENT_TICKER = "{{ reit.symbol }}";
   window.__CURRENT_ASSET_TYPE = "reit";
 
   // Reactive Tax Waterfall Client-Side Logic
-  const TAX_SLABS = {{ tax_waterfall.slabs | tojson }};
+  const TAX_SLABS = JSON.parse(document.getElementById("reitTaxSlabsData").textContent || "[]");
   const TAX_SLABS_DATA = TAX_SLABS;
 
   function selectTaxSlab(slabRate) {
@@ -593,8 +598,8 @@
   }
 
   let activeReitSlabRate = 30.0;
-  const GROSS_YIELD_PCT = {{ reit.distribution_yield_pct|default(6.5)|tojson }};
-  const ROC_SPLIT_PCT = {{ reit.tax_ReturnOfCapital_pct|default(40.0)|tojson }};
+  const GROSS_YIELD_PCT = Number("{{ reit.distribution_yield_pct|default(6.5) }}");
+  const ROC_SPLIT_PCT = Number("{{ reit.tax_ReturnOfCapital_pct|default(40.0) }}");
 
   function recalcReitCorpusWaterfall() {
     const slab = TAX_SLABS.find(s => Number(s.slab_rate_pct) === Number(activeReitSlabRate)) || TAX_SLABS[3] || TAX_SLABS[0];

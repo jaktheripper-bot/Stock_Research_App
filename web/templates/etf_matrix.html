@@ -192,7 +192,7 @@
           </div>
           <div>
             <div style="font-size: 10px; color: #64748b; text-transform: uppercase; font-weight: 600;">Prem / Disc</div>
-            <div style="font-size: 16px; font-weight: 800; color: {% if etf.premium_discount_pct > 0.5 %}#f59e0b{% elif etf.premium_discount_pct < -0.5 %}#10b981{% else %}#f8fafc{% endif %};" class="tnum">
+            <div data-style-color="{% if etf.premium_discount_pct > 0.5 %}#f59e0b{% elif etf.premium_discount_pct < -0.5 %}#10b981{% else %}#f8fafc{% endif %}" style="font-size: 16px; font-weight: 800;" class="tnum">
               {{ "%+.2f"|format(etf.premium_discount_pct) }}%
             </div>
           </div>

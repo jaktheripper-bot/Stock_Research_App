@@ -249,7 +249,7 @@
             <!-- Turnover -->
             <td style="padding: 14px 18px; text-align: right; font-weight: 800; font-size: 15px;">
               {% if f.annual_turnover is not none %}
-                <span style="color: {% if f.annual_turnover >= 50.0 %}#10b981{% elif f.annual_turnover >= 5.0 %}#60a5fa{% else %}#f59e0b{% endif %};">
+                <span data-style-color="{% if f.annual_turnover >= 50.0 %}#10b981{% elif f.annual_turnover >= 5.0 %}#60a5fa{% else %}#f59e0b{% endif %}">
                   ₹{{ "{:,.1f}".format(f.annual_turnover) }} Cr
                 </span>
               {% else %}

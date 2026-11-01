@@ -52,9 +52,9 @@
       {% if ep_ledger.claims %}
       <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap: 12px;">
         {% for c in ep_ledger.claims %}
-        <div style="background: rgba(2, 6, 23, 0.55); border: 1px solid rgba(255,255,255,0.07); border-left: 3px solid {{ c.badge.color }}; border-radius: 8px; padding: 12px;">
+        <div data-style-border-left-color="{{ c.badge.color }}" style="background: rgba(2, 6, 23, 0.55); border: 1px solid rgba(255,255,255,0.07); border-left: 3px solid transparent; border-radius: 8px; padding: 12px;">
           <div style="display: flex; justify-content: space-between; align-items: center; gap: 6px; margin-bottom: 6px;">
-            <span class="epistemic-badge" style="font-size: 10px; font-weight: 800; color: {{ c.badge.color }}; text-transform: uppercase; letter-spacing: 0.04em;">{{ c.badge.label }}</span>
+            <span class="epistemic-badge" data-style-color="{{ c.badge.color }}" style="font-size: 10px; font-weight: 800; text-transform: uppercase; letter-spacing: 0.04em;">{{ c.badge.label }}</span>
             <span class="tnum" style="font-size: 10.5px; color: #94a3b8;">As of {{ c.source_date }}</span>
           </div>
           <div style="font-size: 12.5px; font-weight: 600; color: #f1f5f9; margin-bottom: 6px; line-height: 1.45;">{{ c.claim }}</div>

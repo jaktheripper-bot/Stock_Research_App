@@ -452,7 +452,7 @@
             </div>
             <div>
               <div style="font-size: 10px; color: #64748b; text-transform: uppercase; font-weight: 700;">Spread vs G-Sec</div>
-              <div style="font-size: 14px; font-weight: 800; color: {% if state.spread_over_gsec_bps < 35 %}#34d399{% elif state.spread_over_gsec_bps < 48 %}#fbbf24{% else %}#f87171{% endif %};" class="tnum">+{{ state.spread_over_gsec_bps }} bps</div>
+              <div data-style-color="{% if state.spread_over_gsec_bps < 35 %}#34d399{% elif state.spread_over_gsec_bps < 48 %}#fbbf24{% else %}#f87171{% endif %}" style="font-size: 14px; font-weight: 800;" class="tnum">+{{ state.spread_over_gsec_bps }} bps</div>
             </div>
             <div>
               <div style="font-size: 10px; color: #64748b; text-transform: uppercase; font-weight: 700;">Debt / GSDP</div>

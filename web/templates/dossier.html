@@ -315,7 +315,11 @@
         </div>
         {% if chart_data.trend_badge %}
         <div style="display: flex; align-items: center; gap: 8px;">
-          <span class="badge" style="{% if chart_data.trend_status == 'bullish' %}background: rgba(16, 185, 129, 0.15); color: #34d399; border: 1px solid rgba(16, 185, 129, 0.3);{% else %}background: rgba(245, 158, 11, 0.15); color: #fbbf24; border: 1px solid rgba(245, 158, 11, 0.3);{% endif %} font-weight: 700; font-size: 12px; padding: 5px 12px;">
+          {% if chart_data.trend_status == 'bullish' %}
+          <span class="badge" style="background: rgba(16, 185, 129, 0.15); color: #34d399; border: 1px solid rgba(16, 185, 129, 0.3); font-weight: 700; font-size: 12px; padding: 5px 12px;">
+          {% else %}
+          <span class="badge" style="background: rgba(245, 158, 11, 0.15); color: #fbbf24; border: 1px solid rgba(245, 158, 11, 0.3); font-weight: 700; font-size: 12px; padding: 5px 12px;">
+          {% endif %}
             {{ chart_data.trend_badge }}
           </span>
         </div>
@@ -356,11 +360,11 @@
         <div style="display: flex; align-items: center; gap: 12px; flex-wrap: wrap;">
           <div style="text-align: right;">
             <div style="font-size: 11px; color: var(--text-muted);">Composite Quality</div>
-            <div style="font-size: 22px; font-weight: 800; color: {{ equity_intel.composite_color }};">
+            <div data-style-color="{{ equity_intel.composite_color }}" style="font-size: 22px; font-weight: 800;">
               {{ equity_intel.composite_score }}<span style="font-size: 13px; color: var(--text-muted);">/100</span>
             </div>
           </div>
-          <span class="badge" style="background: rgba(14, 165, 233, 0.15); color: {{ equity_intel.composite_color }}; border: 1px solid {{ equity_intel.composite_color }}44; font-weight: 700; font-size: 12px; padding: 6px 12px; border-radius: 9999px;">
+          <span class="badge" data-style-color="{{ equity_intel.composite_color }}" data-style-border-color="{{ equity_intel.composite_color }}44" style="background: rgba(14, 165, 233, 0.15); border: 1px solid transparent; font-weight: 700; font-size: 12px; padding: 6px 12px; border-radius: 9999px;">
             {{ equity_intel.composite_verdict.replace('_', ' ') }}
           </span>
         </div>
@@ -373,7 +377,7 @@
         <div style="background: rgba(30, 41, 59, 0.5); border: 1px solid rgba(255,255,255,0.06); border-radius: 8px; padding: 12px 14px;">
           <div style="display: flex; justify-content: space-between; align-items: center;">
             <span style="font-size: 11px; color: var(--text-muted); font-weight: 600;">SECTOR EFFICIENCY</span>
-            <span style="font-size: 12px; font-weight: 800; color: {{ equity_intel.sector_intelligence.badge_color }};">{{ equity_intel.sector_intelligence.score }}/100</span>
+            <span data-style-color="{{ equity_intel.sector_intelligence.badge_color }}" style="font-size: 12px; font-weight: 800;">{{ equity_intel.sector_intelligence.score }}/100</span>
           </div>
           <div style="font-size: 13.5px; font-weight: 700; color: #e2e8f0; margin-top: 4px;">
             {{ equity_intel.sector_intelligence.verdict.replace('_', ' ').title() }}
@@ -384,7 +388,7 @@
         <div style="background: rgba(30, 41, 59, 0.5); border: 1px solid rgba(255,255,255,0.06); border-radius: 8px; padding: 12px 14px;">
           <div style="display: flex; justify-content: space-between; align-items: center;">
             <span style="font-size: 11px; color: var(--text-muted); font-weight: 600;">MARGIN OF SAFETY</span>
-            <span style="font-size: 12px; font-weight: 800; color: {{ equity_intel.valuation_radar.badge_color }};">
+            <span data-style-color="{{ equity_intel.valuation_radar.badge_color }}" style="font-size: 12px; font-weight: 800;">
               {% if equity_intel.valuation_radar.status == 'UNAVAILABLE' %}
                 N/A
               {% elif equity_intel.valuation_radar.status == 'IMPLIED_GROWTH_ONLY' %}
@@ -413,9 +417,9 @@
         <div style="background: rgba(30, 41, 59, 0.5); border: 1px solid rgba(255,255,255,0.06); border-radius: 8px; padding: 12px 14px;">
           <div style="display: flex; justify-content: space-between; align-items: center;">
             <span style="font-size: 11px; color: var(--text-muted); font-weight: 600;">360° ACCOUNTING CHECK</span>
-            <span style="font-size: 12px; font-weight: 800; color: {{ equity_intel.forensic_intelligence.badge_color }};">{% if equity_intel.forensic_intelligence.locked %}<svg class="glyph" style="width:10px;height:10px;vertical-align:-1px;margin-right:2px;"><use href="#icon-lock"></use></svg>Gated{% elif equity_intel.forensic_intelligence.verdict == 'INSUFFICIENT_DISCLOSURES' %}{{ equity_intel.forensic_intelligence.disclosed_count }}/{{ equity_intel.forensic_intelligence.total_checks }} Verified{% else %}{{ equity_intel.forensic_intelligence.passed_count }}/{{ equity_intel.forensic_intelligence.total_checks }} Passed{% endif %}</span>
+            <span data-style-color="{{ equity_intel.forensic_intelligence.badge_color }}" style="font-size: 12px; font-weight: 800;">{% if equity_intel.forensic_intelligence.locked %}<svg class="glyph" style="width:10px;height:10px;vertical-align:-1px;margin-right:2px;"><use href="#icon-lock"></use></svg>Gated{% elif equity_intel.forensic_intelligence.verdict == 'INSUFFICIENT_DISCLOSURES' %}{{ equity_intel.forensic_intelligence.disclosed_count }}/{{ equity_intel.forensic_intelligence.total_checks }} Verified{% else %}{{ equity_intel.forensic_intelligence.passed_count }}/{{ equity_intel.forensic_intelligence.total_checks }} Passed{% endif %}</span>
           </div>
-          <div style="font-size: 13.5px; font-weight: 700; color: {{ equity_intel.forensic_intelligence.badge_color }}; margin-top: 4px;">
+          <div data-style-color="{{ equity_intel.forensic_intelligence.badge_color }}" style="font-size: 13.5px; font-weight: 700; margin-top: 4px;">
             {{ equity_intel.forensic_intelligence.badge_label }}
           </div>
         </div>
@@ -424,9 +428,9 @@
         <div style="background: rgba(30, 41, 59, 0.5); border: 1px solid rgba(255,255,255,0.06); border-radius: 8px; padding: 12px 14px;">
           <div style="display: flex; justify-content: space-between; align-items: center;">
             <span style="font-size: 11px; color: var(--text-muted); font-weight: 600;">EXCHANGE DEPTH (L2)</span>
-            <span style="font-size: 12px; font-weight: 800; color: {{ equity_intel.institutional_flow.badge_color }};">{{ equity_intel.institutional_flow.score }}/100</span>
+            <span data-style-color="{{ equity_intel.institutional_flow.badge_color }}" style="font-size: 12px; font-weight: 800;">{{ equity_intel.institutional_flow.score }}/100</span>
           </div>
-          <div style="font-size: 13.5px; font-weight: 700; color: {{ equity_intel.institutional_flow.badge_color }}; margin-top: 4px;">
+          <div data-style-color="{{ equity_intel.institutional_flow.badge_color }}" style="font-size: 13.5px; font-weight: 700; margin-top: 4px;">
             {{ equity_intel.institutional_flow.flow_regime.replace('_', ' ').title() }}
           </div>
         </div>
@@ -452,7 +456,7 @@
             <div style="background: rgba(30, 41, 59, 0.4); border-radius: 6px; padding: 8px 10px;">
               <div style="font-size: 11px; color: var(--text-muted);">{{ k.name }}</div>
               <div style="font-size: 15px; font-weight: 700; color: #f1f5f9; margin-top: 2px;">{{ k.val }}</div>
-              <div style="font-size: 10.5px; color: {% if k.status == 'PASS' %}#10b981{% elif k.status == 'NEUTRAL' %}#94a3b8{% else %}#fbbf24{% endif %}; margin-top: 2px;">
+              <div data-style-color="{% if k.status == 'PASS' %}#10b981{% elif k.status == 'NEUTRAL' %}#94a3b8{% else %}#fbbf24{% endif %}" style="font-size: 10.5px; margin-top: 2px;">
                 {{ k.benchmark }} ({{ k.status }})
               </div>
             </div>
@@ -479,7 +483,7 @@
           <div style="display: flex; justify-content: space-between; margin-bottom: 10px; font-size: 12px;">
             <div>
               <span style="color: var(--text-muted);">Order Imbalance:</span>
-              <strong style="color: {{ equity_intel.institutional_flow.badge_color }};"> {{ (equity_intel.institutional_flow.imbalance_ratio * 100)|round(1) }}% Bids</strong>
+              <strong data-style-color="{{ equity_intel.institutional_flow.badge_color }}"> {{ (equity_intel.institutional_flow.imbalance_ratio * 100)|round(1) }}% Bids</strong>
             </div>
             <div>
               <span style="color: var(--text-muted);">Bid-Ask Spread:</span>
@@ -516,7 +520,7 @@
         <div style="background: rgba(15, 23, 42, 0.6); border: 1px solid rgba(255,255,255,0.08); border-radius: 8px; padding: 14px 16px;">
           <div style="font-size: 13px; font-weight: 700; color: #38bdf8; margin-bottom: 8px; display: flex; justify-content: space-between; align-items: center;">
             <span>360° Forensic Clean-Room Ledger</span>
-            <span class="badge" style="font-size: 10.5px; background: rgba(148,163,184,0.14); color: {{ equity_intel.forensic_intelligence.badge_color }};">
+            <span class="badge" data-style-color="{{ equity_intel.forensic_intelligence.badge_color }}" style="font-size: 10.5px; background: rgba(148,163,184,0.14);">
               {% if equity_intel.forensic_intelligence.verdict == 'INSUFFICIENT_DISCLOSURES' %}{{ equity_intel.forensic_intelligence.disclosed_count }}/{{ equity_intel.forensic_intelligence.total_checks }} Verified{% else %}{{ equity_intel.forensic_intelligence.passed_count }}/{{ equity_intel.forensic_intelligence.total_checks }} Passed{% endif %}
             </span>
           </div>
@@ -535,7 +539,7 @@
                 {% for chk in equity_intel.forensic_intelligence.checks_detail|default([]) %}
                 <tr style="border-bottom: 1px solid rgba(255,255,255,0.04);">
                   <td style="padding: 6px 8px; color: #cbd5e1;">{{ chk.label }}</td>
-                  <td style="padding: 6px 8px; text-align: right; color: {{ chk.color }}; font-weight: 700;">{{ chk.verdict }}</td>
+                  <td data-style-color="{{ chk.color }}" style="padding: 6px 8px; text-align: right; font-weight: 700;">{{ chk.verdict }}</td>
                 </tr>
                 {% endfor %}
               </tbody>
@@ -549,7 +553,7 @@
         <div style="background: rgba(15, 23, 42, 0.6); border: 1px solid rgba(255,255,255,0.08); border-radius: 8px; padding: 14px 16px;">
           <div style="font-size: 13px; font-weight: 700; color: #38bdf8; margin-bottom: 8px; display: flex; justify-content: space-between; align-items: center;">
             <span>Triangulated Intrinsic Valuation Matrix</span>
-            <span class="badge" style="font-size: 10.5px; background: rgba(56,189,248,0.15); color: {{ equity_intel.valuation_radar.badge_color }};">
+            <span class="badge" data-style-color="{{ equity_intel.valuation_radar.badge_color }}" style="font-size: 10.5px; background: rgba(56,189,248,0.15);">
               MoS: {% if equity_intel.valuation_radar.margin_of_safety_pct is not none and equity_intel.valuation_radar.margin_of_safety_pct >= 0 %}+{% endif %}{{ equity_intel.valuation_radar.margin_of_safety_pct }}%
             </span>
           </div>
@@ -651,7 +655,7 @@
               </div>
               <div style="text-align: right;">
                 <div style="font-size: 11px; color: #94a3b8; text-transform: uppercase; font-weight: 700;">Simulated Margin of Safety</div>
-                <div id="dcfSimMos" class="tnum" style="font-size: 20px; font-weight: 800; color: {{ equity_intel.valuation_radar.badge_color }};">
+                <div id="dcfSimMos" class="tnum" data-style-color="{{ equity_intel.valuation_radar.badge_color }}" style="font-size: 20px; font-weight: 800;">
                   {% if equity_intel.valuation_radar.margin_of_safety_pct is not none and equity_intel.valuation_radar.margin_of_safety_pct >= 0 %}+{% endif %}{{ equity_intel.valuation_radar.margin_of_safety_pct }}%
                 </div>
               </div>
@@ -665,10 +669,10 @@
 
       <script>
       function recalcDcfSandbox() {
-        const cmp = {{ equity_intel.valuation_radar.current_price|default(0)|tojson }};
-        const baseEps = {{ equity_intel.valuation_radar.inputs.normalized_eps|default(10)|tojson }};
-        const peModelFv = {{ equity_intel.valuation_radar.models.historical_pe_model.fair_value|default(0)|tojson }};
-        const epvModelFv = {{ equity_intel.valuation_radar.models.epv_model.fair_value|default(0)|tojson }};
+        const cmp = Number("{{ equity_intel.valuation_radar.current_price|default(0) }}");
+        const baseEps = Number("{{ equity_intel.valuation_radar.inputs.normalized_eps|default(10) }}");
+        const peModelFv = Number("{{ equity_intel.valuation_radar.models.historical_pe_model.fair_value|default(0) }}");
+        const epvModelFv = Number("{{ equity_intel.valuation_radar.models.epv_model.fair_value|default(0) }}");
 
         const g = parseFloat(document.getElementById('dcfGrowthSlider').value) / 100.0;
         const wacc = parseFloat(document.getElementById('dcfWaccSlider').value) / 100.0;
@@ -840,7 +844,7 @@
               <span class="tnum" style="font-size: 14px; font-weight: 800; color: #38bdf8;">{{ seg.revenue_share_pct }}%</span>
             </div>
             <div style="height: 6px; width: 100%; background: rgba(15, 23, 42, 0.85); border-radius: 999px; overflow: hidden;">
-              <div style="height: 100%; width: {{ [seg.revenue_share_pct, 100]|min }}%; background: linear-gradient(90deg, #0ea5e9, #10b981); border-radius: 999px;"></div>
+              <div data-style-width="{{ [seg.revenue_share_pct, 100]|min }}%" style="height: 100%; background: linear-gradient(90deg, #0ea5e9, #10b981); border-radius: 999px;"></div>
             </div>
           </div>
           {% endfor %}
@@ -874,7 +878,7 @@
         </div>
         <div style="display: flex; align-items: center; gap: 8px; flex-wrap: wrap;">
           {% if thesis_drift and thesis_drift.price_drift_pct is not none %}
-          <span class="badge tnum" style="{% if thesis_drift.price_drift_pct >= 0 %}background: rgba(16, 185, 129, 0.16); color: #34d399;{% else %}background: rgba(244, 63, 94, 0.16); color: #fb7185;{% endif %} font-size: 11px;">
+          <span class="badge tnum" data-style-bg="{% if thesis_drift.price_drift_pct >= 0 %}rgba(16, 185, 129, 0.16){% else %}rgba(244, 63, 94, 0.16){% endif %}" data-style-color="{% if thesis_drift.price_drift_pct >= 0 %}#34d399{% else %}#fb7185{% endif %}" style="font-size: 11px;">
             Split-Safe Baseline Drift: {% if thesis_drift.price_drift_pct >= 0 %}+{% endif %}{{ thesis_drift.price_drift_pct }}%
           </span>
           {% endif %}
@@ -930,7 +934,7 @@
 
     <!-- 60-Day Post-Earnings Announcement Drift (PEAD) Behavioral Band -->
     {% if pead_data and pead_data.active and pead_data.current_price > 0 %}
-    <div style="margin-bottom: 30px; background: rgba(15, 23, 42, 0.88); border: 1px solid {% if pead_data.status == 'bullish' %}rgba(16, 185, 129, 0.35){% else %}rgba(244, 63, 94, 0.35){% endif %}; border-radius: var(--radius-md); padding: 22px;">
+    <div data-style-border-color="{% if pead_data.status == 'bullish' %}rgba(16, 185, 129, 0.35){% else %}rgba(244, 63, 94, 0.35){% endif %}" style="margin-bottom: 30px; background: rgba(15, 23, 42, 0.88); border: 1px solid transparent; border-radius: var(--radius-md); padding: 22px;">
       <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 14px; flex-wrap: wrap; gap: 10px;">
         <div>
           <div style="font-size: 11px; font-weight: 700; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.05em; margin-bottom: 4px;">
@@ -944,7 +948,7 @@
           <button id="btnOpenThesisPead" class="btn btn-sm" onclick="openThesisModal()" style="font-size: 11.5px; font-weight: 700; padding: 4px 10px; background: rgba(245, 158, 11, 0.15); border: 1px solid rgba(245, 158, 11, 0.4); color: #fbbf24; cursor: pointer; border-radius: 6px; display: inline-flex; align-items: center; gap: 5px;">
             <span><svg class="glyph"><use href="#glyph-scale"></use></svg></span> "Would You Buy Today?" Checkpoint
           </button>
-          <span class="badge" style="{% if pead_data.status == 'bullish' %}background: rgba(16, 185, 129, 0.15); color: #34d399; border: 1px solid rgba(16, 185, 129, 0.3);{% else %}background: rgba(244, 63, 94, 0.15); color: #fb7185; border: 1px solid rgba(244, 63, 94, 0.3);{% endif %} font-weight: 700; font-size: 12px; padding: 5px 12px;">
+          <span class="badge" data-style-bg="{% if pead_data.status == 'bullish' %}rgba(16, 185, 129, 0.15){% else %}rgba(244, 63, 94, 0.15){% endif %}" data-style-color="{% if pead_data.status == 'bullish' %}#34d399{% else %}#fb7185{% endif %}" data-style-border-color="{% if pead_data.status == 'bullish' %}rgba(16, 185, 129, 0.3){% else %}rgba(244, 63, 94, 0.3){% endif %}" style="border: 1px solid transparent; font-weight: 700; font-size: 12px; padding: 5px 12px;">
             {{ pead_data.label }} ({{ pead_data.drift_direction }})
           </span>
           <span class="badge" style="background: rgba(56, 189, 248, 0.15); color: #38bdf8; font-size: 11px;">60-Day Horizon</span>
@@ -956,13 +960,13 @@
         <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 8px; font-size: 13px; color: var(--text-muted); margin-bottom: 8px;">
           <span>Corridor Floor: <strong style="color: #cbd5e1;" class="tnum">₹{{ pead_data.lower_bound }}</strong></span>
           <span>Current Base: <strong style="color: #38bdf8;" class="tnum">₹{{ pead_data.current_price }}</strong></span>
-          <span>Projected Drift Target: <strong style="{% if pead_data.status == 'bullish' %}color: #34d399;{% else %}color: #fb7185;{% endif %}" class="tnum">₹{{ pead_data.target_drift }}</strong></span>
+          <span>Projected Drift Target: <strong data-style-color="{% if pead_data.status == 'bullish' %}#34d399{% else %}#fb7185{% endif %}" class="tnum">₹{{ pead_data.target_drift }}</strong></span>
           <span>Corridor Ceiling: <strong style="color: #cbd5e1;" class="tnum">₹{{ pead_data.upper_bound }}</strong></span>
         </div>
         <!-- Progress / Corridor Bar -->
         <div style="position: relative; height: 14px; background: rgba(51, 65, 85, 0.6); border-radius: 7px; overflow: hidden; display: flex;">
           <div style="width: 25%; background: rgba(148, 163, 184, 0.25);" title="Lower Buffer"></div>
-          <div style="width: 50%; background: {% if pead_data.status == 'bullish' %}linear-gradient(90deg, rgba(56, 189, 248, 0.5), rgba(16, 185, 129, 0.8)){% else %}linear-gradient(90deg, rgba(244, 63, 94, 0.8), rgba(245, 158, 11, 0.5)){% endif %};" title="Empirical Drift Corridor"></div>
+          <div data-style-bg="{% if pead_data.status == 'bullish' %}linear-gradient(90deg, rgba(56, 189, 248, 0.5), rgba(16, 185, 129, 0.8)){% else %}linear-gradient(90deg, rgba(244, 63, 94, 0.8), rgba(245, 158, 11, 0.5)){% endif %}" style="width: 50%;" title="Empirical Drift Corridor"></div>
           <div style="width: 25%; background: rgba(148, 163, 184, 0.25);" title="Upper Buffer"></div>
         </div>
       </div>
@@ -1015,9 +1019,9 @@
         </div>
 
         {% if contagion_alert %}
-        <div style="display: inline-flex; align-items: center; gap: 6px; padding: 6px 14px; border-radius: 9999px; background: rgba(255, 255, 255, 0.05); border: 1px solid {{ contagion_alert.badge_color }};">
-          <span style="width: 8px; height: 8px; border-radius: 50%; background: {{ contagion_alert.badge_color }};"></span>
-          <span style="font-size: 12px; font-weight: 700; color: {{ contagion_alert.badge_color }};"><svg class="glyph" style="width:12px;height:12px;vertical-align:-1px;margin-right:3px;"><use href="#icon-radar"></use></svg>{{ contagion_alert.radar_label }}</span>
+        <div data-style-border-color="{{ contagion_alert.badge_color }}" style="display: inline-flex; align-items: center; gap: 6px; padding: 6px 14px; border-radius: 9999px; background: rgba(255, 255, 255, 0.05); border: 1px solid transparent;">
+          <span data-style-bg="{{ contagion_alert.badge_color }}" style="width: 8px; height: 8px; border-radius: 50%;"></span>
+          <span data-style-color="{{ contagion_alert.badge_color }}" style="font-size: 12px; font-weight: 700;"><svg class="glyph" style="width:12px;height:12px;vertical-align:-1px;margin-right:3px;"><use href="#icon-radar"></use></svg>{{ contagion_alert.radar_label }}</span>
         </div>
         {% endif %}
       </div>
@@ -1308,12 +1312,13 @@
 </div>
 
 {% if chart_data and chart_data.dates %}
+<script id="dossierMomentumChartData" type="application/json">{{ chart_json|safe }}</script>
 <script>
 document.addEventListener('DOMContentLoaded', function() {
   const ctx = document.getElementById('momentumChart');
   if (!ctx) return;
 
-  const chartData = {{ chart_json|safe }};
+  const chartData = JSON.parse(document.getElementById('dossierMomentumChartData').textContent || '{}');
   if (!chartData || !chartData.dates || chartData.dates.length === 0) return;
 
   new Chart(ctx, {

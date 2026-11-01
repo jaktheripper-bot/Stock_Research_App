@@ -111,7 +111,7 @@
       <h2 style="font-size: 22px; font-weight: 800; color: var(--text-primary); margin: 0;">
         Peer Cluster Matrix:
         {% for p in cluster.peers %}
-        <span style="color: {% if loop.first %}var(--accent-cyan){% else %}var(--accent-emerald){% endif %};">{{ p.ticker }}</span>{% if not loop.last %}<span style="color: var(--text-muted); margin: 0 4px;">•</span>{% endif %}
+        <span data-style-color="{% if loop.first %}var(--accent-cyan){% else %}var(--accent-emerald){% endif %}">{{ p.ticker }}</span>{% if not loop.last %}<span style="color: var(--text-muted); margin: 0 4px;">•</span>{% endif %}
         {% endfor %}
       </h2>
       <div style="font-size: 12px; color: var(--text-muted); margin-top: 4px;">{{ cluster.compliance_notice }}</div>
@@ -187,7 +187,7 @@
           <tr style="border-bottom: 1px solid var(--border-color); background: rgba(15, 23, 42, 0.96);">
             <th style="padding: 14px 20px; color: var(--text-muted); font-weight: 600; position: sticky; left: 0; background: rgba(15, 23, 42, 0.98); z-index: 3;">Financial Metric</th>
             {% for p in cluster.peers %}
-            <th style="padding: 14px 18px; color: {% if loop.first %}var(--accent-cyan){% else %}var(--accent-emerald){% endif %}; font-weight: 700;">
+            <th data-style-color="{% if loop.first %}var(--accent-cyan){% else %}var(--accent-emerald){% endif %}" style="padding: 14px 18px; font-weight: 700;">
               {{ p.ticker }}
             </th>
             {% endfor %}
@@ -265,7 +265,7 @@
           <tr style="border-bottom: 1px solid var(--border-color); background: rgba(15, 23, 42, 0.96);">
             <th style="padding: 14px 20px; color: var(--text-muted); font-weight: 600; position: sticky; left: 0; background: rgba(15, 23, 42, 0.98); z-index: 3;">Strategic Pillar</th>
             {% for p in cluster.peers %}
-            <th style="padding: 14px 18px; color: {% if loop.first %}var(--accent-cyan){% else %}var(--accent-emerald){% endif %}; font-weight: 700;">{{ p.ticker }} Posture</th>
+            <th data-style-color="{% if loop.first %}var(--accent-cyan){% else %}var(--accent-emerald){% endif %}" style="padding: 14px 18px; font-weight: 700;">{{ p.ticker }} Posture</th>
             {% endfor %}
           </tr>
         </thead>
