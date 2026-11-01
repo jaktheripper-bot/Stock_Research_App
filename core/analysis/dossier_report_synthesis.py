@@ -76,10 +76,10 @@ def get_latest_flash_models(client) -> list:
     now = time.time()
     is_vertex = getattr(client, "vertexai", False) is True
     if is_vertex:
-        return ["gemini-3.8-flash", "gemini-3.7-flash", "gemini-3.5-flash"]
+        return ["gemini-3.7-flash", "gemini-3.8-flash", "gemini-3.5-flash"]
     if _DISCOVERED_MODELS_CACHE.get("models") and (now - _DISCOVERED_MODELS_CACHE.get("timestamp", 0)) < 86400:
         return _DISCOVERED_MODELS_CACHE["models"]
-    fallback = ["gemini-3.8-flash", "gemini-3.7-flash", "gemini-3.5-flash"]
+    fallback = ["gemini-3.7-flash", "gemini-3.8-flash", "gemini-3.5-flash"]
     try:
         discovered = []
         for m in client.models.list():
@@ -246,9 +246,11 @@ def stream_perplexity_fallback(prompt: str, system_prompt: str, collected_citati
             "Perplexity /v1/responses circuit breaker open (API key quota/credit restriction detected earlier in session)."
         )
     from core.config import get_secret
-    api_key = get_secret("PERPLEXITY_API_KEY")
+    api_key = str(get_secret("PERPLEXITY_API_KEY") or "").strip()
     if not api_key:
         raise ValueError("PERPLEXITY_API_KEY missing from secrets/environment.")
+    if api_key.startswith("AQ.") or api_key.startswith("AIza"):
+        raise ValueError("PERPLEXITY_API_KEY contains a Google/Vertex API key instead of a Perplexity pplx-* key.")
 
     url = "https://api.perplexity.ai/v1/responses"
     headers = {
@@ -373,14 +375,17 @@ def stream_stock_report(ticker: str, language: str = "English (India)", stock_da
         raise PipelineError(stage="Pre-Screening Gate", message=gate_msg)
 
     from core.config import get_secret
+    from bse_master import resolve_bse_scrip_code
     api_key = get_secret("GEMINI_API_KEY")
-    client = genai.Client(api_key=api_key, http_options={"timeout": 180000})
+    client = genai.Client(api_key=api_key, http_options={"timeout": 45000})
     system_prompt = get_system_prompt(ticker, language)
     user_prompt = f"Generate research report for: {stock_data.get('short_name')} ({stock_data.get('ticker')})\nData: {stock_data}"
 
     collected_citations = []
-    scrip = str(stock_data.get("scrip_code") or "").strip()
     clean_sym = stock_data.get("ticker", ticker)
+    scrip = str(stock_data.get("scrip_code") or resolve_bse_scrip_code(clean_sym) or "").strip()
+    if scrip and scrip != "N/A":
+        stock_data["scrip_code"] = scrip
     if scrip and scrip.isdigit():
         collected_citations.append({
             "title": f"BSE Corporate Announcements & Disclosures ({clean_sym})",
@@ -426,13 +431,6 @@ def stream_stock_report(ticker: str, language: str = "English (India)", stock_da
                 report_accumulator.append(err_msg)
                 yield err_msg
             else:
-                notice_u = (
-                    "\n\n> **Notice: Live Web Grounding Offline.**\n"
-                    "> Generating thesis from core parametric intelligence.\n"
-                    "> *Note:* Exchange metrics are verified, but recent disclosures may be omitted.\n\n"
-                )
-                report_accumulator.append(notice_u)
-                yield notice_u
                 try:
                     for chunk in stream_gemini_ungrounded_bypass(client, user_prompt, system_prompt):
                         report_accumulator.append(chunk)

@@ -884,6 +884,7 @@ def get_stock_fundamentals(query: str, fast_db_first: bool = False) -> dict:
                 res_dict = {
                     "ticker": canonical or clean,
                     "short_name": canonical or clean,
+                    "scrip_code": scrip,
                     "sector": "General Industry",
                     "industry": "Diversified",
                     "market_cap": "N/A",

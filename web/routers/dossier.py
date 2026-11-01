@@ -175,7 +175,7 @@ async def synthesize_report(request: Request, payload: SynthesizeRequest):
         new_balance = get_user_credits_balance(clean_uid) if web_user else 999.0
 
     try:
-        report_text = generate_stock_report(canonical)
+        report_text = await run_in_threadpool(generate_stock_report, canonical)
     except Exception as e:
         logger.error(f"Report generation failed for {canonical}: {e}")
         if not is_admin and web_user:
@@ -186,23 +186,43 @@ async def synthesize_report(request: Request, payload: SynthesizeRequest):
             detail_msg = f"Report generation encountered an error for {canonical}. Error: {e}"
         raise HTTPException(status_code=500, detail=detail_msg)
 
-    # Allow a brief 2-second grace interval for connection pool commit if needed
+    # Allow a brief grace interval for connection pool commit if needed
     rep = get_report_by_ticker_sync(canonical)
     if not rep or not rep.get("report_text"):
-        import time
         for _ in range(3):
-            time.sleep(1.0)
+            await asyncio.sleep(1.0)
             rep = get_report_by_ticker_sync(canonical)
             if rep and rep.get("report_text"):
                 break
 
     if not rep or not rep.get("report_text"):
+        # Self-healing fallback: if generate_stock_report produced a valid 7-pillar report text
+        # (>= 800 chars, no failure signatures) that wasn't visible yet in the pool, persist it now
+        clean_rep_text = (report_text or "").strip()
+        is_valid_text = (
+            len(clean_rep_text) >= 800
+            and ("Pillar 1" in clean_rep_text or "DIAGNOSTIC SUMMARY" in clean_rep_text)
+            and "Live Synthesis Failed" not in clean_rep_text
+        )
+        if is_valid_text:
+            try:
+                from core.db import save_report_to_archive
+                stock_data = await run_in_threadpool(get_stock_fundamentals, canonical)
+                await run_in_threadpool(save_report_to_archive, stock_data, clean_rep_text)
+                rep = get_report_by_ticker_sync(canonical)
+            except Exception as save_err:
+                logger.error(f"Fallback archive commit failed for {canonical}: {save_err}")
+
+    if not rep or not rep.get("report_text"):
+        reason_suffix = ""
+        if report_text and "Live Synthesis Failed" in str(report_text):
+            reason_suffix = " Upstream AI synthesis channel timed out or was temporarily unavailable."
         if not is_admin and web_user:
             add_user_credits(clean_uid, 0.0, 1.0, pack_type="REFUND_FAILED_SYNTHESIS")
             refunded_bal = get_user_credits_balance(clean_uid)
-            detail_msg = f"Report generation could not verify report archiving for {canonical}. Your credit has been automatically refunded (balance: {refunded_bal:.1f} credits)."
+            detail_msg = f"Report generation could not verify report archiving for {canonical}.{reason_suffix} Your credit has been automatically refunded (balance: {refunded_bal:.1f} credits)."
         else:
-            detail_msg = f"Report generation could not verify report archiving for {canonical}."
+            detail_msg = f"Report generation could not verify report archiving for {canonical}.{reason_suffix}"
         raise HTTPException(status_code=500, detail=detail_msg)
 
     return json_response_with_cache({

@@ -1329,9 +1329,19 @@ window.openPreflightCreditModal = function(options) {
   const errorBox = document.getElementById('preflightErrorBox');
 
   const user = getStoredUser();
-  const balance = user ? (parseFloat(user.credits_balance) || 0) : 0;
+  const balance = user ? (parseFloat(user.credits_balance ?? user.credits) || 0) : 0;
   const cost = typeof options.cost === 'number' ? options.cost : 1;
   const remaining = Math.max(0, balance - cost);
+
+  if (user && user.id && balance === 0 && !options._balanceRefreshed) {
+    refreshUserBalance(user).then(() => {
+      const updated = getStoredUser();
+      const updatedBal = updated ? (parseFloat(updated.credits_balance ?? updated.credits) || 0) : 0;
+      if (updatedBal !== balance && modal.classList.contains('active')) {
+        window.openPreflightCreditModal(Object.assign({}, options, { _balanceRefreshed: true }));
+      }
+    }).catch(() => {});
+  }
 
   if (titleEl) titleEl.textContent = options.title || 'Confirm Research Task';
   if (descEl) descEl.textContent = options.description || 'Generate a fresh, verified 7-pillar research report for this asset.';
@@ -1397,10 +1407,66 @@ window.showPreflightCreditError = function(errorMsg, onRetry) {
   const errorBox = document.getElementById('preflightErrorBox');
   const errorMsgEl = document.getElementById('preflightErrorMessage');
   const retryBtn = document.getElementById('preflightRetryBtn');
+  const curBalEl = document.getElementById('preflightCurrentBalance');
+  const costEl = document.getElementById('preflightCost') || document.getElementById('preflightComputeCost');
+  const remBalEl = document.getElementById('preflightRemainingBalance');
+  const confirmBtn = document.getElementById('preflightConfirmBtn');
+  const confirmTextEl = document.getElementById('preflightConfirmBtnText');
+  const actionsContainer = document.getElementById('preflightActionsContainer');
+  const topUpContainer = document.getElementById('preflightTopUpContainer');
+
+  const hydrateLedgerUI = (usr) => {
+    const balance = usr ? (parseFloat(usr.credits_balance ?? usr.credits) || 0) : 0;
+    const cost = 1;
+    const remaining = Math.max(0, balance - cost);
+    if (curBalEl) curBalEl.textContent = `${balance} Credit${balance === 1 ? '' : 's'}`;
+    if (costEl) costEl.textContent = `${cost} Credit${cost === 1 ? '' : 's'}`;
+    if (remBalEl) {
+      remBalEl.textContent = balance >= cost ? `${remaining} Credit${remaining === 1 ? '' : 's'}` : 'Insufficient Credits';
+      remBalEl.style.color = balance >= cost ? 'var(--accent-emerald)' : '#ef4444';
+    }
+    if (confirmTextEl) confirmTextEl.textContent = `Confirm & Proceed (${cost} Credit)`;
+    if (balance < cost) {
+      if (actionsContainer) actionsContainer.style.display = 'none';
+      if (topUpContainer) topUpContainer.style.display = 'flex';
+    } else {
+      if (actionsContainer) actionsContainer.style.display = 'flex';
+      if (topUpContainer) topUpContainer.style.display = 'none';
+      if (confirmBtn) {
+        confirmBtn.disabled = false;
+        confirmBtn.onclick = function() {
+          if (errorBox) errorBox.style.display = 'none';
+          window.closePreflightCreditModal();
+          if (typeof onRetry === 'function') onRetry();
+        };
+      }
+    }
+  };
 
   if (modal && errorBox) {
+    const stored = getStoredUser();
+    hydrateLedgerUI(stored);
+    if (stored && stored.id) {
+      refreshUserBalance(stored).then(() => hydrateLedgerUI(getStoredUser())).catch(() => {});
+    } else {
+      fetch('/api/auth/me')
+        .then(r => r.ok ? r.json() : null)
+        .then(d => {
+          if (d && d.authenticated && d.user) {
+            localStorage.setItem('sr_user', JSON.stringify(d.user));
+            syncUserSession();
+            hydrateLedgerUI(d.user);
+          }
+        })
+        .catch(() => {});
+    }
+
     if (errorMsgEl) {
-      errorMsgEl.textContent = errorMsg ? `${errorMsg} — Your research credit was not charged (or has been automatically refunded).` : 'Task could not be completed. Your credit was not charged.';
+      const cleanMsg = errorMsg || 'Task could not be completed.';
+      const alreadyHasRefundText = /refunded|not charged|not deducted/i.test(cleanMsg);
+      errorMsgEl.textContent = alreadyHasRefundText
+        ? cleanMsg
+        : `${cleanMsg} — Your research credit was not charged (or has been automatically refunded).`;
     }
     errorBox.style.display = 'block';
     if (retryBtn) {
@@ -1431,7 +1497,20 @@ function getAuthenticatedUser() {
 window.getAuthenticatedUser = getAuthenticatedUser;
 
 window.synthesizeReport = async function(ticker, forceRefresh = false) {
-  const user = getAuthenticatedUser();
+  let user = getAuthenticatedUser();
+  if (!user) {
+    try {
+      const meResp = await fetch('/api/auth/me');
+      if (meResp.ok) {
+        const meData = await meResp.json();
+        if (meData && meData.authenticated && meData.user) {
+          localStorage.setItem('sr_user', JSON.stringify(meData.user));
+          syncUserSession();
+          user = meData.user;
+        }
+      }
+    } catch (_) {}
+  }
   if (!user) {
     openSignInModal();
     return;
@@ -1449,9 +1528,26 @@ window.synthesizeReport = async function(ticker, forceRefresh = false) {
     window.showEvaluationHUD({ assetType: 'equity', ticker, customTitle: `Generating Report: ${ticker}`, totalSec: 60 });
   }
 
-  // AbortController with 75-second timeout for long search-grounded models
+  const pollUntilReady = async (maxAttempts = 8, intervalMs = 3000) => {
+    for (let i = 0; i < maxAttempts; i++) {
+      try {
+        const pollCheck = await fetch(`/api/dossier/status/${encodeURIComponent(ticker)}`).then(r => r.json()).catch(() => null);
+        if (pollCheck && pollCheck.status === 'ready') {
+          if (typeof window.hideEvaluationHUD === 'function') window.hideEvaluationHUD();
+          window.location.href = pollCheck.dossier_url || `/dossier/${encodeURIComponent(ticker)}`;
+          return true;
+        }
+      } catch (_) {}
+      if (i < maxAttempts - 1) {
+        await new Promise(res => setTimeout(res, intervalMs));
+      }
+    }
+    return false;
+  };
+
+  // AbortController with 95-second timeout for search-grounded models + fallback
   const controller = new AbortController();
-  const timeoutId = setTimeout(() => controller.abort(), 75000);
+  const timeoutId = setTimeout(() => controller.abort(), 95000);
 
   try {
     const resp = await fetch('/api/synthesize', {
@@ -1473,9 +1569,8 @@ window.synthesizeReport = async function(ticker, forceRefresh = false) {
       data = {};
     }
 
-    if (typeof window.hideEvaluationHUD === 'function') window.hideEvaluationHUD();
-
     if (resp.ok && (data.success || data.status === 'success')) {
+      if (typeof window.hideEvaluationHUD === 'function') window.hideEvaluationHUD();
       const newBal = typeof data.new_balance === 'number' ? data.new_balance : (typeof data.remaining_credits === 'number' ? data.remaining_credits : undefined);
       if (typeof newBal === 'number') {
         user.credits_balance = newBal;
@@ -1490,11 +1585,16 @@ window.synthesizeReport = async function(ticker, forceRefresh = false) {
       return;
     }
 
-    // If HTTP error occurred, check if the report was actually saved in the background before showing error
-    const pollCheck = await fetch(`/api/dossier/status/${encodeURIComponent(ticker)}`).then(r => r.json()).catch(() => null);
-    if (pollCheck && pollCheck.status === 'ready') {
-      window.location.href = pollCheck.dossier_url || `/dossier/${encodeURIComponent(ticker)}`;
+    // If HTTP 502/504/500 occurred while backend synthesis was finishing, poll briefly before showing error
+    const pollAttempts = (resp.status === 502 || resp.status === 504) ? 8 : 2;
+    if (await pollUntilReady(pollAttempts, 2500)) {
       return;
+    }
+
+    if (typeof window.hideEvaluationHUD === 'function') window.hideEvaluationHUD();
+
+    if (typeof refreshUserBalance === 'function') {
+      await refreshUserBalance(user);
     }
 
     const errMsg = extractApiError(data, 'Report generation failed. Please try again.');
@@ -1512,28 +1612,19 @@ window.synthesizeReport = async function(ticker, forceRefresh = false) {
     } else {
       window.showPreflightCreditError(errMsg, () => window.synthesizeReport(ticker, forceRefresh));
     }
-
-    if (typeof refreshUserBalance === 'function') {
-      await refreshUserBalance(user);
-    }
   } catch (err) {
     clearTimeout(timeoutId);
-    // Timeout or network drop: Poll status once to check if backend finished
-    try {
-      const pollCheck = await fetch(`/api/dossier/status/${encodeURIComponent(ticker)}`).then(r => r.json()).catch(() => null);
-      if (pollCheck && pollCheck.status === 'ready') {
-        if (typeof window.hideEvaluationHUD === 'function') window.hideEvaluationHUD();
-        window.location.href = pollCheck.dossier_url || `/dossier/${encodeURIComponent(ticker)}`;
-        return;
-      }
-    } catch (_) {}
+    // Timeout or network drop: Poll status up to 8 times (24s) in case backend thread is finishing
+    if (await pollUntilReady(8, 3000)) {
+      return;
+    }
 
     if (typeof window.hideEvaluationHUD === 'function') window.hideEvaluationHUD();
     console.error('Report request failed:', err);
-    window.showPreflightCreditError('Synthesis request timed out or encountered a network error. Your credit was not deducted.', () => window.synthesizeReport(ticker, forceRefresh));
     if (typeof refreshUserBalance === 'function') {
       await refreshUserBalance(user);
     }
+    window.showPreflightCreditError('Synthesis request timed out or encountered a network error. Your credit was not deducted.', () => window.synthesizeReport(ticker, forceRefresh));
   } finally {
     buttons.forEach((btn, idx) => {
       btn.disabled = false;
@@ -2796,6 +2887,19 @@ async function refreshUserBalance(user) {
         syncUserSession();
       }
     } else if (resp.status === 401 || resp.status === 403 || resp.status === 404) {
+      // Check if an active cookie or admin session exists under a different profile before clearing
+      try {
+        const meResp = await fetch('/api/auth/me');
+        if (meResp.ok) {
+          const meData = await meResp.json();
+          if (meData && meData.authenticated && meData.user) {
+            localStorage.setItem('sr_user', JSON.stringify(meData.user));
+            updateNavAuthUI(meData.user);
+            syncUserSession();
+            return;
+          }
+        }
+      } catch (_) {}
       // Session cookie expired or invalidated — clear stale client state
       localStorage.removeItem('sr_user');
       updateNavAuthUI(null);

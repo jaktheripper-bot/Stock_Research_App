@@ -1016,6 +1016,18 @@ class TestUserProfileApiAuth(unittest.TestCase):
         self.assertEqual(res.status_code, 404)
         self.assertEqual(res.json().get("detail"), "User not found")
 
+    def test_auth_me_resolves_admin_session_credits_profile(self):
+        """GET /api/auth/me resolves the admin's user_accounts profile and credit balance when authenticated via admin_session."""
+        res = self.client.get(
+            "/api/auth/me",
+            cookies={ADMIN_COOKIE_NAME: self.admin_token}
+        )
+        self.assertEqual(res.status_code, 200)
+        data = res.json()
+        self.assertTrue(data.get("authenticated"))
+        self.assertIsNotNone(data.get("user"))
+        self.assertGreaterEqual(float(data["user"].get("credits_balance", 0)), 2.0)
+
 
 if __name__ == "__main__":
     unittest.main()

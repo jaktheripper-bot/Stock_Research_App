@@ -425,7 +425,16 @@ async def public_auth_callback(
 async def api_auth_me(request: Request):
     """Returns the currently authenticated user profile from session cookie or Authorization header."""
     from fastapi.encoders import jsonable_encoder
+    from core.db.users import get_user_by_email
     user = _get_current_web_user(request)
+    if not user:
+        admin_sess = _is_admin_authenticated(request)
+        if admin_sess and isinstance(admin_sess, dict) and admin_sess.get("email"):
+            admin_email = str(admin_sess["email"]).strip().lower()
+            user = get_user_by_email(admin_email)
+            if not user:
+                uid = f"usr_{admin_email.replace('@', '_at_').replace('.', '_')}"
+                user = get_or_create_user(user_id=uid, email=admin_email, full_name="Admin Console")
     if not user:
         return JSONResponse(content={"authenticated": False, "user": None})
     return JSONResponse(content=jsonable_encoder({"authenticated": True, "user": user}))
