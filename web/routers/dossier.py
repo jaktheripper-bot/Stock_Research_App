@@ -186,7 +186,16 @@ async def synthesize_report(request: Request, payload: SynthesizeRequest):
             detail_msg = f"Report generation encountered an error for {canonical}. Error: {e}"
         raise HTTPException(status_code=500, detail=detail_msg)
 
+    # Allow a brief 2-second grace interval for connection pool commit if needed
     rep = get_report_by_ticker_sync(canonical)
+    if not rep or not rep.get("report_text"):
+        import time
+        for _ in range(3):
+            time.sleep(1.0)
+            rep = get_report_by_ticker_sync(canonical)
+            if rep and rep.get("report_text"):
+                break
+
     if not rep or not rep.get("report_text"):
         if not is_admin and web_user:
             add_user_credits(clean_uid, 0.0, 1.0, pack_type="REFUND_FAILED_SYNTHESIS")
@@ -207,6 +216,47 @@ async def synthesize_report(request: Request, payload: SynthesizeRequest):
 
 
 api_synthesize = synthesize_report
+
+
+@router.get("/api/dossier/status/{ticker}")
+async def get_dossier_status(ticker: str, request: Request):
+    """
+    Lightweight status check used by the client during long syntheses
+    to detect when the background worker has committed the report,
+    alongside current session unlock metadata.
+    """
+    clean_t = clean_ticker(ticker)
+    if not clean_t:
+        raise HTTPException(status_code=400, detail="Invalid ticker symbol.")
+    canonical = resolve_canonical_symbol(clean_t) or clean_t
+
+    get_rep_fn = _get_override_fn("web.main", "get_report_by_ticker_sync", get_report_by_ticker_sync)
+    rep = get_rep_fn(canonical)
+
+    get_user_fn = _get_override_fn("web.main", "_get_current_web_user", _get_current_web_user)
+    web_user = get_user_fn(request)
+    is_unlocked = _deep_dive_unlocked_for_request(request, canonical)
+
+    if rep and rep.get("report_text") and len(rep.get("report_text", "").strip()) >= 500:
+        return {
+            "status": "ready",
+            "success": True,
+            "ticker": canonical,
+            "dossier_url": f"/dossier/{canonical}",
+            "message": "Dossier compiled and archived successfully.",
+            "is_unlocked": is_unlocked,
+            "user_id": web_user.get("id") if web_user else None,
+        }
+    return {
+        "status": "compiling",
+        "success": True,
+        "ticker": canonical,
+        "is_unlocked": is_unlocked,
+        "user_id": web_user.get("id") if web_user else None,
+    }
+
+
+api_dossier_status = get_dossier_status
 
 
 @router.post("/api/dossier/unlock/{ticker}")
@@ -262,26 +312,6 @@ async def api_unlock_dossier(
         "ticker": canonical,
         "new_balance": new_bal,
         "message": msg
-    })
-
-
-@router.get("/api/dossier/status/{ticker}")
-async def api_dossier_status(request: Request, ticker: str):
-    """Returns the unlock status of the requested ticker for the current user session."""
-    clean_t = clean_ticker(ticker)
-    if not clean_t:
-        raise HTTPException(status_code=400, detail="Invalid ticker symbol.")
-
-    canonical = resolve_canonical_symbol(clean_t) or clean_t
-    get_user_fn = _get_override_fn("web.main", "_get_current_web_user", _get_current_web_user)
-    web_user = get_user_fn(request)
-    is_unlocked = _deep_dive_unlocked_for_request(request, canonical)
-
-    return json_response_with_cache({
-        "success": True,
-        "ticker": canonical,
-        "is_unlocked": is_unlocked,
-        "user_id": web_user.get("id") if web_user else None
     })
 
 

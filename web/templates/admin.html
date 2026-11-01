@@ -1107,6 +1107,120 @@ html[data-theme="light"] .copilot-input {
   border: 1px solid #CBD5E1 !important;
   color: #0B2337 !important;
 }
+
+/* ==============================================================================
+   Jinja-Free Dynamic Style Helpers (IDE / CSS Parser Cleanliness)
+   ============================================================================== */
+.admin-is-hidden {
+  display: none !important;
+}
+.admin-inline-flex-row {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+.admin-inline-flex-row.admin-is-hidden {
+  display: none;
+}
+.admin-auditor-sublink {
+  display: inline-flex;
+  text-decoration: none;
+  color: #38bdf8;
+  border: 1px solid rgba(14, 165, 233, 0.4);
+  background: rgba(14, 165, 233, 0.12);
+  flex-shrink: 0;
+  margin-left: auto;
+}
+.admin-auditor-sublink.admin-is-hidden {
+  display: none;
+}
+.admin-platform-kpi-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+  margin-bottom: 20px;
+}
+.admin-platform-kpi-grid.admin-is-hidden {
+  display: none;
+}
+.admin-dwell-footer {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 12px;
+  margin-top: 14px;
+  padding-top: 12px;
+  border-top: 1px solid rgba(255, 255, 255, 0.08);
+}
+.admin-dwell-footer.admin-is-hidden {
+  display: none;
+}
+.admin-dwell-more-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 12px;
+  padding: 6px 14px;
+}
+.admin-dwell-more-btn.admin-is-hidden {
+  display: none;
+}
+.admin-text-danger { color: #f87171; }
+.admin-text-muted { color: #64748b; }
+.admin-text-emerald { color: #34d399; }
+.admin-text-sky { color: #38bdf8; }
+.admin-session-card {
+  background: rgba(30, 41, 59, 0.45);
+  border-radius: 6px;
+  padding: 8px 10px;
+  border-left: 3px solid #64748b;
+}
+.admin-session-card.is-return {
+  border-left-color: #10b981;
+}
+.admin-tier-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 3px 8px;
+  border-radius: 9999px;
+  font-size: 11px;
+  font-weight: 600;
+  background: rgba(255, 255, 255, 0.06);
+  color: #94a3b8;
+  border: 1px solid rgba(148, 163, 184, 0.25);
+}
+.admin-tier-dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: #94a3b8;
+}
+.admin-tier-badge.tier-high { color: #10b981; border-color: rgba(16, 185, 129, 0.25); }
+.admin-tier-badge.tier-high .admin-tier-dot { background: #10b981; }
+.admin-tier-badge.tier-medium { color: #38bdf8; border-color: rgba(56, 189, 248, 0.25); }
+.admin-tier-badge.tier-medium .admin-tier-dot { background: #38bdf8; }
+.admin-tier-badge.tier-quick { color: #f59e0b; border-color: rgba(245, 158, 11, 0.25); }
+.admin-tier-badge.tier-quick .admin-tier-dot { background: #f59e0b; }
+.admin-progress-fill {
+  width: 0%;
+  height: 100%;
+  border-radius: 3px;
+  transition: width 0.3s ease;
+}
+.admin-bg-sky-grad { background: linear-gradient(90deg, #0ea5e9, #38bdf8); }
+.admin-bg-purple-grad { background: linear-gradient(90deg, #a855f7, #c084fc); }
+.admin-bg-cyan-grad { background: linear-gradient(90deg, #06b6d4, #38bdf8); }
+.admin-bg-emerald-sky-grad { background: linear-gradient(90deg, #10b981, #38bdf8); }
+.admin-bg-emerald-grad { background: linear-gradient(90deg, #10b981, #34d399); }
+.admin-bg-sky-rev-grad { background: linear-gradient(90deg, #38bdf8, #0ea5e9); }
+.admin-bg-red { background: #ef4444; }
+.admin-bg-amber { background: #f59e0b; }
+.admin-bg-emerald { background: #10b981; }
+.admin-bg-sky { background: #38bdf8; }
+.admin-bg-indigo { background: #818cf8; }
+.admin-bg-pink { background: #ec4899; }
+.admin-bg-slate { background: #64748b; }
 </style>
 
 
@@ -1276,16 +1390,16 @@ html[data-theme="light"] .copilot-input {
       <!-- Time Window Filter Form -->
       <form method="GET" action="/admin" id="windowForm" style="display: flex; align-items: center; gap: 8px; flex-wrap: wrap;">
         <label for="windowSelect" style="font-size: 12px; color: var(--text-secondary, #94a3b8);">Window:</label>
-        <select name="window" id="windowSelect" class="admin-select">
-          <option value="24h" {% if window == '24h' %}selected{% endif %}>Last 24 Hours</option>
-          <option value="7d" {% if window == '7d' %}selected{% endif %}>Last 7 Days</option>
-          <option value="30d" {% if window == '30d' or not window %}selected{% endif %}>Last 30 Days (Default)</option>
-          <option value="90d" {% if window == '90d' %}selected{% endif %}>Last 90 Days</option>
-          <option value="mtd" {% if window == 'mtd' %}selected{% endif %}>Month to Date</option>
-          <option value="custom" {% if window == 'custom' %}selected{% endif %}>Custom Range...</option>
+        <select name="window" id="windowSelect" class="admin-select" data-selected-value="{{ window or '30d' }}">
+          <option value="24h">Last 24 Hours</option>
+          <option value="7d">Last 7 Days</option>
+          <option value="30d" selected>Last 30 Days (Default)</option>
+          <option value="90d">Last 90 Days</option>
+          <option value="mtd">Month to Date</option>
+          <option value="custom">Custom Range...</option>
         </select>
         
-        <div id="customDateRange" style="display: {% if window == 'custom' %}inline-flex{% else %}none{% endif %}; align-items: center; gap: 6px;">
+        <div id="customDateRange" class="admin-inline-flex-row {% if window != 'custom' %}admin-is-hidden{% endif %}">
           <input type="date" name="start_date" id="startDateInput" class="admin-input" value="{{ start_date_str or '' }}" style="padding: 6px 10px; font-size: 12px; width: 130px;">
           <span style="color: var(--text-secondary, #94a3b8); font-size: 12px;">to</span>
           <input type="date" name="end_date" id="endDateInput" class="admin-input" value="{{ end_date_str or '' }}" style="padding: 6px 10px; font-size: 12px; width: 130px;">
@@ -1413,7 +1527,7 @@ html[data-theme="light"] .copilot-input {
     <button type="button" class="btn admin-hub-btn {% if current_hub == 'service' %}active{% endif %}" data-hub="service" onclick="showHub('service')">
       <span class="admin-hub-title">
         <span>2. Service &amp; Digest</span>
-        <span id="adminHubServiceTicketsBadge" class="admin-tab-badge" style="{% if not open_tickets_count or open_tickets_count <= 0 %}display: none;{% endif %}">{{ open_tickets_count | default(0) }}</span>
+        <span id="adminHubServiceTicketsBadge" class="admin-tab-badge {% if not open_tickets_count %}admin-is-hidden{% endif %}">{{ open_tickets_count | default(0) }}</span>
       </span>
       <span class="admin-hub-sub">Support Inbox &amp; Day-End Wrap</span>
     </button>
@@ -1434,53 +1548,63 @@ html[data-theme="light"] .copilot-input {
   <!-- Contextual Sub-View Bar (Grouped by Active Hub) -->
   <div id="adminSubTabNav" class="admin-tabs">
     <span id="adminActiveHubLabel" style="font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.06em; color: #64748b; padding: 0 6px;">Sub-Views:</span>
-    <button class="admin-tab-btn {% if current_tab == 'billables' %}active{% endif %}" data-hub="revenue" data-tab="billables" onclick="showTab('billables')" style="{% if current_hub != 'revenue' %}display: none;{% endif %}">
+    <button class="admin-tab-btn {% if current_tab == 'billables' %}active{% endif %} {% if current_hub != 'revenue' %}admin-is-hidden{% endif %}" data-hub="revenue" data-tab="billables" onclick="showTab('billables')">
       Live Billables &amp; Invoices
     </button>
-    <button class="admin-tab-btn {% if current_tab == 'users' %}active{% endif %}" data-hub="revenue" data-tab="users" onclick="showTab('users')" style="{% if current_hub != 'revenue' %}display: none;{% endif %}">
+    <button class="admin-tab-btn {% if current_tab == 'users' %}active{% endif %} {% if current_hub != 'revenue' %}admin-is-hidden{% endif %}" data-hub="revenue" data-tab="users" onclick="showTab('users')">
       User Accounts &amp; Usage
     </button>
-    <button class="admin-tab-btn {% if current_tab == 'tickets' %}active{% endif %}" data-hub="service" data-tab="tickets" onclick="showTab('tickets')" style="{% if current_hub != 'service' %}display: none;{% endif %}">
+    <button class="admin-tab-btn {% if current_tab == 'tickets' %}active{% endif %} {% if current_hub != 'service' %}admin-is-hidden{% endif %}" data-hub="service" data-tab="tickets" onclick="showTab('tickets')">
       Service Inbox &amp; Tickets
-      <span id="adminNavTabTicketsBadge" class="admin-tab-badge" style="{% if not open_tickets_count or open_tickets_count <= 0 %}display: none;{% endif %}">{{ open_tickets_count | default(0) }}</span>
+      <span id="adminNavTabTicketsBadge" class="admin-tab-badge {% if not open_tickets_count %}admin-is-hidden{% endif %}">{{ open_tickets_count | default(0) }}</span>
     </button>
-    <button class="admin-tab-btn {% if current_tab == 'digest' %}active{% endif %}" data-hub="service" data-tab="digest" onclick="showTab('digest')" style="{% if current_hub != 'service' %}display: none;{% endif %}">
+    <button class="admin-tab-btn {% if current_tab == 'digest' %}active{% endif %} {% if current_hub != 'service' %}admin-is-hidden{% endif %}" data-hub="service" data-tab="digest" onclick="showTab('digest')">
       <svg class="glyph" style="width: 14px; height: 14px;"><use href="#glyph-mail"></use></svg> Research Bouquet
     </button>
-    <button class="admin-tab-btn {% if current_tab == 'traffic' %}active{% endif %}" data-hub="traffic" data-tab="traffic" onclick="showTab('traffic')" style="{% if current_hub != 'traffic' %}display: none;{% endif %}">
+    <button class="admin-tab-btn {% if current_tab == 'traffic' %}active{% endif %} {% if current_hub != 'traffic' %}admin-is-hidden{% endif %}" data-hub="traffic" data-tab="traffic" onclick="showTab('traffic')">
       Traffic &amp; Landing Pages
     </button>
-    <button class="admin-tab-btn {% if current_tab == 'journeys' %}active{% endif %}" data-hub="traffic" data-tab="journeys" onclick="showTab('journeys')" style="{% if current_hub != 'traffic' %}display: none;{% endif %}">
+    <button class="admin-tab-btn {% if current_tab == 'journeys' %}active{% endif %} {% if current_hub != 'traffic' %}admin-is-hidden{% endif %}" data-hub="traffic" data-tab="journeys" onclick="showTab('journeys')">
       Session Journeys
     </button>
-    <button class="admin-tab-btn {% if current_tab == 'actions' %}active{% endif %}" data-hub="traffic" data-tab="actions" onclick="showTab('actions')" style="{% if current_hub != 'traffic' %}display: none;{% endif %}">
+    <button class="admin-tab-btn {% if current_tab == 'actions' %}active{% endif %} {% if current_hub != 'traffic' %}admin-is-hidden{% endif %}" data-hub="traffic" data-tab="actions" onclick="showTab('actions')">
       User Actions
     </button>
-    <button class="admin-tab-btn {% if current_tab == 'seo' %}active{% endif %}" data-hub="traffic" data-tab="seo" onclick="showTab('seo')" style="{% if current_hub != 'traffic' %}display: none;{% endif %}">
+    <button class="admin-tab-btn {% if current_tab == 'seo' %}active{% endif %} {% if current_hub != 'traffic' %}admin-is-hidden{% endif %}" data-hub="traffic" data-tab="seo" onclick="showTab('seo')">
       SEO &amp; Search Visibility
     </button>
-    <button class="admin-tab-btn {% if current_tab == 'assets' %}active{% endif %}" data-hub="platform" data-tab="assets" onclick="showTab('assets')" style="{% if current_hub != 'platform' %}display: none;{% endif %}">
+    <button class="admin-tab-btn {% if current_tab == 'assets' %}active{% endif %} {% if current_hub != 'platform' %}admin-is-hidden{% endif %}" data-hub="platform" data-tab="assets" onclick="showTab('assets')">
       Asset Monitoring
     </button>
-    <button class="admin-tab-btn {% if current_tab == 'ai-spends' %}active{% endif %}" data-hub="platform" data-tab="ai-spends" onclick="showTab('ai-spends')" style="{% if current_hub != 'platform' %}display: none;{% endif %}">
+    <button class="admin-tab-btn {% if current_tab == 'ai-spends' %}active{% endif %} {% if current_hub != 'platform' %}admin-is-hidden{% endif %}" data-hub="platform" data-tab="ai-spends" onclick="showTab('ai-spends')">
       Gemini Spends &amp; AI Costs
     </button>
-    <button class="admin-tab-btn {% if current_tab == 'audit' %}active{% endif %}" data-hub="governance" data-tab="audit" onclick="showTab('audit')" style="{% if current_hub != 'governance' %}display: none;{% endif %}">
+    <button class="admin-tab-btn {% if current_tab == 'audit' %}active{% endif %} {% if current_hub != 'governance' %}admin-is-hidden{% endif %}" data-hub="governance" data-tab="audit" onclick="showTab('audit')">
       <svg class="glyph"><use href="#glyph-shield"></use></svg> Admin Audit Trail
     </button>
-    <button class="admin-tab-btn {% if current_tab == 'telemetry' %}active{% endif %}" data-hub="governance" data-tab="telemetry" onclick="showTab('telemetry')" style="{% if current_hub != 'governance' %}display: none;{% endif %}">
+    <button class="admin-tab-btn {% if current_tab == 'telemetry' %}active{% endif %} {% if current_hub != 'governance' %}admin-is-hidden{% endif %}" data-hub="governance" data-tab="telemetry" onclick="showTab('telemetry')">
       Live Audit Stream
     </button>
-    <button class="admin-tab-btn {% if current_tab == 'team' %}active{% endif %}" data-hub="governance" data-tab="team" onclick="showTab('team')" style="{% if current_hub != 'governance' %}display: none;{% endif %}">
+    <button class="admin-tab-btn {% if current_tab == 'team' %}active{% endif %} {% if current_hub != 'governance' %}admin-is-hidden{% endif %}" data-hub="governance" data-tab="team" onclick="showTab('team')">
       Team & Access
     </button>
-    <a href="/admin/audit" class="admin-tab-btn" data-hub="governance" style="{% if current_hub != 'governance' %}display: none;{% else %}display: inline-flex;{% endif %} text-decoration: none; color: #38bdf8; border: 1px solid rgba(14, 165, 233, 0.4); background: rgba(14, 165, 233, 0.12); flex-shrink: 0; margin-left: auto;">
+    {% if current_hub == 'governance' %}
+    <a href="/admin/audit" class="admin-tab-btn admin-auditor-sublink" data-hub="governance" style="display: inline-flex;">
       <svg class="glyph"><use href="#glyph-shield"></use></svg> Autonomous Project Auditor →
     </a>
+    {% else %}
+    <a href="/admin/audit" class="admin-tab-btn admin-auditor-sublink admin-is-hidden" data-hub="governance" style="display: none;">
+      <svg class="glyph"><use href="#glyph-shield"></use></svg> Autonomous Project Auditor →
+    </a>
+    {% endif %}
   </div>
 
   <!-- Hub 4 (Catalog & AI Quotas): Cache Efficiency & Est. API Cost Saved -->
-  <div id="platformQuotaCacheKpis" data-hub-section="platform" class="kpi-grid" style="{% if current_hub != 'platform' %}display: none;{% else %}display: grid;{% endif %} grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); margin-bottom: 20px;">
+  {% if current_hub == 'platform' %}
+  <div id="platformQuotaCacheKpis" data-hub-section="platform" class="kpi-grid admin-platform-kpi-grid" style="display: grid;">
+  {% else %}
+  <div id="platformQuotaCacheKpis" data-hub-section="platform" class="kpi-grid admin-platform-kpi-grid admin-is-hidden" style="display: none;">
+  {% endif %}
     <article class="kpi-card kpi-card-interactive" style="border-left: 3px solid #10b981;">
       <div class="kpi-label">Cache Efficiency <span><svg class="glyph"><use href="#glyph-shield"></use></svg></span></div>
       <div class="kpi-value">{{ summary.cache_efficiency_pct }}%</div>
@@ -1595,7 +1719,7 @@ html[data-theme="light"] .copilot-input {
                 <span style="font-size: 11px; color: var(--text-secondary, #94a3b8); margin-left: 4px;">(+{{ b.credits_added }})</span>
               </td>
               <td class="mono" style="font-weight: 700;">₹{{ "{:,.2f}".format(b.amount_inr) }}</td>
-              <td class="mono" style="color: {% if b.refund_amount_inr %}#f87171{% else %}#64748b{% endif %};">₹{{ "{:,.2f}".format(b.refund_amount_inr or 0.0) }}</td>
+              <td class="mono {% if b.refund_amount_inr %}admin-text-danger{% else %}admin-text-muted{% endif %}">₹{{ "{:,.2f}".format(b.refund_amount_inr or 0.0) }}</td>
               <td class="mono" style="color: #38bdf8;">₹{{ "{:,.2f}".format([b.amount_inr - (b.refund_amount_inr or 0.0), 0.0]|max) }}</td>
               <td>
                 <span class="status-pill {% if b.status == 'success' or b.status == 'paid' %}success{% elif b.status == 'refunded' %}open{% else %}closed{% endif %}">
@@ -1714,7 +1838,7 @@ html[data-theme="light"] .copilot-input {
         </div>
         <div style="display: flex; align-items: center; gap: 10px; flex-wrap: wrap;">
           <input type="search" id="activeInboxSearchInput" class="admin-input" placeholder="Filter active inbox..." oninput="filterActiveTicketsClientSide()" style="font-size: 16px; padding: 5px 10px; min-width: 190px;">
-          <span id="activeInboxCountPill" class="status-pill {% if open_tickets_count > 0 %}open{% else %}success{% endif %}">
+          <span id="activeInboxCountPill" class="status-pill {% if open_tickets_count %}open{% else %}success{% endif %}">
             {{ open_tickets_count }} Unresolved Tickets
           </span>
         </div>
@@ -1763,16 +1887,17 @@ html[data-theme="light"] .copilot-input {
               <td class="col-subject">
                 <div class="ticket-subject-title">{{ t.subject or 'No subject' }}</div>
                 <div id="ticket-msg-{{ t.ticket_id }}" class="ticket-message-preview" title="{{ t.message }}">{{ t.message }}</div>
-                {% if t.message and (t.message|length > 120 or '\n' in t.message) %}
+                {% set msg_len = t.message|length if t.message else 0 %}
+                {% if t.message and ([msg_len, 120]|max != 120 or '\n' in t.message) %}
                 <button type="button" id="ticket-msg-btn-{{ t.ticket_id }}" class="ticket-toggle-expand" onclick="toggleTicketMsg('{{ t.ticket_id }}', event)">(more)</button>
                 {% endif %}
-                <div id="ticket-resp-wrap-{{ t.ticket_id }}" style="margin-top: 6px; {% if not (t.responses and t.responses|length > 0) %}display: none;{% endif %}">
+                <div id="ticket-resp-wrap-{{ t.ticket_id }}" class="{% if not t.responses %}admin-is-hidden{% endif %}" style="margin-top: 6px;">
                   <span style="font-size: 11px; color: #38bdf8; background: rgba(14, 165, 233, 0.1); padding: 3px 8px; border-radius: 4px; display: inline-flex; align-items: center; gap: 4px;">
                     <svg class="glyph" style="width: 12px; height: 12px;"><use href="#glyph-mail"></use></svg>
                     <span id="ticket-resp-count-{{ t.ticket_id }}">{{ t.responses|length if t.responses else 0 }}</span> response(s) sent
                   </span>
                 </div>
-                <div id="ticket-notes-wrap-{{ t.ticket_id }}" style="margin-top: 6px; font-size: 11px; color: #a5b4fc; background: rgba(99, 102, 241, 0.1); padding: 4px 8px; border-radius: 4px; {% if not t.admin_notes %}display: none;{% endif %}">
+                <div id="ticket-notes-wrap-{{ t.ticket_id }}" class="{% if not t.admin_notes %}admin-is-hidden{% endif %}" style="margin-top: 6px; font-size: 11px; color: #a5b4fc; background: rgba(99, 102, 241, 0.1); padding: 4px 8px; border-radius: 4px;">
                   Note: <span id="ticket-notes-text-{{ t.ticket_id }}">{{ t.admin_notes }}</span>
                 </div>
               </td>
@@ -1788,11 +1913,11 @@ html[data-theme="light"] .copilot-input {
                     <svg class="glyph" style="width: 12px; height: 12px;"><use href="#glyph-mail"></use></svg> Reply &amp; Email
                   </button>
                   <form method="POST" action="/admin/tickets/{{ t.ticket_id }}/status" onsubmit="return handleInlineTicketStatusSubmit(event, '{{ t.ticket_id }}')" style="display: flex; gap: 3px; align-items: center; width: 100%;">
-                    <select name="status" id="ticket-status-select-{{ t.ticket_id }}" class="admin-select" onchange="updateTicketStatusAjax('{{ t.ticket_id }}', this.value)" style="padding: 2px 4px; font-size: 10.5px; flex: 1; min-width: 0;">
-                      <option value="open" {% if t.status == 'open' %}selected{% endif %}>Open</option>
-                      <option value="in_progress" {% if t.status == 'in_progress' %}selected{% endif %}>In Progress</option>
-                      <option value="resolved" {% if t.status == 'resolved' %}selected{% endif %}>Resolved</option>
-                      <option value="closed" {% if t.status == 'closed' %}selected{% endif %}>Closed</option>
+                    <select name="status" id="ticket-status-select-{{ t.ticket_id }}" class="admin-select" data-selected-value="{{ t.status }}" onchange="updateTicketStatusAjax('{{ t.ticket_id }}', this.value)" style="padding: 2px 4px; font-size: 10.5px; flex: 1; min-width: 0;">
+                      <option value="open">Open</option>
+                      <option value="in_progress">In Progress</option>
+                      <option value="resolved">Resolved</option>
+                      <option value="closed">Closed</option>
                     </select>
                     <button type="submit" id="ticket-status-btn-{{ t.ticket_id }}" class="btn btn-secondary btn-sm" style="padding: 2px 5px; font-size: 10px; cursor: pointer;">
                       Update
@@ -1906,16 +2031,17 @@ html[data-theme="light"] .copilot-input {
               <td class="col-subject">
                 <div class="ticket-subject-title">{{ t.subject or 'No subject' }}</div>
                 <div id="ticket-msg-{{ t.ticket_id }}" class="ticket-message-preview" title="{{ t.message }}">{{ t.message }}</div>
-                {% if t.message and (t.message|length > 120 or '\n' in t.message) %}
+                {% set msg_len = t.message|length if t.message else 0 %}
+                {% if t.message and ([msg_len, 120]|max != 120 or '\n' in t.message) %}
                 <button type="button" id="ticket-msg-btn-{{ t.ticket_id }}" class="ticket-toggle-expand" onclick="toggleTicketMsg('{{ t.ticket_id }}', event)">(more)</button>
                 {% endif %}
-                <div id="ticket-resp-wrap-{{ t.ticket_id }}" style="margin-top: 6px; {% if not (t.responses and t.responses|length > 0) %}display: none;{% endif %}">
+                <div id="ticket-resp-wrap-{{ t.ticket_id }}" class="{% if not t.responses %}admin-is-hidden{% endif %}" style="margin-top: 6px;">
                   <span style="font-size: 11px; color: #38bdf8; background: rgba(14, 165, 233, 0.1); padding: 3px 8px; border-radius: 4px; display: inline-flex; align-items: center; gap: 4px;">
                     <svg class="glyph" style="width: 12px; height: 12px;"><use href="#glyph-mail"></use></svg>
                     <span id="ticket-resp-count-{{ t.ticket_id }}">{{ t.responses|length if t.responses else 0 }}</span> response(s) sent
                   </span>
                 </div>
-                <div id="ticket-notes-wrap-{{ t.ticket_id }}" style="margin-top: 6px; font-size: 11px; color: #a5b4fc; background: rgba(99, 102, 241, 0.1); padding: 4px 8px; border-radius: 4px; {% if not t.admin_notes %}display: none;{% endif %}">
+                <div id="ticket-notes-wrap-{{ t.ticket_id }}" class="{% if not t.admin_notes %}admin-is-hidden{% endif %}" style="margin-top: 6px; font-size: 11px; color: #a5b4fc; background: rgba(99, 102, 241, 0.1); padding: 4px 8px; border-radius: 4px;">
                   Note: <span id="ticket-notes-text-{{ t.ticket_id }}">{{ t.admin_notes }}</span>
                 </div>
               </td>
@@ -1931,11 +2057,11 @@ html[data-theme="light"] .copilot-input {
                     <svg class="glyph" style="width: 12px; height: 12px;"><use href="#glyph-mail"></use></svg> View Thread / Reply
                   </button>
                   <form method="POST" action="/admin/tickets/{{ t.ticket_id }}/status" onsubmit="return handleInlineTicketStatusSubmit(event, '{{ t.ticket_id }}')" style="display: flex; gap: 3px; align-items: center; width: 100%;">
-                    <select name="status" id="ticket-status-select-{{ t.ticket_id }}" class="admin-select" onchange="updateTicketStatusAjax('{{ t.ticket_id }}', this.value)" style="padding: 2px 4px; font-size: 10.5px; flex: 1; min-width: 0;">
-                      <option value="open" {% if t.status == 'open' %}selected{% endif %}>Re-Open (Active)</option>
-                      <option value="in_progress" {% if t.status == 'in_progress' %}selected{% endif %}>In Progress</option>
-                      <option value="resolved" {% if t.status == 'resolved' %}selected{% endif %}>Resolved</option>
-                      <option value="closed" {% if t.status == 'closed' %}selected{% endif %}>Closed</option>
+                    <select name="status" id="ticket-status-select-{{ t.ticket_id }}" class="admin-select" data-selected-value="{{ t.status }}" onchange="updateTicketStatusAjax('{{ t.ticket_id }}', this.value)" style="padding: 2px 4px; font-size: 10.5px; flex: 1; min-width: 0;">
+                      <option value="open">Re-Open (Active)</option>
+                      <option value="in_progress">In Progress</option>
+                      <option value="resolved">Resolved</option>
+                      <option value="closed">Closed</option>
                     </select>
                     <button type="submit" id="ticket-status-btn-{{ t.ticket_id }}" class="btn btn-secondary btn-sm" style="padding: 2px 5px; font-size: 10px; cursor: pointer;">
                       Update
@@ -2162,7 +2288,7 @@ html[data-theme="light"] .copilot-input {
             <details class="returning-visitor-timeline" style="background: rgba(15, 23, 42, 0.65); border: 1px solid rgba(255, 255, 255, 0.09); border-radius: 8px; padding: 10px 14px;">
               <summary style="cursor: pointer; display: flex; justify-content: space-between; align-items: center; gap: 10px; flex-wrap: wrap; font-size: 12.5px; font-weight: 700; color: #f1f5f9; list-style: none;">
                 <span style="display: inline-flex; align-items: center; gap: 8px; flex-wrap: wrap;">
-                  <span style="color: {% if prof.is_authenticated %}#34d399{% else %}#38bdf8{% endif %};">{{ prof.display_identity }}</span>
+                  <span class="{% if prof.is_authenticated %}admin-text-emerald{% else %}admin-text-sky{% endif %}">{{ prof.display_identity }}</span>
                   <span class="status-pill closed" style="font-size: 10.5px;">Visit #{{ prof.visit_count }}</span>
                   {% if prof.days_since_prev_visit is not none %}
                   <span style="font-size: 11px; color: #94a3b8; font-weight: 500;">returned after {{ prof.days_since_prev_visit }}d</span>
@@ -2184,7 +2310,7 @@ html[data-theme="light"] .copilot-input {
 
                 <div style="display: flex; flex-direction: column; gap: 6px;">
                   {% for sess in prof.sessions %}
-                  <div style="background: rgba(30, 41, 59, 0.45); border-radius: 6px; padding: 8px 10px; border-left: 3px solid {% if sess.is_return_session %}#10b981{% else %}#64748b{% endif %};">
+                  <div class="admin-session-card {% if sess.is_return_session %}is-return{% endif %}">
                     <div style="display: flex; justify-content: space-between; gap: 8px; flex-wrap: wrap; color: #cbd5e1; font-weight: 600; font-size: 11.5px;">
                       <span>Visit #{{ sess.visit_index }} • {{ sess.started_at_str }} ({{ sess.traffic_source }})</span>
                       <span class="mono" style="color: #38bdf8;">{{ sess.formatted_dwell }} • {{ sess.pages_visited_count }} pg</span>
@@ -2245,7 +2371,7 @@ html[data-theme="light"] .copilot-input {
                 <td style="width: 100px; min-width: 80px;">
                   <div style="display: flex; align-items: center; gap: 6px;">
                     <div style="flex: 1; height: 6px; background: rgba(255,255,255,0.08); border-radius: 3px; overflow: hidden;">
-                      <div style="width: {{ lp.percentage }}%; height: 100%; background: linear-gradient(90deg, #0ea5e9, #38bdf8); border-radius: 3px;"></div>
+                      <div class="admin-progress-fill admin-bg-sky-grad" data-progress-width="{{ lp.percentage }}%"></div>
                     </div>
                     <span class="mono" style="font-size: 11.5px; color: var(--accent-cyan, #0ea5e9); min-width: 32px; text-align: right;">{{ lp.percentage }}%</span>
                   </div>
@@ -2301,7 +2427,7 @@ html[data-theme="light"] .copilot-input {
                 <td style="width: 90px; min-width: 75px;">
                   <div style="display: flex; align-items: center; gap: 6px;">
                     <div style="flex: 1; height: 6px; background: rgba(255,255,255,0.08); border-radius: 3px; overflow: hidden;">
-                      <div style="width: {{ vp.percentage }}%; height: 100%; background: linear-gradient(90deg, #a855f7, #c084fc); border-radius: 3px;"></div>
+                      <div class="admin-progress-fill admin-bg-purple-grad" data-progress-width="{{ vp.percentage }}%"></div>
                     </div>
                     <span class="mono" style="font-size: 11.5px; color: #c084fc; min-width: 32px; text-align: right;">{{ vp.percentage }}%</span>
                   </div>
@@ -2390,8 +2516,12 @@ html[data-theme="light"] .copilot-input {
           <tbody>
             {% set max_dwell = summary.page_dwell_times[0].total_dwell_seconds if summary.page_dwell_times else 1 %}
             {% for item in summary.page_dwell_times %}
+            {% set is_extra_dwell_row = loop.index not in [1, 2, 3, 4, 5, 6, 7, 8, 9, 10] %}
+            {% if is_extra_dwell_row %}
+            <tr class="dwell-row admin-is-hidden" style="display: none;"
+            {% else %}
             <tr class="dwell-row"
-                {% if loop.index > 10 %}style="display: none;"{% endif %}
+            {% endif %}
                 data-path="{{ item.path }}"
                 data-category="{{ item.category }}"
                 data-avg-dwell="{{ item.avg_dwell_seconds }}"
@@ -2413,27 +2543,27 @@ html[data-theme="light"] .copilot-input {
               <td class="mono" style="font-weight: 700; color: #f8fafc;">
                 {{ item.formatted_avg_dwell }}
                 <span style="font-size: 11px; font-weight: normal; color: #64748b; margin-left: 4px;">({{ item.avg_dwell_seconds }}s)</span>
-                {% if item.avg_scroll_pct and item.avg_scroll_pct > 0 %}
+                {% if item.avg_scroll_pct %}
                 <span style="display: inline-block; margin-left: 6px; padding: 1px 6px; border-radius: 4px; background: rgba(16, 185, 129, 0.14); color: #34d399; font-size: 10px; font-weight: 600;" title="Average Scroll Depth">↕ {{ item.avg_scroll_pct }}%</span>
                 {% endif %}
               </td>
               <td>
-                <span style="display: inline-flex; align-items: center; gap: 6px; padding: 3px 8px; border-radius: 9999px; font-size: 11px; font-weight: 600; background: rgba(255,255,255,0.06); color: {{ item.badge_color }}; border: 1px solid {{ item.badge_color }}40;">
-                  <span style="width: 6px; height: 6px; border-radius: 50%; background: {{ item.badge_color }};"></span>
+                <span class="admin-tier-badge tier-{{ item.tier }}">
+                  <span class="admin-tier-dot"></span>
                   {{ item.tier_label }}
                 </span>
               </td>
               <td class="mono" style="font-weight: 600; color: #c084fc;">{{ item.formatted_total_dwell }}</td>
               <td class="mono">
                 {{ item.visits_count }}
-                {% if item.measured_visits_count is defined and item.measured_visits_count < item.visits_count %}
+                {% if item.measured_visits_count is defined and item.measured_visits_count != item.visits_count %}
                 <span style="font-size: 10px; color: #94a3b8; display: block;" title="Visits with verified active reading telemetry">({{ item.measured_visits_count }} measured)</span>
                 {% endif %}
               </td>
               <td>
                 <div style="display: flex; align-items: center; gap: 8px;">
                   <div style="flex: 1; height: 6px; background: rgba(255,255,255,0.08); border-radius: 3px; overflow: hidden;">
-                    <div style="width: {{ [((item.total_dwell_seconds / [max_dwell, 1]|max) * 100)|round(1), 100]|min }}%; height: 100%; background: linear-gradient(90deg, #06b6d4, #38bdf8); border-radius: 3px;"></div>
+                    <div class="admin-progress-fill admin-bg-cyan-grad" data-progress-width="{{ [((item.total_dwell_seconds / [max_dwell, 1]|max) * 100)|round(1), 100]|min }}%"></div>
                   </div>
                   <span class="mono" style="font-size: 11px; color: #38bdf8; min-width: 32px; text-align: right;">{{ [((item.total_dwell_seconds / [max_dwell, 1]|max) * 100)|round(0)|int, 100]|min }}%</span>
                 </div>
@@ -2450,7 +2580,8 @@ html[data-theme="light"] .copilot-input {
         </table>
       </div>
       {% set total_dwell_routes = summary.page_dwell_times|length if summary.page_dwell_times else 0 %}
-      <div id="dwellPaginationFooter" style="display: {% if total_dwell_routes > 0 %}flex{% else %}none{% endif %}; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 12px; margin-top: 14px; padding-top: 12px; border-top: 1px solid rgba(255,255,255,0.08);">
+      {% set extra_dwell_routes = [total_dwell_routes - 10, 0]|max %}
+      <div id="dwellPaginationFooter" class="admin-dwell-footer {% if not total_dwell_routes %}admin-is-hidden{% endif %}">
         <div style="font-size: 12px; color: var(--text-secondary, #94a3b8);">
           Showing <strong id="dwellShowingCount" style="color: #f8fafc;">{{ [total_dwell_routes, 10]|min }}</strong> of <strong id="dwellTotalCount" style="color: #f8fafc;">{{ total_dwell_routes }}</strong> tracked routes
         </div>
@@ -2458,8 +2589,8 @@ html[data-theme="light"] .copilot-input {
           <button type="button" id="btnCollapseDwell" class="btn btn-secondary" onclick="resetDwellRowsLimit()" style="display: none; font-size: 12px; padding: 6px 14px;">
             Show Top 10
           </button>
-          <button type="button" id="btnLoadMoreDwell" class="btn btn-secondary" onclick="loadMoreDwellRows(10)" style="display: {% if total_dwell_routes > 10 %}inline-flex{% else %}none{% endif %}; align-items: center; gap: 6px; font-size: 12px; padding: 6px 14px;">
-            See More (+{{ [10, [total_dwell_routes - 10, 0]|max]|min }})
+          <button type="button" id="btnLoadMoreDwell" class="btn btn-secondary admin-dwell-more-btn {% if not extra_dwell_routes %}admin-is-hidden{% endif %}" onclick="loadMoreDwellRows(10)">
+            See More (+{{ [10, extra_dwell_routes]|min }})
           </button>
         </div>
       </div>
@@ -2490,7 +2621,7 @@ html[data-theme="light"] .copilot-input {
             <span class="mono" style="font-size: 12px; font-weight: 700; color: #10b981;">{{ p.formatted_total }}</span>
           </div>
           <div style="height: 5px; background: rgba(255, 255, 255, 0.08); border-radius: 3px; overflow: hidden;">
-            <div style="width: {{ [((p.total_seconds / [max_pillar_sec, 1]|max) * 100)|round(1), 100]|min }}%; height: 100%; background: linear-gradient(90deg, #10b981, #38bdf8); border-radius: 3px;"></div>
+            <div class="admin-progress-fill admin-bg-emerald-sky-grad" data-progress-width="{{ [((p.total_seconds / [max_pillar_sec, 1]|max) * 100)|round(1), 100]|min }}%"></div>
           </div>
           <div style="margin-top: 4px; font-size: 11px; color: #94a3b8; display: flex; justify-content: space-between;">
             <span>Active Attention</span>
@@ -2575,7 +2706,7 @@ html[data-theme="light"] .copilot-input {
                 </div>
                 <div style="display: flex; align-items: center; gap: 16px; flex: 1; max-width: 400px;">
                   <div style="flex: 1; height: 6px; background: rgba(255,255,255,0.08); border-radius: 3px; overflow: hidden;">
-                    <div style="width: {{ dest.percentage }}%; height: 100%; background: linear-gradient(90deg, #10b981, #34d399); border-radius: 3px;"></div>
+                    <div class="admin-progress-fill admin-bg-emerald-grad" data-progress-width="{{ dest.percentage }}%"></div>
                   </div>
                   <span class="mono" style="font-size: 12px; font-weight: 700; color: #34d399; min-width: 45px; text-align: right;">{{ dest.percentage }}%</span>
                   <span class="mono" style="font-size: 11px; color: #94a3b8; min-width: 70px; text-align: right;">
@@ -2638,7 +2769,7 @@ html[data-theme="light"] .copilot-input {
                 <td class="mono" style="font-size: 11.5px; color: #cbd5e1;">{{ camp.top_content|default('-') }}</td>
                 <td class="mono" style="font-weight: 700; color: #34d399;">
                   {{ camp.sessions }}
-                  {% if camp.unique_subscribers and camp.unique_subscribers > 0 %}
+                  {% if camp.unique_subscribers %}
                   <span style="font-size: 10px; color: #94a3b8; display: block;">({{ camp.unique_subscribers }} subs)</span>
                   {% endif %}
                 </td>
@@ -2646,7 +2777,7 @@ html[data-theme="light"] .copilot-input {
                 <td style="min-width: 90px;">
                   <div style="display: flex; align-items: center; gap: 8px;">
                     <div style="flex: 1; height: 6px; background: rgba(255,255,255,0.08); border-radius: 3px; overflow: hidden;">
-                      <div style="width: {{ camp.percentage }}%; height: 100%; background: linear-gradient(90deg, #38bdf8, #0ea5e9); border-radius: 3px;"></div>
+                      <div class="admin-progress-fill admin-bg-sky-rev-grad" data-progress-width="{{ camp.percentage }}%"></div>
                     </div>
                     <span class="mono" style="font-size: 11.5px; color: #38bdf8; min-width: 32px; text-align: right;">{{ camp.percentage }}%</span>
                   </div>
@@ -3227,10 +3358,10 @@ html[data-theme="light"] .copilot-input {
                 <!-- Role modifier form -->
                 <form method="POST" action="/admin/team/role" style="display: inline-flex; align-items: center; gap: 4px;">
                   <input type="hidden" name="email" value="{{ member.email }}">
-                  <select name="new_role" class="admin-select" style="padding: 4px 8px; font-size: 11px;">
-                    <option value="admin" {% if member.role == 'admin' %}selected{% endif %}>Admin</option>
-                    <option value="viewer" {% if member.role == 'viewer' %}selected{% endif %}>Viewer</option>
-                    <option value="owner" {% if member.role == 'owner' %}selected{% endif %}>Owner</option>
+                  <select name="new_role" class="admin-select" data-selected-value="{{ member.role }}" style="padding: 4px 8px; font-size: 11px;">
+                    <option value="admin">Admin</option>
+                    <option value="viewer">Viewer</option>
+                    <option value="owner">Owner</option>
                   </select>
                   <button type="submit" class="btn btn-secondary btn-sm" style="padding: 4px 8px; font-size: 11px;">Update</button>
                 </form>
@@ -3575,8 +3706,10 @@ html[data-theme="light"] .copilot-input {
             <span class="mono" style="font-size: 11.5px; color: #94a3b8;">{{ p.utilization_pct }}%</span>
           </div>
 
+          {% set util_high = [p.utilization_pct, 80]|max == p.utilization_pct and p.utilization_pct != 80 %}
+          {% set util_warn = [p.utilization_pct, 60]|max == p.utilization_pct and p.utilization_pct != 60 %}
           <div style="width: 100%; height: 6px; background: rgba(30, 41, 59, 0.9); border-radius: 999px; overflow: hidden; margin-bottom: 10px;">
-            <div style="width: {{ p.utilization_pct }}%; height: 100%; background: {% if p.utilization_pct > 80 %}#ef4444{% elif p.utilization_pct > 60 %}#f59e0b{% else %}#10b981{% endif %};"></div>
+            <div class="admin-progress-fill {% if util_high %}admin-bg-red{% elif util_warn %}admin-bg-amber{% else %}admin-bg-emerald{% endif %}" data-progress-width="{{ p.utilization_pct }}%"></div>
           </div>
 
           <div style="font-size: 11.5px; color: #cbd5e1; margin-bottom: 4px;">{{ p.secondary_metric }}</div>
@@ -3632,8 +3765,8 @@ html[data-theme="light"] .copilot-input {
       <!-- Progress Bar Track -->
       <div style="display: flex; height: 12px; border-radius: 6px; overflow: hidden; background: rgba(255, 255, 255, 0.05); margin-bottom: 14px;">
         {% for feat in ai_spends.features %}
-          {% if feat.share_pct > 0 %}
-          <div style="width: {{ feat.share_pct }}%; background: {% if feat.id == 'equity_dossiers' %}#38bdf8{% elif feat.id == 'mutual_funds' %}#10b981{% elif feat.id == 'copilot_desk' %}#818cf8{% elif feat.id == 'ai_auditor' %}#f59e0b{% elif feat.id == 'admin_copilot' %}#ec4899{% else %}#64748b{% endif %}; transition: width 0.3s ease;" title="{{ feat.name }}: {{ feat.share_pct }}% (₹{{ '%.2f'|format(feat.cost_inr) }})"></div>
+          {% if feat.share_pct %}
+          <div class="admin-progress-fill {% if feat.id == 'equity_dossiers' %}admin-bg-sky{% elif feat.id == 'mutual_funds' %}admin-bg-emerald{% elif feat.id == 'copilot_desk' %}admin-bg-indigo{% elif feat.id == 'ai_auditor' %}admin-bg-amber{% elif feat.id == 'admin_copilot' %}admin-bg-pink{% else %}admin-bg-slate{% endif %}" data-progress-width="{{ feat.share_pct }}%" title="{{ feat.name }}: {{ feat.share_pct }}% (₹{{ '%.2f'|format(feat.cost_inr) }})"></div>
           {% endif %}
         {% endfor %}
       </div>
@@ -3700,7 +3833,7 @@ html[data-theme="light"] .copilot-input {
             <td class="mono" style="text-align: right; font-size: 12px; color: #cbd5e1;">
               {{ "{:,.0f}".format(feat.total_tokens) }}
             </td>
-            <td class="mono" style="text-align: right; font-weight: 700; color: {% if feat.cost_inr > 0 %}#34d399{% else %}#64748b{% endif %}; font-size: 12px;">
+            <td class="mono {% if feat.cost_inr %}admin-text-emerald{% else %}admin-text-muted{% endif %}" style="text-align: right; font-weight: 700; font-size: 12px;">
               ₹{{ "{:,.2f}".format(feat.cost_inr) }}
             </td>
             <td class="mono" style="text-align: right; font-weight: 700; color: #f8fafc; font-size: 12px;">
@@ -3866,7 +3999,7 @@ html[data-theme="light"] .copilot-input {
                 <td style="min-width: 110px;">
                   <div style="display: flex; align-items: center; gap: 8px;">
                     <div style="flex: 1; height: 6px; background: rgba(255,255,255,0.08); border-radius: 3px; overflow: hidden;">
-                      <div style="width: {{ ab.share_pct }}%; height: 100%; background: linear-gradient(90deg, #10b981, #38bdf8); border-radius: 3px;"></div>
+                      <div class="admin-progress-fill admin-bg-emerald-sky-grad" data-progress-width="{{ ab.share_pct }}%"></div>
                     </div>
                     <span class="mono" style="font-size: 11.5px; color: #38bdf8; min-width: 34px; text-align: right;">{{ ab.share_pct }}%</span>
                   </div>
@@ -4327,9 +4460,18 @@ html[data-theme="light"] .copilot-input {
     </div>
   </div>
 
+  <script id="adminCannedResponsesData" type="application/json">{{ (canned_responses if canned_responses is defined else []) | tojson }}</script>
   <script>
   let currentReplyTicket = null;
-  let adminCannedResponses = {{ (canned_responses if canned_responses is defined else []) | tojson }};
+  let adminCannedResponses = [];
+  try {
+    const cannedEl = document.getElementById('adminCannedResponsesData');
+    if (cannedEl && cannedEl.textContent) {
+      adminCannedResponses = JSON.parse(cannedEl.textContent);
+    }
+  } catch (e) {
+    adminCannedResponses = [];
+  }
   let liveSpellCheckTimer = null;
   let detectedSpellCheckIssues = [];
   let archiveSearchTimer = null;
@@ -5107,11 +5249,13 @@ html[data-theme="light"] .copilot-input {
     const navBadge = document.getElementById('adminNavTabTicketsBadge');
     if (navBadge) {
       navBadge.innerText = String(openCnt);
+      navBadge.classList.toggle('admin-is-hidden', openCnt <= 0);
       navBadge.style.display = openCnt > 0 ? 'inline-flex' : 'none';
     }
     const hubBadge = document.getElementById('adminHubServiceTicketsBadge');
     if (hubBadge) {
       hubBadge.innerText = String(openCnt);
+      hubBadge.classList.toggle('admin-is-hidden', openCnt <= 0);
       hubBadge.style.display = openCnt > 0 ? 'inline-flex' : 'none';
     }
 
@@ -5175,7 +5319,10 @@ html[data-theme="light"] .copilot-input {
       if (typeof responseCount === 'number' && responseCount > 0) {
         const respWrap = document.getElementById(`ticket-resp-wrap-${ticketId}`) || row.querySelector(`#ticket-resp-wrap-${ticketId}`);
         const respCntEl = document.getElementById(`ticket-resp-count-${ticketId}`) || row.querySelector(`#ticket-resp-count-${ticketId}`);
-        if (respWrap) respWrap.style.display = 'block';
+        if (respWrap) {
+          respWrap.classList.remove('admin-is-hidden');
+          respWrap.style.display = 'block';
+        }
         if (respCntEl) respCntEl.innerText = String(responseCount);
       }
 
@@ -5555,7 +5702,9 @@ html[data-theme="light"] .copilot-input {
 
     const visibleCount = Math.min(dwellVisibleLimit, matchedRows.length);
     matchedRows.forEach((row, idx) => {
-      row.style.display = idx < dwellVisibleLimit ? '' : 'none';
+      const showRow = idx < dwellVisibleLimit;
+      row.classList.toggle('admin-is-hidden', !showRow);
+      row.style.display = showRow ? '' : 'none';
     });
 
     const footer = document.getElementById('dwellPaginationFooter');
@@ -5567,6 +5716,7 @@ html[data-theme="light"] .copilot-input {
     if (showingEl) showingEl.textContent = String(visibleCount);
     if (totalEl) totalEl.textContent = String(matchedRows.length);
     if (footer) {
+      footer.classList.toggle('admin-is-hidden', rows.length <= 0);
       footer.style.display = rows.length > 0 ? 'flex' : 'none';
     }
     if (btnMore) {
@@ -5574,8 +5724,10 @@ html[data-theme="light"] .copilot-input {
       if (remaining > 0) {
         const nextStep = Math.min(DWELL_PAGE_STEP, remaining);
         btnMore.textContent = `See More (+${nextStep})`;
+        btnMore.classList.remove('admin-is-hidden');
         btnMore.style.display = 'inline-flex';
       } else {
+        btnMore.classList.add('admin-is-hidden');
         btnMore.style.display = 'none';
       }
     }
@@ -5690,11 +5842,15 @@ html[data-theme="light"] .copilot-input {
     });
     document.querySelectorAll('#adminSubTabNav [data-hub]').forEach(el => {
       const elHub = el.getAttribute('data-hub');
-      el.style.display = (elHub === hubName) ? 'inline-flex' : 'none';
+      const isMatch = (elHub === hubName);
+      el.classList.toggle('admin-is-hidden', !isMatch);
+      el.style.display = isMatch ? 'inline-flex' : 'none';
     });
     document.querySelectorAll('[data-hub-section]').forEach(sec => {
       const secHub = sec.getAttribute('data-hub-section');
-      sec.style.display = (secHub === hubName) ? 'grid' : 'none';
+      const isMatch = (secHub === hubName);
+      sec.classList.toggle('admin-is-hidden', !isMatch);
+      sec.style.display = isMatch ? 'grid' : 'none';
     });
   }
 
@@ -5753,13 +5909,24 @@ html[data-theme="light"] .copilot-input {
 
   // Global listeners for date-range select, backdrop click, Escape key, and AJAX credit grant
   document.addEventListener('DOMContentLoaded', () => {
+    document.querySelectorAll('[data-progress-width]').forEach(el => {
+      const w = el.getAttribute('data-progress-width');
+      if (w) el.style.width = w;
+    });
+    document.querySelectorAll('select[data-selected-value]').forEach(selEl => {
+      const val = selEl.getAttribute('data-selected-value');
+      if (val) selEl.value = val;
+    });
+
     const sel = document.getElementById('windowSelect');
     const customDiv = document.getElementById('customDateRange');
     if (sel && customDiv) {
       sel.addEventListener('change', () => {
         if (sel.value === 'custom') {
+          customDiv.classList.remove('admin-is-hidden');
           customDiv.style.display = 'inline-flex';
         } else {
+          customDiv.classList.add('admin-is-hidden');
           customDiv.style.display = 'none';
           document.getElementById('windowForm').submit();
         }
@@ -5904,7 +6071,7 @@ html[data-theme="light"] .copilot-input {
   // Executive Copilot Client Controller
   let copilotHistory = [];
   const activeWindow = "{{ window or '30d' }}";
-  const activeIncludeTests = {{ include_tests or 0 }};
+  const activeIncludeTests = Number("{{ include_tests or 0 }}");
 
   function toggleAdminCopilot() {
     const drawer = document.getElementById('adminCopilotDrawer');

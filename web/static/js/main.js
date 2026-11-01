@@ -589,10 +589,10 @@ const EVALUATION_CONFIGS = {
     badge: 'Fundamental Equity Engine',
     title: (ticker) => `Evaluating Equity Dossier: ${ticker || 'Selected Company'}`,
     stages: [
-      { maxSec: 7, stage: "Step 1/4: Ingesting BSE Filings & L2 Depth", msg: "Ingesting verified corporate filings from BSE and parsing Level-2 order book depth..." },
-      { maxSec: 16, stage: "Step 2/4: Executing 7-Pillar Cortex & Sieve", msg: "Running clean-room filing filters, 3-step capital efficiency decompositions, and promoter pledge audits..." },
-      { maxSec: 25, stage: "Step 3/4: Solving Reverse DCF & Valuation", msg: "Computing implied market growth rate vs. 12% WACC hurdle rate and sector benchmarks..." },
-      { maxSec: 30, stage: "Step 4/4: Finalizing Thesis", msg: "Assembling Countercase failure modes, statutory footnotes, and executive dossier..." }
+      { maxSec: 12, stage: "Step 1/4: Ingesting BSE Filings & L2 Depth", msg: "Ingesting verified corporate filings from BSE and parsing Level-2 order book depth..." },
+      { maxSec: 28, stage: "Step 2/4: Executing 7-Pillar Cortex & Sieve", msg: "Running clean-room filing filters, 3-step capital efficiency decompositions, and promoter pledge audits..." },
+      { maxSec: 45, stage: "Step 3/4: Solving Reverse DCF & Valuation", msg: "Computing implied market growth rate vs. 12% WACC hurdle rate and sector benchmarks..." },
+      { maxSec: 60, stage: "Step 4/4: Finalizing Thesis & Archiving", msg: "Assembling Countercase failure modes, statutory footnotes, and executive dossier..." }
     ]
   },
   fund: {
@@ -1424,106 +1424,122 @@ window.showPreflightCreditError = function(errorMsg, onRetry) {
 // 4b. Report Synthesis & Deep-Dive Unlocks
 // ==============================================================================
 
-window.synthesizeReport = async function(ticker, forceRefresh = false) {
-  if (!ticker) return;
-
+function getAuthenticatedUser() {
   const user = getStoredUser();
-  if (!user || !user.id) {
-    alert('Please sign in first to generate stock reports. You will receive 2 free research credits.');
+  return (user && user.id) ? user : null;
+}
+window.getAuthenticatedUser = getAuthenticatedUser;
+
+window.synthesizeReport = async function(ticker, forceRefresh = false) {
+  const user = getAuthenticatedUser();
+  if (!user) {
     openSignInModal();
     return;
   }
 
-  const performSynthesis = async () => {
-    const buttons = document.querySelectorAll(`button[onclick*="synthesizeReport('${ticker}')"], #synthesizeBtn`);
-    const originalTexts = [];
-    buttons.forEach((btn, idx) => {
-      originalTexts[idx] = btn.innerHTML;
-      btn.disabled = true;
-      btn.innerHTML = `<span class="spinner-border spinner-border-sm" role="status" aria-hidden="true"></span> Generating Report (15-30s)...`;
-    });
+  const buttons = document.querySelectorAll(`button[onclick*="synthesizeReport('${ticker}')"], #synthesizeBtn`);
+  const originalTexts = [];
+  buttons.forEach((btn, idx) => {
+    originalTexts[idx] = btn.innerHTML;
+    btn.disabled = true;
+    btn.innerHTML = `<span class="spinner-border spinner-border-sm" role="status" aria-hidden="true"></span> Generating Report...`;
+  });
 
-    if (typeof window.showEvaluationHUD === 'function') {
-      window.showEvaluationHUD({ assetType: 'equity', ticker, customTitle: `Generating Report: ${ticker}`, totalSec: 30 });
+  if (typeof window.showEvaluationHUD === 'function') {
+    window.showEvaluationHUD({ assetType: 'equity', ticker, customTitle: `Generating Report: ${ticker}`, totalSec: 60 });
+  }
+
+  // AbortController with 75-second timeout for long search-grounded models
+  const controller = new AbortController();
+  const timeoutId = setTimeout(() => controller.abort(), 75000);
+
+  try {
+    const resp = await fetch('/api/synthesize', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      signal: controller.signal,
+      body: JSON.stringify({
+        ticker: ticker,
+        user_id: user.id,
+        force_refresh: !!forceRefresh
+      })
+    });
+    clearTimeout(timeoutId);
+
+    let data = {};
+    try {
+      data = await resp.json();
+    } catch (_) {
+      data = {};
     }
 
-    try {
-      const resp = await fetch('/api/synthesize', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          ticker: ticker,
-          user_id: user.id,
-          force_refresh: !!forceRefresh
-        })
-      });
+    if (typeof window.hideEvaluationHUD === 'function') window.hideEvaluationHUD();
 
-      let data = {};
-      try {
-        data = await resp.json();
-      } catch (_) {
-        data = {};
+    if (resp.ok && (data.success || data.status === 'success')) {
+      const newBal = typeof data.new_balance === 'number' ? data.new_balance : (typeof data.remaining_credits === 'number' ? data.remaining_credits : undefined);
+      if (typeof newBal === 'number') {
+        user.credits_balance = newBal;
+        user.credits = newBal;
+        localStorage.setItem('sr_user', JSON.stringify(user));
+        syncUserSession();
+        if (typeof updateNavAuthUI === 'function') updateNavAuthUI(user);
       }
 
-      if (typeof window.hideEvaluationHUD === 'function') window.hideEvaluationHUD();
+      const targetUrl = data.dossier_url || data.redirect_url || `/dossier/${encodeURIComponent(ticker)}`;
+      window.location.href = targetUrl;
+      return;
+    }
 
-      if (resp.ok && (data.success || data.status === 'success')) {
-        const newBal = typeof data.new_balance === 'number' ? data.new_balance : (typeof data.remaining_credits === 'number' ? data.remaining_credits : undefined);
-        if (typeof newBal === 'number') {
-          user.credits_balance = newBal;
-          user.credits = newBal;
-          localStorage.setItem('sr_user', JSON.stringify(user));
-          syncUserSession();
-          if (typeof updateNavAuthUI === 'function') updateNavAuthUI(user);
-        }
+    // If HTTP error occurred, check if the report was actually saved in the background before showing error
+    const pollCheck = await fetch(`/api/dossier/status/${encodeURIComponent(ticker)}`).then(r => r.json()).catch(() => null);
+    if (pollCheck && pollCheck.status === 'ready') {
+      window.location.href = pollCheck.dossier_url || `/dossier/${encodeURIComponent(ticker)}`;
+      return;
+    }
 
-        const targetUrl = data.dossier_url || data.redirect_url || `/dossier/${encodeURIComponent(ticker)}`;
-        window.location.href = targetUrl;
+    const errMsg = extractApiError(data, 'Report generation failed. Please try again.');
+    if (resp.status === 402 || (data.detail && data.detail.error === 'INSUFFICIENT_CREDITS')) {
+      window.openPreflightCreditModal({
+        title: 'Insufficient Research Credits',
+        description: errMsg || 'You need at least 1 research credit to generate this report.',
+        cost: 1
+      });
+    } else if (resp.status === 401 || resp.status === 403) {
+      localStorage.removeItem('sr_user');
+      if (typeof updateNavAuthUI === 'function') updateNavAuthUI(null);
+      alert(errMsg || 'Your session has expired. Please sign in again.');
+      openSignInModal();
+    } else {
+      window.showPreflightCreditError(errMsg, () => window.synthesizeReport(ticker, forceRefresh));
+    }
+
+    if (typeof refreshUserBalance === 'function') {
+      await refreshUserBalance(user);
+    }
+  } catch (err) {
+    clearTimeout(timeoutId);
+    // Timeout or network drop: Poll status once to check if backend finished
+    try {
+      const pollCheck = await fetch(`/api/dossier/status/${encodeURIComponent(ticker)}`).then(r => r.json()).catch(() => null);
+      if (pollCheck && pollCheck.status === 'ready') {
+        if (typeof window.hideEvaluationHUD === 'function') window.hideEvaluationHUD();
+        window.location.href = pollCheck.dossier_url || `/dossier/${encodeURIComponent(ticker)}`;
         return;
       }
+    } catch (_) {}
 
-      const errMsg = extractApiError(data, 'Report generation failed. Please try again.');
-      if (resp.status === 402 || (data.detail && data.detail.error === 'INSUFFICIENT_CREDITS')) {
-        window.openPreflightCreditModal({
-          title: 'Insufficient Research Credits',
-          description: errMsg || 'You need at least 1 research credit to generate this report.',
-          cost: 1
-        });
-      } else if (resp.status === 401 || resp.status === 403) {
-        localStorage.removeItem('sr_user');
-        if (typeof updateNavAuthUI === 'function') updateNavAuthUI(null);
-        alert(errMsg || 'Your session has expired. Please sign in again.');
-        openSignInModal();
-      } else {
-        window.showPreflightCreditError(errMsg, () => window.synthesizeReport(ticker, forceRefresh));
-      }
-
-      if (typeof refreshUserBalance === 'function') {
-        await refreshUserBalance(user);
-      }
-    } catch (err) {
-      if (typeof window.hideEvaluationHUD === 'function') window.hideEvaluationHUD();
-      console.error('Report request failed:', err);
-      window.showPreflightCreditError('Network error while requesting your report.', () => window.synthesizeReport(ticker, forceRefresh));
-      if (typeof refreshUserBalance === 'function') {
-        await refreshUserBalance(user);
-      }
-    } finally {
-      buttons.forEach((btn, idx) => {
-        btn.disabled = false;
-        if (originalTexts[idx]) btn.innerHTML = originalTexts[idx];
-      });
+    if (typeof window.hideEvaluationHUD === 'function') window.hideEvaluationHUD();
+    console.error('Report request failed:', err);
+    window.showPreflightCreditError('Synthesis request timed out or encountered a network error. Your credit was not deducted.', () => window.synthesizeReport(ticker, forceRefresh));
+    if (typeof refreshUserBalance === 'function') {
+      await refreshUserBalance(user);
     }
-  };
-
-  window.openPreflightCreditModal({
-    title: forceRefresh ? `Refresh 7-Pillar Report: ${ticker}` : `Generate 7-Pillar Report: ${ticker}`,
-    description: forceRefresh 
-      ? `Re-ingest latest BSE exchange filings and re-run all 7 deterministic analytical engines for ${ticker}.`
-      : `Compile a fresh, verified 7-pillar institutional research dossier for ${ticker} from official exchange disclosures.`,
-    cost: 1,
-    onConfirm: performSynthesis
-  });
+  } finally {
+    buttons.forEach((btn, idx) => {
+      btn.disabled = false;
+      if (originalTexts[idx]) btn.innerHTML = originalTexts[idx];
+    });
+  }
 };
 
 // ==============================================================================
