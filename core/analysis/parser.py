@@ -98,10 +98,17 @@ def strip_conclusion_sections(text: str) -> str:
         r'(?!.*(?:Falsification|Contradict|Revision\s+Trigger|Change\s+This\s+View))'
         r'(?:Conclusion|Final\s+Verdict|Overall\s+Summary|Summary\s+&\s+Conclusion|Key\s+Monitorables|Actionable\s+Guidance|Diagnostic\s+Synthesis|Recommendation|Target\s+Price|Investment\s+Summary\b|Outlook\s+&\s+Recommendation|Strategic\s+Portfolio\s+Roadmap|निष्कर्ष|कार्रवाई\s+योग्य\s+मार्गदर्शन)\b.*$'
     )
-    parts = pattern.split(text)
-    cleaned = parts[0].strip() if parts else text
-    cleaned = re.sub(r'(?im)^\s*(?:#+|\*\*|__)?\s*VERDICT\s*:\s*(?:BUY|HOLD|SELL|AVOID)\b[^\n]*\n*', '', cleaned)
-    cleaned = re.sub(r'(?im)^[ \t]*[-*•]\s*(?:Verdict|Rating|Recommendation)\s*:\s*(?:BUY|HOLD|SELL|AVOID)\b[^\n]*\n*', '', cleaned)
+    p7 = re.search(r'(?im)^#{1,3}\s*(?:Pillar|स्तंभ|Dimension)\s*7\b', text)
+    if p7:
+        head = text[:p7.end()]
+        tail = text[p7.end():]
+        parts = pattern.split(tail)
+        cleaned = (head + parts[0]).strip()
+    else:
+        parts = pattern.split(text)
+        cleaned = parts[0].strip() if parts else text
+    cleaned = re.sub(r'(?im)^\s*(?:#+|\*\*|__)?\s*VERDICT\s*:\s*(?:BUY|HOLD|SELL|AVOID|WATCHLIST|ACCUMULATE|NEUTRAL)\b[^\n]*\n*', '', cleaned)
+    cleaned = re.sub(r'(?im)^[ \t]*[-*•]\s*(?:\*\*|__)?(?:Verdict|Rating|Recommendation)\s*:?\s*(?:\*\*|__)?\s*:?\s*(?:\*\*|__)?(?:BUY|HOLD|SELL|AVOID|WATCHLIST|ACCUMULATE|NEUTRAL)\b[^\n]*\n*', '', cleaned)
     cleaned = re.sub(r'\n*---\s*$', '', cleaned.rstrip())
     return cleaned.strip()
 

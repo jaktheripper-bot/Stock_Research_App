@@ -221,6 +221,10 @@ def save_mutual_fund_schemes_batch(schemes: List[Dict[str, Any]]) -> int:
     try:
         if use_pg:
             from psycopg2.extras import execute_values
+            pg_rows = [
+                r[:15] + (_normalize_pg_portfolio_date(r[15]),)
+                for r in rows
+            ]
             sql_pg = """
                 INSERT INTO mutual_fund_schemes (
                     scheme_code, scheme_name, fund_house, category, broad_category,
@@ -247,8 +251,8 @@ def save_mutual_fund_schemes_batch(schemes: List[Dict[str, Any]]) -> int:
                     last_updated = now();
             """
             template = "(%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, now())"
-            for idx in range(0, len(rows), 500):
-                execute_values(cursor, sql_pg, rows[idx:idx + 500], template=template)
+            for idx in range(0, len(pg_rows), 500):
+                execute_values(cursor, sql_pg, pg_rows[idx:idx + 500], template=template)
         else:
             sql_sq = """
                 INSERT INTO mutual_fund_schemes (

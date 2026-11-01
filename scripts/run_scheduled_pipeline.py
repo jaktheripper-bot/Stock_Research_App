@@ -58,7 +58,7 @@ def _run_leased_phase(
     force: bool = False,
     ttl_seconds: int = DAILY_LEASE_TTL_SECONDS,
 ) -> None:
-    """Runs one leased pipeline phase in isolation.
+    """Runs one leased pipeline phase in isolation with a 1-shot retry on transient DB socket resets.
 
     The exception is caught OUTSIDE the job_lease context manager on purpose: job_lease
     must still observe the failure so release_on_failure=True frees the daily lease for a
@@ -66,18 +66,31 @@ def _run_leased_phase(
     "FAILED: ..." in results and the remaining phases continue. Nothing is fabricated: the
     failed phase simply has no output for this cycle.
     """
-    try:
-        with job_lease(lease_name, ttl_seconds=ttl_seconds, release_on_exit=False) as acquired:
-            if not (acquired or force):
-                logger.info(f"Lease for {lease_name} held by another worker. Skipping {phase_label}.")
-                results[result_key] = "SKIPPED_LEASE_HELD"
+    from core.db.connection import close_all_pg_pools
+
+    for attempt in range(2):
+        try:
+            with job_lease(lease_name, ttl_seconds=ttl_seconds, release_on_exit=False) as acquired:
+                if not (acquired or force):
+                    logger.info(f"Lease for {lease_name} held by another worker. Skipping {phase_label}.")
+                    results[result_key] = "SKIPPED_LEASE_HELD"
+                    return
+                logger.info(f"Executing {phase_label} (attempt {attempt + 1}/2)...")
+                results[result_key] = phase_fn()
+                logger.info(f"{phase_label} complete.")
                 return
-            logger.info(f"Executing {phase_label}...")
-            results[result_key] = phase_fn()
-            logger.info(f"{phase_label} complete.")
-    except Exception as exc:
-        logger.exception(f"{phase_label} failed; continuing with remaining phases: {exc}")
-        results[result_key] = f"FAILED: {type(exc).__name__}: {exc}"
+        except Exception as exc:
+            is_transient_conn_err = any(
+                token in f"{type(exc).__name__}: {exc}".lower()
+                for token in ("interfaceerror", "operationalerror", "connection already closed", "ssl syscall error", "eof detected")
+            )
+            if attempt == 0 and is_transient_conn_err:
+                logger.warning(f"Transient DB socket drop in {phase_label} ({exc}); resetting pool and retrying once...")
+                close_all_pg_pools()
+                continue
+            logger.exception(f"{phase_label} failed; continuing with remaining phases: {exc}")
+            results[result_key] = f"FAILED: {type(exc).__name__}: {exc}"
+            return
 
 
 def run_morning_pipeline(date_str: str, force: bool = False) -> dict:

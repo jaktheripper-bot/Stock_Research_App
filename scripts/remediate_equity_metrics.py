@@ -333,6 +333,7 @@ def run_remediation(
             # 3b. Extract missing metrics from archived `reports.report_text`
             if rep and rep.get("report_text"):
                 seed_for_extract = {
+                    "market_cap": cf.get("market_cap") if cf else rep.get("baseline_mcap"),
                     "pe_ratio": cf.get("pe_ratio") if cf else rep.get("baseline_pe"),
                     "roce": cf.get("roce") if cf else None,
                     "roe": cf.get("roe") if cf else None,
@@ -348,6 +349,7 @@ def run_remediation(
                 changed_fields: Dict[str, Tuple[Any, Any]] = {}
                 if cf:
                     for col in (
+                        "market_cap",
                         "pe_ratio",
                         "roce",
                         "roe",
@@ -367,6 +369,10 @@ def run_remediation(
                             elif old_v in ("Fair", "N/A (Loss-Making)"):
                                 changed_fields[col] = (old_v, norm_old)
                                 cf[col] = norm_old
+                        elif col == "market_cap":
+                            if (old_v is None or float(old_v or 0) <= 0) and new_v is not None and float(new_v) > 0:
+                                changed_fields[col] = (old_v, float(new_v))
+                                cf[col] = float(new_v)
                         else:
                             if old_v is None and new_v is not None:
                                 changed_fields[col] = (old_v, new_v)
@@ -381,6 +387,20 @@ def run_remediation(
                                 f"UPDATE cached_fundamentals SET {set_clauses} WHERE ticker = {p}",
                                 tuple(params),
                             )
+
+                # Backfill `reports.baseline_mcap` when 0 or NULL from cf.market_cap or extracted market_cap
+                old_b_mcap = rep.get("baseline_mcap")
+                best_mcap = (
+                    (cf.get("market_cap") if cf and cf.get("market_cap") and float(cf["market_cap"]) > 0 else None)
+                    or (extracted.get("market_cap") if extracted.get("market_cap") and float(extracted["market_cap"]) > 0 else None)
+                )
+                if (old_b_mcap is None or float(old_b_mcap or 0) <= 0) and best_mcap is not None and abs(float(best_mcap) - 25_000_000_000.0) >= 1.0:
+                    if apply_changes:
+                        cur.execute(
+                            f"UPDATE reports SET baseline_mcap = {p} WHERE ticker = {p}",
+                            (float(best_mcap), ticker),
+                        )
+                    rep["baseline_mcap"] = float(best_mcap)
 
                 # Normalize `reports.baseline_pe` ('Fair' / 'N/A (Loss-Making)' / backfill from cf or extracted)
                 old_b_pe = rep.get("baseline_pe")

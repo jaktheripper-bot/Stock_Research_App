@@ -35,9 +35,9 @@ def extract_fundamentals_from_report_text(report_text: str, fallback_data: Optio
     # 0. Trailing P/E (Price-to-Earnings)
     if res.get("pe_ratio") in [None, "N/A", "Fair", "—", "-", "", 0, 0.0, "0"]:
         extracted_pe: Optional[str] = None
-        # (a) Markdown table row: | **Trailing P/E Ratio** | 29.87x | or | P/E Ratio (TTM) | 120.82x |
+        # (a) Markdown table row: | **Trailing P/E Ratio** | 29.87x | or | P/E Ratio (TTM) | 120.82x | or | Estimated trailing P/E | 24.8 times |
         m_pe_tbl = re.search(
-            r"\|\s*\*?\*?(?:Trailing\s+)?P/E(?:\s+(?:Ratio|Multiple))?(?:\s*\(TTM\))?\*?\*?\s*\|\s*~?`?(\d{1,3}(?:\.\d{1,2})?)\s*(?:x|times)?`?\s*\|",
+            r"\|\s*\*?\*?(?:Estimated\s+)?(?:Trailing\s+)?P/E(?:\s+(?:Ratio|Multiple))?(?:\s*\(TTM\))?\*?\*?\s*\|\s*~?`?(\d{1,3}(?:\.\d{1,2})?)\s*(?:x|times)?`?\s*\|",
             txt,
             re.I,
         )
@@ -242,6 +242,39 @@ def extract_fundamentals_from_report_text(report_text: str, fallback_data: Optio
         if m_fpe:
             res["forward_pe"] = f"{float(m_fpe.group(1)):.2f}"
 
+    # 9. Market Capitalisation (in raw INR, i.e., Cr * 1e7 or Lakh Cr * 1e12)
+    cur_mc = res.get("market_cap")
+    is_missing_mc = cur_mc in [None, "N/A", "", 0, 0.0] or (
+        isinstance(cur_mc, (int, float)) and abs(float(cur_mc) - 25_000_000_000.0) < 1.0
+    )
+    if not is_legacy_synth_template and is_missing_mc:
+        mcap_patterns = (
+            re.compile(
+                r"\|\s*\*?\*?(?:Market|Equity)\s+Cap(?:itali[sz]ation)?(?:\s*\([^\)]*\))?\*?\*?\s*\|\s*(?:~|approx\.?\s*)?(?:INR|₹|Rs\.?)?\s*([\d,]+(?:\.\d+)?)\s*(Lakh\s+Cr(?:ore)?s?|Cr(?:ore)?s?)\b",
+                re.I,
+            ),
+            re.compile(
+                r"(?:Market|Equity)\s+(?:Cap(?:itali[sz]ation)?|Valuation)(?:\s*\([^\)]*\))?\s*\**\s*(?:of|stands?\s+at|is|at|around|approximately|near|:|=|\()\s*\**\s*(?:\[[^\]]*?=\s*)?(?:~|approx\.?\s*|approximately\s+|around\s+|roughly\s+)?(?:INR|₹|Rs\.?)?\s*([\d,]+(?:\.\d+)?)\s*(Lakh\s+Cr(?:ore)?s?|Cr(?:ore)?s?)\b",
+                re.I,
+            ),
+            re.compile(
+                r"(?:INR|₹|Rs\.?)\s*([\d,]+(?:\.\d+)?)\s*(Lakh\s+Cr(?:ore)?s?|Cr(?:ore)?s?)\s+(?:market|equity)\s+cap(?:itali[sz]ation)?\b",
+                re.I,
+            ),
+        )
+        for pat in mcap_patterns:
+            m_mc = pat.search(txt)
+            if m_mc:
+                try:
+                    mc_val = float(m_mc.group(1).replace(",", "").strip())
+                    mc_unit = (m_mc.group(2) or "").lower()
+                    raw_inr = mc_val * 1e12 if "lakh" in mc_unit else mc_val * 1e7
+                    if raw_inr > 0 and abs(raw_inr - 25_000_000_000.0) >= 1.0:
+                        res["market_cap"] = raw_inr
+                        break
+                except Exception as e:
+                    logger.debug("Failed parsing market_cap from report text: %s", e)
+
     return res
 
 
@@ -259,6 +292,7 @@ def get_cached_fundamentals(ticker: str) -> Optional[Dict[str, Any]]:
 
     result_dict: Dict[str, Any] = {}
     had_synth_batch = False
+    should_persist_backfill = False
 
     try:
         # 1. Query cached_fundamentals table
@@ -388,16 +422,19 @@ def get_cached_fundamentals(ticker: str) -> Optional[Dict[str, Any]]:
             except Exception as r_err:
                 logger.debug(f"Reports table parsing notice for {clean}: {r_err}")
 
-            # If we obtained useful metrics (or scrubbed a synthetic batch tuple), persist to cached_fundamentals
+            # If we obtained useful metrics (or scrubbed a synthetic batch tuple), mark for persistence after closing conn
             if had_synth_batch or result_dict.get("current_price") or result_dict.get("roce") or result_dict.get("fifty_two_week_high"):
                 result_dict["ticker"] = clean
-                save_cached_fundamentals(clean, result_dict, force_overwrite=had_synth_batch)
+                should_persist_backfill = True
 
     except Exception as e:
         logger.error(f"Error fetching cached fundamentals for {ticker}: {e}")
     finally:
         cursor.close()
         conn.close()
+
+    if should_persist_backfill and result_dict:
+        save_cached_fundamentals(clean, result_dict, force_overwrite=had_synth_batch)
 
     if not result_dict:
         return None

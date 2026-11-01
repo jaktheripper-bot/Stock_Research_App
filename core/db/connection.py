@@ -190,7 +190,13 @@ class _PooledConnectionProxy:
                 is_healthy = False
             try:
                 if self._pool is not None:
-                    if not is_healthy or self._conn.closed != 0:
+                    # Guard: only return to pool if this socket actually belongs to the pool
+                    pool_conns = set(getattr(self._pool, "_pool", ()) or ()) | set(
+                        getattr(self._pool, "_used", {}).values() if hasattr(self._pool, "_used") else ()
+                    )
+                    if pool_conns and self._conn not in pool_conns:
+                        self._conn.close()
+                    elif not is_healthy or self._conn.closed != 0:
                         _CONN_LAST_OK.pop(id(self._conn), None)
                         _CONN_TZ_SET.discard(id(self._conn))
                         self._pool.putconn(self._conn, close=True)
@@ -240,7 +246,7 @@ def _is_web_server_runtime() -> bool:
 
 
 _DEFAULT_POOL_MIN = "1"
-_DEFAULT_POOL_MAX = "8" if _is_web_server_runtime() else "2"
+_DEFAULT_POOL_MAX = "8"
 
 DB_POOL_MIN = int(os.environ.get("DB_POOL_MIN", _DEFAULT_POOL_MIN))
 DB_POOL_MAX = max(DB_POOL_MIN, int(os.environ.get("DB_POOL_MAX", _DEFAULT_POOL_MAX)))
@@ -384,7 +390,11 @@ def _get_raw_connection():
             pool = _get_pg_pool(norm_url)
             raw_conn = _acquire_connection_from_pool(pool)
             _PG_AVAILABLE = True
-            return _PooledConnectionProxy(pool, raw_conn)
+            pool_conns = set(getattr(pool, "_pool", ()) or ()) | set(
+                getattr(pool, "_used", {}).values() if hasattr(pool, "_used") else ()
+            )
+            bound_pool = None if (pool_conns and raw_conn not in pool_conns) else pool
+            return _PooledConnectionProxy(bound_pool, raw_conn)
         except Exception as e:
             logger.warning(f"Pooled PostgreSQL connection failed: {e}. Attempting direct fallback...")
             try:
