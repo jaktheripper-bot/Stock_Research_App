@@ -80,6 +80,14 @@ def save_report_to_archive(stock_data: dict, report_text: str, announcement: str
     placeholder = get_placeholder()
 
     clean_sym = clean_ticker(stock_data.get("ticker", ""))
+    if not clean_sym or not report_text or not str(report_text).strip():
+        logger.warning("Refusing to archive empty report_text for ticker='%s' (fail-closed guard).", clean_sym)
+        try:
+            cursor.close()
+            conn.close()
+        except Exception as close_err:
+            logger.debug("Empty report guard connection close notice: %s", close_err)
+        return False
     short_name = stock_data.get("short_name") or clean_sym
 
     curr_price = stock_data.get("current_price") or stock_data.get("currentValue") or 0.0
@@ -118,7 +126,11 @@ def save_report_to_archive(stock_data: dict, report_text: str, announcement: str
             ON CONFLICT (ticker) 
             DO UPDATE SET 
                 short_name = EXCLUDED.short_name,
-                report_text = EXCLUDED.report_text,
+                report_text = CASE
+                    WHEN EXCLUDED.report_text IS NOT NULL AND TRIM(EXCLUDED.report_text) <> ''
+                    THEN EXCLUDED.report_text
+                    ELSE reports.report_text
+                END,
                 timestamp = EXCLUDED.timestamp,
                 baseline_price = EXCLUDED.baseline_price,
                 baseline_pe = EXCLUDED.baseline_pe,

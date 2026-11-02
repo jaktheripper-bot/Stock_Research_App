@@ -1239,10 +1239,14 @@ def dossier_page(request: Request, ticker: str):
     if not clean_t:
         return RedirectResponse(url="/")
 
-    from core.search.product_search import resolve_cross_asset_dossier_redirect
-    early_cross_url = resolve_cross_asset_dossier_redirect(clean_t, prefix_only=True)
-    if early_cross_url:
-        return RedirectResponse(url=early_cross_url, status_code=302)
+    # Route non-equity identifiers (UDYAM MSMEs, Mutual Funds, REITs, Bonds, SGBs, ETFs) before Tier-5 BSE JIT lookup
+    if not is_synthetic_test_symbol(clean_t):
+        direct_rep = get_report_by_ticker_sync(clean_t)
+        if not (direct_rep and direct_rep.get("report_text")):
+            from web.common import resolve_non_equity_dossier_redirect
+            cross_asset_url = resolve_non_equity_dossier_redirect(clean_t)
+            if cross_asset_url:
+                return RedirectResponse(url=cross_asset_url, status_code=302)
 
     # Canonicalize ticker symbol (e.g. 'MANALI PETROCHEM' or '500268' -> 'MANALIPETC')
     canonical = resolve_canonical_symbol(clean_t) or clean_t
@@ -1251,9 +1255,11 @@ def dossier_page(request: Request, ticker: str):
 
     rep = get_report_by_ticker_sync(canonical)
     if not rep or not rep.get("report_text"):
-        cross_url = resolve_cross_asset_dossier_redirect(canonical, prefix_only=False)
-        if cross_url:
-            return RedirectResponse(url=cross_url, status_code=302)
+        if canonical != clean_t and not is_synthetic_test_symbol(canonical):
+            from web.common import resolve_non_equity_dossier_redirect
+            cross_url = resolve_non_equity_dossier_redirect(canonical)
+            if cross_url:
+                return RedirectResponse(url=cross_url, status_code=302)
         if is_synthetic_test_symbol(canonical) or is_synthetic_test_symbol(clean_t):
             raise HTTPException(status_code=404, detail=f"Stock dossier '{canonical}' not found.")
         # Resolve company details for the pending template

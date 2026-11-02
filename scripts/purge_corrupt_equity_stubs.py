@@ -12,7 +12,7 @@ os.environ["ENABLE_BACKGROUND_SCHEDULERS"] = "0"
 
 from core.db.connection import get_db_connection, get_db_path, init_db, is_postgres_connection
 
-CORRUPT_TICKERS = ("TOMATO",)
+CORRUPT_TICKERS = ("TOMATO", "SENSEX1", "TATA TELECOM", "GRAND CONTINENTAL")
 
 
 def _row_scalar(row) -> int:

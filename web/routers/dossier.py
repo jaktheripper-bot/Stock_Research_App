@@ -119,6 +119,20 @@ async def synthesize_report(request: Request, payload: SynthesizeRequest):
     if not clean_t:
         raise HTTPException(status_code=400, detail="Invalid ticker symbol.")
 
+    raw_existing = get_report_by_ticker_sync(clean_t)
+    if not (raw_existing and raw_existing.get("report_text")):
+        from web.common import resolve_non_equity_dossier_redirect
+        cross_asset_url = resolve_non_equity_dossier_redirect(clean_t)
+        if cross_asset_url:
+            return json_response_with_cache({
+                "success": True,
+                "already_exists": True,
+                "ticker": clean_t,
+                "dossier_url": cross_asset_url,
+                "new_balance": get_user_credits_balance(clean_uid) if web_user else 999.0,
+                "message": f"{clean_t} is tracked in its dedicated asset directory. No credits were deducted."
+            }, max_age=0)
+
     canonical = resolve_canonical_symbol(clean_t) or clean_t
 
     # Pre-flight validation: Ensure ticker is a recognized BSE/NSE security or archived entity

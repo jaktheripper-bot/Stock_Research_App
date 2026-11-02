@@ -6,6 +6,7 @@ formatting, and response caching across all domain routers.
 
 import os
 import sys
+import re
 import json
 import base64
 import hmac
@@ -667,4 +668,124 @@ def _unlock_asset_deep_dive(request: Request, kind: str, asset_id: str, label: s
         "new_balance": new_bal,
         "message": f"Deep Dive unlocked for {label}."
     })
+
+
+_UDYAM_UIN_RE = re.compile(r"^UDYAM-[A-Z]{2}-\d{2}-\d{7}$", re.IGNORECASE)
+_SOVEREIGN_ISIN_RE = re.compile(r"^IN00[A-Z0-9]{8}$", re.IGNORECASE)
+_ETF_ISIN_RE = re.compile(r"^INF[A-Z0-9]{9}$", re.IGNORECASE)
+_BSE_ETF_NAME_RE = re.compile(r"\b(?:ETF|EXCHANGE\s+TRADED\s+FUND|BEES|MUTUAL\s+FUND)\b", re.IGNORECASE)
+_ETF_STOP_TOKENS = frozenset({"S", "P", "ETF", "FUND", "SCHEME", "PLAN", "DIRECT", "GROWTH", "INDIA", "MUTUAL"})
+
+
+def resolve_non_equity_dossier_redirect(symbol: str) -> Optional[str]:
+    """Returns canonical cross-asset URL when a non-equity identifier hits /dossier/{ticker}, else None."""
+    clean_sym = (symbol or "").strip().upper()
+    if not clean_sym:
+        return None
+    if _UDYAM_UIN_RE.match(clean_sym):
+        return f"/msme/{clean_sym}"
+    if clean_sym.startswith("UDYAM-"):
+        return "/msme"
+    if _SOVEREIGN_ISIN_RE.match(clean_sym):
+        return "/sovereign"
+
+    from bse_master import get_bse_scrips_cache, PRIMARY_BSE_MAP, NSE_ONLY_EQUITIES
+    from core.db.connection import get_db_connection, get_placeholder
+
+    conn = get_db_connection()
+    cur = conn.cursor()
+    p = get_placeholder()
+    try:
+        # 1–5. Single round-trip cross-asset lookup (MSME, Mutual Fund, REIT/InvIT, Corporate Debt/SDI, SGB)
+        cur.execute(
+            f"""
+            SELECT 'MSME' AS kind, uin AS val FROM msme_firms WHERE UPPER(uin) = {p}
+            UNION ALL
+            SELECT 'FUND' AS kind, scheme_code AS val FROM mutual_fund_schemes WHERE UPPER(scheme_code) = {p}
+            UNION ALL
+            SELECT 'REIT' AS kind, symbol AS val FROM reits_and_invits WHERE UPPER(symbol) = {p}
+            UNION ALL
+            SELECT 'DEBT' AS kind, isin AS val FROM corporate_debt_securities WHERE UPPER(isin) = {p}
+            UNION ALL
+            SELECT 'SGB' AS kind, symbol AS val FROM sgb_tranches WHERE UPPER(symbol) = {p}
+            LIMIT 1
+            """,
+            (clean_sym, clean_sym, clean_sym, clean_sym, clean_sym),
+        )
+        row = cur.fetchone()
+        if row:
+            kind = str(row["kind"] if isinstance(row, dict) else row[0]).strip().upper()
+            val = str(row["val"] if isinstance(row, dict) else row[1]).strip().upper()
+            if kind == "MSME":
+                return f"/msme/{val}"
+            if kind == "FUND":
+                return f"/funds/{val}"
+            if kind == "REIT":
+                return f"/reits/{val}"
+            if kind == "DEBT":
+                return f"/debt/{val}"
+            if kind == "SGB":
+                return "/reits#sgbCardsGrid"
+
+        if _ETF_ISIN_RE.match(clean_sym):
+            cur.execute(f"SELECT symbol FROM etf_matrix WHERE UPPER(isin) = {p} LIMIT 1", (clean_sym,))
+            erow = cur.fetchone()
+            if erow:
+                eval_sym = str(erow["symbol"] if isinstance(erow, dict) else erow[0]).strip().upper()
+                return f"/etfs/{eval_sym}"
+
+        # 6. ETF Matrix (strictly skip corporate BSE/NSE equities such as HDFCBANK/ICICIBANK/AXISBANK; zero Tier-5 JIT calls)
+        if clean_sym in PRIMARY_BSE_MAP or clean_sym in NSE_ONLY_EQUITIES:
+            return None
+
+        cache = get_bse_scrips_cache() or {}
+        sym_map = {str(k).upper(): str(v) for k, v in (cache.get("symbols") or {}).items()}
+        code = sym_map.get(clean_sym)
+        bse_name = ""
+        if code and str(code) != "N/A":
+            for nm, cd in (cache.get("names") or {}).items():
+                if str(cd) == str(code):
+                    bse_name = str(nm).upper()
+                    break
+
+        is_corp_equity = bool(clean_sym in sym_map and bse_name and not _BSE_ETF_NAME_RE.search(bse_name))
+        if not is_corp_equity:
+            cur.execute(f"SELECT symbol FROM etf_matrix WHERE UPPER(symbol) = {p} LIMIT 1", (clean_sym,))
+            row = cur.fetchone()
+            if row:
+                val = row["symbol"] if isinstance(row, dict) else row[0]
+                return f"/etfs/{str(val).strip().upper()}"
+
+            if bse_name and _BSE_ETF_NAME_RE.search(bse_name):
+                bse_tokens = {
+                    t for t in re.findall(r"[A-Z0-9]+", bse_name)
+                    if t not in _ETF_STOP_TOKENS and len(t) >= 2
+                }
+                cur.execute("SELECT symbol, scheme_name FROM etf_matrix WHERE symbol IS NOT NULL")
+                best_sym, best_score = None, 0.0
+                for erow in cur.fetchall():
+                    esym = str(erow["symbol"] if isinstance(erow, dict) else erow[0]).strip().upper()
+                    enm = str((erow["scheme_name"] if isinstance(erow, dict) else erow[1]) or "").upper()
+                    etokens = {
+                        t for t in re.findall(r"[A-Z0-9]+", enm)
+                        if t not in _ETF_STOP_TOKENS and len(t) >= 2
+                    }
+                    if bse_tokens and etokens:
+                        inter = len(bse_tokens & etokens)
+                        score = inter / max(len(bse_tokens), len(etokens))
+                        if inter >= 2 and score > best_score:
+                            best_score, best_sym = score, esym
+                if best_sym and best_score >= 0.65:
+                    return f"/etfs/{best_sym}"
+                base_q = re.sub(r"\d+$", "", clean_sym).strip() or clean_sym
+                return f"/etfs?q={urllib.parse.quote(base_q)}"
+    except Exception as e:
+        logger.warning("Cross-asset dossier redirect lookup failed for %s: %s", clean_sym, e)
+    finally:
+        try:
+            cur.close()
+            conn.close()
+        except Exception as close_err:
+            logger.debug("Cross-asset redirect connection close notice: %s", close_err)
+    return None
 

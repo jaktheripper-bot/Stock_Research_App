@@ -249,10 +249,19 @@ class TestOmniSearchWS3(unittest.TestCase):
             r_bank = self.client.get(f"/dossier/{bank_sym}", follow_redirects=False)
             self.assertEqual(r_bank.status_code, 200)
 
-        # Pure ETF (NIFTYBEES) & REIT (EMBASSY) redirect cleanly from /dossier/
+        # Pure ETF (NIFTYBEES & BSE-symbol SENSEX1) & REIT (EMBASSY) redirect cleanly from /dossier/
+        from web.common import resolve_non_equity_dossier_redirect
+        from core.db.reports import save_report_to_archive
+        self.assertEqual(resolve_non_equity_dossier_redirect("SENSEX1"), "/etfs/KOTAKBSESENSEX")
+        self.assertFalse(save_report_to_archive({"ticker": "TEST_EMPTY_GUARD"}, ""))
+
         r_etf = self.client.get("/dossier/NIFTYBEES", follow_redirects=False)
         self.assertEqual(r_etf.status_code, 302)
         self.assertEqual(r_etf.headers.get("location"), "/etfs/NIFTYBEES")
+
+        r_sensex1 = self.client.get("/dossier/SENSEX1", follow_redirects=False)
+        self.assertEqual(r_sensex1.status_code, 302)
+        self.assertEqual(r_sensex1.headers.get("location"), "/etfs/KOTAKBSESENSEX")
 
         r_reit = self.client.get("/dossier/EMBASSY", follow_redirects=False)
         self.assertEqual(r_reit.status_code, 302)

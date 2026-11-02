@@ -9,10 +9,14 @@ to prevent verification blindspots and ensure zero static facades or silent data
 import sys
 import os
 import json
+import ssl
 import urllib.request
 import urllib.error
 import sqlite3
 from typing import Dict, Any
+import certifi
+
+_SSL_CTX = ssl.create_default_context(cafile=certifi.where())
 
 CANONICAL_TARGETS = {
     "equities_min": 150,
@@ -33,7 +37,7 @@ def probe_endpoint(url: str, timeout: int = 15) -> Dict[str, Any]:
         }
     )
     try:
-        with urllib.request.urlopen(req, timeout=timeout) as resp:
+        with urllib.request.urlopen(req, timeout=timeout, context=_SSL_CTX) as resp:
             raw = resp.read().decode("utf-8")
             data = json.loads(raw)
             return {"status_code": resp.status, "data": data, "error": None}
