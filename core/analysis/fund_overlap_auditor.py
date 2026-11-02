@@ -447,9 +447,16 @@ Detail the liquidity bottleneck and sector concentration fault lines if liquidit
     api_key = get_secret("GEMINI_API_KEY")
     if api_key and os.environ.get("TESTING") != "1":
         try:
-            from core.analysis.dossier_report_synthesis import stream_genai_with_fallback
+            from core.analysis.dossier_report_synthesis import (
+                _resolve_vertex_kwarg,
+                stream_genai_with_fallback,
+            )
 
-            client = genai.Client(api_key=api_key, http_options={"timeout": 180000})
+            client = genai.Client(
+                api_key=api_key,
+                http_options={"timeout": 180000},
+                **_resolve_vertex_kwarg(api_key),
+            )
             chunks = []
             for ch in stream_genai_with_fallback(
                 client,

@@ -162,7 +162,13 @@ Verified Live Exchange Metrics:
         from core.config import get_secret
         api_key = get_secret("GEMINI_API_KEY")
         if api_key and os.environ.get("TESTING") != "1":
-            client = genai.Client(api_key=api_key, http_options={"timeout": 60000})
+            from core.analysis.dossier_report_synthesis import _resolve_vertex_kwarg
+
+            client = genai.Client(
+                api_key=api_key,
+                http_options={"timeout": 60000},
+                **_resolve_vertex_kwarg(api_key),
+            )
             model_name = get_light_flash_model(client)
             if on_status:
                 on_status("Executing price & filing Pillar 5 & 6 refresh (Zero Grounding Fee)...")

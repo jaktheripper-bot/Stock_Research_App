@@ -27,6 +27,8 @@ _SECRETS_LOADED = False
 _DB_SECRETS_CACHE: dict[str, tuple[Optional[str], float]] = {}
 _DB_SECRET_TTL = 300.0
 _DB_SYNCABLE_SECRET_KEYS = frozenset({
+    "GEMINI_API_KEY",
+    "GOOGLE_GENAI_USE_VERTEXAI",
     "ANGEL_API_KEY",
     "ANGEL_ONE_API_KEY",
     "ANGEL_CLIENT_CODE",
@@ -114,9 +116,42 @@ def get_secret(key: str, default: Any = None) -> Any:
     3. RLS-protected Supabase PostgreSQL system_settings (for synced cloud gateway keys)
     4. default fallback
     """
+    def _fetch_db_secret(secret_key: str) -> Optional[str]:
+        import time
+        now = time.time()
+        cached = _DB_SECRETS_CACHE.get(secret_key)
+        if cached is not None and (now - cached[1]) < _DB_SECRET_TTL:
+            return cached[0]
+        try:
+            from core.db.settings import get_system_setting
+            db_val = get_system_setting(secret_key)
+            clean_db_val = str(db_val).strip() if db_val and str(db_val).strip() else None
+            _DB_SECRETS_CACHE[secret_key] = (clean_db_val, now)
+            return clean_db_val
+        except Exception as e:
+            logger.debug("Database secret lookup notice for %s: %s", secret_key, e)
+            _DB_SECRETS_CACHE[secret_key] = (None, now)
+            return None
+
     val = os.environ.get(key)
-    if val is not None and str(val).strip():
-        return str(val).strip()
+    clean_env = str(val).strip() if val is not None and str(val).strip() else None
+
+    # Cloud self-heal: if GOOGLE_GENAI_USE_VERTEXAI=true on host (e.g. Render) while env still holds
+    # a stale AI Studio AIza* key, promote the synced AQ.* Vertex Express key from system_settings.
+    if (
+        key == "GEMINI_API_KEY"
+        and clean_env
+        and not clean_env.startswith("AQ.")
+        and not _is_test_runtime()
+        and os.environ.get("GOOGLE_GENAI_USE_VERTEXAI", "").strip().lower() == "true"
+    ):
+        db_vertex_key = _fetch_db_secret("GEMINI_API_KEY")
+        if db_vertex_key and db_vertex_key.startswith("AQ."):
+            os.environ["GEMINI_API_KEY"] = db_vertex_key
+            return db_vertex_key
+
+    if clean_env:
+        return clean_env
 
     secrets = _load_local_secrets()
     if key in secrets:
@@ -125,22 +160,10 @@ def get_secret(key: str, default: Any = None) -> Any:
             return sec_val
 
     if key in _DB_SYNCABLE_SECRET_KEYS and not _is_test_runtime():
-        import time
-        now = time.time()
-        cached = _DB_SECRETS_CACHE.get(key)
-        if cached is not None and (now - cached[1]) < _DB_SECRET_TTL:
-            return cached[0] if cached[0] is not None else default
-        try:
-            from core.db.settings import get_system_setting
-            db_val = get_system_setting(key)
-            clean_db_val = str(db_val).strip() if db_val and str(db_val).strip() else None
-            _DB_SECRETS_CACHE[key] = (clean_db_val, now)
-            if clean_db_val:
-                os.environ[key] = clean_db_val
-                return clean_db_val
-        except Exception as e:
-            logger.debug("Database secret lookup notice for %s: %s", key, e)
-            _DB_SECRETS_CACHE[key] = (None, now)
+        clean_db_val = _fetch_db_secret(key)
+        if clean_db_val:
+            os.environ[key] = clean_db_val
+            return clean_db_val
 
     return default
 

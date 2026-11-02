@@ -69,6 +69,16 @@ CRITICAL COMPLIANCE DIRECTIVE: Strictly avoid Buy/Sell/Hold verdicts, target pri
     brand_context = get_system_prompt_context(content_type="research_dossiers").strip()
     return base_prompt + "\n\n" + brand_context + "\n\n" + EPISTEMIC_PROMPT_DIRECTIVE
 
+def _resolve_vertex_kwarg(api_key: str | None) -> dict:
+    """Aligns genai.Client vertexai mode with key prefix so AIza* vs AQ.* never triggers 400 API_KEY_INVALID."""
+    clean = str(api_key or "").strip()
+    if clean.startswith("AQ."):
+        return {"vertexai": True}
+    if clean.startswith("AIza"):
+        return {"vertexai": False}
+    return {}
+
+
 _DISCOVERED_MODELS_CACHE = {"models": [], "timestamp": 0}
 _MAX_DISCOVERED_MODELS_CACHE_SIZE = 10
 
@@ -217,6 +227,8 @@ def stream_genai_with_fallback(
                 logger.warning(f"Gemini grounded search attempt notice: {e}")
                 last_error = e
                 err_str = str(e)
+                if any(code in err_str for code in ["504", "DEADLINE_EXCEEDED", "timed out", "TimeoutError"]):
+                    raise ValueError(f"Gemini grounded stream deadline exceeded: {last_error}") from e
                 if any(code in err_str for code in ["429", "RESOURCE_EXHAUSTED", "503", "UNAVAILABLE"]):
                     time.sleep(1.0 + random.uniform(0.2, 1.0))
                     continue
@@ -356,7 +368,8 @@ def stream_perplexity_fallback(prompt: str, system_prompt: str, collected_citati
 
 
 def stream_gemini_ungrounded_bypass(client, prompt: str, system_prompt: str):
-    model_name = get_latest_flash_models(client)[0]
+    models = get_latest_flash_models(client)
+    model_name = "gemini-3.5-flash" if "gemini-3.5-flash" in models else models[0]
     chat = client.chats.create(
         model=model_name,
         config=genai.types.GenerateContentConfig(system_instruction=system_prompt, temperature=0.2)
@@ -377,7 +390,7 @@ def stream_stock_report(ticker: str, language: str = "English (India)", stock_da
     from core.config import get_secret
     from bse_master import resolve_bse_scrip_code
     api_key = get_secret("GEMINI_API_KEY")
-    client = genai.Client(api_key=api_key, http_options={"timeout": 45000})
+    client = genai.Client(api_key=api_key, http_options={"timeout": 75000}, **_resolve_vertex_kwarg(api_key))
     system_prompt = get_system_prompt(ticker, language)
     user_prompt = f"Generate research report for: {stock_data.get('short_name')} ({stock_data.get('ticker')})\nData: {stock_data}"
 
@@ -421,25 +434,15 @@ def stream_stock_report(ticker: str, language: str = "English (India)", stock_da
             logger.warning(f"Secondary fallback synthesis failed: {p_err}")
             report_accumulator.clear()
             del collected_citations[base_cites_count:]
-            gem_err_msg = str(gemini_err)
-            is_spend_cap = any(phrase in gem_err_msg for phrase in ["Spend cap breached", "PERMISSION_DENIED", "403", "quota"])
-            if is_spend_cap:
-                err_msg = (
-                    "\n\n> **Live Synthesis Failed:** Grounded synthesis channels are temporarily unavailable. "
-                    "Please retry shortly.\n"
-                )
+            try:
+                for chunk in stream_gemini_ungrounded_bypass(client, user_prompt, system_prompt):
+                    report_accumulator.append(chunk)
+                    yield chunk
+            except Exception as final_err:
+                logger.error(f"Ungrounded synthesis fallback failed: {final_err}")
+                err_msg = "\n\n> **Live Synthesis Failed:** Unable to complete research synthesis at this time. Please retry shortly."
                 report_accumulator.append(err_msg)
                 yield err_msg
-            else:
-                try:
-                    for chunk in stream_gemini_ungrounded_bypass(client, user_prompt, system_prompt):
-                        report_accumulator.append(chunk)
-                        yield chunk
-                except Exception as final_err:
-                    logger.error(f"Ungrounded synthesis fallback failed: {final_err}")
-                    err_msg = "\n\n> **Live Synthesis Failed:** Unable to complete research synthesis at this time. Please retry shortly."
-                    report_accumulator.append(err_msg)
-                    yield err_msg
 
     current_text = "".join(report_accumulator)
     # Append structured source citations block if not already present and synthesis was structurally productive
@@ -561,7 +564,7 @@ def synthesize_batch_stock_reports(
     if not api_key or len(api_key.strip()) <= 10 or not items:
         return {}
 
-    client = genai.Client(api_key=api_key, http_options={"timeout": 180000})
+    client = genai.Client(api_key=api_key, http_options={"timeout": 180000}, **_resolve_vertex_kwarg(api_key))
     model_name = get_latest_flash_models(client)[0]
 
     valid_items = []

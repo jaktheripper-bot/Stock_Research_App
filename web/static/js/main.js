@@ -1545,9 +1545,9 @@ window.synthesizeReport = async function(ticker, forceRefresh = false) {
     return false;
   };
 
-  // AbortController with 95-second timeout for search-grounded models + fallback
+  // AbortController with 115-second timeout for 75s grounded stream + fast ungrounded fallback
   const controller = new AbortController();
-  const timeoutId = setTimeout(() => controller.abort(), 95000);
+  const timeoutId = setTimeout(() => controller.abort(), 115000);
 
   try {
     const resp = await fetch('/api/synthesize', {
@@ -1614,8 +1614,8 @@ window.synthesizeReport = async function(ticker, forceRefresh = false) {
     }
   } catch (err) {
     clearTimeout(timeoutId);
-    // Timeout or network drop: Poll status up to 8 times (24s) in case backend thread is finishing
-    if (await pollUntilReady(8, 3000)) {
+    // Timeout or network drop: Poll status up to 12 times (36s) in case backend thread is finishing
+    if (await pollUntilReady(12, 3000)) {
       return;
     }
 

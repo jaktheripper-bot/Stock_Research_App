@@ -196,6 +196,62 @@ class TestPipelineSyncAndTimeouts(unittest.TestCase):
             self.assertEqual(rows[0][2], 1)
             self.assertTrue(rows[0][3].endswith("+05:30"))
 
+    def test_cloud_vertex_secret_self_heal_promotes_aq_key_over_stale_aiza_env(self):
+        """When GOOGLE_GENAI_USE_VERTEXAI=true and host env holds stale AIza* key, synced AQ.* DB key wins."""
+        import core.config as cfg
+
+        cfg._DB_SECRETS_CACHE.clear()
+        with patch.dict(
+            os.environ,
+            {
+                "GEMINI_API_KEY": "AIzaSyStaleRenderKey000",
+                "GOOGLE_GENAI_USE_VERTEXAI": "true",
+            },
+            clear=False,
+        ), patch("core.config._is_test_runtime", return_value=False), patch(
+            "core.db.settings.get_system_setting",
+            return_value="AQ.MockVertexExpressKey999",
+        ):
+            resolved = cfg.get_secret("GEMINI_API_KEY")
+            self.assertEqual(resolved, "AQ.MockVertexExpressKey999")
+            self.assertEqual(os.environ["GEMINI_API_KEY"], "AQ.MockVertexExpressKey999")
+        cfg._DB_SECRETS_CACHE.clear()
+
+    def test_resolve_vertex_kwarg_and_deadline_fast_fail_and_ungrounded_bypass(self):
+        """Key prefix drives vertexai kwarg; 504 DEADLINE_EXCEEDED aborts grounded loop immediately; bypass uses 3.5-flash."""
+        from core.analysis.dossier_report_synthesis import (
+            _resolve_vertex_kwarg,
+            stream_gemini_ungrounded_bypass,
+            stream_genai_with_fallback,
+        )
+
+        self.assertEqual(_resolve_vertex_kwarg("AQ.VertexKey"), {"vertexai": True})
+        self.assertEqual(_resolve_vertex_kwarg("AIzaStudioKey"), {"vertexai": False})
+        self.assertEqual(_resolve_vertex_kwarg(""), {})
+
+        mock_client = MagicMock()
+        mock_client.vertexai = True
+        mock_chat = MagicMock()
+        mock_chat.send_message_stream.side_effect = RuntimeError("504 DEADLINE_EXCEEDED")
+        mock_client.chats.create.return_value = mock_chat
+
+        with self.assertRaises(ValueError) as ctx:
+            list(stream_genai_with_fallback(mock_client, "prompt", "sys"))
+        self.assertIn("deadline exceeded", str(ctx.exception).lower())
+        self.assertEqual(mock_client.chats.create.call_count, 1)
+
+        bypass_client = MagicMock()
+        bypass_client.vertexai = True
+        chunk_mock = MagicMock()
+        chunk_mock.text = "Ungrounded synthesis body"
+        bypass_chat = MagicMock()
+        bypass_chat.send_message_stream.return_value = [chunk_mock]
+        bypass_client.chats.create.return_value = bypass_chat
+
+        chunks = list(stream_gemini_ungrounded_bypass(bypass_client, "p", "s"))
+        self.assertEqual(chunks, ["Ungrounded synthesis body"])
+        self.assertEqual(bypass_client.chats.create.call_args.kwargs["model"], "gemini-3.5-flash")
+
 
 if __name__ == "__main__":
     unittest.main()

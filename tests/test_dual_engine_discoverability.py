@@ -40,8 +40,23 @@ class TestDualEngineDiscoverability(unittest.TestCase):
         self.assertTrue(text.startswith("# Moatnomics Research Engine"))
         self.assertIn("> Moatnomics provides independent", text)
         self.assertIn("## Instructions for Large Language Model Agents", text)
-        self.assertIn("/equities", text)
-        self.assertIn("/dossier/{TICKER}", text)
+        for path_token in (
+            "/equities",
+            "/funds",
+            "/debt",
+            "/sovereign",
+            "/reits",
+            "/etfs",
+            "/msme",
+            "/discovery",
+            "/compare",
+            "/calculator/tax",
+            "/search",
+            "/m",
+            "/dossier/{TICKER}",
+            "/msme/{UIN}",
+        ):
+            self.assertIn(path_token, text)
         self.assertIn("## Optional", text)
 
     def test_llms_full_txt_deep_documentation(self):
@@ -51,7 +66,11 @@ class TestDualEngineDiscoverability(unittest.TestCase):
         text = res.text
         self.assertIn("# Moatnomics Full Analytical Architecture", text)
         self.assertIn("7-Pillar Equity Evaluation Framework", text)
+        self.assertIn("Pillar 01: Macro-Economic, Geopolitical & Environmental Overlays", text)
+        self.assertIn("Pillar 07: ESG Impact Scorecard", text)
         self.assertIn("Chanakya 10-Point Clean-Room Forensic Filter", text)
+        self.assertIn(">= 0.35", text)
+        self.assertIn("Weekend Warehouse Mode", text)
 
     def test_base_html_schema_graph(self):
         """Verify homepage renders unified Schema.org @graph linking SoftwareApplication & WebSite."""
