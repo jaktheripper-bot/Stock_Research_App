@@ -113,37 +113,189 @@ def strip_conclusion_sections(text: str) -> str:
     return cleaned.strip()
 
 
-def render_epistemic_badges_html(html_text: str) -> str:
-    """Converts [VERIFIED FACT], [CALCULATED METRIC], [MODEL INTERPRETATION], and [UNRESOLVED UNCERTAINTY] tags into styled pills."""
-    if not html_text:
-        return html_text
+_EPISTEMIC_VENDOR_SCRUB_RULES = (
+    (re.compile(r"SmartAPI\s+EOD\s+Candles", re.IGNORECASE), "Official Exchange EOD Data"),
+    (re.compile(r"\bSmartAPI\b", re.IGNORECASE), "Official Exchange Feed"),
+    (re.compile(r"\byfinance\b|\bYahoo\s+Finance\b", re.IGNORECASE), "Market Settlement Data"),
+    (re.compile(r"\b(?:Vertex\s*AI|Perplexity|Gemini)\b", re.IGNORECASE), "Grounded Research Engine"),
+    (re.compile(r"\bmfapi\b", re.IGNORECASE), "AMFI NAV Registry"),
+)
+
+_EPISTEMIC_TIER_META = {
+    "VERIFIED FACT": ("VF", "fact", "✓", "background:rgba(16,185,129,0.14);color:#34d399;border:1px solid rgba(16,185,129,0.35);"),
+    "CALCULATED METRIC": ("CM", "calc", "∑", "background:rgba(56,189,248,0.14);color:#38bdf8;border:1px solid rgba(56,189,248,0.35);"),
+    "MODEL INTERPRETATION": ("MI", "interp", "◈", "background:rgba(168,85,247,0.14);color:#c084fc;border:1px solid rgba(168,85,247,0.35);"),
+    "UNRESOLVED UNCERTAINTY": ("UU", "uncert", "!", "background:rgba(245,158,11,0.14);color:#fbbf24;border:1px solid rgba(245,158,11,0.35);"),
+}
+
+_BARE_MI_TAG_RE = re.compile(
+    r"[ \t]*\[MODEL\s+INTERPRETATION\s*\](?P<punct>[ \t]*[.,;:])?",
+    re.IGNORECASE,
+)
+
+_INLINE_EPISTEMIC_TAG_RE = re.compile(
+    r"(?P<lead_ws>[ \t]*)\[(?P<tier>VERIFIED\s+FACT|CALCULATED\s+METRIC|MODEL\s+INTERPRETATION|UNRESOLVED\s+UNCERTAINTY)"
+    r"(?P<detail>(?:(?!</(?:p|li|div|h[1-6]|blockquote|table|ul|ol)>)[^\[\]]){0,900})\](?P<punct>[ \t]*[.,;:])?",
+    re.IGNORECASE,
+)
+
+
+def _scrub_epistemic_vendor_tokens(text: str) -> str:
+    cleaned = text
+    for pat, repl in _EPISTEMIC_VENDOR_SCRUB_RULES:
+        cleaned = pat.sub(repl, cleaned)
+    return cleaned
+
+
+def _render_full_epistemic_pills(fragment: str) -> str:
+    """Renders full-word epistemic pills (used inside .pillar-citation-strip headers)."""
     replacements = [
         (
-            r"\[VERIFIED FACT([^\]]*)\]",
-            r'<span class="badge epistemic-badge epistemic-badge-fact" style="background:rgba(16,185,129,0.14);color:#34d399;border:1px solid rgba(16,185,129,0.35);font-size:11px;font-weight:700;padding:2px 7px;border-radius:4px;margin-right:4px;">✓ VERIFIED FACT\1</span>'
+            r"\[VERIFIED\s+FACT([^\]]*)\]",
+            r'<span class="badge epistemic-badge epistemic-badge-fact" style="background:rgba(16,185,129,0.14);color:#34d399;border:1px solid rgba(16,185,129,0.35);font-size:11px;font-weight:700;padding:2px 7px;border-radius:4px;margin-right:4px;">✓ VERIFIED FACT\1</span>',
         ),
         (
-            r"\[CALCULATED METRIC([^\]]*)\]",
-            r'<span class="badge epistemic-badge epistemic-badge-calc" style="background:rgba(56,189,248,0.14);color:#38bdf8;border:1px solid rgba(56,189,248,0.35);font-size:11px;font-weight:700;padding:2px 7px;border-radius:4px;margin-right:4px;">∑ CALCULATED METRIC\1</span>'
+            r"\[CALCULATED\s+METRIC([^\]]*)\]",
+            r'<span class="badge epistemic-badge epistemic-badge-calc" style="background:rgba(56,189,248,0.14);color:#38bdf8;border:1px solid rgba(56,189,248,0.35);font-size:11px;font-weight:700;padding:2px 7px;border-radius:4px;margin-right:4px;">∑ CALCULATED METRIC\1</span>',
         ),
         (
-            r"\[MODEL INTERPRETATION([^\]]*)\]",
-            r'<span class="badge epistemic-badge epistemic-badge-interp" style="background:rgba(168,85,247,0.14);color:#c084fc;border:1px solid rgba(168,85,247,0.35);font-size:11px;font-weight:700;padding:2px 7px;border-radius:4px;margin-right:4px;"><svg class="glyph" style="width:11px;height:11px;vertical-align:-1px;margin-right:3px;"><use href="#icon-insights"></use></svg> MODEL INTERPRETATION\1</span>'
+            r"\[MODEL\s+INTERPRETATION([^\]]*)\]",
+            r'<span class="badge epistemic-badge epistemic-badge-interp" style="background:rgba(168,85,247,0.14);color:#c084fc;border:1px solid rgba(168,85,247,0.35);font-size:11px;font-weight:700;padding:2px 7px;border-radius:4px;margin-right:4px;"><svg class="glyph" style="width:11px;height:11px;vertical-align:-1px;margin-right:3px;"><use href="#icon-insights"></use></svg> MODEL INTERPRETATION\1</span>',
         ),
         (
-            r"\[UNRESOLVED UNCERTAINTY([^\]]*)\]",
-            r'<span class="badge epistemic-badge epistemic-badge-uncert" style="background:rgba(245,158,11,0.14);color:#fbbf24;border:1px solid rgba(245,158,11,0.35);font-size:11px;font-weight:700;padding:2px 7px;border-radius:4px;margin-right:4px;"><svg class="glyph" style="width:11px;height:11px;vertical-align:-1px;margin-right:3px;"><use href="#glyph-alert"></use></svg> UNRESOLVED UNCERTAINTY\1</span>'
+            r"\[UNRESOLVED\s+UNCERTAINTY([^\]]*)\]",
+            r'<span class="badge epistemic-badge epistemic-badge-uncert" style="background:rgba(245,158,11,0.14);color:#fbbf24;border:1px solid rgba(245,158,11,0.35);font-size:11px;font-weight:700;padding:2px 7px;border-radius:4px;margin-right:4px;"><svg class="glyph" style="width:11px;height:11px;vertical-align:-1px;margin-right:3px;"><use href="#glyph-alert"></use></svg> UNRESOLVED UNCERTAINTY\1</span>',
         ),
     ]
-    out = html_text
+    out = fragment
     for pat, rep in replacements:
-        out = re.sub(pat, rep, out, flags=re.IGNORECASE)
+        out = re.sub(pat, lambda m: re.sub(pat, rep, _scrub_epistemic_vendor_tokens(m.group(0)), flags=re.IGNORECASE), out, flags=re.IGNORECASE)
+    return out
+
+
+def _dedupe_bare_mi_in_blocks(fragment: str) -> str:
+    """Collapses repeated bare [MODEL INTERPRETATION] tags inside a single <p>, <li>, or <blockquote> to the final occurrence."""
+    block_re = re.compile(r"(<(?P<tag>p|li|blockquote)\b[^>]*>)(?P<body>[\s\S]*?)(</(?P=tag)>)", re.IGNORECASE)
+
+    def _clean_block(m: re.Match) -> str:
+        open_tag, body, close_tag = m.group(1), m.group("body"), m.group(4)
+        matches = list(_BARE_MI_TAG_RE.finditer(body))
+        if len(matches) < 2:
+            return m.group(0)
+        # Remove all earlier bare [MODEL INTERPRETATION] occurrences while preserving trailing punctuation cleanly
+        pieces = []
+        cursor = 0
+        for idx, bm in enumerate(matches):
+            pieces.append(body[cursor:bm.start()])
+            if idx < len(matches) - 1:
+                punct_clean = (bm.group("punct") or "").strip()
+                pieces.append(punct_clean)
+            else:
+                pieces.append(bm.group(0))
+            cursor = bm.end()
+        pieces.append(body[cursor:])
+        return f"{open_tag}{''.join(pieces)}{close_tag}"
+
+    return block_re.sub(_clean_block, fragment)
+
+
+def _render_compact_epistemic_anchors(fragment: str) -> str:
+    """Converts inline prose epistemic tags into compact superscript micro-anchors (VF, CM, MI, UU) tucked after punctuation."""
+    import html as html_lib
+
+    # 1. Unwrap Markdown backtick-wrapped epistemic tags (`[VERIFIED FACT ...]` or `[MODEL INTERPRETATION:` detail])
+    out = re.sub(
+        r"<code>\s*(\[(?:VERIFIED\s+FACT|CALCULATED\s+METRIC|MODEL\s+INTERPRETATION|UNRESOLVED\s+UNCERTAINTY)[^<]{0,900})\s*</code>",
+        r"\1",
+        fragment,
+        flags=re.IGNORECASE,
+    )
+
+    # 2. Collapse redundant bare [MODEL INTERPRETATION] tags within the same paragraph / list item
+    out = _dedupe_bare_mi_in_blocks(out)
+
+    # 3. Convert tags to superscript micro-anchors with punctuation tucked before the anchor (2-pass for nested tags)
+    current_out = out
+
+    def _replace_tag(m: re.Match) -> str:
+        tier_norm = re.sub(r"\s+", " ", m.group("tier").strip().upper())
+        abbr, cls_suffix, sym, inline_color_css = _EPISTEMIC_TIER_META.get(
+            tier_norm,
+            ("VF", "fact", "✓", "background:rgba(16,185,129,0.14);color:#34d399;border:1px solid rgba(16,185,129,0.35);"),
+        )
+        raw_detail = _scrub_epistemic_vendor_tokens(m.group("detail") or "")
+        # Strip any inline HTML tags (e.g. <br />, <em>, <strong>, or inner <a>) from tooltip text
+        plain_detail = re.sub(r"<[^>]+>", " ", raw_detail)
+        unescaped_detail = re.sub(r"\s+", " ", html_lib.unescape(plain_detail)).strip()
+        if unescaped_detail:
+            if unescaped_detail[0] in ("—", "–", "-", ":", "("):
+                sep_detail = f" {unescaped_detail}" if unescaped_detail[0] != ":" else unescaped_detail
+            else:
+                sep_detail = f" — {unescaped_detail}"
+        else:
+            sep_detail = ""
+        full_tooltip = f"{sym} {tier_norm}{sep_detail}"
+        escaped_tip = html_lib.escape(full_tooltip, quote=True)
+
+        punct = (m.group("punct") or "").strip()
+        start_idx = m.start()
+        prev_char = current_out[start_idx - 1] if start_idx > 0 else ""
+
+        prefix = ""
+        if punct:
+            # Avoid double punctuation when sentence already ended with punctuation right before [TAG]
+            prefix = "" if prev_char in (".", ",", ";", ":", "!", "?") else punct
+
+        return (
+            f'{prefix}<a href="#epistemicFalsificationCard" '
+            f'class="badge epistemic-badge epistemic-anchor epistemic-badge-{cls_suffix}" '
+            f'style="{inline_color_css}" '
+            f'data-epistemic-tier="{abbr}" '
+            f'data-epistemic-tooltip="{escaped_tip}" '
+            f'aria-label="{escaped_tip}">{abbr}</a>'
+        )
+
+    for _ in range(2):
+        next_out = _INLINE_EPISTEMIC_TAG_RE.sub(_replace_tag, current_out)
+        if next_out == current_out:
+            break
+        current_out = next_out
+    rendered = current_out
+
+    # 4. Tuck any punctuation caught between or immediately after consecutive micro-anchors
+    cluster_punct_re = re.compile(
+        r'(?P<prev>.?)(?P<cluster>(?:<a href="#epistemicFalsificationCard"[^>]*>[A-Z]{2}</a>[ \t]*)+)(?P<punct>[.,;:])'
+    )
+    while cluster_punct_re.search(rendered):
+        def _tuck_cluster(cm: re.Match) -> str:
+            prev_c = cm.group("prev")
+            cluster = re.sub(r'</a>[ \t]+<a ', '</a><a ', cm.group("cluster").strip())
+            p_ch = cm.group("punct")
+            if prev_c in (".", ",", ";", ":", "!", "?"):
+                return f"{prev_c}{cluster}"
+            return f"{prev_c}{p_ch}{cluster}"
+        rendered = cluster_punct_re.sub(_tuck_cluster, rendered)
+
+    return rendered
+
+
+def render_epistemic_badges_html(html_text: str, compact_inline: bool = True) -> str:
+    """
+    Converts [VERIFIED FACT], [CALCULATED METRIC], [MODEL INTERPRETATION], and [UNRESOLVED UNCERTAINTY]
+    tags into compact superscript micro-anchors (VF, CM, MI, UU) in narrative prose (or full pills
+    when compact_inline=False).
+    """
+    if not html_text:
+        return html_text
+
+    out = _render_compact_epistemic_anchors(html_text) if compact_inline else _render_full_epistemic_pills(html_text)
+
     # Transform technical/jargon-heavy falsification headings to approachable plain language
     out = re.sub(
         r'<h([3-5])([^>]*)>\s*Falsification\s*(?:&amp;|&|\+)\s*Thesis[- ]Revision\s*Triggers\s*</h\1>',
         r'<h\1\2>What Would Change This View (Revision Triggers)</h\1>',
         out,
-        flags=re.IGNORECASE
+        flags=re.IGNORECASE,
     )
     return out
 
@@ -161,11 +313,17 @@ def format_citations_section(citations: list[dict], stock_data: dict = None) -> 
     ]
     seen = set()
     idx = 1
+    clean_issuer = re.sub(r"[^A-Za-z0-9]", "", str((stock_data or {}).get("ticker") or "")).upper() if isinstance(stock_data, dict) else ""
     for c in citations:
         uri = (c.get("uri") or c.get("url") or "").strip()
         title = (c.get("title") or "Exchange / Public Document").strip()
         stype = (c.get("source_type") or "Verified Grounding").strip()
-        if "perplexity" in stype.lower() or "gemini" in stype.lower():
+        low_blob = f"{uri} {title}".lower()
+        if "perplexity.ai" in low_blob or "finance.yahoo.com" in low_blob or "yahoo finance" in low_blob:
+            continue
+        if clean_issuer != "ANGELONE" and ("angelone.in" in low_blob or "angelbroking.com" in low_blob or "angel one" in title.lower()):
+            continue
+        if any(v in stype.lower() for v in ("perplexity", "gemini", "vertex", "smartapi", "yfinance")):
             stype = "Verified Web Grounding"
 
         # Clean title if domain-only
@@ -374,6 +532,17 @@ def enrich_and_classify_citations(
                 logger.warning("Citation URL parse notice for %r: %s", uri, url_err)
                 parsed_host = ""
 
+        low_title_check = title.lower()
+        if "perplexity.ai" in parsed_host or "perplexity.ai" in low_title_check or "finance.yahoo.com" in parsed_host or "yahoo finance" in low_title_check:
+            continue
+        if clean_sym != "ANGELONE" and (
+            "angelone.in" in parsed_host
+            or "angelbroking.com" in parsed_host
+            or "angelone.in" in low_title_check
+            or "angel one" in low_title_check
+        ):
+            continue
+
         is_redirect = "vertexaisearch.cloud.google.com" in parsed_host
         is_primary_domain = (not is_redirect) and any(
             parsed_host == dom or parsed_host.endswith(f".{dom}")
@@ -390,11 +559,11 @@ def enrich_and_classify_citations(
             title = "Ministry of Corporate Affairs Company Master Data"
         elif low_title == "sebi.gov.in":
             title = "SEBI Statutory Orders & Regulatory Framework"
-        elif not title:
-            title = parsed_host or "Verified Regulatory / Market Disclosure"
+        elif not title or "vertexaisearch.cloud.google.com" in low_title:
+            title = "Verified Regulatory / Market Disclosure" if is_redirect else (parsed_host or "Verified Regulatory / Market Disclosure")
 
         if is_primary_domain:
-            if not stype or "grounding" in stype.lower() or "perplexity" in stype.lower() or "gemini" in stype.lower():
+            if not stype or any(v in stype.lower() for v in ("grounding", "perplexity", "gemini", "vertex", "smartapi", "yfinance")):
                 if "bseindia.com" in parsed_host:
                     stype = "BSE Statutory Filing"
                 elif "nseindia.com" in parsed_host:
@@ -417,7 +586,7 @@ def enrich_and_classify_citations(
                 "tier_label": "Primary Statutory Filing",
             })
         else:
-            if not stype or "perplexity" in stype.lower() or "gemini" in stype.lower():
+            if not stype or any(v in stype.lower() for v in ("perplexity", "gemini", "vertex", "smartapi", "yfinance")):
                 stype = "Verified Web Grounding"
             secondary_items.append({
                 "title": title,
@@ -686,12 +855,14 @@ def wrap_html_with_collapsible_pillars(
             7: "[VERIFIED FACT]",
         }.get(p_num, "[VERIFIED FACT]")
 
+        pillar_epistemic_pill = _render_full_epistemic_pills(pillar_epistemic_tag)
+
         open_label = label if str(label).upper().startswith("BSE ") else f"BSE {label}"
         if has_valid_scrip:
             citation_strip_html = (
                 f'<div style="display: flex; align-items: center; gap: 8px; flex-wrap: wrap;">'
                 f'<svg class="glyph" style="width:14px;height:14px;color:#38bdf8;flex-shrink:0;"><use href="#icon-radar"></use></svg>'
-                f'{pillar_epistemic_tag}'
+                f'{pillar_epistemic_pill}'
                 f'<span><strong>Primary Exchange Source:</strong> '
                 f'<a href="{url}" target="_blank" rel="noopener noreferrer" class="pillar-citation-link">{name}</a> '
                 f'(official BSE page for BSE scrip {scrip}).</span>'
@@ -704,7 +875,7 @@ def wrap_html_with_collapsible_pillars(
             citation_strip_html = (
                 f'<span style="display: inline-flex; align-items: center; gap: 6px; flex-wrap: wrap;">'
                 f'<svg class="glyph" style="width:14px;height:14px;color:#38bdf8;flex-shrink:0;"><use href="#icon-radar"></use></svg> '
-                f'{pillar_epistemic_tag} <strong>Primary Exchange Source:</strong> '
+                f'{pillar_epistemic_pill} <strong>Primary Exchange Source:</strong> '
                 'BSE scrip code not yet resolved for this company, so no exchange link is shown.</span>'
             )
 
@@ -868,9 +1039,11 @@ def wrap_fund_dossier_with_collapsible_dimensions(
             5: "[UNRESOLVED UNCERTAINTY]",
         }.get(d_num, "[VERIFIED FACT]")
 
+        dim_epistemic_pill = _render_full_epistemic_pills(dim_epistemic_tag)
+
         citation_strip_html = f"""<div style="display: flex; align-items: center; gap: 8px; flex-wrap: wrap;">
         <svg class="glyph" style="width:14px;height:14px;color:#38bdf8;flex-shrink:0;"><use href="#icon-radar"></use></svg>
-        {dim_epistemic_tag}
+        {dim_epistemic_pill}
         <span><strong>Regulatory Grounding:</strong> <span class="pillar-citation-link">{citation_source}</span> — {citation_desc}</span>
       </div>
       <a href="{doc_url}" target="_blank" rel="noopener noreferrer" class="btn btn-secondary btn-sm" style="font-size: 11.5px; padding: 4px 10px; font-weight: 600; text-decoration: none;" onclick="event.stopPropagation()">

@@ -96,7 +96,7 @@ def _coerce_pg_date(val: Any):
 
 
 def sync_via_postgresql(reports: List[Dict[str, Any]], revisions: List[Dict[str, Any]], db_url: str, sqlite_path: str = None) -> Dict[str, int]:
-    """Syncs all 17 multi-asset tables directly to Supabase PostgreSQL using psycopg2."""
+    """Syncs all 18 multi-asset tables directly to Supabase PostgreSQL using psycopg2."""
     import psycopg2
     from psycopg2.extras import execute_batch
     from core.db.connection import IST, _normalize_pg_dsn, close_all_pg_pools, init_db
@@ -168,6 +168,7 @@ def sync_via_postgresql(reports: List[Dict[str, Any]], revisions: List[Dict[str,
         ("alternative_yield_products", "product_id", True, "updated_at"),
         ("etf_matrix", "symbol", True, "updated_at"),
         ("msme_firms", "uin", True, "last_updated"),
+        ("equity_price_history_cache", "ticker, period", True, "updated_at"),
     ]
 
     def _transform_cell(val: Any, dt: str) -> Any:

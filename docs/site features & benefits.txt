@@ -69,7 +69,7 @@ Why It Matters (User Advantage):
 
 Reasons to Believe (Data, Analysis & Backend Perspective):
   1. Primary Exchange & Statutory Data Grounding:
-     - Live market quotes, 52-week ranges, 5-tier Level-2 order books, and 6-hour cached EOD historical candles are ingested directly from official exchange feeds (Angel One SmartAPI via dedicated static egress + Official BSE Direct JSON APIs, with `YFINANCE_FALLBACK=0` disabled by default in production).
+     - Live market quotes, 52-week ranges, 5-tier Level-2 order books, and persistent EOD historical candles are ingested directly from official NSE/BSE exchange feeds and statutory disclosures, with zero synthetic price fallbacks.
   2. The Chanakya 10-Point Clean-Room Forensic Sieve:
      - Every equity is evaluated deterministically (0–100 score, with non-penalising `PARTIAL_FILING_AUDIT` handling when optional fields are undisclosed) across 10 accounting integrity checks:
        (1) Cash Realisation: CFO / EBITDA >= 0.35 (flags paper profits unbacked by operating cash).
@@ -87,7 +87,7 @@ Reasons to Believe (Data, Analysis & Backend Perspective):
   4. Triangulated Valuation Radar & Symmetric Margin of Safety:
      - Blends 5-Year Historical Median P/E (35% weight), 2-Stage Conservative DCF (40% weight), and Graham Earnings Power Value / EPV (25% weight), using symmetric Graham Margin of Safety `(FV - P) / max(FV, P)` and explicitly disclosing solver boundary hits (`>45.0% CAGR` / `<-20.0% CAGR`).
   5. Event-Driven Surgical Cache Invalidation & Resilient Synthesis Polling:
-     - Live BSE corporate filing watchers and price-drift monitors surgically invalidate affected pillars on material events, while on-demand synthesis runs non-blocking via Vertex AI Grounded SSE streaming (`75s` bounded grounded stream deadline with fast `gemini-3.5-flash` ungrounded bypass + `/api/dossier/status/{ticker}` background polling fallback) so users never lose credits on network drops.
+     - Live BSE corporate filing watchers and price-drift monitors surgically invalidate affected pillars on material events, while on-demand synthesis runs non-blocking via grounded SSE streaming (`75s` bounded grounded stream deadline with fast ungrounded bypass + `/api/dossier/status/{ticker}` background polling fallback) so users never lose credits on network drops.
 
 
 --------------------------------------------------------------------------------
@@ -103,7 +103,7 @@ Why It Matters (User Advantage):
 
 Reasons to Believe (Data, Analysis & Backend Perspective):
   1. Two-Step Evening Harvest Aligned to Official Indian Settlement Clocks:
-     - **Step A (`19:30 IST` Trading Days):** Harvests settled RBI/CCIL Sovereign yields, ETF closing matrices, cross-asset surveillance scans, the 15-stock Discovery Reel, 15 unlisted MSMEs, and 15 uncovered mutual fund equity constituents via Vertex AI Grounded SSE / Gemini Batch-Flex, then dispatches the 7-Asset Day-End Market Wrap at `~19:45 IST` (failing closed via `BouquetDataUnavailableError` rather than ever sending placeholder data).
+     - **Step A (`19:30 IST` Trading Days):** Harvests settled RBI/CCIL Sovereign yields, ETF closing matrices, cross-asset surveillance scans, the 15-stock Discovery Reel, 15 unlisted MSMEs, and 15 uncovered mutual fund equity constituents via grounded batch synthesis, then dispatches the 7-Asset Day-End Market Wrap at `~19:45 IST` (failing closed via `BouquetDataUnavailableError` rather than ever sending placeholder data).
      - **Step B (`23:15 IST` Trading Nights):** Synchronises official AMFI `NAVAll.txt` statutory dispatches and executes the 7-pillar Mutual Fund Rotation Audit, powering the next trading day's `Prior-Session AMFI Audit` spotlight.
      - **Silent `T-1` Catch-Up (`08:00 AM IST`):** Verifies prior-day completion without pre-locking the evening's job leases.
   2. Weekend Warehouse Mode (Saturdays & Sundays):
@@ -277,8 +277,8 @@ FEATURE 12: PRODUCTION RELIABILITY, HONEST COMMERCIAL TRUST & 12-GATE VERIFICATI
 --------------------------------------------------------------------------------
 Why Allocators & AI Systems Can Trust the Platform's Engineering Integrity:
 
-  1. Dual-Layer IST-Standardised Persistence & Bidirectional 17-Table Cloud Sync:
-     - Pairs a sub-millisecond local SQLite read path (`reports.db`) with cloud-replicated Supabase PostgreSQL (`SET TIME ZONE 'Asia/Kolkata'`), append-only `report_revisions` audit trails, bounded Supavisor connection pools, and automated 17-table bidirectional synchronisation (`./run.sh sync-down` / `sync-up`). All timestamps platform-wide are normalised to explicit `IST` (`UTC+05:30`).
+  1. Dual-Layer IST-Standardised Persistence & Bidirectional 18-Table Cloud Sync:
+     - Pairs a sub-millisecond local SQLite read path (`reports.db`) with cloud-replicated PostgreSQL (`SET TIME ZONE 'Asia/Kolkata'`), append-only `report_revisions` audit trails, bounded connection pools, and automated 18-table bidirectional synchronisation (`./run.sh sync-down` / `sync-up`). All timestamps platform-wide are normalised to explicit `IST` (`UTC+05:30`).
 
   2. Honest Commercial Trust, Atomic Credit Safety & Anti-Bot Support Hygiene:
      - Transparent Free vs. 1-Credit Deep-Dive comparison strips, pre-flight credit balance confirmation modals (`#preflightCreditModal`) hydrated from live account state, automatic atomic refunds if an uncached synthesis fails to archive, non-auto-debit 30-day Pro passes with accurate expiry enforcement and early-renewal tenure stacking, and an authenticated, HMAC-timed, burner-domain-filtered `/contact` support desk.

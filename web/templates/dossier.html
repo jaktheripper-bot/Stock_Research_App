@@ -99,7 +99,7 @@
                   <span style="font-weight: 500; font-size: 12px;">• As of {{ quote_timestamp_str|default(formatted_date) }}</span>
                 </div>
                 <div class="provenance-sub">
-                  Source: {{ quote_source_label|default('BSE / SmartAPI Feed') }}{% if baseline_price_str %} • Report Baseline: <span class="tnum">₹{{ baseline_price_str }}</span> ({% if price_drift_pct > 0 %}+{% endif %}{{ price_drift_pct }}%){% endif %}
+                  Source: {{ quote_source_label|default('BSE / NSE Exchange Market Data') }}{% if baseline_price_str %} • Report Baseline: <span class="tnum">₹{{ baseline_price_str }}</span> ({% if price_drift_pct > 0 %}+{% endif %}{{ price_drift_pct }}%){% endif %}
                 </div>
               </div>
               <div class="provenance-cell">
@@ -1212,7 +1212,7 @@
       </strong>
       {{ MANDATORY_SEBI_DISCLAIMER }}
       <div style="margin-top: 10px; font-size: 12px; color: var(--text-muted); border-top: 1px solid rgba(255, 255, 255, 0.08); padding-top: 8px;">
-        <strong>Data Grounding & Provenance:</strong> Valuation metrics, financial statements, and disclosure filings are sourced strictly from official exchange disclosures (BSE/NSE announcements), statutory AMFI feeds, and verified broker gateway APIs. Zero synthetic metrics.
+        <strong>Data Grounding & Provenance:</strong> Valuation metrics, financial statements, and disclosure filings are sourced strictly from official exchange disclosures (BSE/NSE announcements), statutory AMFI feeds, and public market settlement data. Zero synthetic metrics.
       </div>
     </div>
   </article>

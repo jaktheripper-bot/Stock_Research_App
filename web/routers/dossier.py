@@ -77,6 +77,27 @@ class UnlockDossierRequest(BaseModel):
     user_id: Optional[str] = None
 
 
+_VENDOR_ERROR_REDACTION_RE = re.compile(
+    r"(?i)\b(?:smartapi|angel\s*one|angelbroking|yfinance|yahoo\s*finance|"
+    r"gemini(?:-[a-z0-9.\-]+)?|vertex\s*ai|vertexai|perplexity|supabase|mfapi|genai)\b"
+)
+
+
+def _sanitize_public_error_detail(err: Any) -> str:
+    """Scrubs upstream vendor/API/model identifiers from user-facing HTTP error strings."""
+    raw = str(err or "").strip()
+    if not raw:
+        return "Upstream synthesis channel temporarily unavailable."
+    raw = re.sub(r"https?://\S+", "[upstream-endpoint]", raw)
+    raw = re.sub(r"\b(?:AIza[0-9A-Za-z_\-]{10,}|AQ\.[0-9A-Za-z_\-.]{10,}|pplx-[0-9A-Za-z_\-]{8,})\b", "[redacted]", raw)
+    if _VENDOR_ERROR_REDACTION_RE.search(raw):
+        cleaned = _VENDOR_ERROR_REDACTION_RE.sub("research engine", raw)
+        cleaned = re.sub(r"/v1/responses\b", "", cleaned)
+        cleaned = re.sub(r"\s{2,}", " ", cleaned).strip(" :.-")
+        return cleaned[:240] or "Upstream research synthesis service temporarily unavailable."
+    return raw[:240]
+
+
 # ==============================================================================
 # Report Generation & Status Endpoints
 # ==============================================================================
@@ -126,7 +147,7 @@ async def synthesize_report(request: Request, payload: SynthesizeRequest):
             "dossier_url": f"/dossier/{canonical}",
             "new_balance": get_user_credits_balance(clean_uid) if web_user else 999.0,
             "message": f"An existing dossier for {canonical} is already available. No credits were deducted."
-        })
+        }, max_age=0)
 
     from core.billing.qos_governor import authorize_llm_execution
     client_ip = _get_client_ip(request)
@@ -151,7 +172,7 @@ async def synthesize_report(request: Request, payload: SynthesizeRequest):
                     "dossier_url": f"/dossier/{canonical}",
                     "new_balance": get_user_credits_balance(clean_uid) if web_user else 999.0,
                     "message": f"Daily live generation velocity cap reached. Serving cached historical dossier for {canonical}."
-                })
+                }, max_age=0)
         detail_msg = (
             "Hourly report generation limit reached (maximum 20 reports/hour per user) to protect account quota. Please retry later."
             if "HOURLY" in synth_reason
@@ -174,16 +195,25 @@ async def synthesize_report(request: Request, payload: SynthesizeRequest):
     else:
         new_balance = get_user_credits_balance(clean_uid) if web_user else 999.0
 
+    def _invoke_synthesis():
+        if payload.force_refresh:
+            try:
+                return generate_stock_report(canonical, force_refresh=True)
+            except TypeError:
+                return generate_stock_report(canonical)
+        return generate_stock_report(canonical)
+
     try:
-        report_text = await run_in_threadpool(generate_stock_report, canonical)
+        report_text = await run_in_threadpool(_invoke_synthesis)
     except Exception as e:
         logger.error(f"Report generation failed for {canonical}: {e}")
+        safe_err = _sanitize_public_error_detail(e)
         if not is_admin and web_user:
             add_user_credits(clean_uid, 0.0, 1.0, pack_type="REFUND_FAILED_SYNTHESIS")
             refunded_bal = get_user_credits_balance(clean_uid)
-            detail_msg = f"Report generation encountered an error for {canonical}. Your research credit has been automatically refunded (balance: {refunded_bal:.1f} credits). Error: {e}"
+            detail_msg = f"Report generation encountered an error for {canonical}. Your research credit has been automatically refunded (balance: {refunded_bal:.1f} credits). Details: {safe_err}"
         else:
-            detail_msg = f"Report generation encountered an error for {canonical}. Error: {e}"
+            detail_msg = f"Report generation encountered an error for {canonical}. Details: {safe_err}"
         raise HTTPException(status_code=500, detail=detail_msg)
 
     # Allow a brief grace interval for connection pool commit if needed
@@ -216,7 +246,7 @@ async def synthesize_report(request: Request, payload: SynthesizeRequest):
     if not rep or not rep.get("report_text"):
         reason_suffix = ""
         if report_text and "Live Synthesis Failed" in str(report_text):
-            reason_suffix = " Upstream AI synthesis channel timed out or was temporarily unavailable."
+            reason_suffix = " Upstream synthesis service timed out or was temporarily unavailable."
         if not is_admin and web_user:
             add_user_credits(clean_uid, 0.0, 1.0, pack_type="REFUND_FAILED_SYNTHESIS")
             refunded_bal = get_user_credits_balance(clean_uid)
@@ -230,9 +260,10 @@ async def synthesize_report(request: Request, payload: SynthesizeRequest):
         "already_exists": False,
         "ticker": canonical,
         "dossier_url": f"/dossier/{canonical}",
+        "updated_at": str(rep.get("raw_timestamp") or rep.get("timestamp") or ""),
         "new_balance": new_balance,
         "message": f"Dossier for {canonical} compiled successfully! 1 credit deducted." if not is_admin else f"Dossier for {canonical} compiled successfully via Admin Console!"
-    })
+    }, max_age=0)
 
 
 api_synthesize = synthesize_report
@@ -258,22 +289,24 @@ async def get_dossier_status(ticker: str, request: Request):
     is_unlocked = _deep_dive_unlocked_for_request(request, canonical)
 
     if rep and rep.get("report_text") and len(rep.get("report_text", "").strip()) >= 500:
-        return {
+        return json_response_with_cache({
             "status": "ready",
             "success": True,
             "ticker": canonical,
             "dossier_url": f"/dossier/{canonical}",
+            "updated_at": str(rep.get("raw_timestamp") or rep.get("timestamp") or ""),
             "message": "Dossier compiled and archived successfully.",
             "is_unlocked": is_unlocked,
             "user_id": web_user.get("id") if web_user else None,
-        }
-    return {
+        }, max_age=0)
+    return json_response_with_cache({
         "status": "compiling",
         "success": True,
         "ticker": canonical,
+        "updated_at": "",
         "is_unlocked": is_unlocked,
         "user_id": web_user.get("id") if web_user else None,
-    }
+    }, max_age=0)
 
 
 api_dossier_status = get_dossier_status

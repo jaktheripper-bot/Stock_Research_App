@@ -243,6 +243,11 @@ def save_report_to_archive(stock_data: dict, report_text: str, announcement: str
             base_cf.setdefault("source", "REPORTS_ARCHIVE_SYNC")
             extracted_cf = extract_fundamentals_from_report_text(report_text, base_cf)
             save_cached_fundamentals(clean_sym, extracted_cf)
+            try:
+                from core.analysis.fundamentals import get_historical_prices
+                get_historical_prices(clean_sym, period="6mo")
+            except Exception as hist_warm_err:
+                logger.debug(f"Post-archive 6mo price history pre-warm notice for {clean_sym}: {hist_warm_err}")
     except Exception as cf_sync_err:
         logger.debug(f"Post-archive cached_fundamentals sync notice for {clean_sym}: {cf_sync_err}")
 

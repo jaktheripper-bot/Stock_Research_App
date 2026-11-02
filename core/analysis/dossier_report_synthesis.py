@@ -64,7 +64,8 @@ Tabulate the ESG analysis strictly using the following Markdown table format:
 | **Social** | [Score] | [Workforce, safety, and supply-chain drivers] |
 | **Governance** | [Score] | [Board independence, related-party & audit quality] |
 
-CRITICAL COMPLIANCE DIRECTIVE: Strictly avoid Buy/Sell/Hold verdicts, target prices, trade execution signals, portfolio allocation advice, or personalised investment recommendations. Conclude strictly after Pillar 7. Deliver deep causal business and accounting analysis while remaining non-advisory under SEBI Safe Harbor principles."""
+CRITICAL COMPLIANCE DIRECTIVE: Strictly avoid Buy/Sell/Hold verdicts, target prices, trade execution signals, portfolio allocation advice, or personalised investment recommendations. Conclude strictly after Pillar 7. Deliver deep causal business and accounting analysis while remaining non-advisory under SEBI Safe Harbor principles.
+DATA PROVENANCE ANONYMITY RULE: NEVER mention internal APIs, data gateways, broker feeds, cloud providers, or AI model names (e.g., SmartAPI, Angel One feed, yfinance, Yahoo Finance, Gemini, Vertex AI, Perplexity, Supabase, mfapi) anywhere in prose, headings, or epistemic tags; cite only public statutory sources (BSE, NSE, SEBI, MCA, RBI, AMFI, or audited company filings)."""
 
     brand_context = get_system_prompt_context(content_type="research_dossiers").strip()
     return base_prompt + "\n\n" + brand_context + "\n\n" + EPISTEMIC_PROMPT_DIRECTIVE
@@ -379,6 +380,23 @@ def stream_gemini_ungrounded_bypass(client, prompt: str, system_prompt: str):
         if t:
             yield t
 
+_INTERNAL_PROMPT_META_KEYS = frozenset({"source", "exchange_status", "is_fallback"})
+
+
+def _sanitize_prompt_stock_data(stock_data: dict | None) -> dict:
+    """Strips internal gateway metadata keys so third-party vendor/API labels never enter LLM prompts."""
+    if not isinstance(stock_data, dict):
+        return {}
+    cleaned = {k: v for k, v in stock_data.items() if k not in _INTERNAL_PROMPT_META_KEYS}
+    desc = cleaned.get("description")
+    if isinstance(desc, str):
+        for token in ("SmartAPI", "yfinance", "Yahoo Finance", "Angel One"):
+            if token.lower() in desc.lower():
+                cleaned["description"] = re.sub(re.escape(token), "Exchange", desc, flags=re.IGNORECASE)
+                desc = cleaned["description"]
+    return cleaned
+
+
 def stream_stock_report(ticker: str, language: str = "English (India)", stock_data: dict = None, on_status=None, revision_trigger: str = "", use_grounding: bool = True):
     if stock_data is None:
         stock_data = get_stock_fundamentals(ticker)
@@ -392,7 +410,8 @@ def stream_stock_report(ticker: str, language: str = "English (India)", stock_da
     api_key = get_secret("GEMINI_API_KEY")
     client = genai.Client(api_key=api_key, http_options={"timeout": 75000}, **_resolve_vertex_kwarg(api_key))
     system_prompt = get_system_prompt(ticker, language)
-    user_prompt = f"Generate research report for: {stock_data.get('short_name')} ({stock_data.get('ticker')})\nData: {stock_data}"
+    prompt_stock_data = _sanitize_prompt_stock_data(stock_data)
+    user_prompt = f"Generate research report for: {stock_data.get('short_name')} ({stock_data.get('ticker')})\nData: {prompt_stock_data}"
 
     collected_citations = []
     clean_sym = stock_data.get("ticker", ticker)
@@ -498,7 +517,12 @@ def stream_stock_report(ticker: str, language: str = "English (India)", stock_da
         except Exception as e:
             logger.error(f"Error archiving report for {stock_data.get('ticker')}: {e}")
 
-def generate_stock_report(ticker: str, language: str = "English (India)", use_grounding: bool = True) -> str:
+def generate_stock_report(
+    ticker: str,
+    language: str = "English (India)",
+    use_grounding: bool = True,
+    force_refresh: bool = False,
+) -> str:
     from core.billing.qos_governor import (
         single_flight_ticker_lock,
         is_live_generation_allowed,
@@ -518,8 +542,9 @@ def generate_stock_report(ticker: str, language: str = "English (India)", use_gr
                 if not is_live_generation_allowed():
                     logger.warning(f"Live generation velocity cap hit. Serving existing cached report for {clean_ticker}.")
                     return cached_text
-                logger.info(f"Single-flight coalescer: Reusing freshly compiled cached report for {clean_ticker}")
-                return cached_text
+                if not force_refresh:
+                    logger.info(f"Single-flight coalescer: Reusing freshly compiled cached report for {clean_ticker}")
+                    return cached_text
 
         # If live generation cap is hit but we have any cached text, serve it
         if cached and cached.get("report_text") and not is_live_generation_allowed():
@@ -588,9 +613,10 @@ def synthesize_batch_stock_reports(
             )
             req_cfg["tools"] = [{"google_search": {}}]
 
+        prompt_stock_data = _sanitize_prompt_stock_data(stock_data)
         user_prompt = (
             f"Generate research report for: {stock_data.get('short_name') or ticker} ({ticker})\n"
-            f"Data: {stock_data}"
+            f"Data: {prompt_stock_data}"
         )
         inline_requests.append({
             "contents": [{

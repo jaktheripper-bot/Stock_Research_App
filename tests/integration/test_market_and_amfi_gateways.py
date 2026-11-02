@@ -148,12 +148,51 @@ class TestAngelOneGateway(unittest.TestCase):
         with patch.object(AngelOneGateway, "get_historical_candles", return_value=_candles(100)):
             eod = AngelOneGateway.get_eod_summary("INFY")
             self.assertIsNotNone(eod)
-            self.assertEqual(eod["source"], "Angel One SmartAPI EOD Candles")
+            self.assertEqual(eod["source"], "Official Exchange EOD Candles")
             self.assertGreater(eod["current_price"], 100.0)
             self.assertGreaterEqual(eod["52w_high"], eod["current_price"])
             self.assertLessEqual(eod["52w_low"], eod["current_price"])
             self.assertIsNotNone(eod["dma_50"])
             self.assertIsNotNone(eod["dma_200"])
+
+    @patch("requests.post")
+    def test_angel_one_historical_candles_ag8001_jwt_self_heal_and_bse_fallback(self, mock_post):
+        import requests as req_lib
+        AngelOneGateway._session_cache = {"jwt_token": "stale_jwt", "token_expiry": 9999999999}
+
+        stale_resp = MagicMock()
+        stale_resp.status_code = 200
+        stale_resp.content = b'{"status":false,"errorcode":"AG8001","message":"Invalid Token"}'
+        stale_resp.text = '{"status":false,"errorcode":"AG8001","message":"Invalid Token"}'
+        stale_resp.json.return_value = {"status": False, "errorcode": "AG8001", "message": "Invalid Token"}
+
+        bse_ok_resp = MagicMock()
+        bse_ok_resp.status_code = 200
+        bse_ok_resp.content = b'{"status":true}'
+        bse_ok_resp.text = '{"status":true}'
+        bse_ok_resp.json.return_value = {
+            "status": True,
+            "data": [
+                [f"2026-09-{i + 1:02d}T00:00:00+05:30", 70.0 + i, 72.0 + i, 69.0 + i, 71.0 + i, 15000]
+                for i in range(10)
+            ],
+        }
+
+        # Leg 1 fails with AG8001 -> triggers authenticate(force_refresh=True) -> Leg 1 retry times out -> Leg 2 BSE scrip succeeds!
+        mock_post.side_effect = [
+            stale_resp,
+            req_lib.Timeout("NSE leg timeout"),
+            bse_ok_resp,
+        ]
+        with patch.object(AngelOneGateway, "is_configured", return_value=True), \
+             patch.object(AngelOneGateway, "resolve_symbol_token", return_value=("NSE", "99999")), \
+             patch("bse_master.resolve_bse_scrip_code", return_value="544774"), \
+             patch.object(AngelOneGateway, "authenticate", side_effect=["stale_jwt", "fresh_jwt"]) as auth_mock:
+            candles = AngelOneGateway.get_historical_candles("SMR")
+            self.assertIsNotNone(candles)
+            self.assertEqual(len(candles), 10)
+            self.assertEqual(auth_mock.call_count, 2)
+            self.assertEqual(auth_mock.call_args_list[1].kwargs.get("force_refresh"), True)
 
     @patch("requests.post")
     def test_angel_one_search_scrip_token_dynamic_resolution(self, mock_post):
@@ -418,6 +457,60 @@ class TestYfinanceOptIn(unittest.TestCase):
              patch.object(fnd.yf, "Ticker") as tk:
             self.assertIsNone(fnd.get_historical_prices("TSTB2"))
             tk.assert_not_called()
+
+    def test_bse_stockreach_fallback_and_persistent_price_history_cache(self):
+        import json as json_mod
+        from core.db.connection import get_db_connection, get_placeholder
+        from core.db.fundamentals import get_cached_price_history
+
+        test_sym = "CACHESYM"
+        fnd.get_historical_prices.cache_clear()
+        mock_sess = MagicMock()
+        mock_resp = MagicMock()
+        mock_resp.status_code = 200
+        bse_payload = [
+            {"dttm": f"2026-08-{i + 1:02d} 00:00:00", "vale1": str(72.0 + i * 0.5), "vole": "8400"}
+            for i in range(12)
+        ]
+        mock_resp.content = b'{"Data":"[]"}'
+        mock_resp.json.return_value = {"Data": json_mod.dumps(bse_payload)}
+        mock_sess.get.return_value = mock_resp
+
+        try:
+            with patch.dict(
+                os.environ,
+                {"ALLOW_PRICE_HISTORY_CACHE_IN_TEST": "1", "ALLOW_BSE_STOCKREACH_IN_TEST": "1"},
+                clear=False,
+            ), \
+                 patch("core.ingestion.angel_one.AngelOneGateway.is_configured", return_value=False), \
+                 patch.object(fnd, "resolve_bse_scrip_code", return_value="544774"), \
+                 patch.object(fnd, "get_hardened_yfinance_session", return_value=mock_sess):
+                df = fnd.get_historical_prices(test_sym, period="6mo", fast_only=False)
+                self.assertIsNotNone(df)
+                self.assertEqual(len(df), 12)
+                self.assertIn("SMA50", df.columns)
+
+                persisted = get_cached_price_history(test_sym, period="6mo", max_age_hours=12.0)
+                self.assertIsNotNone(persisted)
+                self.assertEqual(len(persisted), 12)
+
+            # Second call with ALL live gateways down still serves from persistent DB cache
+            fnd.get_historical_prices.cache_clear()
+            with patch.dict(os.environ, {"ALLOW_PRICE_HISTORY_CACHE_IN_TEST": "1"}, clear=False), \
+                 patch("core.ingestion.angel_one.AngelOneGateway.is_configured", return_value=False), \
+                 patch.object(fnd, "fetch_bse_stockreach_history", return_value=None):
+                df_cached = fnd.get_historical_prices(test_sym, period="6mo", fast_only=False)
+                self.assertIsNotNone(df_cached)
+                self.assertEqual(len(df_cached), 12)
+        finally:
+            fnd.get_historical_prices.cache_clear()
+            conn = get_db_connection()
+            cur = conn.cursor()
+            p = get_placeholder()
+            cur.execute(f"DELETE FROM equity_price_history_cache WHERE ticker = {p}", (test_sym,))
+            conn.commit()
+            cur.close()
+            conn.close()
 
 
 # ==============================================================================

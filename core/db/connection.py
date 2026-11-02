@@ -2439,6 +2439,41 @@ def init_db(force: bool = False):
                     cursor.execute("INSERT INTO schema_migrations (version) VALUES ('v038_mf_holdings_unique_index') ON CONFLICT DO NOTHING;")
                 conn.commit()
 
+            # Migration v039: Persistent Equity Historical Price & 50-DMA Cache
+            if "v039_equity_price_history_cache" not in applied:
+                logger.info("Applying schema migration: v039_equity_price_history_cache...")
+                if supabase_url:
+                    cursor.execute("""
+                        CREATE TABLE IF NOT EXISTS equity_price_history_cache (
+                            ticker TEXT NOT NULL,
+                            period TEXT NOT NULL,
+                            candles_json TEXT NOT NULL,
+                            source TEXT DEFAULT 'EXCHANGE_EOD',
+                            updated_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
+                            PRIMARY KEY (ticker, period)
+                        );
+                        CREATE INDEX IF NOT EXISTS idx_eq_price_hist_updated
+                            ON equity_price_history_cache(updated_at);
+                        INSERT INTO schema_migrations (version) VALUES ('v039_equity_price_history_cache') ON CONFLICT DO NOTHING;
+                    """)
+                else:
+                    cursor.execute("""
+                        CREATE TABLE IF NOT EXISTS equity_price_history_cache (
+                            ticker TEXT NOT NULL,
+                            period TEXT NOT NULL,
+                            candles_json TEXT NOT NULL,
+                            source TEXT DEFAULT 'EXCHANGE_EOD',
+                            updated_at TEXT DEFAULT (datetime('now')),
+                            PRIMARY KEY (ticker, period)
+                        );
+                    """)
+                    cursor.execute("""
+                        CREATE INDEX IF NOT EXISTS idx_eq_price_hist_updated
+                            ON equity_price_history_cache(updated_at);
+                    """)
+                    cursor.execute("INSERT INTO schema_migrations (version) VALUES ('v039_equity_price_history_cache') ON CONFLICT DO NOTHING;")
+                conn.commit()
+
             _DB_INITIALIZED = True
             _INITIALIZED_DBS.add(target_key)
         except Exception as e:

@@ -63,8 +63,38 @@ class AngelOneGateway:
     _session_cache: Dict[str, Any] = {}
     _DYNAMIC_TOKEN_CACHE: Dict[str, Tuple[str, str]] = {}
     _auth_lock: threading.Lock = threading.Lock()
+    _http_session_lock: threading.Lock = threading.Lock()
+    _http_session: Optional[requests.Session] = None
     _last_auth_failure_time: float = 0.0
-    _AUTH_FAILURE_COOLDOWN: float = 300.0  # 5 minutes failure cooldown
+    _AUTH_FAILURE_COOLDOWN: float = 25.0  # 25s cooldown prevents 5-minute blackouts on transient proxy hiccups
+
+    @classmethod
+    def _get_http_session(cls) -> requests.Session:
+        if cls._http_session is None:
+            with cls._http_session_lock:
+                if cls._http_session is None:
+                    sess = requests.Session()
+                    adapter = requests.adapters.HTTPAdapter(pool_connections=4, pool_maxsize=12)
+                    sess.mount("https://", adapter)
+                    sess.mount("http://", adapter)
+                    cls._http_session = sess
+        return cls._http_session
+
+    @classmethod
+    def _post(cls, url: str, **kwargs):
+        if getattr(requests.post, "__module__", "") != "requests.api":
+            return requests.post(url, **kwargs)
+        return cls._get_http_session().post(url, **kwargs)
+
+    @staticmethod
+    def _is_invalid_jwt_response(resp, data: Optional[Dict[str, Any]]) -> bool:
+        if getattr(resp, "status_code", 200) == 401:
+            return True
+        if not isinstance(data, dict):
+            return False
+        err_code = str(data.get("errorcode") or "").strip().upper()
+        err_msg = str(data.get("message") or "").strip().lower()
+        return err_code in {"AG8001", "AB1007", "AB1010"} or "invalid token" in err_msg or "token expired" in err_msg
 
     @classmethod
     def get_proxy_config(cls) -> Optional[Dict[str, str]]:
@@ -166,6 +196,9 @@ class AngelOneGateway:
         with cls._auth_lock:
             # Re-verify under lock
             now = time.time()
+            if force_refresh:
+                cls._session_cache.clear()
+                cls._last_auth_failure_time = 0.0
             cached = cls._session_cache.get("jwt_token")
             cached_exp = cls._session_cache.get("token_expiry", 0)
             if not force_refresh and cached and now < cached_exp:
@@ -217,7 +250,7 @@ class AngelOneGateway:
 
             try:
                 logger.info("Connecting to Angel One SmartAPI auth gateway via selective proxy...")
-                resp = requests.post(url, json=payload, headers=headers, proxies=proxies, timeout=10)
+                resp = cls._post(url, json=payload, headers=headers, proxies=proxies, timeout=10)
                 data = resp.json()
 
                 if resp.status_code == 200 and data.get("status") and data.get("data"):
@@ -311,7 +344,7 @@ class AngelOneGateway:
 
         for exch in (preferred_exchange.upper(), "BSE"):
             try:
-                resp = requests.post(
+                resp = cls._post(
                     url,
                     json={"exchange": exch, "searchscrip": clean},
                     headers=headers,
@@ -460,8 +493,14 @@ class AngelOneGateway:
         url = f"{cls.BASE_URL}{cls.QUOTE_ENDPOINT}"
 
         try:
-            resp = requests.post(url, json=payload, headers=headers, proxies=proxies, timeout=6)
-            data = resp.json()
+            resp = cls._post(url, json=payload, headers=headers, proxies=proxies, timeout=6)
+            data = resp.json() if resp.content else {}
+            if cls._is_invalid_jwt_response(resp, data):
+                refreshed_jwt = cls.authenticate(force_refresh=True)
+                if refreshed_jwt and refreshed_jwt != jwt_token:
+                    headers["Authorization"] = f"Bearer {refreshed_jwt}"
+                    resp = cls._post(url, json=payload, headers=headers, proxies=proxies, timeout=6)
+                    data = resp.json() if resp.content else {}
             if resp.status_code == 200 and data.get("status") and data.get("data"):
                 fetched = data["data"].get("fetched", [])
                 if not fetched:
@@ -557,46 +596,68 @@ class AngelOneGateway:
         proxies = cls.get_proxy_config()
         url = f"{cls.BASE_URL}{cls.HISTORICAL_ENDPOINT}"
 
+        raw_candles = []
+        refreshed_once = False
+
+        # Leg 1: Primary exchange/token lookup (isolated so timeout/error still falls back to BSE scrip)
         try:
             _candle_rate_wait()
-            resp = requests.post(url, json=payload, headers=headers, proxies=proxies, timeout=8)
+            resp = cls._post(url, json=payload, headers=headers, proxies=proxies, timeout=10)
             body_txt = (resp.text or "").lower()
             if resp.status_code == 429 or "exceeding access rate" in body_txt or "rate limit" in body_txt:
                 time.sleep(1.2)
                 _candle_rate_wait()
-                resp = requests.post(url, json=payload, headers=headers, proxies=proxies, timeout=8)
-            data = resp.json()
+                resp = cls._post(url, json=payload, headers=headers, proxies=proxies, timeout=10)
+            data = resp.json() if resp.content else {}
+            if cls._is_invalid_jwt_response(resp, data):
+                refreshed_once = True
+                refreshed_jwt = cls.authenticate(force_refresh=True)
+                if refreshed_jwt:
+                    headers["Authorization"] = f"Bearer {refreshed_jwt}"
+                    _candle_rate_wait()
+                    resp = cls._post(url, json=payload, headers=headers, proxies=proxies, timeout=10)
+                    data = resp.json() if resp.content else {}
             raw_candles = (data.get("data") if (resp.status_code == 200 and data.get("status")) else None) or []
+        except Exception as leg1_err:
+            logger.debug(f"Primary exchange historical leg notice for {query}: {leg1_err}")
+            raw_candles = []
 
-            # If primary NSE/token attempt yielded no candles, try BSE scrip code fallback
-            if not raw_candles:
+        # Leg 2: If primary NSE/token attempt yielded no candles (or timed out), try BSE scrip code fallback
+        if not raw_candles:
+            try:
                 from bse_master import resolve_bse_scrip_code
                 bse_scrip = resolve_bse_scrip_code(query)
                 if bse_scrip and (exch.upper() != "BSE" or str(token) != str(bse_scrip)):
                     payload_bse = dict(payload, exchange="BSE", symboltoken=str(bse_scrip))
                     _candle_rate_wait()
-                    resp_bse = requests.post(url, json=payload_bse, headers=headers, proxies=proxies, timeout=8)
-                    data_bse = resp_bse.json() if resp_bse.status_code == 200 else {}
-                    if data_bse.get("status") and data_bse.get("data"):
+                    resp_bse = cls._post(url, json=payload_bse, headers=headers, proxies=proxies, timeout=10)
+                    data_bse = resp_bse.json() if resp_bse.content else {}
+                    if not refreshed_once and cls._is_invalid_jwt_response(resp_bse, data_bse):
+                        refreshed_jwt = cls.authenticate(force_refresh=True)
+                        if refreshed_jwt:
+                            headers["Authorization"] = f"Bearer {refreshed_jwt}"
+                            _candle_rate_wait()
+                            resp_bse = cls._post(url, json=payload_bse, headers=headers, proxies=proxies, timeout=10)
+                            data_bse = resp_bse.json() if resp_bse.content else {}
+                    if resp_bse.status_code == 200 and data_bse.get("status") and data_bse.get("data"):
                         raw_candles = data_bse["data"]
+            except Exception as leg2_err:
+                logger.debug(f"BSE historical leg fallback notice for {query}: {leg2_err}")
 
-            if raw_candles:
-                candles = []
-                for c in raw_candles:
-                    # Format: [timestamp, open, high, low, close, volume]
-                    if len(c) >= 6:
-                        candles.append({
-                            "timestamp": c[0],
-                            "open": float(c[1]),
-                            "high": float(c[2]),
-                            "low": float(c[3]),
-                            "close": float(c[4]),
-                            "volume": int(c[5]),
-                        })
-                return candles
-        except Exception as e:
-            logger.debug(f"Angel One historical candles notice for {query}: {e}")
-            return None
+        if raw_candles:
+            candles = []
+            for c in raw_candles:
+                # Format: [timestamp, open, high, low, close, volume]
+                if len(c) >= 6:
+                    candles.append({
+                        "timestamp": c[0],
+                        "open": float(c[1]),
+                        "high": float(c[2]),
+                        "low": float(c[3]),
+                        "close": float(c[4]),
+                        "volume": int(c[5]),
+                    })
+            return candles
         return None
 
     @classmethod
@@ -637,7 +698,7 @@ class AngelOneGateway:
             "dma_200": dma_200,
             "avg_volume_20d": avg_vol_20d,
             "candle_count": len(candles),
-            "source": "Angel One SmartAPI EOD Candles",
+            "source": "Official Exchange EOD Candles",
         }
 
     @classmethod

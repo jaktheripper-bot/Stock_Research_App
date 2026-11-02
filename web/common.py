@@ -109,7 +109,7 @@ def json_response_with_cache(data: dict, max_age: int = 3600) -> JSONResponse:
         elif "items" in safe_data and isinstance(safe_data["items"], list) and len(safe_data["items"]) == 0:
             is_empty = True
 
-    cache_header = "no-cache, no-store, must-revalidate" if is_empty else f"public, max-age={max_age}"
+    cache_header = "no-store, no-cache, must-revalidate" if (is_empty or max_age <= 0) else f"public, max-age={max_age}"
 
     return JSONResponse(
         content=safe_data,

@@ -2,6 +2,7 @@
 
 import os
 import io
+import json
 import time
 import threading
 import contextlib
@@ -434,7 +435,7 @@ def enrich_fundamentals(ticker: str, data: dict) -> dict:
     if exchange_enriched or info:
         try:
             from core.db.fundamentals import save_cached_fundamentals
-            data["source"] = "SMARTAPI_BSE_EXCHANGE" if (exchange_enriched and not info) else "YFINANCE_ENRICHED"
+            data["source"] = "EXCHANGE_MARKET_FEED" if (exchange_enriched and not info) else "SECONDARY_MARKET_FEED"
             save_cached_fundamentals(clean_sym, data)
         except Exception as save_err:
             logger.debug(f"Cached fundamentals persistence notice: {save_err}")
@@ -938,7 +939,7 @@ def get_stock_fundamentals(query: str, fast_db_first: bool = False) -> dict:
                     "upper_circuit": 0.0,
                     "lower_circuit": 0.0,
                     "description": f"Exchange EOD historical candle feed for {clean}.",
-                    "exchange_status": "Active / Primary (SmartAPI EOD Candles)",
+                    "exchange_status": "Active / Primary (Exchange EOD Feed)",
                     "is_fallback": False,
                 }
                 res_dict = _enrich_with_cached_db_fundamentals(res_dict, canonical or clean)
@@ -1024,7 +1025,7 @@ def get_stock_fundamentals(query: str, fast_db_first: bool = False) -> dict:
                     "52w_high": round(float(high_52), 2) if isinstance(high_52, (int, float)) else str(high_52),
                     "52w_low": round(float(low_52), 2) if isinstance(low_52, (int, float)) else str(low_52),
                     "description": f"Exchange data compiled for {clean}.",
-                    "exchange_status": "Active / Secondary (yfinance Fast Gateway)",
+                    "exchange_status": "Active / Secondary (Market Data Feed)",
                     "is_fallback": True
                 }
                 res_dict = _enrich_with_cached_db_fundamentals(res_dict, canonical or clean)
@@ -1072,22 +1073,139 @@ def get_stock_fundamentals(query: str, fast_db_first: bool = False) -> dict:
     # If all fail, raise clean error
     raise ExchangeDataFetchError(clean, "Both primary BSE and secondary market gateways failed to return live quotes.")
 
+def fetch_bse_stockreach_history(clean: str, lookback_days: int = 190) -> Optional[list]:
+    """
+    Fetches official BSE daily EOD price/volume series via BSE StockReachGraph API
+    using the hardened TLS session. Skipped during unit tests unless explicitly enabled.
+    """
+    from bse_master import is_synthetic_test_symbol
+    from core.db.connection import _is_unit_test_runtime
+
+    if not clean or is_synthetic_test_symbol(clean):
+        return None
+    if _is_unit_test_runtime() and os.environ.get("ALLOW_BSE_STOCKREACH_IN_TEST") != "1":
+        return None
+
+    scrip = str(resolve_bse_scrip_code(clean) or "").strip()
+    if not scrip or not scrip.isdigit():
+        return None
+
+    now_dt = datetime.now(IST)
+    from_ymd = (now_dt - timedelta(days=max(30, int(lookback_days)))).strftime("%Y%m%d")
+    to_ymd = now_dt.strftime("%Y%m%d")
+    url = (
+        f"https://api.bseindia.com/BseIndiaAPI/api/StockReachGraph/w"
+        f"?scripcode={scrip}&flag=1&fromdate={from_ymd}&todate={to_ymd}&seriesid="
+    )
+    headers = {
+        "Accept": "application/json, text/plain, */*",
+        "Referer": "https://www.bseindia.com/",
+        "Origin": "https://www.bseindia.com",
+    }
+    try:
+        sess = get_hardened_yfinance_session()
+        resp = sess.get(url, headers=headers, timeout=10) if sess is not None else requests.get(url, headers=headers, timeout=10)
+        if getattr(resp, "status_code", 0) != 200:
+            return None
+        payload = resp.json() if resp.content else {}
+        data_field = payload.get("Data") if isinstance(payload, dict) else None
+        raw_items = json.loads(data_field) if isinstance(data_field, str) and data_field.strip() else (
+            data_field if isinstance(data_field, list) else []
+        )
+        rows = []
+        for item in raw_items:
+            if not isinstance(item, dict):
+                continue
+            dt_raw = str(item.get("dttm") or "").strip()
+            val_raw = str(item.get("vale1") or "").replace(",", "").strip()
+            vol_raw = str(item.get("vole") or "0").replace(",", "").strip()
+            if not dt_raw or not val_raw:
+                continue
+            try:
+                px = float(val_raw)
+                vol = int(float(vol_raw or 0))
+            except (TypeError, ValueError):
+                continue
+            if px <= 0:
+                continue
+            rows.append({
+                "Date": dt_raw,
+                "Open": px,
+                "High": px,
+                "Low": px,
+                "Close": px,
+                "Volume": max(0, vol),
+            })
+        return rows if len(rows) >= 5 else None
+    except Exception as bse_hist_err:
+        logger.debug("BSE StockReachGraph EOD notice for %s (%s): %s", clean, scrip, bse_hist_err)
+        return None
+
+
+def _normalize_history_dataframe(raw_df: pd.DataFrame) -> Optional[pd.DataFrame]:
+    """Validates, sorts, deduplicates by calendar date, and computes 50-DMA on OHLCV rows."""
+    if raw_df is None or raw_df.empty:
+        return None
+    df = raw_df.copy()
+    if "Date" not in df.columns:
+        df = df.reset_index()
+    if "Date" not in df.columns or "Close" not in df.columns:
+        return None
+
+    df["Date"] = pd.to_datetime(df["Date"], errors="coerce").dt.tz_localize(None)
+    df["Close"] = pd.to_numeric(df["Close"], errors="coerce")
+    for ohl_col in ("Open", "High", "Low"):
+        if ohl_col in df.columns:
+            df[ohl_col] = pd.to_numeric(df[ohl_col], errors="coerce").fillna(df["Close"])
+        else:
+            df[ohl_col] = df["Close"]
+    df["Volume"] = pd.to_numeric(df["Volume"] if "Volume" in df.columns else 0, errors="coerce").fillna(0)
+    df = df.dropna(subset=["Date", "Close"])
+    df = df[df["Close"] > 0]
+    if len(df) < 5:
+        return None
+
+    df["_cal_date"] = df["Date"].dt.date
+    df = df.sort_values("Date").drop_duplicates(subset=["_cal_date"], keep="last").drop(columns=["_cal_date"]).reset_index(drop=True)
+    if len(df) < 5:
+        return None
+
+    window = min(50, len(df))
+    df["SMA50"] = df["Close"].rolling(window=window, min_periods=5).mean()
+    ordered_cols = [c for c in ("Date", "Open", "High", "Low", "Close", "SMA50", "Volume") if c in df.columns]
+    return df[ordered_cols]
+
+
 @ttl_cache(ttl_seconds=21600, maxsize=512)
 def _fetch_cached_historical_prices(clean: str, period: str):
     """
-    6-hour thread-safe EOD candle cache backed primarily by Angel One SmartAPI
-    (with opt-in yfinance fallback only when YFINANCE_FALLBACK=1).
+    Multi-tier verified EOD candle resolver:
+    1. Fresh persistent DB cache (`equity_price_history_cache`, 12h weekday / 60h weekend TTL)
+    2. Primary exchange historical candle feed
+    3. Official BSE StockReachGraph daily EOD series
+    4. Opt-in secondary market history (`YFINANCE_FALLBACK=1`)
+    5. Stale-while-offline verified DB cache fallback if all live feeds transiently fail
     """
-    df = pd.DataFrame()
+    from core.db.fundamentals import get_cached_price_history, save_cached_price_history
 
-    # Primary: official exchange daily candles via Angel One SmartAPI
+    fresh_ttl_hours = 60.0 if datetime.now(IST).weekday() >= 5 else 12.0
+    cached_rows = get_cached_price_history(clean, period=period, max_age_hours=fresh_ttl_hours)
+    if cached_rows:
+        cached_df = _normalize_history_dataframe(pd.DataFrame(cached_rows))
+        if cached_df is not None:
+            return cached_df
+
+    df = pd.DataFrame()
+    source_used = "EXCHANGE_EOD"
+    lookback_days = {"1mo": 35, "3mo": 100, "6mo": 190, "1y": 370, "2y": 740}.get(period, 190)
+
+    # Primary: official exchange daily candles
     try:
         from core.ingestion.angel_one import AngelOneGateway
         if AngelOneGateway.is_configured():
-            lookback_days = {"1mo": 35, "3mo": 100, "6mo": 190, "1y": 370, "2y": 740}.get(period, 190)
             from_date = (datetime.now(IST) - timedelta(days=lookback_days)).strftime("%Y-%m-%d 09:15")
             candles = AngelOneGateway.get_historical_candles(clean, from_date=from_date)
-            if candles and len(candles) > 5:
+            if candles and len(candles) >= 5:
                 df = pd.DataFrame(candles).rename(
                     columns={
                         "timestamp": "Date",
@@ -1098,10 +1216,18 @@ def _fetch_cached_historical_prices(clean: str, period: str):
                         "volume": "Volume",
                     }
                 )
+                source_used = "EXCHANGE_EOD"
     except Exception as angel_err:
-        logger.debug(f"Angel One historical candles notice for {clean}: {angel_err}")
+        logger.debug(f"Primary exchange historical candles notice for {clean}: {angel_err}")
 
-    # Last resort (opt-in only): unofficial yfinance history
+    # Secondary official exchange EOD fallback: BSE StockReachGraph
+    if df.empty:
+        bse_rows = fetch_bse_stockreach_history(clean, lookback_days=lookback_days)
+        if bse_rows and len(bse_rows) >= 5:
+            df = pd.DataFrame(bse_rows)
+            source_used = "BSE_EXCHANGE_EOD"
+
+    # Last resort (opt-in only): secondary market history
     if df.empty and yfinance_fallback_enabled() and _yf_circuit_breaker.is_available():
         for suffix in [".BO", ".NS"]:
             try:
@@ -1109,38 +1235,41 @@ def _fetch_cached_historical_prices(clean: str, period: str):
                 with suppress_yfinance_noise():
                     t = get_hardened_yfinance_ticker(sym)
                     hist = t.history(period=period)
-                if hist is not None and not hist.empty and len(hist) > 5:
+                if hist is not None and not hist.empty and len(hist) >= 5:
                     df = hist
+                    source_used = "SECONDARY_MARKET_EOD"
                     _yf_circuit_breaker.record_success()
                     break
             except Exception as yf_err:
                 _yf_circuit_breaker.record_failure(yf_err)
-                logger.warning(f"yfinance history fetch notice for {clean}{suffix}: {yf_err}")
+                logger.warning(f"Secondary history fetch notice for {clean}{suffix}: {yf_err}")
                 continue
 
-    if df.empty:
-        return None
+    norm_df = _normalize_history_dataframe(df)
+    if norm_df is not None:
+        try:
+            persist_rows = [
+                {
+                    "Date": row["Date"].strftime("%Y-%m-%d"),
+                    "Open": float(row["Open"]),
+                    "High": float(row["High"]),
+                    "Low": float(row["Low"]),
+                    "Close": float(row["Close"]),
+                    "Volume": int(row["Volume"]),
+                }
+                for _, row in norm_df.iterrows()
+            ]
+            save_cached_price_history(clean, period=period, rows=persist_rows, source=source_used)
+        except Exception as persist_err:
+            logger.debug("Price history persistence notice for %s: %s", clean, persist_err)
+        return norm_df
 
-    df = df.reset_index()
-    if "Date" not in df.columns or "Close" not in df.columns:
-        return None
+    # Stale-while-offline verified DB fallback (never fabricates prices)
+    stale_rows = get_cached_price_history(clean, period=period, max_age_hours=None)
+    if stale_rows:
+        return _normalize_history_dataframe(pd.DataFrame(stale_rows))
 
-    df["Date"] = pd.to_datetime(df["Date"]).dt.tz_localize(None)
-    df["Close"] = pd.to_numeric(df["Close"], errors="coerce")
-    for ohl_col in ("Open", "High", "Low"):
-        if ohl_col in df.columns:
-            df[ohl_col] = pd.to_numeric(df[ohl_col], errors="coerce")
-    df["Volume"] = pd.to_numeric(df.get("Volume", 0), errors="coerce").fillna(0)
-    df = df.dropna(subset=["Close"])
-
-    if len(df) < 5:
-        return None
-
-    window = min(50, len(df))
-    df["SMA50"] = df["Close"].rolling(window=window, min_periods=5).mean()
-
-    ordered_cols = [c for c in ("Date", "Open", "High", "Low", "Close", "SMA50", "Volume") if c in df.columns]
-    return df[ordered_cols]
+    return None
 
 
 def get_historical_prices(ticker: str, period: str = "6mo", fast_only: bool = False):

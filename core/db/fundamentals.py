@@ -657,3 +657,138 @@ def sync_all_cached_fundamentals() -> int:
 
     logger.info(f"Synchronized {count} equities into cached_fundamentals repository.")
     return count
+
+
+def get_cached_price_history(
+    ticker: str,
+    period: str = "6mo",
+    max_age_hours: Optional[float] = None,
+) -> Optional[list]:
+    """
+    Retrieves persisted EOD OHLCV rows from equity_price_history_cache for (ticker, period).
+    Skipped during unit tests unless ALLOW_PRICE_HISTORY_CACHE_IN_TEST=1 is set.
+    """
+    import os
+    from datetime import datetime
+    from bse_master import is_synthetic_test_symbol
+    from core.db.connection import IST, _is_unit_test_runtime
+    from core.presentation.formatters import _coerce_datetime
+
+    clean = clean_ticker(ticker)
+    if not clean or is_synthetic_test_symbol(clean):
+        return None
+    if _is_unit_test_runtime() and os.environ.get("ALLOW_PRICE_HISTORY_CACHE_IN_TEST") != "1":
+        return None
+
+    norm_period = (period or "6mo").strip().lower()
+    init_db()
+    conn = get_db_connection()
+    cursor = conn.cursor()
+    p = get_placeholder()
+    try:
+        cursor.execute(
+            f"SELECT candles_json, updated_at FROM equity_price_history_cache WHERE ticker = {p} AND period = {p};",
+            (clean, norm_period),
+        )
+        row = cursor.fetchone()
+        if not row or not row[0]:
+            return None
+        if max_age_hours is not None and row[1]:
+            dt = _coerce_datetime(row[1])
+            if dt is not None:
+                age_sec = (datetime.now(IST) - dt).total_seconds()
+                if age_sec > (float(max_age_hours) * 3600.0):
+                    return None
+        parsed = json.loads(row[0]) if isinstance(row[0], str) else row[0]
+        if isinstance(parsed, list) and len(parsed) >= 5:
+            return parsed
+        return None
+    except Exception as e:
+        logger.debug("Price history cache lookup notice for %s (%s): %s", clean, norm_period, e)
+        return None
+    finally:
+        cursor.close()
+        conn.close()
+
+
+def save_cached_price_history(
+    ticker: str,
+    period: str,
+    rows: list,
+    source: str = "EXCHANGE_EOD",
+) -> bool:
+    """
+    Persists verified EOD OHLCV rows (>= 5 trading sessions, strictly positive closes)
+    into equity_price_history_cache.
+    """
+    import os
+    from bse_master import is_synthetic_test_symbol
+    from core.db.connection import _is_unit_test_runtime
+
+    clean = clean_ticker(ticker)
+    if not clean or is_synthetic_test_symbol(clean):
+        return False
+    if _is_unit_test_runtime() and os.environ.get("ALLOW_PRICE_HISTORY_CACHE_IN_TEST") != "1":
+        return False
+    if not isinstance(rows, list) or len(rows) < 5:
+        return False
+
+    sanitized_rows = []
+    for item in rows:
+        if not isinstance(item, dict):
+            continue
+        dt_str = str(item.get("Date") or item.get("date") or item.get("timestamp") or "").strip()
+        try:
+            close_val = float(item.get("Close") if item.get("Close") is not None else item.get("close"))
+        except (TypeError, ValueError):
+            continue
+        if not dt_str or close_val <= 0:
+            continue
+        rec: Dict[str, Any] = {
+            "Date": dt_str[:10],
+            "Close": round(close_val, 2),
+        }
+        for col in ("Open", "High", "Low"):
+            raw_v = item.get(col) if item.get(col) is not None else item.get(col.lower())
+            try:
+                rec[col] = round(float(raw_v), 2) if raw_v is not None else round(close_val, 2)
+            except (TypeError, ValueError):
+                rec[col] = round(close_val, 2)
+        raw_vol = item.get("Volume") if item.get("Volume") is not None else item.get("volume", 0)
+        try:
+            rec["Volume"] = max(0, int(float(raw_vol or 0)))
+        except (TypeError, ValueError):
+            rec["Volume"] = 0
+        sanitized_rows.append(rec)
+
+    if len(sanitized_rows) < 5:
+        return False
+
+    norm_period = (period or "6mo").strip().lower()
+    now_ts = now_ist_iso()
+    payload_json = json.dumps(sanitized_rows, separators=(",", ":"))
+
+    init_db()
+    conn = get_db_connection()
+    cursor = conn.cursor()
+    p = get_placeholder()
+    try:
+        cursor.execute(
+            f"""
+            INSERT INTO equity_price_history_cache (ticker, period, candles_json, source, updated_at)
+            VALUES ({p}, {p}, {p}, {p}, {p})
+            ON CONFLICT (ticker, period) DO UPDATE SET
+                candles_json = EXCLUDED.candles_json,
+                source = EXCLUDED.source,
+                updated_at = EXCLUDED.updated_at;
+            """,
+            (clean, norm_period, payload_json, (source or "EXCHANGE_EOD")[:40], now_ts),
+        )
+        conn.commit()
+        return True
+    except Exception as e:
+        logger.warning("Failed persisting equity_price_history_cache for %s (%s): %s", clean, norm_period, e)
+        return False
+    finally:
+        cursor.close()
+        conn.close()

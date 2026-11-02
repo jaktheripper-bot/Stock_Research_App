@@ -285,50 +285,79 @@ Wide moat secured by patents.
         self.assertEqual(strip_conclusion_sections(non_concl), non_concl)
 
     def test_render_epistemic_badges_html(self):
-        """Verifies that render_epistemic_badges_html converts epistemic tags into styled HTML pills."""
+        """Verifies compact superscript micro-anchors (VF, CM, MI, UU), punctuation tucking, code unwrapping, bare-MI dedupe, and full-pill mode."""
         # 1. Empty / None handling
         self.assertEqual(render_epistemic_badges_html(""), "")
         self.assertIsNone(render_epistemic_badges_html(None))
 
-        # 2. Convert all 4 badge types with metadata passages
+        # 2. Compact superscript micro-anchors with full tooltip attribution & punctuation tucking
         html_input = (
-            "<p>[VERIFIED FACT — BSE Audited FY25/Q3: Revenue stood at ₹4,500 Cr]</p>\n"
-            "<p>[CALCULATED METRIC: RoCE = 24.8% (2-Stage DCF Intrinsic Value ₹1,650)]</p>\n"
-            "<p>[MODEL INTERPRETATION: Specialty chemical moat protected by proprietary formulation patents]</p>\n"
-            "<p>[UNRESOLVED UNCERTAINTY: Outcome of pending USFDA inspection at Unit-II facility]</p>"
+            "<p>Revenue stood at ₹4,500 Cr [VERIFIED FACT — BSE Audited FY25/Q3: Revenue stood at ₹4,500 Cr] .</p>\n"
+            "<p><code>[CALCULATED METRIC: RoCE = 24.8% (2-Stage DCF Intrinsic Value ₹1,650)]</code></p>\n"
+            "<p>First clause [MODEL INTERPRETATION] . Second clause [MODEL INTERPRETATION] . Final clause [MODEL INTERPRETATION] .</p>\n"
+            "<p>[UNRESOLVED UNCERTAINTY: Outcome of pending USFDA inspection at Unit-II facility]</p>\n"
+            "<p>[VERIFIED FACT — SmartAPI EOD Candles]</p>"
         )
         rendered = render_epistemic_badges_html(html_input)
 
-        # Check badge classes, icons, colors, and content
+        # Check compact 2-letter anchors & classes
+        self.assertIn(">VF</a>", rendered)
+        self.assertIn(">CM</a>", rendered)
+        self.assertIn(">MI</a>", rendered)
+        self.assertIn(">UU</a>", rendered)
+        self.assertIn("epistemic-anchor", rendered)
+        self.assertIn('href="#epistemicFalsificationCard"', rendered)
+
+        # Punctuation tucked before anchor (no space before period or detached period after anchor)
+        self.assertIn('Cr.<a href="#epistemicFalsificationCard"', rendered)
+        self.assertNotIn("</a> .", rendered)
+        self.assertNotIn("<code>[CALCULATED METRIC", rendered)
+
+        # Full tier + source passage preserved in accessible tooltip attributes
         self.assertIn("✓ VERIFIED FACT — BSE Audited FY25/Q3: Revenue stood at ₹4,500 Cr", rendered)
         self.assertIn("∑ CALCULATED METRIC: RoCE = 24.8%", rendered)
-        self.assertIn("MODEL INTERPRETATION: Specialty chemical moat", rendered)
-        self.assertIn("UNRESOLVED UNCERTAINTY: Outcome of pending USFDA inspection", rendered)
-        self.assertIn("#icon-insights", rendered)
-        self.assertIn("#glyph-alert", rendered)
-        self.assertIn("color:#34d399", rendered)
-        self.assertIn("color:#38bdf8", rendered)
-        self.assertIn("color:#c084fc", rendered)
-        self.assertIn("color:#fbbf24", rendered)
+        self.assertIn("! UNRESOLVED UNCERTAINTY: Outcome of pending USFDA inspection", rendered)
 
-        # 3. Verify transformation of legacy falsification heading to What Would Change This View
+        # Vendor API token scrubbed inside epistemic tag tooltip
+        self.assertNotIn("SmartAPI", rendered)
+        self.assertIn("Official Exchange EOD Data", rendered)
+
+        # 3 bare [MODEL INTERPRETATION] tags in one <p> collapse to 1 anchor at paragraph end
+        self.assertEqual(rendered.count('data-epistemic-tier="MI"'), 1)
+        self.assertIn("First clause. Second clause. Final clause.<a", rendered)
+
+        # 3. Full-pill mode (compact_inline=False) preserves full labels & icons
+        full_rendered = render_epistemic_badges_html(
+            "<p>[VERIFIED FACT] [CALCULATED METRIC] [MODEL INTERPRETATION] [UNRESOLVED UNCERTAINTY]</p>",
+            compact_inline=False,
+        )
+        self.assertIn("✓ VERIFIED FACT", full_rendered)
+        self.assertIn("∑ CALCULATED METRIC", full_rendered)
+        self.assertIn("#icon-insights", full_rendered)
+        self.assertIn("#glyph-alert", full_rendered)
+        self.assertIn("color:#34d399", full_rendered)
+        self.assertIn("color:#38bdf8", full_rendered)
+        self.assertIn("color:#c084fc", full_rendered)
+        self.assertIn("color:#fbbf24", full_rendered)
+
+        # 4. Verify transformation of legacy falsification heading to What Would Change This View
         heading_html = "<h4>Falsification &amp; Thesis-Revision Triggers</h4><p>Details</p>"
         transformed = render_epistemic_badges_html(heading_html)
         self.assertIn("<h4>What Would Change This View (Revision Triggers)</h4>", transformed)
         self.assertNotIn("Falsification", transformed)
 
     def test_wrap_html_with_collapsible_pillars_renders_badges(self):
-        """Verifies that wrap_html_with_collapsible_pillars passes body content through render_epistemic_badges_html."""
+        """Verifies .pillar-citation-strip renders full badges while prose renders compact VF/CM/MI/UU micro-anchors."""
         sample_html = """
 <h1>Executive Summary</h1>
 <h2>Pillar 1: Macro-Economic Overlays</h2>
 <p>[VERIFIED FACT (BSE)] Inflation steady at 4.2%.</p>
 <h2>Pillar 2: Industry Dynamics & Moat</h2>
-<p>[CALCULATED METRIC: Market share 34.2%].</p>
+<p>Market share stands at 34.2% [CALCULATED METRIC: Market share 34.2%] .</p>
 <h2>Pillar 3: Promoter Quality & Forensic Health</h2>
-<p>[MODEL INTERPRETATION: Clean governance with zero pledging].</p>
+<p>Clean governance with zero pledging [MODEL INTERPRETATION: Clean governance with zero pledging] .</p>
 <h2>Pillar 4: The Drop Diagnostic</h2>
-<p>[UNRESOLVED UNCERTAINTY: Pending arbitration at NCLT].</p>
+<p>Pending arbitration at NCLT [UNRESOLVED UNCERTAINTY: Pending arbitration at NCLT] .</p>
 <h2>Pillar 5: Valuation & Margin of Safety</h2>
 <p>Fair value assessment.</p>
 <h2>Pillar 6: Technical & Momentum Overlay</h2>
@@ -337,12 +366,17 @@ Wide moat secured by patents.
 <p>BRSR Core compliant.</p>
 """
         wrapped = wrap_html_with_collapsible_pillars(sample_html, scrip_code="500209", ticker="INFY")
+        # Full labels in .pillar-citation-strip
         self.assertIn("✓ VERIFIED FACT", wrapped)
         self.assertIn("∑ CALCULATED METRIC", wrapped)
         self.assertIn("MODEL INTERPRETATION", wrapped)
-        self.assertIn("UNRESOLVED UNCERTAINTY", wrapped)
         self.assertIn("#icon-insights", wrapped)
-        self.assertIn("#glyph-alert", wrapped)
+        # Compact micro-anchors in prose body
+        self.assertIn(">VF</a>", wrapped)
+        self.assertIn(">CM</a>", wrapped)
+        self.assertIn(">MI</a>", wrapped)
+        self.assertIn(">UU</a>", wrapped)
+        self.assertIn("! UNRESOLVED UNCERTAINTY: Pending arbitration at NCLT", wrapped)
         self.assertIn("Open BSE Financial Results ↗", wrapped)
         self.assertNotIn("Open BSE BSE", wrapped)
 

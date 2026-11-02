@@ -3771,26 +3771,109 @@ html[data-theme="dark"] .chart-anatomy-canvas {
 
 html[data-theme="light"] .epistemic-badge-fact,
 .dossier-ivory-surface .epistemic-badge-fact {
-  color: #047857 !important;
-  background: rgba(16, 185, 129, 0.12) !important;
+  color: #065F46 !important;
+  background: rgba(16, 185, 129, 0.13) !important;
 }
 
 html[data-theme="light"] .epistemic-badge-calc,
 .dossier-ivory-surface .epistemic-badge-calc {
-  color: #0369A1 !important;
-  background: rgba(14, 165, 233, 0.12) !important;
+  color: #075985 !important;
+  background: rgba(14, 165, 233, 0.13) !important;
 }
 
 html[data-theme="light"] .epistemic-badge-interp,
 .dossier-ivory-surface .epistemic-badge-interp {
-  color: #6D28D9 !important;
-  background: rgba(168, 85, 247, 0.12) !important;
+  color: #5B21B6 !important;
+  background: rgba(168, 85, 247, 0.13) !important;
 }
 
 html[data-theme="light"] .epistemic-badge-uncert,
 .dossier-ivory-surface .epistemic-badge-uncert {
-  color: #B45309 !important;
-  background: rgba(245, 158, 11, 0.14) !important;
+  color: #92400E !important;
+  background: rgba(245, 158, 11, 0.15) !important;
+}
+
+/* Compact Superscript Epistemic Micro-Anchors (VF, CM, MI, UU) & Accessible Hover/Focus Tooltip */
+.epistemic-anchor {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-family: var(--font-mono);
+  font-size: 9.5px !important;
+  font-weight: 700 !important;
+  line-height: 1 !important;
+  letter-spacing: 0.03em;
+  padding: 2px 4.5px !important;
+  border-radius: 4px !important;
+  vertical-align: super;
+  margin-left: 2px !important;
+  margin-right: 1px !important;
+  text-decoration: none !important;
+  cursor: pointer;
+  user-select: none;
+  transition: transform 0.14s ease, filter 0.14s ease;
+}
+
+@supports (text-box: trim-both cap alphabetic) {
+  .epistemic-anchor {
+    text-box: trim-both cap alphabetic;
+    padding: 3px 4.5px !important;
+  }
+}
+
+.epistemic-anchor:hover,
+.epistemic-anchor:focus-visible {
+  transform: translateY(-1px);
+  filter: brightness(1.08);
+  outline: 2px solid var(--accent-cyan);
+  outline-offset: 1px;
+}
+
+.epistemic-tooltip-popover {
+  position: fixed;
+  z-index: 10050;
+  max-width: min(380px, calc(100vw - 24px));
+  padding: 9px 12px;
+  border-radius: 8px;
+  background-color: #0f172a;
+  color: #f8fafc;
+  border: 1px solid rgba(56, 189, 248, 0.4);
+  box-shadow: 0 14px 32px rgba(2, 6, 23, 0.65);
+  font-family: var(--font-sans);
+  font-size: 12px;
+  font-weight: 500;
+  line-height: 1.45;
+  pointer-events: auto;
+  opacity: 0;
+  transform: translateY(3px);
+  transition: opacity 0.12s ease, transform 0.12s ease;
+}
+
+.epistemic-tooltip-popover.is-visible {
+  opacity: 1;
+  transform: translateY(0);
+}
+
+.epistemic-tooltip-popover .epistemic-tooltip-hint {
+  display: block;
+  margin-top: 5px;
+  padding-top: 4px;
+  border-top: 1px solid rgba(148, 163, 184, 0.22);
+  font-size: 10.5px;
+  color: #cbd5e1;
+  font-weight: 600;
+}
+
+html[data-theme="light"] .epistemic-tooltip-popover {
+  background-color: #ffffff;
+  color: #0f172a;
+  border-color: rgba(2, 132, 199, 0.35);
+  box-shadow: 0 12px 28px rgba(15, 23, 42, 0.16);
+}
+
+html[data-theme="light"] .epistemic-tooltip-popover .epistemic-tooltip-hint {
+  border-top-color: rgba(15, 23, 42, 0.12);
+  color: #475569;
 }
 
 /* 10. Track 2C: Universal Light-Mode & Reading-Mode Contrast Sweep */

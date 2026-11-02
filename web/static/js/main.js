@@ -1500,7 +1500,7 @@ window.synthesizeReport = async function(ticker, forceRefresh = false) {
   let user = getAuthenticatedUser();
   if (!user) {
     try {
-      const meResp = await fetch('/api/auth/me');
+      const meResp = await fetch('/api/auth/me', { cache: 'no-store' });
       if (meResp.ok) {
         const meData = await meResp.json();
         if (meData && meData.authenticated && meData.user) {
@@ -1528,31 +1528,119 @@ window.synthesizeReport = async function(ticker, forceRefresh = false) {
     window.showEvaluationHUD({ assetType: 'equity', ticker, customTitle: `Generating Report: ${ticker}`, totalSec: 60 });
   }
 
-  const pollUntilReady = async (maxAttempts = 8, intervalMs = 3000) => {
+  let baselineUpdatedAt = '';
+  if (forceRefresh) {
+    try {
+      const preResp = await fetch(`/api/dossier/status/${encodeURIComponent(ticker)}?_t=${Date.now()}`, { cache: 'no-store' });
+      if (preResp.ok) {
+        const preData = await preResp.json();
+        baselineUpdatedAt = String((preData && preData.updated_at) || '');
+      }
+    } catch (_) {}
+  }
+
+  let hasRedirected = false;
+  let bgPollTimer = null;
+  const controller = new AbortController();
+  const timeoutId = setTimeout(() => controller.abort(), 115000);
+
+  const stopBackgroundPoller = () => {
+    if (bgPollTimer) {
+      clearInterval(bgPollTimer);
+      bgPollTimer = null;
+    }
+  };
+
+  const isStatusReady = (pollCheck) => {
+    if (!pollCheck || pollCheck.status !== 'ready') return false;
+    if (forceRefresh && baselineUpdatedAt) {
+      return Boolean(pollCheck.updated_at) && String(pollCheck.updated_at) !== baselineUpdatedAt;
+    }
+    return true;
+  };
+
+  const redirectToCompiledDossier = (rawTargetUrl, updatedBalance) => {
+    if (hasRedirected) return true;
+    hasRedirected = true;
+    stopBackgroundPoller();
+    clearTimeout(timeoutId);
+
+    if (typeof updatedBalance === 'number') {
+      user.credits_balance = updatedBalance;
+      user.credits = updatedBalance;
+      localStorage.setItem('sr_user', JSON.stringify(user));
+      syncUserSession();
+      if (typeof updateNavAuthUI === 'function') updateNavAuthUI(user);
+    }
+
+    let finalHref = rawTargetUrl || `/dossier/${encodeURIComponent(ticker)}`;
+    try {
+      const dest = new URL(finalHref, window.location.origin);
+      dest.searchParams.set('_fresh', String(Date.now()));
+      finalHref = dest.pathname + dest.search + dest.hash;
+    } catch (_) {
+      const sep = finalHref.includes('?') ? '&' : '?';
+      finalHref = `${finalHref}${sep}_fresh=${Date.now()}`;
+    }
+
+    const navigateNow = () => {
+      window.location.replace(finalHref);
+    };
+
+    if (typeof window.completeEvaluationHUD === 'function') {
+      window.completeEvaluationHUD(navigateNow);
+    } else {
+      navigateNow();
+    }
+    return true;
+  };
+
+  const checkStatusOnce = async () => {
+    try {
+      const pollResp = await fetch(`/api/dossier/status/${encodeURIComponent(ticker)}?_t=${Date.now()}`, {
+        cache: 'no-store',
+        headers: { 'Cache-Control': 'no-cache' }
+      });
+      if (!pollResp.ok) return false;
+      const pollCheck = await pollResp.json();
+      if (isStatusReady(pollCheck)) {
+        try { controller.abort(); } catch (_) {}
+        return redirectToCompiledDossier(pollCheck.dossier_url || `/dossier/${encodeURIComponent(ticker)}`);
+      }
+    } catch (_) {}
+    return false;
+  };
+
+  const pollUntilReady = async (maxAttempts = 20, intervalMs = 3000) => {
     for (let i = 0; i < maxAttempts; i++) {
-      try {
-        const pollCheck = await fetch(`/api/dossier/status/${encodeURIComponent(ticker)}`).then(r => r.json()).catch(() => null);
-        if (pollCheck && pollCheck.status === 'ready') {
-          if (typeof window.hideEvaluationHUD === 'function') window.hideEvaluationHUD();
-          window.location.href = pollCheck.dossier_url || `/dossier/${encodeURIComponent(ticker)}`;
-          return true;
-        }
-      } catch (_) {}
+      if (hasRedirected) return true;
+      if (await checkStatusOnce()) return true;
       if (i < maxAttempts - 1) {
         await new Promise(res => setTimeout(res, intervalMs));
       }
     }
-    return false;
+    return hasRedirected;
   };
 
-  // AbortController with 115-second timeout for 75s grounded stream + fast ungrounded fallback
-  const controller = new AbortController();
-  const timeoutId = setTimeout(() => controller.abort(), 115000);
+  // Concurrent background status poller after 10s so report opens immediately on commit even if proxy stream lags
+  const bgStartTimeout = setTimeout(() => {
+    if (!hasRedirected) {
+      bgPollTimer = setInterval(() => {
+        if (!hasRedirected) {
+          checkStatusOnce();
+        }
+      }, 3000);
+    }
+  }, 10000);
 
   try {
     const resp = await fetch('/api/synthesize', {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      cache: 'no-store',
+      headers: {
+        'Content-Type': 'application/json',
+        'Cache-Control': 'no-cache'
+      },
       signal: controller.signal,
       body: JSON.stringify({
         ticker: ticker,
@@ -1560,7 +1648,11 @@ window.synthesizeReport = async function(ticker, forceRefresh = false) {
         force_refresh: !!forceRefresh
       })
     });
+    clearTimeout(bgStartTimeout);
+    stopBackgroundPoller();
     clearTimeout(timeoutId);
+
+    if (hasRedirected) return;
 
     let data = {};
     try {
@@ -1570,24 +1662,16 @@ window.synthesizeReport = async function(ticker, forceRefresh = false) {
     }
 
     if (resp.ok && (data.success || data.status === 'success')) {
-      if (typeof window.hideEvaluationHUD === 'function') window.hideEvaluationHUD();
       const newBal = typeof data.new_balance === 'number' ? data.new_balance : (typeof data.remaining_credits === 'number' ? data.remaining_credits : undefined);
-      if (typeof newBal === 'number') {
-        user.credits_balance = newBal;
-        user.credits = newBal;
-        localStorage.setItem('sr_user', JSON.stringify(user));
-        syncUserSession();
-        if (typeof updateNavAuthUI === 'function') updateNavAuthUI(user);
-      }
-
       const targetUrl = data.dossier_url || data.redirect_url || `/dossier/${encodeURIComponent(ticker)}`;
-      window.location.href = targetUrl;
+      redirectToCompiledDossier(targetUrl, newBal);
       return;
     }
 
-    // If HTTP 502/504/500 occurred while backend synthesis was finishing, poll briefly before showing error
-    const pollAttempts = (resp.status === 502 || resp.status === 504) ? 8 : 2;
-    if (await pollUntilReady(pollAttempts, 2500)) {
+    // Proxy/gateway timeouts (Cloudflare 524/522/520, Render 502/503/504, or 500 while worker finishes)
+    const isProxyOrServerTimeout = [500, 502, 503, 504, 520, 522, 524].includes(resp.status);
+    const pollAttempts = isProxyOrServerTimeout ? 20 : 2;
+    if (await pollUntilReady(pollAttempts, 3000)) {
       return;
     }
 
@@ -1613,9 +1697,13 @@ window.synthesizeReport = async function(ticker, forceRefresh = false) {
       window.showPreflightCreditError(errMsg, () => window.synthesizeReport(ticker, forceRefresh));
     }
   } catch (err) {
+    clearTimeout(bgStartTimeout);
+    stopBackgroundPoller();
     clearTimeout(timeoutId);
-    // Timeout or network drop: Poll status up to 12 times (36s) in case backend thread is finishing
-    if (await pollUntilReady(12, 3000)) {
+    if (hasRedirected) return;
+
+    // Timeout, proxy cut, or network drop: Poll status up to 20 times (60s) while keeping HUD open
+    if (await pollUntilReady(20, 3000)) {
       return;
     }
 
@@ -1626,10 +1714,14 @@ window.synthesizeReport = async function(ticker, forceRefresh = false) {
     }
     window.showPreflightCreditError('Synthesis request timed out or encountered a network error. Your credit was not deducted.', () => window.synthesizeReport(ticker, forceRefresh));
   } finally {
-    buttons.forEach((btn, idx) => {
-      btn.disabled = false;
-      if (originalTexts[idx]) btn.innerHTML = originalTexts[idx];
-    });
+    clearTimeout(bgStartTimeout);
+    stopBackgroundPoller();
+    if (!hasRedirected) {
+      buttons.forEach((btn, idx) => {
+        btn.disabled = false;
+        if (originalTexts[idx]) btn.innerHTML = originalTexts[idx];
+      });
+    }
   }
 };
 
@@ -4471,6 +4563,169 @@ hydrateDynamicInlineStyles();
 if (document.readyState === "loading") {
   document.addEventListener("DOMContentLoaded", () => hydrateDynamicInlineStyles());
 }
+
+// ==============================================================================
+// Clean Post-Synthesis ?_fresh= Cache-Bust Parameter & Wire Epistemic Micro-Anchors
+// ==============================================================================
+(function initEpistemicMicroAnchorsAndUrlCleanup() {
+  function stripFreshCacheBustParam() {
+    try {
+      if (!window.location.search || !window.location.search.includes("_fresh=")) return;
+      const cleanUrl = new URL(window.location.href);
+      cleanUrl.searchParams.delete("_fresh");
+      const nextHref = cleanUrl.pathname + (cleanUrl.search ? cleanUrl.search : "") + cleanUrl.hash;
+      window.history.replaceState(window.history.state, "", nextHref);
+    } catch (_) {}
+  }
+
+  let activeAnchor = null;
+  let tooltipEl = null;
+  let hideTimer = null;
+
+  function ensureTooltipElement() {
+    if (tooltipEl && document.body.contains(tooltipEl)) return tooltipEl;
+    tooltipEl = document.createElement("div");
+    tooltipEl.id = "epistemicAnchorTooltip";
+    tooltipEl.className = "epistemic-tooltip-popover";
+    tooltipEl.setAttribute("role", "tooltip");
+    tooltipEl.setAttribute("aria-hidden", "true");
+    tooltipEl.addEventListener("mouseenter", () => {
+      if (hideTimer) {
+        clearTimeout(hideTimer);
+        hideTimer = null;
+      }
+    });
+    tooltipEl.addEventListener("mouseleave", () => {
+      scheduleHideTooltip();
+    });
+    document.body.appendChild(tooltipEl);
+    return tooltipEl;
+  }
+
+  function positionTooltip(anchor) {
+    if (!tooltipEl || !anchor) return;
+    const rect = anchor.getBoundingClientRect();
+    const tipRect = tooltipEl.getBoundingClientRect();
+    const margin = 10;
+    let top = rect.top - tipRect.height - 8;
+    if (top < margin) {
+      top = rect.bottom + 8;
+    }
+    let left = rect.left + (rect.width / 2) - (tipRect.width / 2);
+    left = Math.max(margin, Math.min(left, window.innerWidth - tipRect.width - margin));
+    tooltipEl.style.top = `${Math.round(top)}px`;
+    tooltipEl.style.left = `${Math.round(left)}px`;
+  }
+
+  function showTooltipForAnchor(anchor) {
+    const tipText = anchor && anchor.getAttribute("data-epistemic-tooltip");
+    if (!tipText) return;
+    if (hideTimer) {
+      clearTimeout(hideTimer);
+      hideTimer = null;
+    }
+    const el = ensureTooltipElement();
+    activeAnchor = anchor;
+    el.textContent = "";
+    const bodySpan = document.createElement("span");
+    bodySpan.textContent = tipText;
+    const hintSpan = document.createElement("span");
+    hintSpan.className = "epistemic-tooltip-hint";
+    hintSpan.textContent = "Click to inspect Methodology & Source Passages ↓";
+    el.appendChild(bodySpan);
+    el.appendChild(hintSpan);
+    el.setAttribute("aria-hidden", "false");
+    anchor.setAttribute("aria-describedby", "epistemicAnchorTooltip");
+    positionTooltip(anchor);
+    el.classList.add("is-visible");
+  }
+
+  function hideTooltipImmediate() {
+    if (hideTimer) {
+      clearTimeout(hideTimer);
+      hideTimer = null;
+    }
+    if (activeAnchor) {
+      activeAnchor.removeAttribute("aria-describedby");
+      activeAnchor = null;
+    }
+    if (tooltipEl) {
+      tooltipEl.classList.remove("is-visible");
+      tooltipEl.setAttribute("aria-hidden", "true");
+    }
+  }
+
+  function scheduleHideTooltip() {
+    if (hideTimer) clearTimeout(hideTimer);
+    hideTimer = setTimeout(hideTooltipImmediate, 120);
+  }
+
+  document.addEventListener("pointerover", (e) => {
+    const anchor = e.target && e.target.closest ? e.target.closest("a.epistemic-anchor") : null;
+    if (anchor) {
+      showTooltipForAnchor(anchor);
+    }
+  });
+
+  document.addEventListener("pointerout", (e) => {
+    const anchor = e.target && e.target.closest ? e.target.closest("a.epistemic-anchor") : null;
+    if (anchor) {
+      const related = e.relatedTarget;
+      if (related && (anchor.contains(related) || (tooltipEl && tooltipEl.contains(related)))) {
+        return;
+      }
+      scheduleHideTooltip();
+    }
+  });
+
+  document.addEventListener("focusin", (e) => {
+    const anchor = e.target && e.target.closest ? e.target.closest("a.epistemic-anchor") : null;
+    if (anchor) {
+      showTooltipForAnchor(anchor);
+    }
+  });
+
+  document.addEventListener("focusout", (e) => {
+    const anchor = e.target && e.target.closest ? e.target.closest("a.epistemic-anchor") : null;
+    if (anchor) {
+      scheduleHideTooltip();
+    }
+  });
+
+  document.addEventListener("keydown", (e) => {
+    if (e.key === "Escape" && tooltipEl && tooltipEl.classList.contains("is-visible")) {
+      e.stopPropagation();
+      hideTooltipImmediate();
+    }
+  });
+
+  window.addEventListener("scroll", () => {
+    if (activeAnchor && tooltipEl && tooltipEl.classList.contains("is-visible")) {
+      positionTooltip(activeAnchor);
+    }
+  }, { passive: true });
+
+  document.addEventListener("click", (e) => {
+    const anchor = e.target && e.target.closest ? e.target.closest("a.epistemic-anchor") : null;
+    if (!anchor) return;
+    hideTooltipImmediate();
+    const drawer = document.getElementById("methodologyGroundingDrawer");
+    const ledgerCard = document.getElementById("epistemicFalsificationCard");
+    if (drawer || ledgerCard) {
+      e.preventDefault();
+      if (drawer && "open" in drawer) {
+        drawer.open = true;
+      }
+      const scrollTarget = drawer || ledgerCard;
+      scrollTarget.scrollIntoView({ behavior: "smooth", block: "start" });
+    }
+  });
+
+  stripFreshCacheBustParam();
+  if (document.readyState === "loading") {
+    document.addEventListener("DOMContentLoaded", stripFreshCacheBustParam);
+  }
+})();
 
 
 

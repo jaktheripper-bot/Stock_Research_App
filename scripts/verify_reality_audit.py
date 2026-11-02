@@ -963,6 +963,66 @@ class RealityAuditor:
         else:
             self.ok(gate, "Zero unquoted Jinja tokens inside executable <script> blocks across 100% of web templates")
 
+        # 12.5 Zero Public API-Backend / Vendor Exposure across public templates, PDF/provenance strings, stakeholder docs & archived prose
+        forbidden_public_vendor_re = re.compile(
+            r"(?i)(?:\bsmartapi\b|\bsupabase\s+auth\b|\bbroker\s+gateway\s+apis\b|"
+            r"\byfinance\b|\byahoo\s+finance\b|\bvertex\s*ai\b|\bperplexity\b|\bmfapi\b)"
+        )
+        public_vendor_leaks = []
+        for tmpl in sorted((ROOT / "web/templates").rglob("*.html")):
+            if "admin" in tmpl.name.lower():
+                continue
+            rel_path = str(tmpl.relative_to(ROOT))
+            no_comments = re.sub(r"<!--[\s\S]*?-->", "", tmpl.read_text(encoding="utf-8"))
+            for line_no, line in enumerate(no_comments.splitlines(), 1):
+                m_v = forbidden_public_vendor_re.search(line)
+                if m_v:
+                    public_vendor_leaks.append(f"{rel_path}:{line_no} ({m_v.group(0)})")
+
+        for rel_check in ("docs/site features & benefits.txt",):
+            chk_path = ROOT / rel_check
+            if chk_path.exists():
+                for line_no, line in enumerate(chk_path.read_text(encoding="utf-8").splitlines(), 1):
+                    if line.lstrip().startswith("#"):
+                        continue
+                    m_v = forbidden_public_vendor_re.search(line)
+                    if m_v:
+                        public_vendor_leaks.append(f"{rel_check}:{line_no} ({m_v.group(0)})")
+
+        pdf_src = (ROOT / "core/reporting/pdf.py").read_text(encoding="utf-8")
+        if re.search(r"(?i)broker\s+gateway\s+apis|smartapi\s+feed|supabase\s+auth", pdf_src):
+            public_vendor_leaks.append("core/reporting/pdf.py (forbidden broker/API provenance string)")
+
+        main_py_src = (ROOT / "web/main.py").read_text(encoding="utf-8")
+        if "SmartAPI Feed" in main_py_src:
+            public_vendor_leaks.append("web/main.py (quote_source_label='BSE / SmartAPI Feed')")
+
+        db_file = ROOT / "reports.db"
+        if db_file.exists():
+            db_vendor_re = re.compile(
+                r"(?i)(?:\bsmartapi\b|\bsupabase\s+auth\b|\bbroker\s+gateway\s+apis\b|"
+                r"\byfinance\b|\byahoo\s+finance\b|\bvertex\s*ai\b|\bperplexity\.ai\b)"
+            )
+            try:
+                conn_chk = sqlite3.connect(str(db_file))
+                cur_chk = conn_chk.cursor()
+                for tkr_chk, rtxt_chk in cur_chk.execute("SELECT ticker, report_text FROM reports WHERE report_text IS NOT NULL"):
+                    m_db = db_vendor_re.search(rtxt_chk)
+                    if m_db:
+                        public_vendor_leaks.append(f"reports.db:{tkr_chk} ({m_db.group(0)})")
+                conn_chk.close()
+            except Exception as db_chk_err:
+                public_vendor_leaks.append(f"reports.db scan error ({db_chk_err})")
+
+        if public_vendor_leaks:
+            self.fail(
+                gate,
+                ", ".join(public_vendor_leaks[:5]),
+                f"BACKEND VENDOR LEAK: Found {len(public_vendor_leaks)} public API/backend vendor reference(s). Public surfaces & reports must never expose backend API vendors."
+            )
+        else:
+            self.ok(gate, "Zero backend API/vendor names exposed across public templates, PDF exports, docs & archived reports")
+
 
     def report(self) -> int:
         print("=" * 76)

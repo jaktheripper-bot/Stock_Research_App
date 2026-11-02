@@ -1284,7 +1284,8 @@ def dossier_page(request: Request, ticker: str):
                 "active_page": "dossier",
                 "linked_debt": linked_debt,
                 "contagion_alert": contagion_alert,
-            }
+            },
+            headers={"Cache-Control": "no-store, no-cache, must-revalidate"},
         )
 
     # Ingest verified citations footnotes
@@ -1412,7 +1413,7 @@ def dossier_page(request: Request, ticker: str):
 
     if fp_num > 0 and not is_fp_synth_500:
         price_val = fp_num
-        quote_source_label = "BSE / SmartAPI Feed"
+        quote_source_label = "BSE / NSE Exchange Market Data"
     elif rp_num > 0 and not is_rp_synth_500:
         price_val = rp_num
         quote_source_label = "Synthesis Baseline"

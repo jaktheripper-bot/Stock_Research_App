@@ -155,7 +155,7 @@ class TestDossierProvenanceAndCitationsWS2(unittest.TestCase):
                 "debt_to_equity": 0.10,
                 "fifty_two_week_high": 4200.0,
                 "fifty_two_week_low": 2100.0,
-                "source": "SMARTAPI_BSE_EXCHANGE",
+                "source": "EXCHANGE_MARKET_FEED",
             },
             force_overwrite=True,
         )
@@ -168,14 +168,17 @@ class TestDossierProvenanceAndCitationsWS2(unittest.TestCase):
             self.assertNotIn("{{", html)
             self.assertNotIn("{%", html)
             self.assertNotIn('\\"', html)
+            self.assertNotIn("SmartAPI", html)
+            self.assertNotIn("broker gateway APIs", html)
 
             soup = BeautifulSoup(html, "html.parser")
             prov_bar = soup.find(id="dossierProvenanceBar")
             self.assertIsNotNone(prov_bar, "#dossierProvenanceBar must render on equity dossier")
             prov_text = prov_bar.get_text(" ", strip=True)
 
-            # 1. Live quote preferred over stale report baseline + explicit drift transparency
+            # 1. Live quote preferred over stale report baseline + explicit drift transparency + neutral provenance label
             self.assertIn("₹2,530.00", prov_text)
+            self.assertIn("BSE / NSE Exchange Market Data", prov_text)
             self.assertIn("As of", prov_text)
             self.assertIn("Report Baseline:", prov_text)
             self.assertIn("₹2,156.00", prov_text)
@@ -220,6 +223,45 @@ class TestDossierProvenanceAndCitationsWS2(unittest.TestCase):
         fund_soup = BeautifulSoup(fund_res.text, "html.parser")
         self.assertIsNotNone(fund_soup.select_one(".dossier-provenance-bar"))
         self.assertGreaterEqual(len(fund_soup.select("a.provenance-registry-chip")), 2)
+
+    def test_zero_backend_vendor_names_on_public_surfaces_and_errors(self):
+        from web.routers.dossier import _sanitize_public_error_detail
+
+        # 1. Pending dossier page must use no-store caching and never mention Supabase Auth
+        pending_res = self.client.get("/dossier/UNARCHIVED_SYNTH_CHECK_99")
+        self.assertEqual(pending_res.status_code, 200)
+        self.assertIn("no-store", pending_res.headers.get("cache-control", "").lower())
+        self.assertNotIn("Supabase Auth", pending_res.text)
+        self.assertNotIn("SmartAPI", pending_res.text)
+
+        # 2. Citation classifier drops perplexity.ai and non-issuer angelone.in while keeping statutory links
+        cites = [
+            {"title": "perplexity.ai", "uri": "https://www.perplexity.ai/search/xyz", "source_type": "Perplexity Grounding"},
+            {"title": "angelone.in", "uri": "https://www.angelone.in/stocks/infosys", "source_type": "Web"},
+            {"title": "BSE Filing", "uri": "https://www.bseindia.com/corporates/ann.html?scrip_cd=500209", "source_type": "Gemini Grounding"},
+        ]
+        bundle = enrich_and_classify_citations(cites, scrip_code="500209", ticker="INFY", company_name="Infosys Ltd")
+        rendered_blob = str(bundle["citations"]).lower()
+        self.assertNotIn("perplexity", rendered_blob)
+        self.assertNotIn("angelone.in", rendered_blob)
+        self.assertNotIn("gemini", rendered_blob)
+        self.assertEqual(len(bundle["citations"]), 1)
+
+        # ANGELONE issuer itself retains official angelone.in domain if cited
+        angel_bundle = enrich_and_classify_citations(
+            [{"title": "Angel One Investor Relations", "uri": "https://www.angelone.in/investor-relations", "source_type": "IR"}],
+            scrip_code="543235",
+            ticker="ANGELONE",
+            company_name="Angel One Ltd",
+        )
+        self.assertTrue(any("angelone.in" in c.get("uri", "") for c in angel_bundle["citations"]))
+
+        # 3. Error sanitizer strips backend vendor/model/key details
+        sanitized = _sanitize_public_error_detail(
+            "Vertex AI gemini-3.5-flash & Perplexity /v1/responses failed at https://api.perplexity.ai/v1/responses key=AQ.Ab8RN6L1234567890"
+        )
+        for forbidden in ("Vertex", "gemini", "Perplexity", "/v1/responses", "api.perplexity.ai", "AQ.Ab8RN6"):
+            self.assertNotIn(forbidden.lower(), sanitized.lower())
 
 
 if __name__ == "__main__":

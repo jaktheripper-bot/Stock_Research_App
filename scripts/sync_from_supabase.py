@@ -53,6 +53,7 @@ SYNC_TABLE_SPECS: List[Tuple[str, Tuple[str, ...], Optional[str], str]] = [
     ("alternative_yield_products", ("product_id",), "updated_at", "upsert"),
     ("etf_matrix", ("symbol",), "updated_at", "upsert"),
     ("msme_firms", ("uin",), "last_updated", "upsert"),
+    ("equity_price_history_cache", ("ticker", "period"), "updated_at", "upsert"),
 ]
 
 
