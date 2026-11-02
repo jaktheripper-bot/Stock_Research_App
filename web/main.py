@@ -1239,6 +1239,11 @@ def dossier_page(request: Request, ticker: str):
     if not clean_t:
         return RedirectResponse(url="/")
 
+    from core.search.product_search import resolve_cross_asset_dossier_redirect
+    early_cross_url = resolve_cross_asset_dossier_redirect(clean_t, prefix_only=True)
+    if early_cross_url:
+        return RedirectResponse(url=early_cross_url, status_code=302)
+
     # Canonicalize ticker symbol (e.g. 'MANALI PETROCHEM' or '500268' -> 'MANALIPETC')
     canonical = resolve_canonical_symbol(clean_t) or clean_t
     if canonical != clean_t:
@@ -1246,6 +1251,9 @@ def dossier_page(request: Request, ticker: str):
 
     rep = get_report_by_ticker_sync(canonical)
     if not rep or not rep.get("report_text"):
+        cross_url = resolve_cross_asset_dossier_redirect(canonical, prefix_only=False)
+        if cross_url:
+            return RedirectResponse(url=cross_url, status_code=302)
         if is_synthetic_test_symbol(canonical) or is_synthetic_test_symbol(clean_t):
             raise HTTPException(status_code=404, detail=f"Stock dossier '{canonical}' not found.")
         # Resolve company details for the pending template

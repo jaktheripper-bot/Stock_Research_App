@@ -217,6 +217,56 @@ class TestOmniSearchWS3(unittest.TestCase):
                     f"ExceptHandler in product_search.py must log warning/error: {body_src}",
                 )
 
+    def test_cross_asset_dossier_redirects_and_loophole_guards(self):
+        from core.db.telemetry import infer_canonical_asset_path
+        from core.search.product_search import resolve_cross_asset_dossier_redirect
+        from web.common import templates
+
+        # F1 / L2 / L3 / L4: Fast O(1) canonical path inference + Jinja filter parity
+        self.assertIs(templates.env.filters.get("asset_url"), infer_canonical_asset_path)
+        self.assertEqual(infer_canonical_asset_path("UDYAM-AP-07-0056192"), "/msme/UDYAM-AP-07-0056192")
+        self.assertEqual(infer_canonical_asset_path("IN901SDI0012"), "/debt/IN901SDI0012")
+        self.assertEqual(infer_canonical_asset_path("INE002A08012"), "/debt/INE002A08012")
+        self.assertEqual(infer_canonical_asset_path("INE256D01014"), "/dossier/INE256D01014")
+        self.assertEqual(infer_canonical_asset_path("IN0020220011"), "/sovereign")
+        self.assertEqual(infer_canonical_asset_path("118955"), "/funds/118955")
+        self.assertEqual(infer_canonical_asset_path("PPFAS_FLEXICAP_DIR"), "/funds/PPFAS_FLEXICAP_DIR")
+        self.assertEqual(infer_canonical_asset_path("500209"), "/dossier/500209")
+        self.assertEqual(infer_canonical_asset_path("EMBASSY"), "/reits/EMBASSY")
+        self.assertEqual(infer_canonical_asset_path("INFY"), "/dossier/INFY")
+
+        # HTTP 302 -> HTTP 200 end-to-end on /dossier/UDYAM-AP-07-0056192
+        r_msme = self.client.get("/dossier/UDYAM-AP-07-0056192", follow_redirects=False)
+        self.assertEqual(r_msme.status_code, 302)
+        self.assertEqual(r_msme.headers.get("location"), "/msme/UDYAM-AP-07-0056192")
+        r_msme_final = self.client.get("/dossier/UDYAM-AP-07-0056192", follow_redirects=True)
+        self.assertEqual(r_msme_final.status_code, 200)
+        self.assertIn("Guntur Cold Storage", r_msme_final.text)
+
+        # L1: Operating bank equities colliding with ETF tickers stay on /dossier/{bank}
+        for bank_sym in ("HDFCBANK", "ICICIBANK", "AXISBANK"):
+            self.assertIsNone(resolve_cross_asset_dossier_redirect(bank_sym, prefix_only=False))
+            r_bank = self.client.get(f"/dossier/{bank_sym}", follow_redirects=False)
+            self.assertEqual(r_bank.status_code, 200)
+
+        # Pure ETF (NIFTYBEES) & REIT (EMBASSY) redirect cleanly from /dossier/
+        r_etf = self.client.get("/dossier/NIFTYBEES", follow_redirects=False)
+        self.assertEqual(r_etf.status_code, 302)
+        self.assertEqual(r_etf.headers.get("location"), "/etfs/NIFTYBEES")
+
+        r_reit = self.client.get("/dossier/EMBASSY", follow_redirects=False)
+        self.assertEqual(r_reit.status_code, 302)
+        self.assertEqual(r_reit.headers.get("location"), "/reits/EMBASSY")
+
+        # L2: Equity ISIN INE256D01014 never redirects to /debt/, while SDI IN901SDI0012 does
+        self.assertIsNone(resolve_cross_asset_dossier_redirect("INE256D01014", prefix_only=False))
+        self.assertEqual(resolve_cross_asset_dossier_redirect("IN901SDI0012", prefix_only=True), "/debt/IN901SDI0012")
+
+        # L5 & F4: Client JS contracts
+        main_js = (PROJECT_ROOT / "web" / "static" / "js" / "main.js").read_text(encoding="utf-8")
+        self.assertIn("function resolveClientAssetUrl(rawQuery)", main_js)
+        self.assertIn("Math.max(maxSeconds, 30)", main_js)
+
 
 if __name__ == "__main__":
     unittest.main()

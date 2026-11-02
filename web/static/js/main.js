@@ -40,8 +40,50 @@ document.addEventListener('DOMContentLoaded', () => {
 });
 
 // ==============================================================================
-// 1. Search and Autocomplete (Homepage)
+// 1. Search and Autocomplete (Homepage — 7-Asset Canonical Routing)
 // ==============================================================================
+const _CLIENT_KNOWN_REITS = new Set([
+  'BHARATINV', 'BIRET', 'EMBASSY', 'INDIGRID', 'IRBINVIT', 'MINDSPACE',
+  'NEXUS', 'NHIT', 'ORIENTINVIT', 'PGINVIT', 'PROPSHARE', 'STRATA'
+]);
+
+function resolveClientAssetUrl(rawQuery) {
+  const trimmed = (rawQuery || '').trim();
+  if (!trimmed) return '/search';
+  if (/\s/.test(trimmed)) {
+    return `/search?q=${encodeURIComponent(trimmed)}`;
+  }
+  const upper = trimmed.toUpperCase().replace(/\.(NS|BO)$/, '');
+  if (upper.startsWith('UDYAM-')) {
+    return `/msme/${encodeURIComponent(upper)}`;
+  }
+  if (/^IN00[A-Z0-9]{8}$/.test(upper)) {
+    return '/sovereign';
+  }
+  if (/^IN(?:E|9)[A-Z0-9]{9}$/.test(upper) && upper.slice(7, 9) !== '01') {
+    return `/debt/${encodeURIComponent(upper)}`;
+  }
+  if (upper.endsWith('_DIR') || (/^\d{6}$/.test(upper) && Number(upper) >= 100000 && Number(upper) <= 199999)) {
+    return `/funds/${encodeURIComponent(upper)}`;
+  }
+  if (_CLIENT_KNOWN_REITS.has(upper)) {
+    return `/reits/${encodeURIComponent(upper)}`;
+  }
+  if (upper.startsWith('SGB') && upper.length >= 6) {
+    return '/reits#sgbCardsGrid';
+  }
+  return `/dossier/${encodeURIComponent(upper)}`;
+}
+
+function _escapeSuggestionHtml(val) {
+  return String(val == null ? '' : val)
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#39;');
+}
+
 function initSearchAutocomplete() {
   const searchInput = document.getElementById('mainSearchInput');
   const suggestionsBox = document.getElementById('searchSuggestions');
@@ -51,11 +93,11 @@ function initSearchAutocomplete() {
 
   searchForm.addEventListener('submit', (e) => {
     e.preventDefault();
-    const query = searchInput.value.trim().toUpperCase();
-    if (query) {
+    const rawQuery = searchInput.value.trim();
+    if (rawQuery) {
       const submitBtn = searchForm.querySelector('button[type="submit"], .btn-search, .search-btn');
       if (submitBtn) startButtonProgressFill(submitBtn, 'Searching');
-      window.location.href = `/dossier/${encodeURIComponent(query)}`;
+      window.location.href = resolveClientAssetUrl(rawQuery);
     }
   });
 
@@ -70,16 +112,50 @@ function initSearchAutocomplete() {
 
     debounceTimer = setTimeout(async () => {
       try {
-        const resp = await fetch(`/api/suggest?q=${encodeURIComponent(q)}`);
+        const resp = await fetch(`/api/search/products?q=${encodeURIComponent(q)}&asset_class=ALL&limit_per_category=3`);
         if (resp.ok) {
           const data = await resp.json();
-          renderSuggestions(data.suggestions || []);
+          const results = Array.isArray(data.results) ? data.results.slice(0, 8) : [];
+          if (results.length > 0) {
+            renderProductSuggestions(results);
+            return;
+          }
+        }
+        const fallbackResp = await fetch(`/api/suggest?q=${encodeURIComponent(q)}`);
+        if (fallbackResp.ok) {
+          const fbData = await fallbackResp.json();
+          renderSuggestions(fbData.suggestions || []);
         }
       } catch (err) {
         console.error('Failed to fetch suggestions:', err);
       }
     }, 250);
   });
+
+  function renderProductSuggestions(items) {
+    if (!suggestionsBox) return;
+    if (!items || items.length === 0) {
+      suggestionsBox.style.display = 'none';
+      return;
+    }
+    suggestionsBox.innerHTML = items.map((item) => {
+      const ident = _escapeSuggestionHtml(item.identifier || '');
+      const title = _escapeSuggestionHtml(item.title || '');
+      const badge = _escapeSuggestionHtml(item.badge || item.product_type || 'View Dossier');
+      const rawUrl = (item.url && String(item.url).startsWith('/')) ? String(item.url) : resolveClientAssetUrl(item.identifier || '');
+      const safeUrl = _escapeSuggestionHtml(rawUrl);
+      const titleSpan = title && title !== ident
+        ? ` <span style="font-size: 12.5px; color: var(--text-secondary); margin-left: 6px;">${title}</span>`
+        : '';
+      return `
+        <a href="${safeUrl}" class="suggestion-item" style="text-decoration: none; color: inherit;">
+          <span><span class="ticker-badge">${ident}</span>${titleSpan}</span>
+          <span class="view-label">${badge} →</span>
+        </a>
+      `;
+    }).join('');
+    suggestionsBox.style.display = 'block';
+  }
 
   function renderSuggestions(items) {
     if (!suggestionsBox) return;
@@ -88,18 +164,22 @@ function initSearchAutocomplete() {
       return;
     }
 
-    suggestionsBox.innerHTML = items.map(ticker => `
-      <div class="suggestion-item" onclick="window.location.href='/dossier/${encodeURIComponent(ticker)}'">
-        <span class="ticker-badge">${ticker}</span>
-        <span class="view-label">View Stock Report →</span>
-      </div>
-    `).join('');
+    suggestionsBox.innerHTML = items.map((ticker) => {
+      const safeTicker = _escapeSuggestionHtml(ticker);
+      const safeUrl = _escapeSuggestionHtml(resolveClientAssetUrl(ticker));
+      return `
+        <a href="${safeUrl}" class="suggestion-item" style="text-decoration: none; color: inherit;">
+          <span class="ticker-badge">${safeTicker}</span>
+          <span class="view-label">View Dossier →</span>
+        </a>
+      `;
+    }).join('');
     suggestionsBox.style.display = 'block';
   }
 
   // Close suggestions on outside click
   document.addEventListener('click', (e) => {
-    if (suggestionsBox && !searchForm.contains(e.target)) {
+    if (suggestionsBox && !searchForm.contains(e.target) && !suggestionsBox.contains(e.target)) {
       suggestionsBox.style.display = 'none';
     }
   });
@@ -1205,7 +1285,7 @@ window.showEvaluationHUD = function(options = {}) {
   _globalEvaluationTimer = setInterval(() => {
     const elapsedMs = Date.now() - startMs;
     const elapsedSecFloat = elapsedMs / 1000;
-    const displayMax = elapsedSecFloat > maxSeconds ? 30 : maxSeconds;
+    const displayMax = elapsedSecFloat > maxSeconds ? Math.max(maxSeconds, 30) : maxSeconds;
     // Smooth non-linear easing curve: fast initial ramp up to 92% over maxSeconds, then gentle asymptotic glide toward 98.5% if server takes longer
     let pct;
     if (elapsedMs <= maxMs) {

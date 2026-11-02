@@ -2301,7 +2301,7 @@ html[data-theme="light"] .copilot-input {
                 <div style="display: flex; gap: 6px; flex-wrap: wrap; margin-bottom: 8px;">
                   <span class="status-pill closed" style="font-size: 10.5px;">Primary Focus: {{ prof.favorite_category }}</span>
                   {% for tk in prof.top_tickers %}
-                  <a href="/dossier/{{ tk }}" target="_blank" class="status-pill" style="font-size: 10.5px; text-decoration: none; background: rgba(56, 189, 248, 0.14); color: #38bdf8;">{{ tk }}</a>
+                  <a href="{{ tk|asset_url }}" target="_blank" class="status-pill" style="font-size: 10.5px; text-decoration: none; background: rgba(56, 189, 248, 0.14); color: #38bdf8;">{{ tk }}</a>
                   {% endfor %}
                   {% for b in prof.high_intent_badges %}
                   <span class="status-pill" style="font-size: 10.5px; background: rgba(245, 158, 11, 0.14); color: #fbbf24;">{{ b }}</span>
@@ -3187,7 +3187,7 @@ html[data-theme="light"] .copilot-input {
               {% for t in summary.top_searched_tickers %}
               <tr>
                 <td>
-                  <a href="/dossier/{{ t.ticker }}" target="_blank" style="color: var(--accent-cyan, #0ea5e9); font-weight: 700; text-decoration: none;">
+                  <a href="{{ t.ticker|asset_url }}" target="_blank" style="color: var(--accent-cyan, #0ea5e9); font-weight: 700; text-decoration: none;">
                     {{ t.ticker }} ↗
                   </a>
                 </td>

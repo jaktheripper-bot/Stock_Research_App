@@ -2,6 +2,7 @@
 
 import json
 import logging
+import re
 from datetime import datetime
 from normalizer import clean_ticker
 from core.db.connection import init_db, get_db_connection, get_supabase_url, get_placeholder
@@ -9,6 +10,51 @@ from core.db.reports import _format_timestamp
 from telemetry import parse_traffic_source, parse_user_agent, extract_geo
 
 logger = logging.getLogger("equity_research.core.db.telemetry")
+
+_KNOWN_REIT_SYMBOLS = frozenset({
+    "BHARATINV", "BIRET", "EMBASSY", "INDIGRID", "IRBINVIT", "MINDSPACE",
+    "NEXUS", "NHIT", "ORIENTINVIT", "PGINVIT", "PROPSHARE", "STRATA",
+})
+
+
+def infer_canonical_asset_path(raw_id: str, details: dict | None = None, event_type: str = "") -> str:
+    """O(1) zero-SQL canonical path resolver across all 7 asset classes for telemetry & Admin links."""
+    det = details if isinstance(details, dict) else {}
+    action = str(det.get("action") or "").strip().lower()
+    raw_clean = str(raw_id or "").strip()
+    if not raw_clean or raw_clean.upper() == "APP":
+        ev_upper = (event_type or "").upper()
+        if "COMPARE" in ev_upper:
+            return "/compare"
+        if "TICKET" in ev_upper:
+            return "/contact"
+        if "PDF" in ev_upper:
+            return "/dossier"
+        return "/"
+
+    upper_id = raw_clean.upper()
+    if action == "export_msme_pdf" or upper_id.startswith("UDYAM-"):
+        return f"/msme/{upper_id}"
+    if action == "export_fund_pdf":
+        return f"/funds/{raw_clean}"
+    if action == "export_debt_pdf":
+        return f"/debt/{upper_id}"
+    if action == "export_reit_pdf":
+        return f"/reits/{clean_ticker(upper_id)}"
+
+    if re.match(r"^IN00[A-Z0-9]{8}$", upper_id):
+        return "/sovereign"
+    if re.match(r"^IN(?:E|9)[A-Z0-9]{9}$", upper_id) and upper_id[7:9] != "01":
+        return f"/debt/{upper_id}"
+    if upper_id.endswith("_DIR") or (upper_id.isdigit() and 100000 <= int(upper_id) <= 199999):
+        return f"/funds/{upper_id}"
+
+    ct = clean_ticker(upper_id)
+    if ct in _KNOWN_REIT_SYMBOLS:
+        return f"/reits/{ct}"
+    if ct.startswith("SGB") and len(ct) >= 6:
+        return "/reits#sgbCardsGrid"
+    return f"/dossier/{ct}"
 
 def get_admin_emails() -> set[str]:
     """Retrieves all registered administrator emails, lowercased."""
@@ -186,6 +232,9 @@ def classify_page_category(path: str) -> tuple[str, str]:
         return "Executive Admin Console", "🔐"
     if clean_p.startswith("/equities") or clean_p.startswith("/stocks") or clean_p.startswith("/reports"):
         return "Equities Screener & Directory", "📊"
+    if clean_p.startswith("/msme/"):
+        uin_seg = clean_p.split("/")[2] if len(clean_p.split("/")) > 2 else ""
+        return (f"MSME Dossier ({uin_seg})", "🏭") if uin_seg else ("MSME Dossier", "🏭")
     if clean_p.startswith("/msme"):
         return "MSME Enterprise Directory", "🏭"
     if any(clean_p.startswith(x) for x in ["/terms", "/privacy", "/refund", "/disclaimer"]):
@@ -275,13 +324,8 @@ def compute_page_dwell_and_visit_tree(all_events: list) -> dict:
                     p = urlparse(det["landing_url"]).path
                 except Exception as url_err:
                     logger.debug("URL parse notice: %s", url_err)
-        if not p and ev_tick and str(ev_tick).upper() != "APP":
-            p = f"/dossier/{clean_ticker(ev_tick)}"
         if not p:
-            if "COMPARE" in (ev_type or ""): p = "/compare"
-            elif "TICKET" in (ev_type or ""): p = "/contact"
-            elif "PDF" in (ev_type or ""): p = f"/dossier/{clean_ticker(ev_tick)}" if ev_tick else "/dossier"
-            else: p = "/"
+            p = infer_canonical_asset_path(ev_tick, details=det, event_type=ev_type or "")
 
         if not p.startswith("/"):
             p = "/" + p
@@ -553,8 +597,8 @@ def record_usage_event(
 
         details_dict = dict(details or {})
         resolved_lp = landing_page or details_dict.get("landing_page") or details_dict.get("path") or details_dict.get("page") or ""
-        if not resolved_lp and ticker and ticker != "APP":
-            resolved_lp = f"/dossier/{clean_t}"
+        if not resolved_lp:
+            resolved_lp = infer_canonical_asset_path(ticker, details=details_dict, event_type=event_type or "")
         if resolved_lp:
             if not resolved_lp.startswith("/"):
                 resolved_lp = "/" + resolved_lp
@@ -1039,13 +1083,8 @@ def get_site_usage_summary(
                                 p = urlparse(det_obj["landing_url"]).path
                     except Exception as parse_err:
                         logger.debug("Failed to parse telemetry details_json landing page: %s", parse_err)
-                if not p and ev_tick and str(ev_tick).upper() != "APP":
-                    p = f"/dossier/{clean_ticker(ev_tick)}"
                 if not p:
-                    if "COMPARE" in (ev_type or ""): p = "/compare"
-                    elif "TICKET" in (ev_type or ""): p = "/contact"
-                    elif "PDF" in (ev_type or ""): p = f"/dossier/{clean_ticker(ev_tick)}" if ev_tick else "/dossier"
-                    else: p = "/"
+                    p = infer_canonical_asset_path(ev_tick, details=det_obj, event_type=ev_type or "")
 
                 if not p.startswith("/"):
                     p = "/" + p
@@ -1527,13 +1566,8 @@ def get_session_journeys(days: int = None, start_date = None, end_date = None, l
                                 p = urlparse(d["landing_url"]).path
                         except Exception as parse_err:
                             logger.debug("Failed to parse journey landing page: %s", parse_err)
-                    if not p and ev_ticker and str(ev_ticker).upper() != "APP":
-                        p = f"/dossier/{clean_ticker(ev_ticker)}"
                     if not p:
-                        if "COMPARE" in (ev_type or ""): p = "/compare"
-                        elif "TICKET" in (ev_type or ""): p = "/contact"
-                        elif "PDF" in (ev_type or ""): p = f"/dossier/{clean_ticker(ev_ticker)}" if ev_ticker else "/dossier"
-                        else: p = "/"
+                        p = infer_canonical_asset_path(ev_ticker, details=d if isinstance(d, dict) else None, event_type=ev_type or "")
                     if not p.startswith("/"):
                         p = "/" + p
                     if len(p) > 1 and p.endswith("/"):

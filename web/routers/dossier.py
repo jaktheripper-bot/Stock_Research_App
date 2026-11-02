@@ -757,7 +757,8 @@ async def api_download_msme_pdf(uin: str, request: Request):
     record_usage_event(
         event_type="pdf_download",
         ticker=clean_uin,
-        details={"action": "export_msme_pdf"}
+        landing_page=f"/msme/{clean_uin}",
+        details={"action": "export_msme_pdf", "landing_page": f"/msme/{clean_uin}"}
     )
 
     is_unlocked = _asset_unlocked_for_request(request, "MSME", clean_uin)

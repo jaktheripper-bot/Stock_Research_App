@@ -11,9 +11,11 @@ Enables unified discovery across:
 """
 
 import logging
+import re
 from typing import Any, Dict, List, Optional
 
 from bse_master import (
+    NSE_ONLY_EQUITIES,
     PRIMARY_BSE_MAP,
     get_bse_scrips_cache,
     is_synthetic_test_symbol,
@@ -1058,3 +1060,161 @@ def search_all_products(
         if "asset_class" not in it:
             it["asset_class"] = it.get("product_type", "EQUITY")
     return items
+
+
+_ETF_BSE_NAME_GUARD_RE = re.compile(
+    r"\b(?:ETF|BEES|MUTUAL\s+FUND|INDEX|NIFTY|SENSEX)\b",
+    re.IGNORECASE,
+)
+_FAST_REIT_SYMBOL_SET = frozenset({
+    "BHARATINV", "BIRET", "EMBASSY", "INDIGRID", "IRBINVIT", "MINDSPACE",
+    "NEXUS", "NHIT", "ORIENTINVIT", "PGINVIT", "PROPSHARE", "STRATA",
+})
+
+
+def resolve_cross_asset_dossier_redirect(
+    raw_identifier: str,
+    *,
+    prefix_only: bool = False,
+) -> Optional[str]:
+    """Resolves non-equity identifiers hitting `/dossier/{ticker}` to their canonical 7-asset URL.
+
+    When `prefix_only=True`, checks only unambiguous non-equity formats (`UDYAM-*`, `IN00*`,
+    `INE*`/`IN9*` debt ISINs, `INF*` ETF ISINs, and AMFI `scheme_code`s) prior to BSE scrip lookup.
+    When `prefix_only=False` (invoked only after confirming no compiled equity report exists),
+    also checks REIT/InvIT, SGB, and pure ETF symbols while preserving operating-company equities.
+    """
+    from normalizer import clean_ticker
+
+    raw_clean = str(raw_identifier or "").strip()
+    if not raw_clean:
+        return None
+    upper_id = raw_clean.upper()
+
+    if upper_id.startswith("UDYAM-"):
+        try:
+            from core.msme.router import get_msme_detail
+            firm = get_msme_detail(upper_id)
+            if firm and firm.get("uin"):
+                return f"/msme/{str(firm['uin']).strip().upper()}"
+        except Exception as exc:
+            logger.warning("Cross-asset MSME lookup warning for %s: %s", upper_id, exc)
+        return "/msme"
+
+    if re.match(r"^IN00[A-Z0-9]{8}$", upper_id):
+        return "/sovereign"
+
+    conn = None
+    cur = None
+    try:
+        placeholder = get_placeholder()
+
+        if re.match(r"^IN(?:E|9)[A-Z0-9]{9}$", upper_id):
+            conn = get_db_connection()
+            cur = conn.cursor()
+            cur.execute(
+                f"SELECT isin FROM corporate_debt_securities WHERE UPPER(isin) = {placeholder}",
+                (upper_id,),
+            )
+            row = cur.fetchone()
+            return f"/debt/{str(row[0]).strip().upper()}" if row and row[0] else None
+
+        if re.match(r"^INF[A-Z0-9]{9}$", upper_id):
+            conn = get_db_connection()
+            cur = conn.cursor()
+            cur.execute(
+                f"SELECT symbol FROM etf_matrix WHERE UPPER(isin) = {placeholder}",
+                (upper_id,),
+            )
+            row = cur.fetchone()
+            return f"/etfs/{clean_ticker(row[0])}" if row and row[0] else None
+
+        if upper_id.endswith("_DIR") or (upper_id.isdigit() and 100000 <= int(upper_id) <= 199999):
+            conn = get_db_connection()
+            cur = conn.cursor()
+            cur.execute(
+                f"SELECT scheme_code FROM mutual_fund_schemes WHERE UPPER(scheme_code) = {placeholder}",
+                (upper_id,),
+            )
+            row = cur.fetchone()
+            return f"/funds/{str(row[0]).strip()}" if row and row[0] else None
+
+        ct = clean_ticker(upper_id)
+        if ct in _FAST_REIT_SYMBOL_SET:
+            conn = get_db_connection()
+            cur = conn.cursor()
+            cur.execute(
+                f"SELECT symbol FROM reits_and_invits WHERE UPPER(symbol) = {placeholder}",
+                (ct,),
+            )
+            row = cur.fetchone()
+            if row and row[0]:
+                return f"/reits/{clean_ticker(row[0])}"
+
+        if ct.startswith("SGB") and len(ct) >= 6:
+            conn = conn or get_db_connection()
+            cur = cur or conn.cursor()
+            cur.execute(
+                f"SELECT symbol FROM sgb_tranches WHERE UPPER(symbol) = {placeholder}",
+                (ct,),
+            )
+            row = cur.fetchone()
+            if row and row[0]:
+                return "/reits#sgbCardsGrid"
+
+        if prefix_only:
+            return None
+
+        if not ct or ct in PRIMARY_BSE_MAP or ct in NSE_ONLY_EQUITIES:
+            return None
+
+        conn = conn or get_db_connection()
+        cur = cur or conn.cursor()
+
+        cur.execute(
+            f"SELECT symbol FROM reits_and_invits WHERE UPPER(symbol) = {placeholder}",
+            (ct,),
+        )
+        row = cur.fetchone()
+        if row and row[0]:
+            return f"/reits/{clean_ticker(row[0])}"
+
+        cur.execute(
+            f"SELECT symbol FROM sgb_tranches WHERE UPPER(symbol) = {placeholder}",
+            (ct,),
+        )
+        row = cur.fetchone()
+        if row and row[0]:
+            return "/reits#sgbCardsGrid"
+
+        cur.execute(
+            f"SELECT symbol FROM etf_matrix WHERE UPPER(symbol) = {placeholder}",
+            (ct,),
+        )
+        row = cur.fetchone()
+        if row and row[0]:
+            bse_cache = get_bse_scrips_cache() or {}
+            scrip_code = (bse_cache.get("symbols") or {}).get(ct)
+            if scrip_code:
+                matched_names = [
+                    nm for nm, cd in (bse_cache.get("names") or {}).items()
+                    if str(cd) == str(scrip_code)
+                ]
+                if matched_names and not any(_ETF_BSE_NAME_GUARD_RE.search(nm) for nm in matched_names):
+                    return None
+            return f"/etfs/{clean_ticker(row[0])}"
+    except Exception as exc:
+        logger.warning("Cross-asset redirect lookup warning for %s: %s", raw_clean, exc)
+    finally:
+        if cur is not None:
+            try:
+                cur.close()
+            except Exception as close_exc:
+                logger.warning("Cursor close warning in cross-asset redirect: %s", close_exc)
+        if conn is not None:
+            try:
+                conn.close()
+            except Exception as close_exc:
+                logger.warning("Connection close warning in cross-asset redirect: %s", close_exc)
+
+    return None

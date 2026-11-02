@@ -21,6 +21,7 @@ from fastapi.templating import Jinja2Templates
 
 from core.config import get_secret
 from core.db import init_db, IST, MANDATORY_SEBI_DISCLAIMER
+from core.db.telemetry import infer_canonical_asset_path
 from core.db.users import get_user_by_email, is_ticker_unlocked_for_user
 from core.presentation.formatters import _coerce_datetime
 from normalizer import clean_ticker
@@ -32,6 +33,7 @@ logger = logging.getLogger("equity_research.web.common")
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 templates = Jinja2Templates(directory=os.path.join(BASE_DIR, "templates"))
 templates.env.globals["MANDATORY_SEBI_DISCLAIMER"] = MANDATORY_SEBI_DISCLAIMER
+templates.env.filters["asset_url"] = infer_canonical_asset_path
 
 # Cookie Identifiers
 ADMIN_COOKIE_NAME = "admin_session"
