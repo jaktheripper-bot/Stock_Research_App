@@ -78,8 +78,9 @@ def _resolve_mode_and_date(
 
     - Morning runs without an explicit `--date` bind strictly to `T-1` (`yesterday_str`) so
       08:00 AM catch-up checks never pre-lock today's 19:30 IST evening leases.
-    - Post-midnight runs (`00:00–04:59 IST`) bind nightly mode to `T-1` (`yesterday_str`) so
-      late cloud runners do not stamp yesterday's AMFI run under the new calendar day.
+    - Post-midnight / pre-noon runs (`00:00–11:59 IST`) bind `evening`, `nightly`, and `all`
+      modes to `T-1` (`yesterday_str`) so delayed cloud runners never hijack today's post-close
+      leases or mailer.
     """
     today_str = now_ist.strftime("%Y-%m-%d")
     yesterday_str = (now_ist - timedelta(days=1)).strftime("%Y-%m-%d")
@@ -96,9 +97,11 @@ def _resolve_mode_and_date(
     if requested_mode == "morning":
         return "morning", (explicit_date or yesterday_str)
 
-    if requested_mode == "nightly":
-        default_date = yesterday_str if now_ist.hour < 5 else today_str
-        return "nightly", (explicit_date or default_date)
+    if requested_mode in ("evening", "nightly", "all"):
+        # Delayed GitHub Actions cron runs arriving post-midnight (00:00–11:59 IST)
+        # belong to prior trading day T-1; never hijack today's post-close leases or mailer.
+        default_date = yesterday_str if now_ist.hour < 12 else today_str
+        return requested_mode, (explicit_date or default_date)
 
     return requested_mode, (explicit_date or today_str)
 
@@ -169,7 +172,8 @@ def _dispatch_bouquet_phase(
     respect_market_calendar: bool = False,
 ) -> None:
     """Executes the Day-End 7-Asset Market Wrap email dispatch with weekend & local-host guards."""
-    if respect_market_calendar and not force and _is_weekend_date(date_str):
+    force_email_redispatch = bool(force and os.environ.get("FORCE_EMAIL_REDISPATCH") == "1")
+    if respect_market_calendar and not force_email_redispatch and _is_weekend_date(date_str):
         logger.info(f"Markets closed on weekend ({date_str}). Skipping Day-End Market Wrap dispatch.")
         results["morning_bouquet"] = "SKIPPED_MARKET_CLOSED"
         return
@@ -186,7 +190,7 @@ def _dispatch_bouquet_phase(
 
     already_dispatched = False
     dispatch_check_failed = False
-    if not force:
+    if not force_email_redispatch:
         try:
             from core.db.digest import has_edition_been_dispatched
 
@@ -203,7 +207,7 @@ def _dispatch_bouquet_phase(
         def _send_bouquet():
             from core.notify import dispatch_research_bouquet
 
-            bouquet_res = dispatch_research_bouquet(edition_date=date_str, force=force)
+            bouquet_res = dispatch_research_bouquet(edition_date=date_str, force=force_email_redispatch)
             status = bouquet_res.get("status", "COMPLETED")
             logger.info(
                 f"Day-End Market Wrap dispatch status={status} (delivered={bouquet_res.get('delivered', 0)})."

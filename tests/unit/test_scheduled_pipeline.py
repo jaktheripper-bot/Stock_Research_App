@@ -325,6 +325,13 @@ class TestScheduledPipelinePhaseIsolation(unittest.TestCase):
         tue_0015 = datetime(2026, 11, 3, 0, 15, tzinfo=IST)
         self.assertEqual(_resolve_mode_and_date("auto", tue_0015), ("nightly", "2026-11-02"))
         self.assertEqual(_resolve_mode_and_date("nightly", tue_0015), ("nightly", "2026-11-02"))
+        self.assertEqual(_resolve_mode_and_date("all", tue_0015), ("all", "2026-11-02"))
+
+        # 04:04 AM & 05:32 AM IST Tuesday (heavily delayed GHA evening/nightly crons) -> T-1 (2026-11-02)
+        tue_0404 = datetime(2026, 11, 3, 4, 4, tzinfo=IST)
+        tue_0532 = datetime(2026, 11, 3, 5, 32, tzinfo=IST)
+        self.assertEqual(_resolve_mode_and_date("evening", tue_0404), ("evening", "2026-11-02"))
+        self.assertEqual(_resolve_mode_and_date("nightly", tue_0532), ("nightly", "2026-11-02"))
 
     @patch("scripts.run_scheduled_pipeline.prune_zombie_leases")
     @patch("scripts.run_scheduled_pipeline.record_autonomous_event", autospec=True)
@@ -543,6 +550,121 @@ class TestScheduledPipelinePhaseIsolation(unittest.TestCase):
         self.assertEqual(latest["items_scanned"], 2)
         self.assertEqual(latest["items_added"], 1)    # 999888 detected as NEW despite ingest running first
         self.assertEqual(latest["items_updated"], 1)  # 122639 detected as CHANGED (82.10 -> 84.50)
+
+    def test_force_flag_does_not_redispatch_email_without_explicit_env_opt_in(self):
+        """--force alone must bypass data leases without re-emailing an already-dispatched edition."""
+        import os
+        from scripts.run_scheduled_pipeline import _dispatch_bouquet_phase
+
+        # 1. Weekday --force without FORCE_EMAIL_REDISPATCH=1 -> ALREADY_DISPATCHED, 0 emails sent
+        results_suppressed = {}
+        with patch.dict(os.environ, {"FORCE_EMAIL_REDISPATCH": "0"}, clear=False), \
+             patch("scripts.run_scheduled_pipeline.job_lease", self.fake_job_lease), \
+             patch("core.db.digest.has_edition_been_dispatched", return_value=True) as mock_has_disp, \
+             patch("core.notify.dispatch_research_bouquet") as mock_bouquet:
+            _dispatch_bouquet_phase(results_suppressed, "2026-11-03", force=True, respect_market_calendar=True)
+            mock_has_disp.assert_called_once_with("2026-11-03")
+            mock_bouquet.assert_not_called()
+            self.assertEqual(results_suppressed["morning_bouquet"], "ALREADY_DISPATCHED")
+
+        # 2. Weekday --force WITH FORCE_EMAIL_REDISPATCH=1 -> explicitly re-sends with force=True
+        results_forced = {}
+        with patch.dict(os.environ, {"FORCE_EMAIL_REDISPATCH": "1"}, clear=False), \
+             patch("scripts.run_scheduled_pipeline.job_lease", self.fake_job_lease), \
+             patch("core.db.digest.has_edition_been_dispatched", return_value=True) as mock_has_disp2, \
+             patch("core.notify.dispatch_research_bouquet", return_value={"status": "COMPLETED", "delivered": 2}) as mock_bouquet2:
+            _dispatch_bouquet_phase(results_forced, "2026-11-03", force=True, respect_market_calendar=True)
+            mock_has_disp2.assert_not_called()
+            mock_bouquet2.assert_called_once_with(edition_date="2026-11-03", force=True)
+            self.assertEqual(results_forced["morning_bouquet"], "COMPLETED")
+
+    @patch("scripts.run_scheduled_pipeline.prune_zombie_leases")
+    @patch("scripts.run_scheduled_pipeline.record_autonomous_event", autospec=True)
+    @patch("core.db.sovereign.refresh_daily_sovereign_benchmarks", return_value={"benchmarks_updated": 16})
+    @patch("core.ingestion.etf_ingest.ingest_all_amfi_etfs", return_value={"persisted_to_db": 442})
+    @patch("core.analysis.asset_scanner.run_comprehensive_asset_scan", return_value={"status": "OK"})
+    @patch("scripts.run_discovery_worker.run_discovery_pipeline", return_value=True)
+    @patch("core.msme.daily_ingest.ingest_daily_msme_cohort", return_value=15)
+    @patch("core.analysis.daily_stock_ingestion.ingest_daily_stock_cohort", return_value={"status": "OK", "ingested_count": 15})
+    @patch("core.db.digest.has_edition_been_dispatched", return_value=False)
+    @patch("core.notify.dispatch_research_bouquet")
+    def test_weekend_force_harvest_skips_email_without_force_email_redispatch_env(
+        self,
+        mock_bouquet,
+        mock_has_dispatched,
+        mock_stock_ingest,
+        mock_msme,
+        mock_disc,
+        mock_scan,
+        mock_etf,
+        mock_sov,
+        mock_record_event,
+        mock_prune,
+    ):
+        """Sunday --force harvest refreshes data phases while keeping weekend newsletter suppressed."""
+        import os
+        from scripts.run_scheduled_pipeline import run_evening_harvest_pipeline
+
+        with patch.dict(os.environ, {"FORCE_EMAIL_REDISPATCH": "0"}, clear=False), \
+             patch("scripts.run_scheduled_pipeline.job_lease", self.fake_job_lease):
+            sun_res = run_evening_harvest_pipeline("2026-11-01", force=True, respect_market_calendar=True)
+
+        mock_sov.assert_called_once_with("2026-11-01")
+        mock_etf.assert_called_once_with(force_refresh=True)
+        mock_disc.assert_called_once()
+        mock_bouquet.assert_not_called()
+        self.assertEqual(sun_res["morning_bouquet"], "SKIPPED_MARKET_CLOSED")
+
+    def test_sync_amfi_diff_mode_honors_force_refresh_flag(self):
+        """scripts/sync_amfi.py --diff-mode --force-refresh must refresh NAVAll.txt before scan_mutual_funds."""
+        import scripts.sync_amfi as sync_amfi_cli
+
+        call_order = []
+
+        def _fake_fetch(force_refresh=False):
+            call_order.append(("fetch", force_refresh))
+            return "RAW"
+
+        def _fake_scan(limit=None):
+            call_order.append(("scan", limit))
+            return {"scanned": 10, "new": 1, "changed": 2}
+
+        with patch.object(sys, "argv", ["sync_amfi.py", "--diff-mode", "--force-refresh", "--limit", "10"]), \
+             patch.object(sync_amfi_cli, "init_db"), \
+             patch.object(sync_amfi_cli, "record_scan_start", return_value="scan_test_1"), \
+             patch.object(sync_amfi_cli, "record_scan_complete") as mock_complete, \
+             patch.object(sync_amfi_cli, "fetch_amfi_nav_raw", side_effect=_fake_fetch), \
+             patch.object(sync_amfi_cli, "scan_mutual_funds", side_effect=_fake_scan):
+            with self.assertRaises(SystemExit) as ctx:
+                sync_amfi_cli.main()
+            self.assertEqual(ctx.exception.code, 0)
+
+        self.assertEqual(call_order, [("fetch", True), ("scan", 10)])
+        mock_complete.assert_called_once()
+
+    def test_amfi_and_etf_ssl_context_anchors_on_certifi_bundle(self):
+        """AMFI & ETF TLS contexts must anchor on certifi.where() even when SSL_CERT_FILE is set."""
+        import os
+        import ssl
+        import certifi
+        from core.ingestion import amfi as amfi_mod
+        from core.ingestion import etf_ingest as etf_mod
+
+        seen_cafiles = []
+        real_create_ctx = ssl.create_default_context
+
+        def _spy_create_ctx(*args, **kwargs):
+            seen_cafiles.append(kwargs.get("cafile"))
+            return real_create_ctx(*args, **kwargs)
+
+        with patch.dict(os.environ, {"SSL_CERT_FILE": "/etc/ssl/cert.pem"}, clear=False), \
+             patch("ssl.create_default_context", side_effect=_spy_create_ctx):
+            ctx_amfi = amfi_mod._get_ssl_context()
+            ctx_etf = etf_mod._get_ssl_context()
+
+        self.assertIsInstance(ctx_amfi, ssl.SSLContext)
+        self.assertIsInstance(ctx_etf, ssl.SSLContext)
+        self.assertEqual(seen_cafiles, [certifi.where(), certifi.where()])
 
 
 if __name__ == "__main__":

@@ -47,6 +47,8 @@ def main():
     if args.diff_mode:
         scan_id = record_scan_start("MUTUAL_FUNDS", triggered_by="cli_sync_amfi")
         try:
+            if args.force_refresh:
+                fetch_amfi_nav_raw(force_refresh=True)
             summary = scan_mutual_funds(limit=args.limit)
             record_scan_complete(
                 scan_id=scan_id,
