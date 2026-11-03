@@ -1304,8 +1304,12 @@ def dossier_page(request: Request, ticker: str):
                 "active_page": "dossier",
                 "linked_debt": linked_debt,
                 "contagion_alert": contagion_alert,
+                "suppress_canonical": True,
             },
-            headers={"Cache-Control": "no-store, no-cache, must-revalidate"},
+            headers={
+                "Cache-Control": "no-store, no-cache, must-revalidate",
+                "X-Robots-Tag": "noindex, nofollow",
+            },
         )
 
     # Ingest verified citations footnotes

@@ -2633,6 +2633,8 @@ function getReturningVisitorMeta() {
   }
 }
 
+let _srHasTrustedUserInput = false;
+
 window.trackUserEvent = function(eventType, ticker, details) {
   try {
     const user = getStoredUser();
@@ -2658,6 +2660,7 @@ window.trackUserEvent = function(eventType, ticker, details) {
       utm_term: acq.utm_term || '',
       sub_ref: acq.sub_ref || '',
       is_automated: detectAutomationPresence(),
+      has_interacted: _srHasTrustedUserInput,
       screen_res: screenRes,
       touch: hasTouch
     }, details || {});
@@ -2710,7 +2713,8 @@ function initDwellAndTransitionTelemetry() {
   if (window.location.pathname.startsWith('/admin')) return;
 
   const IDLE_CUTOFF_MS = 60000; // 60s idle cutoff: only count active reading attention
-  let lastActivityTime = Date.now();
+  let hasTrustedInput = false;
+  let lastActivityTime = 0;
   let totalActiveSeconds = 0;
   let unsentActiveSeconds = 0;
   let maxScrollPct = 0;
@@ -2733,7 +2737,9 @@ function initDwellAndTransitionTelemetry() {
     const scrollTop = window.scrollY || docEl.scrollTop || 0;
     const scrollable = Math.max(1, (docEl.scrollHeight || 1) - window.innerHeight);
     const pct = Math.min(100, Math.max(0, Math.round((scrollTop / scrollable) * 100)));
-    if (pct > maxScrollPct) maxScrollPct = pct;
+    if (hasTrustedInput && pct > maxScrollPct) {
+      maxScrollPct = pct;
+    }
     if (progressFill) {
       progressFill.style.width = `${pct}%`;
     }
@@ -2776,15 +2782,21 @@ function initDwellAndTransitionTelemetry() {
     return bestLabel;
   }
 
-  function markActivity() {
+  function markTrustedActivity(e) {
+    if (e && e.isTrusted === false) return;
+    hasTrustedInput = true;
+    _srHasTrustedUserInput = true;
     lastActivityTime = Date.now();
+    computeCurrentScrollPct();
   }
 
-  ['mousemove', 'mousedown', 'keydown', 'touchstart', 'click'].forEach((evtName) => {
-    window.addEventListener(evtName, markActivity, { passive: true });
+  ['pointerdown', 'pointermove', 'mousedown', 'mousemove', 'wheel', 'keydown', 'touchstart', 'touchmove', 'click'].forEach((evtName) => {
+    window.addEventListener(evtName, markTrustedActivity, { passive: true });
   });
   window.addEventListener('scroll', () => {
-    markActivity();
+    if (hasTrustedInput) {
+      lastActivityTime = Date.now();
+    }
     const curPct = computeCurrentScrollPct();
     if (activeTimerLabel) {
       activeTimerLabel.textContent = `${formatActiveStudyClock(totalActiveSeconds)} active • ${curPct}% read`;
@@ -2793,9 +2805,10 @@ function initDwellAndTransitionTelemetry() {
 
   computeCurrentScrollPct();
 
-  // 1-second Active Reading Attention ticker (only ticks when tab is visible AND user interacted within 60s)
+  // 1-second Active Reading Attention ticker (only ticks after trusted physical input AND within 60s of activity)
   const attentionInterval = setInterval(() => {
     if (document.visibilityState !== 'visible') return;
+    if (!hasTrustedInput || !lastActivityTime) return;
     if (Date.now() - lastActivityTime > IDLE_CUTOFF_MS) return;
 
     totalActiveSeconds += 1;
@@ -2867,6 +2880,7 @@ function initDwellAndTransitionTelemetry() {
         utm_term: acq.utm_term || '',
         sub_ref: acq.sub_ref || '',
         is_automated: detectAutomationPresence(),
+        has_interacted: hasTrustedInput,
         screen_res: screenRes,
         touch: hasTouch
       }
@@ -2922,6 +2936,7 @@ function initDwellAndTransitionTelemetry() {
   }
 
   document.addEventListener('click', (e) => {
+    if (e && e.isTrusted === false) return;
     const link = e.target.closest('a[href]');
     if (!link) return;
     const href = link.getAttribute('href');

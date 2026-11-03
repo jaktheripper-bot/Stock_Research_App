@@ -13,6 +13,7 @@ import re
 import json
 import logging
 import hmac
+import hashlib
 import asyncio
 from datetime import datetime, timezone
 from typing import Optional, List, Dict, Any
@@ -40,7 +41,13 @@ from core.db import (
     is_ticker_unlocked_for_user,
     IST,
 )
-from core.db.telemetry import record_usage_event
+from core.db.telemetry import (
+    record_usage_event,
+    parse_traffic_source,
+    parse_user_agent,
+    extract_geo,
+)
+from telemetry import classify_bot
 from core.analysis import get_stock_fundamentals, get_historical_prices
 from core.analysis.dossier_report_synthesis import generate_stock_report
 
@@ -55,6 +62,7 @@ from web.common import (
     _pdf_account_ref,
     PDF_LOCKED_NOTICE,
     _get_override_fn,
+    ADMIN_COOKIE_NAME,
     USER_SESSION_COOKIE,
     _validate_user_session_token,
 )
@@ -422,6 +430,67 @@ async def api_dossier_intel(ticker: str, request: Request):
 
 
 # ==============================================================================
+def _record_pdf_export_telemetry(
+    request: Request,
+    identifier: str,
+    action: str,
+    landing_page: str = "",
+    extra_details: Optional[Dict[str, Any]] = None,
+) -> None:
+    """Records verified browser PDF exports while filtering admin sessions, search/AI bots, and sessionless crawls."""
+    try:
+        admin_cookie = request.cookies.get(ADMIN_COOKIE_NAME) or request.cookies.get("admin_session")
+        if admin_cookie or _is_admin_authenticated(request):
+            return
+
+        user_agent = request.headers.get("user-agent", "")
+        if classify_bot(user_agent) is not None:
+            return
+        client_env = parse_user_agent(user_agent)
+        if client_env.get("device") == "Bot / Server":
+            return
+
+        web_user = _get_current_web_user(request)
+        user_id = web_user.get("id") if web_user else None
+        user_email = web_user.get("email") if web_user else None
+
+        hdr_ref = (request.headers.get("referer") or "").strip()
+        base_host = request.base_url.netloc
+        has_same_origin_ref = bool(hdr_ref and base_host and base_host in hdr_ref)
+        external_ref = hdr_ref if (hdr_ref and not has_same_origin_ref) else ""
+        traffic_source, clean_ref = parse_traffic_source(external_ref, {})
+        country = extract_geo(dict(request.headers))
+
+        sess_id = None
+        if user_id or has_same_origin_ref:
+            client_ip = _get_client_ip(request)
+            sess_id = f"sess_{hashlib.md5((client_ip + user_agent).encode()).hexdigest()[:10]}"
+
+        details_payload: Dict[str, Any] = {"action": action}
+        if landing_page:
+            details_payload["landing_page"] = landing_page
+        if extra_details:
+            details_payload.update(extra_details)
+
+        record_usage_event(
+            event_type="pdf_download",
+            ticker=identifier,
+            details=details_payload,
+            session_id=sess_id,
+            traffic_source=traffic_source,
+            referrer=clean_ref,
+            country=country,
+            device_type=client_env.get("device", "Unknown"),
+            browser=client_env.get("browser", "Unknown"),
+            os=client_env.get("os", "Unknown"),
+            user_id=user_id,
+            user_email=user_email,
+            landing_page=landing_page,
+        )
+    except Exception as tel_err:
+        logger.debug("PDF export telemetry notice for %s: %s", identifier, tel_err)
+
+
 # PDF Export Endpoints
 # ==============================================================================
 @router.get("/api/pdf/{ticker}")
@@ -440,10 +509,12 @@ async def api_download_pdf(
     if not rep or not rep.get("report_text"):
         raise HTTPException(status_code=404, detail="Report not found.")
 
-    record_usage_event(
-        event_type="pdf_download",
-        ticker=clean_t,
-        details={"action": "export_pdf", "branded": bool(firm_name)}
+    _record_pdf_export_telemetry(
+        request=request,
+        identifier=clean_t,
+        action="export_pdf",
+        landing_page=f"/dossier/{clean_t}",
+        extra_details={"branded": bool(firm_name)},
     )
 
     branding = None
@@ -654,6 +725,13 @@ async def api_download_fund_pdf(scheme_code: str, request: Request):
     if not scheme:
         raise HTTPException(status_code=404, detail=f"Scheme '{clean_code}' not found.")
 
+    _record_pdf_export_telemetry(
+        request=request,
+        identifier=clean_code,
+        action="export_fund_pdf",
+        landing_page=f"/funds/{clean_code}",
+    )
+
     dossier = get_fund_forensic_dossier(clean_code) or {}
     async with PDF_SEMAPHORE:
         try:
@@ -693,6 +771,13 @@ async def api_download_debt_pdf(isin: str, request: Request):
     if not sec:
         raise HTTPException(status_code=404, detail=f"Debt security with ISIN '{clean_isin}' not found.")
 
+    _record_pdf_export_telemetry(
+        request=request,
+        identifier=clean_isin,
+        action="export_debt_pdf",
+        landing_page=f"/debt/{clean_isin}",
+    )
+
     posture = evaluate_5_pillar_credit_posture(sec)
     async with PDF_SEMAPHORE:
         try:
@@ -731,6 +816,13 @@ async def api_download_reit_pdf(symbol: str, request: Request):
     if not reit:
         raise HTTPException(status_code=404, detail=f"REIT or InvIT with symbol '{clean_sym}' not found.")
 
+    _record_pdf_export_telemetry(
+        request=request,
+        identifier=clean_sym,
+        action="export_reit_pdf",
+        landing_page=f"/reits/{clean_sym}",
+    )
+
     is_unlocked = _asset_unlocked_for_request(request, "REIT", clean_sym)
     async with PDF_SEMAPHORE:
         try:
@@ -768,11 +860,11 @@ async def api_download_msme_pdf(uin: str, request: Request):
     if not dossier:
         raise HTTPException(status_code=404, detail=f"MSME enterprise with UIN '{clean_uin}' not found.")
 
-    record_usage_event(
-        event_type="pdf_download",
-        ticker=clean_uin,
+    _record_pdf_export_telemetry(
+        request=request,
+        identifier=clean_uin,
+        action="export_msme_pdf",
         landing_page=f"/msme/{clean_uin}",
-        details={"action": "export_msme_pdf", "landing_page": f"/msme/{clean_uin}"}
     )
 
     is_unlocked = _asset_unlocked_for_request(request, "MSME", clean_uin)

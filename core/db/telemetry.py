@@ -680,18 +680,32 @@ def record_usage_event(
 
 # Classification clause:
 # An automated/crawler session exhibits:
-# - event_type = 'BOT_CRAWL'
+# - event_type = 'BOT_CRAWL' or device_type = 'Bot / Server'
 # - OR details JSON has is_automated = true
-# - OR (0% scroll depth AND 0 search/unlock/auth actions AND 1 single instantaneous view from cloud DC)
+# - OR passive page/compare load with zero trusted interaction, <15% scroll (blocking programmatic 11% scroll bots),
+#   <45s dwell, no internal link navigation, and no authenticated/interactive action
 HUMAN_ENGAGEMENT_CONDITION = """
     (
-        event_type NOT IN ('BOT_CRAWL')
-        AND COALESCE(LOWER(details::json->>'is_automated'), 'false') NOT IN ('true', '1')
+        (event_type IS NULL OR event_type NOT IN ('BOT_CRAWL'))
+        AND COALESCE(LOWER(NULLIF(details, '')::json->>'is_automated'), 'false') NOT IN ('true', '1')
+        AND COALESCE(device_type, '') != 'Bot / Server'
         AND (
-            user_id IS NOT NULL
-            OR event_type IN ('pdf_download', 'PDF_DOWNLOAD', 'compare_view', 'COMPARE', 'COMPARE_STOCKS', 'PEER_COMPARISON', 'SUPPORT_TICKET_SUBMITTED', 'ARCHIVE_LOAD', 'dossier_unlock', 'SEARCH', 'QUERY', 'SEARCH_QUERY', 'WATCHLIST_ADD', 'WATCHLIST_REMOVE', 'WATCHLIST')
-            OR COALESCE(NULLIF(details::json->>'max_scroll_pct', '')::float, 0) > 0
-            OR COALESCE(NULLIF(details::json->>'dwell_seconds', '')::float, 0) >= 15
+            (user_id IS NOT NULL AND user_id != '')
+            OR event_type IN (
+                'COMPARE', 'COMPARE_STOCKS', 'PEER_COMPARISON',
+                'SUPPORT_TICKET_SUBMITTED', 'ARCHIVE_LOAD', 'dossier_unlock',
+                'FULL_SYNTHESIS', 'SEARCH', 'QUERY', 'SEARCH_QUERY',
+                'WATCHLIST_ADD', 'WATCHLIST_REMOVE', 'WATCHLIST',
+                'share_click', 'user_signin', 'SIGN_IN_SUCCESS', 'purchase_success'
+            )
+            OR (
+                event_type IN ('pdf_download', 'PDF_DOWNLOAD')
+                AND ((session_id IS NOT NULL AND session_id != '') OR (user_id IS NOT NULL AND user_id != ''))
+            )
+            OR COALESCE(LOWER(NULLIF(details, '')::json->>'has_interacted'), 'false') IN ('true', '1')
+            OR COALESCE(NULLIF(details, '')::json->>'to_path', '') != ''
+            OR COALESCE(NULLIF(NULLIF(details, '')::json->>'max_scroll_pct', '')::float, 0) >= 15
+            OR COALESCE(NULLIF(NULLIF(details, '')::json->>'dwell_seconds', '')::float, 0) >= 45
         )
     )
 """
@@ -702,11 +716,24 @@ HUMAN_ENGAGEMENT_CONDITION_SQLITE = """
     (
         (event_type IS NULL OR event_type NOT IN ('BOT_CRAWL'))
         AND COALESCE(LOWER(CAST(json_extract(CASE WHEN json_valid(details) THEN details ELSE '{}' END, '$.is_automated') AS TEXT)), '0') NOT IN ('true', '1')
+        AND COALESCE(device_type, '') != 'Bot / Server'
         AND (
-            user_id IS NOT NULL
-            OR event_type IN ('pdf_download', 'PDF_DOWNLOAD', 'compare_view', 'COMPARE', 'COMPARE_STOCKS', 'PEER_COMPARISON', 'SUPPORT_TICKET_SUBMITTED', 'ARCHIVE_LOAD', 'dossier_unlock', 'SEARCH', 'QUERY', 'SEARCH_QUERY', 'WATCHLIST_ADD', 'WATCHLIST_REMOVE', 'WATCHLIST')
-            OR COALESCE(CAST(json_extract(CASE WHEN json_valid(details) THEN details ELSE '{}' END, '$.max_scroll_pct') AS REAL), 0.0) > 0
-            OR COALESCE(CAST(json_extract(CASE WHEN json_valid(details) THEN details ELSE '{}' END, '$.dwell_seconds') AS REAL), 0.0) >= 15
+            (user_id IS NOT NULL AND user_id != '')
+            OR event_type IN (
+                'COMPARE', 'COMPARE_STOCKS', 'PEER_COMPARISON',
+                'SUPPORT_TICKET_SUBMITTED', 'ARCHIVE_LOAD', 'dossier_unlock',
+                'FULL_SYNTHESIS', 'SEARCH', 'QUERY', 'SEARCH_QUERY',
+                'WATCHLIST_ADD', 'WATCHLIST_REMOVE', 'WATCHLIST',
+                'share_click', 'user_signin', 'SIGN_IN_SUCCESS', 'purchase_success'
+            )
+            OR (
+                event_type IN ('pdf_download', 'PDF_DOWNLOAD')
+                AND ((session_id IS NOT NULL AND session_id != '') OR (user_id IS NOT NULL AND user_id != ''))
+            )
+            OR COALESCE(LOWER(CAST(json_extract(CASE WHEN json_valid(details) THEN details ELSE '{}' END, '$.has_interacted') AS TEXT)), '0') IN ('true', '1')
+            OR COALESCE(CAST(json_extract(CASE WHEN json_valid(details) THEN details ELSE '{}' END, '$.to_path') AS TEXT), '') != ''
+            OR COALESCE(CAST(json_extract(CASE WHEN json_valid(details) THEN details ELSE '{}' END, '$.max_scroll_pct') AS REAL), 0.0) >= 15
+            OR COALESCE(CAST(json_extract(CASE WHEN json_valid(details) THEN details ELSE '{}' END, '$.dwell_seconds') AS REAL), 0.0) >= 45
         )
     )
 """
@@ -967,7 +994,7 @@ def get_site_usage_summary(
                 summary["price_filing_updates"] += count
             elif ev == "FULL_SYNTHESIS":
                 summary["full_syntheses"] += count
-            elif ev == "PDF_DOWNLOAD":
+            elif ev in ("PDF_DOWNLOAD", "pdf_download"):
                 summary["pdf_downloads"] += count
             elif ev in ["COMPARE", "COMPARE_STOCKS", "PEER_COMPARISON"]:
                 summary["comparisons"] += count
@@ -1487,7 +1514,14 @@ def get_traffic_flow_analytics(
             logger.debug("Traffic flow cursor close notice: %s", close_err)
 
 
-def get_session_journeys(days: int = None, start_date = None, end_date = None, limit: int = 25, exclude_tests: bool = True) -> list:
+def get_session_journeys(
+    days: int = None,
+    start_date=None,
+    end_date=None,
+    limit: int = 25,
+    exclude_tests: bool = True,
+    audience_filter: str = "all",
+) -> list:
     """Reconstructs chronological user journeys grouped by session ID across a selectable date range."""
     init_db()
     conn = get_db_connection()
@@ -1495,8 +1529,16 @@ def get_session_journeys(days: int = None, start_date = None, end_date = None, l
     supabase_url = get_supabase_url()
     journeys = []
     try:
+        norm_audience = (audience_filter or "all").strip().lower()
+        include_bots = norm_audience in ("crawler", "bot", "automated")
         time_filter = _build_telemetry_time_filter(
-            supabase_url, days=days, start_date=start_date, end_date=end_date, exclude_tests=exclude_tests
+            supabase_url,
+            days=days,
+            start_date=start_date,
+            end_date=end_date,
+            exclude_tests=exclude_tests,
+            include_bots=include_bots,
+            audience_filter=norm_audience,
         )
 
         placeholder = get_placeholder()
@@ -2146,6 +2188,7 @@ def get_returning_visitor_insights(
     end_date=None,
     exclude_tests: bool = True,
     limit: int = 25,
+    audience_filter: str = "all",
 ) -> dict:
     """
     Computes Returning Visitor & Return-Intent Analytics:
@@ -2176,13 +2219,16 @@ def get_returning_visitor_insights(
     }
 
     try:
+        norm_audience = (audience_filter or "all").strip().lower()
+        include_bots = norm_audience in ("crawler", "bot", "automated")
         where_clause = _build_telemetry_time_filter(
             supabase_url=supabase_url,
             days=days,
             start_date=start_date,
             end_date=end_date,
             exclude_tests=exclude_tests,
-            include_bots=False,
+            include_bots=include_bots,
+            audience_filter=norm_audience,
         )
         cursor.execute(
             f"""

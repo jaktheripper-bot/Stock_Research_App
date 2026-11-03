@@ -641,6 +641,146 @@ class TestAdminTrafficUiAndDomContracts(unittest.TestCase):
             c.close()
             conn.close()
 
+    def test_loopholes_l1_l2_l3_scraper_scroll_compare_and_bot_pdf_segregation(self):
+        """Verifies L1 (11% programmatic scroll / short idle dwell), L2 (passive compare_view), and L3 (bot PDF crawls)."""
+        from pathlib import Path
+        from core.db.connection import get_db_connection, get_placeholder
+        from core.db.telemetry import (
+            get_site_usage_summary,
+            get_session_journeys,
+        )
+
+        # Verify client JS physical-input gate (F1)
+        main_js = Path("web/static/js/main.js").read_text(encoding="utf-8")
+        self.assertIn("let hasTrustedInput = false;", main_js)
+        self.assertIn("e.isTrusted === false", main_js)
+        self.assertIn("has_interacted: hasTrustedInput", main_js)
+
+        s_bot_11pct = "sess_l1_bot_11pct_993"
+        s_bot_cmp = "sess_l2_bot_cmp_994"
+        s_hum_touch = "sess_l1_hum_trusted_995"
+        s_hum_legal = "sess_l1_hum_legal48_996"
+        s_hum_pdf = "sess_l3_hum_pdf_997"
+        bot_pdf_ticker = "UDYAM-BOT-998"
+        hum_pdf_ticker = "INFYPDF997"
+
+        conn = get_db_connection()
+        c = conn.cursor()
+        p = get_placeholder()
+        now_ts = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+        try:
+            baseline_human = get_site_usage_summary(days=7, exclude_tests=False, audience_filter="human")
+            base_pdf_human = baseline_human["pdf_downloads"]
+
+            rows = [
+                # L1: Headless proxy scraper with exact 11% programmatic scroll & 20s untrusted dwell -> Crawler
+                (
+                    s_bot_11pct, "PAGE_DWELL", "BNAGROCHEM", now_ts, "/dossier/BNAGROCHEM", "SG", "Desktop", "Chrome", "Windows",
+                    json.dumps({"is_automated": False, "has_interacted": False, "max_scroll_pct": 11, "dwell_seconds": 20}),
+                ),
+                # L2: Passive compare_view from scraper following Compare Sector Peers (0% scroll, 5s dwell) -> Crawler
+                (
+                    s_bot_cmp, "compare_view", "", now_ts, "/compare", "BR", "Desktop", "Chrome", "Linux",
+                    json.dumps({"is_automated": False, "has_interacted": False, "max_scroll_pct": 0, "dwell_seconds": 5}),
+                ),
+                # L1 positive: Trusted physical interaction (18s dwell, 8% scroll, has_interacted=True) -> Human
+                (
+                    s_hum_touch, "PAGE_DWELL", "TCS", now_ts, "/dossier/TCS", "IN", "Mobile", "Safari", "iOS",
+                    json.dumps({"is_automated": False, "has_interacted": True, "max_scroll_pct": 8, "dwell_seconds": 18}),
+                ),
+                # L1 positive: Non-scrolling legal/contact page read for 48s -> Human
+                (
+                    s_hum_legal, "PAGE_DWELL", "", now_ts, "/contact", "IN", "Desktop", "Chrome", "macOS",
+                    json.dumps({"is_automated": False, "has_interacted": False, "max_scroll_pct": 0, "dwell_seconds": 48}),
+                ),
+                # L3 negative: Sessionless bot crawl of /api/pdf/msme/* -> Crawler (excluded from Human PDFs)
+                (
+                    None, "pdf_download", bot_pdf_ticker, now_ts, f"/msme/{bot_pdf_ticker}", "US", "Desktop", "Chrome", "Linux",
+                    json.dumps({"action": "export_msme_pdf"}),
+                ),
+                # L3 positive: Valid session-backed lowercase pdf_download -> Human (counted in pdf_downloads KPI)
+                (
+                    s_hum_pdf, "pdf_download", hum_pdf_ticker, now_ts, "/dossier/INFY", "IN", "Desktop", "Chrome", "macOS",
+                    json.dumps({"action": "export_pdf", "branded": False}),
+                ),
+            ]
+            for r in rows:
+                c.execute(
+                    f"""
+                    INSERT INTO site_usage_events (
+                        session_id, event_type, ticker, timestamp, landing_page,
+                        country, device_type, browser, os, details
+                    ) VALUES ({p}, {p}, {p}, {p}, {p}, {p}, {p}, {p}, {p}, {p})
+                    """,
+                    r,
+                )
+            conn.commit()
+
+            sum_human = get_site_usage_summary(days=7, exclude_tests=False, audience_filter="human")
+            sum_crawler = get_site_usage_summary(days=7, exclude_tests=False, audience_filter="crawler")
+            journeys_human = {
+                j["session_id"]
+                for j in get_session_journeys(days=7, limit=250, exclude_tests=False, audience_filter="human")
+            }
+            journeys_crawler = {
+                j["session_id"]
+                for j in get_session_journeys(days=7, limit=250, exclude_tests=False, audience_filter="crawler")
+            }
+
+            self.assertNotIn(s_bot_11pct, journeys_human)
+            self.assertNotIn(s_bot_cmp, journeys_human)
+            self.assertIn(s_bot_11pct, journeys_crawler)
+            self.assertIn(s_bot_cmp, journeys_crawler)
+
+            self.assertIn(s_hum_touch, journeys_human)
+            self.assertIn(s_hum_legal, journeys_human)
+            self.assertIn(s_hum_pdf, journeys_human)
+
+            # Lowercase pdf_download from s_hum_pdf increments Human pdf_downloads by 1, while sessionless bot PDF does not
+            self.assertEqual(sum_human["pdf_downloads"], base_pdf_human + 1)
+            crawler_tickers = {e["ticker"] for e in sum_crawler["recent_events"]}
+            self.assertIn(bot_pdf_ticker, crawler_tickers)
+        finally:
+            c.execute(
+                f"DELETE FROM site_usage_events WHERE session_id IN ({p}, {p}, {p}, {p}, {p}) OR ticker IN ({p}, {p})",
+                (s_bot_11pct, s_bot_cmp, s_hum_touch, s_hum_legal, s_hum_pdf, bot_pdf_ticker, hum_pdf_ticker),
+            )
+            conn.commit()
+            c.close()
+            conn.close()
+
+    def test_loopholes_l4_l5_admin_default_human_lens_and_kpi_card_click_css(self):
+        """Verifies L4 (/admin defaults to Human-Engaged with 1-click audience pills) and L5 (.kpi-card-trigger:active CSS fix)."""
+        resp = self.client.get("/admin")
+        self.assertEqual(resp.status_code, 200)
+        soup = BeautifulSoup(resp.text, "html.parser")
+
+        aud_bar = soup.find("nav", id="adminAudienceFilterBar")
+        self.assertIsNotNone(aud_bar, "Missing #adminAudienceFilterBar audience switcher in /admin header.")
+        pills = aud_bar.find_all("a", class_="admin-audience-pill")
+        self.assertEqual(len(pills), 3)
+        self.assertEqual(pills[0].get("aria-current"), "page")
+        self.assertIn("audience_filter=human", pills[0].get("href", ""))
+        self.assertIn("audience_filter=all", pills[1].get("href", ""))
+        self.assertIn("audience_filter=crawler", pills[2].get("href", ""))
+
+        aud_input = soup.find("input", id="audienceFilterInput")
+        self.assertIsNotNone(aud_input)
+        self.assertEqual(aud_input.get("value"), "human")
+
+        # Verify L5 CSS containing-block fix and delegated card click fallback
+        style_text = "\n".join(st.get_text() for st in soup.find_all("style"))
+        self.assertIn(".kpi-card-trigger:active", style_text)
+        self.assertIn("transform: none !important", style_text)
+
+        script_text = "\n".join(sc.get_text() for sc in soup.find_all("script"))
+        self.assertIn("document.querySelectorAll('.kpi-card-interactive')", script_text)
+
+        # Verify /api/admin/traffic/flow also defaults to audience_filter="human"
+        api_resp = self.client.get("/api/admin/traffic/flow?days=30")
+        self.assertEqual(api_resp.status_code, 200)
+        self.assertEqual(api_resp.json().get("audience_filter"), "human")
+
 
 if __name__ == "__main__":
     unittest.main()

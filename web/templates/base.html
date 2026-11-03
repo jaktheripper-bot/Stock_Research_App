@@ -7,7 +7,8 @@
   <script>(function(){try{var v=localStorage.getItem('moatnomics_theme_v2');if(!v){localStorage.setItem('moatnomics_theme_v2','dark');localStorage.setItem('moatnomics_theme','dark');v='dark';}document.documentElement.dataset.theme=(v==='light')?'light':'dark';}catch(e){document.documentElement.dataset.theme='dark';}})();</script>
   <title>{% block title %}Moatnomics | Less noise, more nuance.{% endblock %}</title>
   <meta name="description" content="{% block meta_desc %}Moatnomics is independent research on Indian stocks, mutual funds and corporate bonds. See the evidence, the risks and what to check before you invest.{% endblock %}">
-  {% if canonical_for is defined and request is defined and request %}{% set _canon = canonical_for(request) %}{% if _canon %}
+  {% block robots_meta %}{% endblock %}
+  {% if not suppress_canonical and canonical_for is defined and request is defined and request %}{% set _canon = canonical_for(request) %}{% if _canon %}
   <link rel="canonical" href="{{ _canon }}">
   <meta property="og:url" content="{{ _canon }}">
   {% endif %}{% endif %}
@@ -33,9 +34,9 @@
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600;700&family=IBM+Plex+Sans:ital,wght@0,400;0,500;0,600;0,700;1,400&family=Playfair+Display:ital,wght@0,600;0,700;1,400&display=swap" rel="stylesheet">
-  <link rel="preload" href="/static/css/style.css?v=20261103_0905" as="style" onload="this.rel='stylesheet'">
-  <link rel="preload" href="/static/js/main.js?v=20261103_0905" as="script">
-  <link rel="stylesheet" href="/static/css/style.css?v=20261103_0905">
+  <link rel="preload" href="/static/css/style.css?v=20261103_0955" as="style" onload="this.rel='stylesheet'">
+  <link rel="preload" href="/static/js/main.js?v=20261103_0955" as="script">
+  <link rel="stylesheet" href="/static/css/style.css?v=20261103_0955">
 
   <!-- Schema.org Unified Entity Graph Structured Data (SEO & GEO) -->
   {% block schema_jsonld %}

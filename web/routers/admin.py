@@ -179,7 +179,7 @@ async def admin_dashboard(
     start_date: Optional[str] = None,
     end_date: Optional[str] = None,
     include_tests: int = 0,
-    audience_filter: Optional[str] = "all",
+    audience_filter: Optional[str] = "human",
     msg: Optional[str] = None,
     err: Optional[str] = None,
     error: Optional[str] = None,
@@ -209,6 +209,9 @@ async def admin_dashboard(
     current_email = admin_session.get("email")
     admin_profile = get_admin_user(current_email) or {"email": current_email, "role": admin_session.get("role", "admin")}
     exclude_tests = not bool(include_tests)
+    active_audience = (audience_filter or "human").strip().lower()
+    if active_audience not in ("human", "all", "crawler", "bot", "automated"):
+        active_audience = "human"
 
     today = datetime.now(IST).date()
     parsed_start = None
@@ -250,12 +253,12 @@ async def admin_dashboard(
             start_date=parsed_start,
             end_date=parsed_end,
             exclude_tests=exclude_tests,
-            audience_filter=audience_filter or "all",
+            audience_filter=active_audience,
         )
     except Exception as e:
         logger.error(f"Error fetching site usage summary: {e}")
         summary = {
-            "audience_filter": audience_filter or "all",
+            "audience_filter": active_audience,
             "unique_sessions": 0, "human_sessions": 0, "crawler_sessions": 0,
             "human_events": 0, "crawler_events": 0,
             "total_actions": 0, "cache_efficiency_pct": 0.0,
@@ -333,7 +336,14 @@ async def admin_dashboard(
         open_tickets_count = 0
 
     try:
-        session_journeys = get_session_journeys(days=selected_days, start_date=parsed_start, end_date=parsed_end, limit=25, exclude_tests=exclude_tests)
+        session_journeys = get_session_journeys(
+            days=selected_days,
+            start_date=parsed_start,
+            end_date=parsed_end,
+            limit=25,
+            exclude_tests=exclude_tests,
+            audience_filter=active_audience,
+        )
     except Exception as e:
         logger.warning("Error fetching session journeys in admin_dashboard: %s", e)
         session_journeys = []
@@ -355,6 +365,7 @@ async def admin_dashboard(
             end_date=parsed_end,
             exclude_tests=exclude_tests,
             limit=25,
+            audience_filter=active_audience,
         )
     except Exception as ret_err:
         logger.warning("Error fetching returning visitor insights: %s", ret_err)
@@ -464,6 +475,7 @@ async def admin_dashboard(
             "window": window,
             "exclude_tests": exclude_tests,
             "include_tests": include_tests,
+            "audience_filter": active_audience,
             "start_date_str": parsed_start.strftime("%Y-%m-%d") if parsed_start else "",
             "end_date_str": parsed_end.strftime("%Y-%m-%d") if parsed_end else "",
             "notification": msg,
@@ -494,6 +506,7 @@ def admin_api_returning_visitors(
     days: int = Query(30, ge=1, le=365),
     include_tests: int = Query(0),
     limit: int = Query(25, ge=1, le=100),
+    audience_filter: Optional[str] = Query("human"),
     x_admin_key: Optional[str] = Header(None),
 ):
     """Authenticated JSON endpoint returning Returning Visitor KPIs, Return Magnets, and Multi-Session Timelines."""
@@ -505,6 +518,7 @@ def admin_api_returning_visitors(
         days=days,
         exclude_tests=not bool(include_tests),
         limit=limit,
+        audience_filter=audience_filter or "human",
     )
     return JSONResponse(content=jsonable_encoder(data))
 
@@ -2438,7 +2452,7 @@ def api_admin_traffic_flow(
     start_date: Optional[str] = Query(None),
     end_date: Optional[str] = Query(None),
     include_tests: Optional[bool] = Query(False),
-    audience_filter: Optional[str] = Query("all")
+    audience_filter: Optional[str] = Query("human")
 ):
     """
     Returns granular page dwell times and the internal site visit navigation tree (transition matrix).
@@ -2458,16 +2472,20 @@ def api_admin_traffic_flow(
             logger.warning("Failed parsing date range for traffic flow (%s to %s): %s", start_date, end_date, e)
             parsed_start, parsed_end = None, None
 
+    active_audience = (audience_filter or "human").strip().lower()
+    if active_audience not in ("human", "all", "crawler", "bot", "automated"):
+        active_audience = "human"
+
     flow = get_traffic_flow_analytics(
         days=days if not (parsed_start and parsed_end) else None,
         start_date=parsed_start,
         end_date=parsed_end,
         exclude_tests=not include_tests,
-        audience_filter=audience_filter or "all"
+        audience_filter=active_audience
     )
     return JSONResponse(status_code=200, content={
         "success": True,
-        "audience_filter": (audience_filter or "all").strip().lower(),
+        "audience_filter": active_audience,
         "flow": flow
     })
 

@@ -243,22 +243,32 @@ Detailed forensic analysis with exact page grounding to bseindia.com filings.
         self.assertNotIn("₹N/A", html)
         self.assertNotIn("-2.84", html)                         # fabricated Beneish preview figure
         self.assertNotIn("₹1,840", html)                        # fabricated reverse-DCF preview figure
+        # Compiled dossier remains indexable with canonical link and without noindex headers
+        self.assertIn('<link rel="canonical"', html)
+        self.assertNotIn('name="robots" content="noindex', html)
+        self.assertNotIn("noindex", res.headers.get("X-Robots-Tag", "").lower())
 
     def test_dossier_pending_synthesize_buttons(self):
-        # 1. Unlisted ticker: disabled button with explanatory notice
+        # 1. Unlisted ticker: disabled button with explanatory notice + noindex directives
         res_unlisted = self.client.get("/dossier/UNLISTEDFAKE123")
         self.assertEqual(res_unlisted.status_code, 200)
         self.assertIn('id="synthesizeBtn"', res_unlisted.text)
         self.assertIn("Unlisted / Unrecognized Ticker (Cannot Generate)", res_unlisted.text)
         self.assertIn("could not be matched to a listed BSE or NSE security", res_unlisted.text)
         self.assertIn("disabled", res_unlisted.text)
+        self.assertEqual(res_unlisted.headers.get("X-Robots-Tag"), "noindex, nofollow")
+        self.assertIn('<meta name="robots" content="noindex, nofollow">', res_unlisted.text)
+        self.assertNotIn('<link rel="canonical"', res_unlisted.text)
 
-        # 2. Listed pending ticker: active synthesis button with 1 Credit prompt
+        # 2. Listed pending ticker: active synthesis button with 1 Credit prompt + noindex directives
         res_listed = self.client.get("/dossier/ABB")
         self.assertEqual(res_listed.status_code, 200)
         self.assertIn('id="synthesizeBtn"', res_listed.text)
         self.assertIn("Generate Stock Report (1 Credit)", res_listed.text)
         self.assertIn("onclick=\"synthesizeReport('ABB')\"", res_listed.text)
+        self.assertEqual(res_listed.headers.get("X-Robots-Tag"), "noindex, nofollow")
+        self.assertIn('<meta name="robots" content="noindex, nofollow">', res_listed.text)
+        self.assertNotIn('<link rel="canonical"', res_listed.text)
 
     def test_pillar_links_never_borrow_another_company_scrip(self):
         """Without a valid scrip code, pillar cards must show no exchange link at all."""
